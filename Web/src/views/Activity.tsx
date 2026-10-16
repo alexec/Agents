@@ -5,7 +5,7 @@
 import { useEffect } from "preact/hooks";
 import { useSignal } from "@preact/signals";
 import type { Store } from "../model/store";
-import type { AllowanceState, Consequence, ControlHost, CostState, Event, ProjectSummary, RuntimeAvailability, RuntimeStatus } from "../protocol/generated";
+import type { AllowanceReading, AllowanceState, Consequence, ControlHost, CostState, Event, ProjectSummary, RuntimeAvailability, RuntimeStatus } from "../protocol/generated";
 import { fromWireDate } from "../protocol/dates";
 import type { ActivityPage } from "../route";
 import { Resources } from "./Resources";
@@ -116,6 +116,18 @@ function allowanceReading(state: AllowanceState, now: Date): string | null {
     : left === 0 ? "None left" : `${left}% left`;
   if (!text) return null;
   return [text, reading.resetsAt && `resets ${runtimeTime(reading.resetsAt)}`, `as of ${runtimeTime(reading.at)}`].filter(Boolean).join(" · ");
+}
+
+/**
+ * How much of the plan window is used, as a bar under the reading's words (#1097): only when
+ * the reading has an amount, full when spent. Red when spent, orange when nearly spent. The
+ * words above say the same, so it is hidden from screen readers.
+ */
+function AllowanceBar({ reading }: { reading: AllowanceReading }) {
+  const used = reading.spent ? 1 : reading.used;
+  if (used == null) return null;
+  const tone = reading.spent || used >= 1 ? " spent" : reading.nearlySpent || used >= 0.8 ? " nearly-spent" : "";
+  return <div class={`allowance-bar${tone}`} aria-hidden="true"><span style={{ width: `${Math.round(used * 100)}%` }} /></div>;
 }
 
 const runtimeTime = (wire: number) => fromWireDate(wire as never).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
@@ -269,7 +281,10 @@ export function ActivityPageView({ store, page }: { store: Store; page: Activity
                   return <li key={status.runtime.id} class={isAllowanceOut || isOut(status) ? "out" : ""}>
                     <p><span class="strong">{status.runtime.name}</span>{" "}
                       <span class="quiet small">{allowance?.unusable ? `Not usable: ${allowance.unusable}` : allowance ? allowanceLine(allowance.state) : availabilityWords(status.availability)}{status.outdated ? " · an update is out" : ""}</span></p>
-                    {allowance && !allowance.unusable && allowanceReading(allowance.state, now) && <p class="quiet small">{allowanceReading(allowance.state, now)}</p>}
+                    {allowance && !allowance.unusable && allowanceReading(allowance.state, now) && <>
+                      <p class="quiet small">{allowanceReading(allowance.state, now)}</p>
+                      {allowance.state.reading && <AllowanceBar reading={allowance.state.reading} />}
+                    </>}
                     {status.poolNote && <p class="quiet small">{status.poolNote}</p>}
                     {isAllowanceOut && allowance && <button onClick={() => void store.markRuntimeAvailable(host.id, allowance.credentialKey)}>Mark available</button>}
                   </li>

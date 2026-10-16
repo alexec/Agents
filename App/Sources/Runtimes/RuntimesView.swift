@@ -82,6 +82,9 @@ private struct RuntimeStatusRow: View {
                     Text(reading)
                         .appText(.fine)
                         .foregroundStyle(.secondary)
+                    if let current = allowance?.state.reading {
+                        AllowanceBar(reading: current)
+                    }
                 }
             }
             Spacer()

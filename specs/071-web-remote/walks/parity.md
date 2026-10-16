@@ -316,7 +316,7 @@ The deltas are tracked by 30 issues:
 | Feature | Mac | Remote | Web | Verdict |
 |---|---|---|---|---|
 | Runtimes page: availability, pool note (#140) | `A/Runtimes/RuntimesView.swift:73-122` | `R/Projects/RuntimesView.swift:61-77` | `W/views/Activity.tsx` | **same** |
-| Allowance readings | Yes | Yes | `runtimes/allowances`; since, next check and reading | **same** |
+| Allowance readings | Yes | Yes | `runtimes/allowances`; since, next check and reading, and a bar of the share used (#1097) | **same** |
 | Mark available | Button: `A/Runtimes/RuntimesView.swift:88-93` | Swipe: `R/Projects/RuntimesView.swift:23-28` | Button: `runtimes/markAvailable` | **same** |
 | *working/total* in Activity, red dot only when none work (#379) | `RuntimeTally` over this Mac's runtimes: `A/Runtimes/RuntimesView.swift` (`RuntimesRow`) | `RuntimeTally` over the Mac's runtimes: `R/Sidebar/RemoteSidebar.swift` (`RuntimesRow`) | `runtimeTally` over every host's runtimes, as its page lists them: `W/model/runtimes.ts`, `W/views/Activity.tsx` | **same** |
 | Assess a runtime (#47) | Settings ▸ Agent Runtimes | *Assess in…* | None | **by design** (#47) |

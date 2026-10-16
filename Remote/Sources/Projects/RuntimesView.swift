@@ -70,6 +70,7 @@ private struct RuntimeAllowanceRow: View {
                 .foregroundStyle(row.state.isOut ? StateTint.failure.style(or: .primary) : AnyShapeStyle(.secondary))
             if row.unusable == nil, let reading = PoolWords.reading(row.state.reading, now: at) {
                 Text(reading).appText(.fine).foregroundStyle(.secondary)
+                if let current = row.state.reading { AllowanceBar(reading: current) }
             }
         }
         .accessibilityElement(children: .combine)
