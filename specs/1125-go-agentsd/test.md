@@ -75,6 +75,8 @@ In the window (its title has `run-go1125m`):
 
 ## Known not to work
 
+- **No supervisor on the box.** A Go host that crashes stays down; the window then says "devbox (Go) is offline". `agentsd-go/devbox.sh` starts it again. One crash (a switched-off workflow firing) was found and fixed on 2026-10-16.
+
 - **No lending from the Go Mac host.** It cannot lend its sign-in: `relay/grant` is not there. In A, the Swift Mac host lends.
 - **No question forms.** Elicitations (Claude's AskUserQuestion, Codex's request_user_input) are not offered to the runtime, so no question card shows. What a runtime does instead was not tried.
 - **The Files pane does not refresh by itself.** There is no `files/changed`.

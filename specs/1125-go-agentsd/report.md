@@ -2,7 +2,7 @@
 
 Throwaway code in `agentsd-go/`. Not for merge. The test note is [test.md](test.md).
 
-**In one line:** a Go `agentsd` joined today's control plane over today's wire with no change to any Swift. It ran real Claude and Codex turns on Linux and on this Mac, with cards, the app's tools, terminals, files, workflows, Landlock and hosted MCP. `coder/acp-go-sdk` and `modelcontextprotocol/go-sdk` needed no fork. The stages were all done in one night, and the screen was locked throughout, so what the window *shows* is proved only by its calls and by the notifications; the on-screen walk is still to do.
+**In one line:** a Go `agentsd` joined today's control plane over today's wire with no change to any Swift. It ran real Claude and Codex turns on Linux and on this Mac, with cards, the app's tools, terminals, files, workflows, Landlock and hosted MCP. `coder/acp-go-sdk` and `modelcontextprotocol/go-sdk` needed no fork. The stages were all done in one night. The screen was locked throughout, so the window was looked at in the morning, in a short unlocked spell (see "The walk").
 
 **Recommendation: go on.** Order:
 1. **Linux hosts first.** A 9 MB binary that builds in 13 s, against a 78 MB one that needs the swift.org toolchain and its Static Linux SDK. Landlock is new ground there.
@@ -10,6 +10,15 @@ Throwaway code in `agentsd-go/`. Not for merge. The test note is [test.md](test.
 3. **The Mac daemon last.** It works, but its surface is the widest, and the Mac-only parts are the fiddliest.
 
 Keep the Swift window and the Remote, and check their types against the schema in CI. The size of the job is the gap, not the risk: the Go host serves 54 of the 286 `DaemonAPI` methods (5.5k lines of Go, against 110k lines of Swift on the daemon side, client code included). See "What it would take" at the end.
+
+## The walk (2026-10-16 08:16–08:25, screenshots in `walk/`)
+
+- **`walk/linux-host-transcript.png`: stage 1's pass, seen.** The unchanged Mac window shows the Go Linux host's session "Kernel version and hi.txt" on "devbox (Go)". It shows the prompt, the steps ("Show kernel version info", "Edit file"), the card and its answer ("Asked: Write hi.txt", "You chose Yes"), and the final text, with Claude's controls under the prompt box.
+- **`walk/linux-host-project.png`:** the project "hello" on "devbox (Go)", opened in a window of its own, with all 7 sessions. They show the titles Claude gave (`session_info_update`), the unread dots, the report lines from the derived endings, and the stopped mark on "Sleep 90 command". "List folder files" still shows "```text": that run was before the fix that leaves code fences out of the report line.
+- **`walk/mac-host-sidebar.png`:** the window paired to the Go Mac host lists its project "work" with its 3 sessions. The window was coping with the 19 missing Mac-only methods (pins, events and the rest are empty). The screen locked again before a transcript could be opened there.
+- **Found by the walk: a crash.** The window said "devbox (Go) is offline". The Go Linux host had panicked overnight. A switched-off workflow's `cron:` line fired anyway, the refusal left no firing time, and the summary dereferenced it. Nothing restarts a detached host on the box (no systemd there). Fixed (`workflows.go`), with a test (`workflows_test.go`), and redeployed; the window showed the host back online at once.
+  - Two lessons: a Go host needs `recover` around its timers and handlers, and the box needs a supervisor. The Swift host is not immune either, but it would get systemd from the install script.
+- **Not looked at:** the Workflows page for a server project, the terminal pane, the Files pane, and the permission card while it waits. They are in the test note for Alex.
 
 ## Numbers
 
@@ -44,11 +53,11 @@ Keep the Swift window and the Remote, and check their types against the schema i
 
 | Stage | Status | Commit | What works |
 |---|---|---|---|
-| 1. Base | done (socket); window look waits for an unlocked screen | 3acff3f2 | Joins with a v2 host code over today's wire. A real Claude turn over `coder/acp-go-sdk`, with this Mac's sign-in lent through the control plane. |
-| 2. Everyday turn | done (socket); window look waits | 91657767 | Permission cards both ways; the app's tools (`list_sessions`, `read_session`, `start_session`) on `modelcontextprotocol/go-sdk`; terminals on `creack/pty`; files browse/list/read/write; Codex with the Mac's ChatGPT sign-in lent; stop. |
+| 1. Base | done, seen in the window | 3acff3f2 | Joins with a v2 host code over today's wire. A real Claude turn over `coder/acp-go-sdk`, with this Mac's sign-in lent through the control plane. |
+| 2. Everyday turn | done; the transcript and card answer seen in the window, terminal/files/Codex by socket | 91657767 | Permission cards both ways; the app's tools (`list_sessions`, `read_session`, `start_session`) on `modelcontextprotocol/go-sdk`; terminals on `creack/pty`; files browse/list/read/write; Codex with the Mac's ChatGPT sign-in lent; stop. |
 | 3. Schema-first wire | done | 614aa5ea | `schema/daemon.schema.json`, 118 definitions, with Go, Swift and TypeScript generated from it. Go and Swift round-trip all 316 records today's Swift encoder writes in the fixtures. Today's TypeScript types fit the schema's. The Go host's own records fit it too. |
 | 4. More of the daemon | done (socket); the window's Workflows page waits for a look | 8889e20d | Workflows: today's front matter and schedule, run by `robfig/cron`; one run by its schedule, one by hand. Every runtime under Landlock (`go-landlock`), proved on a real turn. A hosted stdio MCP server shared by two sessions (one pid, calls 1 and 2). |
-| 5. Go agentsd on this Mac | done (socket); the window look waits for an unlocked screen | dd67f41e | `agentsd-go/mac.sh up` makes a scratch control plane, the Go host as this Mac's own host `mac`, and a scratch window. A real Claude turn ran, signed in through the Keychain. `caffeinate` held while it ran; `sandbox-exec` confined writes. |
+| 5. Go agentsd on this Mac | done; its project and sessions seen in the window, the transcript by socket | dd67f41e | `agentsd-go/mac.sh up` makes a scratch control plane, the Go host as this Mac's own host `mac`, and a scratch window. A real Claude turn ran, signed in through the Keychain. `caffeinate` held while it ran; `sandbox-exec` confined writes. |
 
 ## Stage 5: the Go agentsd on this Mac
 

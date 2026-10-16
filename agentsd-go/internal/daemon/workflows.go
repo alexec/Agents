@@ -233,8 +233,11 @@ func (w *workflow) summary(total int, next *Date) map[string]any {
 	if next != nil {
 		s["nextFireAt"] = *next
 	}
+	// A refusal (switched off) has an outcome but no firing.
 	if w.lastOutcome != nil {
 		s["lastOutcome"] = w.lastOutcome
+	}
+	if w.lastFiredAt != nil {
 		s["lastFiredAt"] = *w.lastFiredAt
 		s["lastFiredBy"] = w.lastFiredBy
 	}
