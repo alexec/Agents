@@ -27,10 +27,16 @@ final class NotificationService: UNNotificationServiceExtension {
         let headline = pushed.envelope.flatMap { envelope in
             (try? DeviceKey.load(accessGroup: DeviceKey.sharedAccessGroup)).flatMap { try? Envelope.open(envelope, with: $0) }
         }
-        // A loud push never wakes the app, so the widget hears of it here (#1046).
-        if AttentionSnapshotStore.apply(AttentionPush(need: pushed.needID, headline: headline,
-                                                      withdrawn: pushed.withdrawn || pushed.envelope == nil)) {
+        // A loud push never wakes the app, so the widget hears of it here (#1046), with the
+        // Mac's whole count where the push carries it, which the badge shows too (#1163).
+        let written = AttentionSnapshotStore.apply(AttentionPush(need: pushed.needID, headline: headline,
+                                                                 withdrawn: pushed.withdrawn || pushed.envelope == nil,
+                                                                 count: pushed.count))
+        if written != nil {
             WidgetCenter.shared.reloadTimelines(ofKind: AttentionSnapshot.widgetKind)
+        }
+        if pushed.count != nil, let total = (written ?? AttentionSnapshotStore.read())?.total {
+            content.badge = NSNumber(value: total)
         }
         guard let headline else {
             contentHandler(content)

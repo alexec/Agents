@@ -69,10 +69,8 @@ private struct Small: View {
                 Text(entry.isEmpty ? "Nothing waiting" : "Needs you")
                     .appText(.fine)
                     .foregroundStyle(.secondary)
-                if let age = entry.age(), entry.isStale() {
-                    Spacer(minLength: 0)
-                    Updated(age: age)
-                }
+                Spacer(minLength: 0)
+                Updated(entry: entry)
                 Spacer(minLength: 0)
             }
         }
@@ -90,8 +88,9 @@ private struct Small: View {
 
     private var accessibilityLabel: String {
         if entry.isUnknown { return "Agents. Open the app to see what needs you" }
-        if entry.isEmpty { return "Nothing is waiting for you" }
-        return "\(entry.count) \(entry.count == 1 ? "session needs" : "sessions need") you"
+        let said = entry.isEmpty ? "Nothing is waiting for you"
+            : "\(entry.count) \(entry.count == 1 ? "session needs" : "sessions need") you"
+        return [said, Updated.spoken(entry)].compactMap { $0 }.joined(separator: ". ")
     }
 }
 
@@ -104,33 +103,45 @@ private struct Medium: View {
         if entry.isUnknown {
             Unknown()
         } else if entry.isEmpty {
-            NothingWaiting()
+            NothingWaiting(entry: entry)
         } else {
             rows
         }
     }
 
+    /// As many rows as fit under the heading, the rest counted (#1163): four did not fit
+    /// at the phone's sizes, and the heading, with the count and its time, was cut off.
     private var rows: some View {
+        let all = entry.rows(for: .medium)
+        return ViewThatFits(in: .vertical) {
+            ForEach(Array(stride(from: all.count, through: 1, by: -1)), id: \.self) { drawn in
+                fitted(Array(all.prefix(drawn)))
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+
+    private func fitted(_ sessions: [AttentionSnapshotSession]) -> some View {
         VStack(alignment: .leading, spacing: 7) {
-            Heading(count: entry.count, leftover: entry.leftover(for: .medium))
-            ForEach(entry.rows(for: .medium)) { session in
+            Heading(entry: entry, count: entry.count, leftover: max(0, entry.count - sessions.count), showsTime: true)
+            ForEach(sessions) { session in
                 Link(destination: session.link.url) {
                     SessionRow(session: session)
                 }
             }
-            if let age = entry.age(), entry.isStale() {
-                Updated(age: age)
-            }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxWidth: .infinity, alignment: .topLeading)
     }
 }
 
 /// The count in the one colour for a thing that needs a person, what it means, and how
-/// many are waiting that are not drawn. The same over medium and large.
+/// many are waiting that are not drawn. The same over medium and large. On medium, which
+/// has no room for a line of its own, it says when it was last true too (#1163).
 private struct Heading: View {
+    let entry: AttentionEntry
     let count: Int
     let leftover: Int
+    var showsTime = false
 
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 6) {
@@ -141,11 +152,16 @@ private struct Heading: View {
             Text(count == 1 ? "needs you" : "need you")
                 .appText(.supporting)
                 .foregroundStyle(.secondary)
+                .fixedSize()
             Spacer(minLength: 0)
             if leftover > 0 {
                 Text("+\(leftover) more")
                     .appText(.fine)
                     .foregroundStyle(.tertiary)
+                    .fixedSize()
+            }
+            if showsTime {
+                Updated(entry: entry, short: true)
             }
         }
     }
@@ -162,7 +178,7 @@ private struct Large: View {
         if entry.isUnknown {
             Unknown()
         } else if entry.isEmpty {
-            NothingWaiting()
+            NothingWaiting(entry: entry)
         } else {
             rows
         }
@@ -182,7 +198,7 @@ private struct Large: View {
 
     private func fitted(_ sessions: [AttentionSnapshotSession]) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            Heading(count: entry.count, leftover: max(0, entry.count - sessions.count))
+            Heading(entry: entry, count: entry.count, leftover: max(0, entry.count - sessions.count))
             if size == .extraLarge {
                 let half = (sessions.count + 1) / 2
                 HStack(alignment: .top, spacing: 20) {
@@ -192,9 +208,7 @@ private struct Large: View {
             } else {
                 column(sessions)
             }
-            if let age = entry.age(), entry.isStale() {
-                Updated(age: age)
-            }
+            Updated(entry: entry)
         }
         .frame(maxWidth: .infinity, alignment: .topLeading)
     }
@@ -324,6 +338,8 @@ private struct SessionRow: View {
 /// Nothing waiting. Said in words rather than shown as a zero with no rows under it, which
 /// looks like a mistake (FR-008).
 private struct NothingWaiting: View {
+    let entry: AttentionEntry
+
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
             Spacer(minLength: 0)
@@ -334,6 +350,7 @@ private struct NothingWaiting: View {
                 .appText(.fine)
                 .foregroundStyle(.secondary)
             Spacer(minLength: 0)
+            Updated(entry: entry)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .widgetURL(AttentionLink.attention.url)
@@ -359,17 +376,42 @@ private struct Unknown: View {
     }
 }
 
-/// How long ago the number last moved, once it is old enough to matter (FR-017).
+/// When the number was last true, always (#1163): the time of day while it is fresh, and
+/// how long ago once it is stale (FR-017), so an old number never passes for a new one.
 ///
-/// The app only writes the file when the count or the rows change, so this is when
-/// something actually happened, not when the app last happened to look.
+/// The time is when the Mac counted it or the app was last live with the Mac, not when
+/// the file happened to be written.
 private struct Updated: View {
-    let age: Date
+    let entry: AttentionEntry
+    /// The time alone, beside the medium size's count: "11:28", "40 min ago".
+    var short = false
 
     var body: some View {
-        Text("Updated \(age, style: .relative) ago")
+        if let updated = entry.snapshot?.updated(at: entry.date) {
+            Group {
+                switch updated {
+                case .at(let when):
+                    Text("\(short ? "" : "Updated ")\(when, format: .dateTime.hour().minute())")
+                case .ago(let when):
+                    // "40 minutes ago", counting on by itself on the Home screen.
+                    Text("\(short ? "" : "Updated ")\(Text(.currentDate, format: .reference(to: when, allowedFields: [.day, .hour, .minute], maxFieldCount: 1)))")
+                }
+            }
             .appText(.fine)
+            .monospacedDigit()
             .foregroundStyle(.tertiary)
-            .accessibilityLabel("Last updated \(age.formatted(.relative(presentation: .named))) ago")
+            .lineLimit(1)
+            .minimumScaleFactor(0.8)
+            .accessibilityLabel(Self.spoken(entry) ?? "")
+        }
+    }
+
+    /// The same, as VoiceOver says it.
+    static func spoken(_ entry: AttentionEntry) -> String? {
+        guard let updated = entry.snapshot?.updated(at: entry.date) else { return nil }
+        switch updated {
+        case .at(let when), .ago(let when):
+            return "Last updated \(when.formatted(.relative(presentation: .named)))"
+        }
     }
 }

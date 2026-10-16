@@ -32,10 +32,18 @@ public struct CloudKitMailbox: Mailbox {
         public static let alert = "alert"
         public static let withdrawn = "withdrawn"
         public static let postedAt = "postedAt"
-        /// What a push may carry: everything a device needs to show or remove a banner
-        /// without a round trip.
-        public static let pushed = [needToken, need, envelope, alert, withdrawn]
+        /// The Needs you count across the hosts (#1163), and when it was counted, in
+        /// seconds since 1970: a number survives a push's fields where a date may not.
+        public static let waiting = "waiting"
+        public static let countedAt = "countedAt"
+        /// What a push may carry: everything a device needs to show or remove a banner,
+        /// and to set its count, without a round trip.
+        public static let pushed = [needToken, need, envelope, alert, withdrawn, waiting, countedAt]
     }
+
+    /// The `needToken` of a device's count record (#1163): one per device, replaced as the
+    /// count moves, and pushed quietly.
+    public static let countToken = "count"
 
     private let database: CKDatabase
     private let zone = CKRecordZone.ID(zoneName: zoneName, ownerName: CKCurrentUserDefaultName)
@@ -63,7 +71,28 @@ public struct CloudKitMailbox: Mailbox {
         record[Field.alert] = item.alert ? 1 : 0
         record[Field.withdrawn] = item.envelope == nil ? 1 : 0
         record[Field.postedAt] = item.postedAt
+        if let waiting = item.waiting {
+            record[Field.waiting] = waiting
+            record[Field.countedAt] = item.postedAt.timeIntervalSince1970
+        }
         // All keys, so the record is replaced whole whatever it held.
+        _ = try await database.modifyRecords(saving: [record], deleting: [], savePolicy: .allKeys)
+    }
+
+    /// The device's count (#1163): one record under `countToken`, with no alert, so the
+    /// quiet subscription pushes it content-available and the app wakes to write it.
+    public func post(_ count: MailboxCount) async throws {
+        let id = Self.recordID(device: count.device, token: Self.countToken, zone: zone)
+        let record = CKRecord(recordType: Self.recordType, recordID: id)
+        record[Field.device] = count.device.uuidString
+        record[Field.needToken] = Self.countToken
+        record[Field.need] = ""
+        record[Field.envelope] = ""
+        record[Field.alert] = 0
+        record[Field.withdrawn] = 0
+        record[Field.postedAt] = count.countedAt
+        record[Field.waiting] = count.waiting
+        record[Field.countedAt] = count.countedAt.timeIntervalSince1970
         _ = try await database.modifyRecords(saving: [record], deleting: [], savePolicy: .allKeys)
     }
 
@@ -109,12 +138,14 @@ public struct CloudKitMailbox: Mailbox {
         public var envelope: Envelope?
         public var alert: Bool
         public var withdrawn: Bool
+        /// The whole count as the push left (#1163), nil from an older relay.
+        public var count: AttentionCount?
     }
 
     public static func pushed(from userInfo: [AnyHashable: Any]) -> Pushed? {
         guard let notification = CKNotification(fromRemoteNotificationDictionary: userInfo) as? CKQueryNotification,
               let fields = notification.recordFields,
-              let token = fields[Field.needToken] as? String,
+              let token = fields[Field.needToken] as? String, token != countToken,
               let needText = fields[Field.need] as? String,
               let needID = try? JSONDecoder().decode(NeedID.self, from: Data(needText.utf8))
         else { return nil }
@@ -122,7 +153,22 @@ public struct CloudKitMailbox: Mailbox {
             .flatMap { $0.isEmpty ? nil : try? JSONDecoder().decode(Envelope.self, from: Data($0.utf8)) }
         return Pushed(needID: needID, token: token, envelope: envelope,
                       alert: (fields[Field.alert] as? Int) == 1,
-                      withdrawn: (fields[Field.withdrawn] as? Int) == 1)
+                      withdrawn: (fields[Field.withdrawn] as? Int) == 1,
+                      count: count(in: fields))
+    }
+
+    /// A count push (#1163): the device's count record, and nothing about any need.
+    public static func pushedCount(from userInfo: [AnyHashable: Any]) -> AttentionCount? {
+        guard let notification = CKNotification(fromRemoteNotificationDictionary: userInfo) as? CKQueryNotification,
+              let fields = notification.recordFields,
+              fields[Field.needToken] as? String == countToken else { return nil }
+        return count(in: fields)
+    }
+
+    private static func count(in fields: [String: Any]) -> AttentionCount? {
+        guard let waiting = (fields[Field.waiting] as? NSNumber)?.intValue,
+              let seconds = (fields[Field.countedAt] as? NSNumber)?.doubleValue else { return nil }
+        return AttentionCount(waiting: waiting, countedAt: Date(timeIntervalSince1970: seconds))
     }
 }
 #endif

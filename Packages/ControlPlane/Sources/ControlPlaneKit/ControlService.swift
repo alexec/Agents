@@ -130,6 +130,8 @@ public final class ControlService: @unchecked Sendable {
     public let unproven = UnprovenGate()
     /// What this copy has told its relay host for each need (T097).
     let desk = NoticeDesk()
+    /// Each host's Needs you count, and what each device was told of it (#1163).
+    let counts = CountDesk()
     /// Where this copy is in a handover (R16): serving, receiving, frozen or forwarding.
     let phase: PhaseBox
     /// When a forwarding copy stops telling members where to go.
@@ -320,7 +322,7 @@ public final class ControlService: @unchecked Sendable {
         hooks.unjoinedTunnels = { await tunnels?.unjoined() }
         // Notices (T097): a need goes to the relay host, wherever it is held.
         hooks.need = { [weak self] host, params in
-            await self?.heard(params)
+            await self?.heard(host, params)
             if let need = try? params?.decode(DaemonAPI.AttentionNeed.self) { self?.channels?.desk.post(host, need) }
         }
         hooks.relayChanged = { [weak self] _ in await self?.syncRelays() }
@@ -1014,14 +1016,44 @@ public final class ControlService: @unchecked Sendable {
         }
         guard let params = try? JSONValue.encoding(DaemonAPI.RelayDevices(devices: devices)) else { return }
         for relay in relays { await router.tell(relay, DaemonAPI.Method.relayDevices, params) }
+        // A relay host new here, or a device new to it, has been told no count (#1163).
+        await counts.forgetTold()
+        await countsMoved()
     }
 
     /// A host's `attention/need` (R6): to the relay host if it is held here, otherwise
     /// to the other copies, one of which may hold it. With no relay host anywhere, a need
     /// reaches only the clients connected to its host, over their own channels.
-    func heard(_ params: JSONValue?) async {
+    func heard(_ host: HostID, _ params: JSONValue?) async {
         guard let need = try? params?.decode(DaemonAPI.AttentionNeed.self) else { return }
+        // The host's count (#1163), which moves the devices' whether or not a need goes.
+        if let waiting = need.waiting, await counts.heard(host, waiting: waiting) { await countsMoved() }
+        guard need.need != nil || need.withdraw != nil else { return }
         await deliver(need, fromPeer: false)
+    }
+
+    /// The count moved: every device hears it after a moment, once for a burst (#1163).
+    func countsMoved() async {
+        guard await counts.startFlush() else { return }
+        Task { [weak self] in
+            try? await Task.sleep(for: .seconds(2))
+            await self?.sendCounts()
+        }
+    }
+
+    /// Each device's count, to the relay host if it is held here, as a silent push. With
+    /// no relay host here nobody is told, and the next move tries again.
+    func sendCounts() async {
+        let relay = await router.relayHeldHere()
+        let devices = relay == nil ? [] : await methods.allClients
+            .filter { $0.kind.isDevice && !$0.publicKey.isEmpty }.map(\.id)
+        let owed = await counts.owed(to: devices)
+        guard let relay else { return }
+        for count in owed {
+            guard let params = try? JSONValue.encoding(count) else { continue }
+            await router.tell(relay, DaemonAPI.Method.relayCount, params)
+            log("notice: count \(count.waiting) for \(count.device) to relay \(relay)")
+        }
     }
 
     func deliver(_ need: DaemonAPI.AttentionNeed, fromPeer: Bool) async {
@@ -1042,7 +1074,13 @@ public final class ControlService: @unchecked Sendable {
                           mayNotify: flags[record.id] ?? record.mayNotify)
         }
         let deliveries = await desk.heard(need, presences: await router.foldedPresences(), devices: devices)
-        for delivery in deliveries {
+        let waiting = await counts.total
+        for var delivery in deliveries {
+            // The whole count rides on the need's own push (#1163).
+            if let waiting {
+                delivery.waiting = waiting
+                await counts.told(delivery.device, waiting)
+            }
             guard let params = try? JSONValue.encoding(delivery) else { continue }
             await router.tell(relay, DaemonAPI.Method.relayDeliver, params)
             log("notice: \(delivery.headline == nil ? "withdrew" : "sent") \(delivery.needID) for \(delivery.device) to relay \(relay)")

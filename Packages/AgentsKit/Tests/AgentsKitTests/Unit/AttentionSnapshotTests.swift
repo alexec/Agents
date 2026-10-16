@@ -53,6 +53,13 @@ struct AttentionSnapshotTests {
     }
 
     /// #70: an unread finish left Needs you, and is still news: counted and drawn, once.
+    @Test func theHostsCountIsTheBadgesCount() {
+        // The daemon counts by `Agent.wantsALook` (#1163); the phone, by its shelves.
+        let agents = [agent(state: .waitingOnUser), agent(state: .running), agent(state: .finished),
+                      agent(state: .finished, isUnread: false), agent(state: .stopped), agent(state: .queued)]
+        #expect(agents.count(where: \.wantsALook) == AttentionSnapshot.make(model: model(agents)).total)
+    }
+
     @Test func anUnreadFinishIsCountedThoughItIsDone() {
         let unread = agent(state: .finished, report: WorkReport(outcome: .done, message: "Done", at: Date()))
         let asked = agent(state: .finished, report: WorkReport(outcome: .needsAnswer, message: "Which?", at: Date()))
@@ -243,14 +250,14 @@ struct AttentionSnapshotTests {
         let need = NeedID.permission(UUID())
         let push = AttentionPush(need: need, headline: Headline(h1: "web", h2: "Tidy CSS", h3: "may it edit files"),
                                  withdrawn: false)
-        #expect(AttentionSnapshotStore.apply(push, into: directory.url))
+        #expect(AttentionSnapshotStore.apply(push, into: directory.url) != nil)
         let after = try #require(AttentionSnapshotStore.read(from: directory.url))
         #expect(after.total == before.total + 1)
         #expect(after.sessions.first?.title == "Tidy CSS")
         #expect(after.sessions.first?.kind == .permission)
         #expect(after.sessions.first?.link == .need(need.token), "a question's push does not name its session")
         #expect(!after.isStale(), "written now, not when the app last caught up")
-        #expect(AttentionSnapshotStore.apply(push, into: directory.url) == false, "the same push twice is one need")
+        #expect(AttentionSnapshotStore.apply(push, into: directory.url) == nil, "the same push twice is one need")
     }
 
     @Test func aWithdrawnNeedTakesItsRowAway() throws {
@@ -281,8 +288,90 @@ struct AttentionSnapshotTests {
         let directory = try TemporaryDirectory()
         defer { directory.remove() }
         let push = AttentionPush(need: .permission(UUID()), headline: nil, withdrawn: false)
-        #expect(AttentionSnapshotStore.apply(push, into: directory.url) == false)
+        #expect(AttentionSnapshotStore.apply(push, into: directory.url) == nil)
         #expect(AttentionSnapshotStore.read(from: directory.url) == nil)
+    }
+
+    // MARK: The Mac's count (#1163)
+
+    @Test func aPushThatCarriesTheMacsCountWritesItAsTheTruth() throws {
+        let one = UUID(), two = UUID(), three = UUID()
+        let before = AttentionSnapshot.make(model: model([agent(one), agent(two), agent(three)]),
+                                            at: Date(timeIntervalSinceNow: -3600))
+        #expect(before.total == 3)
+        let counted = Date(timeIntervalSinceNow: -5)
+        // Withdrawn, and no row names it: without the count this changed nothing.
+        let push = AttentionPush(need: .elicitation(UUID()), headline: nil, withdrawn: true,
+                                 count: AttentionCount(waiting: 1, countedAt: counted))
+        let after = try #require(before.applying(push))
+        #expect(after.total == 1)
+        #expect(after.sessions.count == 1, "never more rows than are waiting")
+        #expect(after.writtenAt == counted, "as old as the Mac's count, not the push's arrival")
+    }
+
+    @Test func aNewNeedWithTheCountIsDrawnAndCountedOnce() throws {
+        let agentID = UUID()
+        let before = AttentionSnapshot.make(model: model([agent(agentID)]), at: Date(timeIntervalSinceNow: -3600))
+        let push = AttentionPush(need: .permission(UUID()), headline: Headline(h1: "web", h2: "Tidy CSS", h3: "edit?"),
+                                 withdrawn: false, count: AttentionCount(waiting: 2, countedAt: Date()))
+        let after = try #require(before.applying(push))
+        #expect(after.total == 2)
+        #expect(after.sessions.first?.title == "Tidy CSS")
+    }
+
+    @Test func aCountOlderThanTheFileIsNeverShown() throws {
+        let now = Date()
+        let file = AttentionSnapshot(writtenAt: now, total: 2, sessions: [])
+        #expect(file.applying(AttentionCount(waiting: 5, countedAt: now.addingTimeInterval(-60))) == nil)
+        let push = AttentionPush(need: .permission(UUID()), headline: nil, withdrawn: false,
+                                 count: AttentionCount(waiting: 5, countedAt: now.addingTimeInterval(-60)))
+        #expect(file.applying(push) == nil)
+        #expect(file.applying(AttentionCount(waiting: 0, countedAt: now.addingTimeInterval(1)))?.total == 0)
+    }
+
+    @Test func aSnapshotOlderThanTheFileIsNeverWritten() throws {
+        let directory = try TemporaryDirectory()
+        defer { directory.remove() }
+        let now = Date()
+        // A push counted at the Mac a minute after the app last heard from it.
+        #expect(AttentionSnapshotStore.write(AttentionSnapshot(writtenAt: now, total: 0, sessions: []), into: directory.url))
+        let old = AttentionSnapshot.make(model: model([agent(UUID())]), at: now.addingTimeInterval(-60))
+        #expect(!AttentionSnapshotStore.write(old, into: directory.url))
+        #expect(AttentionSnapshotStore.read(from: directory.url)?.total == 0)
+    }
+
+    @Test func aCountWithNoFileIsTheNumberAndNoRows() throws {
+        let directory = try TemporaryDirectory()
+        defer { directory.remove() }
+        let counted = Date()
+        let written = try #require(AttentionSnapshotStore.apply(AttentionCount(waiting: 3, countedAt: counted),
+                                                                into: directory.url))
+        #expect(written.total == 3)
+        #expect(written.sessions.isEmpty)
+        #expect(AttentionSnapshotStore.read(from: directory.url) == written)
+        #expect(AttentionSnapshotStore.apply(AttentionCount(waiting: 3, countedAt: counted), into: directory.url) == nil,
+                "the same count again changes nothing")
+    }
+
+    @Test func aCountOfZeroDrawsNoRows() throws {
+        let before = AttentionSnapshot.make(model: model([agent(UUID()), agent(UUID())]), at: Date(timeIntervalSinceNow: -60))
+        let after = try #require(before.applying(AttentionCount(waiting: 0, countedAt: Date())))
+        #expect(after.total == 0)
+        #expect(after.sessions.isEmpty)
+    }
+
+    @Test(arguments: [0.0, 60, 14 * 60, 15 * 60 + 1, 3 * 3600, 3 * 86_400, -30] as [TimeInterval])
+    func theUpdatedLineIsSaidAtEveryAge(age: TimeInterval) {
+        let now = Date()
+        let snapshot = AttentionSnapshot(writtenAt: now.addingTimeInterval(-age), total: 1, sessions: [])
+        switch snapshot.updated(at: now) {
+        case .at(let when):
+            #expect(age <= AttentionSnapshot.staleness, "the time of day only while fresh")
+            #expect(when <= now)
+        case .ago(let when):
+            #expect(age > AttentionSnapshot.staleness, "how long ago once stale")
+            #expect(when <= now)
+        }
     }
 
     // MARK: The link

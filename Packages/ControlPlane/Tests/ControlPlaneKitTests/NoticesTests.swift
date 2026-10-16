@@ -182,6 +182,42 @@ struct NoticesTests {
         #expect(await relay.mailbox.waiting(for: device).first?.envelope == nil)
     }
 
+    /// The host's count reaches every device, alone when no need goes (#1163), and on the
+    /// need's own push when one does.
+    @Test func theCountReachesTheDeviceWithAndWithoutANeed() async throws {
+        let running = try await base.start()
+        defer { Task { await running.service.stop() } }
+        let (device, deviceKey, membership) = try await device(running)
+        let (host, uplink) = try await base.host(at: running.url, code: try await running.service.codes.issue(.host).text)
+        defer { uplink.stop() }
+        await eventually { await running.service.router.state(of: host)?.isOnline == true }
+        let phone = ControlLink(dial: try ControlCodeUse.clientDial(membership, privateKey: deviceKey, kind: "iphone",
+                                                                    dial: ControlJoin.nio))
+        defer { phone.disconnect() }
+        let there = DaemonClient(link: phone.link(for: host))
+        try await there.connect(startIfNeeded: false)
+        _ = try await there.call(DaemonAPI.Method.presenceReport,
+                                 try JSONValue.encoding(DaemonAPI.PresenceReport(watching: nil, active: false, mayNotify: true)))
+        let relay = try await relay(running)
+        defer { relay.relay.stop() }
+
+        // Met at the Mac: no need to offer, and the count moves all the same.
+        uplink.tell(DaemonAPI.Method.attentionNeed, try JSONValue.encoding(DaemonAPI.AttentionNeed.count(2)))
+        await eventually { await relay.mailbox.counts.last?.waiting == 2 }
+        #expect(await relay.mailbox.counts.last?.device == device)
+        #expect(await relay.mailbox.posted.isEmpty, "a count is not a need")
+
+        let asked = need()
+        uplink.tell(DaemonAPI.Method.attentionNeed,
+                    try JSONValue.encoding(DaemonAPI.AttentionNeed.offer(asked, buzz: true, waiting: 3)))
+        await eventually { await relay.mailbox.waiting(for: device).first?.waiting == 3 }
+        try await Task.sleep(for: .milliseconds(2500))
+        #expect(await relay.mailbox.counts.map(\.waiting) == [2], "told on the need's push, not twice")
+
+        uplink.tell(DaemonAPI.Method.attentionNeed, try JSONValue.encoding(DaemonAPI.AttentionNeed.count(0)))
+        await eventually { await relay.mailbox.counts.last?.waiting == 0 }
+    }
+
     @Test func aDeviceReachesTheControlPlaneThroughTheRelay() async throws {
         let running = try await base.start()
         defer { Task { await running.service.stop() } }

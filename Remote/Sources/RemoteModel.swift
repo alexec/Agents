@@ -24,7 +24,15 @@ final class RemoteModel {
     @ObservationIgnored private var attentionRefreshTask: Task<Void, Never>?
 
     /// Whether the Mac is answering, and when it last did.
-    private(set) var isConnected = false
+    private(set) var isConnected = false {
+        didSet { if oldValue, !isConnected { liveUntil = Date() } }
+    }
+    /// When what the phone holds was last live with the Mac (#1163): the moment touch was
+    /// lost. Nil before the first connection since launch, when the phone holds nothing.
+    private(set) var liveUntil: Date?
+    /// When the Needs you count was last true, for the "Updated" line beside it: nil while
+    /// live, when it is true now (#1163).
+    var needsYouUpdatedAt: Date? { isConnected ? nil : liveUntil }
     /// Which way the Mac is being reached (046): on its own network, or through iCloud.
     /// Set from the route each connection took (#883); a link that cannot be relayed,
     /// such as the fake, is always direct.
@@ -2612,6 +2620,12 @@ final class RemoteModel {
     /// system shows them. Everything this does is to local notifications, and it
     /// decides nothing about where the need belongs.
     func receivedPush(_ userInfo: [AnyHashable: Any]) async {
+        // The Mac's count moved (#1163): a need met there, a finish read. Nothing to show.
+        if let count = CloudKitMailbox.pushedCount(from: userInfo) {
+            note("push: count")
+            await showOnTheWidget(count)
+            return
+        }
         // What kind of push, never its payload: that is the person's work (#175).
         note("push: \(CloudKitRelayChannel.isRelayPush(userInfo) ? "relay wake-up" : "mailbox")")
         // The relay's wake-up: a relayed session polls, so there is nothing to poke.
@@ -2620,7 +2634,8 @@ final class RemoteModel {
         let headline = pushed.envelope.flatMap { envelope in key.flatMap { try? Envelope.open(envelope, with: $0) } }
         // A need has moved here or away, which is the one thing the widget counts (#1046).
         await showOnTheWidget(AttentionPush(need: pushed.needID, headline: headline,
-                                            withdrawn: pushed.withdrawn || pushed.envelope == nil))
+                                            withdrawn: pushed.withdrawn || pushed.envelope == nil,
+                                            count: pushed.count))
         if pushed.withdrawn || pushed.envelope == nil {
             notifier.withdraw(pushed.token)
             return
@@ -2631,16 +2646,32 @@ final class RemoteModel {
 
     /// A push, on the widget (#1046). Connected, the Mac is asked what waits and the whole
     /// is written. Woken in the background with no link, the push is laid over the file,
-    /// since the model is as old as the last time the app ran.
+    /// since the model is as old as the last time the app ran; the count it carries is the
+    /// Mac's, and the badge shows it too (#1163).
     private func showOnTheWidget(_ push: AttentionPush) async {
         if isConnected {
             // Whole, not only what waits: a guarded change's Needs You row rides on its
             // project's summary, and the agent's state on its record (#1045).
             await catchUp()
-        } else if AttentionSnapshotStore.apply(push) {
-            lastPublished = nil
-            WidgetCenter.shared.reloadTimelines(ofKind: AttentionSnapshot.widgetKind)
+        } else if let written = AttentionSnapshotStore.apply(push) {
+            shownFromAPush(written)
         }
+    }
+
+    /// The Mac's count on its own (#1163). Connected, the model already says it.
+    private func showOnTheWidget(_ count: AttentionCount) async {
+        if isConnected {
+            publishAttention()
+        } else if let written = AttentionSnapshotStore.apply(count) {
+            shownFromAPush(written)
+        }
+    }
+
+    /// A push wrote the file: the widget and the badge show what it wrote.
+    private func shownFromAPush(_ written: AttentionSnapshot) {
+        lastPublished = nil
+        notifier.setBadgeCount(written.total)
+        WidgetCenter.shared.reloadTimelines(ofKind: AttentionSnapshot.widgetKind)
     }
 
     /// The background refresh's name, as `BGTaskSchedulerPermittedIdentifiers` lists it.
@@ -2750,12 +2781,27 @@ final class RemoteModel {
     ///
     /// A push is also what tells the app something moved, so this runs on those too
     /// rather than waiting for the person to open the app.
+    ///
+    /// Dated when the model was last live (#1163), not when it is written: with no link
+    /// it is what the phone last heard, and a push the notification extension laid over
+    /// the file since is newer, so it stays, and the badge shows it.
     func publishAttention() {
-        let snapshot = AttentionSnapshot.make(model: work, at: Date())
-        notifier.setBadgeCount(snapshot.total)
-        guard AttentionSnapshotStore.write(snapshot, over: lastPublished) else { return }
-        lastPublished = snapshot
-        WidgetCenter.shared.reloadTimelines(ofKind: AttentionSnapshot.widgetKind)
+        guard let knownAt = isConnected ? Date() : liveUntil else {
+            // Nothing heard since launch: whatever is on file is all there is.
+            if let total = AttentionSnapshotStore.read()?.total { notifier.setBadgeCount(total) }
+            return
+        }
+        let snapshot = AttentionSnapshot.make(model: work, at: knownAt)
+        // Live, the model is the newest there is. Not, the file may be newer than what
+        // was last written here: the extension writes it too.
+        if AttentionSnapshotStore.write(snapshot, over: isConnected ? lastPublished : nil) {
+            lastPublished = snapshot
+            notifier.setBadgeCount(snapshot.total)
+            WidgetCenter.shared.reloadTimelines(ofKind: AttentionSnapshot.widgetKind)
+        } else {
+            let total = isConnected ? snapshot.total : (AttentionSnapshotStore.read()?.total ?? snapshot.total)
+            notifier.setBadgeCount(total)
+        }
     }
 
     /// What was last written for the widget, so the file is not read back each time.

@@ -23,6 +23,7 @@ import { macHostNoticeDetail, macHostNoticeTitle } from "../model/macHostNotice"
 import { parseQuery, queryMatches, type LabelQuery } from "../model/labels";
 import { keepsInUnread, newSessionProject, ownCount, pinnedSessions, pinnedWorkflows, projectSessions, rememberedProject, rememberProject,
   smartAgents, smartApprovals, smartRows, smartTitles, withKept, type ProjectKey, type SmartRow } from "../model/sidebar";
+import { updatedLine } from "../model/updated";
 import { namedRelative, workflowSummary } from "../model/workflows";
 import { fromWireDate } from "../protocol/dates";
 import type { Agent, ControlHost, ProjectSummary, WorkflowSummary } from "../protocol/generated";
@@ -171,7 +172,8 @@ export function Sidebar({ session, store, linkDown }: { session: Session; store:
         {/* Pinned, Needs You, Working, Unread: a group each across every project and host (#495, #773),
             each that is on in this browser's Settings (#846). */}
         {projects.length > 0 && smartRows.filter((row) => smartGroupsOn.value.has(row) && (!held || aloneRows.has(row))).map((row) => (
-          <SmartFold key={row} row={row} store={store} projects={projects} query={query} linkDown={linkDown} />
+          <SmartFold key={row} row={row} store={store} projects={projects} query={query} linkDown={linkDown}
+            downSince={session.state.value.kind === "down" ? session.state.value.since : undefined} />
         ))}
         {/* One group per project (#495), its name the group's heading, its sessions the rows. */}
         <section class="project-list" aria-label="Projects">
@@ -347,8 +349,10 @@ type SmartLine = Placed & ({ kind: "session"; agent: Agent } | { kind: "workflow
  * searching only with a match (#507); Unread still is while it keeps the open session. Folded, it
  * lists nothing but counts.
  */
-function SmartFold({ row, store, projects, query, linkDown }: {
+function SmartFold({ row, store, projects, query, linkDown, downSince }: {
   row: SmartRow; store: Store; projects: Placed[]; query: string; linkDown: boolean;
+  /** When the link was lost: Needs You says its count was last true then (#1163). */
+  downSince?: number | undefined;
 }) {
   const r = route.value;
   const parsed = query ? parseQuery(query) : undefined;
@@ -412,14 +416,17 @@ function SmartFold({ row, store, projects, query, linkDown }: {
   if (row === "needsYou") count += query ? smartApprovals(waiting).length : approvals.length;
   if (parsed ? lines.length === 0 && approvals.length === 0 : count === 0 && !keptPlace) return null;
   const title = smartTitles[row];
+  const updated = row === "needsYou" && downSince !== undefined ? updatedLine(downSince) : null;
   return (
     <details class={`smart ${row}`} role="group" aria-label={title} open={open}
       onToggle={(e) => {
         const now = (e.currentTarget as HTMLDetailsElement).open;
         if (now !== open) folds.setSmart(row, now);
       }}>
-      <summary class="sidebar-head-label" data-fold={`smart.${row}`} aria-label={count > 0 ? `${title}, ${count}` : `${title}, none`}>
+      <summary class="sidebar-head-label" data-fold={`smart.${row}`}
+        aria-label={[title, count > 0 ? `${count}` : "none", updated].filter(Boolean).join(", ")}>
         {title}
+        {updated && <span class="updated">{updated}</span>}
         {count > 0 && <span class={`count${row === "needsYou" ? " needs" : ""}`}>{count}</span>}
       </summary>
       {open && lines.map((line) => {

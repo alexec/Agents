@@ -47,6 +47,7 @@ extension DaemonCore {
     /// Says `host/status` when it has changed: on the 15-second tick, and when the uplink
     /// comes back. The next scheduled workflow changes it when one fires or is changed. A turn starting is heard within the tick, well inside any idle time.
     func reviseHostStatus() {
+        reviseWaiting()
         guard let tellStatus else { return }
         let now = hostStatus()
         guard now != toldStatus, let params = try? JSONValue.encoding(now) else { return }
