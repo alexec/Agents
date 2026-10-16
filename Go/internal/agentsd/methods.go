@@ -21,6 +21,8 @@ func (d *Daemon) register() {
 		wire.CallAgentsDiscardDraft.Name)
 	d.registerFiles()
 	d.registerAgents()
+	d.registerPins()
+	d.registerSettings()
 	d.registerShells()
 	On(d, wire.CallPermissionsPending, func(ctx context.Context, c *Client, _ wire.Empty) ([]wire.PermissionRequest, error) {
 		return d.pendingPermissions(), nil
@@ -241,6 +243,10 @@ func (d *Daemon) archive(id wire.UUID) error {
 		a.State, a.ArchivedAt, a.ArchivedReason = wire.AgentStateArchived, &t, &byUser
 	})
 	d.record(id, stateChanged(wire.AgentStateArchived, nil))
+	// An archived session is not kept pinned (unpinArchived).
+	if a := d.Store.Agent(id); a != nil {
+		d.unpinSession(projectFolder(a), id)
+	}
 	return nil
 }
 

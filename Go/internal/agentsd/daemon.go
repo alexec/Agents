@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"log"
+	"path/filepath"
 	"sync"
 
 	"github.com/alexec/agents/Go/internal/agentsd/store"
@@ -32,6 +33,11 @@ type Daemon struct {
 	shells    map[shellKey]*shell
 	// agentMu orders every read-change-save of an agent record.
 	agentMu sync.Mutex
+	pinState
+	settingsState
+	// SettingsDir is the person's settings on this host (StoreLocations.personalSettings):
+	// <root>/settings, or $HOME/.agents/settings for a server, as the Swift host's --serve.
+	SettingsDir string
 }
 
 // New opens the root and registers every method this host serves.
@@ -42,7 +48,8 @@ func New(ctx context.Context, root string) (*Daemon, error) {
 	}
 	d := &Daemon{ctx: ctx, Store: st, handlers: map[string]Handler{}, clients: map[int64]*Client{}, unknown: map[string]int{},
 		lives: map[wire.UUID]*live{}, relays: map[string]*relay{}, sent: map[wire.UUID]bool{},
-		watches: map[string]*folderWatch{}, interests: map[string][]interest{}, shells: map[shellKey]*shell{}}
+		watches: map[string]*folderWatch{}, interests: map[string][]interest{}, shells: map[shellKey]*shell{},
+		SettingsDir: filepath.Join(st.Loc.Root, "settings")}
 	d.register()
 	return d, nil
 }

@@ -68,7 +68,7 @@ func TestPingAndAnUnknownMethod(t *testing.T) {
 	if r := c.call(t, 1, "daemon/ping", nil); string(r) != `{"ok":true}` {
 		t.Fatalf("ping %s", r)
 	}
-	c.in <- `{"jsonrpc":"2.0","id":2,"method":"pins/list"}`
+	c.in <- `{"jsonrpc":"2.0","id":2,"method":"nothing/here"}`
 	if line := <-c.out; !strings.Contains(line, "-32601") {
 		t.Fatalf("%s", line)
 	}

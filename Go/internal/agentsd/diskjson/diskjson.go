@@ -14,6 +14,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -241,4 +242,87 @@ func fieldsOf(t reflect.Type) map[string]field {
 	}
 	fields.Store(t, m)
 	return m
+}
+
+// Pretty is a tree (from encoding/json, numbers as json.Number) as Swift's JSONEncoder
+// writes it with [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]: two spaces a
+// level, `"key" : value`, keys sorted, slashes and non-ASCII as they are.
+func Pretty(tree any) ([]byte, error) {
+	var b bytes.Buffer
+	if err := pretty(&b, tree, ""); err != nil {
+		return nil, err
+	}
+	return b.Bytes(), nil
+}
+
+func pretty(b *bytes.Buffer, v any, indent string) error {
+	switch t := v.(type) {
+	case map[string]any:
+		if len(t) == 0 {
+			b.WriteString("{}")
+			return nil
+		}
+		keys := make([]string, 0, len(t))
+		for k := range t {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		b.WriteString("{\n")
+		for i, k := range keys {
+			b.WriteString(indent + "  ")
+			if err := scalar(b, k); err != nil {
+				return err
+			}
+			b.WriteString(" : ")
+			if err := pretty(b, t[k], indent+"  "); err != nil {
+				return err
+			}
+			if i < len(keys)-1 {
+				b.WriteByte(',')
+			}
+			b.WriteByte('\n')
+		}
+		b.WriteString(indent + "}")
+	case []any:
+		if len(t) == 0 {
+			b.WriteString("[]")
+			return nil
+		}
+		b.WriteString("[\n")
+		for i, e := range t {
+			b.WriteString(indent + "  ")
+			if err := pretty(b, e, indent+"  "); err != nil {
+				return err
+			}
+			if i < len(t)-1 {
+				b.WriteByte(',')
+			}
+			b.WriteByte('\n')
+		}
+		b.WriteString(indent + "]")
+	default:
+		return scalar(b, v)
+	}
+	return nil
+}
+
+func scalar(b *bytes.Buffer, v any) error {
+	var s bytes.Buffer
+	enc := json.NewEncoder(&s)
+	enc.SetEscapeHTML(false)
+	if err := enc.Encode(v); err != nil {
+		return err
+	}
+	b.Write(bytes.TrimRight(s.Bytes(), "\n"))
+	return nil
+}
+
+// Compact is JSON as StoreCoding.encoder writes it: keys sorted, slashes and HTML as
+// they are, no spaces.
+func Compact(b []byte) ([]byte, error) {
+	tree, err := decodeTree(b)
+	if err != nil {
+		return nil, err
+	}
+	return encodeTree(tree)
 }
