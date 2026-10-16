@@ -69,6 +69,7 @@ func New(ctx context.Context, root string) (*Daemon, error) {
 	d.loadEvents()
 	d.recover()
 	d.resumeEventWaits()
+	d.resumeBlocks()
 	d.checkEveryQueue()
 	d.watchDisk()
 	return d, nil

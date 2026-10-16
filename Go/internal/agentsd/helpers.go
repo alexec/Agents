@@ -169,6 +169,7 @@ func (d *Daemon) stopSession(caller wire.UUID, args map[string]json.RawMessage) 
 			a.State, a.EndedReason = wire.AgentStateStopped, reason(wire.EndedReasonCancelled)
 		})
 		d.record(t.ID, stateChanged(wire.AgentStateStopped, reason(wire.EndedReasonCancelled)))
+		d.agentEnded(t.ID)
 		return "Took " + name + " off the queue; it will not start. This project now has " + d.helperPlaces(folder) + ".", nil
 	}
 	l := d.live(t.ID)

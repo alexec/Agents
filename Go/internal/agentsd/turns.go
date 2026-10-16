@@ -35,6 +35,9 @@ type live struct {
 	// prompting is whether the turn's words are with the runtime; a stop before then is
 	// kept in stopped, and the turn ends there instead of sending them.
 	prompting, stopped bool
+	// reported is whether this turn said how it went itself (a wait on agents), so its
+	// ending keeps that rather than one worked out from its last words.
+	reported bool
 	// messageText is the text of the agent's last message this turn, for its report.
 	lastMessageID string
 	lastMessage   strings.Builder
@@ -345,7 +348,7 @@ func (l *live) turn() bool {
 	ctx, cancel := context.WithCancel(d.ctx)
 	l.mu.Lock()
 	l.stop = cancel
-	l.inTurn, l.prompting, l.stopped = true, false, false
+	l.inTurn, l.prompting, l.stopped, l.reported = true, false, false, false
 	l.mu.Unlock()
 	defer cancel()
 	defer func() {
@@ -559,7 +562,7 @@ func (d *Daemon) setState(id wire.UUID, s wire.AgentState) {
 // question, done with its first sentence otherwise.
 func (d *Daemon) end(l *live, s wire.AgentState, why wire.EndedReason) {
 	l.mu.Lock()
-	last := l.lastMessage.String()
+	last, reported := l.lastMessage.String(), l.reported
 	l.mu.Unlock()
 	var requested, archiveNow bool
 	d.change(l.id, func(a *wire.Agent) {
@@ -567,7 +570,7 @@ func (d *Daemon) end(l *live, s wire.AgentState, why wire.EndedReason) {
 		a.RestartPickUps = nil // any ending but the daemon's going clears the count
 		unread := s == wire.AgentStateFinished
 		a.IsUnread = &unread
-		if s == wire.AgentStateFinished {
+		if s == wire.AgentStateFinished && !(reported && a.Report != nil) {
 			outcome, message := wire.WorkOutcomeDone, firstSentence(last)
 			if strings.HasSuffix(strings.TrimSpace(last), "?") {
 				outcome = wire.WorkOutcomeNeedsAnswer
@@ -585,10 +588,11 @@ func (d *Daemon) end(l *live, s wire.AgentState, why wire.EndedReason) {
 	d.afterArchiveRequest(l.id, requested, archiveNow)
 	// What the turn did to the app's own files is looked at as it ends (guardedTurnEnded).
 	d.guardedTurnEnded(l.id)
-	// A place may have come free for a queued helper.
+	// A place may have come free for a queued helper, and those waiting on it may go on.
 	if a := d.Store.Agent(l.id); a != nil {
 		d.checkQueueSoon(projectFolder(a))
 	}
+	d.agentEnded(l.id)
 }
 
 func firstSentence(s string) string {

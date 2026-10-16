@@ -119,6 +119,8 @@ func (d *Daemon) prompt(r wire.PromptRequest) error {
 	if from == wire.PromptOriginPerson {
 		// The person's words take back an archive asked for and a question for after the turn.
 		d.change(a.ID, func(a *wire.Agent) { a.ArchiveRequest, a.AfterTurn = nil, nil })
+		// The person carries a blocked agent on past its block.
+		d.dropBlock(a.ID)
 		// And a wait: the runtime is told, ahead of the words.
 		if w := d.endWait(a.ID, "prompt", false); w != nil {
 			p := "(Your wait for " + waitLabel(w) + " was cancelled by this message. Wait again if you still need to.)"
