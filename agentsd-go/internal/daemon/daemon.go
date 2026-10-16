@@ -29,7 +29,10 @@ type Daemon struct {
 	// Sandbox, when set, wraps a runtime's argv (stage 4: Landlock; stage 5: sandbox-exec).
 	Sandbox func(runtimeID, dir string, argv []string) []string
 	// appTools, when set, is the app's own MCP server for an agent (stage 2).
-	appTools func(agentID string) []acp.McpServer
+	appTools  func(agentID string) []acp.McpServer
+	toolsPort int
+	hosted    *hostedServers
+	shells    map[shellKey]*shell
 }
 
 func New(ctx context.Context, root string) (*Daemon, error) {

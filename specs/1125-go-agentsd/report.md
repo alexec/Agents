@@ -6,7 +6,33 @@ Throwaway code in `agentsd-go/`. Not for merge. The test note is [test.md](test.
 
 | Stage | Status | Commit | What works |
 |---|---|---|---|
-| 1. Base | done (socket); window look waits for an unlocked screen | (this commit) | Joins with a v2 host code over today's wire. A real Claude turn over `coder/acp-go-sdk`, with this Mac's sign-in lent through the control plane. |
+| 1. Base | done (socket); window look waits for an unlocked screen | 3acff3f2 | Joins with a v2 host code over today's wire. A real Claude turn over `coder/acp-go-sdk`, with this Mac's sign-in lent through the control plane. |
+| 2. Everyday turn | done (socket); window look waits | (this commit) | Permission cards both ways; the app's tools (`list_sessions`, `read_session`, `start_session`) on `modelcontextprotocol/go-sdk`; terminals on `creack/pty`; files browse/list/read/write; Codex with the Mac's ChatGPT sign-in lent; stop. |
+
+## Stage 2: an everyday turn on Linux
+
+**What was done** (all proved through the scratch control plane with `agentsctl`, 2026-10-16 00:42–00:58)
+- **Cards.** A tool call that needs permission becomes a `permissionAsked` entry, `waitingOnUser`, and `agent/permission` with the request. `permissions/pending` lists it. `permissions/answer` sends the chosen `optionId` back to the runtime over ACP, records `permissionAnswered` and goes back to `running`. The app's own `mcp__agents__*` tools are allowed with no card, as in Swift. A stop (`agents/stop`) cancels over ACP and ends `stopped`/`cancelled`; open cards are cancelled.
+- **The app's tools** on `modelcontextprotocol/go-sdk` v1.8.0:
+  - Streamable HTTP on loopback at `/mcp/agents`, with JSON replies. Each runtime gets its own bearer token, bound to its agent; an unknown token gets 404. It is handed to the runtime only in `session/new`'s `mcpServers`, as `{"type":"http","name":"agents",…}`.
+  - `list_sessions`, `read_session` and `start_session`. Claude called all three in one turn, and the session it started ran and said "pong".
+  - The SDK is a good fit: `mcp.AddTool` with typed inputs makes the JSON Schema from Go structs. `NewStreamableHTTPHandler`'s per-request `getServer` makes "which agent is calling" one map lookup.
+- **Terminals** on `creack/pty` v1.1.24, as `ShellSession.swift` runs them:
+  - `shell/attach|open|list|input|resize|detach|close|restart|signal` run `$SHELL -l` in the agent's or the project's folder, with a 4 MiB scrollback.
+  - `shell/output` carries base64 bytes with `offset`. A reattach with `since`+`startedAt` replays only what is new. `shell/stateChanged` reports `exited` or `released`.
+  - Proved: typed `echo hello-from-$(uname -s) && pwd`, read back `hello-from-Linux` and `/home/agents/src/hello`; closed, and heard `released`.
+  - The project shell (Control-`) is keyed by the id the window makes from the folder. The Go host takes that id as given when `folder` names a project, so it does not reimplement the FNV-1a id.
+- **Files:** `files/list` (folders first, 5000 at most), `files/read` (text up to 128 KiB, images up to 4 MiB, other, and `unchanged` by stamp), `files/browse` (for Add Project, `~` allowed), `files/write` (attachments into `.agents/attachments`), `files/readText|saveText` and `files/mention`. Reads are kept to the agent's folder, with symlinks resolved (`/etc/passwd` → -32602). `files/watch` is a no-op; no `files/changed` is sent yet.
+- **Codex.** I installed the pinned `codex-acp` 1.13.1 by hand, as for Claude. The Go host asks for Codex's sign-in with -32036, as it does for Claude; the Swift host never does (`ServerSignIn.exists("codex")` is always true). The lend then worked unchanged: `relay/grant {runtime:"codex"}` on the Mac and `relay/offer` on the Go host. The Go host writes `CODEX_HOME` (`config.toml` with `chatgpt_base_url` at the gate, and the stand-in `auth.json`) and `CODEX_CA_CERTIFICATE`.
+  - A real Codex turn ran `ls` and answered. As far as I know this is the first run of the Codex relay through a control plane.
+  - Codex's own `bwrap` sandbox cannot make namespaces in the container, so Codex fell back to asking. That is the container's limit, not the host's.
+
+**Known gaps in stage 2**
+- No `files/changed` and no watches: the Files pane does not refresh by itself.
+- No elicitations: question forms from Claude's AskUserQuestion or Codex's request_user_input are not served, and `elicitations/pending` is `[]`.
+- No `agent/terminalOutput` for ACP terminals.
+- The project shell's id is not checked.
+- The relay offers live in memory, as in Swift: after the Go host restarts, the window has to lend again. It does that by itself on -32036.
 
 ## Stage 1: the base
 

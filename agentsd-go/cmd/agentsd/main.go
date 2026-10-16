@@ -17,11 +17,19 @@ import (
 
 	"github.com/alexec/agents/agentsd-go/internal/control"
 	"github.com/alexec/agents/agentsd-go/internal/daemon"
+	"github.com/alexec/agents/agentsd-go/internal/sandbox"
 )
 
 const version = "0.1.0-go"
 
 func main() {
+	if len(os.Args) > 1 && os.Args[1] == "sandbox-exec" {
+		if err := sandbox.Exec(os.Args[2:]); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(126)
+		}
+		return
+	}
 	root := flag.String("root", "", "the host's root (its identity)")
 	serve := flag.Bool("serve", false, "never exit for being idle")
 	detach := flag.Bool("detach", false, "start in the background and return")
@@ -29,6 +37,7 @@ func main() {
 	code := flag.String("control", "", "a host code, used once to enrol")
 	code2 := flag.String("control-code", "", "the same as --control")
 	hostName := flag.String("host-name", "", "what the control plane lists this host as")
+	sandboxed := flag.Bool("sandbox", false, "run every runtime in the sandbox (Landlock on Linux, sandbox-exec on macOS)")
 	flag.Parse()
 	_ = serve
 	if *root == "" {
@@ -72,6 +81,17 @@ func main() {
 	d, err := daemon.New(ctx, *root)
 	if err != nil {
 		log.Fatal(err)
+	}
+	if err := d.StartAppTools(); err != nil {
+		log.Printf("app tools: %v", err)
+	}
+	if *sandboxed || os.Getenv("AGENTS_SANDBOX") == "1" {
+		ok, what := sandbox.Available()
+		log.Printf("sandbox: %s (available: %v)", what, ok)
+		self, _ := os.Executable()
+		d.Sandbox = func(runtimeID, dir string, argv []string) []string {
+			return sandbox.Argv(self, sandbox.For(runtimeID, dir), argv)
+		}
 	}
 	go func() {
 		if err := d.ServeSocket(ctx, filepath.Join(*root, "daemon.sock")); err != nil {

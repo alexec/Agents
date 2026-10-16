@@ -99,6 +99,10 @@ func main() {
 		out(r, err)
 	case "watch":
 		s := session(ctx)
+		// A client hears a host only once it has a channel there: open one.
+		if *host != "" {
+			s.Call(ctx, *host, "daemon/ping", nil)
+		}
 		for n := range s.Notes {
 			if *host == "" || n.Host == *host {
 				fmt.Printf("%s %s %s\n", n.Host, n.Method, n.Params)

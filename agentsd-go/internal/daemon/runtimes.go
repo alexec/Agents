@@ -121,6 +121,10 @@ func (d *Daemon) launchFor(r *RuntimeDef, dir string) (runtime.Launch, error) {
 		}
 	}
 	if r.ID == "codex" {
+		if rl := d.relayFor("codex"); rl != nil {
+			env = without(env, "OPENAI_API_KEY", "CODEX_HOME", "CODEX_CA_CERTIFICATE")
+			env = append(env, "CODEX_HOME="+filepath.Join(d.Root, "runtimes", "codex-relay-home"), "CODEX_CA_CERTIFICATE="+rl.caFile)
+		}
 		env = append(env, "NO_BROWSER=1",
 			`CODEX_CONFIG={"features":{"apps":false,"default_mode_request_user_input":true,"goals":true,"in_app_local_automation":false,"multi_agent":true,"sleep_tool":false}}`)
 	}
@@ -133,10 +137,24 @@ func (d *Daemon) launchFor(r *RuntimeDef, dir string) (runtime.Launch, error) {
 
 // needsSignIn is the -32036 credentialWanted the window answers by lending its own (Lending.swift).
 func (d *Daemon) needsSignIn(runtimeID string) error {
-	if runtimeID != "claude" || ownClaudeSignIn() || d.relayFor("claude") != nil || d.tunneler == nil {
+	if d.tunneler == nil || d.relayFor(runtimeID) != nil {
 		return nil
 	}
-	return &RPCError{Code: -32036, Message: "Claude on this server needs a key.", Data: map[string]any{"runtime": "claude", "offered": false}}
+	switch runtimeID {
+	case "claude":
+		if ownClaudeSignIn() {
+			return nil
+		}
+	case "codex":
+		// The Swift host never asks for Codex (ServerSignIn.exists is always true); this one does.
+		if ownCodexSignIn() {
+			return nil
+		}
+	default:
+		return nil
+	}
+	r := d.catalog(runtimeID)
+	return &RPCError{Code: -32036, Message: r.Name + " on this server needs a key.", Data: map[string]any{"runtime": runtimeID, "offered": false}}
 }
 
 func without(env []string, names ...string) []string {

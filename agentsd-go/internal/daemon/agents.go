@@ -266,7 +266,19 @@ func (d *Daemon) end(id, state, reason, last string) {
 }
 
 func firstSentence(s string) string {
-	s = strings.TrimSpace(s)
+	// Code is not a sentence: leave fenced blocks out.
+	var prose []string
+	fenced := false
+	for _, line := range strings.Split(s, "\n") {
+		if strings.HasPrefix(strings.TrimSpace(line), "```") {
+			fenced = !fenced
+			continue
+		}
+		if !fenced && strings.TrimSpace(line) != "" {
+			prose = append(prose, line)
+		}
+	}
+	s = strings.TrimSpace(strings.Join(prose, "\n"))
 	for i, r := range s {
 		if (r == '.' || r == '!' || r == '?') && (i+1 == len(s) || unicode.IsSpace(rune(s[i+1]))) {
 			return s[:i+1]

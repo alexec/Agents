@@ -59,6 +59,9 @@ func (d *Daemon) offerRelay(o relayOffer) error {
 	d.mu.Unlock()
 	if old != nil {
 		old.standIn, old.caFile = o.StandIn, ca
+		if o.Runtime == "codex" {
+			return writeCodexHome(dir, old.port, o.StandIn)
+		}
 		return nil
 	}
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
@@ -73,6 +76,11 @@ func (d *Daemon) offerRelay(o relayOffer) error {
 	d.relays[o.Runtime] = r
 	d.mu.Unlock()
 	log.Printf("relay: %s's sign-in is lent; gate on 127.0.0.1:%d", o.Runtime, r.port)
+	if o.Runtime == "codex" {
+		if err := writeCodexHome(dir, r.port, o.StandIn); err != nil {
+			return err
+		}
+	}
 	go func() {
 		for {
 			c, err := ln.Accept()
@@ -124,6 +132,33 @@ func (d *Daemon) pump(runtime string, c net.Conn) {
 		}
 	}
 	done()
+}
+
+// writeCodexHome is the CODEX_HOME a lent ChatGPT sign-in runs Codex with: its base URL
+// the gate, its auth.json the stand-in the lender granted (DaemonCore+Credentials.swift).
+func writeCodexHome(dir string, port int, standIn string) error {
+	home := filepath.Join(dir, "codex-relay-home")
+	if err := os.MkdirAll(home, 0o700); err != nil {
+		return err
+	}
+	config := "chatgpt_base_url = \"https://127.0.0.1:" + strconv.Itoa(port) + "/backend-api/\"\n"
+	if err := os.WriteFile(filepath.Join(home, "config.toml"), []byte(config), 0o600); err != nil {
+		return err
+	}
+	return os.WriteFile(filepath.Join(home, "auth.json"), []byte(standIn), 0o600)
+}
+
+func ownCodexSignIn() bool {
+	if os.Getenv("OPENAI_API_KEY") != "" {
+		return true
+	}
+	home, _ := os.UserHomeDir()
+	codexHome := os.Getenv("CODEX_HOME")
+	if codexHome == "" {
+		codexHome = filepath.Join(home, ".codex")
+	}
+	_, err := os.Stat(filepath.Join(codexHome, "auth.json"))
+	return err == nil
 }
 
 // signedIn says whether this machine has Claude's own sign-in.
