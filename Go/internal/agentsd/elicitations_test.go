@@ -280,3 +280,12 @@ func TestAFormIsReadAsSwiftReadsIt(t *testing.T) {
 		t.Fatal("a form under the wrong key")
 	}
 }
+
+func waitFor(t *testing.T, what string, ok func() bool) {
+	t.Helper()
+	for deadline := time.Now().Add(10 * time.Second); !ok(); time.Sleep(20 * time.Millisecond) {
+		if time.Now().After(deadline) {
+			t.Fatalf("never %s", what)
+		}
+	}
+}
