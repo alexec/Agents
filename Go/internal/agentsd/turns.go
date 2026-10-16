@@ -32,6 +32,9 @@ type live struct {
 	stop         context.CancelFunc
 	// inTurn is whether a turn is in flight: a form is asked only in one.
 	inTurn bool
+	// prompting is whether the turn's words are with the runtime; a stop before then is
+	// kept in stopped, and the turn ends there instead of sending them.
+	prompting, stopped bool
 	// messageText is the text of the agent's last message this turn, for its report.
 	lastMessageID string
 	lastMessage   strings.Builder
@@ -298,12 +301,12 @@ func (l *live) turn() bool {
 	ctx, cancel := context.WithCancel(d.ctx)
 	l.mu.Lock()
 	l.stop = cancel
-	l.inTurn = true
+	l.inTurn, l.prompting, l.stopped = true, false, false
 	l.mu.Unlock()
 	defer cancel()
 	defer func() {
 		l.mu.Lock()
-		l.inTurn = false
+		l.inTurn, l.prompting = false, false
 		l.mu.Unlock()
 	}()
 
@@ -318,6 +321,10 @@ func (l *live) turn() bool {
 		}
 		d.record(l.id, wire.TranscriptEntryKind{RuntimeNote: &wire.TranscriptEntryKindRuntimeNote{Value: "Starting " + rt.Name + "…"}})
 		s, err := acp.Start(ctx, launch, l, d.mcpServersFor(l.id), sessionMeta(a.RuntimeID))
+		if err != nil && ctx.Err() != nil {
+			d.end(l, wire.AgentStateStopped, wire.EndedReasonCancelled)
+			return false
+		}
 		if err != nil {
 			log.Printf("agent %s: %v", l.id, err)
 			d.record(l.id, notice("error", rt.Name+" did not start", err.Error()))
@@ -379,8 +386,13 @@ func (l *live) turn() bool {
 		bs = append([]wire.ContentBlock{textBlock(*q.Preface)}, bs...)
 	}
 	l.mu.Lock()
-	s := l.session
+	s, stopped := l.session, l.stopped
+	l.prompting = !stopped
 	l.mu.Unlock()
+	if stopped {
+		d.end(l, wire.AgentStateStopped, wire.EndedReasonCancelled)
+		return false
+	}
 	r, err := s.Prompt(ctx, acpBlocks(bs))
 	if err != nil {
 		if ctx.Err() != nil {
@@ -762,6 +774,14 @@ func (l *live) cancel() {
 	l.closeForms()
 	l.mu.Lock()
 	s, stop := l.session, l.stop
+	if l.inTurn && !l.prompting {
+		// Not with the runtime yet: session/cancel would find no turn to end.
+		l.stopped = true
+		if s != nil {
+			s = nil
+			stop = nil
+		}
+	}
 	for _, pp := range l.pending {
 		select {
 		case pp.answer <- "":
