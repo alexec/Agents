@@ -28,6 +28,8 @@
 //	AGENTS_CONTROL_URL          the one address clients and hosts are given
 //	AGENTS_CONTROL_KEY_FILE     the control plane's private key, raw, 0600 (made if missing)
 //	AGENTS_CONTROL_KEY          or the key itself, base64url
+//	AGENTS_CONTROL_KMS          or sealed in the store by a keeper (an option): base64key://…,
+//	                            hashivault://…, gcpkms://… (gocloud.dev/secrets)
 //	AGENTS_CONTROL_TLS_CERT/_KEY  when this copy terminates TLS itself
 //	AGENTS_CONTROL_PIN          the load balancer's certificate pin, when it terminates TLS
 //	AGENTS_CONTROL_NAME, AGENTS_CONTROL_MACHINE_ID, AGENTS_CONTROL_SERVERS
@@ -53,6 +55,7 @@ import (
 	"github.com/alexec/agents/Go/internal/buildinfo"
 	"github.com/alexec/agents/Go/internal/controllink"
 	"github.com/alexec/agents/Go/internal/controlplane"
+	"github.com/alexec/agents/Go/internal/controlplane/kms"
 	"github.com/alexec/agents/Go/internal/controlplane/records"
 	"github.com/alexec/agents/Go/internal/controlplane/store"
 	"github.com/alexec/agents/Go/internal/controlplane/web"
@@ -184,7 +187,30 @@ func webConfig() *controlplane.WebConfig {
 	return &controlplane.WebConfig{Folder: expand(folder), Port: port}
 }
 
-func privateKey() []byte {
+// privateKey is the control plane's key: a key file (control/control-key, the default),
+// AGENTS_CONTROL_KEY or --key-fd. With AGENTS_CONTROL_KMS (an option) it is sealed in the
+// store instead: a key given or found in a file is sealed the first time, otherwise a new
+// one is made, and any copy with the store and the use of the keeper opens it.
+func privateKey(st store.Store) []byte {
+	keeper := os.Getenv("AGENTS_CONTROL_KMS")
+	if keeper == "" {
+		return plainKey(true)
+	}
+	key, err := kms.ControlKey(context.Background(), st, keeper, func() []byte {
+		if given := plainKey(false); given != nil {
+			return given
+		}
+		return controllink.NewPrivateKey()
+	})
+	if err != nil {
+		fail("the control key: %v", err)
+	}
+	return key
+}
+
+// plainKey is the key given, or with makeFile the key file's, made if missing; nil when
+// there is none and none is to be made.
+func plainKey(makeFile bool) []byte {
 	if fd := value("--key-fd"); fd != "" {
 		n, err := strconv.Atoi(fd)
 		if err != nil {
@@ -208,6 +234,12 @@ func privateKey() []byte {
 	file := os.Getenv("AGENTS_CONTROL_KEY_FILE")
 	if file == "" && home() != "" {
 		file = filepath.Join(home(), "control-key")
+	}
+	if !makeFile {
+		if data, err := os.ReadFile(file); file != "" && err == nil && controllink.ValidPrivateKey(data) {
+			return data
+		}
+		return nil
 	}
 	if file == "" {
 		fail("say where the control plane's key is: AGENTS_CONTROL_KEY_FILE, AGENTS_CONTROL_KEY or --key-fd")
@@ -296,7 +328,7 @@ func serve() {
 		}
 	}
 	cfg.Store = openStore("")
-	cfg.PrivateKey = privateKey()
+	cfg.PrivateKey = privateKey(cfg.Store)
 	s, err := controlplane.New(cfg)
 	if err != nil {
 		fail("%v", err)
@@ -366,7 +398,7 @@ func code() {
 	if settings == nil || settings.URL == nil {
 		fail("this store has no control plane yet: start one with `agents-control serve` first")
 	}
-	key := privateKey()
+	key := privateKey(st)
 	public, err := controllink.PublicKey(key)
 	if err != nil || !bytes.Equal(public, settings.ControlKey) {
 		fail("that key is not this control plane's")
