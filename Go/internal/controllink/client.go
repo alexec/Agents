@@ -13,8 +13,6 @@ import (
 	"github.com/alexec/agents/Go/internal/safe"
 )
 
-const clientSalt = "agents-control-client-v1"
-
 // ClientMembership is what a paired client keeps to dial again.
 type ClientMembership struct {
 	Client     string `json:"client"`
@@ -80,11 +78,10 @@ type Note struct {
 }
 
 func DialClient(ctx context.Context, m *ClientMembership) (*Session, error) {
-	shared, err := SharedSecret(m.Private, m.ControlKey)
+	key, err := ClientKey(m.Private, m.ControlKey, m.Client)
 	if err != nil {
 		return nil, err
 	}
-	key := hkdf32(shared, []byte(clientSalt), []byte(m.Client))
 	epoch := 0
 	l, _, err := Join(ctx, m.URL, m.Pin, Credentials{Identity: "c:" + m.Client, Key: key, Kind: "mac", ControlKey: m.ControlKey, Epoch: &epoch})
 	if err != nil {

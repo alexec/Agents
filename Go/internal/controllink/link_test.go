@@ -61,7 +61,7 @@ func (f *fakeControl) serve(w http.ResponseWriter, r *http.Request) {
 	nonce := make([]byte, 32)
 	rand.Read(nonce)
 	pub, _ := PublicKey(f.private)
-	hello, _ := json.Marshal(map[string]Hello{"hello": {V: authVersion, Name: "scratch", Control: ToB64URL(pub), Nonce: ToB64URL(nonce), Copy: "a"}})
+	hello, _ := json.Marshal(map[string]Hello{"hello": {V: Version, Name: "scratch", Control: B64URL(pub), Nonce: B64URL(nonce), Copy: "a"}})
 	l.Write(ctx, string(hello))
 	line, err := l.Read(ctx)
 	if err != nil {
@@ -78,15 +78,14 @@ func (f *fakeControl) serve(w http.ResponseWriter, r *http.Request) {
 		// The control plane's side of HostKey: ECDH of its private key and the host's public one.
 		key = f.hostKey()
 	}
-	peer, _ := B64URL(a.Nonce)
+	peer, _ := FromB64URL(a.Nonce)
 	origin, _ := Origin(f.srv.URL)
-	tr := transcript(nonce, peer, a.ID, origin)
-	got, _ := B64URL(a.MAC)
-	if key == nil || f.refuse || string(got) != string(hmac256(key, []byte("c"), tr)) {
+	got, _ := FromB64URL(a.MAC)
+	if key == nil || f.refuse || string(got) != string(PeerMAC(key, nonce, peer, a.ID, origin)) {
 		l.Write(ctx, `{"refused":{"reason":"unknown"}}`)
 		return
 	}
-	ok, _ := json.Marshal(map[string]OK{"ok": {MAC: ToB64URL(hmac256(key, []byte("s"), tr))}})
+	ok, _ := json.Marshal(map[string]OK{"ok": {MAC: B64URL(ServerMAC(key, nonce, peer, a.ID, origin))}})
 	l.Write(ctx, string(ok))
 	if strings.HasPrefix(a.ID, "e:") {
 		req, _ := l.Read(ctx)
@@ -144,12 +143,12 @@ func (f *fakeControl) hostKey() []byte {
 func TestParseCode(t *testing.T) {
 	f := newFakeControl(t)
 	c := f.code()
-	text := "agents-control:2:h:-:" + ToB64URL(c.ControlKey) + ":" + ToB64URL(c.Secret) + ":https%3A%2F%2F10.0.0.2%3A8787:abc_-:my%20plane"
+	text := "agents-control:2:h:-:" + B64URL(c.ControlKey) + ":" + B64URL(c.Secret) + ":https%3A%2F%2F10.0.0.2%3A8787:" + B64URL(make([]byte, 32)) + ":my%20plane"
 	got, err := ParseCode(text)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !got.Host || got.URL != "https://10.0.0.2:8787" || got.Pin != "abc_-" || got.Name != "my plane" || got.ID() != c.ID() {
+	if !got.Host || got.URL != "https://10.0.0.2:8787" || got.Pin != B64URL(make([]byte, 32)) || got.Name != "my plane" || got.ID() != c.ID() {
 		t.Fatalf("parsed %+v", got)
 	}
 	if _, err := ParseCode("agents-control:1:h:x"); err == nil {
@@ -159,9 +158,9 @@ func TestParseCode(t *testing.T) {
 
 func TestOrigin(t *testing.T) {
 	for in, want := range map[string]string{
-		"wss://Plane.example":        "https://plane.example:443",
+		"wss://Plane.example":       "https://plane.example:443",
 		"http://10.0.0.2:8787/v1/x": "http://10.0.0.2:8787",
-		"ws://h":                     "http://h:80",
+		"ws://h":                    "http://h:80",
 	} {
 		if got, _ := Origin(in); got != want {
 			t.Errorf("Origin(%q) = %q, want %q", in, got, want)
