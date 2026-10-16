@@ -156,9 +156,17 @@ func (m *Methods) answer(method string, params json.RawMessage, caller Caller) (
 		if id == "" {
 			return nil, fail(invalidParams, "Which client?")
 		}
-		return map[string]any{}, m.forget(strings.ToUpper(id), 0)
+		err := m.forget(strings.ToUpper(id), 0)
+		if err == nil {
+			s.tellCopies("clientForgotten", strings.ToUpper(id), caller.Client)
+		}
+		return map[string]any{}, err
 	case "clients/forgetSelf":
-		return map[string]any{}, m.forget(caller.Client, 200*time.Millisecond)
+		err := m.forget(caller.Client, 200*time.Millisecond)
+		if err == nil {
+			s.tellCopies("clientForgotten", caller.Client, caller.Client)
+		}
+		return map[string]any{}, err
 	case "hosts/startEnroll":
 		return s.codes.Issue(ctx(), true, false, lifetime)
 	case "hosts/install":
@@ -204,7 +212,11 @@ func (m *Methods) answer(method string, params json.RawMessage, caller Caller) (
 		if len(rec.SignInFrom) == 0 {
 			rec.SignInFrom = nil
 		}
-		return map[string]any{}, s.records.SaveHost(ctx(), *rec)
+		err := s.records.SaveHost(ctx(), *rec)
+		if err == nil {
+			s.tellCopies("hostEnrolled", req.Host, caller.Client)
+		}
+		return map[string]any{}, err
 	case "hosts/setRelay":
 		var req struct {
 			Host  string
@@ -222,6 +234,7 @@ func (m *Methods) answer(method string, params json.RawMessage, caller Caller) (
 			return nil, fail(noSuchHost, "No host is called %s.", host)
 		}
 		s.router.ForgetHost(host)
+		s.tellCopies("hostRemoved", host, caller.Client)
 		return map[string]any{}, nil
 	case "hosts/lastHeard":
 		host := param(params, "host")

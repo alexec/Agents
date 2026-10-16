@@ -11,6 +11,7 @@
 // with AGENTS_STORE_ENDPOINT, AGENTS_STORE_PATH_STYLE=1 and AWS_*), AGENTS_CONTROL_URL,
 // AGENTS_CONTROL_KEY_FILE or AGENTS_CONTROL_KEY, AGENTS_CONTROL_TLS_CERT/_KEY,
 // AGENTS_CONTROL_KMS (a gocloud.dev/secrets keeper URL: the key sealed in the store),
+// AGENTS_CONTROL_PEER_URL (where other copies reach this one: several copies over one store),
 // AGENTS_CONTROL_PIN, AGENTS_CONTROL_NAME, AGENTS_CONTROL_MACHINE_ID, AGENTS_CONTROL_WEB_PORT.
 package main
 
@@ -164,7 +165,7 @@ func serve() {
 	}
 	st := openStore("")
 	cfg := service.Config{Store: st, PrivateKey: privateKey(st), URL: text, Bind: value("--bind"), Port: port,
-		HostRoot: value("--host-root"), Log: func(l string) { logger.Println(l) }}
+		HostRoot: value("--host-root"), PeerURL: os.Getenv("AGENTS_CONTROL_PEER_URL"), Log: func(l string) { logger.Println(l) }}
 	dir := value("--self-signed")
 	if dir == "" && home() != "" {
 		dir = filepath.Join(home(), "tls")

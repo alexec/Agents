@@ -1,7 +1,7 @@
 // Package service is ControlService.swift in Go: a store, the router, the methods the
 // control plane answers itself, and a WebSocket server every client and host connects to.
-// One copy: several copies over one store (US3), handovers (R16), the relay's notices,
-// ssh tunnels, workspace providers and Slack are not in this spike.
+// Several copies over one store (US3) link with each other (mesh.go); handovers (R16), the
+// relay's notices, ssh tunnels, workspace providers and Slack are not in this spike.
 package service
 
 import (
@@ -36,6 +36,11 @@ type Config struct {
 	Name       string
 	MachineID  string
 	HostRoot   string // this Mac's host's root, for control/status (#113)
+	// Where other copies reach this one (stage 7). Empty for a single copy, which links
+	// with nobody and takes no leases.
+	PeerURL string
+	// How often a copy beats, looks for the others and renews its leases; shorter in tests.
+	CopyBeat time.Duration
 	Web        *WebConfig
 	Log        func(string)
 }
@@ -51,6 +56,9 @@ type Service struct {
 	methods *Methods
 	started time.Time
 	web     *WebStatus
+
+	mesh       *Mesh
+	peerOrigin string
 
 	readAgainMu sync.Mutex
 	readAgainAt time.Time
@@ -74,6 +82,17 @@ func New(cfg Config) (*Service, error) {
 	s.codes = &Codes{Store: cfg.Store, Private: cfg.PrivateKey, Public: pub, URL: cfg.URL, Pin: cfg.Pin, Name: cfg.Name}
 	s.methods = &Methods{s: s}
 	s.router = NewRouter(s.methods, s.log)
+	if cfg.PeerURL != "" {
+		if s.peerOrigin, err = auth.Origin(cfg.PeerURL); err != nil {
+			return nil, fmt.Errorf("%s is not an address copies can dial", cfg.PeerURL)
+		}
+		s.mesh = newMesh(s, cfg.PeerURL)
+		s.router.OnLocalEnded(func(host string) {
+			if epoch := s.mesh.leases.Release(context.Background(), host); epoch != 0 {
+				s.mesh.released(host, epoch)
+			}
+		})
+	}
 	return s, nil
 }
 
@@ -168,6 +187,9 @@ func (s *Service) Start(ctx context.Context) (int, error) {
 		}
 	}()
 	s.log(fmt.Sprintf("listening on %s:%d for %s", bind, port, s.cfg.URL))
+	if s.mesh != nil {
+		s.mesh.start()
+	}
 	return port, nil
 }
 
@@ -208,6 +230,10 @@ func (s *Service) accept(conn *Conn, webOrigin string) {
 		return
 	}
 	bound := []string{s.origin}
+	// A peer copy dials the address copies reach each other at, and proves that.
+	if strings.HasPrefix(a.ID, "x:") && s.peerOrigin != "" {
+		bound = []string{s.peerOrigin}
+	}
 	if webOrigin != "" {
 		// On the loopback listener only a browser or its code may prove anything, and only
 		// to that listener's own origin (071).
@@ -261,8 +287,11 @@ func (s *Service) accept(conn *Conn, webOrigin string) {
 	case 'p', 'e':
 		s.announce(conn, id.ID, webOrigin != "")
 	default:
-		// Peer copies (x:) link with nobody in this spike.
-		conn.Close()
+		if s.mesh == nil {
+			conn.Close()
+			return
+		}
+		s.mesh.Accepted(id.ID, conn)
 	}
 }
 
@@ -364,7 +393,15 @@ func (s *Service) hostArrived(host string, conn *Conn) {
 		conn.Close()
 		return
 	}
-	s.router.AttachHost(host, conn)
+	s.router.AttachHost(host, conn, true)
+	// This copy holds the host now (T063): every peer reaches it through here.
+	if s.mesh != nil {
+		if epoch, err := s.mesh.leases.Take(context.Background(), host); err == nil {
+			s.mesh.holding(host, epoch)
+		} else {
+			s.log("the store would not give " + host + "'s lease to this copy; serving it anyway")
+		}
+	}
 	result, err := s.methods.HostSaid(host, "host/hello", m.Params)
 	if err != nil {
 		conn.Send(channelFrame(0, replyError(m.ID, err)))
@@ -460,6 +497,7 @@ func (s *Service) spendCode(id, method string, params json.RawMessage, loopback 
 			return nil, err
 		}
 		s.log(name + " paired (" + a.Kind + ")")
+		s.tellCopies("clientPaired", client, "code")
 		s.router.BroadcastControl("control/clientChanged", map[string]any{"client": client})
 		return admitted, nil
 	case sc.Purpose == "host" && method == "hosts/announce":
@@ -504,6 +542,7 @@ func (s *Service) spendCode(id, method string, params json.RawMessage, loopback 
 			s.router.SetRelay(host, &relay)
 		}
 		s.router.Know(host)
+		s.tellCopies("hostEnrolled", host, "code")
 		s.log("host " + a.Name + " enrolled as " + host)
 		return map[string]any{"host": host}, nil
 	}

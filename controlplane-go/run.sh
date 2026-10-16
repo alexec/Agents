@@ -7,6 +7,8 @@
 #        --s3        the store in MinIO (./minio.sh up first), not a folder
 #        --kms       the control plane's key sealed by a local keeper (stage 4)
 #        --lan       at this Mac's LAN address, so the agents-devbox container can join
+#        --copies    a second copy on the same store (stage 7): the host joins copy 1, the
+#                    window copy 2, and copy 2 reaches the host through copy 1
 #   controlplane-go/run.sh code [slug] --client|--host|--client --browser
 #   controlplane-go/run.sh down [slug]
 #
@@ -16,10 +18,10 @@ set -euo pipefail
 here="$(cd "$(dirname "$0")" && pwd)"
 REPO="$(cd "$here/.." && pwd)"
 cmd="${1:-up}"; shift || true
-SLUG="cpgo"; S3=0; KMS=0; LAN=0; WINDOW=1; WEB=1; REST=()
+SLUG="cpgo"; S3=0; KMS=0; LAN=0; WINDOW=1; WEB=1; COPIES=0; REST=()
 for a in "$@"; do
   case "$a" in
-    --s3) S3=1 ;; --kms) KMS=1 ;; --lan) LAN=1 ;; --no-window) WINDOW=0 ;; --no-web) WEB=0 ;;
+    --s3) S3=1 ;; --kms) KMS=1 ;; --lan) LAN=1 ;; --no-window) WINDOW=0 ;; --no-web) WEB=0 ;; --copies) COPIES=1 ;;
     --*) REST+=("$a") ;;
     *) SLUG="$a" ;;
   esac
@@ -35,7 +37,10 @@ STORE_ENV=()
 if [ -f "$ROOT/control/store.env" ]; then while read -r l; do STORE_ENV+=("$l"); done <"$ROOT/control/store.env"; fi
 
 case "$cmd" in
-down) exec "$REPO/.claude/skills/run-app/scripts/stop.sh" "$ROOT" ${REST[@]+"${REST[@]}"} ;;
+down)
+  P2="$(cat "$ROOT/control2/control.pid" 2>/dev/null || true)"
+  [ -n "$P2" ] && ps -o command= -p "$P2" | grep -q agents-control && kill "$P2" && echo "stopping copy 2 $P2"
+  exec "$REPO/.claude/skills/run-app/scripts/stop.sh" "$ROOT" ${REST[@]+"${REST[@]}"} ;;
 code) "${CLEAN[@]}" ${STORE_ENV[@]+"${STORE_ENV[@]}"} "$CONTROL" code ${REST[@]+"${REST[@]}"} --home "$ROOT/control"; exit ;;
 up) ;;
 *) echo "say up, code or down" >&2; exit 2 ;;
@@ -71,7 +76,8 @@ if [ -f "$ROOT/control/store.env" ]; then while read -r l; do STORE_ENV+=("$l");
 WEB_ARGS=()
 [ "$WEB" = 1 ] && WEB_ARGS=(--web "$REPO/Web/dist" --web-port "$WEB_PORT")
 
-"${CLEAN[@]}" ${STORE_ENV[@]+"${STORE_ENV[@]}"} AGENTS_CONTROL_URL="$URL" AGENTS_CONTROL_NAME="run-$SLUG (Go)" \
+PEER=(); [ "$COPIES" = 1 ] && PEER=(AGENTS_CONTROL_PEER_URL="$URL")
+"${CLEAN[@]}" ${STORE_ENV[@]+"${STORE_ENV[@]}"} ${PEER[@]+"${PEER[@]}"} AGENTS_CONTROL_URL="$URL" AGENTS_CONTROL_NAME="run-$SLUG (Go)" \
   nohup "$CONTROL" serve --home "$ROOT/control" --port "$PORT" --no-bonjour --host-root "$ROOT" ${WEB_ARGS[@]+"${WEB_ARGS[@]}"} \
   >>"$ROOT/control/control.log" 2>&1 &
 echo $! >"$ROOT/control/control.pid"
@@ -90,9 +96,29 @@ done
 grep -q "uplink: connected to the control plane" "$ROOT/logs/daemon.log" 2>/dev/null \
   || { echo "the Swift host did not join — see $ROOT/logs/daemon.log" >&2; exit 1; }
 
+# Copy 2: the same store and key (the folder's, or the bucket and its KMS) and the same
+# certificate, so the same pin; its own port and address.
+CLIENT_CODE=(code)
+URL2=""
+if [ "$COPIES" = 1 ]; then
+  PORT2="$(free_port)"; URL2="${URL%:*}:$PORT2"
+  COPY2_ENV=(${STORE_ENV[@]+"${STORE_ENV[@]}"})
+  [ "$S3" = 1 ] || COPY2_ENV+=("AGENTS_STORE=file://$ROOT/control/store")
+  [ "$KMS" = 1 ] || COPY2_ENV+=("AGENTS_CONTROL_KEY_FILE=$ROOT/control/control-key")
+  mkdir -p "$ROOT/control2"
+  "${CLEAN[@]}" "${COPY2_ENV[@]}" AGENTS_CONTROL_URL="$URL2" AGENTS_CONTROL_PEER_URL="$URL2" AGENTS_CONTROL_NAME="run-$SLUG (Go)" \
+    nohup "$CONTROL" serve --home "$ROOT/control2" --self-signed "$ROOT/control/tls" --port "$PORT2" --no-bonjour \
+    >>"$ROOT/control2/control.log" 2>&1 &
+  echo $! >"$ROOT/control2/control.pid"
+  for _ in $(seq 1 100); do grep -q "linked with copy" "$ROOT/control2/control.log" 2>/dev/null && break; sleep 0.2; done
+  grep -q "linked with copy" "$ROOT/control2/control.log" || { echo "copy 2 did not link with copy 1 — see $ROOT/control2/control.log" >&2; exit 1; }
+  code2() { "${CLEAN[@]}" "${COPY2_ENV[@]}" "$CONTROL" code "$@" --home "$ROOT/control2" | head -1; }
+  CLIENT_CODE=(code2)
+fi
+
 APP_PID=none
 if [ "$WINDOW" = 1 ]; then
-  "${CLEAN[@]}" open -n -g --env AGENTS_CONTROL="$(code --client)" "$APP" --args --walk "run-$SLUG" -ApplePersistenceIgnoreState YES
+  "${CLEAN[@]}" open -n -g --env AGENTS_CONTROL="$("${CLIENT_CODE[@]}" --client)" "$APP" --args --walk "run-$SLUG" -ApplePersistenceIgnoreState YES
   for _ in $(seq 1 100); do
     APP_PID="$(pgrep -f "Agents.app/Contents/MacOS/Agents --walk run-$SLUG( |$)" | head -1 || true)"
     [ -n "$APP_PID" ] && break; sleep 0.1
@@ -102,6 +128,7 @@ cat <<EOF
 ROOT=$ROOT
 CONTROL_URL=$URL
 CONTROL_PID=$(cat "$ROOT/control/control.pid")
+COPY2_URL=${URL2:-none}
 HOST_PID=$(tr -d '[:space:]' <"$ROOT/daemon.lock" 2>/dev/null || echo unknown)
 APP_PID=${APP_PID:-none}
 WEB_URL=$([ "$WEB" = 1 ] && echo "http://localhost:$WEB_PORT/" || echo none)

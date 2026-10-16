@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"encoding/json"
 	"strconv"
 	"strings"
@@ -46,6 +47,18 @@ type Router struct {
 	states   map[string]hostState
 	links    map[string]bool // what clients were last said to be connected, and how
 	log      func(string)
+	// Peer copies' links, for streams carried for them (US3, T065).
+	peers map[string]func(string)
+	// Told when a host's real uplink here ends, so its lease is let go (T063).
+	localEnded func(host string)
+}
+
+// uplink is a host's line transport: its own WebSocket here, or a stream on the link to the
+// peer copy that holds it.
+type uplink interface {
+	Send(line string) bool
+	Read(ctx context.Context) (string, error)
+	Close()
 }
 
 type clientSession struct {
@@ -60,16 +73,27 @@ type clientSession struct {
 
 type target struct {
 	session      string // a client session, or
-	tunnelHost   string // the other end of a tunnel between two hosts (T091)
+	tunnelHost   string // the other end of a tunnel between two hosts (T091), or
 	tunnelOthers int
+	peer         string // a stream a peer copy carries for one of its own clients (T065)
+	peerChannel  int
 }
 
 type hostSession struct {
-	conn     *Conn
+	conn     uplink
 	next     int
 	channels map[int]target
 	gen      int64
+	// The host's real uplink is here. Otherwise it is a stream to the copy that holds it.
+	local bool
+	// A peer's stream "peer/channel" to the channel it was given here.
+	proxied map[string]int
 }
+
+func peerKey(peer string, c int) string { return peer + "/" + strconv.Itoa(c) }
+
+// peerFrame is PeerWire.frame: a host line with "p":"<host>" in front.
+func peerFrame(host, hostLine string) string { return `{"p":"` + host + `",` + hostLine[1:] }
 
 type hostState struct {
 	State  string
@@ -79,7 +103,8 @@ type hostState struct {
 
 func NewRouter(h Handler, log func(string)) *Router {
 	return &Router{handler: h, clients: map[string]*clientSession{}, hosts: map[string]*hostSession{},
-		known: map[string]bool{}, relays: map[string]bool{}, states: map[string]hostState{}, links: map[string]bool{}, log: log}
+		known: map[string]bool{}, relays: map[string]bool{}, states: map[string]hostState{}, links: map[string]bool{}, log: log,
+		peers: map[string]func(string){}}
 }
 
 var generation int64
@@ -163,7 +188,7 @@ func (r *Router) SetRelay(host string, relay *bool) {
 
 // AttachHost: a host's uplink is up. A channel opens to it for every client session, then
 // it is read until it ends.
-func (r *Router) AttachHost(host string, conn *Conn) {
+func (r *Router) AttachHost(host string, conn uplink, local bool) {
 	r.mu.Lock()
 	if old := r.hosts[host]; old != nil {
 		r.dropHostLocked(host, 0, nil)
@@ -171,7 +196,7 @@ func (r *Router) AttachHost(host string, conn *Conn) {
 	r.known[host] = true
 	generation++
 	gen := generation
-	r.hosts[host] = &hostSession{conn: conn, next: 1, channels: map[int]target{}, gen: gen}
+	r.hosts[host] = &hostSession{conn: conn, next: 1, channels: map[int]target{}, gen: gen, local: local, proxied: map[string]int{}}
 	r.setState(host, hostState{State: "online"})
 	for id := range r.clients {
 		r.openChannelLocked(id, host)
@@ -186,9 +211,145 @@ func (r *Router) AttachHost(host string, conn *Conn) {
 			r.hostLine(line, host)
 		}
 		r.mu.Lock()
+		current := r.hosts[host] != nil && r.hosts[host].gen == gen
+		if !local {
+			// A proxied stream that ends leaves the state alone: the host has usually moved,
+			// and is shown offline only if nobody holds it again soon.
+			r.dropHostLocked(host, gen, nil)
+			r.mu.Unlock()
+			time.Sleep(5 * time.Second)
+			r.mu.Lock()
+			if r.hosts[host] == nil && r.known[host] && r.states[host].State == "online" {
+				r.setState(host, hostState{State: "offline", Since: time.Now()})
+			}
+			r.mu.Unlock()
+			return
+		}
 		r.dropHostLocked(host, gen, &hostState{State: "offline", Since: time.Now()})
+		ended := r.localEnded
 		r.mu.Unlock()
+		if current && ended != nil {
+			ended(host)
+		}
 	}()
+}
+
+func (r *Router) OnLocalEnded(f func(string)) { r.mu.Lock(); r.localEnded = f; r.mu.Unlock() }
+
+// Holds: this copy has the host's real uplink. Reaches: directly or through a peer.
+func (r *Router) Holds(host string) bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.hosts[host] != nil && r.hosts[host].local
+}
+
+func (r *Router) Reaches(host string) bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.hosts[host] != nil
+}
+
+// Known is every host enrolled, reached or not.
+func (r *Router) Known() []string {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	var out []string
+	for h := range r.known {
+		out = append(out, h)
+	}
+	return out
+}
+
+// CloseLocal closes a host's real uplink here: its lease went to another copy. The host redials.
+func (r *Router) CloseLocal(host string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if h := r.hosts[host]; h != nil && h.local {
+		r.dropHostLocked(host, 0, nil)
+	}
+}
+
+// MARK: Streams carried for peer copies (T065)
+
+// SetPeer: a peer copy's link is up; streams it asks for are answered through send.
+func (r *Router) SetPeer(id string, send func(string)) { r.mu.Lock(); r.peers[id] = send; r.mu.Unlock() }
+
+// DropPeer: a peer's link went; every stream it had open on a host here closes there.
+func (r *Router) DropPeer(id string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	delete(r.peers, id)
+	for _, h := range r.hosts {
+		if !h.local {
+			continue
+		}
+		for key, mine := range h.proxied {
+			if strings.HasPrefix(key, id+"/") {
+				delete(h.proxied, key)
+				delete(h.channels, mine)
+				h.conn.Send(closeFrame(mine))
+			}
+		}
+	}
+}
+
+func (r *Router) tellPeer(peer, line string) {
+	if send := r.peers[peer]; send != nil {
+		send(line)
+	}
+}
+
+// OpenFromPeer: a peer opens a stream to a host held here, a fresh channel on the real uplink.
+func (r *Router) OpenFromPeer(peer, host string, c int, open map[string]any) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	h := r.hosts[host]
+	if _, relay := r.relays[host]; relay || h == nil || !h.local {
+		r.tellPeer(peer, peerFrame(host, closeFrame(c)))
+		return
+	}
+	key := peerKey(peer, c)
+	if old, ok := h.proxied[key]; ok {
+		delete(h.channels, old)
+		h.conn.Send(closeFrame(old))
+	}
+	mine := h.next
+	h.next++
+	h.channels[mine] = target{peer: peer, peerChannel: c}
+	h.proxied[key] = mine
+	// This copy reads fan-out frames and hands each peer its part channel by channel.
+	open["fanOut"] = true
+	h.conn.Send(openFrame(mine, open))
+}
+
+func (r *Router) FromPeer(peer, host string, c int, msg string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	h := r.hosts[host]
+	if h == nil || !h.local {
+		r.tellPeer(peer, peerFrame(host, closeFrame(c)))
+		return
+	}
+	mine, ok := h.proxied[peerKey(peer, c)]
+	if !ok {
+		r.tellPeer(peer, peerFrame(host, closeFrame(c)))
+		return
+	}
+	h.conn.Send(channelFrame(mine, msg))
+}
+
+func (r *Router) CloseFromPeer(peer, host string, c int) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	h := r.hosts[host]
+	if h == nil {
+		return
+	}
+	if mine, ok := h.proxied[peerKey(peer, c)]; ok {
+		delete(h.proxied, peerKey(peer, c))
+		delete(h.channels, mine)
+		h.conn.Send(closeFrame(mine))
+	}
 }
 
 // ForgetHost: hosts/remove. Its uplink closes and it is forgotten.
@@ -209,6 +370,7 @@ func (r *Router) dropHostLocked(host string, gen int64, newState *hostState) {
 	delete(r.hosts, host)
 	h.conn.Close()
 	var bareGone []string
+	peersToTell := map[string]bool{}
 	for _, t := range h.channels {
 		if t.session != "" {
 			s := r.clients[t.session]
@@ -232,7 +394,15 @@ func (r *Router) dropHostLocked(host string, gen int64, newState *hostState) {
 				delete(other.channels, t.tunnelOthers)
 				other.conn.Send(closeFrame(t.tunnelOthers))
 			}
+		} else if t.peer != "" {
+			peersToTell[t.peer] = true
 		}
+	}
+	// The peer's stream ends with the uplink, said once as gone: its clients keep their
+	// sockets, and what they asked is answered hostOffline there. Swift sends a close for
+	// each channel first, which ends those clients' whole connections at the other copy.
+	for peer := range peersToTell {
+		r.tellPeer(peer, goneLine(host, 0))
 	}
 	if newState != nil {
 		r.setState(host, *newState)
@@ -358,10 +528,17 @@ func (r *Router) hostLine(line, host string) {
 		delete(h.channels, f.channel)
 		if t.session != "" {
 			r.detachLocked(t.session, 0)
+		} else if t.peer != "" {
+			delete(h.proxied, peerKey(t.peer, t.peerChannel))
+			r.tellPeer(t.peer, peerFrame(host, closeFrame(t.peerChannel)))
 		} else if other := r.hosts[t.tunnelHost]; other != nil {
 			delete(other.channels, t.tunnelOthers)
 			other.conn.Send(closeFrame(t.tunnelOthers))
 		}
+		return
+	}
+	if t.peer != "" {
+		r.tellPeer(t.peer, peerFrame(host, channelFrame(t.peerChannel, f.msg)))
 		return
 	}
 	if t.tunnelHost != "" {
@@ -399,6 +576,11 @@ func (r *Router) fanOut(msg string, channels []int, host string) {
 	wrapped := ""
 	for _, c := range channels {
 		t, ok := h.channels[c]
+		if ok && t.peer != "" {
+			// Channel by channel, which a copy of any age reads.
+			r.tellPeer(t.peer, peerFrame(host, channelFrame(t.peerChannel, msg)))
+			continue
+		}
 		if !ok || t.session == "" {
 			continue
 		}
