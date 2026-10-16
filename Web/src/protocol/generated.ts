@@ -930,9 +930,33 @@ export interface FilesReadRequest {
   knownStamp?: FileStamp;
 }
 
+export interface FilesSaveTextRequest {
+  path: string;
+  text: string;
+  onlyIfAbsent?: boolean;
+}
+
+export interface FilesText {
+  text?: string;
+}
+
+export interface FilesTextRequest {
+  path: string;
+}
+
 export interface FilesWatchRequest {
   agentID: UUID;
   folder: string;
+}
+
+export interface FilesWriteRequest {
+  agentID: UUID;
+  name: string;
+  data: Base64;
+}
+
+export interface FilesWriteResponse {
+  path: string;
 }
 
 export interface FolderHunk {
@@ -1735,6 +1759,78 @@ export interface SetSandboxRequest {
 export interface SetUnreadRequest {
   agentID: UUID;
   unread: boolean;
+}
+
+export interface ShellAttachRequest {
+  agentID: UUID;
+  shell?: number;
+  rows?: number;
+  cols?: number;
+  since?: number;
+  startedAt?: WireDate;
+  folder?: URLString;
+}
+
+export interface ShellAttachResponse {
+  state: ShellState;
+  scrollback: Base64;
+  dropped: number;
+  startedAt: WireDate;
+  folder?: URLString;
+  offset?: number;
+}
+
+export interface ShellInputRequest {
+  agentID: UUID;
+  shell?: number;
+  bytes: Base64;
+  rows?: number;
+  cols?: number;
+}
+
+export interface ShellListResponse {
+  shells: number[];
+}
+
+export interface ShellOpenResponse {
+  shell: number;
+}
+
+export interface ShellOutputNotification {
+  agentID: UUID;
+  shell: number;
+  bytes: Base64;
+  offset?: number;
+}
+
+export interface ShellRequest {
+  agentID: UUID;
+  shell?: number;
+}
+
+export interface ShellResizeRequest {
+  agentID: UUID;
+  shell?: number;
+  rows: number;
+  cols: number;
+}
+
+export interface ShellSignalRequest {
+  agentID: UUID;
+  shell?: number;
+  signal: number;
+}
+
+export type ShellState =
+  | { live: Record<string, never> }
+  | { exited: { status: number } }
+  | { failed: { reason: string } }
+  | { released: { reason: string } };
+
+export interface ShellStateNotification {
+  agentID: UUID;
+  shell: number;
+  state: ShellState;
 }
 
 export interface ShowFileNotification {
@@ -2749,7 +2845,12 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   FilesChangedNotification: { required: ["agentID", "folders"], optional: ["many"] },
   FilesListRequest: { required: ["agentID", "folder"], optional: [] },
   FilesReadRequest: { required: ["agentID", "path"], optional: ["knownStamp"] },
+  FilesSaveTextRequest: { required: ["path", "text"], optional: ["onlyIfAbsent"] },
+  FilesText: { required: [], optional: ["text"] },
+  FilesTextRequest: { required: ["path"], optional: [] },
   FilesWatchRequest: { required: ["agentID", "folder"], optional: [] },
+  FilesWriteRequest: { required: ["agentID", "name", "data"], optional: [] },
+  FilesWriteResponse: { required: ["path"], optional: [] },
   FolderHunk: { required: ["oldStart", "newStart", "noNewlineAtEnd", "lines"], optional: [] },
   GitAsk: { required: ["server", "from"], optional: [] },
   GuardedChange: { required: ["path", "changedBy", "changedByIDs", "byGit", "since"], optional: ["digest", "askedIn"] },
@@ -2852,6 +2953,16 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   SetPinnedRequest: { required: ["folder", "pinned"], optional: [] },
   SetSandboxRequest: { required: ["agentID"], optional: ["choice"] },
   SetUnreadRequest: { required: ["agentID", "unread"], optional: [] },
+  ShellAttachRequest: { required: ["agentID"], optional: ["shell", "rows", "cols", "since", "startedAt", "folder"] },
+  ShellAttachResponse: { required: ["state", "scrollback", "dropped", "startedAt"], optional: ["folder", "offset"] },
+  ShellInputRequest: { required: ["agentID", "bytes"], optional: ["shell", "rows", "cols"] },
+  ShellListResponse: { required: ["shells"], optional: [] },
+  ShellOpenResponse: { required: ["shell"], optional: [] },
+  ShellOutputNotification: { required: ["agentID", "shell", "bytes"], optional: ["offset"] },
+  ShellRequest: { required: ["agentID"], optional: ["shell"] },
+  ShellResizeRequest: { required: ["agentID", "rows", "cols"], optional: ["shell"] },
+  ShellSignalRequest: { required: ["agentID", "signal"], optional: ["shell"] },
+  ShellStateNotification: { required: ["agentID", "shell", "state"], optional: [] },
   ShowFileNotification: { required: ["agentID", "file"], optional: [] },
   ShownFile: { required: ["path"], optional: ["line", "chart"] },
   SlackSet: { required: [], optional: ["enabled", "memberID", "appToken", "botToken"] },

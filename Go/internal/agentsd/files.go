@@ -2,7 +2,6 @@ package agentsd
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -208,18 +207,6 @@ func expandHome(p string) string {
 }
 
 // raw serves a method not yet in the OpenRPC document, with its own params type.
-func raw[P any](d *Daemon, name string, h func(ctx context.Context, c *Client, p P) (any, error)) {
-	d.handlers[name] = func(ctx context.Context, c *Client, b json.RawMessage) (any, error) {
-		var p P
-		if len(b) > 0 && string(b) != "null" {
-			if err := json.Unmarshal(b, &p); err != nil {
-				return nil, Invalid("%s: %v", name, err)
-			}
-		}
-		return h(ctx, c, p)
-	}
-}
-
 func (d *Daemon) registerFiles() {
 	On(d, wire.CallFilesList, func(ctx context.Context, c *Client, r wire.FilesListRequest) (wire.DirectoryListing, error) {
 		dir, err := d.scoped(r.AgentID, r.Folder)
@@ -279,56 +266,47 @@ func (d *Daemon) registerFiles() {
 		return wire.Empty{}, nil
 	})
 
-	// Not in the OpenRPC document yet: settings files, and attachments.
-	type textRequest struct {
-		Path         string `json:"path"`
-		Text         string `json:"text"`
-		OnlyIfAbsent bool   `json:"onlyIfAbsent"`
-	}
-	raw(d, "files/readText", func(ctx context.Context, c *Client, r textRequest) (any, error) {
+	// Settings files, and attachments.
+	On(d, wire.CallFilesReadText, func(ctx context.Context, c *Client, r wire.FilesTextRequest) (wire.FilesText, error) {
 		path := expandHome(r.Path)
 		b, err := os.ReadFile(path)
 		if os.IsNotExist(err) {
-			return wire.Empty{}, nil
+			return wire.FilesText{}, nil
 		}
 		if err != nil || len(b) > 1<<20 {
-			return nil, fileError(CodeFileNotReadable, filepath.Base(path)+" can't be opened.")
+			return wire.FilesText{}, fileError(CodeFileNotReadable, filepath.Base(path)+" can't be opened.")
 		}
-		return map[string]string{"text": string(b)}, nil
+		text := string(b)
+		return wire.FilesText{Text: &text}, nil
 	})
-	raw(d, "files/saveText", func(ctx context.Context, c *Client, r textRequest) (any, error) {
+	On(d, wire.CallFilesSaveText, func(ctx context.Context, c *Client, r wire.FilesSaveTextRequest) (wire.Empty, error) {
 		path := expandHome(r.Path)
 		if len(r.Text) > 1<<20 {
-			return nil, Invalid("That is more than 1 MB.")
+			return wire.Empty{}, Invalid("That is more than 1 MB.")
 		}
-		if _, err := os.Stat(path); err == nil && r.OnlyIfAbsent {
+		if _, err := os.Stat(path); err == nil && r.OnlyIfAbsent != nil && *r.OnlyIfAbsent {
 			return wire.Empty{}, nil
 		}
 		if err := store.WriteAtomically(path, []byte(r.Text), 0o644); err != nil {
-			return nil, fileError(CodeFileNotReadable, err.Error())
+			return wire.Empty{}, fileError(CodeFileNotReadable, err.Error())
 		}
 		return wire.Empty{}, nil
 	})
-	type writeRequest struct {
-		AgentID wire.UUID `json:"agentID"`
-		Name    string    `json:"name"`
-		Data    []byte    `json:"data"`
-	}
-	raw(d, "files/write", func(ctx context.Context, c *Client, r writeRequest) (any, error) {
+	On(d, wire.CallFilesWrite, func(ctx context.Context, c *Client, r wire.FilesWriteRequest) (wire.FilesWriteResponse, error) {
 		root, err := d.agentFolder(r.AgentID)
 		if err != nil {
-			return nil, err
+			return wire.FilesWriteResponse{}, err
 		}
 		if len(r.Data) > 25<<20 {
-			return nil, Invalid("That is more than 25 MB.")
+			return wire.FilesWriteResponse{}, Invalid("That is more than 25 MB.")
 		}
 		dir := filepath.Join(root, ".agents", "attachments")
 		os.MkdirAll(dir, 0o700)
 		path := filepath.Join(dir, string(store.NewUUID())[:8]+"-"+filepath.Base(r.Name))
 		if err := os.WriteFile(path, r.Data, 0o600); err != nil {
-			return nil, fileError(CodeFileNotReadable, err.Error())
+			return wire.FilesWriteResponse{}, fileError(CodeFileNotReadable, err.Error())
 		}
-		return map[string]string{"path": path}, nil
+		return wire.FilesWriteResponse{Path: path}, nil
 	})
 }
 

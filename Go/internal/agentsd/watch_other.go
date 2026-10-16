@@ -6,4 +6,4 @@ package agentsd
 type folderWatch struct{}
 
 func newFolderWatch(string, func([]string)) (*folderWatch, error) { return &folderWatch{}, nil }
-func (*folderWatch) stop()                                          {}
+func (*folderWatch) stop()                                        {}

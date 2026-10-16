@@ -1206,9 +1206,33 @@ type FilesReadRequest struct {
 	KnownStamp *FileStamp `json:"knownStamp,omitzero"`
 }
 
+type FilesSaveTextRequest struct {
+	Path         string `json:"path"`
+	Text         string `json:"text"`
+	OnlyIfAbsent *bool  `json:"onlyIfAbsent,omitzero"`
+}
+
+type FilesText struct {
+	Text *string `json:"text,omitzero"`
+}
+
+type FilesTextRequest struct {
+	Path string `json:"path"`
+}
+
 type FilesWatchRequest struct {
 	AgentID UUID   `json:"agentID"`
 	Folder  string `json:"folder"`
+}
+
+type FilesWriteRequest struct {
+	AgentID UUID   `json:"agentID"`
+	Name    string `json:"name"`
+	Data    Data   `json:"data"`
+}
+
+type FilesWriteResponse struct {
+	Path string `json:"path"`
 }
 
 type FolderHunk struct {
@@ -2304,6 +2328,91 @@ type SetSandboxRequest struct {
 type SetUnreadRequest struct {
 	AgentID UUID `json:"agentID"`
 	Unread  bool `json:"unread"`
+}
+
+type ShellAttachRequest struct {
+	AgentID   UUID   `json:"agentID"`
+	Shell     *int64 `json:"shell,omitzero"`
+	Rows      *int64 `json:"rows,omitzero"`
+	Cols      *int64 `json:"cols,omitzero"`
+	Since     *int64 `json:"since,omitzero"`
+	StartedAt *Date  `json:"startedAt,omitzero"`
+	Folder    *URL   `json:"folder,omitzero"`
+}
+
+type ShellAttachResponse struct {
+	State      ShellState `json:"state"`
+	Scrollback Data       `json:"scrollback"`
+	Dropped    int64      `json:"dropped"`
+	StartedAt  Date       `json:"startedAt"`
+	Folder     *URL       `json:"folder,omitzero"`
+	Offset     *int64     `json:"offset,omitzero"`
+}
+
+type ShellInputRequest struct {
+	AgentID UUID   `json:"agentID"`
+	Shell   *int64 `json:"shell,omitzero"`
+	Bytes   Data   `json:"bytes"`
+	Rows    *int64 `json:"rows,omitzero"`
+	Cols    *int64 `json:"cols,omitzero"`
+}
+
+type ShellListResponse struct {
+	Shells []int64 `json:"shells"`
+}
+
+type ShellOpenResponse struct {
+	Shell int64 `json:"shell"`
+}
+
+type ShellOutputNotification struct {
+	AgentID UUID   `json:"agentID"`
+	Shell   int64  `json:"shell"`
+	Bytes   Data   `json:"bytes"`
+	Offset  *int64 `json:"offset,omitzero"`
+}
+
+type ShellRequest struct {
+	AgentID UUID   `json:"agentID"`
+	Shell   *int64 `json:"shell,omitzero"`
+}
+
+type ShellResizeRequest struct {
+	AgentID UUID   `json:"agentID"`
+	Shell   *int64 `json:"shell,omitzero"`
+	Rows    int64  `json:"rows"`
+	Cols    int64  `json:"cols"`
+}
+
+type ShellSignalRequest struct {
+	AgentID UUID   `json:"agentID"`
+	Shell   *int64 `json:"shell,omitzero"`
+	Signal  int64  `json:"signal"`
+}
+
+type ShellState struct {
+	Live     *struct{}           `json:"live,omitzero"`
+	Exited   *ShellStateExited   `json:"exited,omitzero"`
+	Failed   *ShellStateFailed   `json:"failed,omitzero"`
+	Released *ShellStateReleased `json:"released,omitzero"`
+}
+
+type ShellStateExited struct {
+	Status int64 `json:"status"`
+}
+
+type ShellStateFailed struct {
+	Reason string `json:"reason"`
+}
+
+type ShellStateReleased struct {
+	Reason string `json:"reason"`
+}
+
+type ShellStateNotification struct {
+	AgentID UUID       `json:"agentID"`
+	Shell   int64      `json:"shell"`
+	State   ShellState `json:"state"`
 }
 
 type ShowFileNotification struct {

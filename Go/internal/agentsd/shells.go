@@ -2,10 +2,9 @@ package agentsd
 
 import (
 	"context"
-	"encoding/json"
 	"os"
 	"os/exec"
-	"sort"
+	"slices"
 	"strings"
 	"sync"
 	"syscall"
@@ -17,35 +16,52 @@ import (
 	"github.com/alexec/agents/Go/wire"
 )
 
-// Terminals (shell/*) are not in the OpenRPC document yet: their records are typed here.
-
 // shell is a person's terminal (ShellSession.swift): $SHELL -l on a pty, its output kept
 // in a 4 MiB ring, each chunk numbered by its offset in everything it has printed.
 type shell struct {
-	agentID string
-	number  int
+	agentID wire.UUID
+	number  int64
 	folder  string
 	mu      sync.Mutex
 	cmd     *exec.Cmd
 	pty     *os.File
 	buf     []byte
-	dropped int
+	dropped int64
 	started wire.Date
-	state   map[string]any
+	state   wire.ShellState
 }
 
 const scrollbackLimit = 4 << 20
 
 type shellKey struct {
-	agent  string
-	number int
+	agent  wire.UUID
+	number int64
 }
 
-func liveState() map[string]any { return map[string]any{"live": map[string]any{}} }
+func key(agentID wire.UUID, number int64) shellKey {
+	return shellKey{wire.UUID(strings.ToUpper(string(agentID))), number}
+}
 
-func (d *Daemon) startShell(agentID string, number int, folder string, rows, cols int) (*shell, error) {
+func liveState() wire.ShellState { return wire.ShellState{Live: &struct{}{}} }
+
+// number is a request's shell, 0 when it names none, as Swift's decoder reads it.
+func number(n *int64) int64 {
+	if n == nil {
+		return 0
+	}
+	return *n
+}
+
+func or(n *int64, otherwise int64) int64 {
+	if n == nil || *n <= 0 {
+		return otherwise
+	}
+	return *n
+}
+
+func (d *Daemon) startShell(agentID wire.UUID, number int64, folder string, rows, cols int64) (*shell, error) {
 	if fi, err := os.Stat(folder); err != nil || !fi.IsDir() {
-		return nil, &Error{Code: -32010, Message: "The folder this agent works in is not there any more: " + folder}
+		return nil, &Error{Code: wire.FailureShellWillNotStart, Message: "The folder this agent works in is not there any more: " + folder}
 	}
 	sh := os.Getenv("SHELL")
 	if sh == "" {
@@ -54,15 +70,9 @@ func (d *Daemon) startShell(agentID string, number int, folder string, rows, col
 	cmd := exec.Command(sh, "-l")
 	cmd.Dir = folder
 	cmd.Env = append(os.Environ(), "TERM=xterm-256color", "TERM_PROGRAM=Agents")
-	if rows <= 0 {
-		rows = 24
-	}
-	if cols <= 0 {
-		cols = 80
-	}
 	f, err := pty.StartWithSize(cmd, &pty.Winsize{Rows: uint16(rows), Cols: uint16(cols)})
 	if err != nil {
-		return nil, &Error{Code: -32010, Message: "The shell would not start: " + err.Error()}
+		return nil, &Error{Code: wire.FailureShellWillNotStart, Message: "The shell would not start: " + err.Error()}
 	}
 	s := &shell{agentID: agentID, number: number, folder: folder, cmd: cmd, pty: f, started: now(), state: liveState()}
 	safe.Go("shell pump", func() { s.pump(d) })
@@ -76,13 +86,14 @@ func (s *shell) pump(d *Daemon) {
 		if n > 0 {
 			// Appended and sent under one lock, so a replay ends where the next chunk starts.
 			s.mu.Lock()
-			offset := s.dropped + len(s.buf)
+			offset := s.dropped + int64(len(s.buf))
 			s.buf = append(s.buf, b[:n]...)
 			if over := len(s.buf) - scrollbackLimit; over > 0 {
 				s.buf = append([]byte(nil), s.buf[over:]...)
-				s.dropped += over
+				s.dropped += int64(over)
 			}
-			broadcastRaw(d, "shell/output", map[string]any{"agentID": s.agentID, "shell": s.number, "bytes": b[:n], "offset": offset})
+			Broadcast(d, wire.NotifyShellOutput, wire.ShellOutputNotification{
+				AgentID: s.agentID, Shell: s.number, Bytes: wire.Data(b[:n]), Offset: &offset})
 			s.mu.Unlock()
 		}
 		if err != nil {
@@ -95,47 +106,35 @@ func (s *shell) pump(d *Daemon) {
 		status = e.ExitCode()
 	}
 	s.mu.Lock()
-	if _, released := s.state["released"]; !released {
-		s.state = map[string]any{"exited": map[string]any{"status": status}}
+	if s.state.Released == nil {
+		s.state = wire.ShellState{Exited: &wire.ShellStateExited{Status: int64(status)}}
 	}
 	state := s.state
 	s.mu.Unlock()
-	broadcastRaw(d, "shell/stateChanged", map[string]any{"agentID": s.agentID, "shell": s.number, "state": state})
+	Broadcast(d, wire.NotifyShellStateChanged, wire.ShellStateNotification{AgentID: s.agentID, Shell: s.number, State: state})
 }
 
 func (s *shell) isLive() bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	_, ok := s.state["live"]
-	return ok
+	return s.state.Live != nil
 }
 
-func (s *shell) resize(rows, cols int) {
-	if rows > 0 && cols > 0 {
-		pty.Setsize(s.pty, &pty.Winsize{Rows: uint16(rows), Cols: uint16(cols)})
+func (s *shell) resize(rows, cols *int64) {
+	if rows != nil && cols != nil && *rows > 0 && *cols > 0 {
+		pty.Setsize(s.pty, &pty.Winsize{Rows: uint16(*rows), Cols: uint16(*cols)})
 	}
-}
-
-type shellRequest struct {
-	AgentID   string `json:"agentID"`
-	Shell     int    `json:"shell"`
-	Rows      int    `json:"rows"`
-	Cols      int    `json:"cols"`
-	Folder    string `json:"folder"`
-	Since     *int   `json:"since"`
-	StartedAt *wire.Date  `json:"startedAt"`
-	Bytes     []byte `json:"bytes"`
 }
 
 // shellFolder: an agent's folder, or a project's for the project shell (Control-`), whose
 // id the window makes from the folder and this host takes as given.
-func (d *Daemon) shellFolder(r shellRequest) (string, error) {
-	if a := d.Store.Agent(wire.UUID(strings.ToUpper(r.AgentID))); a != nil {
+func (d *Daemon) shellFolder(r wire.ShellAttachRequest) (string, error) {
+	if a := d.Store.Agent(wire.UUID(strings.ToUpper(string(r.AgentID)))); a != nil {
 		return store.FolderPath(a.Cwd), nil
 	}
-	if r.Folder != "" {
+	if r.Folder != nil && *r.Folder != "" {
 		for _, p := range d.Store.Projects() {
-			if store.FolderPath(p.Folder) == store.FolderPath(wire.URL(r.Folder)) {
+			if store.FolderPath(p.Folder) == store.FolderPath(*r.Folder) {
 				return store.FolderPath(p.Folder), nil
 			}
 		}
@@ -144,164 +143,141 @@ func (d *Daemon) shellFolder(r shellRequest) (string, error) {
 	return "", &Error{Code: -32005, Message: "There is no such agent."}
 }
 
-func (d *Daemon) shellFor(agentID string, number int) *shell {
+func (d *Daemon) shellFor(agentID wire.UUID, number int64) *shell {
 	d.mu.Lock()
 	defer d.mu.Unlock()
-	return d.shells[shellKey{strings.ToUpper(agentID), number}]
+	return d.shells[key(agentID, number)]
 }
 
 func (d *Daemon) keepShell(s *shell) {
 	d.mu.Lock()
-	d.shells[shellKey{strings.ToUpper(s.agentID), s.number}] = s
+	d.shells[key(s.agentID, s.number)] = s
 	d.mu.Unlock()
 }
 
-func (s *shell) replay(since *int, startedAt *wire.Date) map[string]any {
+func (s *shell) replay(since *int64, startedAt *wire.Date) wire.ShellAttachResponse {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	out := map[string]any{"state": s.state, "dropped": s.dropped, "startedAt": s.started, "folder": fileURL(s.folder, true)}
-	end := s.dropped + len(s.buf)
+	folder := fileURL(s.folder, true)
+	out := wire.ShellAttachResponse{State: s.state, Dropped: s.dropped, StartedAt: s.started, Folder: &folder}
+	end := s.dropped + int64(len(s.buf))
 	if since != nil && startedAt != nil && *startedAt == s.started && *since >= s.dropped && *since <= end {
-		out["scrollback"] = append([]byte{}, s.buf[*since-s.dropped:]...)
-		out["offset"] = *since
+		out.Scrollback = append(wire.Data{}, s.buf[*since-s.dropped:]...)
+		offset := *since
+		out.Offset = &offset
 	} else {
-		out["scrollback"] = append([]byte{}, s.buf...)
+		out.Scrollback = append(wire.Data{}, s.buf...)
 	}
 	return out
 }
 
+func (d *Daemon) openShell(r wire.ShellAttachRequest, number int64) (*shell, error) {
+	folder, err := d.shellFolder(r)
+	if err != nil {
+		return nil, err
+	}
+	s, err := d.startShell(r.AgentID, number, folder, or(r.Rows, 24), or(r.Cols, 80))
+	if err != nil {
+		return nil, err
+	}
+	d.keepShell(s)
+	return s, nil
+}
+
 func (d *Daemon) registerShells() {
-	d.handle("shell/attach", func(ctx context.Context, c *Client, p json.RawMessage) (any, error) {
-		r, err := decode[shellRequest](p)
-		if err != nil {
-			return nil, Invalid("%v", err)
-		}
-		if s := d.shellFor(r.AgentID, r.Shell); s != nil {
+	On(d, wire.CallShellAttach, func(ctx context.Context, c *Client, r wire.ShellAttachRequest) (wire.ShellAttachResponse, error) {
+		if s := d.shellFor(r.AgentID, number(r.Shell)); s != nil {
 			return s.replay(r.Since, r.StartedAt), nil
 		}
-		folder, err := d.shellFolder(r)
+		s, err := d.openShell(r, number(r.Shell))
 		if err != nil {
-			return nil, err
+			return wire.ShellAttachResponse{}, err
 		}
-		s, err := d.startShell(r.AgentID, r.Shell, folder, r.Rows, r.Cols)
-		if err != nil {
-			return nil, err
-		}
-		d.keepShell(s)
 		return s.replay(nil, nil), nil
 	})
-	d.handle("shell/restart", func(ctx context.Context, c *Client, p json.RawMessage) (any, error) {
-		r, err := decode[shellRequest](p)
+	On(d, wire.CallShellRestart, func(ctx context.Context, c *Client, r wire.ShellAttachRequest) (wire.ShellAttachResponse, error) {
+		if s := d.shellFor(r.AgentID, number(r.Shell)); s != nil && s.isLive() {
+			return wire.ShellAttachResponse{}, &Error{Code: wire.FailureShellNotLive, Message: "That shell is still running."}
+		}
+		s, err := d.openShell(r, number(r.Shell))
 		if err != nil {
-			return nil, Invalid("%v", err)
+			return wire.ShellAttachResponse{}, err
 		}
-		if s := d.shellFor(r.AgentID, r.Shell); s != nil && s.isLive() {
-			return nil, &Error{Code: -32011, Message: "That shell is still running."}
-		}
-		folder, err := d.shellFolder(r)
-		if err != nil {
-			return nil, err
-		}
-		s, err := d.startShell(r.AgentID, r.Shell, folder, r.Rows, r.Cols)
-		if err != nil {
-			return nil, err
-		}
-		d.keepShell(s)
-		broadcastRaw(d, "shell/stateChanged", map[string]any{"agentID": r.AgentID, "shell": r.Shell, "state": liveState()})
+		Broadcast(d, wire.NotifyShellStateChanged, wire.ShellStateNotification{AgentID: r.AgentID, Shell: number(r.Shell), State: liveState()})
 		return s.replay(nil, nil), nil
 	})
-	d.handle("shell/open", func(ctx context.Context, c *Client, p json.RawMessage) (any, error) {
-		r, err := decode[shellRequest](p)
-		if err != nil {
-			return nil, Invalid("%v", err)
-		}
-		folder, err := d.shellFolder(r)
-		if err != nil {
-			return nil, err
-		}
-		n := 0
+	On(d, wire.CallShellOpen, func(ctx context.Context, c *Client, r wire.ShellAttachRequest) (wire.ShellOpenResponse, error) {
+		var n int64
 		for _, k := range d.shellNumbers(r.AgentID) {
 			n = max(n, k)
 		}
-		s, err := d.startShell(r.AgentID, n+1, folder, r.Rows, r.Cols)
-		if err != nil {
-			return nil, err
+		if _, err := d.openShell(r, n+1); err != nil {
+			return wire.ShellOpenResponse{}, err
 		}
-		d.keepShell(s)
-		return map[string]any{"shell": n + 1}, nil
+		return wire.ShellOpenResponse{Shell: n + 1}, nil
 	})
-	d.handle("shell/list", func(ctx context.Context, c *Client, p json.RawMessage) (any, error) {
-		r, _ := decode[shellRequest](p)
+	On(d, wire.CallShellList, func(ctx context.Context, c *Client, r wire.AgentRequest) (wire.ShellListResponse, error) {
 		ns := d.shellNumbers(r.AgentID)
 		if len(ns) == 0 {
-			ns = []int{0}
+			ns = []int64{0}
 		}
-		return map[string]any{"shells": ns}, nil
+		return wire.ShellListResponse{Shells: ns}, nil
 	})
-	d.handle("shell/input", func(ctx context.Context, c *Client, p json.RawMessage) (any, error) {
-		r, err := decode[shellRequest](p)
-		if err != nil {
-			return nil, Invalid("%v", err)
-		}
-		s := d.shellFor(r.AgentID, r.Shell)
+	On(d, wire.CallShellInput, func(ctx context.Context, c *Client, r wire.ShellInputRequest) (wire.Empty, error) {
+		s := d.shellFor(r.AgentID, number(r.Shell))
 		if s == nil || !s.isLive() {
-			return nil, &Error{Code: -32011, Message: "That shell is not running."}
+			return wire.Empty{}, &Error{Code: wire.FailureShellNotLive, Message: "That shell is not running."}
 		}
 		s.resize(r.Rows, r.Cols)
 		if _, err := s.pty.Write(r.Bytes); err != nil {
-			return nil, &Error{Code: -32011, Message: "That shell is not running."}
+			return wire.Empty{}, &Error{Code: wire.FailureShellNotLive, Message: "That shell is not running."}
 		}
 		return wire.Empty{}, nil
 	})
-	d.handle("shell/resize", func(ctx context.Context, c *Client, p json.RawMessage) (any, error) {
-		r, _ := decode[shellRequest](p)
-		if s := d.shellFor(r.AgentID, r.Shell); s != nil {
-			s.resize(r.Rows, r.Cols)
+	On(d, wire.CallShellResize, func(ctx context.Context, c *Client, r wire.ShellResizeRequest) (wire.Empty, error) {
+		if s := d.shellFor(r.AgentID, number(r.Shell)); s != nil {
+			s.resize(&r.Rows, &r.Cols)
 		}
 		return wire.Empty{}, nil
 	})
-	d.handle("shell/detach", func(ctx context.Context, c *Client, p json.RawMessage) (any, error) { return wire.Empty{}, nil })
-	d.handle("shell/signal", func(ctx context.Context, c *Client, p json.RawMessage) (any, error) {
-		r, _ := decode[struct {
-			AgentID string `json:"agentID"`
-			Shell   int    `json:"shell"`
-			Signal  int    `json:"signal"`
-		}](p)
-		if s := d.shellFor(r.AgentID, r.Shell); s != nil && s.cmd.Process != nil {
+	On(d, wire.CallShellDetach, func(ctx context.Context, c *Client, r wire.ShellRequest) (wire.Empty, error) {
+		return wire.Empty{}, nil
+	})
+	On(d, wire.CallShellSignal, func(ctx context.Context, c *Client, r wire.ShellSignalRequest) (wire.Empty, error) {
+		if s := d.shellFor(r.AgentID, number(r.Shell)); s != nil && s.cmd.Process != nil {
 			syscall.Kill(-s.cmd.Process.Pid, syscall.Signal(r.Signal))
 		}
 		return wire.Empty{}, nil
 	})
-	d.handle("shell/close", func(ctx context.Context, c *Client, p json.RawMessage) (any, error) {
-		r, _ := decode[shellRequest](p)
-		s := d.shellFor(r.AgentID, r.Shell)
+	On(d, wire.CallShellClose, func(ctx context.Context, c *Client, r wire.ShellRequest) (wire.Empty, error) {
+		s := d.shellFor(r.AgentID, number(r.Shell))
 		if s == nil {
 			return wire.Empty{}, nil
 		}
 		s.mu.Lock()
-		s.state = map[string]any{"released": map[string]any{"reason": "This shell was closed."}}
+		s.state = wire.ShellState{Released: &wire.ShellStateReleased{Reason: "This shell was closed."}}
 		s.mu.Unlock()
 		if s.cmd.Process != nil {
 			s.cmd.Process.Kill()
 		}
 		s.pty.Close()
 		d.mu.Lock()
-		delete(d.shells, shellKey{strings.ToUpper(r.AgentID), r.Shell})
+		delete(d.shells, key(r.AgentID, number(r.Shell)))
 		d.mu.Unlock()
 		return wire.Empty{}, nil
 	})
 }
 
-func (d *Daemon) shellNumbers(agentID string) []int {
+func (d *Daemon) shellNumbers(agentID wire.UUID) []int64 {
 	d.mu.Lock()
 	defer d.mu.Unlock()
-	var ns []int
+	var ns []int64
 	for k := range d.shells {
-		if k.agent == strings.ToUpper(agentID) {
+		if k.agent == key(agentID, 0).agent {
 			ns = append(ns, k.number)
 		}
 	}
-	sort.Ints(ns)
+	slices.Sort(ns)
 	return ns
 }
 
@@ -318,19 +294,4 @@ func (d *Daemon) stopShells() {
 			syscall.Kill(-s.cmd.Process.Pid, syscall.SIGHUP)
 		}
 	}
-}
-
-func decode[T any](p json.RawMessage) (T, error) {
-	var v T
-	if len(p) == 0 || string(p) == "null" {
-		return v, nil
-	}
-	return v, json.Unmarshal(p, &v)
-}
-
-func (d *Daemon) handle(name string, h Handler) { d.handlers[name] = h }
-
-// broadcastRaw sends a notification not yet in the OpenRPC document to every client.
-func broadcastRaw(d *Daemon, method string, params any) {
-	Broadcast(d, wire.Notification[any]{Name: method}, params)
 }
