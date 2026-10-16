@@ -620,9 +620,12 @@ private struct PromptHead: View {
     let agent: Agent
     /// The project folder's branch, for an agent working there rather than in a worktree.
     @State private var projectBranch: String?
+    @Environment(\.horizontalSizeClass) private var sizeClass
+    /// At compact width the labels are one line until tapped (#1107).
+    @State private var editingLabels = false
 
     var body: some View {
-        HStack(alignment: .top, spacing: 10) {
+        HStack(alignment: sizeClass == .compact && !editingLabels ? .center : .top, spacing: 10) {
             if let place {
                 Text(place)
                     .lineLimit(1)
@@ -636,7 +639,7 @@ private struct PromptHead: View {
             // The labels take the width the place leaves, not half of it: a Spacer beside
             // them was as flexible as their wrapping row, so the two split it and the
             // chips wrapped beside empty space (#670).
-            RemoteSessionLabels(agent: agent, compact: false)
+            labels
                 .frame(maxWidth: .infinity, alignment: .leading)
             Text(PromptWords.runtimeName(agent.runtimeID))
                 .lineLimit(1)
@@ -650,6 +653,46 @@ private struct PromptHead: View {
         // Asked once a chat, as the window asks: the branch is not on the agent's record.
         .task(id: "\(agent.id)-\(agent.cwd.path)") {
             projectBranch = agent.worktree == nil ? await model.projectFolderBranch(of: agent) : nil
+        }
+    }
+
+    /// On an iPhone, one line: the first label and +N, or Add label with none. A tap opens
+    /// the whole field in place, focused, and it folds again when the field loses the focus.
+    /// The iPad has the room for the field (#1107).
+    @ViewBuilder private var labels: some View {
+        if sizeClass != .compact {
+            RemoteSessionLabels(agent: agent, compact: false)
+        } else if editingLabels {
+            HStack(alignment: .top, spacing: 6) {
+                LabelTagField(labels: agent.labels,
+                              suggestions: model.labelSuggestions(in: agent.projectFolder),
+                              add: { values in Task { _ = await model.setLabels(on: agent.id, add: values) } },
+                              remove: { value in Task { _ = await model.setLabels(on: agent.id, remove: [value]) } },
+                              focusFirst: true,
+                              onEndEditing: { editingLabels = false })
+                // With five labels there is no field to lose the focus: this folds it.
+                Button("Done") { editingLabels = false }
+                    .appText(.fine)
+                    .buttonStyle(.plain)
+                    .foregroundStyle(Paper.accent)
+                    .padding(.vertical, 3)
+            }
+        } else {
+            Button { editingLabels = true } label: {
+                if agent.labels.isEmpty {
+                    Label("Add label", systemImage: "plus")
+                        .labelStyle(.titleAndIcon)
+                        .appText(.fine)
+                        .foregroundStyle(.secondary)
+                } else {
+                    RemoteCompactLabelRow(labels: agent.labels)
+                }
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(agent.labels.isEmpty
+                ? "Add label"
+                : "Labels: \(agent.labels.map(\.value).joined(separator: ", "))")
+            .accessibilityHint("Edits the labels.")
         }
     }
 
