@@ -892,6 +892,25 @@
       }
     },
     {
+      "name": "cost/setLimits",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/SetLimitsRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/CostState"
+        }
+      }
+    },
+    {
       "name": "cost/state",
       "tags": [
         {
@@ -3627,6 +3646,20 @@
           "required": true,
           "schema": {
             "$ref": "daemon.schema.json#/definitions/CloneNotification"
+          }
+        }
+      ]
+    },
+    {
+      "name": "cost/changed",
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/CostState"
           }
         }
       ]

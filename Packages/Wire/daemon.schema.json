@@ -7815,6 +7815,44 @@
       ],
       "additionalProperties": false
     },
+    "SetLimitsRequest": {
+      "type": "object",
+      "properties": {
+        "perAgent": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Cost"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "daily": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Cost"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "perAgentTokens": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "dailyTokens": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
     "SetOptionRequest": {
       "type": "object",
       "properties": {

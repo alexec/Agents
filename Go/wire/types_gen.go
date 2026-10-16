@@ -2536,6 +2536,13 @@ type SetLabelsRequest struct {
 	Remove  []string `json:"remove"`
 }
 
+type SetLimitsRequest struct {
+	PerAgent       *Cost  `json:"perAgent,omitzero"`
+	Daily          *Cost  `json:"daily,omitzero"`
+	PerAgentTokens *int64 `json:"perAgentTokens,omitzero"`
+	DailyTokens    *int64 `json:"dailyTokens,omitzero"`
+}
+
 type SetOptionRequest struct {
 	AgentID  UUID      `json:"agentID"`
 	OptionID string    `json:"optionID"`
