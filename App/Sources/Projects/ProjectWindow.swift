@@ -44,19 +44,7 @@ extension AppModel {
         let window = projectWindows[key] ?? ProjectWindowState(key: key)
         window.windows += 1
         if projectWindows[key] == nil { projectWindows[key] = window }
-        // What it was opened to show (#1090): a session from the launcher or a notification.
-        if let pick = pendingProjectPicks.removeValue(forKey: key) { window.pick = pick }
         return window
-    }
-
-    /// A session in its project's window, opened for it if it is not open (#1090): what the
-    /// launcher's cards, and a notification with Launcher on, do.
-    func openInProjectWindow(_ id: UUID) {
-        if showInProjectWindow(id) { return }
-        guard let agent = work.agent(id) else { return openAgent(id) }
-        let key = ProjectKey(host: agent.host, folder: agent.projectFolder)
-        pendingProjectPicks[key] = .session(id)
-        openProjectWindow?(key)
     }
 
     /// Its window has closed. The last one lets it go.

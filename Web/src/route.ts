@@ -6,7 +6,6 @@
 // to that project until ‹ All.
 // Every step is a history entry, so the browser's own Back moves between columns (US6).
 import { signal } from "@preact/signals";
-import { homeWindow } from "./model/launcher";
 
 export type ActivityPage = "events" | "resources" | "runtimes" | "mcp" | "worktrees" | "spending" | "tokens" | "time" | "milestones";
 
@@ -108,11 +107,10 @@ export function aloneURL(host: string, folder: string): string {
 }
 
 /** ‹ All: the tab shows every project again, at the project it held. */
-export function showAll(launcher: boolean = homeWindow.peek() === "launcher"): void {
+export function showAll(): void {
   const held = alone.peek();
   alone.value = undefined;
-  // With Launcher on (#1090), back to the cards; else to the project among every project.
-  go(held && !launcher ? { host: held.host, project: held.folder } : {});
+  go(held ? { host: held.host, project: held.folder } : {});
 }
 
 /** Goes to `next` as a new history entry. */

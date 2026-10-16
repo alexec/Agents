@@ -143,7 +143,7 @@ export function Sidebar({ session, store, linkDown }: { session: Session; store:
       <header class="column-head sidebar-head">
         {/* The root list's title at a phone's width, as the iPhone's (#235). */}
         {held ? <>
-          <button class="link back-all" aria-label="All projects" onClick={() => showAll()}>‹ All</button>
+          <button class="link back-all" aria-label="All projects" onClick={showAll}>‹ All</button>
           <h1 class="alone-title">{projects[0] ? projectLabel(projects[0].host, projects[0].project) : "Project"}</h1>
         </> : <h1 class="narrow-only">Agents</h1>}
         <input class="search" type="search" placeholder="Search" aria-label="Search sessions and workflows"

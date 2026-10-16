@@ -7,9 +7,7 @@
 import { useEffect } from "preact/hooks";
 import type { Store } from "../model/store";
 import { folderKey } from "../model/groups";
-import { alone, go, replace, route } from "../route";
-import { homeWindow } from "../model/launcher";
-import { Launcher } from "./Launcher";
+import { replace, route } from "../route";
 import { setPane, textShownAs } from "./files/paneState";
 import type { Session } from "../session";
 import { Banner } from "./Banner";
@@ -54,32 +52,6 @@ export function Columns({ session, store }: { session: Session; store: Store }) 
     else setPane(shown.agentID, { tab: "files", file: shown.path, fileLine: shown.line, last: shown.path });
     if (!route.peek().files) replace({ ...route.peek(), files: true });
   }, [shown?.at, r.session]);
-  // With Launcher on (#1090), a project is always alone in its tab (#1089), and #/ is the cards.
-  const launcher = homeWindow.value === "launcher";
-  useEffect(() => {
-    if (launcher && !alone.peek() && r.host && r.project) alone.value = { host: r.host, folder: r.project };
-  }, [launcher, r.host, r.project]);
-  if (launcher && !alone.value && !(r.host && r.project)) {
-    return (
-      <div class={`app launcher-home${down ? " down" : ""}`}>
-        {down && <Banner session={session} />}
-        <DiskStrip store={store} />
-        <Problem store={store} />
-        <div class="columns" aria-busy={down}>
-          {r.settings || r.activity ? (
-            <div class="launcher-page">
-              <button class="link launcher-back" onClick={() => go({})}>‹ Projects</button>
-              {r.settings ? <SettingsPage store={store} /> : <ActivityPageView store={store} page={r.activity!} />}
-            </div>
-          ) : <Launcher store={store} />}
-        </div>
-        <NewProjectDialog store={store} />
-        <ContextMenu />
-        <MilestoneCard store={store} />
-        <Celebration store={store} />
-      </div>
-    );
-  }
   return (
     <div class={`app depth-${depth}${r.files && r.session ? " files-open" : ""}${down ? " down" : ""}`}>
       {down && <Banner session={session} />}

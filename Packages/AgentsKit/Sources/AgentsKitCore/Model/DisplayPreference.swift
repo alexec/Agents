@@ -22,8 +22,6 @@ public enum DisplayPreference {
     /// The marketplace last chosen in Add Skill and Add MCP Server.
     public static let skillsMarketplace = "catalog.skills.marketplace"
     public static let mcpMarketplace = "catalog.mcp.marketplace"
-    /// The main window's style (#1090): a `HomeWindow` raw value; none is All projects.
-    public static let homeWindow = "homeWindow"
 
     /// The ones kept as a plain value in a client's defaults, and the kind of each.
     public enum Kind: Sendable { case bool, string }
@@ -31,6 +29,5 @@ public enum DisplayPreference {
         turnDetail: .string, smartGroupsOff: .string,
         showsArchivedProjects: .bool, showsActivity: .bool, showsUsage: .bool,
         startRuntimeID: .string, skillsMarketplace: .string, mcpMarketplace: .string,
-        homeWindow: .string,
     ]
 }
