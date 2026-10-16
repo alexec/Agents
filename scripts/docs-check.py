@@ -36,7 +36,7 @@ PRIVATE = [
     (re.compile(r"\bghp_[A-Za-z0-9]"), "a GitHub token"),
     (re.compile(r"\bgithub_pat_"), "a GitHub token"),
     (re.compile(r"\bsk-ant-"), "an Anthropic key"),
-    (re.compile(r"\bxox[abp]-"), "a Slack token"),
+    (re.compile(r"\bxox[abp]-[A-Za-z0-9]"), "a Slack token"),
 ]
 IPV4 = re.compile(r"(?<![\d.])(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})(?![\d.])")
 IPV4_ALLOWED = {"127.0.0.1", "0.0.0.0"}
