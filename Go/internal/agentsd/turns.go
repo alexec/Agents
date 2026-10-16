@@ -542,6 +542,7 @@ func (d *Daemon) end(l *live, s wire.AgentState, why wire.EndedReason) {
 	l.mu.Lock()
 	last := l.lastMessage.String()
 	l.mu.Unlock()
+	var requested, archiveNow bool
 	d.change(l.id, func(a *wire.Agent) {
 		a.State, a.EndedReason = s, reason(why)
 		a.RestartPickUps = nil // any ending but the daemon's going clears the count
@@ -557,10 +558,12 @@ func (d *Daemon) end(l *live, s wire.AgentState, why wire.EndedReason) {
 			}
 			a.Report = &wire.WorkReport{Outcome: outcome, Message: message, At: now()}
 		}
+		requested, archiveNow = d.settleArchiveRequest(a, s, why)
 	})
 	d.record(l.id, stateChanged(s, reason(why)))
 	// The event after the record (042): what a waiting agent hears and what the log keeps.
-	d.raiseAgentEnding(l.id, s, reason(why))
+	d.raiseAgentEnding(l.id, s, reason(why), archiveNow)
+	d.afterArchiveRequest(l.id, requested, archiveNow)
 	// What the turn did to the app's own files is looked at as it ends (guardedTurnEnded).
 	d.guardedTurnEnded(l.id)
 }

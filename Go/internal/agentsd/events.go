@@ -667,14 +667,16 @@ func endedCode(r wire.EndedReason) string {
 
 // raiseAgentEnding is agent.finished, agent.stopped or agent.failed. Stopped is somebody
 // or something choosing to stop it; failed is everything that ended it that nobody chose.
-func (d *Daemon) raiseAgentEnding(id wire.UUID, next wire.AgentState, why *wire.EndedReason) {
+func (d *Daemon) raiseAgentEnding(id wire.UUID, next wire.AgentState, why *wire.EndedReason, archiving ...bool) {
 	a := d.Store.Agent(id)
 	if a == nil {
 		return
 	}
 	if next == wire.AgentStateFinished {
 		details := map[string]string{"afterwards": "stay"}
-		if a.ArchiveRequest != nil && a.ArchiveRequest.Requested != nil {
+		if len(archiving) > 0 && archiving[0] {
+			details["afterwards"] = "archived"
+		} else if a.ArchiveRequest != nil && a.ArchiveRequest.Requested != nil {
 			details["afterwards"] = "archive_requested"
 		}
 		sentence := "finished."
