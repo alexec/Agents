@@ -54,8 +54,23 @@ func (f *fakeRuntime) ResumeSession(_ context.Context, r sdk.ResumeSessionReques
 	}
 	return sdk.ResumeSessionResponse{}, nil
 }
-func (f *fakeRuntime) NewSession(context.Context, sdk.NewSessionRequest) (sdk.NewSessionResponse, error) {
-	return sdk.NewSessionResponse{SessionId: "fake-session"}, nil
+
+// NewSession in a folder called offers offers a model, and a command a moment after.
+func (f *fakeRuntime) NewSession(_ context.Context, r sdk.NewSessionRequest) (sdk.NewSessionResponse, error) {
+	var out sdk.NewSessionResponse
+	if filepath.Base(r.Cwd) != "offers" {
+		return sdk.NewSessionResponse{SessionId: "fake-session"}, nil
+	}
+	json.Unmarshal([]byte(`{"sessionId":"fake-session","configOptions":[{"type":"select","id":"model","name":"Model",
+		"currentValue":"opus","options":[{"value":"opus","name":"Opus"},{"value":"sonnet","name":"Sonnet"}]}]}`), &out)
+	go func() {
+		<-f.ready
+		time.Sleep(50 * time.Millisecond)
+		var u sdk.SessionUpdate
+		json.Unmarshal([]byte(`{"sessionUpdate":"available_commands_update","availableCommands":[{"name":"review","description":"Review the change"}]}`), &u)
+		f.conn.SessionUpdate(context.Background(), sdk.SessionNotification{SessionId: "fake-session", Update: u})
+	}()
+	return out, nil
 }
 func (f *fakeRuntime) Cancel(context.Context, sdk.CancelNotification) error { return nil }
 func (f *fakeRuntime) SetSessionConfigOption(context.Context, sdk.SetSessionConfigOptionRequest) (sdk.SetSessionConfigOptionResponse, error) {
