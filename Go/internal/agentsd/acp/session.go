@@ -15,6 +15,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -58,10 +59,15 @@ type Session struct {
 	client    *client
 	stderr    *tail
 	done      chan struct{}
+	// Continued is whether Start picked the runtime's own conversation back up; Lost is
+	// whether it had one to continue and the runtime no longer had it.
+	Continued, Lost bool
 }
 
-// Start launches the runtime, says initialize and session/new.
-func Start(ctx context.Context, l Launch, sink Sink, mcp []sdk.McpServer, meta map[string]any) (*Session, error) {
+// Start launches the runtime and says initialize, then continues the conversation it
+// names (session/resume where the runtime offers it, else session/load with its replay
+// dropped), or begins one with session/new: also when the runtime no longer has it.
+func Start(ctx context.Context, l Launch, sink Sink, mcp []sdk.McpServer, meta map[string]any, continuing string) (*Session, error) {
 	argv := append([]string{l.Command}, l.Args...)
 	if l.Wrap != nil {
 		argv = l.Wrap(argv)
@@ -108,6 +114,17 @@ func Start(ctx context.Context, l Launch, sink Sink, mcp []sdk.McpServer, meta m
 	if mcp == nil {
 		mcp = []sdk.McpServer{}
 	}
+	if continuing != "" {
+		if err := s.continueSession(ictx, continuing, l.Dir, mcp, meta); err == nil {
+			s.Continued = true
+			s.ID = sdk.SessionId(continuing)
+			return s, nil
+		} else if errors.Is(err, context.DeadlineExceeded) {
+			s.Stop()
+			return nil, fmt.Errorf("the runtime did not answer: %w%s", err, stderr.say())
+		}
+		s.Lost = true
+	}
 	s.NewResult, err = s.conn.NewSession(ictx, sdk.NewSessionRequest{Cwd: l.Dir, McpServers: mcp, Meta: meta})
 	if err != nil {
 		s.Stop()
@@ -115,6 +132,29 @@ func Start(ctx context.Context, l Launch, sink Sink, mcp []sdk.McpServer, meta m
 	}
 	s.ID = s.NewResult.SessionId
 	return s, nil
+}
+
+// continueSession is ACPSession.continueSession: resume where it is offered, else load,
+// whose replay of the conversation is not recorded again.
+func (s *Session) continueSession(ctx context.Context, id, cwd string, mcp []sdk.McpServer, meta map[string]any) error {
+	caps := s.Init.AgentCapabilities
+	switch {
+	case caps.SessionCapabilities.Resume != nil:
+		r, err := s.conn.ResumeSession(ctx, sdk.ResumeSessionRequest{SessionId: sdk.SessionId(id), Cwd: cwd, McpServers: mcp, Meta: meta})
+		if err == nil {
+			s.NewResult.ConfigOptions = r.ConfigOptions
+		}
+		return err
+	case caps.LoadSession:
+		s.client.replaying.Store(true)
+		defer s.client.replaying.Store(false)
+		r, err := s.conn.LoadSession(ctx, sdk.LoadSessionRequest{SessionId: sdk.SessionId(id), Cwd: cwd, McpServers: mcp, Meta: meta})
+		if err == nil {
+			s.NewResult.ConfigOptions = r.ConfigOptions
+		}
+		return err
+	}
+	return errors.New("the runtime can neither resume nor load a conversation")
 }
 
 // Prompt sends one turn and waits for its end. The reply can overtake the last updates,
@@ -212,6 +252,9 @@ type client struct {
 	mu        sync.Mutex
 	terminals map[string]*terminal
 	next      int
+	// replaying is set while a session/load replays the conversation, which is already on
+	// the record.
+	replaying atomic.Bool
 	// raw is each elicitation/create's params as the runtime sent them, oldest first. The
 	// SDK's typed request drops what the form is drawn from (propertyOrder, requestId).
 	raw []json.RawMessage
@@ -317,6 +360,9 @@ func (e *rawElicitations) keep(line []byte) {
 
 func (c *client) SessionUpdate(ctx context.Context, n sdk.SessionNotification) (err error) {
 	defer safe.Err("acp SessionUpdate", &err)
+	if c.replaying.Load() {
+		return nil
+	}
 	c.sink.Update(n)
 	return nil
 }

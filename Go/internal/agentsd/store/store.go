@@ -109,7 +109,9 @@ func mend(a *wire.Agent) bool {
 		if a.EndedReason == nil {
 			a.EndedReason = reason(wire.EndedReasonUnrecognised)
 		}
-	case a.State == wire.AgentStateStarting, a.State == wire.AgentStateRunning, a.State == wire.AgentStateWaitingOnUser:
+	case a.State == wire.AgentStateStarting && (a.EndedReason != nil || a.ArchivedReason != nil):
+		// A start that carries an ending was cut off as it began (AgentStore's mend). The
+		// rest left working are the daemon's to find (DaemonCore+Recovery).
 		a.State = wire.AgentStateStopped
 		a.EndedReason = reason(wire.EndedReasonDaemonGone)
 		a.ArchivedReason = nil

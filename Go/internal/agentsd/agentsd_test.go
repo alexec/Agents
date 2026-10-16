@@ -103,7 +103,9 @@ func TestASwiftRootIsServed(t *testing.T) {
 	os.WriteFile(filepath.Join(dir, "agent.json"), b, 0o644)
 	tb, _ := os.ReadFile(filepath.Join(fix, "transcript.jsonl"))
 	os.WriteFile(filepath.Join(dir, "transcript.jsonl"), tb, 0o644)
-	lines := strings.Count(string(tb), "\n")
+	// The fixture's agent was left running: its record also says it stopped with the
+	// daemon, a note and its ending (DaemonCore+Recovery).
+	lines := strings.Count(string(tb), "\n") + 2
 
 	_, c := start(t, root)
 	var agents []wire.Agent

@@ -89,7 +89,9 @@ func TestARootSwiftWroteOpens(t *testing.T) {
 
 func mustJSON(v any) string { b, _ := json.Marshal(v); return string(b) }
 
-func TestARunningAgentEndsDaemonGone(t *testing.T) {
+// A record left running is the daemon's to find (DaemonCore+Recovery); only a start that
+// carries an ending is mended here.
+func TestARunningAgentIsLeftForTheDaemon(t *testing.T) {
 	root := t.TempDir()
 	s, _ := Open(root)
 	a := wire.Agent{ID: NewUUID(), RuntimeID: "claude", Cwd: "file:///w/", State: wire.AgentStateRunning,
@@ -99,7 +101,7 @@ func TestARunningAgentEndsDaemonGone(t *testing.T) {
 	}
 	s, _ = Open(root)
 	got := s.Agent(a.ID)
-	if got.State != wire.AgentStateStopped || got.EndedReason == nil || *got.EndedReason != wire.EndedReasonDaemonGone {
+	if got.State != wire.AgentStateRunning {
 		t.Fatalf("%v %v", got.State, got.EndedReason)
 	}
 	if got.MadeInRoot == nil || *got.MadeInRoot != s.RootID {

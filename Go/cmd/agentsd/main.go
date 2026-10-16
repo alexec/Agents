@@ -97,6 +97,7 @@ func main() {
 		join(ctx, cl, d)
 	}
 	log.Printf("agentsd %s on %s, root %s", buildinfo.String(), platform(), cl.root)
+	d.PickUpAfterRestart()
 	<-ctx.Done()
 	log.Printf("shutting down")
 	d.Shutdown()
