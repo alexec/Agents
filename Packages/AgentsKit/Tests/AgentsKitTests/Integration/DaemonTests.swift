@@ -57,7 +57,9 @@ struct DaemonTests {
         let launcher = FakeLauncher(script: script)
         let core = try core(launcher, locations: locations)
 
-        let id = try await core.start(.init(runtimeID: "copilot", cwd: work, prompt: "say hello"))
+        // Claude, briefed in its system prompt (#1080): a runtime briefed in its first
+        // prompt has its first turn's title held off.
+        let id = try await core.start(.init(runtimeID: "claude", cwd: work, prompt: "say hello"))
         // The title too, not just the state. It comes down the session's event stream
         // and lands after the turn has ended, so an agent read on the state alone is
         // still wearing the placeholder made from the prompt.

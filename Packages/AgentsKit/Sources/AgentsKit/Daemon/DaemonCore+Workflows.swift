@@ -1040,13 +1040,15 @@ extension DaemonCore {
         let draftID = UUID()
         // A workflow's agent follows the runtime's default (064, FR-011).
         let sandbox = resolveSandbox(runtimeID: runtime.id, override: nil, starter: nil).choice
+        // As a workflow's agent starts (#1080): no persona, nobody's helper.
+        let standing = systemPrompt(runtimeID: runtime.id, persona: nil, project: folder, startedBy: nil)
         let pending = Task { [self] in
             try await freshSession(runtimeID: runtime.id, cwd: folder, mcpServers: [],
-                                   sandbox: sandbox)
+                                   sandbox: sandbox, systemPrompt: standing)
         }
         let draft = Draft(runtimeID: runtime.id, cwd: folder,
                           mcpServers: [], personalServers: PersonalDotAgents.mcpStamp(home: locations.personalHome),
-                          pending: pending, sandbox: sandbox)
+                          pending: pending, sandbox: sandbox, standing: standing)
         drafts[draftID] = draft
 
         let made: DaemonCore.MadeSession

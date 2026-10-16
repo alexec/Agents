@@ -113,7 +113,10 @@ struct HelperAgentTests {
         @Sendable func briefings() async -> [String] {
             var texts: [String] = []
             for agent in launcher.allAgents {
-                if let text = await agent.promptContent?.arrayValue?.first?["text"]?.stringValue { texts.append(text) }
+                // Claude's briefing is its system prompt (#1080).
+                if let text = await agent.newSessionParams?["_meta"]?["systemPrompt"]?["append"]?.stringValue {
+                    texts.append(text)
+                }
             }
             return texts
         }

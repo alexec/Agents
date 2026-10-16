@@ -65,6 +65,8 @@ Picking a persona:
 
 You can still change anything before you start.
 
-The prompt is sent with the agent's first prompt, before your words, and again whenever the
+On Claude and Grok, the prompt goes in the session's system prompt, after the app's
+briefing, and is given again each time the conversation is picked back up. On the other
+runtimes, it is sent with the agent's first prompt, before your words, and again whenever the
 conversation starts over. It is read from the file each time, and is not shown in the
 transcript.

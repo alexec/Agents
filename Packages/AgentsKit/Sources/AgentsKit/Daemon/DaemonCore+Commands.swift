@@ -19,15 +19,19 @@ extension DaemonCore {
         // As the runtime's default would have it: an override chosen in the form after
         // this makes the start let the draft go (064).
         let sandbox = resolveSandbox(runtimeID: request.runtimeID, override: nil, starter: nil).choice
+        // The person's, with no persona yet (#1080): one picked in the form lets it go.
+        let standing = systemPrompt(runtimeID: request.runtimeID, persona: nil, project: request.cwd, startedBy: nil)
         let pending = Task { [self] in
             try await freshSession(runtimeID: request.runtimeID, cwd: request.cwd,
-                                   mcpServers: request.mcpServers, sandbox: sandbox)
+                                   mcpServers: request.mcpServers, sandbox: sandbox,
+                                   systemPrompt: standing)
         }
         drafts[draftID] = Draft(runtimeID: request.runtimeID, cwd: request.cwd,
                                 mcpServers: request.mcpServers,
                                 personalServers: PersonalDotAgents.mcpStamp(home: locations.personalHome),
                                 pending: pending,
                                 sandbox: sandbox,
+                                standing: standing,
                                 connection: connection)
         let key = OptionCache.key(runtimeID: request.runtimeID, cwd: request.cwd,
                                   mcpServers: request.mcpServers)
@@ -284,8 +288,15 @@ extension DaemonCore {
         // extra folders, which a draft is never made with (#230).
         let draft = request.draftID.flatMap { drafts.removeValue(forKey: $0) }
         let sandbox = resolveSandbox(runtimeID: request.runtimeID, override: request.sandbox, starter: starter)
+        // The briefing and persona as system prompt, where the runtime takes one (#1080),
+        // fixed when the session is made. A writer's prompt is its whole briefing.
+        let standing = request.purpose == nil
+            ? systemPrompt(runtimeID: request.runtimeID, persona: request.persona, project: request.cwd,
+                           startedBy: starter)
+            : nil
         let usable = draft.flatMap { $0.runtimeID == request.runtimeID && $0.cwd == cwd
                                      && $0.sandbox == sandbox.choice
+                                     && $0.standing == standing
                                      && $0.mcpServers == request.mcpServers
                                      && request.additionalDirectories.isEmpty
                                      && $0.personalServers == PersonalDotAgents.mcpStamp(home: locations.personalHome) ? $0 : nil }
@@ -312,7 +323,8 @@ extension DaemonCore {
                                               additionalDirectories: request.additionalDirectories,
                                               mcpServers: request.mcpServers,
                                               sandbox: sandbox.choice,
-                                              purpose: request.purpose)
+                                              purpose: request.purpose,
+                                              systemPrompt: standing)
             } catch {
                 await undoWorktree(placed, for: request.worktree)
                 throw error
@@ -475,7 +487,8 @@ extension DaemonCore {
                               additionalDirectories: [URL] = [],
                               mcpServers: [MCPServer] = [],
                               sandbox: SandboxChoice = .runtime,
-                              purpose: AgentPurpose? = nil) async throws -> MadeSession {
+                              purpose: AgentPurpose? = nil,
+                              systemPrompt: String? = nil) async throws -> MadeSession {
         guard let runtime = RuntimeCatalog.runtime(id: runtimeID) else {
             throw JSONRPCError(code: DaemonAPI.Failure.runtimeNotFound,
                                message: "There is no runtime called \(runtimeID).")
@@ -529,7 +542,8 @@ extension DaemonCore {
                                                       meta: purpose != nil
                                                           ? writerSessionMeta(runtimeID: runtimeID, sandbox: sandbox)
                                                           : sessionMeta(runtimeID: runtimeID, cwd: cwd,
-                                                                        sandbox: sandbox))
+                                                                        sandbox: sandbox,
+                                                                        systemPrompt: systemPrompt))
             return MadeSession(session: session, sessionID: result.sessionId,
                                runtime: runtime, appToken: token)
         } catch {
@@ -1266,8 +1280,10 @@ extension DaemonCore {
                                                capabilities: handshake.agentCapabilities?.mcpCapabilities)
 
         // The same scoping a new conversation gets, so an agent picked back up is not
-        // quietly wider than one started this minute (FR-012).
-        let meta = sessionMeta(runtimeID: agent.runtimeID, cwd: agent.cwd, sandbox: sandbox.choice)
+        // quietly wider than one started this minute (FR-012). With its system prompt
+        // again (#1080): a picked-up session reads `_meta` afresh, and a new one needs it.
+        let meta = sessionMeta(runtimeID: agent.runtimeID, cwd: agent.cwd, sandbox: sandbox.choice,
+                               systemPrompt: systemPrompt(for: agent))
 
         // Only what this start learns is carried across the awaits below. The rest of
         // the record is read again at the end: a start takes seconds, and a prompt
@@ -1421,29 +1437,19 @@ extension DaemonCore {
         //
         // The runtime is read first on purpose: an agent that has somehow gone keeps its
         // place in the queue rather than having the briefing quietly spent on nobody.
-        var briefed = false
-        if let runtimeID = agents[agentID]?.runtimeID, needsBriefing.remove(agentID) != nil {
-            briefed = true
-            // With what the person declared on this machine, and what each is for (#116).
-            loadDeclaredIfNeeded()
-            // Who is who (#121): the runtime by its display name, the person by theirs,
-            // and a helper's starter by title.
-            let starter = agents[agentID]?.startedByAgent.map { agents[$0]?.title }
-            let naming = Briefing.Naming(runtime: RuntimeCatalog.runtime(id: runtimeID)?.name ?? runtimeID,
-                                         person: personSettings.effectiveName(),
-                                         pronouns: personSettings.givenPronouns,
-                                         startedBy: starter.map { $0 ?? "" })
-            ours.append(.text(Briefing.text(for: ToolPolicyCatalog.policy(for: runtimeID),
-                                            movesItself: RuntimeCatalog.canMoveFolders(runtimeID: runtimeID),
-                                            naming: naming, declared: declaredResources)))
-        }
-        // The persona it was started as (#760), with the briefing and for the same
-        // reason: standing context, once per conversation. Read now, so an edit to the
-        // file reaches the next conversation, and from the project the agent belongs to.
-        if briefed, let agent = agents[agentID], let id = agent.persona,
-           let found = PersonaFile.find(id, project: agent.projectFolder, home: locations.personalHome),
-           !found.prompt.isEmpty {
-            ours.append(.text(found.prompt))
+        //
+        // With the persona it was started as (#760), for the same reason: standing
+        // context, once per conversation. A runtime that takes a system prompt was given
+        // both with its session (#1080) and hears neither here, so the title it makes
+        // from this prompt is about the person's words. One that takes none hears them
+        // here, and its title waits for the next prompt: until then it would describe
+        // our words, and the one cut from the person's stands.
+        titleHeldOff.remove(agentID)
+        if let agent = agents[agentID], needsBriefing.remove(agentID) != nil,
+           RuntimeCatalog.systemPromptDelivery(runtimeID: agent.runtimeID) == nil {
+            ours += standingWords(runtimeID: agent.runtimeID, persona: agent.persona,
+                                  project: agent.projectFolder, startedBy: agent.startedByAgent).map { .text($0) }
+            titleHeldOff.insert(agentID)
         }
         // What the app owes the agent about this prompt, and only the agent (042).
         if let preface { ours.append(.text(preface)) }

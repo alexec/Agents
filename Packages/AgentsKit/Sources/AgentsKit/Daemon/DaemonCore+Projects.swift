@@ -311,10 +311,14 @@ extension DaemonCore {
     ///
     /// Only the plugins the person has approved (security review, S2): one waiting is in
     /// neither the `_meta` nor the index until they do.
+    ///
+    /// With the briefing and persona as system prompt, for a runtime that takes one (#1080).
     func sessionMeta(runtimeID: String, cwd: URL,
-                     sandbox: SandboxChoice = .runtime) -> JSONValue? {
-        Self.merging(scopingMeta(runtimeID: runtimeID, cwd: cwd),
-                     LaunchSandbox.meta(runtimeID: runtimeID, choice: sandbox))
+                     sandbox: SandboxChoice = .runtime,
+                     systemPrompt: String? = nil) -> JSONValue? {
+        Self.adding(systemPrompt: systemPrompt, runtimeID: runtimeID,
+                    to: Self.merging(scopingMeta(runtimeID: runtimeID, cwd: cwd),
+                                     LaunchSandbox.meta(runtimeID: runtimeID, choice: sandbox)))
     }
 
     private func scopingMeta(runtimeID: String, cwd: URL) -> JSONValue? {
