@@ -1,9 +1,9 @@
 import AgentsKitCore
 import SwiftUI
 
-/// Slack (#1009): the control plane sends an agent's waiting question to the person's
-/// Slack direct messages, and a reply there answers it. The tokens go to the control plane
-/// and are never read back, shown or kept on this device.
+/// Settings ▸ Channels ▸ Slack (#1009, #1109): the control plane sends an agent's waiting
+/// question to the person's Slack direct messages, and a reply there answers it. The tokens
+/// go to the control plane and are never read back, shown or kept on this device.
 struct SlackSettingsSection: View {
     @Environment(RemoteModel.self) private var model
     @State private var enabled = false

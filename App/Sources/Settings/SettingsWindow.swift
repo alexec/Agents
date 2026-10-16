@@ -5,7 +5,7 @@ import SwiftUI
 /// The Settings window (055, look/ frames A–G): one rail down the left and the chosen pane
 /// beside it. It opens at one size for every pane, so choosing another never makes the
 /// window jump, and it can be resized larger than that. The rail has one row for each pane
-/// (#1076); Agent Runtimes, Agent Configuration and Control plane list their own pages in
+/// (#1076); Agent Runtimes, Agent Configuration, Control plane and Channels list their own pages in
 /// a column inside the pane.
 struct SettingsWindow: View {
     @Environment(AppModel.self) private var model
@@ -17,6 +17,7 @@ struct SettingsWindow: View {
     /// back to the front, which is when an edit made elsewhere shows.
     @State private var sharedSnapshot: DaemonAPI.SharedSnapshot?
     @State private var controlPage: ControlPage = .overview
+    @State private var channelPage: ChannelPage = .overview
     /// Settings ▸ Control plane's own view of the control plane, while the window has one
     /// (058). Without one, Devices and Servers are listed as they always were.
     @State private var control: ControlSettingsModel? = ControlConfig.endpoint.flatMap { ControlSettingsModel(endpoint: $0) }
@@ -78,7 +79,7 @@ struct SettingsWindow: View {
         .onChange(of: model.needsFirstRun) { _, unpaired in
             control?.stop()
             control = unpaired ? nil : ControlConfig.endpoint.flatMap { ControlSettingsModel(endpoint: $0) }
-            if unpaired, pane.wrappedValue == .controlPlane { pane.wrappedValue = .appearance }
+            if unpaired, [.controlPlane, .channels].contains(pane.wrappedValue) { pane.wrappedValue = .appearance }
             if let control { Task { await control.start() } }
         }
         // Asked for from elsewhere in the app: a link that names a Settings pane.
@@ -127,6 +128,13 @@ struct SettingsWindow: View {
                     ControlSettingsView(control: control, page: $controlPage)
                 }
             }
+        case .channels:
+            if let control {
+                HStack(spacing: 0) {
+                    ChannelPageList(control: control, page: $channelPage)
+                    ChannelsSettingsView(control: control, page: $channelPage)
+                }
+            }
         }
     }
 
@@ -140,6 +148,8 @@ enum SettingsPane: String, Hashable, CaseIterable {
     case appearance = "general"
     case sidebar, account, mac
     case runtimes, spending, resources, controlPlane
+    /// Where agents' questions go when the person is away (#1109): Slack first.
+    case channels
     /// Was Shared (#754): the raw value is what a window left open on it kept.
     case agentConfiguration = "shared"
 
@@ -154,6 +164,7 @@ enum SettingsPane: String, Hashable, CaseIterable {
         case .spending: "Cost"
         case .resources: "Resources"
         case .controlPlane: "Control plane"
+        case .channels: "Channels"
         }
     }
 
@@ -168,14 +179,15 @@ enum SettingsPane: String, Hashable, CaseIterable {
         case .spending: "dollarsign.circle"
         case .resources: "lock"
         case .controlPlane: "point.3.connected.trianglepath.dotted"
+        case .channels: "bubble.left.and.bubble.right"
         }
     }
 
     /// The panes about this app and this Mac (#846); the panes about agents; Agent
     /// Configuration; the control plane, whose hosts are the servers and whose clients are
-    /// the devices (058, frame D).
+    /// the devices (058, frame D), and its channels (#1109).
     static var groups: [[SettingsPane]] {
-        [[.appearance, .sidebar, .account, .mac], [.runtimes, .spending, .resources], [.agentConfiguration], [.controlPlane]]
+        [[.appearance, .sidebar, .account, .mac], [.runtimes, .spending, .resources], [.agentConfiguration], [.controlPlane, .channels]]
     }
 }
 

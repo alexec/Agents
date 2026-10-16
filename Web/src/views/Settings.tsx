@@ -1,8 +1,10 @@
 // This browser's Settings (#846), opened from the sidebar's foot, in the chat's place: what the
 // window has in Settings ▸ Appearance and Settings ▸ Sidebar. Celebrations (#986) is this
 // browser's alone, in its localStorage; which smart groups are on is the person's, kept on their
-// Mac and the same on every client (#1033). Slack (#1009) is the control plane's: where agents'
-// questions go when the person is away from their Mac.
+// Mac and the same on every client (#1033). Channels (#1109), Slack (#1009) first, are the
+// control plane's: where agents' questions go when the person is away from their Mac. Each has a
+// page of its own under Settings ▸ Channels.
+import type { ComponentChildren } from "preact";
 import { useEffect, useState } from "preact/hooks";
 import type { SlackState } from "../protocol/generated";
 import type { Store } from "../model/store";
@@ -10,6 +12,7 @@ import { describe } from "../model/errors";
 import { smartRows, smartTitles } from "../model/sidebar";
 import { setSmartGroup, smartGroupsOn } from "../model/smartGroups";
 import { BackToList } from "./BackToList";
+import { go, route } from "../route";
 import { celebrationsOn, setCelebrations } from "../model/celebrations";
 
 /** The words under the Sidebar section, as the window's and the Remote's (#846). */
@@ -25,6 +28,16 @@ export const slackSettingsFooter = "Answer agents' questions from Slack. Questio
 
 /** The how-to for Slack (#1009), on GitHub. */
 export const slackSetUpURL = "https://github.com/alexec/Agents/blob/main/docs/how-to/answer-questions-from-slack.md";
+
+/** Settings ▸ Channels' words under its list (#1109), as the window's and the Remote's. */
+export const channelsFooter = "Answer agents' questions from outside the app. Questions go to a channel when you are away from your Mac.";
+
+/** A channel's row on Settings ▸ Channels (#1109): its status line and whether its dot is lit. */
+export function channelStatus(slack: SlackState): { line: string; connected: boolean } {
+  if (!slack.available) return { line: "Not available", connected: false };
+  if (slack.status === "connected") return { line: "Connected", connected: true };
+  return { line: "Not connected", connected: false };
+}
 
 /** What the Slack status line says (#1009). */
 export function slackStatusLine(slack: SlackState): string {
@@ -76,8 +89,7 @@ function SlackSection({ store }: { store: Store }) {
   }
 
   return (
-    <section aria-labelledby="settings-slack">
-      <h2 class="section-head" id="settings-slack">Slack</h2>
+    <section aria-label="Slack">
       <p class="hint">
         {slackSettingsFooter}{" "}
         <a href={slackSetUpURL} target="_blank" rel="noopener noreferrer">Set-up steps</a>
@@ -116,8 +128,53 @@ function SlackSection({ store }: { store: Store }) {
   );
 }
 
+/** A page under Settings (#1109), in its place, with the way back up at its head. */
+function SettingsSubpage({ title, up, back, children }: { title: string; up: string; back: () => void; children: ComponentChildren }) {
+  return (
+    <section class="chat activity-page settings-page" aria-label={title}>
+      <header class="column-head"><button class="back" onClick={back}>‹ {up}</button><h1>{title}</h1></header>
+      <div class="scroll">
+        <div class="activity-body settings-body">{children}</div>
+      </div>
+    </section>
+  );
+}
+
+/** Settings ▸ Channels (#1109): a row for each channel the control plane knows; a row opens its page. */
+function ChannelsList({ store }: { store: Store }) {
+  useEffect(() => { void store.loadChannels(); }, []);
+  const slack = store.channels.value?.slack ?? null;
+  const status = slack ? channelStatus(slack) : null;
+  return (
+    <SettingsSubpage title="Channels" up="Settings" back={() => go({ settings: true })}>
+      <section aria-label="Channels">
+        {slack && status ? (
+          <button class="setting channel-row" onClick={() => go({ settings: true, settingsPage: "slack" })}
+            aria-label={`Slack, ${status.line}`}>
+            <span><span class={`channel-dot${status.connected ? " connected" : ""}`} aria-hidden="true" />Slack</span>
+            <span class="faint small">{status.line} ›</span>
+          </button>
+        ) : <p class="hint" role="status">This control plane has no channels.</p>}
+        <p class="hint">{channelsFooter}</p>
+      </section>
+    </SettingsSubpage>
+  );
+}
+
 export function SettingsPage({ store }: { store: Store }) {
+  const sub = route.value.settingsPage;
+  useEffect(() => { void store.loadChannels(); }, []);
+  if (sub === "channels") return <ChannelsList store={store} />;
+  if (sub === "slack") {
+    return (
+      <SettingsSubpage title="Slack" up="Channels" back={() => go({ settings: true, settingsPage: "channels" })}>
+        <SlackSection store={store} />
+      </SettingsSubpage>
+    );
+  }
   const on = smartGroupsOn.value;
+  // Nil from a control plane too old to know channels: no row at all.
+  const knowsChannels = !!store.channels.value?.slack;
   return (
     <section class="chat activity-page settings-page" aria-label="Settings">
       <header class="column-head"><BackToList /><h1>Settings</h1></header>
@@ -143,7 +200,14 @@ export function SettingsPage({ store }: { store: Store }) {
             ))}
             <p class="hint">{sidebarSettingsFooter}</p>
           </section>
-          <SlackSection store={store} />
+          {knowsChannels && (
+            <section aria-labelledby="settings-channels">
+              <h2 class="section-head" id="settings-channels">Channels</h2>
+              <button class="setting channel-row" onClick={() => go({ settings: true, settingsPage: "channels" })}>
+                <span>Channels</span><span class="faint small" aria-hidden="true">›</span>
+              </button>
+            </section>
+          )}
         </div>
       </div>
     </section>

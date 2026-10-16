@@ -90,7 +90,7 @@ In Slack, open your profile, choose **⋯**, then **Copy member ID**. It starts 
 
 ## 4. Turn it on
 
-Open the **Slack** section of Settings, on your Mac, iPhone, iPad or in a browser:
+Open **Settings ▸ Channels ▸ Slack**, on your Mac, iPhone, iPad or in a browser:
 
 1. Paste the app token and the bot token. They are written to the control plane's secrets,
    and are never shown again: the section says only **Set** or **Not set**.
@@ -119,7 +119,7 @@ SLACK_APP_TOKEN=xapp-…
 SLACK_BOT_TOKEN=xoxb-…
 ```
 
-Then set your member ID and the switch in Settings.
+Then set your member ID and the switch in Settings ▸ Channels ▸ Slack.
 
 ## Answer a question
 
@@ -136,6 +136,6 @@ When it is answered, the message says **Answered:** and what you chose.
 
 ## Turn it off
 
-Turn off **Send questions to Slack** in Settings and choose **Save**. To take the tokens
+Turn off **Send questions to Slack** in Settings ▸ Channels ▸ Slack and choose **Save**. To take the tokens
 away too, delete `~/.agents-secrets/channels.env`, and remove the app at
 <https://api.slack.com/apps>.

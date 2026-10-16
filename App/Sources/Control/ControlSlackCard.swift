@@ -1,7 +1,7 @@
 import AgentsKitCore
 import SwiftUI
 
-/// Settings ▸ Control plane ▸ Overview ▸ Slack (#1009): answer an agent's waiting question
+/// Settings ▸ Channels ▸ Slack (#1009, #1109): answer an agent's waiting question
 /// from Slack. The control plane holds the tokens. The token fields start empty, are never
 /// filled from it, and are cleared once saved.
 struct ControlSlackCard: View {
