@@ -77,9 +77,7 @@ struct DisplayPreferencesTests {
     }
 
     @MainActor @Test func theDefaultsMirrorTheHostAndSendWhatChangesHere() throws {
-        let name = "DisplayMirror-\(UUID().uuidString)"
-        let defaults = try #require(UserDefaults(suiteName: name))
-        defer { defaults.removePersistentDomain(forName: name) }
+        let defaults = MemoryDefaults()
         var sent: [DaemonAPI.DisplayPreferences] = []
         let mirror = DisplayPreferenceMirror(defaults: defaults) { sent.append($0) }
 
