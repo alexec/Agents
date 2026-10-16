@@ -37,6 +37,13 @@ public struct AllowanceReading: Codable, Hashable, Sendable {
         return used.map { 1 - $0 }
     }
 
+    /// How much of the window is used, from 0 to 1, where it is known: what the
+    /// Runtimes page's bar fills to (#1097). A spent window is full whatever it said.
+    public var usedFraction: Double? {
+        if spent { return 1 }
+        return used
+    }
+
     /// A window that has since reset says nothing about the new one.
     public func isCurrent(now: Date) -> Bool {
         guard let resetsAt else { return true }

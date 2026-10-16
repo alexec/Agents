@@ -79,6 +79,15 @@ struct AllowanceReadingTests {
         #expect(percent.used == 0.4)
     }
 
+    /// What the Runtimes page's bar fills to (#1097): the amount, full when spent, and
+    /// nothing when only a reset time is known.
+    @Test func theBarFillsToTheAmountUsed() {
+        #expect(AllowanceReading(used: 0.4, at: now).usedFraction == 0.4)
+        #expect(AllowanceReading(used: 0.4, spent: true, at: now).usedFraction == 1)
+        #expect(AllowanceReading(spent: true, at: now).usedFraction == 1)
+        #expect(AllowanceReading(window: "five_hour", resetsAt: now.addingTimeInterval(60), at: now).usedFraction == nil)
+    }
+
     @Test func aWindowThatHasResetSaysNothing() {
         let old = AllowanceReading(window: "five_hour", used: 0.9, resetsAt: now.addingTimeInterval(-1),
                                    at: now.addingTimeInterval(-3600))
