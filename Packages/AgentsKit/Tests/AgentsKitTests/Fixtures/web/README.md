@@ -14,4 +14,5 @@ a Swift rule fails here until the fixtures are written again, and then fails the
 the port follows. Do not edit these files by hand.
 
 Each folder's README names the Swift it pins. `overrides/` holds Swift-encoded samples of the
-types whose TypeScript is hand-written in `Packages/WebTypes/Overrides`.
+types whose Swift encoder is written by hand; `WireSchemaTests` and `Go/wire`'s round-trip test
+check them against `Packages/Wire/daemon.schema.json`.

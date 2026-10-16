@@ -1,5 +1,10 @@
 # Contract: generated protocol types
 
+> **Superseded by #1135.** `Packages/WebTypes` is gone. `Web/src/protocol/generated.ts` is now
+> made by `scripts/wire.sh gen` from `Packages/Wire` (the schema and the OpenRPC documents),
+> with the Go types; `WireSchemaTests` holds the Swift encoders to the schema. See
+> `Packages/Wire/README.md`. What follows is how it was made before.
+
 Research R6. The generator is `Packages/WebTypes` (`agents-webtypes`). Its output is
 `Web/src/protocol/generated.ts`.
 

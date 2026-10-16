@@ -1,16 +1,18 @@
 #!/bin/sh
 # The web remote (071): its generated types, its build, and the checks CI runs.
 #
-#   scripts/web.sh types   regenerate Web/src/protocol/generated.ts from AgentsKitCore's source
+#   scripts/web.sh types   regenerate Web/src/protocol/generated.ts: scripts/wire.sh gen (#1135)
 #   scripts/web.sh build   install the pinned packages and build Web/dist (needs Node)
 #   scripts/web.sh dist    what Agents Host's build runs first: build Web/dist when a source is
 #                          newer than it; with no Node (or another version), leave an empty one
 #                          and warn, so the app still builds and its web remote stays off
 #   scripts/web.sh test    the web app's tests (needs Node)
-#   scripts/web.sh check   everything CI checks: types fresh, and, when Node is here, a build,
+#   scripts/web.sh check   everything CI checks: types fresh (scripts/wire.sh check), and, when
+#                          Node is here, a build,
 #                          Web/dist matching its manifest, tsc, lint, licences and tests
 #
-# generated.ts is checked in: a change to a protocol type regenerates and commits it. Web/dist
+# generated.ts is checked in, made from Packages/Wire: a change to a protocol type changes the
+# schema there, regenerates and commits it. Web/dist
 # is not (#473): it is ignored, built here, and a pull request never carries it.
 set -eu
 
@@ -49,7 +51,7 @@ build() {
 
 case "${1:-}" in
 types)
-	exec swift run --package-path Packages/WebTypes agents-webtypes --root "$root"
+	exec scripts/wire.sh gen
 	;;
 build)
 	need_node build
@@ -73,7 +75,7 @@ test)
 	exec npm test
 	;;
 check)
-	scripts/build-cache.sh swift run --package-path Packages/WebTypes agents-webtypes --root "$root" --check
+	scripts/wire.sh check
 	if have_node; then
 		build
 		scripts/build-cache.sh swift test --package-path Packages/AgentsKit --filter 'WebDistManifestTests|ControlAgreementVectorTests'

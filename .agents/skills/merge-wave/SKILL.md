@@ -62,9 +62,9 @@ It prints a line per branch (merge sha, checks, or why it was dropped) and `SHIP
 
 ## What it settles, and what stops it
 
-- **`generated.ts` conflicts:** the merge stays open and the next step is `rebuild-web`
-  (under the lease). It runs `scripts/web.sh types` in the wave and commits the merge with
-  the regenerated file. `Web/dist` is not checked in (#473); a branch from before that which
+- **`generated.ts` and `Go/wire/*_gen.go` conflicts:** the merge stays open and the next step
+  is `rebuild-web` (under the lease). It runs `scripts/wire.sh gen` in the wave and commits the
+  merge with the regenerated files. `Web/dist` is not checked in (#473); a branch from before that which
   still carries it conflicts with its removal, and the wave keeps it removed.
 - **`specs/071-web-remote/walks/parity.md`:** both sides' rows are kept, as a union. If
   both lanes edited the same row, both copies stay: read the merged table before

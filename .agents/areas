@@ -29,6 +29,9 @@ Web/package*.json                                      build
 Web/.node-version                                      build
 # The Go module (#1135): its tooling and the wire types the daemon and control plane share.
 Go/                                                    build
+# The wire's schema (#1135): every client and host reads what it says.
+Packages/Wire/                                         build
+scripts/wire.sh                                        build
 
 # docs: the docs site and the specs, where no feature below claims a page.
 docs/                                                  docs
