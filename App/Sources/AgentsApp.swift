@@ -1,9 +1,12 @@
+import AgentsKitCore
 import AppKit
 import SwiftUI
 
 @main
 struct AgentsApp: App {
     @State private var model = AppModel()
+    /// The Dock's menu of projects (#1089).
+    @NSApplicationDelegateAdaptor(AgentsAppDelegate.self) private var delegate
 
     /// Light, dark or the Mac's own, from Settings. Applied to the whole app from here,
     /// once at launch and on every change, so no window decides for itself.
@@ -50,6 +53,15 @@ struct AgentsApp: App {
                 .environment(model)
         }
         .defaultSize(width: 640, height: 720)
+
+        // A project in a window of its own (#1089), from Open in New Window on its heading,
+        // ⌥⌘O, a double-click on the heading, the Window menu or the Dock. One per project:
+        // opening one already open brings it forward. Saved and opened again at launch.
+        WindowGroup(id: ProjectWindowScene.id, for: ProjectKey.self) { $key in
+            ProjectWindow(key: key)
+                .environment(model)
+        }
+        .defaultSize(width: 1_240, height: 760)
 
         // The app's first Settings scene, and what gives it ⌘, and the menu item.
         // A scene rather than a page beside Spending, which Spending itself is not:

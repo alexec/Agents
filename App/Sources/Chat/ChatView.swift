@@ -19,6 +19,9 @@ struct ChatView: View {
     @Environment(\.openURL) private var openURL
     /// Set in a window of its own (#826): this session, not the selection.
     @Environment(\.poppedChat) private var popped
+    /// Whether this window has an inspector: not a session's own window (#826), but a
+    /// project's does (#1089).
+    @Environment(\.windowHasInspector) private var hasInspector
     @State private var formHeight: CGFloat = 0
     /// The open chat's views (#187), torn down when another chat opens.
     @State private var views = AppViewStore()
@@ -32,8 +35,8 @@ struct ChatView: View {
                     Transcript(agent: agent, bottomInset: formHeight, cards: cards)
                         // What was exchanged, a swipe away, as on the phone.
                         .swipeToShowPane(show: {
-                            // A window of its own has no inspector (#826).
-                            guard popped == nil else { return }
+                            // A session's own window has no inspector (#826).
+                            guard hasInspector else { return }
                             frame.pane = .artifacts
                             if !frame.isOpen, SidebarFrame.fits(inWindowOf: frame.windowWidth) { frame.open() }
                         }, hide: { frame.isOpen = false })
@@ -126,20 +129,20 @@ struct ChatView: View {
             acting: { [model] agentID in model.acting(agentID) },
             recipient: { [model] agentID in model.answerRecipient(agentID) },
             // The sidebar's Changes pane, open at that edit (035 FR-014).
-            showEdit: { [model, frame, states, agent, popped] diff, toolCallID in
+            showEdit: { [model, frame, states, agent, hasInspector] diff, toolCallID in
                 guard let agent else { return }
                 // A window of its own has no Changes pane: the file opens in the editor (#826).
-                if popped != nil { return model.open(URL(filePath: diff.path), on: agent.host) }
+                if !hasInspector { return model.open(URL(filePath: diff.path), on: agent.host) }
                 states.state(for: agent.id).changesSelection = ChangesSelection(
                     path: ReportedChanges.key(diff.path), toolCallID: toolCallID)
                 frame.pane = .changes
                 if !frame.isOpen { frame.open() }
             },
             // The sidebar's Background pane, at that subagent (057, frame C).
-            subagentSteps: { [model, frame, states, agent, popped] id in
+            subagentSteps: { [model, frame, states, agent, hasInspector] id in
                 guard let agent else { return }
                 // The Background pane is the main window's: the session opens there (#826).
-                if popped != nil { return model.showInMainWindow(agent.id) }
+                if !hasInspector { return model.showInMainWindow(agent.id) }
                 states.state(for: agent.id).subagent = id
                 frame.pane = .background
                 if !frame.isOpen { frame.open() }
@@ -160,11 +163,11 @@ struct ChatView: View {
             retryKept: { [model] in await model.retryKept($0) },
             hostName: { [model] in model.hosts.label($0) },
             // A card in the chat opens its file in Files, as the agent's call did (#836).
-            showFile: { [model, frame, states, agent, popped] file in
+            showFile: { [model, frame, states, agent, hasInspector] file in
                 guard let agent else { return }
                 model.work.rememberChart(file)
                 // No Files pane in a window of its own: the file opens in the editor (#826).
-                if popped != nil { return model.open(file.url, on: agent.host) }
+                if !hasInspector { return model.open(file.url, on: agent.host) }
                 let state = states.state(for: agent.id)
                 state.folder = file.url.deletingLastPathComponent()
                 state.openFile = file.url

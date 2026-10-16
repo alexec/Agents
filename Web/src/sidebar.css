@@ -248,3 +248,10 @@
 /* Where files dropped on a row went (#934): under it, for a moment. Empty, it takes no room. */
 .with-sidebar .sidebar .drop-note { padding: 0 10px 4px 26px; font-size: 0.6875rem; color: var(--accent); }
 .with-sidebar .sidebar .drop-note:empty { padding: 0; }
+
+/* A tab holding one project alone (#1089): ‹ All and the project's name over its own list, and
+   "✋ N elsewhere" under it while another project needs the person. */
+.with-sidebar .sidebar-head button.link.back-all { flex: none; padding: 4px 2px; cursor: pointer; }
+.with-sidebar .sidebar-head h1.alone-title { flex-basis: 100%; margin: 6px 0 2px; font-size: 1.0625rem; text-align: left; }
+.sidebar button.link.elsewhere { display: block; margin: 12px 8px; padding: 0; font-size: 0.8125rem; cursor: pointer; text-align: left; }
+.sidebar button.link.elsewhere:hover { text-decoration: underline; }

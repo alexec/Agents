@@ -2,6 +2,8 @@
 // /w/<workflow> for a workflow's page in the chat's place (#98), /ar/1 for the project's archive (#499),
 // or #/a/<page> for an Activity page of the sidebar (#151): events, resources, runtimes, mcp (#589),
 // worktrees (#790), spending, tokens (#956) or time, or #/settings for this browser's Settings (#846).
+// A tab holding one project alone (#1089) starts #/o/1/…: Open in New Tab on its heading. It keeps
+// to that project until ‹ All.
 // Every step is a history entry, so the browser's own Back moves between columns (US6).
 import { signal } from "@preact/signals";
 
@@ -30,7 +32,12 @@ export interface Route {
   archive?: boolean | undefined;
   /** The project's MCP servers and how each is doing (#753), a page opened from its row in the sidebar. */
   mcp?: boolean | undefined;
+  /** This tab holds its project alone (#1089): the sidebar is that project's only. */
+  alone?: boolean | undefined;
 }
+
+/** The project this tab holds alone (#1089), from the address it was opened at; undefined for every project. */
+export interface AloneProject { host: string; folder: string }
 
 export function parseRoute(hash: string): Route {
   const path = hash.replace(/^#\/?/, "");
@@ -49,14 +56,19 @@ export function parseRoute(hash: string): Route {
       case "n": route.compose = value === "1"; break;
       case "ar": route.archive = value === "1"; break;
       case "m": route.mcp = value === "1"; break;
+      case "o": route.alone = value === "1"; break;
       case "a": if ((activityPages as readonly string[]).includes(value)) route.activity = value as ActivityPage; break;
     }
   }
   return route;
 }
 
-export function routeHash(route: Route): string {
+export function routeHash(route: Route, aloneIn: AloneProject | undefined = alone.peek()): string {
   const parts: string[] = [];
+  // In a tab holding one project, every place in it says so, so a reload or a copied link keeps it.
+  const held = aloneIn !== undefined && route.host === aloneIn.host && route.project !== undefined
+    && sameFolder(route.project, aloneIn.folder);
+  if (held || (route.alone && route.host && route.project)) parts.push("o", "1");
   if (route.settings) return "#/settings";
   if (route.activity) return "#/a/" + route.activity;
   if (route.host) parts.push("h", route.host);
@@ -71,8 +83,35 @@ export function routeHash(route: Route): string {
   return "#/" + parts.map(encodeURIComponent).join("/");
 }
 
-export const route = signal<Route>(parseRoute(location.hash));
-addEventListener("hashchange", () => (route.value = parseRoute(location.hash)));
+function sameFolder(a: string, b: string): boolean {
+  return a.replace(/\/+$/, "") === b.replace(/\/+$/, "");
+}
+
+/** The project the tab was opened to hold, from its address; kept until ‹ All lets it go. */
+export function aloneProject(r: Route): AloneProject | undefined {
+  return r.alone && r.host && r.project ? { host: r.host, folder: r.project } : undefined;
+}
+
+export const route = signal<Route>(parseRoute(globalThis.location?.hash ?? ""));
+export const alone = signal<AloneProject | undefined>(aloneProject(route.peek()));
+globalThis.addEventListener?.("hashchange", () => {
+  route.value = parseRoute(location.hash);
+  // Back to where the tab held one project, or a link to one: it holds it again.
+  const held = aloneProject(route.value);
+  if (held) alone.value = held;
+});
+
+/** The address of a tab holding this project alone (#1089): Open in New Tab on its heading. */
+export function aloneURL(host: string, folder: string): string {
+  return location.pathname + location.search + routeHash({ host, project: folder, compose: true, alone: true }, undefined);
+}
+
+/** ‹ All: the tab shows every project again, at the project it held. */
+export function showAll(): void {
+  const held = alone.peek();
+  alone.value = undefined;
+  go(held ? { host: held.host, project: held.folder } : {});
+}
 
 /** Goes to `next` as a new history entry. */
 export function go(next: Route): void {

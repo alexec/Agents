@@ -69,6 +69,13 @@ struct RemoteApp: App {
                 .environment(model)
         }
         .handlesExternalEvents(matching: [PoppedChat.activityType])
+
+        // A project in a scene of its own on an iPad (#1089), from its heading's menu. One
+        // scene per project: opening one already open brings it forward.
+        WindowGroup(id: RemoteProjectState.sceneID, for: ProjectKey.self) { $key in
+            RemoteProjectScene(key: key)
+                .environment(model)
+        }
     }
 }
 
@@ -143,6 +150,8 @@ struct RemoteView: View {
             .id(model.sidebarItem)
         }
         .navigationSplitViewStyle(.balanced)
+        // A project shown alone on an iPhone (#1089), over every project, with ‹ All.
+        .modifier(PhoneProjectCover())
         // A milestone just earned (#984), on the iPad: once, until closed or opened.
         .overlay(alignment: .bottomTrailing) {
             if let milestone = model.milestoneCard {
@@ -372,5 +381,24 @@ enum RemoteRoute: Hashable {
     var agentID: UUID? {
         if case .agent(let id) = self { return id }
         return nil
+    }
+}
+
+/// The project an iPhone shows alone (#1089), as the cover's item.
+private struct PhoneProject: Identifiable {
+    let key: ProjectKey
+    var id: String { key.stored }
+}
+
+/// The project an iPhone shows alone (#1089), over every project, with ‹ All.
+private struct PhoneProjectCover: ViewModifier {
+    @Environment(RemoteModel.self) private var model
+
+    func body(content: Content) -> some View {
+        content.fullScreenCover(item: Binding(get: { model.phoneProject.map(PhoneProject.init) },
+                                              set: { model.phoneProject = $0?.key })) { project in
+            RemoteProjectScene(key: project.key, back: { model.phoneProject = nil })
+                .environment(model)
+        }
     }
 }

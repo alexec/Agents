@@ -652,6 +652,14 @@ final class AppModel {
     var popouts: [UUID: PoppedChat] = [:]
     /// The one of them in the key window, if one is: what the person is watching.
     @ObservationIgnored var popoutInFront: UUID?
+    /// The projects open in windows of their own (#1089), each with what it shows.
+    var projectWindows: [ProjectKey: ProjectWindowState] = [:]
+    /// The project whose window's prompt the draft is for, while one is (#1089): there is
+    /// one draft, and it follows the window last composing in.
+    var composingWindow: ProjectKey?
+    /// Brings a project's window forward, or opens it: the scene's own action, handed
+    /// over by the first window to draw, for what is not a view (a notification).
+    @ObservationIgnored var openProjectWindow: ((ProjectKey) -> Void)?
 
     func scrollToEnd() { scrollToEndToken += 1 }
 
@@ -850,6 +858,8 @@ final class AppModel {
         // From the start, not once connected: a banner tapped to launch the app arrives
         // before then, and was dropped (#1055).
         notifier.open = { [weak self] agentID in
+            // In its project's own window when one is open (#1089, Alex).
+            if self?.showInProjectWindow(agentID) == true { return }
             // Its own project first, because picking a project empties the selection:
             // a chat opened from a banner under some other project's heading is a
             // sidebar and a page that disagree about where you are.
@@ -1061,6 +1071,10 @@ final class AppModel {
     /// Where a new agent, a draft, a worktree or a session list for the selected
     /// project goes: that project's host.
     private var selectedHostClient: DaemonClient { client(for: selectedProjectHost) }
+    /// Where a new session's prompt starts it: the project whose own window it is in
+    /// (#1089), or the selected one.
+    private var draftHost: HostID { composingWindow?.host ?? selectedProjectHost }
+    private var draftHostClient: DaemonClient { client(for: draftHost) }
     private var listening: Task<Void, Never>?
 
     /// The panes listening for shell output, one per shell in this window: an agent
@@ -4080,7 +4094,7 @@ final class AppModel {
         draftWorktreesGeneration += 1
         let generation = draftWorktreesGeneration
         guard let folder = draftCwd else { return }
-        let answer = (try? await selectedHostClient.call(DaemonAPI.Method.worktreesList,
+        let answer = (try? await draftHostClient.call(DaemonAPI.Method.worktreesList,
                                              DaemonAPI.WorktreesListRequest(folder: folder),
                                              returning: DaemonAPI.WorktreesListResponse.self))
             ?? .notARepository
@@ -4095,7 +4109,7 @@ final class AppModel {
     /// offers none, and the choice is not drawn.
     func loadDraftPersonas() async {
         guard let folder = draftCwd else { return }
-        let listed = (try? await selectedHostClient.call(DaemonAPI.Method.personasList,
+        let listed = (try? await draftHostClient.call(DaemonAPI.Method.personasList,
                                                          DaemonAPI.PersonasListRequest(folder: folder),
                                                          returning: [Persona].self)) ?? []
         guard folder == draftCwd else { return }
@@ -4165,7 +4179,7 @@ final class AppModel {
         letGo(draft: draftID)
         draftID = nil
         do {
-            let response = try await selectedHostClient.call(DaemonAPI.Method.agentsOptions,
+            let response = try await draftHostClient.call(DaemonAPI.Method.agentsOptions,
                                                  DaemonAPI.OptionsRequest(runtimeID: runtimeID, cwd: cwd,
                                                                           mcpServers: draftServers),
                                                  returning: DaemonAPI.OptionsResponse.self)
@@ -4189,7 +4203,7 @@ final class AppModel {
     private func letGo(draft: UUID?) {
         guard let draft else { return }
         Task {
-            _ = try? await selectedHostClient.call(DaemonAPI.Method.agentsDiscardDraft,
+            _ = try? await draftHostClient.call(DaemonAPI.Method.agentsDiscardDraft,
                                        DaemonAPI.DiscardDraftRequest(draftID: draft))
         }
     }
@@ -4268,31 +4282,36 @@ final class AppModel {
                                              worktree: draftWorktree,
                                              sandbox: draftSandbox, labels: labels, persona: draftPersona)
         // A stopped workspace that starts when used: kept, and shown under this prompt (#691 US3).
-        if selectedProjectHost != .mac, hosts.isOffline(selectedProjectHost), startsWhenUsed(selectedProjectHost) {
+        if draftHost != .mac, hosts.isOffline(draftHost), startsWhenUsed(draftHost) {
             var kept = request
             kept.draftID = nil
             kept.requestID = UUID()
-            guard let said = await keepThroughControl(selectedProjectHost, DaemonAPI.Method.agentsStart, kept) else { return false }
+            guard let said = await keepThroughControl(draftHost, DaemonAPI.Method.agentsStart, kept) else { return false }
             keptStartsShown.insert(said.id)
             return true
         }
         do {
-            let id = try await selectedHostClient.call(DaemonAPI.Method.agentsStart, request, returning: UUID.self)
+            let id = try await draftHostClient.call(DaemonAPI.Method.agentsStart, request, returning: UUID.self)
             draftID = nil
             // Back to the project folder, and the list fetched again: the start may
             // have made a worktree, and it has put an agent in one.
             draftWorktree = nil
             Task { await loadDraftWorktrees() }
-            if selectedProjectHost == .mac {
+            if draftHost == .mac {
                 await refreshAgents()
                 await refreshProjects()
             } else {
-                await refreshServer(selectedProjectHost)
+                await refreshServer(draftHost)
             }
             // Gone to, as the phone does: what you just asked for is what you want to
             // see start. Once the list has it, so the chat opens on a row that is there.
-            justStarted = id
-            selection = id
+            // Started in a project's own window, it opens there (#1089).
+            if let window = composingWindow.flatMap({ projectWindows[$0] }) {
+                window.show(started: id)
+            } else {
+                justStarted = id
+                selection = id
+            }
             draftSandboxRefusal = nil
             return true
         } catch let error as JSONRPCError where error.code == DaemonAPI.Failure.kept {
@@ -4304,10 +4323,10 @@ final class AppModel {
         } catch let error as JSONRPCError where error.code == DaemonAPI.Failure.sandboxWillNotStart {
             // Said over the prompt, which keeps what was typed, with the way on (064).
             draftSandboxRefusal = try? error.data?.decode(DaemonAPI.SandboxWillNotStart.self)
-            if draftSandboxRefusal == nil { fail(error, on: selectedProjectHost) }
+            if draftSandboxRefusal == nil { fail(error, on: draftHost) }
             return false
         } catch {
-            fail(error, on: selectedProjectHost)
+            fail(error, on: draftHost)
             return false
         }
     }

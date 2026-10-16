@@ -16,6 +16,10 @@ import SwiftUI
 /// in for a new chat, with the folder already set to this project.
 struct ProjectAgentsView: View {
     @Environment(AppModel.self) private var model
+    @Environment(\.appearsActive) private var appearsActive
+    /// The project of the window this is in, when that is a project's own (#1089): its
+    /// project, whatever the main window has selected.
+    @Environment(\.windowProject) private var windowProject
     @Binding var selection: UUID?
     /// What the Blobs over the page look at (#987): the prompt, and the pointer while it
     /// has focus.
@@ -23,8 +27,11 @@ struct ProjectAgentsView: View {
     @State private var typed = 0
     @State private var pointer: CGPoint?
 
-    private var folder: URL? { model.selectedProject }
-    private var summary: DaemonAPI.ProjectSummary? { model.selectedProjectSummary }
+    private var folder: URL? { windowProject?.folder ?? model.selectedProject }
+    private var summary: DaemonAPI.ProjectSummary? {
+        guard let windowProject else { return model.selectedProjectSummary }
+        return model.liveProjects.first { $0.key == windowProject }
+    }
 
     var body: some View {
         Group {
@@ -84,14 +91,20 @@ struct ProjectAgentsView: View {
         .onChange(of: folder) { _, folder in
             adopt(folder)
         }
+        // One draft for every window: it follows the one in front (#1089).
+        .onChange(of: appearsActive) { _, active in
+            if active { adopt(folder, again: true) }
+        }
         .task(id: folder) {
             if let folder { await model.refreshPlugins(in: folder) }
         }
     }
 
     /// Point the prompt at this project, so what you type starts an agent here.
-    private func adopt(_ folder: URL?) {
-        guard let folder, model.draftCwd != folder else { return }
+    private func adopt(_ folder: URL?, again: Bool = false) {
+        let window = model.composingWindow
+        model.composingWindow = windowProject
+        guard let folder, model.draftCwd != folder || (again && window != windowProject) else { return }
         model.draftCwd = folder
         Task { await model.loadDraftOptions() }
     }
@@ -102,7 +115,14 @@ struct ProjectAgentsView: View {
     /// on it from here. The one thing about the folder that is news here is that it has gone.
     private var heading: some View {
         VStack(spacing: 6) {
-            projectMenu
+            // No menu of projects in a project's own window: the window is the project.
+            if windowProject == nil {
+                projectMenu
+            } else {
+                Text(summary?.name ?? "Project")
+                    .appText(.title).fontWeight(.semibold)
+                    .lineLimit(1)
+            }
             personaMenu
             if let summary {
                 Text(place(summary))

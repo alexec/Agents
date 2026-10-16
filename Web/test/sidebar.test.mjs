@@ -491,3 +491,33 @@ test("the sidebar follows what the Mac says (#1033)", async () => {
   assert.equal(folds.showsStatus.value, true, "nothing said is the default");
   assert.equal(m.smartGroupsOn.value.has("working"), false, "Working is off at first (#979)");
 });
+
+test("a tab holding one project alone keeps it in every address in it, until ‹ All (#1089)", async () => {
+  globalThis.location = { hash: "#/o/1/h/mac/p/file%3A%2F%2F%2Fw%2Fa/n/1", pathname: "/", search: "" };
+  globalThis.addEventListener = () => {};
+  const went = [];
+  try {
+    const { alone, aloneURL, parseRoute, route, routeHash, showAll } = await load("src/route.ts");
+    assert.deepEqual(parseRoute(location.hash), { alone: true, host: "mac", project: "file:///w/a", compose: true });
+    assert.deepEqual(alone.value, { host: "mac", folder: "file:///w/a" }, "opened alone, it holds the project");
+    assert.equal(route.value.compose, true);
+    assert.equal(routeHash({ host: "mac", project: "file:///w/a/", session: "s" }),
+      "#/o/1/h/mac/p/file%3A%2F%2F%2Fw%2Fa%2F/s/s", "a session in it stays alone");
+    assert.equal(routeHash({ host: "mac", project: "file:///w/b", session: "t" }),
+      "#/h/mac/p/file%3A%2F%2F%2Fw%2Fb/s/t", "another project's is not");
+    assert.equal(aloneURL("box", "file:///w/c"), "/#/o/1/h/box/p/file%3A%2F%2F%2Fw%2Fc/n/1", "Open in New Tab");
+    Object.defineProperty(globalThis.location, "hash", { get: () => "", set: (h) => went.push(h), configurable: true });
+    showAll();
+    assert.equal(alone.value, undefined);
+    assert.deepEqual(went, ["#/h/mac/p/file%3A%2F%2F%2Fw%2Fa"], "‹ All goes to the project among every project");
+  } finally {
+    delete globalThis.location;
+    delete globalThis.addEventListener;
+  }
+});
+
+test("a tab holding one project is titled with its name (#1089)", async () => {
+  const { titleFor } = await load("src/presence.ts");
+  assert.equal(titleFor(0), "Agents");
+  assert.equal(titleFor(2, "alpha"), "(2) alpha");
+});

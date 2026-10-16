@@ -355,3 +355,20 @@ public struct ProjectKey: Hashable, Sendable, CustomStringConvertible {
 
     public var description: String { stored }
 }
+
+/// As its `stored` form, one string: what a project's own window is restored with (#1089).
+extension ProjectKey: Codable {
+    public init(from decoder: Decoder) throws {
+        let text = try decoder.singleValueContainer().decode(String.self)
+        guard let key = ProjectKey(stored: text) else {
+            throw DecodingError.dataCorrupted(.init(codingPath: decoder.codingPath,
+                                                    debugDescription: "Not host|path: \(text)"))
+        }
+        self = key
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(stored)
+    }
+}

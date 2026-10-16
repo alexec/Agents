@@ -10,6 +10,8 @@ import SwiftUI
 struct BackgroundPane: View {
     @Environment(AppModel.self) private var model
     @AppStorage(TurnDisplay.defaultsKey, store: WindowDefaults.store) private var turnDetail = TurnDisplay.initial
+    /// In a project's window, its session's own page of the transcript (#1089).
+    @Environment(\.poppedChat) private var popped
     let agent: Agent
     let state: AgentPaneState
 
@@ -21,7 +23,7 @@ struct BackgroundPane: View {
         Group {
             if let chosen {
                 SubagentStepsView(item: chosen,
-                                  entries: model.selection == agent.id ? model.entries : [],
+                                  entries: popped?.id == agent.id ? popped?.work.entries ?? [] : model.selection == agent.id ? model.entries : [],
                                   showsThinking: turnDetail == .details,
                                   back: { state.subagent = nil })
             } else if agent.background.isEmpty {

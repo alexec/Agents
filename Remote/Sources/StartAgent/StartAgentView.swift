@@ -13,6 +13,8 @@ import SwiftUI
 /// say, not this view's: by then the page has gone.
 struct StartAgentView: View {
     @Environment(RemoteModel.self) private var model
+    /// The project of the scene this is in, when that is a project's own (#1089).
+    @Environment(\.sceneProject) private var sceneProject
     let project: URL
 
     @State private var text = ""
@@ -31,6 +33,8 @@ struct StartAgentView: View {
     var body: some View {
         form
         .onAppear {
+            // What it starts opens in this scene (#1089).
+            model.composingScene = sceneProject
             model.startPageAppeared(in: project, page: page)
             let kept = StartDraftKeeper.shared.draft(in: project)
             text = kept?.text ?? ""
