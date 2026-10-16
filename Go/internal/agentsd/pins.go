@@ -250,8 +250,9 @@ func (f pinsFile) data() ([]byte, error) {
 }
 
 func (d *Daemon) readPins(project string) pinsFile {
-	b, err := os.ReadFile(pinsFileOf(project))
-	if err != nil {
+	// The approved copy while a change made outside the app waits (#502).
+	b, ok := d.guardedContent(project, pinsFilePath)
+	if !ok {
 		return pinsFile{}
 	}
 	f, err := readPinsFile(b)
@@ -263,6 +264,10 @@ func (d *Daemon) readPins(project string) pinsFile {
 
 // writePins removes an empty file, writes only what differs, and tells every client.
 func (d *Daemon) writePins(f pinsFile, project string) error {
+	if !d.settled(project, pinsFilePath) {
+		return pinRefused(guardedRefusal(pinsFilePath, "The pins were not changed: ").(*Error).Message)
+	}
+	defer d.approveWrite(project, pinsFilePath)
 	path := pinsFileOf(project)
 	if f.empty() {
 		if err := os.Remove(path); err != nil && !errors.Is(err, os.ErrNotExist) {

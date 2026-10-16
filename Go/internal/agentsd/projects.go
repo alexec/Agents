@@ -297,6 +297,10 @@ func (d *Daemon) setHelperLimits(r wire.SetHelperLimitsRequest) (wire.ProjectSum
 	if !isDir(folder) {
 		return wire.ProjectSummary{}, noSuchProject(folder + " is not there, so its settings cannot be written.")
 	}
+	if !d.settled(folder, ".agents/project.json") {
+		return wire.ProjectSummary{}, guardedRefusal(".agents/project.json", "The helper limits were not changed: ")
+	}
+	defer d.approveWrite(folder, ".agents/project.json")
 	// HelperLimits.orNilIfDefault: the switch at its default is no choice at all.
 	l := r.Limits
 	if l.AgentsMayArchive != nil && *l.AgentsMayArchive {
@@ -347,6 +351,10 @@ func (d *Daemon) setDiskSpace(r wire.SetDiskSpaceRequest) (wire.ProjectSummary, 
 	if why := diskSpaceProblem(r.DiskSpace); why != "" {
 		return wire.ProjectSummary{}, Invalid("%s", why)
 	}
+	if !d.settled(folder, ".agents/project.json") {
+		return wire.ProjectSummary{}, guardedRefusal(".agents/project.json", "The disk space lines were not changed: ")
+	}
+	defer d.approveWrite(folder, ".agents/project.json")
 	// DiskThresholds.orNilIfDefault: a file says only what was chosen.
 	t := r.DiskSpace
 	if t.LowGB != nil && *t.LowGB == 20 {
@@ -614,6 +622,48 @@ func (d *Daemon) adoptClone(dest string, remote gitRemote) (wire.ProjectSummary,
 	return d.addProject(store.FolderURL(dest))
 }
 
+// approvedConfig is .agents/project.json as last approved, without checking it again.
+func (d *Daemon) approvedConfig(folder string) (map[string]any, error) {
+	d.guardedMu.Lock()
+	s, known := d.stateOf(folder, ".agents/project.json")
+	pending, content := s.Pending != nil, s.ApprovedContent
+	d.guardedMu.Unlock()
+	if !known || !pending {
+		return readProjectConfig(folder)
+	}
+	if content == nil {
+		return map[string]any{}, nil
+	}
+	m, ok := value(content).(map[string]any)
+	if !ok {
+		return nil, notAnObject()
+	}
+	return m, nil
+}
+
+// archiveApprovals is the sessions asking to be archived, oldest first.
+func (d *Daemon) archiveApprovals(folder string) []wire.Approval {
+	var asking []wire.Agent
+	for _, a := range d.agentsOf(folder) {
+		if a.ArchiveRequest != nil && a.ArchiveRequest.Requested != nil && a.State != wire.AgentStateArchived {
+			asking = append(asking, a)
+		}
+	}
+	sort.Slice(asking, func(i, j int) bool {
+		return asking[i].ArchiveRequest.Requested.At < asking[j].ArchiveRequest.Requested.At
+	})
+	var out []wire.Approval
+	for _, a := range asking {
+		title, id, at := "Untitled", a.ID, a.ArchiveRequest.Requested.At
+		if a.Title != nil {
+			title = *a.Title
+		}
+		out = append(out, wire.Approval{Kind: wire.ApprovalKindArchive, Key: string(a.ID), Title: title, Line: "Asks to be archived",
+			Since: &at, Actions: []wire.ApprovalAction{wire.ApprovalActionApprove, wire.ApprovalActionDeny}, AgentID: &id})
+	}
+	return out
+}
+
 // dress is what a summary says beyond the record: the chat project, pinned unless the
 // person unpinned it, and the settings in .agents/project.json (#126), the record's own
 // older ones where the file has none.
@@ -629,7 +679,12 @@ func (d *Daemon) dress(s *wire.ProjectSummary) {
 	if s.Project.Pinned != nil && !*s.Project.Pinned {
 		s.Project.Pinned = nil
 	}
-	if m, err := readProjectConfig(folder); err == nil {
+	s.GuardedChanges = d.guardedChanges(folder)
+	for _, c := range s.GuardedChanges {
+		s.Approvals = append(s.Approvals, fileApproval(c))
+	}
+	s.Approvals = append(s.Approvals, d.archiveApprovals(folder)...)
+	if m, err := d.approvedConfig(folder); err == nil {
 		if v, ok := m["helperLimits"]; ok {
 			var l wire.HelperLimits
 			if b, _ := json.Marshal(v); json.Unmarshal(b, &l) == nil {
