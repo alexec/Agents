@@ -1,0 +1,299 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>A window per project: wireframes</title>
+<style>
+  :root { --ink:#222; --grey:#888; --line:#bbb; --fill:#f3f3f3; --accent:#2f5bd3; --warn:#d97a00; }
+  body { font: 14px/1.45 -apple-system, system-ui, sans-serif; color: var(--ink); max-width: 1180px; margin: 32px auto; padding: 0 24px; }
+  h1 { font-size: 24px; margin-bottom: 4px; }
+  h2 { font-size: 18px; margin-top: 48px; border-top: 1px solid #ddd; padding-top: 20px; }
+  h3 { font-size: 14px; margin: 20px 0 6px; }
+  .sub { color: var(--grey); margin-top: 0; }
+  .rec { background: #eef3ff; border-left: 3px solid var(--accent); padding: 8px 12px; }
+  .row { display: flex; gap: 20px; flex-wrap: wrap; align-items: flex-start; }
+  .note { color: #555; font-size: 13px; max-width: 360px; }
+  .note li { margin-bottom: 4px; }
+
+  /* Mac window */
+  .win { border: 1.5px solid #666; border-radius: 10px; background: #fff; overflow: hidden; box-shadow: 0 4px 14px rgba(0,0,0,.08); }
+  .win.back { transform: translate(18px, -14px); position: absolute; opacity: .55; z-index: 0; }
+  .stack { position: relative; }
+  .stack > .win:not(.back) { position: relative; z-index: 1; }
+  .bar { height: 30px; border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 8px; padding: 0 10px; background: var(--fill); font-size: 12px; }
+  .dots { display: flex; gap: 5px; }
+  .dots i { width: 10px; height: 10px; border-radius: 50%; background: #ccc; display: block; }
+  .title { font-weight: 600; }
+  .grow { flex: 1; }
+  .btn { border: 1px solid var(--line); border-radius: 5px; padding: 1px 7px; background: #fff; color: #444; font-size: 11px; white-space: nowrap; }
+  .tabs { display: flex; border-bottom: 1px solid var(--line); background: #e9e9e9; font-size: 12px; }
+  .tabs span { flex: 1; text-align: center; padding: 4px 0; border-right: 1px solid var(--line); color: #666; }
+  .tabs span.on { background: #fff; color: var(--ink); font-weight: 600; }
+  .body { display: flex; height: 360px; }
+  .side { width: 200px; border-right: 1px solid var(--line); background: #fafafa; padding: 8px 0; font-size: 12px; overflow: hidden; }
+  .side .h { color: var(--grey); font-weight: 600; font-size: 11px; padding: 8px 12px 2px; text-transform: none; }
+  .side .r { padding: 2px 12px; display: flex; gap: 6px; white-space: nowrap; }
+  .side .r.sel { background: #dfe7fb; }
+  .side .r .t { color: var(--grey); margin-left: auto; font-size: 11px; }
+  .side .foot { border-top: 1px solid var(--line); margin-top: 8px; padding: 6px 12px; color: var(--grey); }
+  .m { width: 12px; text-align: center; }
+  .hand { color: var(--warn); }
+  .acc { color: var(--accent); }
+  .main { flex: 1; padding: 12px; display: flex; flex-direction: column; gap: 8px; font-size: 12px; }
+  .bubble { background: var(--fill); border-radius: 8px; padding: 6px 10px; max-width: 80%; }
+  .bubble.me { align-self: flex-end; background: #e4ebfb; }
+  .ph { height: 8px; background: #e2e2e2; border-radius: 4px; margin: 4px 0; }
+  .ph.s { width: 55%; } .ph.m2 { width: 75%; }
+  .composer { margin-top: auto; border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; color: var(--grey); }
+  .insp { width: 170px; border-left: 1px solid var(--line); padding: 8px; font-size: 11px; color: #555; }
+  .insp .seg { display: flex; gap: 3px; margin-bottom: 8px; }
+  .insp .seg b { border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; font-weight: normal; }
+  .insp .seg b.on { background: #dfe7fb; }
+  .card { border: 1px dashed var(--line); border-radius: 8px; padding: 8px; margin-bottom: 6px; }
+  .menu { border: 1px solid #999; border-radius: 6px; background: #fff; font-size: 12px; padding: 4px 0; width: 230px; box-shadow: 0 4px 12px rgba(0,0,0,.12); }
+  .menu div { padding: 2px 14px; display: flex; }
+  .menu div span { margin-left: auto; color: var(--grey); }
+  .menu hr { border: 0; border-top: 1px solid #ddd; margin: 4px 0; }
+  .menu .hd { color: var(--grey); font-size: 11px; }
+
+  /* Phone, iPad, browser */
+  .phone { width: 190px; height: 380px; border: 2px solid #555; border-radius: 26px; padding: 18px 10px; font-size: 12px; background: #fff; }
+  .phone .nav { font-weight: 700; font-size: 15px; margin: 6px 0 8px; }
+  .phone .r { padding: 4px 0; border-bottom: 1px solid #eee; display: flex; gap: 6px; }
+  .ipad { width: 520px; height: 330px; border: 2px solid #555; border-radius: 16px; padding: 10px; background: #f6f6f6; position: relative; }
+  .ipad .win { position: absolute; }
+  .browser { width: 560px; border: 1.5px solid #666; border-radius: 8px; overflow: hidden; background: #fff; }
+  .browser .url { margin: 0 8px; flex: 1; border: 1px solid var(--line); border-radius: 5px; padding: 1px 8px; background: #fff; color: #555; }
+  table { border-collapse: collapse; font-size: 13px; margin-top: 10px; }
+  td, th { border: 1px solid #ddd; padding: 6px 10px; text-align: left; vertical-align: top; }
+  th { background: var(--fill); }
+</style>
+</head>
+<body>
+
+<h1>A window per project</h1>
+<p class="sub">Wireframes for Alex, 2026-10-15. Product Owner. Nothing is built. Grey boxes are content, not design.</p>
+
+<p class="rec"><b>Decided (Alex, 2026-10-15): B and D both.</b> They suit different people. The project window (B) is <a href="https://github.com/alexec/Agents/issues/1089">#1089</a>. A setting, Settings ▸ Sidebar ▸ Home window, chooses All projects (default) or Launcher (D): <a href="https://github.com/alexec/Agents/issues/1090">#1090</a>. A project window shows only its own Needs You, plus an "elsewhere" button. A notification opens in the session's project window when one is open.</p>
+
+<p class="rec"><b>First recommendation: Option B, "project windows beside the main window".</b>
+The main window stays as it is. <b>Open in New Window</b> on a project gives a window that holds only that project.
+It is the same step as a popped chat (#826), one level up. It is easy to undo, because it removes nothing.
+Options C and D change the whole app, and they make the cross-project parts (Needs You, Activity) harder to find.</p>
+
+<!-- ============================================================ -->
+<h2>A. Today: one window, every project</h2>
+<div class="row">
+  <div class="win" style="width:760px">
+    <div class="bar"><div class="dots"><i></i><i></i><i></i></div><span class="title">Agents</span><span class="grow"></span><span class="btn">Pin</span><span class="btn">Archive</span><span class="btn">⊞ Inspector</span></div>
+    <div class="body">
+      <div class="side">
+        <div class="r acc"><span class="m">＋</span>New Session</div>
+        <div class="h">Activity</div>
+        <div class="r acc"><span class="m">◆</span>Events</div>
+        <div class="r acc"><span class="m">◆</span>Resources · Runtimes · Cost</div>
+        <div class="h">Needs You</div>
+        <div class="r"><span class="m hand">✋</span>Fix CI flake<span class="t">2m</span></div>
+        <div class="h">Working</div>
+        <div class="r"><span class="m">◌</span>Sidebar parity<span class="t">5m</span></div>
+        <div class="h">Agents</div>
+        <div class="r sel"><span class="m">○</span>Window wireframes<span class="t">now</span></div>
+        <div class="r"><span class="m">○</span>Release notes<span class="t">1h</span></div>
+        <div class="h">www.alexecollins.com</div>
+        <div class="r"><span class="m">○</span>New post<span class="t">3h</span></div>
+        <div class="h">Chat</div>
+        <div class="r"><span class="m">○</span>Holiday plans<span class="t">1d</span></div>
+      </div>
+      <div class="main">
+        <div class="bubble me">Can we knock up some wireframes?</div>
+        <div class="bubble"><div class="ph m2"></div><div class="ph"></div><div class="ph s"></div></div>
+        <div class="composer">Message…</div>
+      </div>
+      <div class="insp"><div class="seg"><b class="on">Files</b><b>Changes</b><b>Term</b></div><div class="ph"></div><div class="ph s"></div><div class="ph m2"></div></div>
+    </div>
+  </div>
+  <div class="note"><ul>
+    <li>One window. File ▸ New Window is replaced by New Session. Tabs are off.</li>
+    <li>A session can pop out into a window of its own (#826).</li>
+    <li>Smart groups (Pinned, Needs You, Working, Unread) mix all projects.</li>
+    <li>With many projects, the project you work on is a short section far down the list.</li>
+  </ul></div>
+</div>
+
+<!-- ============================================================ -->
+<h2>B. Project windows beside the main window (recommended)</h2>
+
+<h3>B1. A project window</h3>
+<div class="row">
+  <div class="stack" style="width:780px; height:410px">
+    <div class="win back" style="width:760px"><div class="bar"><div class="dots"><i></i><i></i><i></i></div><span class="title">Agents</span></div><div class="body"></div></div>
+    <div class="win" style="width:760px">
+      <div class="bar"><div class="dots"><i></i><i></i><i></i></div><span class="title">Agents</span><span style="color:var(--grey)">— this Mac · main</span><span class="grow"></span><span class="btn">✋ 1 elsewhere</span><span class="btn">⌃` Shell</span><span class="btn">⊞ Inspector</span></div>
+      <div class="body">
+        <div class="side">
+          <div class="r acc"><span class="m">＋</span>New Session</div>
+          <div class="h">Pinned</div>
+          <div class="r acc"><span class="m">▤</span>Roadmap</div>
+          <div class="r acc"><span class="m">▦</span>Pull requests</div>
+          <div class="h">Needs You</div>
+          <div class="r"><span class="m hand">✋</span>Fix CI flake<span class="t">2m</span></div>
+          <div class="h">Sessions</div>
+          <div class="r sel"><span class="m">○</span>Window wireframes<span class="t">now</span></div>
+          <div class="r"><span class="m">◌</span>Sidebar parity<span class="t">5m</span></div>
+          <div class="r"><span class="m">○</span>Release notes<span class="t">1h</span></div>
+          <div class="h">Workflows</div>
+          <div class="r acc"><span class="m">↻</span>Release</div>
+          <div class="r acc"><span class="m">↻</span>Review and fix</div>
+          <div class="r" style="color:var(--grey)"><span class="m">▣</span>Archived</div>
+          <div class="foot">Project Settings…</div>
+        </div>
+        <div class="main">
+          <div class="bubble me">Can we knock up some wireframes?</div>
+          <div class="bubble"><div class="ph m2"></div><div class="ph"></div><div class="ph s"></div></div>
+          <div class="composer">Message…</div>
+        </div>
+        <div class="insp"><div class="seg"><b class="on">Files</b><b>Changes</b><b>Term</b></div><div class="ph"></div><div class="ph s"></div><div class="ph m2"></div></div>
+      </div>
+    </div>
+  </div>
+  <div class="note"><ul>
+    <li><b>Title</b> is the project, then its host and branch.</li>
+    <li><b>Sidebar</b> holds only this project. No Activity group, and no other projects. Needs You is kept, but only for this project.</li>
+    <li><b>"✋ 1 elsewhere"</b> says that another project needs you. Click it to bring the main window forward on that session.</li>
+    <li><b>New Session</b> needs no project menu. The project is the window.</li>
+    <li>The project shell (⌃`) and the inspector belong to the project, so they fit here with no change.</li>
+    <li>The main window stays as it is. It still lists this project too.</li>
+  </ul></div>
+</div>
+
+<h3>B2. How a project window opens</h3>
+<div class="row">
+  <div class="menu">
+    <div class="hd">Project heading's menu (right-click)</div><hr>
+    <div><b>Open in New Window</b><span>⌥⌘O</span></div>
+    <div>New Session in Project</div>
+    <div>Project Settings…</div><hr>
+    <div>Fold</div>
+  </div>
+  <div class="menu">
+    <div class="hd">Window menu</div><hr>
+    <div>Minimize<span>⌘M</span></div>
+    <div>Zoom</div><hr>
+    <div>✓ Agents (all projects)<span>⌘0</span></div>
+    <div>Agents<span>⌘1</span></div>
+    <div>www.alexecollins.com<span>⌘2</span></div><hr>
+    <div class="hd">Open Project Window</div>
+    <div>Chat ›</div>
+  </div>
+  <div class="note"><ul>
+    <li>Ways in: the heading's menu, double-click a project heading, ⌥⌘O, the Window menu, and the Dock menu.</li>
+    <li>One window per project. Open it again and it comes forward, as a popped chat does.</li>
+    <li>The app saves which project windows were open and opens them again at launch.</li>
+    <li>A notification about a project session opens it in that project's window, if it is open.</li>
+  </ul></div>
+</div>
+
+<!-- ============================================================ -->
+<h2>C. Native tabs, one per project</h2>
+<div class="row">
+  <div class="win" style="width:760px">
+    <div class="bar"><div class="dots"><i></i><i></i><i></i></div><span class="title">Agents</span><span class="grow"></span><span class="btn">⊞ Inspector</span></div>
+    <div class="tabs"><span>⌂ Home</span><span class="on">Agents ✋</span><span>www.alexecollins.com</span><span>Chat</span><span>＋</span></div>
+    <div class="body" style="height:300px">
+      <div class="side">
+        <div class="r acc"><span class="m">＋</span>New Session</div>
+        <div class="h">Needs You</div>
+        <div class="r"><span class="m hand">✋</span>Fix CI flake<span class="t">2m</span></div>
+        <div class="h">Sessions</div>
+        <div class="r sel"><span class="m">○</span>Window wireframes<span class="t">now</span></div>
+        <div class="r"><span class="m">◌</span>Sidebar parity<span class="t">5m</span></div>
+        <div class="h">Workflows</div>
+        <div class="r acc"><span class="m">↻</span>Release</div>
+      </div>
+      <div class="main"><div class="bubble me">…</div><div class="bubble"><div class="ph m2"></div><div class="ph s"></div></div><div class="composer">Message…</div></div>
+    </div>
+  </div>
+  <div class="note"><ul>
+    <li>Each project is a macOS tab, so it can be dragged out into a window, and back.</li>
+    <li><b>Home</b> is the tab for Activity and the smart groups of all projects.</li>
+    <li>A ✋ on a tab says that the project needs you.</li>
+    <li>Cost: tabs are a window per tab underneath. The app has turned tabbing off, and the saved-window problem in <code>AgentsApp.swift</code> applies to each tab.</li>
+    <li>With 10 or more projects, the tab bar gets too full.</li>
+  </ul></div>
+</div>
+
+<!-- ============================================================ -->
+<h2>D. Only project windows, with a launcher</h2>
+<div class="row">
+  <div class="win" style="width:380px">
+    <div class="bar"><div class="dots"><i></i><i></i><i></i></div><span class="title">Agents</span></div>
+    <div class="body" style="height:330px; display:block; padding:12px; font-size:12px">
+      <div class="card"><b>✋ Needs You · 2</b><div class="ph s"></div><div class="ph s"></div></div>
+      <div class="card"><b>Agents</b> <span style="color:var(--grey)">3 working · 1 needs you</span></div>
+      <div class="card"><b>www.alexecollins.com</b> <span style="color:var(--grey)">1 working</span></div>
+      <div class="card"><b>Chat</b> <span style="color:var(--grey)">idle</span></div>
+      <div class="card" style="color:var(--grey)">Activity: Events · Resources · Runtimes · Cost</div>
+      <div style="color:var(--accent)">＋ Add Project…</div>
+    </div>
+  </div>
+  <div class="note"><ul>
+    <li>As Xcode and other IDEs do: a small launcher, and each project in a window of its own.</li>
+    <li>The launcher is the only place that shows all projects. Needs You across projects is its first card.</li>
+    <li>The main sidebar goes away. This undoes much of the #495 sidebar that Alex walked over 6 rounds.</li>
+    <li>Biggest change. Hard to undo once Remote and web follow.</li>
+  </ul></div>
+</div>
+
+<!-- ============================================================ -->
+<h2>The other two clients, for option B</h2>
+<div class="row">
+  <div class="phone">
+    <div style="color:var(--accent)">‹ All</div>
+    <div class="nav">Agents</div>
+    <div class="r"><span class="hand">✋</span>Fix CI flake</div>
+    <div class="r">○ Window wireframes</div>
+    <div class="r">◌ Sidebar parity</div>
+    <div class="r" style="color:var(--accent)">↻ Release</div>
+    <div class="r" style="color:var(--grey)">▣ Archived</div>
+    <div style="margin-top:110px;color:var(--grey);font-size:11px">✋ 1 elsewhere</div>
+  </div>
+  <div class="ipad">
+    <div class="win" style="left:10px; top:10px; width:250px; height:300px"><div class="bar"><span class="title">Agents (all)</span></div><div class="body" style="height:270px"><div class="side" style="width:100%"><div class="h">Needs You</div><div class="r"><span class="hand">✋</span>Fix CI flake</div><div class="h">Agents</div><div class="r">○ Wireframes</div><div class="h">www…</div><div class="r">○ New post</div></div></div></div>
+    <div class="win" style="left:270px; top:10px; width:240px; height:300px"><div class="bar"><span class="title">www.alexecollins.com</span></div><div class="body" style="height:270px"><div class="main"><div class="bubble"><div class="ph"></div><div class="ph s"></div></div><div class="composer">Message…</div></div></div></div>
+  </div>
+  <div class="browser">
+    <div class="bar"><div class="dots"><i></i><i></i><i></i></div><span class="url">localhost:8790/p/agents</span></div>
+    <div class="body" style="height:200px"><div class="side" style="width:150px"><div class="h">Sessions</div><div class="r sel">○ Wireframes</div><div class="r">◌ Sidebar parity</div></div><div class="main"><div class="bubble"><div class="ph"></div></div><div class="composer">Message…</div></div></div>
+  </div>
+</div>
+<div class="note" style="max-width:none; margin-top:10px"><ul>
+  <li><b>iPhone:</b> one screen at a time already. A project screen with only that project is the same idea. "‹ All" goes back. Small change.</li>
+  <li><b>iPad:</b> Stage Manager and Split View allow a second scene. "Open in New Window" gives a project scene beside the main one, as on the Mac.</li>
+  <li><b>Web:</b> a project address, <code>/p/&lt;project&gt;</code>, that draws only that project. Open it in a new browser tab. "Open in New Tab" on the project heading.</li>
+</ul></div>
+
+<!-- ============================================================ -->
+<h2>Side by side</h2>
+<table>
+  <tr><th></th><th>B. Beside the main window</th><th>C. Tabs</th><th>D. Only project windows</th></tr>
+  <tr><td>What it removes</td><td>Nothing</td><td>The main sidebar becomes a Home tab</td><td>The main sidebar</td></tr>
+  <tr><td>Needs You across projects</td><td>Main window + "elsewhere" pill</td><td>Home tab + ✋ on tabs</td><td>Launcher card only</td></tr>
+  <tr><td>Activity, Settings</td><td>Main window, as today</td><td>Home tab</td><td>Launcher</td></tr>
+  <tr><td>Many projects (10+)</td><td>Good: open only some</td><td>Poor: tab bar full</td><td>Good</td></tr>
+  <tr><td>Built on</td><td>Popped chat windows (#826)</td><td>Tabbing, now off</td><td>New launcher</td></tr>
+  <tr><td>Remote / web</td><td>Small: project scene, <code>/p/…</code></td><td>Web tabs only</td><td>Large</td></tr>
+  <tr><td>Easy to undo</td><td>Yes</td><td>Mostly</td><td>No</td></tr>
+</table>
+
+<h2>Open questions</h2>
+<ol>
+  <li><b>Needs You in a project window.</b> Show only this project's, plus an "elsewhere" pill (as drawn)? Or show all projects' Needs You in every window?</li>
+  <li><b>Does the main window still list a project that has a window of its own?</b> Drawn as yes. The other choice is to fold it to one row, "Open in its window".</li>
+  <li><b>Notifications.</b> Open in the project window when it is open (as drawn), or always in the main window?</li>
+  <li><b>Chat project.</b> Is Chat a project window like the others, or does it stay in the main window only?</li>
+  <li><b>Projects on servers.</b> Same window, with the host in the title (as drawn)?</li>
+  <li><b>What problem does this fix for Alex?</b> Focus on one project, two projects side by side on one screen, or a project per Space or display? The answer chooses between B and D.</li>
+</ol>
+
+</body>
+</html>
