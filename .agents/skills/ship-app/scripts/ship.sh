@@ -37,6 +37,10 @@ ROOT="$HOME/Library/Application Support/Agents"
 GUI=gui/$(id -u)
 # Agents Host's two jobs.
 HOST_JOBS=(com.alexecollins.agentshost.control com.alexecollins.agentshost.daemon)
+# Its relay, loaded only while Relay for my devices is on. It is started again with the
+# others: its command line names no path, so the clean-up below cannot see that it runs
+# from the old copy, and CloudKit refuses a client whose binary is gone (#1103).
+RELAY_JOB=com.alexecollins.agentshost.relay
 STORE_ID=com.alexecollins.agents.store
 
 loaded() { launchctl print $GUI/$1 >/dev/null 2>&1 }
@@ -76,7 +80,7 @@ restart() { # live-folder sha delay
   fi
   mv "$LIVE/Agents Host.app" "$HOSTAPP_AT"
   echo "$(date) Agents Host $SHA at $HOSTAPP_AT"
-  for j in $HOST_JOBS; do
+  for j in $HOST_JOBS $RELAY_JOB; do
     if loaded $j; then launchctl kickstart -k $GUI/$j && echo "restarted $j"; fi
   done
   if (( HOSTUI )) || ! any_loaded $HOST_JOBS; then
