@@ -3,6 +3,7 @@ module github.com/alexec/agents/Go
 go 1.25.0
 
 require (
+	github.com/coder/acp-go-sdk v0.13.5
 	github.com/coder/websocket v1.8.15
 	gocloud.dev v0.46.0
 	gocloud.dev/secrets/hashivault v0.46.0

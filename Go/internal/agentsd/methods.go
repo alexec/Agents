@@ -20,13 +20,34 @@ func (d *Daemon) register() {
 	Quiet(d, wire.CallPresenceReport.Name, wire.CallCredentialsOffer.Name, wire.CallAgentsPrewarm.Name,
 		wire.CallAgentsDiscardDraft.Name, wire.CallFilesWatch.Name, wire.CallFilesUnwatch.Name)
 	On(d, wire.CallPermissionsPending, func(ctx context.Context, c *Client, _ wire.Empty) ([]wire.PermissionRequest, error) {
-		return []wire.PermissionRequest{}, nil
+		return d.pendingPermissions(), nil
+	})
+	On(d, wire.CallPermissionsAnswer, func(ctx context.Context, c *Client, r wire.AnswerRequest) (wire.Empty, error) {
+		d.mu.Lock()
+		ls := make([]*live, 0, len(d.lives))
+		for _, l := range d.lives {
+			ls = append(ls, l)
+		}
+		d.mu.Unlock()
+		for _, l := range ls {
+			if l.answer(r.PermissionID, r.OptionID) {
+				return wire.Empty{}, nil
+			}
+		}
+		return wire.Empty{}, Invalid("no such question is waiting")
 	})
 	On(d, wire.CallElicitationsPending, func(ctx context.Context, c *Client, _ wire.Empty) ([]wire.ElicitationRequest, error) {
 		return []wire.ElicitationRequest{}, nil
 	})
 	On(d, wire.CallRuntimesList, func(ctx context.Context, c *Client, _ wire.Empty) ([]wire.RuntimeStatus, error) {
-		return []wire.RuntimeStatus{}, nil
+		return d.runtimeStatuses(), nil
+	})
+	// relay/offer: a sign-in lent by another host (056, T091), from the window's lend.
+	On(d, wire.CallRelayOffer, func(ctx context.Context, c *Client, o wire.RelayOffer) (wire.Empty, error) {
+		if o.Runtime == "" {
+			return wire.Empty{}, Invalid("relay/offer: no runtime")
+		}
+		return wire.Empty{}, d.offerRelay(o)
 	})
 
 	On(d, wire.CallProjectsList, func(ctx context.Context, c *Client, r wire.ProjectsListRequest) ([]wire.ProjectSummary, error) {
@@ -38,6 +59,38 @@ func (d *Daemon) register() {
 
 	On(d, wire.CallAgentsList, func(ctx context.Context, c *Client, r wire.ListRequest) ([]wire.Agent, error) {
 		return d.listAgents(r), nil
+	})
+	On(d, wire.CallAgentsStart, func(ctx context.Context, c *Client, r wire.StartRequest) (wire.UUID, error) {
+		return d.start(r)
+	})
+	On(d, wire.CallAgentsPrompt, func(ctx context.Context, c *Client, r wire.PromptRequest) (wire.Empty, error) {
+		a := d.Store.Agent(r.AgentID)
+		if a == nil {
+			return wire.Empty{}, &Error{Code: CodeNoSuchAgent, Message: "no agent " + string(r.AgentID)}
+		}
+		if err := d.needsSignIn(a.RuntimeID); err != nil {
+			return wire.Empty{}, err
+		}
+		if d.once(r.SendID) {
+			d.live(a.ID).enqueue(r.Text)
+		}
+		return wire.Empty{}, nil
+	})
+	On(d, wire.CallAgentsStop, func(ctx context.Context, c *Client, r wire.AgentRequest) (wire.Empty, error) {
+		if d.Store.Agent(r.AgentID) == nil {
+			return wire.Empty{}, &Error{Code: CodeNoSuchAgent, Message: "no agent " + string(r.AgentID)}
+		}
+		d.live(r.AgentID).cancel()
+		return wire.Empty{}, nil
+	})
+	On(d, wire.CallAgentsArchive, func(ctx context.Context, c *Client, r wire.AgentRequest) (wire.Empty, error) {
+		return wire.Empty{}, d.archive(r.AgentID)
+	})
+	On(d, wire.CallAgentsSetUnread, func(ctx context.Context, c *Client, r wire.SetUnreadRequest) (wire.Empty, error) {
+		if d.change(r.AgentID, func(a *wire.Agent) { a.IsUnread = &r.Unread }) == nil {
+			return wire.Empty{}, &Error{Code: CodeNoSuchAgent, Message: "no agent " + string(r.AgentID)}
+		}
+		return wire.Empty{}, nil
 	})
 	On(d, wire.CallAgentsTranscript, func(ctx context.Context, c *Client, r wire.TranscriptRequest) (wire.TranscriptPage, error) {
 		return d.transcript(r)
@@ -171,6 +224,29 @@ func (d *Daemon) addProject(folder wire.URL) (wire.ProjectSummary, error) {
 }
 
 // MARK: agents
+
+// archive puts an agent away: its turn stopped and its runtime ended first.
+func (d *Daemon) archive(id wire.UUID) error {
+	if d.Store.Agent(id) == nil {
+		return &Error{Code: CodeNoSuchAgent, Message: "no agent " + string(id)}
+	}
+	l := d.live(id)
+	l.cancel()
+	l.mu.Lock()
+	s := l.session
+	l.session = nil
+	l.mu.Unlock()
+	if s != nil {
+		s.Stop()
+	}
+	t := now()
+	byUser := wire.AgentArchivedReasonByUser
+	d.change(id, func(a *wire.Agent) {
+		a.State, a.ArchivedAt, a.ArchivedReason = wire.AgentStateArchived, &t, &byUser
+	})
+	d.record(id, stateChanged(wire.AgentStateArchived, nil))
+	return nil
+}
 
 // listAgents is agents/list: newest activity first, a page after a cursor.
 func (d *Daemon) listAgents(r wire.ListRequest) []wire.Agent {

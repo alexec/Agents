@@ -2001,6 +2001,13 @@ type RateLimitInfo struct {
 	OverageDisabledReason *string  `json:"overageDisabledReason,omitzero"`
 }
 
+type RelayOffer struct {
+	Runtime       string `json:"runtime"`
+	SocketPath    string `json:"socketPath"`
+	CaCertificate string `json:"caCertificate"`
+	StandIn       string `json:"standIn"`
+}
+
 type RememberedOptionsRequest struct {
 	RuntimeID string `json:"runtimeID"`
 	Cwd       URL    `json:"cwd"`

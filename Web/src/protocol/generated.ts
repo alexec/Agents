@@ -1533,6 +1533,13 @@ export interface RateLimitInfo {
   overageDisabledReason?: string;
 }
 
+export interface RelayOffer {
+  runtime: string;
+  socketPath: string;
+  caCertificate: string;
+  standIn: string;
+}
+
 export interface RememberedOptionsRequest {
   runtimeID: string;
   cwd: URLString;
@@ -2821,6 +2828,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   QueuedPrompt: { required: ["id", "text", "attachments", "queuedAt", "from"], optional: ["preface", "sender", "hops"] },
   QueuedStart: { required: ["labels"], optional: ["runtimeID", "permissionMode", "model", "worktree"] },
   RateLimitInfo: { required: [], optional: ["status", "resetsAt", "rateLimitType", "utilization", "overageStatus", "overageResetsAt", "isUsingOverage", "overageInUse", "overageDisabledReason"] },
+  RelayOffer: { required: ["runtime", "socketPath", "caCertificate", "standIn"], optional: [] },
   RememberedOptionsRequest: { required: ["runtimeID", "cwd"], optional: [] },
   RemovalCheck: { required: ["blockedBy", "uncommitted", "unmerged"], optional: [] },
   RenameRequest: { required: ["agentID", "title"], optional: [] },

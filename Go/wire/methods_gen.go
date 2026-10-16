@@ -91,6 +91,7 @@ var (
 	CallProjectsSetPinned              = Method[SetPinnedRequest, ProjectSummary]{"projects/setPinned"}
 	CallProjectsUnarchive              = Method[ProjectRequest, ProjectSummary]{"projects/unarchive"}
 	CallProjectsUndoGuardedChange      = Method[GuardedChangeRequest, ProjectSummary]{"projects/undoGuardedChange"}
+	CallRelayOffer                     = Method[RelayOffer, Empty]{"relay/offer"}
 	CallRuntimesAccounts               = Method[Empty, []RuntimeAccount]{"runtimes/accounts"}
 	CallRuntimesAllowances             = Method[*string, RuntimeAllowances]{"runtimes/allowances"}
 	CallRuntimesList                   = Method[Empty, []RuntimeStatus]{"runtimes/list"}
