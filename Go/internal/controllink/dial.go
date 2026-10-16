@@ -63,7 +63,7 @@ func Dial(ctx context.Context, base, pin string) (*Lines, error) {
 				return err
 			}
 			sum := sha256.Sum256(leaf.RawSubjectPublicKeyInfo)
-			if ToB64URL(sum[:]) != pin {
+			if B64URL(sum[:]) != pin {
 				return fmt.Errorf("the certificate is not the pinned one")
 			}
 			return nil
@@ -97,12 +97,22 @@ func Join(ctx context.Context, base, pin string, cr Credentials) (*Lines, *OK, e
 		l.Close()
 		return nil, nil, fmt.Errorf("no hello: %w", err)
 	}
-	auth, expect, err := Answer(hello, cr, origin)
+	h, ok := ParseMessage(hello)
+	if !ok || h.Hello == nil {
+		l.Close()
+		return nil, nil, fmt.Errorf("expected hello, got %s", hello)
+	}
+	id, ok := ParseIdentity(cr.Identity)
+	if !ok {
+		l.Close()
+		return nil, nil, fmt.Errorf("%q is not an identity", cr.Identity)
+	}
+	auth, expect, err := Answer(h.Hello, id, cr.Key, origin, cr.Kind, cr.ControlKey, "", cr.Epoch)
 	if err != nil {
 		l.Close()
 		return nil, nil, err
 	}
-	if err := l.Write(ctx, auth); err != nil {
+	if err := l.Write(ctx, Message{Auth: auth}.Line()); err != nil {
 		l.Close()
 		return nil, nil, err
 	}
@@ -111,10 +121,27 @@ func Join(ctx context.Context, base, pin string, cr Credentials) (*Lines, *OK, e
 		l.Close()
 		return nil, nil, fmt.Errorf("no ok: %w", err)
 	}
-	ok, err := Check(reply, expect)
-	if err != nil {
+	m, ok := ParseMessage(reply)
+	switch {
+	case !ok:
+		l.Close()
+		return nil, nil, fmt.Errorf("expected ok, got %s", reply)
+	case m.OK == nil:
+		l.Close()
+		return nil, nil, Refuse(m.Refused)
+	}
+	if err := Check(m.OK, expect); err != nil {
 		l.Close()
 		return nil, nil, err
 	}
-	return l, ok, nil
+	return l, m.OK, nil
+}
+
+// Credentials are who a peer proves it is, and the key it proves it with.
+type Credentials struct {
+	Identity   string // e:<id>, h:<host>, c:<client>, p:<id>
+	Key        []byte
+	Kind       string
+	ControlKey []byte // the control plane's key the peer already trusts, or nil
+	Epoch      *int
 }
