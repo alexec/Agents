@@ -13,7 +13,8 @@
 # container's own is linux on this Mac's architecture. GO_IMAGE picks another image.
 set -e
 mod=$(cd "$(dirname "$0")/.." && pwd)
-if [ "$(uname -s)" != Darwin ] && command -v go >/dev/null 2>&1; then
+# On a Mac with no Docker running and Go installed (a CI runner), that Go.
+if command -v go >/dev/null 2>&1 && { [ "$(uname -s)" != Darwin ] || ! { command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; }; }; then
 	cd "$mod"
 	exec go "$@"
 fi
