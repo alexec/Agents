@@ -1903,6 +1903,13 @@ export interface SetLabelsRequest {
   remove: string[];
 }
 
+export interface SetLimitsRequest {
+  perAgent?: Cost | null;
+  daily?: Cost | null;
+  perAgentTokens?: number | null;
+  dailyTokens?: number | null;
+}
+
 export interface SetOptionRequest {
   agentID: UUID;
   optionID: string;
@@ -3138,6 +3145,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   SetDiskSpaceRequest: { required: ["folder", "diskSpace"], optional: [] },
   SetHelperLimitsRequest: { required: ["folder", "limits"], optional: [] },
   SetLabelsRequest: { required: ["agentID", "add", "remove"], optional: [] },
+  SetLimitsRequest: { required: [], optional: ["perAgent", "daily", "perAgentTokens", "dailyTokens"] },
   SetOptionRequest: { required: ["agentID", "optionID", "value"], optional: [] },
   SetPinnedRequest: { required: ["folder", "pinned"], optional: [] },
   SetSandboxRequest: { required: ["agentID"], optional: ["choice"] },

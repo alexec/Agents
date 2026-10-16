@@ -108,7 +108,7 @@ func (d *Daemon) catchUp(r wire.CatchUpRequest) wire.CatchUpSnapshot {
 	}
 	disk := d.diskState()
 	notes := wire.StoreNotes{Notes: []string{}}
-	milestones := wire.Milestones{Earned: []wire.EarnedMilestone{}}
+	milestones := d.milestones()
 	s := wire.CatchUpSnapshot{Projects: d.projects(false), Agents: d.listAgents(list), Permissions: d.pendingPermissions(),
 		Elicitations: d.pendingElicitations(),
 		Attention:    d.attentionPending(),

@@ -498,8 +498,17 @@ func (l *live) turn() bool {
 	}
 	if r.Usage != nil {
 		u := wire.TurnUsage{TotalTokens: int64(r.Usage.TotalTokens), InputTokens: int64(r.Usage.InputTokens), OutputTokens: int64(r.Usage.OutputTokens)}
+		optional := func(n *int) *int64 {
+			if n == nil {
+				return nil
+			}
+			v := int64(*n)
+			return &v
+		}
+		u.ThoughtTokens, u.CachedReadTokens, u.CachedWriteTokens = optional(r.Usage.ThoughtTokens), optional(r.Usage.CachedReadTokens), optional(r.Usage.CachedWriteTokens)
 		d.record(l.id, wire.TranscriptEntryKind{UsageRecorded: &wire.TranscriptEntryKindUsageRecorded{Value: u}})
-		d.change(l.id, func(a *wire.Agent) { a.LastTurnUsage = &u })
+		// The turn's tokens on the agent, the day and the charts (finishTurn's banking).
+		d.bankTurnUsage(l.id, u)
 	}
 	switch r.StopReason {
 	case sdk.StopReasonEndTurn:
@@ -759,6 +768,17 @@ func (l *live) Update(n sdk.SessionNotification) {
 		var cmds []wire.SlashCommand
 		if json.Unmarshal(b, &cmds) == nil && cmds != nil {
 			d.change(l.id, func(a *wire.Agent) { a.AvailableCommands = cmds })
+		}
+	case u.UsageUpdate != nil:
+		// The context window and, where the runtime prices it, the session's cost so far.
+		uu := u.UsageUpdate
+		usage := wire.Usage{Used: int64(uu.Used), Size: int64(uu.Size), At: now()}
+		if uu.Cost != nil && uu.Cost.Amount != 0 && uu.Cost.Currency != "" {
+			usage.Cost = &wire.Cost{Amount: uu.Cost.Amount, Currency: uu.Cost.Currency}
+		}
+		d.change(l.id, func(a *wire.Agent) { a.Usage = &usage })
+		if usage.Cost != nil {
+			d.bankSessionCost(l.id, *usage.Cost)
 		}
 	case u.SessionInfoUpdate != nil:
 		// The runtime names the conversation (#492), unless the person named it.

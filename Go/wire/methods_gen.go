@@ -41,6 +41,7 @@ var (
 	CallClientCatchUp                  = Method[CatchUpRequest, CatchUpSnapshot]{"client/catchUp"}
 	CallClientPermissionsState         = Method[Empty, ClientPermissionSettings]{"clientPermissions/state"}
 	CallConnectionBindDevice           = Method[DeviceBinding, Empty]{"connection/bindDevice"}
+	CallCostSetLimits                  = Method[SetLimitsRequest, CostState]{"cost/setLimits"}
 	CallCostState                      = Method[Empty, CostState]{"cost/state"}
 	CallCredentialsLend                = Method[CredentialsLend, Empty]{"credentials/lend"}
 	CallCredentialsOffer               = Method[CredentialsOffer, Empty]{"credentials/offer"}
@@ -161,6 +162,7 @@ var (
 	NotifyAgentsDraftOptions           = Notification[DraftOptionsNotification]{"agents/draftOptions"}
 	NotifyAttentionChanged             = Notification[AttentionNotification]{"attention/changed"}
 	NotifyCloneChanged                 = Notification[CloneNotification]{"clone/changed"}
+	NotifyCostChanged                  = Notification[CostState]{"cost/changed"}
 	NotifyDiskChanged                  = Notification[DiskState]{"disk/changed"}
 	NotifyEventsChanged                = Notification[EventsChange]{"events/changed"}
 	NotifyFilesChanged                 = Notification[FilesChangedNotification]{"files/changed"}
