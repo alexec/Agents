@@ -26,6 +26,13 @@ struct RemoteApp: App {
     /// there is nothing to reach.
     @State private var model = RemoteModel(link: RemoteApp.link())
 
+    init() {
+        #if DEBUG && targetEnvironment(simulator)
+        // The walk simulator's socket (#1182), for run-app's `walk.py remote`; only with -walk.
+        WalkServer.startIfWalking()
+        #endif
+    }
+
     static func link() -> any DaemonLink {
         if ProcessInfo.processInfo.arguments.contains("-fake") { return FakeDaemon() }
         return RemoteControl.link() ?? NotPairedLink()
