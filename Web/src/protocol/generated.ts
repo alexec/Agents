@@ -1019,6 +1019,14 @@ export interface FolderHunk {
   lines: DiffLine[];
 }
 
+export interface FoundFolder {
+  typed?: string;
+  folder: URLString;
+  exists: boolean;
+  isRepository: boolean;
+  isProject: boolean;
+}
+
 export interface GitAsk {
   server: string;
   from: HostID;
@@ -1596,6 +1604,11 @@ export interface ProjectWorktrees {
   worktrees: WorktreeSummary[];
 }
 
+export interface ProjectsFindRequest {
+  paths?: string[];
+  folders?: string[];
+}
+
 export interface ProjectsListRequest {
   includeArchived: boolean;
 }
@@ -1846,6 +1859,16 @@ export interface SetCeilingRequest {
   agentID: UUID;
   ceiling?: Cost;
   tokenCeiling?: number;
+}
+
+export interface SetDiskSpaceRequest {
+  folder: URLString;
+  diskSpace: DiskThresholds;
+}
+
+export interface SetHelperLimitsRequest {
+  folder: URLString;
+  limits: HelperLimits;
 }
 
 export interface SetLabelsRequest {
@@ -2973,6 +2996,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   FilesWriteRequest: { required: ["agentID", "name", "data"], optional: [] },
   FilesWriteResponse: { required: ["path"], optional: [] },
   FolderHunk: { required: ["oldStart", "newStart", "noNewlineAtEnd", "lines"], optional: [] },
+  FoundFolder: { required: ["folder", "exists", "isRepository", "isProject"], optional: ["typed"] },
   GitAsk: { required: ["server", "from"], optional: [] },
   GuardedChange: { required: ["path", "changedBy", "changedByIDs", "byGit", "since"], optional: ["digest", "askedIn"] },
   GuardedChangeReading: { required: ["path", "lines"], optional: ["digest", "approved", "current"] },
@@ -3051,6 +3075,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ProjectRequest: { required: ["folder"], optional: [] },
   ProjectSummary: { required: ["project", "name", "exists", "lastActivityAt", "counts", "costToDate", "unmeasuredAgents", "retiredCount"], optional: ["isChat", "guardedChanges", "approvals"] },
   ProjectWorktrees: { required: ["project", "worktrees"], optional: [] },
+  ProjectsFindRequest: { required: [], optional: ["paths", "folders"] },
   ProjectsListRequest: { required: ["includeArchived"], optional: [] },
   PromptRequest: { required: ["agentID", "text", "attachments", "from"], optional: ["sendID"] },
   QueuedPrompt: { required: ["id", "text", "attachments", "queuedAt", "from"], optional: ["preface", "sender", "hops"] },
@@ -3080,6 +3105,8 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   SessionLabel: { required: ["value", "owner", "addedAt"], optional: [] },
   SessionNotice: { required: ["severity", "title"], optional: ["detail"] },
   SetCeilingRequest: { required: ["agentID"], optional: ["ceiling", "tokenCeiling"] },
+  SetDiskSpaceRequest: { required: ["folder", "diskSpace"], optional: [] },
+  SetHelperLimitsRequest: { required: ["folder", "limits"], optional: [] },
   SetLabelsRequest: { required: ["agentID", "add", "remove"], optional: [] },
   SetOptionRequest: { required: ["agentID", "optionID", "value"], optional: [] },
   SetPinnedRequest: { required: ["folder", "pinned"], optional: [] },

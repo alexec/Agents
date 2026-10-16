@@ -2263,6 +2263,28 @@
       }
     },
     {
+      "name": "projects/find",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/ProjectsFindRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "type": "array",
+          "items": {
+            "$ref": "daemon.schema.json#/definitions/FoundFolder"
+          }
+        }
+      }
+    },
+    {
       "name": "projects/keepGuardedChange",
       "tags": [
         {
@@ -2334,6 +2356,44 @@
         "name": "result",
         "schema": {
           "$ref": "daemon.schema.json#/definitions/GuardedChangeReading"
+        }
+      }
+    },
+    {
+      "name": "projects/setDiskSpace",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/SetDiskSpaceRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/ProjectSummary"
+        }
+      }
+    },
+    {
+      "name": "projects/setHelperLimits",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/SetHelperLimitsRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/ProjectSummary"
         }
       }
     },
