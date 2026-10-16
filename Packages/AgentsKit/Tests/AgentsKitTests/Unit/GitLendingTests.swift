@@ -30,6 +30,14 @@ struct GitLendingUnitTests {
         #expect(DaemonAPI.GitCredential(gitAttributes: "username=alex\n") == nil)
     }
 
+    /// Git runs the helper for every process of the account, so a stranger on the socket may
+    /// ask for a lent credential, and for nothing more than before.
+    @Test func aStrangerMayAskForALentCredentialOnly() {
+        #expect(ConnectionRole.stranger.allows(DaemonAPI.Method.gitCredential))
+        #expect(!ConnectionRole.stranger.allows(DaemonAPI.Method.gitFill))
+        #expect(!ConnectionRole.stranger.allows(DaemonAPI.Method.agentsList))
+    }
+
     @Test func theHelperIsLaidOverGitsConfigAfterAnyThere() {
         defer { GitLending.disable() }
         #expect(GitLending.applied(to: ["A": "1"]) == ["A": "1"])
