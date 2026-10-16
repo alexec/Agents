@@ -2613,6 +2613,21 @@
       ],
       "additionalProperties": false
     },
+    "DeclareResourceRequest": {
+      "type": "object",
+      "properties": {
+        "resource": {
+          "$ref": "#/definitions/DeclaredResource"
+        },
+        "replacing": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "resource"
+      ],
+      "additionalProperties": false
+    },
     "DeclaredResource": {
       "type": "object",
       "properties": {
@@ -4747,6 +4762,56 @@
       ],
       "additionalProperties": false
     },
+    "LeaseNameRequest": {
+      "type": "object",
+      "properties": {
+        "token": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "token",
+        "name"
+      ],
+      "additionalProperties": false
+    },
+    "LeaseNote": {
+      "type": "object",
+      "properties": {
+        "note": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "note"
+      ],
+      "additionalProperties": false
+    },
+    "LeaseRequest": {
+      "type": "object",
+      "properties": {
+        "token": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "minutes": {
+          "type": "integer"
+        },
+        "wait": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "token",
+        "name"
+      ],
+      "additionalProperties": false
+    },
     "LeaseSnapshot": {
       "type": "object",
       "properties": {
@@ -4763,6 +4828,18 @@
       "required": [
         "resources",
         "at"
+      ],
+      "additionalProperties": false
+    },
+    "LeaseTokenRequest": {
+      "type": "object",
+      "properties": {
+        "token": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "token"
       ],
       "additionalProperties": false
     },
@@ -5672,6 +5749,37 @@
       ],
       "additionalProperties": false
     },
+    "PersonEndRequest": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "agentID": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "additionalProperties": false
+    },
+    "PersonRemoveRequest": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "agentID": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "agentID"
+      ],
+      "additionalProperties": false
+    },
     "Persona": {
       "type": "object",
       "properties": {
@@ -6573,6 +6681,18 @@
         "blockedBy",
         "uncommitted",
         "unmerged"
+      ],
+      "additionalProperties": false
+    },
+    "RemoveResourceRequest": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
       ],
       "additionalProperties": false
     },

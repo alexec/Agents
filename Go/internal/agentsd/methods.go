@@ -24,6 +24,7 @@ func (d *Daemon) register() {
 	d.registerPins()
 	d.registerSettings()
 	d.registerHost()
+	d.registerLeases()
 	d.registerShells()
 	On(d, wire.CallPermissionsPending, func(ctx context.Context, c *Client, _ wire.Empty) ([]wire.PermissionRequest, error) {
 		return d.pendingPermissions(), nil
@@ -80,6 +81,7 @@ func (d *Daemon) register() {
 			return wire.Empty{}, &Error{Code: CodeNoSuchAgent, Message: "no agent " + string(r.AgentID)}
 		}
 		d.live(r.AgentID).cancel()
+		d.dropLeases(r.AgentID, "holderStopped")
 		return wire.Empty{}, nil
 	})
 	On(d, wire.CallAgentsArchive, func(ctx context.Context, c *Client, r wire.AgentRequest) (wire.Empty, error) {
@@ -244,6 +246,7 @@ func (d *Daemon) archive(id wire.UUID) error {
 		a.State, a.ArchivedAt, a.ArchivedReason = wire.AgentStateArchived, &t, &byUser
 	})
 	d.record(id, stateChanged(wire.AgentStateArchived, nil))
+	d.dropLeases(id, "holderArchived")
 	// An archived session is not kept pinned (unpinArchived).
 	if a := d.Store.Agent(id); a != nil {
 		d.unpinSession(projectFolder(a), id)

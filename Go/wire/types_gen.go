@@ -848,6 +848,11 @@ type DayRecap struct {
 	LongestClear float64 `json:"longestClear"`
 }
 
+type DeclareResourceRequest struct {
+	Resource  DeclaredResource `json:"resource"`
+	Replacing *string          `json:"replacing,omitzero"`
+}
+
 type DeclaredResource struct {
 	Name           ResourceName `json:"name"`
 	DisplayName    string       `json:"displayName"`
@@ -1519,9 +1524,29 @@ type Lease struct {
 	Warned      bool         `json:"warned"`
 }
 
+type LeaseNameRequest struct {
+	Token string `json:"token"`
+	Name  string `json:"name"`
+}
+
+type LeaseNote struct {
+	Note string `json:"note"`
+}
+
+type LeaseRequest struct {
+	Token   string `json:"token"`
+	Name    string `json:"name"`
+	Minutes *int64 `json:"minutes,omitzero"`
+	Wait    *bool  `json:"wait,omitzero"`
+}
+
 type LeaseSnapshot struct {
 	Resources []ResourceState `json:"resources"`
 	At        Date            `json:"at"`
+}
+
+type LeaseTokenRequest struct {
+	Token string `json:"token"`
 }
 
 type LendGit struct {
@@ -1827,6 +1852,16 @@ type PermissionRequest struct {
 	Options  []PermissionOption `json:"options"`
 	AskedAt  Date               `json:"askedAt"`
 	Subagent *string            `json:"subagent,omitzero"`
+}
+
+type PersonEndRequest struct {
+	Name    string  `json:"name"`
+	AgentID *string `json:"agentID,omitzero"`
+}
+
+type PersonRemoveRequest struct {
+	Name    string `json:"name"`
+	AgentID string `json:"agentID"`
 }
 
 type Persona struct {
@@ -2140,6 +2175,10 @@ type RemovalCheck struct {
 	BlockedBy   []UUID `json:"blockedBy"`
 	Uncommitted int64  `json:"uncommitted"`
 	Unmerged    bool   `json:"unmerged"`
+}
+
+type RemoveResourceRequest struct {
+	Name string `json:"name"`
 }
 
 type RenameRequest struct {
