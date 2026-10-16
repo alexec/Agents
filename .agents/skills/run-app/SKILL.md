@@ -28,7 +28,7 @@ genuinely visual — and say what you already saw.
 ```sh
 S=.claude/skills/run-app/scripts
 
-# 1. build and launch on a fresh root (prints ROOT, APP_PID, DAEMON_PID, CONTROL_PID, CONTROL_URL)
+# 1. build and launch on a fresh root (prints ROOT, APP_PID, WINDOW_ID, WINDOW_ON, DAEMON_PID, CONTROL_PID, CONTROL_URL)
 eval "$($S/launch.sh --slug mychange)"        # /tmp/run-mychange
 
 # 2. give it something to work in — you may create scratch projects freely
@@ -195,7 +195,8 @@ when what you are testing is not the conversation.
 
 ```sh
 $S/shot.sh $ROOT out.png            # captures the window even behind the user's
-swift $S/ui.swift windows <APP_PID> # window ids and sizes
+swift $S/ui.swift windows <APP_PID> # window ids, sizes, names, on|off this Space
+swift $S/ui.swift selftest          # `windows` still finds a window not on screen
 swift $S/ui.swift dump <APP_PID> 14 # the accessibility tree: roles and labels
 swift $S/ui.swift find <APP_PID> "Start"
 swift $S/ui.swift press <APP_PID> "Start"   # AXPress, no pointer, no focus stolen
@@ -211,6 +212,18 @@ this app is usually the `Button` itself, so `press` walks up from a matching
 label to the nearest pressable ancestor. Typing is the weak spot: keystrokes go
 wherever focus is, so use `ui.swift set` on a field, or the socket, rather than
 `cliclick`-style synthetic keys.
+
+### When a full-screen app is in front
+
+A window opened behind (`launch.sh` without `--front`) while the user's front app is
+full screen goes to the desktop's Space, not theirs (#1131). `launch.sh` waits for the
+window on any Space, prints `WINDOW_ID` and `WINDOW_ON` (`on` or `off`), and says so on
+stderr when it is `off`, or when the window process has no window at all after 30s.
+An `off` window is drawn and works: `shot.sh` captures it, and the socket drives it.
+AX does not reach it: `ui.swift dump` shows only the menu bar, and `find`, `press` and
+`set` match nothing. Do not move it onto the user's Space or bring it forward. Prove
+what the socket can, take the screenshots, and leave the presses for when nobody is at
+the keyboard (`--front`, rule 5).
 
 ### When the screen is locked
 

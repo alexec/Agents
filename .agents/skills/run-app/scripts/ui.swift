@@ -1,6 +1,7 @@
 // Look at, and press, one app's window — by pid, without taking focus.
 //
-//   swift ui.swift windows <pid>              window ids and bounds (for screencapture -l)
+//   swift ui.swift windows <pid>              window ids, bounds, name and on|off (for screencapture -l)
+//   swift ui.swift selftest                   check that `windows` finds a window not on screen
 //   swift ui.swift dump <pid> [depth]         the accessibility tree, indented
 //   swift ui.swift find <pid> <text>          every element whose label holds <text>
 //   swift ui.swift press <pid> <text>         AXPress the LAST one that matches (innermost);
@@ -11,6 +12,11 @@
 // AX actions go to the element, not to the pointer, so nothing is stolen from
 // whatever the user is doing. Needs Accessibility permission for the process
 // that runs this (System Settings › Privacy & Security › Accessibility).
+//
+// A window opened behind (`open -g`) while the user's front app is full screen goes to
+// the desktop's Space, not theirs (#1131). It is "off": `screencapture -l` still takes
+// it, but AX lists no AXWindow for it, so dump, find, press and set see only the menu bar.
+import AppKit
 import ApplicationServices
 import CoreGraphics
 import Foundation
@@ -56,7 +62,44 @@ func walk(_ element: AXUIElement, depth: Int, limit: Int, visit: (AXUIElement, I
     for child in children(element) { walk(child, depth: depth + 1, limit: limit, visit: visit) }
 }
 
+/// The pid's ordinary windows (layer 0), on this Space or not: a window on another Space,
+/// or behind a full-screen app, is not "on screen" and is still the app's window (#1131).
+func windows(of pid: pid_t) -> [(id: Int, width: Int, height: Int, name: String, on: Bool)] {
+    let list = CGWindowListCopyWindowInfo([.optionAll, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]] ?? []
+    return list.compactMap { window in
+        guard (window[kCGWindowOwnerPID as String] as? pid_t) == pid,
+              (window[kCGWindowLayer as String] as? Int) == 0 else { return nil }
+        let bounds = (window[kCGWindowBounds as String] as CFTypeRef?)
+            .flatMap { CGRect(dictionaryRepresentation: $0 as! CFDictionary) } ?? .zero
+        return (id: window[kCGWindowNumber as String] as? Int ?? 0,
+                width: Int(bounds.width), height: Int(bounds.height),
+                name: window[kCGWindowName as String] as? String ?? "",
+                on: window[kCGWindowIsOnscreen as String] as? Bool ?? false)
+    }
+}
+
 let arguments = CommandLine.arguments
+if arguments.count == 2, arguments[1] == "selftest" {
+    // A window of this process's own, never shown (alpha 0, ordered out): `windows` must
+    // still find it, as it must find a scratch window on another Space (#1131).
+    _ = NSApplication.shared
+    NSApp.setActivationPolicy(.prohibited)
+    let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 400, height: 300),
+                          styleMask: [.titled], backing: .buffered, defer: false)
+    window.alphaValue = 0
+    // The window server learns of each order only as the run loop turns.
+    window.orderBack(nil)
+    RunLoop.current.run(until: Date().addingTimeInterval(0.3))
+    window.orderOut(nil)
+    RunLoop.current.run(until: Date().addingTimeInterval(0.3))
+    let found = windows(of: getpid()).first { $0.id == window.windowNumber }
+    guard let found, !found.on, found.width == 400 else {
+        FileHandle.standardError.write(Data("selftest: windows did not list a window that is not on screen\n".utf8))
+        exit(1)
+    }
+    print("selftest: ok")
+    exit(0)
+}
 guard arguments.count >= 3, let pid = pid_t(arguments[2]) else {
     print("usage: ui.swift windows|dump|find|press|set <pid> [args]")
     exit(2)
@@ -64,14 +107,8 @@ guard arguments.count >= 3, let pid = pid_t(arguments[2]) else {
 let verb = arguments[1]
 
 if verb == "windows" {
-    let options = CGWindowListOption(arrayLiteral: .optionOnScreenOnly, .excludeDesktopElements)
-    let list = CGWindowListCopyWindowInfo(options, kCGNullWindowID) as? [[String: Any]] ?? []
-    for window in list where (window[kCGWindowOwnerPID as String] as? pid_t) == pid {
-        let bounds = window[kCGWindowBounds as String] as? [String: CGFloat] ?? [:]
-        let id = window[kCGWindowNumber as String] as? Int ?? 0
-        let name = window[kCGWindowName as String] as? String ?? ""
-        let w = bounds["Width"] ?? 0, h = bounds["Height"] ?? 0
-        print("\(id)\t\(Int(w))x\(Int(h))\t\(name)")
+    for window in windows(of: pid) {
+        print("\(window.id)\t\(window.width)x\(window.height)\t\(window.name)\t\(window.on ? "on" : "off")")
     }
     exit(0)
 }
