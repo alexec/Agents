@@ -550,6 +550,15 @@ func endedWords(w *wire.EventWait, by wire.EventWaitEndingCanceller) string {
 func (d *Daemon) waitStatus(a *wire.Agent) *wire.WaitStatus {
 	w := a.EventWait
 	if w == nil || w.Ending != nil {
+		// A block on agents reads the same, and goes when the person prompts.
+		if isOpenBlock(a.Report) && a.Report.Block != nil && len(a.Report.Block.Waits) > 0 {
+			var names []string
+			for _, w := range a.Report.Block.Waits {
+				names = append(names, "\u201C"+d.waitName(w)+"\u201D")
+			}
+			what := listWords(names) + " to finish"
+			return &wire.WaitStatus{Line: waitSymbol + " Waiting for " + what, Mark: waitSymbol + " Waiting for " + what}
+		}
 		return nil
 	}
 	what := waitLabel(w)
@@ -582,7 +591,7 @@ func (d *Daemon) waitingAgents() []wire.WaitingAgent {
 	}
 	var rows []row
 	for _, a := range d.Store.Agents() {
-		if a.State == wire.AgentStateArchived || a.EventWait == nil {
+		if a.State == wire.AgentStateArchived {
 			continue
 		}
 		s := d.waitStatus(&a)
@@ -593,7 +602,11 @@ func (d *Daemon) waitingAgents() []wire.WaitingAgent {
 		if a.Title != nil {
 			title = *a.Title
 		}
-		rows = append(rows, row{wire.WaitingAgent{AgentID: a.ID, Title: title, Folder: store.FolderURL(projectFolder(&a)), Status: *s}, a.EventWait.Since})
+		since := a.LastActivityAt
+		if a.EventWait != nil {
+			since = a.EventWait.Since
+		}
+		rows = append(rows, row{wire.WaitingAgent{AgentID: a.ID, Title: title, Folder: store.FolderURL(projectFolder(&a)), Status: *s}, since})
 	}
 	sort.SliceStable(rows, func(i, j int) bool { return rows[i].since < rows[j].since })
 	out := []wire.WaitingAgent{}
@@ -612,9 +625,10 @@ type openEventCall struct {
 }
 
 type eventWaitState struct {
-	waitMu    sync.Mutex
-	openWaits map[wire.UUID]*openEventCall // by agent
-	waitTimer *time.Timer
+	waitMu     sync.Mutex
+	openWaits  map[wire.UUID]*openEventCall // by agent
+	waitTimer  *time.Timer
+	blockTimer *time.Timer
 }
 
 func (d *Daemon) inScope(e wire.Event, a *wire.Agent) bool {
@@ -655,8 +669,30 @@ func (d *Daemon) waitForEvent(agent wire.UUID, args map[string]json.RawMessage) 
 	if action == "" {
 		action = "wait"
 	}
-	if names, _ := stringList(args, "agents"); len(names) > 0 || action == "wait" && args["events"] == nil && args["until_minutes"] != nil {
-		return "", Invalid("Nothing is waited for: waiting on agents, or on a time alone, does not work on this host yet. Wait on events.")
+	agentList, err := stringList(args, "agents")
+	if err != nil {
+		return "", err
+	}
+	var agentNames []string
+	for _, n := range agentList {
+		if strings.TrimSpace(n) != "" {
+			agentNames = append(agentNames, n)
+		}
+	}
+	hasEvents := false
+	if es, err := stringList(args, "events"); err == nil && len(es) > 0 {
+		hasEvents = true
+	}
+	_, hasMinutes := argInt(args, "until_minutes")
+	if action == "wait" && (len(agentNames) > 0 && !hasEvents || len(agentNames) == 0 && !hasEvents && hasMinutes) {
+		var minutes *int
+		if n, ok := argInt(args, "until_minutes"); ok {
+			minutes = &n
+		}
+		return d.waitOn(agent, agentNames, argString(args, "wake_on"), minutes, argString(args, "message"))
+	}
+	if action == "wait" && len(agentNames) > 0 && hasEvents {
+		return "", Invalid("Nothing is waited for: name agents or events, not both. Wait on agent.finished for events about agents.")
 	}
 	switch action {
 	case "list":
@@ -1144,6 +1180,10 @@ func (d *Daemon) stopEventWaits() {
 	if d.waitTimer != nil {
 		d.waitTimer.Stop()
 		d.waitTimer = nil
+	}
+	if d.blockTimer != nil {
+		d.blockTimer.Stop()
+		d.blockTimer = nil
 	}
 }
 

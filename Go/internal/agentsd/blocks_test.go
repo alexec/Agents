@@ -1,0 +1,66 @@
+package agentsd
+
+import (
+	"strings"
+	"testing"
+
+	"github.com/alexec/agents/Go/wire"
+)
+
+// Ports BlockTests: a lead waits on its helper by name, ends its turn blocked, and is
+// started again with what the helper said once it has finished; what cannot be waited on
+// is refused in a sentence.
+
+func TestALeadWaitsOnItsHelper(t *testing.T) {
+	fakeRuntimes(t)
+	d, _ := start(t, t.TempDir())
+	defer d.Shutdown()
+	dir := t.TempDir()
+	title := func(s string) *string { return &s }
+	lead := seeded(t, d, dir, func(a *wire.Agent) { a.Title, a.State, a.EndedReason = title("Lead"), wire.AgentStateRunning, nil })
+	helper := seeded(t, d, dir, func(a *wire.Agent) { a.Title, a.State, a.EndedReason = title("Helper"), wire.AgentStateRunning, nil })
+	done := seeded(t, d, dir, func(a *wire.Agent) {
+		a.Title, a.Report = title("Done one"), &wire.WorkReport{Outcome: wire.WorkOutcomeDone, Message: "All good.", At: now()}
+	})
+	m := appClient(t, d, lead.ID)
+	m.post("initialize", map[string]any{}, 1)
+	if text, isErr := m.tool(2, "wait_for_event", map[string]any{"agents": []string{"Nobody"}, "until_minutes": 30}); !isErr ||
+		!strings.HasPrefix(text, "Nothing was recorded: no agent in this project is called “Nobody”. The agents here are: ") {
+		t.Fatal(text)
+	}
+	if text, isErr := m.tool(3, "wait_for_event", map[string]any{"agents": []string{"Done one"}, "until_minutes": 30}); !isErr ||
+		text != "Nothing was recorded: “Done one” has already ended (complete — All good.). Use what it said rather than waiting on it." {
+		t.Fatal(text)
+	}
+	if text, isErr := m.tool(4, "wait_for_event", map[string]any{"agents": []string{"Helper"}}); !isErr || !strings.HasPrefix(text, "Nothing is waited for: until_minutes is required") {
+		t.Fatal(text)
+	}
+	text, _ := m.tool(5, "wait_for_event", map[string]any{"agents": []string{"helper"}, "until_minutes": 30, "message": "Waiting for the tests."})
+	if text != "Recorded. The person will see this conversation under \"Waiting\". You will be resumed when “Helper” has finished, or in 30 minutes, whichever comes first." {
+		t.Fatal(text)
+	}
+	if w := d.waitingAgents(); len(w) != 1 || w[0].Status.Line != "◷ Waiting for “Helper” to finish" || w[0].Status.Cancellable {
+		t.Fatalf("%+v", w)
+	}
+	// The lead's turn ends blocked, as it said.
+	d.change(lead.ID, func(a *wire.Agent) { a.State, a.EndedReason = wire.AgentStateFinished, reason(wire.EndedReasonEndTurn) })
+	// The helper finishes: the lead is started again with what it said.
+	d.change(helper.ID, func(a *wire.Agent) {
+		a.State, a.EndedReason = wire.AgentStateFinished, reason(wire.EndedReasonEndTurn)
+		a.Report = &wire.WorkReport{Outcome: wire.WorkOutcomeDone, Message: "Tests pass.", At: now()}
+	})
+	d.closeWaits(helper.ID, *waitEndingHow(d.Store.Agent(helper.ID)))
+	waitFor(t, "the lead started again", func() bool {
+		for _, u := range userMessages(d, lead.ID) {
+			if strings.HasPrefix(u, "The block you reported has cleared: the agent you were waiting on has finished.\n\n- “Helper” (id ") &&
+				strings.Contains(u, "): finished: complete — Tests pass.\n\nYou said you were waiting on: Waiting for the tests.\nCarry on from here.") {
+				return true
+			}
+		}
+		return false
+	})
+	waitFor(t, "its turn over", func() bool {
+		return d.Store.Agent(lead.ID).State == wire.AgentStateFinished && len(d.Store.Agent(lead.ID).QueuedPrompts) == 0
+	})
+	_ = done
+}
