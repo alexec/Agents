@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"maps"
 	"strings"
 	"sync"
 	"time"
@@ -176,6 +177,12 @@ func (d *Daemon) startFor(r wire.StartRequest, by startedBy) (wire.UUID, error) 
 	if extra == nil {
 		extra = []string{}
 	}
+	// Codex's sandbox is its mode, so the choice in force picks the mode it starts in.
+	choice, _ := d.resolveSandbox(r.RuntimeID, r.Sandbox, by.agent)
+	if mode, ok := codexStartMode(r.RuntimeID, choice, stringValue(values["mode"])); ok {
+		values = maps.Clone(values)
+		values["mode"], _ = json.Marshal(mode)
+	}
 	// A worktree asked for is made before anything else, and taken back if the start fails.
 	var wt *wire.AgentWorktree
 	if r.Worktree != nil {
@@ -191,7 +198,7 @@ func (d *Daemon) startFor(r wire.StartRequest, by startedBy) (wire.UUID, error) 
 		StartOptions:      wire.StartOptions{Values: values, ExtraArguments: extra},
 		AdvertisedOptions: []wire.ConfigOption{}, AvailableCommands: []wire.SlashCommand{},
 		CreatedAt: t, LastActivityAt: t, MadeInRoot: &d.Store.RootID, StartRequestID: r.RequestID,
-		StartedByAgent: by.agent,
+		StartedByAgent: by.agent, SandboxOverride: r.Sandbox,
 	}
 	if q := by.queued; q != nil {
 		// Out of the queue, the same agent: its id, its title and when it was asked for.
@@ -384,7 +391,9 @@ func (l *live) turn() bool {
 		if a.RuntimeSessionID != nil {
 			continuing = *a.RuntimeSessionID
 		}
-		s, err := acp.Start(ctx, launch, l, d.mcpServersFor(l.id), sessionMeta(a.RuntimeID), continuing)
+		sandbox, why := d.resolveSandbox(a.RuntimeID, a.SandboxOverride, a.StartedByAgent)
+		launch, meta := withSandbox(launch, sessionMeta(a.RuntimeID), a.RuntimeID, sandbox)
+		s, err := acp.Start(ctx, launch, l, d.mcpServersFor(l.id), meta, continuing)
 		if err != nil {
 			d.dropAppTokens(l.id)
 		}
@@ -401,6 +410,7 @@ func (l *live) turn() bool {
 		l.mu.Lock()
 		l.session = s
 		l.mu.Unlock()
+		d.noteEffectiveSandbox(l.id, sandbox, why)
 		// The handshake says the runtime is ready, and what it takes (noteAccount).
 		pc := s.Init.AgentCapabilities.PromptCapabilities
 		image, audio, embedded := pc.Image, pc.Audio, pc.EmbeddedContext
