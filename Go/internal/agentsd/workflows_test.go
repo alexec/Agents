@@ -85,9 +85,15 @@ func TestWorkflowsWaitForThePersonsOK(t *testing.T) {
 	folder := store.FolderURL(dir)
 	os.MkdirAll(workflowsFolder(dir), 0o755)
 	os.WriteFile(filepath.Join(workflowsFolder(dir), "nightly.md"), []byte("---\non:\n  - schedule:\n      at: \":00\"\n---\nTidy up.\n"), 0o644)
-	// The first look approves what is there.
+	// The host's first look approved what was there then; this came after, and waits.
 	var list []wire.WorkflowSummary
 	json.Unmarshal(c.call(t, 2, "workflows/list", map[string]any{"folder": folder}), &list)
+	if len(list) != 1 || list[0].AwaitingApproval == nil || list[0].NextFireAt != nil {
+		t.Fatalf("%+v", list)
+	}
+	approveAll(t, c, folder)
+	list = nil
+	json.Unmarshal(c.call(t, 20, "workflows/list", map[string]any{"folder": folder}), &list)
 	if len(list) != 1 || list[0].Workflow.Name != "Nightly" || list[0].AwaitingApproval != nil || list[0].NextFireAt == nil || !list[0].IsEnabled {
 		t.Fatalf("%+v", list)
 	}

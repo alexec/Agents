@@ -594,6 +594,7 @@ func (d *Daemon) end(l *live, s wire.AgentState, why wire.EndedReason) {
 	d.record(l.id, stateChanged(s, reason(why)))
 	// The event after the record (042): what a waiting agent hears and what the log keeps.
 	d.raiseAgentEnding(l.id, s, reason(why), archiveNow)
+	d.workflowRunFinished(l.id)
 	d.afterArchiveRequest(l.id, requested, archiveNow)
 	// What the turn did to the app's own files is looked at as it ends (guardedTurnEnded).
 	d.guardedTurnEnded(l.id)
