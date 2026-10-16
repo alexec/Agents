@@ -295,3 +295,27 @@ func unquote(text string) string {
 	}
 	return text
 }
+
+// IsSequence is whether the node is a sequence.
+func (n Node) IsSequence() bool { return n.isSeq }
+
+// JSON is YAMLNode.jsonValue: a scalar a string, a sequence an array, a mapping an object.
+func (n Node) JSON() any {
+	switch {
+	case n.isSeq:
+		out := []any{}
+		for _, e := range n.Sequence {
+			out = append(out, e.JSON())
+		}
+		return out
+	case n.Mapping != nil:
+		out := map[string]any{}
+		for k, v := range n.Mapping {
+			out[k] = v.JSON()
+		}
+		return out
+	case n.Scalar != nil:
+		return *n.Scalar
+	}
+	return nil
+}
