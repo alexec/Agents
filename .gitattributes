@@ -1,4 +1,5 @@
-# The web remote's generated protocol types (071, research R6), made only by
-# scripts/web.sh types. On a merge conflict, regenerate; never resolve by hand.
+# The wire's generated types, made only by scripts/wire.sh gen from Packages/Wire (#1135).
+# On a merge conflict, regenerate; never resolve by hand.
 # (Web/dist is built, not checked in: .gitignore, #473.)
 Web/src/protocol/generated.ts linguist-generated=true -diff
+Go/wire/*_gen.go linguist-generated=true -diff

@@ -1164,9 +1164,9 @@ struct WebFixturesTests {
 
     // MARK: overrides/
 
-    /// A Swift-encoded sample of every case of each type whose TypeScript is hand-written
-    /// (`Packages/WebTypes/Overrides`), so `Web/test/shapes.test.mjs` can hold the
-    /// hand-written shape to real JSON (T020, T042).
+    /// A Swift-encoded sample of every case of each type whose Swift encoder is written by
+    /// hand, so `Web/test/shapes.test.mjs`, `WireSchemaTests` and `Go/wire` can hold the
+    /// schema's shape to real JSON (T020, T042, #1135).
     @Test func overrideSamples() throws {
         let stamp = FileStamp(size: 12, modifiedAt: Self.base)
         let text = Data("hi".utf8)

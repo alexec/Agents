@@ -4,9 +4,10 @@ import Foundation
 ///
 /// Nothing else in Swift ties a method to its params and result, so this table does, for the
 /// methods the web remote uses and no others. It is plain Swift, so a renamed or deleted type
-/// breaks the build here; Packages/WebTypes reads it as source and generates the web remote's
-/// TypeScript from the types it names. `WebSignaturesTests` keeps every host request to what
-/// a person's connection may ask, and none of an agent's tools.
+/// breaks the build here. The methods tagged `web` in Packages/Wire's OpenRPC documents, which
+/// the web remote's TypeScript is made from, are these rows (`WireSchemaTests`).
+/// `WebSignaturesTests` keeps every host request to what a person's connection may ask, and
+/// none of an agent's tools.
 public extension DaemonAPI {
     /// A result that is an empty object.
     struct Empty: Codable, Sendable, Hashable {

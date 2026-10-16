@@ -62,7 +62,6 @@ check_command() { # name [filter]
 	test-agentskit) echo "$CACHED swift test --package-path Packages/AgentsKit${2:+ --filter '$2'}" ;;
 	test-codetext) echo "$CACHED swift test --package-path Packages/CodeText${2:+ --filter '$2'}" ;;
 	test-controlplane) echo "$CACHED swift test --package-path Packages/ControlPlane" ;;
-	test-webtypes) echo "$CACHED swift test --package-path Packages/WebTypes" ;;
 	test-go) echo "Go/scripts/go.sh vet ./... && Go/scripts/go.sh test ./..." ;;
 	smoke) echo "smoke" ;;
 	*) die "no check called $1" ;;
@@ -74,7 +73,7 @@ builds_for_paths() {
 	local host=0 remote=0 web=0 p
 	while IFS= read -r p; do
 		case $p in
-		App/* | Host/* | Daemon/* | Packages/ControlPlane/* | Packages/WebTypes/*) host=1 ;;
+		App/* | Host/* | Daemon/* | Packages/ControlPlane/*) host=1 ;;
 		Packages/* | Shared/* | project.yml) host=1 remote=1 ;;
 		Remote/* | RemoteNotify/* | RemoteWidget/*) remote=1 ;;
 		Web/*) web=1 ;;
@@ -98,7 +97,6 @@ tests_since() { # dir base
 	[ "$(val agentskit)" = skip ] || echo "test-agentskit $(val agentskit_filter)"
 	[ "$(val codetext)" = skip ] || echo "test-codetext $(val codetext_filter)"
 	[ "$(val controlplane)" = skip ] || echo "test-controlplane"
-	[ "$(val webtypes)" = skip ] || echo "test-webtypes"
 	[ "$(val go)" = skip ] || echo "test-go"
 }
 
@@ -138,7 +136,7 @@ resolve() {
 # Conflicted paths a wave settles itself: the web page's generated types and the parity
 # table. Web/dist is no longer checked in (#473); a branch from before that still carries
 # it conflicts with its removal, and the removal wins.
-is_web_generated() { case $1 in Web/dist/* | Web/src/protocol/generated.ts) return 0 ;; *) return 1 ;; esac; }
+is_web_generated() { case $1 in Web/dist/* | Web/src/protocol/generated.ts | Go/wire/*_gen.go) return 0 ;; *) return 1 ;; esac; }
 PARITY=specs/071-web-remote/walks/parity.md
 
 # --- plan -------------------------------------------------------------------------------
@@ -458,17 +456,17 @@ rebuild_web() {
 	local name sha c types=0
 	read -r name sha <"$ST/rebuild"
 	while IFS= read -r c; do
-		[ "$c" = Web/src/protocol/generated.ts ] && types=1
+		case $c in Web/src/protocol/generated.ts | Go/wire/*_gen.go) types=1 ;; esac
 		g checkout -q --ours -- "$c" 2>/dev/null || g rm -q --cached -- "$c"
 	done < <(g diff --name-only --diff-filter=U)
 	local cmd=true
-	[ $types = 0 ] || cmd="scripts/web.sh types"
+	[ $types = 0 ] || cmd="scripts/wire.sh gen"
 	if ! run_logged rebuild-web "$cmd"; then
 		tail -15 "$ST/log.rebuild-web" | sed 's/^/  /' >&2
 		echo "rebuild-web failed for $name; the merge is still open in $WAVE" | tee "$ST/stopped" >&2
 		exit 3
 	fi
-	g add -A -- Web/src/protocol/generated.ts
+	g add -A -- Web/src/protocol/generated.ts Go/wire
 	[ -z "$(g diff --name-only --diff-filter=U)" ] || die "conflicts left after the rebuild"
 	g commit -q --no-edit
 	echo "$name $sha $(g rev-parse HEAD)" >>"$ST/merged"

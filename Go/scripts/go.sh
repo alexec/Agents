@@ -9,15 +9,17 @@
 #   Go/scripts/go.sh vet ./...
 #   GOOS=linux GOARCH=amd64 Go/scripts/go.sh build -o out/agentsd ./cmd/agentsd
 #
-# Paths are inside Go/, from any folder. GOOS, GOARCH and GOFLAGS pass through; the
+# Paths are inside Go/, from any folder; the whole repository is there as `..` (wiregen
+# reads Packages/Wire and writes Web/). GOOS, GOARCH and GOFLAGS pass through; the
 # container's own is linux on this Mac's architecture. GO_IMAGE picks another image.
 set -e
 mod=$(cd "$(dirname "$0")/.." && pwd)
+repo=$(dirname "$mod")
 if [ "$(uname -s)" != Darwin ] && command -v go >/dev/null 2>&1; then
 	cd "$mod"
 	exec go "$@"
 fi
 cache="${AGENTS_BUILD_CACHE:-$HOME/Library/Caches/Agents-build}/go"
 mkdir -p "$cache/gopath" "$cache/gocache"
-exec docker run --rm -v "$mod":/src -v "$cache/gopath":/go -v "$cache/gocache":/root/.cache/go-build \
-	-e CGO_ENABLED=0 -e GOOS -e GOARCH -e GOFLAGS -w /src "${GO_IMAGE:-golang:1.25}" go "$@"
+exec docker run --rm -v "$repo":/repo -v "$cache/gopath":/go -v "$cache/gocache":/root/.cache/go-build \
+	-e CGO_ENABLED=0 -e GOOS -e GOARCH -e GOFLAGS -w /repo/Go "${GO_IMAGE:-golang:1.25}" go "$@"

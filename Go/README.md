@@ -7,7 +7,8 @@ not move.
 
 | Path | What | Area |
 |---|---|---|
-| `wire/` | The wire types, made from the schema in `Packages/Wire/` | build |
+| `wire/` | The wire types: `*_gen.go` made from `Packages/Wire/` by `scripts/wire.sh gen`, the meaning-types by hand | build |
+| `cmd/wiregen/` | Makes `wire/*_gen.go` and `Web/src/protocol/generated.ts` from `Packages/Wire/` | build |
 | `internal/buildinfo/` | The version and the implementation (`go`) | build |
 | `cmd/agentsd/`, `internal/agentsd/` | The host daemon | hosts |
 | `cmd/agents-control/`, `internal/controlplane/` | The control plane | control-plane |

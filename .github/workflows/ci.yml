@@ -460,10 +460,9 @@ jobs:
           swift build --build-tests --package-path Packages/AgentsKit
           run_agentskit_tests
 
-  # The web remote's generator and the control plane (071, research R6), in a job of their
-  # own so they never press on the test job's time cap. WebTypes holds the checked-in
-  # Web/src/protocol/generated.ts to the Swift source: a protocol type changed without
-  # regenerating fails here. ControlPlane links AgentsKit, so it runs on changes to either.
+  # The control plane's package, in a job of its own so it never presses on the test job's
+  # time cap. ControlPlane links AgentsKit, so it runs on changes to either. (The web types'
+  # freshness moved to the `go` job with Packages/Wire, #1135.)
   packages:
     needs: select
     if: ${{ always() && !cancelled() && (needs.select.result != 'success' || needs.select.outputs.packages != 'skip') }}
@@ -488,10 +487,6 @@ jobs:
           fi
           bash scripts/select-test-suites.sh "$base" >> "$GITHUB_OUTPUT"
 
-      - name: Generated types are fresh
-        if: steps.test-selection.outputs.webtypes != 'skip'
-        run: swift test --package-path Packages/WebTypes
-
       - name: Test ControlPlane
         if: steps.test-selection.outputs.controlplane != 'skip'
         timeout-minutes: 20
@@ -512,7 +507,8 @@ jobs:
         run: swift test --package-path Packages/MCPServers
 
   # The Go module at Go/ (#1135): the daemon and the control plane as they move to Go
-  # (#1134). Built, vetted and tested on Linux with the Go its go.mod names.
+  # (#1134). Built, vetted and tested on Linux with the Go its go.mod names. Its wiregen test
+  # holds Go/wire and Web/src/protocol/generated.ts to Packages/Wire, the wire's schema.
   go:
     needs: select
     if: ${{ always() && !cancelled() && (needs.select.result != 'success' || needs.select.outputs.go != 'skip') }}
@@ -527,6 +523,8 @@ jobs:
         with:
           go-version-file: Go/go.mod
           cache-dependency-path: Go/go.mod
+      - name: Formatted
+        run: test -z "$(gofmt -l . | tee /dev/stderr)"
       - name: Build
         run: go build ./...
       - name: Vet

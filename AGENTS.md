@@ -25,7 +25,7 @@
 ## Web/dist and generated.ts
 
 - **`Web/dist` is not checked in** (#473); it is in `.gitignore`. Agents Host's build makes it with `scripts/web.sh dist` (the Node in `Web/.node-version`; without it, an empty one and a warning). Run `scripts/web.sh build`, under the "build" lease, to see a web change without a Mac build.
-- **`Web/src/protocol/generated.ts` is checked in.** A change to a protocol type runs `scripts/web.sh types` and commits the result; a conflict in it is settled by running that again, never by hand.
+- **The wire's types come from `Packages/Wire` (#1135).** A change to a protocol type changes `Packages/Wire/daemon.schema.json` (or a method in its `*.openrpc.json`) first, runs `scripts/wire.sh gen`, and commits what it makes (`Web/src/protocol/generated.ts`, `Go/wire/*_gen.go`); `WireSchemaTests` then says what to change in Swift by hand. A conflict in a generated file is settled by running that again, never by hand.
 
 ## Verifying a lane's work
 

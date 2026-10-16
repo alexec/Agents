@@ -63,7 +63,7 @@ Host still builds, with a warning, and serves no web page. Its protocol types,
 `scripts/web.sh` does all of it:
 
 ```sh
-scripts/web.sh types   # regenerate the TypeScript types after changing a DaemonAPI type
+scripts/wire.sh gen    # regenerate the Go and TypeScript types after changing Packages/Wire
 scripts/web.sh build   # build Web/dist (needs the Node in Web/.node-version); Agents Host's build runs it
 scripts/web.sh check   # what CI checks: types fresh, dist matching its manifest, and with Node, the tests
 ```

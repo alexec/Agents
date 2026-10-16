@@ -5,8 +5,10 @@
 # full package suite when no test suite changed alongside the source. Test-only edits
 # also filter to named suites. Unrecognized changes run every package suite.
 #
-# The web remote (071): WebTypes runs on any change to AgentsKitCore's source, to the
-# generator or to Web/, so a protocol type changed in Swift without regenerating fails.
+# The wire (#1135): Packages/Wire is the source of the wire's types. A change to it or to
+# the generated files adds WireSchemaTests, which holds today's Swift encoders to the schema,
+# and runs `go`, whose wiregen test holds Go/wire and Web/src/protocol/generated.ts to
+# Packages/Wire; a filtered run for AgentsKitCore's source adds WireSchemaTests too.
 # ControlPlane runs on any change to it or to AgentsKit, which it links. A change under
 # Web/ alone runs AgentsKit's three suites that hold Web/ to Swift: the dist manifest, the
 # ported rules' fixtures and the key vectors. CI's web job checks the rest of Web/ with Node,
@@ -22,7 +24,7 @@
 #
 # CI's macOS jobs are chosen here as well (#594): `apps` is skip only when every changed
 # path is prose or agent config that no build reads, and `packages` (the job that runs
-# WebTypes and ControlPlane) is skip when neither of those is selected.
+# ControlPlane) is skip when that is not selected.
 #
 # Usage: scripts/select-test-suites.sh <base-commit> >> "$GITHUB_OUTPUT"
 set -euo pipefail
@@ -30,7 +32,6 @@ set -euo pipefail
 base=${1:-}
 agentskit=skip
 codetext=skip
-webtypes=skip
 controlplane=skip
 mcpservers=skip
 linux=skip
@@ -42,7 +43,6 @@ apps=build
 full_both() {
 	agentskit=full
 	codetext=full
-	webtypes=run
 	controlplane=run
 	mcpservers=run
 	linux=build
@@ -64,6 +64,8 @@ else
 		codetext_touched=false
 		web_touched=false
 		views_touched=false
+		wire_touched=false
+		core_source_touched=false
 		toolsets_touched=false
 		agentskit_source_touched=false
 		codetext_source_touched=false
@@ -77,7 +79,7 @@ else
 
 		while IFS= read -r -d '' path; do
 			case "$path" in
-				docs/*|mkdocs.yml|specs/*|design/*|.agents/*|.claude/*|*.md|Go/*|scripts/pr-areas.py|scripts/replay-conflicts.py|scripts/rerun-cancelled-ci.py) ;;
+				docs/*|mkdocs.yml|specs/*|design/*|.agents/*|.claude/*|*.md|Go/*|Packages/Wire/*|scripts/wire.sh|scripts/pr-areas.py|scripts/replay-conflicts.py|scripts/rerun-cancelled-ci.py) ;;
 				*) apps=build ;;
 			esac
 			case "$path" in
@@ -109,7 +111,7 @@ else
 					linux=build
 					agentskit_source_touched=true
 					controlplane=run
-					[[ "$path" == Packages/AgentsKit/Sources/AgentsKitCore/* ]] && webtypes=run
+					[[ "$path" == Packages/AgentsKit/Sources/AgentsKitCore/* ]] && core_source_touched=true
 					;;
 				Packages/AgentsKit/*)
 					agentskit_touched=true
@@ -117,8 +119,17 @@ else
 					agentskit_full_required=true
 					controlplane=run
 					;;
-				Packages/WebTypes/*)
-					webtypes=run
+				Packages/Wire/*|scripts/wire.sh|Web/src/protocol/generated.ts)
+					go=run
+					agentskit_touched=true
+					if ! $wire_touched; then
+						agentskit_suites+=(WireSchemaTests WebSignaturesTests)
+						wire_touched=true
+					fi
+					if [[ "$path" == Web/* ]] && ! $web_touched; then
+						agentskit_suites+=(WebDistManifestTests ControlAgreementVectorTests WebFixturesTests)
+						web_touched=true
+					fi
 					;;
 				Packages/ControlPlane/*)
 					controlplane=run
@@ -131,7 +142,6 @@ else
 					go=run
 					;;
 				Web/*)
-					webtypes=run
 					agentskit_touched=true
 					if ! $web_touched; then
 						agentskit_suites+=(WebDistManifestTests ControlAgreementVectorTests WebFixturesTests)
@@ -206,6 +216,10 @@ else
 					agentskit=full
 				fi
 				if [[ "$agentskit" == filter ]]; then
+					# A filtered run for AgentsKitCore's source also holds it to the schema.
+					if $core_source_touched && ! $wire_touched; then
+						agentskit_suites+=(WireSchemaTests)
+					fi
 					agentskit_filter=$(IFS='|'; printf '%s' "${agentskit_suites[*]}")
 				fi
 			fi
@@ -248,14 +262,13 @@ fi
 	printf 'agentskit_filter=%s\n' "$agentskit_filter"
 	printf 'codetext=%s\n' "$codetext"
 	printf 'codetext_filter=%s\n' "$codetext_filter"
-	printf 'webtypes=%s\n' "$webtypes"
 	printf 'controlplane=%s\n' "$controlplane"
 	printf 'mcpservers=%s\n' "$mcpservers"
 	printf 'linux=%s\n' "$linux"
 	printf 'go=%s\n' "$go"
 	printf 'agentsd=%s\n' "$agentsd"
 	printf 'apps=%s\n' "$apps"
-	if [[ "$webtypes" == skip && "$controlplane" == skip ]]; then
+	if [[ "$controlplane" == skip ]]; then
 		printf 'packages=skip\n'
 	else
 		printf 'packages=run\n'

@@ -2,7 +2,7 @@
 //
 // Two checks. The top-level objects are held to `Shapes`: every required key there, and no key
 // that is not listed. Then every fixture is type-checked by `tsc` as a literal of its type, which
-// holds nested objects and the hand-written overrides (Packages/WebTypes/Overrides) to real JSON
+// holds nested objects and the hand-written overrides (once Packages/WebTypes/Overrides, now in Packages/Wire's schema) to real JSON
 // the same way: a key Swift writes that the type lacks, or a required one it leaves out, fails.
 import { test } from "node:test";
 import assert from "node:assert/strict";
