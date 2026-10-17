@@ -28,6 +28,9 @@ type mcpCheckFailure struct {
 	kind    string // authRequired, httpStatus, sessionExpired, unreachable, stopped, timedOut, refused, notMCP
 	status  int
 	message string
+	// code and data are a refusal's JSON-RPC error, as the server gave them.
+	code int
+	data json.RawMessage
 }
 
 func (f *mcpCheckFailure) Error() string { return f.kind }
@@ -62,9 +65,11 @@ type mcpReply struct {
 	ID     json.RawMessage `json:"id"`
 	Result json.RawMessage `json:"result"`
 	Error  *struct {
-		Code    int    `json:"code"`
-		Message string `json:"message"`
+		Code    int             `json:"code"`
+		Message string          `json:"message"`
+		Data    json.RawMessage `json:"data"`
 	} `json:"error"`
+	Method string `json:"method"`
 }
 
 // mcpConn is one way to a server: a request and its answer, or a notification.
@@ -131,15 +136,28 @@ func checkMCP(ctx context.Context, s sdk.McpServer, cwd string, timeout time.Dur
 }
 
 func answerOf(raw []byte, id int) (json.RawMessage, bool, error) {
+	return answerHeard(raw, id, nil)
+}
+
+// answerHeard is answerOf, telling heard the method of a notification that is not the answer.
+func answerHeard(raw []byte, id int, heard func(string)) (json.RawMessage, bool, error) {
 	var r mcpReply
 	if json.Unmarshal(raw, &r) != nil {
+		return nil, false, nil
+	}
+	// A message with a method is the server's own: a notification, or a request of its own
+	// whose id may be the same number as ours.
+	if r.Method != "" {
+		if heard != nil && len(r.ID) == 0 {
+			heard(r.Method)
+		}
 		return nil, false, nil
 	}
 	if string(r.ID) != fmt.Sprint(id) {
 		return nil, false, nil
 	}
 	if r.Error != nil {
-		return nil, true, &mcpCheckFailure{kind: "refused", message: r.Error.Message}
+		return nil, true, &mcpCheckFailure{kind: "refused", message: r.Error.Message, code: r.Error.Code, data: r.Error.Data}
 	}
 	if r.Result == nil {
 		return nil, true, &mcpCheckFailure{kind: "notMCP"}
@@ -159,6 +177,8 @@ type stdioMCP struct {
 	lines chan []byte
 	// gone is closed as the check ends, so the reader never waits on a line nobody takes.
 	gone chan struct{}
+	// heard is told each notification's method, seen while a call waits for its answer.
+	heard func(string)
 }
 
 func startStdioMCP(s *sdk.McpServerStdio, cwd string) (*stdioMCP, error) {
@@ -212,7 +232,7 @@ func (c *stdioMCP) call(ctx context.Context, id int, method string, params any) 
 			if !ok {
 				return nil, &mcpCheckFailure{kind: "stopped", message: "The server stopped."}
 			}
-			if r, done, err := answerOf(line, id); done {
+			if r, done, err := answerHeard(line, id, c.heard); done {
 				return r, err
 			}
 		}
@@ -246,6 +266,7 @@ type httpMCP struct {
 	url     string
 	headers []sdk.HttpHeader
 	session string
+	heard   func(string)
 }
 
 func (c *httpMCP) post(ctx context.Context, body []byte) (*http.Response, error) {
@@ -312,7 +333,7 @@ func (c *httpMCP) call(ctx context.Context, id int, method string, params any) (
 		case strings.HasPrefix(line, "data:"):
 			data = append(data, strings.TrimPrefix(strings.TrimPrefix(line, "data:"), " "))
 		case line == "" && len(data) > 0:
-			if a, done, aerr := answerOf([]byte(strings.Join(data, "\n")), id); done {
+			if a, done, aerr := answerHeard([]byte(strings.Join(data, "\n")), id, c.heard); done {
 				return a, aerr
 			}
 			data = nil

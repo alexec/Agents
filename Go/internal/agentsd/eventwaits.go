@@ -416,20 +416,35 @@ func waitPatterns(w *wire.EventWait) []waitPattern {
 	return out
 }
 
+// waitLabel is EventWait.label: a server's event says the servers it was subscribed to.
 func waitLabel(w *wire.EventWait) string {
 	var labels []string
 	for _, p := range waitPatterns(w) {
-		labels = append(labels, p.label())
+		label := p.label()
+		for _, se := range w.ServerEvents {
+			if se.Trigger.Event == p.name {
+				label = waitServerLabel(se)
+				break
+			}
+		}
+		labels = append(labels, label)
 	}
 	return strings.Join(labels, " or ")
 }
 
+// waitMatches is EventWait.matches: a server's event matches by the subscription that
+// raised it (#577), never by its details, since its `where` went to the server.
 func waitMatches(w *wire.EventWait, e wire.Event) bool {
 	if e.Position <= w.From {
 		return false
 	}
+	for _, se := range w.ServerEvents {
+		if mcpTriggerOfWire(se.Trigger).matches(e) {
+			return true
+		}
+	}
 	for _, p := range waitPatterns(w) {
-		if p.matches(e) {
+		if (len(w.ServerEvents) == 0 || !isServerPattern(p.name)) && p.matches(e) {
 			return true
 		}
 	}
@@ -696,8 +711,7 @@ func (d *Daemon) waitForEvent(agent wire.UUID, args map[string]json.RawMessage) 
 	}
 	switch action {
 	case "list":
-		_, text := catalogue()
-		return text, nil
+		return d.mcpEventList(projectFolder(a)), nil
 	case "recent":
 		limit := 20
 		if n, ok := argInt(args, "limit"); ok {
@@ -756,18 +770,18 @@ func (d *Daemon) waitForEvent(agent wire.UUID, args map[string]json.RawMessage) 
 		return "", eventRefused(problem)
 	}
 	var patterns []waitPattern
+	var serverNames []string
 	for _, n := range names {
 		p, problem := parsePattern(n, filters)
 		if problem != "" {
 			return "", eventRefused(problem)
 		}
 		if isServerPattern(p.name) {
-			// No MCP server on this host offers events.
-			msg := "No server here offers " + p.name + ". This project has no MCP server that offers events."
-			if g := closestEvent(p.name); g != "" {
-				msg += " Did you mean " + g + "?"
-			}
-			return "", eventRefused(msg)
+			// A server's event is matched by its subscription, not its details: `where`
+			// goes to the server (#577).
+			patterns = append(patterns, waitPattern{name: p.name, filters: map[string][]string{}})
+			serverNames = append(serverNames, p.name)
+			continue
 		}
 		patterns = append(patterns, p)
 	}
@@ -795,6 +809,13 @@ func (d *Daemon) waitForEvent(agent wire.UUID, args map[string]json.RawMessage) 
 	if len(neverHere) > 0 {
 		warning = neverHereWords(neverHere) + " "
 	}
+	// A server's event is a subscription the wait holds, as a trigger's is (#577):
+	// checked against what the project's servers offer, `where` as its arguments.
+	servers, err := d.checkMCPWait(serverNames, filters, projectFolder(a))
+	if err != nil {
+		return "", err
+	}
+	warning += servers.warning
 	d.eventMu.Lock()
 	from := d.eventHead()
 	d.eventMu.Unlock()
@@ -804,6 +825,9 @@ func (d *Daemon) waitForEvent(agent wire.UUID, args map[string]json.RawMessage) 
 	at := now()
 	deadline := wire.DateOf(at.Time().Add(time.Duration(minutes) * time.Minute))
 	wait := wire.EventWait{ID: store.NewUUID(), From: from, Deadline: &deadline, Since: at}
+	if len(serverNames) > 0 {
+		wait.ServerEvents = servers.events
+	}
 	for _, p := range patterns {
 		wait.Patterns = append(wait.Patterns, p.wire())
 	}
@@ -841,9 +865,10 @@ func (d *Daemon) waitForEvent(agent wire.UUID, args map[string]json.RawMessage) 
 		d.takeOpenWait(agent)
 		return "", &Error{Code: CodeNoSuchAgent, Message: "That agent is not here."}
 	}
+	d.startMCPWait(servers)
 	d.tellEvents(nil)
 	d.armWaitTimer()
-	prefix := warning
+	prefix := warning + subscribedWords(servers.events)
 	if prev != nil {
 		prefix += replacedWords(prev)
 	}
@@ -1091,6 +1116,8 @@ func (d *Daemon) eventHoldReached(agent, waitID wire.UUID) {
 
 // armWaitTimer aims the one timer at the earliest deadline of any open wait.
 func (d *Daemon) armWaitTimer() {
+	// A wait that ended may have held a server's subscription (#577).
+	d.kickMCPEvents()
 	var next *time.Time
 	for _, a := range d.Store.Agents() {
 		if w := a.EventWait; w != nil && w.Ending == nil && w.Deadline != nil {

@@ -119,6 +119,9 @@ func triggerSummary(t wire.WorkflowTrigger) string {
 	if p, ok := triggerPattern(t); ok {
 		return "When " + lowercasedFirst(patternSummary(p))
 	}
+	if mt, ok := serverTrigger(t); ok {
+		return mt.summary()
+	}
 	name := triggerName(t)
 	guess := ""
 	if g := closestEvent(name); g != "" {

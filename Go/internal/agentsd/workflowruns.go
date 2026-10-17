@@ -165,7 +165,9 @@ func (d *Daemon) fireWorkflows(e wire.Event) {
 				continue
 			}
 			for _, t := range w.Triggers {
-				if p, ok := triggerPattern(t); ok && p.matches(e) {
+				p, isPattern := triggerPattern(t)
+				mt, isServer := serverTrigger(t)
+				if isPattern && p.matches(e) || isServer && mt.matches(e) {
 					pos := e.Position
 					fires = append(fires, fireRequest{folder: folder, id: id, trigger: t, triggeringAgent: triggering, depth: e.ChainDepth, causingEvent: &pos})
 					break
@@ -438,7 +440,9 @@ func (d *Daemon) runPrompt(w wire.Workflow, fr fireRequest) string {
 		}
 		text += "\n\n(You were started by the workflow \"" + w.Name + "\" because " + title + " " + what + ".)"
 	} else if fr.causingEvent != nil {
-		if e := d.event(*fr.causingEvent); e != nil {
+		if e := d.event(*fr.causingEvent); e != nil && e.Details["subscription"] != "" && e.Details["server"] != "" {
+			text = serverEventPrompt(w, *e, e.Details["server"])
+		} else if e != nil {
 			details := ""
 			if len(e.Details) > 0 {
 				var keys []string

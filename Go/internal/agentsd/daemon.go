@@ -50,6 +50,7 @@ type Daemon struct {
 	allowanceBook
 	mcpBook
 	mcpHealthBook
+	mcpEventsBook
 	turnBook
 	optionBook
 	timeBook
@@ -149,6 +150,7 @@ func (d *Daemon) Shutdown() {
 	d.attentionMu.Unlock()
 	d.stopAll()
 	d.clearPickUps()
+	d.stopMCPEvents()
 	d.stopEvents()
 	d.stopAppTools()
 	d.allowMu.Lock()
