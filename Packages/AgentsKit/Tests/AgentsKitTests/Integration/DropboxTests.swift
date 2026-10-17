@@ -76,7 +76,8 @@ struct DropboxTests {
         await core.stopWatchingAllWorkflows()
     }
 
-    @Test func aFileStillBeingWrittenFiresOnceWhenItStops() async throws {
+    /// Its 200 ms writes stretch past the quiet period under load (#1350).
+    @Test(.flakyUnderLoad) func aFileStillBeingWrittenFiresOnceWhenItStops() async throws {
         let (locations, work) = try temporary()
         let core = try await core(locations)
         _ = try await core.addProject(work)

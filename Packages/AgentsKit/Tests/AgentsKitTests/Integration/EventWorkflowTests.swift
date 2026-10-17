@@ -125,13 +125,18 @@ struct EventWorkflowTests {
         await core.rescanWorkflows(in: work)
         let first = try await core.start(DaemonAPI.StartRequest(runtimeID: "claude", cwd: work, prompt: "Do a thing"))
         try await eventually("the workflow started an agent") { await started(core, by: "on-finish").count >= 1 }
-        try await Task.sleep(for: .milliseconds(200))
         // One fire for the first agent's finish (its own agent's finish refuses: a run in flight).
-        let finished = await core.eventLog.events.first {
-            $0.name == "agent.finished" && $0.details["agent"] == first.uuidString
+        // The fire is written on the event after the run starts, so wait for it, then for
+        // any second one (#1320).
+        func fired() async -> Int? {
+            let finished = await core.eventLog.events.first {
+                $0.name == "agent.finished" && $0.details["agent"] == first.uuidString
+            }
+            return finished?.consequences.filter { if case .fired = $0 { return true } else { return false } }.count
         }
-        let fired = finished?.consequences.filter { if case .fired = $0 { return true } else { return false } }
-        #expect(fired?.count == 1)
+        try await eventually("the fire is on the log") { (await fired() ?? 0) >= 1 }
+        try await Task.sleep(for: .milliseconds(200))
+        #expect(await fired() == 1)
     }
 
     @Test func aWorkflowIsNeverFiredByNewsOfItself() async throws {

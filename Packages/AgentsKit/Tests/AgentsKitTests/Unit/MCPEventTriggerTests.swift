@@ -23,7 +23,7 @@ struct MCPEventTriggerTests {
 
     @Test func theAppsNounsAreReserved() {
         #expect(EventCatalogue.reservedNouns == ["agent", "project", "workflow", "branch", "dropbox", "lease",
-                                                 "mac", "machine", "person", "cost", "server", "custom"])
+                                                 "mac", "machine", "person", "cost", "server", "system", "custom"])
     }
 
     @Test func aServersEventIsAnyOtherNounDotVerbed() {
