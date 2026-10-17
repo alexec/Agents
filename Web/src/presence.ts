@@ -7,6 +7,7 @@
 import { effect } from "@preact/signals";
 import type { Store } from "./model/store";
 import { alone } from "./route";
+import { faviconFor, iconMood, iconShowsMood, type MoodCounts } from "./model/iconMood";
 
 const settle = 500;
 
@@ -24,6 +25,15 @@ export function needsPersonCount(store: Store): number {
     }
   }
   return total;
+}
+
+/** Each live project's view, for the favicon's mood (#1317). */
+function* liveViews(store: Store): Generator<MoodCounts> {
+  for (const [host, projects] of Object.entries(store.projects.value)) {
+    for (const project of projects) {
+      if (project.project.archivedAt === undefined) yield store.projectView(host, project.project.folder);
+    }
+  }
 }
 
 /** The tab's title: Agents, or the project a tab holds alone (#1089), after how many need the person. */
@@ -74,5 +84,11 @@ export function startPresence(store: Store): void {
   effect(() => {
     const held = alone.value;
     document.title = titleFor(needsPersonCount(store), held && decodeURIComponent(held.folder.replace(/\/+$/, "").split("/").pop() ?? ""));
+  });
+  // The Blob's mood on the favicon (#1317), changed only when the mood does.
+  effect(() => {
+    const href = faviconFor[iconShowsMood.value ? iconMood(liveViews(store)) : "happy"];
+    const icon = document.querySelector<HTMLLinkElement>("link[rel=icon]");
+    if (icon && icon.getAttribute("href") !== href) icon.setAttribute("href", href);
   });
 }

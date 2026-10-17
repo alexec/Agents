@@ -70,6 +70,19 @@ enum WalkCommands {
             guard let drawn else { throw WalkError("could not draw the window") }
             return ["ok": true, "picture": drawn, "width": Int(window.frame.width),
                     "height": Int(window.frame.height)]
+        // What the app gives the Dock tile (#1317): its icon as the Dock draws it, and the
+        // badge. On a locked screen there is no Dock to take a picture of.
+        case "dock":
+            let size = request["size"] as? Int ?? 256
+            guard let canvas = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: size, pixelsHigh: size,
+                                                bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
+                                                colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0)
+            else { throw WalkError("could not make a canvas") }
+            NSGraphicsContext.saveGraphicsState()
+            NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: canvas)
+            NSApp.applicationIconImage.draw(in: NSRect(x: 0, y: 0, width: size, height: size))
+            NSGraphicsContext.restoreGraphicsState()
+            return ["ok": true, "picture": WalkShot.Drawn(canvas: canvas), "badge": NSApp.dockTile.badgeLabel ?? ""]
         case "tree":
             let depth = request["depth"] as? Int ?? 30
             var lines: [String] = []

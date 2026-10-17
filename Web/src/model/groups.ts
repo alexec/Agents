@@ -189,6 +189,8 @@ export interface ProjectView {
   headings: Heading[];
   archived: Agent[];
   needsYou: boolean;
+  /** Something under Working: with needsYou, the favicon's mood (#1317). */
+  working: boolean;
   /** Needs you, Blocked and unread: what the tab's title counts. */
   attention: number;
   subtitle: string | null;
@@ -201,6 +203,7 @@ export function projectView(agents: readonly Agent[], folder: string): ProjectVi
     headings: shown,
     archived: agentsIn(agents, folder, "archived"),
     needsYou: shown.some((h) => h.group === "needsAttention"),
+    working: shown.some((h) => h.group === "running"),
     attention: attentionCount(agents, folder),
     subtitle: projectSubtitle(agents, folder),
   };
