@@ -41,11 +41,13 @@ enum WalkServer {
             withUnsafeMutableBytes(of: &address.sun_path) { raw in
                 "walk.sock".utf8CString.withUnsafeBytes { raw.copyMemory(from: $0) }
             }
-            return withUnsafePointer(to: &address) {
+            let result = withUnsafePointer(to: &address) {
                 $0.withMemoryRebound(to: sockaddr.self, capacity: 1) {
                     bind(fd, $0, socklen_t(MemoryLayout<sockaddr_un>.size))
                 }
             }
+            // This user's processes only, whatever the umask (#1307).
+            return result == 0 ? chmod("walk.sock", 0o600) : result
         }
         guard bound == 0, listen(fd, 4) == 0 else { close(fd); return log("bind: \(errno)") }
         log("listening at \(folder.path)/walk.sock")
