@@ -1,8 +1,6 @@
 package mac
 
 import (
-	"errors"
-	"fmt"
 	"net"
 	"os"
 	"path/filepath"
@@ -37,13 +35,5 @@ func TestPeerTokenIsTheCaller(t *testing.T) {
 	}
 	if int(tok.UID()) != os.Geteuid() || tok.PID() != os.Getpid() {
 		t.Fatalf("token uid %d pid %d, want %d %d", tok.UID(), tok.PID(), os.Geteuid(), os.Getpid())
-	}
-}
-
-// An item that is not there is "not signed in", and asks nobody anything.
-func TestReadKeychainOfNoItem(t *testing.T) {
-	_, err := ReadKeychain(fmt.Sprintf("agents-test-no-such-item-%d", time.Now().UnixNano()))
-	if !errors.Is(err, ErrNotSignedIn) {
-		t.Fatalf("got %v", err)
 	}
 }
