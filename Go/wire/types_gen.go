@@ -1750,6 +1750,110 @@ type ListedSkill struct {
 	Managed     *ManagedSkill `json:"managed,omitzero"`
 }
 
+type MCPAddAnswer struct {
+	Server *ManagedMCPServer `json:"server,omitzero"`
+	Error  *MCPCatalogError  `json:"error,omitzero"`
+}
+
+type MCPAddByHandRequest struct {
+	VerifyID    UUID             `json:"verifyID"`
+	Destination SkillDestination `json:"destination"`
+}
+
+type MCPAddRequest struct {
+	PreviewID   UUID              `json:"previewID"`
+	Destination SkillDestination  `json:"destination"`
+	Secrets     map[string]string `json:"secrets"`
+	Plain       map[string]string `json:"plain"`
+	Replace     bool              `json:"replace"`
+}
+
+type MCPApprovalState struct {
+	Approved *struct{}                `json:"approved,omitzero"`
+	Waiting  *MCPApprovalStateWaiting `json:"waiting,omitzero"`
+}
+
+type MCPApprovalStateWaiting struct {
+	Digest string `json:"digest"`
+	IsNew  bool   `json:"isNew"`
+}
+
+type MCPApproveRequest struct {
+	Destination SkillDestination `json:"destination"`
+	Name        string           `json:"name"`
+	Digest      string           `json:"digest"`
+}
+
+type MCPCatalogError struct {
+	Unreachable      *MCPCatalogErrorUnreachable      `json:"unreachable,omitzero"`
+	TimedOut         *MCPCatalogErrorTimedOut         `json:"timedOut,omitzero"`
+	NoPersonalHome   *struct{}                        `json:"noPersonalHome,omitzero"`
+	Unmanaged        *MCPCatalogErrorUnmanaged        `json:"unmanaged,omitzero"`
+	McpUnreadable    *MCPCatalogErrorMcpUnreadable    `json:"mcpUnreadable,omitzero"`
+	MissingSecret    *MCPCatalogErrorMissingSecret    `json:"missingSecret,omitzero"`
+	StaleDigest      *struct{}                        `json:"staleDigest,omitzero"`
+	SecretStillInUse *MCPCatalogErrorSecretStillInUse `json:"secretStillInUse,omitzero"`
+	PreviewExpired   *struct{}                        `json:"previewExpired,omitzero"`
+	NoRunnableWay    *struct{}                        `json:"noRunnableWay,omitzero"`
+	ReplaceMismatch  *struct{}                        `json:"replaceMismatch,omitzero"`
+	NotAProject      *MCPCatalogErrorNotAProject      `json:"notAProject,omitzero"`
+	NameTaken        *MCPCatalogErrorNameTaken        `json:"nameTaken,omitzero"`
+	Invalid          *MCPCatalogErrorInvalid          `json:"invalid,omitzero"`
+	Failed           *MCPCatalogErrorFailed           `json:"failed,omitzero"`
+}
+
+type MCPCatalogErrorUnreachable struct {
+	Host string `json:"host"`
+}
+
+type MCPCatalogErrorTimedOut struct {
+	Host string `json:"host"`
+}
+
+type MCPCatalogErrorUnmanaged struct {
+	Path string `json:"path"`
+}
+
+type MCPCatalogErrorMcpUnreadable struct {
+	Path string `json:"path"`
+}
+
+type MCPCatalogErrorMissingSecret struct {
+	Name string `json:"name"`
+}
+
+type MCPCatalogErrorSecretStillInUse struct {
+	Name string `json:"name"`
+}
+
+type MCPCatalogErrorNotAProject struct {
+	Path string `json:"path"`
+}
+
+type MCPCatalogErrorNameTaken struct {
+	Name string `json:"name"`
+}
+
+type MCPCatalogErrorInvalid struct {
+	Value string `json:"_0"`
+}
+
+type MCPCatalogErrorFailed struct {
+	Value string `json:"_0"`
+}
+
+type MCPCatalogResult struct {
+	ID          string           `json:"id"`
+	Title       string           `json:"title"`
+	Description string           `json:"description"`
+	Version     string           `json:"version"`
+	Publisher   MCPPublisherInfo `json:"publisher"`
+	Known       bool             `json:"known"`
+	Runs        []MCPRunKind     `json:"runs"`
+	RemoteHost  *string          `json:"remoteHost,omitzero"`
+	Marketplace *string          `json:"marketplace,omitzero"`
+}
+
 type MCPCheckState string
 
 const (
@@ -1763,10 +1867,54 @@ const (
 	MCPCheckStateOldTransport  MCPCheckState = "oldTransport"
 )
 
+type MCPDestinationState struct {
+	Free         *struct{}                        `json:"free,omitzero"`
+	ManagedSame  *struct{}                        `json:"managedSame,omitzero"`
+	ManagedOther *MCPDestinationStateManagedOther `json:"managedOther,omitzero"`
+	Unmanaged    *MCPDestinationStateUnmanaged    `json:"unmanaged,omitzero"`
+	Unavailable  *MCPDestinationStateUnavailable  `json:"unavailable,omitzero"`
+}
+
+type MCPDestinationStateManagedOther struct {
+	RegistryName string `json:"registryName"`
+}
+
+type MCPDestinationStateUnmanaged struct {
+	Path string `json:"path"`
+}
+
+type MCPDestinationStateUnavailable struct {
+	Value MCPCatalogError `json:"_0"`
+}
+
 type MCPEventTrigger struct {
 	Event     string               `json:"event"`
 	Servers   []string             `json:"servers,omitzero"`
 	Arguments map[string]JSONValue `json:"arguments"`
+}
+
+type MCPHandServer struct {
+	Name    string            `json:"name"`
+	Kind    MCPHandServerKind `json:"kind"`
+	Command string            `json:"command"`
+	Args    []string          `json:"args"`
+	Env     []MCPHandValue    `json:"env"`
+	URL     string            `json:"url"`
+	Headers []MCPHandValue    `json:"headers"`
+}
+
+type MCPHandServerKind string
+
+const (
+	MCPHandServerKindCommand MCPHandServerKind = "command"
+	MCPHandServerKindURL     MCPHandServerKind = "url"
+)
+
+type MCPHandValue struct {
+	Name       string  `json:"name"`
+	Value      string  `json:"value"`
+	Secret     bool    `json:"secret"`
+	SecretName *string `json:"secretName,omitzero"`
 }
 
 type MCPHealthCheckRequest struct {
@@ -1782,6 +1930,88 @@ type MCPHealthSnapshot struct {
 	Servers  []MCPServerHealth      `json:"servers"`
 	Problems []MCPHealthFileProblem `json:"problems"`
 	At       Date                   `json:"at"`
+}
+
+type MCPListAnswer struct {
+	Servers          []ProjectMCPServer `json:"servers"`
+	Problem          *string            `json:"problem,omitzero"`
+	ApprovalsProblem *string            `json:"approvalsProblem,omitzero"`
+}
+
+type MCPListRequest struct {
+	Destination SkillDestination `json:"destination"`
+}
+
+type MCPPreview struct {
+	PreviewID        UUID                 `json:"previewID"`
+	Result           MCPCatalogResult     `json:"result"`
+	NameHere         string               `json:"nameHere"`
+	ChosenRun        MCPRunKind           `json:"chosenRun"`
+	CommandOrURL     string               `json:"commandOrURL"`
+	Host             *string              `json:"host,omitzero"`
+	Entry            map[string]JSONValue `json:"entry"`
+	Variables        []MCPVariable        `json:"variables"`
+	Reach            map[string]JSONValue `json:"reach"`
+	DestinationState MCPDestinationState  `json:"destinationState"`
+	Problems         []MCPPreviewProblem  `json:"problems"`
+}
+
+type MCPPreviewAnswer struct {
+	Preview *MCPPreview      `json:"preview,omitzero"`
+	Error   *MCPCatalogError `json:"error,omitzero"`
+}
+
+type MCPPreviewProblem struct {
+	Unreachable        *MCPPreviewProblemUnreachable   `json:"unreachable,omitzero"`
+	NoRunnableWay      *struct{}                       `json:"noRunnableWay,omitzero"`
+	NameTakenUnmanaged *struct{}                       `json:"nameTakenUnmanaged,omitzero"`
+	McpUnreadable      *MCPPreviewProblemMcpUnreadable `json:"mcpUnreadable,omitzero"`
+	NoPersonalHome     *struct{}                       `json:"noPersonalHome,omitzero"`
+}
+
+type MCPPreviewProblemUnreachable struct {
+	Host string `json:"host"`
+}
+
+type MCPPreviewProblemMcpUnreadable struct {
+	Path string `json:"path"`
+}
+
+type MCPPreviewRequest struct {
+	Result      MCPCatalogResult `json:"result"`
+	Destination SkillDestination `json:"destination"`
+	Run         *MCPRunKind      `json:"run,omitzero"`
+}
+
+type MCPPublisherInfo struct {
+	Label     string `json:"label"`
+	Namespace string `json:"namespace"`
+	Known     bool   `json:"known"`
+}
+
+type MCPRemoveAnswer struct {
+	Ok bool `json:"ok"`
+}
+
+type MCPRemoveRequest struct {
+	Destination  SkillDestination `json:"destination"`
+	Name         string           `json:"name"`
+	ForgetSecret *string          `json:"forgetSecret,omitzero"`
+}
+
+type MCPRunKind string
+
+const (
+	MCPRunKindRemote  MCPRunKind = "remote"
+	MCPRunKindNpx     MCPRunKind = "npx"
+	MCPRunKindUvx     MCPRunKind = "uvx"
+	MCPRunKindDocker  MCPRunKind = "docker"
+	MCPRunKindCommand MCPRunKind = "command"
+)
+
+type MCPSearchAnswer struct {
+	Results []MCPCatalogResult `json:"results"`
+	Error   *MCPCatalogError   `json:"error,omitzero"`
 }
 
 type MCPServer struct {
@@ -1822,6 +2052,22 @@ type MCPServerTransportSse struct {
 	URL     string            `json:"url"`
 	Headers map[string]string `json:"headers"`
 }
+
+type MCPSetSecretAnswer struct {
+	Set bool `json:"set"`
+}
+
+type MCPSetSecretRequest struct {
+	Name  string `json:"name"`
+	Value string `json:"value"`
+}
+
+type MCPSignInState string
+
+const (
+	MCPSignInStateSignedIn    MCPSignInState = "signedIn"
+	MCPSignInStateNeedsSignIn MCPSignInState = "needsSignIn"
+)
 
 type MCPTransportName string
 
@@ -1875,6 +2121,59 @@ const (
 	MCPTriggerStatusStateNotThisHost MCPTriggerStatusState = "notThisHost"
 )
 
+type MCPVariable struct {
+	Name        string          `json:"name"`
+	Description string          `json:"description"`
+	Kind        MCPVariableKind `json:"kind"`
+	Required    bool            `json:"required"`
+	AlreadySet  bool            `json:"alreadySet"`
+	Placeholder *string         `json:"placeholder,omitzero"`
+}
+
+type MCPVariableKind string
+
+const (
+	MCPVariableKindSecret MCPVariableKind = "secret"
+	MCPVariableKindPlain  MCPVariableKind = "plain"
+)
+
+type MCPVerifyAnswer struct {
+	VerifyID *UUID                `json:"verifyID,omitzero"`
+	Outcome  *MCPVerifyOutcome    `json:"outcome,omitzero"`
+	Entry    map[string]JSONValue `json:"entry,omitzero"`
+	Error    *MCPCatalogError     `json:"error,omitzero"`
+}
+
+type MCPVerifyOutcome struct {
+	Answered     *MCPVerifyOutcomeAnswered     `json:"answered,omitzero"`
+	AuthRequired *MCPVerifyOutcomeAuthRequired `json:"authRequired,omitzero"`
+	Failed       *MCPVerifyOutcomeFailed       `json:"failed,omitzero"`
+}
+
+type MCPVerifyOutcomeAnswered struct {
+	ServerName *string  `json:"serverName,omitzero"`
+	Version    *string  `json:"version,omitzero"`
+	Tools      []string `json:"tools"`
+}
+
+type MCPVerifyOutcomeAuthRequired struct {
+	ResourceMetadata *string `json:"resourceMetadata,omitzero"`
+}
+
+type MCPVerifyOutcomeFailed struct {
+	Value string `json:"_0"`
+}
+
+type MCPVerifyRequest struct {
+	Destination SkillDestination `json:"destination"`
+	Server      MCPHandServer    `json:"server"`
+}
+
+type MCPViewsForgetRequest struct {
+	Destination SkillDestination `json:"destination"`
+	Name        string           `json:"name"`
+}
+
 // mac/reveal, mac/open: a path on the host; app names the app to open it with.
 type MacPathRequest struct {
 	Path string  `json:"path"`
@@ -1884,6 +2183,16 @@ type MacPathRequest struct {
 // mac/terminal: Terminal, in path if given.
 type MacTerminalRequest struct {
 	Path *string `json:"path,omitzero"`
+}
+
+type ManagedMCPServer struct {
+	Name         string           `json:"name"`
+	RegistryName string           `json:"registryName"`
+	Version      string           `json:"version"`
+	Run          MCPRunKind       `json:"run"`
+	AddedAt      Date             `json:"addedAt"`
+	Destination  SkillDestination `json:"destination"`
+	ByHand       *bool            `json:"byHand,omitzero"`
 }
 
 type ManagedSkill struct {
@@ -2339,6 +2648,18 @@ type Project struct {
 type ProjectDetection struct {
 	Enabled bool     `json:"enabled"`
 	Paths   []string `json:"paths"`
+}
+
+type ProjectMCPServer struct {
+	Name           string            `json:"name"`
+	Summary        string            `json:"summary"`
+	Managed        *ManagedMCPServer `json:"managed,omitzero"`
+	Approval       MCPApprovalState  `json:"approval"`
+	MissingSecrets []string          `json:"missingSecrets"`
+	SecretNames    []string          `json:"secretNames"`
+	EntryDigest    string            `json:"entryDigest"`
+	SignIn         *MCPSignInState   `json:"signIn,omitzero"`
+	Views          *string           `json:"views,omitzero"`
 }
 
 type ProjectPins struct {

@@ -38,7 +38,7 @@ var (
 	CallAttentionPending               = Method[Empty, AttentionPending]{"attention/pending"}
 	CallCatalogDestinationState        = Method[DestinationStateRequest, DestinationStateAnswer]{"catalog/destination-state"}
 	CallCatalogPreview                 = Method[CatalogPreviewRequest, CatalogPreviewAnswer]{"catalog/preview"}
-	CallCatalogSearch                  = Method[CatalogSearchRequest, CatalogSearchAnswer]{"catalog/search"}
+	CallCatalogSearch                  = Method[CatalogSearchRequest, JSONValue]{"catalog/search"}
 	CallChangesFile                    = Method[ChangesFileRequest, ChangedFileDetail]{"changes/file"}
 	CallChangesList                    = Method[ChangesListRequest, ChangesList]{"changes/list"}
 	CallClientCatchUp                  = Method[CatchUpRequest, CatchUpSnapshot]{"client/catchUp"}
@@ -82,9 +82,18 @@ var (
 	CallMarketplacesList               = Method[MarketplacesListRequest, MarketplacesListAnswer]{"marketplaces/list"}
 	CallMarketplacesRemove             = Method[MarketplaceIDRequest, MarketplacesListAnswer]{"marketplaces/remove"}
 	CallMarketplacesSetEnabled         = Method[MarketplaceSetEnabledRequest, MarketplacesListAnswer]{"marketplaces/set-enabled"}
+	CallMCPAdd                         = Method[MCPAddRequest, MCPAddAnswer]{"mcp/add"}
+	CallMCPAddByHand                   = Method[MCPAddByHandRequest, MCPAddAnswer]{"mcp/add-by-hand"}
+	CallMCPApprove                     = Method[MCPApproveRequest, MCPListAnswer]{"mcp/approve"}
+	CallMCPForgetViews                 = Method[MCPViewsForgetRequest, Empty]{"mcp/forgetViews"}
 	CallMCPHealth                      = Method[Empty, MCPHealthSnapshot]{"mcp/health"}
 	CallMCPHealthCheck                 = Method[MCPHealthCheckRequest, MCPHealthSnapshot]{"mcp/health/check"}
 	CallMCPHosted                      = Method[Empty, HostedMCPSnapshot]{"mcp/hosted"}
+	CallMCPList                        = Method[MCPListRequest, MCPListAnswer]{"mcp/list"}
+	CallMCPPreview                     = Method[MCPPreviewRequest, MCPPreviewAnswer]{"mcp/preview"}
+	CallMCPRemove                      = Method[MCPRemoveRequest, MCPRemoveAnswer]{"mcp/remove"}
+	CallMCPSetSecret                   = Method[MCPSetSecretRequest, MCPSetSecretAnswer]{"mcp/set-secret"}
+	CallMCPVerify                      = Method[MCPVerifyRequest, MCPVerifyAnswer]{"mcp/verify"}
 	CallMilestonesState                = Method[Empty, Milestones]{"milestones/state"}
 	CallModesRemembered                = Method[Empty, map[string]JSONValue]{"modes/remembered"}
 	CallOptionsRemembered              = Method[RememberedOptionsRequest, []ConfigOption]{"options/remembered"}

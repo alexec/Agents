@@ -1364,12 +1364,95 @@ export interface ListedSkill {
   managed?: ManagedSkill;
 }
 
+export interface MCPAddAnswer {
+  server?: ManagedMCPServer;
+  error?: MCPCatalogError;
+}
+
+export interface MCPAddByHandRequest {
+  verifyID: UUID;
+  destination: SkillDestination;
+}
+
+export interface MCPAddRequest {
+  previewID: UUID;
+  destination: SkillDestination;
+  secrets: Record<string, string>;
+  plain: Record<string, string>;
+  replace: boolean;
+}
+
+export type MCPApprovalState =
+  | { approved: Record<string, never> }
+  | { waiting: { digest: string; isNew: boolean } };
+
+export interface MCPApproveRequest {
+  destination: SkillDestination;
+  name: string;
+  digest: string;
+}
+
+export type MCPCatalogError =
+  | { unreachable: { host: string } }
+  | { timedOut: { host: string } }
+  | { noPersonalHome: Record<string, never> }
+  | { unmanaged: { path: string } }
+  | { mcpUnreadable: { path: string } }
+  | { missingSecret: { name: string } }
+  | { staleDigest: Record<string, never> }
+  | { secretStillInUse: { name: string } }
+  | { previewExpired: Record<string, never> }
+  | { noRunnableWay: Record<string, never> }
+  | { replaceMismatch: Record<string, never> }
+  | { notAProject: { path: string } }
+  | { nameTaken: { name: string } }
+  | { invalid: { _0: string } }
+  | { failed: { _0: string } };
+
+export interface MCPCatalogResult {
+  id: string;
+  title: string;
+  description: string;
+  version: string;
+  publisher: MCPPublisherInfo;
+  known: boolean;
+  runs: MCPRunKind[];
+  remoteHost?: string;
+  marketplace?: string;
+}
+
 export type MCPCheckState = "unchecked" | "checking" | "answered" | "failed" | "waiting" | "missingSecret" | "signIn" | "oldTransport";
+
+export type MCPDestinationState =
+  | { free: Record<string, never> }
+  | { managedSame: Record<string, never> }
+  | { managedOther: { registryName: string } }
+  | { unmanaged: { path: string } }
+  | { unavailable: { _0: MCPCatalogError } };
 
 export interface MCPEventTrigger {
   event: string;
   servers?: string[];
   arguments: Record<string, JSONValue>;
+}
+
+export interface MCPHandServer {
+  name: string;
+  kind: MCPHandServerKind;
+  command: string;
+  args: string[];
+  env: MCPHandValue[];
+  url: string;
+  headers: MCPHandValue[];
+}
+
+export type MCPHandServerKind = "command" | "url";
+
+export interface MCPHandValue {
+  name: string;
+  value: string;
+  secret: boolean;
+  secretName?: string;
 }
 
 export interface MCPHealthCheckRequest {
@@ -1385,6 +1468,71 @@ export interface MCPHealthSnapshot {
   servers: MCPServerHealth[];
   problems: MCPHealthFileProblem[];
   at: WireDate;
+}
+
+export interface MCPListAnswer {
+  servers: ProjectMCPServer[];
+  problem?: string;
+  approvalsProblem?: string;
+}
+
+export interface MCPListRequest {
+  destination: SkillDestination;
+}
+
+export interface MCPPreview {
+  previewID: UUID;
+  result: MCPCatalogResult;
+  nameHere: string;
+  chosenRun: MCPRunKind;
+  commandOrURL: string;
+  host?: string;
+  entry: Record<string, JSONValue>;
+  variables: MCPVariable[];
+  reach: Record<string, JSONValue>;
+  destinationState: MCPDestinationState;
+  problems: MCPPreviewProblem[];
+}
+
+export interface MCPPreviewAnswer {
+  preview?: MCPPreview;
+  error?: MCPCatalogError;
+}
+
+export type MCPPreviewProblem =
+  | { unreachable: { host: string } }
+  | { noRunnableWay: Record<string, never> }
+  | { nameTakenUnmanaged: Record<string, never> }
+  | { mcpUnreadable: { path: string } }
+  | { noPersonalHome: Record<string, never> };
+
+export interface MCPPreviewRequest {
+  result: MCPCatalogResult;
+  destination: SkillDestination;
+  run?: MCPRunKind;
+}
+
+export interface MCPPublisherInfo {
+  label: string;
+  namespace: string;
+  known: boolean;
+}
+
+export interface MCPRemoveAnswer {
+  ok: boolean;
+}
+
+export interface MCPRemoveRequest {
+  destination: SkillDestination;
+  name: string;
+  forgetSecret?: string;
+}
+
+export type MCPRunKind = "remote" | "npx" | "uvx" | "docker" | "command";
+
+export interface MCPSearchAnswer {
+  results: MCPCatalogResult[];
+  error?: MCPCatalogError;
 }
 
 export interface MCPServer {
@@ -1409,6 +1557,17 @@ export type MCPServerTransport =
   | { http: { url: string; headers: Record<string, string> } }
   | { sse: { url: string; headers: Record<string, string> } };
 
+export interface MCPSetSecretAnswer {
+  set: boolean;
+}
+
+export interface MCPSetSecretRequest {
+  name: string;
+  value: string;
+}
+
+export type MCPSignInState = "signedIn" | "needsSignIn";
+
 export type MCPTransportName = "stdio" | "http" | "sse";
 
 export interface MCPTriggerFailure {
@@ -1432,6 +1591,39 @@ export interface MCPTriggerStatus {
 
 export type MCPTriggerStatusState = "pending" | "active" | "retrying" | "stopped" | "notThisHost";
 
+export interface MCPVariable {
+  name: string;
+  description: string;
+  kind: MCPVariableKind;
+  required: boolean;
+  alreadySet: boolean;
+  placeholder?: string;
+}
+
+export type MCPVariableKind = "secret" | "plain";
+
+export interface MCPVerifyAnswer {
+  verifyID?: UUID;
+  outcome?: MCPVerifyOutcome;
+  entry?: Record<string, JSONValue>;
+  error?: MCPCatalogError;
+}
+
+export type MCPVerifyOutcome =
+  | { answered: { serverName?: string; version?: string; tools: string[] } }
+  | { authRequired: { resourceMetadata?: string } }
+  | { failed: { _0: string } };
+
+export interface MCPVerifyRequest {
+  destination: SkillDestination;
+  server: MCPHandServer;
+}
+
+export interface MCPViewsForgetRequest {
+  destination: SkillDestination;
+  name: string;
+}
+
 /** mac/reveal, mac/open: a path on the host; app names the app to open it with. */
 export interface MacPathRequest {
   path: string;
@@ -1441,6 +1633,16 @@ export interface MacPathRequest {
 /** mac/terminal: Terminal, in path if given. */
 export interface MacTerminalRequest {
   path?: string;
+}
+
+export interface ManagedMCPServer {
+  name: string;
+  registryName: string;
+  version: string;
+  run: MCPRunKind;
+  addedAt: WireDate;
+  destination: SkillDestination;
+  byHand?: boolean;
 }
 
 export interface ManagedSkill {
@@ -1779,6 +1981,18 @@ export interface Project {
 export interface ProjectDetection {
   enabled: boolean;
   paths: string[];
+}
+
+export interface ProjectMCPServer {
+  name: string;
+  summary: string;
+  managed?: ManagedMCPServer;
+  approval: MCPApprovalState;
+  missingSecrets: string[];
+  secretNames: string[];
+  entryDigest: string;
+  signIn?: MCPSignInState;
+  views?: string;
 }
 
 export interface ProjectPins {
@@ -3377,16 +3591,39 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ListCursor: { required: ["lastActivityAt", "id"], optional: [] },
   ListRequest: { required: ["includeArchived", "archivedCommands", "archivedOnly", "lean"], optional: ["folder", "startedByWorkflow", "limit", "agentID", "after", "query"] },
   ListedSkill: { required: ["name", "folder"], optional: ["description", "managed"] },
+  MCPAddAnswer: { required: [], optional: ["server", "error"] },
+  MCPAddByHandRequest: { required: ["verifyID", "destination"], optional: [] },
+  MCPAddRequest: { required: ["previewID", "destination", "secrets", "plain", "replace"], optional: [] },
+  MCPApproveRequest: { required: ["destination", "name", "digest"], optional: [] },
+  MCPCatalogResult: { required: ["id", "title", "description", "version", "publisher", "known", "runs"], optional: ["remoteHost", "marketplace"] },
   MCPEventTrigger: { required: ["event", "arguments"], optional: ["servers"] },
+  MCPHandServer: { required: ["name", "kind", "command", "args", "env", "url", "headers"], optional: [] },
+  MCPHandValue: { required: ["name", "value", "secret"], optional: ["secretName"] },
   MCPHealthCheckRequest: { required: [], optional: ["project"] },
   MCPHealthFileProblem: { required: ["message"], optional: ["project"] },
   MCPHealthSnapshot: { required: ["servers", "problems", "at"], optional: [] },
+  MCPListAnswer: { required: ["servers"], optional: ["problem", "approvalsProblem"] },
+  MCPListRequest: { required: ["destination"], optional: [] },
+  MCPPreview: { required: ["previewID", "result", "nameHere", "chosenRun", "commandOrURL", "entry", "variables", "reach", "destinationState", "problems"], optional: ["host"] },
+  MCPPreviewAnswer: { required: [], optional: ["preview", "error"] },
+  MCPPreviewRequest: { required: ["result", "destination"], optional: ["run"] },
+  MCPPublisherInfo: { required: ["label", "namespace", "known"], optional: [] },
+  MCPRemoveAnswer: { required: ["ok"], optional: [] },
+  MCPRemoveRequest: { required: ["destination", "name"], optional: ["forgetSecret"] },
+  MCPSearchAnswer: { required: ["results"], optional: ["error"] },
   MCPServer: { required: ["name", "transport"], optional: [] },
   MCPServerHealth: { required: ["name", "transport", "hosted", "check"], optional: ["project", "live", "checkedAt", "lastError", "tools"] },
+  MCPSetSecretAnswer: { required: ["set"], optional: [] },
+  MCPSetSecretRequest: { required: ["name", "value"], optional: [] },
   MCPTriggerFailure: { required: ["code", "message", "since"], optional: [] },
   MCPTriggerStatus: { required: ["name", "state"], optional: ["server", "lastPolledAt", "lastEventAt", "missedSince", "failure", "retryAt"] },
+  MCPVariable: { required: ["name", "description", "kind", "required", "alreadySet"], optional: ["placeholder"] },
+  MCPVerifyAnswer: { required: [], optional: ["verifyID", "outcome", "entry", "error"] },
+  MCPVerifyRequest: { required: ["destination", "server"], optional: [] },
+  MCPViewsForgetRequest: { required: ["destination", "name"], optional: [] },
   MacPathRequest: { required: ["path"], optional: ["app"] },
   MacTerminalRequest: { required: [], optional: ["path"] },
+  ManagedMCPServer: { required: ["name", "registryName", "version", "run", "addedAt", "destination"], optional: ["byHand"] },
   ManagedSkill: { required: ["destination", "name", "source", "edited", "update"], optional: ["skillPath", "recordedHash", "commit", "committedAt", "catalogue"] },
   MarkRuntimeAvailable: { required: ["credentialKey"], optional: [] },
   Marketplace: { required: ["id", "name", "format", "url", "tokenMissing", "origin", "enabled"], optional: ["token", "about"] },
@@ -3433,6 +3670,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   PrewarmRequest: { required: ["agentID", "why"], optional: [] },
   Project: { required: ["folder", "addedAt"], optional: ["archivedAt", "laidOutAt", "layoutVersion", "helperLimits", "diskSpace", "pinned"] },
   ProjectDetection: { required: ["enabled", "paths"], optional: [] },
+  ProjectMCPServer: { required: ["name", "summary", "approval", "missingSecrets", "secretNames", "entryDigest"], optional: ["managed", "signIn", "views"] },
   ProjectPins: { required: ["folder", "pins"], optional: ["sessions", "workflows"] },
   ProjectPlugin: { required: ["project", "folder", "name", "carries"], optional: ["awaitingApproval"] },
   ProjectRemovedNotification: { required: ["folder"], optional: [] },

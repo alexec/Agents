@@ -3,6 +3,7 @@ package agentsd
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
@@ -85,8 +86,13 @@ func personsGH(ctx context.Context, path string) ([]byte, error) {
 }
 
 func (d *Daemon) registerCatalog() {
-	On(d, wire.CallCatalogSearch, func(ctx context.Context, c *Client, r wire.CatalogSearchRequest) (wire.CatalogSearchAnswer, error) {
-		return d.catalogSearch(ctx, r), nil
+	// Skills answer a CatalogSearchAnswer, MCP servers an MCPSearchAnswer.
+	On(d, wire.CallCatalogSearch, func(ctx context.Context, c *Client, r wire.CatalogSearchRequest) (wire.JSONValue, error) {
+		var answer any = d.catalogSearch(ctx, r)
+		if r.Kind != nil && *r.Kind == wire.CatalogKindMCP {
+			answer = d.mcpCatalogSearch(ctx, r)
+		}
+		return json.Marshal(answer)
 	})
 	On(d, wire.CallCatalogPreview, func(ctx context.Context, c *Client, r wire.CatalogPreviewRequest) (wire.CatalogPreviewAnswer, error) {
 		return d.catalogPreview(ctx, r), nil
@@ -141,9 +147,6 @@ func (d *Daemon) catalogSearch(ctx context.Context, r wire.CatalogSearchRequest)
 	kind := wire.CatalogKindSkills
 	if r.Kind != nil {
 		kind = *r.Kind
-	}
-	if kind == wire.CatalogKindMCP {
-		return d.mcpCatalogSearch(ctx, r)
 	}
 	none := []wire.CatalogResult{}
 	m, ok := d.marketplace(r.Marketplace, kind, r.Destination)
@@ -438,11 +441,4 @@ func (d *Daemon) marketplacesSetEnabled(r wire.MarketplaceSetEnabledRequest) (wi
 	}
 	log.Printf("marketplaces: %s %s", state, r.ID)
 	return d.marketplacesList(nil, nil), nil
-}
-
-// mcpCatalogSearch is catalog/search for MCP servers, which this host does not answer
-// yet: the sheet says so, rather than showing nothing.
-func (d *Daemon) mcpCatalogSearch(ctx context.Context, r wire.CatalogSearchRequest) wire.CatalogSearchAnswer {
-	return wire.CatalogSearchAnswer{Results: []wire.CatalogResult{},
-		Error: &skillcatalog.Failed("this host cannot search for MCP servers yet").Why}
 }

@@ -839,7 +839,7 @@
       "result": {
         "name": "result",
         "schema": {
-          "$ref": "daemon.schema.json#/definitions/CatalogSearchAnswer"
+          "$ref": "daemon.schema.json#/definitions/JSONValue"
         }
       }
     },
@@ -1760,6 +1760,82 @@
       }
     },
     {
+      "name": "mcp/add",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/MCPAddRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/MCPAddAnswer"
+        }
+      }
+    },
+    {
+      "name": "mcp/add-by-hand",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/MCPAddByHandRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/MCPAddAnswer"
+        }
+      }
+    },
+    {
+      "name": "mcp/approve",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/MCPApproveRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/MCPListAnswer"
+        }
+      }
+    },
+    {
+      "name": "mcp/forgetViews",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/MCPViewsForgetRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
       "name": "mcp/health",
       "tags": [
         {
@@ -1828,6 +1904,101 @@
         "name": "result",
         "schema": {
           "$ref": "daemon.schema.json#/definitions/HostedMCPSnapshot"
+        }
+      }
+    },
+    {
+      "name": "mcp/list",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/MCPListRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/MCPListAnswer"
+        }
+      }
+    },
+    {
+      "name": "mcp/preview",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/MCPPreviewRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/MCPPreviewAnswer"
+        }
+      }
+    },
+    {
+      "name": "mcp/remove",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/MCPRemoveRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/MCPRemoveAnswer"
+        }
+      }
+    },
+    {
+      "name": "mcp/set-secret",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/MCPSetSecretRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/MCPSetSecretAnswer"
+        }
+      }
+    },
+    {
+      "name": "mcp/verify",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/MCPVerifyRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/MCPVerifyAnswer"
         }
       }
     },

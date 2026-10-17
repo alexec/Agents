@@ -49,7 +49,7 @@ func (f *fakeRuntime) Initialize(context.Context, sdk.InitializeRequest) (sdk.In
 	return sdk.InitializeResponse{ProtocolVersion: sdk.ProtocolVersionNumber, AuthMethods: fakeAuthMethods(),
 		AgentCapabilities: sdk.AgentCapabilities{Auth: sdk.AgentAuthCapabilities{Logout: &sdk.LogoutCapabilities{}},
 			Providers: &sdk.ProvidersCapabilities{}, LoadSession: true, SessionCapabilities: sdk.SessionCapabilities{Resume: &sdk.SessionResumeCapabilities{},
-			Fork: &sdk.SessionForkCapabilities{}, List: &sdk.SessionListCapabilities{}, Delete: &sdk.SessionDeleteCapabilities{}}}}, nil
+				Fork: &sdk.SessionForkCapabilities{}, List: &sdk.SessionListCapabilities{}, Delete: &sdk.SessionDeleteCapabilities{}}}}, nil
 }
 
 // The fake holds one conversation the app did not start, "theirs", in any folder.
