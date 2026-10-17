@@ -7,7 +7,6 @@ import { signal } from "@preact/signals";
 import type { JSONValue } from "../protocol/generated";
 
 export const preferenceKeys = {
-  turnDetail: "turnDetail",
   smartGroupsOff: "sidebarSmartGroupsOff",
   showsArchivedProjects: "showsArchivedProjects",
   showsActivity: "showsActivity",

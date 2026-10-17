@@ -132,15 +132,11 @@ say(`sessions column after: ${JSON.stringify(await page.eval(`[...document.query
 say(`row status: ${JSON.stringify(await page.eval(`document.querySelector(".sessions .session .status")?.getAttribute("aria-label")`))}`);
 say(`chat at Outcome: ${JSON.stringify(await page.text(".transcript"))}`);
 
-// 5. The same turn at Steps and at Details (069).
-await page.eval(`(() => { const s = document.querySelector("select.detail"); s.value = "steps"; s.dispatchEvent(new Event("change", { bubbles: true })); })()`);
+// 5. The same turn with every call opened in its place: no levels since #1315.
+await page.eval(`[...document.querySelectorAll(".transcript button.call-line[aria-expanded='false']")].forEach((b) => b.click())`);
 await sleep(300);
-await page.shot(`${out}/us2-6-steps.png`);
-say(`chat at Steps: ${JSON.stringify(await page.text(".transcript"))}`);
-await page.eval(`(() => { const s = document.querySelector("select.detail"); s.value = "details"; s.dispatchEvent(new Event("change", { bubbles: true })); })()`);
-await sleep(300);
-await page.shot(`${out}/us2-7-details.png`);
-await page.eval(`(() => { const s = document.querySelector("select.detail"); s.value = "messages"; s.dispatchEvent(new Event("change", { bubbles: true })); })()`);
+await page.shot(`${out}/us2-6-opened.png`);
+say(`chat with its calls open: ${JSON.stringify(await page.text(".transcript"))}`);
 
 // What the host recorded: the answers given in the browser, and the files the turn wrote.
 const transcript = await op.link.call("agents/transcript", { agentID, limit: 400 }, host);
