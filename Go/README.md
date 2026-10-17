@@ -62,24 +62,21 @@ Server's **Install the Swift host instead**, installs the Swift one. Running the
 with or without it changes a host and keeps its id and agents. A control plane with no Go
 host gives the Swift one.
 
-**Switching a Mac.** Agents Host carries both (`Contents/Helpers/agents-control` and
-`agents-control-go`; `scripts/go-control.sh` builds the Go one). It runs the Swift one
-unless this Mac's entry in `~/.agents/settings/host.json` says
-`"controlImplementation": "go"`; restart the control plane's job after changing it.
-`control.log` then begins with `Agents Host: starting the Go agents-control`. Either way
-back keeps every member, host and pin.
+**Switching a Mac (#1312).** Agents Host carries both control planes
+(`Contents/Helpers/agents-control` and `agents-control-go`; `scripts/go-control.sh` builds the
+Go one) and both hosts (`agentsd` and `agentsd-go`; `scripts/go-agentsd.sh`). It runs the Go
+ones unless this Mac's entry in `~/.agents/settings/host.json` says
+`"controlImplementation": "swift"` or `"daemonImplementation": "swift"`, or the build carries
+no Go one (built with no Docker and no Go). Restart the job after changing it
+(`launchctl kickstart -k gui/$(id -u)/com.alexecollins.agentshost.control`, or `….daemon`).
+`control.log` then begins with `Agents Host: starting the Swift agents-control` (or `Go`), and
+the Go host's `daemon.log` says `agentsd <version> (go)`. The host's launch agent runs `Agents
+Host --launch-daemon`, which becomes the one picked. Both read and write the same root and
+`control/` folder, so either way keeps every agent, member, host and pin.
 
-**Switching a Mac's host (#1138).** Agents Host carries both `Contents/Helpers/agentsd` and
-`agentsd-go` (`scripts/go-agentsd.sh` builds the Go one). The host's launch agent runs
-`Agents Host --launch-daemon`, which becomes the Swift one unless this Mac's entry in
-`~/.agents/settings/host.json` says `"daemonImplementation": "go"`; restart the host's job
-after changing it (`launchctl kickstart -k gui/$(id -u)/com.alexecollins.agentshost.daemon`).
-The host's `daemon.log` (`~/Library/Logs/Agents`) then says `agentsd <version> (go)`. Both serve the same root, so
-going back keeps every agent. The Go host does not yet serve the Mac-only methods.
-
-**On a scratch set-up.** `CONTROL_BIN=$PWD/Go/out/darwin/agents-control
-.claude/skills/run-app/scripts/launch.sh --slug …` runs the Go one in place of the Swift
-one (build it with `GOOS=darwin Go/scripts/go.sh build -o out/darwin/agents-control
+**On a scratch set-up.** `.agents/skills/run-app/scripts/launch.sh` runs the Go ones the
+build carries, and `--swift` the Swift ones. `CONTROL_BIN=$PWD/Go/out/darwin/agents-control
+launch.sh --slug …` runs a Go one built from the tree (build it with `GOOS=darwin Go/scripts/go.sh build -o out/darwin/agents-control
 ./cmd/agents-control`).
 
 ## The github MCP server (`github-mcp`, #1232)

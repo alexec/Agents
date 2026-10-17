@@ -99,10 +99,10 @@ struct HostPaths: Sendable, Equatable {
     /// The Go `agents-control` (#1137), when this build carries one.
     var agentsControlGo: URL { helpers.appendingPathComponent("agents-control-go") }
 
-    /// The `agents-control` the settings pick: the Go one only when asked for and carried,
-    /// otherwise the Swift one. Both read and write the same `control/` folder.
+    /// The `agents-control` the settings pick (#1312): the Go one, unless they say `"swift"`
+    /// or this build carries no Go one. Both read and write the same `control/` folder.
     func agentsControl(for settings: HostSettings) -> URL {
-        guard settings.controlImplementation == "go",
+        guard settings.controlImplementation != "swift",
               FileManager.default.isExecutableFile(atPath: agentsControlGo.path) else { return agentsControl }
         return agentsControlGo
     }
@@ -112,10 +112,10 @@ struct HostPaths: Sendable, Equatable {
     /// The Go `agentsd` (#1138), when this build carries one.
     var agentsdGo: URL { helpers.appendingPathComponent("agentsd-go") }
 
-    /// The `agentsd` the settings pick: the Go one only when asked for and carried,
-    /// otherwise the Swift one. Both read and write the same root.
+    /// The `agentsd` the settings pick (#1312): the Go one, unless they say `"swift"` or this
+    /// build carries no Go one. Both read and write the same root.
     func agentsd(for settings: HostSettings) -> URL {
-        guard settings.daemonImplementation == "go",
+        guard settings.daemonImplementation != "swift",
               FileManager.default.isExecutableFile(atPath: agentsdGo.path) else { return agentsd }
         return agentsdGo
     }

@@ -9,8 +9,8 @@
 #   scripts/go-agentsd.sh --carry    Agents Host's build, after its phases: copy it into the
 #                                    app's Contents/Helpers and sign it, or take it out
 #
-# Agents Host runs it only when this Mac's entry in ~/.agents/settings/host.json says
-# "daemonImplementation": "go" (HostSettings); Swift is the default. As go-control.sh.
+# Agents Host runs it unless this Mac's entry in ~/.agents/settings/host.json says
+# "daemonImplementation": "swift" (HostSettings): Go is the default (#1312). As go-control.sh.
 set -eu
 
 root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
