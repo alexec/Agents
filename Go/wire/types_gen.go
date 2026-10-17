@@ -544,6 +544,47 @@ type CatalogErrorFailed struct {
 	Value string `json:"_0"`
 }
 
+type CatalogKind string
+
+const (
+	CatalogKindSkills CatalogKind = "skills"
+	CatalogKindMCP    CatalogKind = "mcp"
+)
+
+type CatalogPreviewAnswer struct {
+	Preview *SkillPreview `json:"preview,omitzero"`
+	Error   *CatalogError `json:"error,omitzero"`
+}
+
+type CatalogPreviewRequest struct {
+	Result      CatalogResult    `json:"result"`
+	Destination SkillDestination `json:"destination"`
+}
+
+type CatalogResult struct {
+	ID          string  `json:"id"`
+	Name        string  `json:"name"`
+	Owner       string  `json:"owner"`
+	Repo        string  `json:"repo"`
+	SkillID     string  `json:"skillID"`
+	Installs    int64   `json:"installs"`
+	Known       bool    `json:"known"`
+	Marketplace *string `json:"marketplace,omitzero"`
+	SkillPath   *string `json:"skillPath,omitzero"`
+}
+
+type CatalogSearchAnswer struct {
+	Results []CatalogResult `json:"results"`
+	Error   *CatalogError   `json:"error,omitzero"`
+}
+
+type CatalogSearchRequest struct {
+	Query       string            `json:"query"`
+	Kind        *CatalogKind      `json:"kind,omitzero"`
+	Marketplace *string           `json:"marketplace,omitzero"`
+	Destination *SkillDestination `json:"destination,omitzero"`
+}
+
 type CatchUpLeases struct {
 	Leases LeaseSnapshot     `json:"leases"`
 	Hosted HostedMCPSnapshot `json:"hosted"`
@@ -921,6 +962,39 @@ type DeleteSessionRequest struct {
 	RuntimeID string `json:"runtimeID"`
 	SessionID string `json:"sessionID"`
 	Confirmed *bool  `json:"confirmed,omitzero"`
+}
+
+type DestinationState struct {
+	Free         *struct{}                     `json:"free,omitzero"`
+	SameSkill    *DestinationStateSameSkill    `json:"sameSkill,omitzero"`
+	ManagedOther *DestinationStateManagedOther `json:"managedOther,omitzero"`
+	Unmanaged    *DestinationStateUnmanaged    `json:"unmanaged,omitzero"`
+	Unavailable  *DestinationStateUnavailable  `json:"unavailable,omitzero"`
+}
+
+type DestinationStateSameSkill struct {
+	Update bool `json:"update"`
+}
+
+type DestinationStateManagedOther struct {
+	Source string `json:"source"`
+}
+
+type DestinationStateUnmanaged struct {
+	Path string `json:"path"`
+}
+
+type DestinationStateUnavailable struct {
+	Value CatalogError `json:"_0"`
+}
+
+type DestinationStateAnswer struct {
+	DestinationState DestinationState `json:"destinationState"`
+}
+
+type DestinationStateRequest struct {
+	PreviewID   UUID             `json:"previewID"`
+	Destination SkillDestination `json:"destination"`
 }
 
 type DeviceBinding struct {
@@ -1829,6 +1903,61 @@ type MarkRuntimeAvailable struct {
 	CredentialKey string `json:"credentialKey"`
 }
 
+type Marketplace struct {
+	ID           string            `json:"id"`
+	Name         string            `json:"name"`
+	Format       MarketplaceFormat `json:"format"`
+	URL          string            `json:"url"`
+	Token        *string           `json:"token,omitzero"`
+	TokenMissing bool              `json:"tokenMissing"`
+	Origin       MarketplaceOrigin `json:"origin"`
+	Enabled      bool              `json:"enabled"`
+	About        *string           `json:"about,omitzero"`
+}
+
+type MarketplaceAddRequest struct {
+	Name       string            `json:"name"`
+	Format     MarketplaceFormat `json:"format"`
+	URL        string            `json:"url"`
+	Token      *string           `json:"token,omitzero"`
+	TokenValue *string           `json:"tokenValue,omitzero"`
+}
+
+type MarketplaceFormat string
+
+const (
+	MarketplaceFormatMCPRegistry  MarketplaceFormat = "mcp-registry"
+	MarketplaceFormatSkillsSh     MarketplaceFormat = "skills.sh"
+	MarketplaceFormatGithubSkills MarketplaceFormat = "github-skills"
+)
+
+type MarketplaceIDRequest struct {
+	ID string `json:"id"`
+}
+
+type MarketplaceOrigin string
+
+const (
+	MarketplaceOriginProvided MarketplaceOrigin = "provided"
+	MarketplaceOriginPersonal MarketplaceOrigin = "personal"
+	MarketplaceOriginProject  MarketplaceOrigin = "project"
+)
+
+type MarketplaceSetEnabledRequest struct {
+	ID      string `json:"id"`
+	Enabled bool   `json:"enabled"`
+}
+
+type MarketplacesListAnswer struct {
+	Marketplaces []Marketplace `json:"marketplaces"`
+	Problem      *string       `json:"problem,omitzero"`
+}
+
+type MarketplacesListRequest struct {
+	Kind        *CatalogKind      `json:"kind,omitzero"`
+	Destination *SkillDestination `json:"destination,omitzero"`
+}
+
 type MessageSender struct {
 	AgentID UUID   `json:"agentID"`
 	Title   string `json:"title"`
@@ -2159,6 +2288,13 @@ type PresenceReport struct {
 	MayNotify   *bool  `json:"mayNotify,omitzero"`
 	Showing     *UUID  `json:"showing,omitzero"`
 	AlsoShowing []UUID `json:"alsoShowing,omitzero"`
+}
+
+type PreviewFile struct {
+	Path     string `json:"path"`
+	Bytes    int64  `json:"bytes"`
+	Runnable bool   `json:"runnable"`
+	Via      string `json:"via"`
 }
 
 type PreviewProblem struct {
@@ -2836,6 +2972,22 @@ const (
 	SignInWantedReasonUnreadable  SignInWantedReason = "unreadable"
 )
 
+type SkillAddAnswer struct {
+	Skill ManagedSkill `json:"skill"`
+}
+
+type SkillAddRequest struct {
+	PreviewID   UUID             `json:"previewID"`
+	Destination SkillDestination `json:"destination"`
+	Replace     bool             `json:"replace"`
+}
+
+type SkillChanges struct {
+	Added   []string `json:"added"`
+	Changed []string `json:"changed"`
+	Removed []string `json:"removed"`
+}
+
 type SkillDestination struct {
 	Kind   SkillDestinationKind `json:"kind"`
 	Folder *string              `json:"folder,omitzero"`
@@ -2853,8 +3005,35 @@ type SkillNameRequest struct {
 	Name        string           `json:"name"`
 }
 
+type SkillPreview struct {
+	PreviewID        UUID             `json:"previewID"`
+	Result           CatalogResult    `json:"result"`
+	Name             string           `json:"name"`
+	Description      string           `json:"description"`
+	SkillPath        string           `json:"skillPath"`
+	Commit           string           `json:"commit"`
+	CommittedAt      *Date            `json:"committedAt,omitzero"`
+	TreeSHA          string           `json:"treeSHA"`
+	ComputedHash     string           `json:"computedHash"`
+	Files            []PreviewFile    `json:"files"`
+	SkillMarkdown    string           `json:"skillMarkdown"`
+	TotalBytes       int64            `json:"totalBytes"`
+	Problems         []PreviewProblem `json:"problems"`
+	DestinationState DestinationState `json:"destinationState"`
+}
+
 type SkillRemoveAnswer struct {
 	TrashedTo string `json:"trashedTo"`
+}
+
+type SkillUpdatePreviewAnswer struct {
+	Preview SkillPreview `json:"preview"`
+	Changes SkillChanges `json:"changes"`
+	Edited  bool         `json:"edited"`
+}
+
+type SkillUpdatesAnswer struct {
+	Updates map[string]UpdateState `json:"updates"`
 }
 
 type SkillsListAnswer struct {

@@ -36,6 +36,9 @@ var (
 	CallApprovalsRead                  = Method[ApprovalReadRequest, GuardedChangeReading]{"approvals/read"}
 	CallArtifactWrite                  = Method[ArtifactWriteRequest, Empty]{"artifact/write"}
 	CallAttentionPending               = Method[Empty, AttentionPending]{"attention/pending"}
+	CallCatalogDestinationState        = Method[DestinationStateRequest, DestinationStateAnswer]{"catalog/destination-state"}
+	CallCatalogPreview                 = Method[CatalogPreviewRequest, CatalogPreviewAnswer]{"catalog/preview"}
+	CallCatalogSearch                  = Method[CatalogSearchRequest, CatalogSearchAnswer]{"catalog/search"}
 	CallChangesFile                    = Method[ChangesFileRequest, ChangedFileDetail]{"changes/file"}
 	CallChangesList                    = Method[ChangesListRequest, ChangesList]{"changes/list"}
 	CallClientCatchUp                  = Method[CatchUpRequest, CatchUpSnapshot]{"client/catchUp"}
@@ -75,6 +78,10 @@ var (
 	CallMacReveal                      = Method[MacPathRequest, Empty]{"mac/reveal"}
 	CallMacTerminal                    = Method[MacTerminalRequest, Empty]{"mac/terminal"}
 	CallMailboxCarry                   = Method[Empty, Empty]{"mailbox/carry"}
+	CallMarketplacesAdd                = Method[MarketplaceAddRequest, MarketplacesListAnswer]{"marketplaces/add"}
+	CallMarketplacesList               = Method[MarketplacesListRequest, MarketplacesListAnswer]{"marketplaces/list"}
+	CallMarketplacesRemove             = Method[MarketplaceIDRequest, MarketplacesListAnswer]{"marketplaces/remove"}
+	CallMarketplacesSetEnabled         = Method[MarketplaceSetEnabledRequest, MarketplacesListAnswer]{"marketplaces/set-enabled"}
 	CallMCPHealth                      = Method[Empty, MCPHealthSnapshot]{"mcp/health"}
 	CallMCPHealthCheck                 = Method[MCPHealthCheckRequest, MCPHealthSnapshot]{"mcp/health/check"}
 	CallMCPHosted                      = Method[Empty, HostedMCPSnapshot]{"mcp/hosted"}
@@ -146,8 +153,11 @@ var (
 	CallShellResize                    = Method[ShellResizeRequest, Empty]{"shell/resize"}
 	CallShellRestart                   = Method[ShellAttachRequest, ShellAttachResponse]{"shell/restart"}
 	CallShellSignal                    = Method[ShellSignalRequest, Empty]{"shell/signal"}
+	CallSkillsAdd                      = Method[SkillAddRequest, SkillAddAnswer]{"skills/add"}
+	CallSkillsCheckUpdates             = Method[SkillsListRequest, SkillUpdatesAnswer]{"skills/check-updates"}
 	CallSkillsList                     = Method[SkillsListRequest, SkillsListAnswer]{"skills/list"}
 	CallSkillsRemove                   = Method[SkillNameRequest, SkillRemoveAnswer]{"skills/remove"}
+	CallSkillsUpdatePreview            = Method[SkillNameRequest, SkillUpdatePreviewAnswer]{"skills/update-preview"}
 	CallStoreNotes                     = Method[Empty, StoreNotes]{"store/notes"}
 	CallSurfaceIdentify                = Method[SurfaceIdentification, Empty]{"surface/identify"}
 	CallTimeHistory                    = Method[Empty, TimeHistory]{"time/history"}

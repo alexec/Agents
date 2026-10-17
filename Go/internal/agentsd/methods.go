@@ -46,6 +46,7 @@ func (d *Daemon) register() {
 	d.registerPlugins()
 	d.registerWake()
 	d.registerMacSignIn()
+	d.registerCatalog()
 	On(d, wire.CallPermissionsPending, func(ctx context.Context, c *Client, _ wire.Empty) ([]wire.PermissionRequest, error) {
 		return d.pendingPermissions(), nil
 	})

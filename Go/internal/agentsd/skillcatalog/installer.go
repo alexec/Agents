@@ -3,6 +3,7 @@ package skillcatalog
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -178,4 +179,237 @@ func optional(s string) *string {
 		return nil
 	}
 	return &s
+}
+
+// State is what is at the destination already, for the skill a preview is of.
+func (in Installer) State(p wire.SkillPreview, place Place) wire.DestinationState {
+	lock, err := LoadLock(place.LockKind, place.Lock)
+	if err != nil {
+		return wire.DestinationState{Unavailable: &wire.DestinationStateUnavailable{Value: why(err)}}
+	}
+	if _, e, ok := place.ManagedEntry(p.Name, lock); ok {
+		same := strings.EqualFold(e.Source, p.Result.Owner+"/"+p.Result.Repo) && (e.SkillPath == "" || e.SkillPath == p.SkillPath)
+		if !same {
+			return wire.DestinationState{ManagedOther: &wire.DestinationStateManagedOther{Source: e.Source}}
+		}
+		now := p.ComputedHash
+		if place.LockKind == Personal {
+			now = p.TreeSHA
+		}
+		return wire.DestinationState{SameSkill: &wire.DestinationStateSameSkill{Update: e.RecordedHash() != now}}
+	}
+	target := filepath.Join(place.Skills, p.Name)
+	if exists(target) {
+		return wire.DestinationState{Unmanaged: &wire.DestinationStateUnmanaged{Path: target}}
+	}
+	return wire.DestinationState{Free: &struct{}{}}
+}
+
+func why(err error) wire.CatalogError {
+	if ce, ok := err.(*Error); ok {
+		return ce.Why
+	}
+	return Failed(err.Error()).Why
+}
+
+// pending is an add under way, written before anything moves and removed once the lock is
+// written; a daemon that died in between undoes the add at its next start (Recover).
+type pending struct {
+	Lock     string  `json:"lock"`
+	Personal bool    `json:"personal"`
+	Key      string  `json:"key"`
+	Hash     string  `json:"hash"`
+	Target   string  `json:"target"`
+	Trashed  *string `json:"trashed,omitempty"`
+}
+
+func (in Installer) journal() string {
+	return filepath.Join(filepath.Dir(in.Sidecar), "catalog-pending.json")
+}
+
+// Recover undoes an add a dead daemon left unfinished, and says what it undid.
+func (in Installer) Recover() string {
+	b, err := os.ReadFile(in.journal())
+	if err != nil {
+		return ""
+	}
+	defer os.Remove(in.journal())
+	var p pending
+	if json.Unmarshal(b, &p) != nil {
+		return ""
+	}
+	kind := Project
+	if p.Personal {
+		kind = Personal
+	}
+	if lock, err := LoadLock(kind, p.Lock); err == nil {
+		if e, ok := lock.Entry(p.Key); ok && e.RecordedHash() == p.Hash {
+			return ""
+		}
+	}
+	os.RemoveAll(p.Target)
+	if p.Trashed != nil {
+		os.Rename(*p.Trashed, p.Target)
+	}
+	return "undid an unfinished add of " + filepath.Base(p.Target)
+}
+
+// Add puts a staged skill in place, in full or not at all: the old folder to the Trash, the
+// staged one renamed in, the lock written; a step that fails undoes the ones before it.
+func (in Installer) Add(st Staged, place Place, replace bool, now time.Time) (wire.ManagedSkill, error) {
+	p := st.Preview
+	if !CanAdd(p) {
+		var blocking []wire.PreviewProblem
+		for _, x := range p.Problems {
+			if x.Skipped == nil {
+				blocking = append(blocking, x)
+			}
+		}
+		return wire.ManagedSkill{}, CannotAdd(blocking)
+	}
+	switch s := in.State(p, place); {
+	case s.Free != nil:
+		if replace {
+			return wire.ManagedSkill{}, ReplaceMismatch()
+		}
+	case s.SameSkill != nil:
+		if s.SameSkill.Update && !replace {
+			return wire.ManagedSkill{}, ReplaceMismatch()
+		}
+	case s.ManagedOther != nil:
+		if !replace {
+			return wire.ManagedSkill{}, ReplaceMismatch()
+		}
+	case s.Unmanaged != nil:
+		return wire.ManagedSkill{}, Unmanaged(s.Unmanaged.Path)
+	case s.Unavailable != nil:
+		return wire.ManagedSkill{}, &Error{s.Unavailable.Value}
+	}
+	lock, err := LoadLock(place.LockKind, place.Lock)
+	if err != nil {
+		return wire.ManagedSkill{}, err
+	}
+	target := filepath.Join(place.Skills, p.Name)
+	if err := os.MkdirAll(place.Skills, 0o755); err != nil {
+		return wire.ManagedSkill{}, Failed("could not make " + place.Skills)
+	}
+	hash := p.ComputedHash
+	if place.LockKind == Personal {
+		hash = p.TreeSHA
+	}
+	// 0. The journal, before anything moves.
+	j := pending{Lock: place.Lock, Personal: place.LockKind == Personal, Key: st.LockKey, Hash: hash, Target: target}
+	writeJournal := func() error {
+		b, _ := json.Marshal(j)
+		os.MkdirAll(filepath.Dir(in.journal()), 0o755)
+		return os.WriteFile(in.journal(), b, 0o644)
+	}
+	if writeJournal() != nil {
+		return wire.ManagedSkill{}, Failed("could not note the add before starting it")
+	}
+	// 1. The old folder, if any, to the Trash, remembered so it can come back.
+	trashed := ""
+	if exists(target) {
+		if trashed, err = Trash(target, place.Trash, now); err != nil {
+			os.Remove(in.journal())
+			return wire.ManagedSkill{}, Failed("could not move the old copy to the Trash")
+		}
+		j.Trashed = &trashed
+		writeJournal()
+	}
+	// 2. The staged folder into place.
+	if err := os.Rename(st.Folder, target); err != nil {
+		if trashed != "" {
+			os.Rename(trashed, target)
+		}
+		os.Remove(in.journal())
+		return wire.ManagedSkill{}, Failed("could not move the skill into " + place.Skills)
+	}
+	// 3. The lock. A failure here takes the new folder out and puts the old one back.
+	if key, _, ok := place.ManagedEntry(p.Name, lock); ok && key != st.LockKey {
+		lock.Remove(key)
+	}
+	lock.Upsert(st.LockKey, p.Result.Owner+"/"+p.Result.Repo, p.SkillPath, hash, now)
+	if err := lock.Write(); err != nil {
+		os.RemoveAll(target)
+		if trashed != "" {
+			os.Rename(trashed, target)
+		}
+		os.Remove(in.journal())
+		return wire.ManagedSkill{}, Failed("could not write " + filepath.Base(place.Lock))
+	}
+	os.Remove(in.journal())
+	// 4. The project's Claude link, if it has none.
+	if place.Folder != "" {
+		linkClaudeSkills(place.Folder)
+	}
+	// 5. The sidecar: worth having, not worth failing for.
+	catalogue := SkillsShID
+	if p.Result.Marketplace != nil {
+		catalogue = *p.Result.Marketplace
+	}
+	side := LoadSidecar(in.Sidecar)
+	record := SidecarRecord{Commit: p.Commit, TreeSHA: p.TreeSHA, Catalogue: catalogue, AddedAt: now}
+	if p.CommittedAt != nil {
+		t := p.CommittedAt.Time()
+		record.CommittedAt = &t
+	}
+	if h, err := ComputedHash(target); err == nil {
+		record.FolderHash = &h
+	}
+	side.Skills[SidecarKey(place.Destination, p.Name)] = record
+	side.Save(in.Sidecar)
+	return wire.ManagedSkill{Destination: place.Destination, Name: p.Name, Source: p.Result.Owner + "/" + p.Result.Repo,
+		SkillPath: optional(p.SkillPath), RecordedHash: optional(hash), Commit: optional(p.Commit), CommittedAt: p.CommittedAt,
+		Catalogue: &catalogue, Update: wire.UpdateState{Current: &struct{}{}}}, nil
+}
+
+// linkClaudeSkills is .claude/skills -> ../.agents/skills, only where nothing is there.
+func linkClaudeSkills(folder string) {
+	link := filepath.Join(folder, ".claude", "skills")
+	if exists(link) {
+		return
+	}
+	os.MkdirAll(filepath.Dir(link), 0o755)
+	os.Symlink("../.agents/skills", link)
+}
+
+// Changes is the files added, changed and removed going from the installed folder to a
+// staged one, by path and content.
+func Changes(installed, staged string) wire.SkillChanges {
+	before, after := blobs(installed), blobs(staged)
+	out := wire.SkillChanges{Added: []string{}, Changed: []string{}, Removed: []string{}}
+	for p, sha := range after {
+		if was, ok := before[p]; !ok {
+			out.Added = append(out.Added, p)
+		} else if was != sha {
+			out.Changed = append(out.Changed, p)
+		}
+	}
+	for p := range before {
+		if _, ok := after[p]; !ok {
+			out.Removed = append(out.Removed, p)
+		}
+	}
+	sort.Strings(out.Added)
+	sort.Strings(out.Changed)
+	sort.Strings(out.Removed)
+	return out
+}
+
+func blobs(folder string) map[string]string {
+	out := map[string]string{}
+	filepath.Walk(folder, func(path string, info os.FileInfo, err error) error {
+		if err != nil || !info.Mode().IsRegular() {
+			return nil
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return nil
+		}
+		rel, _ := filepath.Rel(folder, path)
+		out[filepath.ToSlash(rel)] = BlobSHA(data)
+		return nil
+	})
+	return out
 }

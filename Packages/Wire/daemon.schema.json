@@ -1658,6 +1658,122 @@
         }
       ]
     },
+    "CatalogKind": {
+      "type": "string",
+      "enum": [
+        "skills",
+        "mcp"
+      ]
+    },
+    "CatalogPreviewAnswer": {
+      "type": "object",
+      "properties": {
+        "preview": {
+          "$ref": "#/definitions/SkillPreview"
+        },
+        "error": {
+          "$ref": "#/definitions/CatalogError"
+        }
+      },
+      "additionalProperties": false
+    },
+    "CatalogPreviewRequest": {
+      "type": "object",
+      "properties": {
+        "result": {
+          "$ref": "#/definitions/CatalogResult"
+        },
+        "destination": {
+          "$ref": "#/definitions/SkillDestination"
+        }
+      },
+      "required": [
+        "result",
+        "destination"
+      ],
+      "additionalProperties": false
+    },
+    "CatalogResult": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "owner": {
+          "type": "string"
+        },
+        "repo": {
+          "type": "string"
+        },
+        "skillID": {
+          "type": "string"
+        },
+        "installs": {
+          "type": "integer"
+        },
+        "known": {
+          "type": "boolean"
+        },
+        "marketplace": {
+          "type": "string"
+        },
+        "skillPath": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "owner",
+        "repo",
+        "skillID",
+        "installs",
+        "known"
+      ],
+      "additionalProperties": false
+    },
+    "CatalogSearchAnswer": {
+      "type": "object",
+      "properties": {
+        "results": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/CatalogResult"
+          }
+        },
+        "error": {
+          "$ref": "#/definitions/CatalogError"
+        }
+      },
+      "required": [
+        "results"
+      ],
+      "additionalProperties": false
+    },
+    "CatalogSearchRequest": {
+      "type": "object",
+      "properties": {
+        "query": {
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/definitions/CatalogKind"
+        },
+        "marketplace": {
+          "type": "string"
+        },
+        "destination": {
+          "$ref": "#/definitions/SkillDestination"
+        }
+      },
+      "required": [
+        "query"
+      ],
+      "additionalProperties": false
+    },
     "CatchUpLeases": {
       "type": "object",
       "properties": {
@@ -2924,6 +3040,137 @@
       "required": [
         "runtimeID",
         "sessionID"
+      ],
+      "additionalProperties": false
+    },
+    "DestinationState": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "free": {
+              "type": "object",
+              "additionalProperties": {
+                "not": {}
+              }
+            }
+          },
+          "required": [
+            "free"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "sameSkill": {
+              "type": "object",
+              "properties": {
+                "update": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "update"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "sameSkill"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "managedOther": {
+              "type": "object",
+              "properties": {
+                "source": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "source"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "managedOther"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "unmanaged": {
+              "type": "object",
+              "properties": {
+                "path": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "path"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "unmanaged"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "unavailable": {
+              "type": "object",
+              "properties": {
+                "_0": {
+                  "$ref": "#/definitions/CatalogError"
+                }
+              },
+              "required": [
+                "_0"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "unavailable"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "DestinationStateAnswer": {
+      "type": "object",
+      "properties": {
+        "destinationState": {
+          "$ref": "#/definitions/DestinationState"
+        }
+      },
+      "required": [
+        "destinationState"
+      ],
+      "additionalProperties": false
+    },
+    "DestinationStateRequest": {
+      "type": "object",
+      "properties": {
+        "previewID": {
+          "$ref": "#/definitions/UUID"
+        },
+        "destination": {
+          "$ref": "#/definitions/SkillDestination"
+        }
+      },
+      "required": [
+        "previewID",
+        "destination"
       ],
       "additionalProperties": false
     },
@@ -5745,6 +5992,148 @@
       ],
       "additionalProperties": false
     },
+    "Marketplace": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "format": {
+          "$ref": "#/definitions/MarketplaceFormat"
+        },
+        "url": {
+          "type": "string"
+        },
+        "token": {
+          "type": "string"
+        },
+        "tokenMissing": {
+          "type": "boolean"
+        },
+        "origin": {
+          "$ref": "#/definitions/MarketplaceOrigin"
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "about": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "format",
+        "url",
+        "tokenMissing",
+        "origin",
+        "enabled"
+      ],
+      "additionalProperties": false
+    },
+    "MarketplaceAddRequest": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "format": {
+          "$ref": "#/definitions/MarketplaceFormat"
+        },
+        "url": {
+          "type": "string"
+        },
+        "token": {
+          "type": "string"
+        },
+        "tokenValue": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "format",
+        "url"
+      ],
+      "additionalProperties": false
+    },
+    "MarketplaceFormat": {
+      "type": "string",
+      "enum": [
+        "mcp-registry",
+        "skills.sh",
+        "github-skills"
+      ]
+    },
+    "MarketplaceIDRequest": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "additionalProperties": false
+    },
+    "MarketplaceOrigin": {
+      "type": "string",
+      "enum": [
+        "provided",
+        "personal",
+        "project"
+      ]
+    },
+    "MarketplaceSetEnabledRequest": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "enabled": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "enabled"
+      ],
+      "additionalProperties": false
+    },
+    "MarketplacesListAnswer": {
+      "type": "object",
+      "properties": {
+        "marketplaces": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Marketplace"
+          }
+        },
+        "problem": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "marketplaces"
+      ],
+      "additionalProperties": false
+    },
+    "MarketplacesListRequest": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "$ref": "#/definitions/CatalogKind"
+        },
+        "destination": {
+          "$ref": "#/definitions/SkillDestination"
+        }
+      },
+      "additionalProperties": false
+    },
     "MessageSender": {
       "type": "object",
       "properties": {
@@ -6731,6 +7120,30 @@
       },
       "required": [
         "active"
+      ],
+      "additionalProperties": false
+    },
+    "PreviewFile": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string"
+        },
+        "bytes": {
+          "type": "integer"
+        },
+        "runnable": {
+          "type": "boolean"
+        },
+        "via": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "path",
+        "bytes",
+        "runnable",
+        "via"
       ],
       "additionalProperties": false
     },
@@ -8895,6 +9308,67 @@
         "unreadable"
       ]
     },
+    "SkillAddAnswer": {
+      "type": "object",
+      "properties": {
+        "skill": {
+          "$ref": "#/definitions/ManagedSkill"
+        }
+      },
+      "required": [
+        "skill"
+      ],
+      "additionalProperties": false
+    },
+    "SkillAddRequest": {
+      "type": "object",
+      "properties": {
+        "previewID": {
+          "$ref": "#/definitions/UUID"
+        },
+        "destination": {
+          "$ref": "#/definitions/SkillDestination"
+        },
+        "replace": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "previewID",
+        "destination",
+        "replace"
+      ],
+      "additionalProperties": false
+    },
+    "SkillChanges": {
+      "type": "object",
+      "properties": {
+        "added": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "changed": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "removed": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "added",
+        "changed",
+        "removed"
+      ],
+      "additionalProperties": false
+    },
     "SkillDestination": {
       "type": "object",
       "properties": {
@@ -8933,6 +9407,75 @@
       ],
       "additionalProperties": false
     },
+    "SkillPreview": {
+      "type": "object",
+      "properties": {
+        "previewID": {
+          "$ref": "#/definitions/UUID"
+        },
+        "result": {
+          "$ref": "#/definitions/CatalogResult"
+        },
+        "name": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "skillPath": {
+          "type": "string"
+        },
+        "commit": {
+          "type": "string"
+        },
+        "committedAt": {
+          "$ref": "#/definitions/WireDate"
+        },
+        "treeSHA": {
+          "type": "string"
+        },
+        "computedHash": {
+          "type": "string"
+        },
+        "files": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/PreviewFile"
+          }
+        },
+        "skillMarkdown": {
+          "type": "string"
+        },
+        "totalBytes": {
+          "type": "integer"
+        },
+        "problems": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/PreviewProblem"
+          }
+        },
+        "destinationState": {
+          "$ref": "#/definitions/DestinationState"
+        }
+      },
+      "required": [
+        "previewID",
+        "result",
+        "name",
+        "description",
+        "skillPath",
+        "commit",
+        "treeSHA",
+        "computedHash",
+        "files",
+        "skillMarkdown",
+        "totalBytes",
+        "problems",
+        "destinationState"
+      ],
+      "additionalProperties": false
+    },
     "SkillRemoveAnswer": {
       "type": "object",
       "properties": {
@@ -8942,6 +9485,41 @@
       },
       "required": [
         "trashedTo"
+      ],
+      "additionalProperties": false
+    },
+    "SkillUpdatePreviewAnswer": {
+      "type": "object",
+      "properties": {
+        "preview": {
+          "$ref": "#/definitions/SkillPreview"
+        },
+        "changes": {
+          "$ref": "#/definitions/SkillChanges"
+        },
+        "edited": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "preview",
+        "changes",
+        "edited"
+      ],
+      "additionalProperties": false
+    },
+    "SkillUpdatesAnswer": {
+      "type": "object",
+      "properties": {
+        "updates": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/definitions/UpdateState"
+          }
+        }
+      },
+      "required": [
+        "updates"
       ],
       "additionalProperties": false
     },
