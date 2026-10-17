@@ -37,6 +37,8 @@ type fakeRuntime struct {
 	ready chan struct{}
 	// sandboxOff is whether session/new's _meta turned Claude's sandbox off.
 	sandboxOff bool
+	// rateLimited is whether "rate limit me" was refused once already.
+	rateLimited bool
 }
 
 func (f *fakeRuntime) Initialize(context.Context, sdk.InitializeRequest) (sdk.InitializeResponse, error) {
@@ -117,6 +119,31 @@ func (f *fakeRuntime) Prompt(ctx context.Context, p sdk.PromptRequest) (sdk.Prom
 	if strings.Contains(text, "wait for me") {
 		<-ctx.Done()
 		return sdk.PromptResponse{StopReason: sdk.StopReasonCancelled}, nil
+	}
+	// Refused once for too many requests, then answered.
+	if strings.Contains(text, "rate limit me") {
+		if !f.rateLimited {
+			f.rateLimited = true
+			return sdk.PromptResponse{}, &sdk.RequestError{Code: 429, Message: "Too many requests"}
+		}
+		say("Answered at last.")
+		return sdk.PromptResponse{StopReason: sdk.StopReasonEndTurn}, nil
+	}
+	// Claude's plan window says spent, and the refusal comes typed beside end_turn (052).
+	if strings.Contains(text, "typed limit") || strings.Contains(text, "pay extra") {
+		var u sdk.SessionUpdate
+		w := fmt.Sprintf(`{"status":"rejected","resetsAt":%d,"rateLimitType":"five_hour","utilization":1}`, time.Now().Add(3*time.Hour).Unix())
+		if strings.Contains(text, "pay extra") {
+			w = `{"status":"allowed","rateLimitType":"five_hour","utilization":0.4,"isUsingOverage":true}`
+		}
+		json.Unmarshal([]byte(`{"sessionUpdate":"usage_update","used":10,"size":100,"_meta":{"_claude/rateLimit":`+w+`}}`), &u)
+		f.conn.SessionUpdate(ctx, sdk.SessionNotification{SessionId: p.SessionId, Update: u})
+		if strings.Contains(text, "pay extra") {
+			say("Done, on extra usage.")
+			return sdk.PromptResponse{StopReason: sdk.StopReasonEndTurn}, nil
+		}
+		return sdk.PromptResponse{StopReason: sdk.StopReasonEndTurn, Meta: map[string]any{"jetbrains": map[string]any{"air": map[string]any{
+			"sessionFailure": map[string]any{"id": "f1", "category": "limit", "title": "You've hit your session limit", "actions": []any{}}}}}}, nil
 	}
 	if strings.Contains(text, "spend it all") {
 		return sdk.PromptResponse{}, &sdk.RequestError{Code: -32603, Message: "Internal error", Data: map[string]any{"message": "Your credit balance is too low to access the API."}}

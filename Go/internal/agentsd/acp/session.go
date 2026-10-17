@@ -104,6 +104,9 @@ func Handshake(ctx context.Context, l Launch, sink Sink) (*Session, error) {
 			// Forms and links (ClientCapabilities.app): {"elicitation":{"form":{},"url":{}}}.
 			Elicitation: &sdk.ElicitationCapabilities{Form: &sdk.ElicitationFormCapabilities{},
 				Url: &sdk.ElicitationUrlCapabilities{}},
+			// Typed session failures (052): JetBrains' AIR extension, version 1, the one
+			// Claude's and Codex's adapters read.
+			Meta: map[string]any{"jetbrains": map[string]any{"air": map[string]any{"version": 1, "capabilities": []string{"sessionFailure"}}}},
 		},
 	})
 	if err != nil {

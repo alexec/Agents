@@ -50,6 +50,17 @@ type live struct {
 	// evidence is what this turn's commands printed and what it replied, for a sandbox
 	// that could not start (sandboxfailure.go).
 	evidence turnEvidence
+	// failure is the turn's typed failure and rateLimit the latest plan window the
+	// runtime reported (limits.go); lastSent the turn's prompt, sent again after a rate
+	// limit as resend, which is not recorded twice; rateLimitStreak and rateLimitAttempts
+	// this chat's rate limits; stops counts the person's stops, which end a retry's wait.
+	failure           *sessionFailure
+	rateLimit         *wire.RateLimitInfo
+	lastSent          *wire.QueuedPrompt
+	resend            wire.UUID
+	rateLimitStreak   []time.Time
+	rateLimitAttempts int
+	stops             int
 }
 
 type pendingPermission struct {
@@ -491,7 +502,16 @@ func (l *live) turn() bool {
 	if len(bs) > 1 {
 		um.Blocks = bs
 	}
-	d.recordFrom(l.id, wire.TranscriptEntryKind{UserMessage: um}, q.Sender)
+	// A prompt sent again after a rate limit is in the conversation already.
+	l.mu.Lock()
+	resent := l.resend == q.ID
+	l.resend = ""
+	sent := q
+	l.lastSent = &sent
+	l.mu.Unlock()
+	if !resent {
+		d.recordFrom(l.id, wire.TranscriptEntryKind{UserMessage: um}, q.Sender)
+	}
 	// The loop guard's count: the person starts it again, another agent's message carries
 	// it on, and the app's own words leave it where it was.
 	d.messageMu.Lock()
@@ -518,6 +538,7 @@ func (l *live) turn() bool {
 	l.lastMessage.Reset()
 	clear(l.toolCalls)
 	l.evidence = turnEvidence{}
+	l.failure = nil
 	l.mu.Unlock()
 	d.setState(l.id, wire.AgentStateRunning)
 	if q.Preface != nil {
@@ -545,8 +566,14 @@ func (l *live) turn() bool {
 		}
 		// What the refusal says about the runtime's allowance (052).
 		if code, msg := refusal(err); code != nil {
-			if why, ok := d.applyLimit(l.id, classifyLimit(a.RuntimeID, code, msg, "")); ok {
+			l.mu.Lock()
+			window := l.rateLimit
+			l.mu.Unlock()
+			if why, ok, retryAt := d.applyLimit(l, classifyLimit(a.RuntimeID, nil, window, code, msg, ""), false); ok {
 				d.end(l, wire.AgentStateStopped, why)
+				if !retryAt.IsZero() {
+					l.retryLater(retryAt)
+				}
 				return false
 			}
 		}
@@ -573,15 +600,37 @@ func (l *live) turn() bool {
 		// The turn's tokens on the agent, the day and the charts (finishTurn's banking).
 		d.bankTurnUsage(l.id, u)
 	}
-	// A runtime that says its allowance is spent in words, and ends the turn as usual.
-	if r.StopReason == sdk.StopReasonEndTurn {
-		l.mu.Lock()
-		said := l.lastMessage.String()
-		l.mu.Unlock()
-		if why, ok := d.applyLimit(l.id, classifyLimit(a.RuntimeID, nil, "", said)); ok {
-			d.end(l, wire.AgentStateStopped, why)
-			return false
+	// What the ending says about the runtime's allowance (052): its typed failure, on the
+	// answer or on an update during the turn, paid overage begun, or a refusal said in
+	// words in a turn ended as usual.
+	l.mu.Lock()
+	failure, window, said := l.failure, l.rateLimit, l.lastMessage.String()
+	l.mu.Unlock()
+	failure = failure.supersededBy(failureIn(r.Meta))
+	if r.StopReason != sdk.StopReasonEndTurn {
+		said = ""
+	}
+	// A warning is a retry the runtime is making: said, and the turn's own ending stands.
+	// An error is said too, and the turn failed whatever its stop reason.
+	failed := failure != nil && failure.isError()
+	if failure != nil {
+		d.noteFailure(l.id, a.RuntimeID, failure)
+	}
+	lim := classifyLimit(a.RuntimeID, failure, window, nil, "", said)
+	worked := r.StopReason == sdk.StopReasonEndTurn && !failed
+	if why, ok, retryAt := d.applyLimit(l, lim, worked); ok {
+		d.end(l, wire.AgentStateStopped, why)
+		if !retryAt.IsZero() {
+			l.retryLater(retryAt)
 		}
+		return false
+	}
+	if failed {
+		d.end(l, wire.AgentStateStopped, wire.EndedReasonRuntimeError)
+		return true
+	}
+	if worked && lim.kind == limitNone {
+		d.allowanceWorked(l, a.RuntimeID)
 	}
 	// A command whose sandbox could not be set up: the turn ran to its end, and the agent
 	// stops there with the card. Never once it said how it went itself (#224).
@@ -868,8 +917,14 @@ func (l *live) Update(n sdk.SessionNotification) {
 			d.change(l.id, func(a *wire.Agent) { a.AvailableCommands = cmds })
 		}
 	case u.UsageUpdate != nil:
-		// The context window and, where the runtime prices it, the session's cost so far.
+		// The context window and, where the runtime prices it, the session's cost so far;
+		// Claude's plan window beside them.
 		uu := u.UsageUpdate
+		if w := rateLimitIn(uu.Meta); w != nil {
+			if a := d.Store.Agent(l.id); a != nil {
+				d.notePlanWindow(l, a.RuntimeID, w)
+			}
+		}
 		usage := wire.Usage{Used: int64(uu.Used), Size: int64(uu.Size), At: now()}
 		if uu.Cost != nil && uu.Cost.Amount != 0 && uu.Cost.Currency != "" {
 			usage.Cost = &wire.Cost{Amount: uu.Cost.Amount, Currency: uu.Cost.Currency}
@@ -879,6 +934,18 @@ func (l *live) Update(n sdk.SessionNotification) {
 			d.bankSessionCost(l.id, *usage.Cost)
 		}
 	case u.SessionInfoUpdate != nil:
+		// A typed failure (052): the turn's, kept for its end; between turns, said.
+		if f := failureIn(u.SessionInfoUpdate.Meta); f != nil {
+			l.mu.Lock()
+			inTurn := l.inTurn
+			if inTurn {
+				l.failure = l.failure.supersededBy(f)
+			}
+			l.mu.Unlock()
+			if a := d.Store.Agent(l.id); !inTurn && a != nil {
+				d.noteFailure(l.id, a.RuntimeID, f)
+			}
+		}
 		// The runtime names the conversation (#492), unless the person named it.
 		if t := u.SessionInfoUpdate.Title; t != nil && *t != "" {
 			d.change(l.id, func(a *wire.Agent) {
@@ -997,6 +1064,7 @@ func (l *live) answer(permissionID wire.UUID, option string) bool {
 func (l *live) cancel() {
 	l.closeForms()
 	l.mu.Lock()
+	l.stops++
 	s, stop := l.session, l.stop
 	if l.inTurn && !l.prompting {
 		// Not with the runtime yet: session/cancel would find no turn to end.
