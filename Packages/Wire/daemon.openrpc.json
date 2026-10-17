@@ -2676,6 +2676,44 @@
       }
     },
     {
+      "name": "runtimes/authenticate",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/AuthenticateRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/RuntimeAccount"
+        }
+      }
+    },
+    {
+      "name": "runtimes/disableProvider",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/SetProviderRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/RuntimeAccount"
+        }
+      }
+    },
+    {
       "name": "runtimes/list",
       "tags": [
         {
@@ -2703,6 +2741,28 @@
       }
     },
     {
+      "name": "runtimes/logout",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/RuntimeRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "type": "array",
+          "items": {
+            "$ref": "daemon.schema.json#/definitions/UUID"
+          }
+        }
+      }
+    },
+    {
       "name": "runtimes/markAvailable",
       "tags": [
         {
@@ -2723,6 +2783,25 @@
         "name": "result",
         "schema": {
           "$ref": "daemon.schema.json#/definitions/RuntimeAllowances"
+        }
+      }
+    },
+    {
+      "name": "runtimes/setProvider",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/SetProviderRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/RuntimeAccount"
         }
       }
     },
