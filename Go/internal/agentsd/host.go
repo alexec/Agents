@@ -6,7 +6,6 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
-	"strconv"
 	"strings"
 	"sync"
 	"syscall"
@@ -286,10 +285,10 @@ func (d *Daemon) checkDisk() {
 		if syscall.Statfs(folder, &st) != nil || syscall.Stat(folder, &fi) != nil {
 			return
 		}
-		key := "device-" + strconv.FormatUint(uint64(fi.Dev), 10)
+		volume, key := diskVolume(&st, uint64(fi.Dev))
 		m := mounts[key]
 		if m == nil {
-			m = &mount{reading: wire.DiskReading{Volume: "This server’s disk", Mount: key,
+			m = &mount{reading: wire.DiskReading{Volume: volume, Mount: key,
 				FreeBytes: int64(st.Bavail) * int64(st.Bsize), TotalBytes: int64(st.Blocks) * int64(st.Bsize)}, t: diskThresholds{20, 5, 2}}
 			mounts[key] = m
 		}
