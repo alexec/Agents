@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"strings"
 
-	"github.com/alexec/agents/Go/internal/safe"
 	"github.com/alexec/agents/Go/wire"
 )
 
@@ -86,7 +85,7 @@ func (d *Daemon) afterArchiveRequest(id wire.UUID, requested, archiveNow bool) {
 		d.checkQueueSoon(projectFolder(a))
 	}
 	if archiveNow {
-		safe.Go("archive when done", func() {
+		d.goAfterTurn("archive when done", func() {
 			d.record(id, runtimeNote("Archived when it asked, as the agent that started it may archive it."))
 			d.archiveBy(id, wire.AgentArchivedReasonByAgent)
 		})

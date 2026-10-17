@@ -178,7 +178,7 @@ func (d *Daemon) fireWorkflows(e wire.Event) {
 	d.workflowMu.Unlock()
 	for _, f := range fires {
 		f := f
-		safe.Go("workflow fire", func() { d.fire(f) })
+		d.goAfterTurn("workflow fire", func() { d.fire(f) })
 	}
 }
 
@@ -622,7 +622,7 @@ func (d *Daemon) releaseQueued(folder, id string) {
 	if next != nil {
 		fr := fireRequest{folder: folder, id: id, trigger: next.Trigger, triggeringAgent: next.TriggeringAgentID, depth: next.Depth,
 			causingEvent: next.CausingEvent, fromQueue: fromQueue}
-		safe.Go("workflow queue", func() { d.fire(fr) })
+		d.goAfterTurn("workflow queue", func() { d.fire(fr) })
 	}
 }
 

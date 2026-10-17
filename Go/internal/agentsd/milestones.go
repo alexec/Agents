@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/alexec/agents/Go/internal/agentsd/diskjson"
-	"github.com/alexec/agents/Go/internal/safe"
 	"github.com/alexec/agents/Go/wire"
 )
 
@@ -81,7 +80,7 @@ func (d *Daemon) checkMilestonesSoon() {
 	}
 	d.milestoneCheck = true
 	d.milestoneMu.Unlock()
-	safe.Go("milestones", func() {
+	started := d.goAfterTurn("milestones", func() {
 		for {
 			d.checkMilestones()
 			d.milestoneMu.Lock()
@@ -94,6 +93,11 @@ func (d *Daemon) checkMilestonesSoon() {
 			d.milestoneMu.Unlock()
 		}
 	})
+	if !started {
+		d.milestoneMu.Lock()
+		d.milestoneCheck, d.milestoneAgain = false, false
+		d.milestoneMu.Unlock()
+	}
 }
 
 // checkMilestones is DaemonCore.checkMilestones: each one not yet earned, earned at the
@@ -198,17 +202,4 @@ func (d *Daemon) hasWorkflowHere() bool {
 		}
 	}
 	return false
-}
-
-// waitForMilestones lets a check under way finish its write, at most a second, as the
-// host goes.
-func (d *Daemon) waitForMilestones() {
-	for deadline := time.Now().Add(time.Second); time.Now().Before(deadline); time.Sleep(10 * time.Millisecond) {
-		d.milestoneMu.Lock()
-		busy := d.milestoneCheck
-		d.milestoneMu.Unlock()
-		if !busy {
-			return
-		}
-	}
 }
