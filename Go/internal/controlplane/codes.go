@@ -175,8 +175,8 @@ func InstallCommand(url, pin, code string) string {
 var serverFileNames = func() map[string]bool {
 	names := map[string]bool{"VERSION": true, "VERSION-go": true}
 	for _, arch := range []string{"x86_64", "aarch64"} {
-		// agentsd-go (#1136): the Go host, a Linux host's default; github-mcp (#1232).
-		for _, program := range []string{"agentsd", "agentsd-go", "ci-watcher", "github-mcp"} {
+		// agentsd-go (#1136): the Go host, a Linux host's default; github-mcp (#1232), linear-mcp (#839).
+		for _, program := range []string{"agentsd", "agentsd-go", "ci-watcher", "github-mcp", "linear-mcp"} {
 			names[program+"-linux-"+arch] = true
 			names[program+"-linux-"+arch+".sha256"] = true
 		}

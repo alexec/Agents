@@ -29,8 +29,8 @@ cd $root
 
 for arch in x86_64 aarch64; do
     # The Go host is a Linux host's default (#1136); the Swift one stays one setting away.
-    [[ -f $servers/agentsd-go-linux-$arch && -f $servers/agentsd-linux-$arch && -f $servers/ci-watcher-linux-$arch && -f $servers/github-mcp-linux-$arch ]] || {
-        print -u2 "No $servers/agentsd-go-linux-$arch, agentsd-linux-$arch, ci-watcher-linux-$arch or github-mcp-linux-$arch: run scripts/build-linux-agentsd.sh first (with Docker or Go for the Go host and github-mcp)."
+    [[ -f $servers/agentsd-go-linux-$arch && -f $servers/agentsd-linux-$arch && -f $servers/ci-watcher-linux-$arch && -f $servers/github-mcp-linux-$arch && -f $servers/linear-mcp-linux-$arch ]] || {
+        print -u2 "No $servers/agentsd-go-linux-$arch, agentsd-linux-$arch, ci-watcher-linux-$arch, github-mcp-linux-$arch or linear-mcp-linux-$arch: run scripts/build-linux-agentsd.sh first (with Docker or Go for the Go host, github-mcp and linear-mcp)."
         exit 1
     }
 done
@@ -83,7 +83,7 @@ fi
 
 # What the bundle must hold, signed: the helpers, the MCP servers it ships (#700) and the
 # Linux agentsd.
-for helper in agentsd agents-control agents-relay.app ci-watcher github-mcp workspace-commands; do
+for helper in agentsd agents-control agents-relay.app ci-watcher github-mcp linear-mcp workspace-commands; do
     [[ -e "$app/Contents/Helpers/$helper" ]] || { print -u2 "Agents Host has no Helpers/$helper"; exit 1 }
 done
 codesign --verify --deep --strict "$app"
@@ -115,10 +115,12 @@ for arch in x86_64 aarch64; do
     # The Go host (#1136) is the default; the Swift one is kept for install.sh --impl swift.
     tar -czf $out/agentsd-go-linux-$arch-$version.tar.gz -C $servers agentsd-go-linux-$arch \
         agentsd-go-linux-$arch.sha256 ci-watcher-linux-$arch ci-watcher-linux-$arch.sha256 \
-        github-mcp-linux-$arch github-mcp-linux-$arch.sha256 VERSION-go
+        github-mcp-linux-$arch github-mcp-linux-$arch.sha256 \
+        linear-mcp-linux-$arch linear-mcp-linux-$arch.sha256 VERSION-go
     tar -czf $out/agentsd-linux-$arch-$version.tar.gz -C $servers agentsd-linux-$arch \
         agentsd-linux-$arch.sha256 ci-watcher-linux-$arch ci-watcher-linux-$arch.sha256 \
-        github-mcp-linux-$arch github-mcp-linux-$arch.sha256 VERSION
+        github-mcp-linux-$arch github-mcp-linux-$arch.sha256 \
+        linear-mcp-linux-$arch linear-mcp-linux-$arch.sha256 VERSION
 done
 (cd $out && shasum -a 256 *.dmg *.zip *.tar.gz > SHA256SUMS)
 print "\n$out:"
