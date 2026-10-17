@@ -201,6 +201,9 @@ func (d *Daemon) noteRestart() restartGap {
 	d.lastRestart = &gap
 	d.diskAfterRestart = gap.Reason != "first_start"
 	d.restartMu.Unlock()
+	d.machineMu.Lock()
+	d.machineAfterRestart = gap.Reason != "first_start"
+	d.machineMu.Unlock()
 	kept := map[string]bool{}
 	var open []string
 	for _, a := range d.Store.Agents() {

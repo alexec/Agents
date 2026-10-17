@@ -30,8 +30,9 @@ func prepareWatch(t *testing.T) {
 			return
 		}
 		out := filepath.Join(dir, "agents-watch")
-		src := filepath.Join("..", "..", "..", "Host", "AgentsWatch", "main.swift")
-		if b, err := exec.Command(swiftc, "-O", "-o", out, src).CombinedOutput(); err != nil {
+		// main.swift and the --machine watch beside it (#1368).
+		srcs, _ := filepath.Glob(filepath.Join("..", "..", "..", "Host", "AgentsWatch", "*.swift"))
+		if b, err := exec.Command(swiftc, append([]string{"-O", "-o", out}, srcs...)...).CombinedOutput(); err != nil {
 			builtWatchErr = &exec.Error{Name: "swiftc " + string(b), Err: err}
 			return
 		}

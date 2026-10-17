@@ -140,6 +140,11 @@ func (d *Daemon) change(id wire.UUID, edit func(a *wire.Agent)) *wire.Agent {
 	}
 	d.tellChanged(*a, &before)
 	d.projectChanged(projectFolder(a))
+	// A project quiet after working says project.idle (#1368).
+	if before.State != a.State {
+		folder := projectFolder(a)
+		safe.Go("project idle", func() { d.watchForIdle(folder) })
+	}
 	// Every place a need begins or ends moves the record (DaemonCore.move's reconsider).
 	safe.Go("reconsider", d.reconsider)
 	return a
