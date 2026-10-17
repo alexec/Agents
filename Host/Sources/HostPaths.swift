@@ -95,29 +95,11 @@ struct HostPaths: Sendable, Equatable {
     var folderStore: URL { controlHome.appendingPathComponent("store", isDirectory: true) }
 
     var helpers: URL { Bundle.main.bundleURL.appendingPathComponent("Contents/Helpers", isDirectory: true) }
+    /// The control plane, Go since #1137; carried under its plain name (#1314).
     var agentsControl: URL { helpers.appendingPathComponent("agents-control") }
-    /// The Go `agents-control` (#1137), when this build carries one.
-    var agentsControlGo: URL { helpers.appendingPathComponent("agents-control-go") }
-
-    /// The `agents-control` the settings pick (#1312): the Go one, unless they say `"swift"`
-    /// or this build carries no Go one. Both read and write the same `control/` folder.
-    func agentsControl(for settings: HostSettings) -> URL {
-        guard settings.controlImplementation != "swift",
-              FileManager.default.isExecutableFile(atPath: agentsControlGo.path) else { return agentsControl }
-        return agentsControlGo
-    }
     /// The built web remote, Web/dist, built and copied in by project.yml (071 research R8, #473).
     var webRemote: URL { Bundle.main.bundleURL.appendingPathComponent("Contents/Resources/dist", isDirectory: true) }
+    /// This Mac's host, Go since #1138; carried under its plain name (#1314).
     var agentsd: URL { helpers.appendingPathComponent("agentsd") }
-    /// The Go `agentsd` (#1138), when this build carries one.
-    var agentsdGo: URL { helpers.appendingPathComponent("agentsd-go") }
-
-    /// The `agentsd` the settings pick (#1312): the Go one, unless they say `"swift"` or this
-    /// build carries no Go one. Both read and write the same root.
-    func agentsd(for settings: HostSettings) -> URL {
-        guard settings.daemonImplementation != "swift",
-              FileManager.default.isExecutableFile(atPath: agentsdGo.path) else { return agentsd }
-        return agentsdGo
-    }
     var agentsRelay: URL { helpers.appendingPathComponent("agents-relay.app/Contents/MacOS/agents-relay") }
 }

@@ -13,9 +13,9 @@
 #   - the "Agents Relay Developer ID" profile installed (the relay reaches CloudKit);
 #   - ASC_KEY_ID, ASC_ISSUER_ID and ASC_KEY_PATH (the App Store Connect key's .p8), for
 #     notarytool.
-# The Linux agentsd, Go (the default, #1136) and Swift, has to be in App/Resources/servers
-# already (scripts/build-linux-agentsd.sh, or the release workflow's linux job): Agents Host
-# carries both for servers, and the release offers each on its own for Linux hosts.
+# The Linux agentsd (Go, #1136) has to be in App/Resources/servers already
+# (scripts/build-linux-agentsd-go.sh, or the release workflow's linux job): Agents Host carries
+# it for servers, and the release offers it on its own for Linux hosts.
 set -euo pipefail
 
 root=${0:A:h:h}
@@ -28,9 +28,8 @@ servers=$root/App/Resources/servers
 cd $root
 
 for arch in x86_64 aarch64; do
-    # The Go host is a Linux host's default (#1136); the Swift one stays one setting away.
-    [[ -f $servers/agentsd-go-linux-$arch && -f $servers/agentsd-linux-$arch && -f $servers/github-mcp-linux-$arch && -f $servers/linear-mcp-linux-$arch ]] || {
-        print -u2 "No $servers/agentsd-go-linux-$arch, agentsd-linux-$arch, github-mcp-linux-$arch or linear-mcp-linux-$arch: run scripts/build-linux-agentsd.sh first (with Docker or Go for the Go host, github-mcp and linear-mcp)."
+    [[ -f $servers/agentsd-go-linux-$arch && -f $servers/github-mcp-linux-$arch && -f $servers/linear-mcp-linux-$arch ]] || {
+        print -u2 "No $servers/agentsd-go-linux-$arch, github-mcp-linux-$arch or linear-mcp-linux-$arch: run scripts/build-linux-agentsd-go.sh first (with Docker or Go)."
         exit 1
     }
 done
@@ -112,15 +111,10 @@ ditto -c -k --keepParent "$app" $out/Agents-Host-$version.zip
 
 for arch in x86_64 aarch64; do
     # The MCP servers Agents ships (#700) go beside it: a Linux host puts them in its bin/.
-    # The Go host (#1136) is the default; the Swift one is kept for install.sh --impl swift.
     tar -czf $out/agentsd-go-linux-$arch-$version.tar.gz -C $servers agentsd-go-linux-$arch \
         agentsd-go-linux-$arch.sha256 \
         github-mcp-linux-$arch github-mcp-linux-$arch.sha256 \
         linear-mcp-linux-$arch linear-mcp-linux-$arch.sha256 VERSION-go
-    tar -czf $out/agentsd-linux-$arch-$version.tar.gz -C $servers agentsd-linux-$arch \
-        agentsd-linux-$arch.sha256 \
-        github-mcp-linux-$arch github-mcp-linux-$arch.sha256 \
-        linear-mcp-linux-$arch linear-mcp-linux-$arch.sha256 VERSION
 done
 (cd $out && shasum -a 256 *.dmg *.zip *.tar.gz > SHA256SUMS)
 print "\n$out:"

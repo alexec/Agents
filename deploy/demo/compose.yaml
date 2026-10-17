@@ -1,8 +1,8 @@
 # The demo control plane App Review is given (058, T092): one copy, one demo host whose only
 # runtime says back what it is told, and codes that last as long as a review does.
 #
-#   scripts/build-linux-control.sh aarch64 && scripts/build-linux-agentsd.sh   # or x86_64
-#   cp App/Resources/servers/agentsd-linux-* deploy/demo/bin/
+#   scripts/build-linux-control.sh aarch64 && scripts/build-linux-agentsd-go.sh   # or x86_64
+#   cp App/Resources/servers/agentsd-go-linux-* deploy/demo/bin/
 #   DEMO_DOMAIN=demo.example.com docker compose -f deploy/demo/compose.yaml up -d --build
 #   docker compose -f deploy/demo/compose.yaml exec codes cat /codes/device /codes/operator
 #

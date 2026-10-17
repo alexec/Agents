@@ -75,13 +75,13 @@ yours: the Performance review workflow looks at that on Wednesdays.
    - **one threat in depth**, the next after the last run's `area:` in this rotation,
      wrapping round; on the first run, start at `tokens`:
      1. `tokens`: relay and pairing tokens, browser session keys: where they are made,
-        stored, compared and sent (Relay, Control, ControlDial, Packages/ControlPlane,
+        stored, compared and sent (Relay, Control, ControlDial, Go/internal/controlplane,
         Remote pairing, Web/src);
      2. `socket-roles`: which daemon.sock calls each kind of client (control, agent,
         device, browser, stranger) may make, and how a caller is identified
-        (Daemon/, DaemonCore, the signature checks);
+        (Go/internal/agentsd: roles.go, rpc.go; Host/PeerCheck, the signature checks);
      3. `servers`: server ssh and credentials: host keys, known_hosts, what is passed on
-        a command line or written to the server (Packages/AgentsKit/Sources/AgentsKit/Hosts,
+        a command line or written to the server (Go/internal/controlplane/hostinstall,
         server install);
      4. `foreign-files`: plugin, skill and workflow files from someone else: what runs
         or is trusted before a person approved it (Catalog, plugin installs, Workflows);

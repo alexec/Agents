@@ -28,7 +28,7 @@ jobs:
   # pull request's time to land was spent queued for a macOS runner, not building: in
   # October 2026 `test` waited 3–31 minutes and `packages` 8–36 to run for a few seconds
   # with nothing selected. A job skipped by its `if:` still satisfies a required check,
-  # so `packages` and `test` start only when there is work for them. The jobs' own
+  # so the macOS jobs start only when there is work for them. The jobs' own
   # selection steps still choose the suites; this only decides whether they start, and
   # if it fails they start anyway.
   #
@@ -43,8 +43,6 @@ jobs:
       apps: ${{ steps.test-selection.outputs.apps }}
       agentskit: ${{ steps.test-selection.outputs.agentskit }}
       codetext: ${{ steps.test-selection.outputs.codetext }}
-      packages: ${{ steps.test-selection.outputs.packages }}
-      linux: ${{ steps.test-selection.outputs.linux }}
       go: ${{ steps.test-selection.outputs.go }}
     steps:
       - name: Let a burst of merges settle
@@ -116,10 +114,10 @@ jobs:
       - name: Cache keys
         id: keys
         env:
-          MANIFESTS: ${{ hashFiles('project.yml', 'Daemon/Package.swift', 'Packages/AgentsKit/Package.swift', 'Packages/AgentsKit/Package.resolved', 'Packages/CodeText/Package.swift', 'Packages/CodeText/Package.resolved') }}
+          MANIFESTS: ${{ hashFiles('project.yml', 'Packages/AgentsKit/Package.swift', 'Packages/AgentsKit/Package.resolved', 'Packages/CodeText/Package.swift', 'Packages/CodeText/Package.resolved') }}
         run: |
-          xcode="$(git ls-tree HEAD -- project.yml App Daemon Host Packages Remote RemoteNotify RemoteWidget Shared Web | git hash-object --stdin)"
-          swiftpm="$(git ls-tree HEAD -- Daemon Packages/AgentsKit Packages/CodeText | git hash-object --stdin)"
+          xcode="$(git ls-tree HEAD -- project.yml App Host Packages Remote RemoteNotify RemoteWidget Shared Web | git hash-object --stdin)"
+          swiftpm="$(git ls-tree HEAD -- Packages/AgentsKit Packages/CodeText | git hash-object --stdin)"
           echo "base=${{ steps.toolchain.outputs.fingerprint }}-${MANIFESTS}" >> "$GITHUB_OUTPUT"
           echo "xcode=${xcode}" >> "$GITHUB_OUTPUT"
           echo "swiftpm=${swiftpm}" >> "$GITHUB_OUTPUT"
@@ -177,17 +175,24 @@ jobs:
         with:
           node-version-file: Web/.node-version
 
+      # Agents Host carries agentsd, agents-control and the MCP servers, all Go (#1314): its
+      # build fails without Go.
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: Go/go.mod
+          cache-dependency-path: Go/go.mod
+
       - name: Generate the project
         run: xcodegen generate
 
       # The Linux agentsd folder is a build output and gitignored, and the app copies
-      # it. Empty is what a Mac without scripts/build-linux-agentsd.sh has.
+      # it. Empty is what a Mac without scripts/build-linux-agentsd-go.sh has.
       - name: Make room for the Linux agentsd
         run: mkdir -p App/Resources/servers
 
       # One scheme after the other, and with plug-in validation skipped: without it
       # SwiftTerm's plug-in fails and says nothing. No signing on a runner. Agents Host
-      # carries agentsd and agents-control; the window is the App Store build.
+      # carries agentsd and agents-control (Go); the window is the App Store build.
       - name: Build Agents Host and the window (macOS)
         id: build-mac
         env:
@@ -235,7 +240,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: bash scripts/prune-ci-caches.sh macos-xcode-27-derived- 'macos-xcode-27-derived-${{ steps.keys.outputs.base }}-${{ steps.keys.outputs.xcode }}' "$GITHUB_REF"
 
-  # AgentsKit, CodeText and agentsd: built and tested with SwiftPM, beside `apps`.
+  # AgentsKit and CodeText: built and tested with SwiftPM, beside `apps`.
   swift:
     needs: select
     # Starts only when the selector chose a suite for it, and whenever the selection failed.
@@ -302,10 +307,10 @@ jobs:
       - name: Cache keys
         id: keys
         env:
-          MANIFESTS: ${{ hashFiles('project.yml', 'Daemon/Package.swift', 'Packages/AgentsKit/Package.swift', 'Packages/AgentsKit/Package.resolved', 'Packages/CodeText/Package.swift', 'Packages/CodeText/Package.resolved') }}
+          MANIFESTS: ${{ hashFiles('project.yml', 'Packages/AgentsKit/Package.swift', 'Packages/AgentsKit/Package.resolved', 'Packages/CodeText/Package.swift', 'Packages/CodeText/Package.resolved') }}
         run: |
-          xcode="$(git ls-tree HEAD -- project.yml App Daemon Host Packages Remote RemoteNotify RemoteWidget Shared Web | git hash-object --stdin)"
-          swiftpm="$(git ls-tree HEAD -- Daemon Packages/AgentsKit Packages/CodeText | git hash-object --stdin)"
+          xcode="$(git ls-tree HEAD -- project.yml App Host Packages Remote RemoteNotify RemoteWidget Shared Web | git hash-object --stdin)"
+          swiftpm="$(git ls-tree HEAD -- Packages/AgentsKit Packages/CodeText | git hash-object --stdin)"
           echo "base=${{ steps.toolchain.outputs.fingerprint }}-${MANIFESTS}" >> "$GITHUB_OUTPUT"
           echo "xcode=${xcode}" >> "$GITHUB_OUTPUT"
           echo "swiftpm=${swiftpm}" >> "$GITHUB_OUTPUT"
@@ -316,9 +321,7 @@ jobs:
         id: swiftpm-cache
         uses: actions/cache/restore@v5
         with:
-          path: |
-            Daemon/.build
-            Packages/CodeText/.build
+          path: Packages/CodeText/.build
           key: macos-xcode-27-swiftpm-${{ steps.keys.outputs.base }}-${{ steps.keys.outputs.swiftpm }}
           restore-keys: |
             macos-xcode-27-swiftpm-${{ steps.keys.outputs.base }}-
@@ -346,16 +349,6 @@ jobs:
         env:
           AGENTSKIT: ${{ steps.keys.outputs.agentskit }}
         run: bash scripts/drop-stale-agentskit.sh Packages/AgentsKit/.build "$AGENTSKIT"
-
-      # agentsd links AgentsKit as a local package, so Daemon/.build holds the same stale
-      # graph. On 2026-10-13 (#897) runs 38334579377 and 38343467490 restored it, the
-      # agentsd link failed on undefined AgentsKitCore symbols, and the clean retry took
-      # 4–6 minutes: with a slow test run after it, the job reached its 30-minute cap.
-      - name: Drop a stale AgentsKit from the SwiftPM build cache
-        if: steps.swiftpm-cache.outputs.cache-matched-key != '' && steps.swiftpm-cache.outputs.cache-hit != 'true'
-        env:
-          AGENTSKIT: ${{ steps.keys.outputs.agentskit }}
-        run: bash scripts/drop-stale-agentskit.sh Daemon/.build "$AGENTSKIT"
 
       - name: Tools
         run: |
@@ -402,23 +395,6 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: bash scripts/prune-ci-caches.sh macos-xcode-27-agentskit- 'macos-xcode-27-agentskit-${{ steps.toolchain.outputs.fingerprint }}-${{ hashFiles('Packages/AgentsKit/Package.swift', 'Packages/AgentsKit/Package.resolved', 'Packages/AgentsKit/Sources/**/*', 'Packages/AgentsKit/Tests/**/*', 'Packages/AgentsKit/Plugins/**/*') }}' "$GITHUB_REF"
 
-      # ServerLinkTests runs this agentsd, and builds it itself when it is missing:
-      # a whole Swift build inside the test run, holding a test thread for minutes,
-      # which on a shared runner stalls everything else. Built here instead, and only
-      # when the run includes a suite that reads it: a filtered run that names none of
-      # them spent three to five minutes here on a binary nothing ran. The selector says
-      # which suites those are. Skipping it also skips the SwiftPM cache save below,
-      # which already waits on this build, so no partial cache is kept.
-      - name: Build agentsd for the tests
-        id: build-agentsd
-        if: steps.test-selection.outputs.agentsd == 'build'
-        env:
-          RESTORED: ${{ steps.swiftpm-cache.outputs.cache-matched-key }}
-        run: |
-          source scripts/ci-clean-retry.sh
-          clean_retry "$RESTORED" Daemon/.build -- \
-            swift build --package-path Daemon --product agentsd
-
       # How long the runner's login shell takes to say its PATH. The app reads it
       # once per process, synchronously, the first time anything looks a runtime up.
       - name: Time the login shell
@@ -436,24 +412,16 @@ jobs:
           clean_retry "$RESTORED" Packages/CodeText/.build -- \
             swift build --build-tests --package-path Packages/CodeText
 
-      - name: Record the AgentsKit sources agentsd was built from
-        if: ${{ always() && steps.test-selection.outputs.agentskit != 'skip' && steps.test-selection.outputs.codetext != 'skip' && steps.swiftpm-cache.outputs.cache-hit != 'true' && steps.build-agentsd.outcome == 'success' && steps.build-codetext.outcome == 'success' }}
-        run: echo "${{ steps.keys.outputs.agentskit }}" > Daemon/.build/agentskit-sources
-
       - name: Save SwiftPM build cache
-        # This combined cache contains both paths below. Save it only when both
-        # package builds ran, so a skipped package cannot produce a partial cache,
-        # and never on a failure, for the reason above.
-        if: ${{ always() && steps.test-selection.outputs.agentskit != 'skip' && steps.test-selection.outputs.codetext != 'skip' && steps.swiftpm-cache.outputs.cache-hit != 'true' && steps.build-agentsd.outcome == 'success' && steps.build-codetext.outcome == 'success' }}
+        # Never on a failure, for the reason above.
+        if: ${{ always() && steps.swiftpm-cache.outputs.cache-hit != 'true' && steps.build-codetext.outcome == 'success' }}
         uses: actions/cache/save@v5
         with:
-          path: |
-            Daemon/.build
-            Packages/CodeText/.build
+          path: Packages/CodeText/.build
           key: macos-xcode-27-swiftpm-${{ steps.keys.outputs.base }}-${{ steps.keys.outputs.swiftpm }}
 
       - name: Prune old SwiftPM caches for this ref
-        if: ${{ always() && steps.build-agentsd.outcome == 'success' && steps.build-codetext.outcome == 'success' && steps.swiftpm-cache.outputs.cache-hit != 'true' }}
+        if: ${{ always() && steps.build-codetext.outcome == 'success' && steps.swiftpm-cache.outputs.cache-hit != 'true' }}
         env:
           GH_TOKEN: ${{ github.token }}
         run: bash scripts/prune-ci-caches.sh macos-xcode-27-swiftpm- 'macos-xcode-27-swiftpm-${{ steps.keys.outputs.base }}-${{ steps.keys.outputs.swiftpm }}' "$GITHUB_REF"
@@ -545,37 +513,6 @@ jobs:
             [[ $result == success || $result == skipped ]] || exit 1
           done
 
-  # The control plane's package, in a job of its own so it never presses on the swift job's
-  # time cap. ControlPlane links AgentsKit, so it runs on changes to either. (The web types'
-  # freshness moved to the `go` job with Packages/Wire, #1135.)
-  packages:
-    needs: select
-    if: ${{ always() && !cancelled() && (needs.select.result != 'success' || needs.select.outputs.packages != 'skip') }}
-    runs-on: xcode-27
-    timeout-minutes: 30
-    env:
-      DEVELOPER_DIR: /Applications/Xcode_27.0.app/Contents/Developer
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
-
-      - name: Select test suites for changed files
-        id: test-selection
-        env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
-          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
-        run: |
-          base="$BASE_SHA"
-          if [[ -z "$base" && -n "$DEFAULT_BRANCH" ]]; then
-            base=$(git merge-base "origin/$DEFAULT_BRANCH" HEAD || true)
-          fi
-          bash scripts/select-test-suites.sh "$base" >> "$GITHUB_OUTPUT"
-
-      - name: Test ControlPlane
-        if: steps.test-selection.outputs.controlplane != 'skip'
-        timeout-minutes: 20
-        run: swift test --package-path Packages/ControlPlane
 
   # The Go module at Go/ (#1135): the daemon and the control plane as they move to Go
   # (#1134). Built, vetted and tested on Linux with the Go its go.mod names. Its wiregen test
@@ -623,68 +560,6 @@ jobs:
         run: go vet ./...
       - name: Test
         run: TMPDIR=$(cd "$RUNNER_TEMP" && pwd -P) go test ./...
-
-  # The Linux host (#805): agentsd, static, for x86_64 only, as
-  # scripts/build-linux-agentsd.sh --check builds them before a ship. A Mac-only symbol
-  # used from code Linux compiles, such as a member declared behind `canImport(CryptoKit)`,
-  # passes every macOS job and broke this build twice in a day (#788, #799), found only when
-  # shipping. One architecture is enough for that: the sources are the same for both. The
-  # toolchain and SDK are the release workflow's linux job's; move them together. The build
-  # is warm from main's newest cache, which only a push to main saves, so pull requests do
-  # not fill the cache with one each.
-  linux:
-    needs: select
-    if: ${{ always() && !cancelled() && (needs.select.result != 'success' || needs.select.outputs.linux != 'skip') }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 45
-    container: swift:6.4.0-noble
-    steps:
-      - uses: actions/checkout@v6
-
-      - name: Tools and the Static Linux SDK
-        run: |
-          apt-get update -qq && apt-get install -y -qq zsh file >/dev/null
-          swift sdk install \
-            https://download.swift.org/swift-6.4.0-release/static-sdk/swift-6.4.0-RELEASE/swift-6.4.0-RELEASE_static-linux-0.1.0.artifactbundle.tar.gz \
-            --checksum 47d2fd89eebfdf9eb4d536b6710414297f755c17926cdebc4742c08982b40a9e
-
-      # Taken before the build, as hashFiles over Daemon/** after it would read .build.
-      - name: Cache key
-        id: linux-keys
-        env:
-          RESOLVED: ${{ hashFiles('Daemon/Package.resolved', 'Packages/AgentsKit/Package.resolved') }}
-          SOURCES: ${{ hashFiles('Daemon/**', 'Packages/AgentsKit/Package.swift', 'Packages/AgentsKit/Sources/**', 'Packages/AgentsKit/Plugins/**') }}
-        run: echo "key=linux-x86_64-swift-6.4.0-${RESOLVED}-${SOURCES}" >> "$GITHUB_OUTPUT"
-
-      - name: Restore the Linux build cache
-        id: linux-cache
-        uses: actions/cache/restore@v5
-        with:
-          path: |
-            Daemon/.build
-          key: ${{ steps.linux-keys.outputs.key }}
-          restore-keys: |
-            linux-x86_64-swift-6.4.0-${{ hashFiles('Daemon/Package.resolved', 'Packages/AgentsKit/Package.resolved') }}-
-            linux-x86_64-swift-6.4.0-
-
-      - name: Build agentsd for Linux
-        id: build-linux
-        shell: bash
-        env:
-          SWIFT: swift
-          RESTORED: ${{ steps.linux-cache.outputs.cache-matched-key }}
-        run: |
-          source scripts/ci-clean-retry.sh
-          clean_retry "$RESTORED" Daemon/.build -- \
-            zsh scripts/build-linux-agentsd.sh --check x86_64
-
-      - name: Save the Linux build cache
-        if: ${{ github.event_name == 'push' && steps.linux-cache.outputs.cache-hit != 'true' && steps.build-linux.outcome == 'success' }}
-        uses: actions/cache/save@v5
-        with:
-          path: |
-            Daemon/.build
-          key: ${{ steps.linux-keys.outputs.key }}
 
   # The web remote (071, D7, research R8): a build with the pinned Node, then tsc, the lint
   # that keeps agent output inert, the licence list and the web tests, which hold the build to

@@ -6,7 +6,7 @@ import SwiftUI
 ///
 /// The same program is the control plane's launcher: started by launchd with
 /// `--launch-control`, it hands the key over and becomes `agents-control`. With
-/// `--launch-daemon` it becomes this Mac's `agentsd`, the Swift or the Go one (#1138).
+/// `--launch-daemon` it becomes this Mac's `agentsd` (#1138).
 @main
 enum HostEntry {
     static func main() {

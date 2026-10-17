@@ -61,7 +61,6 @@ check_command() { # name [filter]
 	web) echo "scripts/web.sh build && cd Web && npm run check && npm test" ;;
 	test-agentskit) echo "$CACHED swift test --package-path Packages/AgentsKit${2:+ --filter '$2'}" ;;
 	test-codetext) echo "$CACHED swift test --package-path Packages/CodeText${2:+ --filter '$2'}" ;;
-	test-controlplane) echo "$CACHED swift test --package-path Packages/ControlPlane" ;;
 	test-go) echo "Go/scripts/go.sh vet ./... && Go/scripts/go.sh test ./..." ;;
 	smoke) echo "smoke" ;;
 	*) die "no check called $1" ;;
@@ -73,7 +72,7 @@ builds_for_paths() {
 	local host=0 remote=0 web=0 p
 	while IFS= read -r p; do
 		case $p in
-		App/* | Host/* | Daemon/* | Packages/ControlPlane/*) host=1 ;;
+		App/* | Host/*) host=1 ;;
 		Packages/* | Shared/* | project.yml) host=1 remote=1 ;;
 		Remote/* | RemoteNotify/* | RemoteWidget/*) remote=1 ;;
 		Web/*) web=1 ;;
@@ -86,7 +85,7 @@ builds_for_paths() {
 
 # Paths on stdin; yes when any of them reaches the apps, the hosts or the page.
 shippable() {
-	grep -Eq '^(App|Host|Daemon|Packages|Shared|Remote|RemoteNotify|RemoteWidget|Web)/|^project\.yml$' && echo yes || echo no
+	grep -Eq '^(App|Host|Go|Packages|Shared|Remote|RemoteNotify|RemoteWidget|Web)/|^project\.yml$' && echo yes || echo no
 }
 
 # The swift (and Go, #1135) test runs CI would choose for base...HEAD, as "name filter" lines.
@@ -96,7 +95,6 @@ tests_since() { # dir base
 	val() { echo "$out" | sed -n "s/^$1=//p"; }
 	[ "$(val agentskit)" = skip ] || echo "test-agentskit $(val agentskit_filter)"
 	[ "$(val codetext)" = skip ] || echo "test-codetext $(val codetext_filter)"
-	[ "$(val controlplane)" = skip ] || echo "test-controlplane"
 	[ "$(val go)" = skip ] || echo "test-go"
 }
 

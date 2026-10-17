@@ -49,7 +49,7 @@ certificate from Let's Encrypt (`auto_https` on) for `AGENTS_DOMAIN`:
 
 ```sh
 scripts/build-linux-control.sh x86_64        # or aarch64
-scripts/build-linux-agentsd.sh               # the host that joining servers download
+scripts/build-linux-agentsd-go.sh            # the host that joining servers download
 deploy/make-secrets.sh --public
 AGENTS_DOMAIN=agents.example.com ACME_EMAIL=you@example.com \
     docker compose -f deploy/compose.public.yaml up -d --build
