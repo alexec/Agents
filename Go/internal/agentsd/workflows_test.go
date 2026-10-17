@@ -141,3 +141,20 @@ func TestWorkflowsWaitForThePersonsOK(t *testing.T) {
 		t.Fatalf("%s", b)
 	}
 }
+
+func TestClearingMissedEventsLeavesTheWorkflow(t *testing.T) {
+	d, c := start(t, t.TempDir())
+	defer d.Shutdown()
+	dir := project(t, c, 1)
+	folder := store.FolderURL(dir)
+	os.MkdirAll(workflowsFolder(dir), 0o755)
+	os.WriteFile(filepath.Join(workflowsFolder(dir), "watch.md"), []byte("---\non: agent.finished\n---\nLook.\n"), 0o644)
+	var s wire.WorkflowSummary
+	json.Unmarshal(c.call(t, 2, "workflows/mcpTrigger/clearMissed", map[string]any{"folder": folder, "workflowID": "watch", "name": "pr.merged", "server": "ci"}), &s)
+	if s.Workflow.WorkflowID != "watch" {
+		t.Fatalf("%+v", s)
+	}
+	if e := c.callError(t, 3, "workflows/mcpTrigger/clearMissed", map[string]any{"folder": folder, "workflowID": "nope", "name": "pr.merged"}); e.Code != wire.FailureNoSuchWorkflow {
+		t.Fatalf("%+v", e)
+	}
+}
