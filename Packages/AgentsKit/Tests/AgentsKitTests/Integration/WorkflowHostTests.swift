@@ -23,9 +23,11 @@ struct WorkflowHostTests {
         return url
     }
 
-    private func core(_ locations: StoreLocations) async throws -> DaemonCore {
+    private func core(_ locations: StoreLocations, turns: TurnGate? = nil) async throws -> DaemonCore {
+        var script = FakeACPAgent.Script()
+        script.gate = turns
         let core = DaemonCore(store: try AgentStore(locations: locations), locations: locations,
-                              discovery: .findsEverything, launcher: FakeLauncher())
+                              discovery: .findsEverything, launcher: FakeLauncher(script: script))
         await core.loadFromDisk()
         return core
     }
@@ -79,7 +81,11 @@ struct WorkflowHostTests {
             Go.
             """, as: "nightly", in: work)
 
-        let core = try await core(locations)
+        // Every turn held: a run that finished would be agent.finished, which "open" and
+        // "here" are triggered by, and start more than the counts below (#1320).
+        let turns = TurnGate()
+        defer { turns.open() }
+        let core = try await core(locations, turns: turns)
         await core.rescanWorkflows(in: work)
         let listed = await core.allWorkflows(in: work).map(\.workflowID)
         #expect(listed == ["here", "open"])

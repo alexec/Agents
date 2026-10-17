@@ -31,6 +31,14 @@ struct RuntimeChoiceTests {
         return core
     }
 
+    /// A core whose fake turns are held until `turns` opens: a lead's turn that ends lets
+    /// its token go, and the helper is then refused for that instead (#1320).
+    private func heldCore(_ locations: StoreLocations, _ turns: TurnGate) async throws -> DaemonCore {
+        var script = FakeACPAgent.Script()
+        script.gate = turns
+        return try await makeCore(locations, FakeLauncher(script: script))
+    }
+
     /// An agent the person started, and a token that speaks for it, bound again before
     /// each call: a fake agent's turn ends when it likes, and its token with it.
     private func caller(_ core: DaemonCore, in folder: URL,
@@ -53,7 +61,9 @@ struct RuntimeChoiceTests {
 
     @Test func anAvailableRuntimeStartsTheHelperOnIt() async throws {
         let (locations, work) = try temporary()
-        let core = try await makeCore(locations)
+        let turns = TurnGate()
+        defer { turns.open() }
+        let core = try await heldCore(locations, turns)
         let lead = try await caller(core, in: work)
 
         let started = try await startHelper(core, lead, runtime: "codex")
@@ -63,7 +73,9 @@ struct RuntimeChoiceTests {
 
     @Test func aRuntimeOutOfThePoolIsRefusedWithTheAvailableOnes() async throws {
         let (locations, work) = try temporary()
-        let core = try await makeCore(locations)
+        let turns = TurnGate()
+        defer { turns.open() }
+        let core = try await heldCore(locations, turns)
         let lead = try await caller(core, in: work)
         await core.runtimeFailed(runtimeID: "grok")
         let before = await core.allAgents().count
@@ -78,7 +90,9 @@ struct RuntimeChoiceTests {
 
     @Test func aRuntimeNotInstalledIsRefusedSayingSo() async throws {
         let (locations, work) = try temporary()
-        let core = try await makeCore(locations)
+        let turns = TurnGate()
+        defer { turns.open() }
+        let core = try await heldCore(locations, turns)
         let lead = try await caller(core, in: work)
 
         let error = await refusal { _ = try await startHelper(core, lead, runtime: "cursor") }
@@ -102,7 +116,9 @@ struct RuntimeChoiceTests {
 
     @Test func anUnknownRuntimeIsRefusedAsBefore() async throws {
         let (locations, work) = try temporary()
-        let core = try await makeCore(locations)
+        let turns = TurnGate()
+        defer { turns.open() }
+        let core = try await heldCore(locations, turns)
         let lead = try await caller(core, in: work)
 
         let error = await refusal { _ = try await startHelper(core, lead, runtime: "nonesuch") }
@@ -135,7 +151,9 @@ struct RuntimeChoiceTests {
 
     @Test func listingSaysWhichRuntimesCanBeNamedAndWhyNotTheRest() async throws {
         let (locations, work) = try temporary()
-        let core = try await makeCore(locations)
+        let turns = TurnGate()
+        defer { turns.open() }
+        let core = try await heldCore(locations, turns)
         let lead = try await caller(core, in: work)
         await core.runtimeFailed(runtimeID: "grok")
 
