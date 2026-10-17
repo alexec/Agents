@@ -7299,6 +7299,38 @@
       },
       "additionalProperties": false
     },
+    "RelayGrantReply": {
+      "type": "object",
+      "properties": {
+        "runtime": {
+          "type": "string"
+        },
+        "caCertificate": {
+          "type": "string"
+        },
+        "standIn": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "runtime",
+        "caCertificate",
+        "standIn"
+      ],
+      "additionalProperties": false
+    },
+    "RelayGrantRequest": {
+      "type": "object",
+      "properties": {
+        "runtime": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "runtime"
+      ],
+      "additionalProperties": false
+    },
     "RelayOffer": {
       "type": "object",
       "properties": {
