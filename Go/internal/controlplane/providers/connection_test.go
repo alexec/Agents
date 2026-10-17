@@ -36,7 +36,7 @@ func TestTheContractsResultsAreRead(t *testing.T) {
 		t.Fatal(err)
 	}
 	yes := true
-	want := []WorkspaceInfo{{ID: "a", Name: "devbox", State: "stopped", SSH: "alex@h -p 2222", Tunnel: &yes, Cost: "$1"},
+	want := []WorkspaceInfo{{ID: "a", Name: "devbox", State: "stopped", SSH: new("alex@h -p 2222"), Tunnel: &yes, Cost: new("$1")},
 		{ID: "b", Name: "odd", State: "unknown"}}
 	if got := ContractMapping.Workspaces(content); !reflect.DeepEqual(got, want) {
 		t.Errorf("%+v", got)
@@ -70,7 +70,7 @@ func TestAMapReadsAnotherServersTools(t *testing.T) {
 	found := m.Workspaces(parsed(t, `{"droplets": [
 		{"id": 4101, "name": "devbox", "status": "off", "networks": {"v4": [{"ip_address": "203.0.113.7"}]}},
 		{"id": 4102, "name": "build", "status": "active", "networks": {"v4": []}}]}`))
-	want := []WorkspaceInfo{{ID: "4101", Name: "devbox", State: "stopped", SSH: "root@203.0.113.7"}, {ID: "4102", Name: "build", State: "running"}}
+	want := []WorkspaceInfo{{ID: "4101", Name: "devbox", State: "stopped", SSH: new("root@203.0.113.7")}, {ID: "4102", Name: "build", State: "running"}}
 	if !reflect.DeepEqual(found, want) {
 		t.Errorf("%+v", found)
 	}
@@ -158,7 +158,7 @@ func TestTheShippedDigitalOceanMap(t *testing.T) {
 	}
 	listed := m.Workspaces(parsed(t, `{"droplets": [{"id": 51234, "name": "agents-devbox", "status": "off",
 		"networks": {"v4": [{"ip_address": "203.0.113.7", "type": "public"}]}, "size": {"price_hourly": 0.02976}}]}`))
-	want := []WorkspaceInfo{{ID: "51234", Name: "agents-devbox", State: "stopped", SSH: "root@203.0.113.7", Cost: "$0.02976/hour while running"}}
+	want := []WorkspaceInfo{{ID: "51234", Name: "agents-devbox", State: "stopped", SSH: new("root@203.0.113.7"), Cost: new("$0.02976/hour while running")}}
 	if !reflect.DeepEqual(listed, want) {
 		t.Errorf("%+v", listed)
 	}

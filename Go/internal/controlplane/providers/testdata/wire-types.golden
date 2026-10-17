@@ -1,0 +1,112 @@
+AgentWorkspaces full
+{"providers":[{"id":"ID","name":"NAME","canMake":true,"canDelete":true,"options":{"k":"v"},"workspaces":[{"id":"ID","name":"NAME","state":"STATE","host":"HOST","hostState":"HOSTSTATE","cost":"COST"}]}]}
+AgentWorkspaces zero
+{"providers":null}
+DraftUpdate full
+{"draft":"DRAFT","state":"STATE","runtimeName":"RUNTIMENAME","steps":[{"at":813922215.25,"kind":"KIND","text":"TEXT"}],"cost":"COST","draftJSON":{"k":"v"},"check":{"passed":true,"workspaces":[{"id":"ID","name":"NAME","state":"STATE","ssh":"SSH","tunnel":true,"cost":"COST","host":"HOST"}],"problem":"PROBLEM","ssh":"SSH","noSSH":true},"question":{"id":"ID","kind":"KIND","workspace":"WORKSPACE","cost":"COST","text":"TEXT","yes":"YES"},"note":"NOTE"}
+DraftUpdate zero
+{"draft":"","state":"","runtimeName":"","steps":null}
+HostLink full
+{"host":"HOST","provider":"PROVIDER","workspace":"WORKSPACE","startWhenUsed":true,"stopWhenIdleMinutes":7}
+HostLink zero
+{"host":"","provider":"","workspace":""}
+HostProviderDraftCall full
+{"agentID":"AGENTID","draft":"DRAFT","tool":"TOOL","arguments":{"k":"v"}}
+HostProviderDraftCall zero
+{"agentID":"","draft":"","tool":""}
+HostRequest full
+{"host":"HOST"}
+HostRequest zero
+{"host":""}
+HostSchedule full
+{"at":813922215.25,"workflow":"WORKFLOW"}
+HostSchedule zero
+{}
+HostStatus full
+{"idle":true,"running":["RUNNING"],"schedule":{"at":813922215.25,"workflow":"WORKFLOW"}}
+HostStatus zero
+{"idle":false,"running":null}
+HostStop full
+{"host":"HOST","confirmRunning":true}
+HostStop zero
+{"host":""}
+HostWorkspace full
+{"provider":"PROVIDER","providerName":"PROVIDERNAME","workspace":"WORKSPACE","workspaceName":"WORKSPACENAME","workspaceState":"WORKSPACESTATE","hostState":"HOSTSTATE","phase":"PHASE","since":813922215.25,"problem":"PROBLEM","stoppedBy":"STOPPEDBY","canStart":true,"canStop":true,"startWhenUsed":true,"stopWhenIdleMinutes":7,"cost":"COST","current":true,"startForSchedules":true,"tellsSchedule":true,"nextWorkflow":"NEXTWORKFLOW","nextWorkflowAt":813922215.25,"wakeAt":813922215.25}
+HostWorkspace zero
+{"provider":"","providerName":"","workspace":"","workspaceName":"","workspaceState":"","canStart":false,"canStop":false,"startWhenUsed":false,"current":false}
+HostWorkspaceCall full
+{"agent":"AGENT","method":"METHOD","params":{"k":"v"}}
+HostWorkspaceCall zero
+{"agent":"","method":"","params":null}
+HostWorkspaceOptions full
+{"host":"HOST","startWhenUsed":true,"stopWhenIdleMinutes":7,"startForSchedules":true}
+HostWorkspaceOptions zero
+{"host":""}
+KeepRequest full
+{"host":"HOST","method":"METHOD","params":{"k":"v"}}
+KeepRequest zero
+{"host":"","method":"","params":null}
+KeptDelivered full
+{"host":"HOST","id":"ID","agentID":"AGENTID"}
+KeptDelivered zero
+{"host":"","id":""}
+KeptList full
+{"kept":[{"id":"ID","host":"HOST","kind":"KIND","agentID":"AGENTID","text":"TEXT","folder":"FOLDER","runtimeID":"RUNTIMEID","at":813922215.25,"failed":"FAILED"}]}
+KeptList zero
+{"kept":null}
+KeptRequest full
+{"id":"ID","host":"HOST","kind":"KIND","agentID":"AGENTID","text":"TEXT","folder":"FOLDER","runtimeID":"RUNTIMEID","at":813922215.25,"failed":"FAILED"}
+KeptRequest zero
+{"id":"","host":"","kind":"","text":"","at":0}
+KeptRequestID full
+{"host":"HOST","id":"ID"}
+KeptRequestID zero
+{"host":"","id":""}
+ProviderAdd full
+{"id":"ID","name":"NAME","kind":"KIND","command":"COMMAND","args":["ARGS"],"url":"URL","headers":{"KEY":"HEADERS"},"commands":{"k":"v"},"map":{"k":"v"},"secrets":{"KEY":"SECRETS"},"cli":"CLI","draft":"DRAFT"}
+ProviderAdd zero
+{"name":"","kind":""}
+ProviderCreate full
+{"id":"ID","name":"NAME","options":{"k":"v"},"clones":["CLONES"]}
+ProviderCreate zero
+{"id":"","name":""}
+ProviderCreated full
+{"workspace":{"id":"ID","name":"NAME","state":"STATE","ssh":"SSH","tunnel":true,"cost":"COST","host":"HOST"},"joining":true}
+ProviderCreated zero
+{"workspace":{"id":"","name":"","state":""},"joining":false}
+ProviderDraftAnswer full
+{"draft":"DRAFT","question":"QUESTION","yes":true}
+ProviderDraftAnswer zero
+{"draft":"","question":"","yes":false}
+ProviderDraftRequest full
+{"draft":"DRAFT"}
+ProviderDraftRequest zero
+{"draft":""}
+ProviderDraftStart full
+{"form":{"id":"ID","name":"NAME","kind":"KIND","command":"COMMAND","args":["ARGS"],"url":"URL","headers":{"KEY":"HEADERS"},"commands":{"k":"v"},"map":{"k":"v"},"secrets":{"KEY":"SECRETS"},"cli":"CLI","draft":"DRAFT"},"secrets":{"KEY":"SECRETS"},"provider":"PROVIDER","runtimeID":"RUNTIMEID"}
+ProviderDraftStart zero
+{"form":{"name":"","kind":""},"runtimeID":""}
+ProviderDraftStarted full
+{"draft":"DRAFT","answered":{"note":"NOTE","map":{"k":"v"},"preset":"PRESET"}}
+ProviderDraftStarted zero
+{"draft":""}
+ProviderOptions full
+{"schema":{"k":"v"}}
+ProviderOptions zero
+{"schema":null}
+ProviderRequest full
+{"id":"ID"}
+ProviderRequest zero
+{}
+ProviderRuntimes full
+{"runtimes":[{"id":"ID","name":"NAME","isDefault":true}],"host":"HOST","why":"WHY"}
+ProviderRuntimes zero
+{"runtimes":null}
+ProviderSummary full
+{"id":"ID","name":"NAME","kind":"KIND","secrets":{"KEY":true},"capabilities":["CAPABILITIES"],"contract":7,"mapped":true,"preset":"PRESET","workspaces":[{"id":"ID","name":"NAME","state":"STATE","ssh":"SSH","tunnel":true,"cost":"COST","host":"HOST"}],"listedAt":813922215.25,"current":true,"problem":"PROBLEM"}
+ProviderSummary zero
+{"id":"","name":"","kind":"","secrets":null,"capabilities":null,"contract":0,"mapped":false,"workspaces":null,"current":false}
+WorkspaceInfo full
+{"id":"ID","name":"NAME","state":"STATE","ssh":"SSH","tunnel":true,"cost":"COST","host":"HOST"}
+WorkspaceInfo zero
+{"id":"","name":"","state":""}

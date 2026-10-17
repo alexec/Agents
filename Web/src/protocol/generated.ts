@@ -105,6 +105,13 @@ export interface ACPProviderInfo {
   configured?: boolean;
 }
 
+/** What either announce is answered with: who the new party now is. */
+export interface Admitted {
+  client?: UUID;
+  host?: HostID;
+  grant?: string;
+}
+
 export interface AdoptRequest {
   runtimeID: string;
   sessionID: string;
@@ -190,6 +197,29 @@ export interface AgentRequest {
  * `unrecognised`.
  */
 export type AgentState = "starting" | "running" | "waitingOnUser" | "finished" | "stopped" | "archived" | "queued";
+
+/** workspaces/forAgent: what list_workspaces shows an agent. */
+export interface AgentWorkspaces {
+  providers: AgentWorkspacesProvider[];
+}
+
+export interface AgentWorkspacesProvider {
+  id: ProviderID;
+  name: string;
+  canMake: boolean;
+  canDelete: boolean;
+  options?: JSONValue;
+  workspaces: AgentWorkspacesWorkspace[];
+}
+
+export interface AgentWorkspacesWorkspace {
+  id: string;
+  name: string;
+  state: string;
+  host?: string;
+  hostState?: string;
+  cost?: string;
+}
 
 export interface AgentWorktree {
   name: string;
@@ -366,6 +396,18 @@ export interface Attachment {
 export interface AttentionDelivery {
   needID: NeedID;
   to?: Surface;
+}
+
+/**
+ * attention/need, unsealed, on a host's channel 0 (R6): a need to offer, or `withdraw`, and the
+ * host's whole Needs you count (#1163).
+ */
+export interface AttentionNeed {
+  need?: Need;
+  headline?: Headline;
+  buzz?: boolean;
+  withdraw?: NeedID;
+  waiting?: number;
 }
 
 export interface AttentionNotification {
@@ -586,6 +628,20 @@ export type ChangesUnavailable =
   | { folderGone: Record<string, never> }
   | { failed: { message: string } };
 
+/**
+ * What a channel on a host's uplink is opened as (ControlWire.ChannelOpen). `grant` is always
+ * `operator`, for an older host (#111).
+ */
+export interface ChannelOpen {
+  grant: string;
+  client: string;
+  device?: UUID;
+  relayed?: boolean;
+  tunnel?: string;
+  tunnelRef?: string;
+  fanOut?: boolean;
+}
+
 export interface ChartHint {
   mark: ChartMark;
   x: string;
@@ -602,6 +658,33 @@ export type ChatProjectState =
   | { noPersonalHome: Record<string, never> }
   | { failed: { message: string } };
 
+/** clients/announce, on a pairing connection. */
+export interface ClientAnnounce {
+  id: UUID;
+  publicKey: Base64;
+  name: string;
+  kind: ClientKind;
+}
+
+/** One row of clients/connections: a client connected now, and how. */
+export interface ClientConnection {
+  client: UUID;
+  relayed: boolean;
+  through?: string;
+}
+
+/** ClientRecord.Kind: a kind a later build added reads as `unknown`. */
+export type ClientKind = "mac" | "iPhone" | "iPad" | "unknown" | "browser";
+
+/**
+ * clients/startPairing: `browser` for the web remote's code (071); a grant an older window sends is
+ * not read.
+ */
+export interface ClientPairingRequest {
+  kind?: string;
+  grant?: string;
+}
+
 /** The older autoReview reads as alwaysApprove. */
 export type ClientPermissionMode = "default" | "alwaysApprove";
 
@@ -609,6 +692,31 @@ export interface ClientPermissionSettings {
   cursor: ClientPermissionMode;
   grok: ClientPermissionMode;
   opencode: ClientPermissionMode;
+}
+
+/**
+ * A paired screen, as clients/list says it (ClientRecord). `grant` is always `operator`, for an
+ * older build (#111).
+ */
+export interface ClientRecord {
+  id: UUID;
+  name: string;
+  kind: ClientKind;
+  publicKey: Base64;
+  grant: string;
+  paired: WireDate;
+  lastSeen?: WireDate;
+  mayNotify?: boolean;
+  owner?: string;
+  rev: number;
+  forgotten?: boolean;
+  forgottenAt?: WireDate;
+  knownEpoch?: number;
+}
+
+/** clients/forget. */
+export interface ClientRequest {
+  client: UUID;
 }
 
 export interface CloneNotification {
@@ -694,6 +802,53 @@ export interface ContinueInProjectRequest {
   requestID?: UUID;
 }
 
+/**
+ * The peer's answer: {"auth":…} (ControlAuth.Auth). `kind` is mac, iphone, ipad, browser, host,
+ * relay or copy.
+ */
+export interface ControlAuth {
+  id: string;
+  nonce: string;
+  mac: string;
+  kind: string;
+  for?: string;
+  epoch?: number;
+}
+
+/**
+ * control/clientChanged: a client paired, renamed, connected or went; nothing says list them all
+ * again.
+ */
+export interface ControlClientChanged {
+  client?: UUID;
+  removed?: boolean;
+}
+
+/**
+ * clients/startPairing, hosts/startEnroll: the code, until when it works, and for a host the one
+ * line to run on the server.
+ */
+export interface ControlCodeShown {
+  text: string;
+  expires: WireDate;
+  command?: string;
+}
+
+/** One place a control plane answers (R16). */
+export interface ControlEndpoint {
+  url: string;
+  pin?: string;
+}
+
+/** The control plane's first line of the exchange: {"hello":…} (ControlAuth.Hello). */
+export interface ControlHello {
+  v: number;
+  name: string;
+  control: string;
+  nonce: string;
+  copy: string;
+}
+
 export interface ControlHost {
   id: HostID;
   name: string;
@@ -709,6 +864,30 @@ export interface ControlHost {
   tunnel?: HostTunnel;
   workspace?: HostWorkspace;
   implementation?: string;
+}
+
+/** control/installProgress: a step of Add a Server. */
+export interface ControlInstallProgress {
+  name: string;
+  step: string;
+}
+
+/** control/moved: where the control plane is now (T085). */
+export interface ControlMoved {
+  url: string;
+  pin?: string;
+  controlKey: Base64;
+  name: string;
+}
+
+/** The control plane's proof back: {"ok":…} (ControlAuth.OK). */
+export interface ControlOK {
+  mac: string;
+  grant?: string;
+  host?: HostID;
+  relayed?: boolean;
+  endpoints?: ControlEndpoint[];
+  epoch?: number;
 }
 
 export interface ControlStatus {
@@ -810,6 +989,14 @@ export interface DestinationStateRequest {
   destination: SkillDestination;
 }
 
+/** One host in the ssh config, and what hosts/detect did with it (#429). */
+export interface DetectedServer {
+  alias: string;
+  resolved: string;
+  outcome: "added" | "known" | "bastion" | "unreachable" | "failed";
+  detail?: string;
+}
+
 /** A paired device (021 US5), as devices.json keeps it. */
 export interface Device {
   id: UUID;
@@ -905,11 +1092,34 @@ export interface DiskWorktree {
   partial: boolean;
 }
 
+export interface DraftCheck {
+  passed: boolean;
+  workspaces?: WorkspaceInfo[];
+  problem?: string;
+  ssh?: string;
+  noSSH?: boolean;
+}
+
 export interface DraftOptionsNotification {
   draftID: UUID;
   options: ConfigOption[];
   commands: SlashCommand[];
   failure?: string;
+}
+
+export interface DraftQuestion {
+  id: UUID;
+  kind: "start" | "stop" | "check";
+  workspace?: string;
+  cost?: string;
+  text: string;
+  yes: string;
+}
+
+export interface DraftStep {
+  at: WireDate;
+  kind: "read" | "help" | "check" | "ask" | "prove" | "note";
+  text: string;
 }
 
 export interface DropboxPutRequest {
@@ -1189,6 +1399,22 @@ export interface GitAsk {
   from: HostID;
 }
 
+/** A credential for one git command. Never printed, logged or kept. */
+export interface GitCredential {
+  username: string;
+  password: string;
+}
+
+/**
+ * git/credential, git/fill (#1122): only https, and only the server. `path` is the Go host's,
+ * unread by Swift.
+ */
+export interface GitCredentialRequest {
+  protocol: string;
+  host: string;
+  path?: string;
+}
+
 /** GitView (Model/AgentChanges.swift): `{ shared: { since } }`, `{ unavailable: … }` and so on. */
 export type GitView =
   | { owned: { since: string } }
@@ -1227,6 +1453,31 @@ export interface GuardedDiffLine {
 
 export type GuardedDiffLineKind = "same" | "removed" | "added";
 
+/** A member as a copy says it, for the one driving a handover (Handover.Status.Member). */
+export interface HandoverMember {
+  id: string;
+  name: string;
+  kind: string;
+  knownEpoch?: number;
+  version?: string;
+  online?: boolean;
+  lastSeen?: WireDate;
+}
+
+/**
+ * handover/status: what a copy says of itself, for the one driving a handover to check before each
+ * step (R16).
+ */
+export interface HandoverStatus {
+  phase: "serving" | "receiving" | "frozen" | "forwarding";
+  controlKey: Base64;
+  hasRecords: boolean;
+  endpoints: ControlEndpoint[];
+  epoch?: number;
+  members: HandoverMember[];
+  forwardingUntil?: WireDate;
+}
+
 export interface Headline {
   h1: string;
   h2: string;
@@ -1239,6 +1490,41 @@ export interface HelperLimits {
   notArchived?: number;
   queued?: number;
   agentsMayArchive?: boolean;
+}
+
+/** hosts/announce, on an enrolment connection. */
+export interface HostAnnounce {
+  publicKey: Base64;
+  name: string;
+  platform: string;
+  version: string;
+  machineID: string;
+  relay?: boolean;
+  implementation?: string;
+}
+
+/** host/hello, on every connect of an uplink. `implementation` is `swift` or `go` (#1134). */
+export interface HostHello {
+  host?: HostID;
+  version: string;
+  platform: string;
+  machineID: string;
+  name?: string;
+  relay?: boolean;
+  implementation?: string;
+}
+
+/**
+ * hosts/install (HostInstall.Request): a server over ssh, with its key, the fingerprint trusted, a
+ * tunnel, and `swift` for the Swift host.
+ */
+export interface HostInstall {
+  destination: string;
+  name?: string;
+  key?: string;
+  trust?: string;
+  tunnel?: boolean;
+  implementation?: string;
 }
 
 export interface HostJoinStatus {
@@ -1255,9 +1541,48 @@ export interface HostLastHeard {
   heardAt?: WireDate;
 }
 
+/** hosts/link. */
+export interface HostLink {
+  host: HostID;
+  provider: ProviderID;
+  workspace: string;
+  startWhenUsed?: boolean;
+  stopWhenIdleMinutes?: number;
+}
+
+/** host/providerDraft: a writing agent called one of the writer's tools (#858). */
+export interface HostProviderDraftCall {
+  agentID: UUID;
+  draft: UUID;
+  tool: string;
+  arguments?: JSONValue;
+}
+
+/** hosts/setRelay. */
+export interface HostRelayRequest {
+  host: HostID;
+  relay: boolean;
+}
+
 export interface HostRequest {
   host: HostID;
   purge?: boolean;
+}
+
+/** A host's next scheduled workflow (#1004). */
+export interface HostSchedule {
+  at?: WireDate;
+  workflow?: string;
+}
+
+/**
+ * host/status on channel 0 (#691 US4): each agent working or waiting on a person, and the next
+ * scheduled workflow.
+ */
+export interface HostStatus {
+  idle: boolean;
+  running: string[];
+  schedule?: HostSchedule;
 }
 
 export interface HostStop {
@@ -1300,6 +1625,21 @@ export interface HostWorkspace {
   wakeAt?: WireDate;
 }
 
+/** host/workspaces, for an agent there: who asked, for the log, and its call. */
+export interface HostWorkspaceCall {
+  agent: string;
+  method: string;
+  params: JSONValue;
+}
+
+/** hosts/setWorkspaceOptions. stopWhenIdleMinutes 0 turns it off. */
+export interface HostWorkspaceOptions {
+  host: HostID;
+  startWhenUsed?: boolean;
+  stopWhenIdleMinutes?: number;
+  startForSchedules?: boolean;
+}
+
 export interface HostedMCPSnapshot {
   servers: HostedMCPStatus[];
   at: WireDate;
@@ -1316,6 +1656,13 @@ export interface HostedMCPStatus {
   lastError?: string;
   restarts: number;
   users: number;
+}
+
+/** hosts/keep: a request for a stopped host, kept until it is up. */
+export interface KeepRequest {
+  host: HostID;
+  method: string;
+  params: JSONValue;
 }
 
 export interface KeptDelivered {
@@ -1387,6 +1734,14 @@ export interface LendGit {
   host: HostID;
   from: HostID;
   server: string;
+  allowed: boolean;
+}
+
+/** hosts/lendSignIn (T091). */
+export interface LendSignIn {
+  host: HostID;
+  from: HostID;
+  runtime: string;
   allowed: boolean;
 }
 
@@ -2174,6 +2529,128 @@ export interface PromptRequest {
   sendID?: UUID;
 }
 
+/**
+ * providers/add and providers/update. `secrets` only ever goes to the control plane; `cli` is not
+ * kept; `draft` is the draft this accepts (#858).
+ */
+export interface ProviderAdd {
+  id?: ProviderID;
+  name: string;
+  kind: "commands" | "stdio" | "http";
+  command?: string;
+  args?: string[];
+  url?: string;
+  headers?: Record<string, string>;
+  commands?: JSONValue;
+  map?: JSONValue;
+  secrets?: Record<string, string>;
+  cli?: string;
+  draft?: UUID;
+}
+
+/** providers/create. */
+export interface ProviderCreate {
+  id: ProviderID;
+  name: string;
+  options?: JSONValue;
+  clones?: string[];
+}
+
+/** What providers/create made. */
+export interface ProviderCreated {
+  workspace: WorkspaceInfo;
+  joining: boolean;
+}
+
+/** providers/draftAnswer: yes or no to a question. */
+export interface ProviderDraftAnswer {
+  draft: UUID;
+  question: UUID;
+  yes: boolean;
+}
+
+/** A draft answered with no agent: the server follows the contract, or a shipped map fits. */
+export interface ProviderDraftAnswered {
+  note: string;
+  map?: JSONValue;
+  preset?: string;
+}
+
+/** providers/draftCancel. */
+export interface ProviderDraftRequest {
+  draft: UUID;
+}
+
+/** providers/draftStart (#858). */
+export interface ProviderDraftStart {
+  form: ProviderAdd;
+  secrets?: Record<string, string>;
+  provider?: ProviderID;
+  runtimeID: string;
+}
+
+export interface ProviderDraftStarted {
+  draft: UUID;
+  answered?: ProviderDraftAnswered;
+}
+
+/** control/providerDraft: how a draft stands, to the client that started it. */
+export interface ProviderDraftUpdate {
+  draft: UUID;
+  state: string;
+  runtimeName: string;
+  steps: DraftStep[];
+  cost?: string;
+  draftJSON?: JSONValue;
+  check?: DraftCheck;
+  question?: DraftQuestion;
+  note?: string;
+}
+
+/** providers/list and control/providersChanged. */
+export interface ProviderList {
+  providers: ProviderSummary[];
+}
+
+/** providers/options: the New Workspace form, a JSON Schema. */
+export interface ProviderOptions {
+  schema: JSONValue;
+}
+
+/** providers/remove, providers/refresh, providers/options. */
+export interface ProviderRequest {
+  id?: ProviderID;
+}
+
+export interface ProviderRuntime {
+  id: string;
+  name: string;
+  isDefault: boolean;
+}
+
+/** providers/runtimes: what may write, on which host, or why none. */
+export interface ProviderRuntimes {
+  runtimes: ProviderRuntime[];
+  host?: string;
+  why?: string;
+}
+
+/** A provider for the Providers page, never its commands, headers or secrets' values. */
+export interface ProviderSummary {
+  id: ProviderID;
+  name: string;
+  kind: string;
+  secrets: Record<string, boolean>;
+  capabilities: string[];
+  contract: number;
+  mapped: boolean;
+  preset?: string;
+  workspaces: WorkspaceInfo[];
+  listedAt?: WireDate;
+  current: boolean;
+  problem?: string;
+}
+
 export interface QueuedPrompt {
   id: UUID;
   text: string;
@@ -2219,6 +2696,37 @@ export interface RateLimitInfo {
   overageDisabledReason?: string;
 }
 
+/** relay/count (#1163): one device's Needs you count, posted as a silent push. */
+export interface RelayCount {
+  device: UUID;
+  waiting: number;
+  countedAt: WireDate;
+}
+
+/**
+ * relay/deliver (T097): seal the headline to `publicKey` and post it for `device`; no headline is a
+ * withdrawal.
+ */
+export interface RelayDelivery {
+  needID: NeedID;
+  device: UUID;
+  publicKey?: Base64;
+  headline?: Headline;
+  alert: boolean;
+  waiting?: number;
+}
+
+/** A device a relay host may carry for, with the key its frames are sealed to. */
+export interface RelayDevice {
+  id: UUID;
+  publicKey: Base64;
+}
+
+/** relay/devices: every device client. */
+export interface RelayDevices {
+  devices: RelayDevice[];
+}
+
 export interface RelayGrantReply {
   runtime: string;
   caCertificate: string;
@@ -2239,6 +2747,11 @@ export interface RelayOffer {
 /** relay/register: the public half of the Mac's relay key, X9.63. */
 export interface RelayRegistration {
   publicKey: Base64;
+}
+
+/** relay/switch (#824): the relay host that says it, on or off. */
+export interface RelaySwitch {
+  relay: boolean;
 }
 
 export interface RememberedOptionsRequest {
@@ -2407,6 +2920,20 @@ export interface RuntimeStatus {
   outdated: boolean;
   poolNote?: string;
   isOut?: boolean;
+}
+
+/** A server ssh knows by a name, for Add a Server's server box (#610). */
+export interface SSHHost {
+  alias: string;
+  resolved: string;
+  throughBastion: boolean;
+  isBastion: boolean;
+  known: boolean;
+}
+
+/** hosts/sshHosts (#610): with a destination, just that, as typed. */
+export interface SSHHostsRequest {
+  destination?: string;
 }
 
 export type SandboxChoice = "runtime" | "on" | "off";
@@ -3003,6 +3530,12 @@ export interface TranscriptRequest {
   from?: number;
 }
 
+/** tunnel/open, from the borrowing host (T091). */
+export interface TunnelOpen {
+  runtime: string;
+  ref: string;
+}
+
 export interface TurnSummary {
   id: UUID;
   start: number;
@@ -3390,6 +3923,20 @@ export interface WorkflowsListRequest {
   folder?: URLString;
 }
 
+/**
+ * One workspace, as its provider last listed it. `state` is running, starting, stopping, stopped or
+ * unknown.
+ */
+export interface WorkspaceInfo {
+  id: string;
+  name: string;
+  state: string;
+  ssh?: string;
+  tunnel?: boolean;
+  cost?: string;
+  host?: HostID;
+}
+
 export type WorktreeChoice =
   | { new: Record<string, never> }
   | { existing: { _0: URLString } }
@@ -3755,10 +4302,14 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ACPAuthMethod: { required: ["id"], optional: ["name", "description", "_meta"] },
   ACPPromptCapabilities: { required: [], optional: ["image", "audio", "embeddedContext"] },
   ACPProviderInfo: { required: ["id"], optional: ["name", "protocol", "configured"] },
+  Admitted: { required: [], optional: ["client", "host", "grant"] },
   AdoptRequest: { required: ["runtimeID", "sessionID", "cwd"], optional: [] },
   Agent: { required: ["id", "runtimeID", "cwd", "state", "startOptions", "advertisedOptions", "availableCommands", "createdAt", "lastActivityAt"], optional: ["title", "labels", "runtimeSessionID", "isUnread", "reportSeenAt", "endedReason", "archivedReason", "usage", "lastTurnUsage", "costToDate", "costCeiling", "tokensToDate", "tokenCeiling", "plans", "background", "additionalDirectories", "mcpServers", "queuedPrompts", "suggestedPrompts", "startedByWorkflow", "purpose", "startedByRun", "startedByAgent", "chainDepth", "eventWait", "worktree", "pendingMove", "startingPoint", "startRequestID", "persona", "restartPickUps", "report", "outcomeAsked", "archiveRequest", "afterTurn", "archivedAt", "sandboxOverride", "effectiveSandbox", "pendingSandboxFailure", "missingFolder", "listsLeftOut", "titleIsPersons", "runtimeTitle", "madeInRoot", "queuedStart"] },
   AgentRemovedNotification: { required: ["agentID"], optional: [] },
   AgentRequest: { required: ["agentID"], optional: [] },
+  AgentWorkspaces: { required: ["providers"], optional: [] },
+  AgentWorkspacesProvider: { required: ["id", "name", "canMake", "canDelete", "workspaces"], optional: ["options"] },
+  AgentWorkspacesWorkspace: { required: ["id", "name", "state"], optional: ["host", "hostState", "cost"] },
   AgentWorktree: { required: ["name", "root", "project", "madeByApp"], optional: ["branch", "base"] },
   AllowanceReading: { required: ["spent", "nearlySpent", "at"], optional: ["window", "used", "resetsAt"] },
   AllowanceState: { required: ["credentialKey", "entryID", "status", "since", "changedAt", "learnedFrom", "spent", "rateLimitStreak"], optional: ["lastRateLimit", "reading", "modelsOut"] },
@@ -3778,6 +4329,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   AssessRuntimeResult: { required: ["agentID", "reportPath"], optional: ["model"] },
   Attachment: { required: ["id", "block", "displayName"], optional: ["byteCount"] },
   AttentionDelivery: { required: ["needID"], optional: ["to"] },
+  AttentionNeed: { required: [], optional: ["need", "headline", "buzz", "withdraw", "waiting"] },
   AttentionNotification: { required: ["needID", "alert"], optional: ["need", "to"] },
   AttentionPending: { required: ["needs", "deliveries"], optional: [] },
   AuthStatus: { required: ["kind", "label"], optional: [] },
@@ -3801,8 +4353,14 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ChangesFileRequest: { required: ["agentID", "path", "whole"], optional: [] },
   ChangesList: { required: ["files", "git", "reportsEdits"], optional: ["more"] },
   ChangesListRequest: { required: ["agentID"], optional: [] },
+  ChannelOpen: { required: ["grant", "client"], optional: ["device", "relayed", "tunnel", "tunnelRef", "fanOut"] },
   ChartHint: { required: ["mark", "x", "y"], optional: ["color", "title"] },
+  ClientAnnounce: { required: ["id", "publicKey", "name", "kind"], optional: [] },
+  ClientConnection: { required: ["client", "relayed"], optional: ["through"] },
+  ClientPairingRequest: { required: [], optional: ["kind", "grant"] },
   ClientPermissionSettings: { required: ["cursor", "grok", "opencode"], optional: [] },
+  ClientRecord: { required: ["id", "name", "kind", "publicKey", "grant", "paired", "rev"], optional: ["lastSeen", "mayNotify", "owner", "forgotten", "forgottenAt", "knownEpoch"] },
+  ClientRequest: { required: ["client"], optional: [] },
   CloneNotification: { required: ["clone", "finished"], optional: [] },
   CloneRequest: { required: ["url"], optional: [] },
   CloneSummary: { required: ["id", "url", "folder", "startedAt"], optional: [] },
@@ -3811,7 +4369,15 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ConfigOption: { required: ["id", "name", "type"], optional: ["description", "category", "currentValue", "options"] },
   ContentBlockAnnotations: { required: [], optional: ["audience", "priority"] },
   ContinueInProjectRequest: { required: ["agentID", "text", "attachments"], optional: ["requestID"] },
+  ControlAuth: { required: ["id", "nonce", "mac", "kind"], optional: ["for", "epoch"] },
+  ControlClientChanged: { required: [], optional: ["client", "removed"] },
+  ControlCodeShown: { required: ["text", "expires"], optional: ["command"] },
+  ControlEndpoint: { required: ["url"], optional: ["pin"] },
+  ControlHello: { required: ["v", "name", "control", "nonce", "copy"], optional: [] },
   ControlHost: { required: ["id", "name", "platform", "version", "state", "reach"], optional: ["machineID", "relay", "signInFrom", "gitFrom", "gitAsks", "tunnel", "workspace", "implementation"] },
+  ControlInstallProgress: { required: ["name", "step"], optional: [] },
+  ControlMoved: { required: ["url", "controlKey", "name"], optional: ["pin"] },
+  ControlOK: { required: ["mac"], optional: ["grant", "host", "relayed", "endpoints", "epoch"] },
   ControlStatus: { required: ["name", "version", "machineID"], optional: ["homeHost", "startedAt", "port", "awayFromHome", "you", "relayKey", "web", "thisMacHost", "projectDetection", "unjoinedTunnels"] },
   Cost: { required: ["amount", "currency"], optional: [] },
   CostLimits: { required: [], optional: ["perAgent", "daily", "perAgentTokens", "dailyTokens"] },
@@ -3825,6 +4391,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   DeleteSessionRequest: { required: ["runtimeID", "sessionID"], optional: ["confirmed"] },
   DestinationStateAnswer: { required: ["destinationState"], optional: [] },
   DestinationStateRequest: { required: ["previewID", "destination"], optional: [] },
+  DetectedServer: { required: ["alias", "resolved", "outcome"], optional: ["detail"] },
   Device: { required: ["id", "publicKey", "name", "kind", "announcedAt"], optional: ["lastSeenAt", "mayNotify"] },
   DeviceAnnouncement: { required: ["id", "publicKey", "name", "kind"], optional: [] },
   DeviceBinding: { required: [], optional: ["id", "pairing"] },
@@ -3839,7 +4406,10 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   DiskState: { required: ["alarms"], optional: [] },
   DiskThresholds: { required: [], optional: ["lowGB", "lowPercent", "criticalGB"] },
   DiskWorktree: { required: ["name", "bytes", "partial"], optional: [] },
+  DraftCheck: { required: ["passed"], optional: ["workspaces", "problem", "ssh", "noSSH"] },
   DraftOptionsNotification: { required: ["draftID", "options", "commands"], optional: ["failure"] },
+  DraftQuestion: { required: ["id", "kind", "text", "yes"], optional: ["workspace", "cost"] },
+  DraftStep: { required: ["at", "kind", "text"], optional: [] },
   DropboxPutRequest: { required: ["folder", "name", "data"], optional: ["subfolder"] },
   DropboxPutResponse: { required: ["path"], optional: [] },
   EarnedMilestone: { required: ["id", "at"], optional: [] },
@@ -3877,21 +4447,36 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   FolderHunk: { required: ["oldStart", "newStart", "noNewlineAtEnd", "lines"], optional: [] },
   FoundFolder: { required: ["folder", "exists", "isRepository", "isProject"], optional: ["typed"] },
   GitAsk: { required: ["server", "from"], optional: [] },
+  GitCredential: { required: ["username", "password"], optional: [] },
+  GitCredentialRequest: { required: ["protocol", "host"], optional: ["path"] },
   GuardedChange: { required: ["path", "changedBy", "changedByIDs", "byGit", "since"], optional: ["digest", "askedIn"] },
   GuardedChangeReading: { required: ["path", "lines"], optional: ["digest", "approved", "current"] },
   GuardedChangeRequest: { required: ["folder", "path"], optional: ["digest"] },
   GuardedDiffLine: { required: ["kind", "text"], optional: [] },
+  HandoverMember: { required: ["id", "name", "kind"], optional: ["knownEpoch", "version", "online", "lastSeen"] },
+  HandoverStatus: { required: ["phase", "controlKey", "hasRecords", "endpoints", "members"], optional: ["epoch", "forwardingUntil"] },
   Headline: { required: ["h1", "h2", "h3"], optional: ["answers"] },
   HelperLimits: { required: [], optional: ["running", "notArchived", "queued", "agentsMayArchive"] },
+  HostAnnounce: { required: ["publicKey", "name", "platform", "version", "machineID"], optional: ["relay", "implementation"] },
+  HostHello: { required: ["version", "platform", "machineID"], optional: ["host", "name", "relay", "implementation"] },
+  HostInstall: { required: ["destination"], optional: ["name", "key", "trust", "tunnel", "implementation"] },
   HostJoinStatus: { required: ["member", "connected", "at"], optional: ["problem"] },
   HostLastHeard: { required: ["host"], optional: ["projects", "agents", "heardAt"] },
+  HostLink: { required: ["host", "provider", "workspace"], optional: ["startWhenUsed", "stopWhenIdleMinutes"] },
+  HostProviderDraftCall: { required: ["agentID", "draft", "tool"], optional: ["arguments"] },
+  HostRelayRequest: { required: ["host", "relay"], optional: [] },
   HostRequest: { required: ["host"], optional: ["purge"] },
+  HostSchedule: { required: [], optional: ["at", "workflow"] },
+  HostStatus: { required: ["idle", "running"], optional: ["schedule"] },
   HostStop: { required: ["host"], optional: ["confirmRunning"] },
   HostTunnel: { required: ["up"], optional: ["problem"] },
   HostTunnelChanged: { required: ["name", "tunnel"], optional: ["host"] },
   HostWorkspace: { required: ["provider", "providerName", "workspace", "workspaceName", "workspaceState", "canStart", "canStop", "startWhenUsed", "current"], optional: ["hostState", "phase", "since", "problem", "stoppedBy", "stopWhenIdleMinutes", "cost", "startForSchedules", "tellsSchedule", "nextWorkflow", "nextWorkflowAt", "wakeAt"] },
+  HostWorkspaceCall: { required: ["agent", "method", "params"], optional: [] },
+  HostWorkspaceOptions: { required: ["host"], optional: ["startWhenUsed", "stopWhenIdleMinutes", "startForSchedules"] },
   HostedMCPSnapshot: { required: ["servers", "at"], optional: [] },
   HostedMCPStatus: { required: ["name", "state", "restarts", "users"], optional: ["project", "since", "retryAt", "lastError"] },
+  KeepRequest: { required: ["host", "method", "params"], optional: [] },
   KeptDelivered: { required: ["host", "id"], optional: ["agentID"] },
   KeptList: { required: ["kept"], optional: [] },
   KeptRequest: { required: ["id", "host", "kind", "text", "at"], optional: ["agentID", "folder", "runtimeID", "failed"] },
@@ -3904,6 +4489,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   LeaseSnapshot: { required: ["resources", "at"], optional: [] },
   LeaseTokenRequest: { required: ["token"], optional: [] },
   LendGit: { required: ["host", "from", "server", "allowed"], optional: [] },
+  LendSignIn: { required: ["host", "from", "runtime", "allowed"], optional: [] },
   LineMember: { required: ["agentID", "askedAt", "isCallOpen"], optional: [] },
   ListCursor: { required: ["lastActivityAt", "id"], optional: [] },
   ListRequest: { required: ["includeArchived", "archivedCommands", "archivedOnly", "lean"], optional: ["folder", "startedByWorkflow", "limit", "agentID", "after", "query"] },
@@ -4006,15 +4592,35 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ProjectsFindRequest: { required: [], optional: ["paths", "folders"] },
   ProjectsListRequest: { required: ["includeArchived"], optional: [] },
   PromptRequest: { required: ["agentID", "text", "attachments", "from"], optional: ["sendID"] },
+  ProviderAdd: { required: ["name", "kind"], optional: ["id", "command", "args", "url", "headers", "commands", "map", "secrets", "cli", "draft"] },
+  ProviderCreate: { required: ["id", "name"], optional: ["options", "clones"] },
+  ProviderCreated: { required: ["workspace", "joining"], optional: [] },
+  ProviderDraftAnswer: { required: ["draft", "question", "yes"], optional: [] },
+  ProviderDraftAnswered: { required: ["note"], optional: ["map", "preset"] },
+  ProviderDraftRequest: { required: ["draft"], optional: [] },
+  ProviderDraftStart: { required: ["form", "runtimeID"], optional: ["secrets", "provider"] },
+  ProviderDraftStarted: { required: ["draft"], optional: ["answered"] },
+  ProviderDraftUpdate: { required: ["draft", "state", "runtimeName", "steps"], optional: ["cost", "draftJSON", "check", "question", "note"] },
+  ProviderList: { required: ["providers"], optional: [] },
+  ProviderOptions: { required: ["schema"], optional: [] },
+  ProviderRequest: { required: [], optional: ["id"] },
+  ProviderRuntime: { required: ["id", "name", "isDefault"], optional: [] },
+  ProviderRuntimes: { required: ["runtimes"], optional: ["host", "why"] },
+  ProviderSummary: { required: ["id", "name", "kind", "secrets", "capabilities", "contract", "mapped", "workspaces", "current"], optional: ["preset", "listedAt", "problem"] },
   QueuedPrompt: { required: ["id", "text", "attachments", "queuedAt", "from"], optional: ["preface", "sender", "hops"] },
   QueuedStart: { required: ["labels"], optional: ["runtimeID", "permissionMode", "model", "worktree"] },
   QuickAnswer: { required: ["kind", "id", "title", "isDestructive"], optional: ["field"] },
   QuitRequest: { required: ["stopAgents"], optional: [] },
   RateLimitInfo: { required: [], optional: ["status", "resetsAt", "rateLimitType", "utilization", "overageStatus", "overageResetsAt", "isUsingOverage", "overageInUse", "overageDisabledReason"] },
+  RelayCount: { required: ["device", "waiting", "countedAt"], optional: [] },
+  RelayDelivery: { required: ["needID", "device", "alert"], optional: ["publicKey", "headline", "waiting"] },
+  RelayDevice: { required: ["id", "publicKey"], optional: [] },
+  RelayDevices: { required: ["devices"], optional: [] },
   RelayGrantReply: { required: ["runtime", "caCertificate", "standIn"], optional: [] },
   RelayGrantRequest: { required: ["runtime"], optional: [] },
   RelayOffer: { required: ["runtime", "socketPath", "caCertificate", "standIn"], optional: [] },
   RelayRegistration: { required: ["publicKey"], optional: [] },
+  RelaySwitch: { required: ["relay"], optional: [] },
   RememberedOptionsRequest: { required: ["runtimeID", "cwd"], optional: [] },
   RemovalCheck: { required: ["blockedBy", "uncommitted", "unmerged"], optional: [] },
   RemoveResourceRequest: { required: ["name"], optional: [] },
@@ -4034,6 +4640,8 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   RuntimeRequest: { required: ["runtimeID"], optional: [] },
   RuntimeSession: { required: ["sessionID", "cwd"], optional: ["additionalDirectories", "title", "updatedAt", "isHeld"] },
   RuntimeStatus: { required: ["runtime", "availability", "checkedAt", "outdated"], optional: ["poolNote", "isOut"] },
+  SSHHost: { required: ["alias", "resolved", "throughBastion", "isBastion", "known"], optional: [] },
+  SSHHostsRequest: { required: [], optional: ["destination"] },
   SandboxFailureRecord: { required: ["runtimeID", "detail", "hang", "recoveryOffered", "completedToolCalls"], optional: [] },
   SandboxSettings: { required: ["defaults"], optional: [] },
   ServedRequest: { required: ["kind", "outcome"], optional: [] },
@@ -4106,6 +4714,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   TranscriptEntry: { required: ["id", "at", "kind"], optional: ["subagentID", "sender"] },
   TranscriptPage: { required: ["firstIndex", "total", "entries"], optional: [] },
   TranscriptRequest: { required: ["agentID", "limit"], optional: ["before", "from"] },
+  TunnelOpen: { required: ["runtime", "ref"], optional: [] },
   TurnSummary: { required: ["id", "start", "end"], optional: ["ask", "last", "concise", "outcome", "steps", "usage"] },
   TurnUsage: { required: ["totalTokens", "inputTokens", "outputTokens"], optional: ["thoughtTokens", "cachedReadTokens", "cachedWriteTokens", "cost"] },
   TurnsPage: { required: ["turns", "firstTurn", "openStart"], optional: [] },
@@ -4145,6 +4754,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   WorkflowSettingsRequest: { required: ["folder", "workflowID", "settings"], optional: ["cooldown", "labels", "hosts", "whenDone"] },
   WorkflowSummary: { required: ["workflow", "isArchived", "isEnabled", "nextFireAtByTrigger", "isRunning", "holdsAFire", "queued"], optional: ["overLimit", "totalLimit", "nextFireAt", "lastOutcome", "causingEvent", "causingEventName", "awaitingApproval", "deniedHere", "lastFiredAt", "lastFiredBy", "cooldownEndsAt", "offReason", "standingAgentID", "mcpTriggers"] },
   WorkflowsListRequest: { required: [], optional: ["folder"] },
+  WorkspaceInfo: { required: ["id", "name", "state"], optional: ["ssh", "tunnel", "cost", "host"] },
   WorktreeRemovalRequest: { required: ["project", "root", "confirmed"], optional: [] },
   WorktreeRemoved: { required: ["removedBranch"], optional: [] },
   WorktreeSize: { required: ["bytes", "partial"], optional: [] },

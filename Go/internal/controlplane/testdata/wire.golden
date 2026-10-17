@@ -1,0 +1,76 @@
+control/status
+{"name":"Test plane","version":"dev","homeHost":"mac","machineID":"MACHINE-1","startedAt":<date>,"port":<port>,"awayFromHome":true,"you":"<UUID>","relayKey":"<secret>","projectDetection":{"enabled":true,"paths":["~","~/src","~/code","~/projects","~/Developer","~/dev","~/git"]}}
+
+hosts/list
+[{"id":"<host a>","name":"box MACHINE-2","platform":"linux aarch64","version":"0.1","state":"online","reach":"dialOut","machineID":"MACHINE-2","implementation":"go"},{"id":"<host b>","name":"relay mac","platform":"macOS arm64","version":"1","state":"online","reach":"dialOut","machineID":"RELAY-MAC","relay":true},{"id":"<host c>","name":"plain mac","platform":"macOS arm64","version":"1","state":"online","reach":"dialOut","machineID":"RELAY-MAC"},{"id":"mac","name":"box MACHINE-1","platform":"linux aarch64","version":"0.1","state":"online","reach":"dialOut","machineID":"MACHINE-1","implementation":"go"}]
+
+clients/list
+[{"id":"<UUID>","name":"Golden window","kind":"mac","publicKey":"<secret>","grant":"operator","paired":<date>,"lastSeen":<date>,"owner":"<uuid>","rev":2,"knownEpoch":0},{"id":"<UUID>","name":"phone","kind":"iPhone","publicKey":"<secret>","grant":"operator","paired":<date>,"lastSeen":<date>,"mayNotify":true,"owner":"<uuid>","rev":2}]
+
+devices/list
+[{"id":"<UUID>","name":"Golden window","kind":"mac","publicKey":"<secret>","grant":"operator","paired":<date>,"lastSeen":<date>,"owner":"<uuid>","rev":2,"knownEpoch":0},{"id":"<UUID>","name":"phone","kind":"iPhone","publicKey":"<secret>","grant":"operator","paired":<date>,"lastSeen":<date>,"mayNotify":true,"owner":"<uuid>","rev":2}]
+
+clients/connections
+[{"client":"<UUID>","relayed":false}]
+
+hosts/startEnroll
+{"text":"<secret>","expires":<date>,"command":"<secret>"}
+
+clients/startPairing
+{"text":"<secret>","expires":<date>}
+
+devices/startPairing
+{"text":"<secret>","expires":<date>}
+
+clients/stopPairing
+{}
+
+hosts/lastHeard
+{"host":"<host a>"}
+
+control/setProjectDetection
+{"enabled":true,"paths":["~/src","~/work"]}
+
+hosts/lendSignIn
+{}
+
+hosts/lendGit
+{}
+
+hosts/setRelay
+{}
+
+control/status
+{"name":"Test plane","version":"dev","homeHost":"mac","machineID":"MACHINE-1","startedAt":<date>,"port":<port>,"awayFromHome":true,"you":"<UUID>","relayKey":"<secret>","projectDetection":{"enabled":true,"paths":["~/src","~/work"]}}
+
+hosts/list
+[{"id":"<host a>","name":"box MACHINE-2","platform":"linux aarch64","version":"0.1","state":"online","reach":"dialOut","machineID":"MACHINE-2","signInFrom":{"claude":"mac"},"gitFrom":{"github.com":"mac"},"implementation":"go"},{"id":"<host b>","name":"relay mac","platform":"macOS arm64","version":"1","state":"online","reach":"dialOut","machineID":"RELAY-MAC","relay":true},{"id":"<host c>","name":"plain mac","platform":"macOS arm64","version":"1","state":"online","reach":"dialOut","machineID":"RELAY-MAC"},{"id":"mac","name":"box MACHINE-1","platform":"linux aarch64","version":"0.1","state":"online","reach":"dialOut","machineID":"MACHINE-1","implementation":"go"}]
+
+clients/setGrant refused
+{"code":-32009,"message":"Every paired client may do everything now, so there is no grant to change. Update this window to lose the choice."}
+
+hosts/remove refused
+{"code":-32091,"message":"No host is called nobody."}
+
+hosts/update refused
+{"code":-32009,"message":"This control plane cannot do that yet."}
+
+providers/list refused
+{"code":-32064,"message":"Workspace providers need a control plane with one copy, for now."}
+
+nothing/here refused
+{"code":-32601,"message":"Method not found","data":{"method":"nothing/here"}}
+
+relay reads
+{"c":0,"m":{"jsonrpc":"2.0","method":"relay/deliver","params":{"needID":{"permission":"<UUID>"},"device":"<UUID>","publicKey":"<secret>","headline":{"h1":"work","h2":"Fix","h3":"may run"},"alert":true}}}
+
+relay reads
+{"c":0,"m":{"jsonrpc":"2.0","method":"relay/deliver","params":{"needID":{"permission":"<UUID>"},"device":"<UUID>","alert":false}}}
+
+host reads
+{"c":1,"open":{"grant":"operator","client":"<UUID>","fanOut":true}}
+
+# notifications
+
+control/hostChanged
+{"host":"<host a>","state":"online"}

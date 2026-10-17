@@ -1,0 +1,4 @@
+WebRemoteStatus full
+{"port":7,"served":true,"reason":"REASON","detail":"DETAIL"}
+WebRemoteStatus zero
+{"port":0,"served":false}

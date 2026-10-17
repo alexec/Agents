@@ -142,6 +142,83 @@ struct WireSchemaTests {
         #expect(!schema.errors(["sometimes": "x"], against: "SharedReach").isEmpty)
     }
 
+    /// The control plane's types (#1313), which the Go control plane now takes from the
+    /// schema: a sample of each, with every field set, read with today's decoder and written
+    /// with today's encoder, fits the schema and comes back whole, so neither has a field
+    /// the other lacks.
+    @Test func controlTypesFitTheSchema() throws {
+        let schema = try WireSchema(Self.read("daemon.schema.json"))
+        let samples = try JSONValue.parse(Data(contentsOf: URL(filePath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .appending(path: "Fixtures/control-wire/samples.json")))
+        let types: [String: @Sendable (JSONValue) throws -> JSONValue] = [
+            "ClientRecord": Self.through(ClientRecord.self),
+            "ClientRequest": Self.through(DaemonAPI.ClientRequest.self),
+            "ClientConnection": Self.through(DaemonAPI.ClientConnection.self),
+            "ClientAnnounce": Self.through(DaemonAPI.ClientAnnounce.self),
+            "HostAnnounce": Self.through(DaemonAPI.HostAnnounce.self),
+            "Admitted": Self.through(DaemonAPI.Admitted.self),
+            "ControlCodeShown": Self.through(DaemonAPI.ControlCodeShown.self),
+            "HostHello": Self.through(DaemonAPI.HostHello.self),
+            "LendSignIn": Self.through(DaemonAPI.LendSignIn.self),
+            "HostRelayRequest": Self.through(DaemonAPI.HostRelayRequest.self),
+            "RelaySwitch": Self.through(DaemonAPI.RelaySwitch.self),
+            "TunnelOpen": Self.through(DaemonAPI.TunnelOpen.self),
+            "ControlMoved": Self.through(DaemonAPI.ControlMoved.self),
+            "ControlEndpoint": Self.through(ControlEndpoint.self),
+            "ControlHello": Self.through(ControlAuth.Hello.self),
+            "ControlAuth": Self.through(ControlAuth.Auth.self),
+            "ControlOK": Self.through(ControlAuth.OK.self),
+            "ChannelOpen": Self.through(ControlWire.ChannelOpen.self),
+            "GitCredentialRequest": Self.through(DaemonAPI.GitCredentialRequest.self),
+            "GitCredential": Self.through(DaemonAPI.GitCredential.self),
+            "AttentionNeed": Self.through(DaemonAPI.AttentionNeed.self),
+            "RelayDevices": Self.through(DaemonAPI.RelayDevices.self),
+            "RelayDelivery": Self.through(DaemonAPI.RelayDelivery.self),
+            "RelayCount": Self.through(DaemonAPI.RelayCount.self),
+            "DetectedServer": Self.through(DaemonAPI.DetectedServer.self),
+            "SSHHost": Self.through(DaemonAPI.SSHHost.self),
+            "WorkspaceInfo": Self.through(DaemonAPI.WorkspaceInfo.self),
+            "ProviderSummary": Self.through(DaemonAPI.ProviderSummary.self),
+            "ProviderAdd": Self.through(DaemonAPI.ProviderAdd.self),
+            "ProviderRequest": Self.through(DaemonAPI.ProviderRequest.self),
+            "HostLink": Self.through(DaemonAPI.HostLink.self),
+            "HostWorkspaceOptions": Self.through(DaemonAPI.HostWorkspaceOptions.self),
+            "ProviderOptions": Self.through(DaemonAPI.ProviderOptions.self),
+            "ProviderCreate": Self.through(DaemonAPI.ProviderCreate.self),
+            "ProviderCreated": Self.through(DaemonAPI.ProviderCreated.self),
+            "HostWorkspaceCall": Self.through(DaemonAPI.HostWorkspaceCall.self),
+            "AgentWorkspaces": Self.through(DaemonAPI.AgentWorkspaces.self),
+            "HostSchedule": Self.through(DaemonAPI.HostSchedule.self),
+            "HostStatus": Self.through(DaemonAPI.HostStatus.self),
+            "KeepRequest": Self.through(DaemonAPI.KeepRequest.self),
+            "ProviderDraftStart": Self.through(DaemonAPI.ProviderDraftStart.self),
+            "ProviderDraftStarted": Self.through(DaemonAPI.ProviderDraftStarted.self),
+            "ProviderDraftRequest": Self.through(DaemonAPI.ProviderDraftRequest.self),
+            "ProviderDraftAnswer": Self.through(DaemonAPI.ProviderDraftAnswer.self),
+            "ProviderRuntimes": Self.through(DaemonAPI.ProviderRuntimes.self),
+            "DraftStep": Self.through(DaemonAPI.DraftStep.self),
+            "DraftCheck": Self.through(DaemonAPI.DraftCheck.self),
+            "DraftQuestion": Self.through(DaemonAPI.DraftQuestion.self),
+            "ProviderDraftUpdate": Self.through(DaemonAPI.ProviderDraftUpdate.self),
+            "HostProviderDraftCall": Self.through(DaemonAPI.HostProviderDraftCall.self),
+        ]
+        let all = samples.objectValue ?? [:]
+        #expect(Set(all.keys) == Set(types.keys), "a sample with no Swift type, or a type with no sample")
+        for (name, sample) in all.sorted(by: { $0.key < $1.key }) {
+            guard let encode = types[name] else { continue }
+            let written: JSONValue
+            do {
+                written = try encode(sample)
+            } catch {
+                Issue.record("\(name): today's decoder refuses the sample: \(error)")
+                continue
+            }
+            #expect(schema.errors(written, against: name) == [], "\(name)")
+            #expect(written == sample, "\(name) does not come back whole:\n\(written)")
+        }
+    }
+
     /// The checker itself finds what is wrong, so a pass above means something.
     @Test func theCheckerRefusesWhatTheSchemaDoesNot() throws {
         let schema = try WireSchema(Self.read("daemon.schema.json"))

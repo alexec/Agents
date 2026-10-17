@@ -13,6 +13,7 @@ import (
 	"github.com/alexec/agents/Go/internal/controllink"
 	"github.com/alexec/agents/Go/internal/controlplane/records"
 	"github.com/alexec/agents/Go/internal/controlplane/store"
+	"github.com/alexec/agents/Go/wire"
 )
 
 // Codes is ControlCodes: pairing and enrolment codes (data-model.md "Code"), stored by
@@ -50,14 +51,14 @@ func spentKey(id string) string { return "v1/codes/" + id + ".spent" }
 
 // Issue makes a code and writes it to the store, for clients/startPairing,
 // hosts/startEnroll or agents-control code.
-func (c *Codes) Issue(ctx context.Context, host, browser bool, lifetime time.Duration) (*codeShown, error) {
+func (c *Codes) Issue(ctx context.Context, host, browser bool, lifetime time.Duration) (*wire.ControlCodeShown, error) {
 	shown, _, err := c.issue(ctx, host, browser, lifetime, c.URL)
 	return shown, err
 }
 
 // issue makes a code that carries url, and says its id: a server behind a bastion dials
 // its end of a reverse tunnel (#435).
-func (c *Codes) issue(ctx context.Context, host, browser bool, lifetime time.Duration, url string) (*codeShown, string, error) {
+func (c *Codes) issue(ctx context.Context, host, browser bool, lifetime time.Duration, url string) (*wire.ControlCodeShown, string, error) {
 	id, secret := controllink.MakeCodeSecret(c.Private)
 	expires := records.At(time.Now().Add(lifetime))
 	stored := storedCode{Purpose: "client", Expires: expires}
@@ -75,7 +76,7 @@ func (c *Codes) issue(ctx context.Context, host, browser bool, lifetime time.Dur
 		return nil, "", err
 	}
 	code := &controllink.Code{Host: host, ControlKey: c.Public, Secret: secret, URL: url, Pin: c.Pin, Name: c.Name}
-	shown := &codeShown{Text: code.Text(), Expires: RefDate(expires.Time)}
+	shown := &wire.ControlCodeShown{Text: code.Text(), Expires: dateOf(expires.Time)}
 	if host {
 		command := InstallCommand(url, c.Pin, shown.Text)
 		shown.Command = &command

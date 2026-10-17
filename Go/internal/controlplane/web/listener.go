@@ -111,7 +111,7 @@ func (l *Listener) Port() int { return l.gate.port }
 func (l *Listener) Origin() string { return l.gate.origin() }
 
 // Status is the status of a listener that serves.
-func (l *Listener) Status() Status { return Status{Port: l.Port(), Served: true} }
+func (l *Listener) Status() Status { return Status{Port: int64(l.Port()), Served: true} }
 
 // Stop is LoopbackListener.stop: it closes both binds. WebSockets already given to
 // Accept stay open; their owner closes them.

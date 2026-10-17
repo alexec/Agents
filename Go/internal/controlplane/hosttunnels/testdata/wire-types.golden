@@ -1,0 +1,8 @@
+HostTunnel full
+{"up":true,"problem":"PROBLEM"}
+HostTunnel zero
+{"up":false}
+HostTunnelChanged full
+{"name":"NAME","host":"HOST","tunnel":{"up":true,"problem":"PROBLEM"}}
+HostTunnelChanged zero
+{"name":"","tunnel":{"up":false}}

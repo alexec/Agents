@@ -11,6 +11,7 @@ import (
 
 	"github.com/alexec/agents/Go/internal/controlplane/records"
 	"github.com/alexec/agents/Go/internal/controlplane/store"
+	"github.com/alexec/agents/Go/wire"
 )
 
 // KeptPrefix is KeptRequests.prefix.
@@ -20,48 +21,22 @@ const KeptPrefix = "v1/kept/"
 const KeptLimit = 20
 
 // KeptRequest is DaemonAPI.KeptRequest: a kept request, as clients draw it, never its
-// attachments or options.
-type KeptRequest struct {
-	ID   string `json:"id"`
-	Host string `json:"host"`
-	// prompt (to an agent there) or start (a new agent in a project there).
-	Kind string `json:"kind"`
-	// For a prompt.
-	AgentID string `json:"agentID,omitempty"`
-	// The prompt's words, or the new agent's first prompt.
-	Text string `json:"text"`
-	// For a start: the project folder, and the runtime it starts.
-	Folder    string  `json:"folder,omitempty"`
-	RuntimeID string  `json:"runtimeID,omitempty"`
-	At        RefDate `json:"at"`
-	// Not sent, and why (US3 AS4).
-	Failed string `json:"failed,omitempty"`
-}
+// attachments or options. Kind is prompt (to an agent there, AgentID) or start (a new
+// agent in a project there: Folder and RuntimeID); Text is the prompt's words, or the new
+// agent's first prompt; Failed, that it was not sent, and why (US3 AS4).
+type KeptRequest = wire.KeptRequest
 
 // KeepRequest is DaemonAPI.KeepRequest: hosts/keep.
-type KeepRequest struct {
-	Host   string          `json:"host"`
-	Method string          `json:"method"`
-	Params json.RawMessage `json:"params"`
-}
+type KeepRequest = wire.KeepRequest
 
 // KeptRequestID is DaemonAPI.KeptRequestID: hosts/dropKept, hosts/retryKept.
-type KeptRequestID struct {
-	Host string `json:"host"`
-	ID   string `json:"id"`
-}
+type KeptRequestID = wire.KeptRequestID
 
 // KeptList is DaemonAPI.KeptList.
-type KeptList struct {
-	Kept []KeptRequest `json:"kept"`
-}
+type KeptList = wire.KeptList
 
 // KeptDelivered is DaemonAPI.KeptDelivered: control/keptDelivered.
-type KeptDelivered struct {
-	Host    string `json:"host"`
-	ID      string `json:"id"`
-	AgentID string `json:"agentID,omitempty"`
-}
+type KeptDelivered = wire.KeptDelivered
 
 // keptRecord is KeptRequests.Record: as it is stored, the request itself and who sent it.
 type keptRecord struct {
@@ -259,11 +234,11 @@ func (k *Kept) Attached(host string) {
 		}
 		k.remove(host, next.ID)
 		k.log(fmt.Sprintf("workspace: delivered kept %s to %s", next.kind(), host))
-		delivered := KeptDelivered{Host: host, ID: next.ID}
+		delivered := KeptDelivered{Host: wire.HostID(host), ID: wire.UUID(next.ID)}
 		if next.Method == MethodAgentsStart {
 			var agent string
 			if json.Unmarshal(reply.Result, &agent) == nil {
-				delivered.AgentID = uuidOf(agent)
+				delivered.AgentID = optional(wire.UUID(uuidOf(agent)))
 			}
 		}
 		k.router.BroadcastControl(NoticeKeptDelivered, delivered)
@@ -305,8 +280,8 @@ func (k *Kept) Answer(method string, params json.RawMessage) (any, error) {
 		if err != nil {
 			return nil, err
 		}
-		k.remove(which.Host, which.ID)
-		k.log("workspace: dropped kept request for " + which.Host)
+		k.remove(string(which.Host), string(which.ID))
+		k.log("workspace: dropped kept request for " + string(which.Host))
 		k.changed()
 		return map[string]any{}, nil
 	case MethodHostsRetryKept:
@@ -314,10 +289,11 @@ func (k *Kept) Answer(method string, params json.RawMessage) (any, error) {
 		if err != nil {
 			return nil, err
 		}
+		host := string(which.Host)
 		k.mu.Lock()
 		index := -1
-		for i, e := range k.kept[which.Host] {
-			if e.record.ID == which.ID {
+		for i, e := range k.kept[host] {
+			if e.record.ID == string(which.ID) {
 				index = i
 			}
 		}
@@ -325,7 +301,7 @@ func (k *Kept) Answer(method string, params json.RawMessage) (any, error) {
 			k.mu.Unlock()
 			return nil, invalid("That was sent or dropped already.")
 		}
-		entry := &k.kept[which.Host][index]
+		entry := &k.kept[host][index]
 		entry.record.Failed = ""
 		key, record := entry.key, entry.record
 		k.mu.Unlock()
@@ -333,10 +309,10 @@ func (k *Kept) Answer(method string, params json.RawMessage) (any, error) {
 			k.store.Put(context.Background(), key, data, store.Always)
 		}
 		k.changed()
-		if k.router.Online(which.Host) {
-			go k.Attached(which.Host)
+		if k.router.Online(host) {
+			go k.Attached(host)
 		} else {
-			k.hooks.Start(which.Host, "kept "+record.kind()+", tried again")
+			k.hooks.Start(host, "kept "+record.kind()+", tried again")
 		}
 		return map[string]any{}, nil
 	}
@@ -433,14 +409,15 @@ func summary(r keptRecord) KeptRequest {
 	var object map[string]any
 	decodeJSON(r.Params, &object)
 	start := r.Method == MethodAgentsStart
-	out := KeptRequest{ID: r.ID, Host: r.Host, Kind: r.kind(), At: RefDate(r.At.Time), Failed: r.Failed}
+	out := KeptRequest{ID: wire.UUID(r.ID), Host: wire.HostID(r.Host), Kind: r.kind(), At: *dateOf(r.At.Time),
+		Failed: optional(r.Failed)}
 	if start {
 		out.Text = strOr(object["prompt"])
-		out.Folder = strOr(object["cwd"])
-		out.RuntimeID = strOr(object["runtimeID"])
+		out.Folder = optional(wire.URL(strOr(object["cwd"])))
+		out.RuntimeID = optional(strOr(object["runtimeID"]))
 	} else {
 		out.Text = strOr(object["text"])
-		out.AgentID = uuidOf(strOr(object["agentID"]))
+		out.AgentID = optional(wire.UUID(uuidOf(strOr(object["agentID"]))))
 	}
 	return out
 }
@@ -451,9 +428,9 @@ func sequence(t time.Time) string { return fmt.Sprintf("%016d", t.UnixMilli()) }
 
 func requireKeptID(params json.RawMessage) (KeptRequestID, error) {
 	var which KeptRequestID
-	if requireParams(params, &which, "KeptRequestID", "host", "id") != nil || !isUUID(which.ID) {
+	if requireParams(params, &which, "KeptRequestID", "host", "id") != nil || !isUUID(string(which.ID)) {
 		return which, invalid("Which kept request?")
 	}
-	which.ID = strings.ToUpper(which.ID)
+	which.ID = wire.UUID(strings.ToUpper(string(which.ID)))
 	return which, nil
 }

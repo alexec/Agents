@@ -14,6 +14,7 @@ import (
 
 	"github.com/alexec/agents/Go/internal/controlplane/records"
 	"github.com/alexec/agents/Go/internal/controlplane/store"
+	"github.com/alexec/agents/Go/wire"
 )
 
 // These port HostTunnelsTests.swift: a server behind a bastion dials the control plane
@@ -321,7 +322,7 @@ func TestTheJSONIsSwifts(t *testing.T) {
 	if string(change) != `{"name":"ws","tunnel":{"up":false}}` {
 		t.Errorf("change %s", change)
 	}
-	change, _ = json.Marshal(Changed{Name: "ws", Host: ptr("h"), Tunnel: Tunnel{Problem: ptr("p")}})
+	change, _ = json.Marshal(Changed{Name: "ws", Host: new(wire.HostID("h")), Tunnel: Tunnel{Problem: ptr("p")}})
 	if string(change) != `{"name":"ws","host":"h","tunnel":{"up":false,"problem":"p"}}` {
 		t.Errorf("change %s", change)
 	}

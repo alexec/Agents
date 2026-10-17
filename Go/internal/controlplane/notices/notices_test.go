@@ -4,8 +4,11 @@ package notices
 
 import (
 	"encoding/json"
+	"strconv"
 	"testing"
 	"time"
+
+	"github.com/alexec/agents/Go/wire"
 )
 
 var (
@@ -133,26 +136,32 @@ func TestThePauseAndTheInterval(t *testing.T) {
 // it back when it is met.
 func TestTheDesk(t *testing.T) {
 	desk := NewDesk()
-	id := json.RawMessage(`{"permission":"E0000000-0000-4000-8000-000000000005"}`)
-	headline := json.RawMessage(`{"h1":"work","h2":"Fix the test","h3":"may run a command"}`)
-	raised := t0.Add(-600 * time.Second).Sub(referenceDate).Seconds()
-	message := AttentionNeed{Need: &NeedOnWire{ID: id, AgentID: &agent, RaisedAt: raised, Headline: headline}}
+	headline := `{"h1":"work","h2":"Fix the test","h3":"may run a command"}`
+	raised := wire.DateOf(t0.Add(-600 * time.Second))
+	var message AttentionNeed
+	if err := json.Unmarshal([]byte(`{"need":{"id":{"permission":"E0000000-0000-4000-8000-000000000005"},"agentID":"`+agent+
+		`","folder":"file:///work","kind":"permission","raisedAt":`+strconv.FormatFloat(float64(raised), 'g', -1, 64)+
+		`,"headline":`+headline+`}}`), &message); err != nil {
+		t.Fatal(err)
+	}
 	devices := []Device{device(phone, IPhone, &yes, t0), device(pad, IPad, &yes, t0)}
 	devices[0].PublicKey = []byte{4, 1}
 
 	first := desk.Heard(message, map[Surface]Presence{dev(phone): presence(dev(phone), "", true, 0)}, devices, t0)
-	if len(first) != 1 || first[0].Device != phone || !first[0].Alert || string(first[0].Headline) != string(headline) || len(first[0].PublicKey) != 2 {
+	if said, _ := json.Marshal(first[0].Headline); len(first) != 1 || first[0].Device != wire.UUID(phone) || !first[0].Alert || string(said) != headline || len(first[0].PublicKey) != 2 {
 		t.Fatalf("%+v", first)
 	}
 	if again := desk.Heard(message, map[Surface]Presence{dev(phone): presence(dev(phone), "", true, 0)}, devices, t0); len(again) != 0 {
 		t.Fatalf("posted twice: %+v", again)
 	}
 	moved := desk.Heard(message, map[Surface]Presence{dev(pad): presence(dev(pad), "", true, 0)}, devices, t0.Add(time.Second))
-	if len(moved) != 2 || moved[0].Device != phone || moved[0].Headline != nil || moved[1].Device != pad || moved[1].Alert {
+	if len(moved) != 2 || moved[0].Device != wire.UUID(phone) || moved[0].Headline != nil || moved[1].Device != wire.UUID(pad) || moved[1].Alert {
 		t.Fatalf("%+v", moved)
 	}
-	gone := desk.Heard(AttentionNeed{Withdraw: json.RawMessage(`{ "permission" : "E0000000-0000-4000-8000-000000000005" }`)}, nil, devices, t0)
-	if len(gone) != 1 || gone[0].Device != pad {
+	var withdraw AttentionNeed
+	json.Unmarshal([]byte(`{"withdraw":{ "permission" : "E0000000-0000-4000-8000-000000000005" }}`), &withdraw)
+	gone := desk.Heard(withdraw, nil, devices, t0)
+	if len(gone) != 1 || gone[0].Device != wire.UUID(pad) {
 		t.Fatalf("%+v", gone)
 	}
 	b, _ := json.Marshal(gone[0])

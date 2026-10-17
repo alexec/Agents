@@ -1,0 +1,12 @@
+DetectedServer full
+{"alias":"ALIAS","resolved":"RESOLVED","outcome":"OUTCOME","detail":"DETAIL"}
+DetectedServer zero
+{"alias":"","resolved":"","outcome":""}
+HostInstall full
+{"destination":"DESTINATION","name":"NAME","key":"KEY","trust":"TRUST","tunnel":true,"implementation":"IMPLEMENTATION"}
+HostInstall zero
+{"destination":""}
+SSHHost full
+{"alias":"ALIAS","resolved":"RESOLVED","throughBastion":true,"isBastion":true,"known":true}
+SSHHost zero
+{"alias":"","resolved":"","throughBastion":false,"isBastion":false,"known":false}
