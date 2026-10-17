@@ -46,6 +46,8 @@ const allowedURLs = new Set([
   // the address, which MCP Apps requires be another origin than the page's. Same port, same Mac.
   "http://localhost:${location.port}",
   "http://127.0.0.1:${location.port}",
+  // The Help link to the docs site (#1327): a link the person follows in a new tab, never fetched.
+  "https://alexec.github.io/Agents/",
 ]);
 const strings = [
   [/\beval\s*\(/g, "no eval"],
