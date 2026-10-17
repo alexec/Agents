@@ -1,5 +1,7 @@
 """U5 Follow a live document (How-to ▸ Follow a live document): the page opening beside
 the chat, the changes marked as the agent writes, and typing on it."""
+import re
+
 GROUP = "usage"
 LAYOUT = "mac"
 TITLE = "Follow a live document"
@@ -13,6 +15,21 @@ LINES = {
 }
 
 PROMPT = "Write a short plan for adding a weekly forecast to plan.md, in three steps, and show it to me while you write it."
+
+
+def last_passage(v):
+    """The label of the page's last passage: the lowest wide button in the files pane."""
+    best = (0, None)
+    for line in v.walk.call("tree", depth=60)["text"].splitlines():
+        line = line.strip()
+        if not line.startswith("AXButton · ") or " @" not in line:
+            continue
+        label, box = line[len("AXButton · "):].rsplit(" @", 1)
+        (x, y), (w, _) = (map(float, box.split(" ")[0].split(",")), map(float, box.split(" ")[1].split("x")))
+        # Not a row of the file list, which is a file's name.
+        if x > WINDOW[0] * 0.6 and w > 300 and y >= best[0] and not re.search(r"\.\w{1,4}$", label):
+            best = (y, label.split(" #")[0])
+    return best[1]
 
 
 def setup(v):
@@ -37,10 +54,15 @@ def run(v):
     agent = v.newest_agent()
     with v.fast(4.0):
         v.wait_state(agent, states=("finished", "idle", "done"), timeout=300)
+        # The page types the file out after the agent has written it.
+        v.sleep(8.0)
     v.tidy()
     v.sleep(1.0)
     v.say("type", wait=False)
     v.sleep(1.5)
-    v.type_on_page("Keep it to one screen. ", 55)
+    # A passage on the page takes a press, and then the keyboard at its end.
+    v.press("=" + last_passage(v))
+    v.sleep(0.4)
+    v.type_on(" Keep it to one screen.", 55)
     v.sleep(max(1.0, v.takes["type"]["duration"] - 2.5))
     v.sleep(1.5)

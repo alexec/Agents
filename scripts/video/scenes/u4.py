@@ -39,7 +39,7 @@ def setup(v):
     agent = v.start(folder, PROMPT)
     v.wait_state(agent, states=("finished", "idle", "done"), timeout=300)
     v.tidy()
-    v.select("weather-app")
+    v.unfold("weather-app")
     v.sleep(0.5)
     v.select_agent(agent)
     v.sleep(1.5)

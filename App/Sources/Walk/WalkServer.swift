@@ -67,7 +67,8 @@ enum WalkServer {
             while let newline = pending.firstIndex(of: 0x0A) {
                 let line = pending[pending.startIndex..<newline]
                 pending = Data(pending[pending.index(after: newline)...])
-                var reply = DispatchQueue.main.sync { MainActor.assumeIsolated { WalkCommands.run(Data(line)) } }
+                let make = DispatchQueue.main.sync { MainActor.assumeIsolated { WalkCommands.run(Data(line)) } }
+                var reply = make()
                 reply.append(0x0A)
                 let written = reply.withUnsafeBytes { raw -> Bool in
                     var offset = 0

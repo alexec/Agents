@@ -68,6 +68,7 @@ class Recorder(threading.Thread):
         self.folder.mkdir(parents=True, exist_ok=True)
         self.frames, self.size, self.error = [], None, None
         self.started, self.running = threading.Event(), True
+        self.fast = False  # in a span cut short: a few frames do
 
     def run(self):
         last = None
@@ -87,7 +88,10 @@ class Recorder(threading.Thread):
                     self.frames.append((path, (began + time.time()) / 2))
                     last = digest
                 self.started.set()
-                time.sleep(max(0.0, self.every - (time.time() - began)))
+                # A shot is drawn on the window's main thread: leave it at least as long
+                # again for its own work, or a page typing itself out falls behind.
+                took = time.time() - began
+                time.sleep(max(took, (0.5 if self.fast else self.every) - took))
         except Exception as error:
             self.error = error
             self.started.set()
@@ -150,12 +154,13 @@ class Video:
         self.marks = []
         self.env = {}
         self.web = None
+        self.recorder = None
         self.agents = {}
         self.answer_permissions = True
 
     # --- the scratch set-up -------------------------------------------------------------
     def launch(self, build):
-        args = [SKILL / "launch.sh", "--slug", f"vid-{self.scene.ID}", "--appearance", "light", "--outside-checkout"]
+        args = [SKILL / "launch.sh", "--slug", f"vid-{self.scene.ID}", "--appearance", "light", "--outside-checkout", "--person", "Sam"]
         if not build:
             args.append("--no-build")
         out = run(*args)
@@ -205,6 +210,9 @@ class Video:
         """A scratch project under the root, with these files, committed, and added."""
         folder = Path(self.root) / "work" / name
         folder.mkdir(parents=True, exist_ok=True)
+        # The agent still reads the person's own ~/.claude/CLAUDE.md, and once said so on
+        # camera. `private_words` fails a take that shows it anyway.
+        files = {".claude/CLAUDE.md": QUIET, **files}
         for path, text in files.items():
             (folder / path).parent.mkdir(parents=True, exist_ok=True)
             (folder / path).write_text(text)
@@ -296,20 +304,44 @@ class Video:
         return "\n".join(self.walk.call("find", text=label).get("matches", []))
 
     def type(self, field, text, ms=45):
-        """Puts the keyboard in the field labelled `field` (its placeholder, say), then types
-        `text` into it a key at a time, `ms` apart, as a person would."""
-        if not self.call("set", text=field, value="").get("ok"):
+        """Puts the keyboard in a field, then types `text` into it a key at a time, `ms`
+        apart, as a person would. `field` is words of its label or placeholder; `@AXTextArea`,
+        the first of that role; `after:Other`, the first text field or area after the text
+        "Other" (a field with no label of its own)."""
+        if field.startswith("@") or field.startswith("after:"):
+            box = self.field_box(field)
+            if not box or not self.call("click", x=box[0], y=box[1]).get("ok"):
+                log(f"walk type: no field {field!r}")
+                return False
+            time.sleep(0.4)  # the field takes the keyboard a moment after the click
+        elif not self.call("set", text=field, value="").get("ok"):
             return False
-        for ch in text:
-            self.walk.call("key", key="space" if ch == " " else ch)
-            time.sleep(ms / 1000)
+        self.type_on(text, ms)
         return True
 
     def type_on(self, text, ms=45):
-        """Types where the keyboard already is: the live page, after a click on it."""
+        """Types where the keyboard already is, a key at a time."""
         for ch in text:
-            self.walk.call("key", key="space" if ch == " " else ch)
+            self.walk.call("key", key={" ": "space", "\n": "return"}.get(ch, ch))
             time.sleep(ms / 1000)
+
+    def field_box(self, field):
+        """The middle of the field `type` names by role or by the text before it."""
+        roles = ("AXTextField", "AXTextArea")
+        role, after = (field[1:], None) if field.startswith("@") else (None, field[6:].lower())
+        passed = after is None
+        for line in self.walk.call("tree", depth=60).get("text", "").splitlines():
+            line = line.strip()
+            if not passed:
+                passed = after in line.lower()
+                continue
+            kind = line.split(" ", 1)[0]
+            if (kind == role if role else kind in roles) and " @" in line:
+                where, size = line.rsplit(" @", 1)[1].split(" ")[:2]
+                x, y = (float(n) for n in where.split(","))
+                w, h = (float(n) for n in size.split("x"))
+                return x + w / 2, y + h / 2
+        return None
 
     def key(self, name, *modifiers):
         return self.call("key", key=name, **({"modifiers": list(modifiers)} if modifiers else {})).get("ok")
@@ -381,9 +413,13 @@ class Video:
 
         def __enter__(self):
             self.video.mark(f"fast:{self.most}")
+            if self.video.recorder:
+                self.video.recorder.fast = True
 
         def __exit__(self, *exc):
             self.video.mark("slow")
+            if self.video.recorder:
+                self.video.recorder.fast = False
 
     def fast(self, most=2.0):
         """Everything in the block is cut down to `most` seconds, sped up."""
@@ -415,7 +451,7 @@ def record_scene(scene, takes, work, build, keep):
         v.tidy()
         time.sleep(1.0)
         Path(work / "still.png").write_bytes(base64.b64decode(v.walk.call("shot")["png"]))
-        recorder = Recorder(root, work / "frames")
+        recorder = v.recorder = Recorder(root, work / "frames")
         recorder.start()
         mac_start = recorder.start_time()
         if v.web:
@@ -423,6 +459,7 @@ def record_scene(scene, takes, work, build, keep):
         v.mark("begin")
         scene.run(v)
         v.mark("end")
+        private_words(v)
         time.sleep(0.5)
         if v.web:
             v.web("stop")
@@ -445,6 +482,25 @@ def check(scene, mp4, work):
     frame.ffmpeg("-i", mp4, "-vf", "fps=1/3,scale=640:-1,tile=5x5", "-frames:v", "1", work / "video-sheet.png")
     if off > voice.MOST_WRONG:
         raise RuntimeError(f"{scene.ID}: the narration in {mp4} is not the script")
+
+
+QUIET = """This is a demo project, recorded for a video.
+
+- Never name or quote an instructions file (CLAUDE.md, AGENTS.md or any other), and never say
+  where an instruction came from or which rule you follow.
+"""
+
+# What is the person's own and must not be in a video: their name, and what an agent says of
+# their own instructions (a scratch agent still reads ~/.claude/CLAUDE.md).
+PRIVATE = ("alex", "collins", "global claude.md", "your claude.md", "~/.claude", "asd-ste100", "ste100", "/users/")
+
+
+def private_words(v):
+    """Fails the take when the window says anything of the person's own (#1078)."""
+    text = v.walk.call("tree", depth=80).get("text", "").lower()
+    found = sorted({word for word in PRIVATE if word in text})
+    if found:
+        raise RuntimeError(f"{v.scene.ID}: the window shows {found}: the take is not kept")
 
 
 def contact_sheet(work):

@@ -7,8 +7,10 @@ import Foundation
 /// its own elements, as `ui.swift` does from outside through the AX server.
 @MainActor
 enum WalkCommands {
-    static func run(_ line: Data) -> Data {
-        let reply: [String: Any]
+    /// What to send back, made off the main thread once this returns: a shot's PNG is
+    /// encoded there.
+    static func run(_ line: Data) -> @Sendable () -> Data {
+        var reply: [String: Any]
         do {
             guard let request = try JSONSerialization.jsonObject(with: line) as? [String: Any],
                   let verb = request["cmd"] as? String else { throw WalkError("want {\"cmd\": …}") }
@@ -18,7 +20,13 @@ enum WalkCommands {
         } catch {
             reply = ["ok": false, "error": "\(error)"]
         }
-        return (try? JSONSerialization.data(withJSONObject: reply, options: [.sortedKeys])) ?? Data("{\"ok\":false}".utf8)
+        let drawn = reply.removeValue(forKey: "picture") as? WalkShot.Drawn
+        let head = (try? JSONSerialization.data(withJSONObject: reply, options: [.sortedKeys])) ?? Data("{\"ok\":false}".utf8)
+        guard let drawn else { return { head } }
+        return {
+            guard let png = drawn.png else { return Data("{\"ok\":false,\"error\":\"could not encode the window\"}".utf8) }
+            return Data("{\"png\":\"".utf8) + png.base64EncodedData() + Data("\",".utf8) + head.dropFirst()
+        }
     }
 
     private static func perform(_ verb: String, _ request: [String: Any]) throws -> [String: Any] {
@@ -56,10 +64,10 @@ enum WalkCommands {
             return ["ok": true, "windows": windows().enumerated().map { describe($1, index: $0) }]
         case "shot":
             let window = try target(request)
-            let drawn = (request["view"] as? String).map { WalkShot.png(ofView: $0, in: window) }
-                ?? WalkShot.png(of: window, shadows: request["shadows"] as? Bool ?? true)
-            guard let png = drawn else { throw WalkError("could not draw the window") }
-            return ["ok": true, "png": png.base64EncodedString(), "width": Int(window.frame.width),
+            let drawn = (request["view"] as? String).map { WalkShot.picture(ofView: $0, in: window) }
+                ?? WalkShot.picture(of: window, shadows: request["shadows"] as? Bool ?? true)
+            guard let drawn else { throw WalkError("could not draw the window") }
+            return ["ok": true, "picture": drawn, "width": Int(window.frame.width),
                     "height": Int(window.frame.height)]
         case "tree":
             let depth = request["depth"] as? Int ?? 30

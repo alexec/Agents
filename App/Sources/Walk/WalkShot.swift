@@ -14,30 +14,42 @@ import SwiftTerm
 /// terminal draws only when asked. The spike behind this is in the PR for #1172.
 @MainActor
 enum WalkShot {
+    /// A drawn window, made into a PNG off the main thread: the encoding was a fifth of a
+    /// shot's time, and a video takes several a second (#1078). Nothing draws into it after.
+    struct Drawn: @unchecked Sendable {
+        let canvas: NSBitmapImageRep
+        var png: Data? { canvas.representation(using: .png, properties: [:]) }
+    }
+
     /// Without `shadows`, the layers' shadows are left out: a layer render blurs each one in
     /// software, most of a shot's time, too slow for a video's frames (#1078).
-    static func png(of window: NSWindow, shadows: Bool = true) -> Data? {
+    static func picture(of window: NSWindow, shadows: Bool = true) -> Drawn? {
         prepare(window)
         guard window.contentView != nil else { return nil }
         let over = [window.attachedSheet].compactMap { $0 } + (window.childWindows ?? []).filter(\.isVisible)
-        var hidden: [(CALayer, Float)] = []
-        if !shadows {
-            func visit(_ layer: CALayer) {
-                if layer.shadowOpacity > 0 { hidden.append((layer, layer.shadowOpacity)) }
-                layer.sublayers?.forEach(visit)
-            }
-            for each in [window] + over { (each.contentView?.superview ?? each.contentView)?.layer.map(visit) }
-            CATransaction.begin()
-            CATransaction.setDisableActions(true)
-            hidden.forEach { $0.0.shadowOpacity = 0 }
+        // A clear layer draws nothing, but a layer render still draws all under it, through
+        // a picture of its own: a pane SwiftUI keeps by its opacity was most of a shot's
+        // time (#1078). Hidden while the shot is drawn, as are shadows when not wanted, and
+        // the sidebar's faint tint (5%), drawn the same way over all of the sidebar.
+        var shadowed: [(CALayer, Float)] = []
+        var clear: [CALayer] = []
+        func visit(_ layer: CALayer) {
+            if layer.opacity < 0.1, !layer.isHidden { clear.append(layer); return }
+            if !shadows, layer.shadowOpacity > 0 { shadowed.append((layer, layer.shadowOpacity)) }
+            layer.sublayers?.forEach(visit)
         }
+        for each in [window] + over { (each.contentView?.superview ?? each.contentView)?.layer.map(visit) }
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        shadowed.forEach { $0.0.shadowOpacity = 0 }
+        clear.forEach { $0.isHidden = true }
         defer {
-            if !shadows {
-                hidden.forEach { $0.0.shadowOpacity = $0.1 }
-                CATransaction.commit()
-            }
+            shadowed.forEach { $0.0.shadowOpacity = $0.1 }
+            clear.forEach { $0.isHidden = false }
+            CATransaction.commit()
         }
-        return png(size: window.frame.size, scale: window.backingScaleFactor) {
+        for each in [window] + over { (each.contentView?.superview ?? each.contentView).map(redraw) }
+        return picture(size: window.frame.size, scale: window.backingScaleFactor) {
             for (index, layer) in ([window] + over).enumerated() {
                 guard let view = layer.contentView?.superview ?? layer.contentView else { continue }
                 // Where it sits on the window, in points from the window's bottom left.
@@ -49,27 +61,20 @@ enum WalkShot {
         }
     }
 
-    /// `root`'s layer tree rendered as it stands, after every view has drawn into its layer:
-    /// a window that is not on screen (locked, covered) has left that for later. SwiftUI
-    /// draws much of a page as plain layers with no view, which only this reaches.
-    private static func render(_ root: NSView, in place: CGRect) {
+    /// Every view draws into its layer: a window that is not on screen (locked, covered)
+    /// has left that for later. Before the canvas is made the current context: drawn while
+    /// it was, SwiftUI's text layers kept a picture upside down (#1078).
+    private static func redraw(_ root: NSView) {
         root.layoutSubtreeIfNeeded()
         for view in [root] + root.subviews(of: NSView.self) where !view.isHiddenOrHasHiddenAncestor {
             view.needsDisplay = true
             view.displayIfNeeded()
         }
-        // A SwiftUI drawing layer that drew while the window was off screen can keep a
-        // picture drawn upside down: text sent from the window on a locked screen (#1078).
-        // Drawn again now, it is the right way up.
-        func fill(_ layer: CALayer) {
-            if layer.delegate != nil, layer.className.contains("CGDrawingLayer"),
-               layer.bounds.width >= 1, layer.bounds.height >= 1 {
-                layer.setNeedsDisplay()
-                layer.displayIfNeeded()
-            }
-            layer.sublayers?.forEach(fill)
-        }
-        root.layer.map(fill)
+    }
+
+    /// `root`'s layer tree rendered as it stands, once `redraw` has had every view draw.
+    /// SwiftUI draws much of a page as plain layers with no view, which only this reaches.
+    private static func render(_ root: NSView, in place: CGRect) {
         // A rect in `root`'s points to one on the canvas, which counts from the bottom left.
         let canvas = { (rect: CGRect) -> CGRect in
             let y = root.isFlipped ? root.bounds.height - rect.maxY : rect.minY
@@ -166,10 +171,11 @@ enum WalkShot {
 
     /// One view only, the first whose class name holds `name` (`name#2`, the second): to
     /// see what draws.
-    static func png(ofView name: String, in window: NSWindow) -> Data? {
+    static func picture(ofView name: String, in window: NSWindow) -> Drawn? {
         prepare(window)
         guard let view = pick(name, in: window) else { return nil }
-        return png(size: view.bounds.size, scale: window.backingScaleFactor) { render(view, in: CGRect(origin: .zero, size: view.bounds.size)) }
+        redraw(view)
+        return picture(size: view.bounds.size, scale: window.backingScaleFactor) { render(view, in: CGRect(origin: .zero, size: view.bounds.size)) }
     }
 
     /// What a window that is not on screen leaves for later, made now: a locked or covered
@@ -185,7 +191,7 @@ enum WalkShot {
         }
     }
 
-    private static func png(size: CGSize, scale: CGFloat, _ draw: () -> Void) -> Data? {
+    private static func picture(size: CGSize, scale: CGFloat, _ draw: () -> Void) -> Drawn? {
         guard size.width >= 1, size.height >= 1,
               let canvas = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: Int(size.width * scale),
                                             pixelsHigh: Int(size.height * scale), bitsPerSample: 8,
@@ -199,7 +205,7 @@ enum WalkShot {
         NSGraphicsContext.current = context
         draw()
         NSGraphicsContext.restoreGraphicsState()
-        return canvas.representation(using: .png, properties: [:])
+        return Drawn(canvas: canvas)
     }
 
     /// Glass, a material, a scroll edge: drawn on screen from what is behind the window, and
