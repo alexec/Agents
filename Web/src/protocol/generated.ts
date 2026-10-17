@@ -1380,6 +1380,17 @@ export interface MCPTriggerStatus {
 
 export type MCPTriggerStatusState = "pending" | "active" | "retrying" | "stopped" | "notThisHost";
 
+/** mac/reveal, mac/open: a path on the host; app names the app to open it with. */
+export interface MacPathRequest {
+  path: string;
+  app?: string;
+}
+
+/** mac/terminal: Terminal, in path if given. */
+export interface MacTerminalRequest {
+  path?: string;
+}
+
 export interface ManagedSkill {
   destination: SkillDestination;
   name: string;
@@ -1497,6 +1508,15 @@ export interface PersonEndRequest {
 export interface PersonRemoveRequest {
   name: string;
   agentID: string;
+}
+
+/**
+ * What agents call the person, and their pronouns (#121), as given: person.json in the person's
+ * settings.
+ */
+export interface PersonSettings {
+  name?: string;
+  pronouns?: string;
 }
 
 export interface Persona {
@@ -3181,6 +3201,8 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   MCPServerHealth: { required: ["name", "transport", "hosted", "check"], optional: ["project", "live", "checkedAt", "lastError", "tools"] },
   MCPTriggerFailure: { required: ["code", "message", "since"], optional: [] },
   MCPTriggerStatus: { required: ["name", "state"], optional: ["server", "lastPolledAt", "lastEventAt", "missedSince", "failure", "retryAt"] },
+  MacPathRequest: { required: ["path"], optional: ["app"] },
+  MacTerminalRequest: { required: [], optional: ["path"] },
   ManagedSkill: { required: ["destination", "name", "source", "edited", "update"], optional: ["skillPath", "recordedHash", "commit", "committedAt", "catalogue"] },
   MarkRuntimeAvailable: { required: ["credentialKey"], optional: [] },
   MessageSender: { required: ["agentID", "title"], optional: [] },
@@ -3196,6 +3218,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   PermissionRequest: { required: ["id", "agentID", "toolCall", "options", "askedAt"], optional: ["subagent"] },
   PersonEndRequest: { required: ["name"], optional: ["agentID"] },
   PersonRemoveRequest: { required: ["name", "agentID"], optional: [] },
+  PersonSettings: { required: [], optional: ["name", "pronouns"] },
   Persona: { required: ["id", "name", "origin", "settings"], optional: ["description", "problem"] },
   PersonasListRequest: { required: ["folder"], optional: [] },
   PinArrangeRequest: { required: ["folder", "paths"], optional: [] },
