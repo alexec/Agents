@@ -24,8 +24,8 @@
 #                   per set of Package.resolved files, so lanes on the same pins share
 #                   one and a lane on other pins never changes it under them
 #   swiftpm/        `swift build` and `swift test`'s cache (--cache-path)
-#   linux/<k>/      the Linux agentsd and MCP servers scripts/build-linux-agentsd.sh built,
-#                   one folder per set of git trees they were built from (#856)
+#   linux/<k>/      what the Swift Linux agentsd builds left (#856) before #1314; prune
+#                   takes it away
 #
 # What is not shared: DerivedData and .build. Their contents name the worktree's own
 # paths, and SwiftPM locks .build for one process at a time, so a shared one would make
@@ -45,7 +45,7 @@ checkouts_key() {
 	local top
 	top=$(repo)
 	# Every pinned package set the apps build with; the spikes under specs/ are not built.
-	(cd "$top" && cat Daemon/Package.resolved Packages/*/Package.resolved 2>/dev/null) |
+	(cd "$top" && cat Packages/*/Package.resolved 2>/dev/null) |
 		shasum | cut -c1-12
 }
 

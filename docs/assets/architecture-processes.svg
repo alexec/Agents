@@ -44,7 +44,7 @@
 
   <!-- Control plane -->
   <rect class="box cp" x="330" y="200" width="620" height="96"/>
-  <text class="title" x="346" y="224">Control plane · agents-control serve (Packages/ControlPlane)</text>
+  <text class="title" x="346" y="224">Control plane · agents-control serve (Go/internal/controlplane)</text>
   <text class="small" x="346" y="244">launchd job com.alexecollins.agentshost.control · Agents Host.app/Contents/Helpers</text>
   <text class="small" x="346" y="262">:8791 wss for windows, phones and hosts · :8792 http loopback for the web page</text>
   <text class="small" x="346" y="280">store: a folder or an S3 bucket (who is paired, which hosts); routes requests, fans out updates</text>
@@ -84,7 +84,7 @@
 
   <!-- agentsd -->
   <rect class="box daemon" x="330" y="340" width="620" height="100"/>
-  <text class="title" x="346" y="364">agentsd --control-network · Daemon/ + Packages/AgentsKit</text>
+  <text class="title" x="346" y="364">agentsd --control-network · Go/internal/agentsd</text>
   <text class="small" x="346" y="384">launchd job com.alexecollins.agentshost.daemon · this Mac's host; owns every agent and writes its record</text>
   <text class="small" x="346" y="402">serves the app's own "agents" MCP tools at http://127.0.0.1:&lt;port&gt;/mcp/agents (token per session)</text>
   <text class="small" x="346" y="420">runs workflows, leases, events; polls MCP servers' events/poll for workflow triggers</text>

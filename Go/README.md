@@ -1,22 +1,23 @@
 # Go
 
-The daemon (`agentsd`) and the control plane (`agents-control`) as they move from Swift
-to Go (#1134). One module, so the two share the wire types and the control exchange.
-The Mac window, the Remote, `Shared/UI`, the web page, Agents Host and `agents-relay` do
-not move.
+The daemon (`agentsd`) and the control plane (`agents-control`), moved from Swift to Go
+(#1134; the Swift ones went in #1314). One module, so the two share the wire types and the
+control exchange. The Mac window, the Remote, `Shared/UI`, the web page, Agents Host and
+`agents-relay` stay as they are.
 
 | Path | What | Area |
 |---|---|---|
 | `wire/` | The wire types: `*_gen.go` made from `Packages/Wire/` by `scripts/wire.sh gen`, the meaning-types by hand | build |
 | `cmd/wiregen/` | Makes `wire/*_gen.go` and `Web/src/protocol/generated.ts` from `Packages/Wire/` | build |
 | `internal/buildinfo/` | The version and the implementation (`go`) | build |
-| `cmd/agentsd/`, `internal/agentsd/` | The host daemon (#1136): `store/` is the root as Swift lays it out, `diskjson/` its encoding | hosts |
+| `cmd/agentsd/`, `internal/agentsd/` | The host daemon (#1136): `store/` is the root as the Swift host laid it out, `diskjson/` its encoding | hosts |
 | `cmd/agentsctl/` | A client of a control plane for walks without the screen; not shipped | hosts |
 | `cmd/agents-control/`, `internal/controlplane/` | The control plane | control-plane |
 | `internal/controllink/` | Both sides of the host ↔ control plane exchange | control-plane |
 | `internal/safe/` | Recover helpers: one panic never takes a host or the control plane down | build |
 | `cmd/github-mcp/`, `internal/githubmcp/` | The `github` MCP server (#1232): the official github-mcp-server's tools, as a library, and the ci server's events | ci-server |
 | `cmd/linear-mcp/`, `internal/linearmcp/` | The `linear` MCP server (#839): Linear's issue events, in github-mcp's shape (tools are Linear's own server's) | ci-server |
+| `cmd/workspace-commands/`, `internal/workspacecommands/` | The command workspace provider (#691, in Go since #1364): workspaces as shell commands and presets, an MCP server the control plane runs | workspaces |
 
 ## Building and testing
 
@@ -38,7 +39,7 @@ host and member.
 
 ## The control plane (`agents-control`, #1137)
 
-The Go `agents-control` takes the Swift one's command line (`serve`, `serve --home`,
+The Go `agents-control` took the Swift one's command line (`serve`, `serve --home`,
 `code`, `hosts`, `clients`, `install-script`, `store check`, `version`) and reads and
 writes today's `control/` folder: the store, `control-key` (or the key on `--key-fd`),
 and `tls/`, so its certificate's pin is the one every member holds. Every one of the
@@ -65,26 +66,18 @@ build added kept whole), the copies' own messages, and the JSON-RPC envelope.
 | `controlplane/providers` | Workspace providers, kept requests, Write It for Me |
 
 **Linux hosts run the Go agentsd** (#1136). `install.sh` installs it, from
-`agentsd-go-linux-<arch>` (`scripts/build-linux-agentsd-go.sh`). `--impl swift`, or Add a
-Server's **Install the Swift host instead**, installs the Swift one. Running the command again
-with or without it changes a host and keeps its id and agents. A control plane with no Go
-host gives the Swift one.
+`agentsd-go-linux-<arch>` (`scripts/build-linux-agentsd-go.sh`).
 
-**Switching a Mac (#1312).** Agents Host carries both control planes
-(`Contents/Helpers/agents-control` and `agents-control-go`; `scripts/go-control.sh` builds the
-Go one) and both hosts (`agentsd` and `agentsd-go`; `scripts/go-agentsd.sh`). It runs the Go
-ones unless this Mac's entry in `~/.agents/settings/host.json` says
-`"controlImplementation": "swift"` or `"daemonImplementation": "swift"`, or the build carries
-no Go one (built with no Docker and no Go). Restart the job after changing it
-(`launchctl kickstart -k gui/$(id -u)/com.alexecollins.agentshost.control`, or `….daemon`).
-`control.log` then begins with `Agents Host: starting the Swift agents-control` (or `Go`), and
-the Go host's `daemon.log` says `agentsd <version> (go)`. The host's launch agent runs `Agents
-Host --launch-daemon`, which becomes the one picked. Both read and write the same root and
-`control/` folder, so either way keeps every agent, member, host and pin.
+**On a Mac (#1312, #1314).** Agents Host carries `Contents/Helpers/agents-control`
+(`scripts/go-control.sh`) and `Contents/Helpers/agentsd` (`scripts/go-agentsd.sh`), both Go:
+its build fails with no Docker running and no Go. The host's launch agent runs `Agents Host
+--launch-daemon`, which becomes `agentsd`; the control plane's runs `--launch-control`, which
+hands over the key and becomes `agents-control`. The Swift ones, and the
+`daemonImplementation` and `controlImplementation` settings that picked them, went in #1314.
 
-**On a scratch set-up.** `.agents/skills/run-app/scripts/launch.sh` runs the Go ones the
-build carries, and `--swift` the Swift ones. `CONTROL_BIN=$PWD/Go/out/darwin/agents-control
-launch.sh --slug …` runs a Go one built from the tree (build it with `GOOS=darwin Go/scripts/go.sh build -o out/darwin/agents-control
+**On a scratch set-up.** `.agents/skills/run-app/scripts/launch.sh` runs the ones the build
+carries. `CONTROL_BIN=$PWD/Go/out/darwin/agents-control launch.sh --slug …` runs one built from
+the tree (build it with `GOOS=darwin Go/scripts/go.sh build -o out/darwin/agents-control
 ./cmd/agents-control`).
 
 ## The github MCP server (`github-mcp`, #1232)
@@ -104,7 +97,7 @@ and passes every other message to the official server unchanged. It signs in as 
 user (`gh auth token`, asked again each minute) and has no account of its own.
 
 Agents Host carries it in `Contents/Helpers` (`scripts/go-github-mcp.sh`, a build phase,
-as `agents-control-go` is), and `scripts/build-linux-agentsd-go.sh` builds
+as `agents-control` is), and `scripts/build-linux-agentsd-go.sh` builds
 `github-mcp-linux-<arch>`, which every Linux host installs beside agentsd. A project names
 it by bare name: `"github": { "command": "github-mcp", "hosted": true }`.
 
@@ -124,3 +117,17 @@ marketplace; this server runs beside agentsd with a personal API key in `LINEAR_
 It reads Linear's GraphQL API (`LINEAR_MCP_API_URL` moves it, for a fake). Agents Host carries
 it (`scripts/go-github-mcp.sh linear-mcp`) and every Linux host installs
 `linear-mcp-linux-<arch>`. See `docs/how-to/use-linear-issues.md`.
+
+## The command workspace provider (`workspace-commands`, #691, #1364)
+
+A workspace provider whose workspaces are shell commands: written out, listed by one command,
+or a preset (`docker`, `doctl`, `codespaces`, `coder`, `gcloud-workstations`). Its configuration
+is the JSON in `WORKSPACE_COMMANDS_CONFIG`, as
+`specs/691-workspace-providers/contracts/command-provider.md` says; it was Swift
+(`Packages/MCPServers`) until #1364, and a configuration written for that one works unchanged.
+It answers MCP on stdio by itself, with no SDK: initialize, ping and the contract's tools.
+
+The control plane runs it from beside itself, then `AGENTS_WORKSPACE_COMMANDS`, then `PATH`
+(`internal/controlplane/providers`). Agents Host carries it beside `agents-control`
+(`scripts/go-github-mcp.sh workspace-commands`); the control-plane image has it beside
+`agents-control` (`scripts/build-linux-control.sh`, `deploy/Containerfile`).

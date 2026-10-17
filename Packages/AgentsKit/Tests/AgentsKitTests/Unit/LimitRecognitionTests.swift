@@ -7,8 +7,16 @@ import Testing
 /// moves a chat; everything else never does.
 @Suite("Recognising a spent allowance")
 struct LimitRecognitionTests {
+    static func fixture(_ name: String) throws -> JSONValue {
+        let url = URL(filePath: #filePath)
+            .deletingLastPathComponent()      // Unit
+            .deletingLastPathComponent()      // AgentsKitTests
+            .appending(path: "Fixtures/session-failures/\(name).json")
+        return try JSONDecoder().decode(JSONValue.self, from: Data(contentsOf: url))
+    }
+
     private func typed(_ name: String) throws -> SessionFailure {
-        try #require(SessionFailure.from(meta: SessionFailureDecodingTests.fixture(name)))
+        try #require(SessionFailure.from(meta: Self.fixture(name)))
     }
 
     private var rejected: RateLimitInfo {
@@ -48,14 +56,14 @@ struct LimitRecognitionTests {
     // MARK: Paid overage
 
     @Test func overageOnAPlanIsOut() throws {
-        let info = try #require(RateLimitInfo.from(meta: SessionFailureDecodingTests.fixture("claude-rate-limit-overage")))
+        let info = try #require(RateLimitInfo.from(meta: Self.fixture("claude-rate-limit-overage")))
         let recognition = LimitRecognition.classify(runtimeID: "claude", rateLimit: info)
         #expect(recognition == .overage(resetsAt: Date(timeIntervalSince1970: 1_790_007_200)))
         #expect(recognition.moves)
     }
 
     @Test func overageOnPrepaidCreditIsWhatCreditIsFor() throws {
-        let info = try #require(RateLimitInfo.from(meta: SessionFailureDecodingTests.fixture("claude-rate-limit-overage")))
+        let info = try #require(RateLimitInfo.from(meta: Self.fixture("claude-rate-limit-overage")))
         #expect(LimitRecognition.classify(runtimeID: "claude", rateLimit: info,
                                           payment: .prepaid(amount: nil, expires: nil)) == .none)
     }

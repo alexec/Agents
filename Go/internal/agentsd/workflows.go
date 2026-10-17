@@ -217,11 +217,7 @@ func (d *Daemon) keepCopyLocked(st *workflowState, f *workflowFile) {
 // every file as it stands.
 func (d *Daemon) scanLocked() {
 	files := map[string]map[string]*workflowFile{}
-	for _, p := range d.projects(false) {
-		if p.Project.ArchivedAt != nil {
-			continue
-		}
-		folder := store.FolderPath(p.Project.Folder)
+	for _, folder := range d.projectFolders() {
 		for _, id := range workflowIDs(folder) {
 			path, _ := workflowPath(folder, id)
 			text, digest, why := readWorkflowFile(path)
@@ -527,17 +523,25 @@ func (d *Daemon) tellWorkflow(folder, id string) {
 	if f == nil {
 		d.workflowMu.Unlock()
 		Broadcast(d, wire.NotifyWorkflowRemoved, wire.WorkflowRemovedNotification{Folder: store.FolderURL(folder), WorkflowID: id})
+		d.sendProject(folder)
 		return
 	}
 	s := d.summaryLocked(folder, id, d.ceilingsLocked())
 	d.workflowMu.Unlock()
 	Broadcast(d, wire.NotifyWorkflowChanged, s)
+	// What waits for an OK rides on the project's summary and in Needs You (#1322).
+	d.sendProject(folder)
 }
 
 // tellEveryWorkflow says each again: a ceiling or an approval moves them all.
 func (d *Daemon) tellEveryWorkflow() {
+	folders := map[string]bool{}
 	for _, s := range d.workflowSummaries("") {
 		Broadcast(d, wire.NotifyWorkflowChanged, s)
+		folders[store.FolderPath(s.Workflow.Folder)] = true
+	}
+	for f := range folders {
+		d.sendProject(f)
 	}
 }
 
@@ -677,6 +681,7 @@ func (d *Daemon) deleteWorkflow(r wire.WorkflowRequest) error {
 	d.workflowMu.Unlock()
 	d.unpinWorkflow(folder, r.WorkflowID)
 	Broadcast(d, wire.NotifyWorkflowRemoved, wire.WorkflowRemovedNotification{Folder: store.FolderURL(folder), WorkflowID: r.WorkflowID})
+	d.sendProject(folder)
 	d.tellEveryWorkflow()
 	return nil
 }

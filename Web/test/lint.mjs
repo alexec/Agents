@@ -37,6 +37,8 @@ function scan(path, rules) {
 const allowedURLs = new Set([
   // Clone Git URL…'s placeholder, the window's own (CloneSheet, #115).
   "https://github.com/owner/repository.git",
+  // Help (#1327): the docs site, a link the person opens in a new tab, never fetched by the page.
+  "https://alexec.github.io/Agents/",
   "http://www.w3.org/1998/Math/MathML",
   "http://www.w3.org/1999/xhtml",
   "http://www.w3.org/2000/svg",
@@ -46,6 +48,8 @@ const allowedURLs = new Set([
   // the address, which MCP Apps requires be another origin than the page's. Same port, same Mac.
   "http://localhost:${location.port}",
   "http://127.0.0.1:${location.port}",
+  // The Help link to the docs site (#1327): a link the person follows in a new tab, never fetched.
+  "https://alexec.github.io/Agents/",
 ]);
 const strings = [
   [/\beval\s*\(/g, "no eval"],

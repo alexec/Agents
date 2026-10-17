@@ -36,14 +36,6 @@ struct HostSettings: Codable, Sendable, Equatable {
     /// through iCloud when away, and posts their notices. Off until turned on (Alex).
     var relay: Bool?
     var relaysForDevices: Bool { relay ?? false }
-    /// Which `agents-control` runs (#1137, #1312): `"swift"` for the Swift one, carried beside
-    /// the Go one for now; absent, or anything else, for the Go one. Not in the window: set
-    /// in `host.json`, and the control plane restarted.
-    var controlImplementation: String?
-    /// Which `agentsd` runs this Mac's host (#1138, #1312): `"swift"` for the Swift one,
-    /// carried beside the Go one for now; absent, or anything else, for the Go one. Not in
-    /// the window: set in `host.json`, and the host restarted. Both serve the same root.
-    var daemonImplementation: String?
 
     /// This Mac's entry in `host.json`: its Bonjour name, which the person sees in Sharing.
     private static func key(_ paths: HostPaths) -> String {

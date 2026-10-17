@@ -1,7 +1,7 @@
 # Contract: the command provider (`workspace-commands`)
 
-`workspace-commands` is a static Swift MCP server in `Packages/MCPServers`, built on
-`MCPServerKit`. It follows the [provider contract](provider-contract.md) and speaks stdio. Its
+`workspace-commands` is a static Go MCP server (`Go/cmd/workspace-commands`,
+`Go/internal/workspacecommands`; Swift in `Packages/MCPServers` until #1364). It follows the [provider contract](provider-contract.md) and speaks stdio. Its
 whole configuration is the JSON in `WORKSPACE_COMMANDS_CONFIG`. Its secrets are the other
 environment variables the control plane passes it, which its commands can use as `$NAME`.
 

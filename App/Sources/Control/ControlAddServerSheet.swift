@@ -66,8 +66,6 @@ struct ControlAddServerSheet: View {
     @State private var tunnel = false
     /// Once the person sets the tunnel, it is theirs: the server box no longer moves it.
     @State private var tunnelChosen = false
-    /// The Swift host in place of the Go one, the default since #1136: one setting away.
-    @State private var swiftHost = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -82,8 +80,6 @@ struct ControlAddServerSheet: View {
                     Text("Over ssh").tag(Way.ssh)
                 }
                 .pickerStyle(.segmented).labelsHidden().fixedSize()
-                Toggle("Install the Swift host instead", isOn: $swiftHost)
-                    .appText(.supporting)
                 switch way {
                 case .command: commandPage
                 case .ssh: sshPage
@@ -109,8 +105,7 @@ struct ControlAddServerSheet: View {
     private var commandPage: some View {
         Text("On the server, as the user your agents should run as:")
             .appText(.reading).foregroundStyle(.secondary)
-        if let shownCommand = shown?.command ?? shown.map({ "agentsd --control-code '\($0.text)'" }) {
-            let command = swiftHost && shown?.command != nil ? shownCommand + " --impl swift" : shownCommand
+        if let command = shown?.command ?? shown.map({ "agentsd --control-code '\($0.text)'" }) {
             Text(command)
                 .appText(.code)
                 .textSelection(.enabled)
@@ -364,8 +359,7 @@ struct ControlAddServerSheet: View {
         Task {
             let result = await control.install(destination: destination.trimmingCharacters(in: .whitespaces),
                                                name: name.trimmingCharacters(in: .whitespaces), key: key, trust: trusting,
-                                               tunnel: control.isOnThisMac ? tunnel : nil,
-                                               implementation: swiftHost ? "swift" : nil)
+                                               tunnel: control.isOnThisMac ? tunnel : nil)
             working = false
             if case .needsTrust(let shownKey) = result {
                 fingerprint = shownKey

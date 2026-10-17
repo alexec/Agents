@@ -80,10 +80,12 @@ struct SidebarSessionRow: View {
                             .foregroundStyle(.tertiary)
                             .accessibilityLabel("started by the workflow \(workflowName)")
                     }
-                    if model.startedByAgentLabel(agent) != nil {
+                    if let starter = model.startedByAgentLabel(agent) {
                         Image(systemName: AgentsModel.startedByAgentSymbol)
                             .appText(.fine)
                             .foregroundStyle(.tertiary)
+                            // Said, as the workflow mark is and the Mac's row says it (#1326).
+                            .accessibilityLabel(starter)
                     }
                 }
                 // The agent's own account of its last turn, one line, as on the Mac.

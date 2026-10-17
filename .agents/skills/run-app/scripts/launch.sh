@@ -17,7 +17,6 @@ WINDOW=1
 FIRST_RUN=0
 LAN=0
 HOST_FIRST=0
-SWIFT=0
 EXTRA_ENV=()
 CONTROL_ENV=()
 APP_ARGS=()
@@ -30,7 +29,6 @@ while [ $# -gt 0 ]; do
     --first-run) FIRST_RUN=1 ;;      # the window unpaired, on frame K; pair it by hand with PAIR_CODE
     --lan)       LAN=1 ;;            # the control plane at this Mac's LAN address, for a container
     --host-first) HOST_FIRST=1 ;;    # the host starts while the control plane is down, then it comes up (#113)
-    --swift)     SWIFT=1 ;;          # the Swift agents-control and agentsd, not the Go ones (#1312)
     --slug)      SLUG="$2"; shift ;;
     --config)    CONFIG="$2"; shift ;;   # Debug (the default) or Live, ship-app's optimised build
     --web-port)  WEB_PORT="$2"; shift ;;   # the web remote's port, e.g. one held already (071 R3)
@@ -41,7 +39,7 @@ while [ $# -gt 0 ]; do
     --app-arg)   APP_ARGS+=("$2"); shift ;;   # one more argument for the window, e.g. a defaults key: -key value
     --outside-checkout) OUTSIDE=1 ;;  # open a copy of the window from the root, so its title names no worktree (#1078)
     --person)    PERSON="$2"; shift ;;   # the first name the window gives the person, in place of the Mac account's (#1078)
-    *) echo "usage: launch.sh [--slug NAME] [--config Debug|Live] [--seeded] [--no-build] [--front] [--no-window] [--first-run] [--lan] [--host-first] [--swift] [--web-port N] [--env KEY=VALUE]… [--control-env KEY=VALUE]… [--appearance light|dark] [--app-arg ARG]… [--outside-checkout] [--person NAME]" >&2; exit 2 ;;
+    *) echo "usage: launch.sh [--slug NAME] [--config Debug|Live] [--seeded] [--no-build] [--front] [--no-window] [--first-run] [--lan] [--host-first] [--web-port N] [--env KEY=VALUE]… [--control-env KEY=VALUE]… [--appearance light|dark] [--app-arg ARG]… [--outside-checkout] [--person NAME]" >&2; exit 2 ;;
   esac
   shift
 done
@@ -97,16 +95,10 @@ if [ "$BUILD" = 1 ]; then
     || { echo "build failed — tail /tmp/run-$SLUG-build.log" >&2; tail -30 /tmp/run-$SLUG-build.log >&2; exit 1; }
 fi
 
-# The Go ones, as Agents Host picks them with no setting (#1312), when the build carries
-# them; --swift for the Swift ones, as "…Implementation": "swift" in host.json.
+# The Go ones the build carries (#1312), as Agents Host runs them; the only ones since #1314.
 HELPERS="$HOSTAPP/Contents/Helpers"
 CONTROL="$HELPERS/agents-control"
 AGENTSD="$HELPERS/agentsd"
-if [ "$SWIFT" = 0 ]; then
-  [ -x "$HELPERS/agents-control-go" ] && CONTROL="$HELPERS/agents-control-go"
-  [ -x "$HELPERS/agentsd-go" ] && AGENTSD="$HELPERS/agentsd-go"
-fi
-# One-off commands (codes) stay the Swift agents-control's, as Agents Host runs them.
 CONTROL_TOOL="$HELPERS/agents-control"
 # CONTROL_BIN: another agents-control in its place:
 #   GOOS=darwin Go/scripts/go.sh build -o out/darwin/agents-control ./cmd/agents-control
@@ -137,7 +129,7 @@ if [ "$LAN" = 1 ]; then
   [ -n "$ADDRESS" ] || { echo "no LAN address on en0 or en1 for --lan" >&2; exit 1; }
   URL="https://$ADDRESS:$PORT"
 fi
-# The Linux hosts a server is given (scripts/build-linux-agentsd.sh), when built.
+# The Linux hosts a server is given (scripts/build-linux-agentsd-go.sh), when built.
 SERVERS=()
 [ -d "$REPO/App/Resources/servers" ] && SERVERS=(AGENTS_CONTROL_SERVERS="$REPO/App/Resources/servers")
 # --host-root: the host's join is in control/status, as on Agents Host's copy (#113).

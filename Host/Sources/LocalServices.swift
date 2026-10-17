@@ -39,6 +39,31 @@ struct LocalServices {
         }
     }
 
+    /// The program this copy's plist names for it, as launchd prints it: `BundleProgram`.
+    func bundledProgram(_ job: Job) -> String? {
+        let url = Bundle.main.bundleURL.appendingPathComponent("Contents/Library/LaunchAgents/\(plist(job))")
+        guard let data = try? Data(contentsOf: url),
+              let plist = try? PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any]
+        else { return nil }
+        return plist["BundleProgram"] as? String
+    }
+
+    /// Registered, and launchd runs another program than this copy's plist names (#1379).
+    /// An update keeps a login item's registration, and `register` finds it enabled: a Mac
+    /// registered before #1138 ran `Helpers/agentsd` straight, never the launcher.
+    func registeredFromAnotherPlist(_ job: Job) async -> Bool {
+        guard !paths.scratch, loginStatus(job) == .enabled, let wanted = bundledProgram(job),
+              let program = await state(job).program else { return false }
+        return program != wanted
+    }
+
+    /// Unregistered and registered again from this copy's plist; launchd starts it again.
+    func registerAgain(_ job: Job) async -> Outcome {
+        await unregister(job)
+        for _ in 0..<20 where await state(job).loaded { try? await Task.sleep(for: .milliseconds(250)) }
+        return await register(job)
+    }
+
     func remove() async {
         await unregister(.control)
         await unregister(.daemon)
@@ -165,9 +190,9 @@ struct LocalServices {
             variables = [StoreLocations.rootVariable: environment[StoreLocations.rootVariable] ?? "", "PATH": path]
             for name in ["AGENTS_HOST_PORT", "AGENTS_HOST_WEB_PORT", "AGENTS_HOST_BONJOUR"] { variables[name] = environment[name] }
         case .daemon:
-            // The one the settings pick (#1138), named here: a scratch job's launcher would
-            // take the host's root for the set-up's.
-            arguments = [paths.agentsd(for: HostSettings.load(paths)).path, "--control-network"]
+            // Named here (#1138): a scratch job's launcher would take the host's root for the
+            // set-up's.
+            arguments = [paths.agentsd.path, "--control-network"]
             variables = [StoreLocations.rootVariable: paths.hostRoot.path, "PATH": path]
         case .relay:
             // `<root>/relay`, and a walk's folder standing in for iCloud when it gives one.

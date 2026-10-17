@@ -61,12 +61,12 @@ Open issues: `is:open label:integration allowance`.
 
 | Integration | Clients that show it | State | Last checked | Where | Gaps |
 | --- | --- | --- | --- | --- | --- |
-| Claude plan windows | Mac, Remote, web | built | — | `Packages/AgentsKit/Sources/AgentsKit/Daemon/DaemonCore+Allowances.swift`, `Go/internal/agentsd/limits.go` | |
+| Claude plan windows | Mac, Remote, web | built | — | `Go/internal/agentsd/limits.go` | |
 | Grok billing | Mac, Remote, web | built | — | `Packages/AgentsKit/Sources/AgentsKitCore/Runtimes/Allowance/AllowanceReading.swift` | |
 | Limits recognised from error text (Codex, Gemini, Copilot, Cursor) | Mac, Remote, web | built | — | `Packages/AgentsKit/Sources/AgentsKitCore/Runtimes/Allowance/LimitRecognition.swift`, `Go/internal/agentsd/limits.go` | |
-| Codex token refresh (auth.openai.com) | Mac, server | built | — | `Packages/AgentsKit/Sources/AgentsKit/Hosts/MacSignIn/CodexFileSignIn.swift`, `Go/internal/mac/signin/codex.go` | |
+| Codex token refresh (auth.openai.com) | Mac, server | built | — | `Go/internal/mac/signin/codex.go` | |
 | Gemini key check (generativelanguage.googleapis.com) | Mac | built | — | `Packages/AgentsKit/Sources/AgentsKitCore/Credentials/CredentialCheck.swift` | |
-| OpenCode borrows the Mac's provider keys | Mac, server | built | — | `Packages/AgentsKit/Sources/AgentsKitCore/Runtimes/LentFileSignIn.swift`, `Packages/AgentsKit/Sources/AgentsKit/Hosts/MacSignIn/MacFileSignIn.swift` | |
+| OpenCode borrows the Mac's provider keys | Mac, server | built | — | `Packages/AgentsKit/Sources/AgentsKitCore/Runtimes/LentFileSignIn.swift` | |
 
 ## Runtime downloads
 
@@ -76,7 +76,7 @@ Open issues: `is:open label:integration install`.
 | Integration | Clients that show it | State | Last checked | Where | Gaps |
 | --- | --- | --- | --- | --- | --- |
 | Node from nodejs.org | Mac, server | built | — | `Packages/AgentsKit/Sources/AgentsKitCore/Runtimes/Toolset.swift`, `Go/internal/controlplane/hostinstall/toolset.go` | |
-| npm toolset locks | Mac, server | built | — | `Packages/AgentsKit/Sources/AgentsKit/Runtimes/MacToolsetInstaller.swift`, `scripts/update-toolset.sh` | |
+| npm toolset locks | Mac, server | built | — | `scripts/update-toolset.sh` | |
 | Antigravity from dl.google.com | Mac | built | — | `Packages/AgentsKit/Sources/AgentsKitCore/Runtimes/ArchiveToolset.swift` | |
 | OpenCode from GitHub releases | Mac, server | built | — | `Packages/AgentsKit/Sources/AgentsKitCore/Runtimes/ArchiveToolset.swift` | |
 | Grok, Copilot and Cursor install scripts | Mac, server | built | — | `App/Sources/AppModel+GetStarted.swift`, `Go/internal/agentsd/install.go` | |
@@ -84,17 +84,17 @@ Open issues: `is:open label:integration install`.
 ## Workspace providers
 
 The machines hosts run on. The contract is in [Workspace providers](workspace-providers.md).
-The presets are in `Packages/MCPServers/Sources/WorkspaceCommands/Presets.swift`.
+The presets are in `Go/internal/workspacecommands/presets.go` (Swift until #1364).
 Open issues: `is:open label:integration workspace`.
 
 | Integration | Clients that show it | State | Last checked | Where | Gaps |
 | --- | --- | --- | --- | --- | --- |
-| Docker | Mac, Remote, web, control plane | walked on scratch | 2026-10-13, PR #966 (`specs/691-workspace-providers/walks/857-real-providers.md`) | `Presets.swift` (`docker`) | #857, #1119 |
-| Coder | Mac, Remote, web, control plane | built | — | `Presets.swift` (`coder`) | #1119 |
-| Codespaces | Mac, Remote, web, control plane | broken (Stop works, Start never brings the host back) | 2026-10-13, PR #966, with a real codespace | `Presets.swift` (`codespaces`) | #864, #1119 |
-| DigitalOcean | Mac, Remote, web, control plane | built | — | `Presets.swift` (`doctl`) | #865, #1119 |
-| Google Cloud Workstations | Mac, Remote, web, control plane | built | — | `Presets.swift` (`gcloud-workstations`) | #1119 |
-| Any MCP or CLI provider (map written by an agent) | Mac, control plane | built | — | `Packages/ControlPlane/Sources/ControlPlaneKit/Providers/ProviderDrafts.swift`, `Go/internal/controlplane/providers/drafts.go` | |
+| Docker | Mac, Remote, web, control plane | walked on scratch | 2026-10-13, PR #966 (`specs/691-workspace-providers/walks/857-real-providers.md`) | `presets.go` (`docker`) | #857, #1119 |
+| Coder | Mac, Remote, web, control plane | built | — | `presets.go` (`coder`) | #1119 |
+| Codespaces | Mac, Remote, web, control plane | broken (Stop works, Start never brings the host back) | 2026-10-13, PR #966, with a real codespace | `presets.go` (`codespaces`) | #864, #1119 |
+| DigitalOcean | Mac, Remote, web, control plane | built | — | `presets.go` (`doctl`) | #865, #1119 |
+| Google Cloud Workstations | Mac, Remote, web, control plane | built | — | `presets.go` (`gcloud-workstations`) | #1119 |
+| Any MCP or CLI provider (map written by an agent) | Mac, control plane | built | — | `Go/internal/controlplane/providers/drafts.go` | |
 | The misbehaving fake provider | control plane | walked on scratch | 2026-10-13, PR #862 | its tests | #857 |
 
 ## MCP and GitHub
@@ -114,11 +114,11 @@ Open issues: `is:open label:integration marketplace`.
 
 | Integration | Clients that show it | State | Last checked | Where | Gaps |
 | --- | --- | --- | --- | --- | --- |
-| GitHub MCP registry | Mac | built | — | `Packages/AgentsKit/Sources/AgentsKit/Catalog/MCPRegistryEndpoints.swift`, `Go/internal/agentsd/mcpcatalog/registry.go` | |
+| GitHub MCP registry | Mac | built | — | `Go/internal/agentsd/mcpcatalog/registry.go` | |
 | registry.modelcontextprotocol.io | Mac | built | — | `MCPRegistryEndpoints.swift`, `Go/internal/agentsd/mcpcatalog/registry.go` | |
 | skills.sh | Mac | built | — | `Go/internal/agentsd/catalog.go`, `App/Sources/Catalog/AddSkillSheet.swift` | |
 | GitHub skill and plugin sources | Mac | built | — | `Go/internal/agentsd/skillcatalog/github.go` | |
-| Custom marketplaces with a token | Mac | built | — | `Packages/AgentsKit/Sources/AgentsKit/Catalog/Marketplaces.swift`, `Go/internal/agentsd/skillcatalog/marketplaces.go` | |
+| Custom marketplaces with a token | Mac | built | — | `Go/internal/agentsd/skillcatalog/marketplaces.go` | |
 
 ## Notifications and links
 
@@ -150,7 +150,7 @@ Open issues: `is:open label:integration gateway`.
 
 | Integration | Clients that show it | State | Last checked | Where | Gaps |
 | --- | --- | --- | --- | --- | --- |
-| Environment variables passed through (Bedrock, Vertex, base URL) | Mac, server | built | — | `Packages/AgentsKit/Sources/AgentsKit/Store/RuntimeEnvironmentStore.swift`, `Go/internal/agentsd/runtimes.go` | #999 |
+| Environment variables passed through (Bedrock, Vertex, base URL) | Mac, server | built | — | `Go/internal/agentsd/runtimes.go` | #999 |
 | Org keys and gateways | — | planned | — | — | #999 |
 
 ## Planned (no code)

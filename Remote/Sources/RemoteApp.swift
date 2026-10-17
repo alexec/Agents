@@ -55,6 +55,14 @@ struct RemoteApp: App {
                           !model.pairedWithControlPlane, RemoteControl.link() == nil else { return }
                     await model.pair(scanned: args[at + 1])
                 }
+                // A link as a widget row or a banner opens it (#1367), without the system's
+                // "Open in Agents?" that `simctl openurl` raises and no walk can press.
+                .task {
+                    let args = ProcessInfo.processInfo.arguments
+                    guard args.contains("-walk"), let at = args.firstIndex(of: "-open"), at + 1 < args.count,
+                          let url = URL(string: args[at + 1]) else { return }
+                    model.openedFromTheWidget(url)
+                }
                 #endif
                 .onChange(of: model.pairedWithControlPlane) { _, paired in
                     guard paired else { return }

@@ -132,7 +132,7 @@ public final class ControlRelay: @unchecked Sendable {
     }
 
     static func hello(name: String) -> DaemonAPI.HostHello {
-        DaemonAPI.HostHello(version: Daemon.version, platform: "macOS relay",
+        DaemonAPI.HostHello(version: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "dev", platform: "macOS relay",
                             machineID: MachineID.current, name: name, relay: true)
     }
 

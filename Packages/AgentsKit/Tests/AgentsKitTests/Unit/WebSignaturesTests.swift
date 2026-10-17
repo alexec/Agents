@@ -15,6 +15,21 @@ struct WebSignaturesTests {
         #expect(Set(requests).isDisjoint(with: tools), "an agent's tool: \(Set(requests).intersection(tools))")
     }
 
+    /// Every method name in `DaemonAPI.Method`, read from its source.
+    static let everyMethod: [String] = {
+        let source = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("Sources/AgentsKitCore/Daemon/DaemonAPI.swift")
+        guard let text = try? String(contentsOf: source, encoding: .utf8),
+              let start = text.range(of: "public enum Method {"),
+              let end = text.range(of: "public enum Notification {") else { return [] }
+        let body = String(text[start.upperBound..<end.lowerBound])
+        let pattern = try! NSRegularExpression(pattern: #"static let \w+ = "([^"]+)""#)
+        return pattern.matches(in: body, range: NSRange(body.startIndex..., in: body)).compactMap {
+            Range($0.range(at: 1), in: body).map { String(body[$0]) }
+        }
+    }()
+
     @Test func noMethodIsListedTwice() {
         let methods = Rows.rows.map(\.method)
         #expect(methods.count == Set(methods).count)
@@ -23,7 +38,7 @@ struct WebSignaturesTests {
     @Test func notificationsAreNotRequests() {
         let notifications = Set(Rows.rows.filter { $0.kind == .hostNotification || $0.kind == .controlNotification }
             .map(\.method))
-        #expect(notifications.isDisjoint(with: Set(ControlGrantTests.everyMethod)))
+        #expect(notifications.isDisjoint(with: Set(Self.everyMethod)))
         #expect(notifications.contains(DaemonAPI.Notification.agentEntry))
     }
 

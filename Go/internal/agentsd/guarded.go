@@ -239,8 +239,14 @@ func (d *Daemon) guardedTurnEnded(id wire.UUID) {
 	}
 }
 
-// guardedChanges is a summary's: the changes waiting in a project, by path.
+// guardedChanges is a summary's: the changes waiting in a project, by path, then the
+// workflows waiting for an OK (#569, #1322).
 func (d *Daemon) guardedChanges(folder string) []wire.GuardedChange {
+	return append(d.guardedFileChanges(folder), d.waitingWorkflowChanges(folder)...)
+}
+
+// guardedFileChanges is the guarded files' changes waiting in a project, by path.
+func (d *Daemon) guardedFileChanges(folder string) []wire.GuardedChange {
 	d.guardedMu.Lock()
 	defer d.guardedMu.Unlock()
 	var out []wire.GuardedChange
@@ -365,6 +371,9 @@ func (d *Daemon) readGuardedChange(r wire.GuardedChangeRequest) (wire.GuardedCha
 	if _, ok := d.summaryFor(folder); !ok {
 		return wire.GuardedChangeReading{}, noSuchProject(folder + " is not a project.")
 	}
+	if id, ok := workflowIDInPath(r.Path); ok {
+		return d.readWorkflowChange(folder, id)
+	}
 	if _, ok := guardedFiles[r.Path]; !ok {
 		return wire.GuardedChangeReading{}, Invalid("%s is not a file the app keeps.", r.Path)
 	}
@@ -399,6 +408,9 @@ func (d *Daemon) keepOrUndo(r wire.GuardedChangeRequest, keep bool) (wire.Projec
 	folder := store.FolderPath(r.Folder)
 	if _, ok := d.summaryFor(folder); !ok {
 		return wire.ProjectSummary{}, noSuchProject(folder + " is not a project.")
+	}
+	if id, ok := workflowIDInPath(r.Path); ok {
+		return d.keepOrUndoWorkflow(folder, id, r.Digest, keep)
 	}
 	if _, ok := guardedFiles[r.Path]; !ok {
 		return wire.ProjectSummary{}, Invalid("%s is not a file the app keeps.", r.Path)
@@ -448,6 +460,8 @@ func (d *Daemon) registerGuarded() {
 		switch r.Kind {
 		case wire.ApprovalKindFile:
 			return d.readGuardedChange(wire.GuardedChangeRequest{Folder: r.Folder, Path: r.Key})
+		case wire.ApprovalKindWorkflow:
+			return d.readGuardedChange(wire.GuardedChangeRequest{Folder: r.Folder, Path: workflowChangePath(r.Key)})
 		case wire.ApprovalKindArchive:
 			return wire.GuardedChangeReading{}, Invalid("An archive request has nothing to read: open the session.")
 		case wire.ApprovalKindWorkflowFailed:
@@ -460,8 +474,8 @@ func (d *Daemon) registerGuarded() {
 	})
 }
 
-// answerApproval is approvals/answer for what this host asks: a file's change, and a
-// session asking to be archived.
+// answerApproval is approvals/answer for what this host asks: a file's change, a workflow
+// waiting for an OK, and a session asking to be archived.
 func (d *Daemon) answerApproval(r wire.ApprovalAnswer) (wire.ProjectSummary, error) {
 	folder := store.FolderPath(r.Folder)
 	if r.Action == wire.ApprovalActionDismiss {
@@ -491,6 +505,14 @@ func (d *Daemon) answerApproval(r wire.ApprovalAnswer) (wire.ProjectSummary, err
 			return s, nil
 		}
 		return d.keepOrUndo(wire.GuardedChangeRequest{Folder: r.Folder, Path: r.Key, Digest: r.Digest}, r.Action == wire.ApprovalActionApprove)
+	case wire.ApprovalKindWorkflow:
+		if r.Action == wire.ApprovalActionRequestChanges {
+			return wire.ProjectSummary{}, Invalid("No agent made this change, so there is nobody to ask. Approve or deny it.")
+		}
+		if _, ok := d.summaryFor(folder); !ok {
+			return wire.ProjectSummary{}, noSuchProject(folder + " is not a project.")
+		}
+		return d.answerWorkflow(folder, r.Key, r.Digest, r.Action == wire.ApprovalActionApprove)
 	case wire.ApprovalKindArchive:
 		id := wire.UUID(strings.ToUpper(r.Key))
 		a := d.Store.Agent(id)

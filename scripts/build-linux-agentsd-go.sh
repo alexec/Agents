@@ -1,8 +1,7 @@
 #!/bin/zsh
-# Build the Go Linux host (#1136), a Linux host's default, beside the Swift one: two static
-# binaries install.sh installs unless told `--impl swift` (Add a Server's "Install the Swift
-# host instead"). And the github (#1232) and linear (#839) MCP servers, which every Linux
-# host installs beside agentsd, Swift or Go.
+# Build the Linux host (#1136), Go: two static binaries install.sh installs (the Swift one went
+# in #1314). And the github (#1232) and linear (#839) MCP servers, which every Linux host
+# installs beside agentsd.
 #
 #   ./scripts/build-linux-agentsd-go.sh           # build both, copy into App/Resources/servers
 #   ./scripts/build-linux-agentsd-go.sh --check   # build both, copy nothing
@@ -16,7 +15,7 @@
 #   VERSION-go                       MARKETING_VERSION+CURRENT_PROJECT_VERSION, as VERSION
 #
 # Go runs through Go/scripts/go.sh (a container on this Mac): lease "build" first. It takes
-# seconds, not the Swift host's minutes, and needs no swift.org toolchain.
+# seconds and needs no swift.org toolchain.
 set -euo pipefail
 
 root=${0:A:h:h}

@@ -52,14 +52,14 @@ The schemes:
 | Scheme | What it builds |
 |---|---|
 | `AgentsStore` | the App Store window: sandboxed, no helpers, reaches everything through a control plane |
-| `AgentsHost` | Agents Host, carrying `agentsd`, `agents-control` and `agents-relay` |
+| `AgentsHost` | Agents Host, carrying `agentsd` and `agents-control` (Go, built from `Go/`) and `agents-relay` |
 | `Remote` | the iPhone and iPad app |
 
 The web page lives in `Web/`: Preact and TypeScript, bundled by esbuild. Its build,
 `Web/dist`, is not checked in: Agents Host's build makes it with the Node in
 `Web/.node-version`, writes a `MANIFEST` of hashes, and carries it. Without that Node, Agents
 Host still builds, with a warning, and serves no web page. Its protocol types,
-`Web/src/protocol/generated.ts`, are generated from the Swift source and checked in.
+`Web/src/protocol/generated.ts`, are generated from `Packages/Wire` and checked in.
 `scripts/web.sh` does all of it:
 
 ```sh
@@ -78,12 +78,13 @@ xcodebuild -scheme AgentsStore -destination 'platform=macOS' -skipPackagePluginV
 xcodebuild -scheme AgentsHost -destination 'platform=macOS' -skipPackagePluginValidation build
 xcodebuild -scheme Remote -destination 'generic/platform=iOS Simulator' -skipPackagePluginValidation build
 swift test --package-path Packages/AgentsKit
-swift test --package-path Packages/ControlPlane
+Go/scripts/go.sh test ./...
 ```
 
-Build the schemes one after another, not at once. The Linux programs are cross-built on
-the Mac, with the swift.org toolchain and Static Linux SDK that match Xcode's Swift:
-`scripts/build-linux-agentsd.sh` for a server's host, and `scripts/build-linux-control.sh`
+Build the schemes one after another, not at once. `agentsd` and `agents-control` are Go
+(`Go/`, see `Go/README.md`): Agents Host's build makes them with Go in a container, so it
+needs Docker running (or Go installed). The Linux programs are built the same way:
+`scripts/build-linux-agentsd-go.sh` for a server's host, and `scripts/build-linux-control.sh`
 for the control plane's container. `deploy/` runs three copies of the control plane over
 MinIO behind Caddy, for trying it out; see `deploy/README.md`.
 
