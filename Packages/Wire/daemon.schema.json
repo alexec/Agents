@@ -5425,6 +5425,31 @@
         "notThisHost"
       ]
     },
+    "MacPathRequest": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string"
+        },
+        "app": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "path"
+      ],
+      "additionalProperties": false
+    },
+    "MacTerminalRequest": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string"
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    },
     "MarkRuntimeAvailable": {
       "type": "object",
       "properties": {
@@ -5956,6 +5981,19 @@
         "name",
         "agentID"
       ],
+      "additionalProperties": false
+    },
+    "PersonSettings": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "pronouns": {
+          "type": "string"
+        }
+      },
+      "required": [],
       "additionalProperties": false
     },
     "Persona": {
@@ -10193,6 +10231,63 @@
         "title",
         "folder",
         "status"
+      ],
+      "additionalProperties": false
+    },
+    "WakeSettings": {
+      "type": "object",
+      "properties": {
+        "keepsAwake": {
+          "type": "boolean"
+        },
+        "graceHours": {
+          "type": "integer"
+        },
+        "warmRuntimes": {
+          "type": "integer"
+        },
+        "awakeOnPower": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "keepsAwake",
+        "graceHours",
+        "warmRuntimes",
+        "awakeOnPower"
+      ],
+      "additionalProperties": false
+    },
+    "WakeState": {
+      "type": "object",
+      "properties": {
+        "isHolding": {
+          "type": "boolean"
+        },
+        "agentsInFlight": {
+          "type": "integer"
+        },
+        "heldBackByBattery": {
+          "type": "boolean"
+        },
+        "batteryPercent": {
+          "type": "integer"
+        },
+        "since": {
+          "$ref": "#/definitions/WireDate"
+        },
+        "graceUntil": {
+          "$ref": "#/definitions/WireDate"
+        },
+        "onPower": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "isHolding",
+        "agentsInFlight",
+        "heldBackByBattery",
+        "onPower"
       ],
       "additionalProperties": false
     },

@@ -1360,6 +1360,15 @@ export interface MCPTriggerStatus {
 
 export type MCPTriggerStatusState = "pending" | "active" | "retrying" | "stopped" | "notThisHost";
 
+export interface MacPathRequest {
+  path: string;
+  app?: string;
+}
+
+export interface MacTerminalRequest {
+  path?: string;
+}
+
 export interface MarkRuntimeAvailable {
   credentialKey: string;
 }
@@ -1464,6 +1473,11 @@ export interface PersonEndRequest {
 export interface PersonRemoveRequest {
   name: string;
   agentID: string;
+}
+
+export interface PersonSettings {
+  name?: string;
+  pronouns?: string;
 }
 
 export interface Persona {
@@ -2397,6 +2411,23 @@ export interface WaitingAgent {
   status: WaitStatus;
 }
 
+export interface WakeSettings {
+  keepsAwake: boolean;
+  graceHours: number;
+  warmRuntimes: number;
+  awakeOnPower: boolean;
+}
+
+export interface WakeState {
+  isHolding: boolean;
+  agentsInFlight: number;
+  heldBackByBattery: boolean;
+  batteryPercent?: number;
+  since?: WireDate;
+  graceUntil?: WireDate;
+  onPower: boolean;
+}
+
 export interface WebRemoteStatus {
   port: number;
   served: boolean;
@@ -3090,6 +3121,8 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   MCPServerHealth: { required: ["name", "transport", "hosted", "check"], optional: ["project", "live", "checkedAt", "lastError", "tools"] },
   MCPTriggerFailure: { required: ["code", "message", "since"], optional: [] },
   MCPTriggerStatus: { required: ["name", "state"], optional: ["server", "lastPolledAt", "lastEventAt", "missedSince", "failure", "retryAt"] },
+  MacPathRequest: { required: ["path"], optional: ["app"] },
+  MacTerminalRequest: { required: [], optional: ["path"] },
   MarkRuntimeAvailable: { required: ["credentialKey"], optional: [] },
   MessageSender: { required: ["agentID", "title"], optional: [] },
   Milestones: { required: ["earned"], optional: [] },
@@ -3104,6 +3137,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   PermissionRequest: { required: ["id", "agentID", "toolCall", "options", "askedAt"], optional: ["subagent"] },
   PersonEndRequest: { required: ["name"], optional: ["agentID"] },
   PersonRemoveRequest: { required: ["name", "agentID"], optional: [] },
+  PersonSettings: { required: [], optional: ["name", "pronouns"] },
   Persona: { required: ["id", "name", "origin", "settings"], optional: ["description", "problem"] },
   PersonasListRequest: { required: ["folder"], optional: [] },
   PinArrangeRequest: { required: ["folder", "paths"], optional: [] },
@@ -3223,6 +3257,8 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   WaitServerEvent: { required: ["trigger", "servers"], optional: [] },
   WaitStatus: { required: ["line", "mark", "cancellable"], optional: [] },
   WaitingAgent: { required: ["agentID", "title", "folder", "status"], optional: [] },
+  WakeSettings: { required: ["keepsAwake", "graceHours", "warmRuntimes", "awakeOnPower"], optional: [] },
+  WakeState: { required: ["isHolding", "agentsInFlight", "heldBackByBattery", "onPower"], optional: ["batteryPercent", "since", "graceUntil"] },
   WebRemoteStatus: { required: ["port", "served"], optional: ["reason", "detail"] },
   WorkReport: { required: ["outcome", "message", "at"], optional: ["block"] },
   Workflow: { required: ["workflowID", "folder", "name", "triggers", "mode", "prompt", "unknownFields", "settings"], optional: ["problem", "cooldown", "enabled", "archived", "hosts", "whenDone"] },

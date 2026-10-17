@@ -59,6 +59,8 @@ type Daemon struct {
 	recoveryState
 	projectState
 	guardedStateHolder
+	// awake keeps a Mac awake while agents work (wake_darwin.go); nil off a Mac.
+	awake *wakeKeeper
 	// SettingsDir is the person's settings on this host (StoreLocations.personalSettings):
 	// <root>/settings, or $HOME/.agents/settings for a server, as the Swift host's --serve.
 	SettingsDir string
@@ -154,6 +156,9 @@ func (d *Daemon) Shutdown() {
 	d.allowMu.Unlock()
 	d.stopEventWaits()
 	d.stopShells()
+	if d.awake != nil {
+		d.awake.shutDown()
+	}
 	d.waitForMilestones()
 }
 

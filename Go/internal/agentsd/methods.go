@@ -40,6 +40,9 @@ func (d *Daemon) register() {
 	d.registerRuntimeAuth()
 	d.registerWorkflows()
 	d.registerShells()
+	d.registerPerson()
+	d.registerWake()
+	d.registerMacVerbs()
 	On(d, wire.CallPermissionsPending, func(ctx context.Context, c *Client, _ wire.Empty) ([]wire.PermissionRequest, error) {
 		return d.pendingPermissions(), nil
 	})

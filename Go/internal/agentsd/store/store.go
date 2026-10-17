@@ -223,6 +223,19 @@ func (s *Store) Agent(id wire.UUID) *wire.Agent {
 	return &c
 }
 
+// CountAgents is how many agents in memory match, copying none: for a check made often.
+func (s *Store) CountAgents(match func(*wire.Agent) bool) int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	n := 0
+	for _, a := range s.agents {
+		if match(a) {
+			n++
+		}
+	}
+	return n
+}
+
 // Agents is every record, newest activity first.
 func (s *Store) Agents() []wire.Agent {
 	s.mu.Lock()

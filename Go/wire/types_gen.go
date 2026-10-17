@@ -1748,6 +1748,15 @@ const (
 	MCPTriggerStatusStateNotThisHost MCPTriggerStatusState = "notThisHost"
 )
 
+type MacPathRequest struct {
+	Path string  `json:"path"`
+	App  *string `json:"app,omitzero"`
+}
+
+type MacTerminalRequest struct {
+	Path *string `json:"path,omitzero"`
+}
+
 type MarkRuntimeAvailable struct {
 	CredentialKey string `json:"credentialKey"`
 }
@@ -1911,6 +1920,11 @@ type PersonEndRequest struct {
 type PersonRemoveRequest struct {
 	Name    string `json:"name"`
 	AgentID string `json:"agentID"`
+}
+
+type PersonSettings struct {
+	Name     *string `json:"name,omitzero"`
+	Pronouns *string `json:"pronouns,omitzero"`
 }
 
 type Persona struct {
@@ -3204,6 +3218,23 @@ type WaitingAgent struct {
 	Title   string     `json:"title"`
 	Folder  URL        `json:"folder"`
 	Status  WaitStatus `json:"status"`
+}
+
+type WakeSettings struct {
+	KeepsAwake   bool  `json:"keepsAwake"`
+	GraceHours   int64 `json:"graceHours"`
+	WarmRuntimes int64 `json:"warmRuntimes"`
+	AwakeOnPower bool  `json:"awakeOnPower"`
+}
+
+type WakeState struct {
+	IsHolding         bool   `json:"isHolding"`
+	AgentsInFlight    int64  `json:"agentsInFlight"`
+	HeldBackByBattery bool   `json:"heldBackByBattery"`
+	BatteryPercent    *int64 `json:"batteryPercent,omitzero"`
+	Since             *Date  `json:"since,omitzero"`
+	GraceUntil        *Date  `json:"graceUntil,omitzero"`
+	OnPower           bool   `json:"onPower"`
 }
 
 type WebRemoteStatus struct {

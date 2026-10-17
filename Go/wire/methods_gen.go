@@ -71,6 +71,9 @@ var (
 	CallLeasesRelease                  = Method[LeaseNameRequest, LeaseNote]{"leases/release"}
 	CallLeasesRemoveWaiter             = Method[PersonRemoveRequest, LeaseSnapshot]{"leases/removeWaiter"}
 	CallLeasesSnapshot                 = Method[Empty, LeaseSnapshot]{"leases/snapshot"}
+	CallMacOpen                        = Method[MacPathRequest, Empty]{"mac/open"}
+	CallMacReveal                      = Method[MacPathRequest, Empty]{"mac/reveal"}
+	CallMacTerminal                    = Method[MacTerminalRequest, Empty]{"mac/terminal"}
 	CallMailboxCarry                   = Method[Empty, Empty]{"mailbox/carry"}
 	CallMCPHealth                      = Method[Empty, MCPHealthSnapshot]{"mcp/health"}
 	CallMCPHealthCheck                 = Method[MCPHealthCheckRequest, MCPHealthSnapshot]{"mcp/health/check"}
@@ -80,6 +83,8 @@ var (
 	CallOptionsRemembered              = Method[RememberedOptionsRequest, []ConfigOption]{"options/remembered"}
 	CallPermissionsAnswer              = Method[AnswerRequest, Empty]{"permissions/answer"}
 	CallPermissionsPending             = Method[Empty, []PermissionRequest]{"permissions/pending"}
+	CallPersonSet                      = Method[PersonSettings, PersonSettings]{"person/set"}
+	CallPersonState                    = Method[Empty, PersonSettings]{"person/state"}
 	CallPersonasList                   = Method[PersonasListRequest, []Persona]{"personas/list"}
 	CallPinsArrange                    = Method[PinArrangeRequest, Empty]{"pins/arrange"}
 	CallPinsArrangeSessions            = Method[PinArrangeSessionsRequest, Empty]{"pins/arrangeSessions"}
@@ -146,6 +151,9 @@ var (
 	CallViewsLog                       = Method[ViewLogRequest, Empty]{"views/log"}
 	CallViewsRead                      = Method[ViewReadRequest, ViewResource]{"views/read"}
 	CallViewsShow                      = Method[ViewShowRequest, Empty]{"views/show"}
+	CallWakeSet                        = Method[WakeSettings, WakeSettings]{"wake/set"}
+	CallWakeSettings                   = Method[Empty, WakeSettings]{"wake/settings"}
+	CallWakeState                      = Method[Empty, WakeState]{"wake/state"}
 	CallWorkflowsApprove               = Method[WorkflowApproveRequest, WorkflowSummary]{"workflows/approve"}
 	CallWorkflowsArchive               = Method[WorkflowArchiveRequest, WorkflowSummary]{"workflows/archive"}
 	CallWorkflowsDelete                = Method[WorkflowRequest, Empty]{"workflows/delete"}
@@ -180,6 +188,7 @@ var (
 	NotifyMilestonesChanged            = Notification[Milestones]{"milestones/changed"}
 	NotifyModesChanged                 = Notification[map[string]JSONValue]{"modes/changed"}
 	NotifyPagesChanged                 = Notification[PagesChangedNotification]{"pages/changed"}
+	NotifyPersonChanged                = Notification[PersonSettings]{"person/changed"}
 	NotifyPinsChanged                  = Notification[PinsChangedNotification]{"pins/changed"}
 	NotifyPreferencesChanged           = Notification[map[string]JSONValue]{"preferences/changed"}
 	NotifyProjectChanged               = Notification[ProjectSummary]{"project/changed"}
@@ -190,6 +199,7 @@ var (
 	NotifyShellStateChanged            = Notification[ShellStateNotification]{"shell/stateChanged"}
 	NotifyStorageWriteFailed           = Notification[WriteFailure]{"storage/writeFailed"}
 	NotifyStoreNotesChanged            = Notification[StoreNotes]{"store/notesChanged"}
+	NotifyWakeChanged                  = Notification[WakeState]{"wake/changed"}
 	NotifyWorkflowChanged              = Notification[WorkflowSummary]{"workflow/changed"}
 	NotifyWorkflowRemoved              = Notification[WorkflowRemovedNotification]{"workflow/removed"}
 	NotifyWorktreesSized               = Notification[WorktreesSized]{"worktrees/sized"}
