@@ -39,7 +39,7 @@ The spike's stage 3 proved that one JSON Schema carries every shape on the wire,
 ### Also needed, not methods
 
 - **Behaviour the window depends on:** lean `agent/changed`, `agent/entry` only to a client that shows the agent, fan-out frames (#167), turn summaries (`agents/turns`), `files/changed` with watches, and resuming agents after a restart (`session/resume`/`load`). M in total.
-- **The toolset installer** on a control-plane host, which nothing does today in Swift or in Go (report, stage 1). M.
+- **The toolset installer** on a control-plane host (report, stage 1). Done in Go: `hosts/install` puts Claude's toolset on the server before the host starts, as the window's `ToolsetInstaller` does (043); a server with no xz, curl or wget gets Node from the control plane, checked against the same pin.
 - **Elicitations** over ACP (question cards). S–M; `acp-go-sdk` has the types.
 - **Tests:** port the daemon's behaviour tests that cover what a server host does. L, and the part that sets the pace.
 

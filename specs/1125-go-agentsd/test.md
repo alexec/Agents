@@ -86,7 +86,7 @@ In the window (its title has `run-go1125m`):
 - **Hosted MCP.** No approval by digest; no restart of a crashed server; tools only (no resources or prompts).
 - **Landlock and sandbox-exec.** The paths are fixed, not set per agent. No `sandboxFailure` record.
 - **Workflows.** Only `new` mode, no queue, no cooldown, no approval. The event triggers are listed but never fire.
-- **Toolsets.** They are installed by hand (`devbox.sh tools`), as nothing installs them on a control-plane host today.
+- **Toolsets.** The Go control plane's `hosts/install` puts Claude's on (#1136). The Swift control plane does not, so a host it installs still needs `devbox.sh tools`.
 
 ## Clean up
 

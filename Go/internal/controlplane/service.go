@@ -53,6 +53,8 @@ type Config struct {
 	HostJoinFile string
 	// Where the Linux hosts it hands out are (ServerFiles.folder).
 	ServerFolder string
+	// Where the runtimes' toolsets hosts/install puts on a server are (#1136): "" puts none.
+	ToolsetFolder string
 	// The web remote's loopback listener (071): Web/dist and the port, or nil for none,
 	// which is a container's default.
 	Web *WebConfig
@@ -172,6 +174,8 @@ func New(cfg Config) (*Service, error) {
 		tunnels = s.tunnels
 	}
 	s.installer = &hostinstall.Installer{Codes: s.codes, ServerFolder: cfg.ServerFolder,
+		ToolsetFolder: cfg.ToolsetFolder,
+		Log:           func(format string, args ...any) { s.log(fmt.Sprintf(format, args...)) },
 		Progress: func(name, step string) {
 			s.router.BroadcastControl("control/installProgress", map[string]string{"name": name, "step": step})
 		},

@@ -207,6 +207,29 @@ func ServerFolder() string {
 	return ""
 }
 
+// ToolsetFolder is where the runtimes' toolsets are read for hosts/install (#1136):
+// AGENTS_CONTROL_TOOLSETS, the app bundle's Resources/toolsets beside
+// Helpers/agents-control, or a container's /toolsets; the first with a Claude manifest.
+func ToolsetFolder() string {
+	var candidates []string
+	if given := os.Getenv("AGENTS_CONTROL_TOOLSETS"); given != "" {
+		candidates = append(candidates, given)
+	}
+	if exe, err := os.Executable(); err == nil {
+		if real, err := filepath.EvalSymlinks(exe); err == nil {
+			exe = real
+		}
+		candidates = append(candidates, filepath.Join(filepath.Dir(filepath.Dir(exe)), "Resources", "toolsets"))
+	}
+	candidates = append(candidates, "/toolsets")
+	for _, c := range candidates {
+		if _, err := os.Stat(filepath.Join(c, "claude", "manifest.json")); err == nil {
+			return c
+		}
+	}
+	return ""
+}
+
 // serverFile is ServerFiles.read: a file by name, from the folder, never a path the
 // request made up.
 func serverFile(name, folder string) ([]byte, bool) {
