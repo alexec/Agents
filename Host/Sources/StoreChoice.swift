@@ -40,6 +40,10 @@ struct HostSettings: Codable, Sendable, Equatable {
     /// one until Alex switches; absent, or anything else, for the Swift one. Not in the
     /// window: set in `host.json`, and the control plane restarted.
     var controlImplementation: String?
+    /// Which `agentsd` runs this Mac's host (#1138): `"go"` for the Go one, carried beside the
+    /// Swift one for a release; absent, or anything else, for the Swift one. Not in the
+    /// window: set in `host.json`, and the host restarted. Both serve the same root.
+    var daemonImplementation: String?
 
     /// This Mac's entry in `host.json`: its Bonjour name, which the person sees in Sharing.
     private static func key(_ paths: HostPaths) -> String {

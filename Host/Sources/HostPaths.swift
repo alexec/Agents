@@ -109,5 +109,15 @@ struct HostPaths: Sendable, Equatable {
     /// The built web remote, Web/dist, built and copied in by project.yml (071 research R8, #473).
     var webRemote: URL { Bundle.main.bundleURL.appendingPathComponent("Contents/Resources/dist", isDirectory: true) }
     var agentsd: URL { helpers.appendingPathComponent("agentsd") }
+    /// The Go `agentsd` (#1138), when this build carries one.
+    var agentsdGo: URL { helpers.appendingPathComponent("agentsd-go") }
+
+    /// The `agentsd` the settings pick: the Go one only when asked for and carried,
+    /// otherwise the Swift one. Both read and write the same root.
+    func agentsd(for settings: HostSettings) -> URL {
+        guard settings.daemonImplementation == "go",
+              FileManager.default.isExecutableFile(atPath: agentsdGo.path) else { return agentsd }
+        return agentsdGo
+    }
     var agentsRelay: URL { helpers.appendingPathComponent("agents-relay.app/Contents/MacOS/agents-relay") }
 }

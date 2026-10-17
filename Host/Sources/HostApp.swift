@@ -5,11 +5,13 @@ import SwiftUI
 /// itself is in launch agents that keep running with the app closed.
 ///
 /// The same program is the control plane's launcher: started by launchd with
-/// `--launch-control`, it hands the key over and becomes `agents-control`.
+/// `--launch-control`, it hands the key over and becomes `agents-control`. With
+/// `--launch-daemon` it becomes this Mac's `agentsd`, the Swift or the Go one (#1138).
 @main
 enum HostEntry {
     static func main() {
         if CommandLine.arguments.contains(ControlLauncher.argument) { ControlLauncher.run() }
+        if CommandLine.arguments.contains(DaemonLauncher.argument) { DaemonLauncher.run() }
         // What's wrong with the login items, for a bug report, with no window (#678).
         if CommandLine.arguments.contains(HostDiagnostics.argument) { HostDiagnostics.runFromCommandLine() }
         // With no window server to reach (an agent's sandbox, ssh, a launchd job outside
