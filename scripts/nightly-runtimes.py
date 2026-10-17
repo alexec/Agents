@@ -4,7 +4,7 @@
 Run by the nightly-runtimes workflow (.agents/workflows/nightly-runtimes.md), one phase at a
 time, so the agent running it can hold the "build" lease around the one phase that builds:
 
-  nightly-runtimes.py plan   [--available claude,codex,…] [--runtimes …] [--force]
+  nightly-runtimes.py plan   [--available claude,codex,…] [--runtimes …] [--force] [--assess]
   nightly-runtimes.py build  [RUN]        xcodebuild Agents Host + the runtime tests  (lease "build")
   nightly-runtimes.py check  [RUN] [--assess]  handshake, tools, one real turn (+ #47's assessment)
   nightly-runtimes.py report [RUN] [--dry-run]
@@ -20,7 +20,8 @@ plan     Checks out --base (default main, this Mac's own: origin/main can be day
          earlier night. A runtime not in --available (the app's pool, #117) is skipped and
          said so. A pinned runtime is re-pinned in the tree with scripts/update-toolset.sh,
          and each new pin is kept in the run, so later phases can test pins one at a time.
-         Prints "Nothing changed." and nothing else when nothing is to be tested.
+         Prints "Nothing changed." and nothing else when nothing is to be tested. With
+         --assess, a runtime with no new release is tested too, only to be assessed (#1284).
 build    xcodegen + xcodebuild -scheme AgentsHost into <home>/tree/build/DD, then the
          AgentsKit runtime tests, all with every new pin in place. Both run on the base as it
          was too: what already fails there is "already failing on main", and no runtime's
@@ -33,12 +34,19 @@ check    Starts a scratch host on that build (the run-app skill's launch.sh --no
          turn through agentsd on the cheapest model the runtime offers. With --assess, a
          runtime whose turn passed is then assessed (#47, the assess-runtime skill): an agent
          on it works through the app's tools and the daemon scores it. Off by default: it
-         takes about five minutes a runtime. Stops the host.
+         takes about five minutes a runtime. The agent's own report is kept in the run.
+         Stops the host.
 report   A pinned runtime that passed every step: one PR per runtime, on the branch
          nightly/runtime-<id> off origin/main (only its toolset folder changes), opened or
          updated. A runtime that failed a step: one issue per runtime, opened or commented
          on, with the version, the step and its output; runtimes that failed the same step for
          the same cause share one issue. What already fails on main is listed, never filed.
+         An assessment step that failed fails the runtime only when it did not fail last
+         time; one that failed last time too is listed, not filed again. Then one PR on
+         nightly/runtime-assessments off origin/main, with auto-merge: a record per runtime
+         tested in .agents/reviews/runtimes/<runtime>-<date>.md, and each runtime's State and
+         Last checked in docs/reference/integrations.md (#1283). A runtime skipped keeps its
+         last check, with a note of why it was skipped.
          --dry-run prints what it would do and opens, pushes and records nothing.
 
 Runtimes the person installs (Grok, Copilot, Cursor) are never updated here: the app runs
@@ -57,6 +65,7 @@ import sys
 import tempfile
 import time
 import urllib.request
+from urllib.parse import unquote, urlparse
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DEFAULT_HOME = os.environ.get("AGENTS_NIGHTLY_HOME") or os.path.expanduser(
@@ -250,11 +259,15 @@ def plan(args):
         entry["to"] = latest
         entry["from"] = pinned_version(tree, rid) if spec["kind"] != "installed" else state.get(rid, {}).get("version")
         tested = state.get(rid, {}).get("version")
-        if not args.force and (latest == entry["from"] and spec["kind"] != "installed" or latest == tested):
+        unchanged = latest == entry["from"] and spec["kind"] != "installed" or latest == tested
+        if unchanged and not args.force and not args.assess:
             entry["status"] = "unchanged"
             continue
         entry["status"] = "testing"
-        if spec["kind"] != "installed":
+        if unchanged and args.assess:
+            # Nothing to update: tested only to be assessed, and never re-pinned (#1284).
+            entry["assess_only"] = True
+        elif spec["kind"] != "installed":
             ok, out = repin(tree, rid, latest, env)
             entry["steps"]["update"] = {"ok": ok, "output": tail(out)}
             if not ok:
@@ -275,7 +288,9 @@ def plan(args):
     else:
         print(f"run {run}")
     for rid, entry in record["runtimes"].items():
-        if entry["status"] == "testing":
+        if entry["status"] == "testing" and entry.get("assess_only"):
+            print(f"  {rid}: {entry['to']}, unchanged, to assess")
+        elif entry["status"] == "testing":
             print(f"  {rid}: {entry.get('from') or 'untested'} → {entry['to']}, to test")
         elif entry["status"] == "failed":
             print(f"  {rid}: {entry.get('from')} → {entry['to']}, update FAILED")
@@ -367,10 +382,14 @@ def build(args):
     status, out = xcodebuild(tree)
     with open(os.path.join(run, "build.log"), "w") as f:
         f.write(out)
-    if status != 0 and pins:
-        # Is it the pins, or does the base not build either?
-        use_pins(tree, run, [])
-        base_status, base_out = xcodebuild(tree)
+    if status != 0:
+        # Is it the pins, or does the base not build either? With no pin new (only assessing),
+        # what was built is the base.
+        if pins:
+            use_pins(tree, run, [])
+            base_status, base_out = xcodebuild(tree)
+        else:
+            base_status, base_out = status, out
         with open(os.path.join(run, "build-baseline.log"), "w") as f:
             f.write(base_out)
         if base_status != 0:
@@ -552,16 +571,28 @@ def assess_client(tree):
     return module
 
 
-def assessment(tree, client, root, rid):
-    """(ok, the daemon's table) for one runtime, assessed unattended on the scratch root."""
+def assessment(tree, client, root, rid, run):
+    """(ok, the daemon's table, each step's verdict) for one runtime, assessed unattended on
+    the scratch root. The agent's own report is copied into the run, as the root goes."""
     module = assess_client(tree)
     result = module.assess(client, rid, os.path.join(root, "work"), 20)
     if "skipped" in result:
-        return False, "not started: " + result["skipped"]
+        return False, "not started: " + result["skipped"], {START: "failed"}
     checks = result["score"]["checks"]
+    report = result.get("reportPath") or ""
+    if report.startswith("file://"):
+        report = unquote(urlparse(report).path)
+    if report and os.path.isfile(report):
+        os.makedirs(os.path.join(run, "assessments"), exist_ok=True)
+        shutil.copyfile(report, os.path.join(run, "assessments", f"{rid}.md"))
     ok = not any(c["verdict"] == "failed" for c in checks)
     passed = sum(c["verdict"] == "passed" for c in checks)
-    return ok, f"{passed} of {len(checks)} passed, ended {result['outcome']}\n\n" + module.table(result["score"])
+    return (ok, f"{passed} of {len(checks)} passed, ended {result['outcome']}\n\n" + module.table(result["score"]),
+            {c["id"]: c["verdict"] for c in checks})
+
+
+# The verdict kept for an assessment that never started.
+START = "(start)"
 
 
 def check(args):
@@ -624,12 +655,13 @@ def check(args):
                 entry["status"] = "failed"
             elif args.assess:
                 try:
-                    ok, out = assessment(tree, client, root, rid)
+                    ok, out, verdicts = assessment(tree, client, root, rid, run)
                 except Exception as e:
-                    ok, out = False, f"{type(e).__name__}: {e}"
-                steps["assess"] = {"ok": ok, "output": tail(out)}
-                if not ok:
-                    entry["status"] = "failed"
+                    ok, out, verdicts = False, f"{type(e).__name__}: {e}", {START: "failed"}
+                # Whether a failed step fails the runtime is report's to say: only a step that
+                # did not fail last time does (#1284).
+                steps["assess"] = {"ok": ok, "output": out if len(out) <= 3 * OUTPUT_LIMIT else tail(out),
+                                   "verdicts": verdicts}
             print(f"{rid}: " + ", ".join(f"{s} {'ok' if v['ok'] else 'FAILED'}" for s, v in steps.items()))
     finally:
         save(os.path.join(run, "run.json"), record)
@@ -757,6 +789,157 @@ def open_shared_issue(record, rids, dry_run):
     return file_issue(prefix, title, body, dry_run)
 
 
+# ---- assessments and the integrations page (#1284) ---------------------------------------
+
+REVIEWS = ".agents/reviews/runtimes"
+PAGE = "docs/reference/integrations.md"
+ASSESSMENTS_BRANCH = "nightly/runtime-assessments"
+
+
+def regressions(entry, previous):
+    """The assessment's steps that failed tonight and did not fail last time: only these open
+    an issue. A step that failed last time too is known, and listed instead."""
+    verdicts = (entry["steps"].get("assess") or {}).get("verdicts") or {}
+    previous = previous or {}
+    return sorted(step for step, verdict in verdicts.items()
+                  if verdict == "failed" and previous.get(step) != "failed")
+
+
+def run_date(record):
+    return record["started"][:10]
+
+
+def review_path(record, rid):
+    return f"{REVIEWS}/{rid}-{run_date(record)}.md"
+
+
+def review(run, record, rid, entry):
+    """The record of one runtime's check, for .agents/reviews/runtimes/<runtime>-<date>.md."""
+    spec = RUNTIMES[rid]
+    change = (f"{entry['to']}, unchanged" if entry.get("assess_only")
+              else f"{entry.get('from') or '(untested)'} → {entry['to']}")
+    parts = [f"# {spec['name']} {entry['to']}, {run_date(record)} (weekly runtime check)",
+             f"{change}, on {base_name(record)}, run {record['started']}, by `scripts/nightly-runtimes.py` "
+             f"(#39, #1284).", steps_table(entry), "## Assessment (#47)"]
+    assess = entry["steps"].get("assess")
+    if assess:
+        parts.append(assess["output"])
+        if entry.get("known"):
+            parts.append("Failed last time too, so no issue was opened: "
+                         + ", ".join(f"`{s}`" for s in entry["known"]) + ".")
+        own = os.path.join(run, "assessments", f"{rid}.md")
+        if os.path.isfile(own):
+            with open(own) as f:
+                # Its headings go under this one.
+                own_text = re.sub(r"^(#+) ", r"##\1 ", f.read().strip(), flags=re.M)
+                parts += ["## The agent's own report", own_text]
+    else:
+        step = first_failure(entry)
+        parts.append(f"Not assessed: it failed at {step}." if step else "Not assessed: run without `--assess`.")
+        if step:
+            parts.append(f"```\n{entry['steps'][step]['output']}\n```")
+    return "\n\n".join(parts) + "\n"
+
+
+def row_for(record, rid, entry):
+    """(state, last checked) for a runtime that was tested."""
+    assess = entry["steps"].get("assess")
+    verdicts = (assess or {}).get("verdicts") or {}
+    failed = sorted(s for s, v in verdicts.items() if v == "failed")
+    step = first_failure(entry)
+    if step and step != "assess":
+        state, what = f"broken (fails at {step})", f"failed at {step}"
+    elif assess:
+        what = "assessment: " + assess["output"].splitlines()[0].split(", ended")[0]
+        state = ("broken (" + ", ".join(f"`{s}`" for s in failed) + " failed)") if failed else "tested on a real account"
+    else:
+        state, what = "tested on a real account", "a real turn passed, not assessed"
+    return state, f"{run_date(record)}, {entry['to']}: {what}, in `{review_path(record, rid)}`"
+
+
+def skipped_cell(cell, date, why):
+    """The last check kept, with a note of tonight's skip in place of any earlier one."""
+    kept = re.sub(r"\s*\(skipped \d{4}-\d\d-\d\d: .*\)\s*$", "", cell).strip()
+    if kept.startswith("—"):
+        kept = "—"
+    return f"{kept} (skipped {date}: {why})"
+
+
+def update_rows(text, record, rows):
+    """Rewrite the State and Last checked cells of these runtimes, between the page's
+    runtimes markers; every other cell and row is left as it was."""
+    begin, end = text.find("<!-- runtimes:begin -->"), text.find("<!-- runtimes:end -->")
+    if begin < 0 or end < begin:
+        raise ValueError(f"{PAGE} has no runtimes markers")
+    names = {RUNTIMES[rid]["name"]: rid for rid in rows}
+    lines = text[begin:end].split("\n")
+    for i, line in enumerate(lines):
+        cells = [c.strip() for c in line.strip().strip("|").split("|")]
+        if len(cells) != 6 or cells[0] not in names:
+            continue
+        kind, value = rows[names[cells[0]]]
+        if kind == "skipped":
+            cells[3] = skipped_cell(cells[3], run_date(record), value)
+        else:
+            cells[2], cells[3] = value
+        lines[i] = "|" + "".join(f" {c} |" if c else " |" for c in cells)
+    return text[:begin] + "\n".join(lines) + text[end:]
+
+
+def open_assessments_pr(run, record, reviews, rows, dry_run):
+    """One PR, off origin/main, with tonight's review files and the integrations page's
+    runtime rows. Docs only, so it merges on its own once green."""
+    if not reviews and not rows:
+        return None
+    date = run_date(record)
+    work = tempfile.mkdtemp(prefix="nightly-assessments-")
+    os.rmdir(work)
+    sh(["git", "-C", REPO, "worktree", "add", "-q", "--detach", work, "origin/main"], check=True)
+    try:
+        for path, text in reviews.items():
+            os.makedirs(os.path.dirname(os.path.join(work, path)), exist_ok=True)
+            with open(os.path.join(work, path), "w") as f:
+                f.write(text)
+        page = os.path.join(work, PAGE)
+        if rows and os.path.isfile(page):
+            with open(page) as f:
+                text = f.read()
+            with open(page, "w") as f:
+                f.write(update_rows(text, record, rows))
+        sh(["git", "-C", work, "add", "-A", "--", REVIEWS, PAGE], check=True)
+        if sh(["git", "-C", work, "diff", "--cached", "--quiet"])[0] == 0:
+            print("  assessments: nothing new for the integrations page")
+            return None
+        title = f"Weekly runtime check {date}: assessments and the integrations page"
+        each = "\n".join(f"- {RUNTIMES[rid]['name']}: " + (f"skipped, {value}" if kind == "skipped" else
+                         f"{value[0]}; {value[1]}") for rid, (kind, value) in rows.items())
+        message = (f"{title} (#1284)\n\n{each}\n\nmac: docs only, remote: docs only, web: docs only\n\n"
+                   f"Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>")
+        sh(["git", "-C", work, "commit", "-q", "-m", message], check=True)
+        print("  " + sh(["git", "-C", work, "show", "--stat", "--format=%h %s", "HEAD"])[1].strip().replace("\n", "\n  "))
+        if dry_run:
+            print("  " + sh(["git", "-C", work, "show", "--format=", "HEAD", "--", PAGE])[1].strip().replace("\n", "\n  "))
+        body = (f"The weekly runtime check (#39, #1284) on {base_name(record)}, run {record['started']}: one "
+                f"record per runtime tested in `{REVIEWS}/`, and the runtime rows of `{PAGE}`.\n\n{each}\n\n"
+                f"mac: docs only, remote: docs only, web: docs only\n\n"
+                f"🤖 Generated with [Claude Code](https://claude.com/claude-code)")
+        status, _ = do(["git", "-C", work, "push", "-f", "-q", "origin", f"HEAD:refs/heads/{ASSESSMENTS_BRANCH}"], dry_run)
+        if status != 0:
+            return False
+        existing = sh(["gh", "pr", "list", "--head", ASSESSMENTS_BRANCH, "--state", "open", "--json", "number",
+                       "--jq", ".[0].number"], cwd=REPO)[1].strip()
+        if existing:
+            status, _ = do(["gh", "pr", "edit", existing, "--title", title, "--body", body], dry_run, cwd=REPO)
+        else:
+            status, _ = do(["gh", "pr", "create", "--base", "main", "--head", ASSESSMENTS_BRANCH, "--title", title,
+                            "--body", body], dry_run, cwd=REPO)
+        if status == 0:
+            status, _ = do(["gh", "pr", "merge", ASSESSMENTS_BRANCH, "--auto", "--squash"], dry_run, cwd=REPO)
+        return status == 0
+    finally:
+        sh(["git", "-C", REPO, "worktree", "remove", "--force", work])
+
+
 def report(args):
     run = run_dir(args.home, args.run)
     record = load(os.path.join(run, "run.json"), {})
@@ -773,22 +956,43 @@ def report(args):
         lines.append(f"- Flaky, failed once and passed on a second run, filed for no runtime: "
                      f"{', '.join(record['flaky'])}")
     failed = {}
+    reviews, rows = {}, {}
     for rid, entry in record["runtimes"].items():
         spec = RUNTIMES[rid]
         if entry["status"] == "skipped":
             lines.append(f"- {spec['name']}: skipped, {entry['why']}")
+            rows[rid] = ("skipped", entry["why"])
             continue
         if entry["status"] == "unchanged":
             continue
         if entry["status"] == "blocked":
             lines.append(f"- {spec['name']}: {entry['to']} not tested; main does not build")
+            rows[rid] = ("skipped", "main does not build")
             continue
         if entry["status"] == "testing" and not entry["steps"].get("turn"):
             lines.append(f"- {spec['name']}: {entry['to']} not tested; build or check did not run")
+            rows[rid] = ("skipped", "the build or the check did not run")
             continue
+        assess = entry["steps"].get("assess")
+        if assess:
+            new = regressions(entry, state.get(rid, {}).get("assessment"))
+            verdicts = assess.get("verdicts") or {}
+            entry["known"] = sorted(s for s, v in verdicts.items() if v == "failed" and s not in new)
+            if new and entry["status"] == "testing":
+                entry["status"] = "failed"
+                assess["cause"] = "assess: " + ", ".join(new)
+            else:
+                # Only steps that failed last time too: known, so the runtime is not failed.
+                assess["ok"] = not new and not entry["known"]
         passed = entry["status"] == "testing"
         print(f"{spec['name']} {entry.get('from')} → {entry['to']}: {'passed' if passed else 'failed at ' + first_failure(entry)}")
-        if passed and spec["kind"] != "installed":
+        reviews[review_path(record, rid)] = review(run, record, rid, entry)
+        rows[rid] = ("tested", row_for(record, rid, entry))
+        if entry.get("known"):
+            lines.append(f"- {spec['name']}: failed again, known, not filed: {', '.join(entry['known'])}")
+        if passed and entry.get("assess_only"):
+            lines.append(f"- {spec['name']} {entry['to']}: unchanged; assessed, {rows[rid][1][0]}")
+        elif passed and spec["kind"] != "installed":
             sent = open_pr(run, record, rid, entry, args.dry_run)
             lines.append(f"- {spec['name']} {entry['to']}: passed; PR {'would be ' if args.dry_run else ''}"
                          f"{'opened or updated' if sent else 'NOT opened (see above)'} on nightly/runtime-{rid}")
@@ -797,8 +1001,12 @@ def report(args):
         else:
             failed.setdefault(cause(entry), []).append(rid)
         if not args.dry_run:
+            previous = state.get(rid, {}).get("assessment")
             state[rid] = {"version": entry["to"], "result": "passed" if passed else "failed",
                           "run": record["started"]}
+            verdicts = (assess or {}).get("verdicts")
+            if verdicts or previous:
+                state[rid]["assessment"] = verdicts or previous
     for (step, _), rids in failed.items():
         shared = len(rids) > 1
         sent = (open_shared_issue if shared else lambda r, ids, d: open_issue(r, ids[0], r["runtimes"][ids[0]], d))(
@@ -806,6 +1014,10 @@ def report(args):
         names = ", ".join(f"{RUNTIMES[rid]['name']} {record['runtimes'][rid]['to']}" for rid in rids)
         lines.append(f"- {names}: failed at {step}; {'one issue for all, ' if shared else 'issue '}"
                      f"{'would be ' if args.dry_run else ''}{'opened or updated' if sent else 'NOT opened'}")
+    sent = open_assessments_pr(run, record, reviews, rows, args.dry_run)
+    if sent is not None:
+        lines.append(f"- Assessments and the integrations page: PR {'would be ' if args.dry_run else ''}"
+                     f"{'opened or updated' if sent else 'NOT opened (see above)'} on {ASSESSMENTS_BRANCH}")
     if not args.dry_run:
         save(state_path, state)
     text = "\n".join(lines)
@@ -828,7 +1040,8 @@ def main():
     parser.add_argument("--dry-run", action="store_true", help="report: open, push and record nothing")
     parser.add_argument("--keep", action="store_true", help="check: leave the scratch root on disk")
     parser.add_argument("--assess", action="store_true",
-                        help="check: also assess each runtime whose turn passed (#47); off by default")
+                        help="plan: test what has not changed too; check: also assess each runtime whose turn "
+                             "passed (#47). Off by default")
     args = parser.parse_args()
     args.home = os.path.abspath(os.path.expanduser(args.home))
     {"plan": plan, "build": build, "check": check, "report": report}[args.phase](args)

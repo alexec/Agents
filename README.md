@@ -235,8 +235,12 @@ cheapest model the runtime offers. A pinned runtime that passes becomes a pull r
 `nightly/runtime-<id>`; one that fails becomes an issue naming the step. It tests on this
 Mac's `main` and runs the same build and tests on `main` unchanged: what already fails there
 is listed as "already failing on main" and filed for no runtime, and runtimes that fail for
-one cause share one issue. A runtime with
-nothing new, or out of the pool, costs nothing. It arrives waiting for your OK: turn it
+one cause share one issue. With `--assess`, as the workflow runs it each Saturday, every
+runtime in the pool also gets the assessment of #47 (about five minutes on its own
+allowance), new release or not: each one's record goes in `.agents/reviews/runtimes/`, and
+its row in `docs/reference/integrations.md` is updated, in one pull request on
+`nightly/runtime-assessments`. An assessment step that fails opens an issue only when it did
+not fail last time. A runtime out of the pool costs nothing and keeps its last check. It arrives waiting for your OK: turn it
 off first (**Turn Off** on its row), then **Approve**, and turn it on when you want it.
 To try it without opening anything:
 
