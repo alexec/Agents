@@ -38,7 +38,7 @@ down for a runtime that has none. [Overall score](#overall-score), after the
 tables, adds every feature up.
 
 The matrix was filled in on 2026-10-12 from each app's own docs, changelog, README,
-releases and, where open, source. Agents' row was last brought up to date on 2026-10-15. Every app is held to the same bar, Agents included: a ●
+releases and, where open, source. Agents' row was last brought up to date on 2026-10-17. Every app is held to the same bar, Agents included: a ●
 needs the whole feature, documented by the app itself, and a ○ needs evidence, such as an
 app that ships for macOS alone having no Android app. Every Monday, after the
 Competitor check, the Feature matrix workflow (`.agents/workflows/feature-matrix.md`)
@@ -61,9 +61,14 @@ Agents' ◐ cells, and why:
   limit. See [Limit spending](../how-to/limit-spending.md).
 - **Task board:** the `github` server gives agents GitHub's issues, with nothing shown in
   the app since the `ci` server's issues view went (#1231).
+- **Pull requests:** the `github` server gives agents GitHub's pull request tools, with
+  nothing shown in the app since the `ci` server's board and pull request page went
+  (#1231).
 - **A browser the agent drives, trackers beyond GitHub, git hosts beyond GitHub:** through
   Playwright, Linear, Jira and GitLab servers from the MCP marketplace, with nothing shown
-  in the app. A GitLab server of Agents' own is parked (#813).
+  in the app. Agents' own `linear` server raises Linear's issue events for waits and
+  workflows (#839), and shows nothing either. A GitLab server of Agents' own is parked
+  (#813).
 
 Agents has none of these at all:
 
@@ -250,9 +255,9 @@ Agents has none of these at all:
 | GitHub Copilot | ● | ● | ● | ● | ● | 100% |
 | Threadlines | ● | ● | ● | ● | ● | 100% |
 | Agentastic | ● | ● | ◐ | ● | ● | 90% |
-| **Agents** | ● | ● | ◐ | ● | ● | 90% |
 | Codeg | ● | ● | ● | ● | ◐ | 90% |
 | Paseo | ● | ● | ● | ● | ◐ | 90% |
+| **Agents** | ● | ◐ | ◐ | ● | ● | 80% |
 | Claude Code | ● | ● | ◐ | ● | ◐ | 80% |
 | Conductor | ● | ● | ?⃝ | ● | ● | 80% |
 | Roamgate | ● | ● | ● | ● | ?⃝ | 80% |
@@ -433,8 +438,8 @@ Each app's score in every table, and overall: its points over the 49 scored feat
 
 | Rank | App | Running | Reach | Following | Reviewing | Tools | Tasks | Extensions | Organising | Overall |
 |--:|---|--:|--:|--:|--:|--:|--:|--:|--:|--:|
-| 1 | **Agents** | 92% | 67% | 100% | 90% | 50% | 89% | 70% | 83% | **82%** |
 | 1 | GitHub Copilot | 92% | 83% | 100% | 100% | 80% | 61% | 100% | 50% | **82%** |
+| 2 | **Agents** | 92% | 67% | 100% | 80% | 50% | 89% | 70% | 83% | **81%** |
 | 3 | Paseo | 100% | 100% | 71% | 90% | 60% | 61% | 60% | 100% | **80%** |
 | 4 | Cursor | 83% | 67% | 86% | 100% | 80% | 67% | 80% | 50% | **76%** |
 | 5 | Claude Code | 67% | 83% | 79% | 80% | 70% | 67% | 80% | 67% | **73%** |
