@@ -1,4 +1,4 @@
-//go:build linux
+//go:build linux || darwin
 
 package agentsd
 
@@ -23,6 +23,7 @@ import (
 // watched is a daemon with folder added as a project, once its watch is up.
 func watched(t *testing.T, folder string) (*Daemon, *conn) {
 	t.Helper()
+	prepareWatch(t)
 	d, c := start(t, t.TempDir())
 	c.call(t, 1, "projects/add", map[string]any{"folder": "file://" + folder})
 	until(t, "the project's watch", func() bool {

@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
-	goruntime "runtime"
 	"strings"
 	"testing"
 
@@ -120,9 +119,7 @@ func TestBrowseListsALinkUnderItsOwnPath(t *testing.T) {
 }
 
 func TestAWatchSaysWhichFoldersChanged(t *testing.T) {
-	if goruntime.GOOS != "linux" {
-		t.Skip("a folder watch is Linux's only, until the Mac's comes with its Swift helper (#1138)")
-	}
+	prepareWatch(t)
 	d, c := start(t, t.TempDir())
 	work, _ := filepath.EvalSymlinks(t.TempDir())
 	os.MkdirAll(filepath.Join(work, "src"), 0o755)
