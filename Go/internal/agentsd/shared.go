@@ -13,6 +13,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/alexec/agents/Go/internal/agentsd/mcpcatalog"
+	"github.com/alexec/agents/Go/internal/agentsd/store"
 	"github.com/alexec/agents/Go/wire"
 )
 
@@ -120,7 +121,7 @@ func (d *Daemon) appHomes() map[string]string {
 
 func emptySnapshot(home string, laidOut bool) wire.SharedSnapshot {
 	return wire.SharedSnapshot{Home: home, LaidOut: laidOut, Runtimes: []wire.SharedRuntimeName{}, Skills: []wire.SharedSkill{},
-		MCP: wire.SharedMCP{Servers: []wire.SharedServer{}, App: []wire.SharedServer{}, RuntimeOnly: []wire.SharedRuntimeOnlyServer{}},
+		MCP:     wire.SharedMCP{Servers: []wire.SharedServer{}, App: []wire.SharedServer{}, RuntimeOnly: []wire.SharedRuntimeOnlyServer{}},
 		Plugins: []wire.SharedPlugin{}, OtherFiles: []wire.SharedOtherFile{}, NeedsALook: []wire.SharedLook{}}
 }
 
@@ -238,7 +239,6 @@ func projectSharedSnapshot(project string) wire.SharedSnapshot {
 	return s
 }
 
-
 func reachOf(kind, note string) wire.SharedReach {
 	b, _ := json.Marshal(map[string]string{kind: note})
 	return b
@@ -327,7 +327,6 @@ func pluginFoldersIn(dir string) []string {
 	return out
 }
 
-
 func sharedInstructions(home string, present []sharedRule, record layoutRecord, looks *[]wire.SharedLook) wire.SharedInstructions {
 	router := filepath.Join(home, ".agents", "AGENTS.md")
 	reach := map[string]wire.SharedReach{}
@@ -356,7 +355,6 @@ func sharedInstructions(home string, present []sharedRule, record layoutRecord, 
 	}
 	return wire.SharedInstructions{Path: router, Exists: lexists(router), Reach: reach}
 }
-
 
 func sharedSkills(home string, present []sharedRule, plugins []string, record layoutRecord, appHomes map[string]string,
 	looks *[]wire.SharedLook) []wire.SharedSkill {
@@ -456,7 +454,6 @@ func skillDescription(skill string) *string {
 	}
 	return nil
 }
-
 
 func sharedMCP(home string, present []sharedRule, secrets map[string]string, looks *[]wire.SharedLook) wire.SharedMCP {
 	file := filepath.Join(home, ".agents", "mcp.json")
@@ -725,7 +722,6 @@ func ownServerNames(home, runtimeID string) []string {
 	return sortedKeys(servers)
 }
 
-
 func pluginDisplayName(plugin string) string {
 	if n, ok := pluginManifest(plugin)["name"].(string); ok {
 		return n
@@ -864,7 +860,7 @@ func pluginReach(home, plugin string, present []sharedRule, record layoutRecord)
 
 // pluginFiles is a plugin's files, relative to it, for the detail's tree: at most 40.
 func pluginFiles(plugin string) []string {
-	root, err := filepath.EvalSymlinks(plugin)
+	root, err := store.Resolve(plugin)
 	if err != nil {
 		return []string{}
 	}
@@ -893,7 +889,7 @@ func pluginFiles(plugin string) []string {
 // modification time, FNV-1a hashed. What the Swift host recorded when it added the plugin
 // to Codex, so it is the same sum over the same lines.
 func pluginFingerprint(plugin string) string {
-	root, err := filepath.EvalSymlinks(plugin)
+	root, err := store.Resolve(plugin)
 	if err != nil {
 		root = plugin
 	}
@@ -922,7 +918,6 @@ func pluginFingerprint(plugin string) string {
 	}
 	return strconv.FormatUint(hash, 16)
 }
-
 
 // sharedOtherFiles is everything in the folder the other pages do not cover.
 func sharedOtherFiles(shared string, appOwned map[string]bool) []wire.SharedOtherFile {

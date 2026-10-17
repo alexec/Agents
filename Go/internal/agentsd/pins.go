@@ -402,11 +402,11 @@ func pageURL(path, project string) (string, error) {
 		return "", Invalid("%s is not in this project.", path)
 	}
 	full := filepath.Join(project, rel)
-	root, err := filepath.EvalSymlinks(project)
+	root, err := store.Resolve(project)
 	if err != nil {
 		root = project
 	}
-	if r, err := filepath.EvalSymlinks(full); err == nil {
+	if r, err := store.Resolve(full); err == nil {
 		if !inside(root, r) {
 			return "", Invalid("%s is not in this project.", path)
 		}
