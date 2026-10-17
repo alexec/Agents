@@ -3961,6 +3961,25 @@
       }
     },
     {
+      "name": "views/toolCall",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/ViewToolCallRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/JSONValue"
+        }
+      }
+    },
+    {
       "name": "wake/set",
       "paramStructure": "by-name",
       "params": [

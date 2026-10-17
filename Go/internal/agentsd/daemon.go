@@ -50,6 +50,7 @@ type Daemon struct {
 	workflowBook
 	allowanceBook
 	mcpBook
+	viewBook
 	mcpHealthBook
 	mcpEventsBook
 	restartBook
