@@ -848,6 +848,14 @@ func (d *Daemon) registerWorkflows() {
 	On(d, wire.CallWorkflowsSettings, func(ctx context.Context, c *Client, r wire.WorkflowSettingsRequest) (wire.WorkflowSummary, error) {
 		return d.workflowSettingsChange(r, d.byPerson(c))
 	})
+	// The page's Clear on an MCP trigger's missed events (#383). This host keeps no MCP
+	// event subscriptions yet, so none has missed any: the workflow as it stands.
+	On(d, wire.CallWorkflowsMcpTriggerClearMissed, func(ctx context.Context, c *Client, r wire.WorkflowMCPClearMissedRequest) (wire.WorkflowSummary, error) {
+		d.workflowMu.Lock()
+		d.scanLocked()
+		d.workflowMu.Unlock()
+		return d.oneWorkflow(store.FolderPath(r.Folder), r.WorkflowID)
+	})
 	On(d, wire.CallWorkflowsApprove, func(ctx context.Context, c *Client, r wire.WorkflowApproveRequest) (wire.WorkflowSummary, error) {
 		return d.approveWorkflow(r, true)
 	})
