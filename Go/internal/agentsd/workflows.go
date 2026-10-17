@@ -239,6 +239,8 @@ func (d *Daemon) scanLocked() {
 		}
 	}
 	d.workflowFiles = files
+	// A server's event a workflow names, or no longer does (#383).
+	d.kickMCPEvents()
 	// A workflow made here can earn the first workflow (#984).
 	defer d.checkMilestonesSoon()
 	r := d.recordsLocked()
@@ -361,6 +363,7 @@ func (d *Daemon) summaryLocked(folder, id string, over map[string]wire.WorkflowL
 	}
 	s.AwaitingApproval, s.DeniedHere = d.approvalOf(folder, id, f)
 	s.IsRunning = d.runningLocked(folder, id)
+	s.McpTriggers = d.mcpTriggerStatuses(folder, id)
 	st := d.stateLocked(folder, id, false)
 	if st != nil {
 		s.LastOutcome, s.LastFiredAt, s.LastFiredBy, s.CausingEvent = st.LastOutcome, st.LastFiredAt, st.LastFiredBy, st.LastCausingEvent
@@ -848,13 +851,9 @@ func (d *Daemon) registerWorkflows() {
 	On(d, wire.CallWorkflowsSettings, func(ctx context.Context, c *Client, r wire.WorkflowSettingsRequest) (wire.WorkflowSummary, error) {
 		return d.workflowSettingsChange(r, d.byPerson(c))
 	})
-	// The page's Clear on an MCP trigger's missed events (#383). This host keeps no MCP
-	// event subscriptions yet, so none has missed any: the workflow as it stands.
+	// The page's Clear on an MCP trigger's missed events (#383).
 	On(d, wire.CallWorkflowsMcpTriggerClearMissed, func(ctx context.Context, c *Client, r wire.WorkflowMCPClearMissedRequest) (wire.WorkflowSummary, error) {
-		d.workflowMu.Lock()
-		d.scanLocked()
-		d.workflowMu.Unlock()
-		return d.oneWorkflow(store.FolderPath(r.Folder), r.WorkflowID)
+		return d.clearMCPMissed(r)
 	})
 	On(d, wire.CallWorkflowsApprove, func(ctx context.Context, c *Client, r wire.WorkflowApproveRequest) (wire.WorkflowSummary, error) {
 		return d.approveWorkflow(r, true)

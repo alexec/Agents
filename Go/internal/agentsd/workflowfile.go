@@ -457,8 +457,18 @@ func triggerNamed(name string, keys map[string]yamlnode.Node) (wire.WorkflowTrig
 		raw[k] = v.JSON()
 	}
 	if isServerEventName(name) {
-		// A server's event (#383): kept, though no MCP server on this host offers events.
-		return unrecognisedTrigger(name, raw), nil
+		// A server's event (#383): `noun.verbed`, not the app's, its keys the subscription's
+		// arguments rather than details matched here. Whether a server offers it is known
+		// only once one is asked, so that is said on the page, not here.
+		t := unrecognisedTrigger(name, raw)
+		mt, ok := serverTrigger(t)
+		if !ok {
+			return wire.WorkflowTrigger{}, failure("`server:` under \"" + name + "\" is a server's name, or a list of them")
+		}
+		if len(canonicalJSON(mustRaw(mt.arguments))) > mcpArgumentLimit {
+			return wire.WorkflowTrigger{}, failure("The settings under \"" + name + "\" are over 2 KB")
+		}
+		return t, nil
 	}
 	if strings.Contains(name, ".") {
 		filters := map[string][]string{}
@@ -623,6 +633,9 @@ func triggerPattern(t wire.WorkflowTrigger) (waitPattern, bool) {
 // triggerSupported is WorkflowTrigger.isSupported: a schedule or an event this host raises.
 func triggerSupported(t wire.WorkflowTrigger) bool {
 	if t.Schedule != nil {
+		return true
+	}
+	if _, ok := serverTrigger(t); ok {
 		return true
 	}
 	_, ok := triggerPattern(t)

@@ -103,6 +103,7 @@ func main() {
 	d.EnsureChatProject()
 	d.PickUpAfterRestart()
 	d.StartMCPHealth()
+	d.StartMCPEvents()
 	<-ctx.Done()
 	log.Printf("shutting down")
 	d.Shutdown()
