@@ -329,7 +329,9 @@ $S/remote.sh down                                # quits it and shuts the simula
 Without `--fake` the Remote is not paired: pair it with a scratch control plane's code
 (`code --client`) at launch, `remote.sh up APP -- -pair "$CODE"` (#1287; the sheet's Paste takes
 no press but a finger's). A Remote still paired with an earlier root keeps that pairing: take the
-app out first with `xcrun simctl uninstall "$(remote.sh udid)" com.alexecollins.agents.remote`. What the walk socket cannot do: the keyboard
+app out first with `xcrun simctl uninstall "$(remote.sh udid)" com.alexecollins.agents.remote` (terminate it first: a running
+app is not taken out). To open a banner's or widget row's link as a tap would, launch with `-- -open
+'agents://need?token=…'` (#1367): `simctl openurl` raises "Open in Agents?", which no walk can press. What the walk socket cannot do: the keyboard
 runs in another process, so it is drawn white (`key escape` first, for a full picture);
 `click` at a point, `menu`, `size` and `fold` are the Mac's only; swipes, long presses,
 context menus and feel stay with the user on a device. A fake device
