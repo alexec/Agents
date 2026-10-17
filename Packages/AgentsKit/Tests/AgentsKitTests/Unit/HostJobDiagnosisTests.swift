@@ -9,6 +9,7 @@ struct HostJobDiagnosisTests {
     gui/501/com.alexecollins.agentshost.daemon = {
     \tactive count = 1
     \tstate = running
+    \tprogram identifier = Contents/Helpers/agentsd (mode: 2)
 
     \targuments = {
     \t\tagentsd
@@ -46,6 +47,12 @@ struct HostJobDiagnosisTests {
         #expect(job.runs == 20)
         #expect(!job.needsLWCRUpdate)
         #expect(HostJobFailure.diagnose(job, login: .enabled) == nil)
+    }
+
+    @Test func theRegisteredProgramIsReadWithoutItsMode() {
+        // An updated Mac kept a login item that runs agentsd directly, not the launcher (#1379).
+        #expect(LaunchJobState.parse(running, exitStatus: 0).program == "Contents/Helpers/agentsd")
+        #expect(LaunchJobState.parse(spawnFailed, exitStatus: 0).program == nil)
     }
 
     @Test func nestedStatesAreNotTheJobs() {
