@@ -14,7 +14,6 @@ type macState struct {
 	signInRelays *signin.Relays
 }
 
-
 // registerMacSignIn is relay/grant (058, T091), on a Mac's host: relay a runtime's
 // sign-in to a server through the control plane. The token stays here; what goes back is
 // the stand-in and the relay's CA. A tunnel the control plane opens for the lend reaches

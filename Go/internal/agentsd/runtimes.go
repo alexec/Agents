@@ -254,7 +254,9 @@ outer:
 // needsSignIn is the -32036 credentialWanted the window answers by lending this Mac's
 // sign-in (Lending.swift), for Claude and Codex on a host that has none of its own.
 func (d *Daemon) needsSignIn(runtimeID string) error {
-	if d.Tunneler == nil || d.relayFor(runtimeID) != nil {
+	// A Mac's own agents use the Mac's own sign-in (in the Keychain for Claude): nothing is
+	// lent to them, and nothing is wanted (DaemonCore+Credentials, onServer false; #1138).
+	if d.Tunneler == nil || macToolsHome != "" || d.relayFor(runtimeID) != nil {
 		return nil
 	}
 	switch runtimeID {
