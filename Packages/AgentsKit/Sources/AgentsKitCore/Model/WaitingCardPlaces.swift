@@ -125,30 +125,3 @@ extension Array where Element == ChatTurn {
         return turns
     }
 }
-
-/// Where a conversation just opened is placed when not at its end (#1287).
-public enum ChatOpeningPlace: Equatable, Sendable {
-    /// The cards of this stretch: the first asked, when it was asked before the end.
-    case cards(stretch: Int)
-    /// This turn's ask, at the top of the pane.
-    case turn(UUID)
-    /// The last turn's ask, which is before the page in hand: a turn longer than the
-    /// opening page opens on its tail. Page back until it is in hand.
-    case askBefore
-}
-
-extension Array {
-    /// Where the reader needs the conversation opened (#1287): at the first card waiting
-    /// when anything came after it, else, unread, at the ask of the last turn, else at the
-    /// end (nil). Unread is one mark on the agent, set only by a finish nobody watched, so
-    /// the last turn is the first unread one. A card at the end is the end. A last turn
-    /// with no ask in hand is the tail of a turn longer than the opening page: its ask is
-    /// before it (`askBefore`).
-    public func openingPlace<Card>(unread: Bool) -> ChatOpeningPlace? where Element == ChatStretch<Card> {
-        if let first = firstIndex(where: { !$0.cards.isEmpty }) {
-            return first == count - 1 ? nil : .cards(stretch: first)
-        }
-        guard unread, let last = last?.turns.last else { return nil }
-        return last.ask != nil ? .turn(last.id) : .askBefore
-    }
-}

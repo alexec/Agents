@@ -137,14 +137,14 @@ try {
   note("6 keyboard", pageUp > 100 && k2.top > k1.top && homeMin < 5 && k4.fromBottom <= 1 && upMin < 5 && k6.fromBottom <= 1 && k7.top < k6.top,
     `PageUp moved ${pageUp}, PageDown ${k2.top - k1.top}, Home reached ${homeMin} (then held at ${k3.top} as the page above landed), End →fromBottom ${k4.fromBottom}, ⌘↑ reached ${upMin}, ⌘↓ →fromBottom ${k6.fromBottom}, ⇧Space ${k7.top - k6.top}`);
 
-  // 7. Coming back to a session.
+  // 7. Coming back to a session read back in: at its latest message, following (#1349).
   await key("End", 35); await sleep(1200);
   for (let i = 0; i < 6; i++) { await wheel(-500); await sleep(80); } await sleep(500);
   const was = await reading();
   await openSession("A short second"); await sleep(1500);
   await openSession("Turn 0"); await sleep(2500);
   const now = await reading(); g = await geo();
-  note("7 come back (reading)", was.text === now.text, `was "${was.text}" y ${was.y}; now "${now.text}" y ${now.y}, fromBottom ${g.fromBottom}`);
+  note("7 come back (at the end)", g.fromBottom <= 1 && !g.jump, `was "${was.text}" y ${was.y}; now "${now.text}" y ${now.y}, fromBottom ${g.fromBottom}, jump ${g.jump}`);
 
   // 9. Performance: frame times while wheeling through the long session.
   await page.eval(`window.__frames = []; window.__go = true; let last = performance.now(); (function tick(now) { window.__frames.push(now - last); last = now; if (window.__go) requestAnimationFrame(tick); })(last)`);

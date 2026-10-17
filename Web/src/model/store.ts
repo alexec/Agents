@@ -791,6 +791,9 @@ export class Work {
     this.nextTrimAt = Math.max(entriesTrimmedAt, entries.length + entriesTrimmedAt - entriesKept);
   }
 
+  /** Asks for the open chat's end, counted so two in a row both land: its sidebar row clicked again (#1349). */
+  readonly toEndAsks = signal(0);
+
   /**
    * The chat says whether it follows the end. Back at the end, the finished turns above the
    * entries are let go down to `turnsKept`: a long scroll up holds no more than it read (#170).

@@ -3879,7 +3879,7 @@ final class RemoteModel {
 
     /// Another page, backwards. Never the whole history: that is the difference
     /// between a conversation opening in a second and one opening on a train.
-    func loadEarlier(limit: Int? = nil) async {
+    func loadEarlier() async {
         guard let selection, work.hasMoreOfTheConversation, !isLoadingEarlier else { return }
         isLoadingEarlier = true
         defer { isLoadingEarlier = false }
@@ -3893,7 +3893,7 @@ final class RemoteModel {
             return
         }
         let request = DaemonAPI.TranscriptRequest(agentID: selection, before: work.firstEntryIndex,
-                                                  limit: limit ?? firstPageSize, from: work.openTurnStart)
+                                                  limit: firstPageSize, from: work.openTurnStart)
         guard let page = try? await client(for: request).call(DaemonAPI.Method.agentsTranscript, request,
                                                               returning: TranscriptPage.self) else { return }
         guard self.selection == selection else { return }
@@ -4563,7 +4563,7 @@ extension RemoteModel {
     }
 
     /// An earlier page of a session in a scene of its own, as `loadEarlier`.
-    func loadEarlier(of chat: PoppedChat, limit: Int? = nil) async {
+    func loadEarlier(of chat: PoppedChat) async {
         let id = chat.id
         let work = chat.work
         guard work.hasMoreOfTheConversation, !chat.isLoadingEarlier else { return }
@@ -4578,7 +4578,7 @@ extension RemoteModel {
             return
         }
         let request = DaemonAPI.TranscriptRequest(agentID: id, before: work.firstEntryIndex,
-                                                  limit: limit ?? firstPageSize, from: work.openTurnStart)
+                                                  limit: firstPageSize, from: work.openTurnStart)
         guard let page = try? await client(for: request).call(DaemonAPI.Method.agentsTranscript, request,
                                                               returning: TranscriptPage.self),
               popouts[id] === chat else { return }
