@@ -1,21 +1,23 @@
 import AgentsKitCore
 import SwiftUI
 
-/// Across the top of the window while a volume this Mac's agents write to is low on
-/// space (#195), beside the control plane's strip: how much is free, and which worktrees
-/// are largest when they could be measured. Gone by itself once it climbs back.
+/// Under a host's offline strip, over its chats and its project's page, while a volume
+/// that host's agents write to is low on space (#195): how much is free, and which
+/// worktrees are largest when they could be measured. Said where the host's work is,
+/// not across the window, so it never reads as the client's own disk (#1329). Gone by
+/// itself once it climbs back.
 struct DiskStrip: View {
     @Environment(AppModel.self) private var model
+    let host: HostID
 
     var body: some View {
-        ForEach(model.work.disk.alarms) { alarm in
+        ForEach(alarms) { alarm in
             row(alarm.line, alarm.level)
         }
-        ForEach(model.serverDisks.keys.sorted { model.hosts.label($0) < model.hosts.label($1) }, id: \.self) { host in
-            ForEach(model.serverDisks[host]?.alarms ?? []) { alarm in
-                row("\(model.hosts.label(host)): \(alarm.line)", alarm.level)
-            }
-        }
+    }
+
+    private var alarms: [DiskAlarm] {
+        host == .mac ? model.work.disk.alarms : model.serverDisks[host]?.alarms ?? []
     }
 
     private func row(_ line: String, _ level: DiskLevel) -> some View {
@@ -27,9 +29,11 @@ struct DiskStrip: View {
                 .textSelection(.enabled)
             Spacer(minLength: 8)
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 8)
-        .background(Paper.wash)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 9)
+        .paperWell(in: RoundedRectangle(cornerRadius: Paper.Radius.card))
+        .chatColumn()
+        .padding(.top, 8)
         .accessibilityElement(children: .combine)
     }
 }

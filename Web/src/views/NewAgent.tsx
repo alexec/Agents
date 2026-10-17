@@ -33,6 +33,7 @@ import { Huddle } from "./Huddle";
 import { Reach } from "./Reach";
 import { Prompt } from "./Prompt";
 import { OfflineStrip } from "./OfflineStrip";
+import { DiskStrip } from "./DiskStrip";
 import { PromptMenus } from "./PromptMenus";
 import { BackToList } from "./BackToList";
 import { orderedProjects, projectLabel } from "./Sidebar";
@@ -365,6 +366,7 @@ export function NewAgent({ store, host, folder, projectName, down }: {
       </header>
       {/* The same strip as over a chat: a prompt here goes to that host too (#83). */}
       {!down && <OfflineStrip store={store} host={host} />}
+      {!down && <DiskStrip store={store} host={host} />}
       <div class="scroll new-heading">
         <Huddle focused={promptFocused.value} typed={typed.value} />
         <ProjectSwitch store={store} host={host} folder={folder} projectName={projectName} down={down} />

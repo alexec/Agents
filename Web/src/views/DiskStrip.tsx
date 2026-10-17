@@ -1,24 +1,21 @@
-// Across the top of the page while a volume a host's agents write to is low on space (#196; the
-// window's DiskStrip, #195): how much is free, and the largest worktrees when they could be
-// measured. Gone by itself once it climbs back. A server's are named, as its offline strip is.
+// Under a host's offline strip, over its chats and a new session, while a volume that host's agents
+// write to is low on space (#196; the window's DiskStrip, #195): how much is free, and the largest
+// worktrees when they could be measured. Said where the host's work is, not across the page, so it
+// never reads as the browser's own disk (#1329). Gone by itself once it climbs back.
 import type { Store } from "../model/store";
 import { diskLine } from "../model/disk";
 
-export function DiskStrip({ store }: { store: Store }) {
-  const rows = Object.entries(store.disk.value).flatMap(([host, state]) =>
-    state.alarms.map((alarm) => ({ host, alarm })));
-  if (rows.length === 0) return null;
+export function DiskStrip({ store, host }: { store: Store; host: string }) {
+  const alarms = store.disk.value[host]?.alarms ?? [];
+  if (alarms.length === 0) return null;
   return (
     <>
-      {rows.map(({ host, alarm }) => {
-        const name = host === "mac" ? null : store.hosts.value.find((h) => h.id === host)?.name ?? host;
-        return (
-          <p key={`${host}|${alarm.reading.mount}`} class={`disk-strip ${alarm.level}`} role="status">
-            <span class="dot" aria-hidden="true" />
-            {name ? `${name}: ${diskLine(alarm)}` : diskLine(alarm)}
-          </p>
-        );
-      })}
+      {alarms.map((alarm) => (
+        <p key={alarm.reading.mount} class={`disk-strip ${alarm.level}`} role="status">
+          <span class="dot" aria-hidden="true" />
+          {diskLine(alarm)}
+        </p>
+      ))}
     </>
   );
 }

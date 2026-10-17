@@ -145,6 +145,8 @@ struct RemoteChatView: View {
                 StaleBanner()
                 // A server's agent whose host has gone: which, and since when (#239).
                 if let agent { HostOfflineStrip(host: agent.host) }
+                // A volume that host writes to low on space (#1329).
+                if let agent { HostDiskStrip(host: agent.host) }
                 // Its folder gone (#119): which, and the ways on, before anything is typed.
                 if let agent, agent.missingFolder != nil, agent.state != .archived {
                     RemoteMissingFolderStrip(agent: agent)
