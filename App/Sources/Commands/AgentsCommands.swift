@@ -188,7 +188,7 @@ struct AgentsCommands: Commands {
             // What every turn starts at (069). Thinking is part of Details now, so
             // Show Thinking went with it.
             Picker("Turns", selection: $turnDetail) {
-                ForEach(TurnDetail.allCases, id: \.self) { detail in
+                ForEach(TurnDetail.levels, id: \.self) { detail in
                     Text(detail.title).help(detail.summary).tag(detail)
                 }
             }

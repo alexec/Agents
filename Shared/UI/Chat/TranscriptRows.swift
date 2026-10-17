@@ -947,7 +947,7 @@ struct WrappingHStack: Layout {
 extension View {
     /// Copy Message on a message (#519): what it says, whole and as written, onto the
     /// pasteboard. Selecting across a reply's paragraphs and code blocks was the only
-    /// way before, and at Outcome what is drawn is not always all there is.
+    /// way before, and in a collapsed turn what is drawn is not always all there is.
     func copiesMessage(_ entry: TranscriptEntry) -> some View {
         modifier(CopiesMessage(text: entry.copiedText))
     }

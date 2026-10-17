@@ -585,7 +585,7 @@ struct ChatTranscript: View {
             fetchedTurns[dropped] = nil
             // Still open, it would ask again and push another one out. Closed, it
             // shows the summary it already had (#285).
-            if turnViews[dropped]?.showsSteps == true { turnViews[dropped] = .outcome }
+            if turnViews[dropped]?.showsSteps == true { turnViews[dropped] = .collapsed }
         }
     }
 
