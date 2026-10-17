@@ -120,7 +120,7 @@ func (f *fakeControl) serve(w http.ResponseWriter, r *http.Request) {
 		f.t.Errorf("first uplink line %s", first)
 	}
 	f.hellos <- frame.M.Params
-	l.Write(ctx, `{"c":1,"open":{"client":"C","device":"D1"}}`)
+	l.Write(ctx, `{"c":1,"open":{"client":"C","device":"D1","fanOut":true}}`)
 	l.Write(ctx, `{"c":1,"m":{"jsonrpc":"2.0","id":7,"method":"daemon/ping"}}`)
 	for {
 		line, err := l.Read(ctx)
@@ -176,6 +176,10 @@ func TestEnrolThenUplink(t *testing.T) {
 		if c.Device() != "D1" {
 			t.Errorf("device %q", c.Device())
 		}
+		// A control plane that reads fan-out frames is sent one for every channel (#167).
+		if up, n, ok := c.(FanOuter).FanOutRoute(); !ok || n != 1 || up == nil {
+			t.Errorf("route %v %d %v", up, n, ok)
+		}
 		for line := range c.In() {
 			served <- line
 			c.Write(`{"jsonrpc":"2.0","id":7,"result":{}}`)
@@ -195,6 +199,10 @@ func TestEnrolThenUplink(t *testing.T) {
 	}
 	if line := <-f.channel; line != `{"c":1,"m":{"jsonrpc":"2.0","id":7,"result":{}}}` {
 		t.Fatalf("reply frame %s", line)
+	}
+	u.WriteFanOut([]int{1, 3}, `{"jsonrpc":"2.0","method":"agent/changed","params":{}}`)
+	if line := <-f.channel; line != `{"f":[1,3],"m":{"jsonrpc":"2.0","method":"agent/changed","params":{}}}` {
+		t.Fatalf("fan-out frame %s", line)
 	}
 }
 

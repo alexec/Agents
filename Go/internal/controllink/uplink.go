@@ -192,6 +192,7 @@ func (u *Uplink) receive(line string) {
 		if frame.Open.Device != nil {
 			c.device = *frame.Open.Device
 		}
+		c.fanOut = frame.Open.FanOut != nil && *frame.Open.FanOut
 		u.mu.Lock()
 		old := u.channels[c.number]
 		if u.channels != nil {
@@ -235,8 +236,31 @@ type channel struct {
 	up     *Uplink
 	in     chan string
 	device string
+	// fanOut is whether the control plane reads fan-out frames on this channel's uplink.
+	fanOut bool
 	once   sync.Once
 	closed atomic.Bool
+}
+
+// FanOuter is a connection a broadcast can reach in one frame with the others on its
+// uplink (#167).
+type FanOuter interface {
+	FanOutRoute() (*Uplink, int, bool)
+}
+
+// FanOutRoute is the channel's uplink and number, when its control plane reads fan-out
+// frames and it is still open.
+func (c *channel) FanOutRoute() (*Uplink, int, bool) {
+	return c.up, c.number, c.fanOut && !c.closed.Load()
+}
+
+// WriteFanOut writes one notification for every channel named (ControlWire.fanOut).
+func (u *Uplink) WriteFanOut(channels []int, line string) error {
+	ns := make([]string, len(channels))
+	for i, n := range channels {
+		ns[i] = strconv.Itoa(n)
+	}
+	return u.write(`{"f":[` + strings.Join(ns, ",") + `],"m":` + line + `}`)
 }
 
 func (c *channel) Write(line string) error {
@@ -312,9 +336,8 @@ func newRef() string {
 	return h[0:8] + "-" + h[8:12] + "-" + h[12:16] + "-" + h[16:20] + "-" + h[20:]
 }
 
-// Broadcast writes a notification to every open channel. The Swift host uses fan-out
-// frames for this (#167); this spike writes channel by channel, which every control
-// plane reads.
+// Broadcast writes a notification to every open channel, channel by channel, which every
+// control plane reads. The daemon's own broadcasts go as fan-out frames (#167).
 func (u *Uplink) Broadcast(line string) {
 	u.mu.Lock()
 	var cs []*channel

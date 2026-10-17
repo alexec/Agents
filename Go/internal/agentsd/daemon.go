@@ -5,9 +5,11 @@ import (
 	"encoding/json"
 	"log"
 	"path/filepath"
+	"sort"
 	"sync"
 
 	"github.com/alexec/agents/Go/internal/agentsd/store"
+	"github.com/alexec/agents/Go/internal/controllink"
 	"github.com/alexec/agents/Go/internal/safe"
 	"github.com/alexec/agents/Go/wire"
 )
@@ -115,8 +117,20 @@ func Broadcast[P any](d *Daemon, n wire.Notification[P], params P) {
 		cs = append(cs, c)
 	}
 	d.mu.Unlock()
+	// Those on a control-plane uplink: one frame per uplink, naming who hears it (#167).
+	routed := map[*controllink.Uplink][]int{}
 	for _, c := range cs {
+		if f, ok := c.conn.(controllink.FanOuter); ok {
+			if up, n, yes := f.FanOutRoute(); yes {
+				routed[up] = append(routed[up], n)
+				continue
+			}
+		}
 		_ = c.conn.Write(string(b))
+	}
+	for up, ns := range routed {
+		sort.Ints(ns)
+		_ = up.WriteFanOut(ns, string(b))
 	}
 }
 
