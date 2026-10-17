@@ -725,8 +725,8 @@ jobs:
   # their findings in the job's summary, and which are in this change's files, without failing,
   # as do golangci-lint and govulncheck. Their old findings are listed in
   # .agents/reviews/lint-2026-10-17.md. The pinned binaries are cached, and golangci-lint's
-  # analysis with them. Not required by main, and not on the way to a merge: the macOS jobs take
-  # longer.
+  # analysis with them. It runs beside the macOS jobs, which take longer, so it does not make a
+  # merge wait.
   #
   # The checks include check-test-indexing.py (#94): tests that index or force-unwrap after an
   # #expect, where a failed check carries on and the trap after it ends the whole `swift test`.
