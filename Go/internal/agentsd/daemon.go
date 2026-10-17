@@ -85,7 +85,6 @@ func New(ctx context.Context, root string) (*Daemon, error) {
 	d.checkEveryQueue()
 	d.restoreRuns()
 	safe.Go("workflow clock", d.workflowClock)
-	safe.Go("mcp health", d.mcpHealthClock)
 	d.checkMilestonesSoon()
 	d.watchDisk()
 	return d, nil

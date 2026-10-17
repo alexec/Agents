@@ -70,7 +70,10 @@ func healthID(project *string, name string) string {
 	return *project + "|" + name
 }
 
-// mcpHealthClock checks at start, then looks again every minute.
+// StartMCPHealth checks the servers now, then looks again every minute: once, after the
+// host knows its personal home.
+func (d *Daemon) StartMCPHealth() { safe.Go("mcp health", d.mcpHealthClock) }
+
 func (d *Daemon) mcpHealthClock() {
 	d.reconcileMCPHealth()
 	t := time.NewTicker(time.Minute)

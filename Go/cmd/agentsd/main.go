@@ -103,6 +103,7 @@ func main() {
 	log.Printf("agentsd %s on %s, root %s", buildinfo.String(), platform(), cl.root)
 	d.EnsureChatProject()
 	d.PickUpAfterRestart()
+	d.StartMCPHealth()
 	<-ctx.Done()
 	log.Printf("shutting down")
 	d.Shutdown()
