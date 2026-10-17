@@ -232,7 +232,7 @@ func (d *Daemon) addProject(folder wire.URL) (wire.ProjectSummary, error) {
 	}
 	if !found {
 		ps = append(ps, wire.Project{Folder: store.FolderURL(path), AddedAt: wire.DateOf(nowFunc())})
-		if err := d.Store.SaveProjects(ps); err != nil {
+		if err := d.saveProjects(ps); err != nil {
 			return wire.ProjectSummary{}, err
 		}
 	}

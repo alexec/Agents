@@ -75,7 +75,7 @@ func (d *Daemon) editRecord(folder string, edit func(p *wire.Project)) error {
 		edit(&p)
 		ps[i] = p
 	}
-	return d.Store.SaveProjects(ps)
+	return d.saveProjects(ps)
 }
 
 func (d *Daemon) sendProject(folder string) (wire.ProjectSummary, error) {
@@ -169,7 +169,7 @@ func (d *Daemon) deleteProject(folder string) error {
 		d.delete(a.ID)
 	}
 	ps = append(ps[:i], ps[i+1:]...)
-	if err := d.Store.SaveProjects(ps); err != nil {
+	if err := d.saveProjects(ps); err != nil {
 		return err
 	}
 	Broadcast(d, wire.NotifyProjectRemoved, wire.ProjectRemovedNotification{Folder: store.FolderURL(folder)})
