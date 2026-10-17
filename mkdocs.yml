@@ -86,6 +86,7 @@ nav:
       - how-to/use-a-shell.md
       - how-to/set-up-a-workflow.md
       - how-to/start-a-workflow-from-an-mcp-event.md
+      - how-to/use-linear-issues.md
       - how-to/hand-files-to-a-workflow.md
       - how-to/pin-a-page-to-a-project.md
       - how-to/sign-a-runtime-in.md

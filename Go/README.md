@@ -16,6 +16,7 @@ not move.
 | `internal/controllink/` | Both sides of the host ↔ control plane exchange | control-plane |
 | `internal/safe/` | Recover helpers: one panic never takes a host or the control plane down | build |
 | `cmd/github-mcp/`, `internal/githubmcp/` | The `github` MCP server (#1232): the official github-mcp-server's tools, as a library, and the ci server's events | ci-server |
+| `cmd/linear-mcp/`, `internal/linearmcp/` | The `linear` MCP server (#839): Linear's issue events, in github-mcp's shape (tools are Linear's own server's) | ci-server |
 
 ## Building and testing
 
@@ -101,3 +102,20 @@ Agents Host carries it in `Contents/Helpers` (`scripts/go-github-mcp.sh`, a buil
 as `agents-control-go` is), and `scripts/build-linux-agentsd-go.sh` builds
 `github-mcp-linux-<arch>`, which every Linux host installs beside agentsd. A project names
 it by bare name: `"github": { "command": "github-mcp", "hosted": true }`.
+
+## The linear MCP server (`linear-mcp`, #839)
+
+The event half of `github-mcp`'s shape: a stdio front (`linearmcp.Front`) answers
+`events/list` and `events/poll` and passes everything else to a go-sdk server with no tools.
+The tools are Linear's own MCP server's (`https://mcp.linear.app/mcp`, OAuth), added from the
+marketplace; this server runs beside agentsd with a personal API key in `LINEAR_API_KEY`.
+
+- **Events**, polled every minute (a personal key has 1500 requests an hour):
+  `issue.opened`, `issue.labelled`, `issue.commented`, `issue.closed` (into a Done or
+  Canceled state), with the github server's cursor and paging. Arguments `team` (a key, as
+  `ENG`), `label`, `issue` (as `ENG-12`) and `anyone`; left out, only the workspace's members
+  count, never a guest or an app (#728).
+
+It reads Linear's GraphQL API (`LINEAR_MCP_API_URL` moves it, for a fake). Agents Host carries
+it (`scripts/go-github-mcp.sh linear-mcp`) and every Linux host installs
+`linear-mcp-linux-<arch>`. See `docs/how-to/use-linear-issues.md`.

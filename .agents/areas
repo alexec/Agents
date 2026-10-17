@@ -377,6 +377,9 @@ Packages/MCPServers/Sources/MCPServerKit/              ci-server
 Packages/MCPServers/Tests/                             ci-server
 Go/cmd/github-mcp/                                     ci-server
 Go/internal/githubmcp/                                 ci-server
+Go/cmd/linear-mcp/                                     ci-server
+Go/internal/linearmcp/                                 ci-server
+docs/how-to/use-linear-issues.md                       ci-server
 scripts/go-github-mcp.sh                               ci-server
 specs/038-*/                                           ci-server
 
