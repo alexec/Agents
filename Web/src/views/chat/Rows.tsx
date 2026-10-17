@@ -22,13 +22,12 @@ import { FileCard } from "./FileCard";
 import type { Shown } from "../../model/shownFile";
 import { switchNote } from "../../model/switchNote";
 import { continueWithout, keepStopped, sandboxCard } from "../../model/sandboxWords";
-import type { TurnDetail } from "../../model/turnDetail";
+import type { TurnDetail, TurnLevel } from "../../model/turnDetail";
 import { memo } from "../../render/memo";
 
-export { turnDetails, type TurnDetail } from "../../model/turnDetail";
-export const detailTitles: Record<TurnDetail, string> = { outcome: "Outcome", messages: "Messages", steps: "Steps", details: "Details" };
-export const detailSummaries: Record<TurnDetail, string> = {
-  outcome: "What was asked and how it went",
+export { turnDetails, type TurnDetail, type TurnLevel } from "../../model/turnDetail";
+export const detailTitles: Record<TurnLevel, string> = { messages: "Messages", steps: "Steps", details: "Details" };
+export const detailSummaries: Record<TurnLevel, string> = {
   messages: "Every step but tools, rolled up",
   steps: "Every step, one line each",
   details: "Every call opened, and thinking",
@@ -490,7 +489,7 @@ export const TurnView = memo(function TurnView({ turn, detail, fetched, fetchFai
     void load.current(turn).finally(() => { loading.value = false; });
   };
   const toggle = () => {
-    if (detail === "outcome") ask();
+    if (detail === "collapsed") ask();
     toggleTurn(turn);
   };
   const waiting = isSummaryOnly(turn) && fetched === undefined;
@@ -498,7 +497,7 @@ export const TurnView = memo(function TurnView({ turn, detail, fetched, fetchFai
   const parts = waiting ? undefined : turnParts(items, isLive);
   const outcome = parts?.outcome ?? turn.storedOutcome ?? [];
   const stepCount = parts?.stepCount ?? turn.storedStepCount;
-  const open = detail !== "outcome";
+  const open = detail !== "collapsed";
   const outcomeIDs = new Set((parts?.outcome ?? []).map((i) => i.id));
   const steps = drawnInTurn(items, isLive).filter((i) => !outcomeIDs.has(i.id) && (detail === "details" || !isThought(i)));
   useEffect(() => {

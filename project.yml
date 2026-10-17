@@ -74,8 +74,7 @@ packages:
   ControlPlane:
     path: Packages/ControlPlane
   # The MCP servers Agents ships (#700): Agents Host carries ci-watcher beside agentsd,
-  # and workspace-commands beside agents-control (#691). github-mcp (#1232) is Go, built
-  # and carried by scripts/go-github-mcp.sh.
+  # and workspace-commands beside agents-control (#691).
   MCPServers:
     path: Packages/MCPServers
   swift-nio-ssl:
@@ -461,11 +460,6 @@ targets:
       - name: Build the Go agentsd
         script: sh "$SRCROOT/scripts/go-agentsd.sh"
         basedOnDependencyAnalysis: false
-      # The github MCP server (#1232), carried beside agentsd as ci-watcher is: with no
-      # Docker or Go it is left out.
-      - name: Build the github MCP server
-        script: sh "$SRCROOT/scripts/go-github-mcp.sh"
-        basedOnDependencyAnalysis: false
     # Carried into Contents/Helpers and signed here, not by a copy phase, which would try
     # to strip it (a Go binary is already stripped, and strip refuses it). Run only when
     # this Mac's host settings say "controlImplementation": "go".
@@ -476,9 +470,6 @@ targets:
       # Run only when the settings say "daemonImplementation": "go".
       - name: Carry the Go agentsd
         script: sh "$SRCROOT/scripts/go-agentsd.sh" --carry
-        basedOnDependencyAnalysis: false
-      - name: Carry the github MCP server
-        script: sh "$SRCROOT/scripts/go-github-mcp.sh" --carry
         basedOnDependencyAnalysis: false
     sources:
       - path: Host/Sources

@@ -301,8 +301,7 @@ public final class ControlService: @unchecked Sendable {
         self.tunnels = tunnels
         // hosts/install (T072): once over ssh with the key given, then the host is on its own.
         let install = HostInstall(codes: codes, servers: ServerFiles.folder(),
-                                  tunnels: tunnels.map { ($0, configuration.port) },
-                                  toolsets: HostToolsets(folder: HostToolsets.folder()) { [weak self] in self?.log($0) }) { [router = self.router] name, step in
+                                  tunnels: tunnels.map { ($0, configuration.port) }) { [router = self.router] name, step in
             await router.broadcastControl(DaemonAPI.Notification.controlInstallProgress,
                                           ["name": .string(name), "step": .string(step)])
         }

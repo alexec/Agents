@@ -427,7 +427,7 @@ private struct ChatMenu: View {
             }
             // What every turn starts at, above the chat's own actions (069, frame F).
             Picker("Turns show", selection: $turnDetail) {
-                ForEach(TurnDetail.allCases, id: \.self) { detail in
+                ForEach(TurnDetail.levels, id: \.self) { detail in
                     Text(detail.title).tag(detail)
                 }
             }

@@ -29,7 +29,7 @@ import { RenameInput, SessionButtons, SessionMenu } from "./SessionMenu";
 import { drawable } from "../model/options";
 import { asksToArchive, projectFolder } from "../model/groups";
 import { savedDetail, toggled } from "../model/turnDetail";
-import { CallActionsContext, detailSummaries, detailTitles, fromLine, ItemRow, turnDetails, TurnView, type CallActions, type TurnDetail } from "./chat/Rows";
+import { CallActionsContext, detailSummaries, detailTitles, fromLine, ItemRow, turnDetails, TurnView, type CallActions, type TurnDetail, type TurnLevel } from "./chat/Rows";
 import { Modal } from "./Modal";
 import { nameOf, pathOf, setPane } from "./files/paneState";
 import { FileSearch, isOpenFileKey } from "./files/FileSearch";
@@ -62,7 +62,7 @@ function shown(entries: TranscriptEntry[]): Item[] {
 
 /** The level every turn starts at, the page's one setting (View ▸ Turns in the window): the
  *  person's, kept on their Mac with the other display choices (#1033). */
-function defaultDetail(): TurnDetail {
+function defaultDetail(): TurnLevel {
   return savedDetail(stringPreference(preferenceKeys.turnDetail) ?? null);
 }
 
@@ -112,7 +112,7 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
     setPane(session, { tab: "files", file: file.path, fileLine: undefined, last: file.path });
     if (!route.peek().files) replace({ ...route.peek(), files: true });
   };
-  const level = useComputed<TurnDetail>(defaultDetail);
+  const level = useComputed<TurnLevel>(defaultDetail);
   /** Turns opened or closed by hand, kept until the chat is left. */
   const chosen = useSignal<Record<string, TurnDetail>>({});
   /** The few opened turns whose entries are held, newest last (#291). */
@@ -383,7 +383,7 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
     const now = turn && (chosen.value[turn.id] ?? level.value);
     // Messages folds a run of calls, so a call is only on screen at Steps (#759).
     const isCall = turn?.items.some((part) => part.id === focus && part.kind === "run");
-    if (turn && (now === "outcome" || (now === "messages" && isCall))) {
+    if (turn && (now === "collapsed" || (now === "messages" && isCall))) {
       follow(false);
       chosen.value = { ...chosen.value, [turn.id]: "steps" };
     }
@@ -448,10 +448,10 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
     chosen.value = { ...chosen.value, [turn.id]: toggled(chosen.value[turn.id] ?? level.value, level.value) };
   };
 
-  // A turn closed, or the level put back to outcome, lets its entries go (#291).
+  // A turn closed lets its entries go (#291).
   useEffect(() => {
     const openNow = new Set<string>();
-    for (const turn of rows) if ((chosen.value[turn.id] ?? level.value) !== "outcome") openNow.add(turn.id);
+    for (const turn of rows) if ((chosen.value[turn.id] ?? level.value) !== "collapsed") openNow.add(turn.id);
     const drop = openedTurns.current.filter((id) => !openNow.has(id));
     if (!drop.length) return;
     const next = { ...fetched.peek() };
@@ -523,7 +523,7 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
     loadEarlier: (turn: ChatTurn) => latest.current.loadEarlierSteps(turn),
   }), []);
 
-  const choose = (detail: TurnDetail) => {
+  const choose = (detail: TurnLevel) => {
     setPreferences({ [preferenceKeys.turnDetail]: detail });
     chosen.value = {};
   };
@@ -540,7 +540,7 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
           : <h1>{agent?.title ?? "New session"}</h1>}
         <span class="actions">
           <select class="detail wide-only" aria-label="Turns" title={detailSummaries[level.value]} value={level.value}
-            onChange={(e) => choose((e.currentTarget as HTMLSelectElement).value as TurnDetail)}>
+            onChange={(e) => choose((e.currentTarget as HTMLSelectElement).value as TurnLevel)}>
             {turnDetails.map((d) => (
               <option key={d} value={d} title={detailSummaries[d]}>{detailTitles[d]}</option>
             ))}

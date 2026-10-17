@@ -140,7 +140,7 @@ say(`chat at Steps: ${JSON.stringify(await page.text(".transcript"))}`);
 await page.eval(`(() => { const s = document.querySelector("select.detail"); s.value = "details"; s.dispatchEvent(new Event("change", { bubbles: true })); })()`);
 await sleep(300);
 await page.shot(`${out}/us2-7-details.png`);
-await page.eval(`(() => { const s = document.querySelector("select.detail"); s.value = "outcome"; s.dispatchEvent(new Event("change", { bubbles: true })); })()`);
+await page.eval(`(() => { const s = document.querySelector("select.detail"); s.value = "messages"; s.dispatchEvent(new Event("change", { bubbles: true })); })()`);
 
 // What the host recorded: the answers given in the browser, and the files the turn wrote.
 const transcript = await op.link.call("agents/transcript", { agentID, limit: 400 }, host);

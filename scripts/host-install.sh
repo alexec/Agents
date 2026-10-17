@@ -75,7 +75,7 @@ ln -sfn "agentsd-$sha" "$d/bin/current"
 
 # The MCP servers Agents ships (#700), beside agentsd, which puts its own folder first on
 # their PATH. One the control plane does not offer is left out, with a word.
-for server in ci-watcher github-mcp; do
+for server in ci-watcher; do
     if fetch "/v1/servers/$server-linux-$arch.sha256" "$tmp/$server.sha256" 2>/dev/null &&
         fetch "/v1/servers/$server-linux-$arch" "$tmp/$server" 2>/dev/null &&
         echo "$(tr -d ' \n' < "$tmp/$server.sha256")  $tmp/$server" | sha256sum -c - >/dev/null 2>&1; then

@@ -109,10 +109,7 @@ struct TurnView: View, Equatable {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        // Keyed on waiting too: a turn drawn from its entries becomes a stored summary when
-        // the chat's history is read again (its host restarted), with its steps still open,
-        // and was left a spinner that never asked for them (#1266).
-        .task(id: detail.showsSteps && waiting) {
+        .task(id: detail.showsSteps) {
             if detail.showsSteps, waiting { await fetch() }
         }
     }
@@ -947,7 +944,7 @@ struct WrappingHStack: Layout {
 extension View {
     /// Copy Message on a message (#519): what it says, whole and as written, onto the
     /// pasteboard. Selecting across a reply's paragraphs and code blocks was the only
-    /// way before, and at Outcome what is drawn is not always all there is.
+    /// way before, and in a collapsed turn what is drawn is not always all there is.
     func copiesMessage(_ entry: TranscriptEntry) -> some View {
         modifier(CopiesMessage(text: entry.copiedText))
     }

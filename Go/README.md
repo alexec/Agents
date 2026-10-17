@@ -15,7 +15,6 @@ not move.
 | `cmd/agents-control/`, `internal/controlplane/` | The control plane | control-plane |
 | `internal/controllink/` | Both sides of the host ↔ control plane exchange | control-plane |
 | `internal/safe/` | Recover helpers: one panic never takes a host or the control plane down | build |
-| `cmd/github-mcp/`, `internal/githubmcp/` | The `github` MCP server (#1232): the official github-mcp-server's tools, as a library, and the ci server's events | ci-server |
 
 ## Building and testing
 
@@ -80,24 +79,3 @@ going back keeps every agent. The Go host does not yet serve the Mac-only method
 .claude/skills/run-app/scripts/launch.sh --slug …` runs the Go one in place of the Swift
 one (build it with `GOOS=darwin Go/scripts/go.sh build -o out/darwin/agents-control
 ./cmd/agents-control`).
-
-## The github MCP server (`github-mcp`, #1232)
-
-One stdio MCP server with GitHub's own tools and our events. The tools are the official
-server's (`github.com/github/github-mcp-server/v2`, a library): by default the
-`context,repos,issues,pull_requests,actions,labels` toolsets (`--toolsets` or
-`GITHUB_TOOLSETS` names others), with merging and reviewing a pull request
-(`HiddenTools`) never offered to the model. The events are the ci server's (CIWatcher.swift,
-#383), with the same names, arguments, data and eventIds, and the same cursor, paging and
-trust filter (#728), polled only: `checks.failed`, `pr.opened`, `pr.merged`, `pr.closed`,
-`pr.conflicted`, `issue.opened`, `issue.labelled`, `issue.commented`, `issue.closed`.
-
-MCP's SDKs have no events (a working-group draft), so `githubmcp.Front` reads stdio itself.
-It answers `events/list` and `events/poll`, adds the `events` capability to `initialize`,
-and passes every other message to the official server unchanged. It signs in as the `gh`
-user (`gh auth token`, asked again each minute) and has no account of its own.
-
-Agents Host carries it in `Contents/Helpers` (`scripts/go-github-mcp.sh`, a build phase,
-as `agents-control-go` is), and `scripts/build-linux-agentsd-go.sh` builds
-`github-mcp-linux-<arch>`, which every Linux host installs beside agentsd. A project names
-it by bare name: `"github": { "command": "github-mcp", "hosted": true }`.

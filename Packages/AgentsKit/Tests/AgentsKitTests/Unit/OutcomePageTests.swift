@@ -38,29 +38,30 @@ struct OutcomePageTests {
         TranscriptEntry.display(entries).turns()[0]
     }
 
-    /// Messages sits between Outcome and Steps, shows steps, and a level stored by name
-    /// before it came still reads back as itself (#759).
-    @Test func messagesIsALevelBetweenOutcomeAndSteps() throws {
-        #expect(TurnDetail.allCases == [.outcome, .messages, .steps, .details])
+    /// Three levels (#1286): Messages, Steps and Details. Collapsed is one turn's state, not
+    /// a level, and an `outcome` stored from when it was one no longer reads.
+    @Test func threeLevelsAndCollapsedIsNotOne() throws {
+        #expect(TurnDetail.levels == [.messages, .steps, .details])
+        #expect(!TurnDetail.levels.contains(.collapsed) && !TurnDetail.collapsed.showsSteps)
         #expect(TurnDetail.messages.showsSteps && TurnDetail.messages.rollsUpCalls)
         #expect(!TurnDetail.steps.rollsUpCalls && !TurnDetail.details.rollsUpCalls)
-        for stored in ["outcome", "steps", "details"] {
+        for stored in ["messages", "steps", "details"] {
             #expect(TurnDetail(rawValue: stored)?.rawValue == stored)
         }
+        #expect(TurnDetail(rawValue: "outcome") == nil)
         let decoded = try JSONDecoder().decode([TurnDetail].self, from: Data(#"["steps","messages"]"#.utf8))
         #expect(decoded == [.steps, .messages])
     }
 
-    /// A turn starts at Messages (#993). Closing it goes to the outcome, and opening it
-    /// again goes back to the level, or to Messages when the level is the outcome.
-    @Test func turnsStartAtMessagesAndToggleThroughTheOutcome() {
+    /// A turn starts at Messages (#993). Closing it collapses it, and opening it again goes
+    /// back to the level.
+    @Test func turnsStartAtMessagesAndToggleThroughCollapsed() {
         #expect(TurnDetail.initial == .messages)
         let closed = TurnDetail.initial.toggled(level: .initial)
-        #expect(closed == .outcome)
+        #expect(closed == .collapsed)
         #expect(closed.toggled(level: .initial) == .messages)
-        #expect(TurnDetail.details.toggled(level: .details) == .outcome)
-        #expect(TurnDetail.outcome.toggled(level: .details) == .details)
-        #expect(TurnDetail.outcome.toggled(level: .outcome) == .messages)
+        #expect(TurnDetail.details.toggled(level: .details) == .collapsed)
+        #expect(TurnDetail.collapsed.toggled(level: .details) == .details)
     }
 
     @Test func aTurnIsItsAskAndEverythingAfterIt() throws {

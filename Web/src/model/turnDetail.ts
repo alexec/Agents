@@ -1,19 +1,24 @@
-/** How much of a turn is drawn (TurnDetail). */
-export type TurnDetail = "outcome" | "messages" | "steps" | "details";
-export const turnDetails: readonly TurnDetail[] = ["outcome", "messages", "steps", "details"];
+/** The levels every turn can start at (TurnDetail.levels, #1286). */
+export type TurnLevel = "messages" | "steps" | "details";
+/** How much of a turn is drawn (TurnDetail): a level, or one turn closed by its *N steps*. */
+export type TurnDetail = TurnLevel | "collapsed";
+export const turnDetails: readonly TurnLevel[] = ["messages", "steps", "details"];
 
 /** The level before anyone has chosen one, on every client (#993). */
-export const initialDetail: TurnDetail = "messages";
+export const initialDetail: TurnLevel = "messages";
 
-/** The level kept in storage, or the initial one when nothing (or nothing known) is kept. */
-export function savedDetail(saved: string | null): TurnDetail {
+/**
+ * The level kept in storage, or the initial one when nothing (or nothing known) is kept. An
+ * `outcome` kept from when it was a level reads as the initial one (#1286).
+ */
+export function savedDetail(saved: string | null): TurnLevel {
   return turnDetails.find((d) => d === saved) ?? initialDetail;
 }
 
 /**
  * A turn opened or closed by its *N steps*, from `now` with the app at `level`. Open is the
- * level when it shows steps and Messages when it does not (#759); closed is always the outcome.
+ * level; closed is always collapsed.
  */
-export function toggled(now: TurnDetail, level: TurnDetail): TurnDetail {
-  return now !== "outcome" ? "outcome" : level !== "outcome" ? level : "messages";
+export function toggled(now: TurnDetail, level: TurnLevel): TurnDetail {
+  return now !== "collapsed" ? "collapsed" : level;
 }

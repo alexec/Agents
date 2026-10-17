@@ -117,7 +117,6 @@ nav:
       - reference/personas.md
       - reference/events.md
       - reference/workspace-providers.md
-      - reference/integrations.md
       - reference/ssh-options.md
       - reference/keyboard-shortcuts.md
       - reference/feature-matrix.md
