@@ -10,7 +10,7 @@ import { preferenceKeys, setPreferences, stringPreference } from "../model/prefe
 import { useEffect, useLayoutEffect, useMemo, useRef } from "preact/hooks";
 import { openTurnsHeld, rememberOpen, type Store } from "../model/store";
 import { backgroundAge, backgroundEnded, backgroundNoun, isRunning, subagentNoSteps, subagentStatus } from "../model/background";
-import { display, isPersonsAsk, isWorking, omittingThoughts, placing, type ChatTurn, type Item } from "../model/turns";
+import { display, isPersonsAsk, isWorking, omittingThoughts, openingPlace, placing, type ChatTurn, type Item } from "../model/turns";
 import { toWireDate } from "../protocol/dates";
 import type { Agent, AppViewCall, BackgroundItem, FileMentionDTO, TranscriptEntry } from "../protocol/generated";
 import { replace, route } from "../route";
@@ -212,8 +212,12 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
   const settled = useRef(false);
   /** The last scroll seen, to tell a move up the page from the page growing or being trimmed (#378). */
   const lastScroll = useRef({ top: 0, height: 0 });
-  /** A place to go back to in a chat being opened again, until its rows are drawn (#378). */
-  const restoring = useRef<{ turn: string; offset: number; pages: number } | null>(null);
+  /**
+   * A place to go back to in a chat being opened again, until its rows are drawn (#378); or the
+   * place the reader needs, a card asked before the end or the first unread turn, found once the
+   * first page is drawn (#1287).
+   */
+  const restoring = useRef<{ turn: string; offset: number; pages: number } | { needed: true; unread: boolean; pages: number } | null>(null);
   /** Held out of sight while it pages back to that place, so the end does not flash first. */
   const hidden = useSignal(false);
 
@@ -232,11 +236,18 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
     settled.current = false;
     // Coming back to a chat read before: the line it was left on, unless it was following (#378).
     const place = readingPlaces.get(`${host}|${session}`);
-    restoring.current = place && !place.following ? { turn: place.turn, offset: place.offset, pages: 0 } : null;
+    // Else where the reader needs it (#1287). Unread as it was chosen: opening it marks it read.
+    const chosenAgent = store.agent(host, session);
+    const unread = !!chosenAgent?.isUnread;
+    restoring.current = place && !place.following ? { turn: place.turn, offset: place.offset, pages: 0 }
+      : unread || cards.length > 0 || chosenAgent?.state === "waitingOnUser" ? { needed: true, unread, pages: 0 }
+      : null;
     hidden.value = !!restoring.current;
     if (restoring.current) {
       following.current = false;
       store.setFollowingEnd(false);
+      // Rows in hand already when it was chosen draw no change to place it on (#1287).
+      requestAnimationFrame(() => restoreNow.current());
     }
     const timer = setTimeout(() => (settled.current = true), 400);
     return () => clearTimeout(timer);
@@ -248,6 +259,34 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
     const el = scroller.current;
     const place = restoring.current;
     if (!el || !place || !store.chatTurns.peek().length || loadingEarlier.current) return;
+    if ("needed" in place) {
+      const opening = openingPlace(stretches, place.unread);
+      // The last turn's ask before the page in hand: the pages before come in, out of sight.
+      if (opening && "askBefore" in opening && store.hasMoreOfTheConversation && place.pages < 40) {
+        place.pages += 1;
+        loadingEarlier.current = true;
+        void store.loadEarlier().finally(() => {
+          loadingEarlier.current = false;
+          requestAnimationFrame(() => restoreNow.current());
+        });
+        return;
+      }
+      const target = !opening || "askBefore" in opening ? null : "cards" in opening ? waiting.current
+        : el.querySelector<HTMLElement>(`[data-turn="${CSS.escape(opening.turn)}"]`);
+      restoring.current = null;
+      hidden.value = false;
+      if (!target) {
+        follow(true);
+        el.scrollTop = el.scrollHeight;
+        return;
+      }
+      el.scrollTop += target.getBoundingClientRect().top - el.getBoundingClientRect().top;
+      lastScroll.current = { top: el.scrollTop, height: el.scrollHeight };
+      // A last turn shorter than the pane leaves it at the end, still following.
+      if (el.scrollHeight - el.scrollTop - el.clientHeight < 1) follow(true);
+      else away.value = true;
+      return;
+    }
     const turn = [...el.querySelectorAll<HTMLElement>("[data-turn]")].find((row) => row.dataset.turn === place.turn);
     if (!turn && store.hasMoreOfTheConversation && place.pages < 40) {
       place.pages += 1;
@@ -271,6 +310,8 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
     lastScroll.current = { top: el.scrollTop, height: el.scrollHeight };
   };
   useLayoutEffect(restore, [rows, session]);
+  const restoreNow = useRef(restore);
+  restoreNow.current = restore;
 
   // Following the end: every kind of growth, a new line or a longer one, keeps the foot in view.
   const entryCount = store.entries.value.length;

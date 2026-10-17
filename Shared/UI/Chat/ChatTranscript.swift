@@ -30,6 +30,9 @@ struct ChatTranscript: View {
     /// Which conversation this is. A change settles the pane at the end again.
     let settleKey: UUID?
     let loadEarlier: () async -> Void
+    /// The same, while paging back out of sight to where it opens: as much as a page may
+    /// hold, where `loadEarlier` asks for a screen's worth (#1287).
+    var loadEarlierToOpen: (() async -> Void)? = nil
     /// How much of the foot of the pane the floating prompt covers.
     var bottomInset: CGFloat = 0
     /// What waits on the person (questions, forms, guarded changes), drawn in the
@@ -138,10 +141,19 @@ struct ChatTranscript: View {
     /// How the pane last moved, and the turn at its top: read on every scroll, so kept
     /// where writing them does not draw the pane again.
     @State private var motion = Motion()
-    /// The turn to go back to in a conversation opened again, until it is drawn (#378).
-    @State private var restoreTurn: UUID?
+    /// Where to open, until it is drawn: the turn a conversation was left on (#378), or the
+    /// place the reader needs, a card waiting or the first unread turn (#1287).
+    @State private var restoreTurn: OpenPlace?
+    /// From choosing a conversation until it is placed: hidden, so it never shows anywhere
+    /// but where it opens (#1287).
+    @State private var isPlacing = false
+    @State private var isAwaitingFirstPage = false
+    /// Opening the conversation in hand (`settle`), until it is placed.
+    @State private var settling: Task<Void, Never>?
     @State private var restorePages = 0
     @State private var isRestoreLoading = false
+    /// Placing it, out of sight, until it stops moving (#1287).
+    @State private var isRestorePlacing = false
     /// Asks for another try once a page has come, from a pass that holds the new rows.
     @State private var restoreTick = 0
     /// Whether the conversation's first page is in hand since it was chosen.
@@ -161,6 +173,8 @@ struct ChatTranscript: View {
         var fromTop: CGFloat = .infinity
         /// The turns on screen, top first: what a key pages from.
         var shown: [UUID] = []
+        /// How far past the furthest the pane can rest it is (`Edges.pastTheEnd`).
+        var pastTheEnd: CGFloat = -.infinity
     }
 
     /// Send now is for a turn that is running, on a runtime that said it takes words
@@ -282,7 +296,9 @@ struct ChatTranscript: View {
             }
             // Hidden while it pages back to where the reader left it, so the end does not
             // show first and then jump (#378).
-            .opacity(restoreTurn == nil ? 1 : 0)
+            // So too while a conversation that opens somewhere other than its end is chosen
+            // and not yet placed: its first frame is the place, never the end (#1287).
+            .opacity(restoreTurn == nil && !isPlacing && !(settleKey != motion.key && opensAway(stretches)) ? 1 : 0)
             .onScrollTargetVisibilityChange(idType: UUID.self, threshold: 0.01) { visible in
                 guard settleKey == motion.key else { return }
                 let visible = Set(visible)
@@ -342,6 +358,7 @@ struct ChatTranscript: View {
                 onHeight?(edges.height)
                 motion.fromTop = edges.fromTop
                 motion.offset = edges.offset
+                motion.pastTheEnd = edges.pastTheEnd
                 // Near the top, the page above. How far down the pane is does not depend
                 // on the content's height, so it is asked for whatever that reads.
                 if edges.contentHeight > 1, edges.fromTop < 400 { askForEarlier() }
@@ -463,6 +480,8 @@ struct ChatTranscript: View {
                 // load is what makes the rows exist to hold: the load's own view
                 // value still has the page from before.
                 if after > 0 { hasFirstPage = true }
+                // The first page, drawn hidden until the pane is placed (`settle`, #1287).
+                if before == 0, after > 0, isAwaitingFirstPage { isPlacing = true }
                 if isLoadingEarlier, after != before { holdPlace(scroller) }
                 if restoreTurn != nil { restore(scroller); return }
                 // Nothing here moves the pane otherwise; the geometry does that. This
@@ -471,7 +490,12 @@ struct ChatTranscript: View {
                 guard after > before, !isLoadingEarlier, restoreTurn == nil, !isFollowing else { return }
                 hasNewBelow = true
             }
-            .task(id: settleKey) { await settle(scroller) }
+            // Opened when it comes on screen and when another conversation is chosen, in a
+            // task of its own: a phone pushing the chat again tells it it has gone 8 ms after
+            // it came, though it stays, and a `.task` ended there was never started again,
+            // so the conversation opened wherever it had been (#1287).
+            .onAppear { startSettling(scroller) }
+            .onChange(of: settleKey) { startSettling(scroller) }
             .onChange(of: restoreTurn) { _, now in if now != nil { restore(scroller) } }
             .onChange(of: restoreTick) { restore(scroller) }
             // Asked for from elsewhere. A message entry is drawn with its own id, so
@@ -696,14 +720,28 @@ struct ChatTranscript: View {
         withTransaction(transaction) { scroller.scrollTo(id, anchor: anchor) }
     }
 
-    /// Open at the end, the way every chat does, and only then let reaching the top
-    /// mean something.
+    private func startSettling(_ scroller: ScrollViewProxy) {
+        settling?.cancel()
+        settling = Task { await settle(scroller) }
+    }
+
+    /// Open where the reader needs it, the end unless something else waits for them
+    /// (#1287), and only then let reaching the top mean something.
     private func settle(_ scroller: ScrollViewProxy) async {
+        let wasUnread = agent.isUnread
+        let mayWait = !cards.isEmpty || agent.state == .waitingOnUser
+        // Hidden until placed, wherever it opens, from the first page on: a lazy stack sent
+        // to its end draws its last rows a screen below the fold, then moves them up as it
+        // measures (#1287). A chat with nothing yet stays shown while it waits.
+        isPlacing = entryCount > 0
+        defer { isPlacing = false }
         motion.key = settleKey
+        motion.pastTheEnd = -.infinity
         motion.topTurn = nil
         motion.wentDown = false
         restoreTurn = nil
         restorePages = 0
+        isRestorePlacing = false
         turnViews = [:]
         fetchedTurns = [:]
         fetchedOrder = []
@@ -724,18 +762,41 @@ struct ChatTranscript: View {
         // it was when the conversation was chosen, so its own `entryCount` never moved,
         // and every open waited out the whole deadline at the top of the page (#378).
         hasFirstPage = entryCount > 0
+        isAwaitingFirstPage = true
         let deadline = ContinuousClock.now.advanced(by: .seconds(3))
         while !hasFirstPage, ContinuousClock.now < deadline, !Task.isCancelled {
             try? await Task.sleep(for: .milliseconds(30))
         }
+        isAwaitingFirstPage = false
         guard !Task.isCancelled else { return }
         // Read back through before, and left there: back to that turn (#378).
         if let key = settleKey, let turn = Self.readingPlaces[key] {
             isFollowing = false
-            restoreTurn = turn
+            restoreTurn = .turn(turn)
+            return
+        }
+        // Else where the reader needs it (#1287): a card asked in the middle of the
+        // conversation, or the ask of the turn that finished with nobody watching. Unread
+        // as it was chosen, since opening it marks it read; where, from the rows as they
+        // are now, which this task does not hold (`restore`).
+        if wasUnread || mayWait {
+            isFollowing = false
+            restoreTurn = .needed(wasUnread: wasUnread)
             return
         }
         place(scroller, on: bottom, anchor: .bottom)
+        // Shown once it has measured and stopped moving, three samples running, or after
+        // 400 ms at most.
+        let shownBy = ContinuousClock.now.advanced(by: .milliseconds(400))
+        var resting = 0
+        var last = motion.pastTheEnd
+        while resting < 3, ContinuousClock.now < shownBy, !Task.isCancelled {
+            try? await Task.sleep(for: .milliseconds(16))
+            let now = motion.pastTheEnd
+            resting = now.isFinite && abs(now - last) < 0.5 ? resting + 1 : 0
+            last = now
+        }
+        isPlacing = false
         try? await Task.sleep(for: .milliseconds(400))
         guard !Task.isCancelled else { return }
         hasSettled = true
@@ -753,16 +814,23 @@ struct ChatTranscript: View {
     }
 
     /// Back to the turn the reader left this conversation on. It opens on its last page, so
-    /// the pages before come in until that turn is in hand; if it never is, the end.
+    /// the pages before come in until that turn is in hand; if it never is, the end. Or to
+    /// the place the reader needs (#1287), worked out now that the first page is drawn.
     private func restore(_ scroller: ScrollViewProxy) {
-        guard let turn = restoreTurn, !isRestoreLoading else { return }
-        if rows.contains(where: { $0.id == turn }) {
-            place(scroller, on: turn, anchor: .top)
-        } else if hasMore, restorePages < 40 {
+        guard var to = restoreTurn, !isRestoreLoading, !isRestorePlacing else { return }
+        if case .needed(let wasUnread) = to {
+            to = openingPlace(rows.placing(cards, at: \.at), wasUnread: wasUnread) ?? .end
+        }
+        let placeIt: () -> Void
+        if case .card(let card) = to {
+            placeIt = { place(scroller, on: card, anchor: .top) }
+        } else if case .turn(let turn) = to, rows.contains(where: { $0.id == turn }) {
+            placeIt = { place(scroller, on: turn, anchor: .top) }
+        } else if to.pagesBack, hasMore, restorePages < 40 {
             restorePages += 1
             isRestoreLoading = true
             Task {
-                await loadEarlier()
+                await (loadEarlierToOpen ?? loadEarlier)()
                 isRestoreLoading = false
                 // From the next pass, which has the page's rows: this one's are as they
                 // were when it was asked for.
@@ -771,11 +839,24 @@ struct ChatTranscript: View {
             return
         } else {
             isFollowing = true
-            place(scroller, on: bottom, anchor: .bottom)
+            placeIt = { place(scroller, on: bottom, anchor: .bottom) }
         }
+        placeIt()
+        isRestorePlacing = true
         Task { @MainActor in
-            // A turn of the run loop for the move to land before the pane is shown.
-            try? await Task.sleep(for: .milliseconds(50))
+            // Placed again, out of sight, until it stops moving: the rows between are
+            // measured after the move, and a phone's grew enough to leave the place a
+            // screen below (#1287). Three samples running, or 400 ms at most.
+            let shownBy = ContinuousClock.now.advanced(by: .milliseconds(400))
+            var resting = 0
+            var last = motion.offset
+            while resting < 3, ContinuousClock.now < shownBy, !Task.isCancelled {
+                try? await Task.sleep(for: .milliseconds(16))
+                placeIt()
+                resting = abs(motion.offset - last) < 0.5 ? resting + 1 : 0
+                last = motion.offset
+            }
+            isRestorePlacing = false
             restoreTurn = nil
             try? await Task.sleep(for: .milliseconds(350))
             hasSettled = true
@@ -819,6 +900,41 @@ struct ChatTranscript: View {
     }
 
     private var bottom: String { "bottom" }
+
+    /// Where a conversation just chosen opens, when not at its end (#1287).
+    private func openingPlace(_ stretches: [ChatStretch<WaitingCard>], wasUnread: Bool) -> OpenPlace? {
+        switch stretches.openingPlace(unread: wasUnread) {
+        case .cards(let stretch): return .card(stretches[stretch].cards[0].id)
+        case .turn(let id): return .turn(id)
+        case .askBefore: return .earlier
+        case nil: return nil
+        }
+    }
+
+    /// Whether the conversation opens somewhere other than its end, from what is in hand.
+    private func opensAway(_ stretches: [ChatStretch<WaitingCard>]) -> Bool {
+        openingPlace(stretches, wasUnread: agent.isUnread) != nil
+    }
+}
+
+/// A place a conversation opens at other than its end.
+private enum OpenPlace: Equatable {
+    case turn(UUID)
+    case card(String)
+    /// Not known until the first page is drawn (#1287).
+    case needed(wasUnread: Bool)
+    /// The last turn's ask, before the page in hand.
+    case earlier
+    /// The end after all.
+    case end
+
+    /// Whether the pages before are asked for until it is in hand.
+    var pagesBack: Bool {
+        switch self {
+        case .turn, .earlier: return true
+        default: return false
+        }
+    }
 }
 
 /// A card that waits on the person, and when it was asked: where it is drawn (#973).

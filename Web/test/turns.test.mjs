@@ -73,6 +73,24 @@ test("a waiting card is placed where it was asked, as Swift's placing (#973)", (
   ]);
 });
 
+test("a chat opens where the reader needs it, as Swift's openingPlace (#1287)", () => {
+  const ask = (id, at) => ({ kind: "entry", id, entry: { id, at, kind: { userMessage: { _0: id, blocks: [] } } } });
+  const said = (id, at) => ({ kind: "entry", id, entry: { id, at, kind: { agentMessage: { messageID: id, text: id, blocks: [] } } } });
+  const rows = turns.turns([ask("A", 0), said("a1", 1), ask("B", 6), said("b1", 7)]);
+  const at = (c) => c.at;
+  const none = turns.placing(rows, [], at);
+  assert.equal(turns.openingPlace(none, false), null);
+  assert.deepEqual(turns.openingPlace(none, true), { turn: rows[rows.length - 1].id });
+  // A card asked in the middle, with B after it: the card, unread or not.
+  assert.deepEqual(turns.openingPlace(turns.placing(rows, [{ at: 3 }], at), true), { cards: 0 });
+  // A card after everything: the end, which is where it is.
+  assert.equal(turns.openingPlace(turns.placing(rows, [{ at: 20 }], at), true), null);
+  // A long last turn's tail in hand, a row with no ask: its ask is before the page.
+  const tail = [{ turns: [...rows, { id: "tail", items: [said("b2", 8)] }], cards: [] }];
+  assert.deepEqual(turns.openingPlace(tail, true), { askBefore: true });
+  assert.equal(turns.openingPlace(tail, false), null);
+});
+
 test("a question's own record, a moment after it, stays above its card (#973)", () => {
   const said = (id, at) => ({ kind: "entry", id, entry: { id, at, kind: { agentMessage: { messageID: id, text: id, blocks: [] } } } });
   const rows = turns.turns([said("a1", 1), said("asked", 3.002), said("a2", 9)]);
