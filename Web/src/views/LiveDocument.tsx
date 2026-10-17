@@ -1,6 +1,7 @@
 // A live page (071 US4 scenarios 3–4; LivePage.swift and PagePane.swift): a Markdown file the
-// agent shows, drawn passage by passage, read again each time the host says its folder changed,
-// and taken to the first passage that changed. The person clicks a passage to type in it; what
+// agent shows, drawn passage by passage, read again each time the host says its folder changed.
+// What changed is typed in by the agent's caret, one passage after another, and the view follows
+// the caret (#1236, the window's PageFollower; model/caret.ts). The person clicks a passage to type in it; what
 // they type is merged with whatever the agent wrote meanwhile (PassageMerge) and written back
 // through `artifact/write`, as the window writes it. While they type, the page doesn't move.
 import { useSignal } from "@preact/signals";
@@ -8,6 +9,7 @@ import { useEffect, useMemo, useRef } from "preact/hooks";
 import type { FileReading, FileStamp } from "../protocol/generated";
 import type { Store } from "../model/store";
 import { describe } from "../model/errors";
+import { idle, reveal, shown as shownOf, skip, tick, typingTick, type Caret } from "../model/caret";
 import { pictureFromReading } from "../model/pageImage";
 import { indexContaining, merge, split, type Passage } from "../model/passages";
 import { Markdown, type PageImages } from "../render/markdown";
@@ -22,7 +24,7 @@ type Loaded =
 
 /** How long typing rests before it is written. */
 const settle = 700;
-/** How long a changed passage stays marked. */
+/** How long the passage holding a line the agent named stays marked. */
 const markFor = 2_500;
 
 interface Editing {
@@ -51,6 +53,8 @@ export function LiveDocument({ store, host, agentID, path, line, source }: {
   const editing = useSignal<Editing | null>(null);
   const theirs = useSignal<string | null>(null);
   const marked = useSignal<Set<number>>(new Set());
+  const caret = useSignal<Caret>(idle);
+  const typist = useRef<ReturnType<typeof setInterval> | null>(null);
   const saving = useRef<ReturnType<typeof setTimeout> | null>(null);
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
   const later = (run: () => void, ms: number) => {
@@ -64,6 +68,7 @@ export function LiveDocument({ store, host, agentID, path, line, source }: {
     for (const timer of timers.current) clearTimeout(timer);
     timers.current = [];
     if (saving.current) clearTimeout(saving.current);
+    if (typist.current) clearInterval(typist.current);
   }, []);
   const container = useRef<HTMLDivElement>(null);
   const folder = path.slice(0, path.lastIndexOf("/")) || "/";
@@ -95,13 +100,18 @@ export function LiveDocument({ store, host, agentID, path, line, source }: {
       }
       const before = was.kind === "text" ? split(was.text) : [];
       loaded.value = { kind: "text", text: r.text, stamp: r.stamp, truncated: r.isTruncated };
-      // The first passage that changed, followed unless the person is typing.
+      // What changed is queued for the caret, which takes the view to each passage as it reaches
+      // it. A write is not marked as well: the caret typing it in says where it changed, as on the
+      // window. Only a change with nothing to type, a deletion, moves the view by hand.
       const after = split(r.text);
       const changed = after.map((p, i) => (before[i]?.source === p.source ? -1 : i)).filter((i) => i >= 0);
+      if (after.length < before.length) changed.push(after.length);
       if (changed.length && was.kind === "text") {
-        marked.value = new Set(changed);
-        later(() => (marked.value = new Set()), markFor);
-        if (!editing.peek()) go(changed[0]!);
+        const typing = editing.peek()?.index;
+        const queued = reveal(before.map((p) => p.source), after.map((p) => p.source), changed.filter((i) => i !== typing));
+        caret.value = queued;
+        if (queued.revealing) startTyping();
+        else if (typing === undefined) go(Math.min(changed[0]!, Math.max(0, after.length - 1)));
       }
     } catch (error) {
       if (n !== reads.current) return;
@@ -114,6 +124,23 @@ export function LiveDocument({ store, host, agentID, path, line, source }: {
     }
   };
 
+  // The caret's beat: typingStep characters every typingTick, until nothing is left to type.
+  const startTyping = () => {
+    if (typist.current) return;
+    typist.current = setInterval(() => {
+      const now = loaded.peek();
+      const sources = now.kind === "text" ? split(now.text).map((p) => p.source) : [];
+      caret.value = tick(caret.peek(), sources);
+      if (!caret.peek().revealing && typist.current) { clearInterval(typist.current); typist.current = null; }
+    }, typingTick);
+  };
+
+  // The view follows the caret from passage to passage, and stays put while the person types.
+  const typingAt = caret.value.revealing?.index;
+  useEffect(() => {
+    if (typingAt !== undefined && !editing.peek()) go(typingAt);
+  }, [typingAt]);
+
   const go = (index: number) => {
     requestAnimationFrame(() => container.current?.querySelector(`[data-passage="${index}"]`)?.scrollIntoView({ block: "center", behavior: "smooth" }));
   };
@@ -121,6 +148,7 @@ export function LiveDocument({ store, host, agentID, path, line, source }: {
   useEffect(() => {
     loaded.value = { kind: "reading" };
     editing.value = null;
+    caret.value = idle;
     const unwatch = page.watch();
     void read();
     return unwatch;
@@ -178,6 +206,12 @@ export function LiveDocument({ store, host, agentID, path, line, source }: {
     else editing.value = null;
   };
 
+  // Opened while the caret is in it, or waiting for it: the person gets it whole at once.
+  const open = (passage: Passage, index: number) => {
+    caret.value = skip(caret.peek(), index);
+    editing.value = { base: text, mine: passage, index, draft: passage.source };
+  };
+
   const focusOnce = (el: HTMLTextAreaElement | null) => {
     if (el && document.activeElement !== el) el.focus();
   };
@@ -220,20 +254,21 @@ export function LiveDocument({ store, host, agentID, path, line, source }: {
             );
           }
           return (
-            <div key={index} data-passage={index} class={`passage${marked.value.has(index) ? " marked" : ""}${passage.isHeading ? " heading" : ""}`}
+            <div key={index} data-passage={index} class={`passage${marked.value.has(index) ? " marked" : ""}${passage.isHeading ? " heading" : ""}${typingAt === index ? " typing" : ""}`}
+              aria-busy={typingAt === index ? true : undefined}
               role={canEdit ? "button" : undefined} tabIndex={canEdit ? 0 : undefined}
               title={canEdit ? "Click to edit this passage" : undefined}
               onClick={() => {
                 if (!canEdit || editing.peek()) return;
-                editing.value = { base: text, mine: passage, index, draft: passage.source };
+                open(passage, index);
               }}
               onKeyDown={(e) => {
                 if (canEdit && e.key === "Enter" && !editing.peek()) {
                   e.preventDefault();
-                  editing.value = { base: text, mine: passage, index, draft: passage.source };
+                  open(passage, index);
                 }
               }}>
-              <Markdown text={passage.source} images={images} />
+              <Markdown text={shownOf(caret.value, index, passage.source)} images={images} />
             </div>
           );
         })}

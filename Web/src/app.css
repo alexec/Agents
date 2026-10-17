@@ -894,6 +894,11 @@ button.remove:hover { opacity: 1; }
 .passage[role=button] { cursor: text; }
 .passage[role=button]:hover { background: var(--paper-wash); }
 .passage.marked { background: color-mix(in srgb, var(--tint-attention) 10%, transparent); }
+/* The agent's caret (#1236): after the last thing typed, in the passage the caret is in. */
+.passage.typing .markdown:empty::after,
+.passage.typing .markdown > :last-child:not(ul, ol, pre, blockquote, table)::after,
+.passage.typing .markdown > :is(ul, ol):last-child > li:last-child::after,
+.passage.typing .markdown > pre:last-child > code::after { content: "▍"; color: var(--accent); }
 .passage-editor {
   display: block;
   width: 100%;
