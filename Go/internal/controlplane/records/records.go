@@ -492,6 +492,34 @@ func (r *Records) SaveClient(ctx context.Context, c ClientRecord) error {
 	return nil
 }
 
+// UpdateClient saves a change to a client already known: its last sight, its name, the
+// endpoints it holds. One forgotten since it was read stays forgotten (#1229): the
+// change is let go rather than written over its tombstone, which SaveClient would do.
+func (r *Records) UpdateClient(ctx context.Context, c ClientRecord) error {
+	r.writing.Lock()
+	defer r.writing.Unlock()
+	r.mu.Lock()
+	c.ID = strings.ToUpper(c.ID)
+	h, ok := r.clients[c.ID]
+	r.mu.Unlock()
+	if !ok {
+		return nil
+	}
+	if c.Owner == nil {
+		c.Owner = h.record.Owner
+	}
+	c.Rev = h.record.Rev + 1
+	key := ClientKey(c.ID)
+	kept, etag, err := write(ctx, r.Store, c, key, store.Matching(h.etag))
+	if err != nil {
+		return err
+	}
+	r.mu.Lock()
+	r.clients[c.ID] = held[ClientRecord]{kept, etag}
+	r.mu.Unlock()
+	return nil
+}
+
 // ForgetClient is clients/forget: a tombstone against the version read. Nothing happens
 // for a client that is not known. The last client may go too (#111).
 func (r *Records) ForgetClient(ctx context.Context, id string) error {

@@ -886,6 +886,13 @@ func (s *Service) accept(conn *Conn, webOrigin string) {
 	switch id.Kind {
 	case 'c':
 		s.router.AttachClient(client, conn, relayed)
+		// Forgotten while it joined (#1229): the forget's sweep of sessions may have come
+		// before this one was attached, and admitting it would write it back over its
+		// tombstone. It is closed as any forgotten client is.
+		if s.records.Client(client.ID) == nil && s.records.WasForgotten(client.ID) {
+			s.router.ForgetClient(client.ID)
+			return
+		}
 		if err := s.methods.Admit(context.Background(), *client); err != nil {
 			s.log("store: could not note " + client.Name + " connecting: " + err.Error())
 		}
