@@ -83,7 +83,14 @@ func (g *goGen) definition(name string, s *Schema) {
 		g.enum(name, s)
 		return
 	}
-	fmt.Fprintf(&g.out, "type %s %s\n", name, g.typeOf(s, name))
+	t := g.typeOf(s, name)
+	if t == "JSONValue" {
+		// An alias, so it keeps json.RawMessage's own MarshalJSON: a type made from it
+		// would be written as base64.
+		fmt.Fprintf(&g.out, "type %s = %s\n", name, t)
+		return
+	}
+	fmt.Fprintf(&g.out, "type %s %s\n", name, t)
 }
 
 func (g *goGen) object(name string, s *Schema) {
