@@ -93,6 +93,8 @@ var (
 	CallPinsUnpinSession               = Method[PinSessionRequest, Empty]{"pins/unpinSession"}
 	CallPinsUnpinWorkflow              = Method[WorkflowRequest, Empty]{"pins/unpinWorkflow"}
 	CallPinsWrite                      = Method[PinWriteRequest, Empty]{"pins/write"}
+	CallPluginsApprove                 = Method[PluginApproveRequest, PluginsList]{"plugins/approve"}
+	CallPluginsList                    = Method[PluginsListRequest, PluginsList]{"plugins/list"}
 	CallPoolApplyAllowances            = Method[ApplyAllowancesRequest, Changed]{"pool/applyAllowances"}
 	CallPreferencesGet                 = Method[Empty, map[string]JSONValue]{"preferences/get"}
 	CallPreferencesSet                 = Method[map[string]JSONValue, map[string]JSONValue]{"preferences/set"}
@@ -137,6 +139,8 @@ var (
 	CallShellResize                    = Method[ShellResizeRequest, Empty]{"shell/resize"}
 	CallShellRestart                   = Method[ShellAttachRequest, ShellAttachResponse]{"shell/restart"}
 	CallShellSignal                    = Method[ShellSignalRequest, Empty]{"shell/signal"}
+	CallSkillsList                     = Method[SkillsListRequest, SkillsListAnswer]{"skills/list"}
+	CallSkillsRemove                   = Method[SkillNameRequest, SkillRemoveAnswer]{"skills/remove"}
 	CallStoreNotes                     = Method[Empty, StoreNotes]{"store/notes"}
 	CallSurfaceIdentify                = Method[SurfaceIdentification, Empty]{"surface/identify"}
 	CallTimeHistory                    = Method[Empty, TimeHistory]{"time/history"}
@@ -181,6 +185,7 @@ var (
 	NotifyModesChanged                 = Notification[map[string]JSONValue]{"modes/changed"}
 	NotifyPagesChanged                 = Notification[PagesChangedNotification]{"pages/changed"}
 	NotifyPinsChanged                  = Notification[PinsChangedNotification]{"pins/changed"}
+	NotifyPluginsChanged               = Notification[PluginsList]{"plugins/changed"}
 	NotifyPreferencesChanged           = Notification[map[string]JSONValue]{"preferences/changed"}
 	NotifyProjectChanged               = Notification[ProjectSummary]{"project/changed"}
 	NotifyProjectRemoved               = Notification[ProjectRemovedNotification]{"project/removed"}

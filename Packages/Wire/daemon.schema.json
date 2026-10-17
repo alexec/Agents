@@ -1441,6 +1441,223 @@
         }
       ]
     },
+    "CatalogError": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "unreachable": {
+              "type": "object",
+              "properties": {
+                "host": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "host"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "unreachable"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "rateLimited": {
+              "type": "object",
+              "properties": {
+                "retryAfter": {
+                  "type": "integer"
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "rateLimited"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "unmanaged": {
+              "type": "object",
+              "properties": {
+                "path": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "path"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "unmanaged"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "lockUnreadable": {
+              "type": "object",
+              "properties": {
+                "path": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "path"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "lockUnreadable"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "noPersonalHome": {
+              "type": "object",
+              "additionalProperties": {
+                "not": {}
+              }
+            }
+          },
+          "required": [
+            "noPersonalHome"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "previewExpired": {
+              "type": "object",
+              "additionalProperties": {
+                "not": {}
+              }
+            }
+          },
+          "required": [
+            "previewExpired"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "notAProject": {
+              "type": "object",
+              "properties": {
+                "path": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "path"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "notAProject"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "replaceMismatch": {
+              "type": "object",
+              "additionalProperties": {
+                "not": {}
+              }
+            }
+          },
+          "required": [
+            "replaceMismatch"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "cannotAdd": {
+              "type": "object",
+              "properties": {
+                "_0": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/definitions/PreviewProblem"
+                  }
+                }
+              },
+              "required": [
+                "_0"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "cannotAdd"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "notManaged": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "name"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "notManaged"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "failed": {
+              "type": "object",
+              "properties": {
+                "_0": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "_0"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "failed"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
     "CatchUpLeases": {
       "type": "object",
       "properties": {
@@ -5098,6 +5315,28 @@
       ],
       "additionalProperties": false
     },
+    "ListedSkill": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "folder": {
+          "type": "string"
+        },
+        "managed": {
+          "$ref": "#/definitions/ManagedSkill"
+        }
+      },
+      "required": [
+        "name",
+        "folder"
+      ],
+      "additionalProperties": false
+    },
     "MCPCheckState": {
       "type": "string",
       "enum": [
@@ -5424,6 +5663,49 @@
         "stopped",
         "notThisHost"
       ]
+    },
+    "ManagedSkill": {
+      "type": "object",
+      "properties": {
+        "destination": {
+          "$ref": "#/definitions/SkillDestination"
+        },
+        "name": {
+          "type": "string"
+        },
+        "source": {
+          "type": "string"
+        },
+        "skillPath": {
+          "type": "string"
+        },
+        "recordedHash": {
+          "type": "string"
+        },
+        "commit": {
+          "type": "string"
+        },
+        "committedAt": {
+          "$ref": "#/definitions/WireDate"
+        },
+        "catalogue": {
+          "type": "string"
+        },
+        "edited": {
+          "type": "boolean"
+        },
+        "update": {
+          "$ref": "#/definitions/UpdateState"
+        }
+      },
+      "required": [
+        "destination",
+        "name",
+        "source",
+        "edited",
+        "update"
+      ],
+      "additionalProperties": false
     },
     "MarkRuntimeAvailable": {
       "type": "object",
@@ -6339,6 +6621,53 @@
         "withdrawn"
       ]
     },
+    "PluginApproveRequest": {
+      "type": "object",
+      "properties": {
+        "plugin": {
+          "$ref": "#/definitions/URLString"
+        },
+        "digest": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "plugin",
+        "digest"
+      ],
+      "additionalProperties": false
+    },
+    "PluginsList": {
+      "type": "object",
+      "properties": {
+        "folder": {
+          "$ref": "#/definitions/URLString"
+        },
+        "plugins": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ProjectPlugin"
+          }
+        }
+      },
+      "required": [
+        "folder",
+        "plugins"
+      ],
+      "additionalProperties": false
+    },
+    "PluginsListRequest": {
+      "type": "object",
+      "properties": {
+        "folder": {
+          "$ref": "#/definitions/URLString"
+        }
+      },
+      "required": [
+        "folder"
+      ],
+      "additionalProperties": false
+    },
     "PresenceReport": {
       "type": "object",
       "properties": {
@@ -6365,6 +6694,89 @@
         "active"
       ],
       "additionalProperties": false
+    },
+    "PreviewProblem": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "noSkillFile": {
+              "type": "object",
+              "additionalProperties": {
+                "not": {}
+              }
+            }
+          },
+          "required": [
+            "noSkillFile"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "notFoundInRepo": {
+              "type": "object",
+              "additionalProperties": {
+                "not": {}
+              }
+            }
+          },
+          "required": [
+            "notFoundInRepo"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "tooLarge": {
+              "type": "object",
+              "properties": {
+                "bytes": {
+                  "type": "integer"
+                },
+                "files": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "bytes",
+                "files"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "tooLarge"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "skipped": {
+              "type": "object",
+              "properties": {
+                "_0": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "required": [
+                "_0"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "skipped"
+          ],
+          "additionalProperties": false
+        }
+      ]
     },
     "PrewarmRequest": {
       "type": "object",
@@ -6470,6 +6882,36 @@
       "required": [
         "folder",
         "pins"
+      ],
+      "additionalProperties": false
+    },
+    "ProjectPlugin": {
+      "type": "object",
+      "properties": {
+        "project": {
+          "$ref": "#/definitions/URLString"
+        },
+        "folder": {
+          "$ref": "#/definitions/URLString"
+        },
+        "name": {
+          "type": "string"
+        },
+        "carries": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "awaitingApproval": {
+          "$ref": "#/definitions/WorkflowApproval"
+        }
+      },
+      "required": [
+        "project",
+        "folder",
+        "name",
+        "carries"
       ],
       "additionalProperties": false
     },
@@ -8382,6 +8824,83 @@
         "unreadable"
       ]
     },
+    "SkillDestination": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "$ref": "#/definitions/SkillDestinationKind"
+        },
+        "folder": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "SkillDestinationKind": {
+      "type": "string",
+      "enum": [
+        "personal",
+        "project"
+      ]
+    },
+    "SkillNameRequest": {
+      "type": "object",
+      "properties": {
+        "destination": {
+          "$ref": "#/definitions/SkillDestination"
+        },
+        "name": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "destination",
+        "name"
+      ],
+      "additionalProperties": false
+    },
+    "SkillRemoveAnswer": {
+      "type": "object",
+      "properties": {
+        "trashedTo": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "trashedTo"
+      ],
+      "additionalProperties": false
+    },
+    "SkillsListAnswer": {
+      "type": "object",
+      "properties": {
+        "skills": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ListedSkill"
+          }
+        }
+      },
+      "required": [
+        "skills"
+      ],
+      "additionalProperties": false
+    },
+    "SkillsListRequest": {
+      "type": "object",
+      "properties": {
+        "destination": {
+          "$ref": "#/definitions/SkillDestination"
+        }
+      },
+      "required": [
+        "destination"
+      ],
+      "additionalProperties": false
+    },
     "SlashCommand": {
       "type": "object",
       "properties": {
@@ -9737,6 +10256,61 @@
         "promptID"
       ],
       "additionalProperties": false
+    },
+    "UpdateState": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "unknown": {
+              "type": "object",
+              "additionalProperties": {
+                "not": {}
+              }
+            }
+          },
+          "required": [
+            "unknown"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "current": {
+              "type": "object",
+              "additionalProperties": {
+                "not": {}
+              }
+            }
+          },
+          "required": [
+            "current"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "available": {
+              "type": "object",
+              "properties": {
+                "commit": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "commit"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "available"
+          ],
+          "additionalProperties": false
+        }
+      ]
     },
     "Usage": {
       "type": "object",

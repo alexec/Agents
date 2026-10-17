@@ -498,6 +498,52 @@ type CarriedSettingSourceLevel struct {
 	Value string `json:"_0"`
 }
 
+type CatalogError struct {
+	Unreachable     *CatalogErrorUnreachable    `json:"unreachable,omitzero"`
+	RateLimited     *CatalogErrorRateLimited    `json:"rateLimited,omitzero"`
+	Unmanaged       *CatalogErrorUnmanaged      `json:"unmanaged,omitzero"`
+	LockUnreadable  *CatalogErrorLockUnreadable `json:"lockUnreadable,omitzero"`
+	NoPersonalHome  *struct{}                   `json:"noPersonalHome,omitzero"`
+	PreviewExpired  *struct{}                   `json:"previewExpired,omitzero"`
+	NotAProject     *CatalogErrorNotAProject    `json:"notAProject,omitzero"`
+	ReplaceMismatch *struct{}                   `json:"replaceMismatch,omitzero"`
+	CannotAdd       *CatalogErrorCannotAdd      `json:"cannotAdd,omitzero"`
+	NotManaged      *CatalogErrorNotManaged     `json:"notManaged,omitzero"`
+	Failed          *CatalogErrorFailed         `json:"failed,omitzero"`
+}
+
+type CatalogErrorUnreachable struct {
+	Host string `json:"host"`
+}
+
+type CatalogErrorRateLimited struct {
+	RetryAfter *int64 `json:"retryAfter,omitzero"`
+}
+
+type CatalogErrorUnmanaged struct {
+	Path string `json:"path"`
+}
+
+type CatalogErrorLockUnreadable struct {
+	Path string `json:"path"`
+}
+
+type CatalogErrorNotAProject struct {
+	Path string `json:"path"`
+}
+
+type CatalogErrorCannotAdd struct {
+	Value []PreviewProblem `json:"_0"`
+}
+
+type CatalogErrorNotManaged struct {
+	Name string `json:"name"`
+}
+
+type CatalogErrorFailed struct {
+	Value string `json:"_0"`
+}
+
 type CatchUpLeases struct {
 	Leases LeaseSnapshot     `json:"leases"`
 	Hosted HostedMCPSnapshot `json:"hosted"`
@@ -1623,6 +1669,13 @@ type ListRequest struct {
 	Query             *string     `json:"query,omitzero"`
 }
 
+type ListedSkill struct {
+	Name        string        `json:"name"`
+	Description *string       `json:"description,omitzero"`
+	Folder      string        `json:"folder"`
+	Managed     *ManagedSkill `json:"managed,omitzero"`
+}
+
 type MCPCheckState string
 
 const (
@@ -1747,6 +1800,19 @@ const (
 	MCPTriggerStatusStateStopped     MCPTriggerStatusState = "stopped"
 	MCPTriggerStatusStateNotThisHost MCPTriggerStatusState = "notThisHost"
 )
+
+type ManagedSkill struct {
+	Destination  SkillDestination `json:"destination"`
+	Name         string           `json:"name"`
+	Source       string           `json:"source"`
+	SkillPath    *string          `json:"skillPath,omitzero"`
+	RecordedHash *string          `json:"recordedHash,omitzero"`
+	Commit       *string          `json:"commit,omitzero"`
+	CommittedAt  *Date            `json:"committedAt,omitzero"`
+	Catalogue    *string          `json:"catalogue,omitzero"`
+	Edited       bool             `json:"edited"`
+	Update       UpdateState      `json:"update"`
+}
 
 type MarkRuntimeAvailable struct {
 	CredentialKey string `json:"credentialKey"`
@@ -2056,12 +2122,42 @@ const (
 	PlanStateWithdrawn PlanState = "withdrawn"
 )
 
+type PluginApproveRequest struct {
+	Plugin URL    `json:"plugin"`
+	Digest string `json:"digest"`
+}
+
+type PluginsList struct {
+	Folder  URL             `json:"folder"`
+	Plugins []ProjectPlugin `json:"plugins"`
+}
+
+type PluginsListRequest struct {
+	Folder URL `json:"folder"`
+}
+
 type PresenceReport struct {
 	Watching    *UUID  `json:"watching,omitzero"`
 	Active      bool   `json:"active"`
 	MayNotify   *bool  `json:"mayNotify,omitzero"`
 	Showing     *UUID  `json:"showing,omitzero"`
 	AlsoShowing []UUID `json:"alsoShowing,omitzero"`
+}
+
+type PreviewProblem struct {
+	NoSkillFile    *struct{}               `json:"noSkillFile,omitzero"`
+	NotFoundInRepo *struct{}               `json:"notFoundInRepo,omitzero"`
+	TooLarge       *PreviewProblemTooLarge `json:"tooLarge,omitzero"`
+	Skipped        *PreviewProblemSkipped  `json:"skipped,omitzero"`
+}
+
+type PreviewProblemTooLarge struct {
+	Bytes int64 `json:"bytes"`
+	Files int64 `json:"files"`
+}
+
+type PreviewProblemSkipped struct {
+	Value []string `json:"_0"`
 }
 
 type PrewarmRequest struct {
@@ -2097,6 +2193,14 @@ type ProjectPins struct {
 	Pins      []PinView `json:"pins"`
 	Sessions  []UUID    `json:"sessions,omitzero"`
 	Workflows []string  `json:"workflows,omitzero"`
+}
+
+type ProjectPlugin struct {
+	Project          URL               `json:"project"`
+	Folder           URL               `json:"folder"`
+	Name             string            `json:"name"`
+	Carries          []string          `json:"carries"`
+	AwaitingApproval *WorkflowApproval `json:"awaitingApproval,omitzero"`
 }
 
 type ProjectRemovedNotification struct {
@@ -2705,6 +2809,35 @@ const (
 	SignInWantedReasonUnreadable  SignInWantedReason = "unreadable"
 )
 
+type SkillDestination struct {
+	Kind   SkillDestinationKind `json:"kind"`
+	Folder *string              `json:"folder,omitzero"`
+}
+
+type SkillDestinationKind string
+
+const (
+	SkillDestinationKindPersonal SkillDestinationKind = "personal"
+	SkillDestinationKindProject  SkillDestinationKind = "project"
+)
+
+type SkillNameRequest struct {
+	Destination SkillDestination `json:"destination"`
+	Name        string           `json:"name"`
+}
+
+type SkillRemoveAnswer struct {
+	TrashedTo string `json:"trashedTo"`
+}
+
+type SkillsListAnswer struct {
+	Skills []ListedSkill `json:"skills"`
+}
+
+type SkillsListRequest struct {
+	Destination SkillDestination `json:"destination"`
+}
+
 type SlashCommand struct {
 	Name        string  `json:"name"`
 	Description *string `json:"description,omitzero"`
@@ -3078,6 +3211,16 @@ type TurnsRequest struct {
 type UnqueueRequest struct {
 	AgentID  UUID `json:"agentID"`
 	PromptID UUID `json:"promptID"`
+}
+
+type UpdateState struct {
+	Unknown   *struct{}             `json:"unknown,omitzero"`
+	Current   *struct{}             `json:"current,omitzero"`
+	Available *UpdateStateAvailable `json:"available,omitzero"`
+}
+
+type UpdateStateAvailable struct {
+	Commit string `json:"commit"`
 }
 
 type Usage struct {
