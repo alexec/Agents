@@ -165,7 +165,9 @@ struct LocalServices {
             variables = [StoreLocations.rootVariable: environment[StoreLocations.rootVariable] ?? "", "PATH": path]
             for name in ["AGENTS_HOST_PORT", "AGENTS_HOST_WEB_PORT", "AGENTS_HOST_BONJOUR"] { variables[name] = environment[name] }
         case .daemon:
-            arguments = [paths.agentsd.path, "--control-network"]
+            // The one the settings pick (#1138), named here: a scratch job's launcher would
+            // take the host's root for the set-up's.
+            arguments = [paths.agentsd(for: HostSettings.load(paths)).path, "--control-network"]
             variables = [StoreLocations.rootVariable: paths.hostRoot.path, "PATH": path]
         case .relay:
             // `<root>/relay`, and a walk's folder standing in for iCloud when it gives one.

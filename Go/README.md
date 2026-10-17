@@ -61,6 +61,14 @@ unless this Mac's entry in `~/.agents/settings/host.json` says
 `control.log` then begins with `Agents Host: starting the Go agents-control`. Either way
 back keeps every member, host and pin.
 
+**Switching a Mac's host (#1138).** Agents Host carries both `Contents/Helpers/agentsd` and
+`agentsd-go` (`scripts/go-agentsd.sh` builds the Go one). The host's launch agent runs
+`Agents Host --launch-daemon`, which becomes the Swift one unless this Mac's entry in
+`~/.agents/settings/host.json` says `"daemonImplementation": "go"`; restart the host's job
+after changing it (`launchctl kickstart -k gui/$(id -u)/com.alexecollins.agentshost.daemon`).
+The host's `daemon.log` (`~/Library/Logs/Agents`) then says `agentsd <version> (go)`. Both serve the same root, so
+going back keeps every agent. The Go host does not yet serve the Mac-only methods.
+
 **On a scratch set-up.** `CONTROL_BIN=$PWD/Go/out/darwin/agents-control
 .claude/skills/run-app/scripts/launch.sh --slug …` runs the Go one in place of the Swift
 one (build it with `GOOS=darwin Go/scripts/go.sh build -o out/darwin/agents-control

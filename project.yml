@@ -456,12 +456,20 @@ targets:
       - name: Build the Go control plane
         script: sh "$SRCROOT/scripts/go-control.sh"
         basedOnDependencyAnalysis: false
+      # The Go agentsd (#1138), beside the Swift one the same way.
+      - name: Build the Go agentsd
+        script: sh "$SRCROOT/scripts/go-agentsd.sh"
+        basedOnDependencyAnalysis: false
     # Carried into Contents/Helpers and signed here, not by a copy phase, which would try
     # to strip it (a Go binary is already stripped, and strip refuses it). Run only when
     # this Mac's host settings say "controlImplementation": "go".
     postBuildScripts:
       - name: Carry the Go control plane
         script: sh "$SRCROOT/scripts/go-control.sh" --carry
+        basedOnDependencyAnalysis: false
+      # Run only when the settings say "daemonImplementation": "go".
+      - name: Carry the Go agentsd
+        script: sh "$SRCROOT/scripts/go-agentsd.sh" --carry
         basedOnDependencyAnalysis: false
     sources:
       - path: Host/Sources

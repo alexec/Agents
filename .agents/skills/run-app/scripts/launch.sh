@@ -99,6 +99,10 @@ CONTROL="$HOSTAPP/Contents/Helpers/agents-control"
 #   CONTROL_BIN=$PWD/Go/out/darwin/agents-control launch.sh …
 [ -n "${CONTROL_BIN:-}" ] && CONTROL="$CONTROL_BIN"
 AGENTSD="$HOSTAPP/Contents/Helpers/agentsd"
+# AGENTSD_BIN: another agentsd in its place, such as the Go one (#1138):
+#   GOOS=darwin Go/scripts/go.sh build -o out/darwin/agentsd ./cmd/agentsd
+#   AGENTSD_BIN=$PWD/Go/out/darwin/agentsd launch.sh …
+[ -n "${AGENTSD_BIN:-}" ] && AGENTSD="$AGENTSD_BIN"
 [ -x "$CONTROL" ] && [ -x "$AGENTSD" ] || { echo "no helpers in $HOSTAPP — run without --no-build" >&2; exit 1; }
 [ "$WINDOW" = 0 ] || [ -d "$APP" ] || { echo "no window at $APP — run without --no-build" >&2; exit 1; }
 
