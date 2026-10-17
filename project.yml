@@ -497,6 +497,9 @@ targets:
       # tracking.
       - path: Host/PrivacyInfo.xcprivacy
         buildPhase: resources
+      # The happy Blob (#1237): the app icon, as the window's, and the menu bar mark, both
+      # drawn by design/logo/blob/final/make.sh.
+      - path: Host/Resources/Assets.xcassets
       # The two launch agents Run it here registers (T055). SMAppService reads them from
       # here and nowhere else.
       - path: Host/LaunchAgents
@@ -580,6 +583,7 @@ targets:
         PRODUCT_NAME: Agents Host
         SDKROOT: macosx
         SUPPORTED_PLATFORMS: macosx
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         GENERATE_INFOPLIST_FILE: NO
         ENABLE_HARDENED_RUNTIME: YES
         # The web remote's build reads Web/ and writes Web/dist, which a sandboxed script

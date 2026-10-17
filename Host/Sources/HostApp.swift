@@ -52,7 +52,7 @@ struct AgentsHostApp: App {
         .defaultSize(width: 680, height: 640)
         .windowResizability(.contentMinSize)
 
-        MenuBarExtra("Agents Host", systemImage: "point.3.connected.trianglepath.dotted") {
+        MenuBarExtra("Agents Host", image: "MenuBarBlob") {
             Button("Open Agents Host") {
                 openWindow(id: "host")
                 NSApp.activate()
