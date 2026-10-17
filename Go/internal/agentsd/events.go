@@ -45,6 +45,12 @@ type eventState struct {
 	BranchTips    map[string]map[string]string `json:"branchTips"`
 	CostCrossings map[string][]string          `json:"costCrossings"`
 	DiskLevels    map[string]string            `json:"diskLevels,omitempty"`
+	// PersonAway is how the person stood when a Mac's host last heard (#1219): kept as
+	// the Swift host wrote it.
+	PersonAway *string `json:"personAway,omitempty"`
+	// WaitRestarts is an open wait's id → the restarts it was open over (#1219), told
+	// when it next wakes.
+	WaitRestarts map[string][]restartGap `json:"waitRestarts,omitempty"`
 }
 
 type eventBook struct {
@@ -766,23 +772,31 @@ func freePercent(r wire.DiskReading) int64 {
 	return int64(float64(r.FreeBytes) / float64(r.TotalBytes) * 100)
 }
 
+// withNoticed is details with what a look after a restart adds (#1219).
+func withNoticed(details, noticed map[string]string) map[string]string {
+	for k, v := range noticed {
+		details[k] = v
+	}
+	return details
+}
+
 // raiseDiskLow and raiseDiskOK are machine.disk_low and machine.disk_ok.
-func (d *Daemon) raiseDiskLow(a wire.DiskAlarm) {
+func (d *Daemon) raiseDiskLow(a wire.DiskAlarm, noticed map[string]string) {
 	r := a.Reading
 	sentence := r.Volume + " is running low: " + diskWords(r.FreeBytes) + " free."
 	if a.Level == wire.DiskLevelCritical {
 		sentence = r.Volume + " is almost full: " + diskWords(r.FreeBytes) + " free."
 	}
 	d.raise(wire.EventDraft{Name: "machine.disk_low", At: now(), Scope: macScope(), Sentence: sentence,
-		Details: map[string]string{"volume": r.Volume, "free_bytes": fmt.Sprint(r.FreeBytes), "free_percent": fmt.Sprint(freePercent(r)),
-			"level": string(a.Level), "threshold": fmt.Sprint(a.Threshold)}})
+		Details: withNoticed(map[string]string{"volume": r.Volume, "free_bytes": fmt.Sprint(r.FreeBytes), "free_percent": fmt.Sprint(freePercent(r)),
+			"level": string(a.Level), "threshold": fmt.Sprint(a.Threshold)}, noticed)})
 }
 
-func (d *Daemon) raiseDiskOK(r wire.DiskReading, threshold int64) {
+func (d *Daemon) raiseDiskOK(r wire.DiskReading, threshold int64, noticed map[string]string) {
 	d.raise(wire.EventDraft{Name: "machine.disk_ok", At: now(), Scope: macScope(),
 		Sentence: r.Volume + " has " + diskWords(r.FreeBytes) + " free again.",
-		Details: map[string]string{"volume": r.Volume, "free_bytes": fmt.Sprint(r.FreeBytes), "free_percent": fmt.Sprint(freePercent(r)),
-			"threshold": fmt.Sprint(threshold)}})
+		Details: withNoticed(map[string]string{"volume": r.Volume, "free_bytes": fmt.Sprint(r.FreeBytes), "free_percent": fmt.Sprint(freePercent(r)),
+			"threshold": fmt.Sprint(threshold)}, noticed)})
 }
 
 func (d *Daemon) registerEvents() {

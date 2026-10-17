@@ -51,6 +51,7 @@ type Daemon struct {
 	mcpBook
 	mcpHealthBook
 	mcpEventsBook
+	restartBook
 	turnBook
 	optionBook
 	timeBook
@@ -84,6 +85,9 @@ func New(ctx context.Context, root string) (*Daemon, error) {
 	d.loadEvents()
 	d.beginMCPApprovals()
 	d.recover()
+	// How long nothing ran, and the waits open over it (#1219): before anything below can
+	// raise an event that wakes one, so its wake says so.
+	d.noteRestart()
 	d.resumeEventWaits()
 	d.resumeBlocks()
 	d.checkEveryQueue()
@@ -141,6 +145,8 @@ func Broadcast[P any](d *Daemon, n wire.Notification[P], params P) {
 
 // Shutdown ends what the host runs: every runtime it started.
 func (d *Daemon) Shutdown() {
+	// First, so a stop that goes wrong below still counts as a stop (#1219).
+	d.noteCleanStop()
 	// Nothing more is routed or written down once the host is going.
 	d.attentionMu.Lock()
 	d.presences = nil

@@ -101,6 +101,9 @@ func main() {
 	}
 	log.Printf("agentsd %s on %s, root %s", buildinfo.String(), platform(), cl.root)
 	d.EnsureChatProject()
+	// The restart itself, for a wait or a workflow that names it (#1219), and from now on
+	// a word once a minute that this host is alive.
+	d.SayRestarted()
 	d.PickUpAfterRestart()
 	d.StartMCPHealth()
 	d.StartMCPEvents()
