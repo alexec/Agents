@@ -34,10 +34,11 @@ def run(v):
     url = v.wait_until(v.opened_url, timeout=20, what="the page's address")
     v.sleep(max(0.3, v.takes["menu"]["duration"] - 1.2))
     v.say("paired", wait=False)
-    v.web("eval", expr=f"location.href = {url!r}")
+    # The same page with the code after a #: a hash change alone does not load it again.
+    v.web("eval", expr=f"location.href = {url!r}; location.reload()")
     v.web("waitFor", expr='document.querySelector(".row .title")', timeout=30000)
     v.sleep(v.takes["paired"]["duration"])
     v.say("same", wait=False)
     v.sleep(1.0)
-    v.web("click", text="weather-app")
+    v.web("eval", expr='document.querySelector(\'button[aria-label="Unfold weather-app"]\')?.click()')
     v.sleep(v.takes["same"]["duration"] + 1.5)

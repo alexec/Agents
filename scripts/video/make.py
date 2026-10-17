@@ -135,7 +135,12 @@ class Web:
         self.proc.stdin.flush()
         answer = json.loads(self.proc.stdout.readline() or '{"ok":false,"error":"web.mjs ended"}')
         if not answer["ok"]:
-            raise RuntimeError(f"web {op}: {answer['error']}")
+            if op != "shot":
+                try:
+                    self("shot", path=str(CACHE / "web-failed.png"))
+                except Exception:
+                    pass
+            raise RuntimeError(f"web {op}: {answer['error']} (the page: {CACHE / 'web-failed.png'})")
         return answer["value"]
 
     def close(self):
@@ -160,7 +165,10 @@ class Video:
 
     # --- the scratch set-up -------------------------------------------------------------
     def launch(self, build):
-        args = [SKILL / "launch.sh", "--slug", f"vid-{self.scene.ID}", "--appearance", "light", "--outside-checkout", "--person", "Sam"]
+        # The real disk's free space is not the video's: a scratch root says its own (Debug).
+        Path(self.root).mkdir(parents=True)
+        (Path(self.root) / "disk-free-override").write_text("500GB\n")
+        args = [SKILL / "launch.sh", "--seeded", "--slug", f"vid-{self.scene.ID}", "--appearance", "light", "--outside-checkout", "--person", "Sam"]
         if not build:
             args.append("--no-build")
         out = run(*args)

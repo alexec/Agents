@@ -311,6 +311,9 @@ enum WalkCommands {
     private static func menu(_ path: [String]) throws -> [String: Any] {
         guard var menu = NSApp.mainMenu else { throw WalkError("no menu bar") }
         for (at, title) in path.enumerated() {
+            // As opening it does: SwiftUI brings a menu's items up to date only then, so
+            // one never opened kept the state it was made with (#1078: Open in Browser off).
+            menu.delegate?.menuNeedsUpdate?(menu)
             menu.update()
             guard let index = menu.items.firstIndex(where: { $0.title.localizedCaseInsensitiveCompare(title) == .orderedSame })
                 ?? menu.items.firstIndex(where: { $0.title.localizedCaseInsensitiveContains(title) }) else {
@@ -319,6 +322,7 @@ enum WalkCommands {
             let item = menu.items[index]
             if at == path.count - 1, let items = item.submenu?.items {
                 // A menu, not an item: say what is in it.
+                if let submenu = item.submenu { submenu.delegate?.menuNeedsUpdate?(submenu) }
                 item.submenu?.update()
                 return ["ok": true, "did": items.filter { !$0.isSeparatorItem }
                     .map { $0.title + ($0.isEnabled ? "" : " (off)") }.joined(separator: "\n")]
