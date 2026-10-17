@@ -3933,6 +3933,14 @@ type UsageHistory struct {
 	Now   string                            `json:"now"`
 }
 
+// What a third-party server's view waits on before it is drawn: the person's Show (#191). The data of a viewNeedsShow failure.
+type ViewAsk struct {
+	Server string `json:"server"`
+	URI    string `json:"uri"`
+	Hash   string `json:"hash"`
+	IsNew  bool   `json:"isNew"`
+}
+
 type ViewCallRequest struct {
 	AgentID   UUID      `json:"agentID"`
 	Project   *URL      `json:"project,omitzero"`
@@ -3988,6 +3996,13 @@ type ViewShowRequest struct {
 	URI     string `json:"uri"`
 	Hash    string `json:"hash"`
 	Show    bool   `json:"show"`
+}
+
+// An agent's call of one of the agents server's tools that has a view, relayed with its token.
+type ViewToolCallRequest struct {
+	Token     string    `json:"token"`
+	Name      string    `json:"name"`
+	Arguments JSONValue `json:"arguments,omitzero"`
 }
 
 type Wait struct {

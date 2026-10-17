@@ -275,6 +275,7 @@ func (d *Daemon) enqueue(id wire.UUID, q wire.QueuedPrompt, first bool) error {
 	if q.Attachments == nil {
 		q.Attachments = []wire.Attachment{}
 	}
+	q = d.withViewContext(id, q)
 	a := d.change(id, func(a *wire.Agent) {
 		if first {
 			a.QueuedPrompts = append([]wire.QueuedPrompt{q}, a.QueuedPrompts...)
@@ -890,6 +891,7 @@ func (l *live) Update(n sdk.SessionNotification) {
 	case u.ToolCall != nil:
 		call := toolCall(u.ToolCall)
 		d.record(l.id, wire.TranscriptEntryKind{ToolCall: &wire.TranscriptEntryKindToolCall{Value: call}})
+		d.noteAgentViewCall(l.id, call)
 		l.mu.Lock()
 		l.evidence.takeCall(call)
 		l.lastMessageID, l.lastMessage = "", strings.Builder{}
@@ -899,6 +901,7 @@ func (l *live) Update(n sdk.SessionNotification) {
 	case u.ToolCallUpdate != nil:
 		call := toolCall(u.ToolCallUpdate)
 		d.record(l.id, wire.TranscriptEntryKind{ToolCallUpdate: &wire.TranscriptEntryKindToolCallUpdate{Value: call}})
+		d.noteAgentViewCall(l.id, call)
 		l.mu.Lock()
 		l.evidence.takeCall(call)
 		l.mu.Unlock()

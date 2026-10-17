@@ -355,10 +355,9 @@ func (d *Daemon) pinViews(project string, f pinsFile) []wire.PinView {
 		v := wire.PinView{Path: e.path, PinnedBy: d.pinnerView(e.pinnedBy), View: e.view}
 		if e.view != nil {
 			v.Kind, v.Title = wire.PinKindView, defaultViewTitle(*e.view)
-			// No server's views are read on this host yet.
-			v.Missing = true
-			reason := "server not set up here"
-			v.MissingReason = &reason
+			if reason := d.viewPinMissing(*e.view, project); reason != "" {
+				v.Missing, v.MissingReason = true, &reason
+			}
 		} else {
 			v.Kind, _ = pinKind(e.path)
 			v.Title = defaultPinTitle(e.path)
@@ -489,11 +488,17 @@ func (d *Daemon) registerPins() {
 		const lead = "Nothing was pinned: "
 		entry := pinEntry{title: r.Title, pinnedBy: thePerson()}
 		if r.View != nil {
-			if why := viewProblem(*r.View); why != "" {
+			if why := d.viewPinRefusal(*r.View, project); why != "" {
 				return nil, pinRefused(lead + why)
 			}
-			// This host reads no server's views yet (DaemonCore.thirdPartyPinRefusal).
-			return nil, pinRefused(lead + "the app hasn't read " + r.View.Server + "'s views yet. Show one in a chat first.")
+			entry.path, entry.view = r.View.URI, r.View
+			if entry.title == nil && !d.pinned(project, r.View.URI) {
+				entry.title = d.viewPinTitle(*r.View, project)
+			}
+			if err := d.pin(entry, project, lead); err != nil {
+				return nil, err
+			}
+			return d.pinViews(project, d.readPins(project)), nil
 		}
 		path, ok := personPinPath(r.Path, project)
 		if !ok {

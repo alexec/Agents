@@ -2927,6 +2927,17 @@ export interface UsageHistory {
   now: string;
 }
 
+/**
+ * What a third-party server's view waits on before it is drawn: the person's Show (#191). The data
+ * of a viewNeedsShow failure.
+ */
+export interface ViewAsk {
+  server: string;
+  uri: string;
+  hash: string;
+  isNew: boolean;
+}
+
 export interface ViewCallRequest {
   agentID: UUID;
   project?: URLString;
@@ -2982,6 +2993,13 @@ export interface ViewShowRequest {
   uri: string;
   hash: string;
   show: boolean;
+}
+
+/** An agent's call of one of the agents server's tools that has a view, relayed with its token. */
+export interface ViewToolCallRequest {
+  token: string;
+  name: string;
+  arguments?: JSONValue;
 }
 
 export interface Wait {
@@ -3934,6 +3952,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   Usage: { required: ["used", "size", "at"], optional: ["cost"] },
   UsageBucket: { required: ["cost", "inputTokens", "outputTokens", "thoughtTokens", "cachedReadTokens", "cachedWriteTokens", "turns", "unpricedTurns"], optional: [] },
   UsageHistory: { required: ["hours", "days", "now"], optional: [] },
+  ViewAsk: { required: ["server", "uri", "hash", "isNew"], optional: [] },
   ViewCallRequest: { required: ["agentID", "viewID", "name"], optional: ["project", "arguments", "feed", "server"] },
   ViewContextRequest: { required: ["agentID", "viewID"], optional: ["uri", "content", "structuredContent"] },
   ViewLogRequest: { required: ["agentID", "viewID"], optional: ["level", "data"] },
@@ -3941,6 +3960,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ViewReadRequest: { required: ["agentID", "uri"], optional: ["server", "project"] },
   ViewResource: { required: ["uri", "mimeType", "html", "policy", "variables"], optional: ["prefersBorder"] },
   ViewShowRequest: { required: ["agentID", "server", "uri", "hash", "show"], optional: ["project"] },
+  ViewToolCallRequest: { required: ["token", "name"], optional: ["arguments"] },
   Wait: { required: ["agentID", "nameAtReport"], optional: ["ending"] },
   WaitEnding: { required: ["at", "how"], optional: [] },
   WaitServerEvent: { required: ["trigger", "servers"], optional: [] },

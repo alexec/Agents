@@ -189,6 +189,7 @@ var (
 	CallViewsLog                       = Method[ViewLogRequest, Empty]{"views/log"}
 	CallViewsRead                      = Method[ViewReadRequest, ViewResource]{"views/read"}
 	CallViewsShow                      = Method[ViewShowRequest, Empty]{"views/show"}
+	CallViewsToolCall                  = Method[ViewToolCallRequest, JSONValue]{"views/toolCall"}
 	CallWakeSet                        = Method[WakeSettings, WakeSettings]{"wake/set"}
 	CallWakeSettings                   = Method[Empty, WakeSettings]{"wake/settings"}
 	CallWakeState                      = Method[Empty, WakeState]{"wake/state"}

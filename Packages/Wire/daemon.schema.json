@@ -11168,6 +11168,31 @@
       ],
       "additionalProperties": false
     },
+    "ViewAsk": {
+      "description": "What a third-party server's view waits on before it is drawn: the person's Show (#191). The data of a viewNeedsShow failure.",
+      "type": "object",
+      "properties": {
+        "server": {
+          "type": "string"
+        },
+        "uri": {
+          "type": "string"
+        },
+        "hash": {
+          "type": "string"
+        },
+        "isNew": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "server",
+        "uri",
+        "hash",
+        "isNew"
+      ],
+      "additionalProperties": false
+    },
     "ViewCallRequest": {
       "type": "object",
       "properties": {
@@ -11354,6 +11379,26 @@
         "uri",
         "hash",
         "show"
+      ],
+      "additionalProperties": false
+    },
+    "ViewToolCallRequest": {
+      "description": "An agent's call of one of the agents server's tools that has a view, relayed with its token.",
+      "type": "object",
+      "properties": {
+        "token": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "arguments": {
+          "$ref": "#/definitions/JSONValue"
+        }
+      },
+      "required": [
+        "token",
+        "name"
       ],
       "additionalProperties": false
     },
