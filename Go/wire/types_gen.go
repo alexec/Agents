@@ -292,6 +292,10 @@ type AppViewPolicy struct {
 	Refused         []string `json:"refused"`
 }
 
+type ApplyAllowancesRequest struct {
+	States []AllowanceState `json:"states"`
+}
+
 type Approval struct {
 	Kind    ApprovalKind     `json:"kind"`
 	Key     string           `json:"key"`
@@ -541,6 +545,8 @@ const (
 	ChangeStateRenamed   ChangeState = "renamed"
 	ChangeStateUntracked ChangeState = "untracked"
 )
+
+type Changed bool
 
 type ChangedFile struct {
 	Path           string       `json:"path"`

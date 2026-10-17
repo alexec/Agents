@@ -398,6 +398,10 @@ func (l *live) turn() bool {
 		l.mu.Lock()
 		l.session = s
 		l.mu.Unlock()
+		// The handshake says the runtime is ready, and what it takes (noteAccount).
+		pc := s.Init.AgentCapabilities.PromptCapabilities
+		image, audio, embedded := pc.Image, pc.Audio, pc.EmbeddedContext
+		d.noteAccount(a.RuntimeID, s.SupportsSteering(), wire.ACPPromptCapabilities{Image: &image, Audio: &audio, EmbeddedContext: &embedded})
 		switch {
 		case s.Continued:
 			d.record(l.id, runtimeNote("Picked the conversation back up."))

@@ -45,6 +45,7 @@ type Daemon struct {
 	helperQueueState
 	costBook
 	workflowBook
+	allowanceBook
 	attentionState
 	worktreeState
 	recoveryState
@@ -126,6 +127,9 @@ func (d *Daemon) Shutdown() {
 	d.clearPickUps()
 	d.stopEvents()
 	d.stopAppTools()
+	d.allowMu.Lock()
+	d.allowStopped = true
+	d.allowMu.Unlock()
 	d.stopEventWaits()
 	d.stopShells()
 }

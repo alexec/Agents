@@ -60,7 +60,11 @@ func TestALeadWaitsOnItsHelper(t *testing.T) {
 		return false
 	})
 	waitFor(t, "its turn over", func() bool {
-		return d.Store.Agent(lead.ID).State == wire.AgentStateFinished && len(d.Store.Agent(lead.ID).QueuedPrompts) == 0
+		l := d.live(lead.ID)
+		l.mu.Lock()
+		busy := l.running || l.inTurn
+		l.mu.Unlock()
+		return !busy && d.Store.Agent(lead.ID).State == wire.AgentStateFinished && len(d.Store.Agent(lead.ID).QueuedPrompts) == 0
 	})
 	_ = done
 }
