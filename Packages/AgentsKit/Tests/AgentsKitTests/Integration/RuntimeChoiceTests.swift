@@ -33,10 +33,20 @@ struct RuntimeChoiceTests {
 
     /// A core whose fake turns are held until `turns` opens: a lead's turn that ends lets
     /// its token go, and the helper is then refused for that instead (#1320).
+    /// `arrived` waits for the lead's turn to reach the gate: its session has connected
+    /// by then, and a connect binds a token of its own in place of the test's.
     private func heldCore(_ locations: StoreLocations, _ turns: TurnGate) async throws -> DaemonCore {
         var script = FakeACPAgent.Script()
         script.gate = turns
         return try await makeCore(locations, FakeLauncher(script: script))
+    }
+
+    private func arrived(_ turns: TurnGate) async {
+        let deadline = ContinuousClock.now.advanced(by: .seconds(30))
+        while turns.turnsArrived == 0, ContinuousClock.now < deadline {
+            try? await Task.sleep(for: .milliseconds(20))
+        }
+        #expect(turns.turnsArrived > 0, "the lead's turn never started")
     }
 
     /// An agent the person started, and a token that speaks for it, bound again before
@@ -65,6 +75,7 @@ struct RuntimeChoiceTests {
         defer { turns.open() }
         let core = try await heldCore(locations, turns)
         let lead = try await caller(core, in: work)
+        await arrived(turns)
 
         let started = try await startHelper(core, lead, runtime: "codex")
 
@@ -77,6 +88,7 @@ struct RuntimeChoiceTests {
         defer { turns.open() }
         let core = try await heldCore(locations, turns)
         let lead = try await caller(core, in: work)
+        await arrived(turns)
         await core.runtimeFailed(runtimeID: "grok")
         let before = await core.allAgents().count
 
@@ -94,6 +106,7 @@ struct RuntimeChoiceTests {
         defer { turns.open() }
         let core = try await heldCore(locations, turns)
         let lead = try await caller(core, in: work)
+        await arrived(turns)
 
         let error = await refusal { _ = try await startHelper(core, lead, runtime: "cursor") }
 
@@ -120,6 +133,7 @@ struct RuntimeChoiceTests {
         defer { turns.open() }
         let core = try await heldCore(locations, turns)
         let lead = try await caller(core, in: work)
+        await arrived(turns)
 
         let error = await refusal { _ = try await startHelper(core, lead, runtime: "nonesuch") }
 
@@ -155,6 +169,7 @@ struct RuntimeChoiceTests {
         defer { turns.open() }
         let core = try await heldCore(locations, turns)
         let lead = try await caller(core, in: work)
+        await arrived(turns)
         await core.runtimeFailed(runtimeID: "grok")
 
         await core.bindAppToken(lead.1, to: lead.0)
