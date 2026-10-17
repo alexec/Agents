@@ -751,13 +751,15 @@ struct ChatTranscript: View {
         isAwaitingFirstPage = false
         guard !Task.isCancelled else { return }
         place(scroller, on: bottom, anchor: .bottom)
-        // Shown once it has measured and stopped moving, three samples running, or after
-        // 400 ms at most.
+        // Placed again, out of sight, until it stops moving: the rows above the end are
+        // measured after the move, and a long chat's grew enough to leave it a screen short
+        // of the end (#1287, #1349). Shown three samples running at rest, or after 400 ms.
         let shownBy = ContinuousClock.now.advanced(by: .milliseconds(400))
         var resting = 0
         var last = motion.pastTheEnd
         while resting < 3, ContinuousClock.now < shownBy, !Task.isCancelled {
             try? await Task.sleep(for: .milliseconds(16))
+            place(scroller, on: bottom, anchor: .bottom)
             let now = motion.pastTheEnd
             resting = now.isFinite && abs(now - last) < 0.5 ? resting + 1 : 0
             last = now
