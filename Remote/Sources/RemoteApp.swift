@@ -46,6 +46,16 @@ struct RemoteApp: App {
                 // A new model on a new link once the phone pairs with a control plane.
                 .id(ObjectIdentifier(model))
                 .task { push.received = { [model] userInfo in await model.receivedPush(userInfo) } }
+                #if DEBUG && targetEnvironment(simulator)
+                // The walk simulator pairs with a scratch control plane's code (#1287): its
+                // Paste control takes no press but a finger's. Only with -walk.
+                .task {
+                    let args = ProcessInfo.processInfo.arguments
+                    guard args.contains("-walk"), let at = args.firstIndex(of: "-pair"), at + 1 < args.count,
+                          !model.pairedWithControlPlane, RemoteControl.link() == nil else { return }
+                    await model.pair(scanned: args[at + 1])
+                }
+                #endif
                 .onChange(of: model.pairedWithControlPlane) { _, paired in
                     guard paired else { return }
                     // The old pairing's connections end with it rather than dialling on (#175).

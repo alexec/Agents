@@ -133,4 +133,24 @@ struct WaitingCardPlacesTests {
         #expect(ids == whole.flatMap { ($0.ask.map { [$0.id] } ?? []) + $0.items.map(\.id) })
         #expect(stretches.last?.cards.map(\.name) == ["z"])
     }
+
+    /// Where a conversation opens (#1287): a card asked before the end, else the last turn's
+    /// ask when unread, else the end. A card at the end is the end.
+    @Test func aConversationOpensWhereTheReaderNeedsIt() throws {
+        let entries = [ask("A", 0), said("a1", 1), ask("B", 6), said("b1", 7)]
+        let none = place(entries, [])
+        #expect(none.openingPlace(unread: false) == nil)
+        let lastAsk = try #require(none.last?.turns.last)
+        #expect(none.openingPlace(unread: true) == .turn(lastAsk.id))
+        // Asked in the middle, with B after it: the card, unread or not.
+        let middle = place(entries, [Card(name: "allow", at: 3)])
+        #expect(middle.openingPlace(unread: true) == .cards(stretch: 0))
+        // Asked after everything: the end, which is where the card is.
+        #expect(place(entries, [Card(name: "allow", at: 20)]).openingPlace(unread: true) == nil)
+        // A long last turn's tail in hand, a row with no ask: its ask is before the page.
+        let tail = ChatTurn(id: UUID(), ask: nil, items: [TranscriptItem.entry(said("b2", 8))])
+        let withTail = [ChatStretch<Card>(turns: none[0].turns + [tail], cards: [])]
+        #expect(withTail.openingPlace(unread: true) == .askBefore)
+        #expect(withTail.openingPlace(unread: false) == nil)
+    }
 }

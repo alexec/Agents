@@ -686,3 +686,18 @@ export function turnParts(items: readonly Item[], isLive: boolean): TurnParts {
 export function isWorking(state: AgentState): boolean {
   return state === "running" || state === "starting" || state === "waitingOnUser";
 }
+
+/**
+ * Where the reader needs a chat opened (#1287), as Swift's `openingPlace`: at the first card
+ * waiting when anything came after it, else, unread, at the ask of the last turn, else at the end
+ * (null). Unread is one mark, set only by a finish nobody watched, so the last turn is the first
+ * unread one. A card at the end is the end.
+ */
+export function openingPlace<Card>(stretches: readonly ChatStretch<Card>[], unread: boolean): { cards: number } | { turn: string } | { askBefore: true } | null {
+  const first = stretches.findIndex((stretch) => stretch.cards.length > 0);
+  if (first >= 0) return first === stretches.length - 1 ? null : { cards: first };
+  // With no ask in hand, it is the tail of a turn longer than the opening page: its ask is before.
+  const turns = stretches[stretches.length - 1]?.turns ?? [];
+  const last = turns[turns.length - 1];
+  return !unread || !last ? null : last.ask ? { turn: last.id } : { askBefore: true };
+}
