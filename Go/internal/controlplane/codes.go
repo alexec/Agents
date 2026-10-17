@@ -233,6 +233,28 @@ func ToolsetFolder() string {
 	return ""
 }
 
+// toolsetFileNames are the only files /v1/toolsets/ hands out (#1312): what a Linux host
+// needs to install a Node toolset itself, for the runtimes hosts/install installs that way.
+var toolsetFileNames = func() map[string]bool {
+	names := map[string]bool{}
+	for _, runtime := range []string{"claude", "codex", "gemini"} {
+		for _, file := range []string{"manifest.json", "package.json", "package-lock.json"} {
+			names[runtime+"/"+file] = true
+		}
+	}
+	return names
+}()
+
+// toolsetFile is a toolset's file by `<runtime>/<file>`, from the folder, never a path
+// the request made up. The shown command fetches them into ~/.agents-server/toolsets.
+func toolsetFile(name, folder string) ([]byte, bool) {
+	if !toolsetFileNames[name] || folder == "" {
+		return nil, false
+	}
+	data, err := os.ReadFile(filepath.Join(folder, name))
+	return data, err == nil
+}
+
 // serverFile is ServerFiles.read: a file by name, from the folder, never a path the
 // request made up.
 func serverFile(name, folder string) ([]byte, bool) {

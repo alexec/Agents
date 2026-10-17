@@ -610,6 +610,14 @@ func (s *Service) serveHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		w.Header().Set("Content-Type", "application/octet-stream")
 		w.Write(data)
+	case strings.HasPrefix(path, "/v1/toolsets/"):
+		data, ok := toolsetFile(strings.TrimPrefix(path, "/v1/toolsets/"), s.cfg.ToolsetFolder)
+		if !ok {
+			plain(w, http.StatusNotFound, "this control plane has no such toolset\n")
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.Write(data)
 	case path == "/v1/connect":
 		ws, err := websocket.Accept(w, r, &websocket.AcceptOptions{InsecureSkipVerify: true})
 		if err != nil {
