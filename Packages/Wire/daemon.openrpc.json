@@ -3353,6 +3353,63 @@
       }
     },
     {
+      "name": "wake/set",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/WakeSettings"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/WakeSettings"
+        }
+      }
+    },
+    {
+      "name": "wake/settings",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/WakeSettings"
+        }
+      }
+    },
+    {
+      "name": "wake/state",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/WakeState"
+        }
+      }
+    },
+    {
       "name": "workflows/approve",
       "tags": [
         {
@@ -4250,6 +4307,20 @@
           "required": true,
           "schema": {
             "$ref": "daemon.schema.json#/definitions/StoreNotes"
+          }
+        }
+      ]
+    },
+    {
+      "name": "wake/changed",
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/WakeState"
           }
         }
       ]

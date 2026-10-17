@@ -2487,6 +2487,28 @@ export interface WaitingAgent {
   status: WaitStatus;
 }
 
+/**
+ * Whether this Mac is kept awake for agents, and for how long after they stop (024), as wake.json
+ * in the root.
+ */
+export interface WakeSettings {
+  keepsAwake: boolean;
+  graceHours: number;
+  warmRuntimes: number;
+  awakeOnPower: boolean;
+}
+
+/** Why the Mac is, or is not, being kept awake (024). */
+export interface WakeState {
+  isHolding: boolean;
+  agentsInFlight: number;
+  heldBackByBattery: boolean;
+  batteryPercent?: number;
+  since?: WireDate;
+  graceUntil?: WireDate;
+  onPower: boolean;
+}
+
 export interface WebRemoteStatus {
   port: number;
   served: boolean;
@@ -3324,6 +3346,8 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   WaitServerEvent: { required: ["trigger", "servers"], optional: [] },
   WaitStatus: { required: ["line", "mark", "cancellable"], optional: [] },
   WaitingAgent: { required: ["agentID", "title", "folder", "status"], optional: [] },
+  WakeSettings: { required: ["keepsAwake", "graceHours", "warmRuntimes", "awakeOnPower"], optional: [] },
+  WakeState: { required: ["isHolding", "agentsInFlight", "heldBackByBattery", "onPower"], optional: ["batteryPercent", "since", "graceUntil"] },
   WebRemoteStatus: { required: ["port", "served"], optional: ["reason", "detail"] },
   WorkReport: { required: ["outcome", "message", "at"], optional: ["block"] },
   Workflow: { required: ["workflowID", "folder", "name", "triggers", "mode", "prompt", "unknownFields", "settings"], optional: ["problem", "cooldown", "enabled", "archived", "hosts", "whenDone"] },
