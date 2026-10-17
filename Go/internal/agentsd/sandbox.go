@@ -14,8 +14,7 @@ import (
 // choice, applied as that runtime takes it: arguments, the environment, Claude's _meta or
 // Codex's mode.
 //
-// A runtime whose sandbox fails to start is not yet recognised here: the failure card and
-// agents/answerSandbox come with it (#1136).
+// A sandbox that fails to start is in sandboxfailure.go.
 
 type sandboxRoute struct {
 	onArgs, offArgs []string
@@ -197,6 +196,20 @@ func (d *Daemon) setSandbox(ctx context.Context, r wire.SetSandboxRequest) (wire
 			a.SandboxOverride = &c
 		}
 	})
+	// Applied from its next turn: a runtime between turns is let go, and the next turn
+	// starts it again with the choice in force, carrying on its conversation.
+	if a.RuntimeID != "codex" {
+		l := d.live(a.ID)
+		l.mu.Lock()
+		s := l.session
+		if l.inTurn {
+			s = nil
+		}
+		l.mu.Unlock()
+		if s != nil {
+			s.Stop()
+		}
+	}
 	if a.RuntimeID == "codex" {
 		choice := d.defaultSandbox(a.RuntimeID)
 		if r.Choice != nil {
@@ -217,11 +230,6 @@ func (d *Daemon) registerSandbox() {
 		return d.setSandbox(ctx, r)
 	})
 	On(d, wire.CallAgentsAnswerSandbox, func(ctx context.Context, c *Client, r wire.AnswerSandboxRequest) (wire.Agent, error) {
-		a := d.Store.Agent(r.AgentID)
-		if a == nil {
-			return wire.Agent{}, &Error{Code: CodeNoSuchAgent, Message: "That agent is not here."}
-		}
-		// No failure is recognised on this host yet, so none waits for an answer.
-		return wire.Agent{}, &Error{Code: wire.FailureNotAllowed, Message: "That has been answered already."}
+		return d.answerSandbox(ctx, r)
 	})
 }

@@ -47,6 +47,9 @@ type live struct {
 	// that came before it on the wire.
 	toolCalls map[string]bool
 	seen      *sync.Cond
+	// evidence is what this turn's commands printed and what it replied, for a sandbox
+	// that could not start (sandboxfailure.go).
+	evidence turnEvidence
 }
 
 type pendingPermission struct {
@@ -403,6 +406,12 @@ func (l *live) turn() bool {
 		}
 		if err != nil {
 			log.Printf("agent %s: %v", l.id, err)
+			// Its sandbox first (064): a runtime that fell over because it could not set one up.
+			if detail := sandboxMatch(a.RuntimeID, err.Error()); detail != "" {
+				d.recordSandboxFailure(l.id, detail, 0)
+				d.end(l, wire.AgentStateStopped, wire.EndedReasonSandboxFailed)
+				return false
+			}
 			d.record(l.id, notice("error", rt.Name+" did not start", err.Error()))
 			d.end(l, wire.AgentStateStopped, wire.EndedReasonProcessDied)
 			return false
@@ -458,6 +467,11 @@ func (l *live) turn() bool {
 	if !taken {
 		return false
 	}
+	d.change(l.id, func(a *wire.Agent) {
+		if a.PendingSandboxFailure != nil {
+			a.PendingSandboxFailure = nil
+		}
+	})
 	bs := blocks(q)
 	from := q.From
 	if from == "" {
@@ -493,6 +507,7 @@ func (l *live) turn() bool {
 	l.lastMessageID = ""
 	l.lastMessage.Reset()
 	clear(l.toolCalls)
+	l.evidence = turnEvidence{}
 	l.mu.Unlock()
 	d.setState(l.id, wire.AgentStateRunning)
 	if q.Preface != nil {
@@ -514,6 +529,10 @@ func (l *live) turn() bool {
 		}
 		log.Printf("agent %s: prompt: %v", l.id, err)
 		l.closeForms()
+		if detail := l.sandboxFailure(err.Error()); detail != "" {
+			d.end(l, wire.AgentStateStopped, wire.EndedReasonSandboxFailed)
+			return false
+		}
 		d.record(l.id, notice("error", "The turn failed", err.Error()))
 		select {
 		case <-s.Done():
@@ -536,6 +555,12 @@ func (l *live) turn() bool {
 		d.record(l.id, wire.TranscriptEntryKind{UsageRecorded: &wire.TranscriptEntryKindUsageRecorded{Value: u}})
 		// The turn's tokens on the agent, the day and the charts (finishTurn's banking).
 		d.bankTurnUsage(l.id, u)
+	}
+	// A command whose sandbox could not be set up: the turn ran to its end, and the agent
+	// stops there with the card. Never once it said how it went itself (#224).
+	if r.StopReason == sdk.StopReasonEndTurn && l.sandboxFailure("") != "" {
+		d.end(l, wire.AgentStateStopped, wire.EndedReasonSandboxFailed)
+		return false
 	}
 	// A turn that took the agent to its limit stops it there, the turn finished first.
 	if r.StopReason == sdk.StopReasonEndTurn {
@@ -773,17 +798,24 @@ func (l *live) Update(n sdk.SessionNotification) {
 			l.lastMessageID = mid
 		}
 		l.lastMessage.WriteString(text)
+		l.evidence.takeReply(text)
 		l.mu.Unlock()
 		d.record(l.id, wire.TranscriptEntryKind{AgentMessage: &wire.TranscriptEntryKindAgentMessage{MessageID: id, Text: text}})
 	case u.ToolCall != nil:
-		d.record(l.id, wire.TranscriptEntryKind{ToolCall: &wire.TranscriptEntryKindToolCall{Value: toolCall(u.ToolCall)}})
+		call := toolCall(u.ToolCall)
+		d.record(l.id, wire.TranscriptEntryKind{ToolCall: &wire.TranscriptEntryKindToolCall{Value: call}})
 		l.mu.Lock()
+		l.evidence.takeCall(call)
 		l.lastMessageID, l.lastMessage = "", strings.Builder{}
 		l.toolCalls[string(u.ToolCall.ToolCallId)] = true
 		l.seen.Broadcast()
 		l.mu.Unlock()
 	case u.ToolCallUpdate != nil:
-		d.record(l.id, wire.TranscriptEntryKind{ToolCallUpdate: &wire.TranscriptEntryKindToolCallUpdate{Value: toolCall(u.ToolCallUpdate)}})
+		call := toolCall(u.ToolCallUpdate)
+		d.record(l.id, wire.TranscriptEntryKind{ToolCallUpdate: &wire.TranscriptEntryKindToolCallUpdate{Value: call}})
+		l.mu.Lock()
+		l.evidence.takeCall(call)
+		l.mu.Unlock()
 	case u.Plan != nil:
 		b, _ := json.Marshal(u.Plan.Entries)
 		var entries []wire.PlanEntry
