@@ -2,7 +2,6 @@ package agentsd
 
 import (
 	"bytes"
-	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -376,69 +375,6 @@ func (d *Daemon) sessionMCP(folder string) []sdk.McpServer {
 		out = append(out, e.server)
 	}
 	return out
-}
-
-// mcpHealth is mcp/health: the person's servers, then each project's, by path. A server
-// is not connected to here: each is said as it stands (waiting, missing a secret, an old
-// transport, or not yet checked).
-func (d *Daemon) mcpHealth() wire.MCPHealthSnapshot {
-	snap := wire.MCPHealthSnapshot{Servers: []wire.MCPServerHealth{}, Problems: []wire.MCPHealthFileProblem{}, At: now()}
-	secrets := d.secrets()
-	row := func(e mcpEntry, project *string, check wire.MCPCheckState) {
-		snap.Servers = append(snap.Servers, wire.MCPServerHealth{Name: e.name, Project: project, Transport: e.kind, Hosted: e.hosted, Check: check})
-	}
-	state := func(e mcpEntry) wire.MCPCheckState {
-		if e.kind == wire.MCPTransportNameSse {
-			return wire.MCPCheckStateOldTransport
-		}
-		if _, gone := filledServer(e.server, secrets); len(gone) > 0 {
-			return wire.MCPCheckStateMissingSecret
-		}
-		return wire.MCPCheckStateUnchecked
-	}
-	if home := d.personalHome(); home != "" {
-		entries, problem := readMCPFile(filepath.Join(home, ".agents", "mcp.json"))
-		if problem != "" {
-			snap.Problems = append(snap.Problems, wire.MCPHealthFileProblem{Message: problem})
-		}
-		for _, e := range entries {
-			row(e, nil, state(e))
-		}
-	}
-	var folders []string
-	for _, p := range d.projects(false) {
-		if p.Project.ArchivedAt == nil {
-			folders = append(folders, store.FolderPath(p.Project.Folder))
-		}
-	}
-	sort.Strings(folders)
-	d.mcpMu.Lock()
-	approved, _, _ := d.mcpApprovalsLocked()
-	d.mcpMu.Unlock()
-	for _, folder := range folders {
-		entries, problem := readMCPFile(filepath.Join(folder, ".agents", "mcp.json"))
-		f := folder
-		if problem != "" {
-			snap.Problems = append(snap.Problems, wire.MCPHealthFileProblem{Project: &f, Message: problem})
-		}
-		for _, e := range entries {
-			check := state(e)
-			if approved == nil || approved[mcpApprovalKey(folder, e.name)] != entryDigest(e.raw) {
-				check = wire.MCPCheckStateWaiting
-			}
-			row(e, &f, check)
-		}
-	}
-	return snap
-}
-
-func (d *Daemon) registerMCP() {
-	d.handlers[wire.CallMCPHealth.Name] = func(ctx context.Context, c *Client, raw json.RawMessage) (any, error) {
-		return d.mcpHealth(), nil
-	}
-	On(d, wire.CallMCPHealthCheck, func(ctx context.Context, c *Client, _ wire.MCPHealthCheckRequest) (wire.MCPHealthSnapshot, error) {
-		return d.mcpHealth(), nil
-	})
 }
 
 // beginMCPApprovals is beginMCPApprovalsIfNeeded, at start-up.
