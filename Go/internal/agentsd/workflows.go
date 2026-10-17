@@ -239,6 +239,8 @@ func (d *Daemon) scanLocked() {
 		}
 	}
 	d.workflowFiles = files
+	// A workflow made here can earn the first workflow (#984).
+	defer d.checkMilestonesSoon()
 	r := d.recordsLocked()
 	if r.ApprovalsBegan == nil && !d.workflowRecsBad {
 		t := now()
