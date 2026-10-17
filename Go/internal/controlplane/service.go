@@ -24,7 +24,6 @@ import (
 
 	"github.com/alexec/agents/Go/internal/buildinfo"
 	"github.com/alexec/agents/Go/internal/controllink"
-	"github.com/alexec/agents/Go/internal/controlplane/channels"
 	"github.com/alexec/agents/Go/internal/controlplane/hostinstall"
 	"github.com/alexec/agents/Go/internal/controlplane/hosttunnels"
 	"github.com/alexec/agents/Go/internal/controlplane/notices"
@@ -57,11 +56,6 @@ type Config struct {
 	// The web remote's loopback listener (071): Web/dist and the port, or nil for none,
 	// which is a container's default.
 	Web *WebConfig
-	// The home whose .agents-secrets holds the channels' tokens (#1009, #1035). "" for
-	// none, and no channels.
-	SecretsHome string
-	// How Slack is reached: Slack itself, or a fake one in tests.
-	SlackTransport channels.SlackTransport
 	// Told whenever the web remote's listener starts or fails to (071 R3): serve --home
 	// writes it beside the log for Agents Host.
 	WebChanged func(web.Status)
@@ -114,8 +108,6 @@ type Service struct {
 	// The reverse tunnels this copy holds for servers behind a bastion (#435): a single
 	// copy's, whose ssh is the person's on this machine.
 	tunnels *hosttunnels.Tunnels
-	// Chat apps that answer Needs You (#1012): only with a home for their secrets.
-	channels *channels.Channels
 	// Workspace providers (#691): only on a single copy with a home for their secrets.
 	providers *providers.Providers
 	// The other copies over this store, and the leases (US3); nil for a single copy.
@@ -168,11 +160,7 @@ func New(cfg Config) (*Service, error) {
 		}
 		s.mesh = newMesh(s, cfg.PeerURL, cfg.CopyBeat)
 	}
-	// Tunnels and channels belong to a single copy: its ssh is the person's on this
-	// machine, and Slack's Socket Mode gives one connection's events to one copy.
-	if cfg.SecretsHome != "" && s.mesh == nil {
-		s.channels = s.makeChannels(cfg.SecretsHome)
-	}
+	// Tunnels belong to a single copy: its ssh is the person's on this machine.
 	if cfg.PeerURL == "" {
 		s.tunnels = hosttunnels.New(hosttunnels.Config{Store: cfg.Store, Port: cfg.Port, Log: s.log,
 			Hosts:   func(context.Context) []records.HostRecord { return s.records.Hosts() },
@@ -277,9 +265,6 @@ func (s *Service) Start(ctx context.Context) (int, error) {
 	if s.mesh != nil && s.phase.now() != phaseReceiving {
 		s.startMesh()
 	}
-	if s.channels != nil {
-		s.channels.Apply()
-	}
 	if s.providers != nil && s.phase.now() != phaseReceiving {
 		s.providers.Start()
 	}
@@ -381,9 +366,6 @@ func (s *Service) Stop() {
 	}
 	if tunnels != nil {
 		tunnels.Stop()
-	}
-	if s.channels != nil {
-		s.channels.Stop()
 	}
 	if s.providers != nil {
 		s.providers.Stop()
@@ -543,70 +525,6 @@ func (s *Service) startMesh() {
 		m.broadcast(peerLinkLine(client, relayed))
 	})
 	m.start()
-}
-
-// channelClient is ControlService.channelClient: who a channel's answers come from on a
-// host, one client of its own for every channel.
-const channelClient = "C4A77E15-0000-4000-8000-000000001009"
-
-// makeChannels is ControlService.makeChannels: the desk asks and answers a host's
-// questions through kept requests, and control.json keeps how the channels are set.
-func (s *Service) makeChannels(home string) *channels.Channels {
-	deliver := func(method string, params any, host string, patience time.Duration) (json.RawMessage, error) {
-		m := s.router.DeliverKept(method, params, channelClient, records.KindUnknown, host, patience)
-		if m == nil {
-			return nil, fmt.Errorf("%s didn't answer", host)
-		}
-		if len(m.Error) > 0 {
-			var e channels.RPCError
-			json.Unmarshal(m.Error, &e)
-			return nil, &e
-		}
-		return m.Result, nil
-	}
-	desk := channels.NewDesk(channels.DeskHooks{
-		Pending: func(_ context.Context, host string) ([]channels.ElicitationRequest, error) {
-			result, err := deliver("elicitations/pending", map[string]any{}, host, 20*time.Second)
-			if err != nil {
-				return nil, err
-			}
-			var pending []channels.ElicitationRequest
-			return pending, json.Unmarshal(result, &pending)
-		},
-		Answer: func(_ context.Context, host string, answer channels.AnswerElicitationRequest) error {
-			_, err := deliver("elicitations/answer", answer, host, 30*time.Second)
-			return err
-		},
-	}, s.log)
-	transport := s.cfg.SlackTransport
-	if transport == nil {
-		transport = channels.SlackHTTP{}
-	}
-	return channels.New(home, desk, channels.Hooks{
-		Settings: func() *channels.ChannelSettings {
-			settings := s.records.Settings()
-			if settings == nil || len(settings.Channels) == 0 {
-				return nil
-			}
-			var set channels.ChannelSettings
-			if json.Unmarshal(settings.Channels, &set) != nil {
-				return nil
-			}
-			return &set
-		},
-		Save: func(set channels.ChannelSettings) error {
-			raw, err := json.Marshal(set)
-			if err != nil {
-				return err
-			}
-			_, err = s.records.ChangeSettings(context.Background(), func(settings *records.Settings) { settings.Channels = raw })
-			return err
-		},
-		Changed: func(state channels.ChannelsState) { s.router.BroadcastControl("control/channelsChanged", state) },
-		Slack: func(tokens channels.SlackTokens, member string) channels.NeedsChannel {
-			return channels.NewSlackChannel(tokens, member, transport, nil, s.log)
-		},
-	})
 }
 
 // heard is a host's attention/need (R6): what to post where, told to the relay host held

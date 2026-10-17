@@ -598,14 +598,6 @@ type ChangesUnavailableFailed struct {
 	Message string `json:"message"`
 }
 
-type ChannelsSet struct {
-	Slack *SlackSet `json:"slack,omitzero"`
-}
-
-type ChannelsState struct {
-	Slack SlackState `json:"slack"`
-}
-
 type ChartHint struct {
 	Mark  ChartMark `json:"mark"`
 	X     string    `json:"x"`
@@ -2672,23 +2664,6 @@ const (
 	SignInWantedReasonNotSignedIn SignInWantedReason = "notSignedIn"
 	SignInWantedReasonUnreadable  SignInWantedReason = "unreadable"
 )
-
-type SlackSet struct {
-	Enabled  *bool   `json:"enabled,omitzero"`
-	MemberID *string `json:"memberID,omitzero"`
-	AppToken *string `json:"appToken,omitzero"`
-	BotToken *string `json:"botToken,omitzero"`
-}
-
-type SlackState struct {
-	Enabled     bool    `json:"enabled"`
-	MemberID    string  `json:"memberID"`
-	AppTokenSet bool    `json:"appTokenSet"`
-	BotTokenSet bool    `json:"botTokenSet"`
-	Status      string  `json:"status"`
-	Detail      *string `json:"detail,omitzero"`
-	Available   bool    `json:"available"`
-}
 
 type SlashCommand struct {
 	Name        string  `json:"name"`

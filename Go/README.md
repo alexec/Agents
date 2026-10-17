@@ -52,7 +52,6 @@ Host's *Move to another machine* and *Relay for my devices* work with it.
 | `controlplane/web` | The web page's loopback listener |
 | `controlplane/hostinstall`, `hosttunnels` | Add a Server over ssh, Detect, the ssh config's hosts, bastion tunnels |
 | `controlplane/notices` | Where a need shows (`Routing`), and the relay host's deliveries |
-| `controlplane/channels` | Chat apps (Slack) that answer Needs You |
 | `controlplane/providers` | Workspace providers, kept requests, Write It for Me |
 
 **Switching a Mac.** Agents Host carries both (`Contents/Helpers/agents-control` and

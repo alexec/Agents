@@ -37,8 +37,6 @@ function scan(path, rules) {
 const allowedURLs = new Set([
   // Clone Git URL…'s placeholder, the window's own (CloneSheet, #115).
   "https://github.com/owner/repository.git",
-  // Settings ▸ Channels ▸ Slack's set-up steps (#1009, #1109): a link the person opens, never fetched.
-  "https://github.com/alexec/Agents/blob/main/docs/how-to/answer-questions-from-slack.md",
   "http://www.w3.org/1998/Math/MathML",
   "http://www.w3.org/1999/xhtml",
   "http://www.w3.org/2000/svg",

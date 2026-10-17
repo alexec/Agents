@@ -231,9 +231,6 @@ public extension DaemonAPI {
                 Row(Method.hostsRetryKept, params: KeptRequestID.self, result: Empty.self, kind: .controlRequest),
                 // What an offline host last listed (#962).
                 Row(Method.hostsLastHeard, params: HostRequest.self, result: HostLastHeard.self, kind: .controlRequest),
-                // Settings ▸ Slack (#1009): Needs You in Slack. Tokens go in and never come back.
-                Row(Method.channelsGet, params: Empty.self, result: ChannelsState.self, kind: .controlRequest),
-                Row(Method.channelsSet, params: ChannelsSet.self, result: ChannelsState.self, kind: .controlRequest),
                 // Heard
                 Row(Notification.agentChanged, params: Agent.self, result: Empty.self, kind: .hostNotification),
                 Row(Notification.agentEntry, params: EntryNotification.self, result: Empty.self, kind: .hostNotification),
@@ -285,8 +282,6 @@ public extension DaemonAPI {
                 Row(Notification.controlHostChanged, params: JSONValue.self, result: Empty.self, kind: .controlNotification),
                 Row(Notification.controlKeptChanged, params: KeptList.self, result: Empty.self, kind: .controlNotification),
                 Row(Notification.controlKeptDelivered, params: KeptDelivered.self, result: Empty.self,
-                    kind: .controlNotification),
-                Row(Notification.controlChannelsChanged, params: ChannelsState.self, result: Empty.self,
                     kind: .controlNotification),
             ]
         }

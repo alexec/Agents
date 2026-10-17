@@ -3,7 +3,6 @@ package controlplane
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"os"
 	"sort"
 	"strings"
@@ -12,7 +11,6 @@ import (
 	"time"
 
 	"github.com/alexec/agents/Go/internal/controllink"
-	"github.com/alexec/agents/Go/internal/controlplane/channels"
 	"github.com/alexec/agents/Go/internal/controlplane/providers"
 	"github.com/alexec/agents/Go/internal/controlplane/records"
 	"github.com/alexec/agents/Go/internal/controlplane/web"
@@ -60,7 +58,6 @@ var own = map[string]bool{
 	"clients/forgetSelf": true,
 	"devices/list":       true, "devices/startPairing": true, "devices/stopPairing": true,
 	"devices/forget": true, "hosts/lastHeard": true,
-	"channels/get": true, "channels/set": true,
 }
 
 // Handles says whether a bare method is the control plane's. A bare daemon/ping from
@@ -81,7 +78,7 @@ var writes = map[string]bool{
 	"hosts/startEnroll": true, "hosts/install": true, "hosts/update": true, "hosts/remove": true,
 	"hosts/setRelay": true, "hosts/lendSignIn": true, "hosts/lendGit": true, "hosts/detect": true,
 	"control/setProjectDetection": true, "clients/startPairing": true, "clients/forget": true,
-	"devices/startPairing": true, "devices/forget": true, "channels/set": true,
+	"devices/startPairing": true, "devices/forget": true,
 }
 
 func (m *Methods) Handle(method string, params json.RawMessage, from Caller) (any, error) {
@@ -284,25 +281,6 @@ func (m *Methods) Handle(method string, params json.RawMessage, from Caller) (an
 			return nil, fail(noSuchHost, "No host is called %s.", request.Host)
 		}
 		return m.s.copies.lastHeard(request.Host), nil
-	case "channels/get":
-		if m.s.channels == nil {
-			return channels.Unavailable(), nil
-		}
-		return m.s.channels.State(), nil
-	case "channels/set":
-		request, err := require[channels.ChannelsSet](params, "ChannelsSet")
-		if err != nil {
-			return nil, err
-		}
-		if m.s.channels == nil {
-			return nil, fail(notSupported, "%s", *channels.Unavailable().Slack.Detail)
-		}
-		state, err := m.s.channels.Set(request)
-		var refused *channels.RPCError
-		if errors.As(err, &refused) {
-			return nil, fail(refused.Code, "%s", refused.Message)
-		}
-		return state, err
 	}
 	if workspaceMethods[method] {
 		if m.s.providers == nil {
@@ -520,12 +498,6 @@ func (m *Methods) HostSaid(host, method string, params json.RawMessage) (any, er
 		return map[string]any{}, nil
 	case "attention/need":
 		m.s.heard(params)
-		if m.s.channels != nil {
-			var need channels.AttentionNeed
-			if json.Unmarshal(params, &need) == nil {
-				m.s.channels.Desk.Post(host, need)
-			}
-		}
 		return map[string]any{}, nil
 	case "host/workspaces", "host/providerDraft", "host/status":
 		if m.s.providers == nil {

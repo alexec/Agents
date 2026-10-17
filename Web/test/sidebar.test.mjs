@@ -261,12 +261,6 @@ test("Settings is in the address on its own (#846)", async () => {
     assert.equal(routeHash({ settings: true, host: "mac", project: "file:///w/a" }), "#/settings");
     assert.deepEqual(parseRoute("#/settings"), { settings: true });
     assert.deepEqual(parseRoute("#/a/settings"), {}, "not an Activity page");
-    // Settings ▸ Channels and a channel's page (#1109).
-    for (const settingsPage of ["channels", "slack"]) {
-      const hash = routeHash({ settings: true, settingsPage });
-      assert.deepEqual(parseRoute(hash), { settings: true, settingsPage });
-    }
-    assert.equal(routeHash({ settings: true, settingsPage: "slack" }), "#/settings/channels/slack");
   } finally {
     delete globalThis.location;
     delete globalThis.addEventListener;

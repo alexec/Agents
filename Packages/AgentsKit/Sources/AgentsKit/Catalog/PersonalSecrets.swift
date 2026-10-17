@@ -7,7 +7,6 @@ import Foundation
 ///
 ///     ~/.agents-secrets/secrets.env          values for `${NAME}` in mcp.json
 ///     ~/.agents-secrets/mcp-sign-ins.json    MCP sign-ins
-///     ~/.agents-secrets/channels.env         the control plane's chat app tokens (#1009)
 public enum PersonalSecrets {
     public static let folder = ".agents-secrets"
 
