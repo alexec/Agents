@@ -383,6 +383,14 @@ func (d *Daemon) mcpVerify(ctx context.Context, r wire.MCPVerifyRequest) wire.MC
 	for _, p := range built.entry.Pairs {
 		entry[p.Key] = wire.JSONValue(p.Value.Stringified())
 	}
+	// Signed in to already: verified as an agent will reach it, with its bearer.
+	if !ownAuthorization {
+		if b := d.signIn().signIns.BearerFor(ctx, server.Http.Url, built.name); b.Kind == "token" {
+			h := *server.Http
+			h.Headers = append(append([]sdk.HttpHeader{}, h.Headers...), sdk.HttpHeader{Name: "Authorization", Value: "Bearer " + b.Token})
+			server = sdk.McpServer{Http: &h}
+		}
+	}
 	name, version, tools, err := verifyMCP(ctx, server, cwd, mcpVerifyTimeout)
 	var outcome wire.MCPVerifyOutcome
 	if err != nil {
@@ -391,7 +399,12 @@ func (d *Daemon) mcpVerify(ctx context.Context, r wire.MCPVerifyRequest) wire.MC
 		case failure.kind == "authRequired" && ownAuthorization:
 			outcome.Failed = &wire.MCPVerifyOutcomeFailed{Value: "It refused the Authorization header it was sent (HTTP 401)."}
 		case failure.kind == "authRequired":
+			_, metadata := probeSignIn(ctx, built.filled.Http.Url, built.filled.Http.Headers, mcpSignInProbeTimeout)
+			d.signIn().signIns.MarkNeedsSignIn(built.filled.Http.Url, built.name, metadata)
 			outcome.AuthRequired = &wire.MCPVerifyOutcomeAuthRequired{}
+			if metadata != "" {
+				outcome.AuthRequired.ResourceMetadata = &metadata
+			}
 		default:
 			outcome.Failed = &wire.MCPVerifyOutcomeFailed{Value: failure.sentence(mcpVerifyTimeout)}
 		}

@@ -1566,7 +1566,51 @@ export interface MCPSetSecretRequest {
   value: string;
 }
 
+export interface MCPSignInAnswer {
+  flowID?: UUID;
+  authorizationURL?: string;
+  needsClient?: string;
+  callback?: string;
+  error?: string;
+}
+
+export interface MCPSignInClient {
+  id: string;
+  secret?: string;
+}
+
+export interface MCPSignInFlowRequest {
+  flowID: UUID;
+}
+
+export interface MCPSignInRequest {
+  target: MCPSignInTarget;
+  client?: MCPSignInClient;
+}
+
 export type MCPSignInState = "signedIn" | "needsSignIn";
+
+export type MCPSignInStatus =
+  | { waiting: Record<string, never> }
+  | { signedIn: Record<string, never> }
+  | { failed: { _0: string } }
+  | { cancelled: Record<string, never> };
+
+export type MCPSignInTarget =
+  | { entry: { destination: SkillDestination; name: string } }
+  | { url: { name: string; url: string } };
+
+export interface MCPSignInWaitAnswer {
+  status: MCPSignInStatus;
+}
+
+export interface MCPSignOutAnswer {
+  error?: string;
+}
+
+export interface MCPSignOutRequest {
+  target: MCPSignInTarget;
+}
 
 export type MCPTransportName = "stdio" | "http" | "sse";
 
@@ -3615,6 +3659,13 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   MCPServerHealth: { required: ["name", "transport", "hosted", "check"], optional: ["project", "live", "checkedAt", "lastError", "tools"] },
   MCPSetSecretAnswer: { required: ["set"], optional: [] },
   MCPSetSecretRequest: { required: ["name", "value"], optional: [] },
+  MCPSignInAnswer: { required: [], optional: ["flowID", "authorizationURL", "needsClient", "callback", "error"] },
+  MCPSignInClient: { required: ["id"], optional: ["secret"] },
+  MCPSignInFlowRequest: { required: ["flowID"], optional: [] },
+  MCPSignInRequest: { required: ["target"], optional: ["client"] },
+  MCPSignInWaitAnswer: { required: ["status"], optional: [] },
+  MCPSignOutAnswer: { required: [], optional: ["error"] },
+  MCPSignOutRequest: { required: ["target"], optional: [] },
   MCPTriggerFailure: { required: ["code", "message", "since"], optional: [] },
   MCPTriggerStatus: { required: ["name", "state"], optional: ["server", "lastPolledAt", "lastEventAt", "missedSince", "failure", "retryAt"] },
   MCPVariable: { required: ["name", "description", "kind", "required", "alreadySet"], optional: ["placeholder"] },

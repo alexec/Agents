@@ -1984,6 +1984,82 @@
       }
     },
     {
+      "name": "mcp/sign-in",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/MCPSignInRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/MCPSignInAnswer"
+        }
+      }
+    },
+    {
+      "name": "mcp/sign-in/cancel",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/MCPSignInFlowRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/MCPSignInWaitAnswer"
+        }
+      }
+    },
+    {
+      "name": "mcp/sign-in/wait",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/MCPSignInFlowRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/MCPSignInWaitAnswer"
+        }
+      }
+    },
+    {
+      "name": "mcp/sign-out",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/MCPSignOutRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/MCPSignOutAnswer"
+        }
+      }
+    },
+    {
       "name": "mcp/verify",
       "paramStructure": "by-name",
       "params": [

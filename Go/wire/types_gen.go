@@ -2062,12 +2062,72 @@ type MCPSetSecretRequest struct {
 	Value string `json:"value"`
 }
 
+type MCPSignInAnswer struct {
+	FlowID           *UUID   `json:"flowID,omitzero"`
+	AuthorizationURL *string `json:"authorizationURL,omitzero"`
+	NeedsClient      *string `json:"needsClient,omitzero"`
+	Callback         *string `json:"callback,omitzero"`
+	Error            *string `json:"error,omitzero"`
+}
+
+type MCPSignInClient struct {
+	ID     string  `json:"id"`
+	Secret *string `json:"secret,omitzero"`
+}
+
+type MCPSignInFlowRequest struct {
+	FlowID UUID `json:"flowID"`
+}
+
+type MCPSignInRequest struct {
+	Target MCPSignInTarget  `json:"target"`
+	Client *MCPSignInClient `json:"client,omitzero"`
+}
+
 type MCPSignInState string
 
 const (
 	MCPSignInStateSignedIn    MCPSignInState = "signedIn"
 	MCPSignInStateNeedsSignIn MCPSignInState = "needsSignIn"
 )
+
+type MCPSignInStatus struct {
+	Waiting   *struct{}              `json:"waiting,omitzero"`
+	SignedIn  *struct{}              `json:"signedIn,omitzero"`
+	Failed    *MCPSignInStatusFailed `json:"failed,omitzero"`
+	Cancelled *struct{}              `json:"cancelled,omitzero"`
+}
+
+type MCPSignInStatusFailed struct {
+	Value string `json:"_0"`
+}
+
+type MCPSignInTarget struct {
+	Entry *MCPSignInTargetEntry `json:"entry,omitzero"`
+	URL   *MCPSignInTargetURL   `json:"url,omitzero"`
+}
+
+type MCPSignInTargetEntry struct {
+	Destination SkillDestination `json:"destination"`
+	Name        string           `json:"name"`
+}
+
+type MCPSignInTargetURL struct {
+	Name string `json:"name"`
+	URL  string `json:"url"`
+}
+
+type MCPSignInWaitAnswer struct {
+	Status MCPSignInStatus `json:"status"`
+}
+
+type MCPSignOutAnswer struct {
+	Error *string `json:"error,omitzero"`
+}
+
+type MCPSignOutRequest struct {
+	Target MCPSignInTarget `json:"target"`
+}
 
 type MCPTransportName string
 

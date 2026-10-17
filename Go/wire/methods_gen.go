@@ -93,6 +93,10 @@ var (
 	CallMCPPreview                     = Method[MCPPreviewRequest, MCPPreviewAnswer]{"mcp/preview"}
 	CallMCPRemove                      = Method[MCPRemoveRequest, MCPRemoveAnswer]{"mcp/remove"}
 	CallMCPSetSecret                   = Method[MCPSetSecretRequest, MCPSetSecretAnswer]{"mcp/set-secret"}
+	CallMCPSignIn                      = Method[MCPSignInRequest, MCPSignInAnswer]{"mcp/sign-in"}
+	CallMCPSignInCancel                = Method[MCPSignInFlowRequest, MCPSignInWaitAnswer]{"mcp/sign-in/cancel"}
+	CallMCPSignInWait                  = Method[MCPSignInFlowRequest, MCPSignInWaitAnswer]{"mcp/sign-in/wait"}
+	CallMCPSignOut                     = Method[MCPSignOutRequest, MCPSignOutAnswer]{"mcp/sign-out"}
 	CallMCPVerify                      = Method[MCPVerifyRequest, MCPVerifyAnswer]{"mcp/verify"}
 	CallMilestonesState                = Method[Empty, Milestones]{"milestones/state"}
 	CallModesRemembered                = Method[Empty, map[string]JSONValue]{"modes/remembered"}

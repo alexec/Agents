@@ -14052,6 +14052,226 @@
           "additionalProperties": false
         }
       ]
+    },
+    "MCPSignOutRequest": {
+      "type": "object",
+      "properties": {
+        "target": {
+          "$ref": "#/definitions/MCPSignInTarget"
+        }
+      },
+      "required": [
+        "target"
+      ],
+      "additionalProperties": false
+    },
+    "MCPSignInStatus": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "waiting": {
+              "type": "object",
+              "additionalProperties": {
+                "not": {}
+              }
+            }
+          },
+          "required": [
+            "waiting"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "signedIn": {
+              "type": "object",
+              "additionalProperties": {
+                "not": {}
+              }
+            }
+          },
+          "required": [
+            "signedIn"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "failed": {
+              "type": "object",
+              "properties": {
+                "_0": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "_0"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "failed"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "cancelled": {
+              "type": "object",
+              "additionalProperties": {
+                "not": {}
+              }
+            }
+          },
+          "required": [
+            "cancelled"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "MCPSignOutAnswer": {
+      "type": "object",
+      "properties": {
+        "error": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "MCPSignInWaitAnswer": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "$ref": "#/definitions/MCPSignInStatus"
+        }
+      },
+      "required": [
+        "status"
+      ],
+      "additionalProperties": false
+    },
+    "MCPSignInRequest": {
+      "type": "object",
+      "properties": {
+        "target": {
+          "$ref": "#/definitions/MCPSignInTarget"
+        },
+        "client": {
+          "$ref": "#/definitions/MCPSignInClient"
+        }
+      },
+      "required": [
+        "target"
+      ],
+      "additionalProperties": false
+    },
+    "MCPSignInFlowRequest": {
+      "type": "object",
+      "properties": {
+        "flowID": {
+          "$ref": "#/definitions/UUID"
+        }
+      },
+      "required": [
+        "flowID"
+      ],
+      "additionalProperties": false
+    },
+    "MCPSignInTarget": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "entry": {
+              "type": "object",
+              "properties": {
+                "destination": {
+                  "$ref": "#/definitions/SkillDestination"
+                },
+                "name": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "destination",
+                "name"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "entry"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "url": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "url": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "name",
+                "url"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "url"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "MCPSignInClient": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "secret": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "additionalProperties": false
+    },
+    "MCPSignInAnswer": {
+      "type": "object",
+      "properties": {
+        "flowID": {
+          "$ref": "#/definitions/UUID"
+        },
+        "authorizationURL": {
+          "type": "string"
+        },
+        "needsClient": {
+          "type": "string"
+        },
+        "callback": {
+          "type": "string"
+        },
+        "error": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
     }
   }
 }

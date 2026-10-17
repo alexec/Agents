@@ -491,7 +491,7 @@ func (d *Daemon) mcpList(dest wire.SkillDestination) (wire.MCPListAnswer, error)
 			ready = append(ready, row)
 		}
 	}
-	answer.Servers = append(append(answer.Servers, waiting...), ready...)
+	answer.Servers = d.mcpSignInStates(append(append(answer.Servers, waiting...), ready...), dest)
 	log.Printf("mcp: list %s → %d", dest.Kind, len(answer.Servers))
 	return answer, nil
 }

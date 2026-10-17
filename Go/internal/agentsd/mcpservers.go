@@ -374,7 +374,7 @@ func (d *Daemon) sessionMCP(folder string) []sdk.McpServer {
 		seen[e.name] = true
 		out = append(out, e.server)
 	}
-	return out
+	return d.withSignIns(out)
 }
 
 // beginMCPApprovals is beginMCPApprovalsIfNeeded, at start-up.
