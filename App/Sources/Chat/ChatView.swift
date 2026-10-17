@@ -46,6 +46,7 @@ struct ChatView: View {
                         .safeAreaInset(edge: .top, spacing: 0) {
                             VStack(spacing: 0) {
                                 OfflineStrip(host: agent.host)
+                                DiskStrip(host: agent.host)
                                 actions(for: agent)
                                 // What it said it would do, as the phone has it (#341).
                                 CurrentPlanStrip(agent: agent)

@@ -142,6 +142,7 @@ struct ContentView: View {
             // pinned view (#189), fed afresh.
             VStack(spacing: 0) {
                 OfflineStrip(host: summary.host)
+                DiskStrip(host: summary.host)
                 if let pin = model.pins(in: key.folder).first(where: { $0.path == path }), let view = pin.view {
                     PinnedViewPage(folder: key.folder, pin: pin, view: view,
                                    call: { method, params in try await model.client(for: key.host).call(method, params) },
@@ -269,7 +270,6 @@ struct ContentView: View {
         // under an inset and hide their first rows behind it.
         VStack(spacing: 0) {
         if model.controlPlaneAway { ControlAwayStrip() }
-        DiskStrip()
         Group {
             if model.needsFirstRun {
                 // No control plane and nothing of the old way: one question, and no

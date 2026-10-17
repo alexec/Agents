@@ -15,6 +15,7 @@ import type { Agent, AppViewCall, BackgroundItem, FileMentionDTO, TranscriptEntr
 import { replace, route } from "../route";
 import { useWaitingCards, type WaitingCard } from "./Cards";
 import { OfflineStrip } from "./OfflineStrip";
+import { DiskStrip } from "./DiskStrip";
 import { KeptBubbles } from "./Kept";
 import { FolderGoneNotice, MissingFolderStrip } from "./MissingFolder";
 import { BlockStrip } from "./BlockStrip";
@@ -578,6 +579,7 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
         </span>
       </header>
       {hostDown && <OfflineStrip store={store} host={host} />}
+      {!hostDown && <DiskStrip store={store} host={host} />}
       <FolderGoneNotice store={store} host={host} agent={agent} />
       <MissingFolderStrip store={store} host={host} agent={agent} />
       <BlockStrip store={store} host={host} agent={agent} disabled={down} />

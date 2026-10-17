@@ -376,7 +376,9 @@ for (const scene of scenes) {
       say(`footer: ${JSON.stringify(await page.text(".identity"))}`);
       await shot("identity");
     } else if (scene === "disk") {
-      // #196: the low disk space strip across the top, as the window's DiskStrip (#195).
+      // #196: the low disk space strip, as the window's DiskStrip (#195); since #1329 on the
+      // host's own screens (here a new session in its project), not across every page.
+      await openProject();
       const override = `${root}/disk-free-override`;
       const strip = (want) => page.waitFor(`[...document.querySelectorAll(".disk-strip")].some((el) => el.innerText.includes(${JSON.stringify(want)}))`, 150_000);
       try {
@@ -399,6 +401,7 @@ for (const scene of scenes) {
         await strip("running low");
         await page.goto(webURL);
         await page.waitFor(`document.querySelector(".projects .row, .sidebar .row.project")`, 30_000);
+        await openProject();
         await page.waitFor(`document.querySelector(".disk-strip")`, 10_000).catch(() => {});
         say(`on a fresh load: ${JSON.stringify(await visible(".disk-strip"))}`);
       } finally {
