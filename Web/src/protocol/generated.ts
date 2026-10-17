@@ -430,6 +430,19 @@ export type CarriedSettingSource =
   | { closestNoLooser: Record<string, never> }
   | { person: Record<string, never> };
 
+export type CatalogError =
+  | { unreachable: { host: string } }
+  | { rateLimited: { retryAfter?: number } }
+  | { unmanaged: { path: string } }
+  | { lockUnreadable: { path: string } }
+  | { noPersonalHome: Record<string, never> }
+  | { previewExpired: Record<string, never> }
+  | { notAProject: { path: string } }
+  | { replaceMismatch: Record<string, never> }
+  | { cannotAdd: { _0: PreviewProblem[] } }
+  | { notManaged: { name: string } }
+  | { failed: { _0: string } };
+
 export interface CatchUpLeases {
   leases: LeaseSnapshot;
   hosted: HostedMCPSnapshot;
@@ -1292,6 +1305,13 @@ export interface ListRequest {
   query?: string;
 }
 
+export interface ListedSkill {
+  name: string;
+  description?: string;
+  folder: string;
+  managed?: ManagedSkill;
+}
+
 export type MCPCheckState = "unchecked" | "checking" | "answered" | "failed" | "waiting" | "missingSecret" | "signIn" | "oldTransport";
 
 export interface MCPEventTrigger {
@@ -1359,6 +1379,19 @@ export interface MCPTriggerStatus {
 }
 
 export type MCPTriggerStatusState = "pending" | "active" | "retrying" | "stopped" | "notThisHost";
+
+export interface ManagedSkill {
+  destination: SkillDestination;
+  name: string;
+  source: string;
+  skillPath?: string;
+  recordedHash?: string;
+  commit?: string;
+  committedAt?: WireDate;
+  catalogue?: string;
+  edited: boolean;
+  update: UpdateState;
+}
 
 export interface MarkRuntimeAvailable {
   credentialKey: string;
@@ -1575,6 +1608,20 @@ export type PlanEntryStatus = "pending" | "in_progress" | "completed";
 
 export type PlanState = "current" | "withdrawn";
 
+export interface PluginApproveRequest {
+  plugin: URLString;
+  digest: string;
+}
+
+export interface PluginsList {
+  folder: URLString;
+  plugins: ProjectPlugin[];
+}
+
+export interface PluginsListRequest {
+  folder: URLString;
+}
+
 export interface PresenceReport {
   watching?: UUID;
   active: boolean;
@@ -1582,6 +1629,12 @@ export interface PresenceReport {
   showing?: UUID;
   alsoShowing?: UUID[];
 }
+
+export type PreviewProblem =
+  | { noSkillFile: Record<string, never> }
+  | { notFoundInRepo: Record<string, never> }
+  | { tooLarge: { bytes: number; files: number } }
+  | { skipped: { _0: string[] } };
 
 export interface PrewarmRequest {
   agentID: UUID;
@@ -1611,6 +1664,14 @@ export interface ProjectPins {
   pins: PinView[];
   sessions?: UUID[];
   workflows?: string[];
+}
+
+export interface ProjectPlugin {
+  project: URLString;
+  folder: URLString;
+  name: string;
+  carries: string[];
+  awaitingApproval?: WorkflowApproval;
 }
 
 export interface ProjectRemovedNotification {
@@ -2054,6 +2115,30 @@ export interface ShownFile {
 
 export type SignInWantedReason = "notSignedIn" | "unreadable";
 
+export interface SkillDestination {
+  kind: SkillDestinationKind;
+  folder?: string;
+}
+
+export type SkillDestinationKind = "personal" | "project";
+
+export interface SkillNameRequest {
+  destination: SkillDestination;
+  name: string;
+}
+
+export interface SkillRemoveAnswer {
+  trashedTo: string;
+}
+
+export interface SkillsListAnswer {
+  skills: ListedSkill[];
+}
+
+export interface SkillsListRequest {
+  destination: SkillDestination;
+}
+
 export interface SlashCommand {
   name: string;
   description?: string;
@@ -2280,6 +2365,11 @@ export interface UnqueueRequest {
   agentID: UUID;
   promptID: UUID;
 }
+
+export type UpdateState =
+  | { unknown: Record<string, never> }
+  | { current: Record<string, never> }
+  | { available: { commit: string } };
 
 export interface Usage {
   used: number;
@@ -3082,6 +3172,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   LineMember: { required: ["agentID", "askedAt", "isCallOpen"], optional: [] },
   ListCursor: { required: ["lastActivityAt", "id"], optional: [] },
   ListRequest: { required: ["includeArchived", "archivedCommands", "archivedOnly", "lean"], optional: ["folder", "startedByWorkflow", "limit", "agentID", "after", "query"] },
+  ListedSkill: { required: ["name", "folder"], optional: ["description", "managed"] },
   MCPEventTrigger: { required: ["event", "arguments"], optional: ["servers"] },
   MCPHealthCheckRequest: { required: [], optional: ["project"] },
   MCPHealthFileProblem: { required: ["message"], optional: ["project"] },
@@ -3090,6 +3181,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   MCPServerHealth: { required: ["name", "transport", "hosted", "check"], optional: ["project", "live", "checkedAt", "lastError", "tools"] },
   MCPTriggerFailure: { required: ["code", "message", "since"], optional: [] },
   MCPTriggerStatus: { required: ["name", "state"], optional: ["server", "lastPolledAt", "lastEventAt", "missedSince", "failure", "retryAt"] },
+  ManagedSkill: { required: ["destination", "name", "source", "edited", "update"], optional: ["skillPath", "recordedHash", "commit", "committedAt", "catalogue"] },
   MarkRuntimeAvailable: { required: ["credentialKey"], optional: [] },
   MessageSender: { required: ["agentID", "title"], optional: [] },
   Milestones: { required: ["earned"], optional: [] },
@@ -3120,11 +3212,15 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   PinsChangedNotification: { required: ["folder", "pins"], optional: ["sessions", "workflows"] },
   Plan: { required: ["entries", "state", "at"], optional: ["planID"] },
   PlanEntry: { required: ["content", "priority", "status"], optional: [] },
+  PluginApproveRequest: { required: ["plugin", "digest"], optional: [] },
+  PluginsList: { required: ["folder", "plugins"], optional: [] },
+  PluginsListRequest: { required: ["folder"], optional: [] },
   PresenceReport: { required: ["active"], optional: ["watching", "mayNotify", "showing", "alsoShowing"] },
   PrewarmRequest: { required: ["agentID", "why"], optional: [] },
   Project: { required: ["folder", "addedAt"], optional: ["archivedAt", "laidOutAt", "layoutVersion", "helperLimits", "diskSpace", "pinned"] },
   ProjectDetection: { required: ["enabled", "paths"], optional: [] },
   ProjectPins: { required: ["folder", "pins"], optional: ["sessions", "workflows"] },
+  ProjectPlugin: { required: ["project", "folder", "name", "carries"], optional: ["awaitingApproval"] },
   ProjectRemovedNotification: { required: ["folder"], optional: [] },
   ProjectRequest: { required: ["folder"], optional: [] },
   ProjectSummary: { required: ["project", "name", "exists", "lastActivityAt", "counts", "costToDate", "unmeasuredAgents", "retiredCount"], optional: ["isChat", "guardedChanges", "approvals"] },
@@ -3184,6 +3280,11 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ShellStateNotification: { required: ["agentID", "shell", "state"], optional: [] },
   ShowFileNotification: { required: ["agentID", "file"], optional: [] },
   ShownFile: { required: ["path"], optional: ["line", "chart"] },
+  SkillDestination: { required: ["kind"], optional: ["folder"] },
+  SkillNameRequest: { required: ["destination", "name"], optional: [] },
+  SkillRemoveAnswer: { required: ["trashedTo"], optional: [] },
+  SkillsListAnswer: { required: ["skills"], optional: [] },
+  SkillsListRequest: { required: ["destination"], optional: [] },
   SlashCommand: { required: ["name"], optional: ["description", "inputHint"] },
   StartOptions: { required: ["values", "extraArguments"], optional: [] },
   StartRequest: { required: ["runtimeID", "cwd", "prompt", "attachments", "startOptions", "additionalDirectories", "mcpServers", "labels"], optional: ["draftID", "worktree", "requestID", "sandbox", "persona", "purpose"] },

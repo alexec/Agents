@@ -2092,6 +2092,44 @@
       }
     },
     {
+      "name": "plugins/approve",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/PluginApproveRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/PluginsList"
+        }
+      }
+    },
+    {
+      "name": "plugins/list",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/PluginsListRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/PluginsList"
+        }
+      }
+    },
+    {
       "name": "pool/applyAllowances",
       "paramStructure": "by-name",
       "params": [
@@ -3061,6 +3099,44 @@
       }
     },
     {
+      "name": "skills/list",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/SkillsListRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/SkillsListAnswer"
+        }
+      }
+    },
+    {
+      "name": "skills/remove",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/SkillNameRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/SkillRemoveAnswer"
+        }
+      }
+    },
+    {
       "name": "store/notes",
       "tags": [
         {
@@ -4006,6 +4082,20 @@
           "required": true,
           "schema": {
             "$ref": "daemon.schema.json#/definitions/PinsChangedNotification"
+          }
+        }
+      ]
+    },
+    {
+      "name": "plugins/changed",
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/PluginsList"
           }
         }
       ]
