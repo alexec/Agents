@@ -92,6 +92,7 @@ func main() {
 			d.ChatHome = home
 		}
 	}
+	d.Door = door(cl.root)
 	safe.Go("socket", func() {
 		if err := d.ServeSocket(ctx, loc.Socket()); err != nil && ctx.Err() == nil {
 			log.Printf("socket: %v", err)

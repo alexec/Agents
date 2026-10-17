@@ -65,6 +65,8 @@ type Client struct {
 	ID   int64
 	conn controllink.Conn
 	d    *Daemon
+	// role is what it may ask for (roles.go): control unless daemon.sock's door says.
+	role Role
 }
 
 func (c *Client) send(v any) {
@@ -114,8 +116,11 @@ func Quiet(d *Daemon, names ...string) {
 var nextClient atomic.Int64
 
 // Accept serves one connection until it closes.
-func (d *Daemon) Accept(conn controllink.Conn) {
-	c := &Client{ID: nextClient.Add(1), conn: conn, d: d}
+func (d *Daemon) Accept(conn controllink.Conn) { d.AcceptAs(conn, RoleControl) }
+
+// AcceptAs serves one connection, as role, until it closes.
+func (d *Daemon) AcceptAs(conn controllink.Conn, role Role) {
+	c := &Client{ID: nextClient.Add(1), conn: conn, d: d, role: role}
 	d.addClient(c)
 	defer d.removeClient(c)
 	for line := range conn.In() {
@@ -135,7 +140,9 @@ func (d *Daemon) dispatch(c *Client, m message) {
 	h := d.handlers[m.Method]
 	var result any
 	var err error
-	if h == nil {
+	if !c.role.Allows(m.Method) {
+		err = &Error{Code: CodeNotPermitted, Message: fmt.Sprintf("%s is not open to this connection (%s)", m.Method, c.role)}
+	} else if h == nil {
 		d.logUnknown(m.Method)
 		err = &Error{Code: CodeMethodNotFound, Message: "Method not found: " + m.Method}
 	} else if v := safe.Catch("rpc "+m.Method, func() { result, err = h(d.ctx, c, m.Params) }); v != nil {
@@ -191,6 +198,11 @@ func (s *sockConn) In() <-chan string { return s.in }
 func (s *sockConn) Close()            { s.c.Close() }
 func (s *sockConn) Device() string    { return "" }
 
+// SocketDoor decides what a connection on daemon.sock may ask for (RolePolicy): on a Mac,
+// by the caller's code signature. ok false closes it unanswered (another account). Nil
+// lets every process of this account call everything, as a Linux host does today.
+type SocketDoor func(c net.Conn) (role Role, ok bool)
+
 // ServeSocket answers on daemon.sock, mode 0600 in the root, until ctx ends.
 func (d *Daemon) ServeSocket(ctx context.Context, path string) error {
 	os.Remove(path)
@@ -204,6 +216,15 @@ func (d *Daemon) ServeSocket(ctx context.Context, path string) error {
 		c, err := l.Accept()
 		if err != nil {
 			return err
+		}
+		role := RoleControl
+		if d.Door != nil {
+			r, ok := d.Door(c)
+			if !ok {
+				c.Close()
+				continue
+			}
+			role = r
 		}
 		sc := &sockConn{c: c, w: bufio.NewWriter(c), in: make(chan string, 256)}
 		safe.Go("socket read", func() {
@@ -219,7 +240,7 @@ func (d *Daemon) ServeSocket(ctx context.Context, path string) error {
 				}
 			}
 		})
-		safe.Go("socket client", func() { d.Accept(sc) })
+		safe.Go("socket client", func() { d.AcceptAs(sc, role) })
 	}
 }
 

@@ -509,6 +509,11 @@ targets:
         copy:
           destination: wrapper
           subpath: Contents/Helpers
+      # What the Go agentsd asks of macOS without cgo (#1138): its callers' signatures.
+      - target: agents-mac
+        copy:
+          destination: wrapper
+          subpath: Contents/Helpers
       # The MCP servers Agents ships (#700), beside agentsd, which puts this folder first
       # on their PATH: `.agents/mcp.json` names them by bare name on a Mac and on Linux.
       - target: ci-watcher
@@ -633,6 +638,28 @@ targets:
         SKIP_INSTALL: YES
         ENABLE_HARDENED_RUNTIME: YES
       # The GitHub release (#669): Release signs it with Developer ID, outside the App Store.
+      configs:
+        Release:
+          CODE_SIGN_STYLE: Manual
+          CODE_SIGN_IDENTITY: Developer ID Application
+          OTHER_CODE_SIGN_FLAGS: --timestamp
+
+  # agents-mac (#1138): a small helper the Go agentsd runs for what Go cannot do on a Mac
+  # without cgo, such as reading a caller's code signature by its audit token. No packages:
+  # it stays small.
+  agents-mac:
+    type: tool
+    supportedDestinations: [macOS]
+    sources:
+      - path: Host/MacHelper
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.alexecollins.agents.mac-helper
+        PRODUCT_NAME: agents-mac
+        SDKROOT: macosx
+        SUPPORTED_PLATFORMS: macosx
+        SKIP_INSTALL: YES
+        ENABLE_HARDENED_RUNTIME: YES
       configs:
         Release:
           CODE_SIGN_STYLE: Manual

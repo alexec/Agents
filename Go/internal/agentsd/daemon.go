@@ -62,6 +62,8 @@ type Daemon struct {
 	SettingsDir string
 	// RaiseByHand lets events/raise make an event: an unreleased build on a scratch root.
 	RaiseByHand bool
+	// Door decides what a caller on daemon.sock may ask for; nil is open (roles.go).
+	Door SocketDoor
 }
 
 // New opens the root and registers every method this host serves.
@@ -120,6 +122,9 @@ func Broadcast[P any](d *Daemon, n wire.Notification[P], params P) {
 	// Those on a control-plane uplink: one frame per uplink, naming who hears it (#167).
 	routed := map[*controllink.Uplink][]int{}
 	for _, c := range cs {
+		if !c.role.HearsNotifications() {
+			continue
+		}
 		if f, ok := c.conn.(controllink.FanOuter); ok {
 			if up, n, yes := f.FanOutRoute(); yes {
 				routed[up] = append(routed[up], n)
