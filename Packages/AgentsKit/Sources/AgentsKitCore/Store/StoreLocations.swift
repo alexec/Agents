@@ -328,6 +328,9 @@ public struct StoreLocations: Sendable {
     /// The little the event sources remember between runs (042): the next position,
     /// branch tips, cost crossings.
     public var eventState: URL { root.appendingPathComponent("events-state.json") }
+    /// When the daemon was last alive, and when it stopped cleanly (#1219): what a
+    /// restart works out how long it was down from.
+    public var alive: URL { root.appendingPathComponent("alive.json") }
     /// What each of the last few local days cost, per currency. One file, so a daemon
     /// restarted part-way through a day comes back having counted the money rather
     /// than starting the day again from zero.

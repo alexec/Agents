@@ -237,6 +237,11 @@ public struct EventState: Codable, Hashable, Sendable {
     /// Volume mount → how it stood at the last look (#195), so a crossing is raised
     /// once and a restart does not raise it again.
     public var diskLevels: [String: String]?
+    /// Whether the person was away, and why ("locked", "idle"), as last heard (#1219), so a
+    /// restart can tell a change in the gap from one already said.
+    public var personAway: String?
+    /// An open wait's id → the restarts it was open over (#1219), told when it next wakes.
+    public var waitRestarts: [String: [RestartGap]]?
 
     public init() {}
 }

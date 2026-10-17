@@ -81,6 +81,18 @@ do {
     exit(1)
 }
 
+// A stop by signal, as launchd and an update stop it, is a clean stop too (#1219): its
+// time is written, so the next start says how long it was down, and then the signal does
+// what it always did.
+signal(SIGTERM, SIG_IGN)
+let stopSignal = DispatchSource.makeSignalSource(signal: SIGTERM, queue: .main)
+stopSignal.setEventHandler {
+    DaemonAliveFile.writeStopped(to: daemon.locations.alive)
+    signal(SIGTERM, SIG_DFL)
+    raise(SIGTERM)
+}
+stopSignal.resume()
+
 let task = Task {
     do {
         try await daemon.start()

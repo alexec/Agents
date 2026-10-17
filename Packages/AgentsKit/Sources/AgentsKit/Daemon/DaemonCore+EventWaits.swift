@@ -168,11 +168,12 @@ extension DaemonCore {
                     agent.eventWait = nil
                     changed(agent)
                     call.resume(returning: .success(EventWords.matched(event,
-                        waited: Int(now().timeIntervalSince(started).rounded()))))
+                        waited: Int(now().timeIntervalSince(started).rounded())) + restartNotice(wait)))
                 } else {
                     // Its turn has ended. The one write: the wait ends and the prompt
                     // that says so is queued, together.
-                    let prompt = QueuedPrompt(text: EventWords.wake(event, extraMatches: 0), from: .app)
+                    let prompt = QueuedPrompt(text: EventWords.wake(event, extraMatches: 0) + restartNotice(wait),
+                                              from: .app)
                     wait.ending = .matched(position: event.position, extraMatches: 0)
                     wait.resumePromptID = prompt.id
                     agent.eventWait = wait
@@ -190,7 +191,7 @@ extension DaemonCore {
                 // will read, rather than waking it twice (spec, Edge Cases).
                 wait.ending = .matched(position: position, extraMatches: extra + 1)
                 agent.eventWait = wait
-                agent.queuedPrompts[index].text = EventWords.wake(first, extraMatches: extra + 1)
+                agent.queuedPrompts[index].text = EventWords.wake(first, extraMatches: extra + 1) + restartNotice(wait)
                 changed(agent)
             }
         }
@@ -285,9 +286,9 @@ extension DaemonCore {
                 openEventWaitStarted.removeValue(forKey: id)
                 agent.eventWait = nil
                 changed(agent)
-                call.resume(returning: .success(EventWords.timedOut(wait, at: at)))
+                call.resume(returning: .success(EventWords.timedOut(wait, at: at) + restartNotice(wait)))
             } else {
-                let prompt = QueuedPrompt(text: EventWords.timedOut(wait, at: at), from: .app)
+                let prompt = QueuedPrompt(text: EventWords.timedOut(wait, at: at) + restartNotice(wait), from: .app)
                 wait.ending = .timedOut
                 wait.resumePromptID = prompt.id
                 agent.eventWait = wait
@@ -305,7 +306,7 @@ extension DaemonCore {
     /// What a restart owes the waiting. No call survives one, so every open wait is an
     /// agent to start when its event comes; a wake the last daemon queued and never
     /// sent is sent, once; and deadlines are aimed again, so one that passed while
-    /// nothing was running ends now. Nothing is raised for the time the daemon was down.
+    /// nothing was running ends now. What the gap owes them is `noteRestart`'s (#1219).
     func resumeEventWaitsAfterRestart() async {
         loadEventsIfNeeded()
         // A wait an earlier build saved with no deadline gets one now (#572), so none

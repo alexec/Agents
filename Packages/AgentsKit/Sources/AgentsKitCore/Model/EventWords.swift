@@ -124,6 +124,51 @@ public enum EventWords {
         return lines.joined(separator: "\n")
     }
 
+    // MARK: Restarts (#1219)
+
+    /// Whether what a pattern names is had again after a restart: a server's events
+    /// replay from their cursor, `branch.moved` compares the saved tips, and the disk and
+    /// the person are looked at again. Anything else that happened in the gap is gone.
+    public static func caughtUpAfterRestart(_ name: String) -> Bool {
+        if EventWait.isServerPattern(name) { return true }
+        if name == "branch.moved" || name == "branch.*" { return true }
+        guard let subject = EventSubject(name: name) else { return false }
+        return [.system, .machine, .person].contains(subject)
+    }
+
+    /// Added to a wake, or a time-out, of a wait that was open over a restart: when, for
+    /// how long, and what may be missing, so the agent knows to catch up.
+    public static func restartNotice(_ gaps: [RestartGap], wait: EventWait) -> String {
+        guard !gaps.isEmpty else { return "" }
+        var lines = [""]
+        for gap in gaps {
+            let down: String
+            if let since = gap.downSince {
+                down = "It was down for about \(gap.downForWords) (from \(clock(since)))."
+            } else {
+                down = "How long it was down is unknown: nothing was recorded before it went."
+            }
+            lines.append("Agents restarted at \(clock(gap.at)) while you waited. \(down)")
+        }
+        let names = wait.patterns.map(\.name)
+        let missing = names.filter { !caughtUpAfterRestart($0) }
+        if missing.isEmpty {
+            lines.append("What you wait on was caught up after it: \(names.joined(separator: ", ")).")
+        } else {
+            lines.append("Events in that time may be missing: \(missing.joined(separator: ", ")). Check with "
+                         + "wait_for_event action \"recent\", and check the state yourself (for example the branch or the PR).")
+        }
+        return "\n" + lines.joined(separator: "\n")
+    }
+
+    public static func restartedSentence(_ gap: RestartGap) -> String {
+        switch gap.reason {
+        case .firstStart: return "Agents started."
+        case .stopped: return "Agents restarted after a clean stop. It was down for \(gap.downForWords)."
+        case .crashed: return "Agents restarted after it stopped unexpectedly. It was down for about \(gap.downForWords)."
+        }
+    }
+
     public static func timedOut(_ wait: EventWait, at: Date) -> String {
         "Your wait for \(wait.label) timed out at \(clock(at)) with no match."
     }

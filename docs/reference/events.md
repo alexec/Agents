@@ -158,6 +158,36 @@ they are `machine.`.
 | `cost.allowance_back` | — | runtime, how | A runtime is back: `check` (the app's check passed), `person` (Mark available), `worked` (a turn on it worked), `time` (a rate limit's wait passed) or `another host` (a server said so). |
 | `server.offline` | — | server | A server's connection dropped. Raised once, while the Agents window is open. |
 | `server.online` | — | server | A server that was offline is back. Raised once, while the Agents window is open. |
+| `system.restarted` | — | reason, down_since, down_for, down_for_text | Agents started again, on a Mac or a server. `reason` is `stopped` (a clean stop was recorded), `crashed` (it was alive and never said it stopped) or `first_start` (nothing was recorded). `down_since` is when it stopped or was last alive; `down_for` is the gap in seconds and `down_for_text` in words ("3 min", or "unknown"). See [Restarts](#restarts). |
+
+## Restarts
+
+A daemon that stops, crashes or is updated keeps what it can. It writes `alive.json` in the
+Agents root once a minute, and its time when it stops cleanly (also when launchd stops it).
+The next start works out from it how long nothing was running, and raises
+`system.restarted`. A workflow can trigger `on: system.restarted`; a missed schedule is still
+not run later.
+
+What is had again after a restart:
+
+- **Waits** are kept. A deadline that passed while it was down ends the wait as timed out; a
+  wake queued and not sent is sent once.
+- **Events from MCP servers** (`pr.merged`, `checks.failed`, …) continue from the cursor in
+  `mcp-events.json`, once each.
+- **`branch.moved`** compares the saved tips with the branches now.
+- **The disk** and **the person** are looked at again. A crossing or a return that happened
+  in the gap is raised then, with the detail `noticed: after_restart`.
+- **The workflow queue** is kept.
+
+What is not: events that happen once and that only the daemon sees, such as `agent.*`,
+`lease.*`, `workflow.*`, `mac.sleep` and `mac.wake`. Nothing recorded them. `server.*` is told
+by the Agents window, and a change while the daemon was down is not told again.
+
+An agent whose wait was open over a restart is not woken only to be told. At its next wake,
+by its event or its time limit, the wake says when Agents restarted, for how long it was down,
+and which of the events it waits on may be missing, so it can check with `wait_for_event`
+action `recent` and look at the state itself. A wait only on events that are had again says
+that they were caught up. To be woken by the restart itself, wait on `system.restarted`.
 
 ## No custom events
 

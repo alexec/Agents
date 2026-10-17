@@ -76,6 +76,10 @@ Stopping or archiving the agent also ends its wait.
   happen wakes it. It can also wait for a whole subject, such as `agent.*`.
 - **Nothing is missed.** If more matching events happen before the agent is running again,
   it is told how many, and can look them up.
+- **Across a restart.** A wait survives Agents stopping, crashing or being updated. When it
+  next wakes, the agent is told how long Agents was down and which of the events it waits on
+  may have been missed in that time, so it can catch up. See
+  [Restarts](../reference/events.md#restarts).
 - **Its own project and this Mac.** An agent can wait for its project's events and the
   Mac's, not another project's.
 - **Time limits** run from 1 minute to 24 hours.

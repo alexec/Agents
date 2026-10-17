@@ -61,6 +61,9 @@ extension DaemonCore {
     /// Look at every volume once, and raise what crossed.
     func checkDiskSpace() async {
         loadEventsIfNeeded()
+        // The first look after a restart: a crossing it finds happened in the gap (#1219).
+        let noticed = diskLookAfterRestart ? Self.noticedAfterRestart : [:]
+        diskLookAfterRestart = false
         // Chat lines a full disk refused, tried again each look: an agent that has gone
         // quiet writes no next line to carry them (#212).
         if await store.holdsLines, let error = await store.keepHeld() {
@@ -96,10 +99,10 @@ extension DaemonCore {
                 let worktrees = await largestWorktrees(on: mount, among: entry.projects)
                 let alarm = DiskAlarm(reading: entry.reading, level: level, threshold: threshold, worktrees: worktrees)
                 alarms[mount] = alarm
-                raiseDiskLow(alarm)
+                raiseDiskLow(alarm, noticed: noticed)
             case .ok(let threshold):
                 alarms[mount] = nil
-                raiseDiskOK(entry.reading, threshold: threshold)
+                raiseDiskOK(entry.reading, threshold: threshold, noticed: noticed)
             case nil:
                 if level == .ok {
                     alarms[mount] = nil
@@ -132,7 +135,7 @@ extension DaemonCore {
         })
     }
 
-    private func raiseDiskLow(_ alarm: DiskAlarm) {
+    private func raiseDiskLow(_ alarm: DiskAlarm, noticed: [String: String]) {
         let reading = alarm.reading
         var details = ["volume": reading.volume, "free_bytes": String(reading.freeBytes),
                        "free_percent": String(reading.freePercent), "level": alarm.level.rawValue,
@@ -147,14 +150,15 @@ extension DaemonCore {
                          sentence: alarm.level == .critical
                              ? "\(reading.volume) is almost full: \(free) free."
                              : "\(reading.volume) is running low: \(free) free.",
-                         details: details))
+                         details: details.merging(noticed) { $1 }))
     }
 
-    private func raiseDiskOK(_ reading: DiskReading, threshold: Int64) {
+    private func raiseDiskOK(_ reading: DiskReading, threshold: Int64, noticed: [String: String]) {
         raise(EventDraft(name: "machine.disk_ok", at: now(), scope: .mac,
                          sentence: "\(reading.volume) has \(DiskSpace.words(reading.freeBytes)) free again.",
                          details: ["volume": reading.volume, "free_bytes": String(reading.freeBytes),
-                                   "free_percent": String(reading.freePercent), "threshold": String(threshold)]))
+                                   "free_percent": String(reading.freePercent), "threshold": String(threshold)]
+                             .merging(noticed) { $1 }))
     }
 
     // MARK: Worktrees

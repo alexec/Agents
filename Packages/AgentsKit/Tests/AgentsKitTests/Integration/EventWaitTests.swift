@@ -573,6 +573,94 @@ struct EventWaitTests {
                 "nothing is invented for the time it was down")
     }
 
+    // MARK: Down for a while (#1219)
+
+    /// A crash, three minutes down: the next start raises `system.restarted` saying so,
+    /// and the agent whose wait was open over it is told at its next wake, not before,
+    /// naming the event it waits on that cannot replay.
+    @Test func aWaitOpenOverACrashIsToldAtItsNextWake() async throws {
+        let clock = Clock()
+        let (locations, work, _) = try temporary()
+        let core = try await makeCore(locations, clock: clock, hold: .milliseconds(100))
+        let (a, token) = try await agent(core, in: work, "Waiting")
+        _ = try await wait(core, token, ["agent.finished"])
+        let downSince = clock.now
+        DaemonAliveFile.write(DaemonAlive(lastAlive: downSince), to: locations.alive)
+        clock.advance(minutes: 3)
+
+        let again = try await makeCore(locations, clock: clock)
+        _ = await again.recover()
+        let gap = await again.noteRestart()
+        await again.resumeEventWaitsAfterRestart()
+        await again.raiseRestarted()
+        #expect(gap.reason == .crashed)
+        let restarted = try #require(await again.eventLog.events.last)
+        #expect(restarted.name == "system.restarted")
+        #expect(restarted.details["reason"] == "crashed")
+        #expect(restarted.details["down_for"] == "180")
+        #expect(restarted.details["down_for_text"] == "3 min")
+        #expect(restarted.details["down_since"] != nil)
+        #expect(await again.agents[a]?.eventWait?.isOpen == true, "not woken only to be told")
+        #expect(DaemonAliveFile.read(locations.alive)?.stoppedAt == nil)
+
+        await again.raise(draft("agent.finished", in: work, ["agent": UUID().uuidString]))
+        try await eventually("woken") { try await !wakes(again, a).isEmpty }
+        let wake = try #require(try await wakes(again, a).first)
+        #expect(wake.contains("Agents restarted at \(EventWords.clock(gap.at)) while you waited."), "\(wake)")
+        #expect(wake.contains("It was down for about 3 min (from \(EventWords.clock(downSince)))."))
+        #expect(wake.contains("Events in that time may be missing: agent.finished."))
+    }
+
+    /// A clean stop says so; a wait only on what replays is told it was caught up; a
+    /// wait made after the restart is told nothing.
+    @Test func aCleanStopAndAWaitThatCaughtUp() async throws {
+        let clock = Clock()
+        let (locations, work, _) = try temporary()
+        let core = try await makeCore(locations, clock: clock, hold: .milliseconds(100))
+        let (a, token) = try await agent(core, in: work, "Branch watcher")
+        _ = try await wait(core, token, ["branch.moved"], where: ["branch": "develop"], until: 10)
+        await core.noteCleanStop()
+        clock.advance(minutes: 20)
+
+        let again = try await makeCore(locations, clock: clock)
+        _ = await again.recover()
+        let gap = await again.noteRestart()
+        #expect(gap.reason == .stopped)
+        #expect(gap.downForWords == "20 min")
+        await again.resumeEventWaitsAfterRestart()
+        try await eventually("timed out") { try await !wakes(again, a).isEmpty }
+        let told = try #require(try await wakes(again, a).first)
+        #expect(told.hasPrefix("Your wait for"))
+        #expect(told.contains("What you wait on was caught up after it: branch.moved."), "\(told)")
+
+        let (b, fresh) = try await agent(again, in: work, "After")
+        _ = try await wait(again, fresh, ["agent.finished"])
+        await again.raise(draft("agent.finished", in: work, ["agent": UUID().uuidString]))
+        try await eventually("woken") { try await !wakes(again, b).isEmpty }
+        #expect(try await wakes(again, b).allSatisfy { !$0.contains("Agents restarted") })
+    }
+
+    /// A wait can name the restart itself, and nothing recorded says how long: a first start.
+    @Test func aWaitOnTheRestartIsWokenByIt() async throws {
+        let clock = Clock()
+        let (locations, work, _) = try temporary()
+        let core = try await makeCore(locations, clock: clock, hold: .milliseconds(100))
+        let (a, token) = try await agent(core, in: work, "Restart watcher")
+        _ = try await wait(core, token, ["system.restarted"])
+
+        let again = try await makeCore(locations, clock: clock)
+        _ = await again.recover()
+        let gap = await again.noteRestart()
+        #expect(gap.reason == .firstStart)
+        await again.resumeEventWaitsAfterRestart()
+        await again.raiseRestarted()
+        try await eventually("woken") { try await !wakes(again, a).isEmpty }
+        let wake = try #require(try await wakes(again, a).first)
+        #expect(wake.contains("system.restarted"))
+        #expect(wake.contains("reason: first_start"))
+        #expect(wake.contains("How long it was down is unknown"), "\(wake)")
+    }
+
     // MARK: No custom events (#639)
 
     @Test func aWaitOnACustomEventIsRefusedSayingWhy() async throws {

@@ -82,10 +82,11 @@ const eventMeanings: Record<string, string> = {
   "cost.allowance_back": "A runtime's allowance came back",
   "server.offline": "A server went offline",
   "server.online": "A server came back",
+  "system.restarted": "Agents started again, after a stop or a crash",
 };
 
 // EventCatalogue.reservedNouns: the app's own subjects, and `custom` (#639), which no server's event may use.
-const reservedNouns = new Set(["agent", "project", "workflow", "branch", "lease", "mac", "machine", "person", "cost", "server", "custom"]);
+const reservedNouns = new Set(["agent", "project", "workflow", "branch", "lease", "mac", "machine", "person", "cost", "server", "system", "custom"]);
 
 /** EventCatalogue.isServerEventName: `noun.verbed`, about none of the app's own subjects. */
 function isServerEventName(name: string): boolean {
@@ -334,6 +335,7 @@ const catalogue: Record<string, { scope: "mac" | "project" | "either"; details: 
   "cost.allowance_back": { scope: "mac", details: ["runtime", "how"] },
   "server.offline": { scope: "mac", details: ["server"] },
   "server.online": { scope: "mac", details: ["server"] },
+  "system.restarted": { scope: "mac", details: ["reason", "down_since", "down_for", "down_for_text"] },
 };
 
 /** `subject.*`'s subject, or null for a single name (EventPattern.wholeSubject). */
