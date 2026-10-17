@@ -16,11 +16,13 @@ import IOKit.pwr_mgt
 private let idleThreshold: TimeInterval = 5 * 60
 private let lookEvery: TimeInterval = 10
 
+// Touched only on machineQueue: the first look in its sync, the timer's looks and IOKit's
+// power messages are delivered on it.
 private let machineQueue = DispatchQueue(label: "agents-watch.machine")
-private var away: String?
-private var rootPort: io_connect_t = 0
-private var notifyPort: IONotificationPortRef?
-private var notifier: io_object_t = 0
+nonisolated(unsafe) private var away: String?
+nonisolated(unsafe) private var rootPort: io_connect_t = 0
+nonisolated(unsafe) private var notifyPort: IONotificationPortRef?
+nonisolated(unsafe) private var notifier: io_object_t = 0
 
 // IOKit's messages are C macros Swift does not import (IOMessage.h).
 private let systemWillSleep: natural_t = 0xE000_0280

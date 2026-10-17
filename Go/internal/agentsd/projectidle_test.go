@@ -20,10 +20,13 @@ func TestAProjectThatStopsWorkingIsIdleOnce(t *testing.T) {
 	defer d.Shutdown()
 	dir := project(t, c, 1)
 	running := func(a *wire.Agent) { a.State, a.EndedReason = wire.AgentStateRunning, nil }
+	finish := func(id wire.UUID) {
+		d.change(id, func(a *wire.Agent) { a.State, a.EndedReason = wire.AgentStateFinished, reason(wire.EndedReasonEndTurn) })
+	}
 	one := seeded(t, d, dir, running)
 	two := seeded(t, d, dir, running)
 	d.watchForIdle(dir)
-	d.setState(one.ID, wire.AgentStateFinished)
+	finish(one.ID)
 	// One still works: nothing yet.
 	time.Sleep(3 * projectIdleSettle)
 	if n := countEvents(d, "project.idle"); n != 0 {
@@ -56,8 +59,8 @@ func TestAProjectThatStopsWorkingIsIdleOnce(t *testing.T) {
 		t.Fatal("its helper is not the clean-up's")
 	}
 	d.watchForIdle(dir)
-	d.setState(job.ID, wire.AgentStateFinished)
-	d.setState(helper.ID, wire.AgentStateFinished)
+	finish(job.ID)
+	finish(helper.ID)
 	time.Sleep(3 * projectIdleSettle)
 	if n := countEvents(d, "project.idle"); n != 1 {
 		t.Fatalf("%d", n)

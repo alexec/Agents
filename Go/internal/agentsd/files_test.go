@@ -42,7 +42,7 @@ func (c *conn) callErr(t *testing.T, id int, method string, params any) string {
 
 func TestFilesAreKeptToTheAgentsFolder(t *testing.T) {
 	d, c := start(t, t.TempDir())
-	work, _ := filepath.EvalSymlinks(t.TempDir())
+	work, _ := store.Resolve(t.TempDir())
 	os.Mkdir(filepath.Join(work, "sub"), 0o755)
 	os.WriteFile(filepath.Join(work, "README.md"), []byte("# hello\n"), 0o644)
 	os.WriteFile(filepath.Join(work, "pic.png"), []byte{0x89, 'P', 'N', 'G'}, 0o644)
@@ -87,7 +87,7 @@ func TestFilesAreKeptToTheAgentsFolder(t *testing.T) {
 // A link is listed under its own path, not its target's (#1265); the folder's own links are resolved.
 func TestBrowseListsALinkUnderItsOwnPath(t *testing.T) {
 	_, c := start(t, t.TempDir())
-	real, _ := filepath.EvalSymlinks(t.TempDir())
+	real, _ := store.Resolve(t.TempDir())
 	os.WriteFile(filepath.Join(real, "AGENTS.md"), []byte("# hi\n"), 0o644)
 	os.Mkdir(filepath.Join(real, "docs"), 0o755)
 	os.Symlink(filepath.Join(real, "AGENTS.md"), filepath.Join(real, "CLAUDE.md"))
@@ -121,7 +121,7 @@ func TestBrowseListsALinkUnderItsOwnPath(t *testing.T) {
 func TestAWatchSaysWhichFoldersChanged(t *testing.T) {
 	prepareWatch(t)
 	d, c := start(t, t.TempDir())
-	work, _ := filepath.EvalSymlinks(t.TempDir())
+	work, _ := store.Resolve(t.TempDir())
 	os.MkdirAll(filepath.Join(work, "src"), 0o755)
 	os.MkdirAll(filepath.Join(work, "node_modules", "x"), 0o755)
 	id := anAgentIn(t, d, work)
@@ -153,7 +153,7 @@ func TestATerminal(t *testing.T) {
 	t.Setenv("SHELL", "/bin/sh")
 	d, c := start(t, t.TempDir())
 	defer d.Shutdown()
-	work, _ := filepath.EvalSymlinks(t.TempDir())
+	work, _ := store.Resolve(t.TempDir())
 	id := anAgentIn(t, d, work)
 	c.call(t, 1, "shell/attach", map[string]any{"agentID": id, "shell": 0, "rows": 24, "cols": 80})
 	in := base64.StdEncoding.EncodeToString([]byte("echo hello-$((40+2)) && pwd\n"))

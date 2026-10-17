@@ -188,4 +188,4 @@ func TestAddAProject(t *testing.T) {
 	}
 }
 
-func mustResolve(p string) string { r, _ := filepath.EvalSymlinks(p); return r }
+func mustResolve(p string) string { r, _ := store.Resolve(p); return r }
