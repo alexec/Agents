@@ -85,6 +85,40 @@ func TestFilesAreKeptToTheAgentsFolder(t *testing.T) {
 	}
 }
 
+// A link is listed under its own path, not its target's (#1265); the folder's own links are resolved.
+func TestBrowseListsALinkUnderItsOwnPath(t *testing.T) {
+	_, c := start(t, t.TempDir())
+	real, _ := filepath.EvalSymlinks(t.TempDir())
+	os.WriteFile(filepath.Join(real, "AGENTS.md"), []byte("# hi\n"), 0o644)
+	os.Mkdir(filepath.Join(real, "docs"), 0o755)
+	os.Symlink(filepath.Join(real, "AGENTS.md"), filepath.Join(real, "CLAUDE.md"))
+	os.Symlink(filepath.Join(real, "docs"), filepath.Join(real, "notes"))
+	via := filepath.Join(t.TempDir(), "via")
+	os.Symlink(real, via)
+
+	var l wire.DirectoryListing
+	json.Unmarshal(c.call(t, 1, "files/browse", map[string]any{"path": via}), &l)
+	if l.URL != store.FolderURL(real)+"/" {
+		t.Fatalf("folder %s", l.URL)
+	}
+	got := map[string]string{}
+	for _, e := range l.Entries {
+		got[e.Name] = string(e.URL)
+	}
+	want := map[string]string{
+		"docs": string(store.PathURL(filepath.Join(real, "docs"))) + "/", "notes": string(store.PathURL(filepath.Join(real, "notes"))) + "/",
+		"AGENTS.md": string(store.PathURL(filepath.Join(real, "AGENTS.md"))), "CLAUDE.md": string(store.PathURL(filepath.Join(real, "CLAUDE.md"))),
+	}
+	for n, u := range want {
+		if got[n] != u {
+			t.Fatalf("%s: %s, want %s", n, got[n], u)
+		}
+	}
+	if len(l.Entries) != 4 || !l.Entries[0].IsDirectory || !l.Entries[1].IsDirectory {
+		t.Fatalf("entries %+v", l.Entries)
+	}
+}
+
 func TestAWatchSaysWhichFoldersChanged(t *testing.T) {
 	if goruntime.GOOS != "linux" {
 		t.Skip("a folder watch is Linux's only, until the Mac's comes with its Swift helper (#1138)")
