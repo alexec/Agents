@@ -85,6 +85,9 @@ enum WalkCommands {
             let found = try matches(request)
             return ["ok": !found.isEmpty, "matches": found.map { $0.element.line(in: $0.window) }]
         case "press":
+            if let x = request["x"] as? Double, let y = request["y"] as? Double {
+                return try pressAt(try target(request), CGPoint(x: x, y: y))
+            }
             return try act(request, verb: "pressed") { $0.press() }
         case "select":
             // A row only: a list's selection is set on its row, as a click would.
@@ -207,7 +210,15 @@ enum WalkCommands {
 
     /// Where a search looks: the window named, with its sheets first; else every window.
     private static func scope(_ request: [String: Any]) throws -> [NSWindow] {
-        guard request["window"] != nil else { return windows() }
+        guard request["window"] != nil else {
+            // A popover is a child window, which a window that is not on screen keeps out
+            // of the app's ordered windows (#1078): its choices are searched first.
+            let listed = windows()
+            let children = listed.flatMap { $0.childWindows.orEmpty }.filter { child in
+                child.isVisible && !listed.contains { $0 === child }
+            }
+            return children + listed
+        }
         let window = try target(request)
         return [window.attachedSheet].compactMap { $0 } + window.childWindows.orEmpty + [window]
     }
@@ -261,6 +272,26 @@ enum WalkCommands {
             }
         }
         throw WalkError("nothing that could be \(verb) matched \(request["text"] ?? "")")
+    }
+
+    /// The element under a point of the window (in its points from the top left), as the AX
+    /// server's hit test finds it, pressed, or the nearest of its parents that takes a press:
+    /// for a control SwiftUI leaves out of the tree it hands out (#1078: the pills over the
+    /// prompt). A click would not do: a window that is not key keeps a button's first click.
+    private static func pressAt(_ window: NSWindow, _ point: CGPoint) throws -> [String: Any] {
+        let onScreen = window.convertPoint(toScreen: CGPoint(x: point.x, y: window.frame.height - point.y))
+        guard let root = window.contentView?.superview,
+              let hit = root.accessibilityHitTest(onScreen) as? NSObject else {
+            throw WalkError("nothing at \(Int(point.x)),\(Int(point.y))")
+        }
+        var current: WalkAX? = WalkAX(object: hit)
+        var hops = 0
+        while let element = current, !element.isWindow, hops <= 6 {
+            if element.press() { return ["ok": true, "did": "pressed: \(element.line(in: window))"] }
+            current = element.parent
+            hops += 1
+        }
+        throw WalkError("nothing at \(Int(point.x)),\(Int(point.y)) takes a press: \(WalkAX(object: hit).line(in: window))")
     }
 
     /// The table a row element is in, and its index: the element is AppKit's stand-in for

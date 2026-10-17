@@ -6,6 +6,7 @@
     walk.py ROOT tree [DEPTH] [--window …]       the accessibility tree, read in process
     walk.py ROOT find TEXT                       every element whose label holds TEXT
     walk.py ROOT press TEXT                      the innermost match that takes a press
+    walk.py ROOT press --x X --y Y               what is at a point of the shot, for a control left out of the tree
     walk.py ROOT select TEXT                     a sidebar or list row
     walk.py ROOT unfold|fold TEXT                a sidebar project, a disclosure row
     walk.py ROOT set TEXT VALUE                  type VALUE into the field labelled TEXT

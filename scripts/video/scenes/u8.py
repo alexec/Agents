@@ -28,8 +28,8 @@ def setup(v):
 
 
 def start_one(v, prompt):
-    v.press("Project folder | Worktree")
-    v.sleep(1.2)
+    v.press("| Worktree")  # "Project folder", or the last choice
+    v.sleep(2.2)
     v.press("New worktree, A new branch")
     v.sleep(0.8)
     v.type("what do you want", prompt, 40)
@@ -52,5 +52,5 @@ def run(v):
     v.sleep(2.0)
     v.unfold("weather-app")
     v.sleep(max(1.0, v.takes["second"]["duration"] - 3.0))
-    v.press("=Worktrees | Every project's worktrees")
+    v.select("Worktrees | Every project's worktrees")
     v.sleep(3.5)
