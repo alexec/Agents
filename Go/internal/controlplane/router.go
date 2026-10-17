@@ -8,12 +8,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/coder/websocket"
-
 	"github.com/alexec/agents/Go/internal/controllink"
 	"github.com/alexec/agents/Go/internal/controlplane/notices"
 	"github.com/alexec/agents/Go/internal/controlplane/providers"
 	"github.com/alexec/agents/Go/internal/controlplane/records"
+	"github.com/alexec/agents/Go/wire"
+	"github.com/coder/websocket"
 )
 
 // Caller is ControlRouter.Caller: who is calling, as the control plane's own methods
@@ -534,7 +534,7 @@ func (r *Router) tellPeerLocked(peer, line string) {
 // OpenFromPeer is a peer opening a stream to a host held here: a fresh channel on the
 // real uplink. This copy reads fan-out frames and hands each peer its part channel by
 // channel, so the host may fan out whatever the peer is.
-func (r *Router) OpenFromPeer(peer, host string, c int, open channelOpen) {
+func (r *Router) OpenFromPeer(peer, host string, c int, open wire.ChannelOpen) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	h := r.hosts[host]
@@ -644,7 +644,7 @@ func (r *Router) OnPresence(f func(client string, device bool, report json.RawMe
 // NotePeerPresence is a presence report made at another copy, folded here as the
 // client's own.
 func (r *Router) NotePeerPresence(client string, device bool, report json.RawMessage) {
-	var p presenceReport
+	var p wire.PresenceReport
 	if json.Unmarshal(report, &p) != nil {
 		return
 	}
@@ -655,7 +655,7 @@ func (r *Router) NotePeerPresence(client string, device bool, report json.RawMes
 	if may == nil {
 		may = previous.mayNotify
 	}
-	r.presence[client] = notedPresence{client: client, device: device, watching: p.Watching, active: p.Active,
+	r.presence[client] = notedPresence{client: client, device: device, watching: (*string)(p.Watching), active: p.Active,
 		heardAt: time.Now(), mayNotify: may}
 }
 
@@ -753,19 +753,9 @@ func wrap(host, msg string) string {
 func channelFrame(c int, msg string) string { return `{"c":` + strconv.Itoa(c) + `,"m":` + msg + `}` }
 func closeFrame(c int) string               { return `{"c":` + strconv.Itoa(c) + `,"close":true}` }
 
-// channelOpen is ControlWire.ChannelOpen: what a channel is opened as.
-type channelOpen struct {
-	// Always operator, which an older host needs to open the channel at all (#111).
-	Grant     string  `json:"grant"`
-	Client    string  `json:"client"`
-	Device    *string `json:"device,omitempty"`
-	Relayed   *bool   `json:"relayed,omitempty"`
-	Tunnel    *string `json:"tunnel,omitempty"`
-	TunnelRef *string `json:"tunnelRef,omitempty"`
-	FanOut    *bool   `json:"fanOut,omitempty"`
-}
-
-func openFrame(c int, open channelOpen) string {
+// openFrame opens a channel as ControlWire.ChannelOpen says: always with grant operator,
+// which an older host needs to open the channel at all (#111).
+func openFrame(c int, open wire.ChannelOpen) string {
 	open.Grant = records.LegacyGrant
 	b, _ := json.Marshal(open)
 	return `{"c":` + strconv.Itoa(c) + `,"open":` + string(b) + `}`
@@ -1059,9 +1049,9 @@ func (r *Router) DeliverKept(method string, params any, client, kind, host strin
 	c := h.next
 	h.next++
 	h.channels[c] = target{kept: delivery}
-	open := channelOpen{Client: client}
+	open := wire.ChannelOpen{Client: client}
 	if kind != records.KindMac {
-		open.Device = &client
+		open.Device = new(wire.UUID(client))
 	}
 	wait := make(chan *message, 1)
 	r.keptWaits[delivery] = wait
@@ -1228,10 +1218,9 @@ func (r *Router) openChannelLocked(sessionID, host string) {
 	// Bound to the client unless it is a Mac's window, which is the Mac, as a window on
 	// the socket is: presence is reported as it, and it names no other device.
 	yes := true
-	open := channelOpen{Client: s.caller.Client, FanOut: &yes}
+	open := wire.ChannelOpen{Client: s.caller.Client, FanOut: &yes}
 	if s.caller.Kind != records.KindMac {
-		device := s.caller.Client
-		open.Device = &device
+		open.Device = new(wire.UUID(s.caller.Client))
 	}
 	if s.caller.Relayed {
 		open.Relayed = &yes
@@ -1335,13 +1324,6 @@ func (r *Router) clientLine(line, sessionID string) {
 	}
 }
 
-// presenceReport is DaemonAPI.PresenceReport, read as it passes to a host.
-type presenceReport struct {
-	Watching  *string `json:"watching"`
-	Active    bool    `json:"active"`
-	MayNotify *bool   `json:"mayNotify"`
-}
-
 func (r *Router) toHostLocked(host, msg, sessionID string) {
 	s := r.clients[sessionID]
 	if s == nil {
@@ -1362,7 +1344,7 @@ func (r *Router) toHostLocked(host, msg, sessionID string) {
 		return
 	}
 	if m.Method == "presence/report" {
-		var p presenceReport
+		var p wire.PresenceReport
 		if json.Unmarshal(m.Params, &p) == nil {
 			previous := r.presence[sessionID]
 			may := p.MayNotify
@@ -1370,7 +1352,7 @@ func (r *Router) toHostLocked(host, msg, sessionID string) {
 				may = previous.mayNotify
 			}
 			device := s.caller.Kind != records.KindMac && s.caller.Kind != records.KindBrowser
-			r.presence[sessionID] = notedPresence{client: s.caller.Client, device: device, watching: p.Watching,
+			r.presence[sessionID] = notedPresence{client: s.caller.Client, device: device, watching: (*string)(p.Watching),
 				active: p.Active, heardAt: time.Now(), mayNotify: may}
 			if r.presenceHeard != nil {
 				go r.presenceHeard(s.caller.Client, device, m.Params)
@@ -1553,7 +1535,7 @@ func (r *Router) OpenTunnel(borrower, lender, runtime, ref string) bool {
 	far.next++
 	near.channels[nc] = target{tunnelHost: lender, tunnelOthers: fc}
 	far.channels[fc] = target{tunnelHost: borrower, tunnelOthers: nc}
-	far.conn.Send(openFrame(fc, channelOpen{Client: "tunnel:" + borrower, Tunnel: &runtime}))
-	near.conn.Send(openFrame(nc, channelOpen{Client: "tunnel:" + lender, Tunnel: &runtime, TunnelRef: &ref}))
+	far.conn.Send(openFrame(fc, wire.ChannelOpen{Client: "tunnel:" + borrower, Tunnel: &runtime}))
+	near.conn.Send(openFrame(nc, wire.ChannelOpen{Client: "tunnel:" + lender, Tunnel: &runtime, TunnelRef: &ref}))
 	return true
 }

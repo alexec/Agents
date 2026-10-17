@@ -749,7 +749,7 @@ export const SidebarSession = memo(function SidebarSession({ store, host, folder
       {/* No wait lines: in the sidebar a session's row is its title and one line (#587). */}
       {store.renaming.value?.id === agent.id && !store.renaming.value.inChat
         ? <div class="row session renaming"><RenameInput store={store} host={host} agent={agent} /></div>
-        : <SessionRow agent={agent} chosen={chosen} onPick={() => go({ host, project: folder, session: agent.id })} going={going}
+        : <SessionRow agent={agent} chosen={chosen} onPick={() => { if (chosen) store.toEndAsks.value++; go({ host, project: folder, session: agent.id }); }} going={going}
         extras={rowExtras(store, host, agent)}
         inSidebar place={place} markAgent={markAgent} />}
       {parent && (

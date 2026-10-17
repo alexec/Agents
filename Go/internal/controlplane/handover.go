@@ -13,6 +13,7 @@ import (
 	"github.com/alexec/agents/Go/internal/controllink"
 	"github.com/alexec/agents/Go/internal/controlplane/records"
 	"github.com/alexec/agents/Go/internal/controlplane/store"
+	"github.com/alexec/agents/Go/wire"
 )
 
 // The handover (058, research R16), the copy's side, as Handover.swift has it: a copy
@@ -63,28 +64,6 @@ func (p *phaseBox) setUntil(t time.Time) {
 	p.mu.Lock()
 	p.until = t
 	p.mu.Unlock()
-}
-
-// handoverStatus is Handover.Status.
-type handoverStatus struct {
-	Phase           string             `json:"phase"`
-	ControlKey      []byte             `json:"controlKey"`
-	HasRecords      bool               `json:"hasRecords"`
-	Endpoints       []records.Endpoint `json:"endpoints"`
-	Epoch           *int               `json:"epoch,omitempty"`
-	Members         []handoverMember   `json:"members"`
-	ForwardingUntil *RefDate           `json:"forwardingUntil,omitempty"`
-}
-
-// handoverMember is Handover.Status.Member.
-type handoverMember struct {
-	ID         string   `json:"id"`
-	Name       string   `json:"name"`
-	Kind       string   `json:"kind"`
-	KnownEpoch *int     `json:"knownEpoch,omitempty"`
-	Version    *string  `json:"version,omitempty"`
-	Online     *bool    `json:"online,omitempty"`
-	LastSeen   *RefDate `json:"lastSeen,omitempty"`
 }
 
 // handoverSession is Handover.session: one driver's requests, answered in turn.
@@ -294,9 +273,9 @@ func (s *Service) handoverAnswer(method string, params json.RawMessage) (any, er
 		}
 		longest := time.Now().Add(longestForwarding)
 		until := longest
-		var asked RefDate
-		if p["until"] != nil && json.Unmarshal(p["until"], &asked) == nil && time.Time(asked).Before(longest) {
-			until = time.Time(asked)
+		var asked wire.Date
+		if p["until"] != nil && json.Unmarshal(p["until"], &asked) == nil && asked.Time().Before(longest) {
+			until = asked.Time()
 		}
 		if err := s.changeEndpoints(list); err != nil {
 			return nil, err
@@ -336,14 +315,14 @@ func (s *Service) handoverAnswer(method string, params json.RawMessage) (any, er
 		if phase != phaseServing {
 			return nil, refuseHandover("A relay is switched on or off at a copy that is serving.")
 		}
-		request, err := require[hostRelayRequest](params, "HostRelayRequest")
+		request, err := require[wire.HostRelayRequest](params, "HostRelayRequest")
 		if err != nil {
 			return nil, refuseHandover("Say the relay host and whether it relays.")
 		}
 		if err := s.methods.setRelay(ctx, request); err != nil {
 			return nil, err
 		}
-		s.announce("hostEnrolled", request.Host, "agents-host")
+		s.announce("hostEnrolled", string(request.Host), "agents-host")
 		return map[string]any{}, nil
 	}
 	return nil, fail(methodNotFound, "%s is not part of a handover.", method)
@@ -416,11 +395,12 @@ func (s *Service) closeMembers() {
 	}
 }
 
-func (s *Service) handoverStatus() handoverStatus {
+// handoverStatus is Handover.Status: what this copy says of itself.
+func (s *Service) handoverStatus() wire.HandoverStatus {
 	phase := s.phase.now()
 	object, _ := s.cfg.Store.Get(context.Background(), records.SettingsKey)
-	status := handoverStatus{Phase: phase, ControlKey: s.public, HasRecords: object != nil,
-		Endpoints: []records.Endpoint{}, Members: []handoverMember{}}
+	status := wire.HandoverStatus{Phase: phase, ControlKey: s.public, HasRecords: object != nil,
+		Endpoints: []records.Endpoint{}, Members: []wire.HandoverMember{}}
 	if phase != phaseReceiving {
 		connected := map[string]bool{}
 		for _, c := range s.router.ConnectedClients() {
@@ -428,8 +408,8 @@ func (s *Service) handoverStatus() handoverStatus {
 		}
 		for _, c := range s.records.Clients() {
 			online := connected[c.ID]
-			status.Members = append(status.Members, handoverMember{ID: c.ID, Name: c.Name, Kind: c.Kind,
-				KnownEpoch: c.KnownEpoch, Online: &online, LastSeen: refDate(c.LastSeen)})
+			status.Members = append(status.Members, wire.HandoverMember{ID: c.ID, Name: c.Name, Kind: c.Kind,
+				KnownEpoch: int64Of(c.KnownEpoch), Online: &online, LastSeen: stampDate(c.LastSeen)})
 		}
 		for _, h := range s.records.Hosts() {
 			kind := "host"
@@ -439,17 +419,16 @@ func (s *Service) handoverStatus() handoverStatus {
 			state, _ := s.router.State(h.ID)
 			online := state.online()
 			version := h.Version
-			status.Members = append(status.Members, handoverMember{ID: h.ID, Name: h.Name, Kind: kind,
-				KnownEpoch: h.KnownEpoch, Version: &version, Online: &online})
+			status.Members = append(status.Members, wire.HandoverMember{ID: h.ID, Name: h.Name, Kind: kind,
+				KnownEpoch: int64Of(h.KnownEpoch), Version: &version, Online: &online})
 		}
 		if settings := s.records.Settings(); settings != nil {
 			status.Endpoints = currentEndpoints(settings)
-			status.Epoch = settings.Epoch
+			status.Epoch = int64Of(settings.Epoch)
 		}
 	}
 	if phase == phaseForwarding {
-		until := RefDate(s.phase.forwardingUntil())
-		status.ForwardingUntil = &until
+		status.ForwardingUntil = new(dateOf(s.phase.forwardingUntil()))
 	}
 	return status
 }

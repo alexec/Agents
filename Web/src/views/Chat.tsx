@@ -5,17 +5,17 @@
 // conversations come a page at a time as the top is reached, and the pane follows the end
 // unless the person has scrolled up.
 import { Fragment } from "preact";
-import { useComputed, useSignal } from "@preact/signals";
-import { preferenceKeys, setPreferences, stringPreference } from "../model/preferences";
+import { useSignal } from "@preact/signals";
 import { useEffect, useLayoutEffect, useMemo, useRef } from "preact/hooks";
 import { openTurnsHeld, rememberOpen, type Store } from "../model/store";
 import { backgroundAge, backgroundEnded, backgroundNoun, isRunning, subagentNoSteps, subagentStatus } from "../model/background";
-import { display, isPersonsAsk, isWorking, omittingThoughts, openingPlace, placing, type ChatTurn, type Item } from "../model/turns";
+import { display, isPersonsAsk, isWorking, placing, type ChatTurn, type Item } from "../model/turns";
 import { toWireDate } from "../protocol/dates";
 import type { Agent, AppViewCall, BackgroundItem, FileMentionDTO, TranscriptEntry } from "../protocol/generated";
 import { replace, route } from "../route";
 import { useWaitingCards, type WaitingCard } from "./Cards";
 import { OfflineStrip } from "./OfflineStrip";
+import { DiskStrip } from "./DiskStrip";
 import { KeptBubbles } from "./Kept";
 import { FolderGoneNotice, MissingFolderStrip } from "./MissingFolder";
 import { BlockStrip } from "./BlockStrip";
@@ -28,8 +28,8 @@ import { ContextMeter, CostLimitBanner, SandboxCapsule } from "./PromptStatus";
 import { RenameInput, SessionButtons, SessionMenu } from "./SessionMenu";
 import { drawable } from "../model/options";
 import { asksToArchive, projectFolder } from "../model/groups";
-import { savedDetail, toggled } from "../model/turnDetail";
-import { CallActionsContext, detailSummaries, detailTitles, fromLine, ItemRow, turnDetails, TurnView, type CallActions, type TurnDetail, type TurnLevel } from "./chat/Rows";
+import { initialDetail, toggled } from "../model/turnDetail";
+import { CallActionsContext, fromLine, ItemRow, TurnView, type CallActions, type TurnDetail } from "./chat/Rows";
 import { Modal } from "./Modal";
 import { nameOf, pathOf, setPane } from "./files/paneState";
 import { FileSearch, isOpenFileKey } from "./files/FileSearch";
@@ -60,17 +60,8 @@ function shown(entries: TranscriptEntry[]): Item[] {
 }
 
 
-/** The level every turn starts at, the page's one setting (View ▸ Turns in the window): the
- *  person's, kept on their Mac with the other display choices (#1033). */
-function defaultDetail(): TurnLevel {
-  return savedDetail(stringPreference(preferenceKeys.turnDetail) ?? null);
-}
-
 /** How close to the end counts as being back at it, on the way down (#378). */
 const atTheEnd = 40;
-
-/** Where the reader was in each chat they left, by `host|session`: following, or a turn and how far down the pane it sat (#378). */
-const readingPlaces = new Map<string, { following: true } | { following: false; turn: string; offset: number }>();
 
 /** Whether a key pressed with focus here is the transcript's to take: not while something else takes keys (#378). */
 function takesKeys(target: EventTarget | null): boolean {
@@ -112,9 +103,10 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
     setPane(session, { tab: "files", file: file.path, fileLine: undefined, last: file.path });
     if (!route.peek().files) replace({ ...route.peek(), files: true });
   };
-  const level = useComputed<TurnLevel>(defaultDetail);
   /** Turns opened or closed by hand, kept until the chat is left. */
   const chosen = useSignal<Record<string, TurnDetail>>({});
+  /** The run of calls gone to from elsewhere: opened, with its first call (#1315). */
+  const focusedRun = useSignal<string | null>(null);
   /** The few opened turns whose entries are held, newest last (#291). */
   const fetched = useSignal<Record<string, HeldTurn>>({});
   /** Turns whose steps were asked for and did not come, until asked again (#544). */
@@ -212,19 +204,11 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
   const settled = useRef(false);
   /** The last scroll seen, to tell a move up the page from the page growing or being trimmed (#378). */
   const lastScroll = useRef({ top: 0, height: 0 });
-  /**
-   * A place to go back to in a chat being opened again, until its rows are drawn (#378); or the
-   * place the reader needs, a card asked before the end or the first unread turn, found once the
-   * first page is drawn (#1287).
-   */
-  const restoring = useRef<{ turn: string; offset: number; pages: number } | { needed: true; unread: boolean; pages: number } | null>(null);
-  /** Held out of sight while it pages back to that place, so the end does not flash first. */
-  const hidden = useSignal(false);
-
   useEffect(() => {
     // Whether its runtime takes words mid-turn, or pictures, is known once it has run.
     void store.loadRuntimes(host);
     chosen.value = {};
+    focusedRun.value = null;
     fetched.value = {};
     failedTurns.value = {};
     subagent.value = null;
@@ -234,84 +218,9 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
     store.setFollowingEnd(true);
     newBelow.value = false;
     settled.current = false;
-    // Coming back to a chat read before: the line it was left on, unless it was following (#378).
-    const place = readingPlaces.get(`${host}|${session}`);
-    // Else where the reader needs it (#1287). Unread as it was chosen: opening it marks it read.
-    const chosenAgent = store.agent(host, session);
-    const unread = !!chosenAgent?.isUnread;
-    restoring.current = place && !place.following ? { turn: place.turn, offset: place.offset, pages: 0 }
-      : unread || cards.length > 0 || chosenAgent?.state === "waitingOnUser" ? { needed: true, unread, pages: 0 }
-      : null;
-    hidden.value = !!restoring.current;
-    if (restoring.current) {
-      following.current = false;
-      store.setFollowingEnd(false);
-      // Rows in hand already when it was chosen draw no change to place it on (#1287).
-      requestAnimationFrame(() => restoreNow.current());
-    }
     const timer = setTimeout(() => (settled.current = true), 400);
     return () => clearTimeout(timer);
   }, [session]);
-
-  // Back to the line it was left on. The chat opens on its last page, so the pages before it come
-  // in, out of sight, until that turn is drawn; if it never is, the end, as a chat opened afresh (#378).
-  const restore = () => {
-    const el = scroller.current;
-    const place = restoring.current;
-    if (!el || !place || !store.chatTurns.peek().length || loadingEarlier.current) return;
-    if ("needed" in place) {
-      const opening = openingPlace(stretches, place.unread);
-      // The last turn's ask before the page in hand: the pages before come in, out of sight.
-      if (opening && "askBefore" in opening && store.hasMoreOfTheConversation && place.pages < 40) {
-        place.pages += 1;
-        loadingEarlier.current = true;
-        void store.loadEarlier().finally(() => {
-          loadingEarlier.current = false;
-          requestAnimationFrame(() => restoreNow.current());
-        });
-        return;
-      }
-      const target = !opening || "askBefore" in opening ? null : "cards" in opening ? waiting.current
-        : el.querySelector<HTMLElement>(`[data-turn="${CSS.escape(opening.turn)}"]`);
-      restoring.current = null;
-      hidden.value = false;
-      if (!target) {
-        follow(true);
-        el.scrollTop = el.scrollHeight;
-        return;
-      }
-      el.scrollTop += target.getBoundingClientRect().top - el.getBoundingClientRect().top;
-      lastScroll.current = { top: el.scrollTop, height: el.scrollHeight };
-      // A last turn shorter than the pane leaves it at the end, still following.
-      if (el.scrollHeight - el.scrollTop - el.clientHeight < 1) follow(true);
-      else away.value = true;
-      return;
-    }
-    const turn = [...el.querySelectorAll<HTMLElement>("[data-turn]")].find((row) => row.dataset.turn === place.turn);
-    if (!turn && store.hasMoreOfTheConversation && place.pages < 40) {
-      place.pages += 1;
-      loadingEarlier.current = true;
-      // Again once it has landed and been drawn: the rows may have changed while it was loading.
-      void store.loadEarlier().finally(() => {
-        loadingEarlier.current = false;
-        requestAnimationFrame(restore);
-      });
-      return;
-    }
-    restoring.current = null;
-    hidden.value = false;
-    if (!turn) {
-      follow(true);
-      el.scrollTop = el.scrollHeight;
-      return;
-    }
-    away.value = true;
-    el.scrollTop += turn.getBoundingClientRect().top - el.getBoundingClientRect().top - place.offset;
-    lastScroll.current = { top: el.scrollTop, height: el.scrollHeight };
-  };
-  useLayoutEffect(restore, [rows, session]);
-  const restoreNow = useRef(restore);
-  restoreNow.current = restore;
 
   // Following the end: every kind of growth, a new line or a longer one, keeps the foot in view.
   const entryCount = store.entries.value.length;
@@ -341,7 +250,7 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
 
   const earlier = async () => {
     const el = scroller.current;
-    if (!el || loadingEarlier.current || restoring.current || !settled.current || !store.hasMoreOfTheConversation) return;
+    if (!el || loadingEarlier.current || !settled.current || !store.hasMoreOfTheConversation) return;
     loadingEarlier.current = true;
     // Hold the line being read: what arrives goes above it.
     const fromBottom = el.scrollHeight - el.scrollTop;
@@ -352,22 +261,12 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
     });
   };
 
-  /** Where the reader is, kept for coming back to this chat (#378). */
-  const remember = (el: HTMLElement) => {
-    if (!settled.current || restoring.current) return;
-    const key = `${host}|${session}`;
-    if (following.current) return void readingPlaces.set(key, { following: true });
-    const top = el.getBoundingClientRect().top;
-    const turn = [...el.querySelectorAll<HTMLElement>("[data-turn]")].find((row) => row.getBoundingClientRect().bottom > top);
-    if (turn?.dataset.turn) readingPlaces.set(key, { following: false, turn: turn.dataset.turn, offset: turn.getBoundingClientRect().top - top });
-  };
-
   const onScroll = (event: Event) => {
     const el = event.currentTarget as HTMLDivElement;
     const fromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
     const was = lastScroll.current;
     lastScroll.current = { top: el.scrollTop, height: el.scrollHeight };
-    if (!loadingEarlier.current && !restoring.current) {
+    if (!loadingEarlier.current) {
       // Any move up the page that is not the page itself changing size is the reader's: a wheel
       // tick, a key, the scroll bar or a finger. Following stops at once, however small (#378).
       // Growth and trimming change the height; this pane only ever moves itself down.
@@ -378,7 +277,6 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
         newBelow.value = false;
       }
     }
-    remember(el);
     if (el.scrollTop < 400) void earlier();
   };
 
@@ -406,11 +304,14 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
     return () => document.removeEventListener("keydown", press);
   }, [host, session]);
 
-  // Asked for from Exchanged. A message is drawn with its entry's id. Being sent to one
-  // is being sent away from the end, or the pane would scroll straight back off it.
+  // Asked for from Exchanged. A message is drawn with its entry's id, and a run of calls with
+  // its first call's, opened with that call and nothing else in the turn (#1315). Being sent to
+  // one is being sent away from the end, or the pane would scroll straight back off it.
   const focus = focusedEntry.value;
   useLayoutEffect(() => {
     if (!focus) return;
+    const turn = rows.find((item) => item.ask?.id === focus || item.items.some((part) => part.id === focus));
+    if (turn?.items.some((part) => part.id === focus && part.kind === "run")) focusedRun.value = focus;
     const root = scroller.current;
     const mark = root && [...root.querySelectorAll("[data-entry]")].find((el) => el.getAttribute("data-entry") === focus);
     const target = mark && getComputedStyle(mark).display === "contents" ? mark.firstElementChild ?? mark : mark;
@@ -420,15 +321,11 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
       focusedEntry.value = null;
       return;
     }
-    const turn = rows.find((item) => item.ask?.id === focus || item.items.some((part) => part.id === focus));
-    const now = turn && (chosen.value[turn.id] ?? level.value);
-    // Messages folds a run of calls, so a call is only on screen at Steps (#759).
-    const isCall = turn?.items.some((part) => part.id === focus && part.kind === "run");
-    if (turn && (now === "collapsed" || (now === "messages" && isCall))) {
+    if (turn && (chosen.value[turn.id] ?? initialDetail) === "collapsed") {
       follow(false);
-      chosen.value = { ...chosen.value, [turn.id]: "steps" };
+      chosen.value = { ...chosen.value, [turn.id]: "open" };
     }
-  }, [focus, rows, level.value, chosen.value]);
+  }, [focus, rows, chosen.value]);
 
   // What waits on the person is in the conversation, not over it (#723), each where it was asked:
   // what came after it is below it (#973). Scrolled out of sight, the way back says a question is
@@ -474,8 +371,16 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
     follow(true);
     newBelow.value = false;
     if (el) el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
-    if (el) readingPlaces.set(`${host}|${session}`, { following: true });
   };
+
+  // The open session's row clicked again: to its latest message, as opening it is (#1349).
+  const toEndAsks = store.toEndAsks.value;
+  const toEndSeen = useRef(toEndAsks);
+  useEffect(() => {
+    if (toEndAsks === toEndSeen.current) return;
+    toEndSeen.current = toEndAsks;
+    toEnd();
+  }, [toEndAsks]);
 
   // To the first waiting card (#973). At the end it is the end, and following goes on; anywhere
   // else it is a place in the middle, as a line the reader is sent to is, and following stops.
@@ -486,13 +391,13 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
   };
 
   const toggle = (turn: ChatTurn) => {
-    chosen.value = { ...chosen.value, [turn.id]: toggled(chosen.value[turn.id] ?? level.value, level.value) };
+    chosen.value = { ...chosen.value, [turn.id]: toggled(chosen.value[turn.id] ?? initialDetail) };
   };
 
   // A turn closed lets its entries go (#291).
   useEffect(() => {
     const openNow = new Set<string>();
-    for (const turn of rows) if ((chosen.value[turn.id] ?? level.value) !== "collapsed") openNow.add(turn.id);
+    for (const turn of rows) if ((chosen.value[turn.id] ?? initialDetail) !== "collapsed") openNow.add(turn.id);
     const drop = openedTurns.current.filter((id) => !openNow.has(id));
     if (!drop.length) return;
     const next = { ...fetched.peek() };
@@ -500,7 +405,7 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
     for (const id of drop) if (id in next) { delete next[id]; changed = true; }
     openedTurns.current = openedTurns.current.filter((id) => openNow.has(id));
     if (changed) fetched.value = next;
-  }, [rows, chosen.value, level.value]);
+  }, [rows, chosen.value]);
 
   useEffect(() => { void store.loadCost(host); }, [store, host]);
 
@@ -564,11 +469,6 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
     loadEarlier: (turn: ChatTurn) => latest.current.loadEarlierSteps(turn),
   }), []);
 
-  const choose = (detail: TurnLevel) => {
-    setPreferences({ [preferenceKeys.turnDetail]: detail });
-    chosen.value = {};
-  };
-
   return (
     <section class="chat" aria-label="Chat" ref={chatColumn}>
       {searchingFiles.value && agent && (
@@ -580,22 +480,16 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
           ? <h1><RenameInput store={store} host={host} agent={agent} /></h1>
           : <h1>{agent?.title ?? "New session"}</h1>}
         <span class="actions">
-          <select class="detail wide-only" aria-label="Turns" title={detailSummaries[level.value]} value={level.value}
-            onChange={(e) => choose((e.currentTarget as HTMLSelectElement).value as TurnLevel)}>
-            {turnDetails.map((d) => (
-              <option key={d} value={d} title={detailSummaries[d]}>{detailTitles[d]}</option>
-            ))}
-          </select>
           <button class="wide-only" onClick={() => replace({ ...r, files: !r.files })} aria-pressed={!!r.files}>Files</button>
           <SessionButtons store={store} host={host} agent={agent} disabled={down} />
           <SessionMenu store={store} host={host} agent={agent} disabled={down} inChat openFile={() => (searchingFiles.value = true)}
             narrow={[
-              ...turnDetails.map((d) => ({ label: `Turns: ${detailTitles[d]}`, help: detailSummaries[d], checked: level.value === d, run: () => choose(d) })),
               { label: "Files", checked: !!r.files, run: () => replace({ ...r, files: !r.files }) },
             ]} />
         </span>
       </header>
       {hostDown && <OfflineStrip store={store} host={host} />}
+      {!hostDown && <DiskStrip store={store} host={host} />}
       <FolderGoneNotice store={store} host={host} agent={agent} />
       <MissingFolderStrip store={store} host={host} agent={agent} />
       <BlockStrip store={store} host={host} agent={agent} disabled={down} />
@@ -603,7 +497,7 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
       <CurrentPlanStrip agent={agent} />
       <CallActionsContext.Provider value={callActions}>
       <ViewLayerContext.Provider value={viewHosting}>
-      <div class="scroll transcript" ref={scroller} onScroll={onScroll} style={hidden.value ? { visibility: "hidden" } : undefined}>
+      <div class="scroll transcript" ref={scroller} onScroll={onScroll}>
         <div class="view-layer" ref={(el) => { layer.element = el; }} />
         {failure && (
           // The history, or its earlier turns, did not load: said, with the way to ask again (#400).
@@ -622,7 +516,7 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
             ...stretch.turns.map((turn) => {
               const i = index++;
               return (
-                <TurnView key={turn.id} turn={turn} detail={chosen.value[turn.id] ?? level.value}
+                <TurnView key={turn.id} turn={turn} detail={chosen.value[turn.id] ?? initialDetail} focusedRun={focusedRun.value}
                   fetched={fetched.value[turn.id]?.items} fetchFailed={!!failedTurns.value[turn.id]} hasEarlier={fetched.value[turn.id]?.hasEarlier ?? false}
                   auto={i >= drawn - openTurnsHeld}
                   isLive={i === drawn - 1 && live} background={background}
@@ -646,8 +540,7 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
         )}
       </div>
       {subagent.value && (
-        <SubagentSteps store={store} item={agent?.background?.find((b) => b.id === subagent.value!.id) ?? subagent.value}
-          showsThinking={level.value === "details"} close={() => (subagent.value = null)} />
+        <SubagentSteps store={store} item={agent?.background?.find((b) => b.id === subagent.value!.id) ?? subagent.value} close={() => (subagent.value = null)} />
       )}
       </ViewLayerContext.Provider>
       </CallActionsContext.Provider>
@@ -800,8 +693,8 @@ function Capsules({ store, host, agent }: { store: Store; host: string; agent: A
  * One subagent: who it is, what it was asked, and what it did (SubagentStepsView, #544), in a
  * sheet over the chat as the phone has it. Its steps are those among the chat's loaded entries.
  */
-function SubagentSteps({ store, item, showsThinking, close }: {
-  store: Store; item: BackgroundItem; showsThinking: boolean; close: () => void;
+function SubagentSteps({ store, item, close }: {
+  store: Store; item: BackgroundItem; close: () => void;
 }) {
   const now = useSignal(toWireDate(new Date()));
   useEffect(() => {
@@ -809,7 +702,6 @@ function SubagentSteps({ store, item, showsThinking, close }: {
     return () => clearInterval(timer);
   }, []);
   const steps = useMemo(() => display(store.entries.value, item.id), [store.entries.value, item.id]);
-  const shown = showsThinking ? steps : omittingThoughts(steps);
   return (
     <Modal label={`Subagent ${item.name}`} close={close}>
       <div class="sheet-body subagent-steps">
@@ -822,7 +714,8 @@ function SubagentSteps({ store, item, showsThinking, close }: {
           </div>
         )}
         {!steps.length && <p class="faint small">{subagentNoSteps(item)}</p>}
-        <div class="steps">{shown.map((step) => <ItemRow key={step.id} item={step} background={[]} />)}</div>
+        {/* Thinking too, each a folded line (#1315). */}
+        <div class="steps">{steps.map((step) => <ItemRow key={step.id} item={step} background={[]} />)}</div>
         <div class="sheet-actions"><button onClick={close}>Done</button></div>
       </div>
     </Modal>

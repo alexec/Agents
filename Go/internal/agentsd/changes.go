@@ -50,7 +50,7 @@ type reportedChanges struct {
 }
 
 func changeKey(path string) string {
-	if r, err := filepath.EvalSymlinks(path); err == nil {
+	if r, err := store.Resolve(path); err == nil {
 		return r
 	}
 	return canonical(path)

@@ -20,8 +20,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/coder/websocket"
-
 	"github.com/alexec/agents/Go/internal/buildinfo"
 	"github.com/alexec/agents/Go/internal/controllink"
 	"github.com/alexec/agents/Go/internal/controlplane/hostinstall"
@@ -31,6 +29,8 @@ import (
 	"github.com/alexec/agents/Go/internal/controlplane/records"
 	"github.com/alexec/agents/Go/internal/controlplane/store"
 	"github.com/alexec/agents/Go/internal/controlplane/web"
+	"github.com/alexec/agents/Go/wire"
+	"github.com/coder/websocket"
 )
 
 // Config is ControlService.Configuration.
@@ -579,7 +579,8 @@ func (s *Service) deliver(need notices.AttentionNeed, fromPeer bool) {
 		if delivery.Headline == nil {
 			did = "withdrew"
 		}
-		s.log(fmt.Sprintf("notice: %s %s for %s to relay %s", did, delivery.NeedID, delivery.Device, relay))
+		needID, _ := json.Marshal(delivery.NeedID)
+		s.log(fmt.Sprintf("notice: %s %s for %s to relay %s", did, needID, delivery.Device, relay))
 	}
 }
 
@@ -689,7 +690,7 @@ func (s *Service) WebPort() int {
 // origin, never to anything the peer says (071, FR-006).
 func (s *Service) accept(conn *Conn, webOrigin string) {
 	serverNonce := controllink.Nonce()
-	hello := controllink.Hello{V: controllink.Version, Name: s.cfg.Name, Control: controllink.B64URL(s.public),
+	hello := controllink.Hello{V: int64(controllink.Version), Name: s.cfg.Name, Control: controllink.B64URL(s.public),
 		Nonce: controllink.B64URL(serverNonce), Copy: s.copyID}
 	refuse := func(err error) {
 		var r *controllink.Refusal
@@ -771,22 +772,22 @@ func (s *Service) accept(conn *Conn, webOrigin string) {
 	// A device through agents-relay (T096): the exchange is its own, end to end, and it
 	// says it came that way, for itself only.
 	relayed := auth.Kind == "relay"
-	if relayed && (id.Kind != 'c' || auth.For != id.ID || client == nil || !client.IsDevice()) {
+	if relayed && (id.Kind != 'c' || deref(auth.For) != id.ID || client == nil || !client.IsDevice()) {
 		refuse(controllink.Refuse(controllink.BadMessage))
 		return
 	}
 	// Once a list has been announced, every member is given it (R16).
 	settings := s.records.Settings()
-	ok2 := controllink.OK{MAC: controllink.B64URL(mac), Host: host}
+	ok2 := controllink.OK{Mac: controllink.B64URL(mac), Host: optional(wire.HostID(host))}
 	if client != nil {
-		ok2.Grant = records.LegacyGrant
+		ok2.Grant = new(records.LegacyGrant)
 	}
 	if relayed {
 		ok2.Relayed = &relayed
 	}
 	if settings != nil && settings.Epoch != nil {
-		ok2.Endpoints, _ = json.Marshal(currentEndpoints(settings))
-		ok2.Epoch = settings.Epoch
+		ok2.Endpoints = currentEndpoints(settings)
+		ok2.Epoch = int64Of(settings.Epoch)
 	}
 	if err := conn.SendNow(controllink.Message{OK: &ok2}.Line()); err != nil {
 		conn.Close()
@@ -794,7 +795,7 @@ func (s *Service) accept(conn *Conn, webOrigin string) {
 	}
 	// A member that says an epoch keeps a list, and takes the one just given.
 	if auth.Epoch != nil {
-		epoch := *auth.Epoch
+		epoch := int(*auth.Epoch)
 		if settings != nil && settings.Epoch != nil && *settings.Epoch > epoch {
 			epoch = *settings.Epoch
 		}
@@ -1044,7 +1045,7 @@ func (s *Service) spend(conn *Conn, id string, loopback bool) {
 	conn.SendNow(reply(m.ID, result))
 }
 
-func (s *Service) spendCode(id, method string, params json.RawMessage, loopback bool) (*admitted, error) {
+func (s *Service) spendCode(id, method string, params json.RawMessage, loopback bool) (*wire.Admitted, error) {
 	ctx := context.Background()
 	stored, err := s.codes.Stored(ctx, id, true)
 	if err != nil {
@@ -1052,16 +1053,15 @@ func (s *Service) spendCode(id, method string, params json.RawMessage, loopback 
 	}
 	switch {
 	case stored.Purpose == "client" && method == "clients/announce":
-		var a clientAnnounce
-		if json.Unmarshal(params, &a) != nil || len(a.PublicKey) == 0 || !controllink.IsUUID(a.ID) {
+		var said wire.ClientAnnounce
+		if json.Unmarshal(params, &said) != nil || len(said.PublicKey) == 0 || !controllink.IsUUID(string(said.ID)) {
 			return nil, fail(invalidParams, "Say who you are.")
 		}
-		a.ID = strings.ToUpper(a.ID)
-		switch a.Kind {
-		case records.KindMac, records.KindIPhone, records.KindIPad, records.KindUnknown, records.KindBrowser:
-		default:
-			a.Kind = records.KindUnknown
-		}
+		// A kind a later build added reads as unknown (ClientKind's fallback).
+		a := struct {
+			ID, Name, Kind string
+			PublicKey      []byte
+		}{strings.ToUpper(string(said.ID)), said.Name, string(said.Kind), said.PublicKey}
 		// A browser pairs through the loopback listener, and only a browser does (071).
 		if (a.Kind == records.KindBrowser) != loopback {
 			return nil, fail(invalidParams, "Pair that kind of client elsewhere.")
@@ -1088,7 +1088,7 @@ func (s *Service) spendCode(id, method string, params json.RawMessage, loopback 
 		if sp.Client != nil {
 			client = strings.ToUpper(*sp.Client)
 		}
-		result := &admitted{Client: client, Grant: records.LegacyGrant}
+		result := &wire.Admitted{Client: new(wire.UUID(client)), Grant: new(records.LegacyGrant)}
 		// The same join again (#212): it paired, and could not keep it.
 		if old := s.records.Client(client); sp.replayed && old != nil && bytes.Equal(old.PublicKey, a.PublicKey) {
 			s.log(name + " paired again with the code it spent (" + a.Kind + ")")
@@ -1103,7 +1103,7 @@ func (s *Service) spendCode(id, method string, params json.RawMessage, loopback 
 		s.announce("clientPaired", client, "code")
 		return result, nil
 	case stored.Purpose == "host" && method == "hosts/announce":
-		var a hostAnnounce
+		var a wire.HostAnnounce
 		if json.Unmarshal(params, &a) != nil {
 			return nil, fail(invalidParams, "Say which host you are.")
 		}
@@ -1123,7 +1123,7 @@ func (s *Service) spendCode(id, method string, params json.RawMessage, loopback 
 			return nil, controllink.Refuse(controllink.Spent)
 		}
 		host := *sp.Host
-		result := &admitted{Host: host}
+		result := &wire.Admitted{Host: new(wire.HostID(host))}
 		// The same join again (#212): it enrolled, and could not keep it.
 		if old := s.records.Host(host); sp.replayed && old != nil && bytes.Equal(old.PublicKey, a.PublicKey) {
 			s.log("host " + a.Name + " enrolled again as " + host + " with the code it spent")
@@ -1135,8 +1135,8 @@ func (s *Service) spendCode(id, method string, params json.RawMessage, loopback 
 		if relay {
 			record.Relay = &relay
 		}
-		if a.Implementation != "" {
-			impl, _ := json.Marshal(a.Implementation)
+		if deref(a.Implementation) != "" {
+			impl, _ := json.Marshal(*a.Implementation)
 			record.Extra = records.Extra{"implementation": impl}
 		}
 		if err := s.records.SaveHost(ctx, record); err != nil {

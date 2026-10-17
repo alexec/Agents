@@ -9,8 +9,8 @@
 #   scripts/go-control.sh --carry    Agents Host's build, after its phases: copy it into the
 #                                    app's Contents/Helpers and sign it, or take it out
 #
-# Agents Host runs it only when this Mac's entry in ~/.agents/settings/host.json says
-# "controlImplementation": "go" (HostSettings); Swift is the default.
+# Agents Host runs it unless this Mac's entry in ~/.agents/settings/host.json says
+# "controlImplementation": "swift" (HostSettings): Go is the default (#1312).
 set -eu
 
 root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)

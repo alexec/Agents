@@ -226,7 +226,7 @@ func countsOf(m map[string]int64) wire.ProjectSummaryCounts {
 
 func (d *Daemon) addProject(folder wire.URL) (wire.ProjectSummary, error) {
 	path := store.FolderPath(folder)
-	if r, err := filepath.EvalSymlinks(path); err == nil {
+	if r, err := store.Resolve(path); err == nil {
 		path = r
 	}
 	if fi, err := os.Stat(path); err != nil || !fi.IsDir() {

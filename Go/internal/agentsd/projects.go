@@ -419,7 +419,7 @@ func (d *Daemon) findProjects(r wire.ProjectsFindRequest) []wire.FoundFolder {
 		}
 		t := typed
 		f := filepath.Clean(expandHome(strings.TrimSpace(typed)))
-		if r, err := filepath.EvalSymlinks(f); err == nil {
+		if r, err := store.Resolve(f); err == nil {
 			f = r
 		}
 		exists := isDir(f)
@@ -706,7 +706,7 @@ func (d *Daemon) registerProjects() {
 	os.RemoveAll(filepath.Join(d.Store.Loc.Root, "Clones"))
 	folderOf := func(u wire.URL) string {
 		f := store.FolderPath(u)
-		if r, err := filepath.EvalSymlinks(f); err == nil {
+		if r, err := store.Resolve(f); err == nil {
 			f = r
 		}
 		return f

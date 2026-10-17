@@ -283,7 +283,8 @@ func (m ToolMapping) Workspace(item any) *WorkspaceInfo {
 	}
 	w := &WorkspaceInfo{ID: id, Name: name, State: state}
 	if m.Listing.SSH != "" {
-		w.SSH, _ = pathText(m.Listing.SSH, item)
+		ssh, _ := pathText(m.Listing.SSH, item)
+		w.SSH = optional(ssh)
 	}
 	if m.Listing.Tunnel != "" {
 		if b, ok := boolean(pathValue(m.Listing.Tunnel, item)); ok {
@@ -295,7 +296,7 @@ func (m ToolMapping) Workspace(item any) *WorkspaceInfo {
 			if utf8.RuneCountInString(cost) > 120 {
 				cost = string([]rune(cost)[:120])
 			}
-			w.Cost = cost
+			w.Cost = optional(cost)
 		}
 	}
 	return w

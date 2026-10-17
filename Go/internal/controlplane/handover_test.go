@@ -10,6 +10,7 @@ import (
 	"github.com/alexec/agents/Go/internal/controllink"
 	"github.com/alexec/agents/Go/internal/controlplane/records"
 	"github.com/alexec/agents/Go/internal/controlplane/store"
+	"github.com/alexec/agents/Go/wire"
 )
 
 // driver is Handover.Link: the handover's side that Agents Host's Swift tool takes.
@@ -61,7 +62,7 @@ func (d *driver) must(method string, params any) json.RawMessage {
 }
 
 func phaseOf(raw json.RawMessage) string {
-	var s handoverStatus
+	var s wire.HandoverStatus
 	json.Unmarshal(raw, &s)
 	return s.Phase
 }
@@ -148,10 +149,9 @@ func TestAHandoverMovesAMemberWithoutPairingAgain(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var endpoints []records.Endpoint
-	json.Unmarshal(ok.Endpoints, &endpoints)
+	endpoints := ok.Endpoints
 	if len(endpoints) != 1 || endpoints[0].URL != newURL || ok.Epoch == nil {
-		t.Fatalf("%s", ok.Endpoints)
+		t.Fatalf("%+v", ok.Endpoints)
 	}
 	// At the new copy, the same pairing works.
 	window, err := controllink.DialClient(context.Background(), &m)

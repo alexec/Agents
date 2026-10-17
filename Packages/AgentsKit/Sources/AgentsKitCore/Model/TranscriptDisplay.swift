@@ -110,11 +110,19 @@ extension TranscriptItem {
         return 0
     }
 
-    /// Whether this item is the agent's thinking, which the session draws only when
-    /// asked. The record keeps it either way.
+    /// Whether this item is the agent's thinking, which the session draws as one folded
+    /// line (#1315). The record keeps it either way.
     public var isThought: Bool {
         if case .entry(let entry) = self, case .agentThought = entry.kind { return true }
         return false
+    }
+
+    /// A thought's folded line (#1315): "Thought:" and its first words, on one line. The
+    /// Markdown marks a runtime puts round a heading ("**Planning**") are left off.
+    public static func thoughtLine(_ text: String) -> String {
+        let words = text.replacingOccurrences(of: "**", with: "")
+            .split(whereSeparator: \.isWhitespace).prefix(24).joined(separator: " ")
+        return words.isEmpty ? "Thought" : "Thought: \(words)"
     }
 }
 

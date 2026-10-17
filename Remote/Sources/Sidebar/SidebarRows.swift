@@ -48,7 +48,7 @@ struct SidebarSessionRow: View {
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
             // What it wants, as the window's sidebar says it (#495): the state is the
-            // row's mark, unread among them. Archived keeps its icon.
+            // row's mark; unread is the bold title (#1323). Archived keeps its icon.
             if let mark = SessionMark(agent: markAgent, group: model.work.group(of: markAgent)) {
                 mark
             } else {
@@ -64,7 +64,7 @@ struct SidebarSessionRow: View {
                     TitleAndPlace {
                         Text(agent.title ?? "Untitled")
                             .appText(.supporting)
-                            .fontWeight(agent.showsUnread ? .semibold : .regular)
+                            .fontWeight(agent.drawsUnread ? .semibold : .regular)
                             .lineLimit(1)
                         if let place {
                             Text(place)
@@ -134,7 +134,7 @@ struct SidebarSessionRow: View {
         // Last known, not current: its host is not answering.
         .opacity(model.isStale(agent) ? 0.55 : 1)
         .accessibilityElement(children: .combine)
-        .accessibilityValue(agent.showsUnread ? "unread" : "")
+        .accessibilityValue(agent.drawsUnread ? "unread" : "")
         .modifier(FoldAction(tree: tree, toggle: toggleFold))
         .tag(SidebarItem.session(agent.id))
         .contextMenu { AgentMenuItems(agent: agent) }
@@ -177,13 +177,13 @@ private struct FoldAction: ViewModifier {
 }
 
 /// A session's mark in the sidebar (#495, #498), the window's: what it wants, in four
-/// shapes — an orange hand when it needs the person, a spinner while it works, two rings
-/// when it finished unread, an empty ring once read; a numbered list while queued, an
+/// shapes — an orange hand when it needs the person, a spinner while it works, an empty
+/// ring once done, read or not (#1323); a numbered list while queued, an
 /// hourglass while it waits and a pause mark once stopped (#630).
 /// An orange archive box when it asks to be archived, as it is listed under Needs You
 /// (#817). Archived keeps its `StatusIcon`.
 private struct SessionMark: View {
-    private enum Kind { case needsYou, working, queued, waiting, paused, unread, read, asksToArchive }
+    private enum Kind { case needsYou, working, queued, waiting, paused, done, asksToArchive }
     private let kind: Kind
 
     init?(agent: Agent, group: AgentGroup) {
@@ -192,7 +192,8 @@ private struct SessionMark: View {
         case .running: kind = .working
         // Asking to be archived (#584), as the window's mark says it.
         case .finished where agent.asksToArchive: kind = .asksToArchive
-        case .finished: kind = agent.showsUnread ? .unread : .read
+        // Read or unread, one ring (#1323): the bold title alone says unread.
+        case .finished: kind = .done
         case .stopped where agent.asksToArchive: kind = .asksToArchive
         // In the accent as the rest, not the grey `StatusIcon` (#630).
         // A queued helper waits for a free place, not on anything it asked for (#630).
@@ -219,9 +220,7 @@ private struct SessionMark: View {
                 Image(systemName: "zzz").foregroundStyle(Paper.accent)
             case .paused:
                 Image(systemName: "pause.circle").foregroundStyle(Paper.accent)
-            case .unread:
-                Image(systemName: "circle.inset.filled").foregroundStyle(Paper.accent)
-            case .read:
+            case .done:
                 Image(systemName: "circle").foregroundStyle(Paper.accent)
             case .asksToArchive:
                 Image(systemName: ArchiveRequestWords.symbol).tinted(.attention)
@@ -241,8 +240,7 @@ private struct SessionMark: View {
         case .queued: "Queued"
         case .waiting: "Waiting"
         case .paused: "Paused"
-        case .unread: "Unread"
-        case .read: "Done"
+        case .done: "Done"
         case .asksToArchive: ArchiveRequestWords.mark
         }
     }

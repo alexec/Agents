@@ -118,7 +118,7 @@ func TestAKeptStartSaysWhichAgentItMade(t *testing.T) {
 	kept := h.keeper()
 	start := map[string]any{"runtimeID": "claude", "cwd": "file:///home/alex/app", "prompt": "fix the login", "draftID": records.NewUUID()}
 	s := keptSummary(t, kept.Keep(devbox, MethodAgentsStart, rawOf(start), h.caller))
-	if s.Kind != "start" || s.Folder != "file:///home/alex/app" || s.RuntimeID != "claude" || s.Text != "fix the login" {
+	if s.Kind != "start" || deref(s.Folder) != "file:///home/alex/app" || deref(s.RuntimeID) != "claude" || s.Text != "fix the login" {
 		t.Errorf("%+v", s)
 	}
 	host := h.connectHost(kept)
@@ -231,16 +231,16 @@ func TestAFailedStartLeavesWhatWasKeptNotSentWithWhyAndTryAgainStartsAgain(t *te
 	h.provider.set("", "Error: droplet is locked", 0)
 	kept := h.keeper()
 	s := keptSummary(t, kept.Keep(devbox, MethodAgentsPrompt, promptParams("go"), h.caller))
-	eventually(t, func() bool { return kept.All()[0].Failed != "" })
-	if kept.All()[0].Failed != "Couldn’t start devbox: Error: droplet is locked" {
-		t.Errorf("%q", kept.All()[0].Failed)
+	eventually(t, func() bool { return deref(kept.All()[0].Failed) != "" })
+	if deref(kept.All()[0].Failed) != "Couldn’t start devbox: Error: droplet is locked" {
+		t.Errorf("%q", deref(kept.All()[0].Failed))
 	}
 	h.provider.set("", "", 0)
 	h.must(MethodHostsRetryKept, KeptRequestID{Host: devbox, ID: s.ID})
-	if kept.All()[0].Failed != "" {
+	if deref(kept.All()[0].Failed) != "" {
 		t.Error("still failed")
 	}
-	h.waitFor("starting", devbox, 5, func(r row) bool { return r.Workspace.Phase == "connecting" })
+	h.waitFor("starting", devbox, 5, func(r row) bool { return deref(r.Workspace.Phase) == "connecting" })
 	if starts, _ := h.provider.count(); starts != 2 {
 		t.Errorf("starts %d", starts)
 	}
@@ -257,9 +257,9 @@ func TestAPromptTheHostRefusesIsShownNotSentInItsWords(t *testing.T) {
 	h.router.mu.Unlock()
 	h.router.setOnline(devbox, true)
 	go kept.Attached(devbox)
-	eventually(t, func() bool { return kept.All()[0].Failed != "" })
-	if kept.All()[0].Failed != "Its folder has gone." {
-		t.Errorf("%q", kept.All()[0].Failed)
+	eventually(t, func() bool { return deref(kept.All()[0].Failed) != "" })
+	if deref(kept.All()[0].Failed) != "Its folder has gone." {
+		t.Errorf("%q", deref(kept.All()[0].Failed))
 	}
 }
 

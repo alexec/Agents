@@ -15,6 +15,7 @@ import (
 	"github.com/alexec/agents/Go/internal/controlplane/notices"
 	"github.com/alexec/agents/Go/internal/controlplane/records"
 	"github.com/alexec/agents/Go/internal/controlplane/store"
+	"github.com/alexec/agents/Go/wire"
 )
 
 // Several copies over one store (058, US3), as Leases.swift and PeerLinks.swift keep
@@ -469,7 +470,7 @@ func (m *mesh) stream(host, hostLine string, link *peerLink) {
 		json.Unmarshal(o["c"], &c)
 		switch {
 		case o["open"] != nil:
-			var open channelOpen
+			var open wire.ChannelOpen
 			json.Unmarshal(o["open"], &open)
 			r.OpenFromPeer(link.peer, host, c, open)
 		case o["m"] != nil:

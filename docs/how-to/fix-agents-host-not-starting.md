@@ -1,7 +1,7 @@
 ---
 diataxis: how-to
 devices: [mac]
-description: Find out why the control plane or this Mac's host won't start, fix the common cases with Repair, and send diagnostics with a report.
+description: Find out why the control plane or this Mac's host won't start, fix the common cases with Repair, send diagnostics with a report, or go back to the Swift host.
 ---
 
 # Fix Agents Host when it won't start
@@ -53,3 +53,33 @@ From Terminal, the same report comes from
 macOS records which build of Agents Host registered its login items. After an update, or
 a copy moved to another folder, it can refuse to start them until they are registered
 again: that is the out-of-date line, and **Repair** is the fix.
+
+## Go back to the Swift host or control plane
+
+Agents Host runs the Go host (`agentsd-go`) and the Go control plane (`agents-control-go`)
+by default. It still carries the Swift ones. If the Go one does something wrong, you can
+run the Swift one in its place:
+
+1. Open `~/.agents/settings/host.json`. Find this Mac's entry: the key is this Mac's name
+   on the network, such as `alexs-macbook-air.local`.
+2. In that entry, add one or both of these lines:
+
+   ```json
+   "daemonImplementation": "swift",
+   "controlImplementation": "swift"
+   ```
+
+3. Restart the job that you changed, in Terminal:
+
+   ```sh
+   launchctl kickstart -k gui/$(id -u)/com.alexecollins.agentshost.daemon
+   launchctl kickstart -k gui/$(id -u)/com.alexecollins.agentshost.control
+   ```
+
+4. Check the logs in `~/Library/Logs/Agents`. After the restart, `daemon.log` says
+   `agentsd <version> (go)` only for the Go host. `control.log` says
+   `Agents Host: starting the Swift agents-control`.
+
+Nothing moves. Both hosts use the same root, and both control planes use the same
+`control/` folder. Every agent, host, member and pin stays. To go back to Go, remove the
+lines and restart the jobs again.

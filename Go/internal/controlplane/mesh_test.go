@@ -8,6 +8,7 @@ import (
 
 	"github.com/alexec/agents/Go/internal/controllink"
 	"github.com/alexec/agents/Go/internal/controlplane/store"
+	"github.com/alexec/agents/Go/wire"
 )
 
 // startCopy is one copy of a control plane of several over st, with the same key: its
@@ -73,15 +74,15 @@ func TestAForgetReachesEveryCopy(t *testing.T) {
 		t.Fatal("a forgotten client was answered at B")
 	}
 	// How a client connects is known at every copy (T080).
-	var links []clientConnection
+	var links []wire.ClientConnection
 	b.waitFor(func() bool {
 		raw, err := b.s.methods.Handle("clients/connections", nil, Caller{})
 		if err != nil {
 			return false
 		}
-		links = raw.([]clientConnection)
+		links = raw.([]wire.ClientConnection)
 		for _, l := range links {
-			if l.Client == member.Client {
+			if string(l.Client) == member.Client {
 				return true
 			}
 		}

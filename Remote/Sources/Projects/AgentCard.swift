@@ -76,7 +76,7 @@ struct AgentCard: View {
                     HStack(alignment: .firstTextBaseline, spacing: 5) {
                         // Unread is a mark, as on the Mac's row (#70): a dot and a
                         // heavier title, and the card stays where it is once read.
-                        if agent.showsUnread {
+                        if agent.drawsUnread {
                             Circle()
                                 .fill(.secondary)
                                 .frame(width: 8, height: 8)
@@ -84,7 +84,7 @@ struct AgentCard: View {
                         }
                         Text(agent.title ?? "Untitled")
                             .appText(.reading)
-                            .fontWeight(agent.showsUnread ? .semibold : .regular)
+                            .fontWeight(agent.drawsUnread ? .semibold : .regular)
                             .lineLimit(2)
                         if let workflowName = startedByWorkflowName {
                             Image(systemName: "flowchart")
@@ -201,7 +201,7 @@ struct AgentCard: View {
         }
         .accessibilityElement(children: .combine)
         .accessibilityLabel(accessibilityLabel)
-        .accessibilityValue(agent.showsUnread ? "unread" : "")
+        .accessibilityValue(agent.drawsUnread ? "unread" : "")
     }
 
     /// Something is on its way to this agent; its menu and swipe hold until it is back (#87).

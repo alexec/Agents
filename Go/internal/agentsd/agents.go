@@ -493,7 +493,7 @@ func (d *Daemon) touchedPaths(id wire.UUID) []string {
 		if p == "" {
 			return
 		}
-		if r, err := filepath.EvalSymlinks(p); err == nil {
+		if r, err := store.Resolve(p); err == nil {
 			p = r
 		}
 		seen[filepath.Clean(p)] = true

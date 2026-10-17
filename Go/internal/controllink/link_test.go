@@ -82,12 +82,12 @@ func (f *fakeControl) serve(w http.ResponseWriter, r *http.Request) {
 	}
 	peer, _ := FromB64URL(a.Nonce)
 	origin, _ := Origin(f.srv.URL)
-	got, _ := FromB64URL(a.MAC)
+	got, _ := FromB64URL(a.Mac)
 	if key == nil || f.refuse || !Same(got, PeerMAC(key, nonce, peer, a.ID, origin)) {
 		l.Write(ctx, Message{Refused: Unknown}.Line())
 		return
 	}
-	l.Write(ctx, Message{OK: &OK{MAC: B64URL(ServerMAC(key, nonce, peer, a.ID, origin))}}.Line())
+	l.Write(ctx, Message{OK: &OK{Mac: B64URL(ServerMAC(key, nonce, peer, a.ID, origin))}}.Line())
 	if strings.HasPrefix(a.ID, "e:") {
 		req, _ := l.Read(ctx)
 		var call struct {
@@ -156,7 +156,7 @@ func TestEnrolThenUplink(t *testing.T) {
 	if string(again) != string(private) {
 		t.Fatal("the host key changed between reads")
 	}
-	hello := HostHello{Version: "1.2.3", Platform: "Linux arm64", MachineID: "m1", Name: "devbox", Implementation: "go"}
+	hello := HostHello{Version: "1.2.3", Platform: "Linux arm64", MachineID: "m1", Name: new("devbox"), Implementation: new("go")}
 	m, err := Enroll(ctx, root, f.code(), private, hello)
 	if err != nil {
 		t.Fatal(err)
@@ -188,7 +188,7 @@ func TestEnrolThenUplink(t *testing.T) {
 	go u.Run(ctx)
 	select {
 	case h := <-f.hellos:
-		if h.Host != f.host || h.Implementation != "go" || h.Version != "1.2.3" {
+		if h.Host == nil || string(*h.Host) != f.host || h.Implementation == nil || *h.Implementation != "go" || h.Version != "1.2.3" {
 			t.Fatalf("hello %+v", h)
 		}
 	case <-ctx.Done():

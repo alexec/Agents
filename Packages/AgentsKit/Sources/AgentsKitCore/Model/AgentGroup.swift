@@ -152,6 +152,13 @@ public extension Agent {
         state == .finished && isUnread
     }
 
+    /// Whether the row draws it unread: a bold title (#1323). Only in Done, so a session
+    /// that asks, waits or needs the person is never bold, read or not; its mark says it.
+    /// The counts, the Unread group and the badge still go by `showsUnread`.
+    var drawsUnread: Bool {
+        showsUnread && group() == .finished
+    }
+
     /// Needs you, Blocked from an older daemon, or unread: one in the badge's count. The
     /// rule `ProjectShelf` counts by and the daemon sends the phone (#1163), so the two
     /// cannot disagree.

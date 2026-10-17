@@ -1,63 +1,28 @@
 import Foundation
 
-/// How much of a turn is drawn (069). The app keeps one of these as the level every turn
-/// starts at; a turn opened or closed by hand holds its own until the chat is left.
-public enum TurnDetail: String, CaseIterable, Codable, Hashable, Sendable {
-    /// One turn closed by its *N steps*: the ask, the answers, the reply and how it went.
-    /// Not a level (#1286): only a turn is ever closed, so a stored `outcome` from when it
-    /// was one reads as nothing, and the level falls back to `initial`.
+/// Whether a turn is drawn with its steps (069). Every turn opens with them; its *N steps*
+/// closes one, and it stays so until the chat is left. There are no levels (#1315): a run
+/// of calls, a call and a thought each open in their place.
+public enum TurnDetail: Hashable, Sendable {
+    /// The ask, the answers, the reply and how it went, and every step between them: a run
+    /// of tool calls is drawn as its last, and opens to the rest (#759); a call opens to
+    /// its argument and return; a thought is one line, and opens to the whole of it.
+    case open
+    /// Closed by its *N steps*: the ask, the answers, the reply and how it went.
     case collapsed
-    /// And every step between them but the tool calls: a run of calls is drawn as its
-    /// last, and opens to the rest (#759).
-    case messages
-    /// And every step between them, one line each.
-    case steps
-    /// And every call opened, and the agent's thinking.
-    case details
 
-    /// The levels every turn can start at, in the menu's order (#1286).
-    public static let levels: [TurnDetail] = [.messages, .steps, .details]
+    public var showsSteps: Bool { self == .open }
 
-    public var title: String {
-        switch self {
-        case .collapsed: return "Collapsed"
-        case .messages: return "Messages"
-        case .steps: return "Steps"
-        case .details: return "Details"
-        }
-    }
+    /// Every turn before anyone opens or closes it, on every client (#993).
+    public static let initial = TurnDetail.open
 
-    /// What the level shows, said beside it in the menu so nobody has to try them all.
-    public var summary: String {
-        switch self {
-        case .collapsed: return "What was asked and how it went"
-        case .messages: return "Every step but tools, rolled up"
-        case .steps: return "Every step, one line each"
-        case .details: return "Every call opened, and thinking"
-        }
-    }
-
-    public var showsSteps: Bool { self != .collapsed }
-
-    /// Whether a run of tool calls is drawn as its last call until it is opened.
-    public var rollsUpCalls: Bool { self == .messages }
-
-    /// Where the phone keeps its choice. The Mac scopes its own by root.
-    public static let phoneDefaultsKey = "turnDetail"
-
-    /// The level before anyone has chosen one, on every client (#993).
-    public static let initial = TurnDetail.messages
-
-    /// A turn opened or closed by its *N steps*, from `self` with the app at `level`.
-    /// Open is the level; closed is always collapsed, never a trip through Details.
-    public func toggled(level: TurnDetail) -> TurnDetail {
-        showsSteps ? .collapsed : (level.showsSteps ? level : .messages)
-    }
+    /// The turn opened or closed by its *N steps*.
+    public var toggled: TurnDetail { showsSteps ? .collapsed : .open }
 }
 
 /// One turn of a conversation: what the person asked, and everything up to the next ask.
 ///
-/// Drawn at one of three levels (069, #759, #1286), or collapsed. Its outcome — the answers, the reply and how it
+/// Drawn open or collapsed (069, #759, #1315). Its outcome — the answers, the reply and how it
 /// went — is drawn at every one; the steps between are a click away.
 public struct ChatTurn: Identifiable, Hashable, Sendable {
     /// The ask's id, or the first item's for what came before any ask.

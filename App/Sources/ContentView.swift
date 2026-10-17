@@ -13,6 +13,8 @@ struct ContentView: View {
     let terminal: ProjectTerminalFrame
     @State private var sidebarStates = SidebarStates()
     @State private var webHolders = WebHolders()
+    /// Settings ▸ Appearance ▸ the icon's mood (#1317), per Mac.
+    @AppStorage(IconMood.showsMoodKey, store: WindowDefaults.store) private var iconShowsMood = true
     /// Which columns are showing. The projects stay put: moving between them is the
     /// ordinary thing to do here, and a list that hides itself when used is a list you
     /// have to keep fetching back.
@@ -140,6 +142,7 @@ struct ContentView: View {
             // pinned view (#189), fed afresh.
             VStack(spacing: 0) {
                 OfflineStrip(host: summary.host)
+                DiskStrip(host: summary.host)
                 if let pin = model.pins(in: key.folder).first(where: { $0.path == path }), let view = pin.view {
                     PinnedViewPage(folder: key.folder, pin: pin, view: view,
                                    call: { method, params in try await model.client(for: key.host).call(method, params) },
@@ -267,7 +270,6 @@ struct ContentView: View {
         // under an inset and hide their first rows behind it.
         VStack(spacing: 0) {
         if model.controlPlaneAway { ControlAwayStrip() }
-        DiskStrip()
         Group {
             if model.needsFirstRun {
                 // No control plane and nothing of the old way: one question, and no
@@ -387,6 +389,11 @@ struct ContentView: View {
         // How many sessions need a person, on the Dock — Needs attention and Blocked.
         .onChange(of: model.needsPersonCount, initial: true) { _, count in
             NSApp.dockTile.badgeLabel = count > 0 ? "\(count)" : nil
+        }
+        // How the agents are, on the Dock tile's Blob (#1317). Set only when the mood or
+        // the switch changes; the image changes with no animation.
+        .onChange(of: iconShowsMood ? model.iconMood : .happy, initial: true) { _, mood in
+            DockMood.show(mood)
         }
     }
 }

@@ -9,7 +9,7 @@ import type { Store } from "../model/store";
 import { leaseMark, startedByAgentLabel, waitMark, worktreeHelp, type LeaseMark, type WaitMark } from "../model/rowLines";
 import { blockWaitNames, openBlock } from "../model/block";
 import { backgroundMark } from "../model/background";
-import { projectFolder, showsUnread } from "../model/groups";
+import { drawsUnread, projectFolder } from "../model/groups";
 import { archiveLine, archiveMark } from "../model/archiveWords";
 import { queuedLine, rowStatus, type StatusShape } from "../model/status";
 import { fromWireDate } from "../protocol/dates";
@@ -31,13 +31,13 @@ export function StatusMark({ agent, comingBack = false }: { agent: Agent; coming
   );
 }
 
-const markWords: Record<SessionMark, string> = { needsYou: "Needs you", working: "Working", queued: "Queued", waiting: "Waiting", paused: "Paused", unread: "Unread", read: "Done",
+const markWords: Record<SessionMark, string> = { needsYou: "Needs you", working: "Working", queued: "Queued", waiting: "Waiting", paused: "Paused", done: "Done",
   asksToArchive: archiveMark };
 
 /**
  * A session's mark in the sidebar (#495, #499), the window's and the Remote's: an orange hand when
  * it needs the person, a spinner while it works, a numbered list while queued, Zs while it waits (#765), a pause mark once
- * stopped (#630), two rings when it finished unread, an empty ring once read. Archived keeps its
+ * stopped (#630), an empty ring once done, read or not (#1323). Archived keeps its
  * status mark.
  */
 export function SidebarMark({ agent, comingBack = false }: { agent: Agent; comingBack?: boolean }) {
@@ -127,8 +127,8 @@ export function SessionRow({ agent, chosen, onPick, going, extras, inSidebar = f
         : <StatusMark agent={agent} comingBack={extras?.comingBack ?? false} />}
       <span class="body">
         {/* Unread is a mark, as in Mail (#70): a dot (two rings in the sidebar) and a heavier title, gone once opened. */}
-        <span class={`title${showsUnread(agent) ? " unread" : ""}${place ? " placed" : ""}`} aria-description={showsUnread(agent) ? "unread" : undefined}>
-          {showsUnread(agent) && !inSidebar && <span class="unread-dot" aria-hidden="true" />}
+        <span class={`title${drawsUnread(agent) ? " unread" : ""}${place ? " placed" : ""}`} aria-description={drawsUnread(agent) ? "unread" : undefined}>
+          {drawsUnread(agent) && !inSidebar && <span class="unread-dot" aria-hidden="true" />}
           {/* The title gives way before its project's name, which is whole (#587). */}
           {place ? <span class="name">{agent.title ?? "Untitled"}</span> : agent.title ?? "Untitled"}
           {place && <span class="place"> {place}</span>}

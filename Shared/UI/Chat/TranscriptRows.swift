@@ -31,19 +31,21 @@ struct TranscriptRow: View {
     }
 }
 
-/// One turn, at the level it is drawn at (069).
+/// One turn, open or collapsed (069, #1315).
 ///
-/// Its outcome — the ask, the answers, the reply and how it went — is drawn at every
-/// level. Between the ask and the outcome, one control opens the steps; it is the only
-/// thing in a turn that does, so the reply's text can be selected like any other.
+/// Its outcome — the ask, the answers, the reply and how it went — is drawn either way.
+/// Between the ask and the outcome, one control opens and closes the steps, so the
+/// reply's text can be selected like any other; each step opens in its place.
 ///
 /// Equal when what it draws is: the closures are left out, because they are made again
 /// on every pass of the chat and do the same thing for the same turn. Without this,
 /// every streamed chunk drew every turn of the conversation again (#90).
 struct TurnView: View, Equatable {
     let turn: ChatTurn
-    /// The app's default, or what the person chose for this turn.
+    /// Open unless the person closed it.
     let detail: TurnDetail
+    /// The run of calls gone to from elsewhere, drawn opened with its first call (#1315).
+    var focusedRun: UUID? = nil
     /// A stored turn's own entries, once fetched.
     let fetched: [TranscriptItem]?
     /// Whether the fetched entries start after the turn does: a turn longer than a
@@ -60,8 +62,8 @@ struct TurnView: View, Equatable {
     var fetchEarlier: () async -> Void = {}
 
     nonisolated static func == (a: TurnView, b: TurnView) -> Bool {
-        a.turn == b.turn && a.detail == b.detail && a.fetched == b.fetched && a.fetchFailed == b.fetchFailed
-            && a.hasEarlier == b.hasEarlier && a.isLive == b.isLive
+        a.turn == b.turn && a.detail == b.detail && a.focusedRun == b.focusedRun && a.fetched == b.fetched
+            && a.fetchFailed == b.fetchFailed && a.hasEarlier == b.hasEarlier && a.isLive == b.isLive
     }
 
     var body: some View {
@@ -75,8 +77,8 @@ struct TurnView: View, Equatable {
         let steps: [TranscriptItem] = {
             guard detail.showsSteps, parts != nil else { return [] }
             let shown = Set(outcome.map(\.id))
-            return TurnParts.drawn(items, isLive: isLive)
-                .filter { !shown.contains($0.id) && (detail == .details || !$0.isThought) }
+            // Thinking too, each a folded line in its place (#1315).
+            return TurnParts.drawn(items, isLive: isLive).filter { !shown.contains($0.id) }
         }()
         VStack(alignment: .leading, spacing: 14) {
             if let ask = turn.ask {
@@ -98,14 +100,14 @@ struct TurnView: View, Equatable {
                     if hasEarlier { EarlierStepsControl(fetch: fetchEarlier) }
                     // In the turn's own margin: no rule and no indent (#148).
                     VStack(alignment: .leading, spacing: 10) {
-                        ForEach(steps) { StepRow(item: $0, isOpen: detail == .details, rollsUp: detail.rollsUpCalls) }
+                        ForEach(steps) { StepRow(item: $0, isFocused: $0.id == focusedRun) }
                     }
-                    ForEach(outcome) { StepRow(item: $0, isOpen: false) }
+                    ForEach(outcome) { StepRow(item: $0) }
                 }
             } else {
                 // Under the control, where the steps would be: what it is doing now.
                 if let live = parts?.live { LiveLine(item: live) }
-                ForEach(outcome) { StepRow(item: $0, isOpen: false) }
+                ForEach(outcome) { StepRow(item: $0) }
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -207,7 +209,7 @@ private struct LiveLine: View {
                 .lineLimit(1)
                 .frame(maxWidth: .infinity, alignment: .leading)
         } else {
-            StepRow(item: item, isOpen: false)
+            StepRow(item: item)
         }
     }
 }
@@ -215,31 +217,34 @@ private struct LiveLine: View {
 /// One item of a turn: a call a line of its own, anything else as it is drawn.
 private struct StepRow: View {
     let item: TranscriptItem
-    /// Every call open from the start, at Details.
-    let isOpen: Bool
-    /// At Messages, a run of calls is its last until it is clicked (#759).
-    var rollsUp = false
+    /// Gone to from elsewhere: the run opened, and its first call (#1315).
+    var isFocused = false
+    /// A run of calls is its last until it is clicked (#759).
     @State private var isUnrolled = false
 
     var body: some View {
-        switch item {
-        case .toolRun(_, let calls) where rollsUp && !isUnrolled && calls.count > 1:
-            if let last = calls.last {
-                ToolCallLine(call: last, lineText: last.turnLine, onClick: { isUnrolled = true }, brightensOnHover: true)
-            }
-        case .toolRun(_, let calls):
-            VStack(alignment: .leading, spacing: isOpen ? 12 : 4) {
-                ForEach(Array(calls.enumerated()), id: \.offset) { _, call in
-                    ToolCallLine(call: call, lineText: call.turnLine, isOpen: isOpen, brightensOnHover: true)
+        Group {
+            switch item {
+            case .toolRun(_, let calls) where !isUnrolled && calls.count > 1:
+                if let last = calls.last {
+                    ToolCallLine(call: last, lineText: last.turnLine, onClick: { isUnrolled = true }, brightensOnHover: true)
+                }
+            case .toolRun(_, let calls):
+                VStack(alignment: .leading, spacing: 4) {
+                    ForEach(Array(calls.enumerated()), id: \.offset) { index, call in
+                        ToolCallLine(call: call, lineText: call.turnLine, isFocused: isFocused && index == 0,
+                                     brightensOnHover: true)
+                    }
+                }
+            case .entry(let entry):
+                if case .toolCall(let call) = entry.kind {
+                    ToolCallLine(call: call, lineText: call.turnLine, isFocused: isFocused, brightensOnHover: true)
+                } else {
+                    EntryRow(entry: entry)
                 }
             }
-        case .entry(let entry):
-            if case .toolCall(let call) = entry.kind {
-                ToolCallLine(call: call, lineText: call.turnLine, isOpen: isOpen, brightensOnHover: true)
-            } else {
-                EntryRow(entry: entry)
-            }
         }
+        .onChange(of: isFocused, initial: true) { _, now in if now { isUnrolled = true } }
     }
 }
 
@@ -298,10 +303,7 @@ private struct EntryRow: View {
                 .copiesMessage(entry)
 
         case .agentThought(_, let text):
-            Text(text)
-                .appText(.reading)
-                .foregroundStyle(.secondary)
-                .textSelection(.enabled)
+            ThoughtLine(text: text)
 
         case .toolCall(let call), .toolCallUpdate(let call):
             // Reached only when something splits a run; a run is drawn by ToolRunRow.
@@ -430,6 +432,42 @@ private struct NoticeLine: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+/// The agent's thinking: one line, "Thought:" and its first words, and the whole of it a
+/// click away, as a call's argument and return are (#1315). It was drawn whole, and only
+/// at the Details level; a turn now draws every thought, so each has to be short.
+private struct ThoughtLine: View {
+    let text: String
+    @State private var isExpanded = false
+    @State private var isHovering = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Button {
+                withAnimation(.easeOut(duration: 0.15)) { isExpanded.toggle() }
+            } label: {
+                Text(TranscriptItem.thoughtLine(text))
+                    .appText(.reading)
+                    .foregroundStyle(isHovering ? .primary : .secondary)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .contentShape(.rect)
+                    .onHover { isHovering = $0 }
+            }
+            .buttonStyle(.plain)
+            .help(isExpanded ? "Hide the thought" : "Show the whole thought")
+            .accessibilityHint(isExpanded ? "Hides the thought" : "Shows the whole thought")
+            if isExpanded {
+                Text(text)
+                    .appText(.reading)
+                    .foregroundStyle(.secondary)
+                    .textSelection(.enabled)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
     }
 }
 
@@ -596,9 +634,8 @@ private struct ToolCallLine: View {
     let call: ToolCall
     /// What the line says, where not the runtime's own line: a turn's description.
     var lineText: String? = nil
-    /// Open from the start and for good: a verbose turn, where the click belongs to
-    /// the turn.
-    var isOpen = false
+    /// Gone to from elsewhere, so opened (#1315). Still closed by a click.
+    var isFocused = false
     /// What a click does instead of opening the call, where the line is standing in
     /// for a whole folded run.
     var onClick: (() -> Void)? = nil
@@ -610,9 +647,10 @@ private struct ToolCallLine: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            if isOpen { line } else { summary }
-            if isExpanded || isOpen { detail }
+            summary
+            if isExpanded { detail }
         }
+        .onChange(of: isFocused, initial: true) { _, now in if now, hasDetail { isExpanded = true } }
     }
 
     // MARK: The line itself

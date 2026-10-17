@@ -25,7 +25,7 @@ func TestAProviderIsListedWithItsWorkspacesAndNeverItsSecret(t *testing.T) {
 		t.Fatalf("listed %v", listed)
 	}
 	s := listed[0]
-	if s.ID != id || s.Name != "DigitalOcean" || s.Preset != "doctl" {
+	if string(s.ID) != id || s.Name != "DigitalOcean" || deref(s.Preset) != "doctl" {
 		t.Errorf("summary %+v", s)
 	}
 	if names := []string{s.Workspaces[0].Name, s.Workspaces[1].Name}; !reflect.DeepEqual(names, []string{"agents-devbox", "scratch-1"}) {
@@ -108,7 +108,7 @@ func TestProvidersAreReadBackAfterARestart(t *testing.T) {
 		Hooks: Hooks{Connect: func(ProviderRecord, map[string]string) (Provider, error) { return h.provider, nil }}})
 	again.Start()
 	defer again.Stop()
-	if s := again.Summaries(); len(s) != 1 || s[0].ID != id {
+	if s := again.Summaries(); len(s) != 1 || string(s[0].ID) != id {
 		t.Errorf("%v", s)
 	}
 }
@@ -166,16 +166,16 @@ func TestStartShowsEachPhaseUntilTheHostConnects(t *testing.T) {
 	if started.State != "starting" {
 		t.Errorf("%+v", started)
 	}
-	waiting := h.waitFor("starting", devbox, 5, func(r row) bool { return r.Workspace.Phase == "connecting" })
-	if waiting.Workspace.Phase != "connecting" {
-		t.Errorf("phase %q", waiting.Workspace.Phase)
+	waiting := h.waitFor("starting", devbox, 5, func(r row) bool { return deref(r.Workspace.Phase) == "connecting" })
+	if deref(waiting.Workspace.Phase) != "connecting" {
+		t.Errorf("phase %q", deref(waiting.Workspace.Phase))
 	}
 	if starts, _ := h.provider.count(); starts != 1 {
 		t.Errorf("starts %d", starts)
 	}
 	h.router.setOnline(devbox, true)
-	online := h.waitFor("online", devbox, 5, func(r row) bool { return r.Workspace.Phase == "" })
-	if online.Workspace.WorkspaceState != "running" || !online.Workspace.CanStop || online.Workspace.Problem != "" {
+	online := h.waitFor("online", devbox, 5, func(r row) bool { return deref(r.Workspace.Phase) == "" })
+	if online.Workspace.WorkspaceState != "running" || !online.Workspace.CanStop || deref(online.Workspace.Problem) != "" {
 		t.Errorf("%+v", online.Workspace)
 	}
 	// How long it took, for a wake-up call (#1004 FR-004).
@@ -191,7 +191,7 @@ func TestASecondStartJoinsTheFirst(t *testing.T) {
 	for range 3 {
 		h.must(MethodHostsStart, map[string]string{"host": devbox})
 	}
-	h.waitFor("starting", devbox, 5, func(r row) bool { return r.Workspace.Phase == "connecting" })
+	h.waitFor("starting", devbox, 5, func(r row) bool { return deref(r.Workspace.Phase) == "connecting" })
 	if starts, _ := h.provider.count(); starts != 1 {
 		t.Errorf("starts %d", starts)
 	}
@@ -202,8 +202,8 @@ func TestAFailedStartSaysWhyAndOffersStartAgain(t *testing.T) {
 	h.link(h.add(), devbox, "agents-devbox")
 	h.provider.set("", "Error: droplet is locked", 0)
 	h.must(MethodHostsStart, map[string]string{"host": devbox})
-	r := h.waitFor("stopped", devbox, 5, func(r row) bool { return r.Workspace.Problem != "" })
-	if r.Workspace.Problem != "Couldn’t start devbox: Error: droplet is locked" || !r.Workspace.CanStart {
+	r := h.waitFor("stopped", devbox, 5, func(r row) bool { return deref(r.Workspace.Problem) != "" })
+	if deref(r.Workspace.Problem) != "Couldn’t start devbox: Error: droplet is locked" || !r.Workspace.CanStart {
 		t.Errorf("%+v", r.Workspace)
 	}
 }
@@ -214,11 +214,11 @@ func TestAHostThatDoesNotConnectIsStartedOverSSHThenGivenUp(t *testing.T) {
 	})
 	h.link(h.add(), devbox, "agents-devbox")
 	h.must(MethodHostsStart, map[string]string{"host": devbox})
-	r := h.waitFor("offline", devbox, 15, func(r row) bool { return r.Workspace.Problem != "" })
+	r := h.waitFor("offline", devbox, 15, func(r row) bool { return deref(r.Workspace.Problem) != "" })
 	if !reflect.DeepEqual(h.ssh.all(), []string{"alex@127.0.0.1 -p 2222"}) {
 		t.Errorf("ssh %v", h.ssh.all())
 	}
-	if r.Workspace.Problem != "devbox didn’t connect in 2 seconds." || !r.Workspace.CanStart {
+	if deref(r.Workspace.Problem) != "devbox didn’t connect in 2 seconds." || !r.Workspace.CanStart {
 		t.Errorf("%+v", r.Workspace)
 	}
 }
@@ -230,11 +230,11 @@ func TestAFailedSSHStartEndsTheStartAtOnceInWords(t *testing.T) {
 	})
 	h.link(h.add(), devbox, "agents-devbox")
 	h.must(MethodHostsStart, map[string]string{"host": devbox})
-	r := h.waitFor("offline", devbox, 15, func(r row) bool { return r.Workspace.Problem != "" })
+	r := h.waitFor("offline", devbox, 15, func(r row) bool { return deref(r.Workspace.Problem) != "" })
 	want := "devbox started, but its agentsd didn’t connect, and starting it over ssh failed. " +
 		"Its host key isn’t in your known_hosts. Check and trust it with “ssh alex@127.0.0.1 -p 2222”, then start it again."
-	if r.Workspace.Problem != want || !r.Workspace.CanStart {
-		t.Errorf("%q", r.Workspace.Problem)
+	if deref(r.Workspace.Problem) != want || !r.Workspace.CanStart {
+		t.Errorf("%q", deref(r.Workspace.Problem))
 	}
 }
 
@@ -246,9 +246,9 @@ func TestWithoutTheProvidersSSHItStartsOverTheInstallsDestination(t *testing.T) 
 	})
 	h.link(h.add(), devbox, "cs-1")
 	h.must(MethodHostsStart, map[string]string{"host": devbox})
-	r := h.waitFor("offline", devbox, 15, func(r row) bool { return r.Workspace.Problem != "" })
-	if !reflect.DeepEqual(h.ssh.all(), []string{"cs.cs-1.main"}) || r.Workspace.Problem != "devbox didn’t connect in 2 seconds." {
-		t.Errorf("%v %q", h.ssh.all(), r.Workspace.Problem)
+	r := h.waitFor("offline", devbox, 15, func(r row) bool { return deref(r.Workspace.Problem) != "" })
+	if !reflect.DeepEqual(h.ssh.all(), []string{"cs.cs-1.main"}) || deref(r.Workspace.Problem) != "devbox didn’t connect in 2 seconds." {
+		t.Errorf("%v %q", h.ssh.all(), deref(r.Workspace.Problem))
 	}
 }
 
@@ -316,9 +316,9 @@ func TestStopTheMomentAStartedHostIsOnlineIsHeard(t *testing.T) {
 	h := newHarness(t)
 	h.link(h.add(), devbox, "agents-devbox")
 	h.must(MethodHostsStart, map[string]string{"host": devbox})
-	h.waitFor("starting", devbox, 5, func(r row) bool { return r.Workspace.Phase == "connecting" })
+	h.waitFor("starting", devbox, 5, func(r row) bool { return deref(r.Workspace.Phase) == "connecting" })
 	h.router.setOnline(devbox, true)
-	h.waitFor("online", devbox, 5, func(r row) bool { return r.Workspace.Phase == "" && r.Workspace.CanStop })
+	h.waitFor("online", devbox, 5, func(r row) bool { return deref(r.Workspace.Phase) == "" && r.Workspace.CanStop })
 	if r := h.must(MethodHostsStop, HostStop{Host: devbox}).(row); r.State != "stopping" {
 		t.Errorf("%+v", r)
 	}
@@ -345,16 +345,16 @@ func TestAnIdleHostIsStoppedAndSaysSo(t *testing.T) {
 	id := h.add()
 	h.link(id, devbox, "scratch-1")
 	minutes := 2
-	h.must(MethodHostsSetOptions, HostWorkspaceOptions{Host: devbox, StopWhenIdleMinutes: &minutes})
+	h.must(MethodHostsSetOptions, HostWorkspaceOptions{Host: devbox, StopWhenIdleMinutes: int64Of(&minutes)})
 	h.router.setOnline(devbox, true)
 	h.providers.Heard(devbox, HostStatus{Idle: true, Running: []string{}})
 	if !eventually(t, func() bool { _, stops := h.provider.count(); return stops == 1 }) {
 		t.Fatal("not stopped")
 	}
 	h.router.setOnline(devbox, false)
-	r := h.waitFor("stopped", devbox, 5, func(r row) bool { return r.Workspace.StoppedBy != "" })
-	if r.Workspace.StoppedBy != "Stopped by Agents after 2 minutes idle" {
-		t.Errorf("%q", r.Workspace.StoppedBy)
+	r := h.waitFor("stopped", devbox, 5, func(r row) bool { return deref(r.Workspace.StoppedBy) != "" })
+	if deref(r.Workspace.StoppedBy) != "Stopped by Agents after 2 minutes idle" {
+		t.Errorf("%q", deref(r.Workspace.StoppedBy))
 	}
 }
 
@@ -362,7 +362,7 @@ func TestBusyAgainCancelsTheIdleCount(t *testing.T) {
 	h := newHarness(t, func(o *harnessOptions) { o.timing.IdleMinute = 30 * time.Millisecond })
 	h.link(h.add(), devbox, "scratch-1")
 	one := 1
-	h.must(MethodHostsSetOptions, HostWorkspaceOptions{Host: devbox, StopWhenIdleMinutes: &one})
+	h.must(MethodHostsSetOptions, HostWorkspaceOptions{Host: devbox, StopWhenIdleMinutes: int64Of(&one)})
 	h.router.setOnline(devbox, true)
 	h.providers.Heard(devbox, HostStatus{Idle: true, Running: []string{}})
 	h.providers.Heard(devbox, HostStatus{Idle: false, Running: []string{"Claude (x)"}})
@@ -376,13 +376,13 @@ func TestAHostsScheduleIsKeptOnItsLinkAndWakesIt(t *testing.T) {
 	h := newHarness(t)
 	h.link(h.add(), devbox, "agents-devbox")
 	due := time.Now().Add(3 * time.Minute)
-	h.providers.Heard(devbox, HostStatus{Idle: true, Running: []string{}, Schedule: &HostSchedule{At: refDate(due), Workflow: "nightly"}})
+	h.providers.Heard(devbox, HostStatus{Idle: true, Running: []string{}, Schedule: &HostSchedule{At: dateOf(due), Workflow: new("nightly")}})
 	link := LinkOf(h.records.Host(devbox))
 	if link.Schedule == nil || link.Schedule.Workflow != "nightly" || !sameTime(link.Schedule.At, &due) {
 		t.Fatalf("%+v", link.Schedule)
 	}
 	r := h.row(devbox)
-	if r.Workspace.NextWorkflow != "nightly" || r.Workspace.WakeAt == nil || r.Workspace.TellsSchedule == nil || !*r.Workspace.TellsSchedule {
+	if deref(r.Workspace.NextWorkflow) != "nightly" || r.Workspace.WakeAt == nil || r.Workspace.TellsSchedule == nil || !*r.Workspace.TellsSchedule {
 		t.Errorf("%+v", r.Workspace)
 	}
 	// Due within the 5 minutes' lead: started once, and marked so.
@@ -441,14 +441,14 @@ func TestAHostRecordWithALinkReadsAndWritesAsSwiftDoes(t *testing.T) {
 }
 
 func TestOverlayAndOfflineRefusal(t *testing.T) {
-	ws := &HostWorkspace{HostState: "stopped"}
+	ws := &HostWorkspace{HostState: new("stopped")}
 	if Overlay(map[string]any{"state": "offline"}, false, ws)["state"] != "stopped" {
 		t.Error("not laid over")
 	}
 	if Overlay(map[string]any{"state": "online"}, true, ws)["state"] != "online" {
 		t.Error("laid over an online host")
 	}
-	if Overlay(map[string]any{"state": "online"}, true, &HostWorkspace{HostState: "stopping"})["state"] != "stopping" {
+	if Overlay(map[string]any{"state": "online"}, true, &HostWorkspace{HostState: new("stopping")})["state"] != "stopping" {
 		t.Error("stopping not shown")
 	}
 	if OfflineRefusal(ws).Message != "That host is stopped. Start it to reach it." || OfflineRefusal(nil).Message != "That host is offline." {
@@ -470,7 +470,7 @@ func TestProviderIDsAndWords(t *testing.T) {
 	if andList([]string{"a", "b", "c"}) != "a, b and c" || orList([]string{"a", "b", "c"}) != "a, b or c" {
 		t.Error("lists")
 	}
-	if !(WorkspaceInfo{Name: "devstack-d7539e59"}).MayBe("cws.devstack-d7539e59") || (WorkspaceInfo{Name: "dev"}).MayBe("devstack") {
+	if !MayBe(WorkspaceInfo{Name: "devstack-d7539e59"}, "cws.devstack-d7539e59") || MayBe(WorkspaceInfo{Name: "dev"}, "devstack") {
 		t.Error("mayBe")
 	}
 }
@@ -479,7 +479,7 @@ func TestProviderIDsAndWords(t *testing.T) {
 
 func (h *harness) create(name string, clones []string) (ProviderCreated, error) {
 	provider := h.must(MethodProvidersList, nil).(map[string]any)["providers"].([]ProviderSummary)[0].ID
-	out, err := h.call(MethodProvidersCreate, ProviderCreate{ID: provider, Name: name, Options: map[string]any{"size": "big"}, Clones: clones})
+	out, err := h.call(MethodProvidersCreate, ProviderCreate{ID: provider, Name: name, Options: jsonValue(map[string]any{"size": "big"}), Clones: clones})
 	if err != nil {
 		return ProviderCreated{}, err
 	}
@@ -490,8 +490,8 @@ func TestTheFormComesFromTheProvidersOptions(t *testing.T) {
 	h := newHarness(t)
 	id := h.add()
 	options := h.must(MethodProvidersOptions, map[string]string{"id": id}).(ProviderOptions)
-	if get(get(get(options.Schema, "properties"), "size"), "title") != "Size" {
-		t.Errorf("%v", options.Schema)
+	if get(get(get(valueOf(options.Schema), "properties"), "size"), "title") != "Size" {
+		t.Errorf("%s", options.Schema)
 	}
 }
 
@@ -540,7 +540,7 @@ func TestOneThatCantRunTheFirstBootIsLeftToAddOverSSH(t *testing.T) {
 	h.add()
 	h.provider.firstBootRuns = false
 	made, err := h.create("build-3", nil)
-	if err != nil || made.Joining || made.Workspace.SSH != "root@10.0.0.9" {
+	if err != nil || made.Joining || deref(made.Workspace.SSH) != "root@10.0.0.9" {
 		t.Fatalf("%v %+v", err, made)
 	}
 }
@@ -596,7 +596,7 @@ func TestAnAgentSeesWorkspacesAndTheirHostsAndNoSecret(t *testing.T) {
 		t.Errorf("%+v", p)
 	}
 	for _, w := range p.Workspaces {
-		if w.ID == "agents-devbox" && (w.Host != "devbox" || w.HostState != "stopped") {
+		if w.ID == "agents-devbox" && (deref(w.Host) != "devbox" || deref(w.HostState) != "stopped") {
 			t.Errorf("%+v", w)
 		}
 	}

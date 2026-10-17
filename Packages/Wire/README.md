@@ -39,8 +39,10 @@ A conflict in a generated file is settled by running `gen` again, never by hand.
 - **Methods.** Each method has one param, `params`: the whole of JSON-RPC's params, as
   `DaemonAPI` sends it (an object, or for a few a bare value). A method with
   `"x-notification": true` has no result: the server sends it. The `web` tag marks what the
-  web page calls and hears. The methods the web page does not use are not here yet: each
-  Go step adds the methods it ports, with their types, schema first.
+  web page calls and hears. `control.openrpc.json` has every method the control plane
+  answers (#1313), a host's on its channel 0 among them, and what it says to clients and
+  hosts. `daemon.openrpc.json` has the host's, as far as the Go host has ported them: each Go
+  step adds the methods it ports, with their types, schema first.
 - **Numbers.** `integer` is Swift's `Int` (Go `int64`); `number` is `Double` (Go `float64`).
 - **The five meaning-types,** written by hand in each language and named by `x-swift-type`
   and `x-go-type` (Go's are in `Go/wire/meaning.go`):

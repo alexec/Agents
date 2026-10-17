@@ -14,8 +14,6 @@ struct RemoteChatView: View {
     @State private var formHeight: CGFloat = 0
     /// The subagent whose steps are open, by its id (057).
     @State private var subagentOnScreen: String?
-    /// The level every turn starts at, chosen from the ··· menu (069).
-    @AppStorage(TurnDetail.phoneDefaultsKey) private var turnDetail = TurnDetail.initial
     @Environment(\.openURL) private var openURL
     /// The open chat's views (#187), torn down when another chat opens.
     @State private var views = AppViewStore()
@@ -81,7 +79,6 @@ struct RemoteChatView: View {
                 ChatTranscript(agent: agent,
                                items: page.transcriptItems,
                                stored: page.turns,
-                               defaultDetail: turnDetail,
                                hasMore: page.hasMoreOfTheConversation,
                                entryCount: page.entries.count + page.turns.count,
                                isComingBack: model.isComingBack(agent),
@@ -89,13 +86,6 @@ struct RemoteChatView: View {
                                settleKey: model.chatID(popped),
                                loadEarlier: { [popped] in
                                    if let popped { await model.loadEarlier(of: popped) } else { await model.loadEarlier() }
-                               },
-                               // Paging back, out of sight, to where it opens: a Mac's page
-                               // at a time, not a screen's (#1287).
-                               loadEarlierToOpen: { [popped] in
-                                   let limit = ChatOpening.wholeTurn
-                                   if let popped { await model.loadEarlier(of: popped, limit: limit) }
-                                   else { await model.loadEarlier(limit: limit) }
                                },
                                bottomInset: formHeight,
                                cards: cards,
@@ -145,6 +135,8 @@ struct RemoteChatView: View {
                 StaleBanner()
                 // A server's agent whose host has gone: which, and since when (#239).
                 if let agent { HostOfflineStrip(host: agent.host) }
+                // A volume that host writes to low on space (#1329).
+                if let agent { HostDiskStrip(host: agent.host) }
                 // Its folder gone (#119): which, and the ways on, before anything is typed.
                 if let agent, agent.missingFolder != nil, agent.state != .archived {
                     RemoteMissingFolderStrip(agent: agent)
@@ -416,7 +408,6 @@ private struct ChatMenu: View {
     @Environment(RemoteModel.self) private var model
     @Environment(\.poppedChat) private var popped
     @Environment(\.horizontalSizeClass) private var sizeClass
-    @AppStorage(TurnDetail.phoneDefaultsKey) private var turnDetail = TurnDetail.initial
     let agent: Agent
     /// Open File… (#415), over the chat.
     let openFile: () -> Void
@@ -432,14 +423,6 @@ private struct ChatMenu: View {
                 .accessibilityHint(AgentsModel.carryOnHelp(for: agent))
                 Divider()
             }
-            // What every turn starts at, above the chat's own actions (069, frame F).
-            Picker("Turns show", selection: $turnDetail) {
-                ForEach(TurnDetail.levels, id: \.self) { detail in
-                    Text(detail.title).tag(detail)
-                }
-            }
-            .pickerStyle(.inline)
-            Divider()
             Button("Open File…", systemImage: "magnifyingglass", action: openFile)
             // On a phone, the panes one item each, in place of the bar's Panes button
             // (#981): the Page once there is one, and only what the Mac can give.

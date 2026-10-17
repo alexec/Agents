@@ -1,4 +1,4 @@
-// One turn of the chat at the level it is drawn at (069), and every kind of line in it, as the
+// One turn of the chat, open or collapsed (069, #1315), and every kind of line in it, as the
 // shared TranscriptRows.swift draws them for the Mac and the phone (071 FR-023). Words come from
 // the ported rules; agent text goes through the Markdown renderer and nowhere else.
 import { useSignal } from "@preact/signals";
@@ -14,7 +14,7 @@ import { backgroundEntryLine } from "../../model/background";
 import { outcomeNeedsAPerson } from "../../model/groups";
 import { outcomeHeadings, queuedLabel, startingLabel } from "../../model/status";
 import {
-  callLine, compactionLine, copiedText, drawnInTurn, fields, isSummaryOnly, isThought, kindOf, turnLine, turnParts, type ChatTurn, type Item,
+  callLine, compactionLine, copiedText, drawnInTurn, fields, isSummaryOnly, kindOf, thoughtLine, turnLine, turnParts, type ChatTurn, type Item,
 } from "../../model/turns";
 import { fileLinkPath, Markdown } from "../../render/markdown";
 import { AppView } from "./AppView";
@@ -22,16 +22,10 @@ import { FileCard } from "./FileCard";
 import type { Shown } from "../../model/shownFile";
 import { switchNote } from "../../model/switchNote";
 import { continueWithout, keepStopped, sandboxCard } from "../../model/sandboxWords";
-import type { TurnDetail, TurnLevel } from "../../model/turnDetail";
+import type { TurnDetail } from "../../model/turnDetail";
 import { memo } from "../../render/memo";
 
-export { turnDetails, type TurnDetail, type TurnLevel } from "../../model/turnDetail";
-export const detailTitles: Record<TurnLevel, string> = { messages: "Messages", steps: "Steps", details: "Details" };
-export const detailSummaries: Record<TurnLevel, string> = {
-  messages: "Every step but tools, rolled up",
-  steps: "Every step, one line each",
-  details: "Every call opened, and thinking",
-};
+export type { TurnDetail } from "../../model/turnDetail";
 
 /** The text of a message's blocks: text blocks as Markdown, anything else named. */
 export function Blocks({ blocks, text }: { blocks: ContentBlock[] | undefined; text: string }) {
@@ -161,11 +155,14 @@ export function EditDiff({ diff }: { diff: Extract<ToolCallContent, { type: "dif
   );
 }
 
-/** One tool call: its line, and what it did once asked (ToolCallLine). */
-export function ToolCallLine({ call, text, open = false, background, onClick }: {
-  call: ToolCall; text?: string; open?: boolean; background: readonly BackgroundItem[]; onClick?: () => void;
+/** One tool call: its line, and what it did once asked (ToolCallLine). Gone to from elsewhere, opened (#1315). */
+export function ToolCallLine({ call, text, focused = false, background, onClick }: {
+  call: ToolCall; text?: string; focused?: boolean; background: readonly BackgroundItem[]; onClick?: () => void;
 }) {
   const expanded = useSignal(false);
+  useEffect(() => {
+    if (focused) expanded.value = true;
+  }, [focused]);
   const actions = useContext(CallActionsContext);
   const runsOn = call.toolCallID !== undefined
     && background.some((item) => item.toolCallID === call.toolCallID && (item.state === "running" || item.state === "paused"))
@@ -173,7 +170,7 @@ export function ToolCallLine({ call, text, open = false, background, onClick }: 
   const hasDetail = (call.content ?? []).length > 0 || (call.locations ?? []).length > 0
     || call.rawInput !== undefined || call.rawOutput !== undefined;
   const line = (text ?? callLine(call)) + runsOn;
-  const showsDetail = open || expanded.value;
+  const showsDetail = expanded.value;
   return (
     <div class="call">
       {onClick || hasDetail ? (
@@ -327,7 +324,7 @@ function entryBody(entry: TranscriptEntry) {
       return <div class="reply copyable"><Blocks blocks={message.blocks} text={message.text} /><CopyMessage entry={entry} /></div>;
     }
     case "agentThought":
-      return <p class="thought quiet">{fields(entry, "agentThought")!.text}</p>;
+      return <ThoughtLine text={fields(entry, "agentThought")!.text} />;
     case "toolCall":
     case "toolCallUpdate":
       return <p class="quiet">{callLine((fields(entry, "toolCall") ?? fields(entry, "toolCallUpdate"))!._0)}</p>;
@@ -439,19 +436,43 @@ export function elicitationTitle(request: { message?: string; mode: { form: { _0
   return "The agent wants you to open a page";
 }
 
-/** An item of a turn: a call a line of its own, anything else as it is drawn (StepRow). */
-function StepRow({ item, open, rollsUp = false, background }: { item: Item; open: boolean; rollsUp?: boolean; background: readonly BackgroundItem[] }) {
-  // At Messages, a run of calls is its last until it is clicked (#759).
+/**
+ * The agent's thinking (ThoughtLine, #1315): one line, "Thought:" and its first words, and the
+ * whole of it a click away, as a call's argument and return are.
+ */
+function ThoughtLine({ text }: { text: string }) {
+  const expanded = useSignal(false);
+  return (
+    <div class="thought">
+      <button class="call-line" aria-expanded={expanded.value}
+        title={expanded.value ? "Hide the thought" : "Show the whole thought"}
+        onClick={() => (expanded.value = !expanded.value)}>
+        {thoughtLine(text)}
+      </button>
+      {expanded.value && <p class="quiet">{text}</p>}
+    </div>
+  );
+}
+
+/**
+ * An item of a turn: a call a line of its own, anything else as it is drawn (StepRow). A run of
+ * calls is its last until it is clicked (#759); gone to from elsewhere, it is opened with its
+ * first call (#1315).
+ */
+function StepRow({ item, focused = false, background }: { item: Item; focused?: boolean; background: readonly BackgroundItem[] }) {
   const unrolled = useSignal(false);
-  if (item.kind === "run" && rollsUp && !unrolled.value && item.calls.length > 1) {
+  useEffect(() => {
+    if (focused) unrolled.value = true;
+  }, [focused]);
+  if (item.kind === "run" && !unrolled.value && !focused && item.calls.length > 1) {
     const last = item.calls[item.calls.length - 1]!;
-    return <div class="run"><ToolCallLine call={last} text={turnLine(last)} background={background} onClick={() => (unrolled.value = true)} /></div>;
+    return <div class="run" data-entry={item.id}><ToolCallLine call={last} text={turnLine(last)} background={background} onClick={() => (unrolled.value = true)} /></div>;
   }
   if (item.kind === "run") {
-    return <div class="run">{item.calls.map((call, i) => <ToolCallLine key={i} call={call} text={turnLine(call)} open={open} background={background} />)}</div>;
+    return <div class="run" data-entry={item.id}>{item.calls.map((call, i) => <ToolCallLine key={i} call={call} text={turnLine(call)} focused={focused && i === 0} background={background} />)}</div>;
   }
   const call = fields(item.entry, "toolCall");
-  if (call) return <ToolCallLine call={call._0} text={turnLine(call._0)} open={open} background={background} />;
+  if (call) return <ToolCallLine call={call._0} text={turnLine(call._0)} focused={focused} background={background} />;
   return <EntryRow entry={item.entry} />;
 }
 
@@ -474,8 +495,8 @@ function stepsWords(count: number | undefined, open: boolean): string {
  * Opening loads the last page once, and only for a turn near the end: every turn open at once
  * would fetch them all. One the chat has let go shows a button instead of fetching itself (#291).
  */
-export const TurnView = memo(function TurnView({ turn, detail, fetched, fetchFailed, hasEarlier, auto, isLive, background, toggle: toggleTurn, loadDetail: loadTurn, loadEarlier }: {
-  turn: ChatTurn; detail: TurnDetail; fetched: Item[] | undefined; fetchFailed: boolean; hasEarlier: boolean; auto: boolean; isLive: boolean;
+export const TurnView = memo(function TurnView({ turn, detail, focusedRun, fetched, fetchFailed, hasEarlier, auto, isLive, background, toggle: toggleTurn, loadDetail: loadTurn, loadEarlier }: {
+  turn: ChatTurn; detail: TurnDetail; focusedRun: string | null; fetched: Item[] | undefined; fetchFailed: boolean; hasEarlier: boolean; auto: boolean; isLive: boolean;
   background: readonly BackgroundItem[]; toggle: (turn: ChatTurn) => void;
   loadDetail: (turn: ChatTurn) => Promise<void>; loadEarlier: (turn: ChatTurn) => Promise<void>;
 }) {
@@ -499,7 +520,8 @@ export const TurnView = memo(function TurnView({ turn, detail, fetched, fetchFai
   const stepCount = parts?.stepCount ?? turn.storedStepCount;
   const open = detail !== "collapsed";
   const outcomeIDs = new Set((parts?.outcome ?? []).map((i) => i.id));
-  const steps = drawnInTurn(items, isLive).filter((i) => !outcomeIDs.has(i.id) && (detail === "details" || !isThought(i)));
+  // Thinking too, each a folded line in its place (#1315).
+  const steps = drawnInTurn(items, isLive).filter((i) => !outcomeIDs.has(i.id));
   useEffect(() => {
     if (!open) asked.current = false;
   }, [open]);
@@ -526,16 +548,16 @@ export const TurnView = memo(function TurnView({ turn, detail, fetched, fetchFai
           : <button class="steps-control" onClick={ask}>Load steps</button>) : (
           <>
             {hasEarlier && <button class="steps-control" onClick={() => void loadEarlier(turn)}>Earlier steps</button>}
-            <div class="steps">{steps.map((item) => <StepRow key={item.id} item={item} open={detail === "details"} rollsUp={detail === "messages"} background={background} />)}</div>
-            {outcome.map((item) => <StepRow key={item.id} item={item} open={false} background={background} />)}
+            <div class="steps">{steps.map((item) => <StepRow key={item.id} item={item} focused={item.id === focusedRun} background={background} />)}</div>
+            {outcome.map((item) => <StepRow key={item.id} item={item} background={background} />)}
           </>
         )
       ) : (
         <>
           {parts?.live && (parts.live.kind === "run"
             ? <p class="live quiet">{turnLine(parts.live.calls[parts.live.calls.length - 1]!)}</p>
-            : <StepRow item={parts.live} open={false} background={background} />)}
-          {outcome.map((item) => <StepRow key={item.id} item={item} open={false} background={background} />)}
+            : <StepRow item={parts.live} background={background} />)}
+          {outcome.map((item) => <StepRow key={item.id} item={item} background={background} />)}
         </>
       )}
     </article>

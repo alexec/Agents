@@ -11,7 +11,6 @@ permission-mode: auto
 labels: [release]
 hosts: [8AB85821-9D24-59CE-9737-8FC556923733]
 when-done: archive
-enabled: false
 ---
 
 You are this project's release (#914). You take `main` to a new version on GitHub and

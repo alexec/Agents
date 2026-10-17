@@ -213,8 +213,11 @@ func join(ctx context.Context, cl commandLine, d *agentsd.Daemon) {
 	if name == "" {
 		name, _ = os.Hostname()
 	}
-	hello := controllink.HostHello{Version: buildinfo.Version, Platform: platform(), MachineID: machineID(), Name: name,
-		Implementation: buildinfo.Implementation}
+	hello := controllink.HostHello{Version: buildinfo.Version, Platform: platform(), MachineID: machineID(),
+		Implementation: new(buildinfo.Implementation)}
+	if name != "" {
+		hello.Name = &name
+	}
 	code := cl.code
 	codeFile := filepath.Join(loc.Root, "control-join-code")
 	if code == "" {
