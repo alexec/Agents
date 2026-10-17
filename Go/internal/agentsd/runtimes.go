@@ -56,25 +56,55 @@ func runtimeByID(id string) *runtimeDef {
 	return nil
 }
 
+// macToolsHome is a Mac host's own toolsets, <cache>/tools (StoreLocations.tools, 048),
+// set as the host starts; "" on a server, which looks in ~/.agents-server/tools.
+var macToolsHome string
+
 // toolsetFolder is Toolset.serverFolder: ~/.agents-server/tools/<id>.
 func toolsetFolder(id string) string {
 	home, _ := os.UserHomeDir()
 	return filepath.Join(home, ".agents-server", "tools", id)
 }
 
-// locate is RuntimeDiscovery.locate on a server: the installed toolset's shim, then (for
-// a runtime that may be the person's own copy) the login shell's PATH.
+// toolsetShim is a whole toolset's bin/<executable> in folder (<tools>/<id>), which runs
+// the pinned package with the toolset's own Node whatever it is passed (Toolset.shimName);
+// "" unless current/ok says it is whole.
+func toolsetShim(folder, executable string) string {
+	cur := filepath.Join(folder, "current")
+	if _, err := os.Stat(filepath.Join(cur, "ok")); err != nil {
+		return ""
+	}
+	shim := filepath.Join(cur, "bin", executable)
+	if fi, err := os.Stat(shim); err == nil && fi.Mode()&0o111 != 0 {
+		return shim
+	}
+	return ""
+}
+
+// locate is RuntimeDiscovery.locate. On a server: the installed toolset's shim, then (for
+// a runtime that may be the person's own copy) the login shell's PATH. On a Mac (#1138):
+// the app's own toolset in the root's cache (macToolsHome) is the only copy of a runtime
+// that uses the app's copy, and is looked for after the person's PATH for the others.
 func (r *runtimeDef) locate() (path string, args []string, lookedIn []string) {
-	cur := filepath.Join(toolsetFolder(r.ID), "current")
-	if _, err := os.Stat(filepath.Join(cur, "ok")); err == nil {
-		// bin/<executable>, which runs the pinned package with the toolset's own Node
-		// whatever it is passed (Toolset.shimName).
-		shim := filepath.Join(cur, "bin", r.Executable)
-		if fi, err := os.Stat(shim); err == nil && fi.Mode()&0o111 != 0 {
+	mac := macToolsHome != ""
+	if !mac {
+		if shim := toolsetShim(toolsetFolder(r.ID), r.Executable); shim != "" {
 			return shim, r.Arguments, nil
 		}
 	}
+	appCopy := func() string {
+		if !mac {
+			return ""
+		}
+		return toolsetShim(filepath.Join(macToolsHome, r.ID), r.Executable)
+	}
 	if r.UsesAppCopyOnly {
+		if shim := appCopy(); shim != "" {
+			return shim, r.Arguments, nil
+		}
+		if mac {
+			return "", nil, []string{filepath.Join(macToolsHome, r.ID, "current", "bin")}
+		}
 		return "", nil, []string{}
 	}
 	if strings.Contains(r.Executable, "/") {
@@ -89,6 +119,9 @@ func (r *runtimeDef) locate() (path string, args []string, lookedIn []string) {
 		if fi, err := os.Stat(p); err == nil && !fi.IsDir() && fi.Mode()&0o111 != 0 {
 			return p, r.Arguments, nil
 		}
+	}
+	if shim := appCopy(); shim != "" {
+		return shim, r.Arguments, nil
 	}
 	return "", nil, dirs
 }
