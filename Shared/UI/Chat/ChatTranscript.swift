@@ -17,8 +17,6 @@ struct ChatTranscript: View {
     let items: [TranscriptItem]
     /// The finished turns before `items`, as stored: drawn from their outcome until opened.
     var stored: [TurnSummary] = []
-    /// The level a turn starts at, the app's one setting (069).
-    var defaultDetail: TurnDetail = .initial
     /// Whether there is more of the conversation before the first page in hand.
     let hasMore: Bool
     /// How many entries are in hand. Growth is what "something new" means.
@@ -53,6 +51,8 @@ struct ChatTranscript: View {
 
     /// The turns opened or closed by hand, by id. Kept until the chat is left (069).
     @State private var turnViews: [UUID: TurnDetail] = [:]
+    /// The run of calls gone to from elsewhere: opened, with its first call (#1315).
+    @State private var focusedRun: UUID?
     /// Every entry of a stored turn once it has been opened, folded. Eight at a time:
     /// opening one lets the oldest opened one go (#285).
     @State private var fetchedTurns: [UUID: FetchedTurn] = [:]
@@ -232,7 +232,8 @@ struct ChatTranscript: View {
                                 // leaves the ones before it as they were: one being read stays open.
                                 ForEach(stretch.turns) { turn in
                                     TurnView(turn: turn,
-                                             detail: turnViews[turn.id] ?? defaultDetail,
+                                             detail: turnViews[turn.id] ?? .initial,
+                                             focusedRun: focusedRun,
                                              fetched: fetchedTurns[turn.id]?.items,
                                              hasEarlier: fetchedTurns[turn.id]?.hasEarlier(than: turn) ?? false,
                                              fetchFailed: failedTurns.contains(turn.id),
@@ -503,10 +504,12 @@ struct ChatTranscript: View {
             .onChange(of: focusedEntry) {
                 guard let focusedEntry else { return }
                 if let turn = rows.first(where: { $0.items.contains { $0.id == focusedEntry } }) {
-                    let level = turnViews[turn.id] ?? defaultDetail
-                    // Messages folds a run of calls, so a call is only on screen at Steps (#759).
-                    let isCall = turn.items.contains { if case .toolRun = $0 { $0.id == focusedEntry } else { false } }
-                    if !level.showsSteps || (level.rollsUpCalls && isCall) { turnViews[turn.id] = .steps }
+                    if !(turnViews[turn.id] ?? .initial).showsSteps { turnViews[turn.id] = .open }
+                    // A run of calls is drawn as its last: open that run and its call, and
+                    // nothing else in the turn (#1315).
+                    if turn.items.contains(where: { if case .toolRun = $0 { $0.id == focusedEntry } else { false } }) {
+                        focusedRun = focusedEntry
+                    }
                 }
                 // Being sent to a line in the middle is being sent away from the end,
                 // and it was asked for. Following on from here would take the reader
@@ -586,7 +589,7 @@ struct ChatTranscript: View {
 
     /// Open a turn's steps, or close them (`TurnDetail.toggled`).
     private func toggle(_ turn: ChatTurn) {
-        turnViews[turn.id] = (turnViews[turn.id] ?? defaultDetail).toggled(level: defaultDetail)
+        turnViews[turn.id] = (turnViews[turn.id] ?? .initial).toggled
     }
 
     /// A stored turn's entries, the first time it is drawn with its steps. The ask is
@@ -743,6 +746,7 @@ struct ChatTranscript: View {
         restorePages = 0
         isRestorePlacing = false
         turnViews = [:]
+        focusedRun = nil
         fetchedTurns = [:]
         fetchedOrder = []
         hasSettled = false

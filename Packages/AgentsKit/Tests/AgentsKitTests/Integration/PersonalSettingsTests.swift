@@ -69,9 +69,9 @@ struct DisplayPreferencesTests {
         locations.personalHome = nil
         let core = DaemonCore(store: try AgentStore(locations: locations), locations: locations,
                               discovery: .findsEverything, launcher: FakeLauncher())
-        _ = try await core.setDisplayPreferences([DisplayPreference.turnDetail: "steps", DisplayPreference.showsUsage: false])
+        _ = try await core.setDisplayPreferences([DisplayPreference.startRuntimeID: "claude", DisplayPreference.showsUsage: false])
         let all = try await core.setDisplayPreferences([DisplayPreference.showsUsage: .null])
-        #expect(all == [DisplayPreference.turnDetail: "steps"])
+        #expect(all == [DisplayPreference.startRuntimeID: "claude"])
         #expect(await core.displayPreferences() == all)
         #expect(FileManager.default.fileExists(atPath: locations.displayPreferences.path))
     }
@@ -85,14 +85,14 @@ struct DisplayPreferencesTests {
         NotificationCenter.default.post(name: UserDefaults.didChangeNotification, object: defaults)
         #expect(sent.isEmpty, "nothing is sent before the host is heard")
 
-        mirror.hostSaid([DisplayPreference.turnDetail: "details", DisplayPreference.showsActivity: false])
-        #expect(defaults.string(forKey: DisplayPreference.turnDetail) == "details")
+        mirror.hostSaid([DisplayPreference.startRuntimeID: "codex", DisplayPreference.showsActivity: false])
+        #expect(defaults.string(forKey: DisplayPreference.startRuntimeID) == "codex")
         #expect(defaults.object(forKey: DisplayPreference.showsActivity) as? Bool == false)
         #expect(defaults.object(forKey: DisplayPreference.showsUsage) == nil, "what the host lacks is the default")
 
-        defaults.set("outcome", forKey: DisplayPreference.turnDetail)
+        defaults.set("grok", forKey: DisplayPreference.startRuntimeID)
         NotificationCenter.default.post(name: UserDefaults.didChangeNotification, object: defaults)
-        #expect(sent == [[DisplayPreference.turnDetail: "outcome"]])
+        #expect(sent == [[DisplayPreference.startRuntimeID: "grok"]])
         NotificationCenter.default.post(name: UserDefaults.didChangeNotification, object: defaults)
         #expect(sent.count == 1, "no change, nothing sent")
     }

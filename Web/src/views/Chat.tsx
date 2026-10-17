@@ -5,12 +5,11 @@
 // conversations come a page at a time as the top is reached, and the pane follows the end
 // unless the person has scrolled up.
 import { Fragment } from "preact";
-import { useComputed, useSignal } from "@preact/signals";
-import { preferenceKeys, setPreferences, stringPreference } from "../model/preferences";
+import { useSignal } from "@preact/signals";
 import { useEffect, useLayoutEffect, useMemo, useRef } from "preact/hooks";
 import { openTurnsHeld, rememberOpen, type Store } from "../model/store";
 import { backgroundAge, backgroundEnded, backgroundNoun, isRunning, subagentNoSteps, subagentStatus } from "../model/background";
-import { display, isPersonsAsk, isWorking, omittingThoughts, openingPlace, placing, type ChatTurn, type Item } from "../model/turns";
+import { display, isPersonsAsk, isWorking, openingPlace, placing, type ChatTurn, type Item } from "../model/turns";
 import { toWireDate } from "../protocol/dates";
 import type { Agent, AppViewCall, BackgroundItem, FileMentionDTO, TranscriptEntry } from "../protocol/generated";
 import { replace, route } from "../route";
@@ -28,8 +27,8 @@ import { ContextMeter, CostLimitBanner, SandboxCapsule } from "./PromptStatus";
 import { RenameInput, SessionButtons, SessionMenu } from "./SessionMenu";
 import { drawable } from "../model/options";
 import { asksToArchive, projectFolder } from "../model/groups";
-import { savedDetail, toggled } from "../model/turnDetail";
-import { CallActionsContext, detailSummaries, detailTitles, fromLine, ItemRow, turnDetails, TurnView, type CallActions, type TurnDetail, type TurnLevel } from "./chat/Rows";
+import { initialDetail, toggled } from "../model/turnDetail";
+import { CallActionsContext, fromLine, ItemRow, TurnView, type CallActions, type TurnDetail } from "./chat/Rows";
 import { Modal } from "./Modal";
 import { nameOf, pathOf, setPane } from "./files/paneState";
 import { FileSearch, isOpenFileKey } from "./files/FileSearch";
@@ -59,12 +58,6 @@ function shown(entries: TranscriptEntry[]): Item[] {
   return items[0] && isPersonsAsk(items[0]) ? items.slice(1) : items;
 }
 
-
-/** The level every turn starts at, the page's one setting (View ▸ Turns in the window): the
- *  person's, kept on their Mac with the other display choices (#1033). */
-function defaultDetail(): TurnLevel {
-  return savedDetail(stringPreference(preferenceKeys.turnDetail) ?? null);
-}
 
 /** How close to the end counts as being back at it, on the way down (#378). */
 const atTheEnd = 40;
@@ -112,9 +105,10 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
     setPane(session, { tab: "files", file: file.path, fileLine: undefined, last: file.path });
     if (!route.peek().files) replace({ ...route.peek(), files: true });
   };
-  const level = useComputed<TurnLevel>(defaultDetail);
   /** Turns opened or closed by hand, kept until the chat is left. */
   const chosen = useSignal<Record<string, TurnDetail>>({});
+  /** The run of calls gone to from elsewhere: opened, with its first call (#1315). */
+  const focusedRun = useSignal<string | null>(null);
   /** The few opened turns whose entries are held, newest last (#291). */
   const fetched = useSignal<Record<string, HeldTurn>>({});
   /** Turns whose steps were asked for and did not come, until asked again (#544). */
@@ -225,6 +219,7 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
     // Whether its runtime takes words mid-turn, or pictures, is known once it has run.
     void store.loadRuntimes(host);
     chosen.value = {};
+    focusedRun.value = null;
     fetched.value = {};
     failedTurns.value = {};
     subagent.value = null;
@@ -406,11 +401,14 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
     return () => document.removeEventListener("keydown", press);
   }, [host, session]);
 
-  // Asked for from Exchanged. A message is drawn with its entry's id. Being sent to one
-  // is being sent away from the end, or the pane would scroll straight back off it.
+  // Asked for from Exchanged. A message is drawn with its entry's id, and a run of calls with
+  // its first call's, opened with that call and nothing else in the turn (#1315). Being sent to
+  // one is being sent away from the end, or the pane would scroll straight back off it.
   const focus = focusedEntry.value;
   useLayoutEffect(() => {
     if (!focus) return;
+    const turn = rows.find((item) => item.ask?.id === focus || item.items.some((part) => part.id === focus));
+    if (turn?.items.some((part) => part.id === focus && part.kind === "run")) focusedRun.value = focus;
     const root = scroller.current;
     const mark = root && [...root.querySelectorAll("[data-entry]")].find((el) => el.getAttribute("data-entry") === focus);
     const target = mark && getComputedStyle(mark).display === "contents" ? mark.firstElementChild ?? mark : mark;
@@ -420,15 +418,11 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
       focusedEntry.value = null;
       return;
     }
-    const turn = rows.find((item) => item.ask?.id === focus || item.items.some((part) => part.id === focus));
-    const now = turn && (chosen.value[turn.id] ?? level.value);
-    // Messages folds a run of calls, so a call is only on screen at Steps (#759).
-    const isCall = turn?.items.some((part) => part.id === focus && part.kind === "run");
-    if (turn && (now === "collapsed" || (now === "messages" && isCall))) {
+    if (turn && (chosen.value[turn.id] ?? initialDetail) === "collapsed") {
       follow(false);
-      chosen.value = { ...chosen.value, [turn.id]: "steps" };
+      chosen.value = { ...chosen.value, [turn.id]: "open" };
     }
-  }, [focus, rows, level.value, chosen.value]);
+  }, [focus, rows, chosen.value]);
 
   // What waits on the person is in the conversation, not over it (#723), each where it was asked:
   // what came after it is below it (#973). Scrolled out of sight, the way back says a question is
@@ -486,13 +480,13 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
   };
 
   const toggle = (turn: ChatTurn) => {
-    chosen.value = { ...chosen.value, [turn.id]: toggled(chosen.value[turn.id] ?? level.value, level.value) };
+    chosen.value = { ...chosen.value, [turn.id]: toggled(chosen.value[turn.id] ?? initialDetail) };
   };
 
   // A turn closed lets its entries go (#291).
   useEffect(() => {
     const openNow = new Set<string>();
-    for (const turn of rows) if ((chosen.value[turn.id] ?? level.value) !== "collapsed") openNow.add(turn.id);
+    for (const turn of rows) if ((chosen.value[turn.id] ?? initialDetail) !== "collapsed") openNow.add(turn.id);
     const drop = openedTurns.current.filter((id) => !openNow.has(id));
     if (!drop.length) return;
     const next = { ...fetched.peek() };
@@ -500,7 +494,7 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
     for (const id of drop) if (id in next) { delete next[id]; changed = true; }
     openedTurns.current = openedTurns.current.filter((id) => openNow.has(id));
     if (changed) fetched.value = next;
-  }, [rows, chosen.value, level.value]);
+  }, [rows, chosen.value]);
 
   useEffect(() => { void store.loadCost(host); }, [store, host]);
 
@@ -564,11 +558,6 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
     loadEarlier: (turn: ChatTurn) => latest.current.loadEarlierSteps(turn),
   }), []);
 
-  const choose = (detail: TurnLevel) => {
-    setPreferences({ [preferenceKeys.turnDetail]: detail });
-    chosen.value = {};
-  };
-
   return (
     <section class="chat" aria-label="Chat" ref={chatColumn}>
       {searchingFiles.value && agent && (
@@ -580,17 +569,10 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
           ? <h1><RenameInput store={store} host={host} agent={agent} /></h1>
           : <h1>{agent?.title ?? "New session"}</h1>}
         <span class="actions">
-          <select class="detail wide-only" aria-label="Turns" title={detailSummaries[level.value]} value={level.value}
-            onChange={(e) => choose((e.currentTarget as HTMLSelectElement).value as TurnLevel)}>
-            {turnDetails.map((d) => (
-              <option key={d} value={d} title={detailSummaries[d]}>{detailTitles[d]}</option>
-            ))}
-          </select>
           <button class="wide-only" onClick={() => replace({ ...r, files: !r.files })} aria-pressed={!!r.files}>Files</button>
           <SessionButtons store={store} host={host} agent={agent} disabled={down} />
           <SessionMenu store={store} host={host} agent={agent} disabled={down} inChat openFile={() => (searchingFiles.value = true)}
             narrow={[
-              ...turnDetails.map((d) => ({ label: `Turns: ${detailTitles[d]}`, help: detailSummaries[d], checked: level.value === d, run: () => choose(d) })),
               { label: "Files", checked: !!r.files, run: () => replace({ ...r, files: !r.files }) },
             ]} />
         </span>
@@ -622,7 +604,7 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
             ...stretch.turns.map((turn) => {
               const i = index++;
               return (
-                <TurnView key={turn.id} turn={turn} detail={chosen.value[turn.id] ?? level.value}
+                <TurnView key={turn.id} turn={turn} detail={chosen.value[turn.id] ?? initialDetail} focusedRun={focusedRun.value}
                   fetched={fetched.value[turn.id]?.items} fetchFailed={!!failedTurns.value[turn.id]} hasEarlier={fetched.value[turn.id]?.hasEarlier ?? false}
                   auto={i >= drawn - openTurnsHeld}
                   isLive={i === drawn - 1 && live} background={background}
@@ -646,8 +628,7 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
         )}
       </div>
       {subagent.value && (
-        <SubagentSteps store={store} item={agent?.background?.find((b) => b.id === subagent.value!.id) ?? subagent.value}
-          showsThinking={level.value === "details"} close={() => (subagent.value = null)} />
+        <SubagentSteps store={store} item={agent?.background?.find((b) => b.id === subagent.value!.id) ?? subagent.value} close={() => (subagent.value = null)} />
       )}
       </ViewLayerContext.Provider>
       </CallActionsContext.Provider>
@@ -800,8 +781,8 @@ function Capsules({ store, host, agent }: { store: Store; host: string; agent: A
  * One subagent: who it is, what it was asked, and what it did (SubagentStepsView, #544), in a
  * sheet over the chat as the phone has it. Its steps are those among the chat's loaded entries.
  */
-function SubagentSteps({ store, item, showsThinking, close }: {
-  store: Store; item: BackgroundItem; showsThinking: boolean; close: () => void;
+function SubagentSteps({ store, item, close }: {
+  store: Store; item: BackgroundItem; close: () => void;
 }) {
   const now = useSignal(toWireDate(new Date()));
   useEffect(() => {
@@ -809,7 +790,6 @@ function SubagentSteps({ store, item, showsThinking, close }: {
     return () => clearInterval(timer);
   }, []);
   const steps = useMemo(() => display(store.entries.value, item.id), [store.entries.value, item.id]);
-  const shown = showsThinking ? steps : omittingThoughts(steps);
   return (
     <Modal label={`Subagent ${item.name}`} close={close}>
       <div class="sheet-body subagent-steps">
@@ -822,7 +802,8 @@ function SubagentSteps({ store, item, showsThinking, close }: {
           </div>
         )}
         {!steps.length && <p class="faint small">{subagentNoSteps(item)}</p>}
-        <div class="steps">{shown.map((step) => <ItemRow key={step.id} item={step} background={[]} />)}</div>
+        {/* Thinking too, each a folded line (#1315). */}
+        <div class="steps">{steps.map((step) => <ItemRow key={step.id} item={step} background={[]} />)}</div>
         <div class="sheet-actions"><button onClick={close}>Done</button></div>
       </div>
     </Modal>

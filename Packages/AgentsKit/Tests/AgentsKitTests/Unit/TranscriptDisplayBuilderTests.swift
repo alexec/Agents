@@ -89,6 +89,15 @@ struct TranscriptDisplayBuilderTests {
         #expect(shown.count == items.count - 1, "the two chunks are one thought, and only that goes")
     }
 
+    /// A thought folds to one line: "Thought:" and its first words (#1315).
+    @Test func aThoughtFoldsToItsFirstWords() {
+        #expect(TranscriptItem.thoughtLine("**Planning the fix**\n\nRead   the file first.")
+                == "Thought: Planning the fix Read the file first.")
+        let long = (1...30).map(String.init).joined(separator: " ")
+        #expect(TranscriptItem.thoughtLine(long) == "Thought: " + (1...24).map(String.init).joined(separator: " "))
+        #expect(TranscriptItem.thoughtLine(" \n ") == "Thought")
+    }
+
     @Test func hidingAThoughtBetweenCallsJoinsThemIntoOneRun() {
         let first = call("t1", "Read the file")
         let items = TranscriptEntry.display([

@@ -431,6 +431,15 @@ export function isThought(item: Item): boolean {
   return item.kind === "entry" && kindOf(item.entry) === "agentThought";
 }
 
+/**
+ * A thought's folded line (TranscriptItem.thoughtLine, #1315): "Thought:" and its first words, on
+ * one line, without the Markdown marks round a heading.
+ */
+export function thoughtLine(text: string): string {
+  const words = text.replaceAll("**", "").split(/\s+/).filter((w) => w !== "").slice(0, 24).join(" ");
+  return words === "" ? "Thought" : `Thought: ${words}`;
+}
+
 /** Runs with nothing drawn between them are one run, under the first run's id. */
 export function joiningAdjacentToolRuns(items: readonly Item[]): Item[] {
   const kept: Item[] = [];

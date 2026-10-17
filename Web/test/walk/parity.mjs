@@ -42,9 +42,10 @@ const clickRow = (scope, text) => page.eval(`(() => {
   (row?.querySelector(".pick") ?? row)?.click();
   return !!row;
 })()`);
+// One sidebar since #145: a project unfolds to its sessions.
 const openProject = async () => {
-  await clickRow(".projects", "work");
-  await page.waitFor(`document.querySelector(".sessions .row.session")`, 30_000);
+  if (!(await page.eval(`!!document.querySelector(".row.session")`))) await page.eval(`document.querySelector(".row.project .disclosure")?.click()`);
+  await page.waitFor(`document.querySelector(".row.session")`, 30_000);
 };
 const openSession = async (title) => {
   if (!(await clickRow(".sessions", title))) throw new Error(`no session called ${title}`);
@@ -84,7 +85,7 @@ for (const scene of scenes) {
       // #121: a question or permission card names who asks, by title and runtime. Takes the
       // first session waiting on a card, so a root with one agent asking is enough.
       await openProject();
-      await page.eval(`document.querySelector(".sessions .row.session .pick, .sessions .row.session")?.click()`);
+      await page.eval(`document.querySelector(".row.session .pick, .row.session")?.click()`);
       await page.waitFor(`document.querySelector(".cards .card")`, 30_000);
       say(`asker: ${JSON.stringify(await visible(".cards .card .asker"))}`);
       say(`card: ${JSON.stringify(await visible(".cards .card .strong"))}`);
@@ -94,10 +95,7 @@ for (const scene of scenes) {
       await openProject();
       await openSession("Repo notes");
       say(`turns: ${JSON.stringify(await visible(".chat .turn"))}`);
-      await shot("chat-messages");
-      await page.eval(`(() => { const s = document.querySelector("select.detail"); s.value = "steps"; s.dispatchEvent(new Event("change", { bubbles: true })); })()`);
-      await shot("chat-steps");
-      await page.eval(`(() => { const s = document.querySelector("select.detail"); s.value = "messages"; s.dispatchEvent(new Event("change", { bubbles: true })); })()`);
+      await shot("chat");
     } else if (scene === "plan") {
       // #776: the plan strip is a card with the step, the count and a bar. Opens the session
       // "Fix the sidebar row", so a root seeded with that one agent holding a plan is enough.
@@ -117,9 +115,8 @@ for (const scene of scenes) {
       // #112: a turn's steps are a run of lines with no chevron; a step still opens. Takes the
       // first session, so a root with one finished turn is enough.
       await openProject();
-      await page.eval(`document.querySelector(".sessions .row.session .pick, .sessions .row.session")?.click()`);
+      await page.eval(`document.querySelector(".row.session .pick, .row.session")?.click()`);
       await page.waitFor(`document.querySelector(".chat .transcript")`, 30_000);
-      await page.eval(`(() => { const s = document.querySelector("select.detail"); s.value = "steps"; s.dispatchEvent(new Event("change", { bubbles: true })); })()`);
       await sleep(300);
       say(`chevrons in the margin: ${await page.eval(`document.querySelectorAll(".turn .call-line .chevron").length`)}`);
       await page.eval(`(() => {
@@ -128,19 +125,18 @@ for (const scene of scenes) {
       })()`);
       say(`opened: ${JSON.stringify(await page.eval(`[...document.querySelectorAll(".turn button.call-line[aria-expanded=true]")].map((b) => b.textContent)`))}`);
       await shot("margin");
-      await page.eval(`(() => { const s = document.querySelector("select.detail"); s.value = "messages"; s.dispatchEvent(new Event("change", { bubbles: true })); })()`);
     } else if (scene === "turn") {
-      // #148: one turn at each level, and collapsed (#1286), beside the window: the ask, the steps
-      // control, the steps (no chevron, no rule, no indent) and the outcome. Takes the first session.
+      // #148, #1315: the last turn open, a thought opened in its place, and collapsed, beside the
+      // window: the ask, the steps control, the steps (no chevron, no rule, no indent), each
+      // thought one folded line, and the outcome. Takes the first session.
       await openProject();
-      await page.eval(`document.querySelector(".sessions .row.session .pick, .sessions .row.session")?.click()`);
+      await page.eval(`document.querySelector(".row.session .pick, .row.session")?.click()`);
       await page.waitFor(`document.querySelector(".chat .turn")`, 30_000);
-      for (const level of ["messages", "steps", "details", "collapsed"]) {
-        // Collapsed is not a level (#1286): the last turn closed by its own steps control.
-        if (level === "collapsed") await page.eval(`[...document.querySelectorAll(".chat .turn")].pop()?.querySelector(".steps-control[aria-expanded]")?.click()`);
-        else await page.eval(`(() => { const s = document.querySelector("select.detail"); s.value = ${JSON.stringify(level)}; s.dispatchEvent(new Event("change", { bubbles: true })); })()`);
+      for (const state of ["open", "thought", "collapsed"]) {
+        if (state === "thought") await page.eval(`[...document.querySelectorAll(".chat .turn")].pop()?.querySelector(".thought .call-line")?.click()`);
+        if (state === "collapsed") await page.eval(`[...document.querySelectorAll(".chat .turn")].pop()?.querySelector(".steps-control[aria-expanded]")?.click()`);
         await sleep(500);
-        say(`${level}: ${JSON.stringify(await page.eval(`(() => {
+        say(`${state}: ${JSON.stringify(await page.eval(`(() => {
           const turn = [...document.querySelectorAll(".chat .turn")].pop();
           const control = turn?.querySelector(".steps-control");
           const steps = turn?.querySelector(".steps");
@@ -150,20 +146,33 @@ for (const scene of scenes) {
             controlLeft: left(control), turnLeft: left(turn),
             stepsLeft: left(steps?.firstElementChild),
             stepsRule: steps ? getComputedStyle(steps).borderLeftWidth : null,
+            thoughts: [...(turn?.querySelectorAll(".thought") ?? [])].map((t) => ({
+              line: t.querySelector(".call-line")?.textContent.slice(0, 60), open: !!t.querySelector("p"),
+            })),
+            chooser: !!document.querySelector("select.detail"),
             lines: [...(turn?.children ?? [])].map((el) => el.innerText.replace(/\\s+/g, " ").trim().slice(0, 60)),
           };
         })()`))}`);
-        await shot(`turn-${level}`);
+        await shot(`turn-${state}`);
       }
-      await page.eval(`(() => { const s = document.querySelector("select.detail"); s.value = "messages"; s.dispatchEvent(new Event("change", { bubbles: true })); })()`);
     } else if (scene === "call") {
       // #153: an open call's detail as the window's: an edit's diff with + and − lines, Show in
       // Changes under it, and each location a link that opens the file. Takes the first session,
       // so a root with one turn that read a file and edited another is enough.
       await openProject();
-      await page.eval(`document.querySelector(".sessions .row.session .pick, .sessions .row.session")?.click()`);
+      await page.eval(`document.querySelector(".row.session .pick, .row.session")?.click()`);
       await page.waitFor(`document.querySelector(".chat .turn")`, 30_000);
-      await page.eval(`(() => { const s = document.querySelector("select.detail"); s.value = "details"; s.dispatchEvent(new Event("change", { bubbles: true })); })()`);
+      // No Details level (#1315): open the first edit's run, then the call itself.
+      await page.eval(`(() => {
+        const runs = [...document.querySelectorAll(".chat .run")];
+        const folded = runs.find((r) => r.querySelector("button.call-line[title='Show the whole run']"));
+        folded?.querySelector("button.call-line")?.click();
+      })()`);
+      await sleep(300);
+      await page.eval(`(() => {
+        const lines = [...document.querySelectorAll(".chat button.call-line[aria-expanded='false']")];
+        (lines.find((b) => /edit|write/i.test(b.textContent)) ?? lines[0])?.click();
+      })()`);
       await page.waitFor(`document.querySelector(".call-detail")`, 30_000);
       await page.eval(`document.querySelector(".call-detail .edit, .call-detail .diff")?.scrollIntoView({ block: "center" })`);
       say(`call: ${JSON.stringify(await page.eval(`(() => {
@@ -203,7 +212,6 @@ for (const scene of scenes) {
         })`))}`);
         await shot("call-location");
       }
-      await page.eval(`(() => { const s = document.querySelector("select.detail"); s.value = "messages"; s.dispatchEvent(new Event("change", { bubbles: true })); })()`);
     } else if (scene === "workflow") {
       // #98 triggers, next run, last fired; #100 Enabled switch and Turn Off/On.
       await openProject();

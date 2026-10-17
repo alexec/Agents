@@ -1,23 +1,20 @@
-// The level turns start at, and opening and closing one (#993, #759, #1286).
+// Opening and closing a turn (#993, #759, #1315).
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { load } from "./load.mjs";
 
 const t = await load("src/model/turnDetail.ts");
+const turns = await load("src/model/turns.ts");
 
-test("three levels, and turns start at Messages when no level is kept", () => {
-  assert.deepEqual([...t.turnDetails], ["messages", "steps", "details"]);
-  assert.equal(t.savedDetail(null), "messages");
-  assert.equal(t.savedDetail("bogus"), "messages");
-  assert.equal(t.savedDetail("outcome"), "messages");
-  assert.equal(t.savedDetail("collapsed"), "messages");
-  for (const kept of ["messages", "steps", "details"]) assert.equal(t.savedDetail(kept), kept);
+test("a turn starts open, and its N steps closes it and opens it again", () => {
+  assert.equal(t.initialDetail, "open");
+  assert.equal(t.toggled(t.initialDetail), "collapsed");
+  assert.equal(t.toggled("collapsed"), "open");
 });
 
-test("closing a turn collapses it, and opening it goes back to the level", () => {
-  const closed = t.toggled(t.initialDetail, t.initialDetail);
-  assert.equal(closed, "collapsed");
-  assert.equal(t.toggled(closed, t.initialDetail), "messages");
-  assert.equal(t.toggled("details", "details"), "collapsed");
-  assert.equal(t.toggled("collapsed", "details"), "details");
+test("a thought folds to its first words, as TranscriptItem.thoughtLine does", () => {
+  assert.equal(turns.thoughtLine("**Planning the fix**\n\nRead   the file first."), "Thought: Planning the fix Read the file first.");
+  const long = Array.from({ length: 30 }, (_, i) => String(i + 1)).join(" ");
+  assert.equal(turns.thoughtLine(long), `Thought: ${Array.from({ length: 24 }, (_, i) => String(i + 1)).join(" ")}`);
+  assert.equal(turns.thoughtLine(" \n "), "Thought");
 });

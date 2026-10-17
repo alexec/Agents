@@ -265,8 +265,6 @@ struct BackgroundEntryLine: View {
 struct SubagentStepsView: View {
     let item: BackgroundItem
     let entries: [TranscriptEntry]
-    /// The session's thinking setting. The phone has no View menu and keeps showing it.
-    var showsThinking = true
     /// Back to the list, where there is one to go back to: the Mac's pane.
     var back: (() -> Void)?
     @State private var expanded: Set<UUID> = []
@@ -298,14 +296,14 @@ struct SubagentStepsView: View {
                     .paperWell(in: RoundedRectangle(cornerRadius: 8))
                 }
                 let steps = TranscriptEntry.display(entries, subagent: item.id)
-                let shown = showsThinking ? steps : steps.omittingThoughts()
                 if steps.isEmpty {
                     Text(item.isRunning ? "Nothing yet. Its steps appear here as it takes them."
                                         : "Its steps are further back in the conversation than is loaded.")
                         .appText(.fine)
                         .foregroundStyle(.tertiary)
                 }
-                ForEach(shown) { step in
+                // Thinking too, each a folded line (#1315).
+                ForEach(steps) { step in
                     TranscriptRow(item: step, isExpanded: expanded.contains(step.id)) {
                         if expanded.contains(step.id) { expanded.remove(step.id) } else { expanded.insert(step.id) }
                     }

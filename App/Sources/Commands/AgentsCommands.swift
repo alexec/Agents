@@ -56,8 +56,6 @@ struct AgentsCommands: Commands {
     let frame: SidebarFrame
     let terminal: ProjectTerminalFrame
 
-    /// Off unless asked for. The session draws thinking only while this is on.
-    @AppStorage(TurnDisplay.defaultsKey, store: WindowDefaults.store) private var turnDetail = TurnDisplay.initial
     /// The session in the key window when that is a window of its own (#826).
     @FocusedValue(\.poppedChat) private var popped
     /// The project in the key window when that is a project's own (#1089).
@@ -185,13 +183,6 @@ struct AgentsCommands: Commands {
             Button("Jump to Latest") { if let popped { popped.scrollToEnd() } else { model.scrollToEnd() } }
                 .keyboardShortcut(.downArrow, modifiers: .command)
                 .disabled(sessionAgent == nil)
-            // What every turn starts at (069). Thinking is part of Details now, so
-            // Show Thinking went with it.
-            Picker("Turns", selection: $turnDetail) {
-                ForEach(TurnDetail.levels, id: \.self) { detail in
-                    Text(detail.title).help(detail.summary).tag(detail)
-                }
-            }
             Divider()
             Button("Find Session") { requests.focusSessionSearch() }
                 .keyboardShortcut("f")

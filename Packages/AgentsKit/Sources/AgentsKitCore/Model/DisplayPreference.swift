@@ -7,8 +7,6 @@ import Foundation
 /// defaults, which now hold a mirror of the host's map (`DisplayPreferenceMirror`) so every
 /// view can go on reading them where it did. The web page keeps no copy.
 public enum DisplayPreference {
-    /// What a finished turn shows: a `TurnDetail` raw value.
-    public static let turnDetail = "turnDetail"
     /// The smart groups that are off, comma-separated (`SidebarSmartRow.offDefaultsKey`).
     public static let smartGroupsOff = "sidebarSmartGroupsOff"
     /// Whether the sidebar shows archived projects, and its Activity and Usage sections.
@@ -26,7 +24,7 @@ public enum DisplayPreference {
     /// The ones kept as a plain value in a client's defaults, and the kind of each.
     public enum Kind: Sendable { case bool, string }
     public static let mirrored: [String: Kind] = [
-        turnDetail: .string, smartGroupsOff: .string,
+        smartGroupsOff: .string,
         showsArchivedProjects: .bool, showsActivity: .bool, showsUsage: .bool,
         startRuntimeID: .string, skillsMarketplace: .string, mcpMarketplace: .string,
     ]
