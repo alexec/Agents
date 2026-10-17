@@ -532,6 +532,12 @@ targets:
         copy:
           destination: wrapper
           subpath: Contents/Helpers
+      # The Go agentsd's folder watch on a Mac (#1138): FSEvents, which Go cannot reach
+      # without cgo, beside it in Contents/Helpers.
+      - target: agents-watch
+        copy:
+          destination: wrapper
+          subpath: Contents/Helpers
       # The MCP servers Agents ships (#700), beside agentsd, which puts this folder first
       # on their PATH: `.agents/mcp.json` names them by bare name on a Mac and on Linux.
       - target: ci-watcher
@@ -662,6 +668,28 @@ targets:
           CODE_SIGN_IDENTITY: Developer ID Application
           OTHER_CODE_SIGN_FLAGS: --timestamp
 
+  # The Go agentsd's folder watch on a Mac (#1138): one for each folder it watches, saying
+  # what FSEvents says changed, which Go cannot hear without cgo.
+  agents-watch:
+    type: tool
+    supportedDestinations: [macOS]
+    sources:
+      - path: Host/AgentsWatch
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.alexecollins.agents.watch
+        PRODUCT_NAME: agents-watch
+        SDKROOT: macosx
+        SUPPORTED_PLATFORMS: macosx
+        SKIP_INSTALL: YES
+        ENABLE_HARDENED_RUNTIME: YES
+      # The GitHub release (#669): Release signs it with Developer ID, outside the App Store.
+      configs:
+        Release:
+          CODE_SIGN_STYLE: Manual
+          CODE_SIGN_IDENTITY: Developer ID Application
+          OTHER_CODE_SIGN_FLAGS: --timestamp
+
   # The Go agentsd's code-signature check on daemon.sock's callers (#1138): Go cannot call
   # the Security framework without cgo, so it asks this, beside it in Contents/Helpers.
   agents-peer:
@@ -732,6 +760,12 @@ schemes:
     build:
       targets:
         agents-peer: all
+    run:
+      config: Debug
+  agents-watch:
+    build:
+      targets:
+        agents-watch: all
     run:
       config: Debug
   Remote:
