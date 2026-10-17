@@ -85,6 +85,14 @@ under Login Items.
 
 ## Devices
 
+The script says, for each device devicectl lists, whether it will install on it and
+why, or why it skips it (a simulator, not paired, not an iPhone or iPad). A paired device
+that devicectl gives no hardware details for (a locked iPhone did this on 2026-10-17,
+#1310) is still installed on, and the line says what was missing. `--list-devices` prints
+those lines and stops, with nothing built or installed: use it to check which devices a
+ship will reach. The choice is `scripts/devices.py`, tested by `scripts/test_devices.py`
+against saved listings in `scripts/testdata/` (run in `scripts/lint.sh`'s checks).
+
 A device that is not listed is asleep, off Wi-Fi, or unplugged. `xcrun devicectl
 list devices` shows it. Ask Alex to wake it. Do not retry in a loop. A launch
 fails on a locked device, but the install still counts.

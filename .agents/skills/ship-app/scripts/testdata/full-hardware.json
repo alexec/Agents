@@ -1,0 +1,144 @@
+{
+  "info": {
+    "commandType": "devicectl.list.devices",
+    "jsonVersion": 5,
+    "outcome": "success"
+  },
+  "result": {
+    "devices": [
+      {
+        "identifier": "00000000-0000-4000-8000-000000000001",
+        "visibilityClass": "simulators",
+        "connectionProperties": {
+          "pairingState": "paired",
+          "transportType": "sameMachine",
+          "tunnelState": "disconnected",
+          "potentialHostnames": []
+        },
+        "deviceProperties": {
+          "name": "Agents Walk",
+          "bootState": "shutdown",
+          "provider": "com.apple.CoreSimulator.SimulatorCoreDevicePlugin"
+        },
+        "hardwareProperties": {
+          "deviceType": "iPhone",
+          "marketingName": "iPhone 17 Pro",
+          "platform": "iOS",
+          "productType": "iPhone18,1",
+          "reality": "simulated",
+          "udid": "00000000-0000-4000-8000-000000000001"
+        },
+        "properties": {
+          "connection": {
+            "pairingState": "paired",
+            "state": "disconnected",
+            "transportType": "sameMachine"
+          },
+          "hardware": {
+            "deviceType": "iPhone",
+            "marketingName": "iPhone 17 Pro",
+            "platform": "iOS",
+            "productType": "iPhone18,1",
+            "reality": "simulated",
+            "udid": "00000000-0000-4000-8000-000000000001"
+          },
+          "state": {
+            "bootState": "shutdown",
+            "name": "Agents Walk",
+            "visibilityClass": "simulators"
+          }
+        }
+      },
+      {
+        "identifier": "11111111-2222-5333-8444-555555555555",
+        "visibilityClass": "default",
+        "connectionProperties": {
+          "pairingState": "paired",
+          "transportType": "localNetwork",
+          "tunnelState": "disconnected",
+          "potentialHostnames": [
+            "Test-iPad.coredevice.local",
+            "11111111-2222-5333-8444-555555555555.coredevice.local",
+            "00008120-000A00000000001E.coredevice.local"
+          ]
+        },
+        "deviceProperties": {
+          "name": "Test iPad",
+          "bootState": "booted"
+        },
+        "hardwareProperties": {
+          "deviceType": "iPad",
+          "marketingName": "iPad (A16)",
+          "platform": "iOS",
+          "productType": "iPad15,7",
+          "reality": "physical",
+          "udid": "00008120-000A00000000001E"
+        },
+        "properties": {
+          "connection": {
+            "pairingState": "paired",
+            "state": "disconnected",
+            "transportType": "localNetwork"
+          },
+          "hardware": {
+            "deviceType": "iPad",
+            "marketingName": "iPad (A16)",
+            "platform": "iOS",
+            "productType": "iPad15,7",
+            "reality": "physical",
+            "udid": "00008120-000A00000000001E"
+          },
+          "state": {
+            "bootState": "booted",
+            "name": "Test iPad"
+          }
+        }
+      },
+      {
+        "identifier": "AAAAAAAA-BBBB-5CCC-8DDD-EEEEEEEEEEEE",
+        "visibilityClass": "default",
+        "connectionProperties": {
+          "pairingState": "paired",
+          "transportType": "localNetwork",
+          "tunnelState": "disconnected",
+          "potentialHostnames": [
+            "Test-iPhone.coredevice.local",
+            "AAAAAAAA-BBBB-5CCC-8DDD-EEEEEEEEEEEE.coredevice.local",
+            "00008130-000B00000000001C.coredevice.local"
+          ]
+        },
+        "deviceProperties": {
+          "name": "Test iPhone",
+          "bootState": "booted"
+        },
+        "hardwareProperties": {
+          "deviceType": "iPhone",
+          "marketingName": "iPhone 15 Pro Max",
+          "platform": "iOS",
+          "productType": "iPhone16,2",
+          "reality": "physical",
+          "udid": "00008130-000B00000000001C"
+        },
+        "properties": {
+          "connection": {
+            "pairingState": "paired",
+            "state": "disconnected",
+            "transportType": "localNetwork"
+          },
+          "hardware": {
+            "deviceType": "iPhone",
+            "marketingName": "iPhone 15 Pro Max",
+            "platform": "iOS",
+            "productType": "iPhone16,2",
+            "reality": "physical",
+            "udid": "00008130-000B00000000001C"
+          },
+          "state": {
+            "bootState": "booted",
+            "name": "Test iPhone"
+          }
+        }
+      }
+    ]
+  }
+}
