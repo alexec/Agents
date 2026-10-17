@@ -94,10 +94,12 @@ struct AgentCard: View {
                         }
                         // Started by another agent (028), marked as the Mac's row
                         // marks it.
-                        if model.startedByAgentLabel(agent) != nil {
+                        if let starter = model.startedByAgentLabel(agent) {
                             Image(systemName: AgentsModel.startedByAgentSymbol)
                                 .appText(.fine)
                                 .foregroundStyle(.tertiary)
+                                // Said, as the workflow mark is and the Mac's row says it (#1326).
+                                .accessibilityLabel(starter)
                         }
                         // Its folder gone (#119), as the Mac's row and a project's say it.
                         if agent.missingFolder != nil, agent.state != .archived {
