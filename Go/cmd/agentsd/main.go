@@ -251,7 +251,8 @@ func join(ctx context.Context, cl commandLine, d *agentsd.Daemon) {
 		os.Remove(codeFile)
 		log.Printf("enrolled as host %s with %s", member.Host, member.Name)
 	}
-	up := &controllink.Uplink{Root: loc.Root, Member: member, Private: private, Hello: hello, Accept: d.Accept}
+	up := &controllink.Uplink{Root: loc.Root, Member: member, Private: private, Hello: hello, Accept: d.Accept,
+		Lend: d.LendingPort}
 	d.Tunneler = up
 	safe.Go("uplink", func() {
 		// A panic in the uplink would leave the host up but offline: dial again.

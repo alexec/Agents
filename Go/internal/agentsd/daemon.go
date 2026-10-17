@@ -62,6 +62,7 @@ type Daemon struct {
 	projectState
 	installBook
 	guardedStateHolder
+	macState
 	// SettingsDir is the person's settings on this host (StoreLocations.personalSettings):
 	// <root>/settings, or $HOME/.agents/settings for a server, as the Swift host's --serve.
 	SettingsDir string
@@ -164,6 +165,7 @@ func (d *Daemon) Shutdown() {
 	d.allowMu.Unlock()
 	d.stopEventWaits()
 	d.stopShells()
+	d.stopSignInRelays()
 	d.waitForMilestones()
 }
 

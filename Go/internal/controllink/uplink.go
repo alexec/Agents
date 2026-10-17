@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"log"
+	"net"
 	"strconv"
 	"strings"
 	"sync"
@@ -41,6 +42,9 @@ type Uplink struct {
 	nextID   atomic.Int64
 	OnChange func(connected bool, problem string)
 	tunnels  map[string]chan *channel
+	// Lend is where this host's relay for a runtime listens on loopback, for a tunnel the
+	// control plane opens to it (the lending Mac's end, T091); 0 when it lends none.
+	Lend func(runtime string) int
 }
 
 func (u *Uplink) Run(ctx context.Context) {
@@ -177,16 +181,35 @@ func (u *Uplink) receive(line string) {
 			u.mu.Lock()
 			wait := u.tunnels[ref]
 			delete(u.tunnels, ref)
-			if wait != nil && u.channels != nil {
+			port := 0
+			if wait == nil && u.Lend != nil {
+				port = u.Lend(*frame.Open.Tunnel)
+			}
+			if (wait != nil || port > 0) && u.channels != nil {
 				u.channels[c.number] = c
 			}
 			u.mu.Unlock()
-			if wait == nil {
+			if wait != nil {
+				wait <- c
+				return
+			}
+			if port <= 0 {
 				log.Printf("uplink: a tunnel for %s was opened that this host did not ask for; it lends no sign-in", *frame.Open.Tunnel)
 				_ = u.write(`{"c":` + strconv.Itoa(*frame.C) + `,"close":true}`)
 				return
 			}
-			wait <- c
+			// The lender's end: the tunnel to its relay on loopback.
+			runtime := *frame.Open.Tunnel
+			safe.Go("relay lend", func() {
+				conn, err := net.DialTimeout("tcp", "127.0.0.1:"+strconv.Itoa(port), 10*time.Second)
+				if err != nil {
+					log.Printf("relay: %v", err)
+					c.end(true)
+					return
+				}
+				log.Printf("relay: a tunnel for %s opened", runtime)
+				Pipe(conn, c)
+			})
 			return
 		}
 		if frame.Open.Device != nil {

@@ -1785,6 +1785,16 @@ export interface RateLimitInfo {
   overageDisabledReason?: string;
 }
 
+export interface RelayGrantReply {
+  runtime: string;
+  caCertificate: string;
+  standIn: string;
+}
+
+export interface RelayGrantRequest {
+  runtime: string;
+}
+
 export interface RelayOffer {
   runtime: string;
   socketPath: string;
@@ -3278,6 +3288,8 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   QuickAnswer: { required: ["kind", "id", "title", "isDestructive"], optional: ["field"] },
   QuitRequest: { required: ["stopAgents"], optional: [] },
   RateLimitInfo: { required: [], optional: ["status", "resetsAt", "rateLimitType", "utilization", "overageStatus", "overageResetsAt", "isUsingOverage", "overageInUse", "overageDisabledReason"] },
+  RelayGrantReply: { required: ["runtime", "caCertificate", "standIn"], optional: [] },
+  RelayGrantRequest: { required: ["runtime"], optional: [] },
   RelayOffer: { required: ["runtime", "socketPath", "caCertificate", "standIn"], optional: [] },
   RememberedOptionsRequest: { required: ["runtimeID", "cwd"], optional: [] },
   RemovalCheck: { required: ["blockedBy", "uncommitted", "unmerged"], optional: [] },

@@ -2698,6 +2698,25 @@
       }
     },
     {
+      "name": "relay/grant",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/RelayGrantRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/RelayGrantReply"
+        }
+      }
+    },
+    {
       "name": "resources/declare",
       "paramStructure": "by-name",
       "params": [

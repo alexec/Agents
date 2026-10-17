@@ -119,6 +119,7 @@ var (
 	CallProjectsSetPinned              = Method[SetPinnedRequest, ProjectSummary]{"projects/setPinned"}
 	CallProjectsUnarchive              = Method[ProjectRequest, ProjectSummary]{"projects/unarchive"}
 	CallProjectsUndoGuardedChange      = Method[GuardedChangeRequest, ProjectSummary]{"projects/undoGuardedChange"}
+	CallRelayGrant                     = Method[RelayGrantRequest, RelayGrantReply]{"relay/grant"}
 	CallRelayOffer                     = Method[RelayOffer, Empty]{"relay/offer"}
 	CallResourcesDeclare               = Method[DeclareResourceRequest, LeaseSnapshot]{"resources/declare"}
 	CallResourcesRemove                = Method[RemoveResourceRequest, LeaseSnapshot]{"resources/remove"}
