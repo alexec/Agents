@@ -8,6 +8,8 @@ import (
 	"os"
 	"path/filepath"
 	"time"
+
+	"github.com/alexec/agents/Go/wire"
 )
 
 // Membership is control-host.json, in the Swift ControlMembership's own shape ([]byte is
@@ -21,25 +23,10 @@ type Membership struct {
 	Pin        string   `json:"pin,omitempty"`
 }
 
-type HostHello struct {
-	Host      string `json:"host,omitempty"`
-	Version   string `json:"version"`
-	Platform  string `json:"platform"`
-	MachineID string `json:"machineID"`
-	Name      string `json:"name,omitempty"`
-	// Implementation is "go" from this host (#1134), so the Hosts pane can say so. A control
-	// plane that does not know the field ignores it, as Swift's Codable does.
-	Implementation string `json:"implementation,omitempty"`
-}
-
-type hostAnnounce struct {
-	PublicKey      []byte `json:"publicKey"`
-	Name           string `json:"name"`
-	Platform       string `json:"platform"`
-	Version        string `json:"version"`
-	MachineID      string `json:"machineID"`
-	Implementation string `json:"implementation,omitempty"`
-}
+// HostHello is DaemonAPI.HostHello: what a host says on every connect. Implementation is
+// "go" from this host (#1134), so the Hosts pane can say so; a control plane that does
+// not know the field ignores it, as Swift's Codable does.
+type HostHello = wire.HostHello
 
 func LoadMembership(root string) (*Membership, error) {
 	b, err := os.ReadFile(filepath.Join(root, "control-host.json"))
@@ -85,7 +72,12 @@ func Enroll(ctx context.Context, root string, code *Code, private []byte, hello 
 		return nil, fmt.Errorf("enrol: %w", err)
 	}
 	defer l.Close()
-	params, _ := json.Marshal(hostAnnounce{PublicKey: pub, Name: hello.Name, Platform: hello.Platform, Version: hello.Version, MachineID: hello.MachineID, Implementation: hello.Implementation})
+	name := ""
+	if hello.Name != nil {
+		name = *hello.Name
+	}
+	params, _ := json.Marshal(wire.HostAnnounce{PublicKey: pub, Name: name, Platform: hello.Platform, Version: hello.Version,
+		MachineID: hello.MachineID, Implementation: hello.Implementation})
 	req, _ := json.Marshal(map[string]any{"jsonrpc": "2.0", "id": 1, "method": "hosts/announce", "params": json.RawMessage(params)})
 	if err := l.Write(ctx, string(req)); err != nil {
 		return nil, err
@@ -97,17 +89,14 @@ func Enroll(ctx context.Context, root string, code *Code, private []byte, hello 
 		return nil, fmt.Errorf("the control plane did not answer: %w", err)
 	}
 	var reply struct {
-		Result *struct {
-			Host string `json:"host"`
-		} `json:"result"`
-		Error json.RawMessage `json:"error"`
+		Result *wire.Admitted `json:"result"`
 	}
 	if err := json.Unmarshal([]byte(line), &reply); err != nil {
 		return nil, err
 	}
-	if reply.Result == nil || reply.Result.Host == "" {
+	if reply.Result == nil || reply.Result.Host == nil || *reply.Result.Host == "" {
 		return nil, fmt.Errorf("hosts/announce: %s", line)
 	}
-	m := &Membership{Host: reply.Result.Host, ControlKey: code.ControlKey, Addresses: []string{}, Name: code.Name, URL: code.URL, Pin: code.Pin}
+	m := &Membership{Host: string(*reply.Result.Host), ControlKey: code.ControlKey, Addresses: []string{}, Name: code.Name, URL: code.URL, Pin: code.Pin}
 	return m, m.Save(root)
 }

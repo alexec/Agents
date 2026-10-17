@@ -1,42 +1,20 @@
 package notices
 
 import (
-	"bytes"
 	"encoding/json"
 	"sync"
 	"time"
+
+	"github.com/alexec/agents/Go/wire"
 )
 
 // AttentionNeed is DaemonAPI.AttentionNeed, as a host says it on channel 0: a need to
 // offer, or one to withdraw.
-type AttentionNeed struct {
-	Need     *NeedOnWire     `json:"need,omitempty"`
-	Headline json.RawMessage `json:"headline,omitempty"`
-	Buzz     *bool           `json:"buzz,omitempty"`
-	Withdraw json.RawMessage `json:"withdraw,omitempty"`
-}
+type AttentionNeed = wire.AttentionNeed
 
-// NeedOnWire is Need as the wire carries it. Its id (NeedID) and headline pass through
-// as they came.
-type NeedOnWire struct {
-	ID       json.RawMessage `json:"id"`
-	AgentID  *string         `json:"agentID,omitempty"`
-	RaisedAt float64         `json:"raisedAt"`
-	Headline json.RawMessage `json:"headline"`
-}
-
-// Delivery to a relay host is DaemonAPI.RelayDelivery: a need posted to a device, or
-// (with no headline) taken back from it.
-type RelayDelivery struct {
-	NeedID    json.RawMessage `json:"needID"`
-	Device    string          `json:"device"`
-	PublicKey []byte          `json:"publicKey,omitempty"`
-	Headline  json.RawMessage `json:"headline,omitempty"`
-	Alert     bool            `json:"alert"`
-}
-
-// referenceDate is 2001-01-01, which Swift's dates count from.
-var referenceDate = time.Unix(978307200, 0)
+// RelayDelivery is DaemonAPI.RelayDelivery, a delivery to a relay host: a need posted to
+// a device, or (with no headline) taken back from it.
+type RelayDelivery = wire.RelayDelivery
 
 type posted struct {
 	device string
@@ -53,21 +31,18 @@ type Desk struct {
 
 func NewDesk() *Desk { return &Desk{posted: map[string]posted{}} }
 
-// key is a NeedID as a map key: its JSON, compacted.
-func key(id json.RawMessage) string {
-	var b bytes.Buffer
-	if json.Compact(&b, id) != nil {
-		return string(id)
-	}
-	return b.String()
+// key is a NeedID as a map key: its JSON.
+func key(id wire.NeedID) string {
+	b, _ := json.Marshal(id)
+	return string(b)
 }
 
 // Heard is NoticeDesk.heard: what to tell the relay host of a need a host raised.
 func (d *Desk) Heard(message AttentionNeed, presences map[Surface]Presence, devices []Device, now time.Time) []RelayDelivery {
 	d.mu.Lock()
 	defer d.mu.Unlock()
-	if len(message.Withdraw) > 0 {
-		return d.withdraw(message.Withdraw)
+	if message.Withdraw != nil {
+		return d.withdraw(*message.Withdraw)
 	}
 	if message.Need == nil {
 		return nil
@@ -81,10 +56,9 @@ func (d *Desk) Heard(message AttentionNeed, presences map[Surface]Presence, devi
 	}
 	agent := ""
 	if need.AgentID != nil {
-		agent = *need.AgentID
+		agent = string(*need.AgentID)
 	}
-	raised := referenceDate.Add(time.Duration(need.RaisedAt * float64(time.Second)))
-	decision := Decide(Need{Agent: agent, RaisedAt: raised}, presences, devices, delivery, Standard, now)
+	decision := Decide(Need{Agent: agent, RaisedAt: need.RaisedAt.Time()}, presences, devices, delivery, Standard, now)
 	var chosen *Device
 	if !decision.Wait && decision.To != nil && !decision.To.IsMac() {
 		for i := range devices {
@@ -106,24 +80,24 @@ func (d *Desk) Heard(message AttentionNeed, presences map[Surface]Presence, devi
 				return nil
 			}
 		} else {
-			out = append(out, RelayDelivery{NeedID: need.ID, Device: previous.device})
+			out = append(out, RelayDelivery{NeedID: need.ID, Device: wire.UUID(previous.device)})
 		}
 	}
 	d.posted[k] = posted{device: chosen.ID, alert: decision.Alert, at: now}
 	headline := message.Headline
-	if len(headline) == 0 {
-		headline = need.Headline
+	if headline == nil {
+		headline = &need.Headline
 	}
-	return append(out, RelayDelivery{NeedID: need.ID, Device: chosen.ID, PublicKey: chosen.PublicKey,
+	return append(out, RelayDelivery{NeedID: need.ID, Device: wire.UUID(chosen.ID), PublicKey: chosen.PublicKey,
 		Headline: headline, Alert: decision.Alert})
 }
 
-func (d *Desk) withdraw(id json.RawMessage) []RelayDelivery {
+func (d *Desk) withdraw(id wire.NeedID) []RelayDelivery {
 	k := key(id)
 	previous, ok := d.posted[k]
 	if !ok {
 		return nil
 	}
 	delete(d.posted, k)
-	return []RelayDelivery{{NeedID: id, Device: previous.device}}
+	return []RelayDelivery{{NeedID: id, Device: wire.UUID(previous.device)}}
 }

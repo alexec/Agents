@@ -379,7 +379,7 @@ func (g *goGen) typeOf(s *Schema, hint string) string {
 	return "JSONValue"
 }
 
-var initialisms = map[string]string{"id": "ID", "url": "URL", "uri": "URI", "mcp": "MCP", "acp": "ACP", "html": "HTML", "json": "JSON"}
+var initialisms = map[string]string{"id": "ID", "url": "URL", "uri": "URI", "mcp": "MCP", "acp": "ACP", "html": "HTML", "json": "JSON", "ssh": "SSH", "cli": "CLI"}
 
 // goName is an exported Go name for a JSON name: `_0` is Value, `agentID` is AgentID,
 // `request_archive` and `mcp/health/check` are RequestArchive and MCPHealthCheck.

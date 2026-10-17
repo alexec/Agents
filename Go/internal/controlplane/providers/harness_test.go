@@ -12,6 +12,7 @@ import (
 
 	"github.com/alexec/agents/Go/internal/controlplane/records"
 	"github.com/alexec/agents/Go/internal/controlplane/store"
+	"github.com/alexec/agents/Go/wire"
 )
 
 // fakeRouter is the service's router as the tests need it: hosts online or not, each
@@ -240,7 +241,7 @@ func (s *standIn) Create(name string, options any, firstBoot *string) (*Workspac
 	if firstBoot != nil {
 		s.firstBoots = append(s.firstBoots, *firstBoot)
 	}
-	made := WorkspaceInfo{ID: "ws-" + name, Name: name, State: "starting", SSH: "root@10.0.0.9"}
+	made := WorkspaceInfo{ID: "ws-" + name, Name: name, State: "starting", SSH: new("root@10.0.0.9")}
 	s.workspaces = append(s.workspaces, made)
 	return &made, s.firstBootRuns, nil
 }
@@ -316,7 +317,7 @@ func quickTiming() Timing {
 
 func newHarness(t *testing.T, opts ...func(*harnessOptions)) *harness {
 	o := harnessOptions{timing: quickTiming(), workspaces: []WorkspaceInfo{
-		{ID: "agents-devbox", Name: "agents-devbox", State: "stopped", SSH: "alex@127.0.0.1 -p 2222"},
+		{ID: "agents-devbox", Name: "agents-devbox", State: "stopped", SSH: new("alex@127.0.0.1 -p 2222")},
 		{ID: "scratch-1", Name: "scratch-1", State: "running"},
 	}}
 	for _, f := range opts {
@@ -374,12 +375,12 @@ func (h *harness) add() string {
 	h.t.Helper()
 	out := h.must(MethodProvidersAdd, map[string]any{"name": "DigitalOcean", "kind": "commands",
 		"commands": map[string]any{"preset": "doctl", "tag": "agents"}, "secrets": map[string]string{"DIGITALOCEAN_TOKEN": "hunter2"}})
-	return out.(ProviderSummary).ID
+	return string(out.(ProviderSummary).ID)
 }
 
 func (h *harness) link(provider, host, workspace string) {
 	h.t.Helper()
-	h.must(MethodHostsLink, HostLink{Host: host, Provider: provider, Workspace: workspace})
+	h.must(MethodHostsLink, HostLink{Host: wire.HostID(host), Provider: wire.ProviderID(provider), Workspace: workspace})
 }
 
 func (h *harness) row(host string) row {

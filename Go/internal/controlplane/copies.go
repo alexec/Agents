@@ -108,7 +108,7 @@ func (c *hostCopies) lastHeard(host string) map[string]any {
 	if copy.Agents != nil {
 		said["agents"] = copy.Agents
 	}
-	said["heardAt"] = RefDate(copy.HeardAt.Time)
+	said["heardAt"] = dateOf(copy.HeardAt.Time)
 	return said
 }
 

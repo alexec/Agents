@@ -14,6 +14,7 @@ import (
 
 	"github.com/alexec/agents/Go/internal/controlplane/hosttunnels"
 	"github.com/alexec/agents/Go/internal/controlplane/records"
+	"github.com/alexec/agents/Go/wire"
 )
 
 // CodeIssuer is what HostInstall needs of ControlCodes: a one-time host code. url is
@@ -79,23 +80,14 @@ type Installer struct {
 	KnownNames func(ctx context.Context) []string
 }
 
-// Request is HostInstall.Request: the params of hosts/install.
-type Request struct {
-	// Destination is user@host, user@host:port, or a name from the ssh config.
-	Destination string  `json:"destination"`
-	Name        *string `json:"name,omitempty"`
-	// Key is the private key's text, OpenSSH or PEM. Nil or empty: ssh's own choice.
-	Key *string `json:"key,omitempty"`
-	// Trust is the fingerprint the person was shown and trusts, on the second call.
-	Trust *string `json:"trust,omitempty"`
-	// Tunnel says whether the server dials back through an ssh tunnel (#610). Nil: when
-	// ssh reaches it through a bastion.
-	Tunnel *bool `json:"tunnel,omitempty"`
-	// Implementation is "swift" for the Swift host, kept one setting away; empty or "go"
-	// for the Go host, the default since #1136. Empty falls back to the Swift host where
-	// this control plane has no Go one.
-	Implementation *string `json:"implementation,omitempty"`
-}
+// Request is HostInstall.Request: the params of hosts/install. Destination is user@host,
+// user@host:port, or a name from the ssh config. Key is the private key's text, OpenSSH or
+// PEM (nil or empty: ssh's own choice). Trust is the fingerprint the person was shown and
+// trusts, on the second call. Tunnel says whether the server dials back through an ssh
+// tunnel (#610); nil: when ssh reaches it through a bastion. Implementation is "swift" for
+// the Swift host, kept one setting away; empty or "go" for the Go host, the default since
+// #1136. Empty falls back to the Swift host where this control plane has no Go one.
+type Request = wire.HostInstall
 
 func (i *Installer) sshExecutable() string {
 	if i.SSH != "" {

@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/alexec/agents/Go/internal/safe"
+	"github.com/alexec/agents/Go/wire"
 )
 
 // Conn is one channel as a daemon client connection: lines in, lines out.
@@ -78,7 +79,7 @@ func (u *Uplink) Run(ctx context.Context) {
 		u.channels = map[int]*channel{}
 		u.mu.Unlock()
 		hello := u.Hello
-		hello.Host = u.Member.Host
+		hello.Host = new(wire.HostID(u.Member.Host))
 		u.Tell("host/hello", hello)
 		log.Printf("uplink: connected to the control plane as %s", u.Member.Host)
 		if u.OnChange != nil {
@@ -135,14 +136,6 @@ func channelLine(n int, message string) string {
 	return `{"c":` + strconv.Itoa(n) + `,"m":` + message + `}`
 }
 
-type channelOpen struct {
-	Client    string  `json:"client"`
-	Device    *string `json:"device"`
-	Tunnel    *string `json:"tunnel"`
-	TunnelRef *string `json:"tunnelRef"`
-	FanOut    *bool   `json:"fanOut"`
-}
-
 func (u *Uplink) receive(line string) {
 	// The fast path: {"c":N,"m":…} written by the Swift side with m last.
 	if strings.HasPrefix(line, `{"c":`) {
@@ -157,10 +150,10 @@ func (u *Uplink) receive(line string) {
 		}
 	}
 	var frame struct {
-		C     *int            `json:"c"`
-		M     json.RawMessage `json:"m"`
-		Open  *channelOpen    `json:"open"`
-		Close bool            `json:"close"`
+		C     *int              `json:"c"`
+		M     json.RawMessage   `json:"m"`
+		Open  *wire.ChannelOpen `json:"open"`
+		Close bool              `json:"close"`
 	}
 	if err := json.Unmarshal([]byte(line), &frame); err != nil || frame.C == nil {
 		return
@@ -213,7 +206,7 @@ func (u *Uplink) receive(line string) {
 			return
 		}
 		if frame.Open.Device != nil {
-			c.device = *frame.Open.Device
+			c.device = string(*frame.Open.Device)
 		}
 		c.fanOut = frame.Open.FanOut != nil && *frame.Open.FanOut
 		u.mu.Lock()

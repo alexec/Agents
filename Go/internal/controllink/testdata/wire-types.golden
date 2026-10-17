@@ -1,0 +1,20 @@
+ControlAuth full
+{"id":"ID","nonce":"NONCE","mac":"MAC","kind":"KIND","for":"FOR","epoch":7}
+ControlAuth zero
+{"id":"","nonce":"","mac":"","kind":""}
+ControlHello full
+{"v":7,"name":"NAME","control":"CONTROL","nonce":"NONCE","copy":"COPY"}
+ControlHello zero
+{"v":0,"name":"","control":"","nonce":"","copy":""}
+ControlOK full
+{"mac":"MAC","grant":"GRANT","host":"HOST","relayed":true,"endpoints":[{"url":"URL","pin":"PIN"}],"epoch":7}
+ControlOK zero
+{"mac":""}
+HostAnnounce full
+{"publicKey":"AQID","name":"NAME","platform":"PLATFORM","version":"VERSION","machineID":"MACHINEID","implementation":"IMPLEMENTATION"}
+HostAnnounce zero
+{"publicKey":null,"name":"","platform":"","version":"","machineID":""}
+HostHello full
+{"host":"HOST","version":"VERSION","platform":"PLATFORM","machineID":"MACHINEID","name":"NAME","implementation":"IMPLEMENTATION"}
+HostHello zero
+{"version":"","platform":"","machineID":""}

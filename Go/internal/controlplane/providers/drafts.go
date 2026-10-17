@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/alexec/agents/Go/internal/controlplane/records"
+	"github.com/alexec/agents/Go/wire"
 )
 
 // The writer's tools (AppTool).
@@ -29,59 +30,31 @@ const (
 	ToolGiveUp     = "give_up"
 )
 
-// ProviderDraftStart is DaemonAPI.ProviderDraftStart: providers/draftStart.
-type ProviderDraftStart struct {
-	// The form so far: for Your commands, kind is commands and cli is set.
-	Form ProviderAdd `json:"form"`
-	// Name to value, typed in the sheet. Held in memory for the draft only.
-	Secrets map[string]string `json:"secrets,omitempty"`
-	// In Edit…: the provider whose map or commands are written again (US4).
-	Provider  string `json:"provider,omitempty"`
-	RuntimeID string `json:"runtimeID"`
-}
+// ProviderDraftStart is DaemonAPI.ProviderDraftStart: providers/draftStart. Form is the
+// form so far (for Your commands, kind is commands and cli is set); Secrets, name to value,
+// are typed in the sheet and held in memory for the draft only; Provider, in Edit…, is the
+// provider whose map or commands are written again (US4).
+type ProviderDraftStart = wire.ProviderDraftStart
 
 // ProviderDraftStarted is DaemonAPI.ProviderDraftStarted.
-type ProviderDraftStarted struct {
-	Draft    string         `json:"draft"`
-	Answered *DraftAnswered `json:"answered,omitempty"`
-}
+type ProviderDraftStarted = wire.ProviderDraftStarted
 
-// DraftAnswered is DaemonAPI.ProviderDraftStarted.Answered: answered with no agent (R8).
-type DraftAnswered struct {
-	Note string `json:"note"`
-	// The shipped map that fits.
-	Map any `json:"map,omitempty"`
-	// The preset whose CLI this is.
-	Preset string `json:"preset,omitempty"`
-}
+// DraftAnswered is DaemonAPI.ProviderDraftStarted.Answered: answered with no agent (R8),
+// with the shipped map that fits, or the preset whose CLI this is.
+type DraftAnswered = wire.ProviderDraftAnswered
 
 // ProviderDraftRequest is DaemonAPI.ProviderDraftRequest: providers/draftCancel.
-type ProviderDraftRequest struct {
-	Draft string `json:"draft"`
-}
+type ProviderDraftRequest = wire.ProviderDraftRequest
 
 // ProviderDraftAnswer is DaemonAPI.ProviderDraftAnswer: providers/draftAnswer.
-type ProviderDraftAnswer struct {
-	Draft    string `json:"draft"`
-	Question string `json:"question"`
-	Yes      bool   `json:"yes"`
-}
+type ProviderDraftAnswer = wire.ProviderDraftAnswer
 
-// ProviderRuntimes is DaemonAPI.ProviderRuntimes: providers/runtimes.
-type ProviderRuntimes struct {
-	Runtimes []ProviderRuntime `json:"runtimes"`
-	// The host the agent runs on, by name.
-	Host string `json:"host,omitempty"`
-	// Why none can write here.
-	Why string `json:"why,omitempty"`
-}
+// ProviderRuntimes is DaemonAPI.ProviderRuntimes: providers/runtimes. Host is the host the
+// agent runs on, by name; Why, why none can write here.
+type ProviderRuntimes = wire.ProviderRuntimes
 
 // ProviderRuntime is DaemonAPI.ProviderRuntimes.Runtime.
-type ProviderRuntime struct {
-	ID        string `json:"id"`
-	Name      string `json:"name"`
-	IsDefault bool   `json:"isDefault"`
-}
+type ProviderRuntime = wire.ProviderRuntime
 
 // Step kinds (DaemonAPI.DraftStep.Kind).
 const (
@@ -94,83 +67,42 @@ const (
 )
 
 // DraftStep is DaemonAPI.DraftStep: one thing a draft did, redacted.
-type DraftStep struct {
-	At   RefDate `json:"at"`
-	Kind string  `json:"kind"`
-	Text string  `json:"text"`
-}
+type DraftStep = wire.DraftStep
 
-// DraftCheck is DaemonAPI.DraftCheck: a draft's last check.
-type DraftCheck struct {
-	Passed     bool            `json:"passed"`
-	Workspaces []WorkspaceInfo `json:"workspaces,omitempty"`
-	Problem    string          `json:"problem,omitempty"`
-	// What ssh -G resolved one workspace's destination to, in words (#975).
-	SSH string `json:"ssh,omitempty"`
-	// The draft gives no ssh destination (#975).
-	NoSSH *bool `json:"noSSH,omitempty"`
-}
+// DraftCheck is DaemonAPI.DraftCheck: a draft's last check. SSH is what ssh -G resolved
+// one workspace's destination to, in words; NoSSH, that the draft gives no ssh destination
+// (#975).
+type DraftCheck = wire.DraftCheck
 
-// DraftQuestion is DaemonAPI.DraftQuestion: a question for the person in the sheet.
-type DraftQuestion struct {
-	ID string `json:"id"`
-	// start, stop or check.
-	Kind      string `json:"kind"`
-	Workspace string `json:"workspace,omitempty"`
-	Cost      string `json:"cost,omitempty"`
-	// Worded whole: "Claude wants to start scratch-1 on DigitalOcean to prove the map."
-	Text string `json:"text"`
-	// Start It, Stop It or Run Check.
-	Yes string `json:"yes"`
-}
+// DraftQuestion is DaemonAPI.DraftQuestion: a question for the person in the sheet. Kind is
+// start, stop or check; Text is worded whole ("Claude wants to start scratch-1 on
+// DigitalOcean to prove the map."); Yes is Start It, Stop It or Run Check.
+type DraftQuestion = wire.DraftQuestion
 
 // DraftUpdate is DaemonAPI.ProviderDraftUpdate: control/providerDraft, where a draft
-// stands, sent on every step and change.
-type DraftUpdate struct {
-	Draft string `json:"draft"`
-	// reading, writing, checking, asking, proving, done, failed, cancelled.
-	State       string         `json:"state"`
-	RuntimeName string         `json:"runtimeName"`
-	Steps       []DraftStep    `json:"steps"`
-	Cost        string         `json:"cost,omitempty"`
-	DraftJSON   any            `json:"draftJSON,omitempty"`
-	Check       *DraftCheck    `json:"check,omitempty"`
-	Question    *DraftQuestion `json:"question,omitempty"`
-	// In done the agent's note; in failed the reason.
-	Note string `json:"note,omitempty"`
-}
+// stands, sent on every step and change. State is reading, writing, checking, asking,
+// proving, done, failed or cancelled; Note, in done the agent's note, in failed the reason.
+type DraftUpdate = wire.ProviderDraftUpdate
 
 // Ended says the draft has ended.
-func (u DraftUpdate) Ended() bool {
+func Ended(u DraftUpdate) bool {
 	return u.State == "done" || u.State == "failed" || u.State == "cancelled"
 }
 
 // HostProviderDraftCall is DaemonAPI.HostProviderDraftCall: a writer's tool call, relayed
 // by its host. AgentID is the caller, which is checked against the draft's agent (FR-011).
-type HostProviderDraftCall struct {
-	AgentID   string `json:"agentID"`
-	Draft     string `json:"draft"`
-	Tool      string `json:"tool"`
-	Arguments any    `json:"arguments,omitempty"`
-}
+type HostProviderDraftCall = wire.HostProviderDraftCall
 
-// StartRequest is the part of DaemonAPI.StartRequest a writing agent's start sends.
-type StartRequest struct {
-	RuntimeID             string   `json:"runtimeID"`
-	CWD                   string   `json:"cwd"`
-	Prompt                string   `json:"prompt"`
-	Attachments           []any    `json:"attachments"`
-	AdditionalDirectories []string `json:"additionalDirectories"`
-	MCPServers            []any    `json:"mcpServers"`
-	Labels                []string `json:"labels"`
-	RequestID             string   `json:"requestID,omitempty"`
-	Sandbox               string   `json:"sandbox,omitempty"`
-	// AgentPurpose: {"providerDraft": {"id": draft}}.
-	Purpose map[string]map[string]string `json:"purpose,omitempty"`
-}
+// StartRequest is DaemonAPI.StartRequest, as a writing agent's start sends it.
+type StartRequest = wire.StartRequest
 
 // PurposeDraft is AgentPurpose.providerDraft's id, or "".
-func (s StartRequest) PurposeDraft() string { return s.Purpose["providerDraft"]["id"] }
+func PurposeDraft(s StartRequest) string {
+	if s.Purpose == nil || s.Purpose.ProviderDraft == nil {
+		return ""
+	}
+	return string(s.Purpose.ProviderDraft.ID)
+}
 
 // Help is ProviderDrafts.Help: what a CLI's help printed.
 type Help struct {
@@ -390,14 +322,14 @@ func refusal(format string, args ...any) *Failure { return invalid(format, args.
 func (s *Drafts) Runtimes() ProviderRuntimes {
 	host := s.hooks.LocalHost()
 	if host == nil {
-		return ProviderRuntimes{Runtimes: []ProviderRuntime{}, Why: "No host runs where the control plane runs, so no agent can write here."}
+		return ProviderRuntimes{Runtimes: []ProviderRuntime{}, Why: new("No host runs where the control plane runs, so no agent can write here.")}
 	}
-	out := ProviderRuntimes{Runtimes: []ProviderRuntime{}, Host: host.Name}
+	out := ProviderRuntimes{Runtimes: []ProviderRuntime{}, Host: &host.Name}
 	for i, id := range WriterRuntimes {
 		out.Runtimes = append(out.Runtimes, ProviderRuntime{ID: id, Name: runtimeName(id), IsDefault: i == 0})
 	}
 	if len(out.Runtimes) == 0 {
-		out.Why = "No runtime here can write with its own tools turned off."
+		out.Why = new("No runtime here can write with its own tools turned off.")
 	}
 	return out
 }
@@ -423,7 +355,7 @@ func (s *Drafts) Start(request ProviderDraftStart, owner Caller, existing *Exist
 			runtimeName(request.RuntimeID))
 	}
 	id := records.NewUUID()
-	d := &draft{id: id, owner: owner, form: request.Form, secrets: secrets, provider: request.Provider,
+	d := &draft{id: id, owner: owner, form: request.Form, secrets: secrets, provider: string(deref(request.Provider)),
 		runtimeID: request.RuntimeID, runtimeName: runtimeName(request.RuntimeID), redact: NewRedaction(secrets),
 		state: "reading", stop: make(chan struct{})}
 	// What it starts from: the tools, or the CLI's own help.
@@ -438,8 +370,8 @@ func (s *Drafts) Start(request ProviderDraftStart, owner Caller, existing *Exist
 		}
 		program := path.Base(cli)
 		if preset, ok := presets[program]; ok {
-			return ProviderDraftStarted{Draft: id, Answered: &DraftAnswered{
-				Note: "Agents has a preset for " + program + ": use " + preset[1] + ".", Preset: preset[0]}}, nil
+			return ProviderDraftStarted{Draft: wire.UUID(id), Answered: &DraftAnswered{
+				Note: "Agents has a preset for " + program + ": use " + preset[1] + ".", Preset: optional(preset[0])}}, nil
 		}
 		help := s.hooks.Help(cli, []string{}, secrets)
 		if help.NotInstalled() {
@@ -447,7 +379,7 @@ func (s *Drafts) Start(request ProviderDraftStart, owner Caller, existing *Exist
 		}
 		d.helpSeen = help.Text
 		seed = d.redact.Text(cut(help.Text))
-		d.steps = append(d.steps, DraftStep{At: RefDate(time.Now()), Kind: StepHelp, Text: "ran " + cli + " --help"})
+		d.steps = append(d.steps, DraftStep{At: *dateOf(time.Now()), Kind: StepHelp, Text: "ran " + cli + " --help"})
 	} else {
 		connection, err := s.hooks.Connect(draftRecord(d, nil), secrets)
 		var tools []any
@@ -469,10 +401,10 @@ func (s *Drafts) Start(request ProviderDraftStart, owner Caller, existing *Exist
 			all = all && contains(names, r)
 		}
 		if all {
-			return ProviderDraftStarted{Draft: id, Answered: &DraftAnswered{Note: "It follows the contract: it needs no map."}}, nil
+			return ProviderDraftStarted{Draft: wire.UUID(id), Answered: &DraftAnswered{Note: "It follows the contract: it needs no map."}}, nil
 		}
 		if shipped, err := MapFrom(ShippedDigitalOceanMap); err == nil && shipped.Missing(names) == "" {
-			return ProviderDraftStarted{Draft: id, Answered: &DraftAnswered{Note: "Agents ships this map.", Map: ShippedDigitalOceanMap}}, nil
+			return ProviderDraftStarted{Draft: wire.UUID(id), Answered: &DraftAnswered{Note: "Agents ships this map.", Map: jsonValue(ShippedDigitalOceanMap)}}, nil
 		}
 		d.tools = tools
 		seed = toolsText(tools, d.redact)
@@ -480,7 +412,7 @@ func (s *Drafts) Start(request ProviderDraftStart, owner Caller, existing *Exist
 		if len(tools) == 1 {
 			plural = ""
 		}
-		d.steps = append(d.steps, DraftStep{At: RefDate(time.Now()), Kind: StepRead, Text: fmt.Sprintf("read %d tool%s", len(tools), plural)})
+		d.steps = append(d.steps, DraftStep{At: *dateOf(time.Now()), Kind: StepRead, Text: fmt.Sprintf("read %d tool%s", len(tools), plural)})
 	}
 	host := s.hooks.LocalHost()
 	if host == nil {
@@ -494,9 +426,12 @@ func (s *Drafts) Start(request ProviderDraftStart, owner Caller, existing *Exist
 	if existing != nil {
 		old = &oldDraft{json: existingJSON(existing.Record), problem: existing.Problem}
 	}
-	start := StartRequest{RuntimeID: request.RuntimeID, CWD: "file:///", Prompt: prompt(d, seed, old),
-		Attachments: []any{}, AdditionalDirectories: []string{}, MCPServers: []any{}, Labels: []string{},
-		RequestID: records.NewUUID(), Sandbox: "on", Purpose: map[string]map[string]string{"providerDraft": {"id": id}}}
+	// As ProviderDrafts.start writes it: DaemonAPI.StartRequest with its defaults.
+	start := StartRequest{RuntimeID: request.RuntimeID, Cwd: "file:///", Prompt: prompt(d, seed, old),
+		Attachments: []wire.Attachment{}, StartOptions: wire.StartOptions{Values: map[string]wire.JSONValue{}, ExtraArguments: []string{}},
+		AdditionalDirectories: []wire.URL{}, McpServers: []wire.MCPServer{}, Labels: []string{},
+		RequestID: new(wire.UUID(records.NewUUID())), Sandbox: new(wire.SandboxChoiceOn),
+		Purpose: &wire.AgentPurpose{ProviderDraft: &wire.AgentPurposeProviderDraft{ID: wire.UUID(id)}}}
 	agent, err := s.hooks.StartAgent(host.ID, start, owner)
 	if err != nil {
 		s.mu.Lock()
@@ -518,7 +453,7 @@ func (s *Drafts) Start(request ProviderDraftStart, owner Caller, existing *Exist
 	s.log(fmt.Sprintf("provider draft %s: %s writing %s on %s", shortID(id), d.runtimeName, what, host.Name))
 	go s.watch(d)
 	s.tell(d)
-	return ProviderDraftStarted{Draft: id}, nil
+	return ProviderDraftStarted{Draft: wire.UUID(id)}, nil
 }
 
 // Cancel is providers/draftCancel: ×, Back and Cancel.
@@ -536,11 +471,11 @@ func (s *Drafts) Cancel(id string, owner Caller) {
 func (s *Drafts) Answer(answer ProviderDraftAnswer, owner Caller) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	d := s.drafts[strings.ToUpper(answer.Draft)]
+	d := s.drafts[strings.ToUpper(string(answer.Draft))]
 	if d == nil || !strings.EqualFold(d.owner.Client, owner.Client) {
 		return refusal("That draft has ended.")
 	}
-	if d.question == nil || !strings.EqualFold(d.question.ID, answer.Question) || d.waiter == nil {
+	if d.question == nil || !strings.EqualFold(string(d.question.ID), string(answer.Question)) || d.waiter == nil {
 		return refusal("That question was answered already.")
 	}
 	d.waiter <- answer.Yes
@@ -565,9 +500,9 @@ func (s *Drafts) Result(id string) (string, any, bool) {
 // Call is ProviderDrafts.call: a writer's tool, from its host (host/providerDraft).
 func (s *Drafts) Call(host string, call HostProviderDraftCall) (any, error) {
 	s.mu.Lock()
-	d := s.drafts[strings.ToUpper(call.Draft)]
+	d := s.drafts[strings.ToUpper(string(call.Draft))]
 	s.mu.Unlock()
-	if d == nil || !strings.EqualFold(d.agent, call.AgentID) || d.host != host {
+	if d == nil || !strings.EqualFold(d.agent, string(call.AgentID)) || d.host != host {
 		return nil, fail(CodeNotPermitted, "%s", NotYoursWords)
 	}
 	// As the wire gives it: a JSON value (objects map[string]any, arrays []any), however
@@ -715,7 +650,7 @@ func (s *Drafts) check(d *draft, given any) string {
 	if err != nil {
 		words := d.redact.Text(errorWords(err))
 		s.mu.Lock()
-		d.check = &DraftCheck{Passed: false, Problem: words}
+		d.check = &DraftCheck{Passed: false, Problem: &words}
 		s.mu.Unlock()
 		s.step(d, StepCheck, "check failed: "+words)
 		return "Failed: " + words
@@ -743,18 +678,18 @@ func (s *Drafts) check(d *draft, given any) string {
 	if n > 0 {
 		noSSH = true
 		for _, w := range checked.Workspaces {
-			noSSH = noSSH && w.SSH == ""
+			noSSH = noSSH && deref(w.SSH) == ""
 		}
 	}
 	var withSSH *WorkspaceInfo
 	for i := range checked.Workspaces {
-		if checked.Workspaces[i].SSH != "" {
+		if deref(checked.Workspaces[i].SSH) != "" {
 			withSSH = &checked.Workspaces[i]
 			break
 		}
 	}
 	if withSSH != nil {
-		words := sshResolved(withSSH.SSH, s.hooks.SSHConfig(SSHDestination(withSSH.SSH)))
+		words := sshResolved(*withSSH.SSH, s.hooks.SSHConfig(SSHDestination(*withSSH.SSH)))
 		resolved = d.redact.Text(words)
 		s.step(d, StepCheck, words)
 		answer += "\n" + words
@@ -765,7 +700,7 @@ func (s *Drafts) check(d *draft, given any) string {
 			answer += " The first item:\n" + d.redact.Text(sample(checked.FirstItem))
 		}
 	}
-	c := &DraftCheck{Passed: true, Workspaces: checked.Workspaces, SSH: resolved}
+	c := &DraftCheck{Passed: true, Workspaces: checked.Workspaces, SSH: optional(resolved)}
 	if noSSH {
 		yes := true
 		c.NoSSH = &yes
@@ -827,13 +762,13 @@ func (s *Drafts) prove(d *draft, start bool, arguments any) string {
 		kind = "commands"
 	}
 	text := fmt.Sprintf("%s wants to %s %s on %s to prove the %s.", d.runtimeName, verb, w.Name, provider, kind)
-	if start && w.Cost != "" {
-		text += " " + w.Cost + " while running."
+	if start && deref(w.Cost) != "" {
+		text += " " + *w.Cost + " while running."
 	}
 	if start {
 		text += " It stays running until you stop it."
 	}
-	if !s.ask(d, DraftQuestion{Kind: verb, Workspace: w.Name, Cost: w.Cost, Text: text, Yes: yesWords}) {
+	if !s.ask(d, DraftQuestion{Kind: verb, Workspace: &w.Name, Cost: optional(deref(w.Cost)), Text: text, Yes: yesWords}) {
 		s.step(d, StepAsk, "asked to "+verb+" "+w.Name+": no")
 		return "The person said no."
 	}
@@ -875,7 +810,7 @@ func (s *Drafts) prove(d *draft, start bool, arguments any) string {
 // ask asks the person in the sheet, and waits; no answer in time is a no. The draft's
 // clock stops while it waits.
 func (s *Drafts) ask(d *draft, question DraftQuestion) bool {
-	question.ID = records.NewUUID()
+	question.ID = wire.UUID(records.NewUUID())
 	waiter := make(chan bool, 1)
 	s.mu.Lock()
 	if d.ended {
@@ -888,7 +823,7 @@ func (s *Drafts) ask(d *draft, question DraftQuestion) bool {
 	d.waiter = waiter
 	s.mu.Unlock()
 	s.step(d, StepAsk, question.Text)
-	timer := time.AfterFunc(s.timing.Answer, func() { s.unanswered(d, question.ID) })
+	timer := time.AfterFunc(s.timing.Answer, func() { s.unanswered(d, string(question.ID)) })
 	yes := <-waiter
 	timer.Stop()
 	s.mu.Lock()
@@ -906,7 +841,7 @@ func (s *Drafts) ask(d *draft, question DraftQuestion) bool {
 func (s *Drafts) unanswered(d *draft, question string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if d.question == nil || d.question.ID != question || d.waiter == nil {
+	if d.question == nil || string(d.question.ID) != question || d.waiter == nil {
 		return
 	}
 	d.waiter <- false
@@ -1046,7 +981,7 @@ func (s *Drafts) end(d *draft, state, note string) {
 
 func (s *Drafts) step(d *draft, kind, text string) {
 	s.mu.Lock()
-	d.steps = append(d.steps, DraftStep{At: RefDate(time.Now()), Kind: kind, Text: d.redact.Text(text)})
+	d.steps = append(d.steps, DraftStep{At: *dateOf(time.Now()), Kind: kind, Text: d.redact.Text(text)})
 	if len(d.steps) > maxSteps {
 		d.steps = d.steps[len(d.steps)-maxSteps:]
 	}
@@ -1058,12 +993,12 @@ func (s *Drafts) step(d *draft, kind, text string) {
 // server's words can hold a secret as well as the agent's draft can.
 func (s *Drafts) tell(d *draft) {
 	s.mu.Lock()
-	update := DraftUpdate{Draft: d.id, State: d.state, RuntimeName: d.runtimeName,
-		Steps: append([]DraftStep{}, d.steps...), Note: d.note}
+	update := DraftUpdate{Draft: wire.UUID(d.id), State: d.state, RuntimeName: d.runtimeName,
+		Steps: append([]DraftStep{}, d.steps...), Note: optional(d.note)}
 	if d.state == "done" {
-		update.DraftJSON = d.best()
+		update.DraftJSON = jsonValue(d.best())
 	} else {
-		update.DraftJSON = d.passed
+		update.DraftJSON = jsonValue(d.passed)
 	}
 	if d.check != nil {
 		c := *d.check
@@ -1087,7 +1022,7 @@ func (s *Drafts) tell(d *draft) {
 			if update.Question != nil {
 				update.Question.Text = d.redact.Text(update.Question.Text)
 			}
-			update.Note = d.redact.Text(update.Note)
+			update.Note = optional(d.redact.Text(deref(update.Note)))
 		}
 	}
 	s.hooks.Notify(d.owner, update)
@@ -1107,7 +1042,7 @@ func redactUpdate(update DraftUpdate, redact Redaction) (DraftUpdate, bool) {
 		}
 	}
 	var out DraftUpdate
-	if decodeJSON(rawOf(redacted), &out) != nil || !isUUID(out.Draft) {
+	if decodeJSON(rawOf(redacted), &out) != nil || !isUUID(string(out.Draft)) {
 		return update, false
 	}
 	for _, step := range out.Steps {
@@ -1115,7 +1050,7 @@ func redactUpdate(update DraftUpdate, redact Redaction) (DraftUpdate, bool) {
 			return update, false
 		}
 	}
-	if q := out.Question; q != nil && (!isUUID(q.ID) || !contains([]string{"start", "stop", "check"}, q.Kind)) {
+	if q := out.Question; q != nil && (!isUUID(string(q.ID)) || !contains([]string{"start", "stop", "check"}, q.Kind)) {
 		return update, false
 	}
 	if c := get(o, "check"); c != nil && !has(c, "passed") {
@@ -1285,11 +1220,11 @@ func sample(item any) string {
 // workspaceLine is ProviderDrafts.line.
 func workspaceLine(w WorkspaceInfo) string {
 	parts := []string{fmt.Sprintf("%s (id %s): %s", w.Name, w.ID, w.State)}
-	if w.SSH != "" {
-		parts = append(parts, "ssh "+w.SSH)
+	if deref(w.SSH) != "" {
+		parts = append(parts, "ssh "+*w.SSH)
 	}
-	if w.Cost != "" {
-		parts = append(parts, w.Cost)
+	if deref(w.Cost) != "" {
+		parts = append(parts, *w.Cost)
 	}
 	return "- " + strings.Join(parts, ", ")
 }

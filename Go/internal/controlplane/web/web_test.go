@@ -616,14 +616,14 @@ func TestABuildThatDoesNotMatchItsManifestLeavesTheListenerOff(t *testing.T) {
 		t.Fatal("served an edited build")
 	}
 	status := StatusOf(DefaultPort, l, err)
-	if status != (Status{Port: DefaultPort, Reason: ReasonBuild, Detail: "app.js does not match its manifest"}) {
+	if !same(status, Status{Port: DefaultPort, Reason: new(ReasonBuild), Detail: new("app.js does not match its manifest")}) {
 		t.Errorf("status: %+v", status)
 	}
 	if !log.has("web: not serving, app.js does not match its manifest") {
 		t.Errorf("log: %v", log.all)
 	}
-	if status.Summary() != "Not serving: this copy of Agents Host’s web app is damaged or missing." {
-		t.Errorf("summary: %s", status.Summary())
+	if Summary(status) != "Not serving: this copy of Agents Host’s web app is damaged or missing." {
+		t.Errorf("summary: %s", Summary(status))
 	}
 }
 
@@ -639,11 +639,11 @@ func TestATakenPortIsReportedAsNotServedAndServesOnceItIsFree(t *testing.T) {
 		t.Fatal("served on a taken port")
 	}
 	off := StatusOf(port, l, err)
-	if off.Port != port || off.Served || off.Reason != ReasonPortInUse || off.Detail == "" {
+	if off.Port != int64(port) || off.Served || off.Reason == nil || *off.Reason != ReasonPortInUse || off.Detail == nil || *off.Detail == "" {
 		t.Errorf("off: %+v", off)
 	}
-	if off.Summary() != fmt.Sprintf("Not serving: port %d is in use by another app.", port) {
-		t.Errorf("summary: %s", off.Summary())
+	if Summary(off) != fmt.Sprintf("Not serving: port %d is in use by another app.", port) {
+		t.Errorf("summary: %s", Summary(off))
 	}
 	if !log.has(fmt.Sprintf("web: port %d not bound", port)) {
 		t.Errorf("log: %v", log.all)
@@ -652,11 +652,11 @@ func TestATakenPortIsReportedAsNotServedAndServesOnceItIsFree(t *testing.T) {
 	taken.Close()
 	l = start(t, Config{Folder: dist(t), Port: port})
 	on := StatusOf(port, l, nil)
-	if on != (Status{Port: port, Served: true}) || on != l.Status() {
+	if !same(on, Status{Port: int64(port), Served: true}) || !same(on, l.Status()) {
 		t.Errorf("on: %+v", on)
 	}
-	if on.Summary() != fmt.Sprintf("At http://localhost:%d, for a browser on this Mac only.", port) {
-		t.Errorf("summary: %s", on.Summary())
+	if Summary(on) != fmt.Sprintf("At http://localhost:%d, for a browser on this Mac only.", port) {
+		t.Errorf("summary: %s", Summary(on))
 	}
 	if resp, _ := fetch(t, "GET", fmt.Sprintf("127.0.0.1:%d", port), fmt.Sprintf("localhost:%d", port), "/"); resp.StatusCode != 200 {
 		t.Errorf("after: %d", resp.StatusCode)
@@ -683,7 +683,7 @@ func TestAPortTakenOnIPv6AloneLeavesTheListenerOff(t *testing.T) {
 	if !errors.Is(err, syscall.EADDRINUSE) {
 		t.Skipf("127.0.0.1:%d was taken by someone else: %v", port, err)
 	}
-	if s := StatusOf(port, l, err); s.Reason != ReasonPortInUse {
+	if s := StatusOf(port, l, err); s.Reason == nil || *s.Reason != ReasonPortInUse {
 		t.Errorf("status: %+v", s)
 	}
 	// And 127.0.0.1 on that port was let go.
@@ -695,25 +695,35 @@ func TestAPortTakenOnIPv6AloneLeavesTheListenerOff(t *testing.T) {
 }
 
 func TestStatusJSONIsTheSwifts(t *testing.T) {
-	for status, want := range map[Status]string{
-		{Port: 8792, Served: true}:                                 `{"port":8792,"served":true}`,
-		{Port: 8792, Reason: ReasonPortInUse}:                      `{"port":8792,"served":false,"reason":"portInUse"}`,
-		{Port: 8792, Reason: ReasonFailed, Detail: "no such file"}: `{"port":8792,"served":false,"reason":"failed","detail":"no such file"}`,
+	for _, c := range []struct {
+		status Status
+		want   string
+	}{
+		{Status{Port: 8792, Served: true}, `{"port":8792,"served":true}`},
+		{Status{Port: 8792, Reason: new(ReasonPortInUse)}, `{"port":8792,"served":false,"reason":"portInUse"}`},
+		{Status{Port: 8792, Reason: new(ReasonFailed), Detail: new("no such file")}, `{"port":8792,"served":false,"reason":"failed","detail":"no such file"}`},
 	} {
-		data, _ := json.Marshal(status)
-		if string(data) != want {
-			t.Errorf("%s, want %s", data, want)
+		data, _ := json.Marshal(c.status)
+		if string(data) != c.want {
+			t.Errorf("%s, want %s", data, c.want)
 		}
 		var back Status
-		if json.Unmarshal(data, &back) != nil || back != status {
+		if json.Unmarshal(data, &back) != nil || !same(back, c.status) {
 			t.Errorf("round trip: %+v", back)
 		}
 	}
-	failed := Status{Port: 1, Reason: ReasonFailed, Detail: "x"}
-	if failed.Summary() != "Not serving: port 1 couldn’t be opened (x)." {
-		t.Errorf("summary: %s", failed.Summary())
+	failed := Status{Port: 1, Reason: new(ReasonFailed), Detail: new("x")}
+	if Summary(failed) != "Not serving: port 1 couldn’t be opened (x)." {
+		t.Errorf("summary: %s", Summary(failed))
 	}
-	if (Status{Port: 1, Reason: ReasonFailed}).Summary() != "Not serving: port 1 couldn’t be opened." {
+	if Summary(Status{Port: 1, Reason: new(ReasonFailed)}) != "Not serving: port 1 couldn’t be opened." {
 		t.Error("summary without detail")
 	}
+}
+
+// same is whether two statuses say the same on the wire.
+func same(a, b Status) bool {
+	x, _ := json.Marshal(a)
+	y, _ := json.Marshal(b)
+	return string(x) == string(y)
 }

@@ -14,6 +14,7 @@ import (
 	"github.com/alexec/agents/Go/internal/controlplane/providers"
 	"github.com/alexec/agents/Go/internal/controlplane/records"
 	"github.com/alexec/agents/Go/internal/controlplane/web"
+	"github.com/alexec/agents/Go/wire"
 )
 
 // Methods is ControlMethods: the methods the control plane answers itself (058,
@@ -98,7 +99,7 @@ func (m *Methods) Handle(method string, params json.RawMessage, from Caller) (an
 	case "hosts/list":
 		return m.hostList(), nil
 	case "clients/list", "devices/list":
-		out := []clientWire{}
+		out := []wire.ClientRecord{}
 		for _, c := range m.records.Clients() {
 			out = append(out, clientOnWire(c))
 		}
@@ -114,9 +115,9 @@ func (m *Methods) Handle(method string, params json.RawMessage, from Caller) (an
 				break
 			}
 		}
-		out := []clientConnection{}
+		out := []wire.ClientConnection{}
 		for client, relayed := range m.router.Connections() {
-			c := clientConnection{Client: client, Relayed: relayed}
+			c := wire.ClientConnection{Client: wire.UUID(client), Relayed: relayed}
 			if relayed {
 				c.Through = relay
 			}
@@ -127,11 +128,9 @@ func (m *Methods) Handle(method string, params json.RawMessage, from Caller) (an
 	case "clients/startPairing":
 		// A grant an older window still sends is let go: every client may do everything
 		// (#111).
-		var p struct {
-			Kind string `json:"kind"`
-		}
+		var p wire.ClientPairingRequest
 		json.Unmarshal(params, &p)
-		return m.s.codes.Issue(ctx, false, p.Kind == records.KindBrowser, controllink.CodeLifetime)
+		return m.s.codes.Issue(ctx, false, deref(p.Kind) == records.KindBrowser, controllink.CodeLifetime)
 	case "devices/startPairing":
 		return m.s.codes.Issue(ctx, false, false, controllink.CodeLifetime)
 	case "clients/stopPairing", "devices/stopPairing":
@@ -140,14 +139,14 @@ func (m *Methods) Handle(method string, params json.RawMessage, from Caller) (an
 		// An older window's grant picker, refused in words: there is nothing left to set.
 		return nil, fail(notSupported, "Every paired client may do everything now, so there is no grant to change. Update this window to lose the choice.")
 	case "clients/forget", "devices/forget":
-		var p struct {
-			Client string `json:"client"`
-			ID     string `json:"id"`
-		}
-		json.Unmarshal(params, &p)
-		id := p.Client
+		// clients/forget says the client; devices/forget, from an older Remote, its id.
+		var client wire.ClientRequest
+		var device wire.DeviceForget
+		json.Unmarshal(params, &client)
+		json.Unmarshal(params, &device)
+		id := string(client.Client)
 		if !controllink.IsUUID(id) {
-			id = p.ID
+			id = string(device.ID)
 		}
 		if !controllink.IsUUID(id) {
 			return nil, fail(invalidParams, "Which client?")
@@ -171,25 +170,23 @@ func (m *Methods) Handle(method string, params json.RawMessage, from Caller) (an
 	case "hosts/detect":
 		return m.s.installer.Detect(ctx)
 	case "hosts/sshHosts":
-		var p struct {
-			Destination string `json:"destination"`
-		}
+		var p wire.SSHHostsRequest
 		json.Unmarshal(params, &p)
-		return m.s.installer.SSHHosts(ctx, strings.TrimSpace(p.Destination))
+		return m.s.installer.SSHHosts(ctx, strings.TrimSpace(deref(p.Destination)))
 	case "hosts/update":
-		request, err := require[hostRequest](params, "HostRequest")
+		request, err := require[wire.HostRequest](params, "HostRequest")
 		if err != nil {
 			return nil, err
 		}
-		return map[string]any{}, m.s.installer.Update(ctx, request.Host)
+		return map[string]any{}, m.s.installer.Update(ctx, string(request.Host))
 	case "hosts/checkAgain":
-		request, err := require[hostRequest](params, "HostRequest")
+		request, err := require[wire.HostRequest](params, "HostRequest")
 		if err != nil {
 			return nil, err
 		}
-		return map[string]any{}, m.s.installer.CheckAgain(ctx, request.Host)
+		return map[string]any{}, m.s.installer.CheckAgain(ctx, string(request.Host))
 	case "control/setProjectDetection":
-		request, err := require[projectDetection](params, "ProjectDetection")
+		request, err := require[wire.ProjectDetection](params, "ProjectDetection")
 		if err != nil {
 			return nil, err
 		}
@@ -206,12 +203,12 @@ func (m *Methods) Handle(method string, params json.RawMessage, from Caller) (an
 		}
 		return request, nil
 	case "hosts/lendSignIn":
-		request, err := require[lendSignIn](params, "LendSignIn")
+		request, err := require[wire.LendSignIn](params, "LendSignIn")
 		if err != nil {
 			return nil, err
 		}
-		record := m.records.Host(request.Host)
-		if record == nil || m.records.Host(request.From) == nil {
+		record := m.records.Host(string(request.Host))
+		if record == nil || m.records.Host(string(request.From)) == nil {
 			return nil, fail(noSuchHost, "No such host.")
 		}
 		lends := map[string]string{}
@@ -219,7 +216,7 @@ func (m *Methods) Handle(method string, params json.RawMessage, from Caller) (an
 			lends[k] = v
 		}
 		if request.Allowed {
-			lends[request.Runtime] = request.From
+			lends[request.Runtime] = string(request.From)
 		} else {
 			delete(lends, request.Runtime)
 		}
@@ -230,57 +227,59 @@ func (m *Methods) Handle(method string, params json.RawMessage, from Caller) (an
 		if err := m.records.SaveHost(ctx, *record); err != nil {
 			return nil, err
 		}
-		m.s.announce("hostEnrolled", request.Host, from.Client)
+		m.s.announce("hostEnrolled", string(request.Host), from.Client)
 		return map[string]any{}, nil
 	case "hosts/lendGit":
-		request, err := require[lendGit](params, "LendGit")
+		request, err := require[wire.LendGit](params, "LendGit")
 		if err != nil {
 			return nil, err
 		}
 		if err := m.lendGit(ctx, request); err != nil {
 			return nil, err
 		}
-		m.s.announce("hostEnrolled", request.Host, from.Client)
+		m.s.announce("hostEnrolled", string(request.Host), from.Client)
 		return map[string]any{}, nil
 	case "hosts/setRelay":
-		request, err := require[hostRelayRequest](params, "HostRelayRequest")
+		request, err := require[wire.HostRelayRequest](params, "HostRelayRequest")
 		if err != nil {
 			return nil, err
 		}
 		if err := m.setRelay(ctx, request); err != nil {
 			return nil, err
 		}
-		m.s.announce("hostEnrolled", request.Host, from.Client)
+		m.s.announce("hostEnrolled", string(request.Host), from.Client)
 		return map[string]any{}, nil
 	case "hosts/remove":
-		request, err := require[hostRequest](params, "HostRequest")
+		request, err := require[wire.HostRequest](params, "HostRequest")
 		if err != nil {
 			return nil, err
 		}
-		gone, err := m.records.RemoveHost(ctx, request.Host)
+		host := string(request.Host)
+		gone, err := m.records.RemoveHost(ctx, host)
 		if err != nil {
 			return nil, err
 		}
 		if !gone {
-			return nil, fail(noSuchHost, "No host is called %s.", request.Host)
+			return nil, fail(noSuchHost, "No host is called %s.", host)
 		}
-		m.router.ForgetHost(request.Host)
-		m.s.copies.forget(request.Host)
+		m.router.ForgetHost(host)
+		m.s.copies.forget(host)
 		if m.s.providers != nil && m.s.providers.Kept() != nil {
-			m.s.providers.Kept().Forget(request.Host)
+			m.s.providers.Kept().Forget(host)
 		}
-		m.s.announce("hostRemoved", request.Host, from.Client)
-		m.s.log("host " + request.Host + " removed")
+		m.s.announce("hostRemoved", host, from.Client)
+		m.s.log("host " + host + " removed")
 		return map[string]any{}, nil
 	case "hosts/lastHeard":
-		request, err := require[hostRequest](params, "HostRequest")
+		request, err := require[wire.HostRequest](params, "HostRequest")
 		if err != nil {
 			return nil, err
 		}
-		if m.records.Host(request.Host) == nil {
-			return nil, fail(noSuchHost, "No host is called %s.", request.Host)
+		host := string(request.Host)
+		if m.records.Host(host) == nil {
+			return nil, fail(noSuchHost, "No host is called %s.", host)
 		}
-		return m.s.copies.lastHeard(request.Host), nil
+		return m.s.copies.lastHeard(host), nil
 	}
 	if workspaceMethods[method] {
 		if m.s.providers == nil {
@@ -294,29 +293,34 @@ func (m *Methods) Handle(method string, params json.RawMessage, from Caller) (an
 // workspaceMethods is DaemonAPI.Method.workspaceMethods: workspace providers (#691).
 var workspaceMethods = providers.WorkspaceMethods
 
-func (m *Methods) status(from Caller) controlStatus {
+func (m *Methods) status(from Caller) wire.ControlStatus {
 	settings := m.records.Settings()
 	if settings == nil {
 		settings = &records.Settings{Name: m.s.cfg.Name, MachineID: m.s.cfg.MachineID}
 	}
-	started := RefDate(m.s.started)
-	port := m.s.cfg.Port
-	status := controlStatus{Name: settings.Name, Version: m.s.cfg.Version, HomeHost: settings.HomeHost,
-		MachineID: settings.MachineID, StartedAt: &started, Port: &port, You: from.Client}
+	status := wire.ControlStatus{Name: settings.Name, Version: m.s.cfg.Version, HomeHost: (*wire.HostID)(settings.HomeHost),
+		MachineID: settings.MachineID, StartedAt: new(dateOf(m.s.started)), Port: new(int64(m.s.cfg.Port)),
+		You: optional(wire.UUID(from.Client))}
 	m.mu.Lock()
 	status.Web = m.web
 	m.mu.Unlock()
 	status.ThisMacHost = m.s.thisMacHost()
 	if m.s.tunnels != nil {
-		for _, unjoined := range m.s.tunnels.Unjoined() {
-			raw, _ := json.Marshal(unjoined)
-			status.UnjoinedTunnels = append(status.UnjoinedTunnels, raw)
+		status.UnjoinedTunnels = m.s.tunnels.Unjoined()
+		if len(status.UnjoinedTunnels) == 0 {
+			status.UnjoinedTunnels = nil
 		}
 	}
-	status.ProjectDetection = settings.ProjectDetection
-	if len(status.ProjectDetection) == 0 {
-		status.ProjectDetection, _ = json.Marshal(standardDetection)
+	// As control.json has it, read as Swift's ControlStatus reads it; the standard where
+	// it has none.
+	detection := standardDetection
+	if len(settings.ProjectDetection) > 0 {
+		var kept wire.ProjectDetection
+		if json.Unmarshal(settings.ProjectDetection, &kept) == nil {
+			detection = kept
+		}
 	}
+	status.ProjectDetection = &detection
 	away := false
 	status.AwayFromHome = &away
 	for _, h := range m.records.Hosts() {
@@ -337,8 +341,8 @@ func (m *Methods) SetWeb(status *web.Status) {
 	m.mu.Unlock()
 }
 
-func (m *Methods) hostList() []controlHost {
-	out := []controlHost{}
+func (m *Methods) hostList() []wire.ControlHost {
+	out := []wire.ControlHost{}
 	for _, h := range m.records.Hosts() {
 		out = append(out, m.hostRow(h))
 	}
@@ -346,26 +350,24 @@ func (m *Methods) hostList() []controlHost {
 }
 
 // hostRow is one hosts/list row, as it stands now.
-func (m *Methods) hostRow(h records.HostRecord) controlHost {
+func (m *Methods) hostRow(h records.HostRecord) wire.ControlHost {
 	state, _ := m.router.Described(h.ID)["state"].(string)
-	row := controlHost{ID: h.ID, Name: h.Name, Platform: h.Platform, Version: h.Version, State: state,
-		Reach: "dialOut", MachineID: h.MachineID, Relay: h.Relay, SignInFrom: h.SignInFrom, GitFrom: h.GitFrom}
-	if impl, ok := h.Extra["implementation"]; ok {
-		json.Unmarshal(impl, &row.Implementation)
+	row := wire.ControlHost{ID: wire.HostID(h.ID), Name: h.Name, Platform: h.Platform, Version: h.Version, State: state,
+		Reach: "dialOut", MachineID: h.MachineID, Relay: h.Relay, SignInFrom: hostIDs(h.SignInFrom), GitFrom: hostIDs(h.GitFrom)}
+	if raw, ok := h.Extra["implementation"]; ok {
+		var impl string
+		json.Unmarshal(raw, &impl)
+		row.Implementation = optional(impl)
 	}
 	m.mu.Lock()
 	for server, ask := range m.gitAsks[h.ID] {
-		row.GitAsks = append(row.GitAsks, gitAsk{Server: server, From: ask.from})
+		row.GitAsks = append(row.GitAsks, wire.GitAsk{Server: server, From: wire.HostID(ask.from)})
 	}
 	m.mu.Unlock()
 	sort.Slice(row.GitAsks, func(i, j int) bool { return row.GitAsks[i].Server < row.GitAsks[j].Server })
-	if ws := m.router.Workspace(h.ID); ws != nil {
-		row.Workspace, _ = json.Marshal(ws)
-	}
+	row.Workspace = m.router.Workspace(h.ID)
 	if m.s.tunnels != nil {
-		if tunnel := m.s.tunnels.State(h.ID); tunnel != nil {
-			row.Tunnel, _ = json.Marshal(tunnel)
-		}
+		row.Tunnel = m.s.tunnels.State(h.ID)
 	}
 	return row
 }
@@ -442,10 +444,11 @@ func (m *Methods) NoteEpoch(ctx context.Context, id controllink.Identity, epoch 
 
 // setRelay is hosts/setRelay or relay/switch (#824): a relay switched on or off, keeping
 // its enrolment.
-func (m *Methods) setRelay(ctx context.Context, request hostRelayRequest) error {
-	record := m.records.Host(request.Host)
+func (m *Methods) setRelay(ctx context.Context, request wire.HostRelayRequest) error {
+	host := string(request.Host)
+	record := m.records.Host(host)
 	if record == nil {
-		return fail(noSuchHost, "No host is called %s.", request.Host)
+		return fail(noSuchHost, "No host is called %s.", host)
 	}
 	// Only agents-relay carries devices; a host that runs agents cannot start to.
 	if record.Relay == nil {
@@ -458,7 +461,7 @@ func (m *Methods) setRelay(ctx context.Context, request hostRelayRequest) error 
 	if err := m.records.SaveHost(ctx, *record); err != nil {
 		return err
 	}
-	m.router.SetRelay(request.Host, record.Relay)
+	m.router.SetRelay(host, record.Relay)
 	m.s.tellRelayDevices()
 	return nil
 }
@@ -469,7 +472,7 @@ func (m *Methods) HostSaid(host, method string, params json.RawMessage) (any, er
 	case "control/ping":
 		return map[string]any{}, nil
 	case "host/hello":
-		hello, err := require[hostHello](params, "HostHello")
+		hello, err := require[wire.HostHello](params, "HostHello")
 		if err != nil {
 			return nil, err
 		}
@@ -485,13 +488,11 @@ func (m *Methods) HostSaid(host, method string, params json.RawMessage) (any, er
 		return map[string]any{}, nil
 	case "relay/switch":
 		// A relay host on or off by its own word (#824): only its own record.
-		request, err := require[struct {
-			Relay bool `json:"relay"`
-		}](params, "RelaySwitch")
+		request, err := require[wire.RelaySwitch](params, "RelaySwitch")
 		if err != nil {
 			return nil, err
 		}
-		if err := m.setRelay(ctx, hostRelayRequest{Host: host, Relay: request.Relay}); err != nil {
+		if err := m.setRelay(ctx, wire.HostRelayRequest{Host: wire.HostID(host), Relay: request.Relay}); err != nil {
 			return nil, err
 		}
 		m.s.announce("hostEnrolled", host, host)
@@ -508,14 +509,14 @@ func (m *Methods) HostSaid(host, method string, params json.RawMessage) (any, er
 		}
 		return m.s.providers.HostSaid(host, method, params)
 	case "git/credential":
-		request, err := require[gitCredentialRequest](params, "GitCredentialRequest")
+		request, err := require[wire.GitCredentialRequest](params, "GitCredentialRequest")
 		if err != nil {
 			return nil, err
 		}
 		return m.gitCredential(ctx, host, request)
 	case "tunnel/open":
 		// Only to a lender a person said yes to, for that runtime (T091).
-		request, err := require[tunnelOpen](params, "TunnelOpen")
+		request, err := require[wire.TunnelOpen](params, "TunnelOpen")
 		if err != nil {
 			return nil, err
 		}
@@ -536,7 +537,7 @@ func (m *Methods) HostSaid(host, method string, params json.RawMessage) (any, er
 
 // hello is host/hello: what the host says it is now, written only when it changed
 // something, and the home host settled.
-func (m *Methods) hello(ctx context.Context, host string, hello hostHello) error {
+func (m *Methods) hello(ctx context.Context, host string, hello wire.HostHello) error {
 	known := m.records.Host(host)
 	record := records.HostRecord{ID: host, Name: host}
 	if hello.Name != nil {
@@ -554,8 +555,8 @@ func (m *Methods) hello(ctx context.Context, host string, hello hostHello) error
 	}
 	// Which language the host is written in (#1134), kept beside the record's own fields
 	// so a Swift copy keeps it too.
-	if hello.Implementation != "" {
-		impl, _ := json.Marshal(hello.Implementation)
+	if deref(hello.Implementation) != "" {
+		impl, _ := json.Marshal(*hello.Implementation)
 		extra := records.Extra{}
 		for k, v := range record.Extra {
 			extra[k] = v
@@ -623,12 +624,6 @@ func sameHost(a, b records.HostRecord) bool {
 
 // MARK: Git access lent between hosts (#1122)
 
-type gitCredentialRequest struct {
-	Protocol string `json:"protocol"`
-	Host     string `json:"host"`
-	Path     string `json:"path,omitempty"`
-}
-
 // isGitServer is GitCredentialRequest.isServer: a host name, and nothing else.
 func isGitServer(s string) bool {
 	if s == "" || len(s) > 253 {
@@ -643,12 +638,13 @@ func isGitServer(s string) bool {
 }
 
 // lendGit is hosts/lendGit: kept for a yes, taken back for a no; either ends a waiting ask.
-func (m *Methods) lendGit(ctx context.Context, request lendGit) error {
+func (m *Methods) lendGit(ctx context.Context, request wire.LendGit) error {
 	if !isGitServer(request.Server) {
 		return fail(invalidParams, "That is not a git server.")
 	}
-	record := m.records.Host(request.Host)
-	if record == nil || m.records.Host(request.From) == nil {
+	host := string(request.Host)
+	record := m.records.Host(host)
+	if record == nil || m.records.Host(string(request.From)) == nil {
 		return fail(noSuchHost, "No such host.")
 	}
 	lends := map[string]string{}
@@ -656,7 +652,7 @@ func (m *Methods) lendGit(ctx context.Context, request lendGit) error {
 		lends[k] = v
 	}
 	if request.Allowed {
-		lends[request.Server] = request.From
+		lends[request.Server] = string(request.From)
 	} else {
 		delete(lends, request.Server)
 	}
@@ -671,22 +667,22 @@ func (m *Methods) lendGit(ctx context.Context, request lendGit) error {
 		}
 	}
 	m.mu.Lock()
-	asked := m.gitAsks[request.Host][request.Server]
-	delete(m.gitAsks[request.Host], request.Server)
+	asked := m.gitAsks[host][request.Server]
+	delete(m.gitAsks[host], request.Server)
 	m.mu.Unlock()
 	if asked != nil {
 		for _, w := range asked.waiting {
 			w <- request.Allowed
 		}
 	}
-	m.sayHostChanged(request.Host)
+	m.sayHostChanged(host)
 	return nil
 }
 
 // gitCredential is git/credential from a host's git: the lent credential, asked of the
 // lender only for a lend a person allowed. With none yet, every client is asked, and the
 // command waits for the answer. It fails at once while the lender is not connected.
-func (m *Methods) gitCredential(ctx context.Context, host string, request gitCredentialRequest) (json.RawMessage, error) {
+func (m *Methods) gitCredential(ctx context.Context, host string, request wire.GitCredentialRequest) (json.RawMessage, error) {
 	if request.Protocol != "https" || !isGitServer(request.Host) {
 		return nil, fail(invalidParams, "Only https git access is lent.")
 	}
@@ -720,10 +716,7 @@ func (m *Methods) gitCredential(ctx context.Context, host string, request gitCre
 		return nil, fail(hostOffline, "%s did not answer for its git access to %s.", lenderName, server)
 	}
 	if len(answer.Result) > 0 {
-		var credential struct {
-			Username string `json:"username"`
-			Password string `json:"password"`
-		}
+		var credential wire.GitCredential
 		if json.Unmarshal(answer.Result, &credential) == nil && credential.Password != "" {
 			return answer.Result, nil
 		}
@@ -839,5 +832,5 @@ func readJoinFile(file string) *HostJoinStatus {
 		return nil
 	}
 	return &HostJoinStatus{Member: read.Status.Member, Connected: read.Status.Connected, Problem: read.Status.Problem,
-		At: RefDate(read.Status.At)}
+		At: dateOf(read.Status.At)}
 }
