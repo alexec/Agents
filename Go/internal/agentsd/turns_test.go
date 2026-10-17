@@ -41,8 +41,30 @@ type fakeRuntime struct {
 
 func (f *fakeRuntime) Initialize(context.Context, sdk.InitializeRequest) (sdk.InitializeResponse, error) {
 	return sdk.InitializeResponse{ProtocolVersion: sdk.ProtocolVersionNumber,
-		AgentCapabilities: sdk.AgentCapabilities{SessionCapabilities: sdk.SessionCapabilities{Resume: &sdk.SessionResumeCapabilities{},
-			Fork: &sdk.SessionForkCapabilities{}}}}, nil
+		AgentCapabilities: sdk.AgentCapabilities{LoadSession: true, SessionCapabilities: sdk.SessionCapabilities{Resume: &sdk.SessionResumeCapabilities{},
+			Fork: &sdk.SessionForkCapabilities{}, List: &sdk.SessionListCapabilities{}, Delete: &sdk.SessionDeleteCapabilities{}}}}, nil
+}
+
+// The fake holds one conversation the app did not start, "theirs", in any folder.
+func (f *fakeRuntime) ListSessions(_ context.Context, r sdk.ListSessionsRequest) (sdk.ListSessionsResponse, error) {
+	title, at := "Their talk", "2026-10-16T09:00:00Z"
+	return sdk.ListSessionsResponse{Sessions: []sdk.SessionInfo{{SessionId: "theirs", Cwd: *r.Cwd, Title: &title, UpdatedAt: &at}}}, nil
+}
+
+// LoadSession replays "theirs": the person's words in two chunks, then the reply.
+func (f *fakeRuntime) LoadSession(ctx context.Context, r sdk.LoadSessionRequest) (sdk.LoadSessionResponse, error) {
+	if r.SessionId != "theirs" {
+		return sdk.LoadSessionResponse{}, fmt.Errorf("no session %s", r.SessionId)
+	}
+	<-f.ready
+	for _, u := range []sdk.SessionUpdate{sdk.UpdateUserMessageText("What is "), sdk.UpdateUserMessageText("two and two?"), sdk.UpdateAgentMessageText("Four.")} {
+		f.conn.SessionUpdate(ctx, sdk.SessionNotification{SessionId: r.SessionId, Update: u})
+	}
+	return sdk.LoadSessionResponse{}, nil
+}
+
+func (f *fakeRuntime) UnstableDeleteSession(context.Context, sdk.UnstableDeleteSessionRequest) (sdk.UnstableDeleteSessionResponse, error) {
+	return sdk.UnstableDeleteSessionResponse{}, nil
 }
 
 func (f *fakeRuntime) UnstableForkSession(_ context.Context, r sdk.UnstableForkSessionRequest) (sdk.UnstableForkSessionResponse, error) {

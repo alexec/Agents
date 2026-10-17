@@ -61,6 +61,26 @@
       ],
       "additionalProperties": false
     },
+    "AdoptRequest": {
+      "type": "object",
+      "properties": {
+        "runtimeID": {
+          "type": "string"
+        },
+        "sessionID": {
+          "type": "string"
+        },
+        "cwd": {
+          "$ref": "#/definitions/URLString"
+        }
+      },
+      "required": [
+        "runtimeID",
+        "sessionID",
+        "cwd"
+      ],
+      "additionalProperties": false
+    },
     "AfterTurn": {
       "type": "string",
       "enum": [
@@ -2673,6 +2693,25 @@
         "displayName",
         "description",
         "holders"
+      ],
+      "additionalProperties": false
+    },
+    "DeleteSessionRequest": {
+      "type": "object",
+      "properties": {
+        "runtimeID": {
+          "type": "string"
+        },
+        "sessionID": {
+          "type": "string"
+        },
+        "confirmed": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "runtimeID",
+        "sessionID"
       ],
       "additionalProperties": false
     },
@@ -7450,6 +7489,37 @@
         }
       ]
     },
+    "RuntimeSession": {
+      "type": "object",
+      "properties": {
+        "sessionID": {
+          "type": "string"
+        },
+        "cwd": {
+          "$ref": "#/definitions/URLString"
+        },
+        "additionalDirectories": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/URLString"
+          }
+        },
+        "title": {
+          "type": "string"
+        },
+        "updatedAt": {
+          "$ref": "#/definitions/WireDate"
+        },
+        "isHeld": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "sessionID",
+        "cwd"
+      ],
+      "additionalProperties": false
+    },
     "RuntimeStatus": {
       "type": "object",
       "properties": {
@@ -7754,6 +7824,22 @@
       "required": [
         "severity",
         "title"
+      ],
+      "additionalProperties": false
+    },
+    "SessionsListRequest": {
+      "type": "object",
+      "properties": {
+        "runtimeID": {
+          "type": "string"
+        },
+        "cwd": {
+          "$ref": "#/definitions/URLString"
+        }
+      },
+      "required": [
+        "runtimeID",
+        "cwd"
       ],
       "additionalProperties": false
     },

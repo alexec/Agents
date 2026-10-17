@@ -121,6 +121,9 @@ var (
 	CallRuntimesList                   = Method[Empty, []RuntimeStatus]{"runtimes/list"}
 	CallRuntimesMarkAvailable          = Method[MarkRuntimeAvailable, RuntimeAllowances]{"runtimes/markAvailable"}
 	CallSandboxState                   = Method[Empty, SandboxSettings]{"sandbox/state"}
+	CallSessionsAdopt                  = Method[AdoptRequest, UUID]{"sessions/adopt"}
+	CallSessionsDelete                 = Method[DeleteSessionRequest, Empty]{"sessions/delete"}
+	CallSessionsList                   = Method[SessionsListRequest, []RuntimeSession]{"sessions/list"}
 	CallShellAttach                    = Method[ShellAttachRequest, ShellAttachResponse]{"shell/attach"}
 	CallShellClose                     = Method[ShellRequest, Empty]{"shell/close"}
 	CallShellDetach                    = Method[ShellRequest, Empty]{"shell/detach"}
