@@ -329,6 +329,18 @@ export interface ArtifactWriteRequest {
   text: string;
 }
 
+export interface AssessRuntimeRequest {
+  runtimeID: string;
+  folder: URLString;
+  model?: string;
+}
+
+export interface AssessRuntimeResult {
+  agentID: UUID;
+  model?: string;
+  reportPath: string;
+}
+
 export interface Attachment {
   id: UUID;
   block: ContentBlock;
@@ -442,6 +454,42 @@ export type CatalogError =
   | { cannotAdd: { _0: PreviewProblem[] } }
   | { notManaged: { name: string } }
   | { failed: { _0: string } };
+
+export type CatalogKind = "skills" | "mcp";
+
+export interface CatalogPreviewAnswer {
+  preview?: SkillPreview;
+  error?: CatalogError;
+}
+
+export interface CatalogPreviewRequest {
+  result: CatalogResult;
+  destination: SkillDestination;
+}
+
+export interface CatalogResult {
+  id: string;
+  name: string;
+  owner: string;
+  repo: string;
+  skillID: string;
+  installs: number;
+  known: boolean;
+  marketplace?: string;
+  skillPath?: string;
+}
+
+export interface CatalogSearchAnswer {
+  results: CatalogResult[];
+  error?: CatalogError;
+}
+
+export interface CatalogSearchRequest {
+  query: string;
+  kind?: CatalogKind;
+  marketplace?: string;
+  destination?: SkillDestination;
+}
 
 export interface CatchUpLeases {
   leases: LeaseSnapshot;
@@ -729,6 +777,22 @@ export interface DeleteSessionRequest {
   runtimeID: string;
   sessionID: string;
   confirmed?: boolean;
+}
+
+export type DestinationState =
+  | { free: Record<string, never> }
+  | { sameSkill: { update: boolean } }
+  | { managedOther: { source: string } }
+  | { unmanaged: { path: string } }
+  | { unavailable: { _0: CatalogError } };
+
+export interface DestinationStateAnswer {
+  destinationState: DestinationState;
+}
+
+export interface DestinationStateRequest {
+  previewID: UUID;
+  destination: SkillDestination;
 }
 
 export interface DeviceBinding {
@@ -1312,12 +1376,95 @@ export interface ListedSkill {
   managed?: ManagedSkill;
 }
 
+export interface MCPAddAnswer {
+  server?: ManagedMCPServer;
+  error?: MCPCatalogError;
+}
+
+export interface MCPAddByHandRequest {
+  verifyID: UUID;
+  destination: SkillDestination;
+}
+
+export interface MCPAddRequest {
+  previewID: UUID;
+  destination: SkillDestination;
+  secrets: Record<string, string>;
+  plain: Record<string, string>;
+  replace: boolean;
+}
+
+export type MCPApprovalState =
+  | { approved: Record<string, never> }
+  | { waiting: { digest: string; isNew: boolean } };
+
+export interface MCPApproveRequest {
+  destination: SkillDestination;
+  name: string;
+  digest: string;
+}
+
+export type MCPCatalogError =
+  | { unreachable: { host: string } }
+  | { timedOut: { host: string } }
+  | { noPersonalHome: Record<string, never> }
+  | { unmanaged: { path: string } }
+  | { mcpUnreadable: { path: string } }
+  | { missingSecret: { name: string } }
+  | { staleDigest: Record<string, never> }
+  | { secretStillInUse: { name: string } }
+  | { previewExpired: Record<string, never> }
+  | { noRunnableWay: Record<string, never> }
+  | { replaceMismatch: Record<string, never> }
+  | { notAProject: { path: string } }
+  | { nameTaken: { name: string } }
+  | { invalid: { _0: string } }
+  | { failed: { _0: string } };
+
+export interface MCPCatalogResult {
+  id: string;
+  title: string;
+  description: string;
+  version: string;
+  publisher: MCPPublisherInfo;
+  known: boolean;
+  runs: MCPRunKind[];
+  remoteHost?: string;
+  marketplace?: string;
+}
+
 export type MCPCheckState = "unchecked" | "checking" | "answered" | "failed" | "waiting" | "missingSecret" | "signIn" | "oldTransport";
+
+export type MCPDestinationState =
+  | { free: Record<string, never> }
+  | { managedSame: Record<string, never> }
+  | { managedOther: { registryName: string } }
+  | { unmanaged: { path: string } }
+  | { unavailable: { _0: MCPCatalogError } };
 
 export interface MCPEventTrigger {
   event: string;
   servers?: string[];
   arguments: Record<string, JSONValue>;
+}
+
+export interface MCPHandServer {
+  name: string;
+  kind: MCPHandServerKind;
+  command: string;
+  args: string[];
+  env: MCPHandValue[];
+  url: string;
+  headers: MCPHandValue[];
+}
+
+export type MCPHandServerKind = "command" | "url";
+
+export interface MCPHandValue {
+  name: string;
+  value: string;
+  secret: boolean;
+  secretName?: string;
 }
 
 export interface MCPHealthCheckRequest {
@@ -1333,6 +1480,71 @@ export interface MCPHealthSnapshot {
   servers: MCPServerHealth[];
   problems: MCPHealthFileProblem[];
   at: WireDate;
+}
+
+export interface MCPListAnswer {
+  servers: ProjectMCPServer[];
+  problem?: string;
+  approvalsProblem?: string;
+}
+
+export interface MCPListRequest {
+  destination: SkillDestination;
+}
+
+export interface MCPPreview {
+  previewID: UUID;
+  result: MCPCatalogResult;
+  nameHere: string;
+  chosenRun: MCPRunKind;
+  commandOrURL: string;
+  host?: string;
+  entry: Record<string, JSONValue>;
+  variables: MCPVariable[];
+  reach: Record<string, JSONValue>;
+  destinationState: MCPDestinationState;
+  problems: MCPPreviewProblem[];
+}
+
+export interface MCPPreviewAnswer {
+  preview?: MCPPreview;
+  error?: MCPCatalogError;
+}
+
+export type MCPPreviewProblem =
+  | { unreachable: { host: string } }
+  | { noRunnableWay: Record<string, never> }
+  | { nameTakenUnmanaged: Record<string, never> }
+  | { mcpUnreadable: { path: string } }
+  | { noPersonalHome: Record<string, never> };
+
+export interface MCPPreviewRequest {
+  result: MCPCatalogResult;
+  destination: SkillDestination;
+  run?: MCPRunKind;
+}
+
+export interface MCPPublisherInfo {
+  label: string;
+  namespace: string;
+  known: boolean;
+}
+
+export interface MCPRemoveAnswer {
+  ok: boolean;
+}
+
+export interface MCPRemoveRequest {
+  destination: SkillDestination;
+  name: string;
+  forgetSecret?: string;
+}
+
+export type MCPRunKind = "remote" | "npx" | "uvx" | "docker" | "command";
+
+export interface MCPSearchAnswer {
+  results: MCPCatalogResult[];
+  error?: MCPCatalogError;
 }
 
 export interface MCPServer {
@@ -1357,6 +1569,61 @@ export type MCPServerTransport =
   | { http: { url: string; headers: Record<string, string> } }
   | { sse: { url: string; headers: Record<string, string> } };
 
+export interface MCPSetSecretAnswer {
+  set: boolean;
+}
+
+export interface MCPSetSecretRequest {
+  name: string;
+  value: string;
+}
+
+export interface MCPSignInAnswer {
+  flowID?: UUID;
+  authorizationURL?: string;
+  needsClient?: string;
+  callback?: string;
+  error?: string;
+}
+
+export interface MCPSignInClient {
+  id: string;
+  secret?: string;
+}
+
+export interface MCPSignInFlowRequest {
+  flowID: UUID;
+}
+
+export interface MCPSignInRequest {
+  target: MCPSignInTarget;
+  client?: MCPSignInClient;
+}
+
+export type MCPSignInState = "signedIn" | "needsSignIn";
+
+export type MCPSignInStatus =
+  | { waiting: Record<string, never> }
+  | { signedIn: Record<string, never> }
+  | { failed: { _0: string } }
+  | { cancelled: Record<string, never> };
+
+export type MCPSignInTarget =
+  | { entry: { destination: SkillDestination; name: string } }
+  | { url: { name: string; url: string } };
+
+export interface MCPSignInWaitAnswer {
+  status: MCPSignInStatus;
+}
+
+export interface MCPSignOutAnswer {
+  error?: string;
+}
+
+export interface MCPSignOutRequest {
+  target: MCPSignInTarget;
+}
+
 export type MCPTransportName = "stdio" | "http" | "sse";
 
 export interface MCPTriggerFailure {
@@ -1380,6 +1647,39 @@ export interface MCPTriggerStatus {
 
 export type MCPTriggerStatusState = "pending" | "active" | "retrying" | "stopped" | "notThisHost";
 
+export interface MCPVariable {
+  name: string;
+  description: string;
+  kind: MCPVariableKind;
+  required: boolean;
+  alreadySet: boolean;
+  placeholder?: string;
+}
+
+export type MCPVariableKind = "secret" | "plain";
+
+export interface MCPVerifyAnswer {
+  verifyID?: UUID;
+  outcome?: MCPVerifyOutcome;
+  entry?: Record<string, JSONValue>;
+  error?: MCPCatalogError;
+}
+
+export type MCPVerifyOutcome =
+  | { answered: { serverName?: string; version?: string; tools: string[] } }
+  | { authRequired: { resourceMetadata?: string } }
+  | { failed: { _0: string } };
+
+export interface MCPVerifyRequest {
+  destination: SkillDestination;
+  server: MCPHandServer;
+}
+
+export interface MCPViewsForgetRequest {
+  destination: SkillDestination;
+  name: string;
+}
+
 /** mac/reveal, mac/open: a path on the host; app names the app to open it with. */
 export interface MacPathRequest {
   path: string;
@@ -1389,6 +1689,16 @@ export interface MacPathRequest {
 /** mac/terminal: Terminal, in path if given. */
 export interface MacTerminalRequest {
   path?: string;
+}
+
+export interface ManagedMCPServer {
+  name: string;
+  registryName: string;
+  version: string;
+  run: MCPRunKind;
+  addedAt: WireDate;
+  destination: SkillDestination;
+  byHand?: boolean;
 }
 
 export interface ManagedSkill {
@@ -1406,6 +1716,49 @@ export interface ManagedSkill {
 
 export interface MarkRuntimeAvailable {
   credentialKey: string;
+}
+
+export interface Marketplace {
+  id: string;
+  name: string;
+  format: MarketplaceFormat;
+  url: string;
+  token?: string;
+  tokenMissing: boolean;
+  origin: MarketplaceOrigin;
+  enabled: boolean;
+  about?: string;
+}
+
+export interface MarketplaceAddRequest {
+  name: string;
+  format: MarketplaceFormat;
+  url: string;
+  token?: string;
+  tokenValue?: string;
+}
+
+export type MarketplaceFormat = "mcp-registry" | "skills.sh" | "github-skills";
+
+export interface MarketplaceIDRequest {
+  id: string;
+}
+
+export type MarketplaceOrigin = "provided" | "personal" | "project";
+
+export interface MarketplaceSetEnabledRequest {
+  id: string;
+  enabled: boolean;
+}
+
+export interface MarketplacesListAnswer {
+  marketplaces: Marketplace[];
+  problem?: string;
+}
+
+export interface MarketplacesListRequest {
+  kind?: CatalogKind;
+  destination?: SkillDestination;
 }
 
 export interface MessageSender {
@@ -1650,6 +2003,13 @@ export interface PresenceReport {
   alsoShowing?: UUID[];
 }
 
+export interface PreviewFile {
+  path: string;
+  bytes: number;
+  runnable: boolean;
+  via: string;
+}
+
 export type PreviewProblem =
   | { noSkillFile: Record<string, never> }
   | { notFoundInRepo: Record<string, never> }
@@ -1677,6 +2037,18 @@ export interface Project {
 export interface ProjectDetection {
   enabled: boolean;
   paths: string[];
+}
+
+export interface ProjectMCPServer {
+  name: string;
+  summary: string;
+  managed?: ManagedMCPServer;
+  approval: MCPApprovalState;
+  missingSecrets: string[];
+  secretNames: string[];
+  entryDigest: string;
+  signIn?: MCPSignInState;
+  views?: string;
 }
 
 export interface ProjectPins {
@@ -1915,6 +2287,26 @@ export interface RuntimeAllowancesRow {
   unusable?: string;
 }
 
+export interface RuntimeAssessmentCheck {
+  id: string;
+  area: string;
+  verdict: RuntimeAssessmentVerdict;
+  evidence: string;
+}
+
+export interface RuntimeAssessmentScore {
+  agentID: UUID;
+  runtimeID: string;
+  model?: string;
+  runtimeVersion?: string;
+  host?: string;
+  scoredAt: WireDate;
+  reportPath?: string;
+  checks: RuntimeAssessmentCheck[];
+}
+
+export type RuntimeAssessmentVerdict = "passed" | "failed" | "not_offered";
+
 export type RuntimeAvailability =
   | { available: { path: string; supportsResume: boolean } }
   | { missing: { lookedIn: string[] } }
@@ -2145,6 +2537,22 @@ export interface ShownFile {
 
 export type SignInWantedReason = "notSignedIn" | "unreadable";
 
+export interface SkillAddAnswer {
+  skill: ManagedSkill;
+}
+
+export interface SkillAddRequest {
+  previewID: UUID;
+  destination: SkillDestination;
+  replace: boolean;
+}
+
+export interface SkillChanges {
+  added: string[];
+  changed: string[];
+  removed: string[];
+}
+
 export interface SkillDestination {
   kind: SkillDestinationKind;
   folder?: string;
@@ -2157,8 +2565,35 @@ export interface SkillNameRequest {
   name: string;
 }
 
+export interface SkillPreview {
+  previewID: UUID;
+  result: CatalogResult;
+  name: string;
+  description: string;
+  skillPath: string;
+  commit: string;
+  committedAt?: WireDate;
+  treeSHA: string;
+  computedHash: string;
+  files: PreviewFile[];
+  skillMarkdown: string;
+  totalBytes: number;
+  problems: PreviewProblem[];
+  destinationState: DestinationState;
+}
+
 export interface SkillRemoveAnswer {
   trashedTo: string;
+}
+
+export interface SkillUpdatePreviewAnswer {
+  preview: SkillPreview;
+  changes: SkillChanges;
+  edited: boolean;
+}
+
+export interface SkillUpdatesAnswer {
+  updates: Record<string, UpdateState>;
 }
 
 export interface SkillsListAnswer {
@@ -3104,6 +3539,8 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ApprovalAnswer: { required: ["folder", "kind", "key", "action"], optional: ["digest", "note"] },
   ApprovalReadRequest: { required: ["folder", "kind", "key"], optional: [] },
   ArtifactWriteRequest: { required: ["agentID", "path", "text"], optional: [] },
+  AssessRuntimeRequest: { required: ["runtimeID", "folder"], optional: ["model"] },
+  AssessRuntimeResult: { required: ["agentID", "reportPath"], optional: ["model"] },
   Attachment: { required: ["id", "block", "displayName"], optional: ["byteCount"] },
   AttentionDelivery: { required: ["needID"], optional: ["to"] },
   AttentionNotification: { required: ["needID", "alert"], optional: ["need", "to"] },
@@ -3116,6 +3553,11 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   BuildOutputRemoved: { required: ["removed", "freed"], optional: [] },
   CancelWaitRequest: { required: ["agentID"], optional: [] },
   CarriedSetting: { required: ["optionID", "name", "source"], optional: ["from", "to"] },
+  CatalogPreviewAnswer: { required: [], optional: ["preview", "error"] },
+  CatalogPreviewRequest: { required: ["result", "destination"], optional: [] },
+  CatalogResult: { required: ["id", "name", "owner", "repo", "skillID", "installs", "known"], optional: ["marketplace", "skillPath"] },
+  CatalogSearchAnswer: { required: ["results"], optional: ["error"] },
+  CatalogSearchRequest: { required: ["query"], optional: ["kind", "marketplace", "destination"] },
   CatchUpLeases: { required: ["leases", "hosted", "health"], optional: [] },
   CatchUpRequest: { required: [], optional: ["agents", "parts"] },
   CatchUpSnapshot: { required: ["projects", "agents", "permissions", "elicitations", "attention", "resuming"], optional: ["disk", "storeNotes", "milestones", "workflows", "pins", "leases"] },
@@ -3146,6 +3588,8 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   DeclareResourceRequest: { required: ["resource"], optional: ["replacing"] },
   DeclaredResource: { required: ["name", "displayName", "description", "holders"], optional: ["defaultMinutes", "maximumMinutes"] },
   DeleteSessionRequest: { required: ["runtimeID", "sessionID"], optional: ["confirmed"] },
+  DestinationStateAnswer: { required: ["destinationState"], optional: [] },
+  DestinationStateRequest: { required: ["previewID", "destination"], optional: [] },
   DeviceBinding: { required: [], optional: ["id", "pairing"] },
   DiffLine: { required: ["kind", "text"], optional: ["newLine"] },
   DirectoryEntry: { required: ["url", "name", "isDirectory"], optional: ["size", "modifiedAt"] },
@@ -3225,18 +3669,54 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ListCursor: { required: ["lastActivityAt", "id"], optional: [] },
   ListRequest: { required: ["includeArchived", "archivedCommands", "archivedOnly", "lean"], optional: ["folder", "startedByWorkflow", "limit", "agentID", "after", "query"] },
   ListedSkill: { required: ["name", "folder"], optional: ["description", "managed"] },
+  MCPAddAnswer: { required: [], optional: ["server", "error"] },
+  MCPAddByHandRequest: { required: ["verifyID", "destination"], optional: [] },
+  MCPAddRequest: { required: ["previewID", "destination", "secrets", "plain", "replace"], optional: [] },
+  MCPApproveRequest: { required: ["destination", "name", "digest"], optional: [] },
+  MCPCatalogResult: { required: ["id", "title", "description", "version", "publisher", "known", "runs"], optional: ["remoteHost", "marketplace"] },
   MCPEventTrigger: { required: ["event", "arguments"], optional: ["servers"] },
+  MCPHandServer: { required: ["name", "kind", "command", "args", "env", "url", "headers"], optional: [] },
+  MCPHandValue: { required: ["name", "value", "secret"], optional: ["secretName"] },
   MCPHealthCheckRequest: { required: [], optional: ["project"] },
   MCPHealthFileProblem: { required: ["message"], optional: ["project"] },
   MCPHealthSnapshot: { required: ["servers", "problems", "at"], optional: [] },
+  MCPListAnswer: { required: ["servers"], optional: ["problem", "approvalsProblem"] },
+  MCPListRequest: { required: ["destination"], optional: [] },
+  MCPPreview: { required: ["previewID", "result", "nameHere", "chosenRun", "commandOrURL", "entry", "variables", "reach", "destinationState", "problems"], optional: ["host"] },
+  MCPPreviewAnswer: { required: [], optional: ["preview", "error"] },
+  MCPPreviewRequest: { required: ["result", "destination"], optional: ["run"] },
+  MCPPublisherInfo: { required: ["label", "namespace", "known"], optional: [] },
+  MCPRemoveAnswer: { required: ["ok"], optional: [] },
+  MCPRemoveRequest: { required: ["destination", "name"], optional: ["forgetSecret"] },
+  MCPSearchAnswer: { required: ["results"], optional: ["error"] },
   MCPServer: { required: ["name", "transport"], optional: [] },
   MCPServerHealth: { required: ["name", "transport", "hosted", "check"], optional: ["project", "live", "checkedAt", "lastError", "tools"] },
+  MCPSetSecretAnswer: { required: ["set"], optional: [] },
+  MCPSetSecretRequest: { required: ["name", "value"], optional: [] },
+  MCPSignInAnswer: { required: [], optional: ["flowID", "authorizationURL", "needsClient", "callback", "error"] },
+  MCPSignInClient: { required: ["id"], optional: ["secret"] },
+  MCPSignInFlowRequest: { required: ["flowID"], optional: [] },
+  MCPSignInRequest: { required: ["target"], optional: ["client"] },
+  MCPSignInWaitAnswer: { required: ["status"], optional: [] },
+  MCPSignOutAnswer: { required: [], optional: ["error"] },
+  MCPSignOutRequest: { required: ["target"], optional: [] },
   MCPTriggerFailure: { required: ["code", "message", "since"], optional: [] },
   MCPTriggerStatus: { required: ["name", "state"], optional: ["server", "lastPolledAt", "lastEventAt", "missedSince", "failure", "retryAt"] },
+  MCPVariable: { required: ["name", "description", "kind", "required", "alreadySet"], optional: ["placeholder"] },
+  MCPVerifyAnswer: { required: [], optional: ["verifyID", "outcome", "entry", "error"] },
+  MCPVerifyRequest: { required: ["destination", "server"], optional: [] },
+  MCPViewsForgetRequest: { required: ["destination", "name"], optional: [] },
   MacPathRequest: { required: ["path"], optional: ["app"] },
   MacTerminalRequest: { required: [], optional: ["path"] },
+  ManagedMCPServer: { required: ["name", "registryName", "version", "run", "addedAt", "destination"], optional: ["byHand"] },
   ManagedSkill: { required: ["destination", "name", "source", "edited", "update"], optional: ["skillPath", "recordedHash", "commit", "committedAt", "catalogue"] },
   MarkRuntimeAvailable: { required: ["credentialKey"], optional: [] },
+  Marketplace: { required: ["id", "name", "format", "url", "tokenMissing", "origin", "enabled"], optional: ["token", "about"] },
+  MarketplaceAddRequest: { required: ["name", "format", "url"], optional: ["token", "tokenValue"] },
+  MarketplaceIDRequest: { required: ["id"], optional: [] },
+  MarketplaceSetEnabledRequest: { required: ["id", "enabled"], optional: [] },
+  MarketplacesListAnswer: { required: ["marketplaces"], optional: ["problem"] },
+  MarketplacesListRequest: { required: [], optional: ["kind", "destination"] },
   MessageSender: { required: ["agentID", "title"], optional: [] },
   Milestones: { required: ["earned"], optional: [] },
   MissingFolder: { required: ["branchKept"], optional: [] },
@@ -3271,9 +3751,11 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   PluginsList: { required: ["folder", "plugins"], optional: [] },
   PluginsListRequest: { required: ["folder"], optional: [] },
   PresenceReport: { required: ["active"], optional: ["watching", "mayNotify", "showing", "alsoShowing"] },
+  PreviewFile: { required: ["path", "bytes", "runnable", "via"], optional: [] },
   PrewarmRequest: { required: ["agentID", "why"], optional: [] },
   Project: { required: ["folder", "addedAt"], optional: ["archivedAt", "laidOutAt", "layoutVersion", "helperLimits", "diskSpace", "pinned"] },
   ProjectDetection: { required: ["enabled", "paths"], optional: [] },
+  ProjectMCPServer: { required: ["name", "summary", "approval", "missingSecrets", "secretNames", "entryDigest"], optional: ["managed", "signIn", "views"] },
   ProjectPins: { required: ["folder", "pins"], optional: ["sessions", "workflows"] },
   ProjectPlugin: { required: ["project", "folder", "name", "carries"], optional: ["awaitingApproval"] },
   ProjectRemovedNotification: { required: ["folder"], optional: [] },
@@ -3305,6 +3787,8 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   RuntimeAccount: { required: ["runtimeID", "state", "authMethods", "canLogOut", "providers", "promptCapabilities", "canSteer", "checkedAt"], optional: ["currentProviderID", "signedInAs"] },
   RuntimeAllowances: { required: ["rows", "at"], optional: ["shared"] },
   RuntimeAllowancesRow: { required: ["credentialKey", "state"], optional: ["unusable"] },
+  RuntimeAssessmentCheck: { required: ["id", "area", "verdict", "evidence"], optional: [] },
+  RuntimeAssessmentScore: { required: ["agentID", "runtimeID", "scoredAt", "checks"], optional: ["model", "runtimeVersion", "host", "reportPath"] },
   RuntimeRequest: { required: ["runtimeID"], optional: [] },
   RuntimeSession: { required: ["sessionID", "cwd"], optional: ["additionalDirectories", "title", "updatedAt", "isHeld"] },
   RuntimeStatus: { required: ["runtime", "availability", "checkedAt", "outdated"], optional: ["poolNote", "isOut"] },
@@ -3337,9 +3821,15 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ShellStateNotification: { required: ["agentID", "shell", "state"], optional: [] },
   ShowFileNotification: { required: ["agentID", "file"], optional: [] },
   ShownFile: { required: ["path"], optional: ["line", "chart"] },
+  SkillAddAnswer: { required: ["skill"], optional: [] },
+  SkillAddRequest: { required: ["previewID", "destination", "replace"], optional: [] },
+  SkillChanges: { required: ["added", "changed", "removed"], optional: [] },
   SkillDestination: { required: ["kind"], optional: ["folder"] },
   SkillNameRequest: { required: ["destination", "name"], optional: [] },
+  SkillPreview: { required: ["previewID", "result", "name", "description", "skillPath", "commit", "treeSHA", "computedHash", "files", "skillMarkdown", "totalBytes", "problems", "destinationState"], optional: ["committedAt"] },
   SkillRemoveAnswer: { required: ["trashedTo"], optional: [] },
+  SkillUpdatePreviewAnswer: { required: ["preview", "changes", "edited"], optional: [] },
+  SkillUpdatesAnswer: { required: ["updates"], optional: [] },
   SkillsListAnswer: { required: ["skills"], optional: [] },
   SkillsListRequest: { required: ["destination"], optional: [] },
   SlashCommand: { required: ["name"], optional: ["description", "inputHint"] },

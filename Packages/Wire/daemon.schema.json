@@ -994,6 +994,44 @@
       ],
       "additionalProperties": false
     },
+    "AssessRuntimeRequest": {
+      "type": "object",
+      "properties": {
+        "runtimeID": {
+          "type": "string"
+        },
+        "folder": {
+          "$ref": "#/definitions/URLString"
+        },
+        "model": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "runtimeID",
+        "folder"
+      ],
+      "additionalProperties": false
+    },
+    "AssessRuntimeResult": {
+      "type": "object",
+      "properties": {
+        "agentID": {
+          "$ref": "#/definitions/UUID"
+        },
+        "model": {
+          "type": "string"
+        },
+        "reportPath": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "agentID",
+        "reportPath"
+      ],
+      "additionalProperties": false
+    },
     "Attachment": {
       "type": "object",
       "properties": {
@@ -1657,6 +1695,122 @@
           "additionalProperties": false
         }
       ]
+    },
+    "CatalogKind": {
+      "type": "string",
+      "enum": [
+        "skills",
+        "mcp"
+      ]
+    },
+    "CatalogPreviewAnswer": {
+      "type": "object",
+      "properties": {
+        "preview": {
+          "$ref": "#/definitions/SkillPreview"
+        },
+        "error": {
+          "$ref": "#/definitions/CatalogError"
+        }
+      },
+      "additionalProperties": false
+    },
+    "CatalogPreviewRequest": {
+      "type": "object",
+      "properties": {
+        "result": {
+          "$ref": "#/definitions/CatalogResult"
+        },
+        "destination": {
+          "$ref": "#/definitions/SkillDestination"
+        }
+      },
+      "required": [
+        "result",
+        "destination"
+      ],
+      "additionalProperties": false
+    },
+    "CatalogResult": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "owner": {
+          "type": "string"
+        },
+        "repo": {
+          "type": "string"
+        },
+        "skillID": {
+          "type": "string"
+        },
+        "installs": {
+          "type": "integer"
+        },
+        "known": {
+          "type": "boolean"
+        },
+        "marketplace": {
+          "type": "string"
+        },
+        "skillPath": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "owner",
+        "repo",
+        "skillID",
+        "installs",
+        "known"
+      ],
+      "additionalProperties": false
+    },
+    "CatalogSearchAnswer": {
+      "type": "object",
+      "properties": {
+        "results": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/CatalogResult"
+          }
+        },
+        "error": {
+          "$ref": "#/definitions/CatalogError"
+        }
+      },
+      "required": [
+        "results"
+      ],
+      "additionalProperties": false
+    },
+    "CatalogSearchRequest": {
+      "type": "object",
+      "properties": {
+        "query": {
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/definitions/CatalogKind"
+        },
+        "marketplace": {
+          "type": "string"
+        },
+        "destination": {
+          "$ref": "#/definitions/SkillDestination"
+        }
+      },
+      "required": [
+        "query"
+      ],
+      "additionalProperties": false
     },
     "CatchUpLeases": {
       "type": "object",
@@ -2924,6 +3078,137 @@
       "required": [
         "runtimeID",
         "sessionID"
+      ],
+      "additionalProperties": false
+    },
+    "DestinationState": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "free": {
+              "type": "object",
+              "additionalProperties": {
+                "not": {}
+              }
+            }
+          },
+          "required": [
+            "free"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "sameSkill": {
+              "type": "object",
+              "properties": {
+                "update": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "update"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "sameSkill"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "managedOther": {
+              "type": "object",
+              "properties": {
+                "source": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "source"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "managedOther"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "unmanaged": {
+              "type": "object",
+              "properties": {
+                "path": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "path"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "unmanaged"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "unavailable": {
+              "type": "object",
+              "properties": {
+                "_0": {
+                  "$ref": "#/definitions/CatalogError"
+                }
+              },
+              "required": [
+                "_0"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "unavailable"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "DestinationStateAnswer": {
+      "type": "object",
+      "properties": {
+        "destinationState": {
+          "$ref": "#/definitions/DestinationState"
+        }
+      },
+      "required": [
+        "destinationState"
+      ],
+      "additionalProperties": false
+    },
+    "DestinationStateRequest": {
+      "type": "object",
+      "properties": {
+        "previewID": {
+          "$ref": "#/definitions/UUID"
+        },
+        "destination": {
+          "$ref": "#/definitions/SkillDestination"
+        }
+      },
+      "required": [
+        "previewID",
+        "destination"
       ],
       "additionalProperties": false
     },
@@ -5745,6 +6030,148 @@
       ],
       "additionalProperties": false
     },
+    "Marketplace": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "format": {
+          "$ref": "#/definitions/MarketplaceFormat"
+        },
+        "url": {
+          "type": "string"
+        },
+        "token": {
+          "type": "string"
+        },
+        "tokenMissing": {
+          "type": "boolean"
+        },
+        "origin": {
+          "$ref": "#/definitions/MarketplaceOrigin"
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "about": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "format",
+        "url",
+        "tokenMissing",
+        "origin",
+        "enabled"
+      ],
+      "additionalProperties": false
+    },
+    "MarketplaceAddRequest": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "format": {
+          "$ref": "#/definitions/MarketplaceFormat"
+        },
+        "url": {
+          "type": "string"
+        },
+        "token": {
+          "type": "string"
+        },
+        "tokenValue": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "format",
+        "url"
+      ],
+      "additionalProperties": false
+    },
+    "MarketplaceFormat": {
+      "type": "string",
+      "enum": [
+        "mcp-registry",
+        "skills.sh",
+        "github-skills"
+      ]
+    },
+    "MarketplaceIDRequest": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "additionalProperties": false
+    },
+    "MarketplaceOrigin": {
+      "type": "string",
+      "enum": [
+        "provided",
+        "personal",
+        "project"
+      ]
+    },
+    "MarketplaceSetEnabledRequest": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "enabled": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "enabled"
+      ],
+      "additionalProperties": false
+    },
+    "MarketplacesListAnswer": {
+      "type": "object",
+      "properties": {
+        "marketplaces": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Marketplace"
+          }
+        },
+        "problem": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "marketplaces"
+      ],
+      "additionalProperties": false
+    },
+    "MarketplacesListRequest": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "$ref": "#/definitions/CatalogKind"
+        },
+        "destination": {
+          "$ref": "#/definitions/SkillDestination"
+        }
+      },
+      "additionalProperties": false
+    },
     "MessageSender": {
       "type": "object",
       "properties": {
@@ -6731,6 +7158,30 @@
       },
       "required": [
         "active"
+      ],
+      "additionalProperties": false
+    },
+    "PreviewFile": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string"
+        },
+        "bytes": {
+          "type": "integer"
+        },
+        "runnable": {
+          "type": "boolean"
+        },
+        "via": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "path",
+        "bytes",
+        "runnable",
+        "via"
       ],
       "additionalProperties": false
     },
@@ -7785,6 +8236,77 @@
         "state"
       ],
       "additionalProperties": false
+    },
+    "RuntimeAssessmentCheck": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "area": {
+          "type": "string"
+        },
+        "verdict": {
+          "$ref": "#/definitions/RuntimeAssessmentVerdict"
+        },
+        "evidence": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "area",
+        "verdict",
+        "evidence"
+      ],
+      "additionalProperties": false
+    },
+    "RuntimeAssessmentScore": {
+      "type": "object",
+      "properties": {
+        "agentID": {
+          "$ref": "#/definitions/UUID"
+        },
+        "runtimeID": {
+          "type": "string"
+        },
+        "model": {
+          "type": "string"
+        },
+        "runtimeVersion": {
+          "type": "string"
+        },
+        "host": {
+          "type": "string"
+        },
+        "scoredAt": {
+          "$ref": "#/definitions/WireDate"
+        },
+        "reportPath": {
+          "type": "string"
+        },
+        "checks": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/RuntimeAssessmentCheck"
+          }
+        }
+      },
+      "required": [
+        "agentID",
+        "runtimeID",
+        "scoredAt",
+        "checks"
+      ],
+      "additionalProperties": false
+    },
+    "RuntimeAssessmentVerdict": {
+      "type": "string",
+      "enum": [
+        "passed",
+        "failed",
+        "not_offered"
+      ]
     },
     "RuntimeAvailability": {
       "anyOf": [
@@ -8895,6 +9417,67 @@
         "unreadable"
       ]
     },
+    "SkillAddAnswer": {
+      "type": "object",
+      "properties": {
+        "skill": {
+          "$ref": "#/definitions/ManagedSkill"
+        }
+      },
+      "required": [
+        "skill"
+      ],
+      "additionalProperties": false
+    },
+    "SkillAddRequest": {
+      "type": "object",
+      "properties": {
+        "previewID": {
+          "$ref": "#/definitions/UUID"
+        },
+        "destination": {
+          "$ref": "#/definitions/SkillDestination"
+        },
+        "replace": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "previewID",
+        "destination",
+        "replace"
+      ],
+      "additionalProperties": false
+    },
+    "SkillChanges": {
+      "type": "object",
+      "properties": {
+        "added": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "changed": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "removed": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "added",
+        "changed",
+        "removed"
+      ],
+      "additionalProperties": false
+    },
     "SkillDestination": {
       "type": "object",
       "properties": {
@@ -8933,6 +9516,75 @@
       ],
       "additionalProperties": false
     },
+    "SkillPreview": {
+      "type": "object",
+      "properties": {
+        "previewID": {
+          "$ref": "#/definitions/UUID"
+        },
+        "result": {
+          "$ref": "#/definitions/CatalogResult"
+        },
+        "name": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "skillPath": {
+          "type": "string"
+        },
+        "commit": {
+          "type": "string"
+        },
+        "committedAt": {
+          "$ref": "#/definitions/WireDate"
+        },
+        "treeSHA": {
+          "type": "string"
+        },
+        "computedHash": {
+          "type": "string"
+        },
+        "files": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/PreviewFile"
+          }
+        },
+        "skillMarkdown": {
+          "type": "string"
+        },
+        "totalBytes": {
+          "type": "integer"
+        },
+        "problems": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/PreviewProblem"
+          }
+        },
+        "destinationState": {
+          "$ref": "#/definitions/DestinationState"
+        }
+      },
+      "required": [
+        "previewID",
+        "result",
+        "name",
+        "description",
+        "skillPath",
+        "commit",
+        "treeSHA",
+        "computedHash",
+        "files",
+        "skillMarkdown",
+        "totalBytes",
+        "problems",
+        "destinationState"
+      ],
+      "additionalProperties": false
+    },
     "SkillRemoveAnswer": {
       "type": "object",
       "properties": {
@@ -8942,6 +9594,41 @@
       },
       "required": [
         "trashedTo"
+      ],
+      "additionalProperties": false
+    },
+    "SkillUpdatePreviewAnswer": {
+      "type": "object",
+      "properties": {
+        "preview": {
+          "$ref": "#/definitions/SkillPreview"
+        },
+        "changes": {
+          "$ref": "#/definitions/SkillChanges"
+        },
+        "edited": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "preview",
+        "changes",
+        "edited"
+      ],
+      "additionalProperties": false
+    },
+    "SkillUpdatesAnswer": {
+      "type": "object",
+      "properties": {
+        "updates": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/definitions/UpdateState"
+          }
+        }
+      },
+      "required": [
+        "updates"
       ],
       "additionalProperties": false
     },
@@ -12264,6 +12951,1436 @@
         "notAllowed",
         "readOnly"
       ]
+    },
+    "MCPCatalogResult": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        },
+        "publisher": {
+          "$ref": "#/definitions/MCPPublisherInfo"
+        },
+        "known": {
+          "type": "boolean"
+        },
+        "runs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/MCPRunKind"
+          }
+        },
+        "remoteHost": {
+          "type": "string"
+        },
+        "marketplace": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "description",
+        "version",
+        "publisher",
+        "known",
+        "runs"
+      ],
+      "additionalProperties": false
+    },
+    "MCPVariableKind": {
+      "type": "string",
+      "enum": [
+        "secret",
+        "plain"
+      ]
+    },
+    "MCPViewsForgetRequest": {
+      "type": "object",
+      "properties": {
+        "destination": {
+          "$ref": "#/definitions/SkillDestination"
+        },
+        "name": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "destination",
+        "name"
+      ],
+      "additionalProperties": false
+    },
+    "ManagedMCPServer": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "registryName": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        },
+        "run": {
+          "$ref": "#/definitions/MCPRunKind"
+        },
+        "addedAt": {
+          "$ref": "#/definitions/WireDate"
+        },
+        "destination": {
+          "$ref": "#/definitions/SkillDestination"
+        },
+        "byHand": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "name",
+        "registryName",
+        "version",
+        "run",
+        "addedAt",
+        "destination"
+      ],
+      "additionalProperties": false
+    },
+    "MCPVerifyRequest": {
+      "type": "object",
+      "properties": {
+        "destination": {
+          "$ref": "#/definitions/SkillDestination"
+        },
+        "server": {
+          "$ref": "#/definitions/MCPHandServer"
+        }
+      },
+      "required": [
+        "destination",
+        "server"
+      ],
+      "additionalProperties": false
+    },
+    "MCPPreviewAnswer": {
+      "type": "object",
+      "properties": {
+        "preview": {
+          "$ref": "#/definitions/MCPPreview"
+        },
+        "error": {
+          "$ref": "#/definitions/MCPCatalogError"
+        }
+      },
+      "additionalProperties": false
+    },
+    "ProjectMCPServer": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "summary": {
+          "type": "string"
+        },
+        "managed": {
+          "$ref": "#/definitions/ManagedMCPServer"
+        },
+        "approval": {
+          "$ref": "#/definitions/MCPApprovalState"
+        },
+        "missingSecrets": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "secretNames": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "entryDigest": {
+          "type": "string"
+        },
+        "signIn": {
+          "$ref": "#/definitions/MCPSignInState"
+        },
+        "views": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "summary",
+        "approval",
+        "missingSecrets",
+        "secretNames",
+        "entryDigest"
+      ],
+      "additionalProperties": false
+    },
+    "MCPSignInState": {
+      "type": "string",
+      "enum": [
+        "signedIn",
+        "needsSignIn"
+      ]
+    },
+    "MCPApprovalState": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "approved": {
+              "type": "object",
+              "additionalProperties": {
+                "not": {}
+              }
+            }
+          },
+          "required": [
+            "approved"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "waiting": {
+              "type": "object",
+              "properties": {
+                "digest": {
+                  "type": "string"
+                },
+                "isNew": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "digest",
+                "isNew"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "waiting"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "MCPSearchAnswer": {
+      "type": "object",
+      "properties": {
+        "results": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/MCPCatalogResult"
+          }
+        },
+        "error": {
+          "$ref": "#/definitions/MCPCatalogError"
+        }
+      },
+      "required": [
+        "results"
+      ],
+      "additionalProperties": false
+    },
+    "MCPCatalogError": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "unreachable": {
+              "type": "object",
+              "properties": {
+                "host": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "host"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "unreachable"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "timedOut": {
+              "type": "object",
+              "properties": {
+                "host": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "host"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "timedOut"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "noPersonalHome": {
+              "type": "object",
+              "additionalProperties": {
+                "not": {}
+              }
+            }
+          },
+          "required": [
+            "noPersonalHome"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "unmanaged": {
+              "type": "object",
+              "properties": {
+                "path": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "path"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "unmanaged"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "mcpUnreadable": {
+              "type": "object",
+              "properties": {
+                "path": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "path"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "mcpUnreadable"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "missingSecret": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "name"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "missingSecret"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "staleDigest": {
+              "type": "object",
+              "additionalProperties": {
+                "not": {}
+              }
+            }
+          },
+          "required": [
+            "staleDigest"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "secretStillInUse": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "name"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "secretStillInUse"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "previewExpired": {
+              "type": "object",
+              "additionalProperties": {
+                "not": {}
+              }
+            }
+          },
+          "required": [
+            "previewExpired"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "noRunnableWay": {
+              "type": "object",
+              "additionalProperties": {
+                "not": {}
+              }
+            }
+          },
+          "required": [
+            "noRunnableWay"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "replaceMismatch": {
+              "type": "object",
+              "additionalProperties": {
+                "not": {}
+              }
+            }
+          },
+          "required": [
+            "replaceMismatch"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "notAProject": {
+              "type": "object",
+              "properties": {
+                "path": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "path"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "notAProject"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "nameTaken": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "name"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "nameTaken"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "invalid": {
+              "type": "object",
+              "properties": {
+                "_0": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "_0"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "invalid"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "failed": {
+              "type": "object",
+              "properties": {
+                "_0": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "_0"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "failed"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "MCPHandServerKind": {
+      "type": "string",
+      "enum": [
+        "command",
+        "url"
+      ]
+    },
+    "MCPAddAnswer": {
+      "type": "object",
+      "properties": {
+        "server": {
+          "$ref": "#/definitions/ManagedMCPServer"
+        },
+        "error": {
+          "$ref": "#/definitions/MCPCatalogError"
+        }
+      },
+      "additionalProperties": false
+    },
+    "MCPHandValue": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "value": {
+          "type": "string"
+        },
+        "secret": {
+          "type": "boolean"
+        },
+        "secretName": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "value",
+        "secret"
+      ],
+      "additionalProperties": false
+    },
+    "MCPRemoveAnswer": {
+      "type": "object",
+      "properties": {
+        "ok": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "ok"
+      ],
+      "additionalProperties": false
+    },
+    "MCPSetSecretAnswer": {
+      "type": "object",
+      "properties": {
+        "set": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "set"
+      ],
+      "additionalProperties": false
+    },
+    "MCPListRequest": {
+      "type": "object",
+      "properties": {
+        "destination": {
+          "$ref": "#/definitions/SkillDestination"
+        }
+      },
+      "required": [
+        "destination"
+      ],
+      "additionalProperties": false
+    },
+    "MCPApproveRequest": {
+      "type": "object",
+      "properties": {
+        "destination": {
+          "$ref": "#/definitions/SkillDestination"
+        },
+        "name": {
+          "type": "string"
+        },
+        "digest": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "destination",
+        "name",
+        "digest"
+      ],
+      "additionalProperties": false
+    },
+    "MCPSetSecretRequest": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "value": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "value"
+      ],
+      "additionalProperties": false
+    },
+    "MCPPreviewProblem": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "unreachable": {
+              "type": "object",
+              "properties": {
+                "host": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "host"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "unreachable"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "noRunnableWay": {
+              "type": "object",
+              "additionalProperties": {
+                "not": {}
+              }
+            }
+          },
+          "required": [
+            "noRunnableWay"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "nameTakenUnmanaged": {
+              "type": "object",
+              "additionalProperties": {
+                "not": {}
+              }
+            }
+          },
+          "required": [
+            "nameTakenUnmanaged"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "mcpUnreadable": {
+              "type": "object",
+              "properties": {
+                "path": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "path"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "mcpUnreadable"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "noPersonalHome": {
+              "type": "object",
+              "additionalProperties": {
+                "not": {}
+              }
+            }
+          },
+          "required": [
+            "noPersonalHome"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "MCPPreview": {
+      "type": "object",
+      "properties": {
+        "previewID": {
+          "$ref": "#/definitions/UUID"
+        },
+        "result": {
+          "$ref": "#/definitions/MCPCatalogResult"
+        },
+        "nameHere": {
+          "type": "string"
+        },
+        "chosenRun": {
+          "$ref": "#/definitions/MCPRunKind"
+        },
+        "commandOrURL": {
+          "type": "string"
+        },
+        "host": {
+          "type": "string"
+        },
+        "entry": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/definitions/JSONValue"
+          }
+        },
+        "variables": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/MCPVariable"
+          }
+        },
+        "reach": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/definitions/JSONValue"
+          }
+        },
+        "destinationState": {
+          "$ref": "#/definitions/MCPDestinationState"
+        },
+        "problems": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/MCPPreviewProblem"
+          }
+        }
+      },
+      "required": [
+        "previewID",
+        "result",
+        "nameHere",
+        "chosenRun",
+        "commandOrURL",
+        "entry",
+        "variables",
+        "reach",
+        "destinationState",
+        "problems"
+      ],
+      "additionalProperties": false
+    },
+    "MCPAddByHandRequest": {
+      "type": "object",
+      "properties": {
+        "verifyID": {
+          "$ref": "#/definitions/UUID"
+        },
+        "destination": {
+          "$ref": "#/definitions/SkillDestination"
+        }
+      },
+      "required": [
+        "verifyID",
+        "destination"
+      ],
+      "additionalProperties": false
+    },
+    "MCPDestinationState": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "free": {
+              "type": "object",
+              "additionalProperties": {
+                "not": {}
+              }
+            }
+          },
+          "required": [
+            "free"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "managedSame": {
+              "type": "object",
+              "additionalProperties": {
+                "not": {}
+              }
+            }
+          },
+          "required": [
+            "managedSame"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "managedOther": {
+              "type": "object",
+              "properties": {
+                "registryName": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "registryName"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "managedOther"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "unmanaged": {
+              "type": "object",
+              "properties": {
+                "path": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "path"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "unmanaged"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "unavailable": {
+              "type": "object",
+              "properties": {
+                "_0": {
+                  "$ref": "#/definitions/MCPCatalogError"
+                }
+              },
+              "required": [
+                "_0"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "unavailable"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "MCPAddRequest": {
+      "type": "object",
+      "properties": {
+        "previewID": {
+          "$ref": "#/definitions/UUID"
+        },
+        "destination": {
+          "$ref": "#/definitions/SkillDestination"
+        },
+        "secrets": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "plain": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "replace": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "previewID",
+        "destination",
+        "secrets",
+        "plain",
+        "replace"
+      ],
+      "additionalProperties": false
+    },
+    "MCPRemoveRequest": {
+      "type": "object",
+      "properties": {
+        "destination": {
+          "$ref": "#/definitions/SkillDestination"
+        },
+        "name": {
+          "type": "string"
+        },
+        "forgetSecret": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "destination",
+        "name"
+      ],
+      "additionalProperties": false
+    },
+    "MCPPublisherInfo": {
+      "type": "object",
+      "properties": {
+        "label": {
+          "type": "string"
+        },
+        "namespace": {
+          "type": "string"
+        },
+        "known": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "label",
+        "namespace",
+        "known"
+      ],
+      "additionalProperties": false
+    },
+    "MCPVerifyAnswer": {
+      "type": "object",
+      "properties": {
+        "verifyID": {
+          "$ref": "#/definitions/UUID"
+        },
+        "outcome": {
+          "$ref": "#/definitions/MCPVerifyOutcome"
+        },
+        "entry": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/definitions/JSONValue"
+          }
+        },
+        "error": {
+          "$ref": "#/definitions/MCPCatalogError"
+        }
+      },
+      "additionalProperties": false
+    },
+    "MCPRunKind": {
+      "type": "string",
+      "enum": [
+        "remote",
+        "npx",
+        "uvx",
+        "docker",
+        "command"
+      ]
+    },
+    "MCPPreviewRequest": {
+      "type": "object",
+      "properties": {
+        "result": {
+          "$ref": "#/definitions/MCPCatalogResult"
+        },
+        "destination": {
+          "$ref": "#/definitions/SkillDestination"
+        },
+        "run": {
+          "$ref": "#/definitions/MCPRunKind"
+        }
+      },
+      "required": [
+        "result",
+        "destination"
+      ],
+      "additionalProperties": false
+    },
+    "MCPVariable": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/definitions/MCPVariableKind"
+        },
+        "required": {
+          "type": "boolean"
+        },
+        "alreadySet": {
+          "type": "boolean"
+        },
+        "placeholder": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "description",
+        "kind",
+        "required",
+        "alreadySet"
+      ],
+      "additionalProperties": false
+    },
+    "MCPHandServer": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/definitions/MCPHandServerKind"
+        },
+        "command": {
+          "type": "string"
+        },
+        "args": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "env": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/MCPHandValue"
+          }
+        },
+        "url": {
+          "type": "string"
+        },
+        "headers": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/MCPHandValue"
+          }
+        }
+      },
+      "required": [
+        "name",
+        "kind",
+        "command",
+        "args",
+        "env",
+        "url",
+        "headers"
+      ],
+      "additionalProperties": false
+    },
+    "MCPListAnswer": {
+      "type": "object",
+      "properties": {
+        "servers": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ProjectMCPServer"
+          }
+        },
+        "problem": {
+          "type": "string"
+        },
+        "approvalsProblem": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "servers"
+      ],
+      "additionalProperties": false
+    },
+    "MCPVerifyOutcome": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "answered": {
+              "type": "object",
+              "properties": {
+                "serverName": {
+                  "type": "string"
+                },
+                "version": {
+                  "type": "string"
+                },
+                "tools": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "required": [
+                "tools"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "answered"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "authRequired": {
+              "type": "object",
+              "properties": {
+                "resourceMetadata": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "authRequired"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "failed": {
+              "type": "object",
+              "properties": {
+                "_0": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "_0"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "failed"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "MCPSignOutRequest": {
+      "type": "object",
+      "properties": {
+        "target": {
+          "$ref": "#/definitions/MCPSignInTarget"
+        }
+      },
+      "required": [
+        "target"
+      ],
+      "additionalProperties": false
+    },
+    "MCPSignInStatus": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "waiting": {
+              "type": "object",
+              "additionalProperties": {
+                "not": {}
+              }
+            }
+          },
+          "required": [
+            "waiting"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "signedIn": {
+              "type": "object",
+              "additionalProperties": {
+                "not": {}
+              }
+            }
+          },
+          "required": [
+            "signedIn"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "failed": {
+              "type": "object",
+              "properties": {
+                "_0": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "_0"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "failed"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "cancelled": {
+              "type": "object",
+              "additionalProperties": {
+                "not": {}
+              }
+            }
+          },
+          "required": [
+            "cancelled"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "MCPSignOutAnswer": {
+      "type": "object",
+      "properties": {
+        "error": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "MCPSignInWaitAnswer": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "$ref": "#/definitions/MCPSignInStatus"
+        }
+      },
+      "required": [
+        "status"
+      ],
+      "additionalProperties": false
+    },
+    "MCPSignInRequest": {
+      "type": "object",
+      "properties": {
+        "target": {
+          "$ref": "#/definitions/MCPSignInTarget"
+        },
+        "client": {
+          "$ref": "#/definitions/MCPSignInClient"
+        }
+      },
+      "required": [
+        "target"
+      ],
+      "additionalProperties": false
+    },
+    "MCPSignInFlowRequest": {
+      "type": "object",
+      "properties": {
+        "flowID": {
+          "$ref": "#/definitions/UUID"
+        }
+      },
+      "required": [
+        "flowID"
+      ],
+      "additionalProperties": false
+    },
+    "MCPSignInTarget": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "entry": {
+              "type": "object",
+              "properties": {
+                "destination": {
+                  "$ref": "#/definitions/SkillDestination"
+                },
+                "name": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "destination",
+                "name"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "entry"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "url": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "url": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "name",
+                "url"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "url"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "MCPSignInClient": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "secret": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "additionalProperties": false
+    },
+    "MCPSignInAnswer": {
+      "type": "object",
+      "properties": {
+        "flowID": {
+          "$ref": "#/definitions/UUID"
+        },
+        "authorizationURL": {
+          "type": "string"
+        },
+        "needsClient": {
+          "type": "string"
+        },
+        "callback": {
+          "type": "string"
+        },
+        "error": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
     }
   }
 }

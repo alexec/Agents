@@ -746,6 +746,9 @@ func (d *Daemon) end(l *live, s wire.AgentState, why wire.EndedReason) {
 		d.checkQueueSoon(projectFolder(a))
 	}
 	d.agentEnded(l.id)
+	if s == wire.AgentStateFinished {
+		d.scoreAssessmentIfDue(l.id)
+	}
 }
 
 func firstSentence(s string) string {
