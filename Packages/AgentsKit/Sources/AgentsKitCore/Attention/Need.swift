@@ -60,12 +60,14 @@ public enum NeedID: Hashable, Sendable, Codable {
     }
 
     /// The project a guarded change's token names (#531), for a banner opened with no
-    /// session behind it: its page is where the question is.
+    /// session behind it: its page is where the question is. Standardised as a project's
+    /// folder is, so `project(_:)` finds it (#1367): a folder with a trailing slash is not
+    /// equal to the project's, and the tap opened nothing.
     public static func guardedFolder(fromToken token: String) -> URL? {
         guard token.hasPrefix("guarded:"), let colon = token.lastIndex(of: ":") else { return nil }
         let start = token.index(token.startIndex, offsetBy: "guarded:".count)
         guard start < colon else { return nil }
-        return URL(filePath: String(token[start..<colon]), directoryHint: .isDirectory)
+        return Project.standardize(URL(filePath: String(token[start..<colon]), directoryHint: .isDirectory))
     }
 }
 

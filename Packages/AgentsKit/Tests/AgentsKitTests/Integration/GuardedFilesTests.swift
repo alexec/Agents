@@ -191,6 +191,22 @@ struct GuardedFilesTests {
         #expect(NeedID.guardedFolder(fromToken: NeedID.permission(UUID()).token) == nil)
     }
 
+    /// A banner's token names its project as the project is kept, so a client finds it
+    /// (#1367): equal to the standardised folder, not a directory URL with a trailing slash,
+    /// whichever form the host sent (`/tmp` or `/private/tmp`, with or without the slash).
+    @Test func aGuardedTokensFolderIsTheProjectsOwn() throws {
+        // There, because Foundation takes /private off only a path that exists.
+        let name = "g1367-\(UUID().uuidString.prefix(8))"
+        let made = URL(filePath: "/tmp/\(name)/work")
+        try FileManager.default.createDirectory(at: made, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: made.deletingLastPathComponent()) }
+        let project = Project.standardize(made)
+        for sent in ["file:///tmp/\(name)/work/", "file:///tmp/\(name)/work", "file:///private/tmp/\(name)/work/"] {
+            let id = NeedID.guardedChange(URL(string: sent)!, ".agents/project.json")
+            #expect(NeedID.guardedFolder(fromToken: id.token) == project, "\(sent)")
+        }
+    }
+
     @Test func linesAreMarkedKeptRemovedAndAdded() {
         let lines = GuardedDiffLine.lines(from: "a\nb\nc\n", to: "a\nB\nc\nd\n")
         #expect(lines == [
