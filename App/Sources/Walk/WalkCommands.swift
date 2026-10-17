@@ -7,8 +7,10 @@ import Foundation
 /// its own elements, as `ui.swift` does from outside through the AX server.
 @MainActor
 enum WalkCommands {
-    static func run(_ line: Data) -> Data {
-        let reply: [String: Any]
+    /// What to send back, made off the main thread once this returns: a shot's PNG is
+    /// encoded there.
+    static func run(_ line: Data) -> @Sendable () -> Data {
+        var reply: [String: Any]
         do {
             guard let request = try JSONSerialization.jsonObject(with: line) as? [String: Any],
                   let verb = request["cmd"] as? String else { throw WalkError("want {\"cmd\": …}") }
@@ -18,7 +20,13 @@ enum WalkCommands {
         } catch {
             reply = ["ok": false, "error": "\(error)"]
         }
-        return (try? JSONSerialization.data(withJSONObject: reply, options: [.sortedKeys])) ?? Data("{\"ok\":false}".utf8)
+        let drawn = reply.removeValue(forKey: "picture") as? WalkShot.Drawn
+        let head = (try? JSONSerialization.data(withJSONObject: reply, options: [.sortedKeys])) ?? Data("{\"ok\":false}".utf8)
+        guard let drawn else { return { head } }
+        return {
+            guard let png = drawn.png else { return Data("{\"ok\":false,\"error\":\"could not encode the window\"}".utf8) }
+            return Data("{\"png\":\"".utf8) + png.base64EncodedData() + Data("\",".utf8) + head.dropFirst()
+        }
     }
 
     private static func perform(_ verb: String, _ request: [String: Any]) throws -> [String: Any] {
@@ -45,7 +53,9 @@ enum WalkCommands {
                 guard level < (request["depth"] as? Int ?? 8) else { return }
                 let delegate = (layer.delegate as? NSObject).map { " ← \($0.className)" } ?? ""
                 lines.append(String(repeating: "  ", count: level) + "\(layer.className) \(Int(layer.bounds.width))x\(Int(layer.bounds.height))"
-                    + (layer.mask != nil ? " mask" : "") + (layer.isHidden ? " hidden" : "") + " op:\(layer.opacity)" + delegate)
+                    + (layer.mask != nil ? " mask" : "") + (layer.isHidden ? " hidden" : "") + " op:\(layer.opacity)"
+                    + (layer.isGeometryFlipped ? " geometryFlipped" : "") + (layer.contentsAreFlipped() ? " contentsFlipped" : "") + (layer.contents == nil ? " noContents" : "")
+                    + (CATransform3DIsIdentity(layer.transform) ? "" : " transform") + delegate)
                 for sub in layer.sublayers ?? [] { dump(sub, level + 1) }
             }
             dump(layer, 0)
@@ -54,10 +64,10 @@ enum WalkCommands {
             return ["ok": true, "windows": windows().enumerated().map { describe($1, index: $0) }]
         case "shot":
             let window = try target(request)
-            let drawn = (request["view"] as? String).map { WalkShot.png(ofView: $0, in: window) }
-                ?? WalkShot.png(of: window)
-            guard let png = drawn else { throw WalkError("could not draw the window") }
-            return ["ok": true, "png": png.base64EncodedString(), "width": Int(window.frame.width),
+            let drawn = (request["view"] as? String).map { WalkShot.picture(ofView: $0, in: window) }
+                ?? WalkShot.picture(of: window, shadows: request["shadows"] as? Bool ?? true)
+            guard let drawn else { throw WalkError("could not draw the window") }
+            return ["ok": true, "picture": drawn, "width": Int(window.frame.width),
                     "height": Int(window.frame.height)]
         case "tree":
             let depth = request["depth"] as? Int ?? 30
@@ -75,6 +85,9 @@ enum WalkCommands {
             let found = try matches(request)
             return ["ok": !found.isEmpty, "matches": found.map { $0.element.line(in: $0.window) }]
         case "press":
+            if let x = request["x"] as? Double, let y = request["y"] as? Double {
+                return try pressAt(try target(request), CGPoint(x: x, y: y))
+            }
             return try act(request, verb: "pressed") { $0.press() }
         case "select":
             // A row only: a list's selection is set on its row, as a click would.
@@ -147,8 +160,14 @@ enum WalkCommands {
             var frame = window.frame
             frame.origin.y += frame.height - height
             frame.size = CGSize(width: width, height: height)
+            // `x` and `y`: its top left, in points from the main screen's top left, as AX
+            // has it. A shot is drawn at the scale of the screen the window is on (#1078).
+            if let x = request["x"] as? Double, let y = request["y"] as? Double,
+               let main = NSScreen.screens.first {
+                frame.origin = CGPoint(x: x, y: main.frame.maxY - y - height)
+            }
             window.setFrame(frame, display: true)
-            return ["ok": true, "frame": box(window.frame)]
+            return ["ok": true, "frame": box(window.frame), "scale": window.backingScaleFactor]
         case "menu":
             guard let path = request["path"] as? [String], !path.isEmpty else { throw WalkError("menu wants a path") }
             return try menu(path)
@@ -191,7 +210,15 @@ enum WalkCommands {
 
     /// Where a search looks: the window named, with its sheets first; else every window.
     private static func scope(_ request: [String: Any]) throws -> [NSWindow] {
-        guard request["window"] != nil else { return windows() }
+        guard request["window"] != nil else {
+            // A popover is a child window, which a window that is not on screen keeps out
+            // of the app's ordered windows (#1078): its choices are searched first.
+            let listed = windows()
+            let children = listed.flatMap { $0.childWindows.orEmpty }.filter { child in
+                child.isVisible && !listed.contains { $0 === child }
+            }
+            return children + listed
+        }
         let window = try target(request)
         return [window.attachedSheet].compactMap { $0 } + window.childWindows.orEmpty + [window]
     }
@@ -247,6 +274,26 @@ enum WalkCommands {
         throw WalkError("nothing that could be \(verb) matched \(request["text"] ?? "")")
     }
 
+    /// The element under a point of the window (in its points from the top left), as the AX
+    /// server's hit test finds it, pressed, or the nearest of its parents that takes a press:
+    /// for a control SwiftUI leaves out of the tree it hands out (#1078: the pills over the
+    /// prompt). A click would not do: a window that is not key keeps a button's first click.
+    private static func pressAt(_ window: NSWindow, _ point: CGPoint) throws -> [String: Any] {
+        let onScreen = window.convertPoint(toScreen: CGPoint(x: point.x, y: window.frame.height - point.y))
+        guard let root = window.contentView?.superview,
+              let hit = root.accessibilityHitTest(onScreen) as? NSObject else {
+            throw WalkError("nothing at \(Int(point.x)),\(Int(point.y))")
+        }
+        var current: WalkAX? = WalkAX(object: hit)
+        var hops = 0
+        while let element = current, !element.isWindow, hops <= 6 {
+            if element.press() { return ["ok": true, "did": "pressed: \(element.line(in: window))"] }
+            current = element.parent
+            hops += 1
+        }
+        throw WalkError("nothing at \(Int(point.x)),\(Int(point.y)) takes a press: \(WalkAX(object: hit).line(in: window))")
+    }
+
     /// The table a row element is in, and its index: the element is AppKit's stand-in for
     /// the row (`NSOutlineRow`), or the row view.
     private static func tableRow(_ element: WalkAX) -> (NSTableView, Int)? {
@@ -264,6 +311,9 @@ enum WalkCommands {
     private static func menu(_ path: [String]) throws -> [String: Any] {
         guard var menu = NSApp.mainMenu else { throw WalkError("no menu bar") }
         for (at, title) in path.enumerated() {
+            // As opening it does: SwiftUI brings a menu's items up to date only then, so
+            // one never opened kept the state it was made with (#1078: Open in Browser off).
+            menu.delegate?.menuNeedsUpdate?(menu)
             menu.update()
             guard let index = menu.items.firstIndex(where: { $0.title.localizedCaseInsensitiveCompare(title) == .orderedSame })
                 ?? menu.items.firstIndex(where: { $0.title.localizedCaseInsensitiveContains(title) }) else {
@@ -272,6 +322,7 @@ enum WalkCommands {
             let item = menu.items[index]
             if at == path.count - 1, let items = item.submenu?.items {
                 // A menu, not an item: say what is in it.
+                if let submenu = item.submenu { submenu.delegate?.menuNeedsUpdate?(submenu) }
                 item.submenu?.update()
                 return ["ok": true, "did": items.filter { !$0.isSeparatorItem }
                     .map { $0.title + ($0.isEnabled ? "" : " (off)") }.joined(separator: "\n")]

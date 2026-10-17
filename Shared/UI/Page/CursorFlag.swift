@@ -26,6 +26,10 @@ struct CursorFlag: Hashable {
     static let person = CursorFlag(name: personName, color: Color(nsColor: .controlAccentColor))
 
     private static let personName: String = {
+        #if DEBUG
+        // A video's window calls the person by a made-up name (#1078).
+        if let name = ProcessInfo.processInfo.environment["AGENTS_PERSON_NAME"], !name.isEmpty { return name }
+        #endif
         let full = NSFullUserName()
         return full.split(separator: " ").first.map(String.init) ?? NSUserName()
     }()

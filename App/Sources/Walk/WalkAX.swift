@@ -65,10 +65,15 @@ struct WalkAX {
     // MARK: reading
 
     var children: [WalkAX] {
-        // Either may come back empty where the other has them: a sheet's hosting view.
+        // Either may come back empty where the other has them (a sheet's hosting view), or
+        // hold only some of them: the pills over the prompt are only in the newer list
+        // (#1078). Both, each once.
         let legacy = (value("AXChildren") as? [Any]) ?? []
-        let all = legacy.isEmpty ? (call("accessibilityChildren") as? [Any]) ?? [] : legacy
-        return all.compactMap { ($0 as? NSObject).map(WalkAX.init) }
+        let newer = (call("accessibilityChildren") as? [Any]) ?? []
+        var seen = Swift.Set<ObjectIdentifier>()
+        return (legacy + newer).compactMap { $0 as? NSObject }
+            .filter { seen.insert(ObjectIdentifier($0)).inserted }
+            .map(WalkAX.init)
     }
 
     var parent: WalkAX? { ((value("AXParent") ?? call("accessibilityParent")) as? NSObject).map(WalkAX.init) }

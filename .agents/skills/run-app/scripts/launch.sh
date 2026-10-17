@@ -37,7 +37,9 @@ while [ $# -gt 0 ]; do
     --control-env) CONTROL_ENV+=("$2"); shift ;;  # KEY=VALUE for the control plane, e.g. AGENTS_SSH=…
     --appearance) APP_ARGS+=(--appearance "$2"); shift ;;  # light|dark|system for the window, no setting changed
     --app-arg)   APP_ARGS+=("$2"); shift ;;   # one more argument for the window, e.g. a defaults key: -key value
-    *) echo "usage: launch.sh [--slug NAME] [--config Debug|Live] [--seeded] [--no-build] [--front] [--no-window] [--first-run] [--lan] [--host-first] [--web-port N] [--env KEY=VALUE]… [--control-env KEY=VALUE]… [--appearance light|dark] [--app-arg ARG]…" >&2; exit 2 ;;
+    --outside-checkout) OUTSIDE=1 ;;  # open a copy of the window from the root, so its title names no worktree (#1078)
+    --person)    PERSON="$2"; shift ;;   # the first name the window gives the person, in place of the Mac account's (#1078)
+    *) echo "usage: launch.sh [--slug NAME] [--config Debug|Live] [--seeded] [--no-build] [--front] [--no-window] [--first-run] [--lan] [--host-first] [--web-port N] [--env KEY=VALUE]… [--control-env KEY=VALUE]… [--appearance light|dark] [--app-arg ARG]… [--outside-checkout] [--person NAME]" >&2; exit 2 ;;
   esac
   shift
 done
@@ -193,6 +195,12 @@ if [ "$WINDOW" = 1 ]; then
     PAIR_CODE="$(code --client)"
   else
     OPEN_FLAGS+=(--env AGENTS_CONTROL="$(code --client)")
+  fi
+  [ -n "${PERSON:-}" ] && OPEN_FLAGS+=(--env AGENTS_PERSON_NAME="$PERSON")
+  if [ "${OUTSIDE:-0}" = 1 ]; then
+    # A window inside a checkout puts the worktree's name in its title (AppCheckout).
+    ditto "$APP" "$ROOT/app/Agents.app"
+    APP="$ROOT/app/Agents.app"
   fi
   "${CLEAN[@]}" open "${OPEN_FLAGS[@]}" "$APP" --args --walk "run-$SLUG" -ApplePersistenceIgnoreState YES ${APP_ARGS[@]+"${APP_ARGS[@]}"}
   for _ in $(seq 1 100); do
