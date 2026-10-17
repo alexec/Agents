@@ -44,8 +44,9 @@ func (d *Daemon) chatFolder() string {
 
 // summaryFor is the summary of one project, or false.
 func (d *Daemon) summaryFor(folder string) (wire.ProjectSummary, bool) {
+	real := resolved(folder)
 	for _, s := range d.projects(true) {
-		if store.FolderPath(s.Project.Folder) == folder {
+		if f := store.FolderPath(s.Project.Folder); f == folder || f == real {
 			return s, true
 		}
 	}
@@ -54,8 +55,9 @@ func (d *Daemon) summaryFor(folder string) (wire.ProjectSummary, bool) {
 
 func (d *Daemon) projectRecord(folder string) (wire.Project, int, []wire.Project) {
 	ps := d.Store.Projects()
+	real := resolved(folder)
 	for i, p := range ps {
-		if store.FolderPath(p.Folder) == folder {
+		if f := store.FolderPath(p.Folder); f == folder || f == real {
 			return p, i, ps
 		}
 	}

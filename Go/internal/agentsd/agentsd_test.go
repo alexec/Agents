@@ -124,6 +124,12 @@ func TestASwiftRootIsServed(t *testing.T) {
 	b, _ := os.ReadFile(filepath.Join(fix, "agent.json"))
 	var head struct{ ID string }
 	json.Unmarshal(b, &head)
+	// The fixture's folder is a real one on the Mac it was made on: here, a folder of the
+	// test's own, so the host never reads (or runs the workflows of) a real project.
+	b = []byte(strings.ReplaceAll(string(b), `"file:///Users/alexcollins/Agents/"`, `"`+string(store.FolderURL(t.TempDir()))+`/"`))
+	if strings.Contains(string(b), "/Users/alexcollins") {
+		t.Fatal("the fixture still names a real folder")
+	}
 	dir := filepath.Join(root, "agents", strings.ToUpper(head.ID))
 	os.MkdirAll(dir, 0o755)
 	os.WriteFile(filepath.Join(dir, "agent.json"), b, 0o644)
@@ -133,7 +139,9 @@ func TestASwiftRootIsServed(t *testing.T) {
 	// daemon, a note and its ending (DaemonCore+Recovery).
 	lines := strings.Count(string(tb), "\n") + 2
 
-	_, c := start(t, root)
+	d, c := start(t, root)
+	// Stopped before the root goes: recovery may still be writing the agent's record.
+	defer d.Shutdown()
 	var agents []wire.Agent
 	json.Unmarshal(c.call(t, 1, "agents/list", map[string]any{"includeArchived": true}), &agents)
 	if len(agents) != 1 || string(agents[0].ID) != strings.ToUpper(head.ID) {

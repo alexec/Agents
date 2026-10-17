@@ -85,12 +85,11 @@ func main() {
 	// events/raise, as a debug build on a scratch root has it: never on a root a person
 	// uses, nor in a release.
 	d.RaiseByHand = buildinfo.Version == "dev" && !ordinaryRoot(cl.root)
-	if cl.serve {
-		// A server's settings are the person's, in their home (Daemon.swift's --serve).
-		if home, err := os.UserHomeDir(); err == nil {
-			d.SettingsDir = filepath.Join(home, ".agents", "settings")
-			d.ChatHome = home
-		}
+	if home := personalHome(cl); home != "" {
+		// The person's settings and chat project are in their home: a server's
+		// (Daemon.swift's --serve), and the ordinary root's (StoreLocations.personalHome).
+		d.SettingsDir = filepath.Join(home, ".agents", "settings")
+		d.ChatHome = home
 	}
 	safe.Go("socket", func() {
 		if err := d.ServeSocket(ctx, loc.Socket()); err != nil && ctx.Err() == nil {
@@ -153,10 +152,9 @@ func parse(args []string) commandLine {
 		cl.root = os.Getenv("AGENTS_ROOT")
 	}
 	if cl.root == "" {
-		// The ordinary root, Application Support/Agents, which is ~/.local/share/Agents on
-		// Linux, as Foundation has it.
+		// The ordinary root, Application Support/Agents, as Foundation has it on this OS.
 		home, _ := os.UserHomeDir()
-		cl.root = filepath.Join(home, ".local", "share", "Agents")
+		cl.root = standardRoot(home)
 	}
 	if strings.HasPrefix(cl.root, "~/") {
 		home, _ := os.UserHomeDir()
@@ -271,9 +269,30 @@ func platform() string {
 	return name + " x86-64"
 }
 
-// machineID is MachineID.current on Linux.
+// personalHome is StoreLocations.personalHome: AGENTS_PERSONAL_HOME first, then the
+// account's home for a server (--serve) or the ordinary root, and none for any other root,
+// which keeps its settings in <root>/settings and never writes the real ~/.agents.
+func personalHome(cl commandLine) string {
+	if named := os.Getenv("AGENTS_PERSONAL_HOME"); named != "" {
+		return named
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return ""
+	}
+	if cl.serve || filepath.Clean(cl.root) == standardRoot(home) {
+		return home
+	}
+	return ""
+}
+
+// machineID is MachineID.current: given, then this Mac's hardware UUID, then Linux's
+// machine-id, then the host name.
 func machineID() string {
 	if id := os.Getenv("AGENTS_MACHINE_ID"); id != "" {
+		return id
+	}
+	if id := hardwareUUID(); id != "" {
 		return id
 	}
 	for _, f := range []string{"/etc/machine-id", "/var/lib/dbus/machine-id"} {
@@ -294,8 +313,7 @@ func isTerminal() bool {
 // invented event would be a lie (Application Support/Agents, or an installed server's).
 func ordinaryRoot(root string) bool {
 	home, _ := os.UserHomeDir()
-	for _, r := range []string{filepath.Join(home, ".local", "share", "Agents"),
-		filepath.Join(home, "Library", "Application Support", "Agents"), filepath.Join(home, ".agents-server", "root")} {
+	for _, r := range []string{standardRoot(home), filepath.Join(home, ".agents-server", "root")} {
 		if filepath.Clean(root) == r {
 			return true
 		}
