@@ -7,7 +7,6 @@ import (
 	"sync"
 
 	"github.com/alexec/agents/Go/internal/agentsd/store"
-	"github.com/alexec/agents/Go/internal/safe"
 	"github.com/alexec/agents/Go/wire"
 )
 
@@ -352,7 +351,7 @@ func (d *Daemon) checkEveryQueue() {
 
 // checkQueueSoon starts what the project's queue may start now, off this call.
 func (d *Daemon) checkQueueSoon(folder string) {
-	safe.Go("helper queue", func() { d.startFromQueue(folder) })
+	d.goAfterTurn("helper queue", func() { d.startFromQueue(folder) })
 }
 
 func (d *Daemon) startFromQueue(folder string) {

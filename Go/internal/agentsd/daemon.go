@@ -56,6 +56,7 @@ type Daemon struct {
 	optionBook
 	timeBook
 	milestoneBook
+	afterTurnState
 	attentionState
 	worktreeState
 	recoveryState
@@ -161,7 +162,11 @@ func (d *Daemon) Shutdown() {
 		t.Stop()
 	}
 	d.attentionMu.Unlock()
+	// No turn starts, and nothing new follows one; the turns stopped here record their
+	// endings and what follows them before the files they write are closed (#1272).
+	d.closeAfterTurns()
 	d.stopAll()
+	d.waitAfterTurns(afterTurnLimit)
 	d.clearPickUps()
 	d.stopMCPEvents()
 	d.stopEvents()
@@ -173,7 +178,6 @@ func (d *Daemon) Shutdown() {
 	d.stopShells()
 	d.stopProjectWatches()
 	d.stopSignInRelays()
-	d.waitForMilestones()
 }
 
 // once is true the first time a sendID is seen: a window sends a prompt again for 30 s

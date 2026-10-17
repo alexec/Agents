@@ -290,14 +290,12 @@ func (d *Daemon) enqueue(id wire.UUID, q wire.QueuedPrompt, first bool) error {
 	return nil
 }
 
-// kick starts the agent's turns unless they are running.
+// kick starts the agent's turns unless they are running, or the host is going.
 func (l *live) kick() {
 	l.mu.Lock()
-	start := !l.running
-	l.running = true
-	l.mu.Unlock()
-	if start {
-		safe.Go("agent "+string(l.id), l.run)
+	defer l.mu.Unlock()
+	if !l.running {
+		l.running = l.d.goAfterTurn("agent "+string(l.id), l.run)
 	}
 }
 
@@ -440,6 +438,12 @@ func (l *live) turn() bool {
 		l.mu.Lock()
 		l.session = s
 		l.mu.Unlock()
+		// Started as the host goes, after stopAll looked (#1272): it would be left running.
+		if d.going() {
+			s.Stop()
+			d.end(l, wire.AgentStateStopped, wire.EndedReasonCancelled)
+			return false
+		}
 		d.noteEffectiveSandbox(l.id, sandbox, why)
 		// The handshake says the runtime is ready, and what it takes (noteAccount).
 		pc := s.Init.AgentCapabilities.PromptCapabilities
@@ -1119,8 +1123,12 @@ func (d *Daemon) stopAll() {
 	d.mu.Unlock()
 	for _, l := range ls {
 		l.mu.Lock()
-		s := l.session
+		s, stop := l.session, l.stop
 		l.mu.Unlock()
+		// A turn still starting its runtime has no session yet: its context ends it.
+		if stop != nil {
+			stop()
+		}
 		if s != nil {
 			s.Stop()
 		}

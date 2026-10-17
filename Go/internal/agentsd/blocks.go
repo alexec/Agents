@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/alexec/agents/Go/internal/agentsd/store"
-	"github.com/alexec/agents/Go/internal/safe"
 	"github.com/alexec/agents/Go/wire"
 )
 
@@ -614,6 +613,6 @@ func (d *Daemon) agentEnded(id wire.UUID) {
 	}
 	if how := waitEndingHow(a); how != nil {
 		h := *how
-		safe.Go("close waits", func() { d.closeWaits(id, h) })
+		d.goAfterTurn("close waits", func() { d.closeWaits(id, h) })
 	}
 }
