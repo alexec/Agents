@@ -109,7 +109,7 @@ struct TurnView: View, Equatable {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .task(id: detail.showsSteps) {
+        .task(id: detail.showsSteps) { // scratch probe (#1231), never merged
             if detail.showsSteps, waiting { await fetch() }
         }
     }
