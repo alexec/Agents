@@ -229,6 +229,7 @@ func (d *Daemon) mcpHealthPass() (wire.MCPHealthSnapshot, []mcpDue) {
 		filled, gone := filledServer(e.server, secrets)
 		switch {
 		case e.hosted:
+			h.Live = d.hostedStatus(project, e.name)
 		case e.kind == wire.MCPTransportNameSse:
 			h.Check = wire.MCPCheckStateOldTransport
 		case waiting:

@@ -360,21 +360,54 @@ func (d *Daemon) personalMCP(secrets map[string]string) (servers []mcpEntry, mis
 	return
 }
 
+// sessionEntry is one server a session is given, with where its file is: project is nil
+// for the person's own.
+type sessionEntry struct {
+	mcpEntry
+	project *string
+	cwd     string
+}
+
 // sessionMCP is the person's and the project's servers a session is given, after the app's.
 func (d *Daemon) sessionMCP(folder string) []sdk.McpServer {
+	entries := d.sessionEntries(folder)
+	out := make([]sdk.McpServer, 0, len(entries))
+	for _, e := range entries {
+		out = append(out, e.server)
+	}
+	return out
+}
+
+// sessionEntries is sessionMCP's servers, signed in, with the file each came from.
+func (d *Daemon) sessionEntries(folder string) []sessionEntry {
 	secrets := d.secrets()
 	project, _, _, _ := d.projectMCP(folder, secrets)
 	personal, _, _ := d.personalMCP(secrets)
-	var out []sdk.McpServer
+	var out []sessionEntry
 	seen := map[string]bool{appServerName: true}
-	for _, e := range append(project, personal...) {
+	f := folder
+	for i, e := range append(project, personal...) {
 		if seen[e.name] {
 			continue
 		}
 		seen[e.name] = true
-		out = append(out, e.server)
+		if i < len(project) {
+			out = append(out, sessionEntry{mcpEntry: e, project: &f, cwd: folder})
+		} else {
+			out = append(out, sessionEntry{mcpEntry: e, cwd: d.personalHome()})
+		}
 	}
-	return d.withSignIns(out)
+	// A server that needs a sign-in is left out; the others keep their place.
+	kept := out[:0]
+	for _, e := range out {
+		signed := d.withSignIns([]sdk.McpServer{e.server})
+		if len(signed) == 0 {
+			continue
+		}
+		e.server = signed[0]
+		kept = append(kept, e)
+	}
+	return kept
 }
 
 // beginMCPApprovals is beginMCPApprovalsIfNeeded, at start-up.
