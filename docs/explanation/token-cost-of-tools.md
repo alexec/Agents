@@ -66,8 +66,8 @@ A project's own MCP servers are added on top, in the same way for each runtime. 
 the person's choice, and they are not measured here. To measure one, list its tools
 (`tools/list`) and count the bytes of the answer.
 
-`ToolCostTests` holds the lead's list under 46,000 bytes (45,000 until #1320). A new
-tool or a longer description that goes over says so in the tests, and the ceiling is raised on purpose.
+`ToolCostTests` holds the lead's list under 45,000 bytes. A new tool or a longer
+description that goes over says so in the tests, and the ceiling is raised on purpose.
 
 ## What changed
 
