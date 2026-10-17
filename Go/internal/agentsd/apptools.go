@@ -102,6 +102,7 @@ func (d *Daemon) startAppTools() (int, error) {
 }
 
 func (d *Daemon) stopAppTools() {
+	d.stopHosted()
 	d.appMu.Lock()
 	srv := d.appServer
 	d.appServer = nil
@@ -132,37 +133,39 @@ func (d *Daemon) mcpServersFor(id wire.UUID) []sdk.McpServer {
 	}
 	a := d.Store.Agent(id)
 	token := string(store.NewUUID())
+	d.dropAppTokens(id)
 	d.appMu.Lock()
 	if d.appTokens == nil {
 		d.appTokens = map[string]*appGrant{}
-	}
-	for t, g := range d.appTokens {
-		if g.agent == id {
-			g.end()
-			delete(d.appTokens, t)
-		}
 	}
 	d.appTokens[token] = &appGrant{agent: id, movesItself: a != nil && runtimeCanMove(a.RuntimeID), sessions: map[string]chan struct{}{}}
 	d.appMu.Unlock()
 	servers := []sdk.McpServer{{Http: &sdk.McpServerHttpInline{Name: appServerName, Type: "http",
 		Url:     "http://127.0.0.1:" + strconv.Itoa(port) + appToolsPath,
 		Headers: []sdk.HttpHeader{{Name: "Authorization", Value: "Bearer " + token}}}}}
-	// Then the project's approved servers and the person's own (SessionServers.plan).
+	// Then the project's approved servers and the person's own (SessionServers.plan), each
+	// hosted one swapped for its route on this endpoint (#488).
 	if a != nil {
-		servers = append(servers, d.sessionMCP(projectFolder(a))...)
+		servers = append(servers, d.hostedSwapped(d.sessionEntries(projectFolder(a)), port, token, a.RuntimeID)...)
 	}
 	return servers
 }
 
-// dropAppTokens takes back every token an agent holds: its runtime has ended.
+// dropAppTokens takes back every token an agent holds: its runtime has ended. A hosted
+// server it used is let go when nothing else uses it.
 func (d *Daemon) dropAppTokens(id wire.UUID) {
 	d.appMu.Lock()
-	defer d.appMu.Unlock()
+	var dropped []string
 	for t, g := range d.appTokens {
 		if g.agent == id {
 			g.end()
 			delete(d.appTokens, t)
+			dropped = append(dropped, t)
 		}
+	}
+	d.appMu.Unlock()
+	for _, t := range dropped {
+		d.hostedRelease(t)
 	}
 }
 
@@ -194,6 +197,10 @@ func (d *Daemon) serveAppTools(w http.ResponseWriter, r *http.Request) {
 	// A page in a browser can reach loopback. Nothing here is for one.
 	if o := r.Header.Get("Origin"); o != "" && !loopbackOrigin(o) {
 		w.WriteHeader(http.StatusForbidden)
+		return
+	}
+	if strings.HasPrefix(r.URL.Path, hostedPathPrefix) {
+		d.serveHosted(w, r)
 		return
 	}
 	if r.URL.Path != appToolsPath {
