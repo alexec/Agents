@@ -1288,6 +1288,11 @@ final class AppModel {
         liveProjects.reduce(0) { $0 + work.attentionCount(in: $1.key) }
     }
 
+    /// The Blob's mood on the Dock tile (#1317), from the same groups the sidebar shows.
+    var iconMood: IconMood {
+        IconMood(counts: liveProjects.lazy.map { self.work.counts(in: $0.key) })
+    }
+
     /// Whether the daemon is bringing this chat back by itself after a restart.
     func isComingBack(_ agent: Agent) -> Bool { work.isComingBack(agent) }
 

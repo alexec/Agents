@@ -3,6 +3,7 @@
 
     walk.py ROOT ping | windows
     walk.py ROOT shot OUT.png [--render] [--window N|TITLE] [--view CLASS]
+    walk.py ROOT dock OUT.png                    the icon the app gives the Dock tile (#1317), and its badge
     walk.py ROOT tree [DEPTH] [--window …]       the accessibility tree, read in process
     walk.py ROOT find TEXT                       every element whose label holds TEXT
     walk.py ROOT press TEXT                      the innermost match that takes a press
@@ -164,6 +165,15 @@ def main(argv):
                 return 0
         reply = walk.shot(positional[0], **args)
         print(reply.get("path") or reply.get("error"))
+        return 0 if reply.get("ok") else 1
+    if verb == "dock":
+        reply = walk.call("dock", **args)
+        if reply.get("ok"):
+            with open(positional[0], "wb") as f:
+                f.write(base64.b64decode(reply.pop("png")))
+            print(positional[0] + (f' badge {reply["badge"]}' if reply.get("badge") else ""))
+        else:
+            print(reply.get("error"))
         return 0 if reply.get("ok") else 1
     if verb in ("wait", "gone"):
         seconds = float(positional[1]) if len(positional) > 1 else 20

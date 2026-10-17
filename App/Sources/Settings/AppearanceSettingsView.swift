@@ -86,9 +86,10 @@ struct MacSettingsView: View {
     }
 }
 
-/// Settings ▸ Appearance: the theme.
+/// Settings ▸ Appearance: the theme, and whether the Dock icon shows the agents' mood.
 struct AppearanceSettingsView: View {
     @AppStorage(Appearance.defaultsKey, store: WindowDefaults.store) private var appearance = Appearance.system
+    @AppStorage(IconMood.showsMoodKey, store: WindowDefaults.store) private var iconShowsMood = true
 
     var body: some View {
         Section {
@@ -98,6 +99,14 @@ struct AppearanceSettingsView: View {
             .pickerStyle(.segmented)
         } footer: {
             Text("System follows your Mac, and changes with it.")
+                .appText(.fine)
+                .foregroundStyle(.secondary)
+        }
+        .paperListRow()
+        Section {
+            Toggle("Icon shows what agents are doing", isOn: $iconShowsMood)
+        } footer: {
+            Text("The Blob on the Dock sleeps when nothing runs, smiles while agents work, and looks puzzled when a question waits. Off, it always smiles.")
                 .appText(.fine)
                 .foregroundStyle(.secondary)
         }
