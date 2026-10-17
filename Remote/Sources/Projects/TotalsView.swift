@@ -28,7 +28,7 @@ struct TotalsView: View {
                         .appText(.supporting)
                         .foregroundStyle(.secondary)
                 }
-                // The Mac's use over time, as Health draws it (#823).
+                // Every host's use over time, as Health draws it (#823, #1267).
                 UsageChartsSection(metric: .cost, load: { await model.usageHistory() }, refresh: model.costState)
                     .padding(.bottom, 8)
                 if spending.isEmpty {

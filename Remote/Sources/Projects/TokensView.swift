@@ -1,7 +1,7 @@
 import AgentsKitCore
 import SwiftUI
 
-/// What the work used in tokens (#956): the Mac's usage charts in tokens, then each
+/// What the work used in tokens (#956): every host's usage charts in tokens, then each
 /// host's tokens today against its token limits. The window's TokensView, from Usage in
 /// the sidebar. Read only: the limits are set on the Mac.
 struct TokensView: View {
@@ -10,7 +10,7 @@ struct TokensView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
-                // The Mac's use over time, as Health draws it (#823).
+                // Every host's use over time, as Health draws it (#823, #1267).
                 UsageChartsSection(metric: .tokens, load: { await model.usageHistory() }, refresh: model.costState)
                     .padding(.bottom, 8)
                 ForEach(model.costStates, id: \.0) { host, state in

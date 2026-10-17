@@ -20,6 +20,8 @@ import { healthTally, personalEmpty, personalIntro, personalServers } from "../m
 import { refusalMessage } from "../model/workflows";
 import { dayTokenLimitReached } from "../model/limits";
 import { UsageCharts } from "./UsageCharts";
+import { mergeUsage } from "../model/usage";
+import { mergeTime } from "../model/time";
 import { TimeCharts } from "./TimeCharts";
 import { MilestonesSection, TimeMilestonesUnder } from "./Milestones";
 import { isComplete } from "../model/milestones";
@@ -477,21 +479,42 @@ function ConsequenceLine({ consequence, host, store, openAgent }: {
   return <span class="quiet small event-consequence">↳ {verb} <button class="link" onClick={openWorkflow}>{item.workflowID}</button> — {refusalMessage(item.reason)}</span>;
 }
 
-/** Where the time of running chats went (#852): This Mac's, as on the window and the Remote. */
+/**
+ * The hosts the charts add up (#1267): This Mac first, whose recap the Time page keeps, then every
+ * other online host, each moved into this browser's days.
+ */
+function chartHosts(store: Store): string[] {
+  const online = store.hosts.value.filter((h) => h.state === "online" && h.relay !== true).map((h) => h.id);
+  const ids = online.length > 0 ? online : store.hosts.value.map((h) => h.id);
+  return [...ids.filter((id) => id === "mac"), ...ids.filter((id) => id !== "mac")];
+}
+
+/** A runtime's name, from the first host that knows it. */
+function chartRuntimeName(store: Store, hosts: readonly string[]) {
+  return (id: string) => hosts.map((host) => store.runtimes.value[host]?.find((s) => s.runtime.id === id)?.runtime.name)
+    .find((name) => name) || id;
+}
+
+/** Where the time of running chats went (#852): every host's, as on the window and the Remote (#1267). */
 function TimePage({ store }: { store: Store }) {
-  const host = store.hosts.value.some((h) => h.id === "mac") ? "mac" : store.hosts.value[0]?.id;
+  const hosts = chartHosts(store);
+  const host = hosts[0];
   useEffect(() => {
-    if (!host) return;
-    void store.loadTime(host);
-    void store.loadRuntimes(host);
-    const every = setInterval(() => { if (document.visibilityState === "visible") void store.loadTime(host); }, 60_000);
+    for (const each of hosts) {
+      void store.loadTime(each);
+      void store.loadRuntimes(each);
+    }
+    const every = setInterval(() => {
+      if (document.visibilityState === "visible") for (const each of hosts) void store.loadTime(each);
+    }, 60_000);
     return () => clearInterval(every);
-  }, [host]);
-  const runtimeName = (id: string) => (host && store.runtimes.value[host]?.find((s) => s.runtime.id === id)?.runtime.name) || id;
+  }, [hosts.join(" ")]);
+  const runtimeName = chartRuntimeName(store, hosts);
   if (!host) return <p class="quiet">No host is connected.</p>;
+  const history = store.time.value[host] ? mergeTime(hosts.flatMap((each) => store.time.value[each] ?? [])) : undefined;
   return (
     <TimeMilestonesUnder milestones={store.milestones.value[host]}>
-      <TimeCharts history={store.time.value[host]} runtimeName={runtimeName} />
+      <TimeCharts history={history} runtimeName={runtimeName} />
     </TimeMilestonesUnder>
   );
 }
@@ -510,14 +533,14 @@ function MilestonesPage({ store }: { store: Store }) {
 
 /** What the work used in tokens (#956): the charts in tokens, then each host's day against its token limits. */
 function TokensPage({ store, hostName }: { store: Store; hostName: (host: string) => string }) {
-  const chartHost = store.hosts.value.some((h) => h.id === "mac") ? "mac" : store.hosts.value[0]?.id;
-  const chartCost = chartHost ? store.costs.value[chartHost] : undefined;
-  useEffect(() => { if (chartHost) void store.loadUsage(chartHost); }, [chartHost, chartCost]);
-  const runtimeName = (id: string) =>
-    (chartHost && store.runtimes.value[chartHost]?.find((s) => s.runtime.id === id)?.runtime.name) || id;
+  const hosts = chartHosts(store);
+  const costs = hosts.map((host) => store.costs.value[host]);
+  useEffect(() => { for (const host of hosts) void store.loadUsage(host); }, [hosts.join(" "), ...costs]);
+  const runtimeName = chartRuntimeName(store, hosts);
+  const history = mergeUsage(hosts.flatMap((host) => store.usage.value[host] ?? []));
   return (
     <>
-      {chartHost && <UsageCharts metric="tokens" history={store.usage.value[chartHost]} runtimeName={runtimeName} />}
+      {hosts.length > 0 && <UsageCharts metric="tokens" history={history} runtimeName={runtimeName} />}
       {Object.entries(store.costs.value).map(([host, state]) => (
         <section key={host}>
           <h2 class="section-head">{hostName(host)}</h2>
@@ -540,15 +563,15 @@ function SpendingPage({ store, hostName }: { store: Store; hostName: (host: stri
   const unmeasured = projects.reduce((count, project) => count + project.unmeasuredAgents, 0);
   const costs = Object.entries(store.costs.value);
   const today = totalWords(todayTotals(store.costs.value));
-  // The charts are This Mac's, as on the window and the Remote; another host's when there is no Mac.
-  const chartHost = store.hosts.value.some((h) => h.id === "mac") ? "mac" : store.hosts.value[0]?.id;
-  const chartCost = chartHost ? store.costs.value[chartHost] : undefined;
-  useEffect(() => { if (chartHost) void store.loadUsage(chartHost); }, [chartHost, chartCost]);
-  const runtimeName = (id: string) =>
-    (chartHost && store.runtimes.value[chartHost]?.find((s) => s.runtime.id === id)?.runtime.name) || id;
+  // The charts are every host's, in this browser's days, as on the window and the Remote (#1267).
+  const hosts = chartHosts(store);
+  const chartCosts = hosts.map((host) => store.costs.value[host]);
+  useEffect(() => { for (const host of hosts) void store.loadUsage(host); }, [hosts.join(" "), ...chartCosts]);
+  const runtimeName = chartRuntimeName(store, hosts);
+  const history = mergeUsage(hosts.flatMap((host) => store.usage.value[host] ?? []));
   return (
     <>
-      {chartHost && <UsageCharts metric="cost" history={store.usage.value[chartHost]} runtimeName={runtimeName} />}
+      {hosts.length > 0 && <UsageCharts metric="cost" history={history} runtimeName={runtimeName} />}
       <p class="spending-today"><span class="quiet">All time</span> <span class="strong">{totalWords(totals) ?? "Nothing has been spent yet"}</span></p>
       {currencies.map((currency) => (
         <section key={currency}>

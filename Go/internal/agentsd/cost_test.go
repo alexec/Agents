@@ -41,7 +41,7 @@ func TestCostIsBankedAndLimitsKept(t *testing.T) {
 	var h wire.UsageHistory
 	json.Unmarshal(c.call(t, 2, "usage/history", nil), &h)
 	day := h.Days[st.Day]["claude"]
-	if day.Cost["USD"] != 0.75 || day.InputTokens != 1000 || day.Turns != 1 || h.Now == "" {
+	if day.Cost["USD"] != 0.75 || day.InputTokens != 1000 || day.Turns != 1 || h.Now == "" || !sameZone(h.TimeZone) {
 		t.Fatalf("%+v", h)
 	}
 	// Limits: set, a key left alone when absent, taken away with null.
@@ -67,7 +67,43 @@ func TestCostIsBankedAndLimitsKept(t *testing.T) {
 	json.Unmarshal(c.call(t, 6, "milestones/state", nil), &m)
 	var th wire.TimeHistory
 	json.Unmarshal(c.call(t, 7, "time/history", nil), &th)
-	if m.Earned == nil || th.Hours == nil || th.Now == "" {
+	if m.Earned == nil || th.Hours == nil || th.Now == "" || !sameZone(th.TimeZone) {
 		t.Fatalf("%+v %+v", m, th)
+	}
+}
+
+func sameZone(z *string) bool {
+	want := zoneName()
+	return (z == nil) == (want == nil) && (z == nil || *z == *want)
+}
+
+// The histories say the zone their stamps are in, so a viewer elsewhere can move them into
+// its own day (#1267).
+func TestNamedZone(t *testing.T) {
+	utc := func() time.Time { return time.Date(2026, 10, 17, 2, 41, 0, 0, time.UTC) }
+	pdt := func() time.Time { return time.Date(2026, 10, 16, 19, 41, 0, 0, time.FixedZone("PDT", -7*3600)) }
+	noLink := func(string) (string, error) { return "", os.ErrNotExist }
+	link := func(to string) func(string) (string, error) { return func(string) (string, error) { return to, nil } }
+	env := func(tz string, set bool) func(string) (string, bool) { return func(string) (string, bool) { return tz, set } }
+	for _, c := range []struct {
+		name     string
+		env      func(string) (string, bool)
+		readlink func(string) (string, error)
+		now      func() time.Time
+		want     string
+	}{
+		{"TZ names a zone", env("America/Los_Angeles", true), noLink, pdt, "America/Los_Angeles"},
+		{"TZ with a colon", env(":Europe/London", true), noLink, utc, "Europe/London"},
+		{"TZ empty is UTC", env("", true), noLink, utc, "UTC"},
+		{"TZ a path", env("/usr/share/zoneinfo/Asia/Kolkata", true), noLink, utc, "Asia/Kolkata"},
+		{"macOS link", env("", false), link("/var/db/timezone/zoneinfo/America/Los_Angeles"), pdt, "America/Los_Angeles"},
+		{"Linux link", env("", false), link("../usr/share/zoneinfo/Etc/UTC"), utc, "Etc/UTC"},
+		{"container with no zone", env("", false), noLink, utc, "UTC"},
+		{"nothing to name", env("", false), noLink, pdt, ""},
+	} {
+		got := namedZone(c.env, c.readlink, c.now)
+		if (got == nil) != (c.want == "") || (got != nil && *got != c.want) {
+			t.Errorf("%s: %v, want %q", c.name, got, c.want)
+		}
 	}
 }

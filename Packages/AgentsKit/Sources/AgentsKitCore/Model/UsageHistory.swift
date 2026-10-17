@@ -15,6 +15,9 @@ public struct UsageHistory: Codable, Sendable, Hashable {
     /// The host's hour when this was read. A client never asks its own clock what
     /// "today" is: it may be in another time zone from the host that stamped these.
     public var now: String
+    /// The zone those stamps are in, an IANA identifier (#1267). Nil from a host too old
+    /// to say, read as the viewer's own.
+    public var timeZone: String?
 
     public static let hoursKept = 168
     public static let daysKept = 90
@@ -24,10 +27,11 @@ public struct UsageHistory: Codable, Sendable, Hashable {
     public static let unattributed = ""
 
     public init(hours: [String: [String: UsageBucket]] = [:],
-                days: [String: [String: UsageBucket]] = [:], now: String = "") {
+                days: [String: [String: UsageBucket]] = [:], now: String = "", timeZone: String? = nil) {
         self.hours = hours
         self.days = days
         self.now = now
+        self.timeZone = timeZone
     }
 
     public var isEmpty: Bool { hours.isEmpty && days.isEmpty }

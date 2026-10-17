@@ -1731,17 +1731,35 @@ final class AppModel {
         work.replaceMCPHealth(snapshot, from: host)
     }
 
-    /// What this Mac's work used by hour and by day (#823), for the charts on Cost. Nil
-    /// from a daemon too old to know the method, and the charts stay out.
+    /// What the work used by hour and by day (#823), for the charts on Cost: this Mac's
+    /// and every connected server's, each moved into this Mac's days (#1267). Nil when no
+    /// host knows the method, and the charts stay out.
     func usageHistory() async -> UsageHistory? {
-        try? await client.call(DaemonAPI.Method.usageHistory, Optional<String>.none, returning: UsageHistory.self)
+        var histories: [UsageHistory] = []
+        for host in chartHosts {
+            if let history = try? await client(for: host).call(DaemonAPI.Method.usageHistory, Optional<String>.none,
+                                                                returning: UsageHistory.self) {
+                histories.append(history)
+            }
+        }
+        return histories.isEmpty ? nil : .merged(histories)
     }
 
-    /// Where the time of this Mac's running chats went (#852), for the Time page. Nil from
-    /// a daemon too old to know the method.
+    /// Where the time of running chats went (#852), for the Time page, from every host as
+    /// `usageHistory` is. The recap is this Mac's. Nil when no host knows the method.
     func timeHistory() async -> TimeHistory? {
-        try? await client.call(DaemonAPI.Method.timeHistory, Optional<String>.none, returning: TimeHistory.self)
+        var histories: [TimeHistory] = []
+        for host in chartHosts {
+            if let history = try? await client(for: host).call(DaemonAPI.Method.timeHistory, Optional<String>.none,
+                                                                returning: TimeHistory.self) {
+                histories.append(history)
+            }
+        }
+        return histories.isEmpty ? nil : .merged(histories)
     }
+
+    /// This Mac first, then every server that has said what it spends.
+    private var chartHosts: [HostID] { [.mac] + serverCosts.keys.filter { $0 != .mac } }
 
     /// Every volume low on space (#195). A daemon too old to know the method leaves it
     /// empty, and no strip is drawn.

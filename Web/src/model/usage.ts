@@ -1,6 +1,7 @@
 // The bars of a usage chart (#823), as AgentsKitCore's UsageChart works them out, so the page's
 // Cost charts say what the window's and the Remote's say. Every stamp is the host's, counted
-// back from history.now; nothing asks the browser's clock what today is.
+// back from history.now; nothing asks the browser's clock what today is. mergeUsage puts every
+// host's stamps in this browser's days first (#1267).
 import type { UsageBucket, UsageHistory } from "../protocol/generated";
 
 export type UsageRange = "D" | "W" | "M" | "3M";
@@ -37,6 +38,93 @@ export function stampDate(stamp: string): Date | null {
   const n = stamp.split(/[-T]/).map(Number);
   if (n.length < 3 || n.some(Number.isNaN)) return null;
   return new Date(n[0]!, n[1]! - 1, n[2]!, n[3] ?? 0);
+}
+
+/** One host's tiers, as UsageHistory and TimeHistory both hold them. */
+export interface HistoryTiers<B> {
+  hours: Record<string, Record<string, B>>;
+  days: Record<string, Record<string, B>>;
+  now: string;
+  timeZone?: string;
+}
+
+/** UsageHistory.hoursKept: a host drops its oldest hours past this many. */
+const hoursKept = 168;
+
+const zoneFormats = new Map<string, Intl.DateTimeFormat>();
+
+/** How far `zone`'s clock is ahead of UTC at `ms`, in ms. Throws for a zone the browser does not know. */
+function zoneOffset(ms: number, zone: string): number {
+  let format = zoneFormats.get(zone);
+  if (!format) {
+    format = new Intl.DateTimeFormat("en-US", { timeZone: zone, hourCycle: "h23", year: "numeric", month: "2-digit",
+      day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit" });
+    zoneFormats.set(zone, format);
+  }
+  const parts = format.formatToParts(new Date(ms));
+  const n = (type: string) => Number(parts.find((p) => p.type === type)?.value);
+  return Date.UTC(n("year"), n("month") - 1, n("day"), n("hour"), n("minute"), n("second")) - Math.floor(ms / 1000) * 1000;
+}
+
+/** A stamp read back in another zone: UsageChart.date with the host's calendar. */
+export function stampDateIn(stamp: string, zone: string): Date | null {
+  const n = stamp.split(/[-T]/).map(Number);
+  if (n.length < 3 || n.some(Number.isNaN)) return null;
+  const wall = Date.UTC(n[0]!, n[1]! - 1, n[2]!, n[3] ?? 0);
+  const guess = wall - zoneOffset(wall, zone);
+  return new Date(wall - zoneOffset(guess, zone));
+}
+
+/**
+ * Every host's tiers as one, in this browser's days (#1267): HistoryMerge in AgentsKitCore. A host's
+ * hours move into this browser's hours exactly; its days are made again from those hours, which are
+ * whole from the oldest kept onwards (all of them while none was dropped). A day older than that goes
+ * in the day here that holds its middle.
+ */
+export function mergeTiers<B>(hosts: readonly HistoryTiers<B>[], empty: () => B, add: (into: B, b: B) => void): HistoryTiers<B> {
+  const here = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const out: HistoryTiers<B> = { hours: {}, days: {}, now: "", timeZone: here };
+  const fold = (runtimes: Record<string, B>, tier: Record<string, Record<string, B>>, key: string) => {
+    const into = (tier[key] ??= {});
+    for (const [runtime, b] of Object.entries(runtimes)) add(into[runtime] ??= empty(), b);
+  };
+  for (const host of hosts) {
+    let zone = host.timeZone && host.timeZone !== here ? host.timeZone : undefined;
+    if (zone) {
+      try { zoneOffset(Date.now(), zone); } catch { zone = undefined; }
+    }
+    if (!zone) {
+      for (const [key, runtimes] of Object.entries(host.hours)) fold(runtimes, out.hours, key);
+      for (const [key, runtimes] of Object.entries(host.days)) fold(runtimes, out.days, key);
+      if (host.now > out.now) out.now = host.now;
+      continue;
+    }
+    const keys = Object.keys(host.hours).sort();
+    // The first of the host's days that is whole in its hours: the oldest hour's day while none was dropped.
+    const oldest = keys[0]?.slice(0, 10);
+    const whole = oldest === undefined ? undefined : keys.length < hoursKept ? oldest : `${oldest}~`;
+    for (const key of keys) {
+      const start = stampDateIn(key, zone);
+      if (!start) continue;
+      const hour = hourStamp(start);
+      fold(host.hours[key]!, out.hours, hour);
+      if (whole !== undefined && key.slice(0, 10) >= whole) fold(host.hours[key]!, out.days, hour.slice(0, 10));
+    }
+    for (const [key, runtimes] of Object.entries(host.days)) {
+      if (whole !== undefined && key >= whole) continue;
+      const start = stampDateIn(key, zone);
+      if (start) fold(runtimes, out.days, dayStamp(new Date(start.getTime() + 12 * 3600_000)));
+    }
+    const now = stampDateIn(host.now, zone);
+    if (now && hourStamp(now) > out.now) out.now = hourStamp(now);
+  }
+  return out;
+}
+
+/** Every host's use added up in this browser's days (#1267): UsageHistory.merged. */
+export function mergeUsage(histories: readonly UsageHistory[]): UsageHistory | undefined {
+  if (histories.length === 0) return undefined;
+  return mergeTiers(histories, emptyBucket, add);
 }
 
 /** What the work asked for and got back; cache reads are said apart. */

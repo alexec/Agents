@@ -67,6 +67,7 @@ public final class UsageLedger: @unchecked Sendable {
             var history = readLocked()
             history.prune()
             history.now = UsageHistory.hourStamp(for: now, calendar: calendar)
+            history.timeZone = calendar.timeZone.identifier
             return history
         }
     }

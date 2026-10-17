@@ -2765,6 +2765,11 @@ export interface TimeHistory {
   hours: Record<string, Record<string, TimeBucket>>;
   days: Record<string, Record<string, TimeBucket>>;
   now: string;
+  /**
+   * The host's time zone, an IANA identifier such as America/Los_Angeles, that its hour and day
+   * stamps are in (#1267). Absent from a host too old to say: read as the viewer's own.
+   */
+  timeZone?: string;
   recap: Record<string, DayRecap>;
   records: TimeRecords;
 }
@@ -2925,6 +2930,11 @@ export interface UsageHistory {
   hours: Record<string, Record<string, UsageBucket>>;
   days: Record<string, Record<string, UsageBucket>>;
   now: string;
+  /**
+   * The host's time zone, an IANA identifier such as America/Los_Angeles, that its hour and day
+   * stamps are in (#1267). Absent from a host too old to say: read as the viewer's own.
+   */
+  timeZone?: string;
 }
 
 /**
@@ -3936,7 +3946,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   SwitchRecord: { required: ["id", "at", "agentID", "from", "to", "reason", "carried", "dropped", "billing"], optional: ["shortened", "fromReturnsAt"] },
   SwitchRecordSide: { required: ["runtimeID"], optional: ["entryID", "model", "mode"] },
   TimeBucket: { required: ["agent", "tools", "others", "person", "turns"], optional: [] },
-  TimeHistory: { required: ["hours", "days", "now", "recap", "records"], optional: [] },
+  TimeHistory: { required: ["hours", "days", "now", "recap", "records"], optional: ["timeZone"] },
   TimeRecord: { required: ["value", "day"], optional: [] },
   TimeRecords: { required: [], optional: ["mostAgents", "mostPRs", "longestClear"] },
   ToolCall: { required: ["title", "content", "locations"], optional: ["toolCallID", "name", "kind", "status", "rawInput", "rawOutput", "raw"] },
@@ -3951,7 +3961,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   UnqueueRequest: { required: ["agentID", "promptID"], optional: [] },
   Usage: { required: ["used", "size", "at"], optional: ["cost"] },
   UsageBucket: { required: ["cost", "inputTokens", "outputTokens", "thoughtTokens", "cachedReadTokens", "cachedWriteTokens", "turns", "unpricedTurns"], optional: [] },
-  UsageHistory: { required: ["hours", "days", "now"], optional: [] },
+  UsageHistory: { required: ["hours", "days", "now"], optional: ["timeZone"] },
   ViewAsk: { required: ["server", "uri", "hash", "isNew"], optional: [] },
   ViewCallRequest: { required: ["agentID", "viewID", "name"], optional: ["project", "arguments", "feed", "server"] },
   ViewContextRequest: { required: ["agentID", "viewID"], optional: ["uri", "content", "structuredContent"] },
