@@ -13,6 +13,7 @@ archived: true
 ---
 
 A pull request's checks failed. The event's data says which PR, branch and jobs.
-Use the `ci` server's `failed_log` to read each failed job. If it is a test known to be
-flaky under load, use `rerun_failed`. Otherwise fix it on the PR's branch in a worktree,
-push, and use `comment_on_pr` to say what you changed.
+Use the `github` server's `get_job_logs` (with `run_id` and `failed_only: true`) to read
+each failed job. If it is a test known to be flaky under load, use `actions_run_trigger`
+with `method: rerun_failed_jobs`. Otherwise fix it on the PR's branch in a worktree, push,
+and use `add_issue_comment` on the PR to say what you changed.
