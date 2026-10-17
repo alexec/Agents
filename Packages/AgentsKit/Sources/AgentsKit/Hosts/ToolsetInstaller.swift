@@ -17,10 +17,10 @@ public struct ToolsetInstaller: Sendable {
     public init(ssh: SSHCommand) { self.ssh = ssh }
 
     /// Why this server cannot have the toolset, before anything is downloaded; nil when
-    /// it can.
-    public static func refusal(_ facts: ServerFacts, _ toolset: Toolset) -> HostProblem? {
+    /// it can. `nodeGiven`: Node comes in the bundle, so the server need not download it.
+    public static func refusal(_ facts: ServerFacts, _ toolset: Toolset, nodeGiven: Bool = false) -> HostProblem? {
         guard facts.canInstallToolsets else { return .unsupportedLibc(facts.libc.display) }
-        guard facts.downloader != nil else { return .noDownloader }
+        guard nodeGiven || facts.downloader != nil else { return .noDownloader }
         guard facts.freeBytes >= toolset.manifest.minFreeBytes else {
             return .diskFullForTools(needed: toolset.manifest.minFreeBytes, free: facts.freeBytes)
         }
@@ -32,9 +32,13 @@ public struct ToolsetInstaller: Sendable {
     }
 
     /// Install `toolset` beside whatever is there. Does not move `current`.
-    public func install(_ toolset: Toolset, on facts: ServerFacts) async throws {
-        if let refusal = Self.refusal(facts, toolset) { throw refusal }
-        let bundle = try await Self.bundle(toolset)
+    ///
+    /// `node`: Node's tarball unpacked to a plain tar, checked against the manifest's
+    /// SHA-256 already, for a server with no xz or no curl or wget (#1268). It goes in the
+    /// bundle as `node.tar`, and the server downloads nothing but npm's packages.
+    public func install(_ toolset: Toolset, on facts: ServerFacts, node: URL? = nil) async throws {
+        if let refusal = Self.refusal(facts, toolset, nodeGiven: node != nil) { throw refusal }
+        let bundle = try await Self.bundle(toolset, node: node)
         defer { try? FileManager.default.removeItem(at: bundle.deletingLastPathComponent()) }
         let out = try await ssh.run(ssh.runArguments(Self.installScript(toolset, facts)), stdin: bundle)
         guard out.status == 0 else { throw Self.problem(status: out.status, stderr: out.stderr) }
@@ -83,10 +87,12 @@ public struct ToolsetInstaller: Sendable {
             mkdir -p "$T"; chmod 700 "$HOME/.agents-server" "$HOME/.agents-server/tools" "$T" 2>/dev/null || true; \
             rm -rf "$P"; mkdir -p "$P/lib"; trap 'rm -rf "$P"' EXIT; cd "$P"; \
             tar -xf - -C lib; mv lib/\(Toolset.manifestFile) .; \
+            if [ -f lib/node.tar ]; then mv lib/node.tar .; mkdir node; \
+            tar -xf node.tar -C node --strip-components=1; rm -f node.tar; else \
             fetch() { \(fetch) 2>"$P/fetch.err"; }; \
             fetch 'https://nodejs.org/dist/\(tarball)' > node.tar.xz || { tail -1 "$P/fetch.err" >&2; exit 21; }; \
             echo '\(sha)  node.tar.xz' | sha256sum -c - >/dev/null 2>&1 || exit 22; \
-            mkdir node; tar -xJf node.tar.xz -C node --strip-components=1; rm -f node.tar.xz fetch.err; \
+            mkdir node; tar -xJf node.tar.xz -C node --strip-components=1; rm -f node.tar.xz fetch.err; fi; \
             PATH="$P/node/bin:$PATH" npm \(npm) --prefix "$P/lib" \
             --cache "$P/.npm" >"$P/npm.log" 2>&1 || { tail -5 "$P/npm.log" >&2; exit 23; }; \
             rm -rf "$P/.npm" "$P/npm.log"; mkdir "$P/bin"; \
@@ -96,9 +102,9 @@ public struct ToolsetInstaller: Sendable {
             """
     }
 
-    /// The three files, as a tar to stream on stdin. Without macOS's extended attributes,
-    /// which GNU tar on the server would warn about.
-    static func bundle(_ toolset: Toolset) async throws -> URL {
+    /// The three files, as a tar to stream on stdin, and `node` as `node.tar` when given.
+    /// Without macOS's extended attributes, which GNU tar on the server would warn about.
+    static func bundle(_ toolset: Toolset, node: URL? = nil) async throws -> URL {
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent("toolset-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         let tar = folder.appendingPathComponent("toolset.tar")
@@ -106,6 +112,12 @@ public struct ToolsetInstaller: Sendable {
         process.executableURL = URL(filePath: "/usr/bin/tar")
         process.arguments = ["--no-xattrs", "--no-mac-metadata", "-cf", tar.path, "-C", toolset.folder.path,
                              Toolset.manifestFile, Toolset.packageFile, Toolset.lockFile]
+        if let node {
+            // Under its own name, so the server finds `lib/node.tar` whatever it was called.
+            let named = folder.appendingPathComponent("node.tar")
+            try FileManager.default.createSymbolicLink(at: named, withDestinationURL: node)
+            process.arguments = ["-L"] + process.arguments! + ["-C", folder.path, "node.tar"]
+        }
         process.environment = ["COPYFILE_DISABLE": "1"]
         let status: Int32 = try await withCheckedThrowingContinuation { done in
             process.terminationHandler = { done.resume(returning: $0.terminationStatus) }
