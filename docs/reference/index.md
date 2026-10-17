@@ -22,6 +22,8 @@ something up, not for reading through.
   and setting, and when a workflow does not run.
 - [Workspace providers](workspace-providers.md): the tools a workspace provider offers, and
   how the control plane checks and calls them.
+- [Integrations](integrations.md): every third-party service and tool the app talks to,
+  starts, installs or signs in to, with its state and when it was last checked.
 - [ssh options](ssh-options.md): how each option in your `~/.ssh/config` fares when the
   control plane connects to a server.
 - [Personas](personas.md): the persona file format, where personas live, and what picking one does.
