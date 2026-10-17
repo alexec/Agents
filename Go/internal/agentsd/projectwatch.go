@@ -48,9 +48,13 @@ type projectWatchState struct {
 	pwKicked     bool
 	pwStopped    bool
 	branchTimers map[string]*time.Timer
-	dropSeen     map[string]map[string]dropStamp
-	dropSettling map[string]map[string]dropStamp
-	dropTimers   map[string]*time.Timer
+	// branchCheckMu makes each checkBranches read and write the tips in one go: two at once
+	// (the first seed and a move) let the one that read first write its older tips last, and
+	// the move after it was not raised (#1278).
+	branchCheckMu sync.Mutex
+	dropSeen      map[string]map[string]dropStamp
+	dropSettling  map[string]map[string]dropStamp
+	dropTimers    map[string]*time.Timer
 }
 
 // skipWatched is what a project's watch leaves out (projectWatchExclusions, WatchFilter):
@@ -315,6 +319,8 @@ func (d *Daemon) checkBranches(folder string) {
 	if stopped {
 		return
 	}
+	d.branchCheckMu.Lock()
+	defer d.branchCheckMu.Unlock()
 	watched := map[string]bool{}
 	for _, a := range d.agentsOf(folder) {
 		if a.State != wire.AgentStateArchived && a.Worktree != nil && a.Worktree.Branch != nil {
