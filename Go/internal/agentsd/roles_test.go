@@ -73,9 +73,11 @@ func socketCall(t *testing.T, path, method string) *message {
 
 func serveWith(t *testing.T, p SocketPolicy) (*Daemon, string) {
 	t.Helper()
-	old := socketPolicyFor
-	socketPolicyFor = func(*Daemon) SocketPolicy { return p }
-	t.Cleanup(func() { socketPolicyFor = old })
+	if p != nil {
+		old := socketPolicyFor
+		socketPolicyFor = func(*Daemon) SocketPolicy { return p }
+		t.Cleanup(func() { socketPolicyFor = old })
+	}
 	root := t.TempDir()
 	d, _ := start(t, root)
 	ctx, cancel := context.WithCancel(context.Background())
