@@ -14381,6 +14381,186 @@
         }
       },
       "additionalProperties": false
+    },
+    "DeviceForget": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/definitions/UUID"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "additionalProperties": false
+    },
+    "Device": {
+      "type": "object",
+      "description": "A paired device (021 US5), as devices.json keeps it.",
+      "properties": {
+        "id": {
+          "$ref": "#/definitions/UUID"
+        },
+        "publicKey": {
+          "$ref": "#/definitions/Base64"
+        },
+        "name": {
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/definitions/DeviceKind"
+        },
+        "announcedAt": {
+          "$ref": "#/definitions/WireDate"
+        },
+        "lastSeenAt": {
+          "$ref": "#/definitions/WireDate"
+        },
+        "mayNotify": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "publicKey",
+        "name",
+        "kind",
+        "announcedAt"
+      ],
+      "additionalProperties": false
+    },
+    "AnnounceReply": {
+      "type": "object",
+      "description": "What devices/announce answers: the device's record, with the Mac's relay key beside its fields when a bridge has registered one (046).",
+      "properties": {
+        "id": {
+          "$ref": "#/definitions/UUID"
+        },
+        "publicKey": {
+          "$ref": "#/definitions/Base64"
+        },
+        "name": {
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/definitions/DeviceKind"
+        },
+        "announcedAt": {
+          "$ref": "#/definitions/WireDate"
+        },
+        "lastSeenAt": {
+          "$ref": "#/definitions/WireDate"
+        },
+        "mayNotify": {
+          "type": "boolean"
+        },
+        "macKey": {
+          "$ref": "#/definitions/Base64"
+        }
+      },
+      "required": [
+        "id",
+        "publicKey",
+        "name",
+        "kind",
+        "announcedAt"
+      ],
+      "additionalProperties": false
+    },
+    "PairingCode": {
+      "type": "object",
+      "description": "devices/startPairing: the Mac's relay key, a one-time secret and this Mac's name, good for five minutes or one device.",
+      "properties": {
+        "macKey": {
+          "$ref": "#/definitions/Base64"
+        },
+        "secret": {
+          "$ref": "#/definitions/Base64"
+        },
+        "name": {
+          "type": "string"
+        },
+        "expires": {
+          "$ref": "#/definitions/WireDate"
+        }
+      },
+      "required": [
+        "macKey",
+        "secret",
+        "name",
+        "expires"
+      ],
+      "additionalProperties": false
+    },
+    "DeviceAnnouncement": {
+      "type": "object",
+      "description": "devices/announce: this device, and the public half of its key.",
+      "properties": {
+        "id": {
+          "$ref": "#/definitions/UUID"
+        },
+        "publicKey": {
+          "$ref": "#/definitions/Base64"
+        },
+        "name": {
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/definitions/DeviceKind"
+        }
+      },
+      "required": [
+        "id",
+        "publicKey",
+        "name",
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "DeviceNotification": {
+      "type": "object",
+      "description": "device/changed: the whole record, or that it was forgotten (046).",
+      "properties": {
+        "id": {
+          "$ref": "#/definitions/UUID"
+        },
+        "device": {
+          "$ref": "#/definitions/Device"
+        },
+        "removed": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "additionalProperties": false
+    },
+    "RelayRegistration": {
+      "type": "object",
+      "description": "relay/register: the public half of the Mac's relay key, X9.63.",
+      "properties": {
+        "publicKey": {
+          "$ref": "#/definitions/Base64"
+        }
+      },
+      "required": [
+        "publicKey"
+      ],
+      "additionalProperties": false
+    },
+    "PairingSecret": {
+      "type": "object",
+      "description": "pairing/current: the secret the bridge's listener should take, if any.",
+      "properties": {
+        "secret": {
+          "$ref": "#/definitions/Base64"
+        },
+        "expires": {
+          "$ref": "#/definitions/WireDate"
+        }
+      },
+      "additionalProperties": false
     }
   }
 }

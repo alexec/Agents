@@ -33,6 +33,7 @@ func (d *Daemon) register() {
 	d.registerEvents()
 	d.registerEventWaits()
 	d.registerCost()
+	d.registerDevices()
 	d.registerAllowances()
 	d.registerMCP()
 	d.registerOptions()

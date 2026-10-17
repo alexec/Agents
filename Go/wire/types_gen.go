@@ -244,6 +244,18 @@ type AllowanceStateStatusOut struct {
 	Why        AllowanceStateOutReason `json:"why"`
 }
 
+// What devices/announce answers: the device's record, with the Mac's relay key beside its fields when a bridge has registered one (046).
+type AnnounceReply struct {
+	ID          UUID       `json:"id"`
+	PublicKey   Data       `json:"publicKey"`
+	Name        string     `json:"name"`
+	Kind        DeviceKind `json:"kind"`
+	AnnouncedAt Date       `json:"announcedAt"`
+	LastSeenAt  *Date      `json:"lastSeenAt,omitzero"`
+	MayNotify   *bool      `json:"mayNotify,omitzero"`
+	MacKey      Data       `json:"macKey,omitzero"`
+}
+
 type AnswerElicitationRequest struct {
 	RequestID UUID                           `json:"requestID"`
 	Action    AnswerElicitationRequestAction `json:"action"`
@@ -1009,9 +1021,32 @@ type DestinationStateRequest struct {
 	Destination SkillDestination `json:"destination"`
 }
 
+// A paired device (021 US5), as devices.json keeps it.
+type Device struct {
+	ID          UUID       `json:"id"`
+	PublicKey   Data       `json:"publicKey"`
+	Name        string     `json:"name"`
+	Kind        DeviceKind `json:"kind"`
+	AnnouncedAt Date       `json:"announcedAt"`
+	LastSeenAt  *Date      `json:"lastSeenAt,omitzero"`
+	MayNotify   *bool      `json:"mayNotify,omitzero"`
+}
+
+// devices/announce: this device, and the public half of its key.
+type DeviceAnnouncement struct {
+	ID        UUID       `json:"id"`
+	PublicKey Data       `json:"publicKey"`
+	Name      string     `json:"name"`
+	Kind      DeviceKind `json:"kind"`
+}
+
 type DeviceBinding struct {
 	ID      *UUID `json:"id,omitzero"`
 	Pairing *bool `json:"pairing,omitzero"`
+}
+
+type DeviceForget struct {
+	ID UUID `json:"id"`
 }
 
 type DeviceKind string
@@ -1021,6 +1056,13 @@ const (
 	DeviceKindIPad    DeviceKind = "iPad"
 	DeviceKindUnknown DeviceKind = "unknown"
 )
+
+// device/changed: the whole record, or that it was forgotten (046).
+type DeviceNotification struct {
+	ID      UUID    `json:"id"`
+	Device  *Device `json:"device,omitzero"`
+	Removed *bool   `json:"removed,omitzero"`
+}
 
 type DiffLine struct {
 	Kind    DiffLineKind `json:"kind"`
@@ -2426,6 +2468,20 @@ type PagesChangedNotification struct {
 	Folders []string `json:"folders"`
 }
 
+// devices/startPairing: the Mac's relay key, a one-time secret and this Mac's name, good for five minutes or one device.
+type PairingCode struct {
+	MacKey  Data   `json:"macKey"`
+	Secret  Data   `json:"secret"`
+	Name    string `json:"name"`
+	Expires Date   `json:"expires"`
+}
+
+// pairing/current: the secret the bridge's listener should take, if any.
+type PairingSecret struct {
+	Secret  Data  `json:"secret,omitzero"`
+	Expires *Date `json:"expires,omitzero"`
+}
+
 type Payment struct {
 	Allowance  *PaymentAllowance  `json:"allowance,omitzero"`
 	FreeTier   *PaymentFreeTier   `json:"freeTier,omitzero"`
@@ -2878,6 +2934,11 @@ type RelayOffer struct {
 	SocketPath    string `json:"socketPath"`
 	CaCertificate string `json:"caCertificate"`
 	StandIn       string `json:"standIn"`
+}
+
+// relay/register: the public half of the Mac's relay key, X9.63.
+type RelayRegistration struct {
+	PublicKey Data `json:"publicKey"`
 }
 
 type RememberedOptionsRequest struct {

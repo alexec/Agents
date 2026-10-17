@@ -72,9 +72,9 @@ func (d *Daemon) registerHost() {
 	On(d, wire.CallSurfaceIdentify, func(ctx context.Context, c *Client, _ wire.SurfaceIdentification) (wire.Empty, error) {
 		return wire.Empty{}, nil
 	})
-	// Which device a control-plane channel is for; this host answers every channel alike.
-	On(d, wire.CallConnectionBindDevice, func(ctx context.Context, c *Client, _ wire.DeviceBinding) (wire.Empty, error) {
-		return wire.Empty{}, nil
+	// The bridge saying a window's connection carries a device, or a phone pairing (devices.go).
+	On(d, wire.CallConnectionBindDevice, func(ctx context.Context, c *Client, b wire.DeviceBinding) (wire.Empty, error) {
+		return wire.Empty{}, d.bindDevice(c, b)
 	})
 	// A connection that will carry the person's mail; this host posts none yet.
 	On(d, wire.CallMailboxCarry, func(ctx context.Context, c *Client, _ wire.Empty) (wire.Empty, error) {
