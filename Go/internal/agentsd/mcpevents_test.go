@@ -278,7 +278,7 @@ func TestAWorkflowHearsAServersEvent(t *testing.T) {
 
 func TestEventsHalfDeliveredAreRaisedOnceAtTheNextStart(t *testing.T) {
 	fakeRuntimes(t)
-	root := t.TempDir()
+	root := lingeringRoot(t)
 	d, c := start(t, root)
 	defer d.Shutdown()
 	ci := newEventsServer(t)
@@ -438,4 +438,24 @@ func TestAWaitOnAServersEvent(t *testing.T) {
 		defer d.mcpEvMu.Unlock()
 		return len(d.mcpSubs) == 0
 	})
+}
+
+// lingeringRoot is a temporary root removed once writes into it have stopped: a run's agent
+// stopped by Shutdown still writes its ending and what follows a turn in the background,
+// which on macOS lands as TempDir's removal runs (#1138). Shutdown does not wait for those
+// writes yet (#1272).
+func lingeringRoot(t *testing.T) string {
+	t.Helper()
+	root, err := os.MkdirTemp("", "agentsd-root")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		for deadline := time.Now().Add(5 * time.Second); ; time.Sleep(50 * time.Millisecond) {
+			if err := os.RemoveAll(root); err == nil || time.Now().After(deadline) {
+				return
+			}
+		}
+	})
+	return root
 }
