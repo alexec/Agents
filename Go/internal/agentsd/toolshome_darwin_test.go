@@ -1,11 +1,14 @@
 package agentsd
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
 
+	"github.com/alexec/agents/Go/internal/controllink"
 	"github.com/alexec/agents/Go/wire"
 )
 
@@ -36,4 +39,24 @@ func TestAMacFindsTheAppsToolsets(t *testing.T) {
 		}
 	}
 	t.Fatal("no codex")
+}
+
+type noTunnels struct{}
+
+func (noTunnels) OpenTunnel(context.Context, string) (controllink.Conn, error) {
+	return nil, errors.New("no tunnels here")
+}
+
+// A Mac's own agents use the Mac's own sign-in, even with a control plane to borrow
+// through: a Mac host never asks the window for a key (DaemonCore+Credentials, #1138).
+func TestAMacHostWantsNoKey(t *testing.T) {
+	d, _ := start(t, t.TempDir())
+	defer d.Shutdown()
+	d.Tunneler = noTunnels{}
+	t.Setenv("HOME", t.TempDir()) // no ~/.claude/.credentials.json, no ~/.codex/auth.json
+	for _, id := range []string{"claude", "codex"} {
+		if err := d.needsSignIn(id); err != nil {
+			t.Fatalf("%s: %v", id, err)
+		}
+	}
 }
