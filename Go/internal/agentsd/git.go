@@ -11,6 +11,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/alexec/agents/Go/internal/agentsd/store"
 )
 
 // Git, run as the Swift host runs it (GitWorktrees.git, GitChanges.run): no optional
@@ -164,7 +166,7 @@ func canonical(path string) string {
 	path = filepath.Clean(path)
 	rest := ""
 	for p := path; ; p = filepath.Dir(p) {
-		if r, err := filepath.EvalSymlinks(p); err == nil {
+		if r, err := store.Resolve(p); err == nil {
 			return filepath.Join(r, rest)
 		}
 		if p == "/" || p == "." {

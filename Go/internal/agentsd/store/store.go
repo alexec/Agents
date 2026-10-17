@@ -381,7 +381,7 @@ func FolderPath(u wire.URL) string {
 // links resolved, and no trailing slash ("file:///home/a/src/x").
 func FolderURL(path string) wire.URL {
 	path = filepath.Clean(path)
-	if r, err := filepath.EvalSymlinks(path); err == nil {
+	if r, err := Resolve(path); err == nil {
 		path = r
 	}
 	return PathURL(path)
@@ -403,7 +403,7 @@ type rootIdentity struct {
 // loadOrMakeRootID is RootIdentity.loadOrMake: the root's id, and whether it was made
 // just now for a root that had none (then unstamped records are this root's own).
 func loadOrMakeRootID(file, root string) (string, bool) {
-	here, err := filepath.EvalSymlinks(root)
+	here, err := Resolve(root)
 	if err != nil {
 		here = root
 	}

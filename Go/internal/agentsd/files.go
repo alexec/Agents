@@ -32,7 +32,7 @@ func (d *Daemon) agentFolder(id wire.UUID) (string, error) {
 		return "", &Error{Code: CodeNoSuchAgent, Message: "That agent is not here."}
 	}
 	root := store.FolderPath(a.Cwd)
-	if r, err := filepath.EvalSymlinks(root); err == nil {
+	if r, err := store.Resolve(root); err == nil {
 		root = r
 	}
 	return root, nil
@@ -48,7 +48,7 @@ func (d *Daemon) scoped(id wire.UUID, path string) (string, error) {
 	if !filepath.IsAbs(path) {
 		return "", Invalid("The path has to be absolute, starting at /.")
 	}
-	real, err := filepath.EvalSymlinks(path)
+	real, err := store.Resolve(path)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return "", fileError(CodeFileGone, filepath.Base(path)+" is gone.")
@@ -67,7 +67,7 @@ func resolved(path string) string {
 	path = filepath.Clean(path)
 	rest := ""
 	for p := path; ; p = filepath.Dir(p) {
-		if r, err := filepath.EvalSymlinks(p); err == nil {
+		if r, err := store.Resolve(p); err == nil {
 			return filepath.Join(r, rest)
 		}
 		if p == filepath.Dir(p) {
@@ -111,7 +111,7 @@ func listing(dir string) (wire.DirectoryListing, error) {
 	}
 	// The folder's links are resolved once; an entry keeps its own name, link or not (#1265).
 	base := dir
-	if r, err := filepath.EvalSymlinks(dir); err == nil {
+	if r, err := store.Resolve(dir); err == nil {
 		base = r
 	}
 	entries := []wire.DirectoryEntry{}

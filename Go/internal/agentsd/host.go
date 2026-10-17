@@ -439,7 +439,7 @@ func inScope(path string, folders []string) bool {
 	resolved := filepath.Clean(path)
 	rest := ""
 	for p := resolved; ; p = filepath.Dir(p) {
-		if r, err := filepath.EvalSymlinks(p); err == nil {
+		if r, err := store.Resolve(p); err == nil {
 			resolved = filepath.Join(r, rest)
 			break
 		}
@@ -450,7 +450,7 @@ func inScope(path string, folders []string) bool {
 	}
 	for _, f := range folders {
 		root := f
-		if r, err := filepath.EvalSymlinks(f); err == nil {
+		if r, err := store.Resolve(f); err == nil {
 			root = r
 		}
 		if inside(root, resolved) {
@@ -465,13 +465,13 @@ const dropboxLimit = 25 * 1024 * 1024
 // putInDropbox is dropbox/put: a file into a project's .agents/dropbox, whole or not at all.
 func (d *Daemon) putInDropbox(r wire.DropboxPutRequest) (wire.DropboxPutResponse, error) {
 	folder := store.FolderPath(r.Folder)
-	if real, err := filepath.EvalSymlinks(folder); err == nil {
+	if real, err := store.Resolve(folder); err == nil {
 		folder = real
 	}
 	known := false
 	for _, p := range d.projects(true) {
 		f := store.FolderPath(p.Project.Folder)
-		if real, err := filepath.EvalSymlinks(f); err == nil {
+		if real, err := store.Resolve(f); err == nil {
 			f = real
 		}
 		known = known || f == folder

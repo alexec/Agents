@@ -195,7 +195,7 @@ func pluginKey(plugin string) string { return filepath.Clean(plugin) }
 // app's worktrees, the project it was made from (DotAgents.projectFolder).
 func pluginProject(cwd string) string {
 	path := filepath.Clean(cwd)
-	if resolved, err := filepath.EvalSymlinks(path); err == nil {
+	if resolved, err := store.Resolve(path); err == nil {
 		path = resolved
 	}
 	if i := strings.Index(path, "/.agents/worktrees/"); i >= 0 {
@@ -269,7 +269,7 @@ func pluginStamp(plugin string) (string, bool) {
 	if dest, err := os.Readlink(plugin); err == nil {
 		fmt.Fprintln(h, dest)
 	}
-	root, err := filepath.EvalSymlinks(plugin)
+	root, err := store.Resolve(plugin)
 	if err != nil {
 		return "", false
 	}
@@ -309,7 +309,7 @@ func computePluginDigest(plugin string) (string, bool) {
 	if dest, err := os.Readlink(plugin); err == nil {
 		lines = append(lines, "R "+dest)
 	}
-	root, err := filepath.EvalSymlinks(plugin)
+	root, err := store.Resolve(plugin)
 	if err != nil {
 		return "", false
 	}
