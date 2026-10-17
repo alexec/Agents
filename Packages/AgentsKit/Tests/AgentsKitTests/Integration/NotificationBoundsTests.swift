@@ -65,6 +65,14 @@ struct NotificationBoundsTests {
         Issue.record("never happened: \(what)")
     }
 
+    /// The fake runtime's own first turn over, so none of its entries lands after a
+    /// `wire.clear()` and is counted as the test's (#1320).
+    private func finished(_ core: DaemonCore, _ ids: UUID...) async {
+        for id in ids {
+            await eventually("the first turn ended") { await core.agent(id)?.state == .finished }
+        }
+    }
+
     private func show(_ agentID: UUID?, on connection: UUID, _ core: DaemonCore) async throws {
         try await core.reportPresence(.init(watching: nil, active: false, showing: agentID),
                                       from: .mac, connection: connection)
@@ -134,6 +142,7 @@ struct NotificationBoundsTests {
         let (core, folder) = try await core(wire)
         let main = try await core.start(.init(runtimeID: "claude", cwd: folder, prompt: "Review"))
         let popped = try await core.start(.init(runtimeID: "claude", cwd: folder, prompt: "Lane"))
+        await finished(core, main, popped)
         try await core.reportPresence(.init(watching: nil, active: false, showing: main, alsoShowing: [popped]),
                                       from: .mac, connection: showing)
         wire.clear()
@@ -154,6 +163,7 @@ struct NotificationBoundsTests {
         let wire = Wire()
         let (core, folder) = try await core(wire)
         let id = try await core.start(.init(runtimeID: "claude", cwd: folder, prompt: "Review"))
+        await finished(core, id)
         try await show(id, on: showing, core)
         wire.clear()
 

@@ -708,7 +708,12 @@ struct DaemonTests {
                           runtimeSessionID: "s", restartPickUps: 1)
         try await store.save(tried)
 
-        let launcher = FakeLauncher()
+        // The turn held: one that ends clears the count, before it can be read (#1320).
+        let turns = TurnGate()
+        defer { turns.open() }
+        var script = FakeACPAgent.Script()
+        script.gate = turns
+        let launcher = FakeLauncher(script: script)
         let core = try core(launcher, locations: locations)
         await core.pickUpAfterRestart(await core.recover())
 

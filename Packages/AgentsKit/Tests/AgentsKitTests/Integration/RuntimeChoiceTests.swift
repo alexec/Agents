@@ -33,8 +33,9 @@ struct RuntimeChoiceTests {
 
     /// An agent the person started, and a token that speaks for it, bound again before
     /// each call: a fake agent's turn ends when it likes, and its token with it.
-    private func caller(_ core: DaemonCore, in folder: URL) async throws -> (UUID, String) {
-        let id = try await core.start(DaemonAPI.StartRequest(runtimeID: "claude", cwd: folder, prompt: "Lead"))
+    private func caller(_ core: DaemonCore, in folder: URL,
+                        runtime: String = "claude") async throws -> (UUID, String) {
+        let id = try await core.start(DaemonAPI.StartRequest(runtimeID: runtime, cwd: folder, prompt: "Lead"))
         return (id, UUID().uuidString)
     }
 
@@ -90,7 +91,8 @@ struct RuntimeChoiceTests {
     @Test func theDefaultRuntimeIsCheckedWhenNoneIsNamed() async throws {
         let (locations, work) = try temporary()
         let core = try await makeCore(locations)
-        let lead = try await caller(core, in: work)
+        // A lead on Claude would bring it back: its turn answering is Claude working (#140).
+        let lead = try await caller(core, in: work, runtime: "codex")
         await core.runtimeFailed(runtimeID: "claude")
 
         let error = await refusal { _ = try await startHelper(core, lead, runtime: nil) }
