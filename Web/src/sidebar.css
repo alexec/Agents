@@ -82,15 +82,13 @@
 .with-sidebar .sidebar .title.placed .place { max-width: 40%; overflow: hidden; text-overflow: ellipsis; }
 
 /* A session's mark in the sidebar (#495): an orange hand, a spinner, a list when queued, an
-   Zs (#765), a pause mark (#630), two rings unread, an empty ring once read; every icon in the
+   Zs (#765), a pause mark (#630), an empty ring once done, read or not (#1323); every icon in the
    accent but what lists it under Needs You (#817). */
 .sidebar-mark { width: 1rem; height: 1rem; margin-top: 1px; box-sizing: border-box; border-radius: 50%;
   display: inline-flex; align-items: center; justify-content: center; color: var(--accent); }
 .sidebar-mark.needsYou { color: var(--tint-attention); font-size: 0.8125rem; border-radius: 0; }
 .sidebar-mark.working { border: 1.5px solid var(--paper-rule); border-top-color: var(--accent); animation: spin 0.9s linear infinite; }
-.sidebar-mark.unread { border: 1.5px solid currentColor; }
-.sidebar-mark.unread::after { content: ""; width: 0.375rem; height: 0.375rem; border-radius: 50%; background: currentColor; }
-.sidebar-mark.read { border: 1.5px solid currentColor; opacity: 0.7; }
+.sidebar-mark.done { border: 1.5px solid currentColor; opacity: 0.7; }
 .sidebar-mark.queued, .sidebar-mark.waiting, .sidebar-mark.paused { font-size: 0.75rem; border-radius: 0; }
 /* Archiving needs approval (#584): the window's archive box, in the attention tint, as it is
    listed under Needs You (#817). */

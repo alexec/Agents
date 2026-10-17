@@ -39,6 +39,20 @@ struct AgentGroupTests {
         #expect(asking.showsUnread)
     }
 
+    /// #1323: the row is bold only for an unread session in Done. One that asks, waits
+    /// or needs the person is never bold, though it still counts as unread.
+    @Test func onlyDoneDrawsUnread() {
+        var completed = agent(.finished, report: .done, endedReason: .endTurn, unread: true)
+        #expect(completed.drawsUnread)
+        completed.archiveRequest = .requested(at: Date())
+        #expect(completed.drawsUnread, "asking to be archived is still done")
+        let asking = agent(.finished, report: .needsAnswer, endedReason: .endTurn, unread: true)
+        #expect(asking.group() == .needsAttention)
+        #expect(asking.showsUnread)
+        #expect(!asking.drawsUnread)
+        #expect(!agent(.finished, report: .done, endedReason: .endTurn, unread: false).drawsUnread)
+    }
+
     /// What truly needs the person stays under Needs you, read or not.
     @Test func whatNeedsYouStaysWhetherReadOrNot() {
         for unread in [false, true] {

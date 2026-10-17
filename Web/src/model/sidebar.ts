@@ -51,7 +51,7 @@ export function inSmartRow(row: Exclude<SmartRow, "pinned">, agent: Agent,
 }
 
 /** The mark a session's row carries in the sidebar (#495): what it wants, or null for its own status mark. */
-export type SessionMark = "needsYou" | "working" | "queued" | "waiting" | "paused" | "unread" | "read" | "asksToArchive";
+export type SessionMark = "needsYou" | "working" | "queued" | "waiting" | "paused" | "done" | "asksToArchive";
 
 export function sessionMark(agent: Agent): SessionMark | null {
   switch (groupOf(agent)) {
@@ -61,7 +61,8 @@ export function sessionMark(agent: Agent): SessionMark | null {
     // A queued helper waits for a free place, not on anything it asked for.
     case "waiting": return agent.state === "queued" ? "queued" : "waiting";
     // Asking to be archived (#584) is what the person has left to do with it, as the window's mark says.
-    case "finished": return asksToArchive(agent) ? "asksToArchive" : showsUnread(agent) ? "unread" : "read";
+    // Read or unread, one ring (#1323): the bold title alone says unread.
+    case "finished": return asksToArchive(agent) ? "asksToArchive" : "done";
     case "stopped": return asksToArchive(agent) ? "asksToArchive" : "paused";
     default: return null;
   }
