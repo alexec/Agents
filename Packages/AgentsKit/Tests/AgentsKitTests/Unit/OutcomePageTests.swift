@@ -38,30 +38,13 @@ struct OutcomePageTests {
         TranscriptEntry.display(entries).turns()[0]
     }
 
-    /// Three levels (#1286): Messages, Steps and Details. Collapsed is one turn's state, not
-    /// a level, and an `outcome` stored from when it was one no longer reads.
-    @Test func threeLevelsAndCollapsedIsNotOne() throws {
-        #expect(TurnDetail.levels == [.messages, .steps, .details])
-        #expect(!TurnDetail.levels.contains(.collapsed) && !TurnDetail.collapsed.showsSteps)
-        #expect(TurnDetail.messages.showsSteps && TurnDetail.messages.rollsUpCalls)
-        #expect(!TurnDetail.steps.rollsUpCalls && !TurnDetail.details.rollsUpCalls)
-        for stored in ["messages", "steps", "details"] {
-            #expect(TurnDetail(rawValue: stored)?.rawValue == stored)
-        }
-        #expect(TurnDetail(rawValue: "outcome") == nil)
-        let decoded = try JSONDecoder().decode([TurnDetail].self, from: Data(#"["steps","messages"]"#.utf8))
-        #expect(decoded == [.steps, .messages])
-    }
-
-    /// A turn starts at Messages (#993). Closing it collapses it, and opening it again goes
-    /// back to the level.
-    @Test func turnsStartAtMessagesAndToggleThroughCollapsed() {
-        #expect(TurnDetail.initial == .messages)
-        let closed = TurnDetail.initial.toggled(level: .initial)
-        #expect(closed == .collapsed)
-        #expect(closed.toggled(level: .initial) == .messages)
-        #expect(TurnDetail.details.toggled(level: .details) == .collapsed)
-        #expect(TurnDetail.collapsed.toggled(level: .details) == .details)
+    /// No levels (#1315): a turn starts open, with its steps, and its *N steps* closes it
+    /// and opens it again.
+    @Test func turnsStartOpenAndToggleThroughCollapsed() {
+        #expect(TurnDetail.initial == .open && TurnDetail.open.showsSteps)
+        #expect(!TurnDetail.collapsed.showsSteps)
+        #expect(TurnDetail.initial.toggled == .collapsed)
+        #expect(TurnDetail.collapsed.toggled == .open)
     }
 
     @Test func aTurnIsItsAskAndEverythingAfterIt() throws {

@@ -7,8 +7,6 @@ import SwiftUI
 /// phone draws too (033). What is left here is where each input comes from on a Mac.
 struct Transcript: View {
     @Environment(AppModel.self) private var model
-    /// The level every turn starts at: View ▸ Turns (069).
-    @AppStorage(TurnDisplay.defaultsKey, store: WindowDefaults.store) private var turnDetail = TurnDisplay.initial
     /// Set in a window of its own (#826), whose page of the transcript is its own.
     @Environment(\.poppedChat) private var popped
     let agent: Agent
@@ -22,7 +20,6 @@ struct Transcript: View {
         ChatTranscript(agent: agent,
                        items: page.transcriptItems,
                        stored: page.turns,
-                       defaultDetail: turnDetail,
                        hasMore: page.hasMoreOfTheConversation,
                        // Turns count as growth at the front too, so an earlier page of
                        // them holds the reader's place as entries do.
