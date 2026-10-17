@@ -10809,6 +10809,65 @@
       ],
       "additionalProperties": false
     },
+    "WakeSettings": {
+      "type": "object",
+      "description": "Whether this Mac is kept awake for agents, and for how long after they stop (024), as wake.json in the root.",
+      "properties": {
+        "keepsAwake": {
+          "type": "boolean"
+        },
+        "graceHours": {
+          "type": "integer"
+        },
+        "warmRuntimes": {
+          "type": "integer"
+        },
+        "awakeOnPower": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "keepsAwake",
+        "graceHours",
+        "warmRuntimes",
+        "awakeOnPower"
+      ],
+      "additionalProperties": false
+    },
+    "WakeState": {
+      "type": "object",
+      "description": "Why the Mac is, or is not, being kept awake (024).",
+      "properties": {
+        "isHolding": {
+          "type": "boolean"
+        },
+        "agentsInFlight": {
+          "type": "integer"
+        },
+        "heldBackByBattery": {
+          "type": "boolean"
+        },
+        "batteryPercent": {
+          "type": "integer"
+        },
+        "since": {
+          "$ref": "#/definitions/WireDate"
+        },
+        "graceUntil": {
+          "$ref": "#/definitions/WireDate"
+        },
+        "onPower": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "isHolding",
+        "agentsInFlight",
+        "heldBackByBattery",
+        "onPower"
+      ],
+      "additionalProperties": false
+    },
     "WebRemoteStatus": {
       "type": "object",
       "properties": {

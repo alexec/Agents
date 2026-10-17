@@ -3366,6 +3366,25 @@ type WaitingAgent struct {
 	Status  WaitStatus `json:"status"`
 }
 
+// Whether this Mac is kept awake for agents, and for how long after they stop (024), as wake.json in the root.
+type WakeSettings struct {
+	KeepsAwake   bool  `json:"keepsAwake"`
+	GraceHours   int64 `json:"graceHours"`
+	WarmRuntimes int64 `json:"warmRuntimes"`
+	AwakeOnPower bool  `json:"awakeOnPower"`
+}
+
+// Why the Mac is, or is not, being kept awake (024).
+type WakeState struct {
+	IsHolding         bool   `json:"isHolding"`
+	AgentsInFlight    int64  `json:"agentsInFlight"`
+	HeldBackByBattery bool   `json:"heldBackByBattery"`
+	BatteryPercent    *int64 `json:"batteryPercent,omitzero"`
+	Since             *Date  `json:"since,omitzero"`
+	GraceUntil        *Date  `json:"graceUntil,omitzero"`
+	OnPower           bool   `json:"onPower"`
+}
+
 type WebRemoteStatus struct {
 	Port   int64   `json:"port"`
 	Served bool    `json:"served"`

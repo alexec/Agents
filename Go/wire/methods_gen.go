@@ -156,6 +156,9 @@ var (
 	CallViewsLog                       = Method[ViewLogRequest, Empty]{"views/log"}
 	CallViewsRead                      = Method[ViewReadRequest, ViewResource]{"views/read"}
 	CallViewsShow                      = Method[ViewShowRequest, Empty]{"views/show"}
+	CallWakeSet                        = Method[WakeSettings, WakeSettings]{"wake/set"}
+	CallWakeSettings                   = Method[Empty, WakeSettings]{"wake/settings"}
+	CallWakeState                      = Method[Empty, WakeState]{"wake/state"}
 	CallWorkflowsApprove               = Method[WorkflowApproveRequest, WorkflowSummary]{"workflows/approve"}
 	CallWorkflowsArchive               = Method[WorkflowArchiveRequest, WorkflowSummary]{"workflows/archive"}
 	CallWorkflowsDelete                = Method[WorkflowRequest, Empty]{"workflows/delete"}
@@ -203,6 +206,7 @@ var (
 	NotifyShellStateChanged            = Notification[ShellStateNotification]{"shell/stateChanged"}
 	NotifyStorageWriteFailed           = Notification[WriteFailure]{"storage/writeFailed"}
 	NotifyStoreNotesChanged            = Notification[StoreNotes]{"store/notesChanged"}
+	NotifyWakeChanged                  = Notification[WakeState]{"wake/changed"}
 	NotifyWorkflowChanged              = Notification[WorkflowSummary]{"workflow/changed"}
 	NotifyWorkflowRemoved              = Notification[WorkflowRemovedNotification]{"workflow/removed"}
 	NotifyWorktreesSized               = Notification[WorktreesSized]{"worktrees/sized"}
