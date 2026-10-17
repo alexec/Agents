@@ -708,8 +708,7 @@ private extension View {
 }
 
 /// Settings (#846): Sidebar, the same on every client (#1033), as the window's Settings
-/// pane of the same name and the page's Settings keep it. Channels (#1109),
-/// Slack (#1009) first, are the control plane's. Everything else follows the Mac.
+/// pane of the same name and the page's Settings keep it. Everything else follows the Mac.
 private struct RemoteSettings: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(RemoteModel.self) private var model
@@ -718,19 +717,10 @@ private struct RemoteSettings: View {
         NavigationStack {
             Form {
                 SidebarSettingsSection()
-                // Nil from a control plane too old to know channels: no row at all.
-                if model.slack != nil {
-                    Section {
-                        NavigationLink("Channels") { ChannelsSettingsScreen() }
-                            .appText(.supporting)
-                    }
-                    .paperListRow()
-                }
                 GitAccessSettingsSection()
             }
             .scrollContentBackground(.hidden)
             .background(Paper.ground)
-            .task { await model.loadChannels() }
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

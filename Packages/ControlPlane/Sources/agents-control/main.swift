@@ -17,7 +17,6 @@ import Musl
 //   agents-control serve … [--host-root DIR]    this Mac's host's root: its join in control/status (#113)
 //   agents-control serve … [--no-forwarding]    serve, even if this copy was forwarding (AGENTS_CONTROL_FORWARDING=0)
 //   agents-control serve … [--log FILE]         stamped lines into FILE, rolled at 4 MB to FILE.previous.log (#174)
-//   agents-control serve … [--secrets-home DIR] DIR/.agents-secrets holds the channels' tokens (#1009)
 //   agents-control code (--client [--browser] | --host) [--minutes N] [--home DIR]
 //   agents-control hosts | clients
 //   agents-control move --from ROOT     an old set-up's devices into this store, once (T084)
@@ -44,9 +43,6 @@ import Musl
 //   AGENTS_CONTROL_TLS_CERT/_KEY  when this copy terminates TLS itself
 //   AGENTS_CONTROL_PIN          the load balancer's certificate pin, for codes, when it terminates TLS
 //   AGENTS_CONTROL_WEB_PORT     the web remote's loopback port, when --web-port is not given
-//   AGENTS_CONTROL_SECRETS_HOME when --secrets-home is not given. Without either: $HOME on a
-//                               server; with --home, that folder, so a scratch set-up never
-//                               reads the person's own (#1035). Agents Host names the home.
 
 setvbuf(stdout, nil, _IOLBF, 0)
 let arguments = Array(CommandLine.arguments.dropFirst())
@@ -171,11 +167,6 @@ func serve() async {
         configuration.providerHome = home ?? environment["AGENTS_CONTROL_PROVIDER_HOME"].map {
             URL(fileURLWithPath: ($0 as NSString).expandingTildeInPath, isDirectory: true)
         }
-        // Chat apps' tokens (#1009) in `.agents-secrets` under this home (#1035).
-        let secretsHome = value("--secrets-home") ?? environment["AGENTS_CONTROL_SECRETS_HOME"]
-        configuration.secretsHome = secretsHome.map {
-            URL(fileURLWithPath: ($0 as NSString).expandingTildeInPath, isDirectory: true)
-        } ?? home ?? URL(fileURLWithPath: NSHomeDirectory(), isDirectory: true)
         // A copy that was forwarding forwards again after a restart, unless told to serve.
         configuration.resumeForwarding = !arguments.contains("--no-forwarding") && environment["AGENTS_CONTROL_FORWARDING"] != "0"
         // Whether the page is served, for Agents Host to read (071 R3): this run's, or none.

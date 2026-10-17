@@ -259,20 +259,17 @@ const (
 
 // What the control plane answers (control.openrpc.json).
 var (
-	CallChannelsGet              = Method[Empty, ChannelsState]{"channels/get"}
-	CallChannelsSet              = Method[ChannelsSet, ChannelsState]{"channels/set"}
-	CallClientsForgetSelf        = Method[Empty, Empty]{"clients/forgetSelf"}
-	CallControlStatus            = Method[Empty, ControlStatus]{"control/status"}
-	CallHostsDropKept            = Method[KeptRequestID, Empty]{"hosts/dropKept"}
-	CallHostsLastHeard           = Method[HostRequest, HostLastHeard]{"hosts/lastHeard"}
-	CallHostsLendGit             = Method[LendGit, Empty]{"hosts/lendGit"}
-	CallHostsList                = Method[Empty, []ControlHost]{"hosts/list"}
-	CallHostsListKept            = Method[Empty, KeptList]{"hosts/listKept"}
-	CallHostsRetryKept           = Method[KeptRequestID, Empty]{"hosts/retryKept"}
-	CallHostsStart               = Method[HostRequest, ControlHost]{"hosts/start"}
-	CallHostsStop                = Method[HostStop, ControlHost]{"hosts/stop"}
-	NotifyControlChannelsChanged = Notification[ChannelsState]{"control/channelsChanged"}
-	NotifyControlHostChanged     = Notification[JSONValue]{"control/hostChanged"}
-	NotifyControlKeptChanged     = Notification[KeptList]{"control/keptChanged"}
-	NotifyControlKeptDelivered   = Notification[KeptDelivered]{"control/keptDelivered"}
+	CallClientsForgetSelf      = Method[Empty, Empty]{"clients/forgetSelf"}
+	CallControlStatus          = Method[Empty, ControlStatus]{"control/status"}
+	CallHostsDropKept          = Method[KeptRequestID, Empty]{"hosts/dropKept"}
+	CallHostsLastHeard         = Method[HostRequest, HostLastHeard]{"hosts/lastHeard"}
+	CallHostsLendGit           = Method[LendGit, Empty]{"hosts/lendGit"}
+	CallHostsList              = Method[Empty, []ControlHost]{"hosts/list"}
+	CallHostsListKept          = Method[Empty, KeptList]{"hosts/listKept"}
+	CallHostsRetryKept         = Method[KeptRequestID, Empty]{"hosts/retryKept"}
+	CallHostsStart             = Method[HostRequest, ControlHost]{"hosts/start"}
+	CallHostsStop              = Method[HostStop, ControlHost]{"hosts/stop"}
+	NotifyControlHostChanged   = Notification[JSONValue]{"control/hostChanged"}
+	NotifyControlKeptChanged   = Notification[KeptList]{"control/keptChanged"}
+	NotifyControlKeptDelivered = Notification[KeptDelivered]{"control/keptDelivered"}
 )

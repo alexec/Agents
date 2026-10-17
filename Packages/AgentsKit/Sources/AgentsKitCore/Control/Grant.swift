@@ -274,8 +274,6 @@ public struct ControlSettings: Codable, Hashable, Sendable {
     public var rev: Int?
     /// Where a host added from now on has its projects found (#429). Nil: the default.
     public var projectDetection: ProjectDetection?
-    /// Chat apps that reach the person's agents (#1012). Nil: none set.
-    public var channels: ChannelSettings?
 
     public init(name: String, port: Int = 8790, homeHost: HostID? = nil, machineID: String,
                 url: String? = nil, pin: String? = nil, controlKey: Data? = nil,

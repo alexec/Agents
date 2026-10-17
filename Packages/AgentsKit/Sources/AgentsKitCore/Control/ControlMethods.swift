@@ -39,8 +39,6 @@ public actor ControlMethods: ControlHandling {
         public var unjoinedTunnels: @Sendable () async -> [DaemonAPI.HostTunnelChanged]? = { nil }
         /// Workspace providers, links, starts and stops (#691); nil where providers can't run.
         public var workspaces: (any WorkspaceHandling)?
-        /// Chat apps that answer Needs You (#1012); nil where channels can't run.
-        public var channels: (any ChannelHandling)?
 
         public init(startPairing: @escaping @Sendable (Bool) async throws -> JSONValue = { _ in throw ControlMethods.notHere },
                     stopPairing: @escaping @Sendable () async -> Void = {},
@@ -207,11 +205,6 @@ public actor ControlMethods: ControlHandling {
         return settings
     }
 
-    /// The channels as set (#1012): no secret, so in the store with the rest.
-    public func setChannels(_ channels: ChannelSettings) async throws {
-        settings = try await records.changeSettings { $0.channels = channels }
-    }
-
     public func setHomeHost(_ host: HostID) async throws {
         guard settings.homeHost != host else { return }
         settings = try await records.changeSettings { $0.homeHost = host }
@@ -247,7 +240,6 @@ public actor ControlMethods: ControlHandling {
         DaemonAPI.Method.clientsForgetSelf,
         DaemonAPI.Method.devicesList, DaemonAPI.Method.devicesStartPairing, DaemonAPI.Method.devicesStopPairing,
         DaemonAPI.Method.devicesForget, DaemonAPI.Method.hostsLastHeard,
-        DaemonAPI.Method.channelsGet, DaemonAPI.Method.channelsSet,
     ]
 
     public nonisolated func handles(_ method: String) -> Bool {
@@ -275,7 +267,6 @@ public actor ControlMethods: ControlHandling {
         DaemonAPI.Method.hostsLendGit, DaemonAPI.Method.hostsDetect, DaemonAPI.Method.controlSetProjectDetection,
         DaemonAPI.Method.clientsStartPairing, DaemonAPI.Method.clientsForget,
         DaemonAPI.Method.devicesStartPairing, DaemonAPI.Method.devicesForget,
-        DaemonAPI.Method.channelsSet,
     ]
 
     private func answer(method: String, params: JSONValue?, from caller: ControlRouter.Caller) async throws -> JSONValue {
@@ -404,15 +395,6 @@ public actor ControlMethods: ControlHandling {
                 throw JSONRPCError(code: DaemonAPI.Failure.noSuchHost, message: "No host is called \(request.host.rawValue).")
             }
             return await copies?.lastHeard(request.host) ?? ["host": .string(request.host.rawValue)]
-        case DaemonAPI.Method.channelsGet:
-            return try JSONValue.encoding(await hooks.channels?.state() ?? .unavailable)
-        case DaemonAPI.Method.channelsSet:
-            let request = try Self.require(params, as: DaemonAPI.ChannelsSet.self)
-            guard let channels = hooks.channels else {
-                throw JSONRPCError(code: DaemonAPI.Failure.notSupported,
-                                   message: DaemonAPI.ChannelsState.unavailable.slack.detail ?? "")
-            }
-            return try JSONValue.encoding(try await channels.set(request))
         case _ where DaemonAPI.Method.workspaceMethods.contains(method):
             guard let workspaces = hooks.workspaces else {
                 throw JSONRPCError(code: DaemonAPI.Failure.providersNeedOneCopy,

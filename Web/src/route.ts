@@ -1,8 +1,7 @@
 // Where the page is, in the URL's fragment (071 research R2): #/h/<host>/p/<folder>/s/<session>, or
 // /w/<workflow> for a workflow's page in the chat's place (#98), /ar/1 for the project's archive (#499),
 // or #/a/<page> for an Activity page of the sidebar (#151): events, resources, runtimes, mcp (#589),
-// worktrees (#790), spending, tokens (#956) or time, or #/settings for this browser's Settings (#846),
-// with #/settings/channels and #/settings/channels/slack for its Channels pages (#1109).
+// worktrees (#790), spending, tokens (#956) or time, or #/settings for this browser's Settings (#846).
 // A tab holding one project alone (#1089) starts #/o/1/…: Open in New Tab on its heading. It keeps
 // to that project until ‹ All.
 // Every step is a history entry, so the browser's own Back moves between columns (US6).
@@ -12,14 +11,9 @@ export type ActivityPage = "events" | "resources" | "runtimes" | "mcp" | "worktr
 
 export const activityPages: readonly ActivityPage[] = ["events", "resources", "runtimes", "mcp", "worktrees", "spending", "tokens", "time", "milestones"];
 
-/** A page under Settings (#1109): the Channels list, or one channel's page. */
-export type SettingsPage = "channels" | "slack";
-
 export interface Route {
-  /** This browser's Settings (#846): which smart groups are on, and Channels (#1109). */
+  /** This browser's Settings (#846): which smart groups are on. */
   settings?: boolean | undefined;
-  /** With settings: a page under it (#1109), in Settings' place. */
-  settingsPage?: SettingsPage | undefined;
   /** An Activity page (#151): about all the work rather than one project. */
   activity?: ActivityPage | undefined;
   host?: string | undefined;
@@ -48,8 +42,6 @@ export interface AloneProject { host: string; folder: string }
 export function parseRoute(hash: string): Route {
   const path = hash.replace(/^#\/?/, "");
   if (path === "settings") return { settings: true };
-  if (path === "settings/channels") return { settings: true, settingsPage: "channels" };
-  if (path === "settings/channels/slack") return { settings: true, settingsPage: "slack" };
   const parts = path.split("/").map((part) => decodeURIComponent(part));
   const route: Route = {};
   for (let i = 0; i + 1 < parts.length; i += 2) {
@@ -77,10 +69,7 @@ export function routeHash(route: Route, aloneIn: AloneProject | undefined = alon
   const held = aloneIn !== undefined && route.host === aloneIn.host && route.project !== undefined
     && sameFolder(route.project, aloneIn.folder);
   if (held || (route.alone && route.host && route.project)) parts.push("o", "1");
-  if (route.settings) {
-    return route.settingsPage === "slack" ? "#/settings/channels/slack"
-      : route.settingsPage === "channels" ? "#/settings/channels" : "#/settings";
-  }
+  if (route.settings) return "#/settings";
   if (route.activity) return "#/a/" + route.activity;
   if (route.host) parts.push("h", route.host);
   if (route.host && route.project) parts.push("p", route.project);

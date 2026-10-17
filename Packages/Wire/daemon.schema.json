@@ -1778,27 +1778,6 @@
         }
       ]
     },
-    "ChannelsSet": {
-      "type": "object",
-      "properties": {
-        "slack": {
-          "$ref": "#/definitions/SlackSet"
-        }
-      },
-      "additionalProperties": false
-    },
-    "ChannelsState": {
-      "type": "object",
-      "properties": {
-        "slack": {
-          "$ref": "#/definitions/SlackState"
-        }
-      },
-      "required": [
-        "slack"
-      ],
-      "additionalProperties": false
-    },
     "ChartHint": {
       "type": "object",
       "properties": {
@@ -8358,59 +8337,6 @@
         "notSignedIn",
         "unreadable"
       ]
-    },
-    "SlackSet": {
-      "type": "object",
-      "properties": {
-        "enabled": {
-          "type": "boolean"
-        },
-        "memberID": {
-          "type": "string"
-        },
-        "appToken": {
-          "type": "string"
-        },
-        "botToken": {
-          "type": "string"
-        }
-      },
-      "additionalProperties": false
-    },
-    "SlackState": {
-      "type": "object",
-      "properties": {
-        "enabled": {
-          "type": "boolean"
-        },
-        "memberID": {
-          "type": "string"
-        },
-        "appTokenSet": {
-          "type": "boolean"
-        },
-        "botTokenSet": {
-          "type": "boolean"
-        },
-        "status": {
-          "type": "string"
-        },
-        "detail": {
-          "type": "string"
-        },
-        "available": {
-          "type": "boolean"
-        }
-      },
-      "required": [
-        "enabled",
-        "memberID",
-        "appTokenSet",
-        "botTokenSet",
-        "status",
-        "available"
-      ],
-      "additionalProperties": false
     },
     "SlashCommand": {
       "type": "object",

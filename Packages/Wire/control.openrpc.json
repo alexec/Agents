@@ -7,54 +7,6 @@
   },
   "methods": [
     {
-      "name": "channels/get",
-      "tags": [
-        {
-          "name": "web"
-        }
-      ],
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/Empty"
-          }
-        }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "$ref": "daemon.schema.json#/definitions/ChannelsState"
-        }
-      }
-    },
-    {
-      "name": "channels/set",
-      "tags": [
-        {
-          "name": "web"
-        }
-      ],
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/ChannelsSet"
-          }
-        }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "$ref": "daemon.schema.json#/definitions/ChannelsState"
-        }
-      }
-    },
-    {
       "name": "clients/forgetSelf",
       "tags": [
         {
@@ -296,25 +248,6 @@
           "$ref": "daemon.schema.json#/definitions/ControlHost"
         }
       }
-    },
-    {
-      "name": "control/channelsChanged",
-      "tags": [
-        {
-          "name": "web"
-        }
-      ],
-      "x-notification": true,
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/ChannelsState"
-          }
-        }
-      ]
     },
     {
       "name": "control/hostChanged",

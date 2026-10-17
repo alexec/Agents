@@ -53,12 +53,6 @@ public final class ControlService: @unchecked Sendable {
         /// Where workspace providers keep their secrets (#691, research R3): the control
         /// plane's own home, never the store. Nil for none, and no providers.
         public var providerHome: URL?
-        /// The home whose `.agents-secrets` holds the channels' tokens (#1009, #1035): the
-        /// person's own on their Mac or a server, a scratch set-up's own folder otherwise.
-        /// Nil for none, and no channels.
-        public var secretsHome: URL?
-        /// How Slack is reached: Slack itself, or a fake one in tests.
-        public var slack: any SlackTransport = SlackHTTP()
         /// How long provider calls, starts and lists take; shorter in tests.
         public var providerTiming: WorkspaceProviders.Timing = .standard
         /// The command provider's binary, when not found beside `agents-control` (tests).
@@ -119,8 +113,6 @@ public final class ControlService: @unchecked Sendable {
     private var tunnels: HostTunnels?
     /// Workspace providers (#691): only on a single copy with a home for their secrets.
     public private(set) var providers: WorkspaceProviders?
-    /// Chat apps that answer Needs You (#1012): only on a single copy with a secrets home.
-    public private(set) var channels: Channels?
     private var sweeper: Task<Void, Never>?
     /// When the store was last read again to admit a member it didn't know (#174).
     private let readAgainAt = DateBox()
@@ -321,10 +313,7 @@ public final class ControlService: @unchecked Sendable {
         hooks.tunnel = { host in await tunnels?.state(for: host) }
         hooks.unjoinedTunnels = { await tunnels?.unjoined() }
         // Notices (T097): a need goes to the relay host, wherever it is held.
-        hooks.need = { [weak self] host, params in
-            await self?.heard(host, params)
-            if let need = try? params?.decode(DaemonAPI.AttentionNeed.self) { self?.channels?.desk.post(host, need) }
-        }
+        hooks.need = { [weak self] host, params in await self?.heard(host, params) }
         hooks.relayChanged = { [weak self] _ in await self?.syncRelays() }
         hooks.clientsChanged = { [weak self] _ in await self?.tellRelayDevices() }
         // Workspace providers (#691): beside the tunnels, on a single copy only (R4).
@@ -374,12 +363,6 @@ public final class ControlService: @unchecked Sendable {
                 log: { [weak self] in self?.log($0) })
         }
         hooks.workspaces = providers
-        // Channels (#1012): beside the providers, on a single copy only, which every host's
-        // needs reach. Slack's Socket Mode also gives one connection's events to one copy.
-        if mesh == nil, channels == nil, let home = configuration.secretsHome {
-            channels = makeChannels(home: home)
-        }
-        hooks.channels = channels
         // Write It for Me (#858): an agent on this machine's own host writes a map.
         if let providers, await providers.drafts == nil, let home = configuration.providerHome {
             let commandProvider = configuration.commandProvider
@@ -438,7 +421,6 @@ public final class ControlService: @unchecked Sendable {
         await methods.setHooks(hooks)
         await tunnels?.start()
         await providers?.start()
-        await channels?.apply()
         await readiness.set(true)
 
         // Leases (T063): a host whose uplink ends here, or whose lease another copy took.
@@ -483,7 +465,6 @@ public final class ControlService: @unchecked Sendable {
         sweeper?.cancel()
         await tunnels?.stop()
         await providers?.stop()
-        await channels?.stop()
         await leases.stop()
         await mesh?.stop()
         for server in servers { try? await server.close() }
@@ -517,44 +498,6 @@ public final class ControlService: @unchecked Sendable {
         } catch {
             log("store: sweep stopped: \(error)")
         }
-    }
-
-    // MARK: Channels (#1012)
-
-    /// Who a channel's answers come from, on a host: one client of its own, for every
-    /// channel, since each is the person by the grant (#111).
-    public static let channelClient = UUID(uuidString: "C4A77E15-0000-4000-8000-000000001009")!
-
-    func makeChannels(home: URL) -> Channels {
-        let router = self.router, methods = self.methods
-        let client = Self.channelClient
-        let desk = ChannelDesk(hooks: .init(
-            pending: { host in
-                switch await router.deliverKept(DaemonAPI.Method.elicitationsPending, params: [:], as: client,
-                                                kind: .unknown, to: host, patience: .seconds(20)) {
-                case .success(_, let result)?: return try result.decode([ElicitationRequest].self)
-                case .failure(_, let error)?: throw error
-                default: throw ControlService.Failure("\(host) didn't answer")
-                }
-            },
-            answer: { host, answer in
-                switch await router.deliverKept(DaemonAPI.Method.elicitationsAnswer, params: try JSONValue.encoding(answer),
-                                                as: client, kind: .unknown, to: host, patience: .seconds(30)) {
-                case .success?: return
-                case .failure(_, let error)?: throw error
-                default: throw ControlService.Failure("\(host) didn't answer")
-                }
-            }), log: { [weak self] in self?.log($0) })
-        return Channels(secretsHome: home, desk: desk, hooks: .init(
-            settings: { await methods.controlSettings.channels },
-            save: { try await methods.setChannels($0) },
-            changed: { state in
-                await router.broadcastControl(DaemonAPI.Notification.controlChannelsChanged,
-                                              (try? JSONValue.encoding(state)) ?? [:])
-            },
-            slack: { [weak self, transport = configuration.slack] tokens, member in
-                SlackChannel(tokens: tokens, memberID: member, transport: transport, log: { [weak self] in self?.log($0) })
-            }))
     }
 
     // MARK: Changes across copies (T066)

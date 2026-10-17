@@ -52,8 +52,6 @@ something particular done.
   in Agents with one you began in Terminal, or delete one.
 - [Answer a question or a permission request](answer-a-question.md): from the Mac, the
   iPhone or iPad, or a notification.
-- [Answer questions from Slack](answer-questions-from-slack.md): a Slack app of your own,
-  and an agent's question in your direct messages, with its options as buttons.
 - [Send a prompt while an agent is working](send-while-an-agent-works.md): let it wait
   its turn, or put it into the running turn with **Send now**.
 - [See what needs you from your Home screen](see-what-needs-you-from-your-home-screen.md):

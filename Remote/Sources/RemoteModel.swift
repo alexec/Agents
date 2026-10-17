@@ -266,9 +266,6 @@ final class RemoteModel {
     private var gitAsksAnswered: Set<String> = []
     /// The host this phone's own connection reaches. Its projects are stamped `.mac`.
     private(set) var controlHome: HostID?
-    /// How the control plane's Slack channel is set and stands (#1009). Nil until the control
-    /// plane answers. It never holds a token: only whether each one is set.
-    private(set) var slack: DaemonAPI.SlackState?
 
     /// Each connected server's local daily ledger, matching the window's combined
     /// Today figure. Limits remain local to the host that owns them.
@@ -2009,31 +2006,6 @@ final class RemoteModel {
         }
     }
 
-    /// Read how Slack is set and stands from the control plane (#1009).
-    func loadChannels() async {
-        guard let control = controlPlane,
-              let state = try? await control.call(DaemonAPI.Method.channelsGet, returning: DaemonAPI.ChannelsState.self)
-        else { return }
-        slack = state.slack
-    }
-
-    /// Change Slack's settings on the control plane (#1009). Only the given fields change.
-    /// Nil when it was saved, or the control plane's reason when not. The request holds
-    /// tokens, so it is never logged.
-    func setSlack(_ request: DaemonAPI.SlackSet) async -> String? {
-        guard let control = controlPlane else {
-            return "The control plane isn’t answering, so that was not saved."
-        }
-        do {
-            let state = try await control.call(DaemonAPI.Method.channelsSet, DaemonAPI.ChannelsSet(slack: request),
-                                               returning: DaemonAPI.ChannelsState.self)
-            slack = state.slack
-            return nil
-        } catch {
-            return sentence(for: error)
-        }
-    }
-
     /// When each other host was last seen to go, for the strip over its chats (#239):
     /// set as it leaves `reachableHosts`, cleared as it comes back.
     private(set) var hostDownSince: [HostID: Date] = [:]
@@ -2067,13 +2039,8 @@ final class RemoteModel {
                     self?.controlPlane = control
                     await self?.syncOtherHosts(control, link: link)
                     await self?.loadKept(control)
-                    await self?.loadChannels()
                     for await change in control.notifications() {
                         guard let self, !Task.isCancelled else { return }
-                        if change.method == DaemonAPI.Notification.controlChannelsChanged {
-                            if let state = try? change.params?.decode(DaemonAPI.ChannelsState.self) { self.slack = state.slack }
-                            continue
-                        }
                         if change.method == DaemonAPI.Notification.controlKeptChanged
                             || change.method == DaemonAPI.Notification.controlKeptDelivered {
                             await self.heardKept(change.method, change.params)
