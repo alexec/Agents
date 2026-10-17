@@ -20,6 +20,10 @@ import (
 // stdin and stdout. A prompt with "ask" in it asks for permission before it answers; one
 // with "wait for me" waits to be cancelled.
 func TestMain(m *testing.M) {
+	if os.Getenv("AGENTS_FAKE_MCP") == "1" {
+		fakeMCPServer()
+		return
+	}
 	if os.Getenv("AGENTS_FAKE_ACP") == "1" {
 		f := &fakeRuntime{ready: make(chan struct{})}
 		f.conn = sdk.NewAgentSideConnection(f, os.Stdout, os.Stdin)
