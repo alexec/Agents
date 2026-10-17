@@ -1,7 +1,7 @@
 import AgentsKitCore
 import SwiftUI
 
-/// Where the time of this Mac's running chats went (#852): the agent working, its tools,
+/// Where the time of every host's running chats went (#852, #1267): the agent working, its tools,
 /// waiting on others, and waiting for you, drawn as the usage charts on Cost are.
 ///
 /// A page in the detail column, picked from Activity in the sidebar. Read-only.

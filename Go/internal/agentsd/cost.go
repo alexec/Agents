@@ -61,6 +61,46 @@ type costBook struct {
 func dayStamp(t time.Time) string  { return t.Local().Format("2006-01-02") }
 func hourStamp(t time.Time) string { return t.Local().Format("2006-01-02T15") }
 
+// zoneName is the IANA name of the zone those stamps are in, sent with the histories so a
+// viewer in another zone can put each hour in its own day (#1267): TZ when it names one,
+// else what /etc/localtime links to, else UTC when the clock is UTC. Nil when none can be
+// named, and a viewer reads the stamps as its own.
+var zoneName = sync.OnceValue(func() *string { return namedZone(os.LookupEnv, os.Readlink, time.Now) })
+
+func namedZone(env func(string) (string, bool), readlink func(string) (string, error), now func() time.Time) *string {
+	fromPath := func(p string) string {
+		if i := strings.LastIndex(p, "zoneinfo/"); i >= 0 {
+			return p[i+len("zoneinfo/"):]
+		}
+		return ""
+	}
+	name := ""
+	if tz, ok := env("TZ"); ok {
+		tz = strings.TrimPrefix(tz, ":")
+		switch {
+		case tz == "":
+			name = "UTC"
+		case strings.HasPrefix(tz, "/"):
+			name = fromPath(tz)
+		default:
+			if _, err := time.LoadLocation(tz); err == nil {
+				name = tz
+			}
+		}
+	} else if link, err := readlink("/etc/localtime"); err == nil {
+		name = fromPath(link)
+	}
+	if name == "" {
+		if _, offset := now().Zone(); offset == 0 {
+			name = "UTC"
+		}
+	}
+	if name == "" {
+		return nil
+	}
+	return &name
+}
+
 func (d *Daemon) spendPath() string  { return filepath.Join(d.Store.Loc.Root, "spend.json") }
 func (d *Daemon) usagePath() string  { return filepath.Join(d.Store.Loc.Root, "usage-history.json") }
 func (d *Daemon) limitsPath() string { return filepath.Join(d.SettingsDir, "limits.json") }
@@ -357,7 +397,7 @@ func (d *Daemon) usageHistory() wire.UsageHistory {
 	u := d.usageLocked()
 	keepNewest(u.Hours, usageHoursKept, "")
 	keepNewest(u.Days, usageDaysKept, "")
-	h := wire.UsageHistory{Hours: map[string]map[string]wire.UsageBucket{}, Days: map[string]map[string]wire.UsageBucket{}, Now: hourStamp(time.Now())}
+	h := wire.UsageHistory{Hours: map[string]map[string]wire.UsageBucket{}, Days: map[string]map[string]wire.UsageBucket{}, Now: hourStamp(time.Now()), TimeZone: zoneName()}
 	for k, v := range u.Hours {
 		h.Hours[k] = v
 	}

@@ -191,6 +191,7 @@ public final class TimeLedger: @unchecked Sendable {
             var history = readLocked()
             history.prune()
             history.now = UsageHistory.hourStamp(for: now, calendar: calendar)
+            history.timeZone = calendar.timeZone.identifier
             if let since = clearSince, now > since {
                 history.changeRecap(UsageChart.dayStamp(now, calendar: calendar)) {
                     $0.longestClear = max($0.longestClear, now.timeIntervalSince(since))

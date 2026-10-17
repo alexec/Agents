@@ -3198,16 +3198,36 @@ final class RemoteModel {
         await refreshEvents()
     }
 
-    /// What the Mac's work used by hour and by day (#823), for the charts on Cost. Nil
-    /// from a daemon too old to know the method.
+    /// What the work used by hour and by day (#823), for the charts on Cost: the Mac's and
+    /// every reachable server's, each moved into this device's days (#1267). Nil when no
+    /// host knows the method.
     func usageHistory() async -> UsageHistory? {
-        try? await client.call(DaemonAPI.Method.usageHistory, Optional<String>.none, returning: UsageHistory.self)
+        var histories: [UsageHistory] = []
+        for host in chartHosts {
+            if let history = try? await host.call(DaemonAPI.Method.usageHistory, Optional<String>.none,
+                                                  returning: UsageHistory.self) {
+                histories.append(history)
+            }
+        }
+        return histories.isEmpty ? nil : .merged(histories)
     }
 
-    /// Where the time of the Mac's running chats went (#852), for the Time page. Nil from
-    /// a daemon too old to know the method.
+    /// Where the time of running chats went (#852), for the Time page, from every host as
+    /// `usageHistory` is. The recap is the Mac's. Nil when no host knows the method.
     func timeHistory() async -> TimeHistory? {
-        try? await client.call(DaemonAPI.Method.timeHistory, Optional<String>.none, returning: TimeHistory.self)
+        var histories: [TimeHistory] = []
+        for host in chartHosts {
+            if let history = try? await host.call(DaemonAPI.Method.timeHistory, Optional<String>.none,
+                                                  returning: TimeHistory.self) {
+                histories.append(history)
+            }
+        }
+        return histories.isEmpty ? nil : .merged(histories)
+    }
+
+    /// The Mac first, then every other host reachable now.
+    private var chartHosts: [DaemonClient] {
+        [client] + reachableHosts.compactMap { otherHosts[$0] }
     }
 
     private func refreshServerCost(_ host: HostID) async {

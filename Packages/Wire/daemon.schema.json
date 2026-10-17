@@ -10029,6 +10029,10 @@
         "now": {
           "type": "string"
         },
+        "timeZone": {
+          "type": "string",
+          "description": "The host's time zone, an IANA identifier such as America/Los_Angeles, that its hour and day stamps are in (#1267). Absent from a host too old to say: read as the viewer's own."
+        },
         "recap": {
           "type": "object",
           "additionalProperties": {
@@ -11159,6 +11163,10 @@
         },
         "now": {
           "type": "string"
+        },
+        "timeZone": {
+          "type": "string",
+          "description": "The host's time zone, an IANA identifier such as America/Los_Angeles, that its hour and day stamps are in (#1267). Absent from a host too old to say: read as the viewer's own."
         }
       },
       "required": [

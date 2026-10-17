@@ -14,22 +14,25 @@ public struct TimeHistory: Codable, Sendable, Hashable {
     public var days: [String: [String: TimeBucket]]
     /// The host's hour when this was read, as `UsageHistory.now`.
     public var now: String
+    /// The zone those stamps are in, as `UsageHistory.timeZone`.
+    public var timeZone: String?
     /// `yyyy-MM-dd`, then the day's recap figures (#985): kept for as many days as `days`.
     public var recap: [String: DayRecap]
     /// The person's records (#985): a handful of values, kept for ever.
     public var records: TimeRecords
 
     public init(hours: [String: [String: TimeBucket]] = [:],
-                days: [String: [String: TimeBucket]] = [:], now: String = "",
+                days: [String: [String: TimeBucket]] = [:], now: String = "", timeZone: String? = nil,
                 recap: [String: DayRecap] = [:], records: TimeRecords = TimeRecords()) {
         self.hours = hours
         self.days = days
         self.now = now
+        self.timeZone = timeZone
         self.recap = recap
         self.records = records
     }
 
-    private enum CodingKeys: String, CodingKey { case hours, days, now, recap, records }
+    private enum CodingKeys: String, CodingKey { case hours, days, now, timeZone, recap, records }
 
     /// A file written before #985 has no recap or records.
     public init(from decoder: any Decoder) throws {
@@ -37,6 +40,7 @@ public struct TimeHistory: Codable, Sendable, Hashable {
         hours = try container.decode([String: [String: TimeBucket]].self, forKey: .hours)
         days = try container.decode([String: [String: TimeBucket]].self, forKey: .days)
         now = try container.decode(String.self, forKey: .now)
+        timeZone = try container.decodeIfPresent(String.self, forKey: .timeZone)
         recap = try container.decodeIfPresent([String: DayRecap].self, forKey: .recap) ?? [:]
         records = try container.decodeIfPresent(TimeRecords.self, forKey: .records) ?? TimeRecords()
     }

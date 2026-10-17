@@ -3626,11 +3626,13 @@ type TimeBucket struct {
 }
 
 type TimeHistory struct {
-	Hours   map[string]map[string]TimeBucket `json:"hours"`
-	Days    map[string]map[string]TimeBucket `json:"days"`
-	Now     string                           `json:"now"`
-	Recap   map[string]DayRecap              `json:"recap"`
-	Records TimeRecords                      `json:"records"`
+	Hours map[string]map[string]TimeBucket `json:"hours"`
+	Days  map[string]map[string]TimeBucket `json:"days"`
+	Now   string                           `json:"now"`
+	// The host's time zone, an IANA identifier such as America/Los_Angeles, that its hour and day stamps are in (#1267). Absent from a host too old to say: read as the viewer's own.
+	TimeZone *string             `json:"timeZone,omitzero"`
+	Recap    map[string]DayRecap `json:"recap"`
+	Records  TimeRecords         `json:"records"`
 }
 
 type TimeRecord struct {
@@ -3931,6 +3933,8 @@ type UsageHistory struct {
 	Hours map[string]map[string]UsageBucket `json:"hours"`
 	Days  map[string]map[string]UsageBucket `json:"days"`
 	Now   string                            `json:"now"`
+	// The host's time zone, an IANA identifier such as America/Los_Angeles, that its hour and day stamps are in (#1267). Absent from a host too old to say: read as the viewer's own.
+	TimeZone *string `json:"timeZone,omitzero"`
 }
 
 // What a third-party server's view waits on before it is drawn: the person's Show (#191). The data of a viewNeedsShow failure.

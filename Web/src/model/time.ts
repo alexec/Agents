@@ -2,7 +2,7 @@
 // what the window's and the Remote's say. Each bar is stacked by kind of time. Every stamp is the
 // host's, counted back from history.now; nothing asks the browser's clock what today is.
 import type { TimeBucket, TimeHistory } from "../protocol/generated";
-import { dayStamp, hourStamp, stampDate, type UsageRange } from "./usage";
+import { dayStamp, hourStamp, mergeTiers, stampDate, type UsageRange } from "./usage";
 
 export type TimeKind = "agent" | "tools" | "others" | "person";
 /** Drawn in this order from the bottom: TimeKind.allCases. */
@@ -37,6 +37,16 @@ function add(into: TimeBucket, b: TimeBucket): void {
   into.others += b.others;
   into.person += b.person;
   into.turns += b.turns;
+}
+
+/**
+ * Every host's time added up in this browser's days (#1267): TimeHistory.merged. The recap and the
+ * records are the first history's, the home host's: one host's figures, which do not add up.
+ */
+export function mergeTime(histories: readonly TimeHistory[]): TimeHistory | undefined {
+  const first = histories[0];
+  if (!first) return undefined;
+  return { ...mergeTiers(histories, emptyTime, add), recap: first.recap, records: first.records };
 }
 
 const addDays = (d: Date, n: number) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);

@@ -477,7 +477,7 @@ func (d *Daemon) timeHistory() wire.TimeHistory {
 	h := cloneTime(*d.timeLocked())
 	pruneTime(&h)
 	at := time.Now()
-	h.Now = hourStamp(at)
+	h.Now, h.TimeZone = hourStamp(at), zoneName()
 	if d.clearSince != nil && at.After(*d.clearSince) {
 		s := at.Sub(*d.clearSince).Seconds()
 		changeRecap(&h, dayStamp(at), func(r *wire.DayRecap) { r.LongestClear = max(r.LongestClear, s) })
