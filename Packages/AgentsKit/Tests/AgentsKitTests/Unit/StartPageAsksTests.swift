@@ -30,6 +30,9 @@ struct StartPageAsksTests {
             let way = nextWay()
             let (near, far) = PairedTransport.pair()
             _ = Task { [weak self] in
+                // The link drops once the page's three calls are all in, so each is heard
+                // whatever order they arrive in (#1320).
+                var calls = 0
                 for try await line in far.lines() {
                     guard let self,
                           let object = try? JSONSerialization.jsonObject(with: Data(line.utf8)) as? [String: Any],
@@ -39,8 +42,9 @@ struct StartPageAsksTests {
                         continue
                     }
                     self.heard(method)
+                    calls += 1
                     switch way {
-                    case .dropsLink: far.close()
+                    case .dropsLink: if calls == StartPageAsks.Ask.allCases.count { far.close() }
                     case .losesReplies: continue
                     case .answers: try? far.write(line: Self.reply(id, to: method))
                     }

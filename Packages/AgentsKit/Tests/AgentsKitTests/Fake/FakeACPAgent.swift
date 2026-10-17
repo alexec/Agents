@@ -301,6 +301,7 @@ actor FakeACPAgent {
             continuedSessionAppToolList = await Self.appTools(in: params)
             if script.loadDelay > .zero { try? await Task.sleep(for: script.loadDelay) }
             if let error = script.sessionGoneError { return .failure(error) }
+            pickedUpAConversation()
             return .success([:])
 
         case ACP.Method.loadSession:
@@ -319,6 +320,7 @@ actor FakeACPAgent {
             }
             if script.pauseBeforeReplay > .zero { try? await Task.sleep(for: script.pauseBeforeReplay) }
             for update in script.replayOnLoad { await send(update: update) }
+            pickedUpAConversation()
             return .success([:])
 
         case ACP.Method.setConfigOption:
@@ -370,6 +372,14 @@ actor FakeACPAgent {
         default:
             return .failure(.methodNotFound(method))
         }
+    }
+
+    /// A conversation picked back up in a new process has had its first turn: with
+    /// `updatesOnFirstTurnOnly`, the next one sends nothing again. Under load the daemon
+    /// may start the runtime again between turns, and a replayed first turn read as the
+    /// runtime saying it all again (#1320).
+    private func pickedUpAConversation() {
+        turnsTaken = max(turnsTaken, 1)
     }
 
     private func runTurn(failing: Bool = true) async -> Result<JSONValue, JSONRPCError> {
