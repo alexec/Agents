@@ -118,6 +118,10 @@ func Start(ctx context.Context, l Launch, sink Sink, mcp []sdk.McpServer, meta m
 			log.Printf("%s does not take MCP servers over http: %s is left out", l.Command, m.Http.Name)
 			continue
 		}
+		if m.Sse != nil && !s.Init.AgentCapabilities.McpCapabilities.Sse {
+			log.Printf("%s does not take MCP servers over sse: %s is left out", l.Command, m.Sse.Name)
+			continue
+		}
 		kept = append(kept, m)
 	}
 	mcp = kept

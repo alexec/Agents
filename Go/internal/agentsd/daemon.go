@@ -46,6 +46,7 @@ type Daemon struct {
 	costBook
 	workflowBook
 	allowanceBook
+	mcpBook
 	attentionState
 	worktreeState
 	recoveryState
@@ -71,6 +72,7 @@ func New(ctx context.Context, root string) (*Daemon, error) {
 	d.register()
 	d.loadAttention()
 	d.loadEvents()
+	d.beginMCPApprovals()
 	d.recover()
 	d.resumeEventWaits()
 	d.resumeBlocks()
