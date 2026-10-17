@@ -5,8 +5,10 @@
 # The release carries:
 #   Agents-Host-<version>.dmg              signed with Developer ID, notarized, stapled
 #   Agents-Host-<version>.zip              the same app, stapled, for Macs that can't mount a .dmg
-#   agentsd-linux-<arch>-<version>.tar.gz  the static Linux agentsd, for a Linux host, with the
-#                                          MCP servers Agents ships beside it (#700)
+#   agentsd-go-linux-<arch>-<version>.tar.gz  the Go Linux agentsd, a Linux host's default
+#                                          (#1136), with the MCP servers Agents ships (#700)
+#   agentsd-linux-<arch>-<version>.tar.gz  the Swift Linux agentsd, one setting away
+#                                          (install.sh --impl swift), with the same servers
 #   SHA256SUMS
 #
 # Beside it, the testflight job (#914) uploads the Universal app to TestFlight: the Mac window
@@ -52,6 +54,7 @@ env:
 jobs:
   # The static Linux agentsd, with the swift.org toolchain and its Static Linux SDK. They
   # must match Xcode's Swift (scripts/build-linux-agentsd.sh); move all three together.
+  # The Go one (#1136), a Linux host's default, is built beside it with Go/go.mod's Go.
   linux:
     runs-on: ubuntu-latest
     timeout-minutes: 45
@@ -68,13 +71,25 @@ jobs:
             https://download.swift.org/swift-6.4.0-release/static-sdk/swift-6.4.0-RELEASE/swift-6.4.0-RELEASE_static-linux-0.1.0.artifactbundle.tar.gz \
             --checksum 47d2fd89eebfdf9eb4d536b6710414297f755c17926cdebc4742c08982b40a9e
 
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: Go/go.mod
+          cache: false
+
       - name: Build agentsd for Linux
         env:
           SWIFT: swift
           AGENTS_BUILD: ${{ github.run_number }}
+          # The checkout in this container is another user's: no VCS stamp for Go to fail on.
+          GOFLAGS: -buildvcs=false
         run: |
           export AGENTS_MARKETING_VERSION="${TAG#v}"
           zsh scripts/build-linux-agentsd.sh
+          # The Go host is a Linux host's default: a release without it is no release.
+          for arch in x86_64 aarch64; do
+            test -f App/Resources/servers/agentsd-go-linux-$arch || {
+              echo "::error::the Go host was not built for $arch"; exit 1; }
+          done
 
       - uses: actions/upload-artifact@v5
         with:

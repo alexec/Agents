@@ -34,7 +34,8 @@ The spike's stage 3 proved that one JSON Schema carries every shape on the wire,
   - The root (`~/.agents-server/root`) and the membership file are the same for both. A host keeps its id when it changes from Swift to Go, because the id is in the root, not in the binary. Changing back is the same script with the other flag.
   - The Go host keeps `agentsd supervise` for a box with no systemd. Under systemd, the unit's `Restart=always` (already in the script) does the job and `supervise` is not used.
 - **What must not differ:** the root's files (`agents/`, `projects.json`, workflows, `mcp.json`). The Go host reads and writes today's files. A host that changes language keeps its agents. Port the Swift record tests that check these files as Go tests over the same fixtures.
-- **When the Go host is the default:** when it serves every method a server host gets (the table below, less the Mac-only and the control-plane rows), and a week of Alex's own server work has run on it. Then the Swift Linux build leaves `scripts/build-linux-agentsd.sh` and CI, and the Static Linux SDK is no longer needed.
+- **Done (#1136, 2026-10-16):** the Go host is a Linux host's default. Alex chose to switch once the last step 1 lanes landed and a full devbox walk passed, in place of a week of use. `install.sh` installs it; `--impl swift` (Add a Server's "Install the Swift host instead") installs the Swift one, and a control plane with no Go host gives the Swift one. The Swift Linux build stays in `scripts/build-linux-agentsd.sh` and the release until Alex chooses to drop it.
+- **When the Go host is the default (as first drafted):** when it serves every method a server host gets (the table below, less the Mac-only and the control-plane rows), and a week of Alex's own server work has run on it. Then the Swift Linux build leaves `scripts/build-linux-agentsd.sh` and CI, and the Static Linux SDK is no longer needed.
 
 ### Also needed, not methods
 

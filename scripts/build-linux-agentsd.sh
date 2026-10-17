@@ -119,9 +119,10 @@ done
 if (( ! check )); then
     print -n "$marketing+$build" > $out/VERSION
     print "wrote $out (version $marketing+$build)"
-    # The Go host beside it (#1136), for install.sh --impl go. Seconds where Go runs (a
-    # container on this Mac, Go on PATH elsewhere); left out, with a word, where it cannot.
+    # The Go host beside it (#1136), a Linux host's default. Seconds where Go runs (a
+    # container on this Mac, Go on PATH elsewhere); left out, with a word, where it cannot,
+    # and install.sh then falls back to the Swift host.
     if ! AGENTS_MARKETING_VERSION=$marketing AGENTS_BUILD=$build $root/scripts/build-linux-agentsd-go.sh; then
-        print -u2 "warning: the Go host was not built (no Docker or Go here); servers get the Swift host only"
+        print -u2 "warning: the Go host was not built (no Docker or Go here); servers fall back to the Swift host"
     fi
 fi

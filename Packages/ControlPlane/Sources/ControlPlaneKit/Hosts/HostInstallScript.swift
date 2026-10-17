@@ -15,15 +15,16 @@ public enum HostInstallScript {
     #!/bin/sh
     # Make this machine a host of an Agents control plane (058, US4).
     #
-    #   curl -fsSL [--pinnedpubkey sha256//…] https://<control plane>/v1/install.sh | sh -s -- '<host code>' [name] [--impl go]
+    #   curl -fsSL [--pinnedpubkey sha256//…] https://<control plane>/v1/install.sh | sh -s -- '<host code>' [name] [--impl swift]
     #
     # Installs the host for this user in ~/.agents-server, and starts it. It connects out to
     # the control plane; nothing needs to reach this machine. Run it again with a new code to
-    # join again. --impl go (or AGENTS_HOST_IMPL=go) installs the Go host, a preview (#1136);
-    # without it, the Swift host. Both use the same root, so a host that changes keeps its agents.
+    # join again. It installs the Go host (#1136); --impl swift (or AGENTS_HOST_IMPL=swift)
+    # installs the Swift host instead. Both use the same root, so a host that changes keeps
+    # its agents.
     set -eu
 
-    code= name= impl=${AGENTS_HOST_IMPL:-swift}
+    code= name= impl=${AGENTS_HOST_IMPL:-}
     while [ $# -gt 0 ]; do
         case "$1" in
             --impl) impl=${2:?say swift or go after --impl}; shift 2 ;;
@@ -32,6 +33,7 @@ public enum HostInstallScript {
         esac
     done
     [ -n "$code" ] || { echo "Say the host code the control plane showed." >&2; exit 2; }
+    asked=$impl impl=${impl:-go}
     name=${name:-$(hostname)}
     case "$code" in agents-control:2:h:*) ;; *) echo "That is not a host code." >&2; exit 2 ;; esac
     case "$impl" in swift) program=agentsd ;; go) program=agentsd-go ;; *) echo "--impl is swift or go." >&2; exit 2 ;; esac
@@ -71,7 +73,13 @@ public enum HostInstallScript {
     trap 'rm -rf "$tmp"' EXIT
 
     echo "Fetching the host ($impl) for $arch-linux from $url…"
-    fetch "/v1/servers/$program-linux-$arch.sha256" "$tmp/sha256"
+    if ! fetch "/v1/servers/$program-linux-$arch.sha256" "$tmp/sha256" 2>/dev/null; then
+        # A control plane from before the Go host was the default offers only the Swift one.
+        [ -z "$asked" ] && [ "$impl" = go ] || { echo "This control plane offers no $impl host for $arch-linux." >&2; exit 1; }
+        echo "This control plane offers no Go host for $arch-linux; installing the Swift host." >&2
+        impl=swift program=agentsd
+        fetch "/v1/servers/$program-linux-$arch.sha256" "$tmp/sha256"
+    fi
     fetch "/v1/servers/$program-linux-$arch" "$tmp/agentsd"
     sha=$(tr -d ' \n' < "$tmp/sha256")
     echo "$sha  $tmp/agentsd" | sha256sum -c - >/dev/null || { echo "The download did not match its checksum." >&2; exit 1; }
@@ -163,7 +171,8 @@ public enum HostInstallScript {
             while standard.count % 4 != 0 { standard += "=" }
             curl += " --insecure --pinnedpubkey sha256//\(standard)"
         }
-        let impl = implementation == "go" ? " --impl go" : ""
+        // The Go host is the script's own default (#1136): only the Swift one is asked for.
+        let impl = implementation == "swift" ? " --impl swift" : ""
         return "\(curl) \(base)/v1/install.sh | sh -s -- '\(code)'\(impl)"
     }
 }
@@ -194,7 +203,10 @@ public enum ServerFiles {
         candidates.append(executable.deletingLastPathComponent().deletingLastPathComponent()
             .appendingPathComponent("Resources/servers", isDirectory: true))
         candidates.append(URL(fileURLWithPath: "/servers", isDirectory: true))
-        return candidates.first { FileManager.default.fileExists(atPath: $0.appendingPathComponent("VERSION").path) }
+        // A folder with either host: a Go-only one (scripts/build-linux-agentsd-go.sh alone) too.
+        return candidates.first { folder in
+            ["VERSION", "VERSION-go"].contains { FileManager.default.fileExists(atPath: folder.appendingPathComponent($0).path) }
+        }
     }
 
     /// A file by name, from the folder: never a path the request made up.
@@ -213,13 +225,18 @@ public enum ServerFiles {
     }
 
     /// Each architecture the folder has, with its checksum and the version beside them:
-    /// the Swift host, or with `implementation` `go` the Go one (#1136).
+    /// the Go host (#1136), or with `implementation` `swift` the Swift one. Asked for
+    /// neither, a folder with no Go host for `arch` gives the Swift one.
     public static func binary(for arch: String, implementation: String? = nil,
                               in folder: URL?) -> (file: URL, sha256: String, version: String)? {
-        let program = implementation == "go" ? "agentsd-go" : "agentsd"
+        if implementation == nil, read("agentsd-go-linux-\(arch).sha256", in: folder) == nil {
+            return binary(for: arch, implementation: "swift", in: folder)
+        }
+        let go = implementation != "swift"
+        let program = go ? "agentsd-go" : "agentsd"
         guard let folder,
               let sha = read("\(program)-linux-\(arch).sha256", in: folder).map({ String(decoding: $0, as: UTF8.self) }) else { return nil }
-        let version = read(implementation == "go" ? "VERSION-go" : "VERSION", in: folder)
+        let version = read(go ? "VERSION-go" : "VERSION", in: folder)
             .map { String(decoding: $0, as: UTF8.self) } ?? "0"
         return (folder.appendingPathComponent("\(program)-linux-\(arch)"), sha.trimmingCharacters(in: .whitespacesAndNewlines),
                 version.trimmingCharacters(in: .whitespacesAndNewlines))

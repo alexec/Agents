@@ -175,7 +175,7 @@ func InstallCommand(url, pin, code string) string {
 var serverFileNames = func() map[string]bool {
 	names := map[string]bool{"VERSION": true, "VERSION-go": true}
 	for _, arch := range []string{"x86_64", "aarch64"} {
-		// agentsd-go (#1136): the Go host, for install.sh --impl go.
+		// agentsd-go (#1136): the Go host, a Linux host's default.
 		for _, program := range []string{"agentsd", "agentsd-go", "ci-watcher"} {
 			names[program+"-linux-"+arch] = true
 			names[program+"-linux-"+arch+".sha256"] = true
@@ -200,8 +200,11 @@ func ServerFolder() string {
 	}
 	candidates = append(candidates, "/servers")
 	for _, c := range candidates {
-		if _, err := os.Stat(filepath.Join(c, "VERSION")); err == nil {
-			return c
+		// A folder with either host: a Go-only one (build-linux-agentsd-go.sh alone) too.
+		for _, version := range []string{"VERSION", "VERSION-go"} {
+			if _, err := os.Stat(filepath.Join(c, version)); err == nil {
+				return c
+			}
 		}
 	}
 	return ""

@@ -156,7 +156,9 @@ All of these, on the commit you will tag (`git rev-parse origin/main`, fetched a
    - one heading per kind that has changes, in this order: `## New` (the plan's
      `[enhancement]`), `## Fixed` (`[bug]`) and `## Changed` (the rest), with a line per
      change, from the pull requests the plan lists. A line names the pull request:
-     `- The sidebar shows … (#698)`. Leave out changes only agents see (CI, scripts,
+     `- The sidebar shows … (#698)`. A pull request whose body has a `Release note:`
+     paragraph gives that paragraph as its line, as written: it says what a person has to
+     do, such as how to go back to the Swift Linux host. Leave out changes only agents see (CI, scripts,
      workflows) unless they change what a person does;
    - `## Security fixes` with only "This release fixes security problems found by our
      own review." when an advisory was fixed since the last tag. Nothing more;

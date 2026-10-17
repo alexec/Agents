@@ -1,6 +1,7 @@
 #!/bin/zsh
-# Build the Go Linux host (#1136) beside the Swift one: two static binaries a server can
-# install with `install.sh --impl go`, or Add a Server's "Install the Go host" switch.
+# Build the Go Linux host (#1136), a Linux host's default, beside the Swift one: two static
+# binaries install.sh installs unless told `--impl swift` (Add a Server's "Install the Swift
+# host instead").
 #
 #   ./scripts/build-linux-agentsd-go.sh           # build both, copy into App/Resources/servers
 #   ./scripts/build-linux-agentsd-go.sh --check   # build both, copy nothing

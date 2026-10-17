@@ -322,10 +322,15 @@ func readServerFile(name, folder string) (string, bool) {
 type serverBinary struct{ file, sha256, version string }
 
 func binaryFor(arch, implementation, folder string) (serverBinary, bool) {
-	// The Swift host, or with implementation "go" the Go one (#1136), as ServerFiles.binary.
-	program, versionFile := "agentsd", "VERSION"
-	if implementation == "go" {
-		program, versionFile = "agentsd-go", "VERSION-go"
+	// The Go host (#1136), or with implementation "swift" the Swift one, as
+	// ServerFiles.binary. Asked for neither, a folder with no Go host for arch gives the
+	// Swift one.
+	if _, ok := readServerFile("agentsd-go-linux-"+arch+".sha256", folder); implementation == "" && !ok {
+		return binaryFor(arch, "swift", folder)
+	}
+	program, versionFile := "agentsd-go", "VERSION-go"
+	if implementation == "swift" {
+		program, versionFile = "agentsd", "VERSION"
 	}
 	sha, ok := readServerFile(program+"-linux-"+arch+".sha256", folder)
 	if !ok {
