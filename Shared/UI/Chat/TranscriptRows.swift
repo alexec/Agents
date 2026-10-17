@@ -109,7 +109,10 @@ struct TurnView: View, Equatable {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .task(id: detail.showsSteps) {
+        // Keyed on waiting too: a turn drawn from its entries becomes a stored summary when
+        // the chat's history is read again (its host restarted), with its steps still open,
+        // and was left a spinner that never asked for them (#1266).
+        .task(id: detail.showsSteps && waiting) {
             if detail.showsSteps, waiting { await fetch() }
         }
     }

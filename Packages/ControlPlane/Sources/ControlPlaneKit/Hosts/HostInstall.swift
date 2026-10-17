@@ -53,16 +53,20 @@ public struct HostInstall: Sendable {
     /// Where a server behind a bastion's tunnel is held, and the port it reaches here;
     /// nil where this copy holds none (several copies, whose ssh is no person's).
     let tunnels: (holder: HostTunnels, port: Int)?
+    /// The runtimes' toolsets put on the server before the host starts (#1268).
+    let toolsets: HostToolsets
     let progress: @Sendable (String, String) async -> Void
     /// `-F` and a config file, for tests; nothing, for the person's own.
     let configFile: [String]
 
     public init(codes: ControlCodes, servers: URL?, tunnels: (holder: HostTunnels, port: Int)? = nil,
+                toolsets: HostToolsets = HostToolsets(folder: nil),
                 configFile: [String] = HostInstall.configFile,
                 progress: @escaping @Sendable (String, String) async -> Void = { _, _ in }) {
         self.codes = codes
         self.servers = servers
         self.tunnels = tunnels
+        self.toolsets = toolsets
         self.configFile = configFile
         self.progress = progress
     }
@@ -158,6 +162,10 @@ public struct HostInstall: Sendable {
         for server in ServerFiles.shippedServers(for: arch, in: servers) {
             try? await installer.installServer(named: server.name, binary: server.file, sha256: server.sha256)
         }
+        // The runtimes' toolsets (#1268), as the window's ToolsetInstaller puts them on a
+        // server it holds, for the Swift host and the Go one alike. One that cannot be
+        // installed leaves the host without that runtime, not without a host.
+        await toolsets.install(over: ssh, facts: facts, name: name)
         // A host code, left in the host's root and read once: never on its command line,
         // where `ps` would show it. Through a tunnel, it names the server's end of the
         // tunnel, which is held from now so the host's first dial finds it (#435, #610).

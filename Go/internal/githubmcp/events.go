@@ -1,0 +1,538 @@
+package githubmcp
+
+import (
+	"context"
+	"encoding/base64"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"regexp"
+	"sort"
+	"strings"
+	"time"
+)
+
+// The MCP events (#383) of CIWatcher.swift, the same names, arguments, data and eventIds,
+// polled only: `events/list` and `events/poll` of the events draft
+// (experimental-ext-triggers-events), which the Agents daemon speaks.
+
+// event is one event as events/list gives it.
+type event struct {
+	name, title, description string
+	input                    schema
+	payload                  map[string]any
+}
+
+func (e event) json() map[string]any {
+	return map[string]any{"name": e.name, "title": e.title, "description": e.description, "delivery": []string{"poll"},
+		"inputSchema": e.input.json(), "payloadSchema": e.payload}
+}
+
+var (
+	repoProperty = property{name: "repo", kind: "string",
+		description: "The GitHub repo, owner/name. Left out, the repo this project's folder pushes to.",
+		pattern:     regexp.MustCompile(`^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$`), looksLike: "owner/name"}
+	prProperty = property{name: "pr", kind: "integer", description: "Only this pull request, by number."}
+	// anyoneProperty opts into anyone's issue, comment or PR (#728); left out, only the repo's own people.
+	anyoneProperty = property{name: "anyone", kind: "boolean",
+		description: "true: from anyone, bots and people outside the repo too. Left out, only the repo's owner, members and collaborators, never a bot."}
+)
+
+func branchProperty(description string) property {
+	return property{name: "branch", kind: "string", description: description}
+}
+
+func object(props map[string]any) map[string]any {
+	return map[string]any{"type": "object", "properties": props}
+}
+
+var str, integer = map[string]any{"type": "string"}, map[string]any{"type": "integer"}
+
+func prSchema(extra map[string]any) map[string]any {
+	props := map[string]any{"number": integer, "title": str, "branch": str, "url": str}
+	for k, v := range extra {
+		props[k] = v
+	}
+	return object(props)
+}
+
+// events are the events this server offers, in CIWatcher's order.
+var events = append([]event{
+	{name: "checks.failed", title: "Checks failed",
+		description: "A pull request's checks finished with a failure: one event per run and attempt, so a rerun that fails again is a new one. Only PRs by the repo's owner, members and collaborators, unless anyone is true.",
+		input:       schema{repoProperty, branchProperty("Only runs on this PR branch."), prProperty, anyoneProperty},
+		payload: object(map[string]any{
+			"pr": prSchema(nil), "headSha": str,
+			"run":        object(map[string]any{"id": integer, "attempt": integer, "name": str, "url": str}),
+			"failedJobs": map[string]any{"type": "array", "items": object(map[string]any{"name": str, "url": str})},
+		})},
+	{name: "pr.opened", title: "Pull request opened",
+		description: "A pull request was opened, or a draft was marked ready for review: a PR open and not a draft now that was not at the last poll. Drafts never count. Reopened, it is raised again. Only PRs by the repo's owner, members and collaborators, never a bot, unless anyone is true.",
+		input:       schema{repoProperty, branchProperty("Only the PR from this branch."), prProperty, anyoneProperty},
+		payload:     object(map[string]any{"pr": prSchema(map[string]any{"author": str}), "openedAt": str})},
+	{name: "pr.merged", title: "Pull request merged", description: "A pull request was merged.",
+		input:   schema{repoProperty, branchProperty("Only the PR from this branch."), prProperty},
+		payload: object(map[string]any{"pr": prSchema(nil), "mergedAt": str, "mergeSha": str})},
+	{name: "pr.closed", title: "Pull request closed", description: "A pull request was closed without being merged.",
+		input:   schema{repoProperty, branchProperty("Only the PR from this branch."), prProperty},
+		payload: object(map[string]any{"pr": prSchema(nil), "closedAt": str})},
+	{name: "pr.conflicted", title: "Pull request in conflict",
+		description: "An open pull request began to conflict with its base, so it cannot merge and its CI may not run until it is rebased. Once per conflict: it is raised again only after the PR merges cleanly and then conflicts anew.",
+		input:       schema{repoProperty, branchProperty("Only the PR from this branch."), prProperty},
+		payload:     object(map[string]any{"pr": prSchema(nil), "conflictedAt": str})},
+}, issueEvents()...)
+
+func issueEvents() []event {
+	issueSchema := object(map[string]any{
+		"number": integer, "title": str, "author": str, "labels": map[string]any{"type": "array", "items": str}, "url": str,
+		"assignees": map[string]any{"type": "array", "items": str},
+	})
+	issue := property{name: "issue", kind: "integer", description: "Only this issue, by number."}
+	kinds := []struct {
+		kind                      IssueKind
+		title, description, label string
+		payload                   map[string]any
+		who                       string
+	}{
+		{IssueOpened, "Issue opened", "An issue was opened. Pull requests are not issues here.",
+			"Only issues opened with this label.", map[string]any{"openedAt": str}, "Only issues opened by"},
+		{IssueLabelled, "Issue labelled", "A label was added to an issue: one event per label added.",
+			"Only when this label is the one added.", map[string]any{"label": str, "by": str, "labelledAt": str}, "Only labels added by"},
+		{IssueCommented, "Issue commented on",
+			"A comment was left on an issue (not a pull request). Its body is the first 4000 characters.",
+			"Only issues with this label.",
+			map[string]any{"comment": object(map[string]any{"author": str, "url": str, "body": str}), "commentedAt": str},
+			"Only comments by"},
+		{IssueClosed, "Issue closed", "An issue was closed, as completed or not planned.", "Only issues with this label.",
+			map[string]any{"reason": map[string]any{"type": "string", "enum": []string{"completed", "not_planned"}}, "by": str, "closedAt": str},
+			"Only issues closed by"},
+	}
+	out := make([]event, len(kinds))
+	for i, k := range kinds {
+		label := property{name: "label", kind: "string", description: k.label}
+		input := schema{repoProperty, label, issue, anyoneProperty}
+		if k.kind == IssueOpened {
+			input = schema{repoProperty, label, anyoneProperty}
+		}
+		description := k.description + " " + k.who + " the repo's owner, members and collaborators, never a bot, unless anyone is true."
+		if k.kind == IssueClosed {
+			description += " Someone outside the repo closing their own issue does not count."
+		}
+		payload := map[string]any{"issue": issueSchema}
+		for name, v := range k.payload {
+			payload[name] = v
+		}
+		out[i] = event{name: "issue." + string(k.kind), title: k.title, description: description, input: input, payload: object(payload)}
+	}
+	return out
+}
+
+func eventNamed(name string) (event, bool) {
+	for _, e := range events {
+		if e.name == name {
+			return e, true
+		}
+	}
+	return event{}, false
+}
+
+// eventsList is events/list's answer.
+func eventsList() map[string]any {
+	list := make([]any, len(events))
+	for i, e := range events {
+		list[i] = e.json()
+	}
+	return map[string]any{"events": list}
+}
+
+// MARK: The cursor
+
+// cursor is where a poll has got to: a high-water time, and the ids already raised at exactly
+// that time, so events that share one time are neither lost nor raised twice. A client keeps
+// it as an opaque string (base64url of its JSON), as CIWatcher's PollCursor.
+type cursor struct {
+	Since string   `json:"since"`
+	IDs   []string `json:"ids"`
+}
+
+func (c cursor) encoded() string {
+	if c.IDs == nil {
+		c.IDs = []string{}
+	}
+	data, _ := json.Marshal(c)
+	return base64.RawURLEncoding.EncodeToString(data)
+}
+
+func decodeCursor(raw json.RawMessage) (cursor, *rpcError) {
+	refused := invalidParams("cursor is not one this server gave")
+	var text string
+	if err := json.Unmarshal(raw, &text); err != nil {
+		return cursor{}, refused
+	}
+	data, err := base64.RawURLEncoding.DecodeString(strings.TrimRight(text, "="))
+	if err != nil {
+		return cursor{}, refused
+	}
+	var c cursor
+	if json.Unmarshal(data, &c) != nil || normalized(c.Since) == "" {
+		return cursor{}, refused
+	}
+	c.Since = normalized(c.Since)
+	return c, nil
+}
+
+// MARK: Polling
+
+// candidate is something that may be raised: its id, its time (in timeLayout), and its data,
+// looked up only once it is taken; nil data skips it, though the cursor still moves past it.
+type candidate struct {
+	eventID string
+	time    string
+	data    func() (map[string]any, error)
+}
+
+const (
+	maxEvents  = 100
+	nextPollMs = 30000
+	// historyDays: a cursor older than this may have missed some, as GitHub keeps no more.
+	historyDays = 90
+)
+
+type pollParams struct {
+	Name      string          `json:"name"`
+	Arguments json.RawMessage `json:"arguments"`
+	Cursor    json.RawMessage `json:"cursor"`
+	MaxEvents *int            `json:"maxEvents"`
+}
+
+func (p pollParams) firstPoll() bool { return len(p.Cursor) == 0 || string(p.Cursor) == "null" }
+
+// Events answers events/list and events/poll over a GitHub.
+type Events struct {
+	GitHub GitHub
+	Now    func() time.Time
+}
+
+func (s *Events) now() time.Time {
+	if s.Now != nil {
+		return s.Now()
+	}
+	return time.Now()
+}
+
+// Poll answers events/poll's params.
+func (s *Events) Poll(ctx context.Context, raw json.RawMessage) (map[string]any, *rpcError) {
+	var p pollParams
+	if err := json.Unmarshal(raw, &p); err != nil {
+		return nil, invalidParams("params must be an object")
+	}
+	e, ok := eventNamed(p.Name)
+	if !ok {
+		names := make([]string, len(events))
+		for i, e := range events {
+			names[i] = e.name
+		}
+		return nil, &rpcError{Code: -32011, Message: fmt.Sprintf("no event %s; this server offers %s", p.Name, strings.Join(names, ", "))}
+	}
+	a, bad := e.input.check(p.Arguments)
+	if bad != nil {
+		return nil, bad
+	}
+	if a.repo == "" {
+		repo, err := s.GitHub.DefaultRepo(ctx)
+		if err != nil {
+			var gh *GitHubError
+			if errors.As(err, &gh) && gh.Kind == NotFound {
+				return nil, invalidParams("%s", gh.Message)
+			}
+			return nil, eventsError(err)
+		}
+		a.repo = repo
+	}
+	switch e.name {
+	case "pr.conflicted":
+		return s.pollDiff(ctx, e.name, "conflictedAt", a, p, func() ([]state, error) {
+			prs, err := s.GitHub.ConflictPRs(ctx, a.repo)
+			out := make([]state, len(prs))
+			for i, c := range prs {
+				out[i] = state{pr: c.PR, on: c.Conflicts, json: c.PR.json()}
+			}
+			return out, err
+		})
+	case "pr.opened":
+		return s.pollDiff(ctx, e.name, "openedAt", a, p, func() ([]state, error) {
+			prs, err := s.GitHub.OpenPRs(ctx, a.repo)
+			var out []state
+			for _, o := range prs {
+				if !a.anyone && !o.Trusted {
+					continue
+				}
+				ready := !o.Draft
+				j := o.PR.json()
+				j["author"] = o.Author
+				out = append(out, state{pr: o.PR, on: &ready, json: j})
+			}
+			return out, err
+		})
+	}
+	return s.poll(e, p, func(since string) ([]candidate, bool, error) { return candidates(ctx, s.GitHub, e.name, a, since) })
+}
+
+// poll is events/poll over a cursor: the first poll (no cursor) gives none and starts from
+// now; later ones give what is new since, oldest first, at most maxEvents, with hasMore and a
+// cursor that goes on from the last one taken.
+func (s *Events) poll(e event, p pollParams, find func(since string) ([]candidate, bool, error)) (map[string]any, *rpcError) {
+	limit := 50
+	if p.MaxEvents != nil {
+		limit = *p.MaxEvents
+	}
+	limit = min(maxEvents, max(1, limit))
+	now := s.now()
+	if p.firstPoll() {
+		return map[string]any{"events": []any{}, "cursor": cursor{Since: timeString(now)}.encoded(),
+			"truncated": false, "hasMore": false, "nextPollMs": nextPollMs}, nil
+	}
+	c, bad := decodeCursor(p.Cursor)
+	if bad != nil {
+		return nil, bad
+	}
+	seen := map[string]bool{}
+	for _, id := range c.IDs {
+		seen[id] = true
+	}
+	found, truncated, err := find(c.Since)
+	if err != nil {
+		return nil, eventsError(err)
+	}
+	var fresh []candidate
+	for _, f := range found {
+		if f.time >= c.Since && !(f.time == c.Since && seen[f.eventID]) {
+			fresh = append(fresh, f)
+		}
+	}
+	sort.SliceStable(fresh, func(i, j int) bool {
+		if fresh[i].time == fresh[j].time {
+			return fresh[i].eventID < fresh[j].eventID
+		}
+		return fresh[i].time < fresh[j].time
+	})
+	taken := fresh[:min(limit, len(fresh))]
+	since := c.Since
+	if len(taken) > 0 {
+		since = taken[len(taken)-1].time
+	}
+	var ids []string
+	if since == c.Since {
+		ids = append(ids, c.IDs...)
+	}
+	for _, t := range taken {
+		if t.time == since && !contains(ids, t.eventID) {
+			ids = append(ids, t.eventID)
+		}
+	}
+	out := []any{}
+	for _, t := range taken {
+		data, err := t.data()
+		if err != nil {
+			return nil, eventsError(err)
+		}
+		if data != nil {
+			out = append(out, map[string]any{"eventId": t.eventID, "name": e.name, "timestamp": t.time, "data": data})
+		}
+	}
+	sinceTime, _ := parseTime(c.Since)
+	old := sinceTime.Before(now.Add(-historyDays * 24 * time.Hour))
+	return map[string]any{"events": out, "cursor": cursor{Since: since, IDs: ids}.encoded(),
+		"truncated": truncated || old, "hasMore": len(fresh) > len(taken), "nextPollMs": nextPollMs}, nil
+}
+
+func contains(list []string, s string) bool {
+	for _, x := range list {
+		if x == s {
+			return true
+		}
+	}
+	return false
+}
+
+// state is a PR and whether its state (in conflict, or open and ready) is on now; nil keeps
+// the one it had.
+type state struct {
+	pr   PR
+	on   *bool
+	json map[string]any
+}
+
+// pollDiff raises an event for each PR whose state is on now and was not at the last poll:
+// the cursor's ids are the PRs that were on then. A first poll takes those already on as
+// known. A conflict has no time on GitHub, only a state, so pr.conflicted diffs it (#712); so
+// does pr.opened (#833), so a draft marked ready is raised as it is.
+func (s *Events) pollDiff(_ context.Context, name, key string, a args, p pollParams, states func() ([]state, error)) (map[string]any, *rpcError) {
+	first := p.firstPoll()
+	c := cursor{}
+	if !first {
+		var bad *rpcError
+		if c, bad = decodeCursor(p.Cursor); bad != nil {
+			return nil, bad
+		}
+	}
+	limit := 100
+	if !first {
+		limit = 50
+		if p.MaxEvents != nil {
+			limit = *p.MaxEvents
+		}
+		limit = min(100, max(1, limit))
+	}
+	prs, err := states()
+	if err != nil {
+		return nil, eventsError(err)
+	}
+	was := map[string]bool{}
+	for _, id := range c.IDs {
+		was[id] = true
+	}
+	id := func(number int) string { return fmt.Sprintf("%s:%s:%d", name, a.repo, number) }
+	var still, fresh []state
+	for _, st := range prs {
+		if (a.pr != 0 && st.pr.Number != a.pr) || (a.branch != "" && st.pr.Branch != a.branch) {
+			continue
+		}
+		on := (st.on != nil && *st.on) || (st.on == nil && was[id(st.pr.Number)])
+		switch {
+		case on && was[id(st.pr.Number)]:
+			still = append(still, st)
+		case on:
+			fresh = append(fresh, st)
+		}
+	}
+	sort.SliceStable(fresh, func(i, j int) bool { return fresh[i].pr.Number < fresh[j].pr.Number })
+	taken := fresh[:min(limit, len(fresh))]
+	now := timeString(s.now())
+	ids := []string{}
+	for _, st := range append(still, taken...) {
+		ids = append(ids, id(st.pr.Number))
+	}
+	out := []any{}
+	if !first {
+		for _, t := range taken {
+			out = append(out, map[string]any{"eventId": id(t.pr.Number) + ":" + now, "name": name, "timestamp": now,
+				"data": map[string]any{"pr": t.json, key: now}})
+		}
+	}
+	return map[string]any{"events": out, "cursor": cursor{Since: now, IDs: ids}.encoded(), "truncated": false,
+		"hasMore": !first && len(fresh) > len(taken), "nextPollMs": nextPollMs}, nil
+}
+
+// candidates finds what an event may raise at or after since.
+func candidates(ctx context.Context, gh GitHub, name string, a args, since string) ([]candidate, bool, error) {
+	repo := a.repo
+	if kind, ok := strings.CutPrefix(name, "issue."); ok {
+		items, truncated, err := gh.IssueActivity(ctx, repo, IssueKind(kind), since)
+		if err != nil {
+			return nil, false, err
+		}
+		var list []candidate
+		for _, it := range items {
+			if a.issue != 0 && it.Issue.Number != a.issue {
+				continue
+			}
+			if !a.anyone && !it.Trusted {
+				continue
+			}
+			if a.label != "" {
+				if it.Kind == IssueLabelled && it.Label != a.label {
+					continue
+				}
+				if it.Kind != IssueLabelled && !contains(it.Issue.Labels, a.label) {
+					continue
+				}
+			}
+			at := normalized(it.At)
+			if at == "" {
+				continue
+			}
+			list = append(list, candidate{eventID: name + ":" + repo + ":" + it.ID, time: at,
+				data: func() (map[string]any, error) { return it.data(), nil }})
+		}
+		return list, truncated, nil
+	}
+	if name == "checks.failed" {
+		runs, truncated, err := gh.FailedRuns(ctx, repo, a.branch, since)
+		if err != nil {
+			return nil, false, err
+		}
+		// A run that names another PR is skipped before its details are fetched; one that names
+		// none is checked against the PR its details find. The cursor still moves past both.
+		var list []candidate
+		for _, ref := range runs {
+			at := normalized(ref.UpdatedAt)
+			if at == "" {
+				continue
+			}
+			list = append(list, candidate{eventID: fmt.Sprintf("checks.failed:%s:%d:%d", repo, ref.ID, ref.Attempt), time: at,
+				data: func() (map[string]any, error) {
+					if a.pr != 0 && ref.PRNumber != 0 && ref.PRNumber != a.pr {
+						return nil, nil
+					}
+					details, err := gh.RunDetails(ctx, repo, ref)
+					if err != nil || details == nil {
+						return nil, err
+					}
+					if (a.pr != 0 && details.PR.Number != a.pr) || (!a.anyone && !details.Trusted) {
+						return nil, nil
+					}
+					return details.json(), nil
+				}})
+		}
+		return list, truncated, nil
+	}
+	merged, closed, truncated, err := gh.ClosedPRs(ctx, repo, since)
+	if err != nil {
+		return nil, false, err
+	}
+	wanted := func(p PR) bool { return (a.pr == 0 || p.Number == a.pr) && (a.branch == "" || p.Branch == a.branch) }
+	var list []candidate
+	if name == "pr.merged" {
+		for _, m := range merged {
+			if at := normalized(m.MergedAt); wanted(m.PR) && at != "" {
+				list = append(list, candidate{eventID: fmt.Sprintf("pr.merged:%s:%d", repo, m.PR.Number), time: at,
+					data: func() (map[string]any, error) {
+						return map[string]any{"pr": m.PR.json(), "mergedAt": m.MergedAt, "mergeSha": m.MergeSHA}, nil
+					}})
+			}
+		}
+		return list, truncated, nil
+	}
+	// Its close time in the id: a PR reopened and closed again is a new event.
+	for _, c := range closed {
+		if at := normalized(c.ClosedAt); wanted(c.PR) && at != "" {
+			list = append(list, candidate{eventID: fmt.Sprintf("pr.closed:%s:%d:%s", repo, c.PR.Number, c.ClosedAt), time: at,
+				data: func() (map[string]any, error) {
+					return map[string]any{"pr": c.PR.json(), "closedAt": c.ClosedAt}, nil
+				}})
+		}
+	}
+	return list, truncated, nil
+}
+
+// eventsError is a GitHub failure as the events draft's error codes.
+func eventsError(err error) *rpcError {
+	var rpc *rpcError
+	if errors.As(err, &rpc) {
+		return rpc
+	}
+	var gh *GitHubError
+	if !errors.As(err, &gh) {
+		return &rpcError{Code: -32603, Message: err.Error()}
+	}
+	switch gh.Kind {
+	case NotSignedIn:
+		return &rpcError{Code: -32012, Message: gh.Message, Data: map[string]any{"reason": "gh not signed in"}}
+	case RateLimited:
+		return &rpcError{Code: -32013, Message: gh.Message, Data: map[string]any{"retryAfterMs": gh.RetryAfterMs}}
+	case NotFound:
+		return invalidParams("%s: check repo", gh.Message)
+	}
+	return &rpcError{Code: -32603, Message: gh.Message}
+}

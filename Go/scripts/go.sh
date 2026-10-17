@@ -23,4 +23,4 @@ fi
 cache="${AGENTS_BUILD_CACHE:-$HOME/Library/Caches/Agents-build}/go"
 mkdir -p "$cache/gopath" "$cache/gocache"
 exec docker run --rm -v "$repo":/repo -v "$cache/gopath":/go -v "$cache/gocache":/root/.cache/go-build \
-	-e CGO_ENABLED=0 -e GOOS -e GOARCH -e GOFLAGS -w /repo/Go "${GO_IMAGE:-golang:1.25}" go "$@"
+	-e CGO_ENABLED=0 -e GOOS -e GOARCH -e GOFLAGS -w /repo/Go "${GO_IMAGE:-golang:1.26}" go "$@"
