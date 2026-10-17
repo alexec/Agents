@@ -238,13 +238,14 @@ mkdir -p "$p/node_modules/@x/adapter/dist" && echo 'ok' > "$p/node_modules/@x/ad
 	}))
 	t.Cleanup(dist.Close)
 	toolsets := t.TempDir()
-	claude := filepath.Join(toolsets, "claude")
-	os.MkdirAll(claude, 0o755)
-	m, _ := json.Marshal(map[string]any{"runtimeID": "claude", "package": "@x/adapter", "entry": "dist/index.js",
+	// Codex, not Claude: a CI runner has an npx on its PATH, which is Claude already there.
+	codex := filepath.Join(toolsets, "codex")
+	os.MkdirAll(codex, 0o755)
+	m, _ := json.Marshal(map[string]any{"runtimeID": "codex", "package": "@x/adapter", "entry": "dist/index.js",
 		"node": map[string]any{"version": "v1", "sha256": map[string]string{serverArch(): sha(node)}}})
-	os.WriteFile(filepath.Join(claude, "manifest.json"), m, 0o644)
-	os.WriteFile(filepath.Join(claude, "package.json"), []byte(`{}`), 0o644)
-	os.WriteFile(filepath.Join(claude, "package-lock.json"), []byte(`{}`), 0o644)
+	os.WriteFile(filepath.Join(codex, "manifest.json"), m, 0o644)
+	os.WriteFile(filepath.Join(codex, "package.json"), []byte(`{}`), 0o644)
+	os.WriteFile(filepath.Join(codex, "package-lock.json"), []byte(`{}`), 0o644)
 
 	home := t.TempDir()
 	t.Setenv("HOME", home)
@@ -260,27 +261,27 @@ mkdir -p "$p/node_modules/@x/adapter/dist" && echo 'ok' > "$p/node_modules/@x/ad
 	d.serveServerInstall(toolsets)
 
 	// Only the Node toolsets: a vendor's script or archive is the person's to run.
-	if d.recipe("claude") == nil || d.recipe("grok") != nil || d.recipe("opencode") != nil {
+	if d.recipe("codex") == nil || d.recipe("grok") != nil || d.recipe("opencode") != nil {
 		t.Fatal("a server's recipes")
 	}
 	// musl, or a glibc older than Node's builds need, is refused before any download.
 	libc = ""
-	c.call(t, 1, "runtimes/install", map[string]any{"runtimeID": "claude"})
-	if end := waitInstalled(t, c, "claude"); end.Availability.InstallFailed == nil ||
+	c.call(t, 1, "runtimes/install", map[string]any{"runtimeID": "codex"})
+	if end := waitInstalled(t, c, "codex"); end.Availability.InstallFailed == nil ||
 		!strings.Contains(end.Availability.InstallFailed.Reason, "glibc 2.28 or later, and this server has musl") {
 		t.Fatalf("musl: %+v", end.Availability)
 	}
 	libc = "glibc 2.36"
-	c.call(t, 2, "runtimes/install", map[string]any{"runtimeID": "claude"})
-	end := waitInstalled(t, c, "claude")
-	want := filepath.Join(home, ".agents-server", "tools", "claude", "current", "bin", "npx")
+	c.call(t, 2, "runtimes/install", map[string]any{"runtimeID": "codex"})
+	end := waitInstalled(t, c, "codex")
+	want := filepath.Join(home, ".agents-server", "tools", "codex", "current", "bin", runtimeByID("codex").Executable)
 	if end.Availability.Available == nil || end.Availability.Available.Path != want {
 		t.Fatalf("%+v, want %s", end.Availability, want)
 	}
-	if target, err := os.Readlink(filepath.Join(home, ".agents-server", "tools", "claude", "current", "node", "bin", "npm")); err != nil || target != "../lib/npm-cli" {
+	if target, err := os.Readlink(filepath.Join(home, ".agents-server", "tools", "codex", "current", "node", "bin", "npm")); err != nil || target != "../lib/npm-cli" {
 		t.Fatalf("npm's link: %q %v", target, err)
 	}
-	if s := d.statusOf(runtimeByID("claude")); s.Outdated || s.Runtime.Install == nil {
+	if s := d.statusOf(runtimeByID("codex")); s.Outdated || s.Runtime.Install == nil {
 		t.Fatalf("listed as %+v", s)
 	}
 }
