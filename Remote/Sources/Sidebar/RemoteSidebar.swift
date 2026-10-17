@@ -721,6 +721,12 @@ private struct RemoteSettings: View {
             Form {
                 SidebarSettingsSection()
                 GitAccessSettingsSection()
+                // The docs site (#1327), as the Mac's Help ▸ Agents Help.
+                Section {
+                    Link(destination: HelpSite.url) {
+                        Label("Help", systemImage: "questionmark.circle")
+                    }
+                }
             }
             .scrollContentBackground(.hidden)
             .background(Paper.ground)

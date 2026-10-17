@@ -43,6 +43,9 @@ import { ApprovalRow, FailedWorkflowRow } from "./Approval";
 import { approvalID, failedRuns, opensItsSubject } from "../model/approvals";
 import { memo } from "../render/memo";
 
+/** The docs site: the guides and the statuses reference (#1327), as the window's Help ▸ Agents Help. */
+const helpSite = "https://alexec.github.io/Agents/";
+
 /** The most archived matches a fold shows before Show all, as the window's (#176). */
 const matchesShown = 10;
 
@@ -236,6 +239,8 @@ export function Sidebar({ session, store, linkDown }: { session: Session; store:
           {/* This browser's Settings (#846): which smart groups are on, as the window's
               Settings ▸ Sidebar. */}
           <button class="link" aria-current={!!r.settings} onClick={() => go({ settings: true })}>Settings</button>
+          {/* The docs site (#1327), as the window's Help ▸ Agents Help. */}
+          <a class="link" href={helpSite} target="_blank" rel="noopener">Help</a>
           {/* What forgetting does, beside the confirm, in the Remote's words (#935). */}
           {confirming.value ? (
             <div class="forget" role="group" aria-label="Forget This Browser">

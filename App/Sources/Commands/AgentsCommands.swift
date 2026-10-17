@@ -84,8 +84,6 @@ struct AgentsCommands: Commands {
         return model.liveProjects.first { $0.key == projectWindow.key }
     }
 
-    static let helpURL = URL(string: "https://alexec.github.io/Agents/")!
-
     var body: some Commands {
         // The standard Show/Hide Sidebar (⌃⌘S) for the projects column.
         SidebarCommands()
@@ -288,7 +286,7 @@ struct AgentsCommands: Commands {
         CommandGroup(replacing: .printItem) {}
 
         CommandGroup(replacing: .help) {
-            Button("Agents Help") { NSWorkspace.shared.open(Self.helpURL) }  // store-ok: a web page
+            Button("Agents Help") { NSWorkspace.shared.open(HelpSite.url) }  // store-ok: a web page
                 .keyboardShortcut("?")
         }
     }
