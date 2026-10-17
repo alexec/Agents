@@ -59,6 +59,12 @@ To change a server from one to the other, run the command again with or without
 and its agents. A control plane that has no Go host to give installs the Swift host, and
 says so.
 
+The Go host then installs Claude by itself, into `~/.agents-server/tools`, from the pins
+the control plane gives with the host (#1312). This takes about a minute and 500 MB. Until
+it is done, **Runtimes** says Claude is installing. Codex and Gemini install the same way
+when you click **Install** under **Runtimes**. The server needs glibc 2.28 or later. Alpine
+(musl) can't run them.
+
 ### Or add it over ssh
 
 1. In **Settings ▸ Control plane ▸ Hosts**, click **Add a Server…**, then choose

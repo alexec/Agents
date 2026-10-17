@@ -689,3 +689,21 @@ func TestAHostsImplementationIsKeptFromItsHello(t *testing.T) {
 		t.Fatalf("a hello from before the field: %q", got)
 	}
 }
+
+func TestToolsetFilesAreTheNamedOnesOnly(t *testing.T) {
+	folder := t.TempDir()
+	os.MkdirAll(filepath.Join(folder, "claude"), 0o755)
+	os.WriteFile(filepath.Join(folder, "claude", "manifest.json"), []byte(`{"runtimeID":"claude"}`), 0o644)
+	os.WriteFile(filepath.Join(folder, "claude", "mac-node.json"), []byte(`{}`), 0o644)
+	if data, ok := toolsetFile("claude/manifest.json", folder); !ok || string(data) != `{"runtimeID":"claude"}` {
+		t.Fatalf("manifest: %q %v", data, ok)
+	}
+	for _, name := range []string{"claude/mac-node.json", "claude/../claude/manifest.json", "opencode/manifest.json", "claude/package.json"} {
+		if _, ok := toolsetFile(name, folder); ok {
+			t.Fatalf("%s was handed out", name)
+		}
+	}
+	if _, ok := toolsetFile("claude/manifest.json", ""); ok {
+		t.Fatal("no folder, yet a file")
+	}
+}

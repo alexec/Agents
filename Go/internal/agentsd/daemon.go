@@ -106,6 +106,7 @@ func New(ctx context.Context, root string) (*Daemon, error) {
 	}
 	d.checkMilestonesSoon()
 	d.watchDisk()
+	d.installDefaultToolsets()
 	return d, nil
 }
 

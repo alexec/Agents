@@ -100,6 +100,26 @@ public enum HostInstallScript {
         fi
     done
 
+    # The Node toolsets the control plane carries (#1312): the Go host installs Claude from
+    # them by itself, and Codex or Gemini when asked, into ~/.agents-server/tools.
+    if [ "$impl" = go ]; then
+        offered=
+        for runtime in claude codex gemini; do
+            mkdir -p "$tmp/toolsets/$runtime"
+            ok=1
+            for file in manifest.json package.json package-lock.json; do
+                fetch "/v1/toolsets/$runtime/$file" "$tmp/toolsets/$runtime/$file" 2>/dev/null || { ok=0; break; }
+            done
+            if [ $ok = 1 ]; then
+                mkdir -p "$d/toolsets"
+                rm -rf "$d/toolsets/$runtime"
+                mv "$tmp/toolsets/$runtime" "$d/toolsets/$runtime"
+                offered="$offered $runtime"
+            fi
+        done
+        [ -n "$offered" ] || echo "This control plane offers no toolsets; the host installs no Claude by itself." >&2
+    fi
+
     # A host already running here stops; it is started again below with the new code.
     if [ -f "$d/root/daemon.lock" ]; then
         old=$(cat "$d/root/daemon.lock" 2>/dev/null || true)
