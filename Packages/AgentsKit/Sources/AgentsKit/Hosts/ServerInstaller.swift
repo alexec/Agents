@@ -7,7 +7,7 @@ import Foundation
 ///
 ///     bin/agentsd-<sha>   one per version ever installed, until the next good connect
 ///     bin/current         which of them runs
-///     bin/ci-watcher      an MCP server Agents ships (#700), one copy, replaced in place
+///     bin/github-mcp      an MCP server Agents ships (#700), one copy, replaced in place
 ///     install.json        the version and checksum `current` points at
 ///     root/               an ordinary daemon root
 ///

@@ -553,7 +553,7 @@ jobs:
       - name: Test
         run: TMPDIR=$(cd "$RUNNER_TEMP" && pwd -P) go test ./...
 
-  # The Linux hosts (#805): agentsd and ci-watcher, static, for x86_64 only, as
+  # The Linux host (#805): agentsd, static, for x86_64 only, as
   # scripts/build-linux-agentsd.sh --check builds them before a ship. A Mac-only symbol
   # used from code Linux compiles, such as a member declared behind `canImport(CryptoKit)`,
   # passes every macOS job and broke this build twice in a day (#788, #799), found only when
@@ -582,7 +582,7 @@ jobs:
         id: linux-keys
         env:
           RESOLVED: ${{ hashFiles('Daemon/Package.resolved', 'Packages/AgentsKit/Package.resolved') }}
-          SOURCES: ${{ hashFiles('Daemon/**', 'Packages/AgentsKit/Package.swift', 'Packages/AgentsKit/Sources/**', 'Packages/AgentsKit/Plugins/**', 'Packages/MCPServers/**') }}
+          SOURCES: ${{ hashFiles('Daemon/**', 'Packages/AgentsKit/Package.swift', 'Packages/AgentsKit/Sources/**', 'Packages/AgentsKit/Plugins/**') }}
         run: echo "key=linux-x86_64-swift-6.4.0-${RESOLVED}-${SOURCES}" >> "$GITHUB_OUTPUT"
 
       - name: Restore the Linux build cache
@@ -591,13 +591,12 @@ jobs:
         with:
           path: |
             Daemon/.build
-            Packages/MCPServers/.build
           key: ${{ steps.linux-keys.outputs.key }}
           restore-keys: |
             linux-x86_64-swift-6.4.0-${{ hashFiles('Daemon/Package.resolved', 'Packages/AgentsKit/Package.resolved') }}-
             linux-x86_64-swift-6.4.0-
 
-      - name: Build agentsd and ci-watcher for Linux
+      - name: Build agentsd for Linux
         id: build-linux
         shell: bash
         env:
@@ -605,7 +604,7 @@ jobs:
           RESTORED: ${{ steps.linux-cache.outputs.cache-matched-key }}
         run: |
           source scripts/ci-clean-retry.sh
-          clean_retry "$RESTORED" Daemon/.build Packages/MCPServers/.build -- \
+          clean_retry "$RESTORED" Daemon/.build -- \
             zsh scripts/build-linux-agentsd.sh --check x86_64
 
       - name: Save the Linux build cache
@@ -614,7 +613,6 @@ jobs:
         with:
           path: |
             Daemon/.build
-            Packages/MCPServers/.build
           key: ${{ steps.linux-keys.outputs.key }}
 
   # The web remote (071, D7, research R8): a build with the pinned Node, then tsc, the lint

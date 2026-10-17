@@ -56,7 +56,7 @@ struct RuntimeEnvironmentTests {
     }
 
     /// The MCP servers Agents ships sit beside agentsd (#700): first on a server's PATH, so
-    /// `"command": "ci-watcher"` is ours on any host; last on a runtime's, shadowing nothing.
+    /// `"command": "github-mcp"` is ours on any host; last on a runtime's, shadowing nothing.
     @Test func theShippedServersFolderGoesOnPath() {
         let folder = URL(filePath: "/Applications/Agents Host.app/Contents/Helpers")
         let given = ["PATH": "/opt/homebrew/bin:/Applications/Agents Host.app/Contents/Helpers:/usr/bin", "HOME": "/Users/a"]

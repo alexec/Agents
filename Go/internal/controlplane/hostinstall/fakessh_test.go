@@ -126,8 +126,8 @@ func newFake(t *testing.T) *fake {
 	f.write("servers/agentsd-linux-aarch64", agentsd, 0o755)
 	f.sha = sum(agentsd)
 	f.write("servers/agentsd-linux-aarch64.sha256", f.sha+"\n", 0o644)
-	f.write("servers/ci-watcher-linux-aarch64", "#!/bin/sh\n", 0o755)
-	f.write("servers/ci-watcher-linux-aarch64.sha256", sum("#!/bin/sh\n")+"\n", 0o644)
+	f.write("servers/github-mcp-linux-aarch64", "#!/bin/sh\n", 0o755)
+	f.write("servers/github-mcp-linux-aarch64.sha256", sum("#!/bin/sh\n")+"\n", 0o644)
 	// Install folders are made here, so a test can see that none is left.
 	t.Setenv("TMPDIR", filepath.Join(dir, "tmp"))
 	if err := os.MkdirAll(filepath.Join(dir, "tmp"), 0o700); err != nil {

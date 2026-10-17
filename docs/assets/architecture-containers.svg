@@ -69,7 +69,7 @@
 <rect x="700" y="880" width="280" height="120" rx="8" fill="#8a8a8a" stroke="#8a8a8a"/>
 <text class="t" x="840.0" y="906">MCP servers</text>
 <text class="k" x="840.0" y="923">[External Software System]</text>
-<text class="d" x="840.0" y="944">stdio or http; e.g. the CI watcher</text>
+<text class="d" x="840.0" y="944">stdio or http; e.g. the github server</text>
 <text class="d" x="840.0" y="959">node, 127.0.0.1:8795</text>
 <rect x="1100" y="880" width="260" height="120" rx="8" fill="#8a8a8a" stroke="#8a8a8a"/>
 <text class="t" x="1230.0" y="906">Model providers</text>

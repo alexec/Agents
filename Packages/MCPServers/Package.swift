@@ -5,7 +5,8 @@ import PackageDescription
 // and, by scripts/build-linux-agentsd.sh, for Linux (musl), so a host that runs one needs no
 // Node or other runtime. MCPServerKit is what they share: newline-delimited JSON-RPC on
 // stdio, the MCP methods every server answers, argument checks, event cursors and running a
-// command. The CI watcher (#383) is the first; the workspace command provider (#691) the second.
+// command. The workspace command provider (#691) is the one here now; the CI watcher (#383)
+// was the first, and the github server in Go (#1232) took its place (#1231).
 //
 // Nothing here depends on AgentsKit, so a server stays small and builds on Linux on its own.
 let package = Package(
@@ -13,23 +14,15 @@ let package = Package(
     platforms: [.macOS("27.0")],
     products: [
         .library(name: "MCPServerKit", targets: ["MCPServerKit"]),
-        // For project.yml's ci-watcher tool, which Agents Host carries (#700).
-        .library(name: "CIWatcher", targets: ["CIWatcher"]),
-        .executable(name: "ci-watcher", targets: ["ci-watcher"]),
         .library(name: "WorkspaceCommands", targets: ["WorkspaceCommands"]),
         .executable(name: "workspace-commands", targets: ["workspace-commands"]),
     ],
     targets: [
         .target(name: "MCPServerKit", swiftSettings: [.treatAllWarnings(as: .error)]),
-        .target(name: "CIWatcher", dependencies: ["MCPServerKit"], swiftSettings: [.treatAllWarnings(as: .error)]),
-        .executableTarget(name: "ci-watcher", dependencies: ["CIWatcher", "MCPServerKit"],
-                          swiftSettings: [.treatAllWarnings(as: .error)]),
         .target(name: "WorkspaceCommands", dependencies: ["MCPServerKit"], swiftSettings: [.treatAllWarnings(as: .error)]),
         .executableTarget(name: "workspace-commands", dependencies: ["WorkspaceCommands", "MCPServerKit"],
                           swiftSettings: [.treatAllWarnings(as: .error)]),
         .testTarget(name: "MCPServerKitTests", dependencies: ["MCPServerKit"]),
-        .testTarget(name: "CIWatcherTests", dependencies: ["CIWatcher", "MCPServerKit"],
-                    resources: [.copy("Fixtures")]),
         .testTarget(name: "WorkspaceCommandsTests", dependencies: ["WorkspaceCommands", "MCPServerKit"]),
     ]
 )

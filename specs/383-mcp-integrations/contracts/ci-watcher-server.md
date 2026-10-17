@@ -1,5 +1,11 @@
 # Contract: the CI watcher MCP server
 
+> **Removed (#1231).** The `ci` server and `Packages/MCPServers/Sources/CIWatcher` are gone.
+> The github MCP server in Go (`Go/cmd/github-mcp`, #1232) raises the same events with the
+> same names, filters, data and `eventId`s, and GitHub's official tools take the place of the
+> tools below. Its views (the board, the issues view and the PR page) went with it. This
+> contract is kept as the record of what the events mean.
+
 `Packages/MCPServers` (`CIWatcher`, the `ci-watcher` binary), a stdio server the daemon hosts
 (#488; until then it was an http server on `127.0.0.1:8795`). Since #700 it is a static Swift
 binary that Agents Host and the Linux host carry beside `agentsd`; it was `node server.ts`

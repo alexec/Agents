@@ -51,7 +51,7 @@ an agent finishes.
      name on [Events](../reference/events.md).
    - Only a few events can be narrowed: `branch.moved` by `branch`, and `person.away` and
      `person.back` by `why`. `branch.moved` is only raised for a branch an agent works on,
-     never the default branch (#702); to run when a pull request lands, use the `ci`
+     never the default branch (#702); to run when a pull request lands, use the `github`
      server's `pr.merged`. To run when one agent's branch moves:
 
      ```yaml

@@ -25,7 +25,7 @@ agent reading another's work.
 A feature that comes from an MCP server is counted the same way for every app:
 
 - ● when the app itself shows it, including through a view drawn from the app's own
-  server, such as Agents' `ci` board.
+  server, such as Agents' own test view.
 - ◐ when a server from the app's own MCP catalogue gives the agent the feature, with
   nothing shown in the app. Every catalogue here carries Playwright, Linear, Jira and
   GitLab servers, as the official MCP registry does, so an app with a catalogue has at
@@ -59,9 +59,8 @@ Agents' ◐ cells, and why:
 - **Spending limits:** in money or in tokens (#838), so only for runtimes that report a
   price or tokens. Cursor, Antigravity and Grok report neither, and run past every
   limit. See [Limit spending](../how-to/limit-spending.md).
-- **Task board:** the `ci` server's issues view lists GitHub issues in the app, with who
-  has each one and Start Agent on each row. It has no columns, and an issue cannot be moved
-  or edited there.
+- **Task board:** the `github` server gives agents GitHub's issues, with nothing shown in
+  the app since the `ci` server's issues view went (#1231).
 - **A browser the agent drives, trackers beyond GitHub, git hosts beyond GitHub:** through
   Playwright, Linear, Jira and GitLab servers from the MCP marketplace, with nothing shown
   in the app. A GitLab server of Agents' own is parked (#813).

@@ -556,7 +556,7 @@ extension DaemonCore {
     }
 
     /// The view's own title, as its server gives it, kept with a pin so its row says what
-    /// it holds ("Pull requests", not the "Board" of ui://ci/board) (#905). Nil when the
+    /// it holds ("Pull requests", not the "Board" of a ui://…/board) (#905). Nil when the
     /// server gives none; the row then takes the last part of the address.
     func viewTitle(_ view: ViewPin, project: URL) -> String? {
         let title: String?

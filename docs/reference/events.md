@@ -35,7 +35,7 @@ give them as two columns:
   narrow the event by. Only a few events take any:
   - `branch` on `branch.moved`, for example `branch: agents/fix-640` for one branch. It is
     raised only for a branch an agent works on, never the default branch (#702), and a wait
-    on the default branch is refused: wait for the `ci` server's `pr.merged` instead;
+    on the default branch is refused: wait for the `github` server's `pr.merged` instead;
   - `why` on `person.away` and `person.back`: `locked` or `idle`;
   - an MCP server's event's own, which the server checks (see
     [Events from MCP servers](#events-from-mcp-servers)).
@@ -255,9 +255,9 @@ trigger is:
 
 - **Checked when it is made.** The name is checked against what the project's servers offer
   (`events/list`). If none offers it, the wait is refused, saying what each one does offer:
-  *No server here offers pr.merge. ci offers checks.failed, pr.merged.*
+  *No server here offers pr.merge. github offers checks.failed, pr.merged.*
 - **`where` is the server's.** Its keys are the subscription's arguments, sent to the server
-  and checked against the event's filter schema, as a trigger's are: *ci's pr.merged takes
+  and checked against the event's filter schema, as a trigger's are: *github's pr.merged takes
   branch, pr, repo; "sha" is not one of its arguments.* They are not matched against the event's details.
   `server:` narrows it to the servers named.
 - **It subscribes for as long as it waits**, from now, sharing a workflow's subscription
@@ -267,11 +267,11 @@ trigger is:
   the wait subscribes once the server can be asked.
 
 The wait's answer and its line under **Waiting now** say which servers it subscribed to:
-**Waiting for pr.merged on ci (repo alexec/Agents)**.
+**Waiting for pr.merged on github (repo alexec/Agents)**.
 
 Each workflow page shows a line for each server its event triggers hear, on the Mac, the
 iPhone and iPad and the web page: when it was last asked and when the last event came, or
-why not (**Can't reach ci**, the server no longer offers the event, refused it, or doesn't
+why not (**Can't reach github**, the server no longer offers the event, refused it, or doesn't
 take the filters).
 
 ## The Events page

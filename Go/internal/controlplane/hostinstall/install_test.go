@@ -296,8 +296,8 @@ func TestATrustedKeyInstallsAndStartsTheHost(t *testing.T) {
 	if info == nil || info.Mode().Perm() != 0o700 {
 		t.Fatalf("~/.agents-server is %v", info)
 	}
-	if _, err := os.Stat(f.server("bin/ci-watcher")); err != nil {
-		t.Fatal("ci-watcher was not copied")
+	if _, err := os.Stat(f.server("bin/github-mcp")); err != nil {
+		t.Fatal("github-mcp was not copied")
 	}
 	var record installRecord
 	data, _ := os.ReadFile(f.server("install.json"))

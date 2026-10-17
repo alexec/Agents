@@ -39,7 +39,7 @@ public enum RuntimeEnvironment {
         }
     }
 
-    /// The folder of the MCP servers Agents ships (#700), such as `ci-watcher`: agentsd's
+    /// The folder of the MCP servers Agents ships (#700), such as `github-mcp`: agentsd's
     /// own, Contents/Helpers in Agents Host and ~/.agents-server/bin on a Linux host. agentsd
     /// sets it as it starts; nil anywhere else, where it changes nothing.
     public static var shippedServersFolder: URL? {
@@ -51,7 +51,7 @@ public enum RuntimeEnvironment {
 
     /// What an MCP server the daemon starts runs with: a runtime's environment, with the
     /// shipped servers' folder first on PATH, so `.agents/mcp.json` names one by its bare
-    /// name (`"command": "ci-watcher"`) and the same entry, and its approval, holds on a Mac
+    /// name (`"command": "github-mcp"`) and the same entry, and its approval, holds on a Mac
     /// and on a Linux host. Ours come first, so a stale copy elsewhere on PATH never answers
     /// for them.
     public static func forMCPServers(_ environment: [String: String] = ProcessInfo.processInfo.environment) -> [String: String] {
