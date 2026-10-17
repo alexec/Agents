@@ -7,6 +7,7 @@ CODE=$(ps -o command= -p $P | sed 's/.* --control-code //')
 kill $P; while kill -0 $P 2>/dev/null; do sleep 0.1; done
 [ "$1" = noindex ] && mv $ROOT/cache/archive.json $ROOT/cache/archive.json.aside
 T0=$(python3 -c 'import time;print(time.time())')
+# shellcheck disable=SC2046 # split on purpose: one -u per CLAUDE_* name
 env -u CLAUDECODE $(env | grep -oE '^CLAUDE_[A-Z_]+' | sed 's/^/-u /') AGENTS_ROOT=$ROOT nohup "$CMD" --control-code "$CODE" >>$ROOT/host.out 2>&1 &
 python3 - "$T0" <<'PY'
 import socket, sys, time, json

@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 # Sourced by CI's build steps (#269): run a build, and when it fails on top of a restored
 # cache, delete what the cache put there and run it once more from clean.
 #

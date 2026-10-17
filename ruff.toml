@@ -1,0 +1,11 @@
+# scripts/lint.sh runs ruff for bugs and security only (#1224): pyflakes, bugbear, bandit.
+target-version = "py39"
+
+[lint]
+select = ["F", "B", "S"]
+# Our scripts run fixed commands we wrote (S603, S607) and assert as their checks (S101).
+ignore = ["S101", "S603", "S607"]
+
+[lint.per-file-ignores]
+# They exec /tmp/rp-measure.py first, which defines C, fds and timed.
+".agents/reviews/robustness-performance/tools/rp-*.py" = ["F821", "S102"]

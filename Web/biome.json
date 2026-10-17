@@ -1,0 +1,14 @@
+{
+  "$schema": "https://biomejs.dev/schemas/2.5.15/schema.json",
+  "files": { "includes": ["src/**", "test/**", "*.mjs", "!src/protocol/generated.ts"] },
+  "formatter": { "enabled": false },
+  "assist": { "enabled": false },
+  "linter": {
+    "rules": {
+      "recommended": false,
+      "correctness": { "recommended": true },
+      "suspicious": { "recommended": true },
+      "security": { "recommended": true }
+    }
+  }
+}

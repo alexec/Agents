@@ -19,7 +19,7 @@ NAME=agents-devbox
 PORT=2222
 CACHE="$HOME/.cache/agents-devbox"
 KNOWN="$CACHE/known_hosts"
-SSH=(ssh -o BatchMode=yes -o UserKnownHostsFile="$KNOWN" -o GlobalKnownHostsFile=/dev/null -p $PORT agents@127.0.0.1)
+SSH=(ssh -o BatchMode=yes -o UserKnownHostsFile="$KNOWN" -o GlobalKnownHostsFile=/dev/null -p "$PORT" agents@127.0.0.1)
 
 colima_up() {
   docker info >/dev/null 2>&1 && return
@@ -87,7 +87,7 @@ case "${1:-status}" in
     ;;
   ssh)
     shift
-    if [ $# -eq 0 ]; then exec ssh -t -o UserKnownHostsFile="$KNOWN" -o GlobalKnownHostsFile=/dev/null -p $PORT agents@127.0.0.1
+    if [ $# -eq 0 ]; then exec ssh -t -o UserKnownHostsFile="$KNOWN" -o GlobalKnownHostsFile=/dev/null -p "$PORT" agents@127.0.0.1
     else exec "${SSH[@]}" "$@"; fi
     ;;
   fresh)

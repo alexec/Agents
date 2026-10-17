@@ -720,13 +720,50 @@ jobs:
       - run: npm run check
       - run: npm test
 
-  # Tests that index or force-unwrap after an #expect (#94): a failed check carries on, and
-  # the trap after it ends the whole `swift test` run, so every later test goes unreported.
-  # A text check, so it runs on every change and needs no Mac.
-  test-indexing:
+  # The linters (#1224), through scripts/lint.sh, on every change: shellcheck, zsh -n and our
+  # own text checks are required (a finding fails the job); ruff, Biome and SwiftLint report
+  # their findings in the job's summary, and which are in this change's files, without failing,
+  # as do golangci-lint and govulncheck. Their old findings are listed in
+  # .agents/reviews/lint-2026-10-17.md. The pinned binaries are cached, and golangci-lint's
+  # analysis with them. It runs beside the macOS jobs, which take longer, so it does not make a
+  # merge wait.
+  #
+  # The checks include check-test-indexing.py (#94): tests that index or force-unwrap after an
+  # #expect, where a failed check carries on and the trap after it ends the whole `swift test`.
+  lint:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v6
-      - run: python3 scripts/check-test-indexing.py --selftest
-      - run: python3 scripts/check-test-indexing.py
+        with:
+          fetch-depth: 2
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: Go/go.mod
+          cache-dependency-path: Go/go.mod
+      - uses: actions/cache@v5
+        with:
+          path: ~/.cache/lint-tools
+          key: lint-tools-${{ hashFiles('scripts/lint.sh') }}
+      # golangci-lint's analysis, warm from main's newest; only a push to main that changed Go
+      # saves one.
+      - uses: actions/cache/restore@v5
+        id: golangci-cache
+        with:
+          path: ~/.cache/golangci-lint
+          key: golangci-lint-${{ hashFiles('Go/**/*.go', 'Go/go.sum', 'Go/.golangci.yml') }}
+          restore-keys: golangci-lint-
+      - name: Tools
+        run: |
+          scripts/lint.sh --tools ~/.cache/lint-tools shellcheck ruff biome swiftlint golangci-lint govulncheck
+          echo ~/.cache/lint-tools >> "$GITHUB_PATH"
+      - name: Lint
+        env:
+          # A pull request is checked out as its merge into the base: the first parent is the base.
+          LINT_BASE: ${{ github.event_name == 'pull_request' && 'HEAD^1' || '' }}
+        run: scripts/lint.sh
+      - if: ${{ github.event_name == 'push' && steps.golangci-cache.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@v5
+        with:
+          path: ~/.cache/golangci-lint
+          key: golangci-lint-${{ hashFiles('Go/**/*.go', 'Go/go.sum', 'Go/.golangci.yml') }}
