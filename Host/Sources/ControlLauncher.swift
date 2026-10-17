@@ -174,9 +174,8 @@ enum ControlLauncher {
             }
             let tool = paths.agentsControl(for: settings).path
             // Said in control.log, so which one ran is never a guess (#1137).
-            if tool != paths.agentsControl.path {
-                FileHandle.standardError.write(Data("Agents Host: starting the Go agents-control\n".utf8))
-            }
+            let which = tool == paths.agentsControl.path ? "Swift" : "Go"
+            FileHandle.standardError.write(Data("Agents Host: starting the \(which) agents-control\n".utf8))
             let argv = ([tool] + planned.arguments).map { strdup($0) } + [nil]
             let envp = planned.environment.map { strdup("\($0.key)=\($0.value)") } + [nil]
             execve(tool, argv, envp)
