@@ -122,6 +122,7 @@ var (
 	CallRuntimesAllowances             = Method[*string, RuntimeAllowances]{"runtimes/allowances"}
 	CallRuntimesAuthenticate           = Method[AuthenticateRequest, RuntimeAccount]{"runtimes/authenticate"}
 	CallRuntimesDisableProvider        = Method[SetProviderRequest, RuntimeAccount]{"runtimes/disableProvider"}
+	CallRuntimesInstall                = Method[RuntimeRequest, RuntimeStatus]{"runtimes/install"}
 	CallRuntimesList                   = Method[Empty, []RuntimeStatus]{"runtimes/list"}
 	CallRuntimesLogout                 = Method[RuntimeRequest, []UUID]{"runtimes/logout"}
 	CallRuntimesMarkAvailable          = Method[MarkRuntimeAvailable, RuntimeAllowances]{"runtimes/markAvailable"}
@@ -190,6 +191,7 @@ var (
 	NotifyProjectChanged               = Notification[ProjectSummary]{"project/changed"}
 	NotifyProjectRemoved               = Notification[ProjectRemovedNotification]{"project/removed"}
 	NotifyRuntimeAccount               = Notification[RuntimeAccount]{"runtime/account"}
+	NotifyRuntimeChanged               = Notification[RuntimeStatus]{"runtime/changed"}
 	NotifyRuntimesAllowancesChanged    = Notification[RuntimeAllowances]{"runtimes/allowancesChanged"}
 	NotifyShellOutput                  = Notification[ShellOutputNotification]{"shell/output"}
 	NotifyShellStateChanged            = Notification[ShellStateNotification]{"shell/stateChanged"}

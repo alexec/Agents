@@ -166,6 +166,7 @@ func (d *Daemon) runtimeStatuses() []wire.RuntimeStatus {
 			}
 			s.Availability.Missing = &wire.RuntimeAvailabilityMissing{LookedIn: looked}
 		}
+		d.overlay(&s)
 		out = append(out, s)
 	}
 	return out

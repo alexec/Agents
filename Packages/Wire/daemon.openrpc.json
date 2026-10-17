@@ -2752,6 +2752,25 @@
       }
     },
     {
+      "name": "runtimes/install",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/RuntimeRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/RuntimeStatus"
+        }
+      }
+    },
+    {
       "name": "runtimes/list",
       "tags": [
         {
@@ -4170,6 +4189,20 @@
           "required": true,
           "schema": {
             "$ref": "daemon.schema.json#/definitions/RuntimeAccount"
+          }
+        }
+      ]
+    },
+    {
+      "name": "runtime/changed",
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/RuntimeStatus"
           }
         }
       ]
