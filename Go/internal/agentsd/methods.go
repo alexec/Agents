@@ -346,14 +346,12 @@ func (d *Daemon) transcript(r wire.TranscriptRequest) (wire.TranscriptPage, erro
 		return wire.TranscriptPage{}, Invalid("a transcript page is counted from zero")
 	}
 	limit := min(r.Limit, maxPage)
-	entries, at, err := d.Store.Transcript(r.AgentID, 0)
+	// Only the page's lines are read and decoded (#91): a long chat costs no more.
+	ends, err := d.Store.LineEnds(r.AgentID)
 	if err != nil {
 		return wire.TranscriptPage{}, err
 	}
-	total := int64(len(at))
-	if total > 0 {
-		total = int64(at[len(at)-1] + 1)
-	}
+	total := int64(len(ends))
 	end := total
 	if r.Before != nil {
 		end = min(*r.Before, total)
@@ -363,10 +361,10 @@ func (d *Daemon) transcript(r wire.TranscriptRequest) (wire.TranscriptPage, erro
 	}
 	start := end - min(limit, end)
 	page := wire.TranscriptPage{FirstIndex: start, Total: total, Entries: []wire.TranscriptEntry{}}
-	for i, e := range entries {
-		if int64(at[i]) >= start && int64(at[i]) < end {
-			page.Entries = append(page.Entries, e)
-		}
+	entries, _, err := d.Store.Entries(r.AgentID, ends, int(start), int(end))
+	if err != nil {
+		return wire.TranscriptPage{}, err
 	}
+	page.Entries = append(page.Entries, entries...)
 	return page, nil
 }

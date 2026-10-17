@@ -12,69 +12,10 @@ import (
 
 // The finished turns, as the chat shows them until one is opened (agents/turns): what was
 // asked, how it went and how many steps it took, made as TurnSummary.of makes them from the
-// transcript as TranscriptEntry.display draws it.
-//
-// The Swift host keeps them in <cache>/turns/<id>.jsonl and finds where turns start without
-// decoding every line. This host reads the transcript whole, as its agents/transcript does,
-// and keeps nothing (#1136).
+// transcript as TranscriptEntry.display draws it. Where they start and how they are kept
+// is turnscache.go.
 
 const turnsLimitCeiling = 200
-
-// turns is agents/turns.
-func (d *Daemon) turns(r wire.TurnsRequest) (wire.TurnsPage, error) {
-	if d.Store.Agent(r.AgentID) == nil {
-		return wire.TurnsPage{}, &Error{Code: CodeNoSuchAgent, Message: "no agent " + string(r.AgentID)}
-	}
-	if r.Limit < 0 || r.Before != nil && *r.Before < 0 {
-		return wire.TurnsPage{}, Invalid("a page of turns is counted from zero")
-	}
-	entries, at, err := d.Store.Transcript(r.AgentID, 0)
-	if err != nil {
-		return wire.TurnsPage{}, err
-	}
-	total := 0
-	if len(at) > 0 {
-		total = at[len(at)-1] + 1
-	}
-	// Where each turn starts, by the line: the first, then every ask after it. The last is
-	// the turn still going.
-	var starts []int
-	if total > 0 {
-		starts = []int{0}
-		for i, e := range entries {
-			if at[i] > 0 && isPersonsAsk(&e) {
-				starts = append(starts, at[i])
-			}
-		}
-	}
-	closed := max(0, len(starts)-1)
-	end := closed
-	if r.Before != nil {
-		end = min(int(*r.Before), closed)
-	}
-	start := end - min(int(min(r.Limit, turnsLimitCeiling)), end)
-	page := wire.TurnsPage{Turns: []wire.TurnSummary{}, FirstTurn: int64(start)}
-	if len(starts) > 0 {
-		page.OpenStart = int64(starts[len(starts)-1])
-	}
-	i := 0
-	for p := start; p < end; p++ {
-		from, to := starts[p], starts[p+1]
-		for i < len(at) && at[i] < from {
-			i++
-		}
-		j := i
-		for j < len(at) && at[j] < to {
-			j++
-		}
-		s := turnSummaryOf(entries[i:j], int64(from))
-		// By the line, as agents/transcript counts: a line that did not decode is still one.
-		s.End = int64(to)
-		page.Turns = append(page.Turns, s)
-		i = j
-	}
-	return page, nil
-}
 
 // turnSummaryOf is TurnSummary.of.
 func turnSummaryOf(entries []wire.TranscriptEntry, start int64) wire.TurnSummary {

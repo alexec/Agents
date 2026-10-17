@@ -50,6 +50,7 @@ type Daemon struct {
 	allowanceBook
 	mcpBook
 	mcpHealthBook
+	turnBook
 	optionBook
 	timeBook
 	milestoneBook

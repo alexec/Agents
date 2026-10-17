@@ -31,6 +31,8 @@ type Store struct {
 	projects []wire.Project
 	// lines is each transcript's count of lines, once counted, for an entry's index.
 	lines map[wire.UUID]int
+	// ib is where the lines of the transcripts read most recently end (lineindex.go).
+	ib indexBook
 }
 
 // Open reads the root, making what is missing.
@@ -151,6 +153,9 @@ func (s *Store) Delete(id wire.UUID) error {
 	delete(s.agents, id)
 	delete(s.lines, id)
 	s.mu.Unlock()
+	s.ib.mu.Lock()
+	delete(s.ib.indexes, id)
+	s.ib.mu.Unlock()
 	if err := os.Remove(s.Loc.Turns(string(id))); err != nil && !os.IsNotExist(err) {
 		return err
 	}

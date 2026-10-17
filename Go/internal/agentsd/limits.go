@@ -128,7 +128,9 @@ func rateLimitIn(meta map[string]any) *wire.RateLimitInfo {
 		IsUsingOverage: flag("isUsingOverage"), OverageInUse: flag("overageInUse"), OverageDisabledReason: str("overageDisabledReason")}
 }
 
-func rateLimitRejected(r *wire.RateLimitInfo) bool { return r != nil && r.Status != nil && *r.Status == "rejected" }
+func rateLimitRejected(r *wire.RateLimitInfo) bool {
+	return r != nil && r.Status != nil && *r.Status == "rejected"
+}
 
 // payingOverage is whether the account has started paying beyond its plan.
 func payingOverage(r *wire.RateLimitInfo) bool {
