@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	sdk "github.com/coder/acp-go-sdk"
 
@@ -406,7 +407,9 @@ func (d *Daemon) appToolsHandle(ctx context.Context, g *appGrant, method string,
 			}
 			return nil, Invalid("No tool called %s.", name)
 		}
+		began := time.Now()
 		note, err := tool.call(d, g.agent, p.Arguments)
+		d.keepAppToolCall(g.agent, tool.name, p.Arguments, note, err, began)
 		if err != nil {
 			msg := err.Error()
 			if e, ok := err.(*Error); ok {

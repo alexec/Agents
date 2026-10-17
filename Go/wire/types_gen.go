@@ -367,6 +367,18 @@ type ArtifactWriteRequest struct {
 	Text    string `json:"text"`
 }
 
+type AssessRuntimeRequest struct {
+	RuntimeID string  `json:"runtimeID"`
+	Folder    URL     `json:"folder"`
+	Model     *string `json:"model,omitzero"`
+}
+
+type AssessRuntimeResult struct {
+	AgentID    UUID    `json:"agentID"`
+	Model      *string `json:"model,omitzero"`
+	ReportPath string  `json:"reportPath"`
+}
+
 type Attachment struct {
 	ID          UUID         `json:"id"`
 	Block       ContentBlock `json:"block"`
@@ -3021,6 +3033,32 @@ type RuntimeAllowancesRow struct {
 	State         AllowanceState `json:"state"`
 	Unusable      *string        `json:"unusable,omitzero"`
 }
+
+type RuntimeAssessmentCheck struct {
+	ID       string                   `json:"id"`
+	Area     string                   `json:"area"`
+	Verdict  RuntimeAssessmentVerdict `json:"verdict"`
+	Evidence string                   `json:"evidence"`
+}
+
+type RuntimeAssessmentScore struct {
+	AgentID        UUID                     `json:"agentID"`
+	RuntimeID      string                   `json:"runtimeID"`
+	Model          *string                  `json:"model,omitzero"`
+	RuntimeVersion *string                  `json:"runtimeVersion,omitzero"`
+	Host           *string                  `json:"host,omitzero"`
+	ScoredAt       Date                     `json:"scoredAt"`
+	ReportPath     *string                  `json:"reportPath,omitzero"`
+	Checks         []RuntimeAssessmentCheck `json:"checks"`
+}
+
+type RuntimeAssessmentVerdict string
+
+const (
+	RuntimeAssessmentVerdictPassed     RuntimeAssessmentVerdict = "passed"
+	RuntimeAssessmentVerdictFailed     RuntimeAssessmentVerdict = "failed"
+	RuntimeAssessmentVerdictNotOffered RuntimeAssessmentVerdict = "not_offered"
+)
 
 type RuntimeAvailability struct {
 	Available     *RuntimeAvailabilityAvailable     `json:"available,omitzero"`

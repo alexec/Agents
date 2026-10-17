@@ -994,6 +994,44 @@
       ],
       "additionalProperties": false
     },
+    "AssessRuntimeRequest": {
+      "type": "object",
+      "properties": {
+        "runtimeID": {
+          "type": "string"
+        },
+        "folder": {
+          "$ref": "#/definitions/URLString"
+        },
+        "model": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "runtimeID",
+        "folder"
+      ],
+      "additionalProperties": false
+    },
+    "AssessRuntimeResult": {
+      "type": "object",
+      "properties": {
+        "agentID": {
+          "$ref": "#/definitions/UUID"
+        },
+        "model": {
+          "type": "string"
+        },
+        "reportPath": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "agentID",
+        "reportPath"
+      ],
+      "additionalProperties": false
+    },
     "Attachment": {
       "type": "object",
       "properties": {
@@ -8198,6 +8236,77 @@
         "state"
       ],
       "additionalProperties": false
+    },
+    "RuntimeAssessmentCheck": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "area": {
+          "type": "string"
+        },
+        "verdict": {
+          "$ref": "#/definitions/RuntimeAssessmentVerdict"
+        },
+        "evidence": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "area",
+        "verdict",
+        "evidence"
+      ],
+      "additionalProperties": false
+    },
+    "RuntimeAssessmentScore": {
+      "type": "object",
+      "properties": {
+        "agentID": {
+          "$ref": "#/definitions/UUID"
+        },
+        "runtimeID": {
+          "type": "string"
+        },
+        "model": {
+          "type": "string"
+        },
+        "runtimeVersion": {
+          "type": "string"
+        },
+        "host": {
+          "type": "string"
+        },
+        "scoredAt": {
+          "$ref": "#/definitions/WireDate"
+        },
+        "reportPath": {
+          "type": "string"
+        },
+        "checks": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/RuntimeAssessmentCheck"
+          }
+        }
+      },
+      "required": [
+        "agentID",
+        "runtimeID",
+        "scoredAt",
+        "checks"
+      ],
+      "additionalProperties": false
+    },
+    "RuntimeAssessmentVerdict": {
+      "type": "string",
+      "enum": [
+        "passed",
+        "failed",
+        "not_offered"
+      ]
     },
     "RuntimeAvailability": {
       "anyOf": [

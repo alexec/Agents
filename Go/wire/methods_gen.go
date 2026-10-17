@@ -146,6 +146,8 @@ var (
 	CallRetentionState                 = Method[Empty, RetentionState]{"retention/state"}
 	CallRuntimesAccounts               = Method[Empty, []RuntimeAccount]{"runtimes/accounts"}
 	CallRuntimesAllowances             = Method[*string, RuntimeAllowances]{"runtimes/allowances"}
+	CallRuntimesAssess                 = Method[AssessRuntimeRequest, AssessRuntimeResult]{"runtimes/assess"}
+	CallRuntimesAssessment             = Method[AgentRequest, RuntimeAssessmentScore]{"runtimes/assessment"}
 	CallRuntimesAuthenticate           = Method[AuthenticateRequest, RuntimeAccount]{"runtimes/authenticate"}
 	CallRuntimesDisableProvider        = Method[SetProviderRequest, RuntimeAccount]{"runtimes/disableProvider"}
 	CallRuntimesInstall                = Method[RuntimeRequest, RuntimeStatus]{"runtimes/install"}

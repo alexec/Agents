@@ -3208,6 +3208,44 @@
       }
     },
     {
+      "name": "runtimes/assess",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/AssessRuntimeRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/AssessRuntimeResult"
+        }
+      }
+    },
+    {
+      "name": "runtimes/assessment",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/AgentRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/RuntimeAssessmentScore"
+        }
+      }
+    },
+    {
       "name": "runtimes/authenticate",
       "paramStructure": "by-name",
       "params": [

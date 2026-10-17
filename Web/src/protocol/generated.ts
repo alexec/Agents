@@ -329,6 +329,18 @@ export interface ArtifactWriteRequest {
   text: string;
 }
 
+export interface AssessRuntimeRequest {
+  runtimeID: string;
+  folder: URLString;
+  model?: string;
+}
+
+export interface AssessRuntimeResult {
+  agentID: UUID;
+  model?: string;
+  reportPath: string;
+}
+
 export interface Attachment {
   id: UUID;
   block: ContentBlock;
@@ -2275,6 +2287,26 @@ export interface RuntimeAllowancesRow {
   unusable?: string;
 }
 
+export interface RuntimeAssessmentCheck {
+  id: string;
+  area: string;
+  verdict: RuntimeAssessmentVerdict;
+  evidence: string;
+}
+
+export interface RuntimeAssessmentScore {
+  agentID: UUID;
+  runtimeID: string;
+  model?: string;
+  runtimeVersion?: string;
+  host?: string;
+  scoredAt: WireDate;
+  reportPath?: string;
+  checks: RuntimeAssessmentCheck[];
+}
+
+export type RuntimeAssessmentVerdict = "passed" | "failed" | "not_offered";
+
 export type RuntimeAvailability =
   | { available: { path: string; supportsResume: boolean } }
   | { missing: { lookedIn: string[] } }
@@ -3507,6 +3539,8 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ApprovalAnswer: { required: ["folder", "kind", "key", "action"], optional: ["digest", "note"] },
   ApprovalReadRequest: { required: ["folder", "kind", "key"], optional: [] },
   ArtifactWriteRequest: { required: ["agentID", "path", "text"], optional: [] },
+  AssessRuntimeRequest: { required: ["runtimeID", "folder"], optional: ["model"] },
+  AssessRuntimeResult: { required: ["agentID", "reportPath"], optional: ["model"] },
   Attachment: { required: ["id", "block", "displayName"], optional: ["byteCount"] },
   AttentionDelivery: { required: ["needID"], optional: ["to"] },
   AttentionNotification: { required: ["needID", "alert"], optional: ["need", "to"] },
@@ -3753,6 +3787,8 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   RuntimeAccount: { required: ["runtimeID", "state", "authMethods", "canLogOut", "providers", "promptCapabilities", "canSteer", "checkedAt"], optional: ["currentProviderID", "signedInAs"] },
   RuntimeAllowances: { required: ["rows", "at"], optional: ["shared"] },
   RuntimeAllowancesRow: { required: ["credentialKey", "state"], optional: ["unusable"] },
+  RuntimeAssessmentCheck: { required: ["id", "area", "verdict", "evidence"], optional: [] },
+  RuntimeAssessmentScore: { required: ["agentID", "runtimeID", "scoredAt", "checks"], optional: ["model", "runtimeVersion", "host", "reportPath"] },
   RuntimeRequest: { required: ["runtimeID"], optional: [] },
   RuntimeSession: { required: ["sessionID", "cwd"], optional: ["additionalDirectories", "title", "updatedAt", "isHeld"] },
   RuntimeStatus: { required: ["runtime", "availability", "checkedAt", "outdated"], optional: ["poolNote", "isOut"] },
