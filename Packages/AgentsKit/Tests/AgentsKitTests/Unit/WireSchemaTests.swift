@@ -111,6 +111,37 @@ struct WireSchemaTests {
         #expect(failures.isEmpty, "\(failures.count) records do not fit the schema:\n\(failures.prefix(20).joined(separator: "\n"))")
     }
 
+    /// `personal/shared` (#1299): every reach and both skill sources, as the Swift host
+    /// writes them, fit the schema the Go host is made from.
+    @Test func sharedSnapshotFitsTheSchema() throws {
+        let schema = try WireSchema(Self.read("daemon.schema.json"))
+        let reach: [String: DaemonAPI.Reach] = [
+            "claude": .gets("sent at start"), "codex": .ownCopy("/h/.codex/config.toml"),
+            "copilot": .leftOut("needs sign-in"), "cursor": .noWay("no way in"),
+            "gemini": .unchecked(nil), "grok": .unchecked("not checked yet"),
+        ]
+        let snapshot = DaemonAPI.SharedSnapshot(
+            home: "/h/.agents", laidOut: true, runtimes: [.init(id: "claude", name: "Claude")],
+            instructions: .init(path: "/h/.agents/AGENTS.md", exists: true, reach: reach),
+            skills: [.init(name: "review", path: "/h/.agents/skills/review", description: "Reviews.", source: .personal,
+                           clash: "/h/.claude/skills/review", reach: reach),
+                     .init(name: "fmt", path: "/p/skills/fmt", description: nil, source: .plugin("tools"), clash: nil, reach: [:])],
+            mcp: .init(file: "/h/.agents/mcp.json", problem: .init(message: "Not JSON.", line: 3),
+                       servers: [.init(name: "docs", transport: "http", summary: "https://docs", headerNames: ["X-Key"],
+                                       clash: ["codex": "/h/.codex/config.toml"], reach: reach)],
+                       app: [.init(name: "agents", transport: "stdio", summary: "show_file", reach: reach)],
+                       runtimeOnly: [.init(name: "own", runtimeID: "codex", file: "/h/.codex/config.toml")]),
+            plugins: [.init(name: "tools", version: "1.0.0", description: nil, path: "/p",
+                            contents: .init(skills: 1, commands: 2, agents: 0, hooks: 0, mcpServers: 1),
+                            files: ["a.md"], serverNames: ["b"], reach: reach)],
+            otherFiles: [.init(path: "personas/critic.md", kind: .persona), .init(path: "project.json", kind: .app)],
+            needsALook: [.init(kind: .clash, page: .skills, item: "review", text: "Also in ~/.claude/skills/review.")])
+        #expect(schema.errors(try JSONValue.encoding(snapshot), against: "SharedSnapshot") == [])
+        #expect(schema.errors(try JSONValue.encoding(DaemonAPI.SharedRequest()), against: "SharedRequest") == [])
+        #expect(schema.errors(try JSONValue.encoding(DaemonAPI.SharedRequest(folder: "/p")), against: "SharedRequest") == [])
+        #expect(!schema.errors(["sometimes": "x"], against: "SharedReach").isEmpty)
+    }
+
     /// The checker itself finds what is wrong, so a pass above means something.
     @Test func theCheckerRefusesWhatTheSchemaDoesNot() throws {
         let schema = try WireSchema(Self.read("daemon.schema.json"))

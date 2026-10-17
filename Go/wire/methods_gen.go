@@ -111,6 +111,7 @@ var (
 	CallPermissionsPending             = Method[Empty, []PermissionRequest]{"permissions/pending"}
 	CallPersonSet                      = Method[PersonSettings, PersonSettings]{"person/set"}
 	CallPersonState                    = Method[Empty, PersonSettings]{"person/state"}
+	CallPersonalShared                 = Method[SharedRequest, SharedSnapshot]{"personal/shared"}
 	CallPersonasList                   = Method[PersonasListRequest, []Persona]{"personas/list"}
 	CallPinsArrange                    = Method[PinArrangeRequest, Empty]{"pins/arrange"}
 	CallPinsArrangeSessions            = Method[PinArrangeSessionsRequest, Empty]{"pins/arrangeSessions"}

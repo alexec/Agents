@@ -44,6 +44,7 @@ func (d *Daemon) register() {
 	d.registerWorkflows()
 	d.registerShells()
 	d.registerSkills()
+	d.registerShared()
 	d.registerPlugins()
 	d.registerWake()
 	d.registerMacSignIn()

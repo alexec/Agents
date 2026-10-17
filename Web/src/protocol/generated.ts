@@ -2519,6 +2519,145 @@ export interface SetUnreadRequest {
   unread: boolean;
 }
 
+export interface SharedInstructions {
+  path: string;
+  exists: boolean;
+  reach: Record<string, SharedReach>;
+}
+
+/** Something the overview lists under Needs a look, and the page it opens. */
+export interface SharedLook {
+  kind: SharedLookKind;
+  page: SharedLookPage;
+  /** What it is about: a skill, a server, a runtime's name. */
+  item: string;
+  text: string;
+}
+
+export type SharedLookKind = "clash" | "leftOut" | "noWay" | "noFile" | "problem";
+
+export type SharedLookPage = "instructions" | "skills" | "mcp" | "plugins" | "other";
+
+export interface SharedMCP {
+  file: string;
+  problem?: SharedProblem;
+  /** The person's, from `mcp.json`. */
+  servers: SharedServer[];
+  /** The app's own, sent to every agent. */
+  app: SharedServer[];
+  /** Set up in one runtime's own config and nowhere else. */
+  runtimeOnly: SharedRuntimeOnlyServer[];
+}
+
+export interface SharedOtherFile {
+  /** Relative to `~/.agents`, or to a project's `.agents`. */
+  path: string;
+  kind: SharedOtherFileKind;
+}
+
+export type SharedOtherFileKind = "persona" | "git" | "managed" | "unused" | "app";
+
+export interface SharedPlugin {
+  name: string;
+  version?: string;
+  description?: string;
+  path: string;
+  contents: SharedPluginContents;
+  /** Its files, relative to its folder, for the detail's tree: at most 40. */
+  files: string[];
+  serverNames: string[];
+  reach: Record<string, SharedReach>;
+}
+
+export interface SharedPluginContents {
+  skills: number;
+  commands: number;
+  agents: number;
+  hooks: number;
+  mcpServers: number;
+}
+
+export interface SharedProblem {
+  message: string;
+  line?: number;
+}
+
+/**
+ * What one runtime does with one thing: it gets it (how), uses its own copy at a path, is left out
+ * (why), has no way to take it, or is not measured yet (`"unchecked"`, or with a note).
+ */
+export type SharedReach = "unchecked" | { gets: string } | { ownCopy: string } | { leftOut: string } | { noWay: string } | { unchecked: string };
+
+/**
+ * `personal/shared`'s params: none reads the person's `~/.agents`; `folder` reads that project's
+ * `.agents` (#754), which has no per-runtime reach.
+ */
+export interface SharedRequest {
+  folder?: string;
+}
+
+export interface SharedRuntimeName {
+  id: string;
+  name: string;
+}
+
+export interface SharedRuntimeOnlyServer {
+  name: string;
+  runtimeID: string;
+  file: string;
+}
+
+export interface SharedServer {
+  name: string;
+  /** `stdio`, `http` or `sse`. */
+  transport: string;
+  /** The command and its first arguments, or the URL without its query. */
+  summary: string;
+  envNames: string[];
+  headerNames: string[];
+  /** The runtimes with a server of this name in their own config, and that file. */
+  clash: Record<string, string>;
+  reach: Record<string, SharedReach>;
+}
+
+export interface SharedSkill {
+  name: string;
+  path: string;
+  description?: string;
+  source: SharedSkillSource;
+  /** The other copy of a skill of this name, left where it was. */
+  clash?: string;
+  reach: Record<string, SharedReach>;
+  /** Where a lock says it came from (059); none for the person's own. */
+  managed?: ManagedSkill;
+}
+
+/** `"personal"`, or `{"plugin": "<name>"}`. */
+export type SharedSkillSource = "personal" | { plugin: string };
+
+/**
+ * `personal/shared` (054): what is in the person's `~/.agents` and which runtime gets each thing,
+ * for Settings ▸ Agent Configuration. Read from disk on every call. Nothing in it is a value from
+ * `mcp.json`: env and headers go by name only (FR-023).
+ */
+export interface SharedSnapshot {
+  /** `~/.agents`, or a project's `.agents` (#754). */
+  home: string;
+  /**
+   * False for a copy of the app with no personal home (a scratch root), when everything else is
+   * empty.
+   */
+  laidOut: boolean;
+  /** The installed runtimes with a rule, by name: the columns. */
+  runtimes: SharedRuntimeName[];
+  instructions?: SharedInstructions;
+  skills: SharedSkill[];
+  mcp: SharedMCP;
+  plugins: SharedPlugin[];
+  otherFiles: SharedOtherFile[];
+  needsALook: SharedLook[];
+}
+
 export interface ShellAttachRequest {
   agentID: UUID;
   shell?: number;
@@ -3912,6 +4051,19 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   SetProviderRequest: { required: ["runtimeID", "providerID"], optional: [] },
   SetSandboxRequest: { required: ["agentID"], optional: ["choice"] },
   SetUnreadRequest: { required: ["agentID", "unread"], optional: [] },
+  SharedInstructions: { required: ["path", "exists", "reach"], optional: [] },
+  SharedLook: { required: ["kind", "page", "item", "text"], optional: [] },
+  SharedMCP: { required: ["file", "servers", "app", "runtimeOnly"], optional: ["problem"] },
+  SharedOtherFile: { required: ["path", "kind"], optional: [] },
+  SharedPlugin: { required: ["name", "path", "contents", "files", "serverNames", "reach"], optional: ["version", "description"] },
+  SharedPluginContents: { required: ["skills", "commands", "agents", "hooks", "mcpServers"], optional: [] },
+  SharedProblem: { required: ["message"], optional: ["line"] },
+  SharedRequest: { required: [], optional: ["folder"] },
+  SharedRuntimeName: { required: ["id", "name"], optional: [] },
+  SharedRuntimeOnlyServer: { required: ["name", "runtimeID", "file"], optional: [] },
+  SharedServer: { required: ["name", "transport", "summary", "envNames", "headerNames", "clash", "reach"], optional: [] },
+  SharedSkill: { required: ["name", "path", "source", "reach"], optional: ["description", "clash", "managed"] },
+  SharedSnapshot: { required: ["home", "laidOut", "runtimes", "skills", "mcp", "plugins", "otherFiles", "needsALook"], optional: ["instructions"] },
   ShellAttachRequest: { required: ["agentID"], optional: ["shell", "rows", "cols", "since", "startedAt", "folder"] },
   ShellAttachResponse: { required: ["state", "scrollback", "dropped", "startedAt"], optional: ["folder", "offset"] },
   ShellInputRequest: { required: ["agentID", "bytes"], optional: ["shell", "rows", "cols"] },

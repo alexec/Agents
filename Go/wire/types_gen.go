@@ -3349,6 +3349,156 @@ type SetUnreadRequest struct {
 	Unread  bool `json:"unread"`
 }
 
+type SharedInstructions struct {
+	Path   string                 `json:"path"`
+	Exists bool                   `json:"exists"`
+	Reach  map[string]SharedReach `json:"reach"`
+}
+
+// Something the overview lists under Needs a look, and the page it opens.
+type SharedLook struct {
+	Kind SharedLookKind `json:"kind"`
+	Page SharedLookPage `json:"page"`
+	// What it is about: a skill, a server, a runtime's name.
+	Item string `json:"item"`
+	Text string `json:"text"`
+}
+
+type SharedLookKind string
+
+const (
+	SharedLookKindClash   SharedLookKind = "clash"
+	SharedLookKindLeftOut SharedLookKind = "leftOut"
+	SharedLookKindNoWay   SharedLookKind = "noWay"
+	SharedLookKindNoFile  SharedLookKind = "noFile"
+	SharedLookKindProblem SharedLookKind = "problem"
+)
+
+type SharedLookPage string
+
+const (
+	SharedLookPageInstructions SharedLookPage = "instructions"
+	SharedLookPageSkills       SharedLookPage = "skills"
+	SharedLookPageMCP          SharedLookPage = "mcp"
+	SharedLookPagePlugins      SharedLookPage = "plugins"
+	SharedLookPageOther        SharedLookPage = "other"
+)
+
+type SharedMCP struct {
+	File    string         `json:"file"`
+	Problem *SharedProblem `json:"problem,omitzero"`
+	// The person's, from `mcp.json`.
+	Servers []SharedServer `json:"servers"`
+	// The app's own, sent to every agent.
+	App []SharedServer `json:"app"`
+	// Set up in one runtime's own config and nowhere else.
+	RuntimeOnly []SharedRuntimeOnlyServer `json:"runtimeOnly"`
+}
+
+type SharedOtherFile struct {
+	// Relative to `~/.agents`, or to a project's `.agents`.
+	Path string              `json:"path"`
+	Kind SharedOtherFileKind `json:"kind"`
+}
+
+type SharedOtherFileKind string
+
+const (
+	SharedOtherFileKindPersona SharedOtherFileKind = "persona"
+	SharedOtherFileKindGit     SharedOtherFileKind = "git"
+	SharedOtherFileKindManaged SharedOtherFileKind = "managed"
+	SharedOtherFileKindUnused  SharedOtherFileKind = "unused"
+	SharedOtherFileKindApp     SharedOtherFileKind = "app"
+)
+
+type SharedPlugin struct {
+	Name        string               `json:"name"`
+	Version     *string              `json:"version,omitzero"`
+	Description *string              `json:"description,omitzero"`
+	Path        string               `json:"path"`
+	Contents    SharedPluginContents `json:"contents"`
+	// Its files, relative to its folder, for the detail's tree: at most 40.
+	Files       []string               `json:"files"`
+	ServerNames []string               `json:"serverNames"`
+	Reach       map[string]SharedReach `json:"reach"`
+}
+
+type SharedPluginContents struct {
+	Skills     int64 `json:"skills"`
+	Commands   int64 `json:"commands"`
+	Agents     int64 `json:"agents"`
+	Hooks      int64 `json:"hooks"`
+	McpServers int64 `json:"mcpServers"`
+}
+
+type SharedProblem struct {
+	Message string `json:"message"`
+	Line    *int64 `json:"line,omitzero"`
+}
+
+// What one runtime does with one thing: it gets it (how), uses its own copy at a path, is left out (why), has no way to take it, or is not measured yet (`"unchecked"`, or with a note).
+type SharedReach = JSONValue
+
+// `personal/shared`'s params: none reads the person's `~/.agents`; `folder` reads that project's `.agents` (#754), which has no per-runtime reach.
+type SharedRequest struct {
+	Folder *string `json:"folder,omitzero"`
+}
+
+type SharedRuntimeName struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+type SharedRuntimeOnlyServer struct {
+	Name      string `json:"name"`
+	RuntimeID string `json:"runtimeID"`
+	File      string `json:"file"`
+}
+
+type SharedServer struct {
+	Name string `json:"name"`
+	// `stdio`, `http` or `sse`.
+	Transport string `json:"transport"`
+	// The command and its first arguments, or the URL without its query.
+	Summary     string   `json:"summary"`
+	EnvNames    []string `json:"envNames"`
+	HeaderNames []string `json:"headerNames"`
+	// The runtimes with a server of this name in their own config, and that file.
+	Clash map[string]string      `json:"clash"`
+	Reach map[string]SharedReach `json:"reach"`
+}
+
+type SharedSkill struct {
+	Name        string            `json:"name"`
+	Path        string            `json:"path"`
+	Description *string           `json:"description,omitzero"`
+	Source      SharedSkillSource `json:"source"`
+	// The other copy of a skill of this name, left where it was.
+	Clash *string                `json:"clash,omitzero"`
+	Reach map[string]SharedReach `json:"reach"`
+	// Where a lock says it came from (059); none for the person's own.
+	Managed *ManagedSkill `json:"managed,omitzero"`
+}
+
+// `"personal"`, or `{"plugin": "<name>"}`.
+type SharedSkillSource = JSONValue
+
+// `personal/shared` (054): what is in the person's `~/.agents` and which runtime gets each thing, for Settings ▸ Agent Configuration. Read from disk on every call. Nothing in it is a value from `mcp.json`: env and headers go by name only (FR-023).
+type SharedSnapshot struct {
+	// `~/.agents`, or a project's `.agents` (#754).
+	Home string `json:"home"`
+	// False for a copy of the app with no personal home (a scratch root), when everything else is empty.
+	LaidOut bool `json:"laidOut"`
+	// The installed runtimes with a rule, by name: the columns.
+	Runtimes     []SharedRuntimeName `json:"runtimes"`
+	Instructions *SharedInstructions `json:"instructions,omitzero"`
+	Skills       []SharedSkill       `json:"skills"`
+	MCP          SharedMCP           `json:"mcp"`
+	Plugins      []SharedPlugin      `json:"plugins"`
+	OtherFiles   []SharedOtherFile   `json:"otherFiles"`
+	NeedsALook   []SharedLook        `json:"needsALook"`
+}
+
 type ShellAttachRequest struct {
 	AgentID   UUID   `json:"agentID"`
 	Shell     *int64 `json:"shell,omitzero"`

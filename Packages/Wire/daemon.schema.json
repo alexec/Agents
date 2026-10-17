@@ -14614,6 +14614,519 @@
         }
       },
       "additionalProperties": false
+    },
+    "SharedRequest": {
+      "description": "`personal/shared`'s params: none reads the person's `~/.agents`; `folder` reads that project's `.agents` (#754), which has no per-runtime reach.",
+      "type": "object",
+      "properties": {
+        "folder": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "SharedSnapshot": {
+      "description": "`personal/shared` (054): what is in the person's `~/.agents` and which runtime gets each thing, for Settings ▸ Agent Configuration. Read from disk on every call. Nothing in it is a value from `mcp.json`: env and headers go by name only (FR-023).",
+      "type": "object",
+      "properties": {
+        "home": {
+          "description": "`~/.agents`, or a project's `.agents` (#754).",
+          "type": "string"
+        },
+        "laidOut": {
+          "description": "False for a copy of the app with no personal home (a scratch root), when everything else is empty.",
+          "type": "boolean"
+        },
+        "runtimes": {
+          "description": "The installed runtimes with a rule, by name: the columns.",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/SharedRuntimeName"
+          }
+        },
+        "instructions": {
+          "$ref": "#/definitions/SharedInstructions"
+        },
+        "skills": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/SharedSkill"
+          }
+        },
+        "mcp": {
+          "$ref": "#/definitions/SharedMCP"
+        },
+        "plugins": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/SharedPlugin"
+          }
+        },
+        "otherFiles": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/SharedOtherFile"
+          }
+        },
+        "needsALook": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/SharedLook"
+          }
+        }
+      },
+      "required": [
+        "home",
+        "laidOut",
+        "runtimes",
+        "skills",
+        "mcp",
+        "plugins",
+        "otherFiles",
+        "needsALook"
+      ],
+      "additionalProperties": false
+    },
+    "SharedRuntimeName": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name"
+      ],
+      "additionalProperties": false
+    },
+    "SharedReach": {
+      "description": "What one runtime does with one thing: it gets it (how), uses its own copy at a path, is left out (why), has no way to take it, or is not measured yet (`\"unchecked\"`, or with a note).",
+      "anyOf": [
+        {
+          "type": "string",
+          "const": "unchecked"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "gets": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "gets"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "ownCopy": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "ownCopy"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "leftOut": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "leftOut"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "noWay": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "noWay"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "unchecked": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "unchecked"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "SharedInstructions": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string"
+        },
+        "exists": {
+          "type": "boolean"
+        },
+        "reach": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/definitions/SharedReach"
+          }
+        }
+      },
+      "required": [
+        "path",
+        "exists",
+        "reach"
+      ],
+      "additionalProperties": false
+    },
+    "SharedSkill": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "source": {
+          "$ref": "#/definitions/SharedSkillSource"
+        },
+        "clash": {
+          "description": "The other copy of a skill of this name, left where it was.",
+          "type": "string"
+        },
+        "reach": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/definitions/SharedReach"
+          }
+        },
+        "managed": {
+          "description": "Where a lock says it came from (059); none for the person's own.",
+          "$ref": "#/definitions/ManagedSkill"
+        }
+      },
+      "required": [
+        "name",
+        "path",
+        "source",
+        "reach"
+      ],
+      "additionalProperties": false
+    },
+    "SharedSkillSource": {
+      "description": "`\"personal\"`, or `{\"plugin\": \"<name>\"}`.",
+      "anyOf": [
+        {
+          "type": "string",
+          "const": "personal"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "plugin": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "plugin"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "SharedMCP": {
+      "type": "object",
+      "properties": {
+        "file": {
+          "type": "string"
+        },
+        "problem": {
+          "$ref": "#/definitions/SharedProblem"
+        },
+        "servers": {
+          "description": "The person's, from `mcp.json`.",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/SharedServer"
+          }
+        },
+        "app": {
+          "description": "The app's own, sent to every agent.",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/SharedServer"
+          }
+        },
+        "runtimeOnly": {
+          "description": "Set up in one runtime's own config and nowhere else.",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/SharedRuntimeOnlyServer"
+          }
+        }
+      },
+      "required": [
+        "file",
+        "servers",
+        "app",
+        "runtimeOnly"
+      ],
+      "additionalProperties": false
+    },
+    "SharedProblem": {
+      "type": "object",
+      "properties": {
+        "message": {
+          "type": "string"
+        },
+        "line": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "message"
+      ],
+      "additionalProperties": false
+    },
+    "SharedServer": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "transport": {
+          "description": "`stdio`, `http` or `sse`.",
+          "type": "string"
+        },
+        "summary": {
+          "description": "The command and its first arguments, or the URL without its query.",
+          "type": "string"
+        },
+        "envNames": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "headerNames": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "clash": {
+          "description": "The runtimes with a server of this name in their own config, and that file.",
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "reach": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/definitions/SharedReach"
+          }
+        }
+      },
+      "required": [
+        "name",
+        "transport",
+        "summary",
+        "envNames",
+        "headerNames",
+        "clash",
+        "reach"
+      ],
+      "additionalProperties": false
+    },
+    "SharedRuntimeOnlyServer": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "runtimeID": {
+          "type": "string"
+        },
+        "file": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "runtimeID",
+        "file"
+      ],
+      "additionalProperties": false
+    },
+    "SharedPlugin": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        },
+        "contents": {
+          "$ref": "#/definitions/SharedPluginContents"
+        },
+        "files": {
+          "description": "Its files, relative to its folder, for the detail's tree: at most 40.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "serverNames": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "reach": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/definitions/SharedReach"
+          }
+        }
+      },
+      "required": [
+        "name",
+        "path",
+        "contents",
+        "files",
+        "serverNames",
+        "reach"
+      ],
+      "additionalProperties": false
+    },
+    "SharedPluginContents": {
+      "type": "object",
+      "properties": {
+        "skills": {
+          "type": "integer"
+        },
+        "commands": {
+          "type": "integer"
+        },
+        "agents": {
+          "type": "integer"
+        },
+        "hooks": {
+          "type": "integer"
+        },
+        "mcpServers": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "skills",
+        "commands",
+        "agents",
+        "hooks",
+        "mcpServers"
+      ],
+      "additionalProperties": false
+    },
+    "SharedOtherFile": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "description": "Relative to `~/.agents`, or to a project's `.agents`.",
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/definitions/SharedOtherFileKind"
+        }
+      },
+      "required": [
+        "path",
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "SharedOtherFileKind": {
+      "type": "string",
+      "enum": [
+        "persona",
+        "git",
+        "managed",
+        "unused",
+        "app"
+      ]
+    },
+    "SharedLook": {
+      "description": "Something the overview lists under Needs a look, and the page it opens.",
+      "type": "object",
+      "properties": {
+        "kind": {
+          "$ref": "#/definitions/SharedLookKind"
+        },
+        "page": {
+          "$ref": "#/definitions/SharedLookPage"
+        },
+        "item": {
+          "description": "What it is about: a skill, a server, a runtime's name.",
+          "type": "string"
+        },
+        "text": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "page",
+        "item",
+        "text"
+      ],
+      "additionalProperties": false
+    },
+    "SharedLookKind": {
+      "type": "string",
+      "enum": [
+        "clash",
+        "leftOut",
+        "noWay",
+        "noFile",
+        "problem"
+      ]
+    },
+    "SharedLookPage": {
+      "type": "string",
+      "enum": [
+        "instructions",
+        "skills",
+        "mcp",
+        "plugins",
+        "other"
+      ]
     }
   }
 }

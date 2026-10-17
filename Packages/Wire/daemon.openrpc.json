@@ -5200,6 +5200,25 @@
           }
         }
       ]
+    },
+    {
+      "name": "personal/shared",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": false,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/SharedRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/SharedSnapshot"
+        }
+      }
     }
   ],
   "components": {
