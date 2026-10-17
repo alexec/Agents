@@ -27,7 +27,7 @@ and then carry on.
    ```
 
    You do not need to know the event's name. The agent finds it, here
-   `pr.merged` from the `ci` server with `pr: 640`, and sets a time limit: yours if you gave one,
+   `pr.merged` from the `github` server with `pr: 640`, and sets a time limit: yours if you gave one,
    otherwise its own. Every wait has one, from 1 minute to 24 hours, so none can last
    for ever; when it runs out the agent is started again and can wait again.
 
@@ -42,8 +42,8 @@ and then carry on.
    particular agents to finish, the agent names them in `agents` instead.
 
    An agent can also wait on an MCP server's event, such as `pr.merged` or `pr.closed`
-   from a `ci` server. Then `where` is what the server is asked for, such as `{"pr": 640}`
-   (the `ci` server fills in `repo` from the project's folder), and the wait subscribes to
+   from a `github` server. Then `where` is what the server is asked for, such as `{"pr": 640}`
+   (the `github` server fills in `repo` from the project's folder), and the wait subscribes to
    the server until it ends. A name
    no server here offers, or a filter the server doesn't take, is refused with what the
    server does take. See [Events from MCP servers](../reference/events.md#events-from-mcp-servers).
@@ -52,7 +52,7 @@ and then carry on.
    ask, and Copilot always does.
 
 3. Check that it is waiting. Above the prompt, the chat shows a capsule such as
-   **◷ Waiting for pr.merged on ci (pr 640) · since 14:02 · until 18:00**. On the
+   **◷ Waiting for pr.merged on github (pr 640) · since 14:02 · until 18:00**. On the
    project page, the agent is under **Waiting** with the same line under its report.
 
 4. Leave it. When the pull request merges, the agent is started again with a message saying

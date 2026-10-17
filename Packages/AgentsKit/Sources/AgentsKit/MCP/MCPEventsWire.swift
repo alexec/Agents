@@ -5,7 +5,7 @@ import Foundation
 /// the daemon speaks (#383, contracts/mcp-events-client.md): poll mode only.
 ///
 /// Every method and field name of the draft is in this one file, so a change to the draft
-/// is one edit here and one in the CI watcher.
+/// is one edit here and one in the github server (Go/internal/githubmcp).
 enum MCPEventsWire {
     /// The newest protocol version the daemon offers on an event connection, then the one
     /// it offers everywhere else. Either is taken back (research R2).

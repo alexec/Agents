@@ -370,9 +370,8 @@ docs/how-to/sign-in-to-an-mcp-server.md                marketplace
 specs/059-*/                                           marketplace
 specs/060-*/                                           marketplace
 
-# ci-server: the ci MCP server (pull requests, checks, issues) and servers like it.
-Packages/MCPServers/Sources/CIWatcher/                 ci-server
-Packages/MCPServers/Sources/ci-watcher/                ci-server
+# ci-server: the github MCP server (pull requests, checks, issues; it replaced the ci
+# server, #1231) and servers like it.
 Packages/MCPServers/Sources/MCPServerKit/              ci-server
 Packages/MCPServers/Tests/                             ci-server
 Go/cmd/github-mcp/                                     ci-server

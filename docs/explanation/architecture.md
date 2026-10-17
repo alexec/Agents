@@ -103,8 +103,8 @@ with it:
 
 The agents MCP tools are not a process. The daemon serves them at
 `http://127.0.0.1:<port>/mcp/agents`, with a token for each session (#185). An http MCP
-server, such as the CI watcher on `127.0.0.1:8795`, belongs to no one in this tree: it is
-a LaunchAgent of its own.
+server belongs to no one in this tree: it is a LaunchAgent of its own. A hosted stdio one,
+such as the github server (`github-mcp`), is a child of agentsd.
 
 ## Related
 

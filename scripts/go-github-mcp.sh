@@ -1,9 +1,9 @@
 #!/bin/sh
 # The github MCP server (#1232), or another Go MCP server named last (linear-mcp, #839), for
-# Agents Host to carry beside agentsd as it carries ci-watcher (#700): what Agents Host's build
-# runs first. Builds Go/out/helpers/<name>, for both Mac architectures, when a Go source is
-# newer than it. With no way to run Go here (no Docker and no Go), it leaves none and warns:
-# the app still builds, without it.
+# Agents Host to carry beside agentsd (#700): what Agents Host's build runs first. Builds
+# Go/out/helpers/<name>, for both Mac architectures, when a Go source is newer than it. With no
+# way to run Go here (no Docker and no Go), it leaves none and warns: the app still builds,
+# without it.
 #
 #   scripts/go-github-mcp.sh                       build github-mcp if stale
 #   scripts/go-github-mcp.sh --force               build it whatever

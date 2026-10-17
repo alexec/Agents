@@ -20,7 +20,7 @@
 <rect x="70" y="1000" width="260" height="100" rx="8" fill="#8a8a8a" stroke="#8a8a8a"/>
 <text x="200.0" y="1024" fill="#fff" font-weight="700" font-size="14.5" text-anchor="middle">MCP servers</text>
 <text x="200.0" y="1040" fill="#fff" font-size="10.5" text-anchor="middle" opacity=".85">[External Software System]</text>
-<text x="200.0" y="1059.0" fill="#fff" font-size="11.3" text-anchor="middle">stdio or http, e.g. the CI watcher</text>
+<text x="200.0" y="1059.0" fill="#fff" font-size="11.3" text-anchor="middle">stdio or http, e.g. the github server</text>
 <path d="M370,1002 L370,1098 A130.0,12 0 0 0 630,1098 L630,1002 A130.0,12 0 0 0 370,1002 Z" fill="#438dd5"/><ellipse cx="500.0" cy="1002" rx="130.0" ry="12" fill="#438dd5" stroke="#fff" stroke-opacity=".5"/>
 <text x="500.0" y="1030" fill="#fff" font-weight="700" font-size="14.5" text-anchor="middle">Host data</text>
 <text x="500.0" y="1046" fill="#fff" font-size="10.5" text-anchor="middle" opacity=".85">[Container: files on the host]</text>

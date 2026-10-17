@@ -103,8 +103,7 @@ Open issues: `is:open label:integration MCP`.
 
 | Integration | Clients that show it | State | Last checked | Where | Gaps |
 | --- | --- | --- | --- | --- | --- |
-| The ci server (gh, polling) | agents | built | — | `Packages/MCPServers/Sources/CIWatcher` | #1231 removes it |
-| The github server (official github-mcp-server tools plus our events) | agents | built | — | `Go/cmd/github-mcp/main.go`, `Go/internal/githubmcp` | #1231 |
+| The github server (official github-mcp-server tools plus our events) | agents | built | 2026-10-16, side by side with the ci server it replaced (#1231) | `Go/cmd/github-mcp/main.go`, `Go/internal/githubmcp` | the ci server's views (board, issues, PR page) are not back |
 | MCP OAuth | Mac | built | — | `Go/internal/agentsd/mcpcatalog/oauth.go`, `App/Sources/Catalog/MCPSignInSheet.swift` | |
 | Events from MCP servers (polling only) | Mac, Remote, web | built | — | `Go/internal/agentsd/mcpevents.go` | |
 | Git credentials lent from the Mac to a Linux host | Mac, server | built | — | `App/Sources/Hosts/Lending.swift` | |

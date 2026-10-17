@@ -80,8 +80,8 @@ ties a view to a tool call the model made. A pin is the host making that call it
   and that tool's arguments (at most 2 KB of JSON). It is kept in `.agents/pins.json`
   beside the Markdown and HTML pins, and shared through git, so the arguments never hold a
   secret. A project has at most 10 pins, pages and views together.
-- **Its name.** The title the server gives the view, such as **Pull requests** for
-  `ui://ci/board`, kept with the pin when it is pinned (#905). When the server gives none,
+- **Its name.** The title the server gives the view, such as **Test view** for
+  `ui://agents/test-view`, kept with the pin when it is pinned (#905). When the server gives none,
   the last part of the address.
 - **Opening it.** The host calls the feeding tool (`views/call` with `feed: true`) and
   draws the view full page with that call's input and result. Each time it is opened the
@@ -144,22 +144,6 @@ sandbox as the app's own views.
 - **Logged.** The server's name, the view's address, its policy and words such as
   *connected*, *ended* or *refused*. Never its command, URL, headers, environment or any
   body.
-
-## The CI watcher's views
-
-The `ci` server's views are drawn as above, on all three clients alike, from its own HTML:
-**Pull requests** (`ui://ci/board`), **Issues** (`ui://ci/issues`) and, since #837, a pull
-request's page (`ui://ci/pr`, fed by `get_pr`): its description, comments, files and diff and
-checks, with **Comment**, **Merge**, **Ask the Agent to Fix** and, on someone else's pull
-request, **Approve** and **Request Changes**. A title on the board opens
-the same page in place. Under the pull requests, the board lists branches pushed in the last 14
-days that have none, each with **Create**: a form filled in from the branch's commits, as
-`gh pr create --fill` writes it, with a draft switch; the new pull request's page opens after.
-**Merge** asks again in the page before it squash-merges and deletes the
-branch. **Ask the Agent to Fix** is an `agents/message-agent` to the session on the PR's branch, so
-you send it, from a chat or a pin; with no session on the branch, it opens the new-agent form on
-that branch. The
-contract is `specs/383-mcp-integrations/contracts/ci-watcher-server.md`.
 
 ## The test view
 

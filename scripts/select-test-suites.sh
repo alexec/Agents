@@ -16,8 +16,8 @@
 # scan those views (ConsistencyTests, OneGroupingTests), and one to App/Resources/toolsets
 # the two that read the bundled toolsets. MCPServers (#700), the MCP servers Agents ships,
 # runs on any change to it, on Linux: it depends on nothing else here. `linux` builds the
-# Linux agentsd and ci-watcher (#805) on any change to what they are built from (Daemon/,
-# AgentsKit, MCPServers) or to the script and job that build them: AgentsKit code behind
+# Linux agentsd (#805) on any change to what it is built from (Daemon/, AgentsKit) or to
+# the script and job that build it: AgentsKit code behind
 # a Mac-only guard used from unguarded code breaks only that build (#788, #799). `go`
 # builds and tests the Go module at Go/ (#1135), on Linux, on any change under it; a change
 # under Go/ alone runs no Swift suite and no macOS job.
@@ -136,7 +136,6 @@ else
 					;;
 				Packages/MCPServers/*)
 					mcpservers=run
-					linux=build
 					;;
 				Go/*)
 					go=run

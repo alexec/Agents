@@ -7,10 +7,10 @@ import Testing
 struct ServerFilesTests {
     @Test func theShippedServersAreServedAndNothingElse() {
         for arch in ["x86_64", "aarch64"] {
-            #expect(ServerFiles.names.contains("ci-watcher-linux-\(arch)"))
-            #expect(ServerFiles.names.contains("ci-watcher-linux-\(arch).sha256"))
+            #expect(ServerFiles.names.contains("github-mcp-linux-\(arch)"))
+            #expect(ServerFiles.names.contains("github-mcp-linux-\(arch).sha256"))
         }
-        #expect(ServerFiles.read("ci-watcher", in: URL(filePath: "/")) == nil)
+        #expect(ServerFiles.read("github-mcp", in: URL(filePath: "/")) == nil)
     }
 
     @Test func aFolderGivesEachShippedServerItHas() throws {
@@ -18,13 +18,13 @@ struct ServerFilesTests {
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: folder) }
         try Data("0+1".utf8).write(to: folder.appending(path: "VERSION"))
-        try Data("binary".utf8).write(to: folder.appending(path: "ci-watcher-linux-aarch64"))
-        try Data("abc123\n".utf8).write(to: folder.appending(path: "ci-watcher-linux-aarch64.sha256"))
+        try Data("binary".utf8).write(to: folder.appending(path: "github-mcp-linux-aarch64"))
+        try Data("abc123\n".utf8).write(to: folder.appending(path: "github-mcp-linux-aarch64.sha256"))
 
         let servers = ServerFiles.shippedServers(for: "aarch64", in: folder)
-        #expect(servers.map(\.name) == ["ci-watcher"])
+        #expect(servers.map(\.name) == ["github-mcp"])
         #expect(servers.map(\.sha256) == ["abc123"])
-        #expect(servers.map(\.file.lastPathComponent) == ["ci-watcher-linux-aarch64"])
+        #expect(servers.map(\.file.lastPathComponent) == ["github-mcp-linux-aarch64"])
         #expect(ServerFiles.shippedServers(for: "x86_64", in: folder).isEmpty, "none built for it")
         #expect(ServerFiles.shippedServers(for: "aarch64", in: nil).isEmpty)
     }

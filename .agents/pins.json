@@ -1,33 +1,6 @@
 {
   "pins" : [
-    {
-      "pinned_by" : {
-        "person" : true
-      },
-      "title" : "Pull requests",
-      "view" : {
-        "arguments" : {
 
-        },
-        "server" : "ci",
-        "tool" : "list_prs",
-        "uri" : "ui://ci/board"
-      }
-    },
-    {
-      "pinned_by" : {
-        "person" : true
-      },
-      "title" : "Issues",
-      "view" : {
-        "arguments" : {
-
-        },
-        "server" : "ci",
-        "tool" : "list_issues",
-        "uri" : "ui://ci/issues"
-      }
-    }
   ],
   "sessions" : [
     {

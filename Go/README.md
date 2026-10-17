@@ -88,8 +88,8 @@ One stdio MCP server with GitHub's own tools and our events. The tools are the o
 server's (`github.com/github/github-mcp-server/v2`, a library): by default the
 `context,repos,issues,pull_requests,actions,labels` toolsets (`--toolsets` or
 `GITHUB_TOOLSETS` names others), with merging and reviewing a pull request
-(`HiddenTools`) never offered to the model. The events are the ci server's (CIWatcher.swift,
-#383), with the same names, arguments, data and eventIds, and the same cursor, paging and
+(`HiddenTools`) never offered to the model. The events are the ones the ci server raised
+(CIWatcher.swift, #383, removed in #1231), with the same names, arguments, data and eventIds, and the same cursor, paging and
 trust filter (#728), polled only: `checks.failed`, `pr.opened`, `pr.merged`, `pr.closed`,
 `pr.conflicted`, `issue.opened`, `issue.labelled`, `issue.commented`, `issue.closed`.
 

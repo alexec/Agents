@@ -73,9 +73,9 @@ packages:
   # The control plane as a service (058): Agents Host carries its agents-control.
   ControlPlane:
     path: Packages/ControlPlane
-  # The MCP servers Agents ships (#700): Agents Host carries ci-watcher beside agentsd,
-  # and workspace-commands beside agents-control (#691). github-mcp (#1232) and linear-mcp
-  # (#839) are Go, built and carried by scripts/go-github-mcp.sh.
+  # The MCP servers Agents ships (#700): Agents Host carries workspace-commands beside
+  # agents-control (#691). github-mcp (#1232) and linear-mcp (#839), beside agentsd, are Go,
+  # built and carried by scripts/go-github-mcp.sh.
   MCPServers:
     path: Packages/MCPServers
   swift-nio-ssl:
@@ -461,8 +461,8 @@ targets:
       - name: Build the Go agentsd
         script: sh "$SRCROOT/scripts/go-agentsd.sh"
         basedOnDependencyAnalysis: false
-      # The github MCP server (#1232), carried beside agentsd as ci-watcher is: with no
-      # Docker or Go it is left out.
+      # The github MCP server (#1232), carried beside agentsd: with no Docker or Go it is
+      # left out.
       - name: Build the github MCP server
         script: sh "$SRCROOT/scripts/go-github-mcp.sh"
         basedOnDependencyAnalysis: false
@@ -548,12 +548,6 @@ targets:
         copy:
           destination: wrapper
           subpath: Contents/Helpers
-      # The MCP servers Agents ships (#700), beside agentsd, which puts this folder first
-      # on their PATH: `.agents/mcp.json` names them by bare name on a Mac and on Linux.
-      - target: ci-watcher
-        copy:
-          destination: wrapper
-          subpath: Contents/Helpers
       # The command workspace provider (#691), which agents-control looks for beside itself.
       - target: workspace-commands
         copy:
@@ -614,33 +608,6 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.alexecollins.agents.control
         PRODUCT_NAME: agents-control
-        SDKROOT: macosx
-        SUPPORTED_PLATFORMS: macosx
-        SKIP_INSTALL: YES
-        ENABLE_HARDENED_RUNTIME: YES
-      # The GitHub release (#669): Release signs it with Developer ID, outside the App Store.
-      configs:
-        Release:
-          CODE_SIGN_STYLE: Manual
-          CODE_SIGN_IDENTITY: Developer ID Application
-          OTHER_CODE_SIGN_FLAGS: --timestamp
-
-  # The CI watcher (#383, #700), an MCP server built here for Agents Host's bundle; Linux
-  # builds it with `swift build` in Packages/MCPServers (scripts/build-linux-agentsd.sh).
-  ci-watcher:
-    type: tool
-    supportedDestinations: [macOS]
-    sources:
-      - path: Packages/MCPServers/Sources/ci-watcher
-    dependencies:
-      - package: MCPServers
-        product: CIWatcher
-      - package: MCPServers
-        product: MCPServerKit
-    settings:
-      base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.alexecollins.agents.ci-watcher
-        PRODUCT_NAME: ci-watcher
         SDKROOT: macosx
         SUPPORTED_PLATFORMS: macosx
         SKIP_INSTALL: YES

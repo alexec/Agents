@@ -74,13 +74,13 @@
   <path class="spawn" d="M290,505 C315,505 305,385 330,385"/>
   <path class="spawn" d="M165,534 L165,600"/>
 
-  <!-- ci-watcher -->
+  <!-- an http MCP server -->
   <rect class="box ext" x="40" y="600" width="250" height="112"/>
-  <text class="title" x="56" y="624">ci-watcher · Integrations/</text>
-  <text class="mono" x="56" y="644">node server.ts --port 8795</text>
-  <text class="small" x="56" y="662">LaunchAgent com.agents.ci-watcher</text>
+  <text class="title" x="56" y="624">an http MCP server</text>
+  <text class="mono" x="56" y="644">its own process and port</text>
+  <text class="small" x="56" y="662">a LaunchAgent of its own</text>
   <text class="small" x="56" y="680">MCP over http, 127.0.0.1 only</text>
-  <text class="small" x="56" y="698">calls gh api as Alex → GitHub</text>
+  <text class="small" x="56" y="698">(a hosted stdio one is agentsd's child)</text>
 
   <!-- agentsd -->
   <rect class="box daemon" x="330" y="340" width="620" height="100"/>
@@ -157,5 +157,5 @@
   <text class="lbls" x="100" y="944">starts (parent → child process)</text>
   <line x1="320" y1="940" x2="370" y2="940" class="conn"/>
   <text class="lbls" x="380" y="944">connects to (socket / http / wss); arrow points the way the connection is made</text>
-  <text class="small" x="40" y="970">Read from the live process tree on 2026-10-08: launchd → agents-control (8791/8792), agentsd → npm → node → claude → zsh, com.agents.ci-watcher → node :8795.</text>
+  <text class="small" x="40" y="970">Read from the live process tree on 2026-10-08: launchd → agents-control (8791/8792), agentsd → npm → node → claude → zsh; an http MCP server under launchd.</text>
 </svg>

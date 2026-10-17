@@ -1,6 +1,6 @@
 #!/bin/zsh
-# Build agentsd for Linux servers (037): two static binaries the app copies over ssh, and
-# beside each the MCP servers Agents ships (#700), which a host puts next to agentsd.
+# Build agentsd for Linux servers (037): two static binaries the app copies over ssh. The MCP
+# server a host puts next to agentsd (#700), github-mcp, is Go: build-linux-agentsd-go.sh.
 #
 #   ./scripts/build-linux-agentsd.sh           # build both, copy into App/Resources/servers
 #   ./scripts/build-linux-agentsd.sh --check   # build both, copy nothing (the pre-merge gate)
@@ -13,7 +13,6 @@
 #   agentsd-linux-<arch>          the binary, stripped
 #   agentsd-linux-<arch>.sha256   its SHA-256, which is its identity: the installer names
 #                                 it on the server by this and compares it on every connect
-#   ci-watcher-linux-<arch>       the CI watcher (Packages/MCPServers), and its .sha256
 # and once:
 #   VERSION                       MARKETING_VERSION+CURRENT_PROJECT_VERSION from project.yml,
 #                                 used only to refuse a server running a newer app's build
@@ -55,7 +54,7 @@ sha256() { if (( $+commands[shasum] )); then shasum -a 256 $1; else sha256sum $1
 # The cache key: everything the binaries are built from, or nothing when that is not all
 # committed. AGENTS_BUILD_CACHE=off turns the cache off, as for build-cache.sh.
 cache=${AGENTS_BUILD_CACHE:-$HOME/Library/Caches/Agents-build}
-inputs=(Daemon Packages/AgentsKit Packages/MCPServers)
+inputs=(Daemon Packages/AgentsKit)
 key=
 if (( ! check )) && [[ $cache != off ]] && git -C $root rev-parse -q --verify HEAD >/dev/null 2>&1 \
     && [[ -z $(git -C $root status --porcelain -- $inputs) ]]; then
@@ -63,11 +62,11 @@ if (( ! check )) && [[ $cache != off ]] && git -C $root rev-parse -q --verify HE
         | { if (( $+commands[shasum] )); then shasum; else sha256sum; fi } | cut -c1-16)
 fi
 
-# One architecture: agentsd and the MCP servers, into $1, in a .build folder of its own so the
+# One architecture: agentsd, into $1, in a .build folder of its own so the
 # two can build at once (SwiftPM locks a .build for one process).
 build_arch() {
     local arch=$1 dest=$2 pkg product bin
-    for pkg product in Daemon agentsd Packages/MCPServers ci-watcher; do
+    for pkg product in Daemon agentsd; do
         print "building $product for $arch-linux…"
         $swift build --package-path $root/$pkg --scratch-path $root/$pkg/.build/linux-$arch -c release \
             --swift-sdk $arch-swift-linux-musl --product $product \
@@ -110,7 +109,7 @@ for arch in $arches; do
     [[ -n $key ]] && from=$cache/linux/$key/$arch && touch $cache/linux/$key
     (( check )) && continue
     mkdir -p $out
-    for product in agentsd ci-watcher; do
+    for product in agentsd; do
         cp $from/$product-linux-$arch $out/$product-linux-$arch
         sha256 $out/$product-linux-$arch > $out/$product-linux-$arch.sha256
     done
