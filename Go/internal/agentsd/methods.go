@@ -36,6 +36,7 @@ func (d *Daemon) register() {
 	d.registerMCP()
 	d.registerOptions()
 	d.registerSandbox()
+	d.registerRuntimeSessions()
 	d.registerWorkflows()
 	d.registerShells()
 	On(d, wire.CallPermissionsPending, func(ctx context.Context, c *Client, _ wire.Empty) ([]wire.PermissionRequest, error) {

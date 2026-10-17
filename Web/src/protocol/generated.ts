@@ -105,6 +105,12 @@ export interface ACPProviderInfo {
   configured?: boolean;
 }
 
+export interface AdoptRequest {
+  runtimeID: string;
+  sessionID: string;
+  cwd: URLString;
+}
+
 export type AfterTurn = "request_archive" | "archive";
 
 export interface Agent {
@@ -707,6 +713,12 @@ export interface DeclaredResource {
   holders: number;
   defaultMinutes?: number;
   maximumMinutes?: number;
+}
+
+export interface DeleteSessionRequest {
+  runtimeID: string;
+  sessionID: string;
+  confirmed?: boolean;
 }
 
 export interface DeviceBinding {
@@ -1828,6 +1840,15 @@ export type RuntimeInstall =
   | { script: { url: URLString; shell: string } }
   | { npmGlobal: { package: string } };
 
+export interface RuntimeSession {
+  sessionID: string;
+  cwd: URLString;
+  additionalDirectories?: URLString[];
+  title?: string;
+  updatedAt?: WireDate;
+  isHeld?: boolean;
+}
+
 export interface RuntimeStatus {
   runtime: Runtime;
   availability: RuntimeAvailability;
@@ -1885,6 +1906,11 @@ export interface SessionNotice {
   severity: string;
   title: string;
   detail?: string;
+}
+
+export interface SessionsListRequest {
+  runtimeID: string;
+  cwd: URLString;
 }
 
 export interface SetCeilingRequest {
@@ -2934,6 +2960,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ACPAuthMethod: { required: ["id"], optional: ["name", "description", "_meta"] },
   ACPPromptCapabilities: { required: [], optional: ["image", "audio", "embeddedContext"] },
   ACPProviderInfo: { required: ["id"], optional: ["name", "protocol", "configured"] },
+  AdoptRequest: { required: ["runtimeID", "sessionID", "cwd"], optional: [] },
   Agent: { required: ["id", "runtimeID", "cwd", "state", "startOptions", "advertisedOptions", "availableCommands", "createdAt", "lastActivityAt"], optional: ["title", "labels", "runtimeSessionID", "isUnread", "reportSeenAt", "endedReason", "archivedReason", "usage", "lastTurnUsage", "costToDate", "costCeiling", "tokensToDate", "tokenCeiling", "plans", "background", "additionalDirectories", "mcpServers", "queuedPrompts", "suggestedPrompts", "startedByWorkflow", "purpose", "startedByRun", "startedByAgent", "chainDepth", "eventWait", "worktree", "pendingMove", "startingPoint", "startRequestID", "persona", "restartPickUps", "report", "outcomeAsked", "archiveRequest", "afterTurn", "archivedAt", "sandboxOverride", "effectiveSandbox", "pendingSandboxFailure", "missingFolder", "listsLeftOut", "titleIsPersons", "runtimeTitle", "madeInRoot", "queuedStart"] },
   AgentRemovedNotification: { required: ["agentID"], optional: [] },
   AgentRequest: { required: ["agentID"], optional: [] },
@@ -2993,6 +3020,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   DayRecap: { required: ["agents", "peakAgents", "longestClear"], optional: ["prsMerged"] },
   DeclareResourceRequest: { required: ["resource"], optional: ["replacing"] },
   DeclaredResource: { required: ["name", "displayName", "description", "holders"], optional: ["defaultMinutes", "maximumMinutes"] },
+  DeleteSessionRequest: { required: ["runtimeID", "sessionID"], optional: ["confirmed"] },
   DeviceBinding: { required: [], optional: ["id", "pairing"] },
   DiffLine: { required: ["kind", "text"], optional: ["newLine"] },
   DirectoryEntry: { required: ["url", "name", "isDirectory"], optional: ["size", "modifiedAt"] },
@@ -3141,6 +3169,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   RuntimeAccount: { required: ["runtimeID", "state", "authMethods", "canLogOut", "providers", "promptCapabilities", "canSteer", "checkedAt"], optional: ["currentProviderID", "signedInAs"] },
   RuntimeAllowances: { required: ["rows", "at"], optional: ["shared"] },
   RuntimeAllowancesRow: { required: ["credentialKey", "state"], optional: ["unusable"] },
+  RuntimeSession: { required: ["sessionID", "cwd"], optional: ["additionalDirectories", "title", "updatedAt", "isHeld"] },
   RuntimeStatus: { required: ["runtime", "availability", "checkedAt", "outdated"], optional: ["poolNote", "isOut"] },
   SandboxFailureRecord: { required: ["runtimeID", "detail", "hang", "recoveryOffered", "completedToolCalls"], optional: [] },
   SandboxSettings: { required: ["defaults"], optional: [] },
@@ -3148,6 +3177,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ServerReachabilityChange: { required: ["server", "online"], optional: [] },
   SessionLabel: { required: ["value", "owner", "addedAt"], optional: [] },
   SessionNotice: { required: ["severity", "title"], optional: ["detail"] },
+  SessionsListRequest: { required: ["runtimeID", "cwd"], optional: [] },
   SetCeilingRequest: { required: ["agentID"], optional: ["ceiling", "tokenCeiling"] },
   SetDiskSpaceRequest: { required: ["folder", "diskSpace"], optional: [] },
   SetHelperLimitsRequest: { required: ["folder", "limits"], optional: [] },

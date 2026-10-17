@@ -64,10 +64,9 @@ type Session struct {
 	Continued, Lost bool
 }
 
-// Start launches the runtime and says initialize, then continues the conversation it
-// names (session/resume where the runtime offers it, else session/load with its replay
-// dropped), or begins one with session/new: also when the runtime no longer has it.
-func Start(ctx context.Context, l Launch, sink Sink, mcp []sdk.McpServer, meta map[string]any, continuing string) (*Session, error) {
+// Handshake launches the runtime and says initialize, and goes no further: for asking a
+// runtime something without starting an agent (DaemonCore.handshakeOnly).
+func Handshake(ctx context.Context, l Launch, sink Sink) (*Session, error) {
 	argv := append([]string{l.Command}, l.Args...)
 	if l.Wrap != nil {
 		argv = l.Wrap(argv)
@@ -111,20 +110,39 @@ func Start(ctx context.Context, l Launch, sink Sink, mcp []sdk.McpServer, meta m
 		s.Stop()
 		return nil, fmt.Errorf("initialize: %w%s", err, stderr.say())
 	}
-	// A server over http only to a runtime that takes one (SessionServers.noHTTPRefusal).
+	return s, nil
+}
+
+// takes is the servers the runtime takes: one over http or sse only where it says so
+// (SessionServers.noHTTPRefusal).
+func (s *Session) takes(mcp []sdk.McpServer, command string) []sdk.McpServer {
 	kept := []sdk.McpServer{}
 	for _, m := range mcp {
 		if m.Http != nil && !s.Init.AgentCapabilities.McpCapabilities.Http {
-			log.Printf("%s does not take MCP servers over http: %s is left out", l.Command, m.Http.Name)
+			log.Printf("%s does not take MCP servers over http: %s is left out", command, m.Http.Name)
 			continue
 		}
 		if m.Sse != nil && !s.Init.AgentCapabilities.McpCapabilities.Sse {
-			log.Printf("%s does not take MCP servers over sse: %s is left out", l.Command, m.Sse.Name)
+			log.Printf("%s does not take MCP servers over sse: %s is left out", command, m.Sse.Name)
 			continue
 		}
 		kept = append(kept, m)
 	}
-	mcp = kept
+	return kept
+}
+
+// Start launches the runtime and says initialize, then continues the conversation it
+// names (session/resume where the runtime offers it, else session/load with its replay
+// dropped), or begins one with session/new: also when the runtime no longer has it.
+func Start(ctx context.Context, l Launch, sink Sink, mcp []sdk.McpServer, meta map[string]any, continuing string) (*Session, error) {
+	s, err := Handshake(ctx, l, sink)
+	if err != nil {
+		return nil, err
+	}
+	stderr := s.stderr
+	ictx, cancel := context.WithTimeout(ctx, 60*time.Second)
+	defer cancel()
+	mcp = s.takes(mcp, l.Command)
 	if continuing != "" {
 		if err := s.continueSession(ictx, continuing, l.Dir, mcp, meta); err == nil {
 			s.Continued = true
@@ -626,4 +644,46 @@ func Fork(ctx context.Context, l Launch, sink Sink, sessionID, cwd string, meta 
 		return "", err
 	}
 	return string(r.SessionId), nil
+}
+
+// CanList, CanDelete and CanLoad are whether the runtime lists its conversations, deletes
+// one, and loads one with its replay.
+func (s *Session) CanList() bool   { return s.Init.AgentCapabilities.SessionCapabilities.List != nil }
+func (s *Session) CanDelete() bool { return s.Init.AgentCapabilities.SessionCapabilities.Delete != nil }
+func (s *Session) CanLoad() bool   { return s.Init.AgentCapabilities.LoadSession }
+
+// ListSessions is session/list for a folder, every page of it (ACPSession.listSessions).
+func (s *Session) ListSessions(ctx context.Context, cwd string) ([]sdk.SessionInfo, error) {
+	var out []sdk.SessionInfo
+	var cursor *string
+	for page := 0; page < 50; page++ {
+		r, err := s.conn.ListSessions(ctx, sdk.ListSessionsRequest{Cwd: &cwd, Cursor: cursor})
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, r.Sessions...)
+		if r.NextCursor == nil || *r.NextCursor == "" {
+			break
+		}
+		cursor = r.NextCursor
+	}
+	return out, nil
+}
+
+// DeleteSession is session/delete.
+func (s *Session) DeleteSession(ctx context.Context, id string) error {
+	_, err := s.conn.UnstableDeleteSession(ctx, sdk.UnstableDeleteSessionRequest{SessionId: sdk.SessionId(id)})
+	return err
+}
+
+// LoadRecorded is session/load with its replay given to the sink: a conversation taken over
+// from the runtime, whose replay is its transcript.
+func (s *Session) LoadRecorded(ctx context.Context, id, cwd string, mcp []sdk.McpServer, meta map[string]any) error {
+	r, err := s.conn.LoadSession(ctx, sdk.LoadSessionRequest{SessionId: sdk.SessionId(id), Cwd: cwd, McpServers: s.takes(mcp, "the runtime"), Meta: meta})
+	if err != nil {
+		return err
+	}
+	s.NewResult.ConfigOptions = r.ConfigOptions
+	s.ID = sdk.SessionId(id)
+	return nil
 }

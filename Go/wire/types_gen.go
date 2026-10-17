@@ -24,6 +24,12 @@ type ACPProviderInfo struct {
 	Configured *bool   `json:"configured,omitzero"`
 }
 
+type AdoptRequest struct {
+	RuntimeID string `json:"runtimeID"`
+	SessionID string `json:"sessionID"`
+	Cwd       URL    `json:"cwd"`
+}
+
 type AfterTurn string
 
 const (
@@ -866,6 +872,12 @@ type DeclaredResource struct {
 	Holders        int64        `json:"holders"`
 	DefaultMinutes *int64       `json:"defaultMinutes,omitzero"`
 	MaximumMinutes *int64       `json:"maximumMinutes,omitzero"`
+}
+
+type DeleteSessionRequest struct {
+	RuntimeID string `json:"runtimeID"`
+	SessionID string `json:"sessionID"`
+	Confirmed *bool  `json:"confirmed,omitzero"`
 }
 
 type DeviceBinding struct {
@@ -2419,6 +2431,15 @@ type RuntimeInstallNpmGlobal struct {
 	Package string `json:"package"`
 }
 
+type RuntimeSession struct {
+	SessionID             string  `json:"sessionID"`
+	Cwd                   URL     `json:"cwd"`
+	AdditionalDirectories []URL   `json:"additionalDirectories,omitzero"`
+	Title                 *string `json:"title,omitzero"`
+	UpdatedAt             *Date   `json:"updatedAt,omitzero"`
+	IsHeld                *bool   `json:"isHeld,omitzero"`
+}
+
 type RuntimeStatus struct {
 	Runtime      Runtime             `json:"runtime"`
 	Availability RuntimeAvailability `json:"availability"`
@@ -2518,6 +2539,11 @@ type SessionNotice struct {
 	Severity string  `json:"severity"`
 	Title    string  `json:"title"`
 	Detail   *string `json:"detail,omitzero"`
+}
+
+type SessionsListRequest struct {
+	RuntimeID string `json:"runtimeID"`
+	Cwd       URL    `json:"cwd"`
 }
 
 type SetCeilingRequest struct {
