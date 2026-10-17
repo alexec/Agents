@@ -89,7 +89,7 @@ Open issues: `is:open label:integration workspace`.
 
 | Integration | Clients that show it | State | Last checked | Where | Gaps |
 | --- | --- | --- | --- | --- | --- |
-| Docker | Mac, Remote, web, control plane | walked on scratch | 2026-10-13, PR #966 (`specs/691-workspace-providers/walks/857-real-providers.md`) | `presets.go` (`docker`) | #857, #1119 |
+| Docker | Mac, Remote, web, control plane | walked on scratch | 2026-10-17, PR #1373: the Go workspace-commands behind a scratch Go control plane, with real Docker (list, start, stop, make and delete); the window last on 2026-10-13, PR #966 (`specs/691-workspace-providers/walks/857-real-providers.md`) | `presets.go` (`docker`) | #857, #1119 |
 | Coder | Mac, Remote, web, control plane | built | — | `presets.go` (`coder`) | #1119 |
 | Codespaces | Mac, Remote, web, control plane | broken (Stop works, Start never brings the host back) | 2026-10-13, PR #966, with a real codespace | `presets.go` (`codespaces`) | #864, #1119 |
 | DigitalOcean | Mac, Remote, web, control plane | built | — | `presets.go` (`doctl`) | #865, #1119 |
