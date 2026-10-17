@@ -243,6 +243,21 @@ export type AllowanceStateStatus =
   | { rateLimited: { until: WireDate } }
   | { out: { until?: WireDate; retryAfter?: WireDate; why: AllowanceStateOutReason } };
 
+/**
+ * What devices/announce answers: the device's record, with the Mac's relay key beside its fields
+ * when a bridge has registered one (046).
+ */
+export interface AnnounceReply {
+  id: UUID;
+  publicKey: Base64;
+  name: string;
+  kind: DeviceKind;
+  announcedAt: WireDate;
+  lastSeenAt?: WireDate;
+  mayNotify?: boolean;
+  macKey?: Base64;
+}
+
 export interface AnswerElicitationRequest {
   requestID: UUID;
   action: AnswerElicitationRequestAction;
@@ -795,12 +810,42 @@ export interface DestinationStateRequest {
   destination: SkillDestination;
 }
 
+/** A paired device (021 US5), as devices.json keeps it. */
+export interface Device {
+  id: UUID;
+  publicKey: Base64;
+  name: string;
+  kind: DeviceKind;
+  announcedAt: WireDate;
+  lastSeenAt?: WireDate;
+  mayNotify?: boolean;
+}
+
+/** devices/announce: this device, and the public half of its key. */
+export interface DeviceAnnouncement {
+  id: UUID;
+  publicKey: Base64;
+  name: string;
+  kind: DeviceKind;
+}
+
 export interface DeviceBinding {
   id?: UUID;
   pairing?: boolean;
 }
 
+export interface DeviceForget {
+  id: UUID;
+}
+
 export type DeviceKind = "iPhone" | "iPad" | "unknown";
+
+/** device/changed: the whole record, or that it was forgotten (046). */
+export interface DeviceNotification {
+  id: UUID;
+  device?: Device;
+  removed?: boolean;
+}
 
 export interface DiffLine {
   kind: DiffLineKind;
@@ -1816,6 +1861,23 @@ export interface PagesChangedNotification {
   folders: string[];
 }
 
+/**
+ * devices/startPairing: the Mac's relay key, a one-time secret and this Mac's name, good for five
+ * minutes or one device.
+ */
+export interface PairingCode {
+  macKey: Base64;
+  secret: Base64;
+  name: string;
+  expires: WireDate;
+}
+
+/** pairing/current: the secret the bridge's listener should take, if any. */
+export interface PairingSecret {
+  secret?: Base64;
+  expires?: WireDate;
+}
+
 export type Payment =
   | { allowance: { label?: string } }
   | { freeTier: { reset: ResetRule } }
@@ -2172,6 +2234,11 @@ export interface RelayOffer {
   socketPath: string;
   caCertificate: string;
   standIn: string;
+}
+
+/** relay/register: the public half of the Mac's relay key, X9.63. */
+export interface RelayRegistration {
+  publicKey: Base64;
 }
 
 export interface RememberedOptionsRequest {
@@ -3529,6 +3596,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   AllowanceReading: { required: ["spent", "nearlySpent", "at"], optional: ["window", "used", "resetsAt"] },
   AllowanceState: { required: ["credentialKey", "entryID", "status", "since", "changedAt", "learnedFrom", "spent", "rateLimitStreak"], optional: ["lastRateLimit", "reading", "modelsOut"] },
   AllowanceStateModelOut: { required: ["model", "since", "retryAfter"], optional: ["name"] },
+  AnnounceReply: { required: ["id", "publicKey", "name", "kind", "announcedAt"], optional: ["lastSeenAt", "mayNotify", "macKey"] },
   AnswerElicitationRequest: { required: ["requestID", "action", "content"], optional: ["sendID"] },
   AnswerRequest: { required: ["permissionID", "optionID"], optional: ["sendID"] },
   AnswerSandboxRequest: { required: ["agentID", "carryOn"], optional: [] },
@@ -3590,7 +3658,11 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   DeleteSessionRequest: { required: ["runtimeID", "sessionID"], optional: ["confirmed"] },
   DestinationStateAnswer: { required: ["destinationState"], optional: [] },
   DestinationStateRequest: { required: ["previewID", "destination"], optional: [] },
+  Device: { required: ["id", "publicKey", "name", "kind", "announcedAt"], optional: ["lastSeenAt", "mayNotify"] },
+  DeviceAnnouncement: { required: ["id", "publicKey", "name", "kind"], optional: [] },
   DeviceBinding: { required: [], optional: ["id", "pairing"] },
+  DeviceForget: { required: ["id"], optional: [] },
+  DeviceNotification: { required: ["id"], optional: ["device", "removed"] },
   DiffLine: { required: ["kind", "text"], optional: ["newLine"] },
   DirectoryEntry: { required: ["url", "name", "isDirectory"], optional: ["size", "modifiedAt"] },
   DirectoryListing: { required: ["url", "entries", "omitted"], optional: [] },
@@ -3724,6 +3796,8 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   OptionsRequest: { required: ["runtimeID", "cwd", "mcpServers"], optional: [] },
   OptionsResponse: { required: ["draftID", "options", "commands"], optional: [] },
   PagesChangedNotification: { required: ["folder", "folders"], optional: [] },
+  PairingCode: { required: ["macKey", "secret", "name", "expires"], optional: [] },
+  PairingSecret: { required: [], optional: ["secret", "expires"] },
   PendingMove: { required: ["target", "removeLeft", "discardChanges", "askedBy", "askedAt"], optional: [] },
   PermissionNotification: { required: ["agentID"], optional: ["request", "requestID"] },
   PermissionOption: { required: ["optionID", "name", "kind"], optional: [] },
@@ -3773,6 +3847,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   RelayGrantReply: { required: ["runtime", "caCertificate", "standIn"], optional: [] },
   RelayGrantRequest: { required: ["runtime"], optional: [] },
   RelayOffer: { required: ["runtime", "socketPath", "caCertificate", "standIn"], optional: [] },
+  RelayRegistration: { required: ["publicKey"], optional: [] },
   RememberedOptionsRequest: { required: ["runtimeID", "cwd"], optional: [] },
   RemovalCheck: { required: ["blockedBy", "uncommitted", "unmerged"], optional: [] },
   RemoveResourceRequest: { required: ["name"], optional: [] },

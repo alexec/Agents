@@ -51,6 +51,11 @@ var (
 	CallDaemonPing                     = Method[Empty, PingResponse]{"daemon/ping"}
 	CallDaemonQuit                     = Method[QuitRequest, Empty]{"daemon/quit"}
 	CallDaemonStatus                   = Method[Empty, DaemonStatus]{"daemon/status"}
+	CallDevicesAnnounce                = Method[DeviceAnnouncement, AnnounceReply]{"devices/announce"}
+	CallDevicesForget                  = Method[DeviceForget, Empty]{"devices/forget"}
+	CallDevicesList                    = Method[Empty, []Device]{"devices/list"}
+	CallDevicesStartPairing            = Method[Empty, PairingCode]{"devices/startPairing"}
+	CallDevicesStopPairing             = Method[Empty, Empty]{"devices/stopPairing"}
 	CallDiskState                      = Method[Empty, DiskState]{"disk/state"}
 	CallDropboxPut                     = Method[DropboxPutRequest, DropboxPutResponse]{"dropbox/put"}
 	CallElicitationsAnswer             = Method[AnswerElicitationRequest, Empty]{"elicitations/answer"}
@@ -101,6 +106,7 @@ var (
 	CallMilestonesState                = Method[Empty, Milestones]{"milestones/state"}
 	CallModesRemembered                = Method[Empty, map[string]JSONValue]{"modes/remembered"}
 	CallOptionsRemembered              = Method[RememberedOptionsRequest, []ConfigOption]{"options/remembered"}
+	CallPairingCurrent                 = Method[Empty, PairingSecret]{"pairing/current"}
 	CallPermissionsAnswer              = Method[AnswerRequest, Empty]{"permissions/answer"}
 	CallPermissionsPending             = Method[Empty, []PermissionRequest]{"permissions/pending"}
 	CallPersonSet                      = Method[PersonSettings, PersonSettings]{"person/set"}
@@ -141,6 +147,7 @@ var (
 	CallProjectsUndoGuardedChange      = Method[GuardedChangeRequest, ProjectSummary]{"projects/undoGuardedChange"}
 	CallRelayGrant                     = Method[RelayGrantRequest, RelayGrantReply]{"relay/grant"}
 	CallRelayOffer                     = Method[RelayOffer, Empty]{"relay/offer"}
+	CallRelayRegister                  = Method[RelayRegistration, Empty]{"relay/register"}
 	CallResourcesDeclare               = Method[DeclareResourceRequest, LeaseSnapshot]{"resources/declare"}
 	CallResourcesRemove                = Method[RemoveResourceRequest, LeaseSnapshot]{"resources/remove"}
 	CallRetentionState                 = Method[Empty, RetentionState]{"retention/state"}
@@ -210,6 +217,7 @@ var (
 	NotifyAttentionChanged             = Notification[AttentionNotification]{"attention/changed"}
 	NotifyCloneChanged                 = Notification[CloneNotification]{"clone/changed"}
 	NotifyCostChanged                  = Notification[CostState]{"cost/changed"}
+	NotifyDeviceChanged                = Notification[DeviceNotification]{"device/changed"}
 	NotifyDiskChanged                  = Notification[DiskState]{"disk/changed"}
 	NotifyEventsChanged                = Notification[EventsChange]{"events/changed"}
 	NotifyFilesChanged                 = Notification[FilesChangedNotification]{"files/changed"}
@@ -219,6 +227,7 @@ var (
 	NotifyMilestonesChanged            = Notification[Milestones]{"milestones/changed"}
 	NotifyModesChanged                 = Notification[map[string]JSONValue]{"modes/changed"}
 	NotifyPagesChanged                 = Notification[PagesChangedNotification]{"pages/changed"}
+	NotifyPairingChanged               = Notification[Empty]{"pairing/changed"}
 	NotifyPersonChanged                = Notification[PersonSettings]{"person/changed"}
 	NotifyPinsChanged                  = Notification[PinsChangedNotification]{"pins/changed"}
 	NotifyPluginsChanged               = Notification[PluginsList]{"plugins/changed"}
