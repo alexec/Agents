@@ -5,8 +5,8 @@ import (
 	"time"
 )
 
-// What the events and tools read from Linear (#839). RealLinear reads it over Linear's
-// GraphQL API with a personal API key; tests use a fake, or recorded answers.
+// What the events read from Linear (#839). RealLinear reads it over Linear's GraphQL API with
+// a personal API key; tests use a fake, or recorded answers.
 
 // Person is who did something: a workspace user, or an app or integration.
 type Person struct {
@@ -38,7 +38,6 @@ type Issue struct {
 	StateType  string // triage, backlog, unstarted, started, completed or canceled
 	Labels     []string
 	Assignee   string
-	Priority   int
 	URL        string
 	CreatedAt  string
 	Creator    *Person
@@ -103,41 +102,11 @@ func (a Activity) trusted() bool {
 	return a.By.trusted()
 }
 
-// Linear is what the events and tools ask of Linear.
+// Linear is what the events ask of Linear.
 type Linear interface {
 	// Activity is what happened to the workspace's issues at or after since, of one kind, in
 	// team when it is not empty.
 	Activity(ctx context.Context, kind Kind, team, since string) (items []Activity, truncated bool, err error)
-	// Issues are issues as list_issues asks for them.
-	Issues(ctx context.Context, q IssueQuery) ([]Issue, bool, error)
-	// IssueDetail is one issue, by identifier or id, with its description and comments.
-	IssueDetail(ctx context.Context, id string) (*Detail, error)
-	// Teams are the workspace's teams.
-	Teams(ctx context.Context) ([]Team, error)
-}
-
-// IssueQuery is what list_issues filters on; empty fields filter nothing.
-type IssueQuery struct {
-	Team, State, Label, Assignee, Text string
-	IncludeClosed                      bool
-	Limit                              int
-}
-
-// Detail is an issue with its description and latest comments.
-type Detail struct {
-	Issue
-	Description string
-	Comments    []Comment
-}
-
-// Comment is a comment on an issue.
-type Comment struct {
-	Author, Body, URL, CreatedAt string
-}
-
-// Team is a team of the workspace.
-type Team struct {
-	Key, Name string
 }
 
 // ErrorKind is why a Linear call failed.

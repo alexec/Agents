@@ -104,8 +104,8 @@ something particular done.
   agent finishes, stops or asks.
 - [Start a workflow from an MCP event](start-a-workflow-from-an-mcp-event.md): an agent
   each time an MCP server reports something, such as a pull request's checks failing.
-- [Use Linear issues](use-linear-issues.md): Linear's issues as read-only tools, and an
-  agent when one is opened, labelled, commented on or closed.
+- [Use Linear issues](use-linear-issues.md): Linear's own tools, and an agent when an
+  issue is opened, labelled, commented on or closed.
 - [Pin a page to a project](pin-a-page-to-a-project.md): a document or an HTML page
   under its project in the sidebar, live as it changes.
 - [Hand files to a workflow](hand-files-to-a-workflow.md): drop a file into a project's

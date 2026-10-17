@@ -1,29 +1,36 @@
 ---
 diataxis: how-to
 devices: [mac]
-description: Give a project's agents the Linear workspace's issues, and start an agent when an issue is opened, labelled, commented on or closed.
+description: Give a project's agents Linear's tools, and start an agent when a Linear issue is opened, labelled, commented on or closed.
 ---
 
 # Use Linear issues
 
-Agents ship a small `linear` MCP server, `linear-mcp`. It gives agents three read-only
-tools and four events from your Linear workspace:
+Two MCP servers work together:
 
-- **Tools:** `list_issues`, `get_issue` (with its description and comments) and
-  `list_teams`. They only read. To change an issue, use Linear, or Linear's own MCP server.
-- **Events:** `issue.opened`, `issue.labelled`, `issue.commented` and `issue.closed`. A
-  workflow or a wait can use them. See
-  [Start a workflow from an MCP event](start-a-workflow-from-an-mcp-event.md).
+- **Tools** come from Linear's own MCP server, `https://mcp.linear.app/mcp`. Agents use it
+  to find, read and change issues.
+- **Events** come from `linear-mcp`, a small server that Agents ships: `issue.opened`,
+  `issue.labelled`, `issue.commented` and `issue.closed`. A workflow or a wait can use them.
+  See [Start a workflow from an MCP event](start-a-workflow-from-an-mcp-event.md).
+  `linear-mcp` has no tools.
 
 Agents Host carries `linear-mcp`, and every Linux host installs it beside agentsd.
 
 ## Before you start
 
 - A Linear workspace that you can sign in to.
-- A personal API key. In Linear, go to **Settings ▸ Security & access ▸ Personal API keys**
-  and make a key. The key reads what you can read.
+- For the events, a personal API key. In Linear, go to **Settings ▸ Security & access ▸
+  Personal API keys** and make a key with the **Read** permission.
 
-## Add the server
+## Add Linear's tools
+
+Add Linear's own server from the registry, or by hand with the URL
+`https://mcp.linear.app/mcp`. It signs in with OAuth in your browser. See
+[Add an MCP server from the registry](add-an-mcp-server-from-the-registry.md) and
+[Sign in to an MCP server](sign-in-to-an-mcp-server.md).
+
+## Add the events
 
 1. Put the key in your own `~/.agents-secrets/secrets.env`, not in the project:
 
@@ -66,7 +73,7 @@ on:
 agent: new
 ---
 
-Read the issue in the event's data with get_issue, and find where the bug is.
+Read the issue in the event's data with Linear's tools, and find where the bug is.
 ```
 
 Give `server: linear`: a github server offers events with the same names.

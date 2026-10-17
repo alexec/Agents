@@ -40,18 +40,6 @@ func (f *fakeLinear) Activity(_ context.Context, kind Kind, team, since string) 
 	return out, false, nil
 }
 
-func (f *fakeLinear) Issues(context.Context, IssueQuery) ([]Issue, bool, error) {
-	return []Issue{issue("ENG-1", "ENG")}, false, nil
-}
-
-func (f *fakeLinear) IssueDetail(_ context.Context, id string) (*Detail, error) {
-	return &Detail{Issue: issue(id, "ENG"), Description: "Why", Comments: []Comment{{Author: "Alex", Body: "Yes"}}}, nil
-}
-
-func (f *fakeLinear) Teams(context.Context) ([]Team, error) {
-	return []Team{{Key: "ENG", Name: "Engineering"}}, nil
-}
-
 var (
 	member = &Person{Name: "Alex"}
 	guest  = &Person{Name: "Visitor", Guest: true}

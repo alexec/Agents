@@ -14,14 +14,20 @@ import (
 
 // The front, as the github server's (Go/internal/githubmcp/front.go): MCP's stdio transport,
 // one JSON-RPC message a line. It answers events/list and events/poll itself, and hands every
-// other message to the tools' server as it came, and that server's messages back as they
-// come. MCP's SDKs have no events (a working-group draft), so the front also adds the
-// `events` capability and the events' words to the tools' server's answer to initialize.
+// other message (initialize, ping, the empty lists) to a go-sdk server with no tools, and that
+// server's messages back as they come. MCP's SDKs have no events (a working-group draft), so
+// the front also adds the `events` capability and the events' words to its answer to
+// initialize. Linear's tools are Linear's own MCP server's (mcp.linear.app), not this one's.
 
 // Instructions are the server's words.
-const Instructions = "The Linear workspace's issues, read with the LINEAR_API_KEY personal API key: list_issues, get_issue and list_teams, " +
-	"and as events, polled: issue.opened, issue.labelled, issue.commented, issue.closed. " +
-	"These tools only read; changing an issue is done in Linear, or with Linear's own MCP server."
+const Instructions = "The Linear workspace's issues as events, polled with the LINEAR_API_KEY personal API key: " +
+	"issue.opened, issue.labelled, issue.commented, issue.closed. This server has no tools: " +
+	"Linear's own MCP server (mcp.linear.app) reads and changes issues."
+
+// NewServer is the server behind the front: it answers initialize and ping, and has no tools.
+func NewServer(version string) *mcp.Server {
+	return mcp.NewServer(&mcp.Implementation{Name: "linear-mcp", Title: "Linear events", Version: version}, nil)
+}
 
 // maxLine is the longest message read; a longer one ends the connection, as the SDK's does.
 const maxLine = 64 << 20
@@ -41,7 +47,7 @@ type message struct {
 	Result json.RawMessage `json:"result"`
 }
 
-// Serve reads in until it ends and writes to out, then stops the tools' server.
+// Serve reads in until it ends and writes to out, then stops the server behind it.
 func (f *Front) Serve(ctx context.Context, in io.Reader, out io.Writer) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -167,7 +173,7 @@ func (f *Front) answer(ctx context.Context, m message) []byte {
 	return line
 }
 
-// initialized is the tools' server's answer to initialize with the events added: the
+// initialized is the answer of the server behind it to initialize with the events added: the
 // capability, which the Agents daemon looks for before it lists them, their words, and this
 // server's name.
 func (f *Front) initialized(line []byte) []byte {

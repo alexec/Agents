@@ -158,7 +158,7 @@ func linearError(res *http.Response, errs []gqlError) *LinearError {
 const fragments = `
 fragment P on User { displayName app guest }
 fragment I on Issue {
-  id identifier title url priority createdAt
+  id identifier title url createdAt
   team { key } state { name type } labels { nodes { name } } assignee { displayName }
   creator { ...P } botActor { name }
 }`
@@ -193,7 +193,6 @@ type gqlIssue struct {
 	Identifier string `json:"identifier"`
 	Title      string `json:"title"`
 	URL        string `json:"url"`
-	Priority   float64
 	CreatedAt  string `json:"createdAt"`
 	Team       *struct {
 		Key string `json:"key"`
@@ -215,7 +214,7 @@ type gqlIssue struct {
 }
 
 func (g gqlIssue) issue() Issue {
-	i := Issue{ID: g.ID, Identifier: g.Identifier, Title: g.Title, URL: g.URL, Priority: int(g.Priority), CreatedAt: g.CreatedAt,
+	i := Issue{ID: g.ID, Identifier: g.Identifier, Title: g.Title, URL: g.URL, CreatedAt: g.CreatedAt,
 		Creator: person(g.Creator, g.BotActor), Labels: []string{}}
 	if g.Team != nil {
 		i.Team = g.Team.Key
@@ -403,121 +402,4 @@ func before(a, b string) bool {
 		return false
 	}
 	return ta.Before(tb)
-}
-
-// Issues are the issues q asks for, the latest updated first.
-func (l *RealLinear) Issues(ctx context.Context, q IssueQuery) ([]Issue, bool, error) {
-	var and []any
-	if q.Team != "" {
-		and = append(and, map[string]any{"team": teamFilter(q.Team)})
-	}
-	if q.State != "" {
-		and = append(and, map[string]any{"state": map[string]any{"or": []any{
-			map[string]any{"name": map[string]any{"eqIgnoreCase": q.State}},
-			map[string]any{"type": map[string]any{"eq": strings.ToLower(q.State)}},
-		}}})
-	} else if !q.IncludeClosed {
-		and = append(and, map[string]any{"state": map[string]any{"type": map[string]any{"nin": []string{"completed", "canceled"}}}})
-	}
-	if q.Label != "" {
-		and = append(and, map[string]any{"labels": map[string]any{"some": map[string]any{"name": map[string]any{"eqIgnoreCase": q.Label}}}})
-	}
-	switch strings.ToLower(q.Assignee) {
-	case "":
-	case "me":
-		and = append(and, map[string]any{"assignee": map[string]any{"isMe": map[string]any{"eq": true}}})
-	case "none":
-		and = append(and, map[string]any{"assignee": map[string]any{"null": true}})
-	default:
-		and = append(and, map[string]any{"assignee": map[string]any{"or": []any{
-			map[string]any{"displayName": map[string]any{"eqIgnoreCase": q.Assignee}},
-			map[string]any{"name": map[string]any{"eqIgnoreCase": q.Assignee}},
-			map[string]any{"email": map[string]any{"eqIgnoreCase": q.Assignee}},
-		}}})
-	}
-	if q.Text != "" {
-		and = append(and, map[string]any{"title": map[string]any{"containsIgnoreCase": q.Text}})
-	}
-	limit := q.Limit
-	if limit <= 0 {
-		limit = 25
-	}
-	limit = min(limit, perPage)
-	var out struct {
-		Issues struct {
-			Nodes    []gqlIssue `json:"nodes"`
-			PageInfo pageInfo   `json:"pageInfo"`
-		} `json:"issues"`
-	}
-	query := `query Issues($filter: IssueFilter, $first: Int) {
-  issues(filter: $filter, first: $first, orderBy: updatedAt) { nodes { ...I } pageInfo { hasNextPage } }
-}` + fragments
-	filter := map[string]any{}
-	if len(and) > 0 {
-		filter["and"] = and
-	}
-	if err := l.query(ctx, query, map[string]any{"filter": filter, "first": limit}, &out); err != nil {
-		return nil, false, err
-	}
-	issues := make([]Issue, len(out.Issues.Nodes))
-	for i, n := range out.Issues.Nodes {
-		issues[i] = n.issue()
-	}
-	return issues, out.Issues.PageInfo.HasNextPage, nil
-}
-
-// IssueDetail is the issue with id (its identifier, as ENG-12, or its id), its description
-// and its first 50 comments, oldest first.
-func (l *RealLinear) IssueDetail(ctx context.Context, id string) (*Detail, error) {
-	var out struct {
-		Issue *struct {
-			gqlIssue
-			Description string `json:"description"`
-			Comments    struct {
-				Nodes []struct {
-					Body      string     `json:"body"`
-					URL       string     `json:"url"`
-					CreatedAt string     `json:"createdAt"`
-					User      *gqlPerson `json:"user"`
-					BotActor  *gqlBot    `json:"botActor"`
-				} `json:"nodes"`
-			} `json:"comments"`
-		} `json:"issue"`
-	}
-	q := `query Issue($id: String!) {
-  issue(id: $id) { ...I description comments(first: 50) { nodes { body url createdAt user { ...P } botActor { name } } } }
-}` + fragments
-	if err := l.query(ctx, q, map[string]any{"id": id}, &out); err != nil {
-		return nil, err
-	}
-	if out.Issue == nil {
-		return nil, &LinearError{Kind: NotFound, Message: "Linear: no issue " + id}
-	}
-	d := &Detail{Issue: out.Issue.gqlIssue.issue(), Description: out.Issue.Description, Comments: []Comment{}}
-	for _, c := range out.Issue.Comments.Nodes {
-		d.Comments = append(d.Comments, Comment{Author: person(c.User, c.BotActor).name(), Body: c.Body, URL: c.URL, CreatedAt: c.CreatedAt})
-	}
-	sort.SliceStable(d.Comments, func(i, j int) bool { return before(d.Comments[i].CreatedAt, d.Comments[j].CreatedAt) })
-	return d, nil
-}
-
-// Teams are the workspace's teams, by key.
-func (l *RealLinear) Teams(ctx context.Context) ([]Team, error) {
-	var out struct {
-		Teams struct {
-			Nodes []struct {
-				Key  string `json:"key"`
-				Name string `json:"name"`
-			} `json:"nodes"`
-		} `json:"teams"`
-	}
-	if err := l.query(ctx, `query Teams { teams(first: 250) { nodes { key name } } }`, map[string]any{}, &out); err != nil {
-		return nil, err
-	}
-	teams := make([]Team, len(out.Teams.Nodes))
-	for i, t := range out.Teams.Nodes {
-		teams[i] = Team{Key: t.Key, Name: t.Name}
-	}
-	sort.Slice(teams, func(i, j int) bool { return teams[i].Key < teams[j].Key })
-	return teams, nil
 }

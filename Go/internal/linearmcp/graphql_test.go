@@ -124,44 +124,10 @@ func TestLabelsAndClosesComeFromHistorySince(t *testing.T) {
 	}
 }
 
-func TestIssueDetailAndTeams(t *testing.T) {
-	_, l := newRecorded(t)
-	d, err := l.IssueDetail(context.Background(), "ENG-5")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if d.Description != "It crashes." || len(d.Comments) != 2 || d.Comments[0].Body != "first" || d.Comments[1].Author != "GitHub" {
-		t.Fatalf("%+v", d)
-	}
-	teams, err := l.Teams(context.Background())
-	if err != nil || len(teams) != 2 || teams[0].Key != "ENG" {
-		t.Fatalf("%v %v", teams, err)
-	}
-}
-
-func TestIssuesFilters(t *testing.T) {
-	r, l := newRecorded(t)
-	if _, _, err := l.Issues(context.Background(), IssueQuery{Team: "ENG", Assignee: "me", Label: "Bug", Limit: 500}); err != nil {
-		t.Fatal(err)
-	}
-	filter, _ := json.Marshal(r.asked[0]["filter"])
-	want := `{"and":[{"team":{"key":{"eq":"ENG"}}},{"state":{"type":{"nin":["completed","canceled"]}}},` +
-		`{"labels":{"some":{"name":{"eqIgnoreCase":"Bug"}}}},{"assignee":{"isMe":{"eq":true}}}]}`
-	if string(filter) != want || r.asked[0]["first"] != float64(100) {
-		t.Fatalf("filter %s first %v", filter, r.asked[0]["first"])
-	}
-	if _, _, err := l.Issues(context.Background(), IssueQuery{}); err != nil {
-		t.Fatal(err)
-	}
-	if filter, _ := json.Marshal(r.asked[1]["filter"]); string(filter) != `{"and":[{"state":{"type":{"nin":["completed","canceled"]}}}]}` {
-		t.Fatalf("filter %s", filter)
-	}
-}
-
 func TestOneAnswerIsSharedForAPoll(t *testing.T) {
 	r, l := newRecorded(t)
 	for range 3 {
-		if _, err := l.Teams(context.Background()); err != nil {
+		if _, _, err := l.Activity(context.Background(), Opened, "", "2026-10-16T12:00:00.000Z"); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -185,7 +151,7 @@ func TestLinearsRefusals(t *testing.T) {
 	} {
 		r, l := newRecorded(t)
 		r.status, r.answer, r.header = c.status, c.body, c.header
-		_, err := l.Teams(context.Background())
+		_, _, err := l.Activity(context.Background(), Opened, "", "2026-10-16T12:00:00.000Z")
 		var le *LinearError
 		if !errors.As(err, &le) || le.Kind != c.kind {
 			t.Fatalf("%s: %v", c.body, err)
@@ -196,7 +162,7 @@ func TestLinearsRefusals(t *testing.T) {
 	}
 	l := NewRealLinear("http://127.0.0.1:1", func() string { return "" })
 	var le *LinearError
-	if _, err := l.Teams(context.Background()); !errors.As(err, &le) || le.Kind != NotSignedIn {
+	if _, _, err := l.Activity(context.Background(), Opened, "", "2026-10-16T12:00:00.000Z"); !errors.As(err, &le) || le.Kind != NotSignedIn {
 		t.Fatalf("no key: %v", err)
 	}
 }

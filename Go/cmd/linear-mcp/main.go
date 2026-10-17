@@ -1,7 +1,7 @@
 // linear-mcp: the `linear` MCP server (#839), on stdio, in the github server's shape
-// (Go/cmd/github-mcp). Read-only tools (list_issues, get_issue, list_teams) and the events of
-// the workspace's issues: issue.opened, issue.labelled, issue.commented and issue.closed,
-// polled. As the personal API key in LINEAR_API_KEY (Linear ▸ Settings ▸ Security & access ▸
+// (Go/cmd/github-mcp), with events only: issue.opened, issue.labelled, issue.commented and
+// issue.closed, polled. No tools: Linear's own MCP server (mcp.linear.app), added from the
+// marketplace, reads and changes issues. As the personal API key in LINEAR_API_KEY (Linear ▸ Settings ▸ Security & access ▸
 // Personal API keys), which `.agents/mcp.json` names as ${LINEAR_API_KEY} so its value stays
 // in ~/.agents-secrets/secrets.env.
 //
@@ -41,7 +41,7 @@ func main() {
 	linear := linearmcp.NewRealLinear(os.Getenv("LINEAR_MCP_API_URL"), key)
 	front := &linearmcp.Front{
 		Events:   &linearmcp.Events{Linear: linear, SignedIn: func() bool { return key() != "" }},
-		Upstream: linearmcp.NewServer(linear, buildinfo.Version), Version: buildinfo.Version, Logger: logger,
+		Upstream: linearmcp.NewServer(buildinfo.Version), Version: buildinfo.Version, Logger: logger,
 	}
 	// A signal ends it at once: the front would otherwise wait on stdin.
 	go func() {
