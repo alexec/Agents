@@ -1801,6 +1801,17 @@ const (
 	MCPTriggerStatusStateNotThisHost MCPTriggerStatusState = "notThisHost"
 )
 
+// mac/reveal, mac/open: a path on the host; app names the app to open it with.
+type MacPathRequest struct {
+	Path string  `json:"path"`
+	App  *string `json:"app,omitzero"`
+}
+
+// mac/terminal: Terminal, in path if given.
+type MacTerminalRequest struct {
+	Path *string `json:"path,omitzero"`
+}
+
 type ManagedSkill struct {
 	Destination  SkillDestination `json:"destination"`
 	Name         string           `json:"name"`
@@ -1977,6 +1988,12 @@ type PersonEndRequest struct {
 type PersonRemoveRequest struct {
 	Name    string `json:"name"`
 	AgentID string `json:"agentID"`
+}
+
+// What agents call the person, and their pronouns (#121), as given: person.json in the person's settings.
+type PersonSettings struct {
+	Name     *string `json:"name,omitzero"`
+	Pronouns *string `json:"pronouns,omitzero"`
 }
 
 type Persona struct {

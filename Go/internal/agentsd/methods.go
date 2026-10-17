@@ -19,6 +19,7 @@ func (d *Daemon) register() {
 	// What the window pushes or reports on connecting, which this host has no use for yet.
 	Quiet(d, wire.CallCredentialsOffer.Name, wire.CallAgentsPrewarm.Name)
 	d.registerFiles()
+	d.registerMac()
 	d.registerAgents()
 	d.registerPins()
 	d.registerSettings()

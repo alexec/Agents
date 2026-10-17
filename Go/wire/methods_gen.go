@@ -71,6 +71,9 @@ var (
 	CallLeasesRelease                  = Method[LeaseNameRequest, LeaseNote]{"leases/release"}
 	CallLeasesRemoveWaiter             = Method[PersonRemoveRequest, LeaseSnapshot]{"leases/removeWaiter"}
 	CallLeasesSnapshot                 = Method[Empty, LeaseSnapshot]{"leases/snapshot"}
+	CallMacOpen                        = Method[MacPathRequest, Empty]{"mac/open"}
+	CallMacReveal                      = Method[MacPathRequest, Empty]{"mac/reveal"}
+	CallMacTerminal                    = Method[MacTerminalRequest, Empty]{"mac/terminal"}
 	CallMailboxCarry                   = Method[Empty, Empty]{"mailbox/carry"}
 	CallMCPHealth                      = Method[Empty, MCPHealthSnapshot]{"mcp/health"}
 	CallMCPHealthCheck                 = Method[MCPHealthCheckRequest, MCPHealthSnapshot]{"mcp/health/check"}
@@ -80,6 +83,8 @@ var (
 	CallOptionsRemembered              = Method[RememberedOptionsRequest, []ConfigOption]{"options/remembered"}
 	CallPermissionsAnswer              = Method[AnswerRequest, Empty]{"permissions/answer"}
 	CallPermissionsPending             = Method[Empty, []PermissionRequest]{"permissions/pending"}
+	CallPersonSet                      = Method[PersonSettings, PersonSettings]{"person/set"}
+	CallPersonState                    = Method[Empty, PersonSettings]{"person/state"}
 	CallPersonasList                   = Method[PersonasListRequest, []Persona]{"personas/list"}
 	CallPinsArrange                    = Method[PinArrangeRequest, Empty]{"pins/arrange"}
 	CallPinsArrangeSessions            = Method[PinArrangeSessionsRequest, Empty]{"pins/arrangeSessions"}
@@ -185,6 +190,7 @@ var (
 	NotifyMilestonesChanged            = Notification[Milestones]{"milestones/changed"}
 	NotifyModesChanged                 = Notification[map[string]JSONValue]{"modes/changed"}
 	NotifyPagesChanged                 = Notification[PagesChangedNotification]{"pages/changed"}
+	NotifyPersonChanged                = Notification[PersonSettings]{"person/changed"}
 	NotifyPinsChanged                  = Notification[PinsChangedNotification]{"pins/changed"}
 	NotifyPluginsChanged               = Notification[PluginsList]{"plugins/changed"}
 	NotifyPreferencesChanged           = Notification[map[string]JSONValue]{"preferences/changed"}

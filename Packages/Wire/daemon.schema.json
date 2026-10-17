@@ -5664,6 +5664,32 @@
         "notThisHost"
       ]
     },
+    "MacPathRequest": {
+      "type": "object",
+      "description": "mac/reveal, mac/open: a path on the host; app names the app to open it with.",
+      "properties": {
+        "path": {
+          "type": "string"
+        },
+        "app": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "path"
+      ],
+      "additionalProperties": false
+    },
+    "MacTerminalRequest": {
+      "type": "object",
+      "description": "mac/terminal: Terminal, in path if given.",
+      "properties": {
+        "path": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
     "ManagedSkill": {
       "type": "object",
       "properties": {
@@ -6238,6 +6264,19 @@
         "name",
         "agentID"
       ],
+      "additionalProperties": false
+    },
+    "PersonSettings": {
+      "type": "object",
+      "description": "What agents call the person, and their pronouns (#121), as given: person.json in the person's settings.",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "pronouns": {
+          "type": "string"
+        }
+      },
       "additionalProperties": false
     },
     "Persona": {
