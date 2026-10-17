@@ -1,4 +1,5 @@
 #if DEBUG
+import AgentsKitCore
 import AppKit
 import Foundation
 
@@ -339,7 +340,7 @@ enum WalkCommands {
     }
 
     static func box(_ rect: CGRect) -> [String: Int] {
-        ["x": Int(rect.minX), "y": Int(rect.minY), "width": Int(rect.width), "height": Int(rect.height)]
+        WalkBox(rect).dictionary
     }
 }
 

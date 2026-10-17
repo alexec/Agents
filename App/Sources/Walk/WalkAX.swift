@@ -1,4 +1,5 @@
 #if DEBUG
+import AgentsKitCore
 import AppKit
 import Foundation
 
@@ -113,8 +114,8 @@ struct WalkAX {
         let text = label
         if !text.isEmpty { line += " · " + text }
         if !identifier.isEmpty { line += " #" + identifier }
-        let box = frame(in: window)
-        if box != .zero { line += " @\(Int(box.minX)),\(Int(box.minY)) \(Int(box.width))x\(Int(box.height))" }
+        let box = WalkBox(frame(in: window))
+        if box != .zero { line += " " + box.text }
         return line
     }
 

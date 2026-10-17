@@ -252,6 +252,10 @@ def place_of(header, body, process, live, when):
         return "scratch", f"bundle {bundle}"
     if uuid and uuid in live:
         return "live", f"the installed {live[uuid]}"
+    # The Remote in a simulator (the walk simulator, #1182) is a Debug build with the Remote's
+    # bundle ID, which is not a device (#1307). Platform 7 is the iOS Simulator.
+    if header.get("platform") == 7 or "/CoreSimulator/" in proc_path:
+        return "scratch", "the iOS Simulator"
     if header.get("platform") == 2 or bundle.startswith("com.alexecollins.agents.remote"):
         return "live", "on a device"
     debug = any((image.get("name") or "").endswith(".debug.dylib")

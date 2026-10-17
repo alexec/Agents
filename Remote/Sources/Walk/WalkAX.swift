@@ -1,4 +1,5 @@
 #if DEBUG && targetEnvironment(simulator)
+import AgentsKitCore
 import UIKit
 
 /// An element of the Remote's accessibility tree, read in process (#1182): a view, or one of
@@ -78,11 +79,11 @@ struct WalkAX {
     }
 
     func line(in window: UIWindow) -> String {
-        let box = WalkAX.local(frame, in: window).finite
+        let box = WalkBox(WalkAX.local(frame, in: window))
         let kind = object is UIView ? "\(type(of: object))" : (traitNames.first ?? "element")
         let id = identifier.isEmpty ? "" : " #\(identifier)"
         let traits = traitNames.isEmpty ? "" : " [\(traitNames.joined(separator: ","))]"
-        return "\(kind) \"\(label)\"\(id)\(traits) @\(Int(box.minX)),\(Int(box.minY)) \(Int(box.width))x\(Int(box.height))"
+        return "\(kind) \"\(label)\"\(id)\(traits) \(box.text)"
     }
 
     // MARK: acting
@@ -159,9 +160,9 @@ struct WalkAX {
 }
 extension CGRect {
     /// Zero for a null or infinite frame (`CGRect.infinite` is huge but finite), which an
-    /// element with no place on the screen has, and which would trap as an `Int`.
+    /// element with no place on the screen has: `WalkBox`'s rule, for a point to hit.
     var finite: CGRect {
-        [minX, minY, width, height].allSatisfy { $0.isFinite && abs($0) < 1_000_000 } ? self : .zero
+        [minX, minY, width, height].allSatisfy { $0.isFinite && abs($0) < WalkBox.limit } ? self : .zero
     }
 }
 #endif
