@@ -76,6 +76,7 @@ func New(ctx context.Context, root string) (*Daemon, error) {
 		lives: map[wire.UUID]*live{}, relays: map[string]*relay{}, sent: map[wire.UUID]bool{},
 		watches: map[string]*folderWatch{}, interests: map[string][]interest{}, shells: map[shellKey]*shell{},
 		SettingsDir: filepath.Join(st.Loc.Root, "settings")}
+	d.setToolsHome()
 	d.register()
 	d.loadAttention()
 	d.loadEvents()
