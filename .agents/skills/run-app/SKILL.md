@@ -227,9 +227,13 @@ What the walk socket does not do, and stays with `ui.swift`, `shot.sh` and the `
 lease while the person is away and the screen unlocked: real trackpad gestures (a row
 swipe, swiping a pane in) and scroll phases (`.cghidEventTap`), animation and feel, and
 menu items that need the key window (most are off in a window launched behind; use the
-button or the row instead). A shot draws what the window would draw: the glass and
-materials as plain fills, the selected row in the grey of a window that is not key, and
-no traffic lights.
+button or the row instead).
+
+`walk.py shot` takes the window server's picture (`shot.sh`) while the screen is unlocked,
+and the window's own render while it is locked: on screen, a window's layers are on the GPU,
+and its own render draws the sidebar and the terminal black. The locked render draws the
+glass and materials as plain fills, the selected row in the grey of a window that is not
+key, and no traffic lights. `--render` takes the window's own render either way.
 
 ```sh
 $S/shot.sh $ROOT out.png            # window server capture, behind the user's window; unlocked only

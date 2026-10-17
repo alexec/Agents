@@ -2,7 +2,7 @@
 """Walk the scratch window through its walk socket (#1172): it draws and presses itself.
 
     walk.py ROOT ping | windows
-    walk.py ROOT shot OUT.png [--window N|TITLE] [--view CLASS]
+    walk.py ROOT shot OUT.png [--render] [--window N|TITLE] [--view CLASS]
     walk.py ROOT tree [DEPTH] [--window …]       the accessibility tree, read in process
     walk.py ROOT find TEXT                       every element whose label holds TEXT
     walk.py ROOT press TEXT                      the innermost match that takes a press
@@ -40,6 +40,15 @@ import socket
 import subprocess
 import sys
 import time
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+
+
+def locked():
+    """The screen is locked: the window server will not capture the window."""
+    out = subprocess.run(["ioreg", "-n", "Root", "-d1", "-a"], capture_output=True, text=True).stdout
+    return "CGSSessionScreenIsLocked" in out
+
 
 CONTAINER = os.path.expanduser(
     "~/Library/Containers/com.alexecollins.agents.store/Data/Library/Application Support/Agents/walks")
@@ -135,8 +144,8 @@ def main(argv):
                 key, value = "modifiers", value.split(",")
             args[key] = value
             i += 2
-        elif flag == "--first":
-            args["first"] = True
+        elif flag in ("--first", "--render"):
+            args[flag[2:]] = True
             i += 1
         else:
             positional.append(flag)
@@ -144,6 +153,14 @@ def main(argv):
 
     walk = Walk(root)
     if verb == "shot":
+        # Unlocked, the window server's picture is the true one: a window on screen keeps
+        # its layers on the GPU, which the window's own render reads as black. Locked, the
+        # window server gives nothing, and the window's own render is right (#1172).
+        render = args.pop("render", False)
+        if root != "remote" and not render and not locked() and "view" not in args and "window" not in args:
+            if subprocess.run([os.path.join(HERE, "shot.sh"), root, positional[0]], capture_output=True).returncode == 0:
+                print(positional[0])
+                return 0
         reply = walk.shot(positional[0], **args)
         print(reply.get("path") or reply.get("error"))
         return 0 if reply.get("ok") else 1
