@@ -372,8 +372,6 @@ specs/060-*/                                           marketplace
 
 # ci-server: the github MCP server (pull requests, checks, issues; it replaced the ci
 # server, #1231) and servers like it.
-Packages/MCPServers/Sources/MCPServerKit/              ci-server
-Packages/MCPServers/Tests/                             ci-server
 Go/cmd/github-mcp/                                     ci-server
 Go/internal/githubmcp/                                 ci-server
 Go/cmd/linear-mcp/                                     ci-server
@@ -548,7 +546,6 @@ Packages/AgentsKit/Tests/AgentsKitTests/Unit/*Event*Tests.swift  events
 Packages/AgentsKit/Tests/AgentsKitTests/Unit/DetailFilterTests.swift  events
 Packages/AgentsKit/Tests/AgentsKitTests/Unit/WaitStatusTests.swift  events
 Packages/AgentsKit/Tests/AgentsKitTests/Unit/WorkflowTrigger*Tests.swift  events
-Packages/MCPServers/Sources/MCPServerKit/EventPolling.swift  events
 docs/reference/events.md                               events
 docs/how-to/wait-for-something.md                      events
 docs/how-to/start-a-workflow-from-an-mcp-event.md      events
@@ -590,9 +587,8 @@ Packages/ControlPlane/Tests/ControlPlaneKitTests/*Workspace*Tests.swift  workspa
 Packages/ControlPlane/Tests/ControlPlaneKitTests/*Provider*Tests.swift  workspaces
 Packages/ControlPlane/Tests/ControlPlaneKitTests/KeptRequestsTests.swift  workspaces
 Packages/ControlPlane/Tests/ControlPlaneKitTests/IdleStopsTests.swift  workspaces
-Packages/MCPServers/Sources/WorkspaceCommands/         workspaces
-Packages/MCPServers/Sources/workspace-commands/        workspaces
-Packages/MCPServers/Tests/WorkspaceCommandsTests/      workspaces
+Go/cmd/workspace-commands/                             workspaces
+Go/internal/workspacecommands/                         workspaces
 Shared/UI/Chat/KeptPromptRow.swift                     workspaces
 Web/src/views/Kept.tsx                                 workspaces
 Web/test/kept*                                         workspaces
