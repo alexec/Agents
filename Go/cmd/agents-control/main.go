@@ -35,7 +35,8 @@
 //	AGENTS_CONTROL_TLS_CERT/_KEY  when this copy terminates TLS itself
 //	AGENTS_CONTROL_PIN          the load balancer's certificate pin, when it terminates TLS
 //	AGENTS_CONTROL_PEER_URL     where other copies reach this one (several copies, US3)
-//	AGENTS_CONTROL_NAME, AGENTS_CONTROL_MACHINE_ID, AGENTS_CONTROL_SERVERS
+//	AGENTS_CONTROL_NAME, AGENTS_CONTROL_MACHINE_ID, AGENTS_CONTROL_SERVERS,
+//	AGENTS_CONTROL_TOOLSETS
 package main
 
 import (
@@ -278,7 +279,7 @@ func serve() {
 		port = p
 	}
 	cfg := controlplane.Config{URL: text, Bind: value("--bind"), Port: port, Log: logs.Write,
-		ServerFolder: controlplane.ServerFolder()}
+		ServerFolder: controlplane.ServerFolder(), ToolsetFolder: controlplane.ToolsetFolder()}
 	if dir := value("--self-signed"); dir != "" || home() != "" {
 		if dir == "" {
 			dir = filepath.Join(home(), "tls")

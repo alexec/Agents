@@ -54,6 +54,15 @@ type Installer struct {
 	Codes CodeIssuer
 	// ServerFolder is ServerFiles.folder: the Linux hosts to copy. "" has none.
 	ServerFolder string
+	// ToolsetFolder is the app's Resources/toolsets: the runtimes to put on a server
+	// beside the host (#1136). "" puts none.
+	ToolsetFolder string
+	// Toolsets are the runtimes whose toolsets an install puts on: nil is DefaultToolsets.
+	Toolsets []string
+	// NodeDist is where the server fetches Node from: "" is nodejs.org's.
+	NodeDist string
+	// Log says what went wrong that an install goes on without: a toolset. Nil: nothing.
+	Log func(format string, args ...any)
 	// SSH is the ssh to run: "" is AGENTS_SSH, else DefaultSSH.
 	SSH string
 	// ConfigFile is an ssh config for tests, given with -F: "" is AGENTS_SSH_CONFIG,
@@ -269,6 +278,10 @@ func (i *Installer) install(ctx context.Context, request Request, personsKnownHo
 	for _, shipped := range shippedFor(arch, i.ServerFolder) {
 		server.installServer(ctx, shipped.name, shipped.file, shipped.sha256)
 	}
+	// The runtimes' toolsets (#1136), as the window's ToolsetInstaller puts them on a server
+	// it holds. One that cannot be installed leaves the host without that runtime, not
+	// without a host: the runtime says why when it is chosen.
+	i.installToolsets(ctx, server, found, folder, name)
 
 	// A host code, left in the host's root and read once, never on its command line.
 	// Through a tunnel, it names the server's end of the tunnel, which is held from now
@@ -321,6 +334,33 @@ func (i *Installer) install(ctx context.Context, request Request, personsKnownHo
 	// The host enrols over its own connection; control/hostChanged says when it is on.
 	return map[string]any{"started": true, "name": name,
 		"platform": found.system + " " + displayArchitecture(found.architecture), "tunnel": tunnelled}, nil
+}
+
+// installToolsets puts each toolset the Installer names on the server, and points its
+// current at it, before the host starts, so the host finds them at once.
+func (i *Installer) installToolsets(ctx context.Context, server installer, found *facts, folder, name string) {
+	runtimes := i.Toolsets
+	if runtimes == nil {
+		runtimes = DefaultToolsets
+	}
+	dist := i.NodeDist
+	if dist == "" {
+		dist = nodeDist
+	}
+	for _, t := range loadToolsets(i.ToolsetFolder, runtimes) {
+		if err := server.installToolset(ctx, t, found, dist, folder); err != nil {
+			text := err.Error()
+			if p, ok := err.(*Problem); ok {
+				text = Say(p, true)
+			}
+			if i.Log != nil {
+				i.Log("hosts/install: %s on %s: %s", runtimeName(t.manifest.RuntimeID), name, text)
+			}
+			continue
+		}
+		// What the server had free goes down by what this one needs, for the next.
+		found.freeBytes -= t.manifest.MinFreeBytes
+	}
 }
 
 // newID is UUID().uuidString.lowercased(): a random version 4 UUID, in lower case.

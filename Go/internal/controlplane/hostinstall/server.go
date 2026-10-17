@@ -22,6 +22,14 @@ type facts struct {
 	installedSHA256  *string
 	// False only when sshd_config turns Unix-socket forwarding off.
 	streamLocalForwarding bool
+	// The 043 lines the toolset installer reads: the C library, curl or wget, and the
+	// toolset each runtime's current points at.
+	glibc      [2]int
+	musl       bool
+	downloader string
+	toolsets   map[string]string
+	// xz: the server can unpack Node's .tar.xz. Without it the control plane does.
+	xz bool
 }
 
 // binarySuffix is Architecture.binarySuffix: the suffix of the binary built for it, or
@@ -66,7 +74,9 @@ const probeScript = `uname -sm; printf '%s\n' "$HOME"; df -Pk "$HOME" | tail -1;
 	`[ -n "$ANTHROPIC_API_KEY$CLAUDE_CODE_OAUTH_TOKEN" ] && echo signin:env || echo signin:none; ` +
 	`[ -n "$GEMINI_API_KEY$GOOGLE_API_KEY" ] && echo signin.gemini:env || echo signin.gemini:none' 2>/dev/null </dev/null; ` +
 	`[ -f "$HOME/.claude/.credentials.json" ] && echo signin:file || echo signin:none; ` +
-	`[ -f "$HOME/.codex/auth.json" ] && echo signin.codex:file || echo signin.codex:none`
+	`[ -f "$HOME/.codex/auth.json" ] && echo signin.codex:file || echo signin.codex:none; ` +
+	// Go's own (#1136): whether the server can unpack Node's .tar.xz itself.
+	`command -v xz >/dev/null 2>&1 && echo xz:yes || echo xz:no`
 
 // installer is ServerInstaller: what goes on a server, in ~/.agents-server, private to
 // the person's account. A binary arrives as a .part and is renamed only once its
@@ -88,8 +98,9 @@ func (i installer) probe(ctx context.Context) (*facts, error) {
 	return parseProbe(out.stdout)
 }
 
-// parseProbe is ServerInstaller.parseProbe, for the first five lines. The 043 lines
-// after them (libc, toolsets, sign-ins) are not read: an install does not use them.
+// parseProbe is ServerInstaller.parseProbe: the first five lines by position, then the
+// 043 lines the toolset installer reads (libc, fetch, toolsets) by key, as
+// readClaudeLines finds them, because a login shell may print a banner of its own.
 func parseProbe(text string) (*facts, error) {
 	all := strings.Split(text, "\n")
 	if len(all) < 5 {
@@ -119,6 +130,28 @@ func parseProbe(text string) (*facts, error) {
 	off := strings.Contains(forwarding, "allowstreamlocalforwarding") &&
 		(strings.HasSuffix(forwarding, " no") || strings.HasSuffix(forwarding, " local"))
 	f.streamLocalForwarding = !off
+	f.toolsets = map[string]string{}
+	for _, line := range all[5:] {
+		key, value, ok := strings.Cut(line, ":")
+		if !ok {
+			continue
+		}
+		value = strings.TrimSpace(value)
+		switch {
+		case key == "libc":
+			parseLibc(value, f)
+		case key == "xz":
+			f.xz = value == "yes"
+		case key == "fetch":
+			if value != "none" && value != "" {
+				f.downloader = filepath.Base(value)
+			}
+		case strings.HasPrefix(key, "toolset."):
+			if value != "none" && value != "" {
+				f.toolsets[strings.TrimPrefix(key, "toolset.")] = value
+			}
+		}
+	}
 	return f, nil
 }
 

@@ -6,6 +6,7 @@ require (
 	github.com/coder/acp-go-sdk v0.13.5
 	github.com/coder/websocket v1.8.15
 	github.com/creack/pty v1.1.24
+	github.com/ulikunitz/xz v0.5.17
 	gocloud.dev v0.46.0
 	gocloud.dev/secrets/hashivault v0.46.0
 	golang.org/x/sys v0.47.0
