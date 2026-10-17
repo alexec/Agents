@@ -517,6 +517,12 @@ targets:
         copy:
           destination: wrapper
           subpath: Contents/Helpers
+      # The Go agentsd's reader of its callers' code signatures (#1138, slice C), which it
+      # looks for beside itself: without it the Go host's socket is open to every caller.
+      - target: agents-peer
+        copy:
+          destination: wrapper
+          subpath: Contents/Helpers
       # The MCP servers Agents ships (#700), beside agentsd, which puts this folder first
       # on their PATH: `.agents/mcp.json` names them by bare name on a Mac and on Linux.
       - target: ci-watcher
