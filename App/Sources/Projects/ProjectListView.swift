@@ -591,6 +591,8 @@ private struct NewSessionTag: ViewModifier {
 /// one selection.
 struct SessionSidebarRow: View {
     @Environment(AppModel.self) private var model
+    /// In a project's own window, how it opens what is picked (#1090).
+    @Environment(\.windowOpen) private var windowOpen
     let agent: Agent
     /// Its project's name, after the title, under a smart row (#495).
     var place: String? = nil
@@ -607,6 +609,11 @@ struct SessionSidebarRow: View {
             .listRowInsets(.vertical, 2)
             .sidebarInk(.session(agent.id))
             .tag(SidebarItem.session(agent.id))
+            // A click on the session already open goes to its latest message, as opening it
+            // does (#1349): the list hears no change of selection for it.
+            .simultaneousGesture(TapGesture().onEnded {
+                if windowOpen == nil, model.selection == agent.id { model.scrollToEnd() }
+            })
             // Into its project's drop box, never its worktree (#231).
             .dropsIntoDropbox(of: ProjectKey(host: agent.host, folder: agent.projectFolder))
             // Pin or Unpin (#180), from the other edge.

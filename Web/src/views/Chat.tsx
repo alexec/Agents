@@ -9,7 +9,7 @@ import { useSignal } from "@preact/signals";
 import { useEffect, useLayoutEffect, useMemo, useRef } from "preact/hooks";
 import { openTurnsHeld, rememberOpen, type Store } from "../model/store";
 import { backgroundAge, backgroundEnded, backgroundNoun, isRunning, subagentNoSteps, subagentStatus } from "../model/background";
-import { display, isPersonsAsk, isWorking, openingPlace, placing, type ChatTurn, type Item } from "../model/turns";
+import { display, isPersonsAsk, isWorking, placing, type ChatTurn, type Item } from "../model/turns";
 import { toWireDate } from "../protocol/dates";
 import type { Agent, AppViewCall, BackgroundItem, FileMentionDTO, TranscriptEntry } from "../protocol/generated";
 import { replace, route } from "../route";
@@ -62,9 +62,6 @@ function shown(entries: TranscriptEntry[]): Item[] {
 
 /** How close to the end counts as being back at it, on the way down (#378). */
 const atTheEnd = 40;
-
-/** Where the reader was in each chat they left, by `host|session`: following, or a turn and how far down the pane it sat (#378). */
-const readingPlaces = new Map<string, { following: true } | { following: false; turn: string; offset: number }>();
 
 /** Whether a key pressed with focus here is the transcript's to take: not while something else takes keys (#378). */
 function takesKeys(target: EventTarget | null): boolean {
@@ -207,15 +204,6 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
   const settled = useRef(false);
   /** The last scroll seen, to tell a move up the page from the page growing or being trimmed (#378). */
   const lastScroll = useRef({ top: 0, height: 0 });
-  /**
-   * A place to go back to in a chat being opened again, until its rows are drawn (#378); or the
-   * place the reader needs, a card asked before the end or the first unread turn, found once the
-   * first page is drawn (#1287).
-   */
-  const restoring = useRef<{ turn: string; offset: number; pages: number } | { needed: true; unread: boolean; pages: number } | null>(null);
-  /** Held out of sight while it pages back to that place, so the end does not flash first. */
-  const hidden = useSignal(false);
-
   useEffect(() => {
     // Whether its runtime takes words mid-turn, or pictures, is known once it has run.
     void store.loadRuntimes(host);
@@ -230,84 +218,9 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
     store.setFollowingEnd(true);
     newBelow.value = false;
     settled.current = false;
-    // Coming back to a chat read before: the line it was left on, unless it was following (#378).
-    const place = readingPlaces.get(`${host}|${session}`);
-    // Else where the reader needs it (#1287). Unread as it was chosen: opening it marks it read.
-    const chosenAgent = store.agent(host, session);
-    const unread = !!chosenAgent?.isUnread;
-    restoring.current = place && !place.following ? { turn: place.turn, offset: place.offset, pages: 0 }
-      : unread || cards.length > 0 || chosenAgent?.state === "waitingOnUser" ? { needed: true, unread, pages: 0 }
-      : null;
-    hidden.value = !!restoring.current;
-    if (restoring.current) {
-      following.current = false;
-      store.setFollowingEnd(false);
-      // Rows in hand already when it was chosen draw no change to place it on (#1287).
-      requestAnimationFrame(() => restoreNow.current());
-    }
     const timer = setTimeout(() => (settled.current = true), 400);
     return () => clearTimeout(timer);
   }, [session]);
-
-  // Back to the line it was left on. The chat opens on its last page, so the pages before it come
-  // in, out of sight, until that turn is drawn; if it never is, the end, as a chat opened afresh (#378).
-  const restore = () => {
-    const el = scroller.current;
-    const place = restoring.current;
-    if (!el || !place || !store.chatTurns.peek().length || loadingEarlier.current) return;
-    if ("needed" in place) {
-      const opening = openingPlace(stretches, place.unread);
-      // The last turn's ask before the page in hand: the pages before come in, out of sight.
-      if (opening && "askBefore" in opening && store.hasMoreOfTheConversation && place.pages < 40) {
-        place.pages += 1;
-        loadingEarlier.current = true;
-        void store.loadEarlier().finally(() => {
-          loadingEarlier.current = false;
-          requestAnimationFrame(() => restoreNow.current());
-        });
-        return;
-      }
-      const target = !opening || "askBefore" in opening ? null : "cards" in opening ? waiting.current
-        : el.querySelector<HTMLElement>(`[data-turn="${CSS.escape(opening.turn)}"]`);
-      restoring.current = null;
-      hidden.value = false;
-      if (!target) {
-        follow(true);
-        el.scrollTop = el.scrollHeight;
-        return;
-      }
-      el.scrollTop += target.getBoundingClientRect().top - el.getBoundingClientRect().top;
-      lastScroll.current = { top: el.scrollTop, height: el.scrollHeight };
-      // A last turn shorter than the pane leaves it at the end, still following.
-      if (el.scrollHeight - el.scrollTop - el.clientHeight < 1) follow(true);
-      else away.value = true;
-      return;
-    }
-    const turn = [...el.querySelectorAll<HTMLElement>("[data-turn]")].find((row) => row.dataset.turn === place.turn);
-    if (!turn && store.hasMoreOfTheConversation && place.pages < 40) {
-      place.pages += 1;
-      loadingEarlier.current = true;
-      // Again once it has landed and been drawn: the rows may have changed while it was loading.
-      void store.loadEarlier().finally(() => {
-        loadingEarlier.current = false;
-        requestAnimationFrame(restore);
-      });
-      return;
-    }
-    restoring.current = null;
-    hidden.value = false;
-    if (!turn) {
-      follow(true);
-      el.scrollTop = el.scrollHeight;
-      return;
-    }
-    away.value = true;
-    el.scrollTop += turn.getBoundingClientRect().top - el.getBoundingClientRect().top - place.offset;
-    lastScroll.current = { top: el.scrollTop, height: el.scrollHeight };
-  };
-  useLayoutEffect(restore, [rows, session]);
-  const restoreNow = useRef(restore);
-  restoreNow.current = restore;
 
   // Following the end: every kind of growth, a new line or a longer one, keeps the foot in view.
   const entryCount = store.entries.value.length;
@@ -337,7 +250,7 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
 
   const earlier = async () => {
     const el = scroller.current;
-    if (!el || loadingEarlier.current || restoring.current || !settled.current || !store.hasMoreOfTheConversation) return;
+    if (!el || loadingEarlier.current || !settled.current || !store.hasMoreOfTheConversation) return;
     loadingEarlier.current = true;
     // Hold the line being read: what arrives goes above it.
     const fromBottom = el.scrollHeight - el.scrollTop;
@@ -348,22 +261,12 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
     });
   };
 
-  /** Where the reader is, kept for coming back to this chat (#378). */
-  const remember = (el: HTMLElement) => {
-    if (!settled.current || restoring.current) return;
-    const key = `${host}|${session}`;
-    if (following.current) return void readingPlaces.set(key, { following: true });
-    const top = el.getBoundingClientRect().top;
-    const turn = [...el.querySelectorAll<HTMLElement>("[data-turn]")].find((row) => row.getBoundingClientRect().bottom > top);
-    if (turn?.dataset.turn) readingPlaces.set(key, { following: false, turn: turn.dataset.turn, offset: turn.getBoundingClientRect().top - top });
-  };
-
   const onScroll = (event: Event) => {
     const el = event.currentTarget as HTMLDivElement;
     const fromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
     const was = lastScroll.current;
     lastScroll.current = { top: el.scrollTop, height: el.scrollHeight };
-    if (!loadingEarlier.current && !restoring.current) {
+    if (!loadingEarlier.current) {
       // Any move up the page that is not the page itself changing size is the reader's: a wheel
       // tick, a key, the scroll bar or a finger. Following stops at once, however small (#378).
       // Growth and trimming change the height; this pane only ever moves itself down.
@@ -374,7 +277,6 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
         newBelow.value = false;
       }
     }
-    remember(el);
     if (el.scrollTop < 400) void earlier();
   };
 
@@ -469,8 +371,16 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
     follow(true);
     newBelow.value = false;
     if (el) el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
-    if (el) readingPlaces.set(`${host}|${session}`, { following: true });
   };
+
+  // The open session's row clicked again: to its latest message, as opening it is (#1349).
+  const toEndAsks = store.toEndAsks.value;
+  const toEndSeen = useRef(toEndAsks);
+  useEffect(() => {
+    if (toEndAsks === toEndSeen.current) return;
+    toEndSeen.current = toEndAsks;
+    toEnd();
+  }, [toEndAsks]);
 
   // To the first waiting card (#973). At the end it is the end, and following goes on; anywhere
   // else it is a place in the middle, as a line the reader is sent to is, and following stops.
@@ -587,7 +497,7 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
       <CurrentPlanStrip agent={agent} />
       <CallActionsContext.Provider value={callActions}>
       <ViewLayerContext.Provider value={viewHosting}>
-      <div class="scroll transcript" ref={scroller} onScroll={onScroll} style={hidden.value ? { visibility: "hidden" } : undefined}>
+      <div class="scroll transcript" ref={scroller} onScroll={onScroll}>
         <div class="view-layer" ref={(el) => { layer.element = el; }} />
         {failure && (
           // The history, or its earlier turns, did not load: said, with the way to ask again (#400).

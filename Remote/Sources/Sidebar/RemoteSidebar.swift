@@ -43,7 +43,10 @@ struct RemoteSidebar: View {
                     // A list clears its selection by itself while rows come and go, and
                     // that must not empty the detail; going back on a phone clears it
                     // through the split view's column instead.
-                    if let item { model.sidebarItem = item }
+                    guard let item else { return }
+                    // The session already open, picked again: to its latest message (#1349).
+                    if item == model.sidebarItem, case .session = item { model.scrollToEnd() }
+                    model.sidebarItem = item
                 })
     }
 

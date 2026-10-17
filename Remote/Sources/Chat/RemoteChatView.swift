@@ -87,13 +87,6 @@ struct RemoteChatView: View {
                                loadEarlier: { [popped] in
                                    if let popped { await model.loadEarlier(of: popped) } else { await model.loadEarlier() }
                                },
-                               // Paging back, out of sight, to where it opens: a Mac's page
-                               // at a time, not a screen's (#1287).
-                               loadEarlierToOpen: { [popped] in
-                                   let limit = ChatOpening.wholeTurn
-                                   if let popped { await model.loadEarlier(of: popped, limit: limit) }
-                                   else { await model.loadEarlier(limit: limit) }
-                               },
                                bottomInset: formHeight,
                                cards: cards,
                                scrollToEndToken: popped?.scrollToEndToken ?? model.scrollToEndToken,
