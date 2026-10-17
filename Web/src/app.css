@@ -642,7 +642,7 @@ dialog.sheet:has(.subagent-steps) { width: min(720px, calc(100vw - 32px)); max-h
 .offline-strip .spinner { flex: none; width: 8px; height: 8px; }
 .offline-strip .elapsed { flex: none; margin-left: auto; font-variant-numeric: tabular-nums; opacity: 0.7; }
 .offline-strip button { flex: none; margin-left: auto; }
-/* A volume low on space (#196), as the window's DiskStrip: attention when low, failure when critical. */
+/* A volume a host writes to low on space (#196, #1329), over its chats and a new session, as the window's DiskStrip: attention when low, failure when critical. */
 .disk-strip { padding: 6px 16px; font-size: 0.75rem; background: var(--paper-well); border-bottom: 1px solid var(--paper-rule);
   display: flex; align-items: center; gap: 8px; margin: 0; user-select: text; }
 .disk-strip .dot { flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--tint-attention); }

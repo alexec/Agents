@@ -51,7 +51,10 @@ struct ProjectAgentsView: View {
         VStack(spacing: 0) {
             WaitingForOKBanner(folder: folder)
             // The same strip as over a chat: a prompt here goes to that host too (#83).
-            if let summary { OfflineStrip(host: summary.host) }
+            if let summary {
+                OfflineStrip(host: summary.host)
+                DiskStrip(host: summary.host)
+            }
             // A change to the project's own files that no session can be asked about (#531).
             if let summary {
                 ForEach(model.work.guardedChanges(ofProject: summary.key)) { change in
