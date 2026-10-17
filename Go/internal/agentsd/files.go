@@ -83,7 +83,10 @@ func inside(root, path string) bool {
 }
 
 func fileURL(p string, dir bool) wire.URL {
-	u := store.FolderURL(p)
+	return slashed(store.FolderURL(p), dir)
+}
+
+func slashed(u wire.URL, dir bool) wire.URL {
 	if dir && !strings.HasSuffix(string(u), "/") {
 		u += "/"
 	}
@@ -106,6 +109,11 @@ func listing(dir string) (wire.DirectoryListing, error) {
 	if err != nil {
 		return wire.DirectoryListing{}, fileError(CodeFileNotReadable, filepath.Base(dir)+" can't be opened.")
 	}
+	// The folder's links are resolved once; an entry keeps its own name, link or not (#1265).
+	base := dir
+	if r, err := filepath.EvalSymlinks(dir); err == nil {
+		base = r
+	}
 	entries := []wire.DirectoryEntry{}
 	for _, it := range items {
 		info, err := it.Info()
@@ -120,7 +128,7 @@ func listing(dir string) (wire.DirectoryListing, error) {
 			}
 		}
 		at := wire.DateOf(info.ModTime())
-		e := wire.DirectoryEntry{URL: fileURL(p, isDir), Name: it.Name(), IsDirectory: isDir, ModifiedAt: &at}
+		e := wire.DirectoryEntry{URL: slashed(store.PathURL(filepath.Join(base, it.Name())), isDir), Name: it.Name(), IsDirectory: isDir, ModifiedAt: &at}
 		if !isDir {
 			s := info.Size()
 			e.Size = &s

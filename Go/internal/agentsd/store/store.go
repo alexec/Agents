@@ -384,7 +384,12 @@ func FolderURL(path string) wire.URL {
 	if r, err := filepath.EvalSymlinks(path); err == nil {
 		path = r
 	}
-	return wire.URL("file://" + escapePath(path))
+	return PathURL(path)
+}
+
+// PathURL is a path as a file URL with its links kept, so a link is listed under its own name.
+func PathURL(path string) wire.URL {
+	return wire.URL("file://" + escapePath(filepath.Clean(path)))
 }
 
 // MARK: root-id.json
