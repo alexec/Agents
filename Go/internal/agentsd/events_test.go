@@ -193,7 +193,7 @@ func TestADiskCrossingIsSaidOnce(t *testing.T) {
 	d, _ := start(t, root)
 	// As low as can be: every disk is under a line of everything it holds.
 	d.raiseDiskLow(wire.DiskAlarm{Reading: wire.DiskReading{Volume: "This server’s disk", FreeBytes: 1_500_000_000, TotalBytes: 100e9},
-		Level: wire.DiskLevelLow, Threshold: 20e9})
+		Level: wire.DiskLevelLow, Threshold: 20e9}, nil)
 	e := d.eventsPage(wire.EventsListRequest{}).Events[0]
 	if e.Sentence != "This server’s disk is running low: 1.5 GB free." || e.Details["free_percent"] != "1" || e.Details["level"] != "low" {
 		t.Fatalf("%+v", e)

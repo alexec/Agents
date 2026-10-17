@@ -272,6 +272,8 @@ func nextDiskLevel(was wire.DiskLevel, free, low, critical int64) wire.DiskLevel
 // checkDisk looks at the root's and every project's disk, and says disk/changed when the
 // alarms change.
 func (d *Daemon) checkDisk() {
+	// The first look after a restart: a crossing it finds happened in the gap (#1219).
+	noticed := d.noticedAfterRestart()
 	type mount struct {
 		reading wire.DiskReading
 		t       diskThresholds
@@ -372,10 +374,10 @@ func (d *Daemon) checkDisk() {
 	d.saveEventStateLocked()
 	d.eventMu.Unlock()
 	for _, a := range crossedLow {
-		d.raiseDiskLow(a)
+		d.raiseDiskLow(a, noticed)
 	}
 	for _, c := range crossedBack {
-		d.raiseDiskOK(c.reading, c.threshold)
+		d.raiseDiskOK(c.reading, c.threshold, noticed)
 	}
 	if changed {
 		Broadcast(d, wire.NotifyDiskChanged, wire.DiskState{Alarms: alarms})

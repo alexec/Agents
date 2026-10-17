@@ -63,7 +63,7 @@ func kindNamed(name string) *eventKind {
 	return nil
 }
 
-var eventSubjects = []string{"agent", "project", "workflow", "branch", "dropbox", "lease", "mac", "machine", "person", "cost", "server"}
+var eventSubjects = []string{"agent", "project", "workflow", "branch", "dropbox", "lease", "mac", "machine", "person", "cost", "server", "system"}
 
 func isSubject(s string) bool {
 	for _, x := range eventSubjects {
@@ -999,9 +999,9 @@ func (d *Daemon) matchWaits(e wire.Event) {
 			if c := d.takeOpenWait(a.ID); c != nil {
 				waited := int(time.Since(c.started).Round(time.Second).Seconds())
 				d.change(a.ID, func(a *wire.Agent) { a.EventWait = nil })
-				c.answer <- matchedWords(e, &waited)
+				c.answer <- matchedWords(e, &waited) + d.restartNotice(w)
 			} else {
-				prompt := wire.QueuedPrompt{ID: store.NewUUID(), Text: wakeWords(e, 0), QueuedAt: now(), From: wire.PromptOriginApp,
+				prompt := wire.QueuedPrompt{ID: store.NewUUID(), Text: wakeWords(e, 0) + d.restartNotice(w), QueuedAt: now(), From: wire.PromptOriginApp,
 					Attachments: []wire.Attachment{}}
 				ended := *w
 				ended.Ending = &wire.EventWaitEnding{Matched: &wire.EventWaitEndingMatched{Position: e.Position}}
@@ -1023,6 +1023,7 @@ func (d *Daemon) matchWaits(e wire.Event) {
 				continue
 			}
 			promptID := *w.ResumePromptID
+			notice := d.restartNotice(w)
 			d.change(a.ID, func(a *wire.Agent) {
 				if a.EventWait == nil || a.EventWait.Ending == nil || a.EventWait.Ending.Matched == nil {
 					return
@@ -1035,7 +1036,7 @@ func (d *Daemon) matchWaits(e wire.Event) {
 						matched.ExtraMatches++
 						ending.Matched, w.Ending = &matched, &ending
 						a.EventWait = &w
-						prompts[i].Text = wakeWords(*first, int(matched.ExtraMatches))
+						prompts[i].Text = wakeWords(*first, int(matched.ExtraMatches)) + notice
 					}
 				}
 				a.QueuedPrompts = prompts
@@ -1150,10 +1151,10 @@ func (d *Daemon) waitDeadlinesPassed() {
 		}
 		if c := d.takeOpenWait(a.ID); c != nil {
 			d.change(a.ID, func(a *wire.Agent) { a.EventWait = nil })
-			c.answer <- timedOutWords(w, at)
+			c.answer <- timedOutWords(w, at) + d.restartNotice(w)
 			continue
 		}
-		prompt := wire.QueuedPrompt{ID: store.NewUUID(), Text: timedOutWords(w, at), QueuedAt: now(), From: wire.PromptOriginApp,
+		prompt := wire.QueuedPrompt{ID: store.NewUUID(), Text: timedOutWords(w, at) + d.restartNotice(w), QueuedAt: now(), From: wire.PromptOriginApp,
 			Attachments: []wire.Attachment{}}
 		ended := *w
 		ended.Ending = &wire.EventWaitEnding{TimedOut: &struct{}{}}
