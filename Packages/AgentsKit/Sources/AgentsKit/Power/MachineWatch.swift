@@ -21,6 +21,14 @@ public enum MachineChange: Hashable, Sendable {
 public protocol MachineWatch: AnyObject, Sendable {
     func start(_ report: @escaping @Sendable (MachineChange) -> Void)
     func stop()
+    /// How the person stood when the last daemon heard (#1219): "locked", "idle" or nil.
+    /// The first look is against it, so a restart neither says an away twice nor misses
+    /// a return in the gap. Before `start`.
+    func assume(away: String?)
+}
+
+extension MachineWatch {
+    public func assume(away: String?) {}
 }
 
 /// The real one (042 research R10, as built).
@@ -47,6 +55,10 @@ public final class IOKitMachineWatch: MachineWatch, @unchecked Sendable {
 
     public init() {}
 
+    public func assume(away: String?) {
+        queue.sync { self.away = away }
+    }
+
     public func start(_ report: @escaping @Sendable (MachineChange) -> Void) {
         queue.sync {
             self.report = report
@@ -58,6 +70,9 @@ public final class IOKitMachineWatch: MachineWatch, @unchecked Sendable {
             timer.setEventHandler { [weak self] in self?.look() }
             timer.resume()
             self.timer = timer
+            // A first look now rather than in ten seconds, so what changed while no daemon
+            // ran is heard inside `start` (#1219).
+            look()
             #endif
         }
     }

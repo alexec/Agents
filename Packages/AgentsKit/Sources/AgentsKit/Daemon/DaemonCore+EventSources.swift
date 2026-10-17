@@ -129,16 +129,27 @@ extension DaemonCore {
         machineWatch = watch
         // One stream, read by one task, so the changes land in the order they happened:
         // a Task each would let a wake overtake the sleep before it.
-        let (changes, continuation) = AsyncStream.makeStream(of: MachineChange.self)
+        // Nil marks the end of the first look: what it heard changed while no daemon ran
+        // (#1219), against the person as the last daemon heard them.
+        loadEventsIfNeeded()
+        watch.assume(away: eventState.personAway)
+        let (changes, continuation) = AsyncStream.makeStream(of: MachineChange?.self)
         watch.start { change in continuation.yield(change) }
+        continuation.yield(nil)
         Task { [weak self] in
-            for await change in changes { await self?.machineChanged(change) }
+            for await change in changes {
+                if let change { await self?.machineChanged(change) } else { await self?.machineFirstLookDone() }
+            }
         }
     }
 
     /// Call `handler` whenever the Mac wakes, as heard by the machine watch.
     public func onWake(_ handler: @escaping @Sendable () -> Void) {
         wakeHandlers.append(handler)
+    }
+
+    func machineFirstLookDone() {
+        machineLookAfterRestart = false
     }
 
     /// One change, as its event, for every project to hear (US5-AS3).
@@ -153,6 +164,13 @@ extension DaemonCore {
         case .back: notePersonAway(false)
         case .sleep, .wake: break
         }
+        // Kept, so the next daemon's first look is against it (#1219).
+        switch change {
+        case .away(let why): eventState.personAway = why; saveEventState()
+        case .back: eventState.personAway = nil; saveEventState()
+        case .sleep, .wake: break
+        }
+        let noticed = machineLookAfterRestart ? Self.noticedAfterRestart : [:]
         let draft: EventDraft
         switch change {
         case .sleep:
@@ -162,11 +180,11 @@ extension DaemonCore {
         case .away(let why):
             draft = EventDraft(name: "person.away", at: now(), scope: .mac,
                                sentence: why == "locked" ? "You locked the screen." : "You stepped away.",
-                               details: ["why": why])
+                               details: ["why": why].merging(noticed) { $1 })
         case .back(let why):
             draft = EventDraft(name: "person.back", at: now(), scope: .mac,
                                sentence: why == "locked" ? "You unlocked the screen." : "You came back.",
-                               details: ["why": why])
+                               details: ["why": why].merging(noticed) { $1 })
         }
         raise(draft)
     }

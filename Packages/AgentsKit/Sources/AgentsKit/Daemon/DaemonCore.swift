@@ -356,6 +356,14 @@ public actor DaemonCore {
     var projectIdleSettle: Duration = .seconds(60)
     /// The once-a-minute look at the volumes (#195). Nil until started.
     var diskTicker: Task<Void, Never>?
+    /// This start, as worked out from what the last daemon left (#1219). Nil until noted.
+    var lastRestart: RestartGap?
+    /// Saying once a minute that the daemon is alive (#1219). Nil until started.
+    var aliveTicker: Task<Void, Never>?
+    /// The first look at the volumes after a restart, whose crossings happened in the gap.
+    var diskLookAfterRestart = false
+    /// The machine watch's first look after a restart, likewise for the person.
+    var machineLookAfterRestart = false
     /// Counts the pull requests merged from agents' branches once an hour (#985).
     var mergedPRsTicker: Task<Void, Never>?
     /// A look asked for by a lease given back or a wake, so a burst makes one.

@@ -16,6 +16,8 @@ public enum EventSubject: String, Codable, Hashable, Sendable, CaseIterable {
     case person
     case cost
     case server
+    /// The daemon itself: `system.restarted` (#1219).
+    case system
 
     public init?(name: String) {
         guard let dot = name.firstIndex(of: ".") else { return nil }
@@ -29,7 +31,7 @@ public enum EventSubject: String, Codable, Hashable, Sendable, CaseIterable {
         case .workflow: return "⟳"
         case .branch: return "⎇"
         case .dropbox: return "⇣"
-        case .mac, .machine, .person, .lease, .cost, .server: return "⌘"
+        case .mac, .machine, .person, .lease, .cost, .server, .system: return "⌘"
         }
     }
 
@@ -40,7 +42,7 @@ public enum EventSubject: String, Codable, Hashable, Sendable, CaseIterable {
         case .workflow: return .workflows
         case .branch: return .branches
         case .dropbox: return .dropbox
-        case .mac, .machine, .person, .lease, .cost, .server: return .mac
+        case .mac, .machine, .person, .lease, .cost, .server, .system: return .mac
         }
     }
 }
@@ -199,6 +201,10 @@ public enum EventCatalogue {
                   "A runtime's allowance came back."),
         EventKind("server.offline", .mac, shown("server"), "A server went offline."),
         EventKind("server.online", .mac, shown("server"), "A server came back."),
+        EventKind("system.restarted", .mac,
+                  [EventDetail("reason", values: RestartGap.Reason.allCases.map(\.rawValue))]
+                      + shown("down_since", "down_for", "down_for_text"),
+                  "Agents started again, after a stop or a crash."),
     ]
 
     // MARK: Details (073, #574, #579)

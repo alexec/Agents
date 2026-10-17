@@ -57,6 +57,49 @@ struct MachineEventTests {
         #expect(await core.eventLog.events.allSatisfy { $0.scope == .mac })
     }
 
+    /// A screen the person unlocked while no daemon ran: its first look is against the away
+    /// the last daemon heard, so the return is raised, marked as noticed after the restart,
+    /// and an away still standing is not said twice (#1219).
+    @Test func aReturnInTheGapIsRaisedAfterTheRestart() async throws {
+        final class LookingWatch: MachineWatch, @unchecked Sendable {
+            private let lock = NSLock()
+            private var assumed: String?
+            let now: String?
+            init(now: String?) { self.now = now }
+            func assume(away: String?) { lock.withLock { assumed = away } }
+            func start(_ report: @escaping @Sendable (MachineChange) -> Void) {
+                let was = lock.withLock { assumed }
+                guard was != now else { return }
+                if let was { report(.back(why: was)) }
+                if let now { report(.away(why: now)) }
+            }
+            func stop() {}
+        }
+        let (locations, _, _) = try temporary()
+        let first = try await core(locations)
+        let watch = FakeMachineWatch()
+        await first.startWatchingMachine(watch)
+        watch.send(.away(why: "locked"))
+        try await eventually("away") { await names(first).contains("person.away") }
+        DaemonAliveFile.write(DaemonAlive(lastAlive: Date()), to: locations.alive)
+
+        let still = try await core(locations)
+        _ = await still.recover()
+        await still.noteRestart()
+        await still.startWatchingMachine(LookingWatch(now: "locked"))
+        try await Task.sleep(for: .milliseconds(100))
+        #expect(await names(still).filter { $0.hasPrefix("person.") } == ["person.away"], "not said twice")
+
+        let back = try await core(locations)
+        _ = await back.recover()
+        await back.noteRestart()
+        await back.startWatchingMachine(LookingWatch(now: nil))
+        try await eventually("back") { await names(back).contains("person.back") }
+        let event = try #require(await back.eventLog.events.last { $0.name == "person.back" })
+        #expect(event.details["noticed"] == "after_restart")
+        #expect(event.details["why"] == "locked")
+    }
+
     /// A wake tells the uplink to dial now (#82, #113): `agentsd` has no AppKit to hear it.
     @Test func aWakeIsToldToWhoeverAsked() async throws {
         let (locations, _, _) = try temporary()

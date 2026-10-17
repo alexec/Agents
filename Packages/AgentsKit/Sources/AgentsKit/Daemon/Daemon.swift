@@ -173,6 +173,9 @@ public final class Daemon: @unchecked Sendable {
         if !recovered.isEmpty {
             DaemonLog.shared.write("marked \(recovered.count) agent(s) stopped: their processes were gone")
         }
+        // How long nothing ran, and the waits open over it (#1219): before anything below
+        // can raise an event that wakes one, so its wake says so.
+        await core.noteRestart()
         let core = self.core
         // Who may ask for what on the socket, from the caller's code signature.
         let roles = RolePolicy.forDaemon(at: locations)
@@ -242,6 +245,10 @@ public final class Daemon: @unchecked Sendable {
         // And the waits on events (042): a wake queued and never sent goes now, and a
         // deadline that passed while nothing ran ends now.
         await core.resumeEventWaitsAfterRestart()
+        // Then the restart itself, for a wait or a workflow that names it (#1219), and
+        // from now on a word once a minute that this daemon is alive.
+        await core.raiseRestarted()
+        await core.startSayingAlive()
         // Helpers queued before the restart (#362), behind the ones coming back.
         await core.checkEveryQueue()
         // The Mac and the person, as events (042). Only in the real daemon; a test
@@ -385,6 +392,8 @@ public final class Daemon: @unchecked Sendable {
 
     public func shutDown() async {
         DaemonLog.shared.write("shutting down")
+        // First, so a stop that goes wrong below still counts as a stop (#1219).
+        await core.noteCleanStop()
         uplinkTriggers?.stop()
         dialNowSignal?.cancel()
         uplink?.stop()
