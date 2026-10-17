@@ -1,7 +1,3 @@
-ChannelOpen full
-{"client":"CLIENT","device":"DEVICE","tunnel":"TUNNEL","tunnelRef":"TUNNELREF","fanOut":true}
-ChannelOpen zero
-{"client":"","device":null,"tunnel":null,"tunnelRef":null,"fanOut":null}
 ControlAuth full
 {"id":"ID","nonce":"NONCE","mac":"MAC","kind":"KIND","for":"FOR","epoch":7}
 ControlAuth zero

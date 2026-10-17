@@ -8,22 +8,17 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/alexec/agents/Go/wire"
 )
 
-// DetectedServer is DaemonAPI.DetectedServer: one host in the ssh config, and what
-// hosts/detect did with it (#429).
-type DetectedServer struct {
-	// Alias is the Host name in the config.
-	Alias string `json:"alias"`
-	// Resolved is user@hostname:port, as `ssh -G` resolved it.
-	Resolved string  `json:"resolved"`
-	Outcome  Outcome `json:"outcome"`
-	// Detail says why, in words, when it was not added.
-	Detail *string `json:"detail,omitempty"`
-}
+// DetectedServer is DaemonAPI.DetectedServer: one host in the ssh config (its Host name,
+// and user@hostname:port as `ssh -G` resolved it), what hosts/detect did with it, and why,
+// in words, when it was not added (#429).
+type DetectedServer = wire.DetectedServer
 
 // Outcome is DaemonAPI.DetectedServer.Outcome.
-type Outcome string
+type Outcome = string
 
 // The outcomes of hosts/detect.
 const (
@@ -40,20 +35,11 @@ const (
 )
 
 // SSHHost is DaemonAPI.SSHHost: a server ssh knows by a name, for Add a Server's server
-// box (#610).
-type SSHHost struct {
-	// Alias is the Host name in the config, or the destination as typed.
-	Alias string `json:"alias"`
-	// Resolved is user@hostname:port, as `ssh -G` resolved it.
-	Resolved string `json:"resolved"`
-	// ThroughBastion: reached through a ProxyJump or ProxyCommand. It rarely can dial
-	// back, so a tunnel is the default.
-	ThroughBastion bool `json:"throughBastion"`
-	// IsBastion: another host's way in, not a server to add.
-	IsBastion bool `json:"isBastion"`
-	// Known: a host by that name is on the control plane already.
-	Known bool `json:"known"`
-}
+// box (#610): the Host name in the config (or the destination as typed), user@hostname:port
+// as `ssh -G` resolved it, whether it is reached through a ProxyJump or ProxyCommand (so
+// it rarely can dial back, and a tunnel is the default), whether it is another host's way
+// in, and whether a host by that name is on the control plane already.
+type SSHHost = wire.SSHHost
 
 // probeResult is HostDetect.Probe: it let ssh in, or why not.
 type probeResult struct {

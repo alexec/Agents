@@ -19,6 +19,7 @@ import (
 	"github.com/alexec/agents/Go/internal/controlplane/records"
 	"github.com/alexec/agents/Go/internal/controlplane/store"
 	"github.com/alexec/agents/Go/internal/controlplane/web"
+	"github.com/alexec/agents/Go/wire"
 )
 
 // A control plane in this process, over plain HTTP on loopback, with the Go host's and a
@@ -89,8 +90,8 @@ type fakeHost struct {
 func (p *plane) host(machine string) *fakeHost {
 	root := p.t.TempDir()
 	private := controllink.NewPrivateKey()
-	hello := controllink.HostHello{Version: "0.1", Platform: "linux aarch64", MachineID: machine, Name: "box " + machine,
-		Implementation: "go"}
+	hello := controllink.HostHello{Version: "0.1", Platform: "linux aarch64", MachineID: machine, Name: new("box " + machine),
+		Implementation: new("go")}
 	member, err := controllink.Enroll(context.Background(), root, p.code(true), private, hello)
 	if err != nil {
 		p.t.Fatal(err)
@@ -209,9 +210,9 @@ func TestAHostAndAWindowThroughTheControlPlane(t *testing.T) {
 	if status.Name != "Test plane" || status.HomeHost != "mac" || status.You != member.Client || status.StartedAt < 8e8 {
 		t.Fatalf("%+v", status)
 	}
-	var hosts []controlHost
+	var hosts []wire.ControlHost
 	json.Unmarshal(call(t, window, "", "hosts/list", nil), &hosts)
-	if len(hosts) != 2 || hosts[0].State != "online" || hosts[1].State != "online" || hosts[0].Implementation != "go" {
+	if len(hosts) != 2 || hosts[0].State != "online" || hosts[1].State != "online" || deref(hosts[0].Implementation) != "go" {
 		t.Fatalf("%+v", hosts)
 	}
 	var clients []map[string]any
@@ -254,11 +255,11 @@ func TestACodeIsUsedOnce(t *testing.T) {
 	// A spent code replayed by the key that spent it is given the same host.
 	hc := p.code(true)
 	priv := controllink.NewPrivateKey()
-	first, err := controllink.Enroll(context.Background(), t.TempDir(), hc, priv, controllink.HostHello{Name: "a", MachineID: "X"})
+	first, err := controllink.Enroll(context.Background(), t.TempDir(), hc, priv, controllink.HostHello{Name: new("a"), MachineID: "X"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	again, err := controllink.Enroll(context.Background(), t.TempDir(), hc, priv, controllink.HostHello{Name: "a", MachineID: "X"})
+	again, err := controllink.Enroll(context.Background(), t.TempDir(), hc, priv, controllink.HostHello{Name: new("a"), MachineID: "X"})
 	if err != nil || again.Host != first.Host {
 		t.Fatal(again, err)
 	}
@@ -304,9 +305,9 @@ func TestTheFolderAndKeyAreTheControlPlane(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer window.Close()
-	var hosts []controlHost
+	var hosts []wire.ControlHost
 	json.Unmarshal(call(t, window, "", "hosts/list", nil), &hosts)
-	if len(hosts) != 1 || hosts[0].ID != h.member.Host {
+	if len(hosts) != 1 || string(hosts[0].ID) != h.member.Host {
 		t.Fatalf("%+v", hosts)
 	}
 	// Another key is not this store's control plane.
@@ -410,7 +411,7 @@ func TestABrowserThroughTheLoopbackListener(t *testing.T) {
 		private := controllink.NewPrivateKey()
 		public, _ := controllink.PublicKey(private)
 		id := records.NewUUID()
-		params, _ := json.Marshal(clientAnnounce{ID: id, PublicKey: public, Name: "Safari", Kind: kind})
+		params, _ := json.Marshal(wire.ClientAnnounce{ID: wire.UUID(id), PublicKey: public, Name: "Safari", Kind: wire.ClientKind(kind)})
 		l.Write(context.Background(), `{"jsonrpc":"2.0","id":1,"method":"clients/announce","params":`+string(params)+`}`)
 		line, err := l.Read(context.Background())
 		if err != nil {
@@ -514,7 +515,7 @@ func (p *plane) rawHost(name string, relay bool) (string, *controllink.Lines) {
 	if err != nil {
 		p.t.Fatal(err)
 	}
-	params, _ := json.Marshal(hostAnnounce{PublicKey: public, Name: name, Platform: "macOS arm64", Version: "1",
+	params, _ := json.Marshal(wire.HostAnnounce{PublicKey: public, Name: name, Platform: "macOS arm64", Version: "1",
 		MachineID: "RELAY-MAC", Relay: &relay})
 	l.Write(ctx, `{"jsonrpc":"2.0","id":1,"method":"hosts/announce","params":`+string(params)+`}`)
 	line, err := l.Read(ctx)
@@ -523,17 +524,17 @@ func (p *plane) rawHost(name string, relay bool) (string, *controllink.Lines) {
 	}
 	l.Close()
 	var answer struct {
-		Result admitted `json:"result"`
+		Result wire.Admitted `json:"result"`
 	}
 	json.Unmarshal([]byte(line), &answer)
-	host := answer.Result.Host
+	host := string(deref(answer.Result.Host))
 	key, _ := controllink.HostKey(private, code.ControlKey, host)
 	l, _, err = controllink.Join(ctx, code.URL, "", controllink.Credentials{Identity: "h:" + host, Key: key,
 		Kind: "host", ControlKey: code.ControlKey})
 	if err != nil {
 		p.t.Fatal(err)
 	}
-	hello, _ := json.Marshal(hostHello{Version: "1", Platform: "macOS arm64", MachineID: "RELAY-MAC", Relay: &relay})
+	hello, _ := json.Marshal(wire.HostHello{Version: "1", Platform: "macOS arm64", MachineID: "RELAY-MAC", Relay: &relay})
 	l.Write(ctx, channelFrame(0, `{"jsonrpc":"2.0","id":1,"method":"host/hello","params":`+string(hello)+`}`))
 	p.t.Cleanup(l.Close)
 	return host, l

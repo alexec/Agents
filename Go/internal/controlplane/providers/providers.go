@@ -15,6 +15,7 @@ import (
 
 	"github.com/alexec/agents/Go/internal/controlplane/records"
 	"github.com/alexec/agents/Go/internal/controlplane/store"
+	"github.com/alexec/agents/Go/wire"
 )
 
 // HostRecords is what Providers needs of ControlRecords; records.Records has it.
@@ -163,7 +164,7 @@ type Providers struct {
 	hooks   Hooks
 	log     func(string)
 
-	mu          sync.Mutex
+	mu sync.Mutex
 	// Held while changed() reads the records and tells the router, so two at once can
 	// never leave the older overlay there (#1296).
 	publishing  sync.Mutex
@@ -374,7 +375,7 @@ func (p *Providers) HostSaid(host, method string, params json.RawMessage) (any, 
 		if err := requireParams(params, &call, "HostProviderDraftCall", "agentID", "draft", "tool"); err != nil {
 			return nil, err
 		}
-		if !isUUID(call.AgentID) || !isUUID(call.Draft) {
+		if !isUUID(string(call.AgentID)) || !isUUID(string(call.Draft)) {
 			return nil, invalid("Those parameters are not a HostProviderDraftCall.")
 		}
 		return p.DraftCall(host, call)
@@ -460,21 +461,21 @@ func (p *Providers) forAgent() AgentWorkspaces {
 		canMake, canDelete := contains(summary.Capabilities, "create"), contains(summary.Capabilities, "delete")
 		var options any
 		if canMake {
-			options, _ = p.providerCall(summary.ID, func(c Provider) (any, error) { return c.Options() })
+			options, _ = p.providerCall(string(summary.ID), func(c Provider) (any, error) { return c.Options() })
 		}
 		workspaces := []AgentWorkspace{}
 		for _, w := range summary.Workspaces {
 			aw := AgentWorkspace{ID: w.ID, Name: w.Name, State: w.State, Cost: w.Cost}
 			for _, h := range hosts {
-				if w.Host != "" && h.ID == w.Host {
-					aw.Host = h.Name
-					aw.HostState = p.router.HostState(h.ID)
+				if w.Host != nil && *w.Host != "" && h.ID == string(*w.Host) {
+					aw.Host = &h.Name
+					aw.HostState = new(p.router.HostState(h.ID))
 				}
 			}
 			workspaces = append(workspaces, aw)
 		}
 		out.Providers = append(out.Providers, AgentProvider{ID: summary.ID, Name: summary.Name, CanMake: canMake,
-			CanDelete: canDelete, Options: options, Workspaces: workspaces})
+			CanDelete: canDelete, Options: jsonValue(options), Workspaces: workspaces})
 	}
 	return out
 }
@@ -496,14 +497,14 @@ func (p *Providers) answer(method string, params json.RawMessage, caller Caller,
 	case MethodProvidersRefresh:
 		var request providerRequest
 		decodeJSON(params, &request)
-		go p.Refresh(request.ID)
+		go p.Refresh(string(deref(request.ID)))
 		return map[string]any{}, nil
 	case MethodProvidersAdd, MethodProvidersUpdate:
 		var request ProviderAdd
 		if err := requireParams(params, &request, "ProviderAdd", "name", "kind"); err != nil {
 			return nil, err
 		}
-		if !knownKind(request.Kind) || (request.Draft != "" && !isUUID(request.Draft)) {
+		if !knownKind(request.Kind) || (request.Draft != nil && *request.Draft != "" && !isUUID(string(*request.Draft))) {
 			return nil, invalid("Those parameters are not a ProviderAdd.")
 		}
 		return p.save(request, method == MethodProvidersUpdate)
@@ -512,10 +513,10 @@ func (p *Providers) answer(method string, params json.RawMessage, caller Caller,
 		if err := requireParams(params, &request, "ProviderRequest"); err != nil {
 			return nil, err
 		}
-		if request.ID == "" {
+		if deref(request.ID) == "" {
 			return nil, invalid("Which provider?")
 		}
-		return map[string]any{}, p.remove(request.ID)
+		return map[string]any{}, p.remove(string(*request.ID))
 	case MethodHostsLink:
 		var request HostLink
 		if err := requireParams(params, &request, "HostLink", "host", "provider", "workspace"); err != nil {
@@ -527,13 +528,13 @@ func (p *Providers) answer(method string, params json.RawMessage, caller Caller,
 		if err := requireParams(params, &request, "HostRequest", "host"); err != nil {
 			return nil, err
 		}
-		return p.changeLink(request.Host, func(h *records.HostRecord) { setLink(h, nil) }, nil)
+		return p.changeLink(string(request.Host), func(h *records.HostRecord) { setLink(h, nil) }, nil)
 	case MethodHostsSetOptions:
 		var options HostWorkspaceOptions
 		if err := requireParams(params, &options, "HostWorkspaceOptions", "host"); err != nil {
 			return nil, err
 		}
-		return p.changeLink(options.Host, func(h *records.HostRecord) {
+		return p.changeLink(string(options.Host), func(h *records.HostRecord) {
 			link := LinkOf(h)
 			if link == nil {
 				return
@@ -543,7 +544,7 @@ func (p *Providers) answer(method string, params json.RawMessage, caller Caller,
 			}
 			if options.StopWhenIdleMinutes != nil {
 				if *options.StopWhenIdleMinutes > 0 {
-					link.StopWhenIdleMinutes = options.StopWhenIdleMinutes
+					link.StopWhenIdleMinutes = intOf(options.StopWhenIdleMinutes)
 				} else {
 					link.StopWhenIdleMinutes = nil
 				}
@@ -552,25 +553,26 @@ func (p *Providers) answer(method string, params json.RawMessage, caller Caller,
 				link.StartForSchedules = options.StartForSchedules
 			}
 			setLink(h, link)
-		}, func() { p.countIdle(options.Host) })
+		}, func() { p.countIdle(string(options.Host)) })
 	case MethodHostsStart:
 		var request hostRequest
 		if err := requireParams(params, &request, "HostRequest", "host"); err != nil {
 			return nil, err
 		}
-		return p.begin(starting, request.Host, who)
+		return p.begin(starting, string(request.Host), who)
 	case MethodHostsStop:
 		var request HostStop
 		if err := requireParams(params, &request, "HostStop", "host"); err != nil {
 			return nil, err
 		}
 		// Asked first while agents are working there (US4 AS4).
+		host := string(request.Host)
 		p.mu.Lock()
-		running := p.statuses[request.Host].Running
+		running := p.statuses[host].Running
 		p.mu.Unlock()
-		if (request.ConfirmRunning == nil || !*request.ConfirmRunning) && len(running) > 0 && p.router.Online(request.Host) {
-			name := request.Host
-			if h := p.records.Host(request.Host); h != nil {
+		if (request.ConfirmRunning == nil || !*request.ConfirmRunning) && len(running) > 0 && p.router.Online(host) {
+			name := host
+			if h := p.records.Host(host); h != nil {
 				name = h.Name
 			}
 			verb := "are"
@@ -581,20 +583,20 @@ func (p *Providers) answer(method string, params json.RawMessage, caller Caller,
 			f.Data = rawOf(map[string]any{"running": running})
 			return nil, f
 		}
-		return p.begin(stopping, request.Host, who)
+		return p.begin(stopping, host, who)
 	case MethodProvidersOptions:
 		var request providerRequest
 		if err := requireParams(params, &request, "ProviderRequest"); err != nil {
 			return nil, err
 		}
-		if request.ID == "" {
+		if deref(request.ID) == "" {
 			return nil, invalid("Which provider?")
 		}
-		schema, err := p.providerCall(request.ID, func(c Provider) (any, error) { return c.Options() })
+		schema, err := p.providerCall(string(*request.ID), func(c Provider) (any, error) { return c.Options() })
 		if err != nil {
 			return nil, err
 		}
-		return ProviderOptions{Schema: schema}, nil
+		return ProviderOptions{Schema: rawOf(schema)}, nil
 	case MethodProvidersCreate:
 		var request ProviderCreate
 		if err := requireParams(params, &request, "ProviderCreate", "id", "name"); err != nil {
@@ -606,7 +608,7 @@ func (p *Providers) answer(method string, params json.RawMessage, caller Caller,
 		if err := requireParams(params, &request, "HostRequest", "host"); err != nil {
 			return nil, err
 		}
-		return map[string]any{}, p.deleteWorkspace(request.Host, who, caller)
+		return map[string]any{}, p.deleteWorkspace(string(request.Host), who, caller)
 	case MethodHostsKeep:
 		var request KeepRequest
 		if err := requireParams(params, &request, "KeepRequest", "host", "method", "params"); err != nil {
@@ -615,11 +617,11 @@ func (p *Providers) answer(method string, params json.RawMessage, caller Caller,
 		kept := p.Kept()
 		var answer *Failure
 		if kept != nil {
-			answer = kept.Keep(request.Host, request.Method, request.Params, caller)
+			answer = kept.Keep(string(request.Host), request.Method, request.Params, caller)
 		}
 		if answer == nil {
 			name := "That host"
-			if h := p.records.Host(request.Host); h != nil {
+			if h := p.records.Host(string(request.Host)); h != nil {
 				name = h.Name
 			}
 			return nil, fail(CodeHostOffline, "%s is offline.", name)
@@ -628,7 +630,7 @@ func (p *Providers) answer(method string, params json.RawMessage, caller Caller,
 	case MethodProvidersRuntimes:
 		drafts := p.Drafts()
 		if drafts == nil {
-			return ProviderRuntimes{Runtimes: []ProviderRuntime{}, Why: "This control plane can’t start a writing agent."}, nil
+			return ProviderRuntimes{Runtimes: []ProviderRuntime{}, Why: new("This control plane can’t start a writing agent.")}, nil
 		}
 		return drafts.Runtimes(), nil
 	case MethodDraftStart:
@@ -644,18 +646,18 @@ func (p *Providers) answer(method string, params json.RawMessage, caller Caller,
 			return nil, invalid("Those parameters are not a ProviderDraftStart.")
 		}
 		var existing *ExistingProvider
-		if request.Provider != "" {
+		if provider := string(deref(request.Provider)); provider != "" {
 			p.mu.Lock()
-			held, ok := p.providers[request.Provider]
+			held, ok := p.providers[provider]
 			problem := ""
-			if l := p.listed[request.Provider]; l != nil {
+			if l := p.listed[provider]; l != nil {
 				problem = l.problem
 			}
 			p.mu.Unlock()
 			if !ok {
 				return nil, invalid("There is no such provider.")
 			}
-			existing = &ExistingProvider{Record: held.record, Secrets: p.secrets.Values(request.Provider), Problem: problem}
+			existing = &ExistingProvider{Record: held.record, Secrets: p.secrets.Values(provider), Problem: problem}
 			// Written again from the provider as it is kept: the sheet knows only its name.
 			cli := ""
 			if request.Form.CLI != nil {
@@ -675,7 +677,7 @@ func (p *Providers) answer(method string, params json.RawMessage, caller Caller,
 			return nil, err
 		}
 		if drafts := p.Drafts(); drafts != nil {
-			drafts.Cancel(request.Draft, caller)
+			drafts.Cancel(string(request.Draft), caller)
 		}
 		return map[string]any{}, nil
 	case MethodDraftAnswer:
@@ -736,18 +738,18 @@ func (p *Providers) Summaries() []ProviderSummary {
 		}
 		workspaces := []WorkspaceInfo{}
 		for _, w := range l.workspaces {
-			w.Host = linked[r.ID+"/"+w.ID]
+			w.Host = optional(wire.HostID(linked[r.ID+"/"+w.ID]))
 			workspaces = append(workspaces, w)
 		}
 		caps := r.Capabilities
 		if caps == nil {
 			caps = []string{}
 		}
-		s := ProviderSummary{ID: r.ID, Name: r.Name, Kind: r.Kind, Secrets: secrets, Capabilities: caps,
-			Contract: r.Contract, Mapped: r.Map != nil, Preset: r.preset(), Workspaces: workspaces, Current: l.current,
-			Problem: l.problem}
+		s := ProviderSummary{ID: wire.ProviderID(r.ID), Name: r.Name, Kind: r.Kind, Secrets: secrets, Capabilities: caps,
+			Contract: int64(r.Contract), Mapped: r.Map != nil, Preset: optional(r.preset()), Workspaces: workspaces,
+			Current: l.current, Problem: optional(l.problem)}
 		if l.listedAt != nil {
-			s.ListedAt = refDate(*l.listedAt)
+			s.ListedAt = dateOf(*l.listedAt)
 		}
 		out = append(out, s)
 	}
@@ -761,12 +763,12 @@ func (p *Providers) save(request ProviderAdd, updating bool) (ProviderSummary, e
 	var heldBefore *ProviderRecord
 	p.mu.Lock()
 	if updating {
-		held, ok := p.providers[request.ID]
-		if request.ID == "" || !ok {
+		held, ok := p.providers[string(deref(request.ID))]
+		if deref(request.ID) == "" || !ok {
 			p.mu.Unlock()
 			return ProviderSummary{}, invalid("There is no such provider.")
 		}
-		id, etag = request.ID, held.etag
+		id, etag = string(*request.ID), held.etag
 		r := held.record
 		heldBefore = &r
 	} else {
@@ -799,10 +801,10 @@ func (p *Providers) save(request ProviderAdd, updating bool) (ProviderSummary, e
 		}
 		if request.Kind == KindCommands {
 			if request.Commands == nil {
-				request.Commands = heldBefore.Commands
+				request.Commands = jsonValue(heldBefore.Commands)
 			}
 		} else if request.Map == nil {
-			request.Map = heldBefore.Map
+			request.Map = jsonValue(heldBefore.Map)
 		}
 	}
 	values := before
@@ -818,7 +820,7 @@ func (p *Providers) save(request ProviderAdd, updating bool) (ProviderSummary, e
 	sort.Strings(names)
 	record := ProviderRecord{ID: id, Name: trimSpaces(request.Name), Kind: request.Kind, Command: request.Command,
 		Args: request.Args, URL: request.URL, Headers: request.Headers, SecretNames: names, Contract: 1}
-	record.Commands, record.Map = request.Commands, request.Map
+	record.Commands, record.Map = valueOf(request.Commands), valueOf(request.Map)
 	if problem := record.Problem(); problem != "" {
 		return ProviderSummary{}, invalid("%s", problem)
 	}
@@ -887,7 +889,7 @@ func (p *Providers) save(request ProviderAdd, updating bool) (ProviderSummary, e
 	p.log(fmt.Sprintf("provider: %s %s (%s%s), %d workspaces", verb, id, record.Kind, extra, len(checked.Workspaces)))
 	p.changed()
 	for _, s := range p.Summaries() {
-		if s.ID == id {
+		if string(s.ID) == id {
 			return s, nil
 		}
 	}
@@ -898,12 +900,12 @@ func (p *Providers) save(request ProviderAdd, updating bool) (ProviderSummary, e
 // done draft and its map or commands are the draft's; otherwise it stays as it was when
 // they are unchanged, and goes when the person changed them.
 func (p *Providers) writtenBy(request ProviderAdd, before *ProviderRecord) *WrittenBy {
-	given := request.Map
+	given := valueOf(request.Map)
 	if request.Kind == KindCommands {
-		given = request.Commands
+		given = valueOf(request.Commands)
 	}
-	if drafts := p.Drafts(); request.Draft != "" && drafts != nil {
-		if runtime, json, ok := drafts.Result(request.Draft); ok && jsonEqual(json, given) {
+	if drafts := p.Drafts(); deref(request.Draft) != "" && drafts != nil {
+		if runtime, json, ok := drafts.Result(string(*request.Draft)); ok && jsonEqual(json, given) {
 			return &WrittenBy{RuntimeID: runtime, At: records.Now()}
 		}
 	}
@@ -1071,8 +1073,9 @@ func (p *Providers) connection(id string) (Provider, error) {
 // MARK: Links
 
 func (p *Providers) link(request HostLink) (any, error) {
+	host, provider := string(request.Host), string(request.Provider)
 	p.mu.Lock()
-	_, ok := p.providers[request.Provider]
+	_, ok := p.providers[provider]
 	p.mu.Unlock()
 	if !ok {
 		return nil, invalid("There is no such provider.")
@@ -1080,16 +1083,16 @@ func (p *Providers) link(request HostLink) (any, error) {
 	// One host per workspace: linking moves the link.
 	for _, other := range p.records.Hosts() {
 		link := LinkOf(&other)
-		if other.ID != request.Host && link != nil && link.Provider == request.Provider && link.Workspace == request.Workspace {
+		if other.ID != host && link != nil && link.Provider == provider && link.Workspace == request.Workspace {
 			setLink(&other, nil)
 			if err := p.records.SaveHost(context.Background(), other); err != nil {
 				return nil, err
 			}
 		}
 	}
-	return p.changeLink(request.Host, func(h *records.HostRecord) {
+	return p.changeLink(host, func(h *records.HostRecord) {
 		had := LinkOf(h)
-		link := &WorkspaceLink{Provider: request.Provider, Workspace: request.Workspace}
+		link := &WorkspaceLink{Provider: provider, Workspace: request.Workspace}
 		on := true
 		switch {
 		case request.StartWhenUsed != nil:
@@ -1102,7 +1105,7 @@ func (p *Providers) link(request HostLink) (any, error) {
 		switch {
 		case request.StopWhenIdleMinutes != nil:
 			if *request.StopWhenIdleMinutes > 0 {
-				link.StopWhenIdleMinutes = request.StopWhenIdleMinutes
+				link.StopWhenIdleMinutes = intOf(request.StopWhenIdleMinutes)
 			}
 		case had == nil:
 			minutes := DefaultIdleMinutes
@@ -1119,7 +1122,7 @@ func (p *Providers) link(request HostLink) (any, error) {
 	}, func() {
 		// Listed again, in the background: the last list can be from before an install
 		// woke the workspace (#965).
-		go p.Refresh(request.Provider)
+		go p.Refresh(provider)
 	})
 }
 
@@ -1166,7 +1169,7 @@ func (p *Providers) Keepable(host string) string {
 	if !known || p.router.Online(host) || (a != nil && a.kind == stopping) {
 		return ""
 	}
-	if shown := p.overlay(*record); shown != nil && (shown.HostState == "stopped" || shown.HostState == "starting") {
+	if shown := p.overlay(*record); shown != nil && (deref(shown.HostState) == "stopped" || deref(shown.HostState) == "starting") {
 		return record.Name
 	}
 	return ""
@@ -1324,8 +1327,9 @@ var hostNamePattern = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9-]{0,62}$`)
 // install command and host code for its first boot, so it joins by itself and is linked.
 // A provider that cannot run it says so, and the person adds it over ssh.
 func (p *Providers) create(request ProviderCreate, who string, caller *Caller) (any, error) {
+	id := string(request.ID)
 	p.mu.Lock()
-	held, ok := p.providers[request.ID]
+	held, ok := p.providers[id]
 	p.mu.Unlock()
 	if !ok {
 		return nil, invalid("There is no such provider.")
@@ -1351,13 +1355,13 @@ func (p *Providers) create(request ProviderCreate, who string, caller *Caller) (
 	}
 	firstBoot := command + " " + shellQuoted(name)
 	began := time.Now()
-	options := request.Options
+	options := valueOf(request.Options)
 	if options == nil {
 		options = map[string]any{}
 	}
 	var made *WorkspaceInfo
 	var runs bool
-	_, err = p.providerCall(request.ID, func(c Provider) (any, error) {
+	_, err = p.providerCall(id, func(c Provider) (any, error) {
 		var err error
 		made, runs, err = c.Create(name, options, &firstBoot)
 		return nil, err
@@ -1366,10 +1370,10 @@ func (p *Providers) create(request ProviderCreate, who string, caller *Caller) (
 		p.log(fmt.Sprintf("workspace: create %s at %s by %s: failed: %s", name, provider.Name, who, errorWords(err)))
 		return nil, err
 	}
-	p.Refresh(request.ID)
+	p.Refresh(id)
 	p.mu.Lock()
 	var listedNow []WorkspaceInfo
-	if l := p.listed[request.ID]; l != nil {
+	if l := p.listed[id]; l != nil {
 		listedNow = l.workspaces
 	}
 	p.mu.Unlock()
@@ -1397,7 +1401,7 @@ func (p *Providers) create(request ProviderCreate, who string, caller *Caller) (
 	if runs {
 		joiningWords = ", joining on first boot"
 	}
-	p.log(fmt.Sprintf("workspace: create %s (%s/%s) by %s: ok in %s%s", name, request.ID, found.ID, who,
+	p.log(fmt.Sprintf("workspace: create %s (%s/%s) by %s: ok in %s%s", name, id, found.ID, who,
 		secondsSince(began), joiningWords))
 	if runs {
 		var clones []string
@@ -1407,7 +1411,7 @@ func (p *Providers) create(request ProviderCreate, who string, caller *Caller) (
 			}
 		}
 		p.mu.Lock()
-		p.joining[name] = &joining{provider: request.ID, workspace: found.ID, clones: clones, caller: caller}
+		p.joining[name] = &joining{provider: id, workspace: found.ID, clones: clones, caller: caller}
 		p.mu.Unlock()
 		go p.linkWhenJoined(name)
 	}
@@ -1429,7 +1433,7 @@ func (p *Providers) linkWhenJoined(name string) {
 				p.mu.Lock()
 				delete(p.joining, name)
 				p.mu.Unlock()
-				p.link(HostLink{Host: h.ID, Provider: wanted.provider, Workspace: wanted.workspace})
+				p.link(HostLink{Host: wire.HostID(h.ID), Provider: wire.ProviderID(wanted.provider), Workspace: wanted.workspace})
 				p.clone(wanted.clones, h.ID, name, wanted.caller)
 				return
 			}
@@ -1530,7 +1534,7 @@ func (p *Providers) Heard(host string, status HostStatus) {
 	p.mu.Unlock()
 	// Kept on its link, for while it is stopped (#1004 FR-003). A host from before #1004
 	// says nothing, and is left as it was (FR-011).
-	if schedule := status.Schedule.schedule(); schedule != nil {
+	if schedule := schedule(status.Schedule); schedule != nil {
 		if link := LinkOf(p.records.Host(host)); link != nil && !link.Schedule.equal(schedule) {
 			p.changeLinkQuietly(host, func(l *WorkspaceLink) { l.Schedule = schedule })
 			p.changed()
@@ -1670,7 +1674,7 @@ func (p *Providers) wakeUps(now time.Time) {
 		if !known || wake == nil || wake.After(now) || busy {
 			continue
 		}
-		if shown := p.overlay(h); shown == nil || shown.HostState != "stopped" || p.router.Online(h.ID) {
+		if shown := p.overlay(h); shown == nil || deref(shown.HostState) != "stopped" || p.router.Online(h.ID) {
 			continue
 		}
 		at := *link.Schedule.At
@@ -1741,8 +1745,8 @@ func (p *Providers) finish(host, problem string) {
 // sshDestination is where agentsd is started over ssh: the provider's destination, or the
 // one the host was installed over (#965).
 func (p *Providers) sshDestination(link WorkspaceLink, host string) string {
-	if w := p.workspace(link); w != nil && w.SSH != "" {
-		return w.SSH
+	if w := p.workspace(link); w != nil && deref(w.SSH) != "" {
+		return *w.SSH
 	}
 	return p.hooks.InstalledOver(host)
 }
@@ -1817,36 +1821,36 @@ func (p *Providers) overlay(record records.HostRecord) *HostWorkspace {
 		hostState = state
 	}
 	problem := p.problems[record.ID]
-	ws := &HostWorkspace{Provider: link.Provider, ProviderName: provider.record.Name, Workspace: link.Workspace,
-		WorkspaceName: link.Workspace, WorkspaceState: state, HostState: hostState, Problem: problem,
+	ws := &HostWorkspace{Provider: wire.ProviderID(link.Provider), ProviderName: provider.record.Name, Workspace: link.Workspace,
+		WorkspaceName: link.Workspace, WorkspaceState: state, HostState: optional(hostState), Problem: optional(problem),
 		// A running one whose start failed can be started again: its agentsd is what is down (#960).
 		CanStart:      a == nil && (state != "running" && state != "starting" || state == "running" && problem != ""),
 		CanStop:       a == nil && (state == "running" || state == "starting" || state == "unknown"),
-		StartWhenUsed: link.StartWhenUsed == nil || *link.StartWhenUsed, StopWhenIdleMinutes: link.StopWhenIdleMinutes,
+		StartWhenUsed: link.StartWhenUsed == nil || *link.StartWhenUsed, StopWhenIdleMinutes: int64Of(link.StopWhenIdleMinutes),
 		Current: l != nil && l.current}
 	if found != nil {
 		ws.WorkspaceName = found.Name
 		ws.Cost = found.Cost
 	}
 	if a != nil {
-		ws.Since = refDate(a.since)
+		ws.Since = dateOf(a.since)
 		if a.kind == starting {
-			ws.Phase = a.phase
+			ws.Phase = optional(a.phase)
 		}
 	}
 	if hostState == "stopped" {
-		ws.StoppedBy = p.stoppedBy[record.ID]
+		ws.StoppedBy = optional(p.stoppedBy[record.ID])
 	}
 	on := link.StartForSchedules == nil || *link.StartForSchedules
 	tells := link.Schedule != nil
 	ws.StartForSchedules, ws.TellsSchedule = &on, &tells
 	if s := link.Schedule; s != nil && s.At != nil && s.At.After(now) {
-		ws.NextWorkflow = s.Workflow
-		ws.NextWorkflowAt = refDate(*s.At)
+		ws.NextWorkflow = optional(s.Workflow)
+		ws.NextWorkflowAt = dateOf(*s.At)
 	}
 	// Also while it runs, so Stop's confirmation can say when it starts next (FR-010).
 	if wake := wakeAt(*link, now); wake != nil {
-		ws.WakeAt = refDate(*wake)
+		ws.WakeAt = dateOf(*wake)
 	}
 	return ws
 }

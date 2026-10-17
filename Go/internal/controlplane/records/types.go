@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+
+	"github.com/alexec/agents/Go/wire"
 )
 
 // LegacyGrant is written where an older build expects a grant: every client may do
@@ -165,11 +167,9 @@ func (h *HostRecord) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-// Endpoint is ControlEndpoint: one place a control plane answers (R16).
-type Endpoint struct {
-	URL string  `json:"url"`
-	Pin *string `json:"pin,omitempty"`
-}
+// Endpoint is ControlEndpoint: one place a control plane answers (R16), on the wire and
+// in control.json alike.
+type Endpoint = wire.ControlEndpoint
 
 // Settings is ControlSettings (v1/control.json): what the control plane is.
 type Settings struct {

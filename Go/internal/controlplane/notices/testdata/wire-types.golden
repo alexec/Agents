@@ -1,4 +1,2 @@
 RelayDelivery full
 {"needID":{"permission":"6F9619FF-8B86-D011-B42D-00C04FC964FF"},"device":"DEVICE","publicKey":"AQID","headline":{"h1":"H1","h2":"H2","h3":"H3"},"alert":true}
-RelayDelivery zero
-{"needID":null,"device":"","alert":false}

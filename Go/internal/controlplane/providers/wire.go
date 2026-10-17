@@ -16,6 +16,8 @@ import (
 	"fmt"
 	"strings"
 	"time"
+
+	"github.com/alexec/agents/Go/wire"
 )
 
 // Error codes: JSONRPCError's and DaemonAPI.Failure's.
@@ -74,28 +76,32 @@ type Caller struct {
 	Kind string
 }
 
-// RefDate is a date on the wire, as Swift's default JSONEncoder writes it: seconds since
-// 2001-01-01.
-type RefDate time.Time
+// dateOf is a time on the wire: seconds since 2001-01-01, as ControlRouter's dates were
+// written before the generated types (#1313), so no byte moves.
+func dateOf(t time.Time) *wire.Date {
+	d := wire.Date(float64(t.UnixNano()-referenceDate*int64(time.Second)) / 1e9)
+	return &d
+}
 
+// referenceDate is 2001-01-01T00:00:00Z in Unix seconds.
 const referenceDate = 978307200
 
-func (d RefDate) MarshalJSON() ([]byte, error) {
-	return json.Marshal(float64(time.Time(d).UnixNano()-referenceDate*int64(time.Second)) / 1e9)
-}
-
-func (d *RefDate) UnmarshalJSON(b []byte) error {
-	var seconds float64
-	if err := json.Unmarshal(b, &seconds); err != nil {
-		return err
+// deref is what p points at, or T's zero.
+func deref[T any](p *T) T {
+	if p == nil {
+		var zero T
+		return zero
 	}
-	*d = RefDate(time.Unix(referenceDate, 0).Add(time.Duration(seconds * float64(time.Second))))
-	return nil
+	return *p
 }
 
-func refDate(t time.Time) *RefDate {
-	d := RefDate(t)
-	return &d
+// optional is v, or nil for T's zero: what an omitempty field said before (#1313).
+func optional[T comparable](v T) *T {
+	var zero T
+	if v == zero {
+		return nil
+	}
+	return &v
 }
 
 // Method names (DaemonAPI.Method).
@@ -193,23 +199,15 @@ func MakeProviderID(name string) string {
 }
 
 // WorkspaceInfo is DaemonAPI.WorkspaceInfo: one workspace, as its provider last listed it.
-type WorkspaceInfo struct {
-	ID   string `json:"id"`
-	Name string `json:"name"`
-	// running, starting, stopping, stopped or unknown.
-	State  string `json:"state"`
-	SSH    string `json:"ssh,omitempty"`
-	Tunnel *bool  `json:"tunnel,omitempty"`
-	Cost   string `json:"cost,omitempty"`
-	// The host it is linked to, in providers/list.
-	Host string `json:"host,omitempty"`
-}
+// State is running, starting, stopping, stopped or unknown; Host, in providers/list, the
+// host it is linked to.
+type WorkspaceInfo = wire.WorkspaceInfo
 
 // MayBe is WorkspaceInfo.mayBe(hostNamed:) (#976): whether a host added by hand may be
 // this workspace.
-func (w WorkspaceInfo) MayBe(hostName string) bool {
+func MayBe(w WorkspaceInfo, hostName string) bool {
 	host := strings.ToLower(hostName)
-	if w.SSH != "" && strings.ToLower(w.SSH) == host {
+	if w.SSH != nil && *w.SSH != "" && strings.ToLower(*w.SSH) == host {
 		return true
 	}
 	name := strings.ToLower(w.Name)
@@ -224,49 +222,13 @@ func (w WorkspaceInfo) MayBe(hostName string) bool {
 
 // ProviderSummary is DaemonAPI.ProviderSummary: a provider for the Providers page, never
 // its commands, headers or secrets' values.
-type ProviderSummary struct {
-	ID           string          `json:"id"`
-	Name         string          `json:"name"`
-	Kind         string          `json:"kind"`
-	Secrets      map[string]bool `json:"secrets"`
-	Capabilities []string        `json:"capabilities"`
-	Contract     int             `json:"contract"`
-	Mapped       bool            `json:"mapped"`
-	Preset       string          `json:"preset,omitempty"`
-	Workspaces   []WorkspaceInfo `json:"workspaces"`
-	ListedAt     *RefDate        `json:"listedAt,omitempty"`
-	Current      bool            `json:"current"`
-	Problem      string          `json:"problem,omitempty"`
-}
+type ProviderSummary = wire.ProviderSummary
 
 // HostWorkspace is DaemonAPI.HostWorkspace: a linked host's workspace, on its hosts/list
-// row and in control/hostChanged.
-type HostWorkspace struct {
-	Provider       string `json:"provider"`
-	ProviderName   string `json:"providerName"`
-	Workspace      string `json:"workspace"`
-	WorkspaceName  string `json:"workspaceName"`
-	WorkspaceState string `json:"workspaceState"`
-	// stopped, starting or stopping: shown over the uplink's own state while it is not
-	// online, and stopping always.
-	HostState string `json:"hostState,omitempty"`
-	// While starting: provider, connecting or sshStart.
-	Phase               string   `json:"phase,omitempty"`
-	Since               *RefDate `json:"since,omitempty"`
-	Problem             string   `json:"problem,omitempty"`
-	StoppedBy           string   `json:"stoppedBy,omitempty"`
-	CanStart            bool     `json:"canStart"`
-	CanStop             bool     `json:"canStop"`
-	StartWhenUsed       bool     `json:"startWhenUsed"`
-	StopWhenIdleMinutes *int     `json:"stopWhenIdleMinutes,omitempty"`
-	Cost                string   `json:"cost,omitempty"`
-	Current             bool     `json:"current"`
-	StartForSchedules   *bool    `json:"startForSchedules,omitempty"`
-	TellsSchedule       *bool    `json:"tellsSchedule,omitempty"`
-	NextWorkflow        string   `json:"nextWorkflow,omitempty"`
-	NextWorkflowAt      *RefDate `json:"nextWorkflowAt,omitempty"`
-	WakeAt              *RefDate `json:"wakeAt,omitempty"`
-}
+// row and in control/hostChanged. HostState is stopped, starting or stopping: shown over
+// the uplink's own state while it is not online, and stopping always. Phase, while
+// starting, is provider, connecting or sshStart.
+type HostWorkspace = wire.HostWorkspace
 
 // Overlay is ControlRouter.described's part for workspaces: a host's description as
 // hosts/list and control/hostChanged say it, with its workspace laid over it. The
@@ -280,8 +242,8 @@ func Overlay(described map[string]any, online bool, ws *HostWorkspace) map[strin
 	for k, v := range described {
 		out[k] = v
 	}
-	if ws.HostState != "" && (ws.HostState == "stopping" || !online) {
-		out["state"] = ws.HostState
+	if state := deref(ws.HostState); state != "" && (state == "stopping" || !online) {
+		out["state"] = state
 	}
 	out["workspace"] = ws
 	return out
@@ -290,136 +252,68 @@ func Overlay(described map[string]any, online bool, ws *HostWorkspace) map[strin
 // OfflineRefusal is ControlRouter.offlineRefusal: what a request for a host that is not
 // up is answered with. A host whose workspace is stopped says so (FR-022).
 func OfflineRefusal(ws *HostWorkspace) *Failure {
-	if ws != nil && ws.HostState == "stopped" {
+	if ws != nil && deref(ws.HostState) == "stopped" {
 		return fail(CodeHostOffline, "That host is stopped. Start it to reach it.")
 	}
 	return fail(CodeHostOffline, "That host is offline.")
 }
 
-// ProviderAdd is DaemonAPI.ProviderAdd: providers/add and providers/update.
-type ProviderAdd struct {
-	ID       string            `json:"id,omitempty"`
-	Name     string            `json:"name"`
-	Kind     string            `json:"kind"`
-	Command  *string           `json:"command,omitempty"`
-	Args     []string          `json:"args,omitempty"`
-	URL      *string           `json:"url,omitempty"`
-	Headers  map[string]string `json:"headers,omitempty"`
-	Commands any               `json:"commands,omitempty"`
-	Map      any               `json:"map,omitempty"`
-	// Name to value. Only ever sent to the control plane; never given back.
-	Secrets map[string]string `json:"secrets,omitempty"`
-	// Your commands: the program its commands use, for Write It for Me. Not kept.
-	CLI *string `json:"cli,omitempty"`
-	// The draft this accepts (#858).
-	Draft string `json:"draft,omitempty"`
-}
+// ProviderAdd is DaemonAPI.ProviderAdd: providers/add and providers/update. Secrets, name
+// to value, only ever go to the control plane and are never given back; CLI, the program
+// Your commands use, for Write It for Me, is not kept; Draft is the draft this accepts
+// (#858).
+type ProviderAdd = wire.ProviderAdd
 
-type providerRequest struct {
-	ID string `json:"id,omitempty"`
-}
+type providerRequest = wire.ProviderRequest
 
-type hostRequest struct {
-	Host string `json:"host"`
-}
+type hostRequest = wire.HostRequest
 
 // HostLink is DaemonAPI.HostLink: hosts/link.
-type HostLink struct {
-	Host                string `json:"host"`
-	Provider            string `json:"provider"`
-	Workspace           string `json:"workspace"`
-	StartWhenUsed       *bool  `json:"startWhenUsed,omitempty"`
-	StopWhenIdleMinutes *int   `json:"stopWhenIdleMinutes,omitempty"`
-}
+type HostLink = wire.HostLink
 
 // HostWorkspaceOptions is DaemonAPI.HostWorkspaceOptions. stopWhenIdleMinutes 0 turns it off.
-type HostWorkspaceOptions struct {
-	Host                string `json:"host"`
-	StartWhenUsed       *bool  `json:"startWhenUsed,omitempty"`
-	StopWhenIdleMinutes *int   `json:"stopWhenIdleMinutes,omitempty"`
-	StartForSchedules   *bool  `json:"startForSchedules,omitempty"`
-}
+type HostWorkspaceOptions = wire.HostWorkspaceOptions
 
 // ProviderOptions is DaemonAPI.ProviderOptions: the New Workspace form, a JSON Schema.
-type ProviderOptions struct {
-	Schema any `json:"schema"`
-}
+type ProviderOptions = wire.ProviderOptions
 
 // ProviderCreate is DaemonAPI.ProviderCreate: providers/create.
-type ProviderCreate struct {
-	ID      string   `json:"id"`
-	Name    string   `json:"name"`
-	Options any      `json:"options,omitempty"`
-	Clones  []string `json:"clones,omitempty"`
-}
+type ProviderCreate = wire.ProviderCreate
 
 // ProviderCreated is DaemonAPI.ProviderCreated: what providers/create made.
-type ProviderCreated struct {
-	Workspace WorkspaceInfo `json:"workspace"`
-	Joining   bool          `json:"joining"`
-}
+type ProviderCreated = wire.ProviderCreated
 
 // HostStop is DaemonAPI.HostStop: hosts/stop.
-type HostStop struct {
-	Host           string `json:"host"`
-	ConfirmRunning *bool  `json:"confirmRunning,omitempty"`
-}
+type HostStop = wire.HostStop
 
 // HostWorkspaceCall is DaemonAPI.HostWorkspaceCall: host/workspaces, for an agent there.
-type HostWorkspaceCall struct {
-	// Who asked, for the log: "Claude (fix-login)".
-	Agent  string          `json:"agent"`
-	Method string          `json:"method"`
-	Params json.RawMessage `json:"params"`
-}
+// Agent is who asked, for the log: "Claude (fix-login)".
+type HostWorkspaceCall = wire.HostWorkspaceCall
 
 // AgentWorkspaces is DaemonAPI.AgentWorkspaces: what list_workspaces shows an agent.
-type AgentWorkspaces struct {
-	Providers []AgentProvider `json:"providers"`
-}
+type AgentWorkspaces = wire.AgentWorkspaces
 
 // AgentProvider is DaemonAPI.AgentWorkspaces.Provider.
-type AgentProvider struct {
-	ID         string           `json:"id"`
-	Name       string           `json:"name"`
-	CanMake    bool             `json:"canMake"`
-	CanDelete  bool             `json:"canDelete"`
-	Options    any              `json:"options,omitempty"`
-	Workspaces []AgentWorkspace `json:"workspaces"`
-}
+type AgentProvider = wire.AgentWorkspacesProvider
 
 // AgentWorkspace is DaemonAPI.AgentWorkspaces.Workspace.
-type AgentWorkspace struct {
-	ID        string `json:"id"`
-	Name      string `json:"name"`
-	State     string `json:"state"`
-	Host      string `json:"host,omitempty"`
-	HostState string `json:"hostState,omitempty"`
-	Cost      string `json:"cost,omitempty"`
-}
+type AgentWorkspace = wire.AgentWorkspacesWorkspace
 
-// HostStatus is DaemonAPI.HostStatus: host/status on channel 0 (#691 US4).
-type HostStatus struct {
-	Idle bool `json:"idle"`
-	// "Claude (fix-login)": each agent working or waiting on a person.
-	Running []string `json:"running"`
-	// Nil from a host from before #1004; empty when nothing is scheduled.
-	Schedule *HostSchedule `json:"schedule,omitempty"`
-}
+// HostStatus is DaemonAPI.HostStatus: host/status on channel 0 (#691 US4). Running is
+// "Claude (fix-login)" for each agent working or waiting on a person; Schedule is nil from
+// a host from before #1004, and empty when nothing is scheduled.
+type HostStatus = wire.HostStatus
 
 // HostSchedule is DaemonAPI.HostSchedule: a host's next scheduled workflow (#1004).
-type HostSchedule struct {
-	At       *RefDate `json:"at,omitempty"`
-	Workflow string   `json:"workflow,omitempty"`
-}
+type HostSchedule = wire.HostSchedule
 
-func (s *HostSchedule) schedule() *Schedule {
+func schedule(s *HostSchedule) *Schedule {
 	if s == nil {
 		return nil
 	}
-	out := &Schedule{Workflow: s.Workflow}
+	out := &Schedule{Workflow: deref(s.Workflow)}
 	if s.At != nil {
-		t := time.Time(*s.At)
+		t := s.At.Time()
 		out.At = &t
 	}
 	return out
@@ -430,4 +324,39 @@ type Reply struct {
 	Result json.RawMessage
 	// The host's refusal, when it said no.
 	Error *Failure
+}
+
+// jsonValue is v as JSON, or nil for nil: an `any` field's omitempty (#1313).
+func jsonValue(v any) wire.JSONValue {
+	if v == nil {
+		return nil
+	}
+	return rawOf(v)
+}
+
+// valueOf is JSON as a generic value, numbers kept as written, or nil for none.
+func valueOf(j wire.JSONValue) any {
+	if len(j) == 0 {
+		return nil
+	}
+	var v any
+	if decodeJSON(j, &v) != nil {
+		return nil
+	}
+	return v
+}
+
+// intOf and int64Of move a count between a record's int and the wire's int64.
+func intOf(n *int64) *int {
+	if n == nil {
+		return nil
+	}
+	return new(int(*n))
+}
+
+func int64Of(n *int) *int64 {
+	if n == nil {
+		return nil
+	}
+	return new(int64(*n))
 }

@@ -38,6 +38,5 @@ func TestWireTypesKeepTheirBytes(t *testing.T) {
 		"ProviderRuntimes":      func() any { return new(ProviderRuntimes) },
 		"DraftUpdate":           func() any { return new(DraftUpdate) },
 		"HostProviderDraftCall": func() any { return new(HostProviderDraftCall) },
-		"StartRequest":          func() any { return new(StartRequest) },
 	}, *update)
 }

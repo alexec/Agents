@@ -1327,7 +1327,7 @@ type DraftCheck struct {
 	Passed     bool            `json:"passed"`
 	Workspaces []WorkspaceInfo `json:"workspaces,omitzero"`
 	Problem    *string         `json:"problem,omitzero"`
-	Ssh        *string         `json:"ssh,omitzero"`
+	SSH        *string         `json:"ssh,omitzero"`
 	NoSSH      *bool           `json:"noSSH,omitzero"`
 }
 
@@ -3224,7 +3224,7 @@ type ProviderAdd struct {
 	Commands JSONValue         `json:"commands,omitzero"`
 	Map      JSONValue         `json:"map,omitzero"`
 	Secrets  map[string]string `json:"secrets,omitzero"`
-	Cli      *string           `json:"cli,omitzero"`
+	CLI      *string           `json:"cli,omitzero"`
 	Draft    *UUID             `json:"draft,omitzero"`
 }
 
@@ -5049,7 +5049,7 @@ type WorkspaceInfo struct {
 	ID     string  `json:"id"`
 	Name   string  `json:"name"`
 	State  string  `json:"state"`
-	Ssh    *string `json:"ssh,omitzero"`
+	SSH    *string `json:"ssh,omitzero"`
 	Tunnel *bool   `json:"tunnel,omitzero"`
 	Cost   *string `json:"cost,omitzero"`
 	Host   *HostID `json:"host,omitzero"`

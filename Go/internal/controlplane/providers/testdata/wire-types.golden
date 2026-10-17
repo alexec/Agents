@@ -106,10 +106,6 @@ ProviderSummary full
 {"id":"ID","name":"NAME","kind":"KIND","secrets":{"KEY":true},"capabilities":["CAPABILITIES"],"contract":7,"mapped":true,"preset":"PRESET","workspaces":[{"id":"ID","name":"NAME","state":"STATE","ssh":"SSH","tunnel":true,"cost":"COST","host":"HOST"}],"listedAt":813922215.25,"current":true,"problem":"PROBLEM"}
 ProviderSummary zero
 {"id":"","name":"","kind":"","secrets":null,"capabilities":null,"contract":0,"mapped":false,"workspaces":null,"current":false}
-StartRequest full
-{"runtimeID":"RUNTIMEID","cwd":"CWD","prompt":"PROMPT","attachments":[{"k":"v"}],"additionalDirectories":["ADDITIONALDIRECTORIES"],"mcpServers":[{"k":"v"}],"labels":["LABELS"],"requestID":"REQUESTID","sandbox":"SANDBOX","purpose":{"KEY":{"KEY":"PURPOSE"}}}
-StartRequest zero
-{"runtimeID":"","cwd":"","prompt":"","attachments":null,"additionalDirectories":null,"mcpServers":null,"labels":null}
 WorkspaceInfo full
 {"id":"ID","name":"NAME","state":"STATE","ssh":"SSH","tunnel":true,"cost":"COST","host":"HOST"}
 WorkspaceInfo zero

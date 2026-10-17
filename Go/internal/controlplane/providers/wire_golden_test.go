@@ -96,7 +96,7 @@ func TestProvidersWireIsWhatItWas(t *testing.T) {
 
 	golden := filepath.Join("testdata", "wire.golden")
 	if *update {
-		os.MkdirAll("testdata", 0o755)
+		_ = os.MkdirAll("testdata", 0o755)
 		if err := os.WriteFile(golden, []byte(got), 0o644); err != nil {
 			t.Fatal(err)
 		}
@@ -119,5 +119,5 @@ func TestProvidersWireIsWhatItWas(t *testing.T) {
 var (
 	goldenUUID      = regexp.MustCompile(`[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}`)
 	goldenLowerUUID = regexp.MustCompile(`[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}`)
-	goldenDates = regexp.MustCompile(`"(listedAt|since|at|wakeAt|nextWorkflowAt)":-?[0-9][0-9.eE+-]*`)
+	goldenDates     = regexp.MustCompile(`"(listedAt|since|at|wakeAt|nextWorkflowAt)":-?[0-9][0-9.eE+-]*`)
 )

@@ -44,7 +44,7 @@ func Check(t *testing.T, golden string, types Types, update bool) {
 				fmt.Fprintf(&out, "%s %s\n%s\n", name, sample.kind, b)
 			}
 		}
-		os.MkdirAll(filepath.Dir(golden), 0o755)
+		_ = os.MkdirAll(filepath.Dir(golden), 0o755)
 		if err := os.WriteFile(golden, []byte(out.String()), 0o644); err != nil {
 			t.Fatal(err)
 		}

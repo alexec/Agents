@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/alexec/agents/Go/internal/wiretest"
+	"github.com/alexec/agents/Go/wire"
 )
 
 var update = flag.Bool("update", false, "write testdata/wire-types.golden from today's types")
@@ -17,7 +18,6 @@ func TestWireTypesKeepTheirBytes(t *testing.T) {
 		"ControlAuth":  func() any { return new(Auth) },
 		"ControlOK":    func() any { return new(OK) },
 		"HostHello":    func() any { return new(HostHello) },
-		"HostAnnounce": func() any { return new(hostAnnounce) },
-		"ChannelOpen":  func() any { return new(channelOpen) },
+		"HostAnnounce": func() any { return new(wire.HostAnnounce) },
 	}, *update)
 }

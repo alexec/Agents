@@ -32,6 +32,7 @@ import (
 
 	"github.com/alexec/agents/Go/internal/controlplane/records"
 	"github.com/alexec/agents/Go/internal/controlplane/store"
+	"github.com/alexec/agents/Go/wire"
 )
 
 // Record is HostTunnels.Record, stored as v1/tunnels/<id>.json. Its fields are the
@@ -53,21 +54,13 @@ type Record struct {
 	Made       records.Stamp `json:"made"`
 }
 
-// Tunnel is DaemonAPI.HostTunnel: how a server's reverse tunnel stands.
-type Tunnel struct {
-	// Up says whether ssh has the server's end of the tunnel open now.
-	Up bool `json:"up"`
-	// Problem is why it is down, in ssh's words, when it said any.
-	Problem *string `json:"problem,omitempty"`
-}
+// Tunnel is DaemonAPI.HostTunnel: whether ssh has the server's end of the tunnel open
+// now, and why not, in ssh's words, when it said any.
+type Tunnel = wire.HostTunnel
 
 // Changed is DaemonAPI.HostTunnelChanged, the params of control/tunnelChanged. It is
 // by name, because a server's tunnel is up before it joins.
-type Changed struct {
-	Name   string  `json:"name"`
-	Host   *string `json:"host,omitempty"`
-	Tunnel Tunnel  `json:"tunnel"`
-}
+type Changed = wire.HostTunnelChanged
 
 // Prefix is HostTunnels.prefix.
 const Prefix = "v1/tunnels/"
@@ -510,7 +503,7 @@ func (t *Tunnels) sayState(ctx context.Context, id string, state Tunnel) {
 		}
 	}
 	t.log(line)
-	t.changed(Changed{Name: record.Name, Host: record.Host, Tunnel: state})
+	t.changed(Changed{Name: record.Name, Host: (*wire.HostID)(record.Host), Tunnel: state})
 }
 
 func sameTunnel(a, b Tunnel) bool {

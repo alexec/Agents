@@ -1,0 +1,519 @@
+{
+  "ClientRecord": {
+    "id": "6F9619FF-8B86-D011-B42D-00C04FC964FF",
+    "name": "name",
+    "kind": "iPhone",
+    "publicKey": "AQID",
+    "grant": "operator",
+    "paired": 812345678.5,
+    "lastSeen": 812345678.5,
+    "mayNotify": true,
+    "owner": "owner",
+    "rev": 7,
+    "forgotten": true,
+    "forgottenAt": 812345678.5,
+    "knownEpoch": 7
+  },
+  "ClientRequest": {
+    "client": "6F9619FF-8B86-D011-B42D-00C04FC964FF"
+  },
+  "ClientConnection": {
+    "client": "6F9619FF-8B86-D011-B42D-00C04FC964FF",
+    "relayed": true,
+    "through": "through"
+  },
+  "ClientAnnounce": {
+    "id": "6F9619FF-8B86-D011-B42D-00C04FC964FF",
+    "publicKey": "AQID",
+    "name": "name",
+    "kind": "iPhone"
+  },
+  "HostAnnounce": {
+    "publicKey": "AQID",
+    "name": "name",
+    "platform": "platform",
+    "version": "version",
+    "machineID": "machineID",
+    "relay": true,
+    "implementation": "implementation"
+  },
+  "Admitted": {
+    "client": "6F9619FF-8B86-D011-B42D-00C04FC964FF",
+    "host": "box",
+    "grant": "grant"
+  },
+  "ControlCodeShown": {
+    "text": "text",
+    "expires": 812345678.5,
+    "command": "command"
+  },
+  "HostHello": {
+    "host": "box",
+    "version": "version",
+    "platform": "platform",
+    "machineID": "machineID",
+    "name": "name",
+    "relay": true,
+    "implementation": "implementation"
+  },
+  "LendSignIn": {
+    "host": "box",
+    "from": "box",
+    "runtime": "runtime",
+    "allowed": true
+  },
+  "HostRelayRequest": {
+    "host": "box",
+    "relay": true
+  },
+  "RelaySwitch": {
+    "relay": true
+  },
+  "TunnelOpen": {
+    "runtime": "runtime",
+    "ref": "ref"
+  },
+  "ControlMoved": {
+    "url": "url",
+    "pin": "pin",
+    "controlKey": "AQID",
+    "name": "name"
+  },
+  "ControlEndpoint": {
+    "url": "url",
+    "pin": "pin"
+  },
+  "ControlHello": {
+    "v": 7,
+    "name": "name",
+    "control": "control",
+    "nonce": "nonce",
+    "copy": "copy"
+  },
+  "ControlAuth": {
+    "id": "id",
+    "nonce": "nonce",
+    "mac": "mac",
+    "kind": "kind",
+    "for": "for",
+    "epoch": 7
+  },
+  "ControlOK": {
+    "mac": "mac",
+    "grant": "grant",
+    "host": "box",
+    "relayed": true,
+    "endpoints": [
+      {
+        "url": "url",
+        "pin": "pin"
+      }
+    ],
+    "epoch": 7
+  },
+  "ChannelOpen": {
+    "grant": "operator",
+    "client": "client",
+    "device": "6F9619FF-8B86-D011-B42D-00C04FC964FF",
+    "relayed": true,
+    "tunnel": "tunnel",
+    "tunnelRef": "tunnelRef",
+    "fanOut": true
+  },
+  "GitCredentialRequest": {
+    "protocol": "protocol",
+    "host": "host"
+  },
+  "GitCredential": {
+    "username": "username",
+    "password": "password"
+  },
+  "AttentionNeed": {
+    "need": {
+      "id": {
+        "permission": "6F9619FF-8B86-D011-B42D-00C04FC964FF"
+      },
+      "agentID": "6F9619FF-8B86-D011-B42D-00C04FC964FF",
+      "folder": "file:///work",
+      "kind": "permission",
+      "raisedAt": 812345678.5,
+      "headline": {
+        "h1": "h1",
+        "h2": "h2",
+        "h3": "h3",
+        "answers": [
+          {
+            "kind": "choice",
+            "id": "id",
+            "title": "title",
+            "field": "field",
+            "isDestructive": true
+          }
+        ]
+      }
+    },
+    "headline": {
+      "h1": "h1",
+      "h2": "h2",
+      "h3": "h3",
+      "answers": [
+        {
+          "kind": "choice",
+          "id": "id",
+          "title": "title",
+          "field": "field",
+          "isDestructive": true
+        }
+      ]
+    },
+    "buzz": true,
+    "withdraw": {
+      "permission": "6F9619FF-8B86-D011-B42D-00C04FC964FF"
+    },
+    "waiting": 7
+  },
+  "RelayDevices": {
+    "devices": [
+      {
+        "id": "6F9619FF-8B86-D011-B42D-00C04FC964FF",
+        "publicKey": "AQID"
+      }
+    ]
+  },
+  "RelayDelivery": {
+    "needID": {
+      "permission": "6F9619FF-8B86-D011-B42D-00C04FC964FF"
+    },
+    "device": "6F9619FF-8B86-D011-B42D-00C04FC964FF",
+    "publicKey": "AQID",
+    "headline": {
+      "h1": "h1",
+      "h2": "h2",
+      "h3": "h3",
+      "answers": [
+        {
+          "kind": "choice",
+          "id": "id",
+          "title": "title",
+          "field": "field",
+          "isDestructive": true
+        }
+      ]
+    },
+    "alert": true,
+    "waiting": 7
+  },
+  "RelayCount": {
+    "device": "6F9619FF-8B86-D011-B42D-00C04FC964FF",
+    "waiting": 7,
+    "countedAt": 812345678.5
+  },
+  "DetectedServer": {
+    "alias": "alias",
+    "resolved": "resolved",
+    "outcome": "added",
+    "detail": "detail"
+  },
+  "SSHHost": {
+    "alias": "alias",
+    "resolved": "resolved",
+    "throughBastion": true,
+    "isBastion": true,
+    "known": true
+  },
+  "WorkspaceInfo": {
+    "id": "id",
+    "name": "name",
+    "state": "state",
+    "ssh": "ssh",
+    "tunnel": true,
+    "cost": "cost",
+    "host": "box"
+  },
+  "ProviderSummary": {
+    "id": "digitalocean-x7k2",
+    "name": "name",
+    "kind": "kind",
+    "secrets": {
+      "key": true
+    },
+    "capabilities": [
+      "capabilities"
+    ],
+    "contract": 7,
+    "mapped": true,
+    "preset": "preset",
+    "workspaces": [
+      {
+        "id": "id",
+        "name": "name",
+        "state": "state",
+        "ssh": "ssh",
+        "tunnel": true,
+        "cost": "cost",
+        "host": "box"
+      }
+    ],
+    "listedAt": 812345678.5,
+    "current": true,
+    "problem": "problem"
+  },
+  "ProviderAdd": {
+    "id": "digitalocean-x7k2",
+    "name": "name",
+    "kind": "commands",
+    "command": "command",
+    "args": [
+      "args"
+    ],
+    "url": "url",
+    "headers": {
+      "key": "headers"
+    },
+    "commands": {
+      "k": "v"
+    },
+    "map": {
+      "k": "v"
+    },
+    "secrets": {
+      "key": "secrets"
+    },
+    "cli": "cli",
+    "draft": "6F9619FF-8B86-D011-B42D-00C04FC964FF"
+  },
+  "ProviderRequest": {
+    "id": "digitalocean-x7k2"
+  },
+  "HostLink": {
+    "host": "box",
+    "provider": "digitalocean-x7k2",
+    "workspace": "workspace",
+    "startWhenUsed": true,
+    "stopWhenIdleMinutes": 7
+  },
+  "HostWorkspaceOptions": {
+    "host": "box",
+    "startWhenUsed": true,
+    "stopWhenIdleMinutes": 7,
+    "startForSchedules": true
+  },
+  "ProviderOptions": {
+    "schema": {
+      "k": "v"
+    }
+  },
+  "ProviderCreate": {
+    "id": "digitalocean-x7k2",
+    "name": "name",
+    "options": {
+      "k": "v"
+    },
+    "clones": [
+      "clones"
+    ]
+  },
+  "ProviderCreated": {
+    "workspace": {
+      "id": "id",
+      "name": "name",
+      "state": "state",
+      "ssh": "ssh",
+      "tunnel": true,
+      "cost": "cost",
+      "host": "box"
+    },
+    "joining": true
+  },
+  "HostWorkspaceCall": {
+    "agent": "agent",
+    "method": "method",
+    "params": {
+      "k": "v"
+    }
+  },
+  "AgentWorkspaces": {
+    "providers": [
+      {
+        "id": "digitalocean-x7k2",
+        "name": "name",
+        "canMake": true,
+        "canDelete": true,
+        "options": {
+          "k": "v"
+        },
+        "workspaces": [
+          {
+            "id": "id",
+            "name": "name",
+            "state": "state",
+            "host": "host",
+            "hostState": "hostState",
+            "cost": "cost"
+          }
+        ]
+      }
+    ]
+  },
+  "HostSchedule": {
+    "at": 812345678.5,
+    "workflow": "workflow"
+  },
+  "HostStatus": {
+    "idle": true,
+    "running": [
+      "running"
+    ],
+    "schedule": {
+      "at": 812345678.5,
+      "workflow": "workflow"
+    }
+  },
+  "KeepRequest": {
+    "host": "box",
+    "method": "method",
+    "params": {
+      "k": "v"
+    }
+  },
+  "ProviderDraftStart": {
+    "form": {
+      "id": "digitalocean-x7k2",
+      "name": "name",
+      "kind": "commands",
+      "command": "command",
+      "args": [
+        "args"
+      ],
+      "url": "url",
+      "headers": {
+        "key": "headers"
+      },
+      "commands": {
+        "k": "v"
+      },
+      "map": {
+        "k": "v"
+      },
+      "secrets": {
+        "key": "secrets"
+      },
+      "cli": "cli",
+      "draft": "6F9619FF-8B86-D011-B42D-00C04FC964FF"
+    },
+    "secrets": {
+      "key": "secrets"
+    },
+    "provider": "digitalocean-x7k2",
+    "runtimeID": "runtimeID"
+  },
+  "ProviderDraftStarted": {
+    "draft": "6F9619FF-8B86-D011-B42D-00C04FC964FF",
+    "answered": {
+      "note": "note",
+      "map": {
+        "k": "v"
+      },
+      "preset": "preset"
+    }
+  },
+  "ProviderDraftRequest": {
+    "draft": "6F9619FF-8B86-D011-B42D-00C04FC964FF"
+  },
+  "ProviderDraftAnswer": {
+    "draft": "6F9619FF-8B86-D011-B42D-00C04FC964FF",
+    "question": "6F9619FF-8B86-D011-B42D-00C04FC964FF",
+    "yes": true
+  },
+  "ProviderRuntimes": {
+    "runtimes": [
+      {
+        "id": "id",
+        "name": "name",
+        "isDefault": true
+      }
+    ],
+    "host": "host",
+    "why": "why"
+  },
+  "DraftStep": {
+    "at": 812345678.5,
+    "kind": "read",
+    "text": "text"
+  },
+  "DraftCheck": {
+    "passed": true,
+    "workspaces": [
+      {
+        "id": "id",
+        "name": "name",
+        "state": "state",
+        "ssh": "ssh",
+        "tunnel": true,
+        "cost": "cost",
+        "host": "box"
+      }
+    ],
+    "problem": "problem",
+    "ssh": "ssh",
+    "noSSH": true
+  },
+  "DraftQuestion": {
+    "id": "6F9619FF-8B86-D011-B42D-00C04FC964FF",
+    "kind": "start",
+    "workspace": "workspace",
+    "cost": "cost",
+    "text": "text",
+    "yes": "yes"
+  },
+  "ProviderDraftUpdate": {
+    "draft": "6F9619FF-8B86-D011-B42D-00C04FC964FF",
+    "state": "state",
+    "runtimeName": "runtimeName",
+    "steps": [
+      {
+        "at": 812345678.5,
+        "kind": "read",
+        "text": "text"
+      }
+    ],
+    "cost": "cost",
+    "draftJSON": {
+      "k": "v"
+    },
+    "check": {
+      "passed": true,
+      "workspaces": [
+        {
+          "id": "id",
+          "name": "name",
+          "state": "state",
+          "ssh": "ssh",
+          "tunnel": true,
+          "cost": "cost",
+          "host": "box"
+        }
+      ],
+      "problem": "problem",
+      "ssh": "ssh",
+      "noSSH": true
+    },
+    "question": {
+      "id": "6F9619FF-8B86-D011-B42D-00C04FC964FF",
+      "kind": "start",
+      "workspace": "workspace",
+      "cost": "cost",
+      "text": "text",
+      "yes": "yes"
+    },
+    "note": "note"
+  },
+  "HostProviderDraftCall": {
+    "agentID": "6F9619FF-8B86-D011-B42D-00C04FC964FF",
+    "draft": "6F9619FF-8B86-D011-B42D-00C04FC964FF",
+    "tool": "tool",
+    "arguments": {
+      "k": "v"
+    }
+  }
+}

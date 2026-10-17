@@ -102,11 +102,11 @@ func TestTheWireIsWhatItWas(t *testing.T) {
 		t.Fatal(err)
 	}
 	say("relay reads", readUntil(t, relay, "relay/deliver"))
-	p.s.methods.HostSaid(box.member.Host, "attention/need", json.RawMessage(`{"withdraw":{"permission":"E0000000-0000-4000-8000-000000000005"},"waiting":0}`))
+	_, _ = p.s.methods.HostSaid(box.member.Host, "attention/need", json.RawMessage(`{"withdraw":{"permission":"E0000000-0000-4000-8000-000000000005"},"waiting":0}`))
 	say("relay reads", readUntil(t, relay, "relay/deliver"))
 
 	// A window's call to a plain host opens a channel: the host reads the open frame.
-	go window.Call(ctx, plainID, "daemon/ping", nil)
+	go func() { _, _ = window.Call(ctx, plainID, "daemon/ping", nil) }()
 	say("host reads", readUntil(t, plain, `"open"`))
 
 	// Every notification the window heard, once each, in order.
@@ -135,7 +135,7 @@ func TestTheWireIsWhatItWas(t *testing.T) {
 
 	golden := filepath.Join("testdata", "wire.golden")
 	if *update {
-		os.MkdirAll("testdata", 0o755)
+		_ = os.MkdirAll("testdata", 0o755)
 		if err := os.WriteFile(golden, []byte(got), 0o644); err != nil {
 			t.Fatal(err)
 		}

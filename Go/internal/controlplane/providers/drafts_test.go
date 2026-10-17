@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/alexec/agents/Go/internal/controlplane/records"
+	"github.com/alexec/agents/Go/wire"
 )
 
 // Write It for Me (#858): a draft of a tool map or commands, written by an agent on the
@@ -44,7 +45,7 @@ type world struct {
 
 func newWorld(tools []string, descriptions map[string]string) *world {
 	config := "hostname cws.devstack-1\nuser coder\nport 22\nproxycommand ssh -W %h:%p bastion.cws.example\nproxyjump none\n"
-	w := &world{workspaces: []WorkspaceInfo{{ID: "101", Name: "agents-devbox", State: "running", Cost: "$0.03/hour"},
+	w := &world{workspaces: []WorkspaceInfo{{ID: "101", Name: "agents-devbox", State: "running", Cost: new("$0.03/hour")},
 		{ID: "102", Name: "scratch-1", State: "stopped"}}, helps: map[string]string{}, sshConfig: &config, ownerHere: true,
 		agent: records.NewUUID()}
 	for _, name := range tools {
@@ -248,11 +249,11 @@ func (h *draftHarness) startMap(t *testing.T) string {
 	if err != nil {
 		t.Fatal(err)
 	}
-	return started.Draft
+	return string(started.Draft)
 }
 
 func (h *draftHarness) tool(draft, name string, arguments any) (string, error) {
-	out, err := h.drafts.Call(h.host, HostProviderDraftCall{AgentID: h.w.agent, Draft: draft, Tool: name, Arguments: arguments})
+	out, err := h.drafts.Call(h.host, HostProviderDraftCall{AgentID: wire.UUID(h.w.agent), Draft: wire.UUID(draft), Tool: name, Arguments: jsonValue(arguments)})
 	if err != nil {
 		return "", err
 	}
@@ -300,11 +301,11 @@ func TestAServerThatDoesNotFollowTheContractStartsAWriter(t *testing.T) {
 		t.Fatalf("%v %+v", err, started)
 	}
 	r := w.started[0]
-	if r.PurposeDraft() != started.Draft || r.RuntimeID != "claude" || r.Sandbox != "on" || !strings.Contains(r.Prompt, "droplet-power-on") ||
+	if PurposeDraft(r) != string(started.Draft) || r.RuntimeID != "claude" || r.Sandbox == nil || *r.Sandbox != "on" || !strings.Contains(r.Prompt, "droplet-power-on") ||
 		!strings.Contains(r.Prompt, "DIGITALOCEAN_API_TOKEN") {
 		t.Errorf("%+v", r)
 	}
-	if string(rawOf(r.Purpose)) != `{"providerDraft":{"id":"`+started.Draft+`"}}` {
+	if string(rawOf(r.Purpose)) != `{"providerDraft":{"id":"`+string(started.Draft)+`"}}` {
 		t.Errorf("%s", rawOf(r.Purpose))
 	}
 	if u := w.last(); u.State != "writing" || u.Steps[0].Text != "read 3 tools" {
@@ -331,7 +332,7 @@ func TestNoHostOnThisMachineRefusesWithTheReason(t *testing.T) {
 	if _, err := h.start(mapForm, nil, "claude"); failureOf(err) == nil {
 		t.Error("started")
 	}
-	if r := h.drafts.Runtimes(); len(r.Runtimes) != 0 || r.Why != "No host runs where the control plane runs, so no agent can write here." {
+	if r := h.drafts.Runtimes(); len(r.Runtimes) != 0 || deref(r.Why) != "No host runs where the control plane runs, so no agent can write here." {
 		t.Errorf("%+v", r)
 	}
 }
@@ -340,7 +341,7 @@ func TestOnlyWriterRuntimesAreOffered(t *testing.T) {
 	w := newWorld([]string{"droplet-list"}, nil)
 	h := newDraftHarness(w, quickDraftTiming(), true, "", nil)
 	r := h.drafts.Runtimes()
-	if len(r.Runtimes) != 1 || r.Runtimes[0].ID != "claude" || !r.Runtimes[0].IsDefault || r.Host != "This Mac" {
+	if len(r.Runtimes) != 1 || r.Runtimes[0].ID != "claude" || !r.Runtimes[0].IsDefault || deref(r.Host) != "This Mac" {
 		t.Errorf("%+v", r)
 	}
 	_, err := h.start(mapForm, nil, "copilot")
@@ -369,7 +370,7 @@ func TestCheckAndSend(t *testing.T) {
 		t.Errorf("%q", note)
 	}
 	u := w.last()
-	if u.State != "done" || !jsonEqual(u.DraftJSON, goodMap) || u.Note != "I didn't try start." {
+	if u.State != "done" || !jsonEqual(u.DraftJSON, goodMap) || deref(u.Note) != "I didn't try start." {
 		t.Errorf("%+v", u)
 	}
 	if runtime, result, ok := h.drafts.Result(id); !ok || runtime != "claude" || !jsonEqual(result, goodMap) {
@@ -406,22 +407,22 @@ func TestACheckOfAMapWithNoSSHSaysSo(t *testing.T) {
 		t.Errorf("%q", answer)
 	}
 	u := w.last()
-	if u.Check.NoSSH == nil || !*u.Check.NoSSH || u.Check.SSH != "" || len(w.sshAsked) != 0 || u.Steps[len(u.Steps)-1].Text != "no ssh destination" {
+	if u.Check.NoSSH == nil || !*u.Check.NoSSH || deref(u.Check.SSH) != "" || len(w.sshAsked) != 0 || u.Steps[len(u.Steps)-1].Text != "no ssh destination" {
 		t.Errorf("%+v", u.Check)
 	}
 }
 
 func TestACheckOfAMapWithSSHTestsItWithSSHG(t *testing.T) {
 	w := newWorld(dropletTools, nil)
-	w.workspaces = []WorkspaceInfo{{ID: "d1", Name: "devstack-1", State: "running", SSH: "coder@cws.devstack-1"},
-		{ID: "d2", Name: "devstack-2", State: "stopped", SSH: "coder@cws.devstack-2"}}
+	w.workspaces = []WorkspaceInfo{{ID: "d1", Name: "devstack-1", State: "running", SSH: new("coder@cws.devstack-1")},
+		{ID: "d2", Name: "devstack-2", State: "stopped", SSH: new("coder@cws.devstack-2")}}
 	h := newDraftHarness(w, quickDraftTiming(), true, "", nil)
 	id := h.startMap(t)
 	m := mapWithSSH("coder@cws.{name}")
 	answer := h.mustTool(t, id, ToolCheckDraft, map[string]any{"draft": m})
 	words := "ssh -G coder@cws.devstack-1: hostname cws.devstack-1, user coder, port 22, ProxyCommand ssh -W %h:%p bastion.cws.example"
 	if !strings.Contains(answer, words) || strings.Contains(answer, "No workspace has an ssh destination") ||
-		!reflect.DeepEqual(w.sshAsked, []string{"coder@cws.devstack-1"}) || w.last().Check.SSH != words || w.last().Check.NoSSH != nil {
+		!reflect.DeepEqual(w.sshAsked, []string{"coder@cws.devstack-1"}) || deref(w.last().Check.SSH) != words || w.last().Check.NoSSH != nil {
 		t.Errorf("%q", answer)
 	}
 	w.read(func() { w.sshConfig = nil })
@@ -433,7 +434,7 @@ func TestACheckOfAMapWithSSHTestsItWithSSHG(t *testing.T) {
 
 func TestThePromptSaysWhereSSHHidesAndAPortIsOneWord(t *testing.T) {
 	w := newWorld(dropletTools, nil)
-	w.workspaces = []WorkspaceInfo{{ID: "d1", Name: "box", State: "running", SSH: "alex@127.0.0.1 -p 2222"}}
+	w.workspaces = []WorkspaceInfo{{ID: "d1", Name: "box", State: "running", SSH: new("alex@127.0.0.1 -p 2222")}}
 	h := newDraftHarness(w, quickDraftTiming(), true, "", nil)
 	id := h.startMap(t)
 	p := w.started[0].Prompt
@@ -472,10 +473,10 @@ func TestAnotherAgentsCallIsRefused(t *testing.T) {
 	w := newWorld([]string{"droplet-list"}, nil)
 	h := newDraftHarness(w, quickDraftTiming(), true, "", nil)
 	id := h.startMap(t)
-	if _, err := h.drafts.Call(h.host, HostProviderDraftCall{AgentID: records.NewUUID(), Draft: id, Tool: ToolReadTools}); failureOf(err) == nil {
+	if _, err := h.drafts.Call(h.host, HostProviderDraftCall{AgentID: wire.UUID(records.NewUUID()), Draft: wire.UUID(id), Tool: ToolReadTools}); failureOf(err) == nil {
 		t.Error("another agent")
 	}
-	if _, err := h.drafts.Call("otherhost", HostProviderDraftCall{AgentID: w.agent, Draft: id, Tool: ToolReadTools}); failureOf(err) == nil {
+	if _, err := h.drafts.Call("otherhost", HostProviderDraftCall{AgentID: wire.UUID(w.agent), Draft: wire.UUID(id), Tool: ToolReadTools}); failureOf(err) == nil {
 		t.Error("another host")
 	}
 	if _, err := h.tool(records.NewUUID(), ToolReadTools, nil); failureOf(err) == nil || failureOf(err).Message != NotYoursWords {
@@ -501,7 +502,7 @@ func TestAfterEightChecksTheTimeIsOver(t *testing.T) {
 	if w.checks != MaxChecks {
 		t.Errorf("checks %d", w.checks)
 	}
-	if h.mustTool(t, id, ToolGiveUp, map[string]any{"reason": "It has no list."}) != "Ended." || w.last().State != "failed" || w.last().Note != "It has no list." {
+	if h.mustTool(t, id, ToolGiveUp, map[string]any{"reason": "It has no list."}) != "Ended." || w.last().State != "failed" || deref(w.last().Note) != "It has no list." {
 		t.Errorf("%+v", w.last())
 	}
 }
@@ -515,7 +516,7 @@ func TestOutOfTimeWithAPassedDraftThatDraftIsTheResult(t *testing.T) {
 	id := h.startMap(t)
 	h.mustTool(t, id, ToolCheckDraft, map[string]any{"draft": goodMap})
 	for range 500 {
-		if u := w.last(); u.Ended() {
+		if u := w.last(); Ended(*u) {
 			break
 		}
 		c.advance(50 * time.Millisecond)
@@ -562,7 +563,7 @@ func TestATurnThatEndsWithNoDraftFails(t *testing.T) {
 	h := newDraftHarness(w, quickDraftTiming(), true, "", nil)
 	id := h.startMap(t)
 	h.mustTool(t, id, "turn_ended", nil)
-	if u := w.last(); u.State != "failed" || u.Note != "It ended without sending a map." {
+	if u := w.last(); u.State != "failed" || deref(u.Note) != "It ended without sending a map." {
 		t.Errorf("%+v", u)
 	}
 }
@@ -603,7 +604,7 @@ func TestAListThatMayChangeSomethingIsAskedFirst(t *testing.T) {
 	if q.Kind != "check" || q.Yes != "Run Check" {
 		t.Errorf("%+v", q)
 	}
-	if err := h.drafts.Answer(ProviderDraftAnswer{Draft: id, Question: q.ID, Yes: false}, h.owner); err != nil {
+	if err := h.drafts.Answer(ProviderDraftAnswer{Draft: wire.UUID(id), Question: q.ID, Yes: false}, h.owner); err != nil {
 		t.Fatal(err)
 	}
 	if note := <-answer; !strings.HasPrefix(note, "The person said no to this check") || w.checks != 0 {
@@ -629,14 +630,14 @@ func TestProveStartAsksAndNoAnswerIsANo(t *testing.T) {
 		started <- h.mustTool(t, id, ToolProveStart, map[string]any{"draft": goodMap, "workspace": "agents-devbox"})
 	}()
 	q := w.question(t)
-	for q.Workspace != "agents-devbox" {
+	for deref(q.Workspace) != "agents-devbox" {
 		time.Sleep(10 * time.Millisecond)
 		q = w.question(t)
 	}
 	if q.Text != "Claude wants to start agents-devbox on DigitalOcean to prove the map. $0.03/hour while running. It stays running until you stop it." || q.Yes != "Start It" {
 		t.Errorf("%+v", q)
 	}
-	if err := h.drafts.Answer(ProviderDraftAnswer{Draft: id, Question: q.ID, Yes: true}, h.owner); err != nil {
+	if err := h.drafts.Answer(ProviderDraftAnswer{Draft: wire.UUID(id), Question: q.ID, Yes: true}, h.owner); err != nil {
 		t.Fatal(err)
 	}
 	if note := <-started; note != "Started agents-devbox: running" || w.starts != 1 {
@@ -668,7 +669,7 @@ func cliWorld() *world {
 func TestAPresetsCLIOrOneNotInstalledStartsNoAgent(t *testing.T) {
 	w := cliWorld()
 	preset, err := newDraftHarness(w, quickDraftTiming(), true, "", nil).start(ProviderAdd{Name: "D", Kind: KindCommands, CLI: ptr("doctl")}, nil, "claude")
-	if err != nil || preset.Answered == nil || preset.Answered.Preset != "doctl" || preset.Answered.Note != "Agents has a preset for doctl: use DigitalOcean Droplets." {
+	if err != nil || preset.Answered == nil || deref(preset.Answered.Preset) != "doctl" || preset.Answered.Note != "Agents has a preset for doctl: use DigitalOcean Droplets." {
 		t.Errorf("%v %+v", err, preset)
 	}
 	w.notInstalled = true
@@ -688,7 +689,7 @@ func TestReadHelpRunsOnlyWordsTheHelpPrinted(t *testing.T) {
 	if !strings.Contains(w.started[0].Prompt, "list    List workspaces") {
 		t.Error("prompt")
 	}
-	if note := h.mustTool(t, id, ToolReadHelp, map[string]any{"words": []string{"list"}}); note != "Usage: cws list [--no-header]" {
+	if note := h.mustTool(t, string(id), ToolReadHelp, map[string]any{"words": []string{"list"}}); note != "Usage: cws list [--no-header]" {
 		t.Errorf("%q", note)
 	}
 	for words, prefix := range map[string]string{"-y list": "Not run: “-y” is a flag", "destroy": "Not run: “destroy” may change",
@@ -697,7 +698,7 @@ func TestReadHelpRunsOnlyWordsTheHelpPrinted(t *testing.T) {
 		if words == "list; rm" {
 			given = []string{words}
 		}
-		if note := h.mustTool(t, id, ToolReadHelp, map[string]any{"words": given}); !strings.HasPrefix(note, prefix) {
+		if note := h.mustTool(t, string(id), ToolReadHelp, map[string]any{"words": given}); !strings.HasPrefix(note, prefix) {
 			t.Errorf("%s: %q", words, note)
 		}
 	}
@@ -712,12 +713,12 @@ func TestASafeListIsCheckedAtOnceOneThatIsntIsAsked(t *testing.T) {
 	started, _ := h.start(commandsForm, nil, "claude")
 	id := started.Draft
 	safe := mustParse(`{"list": "cws list --no-header", "columns": ["id", "name", "state"], "start": "cws start ${id}", "stop": "cws stop ${id}"}`)
-	if note := h.mustTool(t, id, ToolCheckDraft, map[string]any{"draft": safe}); !strings.HasPrefix(note, "Passed: listed 2.") {
+	if note := h.mustTool(t, string(id), ToolCheckDraft, map[string]any{"draft": safe}); !strings.HasPrefix(note, "Passed: listed 2.") {
 		t.Errorf("%q", note)
 	}
 	unsafe := mustParse(`{"list": "cws list | sh", "columns": ["id", "name", "state"], "start": "x", "stop": "y"}`)
 	answer := make(chan string)
-	go func() { answer <- h.mustTool(t, id, ToolCheckDraft, map[string]any{"draft": unsafe}) }()
+	go func() { answer <- h.mustTool(t, string(id), ToolCheckDraft, map[string]any{"draft": unsafe}) }()
 	q := w.question(t)
 	if !strings.Contains(q.Text, "It isn’t on the safe list because `cws list | sh` has “|”") {
 		t.Errorf("%q", q.Text)
@@ -754,15 +755,15 @@ func TestAddWithTheDraftsOwnMapMarksItWrittenByTheRuntime(t *testing.T) {
 	dh.mustTool(t, id, ToolSendDraft, map[string]any{"draft": goodMap})
 	// Written again by the sheet: the same JSON, so the same map.
 	same := mustParse(string(rawOf(goodMap)))
-	kept := h.must(MethodProvidersAdd, ProviderAdd{Name: "Droplets", Kind: KindStdio, Command: ptr("npx"), Map: same, Draft: id}).(ProviderSummary)
-	r := storedRecord(t, h, kept.ID)
+	kept := h.must(MethodProvidersAdd, ProviderAdd{Name: "Droplets", Kind: KindStdio, Command: ptr("npx"), Map: jsonValue(same), Draft: new(wire.UUID(id))}).(ProviderSummary)
+	r := storedRecord(t, h, string(kept.ID))
 	if r.WrittenBy == nil || r.WrittenBy.RuntimeID != "claude" || !jsonEqual(r.Map, goodMap) {
 		t.Errorf("%+v", r)
 	}
 	changed := toValue(goodMap).(map[string]any)
 	changed["list"] = map[string]any{"tool": "droplet-list", "items": "droplets", "id": "id", "name": "name", "state": "state"}
-	other := h.must(MethodProvidersAdd, ProviderAdd{Name: "Droplets 2", Kind: KindStdio, Command: ptr("npx"), Map: changed, Draft: id}).(ProviderSummary)
-	if storedRecord(t, h, other.ID).WrittenBy != nil {
+	other := h.must(MethodProvidersAdd, ProviderAdd{Name: "Droplets 2", Kind: KindStdio, Command: ptr("npx"), Map: jsonValue(changed), Draft: new(wire.UUID(id))}).(ProviderSummary)
+	if storedRecord(t, h, string(other.ID)).WrittenBy != nil {
 		t.Error("a changed map marked written")
 	}
 }
@@ -772,9 +773,9 @@ func TestWritingAgainStartsFromTheKeptRecordAndSaveKeepsTheServer(t *testing.T) 
 	w := newWorld(dropletTools, nil)
 	dh := h.withDrafts(w)
 	kept := h.must(MethodProvidersAdd, ProviderAdd{Name: "Droplets", Kind: KindStdio, Command: ptr("npx"), Args: []string{"-y", "@do/mcp"},
-		Map: goodMap, Secrets: map[string]string{"TOKEN": "dop_v1_keptsecretvalue"}}).(ProviderSummary)
+		Map: jsonValue(goodMap), Secrets: map[string]string{"TOKEN": "dop_v1_keptsecretvalue"}}).(ProviderSummary)
 	// The sheet knows only the name and kind, and types no secret.
-	started := h.must(MethodDraftStart, ProviderDraftStart{Form: ProviderAdd{Name: "Droplets", Kind: KindStdio}, Provider: kept.ID,
+	started := h.must(MethodDraftStart, ProviderDraftStart{Form: ProviderAdd{Name: "Droplets", Kind: KindStdio}, Provider: new(wire.ProviderID(kept.ID)),
 		RuntimeID: "claude"}).(ProviderDraftStarted)
 	p := w.started[0].Prompt
 	if !strings.Contains(p, "It has this map now") || !strings.Contains(p, "droplet-power-on") || !strings.Contains(p, "TOKEN") ||
@@ -783,9 +784,9 @@ func TestWritingAgainStartsFromTheKeptRecordAndSaveKeepsTheServer(t *testing.T) 
 	}
 	newMap := toValue(goodMap).(map[string]any)
 	newMap["list"] = map[string]any{"tool": "droplet-list", "items": "droplets", "id": "id", "name": "name", "state": "state"}
-	dh.mustTool(t, started.Draft, ToolSendDraft, map[string]any{"draft": newMap})
-	h.must(MethodProvidersUpdate, ProviderAdd{ID: kept.ID, Name: "Droplets", Kind: KindStdio, Map: newMap, Draft: started.Draft})
-	r := storedRecord(t, h, kept.ID)
+	dh.mustTool(t, string(started.Draft), ToolSendDraft, map[string]any{"draft": newMap})
+	h.must(MethodProvidersUpdate, ProviderAdd{ID: new(wire.ProviderID(kept.ID)), Name: "Droplets", Kind: KindStdio, Map: jsonValue(newMap), Draft: new(wire.UUID(started.Draft))})
+	r := storedRecord(t, h, string(kept.ID))
 	if *r.Command != "npx" || !reflect.DeepEqual(r.Args, []string{"-y", "@do/mcp"}) || !jsonEqual(r.Map, newMap) ||
 		r.WrittenBy == nil || r.WrittenBy.RuntimeID != "claude" || !reflect.DeepEqual(r.SecretNames, []string{"TOKEN"}) || r.Rev != 2 {
 		t.Errorf("%+v", r)
@@ -802,7 +803,7 @@ func TestACommandProvidersCLIIsFoundFromItsCommands(t *testing.T) {
 func TestAnUpdateWhoseSecretIsAWordIsStillSentRedacted(t *testing.T) {
 	// A secret that is also one of the update's own words ("writing"): what cannot be read
 	// back redacted is not sent, and the rest is.
-	update := DraftUpdate{Draft: records.NewUUID(), State: "writing", RuntimeName: "Claude", Steps: []DraftStep{}, Note: "x"}
+	update := DraftUpdate{Draft: wire.UUID(records.NewUUID()), State: "writing", RuntimeName: "Claude", Steps: []DraftStep{}, Note: new("x")}
 	if _, ok := redactUpdate(update, NewRedaction(map[string]string{"S": "runtimeName"})); ok {
 		t.Error("read back without its runtimeName")
 	}

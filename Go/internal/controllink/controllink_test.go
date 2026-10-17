@@ -12,6 +12,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/alexec/agents/Go/wire"
 )
 
 type vectors struct {
@@ -91,7 +93,7 @@ func TestTheSwiftVectors(t *testing.T) {
 	check("code server MAC", ServerMAC(CodeKey(secret), sn, pn, v.Code.Identity, v.Origin), v.Code.MAC.Server)
 
 	// The server's Verify takes the vector's auth at any of its origins.
-	a := &Auth{ID: v.Client.Identity, Nonce: B64URL(pn), MAC: B64URL(unhex(v.Client.MAC.Peer)), Kind: "browser"}
+	a := &Auth{ID: v.Client.Identity, Nonce: B64URL(pn), Mac: B64URL(unhex(v.Client.MAC.Peer)), Kind: "browser"}
 	id, mac, err := Verify(a, sn, []string{"https://elsewhere:443", v.Origin}, func(Identity) ([]byte, error) { return key, nil })
 	if err != nil || id.Kind != 'c' || hex.EncodeToString(mac) != v.Client.MAC.Server {
 		t.Fatalf("verify: %v %c %x", err, id.Kind, mac)
@@ -138,7 +140,7 @@ func TestTheExchangeBothWays(t *testing.T) {
 	if err != nil || id != (Identity{'h', "box-1"}) {
 		t.Fatal(id, err)
 	}
-	okLine := Message{OK: &OK{MAC: B64URL(mac), Host: "box-1"}}.Line()
+	okLine := Message{OK: &OK{Mac: B64URL(mac), Host: new(wire.HostID("box-1"))}}.Line()
 	if okLine != `{"ok":{"mac":"`+B64URL(mac)+`","host":"box-1"}}` {
 		t.Fatal(okLine)
 	}
@@ -154,7 +156,7 @@ func TestTheExchangeBothWays(t *testing.T) {
 		t.Fatal(err)
 	}
 	// A forged ok is refused.
-	if err := Check(&OK{MAC: B64URL(Nonce())}, expect); !isRefusal(err, WrongControlPlane) {
+	if err := Check(&OK{Mac: B64URL(Nonce())}, expect); !isRefusal(err, WrongControlPlane) {
 		t.Fatal(err)
 	}
 }

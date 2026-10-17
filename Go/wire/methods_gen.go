@@ -330,10 +330,6 @@ var (
 	CallControlPing                 = Method[Empty, Empty]{"control/ping"}
 	CallControlSetProjectDetection  = Method[ProjectDetection, ProjectDetection]{"control/setProjectDetection"}
 	CallControlStatus               = Method[Empty, ControlStatus]{"control/status"}
-	CallDevicesForget               = Method[DeviceForget, Empty]{"devices/forget"}
-	CallDevicesList                 = Method[Empty, []ClientRecord]{"devices/list"}
-	CallDevicesStartPairing         = Method[Empty, ControlCodeShown]{"devices/startPairing"}
-	CallDevicesStopPairing          = Method[Empty, Empty]{"devices/stopPairing"}
 	CallGitCredential               = Method[GitCredentialRequest, GitCredential]{"git/credential"}
 	CallHandoverStatus              = Method[Empty, HandoverStatus]{"handover/status"}
 	CallHostHello                   = Method[HostHello, Empty]{"host/hello"}

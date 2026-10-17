@@ -45,6 +45,14 @@ and `tls/`, so its certificate's pin is the one every member holds. Every one of
 61 control-plane methods is answered; the handover's copy side is there too, so Agents
 Host's *Move to another machine* and *Relay for my devices* work with it.
 
+**Its wire is `Go/wire`'s** (#1313): every method's params and result, what it says to
+clients and hosts, the exchange's lines and a channel's open frame are the generated types,
+from `control.openrpc.json` and `daemon.schema.json`. A date is worked out as before
+(`dateOf`), so no byte moved: `testdata/wire.golden` and each package's
+`testdata/wire-types.golden` were written by the hand-made types and still pass. What stays
+written by hand is not the wire: the store's records (ISO dates, and the fields a later
+build added kept whole), the copies' own messages, and the JSON-RPC envelope.
+
 | Package | What it ports |
 |---|---|
 | `controlplane/` | `ControlService`, `ControlRouter`, `ControlMethods`, `ControlCodes`, `CopyMesh`, `Leases`, `Handover`, `HostCopies`, `StoreSweep`, `ControlLog` |

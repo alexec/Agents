@@ -113,6 +113,7 @@
     },
     {
       "name": "clients/list",
+      "description": "devices/list, from a Remote of before the control plane, is answered the same; devices/startPairing as clients/startPairing, devices/forget with DeviceForget as clients/forget (daemon.openrpc.json has the host's own).",
       "paramStructure": "by-name",
       "params": [
         {
@@ -251,85 +252,6 @@
         "name": "result",
         "schema": {
           "$ref": "daemon.schema.json#/definitions/ControlStatus"
-        }
-      }
-    },
-    {
-      "name": "devices/forget",
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/DeviceForget"
-          }
-        }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "$ref": "daemon.schema.json#/definitions/Empty"
-        }
-      }
-    },
-    {
-      "name": "devices/list",
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/Empty"
-          }
-        }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "type": "array",
-          "items": {
-            "$ref": "daemon.schema.json#/definitions/ClientRecord"
-          }
-        }
-      }
-    },
-    {
-      "name": "devices/startPairing",
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/Empty"
-          }
-        }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "$ref": "daemon.schema.json#/definitions/ControlCodeShown"
-        }
-      }
-    },
-    {
-      "name": "devices/stopPairing",
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/Empty"
-          }
-        }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "$ref": "daemon.schema.json#/definitions/Empty"
         }
       }
     },
