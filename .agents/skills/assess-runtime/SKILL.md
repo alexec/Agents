@@ -14,10 +14,8 @@ from its own record, so the result never rests on the agent's word.
 The usual way in is **Settings ▸ Agent Runtimes ▸ <runtime> ▸ Assess…**, which picks a
 project and calls the daemon's `runtimes/assess`. That starts an agent on the runtime, on
 the cheapest model it offers (Haiku for Claude), read from a draft of the session it starts on, labelled `assess-runtime`, with
-the brief: `RuntimeAssessment.brief` in
-`Packages/AgentsKit/Sources/AgentsKitCore/Model/RuntimeAssessment.swift`. The brief is the
-source of truth for the steps; this file names the same ones, and a test keeps the ids in
-step.
+the brief: `assessBrief` in `Go/internal/agentsd/assess_brief.go`. The brief is the
+source of truth for the steps; this file names the same ones.
 
 From a script, or on a scratch root (see the run-app skill):
 
@@ -63,7 +61,7 @@ as written, even when it expects a failure, and records what the tool answered.
 
 Not one of the scored steps yet: it needs a person's own MCP Apps server. Check it after an
 adapter update, or when a runtime comes back to the pool, because the app finds a third
-party's tool call only by the shape of the runtime's ACP updates (`ACPToolShape`).
+party's tool call only by the shape of the runtime's ACP updates (`Go/internal/agentsd/viewshape.go`).
 
 1. Serve an ext-apps example over streamable http in a scratch folder, e.g.
    `npm i @modelcontextprotocol/server-basic-vanillajs` and
@@ -78,16 +76,16 @@ party's tool call only by the shape of the runtime's ACP updates (`ACPToolShape`
    joined title (`<s>-<t>`). **No entry** for a runtime that passes text only (OpenCode, Q7):
    that is by design, and its view can still be pinned.
 5. Record the tool call's `title`, `name`, `rawInput` and `rawOutput` in the report, so a
-   new shape can be added to `ACPToolShape` and its tests.
+   new shape can be added to `viewshape.go` and its tests.
 
 As of 2026-10-06: Claude walked (running, then done); Codex, Copilot and OpenCode covered by
-`ACPToolShapeTests` from the #186 probe's wire lines, not run live.
+the shape tests from the #186 probe's wire lines, not run live.
 
 ## How it is scored
 
 Every call an agent makes to the app's tools is kept by the daemon, as it answered it, in
 `<root>/agents/<id>/app-tools.jsonl` (method, arguments without the token, answered or
-refused and the words, how long it was held). `RuntimeAssessmentVerifier` reads that, the
+refused and the words, how long it was held). `assess_score.go` reads that, the
 transcript the daemon wrote (endings, questions and their answers, the prompts that started
 the agent again), the event log, the helpers' records and the lease book, and gives each step
 passed, failed or not offered with the evidence. It runs when the assessing agent finishes a

@@ -53,7 +53,6 @@ enum ControlTool {
                     store: StoreAddress? = nil, keys: HostSecrets.BucketKeys? = nil) async -> Result {
         do {
             let planned = try plan(arguments, paths: paths, settings: settings, key: key, store: store, keys: keys)
-            // The Swift tool, whichever copy serves: both read the same store (#1137).
             return try await spawn(paths.agentsControl.path, planned.arguments, planned.environment, planned.secrets)
         } catch {
             return Result(status: -1, output: "", error: "\(error)")
@@ -172,10 +171,7 @@ enum ControlLauncher {
                 close(ends[1])
                 if ends[0] != target { dup2(ends[0], target); close(ends[0]) }
             }
-            let tool = paths.agentsControl(for: settings).path
-            // Said in control.log, so which one ran is never a guess (#1137).
-            let which = tool == paths.agentsControl.path ? "Swift" : "Go"
-            FileHandle.standardError.write(Data("Agents Host: starting the \(which) agents-control\n".utf8))
+            let tool = paths.agentsControl.path
             let argv = ([tool] + planned.arguments).map { strdup($0) } + [nil]
             let envp = planned.environment.map { strdup("\($0.key)=\($0.value)") } + [nil]
             execve(tool, argv, envp)

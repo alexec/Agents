@@ -1,16 +1,14 @@
 import Foundation
 
 /// What this Mac's host's launch agent runs: this app's own program with
-/// `--launch-daemon` (#1138). It becomes the `agentsd` this Mac's settings pick, the Go one
-/// unless `host.json` says `"daemonImplementation": "swift"` or the bundle carries no Go one
-/// (#1312), with the rest of its arguments. launchd keeps it running.
+/// `--launch-daemon` (#1138). It becomes the bundle's `agentsd` (Go since #1312, the only
+/// one since #1314), with the rest of its arguments. launchd keeps it running.
 enum DaemonLauncher {
     static let argument = "--launch-daemon"
 
     static func run() -> Never {
         let paths = HostPaths.current
-        let tool = paths.agentsd(for: HostSettings.load(paths)).path
-        // Which one ran is never a guess: the Go one's daemon.log says "(go)" as it starts.
+        let tool = paths.agentsd.path
         let rest = CommandLine.arguments.dropFirst().filter { $0 != argument }
         let argv = ([tool] + rest).map { strdup($0) } + [nil]
         execv(tool, argv)

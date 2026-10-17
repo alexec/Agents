@@ -18,8 +18,8 @@ copies](run-several-copies.md).
 
 ## Before you start
 
-- A clone of the Agents repository on a Mac with Xcode, and the swift.org toolchain and
-  Static Linux SDK that match Xcode's Swift, to build the Linux programs.
+- A clone of the Agents repository on a Mac with Docker running, to build the Linux
+  programs: they are Go, built in a container.
 - A Linux machine you rent, on x86-64 or ARM64, with Docker and Docker Compose. The
   smallest size a provider offers is plenty: 1 CPU and 1 GB of memory. The control plane
   runs no agents itself.
@@ -64,7 +64,7 @@ On your Mac, in the repository:
 
    ```sh
    scripts/build-linux-control.sh x86_64      # aarch64 for an ARM machine
-   scripts/build-linux-agentsd.sh
+   scripts/build-linux-agentsd-go.sh
    ```
 
    The first goes in `deploy/bin/`. The second goes in `App/Resources/servers/`, from

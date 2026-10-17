@@ -14,9 +14,7 @@ publishes a release. The tag starts the `release` workflow, which:
 - signs it with Developer ID, notarizes and staples it, as `Agents-Host-<version>.dmg`;
 - staples the same app and zips it as `Agents-Host-<version>.zip`, for Macs that may not
   mount a disk image;
-- builds the static Linux agentsd: the Go host, a Linux host's default, as
-  `agentsd-go-linux-<arch>-<version>.tar.gz`, and the Swift host as
-  `agentsd-linux-<arch>-<version>.tar.gz`;
+- builds the static Linux agentsd (Go) as `agentsd-go-linux-<arch>-<version>.tar.gz`;
 - creates the release with these files and a `SHA256SUMS`;
 - in its `testflight` job, archives the Mac window and the Remote (one Universal app),
   checks both archives with `scripts/check-store-archive.sh`, uploads them to TestFlight
@@ -99,7 +97,8 @@ the **release** workflow by hand and give it the tag. It replaces the release's 
 `scripts/release-host.sh 0.2.0` does what the workflow's Mac job does. It needs the
 Developer ID identity in your keychain, the relay's profile installed, and `ASC_KEY_ID`,
 `ASC_ISSUER_ID` and `ASC_KEY_PATH` set. It needs the Linux agentsd in `App/Resources/servers`,
-from `scripts/build-linux-agentsd.sh`.
+from `scripts/build-linux-agentsd-go.sh`, and Docker running (or Go installed) for the Go
+programs Agents Host carries.
 
 `scripts/release-host.sh --dry-run 0.2.0` needs none of that. It signs ad hoc and doesn't
 notarize, which proves the build and the packaging. Gatekeeper refuses the result.

@@ -1,6 +1,6 @@
 ---
 name: run-app
-description: Build, launch and drive this Mac app (Agents) on a scratch set-up of its own (a control plane, this Mac's host and the window), so a change can be seen working without touching the real ones or asking the user to click anything. Use whenever asked to run, start, screenshot, walk or manually verify the app, or whenever a change to App/, Host/, Daemon/, Remote/, Packages/AgentsKit or Packages/ControlPlane needs proving beyond `swift test`.
+description: Build, launch and drive this Mac app (Agents) on a scratch set-up of its own (a control plane, this Mac's host and the window), so a change can be seen working without touching the real ones or asking the user to click anything. Use whenever asked to run, start, screenshot, walk or manually verify the app, or whenever a change to App/, Host/, Go/, Remote/ or Packages/AgentsKit needs proving beyond `swift test`.
 ---
 
 # Run and test this app
@@ -66,19 +66,19 @@ not the Remote or the web page; a `Packages/AgentsKit` change needs its tests fi
 by `scripts/select-test-suites.sh`). The full suite and every scheme run once, in the wave.
 
 Then it:
-1. starts `agents-control-go serve --home $ROOT/control` on a free loopback port, with
+1. starts `agents-control serve --home $ROOT/control` on a free loopback port, with
    no Bonjour (its log is `$ROOT/control/control.log`), serving the web remote (071) from
    this checkout's `Web/dist` (built by Agents Host's build, not checked in) on another free
    loopback port, printed as `WEB_URL` (never the live 8792);
-2. starts `agentsd-go --control-code <host code>` on `$ROOT`, as Agents Host's launch agent
+2. starts `agentsd --control-code <host code>` on `$ROOT`, as Agents Host's launch agent
    would, with this session's `CLAUDE_*` and `AGENTS_*` taken out of its environment;
 3. opens the window with `AGENTS_CONTROL=<client code>` and `--walk run-<slug>`: it
    pairs by itself, into `walks/run-<slug>/` in its container, so it never touches the
    user's own window's pairing, which lives in the same container.
 
 `--no-window` leaves the window out, for work the socket proves on its own.
-It runs the Go `agents-control-go` and `agentsd-go` the build carries, as Agents Host does
-with no setting (#1312), and says which on stderr; `--swift` runs the Swift ones.
+It runs the `agents-control` and `agentsd` the build carries (Go, the only ones since #1314),
+as Agents Host does, and says which on stderr.
 `CONTROL_BIN=<path>` and `AGENTSD_BIN=<path>` run others in their place, such as a Go one
 built from the tree: `GOOS=darwin Go/scripts/go.sh build -o out/darwin/agents-control
 ./cmd/agents-control`, then `CONTROL_BIN=$PWD/Go/out/darwin/agents-control launch.sh …`.

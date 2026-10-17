@@ -5,10 +5,8 @@
 # The release carries:
 #   Agents-Host-<version>.dmg              signed with Developer ID, notarized, stapled
 #   Agents-Host-<version>.zip              the same app, stapled, for Macs that can't mount a .dmg
-#   agentsd-go-linux-<arch>-<version>.tar.gz  the Go Linux agentsd, a Linux host's default
-#                                          (#1136), with the MCP servers Agents ships (#700)
-#   agentsd-linux-<arch>-<version>.tar.gz  the Swift Linux agentsd, one setting away
-#                                          (install.sh --impl swift), with the same servers
+#   agentsd-go-linux-<arch>-<version>.tar.gz  the Linux agentsd (Go, #1136), with the MCP
+#                                          servers Agents ships (#700)
 #   SHA256SUMS
 #
 # Beside it, the testflight job (#914) uploads the Universal app to TestFlight: the Mac window
@@ -52,26 +50,19 @@ env:
   TAG: ${{ github.event.inputs.tag || github.ref_name }}
 
 jobs:
-  # The static Linux agentsd, with the swift.org toolchain and its Static Linux SDK. They
-  # must match Xcode's Swift (scripts/build-linux-agentsd.sh); move all three together.
-  # The Go one (#1136), a Linux host's default, is built beside it with Go/go.mod's Go.
+  # The Linux agentsd (Go, #1136) and the MCP servers beside it, with Go/go.mod's Go. The
+  # Swift one, and the Static Linux SDK it was built with, went in #1314.
   linux:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
-    container: swift:6.4.0-noble
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v6
         with:
           ref: ${{ env.TAG }}
 
-      - name: Tools and the Static Linux SDK
-        run: |
-          apt-get update -qq && apt-get install -y -qq zsh file >/dev/null
-          swift sdk install \
-            https://download.swift.org/swift-6.4.0-release/static-sdk/swift-6.4.0-RELEASE/swift-6.4.0-RELEASE_static-linux-0.1.0.artifactbundle.tar.gz \
-            --checksum 47d2fd89eebfdf9eb4d536b6710414297f755c17926cdebc4742c08982b40a9e
+      - name: Tools
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq zsh >/dev/null
 
-      # Go for the Go host and the github MCP server (#1232), built beside agentsd.
       - uses: actions/setup-go@v6
         with:
           go-version-file: Go/go.mod
@@ -79,17 +70,13 @@ jobs:
 
       - name: Build agentsd for Linux
         env:
-          SWIFT: swift
           AGENTS_BUILD: ${{ github.run_number }}
-          # The checkout in this container is another user's: no VCS stamp for Go to fail on.
-          GOFLAGS: -buildvcs=false
         run: |
           export AGENTS_MARKETING_VERSION="${TAG#v}"
-          zsh scripts/build-linux-agentsd.sh
-          # The Go host is a Linux host's default: a release without it is no release.
+          zsh scripts/build-linux-agentsd-go.sh
           for arch in x86_64 aarch64; do
             test -f App/Resources/servers/agentsd-go-linux-$arch || {
-              echo "::error::the Go host was not built for $arch"; exit 1; }
+              echo "::error::agentsd was not built for $arch"; exit 1; }
           done
 
       - uses: actions/upload-artifact@v5
@@ -127,7 +114,7 @@ jobs:
         with:
           node-version-file: Web/.node-version
 
-      # Go for the github MCP server Agents Host carries (#1232) and the Go control plane.
+      # Go for what Agents Host carries: agentsd, agents-control and the MCP servers (#1314).
       - uses: actions/setup-go@v6
         with:
           go-version-file: Go/go.mod

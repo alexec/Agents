@@ -21,10 +21,9 @@ Pass `--install-mac` only when Alex has asked to install on this Mac. That copie
 Agents Host and the window into `~/Applications` and `launchctl kickstart`s the
 login-item jobs. A development run, a test, and a merge wave never pass it.
 
-`--no-linux` skips rebuilding the Linux hosts (`scripts/build-linux-agentsd.sh`, into
+`--no-linux` skips rebuilding the Linux hosts (`scripts/build-linux-agentsd-go.sh`, into
 `App/Resources/servers`), which the build otherwise does first, since Agents Host
-carries them and a stale one cannot join. That build takes seconds when the shared build
-cache already has binaries from the same git trees (#856), and about 8 minutes when it does not.
+carries them and a stale one cannot join. It is Go (#1314) and takes seconds.
 `--no-devices` skips the iPhone and iPad.
 `--device <UDID>` (repeatable) picks one device. `--now` relaunches the Mac after 3s
 instead of 20s, and only with `--install-mac`. `--build-only` builds in the checkout

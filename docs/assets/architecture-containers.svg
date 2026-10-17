@@ -36,7 +36,7 @@
 <rect x="410" y="420" width="260" height="110" rx="8" fill="#438dd5" stroke="#438dd5"/>
 <text class="t" x="540.0" y="446">Control plane</text>
 <text class="k" x="540.0" y="463">[Container: Swift server, agents-control]</text>
-<text class="d" x="540.0" y="484">Packages/ControlPlane · pairs clients,</text>
+<text class="d" x="540.0" y="484">Go/internal/controlplane · pairs clients,</text>
 <text class="d" x="540.0" y="499">routes requests, fans out updates</text>
 <path d="M750,432 L750,518 A130.0,12 0 0 0 1010,518 L1010,432 A130.0,12 0 0 0 750,432 Z" fill="#438dd5" stroke="#438dd5"/>
 <ellipse cx="880.0" cy="432" rx="130.0" ry="12" fill="#438dd5" stroke="#fff" stroke-opacity=".5"/>
@@ -53,7 +53,7 @@
 <rect x="410" y="620" width="260" height="120" rx="8" fill="#438dd5" stroke="#438dd5"/>
 <text class="t" x="540.0" y="646">Host daemon (agentsd)</text>
 <text class="k" x="540.0" y="663">[Container: Swift daemon, macOS + Linux]</text>
-<text class="d" x="540.0" y="684">Daemon/ + Packages/AgentsKit · owns</text>
+<text class="d" x="540.0" y="684">Go/internal/agentsd · owns</text>
 <text class="d" x="540.0" y="699">agents, terminals, files, git, workflows;</text>
 <text class="d" x="540.0" y="714">serves the agents MCP tools</text>
 <rect x="750" y="620" width="260" height="110" rx="8" fill="#438dd5" stroke="#438dd5"/>

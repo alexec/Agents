@@ -9,22 +9,19 @@
 # the generated files adds WireSchemaTests, which holds today's Swift encoders to the schema,
 # and runs `go`, whose wiregen test holds Go/wire and Web/src/protocol/generated.ts to
 # Packages/Wire; a filtered run for AgentsKitCore's source adds WireSchemaTests too.
-# ControlPlane runs on any change to it or to AgentsKit, which it links. A change under
+# A change under
 # Web/ alone runs AgentsKit's three suites that hold Web/ to Swift: the dist manifest, the
 # ported rules' fixtures and the key vectors. CI's web job checks the rest of Web/ with Node,
 # on every run. A change to App/Sources, Remote/Sources or Shared/UI runs the suites that
 # scan those views (ConsistencyTests, OneGroupingTests), and one to App/Resources/toolsets
 # the two that read the bundled toolsets. The MCP servers Agents ships (#700) are Go, so
-# `go` runs their tests. `linux` builds the
-# Linux agentsd (#805) on any change to what it is built from (Daemon/, AgentsKit) or to
-# the script and job that build it: AgentsKit code behind
-# a Mac-only guard used from unguarded code breaks only that build (#788, #799). `go`
-# builds and tests the Go module at Go/ (#1135), on Linux, on any change under it; a change
-# under Go/ alone runs no Swift suite and no macOS job.
+# `go` runs their tests. `go` builds and tests the Go module at Go/ (#1135), on Linux, on any
+# change under it; a change under Go/ alone runs no Swift suite and no macOS job. The Swift
+# agentsd and agents-control, and the `linux` and `packages` jobs that built them, went in
+# #1314.
 #
 # CI's macOS jobs are chosen here as well (#594): `apps` is skip only when every changed
-# path is prose or agent config that no build reads, and `packages` (the job that runs
-# ControlPlane) is skip when that is not selected.
+# path is prose or agent config that no build reads.
 #
 # Usage: scripts/select-test-suites.sh <base-commit> >> "$GITHUB_OUTPUT"
 set -euo pipefail
@@ -32,8 +29,6 @@ set -euo pipefail
 base=${1:-}
 agentskit=skip
 codetext=skip
-controlplane=skip
-linux=skip
 go=skip
 agentskit_filter=
 codetext_filter=
@@ -42,8 +37,6 @@ apps=build
 full_both() {
 	agentskit=full
 	codetext=full
-	controlplane=run
-	linux=build
 	go=run
 	agentskit_filter=
 	codetext_filter=
@@ -102,23 +95,14 @@ else
 						agentskit_only_tests=false
 					fi
 					;;
-				Daemon/Package.swift)
+				Packages/AgentsKit/Sources/*)
 					agentskit_touched=true
-					linux=build
-					agentskit_full_required=true
-					;;
-				Packages/AgentsKit/Sources/*|Daemon/*)
-					agentskit_touched=true
-					linux=build
 					agentskit_source_touched=true
-					controlplane=run
 					[[ "$path" == Packages/AgentsKit/Sources/AgentsKitCore/* ]] && core_source_touched=true
 					;;
 				Packages/AgentsKit/*)
 					agentskit_touched=true
-					linux=build
 					agentskit_full_required=true
-					controlplane=run
 					;;
 				Packages/Wire/*|scripts/wire.sh|Web/src/protocol/generated.ts)
 					go=run
@@ -131,9 +115,6 @@ else
 						agentskit_suites+=(WebDistManifestTests ControlAgreementVectorTests WebFixturesTests)
 						web_touched=true
 					fi
-					;;
-				Packages/ControlPlane/*)
-					controlplane=run
 					;;
 				Go/*)
 					go=run
@@ -183,11 +164,8 @@ else
 					codetext_touched=true
 					codetext_full_required=true
 					;;
-				scripts/build-linux-agentsd.sh|.github/workflows/ci.yml)
-					linux=build
-					;;
 				# These areas cannot affect either SwiftPM package's tests.
-				App/*|Host/*|Remote/*|RemoteNotify/*|RemoteWidget/*|docs/*|mkdocs.yml|specs/*|design/*|.agents/*|.claude/*|.github/workflows/*|scripts/select-test-suites.sh|scripts/check-test-indexing.py|scripts/check-agentsd-links-no-parsers.sh|scripts/web.sh|scripts/slow-tests.sh|scripts/flaky-tests.sh|scripts/normalize-metaltoolchain-cache.py|scripts/pr-areas.py|scripts/replay-conflicts.py|scripts/rerun-cancelled-ci.py)
+				App/*|Host/*|Remote/*|RemoteNotify/*|RemoteWidget/*|docs/*|mkdocs.yml|specs/*|design/*|.agents/*|.claude/*|.github/workflows/*|scripts/select-test-suites.sh|scripts/check-test-indexing.py|scripts/web.sh|scripts/slow-tests.sh|scripts/flaky-tests.sh|scripts/normalize-metaltoolchain-cache.py|scripts/pr-areas.py|scripts/replay-conflicts.py|scripts/rerun-cancelled-ci.py)
 					;;
 				*)
 					# Root config, CI, scripts, or a new area may change test behavior.
@@ -238,35 +216,11 @@ else
 	fi
 fi
 
-# Whether the AgentsKit run needs Daemon/'s agentsd built first. Only the fake-ssh suites
-# that read ServerLinkTests.agentsd run it, and a filtered run rarely names one, yet the
-# build costs three to five minutes on the runner. The filter is a regular expression over
-# the qualified test id, so it is matched against these suites' own ids. Keep the list to
-# the suites that read ServerLinkTests.agentsd; one left out still builds it, inside its run.
-agentsd=skip
-if [[ "$agentskit" == full ]]; then
-	agentsd=build
-elif [[ "$agentskit" == filter ]]; then
-	for suite in FakeSSHSuites/ServerLinkTests FakeSSHSuites/ServerConnectionTests FakeSSHSuites/ToolsetInstallTests; do
-		if [[ "$suite" =~ $agentskit_filter ]]; then
-			agentsd=build
-		fi
-	done
-fi
-
 {
 	printf 'agentskit=%s\n' "$agentskit"
 	printf 'agentskit_filter=%s\n' "$agentskit_filter"
 	printf 'codetext=%s\n' "$codetext"
 	printf 'codetext_filter=%s\n' "$codetext_filter"
-	printf 'controlplane=%s\n' "$controlplane"
-	printf 'linux=%s\n' "$linux"
 	printf 'go=%s\n' "$go"
-	printf 'agentsd=%s\n' "$agentsd"
 	printf 'apps=%s\n' "$apps"
-	if [[ "$controlplane" == skip ]]; then
-		printf 'packages=skip\n'
-	else
-		printf 'packages=run\n'
-	fi
 } >> "${GITHUB_OUTPUT:-/dev/stdout}"

@@ -70,12 +70,6 @@ packages:
   # the grammars are seventeen megabytes it has no use for.
   CodeText:
     path: Packages/CodeText
-  # The control plane as a service (058): Agents Host carries its agents-control.
-  ControlPlane:
-    path: Packages/ControlPlane
-  swift-nio-ssl:
-    url: https://github.com/apple/swift-nio-ssl.git
-    from: 2.29.0
 targets:
   # The Mac window (058, research R12): the App Store app, sandboxed, and linking
   # AgentsKitCore only, as the Remote does. It carries no helpers, no Linux programs and
@@ -447,12 +441,11 @@ targets:
       - name: Build the web remote
         script: sh "$SRCROOT/scripts/web.sh" dist
         basedOnDependencyAnalysis: false
-      # The Go control plane (#1137), beside the Swift one until Alex switches: with no
-      # Docker or Go it is left out, and Agents Host runs the Swift one.
+      # The control plane (#1137) and this Mac's host (#1138), in Go: with no Docker or Go
+      # the build fails, as Agents Host would carry neither (#1314).
       - name: Build the Go control plane
         script: sh "$SRCROOT/scripts/go-control.sh"
         basedOnDependencyAnalysis: false
-      # The Go agentsd (#1138), beside the Swift one the same way.
       - name: Build the Go agentsd
         script: sh "$SRCROOT/scripts/go-agentsd.sh"
         basedOnDependencyAnalysis: false
@@ -471,13 +464,11 @@ targets:
         script: sh "$SRCROOT/scripts/go-github-mcp.sh" workspace-commands
         basedOnDependencyAnalysis: false
     # Carried into Contents/Helpers and signed here, not by a copy phase, which would try
-    # to strip it (a Go binary is already stripped, and strip refuses it). Run only when
-    # this Mac's host settings say "controlImplementation": "go".
+    # to strip it (a Go binary is already stripped, and strip refuses it).
     postBuildScripts:
       - name: Carry the Go control plane
         script: sh "$SRCROOT/scripts/go-control.sh" --carry
         basedOnDependencyAnalysis: false
-      # Run only when the settings say "daemonImplementation": "go".
       - name: Carry the Go agentsd
         script: sh "$SRCROOT/scripts/go-agentsd.sh" --carry
         basedOnDependencyAnalysis: false
@@ -527,25 +518,17 @@ targets:
         product: AgentsKit
       - package: AgentsKit
         product: AgentsKitCore
-      - target: agentsd
-        copy:
-          destination: wrapper
-          subpath: Contents/Helpers
-      - target: agents-control
-        copy:
-          destination: wrapper
-          subpath: Contents/Helpers
       - target: agents-relay
         copy:
           destination: wrapper
           subpath: Contents/Helpers
-      # The Go agentsd's reader of its callers' code signatures (#1138, slice C), which it
-      # looks for beside itself: without it the Go host's socket is open to every caller.
+      # agentsd's reader of its callers' code signatures (#1138, slice C), which it
+      # looks for beside itself: without it the host's socket is open to every caller.
       - target: agents-peer
         copy:
           destination: wrapper
           subpath: Contents/Helpers
-      # The Go agentsd's folder watch on a Mac (#1138): FSEvents, which Go cannot reach
+      # agentsd's folder watch on a Mac (#1138): FSEvents, which Go cannot reach
       # without cgo, beside it in Contents/Helpers.
       - target: agents-watch
         copy:
@@ -588,36 +571,7 @@ targets:
           CODE_SIGN_IDENTITY: Developer ID Application
           OTHER_CODE_SIGN_FLAGS: --timestamp
 
-  # The control plane's program (058), built here for Agents Host's bundle; Linux builds it
-  # with `swift build` in Packages/ControlPlane.
-  agents-control:
-    type: tool
-    supportedDestinations: [macOS]
-    sources:
-      - path: Packages/ControlPlane/Sources/agents-control
-    dependencies:
-      - package: ControlPlane
-        product: ControlPlaneKit
-      - package: AgentsKit
-        product: AgentsKitCore
-      - package: swift-nio-ssl
-        product: NIOSSL
-    settings:
-      base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.alexecollins.agents.control
-        PRODUCT_NAME: agents-control
-        SDKROOT: macosx
-        SUPPORTED_PLATFORMS: macosx
-        SKIP_INSTALL: YES
-        ENABLE_HARDENED_RUNTIME: YES
-      # The GitHub release (#669): Release signs it with Developer ID, outside the App Store.
-      configs:
-        Release:
-          CODE_SIGN_STYLE: Manual
-          CODE_SIGN_IDENTITY: Developer ID Application
-          OTHER_CODE_SIGN_FLAGS: --timestamp
-
-  # The Go agentsd's folder watch on a Mac (#1138): one for each folder it watches, saying
+  # agentsd's folder watch on a Mac (#1138): one for each folder it watches, saying
   # what FSEvents says changed, which Go cannot hear without cgo.
   agents-watch:
     type: tool
@@ -639,7 +593,7 @@ targets:
           CODE_SIGN_IDENTITY: Developer ID Application
           OTHER_CODE_SIGN_FLAGS: --timestamp
 
-  # The Go agentsd's code-signature check on daemon.sock's callers (#1138): Go cannot call
+  # agentsd's code-signature check on daemon.sock's callers (#1138): Go cannot call
   # the Security framework without cgo, so it asks this, beside it in Contents/Helpers.
   agents-peer:
     type: tool
@@ -650,28 +604,6 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.alexecollins.agents.peer
         PRODUCT_NAME: agents-peer
-        SDKROOT: macosx
-        SUPPORTED_PLATFORMS: macosx
-        SKIP_INSTALL: YES
-        ENABLE_HARDENED_RUNTIME: YES
-      # The GitHub release (#669): Release signs it with Developer ID, outside the App Store.
-      configs:
-        Release:
-          CODE_SIGN_STYLE: Manual
-          CODE_SIGN_IDENTITY: Developer ID Application
-          OTHER_CODE_SIGN_FLAGS: --timestamp
-
-  agentsd:
-    type: tool
-    supportedDestinations: [macOS]
-    sources:
-      - path: Daemon/Sources
-    dependencies:
-      - package: AgentsKit
-    settings:
-      base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.alexecollins.agents.daemon
-        PRODUCT_NAME: agentsd
         SDKROOT: macosx
         SUPPORTED_PLATFORMS: macosx
         SKIP_INSTALL: YES

@@ -3,8 +3,7 @@
 # built from other AgentsKit sources (#898, #897). SwiftPM recompiles AgentsKit but not
 # AgentsKitCore on such a graph, and the link fails on undefined AgentsKitCore symbols;
 # the clean retry after it rebuilds swift-nio, swift-nio-ssl and SwiftTerm as well, which
-# cost 4–11 minutes a run. Both Packages/AgentsKit/.build and Daemon/.build (agentsd
-# links AgentsKit as a local package) hold these targets, in the same layout.
+# cost 4–11 minutes a run.
 #
 # Usage: scripts/drop-stale-agentskit.sh <.build folder> <agentskit sources hash>
 # The save step writes the hash to <.build folder>/agentskit-sources.

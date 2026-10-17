@@ -35,9 +35,9 @@ devices** is on.
 | Remote | `Remote/`, `Shared/UI` | iOS and iPadOS app, SwiftUI, with a widget | A client, on the phone and the iPad. |
 | Web page | `Web/` | TypeScript single-page app | A client, served by the control plane on `localhost:8792`. |
 | Agents Host | `Host/` | macOS menu bar app | Installs the daemon and the control plane, registers them with launchd, makes pairing codes. |
-| Control plane | `Packages/ControlPlane` | Swift server, `agents-control` | Pairs clients, routes each request to its host, sends updates to clients. `:8791` wss, `:8792` loopback http. |
+| Control plane | `Go/cmd/agents-control`, `Go/internal/controlplane` | Go server, `agents-control` | Pairs clients, routes each request to its host, sends updates to clients. `:8791` wss, `:8792` loopback http. |
 | Control plane store | | A folder or an S3 bucket | Who is paired, which hosts there are, unused codes, settings. Nothing about agents. |
-| Host daemon | `Daemon/`, `Packages/AgentsKit` | Swift daemon, `agentsd`, macOS and Linux | Owns agents, terminals, files, git and workflows on its host. Serves the agents MCP tools. |
+| Host daemon | `Go/cmd/agentsd`, `Go/internal/agentsd` | Go daemon, `agentsd`, macOS and Linux | Owns agents, terminals, files, git and workflows on its host. Serves the agents MCP tools. |
 | Host data | | Files on the host | Agent records and transcripts in `~/Library/Application Support/Agents`; the person's settings in `~/.agents/settings`, and shared skills and instructions in `~/.agents` ([the `~/.agents` folder](../reference/agents-folder.md)); a project's own `.agents/`. |
 | agents-relay | `Host/Relay` | macOS helper | Planned: an iCloud mailbox for phones away from home. |
 
@@ -50,25 +50,25 @@ same way. See [The control plane](control-plane.md).
 
 ![The components inside agentsd](../assets/architecture-components.svg)
 
-`agentsd` is the same program on macOS and Linux. Its code is in `Daemon/` (a short
-`main.swift`) and `Packages/AgentsKit`. The folders below are under
-`Packages/AgentsKit/Sources/AgentsKit`.
+`agentsd` is the same program on macOS and Linux, in Go (#1134; the Swift one went in
+#1314). Its code is in `Go/cmd/agentsd` and `Go/internal/agentsd`; the files below are under
+`Go/internal/agentsd`. On a Mac it asks two small Swift helpers beside it for what Go cannot
+reach without cgo: `agents-peer` (callers' code signatures) and `agents-watch` (FSEvents).
 
 | Component | Code | What it does |
 | --- | --- | --- |
-| Control uplink | `Daemon/ControlUplink`, `HostDialer` | The host's one connection out to the control plane. Each client's channel on it becomes a connection to the daemon server. |
-| Daemon server | `Daemon/DaemonServer` | JSON-RPC, over `daemon.sock` and over the uplink's channels. Every connection gets every notification, so clients agree. |
-| Daemon core | `Daemon/DaemonCore`, `AgentTable` | The actor that owns every agent: sessions, turns, queues, statuses and attention. Every request lands here, and every change is announced from here. |
-| Workflows and events | `Daemon/DaemonCore+Workflows`, `+Events`, `+EventWaits`, `Workflows/` | Schedules, triggers, cooldowns and queues. `wait_for_event` and the event log. |
-| Leases and wakefulness | `Daemon/DaemonCore+Leases`, `ResourceCatalog`, `Power/` | A line per declared resource. Keeps the Mac awake while a turn runs. |
-| MCP clients | `MCP/` | The daemon's own connections to MCP servers: `events/poll` for workflow triggers, server views and OAuth sign-ins. |
-| Projects, files and git | `Projects/`, `Files/` | `.agents/` config and plugins, worktrees, changes, clones, folder watching, and file reads and writes for clients. |
-| Installers and catalog | `Runtimes/`, `Catalog/`, `Hosts/` | Finds and installs runtimes, installs skills and MCP servers from the marketplace, installs `agentsd` on a server over ssh. |
-| ACP sessions | `ACP/` | Starts each runtime, and prompts, cancels and resumes it over ACP. Keeps a few warm between turns (`WarmPool`), and puts deadlines on silent turns. |
-| ACP client services | `ACP/Serve/` | Answers what a runtime asks of its client: files, terminal commands, permission requests. |
-| App tools endpoint | `MCP/AppToolsEndpoint`, `ACP/Serve/AppService` | The `mcp__agents__*` tools, over loopback http with a token per session. |
-| Shells | `Terminal/` | Terminals and the project shell, each a pseudo-terminal with its scrollback. |
-| Stores | `Store/` | Whole-file JSON and append-only logs in the host data, kept by one rule (`StoreFile`). |
+| Control uplink | `Go/internal/controllink`, `daemon.go` | The host's one connection out to the control plane. Each client's channel on it becomes a connection to the daemon server. |
+| Daemon server | `rpc.go`, `methods.go` | JSON-RPC, over `daemon.sock` and over the uplink's channels. Every connection gets every notification, so clients agree. |
+| Agents and turns | `agents.go`, `turns.go`, `sessions.go`, `attention.go` | Owns every agent: sessions, turns, queues, statuses and attention. Every change is announced from here. |
+| Workflows and events | `workflows.go`, `workflowruns.go`, `events.go`, `eventwaits.go` | Schedules, triggers, cooldowns and queues. `wait_for_event` and the event log. |
+| Leases and wakefulness | `leases.go`, `leasecalls.go`, `wake.go` | A line per declared resource. Keeps the Mac awake while a turn runs. |
+| MCP clients | `mcpclient.go`, `mcpevents.go`, `mcpsignin.go`, `viewservers.go` | The daemon's own connections to MCP servers: `events/poll` for workflow triggers, server views and OAuth sign-ins. |
+| Projects, files and git | `projects.go`, `files.go`, `git.go`, `worktrees.go`, `changes.go` | `.agents/` config and plugins, worktrees, changes, clones, folder watching, and file reads and writes for clients. |
+| Installers and catalog | `install.go`, `runtimes.go`, `mcpcatalog/`, `skillcatalog/` | Finds and installs runtimes, and installs skills and MCP servers from the marketplace. |
+| ACP sessions | `acp/` | Starts each runtime, and prompts, cancels and resumes it over ACP. |
+| App tools endpoint | `apptools.go`, `agenttools.go` | The `mcp__agents__*` tools, over loopback http with a token per session. |
+| Shells | `shells.go` | Terminals and the project shell, each a pseudo-terminal with its scrollback. |
+| Stores | `store/`, `diskjson/` | Whole-file JSON and append-only logs in the host data, in the layout the Swift host kept. |
 
 ## Processes on this Mac
 

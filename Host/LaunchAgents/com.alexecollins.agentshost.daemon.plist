@@ -4,8 +4,7 @@
      root, dialling out to its control plane with the membership kept there. The first
      time, Agents Host leaves it a one-time host code in the root. It never leaves for
      being idle, and launchd starts it at login. The app's own program is the launcher: it
-     becomes the agentsd this Mac's settings pick, the Go one unless host.json says
-     "daemonImplementation": "swift" (#1138, #1312). -->
+     becomes the bundle's agentsd, the Go one (#1138, #1314). -->
 <plist version="1.0">
 <dict>
     <key>Label</key>

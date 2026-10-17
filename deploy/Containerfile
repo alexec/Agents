@@ -1,5 +1,5 @@
 # agents-control as a container (058, T068): static binaries and a user of their own.
-# The binaries are cross-built on a Mac first: scripts/build-linux-control.sh.
+# The binaries are built on a Mac first: scripts/build-linux-control.sh (agents-control is Go).
 #
 #   docker build -f deploy/Containerfile -t agents-control deploy
 #
