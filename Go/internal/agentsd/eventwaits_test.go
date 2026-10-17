@@ -99,9 +99,7 @@ func TestAHeldWaitWakesTheAgentLater(t *testing.T) {
 	if !strings.HasPrefix(text, "Still waiting for branch.moved branch ci|cd, since ") || !strings.Contains(text, "Your place is kept; you can end your turn.") {
 		t.Fatal(text)
 	}
-	if n := names(d); n[len(n)-1] != "agent.blocked" {
-		t.Fatal(n)
-	}
+	waitFor(t, "agent.blocked on the log", func() bool { n := names(d); return len(n) > 0 && n[len(n)-1] == "agent.blocked" })
 	d.raise(wire.EventDraft{Name: "branch.moved", At: now(), Scope: projectScope(dir), Sentence: "other moved.", Details: map[string]string{"branch": "other"}})
 	if w := d.Store.Agent(a.ID).EventWait; w == nil || w.Ending != nil {
 		t.Fatal("woken by an event it did not wait for")
