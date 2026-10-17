@@ -61,4 +61,4 @@ render tile.svg 512 "$ROOT/Web/assets/icon-512.png"
 render ios.svg 512 "$ROOT/Web/assets/icon-maskable-512.png"
 render ios.svg 180 "$ROOT/Web/assets/apple-touch-icon.png"
 render tile.svg 1024 tile-1024.png
-echo done
+echo "done"

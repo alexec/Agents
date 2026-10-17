@@ -153,6 +153,7 @@ prune() {
 			echo "over the bound, but a build is running: left as it is"
 		else
 			# Oldest first; the newest checkouts folder is the one main builds with.
+			# shellcheck disable=SC2010 # checkouts/<k> names are hash keys (checkouts_key), never with spaces
 			for d in $(ls -1t "$CACHE/checkouts" 2>/dev/null | grep -v '\.lock$' | tail -n +2 | tail -r) packages swiftpm linux cas; do
 				[ "$(size)" -gt "$kb" ] || break
 				case $d in packages | swiftpm | linux | cas) d=$CACHE/$d ;; *) d=$CACHE/checkouts/$d ;; esac

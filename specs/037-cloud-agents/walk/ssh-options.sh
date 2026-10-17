@@ -3,7 +3,7 @@
 # against the devbox (test-servers: devbox.sh up) with the arguments the control plane
 # passes. Nothing of the person's ~/.ssh is read or written: every config is written here.
 set -u
-D=$(mktemp -d /tmp/ssh-options.XXXX); trap 'rm -rf "$D"' EXIT; cd "$D"
+D=$(mktemp -d /tmp/ssh-options.XXXX); trap 'rm -rf "$D"' EXIT; cd "$D" || exit
 K="$D/known_hosts"
 devbox=~/.cache/agents-devbox/known_hosts
 { cat "$devbox"; sed 's/^\[127\.0\.0\.1\]:2222 /127.0.0.1 /' "$devbox" | grep '^127'; sed 's/^\[127\.0\.0\.1\]:2222 /localhost /' "$devbox" | grep '^localhost'; } > "$K"

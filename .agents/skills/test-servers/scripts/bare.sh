@@ -18,7 +18,7 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 NAME=agents-bare
 PORT=2223
 SSH=(ssh -o BatchMode=yes -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR
-     -o GlobalKnownHostsFile=/dev/null -p $PORT agents@127.0.0.1)
+     -o GlobalKnownHostsFile=/dev/null -p "$PORT" agents@127.0.0.1)
 
 colima_up() {
   docker info >/dev/null 2>&1 && return
@@ -64,7 +64,7 @@ case "${1:-status}" in
     ;;
   ssh)
     shift
-    if [ $# -eq 0 ]; then exec ssh -t -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -p $PORT agents@127.0.0.1
+    if [ $# -eq 0 ]; then exec ssh -t -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -p "$PORT" agents@127.0.0.1
     else exec "${SSH[@]}" "$@"; fi
     ;;
   fresh)

@@ -8,6 +8,7 @@ LINE=$(cat $ROOT/daemon.cmd)
 CMD=${LINE% --control-code *}; CODE=${LINE##* --control-code }
 [ "$1" = noindex ] && mv $ROOT/cache/archive.json $ROOT/cache/archive.json.aside 2>/dev/null
 T0=$(python3 -c 'import time;print(time.time())')
+# shellcheck disable=SC2046 # split on purpose: one -u per CLAUDE_* name
 env -u CLAUDECODE $(env | grep -oE '^CLAUDE_[A-Z_]+' | sed 's/^/-u /') AGENTS_TEST_RUNTIME=echo AGENTS_ROOT=$ROOT nohup "$CMD" --control-code "$CODE" >>$ROOT/host.out 2>&1 &
 python3 - "$T0" <<'PY'
 import socket, sys, time

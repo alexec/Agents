@@ -53,7 +53,7 @@ perf_lines() { /usr/bin/log show --last "${2:-2m}" --style compact \
 median() { sort -n | awk '{a[NR]=$1} END {if (NR==0) print "-"; else print a[int((NR+1)/2)]}'; }
 
 windows=(); lists=()
-for run in $(seq 1 "$RUNS"); do
+for _ in $(seq 1 "$RUNS"); do
   old=$(pid_of); [ -n "$old" ] && kill "$old" && while ps -p "$old" >/dev/null; do sleep 0.05; done
   t0=$(python3 -c 'import time; print(time.time())')
   env -i HOME="$HOME" USER="$USER" LOGNAME="$USER" TMPDIR="${TMPDIR:-/tmp}" LANG=en_US.UTF-8 PATH=/usr/bin:/bin \
