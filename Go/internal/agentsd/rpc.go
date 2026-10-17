@@ -63,6 +63,7 @@ func Invalid(format string, args ...any) *Error {
 // Client is one connection: a channel from the control plane, or daemon.sock.
 type Client struct {
 	ID   int64
+	Role Role
 	conn controllink.Conn
 	d    *Daemon
 }
@@ -115,9 +116,12 @@ var nextClient atomic.Int64
 
 // Accept serves one connection until it closes.
 func (d *Daemon) Accept(conn controllink.Conn) {
-	c := &Client{ID: nextClient.Add(1), conn: conn, d: d}
-	d.addClient(c)
-	defer d.removeClient(c)
+	c := &Client{ID: nextClient.Add(1), Role: roleOf(conn), conn: conn, d: d}
+	// Only a person's connection is one the host speaks to unasked (roles.go).
+	if c.Role.HearsNotifications() {
+		d.addClient(c)
+		defer d.removeClient(c)
+	}
 	for line := range conn.In() {
 		var m message
 		if err := json.Unmarshal([]byte(line), &m); err != nil {
@@ -135,7 +139,9 @@ func (d *Daemon) dispatch(c *Client, m message) {
 	h := d.handlers[m.Method]
 	var result any
 	var err error
-	if h == nil {
+	if !c.Role.Allows(m.Method) {
+		err = &Error{Code: CodeNotPermitted, Message: fmt.Sprintf("%s is not open to this connection (%s).", m.Method, c.Role)}
+	} else if h == nil {
 		d.logUnknown(m.Method)
 		err = &Error{Code: CodeMethodNotFound, Message: "Method not found: " + m.Method}
 	} else if v := safe.Catch("rpc "+m.Method, func() { result, err = h(d.ctx, c, m.Params) }); v != nil {
@@ -173,10 +179,11 @@ func (d *Daemon) logUnknown(method string) {
 // MARK: daemon.sock, for driving the host by hand (server-rpc.sh)
 
 type sockConn struct {
-	c  net.Conn
-	w  *bufio.Writer
-	mu sync.Mutex
-	in chan string
+	c    net.Conn
+	w    *bufio.Writer
+	mu   sync.Mutex
+	in   chan string
+	role Role
 }
 
 func (s *sockConn) Write(line string) error {
@@ -190,6 +197,7 @@ func (s *sockConn) Write(line string) error {
 func (s *sockConn) In() <-chan string { return s.in }
 func (s *sockConn) Close()            { s.c.Close() }
 func (s *sockConn) Device() string    { return "" }
+func (s *sockConn) Role() Role        { return s.role }
 
 // ServeSocket answers on daemon.sock, mode 0600 in the root, until ctx ends.
 func (d *Daemon) ServeSocket(ctx context.Context, path string) error {
@@ -199,28 +207,39 @@ func (d *Daemon) ServeSocket(ctx context.Context, path string) error {
 		return err
 	}
 	os.Chmod(path, 0o600)
+	policy := socketPolicyFor(d)
+	log.Printf("socket: %s", policy.Summary())
 	safe.Go("socket close", func() { <-ctx.Done(); l.Close() })
 	for {
 		c, err := l.Accept()
 		if err != nil {
 			return err
 		}
-		sc := &sockConn{c: c, w: bufio.NewWriter(c), in: make(chan string, 256)}
-		safe.Go("socket read", func() {
-			defer close(sc.in)
-			r := bufio.NewReaderSize(c, 1<<20)
-			for {
-				line, err := r.ReadString('\n')
-				if len(line) > 1 {
-					sc.in <- line[:len(line)-1]
-				}
-				if err != nil {
-					return
-				}
-			}
-		})
-		safe.Go("socket client", func() { d.Accept(sc) })
+		safe.Go("socket accept", func() { d.acceptSocket(c, policy) })
 	}
+}
+
+func (d *Daemon) acceptSocket(c net.Conn, policy SocketPolicy) {
+	role, ok := policy.Role(c)
+	if !ok {
+		c.Close() // another account, or one the kernel would not name
+		return
+	}
+	sc := &sockConn{c: c, w: bufio.NewWriter(c), in: make(chan string, 256), role: role}
+	safe.Go("socket read", func() {
+		defer close(sc.in)
+		r := bufio.NewReaderSize(c, 1<<20)
+		for {
+			line, err := r.ReadString('\n')
+			if len(line) > 1 {
+				sc.in <- line[:len(line)-1]
+			}
+			if err != nil {
+				return
+			}
+		}
+	})
+	d.Accept(sc)
 }
 
 func isDir(p string) bool {
