@@ -45,7 +45,9 @@ enum WalkCommands {
                 guard level < (request["depth"] as? Int ?? 8) else { return }
                 let delegate = (layer.delegate as? NSObject).map { " ← \($0.className)" } ?? ""
                 lines.append(String(repeating: "  ", count: level) + "\(layer.className) \(Int(layer.bounds.width))x\(Int(layer.bounds.height))"
-                    + (layer.mask != nil ? " mask" : "") + (layer.isHidden ? " hidden" : "") + " op:\(layer.opacity)" + delegate)
+                    + (layer.mask != nil ? " mask" : "") + (layer.isHidden ? " hidden" : "") + " op:\(layer.opacity)"
+                    + (layer.isGeometryFlipped ? " geometryFlipped" : "") + (layer.contentsAreFlipped() ? " contentsFlipped" : "") + (layer.contents == nil ? " noContents" : "")
+                    + (CATransform3DIsIdentity(layer.transform) ? "" : " transform") + delegate)
                 for sub in layer.sublayers ?? [] { dump(sub, level + 1) }
             }
             dump(layer, 0)
@@ -55,7 +57,7 @@ enum WalkCommands {
         case "shot":
             let window = try target(request)
             let drawn = (request["view"] as? String).map { WalkShot.png(ofView: $0, in: window) }
-                ?? WalkShot.png(of: window)
+                ?? WalkShot.png(of: window, shadows: request["shadows"] as? Bool ?? true)
             guard let png = drawn else { throw WalkError("could not draw the window") }
             return ["ok": true, "png": png.base64EncodedString(), "width": Int(window.frame.width),
                     "height": Int(window.frame.height)]
@@ -147,8 +149,14 @@ enum WalkCommands {
             var frame = window.frame
             frame.origin.y += frame.height - height
             frame.size = CGSize(width: width, height: height)
+            // `x` and `y`: its top left, in points from the main screen's top left, as AX
+            // has it. A shot is drawn at the scale of the screen the window is on (#1078).
+            if let x = request["x"] as? Double, let y = request["y"] as? Double,
+               let main = NSScreen.screens.first {
+                frame.origin = CGPoint(x: x, y: main.frame.maxY - y - height)
+            }
             window.setFrame(frame, display: true)
-            return ["ok": true, "frame": box(window.frame)]
+            return ["ok": true, "frame": box(window.frame), "scale": window.backingScaleFactor]
         case "menu":
             guard let path = request["path"] as? [String], !path.isEmpty else { throw WalkError("menu wants a path") }
             return try menu(path)

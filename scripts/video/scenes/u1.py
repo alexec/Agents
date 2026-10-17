@@ -85,6 +85,7 @@ def run(v):
     v.say("send")
     with v.fast(2.0):
         ask = v.wait_until(lambda: (v.rpc("permissions/pending") or [None])[0], timeout=120, what="a permission card")
+        v.wait_until(lambda: v.find("=Yes"), timeout=90, what="the card in the window")
     v.tidy()
     v.sleep(0.8)
     v.say("ask")

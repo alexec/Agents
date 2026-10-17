@@ -5,9 +5,10 @@ phone inside Apple's iPhone bezel, which is read from ~/.agents/video/assets (it
 it be shown in a video, not given away, so it is not in git). A scene's LAYOUT says what is on
 the backdrop: "mac", "mac+phone" or "mac+browser".
 
-macOS draws a recording badge over the window's traffic lights. The still taken before the
-recording has the real ones, so that corner of the still is laid over the badge; the still's
-alpha is the window's rounded mask too.
+The window draws its own frames (the walk socket, #1172), so no other window can be in them and
+there is no recording badge. A layer render leaves out the window's buttons and its rounded
+corners: the traffic lights of a window that is not key are drawn over each frame, and the
+corners are cut by a mask.
 
 Time: t=0 is the Mac recording's first frame. The scene's markers are unix times. A `fast`
 span is cut to its most seconds, sped up; every marker after it moves with it. Each narration
@@ -28,7 +29,9 @@ SCREEN_RADIUS = 190
 # The web page at iPhone size, in CSS pixels, under a status bar as tall as the Dynamic Island's.
 PHONE_VIEW = (402, 820)
 STATUS_BAR = 54
-BADGE = (16, 16, 184, 92)  # the corner of the window the recording badge sits on, in pixels
+# A window that is not key, as macOS 26 draws it, in points: the traffic lights' middles, their
+# size, and the corners' radius.
+LIGHTS, LIGHT_Y, LIGHT_D, CORNER = (26, 49, 72), 26, 13, 19
 LOGO = Path(__file__).resolve().parent.parent.parent / "docs/assets/logo.png"
 FONT = "/System/Library/Fonts/SFNS.ttf"
 TRADEMARK = "iPhone and Mac are trademarks of Apple Inc., registered in the U.S. and other countries."
@@ -182,6 +185,19 @@ def web_video(work, start, size, out):
            "-c:v", "libx264", "-crf", "14", "-pix_fmt", "yuv420p", out)
 
 
+def traffic_lights(scale, path):
+    """The grey traffic lights of a window that is not key, on a clear picture as wide as them."""
+    size = (round((LIGHTS[-1] + LIGHT_D) * scale), round((LIGHT_Y + LIGHT_D) * scale))
+    img = Image.new("RGBA", size, (0, 0, 0, 0))
+    draw = ImageDraw.Draw(img)
+    r = LIGHT_D * scale / 2
+    for x in LIGHTS:
+        cx, cy = x * scale, LIGHT_Y * scale
+        draw.ellipse((cx - r, cy - r, cx + r, cy + r), fill=(224, 226, 230, 255),
+                     outline=(188, 190, 194, 255), width=max(1, round(scale / 2)))
+    img.save(path)
+
+
 def page_colour(work):
     first = sorted((work / "web/frames").glob("*.jpg"))[-1]
     img = Image.open(first).convert("RGB")
@@ -226,16 +242,15 @@ def compose(scene, takes, work, out_dir):
     mx = (W - mw) // 2 if mac_x0 is None else mac_x0
     my = (H - mh) // 2 if layout != "mac+browser" else 90
 
-    # The window: the still's corner over the badge, its alpha as the mask, a shadow under it.
-    still.crop(BADGE).save(art / "corner.png")
-    still.getchannel("A").resize((mw, mh), Image.LANCZOS).save(art / "mac-mask.png")
+    # The window: its traffic lights drawn on, its corners cut, a shadow under it.
+    traffic_lights(data.get("scale", 2), art / "lights.png")
+    rounded_mask((mw, mh), round(CORNER * data.get("scale", 2) * scale), art / "mac-mask.png")
     pad = shadow((mw, mh), 26, art / "mac-shadow.png")
     i_mac = add(work / "mac.mov", loop=False)
-    i_corner, i_mask, i_shadow = add(art / "corner.png"), add(art / "mac-mask.png"), add(art / "mac-shadow.png")
-    bx, by, bx2, by2 = BADGE
+    i_lights, i_mask, i_shadow = add(art / "lights.png"), add(art / "mac-mask.png"), add(art / "mac-shadow.png")
     graph += [
         f"[{i_mac}:v]fps={FPS},scale={mac_w}:{mac_h},format=rgba[mac0]",
-        f"[mac0][{i_corner}:v]overlay={bx}:{by}[mac1]",
+        f"[mac0][{i_lights}:v]overlay=0:0[mac1]",
         f"[mac1]scale={mw}:{mh}:flags=lanczos,format=rgba[mac2]",
         f"[{i_mask}:v]format=gray[mmask]",
         f"[mac2][mmask]alphamerge[mac]",

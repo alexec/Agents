@@ -14,10 +14,29 @@ import SwiftTerm
 /// terminal draws only when asked. The spike behind this is in the PR for #1172.
 @MainActor
 enum WalkShot {
-    static func png(of window: NSWindow) -> Data? {
+    /// Without `shadows`, the layers' shadows are left out: a layer render blurs each one in
+    /// software, most of a shot's time, too slow for a video's frames (#1078).
+    static func png(of window: NSWindow, shadows: Bool = true) -> Data? {
         prepare(window)
         guard window.contentView != nil else { return nil }
         let over = [window.attachedSheet].compactMap { $0 } + (window.childWindows ?? []).filter(\.isVisible)
+        var hidden: [(CALayer, Float)] = []
+        if !shadows {
+            func visit(_ layer: CALayer) {
+                if layer.shadowOpacity > 0 { hidden.append((layer, layer.shadowOpacity)) }
+                layer.sublayers?.forEach(visit)
+            }
+            for each in [window] + over { (each.contentView?.superview ?? each.contentView)?.layer.map(visit) }
+            CATransaction.begin()
+            CATransaction.setDisableActions(true)
+            hidden.forEach { $0.0.shadowOpacity = 0 }
+        }
+        defer {
+            if !shadows {
+                hidden.forEach { $0.0.shadowOpacity = $0.1 }
+                CATransaction.commit()
+            }
+        }
         return png(size: window.frame.size, scale: window.backingScaleFactor) {
             for (index, layer) in ([window] + over).enumerated() {
                 guard let view = layer.contentView?.superview ?? layer.contentView else { continue }
@@ -39,6 +58,18 @@ enum WalkShot {
             view.needsDisplay = true
             view.displayIfNeeded()
         }
+        // A SwiftUI drawing layer that drew while the window was off screen can keep a
+        // picture drawn upside down: text sent from the window on a locked screen (#1078).
+        // Drawn again now, it is the right way up.
+        func fill(_ layer: CALayer) {
+            if layer.delegate != nil, layer.className.contains("CGDrawingLayer"),
+               layer.bounds.width >= 1, layer.bounds.height >= 1 {
+                layer.setNeedsDisplay()
+                layer.displayIfNeeded()
+            }
+            layer.sublayers?.forEach(fill)
+        }
+        root.layer.map(fill)
         // A rect in `root`'s points to one on the canvas, which counts from the bottom left.
         let canvas = { (rect: CGRect) -> CGRect in
             let y = root.isFlipped ? root.bounds.height - rect.maxY : rect.minY
@@ -162,6 +193,8 @@ enum WalkShot {
                                             colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0),
               let context = NSGraphicsContext(bitmapImageRep: canvas) else { return nil }
         canvas.size = size
+        // The canvas counts in pixels: everything is drawn in points (#1078, a Retina screen).
+        context.cgContext.scaleBy(x: scale, y: scale)
         NSGraphicsContext.saveGraphicsState()
         NSGraphicsContext.current = context
         draw()
