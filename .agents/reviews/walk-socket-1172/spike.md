@@ -68,4 +68,18 @@ Core Graphics view.
 
 ## Unlocked comparison
 
-Pending the next unlock: the same walk shot by `walk.py` and by `shot.sh`.
+17:20, unlocked: the same walk, each shot taken by the window's own render (left) and by
+`shot.sh` (right). The walk itself (press, unfold, select, set, click, key) behaved the same.
+
+| | |
+| --- | --- |
+| Sheet | ![](unlocked-1-sheet.jpg) |
+| Session | ![](unlocked-2-session.jpg) |
+| Terminal | ![](unlocked-3-terminal.jpg) |
+
+The locked render (above) matches `shot.sh` but for the gaps listed (plain fills for glass,
+the grey selection, no window buttons). The **unlocked** render does not: the sidebar comes
+out black with its labels gone, and the terminal black. On screen, AppKit keeps those layers'
+contents on the GPU, and `CALayer.render(in:)` reads them as black; off screen, the forced
+drawing left them on the CPU. So `walk.py shot` takes `shot.sh`'s picture while the screen is
+unlocked and the window's own render while it is locked (`--render` forces the render).
