@@ -51,6 +51,14 @@ it and no port needs opening. See [Projects, hosts and worktrees](../explanation
    unticked (see [Choose its projects](#choose-its-projects)). The server is listed under
    **Hosts**, and has a heading of its own in the projects list.
 
+The server gets the Go host, the default since #1136. To install the Swift host instead,
+turn on **Install the Swift host instead** in the sheet before you copy the command, or add
+`--impl swift` to the end of the command. Both hosts use the same `~/.agents-server/root`.
+To change a server from one to the other, run the command again with or without
+`--impl swift`: a server that has already joined this control plane keeps its place, its id
+and its agents. A control plane that has no Go host to give installs the Swift host, and
+says so.
+
 ### Or add it over ssh
 
 1. In **Settings ▸ Control plane ▸ Hosts**, click **Add a Server…**, then choose

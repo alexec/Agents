@@ -451,24 +451,30 @@ func TestUpdateIsNotHereAndCheckAgainDoesNothing(t *testing.T) {
 	}
 }
 
-// The Go host (#1136) is served beside the Swift one, by its own names and version, and the
-// Swift one stays the default, as ServerFilesTests.theGoHostIsServedBesideTheSwiftOne.
-func TestTheGoHostIsServedBesideTheSwiftOne(t *testing.T) {
+// The Go host (#1136) is the default and the Swift one is served beside it, by its own
+// names and version, as ServerFilesTests.theGoHostIsTheDefaultAndTheSwiftOneIsServedBesideIt.
+func TestTheGoHostIsTheDefaultAndTheSwiftOneIsServedBesideIt(t *testing.T) {
 	folder := t.TempDir()
 	for name, text := range map[string]string{"VERSION": "1.0+5", "VERSION-go": "1.0+5-go",
-		"agentsd-linux-aarch64.sha256": "swift\n", "agentsd-go-linux-aarch64.sha256": "go\n"} {
+		"agentsd-linux-aarch64.sha256": "swift\n", "agentsd-go-linux-aarch64.sha256": "go\n",
+		"agentsd-linux-x86_64.sha256": "swift\n"} {
 		if err := os.WriteFile(filepath.Join(folder, name), []byte(text), 0o644); err != nil {
 			t.Fatal(err)
 		}
 	}
-	if b, ok := binaryFor("aarch64", "", folder); !ok || b.sha256 != "swift" || b.version != "1.0+5" {
+	for _, asked := range []string{"", "go"} {
+		b, ok := binaryFor("aarch64", asked, folder)
+		if !ok || b.sha256 != "go" || filepath.Base(b.file) != "agentsd-go-linux-aarch64" || b.version != "1.0+5-go" {
+			t.Errorf("go (%q): %+v %v", asked, b, ok)
+		}
+	}
+	if b, ok := binaryFor("aarch64", "swift", folder); !ok || b.sha256 != "swift" || b.version != "1.0+5" {
 		t.Errorf("swift: %+v %v", b, ok)
 	}
-	b, ok := binaryFor("aarch64", "go", folder)
-	if !ok || b.sha256 != "go" || filepath.Base(b.file) != "agentsd-go-linux-aarch64" || b.version != "1.0+5-go" {
-		t.Errorf("go: %+v %v", b, ok)
+	if b, ok := binaryFor("x86_64", "", folder); !ok || b.sha256 != "swift" {
+		t.Errorf("no Go host built for x86_64: the Swift one, not %+v %v", b, ok)
 	}
 	if _, ok := binaryFor("x86_64", "go", folder); ok {
-		t.Error("none built for x86_64")
+		t.Error("asked for the Go host, and none built for x86_64")
 	}
 }

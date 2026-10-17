@@ -1,6 +1,6 @@
 // agentsd is the Go host daemon (#1136): it joins a control plane as the Swift agentsd
-// does, with the same flags, on the same root. The Swift Linux host stays the default
-// until Alex chooses (#1134); install.sh --impl go installs this one.
+// does, with the same flags, on the same root. It is a Linux host's default (#1136);
+// install.sh --impl swift installs the Swift one instead.
 package main
 
 import (

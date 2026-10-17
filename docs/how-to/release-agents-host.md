@@ -14,7 +14,9 @@ publishes a release. The tag starts the `release` workflow, which:
 - signs it with Developer ID, notarizes and staples it, as `Agents-Host-<version>.dmg`;
 - staples the same app and zips it as `Agents-Host-<version>.zip`, for Macs that may not
   mount a disk image;
-- builds the static Linux agentsd as `agentsd-linux-<arch>-<version>.tar.gz`;
+- builds the static Linux agentsd: the Go host, a Linux host's default, as
+  `agentsd-go-linux-<arch>-<version>.tar.gz`, and the Swift host as
+  `agentsd-linux-<arch>-<version>.tar.gz`;
 - creates the release with these files and a `SHA256SUMS`;
 - in its `testflight` job, archives the Mac window and the Remote (one Universal app),
   checks both archives with `scripts/check-store-archive.sh`, uploads them to TestFlight

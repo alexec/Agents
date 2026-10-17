@@ -54,6 +54,12 @@ Host's *Move to another machine* and *Relay for my devices* work with it.
 | `controlplane/notices` | Where a need shows (`Routing`), and the relay host's deliveries |
 | `controlplane/providers` | Workspace providers, kept requests, Write It for Me |
 
+**Linux hosts run the Go agentsd** (#1136). `install.sh` installs it, from
+`agentsd-go-linux-<arch>` (`scripts/build-linux-agentsd-go.sh`). `--impl swift`, or Add a
+Server's **Install the Swift host instead**, installs the Swift one. Running the command again
+with or without it changes a host and keeps its id and agents. A control plane with no Go
+host gives the Swift one.
+
 **Switching a Mac.** Agents Host carries both (`Contents/Helpers/agents-control` and
 `agents-control-go`; `scripts/go-control.sh` builds the Go one). It runs the Swift one
 unless this Mac's entry in `~/.agents/settings/host.json` says
