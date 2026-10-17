@@ -109,7 +109,11 @@ func relativePin(file, folder string) (string, bool) {
 	root := strings.TrimSuffix(filepath.Clean(folder), "/") + "/"
 	full := filepath.Clean(file)
 	if !strings.HasPrefix(full, root) {
-		return "", false
+		// The same folder by another way (on a Mac, /var is /private/var).
+		root, full = strings.TrimSuffix(resolved(folder), "/")+"/", resolved(file)
+		if !strings.HasPrefix(full, root) {
+			return "", false
+		}
 	}
 	return normalizePin(strings.TrimPrefix(full, root))
 }

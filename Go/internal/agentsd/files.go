@@ -61,6 +61,22 @@ func (d *Daemon) scoped(id wire.UUID, path string) (string, error) {
 	return real, nil
 }
 
+// resolved is path with its links followed, as far as it exists: a file not made yet in a
+// folder reached through a link is still found in that folder.
+func resolved(path string) string {
+	path = filepath.Clean(path)
+	rest := ""
+	for p := path; ; p = filepath.Dir(p) {
+		if r, err := filepath.EvalSymlinks(p); err == nil {
+			return filepath.Join(r, rest)
+		}
+		if p == filepath.Dir(p) {
+			return path
+		}
+		rest = filepath.Join(filepath.Base(p), rest)
+	}
+}
+
 func inside(root, path string) bool {
 	rel, err := filepath.Rel(root, path)
 	return err == nil && rel != ".." && !strings.HasPrefix(rel, "../")

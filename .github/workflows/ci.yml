@@ -530,6 +530,29 @@ jobs:
       - name: Test
         run: go test -race ./...
 
+  # The Go agentsd on a Mac (#1138): the same module built and tested on macOS, so a
+  # Mac-only path (its root, its folders, a *_darwin.go file) is held as Linux's is. TMPDIR
+  # is resolved, because a Mac's temporary folder is reached through the /var link and the
+  # daemon keeps folders with their links resolved, as the Swift one does.
+  go-darwin:
+    needs: select
+    if: ${{ always() && !cancelled() && (needs.select.result != 'success' || needs.select.outputs.go != 'skip') }}
+    runs-on: macos-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: Go
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: Go/go.mod
+          cache-dependency-path: Go/go.mod
+      - name: Vet
+        run: go vet ./...
+      - name: Test
+        run: TMPDIR=$(cd "$RUNNER_TEMP" && pwd -P) go test ./...
+
   # The Linux hosts (#805): agentsd and ci-watcher, static, for x86_64 only, as
   # scripts/build-linux-agentsd.sh --check builds them before a ship. A Mac-only symbol
   # used from code Linux compiles, such as a member declared behind `canImport(CryptoKit)`,

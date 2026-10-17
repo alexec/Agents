@@ -18,15 +18,16 @@ type Locations struct {
 	Logs  string
 }
 
-// At is the locations of root on this machine, as StoreLocations(root:) works them out on
-// Linux: a root in a temporary folder keeps cache/ and logs/ inside it; any other root has
-// a folder of its own, roots/<name>-<hash>, under $XDG_CACHE_HOME/agents and
-// $XDG_STATE_HOME/agents/logs.
+// At is the locations of root on this machine, as StoreLocations(root:) works them out:
+// platformFolders on Linux, macFolders on a Mac (locations_darwin.go).
 func At(root string) Locations {
 	home, _ := os.UserHomeDir()
-	return platformFolders(filepath.Clean(root), home, os.Getenv)
+	return folders(filepath.Clean(root), home, os.Getenv)
 }
 
+// platformFolders is the Linux rule: a root in a temporary folder keeps cache/ and logs/
+// inside it; any other root has a folder of its own, roots/<name>-<hash>, under
+// $XDG_CACHE_HOME/agents and $XDG_STATE_HOME/agents/logs.
 func platformFolders(root, home string, env func(string) string) Locations {
 	if isTemporary(root) {
 		return Locations{Root: root, Cache: filepath.Join(root, "cache"), Logs: filepath.Join(root, "logs")}
@@ -50,13 +51,17 @@ func isTemporary(root string) bool {
 	if err != nil {
 		resolved = root
 	}
+	// Both the folder and where it leads: a root not made yet is not resolved, and on a
+	// Mac /tmp leads to /private/tmp.
 	for _, t := range []string{os.TempDir(), "/tmp", "/private/tmp", "/var/tmp", "/private/var/tmp"} {
+		candidates := []string{filepath.Clean(t)}
 		if r, err := filepath.EvalSymlinks(t); err == nil {
-			t = r
+			candidates = append(candidates, filepath.Clean(r))
 		}
-		t = filepath.Clean(t)
-		if resolved == t || strings.HasPrefix(resolved, t+"/") {
-			return true
+		for _, c := range candidates {
+			if resolved == c || strings.HasPrefix(resolved, c+"/") {
+				return true
+			}
 		}
 	}
 	return false
