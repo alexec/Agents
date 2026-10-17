@@ -79,10 +79,13 @@ else
 
 		while IFS= read -r -d '' path; do
 			case "$path" in
-				docs/*|mkdocs.yml|specs/*|design/*|.agents/*|.claude/*|*.md|Go/*|Packages/Wire/*|scripts/wire.sh|scripts/pr-areas.py|scripts/replay-conflicts.py|scripts/rerun-cancelled-ci.py) ;;
+				docs/*|mkdocs.yml|specs/*|design/*|.agents/*|.claude/*|*.md|Go/*|Packages/Wire/*|scripts/wire.sh|scripts/pr-areas.py|scripts/replay-conflicts.py|scripts/rerun-cancelled-ci.py|scripts/lint.sh|ruff.toml|.shellcheckrc|.swiftlint.yml|Web/biome.json) ;;
 				*) apps=build ;;
 			esac
 			case "$path" in
+				# The linters' own files (#1224): CI's lint job reads them, no build or test does.
+				scripts/lint.sh|ruff.toml|.shellcheckrc|.swiftlint.yml|Web/biome.json)
+					;;
 				# Quarantine annotations and their inventory do not change test behavior.
 				Packages/AgentsKit/Tests/AgentsKitTests/Support/FlakyUnderLoad.swift)
 					agentskit_touched=true

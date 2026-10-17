@@ -1,0 +1,29 @@
+# scripts/lint.sh runs SwiftLint with bug rules only, none that needs a build (#1224).
+only_rules:
+  - force_try
+  - force_cast
+  - weak_delegate
+  - unowned_variable_capture
+  - discarded_notification_center_observer
+  - duplicate_enum_cases
+  - duplicated_key_in_dictionary_literal
+  - identical_operands
+  - unused_setter_value
+  - class_delegate_protocol
+  - compiler_protocol_init
+  - discouraged_direct_init
+  - dynamic_inline
+  - private_unit_test
+  - redundant_set_access_control
+  - notification_center_detachment
+  - empty_xctest_method
+  - lower_acl_than_parent
+  - ns_number_init_as_function_reference
+  - self_binding
+  - unhandled_throwing_task
+  - array_init
+excluded:
+  - "**/.build"
+  - build
+  - "**/DerivedData"
+  - .agents/worktrees

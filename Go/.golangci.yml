@@ -1,0 +1,7 @@
+# scripts/lint.sh runs golangci-lint for bugs and security only (#1224).
+version: "2"
+linters:
+  default: none
+  enable: [govet, staticcheck, errcheck, ineffassign, unused, gosec]
+  exclusions:
+    presets: [std-error-handling, common-false-positives]
