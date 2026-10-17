@@ -41,6 +41,8 @@ jobs:
     timeout-minutes: 15
     outputs:
       apps: ${{ steps.test-selection.outputs.apps }}
+      agentskit: ${{ steps.test-selection.outputs.agentskit }}
+      codetext: ${{ steps.test-selection.outputs.codetext }}
       packages: ${{ steps.test-selection.outputs.packages }}
       mcpservers: ${{ steps.test-selection.outputs.mcpservers }}
       linux: ${{ steps.test-selection.outputs.linux }}
@@ -66,7 +68,12 @@ jobs:
           fi
           bash scripts/select-test-suites.sh "$base" | tee -a "$GITHUB_OUTPUT"
 
-  test:
+  # The test job ran the Xcode builds and the package builds and tests one after the
+  # other, and they share nothing: a run that touched both took 20–24 minutes on its own
+  # (October 2026: AgentsKit 5–6, the two macOS schemes 4–5, the Remote 3–4, agentsd and
+  # the tests 2–4). `apps` and `swift` now run side by side, each with its own caches, and
+  # `test` below, the check main requires, is red unless both of them passed.
+  apps:
     needs: select
     # `always()` so a failed `select` still runs this job rather than skipping it, which
     # would read as a pass.
@@ -74,12 +81,7 @@ jobs:
     # The project targets the macOS and iOS 27 SDKs, which only this image has.
     # A preview image while macOS 27 is new; move to macos-27 when it is GA.
     runs-on: xcode-27
-    # Long enough for the two builds, CodeText and the whole AgentsKit suite. It was
-    # ten minutes, and a run the selector chose as `full` takes longer than that on this
-    # runner: the job was cancelled at the cap with every test before it passing, on
-    # main as well as on a branch (run 36642820605). The selection is what keeps this
-    # small; the cap has to fit the run it lets through. "Time left for the AgentsKit
-    # tests" below reads the same number as JOB_MINUTES; change both together.
+    # Room for both schemes and the Remote from cold.
     timeout-minutes: 30
     permissions:
       contents: read
@@ -87,28 +89,8 @@ jobs:
     env:
       DEVELOPER_DIR: /Applications/Xcode_27.0.app/Contents/Developer
     steps:
-      # For the AgentsKit tests' budget below.
-      - name: Start the clock
-        id: clock
-        run: echo "start=$(date +%s)" >> "$GITHUB_OUTPUT"
-
+      # The cache keys read the tree, not the history, and nothing here selects suites.
       - uses: actions/checkout@v6
-        with:
-          # The selector compares against the PR base or the previous push.
-          fetch-depth: 0
-
-      - name: Select test suites for changed files
-        id: test-selection
-        env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
-          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
-        run: |
-          base="$BASE_SHA"
-          if [[ -z "$base" && -n "$DEFAULT_BRANCH" ]]; then
-            base=$(git merge-base "origin/$DEFAULT_BRANCH" HEAD || true)
-          fi
-          bash scripts/select-test-suites.sh "$base" >> "$GITHUB_OUTPUT"
-
       # A build graph is only good for the toolchain that wrote it. SwiftPM bakes
       # absolute SDK and framework paths into the objects it produces, and the runner's
       # Xcode moves under it: an image update left every restored cache pointing at an
@@ -181,51 +163,6 @@ jobs:
             find build/DD/Build/Products -maxdepth 2 -name 'AgentsKit*' -exec rm -rf {} +
           fi
 
-      - name: Restore SwiftPM build cache
-        id: swiftpm-cache
-        uses: actions/cache/restore@v5
-        with:
-          path: |
-            Daemon/.build
-            Packages/CodeText/.build
-          key: macos-xcode-27-swiftpm-${{ steps.keys.outputs.base }}-${{ steps.keys.outputs.swiftpm }}
-          restore-keys: |
-            macos-xcode-27-swiftpm-${{ steps.keys.outputs.base }}-
-            macos-xcode-27-swiftpm-${{ steps.toolchain.outputs.fingerprint }}-
-
-      - name: Restore AgentsKit build cache
-        id: agentskit-cache
-        uses: actions/cache/restore@v5
-        with:
-          path: Packages/AgentsKit/.build
-          key: macos-xcode-27-agentskit-${{ steps.toolchain.outputs.fingerprint }}-${{ hashFiles('Packages/AgentsKit/Package.swift', 'Packages/AgentsKit/Package.resolved', 'Packages/AgentsKit/Sources/**/*', 'Packages/AgentsKit/Tests/**/*', 'Packages/AgentsKit/Plugins/**/*') }}
-          restore-keys: |
-            macos-xcode-27-agentskit-${{ steps.toolchain.outputs.fingerprint }}-${{ hashFiles('Packages/AgentsKit/Package.swift', 'Packages/AgentsKit/Package.resolved', 'Packages/AgentsKit/Sources/**/*', 'Packages/AgentsKit/Tests/**/*', 'Packages/AgentsKit/Plugins/**/*') }}-
-            macos-xcode-27-agentskit-${{ steps.toolchain.outputs.fingerprint }}-
-
-      # The same stale graph as the Xcode cache's above (#684), in SwiftPM's build: on
-      # 2026-10-13 every pull request that changed AgentsKit (#882, #886, #887, #889)
-      # restored an older .build, SwiftPM recompiled AgentsKit but not AgentsKitCore, the
-      # link failed on undefined AgentsKitCore symbols, and the clean retry rebuilt the
-      # dependencies too: 6–11 minutes for a step that takes under one when warm. The save
-      # records which AgentsKit sources the graph was built from; when they differ, only the
-      # package's own targets go, and swift-nio, swift-nio-ssl and SwiftTerm stay warm.
-      - name: Drop a stale AgentsKit from the AgentsKit build cache
-        if: steps.agentskit-cache.outputs.cache-matched-key != '' && steps.agentskit-cache.outputs.cache-hit != 'true'
-        env:
-          AGENTSKIT: ${{ steps.keys.outputs.agentskit }}
-        run: bash scripts/drop-stale-agentskit.sh Packages/AgentsKit/.build "$AGENTSKIT"
-
-      # agentsd links AgentsKit as a local package, so Daemon/.build holds the same stale
-      # graph. On 2026-10-13 (#897) runs 38334579377 and 38343467490 restored it, the
-      # agentsd link failed on undefined AgentsKitCore symbols, and the clean retry took
-      # 4–6 minutes: with a slow test run after it, the job reached its 30-minute cap.
-      - name: Drop a stale AgentsKit from the SwiftPM build cache
-        if: steps.swiftpm-cache.outputs.cache-matched-key != '' && steps.swiftpm-cache.outputs.cache-hit != 'true'
-        env:
-          AGENTSKIT: ${{ steps.keys.outputs.agentskit }}
-        run: bash scripts/drop-stale-agentskit.sh Daemon/.build "$AGENTSKIT"
-
       - name: Tools
         run: |
           xcodebuild -version
@@ -234,45 +171,6 @@ jobs:
           # The runner's Xcode comes without it, and the app's build compiles Metal.
           xcodebuild -downloadComponent MetalToolchain
           wait "$xcodegen_pid"
-
-      # SwiftPM's build graph records the random cryptex mount name for MetalToolchain,
-      # and every absolute path of the Xcode and SDK that produced it. Rewrite the mount
-      # when the component version matches; drop the graph when it names an Xcode or SDK
-      # this runner does not have, which is what an image update looks like from here.
-      - name: Normalize AgentsKit build cache
-        if: steps.test-selection.outputs.agentskit != 'skip'
-        run: python3 scripts/normalize-metaltoolchain-cache.py Packages/AgentsKit/.build
-      # Every build below that starts from a restored cache gets one more go from clean
-      # when it fails (scripts/ci-clean-retry.sh says why). The step only fails, and so
-      # is only kept from the cache, when the clean build fails as well.
-      - name: Build AgentsKit tests
-        id: build-agentskit
-        if: steps.test-selection.outputs.agentskit != 'skip'
-        env:
-          RESTORED: ${{ steps.agentskit-cache.outputs.cache-matched-key }}
-        run: |
-          source scripts/ci-clean-retry.sh
-          clean_retry "$RESTORED" Packages/AgentsKit/.build -- \
-            swift build --build-tests --package-path Packages/AgentsKit
-
-      - name: Record the AgentsKit sources this build was made from
-        if: ${{ always() && steps.agentskit-cache.outputs.cache-hit != 'true' && steps.build-agentskit.outcome == 'success' }}
-        run: echo "${{ steps.keys.outputs.agentskit }}" > Packages/AgentsKit/.build/agentskit-sources
-
-      # Only completed builds are saved. Cancellation must not persist a partial cache
-      # that can fill runner disk or poison a later restore.
-      - name: Save AgentsKit build cache
-        if: ${{ always() && steps.agentskit-cache.outputs.cache-hit != 'true' && steps.build-agentskit.outcome == 'success' }}
-        uses: actions/cache/save@v5
-        with:
-          path: Packages/AgentsKit/.build
-          key: macos-xcode-27-agentskit-${{ steps.toolchain.outputs.fingerprint }}-${{ hashFiles('Packages/AgentsKit/Package.swift', 'Packages/AgentsKit/Package.resolved', 'Packages/AgentsKit/Sources/**/*', 'Packages/AgentsKit/Tests/**/*', 'Packages/AgentsKit/Plugins/**/*') }}
-
-      - name: Prune old AgentsKit caches for this ref
-        if: ${{ always() && steps.build-agentskit.outcome == 'success' && steps.agentskit-cache.outputs.cache-hit != 'true' }}
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: bash scripts/prune-ci-caches.sh macos-xcode-27-agentskit- 'macos-xcode-27-agentskit-${{ steps.toolchain.outputs.fingerprint }}-${{ hashFiles('Packages/AgentsKit/Package.swift', 'Packages/AgentsKit/Package.resolved', 'Packages/AgentsKit/Sources/**/*', 'Packages/AgentsKit/Tests/**/*', 'Packages/AgentsKit/Plugins/**/*') }}' "$GITHUB_REF"
 
       # Agents Host's build makes Web/dist, which is not checked in (#473), with the pinned
       # Node; without it the app would build with no web remote.
@@ -337,6 +235,173 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: bash scripts/prune-ci-caches.sh macos-xcode-27-derived- 'macos-xcode-27-derived-${{ steps.keys.outputs.base }}-${{ steps.keys.outputs.xcode }}' "$GITHUB_REF"
+
+  # AgentsKit, CodeText and agentsd: built and tested with SwiftPM, beside `apps`.
+  swift:
+    needs: select
+    # Starts only when the selector chose a suite for it, and whenever the selection failed.
+    if: ${{ always() && !cancelled() && (needs.select.result != 'success' || needs.select.outputs.agentskit != 'skip' || needs.select.outputs.codetext != 'skip') }}
+    runs-on: xcode-27
+    # Long enough for the package builds, CodeText and the whole AgentsKit suite. It was
+    # ten minutes, and a run the selector chose as `full` takes longer than that on this
+    # runner: the job was cancelled at the cap with every test before it passing, on
+    # main as well as on a branch (run 36642820605). The selection is what keeps this
+    # small; the cap has to fit the run it lets through. "Time left for the AgentsKit
+    # tests" below reads the same number as JOB_MINUTES; change both together.
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      actions: write
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_27.0.app/Contents/Developer
+    steps:
+      # For the AgentsKit tests' budget below.
+      - name: Start the clock
+        id: clock
+        run: echo "start=$(date +%s)" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@v6
+        with:
+          # The selector compares against the PR base or the previous push.
+          fetch-depth: 0
+
+      - name: Select test suites for changed files
+        id: test-selection
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          base="$BASE_SHA"
+          if [[ -z "$base" && -n "$DEFAULT_BRANCH" ]]; then
+            base=$(git merge-base "origin/$DEFAULT_BRANCH" HEAD || true)
+          fi
+          bash scripts/select-test-suites.sh "$base" >> "$GITHUB_OUTPUT"
+
+      # A build graph is only good for the toolchain that wrote it. SwiftPM bakes
+      # absolute SDK and framework paths into the objects it produces, and the runner's
+      # Xcode moves under it: an image update left every restored cache pointing at an
+      # SDK that was no longer there, the objects were considered up to date, and the
+      # link failed with every AgentsKitCore symbol undefined. This is part of every
+      # cache key below, so a new image is a miss — a cold build that works — rather
+      # than a restore nobody can use. Both facts come from the image and are true
+      # before anything is restored, which is why this runs here and not in Tools.
+      - name: Toolchain fingerprint
+        id: toolchain
+        run: |
+          version="$(xcodebuild -version | tr -dc '0-9A-Za-z.')"
+          sdk="$(xcrun --sdk macosx --show-sdk-build-version)"
+          echo "fingerprint=${version}-sdk${sdk}" >> "$GITHUB_OUTPUT"
+
+      # The Xcode and SwiftPM keys end in a hash of the sources their builds read (#269).
+      # They used to hash only project.yml and the package manifests, so a change to the
+      # sources still found an exact key: the old build was restored, the save after it
+      # was skipped as a hit, and every run built on that one stale graph until someone
+      # deleted the cache by hand. Now new sources miss their exact key, start warm from
+      # the nearest restore-key, and save a key of their own. `git ls-tree` names each
+      # folder by its tree hash, so this costs nothing and changes exactly when a file
+      # under one of them does. (AgentsKit's key already hashes its sources.)
+      - name: Cache keys
+        id: keys
+        env:
+          MANIFESTS: ${{ hashFiles('project.yml', 'Daemon/Package.swift', 'Packages/AgentsKit/Package.swift', 'Packages/AgentsKit/Package.resolved', 'Packages/CodeText/Package.swift', 'Packages/CodeText/Package.resolved') }}
+        run: |
+          xcode="$(git ls-tree HEAD -- project.yml App Daemon Host Packages Remote RemoteNotify RemoteWidget Shared Web | git hash-object --stdin)"
+          swiftpm="$(git ls-tree HEAD -- Daemon Packages/AgentsKit Packages/CodeText | git hash-object --stdin)"
+          echo "base=${{ steps.toolchain.outputs.fingerprint }}-${MANIFESTS}" >> "$GITHUB_OUTPUT"
+          echo "xcode=${xcode}" >> "$GITHUB_OUTPUT"
+          echo "swiftpm=${swiftpm}" >> "$GITHUB_OUTPUT"
+          agentskit="$(git ls-tree HEAD -- Packages/AgentsKit/Package.swift Packages/AgentsKit/Sources | git hash-object --stdin)"
+          echo "agentskit=${agentskit}" >> "$GITHUB_OUTPUT"
+
+      - name: Restore SwiftPM build cache
+        id: swiftpm-cache
+        uses: actions/cache/restore@v5
+        with:
+          path: |
+            Daemon/.build
+            Packages/CodeText/.build
+          key: macos-xcode-27-swiftpm-${{ steps.keys.outputs.base }}-${{ steps.keys.outputs.swiftpm }}
+          restore-keys: |
+            macos-xcode-27-swiftpm-${{ steps.keys.outputs.base }}-
+            macos-xcode-27-swiftpm-${{ steps.toolchain.outputs.fingerprint }}-
+
+      - name: Restore AgentsKit build cache
+        id: agentskit-cache
+        uses: actions/cache/restore@v5
+        with:
+          path: Packages/AgentsKit/.build
+          key: macos-xcode-27-agentskit-${{ steps.toolchain.outputs.fingerprint }}-${{ hashFiles('Packages/AgentsKit/Package.swift', 'Packages/AgentsKit/Package.resolved', 'Packages/AgentsKit/Sources/**/*', 'Packages/AgentsKit/Tests/**/*', 'Packages/AgentsKit/Plugins/**/*') }}
+          restore-keys: |
+            macos-xcode-27-agentskit-${{ steps.toolchain.outputs.fingerprint }}-${{ hashFiles('Packages/AgentsKit/Package.swift', 'Packages/AgentsKit/Package.resolved', 'Packages/AgentsKit/Sources/**/*', 'Packages/AgentsKit/Tests/**/*', 'Packages/AgentsKit/Plugins/**/*') }}-
+            macos-xcode-27-agentskit-${{ steps.toolchain.outputs.fingerprint }}-
+
+      # The same stale graph as the Xcode cache's above (#684), in SwiftPM's build: on
+      # 2026-10-13 every pull request that changed AgentsKit (#882, #886, #887, #889)
+      # restored an older .build, SwiftPM recompiled AgentsKit but not AgentsKitCore, the
+      # link failed on undefined AgentsKitCore symbols, and the clean retry rebuilt the
+      # dependencies too: 6–11 minutes for a step that takes under one when warm. The save
+      # records which AgentsKit sources the graph was built from; when they differ, only the
+      # package's own targets go, and swift-nio, swift-nio-ssl and SwiftTerm stay warm.
+      - name: Drop a stale AgentsKit from the AgentsKit build cache
+        if: steps.agentskit-cache.outputs.cache-matched-key != '' && steps.agentskit-cache.outputs.cache-hit != 'true'
+        env:
+          AGENTSKIT: ${{ steps.keys.outputs.agentskit }}
+        run: bash scripts/drop-stale-agentskit.sh Packages/AgentsKit/.build "$AGENTSKIT"
+
+      # agentsd links AgentsKit as a local package, so Daemon/.build holds the same stale
+      # graph. On 2026-10-13 (#897) runs 38334579377 and 38343467490 restored it, the
+      # agentsd link failed on undefined AgentsKitCore symbols, and the clean retry took
+      # 4–6 minutes: with a slow test run after it, the job reached its 30-minute cap.
+      - name: Drop a stale AgentsKit from the SwiftPM build cache
+        if: steps.swiftpm-cache.outputs.cache-matched-key != '' && steps.swiftpm-cache.outputs.cache-hit != 'true'
+        env:
+          AGENTSKIT: ${{ steps.keys.outputs.agentskit }}
+        run: bash scripts/drop-stale-agentskit.sh Daemon/.build "$AGENTSKIT"
+
+      - name: Tools
+        run: |
+          xcodebuild -version
+          # The runner's Xcode comes without it, and AgentsKit's build compiles Metal.
+          xcodebuild -downloadComponent MetalToolchain
+
+      # SwiftPM's build graph records the random cryptex mount name for MetalToolchain,
+      # and every absolute path of the Xcode and SDK that produced it. Rewrite the mount
+      # when the component version matches; drop the graph when it names an Xcode or SDK
+      # this runner does not have, which is what an image update looks like from here.
+      - name: Normalize AgentsKit build cache
+        if: steps.test-selection.outputs.agentskit != 'skip'
+        run: python3 scripts/normalize-metaltoolchain-cache.py Packages/AgentsKit/.build
+      # Every build below that starts from a restored cache gets one more go from clean
+      # when it fails (scripts/ci-clean-retry.sh says why). The step only fails, and so
+      # is only kept from the cache, when the clean build fails as well.
+      - name: Build AgentsKit tests
+        id: build-agentskit
+        if: steps.test-selection.outputs.agentskit != 'skip'
+        env:
+          RESTORED: ${{ steps.agentskit-cache.outputs.cache-matched-key }}
+        run: |
+          source scripts/ci-clean-retry.sh
+          clean_retry "$RESTORED" Packages/AgentsKit/.build -- \
+            swift build --build-tests --package-path Packages/AgentsKit
+
+      - name: Record the AgentsKit sources this build was made from
+        if: ${{ always() && steps.agentskit-cache.outputs.cache-hit != 'true' && steps.build-agentskit.outcome == 'success' }}
+        run: echo "${{ steps.keys.outputs.agentskit }}" > Packages/AgentsKit/.build/agentskit-sources
+
+      # Only completed builds are saved. Cancellation must not persist a partial cache
+      # that can fill runner disk or poison a later restore.
+      - name: Save AgentsKit build cache
+        if: ${{ always() && steps.agentskit-cache.outputs.cache-hit != 'true' && steps.build-agentskit.outcome == 'success' }}
+        uses: actions/cache/save@v5
+        with:
+          path: Packages/AgentsKit/.build
+          key: macos-xcode-27-agentskit-${{ steps.toolchain.outputs.fingerprint }}-${{ hashFiles('Packages/AgentsKit/Package.swift', 'Packages/AgentsKit/Package.resolved', 'Packages/AgentsKit/Sources/**/*', 'Packages/AgentsKit/Tests/**/*', 'Packages/AgentsKit/Plugins/**/*') }}
+
+      - name: Prune old AgentsKit caches for this ref
+        if: ${{ always() && steps.build-agentskit.outcome == 'success' && steps.agentskit-cache.outputs.cache-hit != 'true' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash scripts/prune-ci-caches.sh macos-xcode-27-agentskit- 'macos-xcode-27-agentskit-${{ steps.toolchain.outputs.fingerprint }}-${{ hashFiles('Packages/AgentsKit/Package.swift', 'Packages/AgentsKit/Package.resolved', 'Packages/AgentsKit/Sources/**/*', 'Packages/AgentsKit/Tests/**/*', 'Packages/AgentsKit/Plugins/**/*') }}' "$GITHUB_REF"
 
       # ServerLinkTests runs this agentsd, and builds it itself when it is missing:
       # a whole Swift build inside the test run, holding a test thread for minutes,
@@ -460,7 +525,28 @@ jobs:
           swift build --build-tests --package-path Packages/AgentsKit
           run_agentskit_tests
 
-  # The control plane's package, in a job of its own so it never presses on the test job's
+  # The check main requires. It used to be the whole macOS job; now it reads the two that
+  # replaced it. A job that failed or was cancelled (at its cap, #897) makes this red; a job
+  # skipped for want of work passes, as a skipped `test` did. `always()` without
+  # `!cancelled()`: a skipped required check reads as a pass, so a cancelled run must end
+  # here red rather than skip it.
+  test:
+    needs: [select, apps, swift]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Both macOS jobs passed or had nothing to do
+        env:
+          APPS: ${{ needs.apps.result }}
+          SWIFT: ${{ needs.swift.result }}
+        run: |
+          echo "apps: $APPS, swift: $SWIFT"
+          for result in "$APPS" "$SWIFT"; do
+            [[ $result == success || $result == skipped ]] || exit 1
+          done
+
+  # The control plane's package, in a job of its own so it never presses on the swift job's
   # time cap. ControlPlane links AgentsKit, so it runs on changes to either. (The web types'
   # freshness moved to the `go` job with Packages/Wire, #1135.)
   packages:
