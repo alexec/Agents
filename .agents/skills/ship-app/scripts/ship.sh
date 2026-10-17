@@ -27,6 +27,8 @@
 #   ship.sh --no-mac        skip the Mac (the default)
 #   ship.sh --device UDID   only this device (repeatable)
 #   ship.sh --now           relaunch the Mac after 3s instead of 20s
+#   ship.sh --list-devices  say which devices it would install on, and why it skips any;
+#                           nothing is built or installed
 #   ship.sh --build-only    build in this checkout (a worktree's copy builds the worktree),
 #                           check the products are optimised, and stop: nothing is installed
 set -u
@@ -126,7 +128,7 @@ if [[ ${1:-} == --restart ]]; then
   exit
 fi
 
-BUILD=1 DEVICES=1 MAC=0 DELAY=20 LINUX=1 BUILD_ONLY=0
+BUILD=1 DEVICES=1 MAC=0 DELAY=20 LINUX=1 BUILD_ONLY=0 LIST_DEVICES=0
 typeset -a ONLY
 while (( $# )); do
   case $1 in
@@ -138,12 +140,40 @@ while (( $# )); do
     --device) ONLY+=$2; shift ;;
     --now) DELAY=3 ;;
     --build-only) BUILD_ONLY=1 ;;
+    --list-devices) LIST_DEVICES=1 ;;
     *) echo "unknown option $1" >&2; exit 2 ;;
   esac
   shift
 done
 
 HERE=${0:A:h}
+
+# Sets UDIDS to the devices to install on, from devicectl's list, and says for each device
+# why it is installed on or skipped (#1310): devices.py, so a device with no
+# hardwareProperties is not dropped without a word.
+choose_devices() { # json file
+  local plan line action udid rest
+  UDIDS=()
+  rm -f $1
+  xcrun devicectl list devices --json-output $1 >/dev/null 2>&1
+  [[ -s $1 ]] || { echo "devicectl gave no device list; see: xcrun devicectl list devices" >&2; return 1; }
+  plan=$(python3 "$HERE/devices.py" $1) || return 1
+  for line in ${(f)plan}; do
+    read -r action udid rest <<< $line
+    case $action in
+      install) UDIDS+=$udid; echo "will install on $udid $rest" ;;
+      skip) echo "skipping $udid $rest" ;;
+    esac
+  done
+}
+if (( LIST_DEVICES )); then
+  LISTING=$(mktemp -d -t ship-devices)/devices.json
+  choose_devices $LISTING || exit 1
+  rm -rf ${LISTING:h}
+  (( ${#UDIDS} )) || echo "no paired iPhone/iPad to install on"
+  exit 0
+fi
+
 # The main checkout, wherever this script is run from (a worktree's copy included).
 REPO=$(git -C "$HERE" rev-parse --path-format=absolute --git-common-dir)
 REPO=${REPO:h}
@@ -243,16 +273,7 @@ if (( DEVICES )); then
   if (( ${#ONLY} )); then
     UDIDS=($ONLY)
   else
-    xcrun devicectl list devices --json-output $LOGS/devices.json >/dev/null 2>&1
-    UDIDS=($(python3 - $LOGS/devices.json <<'PY'
-import json, sys
-for d in json.load(open(sys.argv[1]))["result"]["devices"]:
-    hw = d.get("hardwareProperties", {})
-    if hw.get("reality") == "physical" and d.get("connectionProperties", {}).get("pairingState") == "paired" \
-       and hw.get("platform") == "iOS":
-        print(hw["udid"])
-PY
-))
+    choose_devices $LOGS/devices.json || exit 1
   fi
   (( ${#UDIDS} )) || echo "no paired iPhone/iPad visible; skipping devices"
   # One installer at a time across agents: a directory lock, stale after 10 minutes.
