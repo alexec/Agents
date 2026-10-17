@@ -683,7 +683,11 @@ func (d *Daemon) dress(s *wire.ProjectSummary) {
 	}
 	s.GuardedChanges = d.guardedChanges(folder)
 	for _, c := range s.GuardedChanges {
-		s.Approvals = append(s.Approvals, fileApproval(c))
+		if _, ok := workflowIDInPath(c.Path); ok {
+			s.Approvals = append(s.Approvals, d.workflowApproval(folder, c))
+		} else {
+			s.Approvals = append(s.Approvals, fileApproval(c))
+		}
 	}
 	s.Approvals = append(s.Approvals, d.archiveApprovals(folder)...)
 	if m, err := d.approvedConfig(folder); err == nil {
