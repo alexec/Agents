@@ -60,6 +60,7 @@ func start(t *testing.T, root string) (*Daemon, *conn) {
 	c := newConn()
 	go d.Accept(c)
 	t.Cleanup(func() { close(c.in) })
+	t.Cleanup(d.stopProjectWatches)
 	// A stopped runtime's turn still records how it ended: wait for that before the
 	// root's TempDir goes, or the removal races a write into it.
 	t.Cleanup(func() {

@@ -63,6 +63,7 @@ type Daemon struct {
 	installBook
 	guardedStateHolder
 	macState
+	projectWatchState
 	// SettingsDir is the person's settings on this host (StoreLocations.personalSettings):
 	// <root>/settings, or $HOME/.agents/settings for a server, as the Swift host's --serve.
 	SettingsDir string
@@ -94,6 +95,11 @@ func New(ctx context.Context, root string) (*Daemon, error) {
 	d.checkEveryQueue()
 	d.restoreRuns()
 	safe.Go("workflow clock", d.workflowClock)
+	// Each project's one watch (#173), which the first workflow scan starts too.
+	d.kickProjectWatches()
+	if done := ctx.Done(); done != nil {
+		safe.Go("project watches end", func() { <-done; d.stopProjectWatches() })
+	}
 	d.checkMilestonesSoon()
 	d.watchDisk()
 	return d, nil
@@ -165,6 +171,7 @@ func (d *Daemon) Shutdown() {
 	d.allowMu.Unlock()
 	d.stopEventWaits()
 	d.stopShells()
+	d.stopProjectWatches()
 	d.stopSignInRelays()
 	d.waitForMilestones()
 }

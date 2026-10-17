@@ -241,6 +241,8 @@ func (d *Daemon) scanLocked() {
 	d.workflowFiles = files
 	// A server's event a workflow names, or no longer does (#383).
 	d.kickMCPEvents()
+	// A project added, archived or gone since: the watches follow it.
+	d.kickProjectWatches()
 	// A workflow made here can earn the first workflow (#984).
 	defer d.checkMilestonesSoon()
 	r := d.recordsLocked()
