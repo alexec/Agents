@@ -1,6 +1,6 @@
 module github.com/alexec/agents/Go
 
-go 1.26.8
+go 1.26.9
 
 require (
 	github.com/coder/acp-go-sdk v0.13.5
