@@ -135,6 +135,35 @@ func (d *Daemon) register() {
 
 // projects is the union of every folder an agent is in and every project kept in
 // projects.json (DaemonCore.allProjects), newest activity first.
+// projectFolders is every folder projects(false) lists, undressed: what a caller holding
+// workflowMu may ask for, since dressing a summary reads the workflows (#1322).
+func (d *Daemon) projectFolders() []string {
+	seen := map[string]bool{}
+	var out []string
+	add := func(f string) {
+		if !seen[f] {
+			seen[f] = true
+			out = append(out, f)
+		}
+	}
+	archived := map[string]bool{}
+	for _, p := range d.Store.Projects() {
+		f := store.FolderPath(p.Folder)
+		if p.ArchivedAt != nil {
+			archived[f] = true
+			continue
+		}
+		add(f)
+	}
+	for _, a := range d.Store.Agents() {
+		if f := projectFolder(&a); !archived[f] && !seen[f] {
+			// As summary names a folder with no record: its links resolved.
+			add(store.FolderPath(store.FolderURL(f)))
+		}
+	}
+	return out
+}
+
 func (d *Daemon) projects(includeArchived bool) []wire.ProjectSummary {
 	records := map[string]wire.Project{}
 	for _, p := range d.Store.Projects() {
