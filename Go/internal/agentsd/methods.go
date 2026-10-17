@@ -35,6 +35,7 @@ func (d *Daemon) register() {
 	d.registerAllowances()
 	d.registerMCP()
 	d.registerOptions()
+	d.registerInstall()
 	d.registerSandbox()
 	d.registerRuntimeSessions()
 	d.registerRuntimeAuth()

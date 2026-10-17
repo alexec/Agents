@@ -1,0 +1,192 @@
+package agentsd
+
+import (
+	"archive/tar"
+	"bytes"
+	"compress/gzip"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/alexec/agents/Go/wire"
+)
+
+// tarGz makes a .tar.gz of files, each name to its text; a name ending in * is executable.
+func tarGz(t *testing.T, files map[string]string) []byte {
+	var b bytes.Buffer
+	z := gzip.NewWriter(&b)
+	w := tar.NewWriter(z)
+	for name, text := range files {
+		mode := int64(0o644)
+		if strings.HasSuffix(name, "*") {
+			name, mode = strings.TrimSuffix(name, "*"), 0o755
+		}
+		w.WriteHeader(&tar.Header{Name: name, Mode: mode, Size: int64(len(text)), Typeflag: tar.TypeReg})
+		w.Write([]byte(text))
+	}
+	w.Close()
+	z.Close()
+	return b.Bytes()
+}
+
+func sha(b []byte) string { s := sha256.Sum256(b); return hex.EncodeToString(s[:]) }
+
+func TestTheBundlesToolsetsLoad(t *testing.T) {
+	ts := loadToolsets("../../../App/Resources/toolsets")
+	for _, id := range []string{"claude", "codex", "gemini", "antigravity", "opencode"} {
+		if ts[id] == nil || len(ts[id].id) != 16 {
+			t.Fatalf("%s: %+v", id, ts[id])
+		}
+	}
+	m, _ := os.ReadFile("../../../App/Resources/toolsets/claude/manifest.json")
+	l, _ := os.ReadFile("../../../App/Resources/toolsets/claude/package-lock.json")
+	if want := sha(append(m, l...))[:16]; ts["claude"].id != want {
+		t.Fatalf("claude's id %s, want %s", ts["claude"].id, want)
+	}
+	if ts["claude"].archive() || !ts["opencode"].archive() || ts["claude"].node == nil {
+		t.Fatal("kinds")
+	}
+	d := &Daemon{}
+	d.toolsets = ts
+	if d.recipe("claude") == nil || d.recipe("opencode") == nil || d.recipe("grok").Script == nil || d.recipe("nothing") != nil {
+		t.Fatal("recipes")
+	}
+}
+
+// A fake Node whose npm writes the package the lock names, and a fake vendor archive.
+func fakeVendors(t *testing.T) (dist *httptest.Server, bundle string) {
+	npm := `#!/bin/sh
+while [ $# -gt 0 ]; do [ "$1" = --prefix ] && p=$2; shift; done
+mkdir -p "$p/node_modules/@x/adapter/dist" && echo 'ok' > "$p/node_modules/@x/adapter/dist/index.js"
+`
+	node := tarGz(t, map[string]string{"node-v1/bin/npm*": npm, "node-v1/bin/node*": "#!/bin/sh\n"})
+	archive := tarGz(t, map[string]string{"opencode*": "#!/bin/sh\necho opencode\n"})
+	dist = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case strings.HasSuffix(r.URL.Path, ".tar.gz") && strings.Contains(r.URL.Path, "node-v1"):
+			w.Write(node)
+		case strings.HasSuffix(r.URL.Path, "/opencode.tar.gz"):
+			w.Write(archive)
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	t.Cleanup(dist.Close)
+	bundle = t.TempDir()
+	codex := filepath.Join(bundle, "codex")
+	os.MkdirAll(codex, 0o755)
+	os.WriteFile(filepath.Join(codex, "manifest.json"), []byte(`{"runtimeID":"codex","package":"@x/adapter","entry":"dist/index.js"}`), 0o644)
+	os.WriteFile(filepath.Join(codex, "package.json"), []byte(`{}`), 0o644)
+	os.WriteFile(filepath.Join(codex, "package-lock.json"), []byte(`{}`), 0o644)
+	pin, _ := json.Marshal(map[string]any{"version": "v1", "sha256": map[string]string{macArch(): sha(node)}})
+	os.WriteFile(filepath.Join(codex, "mac-node.json"), pin, 0o644)
+	oc := filepath.Join(bundle, "opencode")
+	os.MkdirAll(oc, 0o755)
+	m, _ := json.Marshal(map[string]any{"kind": "archive", "runtimeID": "opencode", "version": "1", "minFreeBytes": 1,
+		"platforms": map[string]any{macPlatform(): map[string]any{"url": dist.URL + "/opencode.tar.gz", "sha256": sha(archive),
+			"size": len(archive), "command": "opencode", "arguments": []string{"acp"}}}})
+	os.WriteFile(filepath.Join(oc, "manifest.json"), m, 0o644)
+	old := nodeDistURL
+	nodeDistURL = dist.URL + "/"
+	t.Cleanup(func() { nodeDistURL = old; macToolsHome = "" })
+	return dist, bundle
+}
+
+func waitInstalled(t *testing.T, c *conn, id string) wire.RuntimeStatus {
+	t.Helper()
+	deadline := time.After(20 * time.Second)
+	for {
+		select {
+		case line := <-c.out:
+			var m struct {
+				Method string             `json:"method"`
+				Params wire.RuntimeStatus `json:"params"`
+			}
+			json.Unmarshal([]byte(line), &m)
+			if m.Method == "runtime/changed" && m.Params.Runtime.ID == id && m.Params.Availability.Installing == nil {
+				return m.Params
+			}
+		case <-deadline:
+			t.Fatalf("%s: no ending", id)
+		}
+	}
+}
+
+func TestInstallTheAppsOwnCopies(t *testing.T) {
+	_, bundle := fakeVendors(t)
+	d, c := start(t, t.TempDir())
+	d.serveInstall(filepath.Join(t.TempDir(), "tools"), bundle)
+
+	for i, id := range []string{"codex", "opencode"} {
+		var s wire.RuntimeStatus
+		json.Unmarshal(c.call(t, i+1, "runtimes/install", map[string]any{"runtimeID": id}), &s)
+		if s.Availability.Installing == nil {
+			t.Fatalf("%s: answered %+v", id, s.Availability)
+		}
+		end := waitInstalled(t, c, id)
+		if end.Availability.Available == nil || !strings.HasSuffix(end.Availability.Available.Path, "/current/bin/"+runtimeByID(id).Executable) {
+			t.Fatalf("%s: %+v", id, end.Availability)
+		}
+		shim, _ := os.ReadFile(end.Availability.Available.Path)
+		if id == "codex" && !strings.Contains(string(shim), `"$d/lib/node_modules/@x/adapter/dist/index.js"`) ||
+			id == "opencode" && !strings.Contains(string(shim), `exec "$d/opencode" "acp" "$@"`) {
+			t.Fatalf("%s's shim: %s", id, shim)
+		}
+	}
+	// runtimes/list offers the button, and says the copy is the one the app carries.
+	var list []wire.RuntimeStatus
+	json.Unmarshal(c.call(t, 9, "runtimes/list", nil), &list)
+	for _, s := range list {
+		if s.Runtime.ID == "codex" && (s.Runtime.Install == nil || s.Availability.Available == nil || s.Outdated) {
+			t.Fatalf("codex listed as %+v", s)
+		}
+	}
+	// A device's connection may not install.
+	if _, err := d.installRuntime(&Client{conn: deviceConn{newConn()}}, "codex"); err == nil {
+		t.Fatal("a device installed")
+	}
+}
+
+type deviceConn struct{ *conn }
+
+func (deviceConn) Device() string { return "11111111-2222-3333-4444-555555555555" }
+
+func TestAnInstallThatFailsSaysWhy(t *testing.T) {
+	dist, bundle := fakeVendors(t)
+	// A pin that does not match.
+	os.WriteFile(filepath.Join(bundle, "codex", "mac-node.json"), []byte(`{"version":"v1","sha256":{"`+macArch()+`":"00"}}`), 0o644)
+	d, c := start(t, t.TempDir())
+	tools := filepath.Join(t.TempDir(), "tools")
+	d.serveInstall(tools, bundle)
+	c.call(t, 1, "runtimes/install", map[string]any{"runtimeID": "codex"})
+	end := waitInstalled(t, c, "codex")
+	if end.Availability.InstallFailed == nil || !strings.Contains(end.Availability.InstallFailed.Reason, "checksum") {
+		t.Fatalf("%+v", end.Availability)
+	}
+	if names, _ := os.ReadDir(filepath.Join(tools, "codex")); len(names) != 0 {
+		t.Fatalf("left behind: %v", names)
+	}
+	if err := runScript(dist.URL+"/nothing.sh", "sh", "Grok"); err == nil || !strings.Contains(err.Error(), "Grok’s installer failed") {
+		t.Fatalf("script: %v", err)
+	}
+	if e := c.callError(t, 2, "runtimes/install", map[string]any{"runtimeID": "nothing"}); e.Code != CodeRuntimeNotFound {
+		t.Fatalf("%+v", e)
+	}
+}
+
+func TestNPMProblems(t *testing.T) {
+	out := "npm error code E404\nnpm error 404 Not Found - GET https://registry/x\nnpm error A complete log of this run can be found in: /x\n"
+	if got := npmProblem(out, "Codex").Error(); got != "Installing Codex failed: 404 Not Found - GET https://registry/x" {
+		t.Fatal(got)
+	}
+	if got := npmProblem("npm ERR! code EAI_AGAIN\n", "Codex").Error(); !strings.Contains(got, "internet") {
+		t.Fatal(got)
+	}
+}
