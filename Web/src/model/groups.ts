@@ -51,6 +51,11 @@ export function showsUnread(agent: Agent): boolean {
   return agent.state === "finished" && agent.isUnread === true;
 }
 
+/** Agent.drawsUnread: the row's bold title (#1323), only in Done; the counts go by showsUnread. */
+export function drawsUnread(agent: Agent): boolean {
+  return showsUnread(agent) && groupOf(agent) === "finished";
+}
+
 /** Agent.needsAPerson: it asked for an answer. */
 export function needsAPerson(agent: Agent): boolean {
   return agent.state === "waitingOnUser"

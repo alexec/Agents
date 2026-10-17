@@ -93,7 +93,7 @@ The deltas are tracked by 30 issues:
 | Status shape and tint | `A/AgentList/AgentRow.swift:294-348` | The same shape: `R/Projects/AgentCard.swift:274-284` | Ported: `W/model/status.ts:44-92` | **same** |
 | Spoken status words | `StatusShape.words` (*Unread ·*, *Waiting for an allowance*) | `StatusShape.words(row:)`: `R/Projects/AgentCard.swift` | `W/model/status.ts` | **same** |
 | Coming back after a restart | Spinner and words: `A/AgentList/AgentRow.swift:60, 277` | `R/Projects/AgentCard.swift:68, 270` | Never: `isComingBack` not passed, `W/views/SessionRow.tsx:16` | **delta**: web #251 |
-| Unread mark (#70) | Dot, semibold: `A/AgentList/AgentRow.swift:76-83` | `R/Projects/AgentCard.swift:80-89` | `W/views/SessionRow.tsx:74-75` | **same** |
+| Unread mark (#70) | Semibold title (and a dot off the sidebar) only for a finished unread session in Done (`Agent.drawsUnread`, #1323); the sidebar's ring is the same read or unread: `A/AgentList/AgentRow.swift` | The same: `R/Sidebar/SidebarRows.swift`, `R/Projects/AgentCard.swift` | The same: `W/model/groups.ts` (`drawsUnread`), `W/views/SessionRow.tsx` | **same** (#1323) |
 | Report line, title owning its line (#68) | `A/AgentList/AgentRow.swift` | `R/Projects/AgentCard.swift` | `W/views/SessionRow.tsx:69-92` | **same** |
 | Started-by mark (workflow, agent) | `A/AgentList/AgentRow.swift:84-208` | Workflow and agent: `R/Projects/AgentCard.swift` | None | **delta**: web #251 |
 | Background line | `A/AgentList/AgentRow.swift` | `BackgroundWords.mark`: `R/Projects/AgentCard.swift` | `W/views/SessionRow.tsx:69-92` | **same** |

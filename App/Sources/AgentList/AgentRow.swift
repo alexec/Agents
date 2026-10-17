@@ -91,8 +91,8 @@ struct AgentRow: View {
                     // dot and a heavier title, both gone once it is opened, and the row
                     // where it was. Said as the title's value, not as a label over the
                     // row, which would stack on the Text's own (one element per row).
-                    // In the sidebar the mark says unread (#495); the dot is the page's.
-                    if agent.showsUnread, !isCompact {
+                    // In the sidebar the bold title alone says unread (#1323); the dot is the page's.
+                    if agent.drawsUnread, !isCompact {
                         UnreadDot()
                     }
                     if model.renaming == Renaming(id: agent.id) {
@@ -105,10 +105,10 @@ struct AgentRow: View {
                     TitleAndPlace {
                         Text(agent.title ?? "Untitled")
                             .appText(isCompact ? .supporting : .reading)
-                            .fontWeight(agent.showsUnread ? .semibold : .regular)
+                            .fontWeight(agent.drawsUnread ? .semibold : .regular)
                             .foregroundStyle(.primary)
                             .lineLimit(1)
-                            .accessibilityValue(agent.showsUnread ? "unread" : "")
+                            .accessibilityValue(agent.drawsUnread ? "unread" : "")
                         if let place {
                             Text(place)
                                 .appText(.fine)
@@ -370,13 +370,13 @@ private struct FoldCount: View {
 /// anyone vouched for the ending — are still said, in the tooltip and to a screen
 /// reader, rather than drawn.
 /// A session's mark in the sidebar (Alex, #495): what it wants, in four shapes — an
-/// orange hand when it needs the person, a spinner while it works, two rings when it
-/// finished unread, an empty ring once read; a numbered list while queued, an hourglass
+/// orange hand when it needs the person, a spinner while it works, an empty ring once
+/// done, read or not (#1323); a numbered list while queued, an hourglass
 /// while it waits and a pause mark once stopped (#630).
 /// An orange archive box when it asks to be archived, as it is listed under Needs You
 /// (#817). Archived keeps its `StatusIcon`.
 private struct SessionMark: View {
-    private enum Kind { case needsYou, working, queued, waiting, paused, unread, read, asksToArchive }
+    private enum Kind { case needsYou, working, queued, waiting, paused, done, asksToArchive }
     private let kind: Kind
 
     init?(agent: Agent, group: AgentGroup) {
@@ -385,7 +385,8 @@ private struct SessionMark: View {
         case .running: kind = .working
         // Asking to be archived (#584) is what the person has left to do with it.
         case .finished where agent.asksToArchive: kind = .asksToArchive
-        case .finished: kind = agent.showsUnread ? .unread : .read
+        // Read or unread, one ring (#1323): the bold title alone says unread.
+        case .finished: kind = .done
         case .stopped where agent.asksToArchive: kind = .asksToArchive
         // In the accent as the rest, not the grey `StatusIcon` (#630).
         // A queued helper waits for a free place, not on anything it asked for (#630).
@@ -412,9 +413,7 @@ private struct SessionMark: View {
                 Image(systemName: "zzz").foregroundStyle(Paper.accent)
             case .paused:
                 Image(systemName: "pause.circle").foregroundStyle(Paper.accent)
-            case .unread:
-                Image(systemName: "circle.inset.filled").foregroundStyle(Paper.accent)
-            case .read:
+            case .done:
                 Image(systemName: "circle").foregroundStyle(Paper.accent)
             case .asksToArchive:
                 Image(systemName: ArchiveRequestWords.symbol).tinted(.attention)
@@ -432,8 +431,7 @@ private struct SessionMark: View {
         case .queued: "Queued"
         case .waiting: "Waiting"
         case .paused: "Paused"
-        case .unread: "Unread"
-        case .read: "Done"
+        case .done: "Done"
         case .asksToArchive: ArchiveRequestWords.mark
         }
     }
