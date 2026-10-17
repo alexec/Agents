@@ -282,6 +282,9 @@ button.link {
   opacity: 0.85;
 }
 
+/* Help (#1327): a link to the docs site, drawn as the Settings button beside it. */
+.identity a.link { color: var(--accent); text-decoration: none; }
+.identity a.link:hover { text-decoration: underline; }
 .identity .confirm { display: flex; gap: 6px; }
 .identity .forget { display: flex; flex-direction: column; gap: 4px; }
 .identity .forget p { margin: 0; }
