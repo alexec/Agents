@@ -506,11 +506,17 @@ jobs:
           TEST_MODE: ${{ steps.test-selection.outputs.agentskit }}
           RESTORED: ${{ steps.agentskit-cache.outputs.cache-matched-key }}
         run: |
+          # At most three tests at a time, one per core (#1320). Unbounded, the full suite
+          # had thousands in flight on this three-core runner: their `eventually` loops
+          # took the CPU, trivial tests waited 60 s, and 189 to 331 failed in 14 to 23
+          # minutes. Capped at 3 locally it takes the same two minutes on a tenth of the CPU.
           run_agentskit_tests() {
             if [ "$TEST_MODE" = filter ]; then
-              swift test --skip-build --package-path Packages/AgentsKit --filter "$TEST_FILTER"
+              swift test --skip-build --package-path Packages/AgentsKit \
+                --experimental-maximum-parallelization-width 3 --filter "$TEST_FILTER"
             else
-              swift test --skip-build --package-path Packages/AgentsKit
+              swift test --skip-build --package-path Packages/AgentsKit \
+                --experimental-maximum-parallelization-width 3
             fi
           }
 
