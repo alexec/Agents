@@ -436,7 +436,7 @@ func (m *Methods) admitOnce(ctx context.Context, client records.ClientRecord) (b
 		now := records.Now()
 		known.LastSeen = &now
 		known.Name = client.Name
-		return renamed, m.records.SaveClient(ctx, *known)
+		return renamed, m.records.UpdateClient(ctx, *known)
 	}
 	if client.LastSeen == nil {
 		now := records.Now()
@@ -452,7 +452,7 @@ func (m *Methods) NoteEpoch(ctx context.Context, id controllink.Identity, epoch 
 	case 'c':
 		if c := m.records.Client(id.ID); c != nil && (c.KnownEpoch == nil || *c.KnownEpoch != epoch) {
 			c.KnownEpoch = &epoch
-			m.records.SaveClient(ctx, *c)
+			m.records.UpdateClient(ctx, *c)
 		}
 	case 'h':
 		if h := m.records.Host(id.ID); h != nil && (h.KnownEpoch == nil || *h.KnownEpoch != epoch) {

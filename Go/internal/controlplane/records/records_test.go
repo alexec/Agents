@@ -169,6 +169,37 @@ func TestForgettingAndPairingAgain(t *testing.T) {
 	}
 }
 
+// #1229: a change to a client read before it was forgotten, saved after, leaves it
+// forgotten: a connect noting its endpoints does not bring it back.
+func TestAForgottenClientStaysForgotten(t *testing.T) {
+	s := store.NewMemory()
+	r := New(s)
+	id := NewUUID()
+	r.SaveClient(ctx, ClientRecord{ID: id, Name: "Phone", Kind: KindIPhone, PublicKey: []byte{4}, Paired: Now()})
+	read := r.Client(id)
+	epoch := 0
+	read.KnownEpoch = &epoch
+	if err := r.ForgetClient(ctx, id); err != nil {
+		t.Fatal(err)
+	}
+	if err := r.UpdateClient(ctx, *read); err != nil {
+		t.Fatal(err)
+	}
+	other := New(s)
+	other.Load(ctx)
+	if r.Client(id) != nil || !r.WasForgotten(id) || other.Client(id) != nil || !other.WasForgotten(id) {
+		t.Fatal("brought back")
+	}
+	// A known one is changed.
+	id2 := NewUUID()
+	r.SaveClient(ctx, ClientRecord{ID: id2, Name: "Pad", Kind: KindIPhone, PublicKey: []byte{5}, Paired: Now()})
+	c := r.Client(id2)
+	c.Name = "iPad"
+	if err := r.UpdateClient(ctx, *c); err != nil || r.Client(id2).Name != "iPad" || r.Client(id2).Rev != 2 {
+		t.Fatalf("%v %+v", err, r.Client(id2))
+	}
+}
+
 // #171: a record that can't be decoded is neither known nor forgotten, is said once,
 // and a record held from before keeps being used.
 func TestAnUnreadableRecordIsNeitherKnownNorForgotten(t *testing.T) {
