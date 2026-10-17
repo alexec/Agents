@@ -61,6 +61,22 @@
       ],
       "additionalProperties": false
     },
+    "Admitted": {
+      "type": "object",
+      "description": "What either announce is answered with: who the new party now is.",
+      "properties": {
+        "client": {
+          "$ref": "#/definitions/UUID"
+        },
+        "host": {
+          "$ref": "#/definitions/HostID"
+        },
+        "grant": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
     "AdoptRequest": {
       "type": "object",
       "properties": {
@@ -378,6 +394,85 @@
       ],
       "x-fallback": "stopped",
       "description": "A state this build does not know reads as `stopped` (Agent's init(from:)), with endedReason `unrecognised`."
+    },
+    "AgentWorkspaces": {
+      "type": "object",
+      "description": "workspaces/forAgent: what list_workspaces shows an agent.",
+      "properties": {
+        "providers": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/AgentWorkspacesProvider"
+          }
+        }
+      },
+      "required": [
+        "providers"
+      ],
+      "additionalProperties": false
+    },
+    "AgentWorkspacesProvider": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/definitions/ProviderID"
+        },
+        "name": {
+          "type": "string"
+        },
+        "canMake": {
+          "type": "boolean"
+        },
+        "canDelete": {
+          "type": "boolean"
+        },
+        "options": {
+          "$ref": "#/definitions/JSONValue"
+        },
+        "workspaces": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/AgentWorkspacesWorkspace"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "canMake",
+        "canDelete",
+        "workspaces"
+      ],
+      "additionalProperties": false
+    },
+    "AgentWorkspacesWorkspace": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "state": {
+          "type": "string"
+        },
+        "host": {
+          "type": "string"
+        },
+        "hostState": {
+          "type": "string"
+        },
+        "cost": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "state"
+      ],
+      "additionalProperties": false
     },
     "AgentWorktree": {
       "type": "object",
@@ -1068,6 +1163,28 @@
       "required": [
         "needID"
       ],
+      "additionalProperties": false
+    },
+    "AttentionNeed": {
+      "type": "object",
+      "description": "attention/need, unsealed, on a host's channel 0 (R6): a need to offer, or `withdraw`, and the host's whole Needs you count (#1163).",
+      "properties": {
+        "need": {
+          "$ref": "#/definitions/Need"
+        },
+        "headline": {
+          "$ref": "#/definitions/Headline"
+        },
+        "buzz": {
+          "type": "boolean"
+        },
+        "withdraw": {
+          "$ref": "#/definitions/NeedID"
+        },
+        "waiting": {
+          "type": "integer"
+        }
+      },
       "additionalProperties": false
     },
     "AttentionNotification": {
@@ -2165,6 +2282,38 @@
         }
       ]
     },
+    "ChannelOpen": {
+      "type": "object",
+      "description": "What a channel on a host's uplink is opened as (ControlWire.ChannelOpen). `grant` is always `operator`, for an older host (#111).",
+      "properties": {
+        "grant": {
+          "type": "string"
+        },
+        "client": {
+          "type": "string"
+        },
+        "device": {
+          "$ref": "#/definitions/UUID"
+        },
+        "relayed": {
+          "type": "boolean"
+        },
+        "tunnel": {
+          "type": "string"
+        },
+        "tunnelRef": {
+          "type": "string"
+        },
+        "fanOut": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "grant",
+        "client"
+      ],
+      "additionalProperties": false
+    },
     "ChartHint": {
       "type": "object",
       "properties": {
@@ -2282,6 +2431,76 @@
         }
       ]
     },
+    "ClientAnnounce": {
+      "type": "object",
+      "description": "clients/announce, on a pairing connection.",
+      "properties": {
+        "id": {
+          "$ref": "#/definitions/UUID"
+        },
+        "publicKey": {
+          "$ref": "#/definitions/Base64"
+        },
+        "name": {
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/definitions/ClientKind"
+        }
+      },
+      "required": [
+        "id",
+        "publicKey",
+        "name",
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "ClientConnection": {
+      "type": "object",
+      "description": "One row of clients/connections: a client connected now, and how.",
+      "properties": {
+        "client": {
+          "$ref": "#/definitions/UUID"
+        },
+        "relayed": {
+          "type": "boolean"
+        },
+        "through": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "client",
+        "relayed"
+      ],
+      "additionalProperties": false
+    },
+    "ClientKind": {
+      "type": "string",
+      "enum": [
+        "mac",
+        "iPhone",
+        "iPad",
+        "unknown",
+        "browser"
+      ],
+      "x-fallback": "unknown",
+      "description": "ClientRecord.Kind: a kind a later build added reads as `unknown`."
+    },
+    "ClientPairingRequest": {
+      "type": "object",
+      "description": "clients/startPairing: `browser` for the web remote's code (071); a grant an older window sends is not read.",
+      "properties": {
+        "kind": {
+          "type": "string"
+        },
+        "grant": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
     "ClientPermissionMode": {
       "type": "string",
       "enum": [
@@ -2308,6 +2527,74 @@
         "cursor",
         "grok",
         "opencode"
+      ],
+      "additionalProperties": false
+    },
+    "ClientRecord": {
+      "type": "object",
+      "description": "A paired screen, as clients/list says it (ClientRecord). `grant` is always `operator`, for an older build (#111).",
+      "properties": {
+        "id": {
+          "$ref": "#/definitions/UUID"
+        },
+        "name": {
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/definitions/ClientKind"
+        },
+        "publicKey": {
+          "$ref": "#/definitions/Base64"
+        },
+        "grant": {
+          "type": "string"
+        },
+        "paired": {
+          "$ref": "#/definitions/WireDate"
+        },
+        "lastSeen": {
+          "$ref": "#/definitions/WireDate"
+        },
+        "mayNotify": {
+          "type": "boolean"
+        },
+        "owner": {
+          "type": "string"
+        },
+        "rev": {
+          "type": "integer"
+        },
+        "forgotten": {
+          "type": "boolean"
+        },
+        "forgottenAt": {
+          "$ref": "#/definitions/WireDate"
+        },
+        "knownEpoch": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "kind",
+        "publicKey",
+        "grant",
+        "paired",
+        "rev"
+      ],
+      "additionalProperties": false
+    },
+    "ClientRequest": {
+      "type": "object",
+      "description": "clients/forget.",
+      "properties": {
+        "client": {
+          "$ref": "#/definitions/UUID"
+        }
+      },
+      "required": [
+        "client"
       ],
       "additionalProperties": false
     },
@@ -2741,6 +3028,115 @@
       ],
       "additionalProperties": false
     },
+    "ControlAuth": {
+      "type": "object",
+      "description": "The peer's answer: {\"auth\":…} (ControlAuth.Auth). `kind` is mac, iphone, ipad, browser, host, relay or copy.",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "nonce": {
+          "type": "string"
+        },
+        "mac": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "for": {
+          "type": "string"
+        },
+        "epoch": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "nonce",
+        "mac",
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "ControlClientChanged": {
+      "type": "object",
+      "description": "control/clientChanged: a client paired, renamed, connected or went; nothing says list them all again.",
+      "properties": {
+        "client": {
+          "$ref": "#/definitions/UUID"
+        },
+        "removed": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "ControlCodeShown": {
+      "type": "object",
+      "description": "clients/startPairing, hosts/startEnroll: the code, until when it works, and for a host the one line to run on the server.",
+      "properties": {
+        "text": {
+          "type": "string"
+        },
+        "expires": {
+          "$ref": "#/definitions/WireDate"
+        },
+        "command": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "text",
+        "expires"
+      ],
+      "additionalProperties": false
+    },
+    "ControlEndpoint": {
+      "type": "object",
+      "description": "One place a control plane answers (R16).",
+      "properties": {
+        "url": {
+          "type": "string"
+        },
+        "pin": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "url"
+      ],
+      "additionalProperties": false
+    },
+    "ControlHello": {
+      "type": "object",
+      "description": "The control plane's first line of the exchange: {\"hello\":…} (ControlAuth.Hello).",
+      "properties": {
+        "v": {
+          "type": "integer"
+        },
+        "name": {
+          "type": "string"
+        },
+        "control": {
+          "type": "string"
+        },
+        "nonce": {
+          "type": "string"
+        },
+        "copy": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "v",
+        "name",
+        "control",
+        "nonce",
+        "copy"
+      ],
+      "additionalProperties": false
+    },
     "ControlHost": {
       "type": "object",
       "properties": {
@@ -2803,6 +3199,78 @@
         "version",
         "state",
         "reach"
+      ],
+      "additionalProperties": false
+    },
+    "ControlInstallProgress": {
+      "type": "object",
+      "description": "control/installProgress: a step of Add a Server.",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "step": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "step"
+      ],
+      "additionalProperties": false
+    },
+    "ControlMoved": {
+      "type": "object",
+      "description": "control/moved: where the control plane is now (T085).",
+      "properties": {
+        "url": {
+          "type": "string"
+        },
+        "pin": {
+          "type": "string"
+        },
+        "controlKey": {
+          "$ref": "#/definitions/Base64"
+        },
+        "name": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "url",
+        "controlKey",
+        "name"
+      ],
+      "additionalProperties": false
+    },
+    "ControlOK": {
+      "type": "object",
+      "description": "The control plane's proof back: {\"ok\":…} (ControlAuth.OK).",
+      "properties": {
+        "mac": {
+          "type": "string"
+        },
+        "grant": {
+          "type": "string"
+        },
+        "host": {
+          "$ref": "#/definitions/HostID"
+        },
+        "relayed": {
+          "type": "boolean"
+        },
+        "endpoints": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ControlEndpoint"
+          }
+        },
+        "epoch": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "mac"
       ],
       "additionalProperties": false
     },
@@ -3212,6 +3680,37 @@
       ],
       "additionalProperties": false
     },
+    "DetectedServer": {
+      "type": "object",
+      "description": "One host in the ssh config, and what hosts/detect did with it (#429).",
+      "properties": {
+        "alias": {
+          "type": "string"
+        },
+        "resolved": {
+          "type": "string"
+        },
+        "outcome": {
+          "type": "string",
+          "enum": [
+            "added",
+            "known",
+            "bastion",
+            "unreachable",
+            "failed"
+          ]
+        },
+        "detail": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "alias",
+        "resolved",
+        "outcome"
+      ],
+      "additionalProperties": false
+    },
     "DeviceBinding": {
       "type": "object",
       "properties": {
@@ -3430,6 +3929,33 @@
       ],
       "additionalProperties": false
     },
+    "DraftCheck": {
+      "type": "object",
+      "properties": {
+        "passed": {
+          "type": "boolean"
+        },
+        "workspaces": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/WorkspaceInfo"
+          }
+        },
+        "problem": {
+          "type": "string"
+        },
+        "ssh": {
+          "type": "string"
+        },
+        "noSSH": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "passed"
+      ],
+      "additionalProperties": false
+    },
     "DraftOptionsNotification": {
       "type": "object",
       "properties": {
@@ -3456,6 +3982,69 @@
         "draftID",
         "options",
         "commands"
+      ],
+      "additionalProperties": false
+    },
+    "DraftQuestion": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/definitions/UUID"
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "start",
+            "stop",
+            "check"
+          ]
+        },
+        "workspace": {
+          "type": "string"
+        },
+        "cost": {
+          "type": "string"
+        },
+        "text": {
+          "type": "string"
+        },
+        "yes": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "text",
+        "yes"
+      ],
+      "additionalProperties": false
+    },
+    "DraftStep": {
+      "type": "object",
+      "properties": {
+        "at": {
+          "$ref": "#/definitions/WireDate"
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "read",
+            "help",
+            "check",
+            "ask",
+            "prove",
+            "note"
+          ]
+        },
+        "text": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "at",
+        "kind",
+        "text"
       ],
       "additionalProperties": false
     },
@@ -4760,6 +5349,43 @@
       ],
       "additionalProperties": false
     },
+    "GitCredential": {
+      "type": "object",
+      "description": "A credential for one git command. Never printed, logged or kept.",
+      "properties": {
+        "username": {
+          "type": "string"
+        },
+        "password": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "username",
+        "password"
+      ],
+      "additionalProperties": false
+    },
+    "GitCredentialRequest": {
+      "type": "object",
+      "description": "git/credential, git/fill (#1122): only https, and only the server. `path` is the Go host's, unread by Swift.",
+      "properties": {
+        "protocol": {
+          "type": "string"
+        },
+        "host": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "protocol",
+        "host"
+      ],
+      "additionalProperties": false
+    },
     "GitView": {
       "anyOf": [
         {
@@ -4945,6 +5571,86 @@
         "added"
       ]
     },
+    "HandoverMember": {
+      "type": "object",
+      "description": "A member as a copy says it, for the one driving a handover (Handover.Status.Member).",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "knownEpoch": {
+          "type": "integer"
+        },
+        "version": {
+          "type": "string"
+        },
+        "online": {
+          "type": "boolean"
+        },
+        "lastSeen": {
+          "$ref": "#/definitions/WireDate"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "HandoverStatus": {
+      "type": "object",
+      "description": "handover/status: what a copy says of itself, for the one driving a handover to check before each step (R16).",
+      "properties": {
+        "phase": {
+          "type": "string",
+          "enum": [
+            "serving",
+            "receiving",
+            "frozen",
+            "forwarding"
+          ]
+        },
+        "controlKey": {
+          "$ref": "#/definitions/Base64"
+        },
+        "hasRecords": {
+          "type": "boolean"
+        },
+        "endpoints": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ControlEndpoint"
+          }
+        },
+        "epoch": {
+          "type": "integer"
+        },
+        "members": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/HandoverMember"
+          }
+        },
+        "forwardingUntil": {
+          "$ref": "#/definitions/WireDate"
+        }
+      },
+      "required": [
+        "phase",
+        "controlKey",
+        "hasRecords",
+        "endpoints",
+        "members"
+      ],
+      "additionalProperties": false
+    },
     "Headline": {
       "type": "object",
       "properties": {
@@ -4989,9 +5695,105 @@
       },
       "additionalProperties": false
     },
+    "HostAnnounce": {
+      "type": "object",
+      "description": "hosts/announce, on an enrolment connection.",
+      "properties": {
+        "publicKey": {
+          "$ref": "#/definitions/Base64"
+        },
+        "name": {
+          "type": "string"
+        },
+        "platform": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        },
+        "machineID": {
+          "type": "string"
+        },
+        "relay": {
+          "type": "boolean"
+        },
+        "implementation": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "publicKey",
+        "name",
+        "platform",
+        "version",
+        "machineID"
+      ],
+      "additionalProperties": false
+    },
+    "HostHello": {
+      "type": "object",
+      "description": "host/hello, on every connect of an uplink. `implementation` is `swift` or `go` (#1134).",
+      "properties": {
+        "host": {
+          "$ref": "#/definitions/HostID"
+        },
+        "version": {
+          "type": "string"
+        },
+        "platform": {
+          "type": "string"
+        },
+        "machineID": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "relay": {
+          "type": "boolean"
+        },
+        "implementation": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "version",
+        "platform",
+        "machineID"
+      ],
+      "additionalProperties": false
+    },
     "HostID": {
       "type": "string",
       "x-ts-type": "string & { readonly __brand: \"HostID\" }"
+    },
+    "HostInstall": {
+      "type": "object",
+      "description": "hosts/install (HostInstall.Request): a server over ssh, with its key, the fingerprint trusted, a tunnel, and `swift` for the Swift host.",
+      "properties": {
+        "destination": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "key": {
+          "type": "string"
+        },
+        "trust": {
+          "type": "string"
+        },
+        "tunnel": {
+          "type": "boolean"
+        },
+        "implementation": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "destination"
+      ],
+      "additionalProperties": false
     },
     "HostJoinStatus": {
       "type": "object",
@@ -5043,6 +5845,74 @@
       ],
       "additionalProperties": false
     },
+    "HostLink": {
+      "type": "object",
+      "description": "hosts/link.",
+      "properties": {
+        "host": {
+          "$ref": "#/definitions/HostID"
+        },
+        "provider": {
+          "$ref": "#/definitions/ProviderID"
+        },
+        "workspace": {
+          "type": "string"
+        },
+        "startWhenUsed": {
+          "type": "boolean"
+        },
+        "stopWhenIdleMinutes": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "host",
+        "provider",
+        "workspace"
+      ],
+      "additionalProperties": false
+    },
+    "HostProviderDraftCall": {
+      "type": "object",
+      "description": "host/providerDraft: a writing agent called one of the writer's tools (#858).",
+      "properties": {
+        "agentID": {
+          "$ref": "#/definitions/UUID"
+        },
+        "draft": {
+          "$ref": "#/definitions/UUID"
+        },
+        "tool": {
+          "type": "string"
+        },
+        "arguments": {
+          "$ref": "#/definitions/JSONValue"
+        }
+      },
+      "required": [
+        "agentID",
+        "draft",
+        "tool"
+      ],
+      "additionalProperties": false
+    },
+    "HostRelayRequest": {
+      "type": "object",
+      "description": "hosts/setRelay.",
+      "properties": {
+        "host": {
+          "$ref": "#/definitions/HostID"
+        },
+        "relay": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "host",
+        "relay"
+      ],
+      "additionalProperties": false
+    },
     "HostRequest": {
       "type": "object",
       "properties": {
@@ -5055,6 +5925,42 @@
       },
       "required": [
         "host"
+      ],
+      "additionalProperties": false
+    },
+    "HostSchedule": {
+      "type": "object",
+      "description": "A host's next scheduled workflow (#1004).",
+      "properties": {
+        "at": {
+          "$ref": "#/definitions/WireDate"
+        },
+        "workflow": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "HostStatus": {
+      "type": "object",
+      "description": "host/status on channel 0 (#691 US4): each agent working or waiting on a person, and the next scheduled workflow.",
+      "properties": {
+        "idle": {
+          "type": "boolean"
+        },
+        "running": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "schedule": {
+          "$ref": "#/definitions/HostSchedule"
+        }
+      },
+      "required": [
+        "idle",
+        "running"
       ],
       "additionalProperties": false
     },
@@ -5187,6 +6093,49 @@
       ],
       "additionalProperties": false
     },
+    "HostWorkspaceCall": {
+      "type": "object",
+      "description": "host/workspaces, for an agent there: who asked, for the log, and its call.",
+      "properties": {
+        "agent": {
+          "type": "string"
+        },
+        "method": {
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/definitions/JSONValue"
+        }
+      },
+      "required": [
+        "agent",
+        "method",
+        "params"
+      ],
+      "additionalProperties": false
+    },
+    "HostWorkspaceOptions": {
+      "type": "object",
+      "description": "hosts/setWorkspaceOptions. stopWhenIdleMinutes 0 turns it off.",
+      "properties": {
+        "host": {
+          "$ref": "#/definitions/HostID"
+        },
+        "startWhenUsed": {
+          "type": "boolean"
+        },
+        "stopWhenIdleMinutes": {
+          "type": "integer"
+        },
+        "startForSchedules": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "host"
+      ],
+      "additionalProperties": false
+    },
     "HostedMCPSnapshot": {
       "type": "object",
       "properties": {
@@ -5282,6 +6231,27 @@
       "x-swift-type": "JSONValue",
       "x-go-type": "JSONValue",
       "x-ts-type": "null | boolean | number | string | JSONValue[] | { [key: string]: JSONValue }"
+    },
+    "KeepRequest": {
+      "type": "object",
+      "description": "hosts/keep: a request for a stopped host, kept until it is up.",
+      "properties": {
+        "host": {
+          "$ref": "#/definitions/HostID"
+        },
+        "method": {
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/definitions/JSONValue"
+        }
+      },
+      "required": [
+        "host",
+        "method",
+        "params"
+      ],
+      "additionalProperties": false
     },
     "KeptDelivered": {
       "type": "object",
@@ -5518,6 +6488,31 @@
         "host",
         "from",
         "server",
+        "allowed"
+      ],
+      "additionalProperties": false
+    },
+    "LendSignIn": {
+      "type": "object",
+      "description": "hosts/lendSignIn (T091).",
+      "properties": {
+        "host": {
+          "$ref": "#/definitions/HostID"
+        },
+        "from": {
+          "$ref": "#/definitions/HostID"
+        },
+        "runtime": {
+          "type": "string"
+        },
+        "allowed": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "host",
+        "from",
+        "runtime",
         "allowed"
       ],
       "additionalProperties": false
@@ -7600,9 +8595,394 @@
       ],
       "additionalProperties": false
     },
+    "ProviderAdd": {
+      "type": "object",
+      "description": "providers/add and providers/update. `secrets` only ever goes to the control plane; `cli` is not kept; `draft` is the draft this accepts (#858).",
+      "properties": {
+        "id": {
+          "$ref": "#/definitions/ProviderID"
+        },
+        "name": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "commands",
+            "stdio",
+            "http"
+          ]
+        },
+        "command": {
+          "type": "string"
+        },
+        "args": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "url": {
+          "type": "string"
+        },
+        "headers": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "commands": {
+          "$ref": "#/definitions/JSONValue"
+        },
+        "map": {
+          "$ref": "#/definitions/JSONValue"
+        },
+        "secrets": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "cli": {
+          "type": "string"
+        },
+        "draft": {
+          "$ref": "#/definitions/UUID"
+        }
+      },
+      "required": [
+        "name",
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "ProviderCreate": {
+      "type": "object",
+      "description": "providers/create.",
+      "properties": {
+        "id": {
+          "$ref": "#/definitions/ProviderID"
+        },
+        "name": {
+          "type": "string"
+        },
+        "options": {
+          "$ref": "#/definitions/JSONValue"
+        },
+        "clones": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "name"
+      ],
+      "additionalProperties": false
+    },
+    "ProviderCreated": {
+      "type": "object",
+      "description": "What providers/create made.",
+      "properties": {
+        "workspace": {
+          "$ref": "#/definitions/WorkspaceInfo"
+        },
+        "joining": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "workspace",
+        "joining"
+      ],
+      "additionalProperties": false
+    },
+    "ProviderDraftAnswer": {
+      "type": "object",
+      "description": "providers/draftAnswer: yes or no to a question.",
+      "properties": {
+        "draft": {
+          "$ref": "#/definitions/UUID"
+        },
+        "question": {
+          "$ref": "#/definitions/UUID"
+        },
+        "yes": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "draft",
+        "question",
+        "yes"
+      ],
+      "additionalProperties": false
+    },
+    "ProviderDraftAnswered": {
+      "type": "object",
+      "description": "A draft answered with no agent: the server follows the contract, or a shipped map fits.",
+      "properties": {
+        "note": {
+          "type": "string"
+        },
+        "map": {
+          "$ref": "#/definitions/JSONValue"
+        },
+        "preset": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "note"
+      ],
+      "additionalProperties": false
+    },
+    "ProviderDraftRequest": {
+      "type": "object",
+      "description": "providers/draftCancel.",
+      "properties": {
+        "draft": {
+          "$ref": "#/definitions/UUID"
+        }
+      },
+      "required": [
+        "draft"
+      ],
+      "additionalProperties": false
+    },
+    "ProviderDraftStart": {
+      "type": "object",
+      "description": "providers/draftStart (#858).",
+      "properties": {
+        "form": {
+          "$ref": "#/definitions/ProviderAdd"
+        },
+        "secrets": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "provider": {
+          "$ref": "#/definitions/ProviderID"
+        },
+        "runtimeID": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "form",
+        "runtimeID"
+      ],
+      "additionalProperties": false
+    },
+    "ProviderDraftStarted": {
+      "type": "object",
+      "properties": {
+        "draft": {
+          "$ref": "#/definitions/UUID"
+        },
+        "answered": {
+          "$ref": "#/definitions/ProviderDraftAnswered"
+        }
+      },
+      "required": [
+        "draft"
+      ],
+      "additionalProperties": false
+    },
+    "ProviderDraftUpdate": {
+      "type": "object",
+      "description": "control/providerDraft: how a draft stands, to the client that started it.",
+      "properties": {
+        "draft": {
+          "$ref": "#/definitions/UUID"
+        },
+        "state": {
+          "type": "string"
+        },
+        "runtimeName": {
+          "type": "string"
+        },
+        "steps": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/DraftStep"
+          }
+        },
+        "cost": {
+          "type": "string"
+        },
+        "draftJSON": {
+          "$ref": "#/definitions/JSONValue"
+        },
+        "check": {
+          "$ref": "#/definitions/DraftCheck"
+        },
+        "question": {
+          "$ref": "#/definitions/DraftQuestion"
+        },
+        "note": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "draft",
+        "state",
+        "runtimeName",
+        "steps"
+      ],
+      "additionalProperties": false
+    },
     "ProviderID": {
       "type": "string",
       "x-ts-type": "string & { readonly __brand: \"ProviderID\" }"
+    },
+    "ProviderList": {
+      "type": "object",
+      "description": "providers/list and control/providersChanged.",
+      "properties": {
+        "providers": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ProviderSummary"
+          }
+        }
+      },
+      "required": [
+        "providers"
+      ],
+      "additionalProperties": false
+    },
+    "ProviderOptions": {
+      "type": "object",
+      "description": "providers/options: the New Workspace form, a JSON Schema.",
+      "properties": {
+        "schema": {
+          "$ref": "#/definitions/JSONValue"
+        }
+      },
+      "required": [
+        "schema"
+      ],
+      "additionalProperties": false
+    },
+    "ProviderRequest": {
+      "type": "object",
+      "description": "providers/remove, providers/refresh, providers/options.",
+      "properties": {
+        "id": {
+          "$ref": "#/definitions/ProviderID"
+        }
+      },
+      "additionalProperties": false
+    },
+    "ProviderRuntime": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "isDefault": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "isDefault"
+      ],
+      "additionalProperties": false
+    },
+    "ProviderRuntimes": {
+      "type": "object",
+      "description": "providers/runtimes: what may write, on which host, or why none.",
+      "properties": {
+        "runtimes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ProviderRuntime"
+          }
+        },
+        "host": {
+          "type": "string"
+        },
+        "why": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "runtimes"
+      ],
+      "additionalProperties": false
+    },
+    "ProviderSummary": {
+      "type": "object",
+      "description": "A provider for the Providers page, never its commands, headers or secrets' values.",
+      "properties": {
+        "id": {
+          "$ref": "#/definitions/ProviderID"
+        },
+        "name": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "secrets": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "boolean"
+          }
+        },
+        "capabilities": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "contract": {
+          "type": "integer"
+        },
+        "mapped": {
+          "type": "boolean"
+        },
+        "preset": {
+          "type": "string"
+        },
+        "workspaces": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/WorkspaceInfo"
+          }
+        },
+        "listedAt": {
+          "$ref": "#/definitions/WireDate"
+        },
+        "current": {
+          "type": "boolean"
+        },
+        "problem": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "kind",
+        "secrets",
+        "capabilities",
+        "contract",
+        "mapped",
+        "workspaces",
+        "current"
+      ],
+      "additionalProperties": false
     },
     "QueuedPrompt": {
       "type": "object",
@@ -7750,6 +9130,90 @@
       },
       "additionalProperties": false
     },
+    "RelayCount": {
+      "type": "object",
+      "description": "relay/count (#1163): one device's Needs you count, posted as a silent push.",
+      "properties": {
+        "device": {
+          "$ref": "#/definitions/UUID"
+        },
+        "waiting": {
+          "type": "integer"
+        },
+        "countedAt": {
+          "$ref": "#/definitions/WireDate"
+        }
+      },
+      "required": [
+        "device",
+        "waiting",
+        "countedAt"
+      ],
+      "additionalProperties": false
+    },
+    "RelayDelivery": {
+      "type": "object",
+      "description": "relay/deliver (T097): seal the headline to `publicKey` and post it for `device`; no headline is a withdrawal.",
+      "properties": {
+        "needID": {
+          "$ref": "#/definitions/NeedID"
+        },
+        "device": {
+          "$ref": "#/definitions/UUID"
+        },
+        "publicKey": {
+          "$ref": "#/definitions/Base64"
+        },
+        "headline": {
+          "$ref": "#/definitions/Headline"
+        },
+        "alert": {
+          "type": "boolean"
+        },
+        "waiting": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "needID",
+        "device",
+        "alert"
+      ],
+      "additionalProperties": false
+    },
+    "RelayDevice": {
+      "type": "object",
+      "description": "A device a relay host may carry for, with the key its frames are sealed to.",
+      "properties": {
+        "id": {
+          "$ref": "#/definitions/UUID"
+        },
+        "publicKey": {
+          "$ref": "#/definitions/Base64"
+        }
+      },
+      "required": [
+        "id",
+        "publicKey"
+      ],
+      "additionalProperties": false
+    },
+    "RelayDevices": {
+      "type": "object",
+      "description": "relay/devices: every device client.",
+      "properties": {
+        "devices": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/RelayDevice"
+          }
+        }
+      },
+      "required": [
+        "devices"
+      ],
+      "additionalProperties": false
+    },
     "RelayGrantReply": {
       "type": "object",
       "properties": {
@@ -7803,6 +9267,19 @@
         "socketPath",
         "caCertificate",
         "standIn"
+      ],
+      "additionalProperties": false
+    },
+    "RelaySwitch": {
+      "type": "object",
+      "description": "relay/switch (#824): the relay host that says it, on or off.",
+      "properties": {
+        "relay": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "relay"
       ],
       "additionalProperties": false
     },
@@ -8590,6 +10067,45 @@
         "checkedAt",
         "outdated"
       ],
+      "additionalProperties": false
+    },
+    "SSHHost": {
+      "type": "object",
+      "description": "A server ssh knows by a name, for Add a Server's server box (#610).",
+      "properties": {
+        "alias": {
+          "type": "string"
+        },
+        "resolved": {
+          "type": "string"
+        },
+        "throughBastion": {
+          "type": "boolean"
+        },
+        "isBastion": {
+          "type": "boolean"
+        },
+        "known": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "alias",
+        "resolved",
+        "throughBastion",
+        "isBastion",
+        "known"
+      ],
+      "additionalProperties": false
+    },
+    "SSHHostsRequest": {
+      "type": "object",
+      "description": "hosts/sshHosts (#610): with a destination, just that, as typed.",
+      "properties": {
+        "destination": {
+          "type": "string"
+        }
+      },
       "additionalProperties": false
     },
     "SandboxChoice": {
@@ -10868,6 +12384,23 @@
       ],
       "additionalProperties": false
     },
+    "TunnelOpen": {
+      "type": "object",
+      "description": "tunnel/open, from the borrowing host (T091).",
+      "properties": {
+        "runtime": {
+          "type": "string"
+        },
+        "ref": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "runtime",
+        "ref"
+      ],
+      "additionalProperties": false
+    },
     "TurnSummary": {
       "type": "object",
       "properties": {
@@ -12701,6 +14234,39 @@
           "$ref": "#/definitions/URLString"
         }
       },
+      "additionalProperties": false
+    },
+    "WorkspaceInfo": {
+      "type": "object",
+      "description": "One workspace, as its provider last listed it. `state` is running, starting, stopping, stopped or unknown.",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "state": {
+          "type": "string"
+        },
+        "ssh": {
+          "type": "string"
+        },
+        "tunnel": {
+          "type": "boolean"
+        },
+        "cost": {
+          "type": "string"
+        },
+        "host": {
+          "$ref": "#/definitions/HostID"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "state"
+      ],
       "additionalProperties": false
     },
     "WorktreeChoice": {

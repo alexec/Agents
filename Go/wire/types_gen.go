@@ -24,6 +24,13 @@ type ACPProviderInfo struct {
 	Configured *bool   `json:"configured,omitzero"`
 }
 
+// What either announce is answered with: who the new party now is.
+type Admitted struct {
+	Client *UUID   `json:"client,omitzero"`
+	Host   *HostID `json:"host,omitzero"`
+	Grant  *string `json:"grant,omitzero"`
+}
+
 type AdoptRequest struct {
 	RuntimeID string `json:"runtimeID"`
 	SessionID string `json:"sessionID"`
@@ -155,6 +162,29 @@ func (v *AgentState) UnmarshalJSON(b []byte) error {
 		*v = AgentStateStopped
 	}
 	return nil
+}
+
+// workspaces/forAgent: what list_workspaces shows an agent.
+type AgentWorkspaces struct {
+	Providers []AgentWorkspacesProvider `json:"providers"`
+}
+
+type AgentWorkspacesProvider struct {
+	ID         ProviderID                 `json:"id"`
+	Name       string                     `json:"name"`
+	CanMake    bool                       `json:"canMake"`
+	CanDelete  bool                       `json:"canDelete"`
+	Options    JSONValue                  `json:"options,omitzero"`
+	Workspaces []AgentWorkspacesWorkspace `json:"workspaces"`
+}
+
+type AgentWorkspacesWorkspace struct {
+	ID        string  `json:"id"`
+	Name      string  `json:"name"`
+	State     string  `json:"state"`
+	Host      *string `json:"host,omitzero"`
+	HostState *string `json:"hostState,omitzero"`
+	Cost      *string `json:"cost,omitzero"`
 }
 
 type AgentWorktree struct {
@@ -401,6 +431,15 @@ type Attachment struct {
 type AttentionDelivery struct {
 	NeedID NeedID   `json:"needID"`
 	To     *Surface `json:"to,omitzero"`
+}
+
+// attention/need, unsealed, on a host's channel 0 (R6): a need to offer, or `withdraw`, and the host's whole Needs you count (#1163).
+type AttentionNeed struct {
+	Need     *Need     `json:"need,omitzero"`
+	Headline *Headline `json:"headline,omitzero"`
+	Buzz     *bool     `json:"buzz,omitzero"`
+	Withdraw *NeedID   `json:"withdraw,omitzero"`
+	Waiting  *int64    `json:"waiting,omitzero"`
 }
 
 type AttentionNotification struct {
@@ -720,6 +759,17 @@ type ChangesUnavailableFailed struct {
 	Message string `json:"message"`
 }
 
+// What a channel on a host's uplink is opened as (ControlWire.ChannelOpen). `grant` is always `operator`, for an older host (#111).
+type ChannelOpen struct {
+	Grant     string  `json:"grant"`
+	Client    string  `json:"client"`
+	Device    *UUID   `json:"device,omitzero"`
+	Relayed   *bool   `json:"relayed,omitzero"`
+	Tunnel    *string `json:"tunnel,omitzero"`
+	TunnelRef *string `json:"tunnelRef,omitzero"`
+	FanOut    *bool   `json:"fanOut,omitzero"`
+}
+
 type ChartHint struct {
 	Mark  ChartMark `json:"mark"`
 	X     string    `json:"x"`
@@ -756,6 +806,53 @@ type ChatProjectStateFailed struct {
 	Message string `json:"message"`
 }
 
+// clients/announce, on a pairing connection.
+type ClientAnnounce struct {
+	ID        UUID       `json:"id"`
+	PublicKey Data       `json:"publicKey"`
+	Name      string     `json:"name"`
+	Kind      ClientKind `json:"kind"`
+}
+
+// One row of clients/connections: a client connected now, and how.
+type ClientConnection struct {
+	Client  UUID    `json:"client"`
+	Relayed bool    `json:"relayed"`
+	Through *string `json:"through,omitzero"`
+}
+
+// ClientRecord.Kind: a kind a later build added reads as `unknown`.
+type ClientKind string
+
+const (
+	ClientKindMac     ClientKind = "mac"
+	ClientKindIPhone  ClientKind = "iPhone"
+	ClientKindIPad    ClientKind = "iPad"
+	ClientKindUnknown ClientKind = "unknown"
+	ClientKindBrowser ClientKind = "browser"
+)
+
+// UnmarshalJSON reads a value this build does not know as "unknown".
+func (v *ClientKind) UnmarshalJSON(b []byte) error {
+	var s string
+	if err := json.Unmarshal(b, &s); err != nil {
+		return err
+	}
+	switch ClientKind(s) {
+	case ClientKindMac, ClientKindIPhone, ClientKindIPad, ClientKindUnknown, ClientKindBrowser:
+		*v = ClientKind(s)
+	default:
+		*v = ClientKindUnknown
+	}
+	return nil
+}
+
+// clients/startPairing: `browser` for the web remote's code (071); a grant an older window sends is not read.
+type ClientPairingRequest struct {
+	Kind  *string `json:"kind,omitzero"`
+	Grant *string `json:"grant,omitzero"`
+}
+
 // The older autoReview reads as alwaysApprove.
 type ClientPermissionMode string
 
@@ -783,6 +880,28 @@ type ClientPermissionSettings struct {
 	Cursor   ClientPermissionMode `json:"cursor"`
 	Grok     ClientPermissionMode `json:"grok"`
 	Opencode ClientPermissionMode `json:"opencode"`
+}
+
+// A paired screen, as clients/list says it (ClientRecord). `grant` is always `operator`, for an older build (#111).
+type ClientRecord struct {
+	ID          UUID       `json:"id"`
+	Name        string     `json:"name"`
+	Kind        ClientKind `json:"kind"`
+	PublicKey   Data       `json:"publicKey"`
+	Grant       string     `json:"grant"`
+	Paired      Date       `json:"paired"`
+	LastSeen    *Date      `json:"lastSeen,omitzero"`
+	MayNotify   *bool      `json:"mayNotify,omitzero"`
+	Owner       *string    `json:"owner,omitzero"`
+	Rev         int64      `json:"rev"`
+	Forgotten   *bool      `json:"forgotten,omitzero"`
+	ForgottenAt *Date      `json:"forgottenAt,omitzero"`
+	KnownEpoch  *int64     `json:"knownEpoch,omitzero"`
+}
+
+// clients/forget.
+type ClientRequest struct {
+	Client UUID `json:"client"`
 }
 
 type CloneNotification struct {
@@ -888,6 +1007,44 @@ type ContinueInProjectRequest struct {
 	RequestID   *UUID        `json:"requestID,omitzero"`
 }
 
+// The peer's answer: {"auth":…} (ControlAuth.Auth). `kind` is mac, iphone, ipad, browser, host, relay or copy.
+type ControlAuth struct {
+	ID    string  `json:"id"`
+	Nonce string  `json:"nonce"`
+	Mac   string  `json:"mac"`
+	Kind  string  `json:"kind"`
+	For   *string `json:"for,omitzero"`
+	Epoch *int64  `json:"epoch,omitzero"`
+}
+
+// control/clientChanged: a client paired, renamed, connected or went; nothing says list them all again.
+type ControlClientChanged struct {
+	Client  *UUID `json:"client,omitzero"`
+	Removed *bool `json:"removed,omitzero"`
+}
+
+// clients/startPairing, hosts/startEnroll: the code, until when it works, and for a host the one line to run on the server.
+type ControlCodeShown struct {
+	Text    string  `json:"text"`
+	Expires Date    `json:"expires"`
+	Command *string `json:"command,omitzero"`
+}
+
+// One place a control plane answers (R16).
+type ControlEndpoint struct {
+	URL string  `json:"url"`
+	Pin *string `json:"pin,omitzero"`
+}
+
+// The control plane's first line of the exchange: {"hello":…} (ControlAuth.Hello).
+type ControlHello struct {
+	V       int64  `json:"v"`
+	Name    string `json:"name"`
+	Control string `json:"control"`
+	Nonce   string `json:"nonce"`
+	Copy    string `json:"copy"`
+}
+
 type ControlHost struct {
 	ID             HostID            `json:"id"`
 	Name           string            `json:"name"`
@@ -903,6 +1060,30 @@ type ControlHost struct {
 	Tunnel         *HostTunnel       `json:"tunnel,omitzero"`
 	Workspace      *HostWorkspace    `json:"workspace,omitzero"`
 	Implementation *string           `json:"implementation,omitzero"`
+}
+
+// control/installProgress: a step of Add a Server.
+type ControlInstallProgress struct {
+	Name string `json:"name"`
+	Step string `json:"step"`
+}
+
+// control/moved: where the control plane is now (T085).
+type ControlMoved struct {
+	URL        string  `json:"url"`
+	Pin        *string `json:"pin,omitzero"`
+	ControlKey Data    `json:"controlKey"`
+	Name       string  `json:"name"`
+}
+
+// The control plane's proof back: {"ok":…} (ControlAuth.OK).
+type ControlOK struct {
+	Mac       string            `json:"mac"`
+	Grant     *string           `json:"grant,omitzero"`
+	Host      *HostID           `json:"host,omitzero"`
+	Relayed   *bool             `json:"relayed,omitzero"`
+	Endpoints []ControlEndpoint `json:"endpoints,omitzero"`
+	Epoch     *int64            `json:"epoch,omitzero"`
 }
 
 type ControlStatus struct {
@@ -1021,6 +1202,14 @@ type DestinationStateRequest struct {
 	Destination SkillDestination `json:"destination"`
 }
 
+// One host in the ssh config, and what hosts/detect did with it (#429).
+type DetectedServer struct {
+	Alias    string  `json:"alias"`
+	Resolved string  `json:"resolved"`
+	Outcome  string  `json:"outcome"`
+	Detail   *string `json:"detail,omitzero"`
+}
+
 // A paired device (021 US5), as devices.json keeps it.
 type Device struct {
 	ID          UUID       `json:"id"`
@@ -1134,11 +1323,34 @@ type DiskWorktree struct {
 	Partial bool   `json:"partial"`
 }
 
+type DraftCheck struct {
+	Passed     bool            `json:"passed"`
+	Workspaces []WorkspaceInfo `json:"workspaces,omitzero"`
+	Problem    *string         `json:"problem,omitzero"`
+	Ssh        *string         `json:"ssh,omitzero"`
+	NoSSH      *bool           `json:"noSSH,omitzero"`
+}
+
 type DraftOptionsNotification struct {
 	DraftID  UUID           `json:"draftID"`
 	Options  []ConfigOption `json:"options"`
 	Commands []SlashCommand `json:"commands"`
 	Failure  *string        `json:"failure,omitzero"`
+}
+
+type DraftQuestion struct {
+	ID        UUID    `json:"id"`
+	Kind      string  `json:"kind"`
+	Workspace *string `json:"workspace,omitzero"`
+	Cost      *string `json:"cost,omitzero"`
+	Text      string  `json:"text"`
+	Yes       string  `json:"yes"`
+}
+
+type DraftStep struct {
+	At   Date   `json:"at"`
+	Kind string `json:"kind"`
+	Text string `json:"text"`
 }
 
 type DropboxPutRequest struct {
@@ -1548,6 +1760,19 @@ type GitAsk struct {
 	From   HostID `json:"from"`
 }
 
+// A credential for one git command. Never printed, logged or kept.
+type GitCredential struct {
+	Username string `json:"username"`
+	Password string `json:"password"`
+}
+
+// git/credential, git/fill (#1122): only https, and only the server. `path` is the Go host's, unread by Swift.
+type GitCredentialRequest struct {
+	Protocol string  `json:"protocol"`
+	Host     string  `json:"host"`
+	Path     *string `json:"path,omitzero"`
+}
+
 // GitView (Model/AgentChanges.swift): `{ shared: { since } }`, `{ unavailable: … }` and so on.
 type GitView struct {
 	Owned          *GitViewOwned       `json:"owned,omitzero"`
@@ -1601,6 +1826,28 @@ const (
 	GuardedDiffLineKindAdded   GuardedDiffLineKind = "added"
 )
 
+// A member as a copy says it, for the one driving a handover (Handover.Status.Member).
+type HandoverMember struct {
+	ID         string  `json:"id"`
+	Name       string  `json:"name"`
+	Kind       string  `json:"kind"`
+	KnownEpoch *int64  `json:"knownEpoch,omitzero"`
+	Version    *string `json:"version,omitzero"`
+	Online     *bool   `json:"online,omitzero"`
+	LastSeen   *Date   `json:"lastSeen,omitzero"`
+}
+
+// handover/status: what a copy says of itself, for the one driving a handover to check before each step (R16).
+type HandoverStatus struct {
+	Phase           string            `json:"phase"`
+	ControlKey      Data              `json:"controlKey"`
+	HasRecords      bool              `json:"hasRecords"`
+	Endpoints       []ControlEndpoint `json:"endpoints"`
+	Epoch           *int64            `json:"epoch,omitzero"`
+	Members         []HandoverMember  `json:"members"`
+	ForwardingUntil *Date             `json:"forwardingUntil,omitzero"`
+}
+
 type Headline struct {
 	H1      string        `json:"h1"`
 	H2      string        `json:"h2"`
@@ -1615,7 +1862,39 @@ type HelperLimits struct {
 	AgentsMayArchive *bool  `json:"agentsMayArchive,omitzero"`
 }
 
+// hosts/announce, on an enrolment connection.
+type HostAnnounce struct {
+	PublicKey      Data    `json:"publicKey"`
+	Name           string  `json:"name"`
+	Platform       string  `json:"platform"`
+	Version        string  `json:"version"`
+	MachineID      string  `json:"machineID"`
+	Relay          *bool   `json:"relay,omitzero"`
+	Implementation *string `json:"implementation,omitzero"`
+}
+
+// host/hello, on every connect of an uplink. `implementation` is `swift` or `go` (#1134).
+type HostHello struct {
+	Host           *HostID `json:"host,omitzero"`
+	Version        string  `json:"version"`
+	Platform       string  `json:"platform"`
+	MachineID      string  `json:"machineID"`
+	Name           *string `json:"name,omitzero"`
+	Relay          *bool   `json:"relay,omitzero"`
+	Implementation *string `json:"implementation,omitzero"`
+}
+
 type HostID string
+
+// hosts/install (HostInstall.Request): a server over ssh, with its key, the fingerprint trusted, a tunnel, and `swift` for the Swift host.
+type HostInstall struct {
+	Destination    string  `json:"destination"`
+	Name           *string `json:"name,omitzero"`
+	Key            *string `json:"key,omitzero"`
+	Trust          *string `json:"trust,omitzero"`
+	Tunnel         *bool   `json:"tunnel,omitzero"`
+	Implementation *string `json:"implementation,omitzero"`
+}
 
 type HostJoinStatus struct {
 	Member    bool    `json:"member"`
@@ -1631,9 +1910,45 @@ type HostLastHeard struct {
 	HeardAt  *Date            `json:"heardAt,omitzero"`
 }
 
+// hosts/link.
+type HostLink struct {
+	Host                HostID     `json:"host"`
+	Provider            ProviderID `json:"provider"`
+	Workspace           string     `json:"workspace"`
+	StartWhenUsed       *bool      `json:"startWhenUsed,omitzero"`
+	StopWhenIdleMinutes *int64     `json:"stopWhenIdleMinutes,omitzero"`
+}
+
+// host/providerDraft: a writing agent called one of the writer's tools (#858).
+type HostProviderDraftCall struct {
+	AgentID   UUID      `json:"agentID"`
+	Draft     UUID      `json:"draft"`
+	Tool      string    `json:"tool"`
+	Arguments JSONValue `json:"arguments,omitzero"`
+}
+
+// hosts/setRelay.
+type HostRelayRequest struct {
+	Host  HostID `json:"host"`
+	Relay bool   `json:"relay"`
+}
+
 type HostRequest struct {
 	Host  HostID `json:"host"`
 	Purge *bool  `json:"purge,omitzero"`
+}
+
+// A host's next scheduled workflow (#1004).
+type HostSchedule struct {
+	At       *Date   `json:"at,omitzero"`
+	Workflow *string `json:"workflow,omitzero"`
+}
+
+// host/status on channel 0 (#691 US4): each agent working or waiting on a person, and the next scheduled workflow.
+type HostStatus struct {
+	Idle     bool          `json:"idle"`
+	Running  []string      `json:"running"`
+	Schedule *HostSchedule `json:"schedule,omitzero"`
 }
 
 type HostStop struct {
@@ -1676,6 +1991,21 @@ type HostWorkspace struct {
 	WakeAt              *Date      `json:"wakeAt,omitzero"`
 }
 
+// host/workspaces, for an agent there: who asked, for the log, and its call.
+type HostWorkspaceCall struct {
+	Agent  string    `json:"agent"`
+	Method string    `json:"method"`
+	Params JSONValue `json:"params"`
+}
+
+// hosts/setWorkspaceOptions. stopWhenIdleMinutes 0 turns it off.
+type HostWorkspaceOptions struct {
+	Host                HostID `json:"host"`
+	StartWhenUsed       *bool  `json:"startWhenUsed,omitzero"`
+	StopWhenIdleMinutes *int64 `json:"stopWhenIdleMinutes,omitzero"`
+	StartForSchedules   *bool  `json:"startForSchedules,omitzero"`
+}
+
 type HostedMCPSnapshot struct {
 	Servers []HostedMCPStatus `json:"servers"`
 	At      Date              `json:"at"`
@@ -1699,6 +2029,13 @@ type HostedMCPStatus struct {
 	LastError *string        `json:"lastError,omitzero"`
 	Restarts  int64          `json:"restarts"`
 	Users     int64          `json:"users"`
+}
+
+// hosts/keep: a request for a stopped host, kept until it is up.
+type KeepRequest struct {
+	Host   HostID    `json:"host"`
+	Method string    `json:"method"`
+	Params JSONValue `json:"params"`
 }
 
 type KeptDelivered struct {
@@ -1770,6 +2107,14 @@ type LendGit struct {
 	Host    HostID `json:"host"`
 	From    HostID `json:"from"`
 	Server  string `json:"server"`
+	Allowed bool   `json:"allowed"`
+}
+
+// hosts/lendSignIn (T091).
+type LendSignIn struct {
+	Host    HostID `json:"host"`
+	From    HostID `json:"from"`
+	Runtime string `json:"runtime"`
 	Allowed bool   `json:"allowed"`
 }
 
@@ -2867,7 +3212,126 @@ type PromptRequest struct {
 	SendID      *UUID        `json:"sendID,omitzero"`
 }
 
+// providers/add and providers/update. `secrets` only ever goes to the control plane; `cli` is not kept; `draft` is the draft this accepts (#858).
+type ProviderAdd struct {
+	ID       *ProviderID       `json:"id,omitzero"`
+	Name     string            `json:"name"`
+	Kind     string            `json:"kind"`
+	Command  *string           `json:"command,omitzero"`
+	Args     []string          `json:"args,omitzero"`
+	URL      *string           `json:"url,omitzero"`
+	Headers  map[string]string `json:"headers,omitzero"`
+	Commands JSONValue         `json:"commands,omitzero"`
+	Map      JSONValue         `json:"map,omitzero"`
+	Secrets  map[string]string `json:"secrets,omitzero"`
+	Cli      *string           `json:"cli,omitzero"`
+	Draft    *UUID             `json:"draft,omitzero"`
+}
+
+// providers/create.
+type ProviderCreate struct {
+	ID      ProviderID `json:"id"`
+	Name    string     `json:"name"`
+	Options JSONValue  `json:"options,omitzero"`
+	Clones  []string   `json:"clones,omitzero"`
+}
+
+// What providers/create made.
+type ProviderCreated struct {
+	Workspace WorkspaceInfo `json:"workspace"`
+	Joining   bool          `json:"joining"`
+}
+
+// providers/draftAnswer: yes or no to a question.
+type ProviderDraftAnswer struct {
+	Draft    UUID `json:"draft"`
+	Question UUID `json:"question"`
+	Yes      bool `json:"yes"`
+}
+
+// A draft answered with no agent: the server follows the contract, or a shipped map fits.
+type ProviderDraftAnswered struct {
+	Note   string    `json:"note"`
+	Map    JSONValue `json:"map,omitzero"`
+	Preset *string   `json:"preset,omitzero"`
+}
+
+// providers/draftCancel.
+type ProviderDraftRequest struct {
+	Draft UUID `json:"draft"`
+}
+
+// providers/draftStart (#858).
+type ProviderDraftStart struct {
+	Form      ProviderAdd       `json:"form"`
+	Secrets   map[string]string `json:"secrets,omitzero"`
+	Provider  *ProviderID       `json:"provider,omitzero"`
+	RuntimeID string            `json:"runtimeID"`
+}
+
+type ProviderDraftStarted struct {
+	Draft    UUID                   `json:"draft"`
+	Answered *ProviderDraftAnswered `json:"answered,omitzero"`
+}
+
+// control/providerDraft: how a draft stands, to the client that started it.
+type ProviderDraftUpdate struct {
+	Draft       UUID           `json:"draft"`
+	State       string         `json:"state"`
+	RuntimeName string         `json:"runtimeName"`
+	Steps       []DraftStep    `json:"steps"`
+	Cost        *string        `json:"cost,omitzero"`
+	DraftJSON   JSONValue      `json:"draftJSON,omitzero"`
+	Check       *DraftCheck    `json:"check,omitzero"`
+	Question    *DraftQuestion `json:"question,omitzero"`
+	Note        *string        `json:"note,omitzero"`
+}
+
 type ProviderID string
+
+// providers/list and control/providersChanged.
+type ProviderList struct {
+	Providers []ProviderSummary `json:"providers"`
+}
+
+// providers/options: the New Workspace form, a JSON Schema.
+type ProviderOptions struct {
+	Schema JSONValue `json:"schema"`
+}
+
+// providers/remove, providers/refresh, providers/options.
+type ProviderRequest struct {
+	ID *ProviderID `json:"id,omitzero"`
+}
+
+type ProviderRuntime struct {
+	ID        string `json:"id"`
+	Name      string `json:"name"`
+	IsDefault bool   `json:"isDefault"`
+}
+
+// providers/runtimes: what may write, on which host, or why none.
+type ProviderRuntimes struct {
+	Runtimes []ProviderRuntime `json:"runtimes"`
+	Host     *string           `json:"host,omitzero"`
+	Why      *string           `json:"why,omitzero"`
+}
+
+// A provider for the Providers page, never its commands, headers or secrets' values.
+type ProviderSummary struct {
+	ID           ProviderID      `json:"id"`
+	Name         string          `json:"name"`
+	Kind         string          `json:"kind"`
+	Secrets      map[string]bool `json:"secrets"`
+	Capabilities []string        `json:"capabilities"`
+	Contract     int64           `json:"contract"`
+	Mapped       bool            `json:"mapped"`
+	Preset       *string         `json:"preset,omitzero"`
+	Workspaces   []WorkspaceInfo `json:"workspaces"`
+	ListedAt     *Date           `json:"listedAt,omitzero"`
+	Current      bool            `json:"current"`
+	Problem      *string         `json:"problem,omitzero"`
+}
 
 type QueuedPrompt struct {
 	ID          UUID           `json:"id"`
@@ -2919,6 +3383,34 @@ type RateLimitInfo struct {
 	OverageDisabledReason *string  `json:"overageDisabledReason,omitzero"`
 }
 
+// relay/count (#1163): one device's Needs you count, posted as a silent push.
+type RelayCount struct {
+	Device    UUID  `json:"device"`
+	Waiting   int64 `json:"waiting"`
+	CountedAt Date  `json:"countedAt"`
+}
+
+// relay/deliver (T097): seal the headline to `publicKey` and post it for `device`; no headline is a withdrawal.
+type RelayDelivery struct {
+	NeedID    NeedID    `json:"needID"`
+	Device    UUID      `json:"device"`
+	PublicKey Data      `json:"publicKey,omitzero"`
+	Headline  *Headline `json:"headline,omitzero"`
+	Alert     bool      `json:"alert"`
+	Waiting   *int64    `json:"waiting,omitzero"`
+}
+
+// A device a relay host may carry for, with the key its frames are sealed to.
+type RelayDevice struct {
+	ID        UUID `json:"id"`
+	PublicKey Data `json:"publicKey"`
+}
+
+// relay/devices: every device client.
+type RelayDevices struct {
+	Devices []RelayDevice `json:"devices"`
+}
+
 type RelayGrantReply struct {
 	Runtime       string `json:"runtime"`
 	CaCertificate string `json:"caCertificate"`
@@ -2939,6 +3431,11 @@ type RelayOffer struct {
 // relay/register: the public half of the Mac's relay key, X9.63.
 type RelayRegistration struct {
 	PublicKey Data `json:"publicKey"`
+}
+
+// relay/switch (#824): the relay host that says it, on or off.
+type RelaySwitch struct {
+	Relay bool `json:"relay"`
 }
 
 type RememberedOptionsRequest struct {
@@ -3195,6 +3692,20 @@ type RuntimeStatus struct {
 	Outdated     bool                `json:"outdated"`
 	PoolNote     *string             `json:"poolNote,omitzero"`
 	IsOut        *bool               `json:"isOut,omitzero"`
+}
+
+// A server ssh knows by a name, for Add a Server's server box (#610).
+type SSHHost struct {
+	Alias          string `json:"alias"`
+	Resolved       string `json:"resolved"`
+	ThroughBastion bool   `json:"throughBastion"`
+	IsBastion      bool   `json:"isBastion"`
+	Known          bool   `json:"known"`
+}
+
+// hosts/sshHosts (#610): with a destination, just that, as typed.
+type SSHHostsRequest struct {
+	Destination *string `json:"destination,omitzero"`
 }
 
 type SandboxChoice string
@@ -4012,6 +4523,12 @@ type TranscriptRequest struct {
 	From    *int64 `json:"from,omitzero"`
 }
 
+// tunnel/open, from the borrowing host (T091).
+type TunnelOpen struct {
+	Runtime string `json:"runtime"`
+	Ref     string `json:"ref"`
+}
+
 type TurnSummary struct {
 	ID      UUID              `json:"id"`
 	Start   int64             `json:"start"`
@@ -4525,6 +5042,17 @@ const (
 
 type WorkflowsListRequest struct {
 	Folder *URL `json:"folder,omitzero"`
+}
+
+// One workspace, as its provider last listed it. `state` is running, starting, stopping, stopped or unknown.
+type WorkspaceInfo struct {
+	ID     string  `json:"id"`
+	Name   string  `json:"name"`
+	State  string  `json:"state"`
+	Ssh    *string `json:"ssh,omitzero"`
+	Tunnel *bool   `json:"tunnel,omitzero"`
+	Cost   *string `json:"cost,omitzero"`
+	Host   *HostID `json:"host,omitzero"`
 }
 
 type WorktreeChoice struct {

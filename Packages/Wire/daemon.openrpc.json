@@ -4379,6 +4379,26 @@
       }
     },
     {
+      "name": "git/fill",
+      "description": "Asked by the control plane on the lending host's channel 0, for a lend a person allowed (#1122).",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/GitCredentialRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/GitCredential"
+        }
+      }
+    },
+    {
       "name": "agent/changed",
       "tags": [
         {
