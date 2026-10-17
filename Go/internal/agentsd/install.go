@@ -1,6 +1,7 @@
 package agentsd
 
 import (
+	"archive/tar"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -23,6 +24,7 @@ import (
 	"github.com/alexec/agents/Go/internal/buildinfo"
 	"github.com/alexec/agents/Go/internal/safe"
 	"github.com/alexec/agents/Go/wire"
+	"github.com/ulikunitz/xz"
 )
 
 // Installing a runtime that is missing on this Mac (048, 047, 049), as DaemonCore+Install
@@ -32,13 +34,34 @@ import (
 // go out on runtime/changed. Each lands in <cache>/tools/<runtime>/<id>/, built in
 // .part-<id>, marked whole with ok last, then made current.
 //
-// Only a Mac host installs (install_darwin.go). The recipes are here so they test anywhere.
+// A Mac host installs into <cache>/tools (install_darwin.go). A Linux host (#1312) installs
+// the Node toolsets the shown command left in ~/.agents-server/toolsets into
+// ~/.agents-server/tools, where hosts/install over ssh puts them (install_linux.go). The
+// recipes are here so they test anywhere.
 
 // nodeDistURL is where Node is published; a test serves its own.
 var nodeDistURL = "https://nodejs.org/dist/"
 
 // installTimeout is how long a vendor's script or npm may take.
 var installTimeout = 5 * time.Minute
+
+// toolsHome is where runtimes/install builds toolsets: a Mac's <cache>/tools, or a
+// server's ~/.agents-server/tools. serverToolsets says which (#1312): a server takes Node
+// from the manifest's Linux pins, and installs only the Node toolsets.
+var (
+	toolsHome      string
+	serverToolsets bool
+)
+
+// serverLibc is the C library a server has, as `getconf GNU_LIBC_VERSION` says it
+// ("glibc 2.36"), or "" when it says nothing (musl); a test gives its own.
+var serverLibc = func() string {
+	out, err := exec.Command("getconf", "GNU_LIBC_VERSION").Output()
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(out))
+}
 
 type installBook struct {
 	instMu   sync.Mutex
@@ -58,6 +81,11 @@ type macToolset struct {
 		Package           string `json:"package"`
 		Entry             string `json:"entry"`
 		ForwardsArguments *bool  `json:"forwardsArguments"`
+		// A server's Node, by `uname -m` (Toolset.Manifest.node).
+		Node *struct {
+			Version string            `json:"version"`
+			SHA256  map[string]string `json:"sha256"`
+		} `json:"node"`
 		// An archive's.
 		Version      string                     `json:"version"`
 		MinFreeBytes int64                      `json:"minFreeBytes"`
@@ -152,6 +180,29 @@ func macPlatform() string {
 	return "darwin-x86_64"
 }
 
+// serverArch is a server's `uname -m`, the key of the manifest's Node pins.
+func serverArch() string {
+	if goruntime.GOARCH == "arm64" {
+		return "aarch64"
+	}
+	return "x86_64"
+}
+
+// nodePin is the Node this host installs a Node toolset with: the Mac's from mac-node.json,
+// or a server's from the manifest; "" when the toolset pins none for this machine.
+func (t *macToolset) nodePin() (version, sum string) {
+	if serverToolsets {
+		if n := t.manifest.Node; n != nil {
+			return n.Version, n.SHA256[serverArch()]
+		}
+		return "", ""
+	}
+	if t.node != nil {
+		return t.node.Version, t.node.SHA256[macArch()]
+	}
+	return "", ""
+}
+
 // platform is the archive's entry for this Mac, or why there is none.
 func (t *macToolset) platform() (archivePlatform, string) {
 	p, ok := t.manifest.Platforms[macPlatform()]
@@ -200,28 +251,35 @@ func (d *Daemon) recipe(id string) *wire.RuntimeInstall {
 	if !ok || d.toolsets == nil {
 		return nil
 	}
+	// A server installs only the Node toolsets (#1312): a vendor's script or archive is
+	// the person's own to run there.
+	if serverToolsets && r.Toolset == nil {
+		return nil
+	}
 	if r.Toolset != nil {
 		t := d.toolsets[r.Toolset.RuntimeID]
 		switch {
 		case t == nil:
 			return nil
 		case t.archive():
-			if _, why := t.platform(); why != "" {
+			if _, why := t.platform(); why != "" || serverToolsets {
 				return nil
 			}
-		case t.node == nil || t.node.SHA256[macArch()] == "":
-			return nil
+		default:
+			if _, sum := t.nodePin(); sum == "" {
+				return nil
+			}
 		}
 	}
 	return &r
 }
 
-// appToolset is RuntimeDiscovery.appToolset: the Mac's own copy, when it is whole.
+// appToolset is RuntimeDiscovery.appToolset: the copy runtimes/install made, when it is whole.
 func appToolset(r *runtimeDef) string {
-	if macToolsHome == "" {
+	if toolsHome == "" {
 		return ""
 	}
-	return toolsetShim(filepath.Join(macToolsHome, r.ID), r.Executable)
+	return toolsetShim(filepath.Join(toolsHome, r.ID), r.Executable)
 }
 
 // overlay is DaemonCore.overlaid's install half: the button where this host can carry it
@@ -249,7 +307,7 @@ func (d *Daemon) outdated(id, path string) bool {
 	if t == nil || r == nil || path == "" || path != appToolset(r) {
 		return false
 	}
-	cur, err := os.Readlink(filepath.Join(macToolsHome, id, "current"))
+	cur, err := os.Readlink(filepath.Join(toolsHome, id, "current"))
 	return err == nil && cur != t.id
 }
 
@@ -425,7 +483,7 @@ func runScript(url, shell, name string) error {
 // home is the runtime's folder under tools/, through any link (npm resolves --prefix):
 // /tmp is /private/tmp on a Mac.
 func (t *macToolset) home() (string, error) {
-	dir := filepath.Join(macToolsHome, t.runtimeID)
+	dir := filepath.Join(toolsHome, t.runtimeID)
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return "", err
 	}
@@ -445,7 +503,7 @@ func (t *macToolset) build(make func(part string) error) error {
 		if err := make(part); err != nil {
 			os.RemoveAll(part)
 			if errors.Is(err, syscall.ENOSPC) {
-				return installFailure("There isn’t room on this Mac to install " + runtimeName(t.runtimeID) + ".")
+				return installFailure("There isn’t room on " + thisMachine() + " to install " + runtimeName(t.runtimeID) + ".")
 			}
 			return err
 		}
@@ -474,7 +532,7 @@ func pointCurrent(home, id string) error {
 // tidy removes every toolset but the current one, and anything half-built. Only at the
 // host's start, when nothing can be running from them.
 func (t *macToolset) tidy() {
-	home := filepath.Join(macToolsHome, t.runtimeID)
+	home := filepath.Join(toolsHome, t.runtimeID)
 	keep, _ := os.Readlink(filepath.Join(home, "current"))
 	names, _ := os.ReadDir(home)
 	for _, n := range names {
@@ -566,8 +624,19 @@ func (t *macToolset) shimName() string {
 // app's pin, the adapter with `npm ci` against the app's lock, and the shim.
 func (t *macToolset) installNode(progress func(string)) error {
 	name := runtimeName(t.runtimeID)
-	if t.node == nil || t.node.SHA256[macArch()] == "" {
-		return installFailure("This build of the app carries no Node.js for this Mac.")
+	v, sum := t.nodePin()
+	if sum == "" {
+		return installFailure("This build of the app carries no Node.js for " + thisMachine() + ".")
+	}
+	if serverToolsets {
+		// Node's own Linux builds need glibc 2.28 or later, and musl has none (043, R2).
+		if libc := serverLibc(); !glibcAtLeast(libc, 2, 28) {
+			has := "musl or an unknown C library"
+			if libc != "" {
+				has = libc
+			}
+			return installFailure(name + " needs glibc 2.28 or later, and this server has " + has + ".")
+		}
 	}
 	return t.build(func(part string) error {
 		lib := filepath.Join(part, "lib")
@@ -582,20 +651,35 @@ func (t *macToolset) installNode(progress func(string)) error {
 		if err := copyFile(filepath.Join(t.folder, "manifest.json"), filepath.Join(part, "manifest.json")); err != nil {
 			return err
 		}
-		v := t.node.Version
 		progress("Downloading Node.js " + v)
-		tarball := filepath.Join(part, "node.tar.gz")
-		url := strings.TrimSuffix(nodeDistURL, "/") + "/" + v + "/node-" + v + "-darwin-" + macArch() + ".tar.gz"
-		if err := download(url, tarball, 0, t.node.SHA256[macArch()], "Node.js", nil); err != nil {
-			return err
-		}
-		progress("Unpacking Node.js")
 		node := filepath.Join(part, "node")
 		os.MkdirAll(node, 0o755)
-		if out, err := step(installTimeout, part, loginEnvironment(), "/usr/bin/tar", "-xzf", tarball, "-C", node, "--strip-components=1"); err != nil {
-			return unpackProblem(out, "Couldn’t download Node.js: "+tail(out, 1))
+		base := strings.TrimSuffix(nodeDistURL, "/") + "/" + v + "/node-" + v
+		if serverToolsets {
+			// A tar.xz, unpacked here: a minimal Debian has no xz (043).
+			tarball := filepath.Join(part, "node.tar.xz")
+			if err := download(base+"-linux-"+macArch()+".tar.xz", tarball, 0, sum, "Node.js", nil); err != nil {
+				return err
+			}
+			progress("Unpacking Node.js")
+			if err := untarXZ(tarball, node); err != nil {
+				if errors.Is(err, syscall.ENOSPC) {
+					return err
+				}
+				return installFailure("Couldn’t unpack Node.js: " + err.Error())
+			}
+			os.Remove(tarball)
+		} else {
+			tarball := filepath.Join(part, "node.tar.gz")
+			if err := download(base+"-darwin-"+macArch()+".tar.gz", tarball, 0, sum, "Node.js", nil); err != nil {
+				return err
+			}
+			progress("Unpacking Node.js")
+			if out, err := step(installTimeout, part, loginEnvironment(), "/usr/bin/tar", "-xzf", tarball, "-C", node, "--strip-components=1"); err != nil {
+				return unpackProblem(out, "Couldn’t download Node.js: "+tail(out, 1))
+			}
+			os.Remove(tarball)
 		}
-		os.Remove(tarball)
 		progress("Installing " + name)
 		env := loginEnvironment()
 		for i, kv := range env {
@@ -728,9 +812,20 @@ func npmProblem(out, name string) error {
 }
 
 // serveInstall loads the bundle's toolsets from folder, tidies what is left of older ones
-// and serves runtimes/install; install_darwin.go calls it.
+// and serves runtimes/install, on a Mac into tools; install_darwin.go calls it.
 func (d *Daemon) serveInstall(tools, folder string) {
-	macToolsHome = tools
+	macToolsHome, toolsHome, serverToolsets = tools, tools, false
+	d.loadAndServeInstall(folder)
+}
+
+// serveServerInstall is serveInstall on a server (#1312): from the toolsets in folder into
+// ~/.agents-server/tools, where discovery looks first. install_linux.go calls it.
+func (d *Daemon) serveServerInstall(folder string) {
+	toolsHome, serverToolsets = filepath.Dir(toolsetFolder("claude")), true
+	d.loadAndServeInstall(folder)
+}
+
+func (d *Daemon) loadAndServeInstall(folder string) {
 	d.toolsets = loadToolsets(folder)
 	ids := make([]string, 0, len(d.toolsets))
 	for id := range d.toolsets {
@@ -743,4 +838,101 @@ func (d *Daemon) serveInstall(tools, folder string) {
 	On(d, wire.CallRuntimesInstall, func(_ context.Context, c *Client, r wire.RuntimeRequest) (wire.RuntimeStatus, error) {
 		return d.installRuntime(c, r.RuntimeID)
 	})
+}
+
+// thisMachine is how an install's words name the machine: this Mac, or this server.
+func thisMachine() string {
+	if serverToolsets {
+		return "this server"
+	}
+	return "this Mac"
+}
+
+// glibcAtLeast says whether libc, as getconf says it ("glibc 2.36"), is that glibc or later.
+func glibcAtLeast(libc string, major, minor int) bool {
+	version, ok := strings.CutPrefix(libc, "glibc ")
+	if !ok {
+		return false
+	}
+	var have [2]int
+	for i, p := range strings.SplitN(version, ".", 3) {
+		if i > 1 {
+			break
+		}
+		n := 0
+		for _, c := range p {
+			if c < '0' || c > '9' {
+				break
+			}
+			n = n*10 + int(c-'0')
+		}
+		have[i] = n
+	}
+	return have[0] > major || have[0] == major && have[1] >= minor
+}
+
+// untarXZ unpacks Node's tar.xz into dest, dropping its first folder (tar
+// --strip-components=1): files, folders and the links npm and npx are. Nothing may land
+// outside dest.
+func untarXZ(file, dest string) error {
+	f, err := os.Open(file)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	x, err := xz.NewReader(f)
+	if err != nil {
+		return err
+	}
+	r := tar.NewReader(x)
+	for {
+		h, err := r.Next()
+		if err == io.EOF {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		_, rest, found := strings.Cut(strings.TrimPrefix(h.Name, "./"), "/")
+		rest = strings.TrimSuffix(rest, "/")
+		if !found || rest == "" {
+			continue
+		}
+		target := filepath.Join(dest, rest)
+		if !strings.HasPrefix(target, filepath.Clean(dest)+string(filepath.Separator)) {
+			return fmt.Errorf("%s is outside the archive", h.Name)
+		}
+		switch h.Typeflag {
+		case tar.TypeDir:
+			if err := os.MkdirAll(target, 0o755); err != nil {
+				return err
+			}
+		case tar.TypeReg:
+			if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+				return err
+			}
+			out, err := os.OpenFile(target, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, os.FileMode(h.Mode)&0o755|0o600)
+			if err != nil {
+				return err
+			}
+			_, err = io.Copy(out, r)
+			if cerr := out.Close(); err == nil {
+				err = cerr
+			}
+			if err != nil {
+				return err
+			}
+		case tar.TypeSymlink:
+			if filepath.IsAbs(h.Linkname) || !strings.HasPrefix(filepath.Join(filepath.Dir(target), h.Linkname), filepath.Clean(dest)+string(filepath.Separator)) {
+				return fmt.Errorf("%s links outside the archive", h.Name)
+			}
+			if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+				return err
+			}
+			os.Remove(target)
+			if err := os.Symlink(h.Linkname, target); err != nil {
+				return err
+			}
+		}
+	}
 }
