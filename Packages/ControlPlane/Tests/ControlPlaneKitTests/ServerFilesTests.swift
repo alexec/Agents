@@ -31,9 +31,7 @@ struct ServerFilesTests {
 
     /// The script a server runs fetches each shipped server, and a missing one is no failure.
     @Test func theInstallScriptFetchesTheShippedServers() {
-        for name in ServerFiles.shippedServers {
-            #expect(HostInstallScript.text.contains("for server in \(name)"))
-        }
+        #expect(HostInstallScript.text.contains("for server in \(ServerFiles.shippedServers.joined(separator: " ")); do"))
         #expect(HostInstallScript.text.contains("the host runs without it"))
     }
 

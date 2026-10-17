@@ -375,6 +375,9 @@ Packages/MCPServers/Sources/CIWatcher/                 ci-server
 Packages/MCPServers/Sources/ci-watcher/                ci-server
 Packages/MCPServers/Sources/MCPServerKit/              ci-server
 Packages/MCPServers/Tests/                             ci-server
+Go/cmd/github-mcp/                                     ci-server
+Go/internal/githubmcp/                                 ci-server
+scripts/go-github-mcp.sh                               ci-server
 specs/038-*/                                           ci-server
 
 # control-plane: the control plane: joining, membership, grants, copies and handover,
