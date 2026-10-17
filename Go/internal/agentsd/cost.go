@@ -434,19 +434,6 @@ func (d *Daemon) setLimits(raw json.RawMessage) (wire.CostState, error) {
 	return st, nil
 }
 
-// milestones is milestones/state: what achievements.json says has been earned.
-func (d *Daemon) milestones() wire.Milestones {
-	var m wire.Milestones
-	b, err := os.ReadFile(filepath.Join(d.Store.Loc.Root, "achievements.json"))
-	if err == nil {
-		diskjson.Unmarshal(b, &m)
-	}
-	if m.Earned == nil {
-		m.Earned = []wire.EarnedMilestone{}
-	}
-	return m
-}
-
 func (d *Daemon) registerCost() {
 	On(d, wire.CallCostState, func(ctx context.Context, c *Client, _ wire.Empty) (wire.CostState, error) { return d.costState(), nil })
 	d.handlers[wire.CallCostSetLimits.Name] = func(ctx context.Context, c *Client, raw json.RawMessage) (any, error) {

@@ -49,6 +49,7 @@ type Daemon struct {
 	mcpBook
 	optionBook
 	timeBook
+	milestoneBook
 	attentionState
 	worktreeState
 	recoveryState
@@ -81,6 +82,7 @@ func New(ctx context.Context, root string) (*Daemon, error) {
 	d.checkEveryQueue()
 	d.restoreRuns()
 	safe.Go("workflow clock", d.workflowClock)
+	d.checkMilestonesSoon()
 	d.watchDisk()
 	return d, nil
 }
@@ -136,6 +138,7 @@ func (d *Daemon) Shutdown() {
 	d.allowMu.Unlock()
 	d.stopEventWaits()
 	d.stopShells()
+	d.waitForMilestones()
 }
 
 // once is true the first time a sendID is seen: a window sends a prompt again for 30 s

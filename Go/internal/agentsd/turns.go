@@ -92,6 +92,10 @@ func (d *Daemon) recordFrom(id wire.UUID, kind wire.TranscriptEntryKind, sender 
 			d.noteTime(e, id, a.RuntimeID)
 		}
 	}
+	// A turn starting or ending can earn the first agent or five at once (#984).
+	if kind.StateChanged != nil {
+		d.checkMilestonesSoon()
+	}
 }
 
 func notice(severity, title, detail string) wire.TranscriptEntryKind {
