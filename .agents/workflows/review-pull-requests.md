@@ -17,9 +17,9 @@ which PR (number, title, branch, author, url). You are its second pair of eyes (
 2. Look for what would make it wrong: bugs, a missed case, a broken contract or doc, a test
    that does not test what it says, a security or performance problem. Leave out style
    nits and anything a linter or CI already checks.
-3. Post one comment with the `ci` server's `comment_on_pr`: findings by severity (blocking,
-   should fix, nit), each with `file:line` and why. If you find nothing worth a change, say
-   so in one line.
+3. Post one comment with the `github` server's `add_issue_comment` on the PR: findings by
+   severity (blocking, should fix, nit), each with `file:line` and why. If you find nothing
+   worth a change, say so in one line.
 
 Never push, approve, request changes, merge, close or label the pull request, and never
 change any file. The comment is all you leave.

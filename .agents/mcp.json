@@ -1,1 +1,3 @@
-{ "mcpServers": { "ci": { "command": "ci-watcher", "hosted": true } } }
+{ "mcpServers": {
+    "ci": { "command": "ci-watcher", "hosted": true },
+    "github": { "command": "github-mcp", "hosted": true } } }
