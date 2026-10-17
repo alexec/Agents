@@ -36,6 +36,8 @@ type live struct {
 	// prompting is whether the turn's words are with the runtime; a stop before then is
 	// kept in stopped, and the turn ends there instead of sending them.
 	prompting, stopped bool
+	// turnSeq counts turns, so a cancel sent again is only for the turn it was meant for.
+	turnSeq int
 	// reported is whether this turn said how it went itself (a wait on agents), so its
 	// ending keeps that rather than one worked out from its last words.
 	reported bool
@@ -390,6 +392,7 @@ func (l *live) turn() bool {
 	ctx, cancel := context.WithCancel(d.ctx)
 	l.mu.Lock()
 	l.stop = cancel
+	l.turnSeq++
 	l.inTurn, l.prompting, l.stopped, l.reported = true, false, false, false
 	l.mu.Unlock()
 	defer cancel()
@@ -1072,7 +1075,7 @@ func (l *live) cancel() {
 	l.closeForms()
 	l.mu.Lock()
 	l.stops++
-	s, stop := l.session, l.stop
+	s, stop, seq := l.session, l.stop, l.turnSeq
 	if l.inTurn && !l.prompting {
 		// Not with the runtime yet: session/cancel would find no turn to end.
 		l.stopped = true
@@ -1093,11 +1096,46 @@ func (l *live) cancel() {
 		defer c()
 		if err := s.Cancel(ctx); err != nil && stop != nil {
 			stop()
+		} else if stop != nil {
+			go l.cancelAgain(s, seq, stop)
 		}
 	} else if stop != nil {
 		stop()
 	}
 }
+
+// cancelAgain sends session/cancel again while the same turn goes on, then ends it from
+// this side: a cancel that reaches the runtime before its prompt is under way finds no
+// turn to end, and the turn would wait for ever (#1296).
+func (l *live) cancelAgain(s *acp.Session, seq int, stop context.CancelFunc) {
+	still := func() bool {
+		l.mu.Lock()
+		defer l.mu.Unlock()
+		return l.inTurn && l.turnSeq == seq
+	}
+	for range 3 {
+		select {
+		case <-l.d.ctx.Done():
+			return
+		case <-time.After(cancelAgainAfter):
+		}
+		if !still() {
+			return
+		}
+		ctx, c := context.WithTimeout(context.Background(), 5*time.Second)
+		err := s.Cancel(ctx)
+		c()
+		if err != nil {
+			break
+		}
+	}
+	if still() {
+		stop()
+	}
+}
+
+// cancelAgainAfter is how long a cancelled turn has to end before session/cancel goes again.
+var cancelAgainAfter = time.Second
 
 func (d *Daemon) pendingPermissions() []wire.PermissionRequest {
 	d.mu.Lock()
