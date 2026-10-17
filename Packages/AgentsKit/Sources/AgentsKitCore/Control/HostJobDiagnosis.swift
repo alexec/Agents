@@ -19,9 +19,13 @@ public struct LaunchJobState: Sendable, Equatable {
     public var needsLWCRUpdate: Bool
     /// How many times launchd has started it.
     public var runs: Int?
+    /// What it runs, in the bundle: `program identifier = Contents/MacOS/Agents Host (mode: 2)`
+    /// is `Contents/MacOS/Agents Host`. Another than the bundle's plist names is a login item
+    /// registered from an older plist (#1379).
+    public var program: String?
 
     public init(loaded: Bool, state: String? = nil, pid: Int32? = nil, lastExitCode: Int32? = nil,
-                lastExit: String? = nil, needsLWCRUpdate: Bool = false, runs: Int? = nil) {
+                lastExit: String? = nil, needsLWCRUpdate: Bool = false, runs: Int? = nil, program: String? = nil) {
         self.loaded = loaded
         self.state = state
         self.pid = pid
@@ -29,6 +33,7 @@ public struct LaunchJobState: Sendable, Equatable {
         self.lastExit = lastExit
         self.needsLWCRUpdate = needsLWCRUpdate
         self.runs = runs
+        self.program = program
     }
 
     public static let notLoaded = LaunchJobState(loaded: false)
@@ -61,6 +66,8 @@ public struct LaunchJobState: Sendable, Equatable {
             case "job state": jobState = value
             case "pid": read.pid = Int32(value)
             case "runs": read.runs = Int(value)
+            case "program identifier":
+                read.program = value.range(of: " (mode:").map { String(value[..<$0.lowerBound]) } ?? value
             case "last exit code":
                 read.lastExit = value
                 read.lastExitCode = Int32(value.prefix { $0 == "-" || $0.isNumber })

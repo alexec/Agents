@@ -90,6 +90,23 @@ final class HostModel {
             accessKeyDraft = keys.accessKey
             secretDraft = keys.secretKey
         }
+        Task { await registerOutdatedJobsAgain() }
+    }
+
+    /// Once a launch (#1379): a login item registered from an older copy's plist is
+    /// registered again from this one, so an update reaches what launchd runs.
+    private func registerOutdatedJobsAgain() async {
+        guard !paths.scratch, settings.role != .none else { return }
+        var jobs: [LocalServices.Job] = [.daemon]
+        if settings.role == .runHere, settings.movedTo == nil { jobs.append(.control) }
+        if settings.relaysForDevices { jobs.append(.relay) }
+        let services = self.services
+        var changed = false
+        for job in jobs where await services.registeredFromAnotherPlist(job) {
+            if case .failed(let why) = await services.registerAgain(job) { problem = why }
+            changed = true
+        }
+        if changed { await refresh() }
     }
 
     /// `https://<this Mac>.local:8791`: what codes carry and clients dial.
