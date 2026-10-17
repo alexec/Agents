@@ -17,8 +17,7 @@ func (d *Daemon) register() {
 		return wire.PingResponse{Ok: true}, nil
 	})
 	// What the window pushes or reports on connecting, which this host has no use for yet.
-	Quiet(d, wire.CallCredentialsOffer.Name, wire.CallAgentsPrewarm.Name,
-		wire.CallAgentsDiscardDraft.Name)
+	Quiet(d, wire.CallCredentialsOffer.Name, wire.CallAgentsPrewarm.Name)
 	d.registerFiles()
 	d.registerAgents()
 	d.registerPins()
@@ -35,6 +34,7 @@ func (d *Daemon) register() {
 	d.registerCost()
 	d.registerAllowances()
 	d.registerMCP()
+	d.registerOptions()
 	d.registerWorkflows()
 	d.registerShells()
 	On(d, wire.CallPermissionsPending, func(ctx context.Context, c *Client, _ wire.Empty) ([]wire.PermissionRequest, error) {

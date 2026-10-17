@@ -165,6 +165,9 @@ func (d *Daemon) startFor(r wire.StartRequest, by startedBy) (wire.UUID, error) 
 			}
 		}
 	}
+	if r.DraftID != nil {
+		d.closeDraft(*r.DraftID)
+	}
 	values := r.StartOptions.Values
 	if values == nil {
 		values = map[string]wire.JSONValue{}

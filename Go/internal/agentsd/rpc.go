@@ -46,12 +46,13 @@ const (
 	CodeInternal       = -32603
 	CodeServer         = -32000
 	// DaemonAPI.Failure.
-	CodeRuntimeNotFound  = -32001
-	CodeFolderGone       = -32004
-	CodeNoSuchAgent      = -32005
-	CodeNotSupported     = -32009
-	CodeNoSuchProject    = -32012
-	CodeCredentialWanted = -32036
+	CodeRuntimeNotFound     = -32001
+	CodeRuntimeWillNotStart = -32002
+	CodeFolderGone          = -32004
+	CodeNoSuchAgent         = -32005
+	CodeNotSupported        = -32009
+	CodeNoSuchProject       = -32012
+	CodeCredentialWanted    = -32036
 )
 
 // Invalid is a -32602 for params that do not say what the method needs.
