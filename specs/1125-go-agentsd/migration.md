@@ -55,6 +55,7 @@ The spike's stage 3 proved that one JSON Schema carries every shape on the wire,
 - **Last, because it is the widest:** every method the Linux host serves, plus the Mac-only ones, plus the parts that are fiddly on a Mac: the Keychain sign-in relay (`relay/grant`: read the token with `security … -w`, serve it from a TLS relay on loopback), the code-signature check on `daemon.sock`'s callers (needs cgo for the audit token, or a small Swift helper), launchd, and power (`caffeinate` is enough without cgo).
 - **Side by side:** Agents Host's login item starts `agentsd` from the bundle. Ship both binaries in the bundle for one release, with a hidden setting that picks one. Both read the same `~/.agents` root, so a change back keeps everything.
 - **Decide then:** whether `sandbox-exec` (deprecated, but it works on macOS 27) is enough, or whether the Mac host needs a Swift helper for the Mac-only APIs.
+  - **Decided (#1138, slice I):** the Go host writes no `sandbox-exec` profile, the same as the Swift host. 064 only switches each runtime's own sandbox (`sandbox.go`, already ported), and on a Mac that sandbox is Seatbelt. Seatbelt does not nest: a runtime's own `sandbox-exec` inside a host's fails with `sandbox_apply: Operation not permitted`, checked on macOS 27 and in CI (`sandbox_darwin_test.go`). So the Mac needs no Swift helper for the sandbox. A host-wide sandbox like Linux's Landlock would have to replace the runtimes' own sandboxes, which is a product decision, not a port.
 
 ## The methods not yet ported
 
