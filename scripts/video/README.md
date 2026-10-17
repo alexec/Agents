@@ -23,18 +23,28 @@ and Alex uploads them until the YouTube API project passes Google's audit.
    kept in `~/.cache/agents-video/voice`, so a line that has not changed is not said again.
 2. **Recording** (`make.py`): run-app launches a scratch set-up on `/tmp/run-vid-<id>`,
    never the live app, with the window opened from outside the checkout so that its
-   title names no worktree. The scene drives it through the host's socket, the
-   accessibility tree, and keys posted to the window's pid, so nothing reaches the app
-   in front. `record.swift` records the app's windows, cropped to the main one, even
-   behind other windows. A scene with a phone or a browser drives the web page in
-   headless Chrome (`web.mjs`) and records it with the DevTools screencast.
-3. **Picture** (`frame.py`): the window, with a shadow, on a cobalt backdrop; the phone in
-   Apple's iPhone bezel; the browser in a plain toolbar. The waits marked `fast` are cut
+   title names no worktree. The window is recorded through its **walk socket** (#1172):
+   it draws each frame itself, in its own process, so no other window can be in the
+   picture (not the person's own Agents window, which once was, #1078), and a locked
+   screen does not stop a take. The scene presses, selects and types through the same
+   socket, so nothing reaches the screen, the keyboard or the app in front. A scene with
+   a phone or a browser drives the web page in headless Chrome (`web.mjs`) and records
+   it with the DevTools screencast.
+3. **Picture** (`frame.py`): the window, with a shadow, its traffic lights drawn on and its
+   corners cut, on a cobalt backdrop; the phone in Apple's iPhone bezel; the browser in a
+   plain toolbar. The waits marked `fast` are cut
    to a few seconds. Each line starts at the marker the scene wrote when it said it. The
    video ends on a card with the logo, and the Apple trademark line when an iPhone is shown.
 
+4. **Check**: Whisper hears the finished video against its script, and a contact sheet of
+   it (`~/.cache/agents-video/work/<id>/video-sheet.png`) is made to look at before the
+   video is kept.
+
 Real Claude agents run in the scenes, on scratch projects: a few cents a video. On camera
-the person is called Sam.
+the person is called Sam (`launch.sh --person`), and the scratch root says it has 500 GB
+free, so the real disk is never shown. A scratch agent still reads the person's own
+`~/.claude/CLAUDE.md`: each project tells it never to name an instructions file, and a
+take whose window shows the person's name or their own instructions fails.
 
 ## A scene
 
@@ -46,14 +56,14 @@ recording starts, and `run(v)` is the recording. `v` is the `Video` in `make.py`
 |---|---|
 | `v.project(name, files)` | a committed Git project under the root, added to the app |
 | `v.start(folder, prompt)` | a real agent, as **New Session** would start it |
-| `v.select(text)`, `v.press(text)`, `v.unfold(text)` | the window, through the accessibility tree |
-| `v.type(field, text)`, `v.key("return")` | keys posted to the window |
+| `v.select(text)`, `v.press(text)`, `v.unfold(text)` | the window's accessibility tree, read in its own process |
+| `v.type(field, text)`, `v.key("return")`, `v.menu(menu, item)` | keys and menu items, sent in the window's process |
 | `v.say(key)` | the line starts here; the scene waits until it has been said (`wait=False` goes on at once) |
 | `with v.fast(2.0):` | what happens inside is cut to two seconds |
 | `v.open_phone()`, `v.web(op, …)` | the web page at iPhone size, and what to do on it |
 
-Menus and popovers inside the window are in the picture. The menu bar and anything
-outside the window are not.
+Sheets and popovers are in the picture, where they sit on the window. The menu bar, a
+menu and anything outside the window are not.
 
 ## What it needs
 
@@ -63,8 +73,8 @@ outside the window are not.
   [Apple Design Resources](https://developer.apple.com/design/resources/), in
   `~/.agents/video/assets/`. Its licence lets it be shown in our videos but not given
   away, so it is not in the repository.
-- Accessibility and Screen Recording for the app that runs the script, and the screen
-  unlocked.
+- A main screen at 2× (Retina): the window is put on it, and a take on a 1× screen stops.
+  No Accessibility or Screen Recording permission, and the screen may be locked.
 
 ## The videos
 
