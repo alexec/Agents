@@ -396,6 +396,11 @@ type AuthStatus struct {
 	Label string `json:"label"`
 }
 
+type AuthenticateRequest struct {
+	RuntimeID string `json:"runtimeID"`
+	MethodID  string `json:"methodID"`
+}
+
 type BackgroundItem struct {
 	ID             string              `json:"id"`
 	Kind           BackgroundItemKind  `json:"kind"`
@@ -2423,6 +2428,10 @@ type RuntimeInstallNpmGlobal struct {
 	Package string `json:"package"`
 }
 
+type RuntimeRequest struct {
+	RuntimeID string `json:"runtimeID"`
+}
+
 type RuntimeSession struct {
 	SessionID             string  `json:"sessionID"`
 	Cwd                   URL     `json:"cwd"`
@@ -2576,6 +2585,11 @@ type SetOptionRequest struct {
 type SetPinnedRequest struct {
 	Folder URL  `json:"folder"`
 	Pinned bool `json:"pinned"`
+}
+
+type SetProviderRequest struct {
+	RuntimeID  string `json:"runtimeID"`
+	ProviderID string `json:"providerID"`
 }
 
 type SetSandboxRequest struct {

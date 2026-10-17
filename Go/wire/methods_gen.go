@@ -118,8 +118,12 @@ var (
 	CallRetentionState                 = Method[Empty, RetentionState]{"retention/state"}
 	CallRuntimesAccounts               = Method[Empty, []RuntimeAccount]{"runtimes/accounts"}
 	CallRuntimesAllowances             = Method[*string, RuntimeAllowances]{"runtimes/allowances"}
+	CallRuntimesAuthenticate           = Method[AuthenticateRequest, RuntimeAccount]{"runtimes/authenticate"}
+	CallRuntimesDisableProvider        = Method[SetProviderRequest, RuntimeAccount]{"runtimes/disableProvider"}
 	CallRuntimesList                   = Method[Empty, []RuntimeStatus]{"runtimes/list"}
+	CallRuntimesLogout                 = Method[RuntimeRequest, []UUID]{"runtimes/logout"}
 	CallRuntimesMarkAvailable          = Method[MarkRuntimeAvailable, RuntimeAllowances]{"runtimes/markAvailable"}
+	CallRuntimesSetProvider            = Method[SetProviderRequest, RuntimeAccount]{"runtimes/setProvider"}
 	CallSandboxState                   = Method[Empty, SandboxSettings]{"sandbox/state"}
 	CallSessionsAdopt                  = Method[AdoptRequest, UUID]{"sessions/adopt"}
 	CallSessionsDelete                 = Method[DeleteSessionRequest, Empty]{"sessions/delete"}

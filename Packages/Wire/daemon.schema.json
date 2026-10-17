@@ -1092,6 +1092,22 @@
       ],
       "additionalProperties": false
     },
+    "AuthenticateRequest": {
+      "type": "object",
+      "properties": {
+        "runtimeID": {
+          "type": "string"
+        },
+        "methodID": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "runtimeID",
+        "methodID"
+      ],
+      "additionalProperties": false
+    },
     "BackgroundItem": {
       "type": "object",
       "properties": {
@@ -7468,6 +7484,18 @@
         }
       ]
     },
+    "RuntimeRequest": {
+      "type": "object",
+      "properties": {
+        "runtimeID": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "runtimeID"
+      ],
+      "additionalProperties": false
+    },
     "RuntimeSession": {
       "type": "object",
       "properties": {
@@ -7969,6 +7997,22 @@
       "required": [
         "folder",
         "pinned"
+      ],
+      "additionalProperties": false
+    },
+    "SetProviderRequest": {
+      "type": "object",
+      "properties": {
+        "runtimeID": {
+          "type": "string"
+        },
+        "providerID": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "runtimeID",
+        "providerID"
       ],
       "additionalProperties": false
     },

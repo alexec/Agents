@@ -358,6 +358,11 @@ export interface AuthStatus {
   label: string;
 }
 
+export interface AuthenticateRequest {
+  runtimeID: string;
+  methodID: string;
+}
+
 export interface BackgroundItem {
   id: string;
   kind: BackgroundItemKind;
@@ -1832,6 +1837,10 @@ export type RuntimeInstall =
   | { script: { url: URLString; shell: string } }
   | { npmGlobal: { package: string } };
 
+export interface RuntimeRequest {
+  runtimeID: string;
+}
+
 export interface RuntimeSession {
   sessionID: string;
   cwd: URLString;
@@ -1943,6 +1952,11 @@ export interface SetOptionRequest {
 export interface SetPinnedRequest {
   folder: URLString;
   pinned: boolean;
+}
+
+export interface SetProviderRequest {
+  runtimeID: string;
+  providerID: string;
 }
 
 export interface SetSandboxRequest {
@@ -2953,6 +2967,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   AttentionNotification: { required: ["needID", "alert"], optional: ["need", "to"] },
   AttentionPending: { required: ["needs", "deliveries"], optional: [] },
   AuthStatus: { required: ["kind", "label"], optional: [] },
+  AuthenticateRequest: { required: ["runtimeID", "methodID"], optional: [] },
   BackgroundItem: { required: ["id", "kind", "name", "state", "canStop", "isStopping", "startedAt"], optional: ["taskType", "detail", "command", "parentID", "toolCallID", "outputFilePath", "summary", "lastToolName", "endedAt"] },
   Block: { required: ["waits"], optional: ["checkAgainAt", "wakeOn", "clearedAt", "clearedBy"] },
   BranchSummary: { required: ["name"], optional: ["remote"] },
@@ -3137,6 +3152,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   RuntimeAccount: { required: ["runtimeID", "state", "authMethods", "canLogOut", "providers", "promptCapabilities", "canSteer", "checkedAt"], optional: ["currentProviderID", "signedInAs"] },
   RuntimeAllowances: { required: ["rows", "at"], optional: ["shared"] },
   RuntimeAllowancesRow: { required: ["credentialKey", "state"], optional: ["unusable"] },
+  RuntimeRequest: { required: ["runtimeID"], optional: [] },
   RuntimeSession: { required: ["sessionID", "cwd"], optional: ["additionalDirectories", "title", "updatedAt", "isHeld"] },
   RuntimeStatus: { required: ["runtime", "availability", "checkedAt", "outdated"], optional: ["poolNote", "isOut"] },
   SandboxFailureRecord: { required: ["runtimeID", "detail", "hang", "recoveryOffered", "completedToolCalls"], optional: [] },
@@ -3153,6 +3169,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   SetLimitsRequest: { required: [], optional: ["perAgent", "daily", "perAgentTokens", "dailyTokens"] },
   SetOptionRequest: { required: ["agentID", "optionID", "value"], optional: [] },
   SetPinnedRequest: { required: ["folder", "pinned"], optional: [] },
+  SetProviderRequest: { required: ["runtimeID", "providerID"], optional: [] },
   SetSandboxRequest: { required: ["agentID"], optional: ["choice"] },
   SetUnreadRequest: { required: ["agentID", "unread"], optional: [] },
   ShellAttachRequest: { required: ["agentID"], optional: ["shell", "rows", "cols", "since", "startedAt", "folder"] },
