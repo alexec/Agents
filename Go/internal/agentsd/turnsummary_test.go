@@ -2,9 +2,11 @@ package agentsd
 
 import (
 	"encoding/json"
+	"fmt"
 	"strings"
 	"testing"
 
+	"github.com/alexec/agents/Go/internal/agentsd/store"
 	"github.com/alexec/agents/Go/wire"
 )
 
@@ -98,5 +100,55 @@ func TestAPageOfTurns(t *testing.T) {
 	json.Unmarshal(c.call(t, 4, "agents/turns", map[string]any{"agentID": id, "before": 2, "limit": 1}), &page)
 	if len(page.Turns) != 1 || page.FirstTurn != 1 || page.OpenStart == 0 {
 		t.Fatalf("%+v", page)
+	}
+}
+
+// Ports the kept turns (AgentStoreTurnsTests): a page of a long chat makes only its own
+// turns, the rest are filled in behind it into turns.jsonl, the next look reads them
+// from there, and a kept turn that no longer matches its transcript is made again.
+func TestTurnsAreKept(t *testing.T) {
+	fakeRuntimes(t)
+	d, c := start(t, t.TempDir())
+	defer d.Shutdown()
+	var id wire.UUID
+	json.Unmarshal(c.call(t, 1, "agents/start", map[string]any{"runtimeID": "claude", "cwd": "file://" + t.TempDir(), "prompt": "hello"}), &id)
+	c.until(t, "the first turn", ended(id, wire.AgentStateFinished))
+	person := wire.PromptOriginPerson
+	for i := range 300 {
+		d.Store.Append(id, wire.TranscriptEntry{ID: store.NewUUID(), At: now(), Kind: wire.TranscriptEntryKind{
+			UserMessage: &wire.TranscriptEntryKindUserMessage{Value: fmt.Sprintf("ask %d", i), From: &person}}})
+		d.Store.Append(id, wire.TranscriptEntry{ID: store.NewUUID(), At: now(), Kind: wire.TranscriptEntryKind{
+			AgentMessage: &wire.TranscriptEntryKindAgentMessage{Text: fmt.Sprintf("done %d", i)}}})
+	}
+	var page wire.TurnsPage
+	json.Unmarshal(c.call(t, 2, "agents/turns", map[string]any{"agentID": id, "limit": 5}), &page)
+	if len(page.Turns) != 5 || page.Turns[4].Ask.Kind.UserMessage.Value != "ask 298" {
+		t.Fatalf("%+v", page)
+	}
+	closed := int(page.FirstTurn) + 5
+	waitFor(t, "turns.jsonl filled", func() bool { return len(d.readTurns(id)) == closed })
+
+	// A fresh look reads them, checking the last: one whose first entry is another is made
+	// again from there.
+	kept := d.readTurns(id)
+	kept[closed-1].ID = store.NewUUID()
+	d.writeTurns(id, kept)
+	d.turnMu.Lock()
+	d.turnsOf = nil
+	d.turnMu.Unlock()
+	page = wire.TurnsPage{}
+	json.Unmarshal(c.call(t, 3, "agents/turns", map[string]any{"agentID": id, "before": 150, "limit": 1}), &page)
+	if len(page.Turns) != 1 || page.Turns[0].Ask.Kind.UserMessage.Value != fmt.Sprintf("ask %d", 149-(closed-299)) {
+		b, _ := json.Marshal(page)
+		t.Fatalf("%s", b)
+	}
+	waitFor(t, "made again", func() bool {
+		k := d.readTurns(id)
+		return len(k) == closed && k[closed-1].ID != kept[closed-1].ID
+	})
+	var tp wire.TranscriptPage
+	json.Unmarshal(c.call(t, 4, "agents/transcript", map[string]any{"agentID": id, "before": 10, "limit": 3}), &tp)
+	if tp.FirstIndex != 7 || len(tp.Entries) != 3 || tp.Total < 600 {
+		t.Fatalf("%+v", tp)
 	}
 }
