@@ -164,6 +164,9 @@ type Providers struct {
 	log     func(string)
 
 	mu          sync.Mutex
+	// Held while changed() reads the records and tells the router, so two at once can
+	// never leave the older overlay there (#1296).
+	publishing  sync.Mutex
 	providers   map[string]heldProvider
 	connections map[string]Provider
 	listed      map[string]*listed
@@ -1768,6 +1771,8 @@ func (p *Providers) workspaceLocked(link WorkspaceLink) *WorkspaceInfo {
 
 // changed lays each linked host's workspace over its state, and tells clients the providers.
 func (p *Providers) changed() {
+	p.publishing.Lock()
+	defer p.publishing.Unlock()
 	for _, h := range p.records.Hosts() {
 		p.router.SetWorkspace(h.ID, p.overlay(h))
 	}
