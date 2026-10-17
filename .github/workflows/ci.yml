@@ -44,7 +44,6 @@ jobs:
       agentskit: ${{ steps.test-selection.outputs.agentskit }}
       codetext: ${{ steps.test-selection.outputs.codetext }}
       packages: ${{ steps.test-selection.outputs.packages }}
-      mcpservers: ${{ steps.test-selection.outputs.mcpservers }}
       linux: ${{ steps.test-selection.outputs.linux }}
       go: ${{ steps.test-selection.outputs.go }}
     steps:
@@ -577,20 +576,6 @@ jobs:
         if: steps.test-selection.outputs.controlplane != 'skip'
         timeout-minutes: 20
         run: swift test --package-path Packages/ControlPlane
-
-  # The MCP servers Agents ships (#700), on Linux, where a cloud host runs them: no macOS
-  # runner to wait for, and the same toolchain as the release's static Linux build. The
-  # package depends on nothing else here, so it runs only when it changes.
-  mcp-servers:
-    needs: select
-    if: ${{ always() && !cancelled() && (needs.select.result != 'success' || needs.select.outputs.mcpservers != 'skip') }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    container: swift:6.4.0-noble
-    steps:
-      - uses: actions/checkout@v6
-      - name: Test MCPServers
-        run: swift test --package-path Packages/MCPServers
 
   # The Go module at Go/ (#1135): the daemon and the control plane as they move to Go
   # (#1134). Built, vetted and tested on Linux with the Go its go.mod names. Its wiregen test

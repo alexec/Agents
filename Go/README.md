@@ -17,6 +17,7 @@ not move.
 | `internal/safe/` | Recover helpers: one panic never takes a host or the control plane down | build |
 | `cmd/github-mcp/`, `internal/githubmcp/` | The `github` MCP server (#1232): the official github-mcp-server's tools, as a library, and the ci server's events | ci-server |
 | `cmd/linear-mcp/`, `internal/linearmcp/` | The `linear` MCP server (#839): Linear's issue events, in github-mcp's shape (tools are Linear's own server's) | ci-server |
+| `cmd/workspace-commands/`, `internal/workspacecommands/` | The command workspace provider (#691, in Go since #1364): workspaces as shell commands and presets, an MCP server the control plane runs | workspaces |
 
 ## Building and testing
 
@@ -124,3 +125,17 @@ marketplace; this server runs beside agentsd with a personal API key in `LINEAR_
 It reads Linear's GraphQL API (`LINEAR_MCP_API_URL` moves it, for a fake). Agents Host carries
 it (`scripts/go-github-mcp.sh linear-mcp`) and every Linux host installs
 `linear-mcp-linux-<arch>`. See `docs/how-to/use-linear-issues.md`.
+
+## The command workspace provider (`workspace-commands`, #691, #1364)
+
+A workspace provider whose workspaces are shell commands: written out, listed by one command,
+or a preset (`docker`, `doctl`, `codespaces`, `coder`, `gcloud-workstations`). Its configuration
+is the JSON in `WORKSPACE_COMMANDS_CONFIG`, as
+`specs/691-workspace-providers/contracts/command-provider.md` says; it was Swift
+(`Packages/MCPServers`) until #1364, and a configuration written for that one works unchanged.
+It answers MCP on stdio by itself, with no SDK: initialize, ping and the contract's tools.
+
+The control plane runs it from beside itself, then `AGENTS_WORKSPACE_COMMANDS`, then `PATH`
+(`internal/controlplane/providers`). Agents Host carries it beside `agents-control`
+(`scripts/go-github-mcp.sh workspace-commands`); the control-plane image has it beside
+`agents-control` (`scripts/build-linux-control.sh`, `deploy/Containerfile`).

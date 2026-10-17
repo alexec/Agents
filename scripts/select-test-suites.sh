@@ -14,8 +14,8 @@
 # ported rules' fixtures and the key vectors. CI's web job checks the rest of Web/ with Node,
 # on every run. A change to App/Sources, Remote/Sources or Shared/UI runs the suites that
 # scan those views (ConsistencyTests, OneGroupingTests), and one to App/Resources/toolsets
-# the two that read the bundled toolsets. MCPServers (#700), the MCP servers Agents ships,
-# runs on any change to it, on Linux: it depends on nothing else here. `linux` builds the
+# the two that read the bundled toolsets. The MCP servers Agents ships (#700) are Go, so
+# `go` runs their tests. `linux` builds the
 # Linux agentsd (#805) on any change to what it is built from (Daemon/, AgentsKit) or to
 # the script and job that build it: AgentsKit code behind
 # a Mac-only guard used from unguarded code breaks only that build (#788, #799). `go`
@@ -33,7 +33,6 @@ base=${1:-}
 agentskit=skip
 codetext=skip
 controlplane=skip
-mcpservers=skip
 linux=skip
 go=skip
 agentskit_filter=
@@ -44,7 +43,6 @@ full_both() {
 	agentskit=full
 	codetext=full
 	controlplane=run
-	mcpservers=run
 	linux=build
 	go=run
 	agentskit_filter=
@@ -136,9 +134,6 @@ else
 					;;
 				Packages/ControlPlane/*)
 					controlplane=run
-					;;
-				Packages/MCPServers/*)
-					mcpservers=run
 					;;
 				Go/*)
 					go=run
@@ -265,7 +260,6 @@ fi
 	printf 'codetext=%s\n' "$codetext"
 	printf 'codetext_filter=%s\n' "$codetext_filter"
 	printf 'controlplane=%s\n' "$controlplane"
-	printf 'mcpservers=%s\n' "$mcpservers"
 	printf 'linux=%s\n' "$linux"
 	printf 'go=%s\n' "$go"
 	printf 'agentsd=%s\n' "$agentsd"

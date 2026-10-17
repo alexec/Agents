@@ -2,7 +2,8 @@
 # agents-control for Linux (058, T068): static musl binaries for x86_64 and aarch64, cross-built
 # on this Mac with the swift.org toolchain and its static Linux SDK, as build-linux-agentsd.sh
 # does for the daemon. Beside each, workspace-commands (#691, #806), the command provider the
-# control plane looks for next to itself. They land in deploy/bin/, named by Docker's TARGETARCH.
+# control plane looks for next to itself, in Go (#1364) through Go/scripts/go.sh (lease "build").
+# They land in deploy/bin/, named by Docker's TARGETARCH.
 set -euo pipefail
 
 root=${0:A:h:h}
@@ -12,7 +13,8 @@ swift=~/Library/Developer/Toolchains/swift-$swift_version-RELEASE.xctoolchain/us
 [[ -x $swift ]] || { print -u2 "No swift.org $swift_version toolchain. See specs/037-cloud-agents/quickstart.md."; exit 1 }
 
 out=$root/deploy/bin
-mkdir -p $out
+mkdir -p $out $root/Go/out/servers
+version=$(git -C $root describe --tags --always 2>/dev/null || echo dev)
 typeset -A docker=(x86_64 amd64 aarch64 arm64)
 arches=("$@")
 (( $#arches )) || arches=(aarch64 x86_64)
@@ -25,13 +27,13 @@ for arch in $arches; do
     cp $bin $out/agents-control-linux-${docker[$arch]}
     print "  $out/agents-control-linux-${docker[$arch]} ($(( $(stat -f %z $bin) / 1048576 )) MB)"
 
+    # In Go (#1364), through Go/scripts/go.sh: static, with no cgo.
     print "building workspace-commands for $arch-linux…"
-    $swift build --package-path $root/Packages/MCPServers -c release \
-        --swift-sdk $arch-swift-linux-musl --product workspace-commands -Xswiftc -gnone -Xlinker -s
-    bin=$($swift build --package-path $root/Packages/MCPServers -c release --swift-sdk $arch-swift-linux-musl --show-bin-path)/workspace-commands
-    file $bin | grep -q "statically linked" || { print -u2 "$bin is not static"; exit 1; }
-    cp $bin $out/workspace-commands-linux-${docker[$arch]}
-    print "  $out/workspace-commands-linux-${docker[$arch]} ($(( $(stat -f %z $bin) / 1048576 )) MB)"
+    GOOS=linux GOARCH=${docker[$arch]} CGO_ENABLED=0 $root/Go/scripts/go.sh build -trimpath \
+        -ldflags "-s -w -X github.com/alexec/agents/Go/internal/buildinfo.Version=$version" \
+        -o out/servers/workspace-commands-linux-${docker[$arch]} ./cmd/workspace-commands
+    cp $root/Go/out/servers/workspace-commands-linux-${docker[$arch]} $out/workspace-commands-linux-${docker[$arch]}
+    print "  $out/workspace-commands-linux-${docker[$arch]} ($(( $(stat -f %z $out/workspace-commands-linux-${docker[$arch]}) / 1048576 )) MB)"
 done
 
 # The web remote (071), built here as it is not checked in (#473), so the image can serve it

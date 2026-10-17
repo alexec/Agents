@@ -84,16 +84,16 @@ Open issues: `is:open label:integration install`.
 ## Workspace providers
 
 The machines hosts run on. The contract is in [Workspace providers](workspace-providers.md).
-The presets are in `Packages/MCPServers/Sources/WorkspaceCommands/Presets.swift`.
+The presets are in `Go/internal/workspacecommands/presets.go` (Swift until #1364).
 Open issues: `is:open label:integration workspace`.
 
 | Integration | Clients that show it | State | Last checked | Where | Gaps |
 | --- | --- | --- | --- | --- | --- |
-| Docker | Mac, Remote, web, control plane | walked on scratch | 2026-10-13, PR #966 (`specs/691-workspace-providers/walks/857-real-providers.md`) | `Presets.swift` (`docker`) | #857, #1119 |
-| Coder | Mac, Remote, web, control plane | built | — | `Presets.swift` (`coder`) | #1119 |
-| Codespaces | Mac, Remote, web, control plane | broken (Stop works, Start never brings the host back) | 2026-10-13, PR #966, with a real codespace | `Presets.swift` (`codespaces`) | #864, #1119 |
-| DigitalOcean | Mac, Remote, web, control plane | built | — | `Presets.swift` (`doctl`) | #865, #1119 |
-| Google Cloud Workstations | Mac, Remote, web, control plane | built | — | `Presets.swift` (`gcloud-workstations`) | #1119 |
+| Docker | Mac, Remote, web, control plane | walked on scratch | 2026-10-13, PR #966 (`specs/691-workspace-providers/walks/857-real-providers.md`) | `presets.go` (`docker`) | #857, #1119 |
+| Coder | Mac, Remote, web, control plane | built | — | `presets.go` (`coder`) | #1119 |
+| Codespaces | Mac, Remote, web, control plane | broken (Stop works, Start never brings the host back) | 2026-10-13, PR #966, with a real codespace | `presets.go` (`codespaces`) | #864, #1119 |
+| DigitalOcean | Mac, Remote, web, control plane | built | — | `presets.go` (`doctl`) | #865, #1119 |
+| Google Cloud Workstations | Mac, Remote, web, control plane | built | — | `presets.go` (`gcloud-workstations`) | #1119 |
 | Any MCP or CLI provider (map written by an agent) | Mac, control plane | built | — | `Packages/ControlPlane/Sources/ControlPlaneKit/Providers/ProviderDrafts.swift`, `Go/internal/controlplane/providers/drafts.go` | |
 | The misbehaving fake provider | control plane | walked on scratch | 2026-10-13, PR #862 | its tests | #857 |
 
