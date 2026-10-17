@@ -96,6 +96,9 @@ func (f *fakeRuntime) Prompt(ctx context.Context, p sdk.PromptRequest) (sdk.Prom
 		<-ctx.Done()
 		return sdk.PromptResponse{StopReason: sdk.StopReasonCancelled}, nil
 	}
+	if strings.Contains(text, "spend it all") {
+		return sdk.PromptResponse{}, &sdk.RequestError{Code: -32603, Message: "Internal error", Data: map[string]any{"message": "Your credit balance is too low to access the API."}}
+	}
 	if strings.Contains(text, "sandbox fails") && !f.sandboxOff {
 		// A command whose sandbox could not be set up, as Claude's Bash says it.
 		f.conn.SessionUpdate(ctx, sdk.SessionNotification{SessionId: p.SessionId, Update: sdk.StartToolCall("call_s", "Run make",

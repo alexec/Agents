@@ -543,6 +543,13 @@ func (l *live) turn() bool {
 			d.end(l, wire.AgentStateStopped, wire.EndedReasonSandboxFailed)
 			return false
 		}
+		// What the refusal says about the runtime's allowance (052).
+		if code, msg := refusal(err); code != nil {
+			if why, ok := d.applyLimit(l.id, classifyLimit(a.RuntimeID, code, msg, "")); ok {
+				d.end(l, wire.AgentStateStopped, why)
+				return false
+			}
+		}
 		d.record(l.id, notice("error", "The turn failed", err.Error()))
 		select {
 		case <-s.Done():
@@ -565,6 +572,16 @@ func (l *live) turn() bool {
 		d.record(l.id, wire.TranscriptEntryKind{UsageRecorded: &wire.TranscriptEntryKindUsageRecorded{Value: u}})
 		// The turn's tokens on the agent, the day and the charts (finishTurn's banking).
 		d.bankTurnUsage(l.id, u)
+	}
+	// A runtime that says its allowance is spent in words, and ends the turn as usual.
+	if r.StopReason == sdk.StopReasonEndTurn {
+		l.mu.Lock()
+		said := l.lastMessage.String()
+		l.mu.Unlock()
+		if why, ok := d.applyLimit(l.id, classifyLimit(a.RuntimeID, nil, "", said)); ok {
+			d.end(l, wire.AgentStateStopped, why)
+			return false
+		}
 	}
 	// A command whose sandbox could not be set up: the turn ran to its end, and the agent
 	// stops there with the card. Never once it said how it went itself (#224).
