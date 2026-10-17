@@ -76,6 +76,10 @@ each wait costs one request a minute.
 
 ## When it does not work
 
+- **A label or a close made just after an issue was created is not an event.** Linear keeps
+  no history of the changes in an issue's first few minutes, and labels and closes are read
+  from that history. `issue.opened` has the issue's labels as they are when it is seen.
+
 - **"Linear is not signed in"**: `LINEAR_API_KEY` is not set for the server. Check
   `secrets.env` and the `env` of the entry.
 - **"Linear refused LINEAR_API_KEY"**: the key was revoked. Make a new key.

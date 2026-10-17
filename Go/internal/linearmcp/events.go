@@ -155,6 +155,11 @@ func object(props map[string]any) map[string]any {
 
 var str = map[string]any{"type": "string"}
 
+// firstMinutes says what Linear's issue history, which labels and closes are read from,
+// leaves out: it keeps nothing of what is changed in an issue's first minutes (seen live,
+// #839: a label and a close 4 s and 90 s after creating it had no history; one 5 min after did).
+const firstMinutes = "Linear keeps no history of changes in an issue's first few minutes, so a label added or a close then is not an event."
+
 // events are the events this server offers.
 var events = func() []event {
 	issueSchema := object(map[string]any{
@@ -167,16 +172,16 @@ var events = func() []event {
 		payload                   map[string]any
 		who                       string
 	}{
-		{Opened, "Issue opened", "An issue was created in Linear.",
+		{Opened, "Issue opened", "An issue was created in Linear. Its data is the issue as it is when polled, so labels added in its first minutes are there.",
 			"Only issues created with this label.", map[string]any{"openedAt": str}, "Only issues created by"},
-		{Labelled, "Issue labelled", "A label was added to an issue: one event per label added.",
+		{Labelled, "Issue labelled", "A label was added to an issue: one event per label added. " + firstMinutes,
 			"Only when this label is the one added.", map[string]any{"label": str, "by": str, "labelledAt": str}, "Only labels added by"},
 		{Commented, "Issue commented on", "A comment was left on an issue. Its body is the first 4000 characters.",
 			"Only issues with this label.",
 			map[string]any{"comment": object(map[string]any{"author": str, "url": str, "body": str}), "commentedAt": str},
 			"Only comments by"},
 		{Closed, "Issue closed",
-			"An issue moved into a Done (completed) or Canceled state from an open one. Moving it back and closing it again is a new event.",
+			"An issue moved into a Done (completed) or Canceled state from an open one. Moving it back and closing it again is a new event. " + firstMinutes,
 			"Only issues with this label.",
 			map[string]any{"reason": map[string]any{"type": "string", "enum": []string{"completed", "canceled"}}, "by": str, "closedAt": str},
 			"Only issues closed by"},

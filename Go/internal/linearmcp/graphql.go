@@ -338,7 +338,7 @@ type gqlHistory struct {
 
 // changed reads the latest history of the issues updated since: a label added is labelled, a
 // move from an open state into a closed one is closed. Labels and closes share the one query,
-// so a poll of both costs one.
+// so a poll of both costs one. history(first:) is the newest first.
 func (l *RealLinear) changed(ctx context.Context, kind Kind, team, since string) ([]Activity, bool, error) {
 	filter := map[string]any{"updatedAt": map[string]any{"gte": since}}
 	if team != "" {
