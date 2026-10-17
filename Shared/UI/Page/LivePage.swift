@@ -64,7 +64,7 @@ struct LivePage: View {
     /// for the newer one's.
     @State private var saving = 0
 
-    /// The caret's beat: `PageFollower.typingStep` characters every tick, a
+    /// The caret's beat: `PageFollower.typingStep` characters every tick, two
     /// hundred a second.
     private static let typingTick: Duration = .milliseconds(40)
 
