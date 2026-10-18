@@ -17,3 +17,6 @@ func (d *Daemon) registerInstall() {
 	}
 	d.serveInstall(filepath.Join(d.Store.Loc.Cache, "tools"), folder)
 }
+
+// installDefaultToolsets leaves a Mac's runtimes to the person: the window offers Install.
+func (d *Daemon) installDefaultToolsets() {}

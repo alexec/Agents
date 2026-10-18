@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/alexec/agents/Go/wire"
+	"github.com/ulikunitz/xz"
 )
 
 // tarGz makes a .tar.gz of files, each name to its text; a name ending in * is executable.
@@ -53,6 +54,10 @@ func TestTheBundlesToolsetsLoad(t *testing.T) {
 	if ts["claude"].archive() || !ts["opencode"].archive() || ts["claude"].node == nil {
 		t.Fatal("kinds")
 	}
+	// A Mac's recipes: on Linux, every test host's start made the switch a server's.
+	old := serverToolsets
+	serverToolsets = false
+	t.Cleanup(func() { serverToolsets = old })
 	d := &Daemon{}
 	d.toolsets = ts
 	if d.recipe("claude") == nil || d.recipe("opencode") == nil || d.recipe("grok").Script == nil || d.recipe("nothing") != nil {
@@ -97,6 +102,17 @@ mkdir -p "$p/node_modules/@x/adapter/dist" && echo 'ok' > "$p/node_modules/@x/ad
 	nodeDistURL = dist.URL + "/"
 	t.Cleanup(func() { nodeDistURL = old; macToolsHome = "" })
 	return dist, bundle
+}
+
+// install asks for runtimes/install and waits for its ending. Not c.call, which drops the
+// notifications that come before its answer: an install refused at once (no glibc) can
+// say its ending before the answer, and that ending was lost.
+func install(t *testing.T, c *conn, n int, id string) wire.RuntimeStatus {
+	t.Helper()
+	b, _ := json.Marshal(map[string]any{"jsonrpc": "2.0", "id": n, "method": "runtimes/install",
+		"params": map[string]any{"runtimeID": id}})
+	c.in <- string(b)
+	return waitInstalled(t, c, id)
 }
 
 func waitInstalled(t *testing.T, c *conn, id string) wire.RuntimeStatus {
@@ -165,8 +181,7 @@ func TestAnInstallThatFailsSaysWhy(t *testing.T) {
 	d, c := start(t, t.TempDir())
 	tools := filepath.Join(t.TempDir(), "tools")
 	d.serveInstall(tools, bundle)
-	c.call(t, 1, "runtimes/install", map[string]any{"runtimeID": "codex"})
-	end := waitInstalled(t, c, "codex")
+	end := install(t, c, 1, "codex")
 	if end.Availability.InstallFailed == nil || !strings.Contains(end.Availability.InstallFailed.Reason, "checksum") {
 		t.Fatalf("%+v", end.Availability)
 	}
@@ -188,5 +203,111 @@ func TestNPMProblems(t *testing.T) {
 	}
 	if got := npmProblem("npm ERR! code EAI_AGAIN\n", "Codex").Error(); !strings.Contains(got, "internet") {
 		t.Fatal(got)
+	}
+}
+
+// tarXZ makes a .tar.xz of files, as tarGz; a name starting with @ is a link: "@name": "target".
+func tarXZ(t *testing.T, files map[string]string) []byte {
+	var b bytes.Buffer
+	z, err := xz.NewWriter(&b)
+	if err != nil {
+		t.Fatal(err)
+	}
+	w := tar.NewWriter(z)
+	for name, text := range files {
+		if link, ok := strings.CutPrefix(name, "@"); ok {
+			w.WriteHeader(&tar.Header{Name: link, Linkname: text, Typeflag: tar.TypeSymlink, Mode: 0o777})
+			continue
+		}
+		mode := int64(0o644)
+		if strings.HasSuffix(name, "*") {
+			name, mode = strings.TrimSuffix(name, "*"), 0o755
+		}
+		w.WriteHeader(&tar.Header{Name: name, Mode: mode, Size: int64(len(text)), Typeflag: tar.TypeReg})
+		w.Write([]byte(text))
+	}
+	w.Close()
+	z.Close()
+	return b.Bytes()
+}
+
+// A server (#1312) installs a Node toolset from the manifest's Linux pin, into
+// ~/.agents-server/tools, where discovery looks first.
+func TestAServerInstallsANodeToolset(t *testing.T) {
+	npm := `#!/bin/sh
+while [ $# -gt 0 ]; do [ "$1" = --prefix ] && p=$2; shift; done
+mkdir -p "$p/node_modules/@x/adapter/dist" && echo 'ok' > "$p/node_modules/@x/adapter/dist/index.js"
+`
+	node := tarXZ(t, map[string]string{"node-v1/lib/npm-cli*": npm, "@node-v1/bin/npm": "../lib/npm-cli", "node-v1/bin/node*": "#!/bin/sh\n"})
+	dist := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/v1/node-v1-linux-"+macArch()+".tar.xz" {
+			w.Write(node)
+			return
+		}
+		http.NotFound(w, r)
+	}))
+	t.Cleanup(dist.Close)
+	toolsets := t.TempDir()
+	// Codex, not Claude: a CI runner has an npx on its PATH, which is Claude already there.
+	codex := filepath.Join(toolsets, "codex")
+	os.MkdirAll(codex, 0o755)
+	m, _ := json.Marshal(map[string]any{"runtimeID": "codex", "package": "@x/adapter", "entry": "dist/index.js",
+		"node": map[string]any{"version": "v1", "sha256": map[string]string{serverArch(): sha(node)}}})
+	os.WriteFile(filepath.Join(codex, "manifest.json"), m, 0o644)
+	os.WriteFile(filepath.Join(codex, "package.json"), []byte(`{}`), 0o644)
+	os.WriteFile(filepath.Join(codex, "package-lock.json"), []byte(`{}`), 0o644)
+
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	d, c := start(t, t.TempDir())
+	oldDist, oldLibc, oldMac := nodeDistURL, serverLibc, macToolsHome
+	nodeDistURL, macToolsHome = dist.URL+"/", ""
+	libc := "glibc 2.36"
+	serverLibc = func() string { return libc }
+	t.Cleanup(func() {
+		nodeDistURL, serverLibc, macToolsHome = oldDist, oldLibc, oldMac
+		toolsHome, serverToolsets = "", false
+	})
+	d.serveServerInstall(toolsets)
+
+	// Only the Node toolsets: a vendor's script or archive is the person's to run.
+	if d.recipe("codex") == nil || d.recipe("grok") != nil || d.recipe("opencode") != nil {
+		t.Fatal("a server's recipes")
+	}
+	// musl, or a glibc older than Node's builds need, is refused before any download.
+	libc = ""
+	if end := install(t, c, 1, "codex"); end.Availability.InstallFailed == nil ||
+		!strings.Contains(end.Availability.InstallFailed.Reason, "glibc 2.28 or later, and this server has musl") {
+		t.Fatalf("musl: %+v", end.Availability)
+	}
+	libc = "glibc 2.36"
+	end := install(t, c, 2, "codex")
+	want := filepath.Join(home, ".agents-server", "tools", "codex", "current", "bin", runtimeByID("codex").Executable)
+	if end.Availability.Available == nil || end.Availability.Available.Path != want {
+		t.Fatalf("%+v, want %s", end.Availability, want)
+	}
+	if target, err := os.Readlink(filepath.Join(home, ".agents-server", "tools", "codex", "current", "node", "bin", "npm")); err != nil || target != "../lib/npm-cli" {
+		t.Fatalf("npm's link: %q %v", target, err)
+	}
+	if s := d.statusOf(runtimeByID("codex")); s.Outdated || s.Runtime.Install == nil {
+		t.Fatalf("listed as %+v", s)
+	}
+}
+
+func TestGlibcAtLeast(t *testing.T) {
+	for libc, want := range map[string]bool{"glibc 2.36": true, "glibc 2.28": true, "glibc 2.27": false, "glibc 3.0": true, "": false, "musl": false} {
+		if glibcAtLeast(libc, 2, 28) != want {
+			t.Fatalf("%q", libc)
+		}
+	}
+}
+
+func TestUntarXZStaysInside(t *testing.T) {
+	for _, files := range []map[string]string{{"n/../../escape*": "x"}, {"@n/bin/out": "../../../etc"}} {
+		file := filepath.Join(t.TempDir(), "a.tar.xz")
+		os.WriteFile(file, tarXZ(t, files), 0o644)
+		if err := untarXZ(file, t.TempDir()); err == nil {
+			t.Fatalf("%v unpacked", files)
+		}
 	}
 }
