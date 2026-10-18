@@ -59,6 +59,11 @@ type Config struct {
 	// The web remote's loopback listener (071): Web/dist and the port, or nil for none,
 	// which is a container's default.
 	Web *WebConfig
+	// The built web app (Web/dist) to serve on this listener too, at URL's own origin, for a
+	// browser anywhere (#1459): a control plane behind a proxy with a public certificate
+	// (compose.public.yaml). "" serves none, as Agents Host's copy, whose page is the
+	// loopback listener's.
+	PublicWeb string
 	// Told whenever the web remote's listener starts or fails to (071 R3): serve --home
 	// writes it beside the log for Agents Host.
 	WebChanged func(web.Status)
@@ -138,6 +143,8 @@ type Service struct {
 	stop     chan struct{}
 	ready    bool
 	loopback *web.Listener
+	// The page at this copy's own origin (#1459), or nil.
+	page *web.Public
 }
 
 // New makes a service; Start opens the store and listens.
@@ -201,6 +208,16 @@ func New(cfg Config) (*Service, error) {
 		}}
 	if cfg.ProviderHome != "" && s.mesh == nil {
 		s.providers = s.makeProviders(cfg.ProviderHome)
+	}
+	if cfg.PublicWeb != "" {
+		// A build that doesn't match its manifest leaves the page off and says so; hosts and
+		// clients carry on (071 R3).
+		if s.page, err = web.NewPublic(cfg.PublicWeb, cfg.URL); err != nil {
+			s.log(fmt.Sprintf("web: not serving the page at %s: %v", cfg.URL, err))
+			s.page = nil
+		} else {
+			s.log("web: serving the page at " + s.page.Address())
+		}
 	}
 	return s, nil
 }
@@ -673,13 +690,23 @@ func (s *Service) serveHTTP(w http.ResponseWriter, r *http.Request) {
 			plain(w, http.StatusTooManyRequests, "too many tries from this address; try again in a minute\n")
 			return
 		}
+		// The page's own socket (#1459): its exchange is bound to the page's origin, and only
+		// a browser proves anything on it. Every other socket is a window's, a phone's or a
+		// host's, as before.
+		webOrigin := ""
+		if s.page != nil && s.page.FromPage(r.Header) {
+			webOrigin = s.page.Origin()
+		}
 		ws, err := websocket.Accept(w, r, &websocket.AcceptOptions{InsecureSkipVerify: true})
 		if err != nil {
 			proved(false)
 			return
 		}
-		go s.accept(s.adopt(newConn(ws, source)), "", proved)
+		go s.accept(s.adopt(newConn(ws, source)), webOrigin, proved)
 	default:
+		if s.page != nil && s.page.Serve(w, r) {
+			return
+		}
 		plain(w, http.StatusNotFound, "not here\n")
 	}
 }
@@ -840,8 +867,8 @@ func (s *Service) accept(conn *Conn, webOrigin string, proved func(failed bool))
 		refuse(controllink.Refuse(controllink.Unknown))
 		return
 	}
-	// A browser's key works only through the loopback listener, and nothing else's does
-	// there (071).
+	// A browser's key works only through a page's socket (the loopback listener's, or the
+	// page on this domain's, #1459), and nothing else's does there (071).
 	if client != nil && (client.Kind == records.KindBrowser) != (webOrigin != "") {
 		refuse(controllink.Refuse(controllink.Unknown))
 		return
@@ -904,7 +931,7 @@ func (s *Service) accept(conn *Conn, webOrigin string, proved func(failed bool))
 	case 'h':
 		s.hostArrived(host, conn)
 	case 'p', 'e':
-		s.spend(conn, id.ID, webOrigin != "")
+		s.spend(conn, id.ID, webOrigin)
 	case 'x':
 		if strings.HasPrefix(id.ID, handoverPrefix) {
 			s.handoverSession(conn)
@@ -1143,8 +1170,8 @@ func (s *Service) hostArrived(host string, conn *Conn) {
 const spentWords = "This code has been used. Ask for a new one."
 
 // spend is someone holding a code saying who they are, once, before it hangs up
-// (wire.md).
-func (s *Service) spend(conn *Conn, id string, loopback bool) {
+// (wire.md). webOrigin is the page's origin for a socket from a page, else "".
+func (s *Service) spend(conn *Conn, id string, webOrigin string) {
 	defer func() {
 		// Give the reply time to leave before the socket closes.
 		time.Sleep(200 * time.Millisecond)
@@ -1158,7 +1185,7 @@ func (s *Service) spend(conn *Conn, id string, loopback bool) {
 	if !ok || !m.isRequest() {
 		return
 	}
-	result, err := s.spendCode(id, m.Method, m.Params, loopback)
+	result, err := s.spendCode(id, m.Method, m.Params, webOrigin)
 	if err != nil {
 		var r *controllink.Refusal
 		if errors.As(err, &r) {
@@ -1175,8 +1202,9 @@ func (s *Service) spend(conn *Conn, id string, loopback bool) {
 	conn.SendNow(reply(m.ID, result))
 }
 
-func (s *Service) spendCode(id, method string, params json.RawMessage, loopback bool) (*wire.Admitted, error) {
+func (s *Service) spendCode(id, method string, params json.RawMessage, webOrigin string) (*wire.Admitted, error) {
 	ctx := context.Background()
+	fromPage := webOrigin != ""
 	stored, err := s.codes.Stored(ctx, id, true)
 	if err != nil {
 		return nil, err
@@ -1192,22 +1220,23 @@ func (s *Service) spendCode(id, method string, params json.RawMessage, loopback 
 			ID, Name, Kind string
 			PublicKey      []byte
 		}{strings.ToUpper(string(said.ID)), said.Name, string(said.Kind), said.PublicKey}
-		// A browser pairs through the loopback listener, and only a browser does (071).
-		if (a.Kind == records.KindBrowser) != loopback {
+		// A browser pairs through a page, and only a browser does (071, #1459).
+		if (a.Kind == records.KindBrowser) != fromPage {
 			return nil, fail(invalidParams, "Pair that kind of client elsewhere.")
 		}
-		// And with a code made for one, which is good nowhere else (R2). Refused before it
-		// is spent, so the browser it was made for can still use it.
+		// And with a code made for one, which is good nowhere else (R2): on the page on the
+		// Mac or on this domain's. Refused before it is spent, so the browser it was made for
+		// can still use it.
 		browser := stored.Browser != nil && *stored.Browser
-		if browser != loopback {
+		if browser != fromPage {
 			if browser {
-				return nil, fail(invalidParams, "That code is for a browser on this Mac.")
+				return nil, fail(invalidParams, "That code is for a browser. Paste it in the Agents page.")
 			}
-			return nil, fail(invalidParams, "That code is for a window or a phone. Get one from Pair a Browser….")
+			return nil, fail(invalidParams, "That code is for a window or a phone. Get one from Add a Browser….")
 		}
 		name := a.Name
 		if a.Kind == records.KindBrowser {
-			name = browserName(a.Name)
+			name = browserName(a.Name, s.page != nil && webOrigin == s.page.Origin())
 		}
 		spender := a.ID
 		sp, err := s.codes.Spend(ctx, id, spent{PublicKey: a.PublicKey, Client: &spender})
@@ -1285,14 +1314,18 @@ func (s *Service) spendCode(id, method string, params json.RawMessage, loopback 
 }
 
 // browserName is "Safari on Alex's MacBook": the page can't learn the Mac's name, and the
-// loopback listener only ever runs on the Mac it names (071, FR-010).
-func browserName(said string) string {
+// loopback listener only ever runs on the Mac it names (071, FR-010). A browser that paired
+// on the page on this domain (#1459) may be anywhere: "Safari on the web".
+func browserName(said string, public bool) string {
 	product := strings.TrimSpace(said)
 	if r := []rune(product); len(r) > 40 {
 		product = strings.TrimSpace(string(r[:40]))
 	}
 	if product == "" {
 		product = "A browser"
+	}
+	if public {
+		return product + " on the web"
 	}
 	return product + " on " + LocalName()
 }

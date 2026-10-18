@@ -36,6 +36,8 @@ struct RemoteSidebar: View {
     @AppStorage(SidebarSmartRow.offDefaultsKey) private var smartOff = SidebarSmartRow.offAtFirst
     /// Settings (#846), opened from the sidebar's foot.
     @State private var showsSettings = false
+    /// Add a Browser… (#1459): a code for a browser, as the window's.
+    @State private var addsBrowser = false
 
     private var selection: Binding<SidebarItem?> {
         Binding(get: { model.sidebarItem },
@@ -194,6 +196,8 @@ struct RemoteSidebar: View {
                 Button("Settings…") { showsSettings = true }
                     .appText(.supporting)
                 if !model.needsPairing {
+                    Button("Add a Browser…") { addsBrowser = true }
+                        .appText(.supporting)
                     ForgetThisDeviceRow()
                 }
             }
@@ -210,6 +214,7 @@ struct RemoteSidebar: View {
         }
         .sheet(item: $adding) { NewProjectSheet(adding: $0) }
         .sheet(isPresented: $showsSettings) { RemoteSettings() }
+        .sheet(isPresented: $addsBrowser) { AddBrowserSheet() }
         .searchable(text: $query, prompt: "Search")
         .task(id: query) {
             let words = query.trimmingCharacters(in: .whitespacesAndNewlines)

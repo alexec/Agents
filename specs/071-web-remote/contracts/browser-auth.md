@@ -74,10 +74,30 @@ As built in T012:
 
 - **A code is good only through the listener it was made for** (security review, R2): one made
   with `clients/startPairing {kind: "browser"}`, or `agents-control code --browser`, only
-  through the loopback listener; any other client code only through TLS. `announce` refuses
-  the wrong one with `invalidParams` before spending it, in words the page shows: "That code is
-  for a window or a phone. Get one from Pair a Browser…." here, and "That code is for a
-  browser on this Mac." over TLS.
+  through the loopback listener (or the page on the domain, below); any other client code only
+  through TLS. `announce` refuses the wrong one with `invalidParams` before spending it, in
+  words the page shows: "That code is for a window or a phone. Get one from Add a Browser…."
+  here, and "That code is for a browser. Paste it in the Agents page." over TLS.
+
+## The page on the control plane's own domain (#1459)
+
+With `AGENTS_CONTROL_PUBLIC_WEB` (or `--public-web DIR`), the control plane's own listener also
+serves the page, behind its proxy, at the origin of `AGENTS_CONTROL_URL`, as a browser writes it:
+`O = "https://<domain>"`, with the port only when it isn't 443.
+
+- **Files:** only the manifest's, only at the page's own `Host` (else 421), with the loopback
+  page's headers, `connect-src wss://<domain>`, `frame-src 'none'` and
+  `Strict-Transport-Security`. `/sandbox.html` and `/sandbox.js` are not served: there is no
+  second origin for the proxy, so the page draws no MCP Apps views and says so.
+- **The page's socket** is a `/v1/connect` upgrade whose `Origin` is `O`. It is taken as the
+  loopback listener's is: only `c:` and `p:`, bound to `O`, a browser's key only, and
+  `clients/announce` only for `kind: browser`. Every other socket (no `Origin`, or another) is a
+  window's, a phone's or a host's, as before. Both pass the same per-source budget (058
+  public-security.md P3).
+- **A browser's code** (`clients/startPairing {kind: "browser"}`) is good on either page. Over a
+  window's socket it is refused: "That code is for a browser. Paste it in the Agents page."
+- **Its name** is "<browser> on the web", not "<browser> on <Mac>".
+- `control/status.publicWeb` is the page's address, for **Add a Browser…** to show.
 
 ## Closing
 

@@ -31,8 +31,11 @@ RUN for cmd in agents-control workspace-commands; do \
         -o /out/$cmd ./cmd/$cmd || exit 1; \
     done
 
-# The web remote, built here as it is not checked in (#473): served only with
-# `--web /web --web-port <port>`, on the container's loopback, so off unless asked for.
+# The web remote, built here as it is not checked in (#473), as scripts/web.sh build makes it
+# (npm ci, then build.mjs, which writes the MANIFEST the control plane checks), so the page and
+# the control plane are one version. Off unless asked for: AGENTS_CONTROL_PUBLIC_WEB=/web
+# serves it at the control plane's own address (compose.public.yaml, #1459); `--web /web
+# --web-port <port>` on the container's loopback.
 FROM ${NODE_IMAGE} AS web
 WORKDIR /src/Web
 COPY Web/package.json Web/package-lock.json ./

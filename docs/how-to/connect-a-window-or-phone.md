@@ -63,7 +63,7 @@ first.
 
 1. In a paired window, open **Settings ▸ Control plane**, and click **Show** beside
    **Clients**.
-2. Click **Pair a Browser…**, then click **Copy**.
+2. Click **Add a Browser…**, then click **Copy**.
 3. In Safari or Chrome on the Mac that runs Agents Host, open **http://localhost:8792**,
    paste the code, and click **Connect**.
 

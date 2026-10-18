@@ -24,7 +24,7 @@ struct ControlClientsPage: View {
             HStack(spacing: 8) {
                 Button("Pair a Device…") { pairingDevice = true }.buttonStyle(.paper)
                 Button("Pair a Mac…") { pairingMac = true }.buttonStyle(.paper)
-                Button("Pair a Browser…") { pairingBrowser = true }.buttonStyle(.paper)
+                Button("Add a Browser…") { pairingBrowser = true }.buttonStyle(.paper)
             }
             Text("Forgetting cuts a client off at once, directly and through the relay. To use it again, pair it again.")
                 .appText(.supporting).foregroundStyle(.secondary)

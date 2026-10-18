@@ -1102,16 +1102,18 @@ type ControlOK struct {
 }
 
 type ControlStatus struct {
-	Name             string              `json:"name"`
-	Version          string              `json:"version"`
-	HomeHost         *HostID             `json:"homeHost,omitzero"`
-	MachineID        string              `json:"machineID"`
-	StartedAt        *Date               `json:"startedAt,omitzero"`
-	Port             *int64              `json:"port,omitzero"`
-	AwayFromHome     *bool               `json:"awayFromHome,omitzero"`
-	You              *UUID               `json:"you,omitzero"`
-	RelayKey         Data                `json:"relayKey,omitzero"`
-	Web              *WebRemoteStatus    `json:"web,omitzero"`
+	Name         string           `json:"name"`
+	Version      string           `json:"version"`
+	HomeHost     *HostID          `json:"homeHost,omitzero"`
+	MachineID    string           `json:"machineID"`
+	StartedAt    *Date            `json:"startedAt,omitzero"`
+	Port         *int64           `json:"port,omitzero"`
+	AwayFromHome *bool            `json:"awayFromHome,omitzero"`
+	You          *UUID            `json:"you,omitzero"`
+	RelayKey     Data             `json:"relayKey,omitzero"`
+	Web          *WebRemoteStatus `json:"web,omitzero"`
+	// Where a browser anywhere opens the page, on the control plane's own domain (#1459): its https address, when it serves the page there.
+	PublicWeb        *string             `json:"publicWeb,omitzero"`
 	ThisMacHost      *HostJoinStatus     `json:"thisMacHost,omitzero"`
 	ProjectDetection *ProjectDetection   `json:"projectDetection,omitzero"`
 	UnjoinedTunnels  []HostTunnelChanged `json:"unjoinedTunnels,omitzero"`

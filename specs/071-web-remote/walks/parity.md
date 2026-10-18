@@ -15,7 +15,7 @@
 
 ## Counts
 
-Of 233 rows: **156 same**, **49 by design**, **28 delta** (after #188, #189, #191, #221, #238–#244, #249, #252–#255, #257, #259–#261, #263–#266, #291, #254, #317, #341, #342, #343, #345, #344, #357, #366, #375, #377, #381, #378, #400, #396, #394, #436, #433, #432, #506, #545, #548, #791, #790, #846, #826, #888, #982, #1089, #1109, #1122, #1419, #1123, #1118, #1473). A row with any open delta counts as delta, even where another side's difference is by design.
+Of 234 rows: **157 same**, **49 by design**, **28 delta** (after #188, #189, #191, #221, #238–#244, #249, #252–#255, #257, #259–#261, #263–#266, #291, #254, #317, #341, #342, #343, #345, #344, #357, #366, #375, #377, #381, #378, #400, #396, #394, #436, #433, #432, #506, #545, #548, #791, #790, #846, #826, #888, #982, #1089, #1109, #1122, #1419, #1123, #1118, #1473, #1459). A row with any open delta counts as delta, even where another side's difference is by design.
 
 | Screen | Same | By design | Delta |
 |---|---|---|---|
@@ -33,7 +33,7 @@ Of 233 rows: **156 same**, **49 by design**, **28 delta** (after #188, #189, #19
 | Events and resources | 2 | 1 | 2 |
 | Notifications and badges | 3 | 2 | 0 |
 | Disk strip | 2 | 1 | 0 |
-| Hosts, connection and pairing | 4 | 3 | 1 |
+| Hosts, connection and pairing | 5 | 3 | 1 |
 | MCP Apps views | 5 | 1 | 0 |
 
 The deltas are tracked by 31 issues:
@@ -391,6 +391,7 @@ The deltas are tracked by 31 issues:
 | Workspace providers (#691) | Settings ▸ Control plane ▸ Providers: a provider's workspaces, Add Provider (kind first), Add as Host… (with Link to a host already there by the workspace's name or ssh, #976), and Link to Workspace… in a host's `···` menu, New Workspace… on a provider's card and Delete Workspace… in a host's `···` menu, Write It for Me in Add Provider and Write the Map Again… on a card (#858): `A/Control/ControlProvidersPage.swift`, `A/Control/NewWorkspaceSheet.swift`, `A/Control/ProviderDraftView.swift` | None | None | **by design** (managing hosts is the Mac's) |
 | A host's git using a Mac's git access (#1122) | The window's alert **Let ‹host› use this Mac's git access for ‹server›?**, Allow / Don't Allow, from `gitAsks` on the host's `hosts/list` row: `A/Hosts/Lending.swift`, `A/ContentView.swift`; the row's line *Uses this Mac's git access for …* and **Stop Lending Git Access for …** in its `···`: `A/Control/ControlSettingsView.swift`; words `K/Control/GitLending.swift` (`GitLendWords`) | The same alert: `R/RemoteApp.swift`, `RemoteModel.gitLendAsk`; Settings ▸ Git access with Stop Lending: `R/Sidebar/GitAccessSettingsSection.swift` | The same as a dialog: `W/views/GitLend.tsx`; Settings ▸ Git access: `W/views/Settings.tsx`; words `W/model/gitLending.ts` | **same** (#1122); Clone these projects in New Workspace… is **by design** Mac only, as Workspace providers is; the window's alert unwalked on screen (walked over the socket) |
 | Pairing | Shows the codes: `A/Control/ControlClientsPane.swift` | Scans: `R/Link/PairingView.swift` | Pastes, or `#code=`: `W/views/Pairing.tsx`, `W/pairLink.ts` | **by design** (#105, #109, #111) |
+| Add a Browser (#1459): a one-use browser code, and where to paste it: the page on the control plane's own domain (`control/status.publicWeb`) for a browser anywhere, and this Mac's page at localhost | **Add a Browser…** in Settings ▸ Control plane ▸ Clients, beside Pair a Device…: `A/Control/ControlClientsPane.swift`, `CodeSheet` in `A/Control/ControlSettingsView.swift` | **Add a Browser…** at the sidebar's foot, the code to copy: `R/Link/AddBrowserSheet.swift`, `RemoteModel.startBrowserCode` | Pairs at `https://<domain>/` as at localhost, in words that name both apps' Add a Browser…; named *Chrome on the web*; MCP Apps views not drawn there (no second origin, #1484): `W/views/Pairing.tsx`, `W/place.ts`, `W/views/chat/viewLayer.ts` | **same** (#1459); Mac and web walked on Pebble (`specs/058-control-plane/walks/1459.md`), the Remote's sheet unwalked |
 
 ## MCP Apps views
 

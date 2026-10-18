@@ -16,12 +16,14 @@ import { setTimeout as sleep } from "node:timers/promises";
 export const chromePath = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 
 /** Starts Chrome on `profile` (made if missing) and connects to it. */
-export async function launch({ profile, headed = false, path = chromePath } = {}) {
+/** `args` are Chrome's own flags beside these, such as a test certificate's
+ *  `--ignore-certificate-errors-spki-list=<pin>` for the public page on Pebble (#1459). */
+export async function launch({ profile, headed = false, path = chromePath, args: extra = [] } = {}) {
   if (!profile) throw new Error("say which throwaway profile folder to use");
   mkdirSync(profile, { recursive: true });
   rmSync(`${profile}/DevToolsActivePort`, { force: true });
   const args = [`--user-data-dir=${profile}`, "--remote-debugging-port=0", "--no-first-run", "--no-default-browser-check",
-    "--disable-background-networking", "--disable-sync", "--hide-scrollbars", "about:blank"];
+    "--disable-background-networking", "--disable-sync", "--hide-scrollbars", ...extra, "about:blank"];
   if (!headed) args.unshift("--headless=new");
   const child = spawn(path, args, { stdio: "ignore" });
   for (let i = 0; i < 150 && !existsSync(`${profile}/DevToolsActivePort`); i++) await sleep(100);

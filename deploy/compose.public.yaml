@@ -1,6 +1,7 @@
 # The control plane on a machine of its own, at a real domain with a publicly trusted
 # certificate (#61): one copy over a folder on this machine, and Caddy in front, getting the
-# certificate from Let's Encrypt. Codes carry no pin. The how-to is
+# certificate from Let's Encrypt. Codes carry no pin. The web page is served at the domain
+# too (#1459), for a browser anywhere. The how-to is
 # docs/how-to/run-the-control-plane-in-the-cloud.md.
 #
 #   scripts/build-linux-agentsd.sh               # the Linux host, handed to servers that join
@@ -40,6 +41,10 @@ services:
       # The right to use that key. An empty file: the machine's own service account.
       GOOGLE_APPLICATION_CREDENTIALS: /run/secrets/gcp-service-account
       AGENTS_CONTROL_NAME: ${AGENTS_CONTROL_NAME:-${AGENTS_DOMAIN}}
+      # The web page at https://AGENTS_DOMAIN/ (#1459), built into the image with the control
+      # plane, so the two are one version. A browser pairs there by a code from Add a
+      # Browser… on a paired Mac, iPhone or iPad. Empty serves no page.
+      AGENTS_CONTROL_PUBLIC_WEB: ${AGENTS_CONTROL_PUBLIC_WEB-/web}
       # 1 to start empty, for a handover from Agents Host to fill (058 research R16).
       AGENTS_CONTROL_RECEIVE: ${AGENTS_CONTROL_RECEIVE:-}
       # Caddy's address below: only its X-Forwarded-For says where a socket came from, for

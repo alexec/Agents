@@ -114,6 +114,9 @@ public extension DaemonAPI {
         /// The web remote's loopback listener (071 R3): whether the page is served, and why
         /// not. Nil when this copy was not asked to serve it.
         public var web: WebRemoteStatus?
+        /// Where a browser anywhere opens the page, on the control plane's own domain
+        /// (#1459): its https address. Nil when it serves no page there.
+        public var publicWeb: String?
         /// This Mac's host, as it says its join stands (#113), when the control plane runs
         /// beside it: "Couldn't join the control plane: …". Nil elsewhere.
         public var thisMacHost: HostJoinStatus?

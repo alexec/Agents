@@ -130,7 +130,8 @@ may be forgotten from any other, the last one too; Agents Host can always make a
 
 A browser is one more client. Agents Host serves Agents as a web page at
 **http://localhost:8792**, and a browser on the same Mac pairs with a code, as a phone
-does, from **Pair a Browser…**. It may do everything the window may; its page shows what
+does, from **Add a Browser…**. A control plane in the cloud serves the same page at its
+own address, for a browser anywhere (#1459). It may do everything the window may; its page shows what
 the phone does, except that it has no terminal, no dictation and no notifications.
 
 The browser keeps a key that can't be copied out of it, made when it pairs and kept in

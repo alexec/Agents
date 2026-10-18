@@ -3307,6 +3307,10 @@
         "web": {
           "$ref": "#/definitions/WebRemoteStatus"
         },
+        "publicWeb": {
+          "type": "string",
+          "description": "Where a browser anywhere opens the page, on the control plane's own domain (#1459): its https address, when it serves the page there."
+        },
         "thisMacHost": {
           "$ref": "#/definitions/HostJoinStatus"
         },

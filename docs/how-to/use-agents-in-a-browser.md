@@ -46,7 +46,7 @@ says **Connect this browser to your agents**.
 
 1. Get a code, from either place:
    - In the window, open **Settings ▸ Control plane**, click **Show** beside **Clients**, then
-     click **Pair a Browser…**.
+     click **Add a Browser…**.
    - In Agents Host, click **Pair a Window or Phone…** and choose **A browser on this Mac**.
 
    Click **Copy**. Whoever pastes the code can then do everything the window can, so paste
@@ -55,6 +55,13 @@ says **Connect this browser to your agents**.
 
 The browser keeps a key of its own, which can't be copied out of it. Next time you open the
 address, it connects with that key, and nothing needs pasting.
+
+### A browser on another computer
+
+A control plane in the cloud serves the same page at its own address, such as
+`https://agents.example.com/`, for a browser anywhere. **Add a Browser…** in the window, or
+at the foot of the Remote's sidebar, gives the code and says the address. See
+[Run the control plane in the cloud](run-the-control-plane-in-the-cloud.md#use-agents-in-a-browser).
 
 ### What you can do there
 
@@ -116,13 +123,13 @@ The control plane still lists the browser until you forget it there.
   An address with `#code=` in it, from the browser's history, is one of these: choose **Open in
   Browser** again instead.
 - **That isn't an Agents code. It starts agents-control:2:c:** Something else was pasted, or a
-  code for a host. Copy the code again from **Pair a Browser…**.
+  code for a host. Copy the code again from **Add a Browser…**.
 - **This code is for another control plane.** The code came from a different set-up from the
   one serving this page.
-- **That code is for a window or a phone. Get one from Pair a Browser….** A code from **Pair a
+- **That code is for a window or a phone. Get one from Add a Browser….** A code from **Pair a
   Device…** or **Pair a Mac…** works only for those. Get one made for a browser. It works the
   other way too: a browser's code pasted into a phone or a window says **That code is for a
-  browser on this Mac.**
+  browser. Paste it in the Agents page.**
 - **Can't reach the control plane at localhost:8792. Trying again.** Agents Host's control
   plane has stopped. The page shows what it last knew, and catches up by itself when the
   control plane is back, with no reload.

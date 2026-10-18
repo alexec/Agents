@@ -925,6 +925,11 @@ export interface ControlStatus {
   you?: UUID;
   relayKey?: Base64;
   web?: WebRemoteStatus;
+  /**
+   * Where a browser anywhere opens the page, on the control plane's own domain (#1459): its https
+   * address, when it serves the page there.
+   */
+  publicWeb?: string;
   thisMacHost?: HostJoinStatus;
   projectDetection?: ProjectDetection;
   unjoinedTunnels?: HostTunnelChanged[];
@@ -4529,7 +4534,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ControlInstallProgress: { required: ["name", "step"], optional: [] },
   ControlMoved: { required: ["url", "controlKey", "name"], optional: ["pin"] },
   ControlOK: { required: ["mac"], optional: ["grant", "host", "relayed", "endpoints", "epoch"] },
-  ControlStatus: { required: ["name", "version", "machineID"], optional: ["homeHost", "startedAt", "port", "awayFromHome", "you", "relayKey", "web", "thisMacHost", "projectDetection", "unjoinedTunnels"] },
+  ControlStatus: { required: ["name", "version", "machineID"], optional: ["homeHost", "startedAt", "port", "awayFromHome", "you", "relayKey", "web", "publicWeb", "thisMacHost", "projectDetection", "unjoinedTunnels"] },
   Cost: { required: ["amount", "currency"], optional: [] },
   CostLimits: { required: [], optional: ["perAgent", "daily", "perAgentTokens", "dailyTokens"] },
   CostState: { required: ["limits", "today", "day", "tokensToday"], optional: ["note"] },

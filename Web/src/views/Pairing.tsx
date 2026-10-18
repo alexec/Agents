@@ -1,6 +1,7 @@
 // Frame E: with no key, the page shows this and nothing else (071 US1). A code is pasted,
 // or arrives in the address from Open in Browser (#109, pairLink.ts).
 import { useSignal } from "@preact/signals";
+import { onThisMac } from "../place";
 import type { Session } from "../session";
 import { Huddle } from "./Huddle";
 
@@ -20,11 +21,20 @@ export function Pairing({ session }: { session: Session }) {
         {/* The mark of a team (#1007): no prompt here, so the Blobs only look around. */}
         <Huddle focused={false} typed={0} />
         <h1>Connect this browser to your agents</h1>
-        <p>
-          Get a code from Agents on this Mac: in the window,{" "}
-          <strong>Settings ▸ Control plane ▸ Clients ▸ Pair a Browser…</strong>, or in Agents Host,{" "}
-          <strong>Pair a Window or Phone… ▸ A browser on this Mac</strong>. Paste it here.
-        </p>
+        {onThisMac() ? (
+          <p>
+            Get a code from Agents on this Mac: in the window,{" "}
+            <strong>Settings ▸ Control plane ▸ Clients ▸ Add a Browser…</strong>, or in Agents Host,{" "}
+            <strong>Pair a Window or Phone… ▸ A browser on this Mac</strong>. Paste it here.
+          </p>
+        ) : (
+          // The page on the control plane's own domain (#1459): any paired window or phone makes one.
+          <p>
+            Get a code from Agents where it is already connected: on a Mac,{" "}
+            <strong>Settings ▸ Control plane ▸ Clients ▸ Add a Browser…</strong>; on an iPhone or iPad,{" "}
+            <strong>Add a Browser…</strong> at the foot of the sidebar. Paste it here.
+          </p>
+        )}
         <textarea
           aria-label="Code"
           placeholder="agents-control:2:c:…"

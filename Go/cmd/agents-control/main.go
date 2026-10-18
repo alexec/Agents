@@ -6,6 +6,7 @@
 //	agents-control serve … [--host-root DIR]    this Mac's host's root: its join in control/status (#113)
 //	agents-control serve … [--log FILE]         stamped lines into FILE, rolled at 4 MB (#174)
 //	agents-control serve … [--web DIR] [--web-port N] [--no-web]
+//	agents-control serve … [--public-web DIR]   the page at AGENTS_CONTROL_URL too (#1459)
 //	agents-control serve … [--store-credentials-fd N]
 //	agents-control serve … [--receive]          empty, for a handover to fill (AGENTS_CONTROL_RECEIVE=1)
 //	agents-control serve … [--no-forwarding]    serve, even if this copy was forwarding
@@ -28,6 +29,9 @@
 //	AGENTS_STORE                file:///path, or s3://bucket/prefix (an option)
 //	AGENTS_STORE_ENDPOINT, AGENTS_STORE_PATH_STYLE=1, AWS_*: the bucket (contracts/store.md)
 //	AGENTS_CONTROL_WEB_PORT     the web remote's loopback port, when --web-port is not given
+//	AGENTS_CONTROL_PUBLIC_WEB   the built web app to serve at AGENTS_CONTROL_URL's own origin,
+//	                            when --public-web is not given: behind a proxy with a public
+//	                            certificate (compose.public.yaml), for a browser anywhere (#1459)
 //	AGENTS_CONTROL_URL          the one address clients and hosts are given
 //	AGENTS_CONTROL_KEY_FILE     the control plane's private key, raw, 0600 (made if missing)
 //	AGENTS_CONTROL_KEY          or the key itself, base64url
@@ -173,6 +177,19 @@ func storeCredentials() *controlplane.StoreCredentials {
 	}
 	givenCredentials = &c
 	return givenCredentials
+}
+
+// publicWeb is the built web app to serve on the TLS listener at its own origin (#1459), or
+// "": --public-web or AGENTS_CONTROL_PUBLIC_WEB, and no --no-web.
+func publicWeb() string {
+	folder := value("--public-web")
+	if folder == "" {
+		folder = os.Getenv("AGENTS_CONTROL_PUBLIC_WEB")
+	}
+	if has("--no-web") || folder == "" {
+		return ""
+	}
+	return expand(folder)
 }
 
 // webConfig is the web remote's listener, or nil: a folder and a port both, and no
@@ -373,6 +390,7 @@ func serve() {
 		fail("AGENTS_CONTROL_TRUSTED_PROXIES: %v", err)
 	}
 	cfg.Web = webConfig()
+	cfg.PublicWeb = publicWeb()
 	// Whether the page is served, for Agents Host to read (071 R3): this run's, or none.
 	if home() != "" {
 		file := filepath.Join(home(), "web.json")
@@ -470,7 +488,8 @@ func code() {
 	if m, err := strconv.ParseFloat(value("--minutes"), 64); err == nil {
 		minutes = m
 	}
-	// --browser: for a browser on this Mac, good only through the loopback listener (071 R2).
+	// --browser: for a browser, good only through a page: the loopback listener's, or the
+	// page on the control plane's own domain (071 R2, #1459).
 	shown, err := codes.Issue(context.Background(), host, has("--browser"), time.Duration(minutes*float64(time.Minute)))
 	if err != nil {
 		fail("%v", err)
@@ -527,6 +546,7 @@ const usage = `usage: agents-control serve [--port N] [--bind ADDR] [--self-sign
        agents-control code (--client [--browser] | --host) [--minutes N]
        agents-control serve --home DIR [--no-bonjour]
        agents-control serve … [--host-root DIR] [--log FILE] [--web DIR] [--web-port N] [--no-web]
+       agents-control serve … [--public-web DIR]
        agents-control hosts | clients
        agents-control key seal (--key-fd N | AGENTS_CONTROL_KEY)
        agents-control install-script

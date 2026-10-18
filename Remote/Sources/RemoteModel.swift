@@ -381,6 +381,30 @@ final class RemoteModel {
         return nil
     }
 
+    // MARK: Add a Browser (#1459)
+
+    /// A code for a browser, as the window's Add a Browser… makes one, and the page's
+    /// address on the control plane's own domain when it serves one there. Or why not, in
+    /// words to show.
+    func startBrowserCode() async -> Result<(shown: DaemonAPI.ControlCodeShown, page: String?), BrowserCodeProblem> {
+        do {
+            let shown = try await client.call(DaemonAPI.Method.clientsStartPairing,
+                                              JSONValue.object(["kind": .string(ClientRecord.Kind.browser.rawValue)]),
+                                              returning: DaemonAPI.ControlCodeShown.self)
+            let status = try? await client.call(DaemonAPI.Method.controlStatus, returning: DaemonAPI.ControlStatus.self)
+            return .success((shown, status?.publicWeb))
+        } catch let error as JSONRPCError {
+            return .failure(BrowserCodeProblem(words: error.message))
+        } catch {
+            return .failure(BrowserCodeProblem(words: "The control plane can’t be reached."))
+        }
+    }
+
+    /// The code is no longer shown: it can't be used.
+    func stopBrowserCode() async {
+        _ = try? await client.call(DaemonAPI.Method.clientsStopPairing)
+    }
+
     // MARK: A server's key (#344)
 
     /// A server asked for a key this device has none of to lend: the window's card asks the
