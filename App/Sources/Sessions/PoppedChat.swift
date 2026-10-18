@@ -19,8 +19,6 @@ final class PoppedChat {
     /// Whether it has been looked for once. Until then, a session not in hand is one
     /// still on its way (a window restored at launch), not one that has gone.
     var looked = false
-    /// Session ▸ Rename… with this window in front: its toolbar's field is up.
-    var isRenaming = false
     /// How many windows show it. One, unless SwiftUI restores a second.
     @ObservationIgnored fileprivate var windows = 0
 
