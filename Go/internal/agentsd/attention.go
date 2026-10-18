@@ -75,6 +75,10 @@ type attentionState struct {
 	raisedNeed  map[string]wire.NeedID
 	deliveries  map[string]delivery
 	settling    map[string]*time.Timer
+	// announced is every need the clients were told of with no surface to show it on, by
+	// token, so each is told when it ends too (#1367): a phone's model, and the widget it
+	// writes from it, holds what attention/pending holds and nothing it has dropped.
+	announced map[string]wire.NeedID
 	// kept is what attention.json holds of another build's (withdrawals), written back as
 	// it was; lastWritten is nil until the file has been read.
 	kept        attentionRecords
@@ -111,7 +115,7 @@ func (d *Daemon) loadAttention() {
 	defer d.attentionMu.Unlock()
 	d.presences, d.raisedAt, d.raisedNeed = map[int64]presence{}, map[string]wire.Date{}, map[string]wire.NeedID{}
 	d.deliveries, d.settling = map[string]delivery{}, map[string]*time.Timer{}
-	d.forwarded = map[string]wire.NeedID{}
+	d.forwarded, d.announced = map[string]wire.NeedID{}, map[string]wire.NeedID{}
 	var r attentionRecords
 	if b, err := os.ReadFile(d.attentionFile()); err == nil {
 		var raw struct {
@@ -435,7 +439,14 @@ func (d *Daemon) reconsider() {
 	for t, dv := range d.deliveries {
 		if !live[t] {
 			delete(d.deliveries, t)
+			delete(d.announced, t)
 			notes = append(notes, wire.AttentionNotification{NeedID: dv.NeedID})
+		}
+	}
+	for t, id := range d.announced {
+		if !live[t] {
+			delete(d.announced, t)
+			notes = append(notes, wire.AttentionNotification{NeedID: id})
 		}
 	}
 	// Met, or a need this build does not know (a Swift host's): the control plane hears
@@ -520,6 +531,12 @@ func (d *Daemon) reconsider() {
 			d.deliveries[t] = dv
 			notes = append(notes, wire.AttentionNotification{NeedID: n.ID, Need: &need, To: to, Alert: alert})
 		case to == nil:
+			// Shown nowhere, yet still news to every client (#1367): its model is what
+			// Needs you and the phone's widget draw from. Not a banner: no surface is named.
+			if _, ok := d.announced[t]; !ok {
+				d.announced[t] = n.ID
+				notes = append(notes, wire.AttentionNotification{NeedID: n.ID, Need: &need})
+			}
 		default:
 			d.deliveries[t] = delivery{NeedID: n.ID, To: to, AlertedAt: wire.DateOf(at), AlertCount: 1}
 			notes = append(notes, wire.AttentionNotification{NeedID: n.ID, Need: &need, To: to, Alert: true})
