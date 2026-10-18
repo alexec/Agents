@@ -47,7 +47,7 @@ struct CodeBlockText: View {
     private var styled: AttributedString {
         guard let document, document.plainBecause == nil else { return AttributedString(text) }
         var result = AttributedString()
-        let font = TextStep.code.font(zoom: zoom, dynamicType: dynamicType)
+        let font = TextStep.code.zoomedFont(zoom, dynamicType: dynamicType)
         for (index, line) in document.lines.enumerated() {
             if index > 0 { result.append(AttributedString("\n")) }
             result.append(CodeText.attributed(line, spans: document.spans(line: index),

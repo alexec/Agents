@@ -164,7 +164,7 @@ private struct SteppedText: ViewModifier {
     @Environment(\.dynamicTypeSize) private var dynamicType
 
     func body(content: Content) -> some View {
-        content.font(step.font(zoom: zoom, dynamicType: dynamicType))
+        content.font(step.zoomedFont(zoom, dynamicType: dynamicType))
     }
 }
 
@@ -173,7 +173,7 @@ extension TextStep {
     /// nothing changes where nothing is zoomed. Zoomed, a semantic style cannot be
     /// scaled, so it becomes the point size the style resolves to, times the zoom: on
     /// the phone at the environment's Dynamic Type size, which the Mac does not have.
-    func font(zoom: CGFloat, dynamicType: DynamicTypeSize) -> Font {
+    func zoomedFont(_ zoom: CGFloat, dynamicType: DynamicTypeSize) -> Font {
         guard zoom != 1 else { return font }
         #if os(macOS)
         let points = nsFont.pointSize
