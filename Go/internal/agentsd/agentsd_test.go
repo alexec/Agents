@@ -65,6 +65,10 @@ func start(t *testing.T, root string) (*Daemon, *conn) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// Last of these cleanups, before the root goes: what a test sets off (a turn's
+	// ending, an assessment's score) writes into the root after the test has its answer.
+	// A test that shuts the daemon down itself shuts it down again here, which does nothing.
+	t.Cleanup(d.Shutdown)
 	c := newConn()
 	go d.Accept(c)
 	t.Cleanup(func() { close(c.in) })
