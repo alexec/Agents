@@ -5,8 +5,10 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/alexec/agents/Go/internal/agentsd/store"
 	"github.com/alexec/agents/Go/wire"
@@ -128,6 +130,20 @@ func TestAWatchSaysWhichFoldersChanged(t *testing.T) {
 	c.call(t, 1, "files/watch", map[string]any{"agentID": id, "folder": work})
 	os.WriteFile(filepath.Join(work, "node_modules", "x", "ignored.js"), []byte("x"), 0o644)
 	os.WriteFile(filepath.Join(work, "src", "main.go"), []byte("package main"), 0o644)
+	// Under load FSEvents can say a change many seconds late, or a write go unsaid for a
+	// while: src is written again until it is heard (#1411).
+	heard := make(chan struct{})
+	defer close(heard)
+	go func() {
+		for {
+			select {
+			case <-heard:
+				return
+			case <-time.After(time.Second):
+				os.WriteFile(filepath.Join(work, "src", "main.go"), []byte("package main // again"), 0o644)
+			}
+		}
+	}()
 	c.until(t, "files/changed for src", func(method string, p json.RawMessage) bool {
 		var n wire.FilesChangedNotification
 		if method != "files/changed" || json.Unmarshal(p, &n) != nil {
@@ -138,7 +154,9 @@ func TestAWatchSaysWhichFoldersChanged(t *testing.T) {
 				t.Fatalf("a build folder was heard: %v", n.Folders)
 			}
 		}
-		return n.AgentID == id && len(n.Folders) == 1 && n.Folders[0] == filepath.Join(work, "src")
+		// src, and perhaps work itself: under load FSEvents can say the folders made just
+		// before the watch began, in the same batch (#1411).
+		return n.AgentID == id && slices.Contains(n.Folders, filepath.Join(work, "src"))
 	})
 	c.call(t, 2, "files/unwatch", map[string]any{"agentID": id, "folder": work})
 	d.mu.Lock()
