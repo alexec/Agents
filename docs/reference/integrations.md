@@ -40,14 +40,14 @@ Open issues: `is:open label:integration runtime`.
 <!-- runtimes:begin -->
 | Integration | Clients that show it | State | Last checked | Where | Gaps |
 | --- | --- | --- | --- | --- | --- |
-| Claude | Mac, Remote, web, server | tested on a real account | 2026-10-02, assessment: 11 of 11, in `.agents/reviews/runtimes/2026-10-02-first-assessments.md` | `RuntimeCatalog.swift`, `runtimes.go` | |
-| Grok | Mac, Remote, web, server | built | — (out of the pool on 2026-10-02) | `RuntimeCatalog.swift`, `runtimes.go` | |
-| Copilot | Mac, Remote, web, server | tested on a real account | 2026-10-02, assessment: 9 passed, 1 not offered, in `.agents/reviews/runtimes/2026-10-02-first-assessments.md` | `RuntimeCatalog.swift`, `runtimes.go` | |
-| Cursor | Mac, Remote, web, server | built | — (out of the pool on 2026-10-02) | `RuntimeCatalog.swift`, `runtimes.go` | |
-| Codex | Mac, Remote, web, server | built | — (not installed on the scratch root on 2026-10-02) | `RuntimeCatalog.swift`, `runtimes.go` | |
-| Gemini | Mac, Remote, web, server | built | — (out of the pool on 2026-10-02) | `RuntimeCatalog.swift`, `runtimes.go` | |
-| Antigravity | Mac, Remote, web (Mac host only) | built | — (out of the pool on 2026-10-02) | `RuntimeCatalog.swift` | |
-| OpenCode | Mac, Remote, web, server | built | — (not installed on the scratch root on 2026-10-02) | `RuntimeCatalog.swift`, `runtimes.go` | |
+| Claude | Mac, Remote, web, server | broken (fails at handshake) | 2026-10-17, 0.93.0: failed at handshake, in `.agents/reviews/runtimes/claude-2026-10-17.md` | `RuntimeCatalog.swift`, `runtimes.go` | |
+| Grok | Mac, Remote, web, server | broken (fails at handshake) | 2026-10-17, 1.0.52: failed at handshake, in `.agents/reviews/runtimes/grok-2026-10-17.md` | `RuntimeCatalog.swift`, `runtimes.go` | |
+| Copilot | Mac, Remote, web, server | broken (fails at turn) | 2026-10-17, 1.0.93-1: failed at turn, in `.agents/reviews/runtimes/copilot-2026-10-17.md` | `RuntimeCatalog.swift`, `runtimes.go` | |
+| Cursor | Mac, Remote, web, server | broken (fails at turn) | 2026-10-17, 2026.10.01-e373342: failed at turn, in `.agents/reviews/runtimes/cursor-2026-10-17.md` | `RuntimeCatalog.swift`, `runtimes.go` | |
+| Codex | Mac, Remote, web, server | broken (`ending`, `own_ask`, `scope`, `sessions`, `wait`, `workspaces` failed) | 2026-10-17, 2.2.2: assessment: 7 of 15 passed, in `.agents/reviews/runtimes/codex-2026-10-17.md` | `RuntimeCatalog.swift`, `runtimes.go` | |
+| Gemini | Mac, Remote, web, server | broken (fails at turn) | 2026-10-17, 0.64.0: failed at turn, in `.agents/reviews/runtimes/gemini-2026-10-17.md` | `RuntimeCatalog.swift`, `runtimes.go` | |
+| Antigravity | Mac, Remote, web (Mac host only) | broken (fails at turn) | 2026-10-17, 1.4.1: failed at turn, in `.agents/reviews/runtimes/antigravity-2026-10-17.md` | `RuntimeCatalog.swift` | |
+| OpenCode | Mac, Remote, web, server | broken (`workspaces` failed) | 2026-10-17, 1.19.3: assessment: 12 of 15 passed, in `.agents/reviews/runtimes/opencode-2026-10-17.md` | `RuntimeCatalog.swift`, `runtimes.go` | |
 <!-- runtimes:end -->
 
 | Integration | Clients that show it | State | Last checked | Where | Gaps |
