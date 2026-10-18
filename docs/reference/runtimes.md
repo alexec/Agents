@@ -158,7 +158,7 @@ newer version starts offering.
 | | A temporary folder of its own | `TMPDIR` | It walks that folder at every turn: 40 seconds before the first word with the Mac's own. |
 | | Its question tool off | `OPENCODE_ENABLE_QUESTION_TOOL` removed | Questions go through the app's `ask_form`. |
 | **Grok** | Asks, whatever you saved in its own config | `--permission-mode default` | The app's **Default** or **Always-approve** decides (Settings ▸ Agent Runtimes). |
-| | Only its work tools, its subagents, its question tool, and the app's rules | `_meta.agentProfile`, `_meta.rules` | Its `--disallowed-tools` does nothing here, so it is an allowlist, and unlisted means unavailable. |
+| | Its scheduler, workflow, monitor and feedback tools off; its subagents and question tool stay; the app's rules | `_meta.agentProfile.disallowedTools`, `_meta.rules` | Its `--disallowed-tools` does nothing here, so the list is in a profile of the app's. It was an allowlist until Grok 1.0.52 stopped giving the subagent tools it named (#1447). |
 | | Image and video generation off | `GROK_CONFIG_PATH`, a file of the app's | Its config file is the only place for them, and yours is yours. |
 | **Copilot** | Its session-store tool, your `software-factory` server and its built-in MCP servers off | `--excluded-tools`, `--disable-mcp-server`, `--disable-builtin-mcps` | The work stays where the app can see it. |
 | **Cursor** | Nothing | | It has no lever: its config folder also holds its sign-in. |
@@ -287,11 +287,11 @@ settings files there are the server's own.
 | Option | Where | Values (default) | Under ACP | On servers | Decided |
 | --- | --- | --- | --- | --- | --- |
 | Reasoning effort | ACP `reasoning_effort`; `models.default_reasoning_effort` | low … xhigh (high) | Yes, under the prompt | Yes | Already shown |
-| Web search and fetch | tools `web_search`, `web_fetch`, `open_page` in the app's allowlist | search on; fetch off unless xAI turns it on | Yes | Yes | Show, planned: the web access switch |
+| Web search and fetch | tools `web_search`, `web_fetch`, `open_page` | search on; fetch off unless xAI turns it on | Yes | Yes | Show, planned: the web access switch |
 | Memory | `GROK_MEMORY`; `memory.enabled` | off, unless your config or xAI turns it on | Yes: `/memory`, `/dream`, `/flush` offered | Yes, by the variable | Show, planned: the memory switch, on by default |
 | Self-update | `GROK_DISABLE_AUTOUPDATER` | updates itself in the background | Yes | Yes | Set, planned: off, so a running agent's Grok is not replaced under it |
 | Shared leader process | `--no-leader`; `cli.use_leader` | from your config | Yes: a leader started with always-approve may approve for the app | Yes | Set, planned: `--no-leader`, once measured |
-| Workflows and goals | `GROK_WORKFLOWS`, `GROK_GOAL` | on | Offered as commands | Yes | Set, planned: off, once measured; it may close the `workflow` tool the allowlist cannot |
+| Workflows and goals | `GROK_WORKFLOWS`, `GROK_GOAL` | on | Offered as commands | Yes | Set, planned: off, once measured; the `workflow` tool is already off by the app's deny list |
 | Usage data | `GROK_TELEMETRY_ENABLED`, `DISABLE_TELEMETRY` | on | Yes | Yes | Show, planned: the usage data switch |
 | Auto review | `_meta.autoMode` | off | Not measured with the app | Yes | Leave alone until measured |
 | Folder trust | `x.ai/folder_trust/request` | asks | The app does not answer it; a server's untrusted folder may skip the project's own settings | Yes | Measure on a server |

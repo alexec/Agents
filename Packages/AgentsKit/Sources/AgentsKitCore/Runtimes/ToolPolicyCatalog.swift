@@ -88,29 +88,30 @@ public enum ToolPolicyCatalog {
                            ownSignInVariables: ["CLAUDE_CODE_OAUTH_TOKEN", "ANTHROPIC_API_KEY"],
                            ownSignInFile: ".claude/.credentials.json"))
 
-    /// Grok: an allow list, as a profile, plus a config overlay on disk.
+    /// Grok: a deny list, as a profile, plus a config overlay on disk.
     ///
-    /// The one runtime where we must say what to keep rather than what to remove, which
-    /// is a cost worth naming: a work tool Grok adds next month will not reach an agent
-    /// until this list grows, and the check script is how that gets noticed. It is the
-    /// only lever that works — the documented `--disallowed-tools` flag does nothing over
-    /// `agent stdio` (Research R6).
+    /// The profile's `disallowedTools` is the lever: the documented `--disallowed-tools`
+    /// flag does nothing over `agent stdio` (Research R6). The profile needs its `name`
+    /// and `description` too; without them Grok falls back to its stock profile and every
+    /// tool comes back.
     ///
-    /// `workflow` and `monitor` survive it, and that is not an oversight. Grok's own
-    /// documentation says stock profiles inject their enabled optional tools *before*
-    /// applying the allowlist, and nothing documented lets a client declare a profile
-    /// curated. So they are residue, covered by words.
+    /// It was an allow list, `agentProfile.tools`, until Grok 1.0.52 stopped giving the
+    /// sub-agent tools it named, under their own names or Grok's ids (#1447, measured
+    /// 2026-10-18). The deny list also takes `workflow` and `monitor`, which a stock
+    /// profile added before the allow list applied, so they are no longer residue.
     ///
-    /// Sub-agents came back on 2026-09-29, and an allow list is where that costs
-    /// something a deny list would not: the three names below are now in the profile
-    /// because they are wanted, and a fourth tool Grok adds next month still will not
-    /// arrive until someone adds it here.
+    /// Plan mode (`enter_plan_mode`, `exit_plan_mode`), MCP tool search (`search_tool`,
+    /// `use_tool`), X search (`x_*_search`, `x_thread_fetch`) and `image_edit` stay: none
+    /// of them does a job of the app's. `image_edit` was given under the allow list too,
+    /// and no user config file can switch it off as `image_gen` is.
     public static let grok = ToolPolicy(
         runtimeID: RuntimeCatalog.grok.id,
         removed: [
             RemovedTool(name: "scheduler_create", category: .standingArrangements),
             RemovedTool(name: "scheduler_delete", category: .standingArrangements),
             RemovedTool(name: "scheduler_list", category: .standingArrangements),
+            RemovedTool(name: "workflow", category: .standingArrangements),
+            RemovedTool(name: "monitor", category: .standingArrangements),
             RemovedTool(name: "send_feedback", category: .escalation),
         ],
         kept: [
@@ -122,18 +123,11 @@ public enum ToolPolicyCatalog {
                      because: "Stopping one it started, alongside the app's (2026-09-29)."),
             KeptTool(name: "get_command_or_subagent_output",
                      because: "Reading what one it started left running, alongside the app's (2026-09-29)."),
+            KeptTool(name: "wait_commands_or_subagents",
+                     because: "Waiting on one it started, alongside the app's (Grok 1.0.52)."),
         ],
-        residue: [
-            ResidualTool(name: "workflow", category: .standingArrangements),
-            ResidualTool(name: "monitor", category: .standingArrangements),
-        ],
-        lever: .sessionMetaAllowList(
-            path: ["agentProfile", "tools"],
-            keep: ["read_file", "list_dir", "grep", "search_replace", "write",
-                   "run_terminal_command", "todo_write", "ask_user_question",
-                   "web_search", "web_fetch", "open_page", "open_page_with_find",
-                   "spawn_subagent", "kill_command_or_subagent",
-                   "get_command_or_subagent_output"],
+        lever: .sessionMetaDenyList(
+            path: ["agentProfile", "disallowedTools"],
             extra: ["name": .string("agents-app"),
                     "description": .string("An agent hosted by the Agents app.")]),
         appToolSchemaDelivery: .sessionRules,
@@ -153,7 +147,7 @@ public enum ToolPolicyCatalog {
                 variable: "GROK_CONFIG_PATH"),
         ])
     // No `escalationTool`, and that is the measured answer rather than an omission.
-    // `ask_user_question` is in the allowlist above and stays there, but it cannot reach
+    // `ask_user_question` is not in the deny list above and stays, but it cannot reach
     // a client over `agent stdio`: Grok's own documentation files it under blocking TUI
     // cards, beside the permission prompt and the cancel-turn panel, and the ACP page
     // lists every update kind, extension method and agent-to-client notification without

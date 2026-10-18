@@ -426,16 +426,14 @@ var toolPolicyFiles = map[string][]policyFile{
 		contents: "{\n  \"context\": {\n    \"fileName\": [\"GEMINI.md\", \"AGENTS.md\"]\n  }\n}\n"}},
 }
 
-// grokTools is Grok's allow list, the only lever it has over agent stdio: a tool Grok adds
-// is not an agent's until it is named here. workflow and monitor survive it (a stock
-// profile adds them before the list applies), and the scheduler and send_feedback are
-// left out.
-var grokTools = []string{"read_file", "list_dir", "grep", "search_replace", "write", "run_terminal_command", "todo_write",
-	"ask_user_question", "web_search", "web_fetch", "open_page", "open_page_with_find", "spawn_subagent",
-	"kill_command_or_subagent", "get_command_or_subagent_output"}
+// grokRemoved is Grok's deny list, a profile's disallowedTools: its scheduler, workflow,
+// monitor and send_feedback. It was an allow list until Grok 1.0.52 stopped giving the
+// sub-agent tools it named (#1447). The profile needs its name and description, or Grok
+// falls back to its stock profile and every tool comes back.
+var grokRemoved = []string{"scheduler_create", "scheduler_delete", "scheduler_list", "workflow", "monitor", "send_feedback"}
 
 // sessionMeta is the _meta on session/new, session/load and session/fork: Claude's tools
-// the app takes away, and the tools Grok keeps, as a profile (ToolPolicyCatalog.swift).
+// and Grok's tools the app takes away, Grok's as a profile (ToolPolicyCatalog.swift).
 func sessionMeta(runtimeID string) map[string]any {
 	switch runtimeID {
 	case "claude":
@@ -443,7 +441,7 @@ func sessionMeta(runtimeID string) map[string]any {
 			"Workflow", "CronCreate", "CronList", "CronDelete", "ScheduleWakeup", "Monitor", "RemoteTrigger", "PushNotification",
 			"EnterWorktree", "ExitWorktree"}}}}
 	case "grok":
-		return map[string]any{"agentProfile": map[string]any{"tools": grokTools, "name": "agents-app",
+		return map[string]any{"agentProfile": map[string]any{"disallowedTools": grokRemoved, "name": "agents-app",
 			"description": "An agent hosted by the Agents app."}}
 	}
 	return nil

@@ -75,10 +75,8 @@ CLIENT = {
     "elicitation": {"form": {}, "url": {}},
 }
 
-GROK_KEEP = ["read_file", "list_dir", "grep", "search_replace", "write",
-             "run_terminal_command", "todo_write", "ask_user_question",
-             "web_search", "web_fetch", "open_page", "open_page_with_find",
-             "spawn_subagent", "kill_command_or_subagent", "get_command_or_subagent_output"]
+GROK_REMOVED = ["scheduler_create", "scheduler_delete", "scheduler_list", "workflow", "monitor",
+                "send_feedback"]
 
 GROK_OVERLAY = """# Written by the Agents app. Do not edit: rebuilt on every launch.
 [features]
@@ -103,13 +101,14 @@ POLICIES = {
         "env": {},
     },
     "grok": {
-        "lever": "an allow list as _meta.agentProfile.tools, plus a config overlay on disk",
-        "removed": ["scheduler_create", "scheduler_delete", "scheduler_list", "send_feedback"],
-        "kept": GROK_KEEP,
-        "residue": ["workflow", "monitor"],
+        "lever": "a deny list as _meta.agentProfile.disallowedTools, plus a config overlay on disk",
+        "removed": GROK_REMOVED,
+        "kept": ["ask_user_question", "spawn_subagent", "kill_command_or_subagent",
+                 "get_command_or_subagent_output", "wait_commands_or_subagents"],
+        "residue": [],
         "meta": {"agentProfile": {"name": "agents-app",
                                   "description": "An agent hosted by the Agents app.",
-                                  "tools": GROK_KEEP}},
+                                  "disallowedTools": GROK_REMOVED}},
         "args": [],
         "env": {"GROK_CONFIG_PATH": GROK_OVERLAY},  # written to a temp file below
     },
