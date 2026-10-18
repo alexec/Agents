@@ -16844,6 +16844,55 @@
       ],
       "additionalProperties": false
     },
+    "BringBackRequest": {
+      "type": "object",
+      "description": "Brings a host's branches back into this Mac's repository at `folder` (Bring back from ‹host›…, #1473): fetches the `bundle` upload, moves `branches` forward only, also where a worktree has one checked out, and applies the `patch` upload (the host's uncommitted changes) in `folder`, whose checked-out branch must be `patchOn`. It stops, and changes nothing, when a branch here has commits of its own or a worktree with a branch that moves has uncommitted changes.",
+      "properties": {
+        "folder": {
+          "$ref": "#/definitions/URLString"
+        },
+        "bundle": {
+          "$ref": "#/definitions/UUID"
+        },
+        "patch": {
+          "$ref": "#/definitions/UUID"
+        },
+        "patchOn": {
+          "type": "string"
+        },
+        "branches": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/SentBranch"
+          }
+        }
+      },
+      "required": [
+        "folder",
+        "branches"
+      ],
+      "additionalProperties": false
+    },
+    "BringBack": {
+      "type": "object",
+      "description": "What projects/bringBack did (#1473): the branches that moved forward or were made, and whether the uncommitted changes were applied.",
+      "properties": {
+        "moved": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "applied": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "moved",
+        "applied"
+      ],
+      "additionalProperties": false
+    },
     "SendFactsRequest": {
       "type": "object",
       "description": "Asks this Mac's host about a repository to send (Send to ‹host›…, #1123).",

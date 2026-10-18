@@ -134,6 +134,7 @@ var (
 	CallPresenceReport                 = Method[PresenceReport, Empty]{"presence/report"}
 	CallProjectsAdd                    = Method[ProjectRequest, ProjectSummary]{"projects/add"}
 	CallProjectsArchive                = Method[ProjectRequest, ProjectSummary]{"projects/archive"}
+	CallProjectsBringBack              = Method[BringBackRequest, BringBack]{"projects/bringBack"}
 	CallProjectsChatState              = Method[Empty, ChatProjectState]{"projects/chatState"}
 	CallProjectsClone                  = Method[CloneRequest, ProjectSummary]{"projects/clone"}
 	CallProjectsClones                 = Method[Empty, []CloneSummary]{"projects/clones"}

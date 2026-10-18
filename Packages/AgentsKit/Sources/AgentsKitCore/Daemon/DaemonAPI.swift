@@ -239,6 +239,7 @@ public enum DaemonAPI {
         public static let projectsReceive = "projects/receive"
         /// The sending side, on this Mac's host, since the window reads no repository
         /// itself: the sheet's facts, the bundle and patch made, and one part of either.
+        public static let projectsBringBack = "projects/bringBack"
         public static let projectsSendFacts = "projects/sendFacts"
         public static let projectsSendPack = "projects/sendPack"
         public static let projectsSendRead = "projects/sendRead"
@@ -3911,6 +3912,35 @@ public extension DaemonAPI {
             self.branches = branches
             self.checkout = checkout
             self.origin = origin
+        }
+    }
+
+    /// `projects/bringBack` (#1473): this Mac's repository at `folder` takes the host's
+    /// `branches` from the `bundle` upload, forward only, and the `patch` upload (the host's
+    /// uncommitted changes, on `patchOn`) when it came.
+    struct BringBackRequest: Codable, Hashable, Sendable {
+        public var folder: URL
+        public var bundle: UUID?
+        public var patch: UUID?
+        public var patchOn: String?
+        public var branches: [SentBranch]
+        public init(folder: URL, bundle: UUID? = nil, patch: UUID? = nil, patchOn: String? = nil, branches: [SentBranch]) {
+            self.folder = folder
+            self.bundle = bundle
+            self.patch = patch
+            self.patchOn = patchOn
+            self.branches = branches
+        }
+    }
+
+    /// What `projects/bringBack` did: the branches that moved or were made, and whether the
+    /// uncommitted changes were applied.
+    struct BringBack: Codable, Hashable, Sendable {
+        public var moved: [String]
+        public var applied: Bool
+        public init(moved: [String], applied: Bool) {
+            self.moved = moved
+            self.applied = applied
         }
     }
 

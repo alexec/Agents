@@ -54,26 +54,7 @@ extension AppModel {
             DaemonAPI.SendPackRequest(folder: folder, branches: branches, leavingOut: state.repository ? state.heads : [],
                                       includeChanges: includeChanges),
             checkingEvery: .seconds(10)).decode(DaemonAPI.SendPack.self)
-        let total = (pack.bundle?.size ?? 0) + (pack.patch?.size ?? 0)
-        var sent = 0
-        func relay(_ file: DaemonAPI.SendFile?) async throws -> UUID? {
-            guard let file else { return nil }
-            let id = UUID()
-            var offset = 0
-            while true {
-                let part = try await mac.call(DaemonAPI.Method.projectsSendRead, DaemonAPI.SendReadRequest(id: file.id, offset: offset),
-                                              returning: DaemonAPI.SendRead.self)
-                try await there.call(DaemonAPI.Method.projectsReceiveUpload,
-                                     DaemonAPI.ReceiveUploadRequest(upload: id, offset: offset, data: part.data))
-                offset += part.data.count
-                sent += part.data.count
-                progress(total < 1_000_000 ? "Sending…"
-                         : "Sending \(sent.formatted(.byteCount(style: .file))) of \(total.formatted(.byteCount(style: .file)))…")
-                if part.end || part.data.isEmpty { return id }
-            }
-        }
-        let bundle = try await relay(pack.bundle)
-        let patch = try await relay(pack.patch)
+        let (bundle, patch) = try await relay(pack, from: mac, to: there, verb: "Sending", progress: progress)
         progress("Adding it on \(label)…")
         let answer = try await there.callWhileAnswering(
             DaemonAPI.Method.projectsReceive,
@@ -84,6 +65,31 @@ extension AppModel {
         summary.host = host
         upsert(summary)
         return summary
+    }
+
+    /// Carries the bundle and the patch a pack made from one host's link to the other's, in
+    /// the parts `from` reads, and answers with the uploads they became on `to`.
+    func relay(_ pack: DaemonAPI.SendPack, from: DaemonClient, to: DaemonClient, verb: String,
+               progress: @escaping @MainActor (String) -> Void) async throws -> (bundle: UUID?, patch: UUID?) {
+        let total = (pack.bundle?.size ?? 0) + (pack.patch?.size ?? 0)
+        var sent = 0
+        func carry(_ file: DaemonAPI.SendFile?) async throws -> UUID? {
+            guard let file else { return nil }
+            let id = UUID()
+            var offset = 0
+            while true {
+                let part = try await from.call(DaemonAPI.Method.projectsSendRead, DaemonAPI.SendReadRequest(id: file.id, offset: offset),
+                                               returning: DaemonAPI.SendRead.self)
+                try await to.call(DaemonAPI.Method.projectsReceiveUpload,
+                                  DaemonAPI.ReceiveUploadRequest(upload: id, offset: offset, data: part.data))
+                offset += part.data.count
+                sent += part.data.count
+                progress(total < 1_000_000 ? "\(verb)…"
+                         : "\(verb) \(sent.formatted(.byteCount(style: .file))) of \(total.formatted(.byteCount(style: .file)))…")
+                if part.end || part.data.isEmpty { return id }
+            }
+        }
+        return (try await carry(pack.bundle), try await carry(pack.patch))
     }
 }
 

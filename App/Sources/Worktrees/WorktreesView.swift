@@ -91,6 +91,8 @@ struct WorktreeRow: View {
     @State private var freed: String?
     /// The Send to ‹host›… sheet up for this worktree (#1123).
     @State private var sending: SendToHostRequest?
+    /// The Bring back from ‹host›… sheet up for this worktree (#1473).
+    @State private var bringingBack: BringBackFromHostRequest?
 
     private var canClean: Bool { worktree.madeByApp && worktree.exists && worktree.isIdle }
 
@@ -151,8 +153,15 @@ struct WorktreeRow: View {
                     sending = SendToHostRequest(folder: worktree.root, from: .mac, host: host)
                 }
             }
+            // The server's branches, brought back into this worktree's repository (#1473).
+            ForEach(worktree.exists ? model.sendTargets : [], id: \.self) { host in
+                Button("Bring Back from \(model.hosts.label(host))…") {
+                    bringingBack = BringBackFromHostRequest(folder: worktree.root, from: .mac, host: host)
+                }
+            }
         }
         .sheet(item: $sending) { SendToHostSheet(request: $0).paperSheet() }
+        .sheet(item: $bringingBack) { BringBackSheet(request: $0).paperSheet() }
         .alert(alertTitle, isPresented: isAsking, presenting: asking) { check in
             if check.blockedBy.isEmpty {
                 Button("Remove", role: .destructive) {

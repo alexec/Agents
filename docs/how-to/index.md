@@ -19,7 +19,8 @@ something particular done.
 - [Add a server](add-a-server.md): make a Linux server, or another Mac, a host of your
   control plane.
 - [Send a project to a server](send-a-project-to-a-server.md): a repository on this Mac,
-  with its unpushed branches and uncommitted changes, made a project on the server.
+  with its unpushed branches and uncommitted changes, made a project on the server, and
+  the server's work brought back.
 - [Start workspaces from Agents](start-workspaces-from-agents.md): let the control plane
   start and stop the machines your servers run on, and press Start on a stopped one.
 - [Add a workspace provider](add-a-workspace-provider.md): a preset, your own commands, a
@@ -100,7 +101,8 @@ something particular done.
 
 - [Add a server](add-a-server.md): make a Linux server a host of your control plane.
 - [Send a project to a server](send-a-project-to-a-server.md): a repository on this Mac,
-  with its unpushed branches and uncommitted changes, made a project on the server.
+  with its unpushed branches and uncommitted changes, made a project on the server, and
+  the server's work brought back.
 
 ### Automation
 

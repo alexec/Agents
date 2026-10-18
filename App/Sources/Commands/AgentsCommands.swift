@@ -44,6 +44,9 @@ final class WindowRequests {
     /// the project's context menu, taken down by the sheet.
     var sendToHost: SendToHostRequest?
 
+    /// The folder and host of the Bring back from ‹host›… sheet that is up (#1473), or nil.
+    var bringBackFromHost: BringBackFromHostRequest?
+
     func focusPrompt() { wantsPromptFocus = true }
     func focusSessionSearch() { wantsSessionSearchFocus = true }
 }
