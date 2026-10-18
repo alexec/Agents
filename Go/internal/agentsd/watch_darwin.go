@@ -141,9 +141,13 @@ func (w *folderWatch) gather(paths <-chan string, ready chan struct{}) {
 			}
 			gone = false
 			if here, ok := w.under(p); ok && !w.skipped(here) {
-				if w.files {
+				switch {
+				case w.files:
 					pending[here] = true
-				} else {
+				case here == w.root:
+					// The root itself (made, or its own metadata), not the folder it is in.
+					pending[w.root] = true
+				default:
 					pending[filepath.Dir(here)] = true
 				}
 			}
