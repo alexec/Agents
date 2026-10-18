@@ -228,15 +228,15 @@ To check what each runtime advertises against what the app does with it:
 ./scripts/acp-handshake.sh claude     # one of them
 ```
 
-The **Nightly runtime check** workflow (`.agents/workflows/nightly-runtimes.md`, #39) does
-this, and more, for each runtime with a new release: `scripts/nightly-runtimes.py` re-pins
+The **Runtime check** workflow (`.agents/workflows/nightly-runtimes.md`, #39) does
+this, once per release (#1462), and more, for each runtime with a new release: `scripts/nightly-runtimes.py` re-pins
 it in a tree of its own, builds Agents Host, runs the AgentsKit runtime tests, the
 handshake and the tools check, and has one real turn through a scratch `agentsd` on the
 cheapest model the runtime offers. A pinned runtime that passes becomes a pull request on
 `nightly/runtime-<id>`; one that fails becomes an issue naming the step. It tests on this
 Mac's `main` and runs the same build and tests on `main` unchanged: what already fails there
 is listed as "already failing on main" and filed for no runtime, and runtimes that fail for
-one cause share one issue. With `--assess`, as the workflow runs it each Saturday, every
+one cause share one issue. With `--assess`, as the workflow runs it, every
 runtime in the pool also gets the assessment of #47 (about five minutes on its own
 allowance), new release or not: each one's record goes in `.agents/reviews/runtimes/`, and
 its row in `docs/reference/integrations.md` is updated, in one pull request on
@@ -252,14 +252,14 @@ To try it without opening anything:
 ./scripts/nightly-runtimes.py report --home /tmp/nightly --dry-run
 ```
 
-Two weekly reviews (#42) look for new problems in what changed on `main` since their last
-run, plus one area in rotation, and have the critical and high findings fixed by helper
+Two reviews (#42) run once per release, started by the Release workflow (#1462). They look
+for new problems in what changed on `main` since their last run, plus one area in rotation, and have the critical and high findings fixed by helper
 agents on branches of their own (failing test first, proven, left unmerged for you):
 
-- **Security review** (`.agents/workflows/security-review.md`), Sundays at 03:00: the
+- **Security review** (`.agents/workflows/security-review.md`): the
   `security-review` skill's method, rotating through tokens, daemon.sock roles, servers,
   files from someone else, git hooks, the Keychain and logs. At most two helpers a run.
-- **Performance review** (`.agents/workflows/performance-review.md`), Wednesdays at 03:00:
+- **Performance review** (`.agents/workflows/performance-review.md`):
   main-thread work, unbounded growth, file descriptors, polling, transcript size,
   start-up and reconnects. At most one helper a run, whose proof is six runs of the
   measurement on `main` and six on its branch.
@@ -267,7 +267,7 @@ agents on branches of their own (failing test first, proven, left unmerged for y
 Each keeps its findings, and the commit of `main` it reviewed through, in its own folder,
 `.agents/reviews/security/` or `.agents/reviews/performance/`, on a local branch that is
 never pushed (`agents/reviews-security`, `agents/reviews-performance`): a security
-finding is not published before it is fixed. Both arrive turned off; **Run now** tries one.
+finding is not published before it is fixed. Neither has a schedule; **Run now** tries one.
 
 **Free disk space** (`.agents/workflows/free-disk-space.md`, #199) runs on `machine.disk_low`. It
 deletes build output (the folders `.gitignore` ignores and git tracks nothing in, such as

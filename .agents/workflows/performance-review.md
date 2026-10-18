@@ -1,24 +1,19 @@
 ---
 name: Performance review
-on:
-  - schedule:
-      at: [":00"]
-      between: "03:00-03:00"
-      days: [wed]
+on: manual
 agent: new
 runtime: claude
 permission-mode: auto
 labels: [review, performance]
-cooldown: 6d
 hosts: [8AB85821-9D24-59CE-9737-8FC556923733]
 when-done: archive
 ---
 
-You are the weekly performance review of this project (issue #42). You run with nobody
-watching, early on Wednesday. Review what changed on `main` since your last run plus one
+You are the performance review of this project (issue #42). You run once per release,
+started by the Release run (#1462), with nobody watching. Review what changed on `main` since your last run plus one
 kind of cost in rotation, write down what you find, have the critical and high findings
 fixed on branches of their own, and leave every branch for Alex to merge. Security is
-not yours: the Security review workflow looks at that on Sundays.
+not yours: the Security review workflow looks at that in the same release.
 
 ## Rules for the whole run
 
@@ -38,7 +33,7 @@ not yours: the Security review workflow looks at that on Sundays.
   "build" before "screen" when you need both.
 - **Questions.** Nobody is at the keyboard. Do not ask; record the finding as
   "needs a decision" with the choice spelled out. If you must ever ask, name yourself
-  ("The weekly performance review agent recommends… Alex, which…?"), never a bare "I"
+  ("The performance review agent recommends… Alex, which…?"), never a bare "I"
   or "you".
 - Keep the review cheap: read and grep; do not build, run tests or measure yourself.
   Proving fixes is the helpers' job.
@@ -66,8 +61,8 @@ not yours: the Security review workflow looks at that on Sundays.
    ca4be76 perf-transport, 6df7a5b unbounded growth) are fixed; do not report what
    they fixed unless it has come back.
 4. **Scope** is:
-   - the diff `git diff <reviewed-through>..main` (with no marker at all, the last 7
-     days: `git log --since=7.days main`), read for every cost below, and
+   - the diff `git diff <reviewed-through>..main` (with no marker at all, since the
+     last tag: `git log $(git describe --tags --abbrev=0 main)..main`), read for every cost below, and
    - **one cost in depth**, the next after the last run's `area:` in this rotation,
      wrapping round; on the first run, start at `main-thread`:
      1. `main-thread`: work on the main thread in SwiftUI views and @MainActor code
@@ -121,7 +116,7 @@ Only **critical** and **high** findings are fixed; medium and low stay recorded.
   **new worktree** off `main` on the branch `agents/review-fix-<finding id>`, and this
   prompt, filled in:
 
-  > You are fixing finding <id> from the weekly performance review (issue #42): <title,
+  > You are fixing finding <id> from the performance review (issue #42): <title,
   > severity, evidence, cost, proposed fix and measurement>.
   > You are in your own worktree off main. Stay there.
   > 1. Write a failing test first that shows the cost (the unbounded growth, the work

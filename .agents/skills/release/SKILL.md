@@ -1,6 +1,6 @@
 ---
 name: release
-description: Take main to a new version with nobody watching (#914). Run the reviews that are stale, have every high and medium finding fixed through the Scrum Master's lanes, check the gate, choose the version, write the notes, tag and push, and check the GitHub release and both TestFlight builds. Use when the Release workflow runs, or when Alex asks for a release. Not for installing on Alex's Mac or devices (ship-app), and never for App Review.
+description: Take main to a new version with nobody watching (#914). Run the six reviews and checks once each, have every high and medium finding fixed through the Scrum Master's lanes, check the gate, choose the version, write the notes, tag and push, and check the GitHub release and both TestFlight builds. Use when the Release workflow runs, or when Alex asks for a release. Not for installing on Alex's Mac or devices (ship-app), and never for App Review.
 ---
 
 # Release
@@ -15,7 +15,8 @@ Alex decided (2026-10-13, #914):
 - **It runs on its own.** When the gate passes, push the tag. Do not ask for approval.
 - **Version:** minor when an `enhancement` merged since the last tag, otherwise patch.
   1.0 and major versions only when Alex says.
-- **A review is stale** when its last report is older than **7 days**.
+- **Every release runs the six reviews and checks once each** (#1462): security,
+  performance, runtimes, usability, competitors and the feature matrix.
 - **Priority is a label:** `priority:high` and `priority:medium`.
 - **High always blocks.** Wait for open medium fixes for **1 day**, then release and
   list the medium ones still open as known issues.
@@ -43,25 +44,29 @@ Alex decided (2026-10-13, #914):
 2. `.agents/skills/release/scripts/release-plan.py`. It prints the last tag and the next
    version. If it says nothing merged since the last tag, end with `nothing_to_do`.
 
-## 2. Reviews, if stale
+## 2. Reviews and checks, once each
 
-| Review | Its last report | Its workflow |
+Six workflows run exactly once per release, and only here (#1462). None has a schedule.
+
+| Order | Workflow | It writes |
 |---|---|---|
-| Security | newest `YYYY-MM-DD.md` on `agents/reviews-security` under `.agents/reviews/security/` | `security-review` |
-| Performance | the same on `agents/reviews-performance` under `.agents/reviews/performance/` | `performance-review` |
-| Runtimes | the time of `~/Library/Caches/Agents Nightly Runtimes/runs/latest/report.md` | `nightly-runtimes` |
-| Usability | the same on `agents/reviews-usability` under `.agents/reviews/usability/` | `usability-check` |
+| 1 | `security-review` | `.agents/reviews/security/` on `agents/reviews-security` |
+| 1 | `performance-review` | `.agents/reviews/performance/` on `agents/reviews-performance` |
+| 2 | `nightly-runtimes` (Runtime check) | `~/Library/Caches/Agents Nightly Runtimes/runs/latest/report.md` |
+| 2 | `usability-check` | `.agents/reviews/usability/` on `agents/reviews-usability` |
+| 3 | `competitor-check` | `~/.agents/reviews/competitors/` |
+| 4 | `feature-matrix` | a pull request on `agents/feature-matrix-<date>` |
 
-List a branch's reports with
-`git ls-tree --name-only agents/reviews-security .agents/reviews/security/`. A missing
-branch or file counts as stale.
-
-For each stale review, start it now. An agent cannot press Run now, so read the workflow
-with `manage_workflows read`, and call `start_session` with its prompt (the text under its
-front matter) and its `runtime:`, `model:` and `permission-mode:`. Start at most two at a
-time: the reviews take turns on the "build" lease. Wait with `wait_for_event`, naming the
-sessions in `agents`, `until_minutes: 240`. Archive each with `archive_session` when it
-has finished. A review that failed is a note in your report, not a reason to stop.
+Start every one of them once per release. The only one to skip is one that already ran
+for this release: its report (or pull request) is newer than the last tag, as when an
+earlier run of this skill ended `partly_done`. Never start one again in the same release. An agent cannot press Run now, so
+read the workflow with `manage_workflows read`, and call `start_session` with its prompt
+(the text under its front matter) and its `runtime:`, `model:` and `permission-mode:`.
+Start them by order, at most two at a time: the reviews take turns on the "build" lease,
+and the feature matrix reads the competitor check's report. Wait with `wait_for_event`,
+naming the sessions in `agents`, `until_minutes: 240`. Archive each with
+`archive_session` when it has finished. One that failed is a note in your report, not a
+reason to stop, and it is not started again until the next release.
 
 ## 3. Have high and medium fixed
 

@@ -1,26 +1,21 @@
 ---
-name: Weekly usability check
-on:
-  - schedule:
-      at: [":00"]
-      between: "03:00-03:00"
-      days: [thu]
+name: Usability check
+on: manual
 agent: new
 runtime: claude
 permission-mode: auto
 labels: [review, usability]
-cooldown: 6d
 hosts: [8AB85821-9D24-59CE-9737-8FC556923733]
 when-done: archive
 ---
 
-You are the weekly usability check of this project. You run with nobody watching, early
-on Thursday. Look at the three clients — the Mac window (`App/`), the Remote on iPhone and
+You are the usability check of this project. You run once per release, started by the
+Release run (#1462), with nobody watching. Look at the three clients — the Mac window (`App/`), the Remote on iPhone and
 iPad (`Remote/`), and the web page (`Web/`), with `Shared/UI` drawn by both the window and
 the Remote — for usability problems, for consistency within each client, for parity
 between them, and for the Remote following iOS design. Write down what you find, keep the
 parity table true, and file issues for what should be fixed. Security and performance are
-not yours: their reviews run on Sundays and Wednesdays.
+not yours: their reviews run in the same release.
 
 ## Rules for the whole run
 
@@ -51,7 +46,7 @@ not yours: their reviews run on Sundays and Wednesdays.
   unlock it or keep it awake.
 - **Questions.** Nobody is at the keyboard. Do not ask; record the finding as
   "needs a decision" with the choice spelled out. If you must ever ask, name yourself
-  ("The weekly usability check agent recommends… Alex, which…?"), never a bare "I" or
+  ("The usability check agent recommends… Alex, which…?"), never a bare "I" or
   "you".
 
 ## 1. Set up and scope
@@ -71,7 +66,7 @@ not yours: their reviews run on Sundays and Wednesdays.
    and the "Keeping the three clients in step" section of `AGENTS.md`. Search GitHub for
    open issues about parity and usability, so nothing is reported twice.
 4. **Scope** is:
-   - the UI changes on `main` since `reviewed-through:` (with no marker, the last 7 days):
+   - the UI changes on `main` since `reviewed-through:` (with no marker, since the last tag):
      `git log --stat <reviewed-through>..main -- App/Sources Remote/Sources Shared/UI Web/src`.
      Check each commit's parity lines (`mac:`, `remote:`, `web:`) against what the code
      now does, and each parity row they should have changed; and
@@ -81,7 +76,7 @@ not yours: their reviews run on Sundays and Wednesdays.
 
 ## 2. Look
 
-For the screen in depth, and for anything the week's changes touched:
+For the screen in depth, and for anything the release's changes touched:
 
 1. **Read the code** of all three clients side by side, from the parity table's paths.
 2. **See it where you can.** Launch a scratch set-up with the `run-app` skill (under the

@@ -1,21 +1,17 @@
 ---
-name: Weekly runtime check
-on:
-  - schedule:
-      at: [":00"]
-      between: "03:00-03:00"
-      days: [sat]
+name: Runtime check
+on: manual
 agent: new
 runtime: claude
 model: sonnet
 permission-mode: auto
-cooldown: 6d
 hosts: [8AB85821-9D24-59CE-9737-8FC556923733]
-labels: [weekly, runtimes]
+labels: [release, runtimes]
 when-done: archive
 ---
 
-Update each agent runtime to its latest release and test it against the app (#39), with
+You run once per release, started by the Release run (#1462). Update each agent runtime
+to its latest release and test it against the app (#39), with
 `scripts/nightly-runtimes.py`. Run every command from the project folder, and change no file
 or branch yourself: the script works in a tree of its own.
 

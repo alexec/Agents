@@ -25,7 +25,7 @@ Mermaid) are not on this page.
 
 **Keeping it current:** a pull request that changes the state of an integration (added,
 removed, walked, tested on a real account, broken, fixed) updates its row in the same branch.
-The weekly runtime check writes the rows between the `runtimes` markers below; edit all other
+The runtime check, run once per release, writes the rows between the `runtimes` markers below; edit all other
 rows by hand. A new type of integration adds a section.
 
 All open integration issues: the issue search `is:open label:integration`.

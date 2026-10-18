@@ -1,11 +1,11 @@
 ---
 diataxis: reference
-description: Which apps for running several coding agents have which features, Agents included, as found by the weekly competitor check.
+description: Which apps for running several coding agents have which features, Agents included, as found by the competitor check, run once per release.
 ---
 
 # Feature matrix of coding-agent apps
 
-This page lists every app the weekly competitor check has found that runs several coding
+This page lists every app the competitor check has found that runs several coding
 agents at once, against the full set of features found across them. Agents is in bold,
 wherever its score puts it.
 
@@ -40,9 +40,9 @@ tables, adds every feature up.
 The matrix was filled in on 2026-10-12 from each app's own docs, changelog, README,
 releases and, where open, source. Agents' row was last brought up to date on 2026-10-17. Every app is held to the same bar, Agents included: a ●
 needs the whole feature, documented by the app itself, and a ○ needs evidence, such as an
-app that ships for macOS alone having no Android app. Every Monday, after the
+app that ships for macOS alone having no Android app. Once per release, after the
 Competitor check, the Feature matrix workflow (`.agents/workflows/feature-matrix.md`)
-brings it up to date from the week's merged changes and the Competitor check's report.
+brings it up to date from the merged changes since its last update and the Competitor check's report.
 The reports in `~/.agents/reviews/competitors/` give the sources, and
 [Sources for leases, waits, workflows in the repository and live documents](#sources-for-leases-waits-workflows-in-the-repository-and-live-documents)
 gives them for the four features added on 2026-10-15. Apps change every week, so check a row against the app before relying
