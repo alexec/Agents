@@ -216,6 +216,9 @@ func notAnObject() error {
 
 // readProjectConfig is the file as an object, empty where there is none.
 func readProjectConfig(folder string) (map[string]any, error) {
+	if !ownFolders(folder, ".agents") {
+		return nil, linkedFolder(".agents", folder)
+	}
 	b, err := os.ReadFile(projectConfigPath(folder))
 	if os.IsNotExist(err) {
 		return map[string]any{}, nil
@@ -244,6 +247,9 @@ func setProjectConfig(folder, key string, v any) error {
 		m[key] = value(b)
 	}
 	path := projectConfigPath(folder)
+	if !ownFolders(folder, ".agents") {
+		return linkedFolder(".agents", folder)
+	}
 	if len(m) == 0 {
 		if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
 			return err

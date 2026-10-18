@@ -97,6 +97,9 @@ func (d *Daemon) stateOf(folder, path string) (*guardedState, bool) {
 
 // diskRead is the file's digest and bytes, a nil digest for no file.
 func diskRead(folder, path string) (*string, []byte) {
+	if !ownFolders(folder, filepath.Dir(path)) {
+		return nil, nil
+	}
 	b, err := os.ReadFile(filepath.Join(folder, path))
 	if err != nil {
 		return nil, nil
@@ -430,7 +433,9 @@ func (d *Daemon) keepOrUndo(r wire.GuardedChangeRequest, keep bool) (wire.Projec
 		d.guardedMu.Unlock()
 		path := filepath.Join(folder, r.Path)
 		var err error
-		if had {
+		if !ownFolders(folder, filepath.Dir(r.Path)) {
+			err = linkedFolder(filepath.Dir(r.Path), folder)
+		} else if had {
 			os.MkdirAll(filepath.Dir(path), 0o755)
 			err = store.WriteAtomically(path, content, 0o644)
 		} else if err = os.Remove(path); errors.Is(err, os.ErrNotExist) {

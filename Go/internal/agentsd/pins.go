@@ -273,6 +273,9 @@ func (d *Daemon) writePins(f pinsFile, project string) error {
 	}
 	defer d.approveWrite(project, pinsFilePath)
 	path := pinsFileOf(project)
+	if !ownFolders(project, ".agents") {
+		return pinRefused(linkedFolder(".agents", project).Message)
+	}
 	if f.empty() {
 		if err := os.Remove(path); err != nil && !errors.Is(err, os.ErrNotExist) {
 			return pinRefused("The pins could not be written in " + project + "/.agents: " + err.Error())

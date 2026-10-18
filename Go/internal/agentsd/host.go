@@ -211,6 +211,9 @@ func (t diskThresholds) criticalLine() int64 { return int64(t.criticalGB * gigab
 
 // projectThresholds is a project's .agents/project.json "diskSpace", where it says one.
 func projectThresholds(folder string) (diskThresholds, bool) {
+	if !ownFolders(folder, ".agents") {
+		return diskThresholds{}, false
+	}
 	b, err := os.ReadFile(filepath.Join(folder, ".agents", "project.json"))
 	if err != nil {
 		return diskThresholds{}, false

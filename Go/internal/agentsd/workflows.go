@@ -474,7 +474,10 @@ func (d *Daemon) editWorkflowLocked(folder, id string, byPerson bool, edit func(
 	if f == nil {
 		return noSuchWorkflow(id)
 	}
-	path, _ := workflowPath(folder, id)
+	path, ok := workflowPath(folder, id)
+	if !ok {
+		return notInFolder(id)
+	}
 	text, digest, why := readWorkflowFile(path)
 	if why != "" {
 		return &Error{Code: wire.FailureWorkflowUnreadable, Message: id + ".md could not be read."}
@@ -652,7 +655,11 @@ func (d *Daemon) deleteWorkflow(r wire.WorkflowRequest) error {
 		d.workflowMu.Unlock()
 		return noSuchWorkflow(r.WorkflowID)
 	}
-	path, _ := workflowPath(folder, r.WorkflowID)
+	path, ok := workflowPath(folder, r.WorkflowID)
+	if !ok {
+		d.workflowMu.Unlock()
+		return notInFolder(r.WorkflowID)
+	}
 	if err := os.Remove(path); err != nil {
 		d.workflowMu.Unlock()
 		return &Error{Code: wire.FailureDeleteRefused, Message: "Could not delete workflow file: " + err.Error()}
