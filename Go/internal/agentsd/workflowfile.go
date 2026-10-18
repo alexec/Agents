@@ -23,7 +23,9 @@ import (
 // under it. A file that cannot be read is still listed, with what can be read of it and
 // why the rest cannot; nothing in it ever runs.
 
-func workflowsFolder(project string) string { return filepath.Join(project, ".agents", "workflows") }
+func workflowsFolder(project string) string { return filepath.Join(project, workflowsRel) }
+
+const workflowsRel = ".agents/workflows"
 
 // validWorkflowID is WorkflowFolder.isValidID.
 func validWorkflowID(id string) bool {
@@ -35,7 +37,7 @@ func workflowPath(project, id string) (string, bool) {
 		return "", false
 	}
 	p := filepath.Join(workflowsFolder(project), id+".md")
-	if filepath.Dir(p) != filepath.Clean(workflowsFolder(project)) {
+	if filepath.Dir(p) != filepath.Clean(workflowsFolder(project)) || !ownFolders(project, workflowsRel) {
 		return "", false
 	}
 	return p, true
@@ -43,6 +45,9 @@ func workflowPath(project, id string) (string, bool) {
 
 // workflowIDs is WorkflowFolder.ids: the .md files, not hidden, by name.
 func workflowIDs(project string) []string {
+	if !ownFolders(project, workflowsRel) {
+		return nil
+	}
 	entries, err := os.ReadDir(workflowsFolder(project))
 	if err != nil {
 		return nil

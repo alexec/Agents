@@ -329,11 +329,11 @@ func (d *Daemon) manageWorkflows(caller wire.UUID, args map[string]json.RawMessa
 		if !ok {
 			return "", notInFolder(id)
 		}
-		b, err := os.ReadFile(path)
-		if err != nil {
+		text, _, why := readWorkflowFile(path)
+		if why != "" {
 			return "", noSuchWorkflow(id)
 		}
-		return string(b), nil
+		return text, nil
 	case "write":
 		return d.writeWorkflow(project, id, argString(args, "content"))
 	case "remove":
@@ -456,6 +456,10 @@ func (d *Daemon) writeWorkflow(project, id, content string) (string, error) {
 		return "", &Error{Code: wire.FailureWorkflowUnreadable, Message: "Nothing was written: " + err.Error() + "."}
 	}
 	os.MkdirAll(workflowsFolder(project), 0o755)
+	if _, ok := workflowPath(project, id); !ok {
+		d.workflowMu.Unlock()
+		return "", notInFolder(id)
+	}
 	digest := sha256Hex(text)
 	st := d.stateLocked(project, id, true)
 	if existing == nil {
