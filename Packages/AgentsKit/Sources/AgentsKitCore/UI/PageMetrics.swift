@@ -57,7 +57,11 @@ public struct PageMetrics: Hashable, Sendable {
     /// the boundary going down and the text suddenly has more room — which reads as a
     /// glitch while somebody is dragging the resize handle. Ramping keeps `measure`
     /// monotonic in `width`, which is the property that keeps the page still.
-    public static func forPane(width: Double) -> PageMetrics {
+    ///
+    /// The zoom (#1419) makes the cap larger with the text, so a line keeps the same
+    /// number of words. The pane's own width still wins: zoomed text in a narrow pane
+    /// wraps sooner, it does not run off the side.
+    public static func forPane(width: Double, zoom: Double = 1) -> PageMetrics {
         let padding: Double
         if width <= narrowPane {
             padding = tightPadding
@@ -68,6 +72,6 @@ public struct PageMetrics: Hashable, Sendable {
             padding = tightPadding + t * (widePadding - tightPadding)
         }
         let available = max(0, width - padding * 2)
-        return PageMetrics(measure: min(measureCap, available), padding: padding)
+        return PageMetrics(measure: min(measureCap * zoom, available), padding: padding)
     }
 }

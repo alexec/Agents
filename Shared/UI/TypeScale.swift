@@ -122,6 +122,11 @@ extension TextStep {
         }
     }
 
+    /// The same on a zoomed page (#1419), for the passage editor.
+    func nsFont(zoom: CGFloat) -> NSFont {
+        guard zoom != 1 else { return nsFont }
+        return nsFont.withSize(nsFont.pointSize * zoom)
+    }
 }
 #endif
 
@@ -134,15 +139,52 @@ extension Text {
     }
 }
 
+extension EnvironmentValues {
+    /// How much larger than its step a Markdown page's text is drawn (#1419). Only a
+    /// page sets it; everywhere else it is 1, and the chat and the sidebar draw as
+    /// they always did.
+    @Entry var textZoom: CGFloat = 1
+}
+
 extension View {
     /// Sets the text to a step of the scale. The Mac and the phone resolve the same
     /// step to their own font, because this is the only place a step is resolved
     /// (FR-013). A weight goes on afterwards with `.fontWeight(_:)`.
     ///
     /// The size is the system's (#1034): Dynamic Type on the phone, and the Mac's own
-    /// text size where SwiftUI applies it.
+    /// text size where SwiftUI applies it. A page's zoom (`textZoom`) multiplies it.
     func appText(_ step: TextStep) -> some View {
-        font(step.font)
+        modifier(SteppedText(step: step))
+    }
+}
+
+private struct SteppedText: ViewModifier {
+    let step: TextStep
+    @Environment(\.textZoom) private var zoom
+    @Environment(\.dynamicTypeSize) private var dynamicType
+
+    func body(content: Content) -> some View {
+        content.font(step.zoomedFont(zoom, dynamicType: dynamicType))
+    }
+}
+
+extension TextStep {
+    /// The step at a page's zoom (#1419). At 1 it is the semantic font itself, so
+    /// nothing changes where nothing is zoomed. Zoomed, a semantic style cannot be
+    /// scaled, so it becomes the point size the style resolves to, times the zoom: on
+    /// the phone at the environment's Dynamic Type size, which the Mac does not have.
+    func zoomedFont(_ zoom: CGFloat, dynamicType: DynamicTypeSize) -> Font {
+        guard zoom != 1 else { return font }
+        #if os(macOS)
+        let points = nsFont.pointSize
+        #else
+        let points = uiFont(dynamicType: dynamicType).pointSize
+        #endif
+        return Self.sized(points * zoom, monospaced: self == .code)
+    }
+
+    fileprivate static func sized(_ points: CGFloat, monospaced: Bool) -> Font {
+        monospaced ? .system(size: points, design: .monospaced) : .system(size: points)
     }
 }
 
@@ -176,6 +218,21 @@ extension TextStep {
         return font.weight(.semibold)
         #endif
     }
+
+    /// The same heading on a zoomed page (#1419): the ladder's point size times the
+    /// zoom, and the ladder itself at 1.
+    static func heading(level: Int, zoom: CGFloat, dynamicType: DynamicTypeSize) -> Font {
+        guard zoom != 1 else { return heading(level: level) }
+        #if os(macOS)
+        let style: NSFont.TextStyle = level <= 1 ? .title1 : level == 2 ? .title2 : .title3
+        let points = NSFont.preferredFont(forTextStyle: style).pointSize
+        #else
+        let style: UIFont.TextStyle = level <= 1 ? .title1 : level == 2 ? .title2 : .body
+        let traits = UITraitCollection(preferredContentSizeCategory: UIContentSizeCategory(dynamicType))
+        let points = UIFont.preferredFont(forTextStyle: style, compatibleWith: traits).pointSize
+        #endif
+        return sized(points * zoom, monospaced: false).weight(.semibold)
+    }
 }
 
 #if os(iOS)
@@ -191,6 +248,36 @@ extension TextStep {
         case .code: return .monospacedSystemFont(ofSize: UIFont.preferredFont(forTextStyle: .subheadline).pointSize,
                                                   weight: .regular)
         }
+    }
+
+    /// The same at the text size SwiftUI's environment says, which a zoomed page
+    /// (#1419) multiplies.
+    func uiFont(dynamicType: DynamicTypeSize) -> UIFont {
+        let traits = UITraitCollection(preferredContentSizeCategory: UIContentSizeCategory(dynamicType))
+        let style: UIFont.TextStyle
+        switch self {
+        case .title: style = .title1
+        case .reading: style = .body
+        case .supporting, .code: style = .subheadline
+        case .fine: style = .footnote
+        }
+        let base = UIFont.preferredFont(forTextStyle: style, compatibleWith: traits)
+        return self == .code ? .monospacedSystemFont(ofSize: base.pointSize, weight: .regular) : base
+    }
+
+    /// The same on a zoomed page (#1419), for the passage editor. Scaled through the
+    /// step's own metrics, so the text view still follows Dynamic Type.
+    func uiFont(zoom: CGFloat) -> UIFont {
+        guard zoom != 1 else { return uiFont }
+        let style: UIFont.TextStyle = switch self {
+        case .title: .title1
+        case .reading: .body
+        case .supporting, .code: .subheadline
+        case .fine: .footnote
+        }
+        let atDefault = UIFont.preferredFont(forTextStyle: style,
+                                             compatibleWith: UITraitCollection(preferredContentSizeCategory: .large))
+        return UIFontMetrics(forTextStyle: style).scaledFont(for: atDefault.withSize(atDefault.pointSize * zoom))
     }
 
 }

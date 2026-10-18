@@ -13,6 +13,9 @@ struct CodeBlockText: View {
     var caret: CursorFlag? = nil
 
     @State private var document: CodeDocument?
+    /// A page's zoom (#1419), for the keywords and comments, which carry a font of their own.
+    @Environment(\.textZoom) private var zoom
+    @Environment(\.dynamicTypeSize) private var dynamicType
 
     var body: some View {
         Group {
@@ -44,10 +47,11 @@ struct CodeBlockText: View {
     private var styled: AttributedString {
         guard let document, document.plainBecause == nil else { return AttributedString(text) }
         var result = AttributedString()
+        let font = TextStep.code.zoomedFont(zoom, dynamicType: dynamicType)
         for (index, line) in document.lines.enumerated() {
             if index > 0 { result.append(AttributedString("\n")) }
             result.append(CodeText.attributed(line, spans: document.spans(line: index),
-                                              style: CodeInk.attributes(for:)))
+                                              style: { CodeInk.attributes(for: $0, font: font) }))
         }
         return result
     }

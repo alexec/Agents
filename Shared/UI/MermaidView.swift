@@ -8,6 +8,9 @@ import SwiftUI
 /// Fitted to the width it is offered, never drawn larger than its own size, so a
 /// small diagram stays small and a wide one shrinks to fit.
 struct MermaidView: View {
+    /// A page's zoom (#1419): the diagram is drawn larger as a whole, because its
+    /// boxes are sized for words at `MermaidDiagram.fontSize`.
+    @Environment(\.textZoom) private var zoom
     let diagram: MermaidDiagram
 
     var body: some View {
@@ -17,7 +20,7 @@ struct MermaidView: View {
             draw(&context)
         }
         .aspectRatio(diagram.width / diagram.height, contentMode: .fit)
-        .frame(maxWidth: diagram.width, maxHeight: diagram.height)
+        .frame(maxWidth: diagram.width * zoom, maxHeight: diagram.height * zoom)
         .accessibilityElement()
         .accessibilityLabel("\(diagram.summary): \(diagram.labels.flatMap(\.lines).joined(separator: ", "))")
     }

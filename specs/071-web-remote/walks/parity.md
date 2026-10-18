@@ -15,7 +15,7 @@
 
 ## Counts
 
-Of 229 rows: **155 same**, **47 by design**, **27 delta** (after #188, #189, #191, #221, #238–#244, #249, #252–#255, #257, #259–#261, #263–#266, #291, #254, #317, #341, #342, #343, #345, #344, #357, #366, #375, #377, #381, #378, #400, #396, #394, #436, #433, #432, #506, #545, #548, #791, #790, #846, #826, #888, #982, #1089, #1109, #1122). A row with any open delta counts as delta, even where another side's difference is by design.
+Of 230 rows: **156 same**, **47 by design**, **27 delta** (after #188, #189, #191, #221, #238–#244, #249, #252–#255, #257, #259–#261, #263–#266, #291, #254, #317, #341, #342, #343, #345, #344, #357, #366, #375, #377, #381, #378, #400, #396, #394, #436, #433, #432, #506, #545, #548, #791, #790, #846, #826, #888, #982, #1089, #1109, #1122, #1419). A row with any open delta counts as delta, even where another side's difference is by design.
 
 | Screen | Same | By design | Delta |
 |---|---|---|---|
@@ -25,7 +25,7 @@ Of 229 rows: **155 same**, **47 by design**, **27 delta** (after #188, #189, #19
 | Prompt bar and queued prompts | 20 | 3 | 0 |
 | Question and permission cards | 14 | 3 | 0 |
 | Start sheet and new project | 18 | 5 | 0 |
-| Worktrees and Files | 11 | 5 | 6 |
+| Worktrees and Files | 12 | 5 | 6 |
 | Pins | 4 | 1 | 0 |
 | Workflows page | 15 | 1 | 2 |
 | Settings and Project Settings | 4 | 8 | 0 |
@@ -256,6 +256,7 @@ The deltas are tracked by 30 issues:
 | A folder ends on its contents or a sentence (#62); stale reads dropped (#89) | Yes | Yes | Yes | **same** |
 | Writing a file: the live Markdown page, and any other text file as its source (#415) | The page in place; other text as an editable source view, saved after a pause and on leaving it; a partly read file stays numbered and read-only: `A/Sidebar/FilesPane.swift`, `S/Page/SourceEditor.swift` | The Page; other text in Files as the same shared source view: `R/Panes/PagePane.swift`, `R/Panes/FilesPane.swift` | `W/views/LiveDocument.tsx`; other text, HTML source included, as a textarea: `W/views/files/SourceEditor.tsx` | **same** (#415). Source is plain while typed in, not coloured |
 | The agent's caret on a live page (#1236): what a write changed is typed in, 8 characters every 40 ms (200 a second), one caret, passages in document order, a waiting passage showing what it said before; the view follows the caret unless the person is typing; opening a passage gives it whole | `K/Model/PageFollower.swift` (`typingStep`), `S/Page/LivePage.swift` (`typingTick`), the caret with the agent's flag in `S/Page/CursorFlag.swift` | The same shared page | `W/model/caret.ts`, `W/views/LiveDocument.tsx`, a caret after the typed text (`W/app.css`, `.passage.typing`); no name flag | **same** (#1236); walked on a scratch window and in headless Chrome (`Web/test/walk/caret1236.mjs`, `walks/parity/1236-*.png`); the Remote not walked |
+| Page zoom (#1419): a Markdown page's text at 75 %, 90 %, 100 %, 110 %, 125 %, 150 %, 175 % or 200 %, one level for every page on the device (not per file), kept after the page closes and the app quits; the measure grows with the text; code, headings and Mermaid diagrams take the same scale; the chat and the sidebar keep their size | View ▸ Zoom In (⌘+), Zoom Out (⌘−), Actual Size (⌘0, which is Window ▸ Agents (All Projects) while no page is in front), and a pinch on the trackpad; in `WindowDefaults.store`: `S/Page/LivePage.swift` (`PageZoomAction`), `S/TypeScale.swift` (`textZoom`), `K/UI/PageZoom.swift`, `A/Commands/AgentsCommands.swift` | A pinch on the page, and ⌘+, ⌘− and ⌘0 with an iPad's keyboard; Dynamic Type is the base, the zoom multiplies it: `S/Page/LivePage.swift` (`zoomKeys`) | ⌘+, ⌘− and ⌘0 (Ctrl off a Mac) while a page is shown, a CSS zoom on the page only, in localStorage: `W/model/pageZoom.ts`, `W/views/files/pageZoomKeys.ts`, `W/views/LiveDocument.tsx` | **same** (#1419); no pinch on the page **by design** (the browser's pinch zooms the whole page) |
 | Open File… (#415) | Go ▸ Open File… (⌘P): a field over the window searching the session's folders by name and path on its host (`files/mention`), ↑/↓, Return opens in Files, Escape closes: `A/Commands/AgentsCommands.swift`, `A/ContentView.swift`, `S/Files/FileSearch.swift` | ⌘P with a keyboard attached, and Open File… in the chat's ···: the same shared field; Markdown opens on the Page: `R/Chat/RemoteChatView.swift` | ⌘P or Ctrl+P over the chat, in place of the browser's Print, and Open File… in the chat's ···: `W/views/files/FileSearch.tsx`, `W/views/Chat.tsx`, `W/views/SessionMenu.tsx` | **same** (#415, #543). Needs a session open: the search is its folders |
 | Search in files | None | None | None | **same** |
 | Exchanged documents | `A/Sidebar/ArtifactsPane.swift` | `R/Chat/DocumentView.swift` | `W/views/Exchanged.tsx` (a web address is a link) | **same** |

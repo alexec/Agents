@@ -14,6 +14,7 @@ import { pictureFromReading } from "../model/pageImage";
 import { indexContaining, merge, split, type Passage } from "../model/passages";
 import { Markdown, type PageImages } from "../render/markdown";
 import { nameOf } from "./files/paneState";
+import { usePageZoom } from "./files/pageZoomKeys";
 
 type Loaded =
   | { kind: "reading" }
@@ -54,6 +55,8 @@ export function LiveDocument({ store, host, agentID, path, line, source }: {
   const theirs = useSignal<string | null>(null);
   const marked = useSignal<Set<number>>(new Set());
   const caret = useSignal<Caret>(idle);
+  // How large the page's text is drawn, and ⌘+, ⌘− and ⌘0 while it is shown (#1419).
+  const zoom = usePageZoom();
   const typist = useRef<ReturnType<typeof setInterval> | null>(null);
   const saving = useRef<ReturnType<typeof setTimeout> | null>(null);
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
@@ -240,7 +243,7 @@ export function LiveDocument({ store, host, agentID, path, line, source }: {
           <button class="link" onClick={() => (theirs.value = null)}>OK</button>
         </div>
       )}
-      <article class={`page${state.kind === "gone" ? " gone" : ""}`} aria-label={name}>
+      <article class={`page${state.kind === "gone" ? " gone" : ""}`} aria-label={name} style={zoom}>
         {passages.map((passage, index) => {
           const edit = editing.value;
           if (edit && edit.index === index) {

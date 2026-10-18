@@ -26,7 +26,7 @@ struct CodeLine: View {
     private var styled: AttributedString {
         var mark = AttributeContainer()
         mark.backgroundColor = CodeInk.changedWash
-        return CodeText.attributed(text, spans: spans, style: CodeInk.attributes(for:),
+        return CodeText.attributed(text, spans: spans, style: { CodeInk.attributes(for: $0) },
                                    marks: changed, mark: mark)
     }
 }

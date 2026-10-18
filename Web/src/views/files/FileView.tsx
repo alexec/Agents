@@ -5,6 +5,7 @@
 //
 // Read again whenever the host says something under this agent changed, with the stamp held
 // so an unchanged file costs nothing (#258). A slow read of the last file does not land here.
+import type { ComponentChildren } from "preact";
 import { useSignal } from "@preact/signals";
 import { useLayoutEffect, useMemo, useRef } from "preact/hooks";
 import type { FileReading } from "../../protocol/generated";
@@ -21,6 +22,7 @@ import { MermaidPage } from "./MermaidPage";
 import { FileLines } from "./FileLines";
 import { SourceEditor } from "./SourceEditor";
 import { ZoomPicture } from "./ZoomPicture";
+import { usePageZoom } from "./pageZoomKeys";
 
 export function FileView({ store, host, agentID, path, line }: {
   store: Store; host: string; agentID: string; path: string; line?: number | undefined;
@@ -106,7 +108,7 @@ export function FileView({ store, host, agentID, path, line }: {
       // A Mermaid diagram (#853), drawn from the whole file only.
       if (isMermaid(path) && !r.isTruncated) return <MermaidPage key={path} text={r.text} line={line} />;
       if (shown === "picture") return <>{note}<ZoomPicture bytes={picture?.bytes ?? r.text} type="image/svg+xml" name={name} /></>;
-      if (shown === "page") return <>{note}<div class="file-page"><Markdown text={r.text} images={images} /></div></>;
+      if (shown === "page") return <>{note}<ZoomedPage><Markdown text={r.text} images={images} /></ZoomedPage></>;
       if (shown === "source") {
         return (
           <>
@@ -123,4 +125,9 @@ export function FileView({ store, host, agentID, path, line }: {
       return <SourceEditor key={path} store={store} host={host} agentID={agentID} path={path} text={r.text} line={line} />;
     }
   }
+}
+
+// A Markdown page at the page zoom (#1419).
+function ZoomedPage({ children }: { children: ComponentChildren }) {
+  return <div class="file-page" style={usePageZoom()}>{children}</div>;
 }
