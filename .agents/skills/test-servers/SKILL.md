@@ -9,7 +9,7 @@ Since 058 a server is a **host**: a static Linux `agentsd` in `~/.agents-server`
 out to the control plane over a WebSocket, as this Mac's host does. It joins one of two ways:
 - **the shown command** (FR-018): `curl … /v1/install.sh | sh -s -- '<host code>'`, run on
   the server. The control plane serves the script and the Linux host from
-  `App/Resources/servers` (`scripts/build-linux-agentsd-go.sh` builds them; Go, the only host
+  `App/Resources/servers` (`scripts/build-linux-agentsd.sh` builds them; Go, the only host
   since #1314);
 - **install over ssh** (FR-018a): the control plane runs ssh once with a key it is handed,
   installs, leaves the code, and lets go of the key.
@@ -97,7 +97,7 @@ After a walk, the Mac's token must be nowhere: pipe it (read with `security find
 ## 2. A scratch control plane the box can reach
 
 ```sh
-scripts/build-linux-agentsd-go.sh       # the Linux hosts, into App/Resources/servers (once per change)
+scripts/build-linux-agentsd.sh       # the Linux hosts, into App/Resources/servers (once per change)
 eval "$($S/launch.sh --slug srv --lan)" # the control plane at this Mac's LAN address
 ```
 
@@ -177,7 +177,7 @@ host. Only the environment is read at launch, so each of these needs a fresh roo
 | Remove | Settings ▸ Control plane ▸ Hosts ▸ Remove: gone from every client at once, and its daemon still running on the box (FR-020) |
 | Files pane | open a server chat's files: it reads through `files/browse` on the host |
 | Zero-setup (043, 056) | `bare.sh rebuild`, join it with the command: Claude's toolset installs, a Claude agent answers with the sign-in this Mac lends |
-| Linux binary itself | `scripts/build-linux-agentsd-go.sh --check` |
+| Linux binary itself | `scripts/build-linux-agentsd.sh --check` |
 
 Record what you saw in the spec's `walks/` (058) or `walk/` (037), with screenshots beside it.
 

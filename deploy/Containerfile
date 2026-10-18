@@ -1,7 +1,10 @@
-# agents-control as a container (058, T068): static binaries and a user of their own.
-# The binaries are built on a Mac first: scripts/build-linux-control.sh (agents-control is Go).
+# agents-control as a container (058, T068): static Go binaries and a user of their own.
+# The image builds them itself (#1381), from the repository: agents-control (#1137),
+# workspace-commands (#1364) and the web remote (071). Nothing is built on a Mac first.
 #
-#   docker build -f deploy/Containerfile -t agents-control deploy
+#   docker build -f deploy/Containerfile -t agents-control .
+#
+# from the repository's root; deploy/Containerfile.dockerignore sends only Go/ and Web/.
 #
 # Configured by the environment (contracts/store.md "Configuration"): AGENTS_STORE,
 # AGENTS_CONTROL_URL, AGENTS_CONTROL_PEER_URL, AGENTS_CONTROL_KEY_FILE, and for a bucket
@@ -10,26 +13,40 @@
 # Alpine rather than scratch (#806): the command provider (workspace-commands, #691) runs each
 # command with /bin/sh. An image of your own can `FROM` this one and `apk add` the CLIs your
 # commands call.
+
+# The Go its go.mod names; GO_IMAGE moves it, as Go/scripts/go.sh's does.
+ARG GO_IMAGE=golang:1.26
+# Web/.node-version's Node.
+ARG NODE_IMAGE=node:26.8.2-alpine
+
+FROM ${GO_IMAGE} AS go
+WORKDIR /src/Go
+COPY Go/go.mod Go/go.sum ./
+RUN go mod download
+COPY Go/ ./
+ARG VERSION=dev
+RUN for cmd in agents-control workspace-commands; do \
+      CGO_ENABLED=0 go build -trimpath \
+        -ldflags "-s -w -X github.com/alexec/agents/Go/internal/buildinfo.Version=$VERSION" \
+        -o /out/$cmd ./cmd/$cmd || exit 1; \
+    done
+
+# The web remote, built here as it is not checked in (#473): served only with
+# `--web /web --web-port <port>`, on the container's loopback, so off unless asked for.
+FROM ${NODE_IMAGE} AS web
+WORKDIR /src/Web
+COPY Web/package.json Web/package-lock.json ./
+RUN npm ci --ignore-scripts --no-audit --no-fund
+COPY Web/ ./
+RUN npm run build
+
+# Named base: deploy/demo builds its codes job from it.
 FROM alpine:3.20 AS base
 RUN apk add --no-cache ca-certificates && adduser -D -H -u 10001 control \
  && mkdir /data && chown control /data
-# The machine's own build, chosen here rather than by TARGETARCH, which the classic
-# builder does not set. workspace-commands sits beside agents-control, where it looks first.
-COPY bin/ /bin-in/
-RUN case "$(uname -m)" in aarch64) a=arm64;; x86_64) a=amd64;; *) exit 1;; esac \
- && cp /bin-in/agents-control-linux-$a /agents-control \
- && cp /bin-in/workspace-commands-linux-$a /workspace-commands \
- && chmod 755 /agents-control /workspace-commands
-
-FROM alpine:3.20
-RUN apk add --no-cache ca-certificates && adduser -D -H -u 10001 control
-COPY --from=base /agents-control /workspace-commands /
-# The web remote (071), from scripts/build-linux-control.sh: served only with
-# `--web /web --web-port <port>`, on the container's loopback, so off unless asked for.
-COPY web/ /web/
-# Where a single copy keeps its store (compose.public.yaml): a volume there starts out the
-# control user's.
-COPY --from=base --chown=10001:10001 /data /data
+# workspace-commands sits beside agents-control, where it looks first.
+COPY --from=go /out/agents-control /out/workspace-commands /
+COPY --from=web /src/Web/dist/ /web/
 USER control
 EXPOSE 8791
 ENTRYPOINT ["/agents-control"]

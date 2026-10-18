@@ -1,8 +1,8 @@
 # The demo control plane App Review is given (058, T092): one copy, one demo host whose only
 # runtime says back what it is told, and codes that last as long as a review does.
 #
-#   scripts/build-linux-control.sh aarch64 && scripts/build-linux-agentsd-go.sh   # or x86_64
-#   cp App/Resources/servers/agentsd-go-linux-* deploy/demo/bin/
+#   scripts/build-linux-agentsd.sh
+#   cp App/Resources/servers/agentsd-linux-* deploy/demo/bin/
 #   DEMO_DOMAIN=demo.example.com docker compose -f deploy/demo/compose.yaml up -d --build
 #   docker compose -f deploy/demo/compose.yaml exec codes cat /codes/device /codes/operator
 #
@@ -13,8 +13,8 @@ name: agents-demo
 services:
   control:
     build:
-      context: ..
-      dockerfile: Containerfile
+      context: ../..
+      dockerfile: deploy/Containerfile
     image: agents-control:demo
     # The named volume is root's; the demo has nothing else on this machine to protect.
     user: root
@@ -32,8 +32,8 @@ services:
   # one use. Run it again (`docker compose run --rm codes`) for fresh ones.
   codes:
     build:
-      context: ..
-      dockerfile: Containerfile
+      context: ../..
+      dockerfile: deploy/Containerfile
       target: base
     image: agents-control:demo-tools
     user: root

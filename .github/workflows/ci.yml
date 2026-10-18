@@ -189,7 +189,7 @@ jobs:
         run: xcodegen generate
 
       # The Linux agentsd folder is a build output and gitignored, and the app copies
-      # it. Empty is what a Mac without scripts/build-linux-agentsd-go.sh has.
+      # it. Empty is what a Mac without scripts/build-linux-agentsd.sh has.
       - name: Make room for the Linux agentsd
         run: mkdir -p App/Resources/servers
 

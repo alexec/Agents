@@ -14,7 +14,7 @@ Agents.xcodeproj/
 .agents/worktrees/
 .claude/worktrees/
 
-# Built by scripts/build-linux-agentsd-go.sh (037). Build outputs. The
+# Built by scripts/build-linux-agentsd.sh (037). Build outputs. The
 # README is kept so a fresh clone has the folder the app build copies.
 App/Resources/servers/*
 !App/Resources/servers/README.md

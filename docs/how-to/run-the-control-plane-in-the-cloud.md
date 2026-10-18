@@ -60,15 +60,15 @@ copies](run-several-copies.md).
 
 On your Mac, in the repository:
 
-1. Build the control plane and the Linux host, for the machine's architecture:
+1. Build the Linux host:
 
    ```sh
-   scripts/build-linux-control.sh x86_64      # aarch64 for an ARM machine
-   scripts/build-linux-agentsd-go.sh
+   scripts/build-linux-agentsd.sh
    ```
 
-   The first goes in `deploy/bin/`. The second goes in `App/Resources/servers/`, from
-   where the control plane hands it to every Linux server that joins.
+   It goes in `App/Resources/servers/`, from where the control plane hands it to every
+   Linux server that joins. The control plane itself is built in its image, on the
+   machine, from `Go/` and `Web/`.
 2. Make the control plane's private key:
 
    ```sh
@@ -77,11 +77,12 @@ On your Mac, in the repository:
 
    This writes `deploy/secrets/control-key`. Anyone who has it can pose as your control
    plane, so keep a copy somewhere safe and never commit it.
-3. Copy the repository's `deploy/` folder, with `deploy/bin` and `deploy/secrets`, and
+3. Copy the repository's `deploy/` folder (with `deploy/secrets`), `Go/`, `Web/` and
    `App/Resources/servers/` to the machine, keeping the same layout. For example:
 
    ```sh
-   rsync -a --relative deploy App/Resources/servers you@agents.example.com:agents/
+   rsync -a --relative --exclude node_modules --exclude Web/dist --exclude Go/out \
+       deploy Go Web App/Resources/servers you@agents.example.com:agents/
    ```
 
 ### Start it
@@ -189,8 +190,8 @@ plane at its address and get no notifications.
   Docker volume `agents-control_data`. The certificate and the ACME account are in
   `agents-control_caddy`. The key is `deploy/secrets/control-key`. Back up the store's
   volume and the key. Without the key, the store's hosts and clients can't connect.
-- **Upgrading.** Build again on your Mac, copy `deploy/bin/` and `App/Resources/servers/`
-  across, and run the `up -d --build` line again. Hosts and clients reconnect within
+- **Upgrading.** Build the Linux host again on your Mac, copy `deploy/`, `Go/`, `Web/` and
+  `App/Resources/servers/` across, and run the `up -d --build` line again. Hosts and clients reconnect within
   seconds. Linux servers update their host the next time they connect.
 
 ## If it doesn't work

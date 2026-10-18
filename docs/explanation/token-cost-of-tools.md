@@ -37,8 +37,10 @@ the agent's last turn.
 
 ## The app's own tools
 
-`ToolCostTests` measures what the app's MCP server lists, a tool at a time, as compact
-JSON. A token is taken as about four bytes.
+These numbers were measured by `ToolCostTests`, a test of the Swift host that went with it
+(#1314): what the app's MCP server lists, a tool at a time, as compact JSON. A token is taken
+as about four bytes. To measure the Go host's list, call `tools/list` on a session's app
+tools endpoint and count the bytes of the answer.
 
 | Session | Bytes | About |
 | --- | --- | --- |
@@ -66,8 +68,9 @@ A project's own MCP servers are added on top, in the same way for each runtime. 
 the person's choice, and they are not measured here. To measure one, list its tools
 (`tools/list`) and count the bytes of the answer.
 
-`ToolCostTests` holds the lead's list under 45,000 bytes. A new tool or a longer
-description that goes over says so in the tests, and the ceiling is raised on purpose.
+`ToolCostTests` held the lead's list under 45,000 bytes. Since the Swift host went (#1314),
+no test holds a ceiling; the tools' words are in `Packages/Wire/app-tools.json`, and a change
+there is where to look.
 
 ## What changed
 
@@ -92,7 +95,7 @@ agents still got that wrong. It now says only how the turn went. Waiting is on
 with no id (asking to be archived on `request_archive` since #584, `archive_session` since #638), moves on `move_worktree`, and labels on `set_session_labels`. The next prompt
 was dropped. Old calls still work: `finish_turn` reads every argument it took before.
 
-| Measured by `ToolCostTests` | Before | After |
+| Measured by `ToolCostTests` (Swift, before #1314) | Before | After |
 | --- | --- | --- |
 | `finish_turn` | 8,509 bytes (~2,130 tokens) | 1,154 bytes (~290 tokens) |
 | The tools it gave jobs to: `wait_for_event`, `park_agent`, `archive_agent` | 3,215 | 4,034 |

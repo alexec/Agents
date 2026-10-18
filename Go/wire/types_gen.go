@@ -1886,14 +1886,13 @@ type HostHello struct {
 
 type HostID string
 
-// hosts/install (HostInstall.Request): a server over ssh, with its key, the fingerprint trusted, a tunnel, and `swift` for the Swift host.
+// hosts/install (HostInstall.Request): a server over ssh, with its key, the fingerprint trusted, a tunnel.
 type HostInstall struct {
-	Destination    string  `json:"destination"`
-	Name           *string `json:"name,omitzero"`
-	Key            *string `json:"key,omitzero"`
-	Trust          *string `json:"trust,omitzero"`
-	Tunnel         *bool   `json:"tunnel,omitzero"`
-	Implementation *string `json:"implementation,omitzero"`
+	Destination string  `json:"destination"`
+	Name        *string `json:"name,omitzero"`
+	Key         *string `json:"key,omitzero"`
+	Trust       *string `json:"trust,omitzero"`
+	Tunnel      *bool   `json:"tunnel,omitzero"`
 }
 
 type HostJoinStatus struct {

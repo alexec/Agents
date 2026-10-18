@@ -1516,7 +1516,7 @@ export interface HostHello {
 
 /**
  * hosts/install (HostInstall.Request): a server over ssh, with its key, the fingerprint trusted, a
- * tunnel, and `swift` for the Swift host.
+ * tunnel.
  */
 export interface HostInstall {
   destination: string;
@@ -1524,7 +1524,6 @@ export interface HostInstall {
   key?: string;
   trust?: string;
   tunnel?: boolean;
-  implementation?: string;
 }
 
 export interface HostJoinStatus {
@@ -4459,7 +4458,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   HelperLimits: { required: [], optional: ["running", "notArchived", "queued", "agentsMayArchive"] },
   HostAnnounce: { required: ["publicKey", "name", "platform", "version", "machineID"], optional: ["relay", "implementation"] },
   HostHello: { required: ["version", "platform", "machineID"], optional: ["host", "name", "relay", "implementation"] },
-  HostInstall: { required: ["destination"], optional: ["name", "key", "trust", "tunnel", "implementation"] },
+  HostInstall: { required: ["destination"], optional: ["name", "key", "trust", "tunnel"] },
   HostJoinStatus: { required: ["member", "connected", "at"], optional: ["problem"] },
   HostLastHeard: { required: ["host"], optional: ["projects", "agents", "heardAt"] },
   HostLink: { required: ["host", "provider", "workspace"], optional: ["startWhenUsed", "stopWhenIdleMinutes"] },

@@ -14,7 +14,7 @@
 #   - ASC_KEY_ID, ASC_ISSUER_ID and ASC_KEY_PATH (the App Store Connect key's .p8), for
 #     notarytool.
 # The Linux agentsd (Go, #1136) has to be in App/Resources/servers already
-# (scripts/build-linux-agentsd-go.sh, or the release workflow's linux job): Agents Host carries
+# (scripts/build-linux-agentsd.sh, or the release workflow's linux job): Agents Host carries
 # it for servers, and the release offers it on its own for Linux hosts.
 set -euo pipefail
 
@@ -28,8 +28,8 @@ servers=$root/App/Resources/servers
 cd $root
 
 for arch in x86_64 aarch64; do
-    [[ -f $servers/agentsd-go-linux-$arch && -f $servers/github-mcp-linux-$arch && -f $servers/linear-mcp-linux-$arch ]] || {
-        print -u2 "No $servers/agentsd-go-linux-$arch, github-mcp-linux-$arch or linear-mcp-linux-$arch: run scripts/build-linux-agentsd-go.sh first (with Docker or Go)."
+    [[ -f $servers/agentsd-linux-$arch && -f $servers/github-mcp-linux-$arch && -f $servers/linear-mcp-linux-$arch ]] || {
+        print -u2 "No $servers/agentsd-linux-$arch, github-mcp-linux-$arch or linear-mcp-linux-$arch: run scripts/build-linux-agentsd.sh first (with Docker or Go)."
         exit 1
     }
 done
@@ -111,10 +111,10 @@ ditto -c -k --keepParent "$app" $out/Agents-Host-$version.zip
 
 for arch in x86_64 aarch64; do
     # The MCP servers Agents ships (#700) go beside it: a Linux host puts them in its bin/.
-    tar -czf $out/agentsd-go-linux-$arch-$version.tar.gz -C $servers agentsd-go-linux-$arch \
-        agentsd-go-linux-$arch.sha256 \
+    tar -czf $out/agentsd-linux-$arch-$version.tar.gz -C $servers agentsd-linux-$arch \
+        agentsd-linux-$arch.sha256 \
         github-mcp-linux-$arch github-mcp-linux-$arch.sha256 \
-        linear-mcp-linux-$arch linear-mcp-linux-$arch.sha256 VERSION-go
+        linear-mcp-linux-$arch linear-mcp-linux-$arch.sha256 VERSION
 done
 (cd $out && shasum -a 256 *.dmg *.zip *.tar.gz > SHA256SUMS)
 print "\n$out:"

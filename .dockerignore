@@ -1,0 +1,9 @@
+# What a build from the repository's root is sent (#1381): Go/ and Web/ only, so a
+# checkout's builds, worktrees and node_modules never go to the builder. The same as
+# deploy/Containerfile.dockerignore, for a builder that reads only this one (the legacy one).
+*
+!Go/
+!Web/
+Go/out/
+Web/node_modules/
+Web/dist/

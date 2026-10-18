@@ -1,28 +1,20 @@
 #!/bin/sh
 # Make this machine a host of an Agents control plane (058, US4).
 #
-#   curl -fsSL [--pinnedpubkey sha256//…] https://<control plane>/v1/install.sh | sh -s -- '<host code>' [name] [--impl swift]
+#   curl -fsSL [--pinnedpubkey sha256//…] https://<control plane>/v1/install.sh | sh -s -- '<host code>' [name]
 #
-# Installs the host for this user in ~/.agents-server, and starts it. It connects out to
-# the control plane; nothing needs to reach this machine. Run it again with a new code to
-# join again. It installs the Go host (#1136); --impl swift (or AGENTS_HOST_IMPL=swift)
-# installs the Swift host instead. Both use the same root, so a host that changes keeps
-# its agents.
+# Installs the host (agentsd, Go since #1136) for this user in ~/.agents-server, and starts
+# it. It connects out to the control plane; nothing needs to reach this machine. Run it
+# again with a new code to join again. The Swift host, and --impl, went in #1381.
 set -eu
 
-code= name= impl=${AGENTS_HOST_IMPL:-}
+code= name=
 while [ $# -gt 0 ]; do
-    case "$1" in
-        --impl) impl=${2:?say swift or go after --impl}; shift 2 ;;
-        --impl=*) impl=${1#--impl=}; shift ;;
-        *) if [ -z "$code" ]; then code=$1; elif [ -z "$name" ]; then name=$1; fi; shift ;;
-    esac
+    if [ -z "$code" ]; then code=$1; elif [ -z "$name" ]; then name=$1; fi; shift
 done
 [ -n "$code" ] || { echo "Say the host code the control plane showed." >&2; exit 2; }
-asked=$impl impl=${impl:-go}
 name=${name:-$(hostname)}
 case "$code" in agents-control:2:h:*) ;; *) echo "That is not a host code." >&2; exit 2 ;; esac
-case "$impl" in swift) program=agentsd ;; go) program=agentsd-go ;; *) echo "--impl is swift or go." >&2; exit 2 ;; esac
 
 # The code's own fields: agents-control:2:h:-:<key>:<secret>:<url>:<pin>:<name>
 url=$(printf %s "$code" | cut -d: -f7 | sed 's/%3[Aa]/:/g; s/%2[Ff]/\//g; s/%25/%/g')
@@ -58,15 +50,10 @@ mkdir -p "$d/bin" "$d/root"
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
 
-echo "Fetching the host ($impl) for $arch-linux from $url…"
-if ! fetch "/v1/servers/$program-linux-$arch.sha256" "$tmp/sha256" 2>/dev/null; then
-    # A control plane from before the Go host was the default offers only the Swift one.
-    [ -z "$asked" ] && [ "$impl" = go ] || { echo "This control plane offers no $impl host for $arch-linux." >&2; exit 1; }
-    echo "This control plane offers no Go host for $arch-linux; installing the Swift host." >&2
-    impl=swift program=agentsd
-    fetch "/v1/servers/$program-linux-$arch.sha256" "$tmp/sha256"
-fi
-fetch "/v1/servers/$program-linux-$arch" "$tmp/agentsd"
+echo "Fetching the host for $arch-linux from $url…"
+fetch "/v1/servers/agentsd-linux-$arch.sha256" "$tmp/sha256" 2>/dev/null ||
+    { echo "This control plane offers no host for $arch-linux." >&2; exit 1; }
+fetch "/v1/servers/agentsd-linux-$arch" "$tmp/agentsd"
 sha=$(tr -d ' \n' < "$tmp/sha256")
 echo "$sha  $tmp/agentsd" | sha256sum -c - >/dev/null || { echo "The download did not match its checksum." >&2; exit 1; }
 chmod 700 "$tmp/agentsd"
@@ -88,23 +75,21 @@ done
 
 # The Node toolsets the control plane carries (#1312): the Go host installs Claude from
 # them by itself, and Codex or Gemini when asked, into ~/.agents-server/tools.
-if [ "$impl" = go ]; then
-    offered=
-    for runtime in claude codex gemini; do
-        mkdir -p "$tmp/toolsets/$runtime"
-        ok=1
-        for file in manifest.json package.json package-lock.json; do
-            fetch "/v1/toolsets/$runtime/$file" "$tmp/toolsets/$runtime/$file" 2>/dev/null || { ok=0; break; }
-        done
-        if [ $ok = 1 ]; then
-            mkdir -p "$d/toolsets"
-            rm -rf "$d/toolsets/$runtime"
-            mv "$tmp/toolsets/$runtime" "$d/toolsets/$runtime"
-            offered="$offered $runtime"
-        fi
+offered=
+for runtime in claude codex gemini; do
+    mkdir -p "$tmp/toolsets/$runtime"
+    ok=1
+    for file in manifest.json package.json package-lock.json; do
+        fetch "/v1/toolsets/$runtime/$file" "$tmp/toolsets/$runtime/$file" 2>/dev/null || { ok=0; break; }
     done
-    [ -n "$offered" ] || echo "This control plane offers no toolsets; the host installs no Claude by itself." >&2
-fi
+    if [ $ok = 1 ]; then
+        mkdir -p "$d/toolsets"
+        rm -rf "$d/toolsets/$runtime"
+        mv "$tmp/toolsets/$runtime" "$d/toolsets/$runtime"
+        offered="$offered $runtime"
+    fi
+done
+[ -n "$offered" ] || echo "This control plane offers no toolsets; the host installs no Claude by itself." >&2
 
 # A host already running here stops; it is started again below with the new code.
 if [ -f "$d/root/daemon.lock" ]; then
@@ -112,25 +97,11 @@ if [ -f "$d/root/daemon.lock" ]; then
     [ -n "$old" ] && kill "$old" 2>/dev/null || true
     sleep 1
 fi
-# Changing between the Swift and the Go host (#1136) on a root already joined to this
-# control plane keeps its membership, so the host keeps its id; the code goes unused.
-# Otherwise, as always, the host enrols again with the new code.
-previous=$(cat "$d/impl" 2>/dev/null || echo swift)
-keep=0
-if [ "$previous" != "$impl" ] && [ -f "$d/root/control-host.json" ]; then
-    key=$(printf %s "$code" | cut -d: -f5 | tr '_-' '/+')
-    while [ $(( ${#key} % 4 )) -ne 0 ]; do key="$key="; done
-    kept=$(sed 's#\\/#/#g' "$d/root/control-host.json" | sed -n 's/.*"controlKey" *: *"\([^"]*\)".*/\1/p')
-    [ -n "$kept" ] && [ "$kept" = "$key" ] && keep=1
-fi
-printf %s "$impl" > "$d/impl"
-if [ $keep = 1 ]; then
-    echo "Changing from the $previous host to the $impl host: it keeps its place in the control plane."
-else
-    rm -f "$d/root/control-host.json"
-    printf %s "$code" > "$d/root/control-join-code"
-    chmod 600 "$d/root/control-join-code"
-fi
+# The host enrols again with the new code. (The record of which host was installed,
+# from when there were two, is gone with them.)
+rm -f "$d/root/control-host.json" "$d/impl"
+printf %s "$code" > "$d/root/control-join-code"
+chmod 600 "$d/root/control-join-code"
 
 unit="$HOME/.config/systemd/user/agents-host.service"
 if command -v systemctl >/dev/null 2>&1 && systemctl --user show-environment >/dev/null 2>&1; then

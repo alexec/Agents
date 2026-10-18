@@ -1,7 +1,6 @@
 # Several copies of the control plane over one bucket, behind a load balancer (058, T068;
 # quickstart Walk 2). For walks and for trying it out:
 #
-#   scripts/build-linux-control.sh aarch64      # or x86_64, for the machine running Docker
 #   deploy/make-secrets.sh
 #   docker compose -f deploy/compose.yaml up -d --build
 #
@@ -10,8 +9,8 @@
 
 x-copy: &copy
   build:
-    context: .
-    dockerfile: Containerfile
+    context: ..
+    dockerfile: deploy/Containerfile
   image: agents-control:walk
   restart: unless-stopped
   depends_on:

@@ -3,7 +3,7 @@ DetectedServer full
 DetectedServer zero
 {"alias":"","resolved":"","outcome":""}
 HostInstall full
-{"destination":"DESTINATION","name":"NAME","key":"KEY","trust":"TRUST","tunnel":true,"implementation":"IMPLEMENTATION"}
+{"destination":"DESTINATION","name":"NAME","key":"KEY","trust":"TRUST","tunnel":true}
 HostInstall zero
 {"destination":""}
 SSHHost full

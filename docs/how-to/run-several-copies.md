@@ -32,11 +32,8 @@ is no published image yet: you build it from the source.
 The repository's `deploy/` folder runs a bucket (MinIO), three copies and Caddy in front of
 them, on one machine with Docker.
 
-1. Build the Linux program, for the machine's own architecture:
-
-   ```sh
-   scripts/build-linux-control.sh aarch64      # x86_64 on an Intel machine
-   ```
+1. Nothing to build first: `docker compose … --build` below builds the control plane's
+   image from `Go/` and `Web/`.
 
 2. Make the secrets: the control plane's key, and a certificate for Caddy with its pin.
 
@@ -72,8 +69,7 @@ trying it out only.
 1. Build the image, from the repository's top folder:
 
    ```sh
-   scripts/build-linux-control.sh x86_64       # or aarch64, for the machines it runs on
-   docker build -f deploy/Containerfile -t agents-control deploy
+   docker build -f deploy/Containerfile -t agents-control .
    ```
 
 2. Make the control plane's private key, 32 random bytes, once:

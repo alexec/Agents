@@ -320,7 +320,6 @@ Packages/AgentsKit/Sources/AgentsKitCore/Daemon/DaemonAPI+Shared.swift  control-
 Packages/AgentsKit/Tests/AgentsKitTests/Control/       control-plane
 Packages/AgentsKit/Tests/AgentsKitTests/**/*Control*   control-plane
 deploy/                                                control-plane
-scripts/build-linux-control.sh                         control-plane
 docs/explanation/control-plane.md                      control-plane
 docs/how-to/run-the-control-plane-in-the-cloud.md      control-plane
 docs/how-to/move-an-existing-set-up.md                 control-plane

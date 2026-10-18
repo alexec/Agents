@@ -237,7 +237,7 @@ if (( BUILD )); then
   if (( MAC )); then
     # The Linux hosts a server is given, which Agents Host carries and its control plane
     # serves: gitignored build outputs, so stale until rebuilt here.
-    (( LINUX )) && run build-linux scripts/build-linux-agentsd-go.sh
+    (( LINUX )) && run build-linux scripts/build-linux-agentsd.sh
     run build-host scripts/build-cache.sh xcodebuild -scheme AgentsHost -configuration $CONFIG -destination 'platform=macOS' -derivedDataPath build/DD-host $XFLAGS build
     run build-window scripts/build-cache.sh xcodebuild -scheme AgentsStore -configuration $CONFIG -destination 'platform=macOS' -derivedDataPath build/DD-store $XFLAGS build
   fi
