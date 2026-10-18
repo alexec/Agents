@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"log"
 	"os"
 	"os/exec"
@@ -112,7 +113,7 @@ func handshake(ctx context.Context, l Launch, sink Sink) (_ *Session, silent boo
 		return nil, false, fmt.Errorf("start %s: %w", l.Command, err)
 	}
 	s := &Session{cmd: cmd, stderr: stderr, done: make(chan struct{})}
-	s.client = &client{sink: sink, dir: l.Dir, terminals: map[string]*terminal{}}
+	s.client = &client{sink: sink, dir: l.Dir, env: l.Env, terminals: map[string]*terminal{}}
 	s.conn = sdk.NewClientSideConnection(s.client, stdin, &rawElicitations{r: bufio.NewReader(stdout), c: s.client})
 	safe.Go("runtime wait", func() { _ = cmd.Wait(); close(s.done) })
 
@@ -310,11 +311,17 @@ func (s *Session) Done() <-chan struct{} { return s.done }
 
 // client answers the runtime's requests.
 type client struct {
-	sink      Sink
-	dir       string
+	sink Sink
+	dir  string
+	// env is the runtime's own environment (environment, runtimes.go), which its
+	// terminals get too: never the daemon's whole one.
+	env       []string
 	mu        sync.Mutex
 	terminals map[string]*terminal
 	next      int
+	// allowedEdits is each file the person just allowed an edit to on the runtime's own
+	// card, and when (ACPSession.allowedEdits).
+	allowedEdits map[string]time.Time
 	// replaying is set while a session/load replays the conversation, which is already on
 	// the record.
 	replaying atomic.Bool
@@ -331,7 +338,65 @@ func (c *client) RequestPermission(ctx context.Context, p sdk.RequestPermissionR
 	if option == "" {
 		return sdk.RequestPermissionResponse{Outcome: sdk.RequestPermissionOutcome{Cancelled: &sdk.RequestPermissionOutcomeCancelled{}}}, nil
 	}
+	c.noteAllowedEdit(p, option)
 	return sdk.RequestPermissionResponse{Outcome: sdk.RequestPermissionOutcome{Selected: &sdk.RequestPermissionOutcomeSelected{OptionId: sdk.PermissionOptionId(option)}}}, nil
+}
+
+// allowedEditWindow is how long an edit allowed on the runtime's own card covers its write.
+const allowedEditWindow = 60 * time.Second
+
+// noteAllowedEdit keeps the files an edit the person just allowed on the runtime's own card
+// names (049, T025a). Antigravity asks "Run client_create_file?" with the diff, then writes
+// through fs/write_text_file; asking again there is the same question twice. Only an edit,
+// only by a diff or location naming the file.
+func (c *client) noteAllowedEdit(p sdk.RequestPermissionRequest, option string) {
+	allowed := strings.HasPrefix(option, "allow")
+	for _, o := range p.Options {
+		if string(o.OptionId) == option {
+			allowed = o.Kind == sdk.PermissionOptionKindAllowOnce || o.Kind == sdk.PermissionOptionKindAllowAlways
+		}
+	}
+	if !allowed {
+		return
+	}
+	var named []string
+	for _, content := range p.ToolCall.Content {
+		if content.Diff != nil {
+			named = append(named, content.Diff.Path)
+		}
+	}
+	if p.ToolCall.Kind != nil && *p.ToolCall.Kind == sdk.ToolKindEdit {
+		for _, l := range p.ToolCall.Locations {
+			named = append(named, l.Path)
+		}
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.allowedEdits == nil {
+		c.allowedEdits = map[string]time.Time{}
+	}
+	for _, path := range named {
+		c.allowedEdits[samePath(path)] = time.Now()
+	}
+}
+
+// takeAllowedEdit is whether a write to path was just allowed on the runtime's own card,
+// which it then uses up.
+func (c *client) takeAllowedEdit(path string) bool {
+	key := samePath(path)
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	at, ok := c.allowedEdits[key]
+	delete(c.allowedEdits, key)
+	return ok && time.Since(at) < allowedEditWindow
+}
+
+// samePath is one key for one file: /tmp/x and /private/tmp/x are one.
+func samePath(path string) string {
+	if resolved, err := resolve(path); err == nil {
+		return resolved
+	}
+	return filepath.Clean(path)
 }
 
 func (c *client) UnstableCreateElicitation(ctx context.Context, p sdk.UnstableCreateElicitationRequest) (_ sdk.UnstableCreateElicitationResponse, err error) {
@@ -430,24 +495,59 @@ func (c *client) SessionUpdate(ctx context.Context, n sdk.SessionNotification) (
 	return nil
 }
 
-// inside keeps file service to the agent's folder.
-func (c *client) inside(path string) error {
+// inside keeps file service, and a terminal's folder, to the agent's folder, with links
+// followed (FolderScope.allows): it is the path to use, as resolved. A path that does not
+// exist yet is judged by its nearest parent that does, so a runtime can make a file but not
+// one through a link out of its folder.
+func (c *client) inside(path string) (string, error) {
 	if !filepath.IsAbs(path) {
-		return fmt.Errorf("path must be absolute: %s", path)
+		return "", fmt.Errorf("path must be absolute: %s", path)
 	}
-	rel, err := filepath.Rel(c.dir, filepath.Clean(path))
+	dir, err := resolve(c.dir)
+	if err != nil {
+		return "", err
+	}
+	resolved, err := resolve(path)
+	if err != nil {
+		return "", fmt.Errorf("%s is outside the agent's folder", path)
+	}
+	rel, err := filepath.Rel(dir, resolved)
 	if err != nil || rel == ".." || strings.HasPrefix(rel, "../") {
-		return fmt.Errorf("%s is outside the agent's folder", path)
+		return "", fmt.Errorf("%s is outside the agent's folder", path)
 	}
-	return nil
+	return resolved, nil
+}
+
+// resolve is path with its links followed, working up to the nearest parent that exists
+// when the path does not. A link that leads nowhere is refused: writing it would make
+// the file it names, wherever that is.
+func resolve(path string) (string, error) {
+	p := filepath.Clean(path)
+	var missing []string
+	for {
+		resolved, err := filepath.EvalSymlinks(p)
+		if err == nil {
+			return filepath.Join(append([]string{resolved}, missing...)...), nil
+		}
+		if _, lerr := os.Lstat(p); lerr == nil || !errors.Is(err, fs.ErrNotExist) {
+			return "", err
+		}
+		parent := filepath.Dir(p)
+		if parent == p {
+			return "", err
+		}
+		missing = append([]string{filepath.Base(p)}, missing...)
+		p = parent
+	}
 }
 
 func (c *client) ReadTextFile(ctx context.Context, p sdk.ReadTextFileRequest) (_ sdk.ReadTextFileResponse, err error) {
 	defer safe.Err("acp ReadTextFile", &err)
-	if err := c.inside(p.Path); err != nil {
+	path, err := c.inside(p.Path)
+	if err != nil {
 		return sdk.ReadTextFileResponse{}, err
 	}
-	b, err := os.ReadFile(p.Path)
+	b, err := os.ReadFile(path)
 	if err != nil {
 		return sdk.ReadTextFileResponse{}, err
 	}
@@ -470,17 +570,48 @@ func (c *client) ReadTextFile(ctx context.Context, p sdk.ReadTextFileRequest) (_
 
 func (c *client) WriteTextFile(ctx context.Context, p sdk.WriteTextFileRequest) (_ sdk.WriteTextFileResponse, err error) {
 	defer safe.Err("acp WriteTextFile", &err)
-	if err := c.inside(p.Path); err != nil {
+	path, err := c.inside(p.Path)
+	if err != nil {
 		return sdk.WriteTextFileResponse{}, err
 	}
-	if err := os.MkdirAll(filepath.Dir(p.Path), 0o755); err != nil {
+	// A write is a change, so it is asked about as any other change is, with the change on
+	// the card, unless the person has just allowed it on the runtime's own card.
+	if !c.takeAllowedEdit(path) && c.sink.Permission(ctx, writeRequest(p.Path, path, p.Content)) != "allow_once" {
+		return sdk.WriteTextFileResponse{}, fmt.Errorf("the person said no to writing %s", p.Path)
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return sdk.WriteTextFileResponse{}, err
 	}
-	if err := os.WriteFile(p.Path, []byte(p.Content), 0o644); err != nil {
+	// The resolved path, and no link followed at its end, so what was checked is what is written.
+	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC|syscall.O_NOFOLLOW, 0o644)
+	if err != nil {
+		return sdk.WriteTextFileResponse{}, err
+	}
+	if _, err := f.WriteString(p.Content); err != nil {
+		_ = f.Close()
+		return sdk.WriteTextFileResponse{}, err
+	}
+	if err := f.Close(); err != nil {
 		return sdk.WriteTextFileResponse{}, err
 	}
 	c.sink.Served("write", p.Path)
 	return sdk.WriteTextFileResponse{}, nil
+}
+
+// writeRequest is the card for a write the runtime asks the client for
+// (FileService.writeToolCall): the diff against the file as it is, Allow or Refuse.
+func writeRequest(asked, path, content string) sdk.RequestPermissionRequest {
+	diff := sdk.ToolDiffContent(asked, content)
+	if b, err := os.ReadFile(path); err == nil {
+		diff = sdk.ToolDiffContent(asked, content, string(b))
+	}
+	return sdk.RequestPermissionRequest{
+		ToolCall: sdk.ToolCallUpdate{Title: sdk.Ptr("Write " + filepath.Base(asked)), Kind: sdk.Ptr(sdk.ToolKindEdit),
+			Status: sdk.Ptr(sdk.ToolCallStatusPending), Content: []sdk.ToolCallContent{diff},
+			Locations: []sdk.ToolCallLocation{{Path: asked}}},
+		Options: []sdk.PermissionOption{{OptionId: "allow_once", Name: "Allow", Kind: sdk.PermissionOptionKindAllowOnce},
+			{OptionId: "reject_once", Name: "Refuse", Kind: sdk.PermissionOptionKindRejectOnce}},
+	}
 }
 
 // MARK: terminals the runtime asks for (terminal/*)
@@ -509,9 +640,13 @@ func (c *client) CreateTerminal(ctx context.Context, p sdk.CreateTerminalRequest
 	cmd := exec.Command(p.Command, p.Args...)
 	cmd.Dir = c.dir
 	if p.Cwd != nil {
-		cmd.Dir = *p.Cwd
+		dir, err := c.inside(*p.Cwd)
+		if err != nil {
+			return sdk.CreateTerminalResponse{}, err
+		}
+		cmd.Dir = dir
 	}
-	cmd.Env = os.Environ()
+	cmd.Env = append([]string{}, c.env...)
 	for _, e := range p.Env {
 		cmd.Env = append(cmd.Env, e.Name+"="+e.Value)
 	}
