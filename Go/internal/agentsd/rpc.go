@@ -280,7 +280,7 @@ func (d *Daemon) ServeSocket(ctx context.Context, path string) error {
 		return err
 	}
 	os.Chmod(path, 0o600)
-	policy := socketPolicyFor(d)
+	policy := d.socketPolicy()
 	log.Printf("socket: %s", policy.Summary())
 	safe.Go("socket close", func() { <-ctx.Done(); l.Close() })
 	for {
@@ -298,12 +298,16 @@ func (d *Daemon) acceptSocket(c net.Conn, policy SocketPolicy) {
 		c.Close() // another account, or one the kernel would not name
 		return
 	}
-	sc := newSockConn(c, role)
+	d.serveSockConn(newSockConn(c, role), bufio.NewReaderSize(c, 1<<20))
+}
+
+// serveSockConn reads sc's lines from r, which may hold some already, and serves it until
+// it goes.
+func (d *Daemon) serveSockConn(sc *sockConn, r *bufio.Reader) {
 	safe.Go("socket read", func() {
 		// A client gone takes its writer with it.
 		defer sc.Close()
 		defer close(sc.in)
-		r := bufio.NewReaderSize(c, 1<<20)
 		for {
 			line, err := r.ReadString('\n')
 			if len(line) > 1 {

@@ -1366,6 +1366,21 @@
       ]
     },
     {
+      "name": "host/clients",
+      "description": "To every host, on its channel 0, when it connects and when a window is paired or forgotten (#1118): the windows it may let in on its local socket.",
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/HostClients"
+          }
+        }
+      ]
+    },
+    {
       "name": "relay/devices",
       "description": "To a relay host, on its channel 0 (T096).",
       "x-notification": true,

@@ -3,12 +3,19 @@
 <plist version="1.0">
 <dict>
 	<!-- The App Store window (058, research R12): sandboxed, and a client only. Every
-	     agent, file and terminal is a host's, reached through the control plane. -->
+	     agent, file and terminal is a host's, reached through the control plane, or this
+	     Mac's host directly (#1118). -->
 	<key>com.apple.security.app-sandbox</key>
 	<true/>
 	<!-- The control plane's WebSocket, and Bonjour to find one on this network. -->
 	<key>com.apple.security.network.client</key>
 	<true/>
+	<!-- This Mac's host, directly (#1118): agentsd's socket in the app group the window
+	     shares with Agents Host. Team-prefixed, so no provisioning profile names it. -->
+	<key>com.apple.security.application-groups</key>
+	<array>
+		<string>6T4RVD5724.com.alexecollins.agents</string>
+	</array>
 	<!-- Dictation. -->
 	<key>com.apple.security.device.audio-input</key>
 	<true/>

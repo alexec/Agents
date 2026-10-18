@@ -39,6 +39,7 @@ const (
 	RoleControl  = "control"
 	RoleAgent    = "agent"
 	RoleHostApp  = "hostApp"
+	RoleWindow   = "window"
 	RoleStranger = "stranger"
 )
 
@@ -96,7 +97,7 @@ func (p *PeerChecker) Role(t Token) (string, error) {
 		return "", err
 	}
 	switch line {
-	case RoleControl, RoleAgent, RoleHostApp, RoleStranger:
+	case RoleControl, RoleAgent, RoleHostApp, RoleWindow, RoleStranger:
 	default:
 		return "", fmt.Errorf("agents-peer answered %q", line)
 	}

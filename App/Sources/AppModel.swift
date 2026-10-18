@@ -845,8 +845,8 @@ final class AppModel {
     private var draftOptionsGeneration = 0
     private var draftID: UUID?
 
-    /// This Mac's host: through the control plane when the window has one (058). Set
-    /// once more when first run chooses one.
+    /// This Mac's host: directly over its local socket when it is there (#1118), else
+    /// through the control plane (058). Set once more when first run chooses one.
     private var client = DaemonClient(link: UnreachableLink())
     /// The one connection to the control plane every host's client is carried on (058).
     private var controlLink: ControlLink? = ControlConfig.endpoint.flatMap(ControlConfig.link)
@@ -854,7 +854,7 @@ final class AppModel {
     init() {
         // On `controlLink` itself, not a link of its own (#445): a second connection that
         // nothing else knew of was never let go of, so a wedged one stayed for good.
-        if let controlLink { client = DaemonClient(link: controlLink.link(for: .mac)) }
+        if let controlLink { client = DaemonClient(link: hostLink(.mac, through: controlLink)) }
         // From the start, not once connected: a banner tapped to launch the app arrives
         // before then, and was dropped (#1055).
         notifier.open = { [weak self] agentID in
@@ -942,6 +942,31 @@ final class AppModel {
         return hosts.client(for: host) ?? Self.unreachable
     }
 
+    /// The host on this Mac the window last reached directly, over its local socket, rather
+    /// than through the control plane (#1118): it is still reached with the control plane away.
+    private(set) var directHost: HostID?
+
+    /// A host's link: through the control plane, and first directly over the host's local
+    /// socket when it may be on this Mac (#1118). The host's own answer says whether it is
+    /// the one asked for, so `.mac` is tried even before the control plane has listed it.
+    private func hostLink(_ host: HostID, through controlLink: ControlLink, onThisMac: Bool = true) -> any DaemonLink {
+        let fallback = controlLink.link(for: host)
+        guard onThisMac, let endpoint = ControlConfig.endpoint, let local = ControlConfig.localLink(endpoint, host: host) else {
+            return fallback
+        }
+        return LocalFirstLink(local: local, fallback: fallback) { [weak self] direct in
+            Task { @MainActor in self?.wentDirect(host, direct) }
+        }
+    }
+
+    private func wentDirect(_ host: HostID, _ direct: Bool) {
+        if direct {
+            directHost = host
+        } else if directHost == host {
+            directHost = nil
+        }
+    }
+
     /// Whether `host` is one of the control plane's, reached through it.
     func reachesThroughControl(_ host: HostID) -> Bool { controlHosts[host] != nil }
 
@@ -952,7 +977,7 @@ final class AppModel {
 
     /// The host on this Mac, when there is one. `.mac` until the window has a control plane.
     var thisMacHostID: HostID? {
-        ThisMacHost.resolve(controlPlaneHosts)
+        ThisMacHost.resolve(controlPlaneHosts) ?? directHost
     }
 
     /// Whether this window may read `host`'s folders off this disk (058, R11).
@@ -960,7 +985,7 @@ final class AppModel {
 
     /// The window cannot ask this host right now: the control plane is away, or the host is.
     func hostUnreachable(_ host: HostID) -> Bool {
-        controlPlaneAway || hosts.isOffline(host)
+        (controlPlaneAway && directHost != host) || hosts.isOffline(host)
     }
 
     /// Lend to a host the control plane reaches (058, FR-020). Nil when this window
@@ -1017,7 +1042,8 @@ final class AppModel {
         switch ControlConfig.endpoint {
         case .remote(let membership):
             return HostProblem.controlPlaneUnreachable(name: membership.name,
-                                                       address: membership.url ?? membership.addresses.first ?? "no address")
+                                                       address: membership.url ?? membership.addresses.first ?? "no address",
+                                                       thisMacDirect: directHost != nil && isConnected)
         case nil:
             return nil
         }
@@ -2578,7 +2604,7 @@ final class AppModel {
     func adopt(_ endpoint: ControlConfig.Endpoint) async {
         guard let link = ControlConfig.link(endpoint) else { return }
         controlLink = link
-        client = DaemonClient(link: link.link(for: .mac))
+        client = DaemonClient(link: hostLink(.mac, through: link))
         // Made with the client just replaced, they would ask it for ever (#62).
         serverFilesByHost[.mac] = nil
         serverPicturesByHost[.mac] = nil
@@ -2605,6 +2631,7 @@ final class AppModel {
         controlPlaneListed = false
         controlPlaneReachable = false
         controlPlaneMissed = false
+        directHost = nil
         client = DaemonClient(link: UnreachableLink())
         isConnected = false
     }
@@ -2691,6 +2718,8 @@ final class AppModel {
             watchControlHosts()
         } catch {
             isConnected = false
+            // Neither way reached it: nor is it reached directly any more (#1118).
+            wentDirect(.mac, false)
             if hosts.macDownSince == nil { hosts.macDownSince = Date() }
             // A control plane that cannot be reached is the strip, not an alert.
             if controlLink == nil { problem = describe(error) }
@@ -3074,7 +3103,8 @@ final class AppModel {
         hosts.controlled = Dictionary(uniqueKeysWithValues: others.map { ($0.id, (label: $0.name, online: $0.state == "online")) })
         hosts.controlRows = Dictionary(uniqueKeysWithValues: others.map { ($0.id, $0) })
         for host in others where host.state == "online" {
-            let server = controlHosts[host.id] ?? DaemonClient(link: controlLink.link(for: host.id))
+            let server = controlHosts[host.id]
+                ?? DaemonClient(link: hostLink(host.id, through: controlLink, onThisMac: host.machineID == MachineID.current))
             controlHosts[host.id] = server
             guard await !server.isConnected else { continue }
             guard (try? await server.connect(startIfNeeded: false, timeout: .seconds(5))) != nil else { continue }

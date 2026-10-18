@@ -20,6 +20,10 @@ const (
 	RolePairing Role = "pairing"
 	// RoleHostApp is Agents Host's window: whether the host is there and what it holds.
 	RoleHostApp Role = "hostApp"
+	// RoleWindow is the App Store window, signed by this team. On daemon.sock, which its
+	// sandbox cannot reach anyway, it is a stranger; on the local socket it may prove its
+	// key (localpath.go, #1118).
+	RoleWindow Role = "window"
 	// RoleStranger is anything else of this account: whether the host is there.
 	RoleStranger Role = "stranger"
 )
@@ -103,6 +107,13 @@ type openPolicy struct{ why string }
 func (openPolicy) Role(net.Conn) (Role, bool) { return RoleControl, true }
 func (p openPolicy) Summary() string {
 	return p.why + "every process of this account may call everything"
+}
+
+// socketPolicy is socketPolicyFor(d), decided once: daemon.sock and the local socket
+// ask the same agents-peer.
+func (d *Daemon) socketPolicy() SocketPolicy {
+	d.policyOnce.Do(func() { d.policy = socketPolicyFor(d) })
+	return d.policy
 }
 
 // socketPolicyFor is the policy for d's daemon.sock: by code signature on a Mac

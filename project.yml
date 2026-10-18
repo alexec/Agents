@@ -600,10 +600,17 @@ targets:
     supportedDestinations: [macOS]
     sources:
       - path: Host/PeerCheck
+        excludes:
+          - "*.entitlements"
+      # Listed, not owned. See the note on the AgentsStore target's entitlements.
+      - path: Host/PeerCheck/agents-peer.entitlements
+        buildPhase: none
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.alexecollins.agents.peer
         PRODUCT_NAME: agents-peer
+        # The app group, to make its container for the window's local socket (#1118).
+        CODE_SIGN_ENTITLEMENTS: Host/PeerCheck/agents-peer.entitlements
         SDKROOT: macosx
         SUPPORTED_PLATFORMS: macosx
         SKIP_INSTALL: YES
