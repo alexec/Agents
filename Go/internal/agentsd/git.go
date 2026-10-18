@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -33,6 +34,9 @@ func gitDeadline(args []string) time.Duration {
 			return 300 * time.Second
 		}
 	}
+	if len(args) >= 1 && (args[0] == "fetch" || args[0] == "apply" || args[0] == "add" || args[0] == "bundle" || args[0] == "diff") {
+		return 600 * time.Second // a sent repository (#1123) can be large
+	}
 	return 30 * time.Second
 }
 
@@ -46,6 +50,11 @@ func git(dir string, args ...string) (string, error) {
 }
 
 func gitRaw(dir string, stdin []byte, args ...string) ([]byte, error) {
+	return gitRawEnv(dir, nil, stdin, args...)
+}
+
+// gitRawEnv is gitRaw with more of the environment, such as GIT_INDEX_FILE.
+func gitRawEnv(dir string, env []string, stdin []byte, args ...string) ([]byte, error) {
 	if len(args) > 0 && args[0] == "worktree" && (len(args) < 2 || args[1] != "list") {
 		m, _ := gitLocks.LoadOrStore(filepath.Clean(dir), &sync.Mutex{})
 		m.(*sync.Mutex).Lock()
@@ -56,7 +65,7 @@ func gitRaw(dir string, stdin []byte, args ...string) ([]byte, error) {
 	defer cancel()
 	cmd := exec.CommandContext(ctx, "git", args...)
 	cmd.Dir = dir
-	cmd.Env = append(os.Environ(), "GIT_OPTIONAL_LOCKS=0")
+	cmd.Env = append(append(os.Environ(), "GIT_OPTIONAL_LOCKS=0"), env...)
 	if stdin != nil {
 		cmd.Stdin = bytes.NewReader(stdin)
 	}
@@ -83,6 +92,25 @@ func gitRaw(dir string, stdin []byte, args ...string) ([]byte, error) {
 		return out.Bytes(), &gitError{msg}
 	}
 	return out.Bytes(), nil
+}
+
+// gitTo runs git in dir with its output written to w, with no limit: a patch to send (#1123).
+func gitTo(dir string, w io.Writer, args ...string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), gitDeadline(args))
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "git", args...)
+	cmd.Dir = dir
+	cmd.Env = append(os.Environ(), "GIT_OPTIONAL_LOCKS=0")
+	var errOut bytes.Buffer
+	cmd.Stdout = w
+	cmd.Stderr = &errOut
+	if err := cmd.Run(); err != nil {
+		if msg := strings.TrimSpace(errOut.String()); msg != "" {
+			return &gitError{msg}
+		}
+		return &gitError{"git " + args[0] + " failed."}
+	}
+	return nil
 }
 
 type limited struct {

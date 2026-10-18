@@ -515,5 +515,89 @@
     "arguments": {
       "k": "v"
     }
+  },
+  "ReceiveStateRequest": {
+    "folder": "~/hello"
+  },
+  "ReceiveState": {
+    "folder": "file:///home/agents/hello/",
+    "exists": true,
+    "repository": true,
+    "ownChanges": false,
+    "heads": [
+      "0123456789abcdef0123456789abcdef01234567"
+    ]
+  },
+  "ReceiveUploadRequest": {
+    "upload": "6F0E1C2A-3B4D-4E5F-8A9B-0C1D2E3F4A5B",
+    "offset": 8388608,
+    "data": "aGVsbG8="
+  },
+  "SentBranch": {
+    "name": "main",
+    "commit": "0123456789abcdef0123456789abcdef01234567"
+  },
+  "ReceiveRequest": {
+    "folder": "~/hello",
+    "bundle": "6F0E1C2A-3B4D-4E5F-8A9B-0C1D2E3F4A5B",
+    "patch": "6F0E1C2A-3B4D-4E5F-8A9B-0C1D2E3F4A5B",
+    "branches": [
+      {
+        "name": "main",
+        "commit": "0123456789abcdef0123456789abcdef01234567"
+      }
+    ],
+    "checkout": "main",
+    "origin": "git@github.com:example/hello.git"
+  },
+  "SendFactsRequest": {
+    "folder": "file:///Users/me/hello/"
+  },
+  "SendFacts": {
+    "branches": [
+      "main",
+      "other"
+    ],
+    "current": "main",
+    "origin": "git@github.com:example/hello.git",
+    "hasChanges": true
+  },
+  "SendPackRequest": {
+    "folder": "file:///Users/me/hello/",
+    "branches": [
+      "main"
+    ],
+    "leavingOut": [
+      "0123456789abcdef0123456789abcdef01234567"
+    ],
+    "includeChanges": true
+  },
+  "SendFile": {
+    "id": "6F0E1C2A-3B4D-4E5F-8A9B-0C1D2E3F4A5B",
+    "size": 1234
+  },
+  "SendPack": {
+    "commits": [
+      {
+        "name": "main",
+        "commit": "0123456789abcdef0123456789abcdef01234567"
+      }
+    ],
+    "bundle": {
+      "id": "6F0E1C2A-3B4D-4E5F-8A9B-0C1D2E3F4A5B",
+      "size": 1234
+    },
+    "patch": {
+      "id": "6F0E1C2A-3B4D-4E5F-8A9B-0C1D2E3F4A5B",
+      "size": 56
+    }
+  },
+  "SendReadRequest": {
+    "id": "6F0E1C2A-3B4D-4E5F-8A9B-0C1D2E3F4A5B",
+    "offset": 0
+  },
+  "SendRead": {
+    "data": "aGVsbG8=",
+    "end": true
   }
 }

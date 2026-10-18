@@ -2695,6 +2695,52 @@ export interface RateLimitInfo {
   overageDisabledReason?: string;
 }
 
+/**
+ * Makes or brings up to date a host's copy of a Mac's repository (#1123): fetches the `bundle`
+ * upload, moves `branches` forward only, checks out `checkout`, sets `origin`, applies the `patch`
+ * upload (uncommitted changes), and adds the folder as a project. It stops, and changes nothing,
+ * when the host has changes or commits of its own.
+ */
+export interface ReceiveRequest {
+  folder: string;
+  bundle?: UUID;
+  patch?: UUID;
+  branches: SentBranch[];
+  checkout: string;
+  origin?: string;
+}
+
+/**
+ * What a host has at a folder before a send (#1123). `heads` are the commits of its branches, so
+ * the Mac's bundle carries only what the host lacks. `ownChanges` is true when the folder has
+ * changes that the last send did not put there.
+ */
+export interface ReceiveState {
+  folder: URLString;
+  exists: boolean;
+  repository: boolean;
+  ownChanges: boolean;
+  heads: string[];
+}
+
+/**
+ * Asks a host about a folder a Mac will send a repository to (Send to ‹host›…, #1123). `folder` may
+ * start with ~/.
+ */
+export interface ReceiveStateRequest {
+  folder: string;
+}
+
+/**
+ * One part of a file a Mac sends (#1123), at `offset` in the upload. A part is at most 16 MB; the
+ * host keeps the upload until projects/receive uses it.
+ */
+export interface ReceiveUploadRequest {
+  upload: UUID;
+  offset: number;
+  data: Base64;
+}
+
 /** relay/count (#1163): one device's Needs you count, posted as a silent push. */
 export interface RelayCount {
   device: UUID;
@@ -2950,6 +2996,68 @@ export interface SandboxSettings {
 }
 
 export type SandboxState = "on" | "off" | "runtimeControlled" | "none";
+
+/**
+ * What the Send sheet shows (#1123): the local branches, the one checked out (none when detached),
+ * the origin, and whether anything is uncommitted.
+ */
+export interface SendFacts {
+  branches: string[];
+  current?: string;
+  origin?: string;
+  hasChanges: boolean;
+}
+
+/** Asks this Mac's host about a repository to send (Send to ‹host›…, #1123). */
+export interface SendFactsRequest {
+  folder: URLString;
+}
+
+/** A file the host made for a send, read with projects/sendRead (#1123). */
+export interface SendFile {
+  id: UUID;
+  size: number;
+}
+
+/**
+ * What projects/sendPack made (#1123): each branch at its commit, the bundle (none when the
+ * receiving host has every commit) and the patch (none when nothing is uncommitted).
+ */
+export interface SendPack {
+  commits: SentBranch[];
+  bundle?: SendFile;
+  patch?: SendFile;
+}
+
+/**
+ * Makes what a send carries (#1123): a bundle of `branches` without the commits in `leavingOut`
+ * (the receiving host's), and with `includeChanges` a patch of the uncommitted changes, new files
+ * git does not ignore among them.
+ */
+export interface SendPackRequest {
+  folder: URLString;
+  branches: string[];
+  leavingOut: string[];
+  includeChanges: boolean;
+}
+
+/** A part of at most 8 MB. `end` is true for the last, and then the host removes the file. */
+export interface SendRead {
+  data: Base64;
+  end: boolean;
+}
+
+/** One part of a file projects/sendPack made, from `offset` (#1123). */
+export interface SendReadRequest {
+  id: UUID;
+  offset: number;
+}
+
+/** A branch the Mac sends, at the commit it has (#1123). */
+export interface SentBranch {
+  name: string;
+  commit: string;
+}
 
 export interface ServedRequest {
   kind: ServedRequestKind;
@@ -4611,6 +4719,10 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   QuickAnswer: { required: ["kind", "id", "title", "isDestructive"], optional: ["field"] },
   QuitRequest: { required: ["stopAgents"], optional: [] },
   RateLimitInfo: { required: [], optional: ["status", "resetsAt", "rateLimitType", "utilization", "overageStatus", "overageResetsAt", "isUsingOverage", "overageInUse", "overageDisabledReason"] },
+  ReceiveRequest: { required: ["folder", "branches", "checkout"], optional: ["bundle", "patch", "origin"] },
+  ReceiveState: { required: ["folder", "exists", "repository", "ownChanges", "heads"], optional: [] },
+  ReceiveStateRequest: { required: ["folder"], optional: [] },
+  ReceiveUploadRequest: { required: ["upload", "offset", "data"], optional: [] },
   RelayCount: { required: ["device", "waiting", "countedAt"], optional: [] },
   RelayDelivery: { required: ["needID", "device", "alert"], optional: ["publicKey", "headline", "waiting"] },
   RelayDevice: { required: ["id", "publicKey"], optional: [] },
@@ -4643,6 +4755,14 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   SSHHostsRequest: { required: [], optional: ["destination"] },
   SandboxFailureRecord: { required: ["runtimeID", "detail", "hang", "recoveryOffered", "completedToolCalls"], optional: [] },
   SandboxSettings: { required: ["defaults"], optional: [] },
+  SendFacts: { required: ["branches", "hasChanges"], optional: ["current", "origin"] },
+  SendFactsRequest: { required: ["folder"], optional: [] },
+  SendFile: { required: ["id", "size"], optional: [] },
+  SendPack: { required: ["commits"], optional: ["bundle", "patch"] },
+  SendPackRequest: { required: ["folder", "branches", "leavingOut", "includeChanges"], optional: [] },
+  SendRead: { required: ["data", "end"], optional: [] },
+  SendReadRequest: { required: ["id", "offset"], optional: [] },
+  SentBranch: { required: ["name", "commit"], optional: [] },
   ServedRequest: { required: ["kind", "outcome"], optional: [] },
   ServerReachabilityChange: { required: ["server", "online"], optional: [] },
   SessionLabel: { required: ["value", "owner", "addedAt"], optional: [] },
