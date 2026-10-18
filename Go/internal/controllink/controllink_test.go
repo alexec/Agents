@@ -280,3 +280,27 @@ func TestTheKeyFileIsMadeOnceAndKept(t *testing.T) {
 		t.Fatal("the key was not kept")
 	}
 }
+
+// A member takes a newer list from ok, and keeps its own for an older or a bad one (T125).
+func TestMembershipAdoptsOnlyANewerAcceptableList(t *testing.T) {
+	m := &Membership{URL: "https://mac.local:8791", Pin: B64URL(make([]byte, 32))}
+	if got := m.EndpointsToDial(); len(got) != 1 || got[0].URL != m.URL || got[0].Pin == nil {
+		t.Fatal(got)
+	}
+	two := int64(2)
+	cloud := wire.ControlEndpoint{URL: "https://agents.example.com"}
+	if !m.Adopt(&OK{Endpoints: []wire.ControlEndpoint{cloud}, Epoch: &two}) || m.URL != cloud.URL || m.Pin != "" || *m.Epoch != 2 {
+		t.Fatal(m)
+	}
+	one := int64(1)
+	if m.Adopt(&OK{Endpoints: []wire.ControlEndpoint{{URL: "https://old.example.com"}}, Epoch: &one}) {
+		t.Fatal("took an older list")
+	}
+	three := int64(3)
+	if m.Adopt(&OK{Endpoints: []wire.ControlEndpoint{{URL: "http://agents.example.com"}}, Epoch: &three}) {
+		t.Fatal("took plain http away from loopback")
+	}
+	if m.Adopt(&OK{Epoch: &three}) || m.URL != cloud.URL {
+		t.Fatal("an ok with no list changed the membership")
+	}
+}

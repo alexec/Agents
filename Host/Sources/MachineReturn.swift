@@ -54,7 +54,7 @@ final class MachineReturn {
         if there.ok, let status = try? JSONDecoder().decode(HandoverStatus.self, from: Data(there.output.utf8)),
            status.phase == "serving" {
             reachable = .yes
-        } else if there.problem.contains("wrongControlPlane") || there.problem.contains("badProof") {
+        } else if MachineMove.otherKey(there.problem) {
             reachable = .no("It holds another control plane's key, so this Mac can't take it back from there.")
             return
         } else {

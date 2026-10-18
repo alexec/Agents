@@ -14,6 +14,8 @@
 //	agents-control code (--client [--browser] | --host) [--minutes N] [--home DIR] [--command]
 //	agents-control hosts | clients
 //	agents-control key seal --key-fd N          seal a key handed in, with AGENTS_CONTROL_KMS
+//	agents-control handover STEP --at URL|self … a step of a move to a copy elsewhere (R16, #1490)
+//	agents-control store copy --from URL --to URL  every record into an empty store (Switch Store…)
 //	agents-control install-script               the script a server runs to become a host
 //	agents-control store check [--store URL]
 //	agents-control version
@@ -580,8 +582,10 @@ const usage = `usage: agents-control serve [--port N] [--bind ADDR] [--self-sign
        agents-control serve … [--public-web DIR] [--views-url URL]
        agents-control hosts | clients
        agents-control key seal (--key-fd N | AGENTS_CONTROL_KEY)
+       agents-control handover status|announce|freeze|unfreeze|withdraw|copy|take|forward|stop|shares|relay …
        agents-control install-script
-       agents-control store check [--store URL]`
+       agents-control store check [--store URL]
+       agents-control store copy --from URL --to URL`
 
 func main() {
 	first := ""
@@ -599,6 +603,10 @@ func main() {
 		list(false)
 	case first == "store" && len(args) > 1 && args[1] == "check":
 		checkStore()
+	case first == "store" && len(args) > 1 && args[1] == "copy":
+		copyStore()
+	case first == "handover":
+		handover()
 	case first == "key" && len(args) > 1 && args[1] == "seal":
 		sealKey()
 	case first == "install-script":
