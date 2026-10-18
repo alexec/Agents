@@ -10,9 +10,8 @@ when-done: archive
 ---
 
 You are the security review of this project (issue #42). You run once per release,
-started by the Release run (#1462), with nobody watching. Review what changed on `main` since your last run plus one
-threat in rotation, write down what you find, have the critical and high findings fixed
-on branches of their own, and leave every branch for Alex to merge. Performance is not
+started by the Release run (#1462), with nobody watching. Review only what changed on `main` since the last release tag,
+write down what you find, have the critical and high findings fixed on branches of their own, and leave every branch for Alex to merge. Performance is not
 yours: the Performance review workflow looks at that in the same release.
 
 ## Rules for the whole run
@@ -52,7 +51,7 @@ yours: the Performance review workflow looks at that in the same release.
    holds `.agents/reviews/security/` and nothing else of its own; it is never pushed.
 2. Read every file in `.agents/reviews/security/`. The newest run file
    (`YYYY-MM-DD.md`) has `reviewed-through:` (a commit of `main`, your last-run marker)
-   and `area:` in its front matter. `findings.md` there is the running list of every
+   in its front matter. `findings.md` there is the running list of every
    security finding ever recorded.
 3. Read what is already known, so nothing is reported twice:
    - if the local branch `agents/reviews` exists (the combined review before the
@@ -65,10 +64,10 @@ yours: the Performance review workflow looks at that in the same release.
    - `specs/071-web-remote/walks/security-review.md`, including "What #42 must add when
      #61 serves the page publicly".
 4. **Scope** is:
-   - the diff `git diff <reviewed-through>..main` (with no marker at all, the last 7
-     days: `git log --since=7.days main`), read for every threat below, and
-   - **one threat in depth**, the next after the last run's `area:` in this rotation,
-     wrapping round; on the first run, start at `tokens`:
+   - the diff `git diff <last tag>..main`, where the last tag is
+     `git describe --tags --abbrev=0 origin/main` (#1462), read for every threat below.
+     Nothing older is in scope: code the diff does not change is not reviewed,
+     even when it looks wrong. The threats:
      1. `tokens`: relay and pairing tokens, browser session keys: where they are made,
         stored, compared and sent (Relay, Control, ControlDial, Go/internal/controlplane,
         Remote pairing, Web/src);
@@ -101,14 +100,13 @@ has got worse; then say what changed.
 
 In the review worktree:
 - Create `.agents/reviews/security/<today, YYYY-MM-DD>.md`, with front matter
-  `reviewed-through: <git rev-parse main>`, `area: <the threat>`, `previous: <last
+  `reviewed-through: <git rev-parse main>`, `base: <the last tag>`, `previous: <last
   run's reviewed-through>`, then one section per finding with an id `S<YYYYMMDD>-<n>`
   and the fields above. A run that finds nothing still writes the file, saying what it
   read.
 - Append one line per new finding to `.agents/reviews/security/findings.md`:
   `- S…-n · severity · title · status`, where status starts as `open`.
-- Commit both on `agents/reviews-security` ("Security review <date>: <threat>, <n>
-  findings").
+- Commit both on `agents/reviews-security` ("Security review <date>: <n> findings").
 
 ## 4. Fix the critical and high ones
 

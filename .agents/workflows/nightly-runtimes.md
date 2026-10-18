@@ -16,20 +16,18 @@ to its latest release and test it against the app (#39), with
 or branch yourself: the script works in a tree of its own.
 
 1. Call `list_sessions` with `started_by: me` and note the runtimes it says are available. Then run
-   `scripts/nightly-runtimes.py plan --assess --available <those ids, comma-separated>`.
+   `scripts/nightly-runtimes.py plan --available <those ids, comma-separated>`. It plans
+   only the runtimes with a new release since the last run: what changed is the scope
+   (#1462). Never add `--assess` or `--force`.
    If it prints `Nothing changed.`, say nothing else, and call `archive_session` (no id).
 2. Lease the resource `build` with `lease_resource` for 60 minutes (if you are in line, keep
    waiting with `lease_resource`), run `scripts/nightly-runtimes.py build`, and release
    `build` with `release_resource` the moment it ends, whether it passed or not.
-3. Run `scripts/nightly-runtimes.py check --assess`. It starts and stops a scratch host of its
-   own; never stop any other `agentsd` or `agents-control`. Each runtime whose turn passed
-   gets the runtime assessment of #47, about five minutes each, on its own allowance (#1284).
+3. Run `scripts/nightly-runtimes.py check`. It starts and stops a scratch host of its
+   own; never stop any other `agentsd` or `agents-control`.
 4. Run `scripts/nightly-runtimes.py report`. It opens or updates one pull request per pinned
    runtime that passed, and one issue per cause of failure (runtimes that failed for the same
-   cause share it). An assessment step that failed last time too is listed, not filed. It
-   also opens or updates one pull request, with auto-merge, on `nightly/runtime-assessments`:
-   each runtime's record in `.agents/reviews/runtimes/` and its row in
-   `docs/reference/integrations.md`.
+   cause share it).
 5. If you started any helper agent, archive it with `archive_session` (never delete its
    worktree).
 

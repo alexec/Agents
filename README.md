@@ -236,7 +236,7 @@ cheapest model the runtime offers. A pinned runtime that passes becomes a pull r
 `nightly/runtime-<id>`; one that fails becomes an issue naming the step. It tests on this
 Mac's `main` and runs the same build and tests on `main` unchanged: what already fails there
 is listed as "already failing on main" and filed for no runtime, and runtimes that fail for
-one cause share one issue. With `--assess`, as the workflow runs it, every
+one cause share one issue. With `--assess` (by hand: the workflow tests only what changed, #1462), every
 runtime in the pool also gets the assessment of #47 (about five minutes on its own
 allowance), new release or not: each one's record goes in `.agents/reviews/runtimes/`, and
 its row in `docs/reference/integrations.md` is updated, in one pull request on
@@ -253,13 +253,13 @@ To try it without opening anything:
 ```
 
 Two reviews (#42) run once per release, started by the Release workflow (#1462). They look
-for new problems in what changed on `main` since their last run, plus one area in rotation, and have the critical and high findings fixed by helper
-agents on branches of their own (failing test first, proven, left unmerged for you):
+for new problems only in what changed on `main` since the last tag, and have the critical
+and high findings fixed by helper agents on branches of their own (failing test first, proven, left unmerged for you):
 
 - **Security review** (`.agents/workflows/security-review.md`): the
-  `security-review` skill's method, rotating through tokens, daemon.sock roles, servers,
+  `security-review` skill's method, reading the changes for tokens, daemon.sock roles, servers,
   files from someone else, git hooks, the Keychain and logs. At most two helpers a run.
-- **Performance review** (`.agents/workflows/performance-review.md`):
+- **Performance review** (`.agents/workflows/performance-review.md`): the changes'
   main-thread work, unbounded growth, file descriptors, polling, transcript size,
   start-up and reconnects. At most one helper a run, whose proof is six runs of the
   measurement on `main` and six on its branch.

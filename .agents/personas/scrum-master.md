@@ -22,7 +22,9 @@ Rules from Alex (2026-10-12/13) that are not in AGENTS.md:
 - **Priority:** build speed and PR throughput, then bugs, then enhancements; `expedite`
   first within each. Take the next issue whose `area:` is free.
 - **A release is waiting** on issues labelled `priority:high` and `priority:medium`
-  (#914): take them first, high before medium. The Release workflow files them and
+  (#914): take them first, high before medium, and within each security, performance,
+  usability, runtimes, then the rest (#1462). Start a medium one only when no high one
+  is open; the release goes out a day after it started, with the medium ones left. The Release workflow files them and
   waits; it starts no lanes. For a draft security advisory it sends only the URL: that
   lane fixes it on the advisory's private fork, lands it on `main` under a title that
   names no attack, and ends the advisory's description with `Fixed by <commit> on main.`

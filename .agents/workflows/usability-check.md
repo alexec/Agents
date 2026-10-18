@@ -60,23 +60,21 @@ not yours: their reviews run in the same release.
 
    End your turn; you are started again in it. There, `git merge --no-edit main`. It is never pushed.
 2. Read every file in `.agents/reviews/usability/`. The newest run file (`YYYY-MM-DD.md`)
-   has `reviewed-through:` (a commit of `main`, your last-run marker) and `area:` in its
-   front matter. `findings.md` there is the running list of every finding ever recorded.
+   has `reviewed-through:` (a commit of `main`, your last-run marker) in its front
+   matter. `findings.md` there is the running list of every finding ever recorded.
 3. Read `specs/071-web-remote/walks/parity.md` (the table of where each client stands)
    and the "Keeping the three clients in step" section of `AGENTS.md`. Search GitHub for
    open issues about parity and usability, so nothing is reported twice.
 4. **Scope** is:
-   - the UI changes on `main` since `reviewed-through:` (with no marker, since the last tag):
-     `git log --stat <reviewed-through>..main -- App/Sources Remote/Sources Shared/UI Web/src`.
+   - the UI changes on `main` since the last release tag, `git describe --tags --abbrev=0 origin/main`
+     (#1462): `git log --stat <last tag>..main -- App/Sources Remote/Sources Shared/UI Web/src`.
      Check each commit's parity lines (`mac:`, `remote:`, `web:`) against what the code
-     now does, and each parity row they should have changed; and
-   - **one screen in depth**, the next after the last run's `area:` in the order of the
-     parity table's Counts section, wrapping round; on the first run, start at
-     `Sidebar and project list`.
+     now does, and each parity row they should have changed.
+   Nothing older is in scope: a screen these changes do not touch is not looked at.
 
 ## 2. Look
 
-For the screen in depth, and for anything the release's changes touched:
+For each screen the release's changes touched:
 
 1. **Read the code** of all three clients side by side, from the parity table's paths.
 2. **See it where you can.** Launch a scratch set-up with the `run-app` skill (under the
@@ -123,7 +121,7 @@ recorded or already an issue, unless it has got worse; then say what changed.
 
 In the review worktree:
 - Create `.agents/reviews/usability/<today, YYYY-MM-DD>.md`, with front matter
-  `reviewed-through: <git rev-parse main>`, `area: <the screen>`, `previous: <last
+  `reviewed-through: <git rev-parse main>`, `base: <the last tag>`, `previous: <last
   run's reviewed-through>`, then what was seen and what was only read, then one section
   per finding with an id `U<YYYYMMDD>-<n>` and the fields above. A run that finds
   nothing still writes the file, saying what it read and saw.
@@ -131,7 +129,7 @@ In the review worktree:
   `- U…-n · severity · clients · title · status`, where status starts as `open`.
 - Correct `specs/071-web-remote/walks/parity.md` where a row is wrong or missing, and its
   Counts to match, citing the finding.
-- Commit on `agents/reviews-usability` ("Usability check <date>: <screen>, <n>
+- Commit on `agents/reviews-usability` ("Usability check <date>: <n>
   findings").
 
 ## 4. File the issues
