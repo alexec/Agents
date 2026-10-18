@@ -13,8 +13,7 @@ import Foundation
 //
 // It is a table rather than a run of conditionals because of the rule the README sets
 // for the whole app: no code in the app asks which runtime it is talking to. `Lever` is
-// six ways of *asking* — a deny list in the session, an allow list in the session,
-// flags at launch, JSON in a variable, a file the runtime is pointed at, or nothing at
+// five ways of *asking* — a deny list in the session, flags at launch, JSON in a variable, a file the runtime is pointed at, or nothing at
 // all — and the runtime
 // id appears exactly once, as the
 // key this table is looked up by.
@@ -211,20 +210,17 @@ public struct SignInRelay: Codable, Hashable, Sendable {
 
 /// How a removal is asked for.
 ///
-/// Six ways of asking, not six runtimes. Nothing downstream switches on a runtime id:
+/// Five ways of asking, not five runtimes. Nothing downstream switches on a runtime id:
 /// the daemon asks the policy for a `_meta` object, a list of launch arguments and a set
 /// of environment files, and sends whatever comes back.
 ///
-/// An allow list carries its own `keep` rather than deriving it from `removed`, because
-/// "everything except these" and "only these" are different claims and only one of them
-/// is true of any given runtime. Deriving one from the other would make the table lie
-/// about which claim it is making.
+/// There is no allow list. Grok's was the last, and Grok 1.0.52 stopped giving the
+/// sub-agent tools it named (#1447): a deny list is the one claim that stays true when a
+/// runtime adds a tool.
 public enum Lever: Hashable, Sendable {
-    /// The removed names go into an array at this key path inside `session/new` `_meta`.
-    case sessionMetaDenyList(path: [String])
-    /// The names in `keep` go into an array at this key path; `extra` is whatever else
-    /// that object needs to be accepted.
-    case sessionMetaAllowList(path: [String], keep: [String], extra: [String: JSONValue])
+    /// The removed names go into an array at this key path inside `session/new` `_meta`;
+    /// `extra` is whatever else that object needs to be accepted.
+    case sessionMetaDenyList(path: [String], extra: [String: JSONValue] = [:])
     /// The removed names follow `flag` on the command line, and `extra` is the rest of
     /// the flags.
     case launchArguments(flag: String, repeatsFlag: Bool, extra: [String])
@@ -333,20 +329,16 @@ public struct ToolPolicy: Hashable, Sendable {
 
     /// What rides in `_meta` on `session/new`, `session/load` and `session/fork`.
     ///
-    /// Two shapes, both fixed by `specs/015-runtime-tool-scoping/contracts/runtime-launch.md`:
-    /// a deny list nests the removed names at its path, and an allow list nests the kept
-    /// names at its path with `extra` beside them in that same object. A runtime scoped
-    /// by flags or by words sends no `_meta` at all, exactly as it does today.
+    /// A deny list nests the removed names at its path, with `extra` beside them in that
+    /// same object. A runtime scoped by flags or by words sends no `_meta` at all.
     public var sessionMeta: JSONValue? {
         switch lever {
-        case .sessionMetaDenyList(let path):
+        case .sessionMetaDenyList(let path, let extra):
             // Nothing to deny is not a message. An empty list says the client thought
             // about tools and had none to hide, which is a different thing from saying
             // nothing at all, and a runtime we have nothing to hide from gets the
             // nothing — as it always has.
-            removed.isEmpty ? nil : Self.nesting(.array(removed.map { .string($0.name) }), at: path, beside: [:])
-        case .sessionMetaAllowList(let path, let keep, let extra):
-            Self.nesting(.array(keep.map(JSONValue.string)), at: path, beside: extra)
+            removed.isEmpty ? nil : Self.nesting(.array(removed.map { .string($0.name) }), at: path, beside: extra)
         case .launchArguments, .environmentJSON, .file, .words:
             nil
         }
