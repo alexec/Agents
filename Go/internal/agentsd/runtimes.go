@@ -169,6 +169,34 @@ func loginEnvironment() []string {
 	return append(without(os.Environ(), "PATH"), "PATH="+strings.Join(path, ":"))
 }
 
+// shippedServers is the folder of the MCP servers that ship with the host, beside agentsd
+// (Agents Host.app/Contents/Helpers, ~/.agents-server/bin); a test's own.
+var shippedServers = func() string {
+	self, err := os.Executable()
+	if err != nil {
+		return ""
+	}
+	return filepath.Dir(self)
+}
+
+// mcpEnvironment is RuntimeEnvironment.forMCPServers (#1389): the login environment with
+// the shipped servers' folder first on PATH, so `"command": "github-mcp"` in .agents/mcp.json
+// names the one beside agentsd on a Mac and on a server alike.
+func mcpEnvironment() []string {
+	env := loginEnvironment()
+	dir := shippedServers()
+	if dir == "" {
+		return env
+	}
+	for i, kv := range env {
+		if rest, ok := strings.CutPrefix(kv, "PATH="); ok {
+			env[i] = "PATH=" + dir + ":" + rest
+			return env
+		}
+	}
+	return append(env, "PATH="+dir+":/usr/bin:/bin")
+}
+
 // loginCommand is exec.Command with env's PATH, not this process's, finding a bare name.
 func loginCommand(env []string, name string, args ...string) *exec.Cmd {
 	if !strings.Contains(name, "/") {

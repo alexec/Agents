@@ -485,7 +485,7 @@ func (d *Daemon) hostedStart(h *hostedServer) (json.RawMessage, *Error) {
 	h.initialized = nil
 	d.hostedChangedLocked()
 	s := h.server
-	cmd := loginCommand(loginEnvironment(), s.Command, s.Args...)
+	cmd := loginCommand(mcpEnvironment(), s.Command, s.Args...)
 	cmd.Dir = h.cwd
 	for _, e := range s.Env {
 		cmd.Env = append(cmd.Env, e.Name+"="+e.Value)
