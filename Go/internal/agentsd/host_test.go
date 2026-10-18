@@ -101,7 +101,7 @@ func TestADropBoxAndAnArtifact(t *testing.T) {
 	var put wire.DropboxPutResponse
 	json.Unmarshal(c.call(t, 2, "dropbox/put", map[string]any{"folder": store.FolderURL(dir), "subfolder": "in/box",
 		"name": "../note.txt", "data": "aGk="}), &put)
-	real, _ := filepath.EvalSymlinks(dir)
+	real, _ := store.Resolve(dir)
 	if put.Path != filepath.Join(real, ".agents", "dropbox", "in", "box", "note.txt") {
 		t.Fatal(put.Path)
 	}

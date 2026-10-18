@@ -9,11 +9,18 @@
 // says them (resolved: /tmp is /private/tmp), a quarter of a second at a time, and `\0gone\0`
 // if the folder itself goes. It ends when its standard input closes, which is when the host
 // that started it lets it go or is gone.
+//
+//   agents-watch --machine [locked|idle]
+//
+// watches the Mac and the person at it instead (#1368, Machine.swift).
 import CoreServices
 import Foundation
 
+if CommandLine.arguments.count >= 2, CommandLine.arguments[1] == "--machine" {
+    watchMachine(assumingAway: CommandLine.arguments.count > 2 ? CommandLine.arguments[2] : nil)
+}
 guard CommandLine.arguments.count == 2 else {
-    FileHandle.standardError.write(Data("usage: agents-watch <folder>\n".utf8))
+    FileHandle.standardError.write(Data("usage: agents-watch <folder> | --machine [locked|idle]\n".utf8))
     exit(64)
 }
 let folder = URL(fileURLWithPath: CommandLine.arguments[1]).resolvingSymlinksInPath().path

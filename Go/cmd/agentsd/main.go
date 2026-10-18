@@ -106,6 +106,7 @@ func main() {
 	d.PickUpAfterRestart()
 	d.StartMCPHealth()
 	d.StartMCPEvents()
+	d.StartMachineWatch()
 	<-ctx.Done()
 	log.Printf("shutting down")
 	d.Shutdown()

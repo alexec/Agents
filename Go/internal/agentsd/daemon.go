@@ -54,6 +54,8 @@ type Daemon struct {
 	mcpHealthBook
 	mcpEventsBook
 	restartBook
+	machineBook
+	idleBook
 	turnBook
 	optionBook
 	timeBook
@@ -158,6 +160,13 @@ func Broadcast[P any](d *Daemon, n wire.Notification[P], params P) {
 func (d *Daemon) Shutdown() {
 	// First, so a stop that goes wrong below still counts as a stop (#1219).
 	d.noteCleanStop()
+	d.machineMu.Lock()
+	if d.machineStop != nil {
+		d.machineStop()
+		d.machineStop = nil
+	}
+	d.machineMu.Unlock()
+	d.stopIdleTimers()
 	// Nothing more is routed or written down once the host is going.
 	d.attentionMu.Lock()
 	d.presences = nil
