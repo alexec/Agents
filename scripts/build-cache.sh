@@ -83,8 +83,9 @@ xcode() {
 		CLANG_ENABLE_PROJECT_PREFIX_MAPPING=YES
 		# The project mappings leave the explicit modules' folders in DerivedData unmapped.
 		# The path as the build sees it, which under /tmp is not git's /private/tmp.
-		SWIFT_OTHER_PREFIX_MAPPINGS="$PWD=/^worktree"
-		CLANG_OTHER_PREFIX_MAPPINGS="$PWD=/^worktree"
+		# Quoted as one item of the list: Xcode splits these settings on spaces (#1417).
+		SWIFT_OTHER_PREFIX_MAPPINGS="\"$PWD=/^worktree\""
+		CLANG_OTHER_PREFIX_MAPPINGS="\"$PWD=/^worktree\""
 	)
 	# Two builds resolving into one checkouts folder at once can each write it: the first
 	# build on a new key resolves it under a lock and keeps the project's Package.resolved
