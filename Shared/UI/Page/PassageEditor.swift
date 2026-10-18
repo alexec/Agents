@@ -78,6 +78,8 @@ private struct PassageTextView: NSViewRepresentable {
     @Binding var caret: CGRect?
     /// Escape, or focus going elsewhere.
     let onEnd: () -> Void
+    /// The page's zoom (#1419), so the text does not change size as the passage opens.
+    @Environment(\.textZoom) private var zoom
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
 
@@ -91,7 +93,7 @@ private struct PassageTextView: NSViewRepresentable {
         view.importsGraphics = false
         view.allowsUndo = true
         view.drawsBackground = false
-        view.font = TextStep.reading.nsFont
+        view.font = TextStep.reading.nsFont(zoom: zoom)
         view.textColor = .textColor
         // No inset and no padding, so the first character sits where the rendered one
         // did and opening the passage moves nothing.
@@ -122,7 +124,7 @@ private struct PassageTextView: NSViewRepresentable {
     func updateNSView(_ view: EndingTextView, context: Context) {
         context.coordinator.parent = self
         // The system's text size, if it changed while the passage was open.
-        let font = TextStep.reading.nsFont
+        let font = TextStep.reading.nsFont(zoom: zoom)
         if view.font != font { view.font = font }
         // Only when the text changed from outside — "Use theirs" — never on the
         // person's own keystroke coming back, which would put the caret at the end.
@@ -233,6 +235,8 @@ private struct PassageTextView: UIViewRepresentable {
     @Binding var caret: CGRect?
     /// Focus going elsewhere.
     let onEnd: () -> Void
+    /// The page's zoom (#1419), so the text does not change size as the passage opens.
+    @Environment(\.textZoom) private var zoom
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
 
@@ -240,7 +244,7 @@ private struct PassageTextView: UIViewRepresentable {
         let view = UITextView(usingTextLayoutManager: false)
         view.delegate = context.coordinator
         view.backgroundColor = .clear
-        view.font = TextStep.reading.uiFont
+        view.font = TextStep.reading.uiFont(zoom: zoom)
         view.adjustsFontForContentSizeCategory = true
         view.textColor = .label
         // No inset and no padding, so the first character sits where the rendered one
@@ -268,6 +272,8 @@ private struct PassageTextView: UIViewRepresentable {
 
     func updateUIView(_ view: UITextView, context: Context) {
         context.coordinator.parent = self
+        let font = TextStep.reading.uiFont(zoom: zoom)
+        if view.font != font { view.font = font }
         // Only when the text changed from outside — "Use theirs" — never on the
         // person's own keystroke coming back, which would put the caret at the end.
         if view.text != text {

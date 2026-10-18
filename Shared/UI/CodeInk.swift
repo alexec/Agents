@@ -13,14 +13,15 @@ import SwiftUI
 /// screen theme. Keywords carry weight as well as colour, and comments are set in italic, so
 /// the two things read most often are told apart in grey-scale too.
 enum CodeInk {
-    /// The attributes a stretch of code takes, laid over the line's `TextStep.code` font.
-    static func attributes(for role: CodeRole) -> AttributeContainer {
+    /// The attributes a stretch of code takes, laid over the line's `TextStep.code` font, or
+    /// over the font given: a zoomed page's (#1419).
+    static func attributes(for role: CodeRole, font: Font = TextStep.code.font) -> AttributeContainer {
         var container = AttributeContainer()
         guard let color = colors[role] else { return container }
         container.foregroundColor = color
         switch role {
-        case .keyword: container.font = TextStep.code.font.weight(.semibold)
-        case .comment: container.font = TextStep.code.font.italic()
+        case .keyword: container.font = font.weight(.semibold)
+        case .comment: container.font = font.italic()
         default: break
         }
         return container

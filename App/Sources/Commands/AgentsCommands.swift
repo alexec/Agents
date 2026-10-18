@@ -60,6 +60,8 @@ struct AgentsCommands: Commands {
     @FocusedValue(\.poppedChat) private var popped
     /// The project in the key window when that is a project's own (#1089).
     @FocusedValue(\.projectWindow) private var projectWindow
+    /// A Markdown page on screen in the key window (#1419), for View ▸ Zoom.
+    @FocusedValue(\.pageZoom) private var pageZoom
     @Environment(\.openWindow) private var openWindow
 
     /// What the Session menu acts on: the key window's session, which is the main
@@ -138,6 +140,21 @@ struct AgentsCommands: Commands {
             Button("Project Settings…") { keyRequests.projectSettings = .general }
                 .keyboardShortcut(",", modifiers: [.command, .option])
                 .disabled(keyProject == nil)
+        }
+
+        // A Markdown page's text (#1419), as Safari and Preview have it. ⌘0 is Actual
+        // Size while a page is in front, and Agents (All Projects) otherwise.
+        CommandGroup(after: .toolbar) {
+            Button("Actual Size") { pageZoom?.actualSize() }
+                .keyboardShortcut(pageZoom == nil ? nil : KeyboardShortcut("0"))
+                .disabled(pageZoom?.isActualSize ?? true)
+            Button("Zoom In") { pageZoom?.zoomIn() }
+                .keyboardShortcut("+")
+                .disabled(!(pageZoom?.canZoomIn ?? false))
+            Button("Zoom Out") { pageZoom?.zoomOut() }
+                .keyboardShortcut("-")
+                .disabled(!(pageZoom?.canZoomOut ?? false))
+            Divider()
         }
 
         CommandGroup(after: .sidebar) {
@@ -235,7 +252,7 @@ struct AgentsCommands: Commands {
         // below these by the system, by title.
         CommandGroup(before: .windowList) {
             Button("Agents (All Projects)") { model.bringMainWindowForward(opening: openWindow) }
-                .keyboardShortcut("0")
+                .keyboardShortcut(pageZoom == nil ? KeyboardShortcut("0") : nil)
             Button("Open Project in New Window") {
                 guard let key = model.selectedProjectKey else { return }
                 openWindow(id: ProjectWindowScene.id, value: key)

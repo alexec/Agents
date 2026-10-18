@@ -63,6 +63,11 @@ struct LivePage: View {
     /// Bumped for each save handed out, so an older answer landing late is not taken
     /// for the newer one's.
     @State private var saving = 0
+    /// How large the text is drawn (#1419): one level for every page on this device,
+    /// kept when the page closes and the app quits.
+    @AppStorage(PageZoom.defaultsKey, store: WindowDefaults.store) private var zoomLevel = PageZoom.actualSize
+    /// The level a pinch started at, while the fingers are down.
+    @State private var pinchStart: Double?
 
     /// The caret's beat: `PageFollower.typingStep` characters every tick, two
     /// hundred a second.
@@ -76,7 +81,7 @@ struct LivePage: View {
 
     var body: some View {
         GeometryReader { geometry in
-            let metrics = PageMetrics.forPane(width: geometry.size.width)
+            let metrics = PageMetrics.forPane(width: geometry.size.width, zoom: zoom)
             ScrollViewReader { proxy in
                 ScrollView(.vertical) {
                     LazyVStack(alignment: .leading, spacing: 0) {
@@ -97,6 +102,14 @@ struct LivePage: View {
                 // than the text shrinking back, so the 60-character floor still holds;
                 // `PageMetrics` carries that arithmetic.
                 .appText(.reading)
+                .environment(\.textZoom, zoom)
+                .simultaneousGesture(pinch)
+                #if os(macOS)
+                // What View ▸ Zoom In, Zoom Out and Actual Size act on (#1419).
+                .focusedSceneValue(\.pageZoom, PageZoomAction(level: $zoomLevel))
+                #else
+                .background { zoomKeys }
+                #endif
                 .textSelection(.enabled)
                 .onAppear { load(text) }
                 .onChange(of: text) { _, new in
@@ -137,6 +150,41 @@ struct LivePage: View {
             }
         }
     }
+
+    // MARK: Zoom
+
+    private var zoom: Double { PageZoom.snapped(zoomLevel) }
+
+    /// A pinch on the trackpad or the glass goes through the same steps as the keys.
+    private var pinch: some Gesture {
+        MagnifyGesture()
+            .onChanged { value in
+                let start = pinchStart ?? zoom
+                pinchStart = start
+                let next = PageZoom.pinched(from: start, by: value.magnification)
+                if next != zoom { zoomLevel = next }
+            }
+            .onEnded { _ in pinchStart = nil }
+    }
+
+    #if os(iOS)
+    /// ⌘+, ⌘− and ⌘0 with an iPad's keyboard: buttons no one sees, so the keys are
+    /// there whatever has focus, as ⌘P is in the chat (#415).
+    private var zoomKeys: some View {
+        ZStack {
+            Button("Zoom In") { zoomLevel = PageZoom.larger(than: zoom) }
+                .keyboardShortcut("+")
+            Button("Zoom In") { zoomLevel = PageZoom.larger(than: zoom) }
+                .keyboardShortcut("=")
+            Button("Zoom Out") { zoomLevel = PageZoom.smaller(than: zoom) }
+                .keyboardShortcut("-")
+            Button("Actual Size") { zoomLevel = PageZoom.actualSize }
+                .keyboardShortcut("0")
+        }
+        .opacity(0)
+        .accessibilityHidden(true)
+    }
+    #endif
 
     // MARK: One passage
 
@@ -316,4 +364,23 @@ struct LivePage: View {
             proxy.scrollTo(index, anchor: .center)
         }
     }
+}
+
+/// The page's zoom level, for the Mac's View menu (#1419): handed up by a page on
+/// screen in the key window, so the menu's items are there only while one is.
+struct PageZoomAction {
+    let level: Binding<Double>
+
+    var zoom: Double { PageZoom.snapped(level.wrappedValue) }
+    var canZoomIn: Bool { PageZoom.canZoomIn(zoom) }
+    var canZoomOut: Bool { PageZoom.canZoomOut(zoom) }
+    var isActualSize: Bool { zoom == PageZoom.actualSize }
+
+    func zoomIn() { level.wrappedValue = PageZoom.larger(than: zoom) }
+    func zoomOut() { level.wrappedValue = PageZoom.smaller(than: zoom) }
+    func actualSize() { level.wrappedValue = PageZoom.actualSize }
+}
+
+extension FocusedValues {
+    @Entry var pageZoom: PageZoomAction?
 }
