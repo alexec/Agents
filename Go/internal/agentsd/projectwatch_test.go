@@ -25,9 +25,6 @@ func watched(t *testing.T, folder string) (*Daemon, *conn) {
 	t.Helper()
 	prepareWatch(t)
 	d, c := start(t, t.TempDir())
-	// Stopped before the root goes: what a workflow's change sets off (its project's
-	// summary, Needs You, the events) writes into the root after the test has its answer.
-	t.Cleanup(d.Shutdown)
 	c.call(t, 1, "projects/add", map[string]any{"folder": "file://" + folder})
 	until(t, "the project's watch", func() bool {
 		d.pwMu.Lock()

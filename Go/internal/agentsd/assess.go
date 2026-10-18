@@ -14,7 +14,6 @@ import (
 
 	"github.com/alexec/agents/Go/internal/agentsd/diskjson"
 	"github.com/alexec/agents/Go/internal/agentsd/store"
-	"github.com/alexec/agents/Go/internal/safe"
 	"github.com/alexec/agents/Go/wire"
 )
 
@@ -341,7 +340,8 @@ func (d *Daemon) scoreAssessmentIfDue(id wire.UUID) {
 	if !labelled || a.Report != nil && (a.Report.Outcome == wire.WorkOutcomeBlocked || a.Report.Outcome == wire.WorkOutcomePartlyDone) {
 		return
 	}
-	safe.Go("assessment", func() {
+	// A write after the turn, which Shutdown waits for: the score lands in the root.
+	d.goAfterTurn("assessment", func() {
 		if score, err := d.assessment(id); err == nil {
 			d.record(id, runtimeNote(assessNote(score)))
 		}
