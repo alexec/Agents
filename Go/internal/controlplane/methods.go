@@ -382,6 +382,7 @@ func (m *Methods) forget(ctx context.Context, id string, after time.Duration) er
 		m.router.ForgetClient(id)
 		m.router.BroadcastControl("control/clientChanged", map[string]any{"client": id, "removed": true})
 		m.s.tellRelayDevices()
+		m.s.tellHostClients()
 	}()
 	return nil
 }
@@ -402,6 +403,7 @@ func (m *Methods) Admit(ctx context.Context, client records.ClientRecord) error 
 	if said {
 		m.router.BroadcastControl("control/clientChanged", map[string]any{"client": client.ID})
 		go m.s.tellRelayDevices()
+		go m.s.tellHostClients()
 	}
 	return nil
 }
@@ -607,6 +609,8 @@ func (m *Methods) hello(ctx context.Context, host string, hello wire.HostHello) 
 	}
 	if record.Relay != nil && *record.Relay {
 		m.s.tellRelayDevices()
+	} else {
+		m.s.tellHostClients(host)
 	}
 	// A host marked before #656 to add the projects it found: the mark goes, unsaid.
 	if r := m.records.Host(host); r != nil && r.DetectProjects != nil && *r.DetectProjects {

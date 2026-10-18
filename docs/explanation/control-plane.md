@@ -22,8 +22,10 @@ browser on the Mac that runs the control plane. A client runs nothing. It shows 
 
 The **control plane** sits between them. Every host and every client connects to it, and
 it sends each request to the host it concerns and each update to the clients that should
-hear it. A client never connects to a host directly, and a host never needs to be reached:
-it connects out, like a client does.
+hear it. A client never connects to a host on another machine directly, and a host never
+needs to be reached: it connects out, like a client does. The one exception is the same
+machine: the window on a Mac reaches that Mac's own host directly (see
+[The window and this Mac's host](#the-window-and-this-macs-host)).
 
 So a server you add once is seen by every window and phone, with nothing to set up on each
 one, and who may do what is decided in one place.
@@ -137,6 +139,27 @@ Since every client may do everything (#111), the listener's address and origin c
 the key that can't be read are what keep a browser's session its own. Serving the page at a
 public address, for a browser elsewhere, waits on issue #61.
 
+## The window and this Mac's host
+
+The window on a Mac talks to that Mac's own host over a local socket, not out to the
+control plane and back. It is quicker, and when the control plane cannot be reached, the
+window still works with the agents on this Mac.
+
+The control plane is still the authority for who may connect. It tells each host which
+windows are paired, with their keys, and the host keeps that list for when the control
+plane is away. A window proves its own key to the host, as it does to the control plane.
+Forget a window, and its host cuts it off at once, as the control plane does.
+
+Everything else is as before. What the window does on the local path, the host tells every
+client, those through the control plane too, so every other screen sees the same thing. The
+window still uses the control plane for every other host, for pairing, and for the
+control plane's own settings.
+
+The socket is in a folder that only Agents and Agents Host can reach (their shared app
+group), and is named by the control plane's key, so a second control plane on the same Mac
+has a socket of its own. When it is not there, the window goes through the control plane as
+before. The iPhone, the iPad and a browser always go through the control plane for now.
+
 ## Copies and the store
 
 The control plane itself remembers little: the clients, the hosts, the
@@ -180,9 +203,10 @@ one address, a name, that every code carries.
 
 ## When the control plane is down
 
-When no copy can be reached, no client can reach any host. The window says **Can't reach
-the control plane**, names the address it expected, and shows what it last knew rather
-than an empty list.
+When no copy can be reached, no client can reach a host on another machine. The window
+says **Can't reach the control plane**, names the address it expected, and shows what it
+last knew rather than an empty list. The window still works with this Mac's own host, and
+the strip says so.
 
 Nothing stops on the hosts. An agent that was working carries on and finishes. A question
 it asks waits on its host until a client is back to answer it. The tools an agent is given

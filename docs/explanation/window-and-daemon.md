@@ -20,7 +20,8 @@ Linux server you add runs the same daemon, and owns the agents on it in the same
 
 The window owns nothing. It connects to your control plane (see
 [The control plane](control-plane.md)), shows you what your hosts hold, and passes on what
-you type and click. Your iPhone and iPad do the same thing. Because nothing lives in the
+you type and click. This Mac's own host it reaches directly, over a local socket, so it
+still works with that host when the control plane is away. Your iPhone and iPad do the same thing. Because nothing lives in the
 window, closing it loses nothing, and a window on another Mac sees exactly what this one
 does.
 
@@ -28,7 +29,7 @@ does.
 
 The window runs in the App Store's sandbox. It starts no program of its own, keeps nothing
 running in the background, and reads no file you did not hand it. Everything that needs a
-real machine is asked of a host, through the control plane: starting an agent, a terminal,
+real machine is asked of a host, through the control plane or, for this Mac's host, directly: starting an agent, a terminal,
 reading and writing files, git, installing and signing in runtimes, and your shared skills
 and instructions in `~/.agents`.
 

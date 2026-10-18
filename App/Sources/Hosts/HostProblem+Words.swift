@@ -57,9 +57,13 @@ extension HostProblem {
     }
 
     /// The window cannot reach the control plane at all (058, frame H). One strip for
-    /// every host, naming where the window expected it.
-    static func controlPlaneUnreachable(name: String, address: String) -> String {
-        "Can’t reach the control plane on \(name) (\(address)). Your agents are still working there."
+    /// every host, naming where the window expected it. This Mac's host, reached directly
+    /// (#1118), still works from here.
+    static func controlPlaneUnreachable(name: String, address: String, thisMacDirect: Bool = false) -> String {
+        if thisMacDirect {
+            return "Can’t reach the control plane on \(name) (\(address)). This Mac’s agents still work here; other hosts’ agents are still working there."
+        }
+        return "Can’t reach the control plane on \(name) (\(address)). Your agents are still working there."
     }
 
     /// What Settings ▸ Control plane says when the control plane refused a change (058,

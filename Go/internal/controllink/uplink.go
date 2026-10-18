@@ -47,6 +47,9 @@ type Uplink struct {
 	// Lend is where this host's relay for a runtime listens on loopback, for a tunnel the
 	// control plane opens to it (the lending Mac's end, T091); 0 when it lends none.
 	Lend func(runtime string) int
+	// Told is handed what the control plane tells this host on channel 0, a method and its
+	// params, such as host/clients (#1118); nil hears none of it.
+	Told func(method string, params json.RawMessage)
 	// pingEvery is how often a quiet link is pinged, and how long its pong may take;
 	// upPing when 0.
 	pingEvery time.Duration
@@ -426,6 +429,15 @@ func (u *Uplink) message(n int, message string) {
 		}
 		if strings.Contains(message, `"projects/detect"`) {
 			u.Tell("projects/detected", map[string]int{"added": 0})
+			return
+		}
+		var told struct {
+			ID     json.RawMessage `json:"id"`
+			Method string          `json:"method"`
+			Params json.RawMessage `json:"params"`
+		}
+		if u.Told != nil && json.Unmarshal([]byte(message), &told) == nil && told.ID == nil && told.Method != "" {
+			u.Told(told.Method, told.Params)
 		}
 		return
 	}

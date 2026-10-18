@@ -1873,6 +1873,18 @@ type HostAnnounce struct {
 	Implementation *string `json:"implementation,omitzero"`
 }
 
+// A paired window a host may let in on its local socket (#1118), with the key it proves itself with.
+type HostClient struct {
+	ID        UUID   `json:"id"`
+	Kind      string `json:"kind"`
+	PublicKey Data   `json:"publicKey"`
+}
+
+// host/clients: every window paired with the control plane, which a host checks its local socket against (#1118).
+type HostClients struct {
+	Clients []HostClient `json:"clients"`
+}
+
 // host/hello, on every connect of an uplink. `implementation` is `swift` or `go` (#1134).
 type HostHello struct {
 	Host           *HostID `json:"host,omitzero"`

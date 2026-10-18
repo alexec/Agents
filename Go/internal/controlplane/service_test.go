@@ -708,3 +708,22 @@ func TestToolsetFilesAreTheNamedOnesOnly(t *testing.T) {
 		t.Fatal("no folder, yet a file")
 	}
 }
+
+// Every host hears which windows are paired, and hears it again when one is forgotten: the
+// policy it checks its local socket against (#1118).
+func TestHostsHearThePairedWindows(t *testing.T) {
+	p := startPlane(t, store.NewMemory(), controllink.NewPrivateKey())
+	_, host := p.rawHost("this mac", false)
+	m, err := controllink.PairClient(context.Background(), p.code(false), "window")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for line := readUntil(t, host, "host/clients"); !strings.Contains(line, m.Client); line = readUntil(t, host, "host/clients") {
+	}
+	if err := p.s.methods.forget(context.Background(), m.Client, 0); err != nil {
+		t.Fatal(err)
+	}
+	if line := readUntil(t, host, "host/clients"); strings.Contains(line, m.Client) {
+		t.Fatal("a forgotten window is still listed:", line)
+	}
+}
