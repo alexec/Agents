@@ -34,7 +34,7 @@ func runtime(id, name, exe string, args []string, page string, appCopyOnly bool,
 // (install is nil there).
 var catalog = func() []runtimeDef {
 	c := []runtimeDef{
-		runtime("claude", "Claude", "npx", []string{"-y", "@agentclientprotocol/claude-agent-acp"}, "https://code.claude.com/docs/en/setup", false, "ANTHROPIC_", "CLAUDE_CONFIG_DIR"),
+		runtime("claude", "Claude", "npx", []string{"--prefer-offline", "-y", "@agentclientprotocol/claude-agent-acp"}, "https://code.claude.com/docs/en/setup", false, "ANTHROPIC_", "CLAUDE_CONFIG_DIR"),
 		runtime("grok", "Grok", "grok", []string{"--permission-mode", "default", "agent", "stdio"}, "https://x.ai/cli", false, "GROK_", "XAI_"),
 		runtime("copilot", "Copilot", "copilot", []string{"--acp"}, "https://docs.github.com/en/copilot/how-tos/set-up/install-copilot-cli", false, "COPILOT_", "GH_TOKEN", "GITHUB_TOKEN"),
 		runtime("cursor", "Cursor", "cursor-agent", []string{"acp"}, "https://cursor.com/docs/cli/installation", false, "CURSOR_"),
@@ -296,7 +296,7 @@ func (d *Daemon) launchFor(r *runtimeDef, dir string) (acp.Launch, error) {
 		env = append(env, "GEMINI_HOME="+d.appHomes()["antigravity"], "AGY_ACP_DISABLE_WORKSPACE_TRUST=1",
 			"AGY_ACP_FORCE_FILE_STORAGE=1")
 	}
-	return acp.Launch{Command: path, Args: args, Env: env, Dir: dir}, nil
+	return acp.Launch{Command: path, Args: args, Env: env, Dir: dir, Name: r.Name}, nil
 }
 
 func appendPath(env []string, dir string) []string {
