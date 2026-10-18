@@ -152,6 +152,43 @@ func searchPaths() []string {
 	return out
 }
 
+// loginEnvironment is LoginShellPath.environment: this process's, with the login shell's
+// PATH and the system's folders. launchd starts agentsd with the system's folders only, so
+// a runtime's `#!/usr/bin/env node` or an `npx` MCP server needs the person's (#1382).
+func loginEnvironment() []string {
+	path := searchPaths()
+	for _, s := range []string{"/usr/bin", "/bin", "/usr/sbin", "/sbin"} {
+		found := false
+		for _, p := range path {
+			found = found || p == s
+		}
+		if !found {
+			path = append(path, s)
+		}
+	}
+	return append(without(os.Environ(), "PATH"), "PATH="+strings.Join(path, ":"))
+}
+
+// loginCommand is exec.Command with env's PATH, not this process's, finding a bare name.
+func loginCommand(env []string, name string, args ...string) *exec.Cmd {
+	if !strings.Contains(name, "/") {
+		for _, kv := range env {
+			if dirs, ok := strings.CutPrefix(kv, "PATH="); ok {
+				for _, d := range strings.Split(dirs, ":") {
+					p := filepath.Join(d, name)
+					if fi, err := os.Stat(p); d != "" && err == nil && !fi.IsDir() && fi.Mode()&0o111 != 0 {
+						name = p
+						break
+					}
+				}
+			}
+		}
+	}
+	cmd := exec.Command(name, args...)
+	cmd.Env = env
+	return cmd
+}
+
 func (d *Daemon) runtimeStatuses() []wire.RuntimeStatus {
 	out := []wire.RuntimeStatus{}
 	for i := range catalog {
@@ -203,7 +240,7 @@ func (d *Daemon) launchFor(r *runtimeDef, dir string) (acp.Launch, error) {
 	if path == "" {
 		return acp.Launch{}, &Error{Code: CodeRuntimeNotFound, Message: r.Name + " is not installed on this host (looked in " + strings.Join(looked, ", ") + ")"}
 	}
-	env := environment(r, os.Environ())
+	env := environment(r, loginEnvironment())
 	// The shipped MCP servers sit beside agentsd (~/.agents-server/bin), last on PATH.
 	if self, err := os.Executable(); err == nil {
 		env = appendPath(env, filepath.Dir(self))

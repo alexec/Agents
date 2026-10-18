@@ -378,22 +378,6 @@ type installFailure string
 
 func (f installFailure) Error() string { return string(f) }
 
-// installEnvironment is LoginShellPath.installEnvironment: this process's, with the login
-// shell's PATH and the system's folders.
-func installEnvironment() []string {
-	path := searchPaths()
-	for _, s := range []string{"/usr/bin", "/bin", "/usr/sbin", "/sbin"} {
-		found := false
-		for _, p := range path {
-			found = found || p == s
-		}
-		if !found {
-			path = append(path, s)
-		}
-	}
-	return append(without(os.Environ(), "PATH"), "PATH="+strings.Join(path, ":"))
-}
-
 // step runs one command, and says its output and whether it ran out of time.
 func step(timeout time.Duration, dir string, env []string, name string, args ...string) (string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
@@ -424,7 +408,7 @@ func tail(out string, n int) string {
 // failure rather than an empty script that "succeeds".
 func runScript(url, shell, name string) error {
 	home, _ := os.UserHomeDir()
-	out, err := step(installTimeout, home, installEnvironment(), "/bin/bash", "-c",
+	out, err := step(installTimeout, home, loginEnvironment(), "/bin/bash", "-c",
 		`set -o pipefail; curl -fsSL "$1" | "$2"`, "install", url, shell)
 	switch {
 	case err == context.DeadlineExceeded:
@@ -608,12 +592,12 @@ func (t *macToolset) installNode(progress func(string)) error {
 		progress("Unpacking Node.js")
 		node := filepath.Join(part, "node")
 		os.MkdirAll(node, 0o755)
-		if out, err := step(installTimeout, part, installEnvironment(), "/usr/bin/tar", "-xzf", tarball, "-C", node, "--strip-components=1"); err != nil {
+		if out, err := step(installTimeout, part, loginEnvironment(), "/usr/bin/tar", "-xzf", tarball, "-C", node, "--strip-components=1"); err != nil {
 			return unpackProblem(out, "Couldn’t download Node.js: "+tail(out, 1))
 		}
 		os.Remove(tarball)
 		progress("Installing " + name)
-		env := installEnvironment()
+		env := loginEnvironment()
 		for i, kv := range env {
 			if strings.HasPrefix(kv, "PATH=") {
 				env[i] = "PATH=" + filepath.Join(node, "bin") + ":" + strings.TrimPrefix(kv, "PATH=")
@@ -677,9 +661,9 @@ func (t *macToolset) installArchive(progress func(string)) error {
 		var out string
 		var err error
 		if tarGz {
-			out, err = step(installTimeout, part, installEnvironment(), "/usr/bin/tar", "-xzf", archive, "-C", part)
+			out, err = step(installTimeout, part, loginEnvironment(), "/usr/bin/tar", "-xzf", archive, "-C", part)
 		} else {
-			out, err = step(installTimeout, part, installEnvironment(), "/usr/bin/ditto", "-x", "-k", archive, part)
+			out, err = step(installTimeout, part, loginEnvironment(), "/usr/bin/ditto", "-x", "-k", archive, part)
 		}
 		if err != nil {
 			return unpackProblem(out, "Installing "+name+" failed: couldn’t unpack it: "+tail(out, 1))

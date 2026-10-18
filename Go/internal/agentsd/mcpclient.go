@@ -10,7 +10,6 @@ import (
 	"io"
 	"mime"
 	"net/http"
-	"os"
 	"os/exec"
 	"strings"
 	"time"
@@ -182,9 +181,8 @@ type stdioMCP struct {
 }
 
 func startStdioMCP(s *sdk.McpServerStdio, cwd string) (*stdioMCP, error) {
-	cmd := exec.Command(s.Command, s.Args...)
+	cmd := loginCommand(loginEnvironment(), s.Command, s.Args...)
 	cmd.Dir = cwd
-	cmd.Env = os.Environ()
 	for _, e := range s.Env {
 		cmd.Env = append(cmd.Env, e.Name+"="+e.Value)
 	}
