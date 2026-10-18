@@ -14,6 +14,7 @@ import (
 	"os"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/alexec/agents/Go/internal/controllink"
 	"github.com/alexec/agents/Go/internal/safe"
@@ -178,24 +179,96 @@ func (d *Daemon) logUnknown(method string) {
 
 // MARK: daemon.sock, for driving the host by hand (server-rpc.sh)
 
+// A daemon.sock client is written by a goroutine of its own, through a bounded queue, so a
+// client that stops reading (a window hung or stopped in a debugger) never holds Broadcast,
+// its caller or any lock the caller has (#1399): its queue stays full for sockQueueWait, or
+// a write to it takes longer than sockWriteDeadline, and it is let go. It connects again and catches up.
+const (
+	sockQueue         = 1024
+	sockQueueWait     = 2 * time.Second
+	sockWriteDeadline = 10 * time.Second
+)
+
+var errSocketGone = errors.New("the socket's client was let go")
+
 type sockConn struct {
 	c    net.Conn
-	w    *bufio.Writer
-	mu   sync.Mutex
+	out  chan string
+	done chan struct{}
+	once sync.Once
 	in   chan string
 	role Role
 }
 
-func (s *sockConn) Write(line string) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if _, err := s.w.WriteString(line + "\n"); err != nil {
-		return err
-	}
-	return s.w.Flush()
+func newSockConn(c net.Conn, role Role) *sockConn {
+	s := &sockConn{c: c, out: make(chan string, sockQueue), done: make(chan struct{}), in: make(chan string, 256), role: role}
+	safe.Go("socket write", s.writeAll)
+	return s
 }
+
+// Write queues a line; it never waits for the client.
+func (s *sockConn) Write(line string) error {
+	select {
+	case <-s.done:
+		return errSocketGone
+	default:
+	}
+	select {
+	case s.out <- line:
+		return nil
+	case <-s.done:
+		return errSocketGone
+	default:
+	}
+	// Full: a client behind in a burst gets a moment; one that reads nothing is let go.
+	wait := time.NewTimer(sockQueueWait)
+	defer wait.Stop()
+	select {
+	case s.out <- line:
+		return nil
+	case <-s.done:
+		return errSocketGone
+	case <-wait.C:
+		log.Printf("socket: a client read none of the last %d lines in %s; let go", sockQueue, sockQueueWait)
+		s.Close()
+		return errSocketGone
+	}
+}
+
+// writeAll writes what is queued, as much as is there at once, until the client goes.
+func (s *sockConn) writeAll() {
+	w := bufio.NewWriter(s.c)
+	for {
+		select {
+		case <-s.done:
+			return
+		case line := <-s.out:
+			s.c.SetWriteDeadline(time.Now().Add(sockWriteDeadline))
+			_, err := w.WriteString(line + "\n")
+			for more := true; more && err == nil; {
+				select {
+				case next := <-s.out:
+					_, err = w.WriteString(next + "\n")
+				default:
+					more = false
+				}
+			}
+			if err == nil {
+				err = w.Flush()
+			}
+			if err != nil {
+				if errors.Is(err, os.ErrDeadlineExceeded) {
+					log.Printf("socket: a client took over %s to take a write; let go", sockWriteDeadline)
+				}
+				s.Close()
+				return
+			}
+		}
+	}
+}
+
 func (s *sockConn) In() <-chan string { return s.in }
-func (s *sockConn) Close()            { s.c.Close() }
+func (s *sockConn) Close()            { s.once.Do(func() { close(s.done); s.c.Close() }) }
 func (s *sockConn) Device() string    { return "" }
 func (s *sockConn) Role() Role        { return s.role }
 
@@ -225,8 +298,10 @@ func (d *Daemon) acceptSocket(c net.Conn, policy SocketPolicy) {
 		c.Close() // another account, or one the kernel would not name
 		return
 	}
-	sc := &sockConn{c: c, w: bufio.NewWriter(c), in: make(chan string, 256), role: role}
+	sc := newSockConn(c, role)
 	safe.Go("socket read", func() {
+		// A client gone takes its writer with it.
+		defer sc.Close()
 		defer close(sc.in)
 		r := bufio.NewReaderSize(c, 1<<20)
 		for {
