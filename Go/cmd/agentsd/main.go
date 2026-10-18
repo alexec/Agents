@@ -317,10 +317,9 @@ func machineID() string {
 	return h
 }
 
-func isTerminal() bool {
-	fi, err := os.Stdout.Stat()
-	return err == nil && fi.Mode()&os.ModeCharDevice != 0
-}
+// isTerminal is whether stdout is a person's terminal; anything else (launchd's /dev/null,
+// systemd, a detached start) logs to the root's daemon.log.
+func isTerminal() bool { return isTerminalFD(int(os.Stdout.Fd())) }
 
 // ordinaryRoot is StoreLocations.isStandard: the root a person's host uses, where an
 // invented event would be a lie (Application Support/Agents, or an installed server's).
