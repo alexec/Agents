@@ -340,6 +340,11 @@ func (d *Daemon) scoreAssessmentIfDue(id wire.UUID) {
 	if !labelled || a.Report != nil && (a.Report.Outcome == wire.WorkOutcomeBlocked || a.Report.Outcome == wire.WorkOutcomePartlyDone) {
 		return
 	}
+	// A turn that ends on a wait still open (wait_for_event, "your place is kept") is not
+	// the last: the event or the time limit starts it again (#1432).
+	if a.EventWait != nil && (a.EventWait.Ending == nil || len(a.QueuedPrompts) > 0) {
+		return
+	}
 	// A write after the turn, which Shutdown waits for: the score lands in the root.
 	d.goAfterTurn("assessment", func() {
 		if score, err := d.assessment(id); err == nil {

@@ -68,3 +68,28 @@ func TestALeadWaitsOnItsHelper(t *testing.T) {
 	})
 	_ = done
 }
+
+// A block reported before a card in the same turn is still the turn's ending once the card
+// is answered (#1432): the assessments' helpers and waits were lost to an edit's card.
+func TestABlockOutlivesACardInTheSameTurn(t *testing.T) {
+	fakeRuntimes(t)
+	d, _ := start(t, t.TempDir())
+	defer d.Shutdown()
+	blocked := &wire.WorkReport{Outcome: wire.WorkOutcomeBlocked, Message: "Waiting on the helper.", At: now(),
+		Block: &wire.Block{Waits: []wire.Wait{}, CheckAgainAt: new(now())}}
+	a := seeded(t, d, t.TempDir(), func(a *wire.Agent) { a.State, a.EndedReason, a.Report = wire.AgentStateRunning, nil, blocked })
+	d.setState(a.ID, wire.AgentStateWaitingOnUser)
+	d.setState(a.ID, wire.AgentStateRunning)
+	if r := d.Store.Agent(a.ID).Report; r == nil || r.Outcome != wire.WorkOutcomeBlocked {
+		t.Fatalf("after the card: %+v", r)
+	}
+	// A new turn clears it, as before.
+	d.change(a.ID, func(a *wire.Agent) {
+		a.State, a.EndedReason = wire.AgentStateFinished, reason(wire.EndedReasonEndTurn)
+		a.Report = &wire.WorkReport{Outcome: wire.WorkOutcomeDone, Message: "Done.", At: now()}
+	})
+	d.setState(a.ID, wire.AgentStateRunning)
+	if r := d.Store.Agent(a.ID).Report; r != nil {
+		t.Fatalf("a new turn kept %+v", r)
+	}
+}
