@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -28,6 +29,10 @@ type fakeControl struct {
 	hellos  chan HostHello
 	channel chan string // what the host wrote on channel 1
 	refuse  bool
+	// stall, when set, is what the first uplink waits on after opening its channel, reading
+	// nothing more: a control plane gone quiet (#1403). Later uplinks are served as usual.
+	stall   chan struct{}
+	uplinks atomic.Int32
 
 	mu         sync.Mutex
 	hostPublic []byte // from hosts/announce
@@ -122,6 +127,13 @@ func (f *fakeControl) serve(w http.ResponseWriter, r *http.Request) {
 	f.hellos <- frame.M.Params
 	l.Write(ctx, `{"c":1,"open":{"client":"C","device":"D1","fanOut":true}}`)
 	l.Write(ctx, `{"c":1,"m":{"jsonrpc":"2.0","id":7,"method":"daemon/ping"}}`)
+	if f.uplinks.Add(1) == 1 && f.stall != nil {
+		select {
+		case <-f.stall:
+		case <-ctx.Done():
+		}
+		return
+	}
 	for {
 		line, err := l.Read(ctx)
 		if err != nil {
