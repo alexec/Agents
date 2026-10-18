@@ -142,6 +142,12 @@ var (
 	CallProjectsKeepGuardedChange      = Method[GuardedChangeRequest, ProjectSummary]{"projects/keepGuardedChange"}
 	CallProjectsList                   = Method[ProjectsListRequest, []ProjectSummary]{"projects/list"}
 	CallProjectsReadGuardedChange      = Method[GuardedChangeRequest, GuardedChangeReading]{"projects/readGuardedChange"}
+	CallProjectsReceive                = Method[ReceiveRequest, ProjectSummary]{"projects/receive"}
+	CallProjectsReceiveState           = Method[ReceiveStateRequest, ReceiveState]{"projects/receiveState"}
+	CallProjectsReceiveUpload          = Method[ReceiveUploadRequest, Empty]{"projects/receiveUpload"}
+	CallProjectsSendFacts              = Method[SendFactsRequest, SendFacts]{"projects/sendFacts"}
+	CallProjectsSendPack               = Method[SendPackRequest, SendPack]{"projects/sendPack"}
+	CallProjectsSendRead               = Method[SendReadRequest, SendRead]{"projects/sendRead"}
 	CallProjectsSetDiskSpace           = Method[SetDiskSpaceRequest, ProjectSummary]{"projects/setDiskSpace"}
 	CallProjectsSetHelperLimits        = Method[SetHelperLimitsRequest, ProjectSummary]{"projects/setHelperLimits"}
 	CallProjectsSetPinned              = Method[SetPinnedRequest, ProjectSummary]{"projects/setPinned"}

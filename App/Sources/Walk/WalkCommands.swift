@@ -200,7 +200,30 @@ enum WalkCommands {
             return ["ok": true, "frame": box(window.frame), "scale": window.backingScaleFactor]
         case "menu":
             guard let path = request["path"] as? [String], !path.isEmpty else { throw WalkError("menu wants a path") }
-            return try menu(path)
+            guard let bar = NSApp.mainMenu else { throw WalkError("no menu bar") }
+            return try menu(path, in: bar)
+        case "context":
+            // A row's context menu (#1123), as a right click on its middle builds it, and an
+            // item of it chosen; no menu is shown, so nothing waits on its tracking.
+            let path = request["path"] as? [String] ?? []
+            guard let match = try matches(request).last else { throw WalkError("nothing matched \(request["text"] ?? "")") }
+            let window = match.window, box = match.element.frame(in: window)
+            guard box != .zero, let root = window.contentView?.superview else { throw WalkError("\(match.element.line(in: window)) has no frame") }
+            let point = CGPoint(x: box.midX, y: window.frame.height - box.midY)
+            guard let event = NSEvent.mouseEvent(with: .rightMouseDown, location: point, modifierFlags: [], timestamp: 0,
+                                                 windowNumber: window.windowNumber, context: nil, eventNumber: 0,
+                                                 clickCount: 1, pressure: 1) else { throw WalkError("no event") }
+            var view = root.hitTest(root.convert(point, from: nil))
+            while let current = view {
+                if let found = current.menu(for: event) {
+                    guard path.isEmpty else { return try menu(path, in: found) }
+                    found.update()
+                    return ["ok": true, "did": found.items.filter { !$0.isSeparatorItem }
+                        .map { $0.title + ($0.isEnabled ? "" : " (off)") }.joined(separator: "\n")]
+                }
+                view = current.superview
+            }
+            throw WalkError("\(match.element.line(in: window)) has no context menu")
         default:
             throw WalkError("unknown cmd \(verb)")
         }
@@ -348,8 +371,8 @@ enum WalkCommands {
 
     // MARK: the menu bar, in place of a keyboard shortcut
 
-    private static func menu(_ path: [String]) throws -> [String: Any] {
-        guard var menu = NSApp.mainMenu else { throw WalkError("no menu bar") }
+    private static func menu(_ path: [String], in start: NSMenu) throws -> [String: Any] {
+        var menu = start
         for (at, title) in path.enumerated() {
             // As opening it does: SwiftUI brings a menu's items up to date only then, so
             // one never opened kept the state it was made with (#1078: Open in Browser off).

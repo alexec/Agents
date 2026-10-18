@@ -24,6 +24,8 @@ func (d *Daemon) register() {
 	d.registerPins()
 	d.registerSettings()
 	d.registerHost()
+	d.registerReceive()
+	d.registerSend()
 	d.registerLeases()
 	d.registerAttention()
 	d.registerWorktrees()

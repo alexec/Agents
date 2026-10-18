@@ -66,6 +66,7 @@ nav:
       - how-to/connect-a-window-or-phone.md
       - how-to/use-agents-in-a-browser.md
       - how-to/add-a-server.md
+      - how-to/send-a-project-to-a-server.md
       - how-to/start-workspaces-from-agents.md
       - how-to/add-a-workspace-provider.md
       - how-to/run-the-control-plane-in-the-cloud.md

@@ -16727,6 +16727,265 @@
         "plugins",
         "other"
       ]
+    },
+    "ReceiveStateRequest": {
+      "type": "object",
+      "description": "Asks a host about a folder a Mac will send a repository to (Send to ‹host›…, #1123). `folder` may start with ~/.",
+      "properties": {
+        "folder": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "folder"
+      ],
+      "additionalProperties": false
+    },
+    "ReceiveState": {
+      "type": "object",
+      "description": "What a host has at a folder before a send (#1123). `heads` are the commits of its branches, so the Mac's bundle carries only what the host lacks. `ownChanges` is true when the folder has changes that the last send did not put there.",
+      "properties": {
+        "folder": {
+          "$ref": "#/definitions/URLString"
+        },
+        "exists": {
+          "type": "boolean"
+        },
+        "repository": {
+          "type": "boolean"
+        },
+        "ownChanges": {
+          "type": "boolean"
+        },
+        "heads": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "folder",
+        "exists",
+        "repository",
+        "ownChanges",
+        "heads"
+      ],
+      "additionalProperties": false
+    },
+    "ReceiveUploadRequest": {
+      "type": "object",
+      "description": "One part of a file a Mac sends (#1123), at `offset` in the upload. A part is at most 16 MB; the host keeps the upload until projects/receive uses it.",
+      "properties": {
+        "upload": {
+          "$ref": "#/definitions/UUID"
+        },
+        "offset": {
+          "type": "integer"
+        },
+        "data": {
+          "$ref": "#/definitions/Base64"
+        }
+      },
+      "required": [
+        "upload",
+        "offset",
+        "data"
+      ],
+      "additionalProperties": false
+    },
+    "SentBranch": {
+      "type": "object",
+      "description": "A branch the Mac sends, at the commit it has (#1123).",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "commit": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "commit"
+      ],
+      "additionalProperties": false
+    },
+    "ReceiveRequest": {
+      "type": "object",
+      "description": "Makes or brings up to date a host's copy of a Mac's repository (#1123): fetches the `bundle` upload, moves `branches` forward only, checks out `checkout`, sets `origin`, applies the `patch` upload (uncommitted changes), and adds the folder as a project. It stops, and changes nothing, when the host has changes or commits of its own.",
+      "properties": {
+        "folder": {
+          "type": "string"
+        },
+        "bundle": {
+          "$ref": "#/definitions/UUID"
+        },
+        "patch": {
+          "$ref": "#/definitions/UUID"
+        },
+        "branches": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/SentBranch"
+          }
+        },
+        "checkout": {
+          "type": "string"
+        },
+        "origin": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "folder",
+        "branches",
+        "checkout"
+      ],
+      "additionalProperties": false
+    },
+    "SendFactsRequest": {
+      "type": "object",
+      "description": "Asks this Mac's host about a repository to send (Send to ‹host›…, #1123).",
+      "properties": {
+        "folder": {
+          "$ref": "#/definitions/URLString"
+        }
+      },
+      "required": [
+        "folder"
+      ],
+      "additionalProperties": false
+    },
+    "SendFacts": {
+      "type": "object",
+      "description": "What the Send sheet shows (#1123): the local branches, the one checked out (none when detached), the origin, and whether anything is uncommitted.",
+      "properties": {
+        "branches": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "current": {
+          "type": "string"
+        },
+        "origin": {
+          "type": "string"
+        },
+        "hasChanges": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "branches",
+        "hasChanges"
+      ],
+      "additionalProperties": false
+    },
+    "SendPackRequest": {
+      "type": "object",
+      "description": "Makes what a send carries (#1123): a bundle of `branches` without the commits in `leavingOut` (the receiving host's), and with `includeChanges` a patch of the uncommitted changes, new files git does not ignore among them.",
+      "properties": {
+        "folder": {
+          "$ref": "#/definitions/URLString"
+        },
+        "branches": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "leavingOut": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "includeChanges": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "folder",
+        "branches",
+        "leavingOut",
+        "includeChanges"
+      ],
+      "additionalProperties": false
+    },
+    "SendFile": {
+      "type": "object",
+      "description": "A file the host made for a send, read with projects/sendRead (#1123).",
+      "properties": {
+        "id": {
+          "$ref": "#/definitions/UUID"
+        },
+        "size": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "size"
+      ],
+      "additionalProperties": false
+    },
+    "SendPack": {
+      "type": "object",
+      "description": "What projects/sendPack made (#1123): each branch at its commit, the bundle (none when the receiving host has every commit) and the patch (none when nothing is uncommitted).",
+      "properties": {
+        "commits": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/SentBranch"
+          }
+        },
+        "bundle": {
+          "$ref": "#/definitions/SendFile"
+        },
+        "patch": {
+          "$ref": "#/definitions/SendFile"
+        }
+      },
+      "required": [
+        "commits"
+      ],
+      "additionalProperties": false
+    },
+    "SendReadRequest": {
+      "type": "object",
+      "description": "One part of a file projects/sendPack made, from `offset` (#1123).",
+      "properties": {
+        "id": {
+          "$ref": "#/definitions/UUID"
+        },
+        "offset": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "offset"
+      ],
+      "additionalProperties": false
+    },
+    "SendRead": {
+      "type": "object",
+      "description": "A part of at most 8 MB. `end` is true for the last, and then the host removes the file.",
+      "properties": {
+        "data": {
+          "$ref": "#/definitions/Base64"
+        },
+        "end": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "data",
+        "end"
+      ],
+      "additionalProperties": false
     }
   }
 }
