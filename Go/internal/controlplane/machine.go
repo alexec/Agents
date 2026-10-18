@@ -13,36 +13,16 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"regexp"
 	"runtime"
 	"strings"
 	"time"
 
 	"github.com/alexec/agents/Go/internal/controllink"
+	"github.com/alexec/agents/Go/internal/machine"
 )
 
-// MachineID is MachineID.current: AGENTS_MACHINE_ID, else the Mac's hardware UUID (what
-// gethostuuid gives, read here from ioreg, as there is no cgo), else /etc/machine-id,
-// else the host name.
-func MachineID() string {
-	if id := os.Getenv("AGENTS_MACHINE_ID"); id != "" {
-		return id
-	}
-	if runtime.GOOS == "darwin" {
-		if out, err := exec.Command("/usr/sbin/ioreg", "-rd1", "-c", "IOPlatformExpertDevice").Output(); err == nil {
-			if m := regexp.MustCompile(`"IOPlatformUUID" = "([0-9A-Fa-f-]+)"`).FindSubmatch(out); m != nil {
-				return strings.ToUpper(string(m[1]))
-			}
-		}
-	}
-	for _, f := range []string{"/etc/machine-id", "/var/lib/dbus/machine-id"} {
-		if b, err := os.ReadFile(f); err == nil && strings.TrimSpace(string(b)) != "" {
-			return strings.TrimSpace(string(b))
-		}
-	}
-	h, _ := os.Hostname()
-	return h
-}
+// MachineID is machine.ID: the id a host gives the control plane.
+func MachineID() string { return machine.ID() }
 
 // LocalName is this Mac's name as the window's browser shows it: its ComputerName.
 func LocalName() string {

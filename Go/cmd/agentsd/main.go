@@ -20,6 +20,7 @@ import (
 	"github.com/alexec/agents/Go/internal/agentsd/store"
 	"github.com/alexec/agents/Go/internal/buildinfo"
 	"github.com/alexec/agents/Go/internal/controllink"
+	"github.com/alexec/agents/Go/internal/machine"
 	"github.com/alexec/agents/Go/internal/safe"
 )
 
@@ -213,7 +214,7 @@ func join(ctx context.Context, cl commandLine, d *agentsd.Daemon) {
 	if name == "" {
 		name, _ = os.Hostname()
 	}
-	hello := controllink.HostHello{Version: buildinfo.Version, Platform: platform(), MachineID: machineID(),
+	hello := controllink.HostHello{Version: buildinfo.Version, Platform: platform(), MachineID: machine.ID(),
 		Implementation: new(buildinfo.Implementation)}
 	if name != "" {
 		hello.Name = &name
@@ -297,24 +298,6 @@ func personalHome(cl commandLine) string {
 		return home
 	}
 	return ""
-}
-
-// machineID is MachineID.current: given, then this Mac's hardware UUID, then Linux's
-// machine-id, then the host name.
-func machineID() string {
-	if id := os.Getenv("AGENTS_MACHINE_ID"); id != "" {
-		return id
-	}
-	if id := hardwareUUID(); id != "" {
-		return id
-	}
-	for _, f := range []string{"/etc/machine-id", "/var/lib/dbus/machine-id"} {
-		if b, err := os.ReadFile(f); err == nil && strings.TrimSpace(string(b)) != "" {
-			return strings.TrimSpace(string(b))
-		}
-	}
-	h, _ := os.Hostname()
-	return h
 }
 
 func isTerminal() bool {

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/alexec/agents/Go/internal/agentsd/store"
+	"github.com/alexec/agents/Go/internal/machine"
 	"github.com/alexec/agents/Go/wire"
 )
 
@@ -122,6 +123,39 @@ func TestAFireWhileARunGoesQueues(t *testing.T) {
 		time.Sleep(20 * time.Millisecond)
 	}
 	waitFor(t, "no run left", func() bool {
+		d.workflowMu.Lock()
+		defer d.workflowMu.Unlock()
+		return len(d.recordsLocked().Runs) == 0
+	})
+}
+
+// A workflow pinned to this computer's id is listed and runs; one pinned to another is
+// neither (#1404: a Mac's id is its hardware UUID, which the Go host never read).
+func TestAWorkflowPinnedHereRuns(t *testing.T) {
+	fakeRuntimes(t)
+	t.Setenv("AGENTS_MACHINE_ID", "")
+	d, c := start(t, t.TempDir())
+	defer d.Shutdown()
+	dir := project(t, c, 1)
+	folder := store.FolderURL(dir)
+	os.MkdirAll(workflowsFolder(dir), 0o755)
+	os.WriteFile(filepath.Join(workflowsFolder(dir), "here.md"), []byte("---\nname: Here\non: lease.granted\nhosts: ["+machine.ID()+"]\n---\nLook.\n"), 0o644)
+	os.WriteFile(filepath.Join(workflowsFolder(dir), "there.md"), []byte("---\nname: There\non: lease.granted\nhosts: [another-computer]\n---\nLook.\n"), 0o644)
+	approveAll(t, c, folder)
+	var list []wire.WorkflowSummary
+	json.Unmarshal(c.call(t, 2, "workflows/list", map[string]any{"folder": folder}), &list)
+	if len(list) != 1 || list[0].Workflow.WorkflowID != "here" {
+		t.Fatalf("%+v", list)
+	}
+	var s wire.WorkflowSummary
+	json.Unmarshal(c.call(t, 3, "workflows/run", map[string]any{"folder": folder, "workflowID": "here"}), &s)
+	if s.LastOutcome == nil || s.LastOutcome.Ran == nil {
+		t.Fatalf("%+v", s)
+	}
+	if e := c.callError(t, 4, "workflows/run", map[string]any{"folder": folder, "workflowID": "there"}); e.Code != wire.FailureNoSuchWorkflow {
+		t.Fatalf("%+v", e)
+	}
+	waitFor(t, "the run over", func() bool {
 		d.workflowMu.Lock()
 		defer d.workflowMu.Unlock()
 		return len(d.recordsLocked().Runs) == 0

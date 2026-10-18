@@ -16,6 +16,7 @@ import (
 
 	"github.com/alexec/agents/Go/internal/agentsd/diskjson"
 	"github.com/alexec/agents/Go/internal/agentsd/store"
+	"github.com/alexec/agents/Go/internal/machine"
 	"github.com/alexec/agents/Go/wire"
 )
 
@@ -99,21 +100,9 @@ func (d *Daemon) workflowBegan() string {
 	return filepath.Join(d.Store.Loc.Root, ".workflows.json.began")
 }
 
-// machineID is MachineID.current.
+// machineID is machine.ID, read once: the id a workflow's hosts name (#1404).
 func (d *Daemon) machineID() string {
-	d.machineIDOnce.Do(func() {
-		if v := strings.TrimSpace(os.Getenv("AGENTS_MACHINE_ID")); v != "" {
-			d.machineValue = v
-			return
-		}
-		for _, p := range []string{"/etc/machine-id", "/var/lib/dbus/machine-id"} {
-			if b, err := os.ReadFile(p); err == nil && strings.TrimSpace(string(b)) != "" {
-				d.machineValue = strings.TrimSpace(string(b))
-				return
-			}
-		}
-		d.machineValue, _ = os.Hostname()
-	})
+	d.machineIDOnce.Do(func() { d.machineValue = machine.ID() })
 	return d.machineValue
 }
 
