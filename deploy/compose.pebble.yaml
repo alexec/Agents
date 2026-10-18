@@ -4,13 +4,15 @@
 #
 #   deploy/pebble/up.sh            # then deploy/pebble/down.sh
 #
-# The domain is agents.127.0.0.1.sslip.io: public DNS answers 127.0.0.1 for it, so this Mac
-# reaches Caddy on 127.0.0.1:8444. Inside Docker the same name is Caddy, for Pebble's
-# challenge and for the devbox (up.sh puts it in the devbox's /etc/hosts).
+# The domain is agents.127.0.0.1.sslip.io, and the views name views.127.0.0.1.sslip.io (#1484):
+# public DNS answers 127.0.0.1 for both, so this Mac reaches Caddy on 127.0.0.1:8444. Inside
+# Docker the same names are Caddy, for Pebble's challenge and for the devbox (up.sh puts the
+# domain in the devbox's /etc/hosts).
 services:
   control:
     environment:
       AGENTS_CONTROL_URL: https://${AGENTS_DOMAIN}:8444
+      AGENTS_CONTROL_VIEWS_URL: https://${AGENTS_VIEWS_DOMAIN}:8444
 
   caddy:
     depends_on: [control, pebble]
@@ -20,7 +22,7 @@ services:
       RENEW_INTERVAL: ${RENEW_INTERVAL:-10m}
     networks:
       default:
-        aliases: ["${AGENTS_DOMAIN}"]
+        aliases: ["${AGENTS_DOMAIN}", "${AGENTS_VIEWS_DOMAIN}"]
     volumes:
       - ./pebble/acme.caddy:/etc/caddy/acme.d/pebble.caddy:ro
       - ./secrets/pebble-minica.pem:/etc/caddy/pebble-minica.pem:ro

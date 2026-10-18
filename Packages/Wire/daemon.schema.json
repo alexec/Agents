@@ -3311,6 +3311,10 @@
           "type": "string",
           "description": "Where a browser anywhere opens the page, on the control plane's own domain (#1459): its https address, when it serves the page there."
         },
+        "publicViews": {
+          "type": "string",
+          "description": "The origin of the sandbox proxy that draws MCP Apps views on the page at publicWeb (#1484): a second name in front of the same control plane. None when it draws no views there."
+        },
         "thisMacHost": {
           "$ref": "#/definitions/HostJoinStatus"
         },

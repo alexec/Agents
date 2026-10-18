@@ -23,8 +23,9 @@ copies](run-several-copies.md).
 - A Linux machine you rent, on x86-64 or ARM64, with Docker and Docker Compose. The
   smallest size a provider offers is plenty: 1 CPU and 1 GB of memory. The control plane
   runs no agents itself.
-- A domain you control, such as `example.com`, so that you can add a DNS record for a
-  name like `agents.example.com`.
+- A domain you control, such as `example.com`, so that you can add DNS records for two
+  names like `agents.example.com` and `views.example.com`. The second is where the web
+  page draws MCP Apps views.
 - An email address for Let's Encrypt to write to about the certificate.
 - A Google Cloud project with Cloud KMS turned on, and the `gcloud` command signed in to
   it. Cloud KMS keeps the key that seals the control plane's own key, so that key is never
@@ -50,13 +51,17 @@ copies](run-several-copies.md).
    with the machine's IPv4 address. If the machine has IPv6, add an **AAAA** record too.
    If it has no IPv6, add no AAAA record: Let's Encrypt prefers IPv6, and a record that
    reaches nothing makes the certificate fail.
-2. Check it from your Mac:
+2. Add the same records for the views name, such as `views.example.com`. The web page
+   draws MCP Apps views from this name, because a view must have an origin of its own,
+   apart from the page. A **CNAME** record to the first name is also correct.
+3. Check both from your Mac:
 
    ```sh
    dig +short agents.example.com
+   dig +short views.example.com
    ```
 
-   It prints the machine's address. Wait for that before you start Caddy: until the name
+   Each prints the machine's address. Wait for that before you start Caddy: until the name
    resolves, Let's Encrypt can't check it, and too many failed tries make it wait an hour.
 
 ### Make the key that seals the control plane's key
@@ -145,12 +150,15 @@ On your Mac, in the repository:
 
 On the machine, in the folder you copied to:
 
-1. Say the name and your email, in `deploy/.env`:
+1. Say the two names and your email, in `deploy/.env`:
 
    ```sh
    AGENTS_DOMAIN=agents.example.com
+   AGENTS_VIEWS_DOMAIN=views.example.com
    ACME_EMAIL=you@example.com
    ```
+
+   Caddy gets a certificate for each name.
 
 2. Start the control plane and Caddy:
 
@@ -275,9 +283,11 @@ plane at its address and get no notifications.
 - **The page and the control plane are one version.** The image builds the page from the
   same checkout, so an upgrade changes both. A browser that has the page open loads it
   again when it reconnects.
-- **MCP Apps views show only in the apps** and on the page Agents Host serves on a Mac. The
-  page on the domain has no second address to hold them apart from the page, so it says so
-  where a view would be.
+- **MCP Apps views on the page come from the views name.** At `views.example.com` the
+  control plane serves only the two files that hold a view (`/sandbox.html` and
+  `/sandbox.js`), and only the page may frame them. At `agents.example.com` it refuses
+  them. If the views name has no DNS record or no certificate, the page loads, but each
+  view stays empty.
 - **Don't set `AGENTS_CONTROL_PIN`** with a publicly trusted certificate. Caddy makes a
   new key at each renewal, so a pin would stop every window, phone and host from
   connecting after the first renewal.

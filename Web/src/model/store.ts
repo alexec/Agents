@@ -20,6 +20,7 @@ import type { FolderGoneAsk } from "./missingFolder";
 import { describe, methodNotFound } from "./errors";
 import { artifactsIn, withArtifactsOf, type Artifact } from "./artifacts";
 import { log } from "../log";
+import { knowPublicViews } from "../place";
 import { folderKey, projectFolder, projectView, type ProjectView } from "./groups";
 import { decideMacHostNotice, type MacHostNotice } from "./macHostNotice";
 import { DisplayBuilder, keepingTurns, storedTurn, turns, type ChatTurn, type Item } from "./turns";
@@ -1093,7 +1094,9 @@ export class Store extends Work {
   /** The control plane's status, for this Mac's host notice; a plane that can't say leaves it as it was. */
   private async loadPlane(): Promise<void> {
     const status = await this.link.call("control/status", {}).catch(() => null);
-    if (status) this.plane.value = { machineID: status.machineID, thisMacHost: status.thisMacHost };
+    if (!status) return;
+    this.plane.value = { machineID: status.machineID, thisMacHost: status.thisMacHost };
+    knowPublicViews(status.publicViews);
   }
 
   /** One load of a host at a time: `load` and `reloadHost` queue here rather than running together (#291). */

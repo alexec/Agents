@@ -11,6 +11,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
@@ -744,6 +745,64 @@ func TestPageOrigin(t *testing.T) {
 	for _, address := range []string{"http://agents.example.com", "https://", "nonsense"} {
 		if _, _, err := PageOrigin(address); err == nil {
 			t.Errorf("%s was taken", address)
+		}
+	}
+}
+
+// The page on the control plane's own domain draws views through the sandbox proxy at a
+// second name (#1484): the proxy's two files there only, under the view's own policy and
+// framed by the page only; the page frames that origin and nothing else.
+func TestThePublicPagesViewsAreAtTheViewsNameOnly(t *testing.T) {
+	p := &Public{origin: "https://agents.test:8444", host: "agents.test:8444",
+		viewsOrigin: "https://views.test:8444", viewsHost: "views.test:8444", files: testGate.files}
+	serve := func(method, host, uri string, upgrade bool) (*httptest.ResponseRecorder, bool) {
+		r := httptest.NewRequest(method, uri, nil)
+		r.Host = host
+		if upgrade {
+			r.Header.Set("Upgrade", "websocket")
+		}
+		w := httptest.NewRecorder()
+		return w, p.Serve(w, r)
+	}
+	w, ok := serve("GET", "Views.Test:8444", "/sandbox.html?csp=e30", false)
+	csp := w.Header().Get("Content-Security-Policy")
+	if !ok || w.Code != 200 || w.Body.String() != "<!doctype html>" ||
+		!strings.HasSuffix(csp, "; frame-ancestors https://agents.test:8444") || !strings.Contains(csp, "connect-src 'none'") ||
+		w.Header().Get("X-Frame-Options") != "" || w.Header().Get("Strict-Transport-Security") == "" {
+		t.Fatalf("sandbox.html: %v %d %v", ok, w.Code, w.Header())
+	}
+	if w, ok := serve("GET", "views.test:8444", "/sandbox.js", false); !ok || w.Code != 200 {
+		t.Fatalf("sandbox.js: %v %d", ok, w.Code)
+	}
+	if w, ok := serve("POST", "views.test:8444", "/sandbox.js", false); !ok || w.Code != 405 {
+		t.Fatalf("POST: %v %d", ok, w.Code)
+	}
+	// Nothing else at the views name, and no socket there.
+	for _, uri := range []string{"/", "/index.html", "/app.js", "/sandbox.html"} {
+		if _, ok := serve("GET", "views.test:8444", uri, uri == "/sandbox.html"); ok {
+			t.Errorf("%s answered at the views name", uri)
+		}
+	}
+	// The proxy's files are refused at the page's own name.
+	for _, uri := range []string{"/sandbox.html", "/sandbox.js"} {
+		if _, ok := serve("GET", "agents.test:8444", uri, false); ok {
+			t.Errorf("%s answered at the page's name", uri)
+		}
+	}
+	w, ok = serve("GET", "agents.test:8444", "/", false)
+	if page := w.Header().Get("Content-Security-Policy"); !ok || !strings.Contains(page, "frame-src https://views.test:8444;") {
+		t.Errorf("page CSP: %s", page)
+	}
+	if p.ViewsOrigin() != "https://views.test:8444" {
+		t.Error(p.ViewsOrigin())
+	}
+}
+
+// A views address must be https, and not the page's own origin.
+func TestTheViewsNameIsAnotherHTTPSOrigin(t *testing.T) {
+	for _, views := range []string{"http://views.test", "https://agents.test:8444/", "nonsense"} {
+		if _, err := NewPublic(t.TempDir(), "https://agents.test:8444", views); err == nil {
+			t.Errorf("%s was taken", views)
 		}
 	}
 }

@@ -318,6 +318,9 @@ func (m *Methods) status(from Caller) wire.ControlStatus {
 	m.mu.Unlock()
 	if m.s.page != nil {
 		status.PublicWeb = new(m.s.page.Address())
+		if views := m.s.page.ViewsOrigin(); views != "" {
+			status.PublicViews = new(views)
+		}
 	}
 	status.ThisMacHost = m.s.thisMacHost()
 	if m.s.tunnels != nil {

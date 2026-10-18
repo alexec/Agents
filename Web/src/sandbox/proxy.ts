@@ -1,12 +1,15 @@
 // The sandbox proxy (#187, MCP Apps SEP-1865 "Sandbox proxy"): the web page's view host draws
-// each view through this page, which the control plane serves only at the loopback address,
-// 127.0.0.1, a different origin from the page's own at localhost on the same port, framed only by that page and
-// under the view's own policy (LoopbackGate). It holds the view in an inner
+// each view through this page, which the control plane serves only at another origin than the
+// page's: on this Mac the loopback address, 127.0.0.1, where the page is at localhost on the same
+// port (LoopbackGate); on the control plane's own domain, a second name, views.<domain> (#1484).
+// It is framed only by that page and under the view's own policy. It holds the view in an inner
 // <iframe sandbox="allow-scripts"> (an opaque origin: nothing of this page's or the app's to
 // read) and carries messages both ways, except the spec's own sandbox-* ones, which it keeps.
+import { pageOrigin } from "../place";
 import { header, withPolicy, type Domains } from "./policy";
 
-const host = `http://localhost:${location.port}`;
+// None (a bad host) hears nothing and says nothing.
+const host = pageOrigin() ?? "null";
 let view: HTMLIFrameElement | null = null;
 
 type Message = { jsonrpc?: unknown; method?: unknown; params?: { html?: unknown; csp?: Domains } };

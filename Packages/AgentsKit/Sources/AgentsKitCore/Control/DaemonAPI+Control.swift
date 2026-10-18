@@ -145,6 +145,9 @@ public extension DaemonAPI {
         /// Where a browser anywhere opens the page, on the control plane's own domain
         /// (#1459): its https address. Nil when it serves no page there.
         public var publicWeb: String?
+        /// The origin of the sandbox proxy that draws MCP Apps views on that page (#1484): a
+        /// second name in front of the same control plane. Nil when it draws none there.
+        public var publicViews: String?
         /// This Mac's host, as it says its join stands (#113), when the control plane runs
         /// beside it: "Couldn't join the control plane: …". Nil elsewhere.
         public var thisMacHost: HostJoinStatus?

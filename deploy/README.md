@@ -44,17 +44,20 @@ docker compose -f deploy/compose.yaml exec -T cp1 /agents-control code --host
 ## At a real domain, with a public certificate
 
 `compose.public.yaml` runs one copy over a folder on the machine, with Caddy getting its
-certificate from Let's Encrypt (`auto_https` on) for `AGENTS_DOMAIN`:
+certificate from Let's Encrypt (`auto_https` on) for `AGENTS_DOMAIN` and for
+`AGENTS_VIEWS_DOMAIN`, the second name the web page's MCP Apps views are drawn at (#1484):
 
 ```sh
 scripts/build-linux-agentsd.sh               # the host that joining servers download
 deploy/make-secrets.sh --public --kms projects/P/locations/L/keyRings/R/cryptoKeys/K \
     --service-account sa.json
-AGENTS_DOMAIN=agents.example.com ACME_EMAIL=you@example.com \
-    docker compose -f deploy/compose.public.yaml up -d --build
+AGENTS_DOMAIN=agents.example.com AGENTS_VIEWS_DOMAIN=views.example.com \
+    ACME_EMAIL=you@example.com docker compose -f deploy/compose.public.yaml up -d --build
 ```
 
-The name must point at the machine, with ports 80 and 443 open. Codes carry no pin, and a
+Both names must point at the machine, with ports 80 and 443 open. At the views name the copy
+serves only the sandbox proxy (`/sandbox.html`, `/sandbox.js`), with the loopback proxy's
+headers and framed by the page only; at the page's name it refuses them. Codes carry no pin, and a
 renewal needs nothing from clients or hosts. Don't set `AGENTS_CONTROL_PIN` here: Caddy
 makes a new key at each renewal (058 research R15).
 

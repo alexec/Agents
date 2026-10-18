@@ -163,3 +163,28 @@ func TestABrowserThroughThePublicPage(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+// With a second name (#1484), the page frames the views' sandbox proxy there, and
+// control/status says where it is, for the page to draw views through.
+func TestThePublicPagesViewsName(t *testing.T) {
+	dist := t.TempDir()
+	index := []byte("<html></html>")
+	sum := sha256.Sum256(index)
+	os.WriteFile(filepath.Join(dist, "index.html"), index, 0o644)
+	os.WriteFile(filepath.Join(dist, "MANIFEST"), []byte("agents-web 1\nout "+hex.EncodeToString(sum[:])+" Web/dist/index.html\n"), 0o644)
+	s, err := New(Config{Store: store.NewMemory(), PrivateKey: controllink.NewPrivateKey(), URL: "https://agents.test:8444",
+		Bind: "127.0.0.1", Port: freePort(t), Name: "Test plane", PublicWeb: dist, PublicViews: "https://views.test:8444"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := httptest.NewRequest(http.MethodGet, "/", nil)
+	r.Host = "agents.test:8444"
+	w := httptest.NewRecorder()
+	s.serveHTTP(w, r)
+	if !strings.Contains(w.Header().Get("Content-Security-Policy"), "frame-src https://views.test:8444;") {
+		t.Fatal(w.Header())
+	}
+	if status := s.methods.status(Caller{}); status.PublicViews == nil || *status.PublicViews != "https://views.test:8444" {
+		t.Fatal(status.PublicViews)
+	}
+}
