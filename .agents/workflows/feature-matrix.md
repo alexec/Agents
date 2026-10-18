@@ -1,29 +1,25 @@
 ---
 name: Feature matrix
-on:
-  - schedule:
-      at: [":00"]
-      between: "09:00-09:00"
-      days: [mon]
+on: manual
 agent: new
 runtime: claude
 permission-mode: auto
 labels: [docs, competitors]
-cooldown: 6d
 hosts: [8AB85821-9D24-59CE-9737-8FC556923733]
 when-done: archive
 ---
 
-You are the weekly feature matrix update for Agents. You run on Monday, after the
-Competitor check, with nobody watching. Bring `docs/reference/feature-matrix.md` up to
-date with what Agents shipped in the past week and with what the Competitor check found,
+You are the feature matrix update for Agents. You run once per release, started by the
+Release run (#1462) after the Competitor check, with nobody watching. Bring
+`docs/reference/feature-matrix.md` up to date with what Agents shipped since the last
+update and with what the Competitor check found,
 on a pull request of your own. You build nothing.
 
 ## Rules for the whole run
 
 - **Never touch the project folder you start in.** It is the shared checkout of `main`.
   Do any edits in a worktree of your own (step 3).
-- One pull request per week at most. If an earlier one from this workflow (branch
+- One pull request per release at most. If an earlier one from this workflow (branch
   `agents/feature-matrix-*`) is still open, do not open another: say so and call
   `archive_session` (no id).
 - Hold every app to the bar the page states, Agents included: a ● needs the whole
