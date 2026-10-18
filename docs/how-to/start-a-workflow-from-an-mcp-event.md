@@ -80,8 +80,9 @@ and use `add_issue_comment` on the PR to say what you changed.
   ready for review. It takes the same filters and `anyone`. Drafts never raise it. The
   **Review pull requests** workflow in `.agents/workflows/` starts an agent on it that
   reads the diff and leaves one comment.
-- `checks.failed`, `pr.opened` and the issue events are raised only for the repo's owner,
-  members and collaborators, never a bot (#728). `anyone: true` raises them for everyone.
+- Every PR event and the issue events are raised only for the repo's owner, members and
+  collaborators, never a bot (#728). A PR event is raised only for a PR from a branch of the
+  repo itself, not a fork. `anyone: true` raises them for everyone.
 - Its issue events, `issue.opened`, `issue.labelled`, `issue.commented` and `issue.closed`,
   take `repo` (optional, as above) and `label`; all but `issue.opened` also take `issue`, by number.
   On `issue.labelled`, `label` is the label added: `{repo: alexec/Agents, label: bug}` hears

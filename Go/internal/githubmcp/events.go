@@ -35,8 +35,11 @@ var (
 	prProperty = property{name: "pr", kind: "integer", description: "Only this pull request, by number."}
 	// anyoneProperty opts into anyone's issue, comment or PR (#728); left out, only the repo's own people.
 	anyoneProperty = property{name: "anyone", kind: "boolean",
-		description: "true: from anyone, bots and people outside the repo too. Left out, only the repo's owner, members and collaborators, never a bot."}
+		description: "true: from anyone, bots, forks and people outside the repo too. Left out, only the repo's owner, members and collaborators, never a bot, and for a PR never one from a fork."}
 )
+
+// ownPRs is what every PR event says of whose PRs it raises.
+const ownPRs = " Only PRs from a branch of the repo itself, not a fork, by the repo's owner, members and collaborators, never a bot, unless anyone is true."
 
 func branchProperty(description string) property {
 	return property{name: "branch", kind: "string", description: description}
@@ -59,7 +62,7 @@ func prSchema(extra map[string]any) map[string]any {
 // events are the events this server offers, in CIWatcher's order.
 var events = append([]event{
 	{name: "checks.failed", title: "Checks failed",
-		description: "A pull request's checks finished with a failure: one event per run and attempt, so a rerun that fails again is a new one. Only PRs by the repo's owner, members and collaborators, unless anyone is true.",
+		description: "A pull request's checks finished with a failure: one event per run and attempt, so a rerun that fails again is a new one." + ownPRs,
 		input:       schema{repoProperty, branchProperty("Only runs on this PR branch."), prProperty, anyoneProperty},
 		payload: object(map[string]any{
 			"pr": prSchema(nil), "headSha": str,
@@ -67,18 +70,18 @@ var events = append([]event{
 			"failedJobs": map[string]any{"type": "array", "items": object(map[string]any{"name": str, "url": str})},
 		})},
 	{name: "pr.opened", title: "Pull request opened",
-		description: "A pull request was opened, or a draft was marked ready for review: a PR open and not a draft now that was not at the last poll. Drafts never count. Reopened, it is raised again. Only PRs by the repo's owner, members and collaborators, never a bot, unless anyone is true.",
+		description: "A pull request was opened, or a draft was marked ready for review: a PR open and not a draft now that was not at the last poll. Drafts never count. Reopened, it is raised again." + ownPRs,
 		input:       schema{repoProperty, branchProperty("Only the PR from this branch."), prProperty, anyoneProperty},
 		payload:     object(map[string]any{"pr": prSchema(map[string]any{"author": str}), "openedAt": str})},
-	{name: "pr.merged", title: "Pull request merged", description: "A pull request was merged.",
-		input:   schema{repoProperty, branchProperty("Only the PR from this branch."), prProperty},
+	{name: "pr.merged", title: "Pull request merged", description: "A pull request was merged." + ownPRs,
+		input:   schema{repoProperty, branchProperty("Only the PR from this branch."), prProperty, anyoneProperty},
 		payload: object(map[string]any{"pr": prSchema(nil), "mergedAt": str, "mergeSha": str})},
-	{name: "pr.closed", title: "Pull request closed", description: "A pull request was closed without being merged.",
-		input:   schema{repoProperty, branchProperty("Only the PR from this branch."), prProperty},
+	{name: "pr.closed", title: "Pull request closed", description: "A pull request was closed without being merged." + ownPRs,
+		input:   schema{repoProperty, branchProperty("Only the PR from this branch."), prProperty, anyoneProperty},
 		payload: object(map[string]any{"pr": prSchema(nil), "closedAt": str})},
 	{name: "pr.conflicted", title: "Pull request in conflict",
-		description: "An open pull request began to conflict with its base, so it cannot merge and its CI may not run until it is rebased. Once per conflict: it is raised again only after the PR merges cleanly and then conflicts anew.",
-		input:       schema{repoProperty, branchProperty("Only the PR from this branch."), prProperty},
+		description: "An open pull request began to conflict with its base, so it cannot merge and its CI may not run until it is rebased. Once per conflict: it is raised again only after the PR merges cleanly and then conflicts anew." + ownPRs,
+		input:       schema{repoProperty, branchProperty("Only the PR from this branch."), prProperty, anyoneProperty},
 		payload:     object(map[string]any{"pr": prSchema(nil), "conflictedAt": str})},
 }, issueEvents()...)
 
@@ -253,9 +256,11 @@ func (s *Events) Poll(ctx context.Context, raw json.RawMessage) (map[string]any,
 	case "pr.conflicted":
 		return s.pollDiff(ctx, e.name, "conflictedAt", a, p, func() ([]state, error) {
 			prs, err := s.GitHub.ConflictPRs(ctx, a.repo)
-			out := make([]state, len(prs))
-			for i, c := range prs {
-				out[i] = state{pr: c.PR, on: c.Conflicts, json: c.PR.json()}
+			var out []state
+			for _, c := range prs {
+				if a.anyone || c.Trusted {
+					out = append(out, state{pr: c.PR, on: c.Conflicts, json: c.PR.json()})
+				}
 			}
 			return out, err
 		})
@@ -491,11 +496,13 @@ func candidates(ctx context.Context, gh GitHub, name string, a args, since strin
 	if err != nil {
 		return nil, false, err
 	}
-	wanted := func(p PR) bool { return (a.pr == 0 || p.Number == a.pr) && (a.branch == "" || p.Branch == a.branch) }
+	wanted := func(p PR, trusted bool) bool {
+		return (a.pr == 0 || p.Number == a.pr) && (a.branch == "" || p.Branch == a.branch) && (a.anyone || trusted)
+	}
 	var list []candidate
 	if name == "pr.merged" {
 		for _, m := range merged {
-			if at := normalized(m.MergedAt); wanted(m.PR) && at != "" {
+			if at := normalized(m.MergedAt); wanted(m.PR, m.Trusted) && at != "" {
 				list = append(list, candidate{eventID: fmt.Sprintf("pr.merged:%s:%d", repo, m.PR.Number), time: at,
 					data: func() (map[string]any, error) {
 						return map[string]any{"pr": m.PR.json(), "mergedAt": m.MergedAt, "mergeSha": m.MergeSHA}, nil
@@ -506,7 +513,7 @@ func candidates(ctx context.Context, gh GitHub, name string, a args, since strin
 	}
 	// Its close time in the id: a PR reopened and closed again is a new event.
 	for _, c := range closed {
-		if at := normalized(c.ClosedAt); wanted(c.PR) && at != "" {
+		if at := normalized(c.ClosedAt); wanted(c.PR, c.Trusted) && at != "" {
 			list = append(list, candidate{eventID: fmt.Sprintf("pr.closed:%s:%d:%s", repo, c.PR.Number, c.ClosedAt), time: at,
 				data: func() (map[string]any, error) {
 					return map[string]any{"pr": c.PR.json(), "closedAt": c.ClosedAt}, nil
