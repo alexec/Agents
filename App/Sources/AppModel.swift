@@ -942,6 +942,10 @@ final class AppModel {
         return hosts.client(for: host) ?? Self.unreachable
     }
 
+    /// This Mac's host as the control plane last listed it (#1481), read once at launch.
+    @ObservationIgnored private var keptHost: DaemonAPI.ControlHost? =
+        AppModel.controlKey.flatMap { KeptThisMacHost.read(controlKey: $0, from: WindowDefaults.store) }
+
     /// The host on this Mac the window last reached directly, over its local socket, rather
     /// than through the control plane (#1118): it is still reached with the control plane away.
     private(set) var directHost: HostID?
@@ -977,7 +981,8 @@ final class AppModel {
 
     /// The host on this Mac, when there is one. `.mac` until the window has a control plane.
     var thisMacHostID: HostID? {
-        ThisMacHost.resolve(controlPlaneHosts) ?? directHost
+        if !controlPlaneListed, let kept = keptHost { return kept.id }
+        return ThisMacHost.resolve(controlPlaneHosts) ?? directHost
     }
 
     /// Whether this window may read `host`'s folders off this disk (058, R11).
@@ -1037,13 +1042,20 @@ final class AppModel {
     var controlPlaneAway: Bool { controlLink != nil && controlPlaneMissed && !controlPlaneReachable }
 
     /// Frame H's sentence, naming where the window expected the control plane.
+    /// This Mac's host answers directly, over its local socket: `.mac` through `client`, or,
+    /// with a control plane elsewhere, the host of its own id (#1481).
+    private var reachesThisMacDirectly: Bool {
+        guard let directHost else { return false }
+        return directHost == .mac ? isConnected : hosts.controlled[directHost]?.online == true
+    }
+
     var controlPlaneAwayLine: String? {
         guard controlPlaneAway else { return nil }
         switch ControlConfig.endpoint {
         case .remote(let membership):
             return HostProblem.controlPlaneUnreachable(name: membership.name,
                                                        address: membership.url ?? membership.addresses.first ?? "no address",
-                                                       thisMacDirect: directHost != nil && isConnected)
+                                                       thisMacDirect: reachesThisMacDirectly)
         case nil:
             return nil
         }
@@ -2605,6 +2617,7 @@ final class AppModel {
         guard let link = ControlConfig.link(endpoint) else { return }
         controlLink = link
         client = DaemonClient(link: hostLink(.mac, through: link))
+        keptHost = nil
         // Made with the client just replaced, they would ask it for ever (#62).
         serverFilesByHost[.mac] = nil
         serverPicturesByHost[.mac] = nil
@@ -2632,6 +2645,8 @@ final class AppModel {
         controlPlaneReachable = false
         controlPlaneMissed = false
         directHost = nil
+        keptHost = nil
+        KeptThisMacHost.forget(in: WindowDefaults.store)
         client = DaemonClient(link: UnreachableLink())
         isConnected = false
     }
@@ -2920,6 +2935,8 @@ final class AppModel {
             let control = DaemonClient(link: controlLink.controlLink)
             self?.controlRequests = control
             while !Task.isCancelled {
+                // Before the list comes, and while the control plane stays away (#1481).
+                await self?.reachKeptHost(controlLink)
                 backoff.trying()
                 if (try? await control.connect(startIfNeeded: false, timeout: .seconds(3))) != nil {
                     backoff.connected()
@@ -3090,6 +3107,10 @@ final class AppModel {
               let status = try? await control.call(DaemonAPI.Method.controlStatus, returning: DaemonAPI.ControlStatus.self)
         else { return }
         controlPlaneHosts = listed
+        if let controlKey = Self.controlKey {
+            KeptThisMacHost.keep(from: listed, controlKey: controlKey, in: WindowDefaults.store)
+            keptHost = KeptThisMacHost.read(controlKey: controlKey, from: WindowDefaults.store)
+        }
         // An ask no longer waiting may be asked again later, once taken back (#1122).
         gitAsksAnswered.formIntersection(GitLendAsk.waiting(in: listed))
         controlPlaneListed = true
@@ -3103,30 +3124,7 @@ final class AppModel {
         hosts.controlled = Dictionary(uniqueKeysWithValues: others.map { ($0.id, (label: $0.name, online: $0.state == "online")) })
         hosts.controlRows = Dictionary(uniqueKeysWithValues: others.map { ($0.id, $0) })
         for host in others where host.state == "online" {
-            let server = controlHosts[host.id]
-                ?? DaemonClient(link: hostLink(host.id, through: controlLink, onThisMac: host.machineID == MachineID.current))
-            controlHosts[host.id] = server
-            guard await !server.isConnected else { continue }
-            guard (try? await server.connect(startIfNeeded: false, timeout: .seconds(5))) != nil else { continue }
-            let id = host.id
-            await server.setCredentialLender { [weak self] wanted in
-                await self?.answerCredentialWanted(wanted, on: id) ?? false
-            }
-            _ = try? await server.call(DaemonAPI.Method.credentialsOffer, credentialOffer(id))
-            let shown = work.shown
-            Task.detached(priority: .userInitiated) { [weak self] in
-                for await note in server.notifications() {
-                    // Read here, off the main actor, and applied there (#203).
-                    let update = AgentsModel.read(note.method, note.params, showing: shown.id, alsoShowing: shown.also)
-                    await self?.receivedFromServer(id, note.method, note.params, update)
-                }
-            }
-            await refreshServer(id)
-            await reattachShells(on: id)
-            // Presence starts with this Mac's host; a control plane with none starts it
-            // with its first other host.
-            startPresence()
-            presence?.connected()
+            await reach(host, through: controlLink)
         }
         // One offline or stopped when this window started lists what it last did, greyed, as
         // one that went while it ran (#962).
@@ -3142,6 +3140,57 @@ final class AppModel {
             await controlHosts.removeValue(forKey: id)?.disconnect()
             work.replaceProjects([], from: id)
             work.replaceAgents([], from: id)
+        }
+    }
+
+    /// A client for one of the control plane's hosts, connected: first directly over its
+    /// local socket when it is on this Mac (#1118), else through the control plane.
+    private func reach(_ host: DaemonAPI.ControlHost, through controlLink: ControlLink) async {
+        let server = controlHosts[host.id]
+            ?? DaemonClient(link: hostLink(host.id, through: controlLink, onThisMac: host.machineID == MachineID.current))
+        controlHosts[host.id] = server
+        guard await !server.isConnected else { return }
+        guard (try? await server.connect(startIfNeeded: false, timeout: .seconds(5))) != nil else { return }
+        let id = host.id
+        await server.setCredentialLender { [weak self] wanted in
+            await self?.answerCredentialWanted(wanted, on: id) ?? false
+        }
+        _ = try? await server.call(DaemonAPI.Method.credentialsOffer, credentialOffer(id))
+        let shown = work.shown
+        Task.detached(priority: .userInitiated) { [weak self] in
+            for await note in server.notifications() {
+                // Read here, off the main actor, and applied there (#203).
+                let update = AgentsModel.read(note.method, note.params, showing: shown.id, alsoShowing: shown.also)
+                await self?.receivedFromServer(id, note.method, note.params, update)
+            }
+        }
+        await refreshServer(id)
+        await reattachShells(on: id)
+        // Presence starts with this Mac's host; a control plane with none starts it
+        // with its first other host.
+        startPresence()
+        presence?.connected()
+    }
+
+    /// The control plane's key, with a control plane elsewhere.
+    private static var controlKey: Data? {
+        guard case .remote(let membership)? = ControlConfig.endpoint else { return nil }
+        return membership.controlKey
+    }
+
+    /// This Mac's host as the control plane last listed it (#1481): reached at launch over
+    /// its local socket, before the list comes, so its agents work with the control plane
+    /// away. Tried again while the control plane stays away, until it answers.
+    private func reachKeptHost(_ controlLink: ControlLink) async {
+        guard !controlPlaneListed, let kept = keptHost else { return }
+        if let server = controlHosts[kept.id], await server.isConnected { return }
+        if hosts.controlled[kept.id] == nil {
+            hosts.controlled[kept.id] = (label: kept.name, online: false)
+            hosts.controlRows[kept.id] = kept
+        }
+        await reach(kept, through: controlLink)
+        if let server = controlHosts[kept.id], await server.isConnected {
+            hosts.controlled[kept.id] = (label: kept.name, online: true)
         }
     }
 
