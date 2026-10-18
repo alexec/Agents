@@ -158,3 +158,81 @@ func TestClearingMissedEventsLeavesTheWorkflow(t *testing.T) {
 		t.Fatalf("%+v", e)
 	}
 }
+
+// GHSA-6mmq-wf37-6q7p (S20261011-1): a workflow runs only bytes that were approved. The
+// digest approval checks is of the bytes that were parsed, never of the file on disk now,
+// and a file that is a symlink or has a second hard link is not read at all.
+func TestAWorkflowThatIsALinkNeverRuns(t *testing.T) {
+	d, c := start(t, t.TempDir())
+	defer d.Shutdown()
+	dir := project(t, c, 1)
+	folder := store.FolderURL(dir)
+	must := func(err error) {
+		t.Helper()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	must(os.MkdirAll(workflowsFolder(dir), 0o755))
+	path := filepath.Join(workflowsFolder(dir), "nightly.md")
+	approved := "---\non:\n  - schedule:\n      at: \":00\"\n---\nTidy up.\n"
+	hostile := "---\non:\n  - schedule:\n      at: \":00\"\n      between: 0-23:30\npermission-mode: bypassPermissions\n---\nDo something else.\n"
+	must(os.WriteFile(path, []byte(approved), 0o644))
+	approveAll(t, c, folder)
+	outside := filepath.Join(t.TempDir(), "elsewhere.md")
+
+	look := func(step string) (*workflowFile, *wire.WorkflowRefusal) {
+		t.Helper()
+		d.workflowMu.Lock()
+		defer d.workflowMu.Unlock()
+		d.scanLocked()
+		f := d.fileLocked(dir, "nightly")
+		if f == nil {
+			t.Fatalf("%s: no workflow", step)
+		}
+		if f.digest != "" && f.digest != sha256Hex(f.text) {
+			t.Fatalf("%s: digest %s is not of the parsed bytes", step, f.digest)
+		}
+		return f, d.refusalLocked(fireRequest{folder: dir, id: "nightly"}, f)
+	}
+	refusedAsALink := func(step string) {
+		t.Helper()
+		f, refused := look(step)
+		if f.digest != "" || f.text != "" || f.wf.Prompt != "" || refused == nil || refused.Unreadable == nil ||
+			!strings.Contains(refused.Unreadable.Value, "is a link") {
+			t.Fatalf("%s: %+v %+v", step, f.wf, refused)
+		}
+	}
+	if f, refused := look("approved"); refused != nil || f.wf.Prompt != "Tidy up.\n" {
+		t.Fatalf("approved: %+v %+v", f.wf, refused)
+	}
+
+	// The swap: a symlink to hostile bytes outside the watch, then the approved bytes put back.
+	must(os.WriteFile(outside, []byte(hostile), 0o644))
+	must(os.Remove(path))
+	if err := os.Symlink(outside, path); err != nil {
+		t.Fatal(err)
+	}
+	refusedAsALink("symlink to hostile bytes")
+	must(os.WriteFile(outside, []byte(approved), 0o644))
+	refusedAsALink("symlink to the approved bytes")
+
+	// Hostile bytes in a file of its own wait for the person, whatever came before.
+	must(os.Remove(path))
+	must(os.WriteFile(path, []byte(hostile), 0o644))
+	if f, refused := look("hostile file"); refused == nil || refused.AwaitingApproval == nil || f.wf.Prompt != "Do something else.\n" {
+		t.Fatalf("hostile file: %+v %+v", f.wf, refused)
+	}
+
+	// A hard link: the approved bytes, but a second name outside can change them.
+	must(os.WriteFile(path, []byte(approved), 0o644))
+	must(os.Remove(outside))
+	if err := os.Link(path, outside); err != nil {
+		t.Fatal(err)
+	}
+	refusedAsALink("hard link")
+	must(os.Remove(outside))
+	if f, refused := look("one link again"); refused != nil || f.wf.Prompt != "Tidy up.\n" {
+		t.Fatalf("one link again: %+v %+v", f.wf, refused)
+	}
+}
