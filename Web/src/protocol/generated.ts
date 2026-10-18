@@ -472,6 +472,30 @@ export interface BranchSummary {
   remote?: string;
 }
 
+/**
+ * What projects/bringBack did (#1473): the branches that moved forward or were made, and whether
+ * the uncommitted changes were applied.
+ */
+export interface BringBack {
+  moved: string[];
+  applied: boolean;
+}
+
+/**
+ * Brings a host's branches back into this Mac's repository at `folder` (Bring back from ‹host›…,
+ * #1473): fetches the `bundle` upload, moves `branches` forward only, also where a worktree has one
+ * checked out, and applies the `patch` upload (the host's uncommitted changes) in `folder`, whose
+ * checked-out branch must be `patchOn`. It stops, and changes nothing, when a branch here has
+ * commits of its own or a worktree with a branch that moves has uncommitted changes.
+ */
+export interface BringBackRequest {
+  folder: URLString;
+  bundle?: UUID;
+  patch?: UUID;
+  patchOn?: string;
+  branches: SentBranch[];
+}
+
 export interface BuildOutputRemoved {
   removed: string[];
   freed: WorktreeSize;
@@ -4444,6 +4468,8 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   BackgroundItem: { required: ["id", "kind", "name", "state", "canStop", "isStopping", "startedAt"], optional: ["taskType", "detail", "command", "parentID", "toolCallID", "outputFilePath", "summary", "lastToolName", "endedAt"] },
   Block: { required: ["waits"], optional: ["checkAgainAt", "wakeOn", "clearedAt", "clearedBy"] },
   BranchSummary: { required: ["name"], optional: ["remote"] },
+  BringBack: { required: ["moved", "applied"], optional: [] },
+  BringBackRequest: { required: ["folder", "branches"], optional: ["bundle", "patch", "patchOn"] },
   BuildOutputRemoved: { required: ["removed", "freed"], optional: [] },
   CancelWaitRequest: { required: ["agentID"], optional: [] },
   CarriedSetting: { required: ["optionID", "name", "source"], optional: ["from", "to"] },

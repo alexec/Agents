@@ -529,6 +529,21 @@ type BranchSummary struct {
 	Remote *string `json:"remote,omitzero"`
 }
 
+// What projects/bringBack did (#1473): the branches that moved forward or were made, and whether the uncommitted changes were applied.
+type BringBack struct {
+	Moved   []string `json:"moved"`
+	Applied bool     `json:"applied"`
+}
+
+// Brings a host's branches back into this Mac's repository at `folder` (Bring back from ‹host›…, #1473): fetches the `bundle` upload, moves `branches` forward only, also where a worktree has one checked out, and applies the `patch` upload (the host's uncommitted changes) in `folder`, whose checked-out branch must be `patchOn`. It stops, and changes nothing, when a branch here has commits of its own or a worktree with a branch that moves has uncommitted changes.
+type BringBackRequest struct {
+	Folder   URL          `json:"folder"`
+	Bundle   *UUID        `json:"bundle,omitzero"`
+	Patch    *UUID        `json:"patch,omitzero"`
+	PatchOn  *string      `json:"patchOn,omitzero"`
+	Branches []SentBranch `json:"branches"`
+}
+
 type BuildOutputRemoved struct {
 	Removed []string     `json:"removed"`
 	Freed   WorktreeSize `json:"freed"`

@@ -550,6 +550,24 @@
     "checkout": "main",
     "origin": "git@github.com:example/hello.git"
   },
+  "BringBackRequest": {
+    "folder": "file:///Users/me/hello/",
+    "bundle": "6F0E1C2A-3B4D-4E5F-8A9B-0C1D2E3F4A5B",
+    "patch": "6F0E1C2A-3B4D-4E5F-8A9B-0C1D2E3F4A5B",
+    "patchOn": "main",
+    "branches": [
+      {
+        "name": "main",
+        "commit": "0123456789abcdef0123456789abcdef01234567"
+      }
+    ]
+  },
+  "BringBack": {
+    "moved": [
+      "main"
+    ],
+    "applied": true
+  },
   "SendFactsRequest": {
     "folder": "file:///Users/me/hello/"
   },

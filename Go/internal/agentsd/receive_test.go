@@ -202,3 +202,94 @@ func TestSendToAFolderInTheWay(t *testing.T) {
 		t.Fatal("left behind")
 	}
 }
+
+// Bring back from ‹host›… (#1473): the host's commits come back to the Mac's branches,
+// forward only, also where a branch is checked out; the host's uncommitted changes come
+// back only when asked; the Mac's own changes or commits stop it with nothing changed.
+func TestBringBackFromHost(t *testing.T) {
+	d, c := start(t, t.TempDir())
+	defer d.Shutdown()
+	src := repo(t)
+	os.WriteFile(filepath.Join(src, "README.md"), []byte("hello\n"), 0o644)
+	sendGit(t, src, nil, "add", "-A")
+	sendGit(t, src, nil, "commit", "-q", "-m", "readme")
+	dest := filepath.Join(canonical(t.TempDir()), "hello")
+	m, _ := macSend(t, c, src, nil, false, "main")
+	m["folder"], m["checkout"] = dest, "main"
+	c.call(t, 1, "projects/receive", m)
+
+	// Work on the host: a commit on main, a new branch and a change not committed.
+	host := []string{"GIT_AUTHOR_NAME=H", "GIT_AUTHOR_EMAIL=h@example.com", "GIT_COMMITTER_NAME=H", "GIT_COMMITTER_EMAIL=h@example.com"}
+	os.WriteFile(filepath.Join(dest, "README.md"), []byte("hello from the host\n"), 0o644)
+	sendGit(t, dest, host, "commit", "-q", "-am", "host work")
+	sendGit(t, dest, host, "branch", "other")
+	hostHead := sendGit(t, dest, nil, "rev-parse", "HEAD")
+	os.WriteFile(filepath.Join(dest, "wip.txt"), []byte("not committed\n"), 0o644)
+
+	macHeads := func() []string {
+		var s wire.ReceiveState
+		json.Unmarshal(c.call(t, 2, "projects/receiveState", map[string]any{"folder": src}), &s)
+		return s.Heads
+	}
+	back := func(changes bool, branches ...string) map[string]any {
+		m, _ := macSend(t, c, dest, macHeads(), changes, branches...)
+		m["folder"] = store.FolderURL(src)
+		if changes {
+			m["patchOn"] = "main"
+		}
+		return m
+	}
+	var done wire.BringBack
+	json.Unmarshal(c.call(t, 10, "projects/bringBack", back(false, "main", "other")), &done)
+	if strings.Join(done.Moved, ",") != "main,other" || done.Applied {
+		t.Fatalf("%+v", done)
+	}
+	if got := sendGit(t, src, nil, "rev-parse", "main", "other"); got != hostHead+"\n"+hostHead {
+		t.Fatal(got)
+	}
+	if b, _ := os.ReadFile(filepath.Join(src, "README.md")); string(b) != "hello from the host\n" {
+		t.Fatalf("readme %q", b)
+	}
+	if got := sendGit(t, src, nil, "status", "--porcelain"); got != "" {
+		t.Fatalf("status %q", got)
+	}
+	if got := sendGit(t, src, nil, "for-each-ref", "refs/agents-back"); got != "" {
+		t.Fatal(got)
+	}
+
+	// Again, with the uncommitted changes: nothing moves, the patch applies.
+	json.Unmarshal(c.call(t, 20, "projects/bringBack", back(true, "main")), &done)
+	if len(done.Moved) != 0 || !done.Applied {
+		t.Fatalf("%+v", done)
+	}
+	if b, _ := os.ReadFile(filepath.Join(src, "wip.txt")); string(b) != "not committed\n" {
+		t.Fatalf("wip %q", b)
+	}
+
+	// The Mac's own change, where main is checked out, stops the next one.
+	sendGit(t, dest, host, "commit", "-q", "--allow-empty", "-m", "more host work")
+	macHead := sendGit(t, src, nil, "rev-parse", "HEAD")
+	if msg := c.callErr(t, 30, "projects/bringBack", back(false, "main")); !strings.Contains(msg, "uncommitted changes") {
+		t.Fatal(msg)
+	}
+	if got := sendGit(t, src, nil, "rev-parse", "HEAD"); got != macHead {
+		t.Fatal(got)
+	}
+	if _, err := os.Stat(filepath.Join(src, "wip.txt")); err != nil {
+		t.Fatal("the Mac's change was lost")
+	}
+
+	// A commit of the Mac's own on main stops it too.
+	sendGit(t, src, nil, "add", "-A")
+	sendGit(t, src, nil, "commit", "-q", "-m", "mac work")
+	macHead = sendGit(t, src, nil, "rev-parse", "HEAD")
+	if msg := c.callErr(t, 40, "projects/bringBack", back(false, "main")); !strings.Contains(msg, "commits of its own") {
+		t.Fatal(msg)
+	}
+	if got := sendGit(t, src, nil, "rev-parse", "HEAD"); got != macHead {
+		t.Fatal(got)
+	}
+	if entries, _ := os.ReadDir(d.incomingFolder()); len(entries) != 0 {
+		t.Fatalf("uploads left: %d", len(entries))
+	}
+}

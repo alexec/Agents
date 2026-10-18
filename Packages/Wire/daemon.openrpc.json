@@ -2885,6 +2885,25 @@
       }
     },
     {
+      "name": "projects/bringBack",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/BringBackRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/BringBack"
+        }
+      }
+    },
+    {
       "name": "projects/sendFacts",
       "paramStructure": "by-name",
       "params": [

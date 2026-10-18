@@ -207,6 +207,8 @@ struct WireSchemaTests {
             "ReceiveUploadRequest": Self.through(DaemonAPI.ReceiveUploadRequest.self),
             "SentBranch": Self.through(DaemonAPI.SentBranch.self),
             "ReceiveRequest": Self.through(DaemonAPI.ReceiveRequest.self),
+            "BringBackRequest": Self.through(DaemonAPI.BringBackRequest.self),
+            "BringBack": Self.through(DaemonAPI.BringBack.self),
             "SendFactsRequest": Self.through(DaemonAPI.SendFactsRequest.self),
             "SendFacts": Self.through(DaemonAPI.SendFacts.self),
             "SendPackRequest": Self.through(DaemonAPI.SendPackRequest.self),

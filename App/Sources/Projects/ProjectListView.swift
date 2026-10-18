@@ -294,6 +294,7 @@ struct ProjectListView: View {
             if let project = requests.dropboxProject { DropboxSheet(project: project).paperSheet() }
         }
         .sendToHostSheet(requests)
+        .bringBackSheet(requests)
         // The sheet Settings ▸ Control plane ▸ Add a Server… shows (#503).
         .sheet(isPresented: Binding(get: { addingServer != nil }, set: { if !$0 { addingServer = nil } })) {
             if let control = addingServer {
@@ -735,6 +736,13 @@ private struct ProjectMenu: View {
             ForEach(model.sendTargets, id: \.self) { host in
                 Button("Send to \(model.hosts.label(host))…") {
                     requests.sendToHost = SendToHostRequest(folder: summary.folder, from: summary.host, host: host)
+                }
+                .disabled(!summary.exists)
+            }
+            // The server's branches, brought back into this Mac's repository (#1473).
+            ForEach(model.sendTargets, id: \.self) { host in
+                Button("Bring Back from \(model.hosts.label(host))…") {
+                    requests.bringBackFromHost = BringBackFromHostRequest(folder: summary.folder, from: summary.host, host: host)
                 }
                 .disabled(!summary.exists)
             }

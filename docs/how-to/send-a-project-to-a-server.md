@@ -1,7 +1,7 @@
 ---
 diataxis: how-to
 devices: [mac, server]
-description: Send a repository on this Mac to a server, with its unpushed branches and uncommitted changes, and add it there as a project.
+description: Send a repository on this Mac to a server, with its unpushed branches and uncommitted changes, add it there as a project, and bring the server's work back.
 ---
 
 # Send a project to a server
@@ -50,6 +50,32 @@ A send never overwrites work done on the server. The send stops, and changes not
   then send again;
 - a branch on the server has commits of its own that this Mac does not have.
 
+## Bring the work back
+
+Work done on the server does not come to this Mac until you push it, or bring it back.
+**Bring Back from ‹server›…** brings the server's branches into the repository on this Mac.
+
+1. Right-click the project, or the worktree on **Activity ▸ Worktrees**, and choose
+   **Bring Back from ‹server›…**.
+2. Check **Folder on ‹server›**. It is `~/‹name of the project›` at first: the folder that
+   the send made. Press Return after you change it.
+3. Choose the branches to bring back. The branch that is checked out on the server is chosen
+   at first. A branch that this Mac does not have is made.
+4. To bring back the changes that are not committed on the server too, turn on
+   **Include uncommitted changes from ‹server›**. It is off at first. The changes come back
+   only to a folder that has the same branch checked out, and that folder must have no
+   uncommitted changes.
+5. Click **Bring Back**. The sheet says which branches moved forward.
+
+Only the commits that this Mac does not have come back. A branch moves forward only, also
+in a worktree that has it checked out. A bring back never overwrites work done on this Mac.
+It stops, and changes nothing, when:
+
+- a branch on this Mac has commits of its own that the server does not have. Merge or
+  rebase on the server, or push and pull, then bring back again;
+- a branch that must move is checked out in a folder on this Mac with uncommitted changes.
+  Commit them or remove them, then bring back again.
+
 ## How it works
 
 This Mac's host makes a `git bundle` of the branches, without the commits that the server
@@ -58,3 +84,8 @@ the index of your repository does not change. The window sends both to the serve
 of 8 MB, over the connection it already has to the server through the control plane. The
 server fetches from the bundle, moves each branch forward (never back), checks out the
 branch, applies the patch and adds the folder as a project.
+
+A bring back is the same in reverse: the server makes the bundle, without the commits that
+this Mac has, and the patch. This Mac's host fetches from the bundle and moves each branch
+forward. Where a branch is checked out, it moves with a fast-forward merge, so the files
+there change with it.
