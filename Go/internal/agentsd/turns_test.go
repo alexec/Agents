@@ -88,9 +88,13 @@ func (f *fakeRuntime) ResumeSession(_ context.Context, r sdk.ResumeSessionReques
 	return sdk.ResumeSessionResponse{}, nil
 }
 
-// NewSession in a folder called offers offers a model, and a command a moment after.
+// NewSession in a folder called offers offers a model, and a command a moment after; in
+// one called signedout it wants a sign-in, as Cursor, Gemini and Antigravity do (#1430).
 func (f *fakeRuntime) NewSession(_ context.Context, r sdk.NewSessionRequest) (sdk.NewSessionResponse, error) {
 	var out sdk.NewSessionResponse
+	if filepath.Base(r.Cwd) == "signedout" {
+		return out, &sdk.RequestError{Code: authRequired, Message: "Authentication required"}
+	}
 	b, _ := json.Marshal(r.Meta)
 	f.sandboxOff = strings.Contains(string(b), `"sandbox":{"enabled":false}`)
 	if filepath.Base(r.Cwd) != "offers" {
@@ -345,6 +349,58 @@ func TestAStartInAFolderThatIsNotThere(t *testing.T) {
 			}
 			return
 		}
+	}
+}
+
+// A runtime with no sign-in ends the turn as not signed in, not as a crash, and its
+// account says so (#1430).
+func TestAStartWithNoSignIn(t *testing.T) {
+	fakeRuntimes(t)
+	d, c := start(t, t.TempDir())
+	defer d.Shutdown()
+	folder := filepath.Join(t.TempDir(), "signedout")
+	os.Mkdir(folder, 0o755)
+	var id wire.UUID
+	json.Unmarshal(c.call(t, 1, "agents/start", map[string]any{"runtimeID": "cursor", "cwd": "file://" + folder, "prompt": "hi"}), &id)
+	c.until(t, "stopped", ended(id, wire.AgentStateStopped))
+	if a := d.Store.Agent(id); a.EndedReason == nil || *a.EndedReason != wire.EndedReasonSignInRefused {
+		t.Fatalf("%+v", a.EndedReason)
+	}
+	entries, _, _ := d.Store.Transcript(id, 0)
+	said := false
+	for _, e := range entries {
+		said = said || e.Kind.Notice != nil && e.Kind.Notice.Value.Title == "Cursor is not signed in"
+	}
+	if !said {
+		t.Fatal(kinds(d, id))
+	}
+	for _, a := range d.runtimeAccounts() {
+		if a.RuntimeID == "cursor" && a.State != wire.RuntimeAccountStateNeedsSignIn {
+			t.Fatal(a.State)
+		}
+	}
+}
+
+// Antigravity gets its own home in the root and the switches Swift gave it (049 D8).
+func TestAntigravityLaunchesInItsOwnHome(t *testing.T) {
+	fakeRuntimes(t)
+	t.Setenv("GEMINI_API_KEY", "not-for-antigravity")
+	root := t.TempDir()
+	d, _ := start(t, root)
+	defer d.Shutdown()
+	l, err := d.launchFor(runtimeByID("antigravity"), t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	env := strings.Join(l.Env, "\n")
+	for _, want := range []string{"GEMINI_HOME=" + filepath.Join(root, "runtimes", "antigravity", "home"),
+		"AGY_ACP_DISABLE_WORKSPACE_TRUST=1", "AGY_ACP_FORCE_FILE_STORAGE=1"} {
+		if !strings.Contains(env, want) {
+			t.Fatalf("no %s in\n%s", want, env)
+		}
+	}
+	if strings.Contains(env, "GEMINI_API_KEY") {
+		t.Fatal(env)
 	}
 }
 

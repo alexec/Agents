@@ -289,6 +289,12 @@ func (d *Daemon) launchFor(r *runtimeDef, dir string) (acp.Launch, error) {
 			env = append(env, "CODEX_HOME="+filepath.Join(root, "runtimes", "codex-relay-home"), "CODEX_CA_CERTIFICATE="+rl.caFile)
 		}
 		env = append(env, "NO_BROWSER=1")
+	case "antigravity":
+		// RuntimeLaunch.antigravity (049 D8): its own home in the root, never the person's
+		// ~/.gemini; the agent's folder trusted for this process; the Google sign-in as a
+		// file under that home, not a Keychain item. Neither Gemini key is in env.
+		env = append(env, "GEMINI_HOME="+d.appHomes()["antigravity"], "AGY_ACP_DISABLE_WORKSPACE_TRUST=1",
+			"AGY_ACP_FORCE_FILE_STORAGE=1")
 	}
 	return acp.Launch{Command: path, Args: args, Env: env, Dir: dir}, nil
 }
