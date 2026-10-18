@@ -47,6 +47,9 @@ type projectWatchState struct {
 	pwWatches    map[string]*folderWatch
 	pwKicked     bool
 	pwStopped    bool
+	// pwBusy is what a watch or its timers is doing now: stopProjectWatches waits for it, so
+	// nothing writes into the root after the host is gone.
+	pwBusy       sync.WaitGroup
 	branchTimers map[string]*time.Timer
 	// branchCheckMu makes each checkBranches read and write the tips in one go: two at once
 	// (the first seed and a move) let the one that read first write its older tips last, and
@@ -185,15 +188,29 @@ func (d *Daemon) stopProjectWatches() {
 	for _, w := range ws {
 		w.stop()
 	}
+	d.pwBusy.Wait()
+}
+
+// pwEnter starts a piece of watch work, unless the watches are stopped; pwBusy.Done ends it.
+// Holds pwMu while it adds, so no work starts once stopProjectWatches waits.
+func (d *Daemon) pwEnter(folder string) bool {
+	d.pwMu.Lock()
+	defer d.pwMu.Unlock()
+	if d.pwStopped || folder != "" && d.pwWatches[folder] == nil {
+		return false
+	}
+	d.pwBusy.Add(1)
+	return true
 }
 
 // projectFilesChanged is DaemonCore.projectFilesChanged: what a project's watch heard,
 // sent where it matters.
 func (d *Daemon) projectFilesChanged(folder string, paths []string) {
-	d.pwMu.Lock()
-	stopped := d.pwStopped || d.pwWatches[folder] == nil
-	d.pwMu.Unlock()
-	if stopped || !isDir(folder) {
+	if !d.pwEnter(folder) {
+		return
+	}
+	defer d.pwBusy.Done()
+	if !isDir(folder) {
 		return
 	}
 	agents := filepath.Join(folder, ".agents")
@@ -313,12 +330,10 @@ func (d *Daemon) scheduleBranchCheck(folder string, delay time.Duration) {
 // The first look at a project only seeds them. Not the default branch (#702): the host's
 // copy of it moves only on a pull.
 func (d *Daemon) checkBranches(folder string) {
-	d.pwMu.Lock()
-	stopped := d.pwStopped
-	d.pwMu.Unlock()
-	if stopped {
+	if !d.pwEnter("") {
 		return
 	}
+	defer d.pwBusy.Done()
 	d.branchCheckMu.Lock()
 	defer d.branchCheckMu.Unlock()
 	watched := map[string]bool{}
@@ -431,6 +446,10 @@ func (d *Daemon) scheduleDropboxCheck(folder string) {
 // announced when this look finds it as the last one did; until then it is settling, and
 // another look is due.
 func (d *Daemon) checkDropbox(folder string) {
+	if !d.pwEnter("") {
+		return
+	}
+	defer d.pwBusy.Done()
 	now := dropboxFiles(folder)
 	d.pwMu.Lock()
 	delete(d.dropTimers, folder)
