@@ -1,6 +1,6 @@
 ---
 name: release
-description: Take main to a new version with nobody watching (#914). Run the six reviews and checks once each, have every high and medium finding fixed through the Scrum Master's lanes, check the gate, choose the version, write the notes, tag and push, and check the GitHub release and both TestFlight builds. Use when the Release workflow runs, or when Alex asks for a release. Not for installing on Alex's Mac or devices (ship-app), and never for App Review.
+description: Take main to a new version with nobody watching (#914). Run the six reviews and checks once each on what changed since the last tag, have the high findings fixed (and the medium ones while time is left, within a day) through the Scrum Master's lanes, check the gate, choose the version, write the notes, tag and push, and check the GitHub release and both TestFlight builds. Use when the Release workflow runs, or when Alex asks for a release. Not for installing on Alex's Mac or devices (ship-app), and never for App Review.
 ---
 
 # Release
@@ -17,9 +17,16 @@ Alex decided (2026-10-13, #914):
   1.0 and major versions only when Alex says.
 - **Every release runs the six reviews and checks once each** (#1462): security,
   performance, runtimes, usability, competitors and the feature matrix.
-- **Priority is a label:** `priority:high` and `priority:medium`.
-- **High always blocks.** Wait for open medium fixes for **1 day**, then release and
-  list the medium ones still open as known issues.
+- **Scope is what changed** (#1462): the reviews read only `main` since the last tag, and
+  only what this release found or filed counts (step 3). Older open issues are not
+  this release's.
+- **Time is one day** (#1462), from the start of the run (T0): the reviews and the fixes
+  fit in it.
+- **Priority is a label:** `priority:high` and `priority:medium`. Within each, security
+  goes before performance, before usability, before runtimes, before the rest.
+- **High always blocks.** Medium is worked only once no high is open, while the day
+  lasts; at T0 + 1 day the release goes out, and the medium ones still open are listed
+  as known issues. Low is recorded and not worked.
 - **Security findings stay private** until they ship: a draft GitHub security advisory
   per finding, fixed on its private fork. The notes say only "Security fixes".
 
@@ -40,7 +47,7 @@ Alex decided (2026-10-13, #914):
 
 ## 1. Is a release due?
 
-1. `git fetch --quiet --tags origin main`.
+1. Note the time T0, then `git fetch --quiet --tags origin main`.
 2. `.agents/skills/release/scripts/release-plan.py`. It prints the last tag and the next
    version. If it says nothing merged since the last tag, end with `nothing_to_do`.
 
@@ -59,31 +66,36 @@ Six workflows run exactly once per release, and only here (#1462). None has a sc
 
 Start every one of them once per release. The only one to skip is one that already ran
 for this release: its report (or pull request) is newer than the last tag, as when an
-earlier run of this skill ended `partly_done`. Never start one again in the same release. An agent cannot press Run now, so
-read the workflow with `manage_workflows read`, and call `start_session` with its prompt
+earlier run of this skill ended `partly_done`. Never start one again in the same release.
+An agent cannot press Run now, so read the workflow with `manage_workflows read`, and call `start_session` with its prompt
 (the text under its front matter) and its `runtime:`, `model:` and `permission-mode:`.
 Start them by order, at most two at a time: the reviews take turns on the "build" lease,
 and the feature matrix reads the competitor check's report. Wait with `wait_for_event`,
-naming the sessions in `agents`, `until_minutes: 240`. Archive each with
-`archive_session` when it has finished. One that failed is a note in your report, not a
-reason to stop, and it is not started again until the next release.
+naming the sessions in `agents`, `until_minutes` 240 or the time left to T0 + 1 day,
+whichever is less. As each one finishes, archive it with `archive_session` and do step 3
+for its findings at once, so their fixes start while the others still run. One that
+failed, or is still running at T0 + 1 day (stop it with `stop_session`), is a note in
+your report, not a reason to stop, and it is not started again until the next release.
 
 ## 3. Have high and medium fixed
 
 Collect the open findings with severity high or critical (both are "high" here) or
-medium:
+medium **that this release's runs recorded**: the ones in their run files (front matter
+`base:` is the last tag), not older lines of `findings.md`. In order:
 
-- **Performance:** lines in `git show agents/reviews-performance:.agents/reviews/performance/findings.md`
-  whose status is not `fixed` on main, `won't fix` or `recorded` as low. A status
+- **Security:** lines in `.agents/reviews/security/findings.md` on
+  `agents/reviews-security` whose status is not `fixed` on main, `won't fix` or
+  `recorded` as low. These are private: see "Security findings" below.
+- **Performance:** the same in
+  `git show agents/reviews-performance:.agents/reviews/performance/findings.md`. A status
   `fixed on <branch>` is fixed only when that branch is merged; until then it is open,
   and the issue names the branch so the lane can push it.
 - **Usability:** the same in `.agents/reviews/usability/findings.md` on
   `agents/reviews-usability`. Most already say `filed #NNN`.
-- **Runtimes:** open issues the runtime check filed (their titles start with the cause
-  it found); count each as medium.
-- **Security:** the same in `.agents/reviews/security/findings.md` on
-  `agents/reviews-security`. These are private: see "Security findings" below.
-- **Issues:** every open issue labelled `priority:high` or `priority:medium`.
+- **Runtimes:** open issues the runtime check filed in this release (their titles start with
+  the cause it found); count each as medium.
+- **Issues:** every open issue labelled `priority:high` or `priority:medium` that was
+  opened since the last tag (`gh issue list --search "created:>=<the tag's date>"`).
 
 For each finding that is not security:
 
@@ -95,8 +107,10 @@ For each finding that is not security:
    have one.
 
 Then send the Scrum Master one message (`list_sessions`, then `message_session` to the
-session titled Scrum Master): the issues, highest first, and that the release waits for
-them. If no Scrum Master is running, go on to step 4 and say so in the report: the
+session titled Scrum Master): the issues in priority order (high before medium; within
+each, security, performance, usability, runtimes, the rest), that the release waits for
+the high ones, and that the medium ones are worked only once no high is open, until
+T0 + 1 day. If no Scrum Master is running, go on to step 4 and say so in the report: the
 issues are labelled, and the next Scrum Master takes them.
 
 ### Security findings
@@ -126,16 +140,17 @@ An advisory is fixed when its description says `Fixed by <commit>` and that comm
 
 ## 4. Wait for the fixes
 
-Note the time T when step 3 ended. Then, until the gate can pass:
+Until the gate can pass:
 
-- Recount what is still open: issues labelled `priority:high` or `priority:medium`, and
-  security advisories without their fix on `origin/main`.
-- Go on when nothing high is open, and nothing medium is open or T is a day ago. The
-  medium ones still open go into the notes as known issues.
+- Recount what is still open of what step 3 collected: its issues, and its security
+  advisories without their fix on `origin/main`.
+- Go on when nothing high is open, and nothing medium is open or T0 + 1 day has come.
+  The medium ones still open go into the notes as known issues.
 - Otherwise wait with `wait_for_event` for `issue.closed` and `pr.merged`, with
-  `until_minutes` at most the time left to T + 1 day (1440 when only high is open).
-- High always blocks. After 7 days with a high one still open, end with `partly_done`,
-  naming what is open: the next run starts again from step 1.
+  `until_minutes` at most the time left to T0 + 1 day.
+- High always blocks. At T0 + 1 day with a high one still open, end with `partly_done`,
+  naming what is open. The next run is a new day (a new T0); it skips the reviews that
+  already ran (step 2) and picks up the same findings.
 
 ## 5. Gate
 
@@ -146,8 +161,8 @@ All of these, on the commit you will tag (`git rev-parse origin/main`, fetched a
    `wait_for_event` (`checks.failed`, or `until_minutes: 30`) and look again. If one
    failed, end with `partly_done`; main broken is fixed by its own PR, through the Scrum
    Master.
-2. **No open high:** `gh issue list --label priority:high --state open` is empty, and so
-   is the list of high security advisories without their fix.
+2. **No open high:** none of step 3's high issues is open, and none of its high security
+   advisories is without its fix.
 3. **Walks:** `gh issue list --label needs-walk --state open` holds at most five.
    More than five: end with `partly_done`, naming them; walks are the Scrum Master's to start.
 

@@ -10,9 +10,8 @@ when-done: archive
 ---
 
 You are the performance review of this project (issue #42). You run once per release,
-started by the Release run (#1462), with nobody watching. Review what changed on `main` since your last run plus one
-kind of cost in rotation, write down what you find, have the critical and high findings
-fixed on branches of their own, and leave every branch for Alex to merge. Security is
+started by the Release run (#1462), with nobody watching. Review only what changed on `main` since the last release tag,
+write down what you find, have the critical and high findings fixed on branches of their own, and leave every branch for Alex to merge. Security is
 not yours: the Security review workflow looks at that in the same release.
 
 ## Rules for the whole run
@@ -51,7 +50,7 @@ not yours: the Security review workflow looks at that in the same release.
    holds `.agents/reviews/performance/` and nothing else of its own; it is never pushed.
 2. Read every file in `.agents/reviews/performance/`. The newest run file
    (`YYYY-MM-DD.md`) has `reviewed-through:` (a commit of `main`, your last-run marker)
-   and `area:` in its front matter. `findings.md` there is the running list of every
+   in its front matter. `findings.md` there is the running list of every
    performance finding ever recorded.
 3. Read what is already known, so nothing is reported twice: if the local branch
    `agents/reviews` exists (the combined review before the split), the performance
@@ -61,10 +60,10 @@ not yours: the Security review workflow looks at that in the same release.
    ca4be76 perf-transport, 6df7a5b unbounded growth) are fixed; do not report what
    they fixed unless it has come back.
 4. **Scope** is:
-   - the diff `git diff <reviewed-through>..main` (with no marker at all, since the
-     last tag: `git log $(git describe --tags --abbrev=0 main)..main`), read for every cost below, and
-   - **one cost in depth**, the next after the last run's `area:` in this rotation,
-     wrapping round; on the first run, start at `main-thread`:
+   - the diff `git diff <last tag>..main`, where the last tag is
+     `git describe --tags --abbrev=0 origin/main` (#1462), read for every cost below.
+     Nothing older is in scope: code the diff does not change is not reviewed,
+     even when it looks wrong. The costs:
      1. `main-thread`: work on the main thread in SwiftUI views and @MainActor code
         (file or socket I/O, JSON decoding of whole transcripts, sorting or filtering
         large lists in `body`) in App/, Remote/ and their view models;
@@ -94,13 +93,12 @@ and **a fix** with the measurement that would prove it. Drop anything already re
 
 In the review worktree:
 - Create `.agents/reviews/performance/<today, YYYY-MM-DD>.md`, with front matter
-  `reviewed-through: <git rev-parse main>`, `area: <the cost>`, `previous: <last run's
+  `reviewed-through: <git rev-parse main>`, `base: <the last tag>`, `previous: <last run's
   reviewed-through>`, then one section per finding with an id `P<YYYYMMDD>-<n>` and the
   fields above. A run that finds nothing still writes the file, saying what it read.
 - Append one line per new finding to `.agents/reviews/performance/findings.md`:
   `- P…-n · severity · title · status`, where status starts as `open`.
-- Commit both on `agents/reviews-performance` ("Performance review <date>: <cost>, <n>
-  findings").
+- Commit both on `agents/reviews-performance` ("Performance review <date>: <n> findings").
 
 ## 4. Fix the critical and high ones
 
