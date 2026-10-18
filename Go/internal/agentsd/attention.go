@@ -11,6 +11,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 	"unicode/utf8"
 
@@ -64,7 +65,7 @@ type attentionRecords struct {
 	Raised      []raisedNote      `json:"raised"`
 	Deliveries  []delivery        `json:"deliveries"`
 	Withdrawing []json.RawMessage `json:"withdrawing"`
-	Forwarded   []json.RawMessage `json:"forwarded"`
+	Forwarded   []wire.NeedID     `json:"forwarded"`
 }
 
 type attentionState struct {
@@ -74,10 +75,16 @@ type attentionState struct {
 	raisedNeed  map[string]wire.NeedID
 	deliveries  map[string]delivery
 	settling    map[string]*time.Timer
-	// kept is what attention.json holds of another build's (withdrawals, forwarded needs),
-	// written back as it was; lastWritten is nil until the file has been read.
+	// kept is what attention.json holds of another build's (withdrawals), written back as
+	// it was; lastWritten is nil until the file has been read.
 	kept        attentionRecords
 	lastWritten *attentionRecords
+	// forwarded is forwardedNeeds: what the control plane was offered and not yet told is
+	// over, by token. A Swift host's offers are among them, so they are withdrawn too (#1367).
+	forwarded   map[string]wire.NeedID
+	toldWaiting *int64
+	// tellControl sends on the control plane's channel 0; nil when the host has none.
+	tellControl atomic.Pointer[func(method string, params any)]
 }
 
 // token is Need.token: one string per need, for keys and the file's order.
@@ -104,6 +111,7 @@ func (d *Daemon) loadAttention() {
 	defer d.attentionMu.Unlock()
 	d.presences, d.raisedAt, d.raisedNeed = map[int64]presence{}, map[string]wire.Date{}, map[string]wire.NeedID{}
 	d.deliveries, d.settling = map[string]delivery{}, map[string]*time.Timer{}
+	d.forwarded = map[string]wire.NeedID{}
 	var r attentionRecords
 	if b, err := os.ReadFile(d.attentionFile()); err == nil {
 		var raw struct {
@@ -126,7 +134,13 @@ func (d *Daemon) loadAttention() {
 					r.Deliveries = append(r.Deliveries, dv)
 				}
 			}
-			r.Withdrawing, r.Forwarded = raw.Withdrawing, raw.Forwarded
+			for _, e := range raw.Forwarded {
+				var id wire.NeedID
+				if diskjson.Unmarshal(e, &id) == nil && token(id) != "" {
+					r.Forwarded = append(r.Forwarded, id)
+				}
+			}
+			r.Withdrawing = raw.Withdrawing
 		}
 	}
 	for _, n := range r.Raised {
@@ -137,26 +151,30 @@ func (d *Daemon) loadAttention() {
 			d.deliveries[token(dv.NeedID)] = dv
 		}
 	}
-	d.kept = attentionRecords{Withdrawing: r.Withdrawing, Forwarded: r.Forwarded}
+	for _, id := range r.Forwarded {
+		d.forwarded[token(id)] = id
+	}
+	d.kept = attentionRecords{Withdrawing: r.Withdrawing}
 	written := d.records()
 	d.lastWritten = &written
 }
 
 func (d *Daemon) records() attentionRecords {
-	r := attentionRecords{Raised: []raisedNote{}, Deliveries: []delivery{}, Withdrawing: d.kept.Withdrawing, Forwarded: d.kept.Forwarded}
+	r := attentionRecords{Raised: []raisedNote{}, Deliveries: []delivery{}, Withdrawing: d.kept.Withdrawing, Forwarded: []wire.NeedID{}}
 	for t, at := range d.raisedAt {
 		r.Raised = append(r.Raised, raisedNote{Need: d.raisedNeed[t], At: at})
 	}
 	for _, dv := range d.deliveries {
 		r.Deliveries = append(r.Deliveries, dv)
 	}
+	for _, id := range d.forwarded {
+		r.Forwarded = append(r.Forwarded, id)
+	}
+	sort.Slice(r.Forwarded, func(i, j int) bool { return token(r.Forwarded[i]) < token(r.Forwarded[j]) })
 	sort.Slice(r.Raised, func(i, j int) bool { return token(r.Raised[i].Need) < token(r.Raised[j].Need) })
 	sort.Slice(r.Deliveries, func(i, j int) bool { return token(r.Deliveries[i].NeedID) < token(r.Deliveries[j].NeedID) })
 	if r.Withdrawing == nil {
 		r.Withdrawing = []json.RawMessage{}
-	}
-	if r.Forwarded == nil {
-		r.Forwarded = []json.RawMessage{}
 	}
 	return r
 }
@@ -406,10 +424,27 @@ func (d *Daemon) reconsider() {
 		live[token(n.ID)] = true
 	}
 	var notes []wire.AttentionNotification
+	tell := d.tellControl.Load()
+	var told []wire.AttentionNeed
+	withdraw := func(t string) {
+		if id, ok := d.forwarded[t]; ok {
+			delete(d.forwarded, t)
+			told = append(told, wire.AttentionNeed{Withdraw: &id})
+		}
+	}
 	for t, dv := range d.deliveries {
 		if !live[t] {
 			delete(d.deliveries, t)
 			notes = append(notes, wire.AttentionNotification{NeedID: dv.NeedID})
+		}
+	}
+	// Met, or a need this build does not know (a Swift host's): the control plane hears
+	// it is over, so a phone takes its banner and widget row down (#1367).
+	if tell != nil {
+		for t := range d.forwarded {
+			if !live[t] {
+				withdraw(t)
+			}
 		}
 	}
 	for t, timer := range d.settling {
@@ -446,6 +481,17 @@ func (d *Daemon) reconsider() {
 				}
 			}
 		}
+		// forward: a need shown nowhere this host can see goes to the control plane, which
+		// chooses the device; one being looked at, or about to be, is withdrawn from it.
+		if tell != nil {
+			if wait || to != nil || watched {
+				withdraw(t)
+			} else if _, ok := d.forwarded[t]; !ok {
+				need, buzz, headline := n, true, n.Headline
+				d.forwarded[t] = n.ID
+				told = append(told, wire.AttentionNeed{Need: &need, Headline: &headline, Buzz: &buzz})
+			}
+		}
 		if wait {
 			if d.settling[t] == nil {
 				due := max(0, n.RaisedAt.Time().Add(settlingPause).Sub(at))
@@ -479,11 +525,83 @@ func (d *Daemon) reconsider() {
 			notes = append(notes, wire.AttentionNotification{NeedID: n.ID, Need: &need, To: to, Alert: true})
 		}
 	}
+	// Every message carries the whole Needs you count, and the count goes alone when it
+	// moved with nothing to offer or withdraw (#1163).
+	if tell != nil {
+		waiting := d.waitingCount()
+		if len(told) == 0 && (d.toldWaiting == nil || *d.toldWaiting != waiting) {
+			told = append(told, wire.AttentionNeed{})
+		}
+		for i := range told {
+			told[i].Waiting = &waiting
+		}
+		if len(told) > 0 {
+			d.toldWaiting = &waiting
+		}
+	}
 	d.writeAttentionIfMoved()
 	d.attentionMu.Unlock()
 	for _, note := range notes {
 		Broadcast(d, wire.NotifyAttentionChanged, note)
 	}
+	for _, m := range told {
+		(*tell)(wire.CallAttentionNeed.Name, m)
+	}
+}
+
+// waitingCount is DaemonCore.waitingCount: the agents that want a look, the badge's count,
+// outside archived projects.
+func (d *Daemon) waitingCount() int64 {
+	archived := map[string]bool{}
+	for _, p := range d.Store.Projects() {
+		if p.ArchivedAt != nil {
+			archived[store.FolderPath(p.Folder)] = true
+		}
+	}
+	var n int64
+	for _, a := range d.Store.Agents() {
+		if a.State == wire.AgentStateArchived || archived[projectFolder(&a)] {
+			continue
+		}
+		unread := a.State == wire.AgentStateFinished && a.IsUnread != nil && *a.IsUnread
+		if g := Group(&a); unread || g == "needsAttention" || g == "blocked" {
+			n++
+		}
+	}
+	return n
+}
+
+// SetControl is where attention/need goes: the uplink's channel 0. A host of a control
+// plane offers the needs it shows nowhere, and withdraws them when met (058 R6).
+func (d *Daemon) SetControl(tell func(method string, params any)) {
+	d.tellControl.Store(&tell)
+	d.ControlUplinkChanged(true)
+}
+
+// ControlUplinkChanged is DaemonCore.controlUplinkChanged: a restored uplink knows nothing
+// of offers dropped while it was down, so every live need is offered again, the stale ones
+// withdrawn, and the count said again.
+func (d *Daemon) ControlUplinkChanged(up bool) {
+	if !up || d.tellControl.Load() == nil {
+		return
+	}
+	d.attentionMu.Lock()
+	if d.presences == nil {
+		d.attentionMu.Unlock()
+		return
+	}
+	live := map[string]bool{}
+	for _, n := range d.needs() {
+		live[token(n.ID)] = true
+	}
+	for t := range d.forwarded {
+		if live[t] {
+			delete(d.forwarded, t)
+		}
+	}
+	d.toldWaiting = nil
+	d.attentionMu.Unlock()
+	d.reconsider()
 }
 
 // reportPresence is presence/report: where a window is and what it shows. A window that
