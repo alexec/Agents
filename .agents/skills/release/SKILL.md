@@ -1,6 +1,6 @@
 ---
 name: release
-description: Take main to a new version with nobody watching (#914). Run the six reviews and checks once each on what changed since the last tag, have the high findings fixed (and the medium ones while time is left, within a day) through the Scrum Master's lanes, check the gate, choose the version, write the notes, tag and push, and check the GitHub release and both TestFlight builds. Use when the Release workflow runs, or when Alex asks for a release. Not for installing on Alex's Mac or devices (ship-app), and never for App Review.
+description: Take main to a new version with nobody watching (#914). Run the six reviews and checks once each on what changed since the last tag, have the high findings fixed (and the medium ones while time is left, within a day) through the Scrum Master's lanes, check the gate, choose the version, check its milestone, write the notes, tag and push, check the GitHub release and both TestFlight builds, and close the milestone. Use when the Release workflow runs, or when Alex asks for a release. Not for installing on Alex's Mac or devices (ship-app), and never for App Review.
 ---
 
 # Release
@@ -27,6 +27,9 @@ Alex decided (2026-10-13, #914):
 - **High always blocks.** Medium is worked only once no high is open, while the day
   lasts; at T0 + 1 day the release goes out, and the medium ones still open are listed
   as known issues. Low is recorded and not worked.
+- **A version has a milestone** (#1348): `0.5.0` is the milestone whose title starts
+  with `0.5 `. A patch version has none. The milestone is done when its release has
+  shipped, and this skill closes it then (step 9).
 - **Security findings stay private** until they ship: a draft GitHub security advisory
   per finding, fixed on its private fork. The notes say only "Security fixes".
 
@@ -169,7 +172,11 @@ All of these, on the commit you will tag (`git rev-parse origin/main`, fetched a
 ## 6. Version and notes
 
 1. Run `release-plan.py` again. Its `next:` is the version.
-2. Write the notes in Markdown, in plain short sentences:
+2. **Milestone:** for a minor version, find its milestone
+   (`gh api 'repos/alexec/Agents/milestones?state=open' --jq '.[]|[.number,.title]|@tsv'`)
+   and its open issues (`gh issue list --milestone "<title>" --state open`). Open issues
+   do not stop the release: each one goes into the notes as a known issue.
+3. Write the notes in Markdown, in plain short sentences:
    - one heading per kind that has changes, in this order: `## New` (the plan's
      `[enhancement]`), `## Fixed` (`[bug]`) and `## Changed` (the rest), with a line per
      change, from the pull requests the plan lists. A line names the pull request:
@@ -179,7 +186,8 @@ All of these, on the commit you will tag (`git rev-parse origin/main`, fetched a
      workflows) unless they change what a person does;
    - `## Security fixes` with only "This release fixes security problems found by our
      own review." when an advisory was fixed since the last tag. Nothing more;
-   - `## Known issues`: the medium issues still open, one line each with its number.
+   - `## Known issues`: the medium issues still open and the milestone's open issues,
+     one line each with its number.
 
 ## 7. Tag and push
 
@@ -207,8 +215,16 @@ A tag that already exists for this version means another release ran: end with
    still Alex's to add: say which, from its log, and that the GitHub release is out.
    Any other failure: name the step and the first error.
 
-## 9. Report
+## 9. Close the milestone
+
+When step 8 found the GitHub release and both TestFlight builds, close the version's
+milestone (none for a patch version):
+`gh api -X PATCH repos/alexec/Agents/milestones/<number> -f state=closed`.
+Its open issues stay open in it. Then the next milestone's work can merge to `main`.
+If step 8 failed, leave the milestone open and say so in the report.
+
+## 10. Report
 
 End with `done` and a short table: version, tag, the GitHub release URL, the iOS and
-macOS builds' states, the reviews you ran, the issues fixed for this release, the known
+macOS builds' states, the milestone and whether it is closed, the reviews you ran, the issues fixed for this release, the known
 issues, and the advisories that are fixed and ready for Alex to publish.

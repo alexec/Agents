@@ -53,6 +53,13 @@ Alex answered these the same way every time (#601), so do them without asking an
 
 Alex still decides, by a form: anything hard to undo (deleting data, rewriting history, anything published outside the repo), spending money or making an outside account, restarts of the live app and installs on Alex's devices, and a choice with no option clearly the best.
 
+## Work by milestone (#1340)
+
+- **Work goes by milestone.** The Scrum Master takes issues from the earliest open milestone first; bugs still go before features. An issue with no milestone is the backlog.
+- **A filed issue gets a milestone** only when it serves that milestone's goal (#1340).
+- **The open milestone and the next one are workable;** the next one only in areas the open one does not hold. Later milestones' issues keep `parked`; take it off when their milestone becomes the next one.
+- **A milestone is done when its release has shipped** (the GitHub release and both TestFlight builds), not when GitHub closes it. No change for the next milestone merges to `main` before that (Alex, 2026-10-18). The release skill closes the milestone.
+
 ## Landing a change
 
 - **Every change has an issue and a pull request.** Work on a branch of your own, in a worktree you moved into with move_worktree (never one made by hand with `git worktree add`, which the app never sees: #615), push it, open the PR with `gh pr create`, turn on `gh pr merge --auto --squash` at once, and wait for it to land; fix what CI fails. Never push to `main`.
