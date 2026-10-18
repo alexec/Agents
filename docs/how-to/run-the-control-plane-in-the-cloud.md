@@ -88,7 +88,7 @@ In the repository on your Mac:
 3. Make the DNS records, with the address that `up.sh` printed:
 
    ```sh
-   deploy/cloudflare/dns.sh 203.0.113.10
+   deploy/cloudflare/dns.sh <the address>
    ```
 
    It makes an **A** record for `control.agentloops.dev` and one for
