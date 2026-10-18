@@ -319,7 +319,17 @@ func machineID() string {
 
 func isTerminal() bool {
 	fi, err := os.Stdout.Stat()
-	return err == nil && fi.Mode()&os.ModeCharDevice != 0
+	return err == nil && isTerminalFile(fi)
+}
+
+// isTerminalFile is a character device other than /dev/null: launchd gives the Mac's host
+// /dev/null, a character device too, and its log went nowhere (#1392).
+func isTerminalFile(fi os.FileInfo) bool {
+	if fi.Mode()&os.ModeCharDevice == 0 {
+		return false
+	}
+	null, err := os.Stat(os.DevNull)
+	return err != nil || !os.SameFile(fi, null)
 }
 
 // ordinaryRoot is StoreLocations.isStandard: the root a person's host uses, where an

@@ -33,3 +33,22 @@ func TestOneHostPerRoot(t *testing.T) {
 		t.Fatalf("lock holds %q", b)
 	}
 }
+
+// launchd starts the Mac's host with /dev/null for stdout: not a terminal, so the log goes
+// to the root's daemon.log (#1392).
+func TestDevNullIsNotATerminal(t *testing.T) {
+	null, err := os.Stat(os.DevNull)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if isTerminalFile(null) {
+		t.Fatal("/dev/null counted as a terminal")
+	}
+	file, err := os.Stat("main.go")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if isTerminalFile(file) {
+		t.Fatal("a file counted as a terminal")
+	}
+}
