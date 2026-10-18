@@ -120,6 +120,19 @@ On your Mac, in the repository:
    `deploy/secrets/gcp-service-account`. On a Compute Engine VM that runs as the service
    account, leave out `--service-account`. Then delete `sa.json`: anyone who has it and a
    copy of the store can open the control plane's key. Never commit either.
+
+   For notices on your iPhone and iPad when no Mac host relays them, give the APNs key
+   from your Apple developer account (Certificates, Identifiers & Profiles ▸ Keys, with
+   Apple Push Notification service on). Do it now or later, with or without the rest:
+
+   ```sh
+   deploy/make-secrets.sh --public --apns AuthKey_KEYID.p8
+   ```
+
+   This copies the key to `deploy/secrets/apns-key`, and writes `AGENTS_APNS_KEY_ID` (read
+   from the file's name) and `AGENTS_APNS_TEAM_ID` in `deploy/.env`. Give `--apns-key-id`
+   when the file has another name. Without it, the control plane sends no pushes, and its
+   log says so once when it starts. Never put the key in a code, the store or the repo.
 3. Copy the repository's `deploy/` folder (with `deploy/secrets`), `Go/`, `Web/` and
    `App/Resources/servers/` to the machine, keeping the same layout. For example:
 

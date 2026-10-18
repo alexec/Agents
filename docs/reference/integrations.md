@@ -127,6 +127,7 @@ Open issues: `is:open label:integration notification`.
 | Integration | Clients that show it | State | Last checked | Where | Gaps |
 | --- | --- | --- | --- | --- | --- |
 | CloudKit mailbox push | Remote | built | — | `Packages/AgentsKit/Sources/AgentsKitCore/Remote/CloudKitMailbox.swift`, `RemoteNotify/Sources/NotificationService.swift` | |
+| APNs from the control plane (#1460) | Remote | built | — | `Go/internal/controlplane/apns/`, `Go/internal/controlplane/push.go`, `Packages/AgentsKit/Sources/AgentsKitCore/Remote/ControlPush.swift` | Tested with a fake APNs only; the real push waits for Alex's key (#1461) |
 | CloudKit relay channel (Remote to Mac) | Remote, Mac | built | — | `Packages/AgentsKit/Sources/AgentsKit/Relay/ControlRelay.swift`, `Host/Relay/Sources/main.swift` | |
 | Local notifications | Mac, Remote | built | — | `App/Sources/Notifications/MacNotifier.swift`, `Remote/Sources/Notifications/DeviceNotifier.swift` | |
 | The attention widget | Remote | built | — | `RemoteWidget/Sources/AttentionWidget.swift` | |

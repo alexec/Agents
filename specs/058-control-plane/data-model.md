@@ -37,6 +37,7 @@ Only one exists now. The model is here so records can name their owner (FR-012).
 | `grant` | `operator` \| `device` | |
 | `paired` | Date | |
 | `lastSeen` | Date? | Written at most hourly (R4). |
+| `pushToken` | `{token, environment}`? | A device's APNs token, hex, and `development` or `production` (#1460). Set only by `clients/setPushToken` from that device's own session; never on `clients/list`. |
 | `rev` | Int | |
 
 Rules:

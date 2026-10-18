@@ -140,6 +140,13 @@ public struct CloudKitMailbox: Mailbox {
         public var withdrawn: Bool
         /// The whole count as the push left (#1163), nil from an older relay.
         public var count: AttentionCount?
+        /// The words, already opened: a control plane's push (#1460) is sealed whole, so
+        /// it is opened to be read at all. Nil from the mailbox, whose `envelope` is opened
+        /// by whoever shows it.
+        public var headline: Headline? = nil
+
+        /// Whether the need is to be taken off this device: a withdrawal, or nothing to show.
+        public var withdraws: Bool { withdrawn || (envelope == nil && headline == nil) }
     }
 
     public static func pushed(from userInfo: [AnyHashable: Any]) -> Pushed? {

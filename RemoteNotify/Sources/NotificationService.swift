@@ -5,7 +5,8 @@ import WidgetKit
 /// The banner's words are assembled **on the device**, which is what a notification
 /// service extension is for (021 FR-022).
 ///
-/// A loud push carries the sealed headline and nothing legible. This opens the envelope
+/// A loud push carries the sealed headline and nothing legible: a mailbox item from a Mac
+/// host's relay, or the control plane's own push when no Mac relays (#1460). This opens the envelope
 /// with the device's own key — shared with the app through the keychain group — and
 /// puts the project, the agent and what is wanted into the notification. If the
 /// envelope cannot be opened the system shows what the push already had: a title that
@@ -20,17 +21,22 @@ final class NotificationService: UNNotificationServiceExtension {
         handler = contentHandler
         let content = (request.content.mutableCopy() as? UNMutableNotificationContent) ?? UNMutableNotificationContent()
         self.content = content
-        guard let pushed = CloudKitMailbox.pushed(from: request.content.userInfo) else {
+        let userInfo = request.content.userInfo
+        let key = { try? DeviceKey.load(accessGroup: DeviceKey.sharedAccessGroup) }
+        // The mailbox's, from a Mac host's relay; or the control plane's own (#1460), sealed
+        // whole, when no Mac relays.
+        guard let pushed = CloudKitMailbox.pushed(from: userInfo)
+                ?? (ControlPush.isControlPush(userInfo) ? ControlPush.pushed(from: userInfo, key: key()) : nil) else {
             contentHandler(content)
             return
         }
-        let headline = pushed.envelope.flatMap { envelope in
-            (try? DeviceKey.load(accessGroup: DeviceKey.sharedAccessGroup)).flatMap { try? Envelope.open(envelope, with: $0) }
+        let headline = pushed.headline ?? pushed.envelope.flatMap { envelope in
+            key().flatMap { try? Envelope.open(envelope, with: $0) }
         }
         // A loud push never wakes the app, so the widget hears of it here (#1046), with the
         // Mac's whole count where the push carries it, which the badge shows too (#1163).
         let written = AttentionSnapshotStore.apply(AttentionPush(need: pushed.needID, headline: headline,
-                                                                 withdrawn: pushed.withdrawn || pushed.envelope == nil,
+                                                                 withdrawn: pushed.withdraws,
                                                                  count: pushed.count))
         if written != nil {
             WidgetCenter.shared.reloadTimelines(ofKind: AttentionSnapshot.widgetKind)

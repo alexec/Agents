@@ -92,6 +92,9 @@ type Config struct {
 	// Where each log line goes, already marked with this copy. No line may hold a code,
 	// a key, a MAC or a message (071 FR-033).
 	Log func(string)
+	// Posts this copy's own pushes through APNs (#1460) when no Mac host relays a notice.
+	// Nil, with no key on the machine, sends none.
+	Push Pusher
 }
 
 // WebConfig is ControlService.Configuration.Web.
@@ -115,6 +118,8 @@ type Service struct {
 	started time.Time
 	// What this copy has told its relay host for each need (T097).
 	desk *notices.Desk
+	// This copy's own pushes, when no relay host is online (#1460); nil with no key.
+	pushes *pushes
 	// What each host last listed (#962), for hosts/lastHeard.
 	copies *hostCopies
 	// The reverse tunnels this copy holds for servers behind a bastion (#435): a single
@@ -170,6 +175,9 @@ func New(cfg Config) (*Service, error) {
 		records: records.New(cfg.Store), started: time.Now(), desk: notices.NewDesk(), phase: &phaseBox{phase: phaseServing}, sockets: map[*Conn]bool{}, stop: make(chan struct{}),
 		reads: readGate{every: readAgainEvery}}
 	s.sources = newSources(cfg.TrustedProxies, s.log)
+	if cfg.Push != nil {
+		s.pushes = newPushes(s, cfg.Push)
+	}
 	s.codes = &Codes{Store: cfg.Store, Private: cfg.PrivateKey, Public: public, URL: cfg.URL, Pin: cfg.Pin, Name: cfg.Name}
 	s.router = NewRouter(nil, s.log)
 	s.methods = newMethods(s)
@@ -237,6 +245,9 @@ func (s *Service) Records() *records.Records { return s.records }
 // key, takes up its records and listens. It returns the port bound (the one configured,
 // or the one the system chose for 0).
 func (s *Service) Start(ctx context.Context) (int, error) {
+	if s.pushes == nil {
+		s.log("notice: no APNs key, so this control plane sends no pushes; a Mac host that relays still does")
+	}
 	if err := store.Probe(ctx, s.cfg.Store, s.copyID); err != nil {
 		return 0, fmt.Errorf("the store can't be used: %w", err)
 	}
@@ -605,22 +616,35 @@ func (s *Service) heard(params json.RawMessage) {
 	s.deliver(need, false)
 }
 
-// deliver posts a need through the relay host if it is held here, otherwise tells the
-// other copies, one of which may hold it.
+// deliver posts a need through the relay host if it is held here. With none here but one
+// online at another copy, it tells the other copies. With no relay host online anywhere,
+// the copy that heard the need from its host pushes it through APNs itself (#1460), and
+// no other copy does, so a notice goes one way and arrives once.
 func (s *Service) deliver(need notices.AttentionNeed, fromPeer bool) {
 	relays := s.router.RelaysHeldHere()
-	if len(relays) == 0 {
-		if !fromPeer && s.mesh != nil {
-			s.mesh.broadcast(encodePeer("need", need))
+	relay := ""
+	if len(relays) > 0 {
+		sort.Strings(relays)
+		relay = relays[0]
+	} else {
+		if fromPeer {
+			return
 		}
-		return
+		if s.pushes == nil || s.router.RelayOnline() {
+			if s.mesh != nil {
+				s.mesh.broadcast(encodePeer("need", need))
+			}
+			return
+		}
 	}
-	sort.Strings(relays)
-	relay := relays[0]
 	flags := s.router.NotifyFlags()
 	var devices []notices.Device
 	for _, c := range s.records.Clients() {
 		if !c.IsDevice() || len(c.PublicKey) == 0 {
+			continue
+		}
+		// Pushed from here, only a device that gave its token can be chosen.
+		if relay == "" && c.PushToken == nil {
 			continue
 		}
 		kind := notices.Unknown
@@ -637,12 +661,18 @@ func (s *Service) deliver(need notices.AttentionNeed, fromPeer bool) {
 		devices = append(devices, d)
 	}
 	for _, delivery := range s.desk.Heard(need, s.router.FoldedPresences(), devices, time.Now()) {
-		s.router.Tell(relay, "relay/deliver", delivery)
 		did := "sent"
 		if delivery.Headline == nil {
 			did = "withdrew"
 		}
 		needID, _ := json.Marshal(delivery.NeedID)
+		// A withdrawal goes the way its post went.
+		if relay == "" || s.pushes != nil && delivery.Headline == nil && s.pushes.pushedHere(delivery) {
+			s.pushes.deliver(delivery)
+			s.log(fmt.Sprintf("notice: %s %s for %s through APNs", did, needID, delivery.Device))
+			continue
+		}
+		s.router.Tell(relay, "relay/deliver", delivery)
 		s.log(fmt.Sprintf("notice: %s %s for %s to relay %s", did, needID, delivery.Device, relay))
 	}
 }

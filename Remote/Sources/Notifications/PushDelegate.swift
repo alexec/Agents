@@ -10,10 +10,17 @@ final class PushDelegate: NSObject, UIApplicationDelegate {
     /// What to do with a push. Set by the app once the model exists.
     var received: @MainActor ([AnyHashable: Any]) async -> Void = { _ in }
 
+    /// What to do with this device's APNs token (#1460). Set by the app once the model
+    /// exists; a token that came first is handed over then.
+    var registered: @MainActor (Data) -> Void = { _ in } {
+        didSet { if let token { registered(token) } }
+    }
+    private var token: Data?
+
     func application(_ application: UIApplication,
                      didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
-        // CloudKit subscriptions arrive as remote notifications; the token itself is
-        // Apple's business and is never sent to the Mac.
+        // CloudKit subscriptions arrive as remote notifications. The token goes only to the
+        // control plane (#1460), which pushes here itself when no Mac host relays notices.
         application.registerForRemoteNotifications()
         return true
     }
@@ -22,6 +29,12 @@ final class PushDelegate: NSObject, UIApplicationDelegate {
                      didReceiveRemoteNotification userInfo: [AnyHashable: Any]) async -> UIBackgroundFetchResult {
         await received(userInfo)
         return .newData
+    }
+
+    func application(_ application: UIApplication,
+                     didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
+        token = deviceToken
+        registered(deviceToken)
     }
 
     func application(_ application: UIApplication,

@@ -52,6 +52,9 @@ public extension DaemonAPI.Method {
     static let clientsForgetSelf = "clients/forgetSelf"
     /// How each client reaches the control plane now (frame N, T080).
     static let clientsConnections = "clients/connections"
+    /// `PushToken` (#1460): a device's own APNs token, for the control plane to push to
+    /// when no Mac host relays its notices. Only the device sets its own.
+    static let clientsSetPushToken = "clients/setPushToken"
 
     // A host, on its channel 0.
     static let hostsAnnounce = "hosts/announce"
@@ -94,6 +97,31 @@ public extension DaemonAPI.Notification {
 }
 
 public extension DaemonAPI {
+    /// `clients/setPushToken` (#1460): a device's APNs token, in hex, and which APNs it is
+    /// from. No token takes it away.
+    struct PushToken: Codable, Sendable, Hashable {
+        public enum Environment: String, Codable, Sendable {
+            case development, production
+
+            /// A Debug build is signed for the sandbox; TestFlight and the App Store for production.
+            public static var ofThisBuild: Environment {
+                #if DEBUG
+                .development
+                #else
+                .production
+                #endif
+            }
+        }
+
+        public var token: String?
+        public var environment: Environment
+
+        public init(token: Data?, environment: Environment) {
+            self.token = token.map { $0.map { String(format: "%02x", $0) }.joined() }
+            self.environment = environment
+        }
+    }
+
     /// `control/status`.
     struct ControlStatus: Codable, Sendable, Hashable {
         public var name: String

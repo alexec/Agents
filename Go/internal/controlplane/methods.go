@@ -3,6 +3,7 @@ package controlplane
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"os"
 	"sort"
 	"strings"
@@ -11,8 +12,10 @@ import (
 	"time"
 
 	"github.com/alexec/agents/Go/internal/controllink"
+	"github.com/alexec/agents/Go/internal/controlplane/apns"
 	"github.com/alexec/agents/Go/internal/controlplane/providers"
 	"github.com/alexec/agents/Go/internal/controlplane/records"
+	"github.com/alexec/agents/Go/internal/controlplane/store"
 	"github.com/alexec/agents/Go/internal/controlplane/web"
 	"github.com/alexec/agents/Go/wire"
 )
@@ -56,8 +59,8 @@ var own = map[string]bool{
 	"hosts/sshHosts": true, "control/setProjectDetection": true, "clients/list": true,
 	"clients/startPairing": true, "clients/stopPairing": true,
 	"clients/setGrant": true, "clients/forget": true, "clients/connections": true,
-	"clients/forgetSelf": true,
-	"devices/list":       true, "devices/startPairing": true, "devices/stopPairing": true,
+	"clients/forgetSelf": true, "clients/setPushToken": true,
+	"devices/list": true, "devices/startPairing": true, "devices/stopPairing": true,
 	"devices/forget": true, "hosts/lastHeard": true,
 }
 
@@ -79,7 +82,7 @@ var writes = map[string]bool{
 	"hosts/startEnroll": true, "hosts/install": true, "hosts/update": true, "hosts/remove": true,
 	"hosts/setRelay": true, "hosts/lendSignIn": true, "hosts/lendGit": true, "hosts/detect": true,
 	"control/setProjectDetection": true, "clients/startPairing": true, "clients/forget": true,
-	"devices/startPairing": true, "devices/forget": true,
+	"devices/startPairing": true, "devices/forget": true, "clients/setPushToken": true,
 }
 
 func (m *Methods) Handle(method string, params json.RawMessage, from Caller) (any, error) {
@@ -162,6 +165,15 @@ func (m *Methods) Handle(method string, params json.RawMessage, from Caller) (an
 			return nil, err
 		}
 		m.s.announce("clientForgotten", from.Client, from.Client)
+		return map[string]any{}, nil
+	case "clients/setPushToken":
+		request, err := require[wire.PushToken](params, "PushToken")
+		if err != nil {
+			return nil, err
+		}
+		if err := m.setPushToken(ctx, from.Client, request); err != nil {
+			return nil, err
+		}
 		return map[string]any{}, nil
 	case "hosts/startEnroll":
 		return m.s.codes.Issue(ctx, true, false, controllink.CodeLifetime)
@@ -445,6 +457,52 @@ func (m *Methods) NoteEpoch(ctx context.Context, id controllink.Identity, epoch 
 			m.records.SaveHost(ctx, *h)
 		}
 	}
+}
+
+// setPushToken is clients/setPushToken (#1460): a device's own APNs token, kept in its
+// own record. Only the device itself sets it, over its own session: there is no client
+// to name. A window or a browser has nothing to push to.
+func (m *Methods) setPushToken(ctx context.Context, client string, request wire.PushToken) error {
+	var token *records.PushToken
+	if request.Token != nil && *request.Token != "" {
+		hex := strings.ToLower(*request.Token)
+		if !apns.ValidToken(hex) {
+			return fail(invalidParams, "That is not a push token.")
+		}
+		if request.Environment != wire.PushEnvironmentDevelopment && request.Environment != wire.PushEnvironmentProduction {
+			return fail(invalidParams, "A push token is from development or production.")
+		}
+		token = &records.PushToken{Token: hex, Environment: string(request.Environment)}
+	}
+	for try := 0; ; try++ {
+		record := m.records.Client(client)
+		if record == nil {
+			return fail(invalidParams, "This client is not paired.")
+		}
+		if !record.IsDevice() {
+			return fail(notSupported, "Only an iPhone or an iPad gets pushes.")
+		}
+		if samePushToken(record.PushToken, token) {
+			return nil
+		}
+		record.PushToken = token
+		err := m.records.UpdateClient(ctx, *record)
+		var conflict *store.ConflictError
+		if !errors.As(err, &conflict) || try > 0 {
+			return err
+		}
+		// Another copy wrote it first: read it again and try once more.
+		if err := m.records.Load(ctx); err != nil {
+			return err
+		}
+	}
+}
+
+func samePushToken(a, b *records.PushToken) bool {
+	if a == nil || b == nil {
+		return a == b
+	}
+	return *a == *b
 }
 
 // setRelay is hosts/setRelay or relay/switch (#824): a relay switched on or off, keeping

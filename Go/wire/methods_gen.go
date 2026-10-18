@@ -332,6 +332,7 @@ var (
 	CallClientsForgetSelf           = Method[Empty, Empty]{"clients/forgetSelf"}
 	CallClientsList                 = Method[Empty, []ClientRecord]{"clients/list"}
 	CallClientsSetGrant             = Method[JSONValue, Empty]{"clients/setGrant"}
+	CallClientsSetPushToken         = Method[PushToken, Empty]{"clients/setPushToken"}
 	CallClientsStartPairing         = Method[ClientPairingRequest, ControlCodeShown]{"clients/startPairing"}
 	CallClientsStopPairing          = Method[Empty, Empty]{"clients/stopPairing"}
 	CallControlPing                 = Method[Empty, Empty]{"control/ping"}

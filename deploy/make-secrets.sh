@@ -14,6 +14,16 @@
 # - AGENTS_CONTROL_KMS in deploy/.env: gcpkms:// and the key's name;
 # - gcp-service-account: a copy of the service account file that may use the key, or an empty
 #   file without --service-account, for a machine whose own service account may use it.
+#
+# Pushes without a Mac (#1460): the APNs key from the Apple developer account, scoped to the
+# Remote's app id. Give it once, with --kms or after it:
+#
+#   deploy/make-secrets.sh --public --apns AuthKey_KEYID.p8 [--apns-key-id KEYID] [--team-id TEAM]
+#
+# - apns-key: a copy of the .p8 file, in the 0700 secrets folder, mounted as a compose secret;
+#   an empty file without --apns, and then the control plane sends no pushes and says so;
+# - AGENTS_APNS_KEY_ID and AGENTS_APNS_TEAM_ID in deploy/.env. The Key ID is read from the
+#   file's name (AuthKey_KEYID.p8) when not given; the Team ID is the app's, 6T4RVD5724.
 set -euo pipefail
 dir=${0:A:h}/secrets
 env_file=${0:A:h}/.env
@@ -27,15 +37,48 @@ set_env() {
 
 if [[ ${1:-} == --public ]]; then
     shift
-    kms='' account=''
+    kms='' account='' apns='' apns_key_id='' team_id=6T4RVD5724
     while (( $# )); do
         case $1 in
             --kms) kms=${2:?--kms needs the key name}; shift 2 ;;
             --service-account) account=${2:?--service-account needs a file}; shift 2 ;;
+            --apns) apns=${2:?--apns needs the .p8 file}; shift 2 ;;
+            --apns-key-id) apns_key_id=${2:?--apns-key-id needs the Key ID}; shift 2 ;;
+            --team-id) team_id=${2:?--team-id needs the Team ID}; shift 2 ;;
             *) print -u2 "make-secrets.sh: $1 is not an option"; exit 2 ;;
         esac
     done
+    if [[ -n $apns ]]; then
+        if [[ ! -s $apns ]] || ! grep -q -- '-----BEGIN PRIVATE KEY-----' $apns; then
+            print -u2 "make-secrets.sh: $apns is not an APNs key (.p8)"
+            exit 2
+        fi
+        if [[ -z $apns_key_id && ${apns:t} =~ '^AuthKey_([A-Z0-9]{10})\.p8$' ]]; then
+            apns_key_id=${match[1]}
+        fi
+        if [[ ! $apns_key_id =~ '^[A-Z0-9]{10}$' ]]; then
+            print -u2 "make-secrets.sh: say the key's 10-character Key ID: --apns-key-id KEYID"
+            exit 2
+        fi
+        if [[ ! $team_id =~ '^[A-Z0-9]{10}$' ]]; then
+            print -u2 "make-secrets.sh: $team_id is not a Team ID"
+            exit 2
+        fi
+        cp $apns $dir/apns-key
+        chmod 644 $dir/apns-key
+        set_env AGENTS_APNS_KEY_ID $apns_key_id
+        set_env AGENTS_APNS_TEAM_ID $team_id
+        print "the APNs key $apns_key_id (team $team_id) is in $dir/apns-key"
+    elif [[ ! -f $dir/apns-key ]]; then
+        : > $dir/apns-key
+        chmod 644 $dir/apns-key
+        print "no APNs key: the control plane sends no pushes until you give one with --apns"
+    fi
     if [[ -z $kms ]]; then
+        # Only the APNs key, given after the rest.
+        if [[ -n $apns ]] && [[ -f $env_file ]] && grep -q '^AGENTS_CONTROL_KMS=' $env_file; then
+            exit 0
+        fi
         print -u2 "make-secrets.sh: say which Cloud KMS key seals the control key:"
         print -u2 "    --kms projects/P/locations/L/keyRings/R/cryptoKeys/K [--service-account sa.json]"
         exit 2

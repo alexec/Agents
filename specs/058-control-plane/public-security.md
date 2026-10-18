@@ -212,6 +212,27 @@ means the control plane posts to APNs itself, which adds a secret and a surface:
 - **Decided (Alex, 2026-10-02): APNs from the control plane.** It waits on Alex's key
   (`.p8`, Key ID and Team ID), made by him in the developer account and copied to the
   machine as a compose secret. Never put it in a code, the store or the repo.
+- *Built, #1460.* `Go/internal/controlplane/apns` posts with token auth (an ES256 provider
+  token made again every 40 minutes) over HTTP/2, to the one app id
+  `com.alexecollins.agents.remote`. The key is `deploy/secrets/apns-key`, given with
+  `make-secrets.sh --public --apns AuthKey_KEYID.p8`, and read from `AGENTS_APNS_KEY_FILE`,
+  `AGENTS_APNS_KEY_ID` and `AGENTS_APNS_TEAM_ID`. Without a key the control plane sends no
+  pushes, and its log says so once at start.
+- **When it pushes.** Only when no relay host is online anywhere: not held by this copy, and
+  not reached through another copy. Then only the copy that heard the need from its host
+  pushes; another copy that hears it from a peer does nothing. With a relay host online, the
+  need goes to it as before, and nothing is pushed. A withdrawal goes the way its post went.
+  So one notice goes one way and arrives once. In the short time a relay host comes online
+  after a push, the collapse id is the need's token, as CloudKit's subscription uses, so the
+  two banners are one (a guarded change's token names a file, so its collapse id is a hash).
+- **What the push carries.** `aps` has only the title "An agent needs you" (or
+  `content-available` for a quiet move or a withdrawal). Under `agents` is one envelope,
+  HPKE (P-256, HKDF-SHA256, AES-256-GCM) to the device's key, under its own info
+  (`com.alexecollins.agents.push.v1`): the need's id, whether to buzz, and the headline.
+  The need's id is sealed too, because a guarded change's id names a file.
+- **Device tokens** are a field of the device's own client record (`pushToken`), set only by
+  `clients/setPushToken` from that device's session, refused from a window or a browser, and
+  never on `clients/list`. A token APNs says is gone is taken off the record.
 
 **Alex's other answers, 2026-10-02:** the machine is a **DigitalOcean** droplet, at a
 **subdomain of alexecollins.com** (an A record Alex makes), with records in a **folder on

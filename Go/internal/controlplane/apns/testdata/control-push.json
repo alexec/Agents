@@ -1,0 +1,40 @@
+{
+  "devicePrivateKey": "kp6ZHGsEVIPfM66272OeoL5SlTxJs0kuXrXEdgmxpkk=",
+  "push": {
+    "agents": {
+      "sealed": {
+        "encapsulated": "BCaviOUKOgUer2cwomNinG2WqIcUGomOofCi3X/KvsjGc0ZZldQqxB62PjxyZ2FRZDDMnywlxSwlV7SjCn1ZFUc=",
+        "ciphertext": "C0Cz0TM+d52URlZEXhlSjg0Wy+8iv9V3BPUDfvl8pwbz3S0WGygKM7+DEg48rNboVoN7lHGXZCtoiQUqZTpcLZ7QtYT+BfRhtPT4LChKjJE750n05NpBMdDtjgD4OtrpTOQP2MLQ+TX4jR5GffYSGFAu6wTp9N0xXNwcNtKPI0jufMVqZdALavoDjLdErrOvl4i4/EgarbKSf1clpA8l9fZrqxn2JC2uXtAmFFBr16KLp6HteI9zgSYgBznjfxj6UtKxRadic5oxqMPBe/3aycmIKFdXaCPTTCoT/0qaM4Vc1sjYKahwJVOQO50JHlIUk0lpre06EOG2vNxGaDWaD7yBrhLBgtxIzEUdaDm0Houpw7XiIfStWe40Gf1uGrs="
+      }
+    },
+    "aps": {
+      "alert": {
+        "title": "An agent needs you"
+      },
+      "mutable-content": 1,
+      "sound": "default"
+    }
+  },
+  "item": {
+    "needID": {
+      "report": {
+        "agentID": "A0000000-0000-4000-8000-000000000001",
+        "at": 800000000.5
+      }
+    },
+    "alert": true,
+    "headline": {
+      "h1": "brushwise",
+      "h2": "Rehang the gallery",
+      "h3": "Wants to write hello.txt",
+      "answers": [
+        {
+          "kind": "choice",
+          "id": "allow",
+          "title": "Allow",
+          "isDestructive": false
+        }
+      ]
+    }
+  }
+}

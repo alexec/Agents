@@ -2599,6 +2599,32 @@ final class RemoteModel {
             note("pairing: announce failed: \(error)")
         }
         subscribeOnce()
+        await sendPushToken()
+    }
+
+    /// This device's APNs token (#1460), as the system gave it.
+    @ObservationIgnored private var pushToken: Data?
+
+    /// The system gave this device its APNs token: the control plane hears it now if the
+    /// link is up, else on the next announce.
+    func pushTokenArrived(_ token: Data) {
+        pushToken = token
+        guard isConnected else { return }
+        Task { await sendPushToken() }
+    }
+
+    /// `clients/setPushToken` (#1460): the token, to the control plane only, so it can push
+    /// here when no Mac host relays notices. What it pushes is sealed to this device's key.
+    /// A Mac's own daemon, with no control plane, does not know the method; nothing is lost.
+    private func sendPushToken() async {
+        guard let pushToken else { return }
+        do {
+            try await client.call(DaemonAPI.Method.clientsSetPushToken,
+                                  DaemonAPI.PushToken(token: pushToken, environment: .ofThisBuild))
+            note("push: token given to the control plane")
+        } catch {
+            note("push: the token was not taken: \(error)")
+        }
     }
 
     /// Ask CloudKit to push this device's mailbox items here. Idempotent on the server
@@ -2643,16 +2669,20 @@ final class RemoteModel {
             return
         }
         // What kind of push, never its payload: that is the person's work (#175).
-        note("push: \(CloudKitRelayChannel.isRelayPush(userInfo) ? "relay wake-up" : "mailbox")")
+        let fromControl = ControlPush.isControlPush(userInfo)
+        note("push: \(CloudKitRelayChannel.isRelayPush(userInfo) ? "relay wake-up" : fromControl ? "control plane" : "mailbox")")
         // The relay's wake-up: a relayed session polls, so there is nothing to poke.
         if CloudKitRelayChannel.isRelayPush(userInfo) { return }
-        guard let pushed = CloudKitMailbox.pushed(from: userInfo) else { return }
-        let headline = pushed.envelope.flatMap { envelope in key.flatMap { try? Envelope.open(envelope, with: $0) } }
+        // The mailbox's, or the control plane's own when no Mac relays (#1460).
+        guard let pushed = fromControl ? ControlPush.pushed(from: userInfo, key: key) : CloudKitMailbox.pushed(from: userInfo)
+        else { return }
+        let headline = pushed.headline
+            ?? pushed.envelope.flatMap { envelope in key.flatMap { try? Envelope.open(envelope, with: $0) } }
         // A need has moved here or away, which is the one thing the widget counts (#1046).
         await showOnTheWidget(AttentionPush(need: pushed.needID, headline: headline,
-                                            withdrawn: pushed.withdrawn || pushed.envelope == nil,
+                                            withdrawn: pushed.withdraws,
                                             count: pushed.count))
-        if pushed.withdrawn || pushed.envelope == nil {
+        if pushed.withdraws {
             notifier.withdraw(pushed.token)
             return
         }

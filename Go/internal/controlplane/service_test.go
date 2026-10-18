@@ -43,15 +43,24 @@ func freePort(t *testing.T) int {
 }
 
 func startPlane(t *testing.T, st store.Store, private []byte) *plane {
+	return startPlaneWith(t, st, private, nil)
+}
+
+// startPlaneWith is startPlane with something of its Config changed first.
+func startPlaneWith(t *testing.T, st store.Store, private []byte, change func(*Config)) *plane {
 	port := freePort(t)
 	p := &plane{t: t, url: "http://127.0.0.1:" + itoa(port), store: st, private: private, lines: make(chan string, 1000)}
-	s, err := New(Config{Store: st, PrivateKey: private, URL: p.url, Bind: "127.0.0.1", Port: port,
+	cfg := Config{Store: st, PrivateKey: private, URL: p.url, Bind: "127.0.0.1", Port: port,
 		Name: "Test plane", MachineID: "MACHINE-1", Log: func(l string) {
 			select {
 			case p.lines <- l:
 			default:
 			}
-		}})
+		}}
+	if change != nil {
+		change(&cfg)
+	}
+	s, err := New(cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
