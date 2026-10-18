@@ -70,8 +70,8 @@ func TestFailedRunsAndTheirDetails(t *testing.T) {
 			{"id": 1, "run_attempt": 2, "name": "CI", "html_url": "u1", "head_sha": "s1", "head_branch": "agents/a", "status": "completed",
 			 "conclusion": "timed_out", "updated_at": "2026-10-16T10:01:00Z", "created_at": "2026-10-15T10:00:00Z", "pull_requests": [{"number": 7}]},
 			{"id": 0, "status": "completed", "conclusion": "failure", "updated_at": "2026-10-16T09:00:00Z"}]}`,
-		"repos/" + repo + "/commits/s2/pulls":           `[{"number": 9, "head": {"ref": "fork/main"}}]`,
-		"repos/" + repo + "/actions/runs/2/jobs":        `{"jobs": [{"name": "test", "html_url": "j", "conclusion": "failure"}, {"name": "lint", "conclusion": "success"}]}`,
+		"repos/" + repo + "/commits/s2/pulls":    `[{"number": 9, "head": {"ref": "fork/main"}}]`,
+		"repos/" + repo + "/actions/runs/2/jobs": `{"jobs": [{"name": "test", "html_url": "j", "conclusion": "failure"}, {"name": "lint", "conclusion": "success"}]}`,
 		"repos/" + repo + "/pulls/9": `{"number": 9, "title": "From a fork", "html_url": "p9", "head": {"ref": "fork/main", "repo": {"full_name": "stranger/agents"}},
 			"user": {"login": "stranger"}, "author_association": "FIRST_TIME_CONTRIBUTOR"}`,
 	})
@@ -160,7 +160,7 @@ func TestIssueActivityLeavesPullRequestsOutAndJudgesWhoDidIt(t *testing.T) {
 
 func TestAnUnchangedListingIsSharedThenAskedWithItsETag(t *testing.T) {
 	path := "repos/" + repo + "/pulls"
-	api := newFakeAPI(t, map[string]string{path: `[{"number": 1, "state": "open", "user": {"login": "alexec"}, "author_association": "OWNER"}]`})
+	api := newFakeAPI(t, map[string]string{path: `[{"number": 1, "state": "open", "user": {"login": "alexec"}, "author_association": "OWNER", "head": {"ref": "a", "repo": {"full_name": "` + repo + `"}}}]`})
 	g := api.github()
 	for range 10 {
 		if prs, err := g.OpenPRs(context.Background(), repo); err != nil || len(prs) != 1 || !prs[0].Trusted {
