@@ -1503,6 +1503,24 @@ export interface HostAnnounce {
   implementation?: string;
 }
 
+/**
+ * A paired window a host may let in on its local socket (#1118), with the key it proves itself
+ * with.
+ */
+export interface HostClient {
+  id: UUID;
+  kind: string;
+  publicKey: Base64;
+}
+
+/**
+ * host/clients: every window paired with the control plane, which a host checks its local socket
+ * against (#1118).
+ */
+export interface HostClients {
+  clients: HostClient[];
+}
+
 /** host/hello, on every connect of an uplink. `implementation` is `swift` or `go` (#1134). */
 export interface HostHello {
   host?: HostID;
@@ -4457,6 +4475,8 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   Headline: { required: ["h1", "h2", "h3"], optional: ["answers"] },
   HelperLimits: { required: [], optional: ["running", "notArchived", "queued", "agentsMayArchive"] },
   HostAnnounce: { required: ["publicKey", "name", "platform", "version", "machineID"], optional: ["relay", "implementation"] },
+  HostClient: { required: ["id", "kind", "publicKey"], optional: [] },
+  HostClients: { required: ["clients"], optional: [] },
   HostHello: { required: ["version", "platform", "machineID"], optional: ["host", "name", "relay", "implementation"] },
   HostInstall: { required: ["destination"], optional: ["name", "key", "trust", "tunnel"] },
   HostJoinStatus: { required: ["member", "connected", "at"], optional: ["problem"] },

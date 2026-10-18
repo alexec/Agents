@@ -5730,6 +5730,43 @@
       ],
       "additionalProperties": false
     },
+    "HostClient": {
+      "type": "object",
+      "description": "A paired window a host may let in on its local socket (#1118), with the key it proves itself with.",
+      "properties": {
+        "id": {
+          "$ref": "#/definitions/UUID"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "publicKey": {
+          "$ref": "#/definitions/Base64"
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "publicKey"
+      ],
+      "additionalProperties": false
+    },
+    "HostClients": {
+      "type": "object",
+      "description": "host/clients: every window paired with the control plane, which a host checks its local socket against (#1118).",
+      "properties": {
+        "clients": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/HostClient"
+          }
+        }
+      },
+      "required": [
+        "clients"
+      ],
+      "additionalProperties": false
+    },
     "HostHello": {
       "type": "object",
       "description": "host/hello, on every connect of an uplink. `implementation` is `swift` or `go` (#1134).",

@@ -71,6 +71,9 @@ type Daemon struct {
 	macState
 	projectWatchState
 	deviceBook
+	localBook
+	policyOnce sync.Once
+	policy     SocketPolicy
 	// SettingsDir is the person's settings on this host (StoreLocations.personalSettings):
 	// <root>/settings, or $HOME/.agents/settings for a server, as the Swift host's --serve.
 	SettingsDir string

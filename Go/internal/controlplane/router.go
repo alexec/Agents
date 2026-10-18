@@ -392,6 +392,19 @@ func (r *Router) SetRelay(host string, relay *bool) {
 	}
 }
 
+// HostsHeldHere is every host that runs agents whose uplink ends here.
+func (r *Router) HostsHeldHere() []string {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	var out []string
+	for host, h := range r.hosts {
+		if h != nil && h.local && !r.relays[host] {
+			out = append(out, host)
+		}
+	}
+	return out
+}
+
 // RelaysHeldHere is every relaying host whose uplink ends here.
 func (r *Router) RelaysHeldHere() []string {
 	r.mu.Lock()

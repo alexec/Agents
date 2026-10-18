@@ -385,6 +385,7 @@ var (
 	NotifyControlThisMacHostChanged = Notification[HostJoinStatus]{"control/thisMacHostChanged"}
 	NotifyControlTunnelChanged      = Notification[HostTunnelChanged]{"control/tunnelChanged"}
 	NotifyControlWebChanged         = Notification[WebRemoteStatus]{"control/webChanged"}
+	NotifyHostClients               = Notification[HostClients]{"host/clients"}
 	NotifyProjectsDetect            = Notification[ProjectDetection]{"projects/detect"}
 	NotifyRelayCount                = Notification[RelayCount]{"relay/count"}
 	NotifyRelayDeliver              = Notification[RelayDelivery]{"relay/deliver"}

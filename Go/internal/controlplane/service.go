@@ -492,6 +492,35 @@ func (s *Service) syncRelays() {
 		s.router.SetRelay(h.ID, h.Relay)
 	}
 	s.tellRelayDevices()
+	s.tellHostClients()
+}
+
+// hostClients is host/clients: every paired window and its key, which a host checks
+// its local socket against (#1118). Only a Mac's window is on the same machine as a host.
+func (s *Service) hostClients() wire.HostClients {
+	out := wire.HostClients{Clients: []wire.HostClient{}}
+	for _, c := range s.records.Clients() {
+		if c.Kind == records.KindMac && len(c.PublicKey) > 0 {
+			out.Clients = append(out.Clients, wire.HostClient{ID: wire.UUID(c.ID), Kind: c.Kind, PublicKey: c.PublicKey})
+		}
+	}
+	return out
+}
+
+// tellHostClients tells each host whose uplink ends here, or only those named, which
+// windows it may let in on its local socket: a window forgotten here is cut off there too.
+func (s *Service) tellHostClients(only ...string) {
+	hosts := only
+	if len(hosts) == 0 {
+		hosts = s.router.HostsHeldHere()
+	}
+	if len(hosts) == 0 {
+		return
+	}
+	clients := s.hostClients()
+	for _, host := range hosts {
+		s.router.Tell(host, wire.NotifyHostClients.Name, clients)
+	}
 }
 
 // tellRelayDevices tells each relay host whose uplink ends here every device client and
