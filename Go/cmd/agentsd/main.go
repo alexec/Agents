@@ -159,7 +159,7 @@ func parse(args []string) commandLine {
 	if cl.root == "" {
 		// The ordinary root, Application Support/Agents, as Foundation has it on this OS.
 		home, _ := os.UserHomeDir()
-		cl.root = standardRoot(home)
+		cl.root = store.StandardRoot(home)
 	}
 	if strings.HasPrefix(cl.root, "~/") {
 		home, _ := os.UserHomeDir()
@@ -294,7 +294,7 @@ func personalHome(cl commandLine) string {
 	if err != nil {
 		return ""
 	}
-	if cl.serve || filepath.Clean(cl.root) == standardRoot(home) {
+	if cl.serve || store.IsStandard(cl.root) {
 		return home
 	}
 	return ""
@@ -319,10 +319,5 @@ func isTerminalFile(fi os.FileInfo) bool {
 // invented event would be a lie (Application Support/Agents, or an installed server's).
 func ordinaryRoot(root string) bool {
 	home, _ := os.UserHomeDir()
-	for _, r := range []string{standardRoot(home), filepath.Join(home, ".agents-server", "root")} {
-		if filepath.Clean(root) == r {
-			return true
-		}
-	}
-	return false
+	return store.IsStandard(root) || filepath.Clean(root) == filepath.Join(home, ".agents-server", "root")
 }

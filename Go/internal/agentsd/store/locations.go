@@ -25,6 +25,14 @@ func At(root string) Locations {
 	return folders(filepath.Clean(root), home, os.Getenv)
 }
 
+// IsStandard is root being this OS's ordinary root, StandardRoot: the root the person's
+// own host uses. agentsd's default root and every check that a root is the real one
+// (roles on daemon.sock, events by hand, the real Trash) ask this, never ~/.agents (#1400).
+func IsStandard(root string) bool {
+	home, err := os.UserHomeDir()
+	return err == nil && filepath.Clean(root) == StandardRoot(home)
+}
+
 // platformFolders is the Linux rule: a root in a temporary folder keeps cache/ and logs/
 // inside it; any other root has a folder of its own, roots/<name>-<hash>, under
 // $XDG_CACHE_HOME/agents and $XDG_STATE_HOME/agents/logs.

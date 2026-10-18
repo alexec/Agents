@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/alexec/agents/Go/internal/agentsd/store"
 	"github.com/alexec/agents/Go/internal/mac"
 )
 
@@ -17,7 +18,7 @@ import (
 // from a shell, and nothing on a scratch root is anybody's real work. Whatever the
 // policy, another account is turned away before it can send a line.
 func platformSocketPolicy(d *Daemon) SocketPolicy {
-	if !isStandardRoot(d.Store.Loc.Root) && os.Getenv("AGENTS_ENFORCE_ROLES") == "" {
+	if !store.IsStandard(d.Store.Loc.Root) && os.Getenv("AGENTS_ENFORCE_ROLES") == "" {
 		return ownAccount{openPolicy{why: "a scratch root, so "}}
 	}
 	helper := os.Getenv("AGENTS_PEER_HELPER")
@@ -41,11 +42,6 @@ func platformSocketPolicy(d *Daemon) SocketPolicy {
 		log.Printf("socket: %v", err)
 	}
 	return signatures{peers: p, team: team}
-}
-
-func isStandardRoot(root string) bool {
-	home, err := os.UserHomeDir()
-	return err == nil && filepath.Clean(root) == filepath.Join(home, ".agents")
 }
 
 // ownTokenOf is the caller's audit token, if it is this account's.

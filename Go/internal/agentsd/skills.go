@@ -54,11 +54,10 @@ func (d *Daemon) skillPlace(dest wire.SkillDestination) (skillcatalog.Place, err
 	return skillcatalog.Resolve(dest, d.personalHome(), d.Store.Loc.Root, d.usesRealTrash(), os.Getenv, d.isProjectFolder)
 }
 
-// usesRealTrash is the ordinary daemon on a Mac: ~/.agents, with no personal home named.
+// usesRealTrash is the ordinary daemon on a Mac: the standard root, with no personal home
+// named.
 func (d *Daemon) usesRealTrash() bool {
-	home, err := os.UserHomeDir()
-	return err == nil && goruntime.GOOS == "darwin" && os.Getenv("AGENTS_PERSONAL_HOME") == "" &&
-		filepath.Clean(d.Store.Loc.Root) == filepath.Join(home, ".agents")
+	return goruntime.GOOS == "darwin" && os.Getenv("AGENTS_PERSONAL_HOME") == "" && store.IsStandard(d.Store.Loc.Root)
 }
 
 // isProjectFolder is a project here, one an agent has worked in, or a worktree of either
