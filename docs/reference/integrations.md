@@ -143,7 +143,8 @@ Open issues: `is:open label:integration "control plane"`.
 | Caddy with ACME | control plane | built | — | `deploy/` | #61 |
 | Bonjour discovery | Mac, control plane | built | — | `Host/Sources/LocalServices.swift`, `Go/internal/controlplane/machine.go` | |
 | ssh host install and tunnels | Mac, server, control plane | built | — | `Go/internal/controlplane/hostinstall/ssh.go`, `Go/internal/controlplane/hosttunnels/ssh.go` | |
-| The control plane on a cloud machine | control plane | planned | — | — | #61 |
+| Google Cloud (Compute Engine VM and Cloud KMS) for the control plane | control plane | built (not walked on a real account) | 2026-10-18, `--dry-run` only, flags checked against gcloud 589.0.0 | `deploy/gcp/up.sh`, `deploy/gcp/down.sh`, `deploy/gcp/startup.sh` | #1461 |
+| Cloudflare DNS for the control plane's names | control plane | built (not walked on a real account) | 2026-10-18, `--dry-run` only | `deploy/cloudflare/dns.sh` | #1461, #1468 |
 
 ## Model gateways
 
