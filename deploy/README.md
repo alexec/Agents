@@ -12,9 +12,9 @@ it out:
 | `Containerfile` | Static `agents-control` and `workspace-commands`, built in the image from `Go/` (with the web remote from `Web/`), on Alpine, a user of their own. Built from the repository's root. |
 | `compose.yaml` | MinIO (the bucket), three copies, and Caddy in front of them. |
 | `Caddyfile` | TLS, round robin, and `/readyz` health checks, so a copy that can't reach the store gets no new connections. |
-| `make-secrets.sh` | The control plane's key, shared by every copy, plus Caddy's certificate and its pin. With `--public`, the key only. |
+| `make-secrets.sh` | The control plane's key, shared by every copy, plus Caddy's certificate and its pin. With `--public`, no key file: the Cloud KMS key's name and the service account file. |
 | `compose.public.yaml`, `Caddyfile.public` | One copy at a real domain, with a certificate from Let's Encrypt and no pin (#61). |
-| `compose.pebble.yaml`, `pebble/` | The same with Pebble, Let's Encrypt's test CA, standing in: no domain and no real CA. |
+| `compose.pebble.yaml`, `pebble/` | The same with Pebble, Let's Encrypt's test CA, standing in: no domain and no real CA. A local keeper stands in for Cloud KMS. |
 
 ## Bringing it up
 
@@ -48,14 +48,35 @@ certificate from Let's Encrypt (`auto_https` on) for `AGENTS_DOMAIN`:
 
 ```sh
 scripts/build-linux-agentsd.sh               # the host that joining servers download
-deploy/make-secrets.sh --public
+deploy/make-secrets.sh --public --kms projects/P/locations/L/keyRings/R/cryptoKeys/K \
+    --service-account sa.json
 AGENTS_DOMAIN=agents.example.com ACME_EMAIL=you@example.com \
     docker compose -f deploy/compose.public.yaml up -d --build
 ```
 
 The name must point at the machine, with ports 80 and 443 open. Codes carry no pin, and a
 renewal needs nothing from clients or hosts. Don't set `AGENTS_CONTROL_PIN` here: Caddy
-makes a new key at each renewal (058 research R15). The how-to is
+makes a new key at each renewal (058 research R15).
+
+The control key is never on this machine's disk in clear (#1458). Google Cloud KMS seals it in
+the store (`v1/keys/control.sealed`), and the copy opens it at each start:
+
+| Variable | Here |
+|---|---|
+| `AGENTS_CONTROL_KMS` | `gcpkms://` and the key's name, written in `deploy/.env` by `make-secrets.sh --public --kms` |
+| `GOOGLE_APPLICATION_CREDENTIALS` | `/run/secrets/gcp-service-account`: the service account file that may use the key (Cloud KMS CryptoKey Encrypter/Decrypter). Without `--service-account` the file is empty, and the machine's own service account is used: then no secret of any kind is on the disk. |
+
+With no sealed key in the store, the first start makes a new key and seals it. To bring a key
+from elsewhere (a Mac's, for a move), build the image and seal the key before the first
+`up`. Pipe the key in, so it is never written on the machine:
+
+```sh
+ssh you@agents.example.com 'cd agents && docker compose -f deploy/compose.public.yaml build control'
+ssh you@agents.example.com 'cd agents && docker compose -f deploy/compose.public.yaml \
+    run --rm -T control key seal --key-fd 0' < control-key
+```
+
+Another key given for a store that already has one is refused. The how-to is
 [Run the control plane in the cloud](../docs/how-to/run-the-control-plane-in-the-cloud.md).
 
 ### Trying it with no domain: Pebble

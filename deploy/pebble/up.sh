@@ -10,9 +10,14 @@
 set -euo pipefail
 deploy=${0:A:h:h}
 export AGENTS_DOMAIN=agents.127.0.0.1.sslip.io ACME_EMAIL=walk@example.com
-compose=(docker compose -p agents-pebble -f $deploy/compose.public.yaml -f $deploy/compose.pebble.yaml)
+mkdir -p $deploy/secrets && chmod 700 $deploy/secrets
+# No Google Cloud for a walk: a local keeper stands in for Cloud KMS (#1458), and an empty
+# service account file. Its own env file, so deploy/.env's real key name is left alone.
+walk_env=$deploy/secrets/pebble.env
+[[ -s $walk_env ]] || print "AGENTS_CONTROL_KMS=base64key://$(head -c 32 /dev/urandom | base64 | tr '+/' '-_')" > $walk_env
+[[ -f $deploy/secrets/gcp-service-account ]] || : > $deploy/secrets/gcp-service-account
+compose=(docker compose -p agents-pebble --env-file $walk_env -f $deploy/compose.public.yaml -f $deploy/compose.pebble.yaml)
 
-$deploy/make-secrets.sh --public
 # Pebble's ACME directory is HTTPS signed by its own test CA, which Caddy has to trust.
 id=$(docker create ghcr.io/letsencrypt/pebble:latest)
 docker cp -q $id:/test/certs/pebble.minica.pem $deploy/secrets/pebble-minica.pem
