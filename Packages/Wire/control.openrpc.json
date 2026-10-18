@@ -155,6 +155,26 @@
       }
     },
     {
+      "name": "clients/setPushToken",
+      "description": "A device, over its own session (#1460): its APNs token, kept in its own client record, which only it may set. Refused from a window or a browser.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/PushToken"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
       "name": "clients/startPairing",
       "paramStructure": "by-name",
       "params": [

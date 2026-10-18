@@ -418,6 +418,19 @@ func (r *Router) RelaysHeldHere() []string {
 	return out
 }
 
+// RelayOnline says whether a relaying host is online anywhere: held here, or at another
+// copy that this one reaches it through (#1460).
+func (r *Router) RelayOnline() bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for host, on := range r.relays {
+		if on && r.hosts[host] != nil {
+			return true
+		}
+	}
+	return false
+}
+
 // MARK: Hosts
 
 // AttachHost takes a host's uplink: a channel opens to it for every client session, then

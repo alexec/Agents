@@ -16206,6 +16206,80 @@
       ],
       "additionalProperties": false
     },
+    "PushEnvironment": {
+      "type": "string",
+      "enum": [
+        "development",
+        "production"
+      ],
+      "description": "Which APNs a device token belongs to (#1460): a Debug build's (sandbox) or a TestFlight and App Store build's."
+    },
+    "PushToken": {
+      "type": "object",
+      "description": "clients/setPushToken (#1460): a device's own APNs token, in hex, for the control plane to push to when no Mac host relays its notices. No token takes it away.",
+      "properties": {
+        "token": {
+          "type": "string"
+        },
+        "environment": {
+          "$ref": "#/definitions/PushEnvironment"
+        }
+      },
+      "required": [
+        "environment"
+      ],
+      "additionalProperties": false
+    },
+    "SealedEnvelope": {
+      "type": "object",
+      "description": "Envelope: HPKE (P-256, HKDF-SHA256, AES-256-GCM) to one device's key. Nothing in it is legible but to that device.",
+      "properties": {
+        "encapsulated": {
+          "$ref": "#/definitions/Base64"
+        },
+        "ciphertext": {
+          "$ref": "#/definitions/Base64"
+        }
+      },
+      "required": [
+        "encapsulated",
+        "ciphertext"
+      ],
+      "additionalProperties": false
+    },
+    "ControlPushItem": {
+      "type": "object",
+      "description": "What a control plane's push carries, sealed whole to the device (#1460): the need, whether to buzz, and the banner's words. No headline is a withdrawal.",
+      "properties": {
+        "needID": {
+          "$ref": "#/definitions/NeedID"
+        },
+        "alert": {
+          "type": "boolean"
+        },
+        "headline": {
+          "$ref": "#/definitions/Headline"
+        }
+      },
+      "required": [
+        "needID",
+        "alert"
+      ],
+      "additionalProperties": false
+    },
+    "ControlPush": {
+      "type": "object",
+      "description": "The `agents` key of a push the control plane sends through APNs (#1460), beside an `aps` that says only that an agent needs the person: a ControlPushItem, sealed.",
+      "properties": {
+        "sealed": {
+          "$ref": "#/definitions/SealedEnvelope"
+        }
+      },
+      "required": [
+        "sealed"
+      ],
+      "additionalProperties": false
+    },
     "PairingSecret": {
       "type": "object",
       "description": "pairing/current: the secret the bridge's listener should take, if any.",

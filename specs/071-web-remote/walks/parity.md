@@ -15,7 +15,7 @@
 
 ## Counts
 
-Of 234 rows: **157 same**, **49 by design**, **28 delta** (after #188, #189, #191, #221, #238–#244, #249, #252–#255, #257, #259–#261, #263–#266, #291, #254, #317, #341, #342, #343, #345, #344, #357, #366, #375, #377, #381, #378, #400, #396, #394, #436, #433, #432, #506, #545, #548, #791, #790, #846, #826, #888, #982, #1089, #1109, #1122, #1419, #1123, #1118, #1473, #1459). A row with any open delta counts as delta, even where another side's difference is by design.
+Of 235 rows: **157 same**, **50 by design**, **28 delta** (after #188, #189, #191, #221, #238–#244, #249, #252–#255, #257, #259–#261, #263–#266, #291, #254, #317, #341, #342, #343, #345, #344, #357, #366, #375, #377, #381, #378, #400, #396, #394, #436, #433, #432, #506, #545, #548, #791, #790, #846, #826, #888, #982, #1089, #1109, #1122, #1419, #1123, #1118, #1473, #1459, #1460). A row with any open delta counts as delta, even where another side's difference is by design.
 
 | Screen | Same | By design | Delta |
 |---|---|---|---|
@@ -31,7 +31,7 @@ Of 234 rows: **157 same**, **49 by design**, **28 delta** (after #188, #189, #19
 | Settings and Project Settings | 4 | 8 | 0 |
 | Pool, runtimes and spending | 8 | 1 | 2 |
 | Events and resources | 2 | 1 | 2 |
-| Notifications and badges | 3 | 2 | 0 |
+| Notifications and badges | 3 | 3 | 0 |
 | Disk strip | 2 | 1 | 0 |
 | Hosts, connection and pairing | 5 | 3 | 1 |
 | MCP Apps views | 5 | 1 | 0 |
@@ -358,6 +358,7 @@ The deltas are tracked by 31 issues:
 | Feature | Mac | Remote | Web | Verdict |
 |---|---|---|---|---|
 | Notifications | `A/Notifications/MacNotifier.swift:37-79` | Local and push: `R/Notifications/DeviceNotifier.swift:34-98` | None: `W/presence.ts:5` | **by design** (071: the page takes no notices) |
+| Notices with no Mac host relaying (#1460): the control plane pushes through APNs itself, a generic alert with the item sealed to the device, only when no relay host is online anywhere, and only from the copy that heard the need, so one notice arrives once. The device gives its APNs token over its own session (`clients/setPushToken`) | None needed: the Mac gets notices from its own host | The token from `R/Notifications/PushDelegate.swift` to `sendPushToken` in `R/RemoteModel.swift`; a loud push opened in `RemoteNotify/Sources/NotificationService.swift`, a quiet one in `receivedPush`, both by `K/Remote/ControlPush.swift`. Go: `Go/internal/controlplane/push.go`, `Go/internal/controlplane/apns/` | None: no notifications on the page; Web Push is #1486 | **by design** (mac: its own host's notices; web: #1486); the real push waits for Alex's key (#1461), unwalked on a device |
 | The needs-you count | Dock badge: `A/ContentView.swift:267-268`; live, so no time. The daemon sends its count to the control plane for the devices (#1163): `K/Daemon/DaemonCore+Attention.swift` (`waitingCount`) | App icon badge and widget, from the widget's count; away, from the Mac's count on each push, and a silent count push when it moves (#1163); Needs You says "Updated 14:02" when not live, the widget always: `R/RemoteModel.swift`, `R/Sidebar/RemoteSidebar.swift` (`SmartHeading`), `RemoteWidget/Sources/AttentionEntryView.swift` | The tab's title: `W/presence.ts:16-30`; Needs You says "Updated 14:02" while the link is lost (#1163): `W/views/Sidebar.tsx`, `W/model/updated.ts` | **same** (#1163); unwalked on a device |
 | Answering from the banner (#1170): a permission's own options as buttons (reject ones red), a question's one choice of 2–4 options as buttons, a one-field question as Reply; every button asks for an unlock; a form opens the card. The answers ride in the sealed headline (`K/Remote/QuickAnswer.swift`, `K/Remote/BannerAnswers.swift`) | `A/Notifications/MacNotifier.swift`, `answerFromBanner` in `A/AppModel.swift` | Local and push (`RemoteNotify/Sources/NotificationService.swift`), answered in the background: `R/Notifications/DeviceNotifier.swift`, `answerFromBanner` in `R/RemoteModel.swift` | None: no notifications | **by design** (071: the page takes no notices); unwalked |
 | The needs-you count | Dock badge: `A/ContentView.swift:267-268` | App icon badge, from the widget's count: `R/RemoteModel.swift` | The tab's title: `W/presence.ts:16-30` | **same** |

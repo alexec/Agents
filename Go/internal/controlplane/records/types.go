@@ -45,30 +45,42 @@ type ClientRecord struct {
 	ForgottenAt *Stamp
 	// The newest list of endpoints it has said it holds (R16).
 	KnownEpoch *int
-	Extra      Extra
+	// A device's own APNs token (#1460), set only by that device over its own session,
+	// for the control plane to push to when no Mac host relays its notices. Never on the
+	// wire to another client.
+	PushToken *PushToken
+	Extra     Extra
+}
+
+// PushToken is a device's APNs token, hex, and which APNs it is from: "development" (a
+// Debug build) or "production".
+type PushToken struct {
+	Token       string `json:"token"`
+	Environment string `json:"environment"`
 }
 
 type clientJSON struct {
-	ID          string  `json:"id"`
-	Name        string  `json:"name"`
-	Kind        string  `json:"kind"`
-	PublicKey   []byte  `json:"publicKey"`
-	Grant       string  `json:"grant"`
-	Paired      Stamp   `json:"paired"`
-	LastSeen    *Stamp  `json:"lastSeen,omitempty"`
-	MayNotify   *bool   `json:"mayNotify,omitempty"`
-	Owner       *string `json:"owner,omitempty"`
-	Rev         int     `json:"rev"`
-	Forgotten   *bool   `json:"forgotten,omitempty"`
-	ForgottenAt *Stamp  `json:"forgottenAt,omitempty"`
-	KnownEpoch  *int    `json:"knownEpoch,omitempty"`
+	ID          string     `json:"id"`
+	Name        string     `json:"name"`
+	Kind        string     `json:"kind"`
+	PublicKey   []byte     `json:"publicKey"`
+	Grant       string     `json:"grant"`
+	Paired      Stamp      `json:"paired"`
+	LastSeen    *Stamp     `json:"lastSeen,omitempty"`
+	MayNotify   *bool      `json:"mayNotify,omitempty"`
+	Owner       *string    `json:"owner,omitempty"`
+	Rev         int        `json:"rev"`
+	Forgotten   *bool      `json:"forgotten,omitempty"`
+	ForgottenAt *Stamp     `json:"forgottenAt,omitempty"`
+	KnownEpoch  *int       `json:"knownEpoch,omitempty"`
+	PushToken   *PushToken `json:"pushToken,omitempty"`
 }
 
 // MarshalJSON writes grant: operator, which an older copy needs to read the record at
 // all, and which tells it the truth.
 func (c ClientRecord) MarshalJSON() ([]byte, error) {
 	return encodeKeeping(clientJSON{c.ID, c.Name, c.Kind, c.PublicKey, LegacyGrant, c.Paired, c.LastSeen, c.MayNotify,
-		c.Owner, c.Rev, c.Forgotten, c.ForgottenAt, c.KnownEpoch}, c.Extra)
+		c.Owner, c.Rev, c.Forgotten, c.ForgottenAt, c.KnownEpoch, c.PushToken}, c.Extra)
 }
 
 // UnmarshalJSON does not read the grant: every client may do everything (#111).
@@ -87,7 +99,7 @@ func (c *ClientRecord) UnmarshalJSON(data []byte) error {
 		j.Kind = KindUnknown
 	}
 	*c = ClientRecord{strings.ToUpper(j.ID), j.Name, j.Kind, j.PublicKey, j.Paired, j.LastSeen, j.MayNotify, j.Owner,
-		j.Rev, j.Forgotten, j.ForgottenAt, j.KnownEpoch, extra}
+		j.Rev, j.Forgotten, j.ForgottenAt, j.KnownEpoch, j.PushToken, extra}
 	return nil
 }
 

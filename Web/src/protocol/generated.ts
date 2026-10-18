@@ -914,6 +914,24 @@ export interface ControlOK {
   epoch?: number;
 }
 
+/**
+ * The `agents` key of a push the control plane sends through APNs (#1460), beside an `aps` that
+ * says only that an agent needs the person: a ControlPushItem, sealed.
+ */
+export interface ControlPush {
+  sealed: SealedEnvelope;
+}
+
+/**
+ * What a control plane's push carries, sealed whole to the device (#1460): the need, whether to
+ * buzz, and the banner's words. No headline is a withdrawal.
+ */
+export interface ControlPushItem {
+  needID: NeedID;
+  alert: boolean;
+  headline?: Headline;
+}
+
 export interface ControlStatus {
   name: string;
   version: string;
@@ -2697,6 +2715,21 @@ export interface ProviderSummary {
   problem?: string;
 }
 
+/**
+ * Which APNs a device token belongs to (#1460): a Debug build's (sandbox) or a TestFlight and App
+ * Store build's.
+ */
+export type PushEnvironment = "development" | "production";
+
+/**
+ * clients/setPushToken (#1460): a device's own APNs token, in hex, for the control plane to push to
+ * when no Mac host relays its notices. No token takes it away.
+ */
+export interface PushToken {
+  token?: string;
+  environment: PushEnvironment;
+}
+
 export interface QueuedPrompt {
   id: UUID;
   text: string;
@@ -3043,6 +3076,15 @@ export interface SandboxSettings {
 }
 
 export type SandboxState = "on" | "off" | "runtimeControlled" | "none";
+
+/**
+ * Envelope: HPKE (P-256, HKDF-SHA256, AES-256-GCM) to one device's key. Nothing in it is legible
+ * but to that device.
+ */
+export interface SealedEnvelope {
+  encapsulated: Base64;
+  ciphertext: Base64;
+}
 
 /**
  * What the Send sheet shows (#1123): the local branches, the one checked out (none when detached),
@@ -4534,6 +4576,8 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ControlInstallProgress: { required: ["name", "step"], optional: [] },
   ControlMoved: { required: ["url", "controlKey", "name"], optional: ["pin"] },
   ControlOK: { required: ["mac"], optional: ["grant", "host", "relayed", "endpoints", "epoch"] },
+  ControlPush: { required: ["sealed"], optional: [] },
+  ControlPushItem: { required: ["needID", "alert"], optional: ["headline"] },
   ControlStatus: { required: ["name", "version", "machineID"], optional: ["homeHost", "startedAt", "port", "awayFromHome", "you", "relayKey", "web", "publicWeb", "thisMacHost", "projectDetection", "unjoinedTunnels"] },
   Cost: { required: ["amount", "currency"], optional: [] },
   CostLimits: { required: [], optional: ["perAgent", "daily", "perAgentTokens", "dailyTokens"] },
@@ -4765,6 +4809,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ProviderRuntime: { required: ["id", "name", "isDefault"], optional: [] },
   ProviderRuntimes: { required: ["runtimes"], optional: ["host", "why"] },
   ProviderSummary: { required: ["id", "name", "kind", "secrets", "capabilities", "contract", "mapped", "workspaces", "current"], optional: ["preset", "listedAt", "problem"] },
+  PushToken: { required: ["environment"], optional: ["token"] },
   QueuedPrompt: { required: ["id", "text", "attachments", "queuedAt", "from"], optional: ["preface", "sender", "hops"] },
   QueuedStart: { required: ["labels"], optional: ["runtimeID", "permissionMode", "model", "worktree"] },
   QuickAnswer: { required: ["kind", "id", "title", "isDestructive"], optional: ["field"] },
@@ -4806,6 +4851,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   SSHHostsRequest: { required: [], optional: ["destination"] },
   SandboxFailureRecord: { required: ["runtimeID", "detail", "hang", "recoveryOffered", "completedToolCalls"], optional: [] },
   SandboxSettings: { required: ["defaults"], optional: [] },
+  SealedEnvelope: { required: ["encapsulated", "ciphertext"], optional: [] },
   SendFacts: { required: ["branches", "hasChanges"], optional: ["current", "origin"] },
   SendFactsRequest: { required: ["folder"], optional: [] },
   SendFile: { required: ["id", "size"], optional: [] },

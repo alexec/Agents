@@ -45,7 +45,10 @@ struct RemoteApp: App {
                 .environment(model)
                 // A new model on a new link once the phone pairs with a control plane.
                 .id(ObjectIdentifier(model))
-                .task { push.received = { [model] userInfo in await model.receivedPush(userInfo) } }
+                .task {
+                    push.received = { [model] userInfo in await model.receivedPush(userInfo) }
+                    push.registered = { [model] token in model.pushTokenArrived(token) }
+                }
                 #if DEBUG && targetEnvironment(simulator)
                 // The walk simulator pairs with a scratch control plane's code (#1287): its
                 // Paste control takes no press but a finger's. Only with -walk.

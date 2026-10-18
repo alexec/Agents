@@ -1101,6 +1101,18 @@ type ControlOK struct {
 	Epoch     *int64            `json:"epoch,omitzero"`
 }
 
+// The `agents` key of a push the control plane sends through APNs (#1460), beside an `aps` that says only that an agent needs the person: a ControlPushItem, sealed.
+type ControlPush struct {
+	Sealed SealedEnvelope `json:"sealed"`
+}
+
+// What a control plane's push carries, sealed whole to the device (#1460): the need, whether to buzz, and the banner's words. No headline is a withdrawal.
+type ControlPushItem struct {
+	NeedID   NeedID    `json:"needID"`
+	Alert    bool      `json:"alert"`
+	Headline *Headline `json:"headline,omitzero"`
+}
+
 type ControlStatus struct {
 	Name         string           `json:"name"`
 	Version      string           `json:"version"`
@@ -3361,6 +3373,20 @@ type ProviderSummary struct {
 	Problem      *string         `json:"problem,omitzero"`
 }
 
+// Which APNs a device token belongs to (#1460): a Debug build's (sandbox) or a TestFlight and App Store build's.
+type PushEnvironment string
+
+const (
+	PushEnvironmentDevelopment PushEnvironment = "development"
+	PushEnvironmentProduction  PushEnvironment = "production"
+)
+
+// clients/setPushToken (#1460): a device's own APNs token, in hex, for the control plane to push to when no Mac host relays its notices. No token takes it away.
+type PushToken struct {
+	Token       *string         `json:"token,omitzero"`
+	Environment PushEnvironment `json:"environment"`
+}
+
 type QueuedPrompt struct {
 	ID          UUID           `json:"id"`
 	Text        string         `json:"text"`
@@ -3795,6 +3821,12 @@ const (
 	SandboxStateRuntimeControlled SandboxState = "runtimeControlled"
 	SandboxStateNone              SandboxState = "none"
 )
+
+// Envelope: HPKE (P-256, HKDF-SHA256, AES-256-GCM) to one device's key. Nothing in it is legible but to that device.
+type SealedEnvelope struct {
+	Encapsulated Data `json:"encapsulated"`
+	Ciphertext   Data `json:"ciphertext"`
+}
 
 // What the Send sheet shows (#1123): the local branches, the one checked out (none when detached), the origin, and whether anything is uncommitted.
 type SendFacts struct {

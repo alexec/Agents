@@ -26,6 +26,9 @@ public struct Envelope: Hashable, Sendable, Codable {
     #if canImport(CryptoKit)
     static let suite = HPKE.Ciphersuite.P256_SHA256_AES_GCM_256
     static let purpose = Data("com.alexecollins.agents.headline.v1".utf8)
+    /// What a control plane's own push is sealed under (#1460): not a headline's, so
+    /// neither can be opened as the other.
+    static let pushPurpose = Data("com.alexecollins.agents.push.v1".utf8)
 
     /// Seal a headline to a device.
     public static func seal(_ headline: Headline, to publicKey: Data) throws -> Envelope {
@@ -42,8 +45,9 @@ public struct Envelope: Hashable, Sendable, Codable {
         return try JSONDecoder().decode(Headline.self, from: plaintext)
     }
 
-    static func open<Key: HPKEDiffieHellmanPrivateKey>(_ envelope: Envelope, with key: Key) throws -> Data {
-        var recipient = try HPKE.Recipient(privateKey: key, ciphersuite: suite, info: purpose,
+    static func open<Key: HPKEDiffieHellmanPrivateKey>(_ envelope: Envelope, with key: Key,
+                                                       info: Data = purpose) throws -> Data {
+        var recipient = try HPKE.Recipient(privateKey: key, ciphersuite: suite, info: info,
                                            encapsulatedKey: envelope.encapsulated)
         return try recipient.open(envelope.ciphertext)
     }

@@ -128,10 +128,10 @@ public struct DeviceKey: Sendable {
     }
 
     /// Open something sealed to this device.
-    func open(_ envelope: Envelope) throws -> Data {
+    func open(_ envelope: Envelope, info: Data = Envelope.purpose) throws -> Data {
         switch holder {
-        case .enclave(let key): return try Envelope.open(envelope, with: key)
-        case .software(let key): return try Envelope.open(envelope, with: key)
+        case .enclave(let key): return try Envelope.open(envelope, with: key, info: info)
+        case .software(let key): return try Envelope.open(envelope, with: key, info: info)
         }
     }
 

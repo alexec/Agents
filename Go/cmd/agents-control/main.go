@@ -67,6 +67,7 @@ import (
 	"github.com/alexec/agents/Go/internal/buildinfo"
 	"github.com/alexec/agents/Go/internal/controllink"
 	"github.com/alexec/agents/Go/internal/controlplane"
+	"github.com/alexec/agents/Go/internal/controlplane/apns"
 	"github.com/alexec/agents/Go/internal/controlplane/kms"
 	"github.com/alexec/agents/Go/internal/controlplane/records"
 	"github.com/alexec/agents/Go/internal/controlplane/store"
@@ -181,6 +182,26 @@ func storeCredentials() *controlplane.StoreCredentials {
 
 // publicWeb is the built web app to serve on the TLS listener at its own origin (#1459), or
 // "": --public-web or AGENTS_CONTROL_PUBLIC_WEB, and no --no-web.
+// pusher is the APNs key, Key ID and Team ID (#1460), a compose secret on the machine and
+// never in the store: nil when there is no key, which the service says once. A key that
+// can't be used is said here, and nothing is pushed.
+func pusher() controlplane.Pusher {
+	file := os.Getenv("AGENTS_APNS_KEY_FILE")
+	if file == "" {
+		return nil
+	}
+	if info, err := os.Stat(file); err != nil || info.Size() == 0 {
+		return nil
+	}
+	client, err := apns.New(apns.Config{KeyFile: file, KeyID: strings.TrimSpace(os.Getenv("AGENTS_APNS_KEY_ID")),
+		TeamID: strings.TrimSpace(os.Getenv("AGENTS_APNS_TEAM_ID"))})
+	if err != nil {
+		say("no pushes: " + err.Error())
+		return nil
+	}
+	return client
+}
+
 func publicWeb() string {
 	folder := value("--public-web")
 	if folder == "" {
@@ -391,6 +412,9 @@ func serve() {
 	}
 	cfg.Web = webConfig()
 	cfg.PublicWeb = publicWeb()
+	if p := pusher(); p != nil {
+		cfg.Push = p
+	}
 	// Whether the page is served, for Agents Host to read (071 R3): this run's, or none.
 	if home() != "" {
 		file := filepath.Join(home(), "web.json")
