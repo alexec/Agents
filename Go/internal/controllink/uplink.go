@@ -38,7 +38,7 @@ type Uplink struct {
 	Accept  Accept
 
 	mu       sync.Mutex
-	lines    *Lines
+	out      *sender
 	channels map[int]*channel
 	nextID   atomic.Int64
 	OnChange func(connected bool, problem string)
@@ -46,6 +46,113 @@ type Uplink struct {
 	// Lend is where this host's relay for a runtime listens on loopback, for a tunnel the
 	// control plane opens to it (the lending Mac's end, T091); 0 when it lends none.
 	Lend func(runtime string) int
+	// pingEvery is how often a quiet link is pinged, and how long its pong may take;
+	// upPing when 0.
+	pingEvery time.Duration
+}
+
+// The control plane's socket is written by a goroutine of its own, through a bounded queue,
+// as daemon.sock's clients are (#1399), so a control plane that stops reading (a stalled
+// TLS link, a half-open TCP one after sleep) never holds Broadcast, a channel's writer or
+// u.mu (#1403): its queue stays full for upQueueWait, or a write takes longer than Lines'
+// 10 s, and the socket is dropped. Run dials again. A ping finds a link gone quiet with
+// nothing to write.
+const (
+	upQueue     = 1024
+	upQueueWait = 2 * time.Second
+	upPing      = 20 * time.Second
+)
+
+type sender struct {
+	l    *Lines
+	out  chan string
+	done chan struct{}
+	once sync.Once
+}
+
+func newSender(l *Lines, ping time.Duration) *sender {
+	s := &sender{l: l, out: make(chan string, upQueue), done: make(chan struct{})}
+	safe.Go("uplink write", s.writeAll)
+	safe.Go("uplink ping", func() { s.ping(ping) })
+	return s
+}
+
+// send queues a line; it never waits for the control plane.
+func (s *sender) send(line string) error {
+	select {
+	case <-s.done:
+		return errOffline
+	default:
+	}
+	select {
+	case s.out <- line:
+		return nil
+	case <-s.done:
+		return errOffline
+	default:
+	}
+	// Full: a control plane behind in a burst gets a moment; one that reads nothing is dropped.
+	wait := time.NewTimer(upQueueWait)
+	defer wait.Stop()
+	select {
+	case s.out <- line:
+		return nil
+	case <-s.done:
+		return errOffline
+	case <-wait.C:
+		log.Printf("uplink: the control plane read none of the last %d lines in %s; dropped", upQueue, upQueueWait)
+		s.drop()
+		return errOffline
+	}
+}
+
+func (s *sender) writeAll() {
+	for {
+		select {
+		case <-s.done:
+			return
+		case line := <-s.out:
+			if err := s.l.Write(context.Background(), line); err != nil {
+				log.Printf("uplink: a write to the control plane failed: %v; dropped", err)
+				s.drop()
+				return
+			}
+		}
+	}
+}
+
+// ping pings the control plane every interval; with no pong within as long again, the link goes.
+func (s *sender) ping(every time.Duration) {
+	t := time.NewTicker(every)
+	defer t.Stop()
+	for {
+		select {
+		case <-s.done:
+			return
+		case <-t.C:
+			ctx, cancel := context.WithTimeout(context.Background(), every)
+			err := s.l.ws.Ping(ctx)
+			cancel()
+			if err != nil {
+				select {
+				case <-s.done:
+				default:
+					log.Printf("uplink: the control plane did not answer a ping in %s; dropped", every)
+					s.drop()
+				}
+				return
+			}
+		}
+	}
+}
+
+// drop ends the socket at once, without the closing handshake a stalled control plane
+// would hold up; Run's read then fails, and it dials again.
+func (s *sender) drop() {
+	s.once.Do(func() {
+		close(s.done)
+		_ = s.l.ws.CloseNow()
+	})
 }
 
 func (u *Uplink) Run(ctx context.Context) {
@@ -74,8 +181,13 @@ func (u *Uplink) Run(ctx context.Context) {
 			continue
 		}
 		wait = time.Second
+		ping := u.pingEvery
+		if ping <= 0 {
+			ping = upPing
+		}
+		out := newSender(l, ping)
 		u.mu.Lock()
-		u.lines = l
+		u.out = out
 		u.channels = map[int]*channel{}
 		u.mu.Unlock()
 		hello := u.Hello
@@ -92,11 +204,11 @@ func (u *Uplink) Run(ctx context.Context) {
 			}
 			u.receive(line)
 		}
-		l.Close()
+		out.drop()
 		u.mu.Lock()
 		open := u.channels
 		u.channels = nil
-		u.lines = nil
+		u.out = nil
 		u.mu.Unlock()
 		for _, c := range open {
 			c.end(false)
@@ -110,12 +222,12 @@ func (u *Uplink) Run(ctx context.Context) {
 
 func (u *Uplink) write(line string) error {
 	u.mu.Lock()
-	l := u.lines
+	out := u.out
 	u.mu.Unlock()
-	if l == nil {
+	if out == nil {
 		return errOffline
 	}
-	return l.Write(context.Background(), line)
+	return out.send(line)
 }
 
 type offline struct{}
