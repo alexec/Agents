@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/alexec/agents/Go/internal/agentsd/store"
 	"github.com/alexec/agents/Go/wire"
 )
 
@@ -46,7 +47,7 @@ func TestACardReachesTheWindowAfterThePause(t *testing.T) {
 	var told wire.AttentionNotification
 	c.until(t, "the window told", attentionNote(func(n wire.AttentionNotification) bool {
 		told = n
-		return n.Need != nil
+		return n.Need != nil && n.To != nil
 	}))
 	if told.To == nil || told.To.Mac == nil || !told.Alert || told.Need.Kind != wire.NeedKindPermission ||
 		told.Need.Headline.H3 != "Wants to Write hi.txt" || *told.Need.AgentID != id {
@@ -66,6 +67,48 @@ func TestACardReachesTheWindowAfterThePause(t *testing.T) {
 		return n.Need == nil && n.NeedID.Permission != nil && *n.NeedID.Permission == card.ID
 	}))
 	waitFor(t, "the turn's end", func() bool { return d.Store.Agent(id).State == wire.AgentStateFinished })
+}
+
+// A need shown on no surface is still told to every client, and so is its end (#1367): a
+// phone's Needs you and the widget it writes are drawn from what it was told, and a change
+// kept on the Mac must leave both.
+func TestEveryClientHearsANeedShownNowhereAndItsEnd(t *testing.T) {
+	d, c := start(t, t.TempDir())
+	defer d.Shutdown()
+	dir := project(t, c, 1)
+	folder := store.FolderURL(dir)
+	os.WriteFile(filepath.Join(dir, "a.md"), nil, 0o644)
+	c.call(t, 2, "pins/pin", map[string]any{"folder": folder, "path": "a.md"})
+	worker := seeded(t, d, dir, func(a *wire.Agent) {
+		a.State, a.EndedReason = wire.AgentStateRunning, nil
+	})
+	os.WriteFile(filepath.Join(dir, ".agents", "pins.json"), []byte(`{"pins":[]}`), 0o644)
+	d.readPins(dir)
+	var told wire.AttentionNotification
+	c.until(t, "the change told", attentionNote(func(n wire.AttentionNotification) bool {
+		told = n
+		return n.Need != nil
+	}))
+	if told.To != nil || told.Alert || told.Need.Kind != wire.NeedKindGuardedChange || told.Need.AgentID == nil ||
+		*told.Need.AgentID != worker.ID || told.NeedID.GuardedChange == nil {
+		t.Fatalf("%+v %+v", told, told.Need)
+	}
+	// Told once, however often it is looked at again.
+	d.reconsider()
+	// Kept: every client hears it is over, by its id alone.
+	var reading wire.GuardedChangeReading
+	json.Unmarshal(c.call(t, 3, "projects/readGuardedChange", map[string]any{"folder": folder, "path": ".agents/pins.json"}), &reading)
+	c.in <- `{"jsonrpc":"2.0","id":4,"method":"approvals/answer","params":{"folder":"` + string(folder) +
+		`","kind":"file","key":".agents/pins.json","digest":"` + *reading.Digest + `","action":"approve"}}`
+	c.until(t, "the change over", attentionNote(func(n wire.AttentionNotification) bool {
+		if n.Need != nil {
+			t.Fatalf("told again: %+v", n.Need)
+		}
+		return n.NeedID.GuardedChange != nil && n.NeedID.GuardedChange.Path == ".agents/pins.json"
+	}))
+	if n := d.attentionPending().Needs; len(n) != 0 {
+		t.Fatalf("%+v", n)
+	}
 }
 
 func TestWatchingSilencesItAndALookReadsAReport(t *testing.T) {

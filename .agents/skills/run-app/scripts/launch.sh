@@ -103,7 +103,7 @@ CONTROL_TOOL="$HELPERS/agents-control"
 # CONTROL_BIN: another agents-control in its place:
 #   GOOS=darwin Go/scripts/go.sh build -o out/darwin/agents-control ./cmd/agents-control
 #   CONTROL_BIN=$PWD/Go/out/darwin/agents-control launch.sh …
-[ -n "${CONTROL_BIN:-}" ] && CONTROL="$CONTROL_BIN"
+[ -n "${CONTROL_BIN:-}" ] && CONTROL="$CONTROL_BIN" && CONTROL_TOOL="$CONTROL_BIN"
 # AGENTSD_BIN: another agentsd in its place:
 #   GOOS=darwin Go/scripts/go.sh build -o out/darwin/agentsd ./cmd/agentsd
 #   AGENTSD_BIN=$PWD/Go/out/darwin/agentsd launch.sh …
