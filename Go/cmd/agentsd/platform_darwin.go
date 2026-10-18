@@ -1,33 +1,6 @@
 package main
 
-import (
-	"os/exec"
-	"regexp"
-	"strings"
-
-	"github.com/alexec/agents/Go/internal/agentsd/store"
-)
+import "github.com/alexec/agents/Go/internal/agentsd/store"
 
 // standardRoot is ~/Library/Application Support/Agents, as Foundation has it on a Mac.
 func standardRoot(home string) string { return store.StandardRoot(home) }
-
-var platformUUID = regexp.MustCompile(`"IOPlatformUUID" = "([0-9A-Fa-f-]{36})"`)
-
-// hardwareUUID is gethostuuid(2), which MachineID.current reads on a Mac: the platform
-// expert's IOPlatformUUID, read without cgo (kern.uuid is another value). Upper case, as
-// UUID.uuidString.
-func hardwareUUID() string {
-	out, err := exec.Command("/usr/sbin/ioreg", "-rd1", "-c", "IOPlatformExpertDevice").Output()
-	if err != nil {
-		return ""
-	}
-	return parsePlatformUUID(string(out))
-}
-
-func parsePlatformUUID(ioreg string) string {
-	m := platformUUID.FindStringSubmatch(ioreg)
-	if m == nil {
-		return ""
-	}
-	return strings.ToUpper(m[1])
-}
