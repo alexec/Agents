@@ -73,7 +73,7 @@ struct PoppedChatWindow: View {
     /// Pin, Rename and Archive, as the main window's toolbar has them for its chat.
     @ToolbarContentBuilder
     private var toolbar: some ToolbarContent {
-        if let agent, let chat {
+        if let agent, chat != nil {
             ToolbarItemGroup {
                 let pinned = model.isPinned(agent)
                 Button {
@@ -84,20 +84,7 @@ struct PoppedChatWindow: View {
                 .disabled(agent.state == .archived)
                 .help(pinned ? "Take this session out of Pinned in the sidebar"
                              : "Keep this session in Pinned, at the top of the sidebar")
-                Button {
-                    chat.isRenaming = true
-                } label: {
-                    Label("Rename", systemImage: "pencil")
-                }
-                .disabled(agent.state == .archived)
-                .help("Give this session a title of your own, which the runtime's no longer replaces")
-                .popover(isPresented: Binding(get: { chat.isRenaming }, set: { chat.isRenaming = $0 }),
-                         arrowEdge: .bottom) {
-                    RenameField(agent: agent)
-                        .appText(.reading)
-                        .frame(width: 320)
-                        .padding(10)
-                }
+                RenameButton(agent: agent, place: .ownWindow)
                 if agent.state == .archived {
                     Button {
                         Task { await model.unarchive(agent.id) }

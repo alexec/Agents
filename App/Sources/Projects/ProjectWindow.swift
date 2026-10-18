@@ -179,7 +179,10 @@ private struct ProjectWindowColumns: View {
                 }
             }
             .onGeometryChange(for: Double.self) { $0.size.width } action: { window.frame.windowWidth = $0 }
-            .toolbar { ProjectWindowToolbar(window: window, summary: summary, showsChat: chat != nil) }
+            .toolbar {
+                ProjectWindowToolbar(window: window, summary: summary, showsChat: chat != nil,
+                                     agent: chat.flatMap { model.work.agent($0.id) })
+            }
         }
         .environment(window.frame)
         .environment(window.terminal)
@@ -326,13 +329,16 @@ private struct ProjectNewSessionRow: View {
 }
 
 /// A project's window's toolbar: "✋ N elsewhere" while another project's session needs
-/// the person, the project's shell, and the inspector beside a chat.
+/// the person, Rename for the session shown (#1452), the project's shell, and the
+/// inspector beside a chat.
 private struct ProjectWindowToolbar: ToolbarContent {
     @Environment(AppModel.self) private var model
     @Environment(\.openWindow) private var openWindow
     let window: ProjectWindowState
     let summary: DaemonAPI.ProjectSummary
     let showsChat: Bool
+    /// The session whose chat the window shows.
+    let agent: Agent?
 
     var body: some ToolbarContent {
         ToolbarItemGroup {
@@ -347,6 +353,11 @@ private struct ProjectWindowToolbar: ToolbarContent {
                         .labelStyle(.titleOnly)
                 }
                 .help("Sessions in other projects need you. Go to the first.")
+            }
+            // Here, not only in the main window's, so Session ▸ Rename… has a field in
+            // this window (#1452).
+            if showsChat, let agent {
+                RenameButton(agent: agent, place: .projectWindow(window.key))
             }
             Button {
                 window.terminal.toggle()

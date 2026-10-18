@@ -213,11 +213,8 @@ struct AgentsCommands: Commands {
                 Task { await model.setPinned(agent, !pinned) }
             }
             .disabled(agent == nil || agent?.state == .archived)
-            // The person's title (#751), edited in the toolbar.
-            Button("Rename…") {
-                guard let agent else { return }
-                if let popped { popped.isRenaming = true } else { model.renaming = Renaming(id: agent.id, inToolbar: true) }
-            }
+            // The person's title (#751), edited in the key window's toolbar.
+            Button("Rename…") { rename() }
             .disabled(agent == nil || agent?.state == .archived)
             Divider()
             Button("Branch") { act { await model.fork($0.id) } }
@@ -358,6 +355,21 @@ struct AgentsCommands: Commands {
     private func act(_ work: @escaping (Agent) async -> Void) {
         guard let agent = sessionAgent else { return }
         Task { await work(agent) }
+    }
+
+    /// Session ▸ Rename…: the title's field in the key window's toolbar, and only that
+    /// window's (#1452). In the main window a workflow can be open over the chat with the
+    /// session still selected (#926); the field is in the chat's toolbar, so back to it.
+    private func rename() {
+        guard let agent = sessionAgent, agent.state != .archived else { return }
+        if popped != nil {
+            model.renaming = Renaming(id: agent.id, place: .ownWindow)
+        } else if let projectWindow {
+            model.renaming = Renaming(id: agent.id, place: .projectWindow(projectWindow.key))
+        } else {
+            model.openWorkflow = nil
+            model.renaming = Renaming(id: agent.id, place: .mainWindow)
+        }
     }
 
     private func archive() {
