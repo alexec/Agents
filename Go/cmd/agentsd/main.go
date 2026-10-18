@@ -256,6 +256,11 @@ func join(ctx context.Context, cl commandLine, d *agentsd.Daemon) {
 	up := &controllink.Uplink{Root: loc.Root, Member: member, Private: private, Hello: hello, Accept: d.Accept,
 		Lend: d.LendingPort}
 	d.Tunneler = up
+	// The needs it shows nowhere go to the control plane, offered again on each return (#1367).
+	up.OnChange = func(connected bool, _ string) {
+		safe.Go("attention uplink", func() { d.ControlUplinkChanged(connected) })
+	}
+	d.SetControl(up.Tell)
 	safe.Go("uplink", func() {
 		// A panic in the uplink would leave the host up but offline: dial again.
 		for ctx.Err() == nil && safe.Catch("uplink", func() { up.Run(ctx) }) != nil {
