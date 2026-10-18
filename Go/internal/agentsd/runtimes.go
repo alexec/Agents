@@ -169,6 +169,35 @@ func loginEnvironment() []string {
 	return append(without(os.Environ(), "PATH"), "PATH="+strings.Join(path, ":"))
 }
 
+// mcpServerEnvironment is RuntimeEnvironment.forMCPServers: the login environment with the
+// shipped servers' folder (beside agentsd) first on PATH, so `.agents/mcp.json` names one
+// by its bare name ("github-mcp") on a Mac and a server alike, and a stale copy elsewhere
+// on PATH never answers for it (#1389).
+func mcpServerEnvironment() []string {
+	env := loginEnvironment()
+	self, err := os.Executable()
+	if err != nil {
+		return env
+	}
+	return prependPath(env, filepath.Dir(self))
+}
+
+func prependPath(env []string, dir string) []string {
+	for i, kv := range env {
+		if dirs, ok := strings.CutPrefix(kv, "PATH="); ok {
+			rest := []string{dir}
+			for _, d := range strings.Split(dirs, ":") {
+				if d != dir {
+					rest = append(rest, d)
+				}
+			}
+			env[i] = "PATH=" + strings.Join(rest, ":")
+			return env
+		}
+	}
+	return append(env, "PATH="+dir+":/usr/bin:/bin")
+}
+
 // loginCommand is exec.Command with env's PATH, not this process's, finding a bare name.
 func loginCommand(env []string, name string, args ...string) *exec.Cmd {
 	if !strings.Contains(name, "/") {

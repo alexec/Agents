@@ -42,3 +42,31 @@ func TestLoginEnvironmentHasTheUsualFolders(t *testing.T) {
 	}
 	t.Fatal("no PATH")
 }
+
+// A shipped MCP server is named by its bare name in .agents/mcp.json: the folder beside
+// agentsd is first on an MCP server's PATH, ahead of a stale copy elsewhere (#1389).
+func TestAnMCPServersPathStartsBesideAgentsd(t *testing.T) {
+	self, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, kv := range mcpServerEnvironment() {
+		if dirs, ok := strings.CutPrefix(kv, "PATH="); ok {
+			if got := strings.Split(dirs, ":"); got[0] != filepath.Dir(self) || slices.Contains(got[1:], filepath.Dir(self)) {
+				t.Fatalf("PATH %s", dirs)
+			}
+			return
+		}
+	}
+	t.Fatal("no PATH")
+}
+
+func TestPrependPathMovesTheFolderFirst(t *testing.T) {
+	env := prependPath([]string{"HOME=/h", "PATH=/a:/ours:/b"}, "/ours")
+	if env[1] != "PATH=/ours:/a:/b" {
+		t.Fatalf("%v", env)
+	}
+	if env := prependPath([]string{"HOME=/h"}, "/ours"); env[1] != "PATH=/ours:/usr/bin:/bin" {
+		t.Fatalf("%v", env)
+	}
+}

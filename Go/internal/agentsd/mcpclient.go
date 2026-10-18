@@ -181,7 +181,7 @@ type stdioMCP struct {
 }
 
 func startStdioMCP(s *sdk.McpServerStdio, cwd string) (*stdioMCP, error) {
-	cmd := loginCommand(loginEnvironment(), s.Command, s.Args...)
+	cmd := loginCommand(mcpServerEnvironment(), s.Command, s.Args...)
 	cmd.Dir = cwd
 	for _, e := range s.Env {
 		cmd.Env = append(cmd.Env, e.Name+"="+e.Value)
