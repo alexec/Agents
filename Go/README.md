@@ -66,7 +66,7 @@ build added kept whole), the copies' own messages, and the JSON-RPC envelope.
 | `controlplane/providers` | Workspace providers, kept requests, Write It for Me |
 
 **Linux hosts run the Go agentsd** (#1136). `install.sh` installs it, from
-`agentsd-go-linux-<arch>` (`scripts/build-linux-agentsd-go.sh`).
+`agentsd-linux-<arch>` (`scripts/build-linux-agentsd.sh`).
 
 **On a Mac (#1312, #1314).** Agents Host carries `Contents/Helpers/agents-control`
 (`scripts/go-control.sh`) and `Contents/Helpers/agentsd` (`scripts/go-agentsd.sh`), both Go:
@@ -97,7 +97,7 @@ and passes every other message to the official server unchanged. It signs in as 
 user (`gh auth token`, asked again each minute) and has no account of its own.
 
 Agents Host carries it in `Contents/Helpers` (`scripts/go-github-mcp.sh`, a build phase,
-as `agents-control` is), and `scripts/build-linux-agentsd-go.sh` builds
+as `agents-control` is), and `scripts/build-linux-agentsd.sh` builds
 `github-mcp-linux-<arch>`, which every Linux host installs beside agentsd. A project names
 it by bare name: `"github": { "command": "github-mcp", "hosted": true }`.
 
@@ -130,4 +130,4 @@ It answers MCP on stdio by itself, with no SDK: initialize, ping and the contrac
 The control plane runs it from beside itself, then `AGENTS_WORKSPACE_COMMANDS`, then `PATH`
 (`internal/controlplane/providers`). Agents Host carries it beside `agents-control`
 (`scripts/go-github-mcp.sh workspace-commands`); the control-plane image has it beside
-`agents-control` (`scripts/build-linux-control.sh`, `deploy/Containerfile`).
+`agents-control` (`deploy/Containerfile` builds both).

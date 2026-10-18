@@ -9,7 +9,7 @@ it out:
 
 | File | What it is |
 |---|---|
-| `Containerfile` | Static `agents-control` and `workspace-commands` on Alpine, a user of their own. |
+| `Containerfile` | Static `agents-control` and `workspace-commands`, built in the image from `Go/` (with the web remote from `Web/`), on Alpine, a user of their own. Built from the repository's root. |
 | `compose.yaml` | MinIO (the bucket), three copies, and Caddy in front of them. |
 | `Caddyfile` | TLS, round robin, and `/readyz` health checks, so a copy that can't reach the store gets no new connections. |
 | `make-secrets.sh` | The control plane's key, shared by every copy, plus Caddy's certificate and its pin. With `--public`, the key only. |
@@ -19,9 +19,8 @@ it out:
 ## Bringing it up
 
 ```sh
-scripts/build-linux-control.sh aarch64      # x86_64 on an Intel machine
 deploy/make-secrets.sh
-docker compose -f deploy/compose.yaml up -d --build
+docker compose -f deploy/compose.yaml up -d --build   # builds the image from Go/ and Web/
 ```
 
 The control plane is at `https://127.0.0.1:8443`, pinned by `deploy/secrets/pin`. A code comes
@@ -48,8 +47,7 @@ docker compose -f deploy/compose.yaml exec -T cp1 /agents-control code --host
 certificate from Let's Encrypt (`auto_https` on) for `AGENTS_DOMAIN`:
 
 ```sh
-scripts/build-linux-control.sh x86_64        # or aarch64
-scripts/build-linux-agentsd-go.sh            # the host that joining servers download
+scripts/build-linux-agentsd.sh               # the host that joining servers download
 deploy/make-secrets.sh --public
 AGENTS_DOMAIN=agents.example.com ACME_EMAIL=you@example.com \
     docker compose -f deploy/compose.public.yaml up -d --build

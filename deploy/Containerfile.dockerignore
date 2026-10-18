@@ -1,0 +1,8 @@
+# What deploy/Containerfile is sent from the repository (#1381): Go/ and Web/ only, so a
+# checkout's builds, worktrees and node_modules never go to the builder.
+*
+!Go/
+!Web/
+Go/out/
+Web/node_modules/
+Web/dist/

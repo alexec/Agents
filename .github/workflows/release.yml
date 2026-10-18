@@ -5,7 +5,7 @@
 # The release carries:
 #   Agents-Host-<version>.dmg              signed with Developer ID, notarized, stapled
 #   Agents-Host-<version>.zip              the same app, stapled, for Macs that can't mount a .dmg
-#   agentsd-go-linux-<arch>-<version>.tar.gz  the Linux agentsd (Go, #1136), with the MCP
+#   agentsd-linux-<arch>-<version>.tar.gz  the Linux agentsd (Go, #1136), with the MCP
 #                                          servers Agents ships (#700)
 #   SHA256SUMS
 #
@@ -73,9 +73,9 @@ jobs:
           AGENTS_BUILD: ${{ github.run_number }}
         run: |
           export AGENTS_MARKETING_VERSION="${TAG#v}"
-          zsh scripts/build-linux-agentsd-go.sh
+          zsh scripts/build-linux-agentsd.sh
           for arch in x86_64 aarch64; do
-            test -f App/Resources/servers/agentsd-go-linux-$arch || {
+            test -f App/Resources/servers/agentsd-linux-$arch || {
               echo "::error::agentsd was not built for $arch"; exit 1; }
           done
 

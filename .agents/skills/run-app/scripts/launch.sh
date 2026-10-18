@@ -129,7 +129,7 @@ if [ "$LAN" = 1 ]; then
   [ -n "$ADDRESS" ] || { echo "no LAN address on en0 or en1 for --lan" >&2; exit 1; }
   URL="https://$ADDRESS:$PORT"
 fi
-# The Linux hosts a server is given (scripts/build-linux-agentsd-go.sh), when built.
+# The Linux hosts a server is given (scripts/build-linux-agentsd.sh), when built.
 SERVERS=()
 [ -d "$REPO/App/Resources/servers" ] && SERVERS=(AGENTS_CONTROL_SERVERS="$REPO/App/Resources/servers")
 # --host-root: the host's join is in control/status, as on Agents Host's copy (#113).

@@ -174,10 +174,10 @@ func InstallCommand(url, pin, code string) string {
 
 // serverFileNames is ServerFiles.names: the only files /v1/servers/ hands out.
 var serverFileNames = func() map[string]bool {
-	names := map[string]bool{"VERSION": true, "VERSION-go": true}
+	names := map[string]bool{"VERSION": true}
 	for _, arch := range []string{"x86_64", "aarch64"} {
-		// agentsd-go (#1136): the Go host, a Linux host's default; github-mcp (#1232), linear-mcp (#839).
-		for _, program := range []string{"agentsd", "agentsd-go", "github-mcp", "linear-mcp"} {
+		// The host (Go, #1136; one name since #1381); github-mcp (#1232), linear-mcp (#839).
+		for _, program := range []string{"agentsd", "github-mcp", "linear-mcp"} {
 			names[program+"-linux-"+arch] = true
 			names[program+"-linux-"+arch+".sha256"] = true
 		}
@@ -201,11 +201,8 @@ func ServerFolder() string {
 	}
 	candidates = append(candidates, "/servers")
 	for _, c := range candidates {
-		// A folder with either host: a Go-only one (build-linux-agentsd-go.sh alone) too.
-		for _, version := range []string{"VERSION", "VERSION-go"} {
-			if _, err := os.Stat(filepath.Join(c, version)); err == nil {
-				return c
-			}
+		if _, err := os.Stat(filepath.Join(c, "VERSION")); err == nil {
+			return c
 		}
 	}
 	return ""

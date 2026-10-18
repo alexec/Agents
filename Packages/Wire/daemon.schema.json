@@ -5769,7 +5769,7 @@
     },
     "HostInstall": {
       "type": "object",
-      "description": "hosts/install (HostInstall.Request): a server over ssh, with its key, the fingerprint trusted, a tunnel, and `swift` for the Swift host.",
+      "description": "hosts/install (HostInstall.Request): a server over ssh, with its key, the fingerprint trusted, a tunnel.",
       "properties": {
         "destination": {
           "type": "string"
@@ -5785,9 +5785,6 @@
         },
         "tunnel": {
           "type": "boolean"
-        },
-        "implementation": {
-          "type": "string"
         }
       },
       "required": [
