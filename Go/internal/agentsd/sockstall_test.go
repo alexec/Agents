@@ -18,6 +18,10 @@ import (
 // A daemon.sock client that never reads does not hold Broadcast, or the clients that do
 // read: it is let go, and the others hear everything (#1399).
 func TestAStalledSocketClientIsLetGo(t *testing.T) {
+	// Both callers are windows, which hear notifications, whatever the platform's door.
+	old := socketPolicyFor
+	socketPolicyFor = func(*Daemon) SocketPolicy { return fixedPolicy{role: RoleControl, ok: true} }
+	t.Cleanup(func() { socketPolicyFor = old })
 	d, c := start(t, t.TempDir())
 	// The test's own connection is read too: only the socket's client stalls.
 	go func() {

@@ -106,5 +106,5 @@ func (p openPolicy) Summary() string {
 }
 
 // socketPolicyFor is the policy for d's daemon.sock: by code signature on a Mac
-// (roles_darwin.go), open elsewhere. Tests replace it.
+// (roles_darwin.go), by ssh session on Linux (roles_linux.go). Tests replace it.
 var socketPolicyFor = platformSocketPolicy
