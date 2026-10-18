@@ -601,7 +601,10 @@ func (d *Daemon) messageSession(caller wire.UUID, args map[string]json.RawMessag
 	busy = busy || inFlight(target.State) || target.State == wire.AgentStateQueued
 	waitsOnPerson := target.Report != nil && target.Report.Outcome == wire.WorkOutcomeNeedsAnswer && target.State == wire.AgentStateFinished
 	stopped := target.State == wire.AgentStateStopped
-	wakes := !busy && !stopped && !waitsOnPerson
+	// A target that may do more without asking than this session is not woken, and its
+	// turns pass the message over (nextTurn), until the person speaks to it.
+	looser := d.looserThan(target, me)
+	wakes := !busy && !stopped && !waitsOnPerson && looser == ""
 	if wakes && target.StartedByAgent != nil {
 		limit := int64(defaultRunningCap)
 		if s, ok := d.summaryFor(projectFolder(target)); ok && s.Project.HelperLimits != nil && s.Project.HelperLimits.Running != nil {
@@ -648,6 +651,8 @@ func (d *Daemon) messageSession(caller wire.UUID, args map[string]json.RawMessag
 		l.kick()
 	}
 	switch {
+	case looser != "":
+		return "Sent to " + name + ", but it waits in that chat until the person speaks to it: " + looser + "." + then, nil
 	case busy:
 		return "Sent to " + name + ". It is working, so it reads this once its turn ends." + then, nil
 	case stopped:

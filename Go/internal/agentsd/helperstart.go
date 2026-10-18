@@ -68,6 +68,61 @@ func inheritedMode(caller *wire.Agent, runtime string) *string {
 	return &s
 }
 
+// looserThan is how the target may do more without asking than the caller, or "": a mode
+// looser than the caller's, its sandbox not on while the caller's is, or, for a caller an
+// agent started, a target that has started sessions still here. A message from the caller
+// then waits for the person, as start_session gives a helper no looser a mode.
+func (d *Daemon) looserThan(target, caller *wire.Agent) string {
+	theirs, own := inheritedMode(target, target.RuntimeID), inheritedMode(caller, caller.RuntimeID)
+	switch {
+	case theirs == nil && own == nil:
+	case theirs == nil:
+		return "it runs in its runtime's own mode, which may let it do more without asking than yours (" + *own + ")"
+	case own == nil:
+		return "it runs in " + *theirs + ", and you in your runtime's own mode"
+	case !noLooser(*theirs, *own):
+		return "it runs in " + *theirs + ", which lets it do more without asking than yours (" + *own + ")"
+	}
+	on := func(a *wire.Agent) bool {
+		return a.EffectiveSandbox != nil && a.EffectiveSandbox.State == wire.SandboxStateOn
+	}
+	if on(caller) && !on(target) {
+		return "its command sandbox is not on, and yours is"
+	}
+	if caller.StartedByAgent != nil {
+		for _, a := range d.Store.Agents() {
+			if a.StartedByAgent != nil && *a.StartedByAgent == target.ID && a.State != wire.AgentStateArchived {
+				return "it has started sessions of its own, and you were started by a session"
+			}
+		}
+	}
+	return ""
+}
+
+// heldMessage is whether a message from another session waits in the target's queue
+// until the person speaks to it: its sender is gone, or the target is looser than it.
+func (d *Daemon) heldMessage(q wire.QueuedPrompt, target *wire.Agent) bool {
+	if q.From != wire.PromptOriginAgent {
+		return false
+	}
+	if q.Sender == nil {
+		return true
+	}
+	sender := d.Store.Agent(q.Sender.AgentID)
+	return sender == nil || d.looserThan(target, sender) != ""
+}
+
+// heldMessages is the ids of the messages in the agent's queue that wait for the person.
+func (d *Daemon) heldMessages(a *wire.Agent) map[wire.UUID]bool {
+	held := map[wire.UUID]bool{}
+	for _, q := range a.QueuedPrompts {
+		if d.heldMessage(q, a) {
+			held[q.ID] = true
+		}
+	}
+	return held
+}
+
 func (d *Daemon) unavailableRuntime(rt *runtimeDef) string {
 	if p, _, _ := locateFor(rt); p == "" {
 		return rt.Name + " is not installed on this host"
