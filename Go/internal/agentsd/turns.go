@@ -1,6 +1,7 @@
 package agentsd
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -952,10 +953,23 @@ func (l *live) Update(n sdk.SessionNotification) {
 		d.record(l.id, wire.TranscriptEntryKind{PlanUpdated: &wire.TranscriptEntryKindPlanUpdated{Value: plan}})
 	case u.CurrentModeUpdate != nil:
 		v, _ := json.Marshal(u.CurrentModeUpdate.CurrentModeId)
+		d.change(l.id, func(a *wire.Agent) {
+			id := "mode"
+			if o := modeOption(a.AdvertisedOptions); o != nil {
+				id = o.ID
+			}
+			keepMode(a, id, v)
+		})
 		d.record(l.id, wire.TranscriptEntryKind{OptionChanged: &wire.TranscriptEntryKindOptionChanged{ID: "mode", Value: v}})
 	case u.ConfigOptionUpdate != nil:
 		if opts := configOptions(u.ConfigOptionUpdate.ConfigOptions); opts != nil {
-			d.change(l.id, func(a *wire.Agent) { a.AdvertisedOptions = opts })
+			d.change(l.id, func(a *wire.Agent) {
+				was, now := modeOption(a.AdvertisedOptions), modeOption(opts)
+				if was != nil && now != nil && was.ID == now.ID && len(now.CurrentValue) > 0 && !bytes.Equal(was.CurrentValue, now.CurrentValue) {
+					keepMode(a, now.ID, now.CurrentValue)
+				}
+				a.AdvertisedOptions = opts
+			})
 		}
 	case u.AvailableCommandsUpdate != nil:
 		b, _ := json.Marshal(u.AvailableCommandsUpdate.AvailableCommands)
@@ -1211,4 +1225,23 @@ func (d *Daemon) stopAll() {
 			s.Stop()
 		}
 	}
+}
+
+// keepMode is the runtime moving itself to another mode (Claude leaving plan mode): the
+// agent's mode now, as the Swift host kept it, so that the checks that read it
+// (inheritedMode, looserThan) see the mode it runs in, not the one it started in.
+func keepMode(a *wire.Agent, id string, v wire.JSONValue) {
+	values := make(map[string]wire.JSONValue, len(a.StartOptions.Values)+1)
+	for k, old := range a.StartOptions.Values {
+		values[k] = old
+	}
+	values[id] = v
+	a.StartOptions.Values = values
+	opts := append([]wire.ConfigOption(nil), a.AdvertisedOptions...)
+	for i := range opts {
+		if opts[i].ID == id {
+			opts[i].CurrentValue = v
+		}
+	}
+	a.AdvertisedOptions = opts
 }
