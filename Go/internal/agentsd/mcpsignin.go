@@ -285,7 +285,7 @@ func (d *Daemon) mcpSignIn(ctx context.Context, r wire.MCPSignInRequest) wire.MC
 		// Kept once it has signed in, so a mistyped one is asked for again.
 		client, personsOwn = &c, &c
 	default:
-		if kept, ok := st.signIns.ClientFor(plan.Server.Issuer); ok {
+		if kept, ok := st.signIns.ClientFor(plan.Server); ok {
 			client = &kept
 		} else if plan.Server.RegistrationEndpoint == nil {
 			log.Printf("mcp sign-in: %s needs a client of the person's own", name)
@@ -378,7 +378,7 @@ func (d *Daemon) finishSignIn(flow *signInFlow, redirect *loopback, plan mcpcata
 		return failed("The sign-in couldn't be kept: " + mcpcatalog.SignInFileName + " could not be read or written.")
 	}
 	if given != nil {
-		st.signIns.KeepClient(*given, plan.Server.Issuer)
+		st.signIns.KeepClient(*given, plan.Server)
 	}
 	redirect.finish("Signed in to "+name, "The next agent you start has it. You can close this tab and go back to Agents.")
 	return wire.MCPSignInStatus{SignedIn: &struct{}{}}

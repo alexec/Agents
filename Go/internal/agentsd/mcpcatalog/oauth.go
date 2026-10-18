@@ -26,7 +26,7 @@ import (
 
 // OAuthFailure is a sign-in that did not go through.
 type OAuthFailure struct {
-	Kind string // noMetadata, resourceMismatch, noPKCE, needsClient, refused, invalidGrant, malformed, unreachable
+	Kind string // noMetadata, resourceMismatch, issuerMismatch, noPKCE, needsClient, refused, invalidGrant, malformed, unreachable
 	Why  string // a refusal's own words, or the issuer for needsClient
 }
 
@@ -41,6 +41,8 @@ func (f *OAuthFailure) Sentence() string {
 		return "This server's sign-in describes a different server, so the app won't use it."
 	case "noPKCE":
 		return "This server's sign-in doesn't offer PKCE, which the app needs to sign in safely."
+	case "issuerMismatch":
+		return "This server's sign-in names a different issuer from the one it was found at, so the app won't use it."
 	case "needsClient":
 		return "This server's sign-in doesn't let apps register themselves. Give it a client ID you registered with it."
 	case "refused":
@@ -65,6 +67,8 @@ func (f *OAuthFailure) LogWord() string {
 		return "resource mismatch"
 	case "noPKCE":
 		return "no PKCE"
+	case "issuerMismatch":
+		return "issuer mismatch"
 	case "needsClient":
 		return "needs a client"
 	case "invalidGrant":
@@ -232,11 +236,13 @@ func (o OAuth) Discover(ctx context.Context, server, resourceMetadata string) (P
 			if j == nil || authorize == "" || token == "" {
 				continue
 			}
+			// RFC 8414 §3.3: the document's issuer is the one it was fetched for, exactly. A
+			// server that names another issuer could be given that issuer's client and code.
+			if named, _ := j["issuer"].(string); named != issuer {
+				return Plan{}, oauthFailure("issuerMismatch")
+			}
 			found := AuthorizationServer{Issuer: issuer, AuthorizationEndpoint: authorize, TokenEndpoint: token,
 				CodeChallengeMethods: strs(j["code_challenge_methods_supported"]), Scopes: strs(j["scopes_supported"])}
-			if s, ok := j["issuer"].(string); ok {
-				found.Issuer = s
-			}
 			if s, ok := j["registration_endpoint"].(string); ok {
 				found.RegistrationEndpoint = &s
 			}

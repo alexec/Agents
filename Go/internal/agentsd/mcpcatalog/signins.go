@@ -18,7 +18,9 @@ import (
 type SignInFile struct {
 	Grants      map[string]Grant       `json:"grants"`
 	NeedsSignIn map[string]NeedsSignIn `json:"needsSignIn"`
-	// Clients is the ones the person registered themselves, by issuer.
+	// Clients is the ones the person registered themselves, by issuer and token endpoint
+	// (ClientKey): a server that names a known issuer but its own token endpoint is not
+	// given the person's client.
 	Clients map[string]Client `json:"clients"`
 }
 
@@ -239,13 +241,18 @@ func (s *SignIns) MarkNeedsSignIn(server, name, resourceMetadata string) {
 	s.log("mcp sign-in: " + name + " needs sign-in")
 }
 
-func (s *SignIns) ClientFor(issuer string) (Client, bool) {
-	c, ok := s.read().Clients[issuer]
+// ClientKey is where the person's own client is kept: the issuer and the token endpoint
+// the code and the secret go to, both. A space is in neither URL.
+func ClientKey(a AuthorizationServer) string { return a.Issuer + " " + a.TokenEndpoint }
+
+// ClientFor is the person's own client for this issuer at this token endpoint.
+func (s *SignIns) ClientFor(a AuthorizationServer) (Client, bool) {
+	c, ok := s.read().Clients[ClientKey(a)]
 	return c, ok
 }
 
-func (s *SignIns) KeepClient(c Client, issuer string) error {
-	return s.change(func(f *SignInFile) { f.Clients[issuer] = c })
+func (s *SignIns) KeepClient(c Client, a AuthorizationServer) error {
+	return s.change(func(f *SignInFile) { f.Clients[ClientKey(a)] = c })
 }
 
 // Keep is a sign-in, kept.
