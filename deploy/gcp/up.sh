@@ -1,0 +1,214 @@
+#!/usr/bin/env bash
+# The control plane on a Google Cloud VM (#1461), from nothing to https://control.agentloops.dev,
+# acting as the service account in ~/.agents/secrets/gcp-agents-control.json (its project is the
+# file's). Each step first looks for what it makes, so running it again is safe, and carries on
+# where it stopped.
+#
+#   deploy/gcp/up.sh [--dry-run] [--apns AuthKey_KEYID.p8 [--apns-key-id KEYID]]
+#       [--email you@example.com] [--domain control.agentloops.dev] [--views-domain views.agentloops.dev]
+#       [--seal-key control-key]
+#
+# What it makes:
+# - Compute Engine, Cloud KMS and IAM turned on in the project;
+# - the Cloud KMS key ring "agents" and key "control" (global), which seals the control key (#1458);
+# - the service account agents-control-vm, which may only encrypt and decrypt with that key;
+# - the network agents-control (us-west1), with 80 and 443 open to all, and 22 open only to this
+#   machine's IPv4 address (made again at each run, for a new address);
+# - the static IPv4 address agents-control, about $3.65 a month;
+# - the e2-micro VM agents-control in us-west1-b, Debian with a 30 GB standard disk (the free
+#   tier's), running as agents-control-vm, with deploy/gcp/startup.sh to put Docker on it.
+#
+# Then it prints the address, and stops until both names point at it (deploy/cloudflare/dns.sh):
+# Let's Encrypt allows only a few failed tries an hour. Run it again after that, and it builds
+# the image here (linux/amd64), copies it, deploy/compose.public.yaml and the secrets to
+# /opt/agents on the VM, and starts the control plane and Caddy there. The VM has no service
+# account file (an empty one): it uses the key as its own service account.
+#
+# --apns gives the APNs key (deploy/make-secrets.sh --apns); without it, a key already on the
+# VM is kept. --seal-key seals a control key from elsewhere before the first start, for a move
+# from a Mac (docs/how-to/run-the-control-plane-in-the-cloud.md). --dry-run prints every command
+# and runs none: it needs no gcloud, no key file and no account.
+set -euo pipefail
+here=$(cd "$(dirname "$0")" && pwd)
+root=$(cd "$here/../.." && pwd)
+# shellcheck source=deploy/gcp/common.sh
+. "$here/common.sh"
+
+domain=control.agentloops.dev
+views_domain=views.agentloops.dev
+email=''
+apns=()
+seal_key=''
+while (($#)); do
+	case $1 in
+	--dry-run) dry_run=1; shift ;;
+	--apns) apns+=(--apns "${2:?--apns needs the .p8 file}"); shift 2 ;;
+	--apns-key-id) apns+=(--apns-key-id "${2:?--apns-key-id needs the Key ID}"); shift 2 ;;
+	--email) email=${2:?--email needs an address}; shift 2 ;;
+	--domain) domain=${2:?--domain needs a name}; shift 2 ;;
+	--views-domain) views_domain=${2:?--views-domain needs a name}; shift 2 ;;
+	--seal-key) seal_key=${2:?--seal-key needs the key file}; shift 2 ;;
+	*) die "$1 is not an option" ;;
+	esac
+done
+[[ -n $email ]] || email=$(git -C "$root" config user.email || true)
+[[ -n $email ]] || die "say the address Let's Encrypt writes to: --email you@example.com"
+[[ -z $seal_key || -s $seal_key ]] || die "$seal_key is not a key file"
+
+setup
+kms=projects/$project/locations/$key_location/keyRings/$keyring/cryptoKeys/$key
+
+say "== Compute Engine, Cloud KMS and IAM"
+run gcloud services enable compute.googleapis.com cloudkms.googleapis.com iam.googleapis.com
+
+say "== the key that seals the control key: $kms"
+exists gcloud kms keyrings describe "$keyring" --location "$key_location" ||
+	run gcloud kms keyrings create "$keyring" --location "$key_location"
+exists gcloud kms keys describe "$key" --keyring "$keyring" --location "$key_location" ||
+	run gcloud kms keys create "$key" --keyring "$keyring" --location "$key_location" --purpose encryption
+
+say "== the VM's service account, which may use only that key: $vm_account"
+exists gcloud iam service-accounts describe "$vm_account" ||
+	run gcloud iam service-accounts create "$vm_account_name" --display-name "Agents control plane VM"
+retry gcloud kms keys add-iam-policy-binding "$key" --keyring "$keyring" --location "$key_location" \
+	--member "serviceAccount:$vm_account" --role roles/cloudkms.cryptoKeyEncrypterDecrypter --format none
+
+say "== the network, and its firewall"
+exists gcloud compute networks describe "$name" ||
+	run gcloud compute networks create "$name" --subnet-mode custom
+exists gcloud compute networks subnets describe "$name" --region "$region" ||
+	run gcloud compute networks subnets create "$name" --network "$name" --region "$region" --range "$subnet_range"
+exists gcloud compute firewall-rules describe "$name-web" ||
+	run gcloud compute firewall-rules create "$name-web" --network "$name" --direction INGRESS \
+		--allow tcp:80,tcp:443 --source-ranges 0.0.0.0/0 --target-tags "$name"
+if ((dry_run)); then
+	caller=198.51.100.7
+	say "+ curl -4 -fsS https://checkip.amazonaws.com   (this machine's address; $caller stands in)"
+else
+	caller=$(curl -4 -fsS https://checkip.amazonaws.com | tr -d '[:space:]')
+	[[ $caller =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]] || die "could not tell this machine's IPv4 address"
+fi
+if exists gcloud compute firewall-rules describe "$name-ssh"; then
+	run gcloud compute firewall-rules update "$name-ssh" --source-ranges "$caller/32"
+else
+	run gcloud compute firewall-rules create "$name-ssh" --network "$name" --direction INGRESS \
+		--allow tcp:22 --source-ranges "$caller/32" --target-tags "$name"
+fi
+
+say "== the static IPv4 address"
+exists gcloud compute addresses describe "$name" --region "$region" ||
+	run gcloud compute addresses create "$name" --region "$region"
+if ((dry_run)); then
+	ip=203.0.113.10
+	say "+ $(shown gcloud compute addresses describe "$name" --region "$region" --format 'value(address)')   ($ip stands in)"
+else
+	ip=$(gcloud compute addresses describe "$name" --region "$region" --format 'value(address)')
+fi
+
+say "== the VM"
+if exists gcloud compute instances describe "$name" --zone "$zone"; then
+	run gcloud compute instances add-metadata "$name" --zone "$zone" --metadata-from-file "startup-script=$here/startup.sh"
+else
+	run gcloud compute instances create "$name" --zone "$zone" --machine-type e2-micro \
+		--image-family debian-12 --image-project debian-cloud \
+		--boot-disk-size 30GB --boot-disk-type pd-standard \
+		--network "$name" --subnet "$name" --address "$ip" --tags "$name" \
+		--service-account "$vm_account" --scopes cloud-platform \
+		--shielded-secure-boot --shielded-vtpm --shielded-integrity-monitoring \
+		--metadata-from-file "startup-script=$here/startup.sh"
+fi
+
+say
+say "The VM's address is $ip."
+say
+
+# Both names must point at the VM before Caddy asks Let's Encrypt for their certificates.
+points() {
+	if ((dry_run)); then
+		say "? dig +short $1 @1.1.1.1   (is it $ip?)"
+		return 0
+	fi
+	dig +short "$1" @1.1.1.1 | grep -qx "$ip"
+}
+if ! points "$domain" || ! points "$views_domain"; then
+	say "$domain and $views_domain do not point at $ip yet. Make their A records:"
+	say "    deploy/cloudflare/dns.sh $ip"
+	say "then run deploy/gcp/up.sh again."
+	exit 0
+fi
+
+say "== Docker on the VM (the startup script puts it on at the first boot)"
+if ((dry_run)); then
+	vm_ssh 'sudo docker compose version'
+else
+	for i in $(seq 1 30); do
+		vm_ssh 'sudo docker compose version' >/dev/null 2>&1 && break
+		((i == 30)) && die "Docker is not on the VM after 5 minutes: see gcloud compute ssh $name --zone $zone --command 'sudo journalctl -u google-startup-scripts'"
+		sleep 10
+	done
+fi
+
+say "== the image and the Linux host, built here"
+run "$root/scripts/build-linux-agentsd.sh"
+version=$(git -C "$root" describe --tags --always --dirty 2>/dev/null || echo dev)
+run docker build --platform linux/amd64 --build-arg "VERSION=$version" \
+	-f "$root/deploy/Containerfile" -t agents-control:latest "$root"
+
+say "== what the VM runs, in /opt/agents"
+stage=$(mktemp -d)
+trap 'rm -rf "$stage"' EXIT
+mkdir -p "$stage/deploy" "$stage/App/Resources"
+cp "$root/deploy/compose.public.yaml" "$root/deploy/Caddyfile.public" "$root/deploy/make-secrets.sh" "$stage/deploy/"
+# No --service-account: an empty file, and the VM's own service account uses the key.
+run "$stage/deploy/make-secrets.sh" --public --kms "$kms" ${apns[@]+"${apns[@]}"}
+# Without --apns, a key already on the VM stays: the empty one is not sent.
+tar_skip=()
+((${#apns[@]})) || tar_skip=(--exclude deploy/secrets/apns-key)
+{
+	printf '%s=%s\n' AGENTS_DOMAIN "$domain" AGENTS_VIEWS_DOMAIN "$views_domain" ACME_EMAIL "$email"
+	if [[ -f $stage/deploy/.env ]]; then cat "$stage/deploy/.env"; fi
+} >"$stage/deploy/.env.new"
+rm -f "$stage/deploy/.env" "$stage/deploy/make-secrets.sh"
+((dry_run)) || cp -R "$root/App/Resources/servers" "$stage/App/Resources/servers"
+# The lines in .env.new replace the same names in the VM's deploy/.env; the others stay.
+install='set -e; sudo mkdir -p /opt/agents; sudo tar -C /opt/agents --no-same-owner -xzf -; cd /opt/agents/deploy
+sudo touch .env; sudo chmod 600 .env
+while IFS= read -r line; do k=${line%%=*}; { sudo grep -v "^$k=" .env || true; echo "$line"; } | sudo tee .env.t >/dev/null; sudo mv .env.t .env; done < .env.new
+sudo rm .env.new; [ -f secrets/apns-key ] || { sudo touch secrets/apns-key; sudo chmod 644 secrets/apns-key; }'
+if ((dry_run)); then
+	say "+ docker save agents-control:latest | gzip | $(shown gcloud compute ssh "$name" --zone "$zone" --quiet --command 'gunzip | sudo docker load')"
+	say "+ tar -C STAGE ${tar_skip[*]-} -czf - deploy App | $(shown gcloud compute ssh "$name" --zone "$zone" --quiet --command "$install")"
+else
+	docker save agents-control:latest | gzip | vm_ssh 'gunzip | sudo docker load'
+	COPYFILE_DISABLE=1 tar --no-xattrs -C "$stage" ${tar_skip[@]+"${tar_skip[@]}"} -czf - deploy App | vm_ssh "$install"
+fi
+
+compose='cd /opt/agents && sudo docker compose -f deploy/compose.public.yaml'
+if [[ -n $seal_key ]]; then
+	say "== the control key from $seal_key, sealed in the store before the first start"
+	if ((dry_run)); then
+		say "+ $(shown gcloud compute ssh "$name" --zone "$zone" --quiet --command "$compose run --rm -T control key seal --key-fd 0") < $seal_key"
+	else
+		vm_ssh "$compose run --rm -T control key seal --key-fd 0" <"$seal_key"
+	fi
+fi
+
+say "== the control plane and Caddy"
+vm_ssh "$compose up -d --no-build"
+if ((dry_run)); then
+	say "? curl -fsS https://$domain/healthz   (until it says ok)"
+else
+	printf 'waiting for the certificate'
+	for _ in $(seq 1 60); do
+		curl -fsS "https://$domain/healthz" >/dev/null 2>&1 && break
+		printf .
+		sleep 2
+	done
+	say
+	curl -fsS "https://$domain/healthz" >/dev/null ||
+		die "https://$domain/healthz does not answer: see gcloud compute ssh $name --zone $zone --command '$compose logs caddy'"
+fi
+say
+say "https://$domain is up, at $ip. The first window's code:"
+say "    gcloud compute ssh $name --zone $zone --command '$compose exec -T control /agents-control code --client'"
+say "(with CLOUDSDK_CONFIG=$CLOUDSDK_CONFIG)"

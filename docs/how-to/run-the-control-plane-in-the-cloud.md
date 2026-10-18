@@ -31,7 +31,108 @@ copies](run-several-copies.md).
   it. Cloud KMS keeps the key that seals the control plane's own key, so that key is never
   on the machine's disk in clear.
 
+## Google Cloud
+
+On Google Cloud, three scripts do most of the steps below for you: they make the machine,
+its firewall, its address, the Cloud KMS key and the DNS records, then build and start the
+control plane. Each script looks first for what it makes, so you can run it again safely.
+Each takes `--dry-run`, which prints every command and runs none.
+
+### What you make first
+
+1. A Google Cloud project with billing turned on.
+2. In that project, a service account for the scripts, with these roles: **Service Usage
+   Admin**, **Compute Admin**, **Cloud KMS Admin**, **Service Account Admin** and **Service
+   Account User**. Make a JSON key for it, and put the key in
+   `~/.agents/secrets/gcp-agents-control.json` (`chmod 600`). The scripts read the project
+   from this file. They use a gcloud configuration of their own, in
+   `~/.agents/gcloud/agents-control`, and do not change yours.
+3. The domain, such as `agentloops.dev`, on Cloudflare's DNS, and a Cloudflare API token
+   from the **Edit zone DNS** template, for that zone only. Put the token in the Keychain:
+
+   ```sh
+   security add-generic-password -a "$USER" -s agents-cloudflare-token -w
+   ```
+
+4. For notices on iPhone and iPad with no Mac host: the APNs `.p8` key, as in
+   [Build and copy what it runs](#build-and-copy-what-it-runs). Its name gives the Key ID.
+5. On your Mac: `gcloud` (`brew install --cask gcloud-cli`) and Docker, running.
+
+### Run the scripts
+
+In the repository on your Mac:
+
+1. Look at what `up.sh` will do:
+
+   ```sh
+   deploy/gcp/up.sh --dry-run
+   ```
+
+2. Make the machine:
+
+   ```sh
+   deploy/gcp/up.sh --apns AuthKey_KEYID.p8
+   ```
+
+   It turns on Compute Engine, Cloud KMS and IAM, and makes:
+   - the Cloud KMS key ring `agents` and key `control`;
+   - the service account `agents-control-vm`, which may only encrypt and decrypt with that
+     key. The machine runs as this account, so no key file for it is on the machine;
+   - the network `agents-control`, with ports 80 and 443 open to all, and port 22 open
+     only to your Mac's IPv4 address;
+   - a static IPv4 address;
+   - an e2-micro machine in `us-west1-b`, running Debian, with a 30 GB *standard* disk.
+     A startup script puts Docker on it.
+
+   It prints the machine's address, then stops: the names do not point at it yet.
+3. Make the DNS records, with the address that `up.sh` printed:
+
+   ```sh
+   deploy/cloudflare/dns.sh 203.0.113.10
+   ```
+
+   It makes an **A** record for `control.agentloops.dev` and one for
+   `views.agentloops.dev`, DNS only (not proxied), and never prints the token. Use
+   `--zone` and `--names` for other names.
+4. Run `up.sh` again, with the same options:
+
+   ```sh
+   deploy/gcp/up.sh --apns AuthKey_KEYID.p8
+   ```
+
+   When both names point at the machine, it builds the Linux host and the control
+   plane's image on your Mac, copies them, `deploy/compose.public.yaml` and the secrets to
+   `/opt/agents` on the machine, and starts the control plane and Caddy. It waits until
+   `https://control.agentloops.dev/healthz` answers. Let's Encrypt's address for notices is
+   your git email, or give `--email`. Use `--domain` and `--views-domain` for other names.
+
+   To keep the control plane key from your Mac, give `--seal-key control-key` at this
+   step, before the first start. See
+   [Move the control plane from your Mac](#move-the-control-plane-from-your-mac).
+5. Get the first code with the command that `up.sh` prints, then go on at
+   [Pair your first window](#pair-your-first-window).
+
+To upgrade, run `up.sh` again: it builds and copies the new image, and keeps the store
+and the APNs key.
+
+To remove it all, run `deploy/gcp/down.sh`. It asks first. **The store is on the
+machine's disk,** so after `down.sh` every window, phone and host must pair again. The
+Cloud KMS key stays, unless you give `--destroy-key`. Remove the DNS records at Cloudflare
+yourself.
+
+### What it costs
+
+| Item | Cost |
+| --- | --- |
+| The static IPv4 address | about $3.65 a month |
+| The e2-micro machine in us-west1 | free tier (one a month) |
+| The 30 GB standard disk | free tier (30 GB a month); a *balanced* disk, the console's default, is billed |
+| The Cloud KMS key | about $0.06 a month, and $0.03 for each 10,000 uses |
+| Traffic out | free tier (1 GB a month), then billed |
+
 ## Steps
+
+On another provider, or to do it by hand, follow these steps.
 
 ### Get the machine ready
 

@@ -14,6 +14,8 @@ it out:
 | `Caddyfile` | TLS, round robin, and `/readyz` health checks, so a copy that can't reach the store gets no new connections. |
 | `make-secrets.sh` | The control plane's key, shared by every copy, plus Caddy's certificate and its pin. With `--public`, no key file: the Cloud KMS key's name and the service account file. |
 | `compose.public.yaml`, `Caddyfile.public` | One copy at a real domain, with a certificate from Let's Encrypt and no pin (#61). |
+| `gcp/up.sh`, `gcp/down.sh` | The machine on Google Cloud (#1461): a VM, its firewall and address, and the Cloud KMS key, then the image and `compose.public.yaml` on it. `--dry-run` prints the commands only. |
+| `cloudflare/dns.sh` | The A records for both names at Cloudflare, with the token from the Keychain. |
 | `compose.pebble.yaml`, `pebble/` | The same with Pebble, Let's Encrypt's test CA, standing in: no domain and no real CA. A local keeper stands in for Cloud KMS. |
 
 ## Bringing it up
