@@ -21,9 +21,9 @@ publishes a release. The tag starts the `release` workflow, which:
   and waits until App Store Connect has processed both. Nothing goes to App Review.
 
 The **Release** workflow (`.agents/workflows/release.md`, the `release` skill) does all of
-this with nobody watching, every two weeks or when you press **Run now**: it has the
-high and medium findings fixed first, chooses the version and writes the notes. The steps
-below are the same thing by hand.
+this when you press **Run now**, and nobody needs to watch it. It has the high and medium
+findings fixed first, chooses the version and writes the notes. The steps below are the
+same thing by hand.
 
 ## Before you start
 

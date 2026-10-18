@@ -42,9 +42,6 @@ Alex decided (2026-10-13, #914):
 1. `git fetch --quiet --tags origin main`.
 2. `.agents/skills/release/scripts/release-plan.py`. It prints the last tag and the next
    version. If it says nothing merged since the last tag, end with `nothing_to_do`.
-3. When the run was started by its schedule (the event you were given is a schedule, not
-   Run now or a message from Alex), and the last tag is less than 13 days old, end with
-   `nothing_to_do`: the schedule is weekly, and a release is due every two weeks.
 
 ## 2. Reviews, if stale
 
@@ -133,7 +130,7 @@ Note the time T when step 3 ended. Then, until the gate can pass:
 - Otherwise wait with `wait_for_event` for `issue.closed` and `pr.merged`, with
   `until_minutes` at most the time left to T + 1 day (1440 when only high is open).
 - High always blocks. After 7 days with a high one still open, end with `partly_done`,
-  naming what is open: the next scheduled run starts again from step 1.
+  naming what is open: the next run starts again from step 1.
 
 ## 5. Gate
 
