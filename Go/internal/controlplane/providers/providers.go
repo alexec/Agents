@@ -115,6 +115,8 @@ type listed struct {
 	// False once a list has failed after a good one.
 	current bool
 	problem string
+	// Which list it is, as lists counted them.
+	asked uint64
 }
 
 type activityKind int
@@ -171,7 +173,9 @@ type Providers struct {
 	providers   map[string]heldProvider
 	connections map[string]Provider
 	listed      map[string]*listed
-	activities  map[string]*activity
+	// Counts the lists asked for, so a slow one never replaces a later one (#1443).
+	lists      uint64
+	activities map[string]*activity
 	// Why each host's last start or stop failed, until the next one.
 	problems map[string]string
 	kept     *Kept
@@ -870,7 +874,8 @@ func (p *Providers) save(request ProviderAdd, updating bool) (ProviderSummary, e
 	p.providers[id] = heldProvider{record, newTag}
 	old := p.connections[id]
 	p.connections[id] = connection
-	p.listed[id] = &listed{workspaces: checked.Workspaces, listedAt: &now, current: true}
+	p.lists++
+	p.listed[id] = &listed{workspaces: checked.Workspaces, listedAt: &now, current: true, asked: p.lists}
 	p.mu.Unlock()
 	if old != nil {
 		old.End()
@@ -995,6 +1000,7 @@ func (p *Providers) Refresh(only string) {
 		id         string
 		workspaces []WorkspaceInfo
 		err        error
+		asked      uint64
 	}
 	results := make(chan result)
 	count := 0
@@ -1004,25 +1010,32 @@ func (p *Providers) Refresh(only string) {
 			continue
 		}
 		count++
+		p.mu.Lock()
+		p.lists++
+		asked := p.lists
+		p.mu.Unlock()
 		go func() {
 			workspaces, err := connection.List()
-			results <- result{id, workspaces, err}
+			results <- result{id, workspaces, err, asked}
 		}()
 	}
 	for range count {
 		r := <-results
 		p.mu.Lock()
-		if _, ok := p.providers[r.id]; ok {
+		// A list asked for before the one shown says what was, not what is: a stop's list
+		// replaced by the older one of a link or a poll said the workspace was running.
+		if _, ok := p.providers[r.id]; ok && (p.listed[r.id] == nil || p.listed[r.id].asked < r.asked) {
 			l := p.listed[r.id]
 			if l == nil {
 				l = &listed{current: true}
 			}
 			if r.err == nil {
 				now := time.Now()
-				l = &listed{workspaces: r.workspaces, listedAt: &now, current: true}
+				l = &listed{workspaces: r.workspaces, listedAt: &now, current: true, asked: r.asked}
 			} else {
 				l.current = l.listedAt == nil
 				l.problem = errorWords(r.err)
+				l.asked = r.asked
 			}
 			p.listed[r.id] = l
 		}
@@ -1220,12 +1233,17 @@ func (p *Providers) begin(kind activityKind, host, who string) (any, error) {
 	p.mu.Unlock()
 	if fresh {
 		p.changed()
-		go p.run(kind, host, *link, who)
 	}
 	if h := p.records.Host(host); h != nil {
 		record = h
 	}
-	return p.methods.HostRow(*record), nil
+	// The row is read before the run begins: a fast provider can finish it first, and the
+	// answer to a stop said online (#1443).
+	row := p.methods.HostRow(*record)
+	if fresh {
+		go p.run(kind, host, *link, who)
+	}
+	return row, nil
 }
 
 func (p *Providers) run(kind activityKind, host string, link WorkspaceLink, who string) {
