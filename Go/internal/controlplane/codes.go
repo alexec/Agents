@@ -30,7 +30,8 @@ type Codes struct {
 // storedCode is ControlCodes.Stored.
 type storedCode struct {
 	Purpose string `json:"purpose"`
-	// Made for a browser on this Mac (071 R2): good only through the loopback listener.
+	// Made for a browser (071 R2): good only through a page, the loopback listener's or the
+	// page on the control plane's own domain (#1459).
 	Browser *bool         `json:"browser,omitempty"`
 	Owner   *string       `json:"owner,omitempty"`
 	Expires records.Stamp `json:"expires"`

@@ -304,6 +304,9 @@ func (m *Methods) status(from Caller) wire.ControlStatus {
 	m.mu.Lock()
 	status.Web = m.web
 	m.mu.Unlock()
+	if m.s.page != nil {
+		status.PublicWeb = new(m.s.page.Address())
+	}
 	status.ThisMacHost = m.s.thisMacHost()
 	if m.s.tunnels != nil {
 		status.UnjoinedTunnels = m.s.tunnels.Unjoined()

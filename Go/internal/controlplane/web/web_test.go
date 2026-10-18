@@ -727,3 +727,23 @@ func same(a, b Status) bool {
 	y, _ := json.Marshal(b)
 	return string(x) == string(y)
 }
+
+// The page's origin as a browser writes it (#1459): no port when it is https's own, and
+// only https.
+func TestPageOrigin(t *testing.T) {
+	for address, want := range map[string]string{
+		"https://Agents.Example.com":      "https://agents.example.com",
+		"https://agents.example.com:443/": "https://agents.example.com",
+		"https://agents.test:8444":        "https://agents.test:8444",
+		"wss://agents.example.com/v1/x":   "https://agents.example.com",
+	} {
+		if got, _, err := PageOrigin(address); err != nil || got != want {
+			t.Errorf("%s: %q %v", address, got, err)
+		}
+	}
+	for _, address := range []string{"http://agents.example.com", "https://", "nonsense"} {
+		if _, _, err := PageOrigin(address); err == nil {
+			t.Errorf("%s was taken", address)
+		}
+	}
+}

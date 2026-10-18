@@ -9,7 +9,7 @@ it out:
 
 | File | What it is |
 |---|---|
-| `Containerfile` | Static `agents-control` and `workspace-commands`, built in the image from `Go/` (with the web remote from `Web/`), on Alpine, a user of their own. Built from the repository's root. |
+| `Containerfile` | Static `agents-control` and `workspace-commands`, built in the image from `Go/` (with the web remote from `Web/`, served at the domain by `compose.public.yaml`, #1459), on Alpine, a user of their own. Built from the repository's root. |
 | `compose.yaml` | MinIO (the bucket), three copies, and Caddy in front of them. |
 | `Caddyfile` | TLS, round robin, and `/readyz` health checks, so a copy that can't reach the store gets no new connections. |
 | `make-secrets.sh` | The control plane's key, shared by every copy, plus Caddy's certificate and its pin. With `--public`, no key file: the Cloud KMS key's name and the service account file. |

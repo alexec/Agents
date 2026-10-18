@@ -12,6 +12,7 @@ import { signal } from "@preact/signals";
 import type { AppViewCall, AppViewPolicy, JSONValue, ViewResource } from "../../protocol/generated";
 import { encodeDomains } from "../../sandbox/policy";
 import { CallFailed } from "../../wire/link";
+import { onThisMac } from "../../place";
 import {
   canPin, type Context, needsShow, serverParam, type ViewAsk, contextChanges, error as rpcError, Feed, initializeResult, noAgentWords, notification, policyWire,
   type AgentMessage, noAgentCode, read, request, result, type Start, startAgentMethod, viewTitle,
@@ -127,6 +128,13 @@ export class HostedView {
   }
 
   private async load(mine: number): Promise<void> {
+    // The page on the control plane's own domain has no second origin for the proxy (#1459),
+    // so nothing of a view is read or drawn there.
+    if (!onThisMac()) {
+      this.failure.value = "Views are drawn only on the page on the Mac that runs the control plane, and in the Agents apps.";
+      this.phase.value = "failed";
+      return;
+    }
     let resource: ViewResource;
     try {
       resource = await this.actions.call("views/read", { agentID: this.actions.agentID, uri: this.call.resourceUri,

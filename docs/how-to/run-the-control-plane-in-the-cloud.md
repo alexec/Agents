@@ -178,6 +178,23 @@ The first code comes from the machine. After that, every code comes from a paire
 Pair your iPhone and iPad from that window, as in
 [Connect a window or phone](connect-a-window-or-phone.md).
 
+### Use Agents in a browser
+
+The control plane serves the Agents page at its own address, `https://agents.example.com/`,
+so a browser anywhere can use it. A browser pairs by a code from a window or phone that is
+already paired:
+
+1. In Agents on your Mac, open **Settings ▸ Control plane ▸ Clients** and click
+   **Add a Browser…**. On an iPhone or iPad, tap **Add a Browser…** at the foot of the
+   sidebar.
+2. In the browser, open `https://agents.example.com/`, paste the code, and click
+   **Connect**. The code works once, for five minutes.
+
+The browser shows in **Clients** as *Chrome on the web* (or its own name). It can do all a
+window can. To cut it off, click **Forget…** on its row. To serve no page, set
+`AGENTS_CONTROL_PUBLIC_WEB=` (empty) in `deploy/.env`. Sign-in with an account comes later
+(#995).
+
 ### Enrol a Linux server
 
 1. In the window, open **Settings ▸ Control plane**, click **Show** beside **Hosts**, then
@@ -242,6 +259,12 @@ plane at its address and get no notifications.
 - **The certificate renews itself.** Caddy renews it about a month before it runs out.
   Nothing needs doing: no client or host holds a pin, so a renewed certificate, even with
   a new key, is accepted like the old one, and live connections carry on.
+- **The page and the control plane are one version.** The image builds the page from the
+  same checkout, so an upgrade changes both. A browser that has the page open loads it
+  again when it reconnects.
+- **MCP Apps views show only in the apps** and on the page Agents Host serves on a Mac. The
+  page on the domain has no second address to hold them apart from the page, so it says so
+  where a view would be.
 - **Don't set `AGENTS_CONTROL_PIN`** with a publicly trusted certificate. Caddy makes a
   new key at each renewal, so a pin would stop every window, phone and host from
   connecting after the first renewal.

@@ -28,6 +28,7 @@ import { namedRelative, workflowSummary } from "../model/workflows";
 import { fromWireDate } from "../protocol/dates";
 import type { Agent, ControlHost, ProjectSummary, WorkflowSummary } from "../protocol/generated";
 import { alone, aloneURL, go, route, showAll, type ActivityPage } from "../route";
+import { onThisMac } from "../place";
 import { browserName, type Session } from "../session";
 import { ActivityRows } from "./Activity";
 import { holdForMenu, isMenuKey, openContextMenu, type MenuItem } from "./ContextMenu";
@@ -235,7 +236,7 @@ export function Sidebar({ session, store, linkDown }: { session: Session; store:
           </p>
         )))}
         <div class="identity">
-          <span>{browserName()} on this Mac</span>
+          <span>{browserName()} {onThisMac() ? "on this Mac" : "on the web"}</span>
           {/* This browser's Settings (#846): which smart groups are on, as the window's
               Settings ▸ Sidebar. */}
           <button class="link" aria-current={!!r.settings} onClick={() => go({ settings: true })}>Settings</button>

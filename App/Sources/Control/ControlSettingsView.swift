@@ -622,7 +622,8 @@ struct ProjectDetectionCard: View {
 /// Frame G: the code as text, since a Mac has no camera; and the same sheet for a host's
 /// code. Every client may do everything (#111), so there is nothing to choose first.
 struct CodeSheet: View {
-    /// A browser is a client like a Mac, on this Mac only (071, frame E).
+    /// A browser is a client like a Mac: on this Mac, or anywhere at the page on the control
+    /// plane's own domain (071, frame E; #1459).
     enum Purpose { case mac, browser, host }
 
     @Environment(\.dismiss) private var dismiss
@@ -683,7 +684,7 @@ struct CodeSheet: View {
     private var title: String {
         switch purpose {
         case .mac: "Pair a Mac"
-        case .browser: "Pair a Browser"
+        case .browser: "Add a Browser"
         case .host: "Add a host by code"
         }
     }
@@ -709,19 +710,24 @@ struct CodeSheet: View {
         case .mac:
             return "On the other Mac, open Agents, choose Connect to a control plane and paste this. That Mac can then do all this window can. \(time)"
         case .browser:
-            return "For a browser on this Mac only. \(browserWhere) That browser can then do all this window can. \(time)"
+            return "\(browserWhere) That browser can then do all this window can. \(time)"
         case .host:
             return "On the other machine, start its agents with agentsd --control-code and this code. \(time)"
         }
     }
 
-    /// Where to paste a browser's code: the page's address while it is served, else why it
+    /// Where to paste a browser's code: the page on the control plane's own domain, for a
+    /// browser anywhere (#1459), and the page on this Mac while it is served, else why it
     /// isn't, as the Overview's row says (071 R3).
     private var browserWhere: String {
+        let anywhere = control.status?.publicWeb
         guard let web = control.status?.web else {
+            if let anywhere { return "In any browser, open \(anywhere) and paste it in." }
             return "Turn on Serve Agents to browsers on this Mac in Agents Host first."
         }
-        if !web.served { return "\(web.summary) Try again in Agents Host, then open \(web.address) there and paste it in." }
-        return "Open \(web.address) there and paste it in."
+        let here = web.served ? "On this Mac, open \(web.address) and paste it in."
+            : "\(web.summary) Try again in Agents Host, then open \(web.address) on this Mac and paste it in."
+        guard let anywhere else { return here }
+        return "In any browser, open \(anywhere) and paste it in. \(here)"
     }
 }
