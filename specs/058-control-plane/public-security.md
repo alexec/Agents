@@ -1,5 +1,25 @@
 # Security pass: a control plane on the public internet (#61)
 
+**2026-10-18, the Go `agents-control` (#1457).** #1314 removed the Swift control plane this
+pass was written for. Each finding was checked again against `Go/internal/controlplane`,
+`Go/cmd/agents-control` and `deploy/`. Where it stands now:
+
+| Finding | Now | Test |
+|---|---|---|
+| P1 store read per unknown id | **Fixed.** One read at a time, at most one every 3 s, for the 15 s backstop too | `TestUnknownIDsReadTheStoreOnce`, `TestAMemberPairedElsewhereIsReadAgain` |
+| P2 code id costs a GET | **Not fixed; P3 covers it.** A made-up code id is a failed proof, so a source has 20 a minute | `TestSourcesRefuseAfterTwentyFailedProofs` |
+| P3 in-process budget | **Fixed.** Per-source table: 20 failed proofs a minute, then 429 for a minute; 50 sockets waiting for `auth` | `TestSourcesRefuseAfterTwentyFailedProofs`, `TestSourcesCapSocketsWaitingForAuth`, `TestSourcesHoldABoundedTable`, `TestForwardedForIsTrustedOnlyFromTheProxy`, `TestAStrangerIsRefusedAfterTwentyFailedProofs` |
+| P3 Caddy | **Fixed.** `request_body max_size 1MB` on every site, in `Caddyfile.public` (the Pebble walk imports it) and `Caddyfile` | `TestEveryPublicRouteCapsItsBody` |
+| P3 firewall | Not code: the how-to, at T131 | — |
+| P4 forwarding after a restart | **Fixed before this pass** (a mark in the store, `resumeForwardingIfMarked`); now tested | `TestAForwardingCopyForwardsAfterARestart` |
+| P5 forwarding is public for 30 days | Unchanged, by design | — |
+| Logs | **Fixed.** A store error on a code named its key; it is no longer logged | `TestNoSecretReachesTheLog` |
+| A1–A3, §5, W1–W5 | Unchanged: no code to check yet (no webhooks or APNs in Go) | — |
+
+The sections below are the 2026-10-02 pass. Where they name Swift (`key(for:)`,
+`readAgain()`, `PhaseBox`), the Go names are `Service.key`, `Service.readAgain` and
+`phaseBox`, all in `Go/internal/controlplane/service.go` and `handover.go`.
+
 2026-10-02. Written before the first real cloud machine, from the code at `445e15d1` plus
 the T128 change on `agents/move-github-issue-61`. It covers `deploy/compose.public.yaml`
 behind Caddy with a Let's Encrypt certificate (R15), the move between machines (R16), and
@@ -85,20 +105,41 @@ Nothing limits per source today. Each socket gets 15 seconds to send `auth`; fra
 capped (`maxMessage`), and the listen backlog is 256. Caddy's stock image has no
 `rate_limit` directive. That needs the `caddy-ratelimit` module, built with `xcaddy`.
 
-- **P1. A stranger can make the control plane read the whole store.** In `key(for:)`, an
+- **P1. A stranger can make the control plane read the whole store.** *Go, 2026-10-18:
+  fixed.* `Service.key` read again at most once a second, but two reads could run at once.
+  Now `readGate` runs one read at a time and at most one every 3 s (`readAgainEvery`). A
+  caller that comes during a read waits for it and has its result. Within 3 s of a read, an
+  unknown id is refused as unavailable from memory, and the member tries again. The 15 s
+  backstop (`refresh`) goes through the same gate. `TestUnknownIDsReadTheStoreOnce`: 200
+  made-up client and host ids make one read (two lists), and 200 more make none.
+  *2026-10-02:* In `key(for:)`, an
   unknown client or host id calls `readAgain()`, which is `methods.refresh()`: a LIST and
   GETs over the records. That runs *before* the MAC is checked, for any id the stranger
   makes up. On a bucket every attempt is billed S3 requests, and a few hundred a second
   is a real bill, and a slow control plane for everyone. *Fix:* coalesce `readAgain` (one
   refresh at a time, and at most one every few seconds, whatever the number of callers).
   An unknown id within that window is then answered from memory.
-- **P2. A code id costs one or two store GETs** (`codes.stored`), also before the MAC.
+- **P2. A code id costs one or two store GETs** (*Go, 2026-10-18: not fixed. P3 covers it:
+  a made-up code id is refused, which is a failed proof, so one source has 20 GETs a
+  minute. The tag in the id waits for code version 2.*) (`codes.stored`), also before the MAC.
   The id has to be well formed, but any 16 bytes are. *Fix:* check the id's tag first.
   The id is random, and the secret is the id plus an HMAC of it under the control key.
   That needs the tag in the id, a change to code version 2. Or a per-source budget (P3)
   covers it.
-- **P3. No per-source limits.** Open sockets, failed `auth`s and requests per address
-  are all unbounded. *Fix, in this order:*
+- **P3. No per-source limits.** *Go, 2026-10-18: 1 and 2 fixed, 3 is the how-to's.*
+  `sources.go` keeps a table keyed by the source address: the peer's, or the last
+  `X-Forwarded-For` entry when the peer is in `AGENTS_CONTROL_TRUSTED_PROXIES`.
+  `compose.public.yaml` gives Caddy a fixed address (172.30.61.250) on its own subnet and
+  trusts only that. An IPv6 source counts by its /64. A source is refused with 429, before
+  the WebSocket opens, when it has 50 sockets waiting for `auth`, or for a minute after 20
+  failed proofs in a minute. A failed proof is any refusal before the MAC is proved, and a
+  socket that says nothing in 15 s; a store that can't be read (`notTheirs`) is not. The
+  table holds 4,096 addresses at most and lets idle ones go; when every one is busy, a new
+  address goes uncounted, not refused. Caddy's `request_body max_size 1MB` is on every
+  site. Requests are GETs, and WebSocket frames are capped by `agents-control` itself.
+  The `rate_limit` module for `/v1/hooks/*` waits for #60.
+  *2026-10-02:* Open sockets, failed `auth`s and requests per address are all unbounded.
+  *Fix, in this order:*
   1. In `agents-control`, a small table keyed by the source address that Caddy passes in
      `X-Forwarded-For`, trusted only from the proxy. Cap failed proofs (say 20 a minute,
      then refuse for a minute) and sockets still waiting for `auth` (say 50).
@@ -106,7 +147,13 @@ capped (`maxMessage`), and the listen backlog is 256. Caddy's stock image has no
      `rate_limit` from the module for `/v1/hooks/*` once #60 lands.
   3. The provider's firewall: only 80 and 443 open, and ssh by key from Alex's addresses,
      or through Tailscale.
-- **P4. A forwarding copy forgets it's forwarding.** The phase is held in memory
+- **P4. A forwarding copy forgets it's forwarding.** *Go, 2026-10-18: fixed, and now
+  tested.* `handover/forward` writes `handover/forwarding-<url>` in the store with the end
+  time. `Start` reads it (`resumeForwardingIfMarked`) and comes back frozen and forwarding
+  to the same list until the same time. `--no-forwarding` (`AGENTS_CONTROL_FORWARDING=0`)
+  deletes the mark and serves. The mark is in the store, not in Agents Host's settings, so
+  a container restart forwards too. `TestAForwardingCopyForwardsAfterARestart`.
+  *2026-10-02:* The phase is held in memory
   (`PhaseBox`). If Agents Host's control launch agent restarts after Move to Another
   Machine… (a crash, a reboot, an update), the copy comes back **serving its frozen
   folder store**, writable, at the old address. Members that already moved don't go
@@ -123,6 +170,15 @@ capped (`maxMessage`), and the listen backlog is 256. Caddy's stock image has no
 
 ## 4. Logs and secrets
 
+- *Go, 2026-10-18: checked every log line in `Go/internal/controlplane` and
+  `Go/cmd/agents-control`.* Lines name members, hosts, addresses and refusal reasons,
+  never a code, a code's id, a MAC or a key. One leak was found and fixed: a store error
+  while reading a code was logged whole, and an S3 error names the object's key, which
+  holds the code's id. Now the line says only "could not read a code". There are no
+  webhooks yet, so no signature header to log. `agents-control code` prints a code on
+  purpose, to whoever runs it, not into the log. `TestNoSecretReachesTheLog` pairs,
+  spends twice, connects, fails a proof and fails a code's read, then looks for each code,
+  id, MAC and key in every line.
 - T102 found nothing secret logged on the key's delivery. `control.log` and the
   container's output carry member names and ids, and the addresses announced. A full
   check that no code, MAC or signature header reaches a log belongs with W1, before
@@ -179,6 +235,8 @@ has to provide for them:
   Here Again… must warn when hooks exist.
 
 ## 7. Order of work
+
+*Go, 2026-10-18:* 1 and 2 are done (#1457). 3 to 5 are as before.
 
 1. P4 (forwarding survives a restart): part of T129, since its walk restarts copies.
 2. P1, then P3's in-process budget: before T131, Alex's own machine.

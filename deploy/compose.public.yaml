@@ -33,6 +33,9 @@ services:
       AGENTS_CONTROL_NAME: ${AGENTS_CONTROL_NAME:-${AGENTS_DOMAIN}}
       # 1 to start empty, for a handover from Agents Host to fill (058 research R16).
       AGENTS_CONTROL_RECEIVE: ${AGENTS_CONTROL_RECEIVE:-}
+      # Caddy's address below: only its X-Forwarded-For says where a socket came from, for
+      # the per-source budget (public-security.md P3).
+      AGENTS_CONTROL_TRUSTED_PROXIES: 172.30.61.250
     secrets: [control-key]
     volumes:
       - data:/data
@@ -47,10 +50,20 @@ services:
     environment:
       AGENTS_DOMAIN: ${AGENTS_DOMAIN}
       ACME_EMAIL: ${ACME_EMAIL:?set ACME_EMAIL for Let's Encrypt's notices}
+    networks:
+      default:
+        # Fixed, so agents-control can trust it and nothing else on the network.
+        ipv4_address: 172.30.61.250
     volumes:
       - ./Caddyfile.public:/etc/caddy/Caddyfile:ro
       # The certificate and the ACME account: kept, so a restart doesn't ask for a new one.
       - caddy:/data
+
+networks:
+  default:
+    ipam:
+      config:
+        - subnet: 172.30.61.0/24
 
 secrets:
   control-key:

@@ -8,6 +8,10 @@
 
 :8443 {
 	tls /secrets/cert.pem /secrets/key.pem
+	# As Caddyfile.public: no request agents-control answers has a big body (P3).
+	request_body {
+		max_size 1MB
+	}
 	reverse_proxy cp1:8791 cp2:8791 cp3:8791 {
 		lb_policy round_robin
 		lb_try_duration 5s

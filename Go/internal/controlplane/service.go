@@ -15,6 +15,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"net/netip"
 	"sort"
 	"strings"
 	"sync"
@@ -79,6 +80,10 @@ type Config struct {
 	Receive bool
 	// Serve, even if this copy was forwarding when it stopped (--no-forwarding).
 	NoForwarding bool
+	// The proxies whose X-Forwarded-For names a socket's source (Caddy on a public
+	// machine): the per-source budget counts by it (public-security.md P3). Empty trusts
+	// none, and counts by the peer's own address.
+	TrustedProxies []netip.Prefix
 	// Where each log line goes, already marked with this copy. No line may hold a code,
 	// a key, a MAC or a message (071 FR-033).
 	Log func(string)
@@ -121,13 +126,18 @@ type Service struct {
 	// hosts/install, detect and sshHosts (T072, #429, #610): with the person's own ssh.
 	installer *hostinstall.Installer
 
-	mu          sync.Mutex
-	readAgainAt time.Time
-	servers     []*http.Server
-	sockets     map[*Conn]bool
-	stop        chan struct{}
-	ready       bool
-	loopback    *web.Listener
+	// One read of the store's records at a time, at most one every readAgainEvery
+	// (public-security.md P1).
+	reads readGate
+	// What each source address may still try before it proves a key (P3).
+	sources *sources
+
+	mu       sync.Mutex
+	servers  []*http.Server
+	sockets  map[*Conn]bool
+	stop     chan struct{}
+	ready    bool
+	loopback *web.Listener
 }
 
 // New makes a service; Start opens the store and listens.
@@ -150,7 +160,9 @@ func New(cfg Config) (*Service, error) {
 		cfg.Bind = "0.0.0.0"
 	}
 	s := &Service{cfg: cfg, public: public, origin: origin, copyID: strings.ToLower(records.NewUUID()[:8]),
-		records: records.New(cfg.Store), started: time.Now(), desk: notices.NewDesk(), phase: &phaseBox{phase: phaseServing}, sockets: map[*Conn]bool{}, stop: make(chan struct{})}
+		records: records.New(cfg.Store), started: time.Now(), desk: notices.NewDesk(), phase: &phaseBox{phase: phaseServing}, sockets: map[*Conn]bool{}, stop: make(chan struct{}),
+		reads: readGate{every: readAgainEvery}}
+	s.sources = newSources(cfg.TrustedProxies, s.log)
 	s.codes = &Codes{Store: cfg.Store, Private: cfg.PrivateKey, Public: public, URL: cfg.URL, Pin: cfg.Pin, Name: cfg.Name}
 	s.router = NewRouter(nil, s.log)
 	s.methods = newMethods(s)
@@ -404,12 +416,17 @@ func (s *Service) refresh() {
 	if s.phase.now() == phaseReceiving {
 		return
 	}
-	if err := s.records.Load(context.Background()); err != nil {
+	// A read that ran within readAgainEvery (for a member not known yet) is as good as
+	// this one: the records are held to it all the same.
+	ran, err := s.reads.read(func() error { return s.records.Load(context.Background()) })
+	if err != nil {
 		s.setReady(false)
 		s.log("store: " + err.Error())
 		return
 	}
-	s.setReady(true)
+	if ran {
+		s.setReady(true)
+	}
 	for _, h := range s.records.Hosts() {
 		s.router.Know(h.ID)
 	}
@@ -620,11 +637,19 @@ func (s *Service) serveHTTP(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.Write(data)
 	case path == "/v1/connect":
-		ws, err := websocket.Accept(w, r, &websocket.AcceptOptions{InsecureSkipVerify: true})
-		if err != nil {
+		// Refused before the socket opens, so a refused source costs a reply and no more.
+		source := s.sources.of(r)
+		proved, ok := s.sources.enter(source)
+		if !ok {
+			plain(w, http.StatusTooManyRequests, "too many tries from this address; try again in a minute\n")
 			return
 		}
-		go s.accept(s.adopt(newConn(ws, r.RemoteAddr)), "")
+		ws, err := websocket.Accept(w, r, &websocket.AcceptOptions{InsecureSkipVerify: true})
+		if err != nil {
+			proved(false)
+			return
+		}
+		go s.accept(s.adopt(newConn(ws, source)), "", proved)
 	default:
 		plain(w, http.StatusNotFound, "not here\n")
 	}
@@ -656,7 +681,7 @@ func (s *Service) adopt(c *Conn) *Conn {
 func (s *Service) startWeb() {
 	listener, err := web.Start(web.Config{Folder: s.cfg.Web.Folder, Port: s.cfg.Web.Port, Log: s.log,
 		Accept: func(ws *websocket.Conn, remote, origin string) {
-			s.accept(s.adopt(newConn(ws, remote)), origin)
+			s.accept(s.adopt(newConn(ws, remote)), origin, nil)
 		}})
 	status := web.StatusOf(s.cfg.Web.Port, listener, err)
 	s.mu.Lock()
@@ -695,14 +720,26 @@ func (s *Service) WebPort() int {
 // identity says: a client to the router, a host's uplink to the router, a code holder to
 // a one-time announce. webOrigin is the loopback listener's own origin for a socket that
 // came in there, or "" for the TLS listener: the exchange is bound to the listener's
-// origin, never to anything the peer says (071, FR-006).
-func (s *Service) accept(conn *Conn, webOrigin string) {
+// origin, never to anything the peer says (071, FR-006). proved, when not nil, is told
+// once whether the socket proved a key, for its source's budget (P3).
+func (s *Service) accept(conn *Conn, webOrigin string, proved func(failed bool)) {
+	settle := func(failed bool) {
+		if proved != nil {
+			proved(failed)
+			proved = nil
+		}
+	}
+	defer settle(false)
 	serverNonce := controllink.Nonce()
 	hello := controllink.Hello{V: int64(controllink.Version), Name: s.cfg.Name, Control: controllink.B64URL(s.public),
 		Nonce: controllink.B64URL(serverNonce), Copy: s.copyID}
 	refuse := func(err error) {
 		var r *controllink.Refusal
-		if errors.As(err, &r) {
+		refused := errors.As(err, &r)
+		// A store that can't be read is not the peer's failure; any other refusal is.
+		var theirs notTheirs
+		settle(refused && !errors.As(err, &theirs))
+		if refused {
 			conn.SendNow(controllink.Message{Refused: r.Reason}.Line())
 			s.log(fmt.Sprintf("refused a connection from %s: %s", conn.Remote, r.Reason))
 		} else {
@@ -716,6 +753,8 @@ func (s *Service) accept(conn *Conn, webOrigin string) {
 	}
 	line, err := conn.ReadWithin(15 * time.Second)
 	if err != nil {
+		// Nothing proved in time counts as a failed proof.
+		settle(true)
 		conn.Close()
 		return
 	}
@@ -751,6 +790,7 @@ func (s *Service) accept(conn *Conn, webOrigin string) {
 		refuse(err)
 		return
 	}
+	settle(false)
 	if !admittedAny {
 		refuse(controllink.Refuse(controllink.Unknown))
 		return
@@ -898,7 +938,7 @@ func (s *Service) key(id controllink.Identity) ([]byte, *records.ClientRecord, s
 	// Being filled by a handover, its records are not whole yet: try again, which says
 	// nothing about the member (#81), where unknown would have a browser forget its key.
 	if id.Kind != 'x' && s.phase.now() == phaseReceiving {
-		return nil, nil, "", controllink.Refuse(controllink.Unavailable)
+		return nil, nil, "", notTheirs{controllink.Refuse(controllink.Unavailable)}
 	}
 	switch id.Kind {
 	case 'c':
@@ -916,7 +956,7 @@ func (s *Service) key(id controllink.Identity) ([]byte, *records.ClientRecord, s
 		}
 		// Listed and unreadable is not unknown (#171).
 		if c == nil && s.records.ClientUnreadable(id.ID) {
-			return nil, nil, "", controllink.Refuse(controllink.Unavailable)
+			return nil, nil, "", notTheirs{controllink.Refuse(controllink.Unavailable)}
 		}
 		if c == nil || len(c.PublicKey) == 0 {
 			return nil, nil, "", controllink.Refuse(controllink.Unknown)
@@ -934,7 +974,7 @@ func (s *Service) key(id controllink.Identity) ([]byte, *records.ClientRecord, s
 		}
 		h := s.records.Host(id.ID)
 		if h == nil && s.records.HostUnreadable(id.ID) {
-			return nil, nil, "", controllink.Refuse(controllink.Unavailable)
+			return nil, nil, "", notTheirs{controllink.Refuse(controllink.Unavailable)}
 		}
 		if h == nil || len(h.PublicKey) == 0 {
 			return nil, nil, "", controllink.Refuse(controllink.Unknown)
@@ -948,7 +988,13 @@ func (s *Service) key(id controllink.Identity) ([]byte, *records.ClientRecord, s
 		// Spent or not: a join replayed by the key that spent it is told apart in announce.
 		stored, err := s.codes.Stored(context.Background(), id.ID, true)
 		if err != nil {
-			return nil, nil, "", err
+			var r *controllink.Refusal
+			if errors.As(err, &r) {
+				return nil, nil, "", err
+			}
+			// The store's error may name the code's key: it stays out of the log.
+			s.log("store: could not read a code")
+			return nil, nil, "", notTheirs{controllink.Refuse(controllink.Unavailable)}
 		}
 		wanted := (id.Kind == 'e') == (stored.Purpose == "host")
 		secret := controllink.CodeSecret(s.cfg.PrivateKey, id.ID)
@@ -967,22 +1013,69 @@ func (s *Service) key(id controllink.Identity) ([]byte, *records.ClientRecord, s
 	return nil, nil, "", controllink.Refuse(controllink.Unknown)
 }
 
+// readAgainEvery is how often at most a member not in the records reads the store
+// again (#174). A stranger's made-up ids cost no more than one read in this time,
+// however many there are (public-security.md P1).
+const readAgainEvery = 3 * time.Second
+
 // readAgain reads the store again for a member not in the records, or refuses as
-// unavailable when it cannot: not known yet is not the same as not a member. Once a
-// second at most (#174).
+// unavailable when it cannot: not known yet is not the same as not a member. It shares
+// the read already running, and within readAgainEvery of the last read it refuses as
+// unavailable at once, so the member tries again.
 func (s *Service) readAgain() error {
-	s.mu.Lock()
-	if time.Since(s.readAgainAt) < time.Second {
-		s.mu.Unlock()
-		return controllink.Refuse(controllink.Unavailable)
-	}
-	s.readAgainAt = time.Now()
-	s.mu.Unlock()
-	if err := s.records.Load(context.Background()); err != nil {
+	ran, err := s.reads.read(func() error { return s.records.Load(context.Background()) })
+	if err != nil {
 		s.log("store: could not read it to admit a member: " + err.Error())
+		return notTheirs{controllink.Refuse(controllink.Unavailable)}
+	}
+	if !ran {
 		return controllink.Refuse(controllink.Unavailable)
 	}
 	return nil
+}
+
+// notTheirs is a refusal that says nothing about the peer: the store can't be read, or a
+// handover is filling this copy. Its source's budget doesn't count it (P3).
+type notTheirs struct{ error }
+
+func (e notTheirs) Unwrap() error { return e.error }
+
+// readGate runs one read at a time, and at most one every so often, whatever the number
+// of callers: one that comes while a read runs waits for it, and has its result.
+type readGate struct {
+	every   time.Duration
+	mu      sync.Mutex
+	last    time.Time
+	running *gateRead
+}
+
+type gateRead struct {
+	done chan struct{}
+	err  error
+}
+
+// read runs read, or shares the one running. ran is false when a read finished within
+// every: the caller goes by what is in memory.
+func (g *readGate) read(read func() error) (ran bool, err error) {
+	g.mu.Lock()
+	if r := g.running; r != nil {
+		g.mu.Unlock()
+		<-r.done
+		return true, r.err
+	}
+	if !g.last.IsZero() && time.Since(g.last) < g.every {
+		g.mu.Unlock()
+		return false, nil
+	}
+	r := &gateRead{done: make(chan struct{})}
+	g.running = r
+	g.mu.Unlock()
+	r.err = read()
+	g.mu.Lock()
+	g.running, g.last = nil, time.Now()
+	g.mu.Unlock()
+	close(r.done)
+	return true, r.err
 }
 
 // hostArrived takes a host's uplink: its first line is host/hello on channel 0 (kept
