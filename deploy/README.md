@@ -81,7 +81,17 @@ ssh you@agents.example.com 'cd agents && docker compose -f deploy/compose.public
     run --rm -T control key seal --key-fd 0' < control-key
 ```
 
-Another key given for a store that already has one is refused. The how-to is
+Another key given for a store that already has one is refused. For a move back to a Mac,
+`key export` writes the sealed key, raw, out over ssh into a 0600 file on the Mac. Only a
+shell on the machine can run it: no request gives the key out, and it writes none to a
+terminal:
+
+```sh
+(umask 077; ssh you@agents.example.com 'cd agents && docker compose -f deploy/compose.public.yaml \
+    run --rm -T control key export --key-fd 1' > control-key)
+```
+
+The how-to is
 [Run the control plane in the cloud](../docs/how-to/run-the-control-plane-in-the-cloud.md).
 
 ### Trying it with no domain: Pebble

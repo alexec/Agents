@@ -33,6 +33,28 @@ enum HostSecrets {
         try StoreCoding.writeAtomically(try controlKey(paths), to: file, permissions: 0o600)
     }
 
+    /// The key in `file`, from `agents-control key export` on the machine the control plane
+    /// was moved to, made this Mac's for a move back (T127, #1477). This Mac's own key is kept
+    /// aside as `control-key-before-<time>`, not deleted. Throws, and changes nothing, when
+    /// `file` holds no key.
+    static func useControlKey(_ paths: HostPaths, from file: URL) throws {
+        let key = try Data(contentsOf: file)
+        guard key.count == 32, (try? ControlAgreement.publicKey(privateKey: key)) != nil else {
+            throw ControlService.Failure("\(file.lastPathComponent) holds no control plane key.")
+        }
+        let mine = try controlKey(paths)
+        guard mine != key else { return }
+        let aside = "control-key-before-\(Int(Date().timeIntervalSince1970))"
+        if paths.scratch {
+            let here = paths.controlHome.appendingPathComponent("control-key")
+            try StoreCoding.writeAtomically(mine, to: paths.controlHome.appendingPathComponent(aside), permissions: 0o600)
+            try StoreCoding.writeAtomically(key, to: here, permissions: 0o600)
+        } else {
+            try write(mine, account: aside)
+            try write(key, account: "control-key")
+        }
+    }
+
     static func bucketKeys(_ paths: HostPaths) -> BucketKeys? {
         let data = paths.scratch ? try? Data(contentsOf: bucketFile(paths)) : read(account: "bucket-keys")
         return data.flatMap { try? JSONDecoder().decode(BucketKeys.self, from: $0) }

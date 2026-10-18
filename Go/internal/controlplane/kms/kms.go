@@ -144,6 +144,34 @@ func gcmOf(key []byte) (cipher.AEAD, error) {
 	return cipher.NewGCM(block)
 }
 
+// ErrNoKey is Existing's answer for a store that has no sealed control key.
+var ErrNoKey = errors.New("the store has no sealed control key")
+
+// Existing opens the control key sealed in the store, and makes none: ErrNoKey when there
+// is none. For key export (#1477), which gives a cloud machine's key to a Mac for a move
+// back, and so must never give a key that nothing uses.
+func Existing(ctx context.Context, s store.Store, keeperURL string) ([]byte, error) {
+	ctx, cancel := context.WithTimeout(ctx, Timeout)
+	defer cancel()
+	o, err := s.Get(ctx, Key)
+	if err != nil {
+		return nil, err
+	}
+	if o == nil {
+		return nil, ErrNoKey
+	}
+	var sealed Sealed
+	if err := json.Unmarshal(o.Data, &sealed); err != nil {
+		return nil, fmt.Errorf("%s cannot be read: %w", Key, err)
+	}
+	k, err := Keeper(ctx, keeperURL)
+	if err != nil {
+		return nil, fmt.Errorf("the control key's keeper %s: %w", Describe(keeperURL), err)
+	}
+	defer func() { go k.Close() }()
+	return Open(ctx, k, &sealed)
+}
+
 // ControlKey gets the control key from the store and opens it with the keeper. When the
 // store has no sealed key, it calls make, seals that key and writes it. make gives the
 // key of an existing key file, or a new key. When copies start together on an empty

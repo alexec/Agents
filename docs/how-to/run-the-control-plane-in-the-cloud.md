@@ -370,6 +370,22 @@ ssh you@agents.example.com 'cd agents && docker compose -f deploy/compose.public
 It says **the control key … is sealed in the store by gcpkms://…**. Then delete the saved
 `control-key` on your Mac.
 
+On Google Cloud, `deploy/gcp/up.sh --seal-key control-key` does both steps for you.
+
+To bring the control plane back, use **Run It Here Again…** in Agents Host. If the machine
+made a key of its own (it started with an empty store and no key sealed), the sheet says
+so. Write that key to a file on your Mac, piped out over ssh, so that it is never written on
+the machine:
+
+```sh
+(umask 077; ssh you@agents.example.com 'cd agents && docker compose -f deploy/compose.public.yaml \
+    run --rm -T control key export --key-fd 1' > control-key)
+```
+
+Then click **Use Key…** in the sheet, choose the file, and delete the file. Agents Host
+keeps the Mac's earlier key aside in the keychain. Only a shell on the machine can export
+the key: no request to the control plane gives it out.
+
 ### Notifications
 
 TODO: how a set-up with no Mac host gets notifications on the phone (#61). Until then, the
