@@ -16,6 +16,7 @@
 //	agents-control key seal --key-fd N          seal a key handed in, with AGENTS_CONTROL_KMS
 //	agents-control handover STEP --at URL|self … a step of a move to a copy elsewhere (R16, #1490)
 //	agents-control store copy --from URL --to URL  every record into an empty store (Switch Store…)
+//	agents-control key export --key-fd N        the key, raw, out on N: for a move back to a Mac
 //	agents-control install-script               the script a server runs to become a host
 //	agents-control store check [--store URL]
 //	agents-control version
@@ -338,6 +339,51 @@ func sealKey() {
 	say("the control key " + controllink.B64URL(public) + " is sealed in the store by " + kms.Describe(keeper))
 }
 
+// exportKey writes the control key, raw, on --key-fd: the key sealed in the store with
+// AGENTS_CONTROL_KMS, or the key file's. For a move back from a cloud machine to a Mac
+// (T127, #1477), piped out over ssh into a 0600 file on the Mac:
+//
+//	ssh machine docker compose … run --rm -T control key export --key-fd 1 > control-key
+//
+// Only a shell on the machine can run it: no request asks a control plane for its key. It
+// makes no key, and writes none to a terminal. What it says goes to stderr, as stdout can
+// be the key.
+func exportKey() {
+	fd, err := strconv.Atoi(value("--key-fd"))
+	if err != nil || fd < 0 {
+		fail("say where the key goes: --key-fd N (1 for stdout)")
+	}
+	out := os.NewFile(uintptr(fd), "key")
+	if out == nil {
+		fail("descriptor %d is not open", fd)
+	}
+	if info, err := out.Stat(); err != nil {
+		fail("descriptor %d is not open", fd)
+	} else if info.Mode()&os.ModeCharDevice != 0 {
+		fail("descriptor %d is a terminal: send the key to a file, as in ssh machine … key export --key-fd 1 > control-key", fd)
+	}
+	var key []byte
+	if keeper := os.Getenv("AGENTS_CONTROL_KMS"); keeper != "" {
+		kms.NoCredentialsFile()
+		key, err = kms.Existing(context.Background(), openStore(""), keeper)
+	} else if file := keyFile(); file != "" {
+		key, err = os.ReadFile(file)
+		if err == nil && !controllink.ValidPrivateKey(key) {
+			err = fmt.Errorf("%s holds no key", file)
+		}
+	} else {
+		fail("say where the control plane's key is: AGENTS_CONTROL_KMS or AGENTS_CONTROL_KEY_FILE")
+	}
+	if err != nil {
+		fail("the control key: %v", err)
+	}
+	if _, err := out.Write(key); err != nil {
+		fail("the key was not written: %v", err)
+	}
+	public, _ := controllink.PublicKey(key)
+	fmt.Fprintln(os.Stderr, "agents-control: the control key "+controllink.B64URL(public)+" is written out. Keep it in a 0600 file, and delete it once it is used.")
+}
+
 func serve() {
 	// Beside the rest of what it says, in control.log, rather than in the system log (#93).
 	if file := value("--log"); file != "" {
@@ -583,6 +629,7 @@ const usage = `usage: agents-control serve [--port N] [--bind ADDR] [--self-sign
        agents-control hosts | clients
        agents-control key seal (--key-fd N | AGENTS_CONTROL_KEY)
        agents-control handover status|announce|freeze|unfreeze|withdraw|copy|take|forward|stop|shares|relay …
+       agents-control key export --key-fd N
        agents-control install-script
        agents-control store check [--store URL]
        agents-control store copy --from URL --to URL`
@@ -609,6 +656,8 @@ func main() {
 		handover()
 	case first == "key" && len(args) > 1 && args[1] == "seal":
 		sealKey()
+	case first == "key" && len(args) > 1 && args[1] == "export":
+		exportKey()
 	case first == "install-script":
 		fmt.Print(controlplane.InstallScript)
 	case first == "--version" || first == "version":

@@ -1,4 +1,5 @@
 import AgentsKitCore
+import AppKit
 import Foundation
 import Observation
 import SwiftUI
@@ -14,6 +15,9 @@ final class MachineReturn {
     let model: HostModel
     var step: Step = .check
     var reachable = MachineMove.Tick.waiting
+    /// The other machine holds another control plane's key: it made its own, so this Mac
+    /// takes that key first (#1477).
+    private(set) var otherKey = false
     var ready = MachineMove.Tick.waiting
     private(set) var checking = false
     /// Where the store from before the move was put aside.
@@ -50,12 +54,14 @@ final class MachineReturn {
         defer { checking = false }
         reachable = .waiting
         ready = .waiting
+        otherKey = false
         let there = await handover(["status", "--at", place, "--json"])
         if there.ok, let status = try? JSONDecoder().decode(HandoverStatus.self, from: Data(there.output.utf8)),
            status.phase == "serving" {
             reachable = .yes
         } else if MachineMove.otherKey(there.problem) {
-            reachable = .no("It holds another control plane's key, so this Mac can't take it back from there.")
+            reachable = .no("It holds another control plane's key, so this Mac can't take it back from there yet. Give this Mac that key first.")
+            otherKey = true
             return
         } else {
             reachable = .no("The control plane is unreachable, so this Mac can't take it back from there. Check the machine is running, then Check Again.")
@@ -81,6 +87,25 @@ final class MachineReturn {
             try? await Task.sleep(for: .milliseconds(500))
         }
         ready = .no("This Mac's copy didn't start. Its log is at \(model.paths.controlLog.path).")
+    }
+
+    /// The key from `agents-control key export` on the other machine, made this Mac's, then
+    /// checked again. This Mac's own key is kept aside.
+    func useKey() async {
+        let panel = NSOpenPanel()
+        panel.message = "Choose the key from key export. Delete the file once this Mac has it."
+        panel.canChooseDirectories = false
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        problem = nil
+        do {
+            try HostSecrets.useControlKey(model.paths, from: url)
+        } catch {
+            problem = "\(error)"
+            return
+        }
+        // A copy already started to receive has the old key: it starts again with this one.
+        if model.settings.receiving == true { await model.undoReturn() }
+        await check()
     }
 
     /// On a bucket: this Mac's copy serves it beside the other one, and both must find
@@ -209,6 +234,13 @@ struct MachineReturnSheet: View {
 
     private typealias Pieces = MachineMoveSheet
 
+    /// The other machine's key, sealed in its store, out to a 0600 file here (#1477).
+    static let exportCommand = """
+        (umask 077; ssh you@agents.example.com 'cd agents && \\
+          docker compose -f deploy/compose.public.yaml \\
+          run --rm -T control key export --key-fd 1' > control-key)
+        """
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             if let back { content(back) }
@@ -229,6 +261,16 @@ struct MachineReturnSheet: View {
                 .foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             Pieces.stepTitle("1 · Check both ends")
             Pieces.tick(back.reachable, "\(back.placeName) answers, and holds this control plane's key")
+            if back.otherKey {
+                Pieces.numbered(1) {
+                    Text("Write its key to a file on this Mac. It comes out over ssh, so it's never written on that machine:")
+                    Pieces.command(Self.exportCommand)
+                }
+                Pieces.numbered(2) {
+                    Text("Give it to this Mac, then delete the file. This Mac keeps its own key aside.")
+                    Button("Use Key…") { Task { await back.useKey() } }.disabled(back.checking).padding(.top, 2)
+                }
+            }
             Pieces.tick(back.ready, back.shared ? "This Mac's copy serves the same bucket" : "This Mac's copy is ready, empty, waiting for it",
                         note: back.aside.map { "The store from before the move is kept in Agents Control as \($0)." })
             HStack(alignment: .top, spacing: 10) {

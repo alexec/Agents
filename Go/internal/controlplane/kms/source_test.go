@@ -107,3 +107,25 @@ func TestNoCredentialsFile(t *testing.T) {
 		t.Fatal("a service account file was let go")
 	}
 }
+
+// Existing gives the key sealed in the store, and makes none on an empty store (#1477).
+func TestExistingOpensTheSealedKeyAndMakesNone(t *testing.T) {
+	st := store.NewFolder(t.TempDir())
+	if _, err := Existing(ctx, st, localURL(1)); err != ErrNoKey {
+		t.Fatalf("an empty store gave %v", err)
+	}
+	if o, _ := st.Get(ctx, Key); o != nil {
+		t.Fatal("Existing sealed a key")
+	}
+	sealed, err := Kept{Store: st, Keeper: localURL(1)}.ControlKey(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := Existing(ctx, st, localURL(1))
+	if err != nil || !bytes.Equal(got, sealed) {
+		t.Fatal(err)
+	}
+	if _, err := Existing(ctx, st, localURL(2)); err == nil {
+		t.Fatal("another keeper opened the key")
+	}
+}

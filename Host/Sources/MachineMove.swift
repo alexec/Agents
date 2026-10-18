@@ -108,11 +108,12 @@ final class MachineMove {
 
     // MARK: P · the key
 
-    /// The control plane's key, as one file, for the person to copy to the other machine.
+    /// The control plane's key, as one file, for the person to seal in the other machine's
+    /// store (#1477): `key seal` there, piped in over ssh, so it is never on its disk.
     func saveKey() {
         let panel = NSSavePanel()
         panel.nameFieldStringValue = "control-key"
-        panel.message = "Save the control plane's key, then copy it to the other machine as deploy/secrets/control-key."
+        panel.message = "Save the control plane's key, then seal it in the other machine's store. Delete this copy after."
         guard panel.runModal() == .OK, let url = panel.url else { return }
         problem = nil
         do {
@@ -149,7 +150,7 @@ final class MachineMove {
             trusted = .no("Windows and phones would refuse it. Give the machine a domain name and a certificate from Let's Encrypt; Caddy does this.")
         } else if Self.otherKey(said) {
             answers = .yes; trusted = .yes
-            holdsKey = .no("Copy the key you saved to deploy/secrets/control-key there, empty its store, and start it again.")
+            holdsKey = .no("It holds another key. Stop it, empty its store, seal the key you saved there (step 1), and start it again.")
         } else {
             answers = .no("Nothing answers at that address. Check it's started, and that the name points at the machine.")
         }
@@ -300,10 +301,11 @@ struct MachineMoveSheet: View {
                 .foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             Self.stepTitle("1 · Give the other machine this control plane's key")
             Self.numbered(1) {
-                Text("Save the key, and copy it to the other machine as \(Text("deploy/secrets/control-key").font(.system(.body, design: .monospaced))).")
-                Text("Anyone who has it can pose as your control plane. Delete your copy once it's there.")
+                Text("Save the key. Before the control plane there first starts, seal the key in its store. The key goes in over ssh, so it's never written on that machine:")
+                Button("Save Key…") { move.saveKey() }.padding(.vertical, 2)
+                Self.command(Self.sealCommand)
+                Text("On Google Cloud, \(Text("deploy/gcp/up.sh --seal-key control-key").font(.system(.callout, design: .monospaced))) does this. Anyone who has the key can pose as your control plane: delete the saved copy on this Mac once it's sealed.")
                     .font(.callout).foregroundStyle(.secondary)
-                Button("Save Key…") { move.saveKey() }.padding(.top, 2)
             }
             Self.numbered(2) {
                 if move.shared {
@@ -390,6 +392,16 @@ struct MachineMoveSheet: View {
             .padding(8).frame(maxWidth: .infinity, alignment: .leading)
             .background(Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: 6))
     }
+
+    /// The saved key sealed in the other machine's store (#1458, #1477), as in Run the
+    /// control plane in the cloud.
+    static let sealCommand = """
+        ssh you@agents.example.com 'cd agents && docker compose \\
+          -f deploy/compose.public.yaml build control'
+        ssh you@agents.example.com 'cd agents && docker compose \\
+          -f deploy/compose.public.yaml \\
+          run --rm -T control key seal --key-fd 0' < control-key
+        """
 
     /// compose.public.yaml on the bucket this Mac's copy uses (T128). The keys are not in
     /// it: they go in the machine's deploy/.env, never on a command line.
