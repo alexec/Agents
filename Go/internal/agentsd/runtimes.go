@@ -2,9 +2,11 @@ package agentsd
 
 import (
 	"context"
+	"encoding/json"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -296,7 +298,22 @@ func (d *Daemon) launchFor(r *runtimeDef, dir string) (acp.Launch, error) {
 		env = append(env, "GEMINI_HOME="+d.appHomes()["antigravity"], "AGY_ACP_DISABLE_WORKSPACE_TRUST=1",
 			"AGY_ACP_FORCE_FILE_STORAGE=1")
 	}
-	return acp.Launch{Command: path, Args: args, Env: env, Dir: dir, Name: r.Name}, nil
+	l := withToolPolicy(acp.Launch{Command: path, Args: args, Env: env, Dir: dir, Name: r.Name}, r.ID)
+	for _, f := range toolPolicyFiles[r.ID] {
+		file := filepath.Join(root, "runtimes", f.name)
+		if err := os.MkdirAll(filepath.Dir(file), 0o700); err != nil {
+			return acp.Launch{}, err
+		}
+		if err := os.WriteFile(file, []byte(f.contents), 0o600); err != nil {
+			return acp.Launch{}, err
+		}
+		if f.variable != "" {
+			l.Env = append(without(l.Env, f.variable), f.variable+"="+file)
+		} else {
+			l.Args = append(slices.Clone(l.Args), f.argument, file)
+		}
+	}
+	return l, nil
 }
 
 func appendPath(env []string, dir string) []string {
@@ -348,13 +365,86 @@ func (d *Daemon) needsSignIn(runtimeID string) error {
 		Data: map[string]any{"runtime": runtimeID, "offered": false}}
 }
 
-// sessionMeta is the _meta on session/new: Claude's tools the app takes away
-// (ToolPolicyCatalog.swift).
-func sessionMeta(runtimeID string) map[string]any {
-	if runtimeID != "claude" {
-		return nil
+// The tool policy is ToolPolicyCatalog.swift's levers, one per runtime, measured in 015
+// and kept up there since: what each runtime's own tools would do that the app does (its
+// standing arrangements, artefacts and the like) is taken away, and its question tool is
+// kept. Cursor has no lever (its permission vocabulary names no tool), and Antigravity and
+// Gemini have nothing to take away since sub-agents and task lists came back (2026-09-29):
+// an empty deny list or policy file is not sent, as Swift did not send one.
+
+// toolPolicyEnv is the environmentJSON lever: JSON in a variable the runtime reads at
+// start, compact with sorted keys, the person's own replaced.
+//   - Codex's feature switches in CODEX_CONFIG, which its adapter merges into every
+//     thread's config (047). They take sleep, automations and apps away, and let
+//     request_user_input ask outside plan mode, so Codex's own question reaches the app as
+//     a form (#1432).
+//   - OpenCode's own configuration in OPENCODE_CONFIG_CONTENT, merged over the person's
+//     opencode.json for this process (049 D4): it asks before an edit, a command or a fetch
+//     (its own default is to allow all three), and never updates itself or shares (#1445).
+var toolPolicyEnv = map[string]map[string]any{
+	"codex": {"CODEX_CONFIG": map[string]any{"features": map[string]any{
+		"sleep_tool": false, "goals": true, "in_app_local_automation": false, "apps": false,
+		"multi_agent": true, "default_mode_request_user_input": true}}},
+	"opencode": {"OPENCODE_CONFIG_CONTENT": map[string]any{"autoupdate": false,
+		"permission": map[string]any{"bash": "ask", "edit": "ask", "webfetch": "ask"}, "share": "disabled"}},
+}
+
+// toolPolicyArgs is the launchArguments lever (#1445): Copilot is not given the person's
+// software-factory server (a second copy of the app's whole remit) or its built-in MCP
+// servers, and session_store_sql is excluded.
+var toolPolicyArgs = map[string][]string{
+	"copilot": {"--disable-mcp-server", "software-factory", "--disable-builtin-mcps", "--excluded-tools", "session_store_sql"},
+}
+
+// withToolPolicy is the launch with the runtime's tool policy in its arguments and
+// environment.
+func withToolPolicy(l acp.Launch, runtimeID string) acp.Launch {
+	l.Args = append(slices.Clone(l.Args), toolPolicyArgs[runtimeID]...)
+	for k, v := range toolPolicyEnv[runtimeID] {
+		b, _ := json.Marshal(v)
+		l.Env = append(without(l.Env, k), k+"="+string(b))
 	}
-	return map[string]any{"claudeCode": map[string]any{"options": map[string]any{"disallowedTools": []string{
-		"Workflow", "CronCreate", "CronList", "CronDelete", "ScheduleWakeup", "Monitor", "RemoteTrigger", "PushNotification",
-		"EnterWorktree", "ExitWorktree"}}}}
+	return l
+}
+
+// policyFile is ToolPolicy's EnvironmentFile: written whole to <root>/runtimes/<name> on
+// every launch, and pointed at by a variable or, after an argument, by its path.
+type policyFile struct {
+	name, contents, variable, argument string
+}
+
+// toolPolicyFiles is each runtime's files (#1445).
+//   - Grok reads its feature switches only from a file of its own (GROK_CONFIG in line is
+//     ignored), never the person's ~/.grok/config.toml: no image or video generation.
+//   - Gemini's system defaults, the one settings file below the person's: it reads AGENTS.md
+//     after GEMINI.md (054). Its --policy file of deny rules is written only when a rule
+//     comes back; there are none.
+var toolPolicyFiles = map[string][]policyFile{
+	"grok": {{name: "grok-overlay.toml", variable: "GROK_CONFIG_PATH",
+		contents: "# Written by the Agents app. Do not edit: rebuilt on every launch.\n[features]\nimage_gen = false\nvideo_gen = false\n"}},
+	"gemini": {{name: "gemini-system-defaults.json", variable: "GEMINI_CLI_SYSTEM_DEFAULTS_PATH",
+		contents: "{\n  \"context\": {\n    \"fileName\": [\"GEMINI.md\", \"AGENTS.md\"]\n  }\n}\n"}},
+}
+
+// grokTools is Grok's allow list, the only lever it has over agent stdio: a tool Grok adds
+// is not an agent's until it is named here. workflow and monitor survive it (a stock
+// profile adds them before the list applies), and the scheduler and send_feedback are
+// left out.
+var grokTools = []string{"read_file", "list_dir", "grep", "search_replace", "write", "run_terminal_command", "todo_write",
+	"ask_user_question", "web_search", "web_fetch", "open_page", "open_page_with_find", "spawn_subagent",
+	"kill_command_or_subagent", "get_command_or_subagent_output"}
+
+// sessionMeta is the _meta on session/new, session/load and session/fork: Claude's tools
+// the app takes away, and the tools Grok keeps, as a profile (ToolPolicyCatalog.swift).
+func sessionMeta(runtimeID string) map[string]any {
+	switch runtimeID {
+	case "claude":
+		return map[string]any{"claudeCode": map[string]any{"options": map[string]any{"disallowedTools": []string{
+			"Workflow", "CronCreate", "CronList", "CronDelete", "ScheduleWakeup", "Monitor", "RemoteTrigger", "PushNotification",
+			"EnterWorktree", "ExitWorktree"}}}}
+	case "grok":
+		return map[string]any{"agentProfile": map[string]any{"tools": grokTools, "name": "agents-app",
+			"description": "An agent hosted by the Agents app."}}
+	}
+	return nil
 }
