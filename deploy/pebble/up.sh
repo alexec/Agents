@@ -16,6 +16,8 @@ mkdir -p $deploy/secrets && chmod 700 $deploy/secrets
 walk_env=$deploy/secrets/pebble.env
 [[ -s $walk_env ]] || print "AGENTS_CONTROL_KMS=base64key://$(head -c 32 /dev/urandom | base64 | tr '+/' '-_')" > $walk_env
 [[ -f $deploy/secrets/gcp-service-account ]] || : > $deploy/secrets/gcp-service-account
+# No pushes either (#1460): an empty APNs key.
+[[ -f $deploy/secrets/apns-key ]] || : > $deploy/secrets/apns-key
 compose=(docker compose -p agents-pebble --env-file $walk_env -f $deploy/compose.public.yaml -f $deploy/compose.pebble.yaml)
 
 # Pebble's ACME directory is HTTPS signed by its own test CA, which Caddy has to trust.
