@@ -47,7 +47,16 @@ type Launch struct {
 	Dir     string
 	// Wrap, when set, rewrites the argv (a sandbox).
 	Wrap func(argv []string) []string
+	// Name is the runtime as the person knows it ("Claude"), for errors; "" is the
+	// command's own name.
+	Name string
 }
+
+// ErrNoAnswer is a runtime that did not answer initialize in handshakeWait (#1440).
+var ErrNoAnswer = errors.New("did not answer")
+
+// handshakeWait is how long a runtime has to answer initialize.
+var handshakeWait = 60 * time.Second
 
 // Session is one runtime process and its one ACP session.
 type Session struct {
@@ -65,8 +74,21 @@ type Session struct {
 }
 
 // Handshake launches the runtime and says initialize, and goes no further: for asking a
-// runtime something without starting an agent (DaemonCore.handshakeOnly).
+// runtime something without starting an agent (DaemonCore.handshakeOnly). A runtime that
+// did not answer and wrote nothing, as npx does while the npm registry is slow, is
+// launched once more (#1440).
 func Handshake(ctx context.Context, l Launch, sink Sink) (*Session, error) {
+	s, silent, err := handshake(ctx, l, sink)
+	if silent && ctx.Err() == nil {
+		log.Printf("%s did not answer initialize and wrote nothing: starting it once more", l.Command)
+		s, _, err = handshake(ctx, l, sink)
+	}
+	return s, err
+}
+
+// handshake is one launch and initialize; silent is a runtime that did not answer in
+// handshakeWait and wrote nothing to stderr.
+func handshake(ctx context.Context, l Launch, sink Sink) (_ *Session, silent bool, _ error) {
 	argv := append([]string{l.Command}, l.Args...)
 	if l.Wrap != nil {
 		argv = l.Wrap(argv)
@@ -78,23 +100,23 @@ func Handshake(ctx context.Context, l Launch, sink Sink) (*Session, error) {
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	stderr := &tail{}
 	cmd.Stderr = stderr
 	if err := cmd.Start(); err != nil {
-		return nil, fmt.Errorf("start %s: %w", l.Command, err)
+		return nil, false, fmt.Errorf("start %s: %w", l.Command, err)
 	}
 	s := &Session{cmd: cmd, stderr: stderr, done: make(chan struct{})}
 	s.client = &client{sink: sink, dir: l.Dir, terminals: map[string]*terminal{}}
 	s.conn = sdk.NewClientSideConnection(s.client, stdin, &rawElicitations{r: bufio.NewReader(stdout), c: s.client})
 	safe.Go("runtime wait", func() { _ = cmd.Wait(); close(s.done) })
 
-	ictx, cancel := context.WithTimeout(ctx, 60*time.Second)
+	ictx, cancel := context.WithTimeout(ctx, handshakeWait)
 	defer cancel()
 	s.Init, err = s.conn.Initialize(ictx, sdk.InitializeRequest{
 		ProtocolVersion: sdk.ProtocolVersionNumber,
@@ -111,9 +133,18 @@ func Handshake(ctx context.Context, l Launch, sink Sink) (*Session, error) {
 	})
 	if err != nil {
 		s.Stop()
-		return nil, fmt.Errorf("initialize: %w%s", err, stderr.say())
+		// The SDK hands back the timeout as a JSON-RPC error, "context deadline exceeded".
+		if ctx.Err() == nil && errors.Is(ictx.Err(), context.DeadlineExceeded) {
+			name := l.Name
+			if name == "" {
+				name = filepath.Base(l.Command)
+			}
+			said := stderr.say()
+			return nil, said == "", fmt.Errorf("%s %w in %d s%s", name, ErrNoAnswer, int(handshakeWait.Seconds()), said)
+		}
+		return nil, false, fmt.Errorf("initialize: %w%s", err, stderr.say())
 	}
-	return s, nil
+	return s, false, nil
 }
 
 // takes is the servers the runtime takes: one over http or sse only where it says so
