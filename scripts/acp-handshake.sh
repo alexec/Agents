@@ -94,6 +94,12 @@ HANDLED = {
     "sessionCapabilities.close": "ending an agent without killing it",
     "sessionCapabilities.additionalDirectories": "giving an agent more folders",
     "sessionCapabilities.subagents": "OUT OF SCOPE (a vendor extension)",
+    # Claude 0.93.0 (#1431): ACP's unstable systemPrompt on session/new, load, resume and fork.
+    # The app's words already go to Claude by _meta.systemPrompt.append (#1080), which is the
+    # same as this field's append; override would drop Claude Code's own prompt.
+    **{key: "not sent: the app appends its words by _meta.systemPrompt.append (#1080)" for key in [
+        "sessionCapabilities.systemPrompt", "sessionCapabilities.systemPrompt.mode"]},
+    "sessionCapabilities.systemPrompt.mode.override": "not sent: replacing Claude Code's own prompt is not offered",
     "auth.logout": "signing out from the app",
     "providers": "choosing who answers",
     "mcpCapabilities.http": "attaching an MCP server over http",
@@ -185,7 +191,15 @@ META = {
         "x.ai/hooks": READ_FOR_NOTHING + "Grok's client hooks (pre_tool_use, stop): the app has none to offer",
         "x.ai/capabilities": READ_FOR_NOTHING + "Grok's X search tools, which the tool allowlist leaves out",
     },
-    "session/new": {},
+    "session/new": {
+        # Grok 1.0.52 (#1436): what it found in the folder, and its options again.
+        **{key: READ_FOR_NOTHING + "Grok describing the folder" for key in [
+            "currentWorkingDirectory", "isGitRepo", "gitRoot", "showNonGitWarning", "codebaseIndexed"]},
+        "feedbackEnabled": READ_FOR_NOTHING + "send_feedback is taken away (015)",
+        "x.ai/sessionConfig": READ_FOR_NOTHING + "the configOptions say the same",
+        "x.ai/sessionDetail": READ_FOR_NOTHING + "the session id, folder and model the answer already has",
+        "x.ai/memoryNotesWritable": READ_FOR_NOTHING + "Grok's own memory notes",
+    },
 }
 
 path = subprocess.run(["/bin/zsh", "-lc", 'printf %s "$PATH"'],
