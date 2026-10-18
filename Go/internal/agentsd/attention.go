@@ -601,6 +601,8 @@ func (d *Daemon) ControlUplinkChanged(up bool) {
 	}
 	d.toldWaiting = nil
 	d.attentionMu.Unlock()
+	// A control plane that just heard from this host hears whether it is idle (#1387).
+	d.startHostStatus()
 	d.reconsider()
 }
 

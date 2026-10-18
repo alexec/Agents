@@ -55,6 +55,7 @@ type Daemon struct {
 	mcpEventsBook
 	restartBook
 	machineBook
+	hostStatusBook
 	idleBook
 	turnBook
 	optionBook
