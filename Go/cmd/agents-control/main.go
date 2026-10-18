@@ -7,6 +7,7 @@
 //	agents-control serve … [--log FILE]         stamped lines into FILE, rolled at 4 MB (#174)
 //	agents-control serve … [--web DIR] [--web-port N] [--no-web]
 //	agents-control serve … [--public-web DIR]   the page at AGENTS_CONTROL_URL too (#1459)
+//	agents-control serve … [--views-url URL]    its views' sandbox proxy at URL (#1484)
 //	agents-control serve … [--store-credentials-fd N]
 //	agents-control serve … [--receive]          empty, for a handover to fill (AGENTS_CONTROL_RECEIVE=1)
 //	agents-control serve … [--no-forwarding]    serve, even if this copy was forwarding
@@ -32,6 +33,9 @@
 //	AGENTS_CONTROL_PUBLIC_WEB   the built web app to serve at AGENTS_CONTROL_URL's own origin,
 //	                            when --public-web is not given: behind a proxy with a public
 //	                            certificate (compose.public.yaml), for a browser anywhere (#1459)
+//	AGENTS_CONTROL_VIEWS_URL    the second name in front of this listener (views.<domain>), at
+//	                            which the page's MCP Apps views are drawn (#1484), when
+//	                            --views-url is not given; none draws no views there
 //	AGENTS_CONTROL_URL          the one address clients and hosts are given
 //	AGENTS_CONTROL_KEY_FILE     the control plane's private key, raw, 0600 (made if missing)
 //	AGENTS_CONTROL_KEY          or the key itself, base64url
@@ -412,6 +416,9 @@ func serve() {
 	}
 	cfg.Web = webConfig()
 	cfg.PublicWeb = publicWeb()
+	if cfg.PublicViews = value("--views-url"); cfg.PublicViews == "" {
+		cfg.PublicViews = os.Getenv("AGENTS_CONTROL_VIEWS_URL")
+	}
 	if p := pusher(); p != nil {
 		cfg.Push = p
 	}
@@ -570,7 +577,7 @@ const usage = `usage: agents-control serve [--port N] [--bind ADDR] [--self-sign
        agents-control code (--client [--browser] | --host) [--minutes N]
        agents-control serve --home DIR [--no-bonjour]
        agents-control serve … [--host-root DIR] [--log FILE] [--web DIR] [--web-port N] [--no-web]
-       agents-control serve … [--public-web DIR]
+       agents-control serve … [--public-web DIR] [--views-url URL]
        agents-control hosts | clients
        agents-control key seal (--key-fd N | AGENTS_CONTROL_KEY)
        agents-control install-script

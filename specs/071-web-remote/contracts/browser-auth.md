@@ -86,9 +86,15 @@ serves the page, behind its proxy, at the origin of `AGENTS_CONTROL_URL`, as a b
 `O = "https://<domain>"`, with the port only when it isn't 443.
 
 - **Files:** only the manifest's, only at the page's own `Host` (else 421), with the loopback
-  page's headers, `connect-src wss://<domain>`, `frame-src 'none'` and
-  `Strict-Transport-Security`. `/sandbox.html` and `/sandbox.js` are not served: there is no
-  second origin for the proxy, so the page draws no MCP Apps views and says so.
+  page's headers, `connect-src wss://<domain>`, `frame-src V` and
+  `Strict-Transport-Security`. `/sandbox.html` and `/sandbox.js` are not served there (404).
+- **The views name (#1484):** `V`, the origin of `AGENTS_CONTROL_VIEWS_URL`
+  (`https://views.<domain>`), a second name in front of the same listener. There, only
+  `/sandbox.html` and `/sandbox.js` (GET, no upgrade), with the loopback proxy's headers
+  (the view's own policy from `?csp=`, `frame-ancestors O`) and `Strict-Transport-Security`;
+  everything else is 404. `control/status.publicViews` is `V`, and the page frames
+  `V/sandbox.html?csp=…&host=O`; the proxy hears `O` only. With no views name, `frame-src
+  'none'`, and the page draws no MCP Apps views and says so.
 - **The page's socket** is a `/v1/connect` upgrade whose `Origin` is `O`. It is taken as the
   loopback listener's is: only `c:` and `p:`, bound to `O`, a browser's key only, and
   `clients/announce` only for `kind: browser`. Every other socket (no `Origin`, or another) is a

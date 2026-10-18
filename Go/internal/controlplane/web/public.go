@@ -15,27 +15,41 @@ import (
 // that origin as the browser writes it, so a proof made for the page on the Mac fails here,
 // and the other way round.
 //
-// It has no second origin for the sandbox proxy (#187), so MCP Apps views are not drawn on
-// it: /sandbox.html and /sandbox.js are not served, and the policy frames nothing.
+// MCP Apps views (#187) need the sandbox proxy at another origin than the page's (#1484): a
+// second name in front of the same control plane (views.<domain>), at which /sandbox.html
+// and /sandbox.js are served, and nothing else. The page's policy frames that origin only.
+// With no second name, views are not drawn on the page, and the policy frames nothing.
 type Public struct {
 	origin string
 	host   string
 	files  Files
+	// The sandbox proxy's origin and Host, or "" for none.
+	viewsOrigin string
+	viewsHost   string
 }
 
 // NewPublic loads the files from folder's manifest for the page at address, the control
-// plane's https address. An error is a *FilesError when the build does not match its
-// manifest, or says the address is not one a browser can open the page at.
-func NewPublic(folder, address string) (*Public, error) {
+// plane's https address, with the sandbox proxy at views, another https address ("" for
+// none). An error is a *FilesError when the build does not match its manifest, or says an
+// address is not one a browser can open the page at.
+func NewPublic(folder, address, views string) (*Public, error) {
 	origin, host, err := PageOrigin(address)
 	if err != nil {
 		return nil, err
 	}
-	files, err := LoadFiles(folder)
-	if err != nil {
+	p := &Public{origin: origin, host: host}
+	if views != "" {
+		if p.viewsOrigin, p.viewsHost, err = PageOrigin(views); err != nil {
+			return nil, err
+		}
+		if p.viewsOrigin == origin {
+			return nil, fmt.Errorf("%q is the page's own origin: the views need another name", views)
+		}
+	}
+	if p.files, err = LoadFiles(folder); err != nil {
 		return nil, err
 	}
-	return &Public{origin: origin, host: host, files: files}, nil
+	return p, nil
 }
 
 // PageOrigin is address's origin as a browser writes it (location.origin): no port when it
@@ -68,17 +82,24 @@ func (p *Public) Origin() string { return p.origin }
 // Address is where a person opens the page.
 func (p *Public) Address() string { return p.origin + "/" }
 
+// ViewsOrigin is the sandbox proxy's origin, or "" when views are not drawn on the page.
+func (p *Public) ViewsOrigin() string { return p.viewsOrigin }
+
 // FromPage is true when an upgrade came from the page itself: a browser always sends its
 // page's Origin. A window, a phone or a host sends none, and stays the TLS listener's.
 func (p *Public) FromPage(h http.Header) bool { return h.Get("Origin") == p.origin }
 
 // headers is the loopback gate's headers for this origin: the same policy, with the
-// page's own socket, nothing framed, and HTTPS kept.
+// page's own socket, only the sandbox proxy framed, and HTTPS kept.
 func (p *Public) headers() [][2]string {
+	frames := "'none'"
+	if p.viewsOrigin != "" {
+		frames = p.viewsOrigin
+	}
 	return [][2]string{
 		{"Content-Security-Policy", "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' blob: data:; " +
 			fmt.Sprintf("font-src 'self'; connect-src wss://%s; base-uri 'none'; form-action 'none'; ", p.host) +
-			"frame-ancestors 'none'; frame-src 'none'; object-src 'none'; worker-src 'none'; manifest-src 'self'; " +
+			fmt.Sprintf("frame-ancestors 'none'; frame-src %s; object-src 'none'; worker-src 'none'; manifest-src 'self'; ", frames) +
 			"require-trusted-types-for 'script'; trusted-types 'none'"},
 		{"X-Content-Type-Options", "nosniff"},
 		{"Referrer-Policy", "no-referrer"},
@@ -90,11 +111,28 @@ func (p *Public) headers() [][2]string {
 	}
 }
 
+// proxyHeaders is the loopback gate's proxyHeaders for the views name: the view's own
+// policy, framed by the page only, and HTTPS kept.
+func (p *Public) proxyHeaders(uri string) [][2]string {
+	return [][2]string{
+		{"Content-Security-Policy", policyFor(domains(uri)).header() + "; frame-ancestors " + p.origin},
+		{"X-Content-Type-Options", "nosniff"},
+		{"Referrer-Policy", "no-referrer"},
+		{"Cross-Origin-Resource-Policy", "same-origin"},
+		{"Strict-Transport-Security", "max-age=31536000"},
+		{"Cache-Control", "no-store"},
+	}
+}
+
 // Serve answers a request that is not the socket, when it is the page's: a GET of a file
-// the manifest lists, at the page's own name. False leaves the request to the caller (the
-// probes, the install script and its files).
+// the manifest lists, at the page's own name, or of the sandbox proxy's two at the views
+// name. False leaves the request to the caller (the probes, the install script and its
+// files), which refuses the proxy's files at the page's name.
 func (p *Public) Serve(w http.ResponseWriter, r *http.Request) bool {
 	path := pathOf(r.RequestURI, "/")
+	if p.viewsHost != "" && strings.ToLower(r.Host) == p.viewsHost {
+		return p.serveProxy(w, r, path)
+	}
 	file := path
 	if path == "/" {
 		file = "/index.html"
@@ -120,6 +158,29 @@ func (p *Public) Serve(w http.ResponseWriter, r *http.Request) bool {
 		if r.Method == http.MethodGet {
 			w.Write(f.Data)
 		}
+	}
+	return true
+}
+
+// serveProxy answers at the views name: the sandbox proxy's two files, and nothing else.
+func (p *Public) serveProxy(w http.ResponseWriter, r *http.Request, path string) bool {
+	f, ok := p.files[path]
+	if !ok || !proxyPaths[path] || upgrading(r.Header) {
+		return false
+	}
+	h := w.Header()
+	for _, kv := range p.proxyHeaders(r.RequestURI) {
+		h.Set(kv[0], kv[1])
+	}
+	if r.Method != http.MethodGet && r.Method != http.MethodHead {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return true
+	}
+	h.Set("Content-Type", f.ContentType)
+	h.Set("Content-Length", strconv.Itoa(len(f.Data)))
+	w.WriteHeader(http.StatusOK)
+	if r.Method == http.MethodGet {
+		w.Write(f.Data)
 	}
 	return true
 }

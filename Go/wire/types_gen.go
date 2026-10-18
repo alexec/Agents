@@ -1125,7 +1125,9 @@ type ControlStatus struct {
 	RelayKey     Data             `json:"relayKey,omitzero"`
 	Web          *WebRemoteStatus `json:"web,omitzero"`
 	// Where a browser anywhere opens the page, on the control plane's own domain (#1459): its https address, when it serves the page there.
-	PublicWeb        *string             `json:"publicWeb,omitzero"`
+	PublicWeb *string `json:"publicWeb,omitzero"`
+	// The origin of the sandbox proxy that draws MCP Apps views on the page at publicWeb (#1484): a second name in front of the same control plane. None when it draws no views there.
+	PublicViews      *string             `json:"publicViews,omitzero"`
 	ThisMacHost      *HostJoinStatus     `json:"thisMacHost,omitzero"`
 	ProjectDetection *ProjectDetection   `json:"projectDetection,omitzero"`
 	UnjoinedTunnels  []HostTunnelChanged `json:"unjoinedTunnels,omitzero"`

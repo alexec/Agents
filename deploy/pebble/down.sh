@@ -3,7 +3,7 @@
 # Pebble's root and its /etc/hosts line, if it was given them.
 set -euo pipefail
 deploy=${0:A:h:h}
-export AGENTS_DOMAIN=agents.127.0.0.1.sslip.io ACME_EMAIL=walk@example.com
+export AGENTS_DOMAIN=agents.127.0.0.1.sslip.io AGENTS_VIEWS_DOMAIN=views.127.0.0.1.sslip.io ACME_EMAIL=walk@example.com
 if docker inspect agents-devbox >/dev/null 2>&1; then
     docker exec -u root agents-devbox sh -c "grep -v ' $AGENTS_DOMAIN\$' /etc/hosts > /tmp/hosts; cat /tmp/hosts > /etc/hosts; rm -f /usr/local/share/ca-certificates/pebble-walk.crt; update-ca-certificates --fresh >/dev/null"
     docker network disconnect agents-pebble_default agents-devbox 2>/dev/null || true

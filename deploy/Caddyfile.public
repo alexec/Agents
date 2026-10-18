@@ -1,6 +1,8 @@
 # The front door for a control plane on the internet (#61): a publicly trusted certificate
-# for AGENTS_DOMAIN, from Let's Encrypt, renewed by Caddy on its own, and WebSockets passed
-# through to the copy. Codes carry no pin: see specs/research/public-certificate.md.
+# for AGENTS_DOMAIN, and one for AGENTS_VIEWS_DOMAIN, the second name the web page's MCP Apps
+# views are drawn at (#1484), from Let's Encrypt, renewed by Caddy on its own, and WebSockets
+# passed through to the copy. Both names go to the same copy, which answers each with its own
+# files. Codes carry no pin: see specs/research/public-certificate.md.
 #
 # Port 443 must be open for the certificate (TLS-ALPN), and port 80 too for Caddy's other
 # challenge and its redirect to https.
@@ -12,7 +14,7 @@
 	import /etc/caddy/acme.d/*.caddy
 }
 
-{$AGENTS_DOMAIN} {
+{$AGENTS_DOMAIN}, {$AGENTS_VIEWS_DOMAIN} {
 	# Every request agents-control answers is a GET (the web page's files too, #1459), so no
 	# body is ever big; a WebSocket's
 	# frames past the upgrade are capped by agents-control itself (public-security.md P3).

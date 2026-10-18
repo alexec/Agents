@@ -64,6 +64,9 @@ type Config struct {
 	// (compose.public.yaml). "" serves none, as Agents Host's copy, whose page is the
 	// loopback listener's.
 	PublicWeb string
+	// The second name in front of this listener for the page's MCP Apps views (#1484): the
+	// sandbox proxy's https address (views.<domain>). "" draws no views on the page.
+	PublicViews string
 	// Told whenever the web remote's listener starts or fails to (071 R3): serve --home
 	// writes it beside the log for Agents Host.
 	WebChanged func(web.Status)
@@ -220,11 +223,14 @@ func New(cfg Config) (*Service, error) {
 	if cfg.PublicWeb != "" {
 		// A build that doesn't match its manifest leaves the page off and says so; hosts and
 		// clients carry on (071 R3).
-		if s.page, err = web.NewPublic(cfg.PublicWeb, cfg.URL); err != nil {
+		if s.page, err = web.NewPublic(cfg.PublicWeb, cfg.URL, cfg.PublicViews); err != nil {
 			s.log(fmt.Sprintf("web: not serving the page at %s: %v", cfg.URL, err))
 			s.page = nil
 		} else {
 			s.log("web: serving the page at " + s.page.Address())
+			if views := s.page.ViewsOrigin(); views != "" {
+				s.log("web: serving the views' sandbox proxy at " + views)
+			}
 		}
 	}
 	return s, nil

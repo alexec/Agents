@@ -9,7 +9,7 @@
 #   deploy/pebble/down.sh
 set -euo pipefail
 deploy=${0:A:h:h}
-export AGENTS_DOMAIN=agents.127.0.0.1.sslip.io ACME_EMAIL=walk@example.com
+export AGENTS_DOMAIN=agents.127.0.0.1.sslip.io AGENTS_VIEWS_DOMAIN=views.127.0.0.1.sslip.io ACME_EMAIL=walk@example.com
 mkdir -p $deploy/secrets && chmod 700 $deploy/secrets
 # No Google Cloud for a walk: a local keeper stands in for Cloud KMS (#1458), and an empty
 # service account file. Its own env file, so deploy/.env's real key name is left alone.

@@ -948,6 +948,11 @@ export interface ControlStatus {
    * address, when it serves the page there.
    */
   publicWeb?: string;
+  /**
+   * The origin of the sandbox proxy that draws MCP Apps views on the page at publicWeb (#1484): a
+   * second name in front of the same control plane. None when it draws no views there.
+   */
+  publicViews?: string;
   thisMacHost?: HostJoinStatus;
   projectDetection?: ProjectDetection;
   unjoinedTunnels?: HostTunnelChanged[];
@@ -4578,7 +4583,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ControlOK: { required: ["mac"], optional: ["grant", "host", "relayed", "endpoints", "epoch"] },
   ControlPush: { required: ["sealed"], optional: [] },
   ControlPushItem: { required: ["needID", "alert"], optional: ["headline"] },
-  ControlStatus: { required: ["name", "version", "machineID"], optional: ["homeHost", "startedAt", "port", "awayFromHome", "you", "relayKey", "web", "publicWeb", "thisMacHost", "projectDetection", "unjoinedTunnels"] },
+  ControlStatus: { required: ["name", "version", "machineID"], optional: ["homeHost", "startedAt", "port", "awayFromHome", "you", "relayKey", "web", "publicWeb", "publicViews", "thisMacHost", "projectDetection", "unjoinedTunnels"] },
   Cost: { required: ["amount", "currency"], optional: [] },
   CostLimits: { required: [], optional: ["perAgent", "daily", "perAgentTokens", "dailyTokens"] },
   CostState: { required: ["limits", "today", "day", "tokensToday"], optional: ["note"] },

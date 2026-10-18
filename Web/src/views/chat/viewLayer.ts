@@ -1,7 +1,8 @@
 // The views drawn in one chat on the web page (#187, MCP Apps). Each is the spec's sandbox proxy:
-// an iframe of /sandbox.html at the loopback address, 127.0.0.1, another origin than the page's
-// own at localhost on the same port, which holds the view in a sandboxed frame of its own. The
-// page talks to the proxy; the proxy to the view.
+// an iframe of /sandbox.html at another origin than the page's (viewsOrigin: the loopback address,
+// 127.0.0.1, on this Mac; the views' second name on the control plane's domain, #1484), which
+// holds the view in a sandboxed frame of its own. The page talks to the proxy; the proxy to the
+// view.
 //
 // The frames live in a layer of their own inside the transcript's scroll area, positioned over a
 // slot in their row, rather than in the row: a frame taken out of the page is gone at once, so a
@@ -12,7 +13,7 @@ import { signal } from "@preact/signals";
 import type { AppViewCall, AppViewPolicy, JSONValue, ViewResource } from "../../protocol/generated";
 import { encodeDomains } from "../../sandbox/policy";
 import { CallFailed } from "../../wire/link";
-import { onThisMac } from "../../place";
+import { onThisMac, viewsOrigin } from "../../place";
 import {
   canPin, type Context, needsShow, serverParam, type ViewAsk, contextChanges, error as rpcError, Feed, initializeResult, noAgentWords, notification, policyWire,
   type AgentMessage, noAgentCode, read, request, result, type Start, startAgentMethod, viewTitle,
@@ -112,7 +113,9 @@ export class HostedView {
     void this.load(++this.attempt);
   }
 
-  get proxyOrigin(): string { return `http://127.0.0.1:${location.port}`; }
+  /** The sandbox proxy's origin, once the view knows it: "" before. */
+  proxyOrigin = "";
+  private closed(): boolean { return this.phase.value === "gone"; }
   owns(source: MessageEventSource | null): boolean { return !!this.frame && source === this.frame.contentWindow; }
 
   /**
@@ -128,13 +131,16 @@ export class HostedView {
   }
 
   private async load(mine: number): Promise<void> {
-    // The page on the control plane's own domain has no second origin for the proxy (#1459),
-    // so nothing of a view is read or drawn there.
-    if (!onThisMac()) {
-      this.failure.value = "Views are drawn only on the page on the Mac that runs the control plane, and in the Agents apps.";
+    // A control plane on its own domain with no second name for the proxy (#1484): nothing
+    // of a view is read or drawn there.
+    const proxy = await viewsOrigin();
+    if (mine !== this.attempt || this.closed()) return;
+    if (!proxy) {
+      this.failure.value = "Views are not drawn on this page: its control plane has no views name. The Agents apps draw them.";
       this.phase.value = "failed";
       return;
     }
+    this.proxyOrigin = proxy;
     let resource: ViewResource;
     try {
       resource = await this.actions.call("views/read", { agentID: this.actions.agentID, uri: this.call.resourceUri,
@@ -164,7 +170,9 @@ export class HostedView {
     frame.setAttribute("referrerpolicy", "no-referrer");
     frame.setAttribute("allow", "");
     frame.title = this.title;
-    frame.src = `${this.proxyOrigin}/sandbox.html?csp=${encodeDomains(this.policy)}`;
+    // On the domain, the proxy is told the page's origin, which the control plane frames it for.
+    const host = onThisMac() ? "" : `&host=${encodeURIComponent(location.origin)}`;
+    frame.src = `${this.proxyOrigin}/sandbox.html?csp=${encodeDomains(this.policy)}${host}`;
     this.frame = frame;
     this.box.append(frame);
     this.phase.value = "ready";
