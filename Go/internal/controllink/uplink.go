@@ -43,6 +43,7 @@ type Uplink struct {
 	nextID   atomic.Int64
 	OnChange func(connected bool, problem string)
 	tunnels  map[string]chan *channel
+	asks     map[int64]chan askReply // Ask's requests on channel 0, by id, until answered
 	// Lend is where this host's relay for a runtime listens on loopback, for a tunnel the
 	// control plane opens to it (the lending Mac's end, T091); 0 when it lends none.
 	Lend func(runtime string) int
@@ -244,6 +245,80 @@ func (u *Uplink) Tell(method string, params any) {
 	_ = u.write(channelLine(0, string(m)))
 }
 
+// AskError is the control plane's error answer to Ask, as it said it.
+type AskError struct {
+	Code    int             `json:"code"`
+	Message string          `json:"message"`
+	Data    json.RawMessage `json:"data,omitempty"`
+}
+
+func (e *AskError) Error() string { return e.Message }
+
+type askReply struct {
+	result json.RawMessage
+	err    *AskError
+}
+
+// askWait is how long Ask waits for an answer: a provider may take a while to make a
+// workspace, never this long.
+const askWait = 2 * time.Minute
+
+// Ask sends a request on channel 0 and waits for its answer (host/workspaces, #1444): the
+// result, an *AskError when the control plane refused it, or an error when it is not
+// connected or did not answer.
+func (u *Uplink) Ask(ctx context.Context, method string, params any) (json.RawMessage, error) {
+	id := u.nextID.Add(1)
+	p, err := json.Marshal(params)
+	if err != nil {
+		return nil, err
+	}
+	m, _ := json.Marshal(map[string]any{"jsonrpc": "2.0", "id": id, "method": method, "params": json.RawMessage(p)})
+	wait := make(chan askReply, 1)
+	u.mu.Lock()
+	if u.asks == nil {
+		u.asks = map[int64]chan askReply{}
+	}
+	u.asks[id] = wait
+	u.mu.Unlock()
+	defer func() { u.mu.Lock(); delete(u.asks, id); u.mu.Unlock() }()
+	if err := u.write(channelLine(0, string(m))); err != nil {
+		return nil, err
+	}
+	select {
+	case r := <-wait:
+		if r.err != nil {
+			return nil, r.err
+		}
+		return r.result, nil
+	case <-time.After(askWait):
+		return nil, errors.New("the control plane did not answer")
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	}
+}
+
+// answered hands a reply on channel 0 to the Ask waiting for it; false when it is not one.
+func (u *Uplink) answered(message string) bool {
+	var r struct {
+		ID     *int64          `json:"id"`
+		Method string          `json:"method"`
+		Result json.RawMessage `json:"result"`
+		Error  *AskError       `json:"error"`
+	}
+	if json.Unmarshal([]byte(message), &r) != nil || r.ID == nil || r.Method != "" {
+		return false
+	}
+	u.mu.Lock()
+	wait := u.asks[*r.ID]
+	delete(u.asks, *r.ID)
+	u.mu.Unlock()
+	if wait == nil {
+		return false
+	}
+	wait <- askReply{result: r.Result, err: r.Error}
+	return true
+}
+
 func channelLine(n int, message string) string {
 	return `{"c":` + strconv.Itoa(n) + `,"m":` + message + `}`
 }
@@ -344,8 +419,11 @@ func (u *Uplink) receive(line string) {
 
 func (u *Uplink) message(n int, message string) {
 	if n == 0 {
-		// projects/detect from an older control plane is said done; replies to our own
-		// requests are not waited on in this spike.
+		// A reply to an Ask; projects/detect from an older control plane is said done.
+		// Replies to Tell are not waited on.
+		if u.answered(message) {
+			return
+		}
 		if strings.Contains(message, `"projects/detect"`) {
 			u.Tell("projects/detected", map[string]int{"added": 0})
 		}

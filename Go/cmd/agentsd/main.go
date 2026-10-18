@@ -263,6 +263,7 @@ func join(ctx context.Context, cl commandLine, d *agentsd.Daemon) {
 		safe.Go("attention uplink", func() { d.ControlUplinkChanged(connected) })
 	}
 	d.SetControl(up.Tell)
+	d.SetControlAsk(up.Ask)
 	safe.Go("uplink", func() {
 		// A panic in the uplink would leave the host up but offline: dial again.
 		for ctx.Err() == nil && safe.Catch("uplink", func() { up.Run(ctx) }) != nil {

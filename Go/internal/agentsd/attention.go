@@ -89,6 +89,8 @@ type attentionState struct {
 	toldWaiting *int64
 	// tellControl sends on the control plane's channel 0; nil when the host has none.
 	tellControl atomic.Pointer[func(method string, params any)]
+	// askControl asks the control plane on channel 0 and waits (workspacetools.go).
+	askControl atomic.Pointer[askControl]
 }
 
 // token is Need.token: one string per need, for keys and the file's order.
