@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"log"
 	"os"
 	"os/exec"
@@ -430,24 +431,59 @@ func (c *client) SessionUpdate(ctx context.Context, n sdk.SessionNotification) (
 	return nil
 }
 
-// inside keeps file service to the agent's folder.
-func (c *client) inside(path string) error {
+// inside keeps file service, and a terminal's folder, to the agent's folder, with links
+// followed (FolderScope.allows): it is the path to use, as resolved. A path that does not
+// exist yet is judged by its nearest parent that does, so a runtime can make a file but not
+// one through a link out of its folder.
+func (c *client) inside(path string) (string, error) {
 	if !filepath.IsAbs(path) {
-		return fmt.Errorf("path must be absolute: %s", path)
+		return "", fmt.Errorf("path must be absolute: %s", path)
 	}
-	rel, err := filepath.Rel(c.dir, filepath.Clean(path))
+	dir, err := resolve(c.dir)
+	if err != nil {
+		return "", err
+	}
+	resolved, err := resolve(path)
+	if err != nil {
+		return "", fmt.Errorf("%s is outside the agent's folder", path)
+	}
+	rel, err := filepath.Rel(dir, resolved)
 	if err != nil || rel == ".." || strings.HasPrefix(rel, "../") {
-		return fmt.Errorf("%s is outside the agent's folder", path)
+		return "", fmt.Errorf("%s is outside the agent's folder", path)
 	}
-	return nil
+	return resolved, nil
+}
+
+// resolve is path with its links followed, working up to the nearest parent that exists
+// when the path does not. A link that leads nowhere is refused: writing it would make
+// the file it names, wherever that is.
+func resolve(path string) (string, error) {
+	p := filepath.Clean(path)
+	var missing []string
+	for {
+		resolved, err := filepath.EvalSymlinks(p)
+		if err == nil {
+			return filepath.Join(append([]string{resolved}, missing...)...), nil
+		}
+		if _, lerr := os.Lstat(p); lerr == nil || !errors.Is(err, fs.ErrNotExist) {
+			return "", err
+		}
+		parent := filepath.Dir(p)
+		if parent == p {
+			return "", err
+		}
+		missing = append([]string{filepath.Base(p)}, missing...)
+		p = parent
+	}
 }
 
 func (c *client) ReadTextFile(ctx context.Context, p sdk.ReadTextFileRequest) (_ sdk.ReadTextFileResponse, err error) {
 	defer safe.Err("acp ReadTextFile", &err)
-	if err := c.inside(p.Path); err != nil {
+	path, err := c.inside(p.Path)
+	if err != nil {
 		return sdk.ReadTextFileResponse{}, err
 	}
-	b, err := os.ReadFile(p.Path)
+	b, err := os.ReadFile(path)
 	if err != nil {
 		return sdk.ReadTextFileResponse{}, err
 	}
@@ -470,13 +506,23 @@ func (c *client) ReadTextFile(ctx context.Context, p sdk.ReadTextFileRequest) (_
 
 func (c *client) WriteTextFile(ctx context.Context, p sdk.WriteTextFileRequest) (_ sdk.WriteTextFileResponse, err error) {
 	defer safe.Err("acp WriteTextFile", &err)
-	if err := c.inside(p.Path); err != nil {
+	path, err := c.inside(p.Path)
+	if err != nil {
 		return sdk.WriteTextFileResponse{}, err
 	}
-	if err := os.MkdirAll(filepath.Dir(p.Path), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return sdk.WriteTextFileResponse{}, err
 	}
-	if err := os.WriteFile(p.Path, []byte(p.Content), 0o644); err != nil {
+	// The resolved path, and no link followed at its end, so what was checked is what is written.
+	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC|syscall.O_NOFOLLOW, 0o644)
+	if err != nil {
+		return sdk.WriteTextFileResponse{}, err
+	}
+	if _, err := f.WriteString(p.Content); err != nil {
+		_ = f.Close()
+		return sdk.WriteTextFileResponse{}, err
+	}
+	if err := f.Close(); err != nil {
 		return sdk.WriteTextFileResponse{}, err
 	}
 	c.sink.Served("write", p.Path)
@@ -509,7 +555,11 @@ func (c *client) CreateTerminal(ctx context.Context, p sdk.CreateTerminalRequest
 	cmd := exec.Command(p.Command, p.Args...)
 	cmd.Dir = c.dir
 	if p.Cwd != nil {
-		cmd.Dir = *p.Cwd
+		dir, err := c.inside(*p.Cwd)
+		if err != nil {
+			return sdk.CreateTerminalResponse{}, err
+		}
+		cmd.Dir = dir
 	}
 	cmd.Env = os.Environ()
 	for _, e := range p.Env {
