@@ -1,0 +1,297 @@
+<!doctype html><html><head><meta charset="utf-8"><title>1336 wireframes v2</title><style>
+/* Wireframes for #1336, Connect your tools. Lo-fi, in 059 and 071's hand: paper ground, one accent.
+   Open with #a … #g to see one frame alone. */
+body{margin:0;background:#e8e6e1;font:13px -apple-system,"SF Pro Text",sans-serif;color:#1d1d1d;padding:28px;display:flex;flex-direction:column;gap:40px;align-items:flex-start}
+body.one .frame{display:none}body.one .frame:target{display:flex}
+.frame{display:flex;flex-direction:column;gap:8px}
+.cap{font:600 15px -apple-system,"Helvetica Neue",sans-serif;color:#333}
+.sub{font:13px -apple-system,"Helvetica Neue",sans-serif;color:#666;max-width:1000px;line-height:1.4}
+.anno{color:#c0305a;font:italic 12.5px Georgia,serif;line-height:1.35}
+.annobox{border:1px dashed #c0305a;border-radius:4px;padding:5px 8px;background:rgba(255,255,255,.6);max-width:230px}
+.duo{display:flex;gap:28px;align-items:flex-start}
+/* a Mac window */
+.win{width:1000px;height:640px;background:#f7f5f0;border-radius:12px;box-shadow:0 0 0 1px rgba(0,0,0,.18),0 10px 30px rgba(0,0,0,.2);overflow:hidden;display:flex;position:relative}
+.lights{height:38px;display:flex;align-items:center;gap:8px;padding:0 6px;flex:none}
+.dot{width:12px;height:12px;border-radius:6px;background:#d6d3cc;display:inline-block}
+.side{width:270px;flex:none;background:#f1eee8;border-right:1px solid rgba(0,0,0,.08);display:flex;flex-direction:column;padding:0 10px 10px;overflow:hidden}
+.side .h{font:600 11px -apple-system,"Helvetica Neue",sans-serif;color:#8a877f;padding:12px 6px 4px;text-transform:uppercase;letter-spacing:.04em}
+.si{display:flex;align-items:center;gap:8px;padding:5px 6px;border-radius:6px}
+.si .n{margin-left:auto;color:#8a877f;font-size:12px}
+.si i{font-style:normal;color:#8a877f;width:16px;text-align:center}
+.si.on{background:rgba(0,0,0,.08)}
+.main{flex:1;display:flex;flex-direction:column;min-width:0}
+.bar{height:38px;flex:none;display:flex;align-items:center;gap:10px;padding:0 20px;border-bottom:1px solid rgba(0,0,0,.06)}
+.bar .t{font:600 14px -apple-system,"Helvetica Neue",sans-serif}.bar .sp{flex:1}
+.pagex{flex:1;overflow:hidden;padding:24px 48px 0;color:#bbb}
+.ph{height:10px;border-radius:5px;background:#e6e2da;margin:10px 0}
+/* the card */
+.card{background:#fff;border:1px solid #e3dfd6;border-radius:10px;padding:11px 12px;display:flex;flex-direction:column;gap:9px;margin-bottom:6px}
+.ch{display:flex;align-items:baseline;gap:6px}
+.ch b{font-weight:600}.ch .c{color:#8a877f;font-size:11.5px}.ch .x{margin-left:auto;color:#8a877f;font-size:11px}
+.done1{display:flex;align-items:center;gap:6px;color:#8a877f;font-size:12px}
+.lead{color:#555;font-size:12px;line-height:1.35;background:#f3f1ec;border-radius:7px;padding:6px 8px}
+.step{display:flex;gap:8px;align-items:flex-start}
+.tick{width:14px;height:14px;border-radius:7px;border:1.5px solid #b8b4ab;flex:none;margin-top:1px;box-sizing:border-box}
+.tick.y{background:#3d5a80;border-color:#3d5a80;position:relative}
+.tick.y:after{content:"✓";color:#fff;font-size:9px;position:absolute;left:2.5px;top:-1px;font-weight:700}
+.tick.s{border-style:dashed}
+.tick.w{border-color:#3d5a80;border-right-color:transparent}
+.tick.f{border-color:#b5651d;position:relative}.tick.f:after{content:"!";color:#b5651d;font:700 9px -apple-system,"Helvetica Neue",sans-serif;position:absolute;left:3.5px;top:0}
+.st{flex:1;min-width:0}
+.st .t{line-height:1.25}.st .t.dim{color:#8a877f}
+.st .k{font:600 10.5px -apple-system,"Helvetica Neue",sans-serif;color:#8a877f;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:1px}
+.st .how{color:#8a877f;font-size:11.5px;margin-top:2px;line-height:1.3}
+.st .proof{color:#6d6a64;font-size:11.5px;margin-top:2px;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.st .proof .m{font:11px "SF Mono",Menlo,monospace;color:#3d5a80}
+.st .warn{color:#9a4f10;font-size:11.5px;margin-top:2px;line-height:1.3}
+.acts{display:flex;gap:6px;align-items:center;margin-top:5px;flex-wrap:wrap}
+.btn{border:1px solid #cfcac0;background:#fff;border-radius:6px;padding:2px 9px;font-size:12px;white-space:nowrap;color:#1d1d1d}
+.btn.p{background:#3d5a80;border-color:#3d5a80;color:#fff}
+.btn.d{color:#b3261e}
+.link{color:#3d5a80;font-size:12px;white-space:nowrap}
+.skip{color:#8a877f;font-size:12px;white-space:nowrap}
+.evt{border-top:1px solid #f0ede7;padding-top:8px;color:#6d6a64;font-size:11.5px;line-height:1.4}
+.evt .m{font:11px "SF Mono",Menlo,monospace;color:#3d5a80}
+.chip{display:inline-block;border-radius:9px;padding:1px 7px;font-size:11px;background:#efece6;color:#555;white-space:nowrap}
+.chip.a{background:#e3eaf3;color:#3d5a80}
+.mono{font:12px "SF Mono",Menlo,monospace}
+/* a sheet */
+.veil{position:absolute;inset:0;background:rgba(40,36,30,.28);display:flex;justify-content:center;align-items:flex-start;padding-top:38px;z-index:2}
+.sheet{width:500px;background:#f7f5f0;border-radius:12px;box-shadow:0 0 0 1px rgba(0,0,0,.2),0 18px 40px rgba(0,0,0,.28);display:flex;flex-direction:column;overflow:hidden}
+.sheet .in{padding:18px 22px;display:flex;flex-direction:column;gap:10px}
+.sheet .t{font:600 15px -apple-system,"Helvetica Neue",sans-serif}
+.sheet .bot{display:flex;align-items:center;gap:8px;padding:10px 18px;border-top:1px solid rgba(0,0,0,.08);background:#f1eee8}
+.sheet .bot .sp{flex:1}
+.code{font:600 26px "SF Mono",Menlo,monospace;letter-spacing:.12em;text-align:center;background:#fff;border:1px solid #e3dfd6;border-radius:9px;padding:12px}
+.muted{color:#8a877f}.small{font-size:11.5px}
+.infobox{background:#e3eaf3;color:#27405f;border-radius:8px;padding:8px 11px;line-height:1.4;font-size:12px}
+.warnbox{background:#f7e7d6;color:#6b3a0c;border-radius:8px;padding:8px 11px;line-height:1.4;font-size:12px}
+.or{display:flex;align-items:center;gap:8px;color:#8a877f;font-size:11.5px}.or:before,.or:after{content:"";flex:1;border-top:1px solid #e3dfd6}
+.opt{background:#fff;border:1px solid #e3dfd6;border-radius:8px;padding:8px 10px;display:flex;gap:10px;align-items:center}
+.opt.sel{border-color:#3d5a80;box-shadow:0 0 0 1px #3d5a80}
+.opt .l{flex:1;min-width:0}.opt .s{color:#8a877f;font-size:11.5px;margin-top:1px}
+.rad{width:13px;height:13px;border-radius:7px;border:1.5px solid #b8b4ab;flex:none;box-sizing:border-box}
+.rad.y{border:4px solid #3d5a80}
+/* settings */
+.rail{width:200px;flex:none;background:#f1eee8;border-right:1px solid rgba(0,0,0,.08);display:flex;flex-direction:column;padding:0 8px 10px}
+.ri{display:flex;align-items:center;gap:8px;padding:5px 8px;border-radius:6px}
+.ri i{font-style:normal;width:22px;height:22px;border-radius:6px;background:#dcd8cf;color:#555;display:flex;align-items:center;justify-content:center;font-size:12px;flex:none}
+.ri.on{background:#3d5a80;color:#fff}.ri.on i{background:rgba(255,255,255,.2);color:#fff}
+.gap{height:10px}
+.col{width:600px;padding:18px 28px;display:flex;flex-direction:column;gap:6px;overflow:hidden}
+.sh{font:600 11px -apple-system,"Helvetica Neue",sans-serif;color:#8a877f;text-transform:uppercase;letter-spacing:.04em;margin:10px 4px 2px}
+.form{background:#fff;border:1px solid #e3dfd6;border-radius:9px}
+.line{display:flex;align-items:center;gap:10px;padding:9px 12px;border-bottom:1px solid #f2f0eb}
+.line:last-child{border-bottom:none}
+.line .l{flex:1;min-width:0}.line .s{color:#8a877f;font-size:11.5px;margin-top:2px}
+.foot{color:#8a877f;font-size:11.5px;line-height:1.4;padding:4px 4px 2px}
+.pop{border:1px solid #cfcac0;background:#fff;border-radius:6px;padding:2px 8px;font-size:12px}.pop:after{content:" ⌄";color:#8a877f}
+.av{width:28px;height:28px;border-radius:14px;background:#cdd8e6;color:#3d5a80;display:flex;align-items:center;justify-content:center;font-weight:600;flex:none}
+/* phone */
+.phone{width:390px;height:780px;background:#f7f5f0;border-radius:44px;box-shadow:0 0 0 10px #1d1d1d,0 14px 30px rgba(0,0,0,.25);overflow:hidden;display:flex;flex-direction:column;margin:10px}
+.status{height:44px;flex:none;display:flex;align-items:center;justify-content:space-between;padding:0 30px;font:600 14px -apple-system,"Helvetica Neue",sans-serif}
+.nav{display:flex;align-items:center;justify-content:space-between;padding:4px 16px 8px}
+.nav .big{font:700 30px -apple-system,"Helvetica Neue",sans-serif}
+.pbody{flex:1;overflow:hidden;padding:0 14px;display:flex;flex-direction:column;gap:2px}
+.pbody .card{padding:13px 14px;font-size:14px}
+.pbody .st .how,.pbody .st .proof{font-size:12.5px}
+.prow{display:flex;align-items:center;gap:10px;padding:10px 6px;border-bottom:1px solid #ebe8e1;font-size:15px}
+.prow .n{margin-left:auto;color:#8a877f;font-size:13px}
+/* browser */
+.browser{width:1000px;height:640px;background:#f7f5f0;border-radius:10px;box-shadow:0 0 0 1px rgba(0,0,0,.18),0 10px 30px rgba(0,0,0,.2);overflow:hidden;display:flex;flex-direction:column}
+.chrome{height:40px;flex:none;background:#dedad2;display:flex;align-items:center;gap:10px;padding:0 12px;border-bottom:1px solid rgba(0,0,0,.1)}
+.url{flex:1;height:24px;border-radius:6px;background:#f4f2ed;display:flex;align-items:center;padding:0 10px;color:#555;font:12px "SF Mono",Menlo,monospace}
+.bpage{flex:1;display:flex;min-height:0}
+
+/* v2: a page of its own in the main window */
+.tp{flex:1;overflow:hidden;padding:22px 40px 0;display:flex;flex-direction:column;gap:12px}
+.tp .pt{font:600 20px -apple-system,"Helvetica Neue",sans-serif}
+.tp .ps{color:#8a877f;font-size:12.5px;margin-top:-6px;line-height:1.4}
+.tp .sec{font:600 11px -apple-system,"Helvetica Neue",sans-serif;color:#8a877f;text-transform:uppercase;letter-spacing:.04em;margin:6px 2px 0;display:flex;align-items:center;gap:8px}
+.tp .sec .sp{flex:1}
+.hero{background:#fff;border:1px solid #e3dfd6;border-radius:10px;padding:12px 14px;display:flex;align-items:center;gap:14px}
+.hero .gh{width:34px;height:34px;border-radius:17px;background:#1d1d1d;color:#fff;display:flex;align-items:center;justify-content:center;font:700 13px -apple-system,"Helvetica Neue",sans-serif;flex:none}
+.hero .l{flex:1}.hero .l b{font-weight:600}.hero .s{color:#8a877f;font-size:12px;margin-top:2px}
+.slots{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.slot{background:#fff;border:1px solid #e3dfd6;border-radius:10px;padding:11px 13px;display:flex;flex-direction:column;gap:5px;min-height:92px;box-sizing:border-box}
+.slot.open{grid-column:1/-1;border-color:#3d5a80;box-shadow:0 0 0 1px #3d5a80}
+.slot .top{display:flex;align-items:center;gap:8px}
+.slot .top .k{font:600 10.5px -apple-system,"Helvetica Neue",sans-serif;color:#8a877f;text-transform:uppercase;letter-spacing:.04em}
+.slot .top .sp{flex:1}
+.slot .nm{font-weight:600;font-size:13.5px}
+.slot .how{color:#8a877f;font-size:12px;line-height:1.35}
+.slot .proof{color:#6d6a64;font-size:12px;line-height:1.35}
+.slot .proof .m,.m{font:11.5px "SF Mono",Menlo,monospace;color:#3d5a80}
+.slot .warn{color:#9a4f10;font-size:12px;line-height:1.35}
+.choices{display:flex;gap:8px;flex-wrap:wrap;margin-top:4px}
+.choices .opt{flex:1;min-width:150px}
+.tl{background:#fff;border:1px solid #e3dfd6;border-radius:10px}
+.tl .line{padding:8px 12px}
+.sdot{width:8px;height:8px;border-radius:4px;flex:none}.sdot.g{background:#5b8a5b}.sdot.o{background:#b5651d}.sdot.x{background:#c2beb6}
+.sidepage{display:flex;align-items:center;gap:8px;padding:5px 6px 5px 22px;border-radius:6px}
+.sidepage i{font-style:normal;color:#8a877f;width:16px;text-align:center}
+.sidepage.on{background:#3d5a80;color:#fff}.sidepage.on i{color:#dfe6ef}
+.sidesess{padding:5px 6px 5px 22px;color:#333}
+.dim2{opacity:.35}
+</style></head><body>
+<script>if(location.hash)document.body.classList.add('one')</script>
+<div class="frame" id="a"><div class="cap">A · A project’s Tools page, before anything is connected</div><div class="sub">MCP Servers is now <b>Tools</b>, and its page is where the set-up lives. Every project has a <b>Tools</b> row in its sidebar group, set up or not. The page opens with the one GitHub connection, then four slots in the issue’s order, then every other tool the project has. <b>Where agents run</b> is already This Mac, so a person with no cloud account has nothing to do there. No checklist in the sidebar: the Get started card stays as #982 drew it.</div><div class="duo"><div class="win"><div class="side"><div class="lights"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>
+ <div class="h">Activity</div>
+ <div class="si"><i>◔</i>Running<span class="n">2</span></div>
+ <div class="si"><i>●</i>Needs you<span class="n">1</span></div>
+ <div class="si" ><i >⚒</i>Tools</div>
+ <div class="h">Agents</div>
+ <div class="sidesess">▤ Fix the files watch test</div>
+ <div class="sidesess">▤ Tidy the sidebar</div>
+ <div class="sidepage"><i>⚙</i>Workflows<span class="n" style="margin-left:auto;color:#8a877f;font-size:12px">3</span></div>
+ <div class="sidepage on"><i>⚒</i>Tools</div>
+ <div class="sidepage"><i>▣</i>Archived</div>
+ <div class="h">Blog</div>
+ <div class="sidesess">▤ Draft the October post</div>
+ <div class="sidepage"><i>⚒</i>Tools</div>
+</div><div class="main"><div class="bar"><span class="t">Agents — Tools</span><span class="sp"></span></div><div class="tp"><div class="pt">Tools</div><div class="ps">What agents in <b>Agents</b> can reach. Repository <span class="m">github.com/alexec/agents</span>, from its git remote.</div><div class="hero"><span class="gh">GH</span><div class="l"><b>Connect GitHub once: issues, pull requests and Actions.</b><div class="s">Your connection, for every project. You choose on github.com which repositories Agents can see.</div></div><span class="btn p">Connect GitHub…</span></div><div class="sec">Set up</div><div class="slots"><div class="slot "><div class="top"><span class="tick "></span><span class="k">Tasks</span><span class="sp"></span></div><div class="nm">GitHub Issues</div><div class="how">Agents read, file and close issues in alexec/agents. Comes with the GitHub connection.</div><div class="acts"><span class="link">Use Linear instead…</span><span class="skip">Skip</span></div></div><div class="slot "><div class="top"><span class="tick "></span><span class="k">Code review</span><span class="sp"></span></div><div class="nm">GitHub pull requests</div><div class="how">Agents open pull requests and answer reviews. Comes with the GitHub connection.</div><div class="acts"><span class="skip">Skip</span></div></div><div class="slot "><div class="top"><span class="tick "></span><span class="k">CI</span><span class="sp"></span></div><div class="nm">GitHub Actions</div><div class="how">Agents see checks pass and fail, and wait on them. Comes with the GitHub connection.</div><div class="acts"><span class="skip">Skip</span></div></div><div class="slot "><div class="top"><span class="tick y"></span><span class="k">Where agents run</span><span class="sp"></span><span class="link">Change…</span></div><div class="nm">This Mac</div><div class="how">Nothing to set up. Codespaces is offered once GitHub is connected.</div></div></div>
+<div class="sec">Other tools<span class="sp"></span><span class="btn" style="text-transform:none;letter-spacing:0;font-weight:400;color:#1d1d1d">Add Tool…</span></div>
+<div class="tl"><div class="line"><div class="l muted">No other tools in this project yet. Your own tools reach it too: <span class="link">Your Tools</span>.</div></div></div></div></div></div><div class="annobox anno">The <b>Tools</b> row shows under every project now; until #753 it showed only when <span class="mono">.agents/mcp.json</span> had servers.<br><br>Three slots say they come with the GitHub connection, so the person sees that one press fills three.<br><br><b>Connect GitHub…</b> and <b>Use Linear instead…</b> open the same Connect sheet (B), as every tool does (H).<br><br><b>Add Tool…</b> opens the catalogue (H).</div></div></div>
+<div class="frame" id="b"><div class="cap">B · Connect GitHub: one OAuth 2 sheet, the same for every tool</div><div class="sub">Every tool that needs an account connects with this sheet: its name, what Agents will be able to do in plain words, and <b>Continue on ‹site›</b>. The browser does the approving; the sheet waits and closes by itself when the site says yes. No CLI to install, no token to paste. The host’s Go client then calls the tool’s API directly with that token.</div><div class="duo"><div class="win"><div class="side"><div class="lights"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>
+ <div class="h">Activity</div>
+ <div class="si"><i>◔</i>Running<span class="n">2</span></div>
+ <div class="si"><i>●</i>Needs you<span class="n">1</span></div>
+ <div class="si" ><i >⚒</i>Tools</div>
+ <div class="h">Agents</div>
+ <div class="sidesess">▤ Fix the files watch test</div>
+ <div class="sidesess">▤ Tidy the sidebar</div>
+ <div class="sidepage"><i>⚙</i>Workflows<span class="n" style="margin-left:auto;color:#8a877f;font-size:12px">3</span></div>
+ <div class="sidepage on"><i>⚒</i>Tools</div>
+ <div class="sidepage"><i>▣</i>Archived</div>
+ <div class="h">Blog</div>
+ <div class="sidesess">▤ Draft the October post</div>
+ <div class="sidepage"><i>⚒</i>Tools</div>
+</div><div class="main"><div class="bar"><span class="t">Agents — Tools</span><span class="sp"></span></div><div class="tp"><div class="pt">Tools</div><div class="ps">What agents in <b>Agents</b> can reach. Repository <span class="m">github.com/alexec/agents</span>, from its git remote.</div><div class="hero"><span class="gh">GH</span><div class="l"><b>Connect GitHub once: issues, pull requests and Actions.</b><div class="s">Your connection, for every project. You choose on github.com which repositories Agents can see.</div></div><span class="btn p">Connect GitHub…</span></div></div></div><div class="veil"><div class="sheet"><div class="in">
+  <div style="display:flex;align-items:center;gap:12px"><span class="gh" style="width:38px;height:38px;border-radius:19px;background:#1d1d1d;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700">GH</span><div><div class="t">Connect GitHub</div><div class="muted small">For you, in every project. Agents talks to GitHub’s API directly.</div></div></div>
+  <div class="sh" style="margin:6px 0 0">Agents will be able to</div>
+  <div class="form"><div class="line">Read and write issues</div><div class="line">Read and write pull requests and reviews</div><div class="line">Read checks and Actions runs</div><div class="line">Read and push code</div></div>
+  <div class="muted small">On github.com you choose which repositories. You can take it back there, or with Disconnect here.</div>
+  <div class="infobox">After Continue: ◌ Waiting for github.com… finish in the browser tab that opened. <span class="link">Open It Again</span></div>
+ </div><div class="bot"><span class="muted small">The token is kept by the host, never in a log.</span><span class="sp"></span><span class="btn">Cancel</span><span class="btn p">Continue on github.com</span></div></div></div></div><div class="annobox anno">The list of what it can do comes from the scopes the tool asks for, written once per tool, not shown raw.<br><br>The token is the host’s: the Mac’s Keychain, a Linux host’s secret store (#1035). It refreshes by itself.<br><br>On the iPhone it is the system’s sign-in sheet; on the web page, a new tab.</div></div></div>
+<div class="frame" id="c"><div class="cap">C · Each slot proves itself, and the events go on</div><div class="sub">Right after connecting, each slot reads one real thing and shows it. A slot ticks only when its read works: here Tasks and Code review have read theirs and CI is still reading. Under the slots, the page names the events it turned on and the workflows that can now use them, and <b>All tools</b> is the old MCP Servers list, with its health dots and Check Now.</div><div class="duo"><div class="win"><div class="side"><div class="lights"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>
+ <div class="h">Activity</div>
+ <div class="si"><i>◔</i>Running<span class="n">2</span></div>
+ <div class="si"><i>●</i>Needs you<span class="n">1</span></div>
+ <div class="si" ><i >⚒</i>Tools</div>
+ <div class="h">Agents</div>
+ <div class="sidesess">▤ Fix the files watch test</div>
+ <div class="sidesess">▤ Tidy the sidebar</div>
+ <div class="sidepage"><i>⚙</i>Workflows<span class="n" style="margin-left:auto;color:#8a877f;font-size:12px">3</span></div>
+ <div class="sidepage on"><i>⚒</i>Tools</div>
+ <div class="sidepage"><i>▣</i>Archived</div>
+ <div class="h">Blog</div>
+ <div class="sidesess">▤ Draft the October post</div>
+ <div class="sidepage"><i>⚒</i>Tools</div>
+</div><div class="main"><div class="bar"><span class="t">Agents — Tools</span><span class="sp"></span></div><div class="tp"><div class="pt">Tools</div><div class="ps">What agents in <b>Agents</b> can reach. Repository <span class="m">github.com/alexec/agents</span>, from its git remote.</div><div class="hero" style="padding:9px 14px"><span class="av">A</span><div class="l">Connected to GitHub as <b>alexec</b><div class="s">Your connection, for every project · sees 12 repositories</div></div><span class="link">Manage in Your Tools…</span></div><div class="sec">Set up · 3 of 4</div><div class="slots"><div class="slot "><div class="top"><span class="tick y"></span><span class="k">Tasks</span><span class="sp"></span><span class="link">Change…</span></div><div class="nm">GitHub Issues</div><div class="proof">Newest: <span class="m">#1336</span> Guided set-up: connect a tracker…</div></div><div class="slot "><div class="top"><span class="tick y"></span><span class="k">Code review</span><span class="sp"></span></div><div class="nm">GitHub pull requests</div><div class="proof">Newest: <span class="m">#1412</span> Go agentsd: the files watch test…</div></div><div class="slot "><div class="top"><span class="tick w"></span><span class="k">CI</span><span class="sp"></span></div><div class="nm">GitHub Actions</div><div class="how">Reading the last workflow run…</div></div><div class="slot "><div class="top"><span class="tick y"></span><span class="k">Where agents run</span><span class="sp"></span><span class="link">Change…</span></div><div class="nm">This Mac</div><div class="acts"><span class="btn">Add Codespaces…</span></div></div></div>
+<div class="sec">Events</div>
+<div class="tl"><div class="line"><div class="l">On for Agents: <span class="m">issue.*</span> <span class="m">pr.*</span> <span class="m">ci.*</span><div class="s">Now usable by <span class="link">Babysit PRs</span>, <span class="link">Review and fix</span>, <span class="link">Triage issues</span>.</div></div></div></div>
+<div class="sec">All tools<span class="sp"></span><span class="btn" style="text-transform:none;letter-spacing:0;font-weight:400;color:#1d1d1d">Add Tool…</span> <span class="btn" style="text-transform:none;letter-spacing:0;font-weight:400;color:#1d1d1d">Check Now</span></div>
+<div class="tl"><div class="line"><span class="sdot g"></span><div class="l"><b>github</b> <span class="chip">hosted</span><div class="s">Answering · 38 tools · issues, pull requests, Actions</div></div></div>
+<div class="line"><span class="sdot g"></span><div class="l"><b>context7</b> <span class="chip">yours</span><div class="s">Answering · 2 tools</div></div></div></div></div></div></div><div class="annobox anno">Once connected, the connection is one line: the account is managed on <b>Your Tools</b> (E), because it is the person’s, not the project’s.<br><br>A workflow name opens that workflow.<br><br><b>yours</b> marks a tool from ~/.agents/mcp.json that reaches this project too.</div></div></div>
+<div class="frame" id="d"><div class="cap">D · Change… opens the slot in place: no sheet, the page is the set-up</div><div class="sub">A slot being changed spans the page and shows its choices. Codespaces is fully guided because it rides on the GitHub connection (Choosing it asks github.com for Codespaces access once, through the same Connect sheet): it lists the codespaces it can see, and offers to create the first one from the project’s repository (#1119). The other kinds go to Settings ▸ Control plane ▸ Providers, where they live today. Tasks’ <b>Change…</b> opens the same way, with GitHub Issues, Linear, From a catalogue… and None.</div><div class="duo"><div class="win"><div class="side"><div class="lights"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>
+ <div class="h">Activity</div>
+ <div class="si"><i>◔</i>Running<span class="n">2</span></div>
+ <div class="si"><i>●</i>Needs you<span class="n">1</span></div>
+ <div class="si" ><i >⚒</i>Tools</div>
+ <div class="h">Agents</div>
+ <div class="sidesess">▤ Fix the files watch test</div>
+ <div class="sidesess">▤ Tidy the sidebar</div>
+ <div class="sidepage"><i>⚙</i>Workflows<span class="n" style="margin-left:auto;color:#8a877f;font-size:12px">3</span></div>
+ <div class="sidepage on"><i>⚒</i>Tools</div>
+ <div class="sidepage"><i>▣</i>Archived</div>
+ <div class="h">Blog</div>
+ <div class="sidesess">▤ Draft the October post</div>
+ <div class="sidepage"><i>⚒</i>Tools</div>
+</div><div class="main"><div class="bar"><span class="t">Agents — Tools</span><span class="sp"></span></div><div class="tp"><div class="pt">Tools</div><div class="ps">What agents in <b>Agents</b> can reach. Repository <span class="m">github.com/alexec/agents</span>, from its git remote.</div><div class="hero" style="padding:9px 14px"><span class="av">A</span><div class="l">Connected to GitHub as <b>alexec</b><div class="s">Your connection, for every project · sees 12 repositories</div></div><span class="link">Manage in Your Tools…</span></div><div class="sec">Set up · 4 of 4</div><div class="slots" style="grid-template-columns:repeat(3,1fr)">
+<div class="slot "><div class="top"><span class="tick y"></span><span class="k">Tasks</span><span class="sp"></span></div><div class="nm">GitHub Issues</div><div class="proof">Newest: <span class="m">#1336</span> Guided set-up…</div></div>
+<div class="slot "><div class="top"><span class="tick y"></span><span class="k">Code review</span><span class="sp"></span></div><div class="nm">GitHub pull requests</div><div class="proof">Newest: <span class="m">#1412</span> Go agentsd…</div></div>
+<div class="slot "><div class="top"><span class="tick y"></span><span class="k">CI</span><span class="sp"></span></div><div class="nm">GitHub Actions</div><div class="proof">Last run: CI on main, passed 4 min ago</div></div>
+<div class="slot open"><div class="top"><span class="tick y"></span><span class="k">Where agents run</span><span class="sp"></span></div><div class="nm">Where should Agents’ agents run?</div><div class="choices">
+<div class="opt"><span class="rad"></span><div class="l"><b>This Mac</b><div class="s">Nothing to set up.</div></div></div>
+<div class="opt sel"><span class="rad y"></span><div class="l"><b>GitHub Codespaces</b><div class="s">Read just now: 1 codespace, stopped.</div></div></div>
+<div class="opt"><span class="rad"></span><div class="l"><b>Docker, DigitalOcean, Coder…</b><div class="s"><span class="link">Set up in Providers…</span></div></div></div></div>
+<div class="acts"><span class="btn p">Use Codespaces</span><span class="btn">Create a Codespace from alexec/agents</span><span class="skip">Cancel</span></div>
+<div class="infobox" style="margin-top:4px">A codespace joins Agents by itself when it starts (#1025): nothing to ssh into.</div></div></div></div></div></div><div class="annobox anno">A provider ticks only when its list of workspaces reads, just as Tasks ticks only when an issue reads.<br><br>Codespaces needs #1025 first: with no gh, there is no ssh relay, so the codespace dials in.<br><br>On the Remote and the page, the last choice reads <i>Set up on the Mac</i>. Providers is a Mac-only page, by design.</div></div></div>
+<div class="frame" id="e"><div class="cap">E · Activity ▸ Tools is Your Tools: your connections, every project’s set-up, your own tools</div><div class="sub">The person’s page, where MCP Servers under Activity used to be. Connections live here because a connection is the person’s and covers every project; every one is listed and removed the same way. <b>Projects</b> lists each project’s set-up and opens its Tools page. This takes the place of the Settings ▸ Account section from the first draft. Settings keeps only a link: <i>Connections are on Your Tools</i>.</div><div class="duo"><div class="win"><div class="side"><div class="lights"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>
+ <div class="h">Activity</div>
+ <div class="si"><i>◔</i>Running<span class="n">2</span></div>
+ <div class="si"><i>●</i>Needs you<span class="n">1</span></div>
+ <div class="si on" style="background:#3d5a80;color:#fff"><i style="color:#dfe6ef">⚒</i>Tools</div>
+ <div class="h">Agents</div>
+ <div class="sidesess">▤ Fix the files watch test</div>
+ <div class="sidesess">▤ Tidy the sidebar</div>
+ <div class="sidepage"><i>⚙</i>Workflows<span class="n" style="margin-left:auto;color:#8a877f;font-size:12px">3</span></div>
+ <div class="sidepage"><i>⚒</i>Tools</div>
+ <div class="sidepage"><i>▣</i>Archived</div>
+ <div class="h">Blog</div>
+ <div class="sidesess">▤ Draft the October post</div>
+ <div class="sidepage"><i>⚒</i>Tools</div>
+</div><div class="main"><div class="bar"><span class="t">Your Tools</span><span class="sp"></span></div><div class="tp"><div class="pt">Your Tools</div><div class="ps">Your connections, and the tools in your own <span class="m">~/.agents/mcp.json</span>. They reach every project.</div>
+<div class="sec">Connections<span class="sp"></span><span class="btn" style="text-transform:none;letter-spacing:0;font-weight:400;color:#1d1d1d">Connect…</span></div>
+<div class="tl"><div class="line"><span class="av">A</span><div class="l"><b>GitHub</b> · alexec<div class="s">OAuth · sees 12 repositories · renews by itself</div></div><span class="link">Repositories on github.com</span><span class="btn d">Disconnect</span></div>
+<div class="line"><span class="av" style="background:#efece6;color:#8a877f">L</span><div class="l"><b>Linear</b> · Alex’s workspace<div class="s">OAuth · used by Blog for Tasks</div></div><span class="btn d">Disconnect</span></div></div>
+<div class="sec">Projects</div>
+<div class="tl"><div class="line"><div class="l"><b>Agents</b><div class="s">Issues, pull requests, Actions · This Mac</div></div><span class="muted small">4 of 4</span><span class="link">Open ›</span></div>
+<div class="line"><div class="l"><b>Blog</b><div class="s">No GitHub remote · Tasks: Linear</div></div><span class="muted small">3 of 4</span><span class="link">Open ›</span></div></div>
+<div class="sec">Your tools<span class="sp"></span><span class="btn" style="text-transform:none;letter-spacing:0;font-weight:400;color:#1d1d1d">Add Tool…</span> <span class="btn" style="text-transform:none;letter-spacing:0;font-weight:400;color:#1d1d1d">Check Now</span></div>
+<div class="tl"><div class="line"><span class="sdot g"></span><div class="l"><b>context7</b><div class="s">Answering · 2 tools</div></div></div>
+<div class="line"><span class="sdot o"></span><div class="l"><b>figma</b><div class="s" style="color:#9a4f10">Didn't answer at 21:40: connection refused</div></div></div></div></div></div></div><div class="annobox anno">GitHub and Linear look the same: one row each, one Disconnect (#839 for Linear).<br><br>Disconnect says which projects lose which slots before it goes.</div></div></div>
+<div class="frame" id="f"><div class="cap">F · The Remote and the web page: the same Tools page</div><div class="sub">The same page in the same order. On the iPhone, the slots are a list: each opens its own screen with its proof and its choices. The page, at desktop width, draws the Mac’s grid. Connecting is the same sheet, with the system’s sign-in sheet on the iPhone and a new tab on the web page. The set-up’s state is the host’s, so all three show the same ticks.</div><div class="duo"><div class="phone"><div class="status"><span>9:41</span><span>▮▮▮</span></div>
+<div class="nav"><span class="link" style="font-size:16px">‹ Agents</span><span></span></div>
+<div class="nav" style="padding-top:0"><span class="big">Tools</span></div>
+<div class="pbody" style="gap:10px">
+<div class="hero" style="flex-wrap:wrap"><span class="gh">GH</span><div class="l"><b>Connect GitHub once: issues, pull requests and Actions.</b></div><span class="btn p" style="font-size:14px;padding:5px 12px">Connect GitHub…</span></div>
+<div class="sec" style="font:600 12px -apple-system,Helvetica Neue,sans-serif;color:#8a877f;text-transform:uppercase;margin:4px 2px -4px">Set up</div>
+<div class="tl">
+<div class="line"><span class="tick"></span><div class="l">Tasks · GitHub Issues<div class="s">Comes with GitHub</div></div><span class="muted">›</span></div>
+<div class="line"><span class="tick"></span><div class="l">Code review · GitHub pull requests<div class="s">Comes with GitHub</div></div><span class="muted">›</span></div>
+<div class="line"><span class="tick"></span><div class="l">CI · GitHub Actions<div class="s">Comes with GitHub</div></div><span class="muted">›</span></div>
+<div class="line"><span class="tick y"></span><div class="l">Where agents run · This Mac<div class="s">Other providers are set up on the Mac</div></div><span class="muted">›</span></div></div>
+<div class="sec" style="font:600 12px -apple-system,Helvetica Neue,sans-serif;color:#8a877f;text-transform:uppercase;margin:4px 2px -4px">All tools</div>
+<div class="tl"><div class="line"><span class="sdot g"></span><div class="l">context7 <span class="chip">yours</span><div class="s">Answering · 2 tools</div></div></div></div>
+</div></div><div class="browser" style="width:760px"><div class="chrome"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="url">localhost:8787/#/agents/tools</span></div>
+<div class="bpage"><div class="side" style="width:200px;background:#ebe8e1"><div style="height:6px"></div><div class="h">Agents</div><div class="sidesess">▤ Fix the files watch test</div><div class="sidepage"><i>⚙</i>Workflows</div><div class="sidepage on"><i>⚒</i>Tools</div></div>
+<div class="main"><div class="tp" style="padding:18px 24px 0"><div class="pt">Tools</div><div class="ps">What agents in <b>Agents</b> can reach. Repository <span class="m">github.com/alexec/agents</span>, from its git remote.</div><div class="hero" style="padding:9px 14px"><span class="av">A</span><div class="l">Connected to GitHub as <b>alexec</b><div class="s">Your connection, for every project · sees 12 repositories</div></div><span class="link">Manage in Your Tools…</span></div><div class="sec">Set up · 3 of 4</div><div class="slots">
+<div class="slot "><div class="top"><span class="tick y"></span><span class="k">Tasks</span><span class="sp"></span></div><div class="nm">GitHub Issues</div><div class="proof">Newest: <span class="m">#1336</span> Guided set-up…</div></div>
+<div class="slot "><div class="top"><span class="tick y"></span><span class="k">Code review</span><span class="sp"></span></div><div class="nm">GitHub pull requests</div><div class="proof">Newest: <span class="m">#1412</span> Go agentsd…</div></div>
+<div class="slot "><div class="top"><span class="tick f"></span><span class="k">CI</span><span class="sp"></span></div><div class="nm">GitHub Actions</div><div class="warn">GitHub refused: Agents can’t see Actions in alexec/agents.</div><div class="acts"><span class="btn">Grant on github.com</span><span class="btn">Try Again</span></div></div>
+<div class="slot "><div class="top"><span class="tick y"></span><span class="k">Where agents run</span><span class="sp"></span></div><div class="nm">This Mac</div><div class="how">Other providers are set up on the Mac.</div></div>
+</div></div></div></div></div></div></div>
+<div class="frame" id="g"><div class="cap">G · When GitHub doesn’t fit: no GitHub remote, a first read that fails, a skipped slot</div><div class="sub">Three slots at the page’s width. Skip is always there. A skipped slot shows a dashed circle and counts as dealt with: the page reads <i>4 of 4</i> and does not ask again.</div><div class="duo"><div style="width:300px"><div class="slot "><div class="top"><span class="tick "></span><span class="k">Tasks</span><span class="sp"></span></div><div class="nm">Choose a tracker</div><div class="warn">Blog has no GitHub remote, so GitHub Issues can’t be read for it.</div><div class="acts"><span class="btn">Linear…</span><span class="link">From a catalogue…</span><span class="skip">Skip</span></div></div></div><div style="width:300px"><div class="slot "><div class="top"><span class="tick f"></span><span class="k">Tasks</span><span class="sp"></span></div><div class="nm">GitHub Issues</div><div class="warn">Connected, but github.com can’t be reached for the first read.</div><div class="acts"><span class="btn">Try Again</span></div></div></div><div style="width:300px"><div class="slot "><div class="top"><span class="tick s"></span><span class="k">Code review</span><span class="sp"></span></div><div class="nm">Skipped</div><div class="how">Agents won’t use pull requests here. Nothing is turned on.</div><div class="acts"><span class="link">Set Up</span></div></div></div><div class="annobox anno">Once a slot has read, a lost connection does not untick it. Only a refusal from GitHub does (F, the web page).</div></div></div>
+<div class="frame" id="h"><div class="cap">H · Add Tool…: every tool is added the same way</div><div class="sub">One catalogue for every tool. A tool with an account says <b>Connect…</b> and opens the same OAuth 2 sheet as GitHub (right, for Linear: same shape, same words, its own list of what it can do). A tool with no account, which runs on the host, says <b>Add</b>. Once connected, a tool is a row in Connections (E), and where a slot can use it, it is a choice in that slot (D).</div><div class="duo"><div class="win" style="width:760px"><div class="side dim2"><div class="lights"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>
+ <div class="h">Activity</div>
+ <div class="si"><i>◔</i>Running<span class="n">2</span></div>
+ <div class="si"><i>●</i>Needs you<span class="n">1</span></div>
+ <div class="si" ><i >⚒</i>Tools</div>
+ <div class="h">Agents</div>
+ <div class="sidesess">▤ Fix the files watch test</div>
+ <div class="sidesess">▤ Tidy the sidebar</div>
+ <div class="sidepage"><i>⚙</i>Workflows<span class="n" style="margin-left:auto;color:#8a877f;font-size:12px">3</span></div>
+ <div class="sidepage on"><i>⚒</i>Tools</div>
+ <div class="sidepage"><i>▣</i>Archived</div>
+ <div class="h">Blog</div>
+ <div class="sidesess">▤ Draft the October post</div>
+ <div class="sidepage"><i>⚒</i>Tools</div>
+</div><div class="main"></div><div class="veil"><div class="sheet" style="width:620px"><div class="in">
+ <div class="t">Add a Tool to Agents</div>
+ <div style="background:#fff;border:1px solid #3d5a80;box-shadow:0 0 0 2px #cdd8e6;border-radius:7px;padding:5px 9px;color:#aaa">Search tools</div>
+ <div class="tl">
+  <div class="line"><span class="gh" style="width:26px;height:26px;border-radius:13px;background:#1d1d1d;color:#fff;display:flex;align-items:center;justify-content:center;font:700 10px sans-serif">GH</span><div class="l"><b>GitHub</b><div class="s">Issues, pull requests, Actions, Codespaces</div></div><span class="chip a">connected</span><span class="btn">Add</span></div>
+  <div class="line"><span class="av" style="width:26px;height:26px;background:#e6e3f5;color:#5b4fa8">L</span><div class="l"><b>Linear</b><div class="s">Issues and projects</div></div><span class="btn p">Connect…</span></div>
+  <div class="line"><span class="av" style="width:26px;height:26px;background:#f7e7d6;color:#9a4f10">C</span><div class="l"><b>CodeRabbit</b><div class="s">Code review on pull requests</div></div><span class="btn">Connect…</span></div>
+  <div class="line"><span class="av" style="width:26px;height:26px;background:#efece6;color:#555">S</span><div class="l"><b>Sentry</b><div class="s">Errors and releases</div></div><span class="btn">Connect…</span></div>
+  <div class="line"><span class="av" style="width:26px;height:26px;background:#efece6;color:#555">⌘</span><div class="l"><b>context7</b><div class="s">Library docs · runs on the host, no account</div></div><span class="btn">Add</span></div>
+ </div>
+ <div class="muted small">Adding to <b>Agents</b>. <span class="link">Add to Your Tools instead</span></div>
+</div><div class="bot"><span class="sp"></span><span class="btn">Done</span></div></div></div></div><div class="sheet" style="width:380px;flex:none"><div class="in">
+  <div style="display:flex;align-items:center;gap:12px"><span class="av" style="width:38px;height:38px;border-radius:19px;background:#e6e3f5;color:#5b4fa8">L</span><div><div class="t">Connect Linear</div><div class="muted small">For you, in every project.</div></div></div>
+  <div class="sh" style="margin:6px 0 0">Agents will be able to</div>
+  <div class="form"><div class="line">Read and write issues</div><div class="line">Read projects and cycles</div><div class="line">Comment as you</div></div>
+  <div class="muted small">On linear.app you choose the workspace.</div>
+ </div><div class="bot"><span class="sp"></span><span class="btn">Cancel</span><span class="btn p">Continue on linear.app</span></div></div></div></div>
+</body></html>
