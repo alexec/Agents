@@ -80,3 +80,25 @@ func TestARuntimeAssessedFromTheRecord(t *testing.T) {
 		t.Fatal(note)
 	}
 }
+
+// A runtime that names its conversation after read_session (Codex, #492) still passes
+// sessions: the title list_sessions gave just before the read counts (#1432).
+func TestSessionsTakesTheTitleListedBeforeTheRead(t *testing.T) {
+	me, now := "F19C1064-5986-4C97-B007-D8283136B992", now()
+	title := "Assess Codex runtime"
+	text := func(s string) *string { return &s }
+	call := func(method, answer string, args map[string]json.RawMessage) appToolCall {
+		return appToolCall{At: now, Method: method, Ok: true, Arguments: args, Answer: text(answer)}
+	}
+	r := assessRecord{agent: wire.Agent{ID: wire.UUID(me), Title: &title}, calls: []appToolCall{
+		call("agents/listSessions", "- "+me+": “Assess the Codex runtime (#47)…” (you) — Codex, Working", nil),
+		call("agents/readSession", "# Session “Assess the Codex runtime (#47)…”\n\n- Id: "+me, map[string]json.RawMessage{"session": json.RawMessage(`"` + me + `"`)}),
+	}}
+	if v, why := r.sessions(); v != passed {
+		t.Fatal(why)
+	}
+	r.calls[1].Answer = text("# Session “Something else”\n\n- Id: " + me)
+	if v, _ := r.sessions(); v != failedStep {
+		t.Fatal("a title neither listed nor current passed")
+	}
+}

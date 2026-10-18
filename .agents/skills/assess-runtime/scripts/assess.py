@@ -126,7 +126,10 @@ def follow(client, runtime, agent, model, report_path, minutes):
                 print(f"  answered: {pending.get('message')!r} with {json.dumps(content)}", flush=True)
         record = next((a for a in client.call("agents/list", {"includeArchived": True}) or [] if a.get("id") == agent), None)
         report = (record or {}).get("report") or {}
-        if record and record.get("state") in ("finished", "stopped", "archived") and report.get("outcome") not in ("blocked", "partly_done"):
+        # A turn that ends on a wait still open is not the last: it is started again (#1432).
+        wait = (record or {}).get("eventWait")
+        waiting = wait and (not wait.get("ending") or record.get("queuedPrompts"))
+        if record and record.get("state") in ("finished", "stopped", "archived") and report.get("outcome") not in ("blocked", "partly_done") and not waiting:
             break
     else:
         print(f"  {runtime}: not finished after {minutes} min; scoring what is there", flush=True)

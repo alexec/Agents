@@ -720,7 +720,9 @@ func acpBlocks(bs []wire.ContentBlock) []sdk.ContentBlock {
 	return out
 }
 
-// setState moves a running agent's state, clearing an ending and a report it had.
+// setState moves a running agent's state, clearing an ending and a report it had. A card
+// answered mid-turn (waiting on the person, then running again) keeps the turn's report:
+// a block reported before the card is still how the turn ends (#1432).
 func (d *Daemon) setState(id wire.UUID, s wire.AgentState) {
 	changed, started := false, false
 	d.change(id, func(a *wire.Agent) {
@@ -728,10 +730,11 @@ func (d *Daemon) setState(id wire.UUID, s wire.AgentState) {
 			return
 		}
 		changed, started = true, a.State == wire.AgentStateStarting && s == wire.AgentStateRunning
+		answered := a.State == wire.AgentStateWaitingOnUser
 		a.State = s
 		a.EndedReason = nil
 		a.ArchivedReason = nil
-		if s == wire.AgentStateRunning {
+		if s == wire.AgentStateRunning && !answered {
 			a.Report = nil
 		}
 	})

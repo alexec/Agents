@@ -874,7 +874,18 @@ func (r assessRecord) sessions() (verdict, string) {
 		}
 		return failedStep, "`read_session` did not give this session back: " + clip(answerOfCall(read[len(read)-1]), 160)
 	}
-	if title != "" && !strings.Contains(answerOfCall(*own), title) {
+	// A runtime that names the conversation itself (#492) may do it after the read: the
+	// title the list gave this session just before the read counts as well (#1432).
+	listTitle := ""
+	for _, c := range listed {
+		if c.At > own.At {
+			break
+		}
+		if a := answerOfCall(c); strings.Contains(a, me+": “") {
+			listTitle, _, _ = strings.Cut(a[strings.Index(a, me+": “")+len(me+": “"):], "”")
+		}
+	}
+	if title != "" && !strings.Contains(answerOfCall(*own), title) && (listTitle == "" || !strings.Contains(answerOfCall(*own), "“"+listTitle+"”")) {
 		return failedStep, "`read_session` gave back this id but not its title, \"" + title + "\""
 	}
 	return passed, "listed; `read_session` gave back this session's id and title"
