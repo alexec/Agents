@@ -26,9 +26,11 @@ if [ "${1:-}" = --carry ]; then
 	flags="--force --options runtime"
 	[ "${CONFIGURATION:-Debug}" = Debug ] || flags="$flags --timestamp"
 	# Signed with the identifier agentsd, so the callers' signature check
-	# (CallerSignature: "agentsd" is an agent's own) and the window's take it as that.
+	# (CallerSignature: "agentsd" is an agent's own) and the window's take it as that, and
+	# with the app group the window shares, where it listens for it (#1118).
 	# shellcheck disable=SC2086
-	codesign $flags --identifier agentsd --sign "${EXPANDED_CODE_SIGN_IDENTITY:--}" "$helpers/agentsd"
+	codesign $flags --identifier agentsd --entitlements "$root/Host/agentsd.entitlements" \
+		--sign "${EXPANDED_CODE_SIGN_IDENTITY:--}" "$helpers/agentsd"
 	exit 0
 fi
 

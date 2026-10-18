@@ -3,8 +3,9 @@ import Foundation
 
 /// Where the window's control plane is (058, US1, frame K): only ever elsewhere, reached
 /// over a WebSocket with this window's own key, kept in the keychain on this Mac only
-/// (#1031). There is no local socket, no host run from here and no old way: Agents Host
-/// does all of that.
+/// (#1031). No host is run from here and there is no old way: Agents Host does all of
+/// that. This Mac's own host is also reached directly, over its socket in the app group
+/// (#1118, `localLink`).
 enum ControlConfig {
     enum Endpoint {
         case remote(ControlMembership)
@@ -75,6 +76,21 @@ enum ControlConfig {
                       try newer.save(membershipFile, backedUp: false)
                   }) else { return nil }
             return ControlLink(dial: dial)
+        }
+    }
+
+    /// This Mac's host directly (#1118): agentsd's socket in the app group, named by the
+    /// control plane's key, proved with this window's own key. Nil with no pairing, or no
+    /// group container for this build.
+    static func localLink(_ endpoint: Endpoint, host: HostID) -> LocalHostLink? {
+        switch endpoint {
+        case .remote(let membership):
+            guard let client = membership.client,
+                  let key = try? ControlClientKey.loadOrMake(account: keyAccount),
+                  let group = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: LocalHostLink.group)
+            else { return nil }
+            let socket = group.appendingPathComponent(LocalHostLink.socketName(controlKey: membership.controlKey))
+            return LocalHostLink(socket: socket, client: client, privateKey: key, host: host)
         }
     }
 

@@ -15,7 +15,7 @@
 
 ## Counts
 
-Of 230 rows: **156 same**, **47 by design**, **27 delta** (after #188, #189, #191, #221, #238–#244, #249, #252–#255, #257, #259–#261, #263–#266, #291, #254, #317, #341, #342, #343, #345, #344, #357, #366, #375, #377, #381, #378, #400, #396, #394, #436, #433, #432, #506, #545, #548, #791, #790, #846, #826, #888, #982, #1089, #1109, #1122, #1419). A row with any open delta counts as delta, even where another side's difference is by design.
+Of 231 rows: **156 same**, **47 by design**, **28 delta** (after #188, #189, #191, #221, #238–#244, #249, #252–#255, #257, #259–#261, #263–#266, #291, #254, #317, #341, #342, #343, #345, #344, #357, #366, #375, #377, #381, #378, #400, #396, #394, #436, #433, #432, #506, #545, #548, #791, #790, #846, #826, #888, #982, #1089, #1109, #1122, #1419). A row with any open delta counts as delta, even where another side's difference is by design.
 
 | Screen | Same | By design | Delta |
 |---|---|---|---|
@@ -33,13 +33,13 @@ Of 230 rows: **156 same**, **47 by design**, **27 delta** (after #188, #189, #19
 | Events and resources | 2 | 1 | 2 |
 | Notifications and badges | 3 | 2 | 0 |
 | Disk strip | 2 | 1 | 0 |
-| Hosts, connection and pairing | 4 | 3 | 0 |
+| Hosts, connection and pairing | 4 | 3 | 1 |
 | MCP Apps views | 5 | 1 | 0 |
 
-The deltas are tracked by 30 issues:
+The deltas are tracked by 31 issues:
 - **Already open:** #226 (the Remote's one sidebar) and #235 (the page's one sidebar at phone width).
 - **Filed by this audit, the Remote to change:** #238 (with the page), #239, #240, #241, #242, #243, #244, #245, #246 (with one web row), #247, #248, #249, #888.
-- **The page to change:** #250, #251, #252, #253, #254, #255, #256, #257, #260, #261, #262.
+- **The page to change:** #250, #251, #252, #253, #254, #255, #256, #257, #260, #261, #262, #1480.
 - **The window to change, or more than one side:** #264, #265, #266.
 - **Alex to decide** (one client only, nothing says whether that is meant): #267.
 
@@ -382,6 +382,7 @@ The deltas are tracked by 30 issues:
 | Stop when idle (#691 US4) | Settings ▸ Control plane ▸ Hosts: Stop when idle in the row's `···`, the scheduled-workflows warning, and Stop asks first, naming who is working: `A/Control/ControlSettingsView.swift`; the strip says "stopped by Agents after N minutes idle" | The same strip words: `S/OfflineWords.swift` | The same strip words: `W/views/OfflineStrip.tsx` | **same** for the strip; the setting is **by design** Mac only, as Hosts is |
 | Wake-up calls (#1004) | Settings ▸ Control plane ▸ Hosts: **Start for scheduled workflows** in the row's `···`, *Starts at 02:55 for Nightly review* on a stopped row, *Stays up for …* on an idle one, Stop says when it starts next, and the scheduled-workflows warning only with the switch off or an old host: `A/Control/ControlSettingsView.swift`; the strip and sidebar foot add the line: `S/OfflineWords.swift` (`wakeLine`) | The same strip and foot words: `S/OfflineWords.swift` | The same strip and foot words: `W/views/OfflineStrip.tsx` (`wakeLine`) | **same** for the strip; the switch is **by design** Mac only, as Hosts is |
 | The control plane away | `A/Sidebar/ControlAwayStrip.swift` | `R/StaleBanner.swift` | `W/views/Banner.tsx` | **same** |
+| This Mac's host directly (#1118): over agentsd's socket in the app group, proved with the window's key against the paired windows the control plane sends the host (`host/clients`); the control plane's route when it is not there; with the control plane away, this Mac's agents still work and the strip says so | `K/Client/LocalHostLink.swift`, `A/AppModel.swift` (`hostLink`, `directHost`), `A/Control/ControlConfig.swift` (`localLink`) | Through the control plane | Through the control plane | **by design** on the Remote (not the same machine); web: #1480 |
 | Reconnect on wake and network change (#82) | `A/WakeAndNetwork.swift` | Yes (its hangs are #208, not parity) | Yes, and the `online` event | **same** |
 | A refused write said in words (#88) | `storage/writeFailed` | `storage/writeFailed`: `R/RemoteModel.swift` | `storage/writeFailed` (unit-tested) | **same** |
 | Hosts and servers | Settings ▸ Control plane overview names not joined or not running: `A/Control/ControlSettingsView.swift:140-156`; hosts: `237-268`; Add a Server: Run a command or Over ssh, with the ssh config's hosts and an ssh tunnel (#610), then the projects to add, picked (#656): `A/Control/ControlAddServerSheet.swift`, `A/Control/HostProjectsPicker.swift` | Host headings | Names in the sidebar, the foot | **by design** (managing hosts is the Mac's) |

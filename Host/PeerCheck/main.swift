@@ -5,8 +5,11 @@
 // It begins with one line: `team <ID>`, the team it is signed by, or `unsigned`, and then
 // stops. After `team`, it reads one audit token a line, as 64 hex digits (the kernel's 32
 // bytes, as LOCAL_PEERTOKEN gives them), and answers that process's role on a line:
-// control, agent, hostApp or stranger. These are RolePolicy.signedRoles and
+// control, agent, hostApp, window or stranger. These are RolePolicy.signedRoles and
 // CallerSignature's requirement (AgentsKit), which the Swift agentsd checks for itself.
+//
+// `agents-peer container <group>` instead makes the app group's container and says its path
+// (#1118): macOS refuses a plain mkdir there, and Go cannot ask for it without cgo.
 import Foundation
 import Security
 
@@ -16,6 +19,9 @@ let signedRoles: [(role: String, identifiers: [String])] = [
     ("control", ["com.alexecollins.agents", "com.alexecollins.agents.bridge"]),
     ("agent", ["agentsd"]),
     ("hostApp", ["com.alexecollins.agents.host"]),
+    // The App Store window (Debug and Live are `.store`, the App Store's is the Remote's id):
+    // it may prove its key on the local socket (#1118), and is a stranger on daemon.sock.
+    ("window", ["com.alexecollins.agents.store", "com.alexecollins.agents.remote"]),
 ]
 
 func ownTeam() -> String? {
@@ -64,6 +70,15 @@ func role(of audit: Data, _ rules: [(String, SecRequirement)]) -> String {
 }
 
 setvbuf(stdout, nil, _IOLBF, 0)
+let arguments = CommandLine.arguments
+if arguments.count == 3, arguments[1] == "container" {
+    guard let url = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: arguments[2]) else {
+        FileHandle.standardError.write(Data("no container for \(arguments[2]): not in this helper's entitlements\n".utf8))
+        exit(1)
+    }
+    print(url.path)
+    exit(0)
+}
 guard let team = ownTeam() else {
     print("unsigned")
     exit(0)
