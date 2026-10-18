@@ -104,6 +104,17 @@ mkdir -p "$p/node_modules/@x/adapter/dist" && echo 'ok' > "$p/node_modules/@x/ad
 	return dist, bundle
 }
 
+// install asks for runtimes/install and waits for its ending. Not c.call, which drops the
+// notifications that come before its answer: an install refused at once (no glibc) can
+// say its ending before the answer, and that ending was lost.
+func install(t *testing.T, c *conn, n int, id string) wire.RuntimeStatus {
+	t.Helper()
+	b, _ := json.Marshal(map[string]any{"jsonrpc": "2.0", "id": n, "method": "runtimes/install",
+		"params": map[string]any{"runtimeID": id}})
+	c.in <- string(b)
+	return waitInstalled(t, c, id)
+}
+
 func waitInstalled(t *testing.T, c *conn, id string) wire.RuntimeStatus {
 	t.Helper()
 	deadline := time.After(20 * time.Second)
@@ -170,8 +181,7 @@ func TestAnInstallThatFailsSaysWhy(t *testing.T) {
 	d, c := start(t, t.TempDir())
 	tools := filepath.Join(t.TempDir(), "tools")
 	d.serveInstall(tools, bundle)
-	c.call(t, 1, "runtimes/install", map[string]any{"runtimeID": "codex"})
-	end := waitInstalled(t, c, "codex")
+	end := install(t, c, 1, "codex")
 	if end.Availability.InstallFailed == nil || !strings.Contains(end.Availability.InstallFailed.Reason, "checksum") {
 		t.Fatalf("%+v", end.Availability)
 	}
@@ -266,14 +276,12 @@ mkdir -p "$p/node_modules/@x/adapter/dist" && echo 'ok' > "$p/node_modules/@x/ad
 	}
 	// musl, or a glibc older than Node's builds need, is refused before any download.
 	libc = ""
-	c.call(t, 1, "runtimes/install", map[string]any{"runtimeID": "codex"})
-	if end := waitInstalled(t, c, "codex"); end.Availability.InstallFailed == nil ||
+	if end := install(t, c, 1, "codex"); end.Availability.InstallFailed == nil ||
 		!strings.Contains(end.Availability.InstallFailed.Reason, "glibc 2.28 or later, and this server has musl") {
 		t.Fatalf("musl: %+v", end.Availability)
 	}
 	libc = "glibc 2.36"
-	c.call(t, 2, "runtimes/install", map[string]any{"runtimeID": "codex"})
-	end := waitInstalled(t, c, "codex")
+	end := install(t, c, 2, "codex")
 	want := filepath.Join(home, ".agents-server", "tools", "codex", "current", "bin", runtimeByID("codex").Executable)
 	if end.Availability.Available == nil || end.Availability.Available.Path != want {
 		t.Fatalf("%+v, want %s", end.Availability, want)
