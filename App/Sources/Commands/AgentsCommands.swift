@@ -40,6 +40,10 @@ final class WindowRequests {
     /// context menu, taken down by the sheet's Done.
     var dropboxProject: ProjectKey?
 
+    /// The folder and host of the Send to ‹host›… sheet that is up (#1123), or nil. Set by
+    /// the project's context menu, taken down by the sheet.
+    var sendToHost: SendToHostRequest?
+
     func focusPrompt() { wantsPromptFocus = true }
     func focusSessionSearch() { wantsSessionSearchFocus = true }
 }

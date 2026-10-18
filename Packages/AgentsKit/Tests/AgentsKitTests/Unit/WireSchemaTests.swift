@@ -202,6 +202,18 @@ struct WireSchemaTests {
             "DraftQuestion": Self.through(DaemonAPI.DraftQuestion.self),
             "ProviderDraftUpdate": Self.through(DaemonAPI.ProviderDraftUpdate.self),
             "HostProviderDraftCall": Self.through(DaemonAPI.HostProviderDraftCall.self),
+            "ReceiveStateRequest": Self.through(DaemonAPI.ReceiveStateRequest.self),
+            "ReceiveState": Self.through(DaemonAPI.ReceiveState.self),
+            "ReceiveUploadRequest": Self.through(DaemonAPI.ReceiveUploadRequest.self),
+            "SentBranch": Self.through(DaemonAPI.SentBranch.self),
+            "ReceiveRequest": Self.through(DaemonAPI.ReceiveRequest.self),
+            "SendFactsRequest": Self.through(DaemonAPI.SendFactsRequest.self),
+            "SendFacts": Self.through(DaemonAPI.SendFacts.self),
+            "SendPackRequest": Self.through(DaemonAPI.SendPackRequest.self),
+            "SendFile": Self.through(DaemonAPI.SendFile.self),
+            "SendPack": Self.through(DaemonAPI.SendPack.self),
+            "SendReadRequest": Self.through(DaemonAPI.SendReadRequest.self),
+            "SendRead": Self.through(DaemonAPI.SendRead.self),
         ]
         let all = samples.objectValue ?? [:]
         #expect(Set(all.keys) == Set(types.keys), "a sample with no Swift type, or a type with no sample")

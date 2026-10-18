@@ -1,0 +1,270 @@
+import AgentsKitCore
+import SwiftUI
+
+/// Send to ‹host›… (#1123): a project's or a worktree's folder on this Mac, sent to a host
+/// over the link the window already has to it, and added there as a project. `from` is the
+/// host the folder is on: this Mac's, whose agentsd makes the bundle and the patch, since
+/// the window is sandboxed and reads no repository itself.
+struct SendToHostRequest: Identifiable, Hashable {
+    let folder: URL
+    let from: HostID
+    let host: HostID
+    var id: String { "\(host.rawValue) \(folder.path)" }
+}
+
+extension AppModel {
+    /// The hosts a folder on this Mac can be sent to: the servers that are reachable now.
+    var sendTargets: [HostID] {
+        hosts.servers.filter { $0 != .mac && !isOnThisMac($0) && !hostUnreachable($0) }
+    }
+
+    /// Whether a project's folder is this Mac's to send.
+    func canSend(from host: HostID) -> Bool { host == .mac || isOnThisMac(host) }
+
+    /// What the host has at `destination`.
+    func receiveState(at destination: String, on host: HostID) async throws -> DaemonAPI.ReceiveState {
+        try await client(for: host).call(DaemonAPI.Method.projectsReceiveState,
+                                         DaemonAPI.ReceiveStateRequest(folder: destination),
+                                         returning: DaemonAPI.ReceiveState.self)
+    }
+
+    /// What the sheet shows of the repository at `folder`, from this Mac's host.
+    func sendFacts(_ folder: URL, on from: HostID) async throws -> DaemonAPI.SendFacts {
+        try await client(for: from).call(DaemonAPI.Method.projectsSendFacts, DaemonAPI.SendFactsRequest(folder: folder),
+                                         returning: DaemonAPI.SendFacts.self)
+    }
+
+    /// Sends `branches` of the repository at `folder` on this Mac's host `from`, less what
+    /// `host` already has, and the uncommitted changes when `includeChanges`, then has
+    /// `host` make or bring up to date its copy at `destination`. Each part goes through
+    /// the window, from one host's link to the other's. The project it becomes is listed
+    /// and returned.
+    func sendRepository(_ folder: URL, from: HostID, to host: HostID, at destination: String, branches: [String],
+                        checkout: String, includeChanges: Bool, origin: String?,
+                        progress: @escaping @MainActor (String) -> Void) async throws -> DaemonAPI.ProjectSummary {
+        let label = hosts.label(host)
+        let state = try await receiveState(at: destination, on: host)
+        if state.ownChanges {
+            throw SendFailure(message: "\(destination) has changes of its own on \(label). Commit or remove them there, then send again.")
+        }
+        progress("Making the bundle…")
+        let mac = client(for: from), there = client(for: host)
+        let pack = try await mac.callWhileAnswering(
+            DaemonAPI.Method.projectsSendPack,
+            DaemonAPI.SendPackRequest(folder: folder, branches: branches, leavingOut: state.repository ? state.heads : [],
+                                      includeChanges: includeChanges),
+            checkingEvery: .seconds(10)).decode(DaemonAPI.SendPack.self)
+        let total = (pack.bundle?.size ?? 0) + (pack.patch?.size ?? 0)
+        var sent = 0
+        func relay(_ file: DaemonAPI.SendFile?) async throws -> UUID? {
+            guard let file else { return nil }
+            let id = UUID()
+            var offset = 0
+            while true {
+                let part = try await mac.call(DaemonAPI.Method.projectsSendRead, DaemonAPI.SendReadRequest(id: file.id, offset: offset),
+                                              returning: DaemonAPI.SendRead.self)
+                try await there.call(DaemonAPI.Method.projectsReceiveUpload,
+                                     DaemonAPI.ReceiveUploadRequest(upload: id, offset: offset, data: part.data))
+                offset += part.data.count
+                sent += part.data.count
+                progress(total < 1_000_000 ? "Sending…"
+                         : "Sending \(sent.formatted(.byteCount(style: .file))) of \(total.formatted(.byteCount(style: .file)))…")
+                if part.end || part.data.isEmpty { return id }
+            }
+        }
+        let bundle = try await relay(pack.bundle)
+        let patch = try await relay(pack.patch)
+        progress("Adding it on \(label)…")
+        let answer = try await there.callWhileAnswering(
+            DaemonAPI.Method.projectsReceive,
+            DaemonAPI.ReceiveRequest(folder: destination, bundle: bundle, patch: patch, branches: pack.commits,
+                                     checkout: checkout, origin: origin),
+            checkingEvery: .seconds(10))
+        var summary = try answer.decode(DaemonAPI.ProjectSummary.self)
+        summary.host = host
+        upsert(summary)
+        return summary
+    }
+}
+
+extension View {
+    /// The Send to ‹host›… sheet a project's menu asks for in `requests`.
+    func sendToHostSheet(_ requests: WindowRequests) -> some View {
+        sheet(item: Binding(get: { requests.sendToHost }, set: { requests.sendToHost = $0 })) { request in
+            SendToHostSheet(request: request).paperSheet()
+        }
+    }
+}
+
+/// A send that stops before it starts, in words.
+struct SendFailure: Error, CustomStringConvertible {
+    let message: String
+    var description: String { message }
+}
+
+/// The sheet: the folder on the host, the branches to send, and whether the uncommitted
+/// changes go too. Sending again brings the host's copy up to date with only what it lacks.
+struct SendToHostSheet: View {
+    @Environment(AppModel.self) private var model
+    @Environment(\.dismiss) private var dismiss
+    let request: SendToHostRequest
+
+    @State private var facts: DaemonAPI.SendFacts?
+    @State private var chosen: Set<String> = []
+    @State private var includeChanges = true
+    @State private var destination = ""
+    @State private var state: DaemonAPI.ReceiveState?
+    @State private var progress: String?
+    @State private var problem: String?
+
+    private var label: String { model.hosts.label(request.host) }
+    private var name: String { request.folder.lastPathComponent }
+
+    /// The branch the host checks out: this Mac's when it goes, or else the first chosen.
+    private var checkout: String? {
+        guard let facts else { return nil }
+        if let current = facts.current, chosen.contains(current) { return current }
+        return facts.branches.first(where: chosen.contains)
+    }
+
+    /// The uncommitted changes sit on the branch checked out here, so they go only with it.
+    private var changesCanGo: Bool {
+        guard let facts, let current = facts.current else { return false }
+        return facts.hasChanges && chosen.contains(current)
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Send \(name) to \(label)")
+                .appText(.reading).fontWeight(.semibold)
+            if let facts {
+                form(facts)
+            } else if problem == nil {
+                ProgressView().controlSize(.small)
+            }
+            if let problem {
+                Text(problem)
+                    .appText(.fine).tinted(.failure)
+                    .fixedSize(horizontal: false, vertical: true)
+            } else if let progress {
+                Text(progress).appText(.fine).foregroundStyle(.secondary)
+            }
+            HStack {
+                Spacer()
+                Button("Cancel", role: .cancel) { dismiss() }
+                    .buttonStyle(.paper)
+                    .keyboardShortcut(.cancelAction)
+                    .disabled(progress != nil)
+                Button("Send") { Task { await send() } }
+                    .buttonStyle(.paperProminent)
+                    .keyboardShortcut(.defaultAction)
+                    .disabled(!canSend)
+            }
+        }
+        .padding(20)
+        .frame(width: 460)
+        .task { await load() }
+    }
+
+    @ViewBuilder private func form(_ facts: DaemonAPI.SendFacts) -> some View {
+        LabeledContent("Folder on \(label)") {
+            TextField("~/\(name)", text: $destination)
+                .textFieldStyle(.roundedBorder)
+                .onSubmit { Task { await check() } }
+        }
+        Text(stateLine)
+            .appText(.fine).foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+        Text("Branches").appText(.supporting).fontWeight(.semibold)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 4) {
+                ForEach(facts.branches, id: \.self) { branch in
+                    Toggle(isOn: Binding(get: { chosen.contains(branch) },
+                                         set: { if $0 { chosen.insert(branch) } else { chosen.remove(branch) } })) {
+                        Text(branch == facts.current ? "\(branch) (checked out)" : branch)
+                    }
+                    .toggleStyle(.checkbox)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .frame(maxHeight: 140)
+        Toggle("Include uncommitted changes", isOn: $includeChanges)
+            .toggleStyle(.checkbox)
+            .disabled(!changesCanGo)
+        Text(changesLine(facts))
+            .appText(.fine).foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+
+    private var stateLine: String {
+        guard let state else { return "Checking \(label)…" }
+        if state.ownChanges {
+            return "This folder has changes of its own on \(label). Commit or remove them there, then send again."
+        }
+        if state.repository {
+            return "\(label) has a copy here. Sending again brings it up to date with only the commits it lacks. Its own commits stop the send."
+        }
+        if state.exists {
+            return "This folder is on \(label) and is not a Git repository. It must be empty."
+        }
+        return "A new copy, with the same origin as here."
+    }
+
+    private func changesLine(_ facts: DaemonAPI.SendFacts) -> String {
+        guard facts.hasChanges else { return "Nothing is uncommitted." }
+        guard let current = facts.current, chosen.contains(current) else {
+            return "The uncommitted changes go only with the branch checked out here."
+        }
+        return "Changed and new files go as a patch on \(current). Files that git ignores do not go."
+    }
+
+    private var canSend: Bool {
+        progress == nil && checkout != nil && state != nil && state?.ownChanges != true
+            && !destination.trimmingCharacters(in: .whitespaces).isEmpty
+    }
+
+    private func load() async {
+        destination = "~/\(name)"
+        do {
+            let facts = try await model.sendFacts(request.folder, on: request.from)
+            guard !facts.branches.isEmpty else {
+                problem = "\(name) has no branch with a commit to send."
+                return
+            }
+            chosen = [facts.current ?? facts.branches[0]]
+            self.facts = facts
+        } catch {
+            problem = model.describe(error)
+            return
+        }
+        await check()
+    }
+
+    private func check() async {
+        state = nil
+        problem = nil
+        do {
+            state = try await model.receiveState(at: destination, on: request.host)
+        } catch {
+            problem = model.describe(error)
+        }
+    }
+
+    private func send() async {
+        guard let facts, let checkout else { return }
+        problem = nil
+        progress = "Checking \(label)…"
+        do {
+            let summary = try await model.sendRepository(
+                request.folder, from: request.from, to: request.host, at: destination,
+                branches: facts.branches.filter(chosen.contains), checkout: checkout,
+                includeChanges: includeChanges && changesCanGo, origin: facts.origin) { progress = $0 }
+            dismiss()
+            model.select(summary.key)
+        } catch {
+            progress = nil
+            problem = model.describe(error)
+        }
+    }
+}

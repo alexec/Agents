@@ -3382,6 +3382,37 @@ type RateLimitInfo struct {
 	OverageDisabledReason *string  `json:"overageDisabledReason,omitzero"`
 }
 
+// Makes or brings up to date a host's copy of a Mac's repository (#1123): fetches the `bundle` upload, moves `branches` forward only, checks out `checkout`, sets `origin`, applies the `patch` upload (uncommitted changes), and adds the folder as a project. It stops, and changes nothing, when the host has changes or commits of its own.
+type ReceiveRequest struct {
+	Folder   string       `json:"folder"`
+	Bundle   *UUID        `json:"bundle,omitzero"`
+	Patch    *UUID        `json:"patch,omitzero"`
+	Branches []SentBranch `json:"branches"`
+	Checkout string       `json:"checkout"`
+	Origin   *string      `json:"origin,omitzero"`
+}
+
+// What a host has at a folder before a send (#1123). `heads` are the commits of its branches, so the Mac's bundle carries only what the host lacks. `ownChanges` is true when the folder has changes that the last send did not put there.
+type ReceiveState struct {
+	Folder     URL      `json:"folder"`
+	Exists     bool     `json:"exists"`
+	Repository bool     `json:"repository"`
+	OwnChanges bool     `json:"ownChanges"`
+	Heads      []string `json:"heads"`
+}
+
+// Asks a host about a folder a Mac will send a repository to (Send to ‹host›…, #1123). `folder` may start with ~/.
+type ReceiveStateRequest struct {
+	Folder string `json:"folder"`
+}
+
+// One part of a file a Mac sends (#1123), at `offset` in the upload. A part is at most 16 MB; the host keeps the upload until projects/receive uses it.
+type ReceiveUploadRequest struct {
+	Upload UUID  `json:"upload"`
+	Offset int64 `json:"offset"`
+	Data   Data  `json:"data"`
+}
+
 // relay/count (#1163): one device's Needs you count, posted as a silent push.
 type RelayCount struct {
 	Device    UUID  `json:"device"`
@@ -3735,6 +3766,58 @@ const (
 	SandboxStateRuntimeControlled SandboxState = "runtimeControlled"
 	SandboxStateNone              SandboxState = "none"
 )
+
+// What the Send sheet shows (#1123): the local branches, the one checked out (none when detached), the origin, and whether anything is uncommitted.
+type SendFacts struct {
+	Branches   []string `json:"branches"`
+	Current    *string  `json:"current,omitzero"`
+	Origin     *string  `json:"origin,omitzero"`
+	HasChanges bool     `json:"hasChanges"`
+}
+
+// Asks this Mac's host about a repository to send (Send to ‹host›…, #1123).
+type SendFactsRequest struct {
+	Folder URL `json:"folder"`
+}
+
+// A file the host made for a send, read with projects/sendRead (#1123).
+type SendFile struct {
+	ID   UUID  `json:"id"`
+	Size int64 `json:"size"`
+}
+
+// What projects/sendPack made (#1123): each branch at its commit, the bundle (none when the receiving host has every commit) and the patch (none when nothing is uncommitted).
+type SendPack struct {
+	Commits []SentBranch `json:"commits"`
+	Bundle  *SendFile    `json:"bundle,omitzero"`
+	Patch   *SendFile    `json:"patch,omitzero"`
+}
+
+// Makes what a send carries (#1123): a bundle of `branches` without the commits in `leavingOut` (the receiving host's), and with `includeChanges` a patch of the uncommitted changes, new files git does not ignore among them.
+type SendPackRequest struct {
+	Folder         URL      `json:"folder"`
+	Branches       []string `json:"branches"`
+	LeavingOut     []string `json:"leavingOut"`
+	IncludeChanges bool     `json:"includeChanges"`
+}
+
+// A part of at most 8 MB. `end` is true for the last, and then the host removes the file.
+type SendRead struct {
+	Data Data `json:"data"`
+	End  bool `json:"end"`
+}
+
+// One part of a file projects/sendPack made, from `offset` (#1123).
+type SendReadRequest struct {
+	ID     UUID  `json:"id"`
+	Offset int64 `json:"offset"`
+}
+
+// A branch the Mac sends, at the commit it has (#1123).
+type SentBranch struct {
+	Name   string `json:"name"`
+	Commit string `json:"commit"`
+}
 
 type ServedRequest struct {
 	Kind    ServedRequestKind    `json:"kind"`

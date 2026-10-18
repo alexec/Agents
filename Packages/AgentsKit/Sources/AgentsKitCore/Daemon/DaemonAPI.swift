@@ -231,6 +231,17 @@ public enum DaemonAPI {
         public static let projectsClone = "projects/clone"
         /// The clones under way, for a window that connects in the middle of one.
         public static let projectsClones = "projects/clones"
+        /// Send to ‹host›… (#1123): what the host has at the folder a send names, one part
+        /// of the bundle or the patch, and the send itself, which makes or brings up to
+        /// date the host's copy and adds it as a project.
+        public static let projectsReceiveState = "projects/receiveState"
+        public static let projectsReceiveUpload = "projects/receiveUpload"
+        public static let projectsReceive = "projects/receive"
+        /// The sending side, on this Mac's host, since the window reads no repository
+        /// itself: the sheet's facts, the bundle and patch made, and one part of either.
+        public static let projectsSendFacts = "projects/sendFacts"
+        public static let projectsSendPack = "projects/sendPack"
+        public static let projectsSendRead = "projects/sendRead"
         /// The folders a person may add as projects on this host (#656): the git
         /// repositories directly inside each of `paths`, and each of `folders` as typed.
         /// Adds nothing; the window adds the ones the person ticks with `projects/add`.
@@ -3756,6 +3767,152 @@ public extension DaemonAPI {
 
     /// The most `dropbox/put` carries: what one message over the phone's link takes.
     static let dropboxPutLimit = attachmentLimit
+
+    // MARK: Send to ‹host›… (#1123)
+
+    /// `projects/receiveState`. `folder` is absolute on the host, or starts with ~/.
+    struct ReceiveStateRequest: Codable, Hashable, Sendable {
+        public var folder: String
+        public init(folder: String) { self.folder = folder }
+    }
+
+    /// What the host has at that folder. `heads` are its branches' commits, so the bundle
+    /// leaves out what it already has; `ownChanges` is true when it has changes that the
+    /// last send did not put there, and then a send stops.
+    struct ReceiveState: Codable, Hashable, Sendable {
+        public var folder: URL
+        public var exists: Bool
+        public var repository: Bool
+        public var ownChanges: Bool
+        public var heads: [String]
+        public init(folder: URL, exists: Bool, repository: Bool, ownChanges: Bool, heads: [String]) {
+            self.folder = folder
+            self.exists = exists
+            self.repository = repository
+            self.ownChanges = ownChanges
+            self.heads = heads
+        }
+    }
+
+    /// `projects/sendFacts`, on this Mac's host.
+    struct SendFactsRequest: Codable, Hashable, Sendable {
+        public var folder: URL
+        public init(folder: URL) { self.folder = folder }
+    }
+
+    /// The local branches, the one checked out (nil when detached), the origin, and
+    /// whether anything is uncommitted.
+    struct SendFacts: Codable, Hashable, Sendable {
+        public var branches: [String]
+        public var current: String?
+        public var origin: String?
+        public var hasChanges: Bool
+        public init(branches: [String], current: String? = nil, origin: String? = nil, hasChanges: Bool) {
+            self.branches = branches
+            self.current = current
+            self.origin = origin
+            self.hasChanges = hasChanges
+        }
+    }
+
+    /// `projects/sendPack`: a bundle of `branches` less the commits in `leavingOut` (the
+    /// receiving host's heads), and with `includeChanges` a patch of what is uncommitted.
+    struct SendPackRequest: Codable, Hashable, Sendable {
+        public var folder: URL
+        public var branches: [String]
+        public var leavingOut: [String]
+        public var includeChanges: Bool
+        public init(folder: URL, branches: [String], leavingOut: [String], includeChanges: Bool) {
+            self.folder = folder
+            self.branches = branches
+            self.leavingOut = leavingOut
+            self.includeChanges = includeChanges
+        }
+    }
+
+    struct SendFile: Codable, Hashable, Sendable {
+        public var id: UUID
+        public var size: Int
+        public init(id: UUID, size: Int) {
+            self.id = id
+            self.size = size
+        }
+    }
+
+    /// Each branch at its commit; no bundle when the host has every commit, no patch when
+    /// nothing is uncommitted.
+    struct SendPack: Codable, Hashable, Sendable {
+        public var commits: [SentBranch]
+        public var bundle: SendFile?
+        public var patch: SendFile?
+        public init(commits: [SentBranch], bundle: SendFile? = nil, patch: SendFile? = nil) {
+            self.commits = commits
+            self.bundle = bundle
+            self.patch = patch
+        }
+    }
+
+    /// `projects/sendRead`: a part of at most 8 MB from `offset`. The host removes the file
+    /// once its last part (`end`) is read.
+    struct SendReadRequest: Codable, Hashable, Sendable {
+        public var id: UUID
+        public var offset: Int
+        public init(id: UUID, offset: Int) {
+            self.id = id
+            self.offset = offset
+        }
+    }
+
+    struct SendRead: Codable, Hashable, Sendable {
+        public var data: Data
+        public var end: Bool
+        public init(data: Data, end: Bool) {
+            self.data = data
+            self.end = end
+        }
+    }
+
+    /// `projects/receiveUpload`: one part of a file, at `offset`. `data` is base64 in the JSON.
+    struct ReceiveUploadRequest: Codable, Hashable, Sendable {
+        public var upload: UUID
+        public var offset: Int
+        public var data: Data
+        public init(upload: UUID, offset: Int, data: Data) {
+            self.upload = upload
+            self.offset = offset
+            self.data = data
+        }
+    }
+
+    struct SentBranch: Codable, Hashable, Sendable {
+        public var name: String
+        public var commit: String
+        public init(name: String, commit: String) {
+            self.name = name
+            self.commit = commit
+        }
+    }
+
+    /// `projects/receive`: the uploads to use (no bundle when the host has every commit, no
+    /// patch when nothing is uncommitted), the branches at the Mac's commits, the one to
+    /// check out, and the Mac's origin. Answers with the project it added.
+    struct ReceiveRequest: Codable, Hashable, Sendable {
+        public var folder: String
+        public var bundle: UUID?
+        public var patch: UUID?
+        public var branches: [SentBranch]
+        public var checkout: String
+        public var origin: String?
+        public init(folder: String, bundle: UUID? = nil, patch: UUID? = nil, branches: [SentBranch],
+                    checkout: String, origin: String? = nil) {
+            self.folder = folder
+            self.bundle = bundle
+            self.patch = patch
+            self.branches = branches
+            self.checkout = checkout
+            self.origin = origin
+        }
+    }
 
     // MARK: Deleting archived agents (051, #398)
 

@@ -89,6 +89,8 @@ struct WorktreeRow: View {
     @State private var isBusy = false
     /// What Remove build output freed, said under the row until the list changes.
     @State private var freed: String?
+    /// The Send to ‹host›… sheet up for this worktree (#1123).
+    @State private var sending: SendToHostRequest?
 
     private var canClean: Bool { worktree.madeByApp && worktree.exists && worktree.isIdle }
 
@@ -142,6 +144,15 @@ struct WorktreeRow: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .contentShape(RoundedRectangle(cornerRadius: 14))
         .paperRow()
+        .contextMenu {
+            // This Mac's worktree, sent to a server and added there (#1123).
+            ForEach(worktree.exists ? model.sendTargets : [], id: \.self) { host in
+                Button("Send to \(model.hosts.label(host))…") {
+                    sending = SendToHostRequest(folder: worktree.root, from: .mac, host: host)
+                }
+            }
+        }
+        .sheet(item: $sending) { SendToHostSheet(request: $0).paperSheet() }
         .alert(alertTitle, isPresented: isAsking, presenting: asking) { check in
             if check.blockedBy.isEmpty {
                 Button("Remove", role: .destructive) {

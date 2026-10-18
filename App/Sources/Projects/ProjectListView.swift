@@ -293,6 +293,7 @@ struct ProjectListView: View {
                                     set: { if !$0 { requests.dropboxProject = nil } })) {
             if let project = requests.dropboxProject { DropboxSheet(project: project).paperSheet() }
         }
+        .sendToHostSheet(requests)
         // The sheet Settings ▸ Control plane ▸ Add a Server… shows (#503).
         .sheet(isPresented: Binding(get: { addingServer != nil }, set: { if !$0 { addingServer = nil } })) {
             if let control = addingServer {
@@ -729,6 +730,15 @@ private struct ProjectMenu: View {
         // A drag onto the row goes to the drop box's top; this names a folder in it.
         Button("Put Files in Drop Box…") { requests.dropboxProject = summary.key }
             .disabled(model.hostUnreachable(summary.host) || !summary.exists)
+        // This Mac's repository, sent to a server and added there (#1123).
+        if model.canSend(from: summary.host) {
+            ForEach(model.sendTargets, id: \.self) { host in
+                Button("Send to \(model.hosts.label(host))…") {
+                    requests.sendToHost = SendToHostRequest(folder: summary.folder, from: summary.host, host: host)
+                }
+                .disabled(!summary.exists)
+            }
+        }
         Divider()
         // To the top of the sidebar, above the projects that are not.
         Button(summary.project.isPinned ? "Unpin" : "Pin") {
