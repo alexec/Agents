@@ -113,7 +113,7 @@ func handshake(ctx context.Context, l Launch, sink Sink) (_ *Session, silent boo
 		return nil, false, fmt.Errorf("start %s: %w", l.Command, err)
 	}
 	s := &Session{cmd: cmd, stderr: stderr, done: make(chan struct{})}
-	s.client = &client{sink: sink, dir: l.Dir, terminals: map[string]*terminal{}}
+	s.client = &client{sink: sink, dir: l.Dir, env: l.Env, terminals: map[string]*terminal{}}
 	s.conn = sdk.NewClientSideConnection(s.client, stdin, &rawElicitations{r: bufio.NewReader(stdout), c: s.client})
 	safe.Go("runtime wait", func() { _ = cmd.Wait(); close(s.done) })
 
@@ -311,8 +311,11 @@ func (s *Session) Done() <-chan struct{} { return s.done }
 
 // client answers the runtime's requests.
 type client struct {
-	sink      Sink
-	dir       string
+	sink Sink
+	dir  string
+	// env is the runtime's own environment (environment, runtimes.go), which its
+	// terminals get too: never the daemon's whole one.
+	env       []string
 	mu        sync.Mutex
 	terminals map[string]*terminal
 	next      int
@@ -561,7 +564,7 @@ func (c *client) CreateTerminal(ctx context.Context, p sdk.CreateTerminalRequest
 		}
 		cmd.Dir = dir
 	}
-	cmd.Env = os.Environ()
+	cmd.Env = append([]string{}, c.env...)
 	for _, e := range p.Env {
 		cmd.Env = append(cmd.Env, e.Name+"="+e.Value)
 	}
