@@ -70,9 +70,10 @@ func TestFailedRunsAndTheirDetails(t *testing.T) {
 			{"id": 1, "run_attempt": 2, "name": "CI", "html_url": "u1", "head_sha": "s1", "head_branch": "agents/a", "status": "completed",
 			 "conclusion": "timed_out", "updated_at": "2026-10-16T10:01:00Z", "created_at": "2026-10-15T10:00:00Z", "pull_requests": [{"number": 7}]},
 			{"id": 0, "status": "completed", "conclusion": "failure", "updated_at": "2026-10-16T09:00:00Z"}]}`,
-		"repos/" + repo + "/commits/s2/pulls":           `[{"number": 9, "head": {"ref": "fork/main"}}]`,
-		"repos/" + repo + "/actions/runs/2/jobs":        `{"jobs": [{"name": "test", "html_url": "j", "conclusion": "failure"}, {"name": "lint", "conclusion": "success"}]}`,
-		"repos/" + repo + "/pulls/9":                    `{"number": 9, "title": "From a fork", "html_url": "p9", "head": {"ref": "fork/main"}, "user": {"login": "stranger"}, "author_association": "FIRST_TIME_CONTRIBUTOR"}`,
+		"repos/" + repo + "/commits/s2/pulls":    `[{"number": 9, "head": {"ref": "fork/main"}}]`,
+		"repos/" + repo + "/actions/runs/2/jobs": `{"jobs": [{"name": "test", "html_url": "j", "conclusion": "failure"}, {"name": "lint", "conclusion": "success"}]}`,
+		"repos/" + repo + "/pulls/9": `{"number": 9, "title": "From a fork", "html_url": "p9", "head": {"ref": "fork/main", "repo": {"full_name": "stranger/agents"}},
+			"user": {"login": "stranger"}, "author_association": "FIRST_TIME_CONTRIBUTOR"}`,
 	})
 	g := api.github()
 	runs, truncated, err := g.FailedRuns(context.Background(), repo, "", since)
@@ -89,6 +90,31 @@ func TestFailedRunsAndTheirDetails(t *testing.T) {
 	equal(t, details.PR, PR{Number: 9, Title: "From a fork", Branch: "fork/main", URL: "p9"}, "a fork's PR is found by its commit")
 	equal(t, details.FailedJobs, []Job{{Name: "test", URL: "j"}}, "failed jobs only")
 	equal(t, details.Trusted, false, "a first-time contributor is not one of the repo's own")
+}
+
+// A PR is the repo's own only from a branch of the repo, by one of its own: a collaborator's
+// fork, or a fork since deleted, is not.
+func TestAPRFromAForkIsNotTheReposOwn(t *testing.T) {
+	head := func(r string) string {
+		if r == "" {
+			return `{"ref": "main", "repo": null}`
+		}
+		return `{"ref": "main", "repo": {"full_name": "` + r + `"}}`
+	}
+	api := newFakeAPI(t, map[string]string{"repos/" + repo + "/pulls": `[
+		{"number": 1, "user": {"login": "alexec"}, "author_association": "OWNER", "head": ` + head("Alexec/Agents") + `},
+		{"number": 2, "user": {"login": "friend"}, "author_association": "COLLABORATOR", "head": ` + head("friend/agents") + `},
+		{"number": 3, "user": {"login": "gone"}, "author_association": "COLLABORATOR", "head": ` + head("") + `},
+		{"number": 4, "user": {"login": "stranger"}, "author_association": "CONTRIBUTOR", "head": ` + head(repo) + `}]`})
+	prs, err := api.github().OpenPRs(context.Background(), repo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := []bool{}
+	for _, p := range prs {
+		got = append(got, p.Trusted)
+	}
+	equal(t, got, []bool{true, false, false, false}, "trusted")
 }
 
 func TestIssueActivityLeavesPullRequestsOutAndJudgesWhoDidIt(t *testing.T) {
@@ -134,7 +160,7 @@ func TestIssueActivityLeavesPullRequestsOutAndJudgesWhoDidIt(t *testing.T) {
 
 func TestAnUnchangedListingIsSharedThenAskedWithItsETag(t *testing.T) {
 	path := "repos/" + repo + "/pulls"
-	api := newFakeAPI(t, map[string]string{path: `[{"number": 1, "state": "open", "user": {"login": "alexec"}, "author_association": "OWNER"}]`})
+	api := newFakeAPI(t, map[string]string{path: `[{"number": 1, "state": "open", "user": {"login": "alexec"}, "author_association": "OWNER", "head": {"ref": "a", "repo": {"full_name": "` + repo + `"}}}]`})
 	g := api.github()
 	for range 10 {
 		if prs, err := g.OpenPRs(context.Background(), repo); err != nil || len(prs) != 1 || !prs[0].Trusted {
@@ -152,7 +178,9 @@ func TestAnUnchangedListingIsSharedThenAskedWithItsETag(t *testing.T) {
 
 func TestConflictsComeFromGraphQL(t *testing.T) {
 	api := newFakeAPI(t, map[string]string{"graphql": `{"data": {"repository": {"pullRequests": {"nodes": [
-		{"number": 1, "headRefName": "a", "mergeable": "CONFLICTING"}, {"number": 2, "mergeable": "MERGEABLE"}, {"number": 3, "mergeable": "UNKNOWN"}]}}}}`})
+		{"number": 1, "headRefName": "a", "mergeable": "CONFLICTING", "authorAssociation": "OWNER", "author": {"login": "alexec", "__typename": "User"}},
+		{"number": 2, "mergeable": "MERGEABLE", "isCrossRepository": true, "authorAssociation": "OWNER", "author": {"login": "alexec", "__typename": "User"}},
+		{"number": 3, "mergeable": "UNKNOWN", "authorAssociation": "NONE", "author": {"login": "stranger", "__typename": "User"}}]}}}}`})
 	prs, err := api.github().ConflictPRs(context.Background(), repo)
 	if err != nil {
 		t.Fatal(err)
@@ -166,6 +194,7 @@ func TestConflictsComeFromGraphQL(t *testing.T) {
 		}
 	}
 	equal(t, got, []string{"1:true", "2:false", "3:?"}, "conflicts")
+	equal(t, []bool{prs[0].Trusted, prs[1].Trusted, prs[2].Trusted}, []bool{true, false, false}, "only the repo's own, not a fork")
 }
 
 func TestRefusalsAreSignInRateLimitAndNotFound(t *testing.T) {

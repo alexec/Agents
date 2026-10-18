@@ -230,6 +230,10 @@ type user struct {
 
 type ref struct {
 	Ref string `json:"ref"`
+	// Repo is the repo the head branch is in: a fork's for a fork's PR, null once it is deleted.
+	Repo *struct {
+		FullName string `json:"full_name"`
+	} `json:"repo"`
 }
 
 type pull struct {
@@ -248,7 +252,12 @@ type pull struct {
 
 func (p pull) pr() PR { return PR{Number: p.Number, Title: p.Title, Branch: p.Head.Ref, URL: p.HTMLURL} }
 
-func (p pull) trusted() bool { return isTrusted(p.Association, p.User.Login, p.User.Type) }
+// trusted says whether the PR is the repo's own: its branch in repo, not a fork, and its
+// author one of the repo's own people.
+func (p pull) trusted(repo string) bool {
+	own := p.Head.Repo != nil && strings.EqualFold(p.Head.Repo.FullName, repo)
+	return own && isTrusted(p.Association, p.User.Login, p.User.Type)
+}
 
 type label struct {
 	Name string `json:"name"`
@@ -402,7 +411,7 @@ func (g *RealGitHub) RunDetails(ctx context.Context, repo string, run RunRef) (*
 	if pr.Number == 0 {
 		pr.Number = number
 	}
-	return &FailedRunData{PR: pr, HeadSHA: run.HeadSHA, Run: run, FailedJobs: failed, Trusted: p.trusted()}, nil
+	return &FailedRunData{PR: pr, HeadSHA: run.HeadSHA, Run: run, FailedJobs: failed, Trusted: p.trusted(repo)}, nil
 }
 
 func (g *RealGitHub) ClosedPRs(ctx context.Context, repo, since string) ([]MergedPR, []ClosedPR, bool, error) {
@@ -421,10 +430,10 @@ func (g *RealGitHub) ClosedPRs(ctx context.Context, repo, since string) ([]Merge
 			switch {
 			case p.MergedAt != nil:
 				if !before(*p.MergedAt, since) {
-					merged = append(merged, MergedPR{PR: p.pr(), MergedAt: *p.MergedAt, MergeSHA: p.MergeSHA})
+					merged = append(merged, MergedPR{PR: p.pr(), MergedAt: *p.MergedAt, MergeSHA: p.MergeSHA, Trusted: p.trusted(repo)})
 				}
 			case p.ClosedAt != nil && !before(*p.ClosedAt, since):
-				closed = append(closed, ClosedPR{PR: p.pr(), ClosedAt: *p.ClosedAt})
+				closed = append(closed, ClosedPR{PR: p.pr(), ClosedAt: *p.ClosedAt, Trusted: p.trusted(repo)})
 			}
 		}
 		if len(list) < perPage {
@@ -443,7 +452,7 @@ func (g *RealGitHub) OpenPRs(ctx context.Context, repo string) ([]OpenPR, error)
 			return nil, err
 		}
 		for _, p := range list {
-			out = append(out, OpenPR{PR: p.pr(), Author: p.User.Login, Draft: p.Draft, Trusted: p.trusted()})
+			out = append(out, OpenPR{PR: p.pr(), Author: p.User.Login, Draft: p.Draft, Trusted: p.trusted(repo)})
 		}
 		if len(list) < perPage {
 			break
@@ -455,7 +464,7 @@ func (g *RealGitHub) OpenPRs(ctx context.Context, repo string) ([]OpenPR, error)
 // conflictQuery is the open PRs and whether each can merge: REST's listing does not say.
 const conflictQuery = `query($owner: String!, $name: String!) { repository(owner: $owner, name: $name) {
   pullRequests(states: OPEN, first: 100, orderBy: {field: CREATED_AT, direction: DESC}) {
-    nodes { number title headRefName url mergeable } } } }`
+    nodes { number title headRefName url mergeable isCrossRepository authorAssociation author { login __typename } } } } }`
 
 func (g *RealGitHub) ConflictPRs(ctx context.Context, repo string) ([]ConflictPR, error) {
 	owner, name, ok := strings.Cut(repo, "/")
@@ -479,6 +488,12 @@ func (g *RealGitHub) ConflictPRs(ctx context.Context, repo string) ([]ConflictPR
 						HeadRefName string `json:"headRefName"`
 						URL         string `json:"url"`
 						Mergeable   string `json:"mergeable"`
+						CrossRepo   bool   `json:"isCrossRepository"`
+						Association string `json:"authorAssociation"`
+						Author      *struct {
+							Login    string `json:"login"`
+							Typename string `json:"__typename"`
+						} `json:"author"`
 					} `json:"nodes"`
 				} `json:"pullRequests"`
 			} `json:"repository"`
@@ -503,6 +518,10 @@ func (g *RealGitHub) ConflictPRs(ctx context.Context, repo string) ([]ConflictPR
 	var out []ConflictPR
 	for _, n := range answer.Data.Repository.PullRequests.Nodes {
 		c := ConflictPR{PR: PR{Number: n.Number, Title: n.Title, Branch: n.HeadRefName, URL: n.URL}}
+		// A deleted account is no author: not trusted.
+		if n.Author != nil && !n.CrossRepo {
+			c.Trusted = isTrusted(n.Association, n.Author.Login, n.Author.Typename)
+		}
 		// UNKNOWN while GitHub works it out: neither yes nor no.
 		switch n.Mergeable {
 		case "CONFLICTING":

@@ -123,9 +123,9 @@ func (f *fakeGitHub) ClosedPRs(_ context.Context, _, since string) ([]MergedPR, 
 	for _, p := range f.prs {
 		switch {
 		case p.state == "merged" && !before(p.mergedAt, since):
-			merged = append(merged, MergedPR{PR: p.pr, MergedAt: p.mergedAt, MergeSHA: fmt.Sprintf("abc%d", p.pr.Number)})
+			merged = append(merged, MergedPR{PR: p.pr, MergedAt: p.mergedAt, MergeSHA: fmt.Sprintf("abc%d", p.pr.Number), Trusted: p.trusted})
 		case p.state == "closed" && !before(p.closedAt, since):
-			closed = append(closed, ClosedPR{PR: p.pr, ClosedAt: p.closedAt})
+			closed = append(closed, ClosedPR{PR: p.pr, ClosedAt: p.closedAt, Trusted: p.trusted})
 		}
 	}
 	return merged, closed, false, nil
@@ -137,7 +137,7 @@ func (f *fakeGitHub) ConflictPRs(context.Context, string) ([]ConflictPR, error) 
 	var out []ConflictPR
 	for _, p := range f.prs {
 		if p.state == "open" {
-			out = append(out, ConflictPR{PR: p.pr, Conflicts: p.conflicts})
+			out = append(out, ConflictPR{PR: p.pr, Conflicts: p.conflicts, Trusted: p.trusted})
 		}
 	}
 	return out, nil
@@ -254,7 +254,7 @@ func TestEventsListGivesEveryEventPollOnlyWithTheirSchemas(t *testing.T) {
 		equal(t, props["repo"].(map[string]any)["type"], "string", name+" repo")
 		equal(t, e["payloadSchema"].(map[string]any)["type"], "object", name+" payload")
 		_, hasAnyone := props["anyone"]
-		equal(t, hasAnyone, strings.HasPrefix(name, "issue.") || name == "checks.failed" || name == "pr.opened", name+" anyone")
+		equal(t, hasAnyone, true, name+" anyone")
 		if strings.HasPrefix(name, "issue.") {
 			_, hasIssue := props["issue"]
 			equal(t, hasIssue, name != "issue.opened", name+" issue")
@@ -404,6 +404,27 @@ func TestStrangersRaiseNothingUnlessAnyone(t *testing.T) {
 	}
 }
 
+// A PR from a fork, or by someone outside the repo, raises no PR event unless anyone is true.
+func TestAForksOrStrangersPRRaisesNoPREventUnlessAnyone(t *testing.T) {
+	h := newHarness(t)
+	own, anyone := map[string]any{"repo": repo}, map[string]any{"repo": repo, "anyone": true}
+	names := []string{"checks.failed", "pr.merged", "pr.closed", "pr.conflicted"}
+	firstOwn, firstAnyone := map[string]any{}, map[string]any{}
+	h.fake.addPR(460, "fork/merged", func(p *fakePR) { p.trusted = false })
+	h.fake.addPR(461, "fork/conflicts", func(p *fakePR) { p.trusted, p.conflicts = false, new(false) })
+	for _, name := range names {
+		firstOwn[name], firstAnyone[name] = h.poll(name, own, nil)["cursor"], h.poll(name, anyone, nil)["cursor"]
+	}
+	h.fake.addRun(9460, "fork/merged", h.at(5), 460, false)
+	h.fake.edit(460, func(p *fakePR) { p.state, p.mergedAt = "merged", h.at(5) })
+	h.fake.addPR(462, "fork/closed", func(p *fakePR) { p.trusted, p.state, p.closedAt = false, "closed", h.at(5) })
+	h.fake.edit(461, func(p *fakePR) { p.conflicts = new(true) })
+	for _, name := range names {
+		equal(t, ids(h.poll(name, own, firstOwn[name])), []string{}, name+" own")
+		equal(t, len(ids(h.poll(name, anyone, firstAnyone[name]))), 1, name+" anyone")
+	}
+}
+
 func TestTiesAtOneTimeArentLost(t *testing.T) {
 	h := newHarness(t)
 	args := map[string]any{"repo": repo, "branch": "agents/ties"}
@@ -439,7 +460,7 @@ func TestBadArgumentsAreInvalidParamsAnUnknownEventIsItsOwnCode(t *testing.T) {
 		}
 	}
 	check(map[string]any{"name": "pr.merged", "arguments": map[string]any{"repo": repo, "sha": "x"}, "cursor": nil}, -32602,
-		"unknown argument sha; takes repo, branch, pr")
+		"unknown argument sha; takes repo, branch, pr, anyone")
 	for _, name := range []string{"checks.failed", "pr.merged"} {
 		for _, pr := range []any{"551", 0, -1, 1.5} {
 			check(map[string]any{"name": name, "arguments": map[string]any{"repo": repo, "pr": pr}, "cursor": nil}, -32602,

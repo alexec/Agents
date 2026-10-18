@@ -42,7 +42,7 @@ type FailedRunData struct {
 	HeadSHA    string
 	Run        RunRef
 	FailedJobs []Job
-	// Trusted says whether the PR's author is one of the repo's own (#728).
+	// Trusted says whether the PR is the repo's own: not a fork, by one of its own (#728).
 	Trusted bool
 }
 
@@ -58,7 +58,9 @@ func (d FailedRunData) json() map[string]any {
 	}
 }
 
-// OpenPR is an open pull request, drafts too, as pr.opened sees it (#833).
+// OpenPR is an open pull request, drafts too, as pr.opened sees it (#833). Here and in the
+// PRs below, Trusted says whether the PR is the repo's own: its branch not in a fork, and its
+// author the repo's owner, a member or a collaborator, not a bot (#728).
 type OpenPR struct {
 	PR      PR
 	Author  string
@@ -71,12 +73,14 @@ type MergedPR struct {
 	PR       PR
 	MergedAt string
 	MergeSHA string
+	Trusted  bool
 }
 
 // ClosedPR is a pull request closed without being merged.
 type ClosedPR struct {
 	PR       PR
 	ClosedAt string
+	Trusted  bool
 }
 
 // ConflictPR is an open pull request and whether it conflicts with its base (#712): nil while
@@ -84,6 +88,7 @@ type ClosedPR struct {
 type ConflictPR struct {
 	PR        PR
 	Conflicts *bool
+	Trusted   bool
 }
 
 // Issue is an issue as the issue events name it.
