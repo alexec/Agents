@@ -13,6 +13,13 @@
 }
 
 {$AGENTS_DOMAIN} {
+	# Every request agents-control answers is a GET, so no body is ever big; a WebSocket's
+	# frames past the upgrade are capped by agents-control itself (public-security.md P3).
+	request_body {
+		max_size 1MB
+	}
+	# Caddy writes X-Forwarded-For with the address it saw, and agents-control trusts it
+	# from Caddy's address only (AGENTS_CONTROL_TRUSTED_PROXIES in compose.public.yaml).
 	reverse_proxy control:8791 {
 		health_uri /readyz
 		health_interval 5s

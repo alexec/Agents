@@ -35,6 +35,8 @@
 //	AGENTS_CONTROL_TLS_CERT/_KEY  when this copy terminates TLS itself
 //	AGENTS_CONTROL_PIN          the load balancer's certificate pin, when it terminates TLS
 //	AGENTS_CONTROL_PEER_URL     where other copies reach this one (several copies, US3)
+//	AGENTS_CONTROL_TRUSTED_PROXIES  the proxy in front (addresses or prefixes, commas): its
+//	                            X-Forwarded-For is a socket's source, for the per-source budget
 //	AGENTS_CONTROL_NAME, AGENTS_CONTROL_MACHINE_ID, AGENTS_CONTROL_SERVERS,
 //	AGENTS_CONTROL_TOOLSETS
 package main
@@ -329,6 +331,10 @@ func serve() {
 	// told to serve.
 	cfg.Receive = has("--receive") || os.Getenv("AGENTS_CONTROL_RECEIVE") == "1"
 	cfg.NoForwarding = has("--no-forwarding") || os.Getenv("AGENTS_CONTROL_FORWARDING") == "0"
+	// The proxy in front (Caddy), whose X-Forwarded-For is a socket's source (P3).
+	if cfg.TrustedProxies, err = controlplane.ParseTrustedProxies(os.Getenv("AGENTS_CONTROL_TRUSTED_PROXIES")); err != nil {
+		fail("AGENTS_CONTROL_TRUSTED_PROXIES: %v", err)
+	}
 	cfg.Web = webConfig()
 	// Whether the page is served, for Agents Host to read (071 R3): this run's, or none.
 	if home() != "" {
