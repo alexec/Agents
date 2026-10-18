@@ -237,7 +237,7 @@ struct AgentsCommands: Commands {
         // The main window, and a project's own (#1089). The windows open are listed
         // below these by the system, by title.
         CommandGroup(before: .windowList) {
-            Button("Agents (All Projects)") { model.bringMainWindowForward() }
+            Button("Agents (All Projects)") { model.bringMainWindowForward(opening: openWindow) }
                 .keyboardShortcut("0")
             Button("Open Project in New Window") {
                 guard let key = model.selectedProjectKey else { return }

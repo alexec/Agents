@@ -329,6 +329,7 @@ private struct ProjectNewSessionRow: View {
 /// the person, the project's shell, and the inspector beside a chat.
 private struct ProjectWindowToolbar: ToolbarContent {
     @Environment(AppModel.self) private var model
+    @Environment(\.openWindow) private var openWindow
     let window: ProjectWindowState
     let summary: DaemonAPI.ProjectSummary
     let showsChat: Bool
@@ -340,7 +341,7 @@ private struct ProjectWindowToolbar: ToolbarContent {
                 Button {
                     guard let agent = elsewhere.first else { return }
                     // In its own project's window when that is open, else the main window.
-                    if !model.showInProjectWindow(agent.id) { model.showInMainWindow(agent.id) }
+                    if !model.showInProjectWindow(agent.id) { model.showInMainWindow(agent.id, opening: openWindow) }
                 } label: {
                     Label("✋ \(elsewhere.count) elsewhere", systemImage: "hand.raised")
                         .labelStyle(.titleOnly)
