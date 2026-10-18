@@ -319,6 +319,9 @@ type client struct {
 	mu        sync.Mutex
 	terminals map[string]*terminal
 	next      int
+	// allowedEdits is each file the person just allowed an edit to on the runtime's own
+	// card, and when (ACPSession.allowedEdits).
+	allowedEdits map[string]time.Time
 	// replaying is set while a session/load replays the conversation, which is already on
 	// the record.
 	replaying atomic.Bool
@@ -335,7 +338,65 @@ func (c *client) RequestPermission(ctx context.Context, p sdk.RequestPermissionR
 	if option == "" {
 		return sdk.RequestPermissionResponse{Outcome: sdk.RequestPermissionOutcome{Cancelled: &sdk.RequestPermissionOutcomeCancelled{}}}, nil
 	}
+	c.noteAllowedEdit(p, option)
 	return sdk.RequestPermissionResponse{Outcome: sdk.RequestPermissionOutcome{Selected: &sdk.RequestPermissionOutcomeSelected{OptionId: sdk.PermissionOptionId(option)}}}, nil
+}
+
+// allowedEditWindow is how long an edit allowed on the runtime's own card covers its write.
+const allowedEditWindow = 60 * time.Second
+
+// noteAllowedEdit keeps the files an edit the person just allowed on the runtime's own card
+// names (049, T025a). Antigravity asks "Run client_create_file?" with the diff, then writes
+// through fs/write_text_file; asking again there is the same question twice. Only an edit,
+// only by a diff or location naming the file.
+func (c *client) noteAllowedEdit(p sdk.RequestPermissionRequest, option string) {
+	allowed := strings.HasPrefix(option, "allow")
+	for _, o := range p.Options {
+		if string(o.OptionId) == option {
+			allowed = o.Kind == sdk.PermissionOptionKindAllowOnce || o.Kind == sdk.PermissionOptionKindAllowAlways
+		}
+	}
+	if !allowed {
+		return
+	}
+	var named []string
+	for _, content := range p.ToolCall.Content {
+		if content.Diff != nil {
+			named = append(named, content.Diff.Path)
+		}
+	}
+	if p.ToolCall.Kind != nil && *p.ToolCall.Kind == sdk.ToolKindEdit {
+		for _, l := range p.ToolCall.Locations {
+			named = append(named, l.Path)
+		}
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.allowedEdits == nil {
+		c.allowedEdits = map[string]time.Time{}
+	}
+	for _, path := range named {
+		c.allowedEdits[samePath(path)] = time.Now()
+	}
+}
+
+// takeAllowedEdit is whether a write to path was just allowed on the runtime's own card,
+// which it then uses up.
+func (c *client) takeAllowedEdit(path string) bool {
+	key := samePath(path)
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	at, ok := c.allowedEdits[key]
+	delete(c.allowedEdits, key)
+	return ok && time.Since(at) < allowedEditWindow
+}
+
+// samePath is one key for one file: /tmp/x and /private/tmp/x are one.
+func samePath(path string) string {
+	if resolved, err := resolve(path); err == nil {
+		return resolved
+	}
+	return filepath.Clean(path)
 }
 
 func (c *client) UnstableCreateElicitation(ctx context.Context, p sdk.UnstableCreateElicitationRequest) (_ sdk.UnstableCreateElicitationResponse, err error) {
@@ -513,6 +574,11 @@ func (c *client) WriteTextFile(ctx context.Context, p sdk.WriteTextFileRequest) 
 	if err != nil {
 		return sdk.WriteTextFileResponse{}, err
 	}
+	// A write is a change, so it is asked about as any other change is, with the change on
+	// the card, unless the person has just allowed it on the runtime's own card.
+	if !c.takeAllowedEdit(path) && c.sink.Permission(ctx, writeRequest(p.Path, path, p.Content)) != "allow_once" {
+		return sdk.WriteTextFileResponse{}, fmt.Errorf("the person said no to writing %s", p.Path)
+	}
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return sdk.WriteTextFileResponse{}, err
 	}
@@ -530,6 +596,22 @@ func (c *client) WriteTextFile(ctx context.Context, p sdk.WriteTextFileRequest) 
 	}
 	c.sink.Served("write", p.Path)
 	return sdk.WriteTextFileResponse{}, nil
+}
+
+// writeRequest is the card for a write the runtime asks the client for
+// (FileService.writeToolCall): the diff against the file as it is, Allow or Refuse.
+func writeRequest(asked, path, content string) sdk.RequestPermissionRequest {
+	diff := sdk.ToolDiffContent(asked, content)
+	if b, err := os.ReadFile(path); err == nil {
+		diff = sdk.ToolDiffContent(asked, content, string(b))
+	}
+	return sdk.RequestPermissionRequest{
+		ToolCall: sdk.ToolCallUpdate{Title: sdk.Ptr("Write " + filepath.Base(asked)), Kind: sdk.Ptr(sdk.ToolKindEdit),
+			Status: sdk.Ptr(sdk.ToolCallStatusPending), Content: []sdk.ToolCallContent{diff},
+			Locations: []sdk.ToolCallLocation{{Path: asked}}},
+		Options: []sdk.PermissionOption{{OptionId: "allow_once", Name: "Allow", Kind: sdk.PermissionOptionKindAllowOnce},
+			{OptionId: "reject_once", Name: "Refuse", Kind: sdk.PermissionOptionKindRejectOnce}},
+	}
 }
 
 // MARK: terminals the runtime asks for (terminal/*)
