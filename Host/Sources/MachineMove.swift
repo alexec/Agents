@@ -147,12 +147,18 @@ final class MachineMove {
         if said.contains("CERTIFICATE") || said.contains("certificate") || said.contains("handshake") {
             answers = .yes
             trusted = .no("Windows and phones would refuse it. Give the machine a domain name and a certificate from Let's Encrypt; Caddy does this.")
-        } else if said.contains("wrongControlPlane") || said.contains("wrong-control-plane") || said.contains("badProof") {
+        } else if Self.otherKey(said) {
             answers = .yes; trusted = .yes
             holdsKey = .no("Copy the key you saved to deploy/secrets/control-key there, empty its store, and start it again.")
         } else {
             answers = .no("Nothing answers at that address. Check it's started, and that the name points at the machine.")
         }
+    }
+
+    /// Whether a refusal says the other copy holds another control plane's key: the Swift
+    /// words, and the Go ones (`refused: wrong-control-plane`, `bad-proof`).
+    nonisolated static func otherKey(_ said: String) -> Bool {
+        ["wrongControlPlane", "wrong-control-plane", "badProof", "bad-proof"].contains { said.contains($0) }
     }
 
     // MARK: R · tell everyone

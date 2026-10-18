@@ -161,16 +161,15 @@ func (s *sender) drop() {
 
 func (u *Uplink) Run(ctx context.Context) {
 	wait := time.Second
+	// The endpoint that answered last, tried first (EndpointBook.order).
+	last := ""
 	for ctx.Err() == nil {
 		key, err := HostKey(u.Private, u.Member.ControlKey, u.Member.Host)
 		if err != nil {
 			log.Printf("uplink: %v", err)
 			return
 		}
-		epoch := 0
-		l, _, err := Join(ctx, u.Member.URL, u.Member.Pin, Credentials{
-			Identity: "h:" + u.Member.Host, Key: key, Kind: "host", ControlKey: u.Member.ControlKey, Epoch: &epoch,
-		})
+		l, at, err := u.join(ctx, key, last)
 		if err != nil {
 			log.Printf("uplink: could not reach the control plane: %v", err)
 			if u.OnChange != nil {
@@ -184,6 +183,8 @@ func (u *Uplink) Run(ctx context.Context) {
 			wait = min(wait*2, 30*time.Second)
 			continue
 		}
+		last = at
+		connected := time.Now()
 		wait = time.Second
 		ping := u.pingEvery
 		if ping <= 0 {
@@ -221,7 +222,63 @@ func (u *Uplink) Run(ctx context.Context) {
 		if u.OnChange != nil {
 			u.OnChange(false, "")
 		}
+		// A copy that lets go at once, such as one forwarding to a place this host can't
+		// reach yet, is dialled again only after a wait, never in a tight loop.
+		if time.Since(connected) < 10*time.Second {
+			select {
+			case <-ctx.Done():
+				return
+			case <-time.After(wait):
+			}
+			wait = min(wait*2, 30*time.Second)
+		} else {
+			wait = time.Second
+		}
 	}
+}
+
+// join dials the endpoints in turn, the one that answered last first, each with its own
+// pin, and proves this host with the epoch of the list it holds. A newer list in ok is
+// taken and saved in the root, so a move is kept across a restart (R16, T125).
+func (u *Uplink) join(ctx context.Context, key []byte, last string) (*Lines, string, error) {
+	all := u.Member.EndpointsToDial()
+	order := make([]wire.ControlEndpoint, 0, len(all))
+	for _, e := range all {
+		if e.URL == last {
+			order = append([]wire.ControlEndpoint{e}, order...)
+		} else {
+			order = append(order, e)
+		}
+	}
+	err := errors.New("no address for the control plane")
+	for _, e := range order {
+		epoch := 0
+		if u.Member.Epoch != nil {
+			epoch = *u.Member.Epoch
+		}
+		pin := ""
+		if e.Pin != nil {
+			pin = *e.Pin
+		}
+		var l *Lines
+		var ok *OK
+		l, ok, err = Join(ctx, e.URL, pin, Credentials{
+			Identity: "h:" + u.Member.Host, Key: key, Kind: "host", ControlKey: u.Member.ControlKey, Epoch: &epoch,
+		})
+		if err != nil {
+			continue
+		}
+		if u.Member.Adopt(ok) {
+			log.Printf("uplink: the control plane is now at %s", u.Member.URL)
+			if u.Root != "" {
+				if err := u.Member.Save(u.Root); err != nil {
+					log.Printf("uplink: the new list could not be saved: %v", err)
+				}
+			}
+		}
+		return l, e.URL, nil
+	}
+	return nil, "", err
 }
 
 func (u *Uplink) write(line string) error {

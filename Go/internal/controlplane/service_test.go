@@ -89,6 +89,7 @@ func (p *plane) code(host bool) *controllink.Code {
 // fakeHost enrols with a host code and serves each channel: daemon/ping and
 // agents/list are answered, anything else is method-not-found.
 type fakeHost struct {
+	root   string
 	member *controllink.Membership
 	cancel context.CancelFunc
 	done   chan struct{}
@@ -106,7 +107,7 @@ func (p *plane) host(machine string) *fakeHost {
 		p.t.Fatal(err)
 	}
 	ctx, cancel := context.WithCancel(context.Background())
-	h := &fakeHost{member: member, cancel: cancel, done: make(chan struct{})}
+	h := &fakeHost{root: root, member: member, cancel: cancel, done: make(chan struct{})}
 	u := &controllink.Uplink{Root: root, Member: member, Private: private, Hello: hello, Accept: func(c controllink.Conn) {
 		h.mu.Lock()
 		h.opened = append(h.opened, c.Device())

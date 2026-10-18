@@ -5,8 +5,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/alexec/agents/Go/wire"
@@ -21,6 +23,76 @@ type Membership struct {
 	Name       string   `json:"name"`
 	URL        string   `json:"url"`
 	Pin        string   `json:"pin,omitempty"`
+	// Endpoints is the list the control plane last gave in ok, in the order to try, and
+	// Epoch its number (R16, T125): a control plane that moves tells its members where it
+	// goes, so none pairs again.
+	Endpoints []wire.ControlEndpoint `json:"endpoints,omitempty"`
+	Epoch     *int                   `json:"epoch,omitempty"`
+}
+
+// EndpointsToDial is ControlMembership.endpointsToDial: the list the control plane last
+// gave, or the one address the code gave.
+func (m *Membership) EndpointsToDial() []wire.ControlEndpoint {
+	if len(m.Endpoints) > 0 {
+		return m.Endpoints
+	}
+	if m.URL == "" {
+		return nil
+	}
+	e := wire.ControlEndpoint{URL: m.URL}
+	if m.Pin != "" {
+		pin := m.Pin
+		e.Pin = &pin
+	}
+	return []wire.ControlEndpoint{e}
+}
+
+// Adopt is ControlMembership.adopting: the list an ok gave, when it is newer than the one
+// kept and every entry is one a code could carry. It says whether anything changed.
+func (m *Membership) Adopt(ok *OK) bool {
+	if ok == nil || ok.Epoch == nil || len(ok.Endpoints) == 0 {
+		return false
+	}
+	epoch := int(*ok.Epoch)
+	if m.Epoch != nil && epoch <= *m.Epoch {
+		return false
+	}
+	for _, e := range ok.Endpoints {
+		if !AcceptableEndpoint(e) {
+			return false
+		}
+	}
+	m.Endpoints = append([]wire.ControlEndpoint(nil), ok.Endpoints...)
+	m.Epoch = &epoch
+	m.URL = m.Endpoints[0].URL
+	m.Pin = ""
+	if m.Endpoints[0].Pin != nil {
+		m.Pin = *m.Endpoints[0].Pin
+	}
+	return true
+}
+
+// AcceptableEndpoint is ControlEndpoint.isAcceptable: what a code would accept, https, or
+// http on this machine only, and a pin that is a SHA-256 in base64url.
+func AcceptableEndpoint(e wire.ControlEndpoint) bool {
+	u, err := url.Parse(e.URL)
+	if err != nil || u.Hostname() == "" {
+		return false
+	}
+	switch strings.ToLower(u.Scheme) {
+	case "https", "wss":
+	case "http":
+		if h := u.Hostname(); h != "127.0.0.1" && h != "localhost" && h != "::1" {
+			return false
+		}
+	default:
+		return false
+	}
+	if e.Pin != nil {
+		pin, err := FromB64URL(*e.Pin)
+		return err == nil && len(pin) == 32
+	}
+	return true
 }
 
 // HostHello is DaemonAPI.HostHello: what a host says on every connect. Implementation is

@@ -167,3 +167,27 @@ func TestAHandoverMovesAMemberWithoutPairingAgain(t *testing.T) {
 		t.Fatal("no status")
 	}
 }
+
+// A Go host follows a move (R16, T125, #1490): told the new place in ok, it dials there,
+// keeps the list in its root, and never dials the forwarding copy in a tight loop.
+func TestAHostFollowsAMoveToAnotherCopy(t *testing.T) {
+	key := controllink.NewPrivateKey()
+	old := startPlane(t, store.NewMemory(), key)
+	host := old.host("MACHINE-H")
+	fresh := startPlaneWith(t, store.NewMemory(), key, func(c *Config) { c.Receive = true })
+
+	at := drive(t, old.url, key)
+	at.must("handover/announce", map[string]any{"endpoint": records.Endpoint{URL: fresh.url}})
+	at.must("handover/freeze", nil)
+	if _, _, err := CopyStore(context.Background(), old.store, fresh.store); err != nil {
+		t.Fatal(err)
+	}
+	drive(t, fresh.url, key).must("handover/take", nil)
+	at.must("handover/forward", map[string]any{"endpoints": []records.Endpoint{{URL: fresh.url}}})
+
+	fresh.waitFor(func() bool { s, ok := fresh.s.Router().State(host.member.Host); return ok && s.online() }, "the host at the new copy")
+	kept, err := controllink.LoadMembership(host.root)
+	if err != nil || kept.URL != fresh.url || kept.Epoch == nil || len(kept.Endpoints) != 1 {
+		t.Fatalf("%+v %v", kept, err)
+	}
+}

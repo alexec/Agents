@@ -5,10 +5,12 @@ import (
 	"crypto/sha256"
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -80,6 +82,9 @@ func dial(ctx context.Context, base, pin, origin string) (*Lines, error) {
 			}
 			return nil
 		}
+	}
+	if pin == "" {
+		tlsConfig.RootCAs = TestTrustRoots()
 	}
 	client := &http.Client{Transport: &http.Transport{TLSClientConfig: tlsConfig}}
 	dctx, cancel := context.WithTimeout(ctx, 10*time.Second)
@@ -160,4 +165,28 @@ type Credentials struct {
 	Kind       string
 	ControlKey []byte // the control plane's key the peer already trusts, or nil
 	Epoch      *int
+}
+
+// TestTrustRoots is TestTrustRoot.swift: a walk's stand-in for a publicly trusted root
+// (#61, Pebble), one more CA that counts for a control plane with no pin, so a certificate
+// from a test CA counts as public without touching this Mac's trust settings.
+// AGENTS_TEST_TRUST_ROOT holds the root as PEM, or as its DER in base64; Agents Host passes
+// it on only in a Debug build. Nil, the system roots alone, when it is not set.
+func TestTrustRoots() *x509.CertPool {
+	text := strings.TrimSpace(os.Getenv("AGENTS_TEST_TRUST_ROOT"))
+	if text == "" {
+		return nil
+	}
+	pool, err := x509.SystemCertPool()
+	if err != nil {
+		pool = x509.NewCertPool()
+	}
+	if strings.Contains(text, "-----BEGIN") {
+		pool.AppendCertsFromPEM([]byte(text))
+	} else if der, err := base64.StdEncoding.DecodeString(strings.Join(strings.Fields(text), "")); err == nil {
+		if cert, err := x509.ParseCertificate(der); err == nil {
+			pool.AddCert(cert)
+		}
+	}
+	return pool
 }
