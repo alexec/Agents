@@ -33,14 +33,12 @@ struct AgentsApp: App {
     var body: some Scene {
         // Still a `WindowGroup`, but one window in practice: File ▸ New Window is
         // replaced by New Session (see `AgentsCommands`), and tabbing is off. Not a
-        // `Window` scene, for the same reason as the note below: the window saved by
-        // this group would restore into nothing.
-        WindowGroup {
-            // Exactly `ContentView().environment(model).onChange(…)` and nothing more.
-            // SwiftUI names the saved window after this whole type, modifiers and all,
-            // so one more modifier here renames it: the window saved last time matches
-            // no scene, and the app opens with none. What the window needs besides the
-            // model goes in through `ContentView`'s own properties instead.
+        // `Window` scene: the window saved by this group would restore into nothing.
+        // Its id is what Window ▸ Agents (All Projects) opens it again by once closed
+        // (#1454), and what the saved window is named after. Renaming the id renames
+        // the saved window: the one saved last time matches no scene, and the app
+        // opens with none.
+        WindowGroup(id: MainWindow.sceneID) {
             ContentView(requests: requests, frame: frame, terminal: terminal)
                 .environment(model)
                 .onChange(of: appearance, initial: true) { Appearance.apply(appearance) }

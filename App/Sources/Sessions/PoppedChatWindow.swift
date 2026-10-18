@@ -129,26 +129,35 @@ extension FocusedValues {
 extension AppModel {
     /// The main window, on this session: for what only it can show, such as a subagent's
     /// steps in the inspector (#826).
-    func showInMainWindow(_ id: UUID) {
+    func showInMainWindow(_ id: UUID, opening openWindow: OpenWindowAction) {
         openAgent(id)
-        bringMainWindowForward()
+        bringMainWindowForward(opening: openWindow)
     }
 
-    /// The main window, in front: Window ▸ Agents (All Projects), ⌘0 (#1089).
-    func bringMainWindowForward() {
-        NSApp.windows.first { MainWindow.isMain($0) }?.makeKeyAndOrderFront(nil)
+    /// The main window, in front: Window ▸ Agents (All Projects), ⌘0 (#1089). Minimised,
+    /// it comes back out of the Dock; closed, SwiftUI has let it go, so a new one opens
+    /// (#1454).
+    func bringMainWindowForward(opening openWindow: OpenWindowAction) {
+        guard let window = NSApp.windows.first(where: MainWindow.isMain) else {
+            return openWindow(id: MainWindow.sceneID)
+        }
+        if window.isMiniaturized { window.deminiaturize(nil) }
+        window.makeKeyAndOrderFront(nil)
     }
 }
 
 /// Which of the app's windows is the main one: not Settings, not a session's own, and not
 /// a project's own (#1089).
 enum MainWindow {
+    /// The main window's scene id (`AgentsApp`): what opens it again once closed (#1454).
+    /// AppKit names its windows `main-AppWindow-<n>`, and saves and restores them by it.
+    static let sceneID = "main"
+
     /// The scene id of a session's own window (`AgentsApp`).
     static let poppedSceneID = "session"
 
+    /// By its scene id alone: `canBecomeMain` is false for a minimised window (#1454).
     static func isMain(_ window: NSWindow) -> Bool {
-        guard let identifier = window.identifier?.rawValue, window.canBecomeMain else { return false }
-        return identifier.contains("AppWindow") && !identifier.hasPrefix(poppedSceneID)
-            && !identifier.hasPrefix(ProjectWindowScene.id)
+        window.identifier?.rawValue.hasPrefix("\(sceneID)-AppWindow") == true
     }
 }

@@ -62,7 +62,23 @@ enum WalkCommands {
             dump(layer, 0)
             return ["ok": true, "text": lines.joined(separator: "\n")]
         case "windows":
-            return ["ok": true, "windows": windows().enumerated().map { describe($1, index: $0) }]
+            // `all`: the minimised and the hidden too, with their scene identifiers (#1454).
+            let listed = request["all"] as? Bool == true ? NSApp.windows.filter { $0.className != "NSStatusBarWindow" } : windows()
+            return ["ok": true, "windows": listed.enumerated().map { describe($1, index: $0) }]
+        // A window minimised, closed or sent behind the others, as its buttons and a click
+        // on another window would (#1454).
+        case "minimize":
+            let window = try anyWindow(request)
+            window.miniaturize(nil)
+            return ["ok": true, "did": "minimised \(window.title)"]
+        case "close":
+            let window = try anyWindow(request)
+            window.performClose(nil)
+            return ["ok": true, "did": "closed \(window.title)"]
+        case "back":
+            let window = try anyWindow(request)
+            window.orderBack(nil)
+            return ["ok": true, "did": "sent \(window.title) behind"]
         case "shot":
             let window = try target(request)
             let drawn = (request["view"] as? String).map { WalkShot.picture(ofView: $0, in: window) }
@@ -199,7 +215,17 @@ enum WalkCommands {
 
     private static func describe(_ window: NSWindow, index: Int) -> [String: Any] {
         ["index": index, "title": window.title, "frame": box(window.frame), "sheet": window.isSheet,
-         "key": window.isKeyWindow, "class": window.className, "number": window.windowNumber]
+         "key": window.isKeyWindow, "class": window.className, "number": window.windowNumber,
+         "identifier": window.identifier?.rawValue ?? "", "visible": window.isVisible, "minimised": window.isMiniaturized]
+    }
+
+    /// A window by words of its title, minimised or not; else as `target` finds one.
+    private static func anyWindow(_ request: [String: Any]) throws -> NSWindow {
+        guard let title = request["window"] as? String else { return try target(request) }
+        guard let window = NSApp.windows.first(where: { $0.title.localizedCaseInsensitiveContains(title) }) else {
+            throw WalkError("no window titled \(title)")
+        }
+        return window
     }
 
     /// `window`: an index from `windows`, or words of its title; else the biggest window that

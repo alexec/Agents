@@ -17,6 +17,7 @@ struct ChatView: View {
     @Environment(SidebarFrame.self) private var frame
     @Environment(SidebarStates.self) private var states
     @Environment(\.openURL) private var openURL
+    @Environment(\.openWindow) private var openWindow
     /// Set in a window of its own (#826): this session, not the selection.
     @Environment(\.poppedChat) private var popped
     /// Whether this window has an inspector: not a session's own window (#826), but a
@@ -140,10 +141,10 @@ struct ChatView: View {
                 if !frame.isOpen { frame.open() }
             },
             // The sidebar's Background pane, at that subagent (057, frame C).
-            subagentSteps: { [model, frame, states, agent, hasInspector] id in
+            subagentSteps: { [model, frame, states, agent, hasInspector, openWindow] id in
                 guard let agent else { return }
                 // The Background pane is the main window's: the session opens there (#826).
-                if !hasInspector { return model.showInMainWindow(agent.id) }
+                if !hasInspector { return model.showInMainWindow(agent.id, opening: openWindow) }
                 states.state(for: agent.id).subagent = id
                 frame.pane = .background
                 if !frame.isOpen { frame.open() }
