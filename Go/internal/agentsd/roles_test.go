@@ -161,3 +161,46 @@ func (r *roledConn) ask(t *testing.T, method string) message {
 	}
 	return message{}
 }
+
+// MARK: Linux servers (#726)
+
+// The lines that matter, as Debian's kernel writes them for an ssh login's session.
+func TestProcStatusIsRead(t *testing.T) {
+	status := "Name:\tsshd\nUmask:\t0022\nState:\tS (sleeping)\nTgid:\t3389\nPid:\t3389\nPPid:\t3383\n" +
+		"Uid:\t1000\t1000\t1000\t1000\nGid:\t1000\t1000\t1000\t1000\n"
+	if s, ok := parseProcStatus(status); !ok || s != (procStatus{name: "sshd", uid: 1000, parent: 3383}) {
+		t.Fatalf("%+v %v", s, ok)
+	}
+	if s, ok := parseProcStatus("Name:\tbash\nPPid:\t1\n"); ok {
+		t.Fatalf("no Uid line: %+v", s)
+	}
+}
+
+// The Mac's forward is carried by the login's own sshd, whose parent is the root one.
+func TestAnSSHLoginsSessionIsControl(t *testing.T) {
+	for _, name := range []string{"sshd", "sshd-session"} {
+		if !isSSHSession(procStatus{name: name, uid: 1000, parent: 3383}, &procStatus{name: name, uid: 0, parent: 1}) {
+			t.Errorf("%s", name)
+		}
+	}
+}
+
+// Everything an agent can start: under the daemon, orphaned to a container's sshd at pid
+// 1, named sshd under its own shell, or run by cron as root's child.
+func TestNothingAnAgentStartsIsAnSSHSession(t *testing.T) {
+	for _, c := range []struct {
+		peer   procStatus
+		parent *procStatus
+	}{
+		{procStatus{"socat", 1000, 400}, &procStatus{"bash", 1000, 300}},
+		{procStatus{"sshd", 1000, 1}, &procStatus{"sshd", 0, 0}},
+		{procStatus{"sshd", 1000, 400}, &procStatus{"bash", 1000, 300}},
+		{procStatus{"socat", 1000, 3383}, &procStatus{"sshd", 0, 1}},
+		{procStatus{"sshd", 1000, 500}, &procStatus{"cron", 0, 1}},
+		{procStatus{"sshd", 1000, 3383}, nil},
+	} {
+		if isSSHSession(c.peer, c.parent) {
+			t.Errorf("%+v under %+v", c.peer, c.parent)
+		}
+	}
+}

@@ -1,7 +1,8 @@
-//go:build !darwin
+//go:build !darwin && !linux
 
 package agentsd
 
-// platformSocketPolicy: a server's daemon.sock is reached through ssh, mode 0600, as it
-// was before roles.
-func platformSocketPolicy(*Daemon) SocketPolicy { return openPolicy{} }
+// platformSocketPolicy: no peer check here, so the socket's mode 0600 is the only door.
+func platformSocketPolicy(*Daemon) SocketPolicy {
+	return openPolicy{why: "no peer check on this platform, so "}
+}
