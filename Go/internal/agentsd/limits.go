@@ -251,6 +251,10 @@ func wordsLimit(runtimeID string, code *int, message, said string) limitKind {
 	return limitNone
 }
 
+// authRequired is ACP's auth_required (JSONRPCError.authRequired): the runtime has no
+// sign-in to use. Gemini sends it for a missing API key too.
+const authRequired = -32000
+
 // refusal is a prompt's error as a code and message, when the runtime refused it.
 func refusal(err error) (*int, string) {
 	var re *sdk.RequestError

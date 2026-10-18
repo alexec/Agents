@@ -35,6 +35,8 @@ check    Starts a scratch host on that build (the run-app skill's launch.sh --no
          runtime whose turn passed is then assessed (#47, the assess-runtime skill): an agent
          on it works through the app's tools and the daemon scores it. Off by default: it
          takes about five minutes a runtime. The agent's own report is kept in the run.
+         A turn the account ended (not signed in, its allowance spent, rate limited) is
+         not the runtime's failure: the runtime is skipped, with that as the reason.
          Stops the host.
 report   A pinned runtime that passed every step: one PR per runtime, on the branch
          nightly/runtime-<id> off origin/main (only its toolset folder changes), opened or
@@ -518,8 +520,18 @@ def wait_installed(client, rid, timeout=900):
     return False, f"not installed after {timeout}s: {json.dumps(last)}"
 
 
+# A turn the account ended, not the runtime (#1430, #1433): no sign-in, or a plan spent.
+ACCOUNT_ENDINGS = {"signInRefused": "not signed in", "allowanceSpent": "its allowance is spent",
+                   "rateLimited": "rate limited"}
+
+
+def account_ending(record):
+    """Why the account, not the runtime, ended the turn, or None."""
+    return ACCOUNT_ENDINGS.get((record or {}).get("endedReason"))
+
+
 def real_turn(client, root, rid, model, timeout=300):
-    """(ok, what happened)."""
+    """(ok, what happened, why the account ended it or None)."""
     work = os.path.join(root, "work")
     os.makedirs(work, exist_ok=True)
     if not os.path.exists(os.path.join(work, ".git")):
@@ -543,7 +555,7 @@ def real_turn(client, root, rid, model, timeout=300):
         if record and record.get("state") in ("finished", "stopped", "failed"):
             break
     else:
-        return False, f"no end to the turn after {timeout}s: {json.dumps(record)[:2000]}"
+        return False, f"no end to the turn after {timeout}s: {json.dumps(record)[:2000]}", None
     # The agent's own words only: the transcript also holds the prompt, which says OK too.
     replies = []
     try:
@@ -559,8 +571,9 @@ def real_turn(client, root, rid, model, timeout=300):
     what = (f"agent {agent} on {model or 'the default model'}: {record.get('state')}"
             f"{'' if said_ok else ', and the reply had no OK in it'}")
     if record.get("state") != "finished" or not said_ok:
-        return False, what + "\n" + json.dumps(record)[:2000] + "\nreplied: " + reply[-2000:]
-    return True, what
+        return (False, what + "\n" + json.dumps(record)[:2000] + "\nreplied: " + reply[-2000:],
+                account_ending(record))
+    return True, what, None
 
 
 def assess_client(tree):
@@ -639,18 +652,24 @@ def check(args):
                 if status != 0:
                     entry["status"] = "failed"
             model = cheapest_model(load(os.path.join(sessions, f"{rid}.json"), None))
+            account = None
             try:
-                ok, out = real_turn(client, root, rid, model)
+                ok, out, account = real_turn(client, root, rid, model)
                 if not ok and model:
                     # The cheapest model can be a free one whose provider is down; the runtime
                     # is not at fault if its own default model answers.
-                    ok, again = real_turn(client, root, rid, None)
+                    ok, again, account = real_turn(client, root, rid, None)
                     out = (f"{again}, after {out}" if ok else f"{out}\n\nthen on the default model: {again}")
                     out = out.splitlines()[0] if ok else out
                     model = model if not ok else f"default; {model} failed"
             except Exception as e:
                 ok, out = False, f"{type(e).__name__}: {e}"
             steps["turn"] = {"ok": ok, "output": tail(out), "model": model}
+            if not ok and account and entry["status"] != "failed":
+                # The account's, not the runtime's: not tested, no issue, the row says why.
+                entry["status"], entry["why"] = "skipped", f"{spec['name']} {account} on this Mac"
+                print(f"{rid}: skipped, {entry['why']}")
+                continue
             if not ok:
                 entry["status"] = "failed"
             elif args.assess:

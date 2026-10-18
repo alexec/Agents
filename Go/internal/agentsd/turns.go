@@ -454,6 +454,14 @@ func (l *live) turn() bool {
 				d.end(l, wire.AgentStateStopped, wire.EndedReasonSandboxFailed)
 				return false
 			}
+			// A runtime with no sign-in refuses session/new with -32000 (#1430): it is not
+			// signed in, not crashed, and the Pool page says so.
+			if code, _ := refusal(err); code != nil && *code == authRequired {
+				d.markNeedsSignIn(a.RuntimeID)
+				d.record(l.id, notice("error", rt.Name+" is not signed in", err.Error()))
+				d.end(l, wire.AgentStateStopped, wire.EndedReasonSignInRefused)
+				return false
+			}
 			d.record(l.id, notice("error", rt.Name+" did not start", err.Error()))
 			d.end(l, wire.AgentStateStopped, wire.EndedReasonProcessDied)
 			return false
