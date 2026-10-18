@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"maps"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -298,6 +299,12 @@ func (d *Daemon) enqueue(id wire.UUID, q wire.QueuedPrompt, first bool) error {
 	return nil
 }
 
+// hasTurn is whether something in the agent's queue may go now.
+func (d *Daemon) hasTurn(a *wire.Agent) bool {
+	_, _, ok := nextTurn(a.QueuedPrompts, d.heldMessages(a))
+	return ok
+}
+
 // kick starts the agent's turns unless they are running, or the host is going.
 func (l *live) kick() {
 	l.mu.Lock()
@@ -309,21 +316,28 @@ func (l *live) kick() {
 
 // nextTurn is QueuedPrompt.nextTurn and merging: the run of the person's prompts at the
 // head goes as one (#346), since what was typed later so often corrects what came first;
-// anything else goes alone.
-func nextTurn(queue []wire.QueuedPrompt) (wire.QueuedPrompt, []wire.QueuedPrompt, bool) {
-	if len(queue) == 0 {
+// anything else goes alone. A held message (heldMessage) is passed over, and waits where
+// it is, until the person has something in the queue too.
+func nextTurn(queue []wire.QueuedPrompt, held map[wire.UUID]bool) (wire.QueuedPrompt, []wire.QueuedPrompt, bool) {
+	start := 0
+	if !slices.ContainsFunc(queue, func(q wire.QueuedPrompt) bool { return q.From == wire.PromptOriginPerson }) {
+		for start < len(queue) && held[queue[start].ID] {
+			start++
+		}
+	}
+	if start == len(queue) {
 		return wire.QueuedPrompt{}, queue, false
 	}
-	n := 1
-	if queue[0].From == wire.PromptOriginPerson {
+	n := start + 1
+	if queue[start].From == wire.PromptOriginPerson {
 		for n < len(queue) && queue[n].From == wire.PromptOriginPerson {
 			n++
 		}
 	}
-	merged := queue[0]
+	merged := queue[start]
 	var texts, prefaces []string
 	merged.Attachments = []wire.Attachment{}
-	for _, q := range queue[:n] {
+	for _, q := range queue[start:n] {
 		texts = append(texts, q.Text)
 		if q.Preface != nil {
 			prefaces = append(prefaces, *q.Preface)
@@ -336,7 +350,7 @@ func nextTurn(queue []wire.QueuedPrompt) (wire.QueuedPrompt, []wire.QueuedPrompt
 		p := strings.Join(prefaces, "\n\n")
 		merged.Preface = &p
 	}
-	return merged, append([]wire.QueuedPrompt(nil), queue[n:]...), true
+	return merged, append(append([]wire.QueuedPrompt(nil), queue[:start]...), queue[n:]...), true
 }
 
 // blocks is QueuedPrompt.blocks: the words, then what is attached.
@@ -358,7 +372,7 @@ func (l *live) run() {
 	for {
 		l.mu.Lock()
 		a := l.d.Store.Agent(l.id)
-		if a == nil || len(a.QueuedPrompts) == 0 {
+		if a == nil || !l.d.hasTurn(a) {
 			l.running = false
 			l.mu.Unlock()
 			return
@@ -497,7 +511,11 @@ func (l *live) turn() bool {
 	// The words, off the queue now the runtime is there to take them.
 	var q wire.QueuedPrompt
 	taken := false
-	d.change(l.id, func(a *wire.Agent) { q, a.QueuedPrompts, taken = nextTurn(a.QueuedPrompts) })
+	held := map[wire.UUID]bool{}
+	if a := d.Store.Agent(l.id); a != nil {
+		held = d.heldMessages(a)
+	}
+	d.change(l.id, func(a *wire.Agent) { q, a.QueuedPrompts, taken = nextTurn(a.QueuedPrompts, held) })
 	if !taken {
 		return false
 	}
