@@ -11,6 +11,7 @@
 //	agents-control serve … [--no-forwarding]    serve, even if this copy was forwarding
 //	agents-control code (--client [--browser] | --host) [--minutes N] [--home DIR] [--command]
 //	agents-control hosts | clients
+//	agents-control key seal --key-fd N          seal a key handed in, with AGENTS_CONTROL_KMS
 //	agents-control install-script               the script a server runs to become a host
 //	agents-control store check [--store URL]
 //	agents-control version
@@ -30,8 +31,9 @@
 //	AGENTS_CONTROL_URL          the one address clients and hosts are given
 //	AGENTS_CONTROL_KEY_FILE     the control plane's private key, raw, 0600 (made if missing)
 //	AGENTS_CONTROL_KEY          or the key itself, base64url
-//	AGENTS_CONTROL_KMS          or sealed in the store by a keeper (an option): base64key://…,
-//	                            hashivault://…, gcpkms://… (gocloud.dev/secrets)
+//	AGENTS_CONTROL_KMS          or sealed in the store by a keeper, never on the disk in clear
+//	                            (a cloud machine's, #1458): gcpkms://… (Google Cloud KMS, with
+//	                            GOOGLE_APPLICATION_CREDENTIALS), hashivault://…, base64key://…
 //	AGENTS_CONTROL_TLS_CERT/_KEY  when this copy terminates TLS itself
 //	AGENTS_CONTROL_PIN          the load balancer's certificate pin, when it terminates TLS
 //	AGENTS_CONTROL_PEER_URL     where other copies reach this one (several copies, US3)
@@ -193,31 +195,48 @@ func webConfig() *controlplane.WebConfig {
 	return &controlplane.WebConfig{Folder: expand(folder), Port: port}
 }
 
-// privateKey is the control plane's key: a key file (control/control-key, the default),
-// AGENTS_CONTROL_KEY or --key-fd. With AGENTS_CONTROL_KMS (an option) it is sealed in the
-// store instead: a key given or found in a file is sealed the first time, otherwise a new
-// one is made, and any copy with the store and the use of the keeper opens it.
+// privateKey is the control plane's key, from where it is kept (kms.Source, #1458): a key
+// file (control/control-key, the default, and a Mac's), or with AGENTS_CONTROL_KMS sealed in
+// the store by a keeper (a cloud machine's: gcpkms://…), so it is never on the disk in
+// clear. A key given by --key-fd or AGENTS_CONTROL_KEY is used as it is, or with a keeper
+// is sealed the first time, as is a key file found. Otherwise a keeper makes a new one.
 func privateKey(st store.Store) []byte {
 	keeper := os.Getenv("AGENTS_CONTROL_KMS")
-	if keeper == "" {
-		return plainKey(true)
-	}
-	key, err := kms.ControlKey(context.Background(), st, keeper, func() []byte {
-		if given := plainKey(false); given != nil {
-			return given
+	given, file := givenKey(), keyFile()
+	var source kms.Source
+	found := ""
+	switch {
+	case keeper != "":
+		kms.NoCredentialsFile()
+		if given == nil && file != "" {
+			if data, err := os.ReadFile(file); err == nil && controllink.ValidPrivateKey(data) {
+				given, found = data, file
+			}
 		}
-		return controllink.NewPrivateKey()
-	})
+		source = kms.Kept{Store: st, Keeper: keeper, Given: given}
+	case given != nil:
+		return given
+	case file == "":
+		fail("say where the control plane's key is: AGENTS_CONTROL_KEY_FILE, AGENTS_CONTROL_KEY, --key-fd or AGENTS_CONTROL_KMS")
+	default:
+		source = kms.File{Path: file}
+	}
+	key, err := source.ControlKey(context.Background())
 	if err != nil {
 		fail("the control key: %v", err)
+	}
+	if found != "" {
+		say("the control key is sealed in the store: delete " + found + ", which holds it in clear")
 	}
 	return key
 }
 
-// plainKey is the key given, or with makeFile the key file's, made if missing; nil when
-// there is none and none is to be made.
-func plainKey(makeFile bool) []byte {
+// givenKey is the key handed in by --key-fd or AGENTS_CONTROL_KEY, or nil.
+func givenKey() []byte {
 	if fd := value("--key-fd"); fd != "" {
+		if givenFromFD != nil {
+			return givenFromFD
+		}
 		n, err := strconv.Atoi(fd)
 		if err != nil {
 			fail("no key on descriptor %s", fd)
@@ -228,6 +247,7 @@ func plainKey(makeFile bool) []byte {
 		if len(data) != 32 {
 			fail("no key on descriptor %s", fd)
 		}
+		givenFromFD = data
 		return data
 	}
 	if text := os.Getenv("AGENTS_CONTROL_KEY"); text != "" {
@@ -237,24 +257,41 @@ func plainKey(makeFile bool) []byte {
 		}
 		return key
 	}
-	file := os.Getenv("AGENTS_CONTROL_KEY_FILE")
-	if file == "" && home() != "" {
-		file = filepath.Join(home(), "control-key")
+	return nil
+}
+
+// givenFromFD keeps the key read from --key-fd: the descriptor can be read only once.
+var givenFromFD []byte
+
+// keyFile is AGENTS_CONTROL_KEY_FILE, or control-key in --home.
+func keyFile() string {
+	if file := os.Getenv("AGENTS_CONTROL_KEY_FILE"); file != "" {
+		return file
 	}
-	if !makeFile {
-		if data, err := os.ReadFile(file); file != "" && err == nil && controllink.ValidPrivateKey(data) {
-			return data
-		}
-		return nil
+	if home() != "" {
+		return filepath.Join(home(), "control-key")
 	}
-	if file == "" {
-		fail("say where the control plane's key is: AGENTS_CONTROL_KEY_FILE, AGENTS_CONTROL_KEY or --key-fd")
+	return ""
+}
+
+// sealKey seals a key handed in, such as a Mac's for a move to a cloud machine, in the
+// store with AGENTS_CONTROL_KMS (#1458). Piped in on --key-fd 0, the key is never on the
+// cloud machine's disk:
+//
+//	ssh machine docker compose … run --rm -T control key seal --key-fd 0 < control-key
+func sealKey() {
+	keeper := os.Getenv("AGENTS_CONTROL_KMS")
+	if keeper == "" {
+		fail("say which keeper seals it: AGENTS_CONTROL_KMS=gcpkms://…")
 	}
-	key, err := controllink.LoadOrMakeKey(file)
+	if givenKey() == nil {
+		fail("give the key to seal: --key-fd N or AGENTS_CONTROL_KEY")
+	}
+	public, err := controllink.PublicKey(privateKey(openStore("")))
 	if err != nil {
-		fail("the key file: %v", err)
+		fail("%v", err)
 	}
-	return key
+	say("the control key " + controllink.B64URL(public) + " is sealed in the store by " + kms.Describe(keeper))
 }
 
 func serve() {
@@ -491,6 +528,7 @@ const usage = `usage: agents-control serve [--port N] [--bind ADDR] [--self-sign
        agents-control serve --home DIR [--no-bonjour]
        agents-control serve … [--host-root DIR] [--log FILE] [--web DIR] [--web-port N] [--no-web]
        agents-control hosts | clients
+       agents-control key seal (--key-fd N | AGENTS_CONTROL_KEY)
        agents-control install-script
        agents-control store check [--store URL]`
 
@@ -510,6 +548,8 @@ func main() {
 		list(false)
 	case first == "store" && len(args) > 1 && args[1] == "check":
 		checkStore()
+	case first == "key" && len(args) > 1 && args[1] == "seal":
+		sealKey()
 	case first == "install-script":
 		fmt.Print(controlplane.InstallScript)
 	case first == "--version" || first == "version":

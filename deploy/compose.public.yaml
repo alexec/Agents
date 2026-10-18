@@ -4,12 +4,18 @@
 # docs/how-to/run-the-control-plane-in-the-cloud.md.
 #
 #   scripts/build-linux-agentsd.sh               # the Linux host, handed to servers that join
-#   deploy/make-secrets.sh --public
+#   deploy/make-secrets.sh --public --kms projects/P/locations/L/keyRings/R/cryptoKeys/K \
+#       [--service-account sa.json]
 #   AGENTS_DOMAIN=agents.example.com ACME_EMAIL=you@example.com \
 #       docker compose -f deploy/compose.public.yaml up -d --build
 #
 # AGENTS_DOMAIN must already point at this machine, with ports 80 and 443 open to the
 # internet. The two variables may also go in deploy/.env.
+#
+# The control key is sealed in the store by Google Cloud KMS (#1458), so it is never on this
+# machine's disk in clear. make-secrets.sh puts the key's name in deploy/.env as
+# AGENTS_CONTROL_KMS, and the service account file in deploy/secrets/gcp-service-account
+# (empty when there is none: then the machine's own service account is used).
 name: agents-control
 
 services:
@@ -29,14 +35,17 @@ services:
       AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
       AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
       AGENTS_CONTROL_URL: https://${AGENTS_DOMAIN:?set AGENTS_DOMAIN to the name that points at this machine}
-      AGENTS_CONTROL_KEY_FILE: /run/secrets/control-key
+      # The key that seals the control key: gcpkms://projects/P/locations/L/keyRings/R/cryptoKeys/K.
+      AGENTS_CONTROL_KMS: ${AGENTS_CONTROL_KMS:?run deploy/make-secrets.sh --public --kms <key name>}
+      # The right to use that key. An empty file: the machine's own service account.
+      GOOGLE_APPLICATION_CREDENTIALS: /run/secrets/gcp-service-account
       AGENTS_CONTROL_NAME: ${AGENTS_CONTROL_NAME:-${AGENTS_DOMAIN}}
       # 1 to start empty, for a handover from Agents Host to fill (058 research R16).
       AGENTS_CONTROL_RECEIVE: ${AGENTS_CONTROL_RECEIVE:-}
       # Caddy's address below: only its X-Forwarded-For says where a socket came from, for
       # the per-source budget (public-security.md P3).
       AGENTS_CONTROL_TRUSTED_PROXIES: 172.30.61.250
-    secrets: [control-key]
+    secrets: [gcp-service-account]
     volumes:
       - data:/data
       # The Linux host, served at /v1/servers/… to servers joining with the install command.
@@ -66,8 +75,8 @@ networks:
         - subnet: 172.30.61.0/24
 
 secrets:
-  control-key:
-    file: ./secrets/control-key
+  gcp-service-account:
+    file: ./secrets/gcp-service-account
 
 volumes:
   data:

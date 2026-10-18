@@ -26,6 +26,9 @@ copies](run-several-copies.md).
 - A domain you control, such as `example.com`, so that you can add a DNS record for a
   name like `agents.example.com`.
 - An email address for Let's Encrypt to write to about the certificate.
+- A Google Cloud project with Cloud KMS turned on, and the `gcloud` command signed in to
+  it. Cloud KMS keeps the key that seals the control plane's own key, so that key is never
+  on the machine's disk in clear.
 
 ## Steps
 
@@ -56,6 +59,42 @@ copies](run-several-copies.md).
    It prints the machine's address. Wait for that before you start Caddy: until the name
    resolves, Let's Encrypt can't check it, and too many failed tries make it wait an hour.
 
+### Make the key that seals the control plane's key
+
+The control plane's key proves to every window, phone and host that it is your control
+plane. On the machine it is sealed in the store by a key in Cloud KMS, which never leaves
+Google Cloud. The machine gets only the right to use that key.
+
+On your Mac, with `gcloud` (put your project's id in place of `my-project`):
+
+1. Make a key ring and a key:
+
+   ```sh
+   gcloud kms keyrings create agents --location global --project my-project
+   gcloud kms keys create control --keyring agents --location global \
+       --purpose encryption --project my-project
+   ```
+
+2. Make a service account that may use only that key:
+
+   ```sh
+   gcloud iam service-accounts create agents-control --project my-project
+   gcloud kms keys add-iam-policy-binding control --keyring agents --location global \
+       --member serviceAccount:agents-control@my-project.iam.gserviceaccount.com \
+       --role roles/cloudkms.cryptoKeyEncrypterDecrypter --project my-project
+   ```
+
+3. If the machine is not a Google Compute Engine VM that runs as that service account,
+   make a key file for the service account:
+
+   ```sh
+   gcloud iam service-accounts keys create sa.json \
+       --iam-account agents-control@my-project.iam.gserviceaccount.com
+   ```
+
+   On a Compute Engine VM that runs as the service account, make no key file: the VM gets
+   its right to use the key from Google Cloud, and no secret of any kind is on its disk.
+
 ### Build and copy what it runs
 
 On your Mac, in the repository:
@@ -69,14 +108,18 @@ On your Mac, in the repository:
    It goes in `App/Resources/servers/`, from where the control plane hands it to every
    Linux server that joins. The control plane itself is built in its image, on the
    machine, from `Go/` and `Web/`.
-2. Make the control plane's private key:
+2. Say which key seals the control plane's key, and give the service account's key file:
 
    ```sh
-   deploy/make-secrets.sh --public
+   deploy/make-secrets.sh --public \
+       --kms projects/my-project/locations/global/keyRings/agents/cryptoKeys/control \
+       --service-account sa.json
    ```
 
-   This writes `deploy/secrets/control-key`. Anyone who has it can pose as your control
-   plane, so keep a copy somewhere safe and never commit it.
+   This writes `AGENTS_CONTROL_KMS` in `deploy/.env`, and copies the key file to
+   `deploy/secrets/gcp-service-account`. On a Compute Engine VM that runs as the service
+   account, leave out `--service-account`. Then delete `sa.json`: anyone who has it and a
+   copy of the store can open the control plane's key. Never commit either.
 3. Copy the repository's `deploy/` folder (with `deploy/secrets`), `Go/`, `Web/` and
    `App/Resources/servers/` to the machine, keeping the same layout. For example:
 
@@ -101,6 +144,10 @@ On the machine, in the folder you copied to:
    ```sh
    docker compose -f deploy/compose.public.yaml up -d --build
    ```
+
+   At its first start the control plane makes its key and seals it in the store. To keep
+   a key from elsewhere, seal it before this step: see
+   [Move the control plane from your Mac](#move-the-control-plane-from-your-mac).
 
 3. Within a minute Caddy has its certificate. Check from your Mac:
 
@@ -172,6 +219,18 @@ control plane across, keeping what is paired, is the next section, still to be w
 TODO: moving the live control plane from Agents Host to the machine, and back, with its
 hosts and clients kept (#61).
 
+The machine needs this Mac's control plane key before it first starts. Seal it in the
+machine's store, with the key piped in over ssh, so that it is never written on the machine:
+
+```sh
+ssh you@agents.example.com 'cd agents && docker compose -f deploy/compose.public.yaml build control'
+ssh you@agents.example.com 'cd agents && docker compose -f deploy/compose.public.yaml \
+    run --rm -T control key seal --key-fd 0' < control-key
+```
+
+It says **the control key … is sealed in the store by gcpkms://…**. Then delete the saved
+`control-key` on your Mac.
+
 ### Notifications
 
 TODO: how a set-up with no Mac host gets notifications on the phone (#61). Until then, the
@@ -186,15 +245,29 @@ plane at its address and get no notifications.
 - **Don't set `AGENTS_CONTROL_PIN`** with a publicly trusted certificate. Caddy makes a
   new key at each renewal, so a pin would stop every window, phone and host from
   connecting after the first renewal.
-- **What's kept, and where.** The store, with every host and client, is in the
-  Docker volume `agents-control_data`. The certificate and the ACME account are in
-  `agents-control_caddy`. The key is `deploy/secrets/control-key`. Back up the store's
-  volume and the key. Without the key, the store's hosts and clients can't connect.
+- **What's kept, and where.** The store, with every host and client and the sealed
+  control plane key, is in the Docker volume `agents-control_data`. The certificate and the
+  ACME account are in `agents-control_caddy`. Back up the store's volume. Never destroy
+  the Cloud KMS key: without it, the sealed key doesn't open, and every window, phone and
+  host must pair again.
+- **If the machine or its disk is lost,** remove the service account's key in Google Cloud
+  (**IAM ▸ Service accounts ▸ agents-control ▸ Keys**). A copy of the disk then can't
+  open the control plane's key.
 - **Upgrading.** Build the Linux host again on your Mac, copy `deploy/`, `Go/`, `Web/` and
   `App/Resources/servers/` across, and run the `up -d --build` line again. Hosts and clients reconnect within
   seconds. Linux servers update their host the next time they connect.
 
 ## If it doesn't work
+
+- **The control plane stops at start with `could not find default credentials`.** It has no
+  right to use the Cloud KMS key: `deploy/secrets/gcp-service-account` is empty and the
+  machine isn't a Compute Engine VM with the service account. Run `make-secrets.sh` again
+  with `--service-account`.
+- **It stops with `PermissionDenied`.** The service account may not use the key. Give it
+  the role `roles/cloudkms.cryptoKeyEncrypterDecrypter` on the key, as above.
+- **It stops with `the key given is not the one sealed in the store`.** The store already
+  has a control plane key, and `key seal` was given another one. Give the store's own, or
+  start with an empty store.
 
 - **`curl` says the certificate can't be verified,** or Caddy's log says
   `challenge failed`. The name doesn't point at the machine yet, or port 80 or 443 is

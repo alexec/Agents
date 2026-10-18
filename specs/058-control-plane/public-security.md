@@ -86,12 +86,17 @@ What holds:
   refused while a copy is frozen or forwarding.
 - **Grants** come from the stored record, never from the client (T102).
 - **Handover and copy identities** need the control key itself. Whoever holds that key
-  already *is* the control plane, so it's the one secret on the machine that matters:
-  `deploy/secrets/control-key`, mode 0600, mounted as a compose secret.
+  already *is* the control plane, so it's the one secret on the machine that matters.
+  *Go, 2026-10-18 (#1458):* on the cloud machine Google Cloud KMS seals it in the store
+  (`AGENTS_CONTROL_KMS=gcpkms://…`, `kms.Kept`), so it's never on the disk in clear. A
+  control plane on a Mac keeps it in a 0600 file (`kms.File`, the default).
 
 Risks that remain:
-- **A1. The control key on a rented machine.** The provider, a snapshot or a backup of the
-  disk holds it. Use a provider with encrypted disks, keep the secret out of image
+- **A1. The control key on a rented machine.** *Go, 2026-10-18 (#1458): sealed by Cloud
+  KMS. What is left is the right to use the KMS key: a service account file on the disk,
+  or none on a Compute Engine VM that runs as the service account. With the file, a copy
+  of the disk and the store can still open the key until the file's key is removed in
+  Google Cloud.* Before: the provider, a snapshot or a backup of the disk holds it. Use a provider with encrypted disks, keep the secret out of image
   snapshots, and never bake it into an image. Rotating it means every member pairs again,
   so losing it is the expensive case. (Decided in R16: it goes by hand, once.)
 - **A2. The `hello` says who it is.** Name, public key and copy id go to anyone who opens
