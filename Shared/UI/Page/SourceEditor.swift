@@ -340,15 +340,20 @@ private struct SourceTextView: UIViewRepresentable {
     let line: Int?
     var jump: SourceJump?
     let isEditable: Bool
-    /// Not offered on a phone or iPad yet (#844): its keyboard has no completion list.
+    /// The language server's words for the caret's place (#1603): a row of them above the
+    /// keyboard once the typing stops in a word, or at Ctrl+Space on a hardware keyboard.
     var complete: (@MainActor (_ text: String, _ line: Int, _ column: Int) async -> [String])?
     let onEnd: () -> Void
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
 
     func makeUIView(context: Context) -> UITextView {
-        let view = UITextView()
+        let view = CompletingTextView()
         view.delegate = context.coordinator
+        view.askCompletion = { [weak coordinator = context.coordinator, weak view] in
+            guard let coordinator, let view else { return }
+            coordinator.ask(view)
+        }
         view.backgroundColor = .clear
         view.font = TextStep.code.uiFont
         view.adjustsFontForContentSizeCategory = true
@@ -399,16 +404,176 @@ private struct SourceTextView: UIViewRepresentable {
     final class Coordinator: NSObject, UITextViewDelegate {
         var parent: SourceTextView
         var lastJump: SourceJump?
+        /// The wait after a keystroke before the language server is asked.
+        private var pause: Task<Void, Never>?
 
         init(_ parent: SourceTextView) { self.parent = parent }
 
         func textViewDidChange(_ view: UITextView) {
             parent.text = view.text
+            show([], in: view)
+            pause?.cancel()
+            guard parent.complete != nil, partialWord(in: view) != nil else { return }
+            pause = Task { @MainActor [weak self, weak view] in
+                try? await Task.sleep(for: .milliseconds(600))
+                guard !Task.isCancelled, let self, let view else { return }
+                self.ask(view)
+            }
+        }
+
+        func textViewDidChangeSelection(_ view: UITextView) {
+            // The caret moved off the word the row was for.
+            if view.inputAccessoryView != nil, partialWord(in: view) == nil { show([], in: view) }
         }
 
         func textViewDidEndEditing(_ view: UITextView) {
+            pause?.cancel()
+            show([], in: view)
             parent.onEnd()
         }
+
+        /// Asks the language server for the caret's place, then shows its words.
+        func ask(_ view: UITextView) {
+            guard let complete = parent.complete, view.isEditable else { return }
+            let text = view.text ?? ""
+            let caret = view.selectedRange.location
+            let place = Self.place(of: caret, in: text)
+            Task { @MainActor [weak self, weak view] in
+                let words = await complete(text, place.line, place.column)
+                guard let self, let view, view.text == text, view.selectedRange.location == caret else { return }
+                let partial = self.partialWord(in: view).map { (text as NSString).substring(with: $0).lowercased() } ?? ""
+                let matching = words.filter { $0.lowercased().hasPrefix(partial) }
+                self.show(matching.isEmpty ? words : matching, in: view)
+            }
+        }
+
+        /// The row above the keyboard: shown with words, gone without.
+        private func show(_ words: [String], in view: UITextView) {
+            if words.isEmpty {
+                guard view.inputAccessoryView != nil else { return }
+                view.inputAccessoryView = nil
+            } else {
+                view.inputAccessoryView = CompletionRow(words: words) { [weak self, weak view] word in
+                    guard let self, let view else { return }
+                    self.put(word, in: view)
+                }
+            }
+            view.reloadInputViews()
+        }
+
+        /// The word in place of the one being typed, as one undoable change.
+        private func put(_ word: String, in view: UITextView) {
+            let range = partialWord(in: view) ?? NSRange(location: view.selectedRange.location, length: 0)
+            guard let start = view.position(from: view.beginningOfDocument, offset: range.location),
+                  let end = view.position(from: start, offset: range.length),
+                  let replacing = view.textRange(from: start, to: end) else { return }
+            view.replace(replacing, withText: word)
+            parent.text = view.text
+            show([], in: view)
+        }
+
+        /// The letters, digits and underscores just before the caret; nil when there are none.
+        private func partialWord(in view: UITextView) -> NSRange? {
+            let selection = view.selectedRange
+            guard selection.length == 0 else { return nil }
+            let text = (view.text ?? "") as NSString
+            var start = selection.location
+            while start > 0, let scalar = Unicode.Scalar(text.character(at: start - 1)),
+                  scalar == "_" || CharacterSet.alphanumerics.contains(scalar) {
+                start -= 1
+            }
+            return start < selection.location ? NSRange(location: start, length: selection.location - start) : nil
+        }
+
+        /// A UTF-16 offset as a line and column, both from 1.
+        static func place(of offset: Int, in text: String) -> (line: Int, column: Int) {
+            var line = 1
+            var start = 0
+            for (i, unit) in text.utf16.prefix(offset).enumerated() where unit == 0x0A {
+                line += 1
+                start = i + 1
+            }
+            return (line, offset - start + 1)
+        }
+    }
+}
+
+/// The source text view, with Ctrl+Space on a hardware keyboard asking for completion (#1603).
+private final class CompletingTextView: UITextView {
+    var askCompletion: (() -> Void)?
+
+    override var keyCommands: [UIKeyCommand]? {
+        let ask = UIKeyCommand(title: "Complete", action: #selector(complete), input: " ", modifierFlags: .control)
+        ask.wantsPriorityOverSystemBehavior = true
+        return (super.keyCommands ?? []) + [ask]
+    }
+
+    @objc private func complete() { askCompletion?() }
+}
+
+/// The language server's words in a row above the keyboard (#1603); a tap puts one in.
+private final class CompletionRow: UIInputView, UIInputViewAudioFeedback {
+    private let words: [String]
+    private let chosen: (String) -> Void
+
+    var enableInputClicksWhenVisible: Bool { true }
+
+    init(words: [String], chosen: @escaping (String) -> Void) {
+        self.words = words
+        self.chosen = chosen
+        let short = UIDevice.current.userInterfaceIdiom == .phone
+        super.init(frame: CGRect(x: 0, y: 0, width: 320, height: short ? 40 : 48), inputViewStyle: .keyboard)
+        allowsSelfSizing = true
+        build()
+    }
+
+    required init?(coder: NSCoder) { fatalError("made in code") }
+
+    private func build() {
+        let scroll = UIScrollView()
+        scroll.showsHorizontalScrollIndicator = false
+        scroll.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(scroll)
+
+        let row = UIStackView()
+        row.axis = .horizontal
+        row.spacing = 6
+        row.translatesAutoresizingMaskIntoConstraints = false
+        scroll.addSubview(row)
+
+        for (index, word) in words.enumerated() {
+            let button = UIButton(type: .system)
+            var configuration = UIButton.Configuration.gray()
+            configuration.title = word
+            configuration.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer {
+                var attributes = $0
+                attributes.font = TextStep.code.uiFont
+                return attributes
+            }
+            configuration.contentInsets = NSDirectionalEdgeInsets(top: 6, leading: 12, bottom: 6, trailing: 12)
+            configuration.baseForegroundColor = .label
+            button.configuration = configuration
+            button.tag = index
+            button.addTarget(self, action: #selector(pressed(_:)), for: .touchUpInside)
+            row.addArrangedSubview(button)
+        }
+
+        NSLayoutConstraint.activate([
+            scroll.leadingAnchor.constraint(equalTo: leadingAnchor),
+            scroll.trailingAnchor.constraint(equalTo: trailingAnchor),
+            scroll.topAnchor.constraint(equalTo: topAnchor),
+            scroll.bottomAnchor.constraint(equalTo: bottomAnchor),
+            row.leadingAnchor.constraint(equalTo: scroll.contentLayoutGuide.leadingAnchor, constant: 8),
+            row.trailingAnchor.constraint(equalTo: scroll.contentLayoutGuide.trailingAnchor, constant: -8),
+            row.centerYAnchor.constraint(equalTo: scroll.centerYAnchor),
+            row.heightAnchor.constraint(equalTo: scroll.frameLayoutGuide.heightAnchor, constant: -8),
+        ])
+    }
+
+    @objc private func pressed(_ sender: UIButton) {
+        UIDevice.current.playInputClick()
+        guard words.indices.contains(sender.tag) else { return }
+        chosen(words[sender.tag])
     }
 }
 #endif
