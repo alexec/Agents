@@ -386,18 +386,26 @@ final class RemoteModel {
     /// A code for a browser, as the window's Add a Browser… makes one, and the page's
     /// address on the control plane's own domain when it serves one there. Or why not, in
     /// words to show.
-    func startBrowserCode() async -> Result<(shown: DaemonAPI.ControlCodeShown, page: String?), BrowserCodeProblem> {
+    func startBrowserCode() async -> Result<BrowserCode, BrowserCodeProblem> {
         do {
+            // Who was there before the code, so whoever it lets in can be named (#1537).
+            let listed = await pairedClients()
+            let before = Set(listed?.map(\.id) ?? [])
             let shown = try await client.call(DaemonAPI.Method.clientsStartPairing,
                                               JSONValue.object(["kind": .string(ClientRecord.Kind.browser.rawValue)]),
                                               returning: DaemonAPI.ControlCodeShown.self)
             let status = try? await client.call(DaemonAPI.Method.controlStatus, returning: DaemonAPI.ControlStatus.self)
-            return .success((shown, status?.publicWeb))
+            return .success(BrowserCode(shown: shown, page: status?.publicWeb, web: status?.web, before: before))
         } catch let error as JSONRPCError {
             return .failure(BrowserCodeProblem(words: error.message))
         } catch {
             return .failure(BrowserCodeProblem(words: "The control plane can’t be reached."))
         }
+    }
+
+    /// The control plane's paired clients, or nil when it can't say.
+    func pairedClients() async -> [ClientRecord]? {
+        try? await client.call(DaemonAPI.Method.clientsList, returning: [ClientRecord].self)
     }
 
     /// The code is no longer shown: it can't be used.
