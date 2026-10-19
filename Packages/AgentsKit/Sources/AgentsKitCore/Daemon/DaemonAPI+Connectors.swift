@@ -23,8 +23,9 @@ extension DaemonAPI.Method {
 }
 
 extension DaemonAPI {
-    public enum ConnectionProvider: String, Codable, Sendable, Hashable, CaseIterable {
+    public enum ConnectionProvider: String, Codable, Sendable, Hashable, CaseIterable, Identifiable {
         case github, linear
+        public var id: String { rawValue }
     }
 
     public enum ConnectionState: String, Codable, Sendable, Hashable {

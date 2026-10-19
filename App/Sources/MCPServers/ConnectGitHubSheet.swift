@@ -83,8 +83,8 @@ struct ConnectGitHubSheet: View {
                 // AppKit's accessibility into endless recursion (see FileLineRow, #71).
                 HStack(alignment: .firstTextBaseline, spacing: 10) {
                     Text("Your code").appText(.fine).foregroundStyle(.secondary)
-                    Text(flow.userCode).appText(.title).monospaced().textSelection(.enabled)
-                    Button("Copy") { copy(flow.userCode) }.buttonStyle(.paper).appText(.fine)
+                    Text(flow.userCode ?? "").appText(.title).monospaced().textSelection(.enabled)
+                    Button("Copy") { copy(flow.userCode ?? "") }.buttonStyle(.paper).appText(.fine)
                 }
                 HStack(spacing: 8) {
                     ProgressView().controlSize(.small)
@@ -142,7 +142,7 @@ struct ConnectGitHubSheet: View {
         case .failure(let problem): step = .failed(problem.words); return
         }
         step = .waiting(started)
-        copy(started.userCode)
+        copy(started.userCode ?? "")
         open(started.verificationURL)
         var flow = started
         while case .waiting(let shown) = step, shown.flowID == started.flowID {

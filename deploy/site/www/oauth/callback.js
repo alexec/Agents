@@ -5,7 +5,8 @@
 // - The state has no dot (the Mac and the Remote): go to agents://oauth/callback, which their
 //   authentication session catches.
 // - The state ends in "." and a base64url origin (the web page): postMessage to window.opener,
-//   to that origin only. A page at another origin is never sent the code.
+//   to that origin only. A page at another origin is never sent the code. An origin that is
+//   not agentloops.dev's gets it only after the person sees the origin and agrees.
 //
 // The code alone is of no use: the host that started the sign-in holds the PKCE verifier.
 (function () {
@@ -46,8 +47,26 @@
     say("The Agents page that asked is not open any more. Start the sign-in again from Agents.");
     return;
   }
-  window.opener.postMessage({ type: "agents-oauth-callback", code: answer.code || null,
-    state: answer.state, error: answer.error || null }, origin);
-  say("Signed in. You can close this window.");
-  setTimeout(function () { window.close(); }, 400);
+  function give() {
+    window.opener.postMessage({ type: "agents-oauth-callback", code: answer.code || null,
+      state: answer.state, error: answer.error || null }, origin);
+    say("Signed in. You can close this window.");
+    setTimeout(function () { window.close(); }, 400);
+  }
+  // Any page can start a sign-in with our client ID and name itself in the state. So a page
+  // that is not ours gets the code only when the person sees its address and agrees.
+  var host = new URL(origin).hostname;
+  if (origin.indexOf("https://") === 0 && (host === "agentloops.dev" || /\.agentloops\.dev$/.test(host))) {
+    give();
+    return;
+  }
+  say("Give this sign-in to " + origin + "? Do this only when it is your own Agents page.");
+  back.textContent = "Give it to " + host;
+  back.href = "#";
+  back.hidden = false;
+  back.addEventListener("click", function (e) {
+    e.preventDefault();
+    back.hidden = true;
+    give();
+  });
 })();

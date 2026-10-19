@@ -14,9 +14,15 @@ enum CodeFlowSignIn {
         case failed(String)
     }
 
+    /// Why the host did not take the code, in words.
+    struct Problem: Error, Equatable {
+        var words: String
+        init(_ words: String) { self.words = words }
+    }
+
     @MainActor
     static func finish(_ flow: DaemonAPI.ConnectionSignIn, in session: WebAuthenticationSession,
-                       complete: (DaemonAPI.ConnectionSignInCompleteRequest) async -> Result<DaemonAPI.ConnectionSignIn, String>)
+                       complete: (DaemonAPI.ConnectionSignInCompleteRequest) async -> Result<DaemonAPI.ConnectionSignIn, Problem>)
         async -> Outcome {
         let name = ConnectorSetupWords.name(flow.provider)
         guard let address = URL(string: flow.verificationURL) else { return .failed("\(name) gave no address to open.") }
@@ -34,8 +40,8 @@ enum CodeFlowSignIn {
             return .failed("\(name) came back with no answer. Try again.")
         }
         switch await complete(request) {
-        case .failure(let why):
-            return .failed(why)
+        case .failure(let problem):
+            return .failed(problem.words)
         case .success(let ended):
             switch ended.status {
             case .connected: return .connected(ended)

@@ -11,7 +11,7 @@ struct YourConnectionsView: View {
     @State private var connections: [DaemonAPI.Connection]?
     @State private var setups: [ProjectKey: DaemonAPI.ConnectorSetup] = [:]
     @State private var problem: String?
-    @State private var connecting = false
+    @State private var connecting: DaemonAPI.ConnectionProvider?
     @State private var disconnecting: DaemonAPI.Connection?
 
     private var projects: [DaemonAPI.ProjectSummary] {
@@ -29,8 +29,13 @@ struct YourConnectionsView: View {
             HStack {
                 heading("Connections")
                 Spacer()
-                if connections?.contains(where: { $0.provider == .github && $0.state == .connected }) != true {
-                    Button("Connect\u{2026}") { connecting = true }.buttonStyle(.paper).appText(.fine)
+                if !unconnected.isEmpty {
+                    Menu("Connect\u{2026}") {
+                        ForEach(unconnected, id: \.self) { p in
+                            Button(ConnectorSetupWords.name(p)) { connecting = p }
+                        }
+                    }
+                    .menuStyle(.button).buttonStyle(.paper).fixedSize().appText(.fine)
                 }
             }
             if let problem {
@@ -43,7 +48,7 @@ struct YourConnectionsView: View {
                         connectionRow(c)
                     }
                 } else if connections != nil {
-                    Text("No connections yet. Connect GitHub to give agents issues, pull requests and Actions in every project.")
+                    Text("No connections yet. Connect GitHub to give agents issues, pull requests and Actions in every project, and Linear for its issues.")
                         .appText(.supporting).foregroundStyle(.secondary)
                         .padding(.horizontal, 14).padding(.vertical, 12)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -62,8 +67,11 @@ struct YourConnectionsView: View {
             }
         }
         .task { await load() }
-        .sheet(isPresented: $connecting) {
-            ConnectGitHubSheet(host: .mac, onConnected: { Task { await load() } })
+        .sheet(item: $connecting) { p in
+            switch p {
+            case .github: ConnectGitHubSheet(host: .mac, onConnected: { Task { await load() } })
+            case .linear: ConnectLinearSheet(host: .mac, onConnected: { Task { await load() } })
+            }
         }
         .confirmationDialog(disconnectTitle, isPresented: Binding(get: { disconnecting != nil },
                                                                    set: { if !$0 { disconnecting = nil } }),
@@ -90,7 +98,7 @@ struct YourConnectionsView: View {
 
     private func connectionRow(_ c: DaemonAPI.Connection) -> some View {
         HStack(spacing: 12) {
-            ConnectorMark(letters: String((c.login ?? "G").prefix(1)).uppercased())
+            ConnectorMark(letters: String((c.login ?? ConnectorSetupWords.name(c.provider)).prefix(1)).uppercased())
             VStack(alignment: .leading, spacing: 2) {
                 Text(ConnectorSetupWords.connectionTitle(c)).appText(.supporting).fontWeight(.semibold)
                 Text(ConnectorSetupWords.connectionNote(c)).appText(.fine)
@@ -99,8 +107,8 @@ struct YourConnectionsView: View {
             }
             Spacer(minLength: 8)
             if c.state == .signInAgain {
-                Button("Connect Again\u{2026}") { connecting = true }.buttonStyle(.paper).appText(.fine)
-            } else {
+                Button("Connect Again\u{2026}") { connecting = c.provider }.buttonStyle(.paper).appText(.fine)
+            } else if c.provider == .github {
                 Button("Repositories on github.com") { open(ConnectorSetupWords.installationsURL) }
                     .buttonStyle(.link).appText(.fine)
             }
@@ -127,12 +135,21 @@ struct YourConnectionsView: View {
         .padding(.horizontal, 14).padding(.vertical, 10)
     }
 
+    /// The providers with no working connection, for Connect….
+    private var unconnected: [DaemonAPI.ConnectionProvider] {
+        DaemonAPI.ConnectionProvider.allCases.filter { p in
+            connections?.contains(where: { $0.provider == p && $0.state == .connected }) != true
+        }
+    }
+
     private var disconnectTitle: String {
         disconnecting.map { "Disconnect \(ConnectorSetupWords.connectionTitle($0))?" } ?? ""
     }
 
-    /// Which projects lose which slots, before it goes.
+    /// Which projects lose which slots, before it goes. Only GitHub fills a project's slots.
     private var disconnectMessage: String {
+        guard let c = disconnecting else { return "" }
+        if c.provider != .github { return ConnectorSetupWords.disconnectNote(c.provider) }
         let losing = projects.compactMap { p -> String? in
             guard let s = setups[p.key] else { return nil }
             let slots = s.slots.filter { $0.slot != .workspace && $0.state == .read }
