@@ -1,6 +1,7 @@
 package controllink
 
 import (
+	"cmp"
 	"context"
 	"crypto/rand"
 	"encoding/hex"
@@ -53,7 +54,19 @@ type Uplink struct {
 	// pingEvery is how often a quiet link is pinged, and how long its pong may take;
 	// upPing when 0.
 	pingEvery time.Duration
+	// firstWait, lastWait and steadyFor are upFirstWait, upLastWait and upSteady when 0.
+	firstWait, lastWait, steadyFor time.Duration
 }
+
+// Run waits firstWait before it dials again, twice as long each time up to lastWait, while
+// dials fail or links let go within steadyFor. Only a link that stays up for steadyFor
+// starts the wait again at firstWait, so a copy that lets go at once is dialled every 30 s,
+// not every second (#1529).
+const (
+	upFirstWait = time.Second
+	upLastWait  = 30 * time.Second
+	upSteady    = 10 * time.Second
+)
 
 // The control plane's socket is written by a goroutine of its own, through a bounded queue,
 // as daemon.sock's clients are (#1399), so a control plane that stops reading (a stalled
@@ -160,7 +173,8 @@ func (s *sender) drop() {
 }
 
 func (u *Uplink) Run(ctx context.Context) {
-	wait := time.Second
+	first, longest, steady := cmp.Or(u.firstWait, upFirstWait), cmp.Or(u.lastWait, upLastWait), cmp.Or(u.steadyFor, upSteady)
+	wait := first
 	// The endpoint that answered last, tried first (EndpointBook.order).
 	last := ""
 	for ctx.Err() == nil {
@@ -180,17 +194,12 @@ func (u *Uplink) Run(ctx context.Context) {
 				return
 			case <-time.After(wait):
 			}
-			wait = min(wait*2, 30*time.Second)
+			wait = min(wait*2, longest)
 			continue
 		}
 		last = at
 		connected := time.Now()
-		wait = time.Second
-		ping := u.pingEvery
-		if ping <= 0 {
-			ping = upPing
-		}
-		out := newSender(l, ping)
+		out := newSender(l, cmp.Or(u.pingEvery, upPing))
 		u.mu.Lock()
 		u.out = out
 		u.channels = map[int]*channel{}
@@ -224,15 +233,15 @@ func (u *Uplink) Run(ctx context.Context) {
 		}
 		// A copy that lets go at once, such as one forwarding to a place this host can't
 		// reach yet, is dialled again only after a wait, never in a tight loop.
-		if time.Since(connected) < 10*time.Second {
+		if time.Since(connected) < steady {
 			select {
 			case <-ctx.Done():
 				return
 			case <-time.After(wait):
 			}
-			wait = min(wait*2, 30*time.Second)
+			wait = min(wait*2, longest)
 		} else {
-			wait = time.Second
+			wait = first
 		}
 	}
 }

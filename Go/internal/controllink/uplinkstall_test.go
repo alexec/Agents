@@ -102,3 +102,41 @@ func TestAQuietDeadLinkIsFoundByItsPing(t *testing.T) {
 	hello(t, f, 10*time.Second, "no host/hello")
 	hello(t, f, 10*time.Second, "a link that answers no ping was kept")
 }
+
+// A copy that lets go as soon as the host says hello is dialled less and less often, not
+// every firstWait (#1529). Time here is a hundredth of the real one: 600 ms is a minute,
+// waits of 10, 20, 40, 80, 160 and 300 ms are 1, 2, 4, 8, 16 and 30 s.
+func TestACopyThatLetsGoAtOnceIsDialledLessOften(t *testing.T) {
+	f := newFakeControl(t)
+	f.letGo = true
+	u := enrolled(t, f, func(c Conn) {
+		for range c.In() {
+		}
+	})
+	u.firstWait, u.lastWait, u.steadyFor = 10*time.Millisecond, 300*time.Millisecond, 100*time.Millisecond
+	ctx, cancel := context.WithTimeout(context.Background(), 600*time.Millisecond)
+	defer cancel()
+	done := make(chan struct{})
+	go func() {
+		u.Run(ctx)
+		close(done)
+	}()
+	dials := 0
+	for {
+		select {
+		case <-f.hellos:
+			dials++
+			continue
+		case <-done:
+		}
+		break
+	}
+	t.Logf("%d dials in a scaled minute", dials)
+	if dials < 2 {
+		t.Fatalf("%d dials: the uplink did not dial again", dials)
+	}
+	// Seven waits fit in a minute (1+2+4+8+16+30 s); the old reset dialled about 50 times.
+	if dials > 7 {
+		t.Fatalf("%d dials in a scaled minute, want 7 or fewer: the wait did not grow", dials)
+	}
+}
