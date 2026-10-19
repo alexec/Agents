@@ -24,10 +24,15 @@ const (
 	Refused
 )
 
+// Refresher spends a refresh token for a new pair: GitHub's DeviceFlow and Linear's CodeFlow.
+type Refresher interface {
+	Refresh(ctx context.Context, refresh string) (Token, error)
+}
+
 // RefreshIfDue renews provider's connection in s when its access token ends within
 // RefreshMargin of now. A refresh token is single use: only the host calls this, one call
 // at a time per store. A network failure leaves the connection as it is, to try again.
-func RefreshIfDue(ctx context.Context, s Store, f *DeviceFlow, provider string, now time.Time) (RefreshResult, error) {
+func RefreshIfDue(ctx context.Context, s Store, f Refresher, provider string, now time.Time) (RefreshResult, error) {
 	c, ok, err := s.Get(provider)
 	if err != nil || !ok || c.SignInAgain || c.AccessExpiresAt.IsZero() || now.Add(RefreshMargin).Before(c.AccessExpiresAt) {
 		return Unchanged, err
@@ -43,6 +48,7 @@ func RefreshIfDue(ctx context.Context, s Store, f *DeviceFlow, provider string, 
 		return Unchanged, err
 	}
 	next := t.Connection(c.Provider, c.Login, c.ConnectedAt)
+	next.Workspace = c.Workspace
 	if next.Refresh == "" {
 		next.Refresh, next.RefreshExpiresAt = c.Refresh, c.RefreshExpiresAt
 	}
@@ -51,7 +57,7 @@ func RefreshIfDue(ctx context.Context, s Store, f *DeviceFlow, provider string, 
 
 // signInAgain is c with its tokens gone: the row stays and says "Sign in again".
 func signInAgain(c Connection) Connection {
-	return Connection{Provider: c.Provider, Login: c.Login, ConnectedAt: c.ConnectedAt, SignInAgain: true}
+	return Connection{Provider: c.Provider, Login: c.Login, Workspace: c.Workspace, ConnectedAt: c.ConnectedAt, SignInAgain: true}
 }
 
 // TokenReader is a provider's access token as the host keeps it, read again after a

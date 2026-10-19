@@ -1,14 +1,17 @@
 // linear-mcp: the `linear` MCP server (#839), on stdio, in the github server's shape
 // (Go/cmd/github-mcp), with events only: issue.opened, issue.labelled, issue.commented and
 // issue.closed, polled. No tools: Linear's own MCP server (mcp.linear.app), added from the
-// marketplace, reads and changes issues. As the personal API key in LINEAR_API_KEY (Linear ▸ Settings ▸ Security & access ▸
-// Personal API keys), which `.agents/mcp.json` names as ${LINEAR_API_KEY} so its value stays
-// in ~/.agents-secrets/secrets.env.
+// marketplace, reads and changes issues. As the person's Linear connection on the host
+// (#1343: Connect Linear, kept by the host, read again after each renewal), or as the personal
+// API key in LINEAR_API_KEY (Linear ▸ Settings ▸ Security & access ▸ Personal API keys), which
+// `.agents/mcp.json` names as ${LINEAR_API_KEY} so its value stays in
+// ~/.agents-secrets/secrets.env. The key, when set, goes first.
 //
 //	linear-mcp                       serve on stdio
 //	linear-mcp --version
 //
 //	LINEAR_API_KEY                   the personal API key
+//	AGENTS_CONNECTIONS               where the host keeps the Linear connection (set by the host)
 //	LINEAR_MCP_API_URL               the GraphQL API (https://api.linear.app/graphql), for a fake in tests and walks
 package main
 
@@ -23,6 +26,7 @@ import (
 	"syscall"
 
 	"github.com/alexec/agents/Go/internal/buildinfo"
+	"github.com/alexec/agents/Go/internal/connections"
 	"github.com/alexec/agents/Go/internal/linearmcp"
 )
 
@@ -37,7 +41,17 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	key := func() string { return strings.TrimSpace(os.Getenv("LINEAR_API_KEY")) }
+	// A personal API key goes as it is; an OAuth token says Bearer.
+	connected := connections.TokenReader(connections.FromEnv(), connections.Linear)
+	key := func() string {
+		if k := strings.TrimSpace(os.Getenv("LINEAR_API_KEY")); k != "" {
+			return k
+		}
+		if t := connected(); t != "" {
+			return "Bearer " + t
+		}
+		return ""
+	}
 	linear := linearmcp.NewRealLinear(os.Getenv("LINEAR_MCP_API_URL"), key)
 	front := &linearmcp.Front{
 		Events:   &linearmcp.Events{Linear: linear, SignedIn: func() bool { return key() != "" }},

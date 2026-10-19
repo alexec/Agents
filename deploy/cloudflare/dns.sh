@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # The A records for the control plane's two names (#1461, #1484), at Cloudflare's DNS: the
-# page's name and the views name, both to the VM's address that deploy/gcp/up.sh prints.
+# page's name and the views name, both to the VM's address that deploy/gcp/up.sh prints. The
+# name @ is the zone itself: --names @ points agentloops.dev at the VM, for the hand-back page
+# (#1343, deploy/gcp/site.sh).
 # A record that is already right is left alone, and one with another address is changed, so
 # running it again is safe.
 #
@@ -71,6 +73,7 @@ fi
 
 for n in $names; do
 	fqdn=$n.$zone
+	[[ $n == @ ]] && fqdn=$zone
 	records=$(cf GET "/zones/$zone_id/dns_records?name=$fqdn")
 	if [[ $(jq '[.[] | select(.type == "CNAME")] | length' <<<"$records") != 0 ]]; then
 		die "$fqdn is a CNAME at Cloudflare: delete it there, then run this again"
@@ -97,4 +100,6 @@ for n in $names; do
 	*) die "$fqdn has more than one A record: keep one at Cloudflare, then run this again" ;;
 	esac
 done
-((dry_run)) || echo "Check: dig +short ${names%% *}.$zone @1.1.1.1 (it can take a few minutes)"
+first=${names%% *}.$zone
+[[ ${names%% *} == @ ]] && first=$zone
+((dry_run)) || echo "Check: dig +short $first @1.1.1.1 (it can take a few minutes)"

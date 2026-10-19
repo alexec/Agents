@@ -28,3 +28,8 @@
 		health_interval 5s
 	}
 }
+
+# Our own sites, only where a file in deploy/site.d turns one on: on agentloops.dev's VM, the
+# hand-back page for sign-ins (deploy/site/site.caddy, put there by deploy/gcp/site.sh, #1343).
+# Elsewhere the folder is empty and this adds nothing.
+import /etc/caddy/site.d/*.caddy

@@ -1,0 +1,3 @@
+# The VM's own: deploy/gcp/site.sh copies deploy/site/site.caddy here to turn the site on.
+*
+!.gitignore

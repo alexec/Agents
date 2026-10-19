@@ -84,12 +84,18 @@ services:
       AGENTS_DOMAIN: ${AGENTS_DOMAIN}
       AGENTS_VIEWS_DOMAIN: ${AGENTS_VIEWS_DOMAIN}
       ACME_EMAIL: ${ACME_EMAIL:?set ACME_EMAIL for Let's Encrypt's notices}
+      # The hand-back page's name (agentloops.dev), read only by deploy/site/site.caddy (#1343).
+      AGENTS_SITE_DOMAIN: ${AGENTS_SITE_DOMAIN:-}
     networks:
       default:
         # Fixed, so agents-control can trust it and nothing else on the network.
         ipv4_address: 172.30.61.250
     volumes:
       - ./Caddyfile.public:/etc/caddy/Caddyfile:ro
+      # Our own sites, turned on by a file in deploy/site.d (deploy/gcp/site.sh); empty here
+      # unless that was run. Their files are in deploy/site/www.
+      - ./site.d:/etc/caddy/site.d:ro
+      - ./site/www:/srv/site:ro
       # The certificate and the ACME account: kept, so a restart doesn't ask for a new one.
       - caddy:/data
 
