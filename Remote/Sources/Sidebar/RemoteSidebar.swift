@@ -554,11 +554,12 @@ struct RemoteProjectFold: View {
                     searchMatches(fold)
                 } else if isOpen {
                     // Its connectors (#753), under every project even with none yet (#1422):
-                    // a page, red when one does not answer.
-                    let tally = MCPHealthWords.tally(model.work.mcpServers(in: key))
-                    ProjectPageRow(title: "Connectors", systemImage: "server.rack", count: nil,
+                    // a page, red when one does not answer, with how many (#1569).
+                    let servers = model.work.mcpServers(in: key)
+                    let tally = MCPHealthWords.tally(servers)
+                    ProjectPageRow(title: "Connectors", systemImage: "server.rack", count: servers.count,
                                    item: .projectMCPServers(key), warns: tally?.failing ?? false,
-                                   value: tally?.words ?? "none yet")
+                                   value: tally?.words ?? "none yet", showsCount: true)
                     // The archive, one row opening a page (#495): never a fold inside
                     // the group.
                     let archived = fold.archivedCount(summary) + fold.archivedWorkflows.count
@@ -642,6 +643,9 @@ private struct ProjectPageRow: View {
     var warns = false
     /// What VoiceOver says after the title, when it is not the count.
     var value: String?
+    /// The count small and grey after the title (#1569), none at zero: the Connectors
+    /// row's, which Alex asked to see. The Archived row's stays VoiceOver's.
+    var showsCount = false
 
     var body: some View {
         HStack(spacing: 8) {
@@ -650,9 +654,15 @@ private struct ProjectPageRow: View {
                 .frame(width: 20)
                 .accessibilityHidden(true)
             // Nothing at its end, which is only a session's (#587): the count is
-            // VoiceOver's.
+            // VoiceOver's, or after the title when `showsCount`.
             Text(title)
                 .lineLimit(1)
+            if showsCount, let count, count > 0 {
+                Text("\(count)")
+                    .monospacedDigit()
+                    .appText(.fine)
+                    .foregroundStyle(.secondary)
+            }
             Spacer(minLength: 4)
         }
         .appText(.supporting)

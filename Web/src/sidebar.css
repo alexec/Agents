@@ -104,6 +104,8 @@
 .row.page-row .pin-mark { color: var(--accent); text-align: center; }
 .row.page-row .pin-mark.warns { color: var(--tint-failure); }
 .row.page-row .title { font-weight: 400; }
+/* The Connectors row's count, small and grey just after the title (#1569). */
+.row.page-row .title .count { margin-left: 6px; font-size: 0.6875rem; font-variant-numeric: tabular-nums; }
 
 /* A project's archive, in the chat's place (#499). */
 .with-sidebar .archive-page .column-head .quiet { font-size: 0.75rem; }

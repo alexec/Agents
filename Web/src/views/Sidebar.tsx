@@ -533,7 +533,8 @@ const ProjectFold = memo(function ProjectFold({ store, host, project, query, lin
 
   const here = r.host === host.id && r.project !== undefined && folderKey(r.project) === folderKey(folder);
   const archiveCount = (project.counts.archived ?? 0) + archivedWorkflows.length;
-  const mcpTally = healthTally(projectServers(store.mcpHealthOf(host.id), folder));
+  const mcpServers = projectServers(store.mcpHealthOf(host.id), folder);
+  const mcpTally = healthTally(mcpServers);
   const fold = (open: boolean) => folds.set(host.id, folder, open);
   const projectPinned = project.project.pinned === true;
   const projectMenu: MenuItem[] = [
@@ -626,13 +627,14 @@ const ProjectFold = memo(function ProjectFold({ store, host, project, query, lin
               <button class="link show-all" onClick={() => (showsAllMatches.value = true)}>Show all {archived.length}</button>
             )}
           </> : <>
-          {/* Its connectors (#753), under every project even with none yet (#1422): a page, red when one does not answer. */}
+          {/* Its connectors (#753), under every project even with none yet (#1422): a page, red when one does not answer,
+              with how many after the title, small and grey, none at zero (#1569). */}
           <div class="nav-item">
             <div class={`row page-row${here && r.mcp ? " chosen" : ""}`}>
               <button class="pick" aria-current={here && !!r.mcp} aria-label={`Connectors, ${mcpTally?.words ?? "none yet"}`}
                 title={mcpTally?.words ?? "No connectors yet"} onClick={() => go({ host: host.id, project: folder, mcp: true })}>
                 <span class={`pin-mark${mcpTally?.failing ? " warns" : ""}`} aria-hidden="true">▤</span>
-                <span class="title">Connectors</span>
+                <span class="title">Connectors{mcpServers.length > 0 && <span class="count">{mcpServers.length}</span>}</span>
               </button>
             </div>
           </div>
