@@ -43,12 +43,16 @@ const waitInView = async (session, expression, timeout = 15_000) => {
 };
 const listed = (session) => waitInView(session, `!/Waiting|Listing/.test(document.querySelector("#state-line").textContent)`);
 
+let page;
 try {
-  const page = await chrome.page(webURL, { width: 1440, height: 900 });
+  page = await chrome.page(webURL, { width: 1440, height: 900 });
   await page.waitFor(`document.querySelector("textarea")`);
   await page.focus("textarea");
   await page.type(code);
   await page.press("Connect");
+  // A new project starts folded: unfold it, as its chevron does.
+  await page.waitFor(`document.querySelector('.sidebar button.disclosure[aria-label="Unfold work"]')`, 15_000);
+  await page.eval(`document.querySelector('.sidebar button.disclosure[aria-label="Unfold work"]').click()`);
   await page.waitFor(`document.querySelectorAll(".sidebar .row.pin").length >= 1`, 15_000);
   await page.eval(`[...document.querySelectorAll(".sidebar .row.pin")].find((r) => r.querySelector(".title").textContent === "Linear issues").querySelector(".pick").click()`);
   await sleep(1500);
@@ -77,6 +81,10 @@ try {
   await page.shot(`${out}/web-2-start-agent.png`);
   const errors = page.errors.filter((e) => !e.includes("favicon"));
   check(!errors.length, `no errors on the page: ${js(errors)}`);
+} catch (e) {
+  // What the page showed when it stopped, for the reader.
+  if (page) await page.shot(`${out}/web-failed.png`).catch(() => {});
+  check(false, e.message);
 } finally {
   await chrome.close();
 }

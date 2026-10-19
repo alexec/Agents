@@ -60,9 +60,12 @@ Add Linear's own server from the registry, or by hand with the URL
 3. To keep the page in the sidebar, pin it in the project's `.agents/pins.json`:
 
    ```json
-   { "title": "Linear issues", "view": { "server": "linear", "tool": "show_issues",
-       "uri": "ui://linear/issues", "arguments": { "team": "ENG" } } }
+   { "pins": [ { "pinned_by": { "person": true }, "title": "Linear issues",
+       "view": { "server": "linear", "tool": "show_issues", "uri": "ui://linear/issues",
+                 "arguments": { "team": "ENG" } } } ] }
    ```
+
+   Or pin the page from the app, as any other page.
 
 **Start Agent** opens the new-agent form for the issue. The prompt tells the agent to put
 the issue's identifier (such as `ENG-12`) in its branch and pull request title, so that
