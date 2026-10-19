@@ -7,12 +7,14 @@ import (
 	"io"
 	"log/slog"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 )
 
 // The front as the Agents daemon talks to it: initialize carries the events capability, the
-// events are answered here, and there are no tools (Linear's own server has them).
+// events are answered here, and its one tool is show_issues, with its page (Linear's own
+// server changes issues).
 
 func equal(t *testing.T, got, want any, what string) {
 	t.Helper()
@@ -21,12 +23,14 @@ func equal(t *testing.T, got, want any, what string) {
 	}
 }
 
-func TestTheFrontOffersEventsAndNoTools(t *testing.T) {
+func TestTheFrontOffersEventsAndTheIssuesView(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	fake := &fakeLinear{}
-	front := &Front{Events: &Events{Linear: fake}, Upstream: NewServer("test"), Version: "test", Logger: logger}
+	upstream := NewServer("test")
+	AddViews(upstream, fakeViews{})
+	front := &Front{Events: &Events{Linear: fake}, Upstream: upstream, Version: "test", Logger: logger}
 	clientIn, frontOut := io.Pipe()
 	frontIn, clientOut := io.Pipe()
 	served := make(chan error, 1)
@@ -65,11 +69,20 @@ func TestTheFrontOffersEventsAndNoTools(t *testing.T) {
 	equal(t, result["instructions"], Instructions, "instructions")
 	send(map[string]any{"jsonrpc": "2.0", "method": "notifications/initialized"})
 
-	if tools := call(2, "tools/list", map[string]any{}); tools["error"] == nil {
-		if list, _ := tools["result"].(map[string]any)["tools"].([]any); len(list) != 0 {
-			t.Fatalf("tools offered: %v", list)
-		}
+	tools, _ := call(2, "tools/list", map[string]any{})["result"].(map[string]any)["tools"].([]any)
+	if len(tools) != 1 || tools[0].(map[string]any)["name"] != "show_issues" {
+		t.Fatalf("tools offered: %v", tools)
 	}
+	equal(t, tools[0].(map[string]any)["_meta"].(map[string]any)["ui/resourceUri"], "ui://linear/issues", "the tool's view")
+	page := call(3, "resources/read", map[string]any{"uri": "ui://linear/issues"})["result"].(map[string]any)["contents"].([]any)
+	if text, _ := page[0].(map[string]any)["text"].(string); !strings.Contains(text, "const bridge") || strings.Contains(text, "/*bridge.js*/") {
+		t.Fatal("the page does not carry its bridge")
+	}
+	shown := call(4, "tools/call", map[string]any{"name": "show_issues", "arguments": map[string]any{"team": "ENG"}})["result"].(map[string]any)
+	issues := shown["structuredContent"].(map[string]any)["issues"].([]any)
+	equal(t, issues[0].(map[string]any)["identifier"], "ENG-5", "the listed issue")
+	refused := call(9, "tools/call", map[string]any{"name": "show_issues", "arguments": map[string]any{"state": "completed"}})["result"].(map[string]any)
+	equal(t, refused["isError"], true, "a closed state is refused")
 
 	events := call(5, "events/list", map[string]any{})["result"].(map[string]any)["events"].([]any)
 	equal(t, len(events), 4, "events")

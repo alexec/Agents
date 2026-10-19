@@ -17,14 +17,14 @@ import (
 // other message (initialize, ping, the empty lists) to a go-sdk server with no tools, and that
 // server's messages back as they come. MCP's SDKs have no events (a working-group draft), so
 // the front also adds the `events` capability and the events' words to its answer to
-// initialize. Linear's tools are Linear's own MCP server's (mcp.linear.app), not this one's.
+// initialize. Its one tool and page are AddViews' (views.go); Linear's own MCP server (mcp.linear.app) changes issues.
 
 // Instructions are the server's words.
-const Instructions = "The Linear workspace's issues as events, polled with the LINEAR_API_KEY personal API key: " +
-	"issue.opened, issue.labelled, issue.commented, issue.closed. This server has no tools: " +
-	"Linear's own MCP server (mcp.linear.app) reads and changes issues."
+const Instructions = "The Linear workspace's issues, read with the person's Linear connection (or the LINEAR_API_KEY " +
+	"personal API key): show_issues lists the open ones, with a page that has Start Agent, and the events issue.opened, " +
+	"issue.labelled, issue.commented and issue.closed. Linear's own MCP server (mcp.linear.app) changes issues."
 
-// NewServer is the server behind the front: it answers initialize and ping, and has no tools.
+// NewServer is the server behind the front: it answers initialize and ping. AddViews puts show_issues and its page on it.
 func NewServer(version string) *mcp.Server {
 	return mcp.NewServer(&mcp.Implementation{Name: "linear-mcp", Title: "Linear events", Version: version}, nil)
 }
