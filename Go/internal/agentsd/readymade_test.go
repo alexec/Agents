@@ -17,7 +17,7 @@ import (
 // events that mcpcatalog counts for the Workflows level.
 func TestReadyMadeWorkflowsRead(t *testing.T) {
 	ids := readyMadeIDs()
-	if !slices.Equal(ids, []string{"fix-failed-checks", "work-an-issue"}) {
+	if !slices.Equal(ids, []string{"address-review-comments", "fix-failed-checks", "work-an-issue"}) {
 		t.Fatal(ids)
 	}
 	var events []string
@@ -59,7 +59,7 @@ func TestReadyMadeWorkflowsTurnOnWithOneSwitch(t *testing.T) {
 	}
 	// One that does lists them, off, and nothing is written.
 	json.Unmarshal(c.call(t, 4, "workflows/list", map[string]any{"folder": folder}), &list)
-	if len(list) != 2 || list[0].IsEnabled || list[0].AwaitingApproval != nil || list[1].Workflow.Name != "Work an issue" {
+	if len(list) != 3 || list[0].IsEnabled || list[0].AwaitingApproval != nil || list[2].Workflow.Name != "Work an issue" {
 		t.Fatalf("%+v", list)
 	}
 	if _, err := os.Stat(filepath.Join(dir, ".agents")); !os.IsNotExist(err) {

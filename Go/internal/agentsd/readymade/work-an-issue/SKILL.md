@@ -14,7 +14,8 @@ pull request that fixes it. You use the `github` server's tools for GitHub, not 
    issue is not on GitHub (its url is not on github.com, as for a Linear issue), read it
    from the event's data, and open the pull request in the repository of this project.
 2. **Make a branch.** Use the app's `move_worktree` tool to move into a new worktree on a
-   branch called `agent/issue-<number>`, from the default branch.
+   branch called `agent/issue-<number>`, from the default branch. When you do not have
+   that tool, use `git worktree add` beside the project's folder.
 3. **Do the work.** Change only what the issue asks for. Follow the project's own
    instructions (`AGENTS.md`, `CLAUDE.md` or `README.md`, when there is one). Run the
    project's tests and linters for the files that you changed.
