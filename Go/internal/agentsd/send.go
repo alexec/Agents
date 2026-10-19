@@ -16,7 +16,7 @@ import (
 // (projects/sendPack), and the window reads them in parts (projects/sendRead) and hands
 // them to the receiving host (projects/receiveUpload).
 
-const sendPartSize = 8 << 20
+const sendPartSize = 1 << 20
 
 func (d *Daemon) outgoingFolder() string { return filepath.Join(d.Store.Loc.Root, "Outgoing") }
 

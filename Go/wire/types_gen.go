@@ -3864,7 +3864,7 @@ type SendPackRequest struct {
 	IncludeChanges bool     `json:"includeChanges"`
 }
 
-// A part of at most 8 MB. `end` is true for the last, and then the host removes the file.
+// A part of at most 1 MB (#1530). `end` is true for the last, and then the host removes the file.
 type SendRead struct {
 	Data Data `json:"data"`
 	End  bool `json:"end"`

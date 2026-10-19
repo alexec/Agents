@@ -3135,7 +3135,9 @@ export interface SendPackRequest {
   includeChanges: boolean;
 }
 
-/** A part of at most 8 MB. `end` is true for the last, and then the host removes the file. */
+/**
+ * A part of at most 1 MB (#1530). `end` is true for the last, and then the host removes the file.
+ */
 export interface SendRead {
   data: Base64;
   end: boolean;

@@ -81,7 +81,10 @@ It stops, and changes nothing, when:
 This Mac's host makes a `git bundle` of the branches, without the commits that the server
 has, and a patch of the uncommitted changes. The patch is made with an index of its own, so
 the index of your repository does not change. The window sends both to the server in parts
-of 8 MB, over the connection it already has to the server through the control plane. The
+of 1 MB, over the connection it already has to the server through the control plane. It
+does not decode a part: the text it reads from one host goes to the other as it is, and it
+reads the next part while it sends this one. Thus the window holds about 2 MB of the send,
+and the server's other messages wait for 1 MB at most. The
 server fetches from the bundle, moves each branch forward (never back), checks out the
 branch, applies the patch and adds the folder as a project.
 
