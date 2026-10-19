@@ -223,3 +223,96 @@ func TestAPushTooBigLosesItsButtonsFirst(t *testing.T) {
 		t.Fatal(string(plaintext))
 	}
 }
+
+// A phone as the Remote is (#1509): paired as an iPhone, it gives its token and says, in
+// a presence report to a host, that it may show notifications. Then it is locked, and its
+// session ends: nothing else says it may be notified.
+func (p *plane) lockedPhone(host string) *controllink.ClientMembership {
+	m, err := controllink.PairClientAs(context.Background(), p.code(false), "phone", records.KindIPhone)
+	if err != nil {
+		p.t.Fatal(err)
+	}
+	session, err := controllink.DialClient(context.Background(), m)
+	if err != nil {
+		p.t.Fatal(err)
+	}
+	call(p.t, session, "", "clients/setPushToken", map[string]string{"token": pushDeviceToken, "environment": "development"})
+	// The fake host does not know the method; the control plane hears the report first.
+	session.Call(context.Background(), host, "presence/report", map[string]any{"active": false, "mayNotify": true})
+	p.waitFor(func() bool {
+		c := p.s.Records().Client(m.Client)
+		return c.MayNotify != nil && *c.MayNotify
+	}, "the phone's word kept in its record")
+	session.Close()
+	p.waitFor(func() bool { return len(p.s.Router().NotifyFlags()) == 0 }, "the phone's session gone")
+	return m
+}
+
+// After a move (#1509), a need from the host that followed reaches a phone that is
+// locked: pushed once with no relay host, taken back once, and with a relay host online
+// carried by the relay, with nothing pushed.
+func TestAfterAMoveANeedReachesALockedPhone(t *testing.T) {
+	key := controllink.NewPrivateKey()
+	old := startPlane(t, store.NewMemory(), key)
+	host := old.host("MACHINE-H")
+	m := old.lockedPhone(host.member.Host)
+
+	pusher := &fakePusher{}
+	moved := startPlaneWith(t, store.NewMemory(), key, func(c *Config) { c.Receive = true; c.Push = pusher })
+	at := drive(t, old.url, key)
+	at.must("handover/announce", map[string]any{"endpoint": records.Endpoint{URL: moved.url}})
+	at.must("handover/freeze", nil)
+	if _, _, err := CopyStore(context.Background(), old.store, moved.store); err != nil {
+		t.Fatal(err)
+	}
+	drive(t, moved.url, key).must("handover/take", nil)
+	at.must("handover/forward", map[string]any{"endpoints": []records.Endpoint{{URL: moved.url}}})
+	moved.waitFor(func() bool { s, ok := moved.s.Router().State(host.member.Host); return ok && s.online() }, "the host at the new copy")
+
+	if _, err := moved.s.methods.HostSaid(host.member.Host, "attention/need", json.RawMessage(pushNeed)); err != nil {
+		t.Fatal(err)
+	}
+	moved.waitFor(func() bool { return len(pusher.sent()) == 1 }, "a push to the locked phone")
+	if item := openPush(t, m, pusher.sent()[0]); !item.Alert || item.Headline == nil || item.Headline.H2 != "Fix the gallery" {
+		t.Fatal(item)
+	}
+	moved.s.methods.HostSaid(host.member.Host, "attention/need", json.RawMessage(`{"withdraw":{"permission":"E0000000-0000-4000-8000-000000000005"}}`))
+	moved.waitFor(func() bool { return len(pusher.sent()) == 2 }, "the withdrawal")
+	time.Sleep(100 * time.Millisecond)
+	if n := len(pusher.sent()); n != 2 {
+		t.Fatal(n, "pushes: one arrived twice")
+	}
+	if item := openPush(t, m, pusher.sent()[1]); item.Headline != nil || item.Alert {
+		t.Fatal(item)
+	}
+
+	// With a relay host online at the new copy, the relay carries it.
+	_, relay := moved.rawHost("relay mac", true)
+	moved.s.tellRelayDevices()
+	readUntil(t, relay, m.Client)
+	moved.s.methods.HostSaid(host.member.Host, "attention/need", json.RawMessage(pushNeed))
+	if line := readUntil(t, relay, "relay/deliver"); !strings.Contains(line, m.Client) || !strings.Contains(line, `"h2":"Fix the gallery"`) {
+		t.Fatal(line)
+	}
+	time.Sleep(200 * time.Millisecond)
+	if n := len(pusher.sent()); n != 2 {
+		t.Fatal(n, "pushed beside the relay")
+	}
+}
+
+// A need with no device to go to says so in the log, so a need is never lost in silence.
+func TestANeedWithNoDeviceSaysSo(t *testing.T) {
+	p := startPlaneWith(t, store.NewMemory(), controllink.NewPrivateKey(), func(c *Config) { c.Push = &fakePusher{} })
+	box := p.host("MACHINE-2")
+	p.s.methods.HostSaid(box.member.Host, "attention/need", json.RawMessage(pushNeed))
+	for {
+		select {
+		case line := <-p.lines:
+			if strings.Contains(line, "goes to no device") {
+				return
+			}
+		case <-time.After(2 * time.Second):
+			t.Fatal("nothing said")
+		}
+	}
+}
