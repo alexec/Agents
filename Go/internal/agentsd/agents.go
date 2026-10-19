@@ -414,6 +414,12 @@ func (d *Daemon) delete(id wire.UUID) error {
 	if a.State != wire.AgentStateArchived {
 		return &Error{Code: wire.FailureDeleteRefused, Message: "Only an archived session can be deleted. Archive it first."}
 	}
+	return d.deleteArchived(a, "person")
+}
+
+// deleteArchived removes an archived agent, its folder and its turns; because is who or
+// what deleted it ("person", or "retention" for the sweep).
+func (d *Daemon) deleteArchived(a *wire.Agent, because string) error {
 	d.mu.Lock()
 	l := d.lives[a.ID]
 	delete(d.lives, a.ID)
@@ -433,7 +439,7 @@ func (d *Daemon) delete(id wire.UUID) error {
 		return &Error{Code: wire.FailureCouldNotSave, Message: "The agent could not be deleted: " + err.Error()}
 	}
 	Broadcast(d, wire.NotifyAgentRemoved, wire.AgentRemovedNotification{AgentID: a.ID})
-	d.raiseAbout(a, "agent.deleted", "was deleted with its conversation.", map[string]string{"because": "person"})
+	d.raiseAbout(a, "agent.deleted", "was deleted with its conversation.", map[string]string{"because": because})
 	d.projectChanged(projectFolder(a))
 	return nil
 }

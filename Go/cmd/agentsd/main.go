@@ -106,6 +106,7 @@ func main() {
 	d.SayRestarted()
 	d.PickUpAfterRestart()
 	d.StartConnections()
+	d.StartRetention()
 	d.StartMCPHealth()
 	d.StartMCPEvents()
 	d.StartMachineWatch()
