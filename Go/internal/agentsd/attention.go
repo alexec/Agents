@@ -568,8 +568,9 @@ func (d *Daemon) reconsider() {
 	}
 }
 
-// waitingCount is DaemonCore.waitingCount: the agents that want a look, the badge's count,
-// outside archived projects.
+// waitingCount is DaemonCore.waitingCount: the agents that need the person (Needs you or
+// Blocked), the badge's count, outside archived projects. An unread finish is not
+// counted (#1565).
 func (d *Daemon) waitingCount() int64 {
 	archived := map[string]bool{}
 	for _, p := range d.Store.Projects() {
@@ -582,8 +583,7 @@ func (d *Daemon) waitingCount() int64 {
 		if a.State == wire.AgentStateArchived || archived[projectFolder(&a)] {
 			continue
 		}
-		unread := a.State == wire.AgentStateFinished && a.IsUnread != nil && *a.IsUnread
-		if g := Group(&a); unread || g == "needsAttention" || g == "blocked" {
+		if g := Group(&a); g == "needsAttention" || g == "blocked" {
 			n++
 		}
 	}

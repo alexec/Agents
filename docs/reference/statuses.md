@@ -46,8 +46,9 @@ moment it ends, and opening it clears the mark without moving it. A question or 
 unresolved problem is under **Needs you** whether you have read it or not.
 
 Each group heading counts what is unread under it, such as **Done 5 · 2 unread**, and so
-does the project's row in the sidebar and on the phone. The Dock badge and the Home-screen
-widget count what needs you and what is unread, so a new finish still shows there.
+does the project's row in the sidebar and on the phone. The Dock badge, the app icon badge,
+the Home-screen widget and the tab's title count only what needs you: a question, a block or
+an unexpected stop. An unread finish is not counted there (#1565).
 
 To leave a finished conversation to come back to, choose **Mark as Unread** from its
 menu. It stays unread until you open it again. **Mark as Read** clears the mark without

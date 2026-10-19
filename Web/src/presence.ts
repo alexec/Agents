@@ -12,7 +12,7 @@ import { faviconFor, iconMood, iconShowsMood, type MoodCounts } from "./model/ic
 const settle = 500;
 
 /**
- * Sessions wanting a look across live projects (needsPersonCount): Needs you, Blocked and unread.
+ * Sessions that need the person across live projects (needsPersonCount): Needs you and Blocked, not unread (#1565).
  * Each project's count is worked out once per change to that project's agents (#170).
  */
 export function needsPersonCount(store: Store): number {
@@ -20,7 +20,7 @@ export function needsPersonCount(store: Store): number {
   for (const [host, projects] of Object.entries(store.projects.value)) {
     for (const project of projects) {
       if (project.project.archivedAt !== undefined) continue;
-      // Needs you, Blocked and unread finishes, as the Dock badge counts (#70).
+      // Needs you and Blocked, as the Dock badge counts (#1565).
       total += store.projectView(host, project.project.folder).attention;
     }
   }

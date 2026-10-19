@@ -154,12 +154,11 @@ export function counts(agents: readonly Agent[], folder: string): Partial<Record
   return result;
 }
 
-/** AgentsModel.attentionCount(in:): Needs you, Blocked, or unread: what the badge and the title count. */
+/** AgentsModel.attentionCount(in:): Needs you or Blocked, not unread (#1565): what the badge and the title count. */
 export function attentionCount(agents: readonly Agent[], folder: string): number {
   const wanted = folderKey(folder);
   return agents.filter((a) => {
     if (projectFolder(a) !== wanted) return false;
-    if (showsUnread(a)) return true;
     const group = groupOf(a);
     return group === "needsAttention" || group === "blocked";
   }).length;

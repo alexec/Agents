@@ -174,8 +174,8 @@ public struct AttentionSnapshot: Codable, Hashable, Sendable {
     ///
     /// The count is the Dock badge's count and not a second rule: `AgentsModel.wantsALook`
     /// over the same live projects, so the widget cannot disagree with the badge
-    /// (FR-001, FR-019). An unread finish is counted and drawn though it is no longer
-    /// under Needs you (#70): it is still news.
+    /// (FR-001, FR-019). An unread finish is not counted or drawn: it does not need the
+    /// person (#1565).
     @MainActor
     public static func make(model: AgentsModel, at date: Date = Date(),
                             limit: Int = AttentionSnapshot.rowLimit) -> AttentionSnapshot {

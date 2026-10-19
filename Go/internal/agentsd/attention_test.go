@@ -166,3 +166,24 @@ func TestQuickAnswersForAForm(t *testing.T) {
 		t.Fatalf("%+v", h)
 	}
 }
+
+// The push's waiting count is what needs the person; an unread finish is only a mark
+// on its row (#1565).
+func TestWaitingCountLeavesOutUnreadFinishes(t *testing.T) {
+	d, _ := start(t, t.TempDir())
+	defer d.Shutdown()
+	yes := true
+	seeded(t, d, t.TempDir(), func(a *wire.Agent) {
+		a.IsUnread = &yes
+		a.Report = &wire.WorkReport{Outcome: wire.WorkOutcomeDone, Message: "Done.", At: now()}
+	})
+	if n := d.waitingCount(); n != 0 {
+		t.Fatalf("an unread finish was counted: %d", n)
+	}
+	seeded(t, d, t.TempDir(), func(a *wire.Agent) {
+		a.Report = &wire.WorkReport{Outcome: wire.WorkOutcomeNeedsAnswer, Message: "Which branch?", At: now()}
+	})
+	if n := d.waitingCount(); n != 1 {
+		t.Fatalf("a question was not counted: %d", n)
+	}
+}

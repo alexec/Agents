@@ -1352,8 +1352,8 @@ final class AppModel {
     func counts(in key: ProjectKey?) -> [AgentGroup: Int] { work.counts(in: key) }
     func unreadCount(in key: ProjectKey?) -> Int { work.unreadCount(in: key) }
 
-    /// How many sessions across every project want a look: Needs you, Blocked, and
-    /// unread finishes (#70). Drives the Dock badge.
+    /// How many sessions across every project need the person: Needs you and Blocked,
+    /// not unread finishes (#1565). Drives the Dock badge.
     var needsPersonCount: Int {
         liveProjects.reduce(0) { $0 + work.attentionCount(in: $1.key) }
     }

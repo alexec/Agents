@@ -52,7 +52,6 @@ struct AttentionSnapshotTests {
         #expect(AttentionSnapshot.make(model: model).total == badge)
     }
 
-    /// #70: an unread finish left Needs you, and is still news: counted and drawn, once.
     @Test func theHostsCountIsTheBadgesCount() {
         // The daemon counts by `Agent.wantsALook` (#1163); the phone, by its shelves.
         let agents = [agent(state: .waitingOnUser), agent(state: .running), agent(state: .finished),
@@ -60,14 +59,16 @@ struct AttentionSnapshotTests {
         #expect(agents.count(where: \.wantsALook) == AttentionSnapshot.make(model: model(agents)).total)
     }
 
-    @Test func anUnreadFinishIsCountedThoughItIsDone() {
+    /// #1565: an unread finish does not need the person. It is a mark on its row, not a
+    /// count on the badge or a row in the widget.
+    @Test func anUnreadFinishIsNotCounted() {
         let unread = agent(state: .finished, report: WorkReport(outcome: .done, message: "Done", at: Date()))
         let asked = agent(state: .finished, report: WorkReport(outcome: .needsAnswer, message: "Which?", at: Date()))
         let model = model([unread, asked, agent(state: .finished, isUnread: false)])
         #expect(model.agents(in: folder, group: .finished).contains { $0.id == unread.id })
         let snapshot = AttentionSnapshot.make(model: model)
-        #expect(snapshot.total == 2, "the unread one and the question, each once")
-        #expect(Set(snapshot.sessions.map(\.id)) == [unread.id, asked.id])
+        #expect(snapshot.total == 1, "the question only")
+        #expect(snapshot.sessions.map(\.id) == [asked.id])
     }
 
     @Test func anArchivedProjectIsNotCounted() {
@@ -113,10 +114,10 @@ struct AttentionSnapshotTests {
         #expect(row.title == "Fix the widget")
     }
 
-    /// FR-007: a finished turn nobody has read is in the list, and it is not given a
-    /// question it did not ask.
-    @Test func aFinishedSessionIsNotGivenAQuestionItDidNotAsk() {
-        let model = model([agent(state: .finished, title: "Rename the thing")])
+    /// FR-007: a session that stopped with no need pending is in the list, and it is not
+    /// given a question it did not ask.
+    @Test func aStoppedSessionIsNotGivenAQuestionItDidNotAsk() {
+        let model = model([agent(state: .stopped, title: "Rename the thing")])
         let row = try! #require(AttentionSnapshot.make(model: model).sessions.first)
         #expect(row.wanted == nil)
         #expect(row.kind == nil)

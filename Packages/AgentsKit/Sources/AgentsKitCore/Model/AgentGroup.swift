@@ -159,11 +159,10 @@ public extension Agent {
         showsUnread && group() == .finished
     }
 
-    /// Needs you, Blocked from an older daemon, or unread: one in the badge's count. The
-    /// rule `ProjectShelf` counts by and the daemon sends the phone (#1163), so the two
-    /// cannot disagree.
+    /// Needs you, or Blocked from an older daemon: one in the badge's count. Unread is a
+    /// mark on the row, not a need (#1565). The rule `ProjectShelf` counts by and the
+    /// daemon sends the phone (#1163), so the two cannot disagree.
     var wantsALook: Bool {
-        if showsUnread { return true }
         let group = group()
         return group == .needsAttention || group == .blocked
     }
