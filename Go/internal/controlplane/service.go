@@ -9,6 +9,7 @@ package controlplane
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"crypto/tls"
 	"encoding/json"
 	"errors"
@@ -145,6 +146,8 @@ type Service struct {
 	reads readGate
 	// What each source address may still try before it proves a key (P3).
 	sources *sources
+	// The host/clients each host here was told last (#1528).
+	told toldClients
 
 	mu       sync.Mutex
 	servers  []*http.Server
@@ -543,19 +546,48 @@ func (s *Service) hostClients() wire.HostClients {
 	return out
 }
 
-// tellHostClients tells each host whose uplink ends here, or only those named, which
-// windows it may let in on its local socket: a window forgotten here is cut off there too.
+// toldClients is a hash of the host/clients each host whose uplink ends here was told last.
+type toldClients struct {
+	mu   sync.Mutex
+	last map[string][sha256.Size]byte
+}
+
+// tellHostClients tells each host whose uplink ends here which windows it may let in on its
+// local socket, so a window forgotten here is cut off there too. A host hears the list only
+// when it differs from the one it heard last, not on every refresh (#1528). The hosts named
+// (a host that says host/hello, after a new uplink) hear it in any case.
 func (s *Service) tellHostClients(only ...string) {
+	s.told.mu.Lock()
+	defer s.told.mu.Unlock()
+	held := s.router.HostsHeldHere()
 	hosts := only
 	if len(hosts) == 0 {
-		hosts = s.router.HostsHeldHere()
+		hosts = held
+		// A host whose uplink went is told again when it says hello; forget it until then.
+		for host := range s.told.last {
+			if !slices.Contains(held, host) {
+				delete(s.told.last, host)
+			}
+		}
 	}
 	if len(hosts) == 0 {
 		return
 	}
 	clients := s.hostClients()
+	b, _ := json.Marshal(clients)
+	sum := sha256.Sum256(b)
+	if s.told.last == nil {
+		s.told.last = map[string][sha256.Size]byte{}
+	}
 	for _, host := range hosts {
-		s.router.Tell(host, wire.NotifyHostClients.Name, clients)
+		if len(only) == 0 && s.told.last[host] == sum {
+			continue
+		}
+		if s.router.Tell(host, wire.NotifyHostClients.Name, clients) {
+			s.told.last[host] = sum
+		} else {
+			delete(s.told.last, host)
+		}
 	}
 }
 

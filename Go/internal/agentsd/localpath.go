@@ -2,6 +2,7 @@ package agentsd
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"errors"
 	"io"
@@ -69,6 +70,9 @@ type localBook struct {
 	localClients map[string]wire.HostClient
 	// localConns is each connection on the local socket, and the window it proved.
 	localConns map[*sockConn]string
+	// localKept is what localClientsFile holds, read the first time; it is written only
+	// when host/clients differs from it (#1528).
+	localKept []byte
 }
 
 // SetLocalClients is host/clients: the windows the control plane lists as paired. It is
@@ -78,6 +82,11 @@ func (d *Daemon) SetLocalClients(list wire.HostClients) {
 	for _, c := range list.Clients {
 		clients[strings.ToUpper(string(c.ID))] = c
 	}
+	if list.Clients == nil {
+		list.Clients = []wire.HostClient{}
+	}
+	b, _ := json.Marshal(list)
+	file := filepath.Join(d.Store.Loc.Root, localClientsFile)
 	d.localMu.Lock()
 	d.localClients = clients
 	var gone []*sockConn
@@ -86,15 +95,20 @@ func (d *Daemon) SetLocalClients(list wire.HostClients) {
 			gone = append(gone, sc)
 		}
 	}
+	if d.localKept == nil {
+		d.localKept, _ = os.ReadFile(file)
+	}
+	same := bytes.Equal(b, d.localKept)
+	if !same {
+		d.localKept = b
+	}
 	d.localMu.Unlock()
 	for _, sc := range gone {
 		sc.Close()
 	}
-	if list.Clients == nil {
-		list.Clients = []wire.HostClient{}
+	if same {
+		return
 	}
-	b, _ := json.Marshal(list)
-	file := filepath.Join(d.Store.Loc.Root, localClientsFile)
 	tmp := file + ".tmp"
 	if err := os.WriteFile(tmp, b, 0o600); err == nil {
 		err = os.Rename(tmp, file)

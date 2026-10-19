@@ -737,3 +737,24 @@ func TestHostsHearThePairedWindows(t *testing.T) {
 		t.Fatal("a forgotten window is still listed:", line)
 	}
 }
+
+// A host hears host/clients when it says hello and when the paired windows change, not
+// on every refresh (#1528): forty refreshes (ten minutes of them) tell it nothing, so the
+// next host/clients it reads is the one that lists a new window.
+func TestAHostHearsThePairedWindowsOnlyWhenTheyChange(t *testing.T) {
+	p := startPlane(t, store.NewMemory(), controllink.NewPrivateKey())
+	_, host := p.rawHost("this mac", false)
+	if line := readUntil(t, host, "host/clients"); !strings.Contains(line, `"clients":[]`) {
+		t.Fatal("the hello's host/clients:", line)
+	}
+	for range 40 {
+		p.s.syncRelays()
+	}
+	m, err := controllink.PairClient(context.Background(), p.code(false), "window")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if line := readUntil(t, host, "host/clients"); !strings.Contains(line, m.Client) {
+		t.Fatal("the refreshes told the host an unchanged list:", line)
+	}
+}
