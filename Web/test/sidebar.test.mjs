@@ -134,7 +134,7 @@ test("a search matches an approval's title, kind and grey line (#773)", async ()
   ] }];
   const keys = (query) => smartApprovals(projects, query).map(({ approval }) => approval.key);
   assert.deepEqual(keys("GitHub"), ["github"], "the title, in any case");
-  assert.deepEqual(keys("mcp server"), ["github"], "the kind in words");
+  assert.deepEqual(keys("connector"), ["github"], "the kind in words");
   assert.deepEqual(keys(" since you "), ["nightly"], "the grey line, trimmed");
   assert.deepEqual(keys("archive"), [], "never the session's archive request");
   assert.deepEqual(keys(""), ["github", "nightly"]);
@@ -143,14 +143,14 @@ test("a search matches an approval's title, kind and grey line (#773)", async ()
 test("an approval's words are the window's, per kind (#773)", async () => {
   const { actionWord, approvalID, approvalLine, explanations, kindWords } = await load("src/model/approvals.ts");
   assert.deepEqual(["mcpServer", "workflow", "plugin", "file", "archive"].map((k) => kindWords[k]),
-    ["MCP server", "Workflow", "Plugin", "File", "Archive"]);
+    ["Connector", "Workflow", "Plugin", "File", "Archive"]);
   const words = (kind) => ["approve", "deny", "requestChanges"].map((a) => actionWord(kind, a));
   assert.deepEqual(words("mcpServer"), ["Approve", "Deny", "Request Changes"]);
   assert.deepEqual(words("workflow"), ["Approve", "Deny", "Request Changes"]);
   assert.deepEqual(words("plugin"), ["Approve", "Deny", "Request Changes"]);
   assert.deepEqual(words("file"), ["Keep", "Undo", "Request Changes"]);
   assert.deepEqual(words("archive"), ["Archive", "Keep Session", "Request Changes"]);
-  assert.equal(approvalLine(approval("mcpServer", "github")), "MCP server · New with the last pull");
+  assert.equal(approvalLine(approval("mcpServer", "github")), "Connector · New with the last pull");
   assert.equal(approvalID(approval("file", ".agents/mcp.json")), "file:.agents/mcp.json");
   assert.equal(explanations.archive, "The session asked to be archived. Keep Session takes the request away and leaves it where it is.");
   assert.ok(explanations.mcpServer.endsWith(".agents/mcp.json changes again."));
@@ -330,9 +330,9 @@ test("an Activity page is in the address on its own, and an unknown one is ignor
     assert.deepEqual(parseRoute("#/a/spending"), { activity: "spending" });
     assert.deepEqual(parseRoute("#/a/time"), { activity: "time" });
     assert.deepEqual(parseRoute("#/a/milestones"), { activity: "milestones" });
-    assert.deepEqual(parseRoute("#/a/mcp"), { activity: "mcp" }, "MCP Servers has a page of its own (#589)");
+    assert.deepEqual(parseRoute("#/a/mcp"), { activity: "mcp" }, "Your Connectors has a page of its own (#589)");
     assert.deepEqual(parseRoute("#/h/mac/p/file%3A%2F%2F%2Fw%2Fa/m/1"), { host: "mac", project: "file:///w/a", mcp: true },
-      "a project's MCP Servers has a page of its own (#753)");
+      "a project's Connectors has a page of its own (#753)");
     assert.equal(routeHash({ host: "mac", project: "file:///w/a", mcp: true }), "#/h/mac/p/file%3A%2F%2F%2Fw%2Fa/m/1");
     assert.deepEqual(parseRoute("#/a/settings"), {});
   } finally {
@@ -341,7 +341,7 @@ test("an Activity page is in the address on its own, and an unknown one is ignor
   }
 });
 
-test("the MCP Servers row: none hosted says nothing, one stopped in use is the count (#589)", async () => {
+test("the Your Connectors row: none hosted says nothing, one stopped in use is the count (#589)", async () => {
   const { hostedTally } = await load("src/model/hostedMCP.ts");
   const server = (name, state) => ({ name, state, restarts: 0, users: 1 });
   assert.equal(hostedTally([]), null);
@@ -349,7 +349,7 @@ test("the MCP Servers row: none hosted says nothing, one stopped in use is the c
   assert.deepEqual(hostedTally([server("gh", "running"), server("ci", "restarting")]), { words: "1 stopped", stopped: true });
 });
 
-test("MCP Servers: every server's health, the person's and each project's, in the words the Mac has (#753)", async () => {
+test("Connectors: every connector's health, the person's and each project's, in the words the Mac has (#753)", async () => {
   const { healthTally, healthLine, healthKind, healthLastError, healthTone, personalServers, projectServers, fileProblem } =
     await load("src/model/hostedMCP.ts");
   const snapshot = {
