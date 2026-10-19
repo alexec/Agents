@@ -831,6 +831,9 @@ final class AppModel {
     /// field and clears this, because the prompt itself is still the bar's own and
     /// sending it is still the person's move.
     var offeredPrompt: String?
+    /// Words quoted from a reply for the open chat's prompt bar (#1553): added to what is
+    /// there as a quote, then cleared.
+    var offeredQuote: String?
     /// A new agent a view filled in (#834), for the project page's bar to take once its
     /// folder is this one: the prompt, the labels and the worktree. Starting it is still
     /// the person's move.

@@ -11,6 +11,7 @@
 // A `/` at the start of a word lists the runtime's commands, and an `@` the files the host finds
 // under the agent's folders (#255), over the field as the window's CommandList and MentionList:
 // arrows move, Return or Tab takes one, Escape puts the list away for that word.
+import { quoteInto } from "../model/promptQuote";
 import { recall } from "../model/promptHistory";
 import { useSignal } from "@preact/signals";
 import { useEffect, useRef } from "preact/hooks";
@@ -132,6 +133,20 @@ export function Prompt({ store, draftKey, placeholder, capabilities, disabled, s
     keep();
     store.offeredPrompt.value = null;
   }, [given, draftKey]);
+  // Quote in Prompt (#1553): added after what is typed, the caret after it.
+  const quoted = store.offeredQuote.value;
+  const field = useRef<HTMLTextAreaElement>(null);
+  useEffect(() => {
+    if (!quoted || quoted.draftKey !== draftKey) return;
+    text.value = quoteInto(quoted.words, text.value);
+    keep();
+    store.offeredQuote.value = null;
+    const el = field.current;
+    if (el) {
+      el.focus();
+      requestAnimationFrame(() => el.setSelectionRange(el.value.length, el.value.length));
+    }
+  }, [quoted, draftKey]);
 
   const take = async (files: Iterable<File>) => {
     for (const file of files) {
@@ -268,7 +283,7 @@ export function Prompt({ store, draftKey, placeholder, capabilities, disabled, s
         )}
         <div class="prompt-field">
           {/* Never disabled: what is typed while the link is down is kept and sent once it's back (US7). */}
-          <textarea aria-label="Prompt" enterkeyhint={onTouchScreen() ? "enter" : "send"} placeholder={offered ? `${offered.prompt}  (Tab)` : placeholder} rows={2} value={text.value}
+          <textarea ref={field} aria-label="Prompt" enterkeyhint={onTouchScreen() ? "enter" : "send"} placeholder={offered ? `${offered.prompt}  (Tab)` : placeholder} rows={2} value={text.value}
             readOnly={starting && sending.value}
             onInput={(e) => {
               text.value = (e.currentTarget as HTMLTextAreaElement).value;

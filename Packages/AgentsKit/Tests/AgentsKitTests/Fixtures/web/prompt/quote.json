@@ -1,0 +1,66 @@
+[
+  {
+    "expected" : "> Use the cache.\n\n",
+    "input" : {
+      "quote" : "Use the cache.",
+      "text" : ""
+    },
+    "name" : "into an empty prompt"
+  },
+  {
+    "expected" : "About this:\n\n> Use the cache.\n\n",
+    "input" : {
+      "quote" : "Use the cache.",
+      "text" : "About this:"
+    },
+    "name" : "after a line"
+  },
+  {
+    "expected" : "About this:\n\n> Use the cache.\n\n",
+    "input" : {
+      "quote" : "Use the cache.",
+      "text" : "About this:\n"
+    },
+    "name" : "after a line and its break"
+  },
+  {
+    "expected" : "About this:\n\n> Use the cache.\n\n",
+    "input" : {
+      "quote" : "Use the cache.",
+      "text" : "About this:\n\n"
+    },
+    "name" : "after an empty line"
+  },
+  {
+    "expected" : "> First.\n>\n> Second.\n\n",
+    "input" : {
+      "quote" : "First.\n\nSecond.\n",
+      "text" : ""
+    },
+    "name" : "lines and an empty line in it"
+  },
+  {
+    "expected" : "> Padded.\n\n",
+    "input" : {
+      "quote" : "  \n Padded. \n ",
+      "text" : ""
+    },
+    "name" : "spaces around it"
+  },
+  {
+    "expected" : "Kept.",
+    "input" : {
+      "quote" : " \n",
+      "text" : "Kept."
+    },
+    "name" : "nothing to quote"
+  },
+  {
+    "expected" : "> Use the cache.\n\n> More.\n\n",
+    "input" : {
+      "quote" : "More.",
+      "text" : "> Use the cache.\n\n"
+    },
+    "name" : "a second quote"
+  }
+]

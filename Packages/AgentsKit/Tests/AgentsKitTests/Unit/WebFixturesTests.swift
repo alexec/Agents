@@ -865,6 +865,26 @@ struct WebFixturesTests {
         }
     }
 
+    /// Quote in Prompt (#1553): the quote after what is typed, an empty line between.
+    @Test func promptQuote() throws {
+        let steps: [(String, String, String)] = [
+            ("into an empty prompt", "Use the cache.", ""),
+            ("after a line", "Use the cache.", "About this:"),
+            ("after a line and its break", "Use the cache.", "About this:\n"),
+            ("after an empty line", "Use the cache.", "About this:\n\n"),
+            ("lines and an empty line in it", "First.\n\nSecond.\n", ""),
+            ("spaces around it", "  \n Padded. \n ", ""),
+            ("nothing to quote", " \n", "Kept."),
+            ("a second quote", "More.", "> Use the cache.\n\n"),
+        ]
+        let cases = steps.map { name, quote, text in
+            Case(name: name, input: .object(["quote": .string(quote), "text": .string(text)]))
+        }
+        try pin("prompt/quote.json", cases) { input in
+            .string(PromptQuote.adding(input["quote"]?.stringValue ?? "", to: input["text"]?.stringValue ?? ""))
+        }
+    }
+
     // MARK: sandbox/
 
     @Test func sandbox() throws {
