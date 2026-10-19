@@ -37,6 +37,7 @@ struct Transcript: View {
                        // from (FR-042).
                        scrollToEndToken: popped?.scrollToEndToken ?? model.scrollToEndToken,
                        focusedEntry: popped == nil ? model.focusedEntry : nil,
+                       focusedIndex: popped == nil ? model.focusedIndex : nil,
                        clearFocus: { if popped == nil { model.clearFocus() } },
                        onFollowing: { page.isFollowingEnd = $0 })
     }

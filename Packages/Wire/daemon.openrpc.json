@@ -715,6 +715,30 @@
       }
     },
     {
+      "name": "agents/find",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/FindRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/FindResult"
+        }
+      }
+    },
+    {
       "name": "approvals/answer",
       "tags": [
         {

@@ -23,6 +23,9 @@ struct ChatView: View {
     /// Whether this window has an inspector: not a session's own window (#826), but a
     /// project's does (#1089).
     @Environment(\.windowHasInspector) private var hasInspector
+    @Environment(WindowRequests.self) private var requests
+    /// Find in Chat is up over the chat (#1532).
+    @State private var finding = false
     @State private var formHeight: CGFloat = 0
     /// The open chat's views (#187), torn down when another chat opens.
     @State private var views = AppViewStore()
@@ -49,6 +52,12 @@ struct ChatView: View {
                                 OfflineStrip(host: agent.host)
                                 DiskStrip(host: agent.host)
                                 actions(for: agent)
+                                if finding, popped == nil {
+                                    ChatFindBar(agentID: agent.id,
+                                                search: { [model] text in await model.find(text, in: agent.id) },
+                                                go: { [model] match in await model.reveal(match) },
+                                                close: { finding = false })
+                                }
                                 // What it said it would do, as the phone has it (#341).
                                 CurrentPlanStrip(agent: agent)
                             }
@@ -93,6 +102,11 @@ struct ChatView: View {
             }
         }
         .onChange(of: agent?.id) { views.tearDownAll() }
+        .onChange(of: requests.wantsChatFind) {
+            guard requests.wantsChatFind, popped == nil else { return }
+            requests.wantsChatFind = false
+            finding = true
+        }
         // A view read when the link dropped may never be answered: read it again (#978).
         .onChange(of: model.isConnected) { if model.isConnected { views.reconnected() } }
     }

@@ -80,6 +80,13 @@ public final class AgentsModel {
     /// the page, so folding per redraw was the page's whole length of work, again,
     /// for every word.
     public private(set) var transcriptItems: [TranscriptItem] = []
+    /// Whether the transcript entry at `index` is in hand: in the page of entries, or in one
+    /// of the stored turns before it. Find goes to a match once it is (#1532).
+    public func holds(index: Int) -> Bool {
+        (!entries.isEmpty && index >= firstEntryIndex)
+            || turns.contains { $0.start <= index && index < $0.end }
+    }
+
     /// The prompts the person sent in the page, oldest first: what Up and Down in the
     /// prompt bar give back (#1551).
     public var sentPrompts: [String] { PromptHistory.sent(turns: turns, entries: entries) }

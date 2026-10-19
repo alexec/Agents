@@ -5037,12 +5037,36 @@ final class AppModel {
     /// came from is one tap (FR-042). Cleared once the transcript has scrolled to it.
     var focusedEntry: UUID?
 
-    func focusEntry(_ id: UUID) {
+    /// Where `focusedEntry` is in the transcript, when Find knows it (#1532).
+    var focusedIndex: Int?
+
+    func focusEntry(_ id: UUID, at index: Int? = nil) {
+        focusedIndex = index
         focusedEntry = id
     }
 
     func clearFocus() {
         focusedEntry = nil
+        focusedIndex = nil
+    }
+
+    /// Find in Chat (#1532): what was said in a chat that holds `text`, found by its host.
+    func find(_ text: String, in agentID: UUID) async -> DaemonAPI.FindResult? {
+        try? await client(forAgent: agentID).call(DaemonAPI.Method.agentsFind,
+                                                   DaemonAPI.FindRequest(agentID: agentID, text: text),
+                                                   returning: DaemonAPI.FindResult.self)
+    }
+
+    /// Go to a match in the open chat: earlier pages come in until its turn is in hand
+    /// (each the page Load Earlier would bring), then the chat goes to it.
+    func reveal(_ match: DaemonAPI.FindMatch) async {
+        while !work.holds(index: match.index), work.hasMoreOfTheConversation {
+            let before = (work.firstTurn, work.firstEntryIndex)
+            await loadEarlier()
+            // Nothing came: the link, or the end of the chat. Go as near as it can.
+            if work.firstTurn == before.0, work.firstEntryIndex == before.1 { break }
+        }
+        focusEntry(match.entryID, at: match.index)
     }
 
     /// What this agent last asked the user to look at, taken rather than read: a file

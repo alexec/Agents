@@ -11,7 +11,7 @@ import { openTurnsHeld, rememberOpen, type Store } from "../model/store";
 import { backgroundAge, backgroundEnded, backgroundNoun, isRunning, subagentNoSteps, subagentStatus } from "../model/background";
 import { display, isPersonsAsk, isWorking, placing, type ChatTurn, type Item } from "../model/turns";
 import { fromWireDate, toWireDate } from "../protocol/dates";
-import type { Agent, AppViewCall, BackgroundItem, FileMentionDTO, TranscriptEntry, TurnSummary } from "../protocol/generated";
+import type { Agent, AppViewCall, BackgroundItem, FileMentionDTO, FindMatch, FindResult, TranscriptEntry, TurnSummary } from "../protocol/generated";
 import { replace, route } from "../route";
 import { useWaitingCards, type WaitingCard } from "./Cards";
 import { OfflineStrip } from "./OfflineStrip";
@@ -35,7 +35,7 @@ import { CallActionsContext, fromLine, ItemRow, TurnView, type CallActions, type
 import { Modal } from "./Modal";
 import { nameOf, pathOf, setPane } from "./files/paneState";
 import { FileSearch, isOpenFileKey } from "./files/FileSearch";
-import { focusedEntry } from "../model/focus";
+import { focusedEntry, focusedIndex } from "../model/focus";
 import { ViewLayerContext } from "./chat/AppView";
 import { recipient, type Start, viewPin } from "./chat/appViewBridge";
 import { ViewLayer, type ViewActions } from "./chat/viewLayer";
@@ -110,6 +110,19 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
   const chosen = useSignal<Record<string, TurnDetail>>({});
   /** The run of calls gone to from elsewhere: opened, with its first call (#1315). */
   const focusedRun = useSignal<string | null>(null);
+  /** Find in Chat is up over the chat (#1532). */
+  const finding = useSignal(false);
+  // ⌘F (Ctrl+F) finds in the open chat, as in the window (#1532), in place of the browser's own find.
+  useEffect(() => {
+    const press = (e: KeyboardEvent) => {
+      if (e.key.toLowerCase() !== "f" || !(e.metaKey || e.ctrlKey) || e.shiftKey || e.altKey) return;
+      e.preventDefault();
+      finding.value = true;
+    };
+    document.addEventListener("keydown", press);
+    return () => document.removeEventListener("keydown", press);
+  }, []);
+  useEffect(() => { finding.value = false; }, [host, session]);
   /** The few opened turns whose entries are held, newest last (#291). */
   const fetched = useSignal<Record<string, HeldTurn>>({});
   /** Turns whose steps were asked for and did not come, until asked again (#544). */
@@ -318,13 +331,24 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
       follow(false);
       target.scrollIntoView({ block: "center", behavior: "smooth" });
       focusedEntry.value = null;
+      focusedIndex.value = null;
       return;
     }
     if (turn && (chosen.value[turn.id] ?? initialDetail) === "collapsed") {
       follow(false);
       chosen.value = { ...chosen.value, [turn.id]: "open" };
+      return;
     }
-  }, [focus, rows, chosen.value]);
+    // Found by Find in a stored turn's steps (#1532): the turn is opened, and its steps come.
+    const index = focusedIndex.value;
+    const stored = !turn && index !== null ? rows.find((item) => item.range && item.range.start <= index && index < item.range.end) : undefined;
+    if (stored && (chosen.value[stored.id] ?? initialDetail) !== "open") {
+      follow(false);
+      chosen.value = { ...chosen.value, [stored.id]: "open" };
+      // Asked for here: a turn far up the chat does not load its own steps.
+      void latest.current.loadDetail(stored);
+    }
+  }, [focus, rows, chosen.value, fetched.value]);
 
   // What waits on the person is in the conversation, not over it (#723), each where it was asked:
   // what came after it is below it (#973). Scrolled out of sight, the way back says a question is
@@ -466,6 +490,7 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
       <BlockStrip store={store} host={host} agent={agent} disabled={down} />
       {/* What it said it would do, under what it waits on, as the Remote has it (#341). */}
       <CurrentPlanStrip agent={agent} />
+      {finding.value && agent && <FindBar store={store} host={host} agentID={agent.id} close={() => (finding.value = false)} />}
       <CallActionsContext.Provider value={callActions}>
       <ViewLayerContext.Provider value={viewHosting}>
       <div class="scroll transcript" ref={scroller} onScroll={onScroll}>
@@ -784,4 +809,65 @@ function QuietLine({ since }: { since: Date }) {
   }, []);
   const line = quietLine(since, now.value);
   return line ? <p class="quiet-line" title={since.toLocaleString()}>{line}</p> : null;
+}
+
+/**
+ * Find in Chat (ChatFindBar, #1532): what was said in the open chat, found by its host, newest match
+ * first. Enter and ↑ go back through the chat, Shift-Enter and ↓ come forward, Escape closes it.
+ */
+function FindBar({ store, host, agentID, close }: { store: Store; host: string; agentID: string; close: () => void }) {
+  const text = useSignal("");
+  const result = useSignal<FindResult | null>(null);
+  const at = useSignal<number | null>(null);
+  const go = async (match: FindMatch) => {
+    await store.loadUntil(match.index);
+    focusedIndex.value = match.index;
+    focusedEntry.value = match.entryID;
+  };
+  // A pause in the typing, then the host is asked; a newer word drops the older answer.
+  useEffect(() => {
+    const words = text.value.trim();
+    if (!words) {
+      result.value = null;
+      at.value = null;
+      return;
+    }
+    let gone = false;
+    const timer = setTimeout(() => {
+      void store.find(host, agentID, words).then((found) => {
+        if (gone || !found) return;
+        result.value = found;
+        at.value = found.matches.length ? found.matches.length - 1 : null;
+        if (at.value !== null) void go(found.matches[at.value]!);
+      });
+    }, 250);
+    return () => { gone = true; clearTimeout(timer); };
+  }, [text.value, agentID]);
+  const matches = result.value?.matches ?? [];
+  const step = (back: boolean) => {
+    if (at.value === null) return;
+    const next = at.value + (back ? -1 : 1);
+    if (next < 0 || next >= matches.length) return;
+    at.value = next;
+    void go(matches[next]!);
+  };
+  const count = !result.value ? null : at.value === null ? "No matches"
+    : `${at.value + 1} of ${matches.length}${result.value.more ? "+" : ""}`;
+  return (
+    <div class="find-bar" role="search">
+      <input type="search" aria-label="Find in Chat" placeholder="Find in Chat" value={text.value} ref={(el) => el?.focus()}
+        onInput={(e) => (text.value = (e.currentTarget as HTMLInputElement).value)}
+        onKeyDown={(e) => {
+          if (e.key === "Escape") { e.preventDefault(); close(); }
+          else if (e.key === "Enter" || e.key === "ArrowUp" || e.key === "ArrowDown") {
+            e.preventDefault();
+            step(e.key === "ArrowUp" || (e.key === "Enter" && !e.shiftKey));
+          }
+        }} />
+      {count && <span class="faint small" aria-live="polite">{count}</span>}
+      <button class="link" aria-label="Earlier match" title="Earlier match" disabled={!at.value} onClick={() => step(true)}>↑</button>
+      <button class="link" aria-label="Later match" title="Later match" disabled={at.value === null || at.value >= matches.length - 1} onClick={() => step(false)}>↓</button>
+      <button class="link" onClick={close}>Done</button>
+    </div>
+  );
 }

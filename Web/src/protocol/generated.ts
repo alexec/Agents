@@ -1510,6 +1510,35 @@ export interface FilesWriteResponse {
   path: string;
 }
 
+/**
+ * One message that holds the text: where it is in the transcript (its first chunk), and the line it
+ * is on.
+ */
+export interface FindMatch {
+  index: number;
+  entryID: UUID;
+  line: string;
+}
+
+/**
+ * agents/find (#1532): what was said in one chat, prompts and replies, that holds the text, any
+ * case.
+ */
+export interface FindRequest {
+  agentID: UUID;
+  text: string;
+  limit?: number;
+}
+
+/**
+ * The matches, oldest first: the newest `limit` of them. More is true when older ones were left
+ * out.
+ */
+export interface FindResult {
+  matches: FindMatch[];
+  more: boolean;
+}
+
 export interface FolderHunk {
   oldStart: number;
   newStart: number;
@@ -4314,6 +4343,7 @@ export interface Methods {
   "agents/delete": { params: AgentRequest; result: Empty };
   "agents/discardDraft": { params: DiscardDraftRequest; result: Empty };
   "agents/editQueued": { params: EditQueuedRequest; result: EditQueuedResult };
+  "agents/find": { params: FindRequest; result: FindResult };
   "agents/fork": { params: AgentRequest; result: UUID };
   "agents/labelVocabulary": { params: LabelVocabularyRequest; result: string[] };
   "agents/list": { params: ListRequest; result: Agent[] };
@@ -4443,6 +4473,7 @@ export const MethodTarget = {
   "agents/delete": "host",
   "agents/discardDraft": "host",
   "agents/editQueued": "host",
+  "agents/find": "host",
   "agents/fork": "host",
   "agents/labelVocabulary": "host",
   "agents/list": "host",
@@ -4757,6 +4788,9 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   FilesWatchRequest: { required: ["agentID", "folder"], optional: [] },
   FilesWriteRequest: { required: ["agentID", "name", "data"], optional: [] },
   FilesWriteResponse: { required: ["path"], optional: [] },
+  FindMatch: { required: ["index", "entryID", "line"], optional: [] },
+  FindRequest: { required: ["agentID", "text"], optional: ["limit"] },
+  FindResult: { required: ["matches", "more"], optional: [] },
   FolderHunk: { required: ["oldStart", "newStart", "noNewlineAtEnd", "lines"], optional: [] },
   FoundFolder: { required: ["folder", "exists", "isRepository", "isProject"], optional: ["typed"] },
   GitAsk: { required: ["server", "from"], optional: [] },

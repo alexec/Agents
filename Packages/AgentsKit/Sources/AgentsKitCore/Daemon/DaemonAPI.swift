@@ -119,6 +119,9 @@ public enum DaemonAPI {
         /// New words for the person's queued prompt, in its place in the queue (#1552).
         /// Answers `EditQueuedResult`: not edited when it was sent or taken back first.
         public static let agentsEditQueued = "agents/editQueued"
+        /// What was said in one chat that holds some text (#1532). Takes a `FindRequest`,
+        /// answers a `FindResult`.
+        public static let agentsFind = "agents/find"
         /// Stop one shell or task an agent left running in the background, and nothing
         /// else it is doing (057).
         public static let agentsStopBackground = "agents/stopBackground"
@@ -1187,6 +1190,41 @@ public enum DaemonAPI {
     public struct EditQueuedResult: Codable, Sendable {
         public var edited: Bool
         public init(edited: Bool) { self.edited = edited }
+    }
+
+    /// Find in a chat (#1532): its prompts and replies that hold `text`, any case.
+    public struct FindRequest: Codable, Sendable {
+        public var agentID: UUID
+        public var text: String
+        public var limit: Int?
+        public init(agentID: UUID, text: String, limit: Int? = nil) {
+            self.agentID = agentID
+            self.text = text
+            self.limit = limit
+        }
+    }
+
+    /// One message that holds the text: where it is in the transcript (its first chunk, the
+    /// id the chat draws it with), and the line it is on.
+    public struct FindMatch: Codable, Sendable, Hashable {
+        public var index: Int
+        public var entryID: UUID
+        public var line: String
+        public init(index: Int, entryID: UUID, line: String) {
+            self.index = index
+            self.entryID = entryID
+            self.line = line
+        }
+    }
+
+    /// The newest matches, oldest first; `more` when older ones were left out.
+    public struct FindResult: Codable, Sendable {
+        public var matches: [FindMatch]
+        public var more: Bool
+        public init(matches: [FindMatch], more: Bool) {
+            self.matches = matches
+            self.more = more
+        }
     }
 
     /// What the MCP helper sends when an agent calls the older suggestion tool.

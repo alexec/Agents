@@ -469,6 +469,10 @@ button.link.reading:hover { text-decoration: underline; }
   opacity: 0.65;
 }
 .queued p { margin: 0; }
+/* Find in Chat (#1532): one line over the chat, in the chat's column. */
+.find-bar { display: flex; align-items: center; gap: 10px; margin: 6px auto; padding: 4px 12px; width: min(100% - 32px, 760px);
+  box-sizing: border-box; background: var(--paper-well); border-radius: 999px; }
+.find-bar input { flex: 1; min-width: 0; border: none; background: transparent; font: inherit; color: inherit; outline: none; }
 .queued.editing { width: 70%; }
 .queued-editor { width: 100%; box-sizing: border-box; font: inherit; padding: 6px 11px; resize: vertical;
   background: var(--paper-well); border: 1px solid var(--accent); border-radius: var(--radius-card); color: inherit; }

@@ -12663,6 +12663,67 @@
       ],
       "additionalProperties": false
     },
+    "FindRequest": {
+      "type": "object",
+      "description": "agents/find (#1532): what was said in one chat, prompts and replies, that holds the text, any case.",
+      "properties": {
+        "agentID": {
+          "$ref": "#/definitions/UUID"
+        },
+        "text": {
+          "type": "string"
+        },
+        "limit": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "agentID",
+        "text"
+      ],
+      "additionalProperties": false
+    },
+    "FindMatch": {
+      "type": "object",
+      "description": "One message that holds the text: where it is in the transcript (its first chunk), and the line it is on.",
+      "properties": {
+        "index": {
+          "type": "integer"
+        },
+        "entryID": {
+          "$ref": "#/definitions/UUID"
+        },
+        "line": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "index",
+        "entryID",
+        "line"
+      ],
+      "additionalProperties": false
+    },
+    "FindResult": {
+      "type": "object",
+      "description": "The matches, oldest first: the newest `limit` of them. More is true when older ones were left out.",
+      "properties": {
+        "matches": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/FindMatch"
+          }
+        },
+        "more": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "matches",
+        "more"
+      ],
+      "additionalProperties": false
+    },
     "UpdateState": {
       "anyOf": [
         {

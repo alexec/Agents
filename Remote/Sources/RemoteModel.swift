@@ -47,6 +47,10 @@ final class RemoteModel {
     /// Words quoted from a reply for the open chat's prompt bar (#1553): added to what is
     /// there as a quote, then cleared.
     var offeredQuote: String?
+    /// A message for the open chat to go to, and where it is in the transcript: Find in
+    /// Chat's match (#1532). Cleared once the chat has gone to it.
+    var focusedEntry: UUID?
+    var focusedIndex: Int?
     /// A send refused because the agent's folder has gone (#119), with the ways on.
     var folderGone: FolderGoneAsk?
 
@@ -3969,6 +3973,25 @@ final class RemoteModel {
 
     /// Another page, backwards. Never the whole history: that is the difference
     /// between a conversation opening in a second and one opening on a train.
+    /// Find in Chat (#1532): what was said in a chat that holds `text`, found by its host.
+    func find(_ text: String, in agentID: UUID) async -> DaemonAPI.FindResult? {
+        let request = DaemonAPI.FindRequest(agentID: agentID, text: text)
+        return try? await client(for: request).call(DaemonAPI.Method.agentsFind, request,
+                                                    returning: DaemonAPI.FindResult.self)
+    }
+
+    /// Go to a match in the open chat: earlier pages come in until its turn is in hand,
+    /// then the chat goes to it.
+    func reveal(_ match: DaemonAPI.FindMatch) async {
+        while !work.holds(index: match.index), work.hasMoreOfTheConversation {
+            let before = (work.firstTurn, work.firstEntryIndex)
+            await loadEarlier()
+            if work.firstTurn == before.0, work.firstEntryIndex == before.1 { break }
+        }
+        focusedIndex = match.index
+        focusedEntry = match.entryID
+    }
+
     func loadEarlier() async {
         guard let selection, work.hasMoreOfTheConversation, !isLoadingEarlier else { return }
         isLoadingEarlier = true
