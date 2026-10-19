@@ -10,6 +10,7 @@ import { fromWireDate } from "../protocol/dates";
 import type { ActivityPage } from "../route";
 import { Resources } from "./Resources";
 import { MCPServersList } from "./MCPServers";
+import { YourConnections } from "./ConnectorSetup";
 import { WorktreesList } from "./Worktrees";
 import { forCleanup, pageLine, rowWords, tally as worktreeTally, worktreesIntro } from "../model/worktrees";
 import { BackToList } from "./BackToList";
@@ -300,6 +301,8 @@ export function ActivityPageView({ store, page }: { store: Store; page: Activity
               {store.hosts.value.map((host) => (
                 <section key={host.id}>
                   {several && <h2 class="section-head">{hostName(host.id)}</h2>}
+                  <YourConnections store={store} host={host.id} />
+                  <h2 class="setup-heading">Your connectors</h2>
                   <MCPServersList store={store} host={host.id} />
                 </section>
               ))}
