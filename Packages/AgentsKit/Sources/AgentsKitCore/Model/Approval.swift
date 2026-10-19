@@ -109,7 +109,7 @@ public struct Approval: Codable, Hashable, Sendable, Identifiable {
     }
 
     /// Whether it has lines to read before an answer, which its Review page shows (#1472):
-    /// a file's diff, a workflow's, an MCP server's entry or a plugin's files.
+    /// a file's diff, a workflow's, a connector's entry or a plugin's files.
     public var hasReview: Bool {
         switch kind {
         case .mcpServer, .workflow, .plugin, .file: true

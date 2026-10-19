@@ -3,7 +3,7 @@ import CodeText
 import SwiftUI
 
 /// One change waiting for an OK, on a page of its own (#1472): a workflow, a guarded
-/// `.agents` file, an MCP server's entry or a plugin's files. It opens in the detail column
+/// `.agents` file, a connector's entry or a plugin's files. It opens in the detail column
 /// on a Mac and an iPad and is pushed on an iPhone, where a card or a sheet cut a long
 /// file off at a few hundred points.
 ///
