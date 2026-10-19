@@ -108,6 +108,15 @@ public struct Approval: Codable, Hashable, Sendable, Identifiable {
         }
     }
 
+    /// Whether it has lines to read before an answer, which its Review page shows (#1472):
+    /// a file's diff, a workflow's, a connector's entry or a plugin's files.
+    public var hasReview: Bool {
+        switch kind {
+        case .mcpServer, .workflow, .plugin, .file: true
+        case .archive, .workflowFailed: false
+        }
+    }
+
     /// Whether a session's own row draws it: an archive request is the session's row, with
     /// its mark, and not a row of its own.
     public var isSession: Bool { kind == .archive }

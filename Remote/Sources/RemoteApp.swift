@@ -133,7 +133,8 @@ struct RemoteView: View {
     private var routes: [RemoteRoute] {
         let open = [model.openArchive ? RemoteRoute.archive : nil, model.openMCPServers ? RemoteRoute.mcpServers : nil,
                     model.openPin.map(RemoteRoute.page),
-                    model.openWorkflow.map(RemoteRoute.workflow), model.selection.map(RemoteRoute.agent)]
+                    model.openWorkflow.map(RemoteRoute.workflow), model.selection.map(RemoteRoute.agent),
+                    model.openReview.map(RemoteRoute.review)]
             .compactMap { $0 }
         // A project with nothing open over it starts a session (#366): its New session row (#375).
         if open.isEmpty, model.selectedProject != nil { return [.start] }
@@ -150,6 +151,7 @@ struct RemoteView: View {
                     model.openPin = all.lazy.compactMap(\.pinPath).first
                     model.openWorkflow = all.lazy.compactMap(\.workflowID).first
                     model.selection = all.compactMap(\.agentID).last
+                    model.openReview = all.lazy.compactMap(\.reviewID).first
                 })
     }
 
@@ -327,6 +329,10 @@ struct RemoteView: View {
         case .agent:
             RemoteChatView().paperGround()
         case .workflow(let id): WorkflowPage(workflowID: id).paperGround()
+        case .review(let id):
+            if let summary = model.selectedSummary {
+                RemoteReviewDestination(id: id, project: summary.key).paperGround()
+            }
         case .archive:
             if let summary = model.selectedSummary {
                 ArchivePage(project: summary.key).paperGround()
@@ -398,6 +404,13 @@ enum RemoteRoute: Hashable {
     case archive
     /// The project's MCP servers (#753), from its MCP Servers row in the sidebar.
     case mcpServers
+    /// A change waiting for an OK, on its Review page (#1472), by its `Approval.id`.
+    case review(String)
+
+    var reviewID: String? {
+        if case .review(let id) = self { return id }
+        return nil
+    }
 
     var pinPath: String? {
         if case .page(let path) = self { return path }

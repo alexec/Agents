@@ -468,6 +468,7 @@ final class AppModel {
             if showsMilestones { return .milestones }
             guard let key = selectedProjectKey else { return nil }
             if let id = openWorkflow { return .workflow(id, in: key) }
+            if case .review(let id)? = projectPage { return .review(id, in: key) }
             if projectPage == .archive { return .archive(key) }
             if projectPage == .mcpServers { return .projectMCPServers(key) }
             if let openPin { return .pin(openPin, in: key) }
@@ -498,6 +499,8 @@ final class AppModel {
                 showProjectPage(.archive, of: key)
             case .projectMCPServers(let key):
                 showProjectPage(.mcpServers, of: key)
+            case .review(let id, let key):
+                showProjectPage(.review(id), of: key)
             case .spending:
                 showsSpending = true
             case .tokens:
@@ -738,6 +741,8 @@ final class AppModel {
         case archive
         /// Its MCP servers and how each is doing (#753).
         case mcpServers
+        /// A change waiting for an OK, by its `Approval.id` (#1472).
+        case review(String)
     }
 
     /// The selected project's pinned page (#159) open in the chat's place, by its path in

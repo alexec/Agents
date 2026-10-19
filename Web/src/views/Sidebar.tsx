@@ -464,7 +464,8 @@ function SmartFold({ row, store, projects, query, linkDown, downSince }: {
               chosen={agentID ? r.host === host && r.session === agentID : r.host === host && r.workflow === approval.key} />
           );
         }
-        return <ApprovalRow key={key} store={store} host={host} folder={folder} approval={approval} place={place} down={down} />;
+        return <ApprovalRow key={key} store={store} host={host} folder={folder} approval={approval} place={place} down={down}
+          chosen={r.host === host && r.review === approvalID(approval) && r.project !== undefined && folderKey(r.project) === folderKey(folder)} />;
       })}
     </details>
   );

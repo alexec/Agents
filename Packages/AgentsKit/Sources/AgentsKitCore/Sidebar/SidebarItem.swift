@@ -43,4 +43,7 @@ public enum SidebarItem: Hashable, Sendable {
     case worktrees
     /// A project's MCP servers (#753), under its project when its `.agents/mcp.json` has any.
     case projectMCPServers(ProjectKey)
+    /// A change waiting for an OK, on its Review page (#1472), by its `Approval.id`, from
+    /// its row under Needs You or Review… on its card.
+    case review(String, in: ProjectKey)
 }

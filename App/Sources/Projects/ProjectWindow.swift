@@ -231,6 +231,8 @@ private struct ProjectWindowColumns: View {
             ProjectWorkPage(page: .archive, project: key).paperGround()
         case .projectMCPServers(let key):
             MCPServersView(project: key).paperGround()
+        case .review(let id, let key):
+            ReviewDestination(id: id, project: key).paperGround()
         case .pin(let path, let key):
             PinnedPage(project: key, path: path).paperGround()
         default:
