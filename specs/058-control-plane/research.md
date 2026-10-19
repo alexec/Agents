@@ -515,6 +515,10 @@ does, and turns on the App Sandbox. Its entitlements:
 - `device.audio-input` (dictation);
 - `files.user-selected.read-only`, for the folder pickers, which pass paths to the host and
   never read them.
+- `application-groups`, with the one group `6T4RVD5724.com.alexecollins.agents` (#1118,
+  added by #1546): agentsd's socket for the window on this Mac is in that group's container.
+  On macOS a team-prefixed group needs no registration, and the Mac App Store profile allows
+  `6T4RVD5724.*`. `scripts/check-store-archive.sh` refuses any other group.
 
 What leaves the window (survey classes):
 

@@ -12,7 +12,9 @@
 #
 # For a Mac archive it also checks the app's entitlements are T044's list and no more:
 # the sandbox, network client, audio input and user-selected read-only files, plus the
-# identifiers signing adds.
+# identifiers signing adds, and one app group (#1118, #1546): 6T4RVD5724.com.alexecollins.agents,
+# where agentsd's socket for the window is. A team-prefixed group needs no registration on
+# macOS, and the Mac App Store profile allows 6T4RVD5724.*. Any other group is a failure.
 #
 # For a Mac archive every file must be readable by everyone: App Store Connect refuses an
 # installer package holding one only its owner can read (90255), which a shell with umask
@@ -80,9 +82,22 @@ if (( mac )); then
     com.apple.security.app-sandbox com.apple.security.device.audio-input
     com.apple.security.files.user-selected.read-only com.apple.security.network.client
     com.apple.security.get-task-allow keychain-access-groups
+    com.apple.security.application-groups
   )
+  # The only app group the window may join: the one it shares with Agents Host (#1118).
+  groups_allowed=( 6T4RVD5724.com.alexecollins.agents )
   # get-task-allow is a development signature's; an App Store export removes it.
-  keys=( ${(f)"$(codesign -d --entitlements :- $app 2>/dev/null | plutil -convert json -o - - | python3 -c 'import json,sys; print("\n".join(sorted(json.load(sys.stdin))))')"} )
+  entitlements=$(codesign -d --entitlements :- $app 2>/dev/null | plutil -convert json -o - -)
+  keys=( ${(f)"$(print -r -- $entitlements | python3 -c 'import json,sys; print("\n".join(sorted(json.load(sys.stdin))))')"} )
+  groups=( ${(f)"$(print -r -- $entitlements | python3 -c 'import json,sys; print("\n".join(json.load(sys.stdin).get("com.apple.security.application-groups", [])))')"} )
+  for group in $groups; do
+    if (( ${groups_allowed[(Ie)$group]} )); then
+      print "ok  app group $group"
+    else
+      print "BAD app group $group (only ${groups_allowed[*]} is allowed)"
+      failures=$(( failures + 1 ))
+    fi
+  done
   for key in $keys; do
     if (( ${expected[(Ie)$key]} )); then
       print "ok  entitlement $key"
