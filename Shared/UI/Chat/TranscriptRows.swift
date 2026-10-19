@@ -1089,20 +1089,29 @@ extension View {
     /// pasteboard. Selecting across a reply's paragraphs and code blocks was the only
     /// way before, and in a collapsed turn what is drawn is not always all there is.
     func copiesMessage(_ entry: TranscriptEntry) -> some View {
-        modifier(CopiesMessage(text: entry.copiedText))
+        let isReply = if case .agentMessage = entry.kind { true } else { false }
+        return modifier(CopiesMessage(text: entry.copiedText, isReply: isReply))
     }
 }
 
 private struct CopiesMessage: ViewModifier {
+    @Environment(\.chatActions) private var actions
     let text: String?
+    /// The agent's reply: it can be quoted in the prompt as well (#1553).
+    var isReply = false
 
     func body(content: Content) -> some View {
         if let text {
+            let quote = isReply ? actions.quote : nil
             content
                 .contextMenu {
                     Button("Copy Message") { Self.copy(text) }
+                    if let quote {
+                        Button("Quote in Prompt") { quote(ChatSelection.text() ?? text) }
+                    }
                 }
                 .accessibilityAction(named: "Copy Message") { Self.copy(text) }
+                .accessibilityAction(named: "Quote in Prompt") { quote?(text) }
         } else {
             content
         }
@@ -1114,6 +1123,38 @@ private struct CopiesMessage: ViewModifier {
         NSPasteboard.general.setString(text, forType: .string)
         #else
         UIPasteboard.general.string = text
+        #endif
+    }
+}
+
+/// The words selected in a reply, for Quote in Prompt (#1553). Selectable text tells no one
+/// its selection, but it answers Copy: so it is asked to copy, and the pasteboard is put back
+/// as it was. The prompt bar's own words are not a reply's. The Remote has no such way, and
+/// quotes the whole message.
+enum ChatSelection {
+    @MainActor static func text() -> String? {
+        #if os(macOS)
+        let responder = NSApp.keyWindow?.firstResponder
+        if let editor = responder as? NSTextView, editor.isEditable { return nil }
+        guard let responder, responder.responds(to: #selector(NSText.copy(_:))) else { return nil }
+        let board = NSPasteboard.general
+        let kept = (board.pasteboardItems ?? []).map { item in
+            let copy = NSPasteboardItem()
+            for type in item.types {
+                if let data = item.data(forType: type) { copy.setData(data, forType: type) }
+            }
+            return copy
+        }
+        let before = board.changeCount
+        NSApp.sendAction(#selector(NSText.copy(_:)), to: responder, from: nil)
+        guard board.changeCount != before else { return nil }
+        let words = board.string(forType: .string)
+        board.clearContents()
+        if !kept.isEmpty { board.writeObjects(kept) }
+        guard let words, !words.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
+        return words
+        #else
+        return nil
         #endif
     }
 }

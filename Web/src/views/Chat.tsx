@@ -145,6 +145,8 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
         setPane(session, { tab: "changes", changed: diff.path });
         showPane();
       },
+      // Into this chat's prompt bar, after what is typed there (#1553).
+      quote: (words) => { store.offeredQuote.value = { draftKey: `${host}|${session}`, words }; },
       // Answered only while the agent waits on it, and while its host answers (#253).
       waitingSandbox: agent?.pendingSandboxFailure,
       answerSandbox: agent?.pendingSandboxFailure && !down ? (carryOn) => store.answerSandbox(host, session, carryOn) : undefined,

@@ -167,6 +167,13 @@ struct PromptBar: View {
             focused = true
             model.offeredPrompt = nil
         }
+        // Quote in Prompt (#1553): added after what is typed, the caret after it.
+        .onChange(of: model.offeredQuote) {
+            guard let quote = model.offeredQuote else { return }
+            text = PromptQuote.adding(quote, to: text)
+            focused = true
+            model.offeredQuote = nil
+        }
         // A phone put in a pocket mid-sentence loses nothing.
         .onChange(of: scenePhase) { if scenePhase != .active { StartDraftKeeper.shared.flush() } }
         .onDisappear {

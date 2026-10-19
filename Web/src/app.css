@@ -325,7 +325,8 @@ button.link {
 .copyable > .copy-message { position: absolute; display: none; background: var(--paper-ground); padding: 2px 8px; }
 .bubble.copyable > .copy-message { right: 100%; bottom: 0; margin-right: 6px; }
 .reply.copyable > .copy-message, .note.copyable > .copy-message { top: -2px; right: 0; }
-.copyable:hover > .copy-message, .copy-message:focus-visible { display: block; }
+.copyable:hover > .copy-message, .copy-message:focus-visible, .copy-message:focus-within { display: block; }
+.message-actions > .steps-control + .steps-control { margin-left: 8px; }
 @media (hover: none) {
   .copyable > .copy-message, .bubble.copyable > .copy-message, .reply.copyable > .copy-message, .note.copyable > .copy-message {
     position: static; display: block; margin: 4px 0 0 auto;

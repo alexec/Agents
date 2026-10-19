@@ -240,6 +240,14 @@ struct AgentsCommands: Commands {
             // The person's title (#751), edited in the key window's toolbar.
             Button("Rename…") { rename() }
             .disabled(agent == nil || agent?.state == .archived)
+            // The words selected in a reply, into the prompt as a quote (#1553). The reply's
+            // own menu is the text's, so the key is the way to it there.
+            Button("Quote in Prompt") {
+                guard let words = ChatSelection.text() else { NSSound.beep(); return }
+                model.offeredQuote = words
+            }
+            .keyboardShortcut("'", modifiers: [.command, .shift])
+            .disabled(agent == nil || agent?.state == .archived)
             Divider()
             Button("Branch") { act { await model.fork($0.id) } }
                 .keyboardShortcut("b", modifiers: [.command, .option])

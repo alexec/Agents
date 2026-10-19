@@ -343,6 +343,7 @@ struct RemoteChatView: View {
             },
             unqueue: { [model] prompt, agentID in await model.unqueue(prompt, from: agentID) },
             editQueued: { [model] prompt, text, agentID in await model.editQueued(prompt, text: text, of: agentID) },
+            quote: { [model] words in model.offeredQuote = words },
             sendNow: { [model] prompt, agentID in await model.sendNow(prompt, to: agentID) },
             canSendNow: { [model] runtimeID in model.canSteer(runtimeID) },
             acting: { [model] agentID in model.acting(agentID) },

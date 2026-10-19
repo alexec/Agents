@@ -18,6 +18,9 @@ struct ChatActions {
     /// New words for the person's queued prompt, in its place (#1552). When it was sent
     /// first, the app puts the words in the prompt bar and says so.
     var editQueued: @MainActor (QueuedPrompt, String, UUID) async -> Void = { _, _, _ in }
+    /// Quote in Prompt (#1553): words from a reply, added to the open chat's prompt bar as a
+    /// quote. Nil where there is no prompt bar, and then a reply offers nothing.
+    var quote: (@MainActor (String) -> Void)? = nil
     /// Send a queued prompt into the running turn, and whether this runtime can take one
     /// there at all: what it advertised, by runtime id.
     var sendNow: @MainActor (QueuedPrompt, UUID) async -> Void = { _, _ in }

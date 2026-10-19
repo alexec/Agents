@@ -44,6 +44,9 @@ final class RemoteModel {
     /// Words for the open chat's prompt bar, from elsewhere in the chat: an edit to a queued
     /// prompt that came too late (#1552). The bar takes them and sets this back to nil.
     var offeredPrompt: String?
+    /// Words quoted from a reply for the open chat's prompt bar (#1553): added to what is
+    /// there as a quote, then cleared.
+    var offeredQuote: String?
     /// A send refused because the agent's folder has gone (#119), with the ways on.
     var folderGone: FolderGoneAsk?
 

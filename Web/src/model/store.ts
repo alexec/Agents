@@ -403,6 +403,8 @@ export class Work {
   readonly problem = signal<string | null>(null);
   /** Words for a prompt bar, by its draft key, from elsewhere in the chat: an edit that came too late (#1552). */
   readonly offeredPrompt = signal<{ draftKey: string; text: string } | null>(null);
+  /** Words quoted from a reply for a prompt bar, by its draft key (#1553): added after what is typed. */
+  readonly offeredQuote = signal<{ draftKey: string; words: string } | null>(null);
   private problemsWaiting: string[] = [];
 
   say(sentence: string): void {

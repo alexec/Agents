@@ -217,12 +217,9 @@ struct PromptBar: View {
         .onChange(of: model.draftCwd) { takeOfferedStart() }
         // A persona is picked on the page's heading (#913); its labels go here.
         .onChange(of: model.draftPersona) { _, id in addLabels(ofPersona: id) }
-        .onChange(of: model.offeredPrompt) {
-            guard let offered = model.offeredPrompt else { return }
-            text = offered
-            focused = true
-            model.offeredPrompt = nil
-        }
+        // And a quote from a reply (#1553). One modifier for both: the chain is at the
+        // type checker's limit.
+        .onChange(of: [model.offeredPrompt, model.offeredQuote]) { takeOfferedWords() }
         // A new one is a new turn's worth, so it comes back from having been dismissed.
         .onChange(of: agent?.suggestedPrompts ?? []) {
             dismissedSuggestions = false
@@ -245,6 +242,21 @@ struct PromptBar: View {
         }
         .modifier(KeepsDrafts(text: $text, attachments: $attachments,
                               lostSomething: $draftLostSomething, key: draftKey))
+    }
+
+    /// Words offered from elsewhere: in place of what is typed, or, quoted from a reply
+    /// (#1553), added after it with the caret after them.
+    private func takeOfferedWords() {
+        if let offered = model.offeredPrompt {
+            text = offered
+            focused = true
+            model.offeredPrompt = nil
+        }
+        if let quote = model.offeredQuote, agent != nil {
+            text = PromptQuote.adding(quote, to: text)
+            focused = true
+            model.offeredQuote = nil
+        }
     }
 
     // MARK: A limit reached

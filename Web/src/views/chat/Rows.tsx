@@ -142,6 +142,8 @@ export interface CallActions {
   noteChart?: ((file: Shown) => void) | undefined;
   /** Read a file for a card's preview (ChatActions.readFile, #836). */
   readFile?: ((path: string) => Promise<FileReading>) | undefined;
+  /** Quote in Prompt (ChatActions.quote, #1553): words from a reply, into the prompt bar as a quote. */
+  quote?: ((words: string) => void) | undefined;
 }
 export const CallActionsContext = createContext<CallActions | null>(null);
 
@@ -284,8 +286,10 @@ export function fromLine(title: string | undefined): string {
  * Copy Message (#519): the whole message, as written, onto the clipboard. Shown while the pointer
  * is on the message or the button has focus; the Mac and the phone have it on the message's menu.
  */
-function CopyMessage({ entry }: { entry: TranscriptEntry }) {
+function CopyMessage({ entry, quotes = false }: { entry: TranscriptEntry; quotes?: boolean }) {
   const copied = useSignal(false);
+  const quote = useContext(CallActionsContext)?.quote;
+  const selected = useRef("");
   const text = copiedText(entry);
   if (!text) return null;
   const copy = () => {
@@ -294,10 +298,26 @@ function CopyMessage({ entry }: { entry: TranscriptEntry }) {
       setTimeout(() => { copied.value = false; }, 1500);
     }, () => {});
   };
-  return (
-    <button class="steps-control copy-message" onClick={copy} title="Copy this message, as written">
+  const copyButton = (
+    <button class={quotes && quote ? "steps-control" : "steps-control copy-message"} onClick={copy} title="Copy this message, as written">
       {copied.value ? "Copied" : "Copy"}
     </button>
+  );
+  if (!quotes || !quote) return copyButton;
+  // Quote in Prompt (#1553): the words selected in this reply, or all of it. Taken on the press,
+  // before the click can move the selection.
+  return (
+    <span class="copy-message message-actions">
+      <button class="steps-control" title="Quote the selected words (or all of this reply) in the prompt"
+        onMouseDown={(e) => {
+          const reply = (e.currentTarget as HTMLElement).closest(".reply");
+          const selection = window.getSelection();
+          selected.current = selection && !selection.isCollapsed && reply?.contains(selection.anchorNode) && reply.contains(selection.focusNode)
+            ? selection.toString() : "";
+        }}
+        onClick={() => quote(selected.current.trim() ? selected.current : text)}>Quote</button>
+      {copyButton}
+    </span>
   );
 }
 
@@ -321,7 +341,7 @@ function entryBody(entry: TranscriptEntry) {
     }
     case "agentMessage": {
       const message = fields(entry, "agentMessage")!;
-      return <div class="reply copyable"><Blocks blocks={message.blocks} text={message.text} /><CopyMessage entry={entry} /></div>;
+      return <div class="reply copyable"><Blocks blocks={message.blocks} text={message.text} /><CopyMessage entry={entry} quotes /></div>;
     }
     case "agentThought":
       return <ThoughtLine text={fields(entry, "agentThought")!.text} />;
