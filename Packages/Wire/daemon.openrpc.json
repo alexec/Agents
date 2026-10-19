@@ -2003,6 +2003,25 @@
       }
     },
     {
+      "name": "mcp/made-by-agents",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/MCPSearchAnswer"
+        }
+      }
+    },
+    {
       "name": "mcp/list",
       "paramStructure": "by-name",
       "params": [

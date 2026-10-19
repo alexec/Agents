@@ -101,13 +101,23 @@ Open issues: `is:open label:integration workspace`.
 
 Open issues: `is:open label:integration MCP`.
 
-| Integration | Clients that show it | State | Last checked | Where | Gaps |
-| --- | --- | --- | --- | --- | --- |
-| The github server (official github-mcp-server tools plus our events) | agents | built | 2026-10-16, side by side with the ci server it replaced (#1231) | `Go/cmd/github-mcp/main.go`, `Go/internal/githubmcp` | the ci server's views (board, issues, PR page) are not back |
-| GitHub sign-in (GitHub App `agents-loops`, device flow, no `gh`) | agents (the sheet: #1336) | built | — | `Go/internal/connections`, `Go/internal/agentsd/connections.go` | #1336 (the Connect sheet on Mac, Remote and web) |
-| MCP OAuth | Mac | built | — | `Go/internal/agentsd/mcpcatalog/oauth.go`, `App/Sources/Catalog/MCPSignInSheet.swift` | |
-| Events from MCP servers (polling only) | Mac, Remote, web | built | — | `Go/internal/agentsd/mcpevents.go` | |
-| Git credentials lent from the Mac to a Linux host | Mac, server | built | — | `App/Sources/Hosts/Lending.swift` | |
+**Levels (#1428):** each connector reaches up to five levels: **Tools**, **Events**, **Views**,
+**Workflows** and **Tested**. The host reads the first three from what the server declares
+(`tools/list`, `events` in `initialize`, `ui://` views). Workflows is reached when a ready-made
+workflow names one of the server's events (`ReadyMadeEvents`, none until #1342). Tested is
+reached when the `Tested` field of the connector's catalogue entry has a date
+(`Go/internal/agentsd/mcpcatalog/ours.go`); set it in the same branch that changes the row's
+state to `tested on a real account`. The Mac, the Remote and the web page show the levels on
+every Connectors page, and the Mac's catalogue shows them on each row.
+
+| Integration | Clients that show it | State | Levels | Last checked | Where | Gaps |
+| --- | --- | --- | --- | --- | --- | --- |
+| The github server (official github-mcp-server tools plus our events), Made by Agents | Mac, Remote, web, agents | built | Tools, Events, Views | 2026-10-18, its levels checked on a scratch host (#1428); 2026-10-16, side by side with the ci server it replaced (#1231) | `Go/cmd/github-mcp/main.go`, `Go/internal/githubmcp` | the ci server's views (board, issues, PR page) are not back |
+| GitHub sign-in (GitHub App `agents-loops`, device flow, no `gh`) | agents (the sheet: #1336) | built | — | — | `Go/internal/connections`, `Go/internal/agentsd/connections.go` | #1336 (the Connect sheet on Mac, Remote and web) |
+| The linear server (events only), Made by Agents | Mac, Remote, web, agents | built | Events | — | `Go/cmd/linear-mcp/main.go`, `Go/internal/linearmcp` | #839, #1343 |
+| MCP OAuth | Mac | built | — | — | `Go/internal/agentsd/mcpcatalog/oauth.go`, `App/Sources/Catalog/MCPSignInSheet.swift` | |
+| Events from MCP servers (polling only) | Mac, Remote, web | built | — | — | `Go/internal/agentsd/mcpevents.go` | |
+| Git credentials lent from the Mac to a Linux host | Mac, server | built | — | — | `App/Sources/Hosts/Lending.swift` | |
 
 ## Marketplaces and catalogues
 

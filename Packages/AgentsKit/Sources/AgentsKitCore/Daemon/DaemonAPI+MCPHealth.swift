@@ -64,15 +64,41 @@ extension DaemonAPI {
         public var lastError: String?
         /// How many tools it listed when it last answered.
         public var tools: Int?
+        /// The five levels it reaches (#1428), from what it declared when it last answered.
+        public var levels: MCPLevels?
+        /// One of the connectors Agents makes (#1428).
+        public var madeByAgents: Bool?
 
         public var id: String { (project ?? "~") + "|" + name }
 
         public init(name: String, project: String?, transport: MCPTransportName, hosted: Bool = false,
                     live: HostedMCPStatus? = nil, check: MCPCheckState = .unchecked, checkedAt: Date? = nil,
-                    lastError: String? = nil, tools: Int? = nil) {
+                    lastError: String? = nil, tools: Int? = nil, levels: MCPLevels? = nil, madeByAgents: Bool? = nil) {
             self.name = name; self.project = project; self.transport = transport; self.hosted = hosted
             self.live = live; self.check = check; self.checkedAt = checkedAt; self.lastError = lastError
-            self.tools = tools
+            self.tools = tools; self.levels = levels; self.madeByAgents = madeByAgents
+        }
+    }
+
+    /// The five levels a connector reaches (#1428): tools, events and views from what the
+    /// server declares; workflows when a ready-made workflow names one of its events; tested
+    /// when it was tested on a real account. Never from who made it.
+    public struct MCPLevels: Codable, Sendable, Hashable {
+        public var tools: Bool
+        public var events: Bool
+        public var views: Bool
+        public var workflows: Bool
+        public var tested: Bool
+
+        public init(tools: Bool = false, events: Bool = false, views: Bool = false,
+                    workflows: Bool = false, tested: Bool = false) {
+            self.tools = tools; self.events = events; self.views = views
+            self.workflows = workflows; self.tested = tested
+        }
+
+        /// Each level in order, with its name and whether it is reached.
+        public var each: [(name: String, reached: Bool)] {
+            [("Tools", tools), ("Events", events), ("Views", views), ("Workflows", workflows), ("Tested", tested)]
         }
     }
 

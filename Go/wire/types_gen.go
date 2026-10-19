@@ -2353,15 +2353,17 @@ type MCPCatalogErrorFailed struct {
 }
 
 type MCPCatalogResult struct {
-	ID          string           `json:"id"`
-	Title       string           `json:"title"`
-	Description string           `json:"description"`
-	Version     string           `json:"version"`
-	Publisher   MCPPublisherInfo `json:"publisher"`
-	Known       bool             `json:"known"`
-	Runs        []MCPRunKind     `json:"runs"`
-	RemoteHost  *string          `json:"remoteHost,omitzero"`
-	Marketplace *string          `json:"marketplace,omitzero"`
+	ID           string           `json:"id"`
+	Title        string           `json:"title"`
+	Description  string           `json:"description"`
+	Version      string           `json:"version"`
+	Publisher    MCPPublisherInfo `json:"publisher"`
+	Known        bool             `json:"known"`
+	Runs         []MCPRunKind     `json:"runs"`
+	RemoteHost   *string          `json:"remoteHost,omitzero"`
+	Marketplace  *string          `json:"marketplace,omitzero"`
+	Levels       *MCPLevels       `json:"levels,omitzero"`
+	MadeByAgents *bool            `json:"madeByAgents,omitzero"`
 }
 
 type MCPCheckState string
@@ -2440,6 +2442,15 @@ type MCPHealthSnapshot struct {
 	Servers  []MCPServerHealth      `json:"servers"`
 	Problems []MCPHealthFileProblem `json:"problems"`
 	At       Date                   `json:"at"`
+}
+
+// The five levels a connector reaches (#1428): tools, events and views from what the server declares, workflows when a ready-made workflow names one of its events, tested when it was tested on a real account.
+type MCPLevels struct {
+	Tools     bool `json:"tools"`
+	Events    bool `json:"events"`
+	Views     bool `json:"views"`
+	Workflows bool `json:"workflows"`
+	Tested    bool `json:"tested"`
 }
 
 type MCPListAnswer struct {
@@ -2530,15 +2541,17 @@ type MCPServer struct {
 }
 
 type MCPServerHealth struct {
-	Name      string           `json:"name"`
-	Project   *string          `json:"project,omitzero"`
-	Transport MCPTransportName `json:"transport"`
-	Hosted    bool             `json:"hosted"`
-	Live      *HostedMCPStatus `json:"live,omitzero"`
-	Check     MCPCheckState    `json:"check"`
-	CheckedAt *Date            `json:"checkedAt,omitzero"`
-	LastError *string          `json:"lastError,omitzero"`
-	Tools     *int64           `json:"tools,omitzero"`
+	Name         string           `json:"name"`
+	Project      *string          `json:"project,omitzero"`
+	Transport    MCPTransportName `json:"transport"`
+	Hosted       bool             `json:"hosted"`
+	Live         *HostedMCPStatus `json:"live,omitzero"`
+	Check        MCPCheckState    `json:"check"`
+	CheckedAt    *Date            `json:"checkedAt,omitzero"`
+	LastError    *string          `json:"lastError,omitzero"`
+	Tools        *int64           `json:"tools,omitzero"`
+	Levels       *MCPLevels       `json:"levels,omitzero"`
+	MadeByAgents *bool            `json:"madeByAgents,omitzero"`
 }
 
 type MCPServerTransport struct {

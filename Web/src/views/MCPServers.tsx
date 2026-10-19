@@ -3,9 +3,10 @@
 // its row in the sidebar. Read-only but for Check Now: servers are edited in Settings.
 import { useState } from "preact/hooks";
 import type { Store } from "../model/store";
+import type { MCPLevels } from "../protocol/generated";
 import {
-  fileProblem, healthKind, healthLastError, healthLine, healthTone, personalServers, projectEmpty, projectIntro,
-  projectServers,
+  connectorLevels, fileProblem, healthKind, healthLastError, healthLine, healthTone, levelsSentence, madeByAgents,
+  personalServers, projectEmpty, projectIntro, projectServers,
 } from "../model/hostedMCP";
 import { BackToList } from "./BackToList";
 
@@ -32,10 +33,13 @@ export function MCPServersList({ store, host, folder }: { store: Store; host: st
               <li class="resource" key={`${server.project ?? "~"}|${server.name}`}>
                 <p>
                   <span class={`mcp-dot ${tone}`} aria-hidden="true" />{" "}
-                  <span class="strong">{server.name}</span> <span class="quiet small">{healthKind(server)}</span>
+                  <span class="strong">{server.name}</span>{" "}
+                  {server.madeByAgents && <><span class="made-by-agents">{madeByAgents}</span>{" "}</>}
+                  <span class="quiet small">{healthKind(server)}</span>
                 </p>
                 <p class="quiet small">{healthLine(server)}</p>
                 {error && <p class={tone === "failing" ? "small failure" : "quiet small"}>{error}</p>}
+                <ConnectorLevels levels={server.levels} />
               </li>
             );
           })}
@@ -46,6 +50,18 @@ export function MCPServersList({ store, host, folder }: { store: Store; host: st
           onClick={checkNow}>Check Now</button>
       )}
     </div>
+  );
+}
+
+/** The five levels a connector reaches (#1428), as the window's ConnectorLevels. */
+export function ConnectorLevels({ levels }: { levels: MCPLevels | undefined }) {
+  const sentence = levelsSentence(levels);
+  return (
+    <p class="connector-levels" title={sentence} aria-label={sentence} role="img">
+      {connectorLevels(levels).map((l) => (
+        <span key={l.name} class={l.reached ? "reached" : undefined} aria-hidden="true">{l.name}</span>
+      ))}
+    </p>
   );
 }
 

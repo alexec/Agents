@@ -77,6 +77,25 @@ public enum MCPHealthWords {
     }
 
     /// Above the person's own servers, on Activity.
+    /// The five levels in order (#1428), each with whether it is reached; all not reached
+    /// when no host has seen what the connector declares.
+    public static func levels(_ levels: DaemonAPI.MCPLevels?) -> [(name: String, reached: Bool)] {
+        (levels ?? DaemonAPI.MCPLevels()).each
+    }
+
+    /// The levels as a sentence, for VoiceOver and the tooltip.
+    public static func levelsSentence(_ levels: DaemonAPI.MCPLevels?) -> String {
+        guard let levels else { return "Its levels show once its host has checked it." }
+        let reached = levels.each.filter(\.reached).map(\.name)
+        let not = levels.each.filter { !$0.reached }.map(\.name)
+        if not.isEmpty { return "Reaches all five levels." }
+        if reached.isEmpty { return "Reaches none of the five levels yet." }
+        return "Reaches " + reached.joined(separator: ", ") + ". Not yet " + not.joined(separator: ", ") + "."
+    }
+
+    /// The mark on the connectors that Agents makes (#1428).
+    public static let madeByAgents = "Made by Agents"
+
     public static let personalIntro = "Every connector in your own ~/.agents/mcp.json, which every agent has. "
         + "A hosted one runs once on this host; any other is checked every four hours, and when its entry changes. "
         + "Edit them in Settings \u{25B8} Shared \u{25B8} Connectors."

@@ -1964,6 +1964,8 @@ export interface MCPCatalogResult {
   runs: MCPRunKind[];
   remoteHost?: string;
   marketplace?: string;
+  levels?: MCPLevels;
+  madeByAgents?: boolean;
 }
 
 export type MCPCheckState = "unchecked" | "checking" | "answered" | "failed" | "waiting" | "missingSecret" | "signIn" | "oldTransport";
@@ -2013,6 +2015,19 @@ export interface MCPHealthSnapshot {
   servers: MCPServerHealth[];
   problems: MCPHealthFileProblem[];
   at: WireDate;
+}
+
+/**
+ * The five levels a connector reaches (#1428): tools, events and views from what the server
+ * declares, workflows when a ready-made workflow names one of its events, tested when it was tested
+ * on a real account.
+ */
+export interface MCPLevels {
+  tools: boolean;
+  events: boolean;
+  views: boolean;
+  workflows: boolean;
+  tested: boolean;
 }
 
 export interface MCPListAnswer {
@@ -2095,6 +2110,8 @@ export interface MCPServerHealth {
   checkedAt?: WireDate;
   lastError?: string;
   tools?: number;
+  levels?: MCPLevels;
+  madeByAgents?: boolean;
 }
 
 export type MCPServerTransport =
@@ -4777,13 +4794,14 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   MCPAddByHandRequest: { required: ["verifyID", "destination"], optional: [] },
   MCPAddRequest: { required: ["previewID", "destination", "secrets", "plain", "replace"], optional: [] },
   MCPApproveRequest: { required: ["destination", "name", "digest"], optional: [] },
-  MCPCatalogResult: { required: ["id", "title", "description", "version", "publisher", "known", "runs"], optional: ["remoteHost", "marketplace"] },
+  MCPCatalogResult: { required: ["id", "title", "description", "version", "publisher", "known", "runs"], optional: ["remoteHost", "marketplace", "levels", "madeByAgents"] },
   MCPEventTrigger: { required: ["event", "arguments"], optional: ["servers"] },
   MCPHandServer: { required: ["name", "kind", "command", "args", "env", "url", "headers"], optional: [] },
   MCPHandValue: { required: ["name", "value", "secret"], optional: ["secretName"] },
   MCPHealthCheckRequest: { required: [], optional: ["project"] },
   MCPHealthFileProblem: { required: ["message"], optional: ["project"] },
   MCPHealthSnapshot: { required: ["servers", "problems", "at"], optional: [] },
+  MCPLevels: { required: ["tools", "events", "views", "workflows", "tested"], optional: [] },
   MCPListAnswer: { required: ["servers"], optional: ["problem", "approvalsProblem"] },
   MCPListRequest: { required: ["destination"], optional: [] },
   MCPPreview: { required: ["previewID", "result", "nameHere", "chosenRun", "commandOrURL", "entry", "variables", "reach", "destinationState", "problems"], optional: ["host"] },
@@ -4794,7 +4812,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   MCPRemoveRequest: { required: ["destination", "name"], optional: ["forgetSecret"] },
   MCPSearchAnswer: { required: ["results"], optional: ["error"] },
   MCPServer: { required: ["name", "transport"], optional: [] },
-  MCPServerHealth: { required: ["name", "transport", "hosted", "check"], optional: ["project", "live", "checkedAt", "lastError", "tools"] },
+  MCPServerHealth: { required: ["name", "transport", "hosted", "check"], optional: ["project", "live", "checkedAt", "lastError", "tools", "levels", "madeByAgents"] },
   MCPSetSecretAnswer: { required: ["set"], optional: [] },
   MCPSetSecretRequest: { required: ["name", "value"], optional: [] },
   MCPSignInAnswer: { required: [], optional: ["flowID", "authorizationURL", "needsClient", "callback", "error"] },

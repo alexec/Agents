@@ -32,8 +32,17 @@ func fakeMCPServer() {
 			continue
 		}
 		result := `{"protocolVersion":"2025-06-18","capabilities":{"tools":{}},"serverInfo":{"name":"fake","version":"1"}}`
-		if m.Method == "tools/list" {
+		// With FAKE_MCP_LEVELS it declares events and a ui:// view too (#1428).
+		levels := os.Getenv("FAKE_MCP_LEVELS") == "1"
+		switch {
+		case m.Method == "initialize" && levels:
+			result = `{"protocolVersion":"2025-06-18","capabilities":{"tools":{},"resources":{},"events":{}},"serverInfo":{"name":"fake","version":"1"}}`
+		case m.Method == "tools/list":
 			result = `{"tools":[{"name":"a","inputSchema":{"type":"object"}},{"name":"b","inputSchema":{"type":"object"}}]}`
+		case m.Method == "resources/list":
+			result = `{"resources":[{"uri":"ui://fake/board","name":"board"}]}`
+		case m.Method == "events/list":
+			result = `{"events":[{"name":"pr.opened","delivery":["poll"]}]}`
 		}
 		fmt.Printf(`{"jsonrpc":"2.0","id":%d,"result":%s}`+"\n", *m.ID, result)
 	}
@@ -83,6 +92,7 @@ func TestMCPServersAreChecked(t *testing.T) {
 	os.MkdirAll(filepath.Join(home, ".agents"), 0o755)
 	entries := map[string]any{
 		"fake":   map[string]any{"command": self},
+		"levels": map[string]any{"command": self, "env": map[string]any{"FAKE_MCP_LEVELS": "1"}},
 		"web":    map[string]any{"url": web.URL},
 		"locked": map[string]any{"url": locked.URL},
 		"gone":   map[string]any{"command": "/bin/sh", "args": []string{"-c", "exit 0"}},
@@ -105,7 +115,7 @@ func TestMCPServersAreChecked(t *testing.T) {
 				return false
 			}
 		}
-		return len(m) == 4
+		return len(m) == 5
 	}
 	deadline := time.Now().Add(20 * time.Second)
 	for !settled(byName(snap)) && time.Now().Before(deadline) {
@@ -115,6 +125,12 @@ func TestMCPServersAreChecked(t *testing.T) {
 	got := byName(snap)
 	if h := got["fake"]; h.Check != wire.MCPCheckStateAnswered || h.Tools == nil || *h.Tools != 2 || h.CheckedAt == nil {
 		t.Fatalf("fake: %+v", h)
+	}
+	if h := got["fake"]; h.Levels == nil || *h.Levels != (wire.MCPLevels{Tools: true}) || h.MadeByAgents != nil {
+		t.Fatalf("fake's levels: %+v", h.Levels)
+	}
+	if h := got["levels"]; h.Levels == nil || *h.Levels != (wire.MCPLevels{Tools: true, Events: true, Views: true}) {
+		t.Fatalf("levels: %+v", h.Levels)
 	}
 	if h := got["web"]; h.Check != wire.MCPCheckStateAnswered || h.Tools == nil || *h.Tools != 1 {
 		t.Fatalf("web: %+v", h)

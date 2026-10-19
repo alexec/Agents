@@ -1150,6 +1150,15 @@ button.plain:hover { opacity: 1; }
 .mcp-dot.good { background: currentColor; border-color: currentColor; opacity: 0.55; }
 .mcp-dot.failing { background: var(--tint-failure); border-color: var(--tint-failure); opacity: 1; }
 .mcp-servers button { margin-top: 8px; }
+/* A connector's five levels (#1428): the reached ones in the accent, the others faint; and the
+   mark on the connectors Agents makes. As the window's ConnectorLevels and MadeByAgentsBadge. */
+.connector-levels { display: flex; flex-wrap: wrap; gap: 4px; margin: 4px 0 0; }
+.connector-levels span { font-size: 11px; padding: 0 5px; border-radius: 4px; opacity: 0.45;
+  background: color-mix(in srgb, currentColor 7%, transparent); }
+.connector-levels span.reached { color: var(--accent); opacity: 1;
+  background: color-mix(in srgb, var(--accent) 14%, transparent); }
+.made-by-agents { font-size: 11px; font-weight: 600; padding: 0 6px; border-radius: 999px; color: white;
+  background: var(--accent); }
 
 /* The usage charts on Cost (#823), as Health draws them. */
 .usage-charts { margin-bottom: 24px; }

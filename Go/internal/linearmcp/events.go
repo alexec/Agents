@@ -212,6 +212,15 @@ func eventNamed(name string) (event, bool) {
 	return event{}, false
 }
 
+// EventNames is the events it declares, by name, in events/list's order.
+func EventNames() []string {
+	names := make([]string, len(events))
+	for i, e := range events {
+		names[i] = e.name
+	}
+	return names
+}
+
 // eventsList is events/list's answer.
 func eventsList() map[string]any {
 	list := make([]any, len(events))

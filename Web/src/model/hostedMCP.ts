@@ -1,6 +1,6 @@
 // The words for an MCP server's row on the MCP Servers pages (#488, #589, #753), ported from
 // HostedMCPWords and MCPHealthWords in AgentsKitCore so the Mac, the Remote and the page say the same.
-import type { HostedMCPStatus, MCPHealthSnapshot, MCPServerHealth } from "../protocol/generated";
+import type { HostedMCPStatus, MCPHealthSnapshot, MCPLevels, MCPServerHealth } from "../protocol/generated";
 import { fromWireDate } from "../protocol/dates";
 
 /** "14:05", twenty-four hours, as LeaseWords.clock says it. */
@@ -134,6 +134,31 @@ export function healthTally(servers: MCPServerHealth[]): { words: string; failin
   if (failing > 0) return { words: `${failing} not answering`, failing: true };
   return { words: servers.length === 1 ? "1 connector" : `${servers.length} connectors`, failing: false };
 }
+
+/** The five levels in order (#1428), each with whether it is reached, as `MCPHealthWords.levels`. */
+export function connectorLevels(levels: MCPLevels | undefined): { name: string; reached: boolean }[] {
+  return [
+    { name: "Tools", reached: levels?.tools ?? false },
+    { name: "Events", reached: levels?.events ?? false },
+    { name: "Views", reached: levels?.views ?? false },
+    { name: "Workflows", reached: levels?.workflows ?? false },
+    { name: "Tested", reached: levels?.tested ?? false },
+  ];
+}
+
+/** The levels as a sentence, for a screen reader and the tooltip, as `MCPHealthWords.levelsSentence`. */
+export function levelsSentence(levels: MCPLevels | undefined): string {
+  if (!levels) return "Its levels show once its host has checked it.";
+  const each = connectorLevels(levels);
+  const reached = each.filter((l) => l.reached).map((l) => l.name);
+  const not = each.filter((l) => !l.reached).map((l) => l.name);
+  if (not.length === 0) return "Reaches all five levels.";
+  if (reached.length === 0) return "Reaches none of the five levels yet.";
+  return `Reaches ${reached.join(", ")}. Not yet ${not.join(", ")}.`;
+}
+
+/** The mark on the connectors that Agents makes (#1428). */
+export const madeByAgents = "Made by Agents";
 
 export const personalIntro = "Every connector in your own ~/.agents/mcp.json, which every agent has. "
   + "A hosted one runs once on this host; any other is checked every four hours, and when its entry changes. "

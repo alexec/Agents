@@ -382,6 +382,20 @@ test("Connectors: every connector's health, the person's and each project's, in 
   assert.deepEqual(healthTally([github, shared]), { words: "2 connectors", failing: false });
 });
 
+test("Connectors: each shows its five levels, from what it declares, in the words the Mac has (#1428)", async () => {
+  const { connectorLevels, levelsSentence, madeByAgents } = await load("src/model/hostedMCP.ts");
+  const github = { tools: true, events: true, views: false, workflows: false, tested: false };
+  assert.deepEqual(connectorLevels(github).map((l) => l.name), ["Tools", "Events", "Views", "Workflows", "Tested"]);
+  assert.deepEqual(connectorLevels(github).filter((l) => l.reached).map((l) => l.name), ["Tools", "Events"]);
+  assert.deepEqual(connectorLevels(undefined).filter((l) => l.reached), [], "not checked yet: none reached");
+  assert.equal(levelsSentence(github), "Reaches Tools, Events. Not yet Views, Workflows, Tested.");
+  assert.equal(levelsSentence(undefined), "Its levels show once its host has checked it.");
+  assert.equal(levelsSentence({ tools: false, events: false, views: false, workflows: false, tested: false }),
+    "Reaches none of the five levels yet.");
+  assert.equal(levelsSentence({ tools: true, events: true, views: true, workflows: true, tested: true }), "Reaches all five levels.");
+  assert.equal(madeByAgents, "Made by Agents");
+});
+
 test("Activity rows: spending added up by currency, headroom, out of the pool", async () => {
   const { todayTotals, totalWords, headroom, closeToFull, dayLimitReached, isOut, lifetimeTotals } = await load("src/views/Activity.tsx");
   const costs = {
