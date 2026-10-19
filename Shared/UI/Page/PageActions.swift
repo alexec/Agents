@@ -38,6 +38,9 @@ struct PageActions {
     /// Told when a passage opens for typing and when it closes, so an agent asking to be
     /// looked at waits rather than taking the screen (034 FR-005).
     var typing: @MainActor (Bool) -> Void = { _ in }
+    /// What the language server for a source file's language finds in it, as the editor
+    /// holds it (#844). Nil where nothing can ask, and then the editor lists nothing.
+    var diagnose: (@MainActor (_ path: String, _ text: String) async -> DaemonAPI.FileDiagnostics?)? = nil
 
     init(save: @escaping @MainActor (String, String) async -> String? = { _, _ in
              "Nothing here can save this page."

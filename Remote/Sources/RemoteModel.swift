@@ -4003,6 +4003,13 @@ final class RemoteModel {
 
     /// Another page, backwards. Never the whole history: that is the difference
     /// between a conversation opening in a second and one opening on a train.
+    /// A source file's problems, from its language server on the agent's host (#844).
+    func diagnose(path: String, text: String, of agentID: UUID) async -> DaemonAPI.FileDiagnostics? {
+        let request = DaemonAPI.FileDiagnosticsRequest(agentID: agentID, path: path, text: text)
+        return try? await client(for: request).call(DaemonAPI.Method.filesDiagnostics, request,
+                                                    returning: DaemonAPI.FileDiagnostics.self)
+    }
+
     /// The Simulator pane's calls (#842), to the session's host.
     func simulatorCalls(for agentID: UUID) -> SimulatorCalls {
         let host = { try self.client(for: DaemonAPI.AgentRequest(agentID: agentID)) }

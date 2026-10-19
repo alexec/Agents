@@ -1,3 +1,4 @@
+import AgentsKitCore
 import SwiftUI
 #if os(macOS)
 import AppKit
@@ -32,6 +33,10 @@ struct SourceEditor: View {
     @State private var saved: String
     @State private var pause: Task<Void, Never>?
     @State private var problem: String?
+    /// What the file's language server found, as last asked (#844).
+    @State private var diagnostics: DaemonAPI.FileDiagnostics?
+    /// A line to move the caret to, from the problems list; a new id each time.
+    @State private var jump: SourceJump?
 
     init(text: String, path: String, line: Int?) {
         self.text = text
@@ -51,10 +56,20 @@ struct SourceEditor: View {
                     .padding(.vertical, 6)
                 Divider()
             }
-            SourceTextView(text: $draft, line: line, isEditable: actions.canEdit) {
+            SourceTextView(text: $draft, line: line, jump: jump, isEditable: actions.canEdit) {
                 commit()
             }
             .accessibilityLabel(URL(filePath: path).lastPathComponent)
+            if let diagnostics {
+                ProblemsList(diagnostics: diagnostics) { jump = SourceJump(line: $0) }
+            }
+        }
+        // The language server is asked a moment after the typing stops (#844).
+        .task(id: draft) {
+            guard let diagnose = actions.diagnose else { return }
+            try? await Task.sleep(for: .seconds(1))
+            guard !Task.isCancelled, let found = await diagnose(path, draft), !Task.isCancelled else { return }
+            diagnostics = found
         }
         .onChange(of: text) { _, disk in
             if draft == saved { draft = disk }
@@ -89,6 +104,80 @@ struct SourceEditor: View {
     }
 }
 
+/// A move of the caret to a line, from the problems list: a new id each time, so the same
+/// line twice moves it twice.
+struct SourceJump: Equatable {
+    let line: Int
+    let id = UUID()
+}
+
+/// What a file's language server found (#844), under the editor: each problem's place and
+/// words, a click away from its line. Nothing when the file's language has no server; a
+/// line saying why when its server is not installed or did not answer.
+private struct ProblemsList: View {
+    let diagnostics: DaemonAPI.FileDiagnostics
+    let goTo: (Int) -> Void
+
+    var body: some View {
+        if diagnostics.server != nil, !diagnostics.diagnostics.isEmpty || diagnostics.reason != nil {
+            VStack(alignment: .leading, spacing: 0) {
+                Divider()
+                Text(heading)
+                    .appText(.fine)
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                if !diagnostics.diagnostics.isEmpty {
+                    ScrollView {
+                        LazyVStack(alignment: .leading, spacing: 0) {
+                            ForEach(Array(diagnostics.diagnostics.enumerated()), id: \.offset) { _, problem in
+                                Button { goTo(problem.line) } label: { row(problem) }
+                                    .buttonStyle(.plain)
+                            }
+                        }
+                    }
+                    .frame(maxHeight: 140)
+                }
+            }
+        }
+    }
+
+    private var heading: String {
+        if let reason = diagnostics.reason, diagnostics.diagnostics.isEmpty { return reason }
+        let count = diagnostics.diagnostics.count
+        return "\(count) \(count == 1 ? "problem" : "problems") · \(diagnostics.server ?? "")"
+    }
+
+    private func row(_ problem: DaemonAPI.FileDiagnostic) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 6) {
+            Image(systemName: symbol(problem.severity))
+                .foregroundStyle((problem.severity == "error" ? StateTint.failure
+                    : problem.severity == "warning" ? .attention : .none).style(or: .secondary))
+                .accessibilityLabel(problem.severity)
+            Text("\(problem.line):\(problem.column)")
+                .appText(.fine)
+                .foregroundStyle(.secondary)
+                .monospacedDigit()
+            Text(problem.message)
+                .appText(.fine)
+                .lineLimit(2)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 3)
+        .contentShape(.rect)
+        .help("Go to line \(problem.line)")
+    }
+
+    private func symbol(_ severity: String) -> String {
+        switch severity {
+        case "error": "xmark.octagon.fill"
+        case "warning": "exclamationmark.triangle.fill"
+        default: "info.circle"
+        }
+    }
+}
+
 /// Where a line starts in a text, counted from one: the offset in UTF-16, as the text
 /// views count. Past the end is the end.
 private func sourceOffset(ofLine line: Int, in text: String) -> Int {
@@ -109,6 +198,7 @@ private func sourceOffset(ofLine line: Int, in text: String) -> Int {
 private struct SourceTextView: NSViewRepresentable {
     @Binding var text: String
     let line: Int?
+    var jump: SourceJump?
     let isEditable: Bool
     /// Focus going elsewhere: what is typed goes now rather than after the pause.
     let onEnd: () -> Void
@@ -168,11 +258,20 @@ private struct SourceTextView: NSViewRepresentable {
             let length = (text as NSString).length
             view.setSelectedRange(NSRange(location: min(selection.location, length), length: 0))
         }
+        // A problem chosen in the list (#844): the caret to its line.
+        if let jump, jump != context.coordinator.lastJump {
+            context.coordinator.lastJump = jump
+            let range = NSRange(location: sourceOffset(ofLine: jump.line, in: view.string), length: 0)
+            view.setSelectedRange(range)
+            view.scrollRangeToVisible(range)
+            view.window?.makeFirstResponder(view)
+        }
     }
 
     @MainActor
     final class Coordinator: NSObject, NSTextViewDelegate {
         var parent: SourceTextView
+        var lastJump: SourceJump?
 
         init(_ parent: SourceTextView) { self.parent = parent }
 
@@ -192,6 +291,7 @@ private struct SourceTextView: NSViewRepresentable {
 private struct SourceTextView: UIViewRepresentable {
     @Binding var text: String
     let line: Int?
+    var jump: SourceJump?
     let isEditable: Bool
     let onEnd: () -> Void
 
@@ -235,11 +335,21 @@ private struct SourceTextView: UIViewRepresentable {
             let length = (text as NSString).length
             view.selectedRange = NSRange(location: min(selection.location, length), length: 0)
         }
+        // A problem chosen in the list (#844): the caret to its line.
+        if let jump, jump != context.coordinator.lastJump {
+            context.coordinator.lastJump = jump
+            if let start = view.position(from: view.beginningOfDocument,
+                                         offset: sourceOffset(ofLine: jump.line, in: view.text)) {
+                view.selectedTextRange = view.textRange(from: start, to: start)
+                view.scrollRangeToVisible(view.selectedRange)
+            }
+        }
     }
 
     @MainActor
     final class Coordinator: NSObject, UITextViewDelegate {
         var parent: SourceTextView
+        var lastJump: SourceJump?
 
         init(_ parent: SourceTextView) { self.parent = parent }
 

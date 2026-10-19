@@ -4983,6 +4983,76 @@
       ],
       "additionalProperties": false
     },
+    "FileDiagnosticsRequest": {
+      "type": "object",
+      "description": "files/diagnostics (#844): what the language server for a file's language says of it, as the editor holds it (text) or as it is on disk.",
+      "properties": {
+        "agentID": {
+          "$ref": "#/definitions/UUID"
+        },
+        "path": {
+          "type": "string"
+        },
+        "text": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "agentID",
+        "path"
+      ],
+      "additionalProperties": false
+    },
+    "FileDiagnostic": {
+      "type": "object",
+      "description": "One problem a language server found: where (line and column from 1), how bad (error, warning, info or hint), and what.",
+      "properties": {
+        "line": {
+          "type": "integer"
+        },
+        "column": {
+          "type": "integer"
+        },
+        "severity": {
+          "type": "string"
+        },
+        "message": {
+          "type": "string"
+        },
+        "source": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "line",
+        "column",
+        "severity",
+        "message"
+      ],
+      "additionalProperties": false
+    },
+    "FileDiagnostics": {
+      "type": "object",
+      "description": "A file's problems, at most 200, and the server that found them. Reason says why there is no server for it (none installed for the language, or the file too big).",
+      "properties": {
+        "diagnostics": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/FileDiagnostic"
+          }
+        },
+        "server": {
+          "type": "string"
+        },
+        "reason": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "diagnostics"
+      ],
+      "additionalProperties": false
+    },
     "FileMentionDTO": {
       "type": "object",
       "properties": {

@@ -10,13 +10,16 @@ enum MacPageActions {
     static func make(model: AppModel, agentID: UUID) -> PageActions {
         let host = model.work.agent(agentID)?.host ?? .mac
         let pictures = model.serverPictures(host)
-        return PageActions(
+        var actions = PageActions(
             save: { path, document in
                 await model.writeArtifact(agentID: agentID, path: path, text: document)
             },
             image: { url in await pictures.image(agentID: agentID, url: url) },
             stamp: { url in await pictures.stamp(agentID: agentID, url: url) },
             canEdit: !model.hosts.isOffline(host))
+        // A source file's problems, from its language server on the agent's host (#844).
+        actions.diagnose = { path, text in await model.diagnose(path: path, text: text, of: agentID) }
+        return actions
     }
 }
 

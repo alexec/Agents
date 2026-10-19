@@ -5,6 +5,7 @@
 import { useSignal } from "@preact/signals";
 import { useEffect, useLayoutEffect, useRef } from "preact/hooks";
 import type { Store } from "../../model/store";
+import type { FileDiagnostic, FileDiagnostics } from "../../protocol/generated";
 import { nameOf } from "./paneState";
 
 const settle = 700;
@@ -29,6 +30,29 @@ export function SourceEditor({ store, host, agentID, path, text, line }: {
   const saving = useRef<ReturnType<typeof setTimeout> | null>(null);
   const field = useRef<HTMLTextAreaElement>(null);
   const canEdit = store.link.state.kind === "open" && store.hostIsOnline(host);
+  /** What the file's language server found, as last asked (#844). */
+  const problems = useSignal<FileDiagnostics | null>(null);
+
+  // The language server is asked a moment after the typing stops (#844).
+  const typed = draft.value;
+  useEffect(() => {
+    let gone = false;
+    const timer = setTimeout(() => {
+      void store.link.call("files/diagnostics", { agentID: agentID as never, path, text: typed }, host)
+        .then((found) => { if (!gone) problems.value = found; }, () => {});
+    }, 1000);
+    return () => { gone = true; clearTimeout(timer); };
+  }, [typed, path, host]);
+
+  const goTo = (target: number) => {
+    const el = field.current;
+    if (!el) return;
+    const at = offsetOfLine(el.value, target);
+    el.focus();
+    el.setSelectionRange(at, at);
+    const lineHeight = parseFloat(getComputedStyle(el).lineHeight) || 18;
+    el.scrollTop = Math.max(0, (target - 1) * lineHeight - el.clientHeight / 2);
+  };
 
   // The file changed on disk: taken in place unless something typed is still to be saved.
   useEffect(() => {
@@ -70,6 +94,28 @@ export function SourceEditor({ store, host, agentID, path, text, line }: {
           saving.current = setTimeout(() => void save(), settle);
         }}
         onBlur={() => void save()} />
+      {problems.value && <Problems found={problems.value} goTo={goTo} />}
     </>
+  );
+}
+
+/**
+ * What a file's language server found (ProblemsList, #844), under the editor: each problem's place
+ * and words, a click away from its line. Nothing when the file's language has no server.
+ */
+function Problems({ found, goTo }: { found: FileDiagnostics; goTo: (line: number) => void }) {
+  if (!found.server || (found.diagnostics.length === 0 && !found.reason)) return null;
+  const count = found.diagnostics.length;
+  const heading = found.reason && count === 0 ? found.reason : `${count} ${count === 1 ? "problem" : "problems"} · ${found.server}`;
+  const mark = (p: FileDiagnostic) => (p.severity === "error" ? "⛔" : p.severity === "warning" ? "⚠️" : "ℹ️");
+  return (
+    <div class="problems" role="group" aria-label="Problems">
+      <p class="faint small">{heading}</p>
+      {found.diagnostics.map((p, i) => (
+        <button key={i} type="button" class="problem" title={`Go to line ${p.line}`} onClick={() => goTo(p.line)}>
+          <span aria-label={p.severity}>{mark(p)}</span> <span class="faint">{p.line}:{p.column}</span> {p.message}
+        </button>
+      ))}
+    </div>
   );
 }
