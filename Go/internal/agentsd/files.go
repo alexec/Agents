@@ -324,10 +324,8 @@ func (d *Daemon) registerFiles() {
 		if len(r.Data) > 25<<20 {
 			return wire.FilesWriteResponse{}, Invalid("That is more than 25 MB.")
 		}
-		dir := filepath.Join(root, ".agents", "attachments")
-		os.MkdirAll(dir, 0o700)
-		path := filepath.Join(dir, string(store.NewUUID())[:8]+"-"+filepath.Base(r.Name))
-		if err := os.WriteFile(path, r.Data, 0o600); err != nil {
+		path, err := d.writeAttachment(root, r.Name, r.Data)
+		if err != nil {
 			return wire.FilesWriteResponse{}, fileError(CodeFileNotReadable, err.Error())
 		}
 		return wire.FilesWriteResponse{Path: path}, nil

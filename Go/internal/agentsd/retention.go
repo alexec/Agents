@@ -38,11 +38,12 @@ func keepDays(keep wire.RetentionKeepFor) (time.Duration, bool) {
 	return time.Duration(n) * 24 * time.Hour, ok
 }
 
-// StartRetention sweeps now, then every hour.
+// StartRetention sweeps now, then every hour: archived agents, then attachments (#1556).
 func (d *Daemon) StartRetention() { safe.Go("retention", d.retentionClock) }
 
 func (d *Daemon) retentionClock() {
 	d.sweepArchived()
+	d.sweepAttachments()
 	t := time.NewTicker(retentionSweepEvery)
 	defer t.Stop()
 	for {
@@ -51,6 +52,7 @@ func (d *Daemon) retentionClock() {
 			return
 		case <-t.C:
 			d.sweepArchived()
+			d.sweepAttachments()
 		}
 	}
 }
