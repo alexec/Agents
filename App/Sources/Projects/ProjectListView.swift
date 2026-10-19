@@ -242,6 +242,16 @@ struct ProjectListView: View {
         // What this Mac and its hosts are doing, pinned at the foot: status lines rather
         // than somewhere to go, so not rows of the list. Each is absent when there is
         // nothing to say, which is most of the time (024 FR-015).
+        // Undo after Archive (#1534), for a few seconds, just over the foot. An overlay, not
+        // part of the inset: the list's rows draw over what is in the inset.
+        .overlay(alignment: .bottom) {
+            if let undo = model.archiveUndo {
+                ArchiveUndoStrip(undo: undo,
+                                 perform: { Task { await model.undoArchive() } },
+                                 dismiss: { model.dismissArchiveUndo(undo) })
+            }
+        }
+        .animation(.easeOut(duration: 0.2), value: model.archiveUndo?.id)
         .safeAreaInset(edge: .bottom, spacing: 0) {
             SidebarFoot()
         }

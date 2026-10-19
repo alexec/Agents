@@ -469,6 +469,9 @@ button.link.reading:hover { text-decoration: underline; }
   opacity: 0.65;
 }
 .queued p { margin: 0; }
+/* Undo after Archive (#1534): the line and Undo, at the foot of the sidebar. */
+.archive-undo { display: flex; align-items: center; gap: 10px; }
+.archive-undo span { flex: 1; min-width: 0; }
 /* Find in Chat (#1532): one line over the chat, in the chat's column. */
 .find-bar { display: flex; align-items: center; gap: 10px; margin: 6px auto; padding: 4px 12px; width: min(100% - 32px, 760px);
   box-sizing: border-box; background: var(--paper-well); border-radius: 999px; }

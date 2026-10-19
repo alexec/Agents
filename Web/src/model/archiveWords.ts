@@ -17,3 +17,13 @@ export const keepLabel = "Keep Session";
 export function archiveLine(agent: Agent): string | null {
   return asksToArchive(agent) ? archiveMark : null;
 }
+
+/** Undo after Archive (#1534): how long Undo is offered, in milliseconds (ArchiveUndo.seconds). */
+export const undoMillis = 5000;
+export const undoLabel = "Undo";
+
+/** ArchiveUndo.line: "Archived “Fix the parser”", and that it stays stopped when Archive stopped it. */
+export function undoLine(title: string | undefined | null, stopped: boolean): string {
+  const shown = title?.trim() || "Untitled";
+  return stopped ? `Archived “${shown}” and stopped it. Undo does not start it again.` : `Archived “${shown}”`;
+}

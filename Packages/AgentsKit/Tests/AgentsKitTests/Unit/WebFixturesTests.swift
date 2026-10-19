@@ -885,6 +885,22 @@ struct WebFixturesTests {
         }
     }
 
+    // MARK: archive/
+
+    /// Undo after Archive (#1534): the strip's line, with and without a stop.
+    @Test func archiveUndo() throws {
+        let cases: [(String, String?, Bool)] = [
+            ("archived", "Fix the parser", false), ("archived and stopped", "Fix the parser", true),
+            ("no title", nil, false), ("a blank title", "  ", true),
+        ]
+        try pin("archive/undo.json", cases.map { name, title, stopped in
+            Case(name: name, input: .object(["title": title.map(JSONValue.string) ?? .null, "stopped": .bool(stopped)]))
+        }) { input in
+            .string(ArchiveUndo(agentIDs: [], title: input["title"]?.stringValue,
+                                stopped: input["stopped"]?.boolValue ?? false).line)
+        }
+    }
+
     // MARK: sandbox/
 
     @Test func sandbox() throws {

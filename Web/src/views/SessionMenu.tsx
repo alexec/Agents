@@ -4,6 +4,7 @@
 // sidebar row's menu. The chat's has Open File… first, as the Remote's ··· menu does (#543), for a
 // page with no keyboard to press ⌘P on. Below 760 it has the header's Turns and Files too, so the
 // header's right is the ··· alone, as on the iPhone (#981).
+import { undoLine } from "../model/archiveWords";
 import { useSignal } from "@preact/signals";
 import { useEffect, useRef } from "preact/hooks";
 import type { Agent } from "../protocol/generated";
@@ -123,12 +124,17 @@ export function startedBy(store: Store, host: string, agent: Agent): Agent[] {
  * meanwhile is left as it is.
  */
 export async function archiveWithChildren(store: Store, host: string, agent: Agent): Promise<boolean> {
-  const children = startedBy(store, host, agent).map((a) => a.id);
+  const started = startedBy(store, host, agent);
+  const children = started.map((a) => a.id);
+  const stops = [agent, ...started].some((a) => a.state === "running" || a.state === "starting" || a.state === "waitingOnUser");
   const done = await store.perform(host, agent.id, "agents/archive");
   if (!done) return false;
+  const put = [agent.id];
   for (const id of children) {
-    if (store.agent(host, id)?.state !== "archived") await store.perform(host, id, "agents/archive");
+    if (store.agent(host, id)?.state !== "archived" && await store.perform(host, id, "agents/archive")) put.push(id);
   }
+  // Undo for a few seconds, at the foot of the list (#1534).
+  store.archiveUndo.value = { key: Date.now(), host, agentIDs: put, line: undoLine(agent.title, stops) };
   return true;
 }
 

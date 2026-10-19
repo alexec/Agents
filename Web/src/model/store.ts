@@ -404,6 +404,9 @@ export class Work {
   readonly offeredPrompt = signal<{ draftKey: string; text: string } | null>(null);
   /** Words quoted from a reply for a prompt bar, by its draft key (#1553): added after what is typed. */
   readonly offeredQuote = signal<{ draftKey: string; words: string } | null>(null);
+  /** The last Archive, while Undo is offered for it (ArchiveUndo, #1534). */
+  readonly archiveUndo = signal<{ key: number; host: string; agentIDs: string[]; line: string } | null>(null);
+
   private problemsWaiting: string[] = [];
 
   say(sentence: string): void {
@@ -2033,6 +2036,14 @@ export class Store extends Work {
     // Money or tokens, whichever it reached (#838): Agent.goOnRequest.
     const request = goOnRequest(agent, this.costs.value[host]?.limits);
     await this.act("agents/setCeiling", { ...request, agentID: agent.id }, host);
+  }
+
+  /** Undo after Archive (#1534): Unarchive what that Archive put away; one it stopped stays stopped. */
+  async undoArchive(): Promise<void> {
+    const undo = this.archiveUndo.value;
+    if (!undo) return;
+    this.archiveUndo.value = null;
+    for (const id of undo.agentIDs) await this.perform(undo.host, id, "agents/unarchive");
   }
 
   /** Whether the host took it, so a caller can leave the chat only when it did (#586). */

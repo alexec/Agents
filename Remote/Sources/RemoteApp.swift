@@ -42,6 +42,8 @@ struct RemoteApp: App {
         WindowGroup {
             RemoteView()
                 .background(Paper.ground)
+                // Undo after Archive (#1534), for a few seconds, over the foot of whatever shows.
+                .modifier(ArchiveUndoOverlay())
                 .environment(model)
                 // A new model on a new link once the phone pairs with a control plane.
                 .id(ObjectIdentifier(model))
@@ -444,5 +446,26 @@ private struct PhoneProjectCover: ViewModifier {
             RemoteProjectScene(key: project.key, back: { model.phoneProject = nil })
                 .environment(model)
         }
+    }
+}
+
+/// Undo after Archive (#1534) over the foot of the scene, on the scene's root: RemoteView's
+/// own chain is at the type checker's limit.
+private struct ArchiveUndoOverlay: ViewModifier {
+    @Environment(RemoteModel.self) private var model
+
+    func body(content: Content) -> some View {
+        content
+            .overlay(alignment: .bottom) {
+                if let undo = model.archiveUndo {
+                    ArchiveUndoStrip(undo: undo,
+                                     perform: { Task { await model.undoArchive() } },
+                                     dismiss: { model.dismissArchiveUndo(undo) })
+                        .frame(maxWidth: 480)
+                        .shadow(color: .black.opacity(0.12), radius: 8, y: 2)
+                        .padding(.bottom, 12)
+                }
+            }
+            .animation(.easeOut(duration: 0.2), value: model.archiveUndo?.id)
     }
 }
