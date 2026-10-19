@@ -184,6 +184,28 @@ func TestAProjectsConnectorSetUp(t *testing.T) {
 	}
 }
 
+// A host with no personal home can't add the connector: the page says why in words, with no
+// wire code in them.
+func TestEventsThatCannotBeTurnedOnSayWhy(t *testing.T) {
+	t.Setenv("AGENTS_PERSONAL_HOME", "")
+	d, c := start(t, t.TempDir())
+	defer d.Shutdown()
+	file := &connections.File{Path: filepath.Join(t.TempDir(), ".agents-secrets", connections.FileName)}
+	file.Put(connections.Connection{Provider: connections.GitHub, Login: "alexec", Access: "ghu_secret",
+		AccessExpiresAt: time.Now().Add(time.Hour), ConnectedAt: time.Now()})
+	d.connStoreFor = func() (connections.Store, error) { return file, nil }
+	d.newSetupReader = func(string) setupReader { return &fakeSetupGitHub{} }
+	project := gitProject(t, "https://github.com/alexec/agents-walk.git")
+	c.call(t, 1, "projects/add", map[string]any{"folder": "file://" + project})
+
+	var setup wire.ConnectorSetup
+	json.Unmarshal(c.call(t, 2, "connectors/setup", map[string]any{"folder": project}), &setup)
+	if setup.Events.State != wire.ConnectorEventsStateFailed || setup.Events.Message == nil ||
+		strings.Contains(*setup.Events.Message, "-32") {
+		t.Fatalf("%+v", setup.Events)
+	}
+}
+
 func TestASetUpWithNoGitHubRemote(t *testing.T) {
 	t.Setenv("AGENTS_PERSONAL_HOME", t.TempDir())
 	d, c := start(t, t.TempDir())
