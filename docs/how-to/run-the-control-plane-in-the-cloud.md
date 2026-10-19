@@ -412,6 +412,11 @@ first.
    `deploy/gcp/up.sh --seal-key control-key` seals the key, and starts the control plane.
    Then delete the saved `control-key` on your Mac. Anyone who has it can pose as your
    control plane.
+
+   On Google Cloud, `deploy/gcp/move.sh receive control-key` does steps 1, 2, 4 and 5 in
+   one command. It saves the machine's old store to `/opt/agents/saved/` on the machine
+   before it empties it, and it deletes `control-key` when the key is sealed. After
+   **Move Now**, `deploy/gcp/move.sh done` takes `AGENTS_CONTROL_RECEIVE=1` out again.
 5. Start the control plane on the machine, if it is not running:
 
    ```sh
