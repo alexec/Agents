@@ -454,14 +454,7 @@ func (d *Daemon) deleteArchived(a *wire.Agent, because string) error {
 	delete(d.lives, a.ID)
 	d.mu.Unlock()
 	if l != nil {
-		l.cancel()
-		l.mu.Lock()
-		s := l.session
-		l.session = nil
-		l.mu.Unlock()
-		if s != nil {
-			s.Stop()
-		}
+		l.halt()
 	}
 	d.dropAppTokens(a.ID)
 	if err := d.Store.Delete(a.ID); err != nil {
