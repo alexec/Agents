@@ -798,29 +798,42 @@ export interface Connection {
    * where it is installed.
    */
   installURL?: string;
+  /** The part of the provider the token reaches, such as a Linear workspace's name. */
+  workspace?: string;
 }
 
 export interface ConnectionDisconnectAnswer {
   error?: string;
 }
 
-/** A tool the person connects to with OAuth (#1335). GitHub so far. */
-export type ConnectionProvider = "github";
+/** A tool the person connects to with OAuth: GitHub (#1335) and Linear (#1343). */
+export type ConnectionProvider = "github" | "linear";
 
 export interface ConnectionProviderRequest {
   provider: ConnectionProvider;
+  /**
+   * For connections/sign-in from the web page: the page's origin. The hand-back page sends the code
+   * to this origin only, by postMessage. Without it, the hand-back page sends the code to
+   * agents://oauth/callback (the Mac and the Remote).
+   */
+  origin?: string;
 }
 
 /**
- * A device-flow sign-in under way on the host (#1335): the host polls the provider; a client shows
- * the code and the links, and waits.
+ * A sign-in under way on the host (#1335, #1343). The host keeps the secrets (the device code, the
+ * PKCE verifier); a client shows the code or opens the address, and waits.
  */
 export interface ConnectionSignIn {
   flowID: UUID;
   provider: ConnectionProvider;
   status: ConnectionSignInStatus;
-  /** The code the person types at verificationURL, such as WDJB-MJHT. */
-  userCode: string;
+  grant: ConnectionSignInGrant;
+  /** deviceCode only: the code the person types at verificationURL, such as WDJB-MJHT. */
+  userCode?: string;
+  /**
+   * Where the person goes: the device page, or the provider's authorize page (with the state and
+   * the PKCE challenge, never the verifier).
+   */
   verificationURL: string;
   installURL?: string;
   expiresAt: WireDate;
@@ -829,14 +842,34 @@ export interface ConnectionSignIn {
   message?: string;
 }
 
+/**
+ * What the hand-back page gave the client (#1343): the code and the state, or the provider's error.
+ * The host checks the state, then spends the code with its own verifier.
+ */
+export interface ConnectionSignInCompleteRequest {
+  flowID: UUID;
+  state: string;
+  code?: string;
+  /** The provider's error code, such as access_denied. */
+  error?: string;
+}
+
 export interface ConnectionSignInFlowRequest {
   flowID: UUID;
 }
 
 /**
- * waiting: for the person to type the code. connected: done. expired: the code ended. denied: the
- * person pressed Cancel on the provider's page. cancelled: a client stopped it. failed: see
- * message.
+ * deviceCode: the person types userCode at verificationURL (GitHub), and the host polls.
+ * authorizationCode: the person approves at verificationURL in an authentication session (agents://
+ * on the Mac and the Remote, a pop-up on the web page); the hand-back page gives the code back to
+ * the client, which gives it to the host with connections/sign-in/complete (Linear).
+ */
+export type ConnectionSignInGrant = "deviceCode" | "authorizationCode";
+
+/**
+ * waiting: for the person to approve on the provider's page. connected: done. expired: the code or
+ * the sign-in ended. denied: the person pressed Cancel on the provider's page. cancelled: a client
+ * stopped it. failed: see message.
  */
 export type ConnectionSignInStatus = "waiting" | "connected" | "expired" | "denied" | "cancelled" | "failed";
 
@@ -4556,6 +4589,7 @@ export interface Methods {
   "connections/list": { params: Empty; result: ConnectionsList };
   "connections/sign-in": { params: ConnectionProviderRequest; result: ConnectionSignIn };
   "connections/sign-in/cancel": { params: ConnectionSignInFlowRequest; result: ConnectionSignIn };
+  "connections/sign-in/complete": { params: ConnectionSignInCompleteRequest; result: ConnectionSignIn };
   "connections/sign-in/wait": { params: ConnectionSignInFlowRequest; result: ConnectionSignIn };
   "connectors/setup": { params: ConnectorSetupRequest; result: ConnectorSetup };
   "connectors/setup/skip": { params: ConnectorSkipRequest; result: ConnectorSetup };
@@ -4700,6 +4734,7 @@ export const MethodTarget = {
   "connections/list": "host",
   "connections/sign-in": "host",
   "connections/sign-in/cancel": "host",
+  "connections/sign-in/complete": "host",
   "connections/sign-in/wait": "host",
   "connectors/setup": "host",
   "connectors/setup/skip": "host",
@@ -4906,10 +4941,11 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ConfigChoice: { required: ["value", "name"], optional: ["description"] },
   ConfigChoiceGroup: { required: ["options"], optional: ["name", "group"] },
   ConfigOption: { required: ["id", "name", "type"], optional: ["description", "category", "currentValue", "options"] },
-  Connection: { required: ["provider", "state", "connectedAt"], optional: ["login", "installURL"] },
+  Connection: { required: ["provider", "state", "connectedAt"], optional: ["login", "installURL", "workspace"] },
   ConnectionDisconnectAnswer: { required: [], optional: ["error"] },
-  ConnectionProviderRequest: { required: ["provider"], optional: [] },
-  ConnectionSignIn: { required: ["flowID", "provider", "status", "userCode", "verificationURL", "expiresAt"], optional: ["installURL", "connection", "message"] },
+  ConnectionProviderRequest: { required: ["provider"], optional: ["origin"] },
+  ConnectionSignIn: { required: ["flowID", "provider", "status", "grant", "verificationURL", "expiresAt"], optional: ["userCode", "installURL", "connection", "message"] },
+  ConnectionSignInCompleteRequest: { required: ["flowID", "state"], optional: ["code", "error"] },
   ConnectionSignInFlowRequest: { required: ["flowID"], optional: [] },
   ConnectionsList: { required: ["connections"], optional: [] },
   ConnectorEvents: { required: ["state", "names", "workflows"], optional: ["server", "message"] },

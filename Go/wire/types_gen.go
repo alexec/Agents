@@ -968,30 +968,37 @@ type Connection struct {
 	ConnectedAt Date            `json:"connectedAt"`
 	// Where the person installs the provider's App: a GitHub user token reaches only the repositories where it is installed.
 	InstallURL *string `json:"installURL,omitzero"`
+	// The part of the provider the token reaches, such as a Linear workspace's name.
+	Workspace *string `json:"workspace,omitzero"`
 }
 
 type ConnectionDisconnectAnswer struct {
 	Error *string `json:"error,omitzero"`
 }
 
-// A tool the person connects to with OAuth (#1335). GitHub so far.
+// A tool the person connects to with OAuth: GitHub (#1335) and Linear (#1343).
 type ConnectionProvider string
 
 const (
 	ConnectionProviderGithub ConnectionProvider = "github"
+	ConnectionProviderLinear ConnectionProvider = "linear"
 )
 
 type ConnectionProviderRequest struct {
 	Provider ConnectionProvider `json:"provider"`
+	// For connections/sign-in from the web page: the page's origin. The hand-back page sends the code to this origin only, by postMessage. Without it, the hand-back page sends the code to agents://oauth/callback (the Mac and the Remote).
+	Origin *string `json:"origin,omitzero"`
 }
 
-// A device-flow sign-in under way on the host (#1335): the host polls the provider; a client shows the code and the links, and waits.
+// A sign-in under way on the host (#1335, #1343). The host keeps the secrets (the device code, the PKCE verifier); a client shows the code or opens the address, and waits.
 type ConnectionSignIn struct {
 	FlowID   UUID                   `json:"flowID"`
 	Provider ConnectionProvider     `json:"provider"`
 	Status   ConnectionSignInStatus `json:"status"`
-	// The code the person types at verificationURL, such as WDJB-MJHT.
-	UserCode        string      `json:"userCode"`
+	Grant    ConnectionSignInGrant  `json:"grant"`
+	// deviceCode only: the code the person types at verificationURL, such as WDJB-MJHT.
+	UserCode *string `json:"userCode,omitzero"`
+	// Where the person goes: the device page, or the provider's authorize page (with the state and the PKCE challenge, never the verifier).
 	VerificationURL string      `json:"verificationURL"`
 	InstallURL      *string     `json:"installURL,omitzero"`
 	ExpiresAt       Date        `json:"expiresAt"`
@@ -1000,11 +1007,28 @@ type ConnectionSignIn struct {
 	Message *string `json:"message,omitzero"`
 }
 
+// What the hand-back page gave the client (#1343): the code and the state, or the provider's error. The host checks the state, then spends the code with its own verifier.
+type ConnectionSignInCompleteRequest struct {
+	FlowID UUID    `json:"flowID"`
+	State  string  `json:"state"`
+	Code   *string `json:"code,omitzero"`
+	// The provider's error code, such as access_denied.
+	Error *string `json:"error,omitzero"`
+}
+
 type ConnectionSignInFlowRequest struct {
 	FlowID UUID `json:"flowID"`
 }
 
-// waiting: for the person to type the code. connected: done. expired: the code ended. denied: the person pressed Cancel on the provider's page. cancelled: a client stopped it. failed: see message.
+// deviceCode: the person types userCode at verificationURL (GitHub), and the host polls. authorizationCode: the person approves at verificationURL in an authentication session (agents:// on the Mac and the Remote, a pop-up on the web page); the hand-back page gives the code back to the client, which gives it to the host with connections/sign-in/complete (Linear).
+type ConnectionSignInGrant string
+
+const (
+	ConnectionSignInGrantDeviceCode        ConnectionSignInGrant = "deviceCode"
+	ConnectionSignInGrantAuthorizationCode ConnectionSignInGrant = "authorizationCode"
+)
+
+// waiting: for the person to approve on the provider's page. connected: done. expired: the code or the sign-in ended. denied: the person pressed Cancel on the provider's page. cancelled: a client stopped it. failed: see message.
 type ConnectionSignInStatus string
 
 const (
