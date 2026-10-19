@@ -616,6 +616,11 @@ struct SessionSidebarRow: View {
             .simultaneousGesture(TapGesture().onEnded {
                 if windowOpen == nil, model.selection == agent.id { model.scrollToEnd() }
             })
+            // A double-click edits its title in the row, as Return does (#1518).
+            .simultaneousGesture(TapGesture(count: 2).onEnded {
+                guard agent.state != .archived else { return }
+                model.renaming = Renaming(id: agent.id)
+            })
             // Into its project's drop box, never its worktree (#231).
             .dropsIntoDropbox(of: ProjectKey(host: agent.host, folder: agent.projectFolder))
             // Pin or Unpin (#180), from the other edge.

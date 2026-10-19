@@ -751,7 +751,13 @@ export const SidebarSession = memo(function SidebarSession({ store, host, folder
   return (
     <>
     <div class={`nav-item${treeClass}${drop.targeted ? " drop-target" : ""}`} onContextMenu={(e) => openContextMenu(e, menu())}
-      onKeyDown={(e) => { if (isMenuKey(e)) openContextMenu(e, menu()); }} {...holdForMenu(menu)} {...drop.props}>
+      onKeyDown={(e) => { if (isMenuKey(e)) openContextMenu(e, menu()); }} {...holdForMenu(menu)} {...drop.props}
+      // A double-click edits its title in the row, as the window's does (#1518).
+      onDblClick={(e) => {
+        if (agent.state === "archived" || (e.target as HTMLElement).closest(".fold-count, .renaming")) return;
+        e.preventDefault();
+        runSessionAction(store, host, agent, "rename");
+      }}>
       {/* No wait lines: in the sidebar a session's row is its title and one line (#587). */}
       {store.renaming.value?.id === agent.id && !store.renaming.value.inChat
         ? <div class="row session renaming"><RenameInput store={store} host={host} agent={agent} /></div>
