@@ -43,7 +43,7 @@ logged.
 
 | Field | Type | Meaning |
 | --- | --- | --- |
-| `id` | string | Stable across restarts. What `workspace_start` and `workspace_stop` take. |
+| `id` | string | Stable across restarts, and unique in the list: a second workspace with the same `id` is left out. What `workspace_start` and `workspace_stop` take. |
 | `name` | string | Shown on the Providers page. |
 | `state` | string | `running`, `starting`, `stopping`, `stopped` or `unknown`. Anything else is read as `unknown`. |
 | `ssh` | string, optional | How the control plane's machine reaches it: `user@host`, an alias in its ssh config, or `user@host -p 2222`. |
