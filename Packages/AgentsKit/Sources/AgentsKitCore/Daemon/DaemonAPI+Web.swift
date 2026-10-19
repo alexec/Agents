@@ -106,6 +106,8 @@ public extension DaemonAPI {
                     kind: .hostRequest),
                 Row(Method.connectionsSignInCancel, params: ConnectionSignInFlowRequest.self, result: ConnectionSignIn.self,
                     kind: .hostRequest),
+                Row(Method.connectionsSignInComplete, params: ConnectionSignInCompleteRequest.self,
+                    result: ConnectionSignIn.self, kind: .hostRequest),
                 Row(Method.connectionsDisconnect, params: ConnectionProviderRequest.self,
                     result: ConnectionDisconnectAnswer.self, kind: .hostRequest),
                 Row(Method.connectorsSetup, params: ConnectorSetupRequest.self, result: ConnectorSetup.self, kind: .hostRequest),

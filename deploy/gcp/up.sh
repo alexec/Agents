@@ -166,6 +166,9 @@ stage=$(mktemp -d)
 trap 'rm -rf "$stage"' EXIT
 mkdir -p "$stage/deploy" "$stage/App/Resources"
 cp "$root/deploy/compose.public.yaml" "$root/deploy/Caddyfile.public" "$root/deploy/make-secrets.sh" "$stage/deploy/"
+# The hand-back page's files (#1343), so a new copy of them goes with each run. Only
+# deploy/gcp/site.sh turns the site on.
+cp -R "$root/deploy/site" "$stage/deploy/site"
 # No --service-account: an empty file, and the VM's own service account uses the key.
 run "$stage/deploy/make-secrets.sh" --public --kms "$kms" ${apns[@]+"${apns[@]}"}
 # Without --apns, a key already on the VM stays: the empty one is not sent.

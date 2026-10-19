@@ -20,7 +20,7 @@ App/Resources/servers/*
 !App/Resources/servers/README.md
 
 # Built by scripts/docs.sh (044). The docs site; published from CI, never committed.
-site/
+/site/
 .cache/
 
 # The web remote's packages and its build (071, #473): Web/dist is built by

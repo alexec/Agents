@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"path/filepath"
 	"strings"
 	"sync/atomic"
@@ -50,7 +51,8 @@ func TestConnectingGitHubWithTheDeviceFlow(t *testing.T) {
 
 	var started wire.ConnectionSignIn
 	json.Unmarshal(c.call(t, 1, "connections/sign-in", map[string]any{"provider": "github"}), &started)
-	if started.Status != wire.ConnectionSignInStatusWaiting || started.UserCode != "ABCD-1234" ||
+	if started.Status != wire.ConnectionSignInStatusWaiting || started.UserCode == nil || *started.UserCode != "ABCD-1234" ||
+		started.Grant != wire.ConnectionSignInGrantDeviceCode ||
 		started.VerificationURL != "https://github.com/login/device" || started.InstallURL == nil ||
 		*started.InstallURL != "https://github.com/apps/agents-loops/installations/new" {
 		t.Fatalf("started: %+v", started)
@@ -125,5 +127,104 @@ func TestASignInUnderWayIsShared(t *testing.T) {
 	json.Unmarshal(c.call(t, 3, "connections/sign-in/cancel", map[string]any{"flowID": a.FlowID}), &cancelled)
 	if cancelled.Status != wire.ConnectionSignInStatusCancelled {
 		t.Fatalf("cancel: %+v", cancelled)
+	}
+}
+
+// A Linear sign-in (#1343): the client is given the authorize address with the challenge and
+// the state, never the verifier; a code that comes back with another state is refused; the
+// right state spends the code with the host's verifier, and the list says the account and
+// the workspace, with no token.
+func TestConnectingLinearWithTheCodeFlow(t *testing.T) {
+	var verifier atomic.Value
+	lin := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/oauth/token":
+			r.ParseForm()
+			verifier.Store(r.PostForm.Get("code_verifier"))
+			fmt.Fprint(w, `{"access_token":"lin_oauth_secret","expires_in":86399,"refresh_token":"lin_refresh_secret"}`)
+		case "/graphql":
+			fmt.Fprint(w, `{"data":{"viewer":{"name":"Alex","email":"a@example.com"},"organization":{"name":"Agents Walk"}}}`)
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer lin.Close()
+	d, c := start(t, t.TempDir())
+	defer d.Shutdown()
+	file := &connections.File{Path: filepath.Join(t.TempDir(), connections.FileName)}
+	d.connStoreFor = func() (connections.Store, error) { return file, nil }
+	d.newCodeFlow = func(wire.ConnectionProvider) *connections.CodeFlow {
+		f := connections.NewLinearFlow()
+		f.Token, f.API, f.HTTP = lin.URL+"/oauth/token", lin.URL+"/graphql", lin.Client()
+		return f
+	}
+
+	var started, again, web wire.ConnectionSignIn
+	json.Unmarshal(c.call(t, 1, "connections/sign-in", map[string]any{"provider": "linear"}), &started)
+	if started.Grant != wire.ConnectionSignInGrantAuthorizationCode || started.UserCode != nil ||
+		!strings.HasPrefix(started.VerificationURL, "https://linear.app/oauth/authorize?") {
+		t.Fatalf("started: %+v", started)
+	}
+	u, _ := url.Parse(started.VerificationURL)
+	state := u.Query().Get("state")
+	if state == "" || u.Query().Get("code_challenge") == "" || strings.Contains(state, ".") {
+		t.Fatalf("address: %s", started.VerificationURL)
+	}
+	// The Mac and the Remote share one; a web page has its own, with its origin in the state.
+	json.Unmarshal(c.call(t, 2, "connections/sign-in", map[string]any{"provider": "linear"}), &again)
+	json.Unmarshal(c.call(t, 3, "connections/sign-in", map[string]any{"provider": "linear",
+		"origin": "https://control.agentloops.dev"}), &web)
+	wu, _ := url.Parse(web.VerificationURL)
+	if again.FlowID != started.FlowID || web.FlowID == started.FlowID || !strings.Contains(wu.Query().Get("state"), ".") {
+		t.Fatalf("sharing: %v %v %v", started.FlowID, again.FlowID, web.FlowID)
+	}
+	if why := c.callErr(t, 4, "connections/sign-in", map[string]any{"provider": "linear", "origin": "agents://x"}); why == "" {
+		t.Fatal("a scheme that is not http was taken as an origin")
+	}
+
+	if why := c.callErr(t, 5, "connections/sign-in/complete", map[string]any{"flowID": started.FlowID,
+		"state": "forged", "code": "code-1"}); !strings.Contains(why, "another request") {
+		t.Fatalf("another state: %q", why)
+	}
+	var done wire.ConnectionSignIn
+	raw := c.call(t, 6, "connections/sign-in/complete", map[string]any{"flowID": started.FlowID, "state": state, "code": "code-1"})
+	if strings.Contains(string(raw), "lin_oauth_secret") || strings.Contains(string(raw), "lin_refresh_secret") {
+		t.Fatalf("a secret went to the client: %s", raw)
+	}
+	json.Unmarshal(raw, &done)
+	if done.Status != wire.ConnectionSignInStatusConnected || done.Connection == nil ||
+		deref(done.Connection.Login) != "Alex" || deref(done.Connection.Workspace) != "Agents Walk" {
+		t.Fatalf("done: %s", raw)
+	}
+	if v, _ := verifier.Load().(string); len(v) < 43 || strings.Contains(started.VerificationURL, v) {
+		t.Fatalf("verifier: %q", v)
+	}
+	kept, ok, _ := file.Get(connections.Linear)
+	if !ok || kept.Access != "lin_oauth_secret" || kept.Refresh != "lin_refresh_secret" || kept.Workspace != "Agents Walk" {
+		t.Fatalf("kept: %+v", kept)
+	}
+	// A second complete (the Remote, after the Mac) is told how it ended.
+	json.Unmarshal(c.call(t, 7, "connections/sign-in/complete", map[string]any{"flowID": started.FlowID, "state": state, "code": "code-1"}), &again)
+	if again.Status != wire.ConnectionSignInStatusConnected {
+		t.Fatalf("second complete: %+v", again)
+	}
+
+	// The person pressed Cancel on linear.app.
+	var denied wire.ConnectionSignIn
+	json.Unmarshal(c.call(t, 8, "connections/sign-in/complete", map[string]any{"flowID": web.FlowID,
+		"state": wu.Query().Get("state"), "error": "access_denied"}), &denied)
+	if denied.Status != wire.ConnectionSignInStatusDenied {
+		t.Fatalf("denied: %+v", denied)
+	}
+
+	raw = c.call(t, 9, "connections/list", map[string]any{})
+	if strings.Contains(string(raw), "lin_oauth_secret") {
+		t.Fatalf("a token in the list: %s", raw)
+	}
+	var list wire.ConnectionsList
+	json.Unmarshal(raw, &list)
+	if len(list.Connections) != 1 || list.Connections[0].Provider != wire.ConnectionProviderLinear || list.Connections[0].InstallURL != nil {
+		t.Fatalf("list: %s", raw)
 	}
 }

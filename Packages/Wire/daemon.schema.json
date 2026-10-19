@@ -17493,9 +17493,10 @@
     },
     "ConnectionProvider": {
       "type": "string",
-      "description": "A tool the person connects to with OAuth (#1335). GitHub so far.",
+      "description": "A tool the person connects to with OAuth: GitHub (#1335) and Linear (#1343).",
       "enum": [
-        "github"
+        "github",
+        "linear"
       ]
     },
     "ConnectionState": {
@@ -17526,6 +17527,10 @@
         "installURL": {
           "type": "string",
           "description": "Where the person installs the provider's App: a GitHub user token reaches only the repositories where it is installed."
+        },
+        "workspace": {
+          "type": "string",
+          "description": "The part of the provider the token reaches, such as a Linear workspace's name."
         }
       },
       "required": [
@@ -17555,6 +17560,10 @@
       "properties": {
         "provider": {
           "$ref": "#/definitions/ConnectionProvider"
+        },
+        "origin": {
+          "type": "string",
+          "description": "For connections/sign-in from the web page: the page's origin. The hand-back page sends the code to this origin only, by postMessage. Without it, the hand-back page sends the code to agents://oauth/callback (the Mac and the Remote)."
         }
       },
       "required": [
@@ -17574,9 +17583,33 @@
       ],
       "additionalProperties": false
     },
+    "ConnectionSignInCompleteRequest": {
+      "type": "object",
+      "description": "What the hand-back page gave the client (#1343): the code and the state, or the provider's error. The host checks the state, then spends the code with its own verifier.",
+      "properties": {
+        "flowID": {
+          "$ref": "#/definitions/UUID"
+        },
+        "state": {
+          "type": "string"
+        },
+        "code": {
+          "type": "string"
+        },
+        "error": {
+          "type": "string",
+          "description": "The provider's error code, such as access_denied."
+        }
+      },
+      "required": [
+        "flowID",
+        "state"
+      ],
+      "additionalProperties": false
+    },
     "ConnectionSignInStatus": {
       "type": "string",
-      "description": "waiting: for the person to type the code. connected: done. expired: the code ended. denied: the person pressed Cancel on the provider's page. cancelled: a client stopped it. failed: see message.",
+      "description": "waiting: for the person to approve on the provider's page. connected: done. expired: the code or the sign-in ended. denied: the person pressed Cancel on the provider's page. cancelled: a client stopped it. failed: see message.",
       "enum": [
         "waiting",
         "connected",
@@ -17586,9 +17619,17 @@
         "failed"
       ]
     },
+    "ConnectionSignInGrant": {
+      "type": "string",
+      "description": "deviceCode: the person types userCode at verificationURL (GitHub), and the host polls. authorizationCode: the person approves at verificationURL in an authentication session (agents:// on the Mac and the Remote, a pop-up on the web page); the hand-back page gives the code back to the client, which gives it to the host with connections/sign-in/complete (Linear).",
+      "enum": [
+        "deviceCode",
+        "authorizationCode"
+      ]
+    },
     "ConnectionSignIn": {
       "type": "object",
-      "description": "A device-flow sign-in under way on the host (#1335): the host polls the provider; a client shows the code and the links, and waits.",
+      "description": "A sign-in under way on the host (#1335, #1343). The host keeps the secrets (the device code, the PKCE verifier); a client shows the code or opens the address, and waits.",
       "properties": {
         "flowID": {
           "$ref": "#/definitions/UUID"
@@ -17599,12 +17640,16 @@
         "status": {
           "$ref": "#/definitions/ConnectionSignInStatus"
         },
+        "grant": {
+          "$ref": "#/definitions/ConnectionSignInGrant"
+        },
         "userCode": {
           "type": "string",
-          "description": "The code the person types at verificationURL, such as WDJB-MJHT."
+          "description": "deviceCode only: the code the person types at verificationURL, such as WDJB-MJHT."
         },
         "verificationURL": {
-          "type": "string"
+          "type": "string",
+          "description": "Where the person goes: the device page, or the provider's authorize page (with the state and the PKCE challenge, never the verifier)."
         },
         "installURL": {
           "type": "string"
@@ -17624,7 +17669,7 @@
         "flowID",
         "provider",
         "status",
-        "userCode",
+        "grant",
         "verificationURL",
         "expiresAt"
       ],

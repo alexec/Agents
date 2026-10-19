@@ -1117,6 +1117,30 @@
       }
     },
     {
+      "name": "connections/sign-in/complete",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/ConnectionSignInCompleteRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/ConnectionSignIn"
+        }
+      }
+    },
+    {
       "name": "connections/sign-in/wait",
       "tags": [
         {

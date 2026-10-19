@@ -163,15 +163,47 @@ public enum ConnectorSetupWords {
 
     // MARK: Your Connectors ▸ Connections
 
+    /// The provider's name: GitHub, Linear.
+    public static func name(_ p: DaemonAPI.ConnectionProvider) -> String {
+        switch p {
+        case .github: "GitHub"
+        case .linear: "Linear"
+        }
+    }
+
+    /// The provider's two letters on its mark.
+    public static func letters(_ p: DaemonAPI.ConnectionProvider) -> String {
+        switch p {
+        case .github: "GH"
+        case .linear: "L"
+        }
+    }
+
     public static func connectionTitle(_ c: DaemonAPI.Connection) -> String {
-        c.login.map { "GitHub \u{00B7} \($0)" } ?? "GitHub"
+        c.login.map { "\(name(c.provider)) \u{00B7} \($0)" } ?? name(c.provider)
     }
 
     public static func connectionNote(_ c: DaemonAPI.Connection) -> String {
-        c.state == .signInAgain ? "GitHub refused the renewal: sign in again" : "OAuth \u{00B7} renews by itself"
+        if c.state == .signInAgain { return "\(name(c.provider)) refused the renewal: sign in again" }
+        return [c.workspace, "OAuth \u{00B7} renews by itself"].compactMap { $0 }.joined(separator: " \u{00B7} ")
+    }
+
+    /// A provider with no connection yet, on Your Connectors.
+    public static func notConnectedNote(_ p: DaemonAPI.ConnectionProvider) -> String {
+        switch p {
+        case .github: "Issues, pull requests and Actions in every project."
+        case .linear: "Linear issues in every project, and their events."
+        }
     }
 
     public static let disconnectNote = "Disconnect deletes the host's tokens. Every project's GitHub slots wait for a connection again. To revoke the App too, go to github.com \u{25B8} Settings \u{25B8} Applications."
+
+    public static func disconnectNote(_ p: DaemonAPI.ConnectionProvider) -> String {
+        switch p {
+        case .github: disconnectNote
+        case .linear: "Disconnect deletes the host's tokens. Linear's events stop until you connect again or set LINEAR_API_KEY. To revoke Agents too, go to linear.app \u{25B8} Settings \u{25B8} Security & access."
+        }
+    }
 
     /// A project on Your Connectors: what its set-up uses.
     public static func projectLine(_ setup: Setup) -> String {
@@ -182,12 +214,44 @@ public enum ConnectorSetupWords {
 
     // MARK: The sheet
 
+    /// Connect Linear (#1343, frame H): the same sheet, its own list.
+    public enum Linear {
+        public static let abilities = [
+            "Read and write issues",
+            "Read projects and cycles",
+            "Comment as you",
+        ]
+        public static let subtitle = "For you, in every project. Agents talks to Linear's API directly."
+        public static let choose = "On linear.app you choose the workspace. You can take it back there, or with Disconnect on Your Connectors."
+        public static let continueButton = "Continue on linear.app"
+        public static let waiting = "Waiting for linear.app\u{2026} Approve there, and Agents comes back by itself."
+        public static let finishing = "Finishing the sign-in\u{2026}"
+    }
+
+    /// The sheet's subtitle, list and button, by provider.
+    public static func sheetSubtitle(_ p: DaemonAPI.ConnectionProvider) -> String {
+        p == .linear ? Linear.subtitle : sheetSubtitle
+    }
+
+    public static func abilities(_ p: DaemonAPI.ConnectionProvider) -> [String] {
+        p == .linear ? Linear.abilities : abilities
+    }
+
+    public static func sheetChoose(_ p: DaemonAPI.ConnectionProvider) -> String {
+        p == .linear ? Linear.choose : sheetChoose
+    }
+
+    public static func continueButton(_ p: DaemonAPI.ConnectionProvider) -> String {
+        p == .linear ? Linear.continueButton : continueButton
+    }
+
     public static func sheetStatus(_ s: DaemonAPI.ConnectionSignIn) -> String {
         switch s.status {
+        case .waiting where s.grant == .authorizationCode: Linear.waiting
         case .waiting: "Waiting for github.com\u{2026} Type the code there, then approve."
         case .connected: "Connected."
         case .expired: s.message ?? "The code expired before it was approved. Try again."
-        case .denied: s.message ?? "The sign-in was cancelled on GitHub."
+        case .denied: s.message ?? "The sign-in was cancelled on \(name(s.provider))."
         case .cancelled: "Cancelled."
         case .failed: s.message ?? "The sign-in didn't work."
         }

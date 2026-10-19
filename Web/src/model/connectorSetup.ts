@@ -1,7 +1,7 @@
 // The words of a project's Connectors set-up and the one Connect sheet (#1336), ported from
 // ConnectorSetupWords in AgentsKitCore so the Mac, the Remote and the page say the same.
 import type {
-  Connection, ConnectionSignIn, ConnectorEvents, ConnectorProof, ConnectorSetup, ConnectorSlot, ConnectorSlotKind,
+  Connection, ConnectionProvider, ConnectionSignIn, ConnectionSignInCompleteRequest, UUID, ConnectorEvents, ConnectorProof, ConnectorSetup, ConnectorSlot, ConnectorSlotKind,
 } from "../protocol/generated";
 import { fromWireDate } from "../protocol/dates";
 
@@ -138,12 +138,44 @@ export function workflowsLead(events: ConnectorEvents): string {
   return events.workflows.length === 0 ? "No workflow here starts on them yet." : "Now usable by";
 }
 
+/** The providers a person connects with OAuth, in the order Your Connectors shows them. */
+export const providers: ConnectionProvider[] = ["github", "linear"];
+
+/** The provider's name: GitHub, Linear. */
+export function name(p: ConnectionProvider): string {
+  return { github: "GitHub", linear: "Linear" }[p];
+}
+
+/** The provider's letters on its mark. */
+export function letters(p: ConnectionProvider): string {
+  return { github: "GH", linear: "L" }[p];
+}
+
 export function connectionTitle(c: Connection): string {
-  return c.login ? `GitHub · ${c.login}` : "GitHub";
+  return c.login ? `${name(c.provider)} · ${c.login}` : name(c.provider);
 }
 
 export function connectionNote(c: Connection): string {
-  return c.state === "signInAgain" ? "GitHub refused the renewal: sign in again" : "OAuth · renews by itself";
+  if (c.state === "signInAgain") return `${name(c.provider)} refused the renewal: sign in again`;
+  return [c.workspace, "OAuth · renews by itself"].filter((x): x is string => !!x).join(" · ");
+}
+
+/** A provider with no connection yet, on Your Connectors. */
+export function notConnectedNote(p: ConnectionProvider): string {
+  return {
+    github: "Issues, pull requests and Actions in every project.",
+    linear: "Linear issues in every project, and their events.",
+  }[p];
+}
+
+/** The button that opens the Connect sheet for a provider. */
+export function connectButtonFor(p: ConnectionProvider): string {
+  return `Connect ${name(p)}…`;
+}
+
+export function disconnectNoteFor(p: ConnectionProvider): string {
+  if (p === "github") return disconnectNote;
+  return "Disconnect deletes the host's tokens. Linear's events stop until you connect again or set LINEAR_API_KEY. To revoke Agents too, go to linear.app ▸ Settings ▸ Security & access.";
 }
 
 export function projectLine(setup: ConnectorSetup): string {
@@ -152,14 +184,78 @@ export function projectLine(setup: ConnectorSetup): string {
   return used.length === 0 ? "Not set up" : used.join(", ");
 }
 
+/** Connect Linear (#1343, frame H): the same sheet, its own list. */
+export const linear = {
+  abilities: [
+    "Read and write issues",
+    "Read projects and cycles",
+    "Comment as you",
+  ],
+  subtitle: "For you, in every project. Agents talks to Linear's API directly.",
+  choose: "On linear.app you choose the workspace. You can take it back there, or with Disconnect on Your Connectors.",
+  continueButton: "Continue on linear.app",
+  waiting: "Waiting for linear.app… Approve there, and Agents comes back by itself.",
+  finishing: "Finishing the sign-in…",
+};
+
+/** The sheet's subtitle, list and button, by provider. */
+export function sheetSubtitleFor(p: ConnectionProvider): string {
+  return p === "linear" ? linear.subtitle : sheetSubtitle;
+}
+
+export function abilitiesFor(p: ConnectionProvider): string[] {
+  return p === "linear" ? linear.abilities : abilities;
+}
+
+export function sheetChooseFor(p: ConnectionProvider): string {
+  return p === "linear" ? linear.choose : sheetChoose;
+}
+
+export function continueButtonFor(p: ConnectionProvider): string {
+  return p === "linear" ? linear.continueButton : continueButton;
+}
+
 export function sheetStatus(s: ConnectionSignIn): string {
   switch (s.status) {
-    case "waiting": return "Waiting for github.com… Type the code there, then approve.";
+    case "waiting":
+      return s.grant === "authorizationCode" ? linear.waiting : "Waiting for github.com… Type the code there, then approve.";
     case "connected": return "Connected.";
     case "expired": return s.message ?? "The code expired before it was approved. Try again.";
-    case "denied": return s.message ?? "The sign-in was cancelled on GitHub.";
+    case "denied": return s.message ?? `The sign-in was cancelled on ${name(s.provider)}.`;
     case "cancelled": return "Cancelled.";
     case "failed": return s.message ?? "The sign-in didn't work.";
+  }
+}
+
+/** The origin of the hand-back page (deploy/site/www/oauth/callback.js). */
+export const oauthCallbackOrigin = "https://agentloops.dev";
+
+/**
+ * The hand-back page's message, as connections/sign-in/complete takes it. Undefined for each
+ * other message: one from another origin, of another type, without a state, or for another
+ * sign-in (when `state` is given, the state must be the same).
+ */
+export function oauthCallback(
+  event: { origin: string; data: unknown }, flowID: UUID, state?: string,
+): ConnectionSignInCompleteRequest | undefined {
+  if (event.origin !== oauthCallbackOrigin) return undefined;
+  const data = event.data;
+  if (!data || typeof data !== "object") return undefined;
+  const d = data as { type?: unknown; code?: unknown; state?: unknown; error?: unknown };
+  if (d.type !== "agents-oauth-callback" || typeof d.state !== "string" || !d.state) return undefined;
+  if (state && d.state !== state) return undefined;
+  const answer: ConnectionSignInCompleteRequest = { flowID, state: d.state };
+  if (typeof d.code === "string" && d.code) answer.code = d.code;
+  if (typeof d.error === "string" && d.error) answer.error = d.error;
+  return answer;
+}
+
+/** The state in a provider's authorize address, to match the hand-back page's message. */
+export function authorizeState(verificationURL: string): string | undefined {
+  try {
+    return new URL(verificationURL).searchParams.get("state") ?? undefined;
+  } catch {
+    return undefined;
   }
 }
 

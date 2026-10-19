@@ -51,6 +51,7 @@ var (
 	CallConnectionsList                = Method[Empty, ConnectionsList]{"connections/list"}
 	CallConnectionsSignIn              = Method[ConnectionProviderRequest, ConnectionSignIn]{"connections/sign-in"}
 	CallConnectionsSignInCancel        = Method[ConnectionSignInFlowRequest, ConnectionSignIn]{"connections/sign-in/cancel"}
+	CallConnectionsSignInComplete      = Method[ConnectionSignInCompleteRequest, ConnectionSignIn]{"connections/sign-in/complete"}
 	CallConnectionsSignInWait          = Method[ConnectionSignInFlowRequest, ConnectionSignIn]{"connections/sign-in/wait"}
 	CallConnectorsSetup                = Method[ConnectorSetupRequest, ConnectorSetup]{"connectors/setup"}
 	CallConnectorsSetupSkip            = Method[ConnectorSkipRequest, ConnectorSetup]{"connectors/setup/skip"}

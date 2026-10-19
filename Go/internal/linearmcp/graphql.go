@@ -63,7 +63,7 @@ type gqlError struct {
 func (l *RealLinear) query(ctx context.Context, query string, variables map[string]any, out any) error {
 	key := l.Key()
 	if key == "" {
-		return &LinearError{Kind: NotSignedIn, Message: "Linear is not signed in: set LINEAR_API_KEY to a personal API key"}
+		return &LinearError{Kind: NotSignedIn, Message: "Linear is not signed in: connect Linear in Your Connectors, or set LINEAR_API_KEY to a personal API key"}
 	}
 	body, err := json.Marshal(map[string]any{"query": query, "variables": variables})
 	if err != nil {
@@ -100,7 +100,7 @@ func (l *RealLinear) post(ctx context.Context, key string, body []byte) (json.Ra
 		return nil, &LinearError{Kind: Failed, Message: "Linear: " + err.Error()}
 	}
 	req.Header.Set("Content-Type", "application/json")
-	// A personal API key goes as it is; an OAuth token would say Bearer.
+	// A personal API key goes as it is; an OAuth token says Bearer (the key func adds it).
 	req.Header.Set("Authorization", key)
 	req.Header.Set("User-Agent", "agents-linear-mcp")
 	res, err := l.Client.Do(req)
@@ -144,7 +144,7 @@ func linearError(res *http.Response, errs []gqlError) *LinearError {
 		}
 		return &LinearError{Kind: RateLimited, Message: "Linear's rate limit is reached", RetryAfterMs: retry}
 	case code == "AUTHENTICATION_ERROR" || res.StatusCode == http.StatusUnauthorized:
-		return &LinearError{Kind: NotSignedIn, Message: "Linear refused LINEAR_API_KEY: make a new personal API key"}
+		return &LinearError{Kind: NotSignedIn, Message: "Linear refused the key: connect Linear again, or make a new personal API key"}
 	case code == "FORBIDDEN" || res.StatusCode == http.StatusForbidden:
 		return &LinearError{Kind: NotSignedIn, Message: message}
 	case strings.Contains(strings.ToLower(message), "not found"):

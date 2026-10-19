@@ -4,7 +4,9 @@ import Foundation
 ///
 /// A connection is the person's: one GitHub sign-in on a host covers every project there. The
 /// host does the device flow and keeps the tokens; a client shows the code and the links, and
-/// waits. A project's set-up is the project's: its repository, four slots that each prove
+/// waits. Linear (#1343) is the authorization code with PKCE: the host keeps the verifier, the
+/// client opens the address in an authentication session, and gives back the code that the
+/// hand-back page sends to agents://oauth/callback. A project's set-up is the project's: its repository, four slots that each prove
 /// themselves with one real read, and the github events it turned on.
 extension DaemonAPI.Method {
     public static let connectionsList = "connections/list"
@@ -13,14 +15,17 @@ extension DaemonAPI.Method {
     /// A long poll: answers when the sign-in ends, or after 25 seconds with it still waiting.
     public static let connectionsSignInWait = "connections/sign-in/wait"
     public static let connectionsSignInCancel = "connections/sign-in/cancel"
+    /// The code and the state the hand-back page gave the client; the host spends the code.
+    public static let connectionsSignInComplete = "connections/sign-in/complete"
     public static let connectionsDisconnect = "connections/disconnect"
     public static let connectorsSetup = "connectors/setup"
     public static let connectorsSetupSkip = "connectors/setup/skip"
 }
 
 extension DaemonAPI {
-    public enum ConnectionProvider: String, Codable, Sendable, Hashable {
-        case github
+    public enum ConnectionProvider: String, Codable, Sendable, Hashable, CaseIterable, Identifiable {
+        case github, linear
+        public var id: String { rawValue }
     }
 
     public enum ConnectionState: String, Codable, Sendable, Hashable {
@@ -38,11 +43,13 @@ extension DaemonAPI {
         public var connectedAt: Date
         /// Where the person installs the provider's App on more repositories.
         public var installURL: String?
+        /// The part of the provider the token reaches, such as a Linear workspace.
+        public var workspace: String?
 
         public init(provider: ConnectionProvider, login: String? = nil, state: ConnectionState = .connected,
-                    connectedAt: Date, installURL: String? = nil) {
+                    connectedAt: Date, installURL: String? = nil, workspace: String? = nil) {
             self.provider = provider; self.login = login; self.state = state
-            self.connectedAt = connectedAt; self.installURL = installURL
+            self.connectedAt = connectedAt; self.installURL = installURL; self.workspace = workspace
         }
     }
 
@@ -53,7 +60,40 @@ extension DaemonAPI {
 
     public struct ConnectionProviderRequest: Codable, Sendable, Hashable {
         public var provider: ConnectionProvider
-        public init(provider: ConnectionProvider) { self.provider = provider }
+        /// The web page's origin, for a code flow that hands back by postMessage. Nil on the
+        /// Mac and the Remote, which take it back at agents://oauth/callback.
+        public var origin: String?
+        public init(provider: ConnectionProvider, origin: String? = nil) { self.provider = provider; self.origin = origin }
+    }
+
+    /// What the hand-back page gave the client: the code and the state, or the provider's error.
+    public struct ConnectionSignInCompleteRequest: Codable, Sendable, Hashable {
+        public var flowID: UUID
+        public var state: String
+        public var code: String?
+        public var error: String?
+        public init(flowID: UUID, state: String, code: String? = nil, error: String? = nil) {
+            self.flowID = flowID; self.state = state; self.code = code; self.error = error
+        }
+
+        /// The scheme the hand-back page sends the Mac and the Remote to.
+        public static let callbackScheme = "agents"
+
+        /// The answer in agents://oauth/callback?code=…&state=…, or nil for another address.
+        public init?(flowID: UUID, callback: URL) {
+            guard callback.scheme == Self.callbackScheme, callback.host == "oauth", callback.path == "/callback",
+                  let items = URLComponents(url: callback, resolvingAgainstBaseURL: false)?.queryItems,
+                  let state = items.first(where: { $0.name == "state" })?.value, !state.isEmpty else { return nil }
+            self.init(flowID: flowID, state: state, code: items.first(where: { $0.name == "code" })?.value,
+                      error: items.first(where: { $0.name == "error" })?.value)
+        }
+    }
+
+    public enum ConnectionSignInGrant: String, Codable, Sendable, Hashable {
+        /// The person types userCode at verificationURL (GitHub); the host polls.
+        case deviceCode
+        /// The person approves at verificationURL in an authentication session (Linear).
+        case authorizationCode
     }
 
     public struct ConnectionSignInFlowRequest: Codable, Sendable, Hashable {
@@ -65,13 +105,15 @@ extension DaemonAPI {
         case waiting, connected, expired, denied, cancelled, failed
     }
 
-    /// A device-flow sign-in under way on the host.
+    /// A sign-in under way on the host.
     public struct ConnectionSignIn: Codable, Sendable, Hashable {
         public var flowID: UUID
         public var provider: ConnectionProvider
         public var status: ConnectionSignInStatus
-        /// The code the person types on the provider's page, such as WDJB-MJHT.
-        public var userCode: String
+        public var grant: ConnectionSignInGrant
+        /// deviceCode only: the code the person types on the provider's page, such as WDJB-MJHT.
+        public var userCode: String?
+        /// The device page, or the provider's authorize page.
         public var verificationURL: String
         public var installURL: String?
         public var expiresAt: Date
@@ -79,10 +121,11 @@ extension DaemonAPI {
         /// Why it failed, in words.
         public var message: String?
 
-        public init(flowID: UUID, provider: ConnectionProvider, status: ConnectionSignInStatus, userCode: String,
+        public init(flowID: UUID, provider: ConnectionProvider, status: ConnectionSignInStatus,
+                    grant: ConnectionSignInGrant = .deviceCode, userCode: String? = nil,
                     verificationURL: String, installURL: String? = nil, expiresAt: Date,
                     connection: Connection? = nil, message: String? = nil) {
-            self.flowID = flowID; self.provider = provider; self.status = status; self.userCode = userCode
+            self.flowID = flowID; self.provider = provider; self.status = status; self.grant = grant; self.userCode = userCode
             self.verificationURL = verificationURL; self.installURL = installURL; self.expiresAt = expiresAt
             self.connection = connection; self.message = message
         }
