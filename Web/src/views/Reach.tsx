@@ -1,6 +1,6 @@
 // What a new session may reach beyond its own folder (PromptBar's reach chip and AgentReachView):
 // other folders on the same host, sent as the start's additionalDirectories. A browser can't pick
-// a folder on the host, so one is typed as its path. MCP servers are chosen in the window.
+// a folder on the host, so one is typed as its path. Connectors are chosen in the window.
 import { useSignal } from "@preact/signals";
 import { useEffect, useRef } from "preact/hooks";
 
@@ -72,7 +72,7 @@ export function Reach({ folders, change, disabled }: {
             <button onClick={add} disabled={!typed.value.trim()}>Add</button>
           </div>
           {said.value && <p class="failure small" role="status">{said.value}</p>}
-          <p class="faint small">MCP servers are chosen in the window.</p>
+          <p class="faint small">Connectors are chosen in the window.</p>
         </div>
       )}
     </span>

@@ -56,7 +56,7 @@ struct AddMCPSheet: View {
     private var searchPane: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Text("Add an MCP server").appText(.title)
+                Text("Add a connector").appText(.title)
                 Spacer()
                 MarketplaceMenu(marketplaces: marketplaces, chosen: $chosen, manage: { managing = true })
             }
@@ -65,12 +65,12 @@ struct AddMCPSheet: View {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 6) {
                     if marketplace == nil && !marketplaces.isEmpty {
-                        Text("Every MCP marketplace is off. Manage Marketplaces… in the menu turns one on.")
+                        Text("Every connector marketplace is off. Manage Marketplaces… in the menu turns one on.")
                             .appText(.fine).foregroundStyle(.secondary)
                     } else if let searchError {
                         Text(MCPCatalogWords.sentence(searchError)).appText(.fine).foregroundStyle(.secondary)
                     } else if results.isEmpty && searched {
-                        Text("No servers match.").appText(.fine).foregroundStyle(.secondary)
+                        Text("No connectors match.").appText(.fine).foregroundStyle(.secondary)
                     }
                     ForEach(results) { result in
                         Button {

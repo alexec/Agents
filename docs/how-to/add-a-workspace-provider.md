@@ -158,5 +158,5 @@ provider as it is. It needs no map. The tools, their arguments and their answers
 
 - [Start workspaces from Agents](start-workspaces-from-agents.md): link a server and press
   Start.
-- [Add an MCP server by hand](add-an-mcp-server-by-hand.md): MCP servers for agents, which are
+- [Add a connector by hand](add-an-mcp-server-by-hand.md): connectors (MCP servers) for agents, which are
   set up per project, not on the control plane.

@@ -45,7 +45,7 @@ struct AddMCPByHandPane: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Button("‹ Registry") { onBack() }.buttonStyle(.paper)
-                Text("Add a server by hand").appText(.title)
+                Text("Add a connector by hand").appText(.title)
                 Spacer()
             }
             ScrollView {
@@ -171,7 +171,7 @@ struct AddMCPByHandPane: View {
                             .appText(.fine).tinted(.attention)
                     }
                 case .authRequired:
-                    Text("This server asks you to sign in before it answers. Once you have, it is verified again. Nothing was written.")
+                    Text("This connector asks you to sign in before it answers. Once you have, it is verified again. Nothing was written.")
                         .appText(.fine).tinted(.attention)
                         .fixedSize(horizontal: false, vertical: true)
                     Button("Sign in…") { signingIn = .url(name: current.name, url: current.url) }

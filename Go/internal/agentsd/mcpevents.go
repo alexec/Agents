@@ -586,7 +586,7 @@ func (d *Daemon) reconcileMCPEvents(ctx context.Context) {
 				case "":
 				case "waiting":
 					waiting = append(waiting, name)
-					fixed(wire.MCPTriggerFailureCodeWaitingForApproval, name+" is waiting for approval in this project's MCP servers.", wire.MCPTriggerStatusStateStopped)
+					fixed(wire.MCPTriggerFailureCodeWaitingForApproval, name+" is waiting for approval in this project's Connectors.", wire.MCPTriggerStatusStateStopped)
 					continue
 				case "missingSecret":
 					fixed(wire.MCPTriggerFailureCodeSecretMissing, name+" needs a secret that isn't set here.", wire.MCPTriggerStatusStateStopped)
@@ -661,7 +661,7 @@ func (d *Daemon) reconcileMCPEvents(ctx context.Context) {
 					verb = "are"
 				}
 				tl = append(tl, mcpFixed(t.event, nil, wire.MCPTriggerStatusStateStopped, wire.MCPTriggerFailureCodeWaitingForApproval,
-					strings.Join(waiting, ", ")+" "+verb+" waiting for approval in this project's MCP servers, so "+t.event+" is not asked for yet.", at))
+					strings.Join(waiting, ", ")+" "+verb+" waiting for approval in this project's Connectors, so "+t.event+" is not asked for yet.", at))
 			}
 			if len(tl) == 0 {
 				guess := ""

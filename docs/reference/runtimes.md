@@ -96,10 +96,10 @@ time alone never brings it back. **Mark available** does, at once.
 
 ## What each gets from `~/.agents`
 
-Your own skills, instructions, MCP servers and plugins in `~/.agents` reach each runtime the
-way it can take them. See [Share skills, instructions and servers with every agent](../how-to/share-skills-across-agents.md).
+Your own skills, instructions, connectors and plugins in `~/.agents` reach each runtime the
+way it can take them. See [Share skills, instructions and connectors with every agent](../how-to/share-skills-across-agents.md).
 
-| Runtime | Skills | Instructions | MCP servers from `mcp.json` | Plugins |
+| Runtime | Skills | Instructions | Connectors from `mcp.json` | Plugins |
 | --- | --- | --- | --- | --- |
 | **Claude** | a link in `~/.claude/skills` | `~/.claude/CLAUDE.md`, a link | sent at start | handed at start |
 | **Codex** | reads `~/.agents/skills` | `~/.codex/AGENTS.md`, a link | sent at start, except sse servers; its own server of the same name wins | added to Codex by the app, and again when the plugin changes |

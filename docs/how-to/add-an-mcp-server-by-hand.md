@@ -1,12 +1,12 @@
 ---
 diataxis: how-to
 devices: [mac]
-description: Add an MCP server that is not in the registry, a local command or a remote URL, and see it answer before anything is written.
+description: Add a connector (an MCP server) that is not in the registry, a local command or a remote URL, and see it answer before anything is written.
 ---
 
-# Add an MCP server by hand
+# Add a connector by hand
 
-Not every server is on the [MCP Registry](https://registry.modelcontextprotocol.io). One
+Not every connector is on the [MCP Registry](https://registry.modelcontextprotocol.io). One
 your team runs, or one you are building, can still be added from the app, for yourself or
 to a project. The app connects to it first. Only a server that answered is written, and
 the sheet shows the tools it listed.
@@ -19,8 +19,8 @@ the sheet shows the tools it listed.
 
 ## Add it
 
-1. Open **Settings ▸ Agent Configuration ▸ MCP servers**, or **Project Settings ▸ Agent Configuration ▸ MCP servers**, and
-   choose **Add server…**.
+1. Open **Settings ▸ Agent Configuration ▸ Connectors**, or **Project Settings ▸ Agent Configuration ▸ Connectors**, and
+   choose **Add Connector…**.
 2. Choose **Add by hand…**.
 3. Give it a **Name**: letters, digits, dots, dashes and underscores. Agents see its tools
    under this name.
@@ -42,18 +42,18 @@ the sheet shows the tools it listed.
      or what the URL answered with. Change something and choose **Verify** again.
    - **It asks you to sign in**: the server wants a sign-in, an OAuth one, before it answers.
      The sign-in sheet opens, and once you have signed in in your browser, Verify runs
-     again with it: see [Sign in to an MCP server](sign-in-to-an-mcp-server.md).
+     again with it: see [Sign in to a connector](sign-in-to-an-mcp-server.md).
 7. Choose **Add to ~/.agents**, or **Add to project**. It is offered only once the server
    has answered, and only while the form still says what was verified. Change anything and
    you verify again.
 
-Agents you start after that have the server. A project's entry is approved as it goes in,
+Agents you start after that have the connector. A project's entry is approved as it goes in,
 as a registry one is.
 
 ## Take it out
 
-The row shows **added by hand**, and has **Remove…**, as a registry server's does: see
-[Take a server out](add-an-mcp-server-from-the-registry.md#take-a-server-out).
+The row shows **added by hand**, and has **Remove…**, as a registry connector's does: see
+[Take a connector out](add-an-mcp-server-from-the-registry.md#take-a-connector-out).
 
 ## Where Verify runs
 

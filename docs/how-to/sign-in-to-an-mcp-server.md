@@ -1,19 +1,19 @@
 ---
 diataxis: how-to
 devices: [mac]
-description: Sign in to a remote MCP server that asks for OAuth, such as GitHub's, so agents start with it connected.
+description: Sign in to a remote connector that asks for OAuth, such as GitHub's, so agents start with it connected.
 ---
 
-# Sign in to an MCP server
+# Sign in to a connector
 
-Some remote MCP servers want you to sign in before they answer: GitHub's
+Some remote connectors (MCP servers) want you to sign in before they answer: GitHub's
 (`https://api.githubcopilot.com/mcp/`) is one. The app signs in as an OAuth client, the way
 the [MCP authorization spec](https://modelcontextprotocol.io/specification/2025-06-18/basic/authorization)
-describes, in your own browser. The next agent you start has the server, with your sign-in.
+describes, in your own browser. The next agent you start has the connector, with your sign-in.
 
-## See which servers want it
+## See which connectors want it
 
-Open **Settings ▸ Agent Configuration ▸ MCP servers**, or **Project Settings ▸ Agent Configuration ▸ MCP servers**. A remote
+Open **Settings ▸ Agent Configuration ▸ Connectors**, or **Project Settings ▸ Agent Configuration ▸ Connectors**. A remote
 server that asked for a sign-in says **needs sign-in** on its row, the way a missing secret
 says **NAME not set**. Agents start without it until you sign in.
 
@@ -45,7 +45,7 @@ for a **Client ID** instead, and a **Client secret** if the client has one.
 
 The client is kept for that server's sign-in, so the next sign-in doesn't ask again.
 
-## Add a server that asks, by hand
+## Add a connector that asks, by hand
 
 On [Add by hand](add-an-mcp-server-by-hand.md), **Verify** finds out the server wants a
 sign-in and opens the same sheet. Once you have signed in, it verifies again, with your
@@ -74,5 +74,5 @@ The app gives the agent the server with your sign-in as its `Authorization` head
 sign-in that is about to end is renewed first. If the server no longer takes it, the row
 says **needs sign-in** again, and agents start without the server until you sign in.
 
-Signing in runs on this Mac's own host. A project on a server host can't sign in to an MCP
-server yet.
+Signing in runs on this Mac's own host. A project on a server host can't sign in to a
+connector yet.

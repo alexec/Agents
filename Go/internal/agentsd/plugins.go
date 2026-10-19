@@ -413,8 +413,8 @@ func pluginMCPServers(plugin string, manifest map[string]any) any {
 	return out
 }
 
-// pluginCarries is what the plugin brings, in the words its row uses: hooks and MCP
-// servers, which run by themselves, first.
+// pluginCarries is what the plugin brings, in the words its row uses: hooks and
+// connectors, which run by themselves, first.
 func pluginCarries(plugin string) []string {
 	manifest := pluginManifest(plugin)
 	has := func(p string) bool { _, err := os.Lstat(filepath.Join(plugin, p)); return err == nil }
@@ -424,7 +424,7 @@ func pluginCarries(plugin string) []string {
 	}
 	gemini, _ := jsonObjectAt(filepath.Join(plugin, "gemini-extension.json"))["mcpServers"].(map[string]any)
 	if pluginMCPServers(plugin, manifest) != nil || len(gemini) > 0 {
-		carries = append(carries, "MCP servers")
+		carries = append(carries, "connectors")
 	}
 	for _, f := range []string{"skills", "commands", "agents"} {
 		if has(f) {

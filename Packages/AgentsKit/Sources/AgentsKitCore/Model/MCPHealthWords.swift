@@ -73,19 +73,19 @@ public enum MCPHealthWords {
         guard !servers.isEmpty else { return nil }
         let failing = servers.filter { tone($0) == .failing }.count
         if failing > 0 { return ("\(failing) not answering", true) }
-        return (servers.count == 1 ? "1 server" : "\(servers.count) servers", false)
+        return (servers.count == 1 ? "1 connector" : "\(servers.count) connectors", false)
     }
 
     /// Above the person's own servers, on Activity.
-    public static let personalIntro = "Every server in your own ~/.agents/mcp.json, which every agent has. "
+    public static let personalIntro = "Every connector in your own ~/.agents/mcp.json, which every agent has. "
         + "A hosted one runs once on this host; any other is checked every four hours, and when its entry changes. "
-        + "Edit them in Settings \u{25B8} Shared \u{25B8} MCP servers."
+        + "Edit them in Settings \u{25B8} Shared \u{25B8} Connectors."
 
     /// Above a project's servers.
-    public static let projectIntro = "Every server in this project's .agents/mcp.json. "
+    public static let projectIntro = "Every connector in this project's .agents/mcp.json. "
         + "A hosted one runs once on its host; any other is checked every four hours, and when its entry changes. "
         + "Edit them in the project's settings."
 
-    public static let personalEmpty = "No MCP servers in ~/.agents/mcp.json."
-    public static let projectEmpty = "No MCP servers in this project's .agents/mcp.json."
+    public static let personalEmpty = "No connectors in ~/.agents/mcp.json yet."
+    public static let projectEmpty = "No connectors in this project's .agents/mcp.json yet."
 }

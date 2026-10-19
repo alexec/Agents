@@ -1,12 +1,12 @@
 ---
 diataxis: how-to
 devices: [mac, iphone, ipad]
-description: Start an agent when an MCP server reports an event, such as a pull request's checks failing, and see on the workflow's page that it is listening.
+description: Start an agent when a connector reports an event, such as a pull request's checks failing, and see on the workflow's page that it is listening.
 ---
 
 # Start a workflow from an MCP event
 
-An MCP server can offer events as well as tools and views: "a pull request's checks
+A connector (an MCP server) can offer events as well as tools and views: "a pull request's checks
 failed", "a message arrived". A workflow can run on one of them. This guide uses this
 project's `github` server, GitHub's official MCP server with events added (it turns
 GitHub Actions failures into `checks.failed` events, among others), and the **Fix failed checks** workflow that starts an agent on each
@@ -18,7 +18,7 @@ is shown as not supported yet.
 
 ## Before you start
 
-- A project with an MCP server that offers events. The github server (`github-mcp`) ships
+- A project with a connector that offers events. The github server (`github-mcp`) ships
   with Agents Host and the Linux host, and needs a signed-in `gh` (`gh auth status`) on the
   host. See `Go/README.md` in the repo.
 - For every setting, see [Workflow triggers and actions](../reference/workflows.md), and for
@@ -34,14 +34,14 @@ this project's `.agents/mcp.json` as `github`, a local server the app hosts:
 { "mcpServers": { "github": { "command": "github-mcp", "hosted": true } } }
 ```
 
-1. In **Project Settings ▸ Agent Configuration ▸ MCP servers**, `github` arrived with the project, so it is
+1. In **Project Settings ▸ Agent Configuration ▸ Connectors**, `github` arrived with the project, so it is
    **waiting for your OK**: choose **Approve**. Until you do, it is asked for nothing, and
    the workflow's page says it is waiting for approval. See
-   [Add an MCP server from the registry](add-an-mcp-server-from-the-registry.md).
+   [Add a connector from the registry](add-an-mcp-server-from-the-registry.md).
 2. There is nothing to start. The app runs one copy of it on the host, the first time a
    workflow or an agent asks it something, and every agent shares that copy. It holds no
    token of its own: it asks your `gh` for one (`gh auth token`). See
-   [Share one copy of a local MCP server](share-one-copy-of-a-local-mcp-server.md).
+   [Share one copy of a local connector](share-one-copy-of-a-local-mcp-server.md).
 
 A local server without `"hosted": true` works too: the app runs its own copy of it to ask
 for events, with the same environment and secrets an agent gets, and each agent runs

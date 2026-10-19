@@ -888,7 +888,7 @@ struct PromptBar: View {
         .appText(.fine)
         .fixedSize()
         .paperRaised(in: .capsule)
-        .help("Folders and MCP servers this agent may reach")
+        .help("Folders and connectors this agent may reach")
     }
 
     @ViewBuilder
@@ -1111,7 +1111,7 @@ struct PromptBar: View {
         if folders == 0 && servers == 0 { return "Reach: this folder" }
         var parts: [String] = []
         if folders > 0 { parts.append("\(folders + 1) folders") }
-        if servers > 0 { parts.append("\(servers) MCP") }
+        if servers > 0 { parts.append(servers == 1 ? "1 connector" : "\(servers) connectors") }
         return "Reach: " + parts.joined(separator: " · ")
     }
 

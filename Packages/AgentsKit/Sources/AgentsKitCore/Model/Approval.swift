@@ -62,7 +62,7 @@ public struct Approval: Codable, Hashable, Sendable, Identifiable {
     /// The kind in a person's words, as a row's label leads with it.
     public var kindWord: String {
         switch kind {
-        case .mcpServer: "MCP server"
+        case .mcpServer: "Connector"
         case .workflow: "Workflow"
         case .plugin: "Plugin"
         case .file: "File"

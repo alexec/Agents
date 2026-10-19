@@ -116,7 +116,7 @@ Agents has none of these at all:
 
 **Extensions, accounts and cost**
 
-- **MCP or skills catalogue:** A catalogue or marketplace to add MCP servers or skills from.
+- **MCP or skills catalogue:** A catalogue or marketplace to add connectors (MCP servers) or skills from.
 - **Plugins:** The app has plugins or extensions of its own.
 - **Usage or cost:** Usage, allowance or cost is shown.
 - **Spending limits:** Spending can be capped.

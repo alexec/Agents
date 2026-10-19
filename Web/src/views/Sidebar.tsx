@@ -626,18 +626,16 @@ const ProjectFold = memo(function ProjectFold({ store, host, project, query, lin
               <button class="link show-all" onClick={() => (showsAllMatches.value = true)}>Show all {archived.length}</button>
             )}
           </> : <>
-          {mcpTally && (
-            // Its MCP servers (#753), when its .agents/mcp.json has any: a page, red when one does not answer.
-            <div class="nav-item">
-              <div class={`row page-row${here && r.mcp ? " chosen" : ""}`}>
-                <button class="pick" aria-current={here && !!r.mcp} aria-label={`MCP Servers, ${mcpTally.words}`}
-                  title={mcpTally.words} onClick={() => go({ host: host.id, project: folder, mcp: true })}>
-                  <span class={`pin-mark${mcpTally.failing ? " warns" : ""}`} aria-hidden="true">▤</span>
-                  <span class="title">MCP Servers</span>
-                </button>
-              </div>
+          {/* Its connectors (#753), under every project even with none yet (#1422): a page, red when one does not answer. */}
+          <div class="nav-item">
+            <div class={`row page-row${here && r.mcp ? " chosen" : ""}`}>
+              <button class="pick" aria-current={here && !!r.mcp} aria-label={`Connectors, ${mcpTally?.words ?? "none yet"}`}
+                title={mcpTally?.words ?? "No connectors yet"} onClick={() => go({ host: host.id, project: folder, mcp: true })}>
+                <span class={`pin-mark${mcpTally?.failing ? " warns" : ""}`} aria-hidden="true">▤</span>
+                <span class="title">Connectors</span>
+              </button>
             </div>
-          )}
+          </div>
           {archiveCount > 0 && (
             // The archive, one row opening a page (#495): never a fold inside the group.
             <div class="nav-item">

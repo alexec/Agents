@@ -44,8 +44,8 @@ something particular done.
   project you are done with.
 - [Start an agent in its own worktree](start-in-a-worktree.md): give an agent its own
   checkout and branch.
-- [Give an agent more folders and MCP servers](give-an-agent-more-folders.md): let one
-  agent work across two repositories, or reach a server only it needs.
+- [Give an agent more folders and connectors](give-an-agent-more-folders.md): let one
+  agent work across two repositories, or reach a connector only it needs.
 
 ### Agents
 
@@ -77,20 +77,20 @@ something particular done.
   or Antigravity in or out from the app, and give Gemini its key.
 - [Assess a runtime](assess-a-runtime.md): have an agent on a runtime work through the app's
   tools, and read the app's own score of it.
-- [Share skills, instructions and servers with every agent](share-skills-across-agents.md):
+- [Share skills, instructions and connectors with every agent](share-skills-across-agents.md):
   put them in `~/.agents` once, for every runtime and project.
 - [Add a skill from a catalogue](add-a-skill-from-a-catalogue.md): search skills.sh, look
   before it goes in, and add it for yourself or to a project.
-- [Choose marketplaces](choose-marketplaces.md): which marketplaces Add server… and Add
+- [Choose marketplaces](choose-marketplaces.md): which marketplaces Add Connector… and Add
   skill… search, and adding your own, such as your company's MCP registry.
-- [Add an MCP server from the registry](add-an-mcp-server-from-the-registry.md): search
+- [Add a connector from the registry](add-an-mcp-server-from-the-registry.md): search
   GitHub's MCP registry or another, see what would run, and add it for yourself or to a project. Secrets stay
   in your own `secrets.env`.
-- [Add an MCP server by hand](add-an-mcp-server-by-hand.md): a local command or a remote
+- [Add a connector by hand](add-an-mcp-server-by-hand.md): a local command or a remote
   URL that is not on the registry, verified to answer before anything is written.
-- [Share one copy of a local MCP server](share-one-copy-of-a-local-mcp-server.md): mark a
-  server `"hosted": true` so the app runs it once per host for every agent and workflow.
-- [Sign in to an MCP server](sign-in-to-an-mcp-server.md): a remote server that asks for
+- [Share one copy of a local connector](share-one-copy-of-a-local-mcp-server.md): mark a
+  connector `"hosted": true` so the app runs it once per host for every agent and workflow.
+- [Sign in to a connector](sign-in-to-an-mcp-server.md): a remote connector that asks for
   OAuth, such as GitHub's, signed in to in your browser so agents start with it.
 - [Keep going when a runtime runs out](keep-going-when-a-runtime-runs-out.md): see which
   runtimes are out, and continue a chat's work in a new chat on another.
@@ -109,7 +109,7 @@ something particular done.
 - [Set up a workflow](set-up-a-workflow.md): start agents on a schedule, or when another
   agent finishes, stops or asks.
 - [Start a workflow from an MCP event](start-a-workflow-from-an-mcp-event.md): an agent
-  each time an MCP server reports something, such as a pull request's checks failing.
+  each time a connector reports something, such as a pull request's checks failing.
 - [Use Linear issues](use-linear-issues.md): Linear's own tools, and an agent when an
   issue is opened, labelled, commented on or closed.
 - [Pin a page to a project](pin-a-page-to-a-project.md): a document or an HTML page

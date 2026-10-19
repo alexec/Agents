@@ -56,14 +56,14 @@ struct MarketplacesPane: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
                 Button("‹ Back", action: back).buttonStyle(.paper)
-                Text(kind == .mcp ? "MCP marketplaces" : "Skill marketplaces").appText(.title)
+                Text(kind == .mcp ? "Connector marketplaces" : "Skill marketplaces").appText(.title)
                 Spacer()
                 if !adding {
                     Button("Add Marketplace…") { adding = true }.buttonStyle(.paper)
                 }
             }
             Text(kind == .mcp
-                 ? "Add server… searches the one chosen in its menu. Any MCP Registry can be added, such as your company's own."
+                 ? "Add Connector… searches the one chosen in its menu. Any MCP Registry can be added, such as your company's own."
                  : "Add skill… searches the one chosen in its menu. A GitHub repository of skills can be added too.")
                 .appText(.fine).foregroundStyle(.secondary)
             if adding {

@@ -132,14 +132,14 @@ export function healthTally(servers: MCPServerHealth[]): { words: string; failin
   if (servers.length === 0) return null;
   const failing = servers.filter((s) => healthTone(s) === "failing").length;
   if (failing > 0) return { words: `${failing} not answering`, failing: true };
-  return { words: servers.length === 1 ? "1 server" : `${servers.length} servers`, failing: false };
+  return { words: servers.length === 1 ? "1 connector" : `${servers.length} connectors`, failing: false };
 }
 
-export const personalIntro = "Every server in your own ~/.agents/mcp.json, which every agent has. "
+export const personalIntro = "Every connector in your own ~/.agents/mcp.json, which every agent has. "
   + "A hosted one runs once on this host; any other is checked every four hours, and when its entry changes. "
-  + "Edit them in Settings ▸ Shared ▸ MCP servers.";
-export const projectIntro = "Every server in this project's .agents/mcp.json. "
+  + "Edit them in Settings ▸ Shared ▸ Connectors.";
+export const projectIntro = "Every connector in this project's .agents/mcp.json. "
   + "A hosted one runs once on its host; any other is checked every four hours, and when its entry changes. "
   + "Edit them in the project's settings.";
-export const personalEmpty = "No MCP servers in ~/.agents/mcp.json.";
-export const projectEmpty = "No MCP servers in this project's .agents/mcp.json.";
+export const personalEmpty = "No connectors in ~/.agents/mcp.json yet.";
+export const projectEmpty = "No connectors in this project's .agents/mcp.json yet.";

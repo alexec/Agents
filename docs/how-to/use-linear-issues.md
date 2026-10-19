@@ -6,7 +6,7 @@ description: Give a project's agents Linear's tools, and start an agent when a L
 
 # Use Linear issues
 
-Two MCP servers work together:
+Two connectors (MCP servers) work together:
 
 - **Tools** come from Linear's own MCP server, `https://mcp.linear.app/mcp`. Agents use it
   to find, read and change issues.
@@ -27,8 +27,8 @@ Agents Host carries `linear-mcp`, and every Linux host installs it beside agents
 
 Add Linear's own server from the registry, or by hand with the URL
 `https://mcp.linear.app/mcp`. It signs in with OAuth in your browser. See
-[Add an MCP server from the registry](add-an-mcp-server-from-the-registry.md) and
-[Sign in to an MCP server](sign-in-to-an-mcp-server.md).
+[Add a connector from the registry](add-an-mcp-server-from-the-registry.md) and
+[Sign in to a connector](sign-in-to-an-mcp-server.md).
 
 ## Add the events
 
@@ -46,8 +46,8 @@ Add Linear's own server from the registry, or by hand with the URL
        "env": { "LINEAR_API_KEY": "${LINEAR_API_KEY}" } } } }
    ```
 
-3. In **Project Settings ▸ Agent Configuration ▸ MCP servers**, choose **Approve** on
-   `linear`. See [Add an MCP server by hand](add-an-mcp-server-by-hand.md).
+3. In **Project Settings ▸ Agent Configuration ▸ Connectors**, choose **Approve** on
+   `linear`. See [Add a connector by hand](add-an-mcp-server-by-hand.md).
 
 ## Start an agent on an event
 

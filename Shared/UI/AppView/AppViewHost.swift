@@ -342,7 +342,7 @@ final class AppViewHost {
             if show {
                 await load(mine)
             } else {
-                phase = .failed("Not shown. Ask Again is on \(ask.server)'s row in the project's MCP servers.")
+                phase = .failed("Not shown. Ask Again is on \(ask.server)'s row in the project's Connectors.")
             }
         }
     }

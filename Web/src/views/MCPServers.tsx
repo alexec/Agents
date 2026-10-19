@@ -42,7 +42,7 @@ export function MCPServersList({ store, host, folder }: { store: Store; host: st
         </ul>
       )}
       {checkable && (
-        <button disabled={checking || !store.hostIsOnline(host)} title="Check every server that is not hosted again now"
+        <button disabled={checking || !store.hostIsOnline(host)} title="Check every connector that is not hosted again now"
           onClick={checkNow}>Check Now</button>
       )}
     </div>
@@ -55,8 +55,8 @@ export function MCPServersPage({ store, host, folder, projectName }: {
 }) {
   const empty = projectServers(store.mcpHealthOf(host), folder).length === 0 && !fileProblem(store.mcpHealthOf(host), folder);
   return (
-    <section class="chat activity-page mcp-page" aria-label={`${projectName}: MCP Servers`}>
-      <header class="column-head"><BackToList /><h1>{projectName}: MCP Servers</h1></header>
+    <section class="chat activity-page mcp-page" aria-label={`${projectName}: Connectors`}>
+      <header class="column-head"><BackToList /><h1>{projectName}: Connectors</h1></header>
       <div class="scroll">
         <div class="activity-body">
           <p class="hint">{projectIntro}</p>

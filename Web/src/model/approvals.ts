@@ -10,7 +10,7 @@ export function approvalID(approval: Approval): string {
 
 /** Approval.kindWord: the kind in a person's words, as a row's grey line leads with it. */
 export const kindWords: Record<ApprovalKind, string> = {
-  mcpServer: "MCP server", workflow: "Workflow", plugin: "Plugin", file: "File", archive: "Archive",
+  mcpServer: "Connector", workflow: "Workflow", plugin: "Plugin", file: "File", archive: "Archive",
   workflowFailed: "Workflow",
 };
 
@@ -39,7 +39,7 @@ export const explanations: Record<ApprovalKind, string> = {
     + "until it fails again.",
 };
 
-/** The row's one grey line: "MCP server · New with the last pull". */
+/** The row's one grey line: "Connector · New with the last pull". */
 export function approvalLine(approval: Approval): string {
   return `${kindWords[approval.kind]} · ${approval.line}`;
 }

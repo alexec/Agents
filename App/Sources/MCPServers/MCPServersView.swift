@@ -40,7 +40,7 @@ struct MCPServersView: View {
                         }
                     }
                     .disabled(checking || !servers.contains { !$0.hosted })
-                    .help("Check every server that is not hosted again now")
+                    .help("Check every connector that is not hosted again now")
                 }
                 if let problem {
                     Text(problem)
@@ -64,8 +64,8 @@ struct MCPServersView: View {
             .padding(24)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .navigationTitle(project.flatMap { model.work.project($0)?.name }.map { "\($0) \u{2014} MCP Servers" }
-                         ?? "MCP Servers")
+        .navigationTitle(project.flatMap { model.work.project($0)?.name }.map { "\($0) \u{2014} Connectors" }
+                         ?? "Your Connectors")
         .overlay {
             if servers.isEmpty && problem == nil {
                 Text(project == nil ? MCPHealthWords.personalEmpty : MCPHealthWords.projectEmpty)
@@ -88,11 +88,11 @@ struct MCPServersRow: View {
         // the row's icon red (`activityIcon(_:warns:)`).
         let words = MCPHealthWords.tally(model.work.mcpHealthSnapshot()?.personal ?? [])?.words
         HStack(alignment: .firstTextBaseline) {
-            Text("MCP Servers").foregroundStyle(.primary)
+            Text("Your Connectors").foregroundStyle(.primary)
             Spacer()
         }
-        .help(words.map { "\($0). Every server in your own mcp.json, and how each is doing" }
-              ?? "Every server in your own mcp.json, and how each is doing")
+        .help(words.map { "\($0). Every connector in your own mcp.json, and how each is doing" }
+              ?? "Every connector in your own mcp.json, and how each is doing")
         .accessibilityValue(words ?? "")
     }
 }
