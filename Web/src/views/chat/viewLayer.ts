@@ -16,7 +16,7 @@ import { CallFailed } from "../../wire/link";
 import { onThisMac, viewsOrigin } from "../../place";
 import {
   canPin, type Context, needsShow, serverParam, type ViewAsk, contextChanges, error as rpcError, Feed, initializeResult, noAgentWords, notification, policyWire,
-  type AgentMessage, noAgentCode, read, request, result, type Start, startAgentMethod, viewTitle,
+  type AgentMessage, type Diff, noAgentCode, openDiffMethod, read, request, result, type Start, startAgentMethod, viewTitle,
 } from "./appViewBridge";
 
 export interface ViewActions {
@@ -352,6 +352,13 @@ export class HostedView {
           data: `${startAgentMethod}: the new-agent form opened, filled in` }).catch(() => {});
         break;
       }
+      case "openDiff":
+        // Drawn by the page, over the chat or the pin, with the Review page's diff (#1472).
+        this.layer.diff.value = ask.diff;
+        this.post(result(ask.id));
+        void this.actions.call("views/log", { agentID: this.actions.agentID, viewID: this.call.id, level: "info",
+          data: `${openDiffMethod}: ${ask.diff.files.length} file(s) drawn in the page's diff` }).catch(() => {});
+        break;
       case "updateContext": {
         if (this.actions.project) { this.refuse(ask.id, "ui/update-model-context"); break; }
         const words = Array.isArray(ask.content)
@@ -410,6 +417,8 @@ export class HostedView {
 /** Every view open in one chat. */
 export class ViewLayer {
   readonly fullscreen = signal<string | null>(null);
+  /** A diff a view asked the page to draw (agents/open-diff, #1341): ViewDiff draws it. */
+  readonly diff = signal<Diff | null>(null);
   /** Counts views made, so a page drawing one's state hears it arrive. */
   readonly made = signal(0);
   private views = new Map<string, HostedView>();

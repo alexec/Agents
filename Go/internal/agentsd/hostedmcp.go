@@ -47,7 +47,8 @@ import (
 //     status keeps its last line.
 //
 // Logged: the server's name and a word, never its command, arguments, environment or any
-// body (054 FR-023). Views and event subscriptions still run their own copy on this host.
+// body (054 FR-023). Views go through this copy too (hostedviews.go, #1341); event
+// subscriptions still run their own copy on this host.
 
 const (
 	hostedLimit      = 8
@@ -99,6 +100,8 @@ type hostedServer struct {
 	restarts    int
 	failures    int
 	log         *hostedLog
+	// viewOnly are the tools only a view may call, as its tools/list last said (#1341).
+	viewOnly map[string]bool
 }
 
 type hostedPool struct {
@@ -108,6 +111,8 @@ type hostedPool struct {
 	hostedNextID  int
 	hostedStopped bool
 	hostedTell    chan struct{}
+	// hostedViewTimers end views' use of a copy, viewLinger after their last request.
+	hostedViewTimers map[string]*time.Timer
 }
 
 func (d *Daemon) registerHostedMCP() {
@@ -378,7 +383,7 @@ func (d *Daemon) postHosted(w http.ResponseWriter, r *http.Request, h *hostedSer
 		if m.Method == "" || len(m.ID) == 0 || string(m.ID) == "null" {
 			continue
 		}
-		result, rerr := d.hostedCall(h, m.Method, m.Params)
+		result, rerr := d.hostedSessionCall(h, m.Method, m.Params)
 		if rerr != nil {
 			answers = append(answers, mcpFailure(m.ID, rerr.Code, rerr.Message))
 			continue

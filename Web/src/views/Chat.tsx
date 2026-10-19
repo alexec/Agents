@@ -37,6 +37,7 @@ import { focusedEntry } from "../model/focus";
 import { ViewLayerContext } from "./chat/AppView";
 import { recipient, type Start, viewPin } from "./chat/appViewBridge";
 import { ViewLayer, type ViewActions } from "./chat/viewLayer";
+import { ViewDiff } from "./chat/ViewDiff";
 import { offerStart } from "./NewAgent";
 import { BackToList } from "./BackToList";
 import { comingBackDescription } from "../model/status";
@@ -465,6 +466,7 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
       <ViewLayerContext.Provider value={viewHosting}>
       <div class="scroll transcript" ref={scroller} onScroll={onScroll}>
         <div class="view-layer" ref={(el) => { layer.element = el; }} />
+        <ViewDiff layer={layer} openLink={(url) => { window.open(url, "_blank", "noopener,noreferrer"); }} />
         {failure && (
           // The history, or its earlier turns, did not load: said, with the way to ask again (#400).
           <p class="load-failure" role="status">

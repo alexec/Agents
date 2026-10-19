@@ -276,6 +276,8 @@ type issueJSON struct {
 	CreatedAt   string          `json:"created_at"`
 	StateReason string          `json:"state_reason"`
 	PullRequest json.RawMessage `json:"pull_request"`
+	Comments    int             `json:"comments"`
+	UpdatedAt   string          `json:"updated_at"`
 }
 
 func (i issueJSON) isPR() bool { return len(i.PullRequest) > 0 && string(i.PullRequest) != "null" }

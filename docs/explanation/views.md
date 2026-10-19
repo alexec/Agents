@@ -11,9 +11,10 @@ This is MCP Apps ([SEP-1865, 2026-01-26](https://github.com/modelcontextprotocol
 a tool names a `ui://` resource, the resource is HTML, and the view talks to the app over
 `postMessage` in JSON-RPC.
 
-The app draws views from its own `agents` server, and from your own connectors (MCP servers) reached over
-http ([Views from your own servers](#views-from-your-own-servers)). Views from servers that
-run on this machine (stdio) aren't shown yet.
+The app draws views from its own `agents` server, from the `github` server
+([The github server's views](#the-github-servers-views)), and from your own connectors (MCP servers)
+reached over http or hosted by the app ([Views from your own servers](#views-from-your-own-servers)).
+Views from other servers that run on this machine (stdio) aren't shown yet.
 
 ## Where a view comes from
 
@@ -64,6 +65,7 @@ How each client enforces it:
 | `ui/message` | **Asks you first.** Under the view: "The view asks to send this as your message", with **Send** and **Don't Send**. Send sends it as your own prompt, exactly as if you had typed it. A view never speaks for you without you. |
 | `agents/start-agent` | **Our extension (#834).** Opens the new-agent form in the view's project, filled in with the view's `prompt`, its `labels` and, when it names one, a new `worktree` of that name. You start the agent, or don't: a view never starts one. From a pinned view, it opens the form in the pin's project. A `branch` instead puts the agent in a new worktree on that branch (#837). |
 | `agents/message-agent` | **Our extension (#837). Asks you first.** Sends the view's `text` to the session whose worktree is on the view's `branch`, in the view's project (the latest active one not archived). Under the view: "The view asks to send this to "*session*" as your message", with **Send** and **Don't Send**. It works from a pinned view too. With no such session, the answer is error `-32001`, and the view can offer a new agent instead. |
+| `agents/open-diff` | **Our extension (#1341).** Draws the view's `files`, each as its hunks of context, added and removed lines, in the app's own diff (the Review page's, #1472): over the view, as a sheet on the Mac, the iPhone and the iPad, and over the chat or the pin on the web page. Unified, or Side by Side on a wide one. Each file's path and counts, a break between hunks, long unchanged runs folded, and **Open on GitHub** for the view's `url`. At most 3000 files and 20,000 lines. It works from a pinned view too. |
 | `ui/update-model-context` | Keeps what the view said, and tells the agent with **your next message**: before your words, not in your bubble, in the same way the app tells an agent that a wait ended. Only the last context from each view is kept, and it is used once. A line under the view says what the agent will be told, with **Don't Tell** to take it back. It is kept in memory only, so a daemon restart forgets it. |
 | `ui/request-display-mode` | `inline` or `fullscreen`. Full screen draws the same view in the chat's place, as a pinned page opens, with **Back to the chat**. You can also go full screen from the button beside the view's name. |
 | `ui/notifications/size-changed` | The view's height in the chat, up to 640 points. |
@@ -89,7 +91,7 @@ ties a view to a tool call the model made. A pin is the host making that call it
 - **Which tools can feed a pin.** Only a tool a view may call (`visibility` includes
   `app`) that is marked as changing nothing (`annotations.readOnlyHint`), because opening
   a pin calls it. Anything else is refused.
-- **Which servers.** The `agents` server's, and your own http servers' (#191). A pin this
+- **Which servers.** The `agents` server's, and your own http and hosted servers' (#191, #1341). A pin this
   host can't draw shows as missing, with why: *server not set up here*, *waiting for
   approval*, *a secret is missing*, *needs a sign-in*, *views from local servers aren't
   shown yet* or *no such view*. Each host says for itself, since each has its own servers. That is the way a pinned file shows as missing until its
@@ -104,7 +106,8 @@ ties a view to a tool call the model made. A pin is the host making that call it
 ## Views from your own servers
 
 A tool of one of your own connectors — in a project's `.agents/mcp.json`, your own
-`~/.agents/mcp.json`, or a plugin — can have a view too (#191). The app draws it in the turn
+`~/.agents/mcp.json`, or a plugin — can have a view too (#191). The server is reached over
+http, or is one the app hosts (`"hosted": true`, #1341). The app draws it in the turn
 that called the tool and as a pin, on the Mac, the Remote and the web page, in the same
 sandbox as the app's own views.
 
@@ -115,13 +118,15 @@ sandbox as the app's own views.
   again to get its result: the view gets what the runtime passed on.
 - **Where the connection runs.** The daemon makes a connection of its own to the server, on
   the host that runs the project, with the secrets filled from `secrets.env` as for a
-  session. It reads the server's tools and `ui://` resources (kept in `<root>/mcp-views/`, a
+  session. A hosted server's views go through the host's one copy of it, the copy that the
+  sessions use; the views keep it running for 2 minutes after their last request. It reads the server's tools and `ui://` resources (kept in `<root>/mcp-views/`, a
   day at most), the view's HTML, and the tools the view calls. Clients never connect to your
   server. At most 4 such connections are open on a host, the least recently used goes
   first, and each ends after 2 minutes unused.
-- **http only, for now.** A server that runs on this machine (stdio) would need a second
-  copy of it beside the runtime's, so its views aren't shown yet, and its pin says *views
-  from local servers aren't shown yet*. The old sse transport shows no views.
+- **http and hosted only, for now.** A server that runs on this machine (stdio) and that the
+  app does not host would need a second copy of it beside the runtime's, so its views aren't
+  shown yet, and its pin says *views from local servers aren't shown yet*. The old sse
+  transport shows no views.
 - **Approval, and Show.** A server waiting for approval shows nothing, nor does one missing
   a secret or wanting a sign-in. The first time a server's view is to be drawn, it asks in
   the view's place: "*server* wants to show a view here", with **Show** and **Don't Show**.
@@ -138,12 +143,41 @@ sandbox as the app's own views.
   the #186 probe recorded). OpenCode passes only text, so its calls' views are not drawn in
   the chat; pin them instead. A runtime whose call is named only by a joined title
   (Copilot, OpenCode) is drawn once it has answered.
-- **A known limit.** A tool only a view may call (`visibility: ["app"]`) is still offered to
-  the model, since every runtime lists the server's tools itself and none filters them.
-  Nothing on the app's side can hide it.
+- **A tool only a view may call** (`visibility: ["app"]`) is not offered to an agent by a
+  hosted server: the host leaves it out of the sessions' `tools/list`, and refuses a
+  session's call of it (#1341). An http server's is still offered to the model, since every
+  runtime lists that server's tools itself and none filters them. Nothing on the app's side
+  can hide it. Nor can the app hide it when it has no room to host the server, and the
+  runtime runs a copy of its own.
 - **Logged.** The server's name, the view's address, its policy and words such as
   *connected*, *ended* or *refused*. Never its command, URL, headers, environment or any
   body.
+
+## The github server's views
+
+The `github` server (`Go/internal/githubmcp`, #1341) has three views, each fed by a
+read-only tool, so each can be pinned. This project pins the first two in its
+`.agents/pins.json`; another project with the `github` server pins them with **Pin to
+Project**.
+
+- **Pull requests** (`ui://github/pulls`, from `show_pull_requests`): the open pull
+  requests, each with its checks, review, conflict and auto-merge, and **Rerun** on a
+  failing one. A title opens the pull request's page in the same view.
+- **Issues** (`ui://github/issues`, from `show_issues`): the open issues, with their labels
+  and assignees. A label narrows the list. **Start Agent** opens the new-agent form for the
+  issue.
+- **A pull request's page** (`ui://github/pr`, from `show_pull_request`): the description
+  and the conversation, the comments on lines of code, the files, and the checks, where a
+  failed check shows the end of its log (`failed_log`). An app's words, such as CodeRabbit's,
+  are marked *bot*. **Comment**, **Approve** and **Request Changes** (on someone else's
+  pull request), **Merge** and **Auto-merge** (each asked again), and **Ask an Agent**: to
+  the agent on the branch, or the new-agent form on it. **Show Diff**, or a file's name,
+  reads its hunks (`show_pull_request_diff`) and asks the app to draw them
+  (`agents/open-diff`).
+
+Merge, review and comment are tools that only a view may call (`merge_pr`, `review_pr`,
+`comment_on_pr`): a person does them, from the page. The server reads GitHub as the
+signed-in `gh` user, with `gh auth token`.
 
 ## The test view
 

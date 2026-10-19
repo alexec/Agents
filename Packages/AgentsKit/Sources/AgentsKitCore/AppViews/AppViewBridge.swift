@@ -18,6 +18,9 @@ public enum AppViewBridge {
     /// Our extension of MCP Apps (#837): a view asks to send words to the session working on
     /// a branch. The person says Send first.
     public static let messageAgentMethod = "agents/message-agent"
+    /// Our extension of MCP Apps (#1341): a view asks the app to draw a diff, in its own diff
+    /// (the Review page's, #1472), not in the view.
+    public static let openDiffMethod = "agents/open-diff"
     /// The error code of an `agents/message-agent` that no session in the view's project
     /// works on: the view may offer a new agent instead.
     public static let noAgentCode = -32001
@@ -38,6 +41,8 @@ public enum AppViewBridge {
         case startAgent(id: JSONValue, start: AppViewStart)
         /// Our extension (#837): send words to the session on a branch, once the person says Send.
         case messageAgent(id: JSONValue, message: AppViewAgentMessage)
+        /// Our extension (#1341): draw these files' hunks in the app's own diff.
+        case openDiff(id: JSONValue, diff: AppViewDiff)
         case updateContext(id: JSONValue, content: JSONValue?, structuredContent: JSONValue?)
         case displayMode(id: JSONValue, mode: String)
         case sizeChanged(width: Double?, height: Double?)
@@ -108,6 +113,11 @@ public enum AppViewBridge {
         case messageAgentMethod:
             switch AppViewAgentMessage.read(params) {
             case .success(let message): return .messageAgent(id: id, message: message)
+            case .failure(let reason): return .malformed(id: id, reason: reason.words)
+            }
+        case openDiffMethod:
+            switch AppViewDiff.read(params) {
+            case .success(let diff): return .openDiff(id: id, diff: diff)
             case .failure(let reason): return .malformed(id: id, reason: reason.words)
             }
         case "ui/update-model-context":
@@ -296,6 +306,102 @@ public struct AppViewAgentMessage: Equatable, Sendable {
     public static func name(of agent: Agent) -> String {
         let title = agent.title?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         return title.isEmpty ? (agent.worktree?.name ?? "the agent") : title
+    }
+}
+
+/// What a view asked the app to draw in its own diff (#1341, `agents/open-diff`): a pull
+/// request's files, each as its hunks, as GitHub gives them. The app draws it on a page of
+/// its own, with the diff of the Review page (#1472).
+public struct AppViewDiff: Equatable, Sendable, Identifiable {
+    public enum Kind: String, Sendable { case context, added, removed }
+
+    public struct Line: Equatable, Sendable {
+        public var kind: Kind
+        public var text: String
+    }
+
+    public struct Hunk: Equatable, Sendable {
+        public var oldStart: Int
+        public var newStart: Int
+        public var lines: [Line]
+    }
+
+    public struct File: Equatable, Sendable, Identifiable {
+        public var path: String
+        public var previousPath: String?
+        /// added, removed, modified, renamed …, as GitHub says.
+        public var change: String
+        public var additions: Int
+        public var deletions: Int
+        public var hunks: [Hunk]
+        /// Why it has no hunks, when it has none.
+        public var note: String?
+        public var id: String { path }
+    }
+
+    public var id = UUID()
+    public var title: String
+    /// Where the same diff is on the web, such as the pull request's Files page.
+    public var url: URL?
+    public var files: [File]
+    /// Whether the view cut it: some files are listed with no hunks.
+    public var cut: Bool
+    /// The file to show first, when the view named one.
+    public var path: String?
+
+    public struct Refusal: Error, Equatable {
+        public var words: String
+    }
+
+    /// The most lines a diff may have, all files together, and the most files.
+    public static let lineLimit = 20_000
+    public static let fileLimit = 3000
+
+    public init(title: String, url: URL? = nil, files: [File], cut: Bool = false, path: String? = nil) {
+        self.title = title
+        self.url = url
+        self.files = files
+        self.cut = cut
+        self.path = path
+    }
+
+    public static func == (a: AppViewDiff, b: AppViewDiff) -> Bool {
+        a.title == b.title && a.url == b.url && a.files == b.files && a.cut == b.cut && a.path == b.path
+    }
+
+    /// Read from the message's parameters, or why not.
+    public static func read(_ params: JSONValue?) -> Result<AppViewDiff, Refusal> {
+        guard let given = params?["files"]?.arrayValue else {
+            return .failure(Refusal(words: "agents/open-diff needs files."))
+        }
+        guard given.count <= fileLimit else { return .failure(Refusal(words: "A diff has at most \(fileLimit) files.")) }
+        var lines = 0
+        var files: [File] = []
+        for f in given {
+            guard let path = f["path"]?.stringValue, !path.isEmpty else {
+                return .failure(Refusal(words: "Each file of a diff needs a path."))
+            }
+            var hunks: [Hunk] = []
+            for h in f["hunks"]?.arrayValue ?? [] {
+                var hunk = Hunk(oldStart: max(1, h["oldStart"]?.intValue ?? 1), newStart: max(1, h["newStart"]?.intValue ?? 1), lines: [])
+                for l in h["lines"]?.arrayValue ?? [] {
+                    guard let kind = Kind(rawValue: l["kind"]?.stringValue ?? ""), let text = l["text"]?.stringValue else {
+                        return .failure(Refusal(words: "Each line of a diff is context, added or removed, with its text."))
+                    }
+                    hunk.lines.append(Line(kind: kind, text: text))
+                }
+                lines += hunk.lines.count
+                hunks.append(hunk)
+            }
+            guard lines <= lineLimit else { return .failure(Refusal(words: "A diff has at most \(lineLimit) lines.")) }
+            files.append(File(path: path, previousPath: f["previousPath"]?.stringValue, change: f["change"]?.stringValue ?? "modified",
+                              additions: max(0, f["additions"]?.intValue ?? 0), deletions: max(0, f["deletions"]?.intValue ?? 0),
+                              hunks: hunks, note: f["note"]?.stringValue))
+        }
+        let title = (params?["title"]?.stringValue ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        let url = params?["url"]?.stringValue.flatMap(URL.init(string:)).flatMap { ["http", "https"].contains($0.scheme?.lowercased() ?? "") ? $0 : nil }
+        return .success(AppViewDiff(title: title.isEmpty ? "Changes" : String(title.prefix(200)), url: url, files: files,
+                                    cut: params?["cut"]?.boolValue ?? false, path: params?["path"]?.stringValue))
     }
 }
 

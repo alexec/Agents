@@ -1,0 +1,93 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Issues</title>
+<!-- The github server's Issues (ui://github/issues, #1341): show_issues's result; a label
+     narrows it. Start Agent opens the app's new-agent form filled in for the issue
+     (agents/start-agent, #834). It has no network: it speaks only the MCP Apps bridge. -->
+<style>
+/*common.css*/
+.start { grid-column: 3; grid-row: 1 / span 2; white-space: nowrap; }
+.meta { grid-column: 2; }
+</style></head>
+<body><main>
+  <header><h1>Issues</h1><span id="repo" class="muted"></span><span id="label"></span><span class="grow"></span>
+    <button id="refresh" type="button" disabled>Refresh</button></header>
+  <div id="state" class="muted">Waiting for the host…</div>
+  <ul id="issues"></ul>
+</main>
+<script>
+/*bridge.js*/
+(() => {
+  let repo = "", label = "";
+  const ui = bridge("github-issues", {
+    input: (args) => { repo = args.repo || ""; label = args.label || ""; ui.$("repo").textContent = repo; say("Listing…"); },
+    result: (result) => draw(result),
+    cancelled: (why) => say("Cancelled: " + why, true),
+    started: () => say("Waiting for the issues…"),
+  });
+  const { $, el, link, button } = ui;
+  const say = (text, isError) => { $("state").textContent = text; $("state").className = isError ? "error" : "muted"; ui.size(); };
+
+  // The label the list is narrowed to, with a way back to every open issue.
+  const drawLabel = () => {
+    if (!label) { $("label").replaceChildren(); return; }
+    $("label").replaceChildren(button(label + " ✕", () => choose(""), { className: "pill chosen", title: "Show every open issue" }));
+  };
+
+  const draw = (result) => {
+    const found = ui.data(result);
+    if (!found) { say("Couldn't list issues: " + ui.errorText(result), true); $("refresh").disabled = !repo; return; }
+    if (found.repo) { repo = found.repo; $("repo").textContent = repo; }
+    const issues = Array.isArray(found.issues) ? found.issues : [];
+    $("issues").replaceChildren(...issues.map(row));
+    drawLabel();
+    const assigned = issues.filter((issue) => (issue.assignees || []).length).length;
+    say(issues.length ? `${issues.length} open · ${assigned} assigned · as of ${new Date().toLocaleTimeString()}`
+      : label ? `No open issues labelled ${label}.` : "No open issues.");
+    $("refresh").disabled = !repo;
+  };
+
+  const row = (issue) => {
+    const labels = (issue.labels || []).map((name) => button(name, () => choose(name === label ? "" : name),
+      { className: name === label ? "pill chosen" : "pill", title: "Only issues labelled " + name }));
+    // Who works on it (#905): an issue is taken by assigning it.
+    const assignees = (issue.assignees || []).map((login) =>
+      el("span", { className: "pill assigned", textContent: "@" + login, title: "Assigned to " + login }));
+    const comments = issue.comments ? ` · ${issue.comments} comment${issue.comments === 1 ? "" : "s"}` : "";
+    const start = button("Start Agent", () => startAgent(issue),
+      { className: "start", title: `A new agent for #${issue.number}, in a worktree of its own` });
+    return el("li", {}, [
+      link(`#${issue.number}`, issue.url),
+      el("span", { className: "title", textContent: issue.title, title: issue.title }),
+      start,
+      el("span", { className: "meta" }, [
+        ...assignees,
+        el("span", { textContent: `${issue.author || "someone"}${comments}${issue.updatedAt ? " · " + ui.ago(issue.updatedAt) : ""}` }),
+        ...labels,
+      ]),
+    ]);
+  };
+
+  // The app's new-agent form, filled in for this issue (#834). The person starts it, or not;
+  // the agent assigns the issue to the signed-in gh user once it does.
+  const startAgent = async (issue) => {
+    const n = issue.number, on = repo ? ` --repo ${repo}` : "";
+    const prompt = `Work on GitHub issue #${n} (\`gh issue view ${n}${on}\`): ${issue.title}\n\n`
+      + `First assign it to yourself: \`gh issue edit ${n}${on} --add-assignee @me\`.`;
+    try {
+      await ui.request("agents/start-agent", { prompt, labels: ["#" + n], worktree: `${n} ${issue.title}` });
+      say(`A new agent for #${n} is ready to start.`);
+    } catch (e) { say("Couldn't open a new agent: " + e.message, true); ui.log("start-agent refused: " + e.message, "warning"); }
+  };
+
+  const list = async () => {
+    $("refresh").disabled = true;
+    const args = label ? { repo, label } : { repo };
+    try { draw(await ui.request("tools/call", { name: "show_issues", arguments: args })); }
+    catch (e) { say("Couldn't list issues: " + e.message, true); $("refresh").disabled = false; }
+  };
+  const choose = (name) => { label = name; drawLabel(); say("Listing…"); list(); };
+  $("refresh").onclick = list;
+  ui.start();
+})();
+</script>
+</body></html>

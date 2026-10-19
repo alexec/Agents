@@ -4,6 +4,7 @@
 // two are kept to it. Pure, so test/appViews.test.mjs reads every row.
 import type { Agent, AppViewCall, AppViewPolicy, JSONValue, UUID, ViewPin } from "../../protocol/generated";
 import { folderKey, projectFolder } from "../../model/groups";
+import type { Hunk } from "../../model/fileDiff";
 
 export const protocolVersion = "2026-01-26";
 export const displayModes = ["inline", "fullscreen"] as const;
@@ -11,6 +12,8 @@ export const displayModes = ["inline", "fullscreen"] as const;
 export const startAgentMethod = "agents/start-agent";
 /** Our extension of MCP Apps (#837): a view asks to send words to the session on a branch. */
 export const messageAgentMethod = "agents/message-agent";
+/** Our extension of MCP Apps (#1341): a view asks the page to draw a diff in its own diff (#1472). */
+export const openDiffMethod = "agents/open-diff";
 /** The error code of an agents/message-agent that no session in the view's project works on. */
 export const noAgentCode = -32001;
 
@@ -30,6 +33,8 @@ export type Ask =
   | { kind: "startAgent"; id: Id; start: Start }
   /** Our extension (#837): send words to the session on a branch, once the person says Send. */
   | { kind: "messageAgent"; id: Id; message: AgentMessage }
+  /** Our extension (#1341): draw these files' hunks in the page's own diff. */
+  | { kind: "openDiff"; id: Id; diff: Diff }
   | { kind: "updateContext"; id: Id; content?: JSONValue | undefined; structuredContent?: JSONValue | undefined }
   | { kind: "displayMode"; id: Id; mode: string }
   | { kind: "sizeChanged"; width?: number | undefined; height?: number | undefined }
@@ -98,6 +103,10 @@ export function read(raw: unknown): Ask {
       const read = readAgentMessage(params);
       return "refused" in read ? { kind: "malformed", id, reason: read.refused } : { kind: "messageAgent", id, message: read.message };
     }
+    case openDiffMethod: {
+      const read = readDiff(params);
+      return "refused" in read ? { kind: "malformed", id, reason: read.refused } : { kind: "openDiff", id, diff: read.diff };
+    }
     case "ui/update-model-context":
       return { kind: "updateContext", id, content: params.content as JSONValue, structuredContent: params.structuredContent as JSONValue };
     case "ui/request-display-mode":
@@ -105,6 +114,71 @@ export function read(raw: unknown): Ask {
     default:
       return { kind: "unknown", id, method };
   }
+}
+
+/** What a view asked the page to draw in its own diff (#1341, `agents/open-diff`): AppViewDiff.
+ *  A pull request's files, each as its hunks, as GitHub gives them. */
+export interface DiffFile {
+  path: string;
+  previousPath?: string | undefined;
+  /** added, removed, modified, renamed …, as GitHub says. */
+  change: string;
+  additions: number;
+  deletions: number;
+  hunks: Hunk[];
+  /** Why it has no hunks, when it has none. */
+  note?: string | undefined;
+}
+export interface Diff {
+  title: string;
+  /** Where the same diff is on the web, such as the pull request's Files page. */
+  url?: string | undefined;
+  files: DiffFile[];
+  /** Whether the view cut it: some files are listed with no hunks. */
+  cut: boolean;
+  /** The file to show first, when the view named one. */
+  path?: string | undefined;
+}
+/** The most lines a diff may have, all files together, and the most files. */
+export const diffLineLimit = 20000;
+export const diffFileLimit = 3000;
+
+const count = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? Math.max(0, Math.floor(v)) : 0);
+
+/** Read from the message's parameters, or why not (AppViewDiff.read). */
+export function readDiff(params: Record<string, unknown>): { diff: Diff } | { refused: string } {
+  if (!Array.isArray(params.files)) return { refused: "agents/open-diff needs files." };
+  if (params.files.length > diffFileLimit) return { refused: `A diff has at most ${diffFileLimit} files.` };
+  let lines = 0;
+  const files: DiffFile[] = [];
+  for (const f of params.files) {
+    if (!isObject(f) || typeof f.path !== "string" || !f.path) return { refused: "Each file of a diff needs a path." };
+    const hunks: Hunk[] = [];
+    for (const h of Array.isArray(f.hunks) ? f.hunks : []) {
+      if (!isObject(h)) continue;
+      const hunk: Hunk = { oldStart: Math.max(1, count(h.oldStart)), newStart: Math.max(1, count(h.newStart)), lines: [] };
+      for (const l of Array.isArray(h.lines) ? h.lines : []) {
+        if (!isObject(l) || !["context", "added", "removed"].includes(String(l.kind)) || typeof l.text !== "string") {
+          return { refused: "Each line of a diff is context, added or removed, with its text." };
+        }
+        hunk.lines.push({ kind: l.kind as Hunk["lines"][number]["kind"], text: l.text });
+      }
+      lines += hunk.lines.length;
+      hunks.push(hunk);
+    }
+    if (lines > diffLineLimit) return { refused: `A diff has at most ${diffLineLimit} lines.` };
+    files.push({ path: f.path, previousPath: typeof f.previousPath === "string" ? f.previousPath : undefined,
+      change: typeof f.change === "string" ? f.change : "modified", additions: count(f.additions), deletions: count(f.deletions),
+      hunks, note: typeof f.note === "string" ? f.note : undefined });
+  }
+  const title = typeof params.title === "string" ? params.title.trim().slice(0, 200) : "";
+  let url: string | undefined;
+  try {
+    const u = new URL(String(params.url));
+    if (u.protocol === "https:" || u.protocol === "http:") url = u.href;
+  } catch { /* not a URL */ }
+  return { diff: { title: title || "Changes", url, files, cut: params.cut === true,
+    path: typeof params.path === "string" ? params.path : undefined } };
 }
 
 /** What a view filled the new-agent form with (#834, `agents/start-agent`): AppViewStart. The

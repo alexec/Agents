@@ -112,7 +112,7 @@ every Connectors page, and the Mac's catalogue shows them on each row.
 
 | Integration | Clients that show it | State | Levels | Last checked | Where | Gaps |
 | --- | --- | --- | --- | --- | --- | --- |
-| The github server (official github-mcp-server tools plus our events), Made by Agents | Mac, Remote, web, agents | built | Tools, Events, Views | 2026-10-18, its levels checked on a scratch host (#1428); 2026-10-16, side by side with the ci server it replaced (#1231) | `Go/cmd/github-mcp/main.go`, `Go/internal/githubmcp` | the ci server's views (board, issues, PR page) are not back |
+| The github server (official github-mcp-server tools, our events, and views: Pull requests, Issues, a PR page with its diff, checks and review), Made by Agents | Mac, Remote, web, agents | walked on scratch | Tools, Events, Views | 2026-10-18, views on alexec/agents-walk (#1341, `specs/071-web-remote/walks/1341/`): web walked through, Mac and iPhone drawn; 2026-10-18, its levels checked on a scratch host (#1428); 2026-10-16, side by side with the ci server it replaced (#1231) | `Go/cmd/github-mcp/main.go`, `Go/internal/githubmcp` | the Mac's and the Remote's diff sheet unwalked (a walk can't press inside a view there) |
 | GitHub sign-in (GitHub App `agents-loops`, device flow, no `gh`) | agents (the sheet: #1336) | built | — | — | `Go/internal/connections`, `Go/internal/agentsd/connections.go` | #1336 (the Connect sheet on Mac, Remote and web) |
 | The linear server (events only), Made by Agents | Mac, Remote, web, agents | built | Events | — | `Go/cmd/linear-mcp/main.go`, `Go/internal/linearmcp` | #839, #1343 |
 | MCP OAuth | Mac | built | — | — | `Go/internal/agentsd/mcpcatalog/oauth.go`, `App/Sources/Catalog/MCPSignInSheet.swift` | |

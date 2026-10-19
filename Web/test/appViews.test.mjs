@@ -215,3 +215,24 @@ test("a person's own server's view names its server, and asks Show first (#191)"
   assert.equal(bridge.feedParams("P", "/p", view).server, "kite");
   assert.equal(bridge.feedParams("P", "/p", { ...view, server: "agents" }).server, undefined);
 });
+
+// agents/open-diff (#1341): a pull request's files, as hunks, for the page's own diff.
+test("the bridge reads a diff to draw, and refuses one that is not", () => {
+  const files = [{ path: "average.py", change: "modified", additions: 1, deletions: 1,
+    hunks: [{ oldStart: 4, newStart: 4, lines: [{ kind: "context", text: "a" }, { kind: "removed", text: "b" }, { kind: "added", text: "c" }] }] },
+  { path: "logo.png", change: "added", additions: 0, deletions: 0, hunks: [], note: "No lines to show." }];
+  const read = ask("agents/open-diff", { title: "#1 Fix", url: "https://github.com/o/r/pull/1/files", files, path: "logo.png" });
+  assert.equal(read.kind, "openDiff");
+  assert.equal(read.diff.title, "#1 Fix");
+  assert.equal(read.diff.url, "https://github.com/o/r/pull/1/files");
+  assert.equal(read.diff.path, "logo.png");
+  assert.equal(read.diff.cut, false);
+  assert.deepEqual(read.diff.files[0].hunks, files[0].hunks);
+  assert.equal(read.diff.files[1].note, "No lines to show.");
+  assert.equal(ask("agents/open-diff", { title: "x" }).kind, "malformed");
+  assert.equal(ask("agents/open-diff", { files: [{ hunks: [] }] }).kind, "malformed");
+  assert.equal(ask("agents/open-diff", { files: [{ path: "a", hunks: [{ lines: [{ kind: "moved", text: "x" }] }] }] }).kind, "malformed");
+  assert.equal(ask("agents/open-diff", { files, url: "javascript:alert(1)" }).diff.url, undefined);
+  const many = [{ path: "big", hunks: [{ oldStart: 1, newStart: 1, lines: Array.from({ length: bridge.diffLineLimit + 1 }, () => ({ kind: "added", text: "" })) }] }];
+  assert.equal(ask("agents/open-diff", { files: many }).kind, "malformed");
+});

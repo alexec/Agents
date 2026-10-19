@@ -37,12 +37,19 @@ func fakeMCPServer() {
 		switch {
 		case m.Method == "initialize" && levels:
 			result = `{"protocolVersion":"2025-06-18","capabilities":{"tools":{},"resources":{},"events":{}},"serverInfo":{"name":"fake","version":"1"}}`
-		case m.Method == "tools/list":
-			result = `{"tools":[{"name":"a","inputSchema":{"type":"object"}},{"name":"b","inputSchema":{"type":"object"}}]}`
+		case m.Method == "tools/list" && os.Getenv("AGENTS_FAKE_MCP_VIEWS") == "1":
+			// A tool with a view, and one only a view may call (#1341).
+			result = `{"tools":[{"name":"board","inputSchema":{"type":"object"},"annotations":{"readOnlyHint":true},` +
+				`"_meta":{"ui":{"resourceUri":"ui://fake/board","visibility":["model","app"]}}},` +
+				`{"name":"merge","inputSchema":{"type":"object"},"_meta":{"ui":{"visibility":["app"]}}}]}`
 		case m.Method == "resources/list":
-			result = `{"resources":[{"uri":"ui://fake/board","name":"board"}]}`
+			result = `{"resources":[{"uri":"ui://fake/board","name":"board","title":"Board","mimeType":"text/html;profile=mcp-app"}]}`
 		case m.Method == "events/list":
 			result = `{"events":[{"name":"pr.opened","delivery":["poll"]}]}`
+		case m.Method == "tools/list":
+			result = `{"tools":[{"name":"a","inputSchema":{"type":"object"}},{"name":"b","inputSchema":{"type":"object"}}]}`
+		case m.Method == "tools/call":
+			result = `{"content":[{"type":"text","text":"called"}]}`
 		}
 		fmt.Printf(`{"jsonrpc":"2.0","id":%d,"result":%s}`+"\n", *m.ID, result)
 	}

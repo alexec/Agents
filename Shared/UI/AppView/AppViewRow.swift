@@ -313,8 +313,20 @@ private struct AppViewEdge: ViewModifier {
     }
 }
 
+/// The view's web view, and the diff it asked the app to draw over it (#1341).
+private struct AppViewWeb: View {
+    @Bindable var host: AppViewHost
+
+    var body: some View {
+        AppViewWebView(host: host)
+            .sheet(item: $host.diff) { diff in
+                AppViewDiffPage(diff: diff, openLink: { host.actions.openLink($0) })
+            }
+    }
+}
+
 #if os(macOS)
-private struct AppViewWeb: NSViewRepresentable {
+private struct AppViewWebView: NSViewRepresentable {
     let host: AppViewHost
     func makeNSView(context: Context) -> NSView {
         let box = NSView()
@@ -332,7 +344,7 @@ private struct AppViewWeb: NSViewRepresentable {
     }
 }
 #else
-private struct AppViewWeb: UIViewRepresentable {
+private struct AppViewWebView: UIViewRepresentable {
     let host: AppViewHost
     func makeUIView(context: Context) -> UIView {
         let box = UIView()

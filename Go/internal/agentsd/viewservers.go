@@ -16,9 +16,10 @@ import (
 
 // Which of a person's MCP servers a view may come from, and what views it has
 // (DaemonCore+ThirdPartyViews, ServerViewCatalog). The app reaches the server over a
-// connection of its own, here one for each request. Only http servers show views (Q5): a
-// stdio server's, hosted or not, would need a second copy of it, so they say so instead. A
-// server waiting for approval, missing a secret, or wanting a sign-in shows nothing.
+// connection of its own, here one for each request. http servers show views, and hosted
+// ones through the host's one copy (#1341, hostedviews.go). Any other stdio server's would
+// need a second copy of it (Q5), so they say so instead. A server waiting for approval,
+// missing a secret, or wanting a sign-in shows nothing.
 // Logged: names, ui:// addresses and words; never a command, URL, header or body.
 
 // viewServer is a server a view may come from, set up and approved here.
@@ -29,6 +30,8 @@ type viewServer struct {
 	filled sdk.McpServer
 	// entry is the catalog's key: a digest of the entry as written, ${NAME} and all.
 	entry string
+	// connect is the way to a hosted server's one copy; nil for an http server.
+	connect func() (mcpConn, error)
 }
 
 // viewTrouble is why a server's views are not shown here.
@@ -92,7 +95,7 @@ func (d *Daemon) viewServerFor(name, project string) (viewServer, viewTrouble) {
 	project = filepath.Clean(project)
 	ready := func(e mcpEntry, scope string) (viewServer, viewTrouble) {
 		switch {
-		case e.hosted || e.server.Stdio != nil:
+		case e.server.Stdio != nil && !e.hosted:
 			return viewServer{}, viewLocalServer
 		case e.server.Sse != nil:
 			return viewServer{}, viewOldTransport
@@ -100,6 +103,16 @@ func (d *Daemon) viewServerFor(name, project string) (viewServer, viewTrouble) {
 		filled, missing := filledServer(e.server, d.secrets())
 		if len(missing) > 0 {
 			return viewServer{}, viewMissingSecret
+		}
+		if filled.Stdio != nil {
+			// Hosted: as a session in this scope is given it, so it is the same copy.
+			var in *string
+			cwd := d.personalHome()
+			if scope != viewScope("") {
+				in, cwd = &project, project
+			}
+			return viewServer{name: name, scope: scope, filled: filled, entry: entryDigest(e.raw),
+				connect: d.hostedViewConnect(*filled.Stdio, in, cwd)}, 0
 		}
 		signed := d.withSignIns([]sdk.McpServer{filled})
 		if len(signed) == 0 {
@@ -400,12 +413,21 @@ type viewSession struct {
 
 // withViewSession connects to s, initializes, runs body, and ends the session.
 func withViewSession(ctx context.Context, s viewServer, body func(*viewSession) error) error {
-	if s.filled.Http == nil {
+	var conn mcpConn
+	switch {
+	case s.connect != nil:
+		c, err := s.connect()
+		if err != nil {
+			return err
+		}
+		conn = c
+	case s.filled.Http != nil:
+		conn = &httpMCP{url: s.filled.Http.Url, headers: s.filled.Http.Headers}
+	default:
 		return &mcpCheckFailure{kind: "notMCP"}
 	}
 	ctx, cancel := context.WithTimeout(ctx, viewTimeout)
 	defer cancel()
-	conn := &httpMCP{url: s.filled.Http.Url, headers: s.filled.Http.Headers}
 	defer conn.end()
 	m := &viewSession{ctx: ctx, conn: conn, next: 1}
 	timedOut := func(err error) error {

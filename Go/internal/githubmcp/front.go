@@ -22,7 +22,8 @@ import (
 // Instructions are the events' words, put before the official server's own.
 const Instructions = "This repo's pull requests, their CI, and its issues as events, polled as the person signed in to GitHub in Agents: " +
 	"checks.failed, pr.opened, pr.merged, pr.conflicted, pr.closed, issue.opened, issue.labelled, issue.commented, issue.closed. " +
-	"Merging and reviewing a pull request are a person's: those tools are not here."
+	"show_pull_requests, show_issues and show_pull_request show a page to the person. " +
+	"Merging and reviewing a pull request are a person's, from its page: those tools are not for agents."
 
 // maxLine is the longest message read; a longer one ends the connection, as the SDK's does.
 const maxLine = 64 << 20

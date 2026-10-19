@@ -1,0 +1,87 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Pull requests</title>
+<!-- The github server's Pull requests (ui://github/pulls, #1341): show_pull_requests's result,
+     each with its checks, review, conflict and auto-merge, and Rerun on a failing one. A pull
+     request's title opens its page (show_pull_request) in place, with a way back to the list.
+     It has no network: it speaks only the MCP Apps bridge. -->
+<style>
+/*common.css*/
+/*prpage.css*/
+#list { display: grid; gap: 8px; }
+#list[hidden], #page[hidden] { display: none; }
+</style></head>
+<body><main><div id="list">
+  <header><h1>Pull requests</h1><span id="repo" class="muted"></span><span class="grow"></span>
+    <button id="refresh" type="button" disabled>Refresh</button></header>
+  <div id="state" class="muted">Waiting for the host…</div>
+  <ul id="prs"></ul>
+</div><div id="page" hidden></div></main>
+<script>
+/*bridge.js*/
+/*prpage.js*/
+(() => {
+  let repo = "";
+  const ui = bridge("github-pulls", {
+    input: (args) => { repo = args.repo || ""; ui.$("repo").textContent = repo; say("Listing…"); },
+    result: (result) => draw(result),
+    cancelled: (why) => say("Cancelled: " + why, true),
+    started: () => say("Waiting for the pull requests…"),
+  });
+  const { $, el, link, button } = ui;
+  const say = (text, isError) => { $("state").textContent = text; $("state").className = isError ? "error" : "muted"; ui.size(); };
+
+  const draw = (result) => {
+    const found = ui.data(result);
+    if (!found) { say("Couldn't list pull requests: " + ui.errorText(result), true); $("refresh").disabled = !repo; return; }
+    if (found.repo) { repo = found.repo; $("repo").textContent = repo; }
+    const prs = Array.isArray(found.prs) ? found.prs : [];
+    $("prs").replaceChildren(...prs.map(row));
+    say(prs.length ? `${prs.length} open · as of ${new Date().toLocaleTimeString()}` : "No open pull requests.");
+    $("refresh").disabled = !repo;
+  };
+
+  const row = (pr) => {
+    const action = el("span", { className: "meta" });
+    const rerun = pr.checks === "failing" && pr.failedRunId
+      ? button("Rerun", (event) => rerunFailed(pr, event.target, action), { title: "Rerun the failed jobs" }) : null;
+    const title = el("a", { className: "title", textContent: pr.title, title: "Open #" + pr.number, href: "#" });
+    title.onclick = (event) => { event.preventDefault(); open(pr.number); };
+    return el("li", {}, [
+      link(`#${pr.number}`, pr.url),
+      title,
+      el("span", { className: "pills" }, [...prPills(ui, pr), rerun]),
+      el("span", { className: "meta" }, [
+        el("span", { className: "branch", textContent: pr.branch, title: `${pr.branch} → ${pr.base}` }),
+        el("span", { textContent: `${pr.author || "someone"}${pr.updatedAt ? " · " + ui.ago(pr.updatedAt) : ""}` }),
+      ]),
+      action,
+    ]);
+  };
+
+  const page = prPage(ui, () => repo, () => back());
+  const open = (number) => { $("list").hidden = true; $("page").hidden = false; page.show(number); };
+  const back = () => { $("page").hidden = true; $("list").hidden = false; list(); };
+
+  const list = async () => {
+    $("refresh").disabled = true;
+    try { draw(await ui.request("tools/call", { name: "show_pull_requests", arguments: { repo } })); }
+    catch (e) { say("Couldn't list pull requests: " + e.message, true); $("refresh").disabled = false; }
+  };
+
+  const rerunFailed = async (pr, b, action) => {
+    b.disabled = true; b.textContent = "Rerunning…";
+    try {
+      await ui.call("rerun_failed", { repo, runId: pr.failedRunId });
+      ui.log(`rerun #${pr.number} run ${pr.failedRunId}`);
+      await list();
+    } catch (e) {
+      b.disabled = false; b.textContent = "Rerun";
+      action.replaceChildren(el("span", { className: "error", textContent: e.message }));
+    }
+  };
+
+  $("refresh").onclick = list;
+  ui.start();
+})();
+</script>
+</body></html>
