@@ -21,8 +21,8 @@ func TestOursDeclareWhatTheirServersDeclare(t *testing.T) {
 	if !reflect.DeepEqual(linear.Declares.Events, linearmcp.EventNames()) {
 		t.Fatalf("linear events: %v, the server's %v", linear.Declares.Events, linearmcp.EventNames())
 	}
-	// linear-mcp has no tools (TestTheFrontOffersEventsAndNoTools); github-mcp has the official ones.
-	if linear.Declares.Tools || !github.Declares.Tools {
+	// linear-mcp has show_issues (TestTheViewListsOpenIssues); github-mcp has the official ones.
+	if !linear.Declares.Tools || !linear.Declares.Views || !github.Declares.Tools {
 		t.Fatalf("tools: github %v, linear %v", github.Declares.Tools, linear.Declares.Tools)
 	}
 }
@@ -47,14 +47,14 @@ func TestLevelsComeFromWhatAServerDeclares(t *testing.T) {
 	}
 }
 
-func TestOursAreAddedHostedWithTheirSecretByName(t *testing.T) {
+func TestOursAreAddedHostedWithNoSecretToAsk(t *testing.T) {
+	// Linear reads the person's connection (#1343), as GitHub does: no key to ask for.
 	linear, _ := OursByID("agents/linear")
 	built := BuildOurs(linear, func(string) bool { return false })
-	if got := strings.Join(strings.Fields(built.Entry.Stringified()), ""); got != `{"command":"linear-mcp","hosted":true,"env":{"LINEAR_API_KEY":"${LINEAR_API_KEY}"}}` {
+	if got := strings.Join(strings.Fields(built.Entry.Stringified()), ""); got != `{"command":"linear-mcp","hosted":true}` {
 		t.Fatalf("entry: %s", got)
 	}
-	if built.NameHere != "linear" || built.ChosenRun != wire.MCPRunKindCommand || len(built.Variables) != 1 ||
-		!built.Variables[0].Required || built.Variables[0].Kind != wire.MCPVariableKindSecret {
+	if built.NameHere != "linear" || built.ChosenRun != wire.MCPRunKindCommand || len(built.Variables) != 0 {
 		t.Fatalf("built: %+v", built)
 	}
 	if o, ok := OursByCommand("/usr/local/bin/github-mcp"); !ok || o.ID != "agents/github" {
@@ -64,7 +64,7 @@ func TestOursAreAddedHostedWithTheirSecretByName(t *testing.T) {
 		t.Fatal("npx is not ours")
 	}
 	r := OursResult(linear, linear.Declares)
-	if r.MadeByAgents == nil || !*r.MadeByAgents || r.Levels == nil || r.Levels.Tools || !r.Levels.Events {
+	if r.MadeByAgents == nil || !*r.MadeByAgents || r.Levels == nil || !r.Levels.Tools || !r.Levels.Views || !r.Levels.Events {
 		t.Fatalf("result: %+v", r)
 	}
 }

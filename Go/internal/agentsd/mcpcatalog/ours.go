@@ -36,10 +36,11 @@ var Made = []Ours{
 	{ID: "agents/github", Title: "GitHub", Description: "Issues, pull requests and Actions: the official GitHub MCP server's tools, and events",
 		// Views: the official tools that name a ui:// view (create_pull_request, issue_write, …).
 		Command: "github-mcp", Declares: Declared{Tools: true, Events: githubEvents, Views: true}},
-	{ID: "agents/linear", Title: "Linear", Description: "Events when a Linear issue is opened, labelled, commented on or closed",
-		Command: "linear-mcp", Secret: "LINEAR_API_KEY",
-		SecretDescription: "A Linear personal API key with the Read permission (Linear ▸ Settings ▸ Security & access)",
-		Declares:          Declared{Events: linearEvents}},
+	// No secret to ask for: it reads the person's Linear connection (#1343). A personal API key in
+	// LINEAR_API_KEY, set by hand in mcp.json's env, still goes first. Tools and Views: its one
+	// tool, show_issues, and its page; Linear's own server (mcp.linear.app) changes issues.
+	{ID: "agents/linear", Title: "Linear", Description: "Linear issues: a page of open issues with Start Agent, and events when one is opened, labelled, commented on or closed",
+		Command: "linear-mcp", Declares: Declared{Tools: true, Events: linearEvents, Views: true}},
 }
 
 var (
