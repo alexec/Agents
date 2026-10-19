@@ -51,4 +51,24 @@ struct ConnectorSetupWordsTests {
         #expect(ConnectorSetupWords.line(slot, project: "Blog", repository: nil)
                 == "Blog has no GitHub remote, so GitHub Issues can't be read for it.")
     }
+
+    /// Connect Linear (#1343): the hand-back page's agents://oauth/callback, read for the host.
+    @Test func theCallbackGivesTheCodeAndTheState() throws {
+        let flow = UUID()
+        let url = try #require(URL(string: "agents://oauth/callback?code=c1&state=s1"))
+        let r = try #require(DaemonAPI.ConnectionSignInCompleteRequest(flowID: flow, callback: url))
+        #expect(r == .init(flowID: flow, state: "s1", code: "c1"))
+        let denied = try #require(URL(string: "agents://oauth/callback?error=access_denied&state=s1"))
+        #expect(DaemonAPI.ConnectionSignInCompleteRequest(flowID: flow, callback: denied)?.error == "access_denied")
+        for other in ["agents://oauth/callback?code=c1", "https://agentloops.dev/oauth/callback?code=c1&state=s1",
+                      "agents://other/callback?code=c1&state=s1"] {
+            #expect(DaemonAPI.ConnectionSignInCompleteRequest(flowID: flow, callback: try #require(URL(string: other))) == nil)
+        }
+    }
+
+    @Test func linearWords() {
+        let c = DaemonAPI.Connection(provider: .linear, login: "Alex", connectedAt: Date(), workspace: "Loops")
+        #expect(ConnectorSetupWords.connectionTitle(c) == "Linear \u{00B7} Alex")
+        #expect(ConnectorSetupWords.connectionNote(c) == "Loops \u{00B7} OAuth \u{00B7} renews by itself")
+    }
 }
