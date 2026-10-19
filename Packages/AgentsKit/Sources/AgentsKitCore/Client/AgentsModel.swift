@@ -1589,18 +1589,17 @@ public final class AgentsModel {
         return shelf(key).unread
     }
 
-    /// What the Dock badge counts for one project: every session under Needs you, and
-    /// every finished one nobody has opened, each once (#70). Unread left Needs you, so
-    /// it is added back here: a new finish still raises the badge.
+    /// What the Dock badge counts for one project: every session under Needs you or
+    /// Blocked. An unread finish does not need the person, so it is not counted (#1565);
+    /// it is a mark on the row and in the Unread group.
     public func attentionCount(in key: ProjectKey?) -> Int {
         guard key != nil else { return 0 }
         return shelf(key).attention
     }
 
-    /// Needs you, Blocked from an older daemon, or unread: what the badge and the widget
-    /// count, and what Next Needing Attention visits.
+    /// Needs you, or Blocked from an older daemon: what the badge and the widget count.
+    /// Not unread (#1565).
     public func wantsALook(_ agent: Agent) -> Bool {
-        if agent.showsUnread { return true }
         let group = group(of: agent)
         return group == .needsAttention || group == .blocked
     }

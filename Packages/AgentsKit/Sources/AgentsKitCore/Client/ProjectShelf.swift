@@ -25,7 +25,7 @@ public final class ProjectShelf {
     public private(set) var unread = 0
     /// Asking the person to archive them, whichever group they are under (#584).
     public private(set) var asking = 0
-    /// Needs you, Blocked, and the unread under the rest: what the badge counts.
+    /// Needs you and Blocked: what the badge counts. Unread is not counted (#1565).
     public private(set) var attention = 0
     /// Needs you, and the unread under the rest: what Next Needing Attention visits.
     public private(set) var toVisit = 0
@@ -79,10 +79,7 @@ public final class ProjectShelf {
         if self.unread != unread { self.unread = unread }
         let asking = groups.values.reduce(0) { $0 + $1.count(where: \.asksToArchive) }
         if self.asking != asking { self.asking = asking }
-        let attention = groups.reduce(0) { total, bucket in
-            total + (bucket.key == .needsAttention || bucket.key == .blocked
-                ? bucket.value.count : bucket.value.count(where: \.showsUnread))
-        }
+        let attention = (groups[.needsAttention]?.count ?? 0) + (groups[.blocked]?.count ?? 0)
         if self.attention != attention { self.attention = attention }
         let toVisit = groups.reduce(0) { total, bucket in
             total + (bucket.key == .needsAttention ? bucket.value.count
