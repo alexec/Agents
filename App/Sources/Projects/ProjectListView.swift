@@ -471,10 +471,12 @@ struct ProjectFold: View {
                     searchMatches(fold)
                 } else {
                     // Its connectors (#753), under every project even with none yet (#1422):
-                    // a page, red when one does not answer.
-                    let tally = MCPHealthWords.tally(model.work.mcpServers(in: key))
+                    // a page, red when one does not answer, with how many (#1569).
+                    let servers = model.work.mcpServers(in: key)
+                    let tally = MCPHealthWords.tally(servers)
                     ProjectPageRow(title: "Connectors", systemImage: "server.rack",
-                                   item: .projectMCPServers(key), warns: tally?.failing ?? false)
+                                   item: .projectMCPServers(key), warns: tally?.failing ?? false,
+                                   count: servers.count)
                         .help(tally?.words ?? "No connectors yet")
                     // The archive, one row opening a page (#495): never a fold inside
                     // the group.

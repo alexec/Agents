@@ -260,6 +260,8 @@ struct ProjectPageRow: View {
     let item: SidebarItem
     /// Red when the page has something wrong to say, as an Activity row's (#753).
     var warns = false
+    /// How many the page holds, small and grey after the title (#1569); none at zero.
+    var count: Int?
 
     var body: some View {
         HStack(spacing: 6) {
@@ -268,10 +270,18 @@ struct ProjectPageRow: View {
                 .frame(width: 16)
                 .accessibilityHidden(true)
             // White, as every row's title is (#587); nothing at its end, which is only
-            // a session's, the count in its tooltip.
+            // a session's. The Connectors row has its count after the title, as a
+            // subheading does (#1569), because Alex asked to see it there.
             Text(title)
                 .lineLimit(1)
                 .foregroundStyle(.primary)
+            if let count, count > 0 {
+                Text("\(count)")
+                    .monospacedDigit()
+                    .appText(.fine)
+                    .foregroundStyle(.secondary)
+                    .accessibilityHidden(true)
+            }
             Spacer(minLength: 4)
         }
         // The size of the rows around it, sessions and New Session alike.
