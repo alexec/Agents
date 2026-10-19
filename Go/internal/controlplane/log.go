@@ -5,46 +5,55 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/alexec/agents/Go/internal/rolllog"
 )
 
 // Log is ControlLog: every line stamped with the time and its zone, into control.log
-// when serving with one (#93), rolled past 4 MB to control.previous.log (#174).
+// when serving with one (#93), rolled past 4 MB to control.previous.log (#174) by the
+// shared roller (#1555).
 type Log struct {
-	mu    sync.Mutex
-	file  string
-	limit int64
-	out   *os.File
+	mu   sync.Mutex
+	file *rolllog.File
 }
 
 // LogLimit is ControlLog.limit.
-const LogLimit = 4 * 1024 * 1024
+const LogLimit = rolllog.Limit
 
 // NewLog writes to standard error until Take.
-func NewLog() *Log { return &Log{limit: LogLimit, out: os.Stderr} }
+func NewLog() *Log { return &Log{} }
 
 // Take sends every line, and the process's own standard output and error, to file.
 func (l *Log) Take(file string, limit int64) {
+	f, err := rolllog.Open(file, limit, true)
+	if err != nil {
+		return
+	}
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	l.file, l.limit = file, limit
-	l.reopen()
+	if l.file != nil {
+		l.file.Close()
+	}
+	l.file = f
 }
 
 // Taken says whether lines go to a file.
 func (l *Log) Taken() bool {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	return l.file != ""
+	return l.file != nil
 }
 
 // Write writes a line, each of its lines stamped.
 func (l *Log) Write(line string) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	if l.file != "" {
-		l.rollIfNeeded()
+	text := stamped(line, time.Now())
+	if l.file != nil {
+		l.file.Write([]byte(text))
+		return
 	}
-	l.out.WriteString(stamped(line, time.Now()))
+	os.Stderr.WriteString(text)
 }
 
 // stamped is ControlLog.stamped: ISO 8601 with milliseconds and the local zone, before
@@ -56,28 +65,4 @@ func stamped(message string, at time.Time) string {
 		b.WriteString(stamp + " " + line + "\n")
 	}
 	return b.String()
-}
-
-func (l *Log) rollIfNeeded() {
-	info, err := l.out.Stat()
-	if err != nil || info.Size() <= l.limit {
-		return
-	}
-	previous := strings.TrimSuffix(l.file, ".log") + ".previous.log"
-	os.Rename(l.file, previous)
-	l.reopen()
-}
-
-func (l *Log) reopen() {
-	f, err := os.OpenFile(l.file, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0o600)
-	if err != nil {
-		return
-	}
-	// Whatever the runtime itself writes (a panic) lands beside the lines.
-	dupTo(int(f.Fd()), 1)
-	dupTo(int(f.Fd()), 2)
-	if l.out != os.Stderr {
-		l.out.Close()
-	}
-	l.out = f
 }

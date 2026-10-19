@@ -21,6 +21,7 @@ import (
 	"github.com/alexec/agents/Go/internal/buildinfo"
 	"github.com/alexec/agents/Go/internal/controllink"
 	"github.com/alexec/agents/Go/internal/machine"
+	"github.com/alexec/agents/Go/internal/rolllog"
 	"github.com/alexec/agents/Go/internal/safe"
 )
 
@@ -64,8 +65,8 @@ func main() {
 	}
 	if !isTerminal() {
 		// Detached or under systemd: the log is the root's daemon.log, where the Swift
-		// host keeps it (StoreLocations.log).
-		if f, err := os.OpenFile(loc.Log(), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600); err == nil {
+		// host keeps it (StoreLocations.log), rolled at 4 MB (#1555). A panic lands in it too.
+		if f, err := rolllog.Open(loc.Log(), rolllog.Limit, true); err == nil {
 			setLog(f)
 		}
 	}

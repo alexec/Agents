@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/alexec/agents/Go/internal/agentsd/store"
+	"github.com/alexec/agents/Go/internal/rolllog"
 )
 
 // supervise runs (a box with no systemd: under systemd, Restart=always does this) `agentsd <args>` and starts it again when it crashes (#1125: a host on a box
@@ -24,9 +25,11 @@ import (
 // SIGTERM to it stops the host and then the supervisor.
 func supervise(args []string) {
 	root := parse(args).root
-	out := io.Writer(os.Stderr)
-	if f, err := os.OpenFile(store.At(root).Log(), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600); err == nil {
-		out = f
+	// The host's output at each start: the log as it is then (the host opens its own,
+	// rolled, as soon as it starts).
+	out := func() io.Writer { return os.Stderr }
+	if f, err := rolllog.Open(store.At(root).Log(), rolllog.Limit, false); err == nil {
+		out = func() io.Writer { return f.File() }
 		setLog(f)
 	}
 	lock := filepath.Join(root, "supervise.lock")
@@ -40,7 +43,8 @@ func supervise(args []string) {
 	for {
 		cmd := exec.Command(self, args...)
 		// The host stamps its own lines; a panic's stack goes in as it is.
-		cmd.Stdout, cmd.Stderr = out, out
+		w := out()
+		cmd.Stdout, cmd.Stderr = w, w
 		if err := cmd.Start(); err != nil {
 			log.Printf("supervise: could not start agentsd: %v", err)
 			os.Exit(1)
