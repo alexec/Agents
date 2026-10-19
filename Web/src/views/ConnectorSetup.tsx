@@ -1,12 +1,12 @@
-// A project's Connectors set-up (#1336, frames A, C, F and G), the one Connect GitHub sheet
-// (frame B) and Your Connectors ▸ Connections (frame E), as the window's ConnectorSetupView,
-// ConnectGitHubSheet and YourConnectionsView. The state is the host's, so all three clients
+// A project's Connectors set-up (#1336, frames A, C, F and G), the one Connect sheet for GitHub
+// (frame B) and Linear (#1343, frame H), and Your Connectors ▸ Connections (frame E), as the
+// window's ConnectorSetupView, ConnectGitHubSheet and YourConnectionsView. The state is the host's, so all three clients
 // show the same ticks. The page draws the Mac's grid; Where agents run says the other
 // providers are set up on the Mac, since Providers is a Mac-only page by design.
-import { useEffect, useState } from "preact/hooks";
+import { useEffect, useRef, useState } from "preact/hooks";
 import type { Store } from "../model/store";
 import type {
-  Connection, ConnectionSignIn, ConnectorSetup, ConnectorSetupReading, ConnectorSlot, ConnectorSlotKind, UUID,
+  Connection, ConnectionProvider, ConnectionSignIn, ConnectorSetup, ConnectorSetupReading, ConnectorSlot, ConnectorSlotKind, UUID,
 } from "../protocol/generated";
 import { projectPath } from "../model/hostedMCP";
 import * as words from "../model/connectorSetup";
@@ -100,7 +100,7 @@ export function ConnectorSetupSection({ store, host, folder, projectName, go }: 
       )}
       {!setup && !problem && <p class="quiet small">Reading…</p>}
       {connecting && (
-        <ConnectGitHubDialog store={store} host={host} folder={path}
+        <ConnectDialog store={store} host={host} provider="github" folder={path}
           connected={() => void load("fresh")} close={() => setConnecting(false)} />
       )}
     </div>
@@ -203,82 +203,149 @@ function SlotCard({ slot, setup, projectName, reading, tryAgain, skip }: {
   );
 }
 
-/** Connect GitHub (frame B): the host's device flow, with the code, in a sheet. */
-export function ConnectGitHubDialog({ store, host, folder, connected, close }: {
-  store: Store; host: string; folder?: string; connected: () => void; close: () => void;
+/** The name of the window that the Linear sign-in opens, so the hand-back page has an opener. */
+const signInWindow = "agents-sign-in";
+
+/**
+ * Connect GitHub (frame B): the host's device flow, with the code, in a sheet. Connect Linear
+ * (frame H): the same sheet. The host gives an authorize address; the page opens it in a window,
+ * and the hand-back page sends the code back here by postMessage.
+ */
+export function ConnectDialog({ store, host, provider, folder, connected, close }: {
+  store: Store; host: string; provider: ConnectionProvider; folder?: string; connected: () => void; close: () => void;
 }) {
   type Step = { kind: "asking" } | { kind: "starting" } | { kind: "waiting"; flow: ConnectionSignIn }
-    | { kind: "install"; login: string; repository: string; url: string } | { kind: "failed"; why: string };
+    | { kind: "finishing" } | { kind: "install"; login: string; repository: string; url: string }
+    | { kind: "failed"; why: string };
   const [step, setStep] = useState<Step>({ kind: "asking" });
   const [flowID, setFlowID] = useState<UUID>();
+  /** Removes the message listener of the sign-in under way. */
+  const stopListening = useRef<(() => void) | undefined>(undefined);
+  const providerName = words.name(provider);
 
   useEffect(() => () => {
-    // Closed while GitHub was still out: the host stops polling for it.
+    // Closed while the provider was still out: the host stops polling for it.
     if (flowID) void store.link.call("connections/sign-in/cancel", { flowID }, host).catch(() => null);
   }, [flowID]);
+  useEffect(() => () => stopListening.current?.(), []);
 
   const start = async () => {
+    stopListening.current?.();
+    // Open the window now, in the click, so that the browser does not block it. Without
+    // noopener: the hand-back page sends the code to its opener.
+    const popup = provider === "linear" ? window.open("about:blank", signInWindow) : null;
     setStep({ kind: "starting" });
     let flow: ConnectionSignIn;
     try {
-      flow = await store.link.call("connections/sign-in", { provider: "github" }, host);
+      flow = await store.link.call("connections/sign-in",
+        provider === "linear" ? { provider, origin: location.origin } : { provider }, host);
     } catch (e) {
+      popup?.close();
       setStep({ kind: "failed", why: why(e) });
       return;
     }
     setFlowID(flow.flowID);
     setStep({ kind: "waiting", flow });
-    void navigator.clipboard?.writeText(flow.userCode).catch(() => null);
-    openOut(flow.verificationURL);
-    for (;;) {
-      try {
-        flow = await store.link.call("connections/sign-in/wait", { flowID: flow.flowID }, host);
-      } catch (e) {
-        setStep({ kind: "failed", why: why(e) });
-        return;
-      }
-      if (flow.status === "waiting") continue;
+    // The first answer that ends the sign-in wins: the hand-back page's code, or the long poll
+    // (another client can finish the sign-in too).
+    let over = false;
+    const end = async (done: ConnectionSignIn) => {
+      if (over) return;
+      over = true;
+      stopListening.current?.();
       setFlowID(undefined);
-      if (flow.status === "connected") {
+      if (done.status === "connected") {
         connected();
-        if (folder) {
+        if (folder && provider === "github") {
           const setup = await store.link.call("connectors/setup", { folder, reading: "fresh" }, host).catch(() => null);
           if (setup?.installed === false && setup.repository && setup.installURL) {
-            setStep({ kind: "install", login: flow.connection?.login ?? "you", repository: setup.repository, url: setup.installURL });
+            setStep({ kind: "install", login: done.connection?.login ?? "you", repository: setup.repository, url: setup.installURL });
             return;
           }
         }
         close();
         return;
       }
-      if (flow.status === "cancelled") return;
-      setStep({ kind: "failed", why: words.sheetStatus(flow) });
+      if (done.status === "cancelled") return;
+      setStep({ kind: "failed", why: words.sheetStatus(done) });
+    };
+    const fail = (e: unknown) => {
+      if (over) return;
+      over = true;
+      stopListening.current?.();
+      setStep({ kind: "failed", why: why(e) });
+    };
+
+    if (flow.grant === "authorizationCode") {
+      const id = flow.flowID;
+      const state = words.authorizeState(flow.verificationURL);
+      const listen = (event: MessageEvent) => {
+        const answer = words.oauthCallback(event, id, state);
+        if (!answer || over) return;
+        stopListening.current?.();
+        setStep({ kind: "finishing" });
+        store.link.call("connections/sign-in/complete", answer, host)
+          .then((done) => { if (done.status !== "waiting") void end(done); }, fail);
+      };
+      window.addEventListener("message", listen);
+      stopListening.current = () => {
+        window.removeEventListener("message", listen);
+        stopListening.current = undefined;
+      };
+      if (popup && !popup.closed) popup.location.href = flow.verificationURL;
+      else window.open(flow.verificationURL, signInWindow);
+    } else {
+      if (flow.userCode) void navigator.clipboard?.writeText(flow.userCode).catch(() => null);
+      openOut(flow.verificationURL);
+    }
+    for (;;) {
+      try {
+        flow = await store.link.call("connections/sign-in/wait", { flowID: flow.flowID }, host);
+      } catch (e) {
+        fail(e);
+        return;
+      }
+      if (over) return;
+      if (flow.status === "waiting") continue;
+      await end(flow);
       return;
     }
   };
 
+  const openAgain = (flow: ConnectionSignIn) => {
+    if (flow.grant === "authorizationCode") window.open(flow.verificationURL, signInWindow);
+    else openOut(flow.verificationURL);
+  };
+
   return (
-    <Modal label="Connect GitHub" close={close}>
+    <Modal label={`Connect ${providerName}`} close={close}>
       <div class="sheet-body connect-sheet">
         <div class="connection">
-          <span class="connector-mark" aria-hidden="true">GH</span>
+          <span class="connector-mark" aria-hidden="true">{words.letters(provider)}</span>
           <div>
-            <p class="strong">Connect GitHub</p>
-            <p class="quiet small">{words.sheetSubtitle}</p>
+            <p class="strong">Connect {providerName}</p>
+            <p class="quiet small">{words.sheetSubtitleFor(provider)}</p>
           </div>
         </div>
         <h2 class="setup-heading">Agents will be able to</h2>
-        <ul class="abilities">{words.abilities.map((a) => <li key={a}>{a}</li>)}</ul>
-        <p class="quiet small">{words.sheetChoose}</p>
-        {step.kind === "starting" && <p class="quiet small">Asking GitHub for a code…</p>}
+        <ul class="abilities">{words.abilitiesFor(provider).map((a) => <li key={a}>{a}</li>)}</ul>
+        <p class="quiet small">{words.sheetChooseFor(provider)}</p>
+        {step.kind === "starting" && (
+          <p class="quiet small">{provider === "github" ? "Asking GitHub for a code…" : "Starting the sign-in…"}</p>
+        )}
         {step.kind === "waiting" && (
           <div class="sign-in-code">
-            <p><span class="quiet small">Your code</span> <code class="user-code">{step.flow.userCode}</code>{" "}
-              <button onClick={() => void navigator.clipboard?.writeText(step.flow.userCode)}>Copy</button></p>
+            {step.flow.userCode && (
+              <p><span class="quiet small">Your code</span> <code class="user-code">{step.flow.userCode}</code>{" "}
+                <button onClick={() => void navigator.clipboard?.writeText(step.flow.userCode!)}>Copy</button></p>
+            )}
             <p class="small">{words.sheetStatus(step.flow)}</p>
-            <button class="link small" onClick={() => openOut(step.flow.verificationURL)}>Open github.com Again</button>
+            <button class="link small" onClick={() => openAgain(step.flow)}>
+              Open {step.flow.grant === "authorizationCode" ? "linear.app" : "github.com"} Again
+            </button>
           </div>
         )}
+        {step.kind === "finishing" && <p class="quiet small">{words.linear.finishing}</p>}
         {step.kind === "install" && (
           <div class="sign-in-code">
             <p class="strong">Connected as {step.login}.</p>
@@ -296,7 +363,7 @@ export function ConnectGitHubDialog({ store, host, folder, connected, close }: {
           ) : (
             <>
               <button onClick={close}>Cancel</button>
-              {step.kind === "asking" && <button class="prominent" onClick={() => void start()}>{words.continueButton}</button>}
+              {step.kind === "asking" && <button class="prominent" onClick={() => void start()}>{words.continueButtonFor(provider)}</button>}
               {step.kind === "failed" && <button class="prominent" onClick={() => void start()}>Try Again</button>}
             </>
           )}
@@ -306,11 +373,11 @@ export function ConnectGitHubDialog({ store, host, folder, connected, close }: {
   );
 }
 
-/** Activity ▸ Your Connectors: Connections, with Disconnect (frame E). */
+/** Activity ▸ Your Connectors: Connections, with Disconnect (frame E), and a row to connect each provider that is not connected. */
 export function YourConnections({ store, host }: { store: Store; host: string }) {
   const [connections, setConnections] = useState<Connection[]>();
   const [problem, setProblem] = useState<string>();
-  const [connecting, setConnecting] = useState(false);
+  const [connecting, setConnecting] = useState<ConnectionProvider>();
   const load = async () => {
     try {
       setConnections((await store.link.call("connections/list", {}, host)).connections);
@@ -322,7 +389,7 @@ export function YourConnections({ store, host }: { store: Store; host: string })
   };
   useEffect(() => { void load(); }, [host]);
   const disconnect = async (c: Connection) => {
-    if (!window.confirm(`Disconnect ${words.connectionTitle(c)}? ${words.disconnectNote}`)) return;
+    if (!window.confirm(`Disconnect ${words.connectionTitle(c)}? ${words.disconnectNoteFor(c.provider)}`)) return;
     try {
       const answer = await store.link.call("connections/disconnect", { provider: c.provider }, host);
       setProblem(answer.error);
@@ -331,31 +398,41 @@ export function YourConnections({ store, host }: { store: Store; host: string })
     }
     await load();
   };
-  const githubConnected = connections?.some((c) => c.provider === "github" && c.state === "connected");
+  const notConnected = connections ? words.providers.filter((p) => !connections.some((c) => c.provider === p)) : [];
   return (
     <div class="connections">
       <p class="setup-row">
         <span class="setup-heading grow">Connections</span>
-        {connections && !githubConnected && <button onClick={() => setConnecting(true)}>Connect…</button>}
       </p>
       {problem && <p class="small failure">{problem}</p>}
       <ul class="setup-card list">
-        {connections?.length === 0 && <li class="quiet">No connections yet. Connect GitHub to give agents issues, pull requests and Actions in every project.</li>}
         {connections?.map((c) => (
           <li key={c.provider} class="connection">
-            <span class="connector-mark soft" aria-hidden="true">{(c.login ?? "G").slice(0, 1).toUpperCase()}</span>
+            <span class="connector-mark soft" aria-hidden="true">{(c.login ?? words.letters(c.provider)).slice(0, 1).toUpperCase()}</span>
             <div class="grow">
               <p class="strong">{words.connectionTitle(c)}</p>
               <p class={`small ${c.state === "signInAgain" ? "attention" : "quiet"}`}>{words.connectionNote(c)}</p>
             </div>
             {c.state === "signInAgain"
-              ? <button onClick={() => setConnecting(true)}>Connect Again…</button>
-              : c.installURL && <button class="link small" onClick={() => openOut(c.installURL!)}>Repositories on github.com</button>}
+              ? <button onClick={() => setConnecting(c.provider)}>Connect Again…</button>
+              : c.provider === "github" && c.installURL && <button class="link small" onClick={() => openOut(c.installURL!)}>Repositories on github.com</button>}
             <button class="destructive" onClick={() => void disconnect(c)}>Disconnect</button>
           </li>
         ))}
+        {notConnected.map((p) => (
+          <li key={p} class="connection">
+            <span class="connector-mark" aria-hidden="true">{words.letters(p)}</span>
+            <div class="grow">
+              <p class="strong">{words.name(p)}</p>
+              <p class="small quiet">{words.notConnectedNote(p)}</p>
+            </div>
+            <button onClick={() => setConnecting(p)}>{words.connectButtonFor(p)}</button>
+          </li>
+        ))}
       </ul>
-      {connecting && <ConnectGitHubDialog store={store} host={host} connected={() => void load()} close={() => setConnecting(false)} />}
+      {connecting && (
+        <ConnectDialog store={store} host={host} provider={connecting} connected={() => void load()} close={() => setConnecting(undefined)} />
+      )}
     </div>
   );
 }
