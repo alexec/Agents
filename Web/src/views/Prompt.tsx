@@ -1,6 +1,6 @@
 // The prompt (071 FR-025): text and attachments, dropped, pasted or picked, sent as the Remote
 // sends them (PhoneAttachment's rules), with the draft kept per session across a reload (#254).
-// Return and Shift-Return send; Option-Return is a new line, as in the window (#377). While the agent works and nothing
+// Return sends; Shift-Return and Option-Return are a new line, as in the window (#377, #1514). While the agent works and nothing
 // is typed, Send is Stop; what is typed then is queued, and Send says so. The agent's suggestion
 // is the empty field's placeholder, taken with Tab and put away with Escape, as the window's.
 //
@@ -287,7 +287,7 @@ export function Prompt({ store, draftKey, placeholder, capabilities, disabled, s
                 if (returnAction(e) === "send") {
                   void submit();
                 } else if (!field.readOnly) {
-                  // Put in by hand: not every browser breaks the line for Option-Return itself.
+                  // Put in by hand: not every browser breaks the line for Option- or Shift-Return itself.
                   field.setRangeText("\n", field.selectionStart, field.selectionEnd, "end");
                   text.value = field.value;
                   keep();

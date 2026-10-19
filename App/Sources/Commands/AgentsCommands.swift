@@ -100,10 +100,10 @@ struct AgentsCommands: Commands {
         CommandGroup(replacing: .newItem) {
             Button("New Session") { newSession() }
                 .keyboardShortcut("n")
-                .disabled(model.selectedProjectSummary == nil)
+                .disabled(keyProject == nil)
             Button("New Session in a Worktree") { newSession(inWorktree: true) }
                 .keyboardShortcut("n", modifiers: [.command, .option])
-                .disabled(model.selectedProjectSummary == nil || !model.draftWorktrees.canMakeNew)
+                .disabled(keyProject == nil || !model.draftWorktrees.canMakeNew)
             // A chat in the project this Mac made for chats (#229), with no project to pick;
             // gone while Settings ▸ Account ▸ Chat project is off (#694).
             if !model.chatProjectSwitchedOff {
@@ -336,12 +336,18 @@ struct AgentsCommands: Commands {
         }
     }
 
+    /// In the key window: a project's own window opens its new session (#1513), as its
+    /// New Session row does; the main window composes in its selected project.
     private func newSession(inWorktree: Bool = false) {
-        guard model.selectedProjectKey != nil else { return }
-        model.composing = true
+        if let projectWindow {
+            projectWindow.pick = .project(projectWindow.key)
+        } else {
+            guard model.selectedProjectKey != nil else { return }
+            model.composing = true
+        }
         // Either way, so a plain New Session after a worktree one is back in the folder.
         model.draftWorktree = inWorktree ? .new : nil
-        requests.focusPrompt()
+        keyRequests.focusPrompt()
     }
 
     /// The open chat's folder, or else the selected project's. Only on this Mac:

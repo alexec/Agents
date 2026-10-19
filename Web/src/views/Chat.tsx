@@ -118,7 +118,6 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
   /** Which chat a turn's page was asked for, so a reply for one left behind is dropped. */
   const watchingSession = useRef(`${host}|${session}`);
   watchingSession.current = `${host}|${session}`;
-  const newBelow = useSignal(false);
 
   // Each turn the same object until an entry lands in it, so only that one is drawn again (#170).
   const rows: ChatTurn[] = store.chatTurns.value;
@@ -216,7 +215,6 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
     following.current = true;
     away.value = false;
     store.setFollowingEnd(true);
-    newBelow.value = false;
     settled.current = false;
     const timer = setTimeout(() => (settled.current = true), 400);
     return () => clearTimeout(timer);
@@ -228,7 +226,6 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
     const el = scroller.current;
     if (!el || loadingEarlier.current) return;
     if (following.current) el.scrollTop = el.scrollHeight;
-    else if (settled.current) newBelow.value = true;
   }, [entryCount, store.turns.value.length, session]);
   // Every row is watched, those drawn since too: a queued bubble or a card that grows without an
   // entry arriving used to leave the foot a frame or more behind (#378).
@@ -272,10 +269,7 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
       // Growth and trimming change the height; this pane only ever moves itself down.
       if (el.scrollTop < was.top - 0.5 && el.scrollHeight === was.height) follow(false);
       // Back at the end on the way down, or right at it.
-      else if (fromBottom < 1 || (fromBottom < atTheEnd && el.scrollTop > was.top)) {
-        follow(true);
-        newBelow.value = false;
-      }
+      else if (fromBottom < 1 || (fromBottom < atTheEnd && el.scrollTop > was.top)) follow(true);
     }
     if (el.scrollTop < 400) void earlier();
   };
@@ -346,30 +340,10 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
     }] : []),
   ];
   const stretches = placing(rows, cards, (card) => card.at);
-  const firstCard = stretches.findIndex((stretch) => stretch.cards.length > 0);
-  const firstCardKey = firstCard < 0 ? null : stretches[firstCard]!.cards[0]!.key;
-  const cardsAtTheEnd = firstCard >= 0 && firstCard === stretches.length - 1;
-  const waiting = useRef<HTMLDivElement>(null);
-  const waitingPlace = useSignal<"shown" | "above" | "below">("shown");
-  useEffect(() => {
-    const el = waiting.current;
-    const root = scroller.current;
-    if (!el || !root) return;
-    const watcher = new IntersectionObserver(([seen]) => {
-      if (!seen) return;
-      waitingPlace.value = seen.isIntersecting ? "shown"
-        : seen.boundingClientRect.bottom <= (seen.rootBounds?.top ?? 0) ? "above" : "below";
-    }, { root, threshold: 0.2 });
-    watcher.observe(el);
-    return () => watcher.disconnect();
-  }, [host, session, firstCardKey]);
-  const questionWaiting = cards.length > 0 && waitingPlace.value !== "shown";
-  const questionAbove = questionWaiting && waitingPlace.value === "above";
 
   const toEnd = () => {
     const el = scroller.current;
     follow(true);
-    newBelow.value = false;
     if (el) el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
   };
 
@@ -381,14 +355,6 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
     toEndSeen.current = toEndAsks;
     toEnd();
   }, [toEndAsks]);
-
-  // To the first waiting card (#973). At the end it is the end, and following goes on; anywhere
-  // else it is a place in the middle, as a line the reader is sent to is, and following stops.
-  const toQuestion = () => {
-    if (cardsAtTheEnd && !questionAbove) return toEnd();
-    follow(false);
-    waiting.current?.scrollIntoView({ block: "start", behavior: "smooth" });
-  };
 
   const toggle = (turn: ChatTurn) => {
     chosen.value = { ...chosen.value, [turn.id]: toggled(chosen.value[turn.id] ?? initialDetail) };
@@ -512,7 +478,7 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
           // lets the turns around it join up without drawing them again (#973).
           const drawn = stretches.reduce((n, stretch) => n + stretch.turns.length, 0);
           let index = 0;
-          return stretches.flatMap((stretch, at) => [
+          return stretches.flatMap((stretch) => [
             ...stretch.turns.map((turn) => {
               const i = index++;
               return (
@@ -524,8 +490,7 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
               );
             }),
             ...(stretch.cards.length ? [
-              <div key={`waiting:${stretch.cards[0]!.key}`} class="waiting" aria-label="Waiting for you"
-                {...(at === firstCard ? { ref: waiting } : {})}>
+              <div key={`waiting:${stretch.cards[0]!.key}`} class="waiting" aria-label="Waiting for you">
                 {stretch.cards.map((card) => <Fragment key={card.key}>{card.node}</Fragment>)}
               </div>,
             ] : []),
@@ -544,15 +509,10 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
       )}
       </ViewLayerContext.Provider>
       </CallActionsContext.Provider>
-      {/* As JumpToEnd: shown whenever the reader is away from the end; what came since, or a question
-          waiting above or below, said in words (#973). */}
-      {(away.value || newBelow.value || questionWaiting) && (
-        <button class={`jump${newBelow.value || questionWaiting ? " news" : ""}`} onClick={questionWaiting ? toQuestion : toEnd}
-          title={questionWaiting ? `Go to the question waiting ${questionAbove ? "above" : "below"}`
-            : newBelow.value ? "Go to the end, where something new is" : "Go to the end"}
-          aria-label={questionWaiting ? `Go to the question waiting ${questionAbove ? "above" : "below"} in the conversation`
-            : newBelow.value ? "Go to the end of the conversation, where something new is" : "Go to the end of the conversation"}>
-          <span aria-hidden="true">{questionAbove ? "↑" : "↓"}</span>{questionWaiting ? " Question waiting" : newBelow.value && " Something new"}
+      {/* As JumpToEnd: one arrow to the end, shown whenever the reader is away from it (#1515). */}
+      {away.value && (
+        <button class="jump" onClick={toEnd} title="Go to the end" aria-label="Go to the end of the conversation">
+          <span aria-hidden="true">↓</span>
         </button>
       )}
       <footer class="foot">

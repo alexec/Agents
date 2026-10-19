@@ -105,17 +105,9 @@ struct ChatTranscript: View {
     @State private var isFollowing = true
     /// Whether the last thing to move the pane was a hand rather than the conversation.
     @State private var isUserScrolling = false
-    /// Whether anything has arrived since they scrolled away from the end.
-    ///
-    /// The pane must not move while they are reading (FR-010), so the arrival is said
-    /// rather than shown. Cleared the moment they are back at the end, by either route.
-    @State private var hasNewBelow = false
     /// Whether there is more conversation than pane. No point offering a way to the
     /// end of something already wholly on screen.
     @State private var canScroll = false
-    /// Where the first waiting card is from the screen. Scrolled away from, the way back
-    /// says a question is waiting (#723), and which way (#973).
-    @State private var cardPlace = CardPlace.shown
     /// How tall the pane is, which the foot's margin is held to (#371).
     @State private var paneHeight: CGFloat?
     /// The tallest honest content height seen for this conversation.
@@ -192,9 +184,6 @@ struct ChatTranscript: View {
         let stretches = rows.placing(cards, at: \.at)
         // The live turn is the last row, and when a card cut it, its part after the card.
         let liveID = isWorking ? stretches.last(where: { !$0.turns.isEmpty })?.turns.last?.id : nil
-        let firstCard = stretches.firstIndex { !$0.cards.isEmpty }
-        let firstCardID = firstCard.map { stretches[$0].cards[0].id }
-        let cardsAtTheEnd = firstCard == stretches.count - 1
         ScrollViewReader { scroller in
             ScrollView {
                 VStack(spacing: 14) {
@@ -245,17 +234,10 @@ struct ChatTranscript: View {
                         // away is still built: its half-filled answers and its ⌘1…9 stay
                         // with it (#723).
                         if !stretch.cards.isEmpty {
-                            let block = VStack(spacing: 12) {
+                            VStack(spacing: 12) {
                                 ForEach(stretch.cards) { $0.view }
                             }
                             .id(stretch.cards[0].id)
-                            if offset == firstCard {
-                                block.onGeometryChange(for: CardPlace.self) { proxy in
-                                    CardPlace(proxy.frame(in: .scrollView), visibleHeight: (paneHeight ?? 0) - footMargin)
-                                } action: { cardPlace = $0 }
-                            } else {
-                                block
-                            }
                         }
                     }
                     if hasFoot {
@@ -398,7 +380,6 @@ struct ChatTranscript: View {
                 if !isUserScrolling, edges.fromBottom < atTheEnd, motion.wentDown || edges.pastTheEnd > -1 {
                     motion.wentDown = false
                     isFollowing = true
-                    hasNewBelow = false
                     lastPinnedDistance = 0
                 }
                 // Following the end, taken from the geometry rather than from new
@@ -469,11 +450,6 @@ struct ChatTranscript: View {
                 // The first page, drawn hidden until the pane is placed (`settle`, #1287).
                 if before == 0, after > 0, isAwaitingFirstPage { isPlacing = true }
                 if isLoadingEarlier, after != before { holdPlace(scroller) }
-                // Nothing here moves the pane otherwise; the geometry does that. This
-                // is only the word to the reader who is not watching. Loading earlier
-                // adds to the top, and that must not read as something new having arrived.
-                guard after > before, !isLoadingEarlier, !isFollowing else { return }
-                hasNewBelow = true
             }
             // Opened when it comes on screen and when another conversation is chosen, in a
             // task of its own: a phone pushing the chat again tells it it has gone 8 ms after
@@ -522,48 +498,24 @@ struct ChatTranscript: View {
                 // scroll view eased every correction, so a reader and the pane pulled
                 // against each other for the length of the ease.
                 ZStack(alignment: .bottom) {
-                    if canScroll, !isFollowing || questionWaiting {
-                        JumpToEnd(hasNewBelow: hasNewBelow, questionWaiting: questionWaiting,
-                                  questionAbove: cardPlace == .above) {
-                            if questionWaiting, let firstCardID {
-                                goToQuestion(firstCardID, atTheEnd: cardsAtTheEnd, scroller)
-                            } else {
-                                goToEnd(scroller)
-                            }
-                        }
+                    if canScroll, !isFollowing {
+                        JumpToEnd { goToEnd(scroller) }
                             // Clear of the floating prompt, whose height the chat has
                             // already measured for the transcript's own bottom inset.
                             .padding(.bottom, bottomInset + 12)
                             .transition(.opacity)
                     }
                 }
-                .animation(.easeOut(duration: 0.15), value: canScroll && (!isFollowing || questionWaiting))
+                .animation(.easeOut(duration: 0.15), value: canScroll && !isFollowing)
             }
         }
     }
-
-    /// A card waits on the person and none of it is on screen (#723). Above as well as
-    /// below: a reader following the end is left there as new output pushes the card up,
-    /// and told it is there (#973).
-    private var questionWaiting: Bool { !cards.isEmpty && cardPlace != .shown }
 
     /// Something to draw after the last turn and the cards: what waits to be sent, and
     /// the line that says the agent is at work.
     private var hasFoot: Bool {
         !agent.queuedPrompts.isEmpty || !actions.kept(agent.id).isEmpty || isComingBack
             || agent.state == .running || agent.state == .starting
-    }
-
-    /// To the first waiting card (#973). At the end of the conversation it is the end, and
-    /// following goes on; anywhere else it is a place in the middle, as a line the reader
-    /// is sent to is, and following stops there.
-    private func goToQuestion(_ id: String, atTheEnd: Bool, _ scroller: ScrollViewProxy) {
-        if atTheEnd, cardPlace == .below {
-            goToEnd(scroller)
-            return
-        }
-        isFollowing = false
-        withAnimation(.easeOut(duration: 0.2)) { scroller.scrollTo(id, anchor: .top) }
     }
 
     /// Open a turn's steps, or close them (`TurnDetail.toggled`).
@@ -660,7 +612,6 @@ struct ChatTranscript: View {
     private func goToEnd(_ scroller: ScrollViewProxy) {
         // Still being placed at the end, out of sight: no animated move on open (#1349).
         guard !isPlacing else { return }
-        hasNewBelow = false
         isFollowing = true
         withAnimation(.easeOut(duration: 0.2)) { scroller.scrollTo(bottom, anchor: .bottom) }
     }
@@ -729,7 +680,6 @@ struct ChatTranscript: View {
         hasSettled = false
         isFollowing = true
         isUserScrolling = false
-        hasNewBelow = false
         trustedContentHeight = 0
         lastPinnedHeight = nil
         lastPinnedDistance = nil
@@ -825,24 +775,6 @@ struct WaitingCard: Identifiable {
 extension ChatStretch where Card == WaitingCard {
     /// Named by its first card, the one after its turns; the stretch with none is the end.
     var id: String { cards.first?.id ?? "end" }
-}
-
-/// Where a waiting card is from what is on screen.
-private enum CardPlace: Equatable {
-    case shown, above, below
-
-    /// Shown while a fifth of it, or 40 points, is in the part of the pane not under the
-    /// prompt.
-    init(_ frame: CGRect, visibleHeight: CGFloat) {
-        let enough = min(40, frame.height * 0.2)
-        if frame.maxY < enough {
-            self = .above
-        } else if visibleHeight > 0, frame.minY > visibleHeight - enough {
-            self = .below
-        } else {
-            self = .shown
-        }
-    }
 }
 
 /// The history, or part of it, that did not load, and the way to ask again (#400).

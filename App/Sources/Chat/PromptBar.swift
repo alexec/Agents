@@ -1,4 +1,5 @@
 import AgentsKitCore
+import AppKit
 import SwiftUI
 import UniformTypeIdentifiers
 
@@ -433,11 +434,15 @@ struct PromptBar: View {
                                            attachPicture: attachPicture))
                 // Held, words and all, while they start an agent (#87).
                 .disabled(agent == nil && model.isStarting)
-                // Return and Shift-Return send. Option and Return is left alone, and
-                // the field editor inserts a line break the way it does everywhere else
-                // (#377).
+                // Return sends. Shift-Return and Option-Return break the line (#377,
+                // #1514), put in here: the field editor takes Shift-Return for Return.
                 .onKeyPress(.return, phases: .down) { press in
-                    guard PromptReturn(option: press.modifiers.contains(.option)) == .send else { return .ignored }
+                    guard PromptReturn(option: press.modifiers.contains(.option),
+                                       shift: press.modifiers.contains(.shift)) == .send else {
+                        guard let editor = NSApp.keyWindow?.firstResponder as? NSTextView else { return .ignored }
+                        editor.insertNewlineIgnoringFieldEditor(nil)
+                        return .handled
+                    }
                     // While the list is up, Return takes the command rather than
                     // sending a half-typed one.
                     if isCompleting || isMentioning {

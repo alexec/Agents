@@ -64,7 +64,7 @@ until you archive it.
 - **A card at the end of the chat** says **The agent asks to archive this session**, in the
   attention colour, with what the agent said last. **Approve** archives it; **Keep Session**
   keeps it. It is drawn as a permission question is, on the Mac, iPhone, iPad and web page
-  (#827), and **Question waiting** goes to it when it is out of view.
+  (#827).
 - **Approve** is also beside the mark on the Mac's row. On the Remote and the web page,
   **Archive** is in the row's menu and its swipe.
 - **Needs You** lists every session waiting for approval, across every project and host
