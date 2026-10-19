@@ -169,6 +169,10 @@ type GitHub interface {
 	OpenPRs(ctx context.Context, repo string) ([]OpenPR, error)
 	// IssueActivity is what happened to the repo's issues at or after since, of one kind.
 	IssueActivity(ctx context.Context, repo string, kind IssueKind, since string) (items []IssueActivity, truncated bool, err error)
+	// CodeRabbitPRs are the open PRs and whether CodeRabbit has reviewed each one's head commit (#1344).
+	CodeRabbitPRs(ctx context.Context, repo string) ([]ReviewedPR, error)
+	// CodeRabbitComments are CodeRabbit's review comments made at or after since.
+	CodeRabbitComments(ctx context.Context, repo, since string) (comments []CodeRabbitComment, truncated bool, err error)
 }
 
 // ErrorKind is why a GitHub call failed.

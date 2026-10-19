@@ -21,6 +21,8 @@ type fakeGitHub struct {
 	runs     []fakeRun
 	prs      map[int]*fakePR
 	activity []IssueActivity
+	reviewed []ReviewedPR
+	rabbit   []CodeRabbitComment
 	err      error
 	noRepo   bool
 }
@@ -264,7 +266,7 @@ func TestEventsListGivesEveryEventPollOnlyWithTheirSchemas(t *testing.T) {
 	}
 	sort.Strings(names)
 	equal(t, names, []string{"checks.failed", "issue.closed", "issue.commented", "issue.labelled", "issue.opened",
-		"pr.closed", "pr.conflicted", "pr.merged", "pr.opened"}, "names")
+		"pr.closed", "pr.conflicted", "pr.merged", "pr.opened", "review.comment", "review.posted"}, "names")
 }
 
 func TestCursorNullGivesNoEventsAndACursor(t *testing.T) {

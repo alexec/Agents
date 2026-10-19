@@ -1,7 +1,8 @@
 // github-mcp: the `github` MCP server (#1232), on stdio. The official GitHub MCP server's
 // tools (github/github-mcp-server, as a library) and the events the ci server had (#383):
 // checks.failed, pr.opened, pr.merged, pr.closed, pr.conflicted, issue.opened,
-// issue.labelled, issue.commented and issue.closed, polled; and views (#1341): Pull
+// issue.labelled, issue.commented and issue.closed, polled; CodeRabbit's review.posted and
+// review.comment, with tools that ask it to review, answer and resolve (#1344); and views (#1341): Pull
 // requests, Issues and a pull request's page. As the person: its token is the host's GitHub
 // connection (#1335, in the store connections.EnvName names), so there is no account of its
 // own and no gh. The Agents daemon starts it

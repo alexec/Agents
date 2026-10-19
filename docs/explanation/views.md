@@ -161,19 +161,27 @@ read-only tool, so each can be pinned. This project pins the first two in its
 Project**.
 
 - **Pull requests** (`ui://github/pulls`, from `show_pull_requests`): the open pull
-  requests, each with its checks, review, conflict and auto-merge, and **Rerun** on a
-  failing one. A title opens the pull request's page in the same view.
+  requests, each with its checks, review, conflict, auto-merge and CodeRabbit's status
+  (*CodeRabbit reviewing* or *CodeRabbit reviewed*), and **Rerun** on a failing one. A title opens the pull request's page in the same view.
 - **Issues** (`ui://github/issues`, from `show_issues`): the open issues, with their labels
   and assignees. A label narrows the list. **Start Agent** opens the new-agent form for the
   issue.
 - **A pull request's page** (`ui://github/pr`, from `show_pull_request`): the description
   and the conversation, the comments on lines of code, the files, and the checks, where a
-  failed check shows the end of its log (`failed_log`). An app's words, such as CodeRabbit's,
-  are marked *bot*. **Comment**, **Approve** and **Request Changes** (on someone else's
+  failed check shows the end of its log (`failed_log`). An app's words are marked *bot*;
+  CodeRabbit's are marked *CodeRabbit* (#1344). **Comment**, **Approve** and **Request Changes** (on someone else's
   pull request), **Merge** and **Auto-merge** (each asked again), and **Ask an Agent**: to
   the agent on the branch, or the new-agent form on it. **Show Diff**, or a file's name,
   reads its hunks (`show_pull_request_diff`) and asks the app to draw them
   (`agents/open-diff`).
+- **CodeRabbit on a pull request's page** (#1344): when CodeRabbit is on the pull request, the
+  Conversation tab starts with its block: its status on the last commit, its last review's
+  state, and its summary (the one comment it edits after each review). **Ask CodeRabbit
+  Again** and **Full Review** post `@coderabbitai review` and `@coderabbitai full review`;
+  **Resolve Its Comments** posts `@coderabbitai resolve` while it has open threads. On the
+  Review comments tab, **Reply to CodeRabbit** answers its thread with the box's words. These
+  are the tools `coderabbit_review`, `coderabbit_resolve` and `coderabbit_reply`, which agents
+  may call too.
 
 Merge, review and comment are tools that only a view may call (`merge_pr`, `review_pr`,
 `comment_on_pr`): a person does them, from the page. The server reads GitHub as the

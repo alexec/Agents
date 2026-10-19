@@ -90,6 +90,11 @@ server's (`github.com/github/github-mcp-server/v2`, a library): by default the
 (CIWatcher.swift, #383, removed in #1231), with the same names, arguments, data and eventIds, and the same cursor, paging and
 trust filter (#728), polled only: `checks.failed`, `pr.opened`, `pr.merged`, `pr.closed`,
 `pr.conflicted`, `issue.opened`, `issue.labelled`, `issue.commented`, `issue.closed`.
+CodeRabbit's events are new here (#1344): `review.posted` (once per head commit: its
+review on that commit, or its `CodeRabbit` status at success) and `review.comment` (each
+review comment by it). Its tools `coderabbit_review`, `coderabbit_reply` and
+`coderabbit_resolve` post its `@coderabbitai` commands as the person. There is no CodeRabbit
+API or MCP server in this: it is known by its GitHub App (`coderabbitai`), not by a name.
 
 MCP's SDKs have no events (a working-group draft), so `githubmcp.Front` reads stdio itself.
 It answers `events/list` and `events/poll`, adds the `events` capability to `initialize`,

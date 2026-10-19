@@ -83,6 +83,13 @@ and use `add_issue_comment` on the PR to say what you changed.
   ready for review. It takes the same filters and `anyone`. Drafts never raise it. The
   **Review pull requests** workflow in `.agents/workflows/` starts an agent on it that
   reads the diff and leaves one comment.
+- Its CodeRabbit events (#1344) take the same filters and `anyone`. `review.posted` is raised
+  once for each head commit that CodeRabbit reviews: its review on that commit, or its
+  `CodeRabbit` status at success, whichever comes first. `review.comment` is raised for each
+  review comment by it, on a line or as its answer in a thread; `comment.id` is what
+  `coderabbit_reply` answers. `coderabbit_review` asks it to review again and
+  `coderabbit_resolve` resolves its comments. CodeRabbit is known by its GitHub App, so a
+  person named `coderabbitai` raises nothing.
 - Every PR event and the issue events are raised only for the repo's owner, members and
   collaborators, never a bot (#728). A PR event is raised only for a PR from a branch of the
   repo itself, not a fork. `anyone: true` raises them for everyone.

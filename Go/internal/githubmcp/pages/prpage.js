@@ -1,6 +1,9 @@
 // A pull request's state as pills: on the Pull requests list and on its page.
 const PR_CHECKS = { passing: "Passing", failing: "Failing", running: "Running", none: "No checks", skipped: "Skipped" };
 const PR_REVIEWS = { approved: "Approved", changes_requested: "Changes requested", review_required: "Review required", commented: "Commented" };
+// CodeRabbit's status (#1344): on the list a word, on a page its block's status.
+const PR_RABBIT = { reviewing: ["running", "CodeRabbit reviewing"], reviewed: ["passing", "CodeRabbit reviewed"], failed: ["failing", "CodeRabbit failed"] };
+const rabbitStatus = (pr) => typeof pr.codeRabbit === "string" ? pr.codeRabbit : (pr.codeRabbit && pr.codeRabbit.status) || "";
 const prPills = (ui, pr) => {
   const pill = (kind, text, title) => ui.el("span", { className: "pill " + kind, textContent: text, title: title || "" });
   const out = [];
@@ -10,6 +13,8 @@ const prPills = (ui, pr) => {
   out.push(pill(checks, PR_CHECKS[checks], "Checks"));
   if (pr.conflicts) out.push(pill("conflicts", "Conflicts", "Conflicts with its base: rebase it"));
   if (pr.review && PR_REVIEWS[pr.review]) out.push(pill(pr.review, PR_REVIEWS[pr.review], "Review"));
+  const rabbit = PR_RABBIT[rabbitStatus(pr)];
+  if (rabbit) out.push(pill(rabbit[0], rabbit[1], "CodeRabbit's review of the last commit"));
   if (pr.autoMerge && (pr.state || "open") === "open") out.push(pill("auto", "Auto-merge on", "Merges once its checks pass"));
   return out;
 };
@@ -34,8 +39,9 @@ const prPage = (ui, repo, back) => {
   const fetchPR = (number) => ui.call("show_pull_request", { repo: repo(), number });
   const who = (c) => {
     const out = [el("span", { textContent: `${c.author || "someone"} · ${ui.ago(c.at)}` })];
-    // An app's words, such as CodeRabbit's (#1344), are marked.
-    if (c.bot) out.push(el("span", { className: "pill", textContent: "bot", title: c.author + " is an app" }));
+    // An app's words are marked: CodeRabbit's by its name (#1344), another's as a bot.
+    if (c.app) out.push(el("span", { className: "pill app", textContent: c.app, title: `${c.app}'s GitHub App wrote it` }));
+    else if (c.bot) out.push(el("span", { className: "pill", textContent: "bot", title: c.author + " is an app" }));
     if (c.review && PR_REVIEWS[c.review]) out.push(el("span", { className: "pill " + c.review, textContent: PR_REVIEWS[c.review] }));
     if (c.url) out.push(link("↗", c.url, { title: "Open it on GitHub" }));
     return el("div", { className: "who" }, out);
@@ -54,11 +60,42 @@ const prPage = (ui, repo, back) => {
     const more = button(`Show All (${lines.length} lines)`, () => { opened.add(key); draw(); }, { className: "plain" });
     return el("div", {}, [el("p", { className: "body", textContent: lines.slice(0, 12).join("\n") + "\n…" }), more]);
   };
+  // CodeRabbit's block (#1344): its status and review, its summary (edited after each review),
+  // and the commands it takes, posted as the person.
+  const rabbitOpen = () => (pr.threads || []).filter((t) => !t.resolved && t.comments && t.comments[0] && t.comments[0].app === "CodeRabbit").length;
+  const command = (tool, words, done, args) => {
+    const b = button(words, async () => {
+      b.disabled = true;
+      try { await call(tool, args); say(done); log(`${tool} #${pr.number}`); refresh(); }
+      catch (e) { b.disabled = false; say("Couldn't ask CodeRabbit: " + e.message, true); }
+    });
+    return b;
+  };
+  const codeRabbit = () => {
+    const r = pr.codeRabbit;
+    if (!r) return null;
+    const status = PR_RABBIT[r.status];
+    const head = [el("span", { className: "pill app", textContent: "CodeRabbit" }),
+      status ? el("span", { className: "pill " + status[0], textContent: status[1].replace("CodeRabbit ", "") }) : null,
+      r.review && PR_REVIEWS[r.review] ? el("span", { className: "pill " + r.review, textContent: PR_REVIEWS[r.review] }) : null,
+      r.reviewedAt ? el("span", { textContent: ui.ago(r.reviewedAt) }) : null,
+      el("span", { className: "grow" }),
+      r.reviewUrl ? link("Review ↗", r.reviewUrl, { title: "Its last review, on GitHub" }) : null,
+      r.summaryUrl ? link("Summary ↗", r.summaryUrl, { title: "Its summary, on GitHub" }) : null];
+    const open = rabbitOpen();
+    const actions = pr.state === "open" ? el("div", { className: "actions" }, [
+      command("coderabbit_review", "Ask CodeRabbit Again", "Asked CodeRabbit to review the new changes."),
+      command("coderabbit_review", "Full Review", "Asked CodeRabbit to review every file.", { full: true }),
+      open ? command("coderabbit_resolve", `Resolve Its Comments (${open})`, "Asked CodeRabbit to resolve its comments.") : null,
+    ]) : null;
+    return el("div", { className: "note rabbit" }, [el("div", { className: "who" }, head),
+      body(r.summary, "summary") || el("p", { className: "body muted", textContent: "No summary yet." }), actions]);
+  };
   const conversation = () => {
     const notes = [el("div", { className: "note" }, [
       who({ author: pr.author, at: pr.createdAt }),
       body(pr.body, "description") || el("p", { className: "body muted", textContent: "No description." }),
-    ])];
+    ]), codeRabbit()];
     (pr.comments || []).forEach((c, i) => {
       notes.push(el("div", { className: "note" }, [who(c), body(c.body, "c" + i)]));
     });
@@ -75,6 +112,14 @@ const prPage = (ui, repo, back) => {
         first ? who(first) : null,
         first ? body(first.body, "t" + t.path + t.line) : null,
         ...replies.map((r, i) => el("div", { className: "reply" }, [who(r), body(r.body, "r" + t.path + t.line + i)])),
+        // CodeRabbit's thread is answered in place, with the box's words (#1344).
+        first && first.app === "CodeRabbit" && first.id && pr.state === "open" && !t.resolved
+          ? el("div", { className: "actions" }, [button("Reply to CodeRabbit", async (event) => {
+            if (!text.value.trim()) { say("Write the answer in the box first.", true); return; }
+            event.target.disabled = true;
+            try { await call("coderabbit_reply", { commentId: first.id, body: text.value }); text.value = ""; say("Answered CodeRabbit."); refresh(); }
+            catch (e) { event.target.disabled = false; say("Couldn't answer: " + e.message, true); }
+          }, { title: "Answer it in its thread, with the box's words; @coderabbitai is put first" })]) : null,
       ]);
     });
     return list.length ? list : [el("div", { className: "muted", textContent: "No comments on lines of code." })];
@@ -234,7 +279,7 @@ const prPage = (ui, repo, back) => {
       el("div", { className: "pills" }, prPills(ui, pr)),
       el("div", { className: "branch", textContent: `${pr.branch} → ${pr.base} · ${pr.author || "someone"} · ${ui.ago(pr.createdAt)} · +${pr.additions} −${pr.deletions}` }),
       el("div", { className: "tabs" }, tabs),
-      ...panel,
+      ...panel.filter(Boolean),
       ...actions(),
       el("div", { className: "status " + (line.error ? "error" : "muted"), textContent: line.text }),
     );

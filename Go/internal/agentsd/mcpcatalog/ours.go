@@ -44,7 +44,7 @@ var Made = []Ours{
 
 var (
 	githubEvents = []string{"checks.failed", "pr.opened", "pr.merged", "pr.closed", "pr.conflicted",
-		"issue.opened", "issue.labelled", "issue.commented", "issue.closed"}
+		"review.posted", "review.comment", "issue.opened", "issue.labelled", "issue.commented", "issue.closed"}
 	linearEvents = []string{"issue.opened", "issue.labelled", "issue.commented", "issue.closed"}
 )
 
