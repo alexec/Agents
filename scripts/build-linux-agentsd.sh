@@ -15,7 +15,8 @@
 #   VERSION                          MARKETING_VERSION+CURRENT_PROJECT_VERSION
 #
 # Go runs through Go/scripts/go.sh (a container on this Mac): lease "build, test or scratch app" first. It takes
-# seconds and needs no swift.org toolchain.
+# seconds and needs no swift.org toolchain. The container mounts the repository, and Colima
+# shares only your home folder: a checkout under /tmp fails with "go.mod file not found".
 set -euo pipefail
 
 root=${0:A:h:h}
