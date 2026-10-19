@@ -709,9 +709,9 @@ func (s *Service) deliver(need notices.AttentionNeed, fromPeer bool) {
 				case s.router.RelayOnline():
 					s.log(fmt.Sprintf("notice: %s goes to the copy that holds the relay", needID))
 				case s.mesh != nil:
-					s.log(fmt.Sprintf("notice: %s goes to the other copies: no relay and no APNs key here", needID))
+					s.log(fmt.Sprintf("notice: %s goes to the other copies: no relay here, and this copy does not push", needID))
 				default:
-					s.log(fmt.Sprintf("notice: %s goes to no device: no relay online and no APNs key", needID))
+					s.log(fmt.Sprintf("notice: %s goes to no device: no relay is online, and this copy does not push", needID))
 				}
 			}
 			return
