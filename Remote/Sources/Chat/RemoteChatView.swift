@@ -82,6 +82,7 @@ struct RemoteChatView: View {
                                hasMore: page.hasMoreOfTheConversation,
                                entryCount: page.entries.count + page.turns.count,
                                isComingBack: model.isComingBack(agent),
+                               lastEntryAt: page.lastEntryAt,
                                loadFailure: page.transcriptLoadFailure,
                                settleKey: model.chatID(popped),
                                loadEarlier: { [popped] in

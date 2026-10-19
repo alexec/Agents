@@ -858,6 +858,24 @@ struct WorkingLine: View {
     }
 }
 
+/// How long the chat has been quiet, at its foot: "Last activity 12 minutes ago · 14:32"
+/// (#1564). Nothing under five minutes. Read again on the minute, as `ActivityTime` is.
+struct QuietLine: View {
+    let since: Date
+
+    var body: some View {
+        TimelineView(.everyMinute) { context in
+            if let line = ActivityWords.quiet(since: since, now: context.date) {
+                Text(line)
+                    .appText(.fine)
+                    .foregroundStyle(.tertiary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.bottom, 14)
+            }
+        }
+    }
+}
+
 /// The chat is being picked back up by the daemon, and nobody typed for it.
 struct ComingBackLine: View {
     var body: some View {

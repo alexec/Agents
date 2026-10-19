@@ -796,6 +796,32 @@ struct WebFixturesTests {
         }
     }
 
+    /// The line at the foot of a quiet chat (#1564): nil under five minutes, then minutes,
+    /// hours, yesterday, a day this year and a day of another, each in a time zone.
+    @Test func quiet() throws {
+        // 2026-10-19 14:00 UTC: 15:00 in London, 07:00 in Los Angeles.
+        let now = Date(timeIntervalSinceReferenceDate: 814_111_200)
+        let seconds: [(String, Double, String)] = [
+            ("ahead of now", -90, "Europe/London"), ("under five minutes", 4 * 60 + 59, "Europe/London"),
+            ("five minutes", 5 * 60, "Europe/London"), ("under the hour", 59 * 60 + 59, "Europe/London"),
+            ("an hour", 3600, "Europe/London"), ("hours", 23 * 3600 + 3599, "Europe/London"),
+            ("yesterday", 30 * 3600, "Europe/London"), ("days ago", 4 * 86_400, "Europe/London"),
+            ("last year", 300 * 86_400, "Europe/London"),
+            ("yesterday where it is still early", 26 * 3600, "America/Los_Angeles"),
+            ("two days back where it is still early", 32 * 3600, "America/Los_Angeles"),
+        ]
+        let cases = try seconds.map { name, ago, zone in
+            Case(name: name, input: .object(["at": try Self.encode(now.addingTimeInterval(-ago)),
+                                             "now": try Self.encode(now), "timeZone": .string(zone)]))
+        }
+        try pin("activity/quiet.json", cases) { input in
+            let at = try (input["at"] ?? .null).decode(Date.self)
+            let now = try (input["now"] ?? .null).decode(Date.self)
+            let zone = TimeZone(identifier: input["timeZone"]?.stringValue ?? "")!
+            return ActivityWords.quiet(since: at, now: now, timeZone: zone).map(JSONValue.string) ?? .null
+        }
+    }
+
     // MARK: sandbox/
 
     @Test func sandbox() throws {

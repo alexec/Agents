@@ -25,6 +25,7 @@ struct Transcript: View {
                        // them holds the reader's place as entries do.
                        entryCount: page.entries.count + page.turns.count,
                        isComingBack: model.isComingBack(agent),
+                       lastEntryAt: page.lastEntryAt,
                        loadFailure: page.transcriptLoadFailure,
                        settleKey: popped?.id ?? model.selection,
                        loadEarlier: { [popped] in
