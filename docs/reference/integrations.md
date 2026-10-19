@@ -127,7 +127,7 @@ Open issues: `is:open label:integration notification`.
 | Integration | Clients that show it | State | Last checked | Where | Gaps |
 | --- | --- | --- | --- | --- | --- |
 | CloudKit mailbox push | Remote | built | — | `Packages/AgentsKit/Sources/AgentsKitCore/Remote/CloudKitMailbox.swift`, `RemoteNotify/Sources/NotificationService.swift` | |
-| APNs from the control plane (#1460) | Remote | built | — | `Go/internal/controlplane/apns/`, `Go/internal/controlplane/push.go`, `Packages/AgentsKit/Sources/AgentsKitCore/Remote/ControlPush.swift` | Tested with a fake APNs only; the real push waits for Alex's key (#1461) |
+| APNs from the control plane (#1460) | Remote | built, not working live (#1509) | 2026-10-18, live on control.agentloops.dev with the real key: no push with the relay off, two tries (`specs/058-control-plane/walks/1461.md`) | `Go/internal/controlplane/apns/`, `Go/internal/controlplane/push.go`, `Packages/AgentsKit/Sources/AgentsKitCore/Remote/ControlPush.swift` | #1509 (fix in v0.5.1) |
 | CloudKit relay channel (Remote to Mac) | Remote, Mac | built | — | `Packages/AgentsKit/Sources/AgentsKit/Relay/ControlRelay.swift`, `Host/Relay/Sources/main.swift` | |
 | Local notifications | Mac, Remote | built | — | `App/Sources/Notifications/MacNotifier.swift`, `Remote/Sources/Notifications/DeviceNotifier.swift` | |
 | The attention widget | Remote | built | — | `RemoteWidget/Sources/AttentionWidget.swift` | |
@@ -140,11 +140,11 @@ Open issues: `is:open label:integration "control plane"`.
 | --- | --- | --- | --- | --- | --- |
 | S3 or MinIO store | control plane, Mac | built | — | `Go/internal/controlplane/s3store/s3store.go`, `Host/Sources/StoreChoice.swift` | |
 | KMS (local, HashiCorp Vault, Google Cloud KMS) | control plane | built | — | `Go/internal/controlplane/kms/kms.go` | |
-| Caddy with ACME | control plane | built | — | `deploy/` | #61 |
+| Caddy with ACME | control plane | tested on a real account | 2026-10-18, Let's Encrypt certificates for control.agentloops.dev and views.agentloops.dev (`specs/058-control-plane/walks/1461.md`) | `deploy/` | |
 | Bonjour discovery | Mac, control plane | built | — | `Host/Sources/LocalServices.swift`, `Go/internal/controlplane/machine.go` | |
 | ssh host install and tunnels | Mac, server, control plane | built | — | `Go/internal/controlplane/hostinstall/ssh.go`, `Go/internal/controlplane/hosttunnels/ssh.go` | |
-| Google Cloud (Compute Engine VM and Cloud KMS) for the control plane | control plane | built (not walked on a real account) | 2026-10-18, `--dry-run` only, flags checked against gcloud 589.0.0 | `deploy/gcp/up.sh`, `deploy/gcp/down.sh`, `deploy/gcp/startup.sh` | #1461 |
-| Cloudflare DNS for the control plane's names | control plane | built (not walked on a real account) | 2026-10-18, `--dry-run` only | `deploy/cloudflare/dns.sh` | #1461, #1468 |
+| Google Cloud (Compute Engine VM and Cloud KMS) for the control plane | control plane | tested on a real account | 2026-10-18, `up.sh` made the VM `agents-control`, the live control plane moved there and back (`specs/058-control-plane/walks/1461.md`) | `deploy/gcp/up.sh`, `deploy/gcp/down.sh`, `deploy/gcp/startup.sh` | |
+| Cloudflare DNS for the control plane's names | control plane | tested on a real account | 2026-10-18, `dns.sh` made the A records for control.agentloops.dev and views.agentloops.dev (`specs/058-control-plane/walks/1461.md`) | `deploy/cloudflare/dns.sh` | |
 
 ## Model gateways
 

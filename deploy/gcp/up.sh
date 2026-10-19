@@ -64,6 +64,9 @@ kms=projects/$project/locations/$key_location/keyRings/$keyring/cryptoKeys/$key
 
 say "== Compute Engine, Cloud KMS and IAM"
 run gcloud services enable compute.googleapis.com cloudkms.googleapis.com iam.googleapis.com
+# The IAM API needs about a minute after it is first turned on. Until then the describe below
+# fails as if there were no account, and the create fails too (#1461).
+retry gcloud iam service-accounts list --limit 1 --format none
 
 say "== the key that seals the control key: $kms"
 exists gcloud kms keyrings describe "$keyring" --location "$key_location" ||

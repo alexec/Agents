@@ -40,7 +40,10 @@ Each takes `--dry-run`, which prints every command and runs none.
 
 ### What you make first
 
-1. A Google Cloud project with billing turned on.
+1. A Google Cloud project, with a billing account linked to it. Link it in the console
+   (**Billing ▸ Link a billing account**). A billing account that is not linked to the
+   project is not sufficient: without the link, `up.sh` can't turn on Compute Engine or
+   Cloud KMS.
 2. In that project, a service account for the scripts, with these roles: **Service Usage
    Admin**, **Compute Admin**, **Cloud KMS Admin**, **Service Account Admin** and **Service
    Account User**. Make a JSON key for it, and put the key in
@@ -82,7 +85,8 @@ In the repository on your Mac:
    deploy/gcp/up.sh --apns AuthKey_KEYID.p8
    ```
 
-   It turns on Compute Engine, Cloud KMS and IAM, and makes:
+   It turns on Compute Engine, Cloud KMS and IAM. The IAM API needs about a minute after
+   it is first turned on, so `up.sh` waits until IAM answers. Then it makes:
    - the Cloud KMS key ring `agents` and key `control`;
    - the service account `agents-control-vm`, which may only encrypt and decrypt with that
      key. The machine runs as this account, so no key file for it is on the machine;
@@ -363,47 +367,108 @@ Your Mac becomes a host of the control plane in the cloud with Agents Host.
    projects appear under its own heading in every window.
 
 If Agents Host already runs a control plane on this Mac with hosts and devices paired to
-it, joining one elsewhere starts afresh: those devices pair again. Moving an existing
-control plane across, keeping what is paired, is the next section, still to be written.
+it, joining one elsewhere starts afresh: those devices pair again. To move an existing
+control plane across and keep what is paired, see the next section.
 
 ### Move the control plane from your Mac
 
-TODO: moving the live control plane from Agents Host to the machine, and back, with its
-hosts and clients kept (#61).
+If Agents Host already runs the control plane on your Mac, you can move it to the machine
+and keep every window, phone and host paired. The machine gets this Mac's control plane
+key, so everything that is paired trusts it. Agents keep working while it moves.
 
-The machine needs this Mac's control plane key before it first starts. Seal it in the
-machine's store, with the key piped in over ssh, so that it is never written on the machine:
+Get the machine ready first, as above, with its names and certificate. If the control
+plane on the machine has already started (it has a store and a key of its own), empty it
+first.
 
-```sh
-ssh you@agents.example.com 'cd agents && docker compose -f deploy/compose.public.yaml build control'
-ssh you@agents.example.com 'cd agents && docker compose -f deploy/compose.public.yaml \
-    run --rm -T control key seal --key-fd 0' < control-key
-```
+1. On the machine, stop the control plane and remove its store:
 
-It says **the control key … is sealed in the store by gcpkms://…**. Then delete the saved
-`control-key` on your Mac.
+   ```sh
+   docker compose -f deploy/compose.public.yaml down
+   docker volume rm agents-control_data
+   ```
 
-On Google Cloud, `deploy/gcp/up.sh --seal-key control-key` does both steps for you.
+   This removes everything that the machine's control plane keeps: its hosts, its
+   clients and its own key. The certificate is in another volume and stays.
+2. In `deploy/.env` on the machine, add this line. It starts the control plane empty, to
+   wait for this Mac's records:
 
-To bring the control plane back, use **Run It Here Again…** in Agents Host. If the machine
-made a key of its own (it started with an empty store and no key sealed), the sheet says
-so. Write that key to a file on your Mac, piped out over ssh, so that it is never written on
-the machine:
+   ```sh
+   AGENTS_CONTROL_RECEIVE=1
+   ```
 
-```sh
-(umask 077; ssh you@agents.example.com 'cd agents && docker compose -f deploy/compose.public.yaml \
-    run --rm -T control key export --key-fd 1' > control-key)
-```
+3. In Agents Host on your Mac, click **Move to Another Machine…**. The sheet opens at
+   step 1.
+4. Click **Save Key…**, and save the key as `control-key`. Then seal the key in the
+   machine's store, with the key piped in over ssh, so that it is never written on the
+   machine:
 
-Then click **Use Key…** in the sheet, choose the file, and delete the file. Agents Host
-keeps the Mac's earlier key aside in the keychain. Only a shell on the machine can export
-the key: no request to the control plane gives it out.
+   ```sh
+   ssh you@agents.example.com 'cd agents && docker compose -f deploy/compose.public.yaml build control'
+   ssh you@agents.example.com 'cd agents && docker compose -f deploy/compose.public.yaml \
+       run --rm -T control key seal --key-fd 0' < control-key
+   ```
+
+   It says **the control key … is sealed in the store by gcpkms://…**. On Google Cloud,
+   `deploy/gcp/up.sh --seal-key control-key` seals the key, and starts the control plane.
+   Then delete the saved `control-key` on your Mac. Anyone who has it can pose as your
+   control plane.
+5. Start the control plane on the machine, if it is not running:
+
+   ```sh
+   docker compose -f deploy/compose.public.yaml up -d
+   ```
+
+6. In the sheet, click **Continue**. Type the machine's address, such as
+   `https://agents.example.com`, and click **Check**. Each line must get a tick: **It
+   answers**, **Its certificate is publicly trusted**, **It holds this control plane's
+   key** and **It's empty, and waiting for this one**.
+7. Click **Tell Everyone**. Every window, phone and host that is paired gets the new
+   address. The sheet counts who knows. You can move when some have not heard yet: this
+   Mac sends them on later.
+8. Click **Move Now**. The sheet shows each stage: records held still, records copied, the
+   machine takes over, this Mac's host and relay go there, and this Mac forwards anyone
+   who still comes to it.
+
+When the move is done, Agents Host says **Joined** and the machine's address. Windows,
+phones and hosts connect to the machine in a few seconds, and nothing pairs again. This
+Mac's copy of the control plane keeps running only to send members on to the machine, for
+30 days. It does this again after the Mac restarts.
+
+**After the move, take `AGENTS_CONTROL_RECEIVE=1` out of `deploy/.env`.** On a store that
+it has already taken, the setting has no effect. But if the store is lost, a control plane
+with this setting waits for a move and does not start a store of its own.
+
+#### Bring it back to your Mac
+
+1. In Agents Host, click **Run It Here Again…**. The sheet checks both ends: the machine
+   answers and holds this control plane's key, and this Mac's copy is ready and empty.
+2. Only if the machine made a key of its own (it started with an empty store and no key
+   sealed), the sheet says so. Then write that key to a file on your Mac, piped out over
+   ssh, so that it is never written on the machine:
+
+   ```sh
+   (umask 077; ssh you@agents.example.com 'cd agents && docker compose -f deploy/compose.public.yaml \
+       run --rm -T control key export --key-fd 1' > control-key)
+   ```
+
+   Click **Use Key…** in the sheet, choose the file, and then delete the file. Agents Host
+   keeps the Mac's earlier key aside in the keychain. Only a shell on the machine can
+   export the key: no request to the control plane gives it out. After a move from your
+   Mac, the machine holds this Mac's key, and you do not do this step.
+3. Click **Tell Everyone**, and then **Move Now**.
+
+Every window, phone and host comes back to the Mac, with nothing paired again. Away from
+home, the iPhone and iPad then reach the Mac only through your iCloud, and only while
+**Relay for my devices** is on.
 
 ### Notifications
 
-TODO: how a set-up with no Mac host gets notifications on the phone (#61). Until then, the
-relay and notifications need a Mac host: with only Linux hosts, devices reach the control
-plane at its address and get no notifications.
+With the APNs key (`--apns`), the control plane sends notifications to the iPhone and iPad
+through Apple, so that a phone can get them with no Mac host. In v0.5.0 this does not work
+yet: with **Relay for my devices** off, a need from a host does not get to the locked phone
+(#1509, to be fixed in v0.5.1). Until then, keep **Relay for my devices** on, on a Mac host.
+With only Linux hosts, devices reach the control plane at its address and get no
+notifications.
 
 ## What to know
 
