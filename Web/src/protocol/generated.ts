@@ -786,6 +786,70 @@ export interface ConfigOption {
   options?: ConfigChoice[] | ConfigChoiceGroup[];
 }
 
+/** The person's sign-in to one provider, as the host keeps it. Never its tokens. */
+export interface Connection {
+  provider: ConnectionProvider;
+  /** The account's name on the provider, such as alexec. */
+  login?: string;
+  state: ConnectionState;
+  connectedAt: WireDate;
+  /**
+   * Where the person installs the provider's App: a GitHub user token reaches only the repositories
+   * where it is installed.
+   */
+  installURL?: string;
+}
+
+export interface ConnectionDisconnectAnswer {
+  error?: string;
+}
+
+/** A tool the person connects to with OAuth (#1335). GitHub so far. */
+export type ConnectionProvider = "github";
+
+export interface ConnectionProviderRequest {
+  provider: ConnectionProvider;
+}
+
+/**
+ * A device-flow sign-in under way on the host (#1335): the host polls the provider; a client shows
+ * the code and the links, and waits.
+ */
+export interface ConnectionSignIn {
+  flowID: UUID;
+  provider: ConnectionProvider;
+  status: ConnectionSignInStatus;
+  /** The code the person types at verificationURL, such as WDJB-MJHT. */
+  userCode: string;
+  verificationURL: string;
+  installURL?: string;
+  expiresAt: WireDate;
+  connection?: Connection;
+  /** Why it failed, in words. Never a token. */
+  message?: string;
+}
+
+export interface ConnectionSignInFlowRequest {
+  flowID: UUID;
+}
+
+/**
+ * waiting: for the person to type the code. connected: done. expired: the code ended. denied: the
+ * person pressed Cancel on the provider's page. cancelled: a client stopped it. failed: see
+ * message.
+ */
+export type ConnectionSignInStatus = "waiting" | "connected" | "expired" | "denied" | "cancelled" | "failed";
+
+/**
+ * connected: the host has a token and renews it. signInAgain: the provider refused the renewal, so
+ * the person signs in again.
+ */
+export type ConnectionState = "connected" | "signInAgain";
+
+export interface ConnectionsList {
+  connections: Connection[];
+}
+
 export type Consequence =
   | { woke: { agentID: UUID; title: string } }
   | { fired: { workflowID: string; folder: URLString; agentID?: UUID } }
@@ -4572,6 +4636,12 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ConfigChoice: { required: ["value", "name"], optional: ["description"] },
   ConfigChoiceGroup: { required: ["options"], optional: ["name", "group"] },
   ConfigOption: { required: ["id", "name", "type"], optional: ["description", "category", "currentValue", "options"] },
+  Connection: { required: ["provider", "state", "connectedAt"], optional: ["login", "installURL"] },
+  ConnectionDisconnectAnswer: { required: [], optional: ["error"] },
+  ConnectionProviderRequest: { required: ["provider"], optional: [] },
+  ConnectionSignIn: { required: ["flowID", "provider", "status", "userCode", "verificationURL", "expiresAt"], optional: ["installURL", "connection", "message"] },
+  ConnectionSignInFlowRequest: { required: ["flowID"], optional: [] },
+  ConnectionsList: { required: ["connections"], optional: [] },
   ContentBlockAnnotations: { required: [], optional: ["audience", "priority"] },
   ContinueInProjectRequest: { required: ["agentID", "text", "attachments"], optional: ["requestID"] },
   ControlAuth: { required: ["id", "nonce", "mac", "kind"], optional: ["for", "epoch"] },

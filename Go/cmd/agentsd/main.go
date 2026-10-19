@@ -105,6 +105,7 @@ func main() {
 	// a word once a minute that this host is alive.
 	d.SayRestarted()
 	d.PickUpAfterRestart()
+	d.StartConnections()
 	d.StartMCPHealth()
 	d.StartMCPEvents()
 	d.StartMachineWatch()

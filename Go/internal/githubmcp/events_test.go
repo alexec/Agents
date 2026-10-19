@@ -530,9 +530,9 @@ func TestPROpenedRaisesAReadyPROnceAndADraftWhenMarkedReady(t *testing.T) {
 func TestNotSignedInAndARateLimit(t *testing.T) {
 	h := newHarness(t)
 	c := cursor{Since: timeString(time.Now())}.encoded()
-	h.fake.err = &GitHubError{Kind: NotSignedIn, Message: "gh not signed in: run `gh auth login`"}
+	h.fake.err = &GitHubError{Kind: NotSignedIn, Message: NotConnected}
 	_, err := h.rpc(map[string]any{"name": "checks.failed", "arguments": map[string]any{"repo": repo}, "cursor": c})
-	if err == nil || err.Code != -32012 || err.Data["reason"] != "gh not signed in" {
+	if err == nil || err.Code != -32012 || err.Data["reason"] != "not connected" {
 		t.Fatalf("got %v", err)
 	}
 	h.fake.err = &GitHubError{Kind: RateLimited, Message: "GitHub rate limit", RetryAfterMs: 60000}

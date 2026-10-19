@@ -1,8 +1,9 @@
 // github-mcp: the `github` MCP server (#1232), on stdio. The official GitHub MCP server's
 // tools (github/github-mcp-server, as a library) and the events the ci server had (#383):
 // checks.failed, pr.opened, pr.merged, pr.closed, pr.conflicted, issue.opened,
-// issue.labelled, issue.commented and issue.closed, polled. As the signed-in gh user: its
-// token is `gh auth token`'s, so there is no account of its own. The Agents daemon starts it
+// issue.labelled, issue.commented and issue.closed, polled. As the person: its token is the
+// host's GitHub connection (#1335, in the store connections.EnvName names), so there is no
+// account of its own and no gh. The Agents daemon starts it
 // from `.agents/mcp.json` by bare name; Agents Host and a Linux host carry it beside agentsd.
 //
 //	github-mcp                       serve on stdio
@@ -41,7 +42,7 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	token := githubmcp.GhToken()
+	token := githubmcp.Token()
 	var sets []string
 	for _, s := range strings.Split(*toolsets, ",") {
 		if s = strings.TrimSpace(s); s != "" {
@@ -56,7 +57,7 @@ func main() {
 		os.Exit(1)
 	}
 	front := &githubmcp.Front{
-		Events:   &githubmcp.Events{GitHub: githubmcp.NewRealGitHub(os.Getenv("GITHUB_MCP_API_URL"), token, githubmcp.GhRepo())},
+		Events:   &githubmcp.Events{GitHub: githubmcp.NewRealGitHub(os.Getenv("GITHUB_MCP_API_URL"), token, githubmcp.GitRepo())},
 		Upstream: upstream, Version: buildinfo.Version, Logger: logger,
 	}
 	// A signal ends it at once: the front would otherwise wait on stdin.

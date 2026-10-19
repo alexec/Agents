@@ -14,10 +14,12 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/alexec/agents/Go/internal/connections"
 )
 
-// RealGitHub reads GitHub's REST and GraphQL APIs as the signed-in gh user, with the token
-// `gh auth token` gives (no account of its own). GET bodies are kept with their ETags, so an
+// RealGitHub reads GitHub's REST and GraphQL APIs as the person, with the token of the
+// host's GitHub connection (#1335; no account of its own, and no gh). GET bodies are kept with their ETags, so an
 // unchanged listing costs no rate limit (GitHub doesn't count 304s). The listings events poll
 // are shared for sharedFor (#932): every wait polls on its own, and ten waits on one repo
 // would otherwise fetch the same page ten times.
@@ -26,7 +28,7 @@ type RealGitHub struct {
 	API    string
 	Token  func() string
 	Client *http.Client
-	// Repo is the repo the server's folder pushes to, asked of gh once it is needed.
+	// Repo is the repo the server's folder pushes to, read from git once it is needed.
 	Repo func(ctx context.Context) (string, error)
 
 	mu        sync.Mutex
@@ -76,7 +78,7 @@ func NewRealGitHub(api string, token func() string, repo func(ctx context.Contex
 func (g *RealGitHub) do(ctx context.Context, method, path string, body []byte, cache bool) ([]byte, error) {
 	token := g.Token()
 	if token == "" {
-		return nil, &GitHubError{Kind: NotSignedIn, Message: "gh not signed in: run `gh auth login`"}
+		return nil, &GitHubError{Kind: NotSignedIn, Message: NotConnected}
 	}
 	var reader io.Reader
 	if body != nil {
@@ -142,7 +144,7 @@ func (g *RealGitHub) remember(path, etag, body string) {
 func failure(res *http.Response, body []byte) *GitHubError {
 	switch {
 	case res.StatusCode == http.StatusUnauthorized:
-		return &GitHubError{Kind: NotSignedIn, Message: "gh not signed in: run `gh auth login`"}
+		return &GitHubError{Kind: NotSignedIn, Message: NotConnected}
 	case res.StatusCode == http.StatusForbidden || res.StatusCode == http.StatusTooManyRequests:
 		ms := retryAfter(res.Header)
 		if ms > 0 || bytes.Contains(bytes.ToLower(body), []byte("rate limit")) {
@@ -648,34 +650,21 @@ func (g *RealGitHub) IssueActivity(ctx context.Context, repo string, kind IssueK
 	return out, truncated, nil
 }
 
-// MARK: The gh sign-in
+// MARK: The host's connection
 
-// GhToken is `gh auth token`'s answer, asked again after a minute or once it failed, so a
-// sign-in or a switch of account is seen without a restart.
-func GhToken() func() string {
-	var mu sync.Mutex
-	var token string
-	var at time.Time
-	return func() string {
-		mu.Lock()
-		defer mu.Unlock()
-		if token != "" && time.Since(at) < time.Minute {
-			return token
-		}
-		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer cancel()
-		out, err := exec.CommandContext(ctx, "gh", "auth", "token").Output()
-		if err != nil {
-			token = ""
-			return ""
-		}
-		token, at = strings.TrimSpace(string(out)), time.Now()
-		return token
-	}
+// NotConnected is what a call says with no token: the person connects GitHub in Agents.
+const NotConnected = "GitHub is not connected, or its sign-in ended: connect GitHub in Agents (Connectors)"
+
+// Token is the access token of the host's GitHub connection (#1335), read from the host's
+// store (connections.EnvName) again after a minute or once it has ended, so a sign-in or a
+// renewal is seen without a restart. "" when there is none. The host refreshes it.
+func Token() func() string {
+	return connections.TokenReader(connections.FromEnv(), connections.GitHub)
 }
 
-// GhRepo is the repo this folder pushes to, by `gh repo view`, asked once it succeeds.
-func GhRepo() func(ctx context.Context) (string, error) {
+// GitRepo is the GitHub repo this folder pushes to, from its git remote (origin first),
+// asked once it succeeds.
+func GitRepo() func(ctx context.Context) (string, error) {
 	var mu sync.Mutex
 	var repo string
 	return func(ctx context.Context) (string, error) {
@@ -684,16 +673,59 @@ func GhRepo() func(ctx context.Context) (string, error) {
 		if repo != "" {
 			return repo, nil
 		}
-		out, err := exec.CommandContext(ctx, "gh", "repo", "view", "--json", "nameWithOwner", "-q", ".nameWithOwner").Output()
-		name := strings.TrimSpace(string(out))
-		if err != nil || name == "" {
-			if _, missing := exec.LookPath("gh"); missing != nil {
-				return "", &GitHubError{Kind: NotSignedIn, Message: "gh not signed in: gh is not installed"}
+		for _, remote := range gitRemotes(ctx) {
+			out, err := exec.CommandContext(ctx, "git", "remote", "get-url", remote).Output()
+			if err != nil {
+				continue
 			}
-			cwd, _ := os.Getwd()
-			return "", &GitHubError{Kind: NotFound, Message: "repo is needed: " + cwd + " has no GitHub repo"}
+			if name, ok := RepoOfRemote(strings.TrimSpace(string(out))); ok {
+				repo = name
+				return repo, nil
+			}
 		}
-		repo = name
-		return repo, nil
+		cwd, _ := os.Getwd()
+		return "", &GitHubError{Kind: NotFound, Message: "repo is needed: " + cwd + " has no GitHub remote"}
 	}
+}
+
+// gitRemotes is the folder's remotes, origin first.
+func gitRemotes(ctx context.Context) []string {
+	out, err := exec.CommandContext(ctx, "git", "remote").Output()
+	if err != nil {
+		return nil
+	}
+	remotes := []string{}
+	for _, r := range strings.Fields(string(out)) {
+		if r == "origin" {
+			remotes = append([]string{r}, remotes...)
+		} else {
+			remotes = append(remotes, r)
+		}
+	}
+	return remotes
+}
+
+// RepoOfRemote is owner/name of a github.com remote: https://github.com/o/n(.git),
+// git@github.com:o/n(.git) or ssh://git@github.com/o/n(.git).
+func RepoOfRemote(remote string) (string, bool) {
+	rest := ""
+	for _, prefix := range []string{"https://github.com/", "http://github.com/", "git@github.com:",
+		"ssh://git@github.com/", "git://github.com/"} {
+		if r, ok := strings.CutPrefix(remote, prefix); ok {
+			rest = r
+			break
+		}
+	}
+	if rest == "" && strings.HasPrefix(remote, "https://") {
+		// https://user@github.com/o/n: a remote with a name in it.
+		if _, r, ok := strings.Cut(strings.TrimPrefix(remote, "https://"), "@github.com/"); ok {
+			rest = r
+		}
+	}
+	rest = strings.TrimSuffix(strings.TrimSuffix(rest, "/"), ".git")
+	owner, name, ok := strings.Cut(rest, "/")
+	if !ok || owner == "" || name == "" || strings.Contains(name, "/") {
+		return "", false
+	}
+	return owner + "/" + name, true
 }
