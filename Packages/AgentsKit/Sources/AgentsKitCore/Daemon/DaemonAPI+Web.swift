@@ -98,6 +98,19 @@ public extension DaemonAPI {
                 Row(Method.mcpHealth, params: Empty.self, result: MCPHealthSnapshot.self, kind: .hostRequest),
                 Row(Method.mcpHealthCheck, params: MCPHealthCheckRequest.self, result: MCPHealthSnapshot.self,
                     kind: .hostRequest),
+                // The person's connections (#1335) and a project's Connectors set-up (#1336).
+                Row(Method.connectionsList, params: Empty.self, result: ConnectionsList.self, kind: .hostRequest),
+                Row(Method.connectionsSignIn, params: ConnectionProviderRequest.self, result: ConnectionSignIn.self,
+                    kind: .hostRequest),
+                Row(Method.connectionsSignInWait, params: ConnectionSignInFlowRequest.self, result: ConnectionSignIn.self,
+                    kind: .hostRequest),
+                Row(Method.connectionsSignInCancel, params: ConnectionSignInFlowRequest.self, result: ConnectionSignIn.self,
+                    kind: .hostRequest),
+                Row(Method.connectionsDisconnect, params: ConnectionProviderRequest.self,
+                    result: ConnectionDisconnectAnswer.self, kind: .hostRequest),
+                Row(Method.connectorsSetup, params: ConnectorSetupRequest.self, result: ConnectorSetup.self, kind: .hostRequest),
+                Row(Method.connectorsSetupSkip, params: ConnectorSkipRequest.self, result: ConnectorSetup.self,
+                    kind: .hostRequest),
                 // The low disk space strip (#195, #196), as the window draws it.
                 Row(Method.diskState, params: Empty.self, result: DiskState.self, kind: .hostRequest),
                 // The files the host could not read in this run (#205, #223), as the window's sidebar foot.

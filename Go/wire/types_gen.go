@@ -1028,6 +1028,117 @@ type ConnectionsList struct {
 	Connections []Connection `json:"connections"`
 }
 
+// The github events the set-up turned on, and the project's workflows that start on one of them.
+type ConnectorEvents struct {
+	State ConnectorEventsState `json:"state"`
+	// The events, such as pr.opened.
+	Names []string `json:"names"`
+	// The mcp.json name that offers them.
+	Server    *string             `json:"server,omitzero"`
+	Workflows []ConnectorWorkflow `json:"workflows"`
+	Message   *string             `json:"message,omitzero"`
+}
+
+// on: the github connector is in the project's or the person's mcp.json, so its events reach this project. off: not yet (nothing connected, or every GitHub slot skipped). taken: an mcp.json entry not made by Agents already has the name github, and it is left alone. failed: the entry could not be written; message says why.
+type ConnectorEventsState string
+
+const (
+	ConnectorEventsStateOn     ConnectorEventsState = "on"
+	ConnectorEventsStateOff    ConnectorEventsState = "off"
+	ConnectorEventsStateTaken  ConnectorEventsState = "taken"
+	ConnectorEventsStateFailed ConnectorEventsState = "failed"
+)
+
+// The one real thing a slot read: the newest issue or pull request, or the last workflow run.
+type ConnectorProof struct {
+	// The issue or pull request number.
+	Number *int64 `json:"number,omitzero"`
+	// Its title, or the run's workflow and branch, such as "CI on main".
+	Title string `json:"title"`
+	// A run's outcome in a word: passed, failed, running, cancelled.
+	Outcome *string `json:"outcome,omitzero"`
+	URL     *string `json:"url,omitzero"`
+	At      *Date   `json:"at,omitzero"`
+}
+
+// A project's Connectors set-up (#1336): its GitHub repository, the person's connection, four slots that each prove themselves with one read, and the events.
+type ConnectorSetup struct {
+	Folder string `json:"folder"`
+	// owner/name, from the project's git remote (origin first). Absent with no GitHub remote.
+	Repository *string     `json:"repository,omitzero"`
+	Connection *Connection `json:"connection,omitzero"`
+	// Whether the Agents App is installed on the repository. Absent when not known.
+	Installed  *bool   `json:"installed,omitzero"`
+	InstallURL *string `json:"installURL,omitzero"`
+	// How many repositories the connection sees through the App.
+	Repositories *int64          `json:"repositories,omitzero"`
+	Slots        []ConnectorSlot `json:"slots"`
+	Events       ConnectorEvents `json:"events"`
+	// Slots that read or were skipped, of the four.
+	Done int64 `json:"done"`
+}
+
+// stored: no call to the provider, only what was read before (for a list of every project). cached: a read at most five minutes old is used again. fresh: read now (Try Again).
+type ConnectorSetupReading string
+
+const (
+	ConnectorSetupReadingStored ConnectorSetupReading = "stored"
+	ConnectorSetupReadingCached ConnectorSetupReading = "cached"
+	ConnectorSetupReadingFresh  ConnectorSetupReading = "fresh"
+)
+
+type ConnectorSetupRequest struct {
+	Folder  string                 `json:"folder"`
+	Reading *ConnectorSetupReading `json:"reading,omitzero"`
+}
+
+// Skip a slot, or set it up again. Kept in the project's .agents/project.json.
+type ConnectorSkipRequest struct {
+	Folder  string            `json:"folder"`
+	Slot    ConnectorSlotKind `json:"slot"`
+	Skipped bool              `json:"skipped"`
+}
+
+// One slot and what it read. A slot that has read keeps its proof when a later read cannot reach the provider; only a refusal unticks it.
+type ConnectorSlot struct {
+	Slot ConnectorSlotKind `json:"slot"`
+	// What fills it, in words: GitHub Issues, GitHub pull requests, GitHub Actions, This Mac.
+	Choice string             `json:"choice"`
+	State  ConnectorSlotState `json:"state"`
+	Proof  *ConnectorProof    `json:"proof,omitzero"`
+	ReadAt *Date              `json:"readAt,omitzero"`
+	// Why a read failed or was refused, in words. Never a token.
+	Message *string `json:"message,omitzero"`
+}
+
+// One slot of a project's set-up (#1336), in the page's order: tasks (the tracker), codeReview, ci, and workspace (where agents run).
+type ConnectorSlotKind string
+
+const (
+	ConnectorSlotKindTasks      ConnectorSlotKind = "tasks"
+	ConnectorSlotKindCodeReview ConnectorSlotKind = "codeReview"
+	ConnectorSlotKindCi         ConnectorSlotKind = "ci"
+	ConnectorSlotKindWorkspace  ConnectorSlotKind = "workspace"
+)
+
+// notConnected: the slot comes with a connection that is not there yet. notRead: connected, but not read yet (a stored reading). read: its one read worked (a tick). failed: the read did not reach the provider; message says why. refused: the provider refused the read, so the person grants it on the provider's site. noRemote: the project has no GitHub remote. skipped: the person skipped it; it counts as done.
+type ConnectorSlotState string
+
+const (
+	ConnectorSlotStateNotConnected ConnectorSlotState = "notConnected"
+	ConnectorSlotStateNotRead      ConnectorSlotState = "notRead"
+	ConnectorSlotStateRead         ConnectorSlotState = "read"
+	ConnectorSlotStateFailed       ConnectorSlotState = "failed"
+	ConnectorSlotStateRefused      ConnectorSlotState = "refused"
+	ConnectorSlotStateNoRemote     ConnectorSlotState = "noRemote"
+	ConnectorSlotStateSkipped      ConnectorSlotState = "skipped"
+)
+
+type ConnectorWorkflow struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
 type Consequence struct {
 	Woke         *ConsequenceWoke         `json:"woke,omitzero"`
 	Fired        *ConsequenceFired        `json:"fired,omitzero"`

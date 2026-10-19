@@ -15,7 +15,7 @@
 
 ## Counts
 
-Of 235 rows: **157 same**, **50 by design**, **28 delta** (after #188, #189, #191, #221, #238–#244, #249, #252–#255, #257, #259–#261, #263–#266, #291, #254, #317, #341, #342, #343, #345, #344, #357, #366, #375, #377, #381, #378, #400, #396, #394, #436, #433, #432, #506, #545, #548, #791, #790, #846, #826, #888, #982, #1089, #1109, #1122, #1419, #1123, #1118, #1473, #1459, #1460). A row with any open delta counts as delta, even where another side's difference is by design.
+Of 236 rows: **157 same**, **50 by design**, **29 delta** (after #188, #189, #191, #221, #238–#244, #249, #252–#255, #257, #259–#261, #263–#266, #291, #254, #317, #341, #342, #343, #345, #344, #357, #366, #375, #377, #381, #378, #400, #396, #394, #436, #433, #432, #506, #545, #548, #791, #790, #846, #826, #888, #982, #1089, #1109, #1122, #1419, #1123, #1118, #1473, #1459, #1460, #1336). A row with any open delta counts as delta, even where another side's difference is by design.
 
 | Screen | Same | By design | Delta |
 |---|---|---|---|
@@ -30,7 +30,7 @@ Of 235 rows: **157 same**, **50 by design**, **28 delta** (after #188, #189, #19
 | Workflows page | 15 | 1 | 2 |
 | Settings and Project Settings | 4 | 8 | 0 |
 | Pool, runtimes and spending | 8 | 1 | 2 |
-| Events and resources | 2 | 1 | 2 |
+| Events and resources | 2 | 1 | 3 |
 | Notifications and badges | 3 | 3 | 0 |
 | Disk strip | 2 | 1 | 0 |
 | Hosts, connection and pairing | 5 | 3 | 1 |
@@ -357,6 +357,7 @@ The deltas are tracked by 31 issues:
 | Resources, counted holders (#116) | `A/Resources/ResourcesView.swift` | Read-only: `R/Resources/ResourcesListView.swift` | Read-only: `W/views/Resources.tsx` | **same** (reading) |
 | Declaring resources, ending leases (#116) | Settings ▸ Resources, the Resources page | None | None | **by design** (the Mac's) |
 | Your Connectors (was MCP Servers, #1422), an Activity page of its own (#589), every connector in the person's own `~/.agents/mcp.json` (#753): a hosted one's running / idle / starting again and why it last stopped (#488); any other's last check (answered, how many tools, when; didn't answer and why; waiting for approval, missing a secret, wants a sign-in, sse), **Check Now**; and a project's own **Connectors** row and page in its sidebar group, under every project even with none yet (#753, #1422). Rows the title alone (#587, #591), the count in the tooltip and told to VoiceOver, the icon red when one does not answer; a project's Connectors row has its count after the title, small and grey, none at zero (#1569); each row with the five levels it reaches, from what the server declares, and **Made by Agents** on ours (#1428) | `A/MCPServers/MCPServersView.swift` (`project:` for a project's), `A/Projects/ProjectListView.swift`; row `S/MCPHealthRow.swift`, words `MCPHealthWords` (`tally` for the rows); levels `S/ConnectorLevels.swift` | `R/MCPServers/MCPServersListView.swift` (`project:`), `R/Sidebar/RemoteSidebar.swift`, the same `S/MCPHealthRow.swift` | Per host, `#/a/mcp` and a project's `…/m/1`: `W/views/MCPServers.tsx`, `W/views/Activity.tsx`, `W/views/Sidebar.tsx`, words `W/model/hostedMCP.ts` (`healthTally`); levels `ConnectorLevels`, words `connectorLevels`, `levelsSentence` | **same** (the Mac and the Remote show this Mac's personal servers, a project's from its own host; the page each host's); the levels (#1428) walked on all three 2026-10-18 (`specs/1336-connect-your-tools/walks/1428-*-connectors.png`) |
+| Connect your tools (#1336): a project's Connectors page opens with its set-up (frames A, C, D, G): one **Connect GitHub…**, then four slots (Tasks, Code review, CI, Where agents run = This Mac), each ticking only from one real read (newest issue, newest pull request, last run), **Skip** always there and counted (dashed circle), **Change…** opening a slot in place, the github events turned on and the workflows that use them; the one **Connect GitHub** sheet (frame B: the device-flow code, closing by itself, the install link when the App is not on the repository); Your Connectors ▸ **Connections** with **Disconnect**, and each project's set-up with **Open ›** (frame E) | `A/MCPServers/ConnectorSetupView.swift`, `A/MCPServers/ConnectGitHubSheet.swift`, `A/MCPServers/YourConnectionsView.swift`; words `K/Model/ConnectorSetupWords.swift` | None yet (#1336, next PR) | None yet (#1336, next PR) | **delta** (#1336: the Remote and the page come in the next PR); Mac walked on scratch 2026-10-19 (`specs/1336-connect-your-tools/walks/`) |
 
 ## Notifications and badges
 

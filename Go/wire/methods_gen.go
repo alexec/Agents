@@ -51,6 +51,8 @@ var (
 	CallConnectionsSignIn              = Method[ConnectionProviderRequest, ConnectionSignIn]{"connections/sign-in"}
 	CallConnectionsSignInCancel        = Method[ConnectionSignInFlowRequest, ConnectionSignIn]{"connections/sign-in/cancel"}
 	CallConnectionsSignInWait          = Method[ConnectionSignInFlowRequest, ConnectionSignIn]{"connections/sign-in/wait"}
+	CallConnectorsSetup                = Method[ConnectorSetupRequest, ConnectorSetup]{"connectors/setup"}
+	CallConnectorsSetupSkip            = Method[ConnectorSkipRequest, ConnectorSetup]{"connectors/setup/skip"}
 	CallCostSetLimits                  = Method[SetLimitsRequest, CostState]{"cost/setLimits"}
 	CallCostState                      = Method[Empty, CostState]{"cost/state"}
 	CallCredentialsLend                = Method[CredentialsLend, Empty]{"credentials/lend"}

@@ -97,6 +97,10 @@ struct SettingsWindow: View {
             guard let asked else { return }
             pane.wrappedValue = asked
             model.settingsPaneAsked = nil
+            if let page = model.controlPageAsked {
+                controlPage = page
+                model.controlPageAsked = nil
+            }
         }
         .onChange(of: pane.wrappedValue) { _, chosen in
             if chosen == .agentConfiguration { Task { await refreshShared() } }
