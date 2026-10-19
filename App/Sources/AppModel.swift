@@ -1035,6 +1035,16 @@ final class AppModel {
                                     windowMissed: hosts.macDownSince != nil)
     }
 
+    /// The control plane is elsewhere and lists no host on this Mac (#1503): only the window
+    /// is paired here, and servers alone are hosts. Nothing then answers for this Mac's own
+    /// things (runtimes, settings), and what is aimed at them says there is no host here,
+    /// not that one isn't answering. A control plane on this Mac with no host here is
+    /// `macHostNotice`'s: the host is not running.
+    var noHostOnThisMac: Bool {
+        controlLink != nil && controlPlaneListed && controlPlaneMachine != nil
+            && controlPlaneMachine != MachineID.current && thisMacHostID == nil
+    }
+
     /// This Mac's row in the control plane's last list, `online` or not.
     private var macHostState: String? { controlPlaneHosts?.first { $0.id == .mac }?.state }
 
@@ -3534,7 +3544,7 @@ final class AppModel {
     /// Nil when it could not be read; the page then keeps what it last had.
     func sharedSnapshot(project: URL? = nil) async -> DaemonAPI.SharedSnapshot? {
         var snapshot: DaemonAPI.SharedSnapshot?
-        _ = await attempt {
+        _ = await attempt(quietWhenDown: true) {
             if let project {
                 snapshot = try await self.macClient.call(DaemonAPI.Method.personalShared,
                                                       DaemonAPI.SharedRequest(folder: project.path),
@@ -3851,7 +3861,7 @@ final class AppModel {
     }
 
     func refreshRuntimes() async {
-        let listed = await attempt {
+        let listed = await attempt(quietWhenDown: true) {
             self.runtimes = RuntimeCatalog.sortedByName(try await self.macClient.call(DaemonAPI.Method.runtimesList,
                                                                                    Optional<String>.none,
                                                                                    returning: [RuntimeStatus].self))
@@ -5259,10 +5269,17 @@ final class AppModel {
     }
 
     @discardableResult
-    /// `quietWhenDown`: a server the offline strip already explains raises no alert (#963).
+    /// `quietWhenDown`: a server the offline strip already explains raises no alert (#963),
+    /// and neither does this Mac's own refresh with no host on this Mac (#1503).
     func attempt(on host: HostID = .mac, quietWhenDown: Bool = false, _ work: () async throws -> Void) async -> Bool {
         // Already known to be quiet: said now, naming why, not after waiting out a
         // connect the reconnect loop is already making (#83, #303). The strip has Try Again.
+        // With no host on this Mac, nothing is asked: a pane's own refresh (quiet) says
+        // nothing, as the pane says it; what a person asked for says there is none (#1503).
+        if host == .mac, noHostOnThisMac {
+            if !quietWhenDown { problem = HostSet.noMacHostProblem }
+            return false
+        }
         if host == .mac, !controlPlaneAway, hosts.isOffline(macHostElsewhere ?? .mac) || macHostNotice != nil {
             problem = macHostNotice?.action ?? HostSet.macDownProblem
             return false
