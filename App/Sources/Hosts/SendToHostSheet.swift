@@ -69,27 +69,60 @@ extension AppModel {
 
     /// Carries the bundle and the patch a pack made from one host's link to the other's, in
     /// the parts `from` reads, and answers with the uploads they became on `to`.
+    ///
+    /// A part's base64 text goes on as it came, never decoded and encoded again, and the
+    /// next part is read while this one is uploaded (#1530): the window holds about two
+    /// parts of 1 MB, and a part on the link holds the host's other lines for a moment only.
     func relay(_ pack: DaemonAPI.SendPack, from: DaemonClient, to: DaemonClient, verb: String,
                progress: @escaping @MainActor (String) -> Void) async throws -> (bundle: UUID?, patch: UUID?) {
         let total = (pack.bundle?.size ?? 0) + (pack.patch?.size ?? 0)
         var sent = 0
+        func read(_ file: DaemonAPI.SendFile, at offset: Int) async throws -> RelayPart {
+            try RelayPart(try await from.call(DaemonAPI.Method.projectsSendRead,
+                                              DaemonAPI.SendReadRequest(id: file.id, offset: offset)))
+        }
         func carry(_ file: DaemonAPI.SendFile?) async throws -> UUID? {
             guard let file else { return nil }
             let id = UUID()
             var offset = 0
+            var part = try await read(file, at: 0)
             while true {
-                let part = try await from.call(DaemonAPI.Method.projectsSendRead, DaemonAPI.SendReadRequest(id: file.id, offset: offset),
-                                               returning: DaemonAPI.SendRead.self)
+                let next = offset + part.size, more = !part.end && part.size > 0
+                async let ahead: RelayPart? = more ? try await read(file, at: next) : nil
                 try await to.call(DaemonAPI.Method.projectsReceiveUpload,
-                                  DaemonAPI.ReceiveUploadRequest(upload: id, offset: offset, data: part.data))
-                offset += part.data.count
-                sent += part.data.count
+                                  JSONValue.object(["upload": .string(id.uuidString), "offset": .int(offset), "data": part.data]))
+                offset = next
+                sent += part.size
                 progress(total < 1_000_000 ? "\(verb)…"
                          : "\(verb) \(sent.formatted(.byteCount(style: .file))) of \(total.formatted(.byteCount(style: .file)))…")
-                if part.end || part.data.isEmpty { return id }
+                guard let following = try await ahead else { return id }
+                part = following
             }
         }
         return (try await carry(pack.bundle), try await carry(pack.patch))
+    }
+}
+
+/// One part of a send as `projects/sendRead` answered it: its data still the base64 text.
+struct RelayPart: Sendable {
+    let data: JSONValue
+    let size: Int
+    let end: Bool
+
+    init(_ answer: JSONValue) throws {
+        guard let text = answer["data"]?.stringValue, let end = answer["end"]?.boolValue else {
+            throw SendFailure(message: "A part of the send came back in a shape this window cannot read.")
+        }
+        data = .string(text)
+        size = Self.decodedSize(text)
+        self.end = end
+    }
+
+    /// The bytes base64 `text` holds, without decoding it.
+    static func decodedSize(_ text: String) -> Int {
+        let utf8 = text.utf8
+        let padding = utf8.reversed().prefix(2).prefix(while: { $0 == UInt8(ascii: "=") }).count
+        return utf8.count / 4 * 3 - padding
     }
 }
 

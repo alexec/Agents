@@ -17103,7 +17103,7 @@
     },
     "SendRead": {
       "type": "object",
-      "description": "A part of at most 8 MB. `end` is true for the last, and then the host removes the file.",
+      "description": "A part of at most 1 MB (#1530). `end` is true for the last, and then the host removes the file.",
       "properties": {
         "data": {
           "$ref": "#/definitions/Base64"
