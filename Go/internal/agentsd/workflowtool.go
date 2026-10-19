@@ -421,7 +421,7 @@ func (d *Daemon) runWorkflowForAgent(a *wire.Agent, project, id string) (string,
 	if a.ChainDepth != nil {
 		depth = *a.ChainDepth
 	}
-	d.fire(fireRequest{folder: project, id: id, byHand: true, trigger: byHandTrigger(), depth: depth})
+	d.fire(fireRequest{folder: project, id: id, byHand: true, byAgent: &a.ID, trigger: byHandTrigger(), depth: depth})
 	after, err := d.oneWorkflow(project, id)
 	if err != nil {
 		return "", err

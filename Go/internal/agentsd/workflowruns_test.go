@@ -52,7 +52,7 @@ func TestAWorkflowRuns(t *testing.T) {
 		n := names(d)
 		return strings.Contains(strings.Join(n, " "), "workflow.completed")
 	})
-	if u := userMessages(d, agent); len(u) != 1 || u[0] != "Review what changed.\n" {
+	if u := userMessages(d, agent); len(u) != 1 || u[0] != "Review what changed.\n\n\n(You were started by the workflow \"Review\" because the person ran it by hand, with Run now.)" {
 		t.Fatalf("%q", u)
 	}
 	// An event the workflow waits on fires it, and says so on the event.
