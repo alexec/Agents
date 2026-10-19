@@ -38,7 +38,7 @@ down for a runtime that has none. [Overall score](#overall-score), after the
 tables, adds every feature up.
 
 The matrix was filled in on 2026-10-12 from each app's own docs, changelog, README,
-releases and, where open, source. Agents' row was last brought up to date on 2026-10-18. Every app is held to the same bar, Agents included: a ●
+releases and, where open, source. Agents' row was last brought up to date on 2026-10-19. Every app is held to the same bar, Agents included: a ●
 needs the whole feature, documented by the app itself, and a ○ needs evidence, such as an
 app that ships for macOS alone having no Android app. Once per release, after the
 Competitor check, the Feature matrix workflow (`.agents/workflows/feature-matrix.md`)
@@ -151,6 +151,7 @@ Agents has none of these at all:
 | tuios | ● | ● | ● | ● | ● | ○ | 83% |
 | Warp | ● | ● | ● | ?⃝ | ● | ● | 83% |
 | Conductor | ● | ● | ● | ?⃝ | ● | ◐ | 75% |
+| Orca | ● | ● | ● | ◐ | ◐ | ◐ | 75% |
 | Pragma | ● | ● | ● | ◐ | ● | ?⃝ | 75% |
 | Superset | ● | ● | ● | ?⃝ | ● | ◐ | 75% |
 | Claude Code | ● | ● | ○ | ?⃝ | ● | ● | 67% |
@@ -186,6 +187,7 @@ Agents has none of these at all:
 | **Agents** | ○ | ● | ○ | ● | ● | ● | 67% |
 | Codeg | ● | ◐ | ◐ | ● | ○ | ● | 67% |
 | Cursor | ● | ● | ○ | ● | ○ | ● | 67% |
+| Orca | ● | ◐ | ◐ | ◐ | ◐ | ● | 67% |
 | CodeAgentSwarm | ● | ◐ | ◐ | ◐ | ?⃝ | ● | 58% |
 | Warp | ● | ○ | ○ | ● | ◐ | ● | 58% |
 | Maestro | ● | ○ | ○ | ● | ○ | ● | 50% |
@@ -222,7 +224,9 @@ Agents has none of these at all:
 | Parallel Code | ● | ● | ● | ● | ◐ | ○ | ● | 79% |
 | Atelier (was Acepe) | ● | ● | ◐ | ● | ● | ○ | ◐ | 71% |
 | OpenAI Codex | ● | ● | ◐ | ● | ● | ◐ | ?⃝ | 71% |
+| Orca | ● | ● | ◐ | ◐ | ● | ◐ | ◐ | 71% |
 | Paseo | ● | ● | ◐ | ● | ● | ◐ | ?⃝ | 71% |
+| Superset | ● | ● | ◐ | ● | ● | ◐ | ?⃝ | 71% |
 | Threadlines | ● | ?⃝ | ● | ● | ● | ● | ?⃝ | 71% |
 | Codeg | ● | ● | ◐ | ● | ?⃝ | ● | ?⃝ | 64% |
 | Happy | ● | ?⃝ | ◐ | ● | ● | ● | ?⃝ | 64% |
@@ -231,7 +235,6 @@ Agents has none of these at all:
 | Emdash | ● | ● | ?⃝ | ● | ◐ | ◐ | ?⃝ | 57% |
 | Maestro | ● | ● | ◐ | ● | ?⃝ | ◐ | ?⃝ | 57% |
 | Pragma | ● | ● | ◐ | ● | ?⃝ | ◐ | ?⃝ | 57% |
-| Superset | ● | ● | ◐ | ● | ?⃝ | ◐ | ?⃝ | 57% |
 | DockTerm | ● | ● | ◐ | ?⃝ | ● | ?⃝ | ?⃝ | 50% |
 | tuios | ● | ● | ◐ | ● | ?⃝ | ○ | ○ | 50% |
 | Conductor | ● | ?⃝ | ?⃝ | ● | ◐ | ◐ | ?⃝ | 43% |
@@ -259,6 +262,7 @@ Agents has none of these at all:
 | **Agents** | ● | ◐ | ◐ | ● | ● | 80% |
 | Claude Code | ● | ● | ◐ | ● | ◐ | 80% |
 | Conductor | ● | ● | ?⃝ | ● | ● | 80% |
+| Orca | ● | ● | ● | ● | ○ | 80% |
 | Roamgate | ● | ● | ● | ● | ?⃝ | 80% |
 | Sculptor | ● | ● | ?⃝ | ● | ● | 80% |
 | T3 Code | ● | ● | ● | ● | ?⃝ | 80% |
@@ -296,6 +300,7 @@ Agents has none of these at all:
 | Claude Code | ● | ● | ● | ◐ | ● | ?⃝ | 70% |
 | Emdash | ● | ● | ◐ | ?⃝ | ● | ● | 70% |
 | Nimbalyst | ● | ● | ● | ?⃝ | ● | ◐ | 70% |
+| Orca | ● | ● | ● | ◐ | ● | ○ | 70% |
 | Warp | ● | ?⃝ | ◐ | ?⃝ | ● | ● | 70% |
 | Ace | ● | ● | ● | ?⃝ | ● | ?⃝ | 60% |
 | Atelier (was Acepe) | ?⃝ | ● | ● | ?⃝ | ● | ● | 60% |
@@ -327,6 +332,7 @@ Agents has none of these at all:
 | App | Task board | Starts agents from issues | Trackers beyond GitHub | Scheduled or triggered runs | Agents start agents | The app's own tools for agents | Leases on shared resources | Wait for an event without polling | Workflows as files in the repository | Score |
 |---|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|--:|
 | **Agents** | ◐ | ● | ◐ | ● | ● | ● | ● | ● | ● | 89% |
+| Orca | ● | ● | ● | ● | ● | ● | ○ | ◐ | ○ | 72% |
 | Superset | ● | ● | ● | ● | ● | ● | ?⃝ | ◐ | ?⃝ | 72% |
 | Agentastic | ● | ● | ● | ● | ● | ● | ?⃝ | ?⃝ | ○ | 67% |
 | Claude Code | ?⃝ | ● | ◐ | ● | ● | ● | ?⃝ | ◐ | ● | 67% |
@@ -375,6 +381,7 @@ Agents has none of these at all:
 | Warp | ● | ?⃝ | ● | ● | ◐ | ?⃝ | 70% |
 | Ace | ?⃝ | ● | ● | ?⃝ | ● | ◐ | 60% |
 | Maestro | ?⃝ | ● | ● | ?⃝ | ● | ?⃝ | 60% |
+| Orca | ◐ | ◐ | ● | ○ | ● | ○ | 60% |
 | Paseo | ?⃝ | ● | ● | ?⃝ | ● | ?⃝ | 60% |
 | Pragma | ?⃝ | ● | ● | ?⃝ | ● | ● | 60% |
 | Threadlines | ?⃝ | ● | ● | ?⃝ | ● | ?⃝ | 60% |
@@ -408,6 +415,7 @@ Agents has none of these at all:
 | Nimbalyst | ● | ● | ● | ◐ | ● | ◐ | 83% |
 | Nuphos | ?⃝ | ● | ● | ● | ● | ● | 83% |
 | Superset | ● | ● | ● | ● | ○ | ● | 83% |
+| Orca | ○ | ● | ● | ◐ | ● | ● | 75% |
 | Claude Code | ?⃝ | ● | ● | ● | ○ | ● | 67% |
 | Conductor | ?⃝ | ● | ● | ● | ○ | ● | 67% |
 | Emdash | ?⃝ | ● | ● | ?⃝ | ● | ● | 67% |
@@ -449,32 +457,33 @@ Each app's score in every table, and overall: its points over the 49 scored feat
 | 5 | Claude Code | 67% | 83% | 79% | 80% | 70% | 67% | 80% | 67% | **73%** |
 | 5 | Nimbalyst | 83% | 83% | 86% | 70% | 70% | 50% | 70% | 83% | **73%** |
 | 7 | Codeg | 100% | 67% | 64% | 90% | 60% | 67% | 40% | 83% | **71%** |
-| 8 | Agentastic | 100% | 42% | 79% | 90% | 80% | 67% | 80% | 33% | **70%** |
-| 9 | OpenAI Codex | 67% | 83% | 71% | 70% | 40% | 67% | 80% | 67% | **68%** |
-| 9 | Warp | 83% | 58% | 86% | 60% | 70% | 67% | 70% | 50% | **68%** |
-| 11 | T3 Code | 83% | 92% | 64% | 80% | 80% | 39% | 40% | 67% | **66%** |
-| 12 | Superset | 75% | 42% | 57% | 70% | 80% | 72% | 40% | 83% | **65%** |
-| 13 | Pragma | 75% | 83% | 57% | 60% | 60% | 50% | 60% | 50% | **61%** |
-| 14 | Threadlines | 83% | 50% | 71% | 100% | 40% | 28% | 60% | 67% | **60%** |
-| 15 | Happy | 92% | 100% | 64% | 30% | 20% | 33% | 40% | 67% | **56%** |
-| 15 | Nuphos | 83% | 42% | 64% | 70% | 40% | 44% | 20% | 83% | **56%** |
-| 17 | Emdash | 83% | 33% | 57% | 70% | 70% | 33% | 40% | 67% | **55%** |
-| 18 | Maestro | 50% | 50% | 57% | 50% | 60% | 56% | 60% | 50% | **54%** |
-| 19 | Parallel Code | 67% | 75% | 79% | 60% | 20% | 44% | 20% | 33% | **51%** |
-| 20 | Conductor | 75% | 25% | 43% | 80% | 40% | 50% | 10% | 67% | **49%** |
-| 21 | Rove | 67% | 33% | 29% | 60% | 20% | 61% | 40% | 50% | **46%** |
-| 22 | Atelier (was Acepe) | 50% | 8% | 71% | 60% | 60% | 33% | 20% | 50% | **44%** |
-| 22 | CodeAgentSwarm | 67% | 58% | 36% | 30% | 30% | 39% | 80% | 17% | **44%** |
-| 24 | tuios | 83% | 33% | 50% | 60% | 20% | 33% | 30% | 33% | **43%** |
-| 24 | Vibe Kanban | 67% | 50% | 29% | 60% | 30% | 28% | 20% | 67% | **43%** |
-| 26 | Sculptor | 58% | 33% | 29% | 80% | 20% | 33% | 20% | 33% | **38%** |
-| 27 | Roamgate | 67% | 50% | 29% | 80% | 20% | 11% | 0% | 50% | **37%** |
-| 28 | Ace | 33% | 17% | 29% | 40% | 60% | 17% | 60% | 33% | **34%** |
-| 29 | Helicon | 42% | 33% | 29% | 20% | 0% | 6% | 40% | 67% | **29%** |
-| 29 | VibeiDE | 50% | 50% | 29% | 40% | 30% | 11% | 20% | 8% | **29%** |
-| 31 | DockTerm | 17% | 33% | 50% | 20% | 40% | 0% | 20% | 33% | **26%** |
-| 32 | ReevesAgents | 33% | 17% | 29% | 0% | 20% | 22% | 0% | 50% | **22%** |
-| 33 | Claude Squad | 50% | 0% | 14% | 20% | 20% | 0% | 0% | 33% | **16%** |
+| 7 | Orca | 75% | 67% | 71% | 80% | 70% | 72% | 60% | 75% | **71%** |
+| 9 | Agentastic | 100% | 42% | 79% | 90% | 80% | 67% | 80% | 33% | **70%** |
+| 10 | OpenAI Codex | 67% | 83% | 71% | 70% | 40% | 67% | 80% | 67% | **68%** |
+| 10 | Warp | 83% | 58% | 86% | 60% | 70% | 67% | 70% | 50% | **68%** |
+| 12 | Superset | 75% | 42% | 71% | 70% | 80% | 72% | 40% | 83% | **67%** |
+| 13 | T3 Code | 83% | 92% | 64% | 80% | 80% | 39% | 40% | 67% | **66%** |
+| 14 | Pragma | 75% | 83% | 57% | 60% | 60% | 50% | 60% | 50% | **61%** |
+| 15 | Threadlines | 83% | 50% | 71% | 100% | 40% | 28% | 60% | 67% | **60%** |
+| 16 | Happy | 92% | 100% | 64% | 30% | 20% | 33% | 40% | 67% | **56%** |
+| 16 | Nuphos | 83% | 42% | 64% | 70% | 40% | 44% | 20% | 83% | **56%** |
+| 18 | Emdash | 83% | 33% | 57% | 70% | 70% | 33% | 40% | 67% | **55%** |
+| 19 | Maestro | 50% | 50% | 57% | 50% | 60% | 56% | 60% | 50% | **54%** |
+| 20 | Parallel Code | 67% | 75% | 79% | 60% | 20% | 44% | 20% | 33% | **51%** |
+| 21 | Conductor | 75% | 25% | 43% | 80% | 40% | 50% | 10% | 67% | **49%** |
+| 22 | Rove | 67% | 33% | 29% | 60% | 20% | 61% | 40% | 50% | **46%** |
+| 23 | Atelier (was Acepe) | 50% | 8% | 71% | 60% | 60% | 33% | 20% | 50% | **44%** |
+| 23 | CodeAgentSwarm | 67% | 58% | 36% | 30% | 30% | 39% | 80% | 17% | **44%** |
+| 25 | tuios | 83% | 33% | 50% | 60% | 20% | 33% | 30% | 33% | **43%** |
+| 25 | Vibe Kanban | 67% | 50% | 29% | 60% | 30% | 28% | 20% | 67% | **43%** |
+| 27 | Sculptor | 58% | 33% | 29% | 80% | 20% | 33% | 20% | 33% | **38%** |
+| 28 | Roamgate | 67% | 50% | 29% | 80% | 20% | 11% | 0% | 50% | **37%** |
+| 29 | Ace | 33% | 17% | 29% | 40% | 60% | 17% | 60% | 33% | **34%** |
+| 30 | Helicon | 42% | 33% | 29% | 20% | 0% | 6% | 40% | 67% | **29%** |
+| 30 | VibeiDE | 50% | 50% | 29% | 40% | 30% | 11% | 20% | 8% | **29%** |
+| 32 | DockTerm | 17% | 33% | 50% | 20% | 40% | 0% | 20% | 33% | **26%** |
+| 33 | ReevesAgents | 33% | 17% | 29% | 0% | 20% | 22% | 0% | 50% | **22%** |
+| 34 | Claude Squad | 50% | 0% | 14% | 20% | 20% | 0% | 0% | 33% | **16%** |
 
 ## Sources for leases, waits, workflows in the repository and live documents
 
@@ -501,6 +510,7 @@ thing. A ?⃝ has no link: the app's docs did not say.
 - **Maestro:** Leases ○ ([source](https://github.com/RunMaestro/Maestro)); Waits ○ ([source](https://github.com/RunMaestro/Maestro)); Workflows in the repository ● ([source](https://github.com/RunMaestro/Maestro/blob/HEAD/docs/maestro-cue-configuration.md)); Live documents ?⃝.
 - **Nimbalyst:** Leases ?⃝; Waits ?⃝; Workflows in the repository ?⃝; Live documents ● ([source](https://nimbalyst.com/docs/visual-editors-powered-by-ai/markdown-wysiwyg/ai-editing-red-green-diff-approval/)).
 - **Nuphos:** Leases ○ ([source](https://github.com/nuphos/nuphos)); Waits ○ ([source](https://github.com/nuphos/nuphos)); Workflows in the repository ○ ([source](https://github.com/nuphos/nuphos)); Live documents ?⃝.
+- **Orca:** Leases ○ ([source](https://github.com/stablyai/orca)); Waits ◐ ([source](https://www.onorca.dev/docs/cli/orchestration)); Workflows in the repository ○ ([source](https://www.onorca.dev/docs/model/orca-yaml)); Live documents ◐ ([source](https://www.onorca.dev/docs/editing/file-explorer)).
 - **OpenAI Codex:** Leases ?⃝; Waits ?⃝; Workflows in the repository ● ([source](https://developers.openai.com/codex/github-action)); Live documents ?⃝.
 - **Parallel Code:** Leases ○ ([source](https://github.com/johannesjo/parallel-code)); Waits ◐ ([source](https://github.com/johannesjo/parallel-code/blob/HEAD/docs/design-doc.md)); Workflows in the repository ○ ([source](https://github.com/johannesjo/parallel-code)); Live documents ● ([source](https://github.com/johannesjo/parallel-code/blob/HEAD/docs/document-workspaces.md)).
 - **Paseo:** Leases ○ ([source](https://github.com/getpaseo/paseo)); Waits ◐ ([source](https://github.com/getpaseo/paseo/blob/HEAD/public-docs/mcp.md)); Workflows in the repository ● ([source](https://github.com/getpaseo/paseo/blob/HEAD/public-docs/hub/configuration/hub-yml.md)); Live documents ?⃝.
@@ -538,6 +548,7 @@ thing. A ?⃝ has no link: the app's docs did not say.
 - **[Nimbalyst](https://nimbalyst.com):** A desktop, mobile and web workspace with a tracker, a wiki and session trees.
 - **[Nuphos](https://github.com/nuphos/nuphos):** A team workspace over ACP, local, remote or in cloud containers.
 - **[OpenAI Codex](https://developers.openai.com/codex):** OpenAI's agent in the ChatGPT apps, the cloud and a CLI; open source and self-hosted apply to the CLI only.
+- **[Orca](https://github.com/stablyai/orca):** An open-source (MIT) desktop app for Mac, Windows and Linux running many CLI agents side by side, a worktree each, with terminals, a browser the agents drive, pull requests, SSH and self-hosted Orca servers, and a beta phone companion.
 - **[Parallel Code](https://github.com/johannesjo/parallel-code):** A desktop app with tiled tasks, Docker sandboxes and an Android app.
 - **[Paseo](https://github.com/getpaseo/paseo):** An open-source daemon with desktop, iOS, Android, web and CLI clients.
 - **[Pragma](https://pragma-app.sh):** A desktop app with a task board, SSH remote projects and the Pragma Go mobile client.
