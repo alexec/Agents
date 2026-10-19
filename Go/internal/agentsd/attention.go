@@ -45,6 +45,9 @@ type presence struct {
 	heardAt  time.Time
 	// shown is PresenceReport.shownSet: what the page draws, for lean records.
 	shown map[wire.UUID]bool
+	// device is a phone's or a tablet's connection (a control plane's channel for one, or
+	// one the bridge bound): it can watch an agent, but it is not the Mac (#1509).
+	device bool
 }
 
 type delivery struct {
@@ -402,12 +405,16 @@ func (d *Daemon) attentionPending() wire.AttentionPending {
 	return out
 }
 
-// macPresence is presencesBySurface for the one surface a server has: an active report
-// beats an idle one, and the latest heard among equals.
+// macPresence is presencesBySurface for the Mac: an active report beats an idle one, and
+// the latest heard among equals. A device's report is not the Mac's (#1509): an open iPad
+// does not keep a need from the control plane, which chooses the device.
 func (d *Daemon) macPresence() (presence, bool) {
 	var best presence
 	found := false
 	for _, p := range d.presences {
+		if p.device {
+			continue
+		}
 		if !found || (p.active && !best.active) || (p.active == best.active && p.heardAt.After(best.heardAt)) {
 			best, found = p, true
 		}
@@ -436,6 +443,7 @@ func (d *Daemon) reconsider() {
 		if id, ok := d.forwarded[t]; ok {
 			delete(d.forwarded, t)
 			told = append(told, wire.AttentionNeed{Withdraw: &id})
+			log.Printf("attention: %s withdrawn from the control plane", t)
 		}
 	}
 	for t, dv := range d.deliveries {
@@ -503,6 +511,7 @@ func (d *Daemon) reconsider() {
 				need, buzz, headline := n, true, n.Headline
 				d.forwarded[t] = n.ID
 				told = append(told, wire.AttentionNeed{Need: &need, Headline: &headline, Buzz: &buzz})
+				log.Printf("attention: %s offered to the control plane", t)
 			}
 		}
 		if wait {
@@ -628,6 +637,10 @@ func (d *Daemon) ControlUplinkChanged(up bool) {
 // reportPresence is presence/report: where a window is and what it shows. A window that
 // comes to watch a chat has read it (markRead).
 func (d *Daemon) reportPresence(c *Client, r wire.PresenceReport) {
+	d.devMu.Lock()
+	b, _ := d.callerDevice(c)
+	d.devMu.Unlock()
+	device := b != nil
 	d.attentionMu.Lock()
 	if d.presences == nil {
 		d.attentionMu.Unlock()
@@ -643,7 +656,7 @@ func (d *Daemon) reportPresence(c *Client, r wire.PresenceReport) {
 	for _, id := range r.AlsoShowing {
 		shown[id] = true
 	}
-	d.presences[c.ID] = presence{watching: r.Watching, active: r.Active, heardAt: time.Now(), shown: shown}
+	d.presences[c.ID] = presence{watching: r.Watching, active: r.Active, heardAt: time.Now(), shown: shown, device: device}
 	d.attentionMu.Unlock()
 	var was *wire.UUID
 	if had && before.active {
