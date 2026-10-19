@@ -86,8 +86,8 @@ An arrival can't be narrowed by its folder or extension, so the prompt says whic
 leave, and a file the agent is done with leaves the drop box: moved to a folder inside it, it
 would arrive again.
 
-A run started by an event no agent is behind, such as this one, is told the event at the end of
-its prompt, details and all, so the agent reads the file's `path` there.
+A run started by an event, such as this one, is told the event at the end of its prompt,
+details and all, so the agent reads the file's `path` there.
 
 Only `branch` on `branch.moved` and `why` on `person.away` and `person.back` narrow an
 event (see [Names and filters](events.md#names-and-filters)). To narrow by more than one
@@ -155,9 +155,19 @@ Under **Triggers**, the workflow's page shows a line for each server a trigger h
 the server was last asked and when the last event came, or why not. See
 [Start a workflow from an MCP event](../how-to/start-a-workflow-from-an-mcp-event.md).
 
-A `new` or `standing` run set off by an event no agent is behind, such as `machine.disk_low`,
-is told the event at the end of its prompt: its sentence and every detail, so the agent can
-act on `level: critical` without looking it up.
+Every run is told why it started, in a note at the end of its prompt (#1562):
+
+| What started it | The note |
+| --- | --- |
+| An event, such as `machine.disk_low` | The event's name, its sentence and every detail, so the agent can act on `level: critical` without looking it up |
+| An MCP server's event | The same, then the server's data in a fence |
+| An event with an agent behind it (`agent: triggering`) | The agent's title and what it did ("has just finished its work"), then the event's name, sentence and details |
+| A schedule | `because of its schedule: the 09:00 run.` |
+| Run now | `because the person ran it by hand, with Run now.` |
+| `manage_workflows` `run` | `because the agent "<title>" (id <id>) ran it.` |
+
+A queued or held run is told the cause of the trigger that queued it. The workflow file
+itself is not changed: there are no placeholders such as `{{event.pr}}` in its body.
 
 Every agent event carries the agent's `labels`, `runtime` and `started_by`, so
 `agent.failed` with `runtime: [gemini, grok]` runs on a Gemini or Grok agent's failure.

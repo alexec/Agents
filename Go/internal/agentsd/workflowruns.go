@@ -31,6 +31,8 @@ type fireRequest struct {
 	folder, id      string
 	trigger         wire.WorkflowTrigger
 	byHand          bool
+	byAgent         *wire.UUID // the agent whose manage_workflows run this is (#1562)
+	dueAt           *time.Time // the schedule's run this is (#1562)
 	triggeringAgent *wire.UUID
 	depth           int64
 	causingEvent    *int64
@@ -313,6 +315,10 @@ func (d *Daemon) fire(fr fireRequest) {
 	if refused := d.refusalLocked(fr, f); refused != nil {
 		st := d.stateLocked(fr.folder, fr.id, true)
 		hf := heldFire{Trigger: fr.trigger, TriggeringAgentID: fr.triggeringAgent, Depth: fr.depth, CausingEvent: fr.causingEvent, HeldAt: now()}
+		if fr.dueAt != nil {
+			due := wire.DateOf(*fr.dueAt)
+			hf.DueAt = &due
+		}
 		switch {
 		case refused.Queued != nil:
 			st.QueuedFires = append(st.QueuedFires, hf)
@@ -415,51 +421,74 @@ func (d *Daemon) runAgent(w wire.Workflow, run workflowRun, fr fireRequest) (wir
 	return id, nil
 }
 
-// runPrompt is the file's prompt, and what started it.
+// runPrompt is the file's prompt, and a note at its end that says why the run started
+// (#1562): the event and its details, the agent behind it, the schedule, or a run by hand.
 func (d *Daemon) runPrompt(w wire.Workflow, fr fireRequest) string {
 	text := w.Prompt
-	if fr.triggeringAgent != nil {
-		title := "an untitled agent"
-		if a := d.Store.Agent(*fr.triggeringAgent); a != nil && a.Title != nil {
-			title = "“" + *a.Title + "”"
-		}
+	started := "\n\n(You were started by the workflow \"" + w.Name + "\" because "
+	var e *wire.Event
+	if fr.causingEvent != nil {
+		e = d.event(*fr.causingEvent)
+	}
+	switch {
+	case fr.triggeringAgent != nil:
 		what := "triggered this"
-		if fr.causingEvent != nil {
-			if e := d.event(*fr.causingEvent); e != nil {
-				switch e.Name {
-				case "agent.finished":
-					what = "has just finished its work"
-				case "agent.asked_permission":
-					what = "is waiting for permission"
-				case "agent.asked_form":
-					what = "is waiting on a form"
-				case "agent.stopped", "agent.failed":
-					what = "stopped without finishing"
-				}
+		if e != nil {
+			switch e.Name {
+			case "agent.finished":
+				what = "has just finished its work"
+			case "agent.asked_permission":
+				what = "is waiting for permission"
+			case "agent.asked_form":
+				what = "is waiting on a form"
+			case "agent.stopped", "agent.failed":
+				what = "stopped without finishing"
 			}
 		}
-		text += "\n\n(You were started by the workflow \"" + w.Name + "\" because " + title + " " + what + ".)"
-	} else if fr.causingEvent != nil {
-		if e := d.event(*fr.causingEvent); e != nil && e.Details["subscription"] != "" && e.Details["server"] != "" {
-			text = serverEventPrompt(w, *e, e.Details["server"])
-		} else if e != nil {
-			details := ""
-			if len(e.Details) > 0 {
-				var keys []string
-				for k := range e.Details {
-					keys = append(keys, k)
-				}
-				sort.Strings(keys)
-				var parts []string
-				for _, k := range keys {
-					parts = append(parts, k+": "+e.Details[k])
-				}
-				details = " Its details are " + strings.Join(parts, "; ") + "."
-			}
-			text += "\n\n(You were started by the workflow \"" + w.Name + "\" because of the event " + e.Name + ": " + e.Sentence + details + ")"
+		text += started + d.agentWords(*fr.triggeringAgent) + " " + what + "."
+		if e != nil {
+			text += " The event was " + e.Name + ": " + e.Sentence + eventDetails(*e)
 		}
+		text += ")"
+	case e != nil && e.Details["subscription"] != "" && e.Details["server"] != "":
+		text = serverEventPrompt(w, *e, e.Details["server"])
+	case e != nil:
+		text += started + "of the event " + e.Name + ": " + e.Sentence + eventDetails(*e) + ")"
+	case fr.byAgent != nil:
+		text += started + "the agent " + d.agentWords(*fr.byAgent) + " (id " + string(*fr.byAgent) + ") ran it.)"
+	case fr.byHand:
+		text += started + "the person ran it by hand, with Run now.)"
+	case fr.trigger.Schedule != nil && fr.dueAt != nil:
+		text += started + "of its schedule: the " + fr.dueAt.Local().Format("15:04") + " run.)"
+	case fr.trigger.Schedule != nil:
+		text += started + "of its schedule.)"
 	}
 	return text
+}
+
+// agentWords is an agent's title in quotes, or "an untitled agent".
+func (d *Daemon) agentWords(id wire.UUID) string {
+	if a := d.Store.Agent(id); a != nil && a.Title != nil {
+		return "“" + *a.Title + "”"
+	}
+	return "an untitled agent"
+}
+
+// eventDetails is " Its details are k: v; …." in key order, or nothing.
+func eventDetails(e wire.Event) string {
+	if len(e.Details) == 0 {
+		return ""
+	}
+	var keys []string
+	for k := range e.Details {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	var parts []string
+	for _, k := range keys {
+		parts = append(parts, k+": "+e.Details[k])
+	}
+	return " Its details are " + strings.Join(parts, "; ") + "."
 }
 
 // recordOutcome is record(): the outcome kept, said on the log and on its causing event.
@@ -622,6 +651,10 @@ func (d *Daemon) releaseQueued(folder, id string) {
 	if next != nil {
 		fr := fireRequest{folder: folder, id: id, trigger: next.Trigger, triggeringAgent: next.TriggeringAgentID, depth: next.Depth,
 			causingEvent: next.CausingEvent, fromQueue: fromQueue}
+		if next.DueAt != nil {
+			due := next.DueAt.Time()
+			fr.dueAt = &due
+		}
 		d.goAfterTurn("workflow queue", func() { d.fire(fr) })
 	}
 }
@@ -701,7 +734,7 @@ func (d *Daemon) workflowTickOnce(at time.Time) {
 						continue
 					}
 					if due, ok := nextDue(t.Schedule.Value, *since); ok && !due.After(at) {
-						fr := fireRequest{folder: folder, id: id, trigger: t}
+						fr := fireRequest{folder: folder, id: id, trigger: t, dueAt: &due}
 						if away {
 							missed = append(missed, fr)
 						} else {

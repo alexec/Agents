@@ -58,6 +58,7 @@ type heldFire struct {
 	Depth             int64                `json:"depth"`
 	CausingEvent      *int64               `json:"causingEvent,omitempty"`
 	HeldAt            wire.Date            `json:"heldAt"`
+	DueAt             *wire.Date           `json:"dueAt,omitempty"`
 }
 
 type workflowRun struct {
