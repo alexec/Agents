@@ -468,6 +468,9 @@ button.link.reading:hover { text-decoration: underline; }
   opacity: 0.65;
 }
 .queued p { margin: 0; }
+.queued.editing { width: 70%; }
+.queued-editor { width: 100%; box-sizing: border-box; font: inherit; padding: 6px 11px; resize: vertical;
+  background: var(--paper-well); border: 1px solid var(--accent); border-radius: var(--radius-card); color: inherit; }
 .working, .more { margin: 0; }
 /* A quiet chat's foot (#1564): as a row's time, fine and grey. */
 .quiet-line { margin: 0; font-size: 0.75rem; opacity: 0.45; font-variant-numeric: tabular-nums; }

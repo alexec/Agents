@@ -9,6 +9,7 @@ var (
 	CallAgentsContinueInProject        = Method[ContinueInProjectRequest, UUID]{"agents/continueInProject"}
 	CallAgentsDelete                   = Method[AgentRequest, Empty]{"agents/delete"}
 	CallAgentsDiscardDraft             = Method[DiscardDraftRequest, Empty]{"agents/discardDraft"}
+	CallAgentsEditQueued               = Method[EditQueuedRequest, EditQueuedResult]{"agents/editQueued"}
 	CallAgentsFork                     = Method[AgentRequest, UUID]{"agents/fork"}
 	CallAgentsLabelVocabulary          = Method[LabelVocabularyRequest, []string]{"agents/labelVocabulary"}
 	CallAgentsList                     = Method[ListRequest, []Agent]{"agents/list"}

@@ -41,6 +41,9 @@ final class RemoteModel {
     private(set) var relayTrouble: RelayTrouble?
     private(set) var lastHeardFrom: Date?
     private(set) var problem: String?
+    /// Words for the open chat's prompt bar, from elsewhere in the chat: an edit to a queued
+    /// prompt that came too late (#1552). The bar takes them and sets this back to nil.
+    var offeredPrompt: String?
     /// A send refused because the agent's folder has gone (#119), with the ways on.
     var folderGone: FolderGoneAsk?
 
@@ -4236,6 +4239,27 @@ final class RemoteModel {
             try await client(for: request).call(DaemonAPI.Method.agentsUnqueue, request)
         } catch {
             problem = "That did not reach your Mac."
+        }
+    }
+
+    /// New words for a queued prompt, in its place in the queue (#1552). When it was sent or
+    /// taken back first, the words go into the prompt bar, so nothing typed is lost.
+    func editQueued(_ prompt: QueuedPrompt, text: String, of agentID: UUID) async {
+        guard !isStale else {
+            offeredPrompt = text
+            problem = "Your Mac is not answering, so that could not be changed. Your words are in the prompt bar."
+            return
+        }
+        do {
+            let request = DaemonAPI.EditQueuedRequest(agentID: agentID, promptID: prompt.id, text: text)
+            let result = try await client(for: request).call(DaemonAPI.Method.agentsEditQueued, request,
+                                                             returning: DaemonAPI.EditQueuedResult.self)
+            guard !result.edited else { return }
+            offeredPrompt = text
+            problem = QueuedPrompt.sentBeforeEdit
+        } catch {
+            offeredPrompt = text
+            problem = "That did not reach your Mac. Your words are in the prompt bar."
         }
     }
 

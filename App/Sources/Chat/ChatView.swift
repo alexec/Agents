@@ -126,6 +126,7 @@ struct ChatView: View {
             open: { [model, agent] location in model.open(URL(filePath: location.path), on: agent?.host ?? .mac) },
             terminalOutput: { [model, popped] id in (popped?.work.terminalOutput ?? model.terminalOutput)[id] ?? "" },
             unqueue: { [model] prompt, agentID in await model.unqueue(prompt, from: agentID) },
+            editQueued: { [model] prompt, text, agentID in await model.editQueued(prompt, text: text, of: agentID) },
             sendNow: { [model] prompt, agentID in await model.sendNow(prompt, to: agentID) },
             canSendNow: { [model] runtimeID in runtimeID.flatMap { model.accounts[$0]?.canSteer } ?? false },
             acting: { [model] agentID in model.acting(agentID) },

@@ -122,6 +122,8 @@ public extension DaemonAPI {
                 Row(Method.agentsPrompt, params: PromptRequest.self, result: Empty.self, kind: .hostRequest),
                 Row(Method.agentsSendNow, params: UnqueueRequest.self, result: Empty.self, kind: .hostRequest),
                 Row(Method.agentsUnqueue, params: UnqueueRequest.self, result: Empty.self, kind: .hostRequest),
+                Row(Method.agentsEditQueued, params: EditQueuedRequest.self, result: EditQueuedResult.self,
+                    kind: .hostRequest),
                 Row(Method.agentsStop, params: AgentRequest.self, result: Empty.self, kind: .hostRequest),
                 // Events ▸ Waiting now's ✕, as the window and the Remote have it (#541).
                 Row(Method.eventsCancelWait, params: CancelWaitRequest.self, result: [WaitingAgent].self,

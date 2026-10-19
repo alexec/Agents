@@ -1259,6 +1259,21 @@ export interface EarnedMilestone {
   at: WireDate;
 }
 
+/** agents/editQueued (#1552): a queued prompt's new words, in its place in the queue. */
+export interface EditQueuedRequest {
+  agentID: UUID;
+  promptID: UUID;
+  text: string;
+}
+
+/**
+ * Whether the prompt was still waiting and now has the new words. False: it was sent, or taken
+ * back, first.
+ */
+export interface EditQueuedResult {
+  edited: boolean;
+}
+
 export interface EffectiveSandbox {
   state: SandboxState;
   requested: SandboxChoice;
@@ -4298,6 +4313,7 @@ export interface Methods {
   "agents/continueInProject": { params: ContinueInProjectRequest; result: UUID };
   "agents/delete": { params: AgentRequest; result: Empty };
   "agents/discardDraft": { params: DiscardDraftRequest; result: Empty };
+  "agents/editQueued": { params: EditQueuedRequest; result: EditQueuedResult };
   "agents/fork": { params: AgentRequest; result: UUID };
   "agents/labelVocabulary": { params: LabelVocabularyRequest; result: string[] };
   "agents/list": { params: ListRequest; result: Agent[] };
@@ -4426,6 +4442,7 @@ export const MethodTarget = {
   "agents/continueInProject": "host",
   "agents/delete": "host",
   "agents/discardDraft": "host",
+  "agents/editQueued": "host",
   "agents/fork": "host",
   "agents/labelVocabulary": "host",
   "agents/list": "host",
@@ -4707,6 +4724,8 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   DropboxPutRequest: { required: ["folder", "name", "data"], optional: ["subfolder"] },
   DropboxPutResponse: { required: ["path"], optional: [] },
   EarnedMilestone: { required: ["id", "at"], optional: [] },
+  EditQueuedRequest: { required: ["agentID", "promptID", "text"], optional: [] },
+  EditQueuedResult: { required: ["edited"], optional: [] },
   EffectiveSandbox: { required: ["state", "requested"], optional: ["reason"] },
   ElicitationAnswer: { required: ["question", "answer"], optional: [] },
   ElicitationNotification: { required: ["agentID", "requestID"], optional: ["request"] },

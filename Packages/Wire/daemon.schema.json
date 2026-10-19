@@ -12629,6 +12629,40 @@
       ],
       "additionalProperties": false
     },
+    "EditQueuedRequest": {
+      "type": "object",
+      "description": "agents/editQueued (#1552): a queued prompt's new words, in its place in the queue.",
+      "properties": {
+        "agentID": {
+          "$ref": "#/definitions/UUID"
+        },
+        "promptID": {
+          "$ref": "#/definitions/UUID"
+        },
+        "text": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "agentID",
+        "promptID",
+        "text"
+      ],
+      "additionalProperties": false
+    },
+    "EditQueuedResult": {
+      "type": "object",
+      "description": "Whether the prompt was still waiting and now has the new words. False: it was sent, or taken back, first.",
+      "properties": {
+        "edited": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "edited"
+      ],
+      "additionalProperties": false
+    },
     "UpdateState": {
       "anyOf": [
         {

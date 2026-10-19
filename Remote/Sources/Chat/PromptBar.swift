@@ -159,6 +159,14 @@ struct PromptBar: View {
         .onChange(of: attachments) { keepDraft() }
         // A new one is a new turn's worth, so it comes back from having been dismissed.
         .onChange(of: agent.suggestedPrompts) { dismissedSuggestions = false }
+        // Words offered from elsewhere in the chat (#1552): they land in the field, focused
+        // and unsent, as on the Mac.
+        .onChange(of: model.offeredPrompt) {
+            guard let offered = model.offeredPrompt else { return }
+            text = offered
+            focused = true
+            model.offeredPrompt = nil
+        }
         // A phone put in a pocket mid-sentence loses nothing.
         .onChange(of: scenePhase) { if scenePhase != .active { StartDraftKeeper.shared.flush() } }
         .onDisappear {

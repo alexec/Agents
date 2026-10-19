@@ -116,6 +116,9 @@ public enum DaemonAPI {
         public static let agentsLabelVocabulary = "agents/labelVocabulary"
         public static let agentsPrompt = "agents/prompt"
         public static let agentsUnqueue = "agents/unqueue"
+        /// New words for the person's queued prompt, in its place in the queue (#1552).
+        /// Answers `EditQueuedResult`: not edited when it was sent or taken back first.
+        public static let agentsEditQueued = "agents/editQueued"
         /// Stop one shell or task an agent left running in the background, and nothing
         /// else it is doing (057).
         public static let agentsStopBackground = "agents/stopBackground"
@@ -1167,6 +1170,23 @@ public enum DaemonAPI {
             self.agentID = agentID
             self.promptID = promptID
         }
+    }
+
+    public struct EditQueuedRequest: Codable, Sendable {
+        public var agentID: UUID
+        public var promptID: UUID
+        public var text: String
+        public init(agentID: UUID, promptID: UUID, text: String) {
+            self.agentID = agentID
+            self.promptID = promptID
+            self.text = text
+        }
+    }
+
+    /// Whether the queued prompt was still waiting and now has the new words (#1552).
+    public struct EditQueuedResult: Codable, Sendable {
+        public var edited: Bool
+        public init(edited: Bool) { self.edited = edited }
     }
 
     /// What the MCP helper sends when an agent calls the older suggestion tool.

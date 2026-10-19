@@ -89,6 +89,39 @@ func TestTheQueueOutlivesATurnAndGoesTogether(t *testing.T) {
 	}
 }
 
+// editQueued (#1552): the person's waiting prompt takes new words in its place; one not
+// waiting any more, or another agent's, says edited false and is left as it was.
+func TestEditQueued(t *testing.T) {
+	fakeRuntimes(t)
+	d, c := start(t, t.TempDir())
+	defer d.Shutdown()
+	id := startAgent(t, c, 1, t.TempDir(), "wait for me")
+	c.until(t, "running", ended(id, wire.AgentStateRunning))
+	c.call(t, 2, "agents/prompt", map[string]any{"agentID": id, "text": "first", "from": "person"})
+	c.call(t, 3, "agents/prompt", map[string]any{"agentID": id, "text": "second", "from": "person"})
+	c.call(t, 4, "agents/prompt", map[string]any{"agentID": id, "text": "from a helper", "from": "agent"})
+	q := d.Store.Agent(id).QueuedPrompts
+	edit := func(n int, promptID wire.UUID, text string) bool {
+		var r wire.EditQueuedResult
+		json.Unmarshal(c.call(t, n, "agents/editQueued", map[string]any{"agentID": id, "promptID": promptID, "text": text}), &r)
+		return r.Edited
+	}
+	if !edit(5, q[0].ID, "first, changed") {
+		t.Fatal("a waiting prompt was not edited")
+	}
+	if edit(6, q[2].ID, "not mine") {
+		t.Fatal("another agent's prompt was edited")
+	}
+	c.call(t, 7, "agents/unqueue", map[string]any{"agentID": id, "promptID": q[1].ID})
+	if edit(8, q[1].ID, "too late") {
+		t.Fatal("a prompt taken back was edited")
+	}
+	got := d.Store.Agent(id).QueuedPrompts
+	if len(got) != 2 || got[0].ID != q[0].ID || got[0].Text != "first, changed" || got[1].Text != "from a helper" {
+		t.Fatalf("queue %+v", got)
+	}
+}
+
 // sendNow with no turn running sends it first; mid-turn, a runtime that cannot steer says so.
 func TestSendNow(t *testing.T) {
 	fakeRuntimes(t)

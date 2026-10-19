@@ -62,6 +62,9 @@ public struct QueuedPrompt: Codable, Hashable, Sendable, Identifiable {
         return merged
     }
 
+    /// Said when an edit came too late (#1552): the prompt went, or was taken back, first.
+    /// The same words on the page (`sentBeforeEdit` in `Web/src/views/Chat.tsx`).
+    public static let sentBeforeEdit = "That prompt was sent before your change. Your words are in the prompt bar."
 }
 
 extension Array where Element == QueuedPrompt {
