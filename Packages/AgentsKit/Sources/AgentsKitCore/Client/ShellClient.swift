@@ -38,6 +38,14 @@ public final class ShellClient {
     /// it was started in is no longer where it is.
     public var directory: URL?
 
+    /// What the shell printed since a command was run from a reply (#1533), for Tell the
+    /// Agent: the newest `recentLimit` bytes only.
+    @ObservationIgnored public private(set) var recent = Data()
+    private static let recentLimit = 16 * 1024
+
+    /// A command from a reply is about to be typed: what it prints is kept from here.
+    public func beginRecent() { recent = Data() }
+
     /// Typing that did not reach the shell, said under the screen rather than lost in
     /// silence (#401). Cleared by the next keystroke that does.
     public private(set) var sendProblem: String?
@@ -284,6 +292,7 @@ public final class ShellClient {
         guard let onOutput else { return }
         guard let offset else {
             // A host before #401: no offsets, so shown as it comes.
+            keepRecent(data)
             onOutput(data)
             return
         }
@@ -293,8 +302,15 @@ public final class ShellClient {
         guard let seen else { return }
         let end = offset + data.count
         guard end > seen else { return }
-        onOutput(offset >= seen ? data : data.suffix(end - seen))
+        let fresh = offset >= seen ? data : data.suffix(end - seen)
+        keepRecent(fresh)
+        onOutput(fresh)
         self.seen = end
+    }
+
+    private func keepRecent(_ data: Data) {
+        recent.append(data)
+        if recent.count > Self.recentLimit { recent = Data(recent.suffix(Self.recentLimit)) }
     }
 
     /// A new shell in this place: a blank screen, and its output from the start.

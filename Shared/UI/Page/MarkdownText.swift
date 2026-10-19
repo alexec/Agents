@@ -19,10 +19,13 @@ extension EnvironmentValues {
     /// Whether a long text may lay out only the blocks on screen. Set by the chat, whose
     /// rows sit in one scroll view with nothing to keep a place by but the scroll (#90).
     @Entry var textIsLazy = false
+    /// Whether a shell's code block offers Run (#1533): set on an agent's reply only.
+    @Entry var codeRuns = false
 }
 
 struct MarkdownText: View {
     @Environment(\.textFillsWidth) private var fillsWidth
+    @Environment(\.codeRuns) private var codeRuns
     @Environment(\.textIsLazy) private var isLazy
     /// A page's zoom (#1419), which headings take as the steps do.
     @Environment(\.textZoom) private var zoom
@@ -109,6 +112,9 @@ struct MarkdownText: View {
                     .padding(10)
             }
             .paperWell(in: RoundedRectangle(cornerRadius: 8))
+            if codeRuns, caret == nil, let command = ShellCommand.runnable(tag: language, text: text) {
+                RunCommandBar(command: command)
+            }
         }
     }
 

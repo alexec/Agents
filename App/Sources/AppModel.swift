@@ -4886,6 +4886,26 @@ final class AppModel {
 
     // MARK: The user's shells
 
+    /// Run a command from a reply in the session's shell (#1533), once the shell's pane has
+    /// it attached: a few seconds at most. What it prints is kept for Tell the Agent.
+    func runCommand(_ command: String, in agentID: UUID) async {
+        let shell = shellClient(for: agentID)
+        for _ in 0..<30 where !shell.isAttached { try? await Task.sleep(for: .milliseconds(100)) }
+        guard shell.isAttached, shell.state.isLive else {
+            problem = "The session's shell is not running, so the command was not run. Start it again in Terminal."
+            return
+        }
+        shell.beginRecent()
+        shell.type(ShellCommand.typed(command))
+    }
+
+    /// Tell the Agent (#1533): the command run from a reply and the end of what it printed,
+    /// sent to the session as the person's prompt.
+    func tellAgent(about command: String, in agentID: UUID) async {
+        let printed = ShellCommand.tail(shellClient(for: agentID).recent)
+        _ = await send(ShellCommand.report(command: command, printed: printed), to: agentID)
+    }
+
     /// The pane's end of one of an agent's shells, made once per shell per window.
     func shellClient(for agentID: UUID, shell: Int = 0) -> ShellClient {
         let key = ShellKey(agentID: agentID, shell: shell)

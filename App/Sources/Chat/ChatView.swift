@@ -133,6 +133,22 @@ struct ChatView: View {
             sendTo: { [model] id, text in await model.send(text, to: id) })
     }
 
+    /// Run a command from a reply in the session's Terminal pane (#1533); a window of its
+    /// own has none.
+    private var runCommand: (@MainActor (String) -> Void)? {
+        guard hasInspector, let agent else { return nil }
+        return { [model, frame] command in
+            frame.pane = .terminal
+            if !frame.isOpen { frame.open() }
+            Task { await model.runCommand(command, in: agent.id) }
+        }
+    }
+
+    private var tellAgent: (@MainActor (String) -> Void)? {
+        guard let agent else { return nil }
+        return { [model] command in Task { await model.tellAgent(about: command, in: agent.id) } }
+    }
+
     /// What the shared chat rows mean on a Mac (033).
     private var chatActions: ChatActions {
         ChatActions(
@@ -142,6 +158,8 @@ struct ChatView: View {
             unqueue: { [model] prompt, agentID in await model.unqueue(prompt, from: agentID) },
             editQueued: { [model] prompt, text, agentID in await model.editQueued(prompt, text: text, of: agentID) },
             quote: { [model] words in model.offeredQuote = words },
+            runCommand: runCommand,
+            tellAgent: tellAgent,
             sendNow: { [model] prompt, agentID in await model.sendNow(prompt, to: agentID) },
             canSendNow: { [model] runtimeID in runtimeID.flatMap { model.accounts[$0]?.canSteer } ?? false },
             acting: { [model] agentID in model.acting(agentID) },

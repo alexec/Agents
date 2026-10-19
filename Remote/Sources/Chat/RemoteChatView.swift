@@ -352,6 +352,21 @@ struct RemoteChatView: View {
     /// is now, in Files at the line the call named, with what the agent did one tap from
     /// there (034 FR-014). A Mac too old to read files for the phone gets 033's sheet of
     /// the change instead.
+    /// Run a command from a reply in the session's Terminal pane (#1533), where the Mac can
+    /// give one.
+    private var runCommand: (@MainActor (String) -> Void)? {
+        guard !model.macLacksPanes, let agent else { return nil }
+        return { [model] command in
+            model.panes.state(for: agent.id).show(.terminal)
+            Task { await model.runCommand(command, in: agent.id) }
+        }
+    }
+
+    private var tellAgent: (@MainActor (String) -> Void)? {
+        guard let agent else { return nil }
+        return { [model] command in Task { await model.tellAgent(about: command, in: agent.id) } }
+    }
+
     private var actions: ChatActions {
         let agentID = agent?.id
         return ChatActions(
@@ -368,6 +383,8 @@ struct RemoteChatView: View {
             unqueue: { [model] prompt, agentID in await model.unqueue(prompt, from: agentID) },
             editQueued: { [model] prompt, text, agentID in await model.editQueued(prompt, text: text, of: agentID) },
             quote: { [model] words in model.offeredQuote = words },
+            runCommand: runCommand,
+            tellAgent: tellAgent,
             sendNow: { [model] prompt, agentID in await model.sendNow(prompt, to: agentID) },
             canSendNow: { [model] runtimeID in model.canSteer(runtimeID) },
             acting: { [model] agentID in model.acting(agentID) },
