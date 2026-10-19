@@ -1,0 +1,34 @@
+[
+  {
+    "expected" : "Archived “Fix the parser”",
+    "input" : {
+      "stopped" : false,
+      "title" : "Fix the parser"
+    },
+    "name" : "archived"
+  },
+  {
+    "expected" : "Archived “Fix the parser” and stopped it. Undo does not start it again.",
+    "input" : {
+      "stopped" : true,
+      "title" : "Fix the parser"
+    },
+    "name" : "archived and stopped"
+  },
+  {
+    "expected" : "Archived “Untitled”",
+    "input" : {
+      "stopped" : false,
+      "title" : null
+    },
+    "name" : "no title"
+  },
+  {
+    "expected" : "Archived “Untitled” and stopped it. Undo does not start it again.",
+    "input" : {
+      "stopped" : true,
+      "title" : "  "
+    },
+    "name" : "a blank title"
+  }
+]

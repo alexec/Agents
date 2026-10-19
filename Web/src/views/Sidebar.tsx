@@ -12,6 +12,7 @@
 // One list for the keys: ↑ and ↓ move through every row shown, opening what they land on, as the
 // window's selection does; → unfolds a project or group and ← folds it, or steps out to its project
 // from a row under it. The menu key, Shift-F10 or a right click opens a row's menu.
+import { undoLabel, undoMillis } from "../model/archiveWords";
 import { healthTally, projectServers } from "../model/hostedMCP";
 import { signal, useSignal } from "@preact/signals";
 import { useEffect } from "preact/hooks";
@@ -208,6 +209,7 @@ export function Sidebar({ session, store, linkDown }: { session: Session; store:
       {/* What the hosts and this browser are doing, pinned at the foot: status lines rather than
           somewhere to go. Each is absent when there is nothing to say. */}
       <footer class="sidebar-foot">
+        <ArchiveUndoStrip store={store} />
         {/* This Mac's host: still connecting is said as the window says it, not as down (#250); down,
             why, in the window's words, when the control plane knows (#666). */}
         {macNotice && (macHost?.state === "connecting" && macNotice.kind === "notAnswering" ? (
@@ -887,5 +889,35 @@ function Elsewhere({ store, projects }: { store: Store; projects: Placed[] }) {
         showAll();
         if (first) go({ host: first.host, project: first.folder, session: first.id });
       }}>✋ {count} elsewhere</button>
+  );
+}
+
+/**
+ * Undo after Archive (ArchiveUndoStrip, #1534): "Archived “Fix the parser”" with Undo for a few
+ * seconds; ⌘Z (Ctrl+Z) does the same while it shows, outside a text field.
+ */
+function ArchiveUndoStrip({ store }: { store: Store }) {
+  const undo = store.archiveUndo.value;
+  useEffect(() => {
+    if (!undo) return;
+    const timer = setTimeout(() => {
+      if (store.archiveUndo.value?.key === undo.key) store.archiveUndo.value = null;
+    }, undoMillis);
+    const press = (e: KeyboardEvent) => {
+      if (e.key.toLowerCase() !== "z" || !(e.metaKey || e.ctrlKey) || e.shiftKey || e.altKey) return;
+      const target = e.target as HTMLElement | null;
+      if (target?.closest("input, textarea, [contenteditable=true]")) return;
+      e.preventDefault();
+      void store.undoArchive();
+    };
+    document.addEventListener("keydown", press);
+    return () => { clearTimeout(timer); document.removeEventListener("keydown", press); };
+  }, [undo?.key]);
+  if (!undo) return null;
+  return (
+    <p class="foot-line archive-undo" role="status">
+      <span>{undo.line}</span>
+      <button type="button" class="link" onClick={() => void store.undoArchive()}>{undoLabel}</button>
+    </p>
   );
 }

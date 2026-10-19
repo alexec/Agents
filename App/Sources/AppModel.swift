@@ -4771,12 +4771,33 @@ final class AppModel {
     func archive(_ id: UUID, andLeave: Bool = false) async {
         // The sessions it started go with it (Alex, #835), named before it goes.
         let children = work.liveDescendants(of: id).map(\.id)
+        let agent = work.agent(id)
+        let stops = ([agent] + children.map(work.agent)).contains { $0.map { ArchiveUndo.stops($0.state) } ?? false }
         let archived = await archiveOne(id, andLeave: andLeave)
         guard archived else { return }
+        var put = [id]
         // One archived meanwhile (a ⌫ over parent and child together) is left as it is.
         for child in children where work.agent(child)?.state != .archived {
-            await archiveOne(child, andLeave: andLeave)
+            if await archiveOne(child, andLeave: andLeave) { put.append(child) }
         }
+        // Undo for a few seconds, at the foot of the list (#1534).
+        archiveUndo = ArchiveUndo(agentIDs: put, title: agent?.title, stopped: stops)
+    }
+
+    /// The last Archive, while Undo is offered for it (#1534).
+    var archiveUndo: ArchiveUndo?
+
+    /// Undo after Archive (#1534): Unarchive what that Archive put away. One that Archive
+    /// stopped stays stopped.
+    func undoArchive() async {
+        guard let undo = archiveUndo else { return }
+        archiveUndo = nil
+        for id in undo.agentIDs { await unarchive(id) }
+    }
+
+    /// The strip's seconds are over.
+    func dismissArchiveUndo(_ undo: ArchiveUndo) {
+        if archiveUndo?.id == undo.id { archiveUndo = nil }
     }
 
     @discardableResult

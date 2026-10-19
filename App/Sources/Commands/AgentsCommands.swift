@@ -232,6 +232,12 @@ struct AgentsCommands: Commands {
             Button("Carry On") { act { await model.carryOn($0.id) } }
                 .keyboardShortcut(.return, modifiers: [.command, .shift])
                 .disabled(agent.map { !model.isBlocked($0) } ?? true)
+            // Undo after Archive (#1534): ⌘Z while the strip offers it, and only then, so a
+            // text field's own Undo is the key's the rest of the time.
+            if model.archiveUndo != nil {
+                Button("Undo Archive") { Task { await model.undoArchive() } }
+                    .keyboardShortcut("z")
+            }
             if agent?.state == .archived {
                 Button("Unarchive") { act { await model.unarchive($0.id) } }
                     .keyboardShortcut(.delete, modifiers: [.command, .option])
