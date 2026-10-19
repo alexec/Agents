@@ -132,12 +132,8 @@ struct ControlOverviewPage: View {
                 }
                 Divider()
                 ControlRow(dot: .none, title: "Reachable away from home",
-                           detail: control.status?.awayFromHome == true
-                               ? "Through your iCloud account, sealed to each device"
-                               // A control plane with no Mac relaying for it, a server's alone
-                               // included, gets one from Agents Host on any Mac (#824).
-                               : "Off: devices reach it on this network only. Turn on Relay for my devices in Agents Host on a Mac.") {
-                    Text(control.status?.awayFromHome == true ? "On" : "Off")
+                           detail: reachableLine) {
+                    Text(control.publicAddress != nil || control.status?.awayFromHome == true ? "On" : "Off")
                         .appText(.reading)
                         .foregroundStyle(.secondary)
                 }
@@ -183,13 +179,26 @@ struct ControlOverviewPage: View {
         }
     }
 
+    private var reachableLine: String {
+        // On the internet (#1498): every device reaches it from any network, with no relay.
+        if let address = control.publicAddress { return "On the internet at \(address): devices reach it from any network" }
+        if control.status?.awayFromHome == true { return "Through your iCloud account, sealed to each device" }
+        // A control plane with no Mac relaying for it, a server's alone included, gets one
+        // from Agents Host on any Mac (#824).
+        return "Off: devices reach it on this network only. Turn on Relay for my devices in Agents Host on a Mac."
+    }
+
     private var runningLine: String {
         guard let status = control.status else { return "Not answering" }
         var parts = ["agents-control \(status.version)"]
+        // Its address, unless its name already says it.
+        if let address = control.publicAddress, address != status.name { parts.append(address) }
         if let started = status.startedAt {
             parts.append("running since \(started.formatted(date: .omitted, time: .shortened))")
         }
-        if let port = status.port { parts.append("port \(port)") }
+        // The port it listens on is its own; on the internet, a proxy in front of it has
+        // the one devices use (#1498).
+        if control.publicAddress == nil, let port = status.port { parts.append("port \(port)") }
         return parts.joined(separator: " · ")
     }
 
@@ -554,9 +563,9 @@ struct ControlHostsPage: View {
         } else {
             parts.append("connects out")
         }
-        // The sign-in relay needs a path back to this Mac, which the control plane does
-        // not carry yet (R9). A lent key still works; the relay does not.
-        parts.append("Sign-in relay needs this Mac on the same network")
+        // The sign-in relay goes to this Mac's host through the control plane (T091), on
+        // any network (#1498).
+        parts.append("Sign-in relay goes to this Mac through the control plane")
         return parts.joined(separator: " · ")
     }
 }

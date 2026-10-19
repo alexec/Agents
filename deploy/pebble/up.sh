@@ -24,7 +24,8 @@ compose=(docker compose -p agents-pebble --env-file $walk_env -f $deploy/compose
 id=$(docker create ghcr.io/letsencrypt/pebble:latest)
 docker cp -q $id:/test/certs/pebble.minica.pem $deploy/secrets/pebble-minica.pem
 docker rm $id >/dev/null
-$compose up -d --build
+# The version the control plane says (#1498), as deploy/gcp/up.sh gives it.
+AGENTS_VERSION=$(git -C $deploy/.. describe --tags --always --dirty 2>/dev/null || print dev) $compose up -d --build
 # Colima doesn't always forward a new container's ports to this Mac; its ssh does it here.
 mux=~/.colima/_lima/colima/ssh.sock
 if [[ -S $mux ]]; then

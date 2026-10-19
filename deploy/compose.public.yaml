@@ -28,6 +28,10 @@ services:
     build:
       context: ..
       dockerfile: deploy/Containerfile
+      # The version Settings ▸ Control plane shows (#1498): git describe, as deploy/gcp/up.sh
+      # gives it. Unset, it is "dev".
+      args:
+        VERSION: ${AGENTS_VERSION:-dev}
     image: agents-control:latest
     restart: unless-stopped
     environment:

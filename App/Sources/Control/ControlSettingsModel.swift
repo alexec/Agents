@@ -1,5 +1,6 @@
 import AgentsKitCore
 import AppKit
+import Network
 
 /// What Settings ▸ Control plane shows (058, frames D–F): the control plane itself, its
 /// hosts and its clients, kept true by the control plane's own notifications.
@@ -31,6 +32,10 @@ final class ControlSettingsModel {
     /// Where the control plane is, as the page says it when it can't be reached: its
     /// folder on this Mac, or the addresses it was paired at.
     let whereItIs: String
+    /// The control plane's address when it is on the internet (#1498), such as
+    /// `control.agentloops.dev`: paired with no pin, so its certificate is publicly trusted
+    /// and devices reach it from any network. Nil for one with a pin, as on a Mac.
+    let publicAddress: String?
     private let link: ControlLink
     private let client: DaemonClient
     private var listening: Task<Void, Never>?
@@ -42,7 +47,18 @@ final class ControlSettingsModel {
         switch endpoint {
         case .remote(let membership):
             whereItIs = "\(membership.name) (\(membership.url ?? membership.addresses.first ?? "no address"))"
+            publicAddress = Self.publicAddress(url: membership.url, pin: membership.pin)
         }
+    }
+
+    /// A pinless `https` address at a name, not an IP address or `localhost`: its host,
+    /// with its port when that is not 443.
+    static func publicAddress(url: String?, pin: String?) -> String? {
+        guard pin?.isEmpty ?? true, let url, let parts = URLComponents(string: url), parts.scheme == "https",
+              let host = parts.host, !host.isEmpty, host != "localhost",
+              IPv4Address(host) == nil, IPv6Address(host) == nil else { return nil }
+        guard let port = parts.port, port != 443 else { return host }
+        return "\(host):\(port)"
     }
 
     /// Whether the control plane runs on this Mac, and so may be restarted from here.

@@ -276,6 +276,10 @@ On the machine, in the folder you copied to:
    docker compose -f deploy/compose.public.yaml up -d --build
    ```
 
+   The control plane says its version in Settings ▸ Control plane. Put it in
+   `AGENTS_VERSION` (in `deploy/.env` or the environment), such as the output of
+   `git describe --tags --always`. Without it, the version is `dev`.
+
    At its first start the control plane makes its key and seals it in the store. To keep
    a key from elsewhere, seal it before this step: see
    [Move the control plane from your Mac](#move-the-control-plane-from-your-mac).
