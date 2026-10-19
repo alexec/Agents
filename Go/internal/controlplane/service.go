@@ -702,6 +702,18 @@ func (s *Service) deliver(need notices.AttentionNeed, fromPeer bool) {
 			if s.mesh != nil {
 				s.mesh.broadcast(encodePeer("need", need))
 			}
+			// Each way a need ends here with nothing sent is said (#1509).
+			if need.Need != nil {
+				needID, _ := json.Marshal(need.Need.ID)
+				switch {
+				case s.router.RelayOnline():
+					s.log(fmt.Sprintf("notice: %s goes to the copy that holds the relay", needID))
+				case s.mesh != nil:
+					s.log(fmt.Sprintf("notice: %s goes to the other copies: no relay here, and this copy does not push", needID))
+				default:
+					s.log(fmt.Sprintf("notice: %s goes to no device: no relay is online, and this copy does not push", needID))
+				}
+			}
 			return
 		}
 	}
@@ -728,11 +740,17 @@ func (s *Service) deliver(need notices.AttentionNeed, fromPeer bool) {
 		}
 		devices = append(devices, d)
 	}
-	if need.Need != nil && !slices.ContainsFunc(devices, func(d notices.Device) bool { return d.MayNotify != nil && *d.MayNotify }) {
+	noDevice := need.Need != nil && !slices.ContainsFunc(devices, func(d notices.Device) bool { return d.MayNotify != nil && *d.MayNotify })
+	if noDevice {
 		needID, _ := json.Marshal(need.Need.ID)
 		s.log(fmt.Sprintf("notice: %s goes to no device: none here may be notified", needID))
 	}
-	for _, delivery := range s.desk.Heard(need, s.router.FoldedPresences(), devices, time.Now()) {
+	deliveries := s.desk.Heard(need, s.router.FoldedPresences(), devices, time.Now())
+	if need.Need != nil && !noDevice && len(deliveries) == 0 {
+		needID, _ := json.Marshal(need.Need.ID)
+		s.log(fmt.Sprintf("notice: %s sent to no device: it is watched, at the Mac, or sent already", needID))
+	}
+	for _, delivery := range deliveries {
 		did := "sent"
 		if delivery.Headline == nil {
 			did = "withdrew"

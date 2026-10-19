@@ -94,3 +94,27 @@ func TestAHostOfAControlPlaneOffersAndWithdrawsNeeds(t *testing.T) {
 		t.Fatalf("%s", b)
 	}
 }
+
+// An open iPad is not the Mac (#1509): its active report keeps no need from the control
+// plane, which chooses the device. The window's report still does, after the pause.
+func TestADevicesPresenceIsNotTheMacs(t *testing.T) {
+	shortPause(t)
+	d, c := start(t, t.TempDir())
+	report := seeded(t, d, t.TempDir(), func(a *wire.Agent) {
+		a.Report = &wire.WorkReport{Outcome: wire.WorkOutcomeNeedsAnswer, Message: "Which branch?", At: now()}
+	})
+	d.reportPresence(&Client{ID: 1 << 40, conn: deviceConn{newConn()}}, wire.PresenceReport{Active: true})
+	control := &toldControl{}
+	d.SetControl(control.tell)
+	offered := func(m wire.AttentionNeed) bool {
+		return m.Need != nil && m.Need.ID.Report != nil && m.Need.ID.Report.AgentID == report.ID
+	}
+	if control.find(offered) == nil {
+		t.Fatalf("an active iPad kept the need from the control plane: %+v", control.sent)
+	}
+	// At the window: withdrawn while the window has its moment to look.
+	c.call(t, 1, "presence/report", map[string]any{"active": true})
+	waitFor(t, "withdrawn", func() bool {
+		return control.find(func(m wire.AttentionNeed) bool { return m.Withdraw != nil && m.Withdraw.Report != nil }) != nil
+	})
+}
