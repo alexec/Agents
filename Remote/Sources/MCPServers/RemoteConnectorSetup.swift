@@ -48,11 +48,11 @@ struct RemoteConnectorSetup: View {
                         Text(ConnectorSetupWords.eventsLead(setup.events))
                         if setup.events.state == .on {
                             Text(ConnectorSetupWords.eventNouns(setup.events.names).joined(separator: " "))
-                                .font(.callout.monospaced()).foregroundStyle(Color.accentColor)
+                                .appText(.code).foregroundStyle(Paper.accent)
                             Text(ConnectorSetupWords.workflowsLead(setup.events)
                                  + (setup.events.workflows.isEmpty ? ""
                                     : " " + setup.events.workflows.map(\.name).joined(separator: ", ") + "."))
-                                .font(.footnote).foregroundStyle(.secondary)
+                                .appText(.fine).foregroundStyle(.secondary)
                         }
                     }
                     .paperListRow()
@@ -65,18 +65,18 @@ struct RemoteConnectorSetup: View {
         if let c = setup.connection, c.state == .connected {
             VStack(alignment: .leading, spacing: 4) {
                 Text(ConnectorSetupWords.connected(c)).fontWeight(.semibold)
-                Text(ConnectorSetupWords.connectedNote(setup)).font(.footnote).foregroundStyle(.secondary)
+                Text(ConnectorSetupWords.connectedNote(setup)).appText(.fine).foregroundStyle(.secondary)
                 if setup.installed == false, let repository = setup.repository {
-                    Text(ConnectorSetupWords.notInstalled(repository)).font(.footnote).tinted(.attention)
+                    Text(ConnectorSetupWords.notInstalled(repository)).appText(.fine).tinted(.attention)
                     Link("Install on github.com", destination: URL(string: setup.installURL ?? ConnectorSetupWords.installURL)!)
-                        .font(.footnote)
+                        .appText(.fine)
                 }
             }
         } else {
             HStack(spacing: 12) {
                 Text(setup.connection?.state == .signInAgain ? "GitHub asks you to connect again."
                      : ConnectorSetupWords.connectTitle)
-                    .font(.subheadline.weight(.semibold))
+                    .appText(.supporting).fontWeight(.semibold)
                 Spacer(minLength: 8)
                 Button(ConnectorSetupWords.connectButton) { connecting = true }
                     .buttonStyle(.borderedProminent)
@@ -103,7 +103,7 @@ private struct RemoteSlotRow: View {
             RemoteSlotMark(state: slot.state)
             VStack(alignment: .leading, spacing: 2) {
                 Text("\(ConnectorSetupWords.heading(slot.slot)) \u{00B7} \(ConnectorSetupWords.title(slot))")
-                Text(subtitle).font(.footnote).foregroundStyle(.secondary).lineLimit(2)
+                Text(subtitle).appText(.fine).foregroundStyle(.secondary).lineLimit(2)
             }
         }
         .accessibilityElement(children: .combine)
@@ -123,7 +123,7 @@ private struct RemoteSlotMark: View {
     var body: some View {
         Group {
             switch state {
-            case .read: Image(systemName: "checkmark.circle.fill").foregroundStyle(Color.accentColor)
+            case .read: Image(systemName: "checkmark.circle.fill").foregroundStyle(Paper.accent)
             case .failed, .refused: Image(systemName: "exclamationmark.circle").tinted(.attention)
             case .skipped:
                 Circle().strokeBorder(style: StrokeStyle(lineWidth: 1.4, dash: [3, 2.5])).foregroundStyle(.secondary)
@@ -156,7 +156,7 @@ private struct RemoteSlotView: View {
                     VStack(alignment: .leading, spacing: 6) {
                         HStack(spacing: 8) {
                             RemoteSlotMark(state: slot.state)
-                            Text(ConnectorSetupWords.title(slot)).font(.headline)
+                            Text(ConnectorSetupWords.title(slot)).appText(.reading).fontWeight(.semibold)
                         }
                         if let proof = slot.proof {
                             HStack(alignment: .firstTextBaseline, spacing: 4) {
@@ -170,15 +170,15 @@ private struct RemoteSlotView: View {
                                 }
                                 Text(ConnectorSetupWords.proofText(proof)).foregroundStyle(.secondary)
                             }
-                            .font(.subheadline)
+                            .appText(.supporting)
                         } else {
                             Text(slot.slot == .workspace && slot.state == .read ? ConnectorSetupWords.otherProvidersElsewhere
                                  : ConnectorSetupWords.line(slot, project: projectName, repository: setup.repository))
-                                .font(.subheadline)
+                                .appText(.supporting)
                                 .tinted([.failed, .refused, .noRemote].contains(slot.state) ? .attention : .none)
                                 .foregroundStyle(.secondary)
                         }
-                        if let problem { Text(problem).font(.footnote).tinted(.failure) }
+                        if let problem { Text(problem).appText(.fine).tinted(.failure) }
                     }
                     .paperListRow()
                 }
@@ -199,7 +199,7 @@ private struct RemoteSlotView: View {
                         }
                         if kind == .tasks {
                             Text("Linear and other trackers: Add Connector on the Mac.")
-                                .font(.footnote).foregroundStyle(.secondary)
+                                .appText(.fine).foregroundStyle(.secondary)
                         }
                     } else {
                         Text(ConnectorSetupWords.otherProvidersElsewhere).foregroundStyle(.secondary)
@@ -267,15 +267,15 @@ struct RemoteConnectSheet: View {
                         ProgressView()
                     case .waiting(let flow):
                         VStack(alignment: .leading, spacing: 8) {
-                            Text("Your code").font(.footnote).foregroundStyle(.secondary)
-                            Text(flow.userCode).font(.largeTitle.monospaced().weight(.semibold)).textSelection(.enabled)
-                            Text(ConnectorSetupWords.sheetStatus(flow)).font(.footnote)
+                            Text("Your code").appText(.fine).foregroundStyle(.secondary)
+                            Text(flow.userCode).appText(.title).monospaced().fontWeight(.semibold).textSelection(.enabled)
+                            Text(ConnectorSetupWords.sheetStatus(flow)).appText(.fine)
                         }
                         Button("Copy Code") { UIPasteboard.general.string = flow.userCode }
                         Button("Open github.com Again") { open(flow.verificationURL) }
                     case .install(let login, let repository):
                         Text("Connected as \(login).").fontWeight(.semibold)
-                        Text(ConnectorSetupWords.notInstalled(repository)).font(.footnote)
+                        Text(ConnectorSetupWords.notInstalled(repository)).appText(.fine)
                         Button("Install on github.com") { open(ConnectorSetupWords.installURL); dismiss() }
                     case .failed(let why):
                         Text(why).tinted(.failure)
@@ -369,7 +369,7 @@ struct RemoteConnections: View {
                 ForEach(connections, id: \.provider) { c in
                     VStack(alignment: .leading, spacing: 2) {
                         Text(ConnectorSetupWords.connectionTitle(c)).fontWeight(.semibold)
-                        Text(ConnectorSetupWords.connectionNote(c)).font(.footnote)
+                        Text(ConnectorSetupWords.connectionNote(c)).appText(.fine)
                             .tinted(c.state == .signInAgain ? .attention : .none).foregroundStyle(.secondary)
                     }
                     Button("Disconnect", role: .destructive) { disconnecting = c }
