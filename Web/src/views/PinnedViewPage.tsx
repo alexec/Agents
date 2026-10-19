@@ -13,6 +13,7 @@ import { go } from "../route";
 import { BackToList } from "./BackToList";
 import { feedParams, pinnedViewCall, recipient } from "./chat/appViewBridge";
 import { ViewLayer, type ViewActions } from "./chat/viewLayer";
+import { ViewDiff } from "./chat/ViewDiff";
 import { offerStart } from "./NewAgent";
 
 /** Where this opening's feeding call is, for the call `id` it was made for. */
@@ -100,6 +101,7 @@ export function PinnedViewPage({ store, host, folder, path, pin, down }: {
         <div class="scroll view-host" ref={frame}>
           <ViewState layer={layer} id={id} />
           <div class="view-layer" ref={(el) => { layer.element = el; }} />
+          <ViewDiff layer={layer} openLink={(url) => { window.open(url, "_blank", "noopener,noreferrer"); }} />
         </div>
       )}
     </section>

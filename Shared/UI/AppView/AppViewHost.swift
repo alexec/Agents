@@ -108,6 +108,8 @@ final class AppViewHost {
     private(set) var pinNote: String?
     /// Whether `retry()` would read it again: a failure drawn with Try Again (#978).
     private(set) var canRetry = false
+    /// A diff the view asked the app to draw (`agents/open-diff`, #1341), over the view.
+    var diff: AppViewDiff?
 
     @ObservationIgnored var actions: AppViewActions
     @ObservationIgnored weak var store: AppViewStore?
@@ -478,6 +480,10 @@ final class AppViewHost {
                 send(AppViewBridge.result(id))
                 log("agents/start-agent: the new-agent form opened, filled in")
             }
+        case .openDiff(let id, let diff):
+            self.diff = diff
+            send(AppViewBridge.result(id))
+            log("agents/open-diff: \(diff.files.count) file(s) drawn in the app's diff")
         case .updateContext(let id, let content, let structured):
             contextLine = AppViewBridge.contextPreface(viewTitle: title, content: content, structuredContent: structured)
                 .map { _ in Self.contextWords(content, structured) }

@@ -1,0 +1,26 @@
+#page { display: grid; gap: 8px; }
+#page .branch { white-space: normal; overflow-wrap: anywhere; }
+.bar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+h2 { font-size: 15px; margin: 0; font-weight: 600; }
+#page .pills { justify-content: flex-start; }
+.tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--color-border-primary); flex-wrap: wrap; }
+.tabs button { border: none; border-bottom: 2px solid transparent; border-radius: 0; background: transparent; padding: 4px 10px; }
+.tabs button.chosen { border-bottom-color: var(--color-text-info); color: var(--color-text-info); }
+.body { white-space: pre-wrap; overflow-wrap: anywhere; margin: 0; }
+.note { border: 1px solid var(--color-border-primary); border-radius: var(--border-radius-sm); padding: 6px 10px; display: grid; gap: 4px; min-width: 0; }
+.note .who { font-size: var(--font-text-sm-size); color: var(--color-text-secondary); display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.note.resolved { opacity: 0.7; }
+.reply { border-top: 1px solid var(--color-border-primary); padding-top: 4px; display: grid; gap: 4px; }
+.path { font: var(--font-text-sm-size) var(--font-mono); overflow-wrap: anywhere; }
+.files li { grid-template-columns: minmax(0, 1fr) auto auto; }
+.add { color: var(--color-text-success); } .del { color: var(--color-text-danger); }
+.checks li { grid-template-columns: auto minmax(0, 1fr) auto; }
+pre.log { margin: 0; padding: 6px 8px; max-height: 320px; overflow: auto; font: 11px/1.4 var(--font-mono); white-space: pre;
+  background: var(--color-background-secondary); border-radius: var(--border-radius-sm); grid-column: 1 / -1; }
+textarea { font: inherit; color: inherit; background: var(--color-background-primary); border: 1px solid var(--color-border-primary);
+  border-radius: var(--border-radius-sm); padding: 6px 8px; min-height: 3.2em; resize: vertical; width: 100%; box-sizing: border-box; }
+.actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+button.primary { background: var(--color-background-success); color: var(--color-text-success); border-color: transparent; font-weight: 600; }
+.confirm { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; padding: 6px 10px; border-radius: var(--border-radius-sm);
+  background: var(--color-background-secondary); }
+button.plain { border: none; background: transparent; color: var(--color-text-info); padding: 0; font-size: var(--font-text-sm-size); }
