@@ -109,3 +109,40 @@ func TestOneCutOffThreeTimesAndOneCopiedInAreLeft(t *testing.T) {
 		t.Fatalf("%d to pick up", n)
 	}
 }
+
+// A clean stop (an update) cuts a working agent off: the next start picks it up, as after a
+// crash, and the stop is not said to be somebody's (#1605).
+func TestAnAgentACleanStopCutOffIsPickedBackUp(t *testing.T) {
+	fakeRuntimes(t)
+	root := t.TempDir()
+	first, c := start(t, root)
+	var id wire.UUID
+	json.Unmarshal(c.call(t, 1, "agents/start", map[string]any{"runtimeID": "claude", "cwd": "file://" + t.TempDir(),
+		"prompt": "wait for me"}), &id)
+	c.until(t, "running", ended(id, wire.AgentStateRunning))
+	first.Shutdown()
+	if a := first.Store.Agent(id); a.State != wire.AgentStateStopped || *a.EndedReason != wire.EndedReasonDaemonGone {
+		t.Fatalf("%s %v", a.State, a.EndedReason)
+	}
+
+	d, _ := start(t, root)
+	defer d.Shutdown()
+	d.PickUpAfterRestart()
+	waitFor(t, "finished", func() bool { return d.Store.Agent(id).State == wire.AgentStateFinished })
+	if n := strings.Join(notes(d, id), " | "); !strings.Contains(n, "This agent was working when the daemon stopped, so it stopped too.") {
+		t.Fatal(n)
+	}
+	if m := userMessages(d, id); len(m) != 2 || !strings.HasPrefix(m[1], "(The app restarted while you were working") {
+		t.Fatalf("%q", m)
+	}
+	entries, _, _ := d.Store.Transcript(id, 0)
+	gone := 0
+	for _, e := range entries {
+		if c := e.Kind.StateChanged; c != nil && c.Reason != nil && *c.Reason == wire.EndedReasonDaemonGone {
+			gone++
+		}
+	}
+	if gone != 1 {
+		t.Fatalf("stopped with the daemon %d times, want once", gone)
+	}
+}
