@@ -1,4 +1,5 @@
 import AgentsKitCore
+import AuthenticationServices
 import SwiftUI
 
 /// A project's Connectors set-up on the iPhone and iPad (#1336, frame F): the same page as
@@ -229,12 +230,16 @@ private struct RemoteSlotView: View {
     }
 }
 
-/// Connect GitHub on the iPhone and iPad (frame B): the host's device flow. The sheet shows
-/// the code, copies it, opens github.com/login/device in Safari, waits, and closes by itself.
+/// Connect GitHub or Linear on the iPhone and iPad (frames B and H). GitHub is the host's
+/// device flow: the sheet shows the code, copies it, opens github.com/login/device in Safari,
+/// waits, and closes by itself. Linear is the code flow: the sheet opens linear.app in an
+/// authentication session and gives the host what came back (CodeFlowSignIn).
 struct RemoteConnectSheet: View {
     @Environment(RemoteModel.self) private var model
     @Environment(\.dismiss) private var dismiss
     @Environment(\.openURL) private var openURL
+    @Environment(\.webAuthenticationSession) private var webAuthenticationSession
+    var provider: DaemonAPI.ConnectionProvider = .github
     let host: HostID
     var project: ProjectKey?
     var onConnected: () -> Void = {}
@@ -243,6 +248,10 @@ struct RemoteConnectSheet: View {
         case asking, starting
         case waiting(DaemonAPI.ConnectionSignIn)
         case install(login: String, repository: String)
+        /// Linear only: the host takes the code that came back.
+        case finishing
+        /// Linear only: the person closed linear.app's page.
+        case cancelled
         case failed(String)
     }
 
@@ -252,43 +261,58 @@ struct RemoteConnectSheet: View {
         NavigationStack {
             List {
                 Section {
-                    Text(ConnectorSetupWords.sheetSubtitle).foregroundStyle(.secondary)
+                    Text(ConnectorSetupWords.sheetSubtitle(provider)).foregroundStyle(.secondary)
                 }
                 .paperListRow()
                 Section("Agents will be able to") {
-                    ForEach(ConnectorSetupWords.abilities, id: \.self) { Text($0) }
+                    ForEach(ConnectorSetupWords.abilities(provider), id: \.self) { Text($0) }
                 }
                 .paperListRow()
                 Section {
                     switch step {
                     case .asking:
-                        Button(ConnectorSetupWords.continueButton) { Task { await start() } }.fontWeight(.semibold)
+                        continueButton
                     case .starting:
                         ProgressView()
                     case .waiting(let flow):
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("Your code").appText(.fine).foregroundStyle(.secondary)
-                            Text(flow.userCode).appText(.title).monospaced().fontWeight(.semibold).textSelection(.enabled)
-                            Text(ConnectorSetupWords.sheetStatus(flow)).appText(.fine)
+                        if let code = flow.userCode {
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("Your code").appText(.fine).foregroundStyle(.secondary)
+                                Text(code).appText(.title).monospaced().fontWeight(.semibold).textSelection(.enabled)
+                                Text(ConnectorSetupWords.sheetStatus(flow)).appText(.fine)
+                            }
+                            Button("Copy Code") { UIPasteboard.general.string = code }
+                            Button("Open github.com Again") { open(flow.verificationURL) }
+                        } else {
+                            HStack(spacing: 8) {
+                                ProgressView()
+                                Text(ConnectorSetupWords.sheetStatus(flow)).appText(.fine)
+                            }
                         }
-                        Button("Copy Code") { UIPasteboard.general.string = flow.userCode }
-                        Button("Open github.com Again") { open(flow.verificationURL) }
+                    case .finishing:
+                        HStack(spacing: 8) {
+                            ProgressView()
+                            Text(ConnectorSetupWords.Linear.finishing).appText(.fine)
+                        }
                     case .install(let login, let repository):
                         Text("Connected as \(login).").fontWeight(.semibold)
                         Text(ConnectorSetupWords.notInstalled(repository)).appText(.fine)
                         Button("Install on github.com") { open(ConnectorSetupWords.installURL); dismiss() }
+                    case .cancelled:
+                        Text("Cancelled.").foregroundStyle(.secondary)
+                        continueButton
                     case .failed(let why):
                         Text(why).tinted(.failure)
                         Button("Try Again") { Task { await start() } }
                     }
                 } footer: {
-                    Text(ConnectorSetupWords.sheetChoose + " " + ConnectorSetupWords.sheetFoot)
+                    Text(ConnectorSetupWords.sheetChoose(provider) + " " + ConnectorSetupWords.sheetFoot)
                 }
                 .paperListRow()
             }
             .scrollContentBackground(.hidden)
             .background(Paper.ground)
-            .navigationTitle("Connect GitHub")
+            .navigationTitle("Connect \(ConnectorSetupWords.name(provider))")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -301,16 +325,25 @@ struct RemoteConnectSheet: View {
         }
     }
 
+    private var continueButton: some View {
+        Button(ConnectorSetupWords.continueButton(provider)) { Task { await start() } }.fontWeight(.semibold)
+    }
+
     private var isInstall: Bool { if case .install = step { true } else { false } }
 
     private func start() async {
         step = .starting
         let started: DaemonAPI.ConnectionSignIn
-        switch await model.startSignIn(.github, on: host) {
+        switch await model.startSignIn(provider, on: host) {
         case .success(let flow): started = flow
         case .failure(let problem): step = .failed(problem.words); return
         }
         step = .waiting(started)
+        if started.grant == .authorizationCode {
+            await finishCodeFlow(started)
+            return
+        }
+        // The device flow (GitHub): it always has a code.
         UIPasteboard.general.string = started.userCode
         open(started.verificationURL)
         while case .waiting(let shown) = step, shown.flowID == started.flowID {
@@ -337,6 +370,25 @@ struct RemoteConnectSheet: View {
         }
     }
 
+    /// The code flow (Linear): the authentication session, then the host finishes it. The
+    /// sheet closes by itself once the host says connected, as the Mac's does.
+    private func finishCodeFlow(_ started: DaemonAPI.ConnectionSignIn) async {
+        let outcome = await CodeFlowSignIn.finish(started, in: webAuthenticationSession) { request in
+            step = .finishing
+            return await model.completeSignIn(request, on: host).mapError { CodeFlowSignIn.Problem($0.words) }
+        }
+        switch outcome {
+        case .connected:
+            onConnected()
+            dismiss()
+        case .cancelled:
+            step = .cancelled
+            await model.cancelSignIn(started.flowID, on: host)
+        case .failed(let why):
+            step = .failed(why)
+        }
+    }
+
     private func cancel() async {
         if case .waiting(let flow) = step {
             step = .asking
@@ -355,7 +407,7 @@ struct RemoteConnections: View {
     @Environment(RemoteModel.self) private var model
     @State private var connections: [DaemonAPI.Connection]?
     @State private var problem: String?
-    @State private var connecting = false
+    @State private var connecting: DaemonAPI.ConnectionProvider?
     @State private var disconnecting: DaemonAPI.Connection?
 
     var body: some View {
@@ -363,7 +415,7 @@ struct RemoteConnections: View {
             if let problem { Text(problem).tinted(.failure) }
             if let connections {
                 if connections.isEmpty {
-                    Text("No connections yet. Connect GitHub to give agents issues, pull requests and Actions in every project.")
+                    Text("No connections yet. Connect GitHub to give agents issues, pull requests and Actions in every project, and Linear for its issues.")
                         .foregroundStyle(.secondary)
                 }
                 ForEach(connections, id: \.provider) { c in
@@ -374,8 +426,15 @@ struct RemoteConnections: View {
                     }
                     Button("Disconnect", role: .destructive) { disconnecting = c }
                 }
-                if !connections.contains(where: { $0.provider == .github && $0.state == .connected }) {
-                    Button(ConnectorSetupWords.connectButton) { connecting = true }
+                if !isConnected(.github, in: connections) {
+                    Button(ConnectorSetupWords.connectButton) { connecting = .github }
+                }
+                // Linear (#1343): its own row while it is not connected.
+                if !isConnected(.linear, in: connections) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Button("Connect Linear\u{2026}") { connecting = .linear }
+                        Text(ConnectorSetupWords.notConnectedNote(.linear)).appText(.fine).foregroundStyle(.secondary)
+                    }
                 }
             } else {
                 ProgressView()
@@ -385,8 +444,8 @@ struct RemoteConnections: View {
         }
         .paperListRow()
         .task { await load() }
-        .sheet(isPresented: $connecting) {
-            RemoteConnectSheet(host: .mac, onConnected: { Task { await load() } })
+        .sheet(item: $connecting) { provider in
+            RemoteConnectSheet(provider: provider, host: .mac, onConnected: { Task { await load() } })
         }
         .confirmationDialog(disconnecting.map { "Disconnect \(ConnectorSetupWords.connectionTitle($0))?" } ?? "",
                             isPresented: Binding(get: { disconnecting != nil }, set: { if !$0 { disconnecting = nil } }),
@@ -395,8 +454,12 @@ struct RemoteConnections: View {
                 if let c = disconnecting { Task { await disconnect(c) } }
             }
         } message: {
-            Text(ConnectorSetupWords.disconnectNote)
+            Text(disconnecting.map { ConnectorSetupWords.disconnectNote($0.provider) } ?? "")
         }
+    }
+
+    private func isConnected(_ provider: DaemonAPI.ConnectionProvider, in list: [DaemonAPI.Connection]) -> Bool {
+        list.contains { $0.provider == provider && $0.state == .connected }
     }
 
     private func load() async {

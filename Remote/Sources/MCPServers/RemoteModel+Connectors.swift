@@ -44,6 +44,14 @@ extension RemoteModel {
         }
     }
 
+    /// Gives the host the code and the state that the hand-back page gave back (Linear).
+    func completeSignIn(_ request: DaemonAPI.ConnectionSignInCompleteRequest, on host: HostID) async
+        -> Result<DaemonAPI.ConnectionSignIn, RemoteConnectorProblem> {
+        await connectorCall(host) {
+            try await $0.call(DaemonAPI.Method.connectionsSignInComplete, request, returning: DaemonAPI.ConnectionSignIn.self)
+        }
+    }
+
     func cancelSignIn(_ flow: UUID, on host: HostID) async {
         _ = await connectorCall(host) {
             try await $0.call(DaemonAPI.Method.connectionsSignInCancel, DaemonAPI.ConnectionSignInFlowRequest(flowID: flow),
