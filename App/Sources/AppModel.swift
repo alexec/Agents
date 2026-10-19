@@ -942,6 +942,21 @@ final class AppModel {
         return hosts.client(for: host) ?? Self.unreachable
     }
 
+    /// This Mac's host, for what is this Mac's own rather than a project's: its runtimes,
+    /// pool, settings and catalogue. `client`, or, with a control plane elsewhere that gave
+    /// this Mac's host an id of its own, that host's client (#1496): no host is `.mac` then.
+    private var macClient: DaemonClient {
+        guard let mine = macHostElsewhere, let reached = controlHosts[mine] else { return client }
+        return reached
+    }
+
+    /// This Mac's host when it is one of the control plane's hosts with an id other than
+    /// `.mac` (#1481, #1496). Its work is that host's, by its id; nil when it is `.mac`.
+    private var macHostElsewhere: HostID? {
+        guard controlLink != nil, let mine = thisMacHostID, mine != .mac else { return nil }
+        return mine
+    }
+
     /// This Mac's host as the control plane last listed it (#1481), read once at launch.
     @ObservationIgnored private var keptHost: DaemonAPI.ControlHost? =
         AppModel.controlKey.flatMap { KeptThisMacHost.read(controlKey: $0, from: WindowDefaults.store) }
@@ -1009,7 +1024,9 @@ final class AppModel {
     /// Nil while the window is connected to it, while the control plane itself is away,
     /// and while the first list is still on its way (that is *Connecting…*).
     var macHostNotice: MacHostNotice? {
-        guard !isConnected, !controlPlaneAway else { return nil }
+        // This Mac's host by an id of its own is reached as the control plane's other hosts
+        // are, and is offline as they are; `.mac`'s connection is not its (#1496).
+        guard !isConnected, !controlPlaneAway, macHostElsewhere == nil else { return nil }
         guard controlLink != nil else { return hosts.isOffline(.mac) ? .notAnswering : nil }
         guard controlPlaneListed else { return nil }
         return MacHostNotice.decide(planeOnThisMac: controlPlaneMachine == MachineID.current,
@@ -1703,7 +1720,7 @@ final class AppModel {
     /// Asked once on connecting, then heard as it changes. A daemon too old to know the
     /// method leaves the list empty, as it would be with nothing to say.
     func refreshStoreNotes() async {
-        guard let notes = try? await client.call(DaemonAPI.Method.storeNotes,
+        guard let notes = try? await macClient.call(DaemonAPI.Method.storeNotes,
                                                  Optional<String>.none,
                                                  returning: DaemonAPI.StoreNotes.self) else { return }
         work.replaceStoreNotes(notes)
@@ -1712,13 +1729,13 @@ final class AppModel {
     /// The milestones (#984), asked once on connecting. A host too old to know the method
     /// leaves them nil, and the Time page shows none.
     func refreshMilestones() async {
-        guard let milestones = try? await client.call(DaemonAPI.Method.milestonesState, Optional<String>.none,
+        guard let milestones = try? await macClient.call(DaemonAPI.Method.milestonesState, Optional<String>.none,
                                                       returning: Milestones.self) else { return }
         takeMilestones(milestones)
     }
 
     func refreshWakeState() async {
-        guard let state = try? await client.call(DaemonAPI.Method.wakeState,
+        guard let state = try? await macClient.call(DaemonAPI.Method.wakeState,
                                                  Optional<String>.none,
                                                  returning: DaemonAPI.WakeState.self) else { return }
         work.replaceWakeState(state)
@@ -1727,7 +1744,7 @@ final class AppModel {
     /// The switch and the hours. A daemon too old to know the method leaves this nil,
     /// and Settings ▸ Mac draws Archived agents alone.
     func refreshWakeSettings() async {
-        wakeSettings = try? await client.call(DaemonAPI.Method.wakeSettings,
+        wakeSettings = try? await macClient.call(DaemonAPI.Method.wakeSettings,
                                               Optional<String>.none,
                                               returning: WakeSettings.self)
     }
@@ -1735,7 +1752,7 @@ final class AppModel {
     /// The person changed Sleep. The daemon clamps the hours and answers with what it kept.
     func setWakeSettings(_ settings: WakeSettings) async {
         await attempt {
-            self.wakeSettings = try await self.client.call(DaemonAPI.Method.wakeSet, settings,
+            self.wakeSettings = try await self.macClient.call(DaemonAPI.Method.wakeSet, settings,
                                                            returning: WakeSettings.self)
         }
     }
@@ -1743,7 +1760,7 @@ final class AppModel {
     /// Every resource and who holds it (036). A daemon too old to know the method
     /// leaves `leases` nil, and nothing about leases is drawn.
     func refreshLeases() async {
-        guard let snapshot = try? await client.call(DaemonAPI.Method.leasesSnapshot,
+        guard let snapshot = try? await macClient.call(DaemonAPI.Method.leasesSnapshot,
                                                     Optional<String>.none,
                                                     returning: DaemonAPI.LeaseSnapshot.self) else { return }
         work.replaceLeases(snapshot)
@@ -1752,7 +1769,7 @@ final class AppModel {
     /// The MCP servers this Mac runs for every agent (#488). A daemon too old to know the
     /// method leaves `hostedMCP` nil, and the Resources page draws no such group.
     func refreshHostedMCP() async {
-        guard let snapshot = try? await client.call(DaemonAPI.Method.mcpHosted, Optional<String>.none,
+        guard let snapshot = try? await macClient.call(DaemonAPI.Method.mcpHosted, Optional<String>.none,
                                                     returning: DaemonAPI.HostedMCPSnapshot.self) else { return }
         work.replaceHostedMCP(snapshot)
     }
@@ -1807,7 +1824,7 @@ final class AppModel {
     /// Every volume low on space (#195). A daemon too old to know the method leaves it
     /// empty, and no strip is drawn.
     func refreshDisk() async {
-        guard let state = try? await client.call(DaemonAPI.Method.diskState, Optional<String>.none,
+        guard let state = try? await macClient.call(DaemonAPI.Method.diskState, Optional<String>.none,
                                                  returning: DiskState.self) else { return }
         work.replaceDisk(state)
     }
@@ -1825,7 +1842,7 @@ final class AppModel {
     func refreshEvents(_ filter: EventFilter? = nil) async {
         let filter = filter ?? work.eventsFilter
         work.eventsFilter = filter
-        guard let page = try? await client.call(DaemonAPI.Method.eventsList, DaemonAPI.EventsListRequest(filter),
+        guard let page = try? await macClient.call(DaemonAPI.Method.eventsList, DaemonAPI.EventsListRequest(filter),
                                                 returning: DaemonAPI.EventsPage.self) else { return }
         work.takeEvents(page, for: filter)
     }
@@ -1834,7 +1851,7 @@ final class AppModel {
     func loadOlderEvents() async {
         let filter = work.eventsFilter
         guard work.moreEvents, let oldest = work.recentEvents.last?.position else { return }
-        guard let page = try? await client.call(DaemonAPI.Method.eventsList,
+        guard let page = try? await macClient.call(DaemonAPI.Method.eventsList,
                                                 DaemonAPI.EventsListRequest(before: oldest, filter),
                                                 returning: DaemonAPI.EventsPage.self) else { return }
         work.takeEvents(page, for: filter, appending: true)
@@ -1842,14 +1859,14 @@ final class AppModel {
 
     /// The person cancelling an agent's wait (042 FR-013). The Mac only.
     func cancelWait(of agentID: UUID) async {
-        _ = try? await client.call(DaemonAPI.Method.eventsCancelWait, DaemonAPI.CancelWaitRequest(agentID: agentID),
+        _ = try? await macClient.call(DaemonAPI.Method.eventsCancelWait, DaemonAPI.CancelWaitRequest(agentID: agentID),
                                    returning: [DaemonAPI.WaitingAgent].self)
     }
 
     /// The person ending a lease (036 US4): one holder's, or with none named, every
     /// one. Never a way to take one.
     func endLease(_ name: ResourceName, holder: UUID? = nil) async {
-        guard let snapshot = try? await client.call(DaemonAPI.Method.leasesEnd,
+        guard let snapshot = try? await macClient.call(DaemonAPI.Method.leasesEnd,
                                                     DaemonAPI.PersonEndRequest(name: name.key,
                                                                                agentID: holder?.uuidString),
                                                     returning: DaemonAPI.LeaseSnapshot.self) else { return }
@@ -1860,7 +1877,7 @@ final class AppModel {
     /// in its words, when it will not keep it.
     func declareResource(_ resource: DeclaredResource, replacing: ResourceName?) async -> String? {
         do {
-            let snapshot = try await client.call(DaemonAPI.Method.resourcesDeclare,
+            let snapshot = try await macClient.call(DaemonAPI.Method.resourcesDeclare,
                                                  DaemonAPI.DeclareResourceRequest(resource: resource,
                                                                                   replacing: replacing?.key),
                                                  returning: DaemonAPI.LeaseSnapshot.self)
@@ -1875,7 +1892,7 @@ final class AppModel {
 
     /// The person taking a declaration away (#116). Whoever holds it keeps the lease.
     func removeDeclaredResource(_ name: ResourceName) async {
-        guard let snapshot = try? await client.call(DaemonAPI.Method.resourcesRemove,
+        guard let snapshot = try? await macClient.call(DaemonAPI.Method.resourcesRemove,
                                                     DaemonAPI.RemoveResourceRequest(name: name.key),
                                                     returning: DaemonAPI.LeaseSnapshot.self) else { return }
         work.replaceLeases(snapshot)
@@ -1883,7 +1900,7 @@ final class AppModel {
 
     /// The person taking one agent out of one line (036 US4).
     func removeFromLine(_ name: ResourceName, agentID: UUID) async {
-        guard let snapshot = try? await client.call(
+        guard let snapshot = try? await macClient.call(
             DaemonAPI.Method.leasesRemoveWaiter,
             DaemonAPI.PersonRemoveRequest(name: name.key, agentID: agentID.uuidString),
             returning: DaemonAPI.LeaseSnapshot.self) else { return }
@@ -1891,7 +1908,7 @@ final class AppModel {
     }
 
     func refreshCostState() async {
-        guard let state = try? await client.call(DaemonAPI.Method.costState,
+        guard let state = try? await macClient.call(DaemonAPI.Method.costState,
                                                  Optional<String>.none,
                                                  returning: DaemonAPI.CostState.self) else { return }
         work.replaceCostState(state)
@@ -1907,14 +1924,14 @@ final class AppModel {
 
     /// Every runtime's state on this Mac (065, US4). Asking also asks Grok what is left.
     func refreshRuntimeAllowances() async {
-        guard let allowances = try? await client.call(DaemonAPI.Method.runtimesAllowances, Optional<String>.none,
+        guard let allowances = try? await macClient.call(DaemonAPI.Method.runtimesAllowances, Optional<String>.none,
                                                       returning: RuntimeAllowances.self) else { return }
         work.replaceRuntimeAllowances(allowances)
     }
 
     /// The person says a runtime is back, by its credential (065).
     func markRuntimeAvailable(_ credentialKey: String) async {
-        guard let allowances = try? await client.call(DaemonAPI.Method.runtimesMarkAvailable,
+        guard let allowances = try? await macClient.call(DaemonAPI.Method.runtimesMarkAvailable,
                                                       DaemonAPI.MarkRuntimeAvailable(credentialKey: credentialKey),
                                                       returning: RuntimeAllowances.self) else { return }
         work.replaceRuntimeAllowances(allowances)
@@ -1925,7 +1942,7 @@ final class AppModel {
     /// (a runtime out of the pool, not installed, not signed in).
     func assessRuntime(_ runtimeID: String, in folder: URL) async -> String? {
         do {
-            let started = try await client.call(DaemonAPI.Method.runtimesAssess,
+            let started = try await macClient.call(DaemonAPI.Method.runtimesAssess,
                                                 DaemonAPI.AssessRuntimeRequest(runtimeID: runtimeID, folder: folder),
                                                 returning: DaemonAPI.AssessRuntimeResult.self)
             openAgent(started.agentID)
@@ -1946,7 +1963,7 @@ final class AppModel {
     }
 
     func refreshRetentionState() async {
-        guard let state = try? await client.call(DaemonAPI.Method.retentionState,
+        guard let state = try? await macClient.call(DaemonAPI.Method.retentionState,
                                                  Optional<String>.none,
                                                  returning: DaemonAPI.RetentionState.self) else { return }
         work.replaceRetentionState(state)
@@ -1957,7 +1974,7 @@ final class AppModel {
     /// the confirmation; confirmed, it is applied here and then on every server, which
     /// keeps to the Mac's settings the way it keeps to its limits (037 R7).
     func setRetention(_ settings: RetentionSettings, confirmed: Bool) async -> DaemonAPI.RetentionSetResult? {
-        guard let result = try? await client.call(
+        guard let result = try? await macClient.call(
             DaemonAPI.Method.retentionSet,
             DaemonAPI.RetentionSetRequest(settings: settings, confirmed: confirmed),
             returning: DaemonAPI.RetentionSetResult.self) else { return nil }
@@ -1976,7 +1993,7 @@ final class AppModel {
     }
 
     func refreshWorkflowLimit() async {
-        workflowLimit = try? await client.call(DaemonAPI.Method.workflowsLimit, Optional<String>.none,
+        workflowLimit = try? await macClient.call(DaemonAPI.Method.workflowsLimit, Optional<String>.none,
                                                returning: WorkflowLimitSettings.self)
     }
 
@@ -1984,7 +2001,7 @@ final class AppModel {
     /// the Mac's settings the way it keeps to its retention.
     func setWorkflowLimit(_ settings: WorkflowLimitSettings) async {
         await attempt {
-            self.workflowLimit = try await self.client.call(DaemonAPI.Method.workflowsSetLimit, settings,
+            self.workflowLimit = try await self.macClient.call(DaemonAPI.Method.workflowsSetLimit, settings,
                                                             returning: WorkflowLimitSettings.self)
         }
         for host in hosts.hosts.all where !hosts.isOffline(host.id) {
@@ -1994,7 +2011,7 @@ final class AppModel {
     }
 
     func refreshClientPermissions() async {
-        guard let settings = try? await client.call(DaemonAPI.Method.clientPermissionsState,
+        guard let settings = try? await macClient.call(DaemonAPI.Method.clientPermissionsState,
                                                     Optional<String>.none,
                                                     returning: ClientPermissionSettings.self) else { return }
         clientPermissions = settings
@@ -2007,18 +2024,18 @@ final class AppModel {
     }
 
     private func sendDisplayPreferences(_ changes: DaemonAPI.DisplayPreferences) {
-        Task { _ = try? await client.call(DaemonAPI.Method.preferencesSet, changes,
+        Task { _ = try? await macClient.call(DaemonAPI.Method.preferencesSet, changes,
                                          returning: DaemonAPI.DisplayPreferences.self) }
     }
 
     func refreshDisplayPreferences() async {
-        guard let preferences = try? await client.call(DaemonAPI.Method.preferencesGet, Optional<String>.none,
+        guard let preferences = try? await macClient.call(DaemonAPI.Method.preferencesGet, Optional<String>.none,
                                                        returning: DaemonAPI.DisplayPreferences.self) else { return }
         displayMirror.hostSaid(preferences)
     }
 
     func refreshPerson() async {
-        guard let settings = try? await client.call(DaemonAPI.Method.personState, Optional<String>.none,
+        guard let settings = try? await macClient.call(DaemonAPI.Method.personState, Optional<String>.none,
                                                     returning: PersonSettings.self) else { return }
         person = settings
     }
@@ -2029,7 +2046,7 @@ final class AppModel {
     func setPerson(_ settings: PersonSettings) async {
         var saved: PersonSettings?
         await attempt {
-            saved = try await self.client.call(DaemonAPI.Method.personSet, settings, returning: PersonSettings.self)
+            saved = try await self.macClient.call(DaemonAPI.Method.personSet, settings, returning: PersonSettings.self)
         }
         guard let saved else { return }
         person = saved
@@ -2043,7 +2060,7 @@ final class AppModel {
     func setClientPermissions(_ settings: ClientPermissionSettings) async {
         var saved: ClientPermissionSettings?
         await attempt {
-            saved = try await self.client.call(DaemonAPI.Method.clientPermissionsSet, settings,
+            saved = try await self.macClient.call(DaemonAPI.Method.clientPermissionsSet, settings,
                                                returning: ClientPermissionSettings.self)
         }
         guard let saved else { return }
@@ -2076,7 +2093,7 @@ final class AppModel {
     }
 
     func refreshSandboxSettings() async {
-        guard let settings = try? await client.call(DaemonAPI.Method.sandboxState, Optional<String>.none,
+        guard let settings = try? await macClient.call(DaemonAPI.Method.sandboxState, Optional<String>.none,
                                                     returning: SandboxSettings.self) else { return }
         sandboxSettings = settings
     }
@@ -2089,7 +2106,7 @@ final class AppModel {
         sandboxSettings = wanted
         var saved: SandboxSettings?
         await attempt {
-            saved = try await self.client.call(DaemonAPI.Method.sandboxSet, wanted,
+            saved = try await self.macClient.call(DaemonAPI.Method.sandboxSet, wanted,
                                                returning: SandboxSettings.self)
         }
         // Not kept, so not shown: the picker goes back to what the host still has (073).
@@ -2122,7 +2139,7 @@ final class AppModel {
         var set: DaemonAPI.CostState?
         // A limit that did not take is said, not left looking set (073).
         await attempt {
-            set = try await self.client.call(DaemonAPI.Method.costSetLimits,
+            set = try await self.macClient.call(DaemonAPI.Method.costSetLimits,
                                              DaemonAPI.SetLimitsRequest(perAgent: perAgent, daily: daily,
                                                                         perAgentTokens: perAgentTokens,
                                                                         dailyTokens: dailyTokens),
@@ -2145,8 +2162,9 @@ final class AppModel {
     private(set) var serverDisks: [HostID: DiskState] = [:]
 
     /// What the servers have spent today, together, per currency. Empty when nothing.
+    /// This Mac's host by an id of its own is this Mac's spending, not a server's (#1496).
     var serversToday: [String: Decimal] {
-        serverCosts.values.reduce(into: [:]) { sum, state in
+        serverCosts.filter { $0.key != macHostElsewhere }.values.reduce(into: [:]) { sum, state in
             for (currency, amount) in state.today { sum[currency, default: 0] += amount }
         }
     }
@@ -2705,6 +2723,14 @@ final class AppModel {
         // The control plane's own client, started whether or not this Mac's host
         // answers: a host can be down while the control plane is up (frame H).
         if controlLink != nil { watchControlHosts() }
+        // This Mac's host has an id of its own (#1496): `reach` connects it, as the control
+        // plane's other hosts, and no host is `.mac` to dial.
+        if let mine = macHostElsewhere {
+            hosts.macDownSince = nil
+            missesWithHostUp = 0
+            isConnected = await controlHosts[mine]?.isConnected ?? false
+            return
+        }
         do {
             try await client.connect()
             isConnected = true
@@ -3166,6 +3192,12 @@ final class AppModel {
         }
         await refreshServer(id)
         await reattachShells(on: id)
+        // This Mac's host by an id of its own (#1496): what is this Mac's own comes from it.
+        if id == macHostElsewhere {
+            isConnected = true
+            hosts.macDownSince = nil
+            await refreshThisMacsOwn()
+        }
         // Presence starts with this Mac's host; a control plane with none starts it
         // with its first other host.
         startPresence()
@@ -3202,6 +3234,12 @@ final class AppModel {
 
     private func receivedFromServer(_ host: HostID, _ method: String, _ params: JSONValue?,
                                     _ update: AgentsModel.Update?) async {
+        // This Mac's host by an id of its own (#1496): what it says of this Mac is the
+        // window's own, as `.mac`'s is.
+        if host == macHostElsewhere, Self.aboutThisMac.contains(method) {
+            await received(method, params, update)
+            return
+        }
         // What is about the whole of a daemon rather than its work is the Mac's alone in
         // the model: a server's spending is kept beside it, and a server's wakefulness,
         // modes and notices have no place in this window (037).
@@ -3212,7 +3250,7 @@ final class AppModel {
             // Codex spends the Mac's ChatGPT plan, so a refusal there is the Mac's plan out.
             let shared = (try? params?.decode(RuntimeAllowances.self))?.shared ?? []
             if !shared.isEmpty {
-                _ = try? await client.call(DaemonAPI.Method.poolApplyAllowances,
+                _ = try? await macClient.call(DaemonAPI.Method.poolApplyAllowances,
                                            DaemonAPI.ApplyAllowances(states: shared), returning: Bool.self)
             }
             return
@@ -3358,6 +3396,41 @@ final class AppModel {
         for chat in popouts.values where theirs.contains(chat.id) { await loadTranscript(of: chat) }
     }
 
+    /// What a host says about the whole of this Mac rather than its work (#1496).
+    private static let aboutThisMac: Set<String> = [
+        DaemonAPI.Notification.runtimesAllowancesChanged, DaemonAPI.Notification.costChanged,
+        DaemonAPI.Notification.leasesChanged, DaemonAPI.Notification.eventsChanged,
+        DaemonAPI.Notification.mcpHostedChanged, DaemonAPI.Notification.wakeChanged,
+        DaemonAPI.Notification.modesChanged, DaemonAPI.Notification.storeNotesChanged,
+        DaemonAPI.Notification.milestonesChanged, DaemonAPI.Notification.preferencesChanged,
+        DaemonAPI.Notification.runtimeChanged, DaemonAPI.Notification.runtimeAccountChanged,
+        DaemonAPI.Notification.signInNeeded, DaemonAPI.Notification.clientPermissionsChanged,
+        DaemonAPI.Notification.personChanged, DaemonAPI.Notification.sandboxChanged,
+    ]
+
+    /// What is this Mac's own, from this Mac's host by an id of its own (#1496). Its
+    /// agents and projects come with `refreshServer`, under that id.
+    private func refreshThisMacsOwn() async {
+        async let runtimes: Void = refreshRuntimes()
+        async let accounts: Void = refreshAccounts()
+        async let cost: Void = refreshCostState()
+        async let retention: Void = refreshRetentionState()
+        async let clientPermissions: Void = refreshClientPermissions()
+        async let sandbox: Void = refreshSandboxSettings()
+        async let person: Void = refreshPerson()
+        async let runtimeStates: Void = refreshRuntimeAllowances()
+        async let wake: Void = refreshWakeState()
+        async let storeNotes: Void = refreshStoreNotes()
+        async let milestones: Void = refreshMilestones()
+        async let leases: Void = refreshLeases()
+        async let hostedMCP: Void = refreshHostedMCP()
+        async let events: Void = refreshEvents()
+        async let modes: Void = refreshModes()
+        async let display: Void = refreshDisplayPreferences()
+        _ = await (runtimes, accounts, cost, retention, clientPermissions, sandbox, person, runtimeStates, wake,
+                   storeNotes, milestones, leases, hostedMCP, events, modes, display)
+    }
+
     func refreshEverything() async {
         await refreshAgents()
         // After the agents, because a project's counts are worked out from them and a
@@ -3463,11 +3536,11 @@ final class AppModel {
         var snapshot: DaemonAPI.SharedSnapshot?
         _ = await attempt {
             if let project {
-                snapshot = try await self.client.call(DaemonAPI.Method.personalShared,
+                snapshot = try await self.macClient.call(DaemonAPI.Method.personalShared,
                                                       DaemonAPI.SharedRequest(folder: project.path),
                                                       returning: DaemonAPI.SharedSnapshot.self)
             } else {
-                snapshot = try await self.client.call(DaemonAPI.Method.personalShared, Optional<String>.none,
+                snapshot = try await self.macClient.call(DaemonAPI.Method.personalShared, Optional<String>.none,
                                                       returning: DaemonAPI.SharedSnapshot.self)
             }
         }
@@ -3481,7 +3554,7 @@ final class AppModel {
     func catalogSearch(_ query: String, marketplace: String? = nil,
                        destination: DaemonAPI.SkillDestination? = nil) async -> DaemonAPI.CatalogSearchAnswer {
         do {
-            return try await client.call(DaemonAPI.Method.catalogSearch,
+            return try await macClient.call(DaemonAPI.Method.catalogSearch,
                                          DaemonAPI.CatalogSearchRequest(query: query, marketplace: marketplace,
                                                                         destination: destination),
                                          returning: DaemonAPI.CatalogSearchAnswer.self)
@@ -3493,7 +3566,7 @@ final class AppModel {
     func catalogPreview(_ result: DaemonAPI.CatalogResult,
                         for destination: DaemonAPI.SkillDestination) async -> DaemonAPI.CatalogPreviewAnswer {
         do {
-            return try await client.call(DaemonAPI.Method.catalogPreview,
+            return try await macClient.call(DaemonAPI.Method.catalogPreview,
                                          DaemonAPI.CatalogPreviewRequest(result: result, destination: destination),
                                          returning: DaemonAPI.CatalogPreviewAnswer.self)
         } catch {
@@ -3503,7 +3576,7 @@ final class AppModel {
 
     func catalogDestinationState(_ previewID: UUID,
                                  for destination: DaemonAPI.SkillDestination) async -> DaemonAPI.DestinationState? {
-        try? await client.call(DaemonAPI.Method.catalogDestinationState,
+        try? await macClient.call(DaemonAPI.Method.catalogDestinationState,
                                DaemonAPI.DestinationStateRequest(previewID: previewID, destination: destination),
                                returning: DaemonAPI.DestinationStateAnswer.self).destinationState
     }
@@ -3511,7 +3584,7 @@ final class AppModel {
     func addSkill(_ previewID: UUID, to destination: DaemonAPI.SkillDestination,
                   replace: Bool) async -> Result<DaemonAPI.ManagedSkill, DaemonAPI.CatalogError> {
         do {
-            let answer = try await client.call(DaemonAPI.Method.skillsAdd,
+            let answer = try await macClient.call(DaemonAPI.Method.skillsAdd,
                                                DaemonAPI.SkillAddRequest(previewID: previewID, destination: destination,
                                                                          replace: replace),
                                                returning: DaemonAPI.SkillAddAnswer.self)
@@ -3529,7 +3602,7 @@ final class AppModel {
 
     /// Skills in `~/.agents/skills` or a project's `.agents/skills`.
     func skills(at destination: DaemonAPI.SkillDestination) async -> [DaemonAPI.ListedSkill]? {
-        try? await client.call(DaemonAPI.Method.skillsList,
+        try? await macClient.call(DaemonAPI.Method.skillsList,
                                DaemonAPI.SkillsListRequest(destination: destination),
                                returning: DaemonAPI.SkillsListAnswer.self).skills
     }
@@ -3537,14 +3610,14 @@ final class AppModel {
     /// Whether each added skill at a destination has an update (FR-018). Nil when it could
     /// not be asked; the page then shows no marks rather than wrong ones.
     func skillUpdates(at destination: DaemonAPI.SkillDestination) async -> [String: DaemonAPI.UpdateState]? {
-        try? await client.call(DaemonAPI.Method.skillsCheckUpdates, DaemonAPI.SkillsListRequest(destination: destination),
+        try? await macClient.call(DaemonAPI.Method.skillsCheckUpdates, DaemonAPI.SkillsListRequest(destination: destination),
                                returning: DaemonAPI.SkillUpdatesAnswer.self).updates
     }
 
     func skillUpdatePreview(_ name: String, at destination: DaemonAPI.SkillDestination)
         async -> Result<DaemonAPI.SkillUpdatePreviewAnswer, DaemonAPI.CatalogError> {
         do {
-            return .success(try await client.call(DaemonAPI.Method.skillsUpdatePreview,
+            return .success(try await macClient.call(DaemonAPI.Method.skillsUpdatePreview,
                                                   DaemonAPI.SkillNameRequest(destination: destination, name: name),
                                                   returning: DaemonAPI.SkillUpdatePreviewAnswer.self))
         } catch {
@@ -3555,7 +3628,7 @@ final class AppModel {
     /// Take out a skill the app or the skills tool added; its folder goes to the Trash.
     func removeSkill(_ name: String, at destination: DaemonAPI.SkillDestination) async -> DaemonAPI.CatalogError? {
         do {
-            _ = try await client.call(DaemonAPI.Method.skillsRemove,
+            _ = try await macClient.call(DaemonAPI.Method.skillsRemove,
                                       DaemonAPI.SkillNameRequest(destination: destination, name: name),
                                       returning: DaemonAPI.SkillRemoveAnswer.self)
             return nil
@@ -3579,7 +3652,7 @@ final class AppModel {
     /// when the daemon could not be asked.
     func marketplaces(_ kind: DaemonAPI.CatalogKind,
                       for destination: DaemonAPI.SkillDestination?) async -> DaemonAPI.MarketplacesListAnswer? {
-        try? await client.call(DaemonAPI.Method.marketplacesList,
+        try? await macClient.call(DaemonAPI.Method.marketplacesList,
                                DaemonAPI.MarketplacesListRequest(kind: kind, destination: destination),
                                returning: DaemonAPI.MarketplacesListAnswer.self)
     }
@@ -3600,7 +3673,7 @@ final class AppModel {
 
     private func marketplaceCall<P: Encodable & Sendable>(_ method: String, _ params: P) async -> String? {
         do {
-            _ = try await client.call(method, params, returning: DaemonAPI.MarketplacesListAnswer.self)
+            _ = try await macClient.call(method, params, returning: DaemonAPI.MarketplacesListAnswer.self)
             return nil
         } catch let rpc as JSONRPCError {
             return rpc.message
@@ -3614,7 +3687,7 @@ final class AppModel {
     func mcpSearch(_ query: String, marketplace: String? = nil,
                    destination: DaemonAPI.SkillDestination? = nil) async -> DaemonAPI.MCPSearchAnswer {
         do {
-            return try await client.call(DaemonAPI.Method.catalogSearch,
+            return try await macClient.call(DaemonAPI.Method.catalogSearch,
                                          DaemonAPI.CatalogSearchRequest(query: query, kind: .mcp, marketplace: marketplace,
                                                                         destination: destination),
                                          returning: DaemonAPI.MCPSearchAnswer.self)
@@ -3627,7 +3700,7 @@ final class AppModel {
                     for destination: DaemonAPI.SkillDestination,
                     run: DaemonAPI.MCPRunKind?) async -> DaemonAPI.MCPPreviewAnswer {
         do {
-            return try await client.call(DaemonAPI.Method.mcpPreview,
+            return try await macClient.call(DaemonAPI.Method.mcpPreview,
                                          DaemonAPI.MCPPreviewRequest(result: result, destination: destination, run: run),
                                          returning: DaemonAPI.MCPPreviewAnswer.self)
         } catch {
@@ -3636,7 +3709,7 @@ final class AppModel {
     }
 
     func mcpServers(at destination: DaemonAPI.SkillDestination) async -> DaemonAPI.MCPListAnswer? {
-        try? await client.call(DaemonAPI.Method.mcpList,
+        try? await macClient.call(DaemonAPI.Method.mcpList,
                                DaemonAPI.MCPListRequest(destination: destination),
                                returning: DaemonAPI.MCPListAnswer.self)
     }
@@ -3644,7 +3717,7 @@ final class AppModel {
     /// Write one name into `secrets.env`. The value is not kept here.
     func mcpSetSecret(name: String, value: String) async -> DaemonAPI.MCPCatalogError? {
         do {
-            _ = try await client.call(DaemonAPI.Method.mcpSetSecret,
+            _ = try await macClient.call(DaemonAPI.Method.mcpSetSecret,
                                      DaemonAPI.MCPSetSecretRequest(name: name, value: value),
                                      returning: DaemonAPI.MCPSetSecretAnswer.self)
             return nil
@@ -3656,7 +3729,7 @@ final class AppModel {
     func mcpRemove(_ name: String, at destination: DaemonAPI.SkillDestination,
                    forgetSecret: String?) async -> DaemonAPI.MCPCatalogError? {
         do {
-            _ = try await client.call(DaemonAPI.Method.mcpRemove,
+            _ = try await macClient.call(DaemonAPI.Method.mcpRemove,
                                      DaemonAPI.MCPRemoveRequest(destination: destination, name: name,
                                                                forgetSecret: forgetSecret),
                                      returning: DaemonAPI.MCPRemoveAnswer.self)
@@ -3669,7 +3742,7 @@ final class AppModel {
     /// Ask Again for a server's views (#191): forget the person's Show or Don't Show.
     func forgetMCPViews(_ name: String, at destination: DaemonAPI.SkillDestination) async -> Bool {
         do {
-            _ = try await client.call(DaemonAPI.Method.mcpForgetViews,
+            _ = try await macClient.call(DaemonAPI.Method.mcpForgetViews,
                                       DaemonAPI.MCPViewsForgetRequest(destination: destination, name: name),
                                       returning: DaemonAPI.Empty.self)
             return true
@@ -3681,7 +3754,7 @@ final class AppModel {
     /// Approve the entry the row showed. A digest that no longer matches comes back as an error.
     func approveProjectMCP(_ name: String, digest: String, in folder: URL) async -> DaemonAPI.MCPCatalogError? {
         do {
-            _ = try await client.call(DaemonAPI.Method.mcpApprove,
+            _ = try await macClient.call(DaemonAPI.Method.mcpApprove,
                                       DaemonAPI.MCPApproveRequest(destination: .project(folder: folder.path),
                                                                   name: name, digest: digest),
                                       returning: DaemonAPI.MCPListAnswer.self)
@@ -3695,7 +3768,7 @@ final class AppModel {
                 secrets: [String: String], plain: [String: String],
                 replace: Bool) async -> Result<DaemonAPI.ManagedMCPServer, DaemonAPI.MCPCatalogError> {
         do {
-            let answer = try await client.call(DaemonAPI.Method.mcpAdd,
+            let answer = try await macClient.call(DaemonAPI.Method.mcpAdd,
                                                DaemonAPI.MCPAddRequest(previewID: previewID, destination: destination,
                                                                        secrets: secrets, plain: plain, replace: replace),
                                                returning: DaemonAPI.MCPAddAnswer.self)
@@ -3710,7 +3783,7 @@ final class AppModel {
     func mcpVerify(_ server: DaemonAPI.MCPHandServer,
                    for destination: DaemonAPI.SkillDestination) async -> DaemonAPI.MCPVerifyAnswer {
         do {
-            return try await client.call(DaemonAPI.Method.mcpVerify,
+            return try await macClient.call(DaemonAPI.Method.mcpVerify,
                                          DaemonAPI.MCPVerifyRequest(destination: destination, server: server),
                                          returning: DaemonAPI.MCPVerifyAnswer.self)
         } catch {
@@ -3721,7 +3794,7 @@ final class AppModel {
     func mcpAddByHand(_ verifyID: UUID, to destination: DaemonAPI.SkillDestination)
         async -> Result<DaemonAPI.ManagedMCPServer, DaemonAPI.MCPCatalogError> {
         do {
-            let answer = try await client.call(DaemonAPI.Method.mcpAddByHand,
+            let answer = try await macClient.call(DaemonAPI.Method.mcpAddByHand,
                                                DaemonAPI.MCPAddByHandRequest(verifyID: verifyID, destination: destination),
                                                returning: DaemonAPI.MCPAddAnswer.self)
             if let server = answer.server { return .success(server) }
@@ -3736,7 +3809,7 @@ final class AppModel {
     func mcpSignIn(_ target: DaemonAPI.MCPSignInTarget,
                    client: DaemonAPI.MCPSignInClient? = nil) async -> DaemonAPI.MCPSignInAnswer {
         do {
-            return try await self.client.call(DaemonAPI.Method.mcpSignIn,
+            return try await self.macClient.call(DaemonAPI.Method.mcpSignIn,
                                               DaemonAPI.MCPSignInRequest(target: target, client: client),
                                               returning: DaemonAPI.MCPSignInAnswer.self)
         } catch {
@@ -3747,7 +3820,7 @@ final class AppModel {
     /// Wait on a sign-in, a while at a time: `waiting` means ask again.
     func mcpSignInWait(_ flowID: UUID) async -> DaemonAPI.MCPSignInStatus {
         do {
-            return try await client.call(DaemonAPI.Method.mcpSignInWait, DaemonAPI.MCPSignInFlowRequest(flowID: flowID),
+            return try await macClient.call(DaemonAPI.Method.mcpSignInWait, DaemonAPI.MCPSignInFlowRequest(flowID: flowID),
                                          returning: DaemonAPI.MCPSignInWaitAnswer.self).status
         } catch {
             return .failed("The app lost touch with its host while waiting.")
@@ -3755,14 +3828,14 @@ final class AppModel {
     }
 
     func mcpSignInCancel(_ flowID: UUID) async {
-        _ = try? await client.call(DaemonAPI.Method.mcpSignInCancel, DaemonAPI.MCPSignInFlowRequest(flowID: flowID),
+        _ = try? await macClient.call(DaemonAPI.Method.mcpSignInCancel, DaemonAPI.MCPSignInFlowRequest(flowID: flowID),
                                    returning: DaemonAPI.MCPSignInWaitAnswer.self)
     }
 
     /// Forget a server's sign-in. Nil, or why it could not.
     func mcpSignOut(_ target: DaemonAPI.MCPSignInTarget) async -> String? {
         do {
-            return try await client.call(DaemonAPI.Method.mcpSignOut, DaemonAPI.MCPSignOutRequest(target: target),
+            return try await macClient.call(DaemonAPI.Method.mcpSignOut, DaemonAPI.MCPSignOutRequest(target: target),
                                          returning: DaemonAPI.MCPSignOutAnswer.self).error
         } catch {
             return "It couldn't be signed out: the app could not reach its host."
@@ -3779,7 +3852,7 @@ final class AppModel {
 
     func refreshRuntimes() async {
         let listed = await attempt {
-            self.runtimes = RuntimeCatalog.sortedByName(try await self.client.call(DaemonAPI.Method.runtimesList,
+            self.runtimes = RuntimeCatalog.sortedByName(try await self.macClient.call(DaemonAPI.Method.runtimesList,
                                                                                    Optional<String>.none,
                                                                                    returning: [RuntimeStatus].self))
         }
@@ -3794,7 +3867,7 @@ final class AppModel {
     /// with it and the new-agent menu has it the moment it is there.
     func installRuntime(_ runtimeID: String) async {
         await attempt {
-            let status = try await self.client.call(DaemonAPI.Method.runtimesInstall,
+            let status = try await self.macClient.call(DaemonAPI.Method.runtimesInstall,
                                                     DaemonAPI.RuntimeRequest(runtimeID: runtimeID),
                                                     returning: RuntimeStatus.self)
             if let index = self.runtimes.firstIndex(where: { $0.id == status.id }) {
@@ -4125,7 +4198,7 @@ final class AppModel {
     /// Every project's worktrees on this Mac, for Activity ▸ Worktrees (#790). Sizes the
     /// daemon has not measured yet come later, on `worktrees/sized`.
     func loadWorktrees() async {
-        guard let listed = try? await client.call(DaemonAPI.Method.worktreesAll, DaemonAPI.Empty(),
+        guard let listed = try? await macClient.call(DaemonAPI.Method.worktreesAll, DaemonAPI.Empty(),
                                                   returning: [DaemonAPI.ProjectWorktrees].self) else { return }
         work.replaceWorktrees(listed)
     }
@@ -4134,7 +4207,7 @@ final class AppModel {
     /// not be asked (and `problem` says why).
     func checkWorktreeRemoval(_ root: URL, in project: URL) async -> DaemonAPI.RemovalCheck? {
         do {
-            return try await client.call(DaemonAPI.Method.worktreesCheck,
+            return try await macClient.call(DaemonAPI.Method.worktreesCheck,
                                          DaemonAPI.WorktreeRemovalRequest(project: project, root: root),
                                          returning: DaemonAPI.RemovalCheck.self)
         } catch {
@@ -4147,7 +4220,7 @@ final class AppModel {
     /// what would be lost; the daemon checks again either way.
     func removeWorktree(_ root: URL, in project: URL, confirmed: Bool) async {
         do {
-            _ = try await client.call(DaemonAPI.Method.worktreesRemove,
+            _ = try await macClient.call(DaemonAPI.Method.worktreesRemove,
                                       DaemonAPI.WorktreeRemovalRequest(project: project, root: root,
                                                                        confirmed: confirmed),
                                       returning: DaemonAPI.WorktreeRemoved.self)
@@ -4163,7 +4236,7 @@ final class AppModel {
     func removeBuildOutput(_ root: URL, in project: URL) async -> String? {
         defer { Task { await loadWorktrees() } }
         do {
-            let removed = try await client.call(DaemonAPI.Method.worktreesRemoveBuildOutput,
+            let removed = try await macClient.call(DaemonAPI.Method.worktreesRemoveBuildOutput,
                                                 DaemonAPI.WorktreeRemovalRequest(project: project, root: root),
                                                 returning: DaemonAPI.BuildOutputRemoved.self)
             return WorktreeTally.freedWords(removed)
@@ -4628,7 +4701,7 @@ final class AppModel {
     }
 
     func refreshAccounts() async {
-        guard let list = try? await client.call(DaemonAPI.Method.runtimesAccounts,
+        guard let list = try? await macClient.call(DaemonAPI.Method.runtimesAccounts,
                                                 Optional<Int>.none,
                                                 returning: [RuntimeAccount].self) else { return }
         accounts = Dictionary(uniqueKeysWithValues: list.map { ($0.runtimeID, $0) })
@@ -4768,7 +4841,7 @@ final class AppModel {
     /// on the runtime's own current mode, which is what it did before anything was
     /// remembered.
     func refreshModes() async {
-        let modes = try? await client.call(DaemonAPI.Method.modesRemembered, Optional<Int>.none,
+        let modes = try? await macClient.call(DaemonAPI.Method.modesRemembered, Optional<Int>.none,
                                            returning: DaemonAPI.RememberedModes.self)
         if let modes { work.replaceRememberedModes(modes) }
     }
@@ -4944,7 +5017,7 @@ final class AppModel {
 
     func signIn(runtimeID: String, methodID: String) async -> String? {
         do {
-            let account = try await client.call(DaemonAPI.Method.runtimeAuthenticate,
+            let account = try await macClient.call(DaemonAPI.Method.runtimeAuthenticate,
                                                 DaemonAPI.AuthenticateRequest(runtimeID: runtimeID,
                                                                               methodID: methodID),
                                                 returning: RuntimeAccount.self)
@@ -4965,7 +5038,7 @@ final class AppModel {
 
     func signOut(runtimeID: String) async {
         await attempt {
-            _ = try await self.client.call(DaemonAPI.Method.runtimeLogOut,
+            _ = try await self.macClient.call(DaemonAPI.Method.runtimeLogOut,
                                            DaemonAPI.RuntimeRequest(runtimeID: runtimeID),
                                            returning: [UUID].self)
         }
@@ -4975,7 +5048,7 @@ final class AppModel {
 
     func setProvider(runtimeID: String, providerID: String) async {
         await attempt {
-            _ = try await self.client.call(DaemonAPI.Method.runtimeSetProvider,
+            _ = try await self.macClient.call(DaemonAPI.Method.runtimeSetProvider,
                                            DaemonAPI.SetProviderRequest(runtimeID: runtimeID,
                                                                         providerID: providerID),
                                            returning: RuntimeAccount.self)
@@ -4985,7 +5058,7 @@ final class AppModel {
 
     func disableProvider(runtimeID: String, providerID: String) async {
         await attempt {
-            _ = try await self.client.call(DaemonAPI.Method.runtimeDisableProvider,
+            _ = try await self.macClient.call(DaemonAPI.Method.runtimeDisableProvider,
                                            DaemonAPI.SetProviderRequest(runtimeID: runtimeID,
                                                                         providerID: providerID),
                                            returning: RuntimeAccount.self)
@@ -5190,7 +5263,7 @@ final class AppModel {
     func attempt(on host: HostID = .mac, quietWhenDown: Bool = false, _ work: () async throws -> Void) async -> Bool {
         // Already known to be quiet: said now, naming why, not after waiting out a
         // connect the reconnect loop is already making (#83, #303). The strip has Try Again.
-        if host == .mac, !controlPlaneAway, hosts.isOffline(.mac) || macHostNotice != nil {
+        if host == .mac, !controlPlaneAway, hosts.isOffline(macHostElsewhere ?? .mac) || macHostNotice != nil {
             problem = macHostNotice?.action ?? HostSet.macDownProblem
             return false
         }
