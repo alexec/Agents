@@ -28,6 +28,7 @@ import { ContextMeter, CostLimitBanner, SandboxCapsule } from "./PromptStatus";
 import { RenameInput, SessionButtons, SessionMenu } from "./SessionMenu";
 import { drawable } from "../model/options";
 import { quietLine } from "../model/activity";
+import { sentPrompts } from "../model/promptHistory";
 import { asksToArchive, projectFolder } from "../model/groups";
 import { initialDetail, toggled } from "../model/turnDetail";
 import { CallActionsContext, fromLine, ItemRow, TurnView, type CallActions, type TurnDetail } from "./chat/Rows";
@@ -532,6 +533,7 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
             goOn={() => void store.letAgentGoOn(host, agent)} />}
           recipient={store.recipient(host)}
           capabilities={agent ? store.account(host, agent.runtimeID)?.promptCapabilities : undefined}
+          sent={agent ? sentPrompts(store.turns.value, store.entries.value) : []}
           send={(text, attachments) => {
             // Sending is asking for the end, as the window's prompt does (#378).
             toEnd();

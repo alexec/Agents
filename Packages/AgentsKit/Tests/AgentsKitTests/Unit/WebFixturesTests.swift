@@ -822,6 +822,49 @@ struct WebFixturesTests {
         }
     }
 
+    // MARK: prompt/
+
+    /// Up and Down in the prompt bar (#1551): which prompt each key gives back, and which
+    /// prompts count as the person's.
+    @Test func promptHistory() throws {
+        let sent = ["first", "second", "third"]
+        let steps: [(String, String, String, [String], Int?)] = [
+            ("up from empty", "up", "", sent, nil), ("up again", "up", "third", sent, 0),
+            ("up at the oldest", "up", "first", sent, 2), ("up with nothing sent", "up", "", [], nil),
+            ("up on typed words", "up", "half typed", sent, nil), ("up on a changed recall", "up", "third!", sent, 0),
+            ("down to newer", "down", "second", sent, 1), ("down past the newest", "down", "third", sent, 0),
+            ("down on typed words", "down", "half typed", sent, nil), ("down from empty", "down", "", sent, nil),
+            ("up on empty after sending", "up", "", sent + ["fourth"], 0),
+        ]
+        let cases = steps.map { name, direction, text, sent, at in
+            Case(name: name, input: .object(["direction": .string(direction), "text": .string(text),
+                                             "sent": .array(sent.map(JSONValue.string)),
+                                             "at": at.map { .int($0) } ?? .null]))
+        }
+        try pin("prompt/recall.json", cases) { input in
+            let direction = PromptHistory.Direction(rawValue: input["direction"]?.stringValue ?? "")!
+            let sent = (input["sent"]?.arrayValue ?? []).compactMap(\.stringValue)
+            let at = try (input["at"] ?? .null).decode(Int?.self)
+            guard let step = PromptHistory.recall(direction, text: input["text"]?.stringValue ?? "",
+                                                  sent: sent, at: at) else { return .null }
+            return .object(["text": .string(step.text), "at": step.at.map { .int($0) } ?? .null])
+        }
+
+        let ask = { (n: Int, text: String) in Self.entry(n, .userMessage(text)) }
+        let turns = [TurnSummary.of([ask(1, "fix the build"), Self.entry(2, .agentMessage(messageID: nil, text: "Done."))], start: 0),
+                     TurnSummary.of([ask(3, "fix the build")], start: 2),
+                     TurnSummary.of([Self.entry(4, .userMessage("from a helper", from: .agent))], start: 3)]
+        let entries = [Self.entry(5, .userMessage("Did it work?", from: .app)), ask(6, "now the tests"),
+                       Self.entry(7, .agentMessage(messageID: nil, text: "Running."))]
+        let sentCases = [Case(name: "the person's, oldest first, repeats once",
+                              input: .object(["turns": try Self.encode(turns), "entries": try Self.encode(entries)]))]
+        try pin("prompt/sent.json", sentCases) { input in
+            let turns = try (input["turns"] ?? .null).decode([TurnSummary].self)
+            let entries = try (input["entries"] ?? .null).decode([TranscriptEntry].self)
+            return .array(PromptHistory.sent(turns: turns, entries: entries).map(JSONValue.string))
+        }
+    }
+
     // MARK: sandbox/
 
     @Test func sandbox() throws {

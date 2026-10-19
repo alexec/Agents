@@ -11,6 +11,7 @@
 // A `/` at the start of a word lists the runtime's commands, and an `@` the files the host finds
 // under the agent's folders (#255), over the field as the window's CommandList and MentionList:
 // arrows move, Return or Tab takes one, Escape puts the list away for that word.
+import { recall } from "../model/promptHistory";
 import { useSignal } from "@preact/signals";
 import { useEffect, useRef } from "preact/hooks";
 import type { ComponentChildren } from "preact";
@@ -28,7 +29,7 @@ const slowSend = 400;
 const mentionPause = 150;
 
 export function Prompt({ store, draftKey, placeholder, capabilities, disabled, send, recipient, starting = false, where, runtime, onTyping, children,
-  stop, acting, queues = false, suggestion, commands = [], findFiles, banner }: {
+  stop, acting, queues = false, suggestion, commands = [], findFiles, banner, sent = [] }: {
   store: Store;
   /** Where the draft is kept: a session, or a new-agent form. */
   draftKey: string;
@@ -64,6 +65,8 @@ export function Prompt({ store, draftKey, placeholder, capabilities, disabled, s
   findFiles?: ((term: string) => Promise<FileMentionDTO[]>) | undefined;
   /** A limit notice, above the field as in both Swift clients. */
   banner?: ComponentChildren;
+  /** The prompts the person sent in this session, oldest first: what Up gives back (#1551). */
+  sent?: readonly string[];
 }) {
   const kept = store.drafts.get(draftKey);
   const text = useSignal(kept?.text ?? "");
@@ -76,6 +79,8 @@ export function Prompt({ store, draftKey, placeholder, capabilities, disabled, s
   const dismissed = useSignal<string | null>(null);
   const mentions = useSignal<FileMentionDTO[]>([]);
   const selected = useSignal(0);
+  /** How far back Up has gone through `sent`; null at the bar's own text (#1551). */
+  const recalled = useSignal<number | null>(null);
   // The word whose list Escape put away; typing on brings it back.
   const putAway = useSignal<string | null>(null);
   const search = useRef(0);
@@ -281,6 +286,16 @@ export function Prompt({ store, draftKey, placeholder, capabilities, disabled, s
                   putAway.value = listing === "commands" ? `/${command?.term}` : `@${mention?.term}`;
                   return;
                 }
+              }
+              // The prompts sent before, as a terminal gives back its commands (#1551).
+              const step = (e.key === "ArrowUp" || e.key === "ArrowDown") && !e.isComposing && !e.shiftKey && !e.altKey && !e.metaKey && !e.ctrlKey
+                ? recall(e.key === "ArrowUp" ? "up" : "down", text.value, sent, recalled.value) : null;
+              if (step) {
+                e.preventDefault();
+                text.value = step.text;
+                recalled.value = step.at;
+                keep();
+                return;
               }
               if (e.key === "Enter" && !e.isComposing) {
                 e.preventDefault();

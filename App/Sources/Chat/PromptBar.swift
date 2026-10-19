@@ -23,6 +23,11 @@ struct PromptBar: View {
     /// over a new session to look at it (#987).
     var presence: ((_ focused: Bool, _ typed: Int) -> Void)?
     @State private var text = ""
+    /// How far back Up has gone through the prompts sent here; nil at the prompt bar's
+    /// own text (#1551).
+    @State private var recalled: Int?
+    /// The prompts the person sent in this chat, oldest first: what Up gives back.
+    private var sentPrompts: [String] { agent == nil ? [] : (popped?.work ?? model.work).sentPrompts }
     @State private var selectedCommand = 0
     @State private var attachments: [Attachment] = []
     @State private var draftLabels: [String] = []
@@ -472,6 +477,12 @@ struct PromptBar: View {
                         selectedMention = min(selectedMention + 1, mentions.count - 1)
                         return .handled
                     }
+                    // The prompts sent before, as a terminal gives back its commands (#1551).
+                    if let step = PromptHistory.recall(.down, text: text, sent: sentPrompts, at: recalled) {
+                        text = step.text
+                        recalled = step.at
+                        return .handled
+                    }
                     return .ignored
                 }
                 .onKeyPress(.upArrow) {
@@ -481,6 +492,12 @@ struct PromptBar: View {
                     }
                     if isMentioning {
                         selectedMention = max(selectedMention - 1, 0)
+                        return .handled
+                    }
+                    // The prompts sent before, as a terminal gives back its commands (#1551).
+                    if let step = PromptHistory.recall(.up, text: text, sent: sentPrompts, at: recalled) {
+                        text = step.text
+                        recalled = step.at
                         return .handled
                     }
                     return .ignored

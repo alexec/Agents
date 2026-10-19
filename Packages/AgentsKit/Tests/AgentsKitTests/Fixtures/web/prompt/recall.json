@@ -1,0 +1,170 @@
+[
+  {
+    "expected" : {
+      "at" : 0,
+      "text" : "third"
+    },
+    "input" : {
+      "at" : null,
+      "direction" : "up",
+      "sent" : [
+        "first",
+        "second",
+        "third"
+      ],
+      "text" : ""
+    },
+    "name" : "up from empty"
+  },
+  {
+    "expected" : {
+      "at" : 1,
+      "text" : "second"
+    },
+    "input" : {
+      "at" : 0,
+      "direction" : "up",
+      "sent" : [
+        "first",
+        "second",
+        "third"
+      ],
+      "text" : "third"
+    },
+    "name" : "up again"
+  },
+  {
+    "expected" : null,
+    "input" : {
+      "at" : 2,
+      "direction" : "up",
+      "sent" : [
+        "first",
+        "second",
+        "third"
+      ],
+      "text" : "first"
+    },
+    "name" : "up at the oldest"
+  },
+  {
+    "expected" : null,
+    "input" : {
+      "at" : null,
+      "direction" : "up",
+      "sent" : [
+
+      ],
+      "text" : ""
+    },
+    "name" : "up with nothing sent"
+  },
+  {
+    "expected" : null,
+    "input" : {
+      "at" : null,
+      "direction" : "up",
+      "sent" : [
+        "first",
+        "second",
+        "third"
+      ],
+      "text" : "half typed"
+    },
+    "name" : "up on typed words"
+  },
+  {
+    "expected" : null,
+    "input" : {
+      "at" : 0,
+      "direction" : "up",
+      "sent" : [
+        "first",
+        "second",
+        "third"
+      ],
+      "text" : "third!"
+    },
+    "name" : "up on a changed recall"
+  },
+  {
+    "expected" : {
+      "at" : 0,
+      "text" : "third"
+    },
+    "input" : {
+      "at" : 1,
+      "direction" : "down",
+      "sent" : [
+        "first",
+        "second",
+        "third"
+      ],
+      "text" : "second"
+    },
+    "name" : "down to newer"
+  },
+  {
+    "expected" : {
+      "at" : null,
+      "text" : ""
+    },
+    "input" : {
+      "at" : 0,
+      "direction" : "down",
+      "sent" : [
+        "first",
+        "second",
+        "third"
+      ],
+      "text" : "third"
+    },
+    "name" : "down past the newest"
+  },
+  {
+    "expected" : null,
+    "input" : {
+      "at" : null,
+      "direction" : "down",
+      "sent" : [
+        "first",
+        "second",
+        "third"
+      ],
+      "text" : "half typed"
+    },
+    "name" : "down on typed words"
+  },
+  {
+    "expected" : null,
+    "input" : {
+      "at" : null,
+      "direction" : "down",
+      "sent" : [
+        "first",
+        "second",
+        "third"
+      ],
+      "text" : ""
+    },
+    "name" : "down from empty"
+  },
+  {
+    "expected" : {
+      "at" : 0,
+      "text" : "fourth"
+    },
+    "input" : {
+      "at" : 0,
+      "direction" : "up",
+      "sent" : [
+        "first",
+        "second",
+        "third",
+        "fourth"
+      ],
+      "text" : ""
+    },
+    "name" : "up on empty after sending"
+  }
+]
