@@ -52,8 +52,19 @@ struct SettingsWindow: View {
         HStack(spacing: 0) {
             SettingsRail(pane: pane)
             Divider()
-            content
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            VStack(alignment: .leading, spacing: 0) {
+                // A pane of this Mac's own things, with no host on this Mac (#1503): what is
+                // true, and what to do, over a pane that has nothing to show.
+                if model.noHostOnThisMac, pane.wrappedValue.isThisMacs {
+                    NoMacHostNotice {
+                        controlPage = .hosts
+                        pane.wrappedValue = .controlPlane
+                    }
+                    Divider()
+                }
+                content
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .frame(minWidth: Self.size.width, idealWidth: Self.size.width,
@@ -143,6 +154,14 @@ enum SettingsPane: String, Hashable, CaseIterable {
     /// Was Shared (#754): the raw value is what a window left open on it kept.
     case agentConfiguration = "shared"
 
+    /// A pane of what this Mac's host keeps: its runtimes, settings, cost and resources.
+    var isThisMacs: Bool {
+        switch self {
+        case .runtimes, .agentConfiguration, .mac, .spending, .resources: true
+        case .appearance, .sidebar, .account, .controlPlane: false
+        }
+    }
+
     var title: String {
         switch self {
         case .appearance: "Appearance"
@@ -227,6 +246,28 @@ private final class SettingsGrowView: NSView {
         if window.contentMinSize.width < floor.width || window.contentMinSize.height < floor.height {
             window.contentMinSize = floor
         }
+    }
+}
+
+/// No host on this Mac (#1503): the control plane is elsewhere and lists only servers as
+/// hosts, so this Mac's runtimes and settings have nobody to keep them.
+private struct NoMacHostNotice: View {
+    let showHosts: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Label("There is no host on this Mac", systemImage: "exclamationmark.triangle")
+                .appText(.supporting).fontWeight(.semibold)
+                .tinted(.attention)
+            Text("This Mac’s runtimes and settings are on its host, and the control plane has no host on this Mac. Agents on your servers are not changed. To add this Mac, make a code in Control plane ▸ Hosts ▸ Add by Code…, then paste it in Agents Host under Join one elsewhere.")
+                .appText(.fine).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            Button("Show Hosts", action: showHosts)
+                .controlSize(.small)
+        }
+        .frame(maxWidth: 560, alignment: .leading)
+        .padding(16)
+        .accessibilityElement(children: .contain)
     }
 }
 
