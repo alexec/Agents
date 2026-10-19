@@ -18,6 +18,21 @@ import (
 
 func (d *Daemon) bringBack(r wire.BringBackRequest) (wire.BringBack, error) {
 	done := wire.BringBack{Moved: []string{}}
+	// The uploads go whatever the answer, also when a check below refuses (#1531).
+	var bundle, patch string
+	var err error
+	if r.Bundle != nil {
+		if bundle, err = d.incomingFile(*r.Bundle); err != nil {
+			return done, err
+		}
+		defer os.Remove(bundle)
+	}
+	if r.Patch != nil {
+		if patch, err = d.incomingFile(*r.Patch); err != nil {
+			return done, err
+		}
+		defer os.Remove(patch)
+	}
 	path, err := sendRepository(r.Folder)
 	if err != nil {
 		return done, err
@@ -36,21 +51,8 @@ func (d *Daemon) bringBack(r wire.BringBackRequest) (wire.BringBack, error) {
 		}
 		patchSent = patchSent || b.Name == patchOn
 	}
-	var bundle, patch string
-	if r.Bundle != nil {
-		if bundle, err = d.incomingFile(*r.Bundle); err != nil {
-			return done, err
-		}
-		defer os.Remove(bundle)
-	}
-	if r.Patch != nil {
-		if patch, err = d.incomingFile(*r.Patch); err != nil {
-			return done, err
-		}
-		defer os.Remove(patch)
-		if !patchSent {
-			return done, Invalid("The uncommitted changes come back only with the branch they are on.")
-		}
+	if patch != "" && !patchSent {
+		return done, Invalid("The uncommitted changes come back only with the branch they are on.")
 	}
 	repo, _ := repositoryOf(path)
 	m, _ := receiveLocks.LoadOrStore(canonical(repo.commonDir), &sync.Mutex{})

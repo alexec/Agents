@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/alexec/agents/Go/internal/agentsd/store"
 	"github.com/alexec/agents/Go/wire"
@@ -291,5 +292,78 @@ func TestBringBackFromHost(t *testing.T) {
 	}
 	if entries, _ := os.ReadDir(d.incomingFolder()); len(entries) != 0 {
 		t.Fatalf("uploads left: %d", len(entries))
+	}
+}
+
+// An abandoned send (#1531): what it left in Outgoing and Incoming goes once nothing has
+// touched it for transferLimit, at the next send; a send that refuses removes its uploads.
+func TestAbandonedSendIsSwept(t *testing.T) {
+	d, c := start(t, t.TempDir())
+	defer d.Shutdown()
+	src := repo(t)
+	pack := func(id int) {
+		c.call(t, id, "projects/sendPack", map[string]any{"folder": store.FolderURL(src), "branches": []string{"main"}})
+	}
+	upload := func(id int) {
+		c.call(t, id, "projects/receiveUpload", map[string]any{"upload": store.NewUUID(), "offset": 0, "data": []byte("part")})
+	}
+	count := func(folder string) int {
+		entries, _ := os.ReadDir(folder)
+		return len(entries)
+	}
+	age := func(folder string, by time.Duration) {
+		entries, _ := os.ReadDir(folder)
+		for _, e := range entries {
+			then := time.Now().Add(-by)
+			os.Chtimes(filepath.Join(folder, e.Name()), then, then)
+		}
+	}
+
+	// Started and abandoned; within the limit, a second send leaves the first alone.
+	pack(1)
+	upload(2)
+	age(d.outgoingFolder(), transferLimit/2)
+	age(d.incomingFolder(), transferLimit/2)
+	pack(3)
+	upload(4)
+	if count(d.outgoingFolder()) != 2 || count(d.incomingFolder()) != 2 {
+		t.Fatalf("outgoing %d, incoming %d", count(d.outgoingFolder()), count(d.incomingFolder()))
+	}
+	// Past the limit, the next send removes what nothing touched.
+	age(d.outgoingFolder(), transferLimit+time.Minute)
+	age(d.incomingFolder(), transferLimit+time.Minute)
+	pack(5)
+	upload(6)
+	if count(d.outgoingFolder()) != 1 || count(d.incomingFolder()) != 1 {
+		t.Fatalf("outgoing %d, incoming %d", count(d.outgoingFolder()), count(d.incomingFolder()))
+	}
+
+	// A part read keeps a slow send's file.
+	slow := store.NewUUID()
+	os.WriteFile(filepath.Join(d.outgoingFolder(), string(slow)), make([]byte, sendPartSize+1), 0o600)
+	age(d.outgoingFolder(), transferLimit+time.Minute)
+	c.call(t, 7, "projects/sendRead", map[string]any{"id": slow, "offset": 0})
+	pack(8)
+	if _, err := os.Stat(filepath.Join(d.outgoingFolder(), string(slow))); err != nil {
+		t.Fatal("a send that goes on lost its file")
+	}
+
+	// A receive or a bring back that refuses at its first check removes its uploads.
+	for i, refused := range []map[string]any{
+		{"method": "projects/receive", "folder": "relative", "checkout": "main"},
+		{"method": "projects/bringBack", "folder": store.FolderURL(t.TempDir())},
+	} {
+		u := store.NewUUID()
+		c.call(t, 20+i*2, "projects/receiveUpload", map[string]any{"upload": u, "offset": 0, "data": []byte("x")})
+		params := map[string]any{"bundle": u, "branches": []map[string]any{{"name": "main", "commit": strings.Repeat("a", 40)}}}
+		for k, v := range refused {
+			if k != "method" {
+				params[k] = v
+			}
+		}
+		c.callErr(t, 21+i*2, refused["method"].(string), params)
+		if _, err := os.Stat(filepath.Join(d.incomingFolder(), string(u))); err == nil {
+			t.Fatalf("%s left its upload", refused["method"])
+		}
 	}
 }

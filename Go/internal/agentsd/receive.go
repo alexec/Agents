@@ -46,10 +46,11 @@ func (d *Daemon) receiveUpload(r wire.ReceiveUploadRequest) error {
 	if r.Offset+int64(len(r.Data)) > receiveLimit {
 		return Invalid("That is more than 8 GB.")
 	}
-	os.MkdirAll(d.incomingFolder(), 0o700)
 	if r.Offset == 0 {
+		sweepTransfers(d.incomingFolder())
 		os.Remove(path)
 	}
+	os.MkdirAll(d.incomingFolder(), 0o700)
 	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY, 0o600)
 	if err != nil {
 		return fileError(CodeFileNotReadable, err.Error())
@@ -172,6 +173,20 @@ func validBranch(name string) bool {
 }
 
 func (d *Daemon) receive(r wire.ReceiveRequest) (summary wire.ProjectSummary, err error) {
+	// The uploads go whatever the answer, also when a check below refuses (#1531).
+	var bundle, patch string
+	if r.Bundle != nil {
+		if bundle, err = d.incomingFile(*r.Bundle); err != nil {
+			return summary, err
+		}
+		defer os.Remove(bundle)
+	}
+	if r.Patch != nil {
+		if patch, err = d.incomingFile(*r.Patch); err != nil {
+			return summary, err
+		}
+		defer os.Remove(patch)
+	}
 	path, err := receiveFolder(r.Folder)
 	if err != nil {
 		return summary, err
@@ -188,19 +203,6 @@ func (d *Daemon) receive(r wire.ReceiveRequest) (summary wire.ProjectSummary, er
 	}
 	if !checkoutSent {
 		return summary, Invalid("The branch to check out is not one of those sent.")
-	}
-	var bundle, patch string
-	if r.Bundle != nil {
-		if bundle, err = d.incomingFile(*r.Bundle); err != nil {
-			return summary, err
-		}
-		defer os.Remove(bundle)
-	}
-	if r.Patch != nil {
-		if patch, err = d.incomingFile(*r.Patch); err != nil {
-			return summary, err
-		}
-		defer os.Remove(patch)
 	}
 	m, _ := receiveLocks.LoadOrStore(path, &sync.Mutex{})
 	m.(*sync.Mutex).Lock()

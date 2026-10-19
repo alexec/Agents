@@ -92,3 +92,7 @@ A bring back is the same in reverse: the server makes the bundle, without the co
 this Mac has, and the patch. This Mac's host fetches from the bundle and moves each branch
 forward. Where a branch is checked out, it moves with a fast-forward merge, so the files
 there change with it.
+
+A send that stops before its end (a sheet closed, a window that quit, a lost connection)
+leaves its files on the hosts for a time. The next send removes each file that nothing
+touched for an hour. A send or a bring back that stops at a check removes its files at once.
