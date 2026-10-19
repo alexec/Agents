@@ -181,3 +181,45 @@ func TestAForgottenWindowIsCutOff(t *testing.T) {
 		t.Fatal("the list was not kept in the root")
 	}
 }
+
+// control-clients.json is written only when host/clients changes, not on every notice
+// (#1528), and a host that starts with the same list kept does not write it again.
+func TestTheLocalClientsFileIsWrittenOnlyWhenItChanges(t *testing.T) {
+	root := t.TempDir()
+	d, _ := start(t, root)
+	_, listed := newWindow(t)
+	list := wire.HostClients{Clients: []wire.HostClient{listed}}
+	file := filepath.Join(d.Store.Loc.Root, localClientsFile)
+	d.SetLocalClients(list)
+	old := time.Now().Add(-time.Hour).Truncate(time.Second)
+	if err := os.Chtimes(file, old, old); err != nil {
+		t.Fatal(err)
+	}
+	written := func() bool {
+		info, err := os.Stat(file)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return !info.ModTime().Equal(old)
+	}
+	// Forty notices are ten minutes of the control plane's refreshes.
+	for range 40 {
+		d.SetLocalClients(list)
+	}
+	if written() {
+		t.Fatal("an unchanged host/clients wrote the file again")
+	}
+	// Another daemon over the same root, as after a restart, finds the list kept.
+	again := &Daemon{Store: d.Store}
+	again.SetLocalClients(list)
+	if written() {
+		t.Fatal("a host that started with the same list kept wrote it again")
+	}
+	d.SetLocalClients(wire.HostClients{})
+	if !written() {
+		t.Fatal("a changed host/clients was not written")
+	}
+	if b, _ := os.ReadFile(file); string(b) != `{"clients":[]}` {
+		t.Fatalf("the file holds %s", b)
+	}
+}
