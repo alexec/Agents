@@ -135,15 +135,6 @@ func AddViews(server *mcp.Server, linear Views) {
 		})
 }
 
-func contains(list []string, s string) bool {
-	for _, x := range list {
-		if x == s {
-			return true
-		}
-	}
-	return false
-}
-
 // MARK: Read from Linear
 
 // priorityName is Linear's priority number in words.

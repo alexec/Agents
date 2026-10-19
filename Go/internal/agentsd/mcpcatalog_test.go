@@ -224,26 +224,27 @@ func TestOursAreListedAndAddedLikeAnyConnector(t *testing.T) {
 	if github.MadeByAgents == nil || !*github.MadeByAgents || *github.Levels != (wire.MCPLevels{Tools: true, Events: true, Views: true, Workflows: true}) {
 		t.Fatalf("github: %+v", github)
 	}
-	if *linear.Levels != (wire.MCPLevels{Events: true, Workflows: true}) {
+	if *linear.Levels != (wire.MCPLevels{Tools: true, Events: true, Views: true, Workflows: true}) {
 		t.Fatalf("linear: %+v", linear.Levels)
 	}
 
 	var preview wire.MCPPreviewAnswer
 	json.Unmarshal(c.call(t, 3, "mcp/preview", map[string]any{"result": linear, "destination": dest}), &preview)
 	p := preview.Preview
-	if preview.Error != nil || p.NameHere != "linear" || p.ChosenRun != wire.MCPRunKindCommand || len(p.Variables) != 1 ||
-		p.Variables[0].Name != "LINEAR_API_KEY" || p.DestinationState.Free == nil {
+	// No key to ask for: it reads the person's Linear connection (#1343).
+	if preview.Error != nil || p.NameHere != "linear" || p.ChosenRun != wire.MCPRunKindCommand || len(p.Variables) != 0 ||
+		p.DestinationState.Free == nil {
 		t.Fatalf("%+v %+v", preview.Error, p)
 	}
 	var added wire.MCPAddAnswer
 	json.Unmarshal(c.call(t, 4, "mcp/add", map[string]any{"previewID": p.PreviewID, "destination": dest,
-		"secrets": map[string]any{"LINEAR_API_KEY": "lin_api_x"}, "plain": map[string]any{}, "replace": false}), &added)
+		"secrets": map[string]any{}, "plain": map[string]any{}, "replace": false}), &added)
 	if added.Server == nil || added.Server.RegistryName != "agents/linear" {
 		t.Fatalf("%+v", added)
 	}
 	file, _ := os.ReadFile(filepath.Join(project, ".agents", "mcp.json"))
 	if !strings.Contains(string(file), `"command": "linear-mcp"`) || !strings.Contains(string(file), `"hosted": true`) ||
-		!strings.Contains(string(file), `"LINEAR_API_KEY": "${LINEAR_API_KEY}"`) {
+		strings.Contains(string(file), "LINEAR_API_KEY") {
 		t.Fatal(string(file))
 	}
 	// Its row on the project's Connectors page says who made it.
