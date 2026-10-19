@@ -37,7 +37,8 @@ const pageAnswer = `{"data":{"viewer":{"login":"alexec"},"repository":{"pullRequ
  "comments":{"nodes":[{"author":{"login":"coderabbitai","__typename":"Bot"},"body":"<!-- This is an auto-generated comment: summarize by coderabbit.ai -->\n## Walkthrough","createdAt":"2026-10-18T08:05:00Z","url":"u1"}]},
  "reviews":{"nodes":[
   {"author":{"login":"coderabbitai","__typename":"Bot"},"body":"Actionable comments posted: 1","state":"COMMENTED","submittedAt":"2026-10-18T08:06:00Z","url":"u2"},
-  {"author":{"login":"kim","__typename":"User"},"body":"","state":"COMMENTED","submittedAt":"2026-10-18T08:07:00Z","url":"u3"}]},
+  {"author":{"login":"kim","__typename":"User"},"body":"","state":"COMMENTED","submittedAt":"2026-10-18T08:07:00Z","url":"u3"},
+  {"author":{"login":"coderabbitai","__typename":"Bot"},"body":"","state":"COMMENTED","submittedAt":"2026-10-18T08:09:00Z","url":"u5"}]},
  "reviewThreads":{"nodes":[{"isResolved":false,"isOutdated":false,"path":"average.py","line":6,"originalLine":6,
   "comments":{"nodes":[{"author":{"login":"coderabbitai","__typename":"Bot"},"body":"Return the mean.","createdAt":"2026-10-18T08:06:00Z","url":"u4","databaseId":44}]}}]},
  "commits":{"nodes":[{"commit":{"statusCheckRollup":{"contexts":{"nodes":[

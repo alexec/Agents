@@ -45,18 +45,41 @@ func (a *gqlActor) app() string {
 	return ""
 }
 
+// isWholeReview says whether a review is one CodeRabbit posted as a review: with words or a
+// verdict. Its answer in a thread is a review too, with no words: not a review of the PR.
+func isWholeReview(body, state string) bool {
+	return strings.TrimSpace(body) != "" || strings.EqualFold(state, "APPROVED") || strings.EqualFold(state, "CHANGES_REQUESTED")
+}
+
 // MARK: What the events read
 
-// ReviewedPR is an open pull request and whether CodeRabbit has reviewed its head commit: a
-// review on that commit, or its status at success. Review is its last review's state there
-// (commented, approved or changes_requested), "" when only the status says so.
+// ReviewedPR is an open pull request and whether CodeRabbit has finished reviewing its head
+// commit. Its CodeRabbit status says so when the commit has one: success, set again after
+// each review, a full review of the same commit too (which may post no review). With no
+// status (the app can't set one), its review on that commit says so. Review, ReviewID and URL
+// are its last review's there: state (commented, approved or changes_requested), id and link.
 type ReviewedPR struct {
 	PR
 	HeadSHA  string
 	Reviewed bool
+	// StatusAt is when its status on the head commit was last set; "" with no status.
+	StatusAt string
 	Review   string
+	ReviewID int
 	URL      string
 	Trusted  bool
+}
+
+// round is what makes one review.posted: the head commit and the time its status was set
+// (so a full review of the same commit is a new one), or its review with no status.
+func (r ReviewedPR) round() string {
+	switch {
+	case r.StatusAt != "":
+		return r.HeadSHA + ":" + r.StatusAt
+	case r.ReviewID != 0:
+		return fmt.Sprintf("%s:%d", r.HeadSHA, r.ReviewID)
+	}
+	return r.HeadSHA
 }
 
 // CodeRabbitComment is one review comment by CodeRabbit, on a line or as an answer in a thread.
@@ -88,8 +111,8 @@ func (c CodeRabbitComment) data() map[string]any {
 const reviewedQuery = `query($owner: String!, $name: String!) { repository(owner: $owner, name: $name) {
   pullRequests(states: OPEN, first: 100, orderBy: {field: UPDATED_AT, direction: DESC}) { nodes {
     number title headRefName headRefOid url isCrossRepository authorAssociation author { login __typename }
-    reviews(last: 20) { nodes { author { login __typename } state url commit { oid } } }
-    commits(last: 1) { nodes { commit { oid status { context(name: "` + codeRabbitStatus + `") { state } } } } } } } } }`
+    reviews(last: 20) { nodes { author { login __typename } body state url databaseId commit { oid } } }
+    commits(last: 1) { nodes { commit { oid status { context(name: "` + codeRabbitStatus + `") { state createdAt } } } } } } } } }`
 
 func (g *RealGitHub) CodeRabbitPRs(ctx context.Context, repo string) ([]ReviewedPR, error) {
 	owner, name, err := ownerName(repo)
@@ -118,10 +141,12 @@ func (g *RealGitHub) CodeRabbitPRs(ctx context.Context, repo string) ([]Reviewed
 						Author      *gqlActor `json:"author"`
 						Reviews     struct {
 							Nodes []struct {
-								Author *gqlActor `json:"author"`
-								State  string    `json:"state"`
-								URL    string    `json:"url"`
-								Commit *struct {
+								Author     *gqlActor `json:"author"`
+								Body       string    `json:"body"`
+								State      string    `json:"state"`
+								URL        string    `json:"url"`
+								DatabaseID int       `json:"databaseId"`
+								Commit     *struct {
 									Oid string `json:"oid"`
 								} `json:"commit"`
 							} `json:"nodes"`
@@ -132,7 +157,8 @@ func (g *RealGitHub) CodeRabbitPRs(ctx context.Context, repo string) ([]Reviewed
 									Oid    string `json:"oid"`
 									Status *struct {
 										Context *struct {
-											State string `json:"state"`
+											State     string `json:"state"`
+											CreatedAt string `json:"createdAt"`
 										} `json:"context"`
 									} `json:"status"`
 								} `json:"commit"`
@@ -162,15 +188,19 @@ func (g *RealGitHub) CodeRabbitPRs(ctx context.Context, repo string) ([]Reviewed
 		if n.Author != nil && !n.CrossRepo {
 			r.Trusted = isTrusted(n.Association, n.Author.Login, n.Author.Typename)
 		}
-		for _, c := range n.Commits.Nodes {
-			if c.Commit.Oid == n.HeadRefOid && c.Commit.Status != nil && c.Commit.Status.Context != nil &&
-				strings.EqualFold(c.Commit.Status.Context.State, "SUCCESS") {
-				r.Reviewed = true
+		for _, v := range n.Reviews.Nodes {
+			if v.Author.isCodeRabbit() && isWholeReview(v.Body, v.State) && v.Commit != nil && v.Commit.Oid == n.HeadRefOid {
+				r.Reviewed, r.Review, r.ReviewID, r.URL = true, strings.ToLower(v.State), v.DatabaseID, v.URL
 			}
 		}
-		for _, v := range n.Reviews.Nodes {
-			if v.Author.isCodeRabbit() && v.Commit != nil && v.Commit.Oid == n.HeadRefOid {
-				r.Reviewed, r.Review, r.URL = true, strings.ToLower(v.State), v.URL
+		for _, c := range n.Commits.Nodes {
+			if c.Commit.Oid == n.HeadRefOid && c.Commit.Status != nil && c.Commit.Status.Context != nil {
+				// Its status rules: pending while it reviews, even with an earlier review on the commit.
+				r.Reviewed = strings.EqualFold(c.Commit.Status.Context.State, "SUCCESS")
+				r.StatusAt = normalized(c.Commit.Status.Context.CreatedAt)
+				if r.StatusAt == "" {
+					r.StatusAt = c.Commit.Status.Context.CreatedAt
+				}
 			}
 		}
 		if r.URL == "" {
@@ -292,7 +322,8 @@ func addCodeRabbitTools(server *mcp.Server, gh Views, repoOf func(context.Contex
 
 	mcp.AddTool(server, &mcp.Tool{Name: "coderabbit_review", Title: "Ask CodeRabbit to review again",
 		Description: "Asks CodeRabbit to review a pull request again, with a comment `@coderabbitai review` (the changes since its last " +
-			"review) or, with full, `@coderabbitai full review` (every file). Its review comes back as review.posted and review.comment events.",
+			"review) or, with full, `@coderabbitai full review` (every file). CodeRabbit does not review a commit it has reviewed again " +
+			"unless full is true. Its review comes back as review.posted and review.comment events.",
 		Meta: uiMeta("", "model", "app")},
 		func(ctx context.Context, _ *mcp.CallToolRequest, in askReviewArgs) (*mcp.CallToolResult, any, error) {
 			words := "@" + codeRabbitApp + " review"

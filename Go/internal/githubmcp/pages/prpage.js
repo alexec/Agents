@@ -84,7 +84,8 @@ const prPage = (ui, repo, back) => {
       r.summaryUrl ? link("Summary ↗", r.summaryUrl, { title: "Its summary, on GitHub" }) : null];
     const open = rabbitOpen();
     const actions = pr.state === "open" ? el("div", { className: "actions" }, [
-      command("coderabbit_review", "Ask CodeRabbit Again", "Asked CodeRabbit to review the new changes."),
+      // On a commit it has reviewed, CodeRabbit does only a full review again.
+      r.status === "reviewed" ? null : command("coderabbit_review", "Ask CodeRabbit Again", "Asked CodeRabbit to review the new changes."),
       command("coderabbit_review", "Full Review", "Asked CodeRabbit to review every file.", { full: true }),
       open ? command("coderabbit_resolve", `Resolve Its Comments (${open})`, "Asked CodeRabbit to resolve its comments.") : null,
     ]) : null;

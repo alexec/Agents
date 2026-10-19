@@ -33,7 +33,7 @@ func (f *fakeGitHub) setReviewed(prs ...ReviewedPR) {
 	f.reviewed = prs
 }
 
-func TestReviewPostedIsRaisedOncePerHeadCommit(t *testing.T) {
+func TestReviewPostedIsRaisedOncePerReview(t *testing.T) {
 	h := newHarness(t)
 	all := map[string]any{"repo": repo}
 	pr := PR{Number: 1, Title: "Average", Branch: "walk/coderabbit-check", URL: "https://github.com/alexec/agents/pull/1"}
@@ -44,20 +44,42 @@ func TestReviewPostedIsRaisedOncePerHeadCommit(t *testing.T) {
 	again := h.poll("review.posted", all, first["cursor"])
 	equal(t, ids(again), []string{}, "and not raised later")
 
-	// A push: not reviewed yet, then its status goes to success, then its review comes too.
-	h.fake.setReviewed(ReviewedPR{PR: pr, HeadSHA: "b2", Trusted: true}, stranger)
+	// A push: its status pending, then at success with its review; as on alexec/agents-walk.
+	reviewed := func(status string, done bool, review int) ReviewedPR {
+		r := ReviewedPR{PR: pr, HeadSHA: "b2", Reviewed: done, StatusAt: status, Trusted: true, URL: pr.URL}
+		if review != 0 {
+			r.Review, r.ReviewID = "commented", review
+		}
+		return r
+	}
+	h.fake.setReviewed(reviewed("t1", false, 0), stranger)
 	pushed := h.poll("review.posted", all, again["cursor"])
-	equal(t, ids(pushed), []string{}, "a commit not reviewed")
-	h.fake.setReviewed(ReviewedPR{PR: pr, HeadSHA: "b2", Reviewed: true, Trusted: true, URL: pr.URL}, stranger)
-	raised := h.poll("review.posted", all, pushed["cursor"])
+	equal(t, ids(pushed), []string{}, "a commit it is reviewing")
+	h.fake.setReviewed(reviewed("t1", false, 7), stranger)
+	early := h.poll("review.posted", all, pushed["cursor"])
+	equal(t, ids(early), []string{}, "its review before its status: still reviewing")
+	h.fake.setReviewed(reviewed("t2", true, 7), stranger)
+	raised := h.poll("review.posted", all, early["cursor"])
 	e := eventsOf(raised)
-	if len(e) != 1 || !strings.HasPrefix(e[0]["eventId"].(string), "review.posted:"+repo+":1:b2:") {
+	if len(e) != 1 || !strings.HasPrefix(e[0]["eventId"].(string), "review.posted:"+repo+":1:b2:t2:") {
 		t.Fatalf("raised %v", ids(raised))
 	}
 	data := e[0]["data"].(map[string]any)
-	equal(t, []any{data["headSha"], data["state"], data["pr"].(map[string]any)["branch"]}, []any{"b2", "", "walk/coderabbit-check"}, "data")
-	h.fake.setReviewed(ReviewedPR{PR: pr, HeadSHA: "b2", Reviewed: true, Review: "commented", Trusted: true}, stranger)
-	equal(t, ids(h.poll("review.posted", all, raised["cursor"])), []string{}, "its review after its status is the same review")
+	equal(t, []any{data["headSha"], data["state"], data["pr"].(map[string]any)["branch"]}, []any{"b2", "commented", "walk/coderabbit-check"}, "data")
+	equal(t, ids(h.poll("review.posted", all, raised["cursor"])), []string{}, "a review is raised once")
+
+	// A full review of the same commit posts no review, only its status again.
+	h.fake.setReviewed(reviewed("t3", false, 7), stranger)
+	full := h.poll("review.posted", all, raised["cursor"])
+	equal(t, ids(full), []string{}, "a full review running")
+	h.fake.setReviewed(reviewed("t4", true, 7), stranger)
+	equal(t, len(ids(h.poll("review.posted", all, full["cursor"]))), 1, "a full review finished")
+
+	// With no status, its review says so.
+	h.fake.setReviewed(ReviewedPR{PR: pr, HeadSHA: "c3", Reviewed: true, Review: "commented", ReviewID: 9, Trusted: true}, stranger)
+	if got := ids(h.poll("review.posted", all, full["cursor"])); len(got) != 1 || !strings.HasPrefix(got[0], "review.posted:"+repo+":1:c3:9:") {
+		t.Fatalf("no status: %v", got)
+	}
 
 	// A fork's PR, or a stranger's, only with anyone.
 	everyone := h.poll("review.posted", map[string]any{"repo": repo, "anyone": true}, first["cursor"])
@@ -96,14 +118,18 @@ func TestRealGitHubKnowsCodeRabbitByItsApp(t *testing.T) {
 			"repo": {"full_name": "` + repo + `"}}, "user": {"login": "alexec", "type": "User"}, "author_association": "OWNER"}`,
 		"graphql": `{"data": {"repository": {"pullRequests": {"nodes": [
 			{"number": 1, "headRefName": "a", "headRefOid": "h1", "authorAssociation": "OWNER", "author": {"login": "alexec", "__typename": "User"},
-			 "reviews": {"nodes": [{"author": {"login": "coderabbitai", "__typename": "Bot"}, "state": "COMMENTED", "url": "r1", "commit": {"oid": "h1"}}]},
+			 "reviews": {"nodes": [{"author": {"login": "coderabbitai", "__typename": "Bot"}, "body": "Actionable comments posted: 1", "state": "COMMENTED", "url": "r1", "databaseId": 5, "commit": {"oid": "h1"}},
+			   {"author": {"login": "coderabbitai", "__typename": "Bot"}, "body": "", "state": "COMMENTED", "url": "r9", "databaseId": 9, "commit": {"oid": "h1"}}]},
 			 "commits": {"nodes": [{"commit": {"oid": "h1", "status": null}}]}},
 			{"number": 2, "headRefName": "b", "headRefOid": "h2", "authorAssociation": "OWNER", "author": {"login": "alexec", "__typename": "User"},
 			 "reviews": {"nodes": [{"author": {"login": "coderabbitai", "__typename": "User"}, "state": "APPROVED", "commit": {"oid": "h2"}}]},
-			 "commits": {"nodes": [{"commit": {"oid": "h2", "status": {"context": {"state": "PENDING"}}}}]}},
+			 "commits": {"nodes": [{"commit": {"oid": "h2", "status": {"context": {"state": "PENDING", "createdAt": "2026-10-19T19:26:55Z"}}}}]}},
 			{"number": 3, "headRefName": "c", "headRefOid": "h3", "authorAssociation": "OWNER", "author": {"login": "alexec", "__typename": "User"},
 			 "reviews": {"nodes": [{"author": {"login": "coderabbitai", "__typename": "Bot"}, "state": "COMMENTED", "commit": {"oid": "old"}}]},
-			 "commits": {"nodes": [{"commit": {"oid": "h3", "status": {"context": {"state": "SUCCESS"}}}}]}}]}}}}`,
+			 "commits": {"nodes": [{"commit": {"oid": "h3", "status": {"context": {"state": "SUCCESS", "createdAt": "2026-10-19T19:29:03Z"}}}}]}},
+			{"number": 4, "headRefName": "d", "headRefOid": "h4", "authorAssociation": "OWNER", "author": {"login": "alexec", "__typename": "User"},
+			 "reviews": {"nodes": [{"author": {"login": "coderabbitai", "__typename": "Bot"}, "body": "Actionable comments posted: 0", "state": "COMMENTED", "databaseId": 6, "commit": {"oid": "h4"}}]},
+			 "commits": {"nodes": [{"commit": {"oid": "h4", "status": {"context": {"state": "PENDING", "createdAt": "2026-10-19T19:26:55Z"}}}}]}}]}}}}`,
 	})
 	gh := api.github()
 	comments, _, err := gh.CodeRabbitComments(context.Background(), repo, "2026-10-19T00:00:00Z")
@@ -119,16 +145,18 @@ func TestRealGitHubKnowsCodeRabbitByItsApp(t *testing.T) {
 	}
 	got := []any{}
 	for _, p := range prs {
-		got = append(got, p.Reviewed, p.Review)
+		got = append(got, p.Reviewed, p.Review, p.round())
 	}
-	equal(t, got, []any{true, "commented", false, "", true, ""}, "a review on the head by its bot, or its status at success")
+	equal(t, got, []any{true, "commented", "h1:5", false, "", "h2:2026-10-19T19:26:55.000Z", true, "", "h3:2026-10-19T19:29:03.000Z",
+		false, "commented", "h4:2026-10-19T19:26:55.000Z"},
+		"its status at success, set anew by each review; with no status, a review on the head by its bot (not its answer in a thread)")
 }
 
 func TestThePageNamesCodeRabbitAndItsToolsPostItsCommands(t *testing.T) {
 	c, api := viewsClient(t)
 	_, p := callTool(t, c, "show_pull_request", map[string]any{"number": 7})
 	rabbit, _ := p["codeRabbit"].(map[string]any)
-	if rabbit == nil || rabbit["review"] != "commented" || rabbit["status"] != "reviewed" || !strings.Contains(rabbit["summary"].(string), "Walkthrough") {
+	if rabbit == nil || rabbit["review"] != "commented" || rabbit["reviewUrl"] != "u2" || rabbit["status"] != "reviewed" || !strings.Contains(rabbit["summary"].(string), "Walkthrough") {
 		t.Fatalf("codeRabbit: %v", p["codeRabbit"])
 	}
 	comments := p["comments"].([]any)

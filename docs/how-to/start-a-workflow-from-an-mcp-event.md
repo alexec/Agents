@@ -84,8 +84,11 @@ and use `add_issue_comment` on the PR to say what you changed.
   **Review pull requests** workflow in `.agents/workflows/` starts an agent on it that
   reads the diff and leaves one comment.
 - Its CodeRabbit events (#1344) take the same filters and `anyone`. `review.posted` is raised
-  once for each head commit that CodeRabbit reviews: its review on that commit, or its
-  `CodeRabbit` status at success, whichever comes first. `review.comment` is raised for each
+  once for each review CodeRabbit finishes on a pull request's head commit: each time its
+  `CodeRabbit` status on that commit goes to success (where it sets no status, its review on
+  that commit). A full review of a commit may post no new review, only the status. A push that it
+  reviews, or a full review of the same commit, is a new one. CodeRabbit does not review a
+  commit again on `@coderabbitai review`: use `coderabbit_review` with `full: true`. `review.comment` is raised for each
   review comment by it, on a line or as its answer in a thread; `comment.id` is what
   `coderabbit_reply` answers. `coderabbit_review` asks it to review again and
   `coderabbit_resolve` resolves its comments. CodeRabbit is known by its GitHub App, so a

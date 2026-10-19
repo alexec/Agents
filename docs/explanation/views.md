@@ -177,7 +177,8 @@ Project**.
 - **CodeRabbit on a pull request's page** (#1344): when CodeRabbit is on the pull request, the
   Conversation tab starts with its block: its status on the last commit, its last review's
   state, and its summary (the one comment it edits after each review). **Ask CodeRabbit
-  Again** and **Full Review** post `@coderabbitai review` and `@coderabbitai full review`;
+  Again** (only while the last commit is not reviewed: CodeRabbit does not review a commit
+  twice) and **Full Review** post `@coderabbitai review` and `@coderabbitai full review`;
   **Resolve Its Comments** posts `@coderabbitai resolve` while it has open threads. On the
   Review comments tab, **Reply to CodeRabbit** answers its thread with the box's words. These
   are the tools `coderabbit_review`, `coderabbit_resolve` and `coderabbit_reply`, which agents

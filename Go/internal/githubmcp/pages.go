@@ -461,7 +461,7 @@ func (g *RealGitHub) PRPage(ctx context.Context, repo string, number int) (map[s
 		notes = append(notes, note{c.CreatedAt, c.json(c.CreatedAt)})
 	}
 	for _, r := range p.Reviews.Nodes {
-		if r.Author.isCodeRabbit() {
+		if r.Author.isCodeRabbit() && isWholeReview(r.Body, r.State) {
 			if rabbit == nil {
 				rabbit = map[string]any{}
 			}

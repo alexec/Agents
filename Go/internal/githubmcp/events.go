@@ -85,7 +85,7 @@ var events = append([]event{
 		payload:     object(map[string]any{"pr": prSchema(nil), "conflictedAt": str})},
 	// CodeRabbit's (#1344), known by its GitHub App, not by a name.
 	{name: "review.posted", title: "CodeRabbit reviewed",
-		description: "CodeRabbit finished a review of a pull request's head commit: a review by its GitHub App on that commit, or its CodeRabbit status gone to success. Once per head commit: a push it reviews again is a new one. state is its review's (commented, approved or changes_requested), empty when only its status says so; its comments come as review.comment." + ownPRs,
+		description: "CodeRabbit finished a review of a pull request's head commit: its CodeRabbit status on that commit gone to success, or, where it sets no status, a review by its GitHub App on that commit. Once per review: a push it reviews, or a full review asked of the same commit (coderabbit_review with full), is a new one. state is its review's (commented, approved or changes_requested), empty when only its status says so; its comments come as review.comment." + ownPRs,
 		input:       schema{repoProperty, branchProperty("Only the PR from this branch."), prProperty, anyoneProperty},
 		payload:     object(map[string]any{"pr": prSchema(nil), "headSha": str, "state": str, "url": str, "reviewedAt": str})},
 	{name: "review.comment", title: "CodeRabbit commented on a line",
@@ -305,7 +305,7 @@ func (s *Events) Poll(ctx context.Context, raw json.RawMessage) (map[string]any,
 			for _, r := range prs {
 				if a.anyone || r.Trusted {
 					reviewed := r.Reviewed
-					out = append(out, state{pr: r.PR, on: &reviewed, key: r.HeadSHA,
+					out = append(out, state{pr: r.PR, on: &reviewed, key: r.round(),
 						json: r.PR.json(), extra: map[string]any{"headSha": r.HeadSHA, "state": r.Review, "url": r.URL}})
 				}
 			}
@@ -393,8 +393,8 @@ func contains(list []string, s string) bool {
 }
 
 // state is a PR and whether its state (in conflict, open and ready, or reviewed) is on now;
-// nil keeps the one it had. key, when set, is part of its id: review.posted's head commit, so
-// each commit is raised once. extra is more of the event's data.
+// nil keeps the one it had. key, when set, is part of its id: review.posted's head commit and
+// review, so each review is raised once. extra is more of the event's data.
 type state struct {
 	pr    PR
 	on    *bool
@@ -407,7 +407,7 @@ type state struct {
 // the cursor's ids are the PRs that were on then. A first poll takes those already on as
 // known. A conflict has no time on GitHub, only a state, so pr.conflicted diffs it (#712); so
 // does pr.opened (#833), so a draft marked ready is raised as it is, and review.posted (#1344),
-// by head commit, so a review and its status that say the same are raised once.
+// by head commit and review, so a review and its status that say the same are raised once.
 func (s *Events) pollDiff(_ context.Context, name, key string, a args, p pollParams, states func() ([]state, error)) (map[string]any, *rpcError) {
 	first := p.firstPoll()
 	c := cursor{}
