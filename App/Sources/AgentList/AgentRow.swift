@@ -222,6 +222,14 @@ struct AgentRow: View {
                             .lineLimit(1)
                             .help(wait.detail)
                     }
+                    // While the sidebar searches: the line it said that matches (#1585).
+                    if let said = model.work.saidLines[agent.id] {
+                        Text(said)
+                            .appText(.fine)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                            .help(said)
+                    }
                     // An agent asked for it to be archived (#584): the mark, and the one
                     // click that agrees. In the sidebar the leading mark says it instead.
                     if let line = ArchiveRequestWords.line(agent) {

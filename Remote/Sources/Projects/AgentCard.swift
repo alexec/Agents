@@ -167,6 +167,13 @@ struct AgentCard: View {
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
                     }
+                    // While the sidebar searches: the line it said that matches (#1585).
+                    if let said = model.work.saidLines[agent.id] {
+                        Text(said)
+                            .appText(.fine)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
                     // As on the Mac's row (#584). Archive itself is the swipe and the menu:
                     // the card is a link, and a button inside it would open the chat too.
                     if let line = ArchiveRequestWords.line(agent) {

@@ -12839,6 +12839,58 @@
       ],
       "additionalProperties": false
     },
+    "SaidSearchRequest": {
+      "type": "object",
+      "description": "agents/said (#1585): the sessions whose prompts or replies hold the text, any case, in one project when folder says.",
+      "properties": {
+        "text": {
+          "type": "string"
+        },
+        "folder": {
+          "$ref": "#/definitions/URLString"
+        },
+        "limit": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "text"
+      ],
+      "additionalProperties": false
+    },
+    "SaidMatch": {
+      "type": "object",
+      "description": "A session that said the text, and the line it is on.",
+      "properties": {
+        "agentID": {
+          "$ref": "#/definitions/UUID"
+        },
+        "line": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "agentID",
+        "line"
+      ],
+      "additionalProperties": false
+    },
+    "SaidSearchResult": {
+      "type": "object",
+      "description": "The sessions that said it, the most recently active first.",
+      "properties": {
+        "matches": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/SaidMatch"
+          }
+        }
+      },
+      "required": [
+        "matches"
+      ],
+      "additionalProperties": false
+    },
     "UpdateState": {
       "anyOf": [
         {

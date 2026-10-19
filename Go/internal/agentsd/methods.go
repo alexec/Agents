@@ -364,6 +364,11 @@ func (d *Daemon) listAgents(r wire.ListRequest) []wire.Agent {
 		limit = *r.Limit
 	}
 	out := []wire.Agent{}
+	query := ""
+	if r.Query != nil {
+		query = *r.Query
+	}
+	read := 0
 	for _, a := range d.Store.Agents() {
 		archived := a.State == wire.AgentStateArchived
 		if archived && !r.IncludeArchived && !r.ArchivedOnly || r.ArchivedOnly && !archived {
@@ -377,6 +382,13 @@ func (d *Daemon) listAgents(r wire.ListRequest) []wire.Agent {
 		}
 		if c := r.After; c != nil && (a.LastActivityAt > c.LastActivityAt || a.LastActivityAt == c.LastActivityAt && a.ID <= c.ID) {
 			continue
+		}
+		// A search (#165) asks for the sessions it matches; what was said is read for the
+		// most recently active saidSessions only (#1585).
+		if query != "" {
+			if read++; read > saidSessions && !d.titleMatches(a, query) || read <= saidSessions && !d.queryMatches(a, query) {
+				continue
+			}
 		}
 		out = append(out, listed(a, r))
 		if int64(len(out)) == limit {

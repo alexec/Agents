@@ -3115,10 +3115,20 @@ final class RemoteModel {
             let unseen = Set(archivedToLetGo(work.agents, projects: archivedHeldFor, chat: selection))
             work.forget(earlier.filter { unseen.contains($0) })
         }
+        work.saidLines = [:]
         guard !words.isEmpty else { return }
         let request = DaemonAPI.ListRequest(archivedCommands: false, limit: Self.searchShown, lean: true, query: words)
         let hosts: [HostID] = [.mac] + reachableHosts.sorted { $0.rawValue < $1.rawValue }
-        for host in hosts { await search(request, on: host) }
+        for host in hosts {
+            await search(request, on: host)
+            // What was said (#1585): the sessions whose prompts or replies hold the words.
+            if let target = hostClient(host),
+               let said = try? await target.call(DaemonAPI.Method.agentsSaid, DaemonAPI.SaidSearchRequest(text: words),
+                                                 returning: DaemonAPI.SaidSearchResult.self),
+               !Task.isCancelled {
+                for match in said.matches { work.saidLines[match.agentID] = match.line }
+            }
+        }
     }
 
     /// The next page from each host that has more, newest first as the host lists them.

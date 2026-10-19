@@ -80,6 +80,10 @@ public final class AgentsModel {
     /// the page, so folding per redraw was the page's whole length of work, again,
     /// for every word.
     public private(set) var transcriptItems: [TranscriptItem] = []
+    /// While the sidebar searches: the sessions whose prompts or replies hold the words, and
+    /// the line, as their hosts found them (`agents/said`, #1585). Empty otherwise.
+    public var saidLines: [UUID: String] = [:]
+
     /// Whether the transcript entry at `index` is in hand: in the page of entries, or in one
     /// of the stored turns before it. Find goes to a match once it is (#1532).
     public func holds(index: Int) -> Bool {
