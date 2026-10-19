@@ -1196,6 +1196,48 @@ button.plain:hover { opacity: 1; }
 .made-by-agents { font-size: 11px; font-weight: 600; padding: 0 6px; border-radius: 999px; color: white;
   background: var(--accent); }
 
+/* A project's Connectors set-up and the Connect sheet (#1336): the connection card, the slots in the
+   window's grid, each with its mark (a tick once it read, a dashed circle when skipped), and the events. */
+.connector-setup { margin-bottom: 8px; }
+.setup-heading { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.02em;
+  opacity: 0.6; margin: 18px 0 8px; }
+.setup-card { background: var(--paper-raised); border: 1px solid var(--paper-rule); border-radius: 10px;
+  padding: 12px 14px; margin: 0; }
+.setup-card p { margin: 0 0 3px; }
+.setup-card.connection, .setup-card .connection, .connect-sheet .connection, .connections li.connection {
+  display: flex; align-items: center; gap: 12px; }
+.setup-card.list { list-style: none; padding: 0; }
+.setup-card.list > li { padding: 10px 14px; border-top: 1px solid var(--paper-rule); }
+.setup-card.list > li:first-child { border-top: 0; }
+.setup-row { display: flex; align-items: center; gap: 8px; margin: 0; }
+.setup-row .setup-heading { margin: 18px 0 8px; }
+.connector-setup .grow, .connections .grow, .connect-sheet .grow { flex: 1; min-width: 0; }
+.connector-mark { flex: none; width: 34px; height: 34px; border-radius: 50%; display: inline-flex; align-items: center;
+  justify-content: center; font-size: 13px; font-weight: 700; background: #222; color: white; }
+.connector-mark.soft { background: color-mix(in srgb, var(--accent) 15%, transparent); color: var(--accent); }
+.slot-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; }
+.setup-card.slot { min-height: 104px; }
+.setup-card.slot.changing { grid-column: 1 / -1; border: 2px solid var(--accent); }
+.slot-head { display: flex; align-items: center; gap: 6px; }
+.slot-kind { font-size: 12px; font-weight: 600; text-transform: uppercase; opacity: 0.6; flex: 1; }
+.slot-mark { flex: none; width: 14px; height: 14px; border-radius: 50%; border: 1.5px solid currentColor; opacity: 0.55;
+  display: inline-flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; box-sizing: border-box; }
+.slot-mark.read { background: var(--accent); border-color: var(--accent); color: var(--paper-ground); opacity: 1; }
+.slot-mark.failed, .slot-mark.refused { color: var(--tint-attention); opacity: 1; }
+.slot-mark.skipped { border-style: dashed; }
+.slot-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 6px; }
+.slot-actions:empty { display: none; }
+.slot-change { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.connector-setup .attention, .connections .attention { color: var(--tint-attention); }
+.connect-sheet { max-width: 480px; }
+.connect-sheet ul.abilities { list-style: none; padding: 0; margin: 0 0 8px; background: var(--paper-raised);
+  border: 1px solid var(--paper-rule); border-radius: 8px; }
+.connect-sheet ul.abilities li { padding: 7px 12px; border-top: 1px solid var(--paper-rule); }
+.connect-sheet ul.abilities li:first-child { border-top: 0; }
+.sign-in-code { padding: 10px 12px; border-radius: 8px; background: color-mix(in srgb, var(--accent) 10%, transparent); }
+.sign-in-code p { margin: 0 0 4px; }
+.user-code { font-size: 1.5rem; font-weight: 600; letter-spacing: 0.06em; user-select: all; }
+
 /* The usage charts on Cost (#823), as Health draws them. */
 .usage-charts { margin-bottom: 24px; }
 .usage-charts .segmented { margin: 0 4px 8px 0; }

@@ -3153,7 +3153,7 @@ final class RemoteModel {
     }
 
     /// The client for `host`: the Mac's own, or a server's while it answers.
-    private func hostClient(_ host: HostID) -> DaemonClient? {
+    func hostClient(_ host: HostID) -> DaemonClient? {
         if host == .mac { return client }
         guard reachableHosts.contains(host) else { return nil }
         return otherHosts[host]

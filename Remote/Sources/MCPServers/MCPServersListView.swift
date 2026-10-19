@@ -1,14 +1,17 @@
 import AgentsKitCore
 import SwiftUI
 
-/// Every MCP server in one `mcp.json` and how each is doing (#753), as the window's: under
-/// Activity, the person's own on the Mac (#589); under a project, its `.agents/mcp.json`.
+/// A project's Connectors page, with its set-up first (#1336), or Your Connectors, with the
+/// person's connections first. Then every MCP server in one `mcp.json` and how each is doing
+/// (#753), as the window's: under Activity, the person's own on the Mac (#589); under a
+/// project, its `.agents/mcp.json`.
 /// Read-only but for Check Now: servers are edited in Settings.
 struct MCPServersListView: View {
     @Environment(RemoteModel.self) private var model
     /// Nil for the person's own servers, on the Mac.
     var project: ProjectKey?
     @State private var checking = false
+    @State private var setup: DaemonAPI.ConnectorSetup?
 
     private var snapshot: DaemonAPI.MCPHealthSnapshot? { model.work.mcpHealthSnapshot(project?.host ?? .mac) }
 
@@ -21,6 +24,13 @@ struct MCPServersListView: View {
 
     var body: some View {
         List {
+            // The set-up first (#1336): a project's slots, or the person's connections.
+            if let project {
+                RemoteConnectorSetup(project: project, projectName: model.work.project(project)?.name
+                                         ?? project.folder.lastPathComponent, setup: $setup)
+            } else {
+                RemoteConnections()
+            }
             Section {
                 if let problem {
                     Text(problem).foregroundStyle(StateTint.failure.style(or: .secondary))
@@ -30,6 +40,8 @@ struct MCPServersListView: View {
                 }
                 ForEach(servers) { MCPHealthRow(server: $0) }
                     .paperListRow()
+            } header: {
+                Text(project == nil ? "Your connectors" : "All connectors")
             } footer: {
                 Text(project == nil ? MCPHealthWords.personalIntro : MCPHealthWords.projectIntro)
             }
