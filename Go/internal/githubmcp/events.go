@@ -83,6 +83,16 @@ var events = append([]event{
 		description: "An open pull request began to conflict with its base, so it cannot merge and its CI may not run until it is rebased. Once per conflict: it is raised again only after the PR merges cleanly and then conflicts anew." + ownPRs,
 		input:       schema{repoProperty, branchProperty("Only the PR from this branch."), prProperty, anyoneProperty},
 		payload:     object(map[string]any{"pr": prSchema(nil), "conflictedAt": str})},
+	// CodeRabbit's (#1344), known by its GitHub App, not by a name.
+	{name: "review.posted", title: "CodeRabbit reviewed",
+		description: "CodeRabbit finished a review of a pull request's head commit: its CodeRabbit status on that commit gone to success, or, where it sets no status, a review by its GitHub App on that commit. Once per review: a push it reviews, or a full review asked of the same commit (coderabbit_review with full), is a new one. state is its review's (commented, approved or changes_requested), empty when only its status says so; its comments come as review.comment." + ownPRs,
+		input:       schema{repoProperty, branchProperty("Only the PR from this branch."), prProperty, anyoneProperty},
+		payload:     object(map[string]any{"pr": prSchema(nil), "headSha": str, "state": str, "url": str, "reviewedAt": str})},
+	{name: "review.comment", title: "CodeRabbit commented on a line",
+		description: "CodeRabbit left a review comment on a pull request: on a line of its diff, or as an answer in a thread (inReplyTo is the comment it answers). Its body is the first 4000 characters. Answer it with coderabbit_reply and comment.id." + ownPRs,
+		input:       schema{repoProperty, branchProperty("Only the PR from this branch."), prProperty, anyoneProperty},
+		payload: object(map[string]any{"pr": prSchema(nil), "commentedAt": str,
+			"comment": object(map[string]any{"id": integer, "path": str, "line": integer, "inReplyTo": integer, "body": str, "url": str})})},
 }, issueEvents()...)
 
 func issueEvents() []event {
@@ -288,6 +298,19 @@ func (s *Events) Poll(ctx context.Context, raw json.RawMessage) (map[string]any,
 			}
 			return out, err
 		})
+	case "review.posted":
+		return s.pollDiff(ctx, e.name, "reviewedAt", a, p, func() ([]state, error) {
+			prs, err := s.GitHub.CodeRabbitPRs(ctx, a.repo)
+			var out []state
+			for _, r := range prs {
+				if a.anyone || r.Trusted {
+					reviewed := r.Reviewed
+					out = append(out, state{pr: r.PR, on: &reviewed, key: r.round(),
+						json: r.PR.json(), extra: map[string]any{"headSha": r.HeadSHA, "state": r.Review, "url": r.URL}})
+				}
+			}
+			return out, err
+		})
 	}
 	return s.poll(e, p, func(since string) ([]candidate, bool, error) { return candidates(ctx, s.GitHub, e.name, a, since) })
 }
@@ -369,18 +392,22 @@ func contains(list []string, s string) bool {
 	return false
 }
 
-// state is a PR and whether its state (in conflict, or open and ready) is on now; nil keeps
-// the one it had.
+// state is a PR and whether its state (in conflict, open and ready, or reviewed) is on now;
+// nil keeps the one it had. key, when set, is part of its id: review.posted's head commit and
+// review, so each review is raised once. extra is more of the event's data.
 type state struct {
-	pr   PR
-	on   *bool
-	json map[string]any
+	pr    PR
+	on    *bool
+	key   string
+	json  map[string]any
+	extra map[string]any
 }
 
 // pollDiff raises an event for each PR whose state is on now and was not at the last poll:
 // the cursor's ids are the PRs that were on then. A first poll takes those already on as
 // known. A conflict has no time on GitHub, only a state, so pr.conflicted diffs it (#712); so
-// does pr.opened (#833), so a draft marked ready is raised as it is.
+// does pr.opened (#833), so a draft marked ready is raised as it is, and review.posted (#1344),
+// by head commit and review, so a review and its status that say the same are raised once.
 func (s *Events) pollDiff(_ context.Context, name, key string, a args, p pollParams, states func() ([]state, error)) (map[string]any, *rpcError) {
 	first := p.firstPoll()
 	c := cursor{}
@@ -406,15 +433,20 @@ func (s *Events) pollDiff(_ context.Context, name, key string, a args, p pollPar
 	for _, id := range c.IDs {
 		was[id] = true
 	}
-	id := func(number int) string { return fmt.Sprintf("%s:%s:%d", name, a.repo, number) }
+	id := func(st state) string {
+		if st.key != "" {
+			return fmt.Sprintf("%s:%s:%d:%s", name, a.repo, st.pr.Number, st.key)
+		}
+		return fmt.Sprintf("%s:%s:%d", name, a.repo, st.pr.Number)
+	}
 	var still, fresh []state
 	for _, st := range prs {
 		if (a.pr != 0 && st.pr.Number != a.pr) || (a.branch != "" && st.pr.Branch != a.branch) {
 			continue
 		}
-		on := (st.on != nil && *st.on) || (st.on == nil && was[id(st.pr.Number)])
+		on := (st.on != nil && *st.on) || (st.on == nil && was[id(st)])
 		switch {
-		case on && was[id(st.pr.Number)]:
+		case on && was[id(st)]:
 			still = append(still, st)
 		case on:
 			fresh = append(fresh, st)
@@ -425,13 +457,16 @@ func (s *Events) pollDiff(_ context.Context, name, key string, a args, p pollPar
 	now := timeString(s.now())
 	ids := []string{}
 	for _, st := range append(still, taken...) {
-		ids = append(ids, id(st.pr.Number))
+		ids = append(ids, id(st))
 	}
 	out := []any{}
 	if !first {
 		for _, t := range taken {
-			out = append(out, map[string]any{"eventId": id(t.pr.Number) + ":" + now, "name": name, "timestamp": now,
-				"data": map[string]any{"pr": t.json, key: now}})
+			data := map[string]any{"pr": t.json, key: now}
+			for k, v := range t.extra {
+				data[k] = v
+			}
+			out = append(out, map[string]any{"eventId": id(t) + ":" + now, "name": name, "timestamp": now, "data": data})
 		}
 	}
 	return map[string]any{"events": out, "cursor": cursor{Since: now, IDs: ids}.encoded(), "truncated": false,
@@ -468,6 +503,22 @@ func candidates(ctx context.Context, gh GitHub, name string, a args, since strin
 			}
 			list = append(list, candidate{eventID: name + ":" + repo + ":" + it.ID, time: at,
 				data: func() (map[string]any, error) { return it.data(), nil }})
+		}
+		return list, truncated, nil
+	}
+	if name == "review.comment" {
+		comments, truncated, err := gh.CodeRabbitComments(ctx, repo, since)
+		if err != nil {
+			return nil, false, err
+		}
+		var list []candidate
+		for _, c := range comments {
+			at := normalized(c.At)
+			if at == "" || (a.pr != 0 && c.PR.Number != a.pr) || (a.branch != "" && c.PR.Branch != a.branch) || !(a.anyone || c.Trusted) {
+				continue
+			}
+			list = append(list, candidate{eventID: fmt.Sprintf("review.comment:%s:%d", repo, c.ID), time: at,
+				data: func() (map[string]any, error) { return c.data(), nil }})
 		}
 		return list, truncated, nil
 	}

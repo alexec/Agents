@@ -34,17 +34,21 @@ const pageAnswer = `{"data":{"viewer":{"login":"alexec"},"repository":{"pullRequ
  "state":"OPEN","isDraft":false,"body":"Divide by the count.","createdAt":"2026-10-18T08:00:00Z","additions":3,"deletions":1,
  "mergeable":"MERGEABLE","reviewDecision":"REVIEW_REQUIRED","author":{"login":"sam","__typename":"User"},"autoMergeRequest":null,
  "files":{"totalCount":1,"nodes":[{"path":"average.py","additions":3,"deletions":1,"changeType":"MODIFIED"}]},
- "comments":{"nodes":[{"author":{"login":"coderabbitai","__typename":"Bot"},"body":"Summary","createdAt":"2026-10-18T08:05:00Z","url":"u1"}]},
+ "comments":{"nodes":[{"author":{"login":"coderabbitai","__typename":"Bot"},"body":"<!-- This is an auto-generated comment: summarize by coderabbit.ai -->\n## Walkthrough","createdAt":"2026-10-18T08:05:00Z","url":"u1"}]},
  "reviews":{"nodes":[
   {"author":{"login":"coderabbitai","__typename":"Bot"},"body":"Actionable comments posted: 1","state":"COMMENTED","submittedAt":"2026-10-18T08:06:00Z","url":"u2"},
-  {"author":{"login":"kim","__typename":"User"},"body":"","state":"COMMENTED","submittedAt":"2026-10-18T08:07:00Z","url":"u3"}]},
+  {"author":{"login":"kim","__typename":"User"},"body":"","state":"COMMENTED","submittedAt":"2026-10-18T08:07:00Z","url":"u3"},
+  {"author":{"login":"coderabbitai","__typename":"Bot"},"body":"","state":"COMMENTED","submittedAt":"2026-10-18T08:09:00Z","url":"u5"}]},
  "reviewThreads":{"nodes":[{"isResolved":false,"isOutdated":false,"path":"average.py","line":6,"originalLine":6,
-  "comments":{"nodes":[{"author":{"login":"coderabbitai","__typename":"Bot"},"body":"Return the mean.","createdAt":"2026-10-18T08:06:00Z","url":"u4"}]}}]},
- "commits":{"nodes":[{"commit":{"statusCheckRollup":null}}]}}}}}`
+  "comments":{"nodes":[{"author":{"login":"coderabbitai","__typename":"Bot"},"body":"Return the mean.","createdAt":"2026-10-18T08:06:00Z","url":"u4","databaseId":44}]}}]},
+ "commits":{"nodes":[{"commit":{"statusCheckRollup":{"contexts":{"nodes":[
+  {"__typename":"StatusContext","context":"CodeRabbit","state":"SUCCESS","targetUrl":""}]}}}}]}}}}}`
 
 type viewsAPI struct {
 	mu    sync.Mutex
 	calls []string
+	// posted is each comment posted: its path and words.
+	posted []string
 }
 
 func (a *viewsAPI) serve(t *testing.T) *httptest.Server {
@@ -71,6 +75,15 @@ func (a *viewsAPI) serve(t *testing.T) *httptest.Server {
 			io.WriteString(w, `{"merged":true}`)
 		case r.URL.Path == "/repos/o/r/git/refs/heads/fix-mean" && r.Method == http.MethodDelete:
 			w.WriteHeader(http.StatusNoContent)
+		case r.Method == http.MethodPost && (r.URL.Path == "/repos/o/r/issues/7/comments" || r.URL.Path == "/repos/o/r/pulls/7/comments/44/replies"):
+			var c struct {
+				Body string `json:"body"`
+			}
+			_ = json.Unmarshal(body, &c)
+			a.mu.Lock()
+			a.posted = append(a.posted, r.URL.Path+" "+c.Body)
+			a.mu.Unlock()
+			io.WriteString(w, `{"html_url":"https://github.com/o/r/pull/7#c"}`)
 		case r.URL.Path == "/repos/o/r/pulls/7/reviews":
 			io.WriteString(w, `{"id":1}`)
 		case r.URL.Path == "/repos/o/r/pulls/7/files":
@@ -206,13 +219,13 @@ func TestTheIssuesListLeavesOutPullRequests(t *testing.T) {
 func TestAPullRequestsPageHasItsConversationReviewAndChecks(t *testing.T) {
 	c, _ := viewsClient(t)
 	_, p := callTool(t, c, "show_pull_request", map[string]any{"number": 7})
-	if p["number"] != 7.0 || p["state"] != "open" || p["checks"] != "none" || p["conflicts"] != false || p["review"] != "review_required" ||
+	if p["number"] != 7.0 || p["state"] != "open" || p["checks"] != "passing" || p["conflicts"] != false || p["review"] != "review_required" ||
 		p["viewer"] != "alexec" || p["filesTotal"] != 1.0 {
 		t.Fatalf("page: %v", p)
 	}
-	// CodeRabbit's summary and review are marked as an app's; a review with no words is in its threads.
+	// CodeRabbit's review is marked as an app's (its summary is its own block); a review with no words is in its threads.
 	comments := p["comments"].([]any)
-	if len(comments) != 2 || comments[0].(map[string]any)["bot"] != true || comments[1].(map[string]any)["review"] != "commented" {
+	if len(comments) != 1 || comments[0].(map[string]any)["bot"] != true || comments[0].(map[string]any)["review"] != "commented" {
 		t.Errorf("conversation: %v", comments)
 	}
 	threads := p["threads"].([]any)

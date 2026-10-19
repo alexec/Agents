@@ -119,6 +119,7 @@ func AddViews(server *mcp.Server, gh Views) {
 		return gh.DefaultRepo(ctx)
 	}
 	readOnly := &mcp.ToolAnnotations{ReadOnlyHint: true}
+	addCodeRabbitTools(server, gh, repoOf)
 
 	mcp.AddTool(server, &mcp.Tool{Name: "show_pull_requests", Title: "Show pull requests",
 		Description: "The repo's open pull requests, newest updated first, each with its checks (passing, failing, running or none), " +
@@ -164,6 +165,7 @@ func AddViews(server *mcp.Server, gh Views) {
 	mcp.AddTool(server, &mcp.Tool{Name: "show_pull_request", Title: "Show a pull request",
 		Description: "One pull request: its description, checks (a failing one with its run's id for failed_log), files, comments, " +
 			"reviews and review threads (path and line), whether it conflicts with its base, its review decision, and the signed-in login (viewer). " +
+			"An app's words say which app (app: CodeRabbit); codeRabbit is CodeRabbit's summary, its review status and its last review's state. " +
 			"Its view is the pull request's page.",
 		Annotations: readOnly, Meta: uiMeta(prURI, "model", "app")},
 		func(ctx context.Context, _ *mcp.CallToolRequest, in prArgs) (*mcp.CallToolResult, any, error) {
@@ -290,7 +292,7 @@ func AddViews(server *mcp.Server, gh Views) {
 		{issuesURI, "issues", "Issues", "The repo's open issues, with their labels and assignees, and Start Agent; a label narrows " +
 			"the list. Fed by show_issues.", "issues.html"},
 		{prURI, "pr", "Pull request", "One pull request's page: description, checks with a failed run's log, files, comments and " +
-			"review threads, with Comment, Approve, Merge, Auto-merge and Start Agent. Fed by show_pull_request.", "pr.html"},
+			"review threads, CodeRabbit's summary and review, with Comment, Approve, Merge, Auto-merge, Start Agent and Ask CodeRabbit Again. Fed by show_pull_request.", "pr.html"},
 	} {
 		html := page(v.file)
 		uri := v.uri

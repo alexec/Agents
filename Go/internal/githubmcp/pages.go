@@ -28,6 +28,7 @@ type Views interface {
 	MergePR(ctx context.Context, repo string, number int, auto bool) (map[string]any, error)
 	ReviewPR(ctx context.Context, repo string, number int, approve bool, body string) (map[string]any, error)
 	CommentOnPR(ctx context.Context, repo string, number int, body string) (map[string]any, error)
+	ReplyInThread(ctx context.Context, repo string, number, commentID int, body string) (map[string]any, error)
 }
 
 // Board is the open pull requests, newest updated first, and who is signed in.
@@ -48,6 +49,8 @@ type BoardPR struct {
 	Conflicts *bool
 	// Review is approved, changes_requested, review_required or "".
 	Review string
+	// CodeRabbit is its status: reviewing, reviewed, failed or "" (#1344).
+	CodeRabbit string
 }
 
 func (p BoardPR) json() map[string]any {
@@ -62,6 +65,9 @@ func (p BoardPR) json() map[string]any {
 	}
 	if p.Review != "" {
 		j["review"] = p.Review
+	}
+	if p.CodeRabbit != "" {
+		j["codeRabbit"] = p.CodeRabbit
 	}
 	return j
 }
@@ -208,7 +214,7 @@ func (a *gqlActor) login() string {
 	return a.Login
 }
 
-// isBot: a GitHub App, such as CodeRabbit (#1344), writes as a Bot.
+// isBot: a GitHub App writes as a Bot; CodeRabbit (#1344) is named as itself.
 func (a *gqlActor) isBot() bool { return a != nil && a.Typename == "Bot" }
 
 // rollupFields are a PR's last commit's checks.
@@ -290,7 +296,7 @@ func (g *RealGitHub) BoardPRs(ctx context.Context, repo string) (Board, error) {
 			PR:   PR{Number: n.Number, Title: n.Title, Branch: n.HeadRefName, URL: n.URL},
 			Base: n.BaseRefName, Author: n.Author.login(), UpdatedAt: n.UpdatedAt, Draft: n.IsDraft,
 			AutoMerge: n.AutoMerge != nil, Checks: checks, FailedRunID: runID, Conflicts: conflictsOf(n.Mergeable),
-			Review: strings.ToLower(n.Review),
+			Review: strings.ToLower(n.Review), CodeRabbit: codeRabbitState(n.Commits.items()),
 		})
 	}
 	return b, nil
@@ -335,7 +341,7 @@ const pageQuery = `query($owner: String!, $name: String!, $number: Int!) { viewe
     comments(first: 100) { nodes { author { login __typename } body createdAt url } }
     reviews(first: 100) { nodes { author { login __typename } body state submittedAt url } }
     reviewThreads(first: 100) { nodes { isResolved isOutdated path line originalLine
-      comments(first: 50) { nodes { author { login __typename } body createdAt url } } } }
+      comments(first: 50) { nodes { author { login __typename } body createdAt url databaseId } } } }
     ` + rollupFields + ` } } }`
 
 type gqlComment struct {
@@ -343,10 +349,19 @@ type gqlComment struct {
 	Body      string    `json:"body"`
 	CreatedAt string    `json:"createdAt"`
 	URL       string    `json:"url"`
+	// DatabaseID is a review comment's REST id, to answer it in its thread.
+	DatabaseID int `json:"databaseId"`
 }
 
 func (c gqlComment) json(at string) map[string]any {
-	return map[string]any{"author": c.Author.login(), "bot": c.Author.isBot(), "body": c.Body, "at": at, "url": c.URL}
+	j := map[string]any{"author": c.Author.login(), "bot": c.Author.isBot(), "body": c.Body, "at": at, "url": c.URL}
+	if app := c.Author.app(); app != "" {
+		j["app"] = app
+	}
+	if c.DatabaseID != 0 {
+		j["id"] = c.DatabaseID
+	}
+	return j
 }
 
 func (g *RealGitHub) PRPage(ctx context.Context, repo string, number int) (map[string]any, error) {
@@ -432,8 +447,32 @@ func (g *RealGitHub) PRPage(ctx context.Context, repo string, number int) (map[s
 		json map[string]any
 	}
 	var notes []note
+	// CodeRabbit's summary is its own block, not a comment among the others; its review state
+	// is its last review's.
+	var rabbit map[string]any
 	for _, c := range p.Comments.Nodes {
+		if c.Author.isCodeRabbit() && strings.HasPrefix(strings.TrimSpace(c.Body), codeRabbitSummary) {
+			if rabbit == nil {
+				rabbit = map[string]any{}
+			}
+			rabbit["summary"], rabbit["summaryUrl"] = c.Body, c.URL
+			continue
+		}
 		notes = append(notes, note{c.CreatedAt, c.json(c.CreatedAt)})
+	}
+	for _, r := range p.Reviews.Nodes {
+		if r.Author.isCodeRabbit() && isWholeReview(r.Body, r.State) {
+			if rabbit == nil {
+				rabbit = map[string]any{}
+			}
+			rabbit["review"], rabbit["reviewUrl"], rabbit["reviewedAt"] = strings.ToLower(r.State), r.URL, r.SubmittedAt
+		}
+	}
+	if s := codeRabbitState(items); s != "" {
+		if rabbit == nil {
+			rabbit = map[string]any{}
+		}
+		rabbit["status"] = s
 	}
 	for _, r := range p.Reviews.Nodes {
 		review := strings.ToLower(r.State)
@@ -482,6 +521,9 @@ func (g *RealGitHub) PRPage(ctx context.Context, repo string, number int) (map[s
 	}
 	if p.Review != "" {
 		page["review"] = strings.ToLower(p.Review)
+	}
+	if rabbit != nil {
+		page["codeRabbit"] = rabbit
 	}
 	return page, nil
 }
