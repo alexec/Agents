@@ -28,6 +28,10 @@ final class WindowRequests {
     /// Set to put the keyboard in the sidebar's search field.
     var wantsSessionSearchFocus = false
 
+    /// Set by Find in Chat (#1532), taken (and cleared) by the main window's chat, which
+    /// shows its find bar.
+    var wantsChatFind = false
+
     /// Open File… is up over the window (#415), searching the open session's folders.
     var showsFileSearch = false
 
@@ -206,8 +210,14 @@ struct AgentsCommands: Commands {
                 .keyboardShortcut(.downArrow, modifiers: .command)
                 .disabled(sessionAgent == nil)
             Divider()
+            // In the main window's open chat, ⌘F finds in it (#1532), and Find Session
+            // takes ⌥⌘F; with no chat open, ⌘F is Find Session as before.
+            let findsInChat = popped == nil && projectWindow == nil && model.selectedAgent != nil
+            Button("Find in Chat") { requests.wantsChatFind = true }
+                .keyboardShortcut(findsInChat ? KeyboardShortcut("f") : nil)
+                .disabled(!findsInChat)
             Button("Find Session") { requests.focusSessionSearch() }
-                .keyboardShortcut("f")
+                .keyboardShortcut(findsInChat ? KeyboardShortcut("f", modifiers: [.command, .option]) : KeyboardShortcut("f"))
                 .disabled(model.selectedProjectSummary == nil)
         }
 

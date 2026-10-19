@@ -3,3 +3,5 @@
 import { signal } from "@preact/signals";
 
 export const focusedEntry = signal<string | null>(null);
+/** Where that entry is in the transcript, when Find knows it (#1532): one in a stored turn's steps is drawn once the turn is open. */
+export const focusedIndex = signal<number | null>(null);

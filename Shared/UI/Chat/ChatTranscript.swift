@@ -42,6 +42,9 @@ struct ChatTranscript: View {
     var scrollToEndToken = 0
     /// A message to go to, asked for from elsewhere (the Mac's artifacts pane).
     var focusedEntry: UUID? = nil
+    /// Where that message is in the transcript, when known (Find, #1532): a message in a
+    /// stored turn's steps is drawn only once the turn is opened and its entries fetched.
+    var focusedIndex: Int? = nil
     var clearFocus: () -> Void = {}
     /// How tall the visible part is. The phone sizes its first page to it.
     var onHeight: ((CGFloat) -> Void)? = nil
@@ -472,6 +475,20 @@ struct ChatTranscript: View {
             // this lands on it.
             .onChange(of: focusedEntry) {
                 guard let focusedEntry else { return }
+                // In a stored turn's steps, not yet drawn: the turn is opened and its steps
+                // fetched, and then gone to (#1532).
+                if let focusedIndex, !rows.contains(where: { $0.draws(focusedEntry) }),
+                   let turn = rows.first(where: { $0.range?.contains(focusedIndex) == true }) {
+                    turnViews[turn.id] = .open
+                    isFollowing = false
+                    clearFocus()
+                    Task {
+                        await fetch(turn)
+                        try? await Task.sleep(for: .milliseconds(50))
+                        withAnimation(.easeOut(duration: 0.2)) { scroller.scrollTo(focusedEntry, anchor: .center) }
+                    }
+                    return
+                }
                 if let turn = rows.first(where: { $0.items.contains { $0.id == focusedEntry } }) {
                     if !(turnViews[turn.id] ?? .initial).showsSteps { turnViews[turn.id] = .open }
                     // A run of calls is drawn as its last: open that run and its call, and
@@ -817,5 +834,13 @@ private struct LoadFailureLine: View {
         }
         .appText(.fine)
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+private extension ChatTurn {
+    /// Whether the chat draws a row with this id for the turn as it stands: its ask, its
+    /// items, or a stored turn's outcome.
+    func draws(_ id: UUID) -> Bool {
+        ask?.id == id || items.contains { $0.id == id } || (storedOutcome ?? []).contains { $0.id == id }
     }
 }

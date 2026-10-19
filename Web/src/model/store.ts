@@ -12,8 +12,7 @@ import type {
   ChatProjectState, CostState, EventsPage, Event as ActivityEvent, ConfigOption, WorkflowSettings,
   PagesChangedNotification, PinsChangedNotification, PinView, ViewPin, ListCursor, ListRequest, FileMentionDTO, SandboxChoice, RuntimeAllowances,
   GuardedChange, GuardedChangeReading, HostJoinStatus, KeptDelivered, KeptList, KeptRequest, Approval, ApprovalAction, UsageHistory, TimeHistory, Milestones,
-  BuildOutputRemoved, ProjectWorktrees, RemovalCheck, WorktreeSize, WorktreeSummary, WorktreesSized,
-} from "../protocol/generated";
+  BuildOutputRemoved, ProjectWorktrees, RemovalCheck, WorktreeSize, WorktreeSummary, WorktreesSized, FindResult } from "../protocol/generated";
 import { Failure } from "../protocol/generated";
 import { CallFailed, type Link } from "../wire/link";
 import type { FolderGoneAsk } from "./missingFolder";
@@ -1551,6 +1550,26 @@ export class Store extends Work {
         if (entry) this.fillOversized(entry, host, agentID);
       })
       .catch(() => {});
+  }
+
+  /** Find in Chat (#1532): what was said in the open chat that holds `text`, found by its host. */
+  async find(host: string, agentID: string, text: string): Promise<FindResult | null> {
+    return this.link.call("agents/find", { agentID: agentID as UUID, text }, host).catch(() => null);
+  }
+
+  /** Whether the transcript entry at `index` is in hand: in the page, or in a stored turn (AgentsModel.holds). */
+  holds(index: number): boolean {
+    return (this.entries.value.length > 0 && index >= this.firstEntryIndex.value)
+      || this.turns.value.some((turn) => turn.start <= index && index < turn.end);
+  }
+
+  /** Earlier pages, as Load Earlier brings them, until the entry at `index` is in hand or no more come (#1532). */
+  async loadUntil(index: number): Promise<void> {
+    while (!this.holds(index) && this.hasMoreOfTheConversation) {
+      const before = [this.firstTurn.value, this.firstEntryIndex.value, this.turns.value.length, this.entries.value.length].join();
+      await this.loadEarlier();
+      if ([this.firstTurn.value, this.firstEntryIndex.value, this.turns.value.length, this.entries.value.length].join() === before) return;
+    }
   }
 
   /** Further back: the open turn's earlier entries, then the turns before it. A chat scrolled up

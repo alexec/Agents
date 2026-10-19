@@ -1852,6 +1852,26 @@ type FilesWriteResponse struct {
 	Path string `json:"path"`
 }
 
+// One message that holds the text: where it is in the transcript (its first chunk), and the line it is on.
+type FindMatch struct {
+	Index   int64  `json:"index"`
+	EntryID UUID   `json:"entryID"`
+	Line    string `json:"line"`
+}
+
+// agents/find (#1532): what was said in one chat, prompts and replies, that holds the text, any case.
+type FindRequest struct {
+	AgentID UUID   `json:"agentID"`
+	Text    string `json:"text"`
+	Limit   *int64 `json:"limit,omitzero"`
+}
+
+// The matches, oldest first: the newest `limit` of them. More is true when older ones were left out.
+type FindResult struct {
+	Matches []FindMatch `json:"matches"`
+	More    bool        `json:"more"`
+}
+
 type FolderHunk struct {
 	OldStart       int64      `json:"oldStart"`
 	NewStart       int64      `json:"newStart"`

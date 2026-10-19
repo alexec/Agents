@@ -19,6 +19,8 @@ struct RemoteChatView: View {
     @State private var views = AppViewStore()
     /// Open File… is up over the chat (#415).
     @State private var searchingFiles = false
+    /// Find in Chat is up over the chat (#1532).
+    @State private var finding = false
     /// How wide the conversation is, so a pull can be told from the right edge (#1560).
     @State private var conversationWidth: CGFloat = 0
     /// How near the right edge a pull starts to bring in the panes: about the width of
@@ -50,6 +52,12 @@ struct RemoteChatView: View {
             Button("Open File…") { searchingFiles = true }
                 .keyboardShortcut("p")
                 .disabled(agent == nil)
+                .opacity(0)
+                .accessibilityHidden(true)
+            // ⌘F finds in the chat with a keyboard attached, as on the Mac (#1532).
+            Button("Find in Chat") { finding = true }
+                .keyboardShortcut("f")
+                .disabled(agent == nil || popped != nil)
                 .opacity(0)
                 .accessibilityHidden(true)
         }
@@ -96,6 +104,12 @@ struct RemoteChatView: View {
                                bottomInset: formHeight,
                                cards: cards,
                                scrollToEndToken: popped?.scrollToEndToken ?? model.scrollToEndToken,
+                               focusedEntry: popped == nil ? model.focusedEntry : nil,
+                               focusedIndex: popped == nil ? model.focusedIndex : nil,
+                               clearFocus: { [model] in
+                                   model.focusedEntry = nil
+                                   model.focusedIndex = nil
+                               },
                                // The conversation is the only thing that knows how tall
                                // it is, and the page it asks for next should be sized to
                                // that (SC-007).
@@ -103,6 +117,16 @@ struct RemoteChatView: View {
                                onFollowing: { page.isFollowingEnd = $0 })
             }
             form
+        }
+        // Find in Chat (#1532): over the top of the chat, which scrolls on under it.
+        .safeAreaInset(edge: .top, spacing: 0) {
+            if finding, let agent {
+                ChatFindBar(agentID: agent.id,
+                            search: { [model] text in await model.find(text, in: agent.id) },
+                            go: { [model] match in await model.reveal(match) },
+                            close: { finding = false })
+                    .background(Paper.ground)
+            }
         }
         .onGeometryChange(for: CGFloat.self, of: \.size.width) { conversationWidth = $0 }
         // A pull from the right edge brings what was exchanged in from that side, as the
@@ -246,7 +270,7 @@ struct RemoteChatView: View {
             }
             if let agent {
                 ToolbarItem(placement: .topBarTrailing) {
-                    ChatMenu(agent: agent) { searchingFiles = true }
+                    ChatMenu(agent: agent, find: popped == nil ? { finding = true } : nil) { searchingFiles = true }
                 }
             }
         }
@@ -420,6 +444,8 @@ private struct ChatMenu: View {
     @Environment(\.poppedChat) private var popped
     @Environment(\.horizontalSizeClass) private var sizeClass
     let agent: Agent
+    /// Find in Chat (#1532), over the chat. Nil in a scene of its own.
+    var find: (() -> Void)? = nil
     /// Open File… (#415), over the chat.
     let openFile: () -> Void
 
@@ -433,6 +459,9 @@ private struct ChatMenu: View {
                 .disabled(model.isStale(agent))
                 .accessibilityHint(AgentsModel.carryOnHelp(for: agent))
                 Divider()
+            }
+            if let find {
+                Button("Find in Chat", systemImage: "text.magnifyingglass", action: find)
             }
             Button("Open File…", systemImage: "magnifyingglass", action: openFile)
             // On a phone, the panes one item each, in place of the bar's Panes button
