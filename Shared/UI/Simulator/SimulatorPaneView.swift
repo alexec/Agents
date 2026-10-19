@@ -12,11 +12,14 @@ struct SimulatorCalls {
     var boot: @MainActor (String) async throws -> Void
     var shutdown: @MainActor (String) async throws -> Void
     var screen: @MainActor (String) async throws -> DaemonAPI.SimulatorScreen
+    /// A touch at x and y, from 0 to 1 across and down, and the Home button.
+    var tap: @MainActor (String, Double, Double) async throws -> Void
+    var home: @MainActor (String) async throws -> Void
 }
 
 /// The iOS Simulator pane (#842): a simulator on the session's Mac, its screen shown and
 /// read again each second while the pane is on screen. Booting and shutting down are the
-/// person's press only. It shows the screen; it does not take taps yet.
+/// person's press only. A click or a tap on the screen is a touch there; Home is its button.
 struct SimulatorPaneView: View {
     let calls: SimulatorCalls
     /// Whether the pane is on screen. The screen is asked for only then.
@@ -27,6 +30,10 @@ struct SimulatorPaneView: View {
     @State private var screen: DaemonAPI.SimulatorScreen?
     @State private var problem: String?
     @State private var busy = false
+    /// How big the screen is drawn, for where a touch lands on it.
+    @State private var shown: CGSize = .zero
+    /// Counts touches, so the screen is read again at once after one.
+    @State private var touches = 0
 
     private var simulator: DaemonAPI.Simulator? {
         list?.simulators.first { $0.udid == chosen } ?? list?.simulators.first
@@ -48,7 +55,7 @@ struct SimulatorPaneView: View {
         .padding(12)
         .task { await reload() }
         // Read again each second, while on screen and booted, and never two at once.
-        .task(id: "\(isVisible)-\(simulator?.udid ?? "")-\(simulator?.booted == true)") {
+        .task(id: "\(isVisible)-\(simulator?.udid ?? "")-\(simulator?.booted == true)-\(touches)") {
             guard isVisible, let simulator, simulator.booted else {
                 screen = nil
                 return
@@ -78,6 +85,15 @@ struct SimulatorPaneView: View {
             }
             Spacer(minLength: 0)
             if let simulator {
+                if simulator.booted {
+                    Button {
+                        touch { try await calls.home(simulator.udid) }
+                    } label: {
+                        Image(systemName: "circle.circle")
+                    }
+                    .help("Home")
+                    .accessibilityLabel("Home")
+                }
                 Button(simulator.booted ? "Shut Down" : "Boot") { toggle(simulator) }
                     .disabled(busy)
             }
@@ -105,7 +121,16 @@ struct SimulatorPaneView: View {
                     .aspectRatio(CGFloat(screen.width) / CGFloat(max(screen.height, 1)), contentMode: .fit)
                     .clipShape(RoundedRectangle(cornerRadius: 18))
                     .overlay { RoundedRectangle(cornerRadius: 18).strokeBorder(.quaternary) }
+                    .onGeometryChange(for: CGSize.self, of: \.size) { shown = $0 }
+                    // A touch where it was clicked or tapped, as a share of the screen.
+                    .onTapGesture { point in
+                        guard shown.width > 0, shown.height > 0 else { return }
+                        let x = min(max(point.x / shown.width, 0), 1)
+                        let y = min(max(point.y / shown.height, 0), 1)
+                        touch { try await calls.tap(simulator.udid, x, y) }
+                    }
                     .accessibilityLabel("The screen of \(simulator.name)")
+                    .accessibilityHint("A tap here is a tap on the simulator")
             } else if simulator.booted {
                 ProgressView().controlSize(.small)
             } else {
@@ -119,6 +144,20 @@ struct SimulatorPaneView: View {
                 .appText(.supporting)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
+        }
+    }
+
+    /// A touch or Home, then the screen read again at once to show what it did.
+    private func touch(_ send: @escaping @MainActor () async throws -> Void) {
+        Task {
+            do {
+                try await send()
+                problem = nil
+                try? await Task.sleep(for: .milliseconds(250))
+                touches += 1
+            } catch {
+                problem = describe(error)
+            }
         }
     }
 

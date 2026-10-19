@@ -143,6 +143,8 @@ public extension DaemonAPI {
                 Row(Method.simulatorsShutdown, params: SimulatorRequest.self, result: Empty.self, kind: .hostRequest),
                 Row(Method.simulatorsScreen, params: SimulatorScreenRequest.self, result: SimulatorScreen.self,
                     kind: .hostRequest),
+                Row(Method.simulatorsTap, params: SimulatorTapRequest.self, result: Empty.self, kind: .hostRequest),
+                Row(Method.simulatorsHome, params: SimulatorRequest.self, result: Empty.self, kind: .hostRequest),
                 Row(Method.agentsStop, params: AgentRequest.self, result: Empty.self, kind: .hostRequest),
                 // Events ▸ Waiting now's ✕, as the window and the Remote have it (#541).
                 Row(Method.eventsCancelWait, params: CancelWaitRequest.self, result: [WaitingAgent].self,

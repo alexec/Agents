@@ -1359,4 +1359,4 @@ button.file-card:hover { border-color: color-mix(in srgb, var(--paper-ink) 25%, 
 .simulator-pane { display: flex; flex-direction: column; gap: 10px; padding: 12px; }
 .simulator-bar { display: flex; align-items: center; gap: 10px; }
 .simulator-bar .spacer { flex: 1; }
-.simulator-screen { max-width: 100%; height: auto; max-height: 75vh; object-fit: contain; align-self: center; border-radius: 18px; border: 1px solid var(--paper-rule); }
+.simulator-screen { cursor: pointer; width: auto; height: auto; max-width: 100%; max-height: 75vh; align-self: center; border-radius: 18px; border: 1px solid var(--paper-rule); }

@@ -11083,6 +11083,27 @@
       ],
       "additionalProperties": false
     },
+    "SimulatorTapRequest": {
+      "type": "object",
+      "description": "simulators/tap: a touch on a booted simulator's screen, where from 0 to 1 across (x) and down (y).",
+      "properties": {
+        "udid": {
+          "type": "string"
+        },
+        "x": {
+          "type": "number"
+        },
+        "y": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "udid",
+        "x",
+        "y"
+      ],
+      "additionalProperties": false
+    },
     "SimulatorScreen": {
       "type": "object",
       "description": "A booted simulator's screen as a JPEG, and its size in pixels.",

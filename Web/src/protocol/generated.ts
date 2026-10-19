@@ -3744,6 +3744,16 @@ export interface SimulatorScreenRequest {
   maxHeight?: number;
 }
 
+/**
+ * simulators/tap: a touch on a booted simulator's screen, where from 0 to 1 across (x) and down
+ * (y).
+ */
+export interface SimulatorTapRequest {
+  udid: string;
+  x: number;
+  y: number;
+}
+
 export interface SkillAddAnswer {
   skill: ManagedSkill;
 }
@@ -4594,9 +4604,11 @@ export interface Methods {
   "runtimes/markAvailable": { params: MarkRuntimeAvailable; result: RuntimeAllowances };
   "sandbox/state": { params: Empty; result: SandboxSettings };
   "simulators/boot": { params: SimulatorRequest; result: Empty };
+  "simulators/home": { params: SimulatorRequest; result: Empty };
   "simulators/list": { params: Empty; result: SimulatorList };
   "simulators/screen": { params: SimulatorScreenRequest; result: SimulatorScreen };
   "simulators/shutdown": { params: SimulatorRequest; result: Empty };
+  "simulators/tap": { params: SimulatorTapRequest; result: Empty };
   "store/notes": { params: Empty; result: StoreNotes };
   "surface/identify": { params: SurfaceIdentification; result: Empty };
   "time/history": { params: Empty; result: TimeHistory };
@@ -4735,9 +4747,11 @@ export const MethodTarget = {
   "runtimes/markAvailable": "host",
   "sandbox/state": "host",
   "simulators/boot": "host",
+  "simulators/home": "host",
   "simulators/list": "host",
   "simulators/screen": "host",
   "simulators/shutdown": "host",
+  "simulators/tap": "host",
   "store/notes": "host",
   "surface/identify": "host",
   "time/history": "host",
@@ -5228,6 +5242,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   SimulatorRequest: { required: ["udid"], optional: [] },
   SimulatorScreen: { required: ["jpeg", "width", "height"], optional: [] },
   SimulatorScreenRequest: { required: ["udid"], optional: ["maxHeight"] },
+  SimulatorTapRequest: { required: ["udid", "x", "y"], optional: [] },
   SkillAddAnswer: { required: ["skill"], optional: [] },
   SkillAddRequest: { required: ["previewID", "destination", "replace"], optional: [] },
   SkillChanges: { required: ["added", "changed", "removed"], optional: [] },
