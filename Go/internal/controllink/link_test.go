@@ -34,6 +34,9 @@ type fakeControl struct {
 	// nothing more: a control plane gone quiet (#1403). Later uplinks are served as usual.
 	stall   chan struct{}
 	uplinks atomic.Int32
+	// letGo, when set, closes every uplink as soon as its host/hello is read: a copy that
+	// lets go at once (#1529).
+	letGo bool
 
 	mu         sync.Mutex
 	hostPublic []byte // from hosts/announce
@@ -126,6 +129,9 @@ func (f *fakeControl) serve(w http.ResponseWriter, r *http.Request) {
 		f.t.Errorf("first uplink line %s", first)
 	}
 	f.hellos <- frame.M.Params
+	if f.letGo {
+		return
+	}
 	l.Write(ctx, `{"c":1,"open":{"client":"C","device":"D1","fanOut":true}}`)
 	l.Write(ctx, `{"c":1,"m":{"jsonrpc":"2.0","id":7,"method":"daemon/ping"}}`)
 	if f.uplinks.Add(1) == 1 && f.stall != nil {
