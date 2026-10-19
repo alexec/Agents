@@ -21,6 +21,11 @@ struct ChatActions {
     /// Quote in Prompt (#1553): words from a reply, added to the open chat's prompt bar as a
     /// quote. Nil where there is no prompt bar, and then a reply offers nothing.
     var quote: (@MainActor (String) -> Void)? = nil
+    /// Run a command from a reply in the session's shell, and show the shell (#1533). Nil
+    /// where there is no shell, and then a reply offers nothing.
+    var runCommand: (@MainActor (String) -> Void)? = nil
+    /// Send a command run from a reply, and the end of what it printed, to the agent.
+    var tellAgent: (@MainActor (String) -> Void)? = nil
     /// Send a queued prompt into the running turn, and whether this runtime can take one
     /// there at all: what it advertised, by runtime id.
     var sendNow: @MainActor (QueuedPrompt, UUID) async -> Void = { _, _ in }

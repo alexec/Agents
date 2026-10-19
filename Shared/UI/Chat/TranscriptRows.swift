@@ -300,6 +300,8 @@ private struct EntryRow: View {
         case .agentMessage(_, let text, let blocks):
             BlocksView(blocks: blocks.isEmpty ? [.text(text)] : blocks)
                 .appText(.reading)
+                // A shell's code block in a reply can be run (#1533).
+                .environment(\.codeRuns, true)
                 .copiesMessage(entry)
 
         case .agentThought(_, let text):
