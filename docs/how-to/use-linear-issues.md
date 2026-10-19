@@ -68,6 +68,18 @@ Add Linear's own server from the registry, or by hand with the URL
 the issue's identifier (such as `ENG-12`) in its branch and pull request title, so that
 Linear's GitHub integration links the pull request to the issue.
 
+## Work a Linear issue with an agent
+
+A project that pushes to GitHub lists the ready-made workflow **Work a Linear issue**, off.
+Turn it on in the project's Workflows. Then, when a Linear issue gets the `agent` label, a
+new agent reads it with Linear's server, takes it, works on a branch `agent/eng-12`, opens a
+pull request whose title starts with `ENG-12`, and comments on the issue with the link. With
+Linear's GitHub integration on, the pull request shows on the issue, and `Fixes ENG-12` in its
+body closes the issue when it merges. The agent never merges.
+
+The GitHub **Work an issue** workflow takes only the `github` server's `issue.labelled`, so
+one label starts one agent.
+
 ## Start an agent on an event
 
 Each event takes these arguments. All of them are optional:
