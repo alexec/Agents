@@ -1939,6 +1939,8 @@ final class AppModel {
     /// A Settings pane to open on, asked for by a link elsewhere (052): read and cleared
     /// by the Settings window.
     var settingsPaneAsked: SettingsPane?
+    /// The Control plane page asked for with it, such as Providers from a project's set-up (#1336).
+    var controlPageAsked: ControlPage?
 
     /// Every runtime's state on this Mac (065, US4). Asking also asks Grok what is left.
     func refreshRuntimeAllowances() async {

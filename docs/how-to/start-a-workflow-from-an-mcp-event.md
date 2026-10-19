@@ -21,9 +21,10 @@ is shown as not supported yet.
 - A project with a connector that offers events. The github server (`github-mcp`) ships
   with Agents Host and the Linux host, and needs the host's GitHub connection: the GitHub
   App `agents-loops`, signed in with a code on github.com (#1335), and installed on the
-  repository. The **Connect GitHub** sheet is #1336; until it comes, a client starts the
-  sign-in with the host's `connections/sign-in` method. It does not use `gh`. See
-  `Go/README.md` in the repo.
+  repository. On the project's **Connectors** page, press **Connect GitHub…** and type the
+  code on github.com (#1336). Once a slot has read from GitHub, the page adds the github
+  connector to the project's `.agents/mcp.json`, so its events reach the project. It does
+  not use `gh`.
 - For every setting, see [Workflow triggers and actions](../reference/workflows.md), and for
   what the event carries, [Events from MCP servers](../reference/events.md#events-from-mcp-servers).
 

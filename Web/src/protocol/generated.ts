@@ -850,6 +850,112 @@ export interface ConnectionsList {
   connections: Connection[];
 }
 
+/**
+ * The github events the set-up turned on, and the project's workflows that start on one of them.
+ */
+export interface ConnectorEvents {
+  state: ConnectorEventsState;
+  /** The events, such as pr.opened. */
+  names: string[];
+  /** The mcp.json name that offers them. */
+  server?: string;
+  workflows: ConnectorWorkflow[];
+  message?: string;
+}
+
+/**
+ * on: the github connector is in the project's or the person's mcp.json, so its events reach this
+ * project. off: not yet (nothing connected, or every GitHub slot skipped). taken: an mcp.json entry
+ * not made by Agents already has the name github, and it is left alone. failed: the entry could not
+ * be written; message says why.
+ */
+export type ConnectorEventsState = "on" | "off" | "taken" | "failed";
+
+/** The one real thing a slot read: the newest issue or pull request, or the last workflow run. */
+export interface ConnectorProof {
+  /** The issue or pull request number. */
+  number?: number;
+  /** Its title, or the run's workflow and branch, such as "CI on main". */
+  title: string;
+  /** A run's outcome in a word: passed, failed, running, cancelled. */
+  outcome?: string;
+  url?: string;
+  at?: WireDate;
+}
+
+/**
+ * A project's Connectors set-up (#1336): its GitHub repository, the person's connection, four slots
+ * that each prove themselves with one read, and the events.
+ */
+export interface ConnectorSetup {
+  folder: string;
+  /** owner/name, from the project's git remote (origin first). Absent with no GitHub remote. */
+  repository?: string;
+  connection?: Connection;
+  /** Whether the Agents App is installed on the repository. Absent when not known. */
+  installed?: boolean;
+  installURL?: string;
+  /** How many repositories the connection sees through the App. */
+  repositories?: number;
+  slots: ConnectorSlot[];
+  events: ConnectorEvents;
+  /** Slots that read or were skipped, of the four. */
+  done: number;
+}
+
+/**
+ * stored: no call to the provider, only what was read before (for a list of every project). cached:
+ * a read at most five minutes old is used again. fresh: read now (Try Again).
+ */
+export type ConnectorSetupReading = "stored" | "cached" | "fresh";
+
+export interface ConnectorSetupRequest {
+  folder: string;
+  reading?: ConnectorSetupReading;
+}
+
+/** Skip a slot, or set it up again. Kept in the project's .agents/project.json. */
+export interface ConnectorSkipRequest {
+  folder: string;
+  slot: ConnectorSlotKind;
+  skipped: boolean;
+}
+
+/**
+ * One slot and what it read. A slot that has read keeps its proof when a later read cannot reach
+ * the provider; only a refusal unticks it.
+ */
+export interface ConnectorSlot {
+  slot: ConnectorSlotKind;
+  /** What fills it, in words: GitHub Issues, GitHub pull requests, GitHub Actions, This Mac. */
+  choice: string;
+  state: ConnectorSlotState;
+  proof?: ConnectorProof;
+  readAt?: WireDate;
+  /** Why a read failed or was refused, in words. Never a token. */
+  message?: string;
+}
+
+/**
+ * One slot of a project's set-up (#1336), in the page's order: tasks (the tracker), codeReview, ci,
+ * and workspace (where agents run).
+ */
+export type ConnectorSlotKind = "tasks" | "codeReview" | "ci" | "workspace";
+
+/**
+ * notConnected: the slot comes with a connection that is not there yet. notRead: connected, but not
+ * read yet (a stored reading). read: its one read worked (a tick). failed: the read did not reach
+ * the provider; message says why. refused: the provider refused the read, so the person grants it
+ * on the provider's site. noRemote: the project has no GitHub remote. skipped: the person skipped
+ * it; it counts as done.
+ */
+export type ConnectorSlotState = "notConnected" | "notRead" | "read" | "failed" | "refused" | "noRemote" | "skipped";
+
+export interface ConnectorWorkflow {
+  id: string;
+  name: string;
+}
+
 export type Consequence =
   | { woke: { agentID: UUID; title: string } }
   | { fired: { workflowID: string; folder: URLString; agentID?: UUID } }
@@ -4344,6 +4450,13 @@ export interface Methods {
   "changes/file": { params: ChangesFileRequest; result: ChangedFileDetail };
   "changes/list": { params: ChangesListRequest; result: ChangesList };
   "clients/forgetSelf": { params: Empty; result: Empty };
+  "connections/disconnect": { params: ConnectionProviderRequest; result: ConnectionDisconnectAnswer };
+  "connections/list": { params: Empty; result: ConnectionsList };
+  "connections/sign-in": { params: ConnectionProviderRequest; result: ConnectionSignIn };
+  "connections/sign-in/cancel": { params: ConnectionSignInFlowRequest; result: ConnectionSignIn };
+  "connections/sign-in/wait": { params: ConnectionSignInFlowRequest; result: ConnectionSignIn };
+  "connectors/setup": { params: ConnectorSetupRequest; result: ConnectorSetup };
+  "connectors/setup/skip": { params: ConnectorSkipRequest; result: ConnectorSetup };
   "control/status": { params: Empty; result: ControlStatus };
   "cost/state": { params: Empty; result: CostState };
   "credentials/lend": { params: CredentialsLend; result: Empty };
@@ -4473,6 +4586,13 @@ export const MethodTarget = {
   "changes/file": "host",
   "changes/list": "host",
   "clients/forgetSelf": "control",
+  "connections/disconnect": "host",
+  "connections/list": "host",
+  "connections/sign-in": "host",
+  "connections/sign-in/cancel": "host",
+  "connections/sign-in/wait": "host",
+  "connectors/setup": "host",
+  "connectors/setup/skip": "host",
   "control/status": "control",
   "cost/state": "host",
   "credentials/lend": "host",
@@ -4676,6 +4796,13 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ConnectionSignIn: { required: ["flowID", "provider", "status", "userCode", "verificationURL", "expiresAt"], optional: ["installURL", "connection", "message"] },
   ConnectionSignInFlowRequest: { required: ["flowID"], optional: [] },
   ConnectionsList: { required: ["connections"], optional: [] },
+  ConnectorEvents: { required: ["state", "names", "workflows"], optional: ["server", "message"] },
+  ConnectorProof: { required: ["title"], optional: ["number", "outcome", "url", "at"] },
+  ConnectorSetup: { required: ["folder", "slots", "events", "done"], optional: ["repository", "connection", "installed", "installURL", "repositories"] },
+  ConnectorSetupRequest: { required: ["folder"], optional: ["reading"] },
+  ConnectorSkipRequest: { required: ["folder", "slot", "skipped"], optional: [] },
+  ConnectorSlot: { required: ["slot", "choice", "state"], optional: ["proof", "readAt", "message"] },
+  ConnectorWorkflow: { required: ["id", "name"], optional: [] },
   ContentBlockAnnotations: { required: [], optional: ["audience", "priority"] },
   ContinueInProjectRequest: { required: ["agentID", "text", "attachments"], optional: ["requestID"] },
   ControlAuth: { required: ["id", "nonce", "mac", "kind"], optional: ["for", "epoch"] },

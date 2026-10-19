@@ -1,0 +1,81 @@
+import AgentsKitCore
+import Foundation
+
+/// The person's connections (#1335) and a project's Connectors set-up (#1336), on the host
+/// that has the project. The answer or the error in words.
+extension AppModel {
+    func connectorSetup(_ project: ProjectKey, reading: DaemonAPI.ConnectorSetupReading = .cached) async
+        -> Result<DaemonAPI.ConnectorSetup, ConnectorProblem> {
+        await connectorCall(project.host) {
+            try await $0.call(DaemonAPI.Method.connectorsSetup,
+                              DaemonAPI.ConnectorSetupRequest(folder: project.folder.path, reading: reading),
+                              returning: DaemonAPI.ConnectorSetup.self)
+        }
+    }
+
+    func skipConnectorSlot(_ project: ProjectKey, _ slot: DaemonAPI.ConnectorSlotKind, skipped: Bool) async
+        -> Result<DaemonAPI.ConnectorSetup, ConnectorProblem> {
+        await connectorCall(project.host) {
+            try await $0.call(DaemonAPI.Method.connectorsSetupSkip,
+                              DaemonAPI.ConnectorSkipRequest(folder: project.folder.path, slot: slot, skipped: skipped),
+                              returning: DaemonAPI.ConnectorSetup.self)
+        }
+    }
+
+    func connections(on host: HostID = .mac) async -> Result<[DaemonAPI.Connection], ConnectorProblem> {
+        await connectorCall(host) {
+            try await $0.call(DaemonAPI.Method.connectionsList, DaemonAPI.Empty(),
+                              returning: DaemonAPI.ConnectionsList.self).connections
+        }
+    }
+
+    func startSignIn(_ provider: DaemonAPI.ConnectionProvider, on host: HostID) async
+        -> Result<DaemonAPI.ConnectionSignIn, ConnectorProblem> {
+        await connectorCall(host) {
+            try await $0.call(DaemonAPI.Method.connectionsSignIn, DaemonAPI.ConnectionProviderRequest(provider: provider),
+                              returning: DaemonAPI.ConnectionSignIn.self)
+        }
+    }
+
+    /// One long poll: the sign-in once it ended, or still waiting after 25 seconds.
+    func waitForSignIn(_ flow: UUID, on host: HostID) async -> Result<DaemonAPI.ConnectionSignIn, ConnectorProblem> {
+        await connectorCall(host) {
+            try await $0.call(DaemonAPI.Method.connectionsSignInWait, DaemonAPI.ConnectionSignInFlowRequest(flowID: flow),
+                              returning: DaemonAPI.ConnectionSignIn.self)
+        }
+    }
+
+    func cancelSignIn(_ flow: UUID, on host: HostID) async {
+        _ = await connectorCall(host) {
+            try await $0.call(DaemonAPI.Method.connectionsSignInCancel, DaemonAPI.ConnectionSignInFlowRequest(flowID: flow),
+                              returning: DaemonAPI.ConnectionSignIn.self)
+        }
+    }
+
+    /// Nil when it went; else why not.
+    func disconnect(_ provider: DaemonAPI.ConnectionProvider, on host: HostID = .mac) async -> String? {
+        let answer = await connectorCall(host) {
+            try await $0.call(DaemonAPI.Method.connectionsDisconnect, DaemonAPI.ConnectionProviderRequest(provider: provider),
+                              returning: DaemonAPI.ConnectionDisconnectAnswer.self)
+        }
+        switch answer {
+        case .success(let a): return a.error
+        case .failure(let problem): return problem.words
+        }
+    }
+
+    private func connectorCall<T: Sendable>(_ host: HostID, _ body: (DaemonClient) async throws -> T) async
+        -> Result<T, ConnectorProblem> {
+        do {
+            return .success(try await body(client(for: host)))
+        } catch let rpc as JSONRPCError {
+            return .failure(ConnectorProblem(words: rpc.message))
+        } catch {
+            return .failure(ConnectorProblem(words: error.localizedDescription))
+        }
+    }
+}
+
+struct ConnectorProblem: Error, Equatable {
+    var words: String
+}

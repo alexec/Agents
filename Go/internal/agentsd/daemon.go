@@ -73,6 +73,7 @@ type Daemon struct {
 	deviceBook
 	localBook
 	connectionBook
+	setupBook
 	policyOnce sync.Once
 	policy     SocketPolicy
 	// SettingsDir is the person's settings on this host (StoreLocations.personalSettings):

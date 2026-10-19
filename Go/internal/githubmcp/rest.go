@@ -154,9 +154,10 @@ func failure(res *http.Response, body []byte) *GitHubError {
 			return &GitHubError{Kind: RateLimited, Message: "GitHub rate limit", RetryAfterMs: ms}
 		}
 	case res.StatusCode == http.StatusNotFound:
-		return &GitHubError{Kind: NotFound, Message: "not found on GitHub"}
+		return &GitHubError{Kind: NotFound, Message: "not found on GitHub", Refused: true}
 	}
-	return &GitHubError{Kind: Failed, Message: fmt.Sprintf("GitHub: HTTP %d", res.StatusCode)}
+	return &GitHubError{Kind: Failed, Message: fmt.Sprintf("GitHub: HTTP %d", res.StatusCode),
+		Refused: res.StatusCode == http.StatusForbidden}
 }
 
 func retryAfter(h http.Header) int {
@@ -252,7 +253,9 @@ type pull struct {
 	MergeSHA    string  `json:"merge_commit_sha"`
 }
 
-func (p pull) pr() PR { return PR{Number: p.Number, Title: p.Title, Branch: p.Head.Ref, URL: p.HTMLURL} }
+func (p pull) pr() PR {
+	return PR{Number: p.Number, Title: p.Title, Branch: p.Head.Ref, URL: p.HTMLURL}
+}
 
 // trusted says whether the PR is the repo's own: its branch in repo, not a fork, and its
 // author one of the repo's own people.
