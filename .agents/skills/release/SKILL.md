@@ -219,8 +219,14 @@ A tag that already exists for this version means another release ran: end with
 
 When step 8 found the GitHub release and both TestFlight builds, close the version's
 milestone (none for a patch version):
-`gh api -X PATCH repos/alexec/Agents/milestones/<number> -f state=closed`.
-Its open issues stay open in it. Then the next milestone's work can merge to `main`.
+
+1. Move its open bugs to the next milestone first (#1570):
+   `gh issue list --milestone "<title>" --state open --label bug --json number --jq '.[].number'`,
+   then `gh issue edit N --milestone "<next>"` for each one. The next milestone is the
+   open one with the next lowest version.
+2. Close it: `gh api -X PATCH repos/alexec/Agents/milestones/<number> -f state=closed`.
+
+Its other open issues stay open in it. Then the next milestone's work can merge to `main`.
 If step 8 failed, leave the milestone open and say so in the report.
 
 ## 10. Report
