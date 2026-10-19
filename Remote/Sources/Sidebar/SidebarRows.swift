@@ -179,8 +179,8 @@ private struct FoldAction: ViewModifier {
 }
 
 /// A session's mark in the sidebar (#495, #498), the window's: what it wants, in four
-/// shapes — an orange hand when it needs the person, a spinner while it works, an empty
-/// ring once done, read or not (#1323); a numbered list while queued, an
+/// shapes — an orange hand when it needs the person, a spinner in the accent while it
+/// works (#1558), an empty ring once done, read or not (#1323); a numbered list while queued, an
 /// hourglass while it waits and a pause mark once stopped (#630).
 /// An orange archive box when it asks to be archived, as it is listed under Needs You
 /// (#817). Archived keeps its `StatusIcon`.
@@ -215,7 +215,8 @@ private struct SessionMark: View {
             case .needsYou:
                 Image(systemName: "hand.raised.fill").tinted(.attention)
             case .working:
-                SyncedSpinner(diameter: 14 * scale)
+                // In the accent as the other marks (#1558).
+                SyncedSpinner(diameter: 14 * scale, color: Paper.accent)
             case .queued:
                 Image(systemName: "list.number").foregroundStyle(Paper.accent)
             case .waiting:
@@ -382,7 +383,7 @@ struct WorkflowMark: View {
     var body: some View {
         Group {
             if summary.isRunning {
-                SyncedSpinner(diameter: 14 * scale)
+                SyncedSpinner(diameter: 14 * scale, color: Paper.accent)
             } else {
                 Image(systemName: symbol)
                     // Decorative: the workflow's mark filling a 20-point well, not text (FR-015).
