@@ -235,7 +235,7 @@ input.rename {
   font-weight: 700;
   opacity: 0.55;
 }
-.status.working { border-color: var(--paper-rule); border-top-color: var(--paper-ink); animation: spin 0.9s linear infinite; }
+.status.working { border: none; --notch-width: 1.5px; }
 .status.needsYou { background: currentColor; }
 .status.needsYou .glyph { color: var(--paper-ground); }
 .status.needsYou.tinted { color: var(--tint-attention); opacity: 1; }
@@ -488,11 +488,16 @@ button.link.reading:hover { text-decoration: underline; }
   display: inline-block;
   width: 12px;
   height: 12px;
-  border: 2px solid var(--paper-rule);
-  border-top-color: var(--paper-ink);
   border-radius: 50%;
-  animation: spin 0.9s linear infinite;
   vertical-align: middle;
+}
+/* The working spinner on all three clients (#1606): a circle-notch, a ring with a fifth of it open,
+   turning once a second as SpinnerClock does. --notch is its colour, --notch-width the ring's. */
+.spinner, .status.working, .sidebar-mark.working {
+  background: conic-gradient(var(--notch, var(--paper-ink)) 0 80%, transparent 0);
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - var(--notch-width, 2px) - 0.5px), #000 calc(100% - var(--notch-width, 2px)));
+  mask: radial-gradient(farthest-side, transparent calc(100% - var(--notch-width, 2px) - 0.5px), #000 calc(100% - var(--notch-width, 2px)));
+  animation: spin 1s linear infinite;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .spinner { animation-duration: 3s; } }
@@ -994,7 +999,7 @@ button.remove:hover { opacity: 1; }
 .telling { display: inline-flex; align-items: center; gap: 6px; font-size: 0.71875rem; opacity: 0.75; }
 .telling .spinner, .send .spinner { width: 10px; height: 10px; }
 .bar > .telling { margin: 0 4px 6px; }
-.send .spinner { border-color: color-mix(in srgb, var(--paper-ground) 35%, transparent); border-top-color: var(--paper-ground); }
+.send .spinner { --notch: var(--paper-ground); }
 .sessions.greyed .row.session, .sessions.greyed .row.workflow { opacity: 0.55; }
 
 /* Changes as a tree (#63): a changed file's square in its status colour; folders with their totals. */
