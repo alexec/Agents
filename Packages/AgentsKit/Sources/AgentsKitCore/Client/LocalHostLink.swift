@@ -44,6 +44,11 @@ public struct LocalHostLink: DaemonLink {
                   let hostKey = ControlCode.data(base64url: hello.control) else {
                 throw ControlAuth.Refusal(.badMessage)
             }
+            // The host names itself in its hello: another host is left at once, before any
+            // proof (#1497). `.mac`'s client, with a control plane elsewhere where this Mac's
+            // host has an id of its own, tries here at each reconnect, and each proof was a
+            // connection the host counted. `ok` still decides, once proved.
+            guard hello.name == host.rawValue else { throw DaemonClient.ConnectError.couldNotConnect }
             let key = try ControlAuth.clientKey(privateKey: privateKey, peer: hostKey, client: client)
             let (auth, expect) = try ControlAuth.answer(hello, identity: .client(client), key: key, origin: Self.origin,
                                                         kind: ClientRecord.Kind.mac.rawValue, expecting: nil)
