@@ -104,7 +104,8 @@ Open issues: `is:open label:integration MCP`.
 **Levels (#1428):** each connector reaches up to five levels: **Tools**, **Events**, **Views**,
 **Workflows** and **Tested**. The host reads the first three from what the server declares
 (`tools/list`, `events` in `initialize`, `ui://` views). Workflows is reached when a ready-made
-workflow names one of the server's events (`ReadyMadeEvents`, none until #1342). Tested is
+workflow names one of the server's events (`ReadyMadeEvents`: `issue.labelled` and
+`checks.failed` since #1342; the workflows are in `Go/internal/agentsd/readymade/`). Tested is
 reached when the `Tested` field of the connector's catalogue entry has a date
 (`Go/internal/agentsd/mcpcatalog/ours.go`); set it in the same branch that changes the row's
 state to `tested on a real account`. The Mac, the Remote and the web page show the levels on
