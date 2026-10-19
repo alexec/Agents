@@ -19,8 +19,11 @@ is shown as not supported yet.
 ## Before you start
 
 - A project with a connector that offers events. The github server (`github-mcp`) ships
-  with Agents Host and the Linux host, and needs a signed-in `gh` (`gh auth status`) on the
-  host. See `Go/README.md` in the repo.
+  with Agents Host and the Linux host, and needs the host's GitHub connection: the GitHub
+  App `agents-loops`, signed in with a code on github.com (#1335), and installed on the
+  repository. The **Connect GitHub** sheet is #1336; until it comes, a client starts the
+  sign-in with the host's `connections/sign-in` method. It does not use `gh`. See
+  `Go/README.md` in the repo.
 - For every setting, see [Workflow triggers and actions](../reference/workflows.md), and for
   what the event carries, [Events from MCP servers](../reference/events.md#events-from-mcp-servers).
 
@@ -40,7 +43,7 @@ this project's `.agents/mcp.json` as `github`, a local server the app hosts:
    [Add a connector from the registry](add-an-mcp-server-from-the-registry.md).
 2. There is nothing to start. The app runs one copy of it on the host, the first time a
    workflow or an agent asks it something, and every agent shares that copy. It holds no
-   token of its own: it asks your `gh` for one (`gh auth token`). See
+   token of its own: it reads the host's GitHub connection, which the host renews. See
    [Share one copy of a local connector](share-one-copy-of-a-local-mcp-server.md).
 
 A local server without `"hosted": true` works too: the app runs its own copy of it to ask

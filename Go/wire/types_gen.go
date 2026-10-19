@@ -959,6 +959,75 @@ type ConfigOption struct {
 	Options      JSONValue `json:"options,omitzero"`
 }
 
+// The person's sign-in to one provider, as the host keeps it. Never its tokens.
+type Connection struct {
+	Provider ConnectionProvider `json:"provider"`
+	// The account's name on the provider, such as alexec.
+	Login       *string         `json:"login,omitzero"`
+	State       ConnectionState `json:"state"`
+	ConnectedAt Date            `json:"connectedAt"`
+	// Where the person installs the provider's App: a GitHub user token reaches only the repositories where it is installed.
+	InstallURL *string `json:"installURL,omitzero"`
+}
+
+type ConnectionDisconnectAnswer struct {
+	Error *string `json:"error,omitzero"`
+}
+
+// A tool the person connects to with OAuth (#1335). GitHub so far.
+type ConnectionProvider string
+
+const (
+	ConnectionProviderGithub ConnectionProvider = "github"
+)
+
+type ConnectionProviderRequest struct {
+	Provider ConnectionProvider `json:"provider"`
+}
+
+// A device-flow sign-in under way on the host (#1335): the host polls the provider; a client shows the code and the links, and waits.
+type ConnectionSignIn struct {
+	FlowID   UUID                   `json:"flowID"`
+	Provider ConnectionProvider     `json:"provider"`
+	Status   ConnectionSignInStatus `json:"status"`
+	// The code the person types at verificationURL, such as WDJB-MJHT.
+	UserCode        string      `json:"userCode"`
+	VerificationURL string      `json:"verificationURL"`
+	InstallURL      *string     `json:"installURL,omitzero"`
+	ExpiresAt       Date        `json:"expiresAt"`
+	Connection      *Connection `json:"connection,omitzero"`
+	// Why it failed, in words. Never a token.
+	Message *string `json:"message,omitzero"`
+}
+
+type ConnectionSignInFlowRequest struct {
+	FlowID UUID `json:"flowID"`
+}
+
+// waiting: for the person to type the code. connected: done. expired: the code ended. denied: the person pressed Cancel on the provider's page. cancelled: a client stopped it. failed: see message.
+type ConnectionSignInStatus string
+
+const (
+	ConnectionSignInStatusWaiting   ConnectionSignInStatus = "waiting"
+	ConnectionSignInStatusConnected ConnectionSignInStatus = "connected"
+	ConnectionSignInStatusExpired   ConnectionSignInStatus = "expired"
+	ConnectionSignInStatusDenied    ConnectionSignInStatus = "denied"
+	ConnectionSignInStatusCancelled ConnectionSignInStatus = "cancelled"
+	ConnectionSignInStatusFailed    ConnectionSignInStatus = "failed"
+)
+
+// connected: the host has a token and renews it. signInAgain: the provider refused the renewal, so the person signs in again.
+type ConnectionState string
+
+const (
+	ConnectionStateConnected   ConnectionState = "connected"
+	ConnectionStateSignInAgain ConnectionState = "signInAgain"
+)
+
+type ConnectionsList struct {
+	Connections []Connection `json:"connections"`
+}
+
 type Consequence struct {
 	Woke         *ConsequenceWoke         `json:"woke,omitzero"`
 	Fired        *ConsequenceFired        `json:"fired,omitzero"`

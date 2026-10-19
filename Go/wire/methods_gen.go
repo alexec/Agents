@@ -44,6 +44,11 @@ var (
 	CallClientCatchUp                  = Method[CatchUpRequest, CatchUpSnapshot]{"client/catchUp"}
 	CallClientPermissionsState         = Method[Empty, ClientPermissionSettings]{"clientPermissions/state"}
 	CallConnectionBindDevice           = Method[DeviceBinding, Empty]{"connection/bindDevice"}
+	CallConnectionsDisconnect          = Method[ConnectionProviderRequest, ConnectionDisconnectAnswer]{"connections/disconnect"}
+	CallConnectionsList                = Method[Empty, ConnectionsList]{"connections/list"}
+	CallConnectionsSignIn              = Method[ConnectionProviderRequest, ConnectionSignIn]{"connections/sign-in"}
+	CallConnectionsSignInCancel        = Method[ConnectionSignInFlowRequest, ConnectionSignIn]{"connections/sign-in/cancel"}
+	CallConnectionsSignInWait          = Method[ConnectionSignInFlowRequest, ConnectionSignIn]{"connections/sign-in/wait"}
 	CallCostSetLimits                  = Method[SetLimitsRequest, CostState]{"cost/setLimits"}
 	CallCostState                      = Method[Empty, CostState]{"cost/state"}
 	CallCredentialsLend                = Method[CredentialsLend, Empty]{"credentials/lend"}

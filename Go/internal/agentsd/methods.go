@@ -55,6 +55,7 @@ func (d *Daemon) register() {
 	d.registerMCPCatalog()
 	d.registerMCPVerify()
 	d.registerMCPSignIn()
+	d.registerConnections()
 	d.registerAssess()
 	d.registerHostedMCP()
 	d.registerViews()

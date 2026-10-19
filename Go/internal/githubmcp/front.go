@@ -20,7 +20,7 @@ import (
 // official server's answer to initialize.
 
 // Instructions are the events' words, put before the official server's own.
-const Instructions = "This repo's pull requests, their CI, and its issues as events, polled as the signed-in gh user: " +
+const Instructions = "This repo's pull requests, their CI, and its issues as events, polled as the person signed in to GitHub in Agents: " +
 	"checks.failed, pr.opened, pr.merged, pr.conflicted, pr.closed, issue.opened, issue.labelled, issue.commented, issue.closed. " +
 	"Merging and reviewing a pull request are a person's: those tools are not here."
 

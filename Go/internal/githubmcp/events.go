@@ -535,7 +535,7 @@ func eventsError(err error) *rpcError {
 	}
 	switch gh.Kind {
 	case NotSignedIn:
-		return &rpcError{Code: -32012, Message: gh.Message, Data: map[string]any{"reason": "gh not signed in"}}
+		return &rpcError{Code: -32012, Message: gh.Message, Data: map[string]any{"reason": "not connected"}}
 	case RateLimited:
 		return &rpcError{Code: -32013, Message: gh.Message, Data: map[string]any{"retryAfterMs": gh.RetryAfterMs}}
 	case NotFound:

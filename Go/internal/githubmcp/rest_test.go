@@ -220,3 +220,20 @@ func TestRefusalsAreSignInRateLimitAndNotFound(t *testing.T) {
 		t.Fatalf("no token: %v", err)
 	}
 }
+
+func TestTheRepoIsReadFromTheGitRemote(t *testing.T) {
+	for remote, want := range map[string]string{
+		"https://github.com/alexec/agents-walk.git":   "alexec/agents-walk",
+		"https://github.com/alexec/agents-walk":       "alexec/agents-walk",
+		"git@github.com:alexec/agents-walk.git":       "alexec/agents-walk",
+		"ssh://git@github.com/alexec/agents-walk.git": "alexec/agents-walk",
+		"https://alexec@github.com/alexec/Agents.git": "alexec/Agents",
+		"https://gitlab.com/alexec/agents-walk.git":   "",
+		"git@github.com:alexec":                       "",
+	} {
+		got, ok := RepoOfRemote(remote)
+		if got != want || ok != (want != "") {
+			t.Errorf("%s: got %q %v, want %q", remote, got, ok, want)
+		}
+	}
+}

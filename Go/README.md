@@ -93,8 +93,10 @@ trust filter (#728), polled only: `checks.failed`, `pr.opened`, `pr.merged`, `pr
 
 MCP's SDKs have no events (a working-group draft), so `githubmcp.Front` reads stdio itself.
 It answers `events/list` and `events/poll`, adds the `events` capability to `initialize`,
-and passes every other message to the official server unchanged. It signs in as the `gh`
-user (`gh auth token`, asked again each minute) and has no account of its own.
+and passes every other message to the official server unchanged. It calls GitHub as the
+person, with the token of the host's GitHub connection (#1335: the GitHub App
+`agents-loops`, device flow), read again each minute from the store `AGENTS_CONNECTIONS`
+names. It has no account of its own and does not use `gh`.
 
 Agents Host carries it in `Contents/Helpers` (`scripts/go-github-mcp.sh`, a build phase,
 as `agents-control` is), and `scripts/build-linux-agentsd.sh` builds
