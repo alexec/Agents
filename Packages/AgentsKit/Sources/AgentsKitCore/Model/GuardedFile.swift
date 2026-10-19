@@ -83,6 +83,13 @@ public struct GuardedChange: Codable, Hashable, Sendable, Identifiable {
     /// A workflow waiting for an OK, rather than one of the `GuardedFile`s.
     public var isWorkflow: Bool { Self.workflowID(inPath: path) != nil }
 
+    /// The id of the item in the project's `approvals` that asks the same thing (#773):
+    /// its Review page opens by it (#1472).
+    public var approvalID: String {
+        Self.workflowID(inPath: path).map { "\(Approval.Kind.workflow.rawValue):\($0)" }
+            ?? "\(Approval.Kind.file.rawValue):\(path)"
+    }
+
     /// What Keep and Undo do, in a person's words.
     public var explanation: String {
         if isWorkflow {
@@ -131,6 +138,21 @@ public struct GuardedChangeReading: Codable, Hashable, Sendable {
         self.current = current
         lines = GuardedDiffLine.lines(from: approved ?? "", to: current ?? "")
     }
+
+    /// How many lines were added and removed: the card's "+N −M" (#1472).
+    public var counts: (added: Int, removed: Int) {
+        lines.reduce(into: (0, 0)) { sum, line in
+            switch line.kind {
+            case .added: sum.0 += 1
+            case .removed: sum.1 += 1
+            case .same: break
+            }
+        }
+    }
+
+    /// The host stopped at `GuardedDiffLine.limit` lines, so the end of the change is not
+    /// shown; the Review page says so (#1472).
+    public var isCut: Bool { lines.count >= GuardedDiffLine.limit }
 }
 
 /// One line of a guarded file's change.

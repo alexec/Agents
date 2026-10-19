@@ -1,5 +1,6 @@
 // Where the page is, in the URL's fragment (071 research R2): #/h/<host>/p/<folder>/s/<session>, or
 // /w/<workflow> for a workflow's page in the chat's place (#98), /ar/1 for the project's archive (#499),
+// /rv/<kind:key> for a change waiting for an OK, on its Review page (#1472),
 // or #/a/<page> for an Activity page of the sidebar (#151): events, resources, runtimes, mcp (#589),
 // worktrees (#790), spending, tokens (#956) or time, or #/settings for this browser's Settings (#846).
 // A tab holding one project alone (#1089) starts #/o/1/…: Open in New Tab on its heading. It keeps
@@ -32,6 +33,8 @@ export interface Route {
   archive?: boolean | undefined;
   /** The project's MCP servers and how each is doing (#753), a page opened from its row in the sidebar. */
   mcp?: boolean | undefined;
+  /** A change waiting for an OK, on its Review page in the chat's place (#1472), by its approval's id. */
+  review?: string | undefined;
   /** This tab holds its project alone (#1089): the sidebar is that project's only. */
   alone?: boolean | undefined;
 }
@@ -56,6 +59,7 @@ export function parseRoute(hash: string): Route {
       case "n": route.compose = value === "1"; break;
       case "ar": route.archive = value === "1"; break;
       case "m": route.mcp = value === "1"; break;
+      case "rv": route.review = value; break;
       case "o": route.alone = value === "1"; break;
       case "a": if ((activityPages as readonly string[]).includes(value)) route.activity = value as ActivityPage; break;
     }
@@ -73,9 +77,11 @@ export function routeHash(route: Route, aloneIn: AloneProject | undefined = alon
   if (route.activity) return "#/a/" + route.activity;
   if (route.host) parts.push("h", route.host);
   if (route.host && route.project) parts.push("p", route.project);
-  if (route.host && route.project && route.session) parts.push("s", route.session);
+  if (route.host && route.project && route.review) parts.push("rv", route.review);
+  else if (route.host && route.project && route.session) parts.push("s", route.session);
   else if (route.host && route.project && route.workflow) parts.push("w", route.workflow);
   else if (route.host && route.project && route.page) parts.push("pg", route.page);
+  if (route.review) return "#/" + parts.map(encodeURIComponent).join("/");
   if (route.session && route.files) parts.push("f", "1");
   if (route.host && route.project && !route.session && !route.workflow && !route.page && route.compose) parts.push("n", "1");
   else if (route.host && route.project && !route.session && !route.workflow && !route.page && route.archive) parts.push("ar", "1");

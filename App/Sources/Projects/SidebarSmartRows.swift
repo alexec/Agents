@@ -125,23 +125,25 @@ struct SmartFold: View {
 }
 
 /// One thing waiting for an OK under Needs You (#773): an MCP server, a workflow, a plugin
-/// or a guarded file. A click opens what it is, with Approve, Deny and, where an agent
-/// made it, Request Changes; the menu answers at once.
+/// or a guarded file. A click opens its Review page in the detail column (#1472), with
+/// Approve, Deny and, where an agent made it, Request Changes; the menu answers at once.
 private struct ApprovalListRow: View {
     @Environment(AppModel.self) private var model
+    /// In a project's own window, how it opens what is picked (#1090).
+    @Environment(\.windowOpen) private var windowOpen
     let approval: Approval
     let project: ProjectKey
     let place: String?
-    @State private var open = false
+
+    private var item: SidebarItem { .review(approval.id, in: project) }
 
     var body: some View {
         ApprovalRowLabel(approval: approval, place: place)
-            .onTapGesture { open = true }
             .help("\(approval.kindWord) · \(approval.line)")
-            .accessibilityAddTraits(.isButton)
-            .accessibilityAction { open = true }
+            .sidebarInk(item)
+            .tag(item)
             .contextMenu {
-                Button("Open…") { open = true }
+                Button("Review…") { open() }
                 if approval.actions.contains(.approve) {
                     Button(approval.word(for: .approve)) { answerNow(.approve) }
                 }
@@ -149,16 +151,13 @@ private struct ApprovalListRow: View {
                     Button(approval.word(for: .deny)) { answerNow(.deny) }
                 }
                 if approval.actions.contains(.requestChanges) {
-                    Button(approval.word(for: .requestChanges) + "…") { open = true }
+                    Button(approval.word(for: .requestChanges) + "…") { open() }
                 }
             }
-            .sheet(isPresented: $open) {
-                ApprovalSheet(approval: approval, place: place,
-                              read: { await model.readApproval(approval, for: project) },
-                              answer: { action, digest, note in
-                                  await model.answerApproval(approval, action, digest: digest, note: note, for: project)
-                              })
-            }
+    }
+
+    private func open() {
+        if let windowOpen { windowOpen(item) } else { model.sidebarItem = item }
     }
 
     /// From the menu, of the version the row was drawn from: a later change is refused.

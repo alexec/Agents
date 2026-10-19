@@ -131,6 +131,9 @@ struct ContentView: View {
             // No files pane and no sidebar toggle: a workflow has no agent to have
             // asked about a file, so there would be nothing for either to show.
             WorkflowPage(workflowID: id).paperGround()
+        } else if case .review(let id)? = model.projectPage, let key = model.selectedProjectKey {
+            // A change waiting for an OK, on its own page (#1472).
+            ReviewDestination(id: id, project: key).paperGround()
         } else if model.projectPage == .mcpServers, let key = model.selectedProjectKey {
             // A project's MCP servers, from its row in the sidebar (#753).
             MCPServersView(project: key).paperGround()

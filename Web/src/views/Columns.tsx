@@ -1,7 +1,7 @@
 // The Mac window's layout in a tab (071 US2, US6; #151, #235). As the window since #145: one
 // sidebar (New Session, Activity, the smart groups, a group per project, the hosts' state at its
 // foot; #499), then the chat, a project's new-session form, a workflow, its archive, an Activity
-// page, this browser's Settings (#846), or help text with nothing chosen; the files pane a third column from 1440, over the chat below that. Below 760 the same
+// page, a change's Review page (#1472), this browser's Settings (#846), or help text with nothing chosen; the files pane a third column from 1440, over the chat below that. Below 760 the same
 // sidebar is the root list, as the iPhone Remote's is (#226), and what it picks takes its place,
 // with ‹ Agents back to it.
 import { useEffect } from "preact/hooks";
@@ -23,6 +23,7 @@ import { WorkflowPage } from "./WorkflowPage";
 import { PinnedPage } from "./Pins";
 import { ArchivePage } from "./ArchivePage";
 import { MCPServersPage } from "./MCPServers";
+import { ReviewPage } from "./Review";
 import { Sidebar } from "./Sidebar";
 import { ActivityPageView } from "./Activity";
 import { SettingsPage } from "./Settings";
@@ -33,7 +34,7 @@ export function Columns({ session, store }: { session: Session; store: Store }) 
   const r = route.value;
   const down = session.state.value.kind === "down";
   // What a narrow window shows: the list, or what the route opens in the chat's place.
-  const depth = r.settings || r.activity || r.session || r.workflow || r.page || r.compose || r.archive || r.mcp ? "chat" : "list";
+  const depth = r.settings || r.activity || r.session || r.workflow || r.page || r.compose || r.archive || r.mcp || r.review ? "chat" : "list";
   const project = r.host && r.project
     ? (store.projects.value[r.host] ?? []).find((p) => folderKey(p.project.folder) === folderKey(r.project!))
     : undefined;
@@ -59,7 +60,10 @@ export function Columns({ session, store }: { session: Session; store: Store }) 
         <Sidebar session={session} store={store} linkDown={down} />
         {r.settings ? <SettingsPage store={store} />
           : r.activity ? <ActivityPageView store={store} page={r.activity} />
-          : r.host && r.session ? <Chat store={store} host={r.host} session={r.session} down={down} />
+          : r.host && r.project && project && r.review ? (
+            <ReviewPage key={`${r.host}|${r.review}`} store={store} host={r.host} folder={project.project.folder} projectName={project.name}
+              id={r.review} down={down || !store.hostIsOnline(r.host)} />
+          ) : r.host && r.session ? <Chat store={store} host={r.host} session={r.session} down={down} />
           : r.host && r.project && project && r.workflow ? (
             <WorkflowPage store={store} host={r.host} folder={project.project.folder} projectName={project.name}
               workflowID={r.workflow} down={down || !store.hostIsOnline(r.host)} />

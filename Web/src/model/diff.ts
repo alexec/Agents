@@ -135,8 +135,8 @@ export function wordMarks(old: string, next: string): { old: [number, number][];
 }
 
 /** Pairs the removed and added lines of each change block, first with first, and marks the words that differ (LineDiff.markWords). */
-export function markWords(lines: readonly DiffLine[]): MarkedLine[] {
-  const rows: MarkedLine[] = lines.map((line) => ({ ...line }));
+export function markWords<T extends DiffLine>(lines: readonly T[]): (T & { changed?: [number, number][] })[] {
+  const rows: (T & { changed?: [number, number][] })[] = lines.map((line) => ({ ...line }));
   let index = 0;
   while (index < rows.length) {
     if (rows[index]!.kind === "context") { index++; continue; }

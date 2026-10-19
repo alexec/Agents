@@ -63,6 +63,8 @@ final class RemoteModel {
     var selection: UUID? {
         didSet {
             guard selection != oldValue else { return }
+            // A Review page pushed over the last chat is not left over the next (#1472).
+            openReview = nil
             work.watching = selection
             presence?.watching(selection)
             // Opened from Unread, it stays there until something else is opened (#495,
@@ -632,6 +634,9 @@ final class RemoteModel {
     var openArchive = false
     /// The project's MCP servers (#753), a page opened from its row in the sidebar.
     var openMCPServers = false
+    /// A change waiting for an OK, on its Review page (#1472), by its `Approval.id`: from
+    /// Needs You, the detail's own page; from Review… on a chat's card, pushed over the chat.
+    var openReview: String?
     /// The milestones this device has shown (#984); nil before its first look. See
     /// `RemoteModel+Milestones`.
     var milestonesSeen: Set<String>? = RemoteModel.keptMilestonesSeen
@@ -662,6 +667,7 @@ final class RemoteModel {
             if let openPin { return .pin(openPin, in: key) }
             if let openWorkflow { return .workflow(openWorkflow, in: key) }
             if let selection { return .session(selection) }
+            if let openReview { return .review(openReview, in: key) }
             return .project(key)
         }
         set {
@@ -674,6 +680,7 @@ final class RemoteModel {
                 openPin = nil
                 openArchive = false
                 openMCPServers = false
+                openReview = nil
             case .project(let key):
                 selectedProject = key.folder
                 selection = nil
@@ -681,6 +688,7 @@ final class RemoteModel {
                 openWorkflow = nil
                 openArchive = false
                 openMCPServers = false
+                openReview = nil
                 // The next New Session at the sidebar's top starts here too (#495).
                 rememberNewSessionProject(key)
             case .session(let id):
@@ -689,6 +697,7 @@ final class RemoteModel {
                 openWorkflow = nil
                 openArchive = false
                 openMCPServers = false
+                openReview = nil
                 selection = id
             case .workflow(let id, let key):
                 selectedProject = key.folder
@@ -696,6 +705,7 @@ final class RemoteModel {
                 selection = nil
                 openArchive = false
                 openMCPServers = false
+                openReview = nil
                 openWorkflow = id
             case .pin(let path, let key):
                 selectedProject = key.folder
@@ -703,7 +713,17 @@ final class RemoteModel {
                 selection = nil
                 openArchive = false
                 openMCPServers = false
+                openReview = nil
                 openPin = path
+            case .review(let id, let key):
+                // A change waiting for an OK (#1472), from its row under Needs You.
+                selectedProject = key.folder
+                selection = nil
+                openPin = nil
+                openWorkflow = nil
+                openArchive = false
+                openMCPServers = false
+                openReview = id
             case .spending, .tokens, .time, .milestones, .resources, .events, .runtimes, .mcpServers, .worktrees:
                 openActivity = newValue
             case .archive(let key):
@@ -714,6 +734,7 @@ final class RemoteModel {
                 openPin = nil
                 openWorkflow = nil
                 openMCPServers = false
+                openReview = nil
                 openArchive = true
             case .projectMCPServers(let key):
                 // The project's MCP servers (#753), with what is opened from it pushed over it.
@@ -723,6 +744,7 @@ final class RemoteModel {
                 openWorkflow = nil
                 openArchive = false
                 openMCPServers = true
+                openReview = nil
             }
         }
     }

@@ -373,42 +373,30 @@ struct RemoteSmartFold: View {
 }
 
 /// One thing waiting for an OK under Needs You (#773), the window's `ApprovalListRow`: a
-/// tap opens what it is with its buttons, a long press answers at once.
+/// tap opens its Review page (#1472), pushed on an iPhone; a long press answers at once.
 private struct RemoteApprovalRow: View {
     @Environment(RemoteModel.self) private var model
     let approval: Approval
     let project: ProjectKey
     let place: String?
-    @State private var open = false
+
+    private var item: SidebarItem { .review(approval.id, in: project) }
 
     var body: some View {
-        Button { open = true } label: {
-            ApprovalRowLabel(approval: approval, place: place)
-        }
-        .buttonStyle(.plain)
-        .contextMenu {
-            if approval.actions.contains(.approve) {
-                Button(approval.word(for: .approve)) { answerNow(.approve) }
+        ApprovalRowLabel(approval: approval, place: place)
+            .tag(item)
+            .contextMenu {
+                Button("Review…", systemImage: "doc.text.magnifyingglass") { model.sidebarItem = item }
+                if approval.actions.contains(.approve) {
+                    Button(approval.word(for: .approve)) { answerNow(.approve) }
+                }
+                if approval.actions.contains(.deny) {
+                    Button(approval.word(for: .deny)) { answerNow(.deny) }
+                }
+                if approval.actions.contains(.requestChanges) {
+                    Button(approval.word(for: .requestChanges) + "…") { model.sidebarItem = item }
+                }
             }
-            if approval.actions.contains(.deny) {
-                Button(approval.word(for: .deny)) { answerNow(.deny) }
-            }
-            if approval.actions.contains(.requestChanges) {
-                Button(approval.word(for: .requestChanges) + "…") { open = true }
-            }
-        }
-        .sheet(isPresented: $open) {
-            ScrollView {
-                ApprovalSheet(approval: approval, place: place,
-                              read: { await model.readApproval(approval, for: project) },
-                              answer: { action, digest, note in
-                                  await model.answerApproval(approval, action, digest: digest, note: note, for: project)
-                              },
-                              isOffline: !model.isConnected)
-            }
-            .presentationDetents([.medium, .large])
-            .paperGround()
-        }
     }
 
     private func answerNow(_ action: Approval.Action) {

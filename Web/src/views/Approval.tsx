@@ -1,19 +1,14 @@
 // One thing waiting for the person's OK in Needs You (#773): an MCP server, a workflow, a plugin or a
-// guarded file, as the window's and the Remote's ApprovalRowLabel and ApprovalSheet
-// (Shared/UI/ApprovalViews.swift). The row is drawn as a session's is (#587): the mark, the title
-// with its project, the time and one grey line, with the same orange shield for every kind. Opened,
-// a sheet says what it is, shows the lines being approved, and offers the answers its host does.
-import { useSignal } from "@preact/signals";
-import { useEffect } from "preact/hooks";
-import type { Approval as ApprovalItem, ApprovalAction, GuardedChangeReading } from "../protocol/generated";
+// guarded file, as the window's and the Remote's ApprovalRowLabel (Shared/UI/ApprovalViews.swift).
+// The row is drawn as a session's is (#587): the mark, the title with its project, the time and one
+// grey line, with the same orange shield for every kind. Opened, its Review page (Review.tsx, #1472)
+// says what it is, shows the lines being approved, and offers the answers its host does.
+import type { Approval as ApprovalItem, ApprovalAction } from "../protocol/generated";
 import type { Store } from "../model/store";
-import { actionWord, approvalLine, explanations, kindWords, notePlaceholder, sendNoteLabel } from "../model/approvals";
+import { actionWord, approvalID, approvalLine } from "../model/approvals";
 import { shortAgo } from "../model/activity";
 import { describe } from "../model/errors";
 import { fromWireDate } from "../protocol/dates";
-import { Lines } from "./Changes";
-import { readingLines } from "./GuardedChange";
-import { Modal } from "./Modal";
 import { holdForMenu, isMenuKey, openContextMenu, type MenuItem } from "./ContextMenu";
 import { go } from "../route";
 
@@ -83,17 +78,27 @@ export function FailedWorkflowRow({ store, host, folder, approval, place, down, 
 
 /**
  * Its row under Needs You, with its project's name after the title, as the group's session rows
- * have theirs. A press, Enter or Space opens the sheet; the arrow keys only land on it.
+ * have theirs. A press, Enter or Space opens its Review page in the chat's place (#1472); its menu
+ * answers at once, of the version the row was drawn from.
  */
-export function ApprovalRow({ store, host, folder, approval, place, down }: {
-  store: Store; host: string; folder: string; approval: ApprovalItem; place: string; down: boolean;
+export function ApprovalRow({ store, host, folder, approval, place, down, chosen }: {
+  store: Store; host: string; folder: string; approval: ApprovalItem; place: string; down: boolean; chosen: boolean;
 }) {
-  const open = useSignal(false);
   const since = approval.since === undefined ? undefined : fromWireDate(approval.since);
+  const open = () => go({ host, project: folder, review: approvalID(approval) });
+  const answer = (action: ApprovalAction) => () => void store.answerApproval(host, folder, approval, action, approval.digest)
+    .catch((error) => store.say(describe(error)));
+  const menu = (): MenuItem[] => [
+    { label: "Review…", run: open },
+    ...(approval.actions.includes("approve") ? [{ label: actionWord(approval.kind, "approve"), disabled: down, run: answer("approve") }] : []),
+    ...(approval.actions.includes("deny") ? [{ label: actionWord(approval.kind, "deny"), disabled: down, run: answer("deny") }] : []),
+    ...(approval.actions.includes("requestChanges") ? [{ label: `${actionWord(approval.kind, "requestChanges")}…`, run: open }] : []),
+  ];
   return (
     <div class="nav-item">
-      <button class="row session approval" aria-haspopup="dialog" aria-description="waiting for your approval"
-        onClick={() => (open.value = true)}>
+      <button class={`row session approval${chosen ? " chosen" : ""}`} aria-current={chosen} aria-description="waiting for your approval"
+        onClick={open} onContextMenu={(e) => openContextMenu(e, menu())}
+        onKeyDown={(e) => { if (isMenuKey(e)) openContextMenu(e, menu()); }} {...holdForMenu(menu)}>
         <ApprovalMark />
         <span class="body">
           <span class="title placed">
@@ -104,106 +109,6 @@ export function ApprovalRow({ store, host, folder, approval, place, down }: {
         </span>
         {since && <time class="when" dateTime={since.toISOString()} title={since.toLocaleString()}>{shortAgo(since)}</time>}
       </button>
-      {open.value && (
-        <ApprovalSheet store={store} host={host} folder={folder} approval={approval} place={place} down={down}
-          close={() => (open.value = false)} />
-      )}
     </div>
-  );
-}
-
-/**
- * What a waiting item is, and the choice: the lines being approved (a file's diff against the
- * approved copy, an MCP server's entry, a plugin's files), what Approve and Deny do, then the
- * answers the host offers for it. Request Changes opens a note sent to the agent that made the
- * change. A refusal is said here and the sheet stays; answered, it closes.
- */
-export function ApprovalSheet({ store, host, folder, approval, place, down, close }: {
-  store: Store; host: string; folder: string; approval: ApprovalItem; place?: string | undefined; down: boolean;
-  close: () => void;
-}) {
-  const reading = useSignal<GuardedChangeReading | null>(null);
-  const loaded = useSignal(false);
-  const busy = useSignal(false);
-  const asking = useSignal(false);
-  const note = useSignal("");
-  const refusal = useSignal<string | null>(null);
-  useEffect(() => {
-    let current = true;
-    // An archive request has nothing to read: its session is the thing.
-    if (approval.kind === "archive") {
-      loaded.value = true;
-      return;
-    }
-    reading.value = null;
-    loaded.value = false;
-    store.readApproval(host, folder, approval).then(
-      (read) => { if (current) reading.value = read; },
-      (error) => { if (current) refusal.value = describe(error); },
-    ).finally(() => { if (current) loaded.value = true; });
-    return () => { current = false; };
-  }, [host, folder, approval.kind, approval.key, approval.digest]);
-  // The version answered is the one read, so a change since is refused, not approved.
-  const send = async (action: ApprovalAction) => {
-    busy.value = true;
-    refusal.value = null;
-    const digest = approval.kind === "archive" ? undefined : reading.value?.digest ?? approval.digest;
-    try {
-      await store.answerApproval(host, folder, approval, action, digest,
-        action === "requestChanges" ? note.value.trim() : undefined);
-      close();
-    } catch (error) {
-      refusal.value = describe(error);
-    } finally {
-      busy.value = false;
-    }
-  };
-  const held = busy.value || down || (approval.kind !== "archive" && !reading.value && approval.digest !== undefined);
-  const offers = (action: ApprovalAction) => approval.actions.includes(action);
-  return (
-    <Modal label={approval.title} close={close}>
-      <form method="dialog" class="sheet-body approval-sheet" onSubmit={(e) => e.preventDefault()}>
-        <div class="approval-head">
-          <ApprovalMark />
-          <div>
-            <h2>{approval.title}</h2>
-            <p class="quiet small">{[kindWords[approval.kind], place].filter(Boolean).join(" · ")}</p>
-          </div>
-        </div>
-        <p>{approval.line}</p>
-        <p class="quiet">{explanations[approval.kind]}</p>
-        {reading.value ? <>
-          <p class="quiet small">{reading.value.path}</p>
-          <div class="approval-lines"><Lines lines={readingLines(reading.value)} /></div>
-        </> : !loaded.value && <p class="quiet">Reading…</p>}
-        {asking.value && (
-          <textarea rows={3} aria-label="Changes to ask for" placeholder={notePlaceholder} value={note.value}
-            onInput={(e) => (note.value = (e.currentTarget as HTMLTextAreaElement).value)} />
-        )}
-        {refusal.value && <p class="sheet-note failure" role="alert">{refusal.value}</p>}
-        <div class="sheet-actions">
-          <button type="button" onClick={close}>Cancel</button>
-          <span class="spacer" />
-          {asking.value ? (
-            <button type="button" class="prominent" disabled={held || !note.value.trim()}
-              onClick={() => void send("requestChanges")}>{sendNoteLabel}</button>
-          ) : <>
-            {offers("requestChanges") && (
-              <button type="button" disabled={held} onClick={() => (asking.value = true)}>
-                {actionWord(approval.kind, "requestChanges")}
-              </button>
-            )}
-            {offers("deny") && (
-              <button type="button" disabled={held} onClick={() => void send("deny")}>{actionWord(approval.kind, "deny")}</button>
-            )}
-            {offers("approve") && (
-              <button type="button" class="prominent" disabled={held} onClick={() => void send("approve")}>
-                {actionWord(approval.kind, "approve")}
-              </button>
-            )}
-          </>}
-        </div>
-      </form>
-    </Modal>
   );
 }

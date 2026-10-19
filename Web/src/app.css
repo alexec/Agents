@@ -1046,13 +1046,39 @@ dialog.sheet::backdrop { background: rgb(0 0 0 / 0.25); }
 .sheet-body .sheet-note { margin: 0; }
 .sheet-note.failure { color: var(--tint-failure); opacity: 1; }
 .sheet-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 10px; }
-/* Approve, Deny or Request Changes of something in Needs You (#773): what it is, its lines, the note. */
-.approval-sheet p { margin: 0; }
-.approval-head { display: flex; align-items: flex-start; gap: 8px; }
-.approval-lines .diff-lines { max-height: 320px; overflow: auto; }
-.approval-sheet textarea { font: inherit; color: inherit; padding: 5px 8px; resize: vertical;
+/* A change waiting for an OK, on its Review page (#1472): the header, the whole change, which the
+   page scrolls, and the answers in a bar that stays at the foot. */
+.review-body { max-width: 1400px; padding: 12px 16px 24px; display: flex; flex-direction: column; gap: 12px; }
+.review-body p { margin: 0; }
+.review-head { display: flex; align-items: flex-start; gap: 8px; }
+.review-head h2 { margin: 0 0 2px; font-size: 1.5rem; }
+.review-head .link { font: inherit; margin-left: 6px; }
+.review-diff-head { display: flex; align-items: baseline; gap: 10px; }
+.review-diff-head .path { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; direction: rtl; text-align: left; }
+.review-diff-head .spacer, .guarded-answers .spacer { flex: 1; }
+.review-bar { border-top: 1px solid var(--paper-rule); padding: 10px 16px; background: var(--paper-ground); display: flex; flex-direction: column; gap: 8px; }
+.review-bar .sheet-actions { margin-top: 0; }
+.review-bar .spacer { flex: 1; }
+.review-bar textarea { font: inherit; color: inherit; padding: 5px 8px; resize: vertical;
   border: 1px solid var(--paper-rule); border-radius: var(--radius-control); background: var(--paper-ground); }
-.approval-sheet .sheet-actions .spacer { flex: 1; }
+.review-page.empty { align-items: center; text-align: center; }
+/* The one diff of a page (FileDiff, #1472): numbers for the old file and the new, wrapped lines,
+   folds and breaks; marked by sign, weight, strike and a faint wash, as .diff-line is. */
+.file-diff { font: 0.75rem/1.5 var(--font-mono); border-radius: var(--radius-control); background: var(--paper-well); padding: 6px 0; }
+.file-diff .line { display: flex; align-items: baseline; padding-right: 10px; }
+.file-diff .number { flex: none; width: 3.5em; padding-right: 0.5em; text-align: right; opacity: 0.4; user-select: none; font-variant-numeric: tabular-nums; }
+.file-diff .sign { flex: none; width: 1.4em; text-align: center; opacity: 0.6; user-select: none; }
+.file-diff .text { flex: 1; min-width: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.file-diff .line.added { background: var(--paper-wash); font-weight: 500; }
+.file-diff .line.removed .text { opacity: 0.55; text-decoration: line-through; text-decoration-color: color-mix(in srgb, currentColor 40%, transparent); }
+.file-diff .line.removed { background: color-mix(in srgb, var(--paper-ink) 6%, transparent); }
+.file-diff .pair { display: grid; grid-template-columns: 1fr 1fr; }
+.file-diff .pair > :first-child { border-right: 1px solid var(--paper-rule); }
+.file-diff .pair .empty { background: color-mix(in srgb, var(--paper-ink) 4%, transparent); }
+.file-diff .fold { display: block; width: 100%; text-align: left; border: 0; border-radius: 0; background: none; color: inherit;
+  font: inherit; opacity: 0.6; padding: 2px 10px; cursor: pointer; }
+.file-diff .fold:hover { opacity: 1; background: var(--paper-wash); }
+.file-diff .gap { padding: 2px 10px; opacity: 0.5; }
 .folder-list {
   display: flex;
   flex-direction: column;

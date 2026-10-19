@@ -218,6 +218,7 @@ struct ProjectSettingsSheet: View {
 /// agents may start (#64).
 private struct ProjectGeneralPane: View {
     @Environment(AppModel.self) private var model
+    @Environment(\.dismiss) private var dismiss
 
     private var summary: DaemonAPI.ProjectSummary? { model.selectedProjectSummary }
 
@@ -229,7 +230,7 @@ private struct ProjectGeneralPane: View {
             if let summary {
                 // Changes made outside the app to its own files wait here (#502).
                 ForEach(summary.guardedChanges ?? []) { change in
-                    GuardedChangeQuestion(change: change, key: summary.key)
+                    GuardedChangeQuestion(change: change, key: summary.key, leaving: { dismiss() })
                         .padding(.bottom, 18)
                 }
                 Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 14, verticalSpacing: 12) {
