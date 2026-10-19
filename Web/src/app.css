@@ -1355,3 +1355,8 @@ button.file-card:hover { border-color: color-mix(in srgb, var(--paper-ink) 25%, 
 .view-diff .scroll { flex: 1; overflow: auto; }
 .view-diff-file { display: flex; flex-direction: column; gap: 6px; }
 .view-diff-file .file-diff { border: 1px solid var(--paper-rule); border-radius: 8px; overflow: hidden; }
+/* The Simulator pane (#842): the picker and buttons on one line, the screen fitted under it. */
+.simulator-pane { display: flex; flex-direction: column; gap: 10px; padding: 12px; }
+.simulator-bar { display: flex; align-items: center; gap: 10px; }
+.simulator-bar .spacer { flex: 1; }
+.simulator-screen { max-width: 100%; height: auto; max-height: 75vh; object-fit: contain; align-self: center; border-radius: 18px; border: 1px solid var(--paper-rule); }

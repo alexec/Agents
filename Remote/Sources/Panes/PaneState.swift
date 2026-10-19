@@ -8,7 +8,7 @@ import Observation
 /// the agent's local servers, which only listen on the Mac, and a pane that could never
 /// show anything is not offered (FR-030).
 enum Pane: String, CaseIterable, Identifiable, Hashable {
-    case page, files, changes, terminal, exchanged
+    case page, files, changes, terminal, exchanged, simulator
 
     var id: String { rawValue }
 
@@ -19,6 +19,7 @@ enum Pane: String, CaseIterable, Identifiable, Hashable {
         case .changes: "Changes"
         case .terminal: "Terminal"
         case .exchanged: "Exchanged"
+        case .simulator: "Simulator"
         }
     }
 }

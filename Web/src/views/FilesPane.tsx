@@ -16,10 +16,11 @@ import { sorted } from "../model/fileTree";
 import { fileToPin, nameOf, paneOf, pathOf, setPane, textShownAs, type Tab } from "./files/paneState";
 import { LiveDocument } from "./LiveDocument";
 import { Exchanged } from "./Exchanged";
+import { SimulatorPane } from "./SimulatorPane";
 
 const tabs: { tab: Tab; label: string }[] = [
   { tab: "files", label: "Files" }, { tab: "changes", label: "Changes" }, { tab: "page", label: "Page" },
-  { tab: "exchanged", label: "Exchanged" },
+  { tab: "exchanged", label: "Exchanged" }, { tab: "simulator", label: "Simulator" },
 ];
 
 /** Below 760 the page is the phone's one column at a time, and Files lists one folder at a time, as the Remote does. */
@@ -149,6 +150,7 @@ export function FilesPane({ store, host, session }: { store: Store; host: string
           ? <LiveDocument store={store} host={host} agentID={session} path={pane.page} line={pane.line} />
           : <p class="hint">A Markdown file the agent shows reads here.</p>)}
         {pane.tab === "exchanged" && <Exchanged store={store} host={host} session={session} />}
+        {pane.tab === "simulator" && <SimulatorPane store={store} host={host} />}
       </div>
     </aside>
   );

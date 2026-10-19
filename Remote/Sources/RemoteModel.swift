@@ -3993,6 +3993,21 @@ final class RemoteModel {
 
     /// Another page, backwards. Never the whole history: that is the difference
     /// between a conversation opening in a second and one opening on a train.
+    /// The Simulator pane's calls (#842), to the session's host.
+    func simulatorCalls(for agentID: UUID) -> SimulatorCalls {
+        let host = { try self.client(for: DaemonAPI.AgentRequest(agentID: agentID)) }
+        return SimulatorCalls(
+            list: { try await host().call(DaemonAPI.Method.simulatorsList, Optional<String>.none,
+                                          returning: DaemonAPI.SimulatorList.self) },
+            boot: { udid in _ = try await host().call(DaemonAPI.Method.simulatorsBoot,
+                                                      DaemonAPI.SimulatorRequest(udid: udid)) },
+            shutdown: { udid in _ = try await host().call(DaemonAPI.Method.simulatorsShutdown,
+                                                          DaemonAPI.SimulatorRequest(udid: udid)) },
+            screen: { udid in try await host().call(DaemonAPI.Method.simulatorsScreen,
+                                                    DaemonAPI.SimulatorScreenRequest(udid: udid),
+                                                    returning: DaemonAPI.SimulatorScreen.self) })
+    }
+
     /// Find in Chat (#1532): what was said in a chat that holds `text`, found by its host.
     func find(_ text: String, in agentID: UUID) async -> DaemonAPI.FindResult? {
         let request = DaemonAPI.FindRequest(agentID: agentID, text: text)
