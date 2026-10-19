@@ -17,7 +17,7 @@ idea, in the project's own `.agents` folder.
 | `skills/` | Skills every agent gets | You, or **Settings ▸ Agent Configuration** |
 | `personas/` | Personas you can start an agent as | You |
 | `plugins/` | Plugins every agent gets | **Settings ▸ Agent Configuration** |
-| `mcp.json` | MCP servers every agent gets. Secrets are named as `${NAME}`, never held. | You, or **Settings ▸ Agent Configuration** |
+| `mcp.json` | Connectors (MCP servers) every agent gets. Secrets are named as `${NAME}`, never held. | You, or **Settings ▸ Agent Configuration** |
 | `marketplaces.json` | Which marketplaces are on | **Manage Marketplaces…** |
 | `chat/` | The chat project, for chats without a project | The app |
 | `settings/` | The settings below, one file each | The app |

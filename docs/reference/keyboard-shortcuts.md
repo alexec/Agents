@@ -28,7 +28,7 @@ ones every Mac app has.
 | Shift-Command-O | **File ▸ Clone Project from Git URL…** | Clones a Git URL as a project. |
 | Control-Command-O | **File ▸ Add Server…** | Adds a Linux server. |
 | Shift-Command-R | **File ▸ Show in Finder** | Shows the agent's or project's folder in Finder. |
-| Option-Command-, | **File ▸ Project Settings…** | Opens the selected project's settings: its instructions, skills, plugins, MCP servers and worktrees. |
+| Option-Command-, | **File ▸ Project Settings…** | Opens the selected project's settings: its instructions, skills, plugins, connectors and worktrees. |
 | Command-. | **Session ▸ Stop** | Stops the agent and stays on the conversation. |
 | Shift-Command-Return | **Session ▸ Carry On** | Tells an agent blocked under **Needs you** that its block has gone, or a **Waiting** one that its wait is over early. |
 | Option-Command-Delete | **Session ▸ Archive** or **Unarchive** | Archives the session, or unarchives an archived one. |

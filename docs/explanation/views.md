@@ -11,7 +11,7 @@ This is MCP Apps ([SEP-1865, 2026-01-26](https://github.com/modelcontextprotocol
 a tool names a `ui://` resource, the resource is HTML, and the view talks to the app over
 `postMessage` in JSON-RPC.
 
-The app draws views from its own `agents` server, and from your own MCP servers reached over
+The app draws views from its own `agents` server, and from your own connectors (MCP servers) reached over
 http ([Views from your own servers](#views-from-your-own-servers)). Views from servers that
 run on this machine (stdio) aren't shown yet.
 
@@ -103,7 +103,7 @@ ties a view to a tool call the model made. A pin is the host making that call it
 
 ## Views from your own servers
 
-A tool of one of your own MCP servers — in a project's `.agents/mcp.json`, your own
+A tool of one of your own connectors — in a project's `.agents/mcp.json`, your own
 `~/.agents/mcp.json`, or a plugin — can have a view too (#191). The app draws it in the turn
 that called the tool and as a pin, on the Mac, the Remote and the web page, in the same
 sandbox as the app's own views.
@@ -128,7 +128,7 @@ sandbox as the app's own views.
   It asks again whenever the view changes (its address, type, HTML or `_meta.ui`), and it
   asks for your own servers too, since it is about drawing their HTML, not about running
   them. The answers are kept beside the approvals in `<root>/mcp-approvals.json`. **Ask
-  Again** on the server's row in the project's MCP servers forgets them.
+  Again** on the server's row in the project's Connectors forgets them.
 - **What it may reach.** Exactly what it declared in its `_meta.ui.csp`, as above. Its
   `tools/call` reaches only its own server, and only a tool whose `visibility` includes
   `app`. A view of one server asking for another's tool, or for the `agents` server's, is

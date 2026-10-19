@@ -41,7 +41,7 @@ and then carry on.
    the agent fixes it rather than waiting for something that never comes. To wait for
    particular agents to finish, the agent names them in `agents` instead.
 
-   An agent can also wait on an MCP server's event, such as `pr.merged` or `pr.closed`
+   An agent can also wait on a connector's event, such as `pr.merged` or `pr.closed`
    from a `github` server. Then `where` is what the server is asked for, such as `{"pr": 640}`
    (the `github` server fills in `repo` from the project's folder), and the wait subscribes to
    the server until it ends. A name

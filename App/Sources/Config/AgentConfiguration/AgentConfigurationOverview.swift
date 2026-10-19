@@ -73,7 +73,7 @@ struct AgentConfigurationOverview: View {
             if count == 0 { return "None" }
             let noun: (String, String) = switch kind {
             case .skills: ("skill", "skills")
-            case .mcp: ("server", "servers")
+            case .mcp: ("connector", "connectors")
             case .plugins: ("plugin", "plugins")
             default: ("file", "files")
             }
@@ -98,7 +98,7 @@ struct AgentConfigurationOverview: View {
             Divider()
             row("Skills", count: snapshot.skills.count) { countCell(snapshot.skills.map(\.reach), runtime: $0) }
             Divider()
-            row("MCP servers", count: snapshot.mcp.problem == nil ? snapshot.mcp.servers.count : nil) { runtime in
+            row("Connectors", count: snapshot.mcp.problem == nil ? snapshot.mcp.servers.count : nil) { runtime in
                 if snapshot.mcp.problem != nil {
                     Cell(text: "⚠", tone: .attention)
                 } else {

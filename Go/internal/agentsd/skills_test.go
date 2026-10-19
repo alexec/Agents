@@ -99,7 +99,7 @@ func TestAProjectPluginWaitsUntilApproved(t *testing.T) {
 	var list wire.PluginsList
 	json.Unmarshal(c.call(t, 2, "plugins/list", map[string]any{"folder": "file://" + project}), &list)
 	if len(list.Plugins) != 1 || list.Plugins[0].Name != "old" || list.Plugins[0].AwaitingApproval != nil ||
-		len(list.Plugins[0].Carries) != 2 || list.Plugins[0].Carries[0] != "hooks" || list.Plugins[0].Carries[1] != "MCP servers" {
+		len(list.Plugins[0].Carries) != 2 || list.Plugins[0].Carries[0] != "hooks" || list.Plugins[0].Carries[1] != "connectors" {
 		t.Fatalf("%+v", list)
 	}
 	gemini, _ := os.ReadFile(filepath.Join(plugins, "old", "gemini-extension.json"))

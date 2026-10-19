@@ -22,8 +22,8 @@ working and what is done.
 
 An agent is filed under one project, but it need not stay inside that one folder. Work
 that spans two repositories is ordinary, so a new agent can be given more folders to reach,
-and MCP servers of its own, before it starts. It is still listed under the project it
-started in. See [Give an agent more folders and MCP servers](../how-to/give-an-agent-more-folders.md).
+and connectors of its own, before it starts. It is still listed under the project it
+started in. See [Give an agent more folders and connectors](../how-to/give-an-agent-more-folders.md).
 
 A project need not be a Git repository. Worktrees, branches and the git half of an
 agent's changes need one, and are simply not offered in a folder that is not; everything
@@ -153,7 +153,7 @@ committed or a branch that is not merged.
 A project can carry its own `.agents` folder, with skills, instructions and plugins that
 belong to that project and apply only inside it. A plugin there that is new or has changed
 waits for your OK on the project's page before any agent is handed it — the same check as
-a workflow file — because it can run hooks and MCP servers when a session starts. See
+a workflow file — because it can run hooks and connectors when a session starts. See
 [A project's own plugins](../how-to/share-skills-across-agents.md#a-projects-own-plugins).
 `~/.agents` in your home folder is the same idea one level up: your own set, which every
 agent the app starts gets, in every project and on every runtime. The app lays it out on
@@ -162,14 +162,14 @@ the server keep whatever they were set up with there.
 
 Your set goes to each runtime the way that runtime can take it, which differs. Some read
 `~/.agents/skills` themselves; for others the app places links, which it never puts back
-once you delete them; MCP servers go with each conversation as it starts, so nothing is
+once you delete them; connectors go with each conversation as it starts, so nothing is
 written into a runtime's own config. **Settings ▸ Agent Configuration** shows what each runtime ends up
-with. See [Share skills, instructions and servers with every agent](../how-to/share-skills-across-agents.md).
+with. See [Share skills, instructions and connectors with every agent](../how-to/share-skills-across-agents.md).
 
-A project's instructions, skills, MCP servers and plugins are set up in **Project Settings ▸
+A project's instructions, skills, connectors and plugins are set up in **Project Settings ▸
 Agent Configuration**, a sheet opened from the project page's toolbar, the project's context
 menu in the sidebar, or **File ▸ Project Settings…** (Option-Command-comma). Its pages are the
-same as **Settings ▸ Agent Configuration**: Overview, Instructions, Skills, MCP servers,
+same as **Settings ▸ Agent Configuration**: Overview, Instructions, Skills, Connectors,
 Plugins and Other files, between the project's own **General** and **Worktrees**. The folder
 is the difference: yours is `~/.agents`, the project's is its `.agents`, and its instructions
 are `AGENTS.md` at the top of the project. A project's Overview counts what is there, where
@@ -179,14 +179,14 @@ is yours alone. A worktree has its own `.agents`, so a change there stays on tha
 it is merged. **General** also holds the project's two limits on agents that other agents start: how many may be running (3 unless you change it) and how many may be kept until you archive them (5). They are saved in the project's own `.agents/project.json`, so they go wherever the project goes. A change to that file, or to `.agents/pins.json`, made outside the app is not used until you keep it there; see [Settings](../reference/settings.md). See [Agent tools](../reference/agent-tools.md). On a server, Project Settings shows only **General**. See
 [Add a skill from a catalogue](../how-to/add-a-skill-from-a-catalogue.md).
 
-A project's MCP servers live in `.agents/mcp.json`, on that same page. The file is committed, so it names each secret as `${NAME}` and never
-holds the value. Each person sets their own in `~/.agents-secrets/secrets.env`, a folder apart from `~/.agents` and readable only by them, because `~/.agents` is settings a person may copy or commit and a secret is not. A server added from
+A project's connectors (MCP servers) live in `.agents/mcp.json`, on that same page. The file is committed, so it names each secret as `${NAME}` and never
+holds the value. Each person sets their own in `~/.agents-secrets/secrets.env`, a folder apart from `~/.agents` and readable only by them, because `~/.agents` is settings a person may copy or commit and a secret is not. A connector added from
 the sheet is approved as it goes in. One that arrives with a pull waits, marked **waiting
 for your OK**, until you choose **Approve**; no agent is given it before that. Where you and
-the project both have a server of the same name, agents in the project get the project's. A
-missing secret is named on the row, and agents start without that server rather than with an
+the project both have a connector of the same name, agents in the project get the project's. A
+missing secret is named on the row, and agents start without that connector rather than with an
 empty key. Projects on a server don't show the section. See
-[Add an MCP server from the registry](../how-to/add-an-mcp-server-from-the-registry.md).
+[Add a connector from the registry](../how-to/add-an-mcp-server-from-the-registry.md).
 
 Nothing from a catalogue is taken on trust. skills.sh does not review what it lists, so the
 app shows every file before anything is written, points out scripts an agent could run, pins
@@ -197,5 +197,5 @@ the commit it took, and checks each file against GitHub's own record of it at th
 - [Add a project](../how-to/add-a-project.md), [Add a server](../how-to/add-a-server.md)
   and [Start an agent in its own worktree](../how-to/start-in-a-worktree.md).
 - [The control plane](control-plane.md).
-- [Give an agent more folders and MCP servers](../how-to/give-an-agent-more-folders.md).
+- [Give an agent more folders and connectors](../how-to/give-an-agent-more-folders.md).
 - [Settings and the Resources page](../reference/settings.md).

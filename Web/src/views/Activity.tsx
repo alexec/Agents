@@ -230,14 +230,14 @@ export function ActivityRows({ group, store, chosen, onPick }: {
       {row("runtimes", "Runtimes", "What each runtime can be started on right now",
         tally ? (tally.working === 0 ? `None of ${tally.total} working` : `${tally.working} of ${tally.total} working`) : null,
         tally?.working === 0)}
-      {row("mcp", "MCP Servers", "Every server in your own mcp.json, and how each is doing",
+      {row("mcp", "Your Connectors", "Every connector in your own mcp.json, and how each is doing",
         mcp?.words ?? null, mcp?.failing ?? false)}
       {row("worktrees", "Worktrees", "Every project's worktrees, and how much each holds", worktrees)}
     </>
   );
 }
 
-const pageTitles: Record<ActivityPage, string> = { events: "Events", resources: "Resources", runtimes: "Runtimes", mcp: "MCP Servers", worktrees: "Worktrees", spending: "Cost", tokens: "Tokens", time: "Time", milestones: "Milestones" };
+const pageTitles: Record<ActivityPage, string> = { events: "Events", resources: "Resources", runtimes: "Runtimes", mcp: "Your Connectors", worktrees: "Worktrees", spending: "Cost", tokens: "Tokens", time: "Time", milestones: "Milestones" };
 
 /** An Activity page in the chat's place. */
 export function ActivityPageView({ store, page }: { store: Store; page: ActivityPage }) {

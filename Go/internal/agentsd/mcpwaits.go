@@ -182,7 +182,7 @@ func (d *Daemon) mcpOfferedEvents(names []string, project string) (map[string]of
 				mayComeBack = append(mayComeBack, mcpEventsWords(listing.failure, name))
 			}
 		case "waiting":
-			mayComeBack = append(mayComeBack, name+" is waiting for approval in this project's MCP servers.")
+			mayComeBack = append(mayComeBack, name+" is waiting for approval in this project's Connectors.")
 		}
 	}
 	return offered, mayComeBack

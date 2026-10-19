@@ -28,7 +28,7 @@ struct ProjectMCPSection: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .paperRow()
         } else if servers.isEmpty {
-            Text(place == .you ? "No MCP servers of your own yet." : "No MCP servers in this project yet.")
+            Text(place == .you ? "No connectors of your own yet." : "No connectors in this project yet.")
                 .appText(.supporting).foregroundStyle(.secondary)
                 .padding(.horizontal, 16).padding(.vertical, 13)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -58,7 +58,7 @@ struct ProjectMCPSection: View {
 
     private var heading: some View {
         HStack(spacing: 8) {
-            SectionHeading(title: "MCP servers")
+            SectionHeading(title: "Connectors")
                 .fixedSize()
             if !servers.isEmpty {
                 SharedChip(text: "\(servers.count)").padding(.top, 20)
@@ -69,7 +69,7 @@ struct ProjectMCPSection: View {
                     SharedFiles.reveal(file.isEmpty ? revealFallback : file)
                 }
                 .buttonStyle(.paper)
-                Button("Add server…") { adding = true }.buttonStyle(.paperProminent)
+                Button("Add Connector…") { adding = true }.buttonStyle(.paperProminent)
             }
             .padding(.top, 20)
         }
@@ -120,7 +120,7 @@ private struct ProjectMCPRow: View {
             Image(systemName: icon)
                 .appText(.reading)
                 .foregroundStyle((isWaiting || !server.missingSecrets.isEmpty || needsSignIn ? StateTint.attention : StateTint.none).style(or: .secondary))
-                .accessibilityLabel(isWaiting ? "Waiting for your OK" : "Server")
+                .accessibilityLabel(isWaiting ? "Waiting for your OK" : "Connector")
                 .padding(.top, 1)
 
             VStack(alignment: .leading, spacing: 3) {

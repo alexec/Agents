@@ -553,12 +553,12 @@ struct RemoteProjectFold: View {
                     // match is one tap away.
                     searchMatches(fold)
                 } else if isOpen {
-                    // Its MCP servers (#753), when its .agents/mcp.json has any: a page, red
-                    // when one does not answer.
-                    if let tally = MCPHealthWords.tally(model.work.mcpServers(in: key)) {
-                        ProjectPageRow(title: "MCP Servers", systemImage: "server.rack", count: nil,
-                                       item: .projectMCPServers(key), warns: tally.failing, value: tally.words)
-                    }
+                    // Its connectors (#753), under every project even with none yet (#1422):
+                    // a page, red when one does not answer.
+                    let tally = MCPHealthWords.tally(model.work.mcpServers(in: key))
+                    ProjectPageRow(title: "Connectors", systemImage: "server.rack", count: nil,
+                                   item: .projectMCPServers(key), warns: tally?.failing ?? false,
+                                   value: tally?.words ?? "none yet")
                     // The archive, one row opening a page (#495): never a fold inside
                     // the group.
                     let archived = fold.archivedCount(summary) + fold.archivedWorkflows.count

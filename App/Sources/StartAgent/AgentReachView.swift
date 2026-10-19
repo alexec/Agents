@@ -47,7 +47,7 @@ struct AgentReachView: View {
             Divider()
 
             VStack(alignment: .leading, spacing: 6) {
-                Text("MCP servers").appText(.reading).fontWeight(.semibold)
+                Text("Connectors").appText(.reading).fontWeight(.semibold)
                 ForEach(servers) { server in
                     HStack {
                         Text(server.name).appText(.reading)
@@ -71,7 +71,7 @@ struct AgentReachView: View {
                         .buttonStyle(.paper)
                         .disabled(serverName.isEmpty || serverCommand.isEmpty)
                 }
-                Text("A server that will not start is reported against the agent and does not stop it.")
+                Text("A connector that will not start is reported against the agent and does not stop it.")
                     .appText(.fine)
                     .foregroundStyle(.secondary)
             }

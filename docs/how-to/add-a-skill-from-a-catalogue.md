@@ -99,5 +99,5 @@ added, the app lists what `npx skills add` put in `~/.agents/skills`, and
 
 ## Related
 
-- [Share skills, instructions and servers with every agent](share-skills-across-agents.md)
+- [Share skills, instructions and connectors with every agent](share-skills-across-agents.md)
 - [Projects, hosts and worktrees](../explanation/projects-hosts-worktrees.md)

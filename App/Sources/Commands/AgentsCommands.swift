@@ -188,7 +188,7 @@ struct AgentsCommands: Commands {
                 .keyboardShortcut("l", modifiers: [.command, .option])
             Button("Runtimes") { model.showRuntimes() }
                 .keyboardShortcut("r", modifiers: [.command, .option])
-            Button("MCP Servers") { model.showsMCPServers = true }
+            Button("Your Connectors") { model.showsMCPServers = true }
             Button("Worktrees") { model.showsWorktrees = true }
             Button("Cost") { model.showsSpending = true }
                 .keyboardShortcut("s", modifiers: [.command, .option])

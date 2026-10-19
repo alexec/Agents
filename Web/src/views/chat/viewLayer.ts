@@ -202,7 +202,7 @@ export class HostedView {
     if (show) {
       await this.load(mine);
     } else {
-      this.failure.value = `Not shown. Ask Again is on ${ask.server}'s row in the project's MCP servers.`;
+      this.failure.value = `Not shown. Ask Again is on ${ask.server}'s row in the project's Connectors.`;
       this.phase.value = "failed";
     }
   }

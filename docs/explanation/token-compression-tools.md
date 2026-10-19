@@ -163,7 +163,7 @@ in `turns.jsonl`.
   - Keep each turn's token counts, and compare agents with the switch on and off. Judge it
     on those figures, not on what Headroom reports about itself.
 - **Cut what is sent instead of compressing it.** These savings are in the app's own hands:
-  - give each agent fewer tools and MCP servers, since their schemas are sent every turn;
+  - give each agent fewer tools and connectors, since their schemas are sent every turn;
   - keep the start of each prompt the same from turn to turn, so the cache keeps working;
   - choose when each runtime compacts. All eight compact on their own already
     (see [Compaction in each runtime](compaction-by-runtime.md)).

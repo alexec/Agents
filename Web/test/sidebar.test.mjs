@@ -379,7 +379,7 @@ test("MCP Servers: every server's health, the person's and each project's, in th
   assert.equal(healthTone(shared), "quiet");
   assert.equal(healthTally([]), null);
   assert.deepEqual(healthTally(personalServers(snapshot)), { words: "1 not answering", failing: true });
-  assert.deepEqual(healthTally([github, shared]), { words: "2 servers", failing: false });
+  assert.deepEqual(healthTally([github, shared]), { words: "2 connectors", failing: false });
 });
 
 test("Activity rows: spending added up by currency, headroom, out of the pool", async () => {

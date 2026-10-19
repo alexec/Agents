@@ -1,13 +1,13 @@
 ---
 diataxis: how-to
 devices: [mac]
-description: Put your skills, instructions, MCP servers and plugins in ~/.agents once, and every agent the app starts gets them, on every runtime.
+description: Put your skills, instructions, connectors and plugins in ~/.agents once, and every agent the app starts gets them, on every runtime.
 ---
 
-# Share skills, instructions and servers with every agent
+# Share skills, instructions and connectors with every agent
 
 `~/.agents` in your home folder is your own set of things every agent should have: how you
-like to work, your skills, your MCP servers and your plugins. Put each one there once, and
+like to work, your skills, your connectors and your plugins. Put each one there once, and
 every agent the app starts gets it, whichever runtime it runs on and whichever project it is
 in. You do not set anything up per runtime.
 
@@ -15,7 +15,7 @@ in. You do not set anything up per runtime.
 | --- | --- | --- |
 | How you like to work | `~/.agents/AGENTS.md` | reads it as your personal instructions |
 | A skill | `~/.agents/skills/<name>/SKILL.md` | is offered the skill |
-| MCP servers | `~/.agents/mcp.json` | has the servers' tools |
+| Connectors (MCP servers) | `~/.agents/mcp.json` | has the connectors' tools |
 | A plugin | `~/.agents/plugins/<name>/` | gets its skills, commands and servers, where the runtime can take a plugin |
 
 A project's own `.agents` folder still applies inside that project, as well as these.
@@ -49,13 +49,13 @@ Edit `~/.agents/AGENTS.md`. The app links it into the file each runtime reads:
 `~/.copilot/copilot-instructions.md`. Cursor keeps its User Rules in its own settings, and
 Antigravity reads no instructions file when the app starts it, so neither gets it.
 
-## Add an MCP server
+## Add a connector
 
 To find one on the MCP Registry and add it from the app, see
-[Add an MCP server from the registry](add-an-mcp-server-from-the-registry.md). The entry it
+[Add a connector from the registry](add-an-mcp-server-from-the-registry.md). The entry it
 writes names each secret as `${NAME}`, and the value goes in `~/.agents-secrets/secrets.env`, which
 is yours alone, readable only by you, and never committed. When an agent starts, the app
-fills each `${NAME}` from that file. A name that is not set means that server is left out
+fills each `${NAME}` from that file. A name that is not set means that connector is left out
 of the session, and **Settings ▸ Agent Configuration** says which name is missing. The value is never
 shown or logged.
 
@@ -94,7 +94,7 @@ Put the plugin's folder in `~/.agents/plugins`, laid out as a Claude Code plugin
 its `.claude-plugin/plugin.json`, and `.mcp.json` if it has servers.
 
 - Claude and Grok are handed it when an agent starts. Grok does not start a plugin's
-  servers itself, so the app sends them along with your MCP servers.
+  servers itself, so the app sends them along with your connectors.
 - Codex keeps a copy of each plugin. The app writes `~/.agents/plugins/marketplace.json`
   and adds the plugin to Codex, and adds it again whenever anything in its folder changes,
   before the next Codex agent starts. An index you wrote yourself is left alone.
@@ -111,7 +111,7 @@ it out of Codex and removes its Gemini link.
 ## A project's own plugins
 
 A project can also keep plugins in `.agents/plugins` inside the project folder. Those
-apply only in that project. Because a plugin can run hooks and start MCP servers when a
+apply only in that project. Because a plugin can run hooks and start connectors when a
 session begins, a new or changed project plugin does not reach any agent until you approve
 it on the project's page — the same idea as [a workflow waiting for your OK](set-up-a-workflow.md).
 
@@ -139,7 +139,7 @@ linked into or deleted.
 ## See what every agent gets
 
 Open **Settings ▸ Agent Configuration**. The overview shows, for each runtime, how many of your
-instructions, skills, servers and plugins it gets, and lists everything that needs a look:
+instructions, skills, connectors and plugins it gets, and lists everything that needs a look:
 a clash, something left out, a runtime with no way in. Each page has **Edit** to open the
 file in your editor and **Reveal in Finder**.
 

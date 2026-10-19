@@ -74,7 +74,7 @@ enum AgentConfigurationPage: String, Hashable, CaseIterable {
         case .overview: "Overview"
         case .instructions: "Instructions"
         case .skills: "Skills"
-        case .mcp: "MCP servers"
+        case .mcp: "Connectors"
         case .plugins: "Plugins"
         case .other: "Other files"
         }
@@ -158,9 +158,9 @@ private struct SharedEmptyState: View {
     private var words: String {
         switch place {
         case .you:
-            "Put things in ~/.agents once and every agent gets them, on every runtime: AGENTS.md for instructions · skills/ · mcp.json for MCP servers · plugins/"
+            "Put things in ~/.agents once and every agent gets them, on every runtime: AGENTS.md for instructions · skills/ · mcp.json for connectors · plugins/"
         case .project:
-            "Put things in this project’s .agents and every agent here gets them, and everyone who clones it: skills/ · mcp.json for MCP servers · plugins/. Its instructions are AGENTS.md at the top of the project."
+            "Put things in this project’s .agents and every agent here gets them, and everyone who clones it: skills/ · mcp.json for connectors · plugins/. Its instructions are AGENTS.md at the top of the project."
         }
     }
 }

@@ -470,14 +470,12 @@ struct ProjectFold: View {
                     // match is one click away as it was.
                     searchMatches(fold)
                 } else {
-                    // Its MCP servers (#753), when its .agents/mcp.json has any: a page, red
-                    // when one does not answer.
-                    let servers = model.work.mcpServers(in: key)
-                    if let tally = MCPHealthWords.tally(servers) {
-                        ProjectPageRow(title: "MCP Servers", systemImage: "server.rack",
-                                       item: .projectMCPServers(key), warns: tally.failing)
-                            .help(tally.words)
-                    }
+                    // Its connectors (#753), under every project even with none yet (#1422):
+                    // a page, red when one does not answer.
+                    let tally = MCPHealthWords.tally(model.work.mcpServers(in: key))
+                    ProjectPageRow(title: "Connectors", systemImage: "server.rack",
+                                   item: .projectMCPServers(key), warns: tally?.failing ?? false)
+                        .help(tally?.words ?? "No connectors yet")
                     // The archive, one row opening a page (#495): never a fold inside
                     // the group.
                     let archived = fold.archivedCount(summary) + fold.archivedWorkflows.count

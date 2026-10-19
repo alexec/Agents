@@ -37,7 +37,7 @@ struct MCPServersListView: View {
         .listStyle(.insetGrouped)
         .scrollContentBackground(.hidden)
         .background(Paper.ground)
-        .navigationTitle(project.flatMap { model.work.project($0)?.name }.map { "\($0): MCP Servers" } ?? "MCP Servers")
+        .navigationTitle(project.flatMap { model.work.project($0)?.name }.map { "\($0): Connectors" } ?? "Your Connectors")
         .toolbar {
             Button("Check Now") {
                 checking = true
@@ -61,11 +61,11 @@ struct MCPServersRow: View {
         // The title alone (#587): the count is said to VoiceOver, and one not answering
         // turns the row's icon red (`activityIcon(_:warns:)`).
         HStack(alignment: .firstTextBaseline) {
-            Text("MCP Servers")
+            Text("Your Connectors")
             Spacer()
         }
         .accessibilityElement(children: .combine)
         .accessibilityValue(MCPHealthWords.tally(model.work.mcpHealthSnapshot()?.personal ?? [])?.words ?? "")
-        .accessibilityHint("Opens MCP Servers")
+        .accessibilityHint("Opens Your Connectors")
     }
 }
