@@ -166,7 +166,7 @@ func Broadcast[P any](d *Daemon, n wire.Notification[P], params P) {
 // Shutdown ends what the host runs: every runtime it started.
 func (d *Daemon) Shutdown() {
 	// First, so a stop that goes wrong below still counts as a stop (#1219).
-	d.noteCleanStop()
+	stoppedAt := d.noteCleanStop()
 	d.machineMu.Lock()
 	if d.machineStop != nil {
 		d.machineStop()
@@ -186,6 +186,7 @@ func (d *Daemon) Shutdown() {
 	d.closeAfterTurns()
 	d.stopAll()
 	d.waitAfterTurns(afterTurnLimit)
+	d.noteCutOffAgents(stoppedAt)
 	d.clearPickUps()
 	d.stopMCPEvents()
 	d.stopEvents()

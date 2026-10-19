@@ -755,10 +755,20 @@ func (d *Daemon) end(l *live, s wire.AgentState, why wire.EndedReason) {
 	l.mu.Lock()
 	last, reported := l.lastMessage.String(), l.reported
 	l.mu.Unlock()
+	// A turn the host's going cut off is the daemon's going, not a stop somebody chose
+	// (#1605): the next start picks it up, as after a crash.
+	if d.going() && s == wire.AgentStateStopped && (why == wire.EndedReasonCancelled || why == wire.EndedReasonProcessDied) {
+		why = wire.EndedReasonDaemonGone
+		if a := d.Store.Agent(l.id); a != nil {
+			d.noteCutOff(l.id, a.State)
+		}
+	}
 	var requested, archiveNow bool
 	d.change(l.id, func(a *wire.Agent) {
 		a.State, a.EndedReason = s, reason(why)
-		a.RestartPickUps = nil // any ending but the daemon's going clears the count
+		if why != wire.EndedReasonDaemonGone {
+			a.RestartPickUps = nil // any ending but the daemon's going clears the count
+		}
 		unread := s == wire.AgentStateFinished
 		a.IsUnread = &unread
 		if s == wire.AgentStateFinished && !(reported && a.Report != nil) {

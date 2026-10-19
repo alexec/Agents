@@ -5,6 +5,7 @@
 import { useSignal } from "@preact/signals";
 import { useEffect, useLayoutEffect, useRef } from "preact/hooks";
 import type { Store } from "../../model/store";
+import type { FileCompletion, FileDiagnostic, FileDiagnostics } from "../../protocol/generated";
 import { nameOf } from "./paneState";
 
 const settle = 700;
@@ -29,6 +30,62 @@ export function SourceEditor({ store, host, agentID, path, text, line }: {
   const saving = useRef<ReturnType<typeof setTimeout> | null>(null);
   const field = useRef<HTMLTextAreaElement>(null);
   const canEdit = store.link.state.kind === "open" && store.hostIsOnline(host);
+  /** What the file's language server found, as last asked (#844). */
+  const problems = useSignal<FileDiagnostics | null>(null);
+
+  // The language server is asked a moment after the typing stops (#844).
+  const typed = draft.value;
+  useEffect(() => {
+    let gone = false;
+    const timer = setTimeout(() => {
+      void store.link.call("files/diagnostics", { agentID: agentID as never, path, text: typed }, host)
+        .then((found) => { if (!gone) problems.value = found; }, () => {});
+    }, 1000);
+    return () => { gone = true; clearTimeout(timer); };
+  }, [typed, path, host]);
+
+  /** The language server's words for the caret's place (#844), while the list is up. */
+  const offered = useSignal<FileCompletion[] | null>(null);
+  const chosen = useSignal(0);
+  const ask = async () => {
+    const el = field.current;
+    if (!el) return;
+    const before = el.value.slice(0, el.selectionStart);
+    const line = before.split("\n").length;
+    const column = before.length - (before.lastIndexOf("\n") + 1) + 1;
+    const found = await store.link.call("files/complete", { agentID: agentID as never, path, text: el.value, line, column }, host)
+      .catch(() => null);
+    // As the Mac's list: those that start with the word being typed, or all when none do.
+    const typedWord = (/[A-Za-z0-9_]*$/.exec(before)?.[0] ?? "").toLowerCase();
+    const items = found?.items ?? [];
+    const matching = items.filter((item) => (item.insert ?? item.label).toLowerCase().startsWith(typedWord));
+    const shown = matching.length ? matching : items;
+    offered.value = shown.length ? shown : null;
+    chosen.value = 0;
+  };
+  /** The word being typed, before the caret, goes; the chosen one takes its place. */
+  const take = (item: FileCompletion) => {
+    const el = field.current;
+    offered.value = null;
+    if (!el) return;
+    const at = el.selectionStart;
+    const start = at - (/[A-Za-z0-9_]*$/.exec(el.value.slice(0, at))?.[0].length ?? 0);
+    el.setRangeText(item.insert ?? item.label, start, at, "end");
+    draft.value = el.value;
+    if (saving.current) clearTimeout(saving.current);
+    saving.current = setTimeout(() => void save(), settle);
+    el.focus();
+  };
+
+  const goTo = (target: number) => {
+    const el = field.current;
+    if (!el) return;
+    const at = offsetOfLine(el.value, target);
+    el.focus();
+    el.setSelectionRange(at, at);
+    const lineHeight = parseFloat(getComputedStyle(el).lineHeight) || 18;
+    el.scrollTop = Math.max(0, (target - 1) * lineHeight - el.clientHeight / 2);
+  };
 
   // The file changed on disk: taken in place unless something typed is still to be saved.
   useEffect(() => {
@@ -69,7 +126,50 @@ export function SourceEditor({ store, host, agentID, path, text, line }: {
           if (saving.current) clearTimeout(saving.current);
           saving.current = setTimeout(() => void save(), settle);
         }}
+        onKeyDown={(e) => {
+          // Ctrl+Space asks the language server what to write here (#844); the list takes the arrows.
+          if (e.key === " " && e.ctrlKey) { e.preventDefault(); void ask(); return; }
+          const list = offered.value;
+          if (!list) return;
+          if (e.key === "Escape") { e.preventDefault(); offered.value = null; }
+          else if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+            e.preventDefault();
+            chosen.value = Math.max(0, Math.min(list.length - 1, chosen.value + (e.key === "ArrowDown" ? 1 : -1)));
+          } else if (e.key === "Enter" || e.key === "Tab") { e.preventDefault(); take(list[chosen.value]!); }
+        }}
         onBlur={() => void save()} />
+      {offered.value && (
+        <div class="completions" role="listbox" aria-label="Completions">
+          {offered.value.map((item, i) => (
+            <button key={i} type="button" role="option" aria-selected={i === chosen.value} class={`completion${i === chosen.value ? " chosen" : ""}`}
+              onMouseDown={(e) => { e.preventDefault(); take(item); }}>
+              <span>{item.label}</span>{item.detail && <span class="faint small"> {item.detail}</span>}
+            </button>
+          ))}
+        </div>
+      )}
+      {problems.value && <Problems found={problems.value} goTo={goTo} />}
     </>
+  );
+}
+
+/**
+ * What a file's language server found (ProblemsList, #844), under the editor: each problem's place
+ * and words, a click away from its line. Nothing when the file's language has no server.
+ */
+function Problems({ found, goTo }: { found: FileDiagnostics; goTo: (line: number) => void }) {
+  if (!found.server || (found.diagnostics.length === 0 && !found.reason)) return null;
+  const count = found.diagnostics.length;
+  const heading = found.reason && count === 0 ? found.reason : `${count} ${count === 1 ? "problem" : "problems"} · ${found.server}`;
+  const mark = (p: FileDiagnostic) => (p.severity === "error" ? "⛔" : p.severity === "warning" ? "⚠️" : "ℹ️");
+  return (
+    <div class="problems" role="group" aria-label="Problems">
+      <p class="faint small">{heading}</p>
+      {found.diagnostics.map((p, i) => (
+        <button key={i} type="button" class="problem" title={`Go to line ${p.line}`} onClick={() => goTo(p.line)}>
+          <span aria-label={p.severity}>{mark(p)}</span> <span class="faint">{p.line}:{p.column}</span> {p.message}
+        </button>
+      ))}
+    </div>
   );
 }

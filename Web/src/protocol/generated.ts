@@ -1577,6 +1577,69 @@ export interface EventsPage {
   hasMore: boolean;
 }
 
+/**
+ * One thing to write: what the list shows, what goes in the text (the label when left out), and a
+ * line about it.
+ */
+export interface FileCompletion {
+  label: string;
+  insert?: string;
+  detail?: string;
+}
+
+/**
+ * files/complete (#844): what the language server would write at a place in a file, as the editor
+ * holds it. line from 1; column from 1, in UTF-16 units as the text views count.
+ */
+export interface FileCompletionRequest {
+  agentID: UUID;
+  path: string;
+  text: string;
+  line: number;
+  column: number;
+}
+
+/**
+ * At most 50 completions, in the server's order; reason says why there are none (no server, or none
+ * installed).
+ */
+export interface FileCompletions {
+  items: FileCompletion[];
+  reason?: string;
+}
+
+/**
+ * One problem a language server found: where (line and column from 1), how bad (error, warning,
+ * info or hint), and what.
+ */
+export interface FileDiagnostic {
+  line: number;
+  column: number;
+  severity: string;
+  message: string;
+  source?: string;
+}
+
+/**
+ * A file's problems, at most 200, and the server that found them. Reason says why there is no
+ * server for it (none installed for the language, or the file too big).
+ */
+export interface FileDiagnostics {
+  diagnostics: FileDiagnostic[];
+  server?: string;
+  reason?: string;
+}
+
+/**
+ * files/diagnostics (#844): what the language server for a file's language says of it, as the
+ * editor holds it (text) or as it is on disk.
+ */
+export interface FileDiagnosticsRequest {
+  agentID: UUID;
+  path: string;
+  text?: string;
+}
+
 export interface FileMentionDTO {
   path: string;
   relativePath: string;
@@ -4604,6 +4667,8 @@ export interface Methods {
   "events/cancelWait": { params: CancelWaitRequest; result: WaitingAgent[] };
   "events/list": { params: EventsListRequest; result: EventsPage };
   "files/browse": { params: FilesBrowseRequest; result: DirectoryListing };
+  "files/complete": { params: FileCompletionRequest; result: FileCompletions };
+  "files/diagnostics": { params: FileDiagnosticsRequest; result: FileDiagnostics };
   "files/list": { params: FilesListRequest; result: DirectoryListing };
   "files/mention": { params: FileMentionRequest; result: FileMentionDTO[] };
   "files/read": { params: FilesReadRequest; result: FileReading };
@@ -4749,6 +4814,8 @@ export const MethodTarget = {
   "events/cancelWait": "host",
   "events/list": "host",
   "files/browse": "host",
+  "files/complete": "host",
+  "files/diagnostics": "host",
   "files/list": "host",
   "files/mention": "host",
   "files/read": "host",
@@ -5023,6 +5090,12 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   EventsChange: { required: ["waiting"], optional: ["event"] },
   EventsListRequest: { required: ["limit"], optional: ["before", "scope", "groups"] },
   EventsPage: { required: ["events", "waiting", "hasMore"], optional: [] },
+  FileCompletion: { required: ["label"], optional: ["insert", "detail"] },
+  FileCompletionRequest: { required: ["agentID", "path", "text", "line", "column"], optional: [] },
+  FileCompletions: { required: ["items"], optional: ["reason"] },
+  FileDiagnostic: { required: ["line", "column", "severity", "message"], optional: ["source"] },
+  FileDiagnostics: { required: ["diagnostics"], optional: ["server", "reason"] },
+  FileDiagnosticsRequest: { required: ["agentID", "path"], optional: ["text"] },
   FileMentionDTO: { required: ["path", "relativePath"], optional: [] },
   FileMentionRequest: { required: ["agentID", "term"], optional: [] },
   FileStamp: { required: ["size", "modifiedAt"], optional: [] },

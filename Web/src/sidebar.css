@@ -87,7 +87,7 @@
 .sidebar-mark { width: 1rem; height: 1rem; margin-top: 1px; box-sizing: border-box; border-radius: 50%;
   display: inline-flex; align-items: center; justify-content: center; color: var(--accent); }
 .sidebar-mark.needsYou { color: var(--tint-attention); font-size: 0.8125rem; border-radius: 0; }
-.sidebar-mark.working { border: 1.5px solid var(--paper-rule); border-top-color: var(--accent); animation: spin 0.9s linear infinite; }
+.sidebar-mark.working { --notch: var(--accent); --notch-width: 1.5px; }
 .sidebar-mark.done { border: 1.5px solid currentColor; opacity: 0.7; }
 .sidebar-mark.queued, .sidebar-mark.waiting, .sidebar-mark.paused { font-size: 0.75rem; border-radius: 0; }
 /* Archiving needs approval (#584): the window's archive box, in the attention tint, as it is

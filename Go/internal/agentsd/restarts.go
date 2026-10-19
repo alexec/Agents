@@ -41,6 +41,8 @@ type restartGap struct {
 type daemonAlive struct {
 	LastAlive wire.Date  `json:"lastAlive"`
 	StoppedAt *wire.Date `json:"stoppedAt,omitempty"`
+	// CutOff is the agents a clean stop cut off in a turn, with their state before (#1605).
+	CutOff map[wire.UUID]wire.AgentState `json:"cutOff,omitempty"`
 }
 
 type restartBook struct {
@@ -266,7 +268,7 @@ func (d *Daemon) SayRestarted() {
 }
 
 // noteCleanStop writes the stop's time, so the next start says stopped rather than crashed.
-func (d *Daemon) noteCleanStop() {
+func (d *Daemon) noteCleanStop() wire.Date {
 	d.restartMu.Lock()
 	if d.aliveStop != nil {
 		close(d.aliveStop)
@@ -275,6 +277,22 @@ func (d *Daemon) noteCleanStop() {
 	d.restartMu.Unlock()
 	at := now()
 	d.writeAlive(daemonAlive{LastAlive: at, StoppedAt: &at})
+	return at
+}
+
+// noteCutOffAgents writes again, after the turns the stop cut off have ended, the stop's
+// time with those agents, so the next start picks them up (#1605).
+func (d *Daemon) noteCutOffAgents(at wire.Date) {
+	d.resumeMu.Lock()
+	cut := make(map[wire.UUID]wire.AgentState, len(d.cutOff))
+	for id, was := range d.cutOff {
+		cut[id] = was
+	}
+	d.resumeMu.Unlock()
+	if len(cut) == 0 {
+		return
+	}
+	d.writeAlive(daemonAlive{LastAlive: at, StoppedAt: &at, CutOff: cut})
 }
 
 // noticedAfterRestart is the details a crossing found at the first disk look after a

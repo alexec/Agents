@@ -16,7 +16,8 @@ You use the `github` server's tools for GitHub, not `gh`.
    with `method: rerun_failed_jobs` and `run_id`, use `add_issue_comment` on the pull
    request to say why, and stop.
 3. **Get the branch.** Use the app's `move_worktree` tool to move into a worktree on the
-   pull request's branch (the event's `pr.branch`). Pull it first, so that you have its
+   pull request's branch (the event's `pr.branch`). When you do not have that tool, use
+   `git worktree add` beside the project's folder. Pull it first, so that you have its
    newest commit.
 4. **Fix it.** Change only what makes the check pass. Never turn off, skip or weaken a
    check or a test to make it pass. Run the check that failed, on your computer, when you

@@ -2,54 +2,37 @@ import Foundation
 import Testing
 @testable import AgentsKitCore
 
-/// Every spinner reads its step off the clock, so two drawn at the same instant agree
+/// Every spinner reads its angle off the clock, so two drawn at the same instant agree
 /// however long each has been on screen.
 @Suite("Spinners turn together")
 struct SpinnerClockTests {
-    @Test("The same instant gives the same step, whenever the spinner appeared")
-    func sameInstantSameStep() {
-        let now = Date(timeIntervalSinceReferenceDate: 812_345_678.37)
+    @Test("The same instant gives the same angle, whenever the spinner appeared")
+    func sameInstantSameAngle() {
+        let first = Date(timeIntervalSinceReferenceDate: 812_345_678.25)
+        let second = Date(timeIntervalSince1970: first.timeIntervalSince1970)
         // Nothing about the view goes in: only the date. Two calls are two spinners.
-        #expect(SpinnerClock.step(at: now, spokes: 12) == SpinnerClock.step(at: now, spokes: 12))
-        #expect(SpinnerClock.step(at: now, spokes: 12) == 4)
+        #expect(SpinnerClock.angle(at: first) == SpinnerClock.angle(at: second))
+        #expect(abs(SpinnerClock.angle(at: first) - 90) < 0.001)
     }
 
-    @Test("A step lasts one tick, and a full period comes back round")
-    func ticks() {
+    @Test("The notch glides through a turn, and a full period comes back round")
+    func glides() {
         let start = SpinnerClock.epoch.addingTimeInterval(1000)
-        for spokes in [8, 12] {
-            let tick = SpinnerClock.tick(spokes: spokes)
-            for n in 0..<spokes {
-                // The middle of each tick, clear of floating-point edges.
-                let date = start.addingTimeInterval((Double(n) + 0.5) * tick)
-                #expect(SpinnerClock.step(at: date, spokes: spokes) == n)
-                #expect(SpinnerClock.step(at: date.addingTimeInterval(SpinnerClock.period), spokes: spokes) == n)
-            }
+        for n in 0..<10 {
+            let date = start.addingTimeInterval(Double(n) / 10 * SpinnerClock.period)
+            #expect(abs(SpinnerClock.angle(at: date) - Double(n) * 36) < 0.001)
+            let later = date.addingTimeInterval(SpinnerClock.period)
+            #expect(abs(SpinnerClock.angle(at: later) - SpinnerClock.angle(at: date)) < 0.001)
         }
     }
 
-    @Test("A date before the epoch still lands in range")
+    @Test("A date before the epoch still lands in range, and turns the same way")
     func beforeEpoch() {
         for offset in stride(from: -3.0, to: 0, by: 0.07) {
-            let step = SpinnerClock.step(at: SpinnerClock.epoch.addingTimeInterval(offset), spokes: 8)
-            #expect((0..<8).contains(step))
+            let angle = SpinnerClock.angle(at: SpinnerClock.epoch.addingTimeInterval(offset))
+            #expect(angle >= 0 && angle < 360)
         }
-    }
-
-    @Test("The lit spoke is full, the tail fades behind it and never vanishes")
-    func tail() {
-        let spokes = 12
-        let step = 3
-        #expect(SpinnerClock.opacity(ofSpoke: step, step: step, spokes: spokes) == 1)
-        // Walking backwards from the lit spoke, each is fainter than the one before,
-        // wrapping past zero.
-        var last = 1.0
-        for behind in 1..<spokes {
-            let spoke = (step - behind + spokes) % spokes
-            let opacity = SpinnerClock.opacity(ofSpoke: spoke, step: step, spokes: spokes)
-            #expect(opacity < last)
-            #expect(opacity >= SpinnerClock.faintest)
-            last = opacity
-        }
+        let quarterBefore = SpinnerClock.epoch.addingTimeInterval(-0.25 * SpinnerClock.period)
+        #expect(abs(SpinnerClock.angle(at: quarterBefore) - 270) < 0.001)
     }
 }
