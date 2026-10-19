@@ -507,15 +507,75 @@ struct QueuedPromptRow: View {
     let agentID: UUID
     /// A turn is running and its runtime takes words mid-turn (`_session/steering`).
     var canSendNow = false
+    /// The words being changed, while Edit is open (#1552); nil otherwise.
+    @State private var draft: String?
+    @FocusState private var editorFocused: Bool
 
     var body: some View {
+        if let draft {
+            editor(draft)
+        } else {
+            waiting
+        }
+    }
+
+    /// Edit open (#1552): the words in the bubble's place, with Cancel and Save under them.
+    /// Save keeps the prompt's place in the queue.
+    private func editor(_ words: String) -> some View {
+        VStack(alignment: .trailing, spacing: 2) {
+            TextField("Queued prompt", text: Binding(get: { draft ?? words }, set: { draft = $0 }),
+                      axis: .vertical)
+                .textFieldStyle(.plain)
+                .appText(.reading)
+                .lineLimit(1...12)
+                .focused($editorFocused)
+                .padding(12)
+                .paperWell(in: RoundedRectangle(cornerRadius: 12))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 12).strokeBorder(.tint, lineWidth: 1)
+                }
+                .onAppear { editorFocused = true }
+                // Sent while it was being changed: the change is asked for anyway, and the
+                // app, told it came too late, puts the words in the prompt bar.
+                .onDisappear { save() }
+                .onKeyPress(.escape) {
+                    draft = nil
+                    return .handled
+                }
+            HStack(spacing: 12) {
+                Button("Cancel") { draft = nil }
+                    .appText(.supporting)
+                    .buttonStyle(.borderless)
+                    .foregroundStyle(.secondary)
+                Button("Save") { save() }
+                    .appText(.supporting)
+                    .buttonStyle(.borderless)
+                    .keyboardShortcut(.return, modifiers: .command)
+                    .disabled((draft ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            }
+            #if os(iOS)
+            .frame(minHeight: 44)
+            #endif
+        }
+        .padding(.leading, 60)
+        .frame(maxWidth: .infinity, alignment: .trailing)
+    }
+
+    private func save() {
+        guard let words = draft else { return }
+        draft = nil
+        guard words != prompt.text else { return }
+        Task { await actions.editQueued(prompt, words, agentID) }
+    }
+
+    private var waiting: some View {
         // Held while anything is on its way to this agent; this one, said (#87).
         let acting = actions.acting(agentID)
         let going = acting == .sendNow(prompt.id)
         // The person's bubble (TranscriptRow's .userMessage), dashed and dimmed: at the
         // right, as wide as its words, with what can be done to it underneath, so the
         // buttons never push it off the edge (#95).
-        VStack(alignment: .trailing, spacing: 2) {
+        return VStack(alignment: .trailing, spacing: 2) {
             // Another agent's, waiting (#560): named, as it is once sent.
             if prompt.from == .agent {
                 Text(EntryRow.fromLine(prompt.sender)).appText(.reading).foregroundStyle(.tertiary)
@@ -544,6 +604,10 @@ struct QueuedPromptRow: View {
                     guard !going else { return }
                     Task { await actions.unqueue(prompt, agentID) }
                 }
+                .accessibilityAction(named: "Edit") {
+                    guard !going, prompt.from == .person else { return }
+                    draft = prompt.text
+                }
 
             // A step down from the words, so the row under the bubble stays quiet.
             HStack(spacing: 12) {
@@ -569,6 +633,26 @@ struct QueuedPromptRow: View {
                     // model refuses a second press of it.
                     .disabled(acting != nil && !going)
                     .help("Send this into the turn that is running, without waiting for it to end")
+                }
+
+                // The person's own words only: another agent's are theirs (#560).
+                if prompt.from == .person {
+                    Button {
+                        draft = prompt.text
+                    } label: {
+                        Image(systemName: "pencil")
+                            .appText(.supporting)
+                            .frame(width: 18, height: 18)
+                            #if os(iOS)
+                            .frame(width: 44, height: 44)
+                            .contentShape(.rect)
+                            #endif
+                    }
+                    .buttonStyle(.borderless)
+                    .foregroundStyle(.tertiary)
+                    .disabled(going)
+                    .help("Change the words. It keeps its place in the queue.")
+                    .accessibilityLabel("Edit queued prompt")
                 }
 
                 Button {

@@ -1487,6 +1487,18 @@ type EarnedMilestone struct {
 	At Date   `json:"at"`
 }
 
+// agents/editQueued (#1552): a queued prompt's new words, in its place in the queue.
+type EditQueuedRequest struct {
+	AgentID  UUID   `json:"agentID"`
+	PromptID UUID   `json:"promptID"`
+	Text     string `json:"text"`
+}
+
+// Whether the prompt was still waiting and now has the new words. False: it was sent, or taken back, first.
+type EditQueuedResult struct {
+	Edited bool `json:"edited"`
+}
+
 type EffectiveSandbox struct {
 	State     SandboxState  `json:"state"`
 	Requested SandboxChoice `json:"requested"`

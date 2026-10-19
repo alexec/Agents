@@ -124,6 +124,15 @@ export function Prompt({ store, draftKey, placeholder, capabilities, disabled, s
 
   const keep = () => store.drafts.set(draftKey, { text: text.value, attachments: attachments.value });
 
+  // Words offered from elsewhere in the chat (#1552): they land in the field, unsent.
+  const given = store.offeredPrompt.value;
+  useEffect(() => {
+    if (!given || given.draftKey !== draftKey) return;
+    text.value = given.text;
+    keep();
+    store.offeredPrompt.value = null;
+  }, [given, draftKey]);
+
   const take = async (files: Iterable<File>) => {
     for (const file of files) {
       const made = await attach(file);

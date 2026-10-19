@@ -401,6 +401,8 @@ export class Work {
    * meanwhile waits its turn rather than replacing it, as the window's alerts do (#101).
    */
   readonly problem = signal<string | null>(null);
+  /** Words for a prompt bar, by its draft key, from elsewhere in the chat: an edit that came too late (#1552). */
+  readonly offeredPrompt = signal<{ draftKey: string; text: string } | null>(null);
   private problemsWaiting: string[] = [];
 
   say(sentence: string): void {
@@ -1037,6 +1039,9 @@ export function tellingWords(doing: string | null, recipient: string): string {
 }
 
 /** The reducer, fed by the link: everything loaded on each connection, then kept by notifications. */
+/** Said when an edit came too late (#1552), as QueuedPrompt.sentBeforeEdit says it. */
+export const sentBeforeEdit = "That prompt was sent before your change. Your words are in the prompt bar.";
+
 export class Store extends Work {
   constructor(readonly link: Link) {
     super();
@@ -1976,6 +1981,17 @@ export class Store extends Work {
 
   async unqueue(host: string, agentID: string, promptID: string): Promise<void> {
     await this.act("agents/unqueue", { agentID: agentID as UUID, promptID: promptID as UUID }, host);
+  }
+
+  /**
+   * New words for the person's queued prompt, in its place in the queue (#1552). When it was sent
+   * or taken back first, or the call failed, the words go into the prompt bar under `draftKey`.
+   */
+  async editQueued(host: string, agentID: string, promptID: string, text: string, draftKey: string): Promise<void> {
+    const result = await this.act("agents/editQueued", { agentID: agentID as UUID, promptID: promptID as UUID, text }, host);
+    if (result?.edited) return;
+    this.offeredPrompt.value = { draftKey, text };
+    if (result) this.say(sentBeforeEdit);
   }
 
   /** One task an agent left running, and nothing else it is doing (057, #253). */

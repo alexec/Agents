@@ -30,6 +30,9 @@ func (d *Daemon) registerAgents() {
 		}
 		return wire.Empty{}, nil
 	})
+	On(d, wire.CallAgentsEditQueued, func(ctx context.Context, c *Client, r wire.EditQueuedRequest) (wire.EditQueuedResult, error) {
+		return d.editQueued(r)
+	})
 	On(d, wire.CallAgentsSendNow, func(ctx context.Context, c *Client, r wire.UnqueueRequest) (wire.Empty, error) {
 		return wire.Empty{}, d.sendNow(ctx, r)
 	})
@@ -94,6 +97,26 @@ func unqueued(queue []wire.QueuedPrompt, id wire.UUID) []wire.QueuedPrompt {
 		}
 	}
 	return out
+}
+
+// editQueued is agents/editQueued (#1552): the person's queued prompt takes new words and
+// keeps its place. Edited is false when it is not waiting any more (sent, or taken back),
+// so the client keeps the words for the person; another agent's prompt is not theirs to edit.
+func (d *Daemon) editQueued(r wire.EditQueuedRequest) (wire.EditQueuedResult, error) {
+	edited := false
+	if d.change(r.AgentID, func(a *wire.Agent) {
+		queue := append([]wire.QueuedPrompt{}, a.QueuedPrompts...)
+		for i := range queue {
+			if queue[i].ID == r.PromptID && queue[i].From == wire.PromptOriginPerson {
+				queue[i].Text = r.Text
+				edited = true
+			}
+		}
+		a.QueuedPrompts = queue
+	}) == nil {
+		return wire.EditQueuedResult{}, noSuchAgent()
+	}
+	return wire.EditQueuedResult{Edited: edited}, nil
 }
 
 // prompt is agents/prompt: the words go on the queue, never refused for the agent being

@@ -4687,6 +4687,20 @@ final class AppModel {
         }
     }
 
+    /// New words for a queued prompt, in its place in the queue (#1552). When it was sent or
+    /// taken back first, the words go into the prompt bar, so nothing typed is lost.
+    func editQueued(_ prompt: QueuedPrompt, text: String, of agentID: UUID) async {
+        await attempt {
+            let result = try await self.client(forAgent: agentID).call(
+                DaemonAPI.Method.agentsEditQueued,
+                DaemonAPI.EditQueuedRequest(agentID: agentID, promptID: prompt.id, text: text),
+                returning: DaemonAPI.EditQueuedResult.self)
+            guard !result.edited else { return }
+            self.offeredPrompt = text
+            self.problem = QueuedPrompt.sentBeforeEdit
+        }
+    }
+
     /// Send a queued prompt into the turn that is running, where the runtime takes one.
     /// Once: the row shows it going, and a second press is not a second send (#87).
     func sendNow(_ prompt: QueuedPrompt, to agentID: UUID) async {

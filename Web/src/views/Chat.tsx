@@ -500,7 +500,7 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
             ] : []),
           ]);
         })()}
-        {agent && <Queued store={store} host={host} agent={agent} disabled={down} />}
+        {agent && <Queued store={store} host={host} agent={agent} disabled={down} draftKey={`${host}|${session}`} />}
         {agent && <KeptBubbles store={store} kept={store.keptFor(host, agent.id)} />}
         {/* Live, at the foot: what the row says, until the prompt lands (ChatTranscript, #251). */}
         {agent && store.isComingBack(host, agent.id) ? <p class="working coming-back" role="status">↻ {comingBackDescription}</p>
@@ -598,15 +598,49 @@ function RuntimeLabel({ store, host, runtimeID }: { store: Store; host: string; 
  * Something typed while the agent worked, where it will appear (QueuedPromptRow), removable, and
  * with Send now while a turn runs on a runtime that takes words mid-turn.
  */
-function Queued({ store, host, agent, disabled }: { store: Store; host: string; agent: Agent; disabled: boolean }) {
+function Queued({ store, host, agent, disabled, draftKey }: { store: Store; host: string; agent: Agent; disabled: boolean; draftKey: string }) {
   const canSendNow = (agent.state === "running" || agent.state === "waitingOnUser")
     && store.account(host, agent.runtimeID)?.canSteer === true;
+  /** The prompt being changed and its words, while Edit is open (#1552). */
+  const editing = useSignal<{ id: string; text: string } | null>(null);
+  const save = (id: string, before: string) => {
+    const words = editing.value?.text ?? before;
+    editing.value = null;
+    if (words !== before && words.trim()) void store.editQueued(host, agent.id, id, words, draftKey);
+  };
+  // Sent while it was being changed: the change is asked for anyway, and comes back as words in the prompt bar.
+  const open = editing.value;
+  const stillQueued = !open || (agent.queuedPrompts ?? []).some((q) => q.id === open.id);
+  useEffect(() => {
+    if (!stillQueued && open) {
+      editing.value = null;
+      void store.editQueued(host, agent.id, open.id, open.text, draftKey);
+    }
+  }, [stillQueued]);
   // Held while anything is on its way to this agent; the one going, said (#87).
   const acting = store.onItsWay.value[agent.id];
   return (
     <>
       {(agent.queuedPrompts ?? []).map((queued) => {
         const going = typeof acting === "object" && acting.sendNow === queued.id;
+        if (editing.value?.id === queued.id) {
+          // Edit open (#1552): the words in the bubble's place, Cancel and Save under them; Save keeps its place.
+          return (
+            <div key={queued.id} class="queued editing">
+              <textarea class="queued-editor" aria-label="Queued prompt" rows={Math.min(12, Math.max(2, editing.value.text.split("\n").length))}
+                value={editing.value.text} ref={(el) => el?.focus()}
+                onInput={(e) => (editing.value = { id: queued.id, text: (e.currentTarget as HTMLTextAreaElement).value })}
+                onKeyDown={(e) => {
+                  if (e.key === "Escape") { e.preventDefault(); editing.value = null; }
+                  if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); save(queued.id, queued.text); }
+                }} />
+              <div class="queued-actions">
+                <button class="link" onClick={() => (editing.value = null)}>Cancel</button>
+                <button class="link" disabled={!editing.value.text.trim()} onClick={() => save(queued.id, queued.text)}>Save</button>
+              </div>
+            </div>
+          );
+        }
         // The person's bubble, dashed and dimmed, with what can be done to it underneath (#95).
         return (
         <div key={queued.id} class="queued">
@@ -621,6 +655,11 @@ function Queued({ store, host, agent, disabled }: { store: Store; host: string; 
               <button class="link" disabled={disabled || !!acting} title="Send this into the turn that is running, without waiting for it to end"
                 onClick={() => void store.sendNow(host, agent.id, queued.id)}>↑ Send now</button>
             ))}
+            {/* The person's own words only: another agent's are theirs (#560). */}
+            {(queued.from ?? "person") === "person" && (
+              <button class="link" aria-label="Edit queued prompt" title="Change the words. It keeps its place in the queue." disabled={disabled || going}
+                onClick={() => (editing.value = { id: queued.id, text: queued.text })}>Edit</button>
+            )}
             <button class="remove" aria-label="Remove queued prompt" title="Do not send this" disabled={disabled || going}
               onClick={() => void store.unqueue(host, agent.id, queued.id)}>×</button>
           </div>
