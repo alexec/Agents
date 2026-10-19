@@ -404,7 +404,13 @@ func (d *Daemon) setupEvents(ctx context.Context, folder string, rec *setupRecor
 	case turnOn && reads && !rec.EventsAdded:
 		if err := d.addGitHubConnector(ctx, folder); err != nil {
 			ev.State = wire.ConnectorEventsStateFailed
-			m := "The github connector could not be added: " + err.Error()
+			// The words alone: a person reads this, not the wire's error code.
+			why := err.Error()
+			var rpcErr *Error
+			if errors.As(err, &rpcErr) {
+				why = rpcErr.Message
+			}
+			m := "The github connector could not be added: " + why
 			ev.Message = &m
 			break
 		}
