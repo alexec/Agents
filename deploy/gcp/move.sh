@@ -38,7 +38,7 @@ esac
 setup
 compose='cd /opt/agents && sudo docker compose -f deploy/compose.public.yaml'
 
-if [[ $what == done ]]; then
+if [[ $what == "done" ]]; then
 	say "== AGENTS_CONTROL_RECEIVE out of /opt/agents/deploy/.env"
 	vm_ssh 'cd /opt/agents/deploy && { sudo grep -v "^AGENTS_CONTROL_RECEIVE=" .env || true; } | sudo tee .env.t >/dev/null && sudo mv .env.t .env && sudo chmod 600 .env'
 	say "Done. The control plane keeps running on the store it took."
