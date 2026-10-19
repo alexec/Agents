@@ -33,6 +33,9 @@ func (d *Daemon) registerMCPCatalog() {
 	On(d, wire.CallMCPAdd, func(ctx context.Context, c *Client, r wire.MCPAddRequest) (wire.MCPAddAnswer, error) {
 		return d.mcpAdd(r)
 	})
+	On(d, wire.CallMCPMadeByAgents, func(ctx context.Context, c *Client, r wire.Empty) (wire.MCPSearchAnswer, error) {
+		return d.mcpMadeByAgents(), nil
+	})
 	On(d, wire.CallMCPList, func(ctx context.Context, c *Client, r wire.MCPListRequest) (wire.MCPListAnswer, error) {
 		return d.mcpList(r.Destination)
 	})
@@ -156,6 +159,29 @@ func (d *Daemon) mcpCatalogSearch(ctx context.Context, r wire.CatalogSearchReque
 	return wire.MCPSearchAnswer{Results: results}
 }
 
+// mcpMadeByAgents is mcp/made-by-agents: the connectors Agents makes, for the catalogue's
+// first group (#1428). Each one's levels are what a copy on this host declared when it was
+// last checked, or what it declares as written down before that.
+func (d *Daemon) mcpMadeByAgents() wire.MCPSearchAnswer {
+	results := []wire.MCPCatalogResult{}
+	for _, o := range mcpcatalog.Made {
+		results = append(results, mcpcatalog.OursResult(o, d.declaredBy(o)))
+	}
+	return wire.MCPSearchAnswer{Results: results}
+}
+
+// declaredBy is what a checked copy of one of ours declared, or what it is written to declare.
+func (d *Daemon) declaredBy(o mcpcatalog.Ours) mcpcatalog.Declared {
+	d.healthMu.Lock()
+	defer d.healthMu.Unlock()
+	for _, kept := range d.results {
+		if kept.ours == o.ID && kept.check == wire.MCPCheckStateAnswered {
+			return kept.declared
+		}
+	}
+	return o.Declares
+}
+
 // mcpStaged is a preview waiting to be added, for half an hour.
 type mcpStaged struct {
 	preview      wire.MCPPreview
@@ -185,6 +211,13 @@ func (d *Daemon) mcpPreview(ctx context.Context, r wire.MCPPreviewRequest) wire.
 			market = &m
 		}
 	}
+	secrets := skillcatalog.Secrets{}
+	if home := d.personalHome(); home != "" {
+		secrets = skillcatalog.LoadSecrets(skillcatalog.SecretsPath(home))
+	}
+	if o, ours := mcpcatalog.OursByID(r.Result.ID); ours {
+		return d.stageMCPPreview(r, mcpcatalog.BuildOurs(o, secrets.IsSet), o.ID, "")
+	}
 	server, err := d.mcpRegistry(market).Detail(ctx, r.Result.ID)
 	if err != nil {
 		return fail(err)
@@ -199,15 +232,25 @@ func (d *Daemon) mcpPreview(ctx context.Context, r wire.MCPPreviewRequest) wire.
 	default:
 		return fail(mcpcatalog.NoRunnableWay())
 	}
-	secrets := skillcatalog.Secrets{}
-	if home := d.personalHome(); home != "" {
-		secrets = skillcatalog.LoadSecrets(skillcatalog.SecretsPath(home))
-	}
 	built, err := mcpcatalog.Build(server, chosen, secrets.IsSet)
 	if err != nil {
 		return fail(err)
 	}
-	state, err := d.mcpDestinationState(built.NameHere, server.Name, r.Destination)
+	version := r.Result.Version
+	if server.Version != nil {
+		version = *server.Version
+	}
+	return d.stageMCPPreview(r, built, server.Name, version)
+}
+
+// stageMCPPreview keeps a built entry for half an hour, for mcp/add.
+func (d *Daemon) stageMCPPreview(r wire.MCPPreviewRequest, built mcpcatalog.Built, registryName, version string) wire.MCPPreviewAnswer {
+	fail := func(err error) wire.MCPPreviewAnswer {
+		log.Printf("mcp: preview %s failed: %v", r.Result.ID, err)
+		why := mcpWhy(err)
+		return wire.MCPPreviewAnswer{Error: &why}
+	}
+	state, err := d.mcpDestinationState(built.NameHere, registryName, r.Destination)
 	if err != nil {
 		return fail(err)
 	}
@@ -219,10 +262,6 @@ func (d *Daemon) mcpPreview(ctx context.Context, r wire.MCPPreviewRequest) wire.
 	for _, p := range built.Entry.Pairs {
 		entry[p.Key] = wire.JSONValue(p.Value.Stringified())
 	}
-	version := r.Result.Version
-	if server.Version != nil {
-		version = *server.Version
-	}
 	preview := wire.MCPPreview{PreviewID: store.NewUUID(), Result: r.Result, NameHere: built.NameHere, ChosenRun: built.ChosenRun,
 		CommandOrURL: built.CommandOrURL, Host: built.Host, Entry: entry, Variables: built.Variables,
 		Reach: map[string]wire.JSONValue{}, DestinationState: state, Problems: problems}
@@ -232,10 +271,10 @@ func (d *Daemon) mcpPreview(ctx context.Context, r wire.MCPPreviewRequest) wire.
 			delete(mcpPreviews.m, id)
 		}
 	}
-	mcpPreviews.m[preview.PreviewID] = mcpStaged{preview: preview, entry: built.Entry, registryName: server.Name,
+	mcpPreviews.m[preview.PreviewID] = mcpStaged{preview: preview, entry: built.Entry, registryName: registryName,
 		version: version, until: time.Now().Add(30 * time.Minute)}
 	mcpPreviews.Unlock()
-	log.Printf("mcp: preview %s as %s via %s", server.Name, built.NameHere, chosen)
+	log.Printf("mcp: preview %s as %s via %s", registryName, built.NameHere, built.ChosenRun)
 	return wire.MCPPreviewAnswer{Preview: &preview}
 }
 

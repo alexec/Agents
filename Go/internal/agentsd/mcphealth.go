@@ -15,6 +15,7 @@ import (
 
 	sdk "github.com/coder/acp-go-sdk"
 
+	"github.com/alexec/agents/Go/internal/agentsd/mcpcatalog"
 	"github.com/alexec/agents/Go/internal/agentsd/store"
 	"github.com/alexec/agents/Go/internal/safe"
 	"github.com/alexec/agents/Go/wire"
@@ -24,7 +25,8 @@ import (
 // hosted is checked as a session would reach it (mcpclient.go): as the host starts, when
 // its entry changes (the files are read once a minute), every four hours, and on Check
 // Now. A project's server not approved here, and one missing a secret, are never started.
-// A hosted server is never checked: that would be a second copy.
+// A hosted server's state is its one copy's; a short check of it only learns what it
+// declares, for its levels (#1428), when its entry changes and every four hours.
 //
 // Logged: the server's name and the outcome in a word. Never a command, argument,
 // environment value, header, URL or body (054 FR-023).
@@ -42,6 +44,10 @@ type mcpHealthResult struct {
 	at     wire.Date
 	err    string
 	tools  int
+	// declared is what the server declared when it answered, for its levels.
+	declared mcpcatalog.Declared
+	// ours is the catalogue id when Agents made the server.
+	ours string
 }
 
 type mcpHealthBook struct {
@@ -61,6 +67,21 @@ type mcpDue struct {
 	id, cwd, digest string
 	name            string
 	server          sdk.McpServer
+}
+
+// mcpLevels is a row's five levels from what its check found, and whether Agents made it.
+func mcpLevels(h *wire.MCPServerHealth, e mcpEntry, kept *mcpHealthResult) {
+	ours, made := mcpcatalog.Ours{}, false
+	if e.server.Stdio != nil {
+		ours, made = mcpcatalog.OursByCommand(e.server.Stdio.Command)
+	}
+	if made {
+		h.MadeByAgents = &made
+	}
+	if kept != nil && kept.check == wire.MCPCheckStateAnswered {
+		levels := mcpcatalog.Levels(kept.declared, made && ours.Tested != "")
+		h.Levels = &levels
+	}
 }
 
 func healthID(project *string, name string) string {
@@ -139,7 +160,7 @@ func (d *Daemon) reconcileMCPHealth() {
 			d.running[item.id] = true
 			delete(d.forced, item.id)
 			for i := range snap.Servers {
-				if healthID(snap.Servers[i].Project, snap.Servers[i].Name) == item.id {
+				if healthID(snap.Servers[i].Project, snap.Servers[i].Name) == item.id && !snap.Servers[i].Hosted {
 					snap.Servers[i].Check = wire.MCPCheckStateChecking
 				}
 			}
@@ -171,10 +192,15 @@ func (d *Daemon) checkMCPServer(item mcpDue) {
 		timeout = time.Minute
 	}
 	r := mcpHealthResult{digest: item.digest, check: wire.MCPCheckStateFailed}
-	tools, err := checkMCP(d.ctx, item.server, item.cwd, timeout)
+	if item.server.Stdio != nil {
+		if o, ok := mcpcatalog.OursByCommand(item.server.Stdio.Command); ok {
+			r.ours = o.ID
+		}
+	}
+	tools, declared, err := checkMCP(d.ctx, item.server, item.cwd, timeout)
 	switch f := mcpFailureOf(err); {
 	case err == nil:
-		r.check, r.tools = wire.MCPCheckStateAnswered, tools
+		r.check, r.tools, r.declared = wire.MCPCheckStateAnswered, tools, declared
 	case f.kind == "authRequired" && bringsOwnAuthorization(item.server):
 		r.err = "It refused the Authorization header it was sent (HTTP 401)."
 	case f.kind == "authRequired":
@@ -226,10 +252,24 @@ func (d *Daemon) mcpHealthPass() (wire.MCPHealthSnapshot, []mcpDue) {
 		h := wire.MCPServerHealth{Name: e.name, Project: project, Transport: e.kind, Hosted: e.hosted, Check: wire.MCPCheckStateUnchecked}
 		id := healthID(project, e.name)
 		listed[id] = true
+		mcpLevels(&h, e, nil)
 		filled, gone := filledServer(e.server, secrets)
 		switch {
 		case e.hosted:
 			h.Live = d.hostedStatus(project, e.name)
+			if waiting || len(gone) > 0 {
+				break
+			}
+			digest := serverDigest(filled)
+			kept, ok := d.results[id]
+			if ok && kept.digest == digest {
+				mcpLevels(&h, e, &kept)
+			} else {
+				ok = false
+			}
+			if !d.running[id] && (!ok || at.Sub(kept.at.Time()) >= mcpHealthInterval) {
+				due = append(due, mcpDue{id: id, cwd: cwd, digest: digest, name: e.name, server: filled})
+			}
 		case e.kind == wire.MCPTransportNameSse:
 			h.Check = wire.MCPCheckStateOldTransport
 		case waiting:
@@ -248,6 +288,7 @@ func (d *Daemon) mcpHealthPass() (wire.MCPHealthSnapshot, []mcpDue) {
 					n := int64(kept.tools)
 					h.Tools = &n
 				}
+				mcpLevels(&h, e, &kept)
 			} else {
 				ok = false
 			}

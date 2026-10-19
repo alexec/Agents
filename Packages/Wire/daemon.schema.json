@@ -6792,6 +6792,12 @@
         },
         "tools": {
           "type": "integer"
+        },
+        "levels": {
+          "$ref": "#/definitions/MCPLevels"
+        },
+        "madeByAgents": {
+          "type": "boolean"
         }
       },
       "required": [
@@ -6799,6 +6805,35 @@
         "transport",
         "hosted",
         "check"
+      ],
+      "additionalProperties": false
+    },
+    "MCPLevels": {
+      "description": "The five levels a connector reaches (#1428): tools, events and views from what the server declares, workflows when a ready-made workflow names one of its events, tested when it was tested on a real account.",
+      "type": "object",
+      "properties": {
+        "tools": {
+          "type": "boolean"
+        },
+        "events": {
+          "type": "boolean"
+        },
+        "views": {
+          "type": "boolean"
+        },
+        "workflows": {
+          "type": "boolean"
+        },
+        "tested": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "tools",
+        "events",
+        "views",
+        "workflows",
+        "tested"
       ],
       "additionalProperties": false
     },
@@ -14645,6 +14680,12 @@
         },
         "marketplace": {
           "type": "string"
+        },
+        "levels": {
+          "$ref": "#/definitions/MCPLevels"
+        },
+        "madeByAgents": {
+          "type": "boolean"
         }
       },
       "required": [

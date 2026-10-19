@@ -19,10 +19,12 @@ extension DaemonAPI.Method {
     public static let mcpSignInWait = "mcp/sign-in/wait"
     public static let mcpSignInCancel = "mcp/sign-in/cancel"
     public static let mcpSignOut = "mcp/sign-out"
+    /// The connectors Agents makes, for the catalogue's first group (#1428).
+    public static let mcpMadeByAgents = "mcp/made-by-agents"
 
     public static let mcpCatalogMethods: [String] = [
         mcpPreview, mcpAdd, mcpList, mcpApprove, mcpSetSecret, mcpRemove, mcpVerify, mcpAddByHand,
-        mcpSignIn, mcpSignInWait, mcpSignInCancel, mcpSignOut, mcpForgetViews,
+        mcpSignIn, mcpSignInWait, mcpSignInCancel, mcpSignOut, mcpForgetViews, mcpMadeByAgents,
     ]
 }
 
@@ -58,13 +60,17 @@ extension DaemonAPI {
         public var remoteHost: String?
         /// The marketplace it was found in (#687); nil for the official registry.
         public var marketplace: String?
+        /// The five levels it reaches (#1428); nil when no host has seen what it declares.
+        public var levels: MCPLevels?
+        /// One of the connectors Agents makes (#1428).
+        public var madeByAgents: Bool?
 
         public init(id: String, title: String, description: String, version: String,
                     publisher: MCPPublisherInfo, known: Bool, runs: [MCPRunKind], remoteHost: String?,
-                    marketplace: String? = nil) {
+                    marketplace: String? = nil, levels: MCPLevels? = nil, madeByAgents: Bool? = nil) {
             self.id = id; self.title = title; self.description = description; self.version = version
             self.publisher = publisher; self.known = known; self.runs = runs; self.remoteHost = remoteHost
-            self.marketplace = marketplace
+            self.marketplace = marketplace; self.levels = levels; self.madeByAgents = madeByAgents
         }
     }
 

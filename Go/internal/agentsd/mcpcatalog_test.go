@@ -203,3 +203,55 @@ func TestAnMCPServerTypedVerifiedAndAdded(t *testing.T) {
 		t.Fatalf("%+v", v)
 	}
 }
+
+// Ours are listed first, with their levels and the Made by Agents mark, and added as any
+// connector is: hosted, with their secret by name (#1428).
+func TestOursAreListedAndAddedLikeAnyConnector(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("AGENTS_PERSONAL_HOME", home)
+	d, c := start(t, t.TempDir())
+	defer d.Shutdown()
+	project := t.TempDir()
+	c.call(t, 1, "projects/add", map[string]any{"folder": "file://" + project})
+	dest := map[string]any{"kind": "project", "folder": project}
+
+	var ours wire.MCPSearchAnswer
+	json.Unmarshal(c.call(t, 2, "mcp/made-by-agents", map[string]any{}), &ours)
+	if len(ours.Results) != 2 || ours.Results[0].Title != "GitHub" || ours.Results[1].Title != "Linear" {
+		t.Fatalf("%+v", ours)
+	}
+	github, linear := ours.Results[0], ours.Results[1]
+	if github.MadeByAgents == nil || !*github.MadeByAgents || *github.Levels != (wire.MCPLevels{Tools: true, Events: true, Views: true}) {
+		t.Fatalf("github: %+v", github)
+	}
+	if *linear.Levels != (wire.MCPLevels{Events: true}) {
+		t.Fatalf("linear: %+v", linear.Levels)
+	}
+
+	var preview wire.MCPPreviewAnswer
+	json.Unmarshal(c.call(t, 3, "mcp/preview", map[string]any{"result": linear, "destination": dest}), &preview)
+	p := preview.Preview
+	if preview.Error != nil || p.NameHere != "linear" || p.ChosenRun != wire.MCPRunKindCommand || len(p.Variables) != 1 ||
+		p.Variables[0].Name != "LINEAR_API_KEY" || p.DestinationState.Free == nil {
+		t.Fatalf("%+v %+v", preview.Error, p)
+	}
+	var added wire.MCPAddAnswer
+	json.Unmarshal(c.call(t, 4, "mcp/add", map[string]any{"previewID": p.PreviewID, "destination": dest,
+		"secrets": map[string]any{"LINEAR_API_KEY": "lin_api_x"}, "plain": map[string]any{}, "replace": false}), &added)
+	if added.Server == nil || added.Server.RegistryName != "agents/linear" {
+		t.Fatalf("%+v", added)
+	}
+	file, _ := os.ReadFile(filepath.Join(project, ".agents", "mcp.json"))
+	if !strings.Contains(string(file), `"command": "linear-mcp"`) || !strings.Contains(string(file), `"hosted": true`) ||
+		!strings.Contains(string(file), `"LINEAR_API_KEY": "${LINEAR_API_KEY}"`) {
+		t.Fatal(string(file))
+	}
+	// Its row on the project's Connectors page says who made it.
+	var snap wire.MCPHealthSnapshot
+	json.Unmarshal(c.call(t, 5, "mcp/health", nil), &snap)
+	for _, h := range snap.Servers {
+		if h.Name == "linear" && (h.MadeByAgents == nil || !*h.MadeByAgents || !h.Hosted) {
+			t.Fatalf("%+v", h)
+		}
+	}
+}

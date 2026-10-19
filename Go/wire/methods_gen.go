@@ -101,6 +101,7 @@ var (
 	CallMCPHealthCheck                 = Method[MCPHealthCheckRequest, MCPHealthSnapshot]{"mcp/health/check"}
 	CallMCPHosted                      = Method[Empty, HostedMCPSnapshot]{"mcp/hosted"}
 	CallMCPList                        = Method[MCPListRequest, MCPListAnswer]{"mcp/list"}
+	CallMCPMadeByAgents                = Method[Empty, MCPSearchAnswer]{"mcp/made-by-agents"}
 	CallMCPPreview                     = Method[MCPPreviewRequest, MCPPreviewAnswer]{"mcp/preview"}
 	CallMCPRemove                      = Method[MCPRemoveRequest, MCPRemoveAnswer]{"mcp/remove"}
 	CallMCPSetSecret                   = Method[MCPSetSecretRequest, MCPSetSecretAnswer]{"mcp/set-secret"}

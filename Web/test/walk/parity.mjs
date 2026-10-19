@@ -353,6 +353,18 @@ for (const scene of scenes) {
       say(`runtimes: ${JSON.stringify(await page.eval(`(() => { const s = document.querySelector(".new-agent select[aria-label='Runtime']");
         s.size = s.options.length; return { options: [...s.options].map((o) => o.textContent), chosen: s.value }; })()`))}`);
       await shot("runtimes");
+    } else if (scene === "connectors") {
+      // #1428: a project's Connectors page, each row with its five levels and ours with Made by
+      // Agents. The walker writes the project's mcp.json and approves it first.
+      if (!(await page.eval(`!!document.querySelector("[aria-label^='Connectors, ']")`))) {
+        await page.eval(`document.querySelector(".row.project .disclosure")?.click()`);
+      }
+      await page.waitFor(`document.querySelector("[aria-label^='Connectors, ']")`, 30_000);
+      await page.eval(`document.querySelector("[aria-label^='Connectors, ']").click()`);
+      await page.waitFor(`document.querySelector(".mcp-page .connector-levels")`, 30_000);
+      say(`connectors: ${JSON.stringify(await visible(".mcp-page li.resource"))}`);
+      say(`levels: ${JSON.stringify(await page.eval(`[...document.querySelectorAll(".mcp-page .connector-levels")].map((p) => p.getAttribute("aria-label"))`))}`);
+      await shot("connectors");
     } else if (scene === "milestones") {
       // #984, #1067: the milestones on their own page, from their row in Usage, then the
       // one-time card for one earned while the page looks. The walker earns one meanwhile (a

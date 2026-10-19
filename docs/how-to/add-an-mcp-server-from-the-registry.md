@@ -21,11 +21,17 @@ never committed and never shown again.
 ## Add a connector for yourself
 
 1. Open **Settings ▸ Agent Configuration ▸ Connectors** and choose **Add Connector…**.
+   The connectors that Agents makes come first, under **Made by Agents**: GitHub and Linear.
+   They run hosted, one copy for each host, so their events come in when no agent runs.
 2. Type what you are looking for. Results come from the marketplace chosen in the
    **Marketplace** menu, in its own order (GitHub's puts the most starred first). Each
    shows the publisher it has checked (a GitHub org, or a domain), the description, the
    version, and how the server runs. **known** marks a publisher on the app's short list.
    A remote that runs on someone else's host names that host.
+   Each row also shows the five levels the connector reaches: **Tools**, **Events**,
+   **Views**, **Workflows** and **Tested**. A level that is not reached is grey. A connector
+   from a registry shows its levels after its host checks it. See
+   [Integrations](../reference/integrations.md) for what each level means.
 3. Choose one. The sheet shows the command, with the version pinned, or the URL, each
    variable, and the entry that will be written, with `${NAME}` where a secret goes. Where
    there is more than one way to run it, **Run with** chooses, and the rest follows.

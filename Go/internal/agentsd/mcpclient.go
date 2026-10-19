@@ -15,10 +15,13 @@ import (
 	"time"
 
 	sdk "github.com/coder/acp-go-sdk"
+
+	"github.com/alexec/agents/Go/internal/agentsd/mcpcatalog"
 )
 
 // A check of an MCP server as a session would reach it (MCPClient, #753): started or
-// connected, initialize, notifications/initialized, tools/list to its end, then ended.
+// connected, initialize, notifications/initialized, tools/list to its end, then
+// resources/list and events/list when it declares them (#1428), then ended.
 // stdio is a line of JSON each way; http is MCP's streamable HTTP, an answer as JSON or
 // as server-sent events, with the session id the server gives. sse is not spoken.
 
@@ -78,8 +81,10 @@ type mcpConn interface {
 	end()
 }
 
-// checkMCP connects, lists the tools and ends: how many it has, or why it did not answer.
-func checkMCP(ctx context.Context, s sdk.McpServer, cwd string, timeout time.Duration) (int, error) {
+// checkMCP connects, lists the tools and ends: how many it has and what it declares (#1428),
+// or why it did not answer.
+func checkMCP(ctx context.Context, s sdk.McpServer, cwd string, timeout time.Duration) (int, mcpcatalog.Declared, error) {
+	none := mcpcatalog.Declared{}
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 	var c mcpConn
@@ -87,13 +92,13 @@ func checkMCP(ctx context.Context, s sdk.McpServer, cwd string, timeout time.Dur
 	case s.Stdio != nil:
 		sc, err := startStdioMCP(s.Stdio, cwd)
 		if err != nil {
-			return 0, err
+			return 0, none, err
 		}
 		c = sc
 	case s.Http != nil:
 		c = &httpMCP{url: s.Http.Url, headers: s.Http.Headers}
 	default:
-		return 0, &mcpCheckFailure{kind: "notMCP"}
+		return 0, none, &mcpCheckFailure{kind: "notMCP"}
 	}
 	defer c.end()
 	timedOut := func(err error) error {
@@ -102,36 +107,73 @@ func checkMCP(ctx context.Context, s sdk.McpServer, cwd string, timeout time.Dur
 		}
 		return err
 	}
-	if _, err := c.call(ctx, 1, "initialize", map[string]any{"protocolVersion": "2025-06-18", "capabilities": map[string]any{},
-		"clientInfo": map[string]any{"name": "Agents", "version": "1"}}); err != nil {
-		return 0, timedOut(err)
+	raw, err := c.call(ctx, 1, "initialize", map[string]any{"protocolVersion": "2025-06-18", "capabilities": map[string]any{},
+		"clientInfo": map[string]any{"name": "Agents", "version": "1"}})
+	if err != nil {
+		return 0, none, timedOut(err)
 	}
+	var init struct {
+		Capabilities map[string]json.RawMessage `json:"capabilities"`
+	}
+	_ = json.Unmarshal(raw, &init)
 	if err := c.notify(ctx, "notifications/initialized"); err != nil {
-		return 0, timedOut(err)
+		return 0, none, timedOut(err)
 	}
-	tools, cursor := 0, ""
-	for id := 2; ; id++ {
+	var tools []json.RawMessage
+	id := 2
+	for cursor := ""; ; id++ {
 		params := map[string]any{}
 		if cursor != "" {
 			params["cursor"] = cursor
 		}
 		raw, err := c.call(ctx, id, "tools/list", params)
 		if err != nil {
-			return 0, timedOut(err)
+			return 0, none, timedOut(err)
 		}
 		var page struct {
 			Tools      []json.RawMessage `json:"tools"`
 			NextCursor string            `json:"nextCursor"`
 		}
 		if json.Unmarshal(raw, &page) != nil {
-			return 0, &mcpCheckFailure{kind: "notMCP"}
+			return 0, none, &mcpCheckFailure{kind: "notMCP"}
 		}
-		tools += len(page.Tools)
+		tools = append(tools, page.Tools...)
 		if page.NextCursor == "" || id > 50 {
-			return tools, nil
+			break
 		}
 		cursor = page.NextCursor
 	}
+	declared := mcpcatalog.Declared{Tools: len(tools) > 0}
+	// What follows only adds levels: a server that refuses a list still answered.
+	var resources []json.RawMessage
+	if _, has := init.Capabilities["resources"]; has {
+		id++
+		if raw, err := c.call(ctx, id, "resources/list", map[string]any{}); err == nil {
+			var page struct {
+				Resources []json.RawMessage `json:"resources"`
+			}
+			_ = json.Unmarshal(raw, &page)
+			resources = page.Resources
+		}
+	}
+	views := makeViewCatalog("", tools, resources, time.Time{})
+	declared.Views = len(views.Tools) > 0 || len(views.Resources) > 0
+	if _, has := init.Capabilities["events"]; has {
+		declared.HasEvents = true
+		id++
+		if raw, err := c.call(ctx, id, mcpEventsListMethod, map[string]any{}); err == nil {
+			var list struct {
+				Events []struct {
+					Name string `json:"name"`
+				} `json:"events"`
+			}
+			_ = json.Unmarshal(raw, &list)
+			for _, e := range list.Events {
+				declared.Events = append(declared.Events, e.Name)
+			}
+		}
+	}
+	return len(tools), declared, nil
 }
 
 func answerOf(raw []byte, id int) (json.RawMessage, bool, error) {

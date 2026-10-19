@@ -3706,6 +3706,12 @@ final class AppModel {
         }
     }
 
+    /// The connectors Agents makes, for the catalogue's first group (#1428).
+    func mcpMadeByAgents() async -> [DaemonAPI.MCPCatalogResult] {
+        (try? await macClient.call(DaemonAPI.Method.mcpMadeByAgents, DaemonAPI.Empty(),
+                                   returning: DaemonAPI.MCPSearchAnswer.self))?.results ?? []
+    }
+
     func mcpPreview(_ result: DaemonAPI.MCPCatalogResult,
                     for destination: DaemonAPI.SkillDestination,
                     run: DaemonAPI.MCPRunKind?) async -> DaemonAPI.MCPPreviewAnswer {
