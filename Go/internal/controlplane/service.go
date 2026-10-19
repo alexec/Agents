@@ -16,6 +16,7 @@ import (
 	"net"
 	"net/http"
 	"net/netip"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -183,6 +184,7 @@ func New(cfg Config) (*Service, error) {
 	}
 	s.codes = &Codes{Store: cfg.Store, Private: cfg.PrivateKey, Public: public, URL: cfg.URL, Pin: cfg.Pin, Name: cfg.Name}
 	s.router = NewRouter(nil, s.log)
+	s.router.OnPresence(s.presenceHeard)
 	s.methods = newMethods(s)
 	s.router.handler = s.methods
 	s.copies = newHostCopies(cfg.Store)
@@ -595,13 +597,6 @@ func (s *Service) startMesh() {
 		s.router.CloseLocal(host)
 		m.released(host, epoch)
 	}
-	s.router.OnPresence(func(client string, device bool, report json.RawMessage) {
-		grant := records.LegacyGrant
-		if device {
-			grant = "device"
-		}
-		m.broadcast(encodePeer("presence", map[string]any{"client": client, "grant": grant, "report": report}))
-	})
 	s.router.OnLinkChanged(func(client string, relayed *bool) {
 		if relayed == nil {
 			s.log("client " + client + " disconnected")
@@ -609,6 +604,41 @@ func (s *Service) startMesh() {
 		m.broadcast(peerLinkLine(client, relayed))
 	})
 	m.start()
+}
+
+// presenceHeard is a presence report a client made here: the other copies fold it, and a
+// device's own word on whether it may show a notification is kept.
+func (s *Service) presenceHeard(client string, device bool, report json.RawMessage) {
+	var p wire.PresenceReport
+	if device && json.Unmarshal(report, &p) == nil && p.MayNotify != nil {
+		s.keepMayNotify(client, *p.MayNotify)
+	}
+	if s.mesh != nil {
+		grant := records.LegacyGrant
+		if device {
+			grant = "device"
+		}
+		s.mesh.broadcast(encodePeer("presence", map[string]any{"client": client, "grant": grant, "report": report}))
+	}
+}
+
+// keepMayNotify keeps a device's MayNotify in its record (#1509). A locked phone's
+// session ends, and its report with it, so a need finds the phone only by its record.
+// A move carries the record. A copy that is frozen for a move writes nothing.
+func (s *Service) keepMayNotify(client string, may bool) {
+	if c := s.records.Client(client); c == nil || c.MayNotify != nil && *c.MayNotify == may || s.phase.now() != phaseServing {
+		return
+	}
+	err := s.records.ChangeClient(context.Background(), client, func(c *records.ClientRecord) bool {
+		if c.MayNotify != nil && *c.MayNotify == may {
+			return false
+		}
+		c.MayNotify = &may
+		return true
+	})
+	if err != nil {
+		s.log("notice: could not keep whether " + client + " may be notified: " + err.Error())
+	}
 }
 
 // heard is a host's attention/need (R6): what to post where, told to the relay host held
@@ -665,6 +695,10 @@ func (s *Service) deliver(need notices.AttentionNeed, fromPeer bool) {
 			d.MayNotify = &may
 		}
 		devices = append(devices, d)
+	}
+	if need.Need != nil && !slices.ContainsFunc(devices, func(d notices.Device) bool { return d.MayNotify != nil && *d.MayNotify }) {
+		needID, _ := json.Marshal(need.Need.ID)
+		s.log(fmt.Sprintf("notice: %s goes to no device: none here may be notified", needID))
 	}
 	for _, delivery := range s.desk.Heard(need, s.router.FoldedPresences(), devices, time.Now()) {
 		did := "sent"
