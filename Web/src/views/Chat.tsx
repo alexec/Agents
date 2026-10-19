@@ -10,8 +10,8 @@ import { useEffect, useLayoutEffect, useMemo, useRef } from "preact/hooks";
 import { openTurnsHeld, rememberOpen, type Store } from "../model/store";
 import { backgroundAge, backgroundEnded, backgroundNoun, isRunning, subagentNoSteps, subagentStatus } from "../model/background";
 import { display, isPersonsAsk, isWorking, placing, type ChatTurn, type Item } from "../model/turns";
-import { toWireDate } from "../protocol/dates";
-import type { Agent, AppViewCall, BackgroundItem, FileMentionDTO, TranscriptEntry } from "../protocol/generated";
+import { fromWireDate, toWireDate } from "../protocol/dates";
+import type { Agent, AppViewCall, BackgroundItem, FileMentionDTO, TranscriptEntry, TurnSummary } from "../protocol/generated";
 import { replace, route } from "../route";
 import { useWaitingCards, type WaitingCard } from "./Cards";
 import { OfflineStrip } from "./OfflineStrip";
@@ -27,6 +27,7 @@ import { PromptMenus } from "./PromptMenus";
 import { ContextMeter, CostLimitBanner, SandboxCapsule } from "./PromptStatus";
 import { RenameInput, SessionButtons, SessionMenu } from "./SessionMenu";
 import { drawable } from "../model/options";
+import { quietLine } from "../model/activity";
 import { asksToArchive, projectFolder } from "../model/groups";
 import { initialDetail, toggled } from "../model/turnDetail";
 import { CallActionsContext, fromLine, ItemRow, TurnView, type CallActions, type TurnDetail } from "./chat/Rows";
@@ -503,6 +504,9 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
           : agent && (agent.state === "running" || agent.state === "starting") && (
           <p class="working" aria-label="Working"><span class="spinner" /></p>
         )}
+        {agent && !store.isComingBack(host, agent.id) && agent.state !== "running" && agent.state !== "starting" && (
+          <QuietLine since={lastEntryAt(store.entries.value, store.turns.value) ?? fromWireDate(agent.lastActivityAt)} />
+        )}
       </div>
       {subagent.value && (
         <SubagentSteps store={store} item={agent?.background?.find((b) => b.id === subagent.value!.id) ?? subagent.value} close={() => (subagent.value = null)} />
@@ -717,4 +721,22 @@ function BackgroundRows({ store, host, agent, disabled, steps }: {
       ))}
     </ul>
   );
+}
+
+/** When the conversation last did anything: its last entry, or the last stored turn's (AgentsModel.lastEntryAt). */
+function lastEntryAt(entries: readonly TranscriptEntry[], turns: readonly TurnSummary[]): Date | null {
+  const turn = turns[turns.length - 1];
+  const at = entries[entries.length - 1]?.at ?? turn?.outcome?.[turn.outcome.length - 1]?.at ?? turn?.last?.at ?? turn?.ask?.at;
+  return at === undefined ? null : fromWireDate(at);
+}
+
+/** How long the chat has been quiet, at its foot (QuietLine, #1564). Nothing under five minutes; read again on the minute. */
+function QuietLine({ since }: { since: Date }) {
+  const now = useSignal(new Date());
+  useEffect(() => {
+    const timer = setInterval(() => (now.value = new Date()), 60_000);
+    return () => clearInterval(timer);
+  }, []);
+  const line = quietLine(since, now.value);
+  return line ? <p class="quiet-line" title={since.toLocaleString()}>{line}</p> : null;
 }

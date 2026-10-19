@@ -23,6 +23,9 @@ struct ChatTranscript: View {
     let entryCount: Int
     /// Whether the daemon is picking this conversation back up after a restart.
     let isComingBack: Bool
+    /// When the conversation last did anything (`AgentsModel.lastEntryAt`). Nil with no
+    /// page in hand: the agent's own last activity is said instead (#1564).
+    var lastEntryAt: Date? = nil
     /// Why the history did not load, or only partly, said at its top with Try Again (#400).
     var loadFailure: TranscriptLoadFailure? = nil
     /// Which conversation this is. A change settles the pane at the end again.
@@ -261,7 +264,15 @@ struct ChatTranscript: View {
                         }
                         .chatColumn()
                     }
-                    Color.clear.frame(height: 1).id(bottom)
+                    // In a stack of its own with the end marker, so a chat not yet quiet
+                    // has no gap where the line would be.
+                    VStack(alignment: .leading, spacing: 0) {
+                        if let quietSince {
+                            QuietLine(since: quietSince)
+                                .chatColumn()
+                        }
+                        Color.clear.frame(height: 1).id(bottom)
+                    }
                 }
                 .padding(.vertical, 20)
             }
@@ -516,6 +527,13 @@ struct ChatTranscript: View {
     private var hasFoot: Bool {
         !agent.queuedPrompts.isEmpty || !actions.kept(agent.id).isEmpty || isComingBack
             || agent.state == .running || agent.state == .starting
+    }
+
+    /// When the chat last did anything, for the line at its foot once it is quiet: none
+    /// while the agent is at work or coming back, where the foot says so already (#1564).
+    private var quietSince: Date? {
+        guard !isComingBack, agent.state != .running, agent.state != .starting else { return nil }
+        return lastEntryAt ?? agent.lastActivityAt
     }
 
     /// Open a turn's steps, or close them (`TurnDetail.toggled`).

@@ -1,5 +1,6 @@
 // The plan strip at the head of the chat and the time in a row's corner (#341), as
-// Agent.planInForce, Plan.stripSummary, stripStep, stripDone and ActivityWords.short say them.
+// Agent.planInForce, Plan.stripSummary, stripStep, stripDone and ActivityWords.short say them,
+// and the line at a quiet chat's foot (#1564) as ActivityWords.quiet says it.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { load } from "./load.mjs";
@@ -20,5 +21,11 @@ for (const { name, input, expected } of cases("plan/strip.json")) {
 for (const { name, input, expected } of cases("activity/short.json")) {
   test(`activity: ${name}`, () => {
     assert.equal(a.shortAgo(fromWireDate(input.lastActivityAt), fromWireDate(input.now)), expected);
+  });
+}
+
+for (const { name, input, expected } of cases("activity/quiet.json")) {
+  test(`quiet: ${name}`, () => {
+    assert.equal(a.quietLine(fromWireDate(input.at), fromWireDate(input.now), input.timeZone), expected);
   });
 }

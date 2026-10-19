@@ -469,6 +469,8 @@ button.link.reading:hover { text-decoration: underline; }
 }
 .queued p { margin: 0; }
 .working, .more { margin: 0; }
+/* A quiet chat's foot (#1564): as a row's time, fine and grey. */
+.quiet-line { margin: 0; font-size: 0.75rem; opacity: 0.45; font-variant-numeric: tabular-nums; }
 .more { text-align: center; }
 .load-failure { display: flex; gap: 8px; align-items: baseline; margin: 0 0 12px; opacity: 0.75; font-size: 0.9em; }
 .spinner {

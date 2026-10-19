@@ -1,0 +1,101 @@
+[
+  {
+    "expected" : null,
+    "input" : {
+      "at" : 814111290,
+      "now" : 814111200,
+      "timeZone" : "Europe/London"
+    },
+    "name" : "ahead of now"
+  },
+  {
+    "expected" : null,
+    "input" : {
+      "at" : 814110901,
+      "now" : 814111200,
+      "timeZone" : "Europe/London"
+    },
+    "name" : "under five minutes"
+  },
+  {
+    "expected" : "Last activity 5 minutes ago · 14:55",
+    "input" : {
+      "at" : 814110900,
+      "now" : 814111200,
+      "timeZone" : "Europe/London"
+    },
+    "name" : "five minutes"
+  },
+  {
+    "expected" : "Last activity 59 minutes ago · 14:00",
+    "input" : {
+      "at" : 814107601,
+      "now" : 814111200,
+      "timeZone" : "Europe/London"
+    },
+    "name" : "under the hour"
+  },
+  {
+    "expected" : "Last activity 1 hour ago · 14:00",
+    "input" : {
+      "at" : 814107600,
+      "now" : 814111200,
+      "timeZone" : "Europe/London"
+    },
+    "name" : "an hour"
+  },
+  {
+    "expected" : "Last activity 23 hours ago · 15:00",
+    "input" : {
+      "at" : 814024801,
+      "now" : 814111200,
+      "timeZone" : "Europe/London"
+    },
+    "name" : "hours"
+  },
+  {
+    "expected" : "Last activity yesterday · 09:00",
+    "input" : {
+      "at" : 814003200,
+      "now" : 814111200,
+      "timeZone" : "Europe/London"
+    },
+    "name" : "yesterday"
+  },
+  {
+    "expected" : "Last activity 15 Oct · 15:00",
+    "input" : {
+      "at" : 813765600,
+      "now" : 814111200,
+      "timeZone" : "Europe/London"
+    },
+    "name" : "days ago"
+  },
+  {
+    "expected" : "Last activity 23 Dec 2025 · 14:00",
+    "input" : {
+      "at" : 788191200,
+      "now" : 814111200,
+      "timeZone" : "Europe/London"
+    },
+    "name" : "last year"
+  },
+  {
+    "expected" : "Last activity yesterday · 05:00",
+    "input" : {
+      "at" : 814017600,
+      "now" : 814111200,
+      "timeZone" : "America/Los_Angeles"
+    },
+    "name" : "yesterday where it is still early"
+  },
+  {
+    "expected" : "Last activity 17 Oct · 23:00",
+    "input" : {
+      "at" : 813996000,
+      "now" : 814111200,
+      "timeZone" : "America/Los_Angeles"
+    },
+    "name" : "two days back where it is still early"
+  }
+]
