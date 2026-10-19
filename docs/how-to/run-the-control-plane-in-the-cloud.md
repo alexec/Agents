@@ -220,7 +220,8 @@ On your Mac, in the repository:
    ```
 
    It goes in `App/Resources/servers/`, from where the control plane hands it to every
-   Linux server that joins. The control plane itself is built in its image, on the
+   Linux server that joins. The control plane also hands each server the runtimes'
+   toolsets in `App/Resources/toolsets/`, so the server installs Claude by itself. The control plane itself is built in its image, on the
    machine, from `Go/` and `Web/`.
 2. Say which key seals the control plane's key, and give the service account's key file:
 
@@ -247,12 +248,12 @@ On your Mac, in the repository:
    from the file's name) and `AGENTS_APNS_TEAM_ID` in `deploy/.env`. Give `--apns-key-id`
    when the file has another name. Without it, the control plane sends no pushes, and its
    log says so once when it starts. Never put the key in a code, the store or the repo.
-3. Copy the repository's `deploy/` folder (with `deploy/secrets`), `Go/`, `Web/` and
-   `App/Resources/servers/` to the machine, keeping the same layout. For example:
+3. Copy the repository's `deploy/` folder (with `deploy/secrets`), `Go/`, `Web/`,
+   `App/Resources/servers/` and `App/Resources/toolsets/` to the machine, keeping the same layout. For example:
 
    ```sh
    rsync -a --relative --exclude node_modules --exclude Web/dist --exclude Go/out \
-       deploy Go Web App/Resources/servers you@agents.example.com:agents/
+       deploy Go Web App/Resources/servers App/Resources/toolsets you@agents.example.com:agents/
    ```
 
 ### Start it
@@ -424,8 +425,8 @@ plane at its address and get no notifications.
 - **If the machine or its disk is lost,** remove the service account's key in Google Cloud
   (**IAM ▸ Service accounts ▸ agents-control ▸ Keys**). A copy of the disk then can't
   open the control plane's key.
-- **Upgrading.** Build the Linux host again on your Mac, copy `deploy/`, `Go/`, `Web/` and
-  `App/Resources/servers/` across, and run the `up -d --build` line again. Hosts and clients reconnect within
+- **Upgrading.** Build the Linux host again on your Mac, copy `deploy/`, `Go/`, `Web/`,
+  `App/Resources/servers/` and `App/Resources/toolsets/` across, and run the `up -d --build` line again. Hosts and clients reconnect within
   seconds. Linux servers update their host the next time they connect.
 
 ## If it doesn't work
