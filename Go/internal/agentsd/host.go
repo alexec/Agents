@@ -163,18 +163,7 @@ func (d *Daemon) clientPermissions() wire.ClientPermissionSettings {
 }
 
 func (d *Daemon) retentionState() wire.RetentionState {
-	var raw struct {
-		KeepFor string `json:"keepFor"`
-	}
-	d.readSetting("retention.json", &raw)
-	keep := wire.RetentionKeepFor(raw.KeepFor)
-	switch keep {
-	case wire.RetentionKeepForDays7, wire.RetentionKeepForDays14, wire.RetentionKeepForDays30, wire.RetentionKeepForDays90,
-		wire.RetentionKeepForForever:
-	default:
-		keep = wire.RetentionKeepForDays30
-	}
-	s := wire.RetentionState{Settings: wire.RetentionSettings{KeepFor: keep}}
+	s := wire.RetentionState{Settings: wire.RetentionSettings{KeepFor: d.keepFor()}}
 	for _, a := range d.Store.Agents() {
 		if a.State == wire.AgentStateArchived {
 			s.ArchivedCount++
