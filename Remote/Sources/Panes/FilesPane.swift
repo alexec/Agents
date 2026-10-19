@@ -553,6 +553,10 @@ struct FilesPane: View {
             canEdit: !model.isStale)
         // A source file's problems, from its language server on the agent's host (#844).
         actions.diagnose = { path, text in await model.diagnose(path: path, text: text, of: agentID) }
+        // And what it would write at the caret (#1603).
+        actions.complete = { path, text, line, column in
+            await model.complete(path: path, text: text, line: line, column: column, of: agentID)
+        }
         return actions
     }
 
