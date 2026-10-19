@@ -490,6 +490,7 @@ private struct ChatMenu: View {
                 }
                 Button("Files", systemImage: "folder") { state.show(.files) }
                 Button("Terminal", systemImage: "terminal") { state.show(.terminal) }
+                Button("Simulator", systemImage: "iphone") { state.show(.simulator) }
             }
             Button("Exchanged", systemImage: "doc") { model.panes.state(for: agent.id).show(.exchanged) }
             // The main scene's chat, in a scene of its own (#888).

@@ -153,6 +153,9 @@ struct PaneView: View {
                 TerminalPane(agent: agent)
             case .exchanged:
                 ArtifactsList()
+            case .simulator:
+                // The session's Mac's simulators (#842), its screen read while shown.
+                SimulatorPaneView(calls: model.simulatorCalls(for: agent.id))
             }
         }
     }
