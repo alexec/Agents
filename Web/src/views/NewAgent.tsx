@@ -344,7 +344,7 @@ export function NewAgent({ store, host, folder, projectName, down }: {
   // Pool page's line, as the window's chooser says it under the runtime's name.
   const poolNote = runtimes.find((r) => r.runtime.id === chosenRuntime)?.poolNote;
   const hostRecord = store.hosts.value.find((h) => h.id === host);
-  const machine = host === "mac" ? "this Mac" : hostRecord?.name ?? host;
+  const machine = store.isMac(host) ? "this Mac" : hostRecord?.name ?? host;
   const path = decodeURI(folderKey(folder).replace(/^file:\/\//, ""));
   // What the area under the input says when it has no menus, as the window's OptionsNote does.
   const setChosen = (id: string, value: JSONValue) => {
@@ -591,18 +591,18 @@ function PersonaSwitch({ personas, picked, down, choose }: {
 function ProjectSwitch({ store, host, folder, projectName, down }: {
   store: Store; host: string; folder: string; projectName: string; down: boolean;
 }) {
-  const projects = orderedProjects(store.hosts.value, store.projects.value);
+  const projects = orderedProjects(store.hosts.value, store.projects.value, store.macHostID.value);
   const at = projects.findIndex((p) => p.host.id === host && folderKey(p.project.project.folder) === folderKey(folder));
   if (projects.length < 2 || at < 0) return <h1>{projectName}</h1>;
   return (
     <h1 class="project-switch" title="Start it in another project">
-      <span aria-hidden="true">{projectLabel(projects[at]!.host, projects[at]!.project)} <span class="caret">▾</span></span>
+      <span aria-hidden="true">{projectLabel(projects[at]!.host, projects[at]!.project, store.macHostID.value)} <span class="caret">▾</span></span>
       <select aria-label="Project" disabled={down} value={String(at)}
         onChange={(e) => {
           const picked = projects[Number((e.currentTarget as HTMLSelectElement).value)];
           if (picked) go({ host: picked.host.id, project: picked.project.project.folder, compose: true });
         }}>
-        {projects.map(({ host: h, project: p }, i) => <option key={`${h.id}|${p.project.folder}`} value={String(i)}>{projectLabel(h, p)}</option>)}
+        {projects.map(({ host: h, project: p }, i) => <option key={`${h.id}|${p.project.folder}`} value={String(i)}>{projectLabel(h, p, store.macHostID.value)}</option>)}
       </select>
     </h1>
   );

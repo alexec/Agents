@@ -70,7 +70,7 @@ export function WorkflowPage({ store, host, folder, projectName, workflowID, dow
     );
   }
   const workflow = summary.workflow;
-  const hostName = host === "mac" ? "this Mac" : store.hosts.value.find((h) => h.id === host)?.name ?? host;
+  const hostName = store.isMac(host) ? "this Mac" : store.hosts.value.find((h) => h.id === host)?.name ?? host;
   const runtimeName = (id: string) => (store.runtimes.value[host] ?? []).find((r) => r.runtime.id === id)?.runtime.name;
   const status = workflowStatusLines(summary);
   const standing = workflow.mode === "standing" && summary.standingAgentID
@@ -78,7 +78,7 @@ export function WorkflowPage({ store, host, folder, projectName, workflowID, dow
   const cooldown = cooldownSentence(summary);
   const unknown = unknownLines(workflow);
   const pinned = workflow.hosts ?? [];
-  const choices = workflowHostChoices(store.hosts.value);
+  const choices = workflowHostChoices(store.hosts.value, store.macHostID.value);
   const knownHosts = new Set(choices.map((choice) => choice.machineID));
   const rows = [...choices, ...pinned.filter((id) => !knownHosts.has(id)).map((id) => ({ machineID: id, name: id }))];
   // A file that could not be read has no settings to show, so a change would write the empty ones.

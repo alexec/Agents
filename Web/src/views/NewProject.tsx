@@ -48,13 +48,13 @@ export async function newChat(store: Store, host: string): Promise<void> {
 
 /** "This Mac" for the host on this Mac; otherwise its name, as the window labels them. */
 export function hostLabel(store: Store, host: string): string {
-  return host === "mac" ? "This Mac" : store.hosts.value.find((h) => h.id === host)?.name ?? host;
+  return store.isMac(host) ? "This Mac" : store.hosts.value.find((h) => h.id === host)?.name ?? host;
 }
 
 /** The window's menu item for a host that can't be asked: "This Mac — Not answering", a server's "— Offline". */
-function hostItem(host: ControlHost): string {
-  if (host.state === "online") return host.id === "mac" ? "This Mac" : host.name;
-  return host.id === "mac" ? "This Mac — Not answering" : `${host.name} — Offline`;
+function hostItem(host: ControlHost, macID: string): string {
+  if (host.state === "online") return host.id === macID ? "This Mac" : host.name;
+  return host.id === macID ? "This Mac — Not answering" : `${host.name} — Offline`;
 }
 
 /**
@@ -72,8 +72,8 @@ export function NewProjectItems({ store, onChoose }: { store: Store; onChoose?: 
       {hosts.map((host) => {
         const offline = host.state !== "online";
         return (
-          <div class="new-project-host" role="group" aria-label={hostItem(host)} key={host.id}>
-            {hosts.length > 1 && <p class="menu-head">{hostItem(host)}</p>}
+          <div class="new-project-host" role="group" aria-label={hostItem(host, store.macHostID.value)} key={host.id}>
+            {hosts.length > 1 && <p class="menu-head">{hostItem(host, store.macHostID.value)}</p>}
             {!chatSwitchedOff(store.projects.value[host.id]) && (
               <button role="menuitem" disabled={offline} onClick={() => { onChoose?.(); void newChat(store, host.id); }}>New Chat</button>
             )}
@@ -126,8 +126,9 @@ export function EmptyProjects({ store }: { store: Store }) {
   const none = online.every((h) => (store.projects.value[h.id] ?? []).every((p) => p.project.archivedAt !== undefined)
     && (store.clones.value[h.id] ?? []).length === 0);
   const showing = online.length > 0 && listed && none;
-  const macOnline = online.some((h) => h.id === "mac");
-  const macListed = macOnline && store.runtimes.value.mac !== undefined;
+  const macID = store.macHostID.value;
+  const macOnline = online.some((h) => h.id === macID);
+  const macListed = macOnline && store.runtimes.value[macID] !== undefined;
   // A list that failed is not "no runtime": the add-folder prompt stays, and the next look tries again.
   const failed = useSignal(false);
   useEffect(() => {
@@ -135,22 +136,22 @@ export function EmptyProjects({ store }: { store: Store }) {
     let live = true;
     if (!macListed) {
       failed.value = false;
-      void store.loadRuntimes("mac").finally(() => {
-        if (live && store.runtimes.peek().mac === undefined) failed.value = true;
+      void store.loadRuntimes(macID).finally(() => {
+        if (live && store.runtimes.peek()[macID] === undefined) failed.value = true;
       });
     }
     // An install on the Mac shows up when the page is shown again: the page is not told runtime/changed.
-    const onVis = () => { if (document.visibilityState === "visible") void store.loadRuntimes("mac"); };
+    const onVis = () => { if (document.visibilityState === "visible") void store.loadRuntimes(macID); };
     document.addEventListener("visibilitychange", onVis);
     return () => { live = false; document.removeEventListener("visibilitychange", onVis); };
-  }, [showing, macOnline, macListed]);
+  }, [showing, macID, macOnline, macListed]);
   if (!showing) return null;
-  const macRuntimes = macOnline ? store.runtimes.value.mac : undefined;
+  const macRuntimes = macOnline ? store.runtimes.value[macID] : undefined;
   // Held until this Mac's list arrives, so "No projects yet" does not flash in its place.
   if (macOnline && macRuntimes === undefined && !failed.value) return null;
   if (noAgentRuntime(macRuntimes)) return <NoAgentRuntime runtimes={macRuntimes ?? []} />;
   // On this Mac when it answers, as the window's empty list adds to this Mac.
-  const host = online.find((h) => h.id === "mac")?.id ?? online[0]!.id;
+  const host = online.find((h) => h.id === macID)?.id ?? online[0]!.id;
   return (
     <div class="empty-projects">
       <p class="strong">No projects yet</p>
@@ -316,7 +317,7 @@ function CloneDialog({ store, host, close }: { store: Store; host: string; close
     });
   };
   const note = remote
-    ? (host === "mac" ? `Clones into ~/${remote.folderName} and adds it as a project.`
+    ? (store.isMac(host) ? `Clones into ~/${remote.folderName} and adds it as a project.`
       : `Clones into ~/${remote.folderName} on ${hostLabel(store, host)} and adds it as a project.`)
     : !text.value.trim() ? "Paste an HTTPS or SSH address."
     : "That is not a Git URL this app can clone. Paste an HTTPS or SSH address.";

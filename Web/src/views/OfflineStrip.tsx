@@ -64,13 +64,13 @@ export function elapsed(since: number, now: number): string {
 }
 
 /** What the strip draws for `host`: its words, a spinner or the dot, and Start or the timer. */
-export function offlineStrip(host: string, row: ControlHost | undefined, at: string | null):
+export function offlineStrip(host: string, row: ControlHost | undefined, at: string | null, macID = "mac"):
   { line: string; starting: boolean; since: number | null; start: boolean } {
   const name = row?.name ?? "This host";
   const state = row?.state ?? "offline";
   const workspace = row?.workspace;
   const said = workspace ? workspaceLine(name, state, workspace) : null;
-  const line = said ?? (host === "mac"
+  const line = said ?? (host === macID
     ? `This Mac’s host hasn’t answered${at ? ` since ${at}` : ""}. Nothing here can change until it’s back. Trying again…`
     : `${name} is offline${at ? ` since ${at}` : ""}. Agents there keep working; nothing can be sent until it’s back.`);
   const starting = workspace !== undefined && state === "starting";
@@ -87,7 +87,7 @@ export function OfflineStrip({ store, host }: { store: Store; host: string }) {
   const since = store.downSince.value[host];
   const at = since ? new Date(since).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : null;
   const row = store.hosts.value.find((h) => h.id === host);
-  const strip = offlineStrip(host, row, at);
+  const strip = offlineStrip(host, row, at, store.macHostID.value);
   return (
     <p class="offline-strip" role="status">
       {strip.starting ? <span class="spinner" aria-hidden="true" /> : <span class="dot" aria-hidden="true" />}
