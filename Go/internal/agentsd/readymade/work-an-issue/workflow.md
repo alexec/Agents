@@ -2,6 +2,7 @@
 name: Work an issue
 on:
   - issue.labelled:
+      server: github
       label: agent
 agent: new
 labels: [github]

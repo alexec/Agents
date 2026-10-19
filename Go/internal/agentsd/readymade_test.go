@@ -17,7 +17,7 @@ import (
 // events that mcpcatalog counts for the Workflows level.
 func TestReadyMadeWorkflowsRead(t *testing.T) {
 	ids := readyMadeIDs()
-	if !slices.Equal(ids, []string{"fix-failed-checks", "work-an-issue"}) {
+	if !slices.Equal(ids, []string{"fix-failed-checks", "work-a-linear-issue", "work-an-issue"}) {
 		t.Fatal(ids)
 	}
 	var events []string
@@ -42,6 +42,19 @@ func TestReadyMadeWorkflowsRead(t *testing.T) {
 	}
 }
 
+// One label is one agent (#1343): a GitHub issue's starts Work an issue, a Linear issue's
+// Work a Linear issue, as both servers raise issue.labelled.
+func TestEachIssueWorkflowTakesOneServer(t *testing.T) {
+	for id, server := range map[string]string{"work-an-issue": "github", "work-a-linear-issue": "linear"} {
+		text, _ := readyMadeText(id)
+		w := parseWorkflow(text, id, "/p")
+		raw, _ := json.Marshal(w.Triggers)
+		if len(w.Triggers) != 1 || triggerName(w.Triggers[0]) != "issue.labelled" || !strings.Contains(string(raw), `"`+server+`"`) {
+			t.Fatalf("%s: %s", id, raw)
+		}
+	}
+}
+
 func TestReadyMadeWorkflowsTurnOnWithOneSwitch(t *testing.T) {
 	d, c := start(t, t.TempDir())
 	defer d.Shutdown()
@@ -59,7 +72,7 @@ func TestReadyMadeWorkflowsTurnOnWithOneSwitch(t *testing.T) {
 	}
 	// One that does lists them, off, and nothing is written.
 	json.Unmarshal(c.call(t, 4, "workflows/list", map[string]any{"folder": folder}), &list)
-	if len(list) != 2 || list[0].IsEnabled || list[0].AwaitingApproval != nil || list[1].Workflow.Name != "Work an issue" {
+	if len(list) != 3 || list[0].IsEnabled || list[0].AwaitingApproval != nil || list[2].Workflow.Name != "Work an issue" {
 		t.Fatalf("%+v", list)
 	}
 	if _, err := os.Stat(filepath.Join(dir, ".agents")); !os.IsNotExist(err) {
