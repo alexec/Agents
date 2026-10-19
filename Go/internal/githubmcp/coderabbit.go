@@ -112,7 +112,7 @@ const reviewedQuery = `query($owner: String!, $name: String!) { repository(owner
   pullRequests(states: OPEN, first: 100, orderBy: {field: UPDATED_AT, direction: DESC}) { nodes {
     number title headRefName headRefOid url isCrossRepository authorAssociation author { login __typename }
     reviews(last: 20) { nodes { author { login __typename } body state url databaseId commit { oid } } }
-    commits(last: 1) { nodes { commit { oid status { context(name: "` + codeRabbitStatus + `") { state createdAt } } } } } } } } }`
+    commits(last: 1) { nodes { commit { oid status { context(name: "` + codeRabbitStatus + `") { state description createdAt } } } } } } } } }`
 
 func (g *RealGitHub) CodeRabbitPRs(ctx context.Context, repo string) ([]ReviewedPR, error) {
 	owner, name, err := ownerName(repo)
@@ -157,8 +157,9 @@ func (g *RealGitHub) CodeRabbitPRs(ctx context.Context, repo string) ([]Reviewed
 									Oid    string `json:"oid"`
 									Status *struct {
 										Context *struct {
-											State     string `json:"state"`
-											CreatedAt string `json:"createdAt"`
+											State       string `json:"state"`
+											Description string `json:"description"`
+											CreatedAt   string `json:"createdAt"`
 										} `json:"context"`
 									} `json:"status"`
 								} `json:"commit"`
@@ -196,7 +197,7 @@ func (g *RealGitHub) CodeRabbitPRs(ctx context.Context, repo string) ([]Reviewed
 		for _, c := range n.Commits.Nodes {
 			if c.Commit.Oid == n.HeadRefOid && c.Commit.Status != nil && c.Commit.Status.Context != nil {
 				// Its status rules: pending while it reviews, even with an earlier review on the commit.
-				r.Reviewed = strings.EqualFold(c.Commit.Status.Context.State, "SUCCESS")
+				r.Reviewed = statusReviewed(c.Commit.Status.Context.State, c.Commit.Status.Context.Description)
 				r.StatusAt = normalized(c.Commit.Status.Context.CreatedAt)
 				if r.StatusAt == "" {
 					r.StatusAt = c.Commit.Status.Context.CreatedAt
@@ -209,6 +210,14 @@ func (g *RealGitHub) CodeRabbitPRs(ctx context.Context, repo string) ([]Reviewed
 		out = append(out, r)
 	}
 	return out, nil
+}
+
+// statusReviewed is whether CodeRabbit's status says it reviewed the commit. It sets success
+// also when it did not review (#1616): "Review rate limited", "Review skipped: …",
+// "Approve command performed: …". Only "Review completed", or no description, is a review.
+func statusReviewed(state, description string) bool {
+	return strings.EqualFold(state, "SUCCESS") &&
+		(description == "" || strings.Contains(strings.ToLower(description), "review completed"))
 }
 
 func (g *RealGitHub) CodeRabbitComments(ctx context.Context, repo, since string) ([]CodeRabbitComment, bool, error) {

@@ -129,7 +129,13 @@ func TestRealGitHubKnowsCodeRabbitByItsApp(t *testing.T) {
 			 "commits": {"nodes": [{"commit": {"oid": "h3", "status": {"context": {"state": "SUCCESS", "createdAt": "2026-10-19T19:29:03Z"}}}}]}},
 			{"number": 4, "headRefName": "d", "headRefOid": "h4", "authorAssociation": "OWNER", "author": {"login": "alexec", "__typename": "User"},
 			 "reviews": {"nodes": [{"author": {"login": "coderabbitai", "__typename": "Bot"}, "body": "Actionable comments posted: 0", "state": "COMMENTED", "databaseId": 6, "commit": {"oid": "h4"}}]},
-			 "commits": {"nodes": [{"commit": {"oid": "h4", "status": {"context": {"state": "PENDING", "createdAt": "2026-10-19T19:26:55Z"}}}}]}}]}}}}`,
+			 "commits": {"nodes": [{"commit": {"oid": "h4", "status": {"context": {"state": "PENDING", "createdAt": "2026-10-19T19:26:55Z"}}}}]}},
+			{"number": 5, "headRefName": "e", "headRefOid": "h5", "authorAssociation": "OWNER", "author": {"login": "alexec", "__typename": "User"},
+			 "reviews": {"nodes": []},
+			 "commits": {"nodes": [{"commit": {"oid": "h5", "status": {"context": {"state": "SUCCESS", "description": "Review rate limited", "createdAt": "2026-10-19T23:21:35Z"}}}}]}},
+			{"number": 6, "headRefName": "f", "headRefOid": "h6", "authorAssociation": "OWNER", "author": {"login": "alexec", "__typename": "User"},
+			 "reviews": {"nodes": []},
+			 "commits": {"nodes": [{"commit": {"oid": "h6", "status": {"context": {"state": "SUCCESS", "description": "Review completed", "createdAt": "2026-10-19T23:40:00Z"}}}}]}}]}}}}`,
 	})
 	gh := api.github()
 	comments, _, err := gh.CodeRabbitComments(context.Background(), repo, "2026-10-19T00:00:00Z")
@@ -148,8 +154,8 @@ func TestRealGitHubKnowsCodeRabbitByItsApp(t *testing.T) {
 		got = append(got, p.Reviewed, p.Review, p.round())
 	}
 	equal(t, got, []any{true, "commented", "h1:5", false, "", "h2:2026-10-19T19:26:55.000Z", true, "", "h3:2026-10-19T19:29:03.000Z",
-		false, "commented", "h4:2026-10-19T19:26:55.000Z"},
-		"its status at success, set anew by each review; with no status, a review on the head by its bot (not its answer in a thread)")
+		false, "commented", "h4:2026-10-19T19:26:55.000Z", false, "", "h5:2026-10-19T23:21:35.000Z", true, "", "h6:2026-10-19T23:40:00.000Z"},
+		"its status at success, set anew by each review, but not when it was rate limited (#1616); with no status, a review on the head by its bot (not its answer in a thread)")
 }
 
 func TestThePageNamesCodeRabbitAndItsToolsPostItsCommands(t *testing.T) {
