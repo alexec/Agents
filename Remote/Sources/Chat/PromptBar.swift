@@ -26,6 +26,11 @@ struct PromptBar: View {
     var isQuestionUp = false
 
     @State private var text = ""
+    /// How far back Up has gone through the prompts sent here; nil at the prompt bar's
+    /// own text (#1551).
+    @State private var recalled: Int?
+    /// The prompts the person sent in this chat, oldest first: what Up gives back.
+    private var sentPrompts: [String] { model.page(popped).sentPrompts }
     /// Where the cursor is in `text`, so dictation can write there rather than at the
     /// end (#427).
     @State private var selection: TextSelection?
@@ -207,6 +212,12 @@ struct PromptBar: View {
                         selectedMention = min(selectedMention + 1, mentions.count - 1)
                         return .handled
                     }
+                    // The prompts sent before, as a terminal gives back its commands (#1551).
+                    if let step = PromptHistory.recall(.down, text: text, sent: sentPrompts, at: recalled) {
+                        text = step.text
+                        recalled = step.at
+                        return .handled
+                    }
                     return .ignored
                 }
                 .onKeyPress(.upArrow) {
@@ -216,6 +227,12 @@ struct PromptBar: View {
                     }
                     if isMentioning {
                         selectedMention = max(selectedMention - 1, 0)
+                        return .handled
+                    }
+                    // The prompts sent before, as a terminal gives back its commands (#1551).
+                    if let step = PromptHistory.recall(.up, text: text, sent: sentPrompts, at: recalled) {
+                        text = step.text
+                        recalled = step.at
                         return .handled
                     }
                     return .ignored

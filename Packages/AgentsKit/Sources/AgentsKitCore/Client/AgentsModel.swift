@@ -80,6 +80,9 @@ public final class AgentsModel {
     /// the page, so folding per redraw was the page's whole length of work, again,
     /// for every word.
     public private(set) var transcriptItems: [TranscriptItem] = []
+    /// The prompts the person sent in the page, oldest first: what Up and Down in the
+    /// prompt bar give back (#1551).
+    public var sentPrompts: [String] { PromptHistory.sent(turns: turns, entries: entries) }
     /// When the conversation last did anything: its last entry, or the last stored turn's
     /// when the page holds none. The foot of the chat says it once it is quiet (#1564).
     public var lastEntryAt: Date? {
