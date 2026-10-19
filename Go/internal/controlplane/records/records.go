@@ -520,6 +520,37 @@ func (r *Records) UpdateClient(ctx context.Context, c ClientRecord) error {
 	return nil
 }
 
+// ChangeClient changes a client already known on the copy held now, read and written
+// under the write lock: a change made since the caller looked is kept. UpdateClient of
+// a copy read before it would write over it, as a connect noting its endpoints in the
+// background wrote over a device's kind and switch (#1505). change says whether there
+// is anything to write. Nothing happens for a client not known.
+func (r *Records) ChangeClient(ctx context.Context, id string, change func(*ClientRecord) bool) error {
+	r.writing.Lock()
+	defer r.writing.Unlock()
+	id = strings.ToUpper(id)
+	r.mu.Lock()
+	h, ok := r.clients[id]
+	r.mu.Unlock()
+	if !ok {
+		return nil
+	}
+	c := h.record
+	if !change(&c) {
+		return nil
+	}
+	c.ID = id
+	c.Rev = h.record.Rev + 1
+	kept, etag, err := write(ctx, r.Store, c, ClientKey(id), store.Matching(h.etag))
+	if err != nil {
+		return err
+	}
+	r.mu.Lock()
+	r.clients[id] = held[ClientRecord]{kept, etag}
+	r.mu.Unlock()
+	return nil
+}
+
 // ForgetClient is clients/forget: a tombstone against the version read. Nothing happens
 // for a client that is not known. The last client may go too (#111).
 func (r *Records) ForgetClient(ctx context.Context, id string) error {

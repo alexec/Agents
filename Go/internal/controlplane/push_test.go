@@ -44,11 +44,11 @@ const pushDeviceToken = "a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5
 // session, as the Remote does.
 func (p *plane) phoneWithToken() (*controllink.ClientMembership, *controllink.Session) {
 	m, session := p.client("phone")
-	client := p.s.Records().Client(m.Client)
-	client.Kind = records.KindIPhone
 	yes := true
-	client.MayNotify = &yes
-	if err := p.s.Records().SaveClient(context.Background(), *client); err != nil {
+	if err := p.s.Records().ChangeClient(context.Background(), m.Client, func(c *records.ClientRecord) bool {
+		c.Kind, c.MayNotify = records.KindIPhone, &yes
+		return true
+	}); err != nil {
 		p.t.Fatal(err)
 	}
 	call(p.t, session, "", "clients/setPushToken", map[string]string{"token": strings.ToUpper(pushDeviceToken), "environment": "development"})

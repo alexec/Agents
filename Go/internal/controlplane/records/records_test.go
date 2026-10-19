@@ -200,6 +200,48 @@ func TestAForgottenClientStaysForgotten(t *testing.T) {
 	}
 }
 
+// #1505: a change on the copy held keeps what was written since the caller looked, as
+// a background write of a copy read before does not.
+func TestAChangeKeepsWhatWasWrittenSince(t *testing.T) {
+	r := New(store.NewMemory())
+	id := NewUUID()
+	r.SaveClient(ctx, ClientRecord{ID: id, Name: "Phone", Kind: KindUnknown, PublicKey: []byte{4}, Paired: Now()})
+	yes := true
+	var wg sync.WaitGroup
+	for n := range 20 {
+		wg.Add(2)
+		go func() {
+			defer wg.Done()
+			r.ChangeClient(ctx, id, func(c *ClientRecord) bool {
+				epoch := n
+				c.KnownEpoch = &epoch
+				return true
+			})
+		}()
+		go func() {
+			defer wg.Done()
+			if n == 10 {
+				r.ChangeClient(ctx, id, func(c *ClientRecord) bool {
+					c.Kind, c.MayNotify = KindIPhone, &yes
+					return true
+				})
+			}
+		}()
+	}
+	wg.Wait()
+	if c := r.Client(id); c.Kind != KindIPhone || c.MayNotify == nil || c.KnownEpoch == nil || c.Rev != 22 {
+		t.Fatalf("%+v", c)
+	}
+	if err := r.ChangeClient(ctx, NewUUID(), func(*ClientRecord) bool { t.Fatal("changed an unknown client"); return true }); err != nil {
+		t.Fatal(err)
+	}
+	unchanged := r.Client(id).Rev
+	r.ChangeClient(ctx, id, func(*ClientRecord) bool { return false })
+	if r.Client(id).Rev != unchanged {
+		t.Fatal("wrote nothing")
+	}
+}
+
 // #171: a record that can't be decoded is neither known nor forgotten, is said once,
 // and a record held from before keeps being used.
 func TestAnUnreadableRecordIsNeitherKnownNorForgotten(t *testing.T) {
