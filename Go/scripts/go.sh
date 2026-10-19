@@ -22,5 +22,10 @@ if command -v go >/dev/null 2>&1 && { [ "$(uname -s)" != Darwin ] || ! { command
 fi
 cache="${AGENTS_BUILD_CACHE:-$HOME/Library/Caches/Agents-build}/go"
 mkdir -p "$cache/gopath" "$cache/gocache"
+# Cgo stays off, as the binaries ship, except for -race, which needs it (#1505).
+cgo="${CGO_ENABLED:-0}"
+for arg in "$@"; do
+	[ "$arg" = -race ] && cgo=1
+done
 exec docker run --rm -v "$repo":/repo -v "$cache/gopath":/go -v "$cache/gocache":/root/.cache/go-build \
-	-e CGO_ENABLED=0 -e GOOS -e GOARCH -e GOFLAGS -w /repo/Go "${GO_IMAGE:-golang:1.26}" go "$@"
+	-e CGO_ENABLED="$cgo" -e GOOS -e GOARCH -e GOFLAGS -w /repo/Go "${GO_IMAGE:-golang:1.26}" go "$@"

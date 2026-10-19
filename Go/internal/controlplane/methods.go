@@ -427,16 +427,20 @@ func (m *Methods) Admit(ctx context.Context, client records.ClientRecord) error 
 }
 
 func (m *Methods) admitOnce(ctx context.Context, client records.ClientRecord) (bool, error) {
-	if known := m.records.Client(client.ID); known != nil {
-		stale := known.LastSeen == nil || time.Since(known.LastSeen.Time) > time.Hour
-		renamed := known.Name != client.Name
-		if !stale && !renamed {
-			return false, nil
-		}
-		now := records.Now()
-		known.LastSeen = &now
-		known.Name = client.Name
-		return renamed, m.records.UpdateClient(ctx, *known)
+	if m.records.Client(client.ID) != nil {
+		renamed := false
+		err := m.records.ChangeClient(ctx, client.ID, func(known *records.ClientRecord) bool {
+			stale := known.LastSeen == nil || time.Since(known.LastSeen.Time) > time.Hour
+			renamed = known.Name != client.Name
+			if !stale && !renamed {
+				return false
+			}
+			now := records.Now()
+			known.LastSeen = &now
+			known.Name = client.Name
+			return true
+		})
+		return renamed, err
 	}
 	if client.LastSeen == nil {
 		now := records.Now()
@@ -450,10 +454,13 @@ func (m *Methods) admitOnce(ctx context.Context, client records.ClientRecord) (b
 func (m *Methods) NoteEpoch(ctx context.Context, id controllink.Identity, epoch int) {
 	switch id.Kind {
 	case 'c':
-		if c := m.records.Client(id.ID); c != nil && (c.KnownEpoch == nil || *c.KnownEpoch != epoch) {
+		m.records.ChangeClient(ctx, id.ID, func(c *records.ClientRecord) bool {
+			if c.KnownEpoch != nil && *c.KnownEpoch == epoch {
+				return false
+			}
 			c.KnownEpoch = &epoch
-			m.records.UpdateClient(ctx, *c)
-		}
+			return true
+		})
 	case 'h':
 		if h := m.records.Host(id.ID); h != nil && (h.KnownEpoch == nil || *h.KnownEpoch != epoch) {
 			h.KnownEpoch = &epoch
@@ -488,8 +495,10 @@ func (m *Methods) setPushToken(ctx context.Context, client string, request wire.
 		if samePushToken(record.PushToken, token) {
 			return nil
 		}
-		record.PushToken = token
-		err := m.records.UpdateClient(ctx, *record)
+		err := m.records.ChangeClient(ctx, client, func(c *records.ClientRecord) bool {
+			c.PushToken = token
+			return true
+		})
 		var conflict *store.ConflictError
 		if !errors.As(err, &conflict) || try > 0 {
 			return err

@@ -163,11 +163,18 @@ func (p *pushes) send(push apns.Push) {
 // new one the next time it opens.
 func (p *pushes) forgetToken(token string) {
 	for _, c := range p.s.records.Clients() {
-		if c.PushToken != nil && c.PushToken.Token == token {
-			c.PushToken = nil
-			if err := p.s.records.UpdateClient(context.Background(), c); err != nil {
-				p.s.log("notice: could not forget a gone push token: " + err.Error())
+		if c.PushToken == nil || c.PushToken.Token != token {
+			continue
+		}
+		err := p.s.records.ChangeClient(context.Background(), c.ID, func(c *records.ClientRecord) bool {
+			if c.PushToken == nil || c.PushToken.Token != token {
+				return false
 			}
+			c.PushToken = nil
+			return true
+		})
+		if err != nil {
+			p.s.log("notice: could not forget a gone push token: " + err.Error())
 		}
 	}
 }

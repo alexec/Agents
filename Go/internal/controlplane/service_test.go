@@ -580,11 +580,11 @@ func TestANeedGoesToTheRelayHost(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	client := p.s.Records().Client(m.Client)
-	client.Kind = records.KindIPhone
 	yes := true
-	client.MayNotify = &yes
-	if err := p.s.Records().SaveClient(context.Background(), *client); err != nil {
+	if err := p.s.Records().ChangeClient(context.Background(), m.Client, func(c *records.ClientRecord) bool {
+		c.Kind, c.MayNotify = records.KindIPhone, &yes
+		return true
+	}); err != nil {
 		t.Fatal(err)
 	}
 	p.s.tellRelayDevices()
