@@ -11,6 +11,8 @@ x-copy: &copy
   build:
     context: ..
     dockerfile: deploy/Containerfile
+    args:
+      VERSION: ${AGENTS_VERSION:-dev}
   image: agents-control:walk
   restart: unless-stopped
   depends_on:
