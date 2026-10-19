@@ -370,8 +370,8 @@ private struct FoldCount: View {
 /// anyone vouched for the ending — are still said, in the tooltip and to a screen
 /// reader, rather than drawn.
 /// A session's mark in the sidebar (Alex, #495): what it wants, in four shapes — an
-/// orange hand when it needs the person, a spinner while it works, an empty ring once
-/// done, read or not (#1323); a numbered list while queued, an hourglass
+/// orange hand when it needs the person, a spinner in the accent while it works (#1558),
+/// an empty ring once done, read or not (#1323); a numbered list while queued, an hourglass
 /// while it waits and a pause mark once stopped (#630).
 /// An orange archive box when it asks to be archived, as it is listed under Needs You
 /// (#817). Archived keeps its `StatusIcon`.
@@ -406,7 +406,8 @@ private struct SessionMark: View {
             case .needsYou:
                 Image(systemName: "hand.raised.fill").tinted(.attention)
             case .working:
-                ProgressView().controlSize(.mini)
+                // In the accent as the other marks, and in step with every spinner (#1558).
+                SyncedSpinner(diameter: 12 * scale, color: Paper.accent)
             case .queued:
                 Image(systemName: "list.number").foregroundStyle(Paper.accent)
             case .waiting:

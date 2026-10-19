@@ -15,6 +15,9 @@ import SwiftUI
 struct SyncedSpinner: View {
     /// The wheel's width and height, in points.
     var diameter: CGFloat
+    /// The spokes' colour: grey, as the system's, except in the sidebar's marks, which are
+    /// in the accent as the rest of them (#1558).
+    var color: Color = .secondary
 
     #if os(macOS)
     private static let spokes = 12
@@ -34,7 +37,7 @@ struct SyncedSpinner: View {
                         .opacity(SpinnerClock.opacity(ofSpoke: spoke, step: step, spokes: Self.spokes))
                 }
             }
-            .foregroundStyle(.secondary)
+            .foregroundStyle(color)
             // A parent's animation would fade one spoke into the next. The wheel ticks.
             .transaction { $0.animation = nil }
         }
