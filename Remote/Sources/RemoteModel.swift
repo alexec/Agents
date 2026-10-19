@@ -4010,6 +4010,14 @@ final class RemoteModel {
                                                     returning: DaemonAPI.FileDiagnostics.self)
     }
 
+    /// What the file's language server would write at a line and column (#1603).
+    func complete(path: String, text: String, line: Int, column: Int, of agentID: UUID) async -> [DaemonAPI.FileCompletion] {
+        let request = DaemonAPI.FileCompletionRequest(agentID: agentID, path: path, text: text, line: line, column: column)
+        let found = try? await client(for: request).call(DaemonAPI.Method.filesComplete, request,
+                                                         returning: DaemonAPI.FileCompletions.self)
+        return found?.items ?? []
+    }
+
     /// The Simulator pane's calls (#842), to the session's host.
     func simulatorCalls(for agentID: UUID) -> SimulatorCalls {
         let host = { try self.client(for: DaemonAPI.AgentRequest(agentID: agentID)) }
