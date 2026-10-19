@@ -227,7 +227,8 @@ and what set it off. A file that cannot be read still lists the triggers it coul
 ## Run only by hand
 
 A workflow you only ever start yourself says `on: manual`, or has no `on:` at all.
-Nothing else starts it: it runs when you press **Run now**. Pin it to the sidebar to keep
+Nothing else starts it: it runs when you press **Run now**, or when an agent runs it with
+`manage_workflows` (only when it is turned on and approved). Pin it to the sidebar to keep
 it one click away.
 
 ```markdown

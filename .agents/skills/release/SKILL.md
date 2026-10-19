@@ -70,8 +70,8 @@ Six workflows run exactly once per release, and only here (#1462). None has a sc
 Start every one of them once per release. The only one to skip is one that already ran
 for this release: its report (or pull request) is newer than the last tag, as when an
 earlier run of this skill ended `partly_done`. Never start one again in the same release.
-An agent cannot press Run now, so read the workflow with `manage_workflows read`, and call `start_session` with its prompt
-(the text under its front matter) and its `runtime:`, `model:` and `permission-mode:`.
+Run each with `manage_workflows run`. When that is refused (the workflow is turned off, or waits for Alex's OK), read the workflow with
+`manage_workflows read`, and call `start_session` with its prompt (the text under its front matter) and its `runtime:`, `model:` and `permission-mode:`.
 Start them by order, at most two at a time: the reviews take turns on the "build" lease,
 and the feature matrix reads the competitor check's report. Wait with `wait_for_event`,
 naming the sessions in `agents`, `until_minutes` 240 or the time left to T0 + 1 day,

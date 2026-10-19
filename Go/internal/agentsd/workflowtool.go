@@ -386,8 +386,54 @@ func (d *Daemon) manageWorkflows(caller wire.UUID, args map[string]json.RawMessa
 			note += " It is still waiting for their OK, so it will not run until they approve it."
 		}
 		return note, nil
+	case "run":
+		return d.runWorkflowForAgent(a, project, id)
 	}
-	return "", Invalid("Nothing was done: `action` has to be one of list, read, write, remove, enable or disable.")
+	return "", Invalid("Nothing was done: `action` has to be one of list, read, write, remove, enable, disable or run.")
+}
+
+// runWorkflowForAgent is manage_workflows' run (#1524): Run now, as the person's, but never
+// one that is turned off, and at the caller's chain depth, so runs cannot loop.
+func (d *Daemon) runWorkflowForAgent(a *wire.Agent, project, id string) (string, error) {
+	if _, ok := workflowPath(project, id); !ok {
+		return "", notInFolder(id)
+	}
+	d.workflowMu.Lock()
+	d.scanLocked()
+	d.workflowMu.Unlock()
+	s, err := d.oneWorkflow(project, id)
+	if err != nil {
+		return "", err
+	}
+	if s.IsArchived {
+		return "", &Error{Code: wire.FailureWorkflowTurnedOffByPerson, Message: "Nothing was run: " + id + " is archived. Ask the person to bring it back from the project page if it should run."}
+	}
+	if s.AwaitingApproval != nil {
+		return "", &Error{Code: wire.FailureWorkflowTurnedOffByPerson, Message: "Nothing was run: " + id + " is waiting for the person's OK on the project page. Ask them to approve it if it should run."}
+	}
+	if !s.IsEnabled {
+		return "", &Error{Code: wire.FailureWorkflowTurnedOffByPerson, Message: "Nothing was run: " + id + " is turned off, so only the person runs it, with Run now on its page. Ask them to if it should run."}
+	}
+	if s.Workflow.Mode == wire.WorkflowModeTriggering {
+		return "", Invalid("Nothing was run: %s runs in the agent that triggered it, and nothing did. Only its triggers run it.", id)
+	}
+	var depth int64
+	if a.ChainDepth != nil {
+		depth = *a.ChainDepth
+	}
+	d.fire(fireRequest{folder: project, id: id, byHand: true, trigger: byHandTrigger(), depth: depth})
+	after, err := d.oneWorkflow(project, id)
+	if err != nil {
+		return "", err
+	}
+	o := after.LastOutcome
+	switch {
+	case o == nil:
+		return "", &Error{Code: wire.FailureNoSuchWorkflow, Message: "Nothing was run: " + id + " does not run on this computer."}
+	case o.Ran != nil:
+		return "Ran " + id + ": it started agent " + string(o.Ran.AgentID) + ". Use wait_for_event with that id to wait for it to finish, or read_session to see it.", nil
+	}
+	return "", &Error{Code: wire.FailureNotAllowed, Message: "Nothing was run: " + id + " did not run, as " + refusalWords(o.Refused.Value) + "."}
 }
 
 // writeWorkflow is manage_workflows' write: the whole file, checked, and a new one off.

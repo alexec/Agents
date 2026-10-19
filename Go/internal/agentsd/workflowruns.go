@@ -641,10 +641,14 @@ func (d *Daemon) runWorkflow(r wire.WorkflowRequest) (wire.WorkflowSummary, erro
 		return wire.WorkflowSummary{}, &Error{Code: wire.FailureNoSuchWorkflow, Message: f.wf.Name + " runs on another computer."}
 	}
 	d.workflowMu.Unlock()
-	d.fire(fireRequest{folder: folder, id: r.WorkflowID, byHand: true,
-		trigger: wire.WorkflowTrigger{Schedule: &wire.WorkflowTriggerStoredSchedule{Value: wire.WorkflowSchedule{Minutes: []int64{0},
-			Hours: [2]int64{0, 23}, EndMinute: 30, Days: []wire.Weekday{"sun", "mon", "tue", "wed", "thu", "fri", "sat"}}}}})
+	d.fire(fireRequest{folder: folder, id: r.WorkflowID, byHand: true, trigger: byHandTrigger()})
 	return d.oneWorkflow(folder, r.WorkflowID)
+}
+
+// byHandTrigger is the trigger a run by hand records: Run now, or an agent's run.
+func byHandTrigger() wire.WorkflowTrigger {
+	return wire.WorkflowTrigger{Schedule: &wire.WorkflowTriggerStoredSchedule{Value: wire.WorkflowSchedule{Minutes: []int64{0},
+		Hours: [2]int64{0, 23}, EndMinute: 30, Days: []wire.Weekday{"sun", "mon", "tue", "wed", "thu", "fri", "sat"}}}}
 }
 
 // workflowClock ticks every 15 seconds: a schedule due since the last tick fires, or is
