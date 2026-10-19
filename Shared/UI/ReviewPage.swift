@@ -78,6 +78,10 @@ struct ReviewPage: View {
         .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
         .safeAreaInset(edge: .bottom, spacing: 0) { bar }
         .navigationTitle(approval.title)
+        #if os(iOS)
+        // The header says the title large; the bar says it once, small.
+        .navigationBarTitleDisplayMode(.inline)
+        #endif
         .task(id: approval) {
             reading = await read()
             rows = reading.map(Self.rows) ?? []
@@ -107,7 +111,7 @@ struct ReviewPage: View {
                     .appText(.supporting)
                 if let id = approval.agentID, let openAgent {
                     Button("Open Session") { openAgent(id) }
-                        .buttonStyle(.link)
+                        .buttonStyle(.borderless)
                         .appText(.supporting)
                 }
             }

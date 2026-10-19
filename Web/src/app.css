@@ -404,7 +404,7 @@ button.call-line:hover { opacity: 1; }
    the window's are, and Show in Changes under it at the right. */
 .call-detail .edit { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
 .call-diff { align-self: stretch; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.call-diff .path { font-size: 0.6875rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; direction: rtl; text-align: left; }
+.call-diff .path { font-size: 0.6875rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .call-diff .diff-lines { max-height: 280px; overflow: auto; }
 button.link.reading { font: inherit; cursor: pointer; }
 button.link.reading:hover { text-decoration: underline; }
@@ -1054,7 +1054,7 @@ dialog.sheet::backdrop { background: rgb(0 0 0 / 0.25); }
 .review-head h2 { margin: 0 0 2px; font-size: 1.5rem; }
 .review-head .link { font: inherit; margin-left: 6px; }
 .review-diff-head { display: flex; align-items: baseline; gap: 10px; }
-.review-diff-head .path { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; direction: rtl; text-align: left; }
+.review-diff-head .path { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .review-diff-head .spacer, .guarded-answers .spacer { flex: 1; }
 .review-bar { border-top: 1px solid var(--paper-rule); padding: 10px 16px; background: var(--paper-ground); display: flex; flex-direction: column; gap: 8px; }
 .review-bar .sheet-actions { margin-top: 0; }

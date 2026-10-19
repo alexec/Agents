@@ -18,7 +18,7 @@ struct HunkRowsTests {
             .init(oldStart: 40, newStart: 41, lines: [(.removed, "y"), (.context, "z")]),
         ])
         #expect(rows.map(\.oldLine) == [1, nil, 40, 41])
-        #expect(rows.map(\.newLine) == [1, 2, nil, 42])
+        #expect(rows.map(\.newLine) == [1, 2, nil, 41])
         #expect(LineDiff.breaks(rows) == [2])
     }
 
