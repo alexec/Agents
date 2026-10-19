@@ -50,6 +50,28 @@ A local server without `"hosted": true` works too: the app runs its own copy of 
 for events, with the same environment and secrets an agent gets, and each agent runs
 another for its tools.
 
+## Turn on a ready-made workflow
+
+Agents has ready-made workflows for the dev loop on GitHub (#1342). Each project that
+pushes to GitHub shows them on its **Workflows** page, off:
+
+| Workflow | It starts on | The agent |
+| --- | --- | --- |
+| **Work an issue** | `issue.labelled` with `label: agent`: someone adds the `agent` label to an issue | does what the issue asks on a branch of its own, and opens a pull request for it |
+| **Fix failed checks** | `checks.failed`: a pull request's checks failed | reads the failed jobs, fixes the cause on the PR's branch and pushes, or runs the jobs again when the change did not cause it |
+
+1. Open the workflow and turn on its **Enabled** switch.
+2. The app writes the workflow to `.agents/workflows/<id>.md` and its method to
+   `.agents/skills/<id>/SKILL.md`, approved. From then on they are your project's own
+   files: change them as you like. A skill of the same name that the project has already
+   is kept.
+3. For **Work an issue**, make an `agent` label in the repository, if it has none.
+
+Nothing runs before you turn a workflow on, and a workflow that an agent turns on waits
+for your OK. Without `repo:` they listen to the repository that the project's folder
+pushes to, and only to the repository's own people (`anyone: true` opens them to anyone).
+To hide one that you do not want, archive it.
+
 ## Write the workflow
 
 A server's event is named the way the app's own are, `noun.verbed`, with no prefix. Under

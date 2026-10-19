@@ -84,6 +84,8 @@ type workflowFile struct {
 	wf     wire.Workflow
 	digest string
 	text   string
+	// readyMade is a ready-made workflow with no file in the project yet (#1342).
+	readyMade bool
 }
 
 type workflowBook struct {
@@ -223,6 +225,7 @@ func (d *Daemon) scanLocked() {
 			}
 			files[folder][id] = &workflowFile{wf: wf, digest: digest, text: text}
 		}
+		d.addReadyMadeLocked(folder, files)
 	}
 	d.workflowFiles = files
 	// A server's event a workflow names, or no longer does (#383).
@@ -475,6 +478,11 @@ func (d *Daemon) editWorkflowLocked(folder, id string, byPerson bool, edit func(
 	if f == nil {
 		return noSuchWorkflow(id)
 	}
+	if f.readyMade {
+		if err := d.writeReadyMadeLocked(folder, id, byPerson); err != nil {
+			return err
+		}
+	}
 	path, ok := workflowPath(folder, id)
 	if !ok {
 		return notInFolder(id)
@@ -652,9 +660,12 @@ func (d *Daemon) deleteWorkflow(r wire.WorkflowRequest) error {
 	folder := store.FolderPath(r.Folder)
 	d.workflowMu.Lock()
 	d.scanLocked()
-	if d.fileLocked(folder, r.WorkflowID) == nil {
+	if f := d.fileLocked(folder, r.WorkflowID); f == nil {
 		d.workflowMu.Unlock()
 		return noSuchWorkflow(r.WorkflowID)
+	} else if f.readyMade {
+		d.workflowMu.Unlock()
+		return &Error{Code: wire.FailureDeleteRefused, Message: f.wf.Name + " is ready-made and has no file to delete. Archive it to hide it."}
 	}
 	path, ok := workflowPath(folder, r.WorkflowID)
 	if !ok {

@@ -331,6 +331,12 @@ func (d *Daemon) manageWorkflows(caller wire.UUID, args map[string]json.RawMessa
 		}
 		text, _, why := readWorkflowFile(path)
 		if why != "" {
+			d.workflowMu.Lock()
+			f := d.fileLocked(project, id)
+			d.workflowMu.Unlock()
+			if f != nil && f.readyMade {
+				return f.text, nil // ready-made, with no file yet (#1342)
+			}
 			return "", noSuchWorkflow(id)
 		}
 		return text, nil
