@@ -170,6 +170,7 @@ tar_skip=()
 } >"$stage/deploy/.env.new"
 rm -f "$stage/deploy/.env" "$stage/deploy/make-secrets.sh"
 ((dry_run)) || cp -R "$root/App/Resources/servers" "$stage/App/Resources/servers"
+((dry_run)) || cp -R "$root/App/Resources/toolsets" "$stage/App/Resources/toolsets"
 # The lines in .env.new replace the same names in the VM's deploy/.env; the others stay.
 install='set -e; sudo mkdir -p /opt/agents; sudo tar -C /opt/agents --no-same-owner -xzf -; cd /opt/agents/deploy
 sudo touch .env; sudo chmod 600 .env

@@ -67,6 +67,9 @@ services:
       - data:/data
       # The Linux host, served at /v1/servers/… to servers joining with the install command.
       - ../App/Resources/servers:/servers:ro
+      # The runtimes' toolsets, served at /v1/toolsets/…, so a server that joins installs
+      # Claude by itself (#1312). Without them it gets no Claude (#1461's walk).
+      - ../App/Resources/toolsets:/toolsets:ro
 
   caddy:
     image: caddy:2
