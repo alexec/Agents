@@ -1,13 +1,15 @@
 // agentsctl is a client of a control plane, as the window is one, for driving hosts in a
 // walk without the screen (#1125's spike, kept for #1136's proofs). Not shipped.
 //
-//	agentsctl pair '<client code>'                    keeps ~/.agents-go/ctl.json
+//	agentsctl pair [-kind iPhone] '<client code>'     keeps ~/.agents-go/ctl.json
 //	agentsctl hosts                                   control/status's hosts
 //	agentsctl call [-host H] METHOD ['{json}']        one request; prints the result
 //	agentsctl watch [-host H]                         prints notifications
 //	agentsctl lend -host H [-from mac]                lends -from's Claude sign-in to H (Lending.swift by hand)
 //	agentsctl turn -host H -runtime claude -cwd PATH [-allow] 'prompt'
 //	                                                  starts an agent, follows it to its end, prints it
+//	agentsctl device -host H -token T                 a device's stand-in (#1507): gives its push
+//	                                                  token, says it may be notified, stays
 package main
 
 import (
@@ -53,7 +55,7 @@ func session(ctx context.Context) *controllink.Session {
 
 func main() {
 	if len(os.Args) < 2 {
-		die("usage: agentsctl pair|hosts|call|watch|lend|turn …")
+		die("usage: agentsctl pair|hosts|call|watch|lend|turn|device …")
 	}
 	ctx := context.Background()
 	cmd, args := os.Args[1], os.Args[2:]
@@ -64,6 +66,8 @@ func main() {
 	cwd := fs.String("cwd", "", "the agent's folder on the host")
 	allow := fs.Bool("allow", false, "answer every permission card with its first allow option, and every form with its first choices")
 	wait := fs.Int("wait", 300, "seconds to follow a turn")
+	kind := fs.String("kind", "mac", "pair as this kind of client: mac, iPhone or iPad")
+	token := fs.String("token", "", "a push token, for device")
 	fs.Parse(args)
 	rest := fs.Args()
 	switch cmd {
@@ -75,7 +79,7 @@ func main() {
 		if err != nil {
 			die("%v", err)
 		}
-		m, err := controllink.PairClient(ctx, code, "agentsctl")
+		m, err := controllink.PairClientAs(ctx, code, "agentsctl", *kind)
 		if err != nil {
 			die("pair: %v", err)
 		}
@@ -108,6 +112,17 @@ func main() {
 			if *host == "" || n.Host == *host {
 				fmt.Printf("%s %s %s\n", n.Host, n.Method, n.Params)
 			}
+		}
+	case "device":
+		if *host == "" || *token == "" {
+			die("agentsctl device -host H -token T")
+		}
+		s := session(ctx)
+		out(s.Call(ctx, "", "clients/setPushToken", map[string]string{"token": *token, "environment": "development"}))
+		// Presence goes to a host; it says this device may be notified and is not in use.
+		out(s.Call(ctx, *host, "presence/report", map[string]any{"active": false, "mayNotify": true}))
+		fmt.Println("a device, with its push token; until stopped")
+		for range s.Notes {
 		}
 	case "lend":
 		s := session(ctx)

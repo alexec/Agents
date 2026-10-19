@@ -25,6 +25,12 @@ type ClientMembership struct {
 
 // PairClient uses a client code once (clients/announce), as a window does.
 func PairClient(ctx context.Context, code *Code, name string) (*ClientMembership, error) {
+	return PairClientAs(ctx, code, name, "mac")
+}
+
+// PairClientAs is PairClient as another kind of client: "iPhone" or "iPad" for a walk's
+// stand-in for a device (#1507).
+func PairClientAs(ctx context.Context, code *Code, name, kind string) (*ClientMembership, error) {
 	if code.Host {
 		return nil, errors.New("that is a host code")
 	}
@@ -36,7 +42,7 @@ func PairClient(ctx context.Context, code *Code, name string) (*ClientMembership
 		return nil, err
 	}
 	defer l.Close()
-	params, _ := json.Marshal(map[string]any{"id": id, "publicKey": pub, "name": name, "kind": "mac"})
+	params, _ := json.Marshal(map[string]any{"id": id, "publicKey": pub, "name": name, "kind": kind})
 	req, _ := json.Marshal(map[string]any{"jsonrpc": "2.0", "id": 1, "method": "clients/announce", "params": json.RawMessage(params)})
 	if err := l.Write(ctx, string(req)); err != nil {
 		return nil, err

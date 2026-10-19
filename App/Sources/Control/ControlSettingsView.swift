@@ -203,7 +203,7 @@ struct ControlOverviewPage: View {
     }
 
     private func hostName(_ host: DaemonAPI.ControlHost) -> String {
-        let name = host.machineID == MachineID.current && host.relay != true ? "This Mac" : host.name
+        let name = host.machineID == MachineID.current && host.runsAgents ? "This Mac" : host.name
         return host.state == "online" ? name : "\(name) (\(host.state))"
     }
 }
