@@ -2,14 +2,14 @@ import Testing
 
 @testable import AgentsKitCore
 
-/// The prompt's keys (#377): Return sends, Shift-Return sends, Option-Return breaks the line.
+/// The prompt's keys (#377): Return sends; Shift-Return and Option-Return break the line (#1514).
 struct PromptReturnTests {
     @Test func returnSends() {
         #expect(PromptReturn(option: false, shift: false) == .send)
     }
 
-    @Test func shiftReturnSends() {
-        #expect(PromptReturn(option: false, shift: true) == .send)
+    @Test func shiftReturnBreaksTheLine() {
+        #expect(PromptReturn(option: false, shift: true) == .lineBreak)
     }
 
     @Test func optionReturnBreaksTheLine() {

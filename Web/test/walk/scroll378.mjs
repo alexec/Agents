@@ -28,7 +28,7 @@ const note = (item, pass, detail) => { results.push({ item, pass, detail }); con
 try {
   const page = await chrome.page(webURL, { width: 1280, height: 800 });
   const T = `document.querySelector(".transcript")`;
-  const geo = async () => JSON.parse(await page.eval(`(() => { const e = ${T}; return JSON.stringify({ top: e.scrollTop, h: e.scrollHeight, c: e.clientHeight, fromBottom: e.scrollHeight - e.scrollTop - e.clientHeight, jump: !!document.querySelector("button.jump"), news: !!document.querySelector("button.jump.news") }); })()`));
+  const geo = async () => JSON.parse(await page.eval(`(() => { const e = ${T}; return JSON.stringify({ top: e.scrollTop, h: e.scrollHeight, c: e.clientHeight, fromBottom: e.scrollHeight - e.scrollTop - e.clientHeight, jump: !!document.querySelector("button.jump") }); })()`));
   const wheel = async (deltaY) => {
     const r = JSON.parse(await page.eval(`JSON.stringify(${T}.getBoundingClientRect())`));
     await page.raw("Input.dispatchMouseEvent", { type: "mouseWheel", x: r.x + r.width / 2, y: r.y + r.height / 2, deltaX: 0, deltaY });
@@ -72,10 +72,10 @@ try {
   send(3, 0.2); await sleep(1200);
   const after = await geo(); const at2 = await reading();
   note("3 read back (small tick)", Math.abs(after.top - before.top) <= 1 && at.text === at2.text && at.y === at2.y,
-    `tick moved to ${before.fromBottom}px from the end; after 3 arrivals scrollTop ${before.top}→${after.top}, row "${at.text}" y ${at.y}→${at2.y}, jump ${after.jump}, news ${after.news}`);
+    `tick moved to ${before.fromBottom}px from the end; after 3 arrivals scrollTop ${before.top}→${after.top}, row "${at.text}" y ${at.y}→${at2.y}, jump ${after.jump}`);
   await wheel(-600); await sleep(400);
   const b2 = await geo(); send(3, 0.2); await sleep(1200); const a2 = await geo();
-  note("3 read back (big)", Math.abs(a2.top - b2.top) <= 1 && a2.jump && a2.news, `scrollTop ${b2.top}→${a2.top}, jump ${a2.jump}, news ${a2.news}`);
+  note("3 read back (big)", Math.abs(a2.top - b2.top) <= 1 && a2.jump, `scrollTop ${b2.top}→${a2.top}, jump ${a2.jump}`);
   // Growth above the pane: a row above the fold grows by 300px.
   const r0 = await reading();
   await page.eval(`(() => { const e = ${T}; const t = e.getBoundingClientRect().top; const above = [...e.querySelectorAll(".bubble")].filter((r) => r.getBoundingClientRect().bottom < t - 50).pop(); if (above) above.style.paddingBottom = "300px"; })()`);

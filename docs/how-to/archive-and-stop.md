@@ -59,7 +59,7 @@ partly done one stays under **Needs you**. Nothing is hidden until you approve i
 1. Open the chat. At the end of the conversation, a card in orange says **The agent asks
    to archive this session**, with what the agent said last. Click **Approve** to archive
    it, or **Keep Session** to keep it. The card is the same on the Mac, iPhone, iPad and the
-   web page. When it is out of view, **Question waiting** takes you to it.
+   web page. When you are scrolled up, **↓** takes you back to it at the end.
 2. Or use **Needs You**, at the top of the sidebar. It shows every chat waiting for
    approval, in every project and on every host. **Approve** is beside the mark on the
    Mac's row; on the Remote and the web page it is in the row's menu and its swipe. Each

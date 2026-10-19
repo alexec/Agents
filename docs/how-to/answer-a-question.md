@@ -30,9 +30,9 @@ Whichever it is, the agent and its project say **Needs you** until you answer.
    question is above it, and anything that came after it (more of the agent's work, a
    prompt waiting to be sent) is below it. Usually that is the end of the conversation,
    just above the prompt. It scrolls with the conversation.
-   While it is out of sight, **↑ Question waiting** or **↓ Question waiting** above the
-   prompt says which way it is, and takes you to it. When you follow the end of the
-   conversation and new work pushes the card up, the conversation keeps following the end.
+   When you follow the end of the conversation and new work pushes the card up, the
+   conversation keeps following the end. Scroll up to find the card again; **↓** above the
+   prompt takes you back to the end.
    When the agent asks about several things at once — several file edits, for example —
    each question stays as its own card, each where it was asked, until you answer it.
    Answering one leaves the others.
