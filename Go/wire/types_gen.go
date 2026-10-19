@@ -1886,6 +1886,29 @@ type EventsPage struct {
 	HasMore bool           `json:"hasMore"`
 }
 
+// One problem a language server found: where (line and column from 1), how bad (error, warning, info or hint), and what.
+type FileDiagnostic struct {
+	Line     int64   `json:"line"`
+	Column   int64   `json:"column"`
+	Severity string  `json:"severity"`
+	Message  string  `json:"message"`
+	Source   *string `json:"source,omitzero"`
+}
+
+// A file's problems, at most 200, and the server that found them. Reason says why there is no server for it (none installed for the language, or the file too big).
+type FileDiagnostics struct {
+	Diagnostics []FileDiagnostic `json:"diagnostics"`
+	Server      *string          `json:"server,omitzero"`
+	Reason      *string          `json:"reason,omitzero"`
+}
+
+// files/diagnostics (#844): what the language server for a file's language says of it, as the editor holds it (text) or as it is on disk.
+type FileDiagnosticsRequest struct {
+	AgentID UUID    `json:"agentID"`
+	Path    string  `json:"path"`
+	Text    *string `json:"text,omitzero"`
+}
+
 type FileMentionDTO struct {
 	Path         string `json:"path"`
 	RelativePath string `json:"relativePath"`

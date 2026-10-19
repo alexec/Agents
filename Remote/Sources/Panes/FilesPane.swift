@@ -548,9 +548,12 @@ struct FilesPane: View {
     private var editActions: PageActions {
         let agentID = agent.id
         let model = model
-        return PageActions(
+        var actions = PageActions(
             save: { path, document in await model.writeArtifact(agentID: agentID, path: path, text: document) },
             canEdit: !model.isStale)
+        // A source file's problems, from its language server on the agent's host (#844).
+        actions.diagnose = { path, text in await model.diagnose(path: path, text: text, of: agentID) }
+        return actions
     }
 
     // MARK: Reading

@@ -124,6 +124,8 @@ public enum DaemonAPI {
         public static let agentsFind = "agents/find"
         /// The sessions whose prompts or replies hold some words (#1585), with the line.
         public static let agentsSaid = "agents/said"
+        /// What the language server for a file's language finds in it (#844).
+        public static let filesDiagnostics = "files/diagnostics"
         /// The iOS simulators on a Mac host (#842): listed, booted and shut down on the
         /// person's press, and a booted one's screen as a JPEG.
         public static let simulatorsList = "simulators/list"
@@ -1252,6 +1254,46 @@ public enum DaemonAPI {
     public struct SaidSearchResult: Codable, Sendable {
         public var matches: [SaidMatch]
         public init(matches: [SaidMatch]) { self.matches = matches }
+    }
+
+    /// A file's problems, as its language server finds them (#844).
+    public struct FileDiagnosticsRequest: Codable, Sendable {
+        public var agentID: UUID
+        public var path: String
+        public var text: String?
+        public init(agentID: UUID, path: String, text: String? = nil) {
+            self.agentID = agentID
+            self.path = path
+            self.text = text
+        }
+    }
+
+    /// One problem: line and column from 1, severity (error, warning, info, hint), words.
+    public struct FileDiagnostic: Codable, Sendable, Hashable {
+        public var line: Int
+        public var column: Int
+        public var severity: String
+        public var message: String
+        public var source: String?
+        public init(line: Int, column: Int, severity: String, message: String, source: String? = nil) {
+            self.line = line
+            self.column = column
+            self.severity = severity
+            self.message = message
+            self.source = source
+        }
+    }
+
+    /// At most 200 problems and the server that found them; `reason` when there is none.
+    public struct FileDiagnostics: Codable, Sendable {
+        public var diagnostics: [FileDiagnostic]
+        public var server: String?
+        public var reason: String?
+        public init(diagnostics: [FileDiagnostic], server: String? = nil, reason: String? = nil) {
+            self.diagnostics = diagnostics
+            self.server = server
+            self.reason = reason
+        }
     }
 
     /// An iOS simulator on a Mac host (#842).
