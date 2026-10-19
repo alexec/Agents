@@ -12,6 +12,7 @@ import (
 	"regexp"
 	goruntime "runtime"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -43,6 +44,15 @@ func (d *Daemon) registerSimulators() {
 	On(d, wire.CallSimulatorsShutdown, func(ctx context.Context, _ *Client, r wire.SimulatorRequest) (wire.Empty, error) {
 		_, err := simctl(ctx, "shutdown", r.Udid)
 		return wire.Empty{}, err
+	})
+	On(d, wire.CallSimulatorsTap, func(ctx context.Context, _ *Client, r wire.SimulatorTapRequest) (wire.Empty, error) {
+		if r.X < 0 || r.X > 1 || r.Y < 0 || r.Y > 1 {
+			return wire.Empty{}, Invalid("a touch is from 0 to 1 across and down")
+		}
+		return wire.Empty{}, simulatorInput(ctx, "tap", r.Udid, strconv.FormatFloat(r.X, 'f', 4, 64), strconv.FormatFloat(r.Y, 'f', 4, 64))
+	})
+	On(d, wire.CallSimulatorsHome, func(ctx context.Context, _ *Client, r wire.SimulatorRequest) (wire.Empty, error) {
+		return wire.Empty{}, simulatorInput(ctx, "home", r.Udid)
 	})
 	On(d, wire.CallSimulatorsScreen, func(ctx context.Context, _ *Client, r wire.SimulatorScreenRequest) (wire.SimulatorScreen, error) {
 		height := simulatorScreenHeight
@@ -83,6 +93,32 @@ func simctl(ctx context.Context, verb, udid string, args ...string) ([]byte, err
 		return nil, &Error{Code: CodeServer, Message: "simctl " + verb + ": " + said}
 	}
 	return out, nil
+}
+
+// simulatorInput is a touch or the Home button, through agents-watch --simulator beside this
+// binary: SimulatorKit, which Go cannot reach without cgo (Host/AgentsWatch/Simulator.swift).
+func simulatorInput(ctx context.Context, verb, udid string, args ...string) error {
+	if reason := noSimulators(); reason != "" {
+		return &Error{Code: wire.FailureNotSupported, Message: reason}
+	}
+	if !simulatorUDID.MatchString(udid) {
+		return Invalid("not a simulator's UDID: %s", udid)
+	}
+	helper := simulatorHelper()
+	if helper == "" {
+		return &Error{Code: wire.FailureNotSupported, Message: "This host cannot touch a simulator: agents-watch is not beside agentsd."}
+	}
+	ctx, cancel := context.WithTimeout(ctx, simulatorTimeout)
+	defer cancel()
+	out, err := exec.CommandContext(ctx, helper, append([]string{"--simulator", verb, udid}, args...)...).CombinedOutput()
+	if err != nil {
+		said := strings.TrimSpace(string(out))
+		if said == "" {
+			said = err.Error()
+		}
+		return &Error{Code: CodeServer, Message: said}
+	}
+	return nil
 }
 
 func listSimulators(ctx context.Context) wire.SimulatorList {

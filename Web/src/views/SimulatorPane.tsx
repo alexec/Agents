@@ -1,6 +1,6 @@
 // The Simulator pane (#842; SimulatorPaneView): a simulator on the session's Mac, its screen read
-// again each second while the pane shows. Boot and Shut Down are the person's press only. It
-// shows the screen; it does not take taps yet.
+// again each second while the pane shows. Boot and Shut Down are the person's press only. A click
+// on the screen is a touch there; Home is its button.
 import { useSignal } from "@preact/signals";
 import { useEffect } from "preact/hooks";
 import type { Store } from "../model/store";
@@ -13,6 +13,8 @@ export function SimulatorPane({ store, host }: { store: Store; host: string }) {
   const screen = useSignal<SimulatorScreen | null>(null);
   const problem = useSignal<string | null>(null);
   const busy = useSignal(false);
+  /** Counts touches, so the screen is read again at once after one. */
+  const touches = useSignal(0);
 
   const reload = async () => {
     try {
@@ -46,7 +48,18 @@ export function SimulatorPane({ store, host }: { store: Store; host: string }) {
     };
     void read();
     return () => { gone = true; };
-  }, [host, simulator?.udid, simulator?.booted]);
+  }, [host, simulator?.udid, simulator?.booted, touches.value]);
+
+  const touch = async (method: "simulators/tap" | "simulators/home", params: { udid: string; x?: number; y?: number }) => {
+    try {
+      if (method === "simulators/tap") await store.link.call(method, params as { udid: string; x: number; y: number }, host);
+      else await store.link.call(method, { udid: params.udid }, host);
+      problem.value = null;
+      setTimeout(() => { touches.value += 1; }, 250);
+    } catch (error) {
+      problem.value = describe(error);
+    }
+  };
 
   const toggle = async () => {
     if (!simulator) return;
@@ -71,6 +84,7 @@ export function SimulatorPane({ store, host }: { store: Store; host: string }) {
           </select>
         )}
         <span class="spacer" />
+        {simulator?.booted && <button class="link" title="Home" aria-label="Home" onClick={() => void touch("simulators/home", { udid: simulator.udid })}>⌂</button>}
         {simulator && <button class="link" disabled={busy.value} onClick={() => void toggle()}>{simulator.booted ? "Shut Down" : "Boot"}</button>}
         <button class="link" title="List the simulators again" aria-label="List the simulators again" onClick={() => void reload()}>↻</button>
       </div>
@@ -78,7 +92,14 @@ export function SimulatorPane({ store, host }: { store: Store; host: string }) {
         : !simulator ? <p class="hint">{list.value.reason ?? "This Mac has no iOS simulators. Make one in Xcode."}</p>
         : !simulator.booted ? <p class="hint">{simulator.name} is shut down. Boot it to see its screen.</p>
         : screen.value ? <img class="simulator-screen" alt={`The screen of ${simulator.name}`} width={screen.value.width} height={screen.value.height}
-            src={`data:image/jpeg;base64,${screen.value.jpeg}`} />
+            title="A click here is a tap on the simulator" src={`data:image/jpeg;base64,${screen.value.jpeg}`}
+            onClick={(e) => {
+              const shown = (e.currentTarget as HTMLImageElement).getBoundingClientRect();
+              if (!shown.width || !shown.height) return;
+              const x = Math.min(Math.max((e.clientX - shown.left) / shown.width, 0), 1);
+              const y = Math.min(Math.max((e.clientY - shown.top) / shown.height, 0), 1);
+              void touch("simulators/tap", { udid: simulator.udid, x, y });
+            }} />
         : <p class="hint"><span class="spinner" /></p>}
       {problem.value && <p class="faint small">{problem.value}</p>}
     </div>

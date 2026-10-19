@@ -4515,6 +4515,13 @@ type SimulatorScreenRequest struct {
 	MaxHeight *int64 `json:"maxHeight,omitzero"`
 }
 
+// simulators/tap: a touch on a booted simulator's screen, where from 0 to 1 across (x) and down (y).
+type SimulatorTapRequest struct {
+	Udid string  `json:"udid"`
+	X    float64 `json:"x"`
+	Y    float64 `json:"y"`
+}
+
 type SkillAddAnswer struct {
 	Skill ManagedSkill `json:"skill"`
 }

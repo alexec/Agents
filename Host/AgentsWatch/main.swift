@@ -13,9 +13,16 @@
 //   agents-watch --machine [locked|idle]
 //
 // watches the Mac and the person at it instead (#1368, Machine.swift).
+//
+//   agents-watch --simulator tap <udid> <x> <y> | home <udid>
+//
+// touches a booted simulator's screen, or presses its Home button (#842, Simulator.swift).
 import CoreServices
 import Foundation
 
+if CommandLine.arguments.count >= 2, CommandLine.arguments[1] == "--simulator" {
+    touchSimulator(Array(CommandLine.arguments.dropFirst(2)))
+}
 if CommandLine.arguments.count >= 2, CommandLine.arguments[1] == "--machine" {
     watchMachine(assumingAway: CommandLine.arguments.count > 2 ? CommandLine.arguments[2] : nil)
 }

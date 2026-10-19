@@ -128,6 +128,9 @@ public enum DaemonAPI {
         public static let simulatorsBoot = "simulators/boot"
         public static let simulatorsShutdown = "simulators/shutdown"
         public static let simulatorsScreen = "simulators/screen"
+        /// A touch on a booted simulator's screen, and its Home button (#842).
+        public static let simulatorsTap = "simulators/tap"
+        public static let simulatorsHome = "simulators/home"
         /// Stop one shell or task an agent left running in the background, and nothing
         /// else it is doing (057).
         public static let agentsStopBackground = "agents/stopBackground"
@@ -1259,6 +1262,18 @@ public enum DaemonAPI {
         public init(udid: String, maxHeight: Int? = nil) {
             self.udid = udid
             self.maxHeight = maxHeight
+        }
+    }
+
+    /// A touch on a booted simulator's screen, from 0 to 1 across (x) and down (y).
+    public struct SimulatorTapRequest: Codable, Sendable {
+        public var udid: String
+        public var x: Double
+        public var y: Double
+        public init(udid: String, x: Double, y: Double) {
+            self.udid = udid
+            self.x = x
+            self.y = y
         }
     }
 
