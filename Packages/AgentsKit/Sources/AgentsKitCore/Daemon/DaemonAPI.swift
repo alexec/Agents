@@ -2610,6 +2610,8 @@ public enum DaemonAPI {
             case list, read, write, remove
             /// Turn one on or off (#100).
             case enable, disable
+            /// Run one now, as Run now does (#1524).
+            case run
         }
 
         public var token: String

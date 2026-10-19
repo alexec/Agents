@@ -2,9 +2,11 @@ package agentsd
 
 import (
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/alexec/agents/Go/internal/agentsd/store"
 	"github.com/alexec/agents/Go/wire"
 )
 
@@ -53,4 +55,57 @@ func TestAnAgentWritesAWorkflow(t *testing.T) {
 		t.Fatal(text)
 	}
 	_ = wire.WorkflowModeNew
+}
+
+// An agent runs a workflow as Run now does (#1524), but never one waiting for the person's
+// OK or turned off, never one that runs in its triggering agent, and never past the chain limit.
+func TestAnAgentRunsAWorkflow(t *testing.T) {
+	fakeRuntimes(t)
+	d, c := start(t, t.TempDir())
+	defer d.Shutdown()
+	dir := project(t, c, 1)
+	folder := store.FolderURL(dir)
+	os.MkdirAll(workflowsFolder(dir), 0o755)
+	write := func(id, text string) {
+		os.WriteFile(filepath.Join(workflowsFolder(dir), id+".md"), []byte(text), 0o644)
+	}
+	write("review", "---\nname: Review\non: manual\n---\nReview what changed.\n")
+	write("off", "---\non: manual\nenabled: false\n---\nx\n")
+	write("mine", "---\non: agent.finished\nagent: triggering\n---\nx\n")
+	approveAll(t, c, folder)
+	write("new", "---\non: manual\n---\nx\n")
+	a := seeded(t, d, dir, nil)
+	m := appClient(t, d, a.ID)
+	m.post("initialize", map[string]any{}, 1)
+	run := func(n int, id string) (string, bool) {
+		return m.tool(n, "manage_workflows", map[string]any{"action": "run", "id": id})
+	}
+	text, isErr := run(2, "review")
+	if isErr || !strings.HasPrefix(text, "Ran review: it started agent ") {
+		t.Fatal(text)
+	}
+	ran := d.Store.Agent(wire.UUID(strings.Fields(strings.TrimPrefix(text, "Ran review: it started agent "))[0][:36]))
+	if ran == nil || ran.StartedByWorkflow == nil || *ran.StartedByWorkflow != "review" || *ran.ChainDepth != 1 {
+		t.Fatalf("%+v", ran)
+	}
+	if text, isErr := run(3, "new"); !isErr || !strings.HasPrefix(text, "Nothing was run: new is waiting for the person's OK") {
+		t.Fatal(text)
+	}
+	if text, isErr := run(4, "off"); !isErr || !strings.HasPrefix(text, "Nothing was run: off is turned off") {
+		t.Fatal(text)
+	}
+	if text, isErr := run(5, "mine"); !isErr || !strings.HasPrefix(text, "Nothing was run: mine runs in the agent that triggered it") {
+		t.Fatal(text)
+	}
+	if text, isErr := run(6, "../x"); !isErr || !strings.HasPrefix(text, "Workflows can only be read and written inside") {
+		t.Fatal(text)
+	}
+	deep := seeded(t, d, dir, func(a *wire.Agent) { n := int64(workflowChainLimit + 1); a.ChainDepth = &n })
+	dm := appClient(t, d, deep.ID)
+	dm.post("initialize", map[string]any{}, 1)
+	waitFor(t, "the first run over", func() bool { return !d.runningOf(dir, "review") })
+	if text, isErr := dm.tool(2, "manage_workflows", map[string]any{"action": "run", "id": "review"}); !isErr ||
+		text != "Nothing was run: review did not run, as this chain is already 3 deep." {
+		t.Fatal(text)
+	}
 }
