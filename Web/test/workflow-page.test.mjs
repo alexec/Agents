@@ -64,10 +64,11 @@ test("a value the runtime does not offer is said, naming what it does", () => {
   ]);
 });
 
-test("the host list offers This Mac first and leaves out a relay (#317)", () => {
+test("the host list offers This Mac first and leaves out a relay, on or off (#317, #1507)", () => {
   assert.deepEqual(w.workflowHostChoices([
     { id: "box", name: "Zebra", machineID: "z" },
     { id: "relay", name: "Relay", machineID: "r", relay: true },
+    { id: "off", name: "Relay switched off", machineID: "o", relay: false },
     { id: "mac", name: "Office", machineID: "mac-id" },
     { id: "gone", name: "No id" },
     { id: "again", name: "Also", machineID: "mac-id" },

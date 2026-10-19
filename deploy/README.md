@@ -109,6 +109,12 @@ Pebble issues the certificate for `agents.127.0.0.1.sslip.io`, which public DNS 
   base64 DER). This Mac's trust settings are not touched. The sandboxed window also needs an
   ATS exception for `sslip.io` in a walk copy of its own; see `specs/058-control-plane/walks/public-cert.md`.
 
+To count pushes with no relay host (#1460), give the control plane a fake APNs key (any P-256
+`.p8`, and 10-character Key and Team IDs), and `AGENTS_TEST_APNS_URL` for a fake APNs server on
+the compose network whose certificate chains to the control plane's `AGENTS_TEST_TRUST_ROOT`.
+Nothing then goes to Apple. `agentsctl pair -kind iPhone` and `agentsctl device` stand in for a
+phone. See `specs/058-control-plane/walks/1507.md`.
+
 ## Beyond one machine
 
 The same image runs anywhere containers do. Point `AGENTS_STORE` at a bucket of your own

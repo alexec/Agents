@@ -13,6 +13,7 @@ struct WorkflowHostsTests {
         let hosts = [
             host("box", "Zebra", machine: "zebra"),
             host("relay", "Relay", machine: "relay-id", relay: true),
+            host("off", "Relay switched off", machine: "off-id", relay: false),
             host("mac", "Alex’s Mac", machine: "mac-id"),
             host("gone", "No id", machine: nil),
             host("blank", "Blank", machine: "  "),
@@ -21,6 +22,14 @@ struct WorkflowHostsTests {
         let choices = WorkflowHosts.choices(from: hosts, thisMachine: "mac-id")
         #expect(choices.map(\.name) == ["This Mac", "Zebra"])
         #expect(choices.map(\.machineID) == ["mac-id", "zebra"])
+    }
+
+    /// A relay switched off is still a relay (#1507): on this Mac's machine, it is not
+    /// this Mac's host, and nothing reaches it for agents.
+    @Test func aRelaySwitchedOffRunsNoAgents() {
+        #expect(host("mac", "Mac", machine: "mac-id").runsAgents)
+        #expect(!host("relay", "Relay", machine: "mac-id", relay: true).runsAgents)
+        #expect(!host("relay", "Relay", machine: "mac-id", relay: false).runsAgents)
     }
 
     @Test func aPhoneCallsTheMacHostThisMacAndSortsTheRestByName() {

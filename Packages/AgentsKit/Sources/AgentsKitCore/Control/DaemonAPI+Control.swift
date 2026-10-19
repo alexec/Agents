@@ -218,7 +218,11 @@ public extension DaemonAPI {
         public var reach: String
         public var machineID: String?
         /// A relay host (`agents-relay`): it carries devices through iCloud and runs no agents.
+        /// True while it relays, false while it is switched off, nil on a host that runs agents.
         public var relay: Bool?
+        /// Not a relay host. A relay switched off is still a relay (`relay` false), and still
+        /// runs no agents (#1507).
+        public var runsAgents: Bool { relay == nil }
         /// The hosts whose sign-in this one may use, by runtime (T091).
         public var signInFrom: [String: HostID]?
         /// The hosts whose git access this one may use, by git server (#1122).

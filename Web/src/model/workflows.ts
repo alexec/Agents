@@ -786,7 +786,7 @@ export interface WorkflowHostChoice {
 export function workflowHostChoices(hosts: readonly { id: string; name: string; machineID?: string | undefined; relay?: boolean | undefined }[]): WorkflowHostChoice[] {
   const usable = hosts.flatMap((host) => {
     const machineID = (host.machineID ?? "").trim();
-    return host.relay === true || machineID === "" ? [] : [{ ...host, machineID }];
+    return host.relay !== undefined || machineID === "" ? [] : [{ ...host, machineID }];
   });
   const ordered = [...usable].sort((a, b) => {
     const aMac = a.id === "mac";

@@ -65,7 +65,7 @@ final class ControlSettingsModel {
     var isOnThisMac: Bool { status?.machineID == MachineID.current }
 
     /// The host on this Mac: shown first and without buttons (the look gate's decision).
-    var thisMacHost: DaemonAPI.ControlHost? { hosts.first { $0.machineID == MachineID.current && $0.relay != true } }
+    var thisMacHost: DaemonAPI.ControlHost? { hosts.first { $0.machineID == MachineID.current && $0.runsAgents } }
     /// Every other host, and this Mac's relay: it shares the Mac's machine but is not its host.
     var otherHosts: [DaemonAPI.ControlHost] { hosts.filter { $0.machineID != MachineID.current || $0.relay != nil } }
 
@@ -325,7 +325,7 @@ final class ControlSettingsModel {
     /// (#976): Add as Host… offers to link one instead.
     func hostsThatMayBe(_ workspace: DaemonAPI.WorkspaceInfo) -> [DaemonAPI.ControlHost] {
         guard workspace.host == nil else { return [] }
-        return hosts.filter { $0.workspace == nil && $0.relay != true && workspace.mayBe(hostNamed: $0.name) }
+        return hosts.filter { $0.workspace == nil && $0.runsAgents && workspace.mayBe(hostNamed: $0.name) }
     }
 
     /// The workspaces no host is linked to yet, by provider, for Link to Workspace….

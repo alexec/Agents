@@ -25,7 +25,7 @@ enum KeptThisMacHost {
     /// The host on this machine in `listed`, kept; none there forgets the one kept.
     static func keep(from listed: [DaemonAPI.ControlHost], controlKey: Data, machine: String = MachineID.current,
                      in defaults: UserDefaults) {
-        guard let mine = listed.first(where: { $0.machineID == machine && $0.relay != true && $0.id != .mac }) else {
+        guard let mine = listed.first(where: { $0.machineID == machine && $0.runsAgents && $0.id != .mac }) else {
             defaults.removeObject(forKey: defaultsKey)
             return
         }

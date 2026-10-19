@@ -12,6 +12,6 @@ enum ThisMacHost {
     /// that host. Otherwise this Mac is not a host.
     static func resolve(_ hosts: [DaemonAPI.ControlHost]?, machine: String = MachineID.current) -> HostID? {
         guard let hosts else { return .mac }
-        return hosts.first(where: { $0.machineID == machine && $0.relay != true })?.id
+        return hosts.first(where: { $0.machineID == machine && $0.runsAgents })?.id
     }
 }

@@ -1078,7 +1078,7 @@ export class Store extends Work {
         await this.loadHost(host.id);
       })));
       // One offline or stopped now lists what it last did, greyed, as the window keeps it (#962).
-      await Promise.all(this.hosts.value.filter((host) => host.state !== "online" && host.relay !== true)
+      await Promise.all(this.hosts.value.filter((host) => host.state !== "online" && host.relay === undefined)
         .map((host) => this.onHost(host.id, () => this.loadLastHeard(host.id))));
       const watching = this.watching.value;
       if (watching) await this.loadTranscript(watching.host, watching.session);

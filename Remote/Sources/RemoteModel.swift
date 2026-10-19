@@ -2107,13 +2107,13 @@ final class RemoteModel {
         guard let status = try? await control.call(DaemonAPI.Method.controlStatus, returning: DaemonAPI.ControlStatus.self),
               let listed = try? await control.call(DaemonAPI.Method.hostsList, returning: [DaemonAPI.ControlHost].self)
         else { return }
-        controlHosts = listed.filter { $0.relay != true }
+        controlHosts = listed.filter(\.runsAgents)
         gitAsksAnswered.formIntersection(GitLendAsk.waiting(in: listed))
         controlHome = status.homeHost
         // The relay's key, from the control plane itself (T077): kept for when its address
         // cannot be reached.
         RemoteControl.keepRelayKey(status.relayKey)
-        let others = listed.filter { $0.id != status.homeHost && $0.state == "online" && $0.relay != true }
+        let others = listed.filter { $0.id != status.homeHost && $0.state == "online" && $0.runsAgents }
         for host in others {
             let other = otherHosts[host.id] ?? DaemonClient(link: link.link(for: host.id))
             otherHosts[host.id] = other

@@ -52,14 +52,18 @@
 //	                            X-Forwarded-For is a socket's source, for the per-source budget
 //	AGENTS_CONTROL_NAME, AGENTS_CONTROL_MACHINE_ID, AGENTS_CONTROL_SERVERS,
 //	AGENTS_CONTROL_TOOLSETS
+//	AGENTS_APNS_KEY_FILE, AGENTS_APNS_KEY_ID, AGENTS_APNS_TEAM_ID: the APNs key (#1460)
+//	AGENTS_TEST_APNS_URL        a walk's fake APNs, trusted by AGENTS_TEST_TRUST_ROOT (#1507)
 package main
 
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io"
+	"net/http"
 	"net/url"
 	"os"
 	"os/exec"
@@ -79,6 +83,7 @@ import (
 	"github.com/alexec/agents/Go/internal/controlplane/records"
 	"github.com/alexec/agents/Go/internal/controlplane/store"
 	"github.com/alexec/agents/Go/internal/controlplane/web"
+	"github.com/alexec/agents/Go/wire"
 )
 
 var (
@@ -200,8 +205,18 @@ func pusher() controlplane.Pusher {
 	if info, err := os.Stat(file); err != nil || info.Size() == 0 {
 		return nil
 	}
-	client, err := apns.New(apns.Config{KeyFile: file, KeyID: strings.TrimSpace(os.Getenv("AGENTS_APNS_KEY_ID")),
-		TeamID: strings.TrimSpace(os.Getenv("AGENTS_APNS_TEAM_ID"))})
+	cfg := apns.Config{KeyFile: file, KeyID: strings.TrimSpace(os.Getenv("AGENTS_APNS_KEY_ID")),
+		TeamID: strings.TrimSpace(os.Getenv("AGENTS_APNS_TEAM_ID"))}
+	// A walk's stand-in for Apple (#1507): every push goes to AGENTS_TEST_APNS_URL, whose
+	// certificate chains to AGENTS_TEST_TRUST_ROOT, so a walk counts its pushes with a fake
+	// key and nothing reaches Apple.
+	if fake := strings.TrimSpace(os.Getenv("AGENTS_TEST_APNS_URL")); fake != "" {
+		cfg.Hosts = map[wire.PushEnvironment]string{wire.PushEnvironmentProduction: fake, wire.PushEnvironmentDevelopment: fake}
+		cfg.HTTP = &http.Client{Timeout: 30 * time.Second, Transport: &http.Transport{ForceAttemptHTTP2: true,
+			TLSClientConfig: &tls.Config{RootCAs: controllink.TestTrustRoots()}}}
+		say("pushes go to " + fake + ", a walk's stand-in for APNs")
+	}
+	client, err := apns.New(cfg)
 	if err != nil {
 		say("no pushes: " + err.Error())
 		return nil
