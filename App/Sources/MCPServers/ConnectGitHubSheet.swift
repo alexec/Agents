@@ -96,7 +96,7 @@ struct ConnectGitHubSheet: View {
             }
             .padding(12)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color.accentColor.opacity(0.1), in: RoundedRectangle(cornerRadius: 8))
+            .background(Paper.accent.opacity(0.1), in: RoundedRectangle(cornerRadius: 8))
         case .install(let login, let repository):
             VStack(alignment: .leading, spacing: 6) {
                 Text("Connected as \(login).").appText(.supporting).fontWeight(.semibold)
@@ -105,7 +105,7 @@ struct ConnectGitHubSheet: View {
             }
             .padding(12)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color.accentColor.opacity(0.1), in: RoundedRectangle(cornerRadius: 8))
+            .background(Paper.accent.opacity(0.1), in: RoundedRectangle(cornerRadius: 8))
         case .failed(let why):
             Text(why).appText(.fine).tinted(.failure).fixedSize(horizontal: false, vertical: true)
         }
@@ -206,10 +206,11 @@ struct ConnectorMark: View {
 
     var body: some View {
         Text(letters)
+            // Decorative: two letters in a fixed disc, like an avatar, not text to read.
             .font(.system(size: 13, weight: .bold))
-            .foregroundStyle(filled ? Color.white : Color.accentColor)
+            .foregroundStyle(filled ? Color.white : Paper.accent)
             .frame(width: 34, height: 34)
-            .background(filled ? AnyShapeStyle(Color(white: 0.13)) : AnyShapeStyle(Color.accentColor.opacity(0.15)), in: Circle())
+            .background(filled ? AnyShapeStyle(Color(white: 0.13)) : AnyShapeStyle(Paper.accent.opacity(0.15)), in: Circle())
             .accessibilityHidden(true)
     }
 }

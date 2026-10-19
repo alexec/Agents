@@ -131,7 +131,7 @@ struct ConnectorSetupView: View {
                     .fixedSize(horizontal: false, vertical: true)
                 if events.state == .on {
                     Text(ConnectorSetupWords.eventNouns(events.names).joined(separator: " "))
-                        .appText(.code).foregroundStyle(Color.accentColor)
+                        .appText(.code).foregroundStyle(Paper.accent)
                         .help(events.names.joined(separator: ", "))
                 }
             }
@@ -297,7 +297,7 @@ private struct SlotMark: View {
         Group {
             switch state {
             case .read:
-                Image(systemName: "checkmark.circle.fill").foregroundStyle(Color.accentColor)
+                Image(systemName: "checkmark.circle.fill").foregroundStyle(Paper.accent)
             case .failed, .refused:
                 Image(systemName: "exclamationmark.circle").tinted(.attention)
             case .skipped:
@@ -349,7 +349,7 @@ private struct SlotChange: View {
                     Button(action: choice.pick) {
                         HStack(alignment: .top, spacing: 8) {
                             Image(systemName: choice.chosen ? "largecircle.fill.circle" : "circle")
-                                .foregroundStyle(choice.chosen ? Color.accentColor : .secondary)
+                                .foregroundStyle(choice.chosen ? Paper.accent : .secondary)
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(choice.title).appText(.supporting).fontWeight(.semibold)
                                 Text(choice.note).appText(.fine).foregroundStyle(.secondary)
@@ -361,7 +361,7 @@ private struct SlotChange: View {
                         .frame(maxWidth: .infinity, alignment: .topLeading)
                         .contentShape(Rectangle())
                         .overlay(RoundedRectangle(cornerRadius: 8)
-                            .strokeBorder(choice.chosen ? Color.accentColor : Paper.rule, lineWidth: choice.chosen ? 2 : 1))
+                            .strokeBorder(choice.chosen ? Paper.accent : Paper.rule, lineWidth: choice.chosen ? 2 : 1))
                     }
                     .buttonStyle(.plain)
                     .accessibilityAddTraits(choice.chosen ? .isSelected : [])
@@ -375,7 +375,7 @@ private struct SlotChange: View {
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Paper.raised, in: RoundedRectangle(cornerRadius: 10))
-        .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(Color.accentColor, lineWidth: 2))
+        .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(Paper.accent, lineWidth: 2))
     }
 
     private struct Choice {
