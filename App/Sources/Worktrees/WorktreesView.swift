@@ -147,16 +147,17 @@ struct WorktreeRow: View {
         .contentShape(RoundedRectangle(cornerRadius: 14))
         .paperRow()
         .contextMenu {
-            // This Mac's worktree, sent to a server and added there (#1123).
+            // This Mac's worktree, sent to a server and added there (#1123). The worktrees are
+            // this Mac's host's, by its own id when it has one (#1496, #1536).
             ForEach(worktree.exists ? model.sendTargets : [], id: \.self) { host in
                 Button("Send to \(model.hosts.label(host))…") {
-                    sending = SendToHostRequest(folder: worktree.root, from: .mac, host: host)
+                    sending = SendToHostRequest(folder: worktree.root, from: model.thisMacHostID ?? .mac, host: host)
                 }
             }
             // The server's branches, brought back into this worktree's repository (#1473).
             ForEach(worktree.exists ? model.sendTargets : [], id: \.self) { host in
                 Button("Bring Back from \(model.hosts.label(host))…") {
-                    bringingBack = BringBackFromHostRequest(folder: worktree.root, from: .mac, host: host)
+                    bringingBack = BringBackFromHostRequest(folder: worktree.root, from: model.thisMacHostID ?? .mac, host: host)
                 }
             }
         }
