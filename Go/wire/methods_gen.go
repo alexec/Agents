@@ -75,6 +75,7 @@ var (
 	CallEventsRaise                    = Method[EventRaiseRequest, Event]{"events/raise"}
 	CallEventsServer                   = Method[ServerReachabilityChange, Event]{"events/server"}
 	CallFilesBrowse                    = Method[FilesBrowseRequest, DirectoryListing]{"files/browse"}
+	CallFilesComplete                  = Method[FileCompletionRequest, FileCompletions]{"files/complete"}
 	CallFilesDiagnostics               = Method[FileDiagnosticsRequest, FileDiagnostics]{"files/diagnostics"}
 	CallFilesList                      = Method[FilesListRequest, DirectoryListing]{"files/list"}
 	CallFilesMention                   = Method[FileMentionRequest, []FileMentionDTO]{"files/mention"}

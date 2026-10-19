@@ -56,7 +56,8 @@ struct SourceEditor: View {
                     .padding(.vertical, 6)
                 Divider()
             }
-            SourceTextView(text: $draft, line: line, jump: jump, isEditable: actions.canEdit) {
+            SourceTextView(text: $draft, line: line, jump: jump, isEditable: actions.canEdit,
+                           complete: completer) {
                 commit()
             }
             .accessibilityLabel(URL(filePath: path).lastPathComponent)
@@ -86,6 +87,13 @@ struct SourceEditor: View {
         }
         // Left with something unsaved — Back, another file, the pane shut: written now.
         .onDisappear { commit() }
+    }
+
+    /// The language server's completion at a place in the text (#844), for the text view.
+    private var completer: (@MainActor (String, Int, Int) async -> [String])? {
+        guard let complete = actions.complete else { return nil }
+        let path = path
+        return { text, line, column in await complete(path, text, line, column).map(\.written) }
     }
 
     private func commit() {
@@ -200,6 +208,9 @@ private struct SourceTextView: NSViewRepresentable {
     let line: Int?
     var jump: SourceJump?
     let isEditable: Bool
+    /// The language server's words for the caret's place (#844): ⌥Esc or F5 asks, and the
+    /// text view's own completion list shows them.
+    var complete: (@MainActor (_ text: String, _ line: Int, _ column: Int) async -> [String])?
     /// Focus going elsewhere: what is typed goes now rather than after the pause.
     let onEnd: () -> Void
 
@@ -272,6 +283,42 @@ private struct SourceTextView: NSViewRepresentable {
     final class Coordinator: NSObject, NSTextViewDelegate {
         var parent: SourceTextView
         var lastJump: SourceJump?
+        /// The language server's last words, for the completion list and its filtering.
+        var offered: [String]?
+
+        /// Complete (⌥Esc, F5): asked of the language server, then the list shown.
+        func textView(_ textView: NSTextView, doCommandBy selector: Selector) -> Bool {
+            guard selector == #selector(NSResponder.complete(_:)), let complete = parent.complete else { return false }
+            let place = Self.place(of: textView.selectedRange().location, in: textView.string)
+            let text = textView.string
+            Task { @MainActor [weak self, weak textView] in
+                let words = await complete(text, place.line, place.column)
+                guard let self, let textView, textView.string == text else { return }
+                guard !words.isEmpty else { NSSound.beep(); return }
+                self.offered = words
+                textView.complete(nil)
+            }
+            return true
+        }
+
+        func textView(_ textView: NSTextView, completions words: [String], forPartialWordRange charRange: NSRange,
+                      indexOfSelectedItem index: UnsafeMutablePointer<Int>?) -> [String] {
+            guard let offered else { return words }
+            let partial = (textView.string as NSString).substring(with: charRange).lowercased()
+            let matching = offered.filter { $0.lowercased().hasPrefix(partial) }
+            return matching.isEmpty ? offered : matching
+        }
+
+        /// A UTF-16 offset as a line and column, both from 1.
+        static func place(of offset: Int, in text: String) -> (line: Int, column: Int) {
+            var line = 1
+            var start = 0
+            for (i, unit) in text.utf16.prefix(offset).enumerated() where unit == 0x0A {
+                line += 1
+                start = i + 1
+            }
+            return (line, offset - start + 1)
+        }
 
         init(_ parent: SourceTextView) { self.parent = parent }
 
@@ -293,6 +340,8 @@ private struct SourceTextView: UIViewRepresentable {
     let line: Int?
     var jump: SourceJump?
     let isEditable: Bool
+    /// Not offered on a phone or iPad yet (#844): its keyboard has no completion list.
+    var complete: (@MainActor (_ text: String, _ line: Int, _ column: Int) async -> [String])?
     let onEnd: () -> Void
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
