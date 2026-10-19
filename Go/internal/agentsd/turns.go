@@ -580,7 +580,13 @@ func (l *live) turn() bool {
 	l.evidence = turnEvidence{}
 	l.failure = nil
 	l.mu.Unlock()
-	d.setState(l.id, wire.AgentStateRunning)
+	// Archived or stopped while it got ready (#1611): its context is gone, and the state
+	// is left as the stop wrote it.
+	if ctx.Err() != nil {
+		d.end(l, wire.AgentStateStopped, wire.EndedReasonCancelled)
+		return false
+	}
+	d.moveState(l.id, wire.AgentStateRunning, true)
 	if q.Preface != nil {
 		bs = append([]wire.ContentBlock{textBlock(*q.Preface)}, bs...)
 	}
@@ -725,9 +731,16 @@ func acpBlocks(bs []wire.ContentBlock) []sdk.ContentBlock {
 // answered mid-turn (waiting on the person, then running again) keeps the turn's report:
 // a block reported before the card is still how the turn ends (#1432).
 func (d *Daemon) setState(id wire.UUID, s wire.AgentState) {
+	d.moveState(id, s, false)
+}
+
+// moveState is setState; only a turn's words sent to an archived agent take it out of the
+// archive (unarchive): a card or an answer in a turn its archive cut off leaves it there
+// (#1611).
+func (d *Daemon) moveState(id wire.UUID, s wire.AgentState, fromArchive bool) {
 	changed, started := false, false
 	d.change(id, func(a *wire.Agent) {
-		if a.State == s {
+		if a.State == s || a.State == wire.AgentStateArchived && !fromArchive {
 			return
 		}
 		changed, started = true, a.State == wire.AgentStateStarting && s == wire.AgentStateRunning
@@ -755,6 +768,15 @@ func (d *Daemon) end(l *live, s wire.AgentState, why wire.EndedReason) {
 	l.mu.Lock()
 	last, reported := l.lastMessage.String(), l.reported
 	l.mu.Unlock()
+	// A turn its archive cut off (#1611): the session stays archived, and the ending is not
+	// said, as a stop or a crash, nor picked up after a restart.
+	if a := d.Store.Agent(l.id); a != nil && a.State == wire.AgentStateArchived {
+		d.workflowRunFinished(l.id)
+		d.guardedTurnEnded(l.id)
+		d.checkQueueSoon(projectFolder(a))
+		d.agentEnded(l.id)
+		return
+	}
 	// A turn the host's going cut off is the daemon's going, not a stop somebody chose
 	// (#1605): the next start picks it up, as after a crash.
 	if d.going() && s == wire.AgentStateStopped && (why == wire.EndedReasonCancelled || why == wire.EndedReasonProcessDied) {
@@ -1162,6 +1184,23 @@ func (l *live) cancel() {
 		}
 	} else if stop != nil {
 		stop()
+	}
+}
+
+// halt ends the turn and the runtime for the daemon's own reasons (an archive, a delete):
+// the turn's context goes first, so the turn ends cancelled and the runtime's exit is not
+// taken for a crash (#1611).
+func (l *live) halt() {
+	l.cancel()
+	l.mu.Lock()
+	s, stop := l.session, l.stop
+	l.session = nil
+	l.mu.Unlock()
+	if stop != nil {
+		stop()
+	}
+	if s != nil {
+		s.Stop()
 	}
 }
 
