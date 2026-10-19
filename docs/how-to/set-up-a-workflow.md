@@ -145,6 +145,46 @@ unarchiving it does not pin it again.
   clones, Macs and servers. Commit it if they should have it too.
 - To remove it for good, delete its file. **Show in Finder** on the row's menu finds it.
 
+## Keep a long method in a skill
+
+When a workflow's prompt grows past a few paragraphs, put the method in a skill and keep
+the workflow slim (#1563). A person or an agent can then follow the same method by hand,
+and you change the method without touching the workflow's triggers.
+
+1. Write the method as a skill in the project: `.agents/skills/<name>/SKILL.md`, with a
+   `name` and a `description` that says when to use it. See
+   [Share skills across agents](share-skills-across-agents.md).
+2. Keep the workflow to its front matter, one or two lines about what it is for, its
+   limits, and a line that names the skill. For example, `.agents/workflows/crash-reports.md`:
+
+   ```markdown
+   ---
+   name: Crash reports
+   on:
+     - schedule:
+         at: [":00"]
+         between: "07:00-07:00"
+   agent: new
+   permission-mode: auto
+   when-done: archive
+   ---
+
+   You read the crash reports this project's apps wrote on this Mac since the last run,
+   and file a GitHub issue for each distinct crash that is not already tracked. The
+   issues are the handoff: you fix nothing.
+
+   Follow the `crash-reports` skill (`.agents/skills/crash-reports/SKILL.md`) from its
+   first step to its last. Its rules are the limits of this run. The note at the end of
+   this prompt says why the run started.
+   ```
+
+3. Do not write the cause of the run into the file. The app adds a note at the end of
+   every run's prompt that says why it started: the event and its details, the agent
+   behind it, the schedule's time, **Run now**, or the agent that ran it (#1562). See
+   [Workflow triggers and actions](../reference/workflows.md).
+
+`.agents/workflows/release.md` and the review workflows in this repository have this shape.
+
 ## If it doesn't work
 
 A workflow that did not run says why on its row and its page, for example:
