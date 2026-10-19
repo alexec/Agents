@@ -21,6 +21,9 @@ Rules from Alex (2026-10-12/13) that are not in AGENTS.md:
   land first.
 - **Priority:** build speed and PR throughput, then bugs, then enhancements; `expedite`
   first within each. Take the next issue whose `area:` is free.
+- **One standing lane for polish and competitor gaps** (#1570): it takes the open
+  issues labelled `polish` or `competitor` with no milestone, highest RICE first,
+  alongside the milestone lanes and under the same area and open-PR limits.
 - **A release is waiting** on issues labelled `priority:high` and `priority:medium`
   (#914): take them first, high before medium, and within each security, performance,
   usability, runtimes, then the rest (#1462). Start a medium one only when no high one
