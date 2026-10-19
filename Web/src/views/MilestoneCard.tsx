@@ -7,7 +7,8 @@ import type { Store } from "../model/store";
 
 /** The one-time card for a milestone just earned on this Mac's host. No notification is sent. */
 export function MilestoneCard({ store }: { store: Store }) {
-  const host = store.hosts.value.some((h) => h.id === "mac") ? "mac" : store.hosts.value[0]?.id;
+  const macID = store.macHostID.value;
+  const host = store.hosts.value.some((h) => h.id === macID) ? macID : store.hosts.value[0]?.id;
   const id = milestonesSeen.card(host ? store.milestones.value[host] : undefined);
   if (!id) return null;
   const milestone = milestoneList.find((m) => m.id === id)!;

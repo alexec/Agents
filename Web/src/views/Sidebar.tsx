@@ -53,9 +53,9 @@ const matchesShown = 10;
 /** How long the typing pauses before the folds filter and the hosts are asked (#176). */
 export const searchPause = 150;
 
-/** A project's name in the sidebar: `host:Project` on a server, the name alone on this Mac. */
-export function projectLabel(host: ControlHost | undefined, project: ProjectSummary): string {
-  return !host || host.id === "mac" ? project.name : `${host.name}:${project.name}`;
+/** A project's name in the sidebar: `host:Project` on a server, the name alone on this Mac (`macID`, #1501). */
+export function projectLabel(host: ControlHost | undefined, project: ProjectSummary, macID = "mac"): string {
+  return !host || host.id === macID ? project.name : `${host.name}:${project.name}`;
 }
 
 /**
@@ -73,9 +73,9 @@ export function byAdded(a: ProjectSummary, b: ProjectSummary): number {
  * oldest added first, as the window's and the Remote's (SidebarOrder.projects, #250, #357): no
  * heading for a host.
  */
-export function orderedProjects(hosts: ControlHost[], projects: Record<string, ProjectSummary[]>):
+export function orderedProjects(hosts: ControlHost[], projects: Record<string, ProjectSummary[]>, macID = "mac"):
   { host: ControlHost; project: ProjectSummary }[] {
-  const ordered = [...hosts.filter((h) => h.id === "mac"), ...hosts.filter((h) => h.id !== "mac")];
+  const ordered = [...hosts.filter((h) => h.id === macID), ...hosts.filter((h) => h.id !== macID)];
   const byHost = ordered.flatMap((host) => (projects[host.id] ?? [])
     .filter((project) => project.project.archivedAt === undefined)
     .sort(byAdded)
@@ -134,13 +134,13 @@ export function Sidebar({ session, store, linkDown }: { session: Session; store:
   }, [r.host, r.project, r.compose]);
   // A tab holding one project alone (#1089): its sidebar is that project's only.
   const held = alone.value;
-  const every = orderedProjects(store.hosts.value, store.projects.value);
+  const every = orderedProjects(store.hosts.value, store.projects.value, store.macHostID.value);
   const projects = held ? every.filter(({ host, project }) => host.id === held.host
     && folderKey(project.project.folder) === folderKey(held.folder)) : every;
   const archived = held ? [] : archivedProjects(store.hosts.value, store.projects.value);
   const showsArchived = folds.showsArchivedProjects.value;
   const offline = store.hosts.value.filter((h) => h.state !== "online");
-  const macHost = store.hosts.value.find((h) => h.id === "mac");
+  const macHost = store.hosts.value.find((h) => h.id === store.macHostID.value);
   const macNotice = store.macHostNotice.value;
   const query = searched.value;
   return (
@@ -149,7 +149,7 @@ export function Sidebar({ session, store, linkDown }: { session: Session; store:
         {/* The root list's title at a phone's width, as the iPhone's (#235). */}
         {held ? <>
           <button class="link back-all" aria-label="All projects" onClick={showAll}>‹ All</button>
-          <h1 class="alone-title">{projects[0] ? projectLabel(projects[0].host, projects[0].project) : "Project"}</h1>
+          <h1 class="alone-title">{projects[0] ? projectLabel(projects[0].host, projects[0].project, store.macHostID.value) : "Project"}</h1>
         </> : <h1 class="narrow-only">Agents</h1>}
         <input class="search" type="search" placeholder="Search" aria-label="Search sessions and workflows"
           value={search.value} onInput={(e) => (search.value = (e.currentTarget as HTMLInputElement).value)} />
@@ -218,7 +218,7 @@ export function Sidebar({ session, store, linkDown }: { session: Session; store:
             <p class="quiet small">{macHostNoticeDetail(macNotice)}</p>
           </div>
         ))}
-        {offline.filter((host) => host.id !== "mac").map((host) => (
+        {offline.filter((host) => !store.isMac(host.id)).map((host) => (
           <p class="foot-line" role="status" key={host.id}>
             <span aria-hidden="true">⚡︎</span> {footLine(host)}
             {/* One on a stopped workspace offers Start, as its strip (#961). */}
@@ -232,7 +232,7 @@ export function Sidebar({ session, store, linkDown }: { session: Session; store:
             may have gone from view, and that what they held is kept. A server's are named. */}
         {store.hosts.value.flatMap((host) => (store.storeNotes.value[host.id] ?? []).map((note) => (
           <p class="foot-line store-note" role="status" key={`${host.id}|${note}`}>
-            <span aria-hidden="true">⚠︎</span> {host.id === "mac" ? note : `${host.name}: ${note}`}
+            <span aria-hidden="true">⚠︎</span> {store.isMac(host.id) ? note : `${host.name}: ${note}`}
           </p>
         )))}
         <div class="identity">
@@ -439,7 +439,7 @@ function SmartFold({ row, store, projects, query, linkDown, downSince }: {
         const host = line.host.id;
         const folder = line.project.project.folder;
         const down = linkDown || !store.hostIsOnline(host);
-        const place = projectLabel(line.host, line.project);
+        const place = projectLabel(line.host, line.project, store.macHostID.value);
         return line.kind === "session" ? (
           <SidebarSession key={`${host}|${line.agent.id}`} store={store} host={host} folder={folder} agent={line.agent}
             chosen={r.host === host && r.session === line.agent.id} down={down} pinnedAt={line.pins} place={place} tree={line.tree} />
@@ -455,7 +455,7 @@ function SmartFold({ row, store, projects, query, linkDown, downSince }: {
         const host = placed.host.id;
         const folder = placed.project.project.folder;
         const key = `${host}|${folder}|${approvalID(approval)}`;
-        const place = projectLabel(placed.host, placed.project);
+        const place = projectLabel(placed.host, placed.project, store.macHostID.value);
         const down = linkDown || !store.hostIsOnline(host);
         if (opensItsSubject(approval)) {
           const agentID = approval.agentID as string | undefined;
@@ -485,7 +485,7 @@ const ProjectFold = memo(function ProjectFold({ store, host, project, query, lin
 }) {
   const r = route.value;
   const folder = project.project.folder;
-  const label = projectLabel(host, project);
+  const label = projectLabel(host, project, store.macHostID.value);
   const searching = query !== "";
   const unfolded = searching || isAlone || folds.isOpen(host.id, folder);
   const down = linkDown || !store.hostIsOnline(host.id);
@@ -668,7 +668,7 @@ function ArchivedProjectRow({ store, host, project, down }: {
 }) {
   const folder = project.project.folder;
   const archivedAt = project.project.archivedAt;
-  const label = projectLabel(host, project);
+  const label = projectLabel(host, project, store.macHostID.value);
   const unarchive = async () => {
     if (await store.unarchiveProject(host.id, folder)) go({ host: host.id, project: folder, compose: true });
   };

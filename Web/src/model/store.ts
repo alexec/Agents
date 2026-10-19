@@ -38,9 +38,6 @@ import { goOnRequest } from "./limits";
 import { milestonesSeen } from "./milestones";
 import type { ChartHint } from "./chart";
 
-/** The person's Mac: the host that keeps their display choices (#1033). */
-const macHost = "mac";
-
 export { folderKey } from "./groups";
 
 /** DaemonAPI.SandboxWillNotStart, a start's refusal when its runtime's sandbox will not start, with its sentence. */
@@ -366,12 +363,33 @@ export class Work {
     this.milestones.value = { ...this.milestones.value, [host]: milestones };
     milestonesSeen.take(milestones);
   }
-  /** The control plane's machine, and how this Mac's host says its join stands (#666), from `control/status`. */
-  readonly plane = signal<{ machineID: string; thisMacHost?: HostJoinStatus | undefined } | null>(null);
+  /**
+   * The control plane's machine, its home host, and how this Mac's host says its join stands
+   * (#666), from `control/status`.
+   */
+  readonly plane = signal<{ machineID: string; homeHost?: string | undefined; thisMacHost?: HostJoinStatus | undefined } | null>(null);
+  /**
+   * The person's Mac (#1501): the host that keeps their display choices (#1033) and that the page
+   * calls "This Mac". It is `mac`, or, with a control plane elsewhere, where this Mac's host joins
+   * with an id of its own (#1496), the control plane's home host when it is a Mac. The page is on
+   * no Mac, so it cannot find the host by its own machine id as the window does.
+   */
+  readonly macHostID: ReadonlySignal<string> = computed(() => {
+    const hosts = this.hosts.value;
+    if (hosts.some((h) => h.id === "mac")) return "mac";
+    const home = this.plane.value?.homeHost;
+    const listed = home ? hosts.find((h) => h.id === home) : undefined;
+    return listed && listed.relay === undefined && listed.platform.startsWith("macOS") ? listed.id : "mac";
+  });
+  /** Whether `host` is the person's Mac (#1501). */
+  isMac(host: string | undefined): boolean {
+    return host !== undefined && host === this.macHostID.value;
+  }
   /** Why this Mac's host is quiet, as the window says it (#666), or nil while it is online. */
   readonly macHostNotice: ReadonlySignal<MacHostNotice | null> = computed(() => {
     const plane = this.plane.value;
-    const mac = this.hosts.value.find((h) => h.id === "mac");
+    const macID = this.macHostID.value;
+    const mac = this.hosts.value.find((h) => h.id === macID);
     const onThisMac = !!plane?.machineID && plane.machineID === mac?.machineID;
     return decideMacHostNotice(onThisMac, mac?.state, plane?.thisMacHost);
   });
@@ -543,7 +561,7 @@ export class Work {
         this.takeMilestones(host, params as Milestones);
         return true;
       case "preferences/changed":
-        if (host === macHost) preferencesSaid(params as Record<string, JSONValue>);
+        if (this.isMac(host)) preferencesSaid(params as Record<string, JSONValue>);
         return true;
       case "modes/changed":
         this.rememberedModes.value = { ...this.rememberedModes.value, [host]: params as Record<string, JSONValue> };
@@ -1024,7 +1042,7 @@ export class Store extends Work {
     super();
     // The person's display choices are kept on their Mac (#1033).
     sendPreferencesWith((changes) => {
-      void this.link.call("preferences/set", changes as Record<string, JSONValue>, macHost)
+      void this.link.call("preferences/set", changes as Record<string, JSONValue>, this.macHostID.peek())
         .then((said) => preferencesSaid(said)).catch(() => undefined);
     });
     link.onNotification((method, params, host) => {
@@ -1095,7 +1113,7 @@ export class Store extends Work {
   private async loadPlane(): Promise<void> {
     const status = await this.link.call("control/status", {}).catch(() => null);
     if (!status) return;
-    this.plane.value = { machineID: status.machineID, thisMacHost: status.thisMacHost };
+    this.plane.value = { machineID: status.machineID, homeHost: status.homeHost, thisMacHost: status.thisMacHost };
     knowPublicViews(status.publicViews);
   }
 
@@ -1295,7 +1313,7 @@ export class Store extends Work {
     }).catch(failed("store/notes"));
     // The person's display choices, from their Mac (#1033). A Mac too old to know the method
     // leaves every choice at its default.
-    if (host === macHost) {
+    if (host === this.macHostID.peek()) {
       void this.link.call("preferences/get", {}, host).then((said) => preferencesSaid(said))
         .catch(failed("preferences/get"));
     }
@@ -1867,7 +1885,7 @@ export class Store extends Work {
       return await this.link.call(method, params, host);
     } catch (error) {
       const runtime = error instanceof CallFailed && error.code === Failure.credentialWanted ? wantedRuntime(error.data) : null;
-      if (host === "mac" || !runtime || !takesKey(runtime) || this.tokenAsk.peek()) throw error;
+      if (this.isMac(host) || !runtime || !takesKey(runtime) || this.tokenAsk.peek()) throw error;
       const lent = await new Promise<boolean>((answer) => { this.tokenAsk.value = { host, runtimeID: runtime, answer }; });
       if (!lent) throw error;
       return await this.link.call(method, params, host);
@@ -1942,7 +1960,7 @@ export class Store extends Work {
 
   /** Who an action goes to, as the pending mark says it: "your Mac", or the host's name. */
   recipient(host: string): string {
-    return host === "mac" ? "your Mac" : this.hosts.value.find((h) => h.id === host)?.name ?? "the host";
+    return this.isMac(host) ? "your Mac" : this.hosts.value.find((h) => h.id === host)?.name ?? "the host";
   }
 
   private async acting(agentID: string, act: AgentAct, run: () => Promise<unknown>): Promise<void> {

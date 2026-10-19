@@ -193,7 +193,7 @@ export function ActivityRows({ group, store, chosen, onPick }: {
     forCleanup(store.worktreeLists.value[host.id] ?? [], store.worktreeSizes.value[host.id]).flatMap((g) => g.worktrees))));
   const costs = store.costs.value;
   const today = totalWords(todayTotals(costs));
-  const mac = costs["mac"];
+  const mac = costs[store.macHostID.value];
   const milestones = store.milestones.value[milestonesHost(store) ?? ""];
   const left = headroom(mac);
   // The page's name in the projects' type, after its icon in the accent, as the window's rows
@@ -251,7 +251,7 @@ export function ActivityPageView({ store, page }: { store: Store; page: Activity
     }
   }, [page]);
   const several = store.hosts.value.length > 1;
-  const hostName = (host: string) => (host === "mac" ? "This Mac" : store.hosts.value.find((h) => h.id === host)?.name ?? host);
+  const hostName = (host: string) => (store.isMac(host) ? "This Mac" : store.hosts.value.find((h) => h.id === host)?.name ?? host);
   return (
     <section class={`chat activity-page ${page}-page`} aria-label={pageTitles[page]}>
       <header class="column-head"><BackToList /><h1>{pageTitles[page]}</h1></header>
@@ -486,7 +486,8 @@ function ConsequenceLine({ consequence, host, store, openAgent }: {
 function chartHosts(store: Store): string[] {
   const online = store.hosts.value.filter((h) => h.state === "online" && h.relay === undefined).map((h) => h.id);
   const ids = online.length > 0 ? online : store.hosts.value.map((h) => h.id);
-  return [...ids.filter((id) => id === "mac"), ...ids.filter((id) => id !== "mac")];
+  const macID = store.macHostID.value;
+  return [...ids.filter((id) => id === macID), ...ids.filter((id) => id !== macID)];
 }
 
 /** A runtime's name, from the first host that knows it. */
@@ -521,7 +522,8 @@ function TimePage({ store }: { store: Store }) {
 
 /** The host whose milestones are drawn: this Mac's, as on the window and the Remote. */
 function milestonesHost(store: Store): string | undefined {
-  return store.hosts.value.some((h) => h.id === "mac") ? "mac" : store.hosts.value[0]?.id;
+  const macID = store.macHostID.value;
+  return store.hosts.value.some((h) => h.id === macID) ? macID : store.hosts.value[0]?.id;
 }
 
 /** The milestones as a page (#1067): the newcomer's checklist, from its row in Usage. */
