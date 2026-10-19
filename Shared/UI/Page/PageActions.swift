@@ -41,6 +41,10 @@ struct PageActions {
     /// What the language server for a source file's language finds in it, as the editor
     /// holds it (#844). Nil where nothing can ask, and then the editor lists nothing.
     var diagnose: (@MainActor (_ path: String, _ text: String) async -> DaemonAPI.FileDiagnostics?)? = nil
+    /// What the language server would write at a line and column (from 1), for the editor's
+    /// completion (#844). Nil where nothing can ask.
+    var complete: (@MainActor (_ path: String, _ text: String, _ line: Int, _ column: Int) async
+        -> [DaemonAPI.FileCompletion])? = nil
 
     init(save: @escaping @MainActor (String, String) async -> String? = { _, _ in
              "Nothing here can save this page."

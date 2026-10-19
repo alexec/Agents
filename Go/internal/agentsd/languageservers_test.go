@@ -2,12 +2,15 @@ package agentsd
 
 import (
 	"bufio"
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/alexec/agents/Go/wire"
 )
 
 // TestLanguageServerHelper is a fake language server when AGENTS_FAKE_LSP is set: each line
@@ -45,6 +48,12 @@ func TestLanguageServerHelper(t *testing.T) {
 			write(map[string]any{"jsonrpc": "2.0", "id": m.ID, "result": map[string]any{"capabilities": map[string]any{}}})
 			write(map[string]any{"jsonrpc": "2.0", "id": 99, "method": "workspace/configuration",
 				"params": map[string]any{"items": []any{map[string]any{}}}})
+		case "textDocument/completion":
+			write(map[string]any{"jsonrpc": "2.0", "id": m.ID, "result": map[string]any{"isIncomplete": false, "items": []any{
+				map[string]any{"label": "Println", "insertText": "Println(${1:a})", "detail": "func(a ...any)"},
+				map[string]any{"label": "Sprint", "insertText": "Sprint(a: , b: )"},
+				map[string]any{"label": "Printf"},
+			}}})
 		case "textDocument/didOpen", "textDocument/didChange":
 			text := m.Params.TextDocument.Text
 			if len(m.Params.ContentChanges) > 0 {
@@ -107,5 +116,25 @@ func TestReadFrame(t *testing.T) {
 	r := bufio.NewReader(strings.NewReader("Content-Type: x\r\nContent-Length: 2\r\n\r\n{}rest"))
 	if b, err := readFrame(r); err != nil || string(b) != "{}" {
 		t.Fatalf("%q %v", b, err)
+	}
+}
+
+// files/complete's client end (#844): the server's items, a snippet cut at its first
+// placeholder, the label alone when that is all there is to write.
+func TestLanguageServerCompletion(t *testing.T) {
+	t.Setenv("AGENTS_FAKE_LSP", "1")
+	was := installedCommand
+	installedCommand = func(s languageServerSpec) []string {
+		return []string{os.Args[0], "-test.run=^TestLanguageServerHelper$"}
+	}
+	defer func() { installedCommand = was }()
+	pool := &languageServers{running: map[string]*languageServer{}}
+	defer pool.stopAll()
+	root := t.TempDir()
+	got := pool.complete(context.Background(), root, filepath.Join(root, "main.go"), wire.FileCompletionRequest{
+		Text: "package main\nimport \"fmt\"\nfunc main() { fmt.P }\n", Line: 3, Column: 20})
+	if len(got.Items) != 3 || got.Items[0].Label != "Println" || got.Items[0].Insert == nil || *got.Items[0].Insert != "Println(" ||
+		got.Items[1].Insert == nil || *got.Items[1].Insert != "Sprint(" || got.Items[2].Insert != nil || got.Items[0].Detail == nil {
+		t.Fatalf("%+v", got)
 	}
 }

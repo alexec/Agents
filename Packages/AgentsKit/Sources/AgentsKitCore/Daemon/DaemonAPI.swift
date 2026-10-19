@@ -126,6 +126,8 @@ public enum DaemonAPI {
         public static let agentsSaid = "agents/said"
         /// What the language server for a file's language finds in it (#844).
         public static let filesDiagnostics = "files/diagnostics"
+        /// What the language server would write at a place in a file (#844).
+        public static let filesComplete = "files/complete"
         /// The iOS simulators on a Mac host (#842): listed, booted and shut down on the
         /// person's press, and a booted one's screen as a JPEG.
         public static let simulatorsList = "simulators/list"
@@ -1265,6 +1267,46 @@ public enum DaemonAPI {
             self.agentID = agentID
             self.path = path
             self.text = text
+        }
+    }
+
+    /// What the language server would write at line and column (from 1; UTF-16 columns).
+    public struct FileCompletionRequest: Codable, Sendable {
+        public var agentID: UUID
+        public var path: String
+        public var text: String
+        public var line: Int
+        public var column: Int
+        public init(agentID: UUID, path: String, text: String, line: Int, column: Int) {
+            self.agentID = agentID
+            self.path = path
+            self.text = text
+            self.line = line
+            self.column = column
+        }
+    }
+
+    /// One thing to write: what the list shows, what goes in (the label when nil), a line on it.
+    public struct FileCompletion: Codable, Sendable, Hashable {
+        public var label: String
+        public var insert: String?
+        public var detail: String?
+        public init(label: String, insert: String? = nil, detail: String? = nil) {
+            self.label = label
+            self.insert = insert
+            self.detail = detail
+        }
+        /// What goes in the text.
+        public var written: String { insert ?? label }
+    }
+
+    /// At most 50 completions in the server's order; `reason` when there are none to ask for.
+    public struct FileCompletions: Codable, Sendable {
+        public var items: [FileCompletion]
+        public var reason: String?
+        public init(items: [FileCompletion], reason: String? = nil) {
+            self.items = items
+            self.reason = reason
         }
     }
 

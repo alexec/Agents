@@ -5,7 +5,7 @@
 import { useSignal } from "@preact/signals";
 import { useEffect, useLayoutEffect, useRef } from "preact/hooks";
 import type { Store } from "../../model/store";
-import type { FileDiagnostic, FileDiagnostics } from "../../protocol/generated";
+import type { FileCompletion, FileDiagnostic, FileDiagnostics } from "../../protocol/generated";
 import { nameOf } from "./paneState";
 
 const settle = 700;
@@ -43,6 +43,39 @@ export function SourceEditor({ store, host, agentID, path, text, line }: {
     }, 1000);
     return () => { gone = true; clearTimeout(timer); };
   }, [typed, path, host]);
+
+  /** The language server's words for the caret's place (#844), while the list is up. */
+  const offered = useSignal<FileCompletion[] | null>(null);
+  const chosen = useSignal(0);
+  const ask = async () => {
+    const el = field.current;
+    if (!el) return;
+    const before = el.value.slice(0, el.selectionStart);
+    const line = before.split("\n").length;
+    const column = before.length - (before.lastIndexOf("\n") + 1) + 1;
+    const found = await store.link.call("files/complete", { agentID: agentID as never, path, text: el.value, line, column }, host)
+      .catch(() => null);
+    // As the Mac's list: those that start with the word being typed, or all when none do.
+    const typedWord = (/[A-Za-z0-9_]*$/.exec(before)?.[0] ?? "").toLowerCase();
+    const items = found?.items ?? [];
+    const matching = items.filter((item) => (item.insert ?? item.label).toLowerCase().startsWith(typedWord));
+    const shown = matching.length ? matching : items;
+    offered.value = shown.length ? shown : null;
+    chosen.value = 0;
+  };
+  /** The word being typed, before the caret, goes; the chosen one takes its place. */
+  const take = (item: FileCompletion) => {
+    const el = field.current;
+    offered.value = null;
+    if (!el) return;
+    const at = el.selectionStart;
+    const start = at - (/[A-Za-z0-9_]*$/.exec(el.value.slice(0, at))?.[0].length ?? 0);
+    el.setRangeText(item.insert ?? item.label, start, at, "end");
+    draft.value = el.value;
+    if (saving.current) clearTimeout(saving.current);
+    saving.current = setTimeout(() => void save(), settle);
+    el.focus();
+  };
 
   const goTo = (target: number) => {
     const el = field.current;
@@ -93,7 +126,28 @@ export function SourceEditor({ store, host, agentID, path, text, line }: {
           if (saving.current) clearTimeout(saving.current);
           saving.current = setTimeout(() => void save(), settle);
         }}
+        onKeyDown={(e) => {
+          // Ctrl+Space asks the language server what to write here (#844); the list takes the arrows.
+          if (e.key === " " && e.ctrlKey) { e.preventDefault(); void ask(); return; }
+          const list = offered.value;
+          if (!list) return;
+          if (e.key === "Escape") { e.preventDefault(); offered.value = null; }
+          else if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+            e.preventDefault();
+            chosen.value = Math.max(0, Math.min(list.length - 1, chosen.value + (e.key === "ArrowDown" ? 1 : -1)));
+          } else if (e.key === "Enter" || e.key === "Tab") { e.preventDefault(); take(list[chosen.value]!); }
+        }}
         onBlur={() => void save()} />
+      {offered.value && (
+        <div class="completions" role="listbox" aria-label="Completions">
+          {offered.value.map((item, i) => (
+            <button key={i} type="button" role="option" aria-selected={i === chosen.value} class={`completion${i === chosen.value ? " chosen" : ""}`}
+              onMouseDown={(e) => { e.preventDefault(); take(item); }}>
+              <span>{item.label}</span>{item.detail && <span class="faint small"> {item.detail}</span>}
+            </button>
+          ))}
+        </div>
+      )}
       {problems.value && <Problems found={problems.value} goTo={goTo} />}
     </>
   );

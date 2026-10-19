@@ -1578,6 +1578,37 @@ export interface EventsPage {
 }
 
 /**
+ * One thing to write: what the list shows, what goes in the text (the label when left out), and a
+ * line about it.
+ */
+export interface FileCompletion {
+  label: string;
+  insert?: string;
+  detail?: string;
+}
+
+/**
+ * files/complete (#844): what the language server would write at a place in a file, as the editor
+ * holds it. line from 1; column from 1, in UTF-16 units as the text views count.
+ */
+export interface FileCompletionRequest {
+  agentID: UUID;
+  path: string;
+  text: string;
+  line: number;
+  column: number;
+}
+
+/**
+ * At most 50 completions, in the server's order; reason says why there are none (no server, or none
+ * installed).
+ */
+export interface FileCompletions {
+  items: FileCompletion[];
+  reason?: string;
+}
+
+/**
  * One problem a language server found: where (line and column from 1), how bad (error, warning,
  * info or hint), and what.
  */
@@ -4636,6 +4667,7 @@ export interface Methods {
   "events/cancelWait": { params: CancelWaitRequest; result: WaitingAgent[] };
   "events/list": { params: EventsListRequest; result: EventsPage };
   "files/browse": { params: FilesBrowseRequest; result: DirectoryListing };
+  "files/complete": { params: FileCompletionRequest; result: FileCompletions };
   "files/diagnostics": { params: FileDiagnosticsRequest; result: FileDiagnostics };
   "files/list": { params: FilesListRequest; result: DirectoryListing };
   "files/mention": { params: FileMentionRequest; result: FileMentionDTO[] };
@@ -4782,6 +4814,7 @@ export const MethodTarget = {
   "events/cancelWait": "host",
   "events/list": "host",
   "files/browse": "host",
+  "files/complete": "host",
   "files/diagnostics": "host",
   "files/list": "host",
   "files/mention": "host",
@@ -5057,6 +5090,9 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   EventsChange: { required: ["waiting"], optional: ["event"] },
   EventsListRequest: { required: ["limit"], optional: ["before", "scope", "groups"] },
   EventsPage: { required: ["events", "waiting", "hasMore"], optional: [] },
+  FileCompletion: { required: ["label"], optional: ["insert", "detail"] },
+  FileCompletionRequest: { required: ["agentID", "path", "text", "line", "column"], optional: [] },
+  FileCompletions: { required: ["items"], optional: ["reason"] },
   FileDiagnostic: { required: ["line", "column", "severity", "message"], optional: ["source"] },
   FileDiagnostics: { required: ["diagnostics"], optional: ["server", "reason"] },
   FileDiagnosticsRequest: { required: ["agentID", "path"], optional: ["text"] },

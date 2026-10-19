@@ -143,6 +143,8 @@ public extension DaemonAPI {
                 Row(Method.agentsSaid, params: SaidSearchRequest.self, result: SaidSearchResult.self, kind: .hostRequest),
                 Row(Method.filesDiagnostics, params: FileDiagnosticsRequest.self, result: FileDiagnostics.self,
                     kind: .hostRequest),
+                Row(Method.filesComplete, params: FileCompletionRequest.self, result: FileCompletions.self,
+                    kind: .hostRequest),
                 Row(Method.simulatorsList, params: Empty.self, result: SimulatorList.self, kind: .hostRequest),
                 Row(Method.simulatorsBoot, params: SimulatorRequest.self, result: Empty.self, kind: .hostRequest),
                 Row(Method.simulatorsShutdown, params: SimulatorRequest.self, result: Empty.self, kind: .hostRequest),

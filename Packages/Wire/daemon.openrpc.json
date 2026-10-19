@@ -1549,6 +1549,30 @@
       }
     },
     {
+      "name": "files/complete",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/FileCompletionRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/FileCompletions"
+        }
+      }
+    },
+    {
       "name": "files/diagnostics",
       "tags": [
         {

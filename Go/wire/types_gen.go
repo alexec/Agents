@@ -1910,6 +1910,28 @@ type EventsPage struct {
 	HasMore bool           `json:"hasMore"`
 }
 
+// One thing to write: what the list shows, what goes in the text (the label when left out), and a line about it.
+type FileCompletion struct {
+	Label  string  `json:"label"`
+	Insert *string `json:"insert,omitzero"`
+	Detail *string `json:"detail,omitzero"`
+}
+
+// files/complete (#844): what the language server would write at a place in a file, as the editor holds it. line from 1; column from 1, in UTF-16 units as the text views count.
+type FileCompletionRequest struct {
+	AgentID UUID   `json:"agentID"`
+	Path    string `json:"path"`
+	Text    string `json:"text"`
+	Line    int64  `json:"line"`
+	Column  int64  `json:"column"`
+}
+
+// At most 50 completions, in the server's order; reason says why there are none (no server, or none installed).
+type FileCompletions struct {
+	Items  []FileCompletion `json:"items"`
+	Reason *string          `json:"reason,omitzero"`
+}
+
 // One problem a language server found: where (line and column from 1), how bad (error, warning, info or hint), and what.
 type FileDiagnostic struct {
 	Line     int64   `json:"line"`

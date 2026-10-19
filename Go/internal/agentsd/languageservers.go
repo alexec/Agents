@@ -91,6 +91,48 @@ func (d *Daemon) registerLanguageServers() {
 		}
 		return languageServerPool.diagnose(root, path, r.Text), nil
 	})
+	On(d, wire.CallFilesComplete, func(ctx context.Context, _ *Client, r wire.FileCompletionRequest) (wire.FileCompletions, error) {
+		path, err := d.scoped(r.AgentID, r.Path)
+		if err != nil {
+			return wire.FileCompletions{}, err
+		}
+		root := filepath.Dir(path)
+		if a := d.Store.Agent(r.AgentID); a != nil {
+			root = projectFolder(a)
+		}
+		return languageServerPool.complete(ctx, root, path, r), nil
+	})
+}
+
+const completionsMax = 50
+
+func (p *languageServers) complete(ctx context.Context, root, path string, r wire.FileCompletionRequest) wire.FileCompletions {
+	out := wire.FileCompletions{Items: []wire.FileCompletion{}}
+	spec, languageID, ok := languageServerFor(path)
+	if !ok {
+		reason := "No language server for this kind of file."
+		out.Reason = &reason
+		return out
+	}
+	if len(r.Text) > diagnosticsTextLimit {
+		reason := "The file is too big for its language server to read here."
+		out.Reason = &reason
+		return out
+	}
+	server, err := p.server(root, spec)
+	if err != nil {
+		reason := err.Error()
+		out.Reason = &reason
+		return out
+	}
+	items, err := server.complete(ctx, path, languageID, r.Text, int(r.Line), int(r.Column))
+	if err != nil {
+		reason := spec.name + ": " + err.Error()
+		out.Reason = &reason
+		return out
+	}
+	out.Items = items
+	return out
 }
 
 func (p *languageServers) diagnose(root, path string, text *string) wire.FileDiagnostics {
@@ -300,22 +342,11 @@ func (s *languageServer) stop() {
 func (s *languageServer) diagnose(path, languageID, text string) ([]wire.FileDiagnostic, error) {
 	s.touch()
 	uri := fileURI(path)
-	s.mu.Lock()
-	version := s.versions[uri] + 1
-	s.versions[uri] = version
 	published := make(chan struct{})
+	s.mu.Lock()
 	s.notify[uri] = published
 	s.mu.Unlock()
-	var message map[string]any
-	if version == 1 {
-		message = map[string]any{"jsonrpc": "2.0", "method": "textDocument/didOpen", "params": map[string]any{
-			"textDocument": map[string]any{"uri": uri, "languageId": languageID, "version": version, "text": text}}}
-	} else {
-		message = map[string]any{"jsonrpc": "2.0", "method": "textDocument/didChange", "params": map[string]any{
-			"textDocument":   map[string]any{"uri": uri, "version": version},
-			"contentChanges": []map[string]any{{"text": text}}}}
-	}
-	if err := s.send(message); err != nil {
+	if err := s.sync(uri, languageID, text); err != nil {
 		return nil, err
 	}
 	select {
@@ -328,6 +359,91 @@ func (s *languageServer) diagnose(path, languageID, text string) ([]wire.FileDia
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return append([]wire.FileDiagnostic{}, s.diags[uri]...), nil
+}
+
+// sync says the editor's text to the server, opening the document the first time.
+func (s *languageServer) sync(uri, languageID, text string) error {
+	s.mu.Lock()
+	version := s.versions[uri] + 1
+	s.versions[uri] = version
+	s.mu.Unlock()
+	if version == 1 {
+		return s.send(map[string]any{"jsonrpc": "2.0", "method": "textDocument/didOpen", "params": map[string]any{
+			"textDocument": map[string]any{"uri": uri, "languageId": languageID, "version": version, "text": text}}})
+	}
+	return s.send(map[string]any{"jsonrpc": "2.0", "method": "textDocument/didChange", "params": map[string]any{
+		"textDocument":   map[string]any{"uri": uri, "version": version},
+		"contentChanges": []map[string]any{{"text": text}}}})
+}
+
+// complete is what the server would write at line and column (from 1, UTF-16 as LSP counts).
+func (s *languageServer) complete(ctx context.Context, path, languageID, text string, line, column int) ([]wire.FileCompletion, error) {
+	s.touch()
+	uri := fileURI(path)
+	if err := s.sync(uri, languageID, text); err != nil {
+		return nil, err
+	}
+	ctx, cancel := context.WithTimeout(ctx, languageServerWait)
+	defer cancel()
+	raw, err := s.request(ctx, "textDocument/completion", map[string]any{
+		"textDocument": map[string]any{"uri": uri},
+		"position":     map[string]any{"line": max(0, line-1), "character": max(0, column-1)},
+	})
+	if err != nil {
+		return nil, err
+	}
+	return completionItems(raw), nil
+}
+
+// completionItems reads a completion answer: a list, or {isIncomplete, items}.
+func completionItems(raw json.RawMessage) []wire.FileCompletion {
+	type item struct {
+		Label      string `json:"label"`
+		InsertText string `json:"insertText"`
+		Detail     string `json:"detail"`
+		TextEdit   *struct {
+			NewText string `json:"newText"`
+		} `json:"textEdit"`
+	}
+	var items []item
+	if json.Unmarshal(raw, &items) != nil {
+		var list struct {
+			Items []item `json:"items"`
+		}
+		_ = json.Unmarshal(raw, &list)
+		items = list.Items
+	}
+	out := []wire.FileCompletion{}
+	for _, it := range items {
+		if it.Label == "" {
+			continue
+		}
+		c := wire.FileCompletion{Label: it.Label}
+		insert := it.InsertText
+		if it.TextEdit != nil && it.TextEdit.NewText != "" {
+			insert = it.TextEdit.NewText
+		}
+		// Snippet placeholders ($1, ${2:name}) are not typed: what is before the first goes in.
+		if at := strings.IndexAny(insert, "$"); at >= 0 {
+			insert = insert[:at]
+		}
+		// A call goes in as far as its "(": the arguments are the person's to write.
+		if at := strings.Index(insert, "("); at >= 0 {
+			insert = insert[:at+1]
+		}
+		if insert != "" && insert != it.Label {
+			c.Insert = &insert
+		}
+		if it.Detail != "" {
+			detail := it.Detail
+			c.Detail = &detail
+		}
+		out = append(out, c)
+		if len(out) == completionsMax {
+			break
+		}
+	}
+	return out
 }
 
 func (s *languageServer) request(ctx context.Context, method string, params any) (json.RawMessage, error) {
