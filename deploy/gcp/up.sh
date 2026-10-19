@@ -54,6 +54,10 @@ done
 [[ -n $email ]] || email=$(git -C "$root" config user.email || true)
 [[ -n $email ]] || die "say the address Let's Encrypt writes to: --email you@example.com"
 [[ -z $seal_key || -s $seal_key ]] || die "$seal_key is not a key file"
+# The image is built for linux/amd64. On an Apple silicon Mac the classic builder cannot do it:
+# it needs BuildKit, through the buildx plugin. Look before anything is made in the cloud.
+((dry_run)) || docker buildx version >/dev/null 2>&1 ||
+	die "docker buildx is not installed: brew install docker-buildx, then link it for Docker: mkdir -p ~/.docker/cli-plugins && ln -sfn \$(brew --prefix)/opt/docker-buildx/bin/docker-buildx ~/.docker/cli-plugins/docker-buildx"
 
 setup
 kms=projects/$project/locations/$key_location/keyRings/$keyring/cryptoKeys/$key

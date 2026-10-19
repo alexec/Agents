@@ -3,6 +3,7 @@
 # workspace-commands (#1364) and the web remote (071). Nothing is built on a Mac first.
 #
 #   docker build -f deploy/Containerfile -t agents-control .
+#   docker buildx build --platform linux/amd64 -f deploy/Containerfile -t agents-control .
 #
 # from the repository's root; deploy/Containerfile.dockerignore sends only Go/ and Web/.
 #
@@ -19,14 +20,18 @@ ARG GO_IMAGE=golang:1.26
 # Web/.node-version's Node.
 ARG NODE_IMAGE=node:26.8.2-alpine
 
-FROM ${GO_IMAGE} AS go
+# Go runs on the machine that builds and cross-compiles for the target (#1461): under qemu
+# (linux/amd64 on an Apple silicon Mac) go mod download crashes. BuildKit sets BUILDPLATFORM,
+# TARGETOS and TARGETARCH; empty, Go builds for the machine it runs on.
+FROM --platform=$BUILDPLATFORM ${GO_IMAGE} AS go
+ARG TARGETOS TARGETARCH
 WORKDIR /src/Go
 COPY Go/go.mod Go/go.sum ./
 RUN go mod download
 COPY Go/ ./
 ARG VERSION=dev
 RUN for cmd in agents-control workspace-commands; do \
-      CGO_ENABLED=0 go build -trimpath \
+      CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -trimpath \
         -ldflags "-s -w -X github.com/alexec/agents/Go/internal/buildinfo.Version=$VERSION" \
         -o /out/$cmd ./cmd/$cmd || exit 1; \
     done
@@ -35,8 +40,9 @@ RUN for cmd in agents-control workspace-commands; do \
 # (npm ci, then build.mjs, which writes the MANIFEST the control plane checks), so the page and
 # the control plane are one version. Off unless asked for: AGENTS_CONTROL_PUBLIC_WEB=/web
 # serves it at the control plane's own address (compose.public.yaml, #1459); `--web /web
-# --web-port <port>` on the container's loopback.
-FROM ${NODE_IMAGE} AS web
+# --web-port <port>` on the container's loopback. Its output is static files, so it also runs
+# on the machine that builds.
+FROM --platform=$BUILDPLATFORM ${NODE_IMAGE} AS web
 WORKDIR /src/Web
 COPY Web/package.json Web/package-lock.json ./
 RUN npm ci --ignore-scripts --no-audit --no-fund
