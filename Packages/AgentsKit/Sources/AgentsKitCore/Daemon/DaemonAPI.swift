@@ -122,6 +122,12 @@ public enum DaemonAPI {
         /// What was said in one chat that holds some text (#1532). Takes a `FindRequest`,
         /// answers a `FindResult`.
         public static let agentsFind = "agents/find"
+        /// The iOS simulators on a Mac host (#842): listed, booted and shut down on the
+        /// person's press, and a booted one's screen as a JPEG.
+        public static let simulatorsList = "simulators/list"
+        public static let simulatorsBoot = "simulators/boot"
+        public static let simulatorsShutdown = "simulators/shutdown"
+        public static let simulatorsScreen = "simulators/screen"
         /// Stop one shell or task an agent left running in the background, and nothing
         /// else it is doing (057).
         public static let agentsStopBackground = "agents/stopBackground"
@@ -1214,6 +1220,57 @@ public enum DaemonAPI {
             self.index = index
             self.entryID = entryID
             self.line = line
+        }
+    }
+
+    /// An iOS simulator on a Mac host (#842).
+    public struct Simulator: Codable, Sendable, Hashable, Identifiable {
+        public var udid: String
+        public var name: String
+        public var os: String
+        public var booted: Bool
+        public var id: String { udid }
+        public init(udid: String, name: String, os: String, booted: Bool) {
+            self.udid = udid
+            self.name = name
+            self.os = os
+            self.booted = booted
+        }
+    }
+
+    /// The host's simulators, booted first; `reason` says why there are none to list.
+    public struct SimulatorList: Codable, Sendable {
+        public var simulators: [Simulator]
+        public var reason: String?
+        public init(simulators: [Simulator], reason: String? = nil) {
+            self.simulators = simulators
+            self.reason = reason
+        }
+    }
+
+    public struct SimulatorRequest: Codable, Sendable {
+        public var udid: String
+        public init(udid: String) { self.udid = udid }
+    }
+
+    public struct SimulatorScreenRequest: Codable, Sendable {
+        public var udid: String
+        public var maxHeight: Int?
+        public init(udid: String, maxHeight: Int? = nil) {
+            self.udid = udid
+            self.maxHeight = maxHeight
+        }
+    }
+
+    /// A booted simulator's screen as a JPEG, and its size in pixels.
+    public struct SimulatorScreen: Codable, Sendable {
+        public var jpeg: Data
+        public var width: Int
+        public var height: Int
+        public init(jpeg: Data, width: Int, height: Int) {
+            self.jpeg = jpeg
+            self.width = width
+            self.height = height
         }
     }
 

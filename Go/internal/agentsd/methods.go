@@ -52,6 +52,7 @@ func (d *Daemon) register() {
 	d.registerWake()
 	d.registerMacSignIn()
 	d.registerCatalog()
+	d.registerSimulators()
 	d.registerMCPCatalog()
 	d.registerMCPVerify()
 	d.registerMCPSignIn()

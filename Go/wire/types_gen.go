@@ -4483,6 +4483,38 @@ const (
 	SignInWantedReasonUnreadable  SignInWantedReason = "unreadable"
 )
 
+// An iOS simulator on a Mac host (#842): its UDID, its name, its system and whether it is booted.
+type Simulator struct {
+	Udid   string `json:"udid"`
+	Name   string `json:"name"`
+	Os     string `json:"os"`
+	Booted bool   `json:"booted"`
+}
+
+// simulators/list: the host's simulators, booted first. Reason says why there are none to list, when a host has no simulators (not a Mac, no Xcode).
+type SimulatorList struct {
+	Simulators []Simulator `json:"simulators"`
+	Reason     *string     `json:"reason,omitzero"`
+}
+
+// simulators/boot and simulators/shutdown: one simulator, by its UDID.
+type SimulatorRequest struct {
+	Udid string `json:"udid"`
+}
+
+// A booted simulator's screen as a JPEG, and its size in pixels.
+type SimulatorScreen struct {
+	Jpeg   Data  `json:"jpeg"`
+	Width  int64 `json:"width"`
+	Height int64 `json:"height"`
+}
+
+// simulators/screen: a booted simulator's screen, at most maxHeight pixels tall (1200 when left out).
+type SimulatorScreenRequest struct {
+	Udid      string `json:"udid"`
+	MaxHeight *int64 `json:"maxHeight,omitzero"`
+}
+
 type SkillAddAnswer struct {
 	Skill ManagedSkill `json:"skill"`
 }
