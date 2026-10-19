@@ -55,10 +55,10 @@ Alex still decides, by a form: anything hard to undo (deleting data, rewriting h
 
 ## Work by milestone (#1340)
 
-- **Work goes by milestone.** The Scrum Master takes issues from the earliest open milestone first, bugs before features. An issue with no milestone is the backlog, except `polish` and `competitor` issues, which have a lane of their own.
+- **Work goes by milestone.** The Scrum Master takes issues from the earliest open milestone first, bugs before features. An issue with no milestone is the backlog, except `polish` and `competitor` issues, which have standing lanes of their own.
 - **A filed issue gets a milestone** only when it serves that milestone's goal (#1340). Bugs are the exception: they always go in the open milestone.
 - **Bugs go in the open milestone.** A bug is filed into the open milestone, whatever its theme. When a release ships, the release skill moves the milestone's open bugs to the next milestone before it closes the milestone.
-- **Polish and competitor gaps have no milestone.** Issues labelled `polish` or `competitor` stay out of milestones. The exception is a competitor gap that serves a milestone's goal; it keeps that milestone. One standing lane works them alongside the milestone lanes, highest RICE first, under the same area and open-PR limits. They are for no milestone, so they can merge before a release ships (#1570).
+- **Polish and competitor gaps have no milestone.** Issues labelled `polish` or `competitor` stay out of milestones. The exception is a competitor gap that serves a milestone's goal; it keeps that milestone. At least one standing lane works them alongside the milestone lanes, highest RICE first, under the same area and open-PR limits. A free slot that no workable milestone issue can fill (none open, all areas held, or all taken) also goes to the next of them (#1604); milestone work and bugs always go first. They are for no milestone, so they can merge before a release ships (#1570).
 - **The open milestone and the next one are workable;** the next one only in areas the open one does not hold. Later milestones' issues keep `parked`; take it off when their milestone becomes the next one.
 - **A milestone is done when its release has shipped** (the GitHub release and both TestFlight builds), not when GitHub closes it. No change for the next milestone merges to `main` before that (Alex, 2026-10-18). The release skill closes the milestone.
 
