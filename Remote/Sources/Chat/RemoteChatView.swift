@@ -19,6 +19,11 @@ struct RemoteChatView: View {
     @State private var views = AppViewStore()
     /// Open File… is up over the chat (#415).
     @State private var searchingFiles = false
+    /// How wide the conversation is, so a pull can be told from the right edge (#1560).
+    @State private var conversationWidth: CGFloat = 0
+    /// How near the right edge a pull starts to bring in the panes: about the width of
+    /// the system's own left-edge Back (#1560).
+    private static let edgePull: CGFloat = 24
     /// Set in a scene of its own (#888): this session, not the selection.
     @Environment(\.poppedChat) private var popped
 
@@ -99,12 +104,15 @@ struct RemoteChatView: View {
             }
             form
         }
-        // Right to left across the chat brings what was exchanged in from that side, as
-        // the Mac's two-finger swipe does. Left to right stays the system's Back.
+        .onGeometryChange(for: CGFloat.self, of: \.size.width) { conversationWidth = $0 }
+        // A pull from the right edge brings what was exchanged in from that side, as the
+        // Mac's two-finger swipe does. Only from the edge: a swipe across the chat is a
+        // scroll, a little sideways or not (#1560). Left to right stays the system's Back.
         .simultaneousGesture(
             DragGesture(minimumDistance: 30)
                 .onEnded { drag in
-                    guard let agent, drag.translation.width < -80,
+                    guard let agent, drag.startLocation.x >= conversationWidth - Self.edgePull,
+                          drag.translation.width < -80,
                           abs(drag.translation.width) > abs(drag.translation.height) * 2 else { return }
                     model.panes.state(for: agent.id).show(.exchanged)
                 }
