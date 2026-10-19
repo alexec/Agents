@@ -14,7 +14,7 @@ import (
 
 // What the views read and do on GitHub (#1341): the open pull requests and issues, one pull
 // request's page, a failed run's log, and a person's merge, review and comment. As the
-// signed-in gh user, with the same token as the events (#1335 changes where it comes from).
+// person, with the same token as the events: the host's GitHub connection (#1335).
 
 // Views is what the views ask of GitHub. RealGitHub is one; tests use a fake API under it.
 type Views interface {

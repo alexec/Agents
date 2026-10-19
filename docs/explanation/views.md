@@ -177,7 +177,7 @@ Project**.
 
 Merge, review and comment are tools that only a view may call (`merge_pr`, `review_pr`,
 `comment_on_pr`): a person does them, from the page. The server reads GitHub as the
-signed-in `gh` user, with `gh auth token`.
+person, with the host's GitHub connection (#1335).
 
 ## The test view
 

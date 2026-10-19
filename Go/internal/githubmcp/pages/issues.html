@@ -68,7 +68,7 @@
   };
 
   // The app's new-agent form, filled in for this issue (#834). The person starts it, or not;
-  // the agent assigns the issue to the signed-in gh user once it does.
+  // the agent assigns the issue to the signed-in person once it does.
   const startAgent = async (issue) => {
     const n = issue.number, on = repo ? ` --repo ${repo}` : "";
     const prompt = `Work on GitHub issue #${n} (\`gh issue view ${n}${on}\`): ${issue.title}\n\n`
