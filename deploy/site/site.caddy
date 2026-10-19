@@ -1,0 +1,22 @@
+# The hand-back page for sign-ins (#1343) at AGENTS_SITE_DOMAIN (agentloops.dev). Only
+# /oauth/callback and its two files; every other address is 404. The page holds nothing, so it
+# keeps no log of its own, and the answer says: no referrer, no cache, no frames, no other
+# script. deploy/gcp/site.sh puts this file in deploy/site.d on the VM to turn it on.
+{$AGENTS_SITE_DOMAIN} {
+	header {
+		Content-Security-Policy "default-src 'none'; script-src 'self'; style-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+		Referrer-Policy no-referrer
+		Cache-Control no-store
+		X-Content-Type-Options nosniff
+		Strict-Transport-Security "max-age=31536000"
+	}
+	@page path /oauth/callback /oauth/callback.js /oauth/callback.css
+	handle @page {
+		root * /srv/site
+		rewrite /oauth/callback /oauth/callback.html
+		file_server
+	}
+	handle {
+		respond 404
+	}
+}
