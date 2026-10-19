@@ -44,17 +44,19 @@ struct LocalHostLinkTests {
             }
         }
 
-        /// Serves one window that proves `windowKey` as `client`, as host `name`.
-        func serve(client: UUID, windowPublic: Data, as name: HostID) async throws {
+        /// Serves one window that proves `windowKey` as `client`, as host `name`. Says whether
+        /// the window sent its auth at all.
+        @discardableResult
+        func serve(client: UUID, windowPublic: Data, as name: HostID) async throws -> Bool {
             let fd = accept(listening, nil, nil)
             let reader = PrefixReader(FDTransport(socket: fd))
             let nonce = ControlAuth.nonce()
             try reader.write(line: ControlAuth.Message.hello(.init(name: name.rawValue,
                                                                     control: ControlCode.base64url(hostKey.publicKey),
                                                                     nonce: ControlCode.base64url(nonce), copy: "")).line)
-            guard let line = try await reader.next(within: 5), case .auth(let auth)? = ControlAuth.Message(line: line) else {
+            guard let line = try? await reader.next(within: 5), case .auth(let auth)? = ControlAuth.Message(line: line) else {
                 reader.close()
-                return
+                return false
             }
             do {
                 let (_, mac) = try await ControlAuth.verify(auth, serverNonce: nonce, origin: LocalHostLink.origin) { identity in
@@ -67,6 +69,7 @@ struct LocalHostLinkTests {
                 try reader.write(line: ControlAuth.Message.refused(refusal.reason).line)
                 reader.close()
             }
+            return true
         }
 
         func stop() {
@@ -85,12 +88,12 @@ struct LocalHostLinkTests {
         defer { host.stop() }
         let window = ControlAgreement.generate()
         let id = UUID()
-        async let served: Void = host.serve(client: id, windowPublic: window.publicKey, as: .mac)
+        async let served = host.serve(client: id, windowPublic: window.publicKey, as: .mac)
         let link = LocalHostLink(socket: host.place, client: id, privateKey: window.privateKey, host: .mac)
         let transport = try await link.transport()
         var lines = transport.lines().makeAsyncIterator()
         #expect(try await lines.next()?.contains("daemon/hello") == true)
-        try await served
+        _ = try await served
         transport.close()
     }
 
@@ -98,10 +101,10 @@ struct LocalHostLinkTests {
         let host = try FakeHost()
         defer { host.stop() }
         let window = ControlAgreement.generate()
-        async let served: Void = host.serve(client: UUID(), windowPublic: window.publicKey, as: .mac)
+        async let served = host.serve(client: UUID(), windowPublic: window.publicKey, as: .mac)
         let link = LocalHostLink(socket: host.place, client: UUID(), privateKey: window.privateKey, host: .mac)
         await #expect(throws: ControlAuth.Refusal.self) { _ = try await link.transport() }
-        try await served
+        _ = try await served
     }
 
     @Test func anotherHostOnTheSocketIsNotUsed() async throws {
@@ -109,10 +112,12 @@ struct LocalHostLinkTests {
         defer { host.stop() }
         let window = ControlAgreement.generate()
         let id = UUID()
-        async let served: Void = host.serve(client: id, windowPublic: window.publicKey, as: HostID(rawValue: "box"))
+        async let served = host.serve(client: id, windowPublic: window.publicKey, as: HostID(rawValue: "box"))
         let link = LocalHostLink(socket: host.place, client: id, privateKey: window.privateKey, host: .mac)
         await #expect(throws: (any Error).self) { _ = try await link.transport() }
-        try await served
+        // Gone at its hello, before any proof (#1497): the host never counts it as connected,
+        // and a client that keeps trying (`.mac`, with a control plane elsewhere) costs nothing.
+        #expect(try await served == false)
     }
 
     /// No socket: the control plane's route, and it says so.

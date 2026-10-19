@@ -3,6 +3,8 @@ package agentsd
 import (
 	"bufio"
 	"context"
+	"errors"
+	"io"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -208,6 +210,11 @@ func (d *Daemon) acceptLocal(c net.Conn, policy SocketPolicy, host string, priva
 	c.SetDeadline(time.Now().Add(localExchangeWait))
 	r := bufio.NewReaderSize(c, 1<<20)
 	client, err := d.localExchange(c, r, host, private)
+	if errors.Is(err, io.EOF) {
+		// Gone at the hello, before any proof: a window that wanted another host (#1497).
+		c.Close()
+		return
+	}
 	if err != nil {
 		reason := controllink.BadMessage
 		if refusal, ok := err.(*controllink.Refusal); ok {
@@ -232,6 +239,7 @@ func (d *Daemon) acceptLocal(c net.Conn, policy SocketPolicy, host string, priva
 		d.localMu.Lock()
 		delete(d.localConns, sc)
 		d.localMu.Unlock()
+		log.Printf("local: window %s went", client)
 	}()
 	d.serveSockConn(sc, r)
 }
