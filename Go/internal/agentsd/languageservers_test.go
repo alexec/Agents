@@ -129,11 +129,7 @@ func TestLanguageServerCompletion(t *testing.T) {
 	}
 	defer func() { installedCommand = was }()
 	pool := &languageServers{running: map[string]*languageServer{}}
-	defer func() {
-		for _, s := range pool.running {
-			s.stop()
-		}
-	}()
+	defer pool.stopAll()
 	root := t.TempDir()
 	got := pool.complete(context.Background(), root, filepath.Join(root, "main.go"), wire.FileCompletionRequest{
 		Text: "package main\nimport \"fmt\"\nfunc main() { fmt.P }\n", Line: 3, Column: 20})
