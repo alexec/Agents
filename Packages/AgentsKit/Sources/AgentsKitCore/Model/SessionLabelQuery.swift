@@ -5,6 +5,14 @@ import Foundation
 public struct SessionLabelQuery: Hashable, Sendable {
     public var label: String?
     public var text: String
+    /// The sessions whose prompts or replies hold the words, as their hosts found them
+    /// (`agents/said`, #1585): they match as their title would.
+    public var said: [UUID: String] = [:]
+
+    public init(_ input: String, said: [UUID: String]) {
+        self.init(input)
+        self.said = said
+    }
 
     public init(_ input: String) {
         let pattern = #"(?i)(?:^|\s)label:(?:"([^"]*)"|(\S*))"#
@@ -30,7 +38,7 @@ public struct SessionLabelQuery: Hashable, Sendable {
         }
         guard !text.isEmpty else { return true }
         return [agent.title, agent.report?.message].compactMap { $0 }
-            .contains { $0.localizedCaseInsensitiveContains(text) }
+            .contains { $0.localizedCaseInsensitiveContains(text) } || said[agent.id] != nil
     }
 
     /// A workflow by its name and what it is. Workflows carry no labels, so a query

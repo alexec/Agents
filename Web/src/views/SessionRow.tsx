@@ -78,6 +78,8 @@ export interface RowExtras {
   wait: WaitMark | null;
   /** A queued helper's place in its project's queue (#362), "Queued, 2nd". */
   queued: string | null;
+  /** While the sidebar searches: the line it said that matches (#1585). */
+  said?: string | null;
 }
 
 /** A row's extras, read from the store: only what this agent names is looked up. */
@@ -97,6 +99,7 @@ export function rowExtras(store: Store, host: string, agent: Agent): RowExtras {
       ? { names: blockWaitNames(agent, store.agents.value[host] ?? []), lines: store.waitsOf(host, agent) }
       : { names: [], lines: [] }, leases, title),
     queued: agent.state === "queued" ? queuedLine(agent, store.projectAgents(host, projectFolder(agent))) : null,
+    said: store.saidLines.value[agent.id] ?? null,
   };
 }
 
@@ -165,6 +168,8 @@ export function SessionRow({ agent, chosen, onPick, going, extras, inSidebar = f
           {running && <span class="subtitle">{running}</span>}
           {/* What it waits for (#582): agents, events and resources on one line; each in full is its title, and the chat's. */}
           {extras?.wait && <span class="subtitle wait-line" title={extras.wait.detail}>{extras.wait.line}</span>}
+          {/* While the sidebar searches: the line it said that matches (#1585). */}
+          {extras?.said && <span class="subtitle" title={extras.said}>{extras.said}</span>}
           {asks && <span class="subtitle quiet archive-mark">{asks}</span>}
         </>}
       </span>

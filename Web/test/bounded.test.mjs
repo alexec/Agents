@@ -355,6 +355,8 @@ test("a search's reply for words no longer asked is dropped (#193)", async () =>
   const second = store.searchSessions("abc");
   await link.answer("agents/list");
   await link.answer("agents/list");
+  // The search still asked for asks what was said too (#1585); the one dropped does not.
+  await link.answer("agents/said");
   await Promise.all([first, second]);
   assert.deepEqual((store.agents.value.mac ?? []).map((a) => a.id), ["for-abc"]);
 });

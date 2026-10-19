@@ -33,6 +33,9 @@ func (d *Daemon) registerAgents() {
 	On(d, wire.CallAgentsEditQueued, func(ctx context.Context, c *Client, r wire.EditQueuedRequest) (wire.EditQueuedResult, error) {
 		return d.editQueued(r)
 	})
+	On(d, wire.CallAgentsSaid, func(ctx context.Context, c *Client, r wire.SaidSearchRequest) (wire.SaidSearchResult, error) {
+		return d.saidSearch(r), nil
+	})
 	On(d, wire.CallAgentsFind, func(ctx context.Context, c *Client, r wire.FindRequest) (wire.FindResult, error) {
 		return d.find(r)
 	})

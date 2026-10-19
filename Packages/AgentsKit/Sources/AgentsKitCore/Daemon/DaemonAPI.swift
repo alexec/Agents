@@ -122,6 +122,8 @@ public enum DaemonAPI {
         /// What was said in one chat that holds some text (#1532). Takes a `FindRequest`,
         /// answers a `FindResult`.
         public static let agentsFind = "agents/find"
+        /// The sessions whose prompts or replies hold some words (#1585), with the line.
+        public static let agentsSaid = "agents/said"
         /// The iOS simulators on a Mac host (#842): listed, booted and shut down on the
         /// person's press, and a booted one's screen as a JPEG.
         public static let simulatorsList = "simulators/list"
@@ -1224,6 +1226,32 @@ public enum DaemonAPI {
             self.entryID = entryID
             self.line = line
         }
+    }
+
+    /// The session search over what was said (#1585).
+    public struct SaidSearchRequest: Codable, Sendable {
+        public var text: String
+        public var folder: URL?
+        public var limit: Int?
+        public init(text: String, folder: URL? = nil, limit: Int? = nil) {
+            self.text = text
+            self.folder = folder
+            self.limit = limit
+        }
+    }
+
+    public struct SaidMatch: Codable, Sendable, Hashable {
+        public var agentID: UUID
+        public var line: String
+        public init(agentID: UUID, line: String) {
+            self.agentID = agentID
+            self.line = line
+        }
+    }
+
+    public struct SaidSearchResult: Codable, Sendable {
+        public var matches: [SaidMatch]
+        public init(matches: [SaidMatch]) { self.matches = matches }
     }
 
     /// An iOS simulator on a Mac host (#842).

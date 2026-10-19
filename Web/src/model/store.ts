@@ -1426,15 +1426,26 @@ export class Store extends Work {
     this.searchWords = words;
     this.searchNext.value = {};
     this.forgetSearched();
+    this.saidLines.value = {};
     if (!words) return;
     const request: ListRequest = {
       includeArchived: true, archivedCommands: false, archivedOnly: false, lean: true, limit: searchShown, query: words,
     };
     for (const host of this.hosts.value) {
       if (turn !== this.searchTurn) return;
-      if (this.hostIsOnline(host.id)) await this.search(request, host.id, turn);
+      if (!this.hostIsOnline(host.id)) continue;
+      await this.search(request, host.id, turn);
+      if (turn !== this.searchTurn) return;
+      // What was said (#1585): the sessions whose prompts or replies hold the words.
+      const said = await this.link.call("agents/said", { text: words }, host.id).catch(() => null);
+      if (Array.isArray(said?.matches) && turn === this.searchTurn) {
+        this.saidLines.value = { ...this.saidLines.value, ...Object.fromEntries(said.matches.map((m) => [m.agentID, m.line])) };
+      }
     }
   }
+
+  /** While the sidebar searches: the line each session said that matches, by its id (#1585). */
+  readonly saidLines = signal<Record<string, string>>({});
 
   /** The next page from each host that has more, newest first as the host lists them. */
   async searchMore(): Promise<void> {

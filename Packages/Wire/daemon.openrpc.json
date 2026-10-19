@@ -739,6 +739,30 @@
       }
     },
     {
+      "name": "agents/said",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/SaidSearchRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/SaidSearchResult"
+        }
+      }
+    },
+    {
       "name": "approvals/answer",
       "tags": [
         {

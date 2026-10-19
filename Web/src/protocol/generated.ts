@@ -3297,6 +3297,27 @@ export interface SSHHostsRequest {
   destination?: string;
 }
 
+/** A session that said the text, and the line it is on. */
+export interface SaidMatch {
+  agentID: UUID;
+  line: string;
+}
+
+/**
+ * agents/said (#1585): the sessions whose prompts or replies hold the text, any case, in one
+ * project when folder says.
+ */
+export interface SaidSearchRequest {
+  text: string;
+  folder?: URLString;
+  limit?: number;
+}
+
+/** The sessions that said it, the most recently active first. */
+export interface SaidSearchResult {
+  matches: SaidMatch[];
+}
+
 export type SandboxChoice = "runtime" | "on" | "off";
 
 export interface SandboxFailureRecord {
@@ -4509,6 +4530,7 @@ export interface Methods {
   "agents/recreateWorktree": { params: AgentRequest; result: Agent };
   "agents/rename": { params: RenameRequest; result: Agent };
   "agents/resuming": { params: Empty; result: ResumingResponse };
+  "agents/said": { params: SaidSearchRequest; result: SaidSearchResult };
   "agents/sendNow": { params: UnqueueRequest; result: Empty };
   "agents/setCeiling": { params: SetCeilingRequest; result: Agent };
   "agents/setLabels": { params: SetLabelsRequest; result: Agent };
@@ -4652,6 +4674,7 @@ export const MethodTarget = {
   "agents/recreateWorktree": "host",
   "agents/rename": "host",
   "agents/resuming": "host",
+  "agents/said": "host",
   "agents/sendNow": "host",
   "agents/setCeiling": "host",
   "agents/setLabels": "host",
@@ -5186,6 +5209,9 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   RuntimeStatus: { required: ["runtime", "availability", "checkedAt", "outdated"], optional: ["poolNote", "isOut"] },
   SSHHost: { required: ["alias", "resolved", "throughBastion", "isBastion", "known"], optional: [] },
   SSHHostsRequest: { required: [], optional: ["destination"] },
+  SaidMatch: { required: ["agentID", "line"], optional: [] },
+  SaidSearchRequest: { required: ["text"], optional: ["folder", "limit"] },
+  SaidSearchResult: { required: ["matches"], optional: [] },
   SandboxFailureRecord: { required: ["runtimeID", "detail", "hang", "recoveryOffered", "completedToolCalls"], optional: [] },
   SandboxSettings: { required: ["defaults"], optional: [] },
   SealedEnvelope: { required: ["encapsulated", "ciphertext"], optional: [] },

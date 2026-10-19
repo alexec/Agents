@@ -4020,6 +4020,24 @@ type SSHHostsRequest struct {
 	Destination *string `json:"destination,omitzero"`
 }
 
+// A session that said the text, and the line it is on.
+type SaidMatch struct {
+	AgentID UUID   `json:"agentID"`
+	Line    string `json:"line"`
+}
+
+// agents/said (#1585): the sessions whose prompts or replies hold the text, any case, in one project when folder says.
+type SaidSearchRequest struct {
+	Text   string `json:"text"`
+	Folder *URL   `json:"folder,omitzero"`
+	Limit  *int64 `json:"limit,omitzero"`
+}
+
+// The sessions that said it, the most recently active first.
+type SaidSearchResult struct {
+	Matches []SaidMatch `json:"matches"`
+}
+
 type SandboxChoice string
 
 const (

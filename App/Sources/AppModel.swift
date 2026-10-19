@@ -1269,10 +1269,20 @@ final class AppModel {
         searched = []
         searchNext = [:]
         work.forget(earlier)
+        work.saidLines = [:]
         guard !words.isEmpty else { return }
         let request = DaemonAPI.ListRequest(archivedCommands: false, limit: Self.searchShown, lean: true, query: words)
         let hosts: [HostID] = (hasMacHost ? [.mac] : []) + self.hosts.servers.filter { !hostUnreachable($0) }
-        for host in hosts { await search(request, on: host) }
+        for host in hosts {
+            await search(request, on: host)
+            // What was said (#1585): the sessions whose prompts or replies hold the words.
+            if let said = try? await client(for: host).call(DaemonAPI.Method.agentsSaid,
+                                                            DaemonAPI.SaidSearchRequest(text: words),
+                                                            returning: DaemonAPI.SaidSearchResult.self),
+               !Task.isCancelled {
+                for match in said.matches { work.saidLines[match.agentID] = match.line }
+            }
+        }
     }
 
     /// The next page from each host that has more, newest first as the host lists them.

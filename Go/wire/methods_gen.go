@@ -20,6 +20,7 @@ var (
 	CallAgentsRecreateWorktree         = Method[AgentRequest, Agent]{"agents/recreateWorktree"}
 	CallAgentsRename                   = Method[RenameRequest, Agent]{"agents/rename"}
 	CallAgentsResuming                 = Method[Empty, ResumingResponse]{"agents/resuming"}
+	CallAgentsSaid                     = Method[SaidSearchRequest, SaidSearchResult]{"agents/said"}
 	CallAgentsSendNow                  = Method[UnqueueRequest, Empty]{"agents/sendNow"}
 	CallAgentsSetCeiling               = Method[SetCeilingRequest, Agent]{"agents/setCeiling"}
 	CallAgentsSetLabels                = Method[SetLabelsRequest, Agent]{"agents/setLabels"}

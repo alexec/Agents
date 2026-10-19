@@ -46,6 +46,8 @@ export function accepted(typed: readonly string[], existing: readonly string[]):
 export interface LabelQuery {
   label: string | null;
   text: string;
+  /** The sessions whose prompts or replies hold the words, by id, as their hosts found them (agents/said, #1585). */
+  said?: Readonly<Record<string, string>>;
 }
 
 /** The search field's words: `label:x` or `label:"x y"` filters, the rest matches title and report. */
@@ -66,5 +68,6 @@ export function queryMatches(query: LabelQuery, agent: Agent): boolean {
     if (!wanted || !(agent.labels ?? []).some((label) => labelKey(label.value) === wanted)) return false;
   }
   if (!query.text) return true;
-  return [agent.title, agent.report?.message].some((value) => value !== undefined && containsIgnoringCase(value, query.text));
+  return [agent.title, agent.report?.message].some((value) => value !== undefined && containsIgnoringCase(value, query.text))
+    || query.said?.[agent.id] !== undefined;
 }

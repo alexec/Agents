@@ -363,7 +363,7 @@ function SmartFold({ row, store, projects, query, linkDown, downSince }: {
   downSince?: number | undefined;
 }) {
   const r = route.value;
-  const parsed = query ? parseQuery(query) : undefined;
+  const parsed = query ? { ...parseQuery(query), said: store.saidLines.value } : undefined;
   // Pinned workflows of folded projects are listed too, held while Pinned is drawn (#432).
   const flowPinned = row !== "pinned" ? [] : projects.filter(({ host, project }) =>
     store.hostIsOnline(host.id) && store.workflowPinsIn(host.id, project.project.folder).length > 0);
@@ -508,7 +508,7 @@ const ProjectFold = memo(function ProjectFold({ store, host, project, query, lin
 
   const view = store.projectView(host.id, folder);
   // The matcher is made once per fold, not per row.
-  const parsed = searching ? parseQuery(query) : undefined;
+  const parsed = searching ? { ...parseQuery(query), said: store.saidLines.value } : undefined;
   const live = view.headings.flatMap((h) => h.agents);
   // Those a group at the top lists are there alone (#495, #587), out of the project's list. A
   // group turned off (#846) lists nothing, so its sessions are here unless the next group has them.
