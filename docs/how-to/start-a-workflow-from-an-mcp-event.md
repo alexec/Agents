@@ -60,6 +60,7 @@ pushes to GitHub shows them on its **Workflows** page, off:
 | --- | --- | --- |
 | **Work an issue** | `issue.labelled` with `label: agent`: someone adds the `agent` label to an issue | does what the issue asks on a branch of its own, and opens a pull request for it |
 | **Fix failed checks** | `checks.failed`: a pull request's checks failed | reads the failed jobs, fixes the cause on the PR's branch and pushes, or runs the jobs again when the change did not cause it |
+| **Address review comments** | `review.posted`: CodeRabbit finished a review of a pull request | fixes or answers each open review comment on the PR, a person's or CodeRabbit's, and pushes |
 
 1. Open the workflow and turn on its **Enabled** switch.
 2. The app writes the workflow to `.agents/workflows/<id>.md` and its method to

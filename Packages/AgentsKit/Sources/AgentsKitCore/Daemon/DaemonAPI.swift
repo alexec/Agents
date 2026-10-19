@@ -124,6 +124,10 @@ public enum DaemonAPI {
         public static let agentsFind = "agents/find"
         /// The sessions whose prompts or replies hold some words (#1585), with the line.
         public static let agentsSaid = "agents/said"
+        /// What the language server for a file's language finds in it (#844).
+        public static let filesDiagnostics = "files/diagnostics"
+        /// What the language server would write at a place in a file (#844).
+        public static let filesComplete = "files/complete"
         /// The iOS simulators on a Mac host (#842): listed, booted and shut down on the
         /// person's press, and a booted one's screen as a JPEG.
         public static let simulatorsList = "simulators/list"
@@ -1252,6 +1256,86 @@ public enum DaemonAPI {
     public struct SaidSearchResult: Codable, Sendable {
         public var matches: [SaidMatch]
         public init(matches: [SaidMatch]) { self.matches = matches }
+    }
+
+    /// A file's problems, as its language server finds them (#844).
+    public struct FileDiagnosticsRequest: Codable, Sendable {
+        public var agentID: UUID
+        public var path: String
+        public var text: String?
+        public init(agentID: UUID, path: String, text: String? = nil) {
+            self.agentID = agentID
+            self.path = path
+            self.text = text
+        }
+    }
+
+    /// What the language server would write at line and column (from 1; UTF-16 columns).
+    public struct FileCompletionRequest: Codable, Sendable {
+        public var agentID: UUID
+        public var path: String
+        public var text: String
+        public var line: Int
+        public var column: Int
+        public init(agentID: UUID, path: String, text: String, line: Int, column: Int) {
+            self.agentID = agentID
+            self.path = path
+            self.text = text
+            self.line = line
+            self.column = column
+        }
+    }
+
+    /// One thing to write: what the list shows, what goes in (the label when nil), a line on it.
+    public struct FileCompletion: Codable, Sendable, Hashable {
+        public var label: String
+        public var insert: String?
+        public var detail: String?
+        public init(label: String, insert: String? = nil, detail: String? = nil) {
+            self.label = label
+            self.insert = insert
+            self.detail = detail
+        }
+        /// What goes in the text.
+        public var written: String { insert ?? label }
+    }
+
+    /// At most 50 completions in the server's order; `reason` when there are none to ask for.
+    public struct FileCompletions: Codable, Sendable {
+        public var items: [FileCompletion]
+        public var reason: String?
+        public init(items: [FileCompletion], reason: String? = nil) {
+            self.items = items
+            self.reason = reason
+        }
+    }
+
+    /// One problem: line and column from 1, severity (error, warning, info, hint), words.
+    public struct FileDiagnostic: Codable, Sendable, Hashable {
+        public var line: Int
+        public var column: Int
+        public var severity: String
+        public var message: String
+        public var source: String?
+        public init(line: Int, column: Int, severity: String, message: String, source: String? = nil) {
+            self.line = line
+            self.column = column
+            self.severity = severity
+            self.message = message
+            self.source = source
+        }
+    }
+
+    /// At most 200 problems and the server that found them; `reason` when there is none.
+    public struct FileDiagnostics: Codable, Sendable {
+        public var diagnostics: [FileDiagnostic]
+        public var server: String?
+        public var reason: String?
+        public init(diagnostics: [FileDiagnostic], server: String? = nil, reason: String? = nil) {
+            self.diagnostics = diagnostics
+            self.server = server
+            self.reason = reason
+        }
     }
 
     /// An iOS simulator on a Mac host (#842).

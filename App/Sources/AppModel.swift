@@ -4917,6 +4917,25 @@ final class AppModel {
         if let modes { work.replaceRememberedModes(modes) }
     }
 
+    // MARK: Language servers
+
+    /// A source file's problems, from its language server on the agent's host (#844).
+    func diagnose(path: String, text: String, of agentID: UUID) async -> DaemonAPI.FileDiagnostics? {
+        try? await client(forAgent: agentID).call(
+            DaemonAPI.Method.filesDiagnostics,
+            DaemonAPI.FileDiagnosticsRequest(agentID: agentID, path: path, text: text),
+            returning: DaemonAPI.FileDiagnostics.self)
+    }
+
+    /// What the file's language server would write at a line and column (#844).
+    func complete(path: String, text: String, line: Int, column: Int, of agentID: UUID) async -> [DaemonAPI.FileCompletion] {
+        let found = try? await client(forAgent: agentID).call(
+            DaemonAPI.Method.filesComplete,
+            DaemonAPI.FileCompletionRequest(agentID: agentID, path: path, text: text, line: line, column: column),
+            returning: DaemonAPI.FileCompletions.self)
+        return found?.items ?? []
+    }
+
     // MARK: Simulators
 
     /// The Simulator pane's calls (#842), to the session's host.

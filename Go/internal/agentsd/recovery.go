@@ -33,6 +33,32 @@ type recoveryState struct {
 	resumeMu    sync.Mutex
 	interrupted map[wire.UUID]wire.AgentState
 	resuming    map[wire.UUID]bool
+	// cutOff is the agents this host's clean stop cut off in a turn, with their state
+	// before (#1605).
+	cutOff map[wire.UUID]wire.AgentState
+}
+
+// noteCutOff keeps an agent the host's going cut off, with its state before the end.
+func (d *Daemon) noteCutOff(id wire.UUID, was wire.AgentState) {
+	switch was {
+	case wire.AgentStateStarting, wire.AgentStateRunning, wire.AgentStateWaitingOnUser:
+	default:
+		return
+	}
+	d.resumeMu.Lock()
+	if d.cutOff == nil {
+		d.cutOff = map[wire.UUID]wire.AgentState{}
+	}
+	d.cutOff[id] = was
+	d.resumeMu.Unlock()
+}
+
+// leftAgent is an agent the last host left working, and the state it was in.
+type leftAgent struct {
+	a   wire.Agent
+	was wire.AgentState
+	// ended is whether the last host already wrote it stopped with the daemon (a clean stop).
+	ended bool
 }
 
 func pickUps(a *wire.Agent) int64 {
@@ -50,9 +76,9 @@ func mayBePickedUp(a *wire.Agent) bool {
 // recover is DaemonCore.recover's part for agents: called before any client connects.
 func (d *Daemon) recover() {
 	d.resumeMu.Lock()
-	d.interrupted, d.resuming = map[wire.UUID]wire.AgentState{}, map[wire.UUID]bool{}
+	d.interrupted, d.resuming, d.cutOff = map[wire.UUID]wire.AgentState{}, map[wire.UUID]bool{}, map[wire.UUID]wire.AgentState{}
 	d.resumeMu.Unlock()
-	var left []wire.Agent
+	var left []leftAgent
 	for _, a := range d.Store.Agents() {
 		// Made under another set-up and copied here: shown, never run (stampOrImport).
 		if a.State != wire.AgentStateArchived && a.MadeInRoot != nil && *a.MadeInRoot != d.Store.RootID &&
@@ -66,25 +92,39 @@ func (d *Daemon) recover() {
 		}
 		switch a.State {
 		case wire.AgentStateStarting, wire.AgentStateRunning, wire.AgentStateWaitingOnUser:
-			left = append(left, a)
+			left = append(left, leftAgent{a: a, was: a.State})
 		}
 	}
-	sort.SliceStable(left, func(i, j int) bool { return left[i].LastActivityAt > left[j].LastActivityAt })
-	for _, a := range left {
-		if a.State == wire.AgentStateWaitingOnUser {
+	// Those a clean stop cut off in a turn, which it wrote stopped with the daemon (#1605).
+	if alive := d.readAlive(); alive != nil {
+		for id, was := range alive.CutOff {
+			a := d.Store.Agent(id)
+			if a == nil || a.State != wire.AgentStateStopped || a.EndedReason == nil || *a.EndedReason != wire.EndedReasonDaemonGone {
+				continue
+			}
+			left = append(left, leftAgent{a: *a, was: was, ended: true})
+		}
+	}
+	sort.SliceStable(left, func(i, j int) bool { return left[i].a.LastActivityAt > left[j].a.LastActivityAt })
+	for _, l := range left {
+		a := l.a
+		if l.was == wire.AgentStateWaitingOnUser {
 			d.record(a.ID, runtimeNote(questionWentUnanswered))
 		}
 		d.record(a.ID, runtimeNote("This agent was working when the daemon stopped, so it stopped too."))
 		if n := pickUps(&a); n >= pickUpsBeforeLeavingAlone {
 			d.record(a.ID, runtimeNote(fmt.Sprintf("Not picked back up: the app stopped %d times in a row while picking this conversation up, so picking it up may be what stops it. Send it a message to pick it up yourself.", n)))
 		}
-		after := d.change(a.ID, func(a *wire.Agent) {
-			a.State, a.EndedReason, a.ArchivedReason = wire.AgentStateStopped, reason(wire.EndedReasonDaemonGone), nil
-		})
-		d.record(a.ID, stateChanged(wire.AgentStateStopped, reason(wire.EndedReasonDaemonGone)))
+		after := d.Store.Agent(a.ID)
+		if !l.ended {
+			after = d.change(a.ID, func(a *wire.Agent) {
+				a.State, a.EndedReason, a.ArchivedReason = wire.AgentStateStopped, reason(wire.EndedReasonDaemonGone), nil
+			})
+			d.record(a.ID, stateChanged(wire.AgentStateStopped, reason(wire.EndedReasonDaemonGone)))
+		}
 		if after != nil && mayBePickedUp(after) && after.Purpose == nil {
 			d.resumeMu.Lock()
-			d.interrupted[a.ID] = a.State
+			d.interrupted[a.ID] = l.was
 			d.resumeMu.Unlock()
 		}
 	}

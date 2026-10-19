@@ -5,41 +5,32 @@ import SwiftUI
 ///
 /// The system's `ProgressView()` starts its turn when it appears, and nothing can set
 /// its phase, so a column of working agents spun out of step with each other and with
-/// the chat's working line. This draws the same wheel, with the lit spoke read off the
-/// clock (`SpinnerClock`), so all of them land on the same spoke on the same frame.
+/// the chat's working line. This draws a circle-notch, an open ring with round caps
+/// (#1606), turned to the angle read off the clock (`SpinnerClock`), so all of them
+/// show the notch at the same angle on the same frame.
 ///
-/// The spokes follow the platform's own: twelve on the Mac, eight on the phone. The
-/// timeline ticks once a spoke rather than every frame, so a list of working agents
-/// redraws a dozen times a second, not sixty. Like the system spinner it keeps turning
-/// under Reduce Motion: a still wheel would read as stuck.
+/// The notch glides, so the timeline redraws at most thirty times a second, and only
+/// the rotation changes from one frame to the next. Like the system spinner it keeps
+/// turning under Reduce Motion: a still ring would read as stuck.
 struct SyncedSpinner: View {
-    /// The wheel's width and height, in points.
+    /// The ring's width and height, in points.
     var diameter: CGFloat
-    /// The spokes' colour: grey, as the system's, except in the sidebar's marks, which are
+    /// The ring's colour: grey, as the system's, except in the sidebar's marks, which are
     /// in the accent as the rest of them (#1558).
     var color: Color = .secondary
 
-    #if os(macOS)
-    private static let spokes = 12
-    #else
-    private static let spokes = 8
-    #endif
-
     var body: some View {
-        TimelineView(.periodic(from: SpinnerClock.epoch, by: SpinnerClock.tick(spokes: Self.spokes))) { context in
-            let step = SpinnerClock.step(at: context.date, spokes: Self.spokes)
-            ZStack {
-                ForEach(0..<Self.spokes, id: \.self) { spoke in
-                    Capsule()
-                        .frame(width: diameter * 0.09, height: diameter * 0.28)
-                        .offset(y: -diameter * 0.32)
-                        .rotationEffect(.degrees(Double(spoke) * 360 / Double(Self.spokes)))
-                        .opacity(SpinnerClock.opacity(ofSpoke: spoke, step: step, spokes: Self.spokes))
-                }
-            }
-            .foregroundStyle(color)
-            // A parent's animation would fade one spoke into the next. The wheel ticks.
-            .transaction { $0.animation = nil }
+        let lineWidth = diameter * 0.12
+        let ring = Circle()
+            .trim(from: 0, to: 0.8)
+            .stroke(color, style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
+            // Inset by half the stroke, so the ring and its caps stay in the frame.
+            .padding(lineWidth / 2)
+        TimelineView(.animation(minimumInterval: 1.0 / 30)) { context in
+            ring
+                .rotationEffect(.degrees(SpinnerClock.angle(at: context.date)))
+                // A parent's animation would ease the notch between frames. The clock sets it.
+                .transaction { $0.animation = nil }
         }
         .frame(width: diameter, height: diameter)
         // One element and no words of its own: the caller says what it means, and a

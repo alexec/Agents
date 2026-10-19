@@ -1,6 +1,6 @@
 ---
 name: fill-free-slots
-description: Find the free agent slots in this project and start an agent on each open, unassigned GitHub issue until the slots are full. Bugs go first, walk lanes go first while more than five issues need a walk, and only one lane works in each area. Nothing else. Use when the Fill free slots workflow runs, or when Alex asks to fill the free slots.
+description: Find the free agent slots in this project and start an agent on each open, unassigned GitHub issue until the slots are full. Milestone issues and bugs go first, walk lanes go first while more than five issues need a walk, spare slots go to polish and competitor issues by RICE, and only one lane works in each area. Nothing else. Use when the Fill free slots workflow runs, or when Alex asks to fill the free slots.
 ---
 
 # Fill free slots
@@ -28,10 +28,20 @@ issues that are not labelled `parked`:
 
 ```sh
 gh issue list --state open --search "no:assignee -label:parked" --limit 100 \
-  --json number,title,labels,createdAt
+  --json number,title,labels,milestone,createdAt
 ```
 
-Order them: `bug` first, then everything else; within each, oldest first.
+Order them by AGENTS.md, "Work by milestone": issues in the open milestone first, then
+those in the next one (only in areas the open one does not hold); `bug` before the rest
+within each, oldest first. Issues with no milestone are the backlog: leave them out,
+except the standing issues below.
+
+**Standing work (#1570, #1604).** The open issues labelled `polish` or `competitor`
+with no milestone are standing issues; order them by RICE, highest first. Keep at least
+one standing lane running: if no running agent works on a standing issue, the first free
+slot goes to the first standing issue whose area is free. Slots left after every
+workable milestone issue has an agent also go to standing issues, in RICE order. A
+standing issue never takes a slot that a workable milestone issue can fill.
 
 **Untried work first (#611).** Count the issues labelled `needs-walk` (merged UI changes
 nobody has run): `gh issue list --state all --label needs-walk --json number,title,assignees`.
