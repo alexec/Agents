@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/alexec/agents/Go/internal/agentsd/store"
 	"github.com/alexec/agents/Go/wire"
@@ -17,6 +18,22 @@ import (
 // them to the receiving host (projects/receiveUpload).
 
 const sendPartSize = 1 << 20
+
+// transferLimit is how long a file of a send waits untouched in Outgoing or Incoming
+// before it is taken as abandoned (#1531): a sheet closed mid-send, a window that quit, a
+// lost link. Each part read or written touches it, so a slow send that goes on keeps it.
+const transferLimit = time.Hour
+
+// sweepTransfers removes the files in folder that nothing touched for transferLimit.
+func sweepTransfers(folder string) {
+	entries, _ := os.ReadDir(folder)
+	before := time.Now().Add(-transferLimit)
+	for _, e := range entries {
+		if fi, err := e.Info(); err == nil && fi.ModTime().Before(before) {
+			os.Remove(filepath.Join(folder, e.Name()))
+		}
+	}
+}
 
 func (d *Daemon) outgoingFolder() string { return filepath.Join(d.Store.Loc.Root, "Outgoing") }
 
@@ -82,6 +99,7 @@ func (d *Daemon) sendPack(r wire.SendPackRequest) (wire.SendPack, error) {
 		p.Commits = append(p.Commits, wire.SentBranch{Name: b, Commit: commit})
 		refs = append(refs, "refs/heads/"+b)
 	}
+	sweepTransfers(d.outgoingFolder())
 	os.MkdirAll(d.outgoingFolder(), 0o700)
 
 	// Only the receiving host's commits this repository has too can be left out.
@@ -151,6 +169,9 @@ func (d *Daemon) sendRead(r wire.SendReadRequest) (wire.SendRead, error) {
 	end := fi == nil || r.Offset+int64(n) >= fi.Size()
 	if end {
 		os.Remove(path)
+	} else {
+		now := time.Now()
+		os.Chtimes(path, now, now)
 	}
 	return wire.SendRead{Data: buf[:n], End: end}, nil
 }
