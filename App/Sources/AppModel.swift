@@ -4886,6 +4886,22 @@ final class AppModel {
         if let modes { work.replaceRememberedModes(modes) }
     }
 
+    // MARK: Simulators
+
+    /// The Simulator pane's calls (#842), to the session's host.
+    func simulatorCalls(for agentID: UUID) -> SimulatorCalls {
+        SimulatorCalls(
+            list: { try await self.client(forAgent: agentID).call(
+                DaemonAPI.Method.simulatorsList, Optional<String>.none, returning: DaemonAPI.SimulatorList.self) },
+            boot: { udid in _ = try await self.client(forAgent: agentID).call(
+                DaemonAPI.Method.simulatorsBoot, DaemonAPI.SimulatorRequest(udid: udid)) },
+            shutdown: { udid in _ = try await self.client(forAgent: agentID).call(
+                DaemonAPI.Method.simulatorsShutdown, DaemonAPI.SimulatorRequest(udid: udid)) },
+            screen: { udid in try await self.client(forAgent: agentID).call(
+                DaemonAPI.Method.simulatorsScreen, DaemonAPI.SimulatorScreenRequest(udid: udid),
+                returning: DaemonAPI.SimulatorScreen.self) })
+    }
+
     // MARK: The user's shells
 
     /// Run a command from a reply in the session's shell (#1533), once the shell's pane has

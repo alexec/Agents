@@ -11010,6 +11010,100 @@
         "unreadable"
       ]
     },
+    "Simulator": {
+      "type": "object",
+      "description": "An iOS simulator on a Mac host (#842): its UDID, its name, its system and whether it is booted.",
+      "properties": {
+        "udid": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "os": {
+          "type": "string"
+        },
+        "booted": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "udid",
+        "name",
+        "os",
+        "booted"
+      ],
+      "additionalProperties": false
+    },
+    "SimulatorList": {
+      "type": "object",
+      "description": "simulators/list: the host's simulators, booted first. Reason says why there are none to list, when a host has no simulators (not a Mac, no Xcode).",
+      "properties": {
+        "simulators": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Simulator"
+          }
+        },
+        "reason": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "simulators"
+      ],
+      "additionalProperties": false
+    },
+    "SimulatorRequest": {
+      "type": "object",
+      "description": "simulators/boot and simulators/shutdown: one simulator, by its UDID.",
+      "properties": {
+        "udid": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "udid"
+      ],
+      "additionalProperties": false
+    },
+    "SimulatorScreenRequest": {
+      "type": "object",
+      "description": "simulators/screen: a booted simulator's screen, at most maxHeight pixels tall (1200 when left out).",
+      "properties": {
+        "udid": {
+          "type": "string"
+        },
+        "maxHeight": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "udid"
+      ],
+      "additionalProperties": false
+    },
+    "SimulatorScreen": {
+      "type": "object",
+      "description": "A booted simulator's screen as a JPEG, and its size in pixels.",
+      "properties": {
+        "jpeg": {
+          "$ref": "#/definitions/Base64"
+        },
+        "width": {
+          "type": "integer"
+        },
+        "height": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "jpeg",
+        "width",
+        "height"
+      ],
+      "additionalProperties": false
+    },
     "SkillAddAnswer": {
       "type": "object",
       "properties": {

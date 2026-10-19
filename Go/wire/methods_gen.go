@@ -194,6 +194,10 @@ var (
 	CallShellResize                    = Method[ShellResizeRequest, Empty]{"shell/resize"}
 	CallShellRestart                   = Method[ShellAttachRequest, ShellAttachResponse]{"shell/restart"}
 	CallShellSignal                    = Method[ShellSignalRequest, Empty]{"shell/signal"}
+	CallSimulatorsBoot                 = Method[SimulatorRequest, Empty]{"simulators/boot"}
+	CallSimulatorsList                 = Method[Empty, SimulatorList]{"simulators/list"}
+	CallSimulatorsScreen               = Method[SimulatorScreenRequest, SimulatorScreen]{"simulators/screen"}
+	CallSimulatorsShutdown             = Method[SimulatorRequest, Empty]{"simulators/shutdown"}
 	CallSkillsAdd                      = Method[SkillAddRequest, SkillAddAnswer]{"skills/add"}
 	CallSkillsCheckUpdates             = Method[SkillsListRequest, SkillUpdatesAnswer]{"skills/check-updates"}
 	CallSkillsList                     = Method[SkillsListRequest, SkillsListAnswer]{"skills/list"}

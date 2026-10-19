@@ -3704,6 +3704,46 @@ export interface ShownFile {
 
 export type SignInWantedReason = "notSignedIn" | "unreadable";
 
+/**
+ * An iOS simulator on a Mac host (#842): its UDID, its name, its system and whether it is booted.
+ */
+export interface Simulator {
+  udid: string;
+  name: string;
+  os: string;
+  booted: boolean;
+}
+
+/**
+ * simulators/list: the host's simulators, booted first. Reason says why there are none to list,
+ * when a host has no simulators (not a Mac, no Xcode).
+ */
+export interface SimulatorList {
+  simulators: Simulator[];
+  reason?: string;
+}
+
+/** simulators/boot and simulators/shutdown: one simulator, by its UDID. */
+export interface SimulatorRequest {
+  udid: string;
+}
+
+/** A booted simulator's screen as a JPEG, and its size in pixels. */
+export interface SimulatorScreen {
+  jpeg: Base64;
+  width: number;
+  height: number;
+}
+
+/**
+ * simulators/screen: a booted simulator's screen, at most maxHeight pixels tall (1200 when left
+ * out).
+ */
+export interface SimulatorScreenRequest {
+  udid: string;
+  maxHeight?: number;
+}
+
 export interface SkillAddAnswer {
   skill: ManagedSkill;
 }
@@ -4553,6 +4593,10 @@ export interface Methods {
   "runtimes/list": { params: Empty; result: RuntimeStatus[] };
   "runtimes/markAvailable": { params: MarkRuntimeAvailable; result: RuntimeAllowances };
   "sandbox/state": { params: Empty; result: SandboxSettings };
+  "simulators/boot": { params: SimulatorRequest; result: Empty };
+  "simulators/list": { params: Empty; result: SimulatorList };
+  "simulators/screen": { params: SimulatorScreenRequest; result: SimulatorScreen };
+  "simulators/shutdown": { params: SimulatorRequest; result: Empty };
   "store/notes": { params: Empty; result: StoreNotes };
   "surface/identify": { params: SurfaceIdentification; result: Empty };
   "time/history": { params: Empty; result: TimeHistory };
@@ -4690,6 +4734,10 @@ export const MethodTarget = {
   "runtimes/list": "host",
   "runtimes/markAvailable": "host",
   "sandbox/state": "host",
+  "simulators/boot": "host",
+  "simulators/list": "host",
+  "simulators/screen": "host",
+  "simulators/shutdown": "host",
   "store/notes": "host",
   "surface/identify": "host",
   "time/history": "host",
@@ -5175,6 +5223,11 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ShellStateNotification: { required: ["agentID", "shell", "state"], optional: [] },
   ShowFileNotification: { required: ["agentID", "file"], optional: [] },
   ShownFile: { required: ["path"], optional: ["line", "chart"] },
+  Simulator: { required: ["udid", "name", "os", "booted"], optional: [] },
+  SimulatorList: { required: ["simulators"], optional: ["reason"] },
+  SimulatorRequest: { required: ["udid"], optional: [] },
+  SimulatorScreen: { required: ["jpeg", "width", "height"], optional: [] },
+  SimulatorScreenRequest: { required: ["udid"], optional: ["maxHeight"] },
   SkillAddAnswer: { required: ["skill"], optional: [] },
   SkillAddRequest: { required: ["previewID", "destination", "replace"], optional: [] },
   SkillChanges: { required: ["added", "changed", "removed"], optional: [] },
