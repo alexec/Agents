@@ -105,6 +105,18 @@ export interface ACPProviderInfo {
   configured?: boolean;
 }
 
+/**
+ * clients/setActivityToken (#1744): the push token of one session's Live Activity on this device,
+ * in hex, for the control plane to update it by APNs while the Remote is not running. startedAt is
+ * when the turn began, where the activity's timer counts from. No token takes it away.
+ */
+export interface ActivityToken {
+  agentID: UUID;
+  token?: string;
+  environment: PushEnvironment;
+  startedAt: WireDate;
+}
+
 /** What either announce is answered with: who the new party now is. */
 export interface Admitted {
   client?: UUID;
@@ -425,6 +437,17 @@ export interface AttentionNotification {
 export interface AttentionPending {
   needs: Need[];
   deliveries: AttentionDelivery[];
+}
+
+/**
+ * attention/turn (#1744): a host says that a session's turn moved to a new phase, so the control
+ * plane can update that session's Live Activity on a device by APNs. No words: the phase, and when
+ * it ended.
+ */
+export interface AttentionTurn {
+  agentID: UUID;
+  phase: TurnPhase;
+  endedAt?: WireDate;
 }
 
 export interface AuthStatus {
@@ -4251,6 +4274,12 @@ export interface TunnelOpen {
   ref: string;
 }
 
+/**
+ * Where a session's turn is, as its Live Activity says it (#1744): working; a question or an
+ * approval waiting on the person; done; ended for another reason; or gone (archived or deleted).
+ */
+export type TurnPhase = "working" | "question" | "approval" | "done" | "failed" | "gone";
+
 export interface TurnSummary {
   id: UUID;
   start: number;
@@ -5066,6 +5095,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ACPAuthMethod: { required: ["id"], optional: ["name", "description", "_meta"] },
   ACPPromptCapabilities: { required: [], optional: ["image", "audio", "embeddedContext"] },
   ACPProviderInfo: { required: ["id"], optional: ["name", "protocol", "configured"] },
+  ActivityToken: { required: ["agentID", "environment", "startedAt"], optional: ["token"] },
   Admitted: { required: [], optional: ["client", "host", "grant"] },
   AdoptRequest: { required: ["runtimeID", "sessionID", "cwd"], optional: [] },
   Agent: { required: ["id", "runtimeID", "cwd", "state", "startOptions", "advertisedOptions", "availableCommands", "createdAt", "lastActivityAt"], optional: ["title", "labels", "runtimeSessionID", "isUnread", "reportSeenAt", "endedReason", "archivedReason", "usage", "lastTurnUsage", "costToDate", "costCeiling", "tokensToDate", "tokenCeiling", "plans", "background", "additionalDirectories", "mcpServers", "queuedPrompts", "suggestedPrompts", "startedByWorkflow", "purpose", "startedByRun", "startedByAgent", "chainDepth", "eventWait", "worktree", "pendingMove", "startingPoint", "startRequestID", "persona", "restartPickUps", "report", "outcomeAsked", "archiveRequest", "afterTurn", "archivedAt", "sandboxOverride", "effectiveSandbox", "pendingSandboxFailure", "missingFolder", "listsLeftOut", "titleIsPersons", "runtimeTitle", "madeInRoot", "queuedStart", "branchedFrom"] },
@@ -5096,6 +5126,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   AttentionNeed: { required: [], optional: ["need", "headline", "buzz", "withdraw", "waiting"] },
   AttentionNotification: { required: ["needID", "alert"], optional: ["need", "to"] },
   AttentionPending: { required: ["needs", "deliveries"], optional: [] },
+  AttentionTurn: { required: ["agentID", "phase"], optional: ["endedAt"] },
   AuthStatus: { required: ["kind", "label"], optional: [] },
   AuthenticateRequest: { required: ["runtimeID", "methodID"], optional: [] },
   BackgroundItem: { required: ["id", "kind", "name", "state", "canStop", "isStopping", "startedAt"], optional: ["taskType", "detail", "command", "parentID", "toolCallID", "outputFilePath", "summary", "lastToolName", "endedAt"] },

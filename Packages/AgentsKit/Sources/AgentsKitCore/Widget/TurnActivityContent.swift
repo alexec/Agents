@@ -10,6 +10,11 @@ import Foundation
 ///
 /// It is ActivityKit's `ContentState`, so it is small (the system refuses more than 4 KB)
 /// and only `Codable`.
+///
+/// The control plane updates it by push while the Remote is not running (#1744). Apple
+/// reads a pushed state, so the control plane writes only the phase and the times, with no
+/// title and no line (public-security.md §5): the activity shows the title it was started
+/// with, and a line that says to open the app.
 public struct TurnActivityContent: Codable, Hashable, Sendable {
     public enum Phase: String, Codable, Hashable, Sendable {
         case working
@@ -23,9 +28,9 @@ public struct TurnActivityContent: Codable, Hashable, Sendable {
     }
 
     public var phase: Phase
-    /// The session's title, here and not in the attributes: a runtime names a new session
-    /// after its first turn has begun.
-    public var title: String
+    /// The session's title, here and not only in the attributes: a runtime names a new
+    /// session after its first turn has begun. Nil from a push, which carries no words.
+    public var title: String?
     /// The grey line: the step, the question, the report or the reason. Nil says nothing.
     public var line: String?
     /// When this device sent the turn's prompt. The timer counts from here.
@@ -33,7 +38,7 @@ public struct TurnActivityContent: Codable, Hashable, Sendable {
     /// When it ended, so the timer stops there.
     public var endedAt: Date?
 
-    public init(phase: Phase, title: String, line: String?, startedAt: Date, endedAt: Date? = nil) {
+    public init(phase: Phase, title: String?, line: String?, startedAt: Date, endedAt: Date? = nil) {
         self.phase = phase
         self.title = title
         self.line = line.map(Self.shortened).flatMap { $0.isEmpty ? nil : $0 }
@@ -56,6 +61,26 @@ public struct TurnActivityContent: Codable, Hashable, Sendable {
         case .done: "Done"
         case .failed: "Stopped"
         }
+    }
+
+    /// The title to show: this state's, else the one the activity was started with.
+    public func title(startedWith started: String?) -> String {
+        title ?? started ?? Self.untitled
+    }
+
+    /// The line under the title. While it works and the Remote has not been heard from for
+    /// a while, it says so rather than going on showing a step it may have left; a pushed
+    /// state that waits on the person, which has no words, says where they are.
+    public func line(isStale: Bool) -> String? {
+        if isStale && !isOver { return "Open Agents to see where it is" }
+        if line == nil, title == nil {
+            switch phase {
+            case .question: return "Open Agents to answer it"
+            case .approval: return "Open Agents to decide"
+            case .working, .done, .failed: return nil
+            }
+        }
+        return line
     }
 
     /// The title a session with none yet is shown with.

@@ -12,8 +12,10 @@ import Foundation
 /// while. Ended with Done, or the reason, when the turn ends; at once when the session is
 /// archived or gone, or the switch in Settings is turned off.
 ///
-/// Updates by push while the app is not running are not here yet: the control plane's APNs
-/// path would carry them (#1744).
+/// While the app is not running, the control plane updates it by push (#1744): each
+/// activity is asked for with a push token, and `tokenChanged` gives the token to the
+/// control plane, and takes it back when the activity ends. A push carries the phase and
+/// the times, never the words; the attributes keep the title it started with.
 @MainActor
 final class TurnActivities {
     /// Settings ▸ Notifications ▸ Live Activities.
@@ -36,6 +38,12 @@ final class TurnActivities {
     private var startsAsked: Set<UUID> = []
     /// Sessions sent a prompt from here, and when, until the Mac says the turn runs.
     private var sentAt: [UUID: Date] = [:]
+    /// What watches each activity's push token, by activity id.
+    private var watching: [String: Task<Void, Never>] = [:]
+
+    /// An activity's push token for a session, and when its turn began; nil when it ended.
+    /// The model sends it to the control plane (`clients/setActivityToken`).
+    var tokenChanged: (_ agentID: UUID, _ token: Data?, _ startedAt: Date) -> Void = { _, _, _ in }
 
     var isOn: Bool {
         (WindowDefaults.store.object(forKey: Self.onKey) as? Bool) ?? Self.onAtFirst
@@ -65,14 +73,17 @@ final class TurnActivities {
         let content = TurnActivityContent.sent(title: agent?.title, at: now)
         if let existing = activity(for: agentID) {
             Task { await Self.update(existing.id, Self.content(content)) }
+            // A new turn: its timer counts from now, by push as well.
+            if let token = existing.pushToken { tokenChanged(agentID, token, now) }
             return
         }
         let attributes = TurnActivityAttributes(agentID: agentID,
                                                 runtime: PoolWords.runtimeName(agent?.runtimeID ?? ""),
-                                                project: project)
+                                                project: project, title: agent?.title)
         do {
-            _ = try TurnActivity.request(attributes: attributes, content: Self.content(content), pushType: nil)
+            let activity = try TurnActivity.request(attributes: attributes, content: Self.content(content), pushType: .token)
             note("live activity: started for \(agentID)")
+            watch(activity)
         } catch {
             note("live activity: could not start for \(agentID): \(error)")
         }
@@ -109,7 +120,42 @@ final class TurnActivities {
         startsAsked.removeAll()
         sentAt.removeAll()
         for activity in TurnActivity.activities {
+            ended(activity)
             Task { await Self.end(activity.id, nil, .immediate) }
+        }
+    }
+
+    /// Every live activity's token again, for a control plane that may not have heard it:
+    /// on each new link, and for those left from before a launch.
+    func sayTokens() {
+        for activity in TurnActivity.activities
+        where activity.activityState == .active || activity.activityState == .stale {
+            if watching[activity.id] == nil {
+                watch(activity)
+            } else if let token = activity.pushToken {
+                tokenChanged(activity.attributes.agentID, token, activity.content.state.startedAt)
+            }
+        }
+    }
+
+    /// Gives each push token the activity is given to the control plane, until it ends.
+    private func watch(_ activity: TurnActivity) {
+        let id = activity.id
+        let updates = activity.pushTokenUpdates
+        watching[id]?.cancel()
+        watching[id] = Task { [weak self] in
+            for await token in updates {
+                guard let self, let activity = TurnActivity.activities.first(where: { $0.id == id }) else { return }
+                tokenChanged(activity.attributes.agentID, token, activity.content.state.startedAt)
+            }
+        }
+    }
+
+    /// The activity ends here: the control plane forgets its token.
+    private func ended(_ activity: TurnActivity) {
+        watching.removeValue(forKey: activity.id)?.cancel()
+        if activity.pushToken != nil {
+            tokenChanged(activity.attributes.agentID, nil, activity.content.state.startedAt)
         }
     }
 
@@ -119,6 +165,7 @@ final class TurnActivities {
         guard var next = TurnActivityContent.make(agent: agent, needs: needs, startedAt: current.startedAt) else {
             sentAt.removeValue(forKey: agentID)
             note("live activity: session \(agentID) gone or archived, ending")
+            ended(activity)
             Task { await Self.end(activity.id, nil, .immediate) }
             return
         }
@@ -130,6 +177,7 @@ final class TurnActivities {
         if next.isOver {
             if next.endedAt.map({ $0 > Date() }) ?? false { next.endedAt = Date() }
             note("live activity: \(agentID) \(next.phase.rawValue), ending")
+            ended(activity)
             Task { await Self.end(activity.id, Self.content(next), .after(Date().addingTimeInterval(Self.keptAfterEnd))) }
             return
         }

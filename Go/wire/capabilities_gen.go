@@ -44,6 +44,7 @@ const (
 	CapHost1               = "host/1"
 	CapHosts1              = "hosts/1"
 	CapLeases1             = "leases/1"
+	CapLiveactivity1       = "liveactivity/1"
 	CapMac1                = "mac/1"
 	CapMailbox1            = "mailbox/1"
 	CapMarketplaces1       = "marketplaces/1"
@@ -414,11 +415,13 @@ var HostNotifications = map[string]bool{
 // ControlCapabilities is the capability of each method and notification in control.openrpc.json.
 var ControlCapabilities = map[string]string{
 	"attention/need":              "attention/1",
+	"attention/turn":              "liveactivity/1",
 	"clients/announce":            "clients/1",
 	"clients/connections":         "clients/1",
 	"clients/forget":              "clients/1",
 	"clients/forgetSelf":          "clients/1",
 	"clients/list":                "clients/1",
+	"clients/setActivityToken":    "liveactivity/1",
 	"clients/setGrant":            "clients/1",
 	"clients/setPushToken":        "clients/1",
 	"clients/startPairing":        "clients/1",

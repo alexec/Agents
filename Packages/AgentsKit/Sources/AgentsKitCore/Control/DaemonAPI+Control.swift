@@ -55,6 +55,9 @@ public extension DaemonAPI.Method {
     /// `PushToken` (#1460): a device's own APNs token, for the control plane to push to
     /// when no Mac host relays its notices. Only the device sets its own.
     static let clientsSetPushToken = "clients/setPushToken"
+    /// `ActivityToken` (#1744): the push token of one session's Live Activity on a device,
+    /// for the control plane to update it by APNs. Only the device sets its own.
+    static let clientsSetActivityToken = "clients/setActivityToken"
 
     // A host, on its channel 0.
     static let hostsAnnounce = "hosts/announce"
@@ -119,6 +122,22 @@ public extension DaemonAPI {
         public init(token: Data?, environment: Environment) {
             self.token = token.map { $0.map { String(format: "%02x", $0) }.joined() }
             self.environment = environment
+        }
+    }
+
+    /// `clients/setActivityToken` (#1744): the push token of one session's Live Activity,
+    /// in hex, which APNs it is from, and when the turn began. No token takes it away.
+    struct ActivityToken: Codable, Sendable, Hashable {
+        public var agentID: UUID
+        public var token: String?
+        public var environment: PushToken.Environment
+        public var startedAt: Date
+
+        public init(agentID: UUID, token: Data?, environment: PushToken.Environment, startedAt: Date) {
+            self.agentID = agentID
+            self.token = token.map { $0.map { String(format: "%02x", $0) }.joined() }
+            self.environment = environment
+            self.startedAt = startedAt
         }
     }
 

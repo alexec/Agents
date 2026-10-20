@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"os"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -59,7 +60,7 @@ var own = map[string]bool{
 	"hosts/sshHosts": true, "control/setProjectDetection": true, "clients/list": true,
 	"clients/startPairing": true, "clients/stopPairing": true,
 	"clients/setGrant": true, "clients/forget": true, "clients/connections": true,
-	"clients/forgetSelf": true, "clients/setPushToken": true,
+	"clients/forgetSelf": true, "clients/setPushToken": true, "clients/setActivityToken": true,
 	"devices/list": true, "devices/startPairing": true, "devices/stopPairing": true,
 	"devices/forget": true, "hosts/lastHeard": true,
 }
@@ -83,6 +84,7 @@ var writes = map[string]bool{
 	"hosts/setRelay": true, "hosts/lendSignIn": true, "hosts/lendGit": true, "hosts/detect": true,
 	"control/setProjectDetection": true, "clients/startPairing": true, "clients/forget": true,
 	"devices/startPairing": true, "devices/forget": true, "clients/setPushToken": true,
+	"clients/setActivityToken": true,
 }
 
 func (m *Methods) Handle(method string, params json.RawMessage, from Caller) (any, error) {
@@ -172,6 +174,15 @@ func (m *Methods) Handle(method string, params json.RawMessage, from Caller) (an
 			return nil, err
 		}
 		if err := m.setPushToken(ctx, from.Client, request); err != nil {
+			return nil, err
+		}
+		return map[string]any{}, nil
+	case "clients/setActivityToken":
+		request, err := require[wire.ActivityToken](params, "ActivityToken")
+		if err != nil {
+			return nil, err
+		}
+		if err := m.setActivityToken(ctx, from.Client, request); err != nil {
 			return nil, err
 		}
 		return map[string]any{}, nil
@@ -514,6 +525,80 @@ func (m *Methods) setPushToken(ctx context.Context, client string, request wire.
 	}
 }
 
+// setActivityToken is clients/setActivityToken (#1744): the push token of one session's
+// Live Activity on the device, kept in its own record beside its APNs token, as only it
+// may set. A new token for the session takes the old one's place; no token takes it away.
+// Those older than an activity lives, and the oldest past MostActivityTokens, go.
+func (m *Methods) setActivityToken(ctx context.Context, client string, request wire.ActivityToken) error {
+	agent := strings.ToUpper(string(request.AgentID))
+	if !records.IsUUID(agent) {
+		return fail(invalidParams, "That is not a session.")
+	}
+	var token *records.ActivityToken
+	if request.Token != nil && *request.Token != "" {
+		hex := strings.ToLower(*request.Token)
+		if !apns.ValidToken(hex) {
+			return fail(invalidParams, "That is not a push token.")
+		}
+		if request.Environment != wire.PushEnvironmentDevelopment && request.Environment != wire.PushEnvironmentProduction {
+			return fail(invalidParams, "A push token is from development or production.")
+		}
+		token = &records.ActivityToken{Agent: agent, Token: hex, Environment: string(request.Environment),
+			StartedAt: request.StartedAt, SetAt: records.Now()}
+	}
+	for try := 0; ; try++ {
+		record := m.records.Client(client)
+		if record == nil {
+			return fail(invalidParams, "This client is not paired.")
+		}
+		if !record.IsDevice() {
+			return fail(notSupported, "Only an iPhone or an iPad shows Live Activities.")
+		}
+		next := withActivityToken(record.ActivityTokens, agent, token, time.Now())
+		if slices.Equal(next, record.ActivityTokens) {
+			return nil
+		}
+		err := m.records.ChangeClient(ctx, client, func(c *records.ClientRecord) bool {
+			c.ActivityTokens = withActivityToken(c.ActivityTokens, agent, token, time.Now())
+			return true
+		})
+		var conflict *store.ConflictError
+		if !errors.As(err, &conflict) || try > 0 {
+			return err
+		}
+		if err := m.records.Load(ctx); err != nil {
+			return err
+		}
+	}
+}
+
+// activityLife is the longest a Live Activity shows: eight hours, and four more ended.
+const activityLife = 12 * time.Hour
+
+// withActivityToken is the list with the session's token put last (or taken out when
+// nil), and the old and the extra ones dropped.
+func withActivityToken(list []records.ActivityToken, agent string, token *records.ActivityToken, now time.Time) []records.ActivityToken {
+	var out []records.ActivityToken
+	for _, t := range list {
+		if t.Agent != agent && now.Sub(t.SetAt.Time) < activityLife {
+			out = append(out, t)
+		}
+	}
+	if token != nil {
+		// The same token for the same session is not news: it keeps its first SetAt.
+		for _, t := range list {
+			if t.Agent == agent && t.Token == token.Token && t.Environment == token.Environment && t.StartedAt == token.StartedAt {
+				token = &t
+			}
+		}
+		out = append(out, *token)
+	}
+	if len(out) > records.MostActivityTokens {
+		out = out[len(out)-records.MostActivityTokens:]
+	}
+	return out
+}
+
 func samePushToken(a, b *records.PushToken) bool {
 	if a == nil || b == nil {
 		return a == b
@@ -578,6 +663,13 @@ func (m *Methods) HostSaid(host, method string, params json.RawMessage) (any, er
 		return map[string]any{}, nil
 	case "attention/need":
 		m.s.heard(params)
+		return map[string]any{}, nil
+	case "attention/turn":
+		turn, err := require[wire.AttentionTurn](params, "AttentionTurn")
+		if err != nil {
+			return nil, err
+		}
+		m.s.turnMoved(turn)
 		return map[string]any{}, nil
 	case "host/workspaces", "host/providerDraft", "host/status":
 		if m.s.providers == nil {

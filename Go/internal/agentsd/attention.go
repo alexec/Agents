@@ -90,6 +90,9 @@ type attentionState struct {
 	// over, by token. A Swift host's offers are among them, so they are withdrawn too (#1367).
 	forwarded   map[string]wire.NeedID
 	toldWaiting *int64
+	// toldTurns is the phase the control plane was last told of each recent session's turn
+	// (#1744); nil says every one again.
+	toldTurns map[wire.UUID]wire.TurnPhase
 	// tellControl sends on the control plane's channel 0; nil when the host has none.
 	tellControl atomic.Pointer[func(method string, params any)]
 	// askControl asks the control plane on channel 0 and waits (workspacetools.go).
@@ -553,6 +556,11 @@ func (d *Daemon) reconsider() {
 			notes = append(notes, wire.AttentionNotification{NeedID: n.ID, Need: &need, To: to, Alert: true})
 		}
 	}
+	// Each recent turn that moved, for its Live Activity (#1744).
+	var turns []wire.AttentionTurn
+	if tell != nil {
+		turns = d.turnsMoved(outstanding, at)
+	}
 	// Every message carries the whole Needs you count, and the count goes alone when it
 	// moved with nothing to offer or withdraw (#1163).
 	if tell != nil {
@@ -574,6 +582,9 @@ func (d *Daemon) reconsider() {
 	}
 	for _, m := range told {
 		(*tell)(wire.CallAttentionNeed.Name, m)
+	}
+	for _, turn := range turns {
+		(*tell)(wire.CallAttentionTurn.Name, turn)
 	}
 }
 
@@ -628,6 +639,7 @@ func (d *Daemon) ControlUplinkChanged(up bool) {
 		}
 	}
 	d.toldWaiting = nil
+	d.toldTurns = nil
 	d.attentionMu.Unlock()
 	// A control plane that just heard from this host hears whether it is idle (#1387).
 	d.startHostStatus()

@@ -1,0 +1,103 @@
+package agentsd
+
+import (
+	"sync"
+	"testing"
+	"time"
+
+	"github.com/alexec/agents/Go/wire"
+)
+
+// The phase is TurnActivityContent.make's (#1744): what waits on the person first, then
+// the state; a clean end is done, any other ending failed.
+func TestATurnsPhaseIsWhatItsActivitySays(t *testing.T) {
+	id := wire.UUID("A0000000-0000-4000-8000-000000000001")
+	agent := func(s wire.AgentState, r *wire.EndedReason) wire.Agent {
+		return wire.Agent{ID: id, State: s, EndedReason: r, LastActivityAt: 800000300}
+	}
+	elicitation, permission := wire.UUID("E0000000-0000-4000-8000-000000000001"), wire.UUID("E0000000-0000-4000-8000-000000000002")
+	asks := []wire.Need{
+		{ID: wire.NeedID{Permission: &permission}, AgentID: &id, Kind: wire.NeedKindPermission, RaisedAt: 1},
+		{ID: wire.NeedID{Elicitation: &elicitation}, AgentID: &id, Kind: wire.NeedKindElicitation, RaisedAt: 2},
+	}
+	for _, c := range []struct {
+		agent wire.Agent
+		needs []wire.Need
+		want  wire.TurnPhase
+	}{
+		{agent(wire.AgentStateRunning, nil), nil, wire.TurnPhaseWorking},
+		{agent(wire.AgentStateQueued, nil), nil, wire.TurnPhaseWorking},
+		{agent(wire.AgentStateWaitingOnUser, nil), asks, wire.TurnPhaseQuestion},
+		{agent(wire.AgentStateWaitingOnUser, nil), asks[:1], wire.TurnPhaseApproval},
+		{agent(wire.AgentStateWaitingOnUser, nil), nil, wire.TurnPhaseQuestion},
+		{agent(wire.AgentStateFinished, reason(wire.EndedReasonEndTurn)), nil, wire.TurnPhaseDone},
+		{agent(wire.AgentStateFinished, reason(wire.EndedReasonProcessDied)), nil, wire.TurnPhaseFailed},
+		{agent(wire.AgentStateStopped, nil), nil, wire.TurnPhaseFailed},
+		{agent(wire.AgentStateArchived, nil), asks, wire.TurnPhaseGone},
+	} {
+		turn := turnPhase(c.agent, c.needs)
+		if turn.Phase != c.want {
+			t.Errorf("%s with %d needs: %s, not %s", c.agent.State, len(c.needs), turn.Phase, c.want)
+		}
+		if ended := turn.EndedAt != nil; ended != (c.want == wire.TurnPhaseDone || c.want == wire.TurnPhaseFailed) {
+			t.Errorf("%s: endedAt %v", c.want, turn.EndedAt)
+		}
+	}
+}
+
+type toldTurns struct {
+	mu    sync.Mutex
+	turns []wire.AttentionTurn
+}
+
+func (c *toldTurns) tell(method string, params any) {
+	if method != wire.CallAttentionTurn.Name {
+		return
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.turns = append(c.turns, params.(wire.AttentionTurn))
+}
+
+func (c *toldTurns) of(id wire.UUID) []wire.TurnPhase {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	var out []wire.TurnPhase
+	for _, t := range c.turns {
+		if t.AgentID == id {
+			out = append(out, t.Phase)
+		}
+	}
+	return out
+}
+
+// A host tells its control plane each move of a recent turn, once; not one long idle; and
+// gone for one deleted.
+func TestAHostTellsItsControlPlaneEachMoveOfATurn(t *testing.T) {
+	d, _ := start(t, t.TempDir())
+	defer d.Shutdown()
+	recent := seeded(t, d, t.TempDir(), nil)
+	old := seeded(t, d, t.TempDir(), func(a *wire.Agent) { a.LastActivityAt = wire.DateOf(time.Now().Add(-13 * time.Hour)) })
+	control := &toldTurns{}
+	d.SetControl(control.tell)
+	waitFor(t, "the recent turn told", func() bool { return len(control.of(recent.ID)) == 1 })
+	if got := control.of(recent.ID); got[0] != wire.TurnPhaseDone {
+		t.Fatal(got)
+	}
+	d.setState(recent.ID, wire.AgentStateRunning)
+	waitFor(t, "working told", func() bool { return len(control.of(recent.ID)) == 2 })
+	d.reconsider()
+	if got := control.of(recent.ID); len(got) != 2 || got[1] != wire.TurnPhaseWorking {
+		t.Fatal(got)
+	}
+	if got := control.of(old.ID); len(got) != 0 {
+		t.Fatal("an old turn told:", got)
+	}
+	if err := d.Store.Delete(recent.ID); err != nil {
+		t.Fatal(err)
+	}
+	d.reconsider()
+	if got := control.of(recent.ID); len(got) != 3 || got[2] != wire.TurnPhaseGone {
+		t.Fatal(got)
+	}
+}

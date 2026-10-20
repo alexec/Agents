@@ -28,10 +28,10 @@ struct TurnActivityWidget: Widget {
                 }
                 DynamicIslandExpandedRegion(.bottom) {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(context.state.title)
+                        Text(context.state.title(startedWith: context.attributes.title))
                             .appText(.reading)
                             .lineLimit(1)
-                        if let line = TurnLine.text(context.state, isStale: context.isStale) {
+                        if let line = context.state.line(isStale: context.isStale) {
                             Text(line)
                                 .appText(.fine)
                                 .foregroundStyle(.secondary)
@@ -66,14 +66,14 @@ struct TurnLockScreen: View {
             TurnMark(phase: state.phase)
                 .font(.title3)
             VStack(alignment: .leading, spacing: 2) {
-                Text(state.title)
+                Text(state.title(startedWith: attributes.title))
                     .appText(.reading)
                     .lineLimit(1)
                 Text([state.word, attributes.runtime, attributes.project].joined(separator: " · "))
                     .appText(.fine)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
-                if let line = TurnLine.text(state, isStale: isStale) {
+                if let line = state.line(isStale: isStale) {
                     Text(line)
                         .appText(.fine)
                         .foregroundStyle(.secondary)
@@ -87,15 +87,6 @@ struct TurnLockScreen: View {
         }
         .padding(16)
         .accessibilityElement(children: .combine)
-    }
-}
-
-/// The line under the title. While it works and the Remote has not been heard from for a
-/// while, it says so rather than going on showing a step it may have left.
-enum TurnLine {
-    static func text(_ state: TurnActivityContent, isStale: Bool) -> String? {
-        if isStale && !state.isOver { return "Open Agents to see where it is" }
-        return state.line
     }
 }
 

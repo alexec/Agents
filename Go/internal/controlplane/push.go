@@ -88,6 +88,16 @@ func (p *pushes) deliver(d notices.RelayDelivery) {
 	}
 }
 
+// queueActivity queues a Live Activity's push (#1744) in the same line as the notices, so
+// it goes in the order it was said.
+func (p *pushes) queueActivity(push apns.Push, device string) {
+	select {
+	case p.queue <- push:
+	default:
+		p.s.log(fmt.Sprintf("live activity: the push queue is full; dropped one for %s", device))
+	}
+}
+
 func (p *pushes) dropOldest() {
 	oldest, at := "", time.Time{}
 	for k, t := range p.sent {
@@ -147,10 +157,18 @@ func (p *pushes) send(push apns.Push) {
 	switch {
 	case err == nil:
 		what := "an alert"
-		if !push.Alert {
+		switch {
+		case push.Activity != nil:
+			what = "a Live Activity update"
+		case !push.Alert:
 			what = "a background push"
 		}
 		p.s.log("notice: sent " + what + " through APNs")
+	case errors.Is(err, apns.ErrGone) && push.Activity != nil:
+		p.s.log("live activity: APNs says an activity's token is gone; it is forgotten")
+		for _, c := range p.s.records.Clients() {
+			p.s.forgetActivityToken(c.ID, push.Token)
+		}
 	case errors.Is(err, apns.ErrGone):
 		p.s.log("notice: APNs says a device's token is gone; it is forgotten")
 		p.forgetToken(push.Token)

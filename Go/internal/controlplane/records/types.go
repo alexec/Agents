@@ -49,8 +49,26 @@ type ClientRecord struct {
 	// for the control plane to push to when no Mac host relays its notices. Never on the
 	// wire to another client.
 	PushToken *PushToken
-	Extra     Extra
+	// The push tokens of its Live Activities (#1744), one for each session it shows,
+	// newest last, held to MostActivityTokens. Set only by the device, as PushToken is.
+	ActivityTokens []ActivityToken
+	Extra          Extra
 }
+
+// ActivityToken is one Live Activity's push token on a device: for which session, from
+// which APNs, and when its turn began, where the activity's timer counts from.
+type ActivityToken struct {
+	Agent       string    `json:"agent"`
+	Token       string    `json:"token"`
+	Environment string    `json:"environment"`
+	StartedAt   wire.Date `json:"startedAt"`
+	// When the device gave it. A Live Activity lives at most 12 hours; one older is
+	// dropped.
+	SetAt Stamp `json:"setAt"`
+}
+
+// MostActivityTokens is how many Live Activity tokens a device keeps.
+const MostActivityTokens = 16
 
 // PushToken is a device's APNs token, hex, and which APNs it is from: "development" (a
 // Debug build) or "production".
@@ -74,13 +92,15 @@ type clientJSON struct {
 	ForgottenAt *Stamp     `json:"forgottenAt,omitempty"`
 	KnownEpoch  *int       `json:"knownEpoch,omitempty"`
 	PushToken   *PushToken `json:"pushToken,omitempty"`
+	// Activities: the push tokens of its Live Activities (#1744).
+	Activities []ActivityToken `json:"activityTokens,omitempty"`
 }
 
 // MarshalJSON writes grant: operator, which an older copy needs to read the record at
 // all, and which tells it the truth.
 func (c ClientRecord) MarshalJSON() ([]byte, error) {
 	return encodeKeeping(clientJSON{c.ID, c.Name, c.Kind, c.PublicKey, LegacyGrant, c.Paired, c.LastSeen, c.MayNotify,
-		c.Owner, c.Rev, c.Forgotten, c.ForgottenAt, c.KnownEpoch, c.PushToken}, c.Extra)
+		c.Owner, c.Rev, c.Forgotten, c.ForgottenAt, c.KnownEpoch, c.PushToken, c.ActivityTokens}, c.Extra)
 }
 
 // UnmarshalJSON does not read the grant: every client may do everything (#111).
@@ -99,7 +119,7 @@ func (c *ClientRecord) UnmarshalJSON(data []byte) error {
 		j.Kind = KindUnknown
 	}
 	*c = ClientRecord{strings.ToUpper(j.ID), j.Name, j.Kind, j.PublicKey, j.Paired, j.LastSeen, j.MayNotify, j.Owner,
-		j.Rev, j.Forgotten, j.ForgottenAt, j.KnownEpoch, j.PushToken, extra}
+		j.Rev, j.Forgotten, j.ForgottenAt, j.KnownEpoch, j.PushToken, j.Activities, extra}
 	return nil
 }
 
@@ -277,6 +297,9 @@ func NewHostID() string {
 		}
 	}
 }
+
+// IsUUID says whether s is a UUID, in either case.
+func IsUUID(s string) bool { return isUUID(s) }
 
 func isUUID(s string) bool {
 	if len(s) != 36 {

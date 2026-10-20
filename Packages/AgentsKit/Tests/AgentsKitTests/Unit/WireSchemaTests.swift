@@ -216,6 +216,7 @@ struct WireSchemaTests {
             "SendPack": Self.through(DaemonAPI.SendPack.self),
             "SendReadRequest": Self.through(DaemonAPI.SendReadRequest.self),
             "SendRead": Self.through(DaemonAPI.SendRead.self),
+            "ActivityToken": Self.through(DaemonAPI.ActivityToken.self),
         ]
         let all = samples.objectValue ?? [:]
         #expect(Set(all.keys) == Set(types.keys), "a sample with no Swift type, or a type with no sample")
