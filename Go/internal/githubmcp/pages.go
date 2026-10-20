@@ -22,11 +22,11 @@ type Views interface {
 	BoardPRs(ctx context.Context, repo string) (Board, error)
 	OpenIssues(ctx context.Context, repo, label string) ([]ListedIssue, error)
 	PRPage(ctx context.Context, repo string, number int) (map[string]any, error)
-	PRDiff(ctx context.Context, repo string, number int) (map[string]any, error)
+	PRDiff(ctx context.Context, repo string, number int, sha string) (map[string]any, error)
 	FailedLog(ctx context.Context, repo string, runID int, job string) (string, error)
 	RerunFailed(ctx context.Context, repo string, runID int) (map[string]any, error)
-	MergePR(ctx context.Context, repo string, number int, auto bool) (map[string]any, error)
-	ReviewPR(ctx context.Context, repo string, number int, approve bool, body string) (map[string]any, error)
+	MergePR(ctx context.Context, repo string, number int, sha string, auto bool) (map[string]any, error)
+	ReviewPR(ctx context.Context, repo string, number int, sha string, approve bool, body string) (map[string]any, error)
 	CommentOnPR(ctx context.Context, repo string, number int, body string) (map[string]any, error)
 	ReplyInThread(ctx context.Context, repo string, number, commentID int, body string) (map[string]any, error)
 }
@@ -335,7 +335,7 @@ func (g *RealGitHub) OpenIssues(ctx context.Context, repo, label string) ([]List
 
 const pageQuery = `query($owner: String!, $name: String!, $number: Int!) { viewer { login } repository(owner: $owner, name: $name) {
   pullRequest(number: $number) {
-    number title url headRefName baseRefName state isDraft body createdAt additions deletions mergeable reviewDecision
+    number title url headRefName headRefOid baseRefName state isDraft body createdAt additions deletions mergeable reviewDecision
     author { login __typename } autoMergeRequest { enabledAt }
     files(first: 100) { totalCount nodes { path additions deletions changeType } }
     comments(first: 100) { nodes { author { login __typename } body createdAt url } }
@@ -377,6 +377,7 @@ func (g *RealGitHub) PRPage(ctx context.Context, repo string, number int) (map[s
 				Title       string    `json:"title"`
 				URL         string    `json:"url"`
 				HeadRefName string    `json:"headRefName"`
+				HeadRefOid  string    `json:"headRefOid"`
 				BaseRefName string    `json:"baseRefName"`
 				State       string    `json:"state"`
 				IsDraft     bool      `json:"isDraft"`
@@ -507,7 +508,7 @@ func (g *RealGitHub) PRPage(ctx context.Context, repo string, number int) (map[s
 		state = "open"
 	}
 	page := map[string]any{
-		"repo": repo, "number": p.Number, "title": p.Title, "url": p.URL, "branch": p.HeadRefName, "base": p.BaseRefName,
+		"repo": repo, "number": p.Number, "title": p.Title, "url": p.URL, "branch": p.HeadRefName, "headSha": p.HeadRefOid, "base": p.BaseRefName,
 		"author": p.Author.login(), "state": state, "draft": p.IsDraft, "body": p.Body, "createdAt": p.CreatedAt,
 		"additions": p.Additions, "deletions": p.Deletions, "checks": checks, "autoMerge": p.AutoMerge != nil,
 		"checkRuns": runs, "files": files, "filesTotal": p.Files.TotalCount,
@@ -604,10 +605,27 @@ func prURL(repo string, number int) string {
 	return fmt.Sprintf("https://github.com/%s/pull/%d", repo, number)
 }
 
+// headChanged is the error when a pull request's head is not the commit the person saw.
+func headChanged(number int) error {
+	return &GitHubError{Kind: Failed, Message: fmt.Sprintf("#%d changed since its page was shown: open it again to see the newest commit", number)}
+}
+
+// checkSha refuses an action with no head commit: a person acts on the commit they saw.
+func checkSha(sha string) error {
+	if strings.TrimSpace(sha) == "" {
+		return &GitHubError{Kind: Failed, Message: "sha is needed: the head commit that the page shows"}
+	}
+	return nil
+}
+
 // MergePR squash-merges it and deletes its branch on GitHub; with auto, GitHub does that once
-// its checks pass. It never touches a local branch.
-func (g *RealGitHub) MergePR(ctx context.Context, repo string, number int, auto bool) (map[string]any, error) {
+// its checks pass. It never touches a local branch. sha is the head commit the person saw:
+// when the head is another commit, GitHub merges nothing.
+func (g *RealGitHub) MergePR(ctx context.Context, repo string, number int, sha string, auto bool) (map[string]any, error) {
 	if _, _, err := ownerName(repo); err != nil {
+		return nil, err
+	}
+	if err := checkSha(sha); err != nil {
 		return nil, err
 	}
 	var p struct {
@@ -617,16 +635,19 @@ func (g *RealGitHub) MergePR(ctx context.Context, repo string, number int, auto 
 	if err := g.get(ctx, fmt.Sprintf("repos/%s/pulls/%d", repo, number), false, &p); err != nil {
 		return nil, err
 	}
+	if p.Head.Sha != sha {
+		return nil, headChanged(number)
+	}
 	if auto {
-		const enable = `mutation($id: ID!) { enablePullRequestAutoMerge(input: {pullRequestId: $id, mergeMethod: SQUASH}) {
-  pullRequest { number } } }`
+		const enable = `mutation($id: ID!, $sha: GitObjectID!) { enablePullRequestAutoMerge(input: {pullRequestId: $id,
+  mergeMethod: SQUASH, expectedHeadOid: $sha}) { pullRequest { number } } }`
 		var out struct{}
-		if err := g.graphql(ctx, enable, map[string]any{"id": p.NodeID}, &out); err != nil {
+		if err := g.graphql(ctx, enable, map[string]any{"id": p.NodeID, "sha": sha}, &out); err != nil {
 			return nil, err
 		}
 		return map[string]any{"merged": false, "auto": true, "url": prURL(repo, number)}, nil
 	}
-	body, _ := json.Marshal(map[string]string{"merge_method": "squash"})
+	body, _ := json.Marshal(map[string]string{"merge_method": "squash", "sha": sha})
 	if _, err := g.do(ctx, http.MethodPut, fmt.Sprintf("repos/%s/pulls/%d/merge", repo, number), body, false); err != nil {
 		return nil, err
 	}
@@ -637,15 +658,29 @@ func (g *RealGitHub) MergePR(ctx context.Context, repo string, number int, auto 
 	return map[string]any{"merged": true, "auto": false, "url": prURL(repo, number)}, nil
 }
 
-func (g *RealGitHub) ReviewPR(ctx context.Context, repo string, number int, approve bool, words string) (map[string]any, error) {
+// ReviewPR reviews the head commit the person saw (sha). When the head is another commit,
+// it reviews nothing, so the person sees the newer one first.
+func (g *RealGitHub) ReviewPR(ctx context.Context, repo string, number int, sha string, approve bool, words string) (map[string]any, error) {
 	if _, _, err := ownerName(repo); err != nil {
 		return nil, err
+	}
+	if err := checkSha(sha); err != nil {
+		return nil, err
+	}
+	var p struct {
+		Head ref `json:"head"`
+	}
+	if err := g.get(ctx, fmt.Sprintf("repos/%s/pulls/%d", repo, number), false, &p); err != nil {
+		return nil, err
+	}
+	if p.Head.Sha != sha {
+		return nil, headChanged(number)
 	}
 	event := "REQUEST_CHANGES"
 	if approve {
 		event = "APPROVE"
 	}
-	review := map[string]string{"event": event}
+	review := map[string]string{"event": event, "commit_id": sha}
 	if words != "" {
 		review["body"] = words
 	}
@@ -720,7 +755,9 @@ func hunks(patch string) []Hunk {
 	return out
 }
 
-func (g *RealGitHub) PRDiff(ctx context.Context, repo string, number int) (map[string]any, error) {
+// PRDiff is the pull request's diff at its head now, with that head's sha. With sha, it is
+// refused when the head is another commit, so the diff is the commit the page shows.
+func (g *RealGitHub) PRDiff(ctx context.Context, repo string, number int, sha string) (map[string]any, error) {
 	if _, _, err := ownerName(repo); err != nil {
 		return nil, err
 	}
@@ -743,6 +780,16 @@ func (g *RealGitHub) PRDiff(ctx context.Context, repo string, number int) (map[s
 		if len(list) < perPage {
 			break
 		}
+	}
+	// The head is read after the files: a push before or during the listing moves it.
+	var head struct {
+		Head ref `json:"head"`
+	}
+	if err := g.get(ctx, fmt.Sprintf("repos/%s/pulls/%d", repo, number), false, &head); err != nil {
+		return nil, err
+	}
+	if sha != "" && head.Head.Sha != sha {
+		return nil, headChanged(number)
 	}
 	files := make([]any, 0, len(all))
 	left, cut := diffLines, false
@@ -767,5 +814,5 @@ func (g *RealGitHub) PRDiff(ctx context.Context, repo string, number int) (map[s
 		}
 		files = append(files, j)
 	}
-	return map[string]any{"repo": repo, "number": number, "url": prURL(repo, number) + "/files", "files": files, "cut": cut}, nil
+	return map[string]any{"repo": repo, "number": number, "url": prURL(repo, number) + "/files", "headSha": head.Head.Sha, "files": files, "cut": cut}, nil
 }

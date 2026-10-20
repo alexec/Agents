@@ -310,6 +310,7 @@ type user struct {
 
 type ref struct {
 	Ref string `json:"ref"`
+	Sha string `json:"sha"`
 	// Repo is the repo the head branch is in: a fork's for a fork's PR, null once it is deleted.
 	Repo *struct {
 		FullName string `json:"full_name"`

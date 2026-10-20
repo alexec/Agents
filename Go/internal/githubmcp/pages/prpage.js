@@ -145,7 +145,7 @@ const prPage = (ui, repo, back) => {
   const showDiff = async (path) => {
     say("Loading the diff…");
     let diff;
-    try { diff = await ui.call("show_pull_request_diff", { repo: repo() || pr.repo, number: pr.number }); }
+    try { diff = await ui.call("show_pull_request_diff", { repo: repo() || pr.repo, number: pr.number, sha: pr.headSha }); }
     catch (e) { say("Couldn't load the diff: " + e.message, true); return; }
     try {
       await request("agents/open-diff", { title: `#${pr.number} ${pr.title}`, url: diff.url, files: diff.files, cut: !!diff.cut,
@@ -208,7 +208,7 @@ const prPage = (ui, repo, back) => {
         if (event === "request_changes" && !text.value.trim()) { say("Write what is to change first.", true); return; }
         b.disabled = true;
         try {
-          await call("review_pr", { event, body: text.value });
+          await call("review_pr", { event, body: text.value, sha: pr.headSha });
           text.value = "";
           say(event === "approve" ? `Approved #${pr.number}.` : `Asked for changes on #${pr.number}.`);
           log(`review #${pr.number} ${event}`);
@@ -232,7 +232,7 @@ const prPage = (ui, repo, back) => {
       const yes = button(isAuto ? "Turn On Auto-merge" : "Merge", async () => {
         yes.disabled = true;
         try {
-          const r = await call("merge_pr", { auto: isAuto });
+          const r = await call("merge_pr", { auto: isAuto, sha: pr.headSha });
           confirming = null;
           say(r.auto ? "Auto-merge is on: it merges once its checks pass." : `Merged #${pr.number}.`);
           log(`merge #${pr.number}${isAuto ? " (auto)" : ""}`);
