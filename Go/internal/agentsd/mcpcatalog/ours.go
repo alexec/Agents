@@ -35,7 +35,8 @@ type Ours struct {
 var Made = []Ours{
 	{ID: "agents/github", Title: "GitHub", Description: "Issues, pull requests and Actions: the official GitHub MCP server's tools, and events",
 		// Views: the official tools that name a ui:// view (create_pull_request, issue_write, …).
-		Command: "github-mcp", Declares: Declared{Tools: true, Events: githubEvents, Views: true}},
+		// Tested: the three ready-made workflows walked on alexec/agents-walk (#1342).
+		Command: "github-mcp", Declares: Declared{Tools: true, Events: githubEvents, Views: true}, Tested: "2026-10-19"},
 	// No secret to ask for: it reads the person's Linear connection (#1343). A personal API key in
 	// LINEAR_API_KEY, set by hand in mcp.json's env, still goes first. Tools and Views: its one
 	// tool, show_issues, and its page; Linear's own server (mcp.linear.app) changes issues.
