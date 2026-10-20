@@ -4,6 +4,7 @@
 import type { Store } from "../model/store";
 import { smartRows, smartTitles } from "../model/sidebar";
 import { setSmartGroup, smartGroupsOn } from "../model/smartGroups";
+import { mayArchiveMyChats, mayArchiveMyChatsFooter, setMayArchiveMyChats } from "../model/fileToSeeWords";
 import { BackToList } from "./BackToList";
 import { gitLendWords, lends } from "../model/gitLending";
 import { iconShowsMood, setIconShowsMood } from "../model/iconMood";
@@ -91,6 +92,15 @@ export function SettingsPage({ store }: { store: Store }) {
               </label>
             ))}
             <p class="hint">{sidebarSettingsFooter}</p>
+          </section>
+          <section aria-labelledby="settings-finished">
+            <h2 class="section-head" id="settings-finished">Finished chats</h2>
+            <label class="setting">
+              <span>Agents may archive the chats I start</span>
+              <input type="checkbox" role="switch" checked={mayArchiveMyChats.value}
+                onChange={(e) => setMayArchiveMyChats(e.currentTarget.checked)} />
+            </label>
+            <p class="hint">{mayArchiveMyChatsFooter}</p>
           </section>
           <GitAccessSection store={store} />
           <VersionsSection store={store} />

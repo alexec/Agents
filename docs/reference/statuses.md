@@ -27,7 +27,6 @@ colour. Session labels appear beneath the title on Mac rows and phone cards; age
 | **Blocked** | Needs you | The turn ended blocked on something the app cannot watch, such as a review. | **Carry on**, once the block has gone. **Stop**, **Archive**, **Branch**. |
 | **Outcome unknown** | Needs you | The turn ended without a report saying how the work went. | Read the conversation and reply if needed. |
 | **Unexpected stop** | Needs you | The runtime crashed, failed, hit a limit or otherwise stopped short without you choosing to stop it. | Read the reason on the row and reply to resume. |
-| A session that asked you to look at a file | Needs you | The agent opened a file for you to look at, and you have not looked. | Open the conversation. |
 | **Waiting** | Waiting | The agent is waiting on something the app watches: agents it started, a time to check again, or an event such as checks passing. The card says what it is waiting for. It carries on by itself when that comes, so you need not do anything. Its icon is Zs: asleep until what it waits for comes. | **Carry on**, to tell it the wait is over early. **Stop**, so it does not carry on. **Archive**, **Branch**. |
 | **Complete** | Done | The agent did what was asked. | Reply in the prompt. **Mark as Unread**, **Archive**, **Branch**. |
 | **Nothing to do** | Done | The agent found nothing that needed doing. | Reply in the prompt. **Mark as Unread**, **Archive**, **Branch**. |
@@ -49,6 +48,18 @@ Each group heading counts what is unread under it, such as **Done 5 · 2 unread*
 does the project's row in the sidebar and on the phone. The Dock badge, the app icon badge,
 the Home-screen widget and the tab's title count only what needs you: a question, a block or
 an unexpected stop. An unread finish is not counted there (#1565).
+
+## A file to see
+
+A session whose agent showed you a file with `show_file` is not under **Needs you**:
+**Needs you** means only that the agent cannot go on without you (#1802). The session stays
+where its ending puts it, usually unread under **Done**, and its row has a small document
+mark beside the title. Hover over it, or let a screen reader read it, for the file's name:
+**File to see: report.md**. The mark is not counted on the Dock badge, the app icon badge,
+the widget or the tab's title, and the session is not in the **Needs You** list.
+
+The mark goes when you open the conversation, which opens the file beside it, or choose
+**Mark as Read**. A file shown while you are watching the conversation gets no mark.
 
 To leave a finished conversation to come back to, choose **Mark as Unread** from its
 menu. It stays unread until you open it again. **Mark as Read** clears the mark without
@@ -74,9 +85,10 @@ until you archive it.
   (with a question, stuck, blocked or crashed), or when the session is archived. Bringing
   it back does not bring the mark back. A workflow's prompt, or the app's own, leaves it.
 - A session that may already archive itself is archived without your approval, if its turn
-  ends **Complete** or **Nothing to do**: a workflow's run whose workflow says
-  `when-done: archive-allowed` or `archive`, and a helper in a project where agents may
-  archive the helpers they started.
+  ends **Complete** or **Nothing to do**: a chat you started, while **Agents may archive the
+  chats I start** is on (the default; not when that turn showed you a file), a workflow's run
+  whose workflow says `when-done: archive-allowed` or `archive`, and a helper in a project
+  where agents may archive the helpers they started.
 
 A session parked before parking was taken out comes back, on first load, to the group its
 last ending puts it in, usually **Done**, marked read.

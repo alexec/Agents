@@ -101,6 +101,8 @@ type Agent struct {
 	QueuedStart           *QueuedStart          `json:"queuedStart,omitzero"`
 	// The session this one was branched from at one of its prompts (#1658). Until it has a conversation of its own, its runtime reads the record it was given ahead of its first prompt.
 	BranchedFrom *UUID `json:"branchedFrom,omitzero"`
+	// The last file it showed with show_file that the person has not looked at (#1802): a mark on its row, never a group or a badge. Cleared when the person opens the conversation or marks it read.
+	FileToSee *ShownFile `json:"fileToSee,omitzero"`
 }
 
 type AgentArchivedReason string

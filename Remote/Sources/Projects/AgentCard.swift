@@ -101,6 +101,14 @@ struct AgentCard: View {
                                 // Said, as the workflow mark is and the Mac's row says it (#1326).
                                 .accessibilityLabel(starter)
                         }
+                        // A file it showed that the person has not looked at (#1802), as
+                        // the Mac's row marks it: never Needs you.
+                        if let file = FileToSeeWords.line(agent) {
+                            Image(systemName: FileToSeeWords.symbol)
+                                .appText(.fine)
+                                .foregroundStyle(.secondary)
+                                .accessibilityLabel(file)
+                        }
                         // Its folder gone (#119), as the Mac's row and a project's say it.
                         if agent.missingFolder != nil, agent.state != .archived {
                             Label(MissingFolderWords.label, systemImage: "exclamationmark.triangle")
@@ -230,7 +238,8 @@ struct AgentCard: View {
     private var accessibilityLabel: String {
         let words = model.queuedLine(agent) ?? StatusShape.words(row: agent, isComingBack: isComingBack)
         return ([agent.title ?? "Untitled", model.startedByAgentLabel(agent), words, agent.report?.message]
-            .compactMap { $0 } + [model.work.waitMark(of: agent)?.detail, ArchiveRequestWords.line(agent)].compactMap { $0 })
+            .compactMap { $0 } + [model.work.waitMark(of: agent)?.detail, ArchiveRequestWords.line(agent),
+                                FileToSeeWords.line(agent)].compactMap { $0 })
             .joined(separator: ", ")
     }
 }

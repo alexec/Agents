@@ -13,7 +13,7 @@ Two ways to put an agent down, each keeping its whole conversation:
 - **Archive** puts away a chat you are done with. It folds out of sight under **Archived sessions**.
   It can be unarchived.
 
-An agent that has finished can also archive itself. Where that needs your approval, you approve it with one click.
+An agent that has finished can also archive itself. A chat you started does so without asking, unless you turn that off; where it needs your approval, you approve it with one click.
 
 ## Before you start
 
@@ -68,9 +68,17 @@ partly done one stays under **Needs you**. Nothing is hidden until you approve i
    that ends wanting you: with a question, stuck, blocked or crashed. Unarchiving an
    archived chat does not bring the mark back.
 
-A workflow's run whose workflow allows it to archive itself, and a helper in a project
-where agents may archive their helpers, are archived without your approval, if the turn ends
-**Complete** or **Nothing to do**. A partly done one still waits for it. See
+A chat you started, a workflow's run whose workflow allows it to archive itself, and a
+helper in a project where agents may archive their helpers, are archived without your
+approval, if the turn ends **Complete** or **Nothing to do**. A partly done one still waits
+for it.
+
+For chats you started, this is the setting **Agents may archive the chats I start**, in
+**Settings ▸ Sidebar ▸ Finished chats** on the Mac, iPhone and iPad, and **Settings ▸
+Finished chats** on the web page. It is on at first. Turn it off to approve each one, as
+above. Even with it on, a chat whose last turn showed you a file with `show_file` is not
+archived: it stays unread under **Done**, with the file's mark on its row, and asks no
+approval. Bring back an archived chat with **Unarchive**. See
 [When a run is done](../reference/workflows.md#when-a-run-is-done) and
 **Agents may archive the helpers they started** in the
 [settings reference](../reference/settings.md).

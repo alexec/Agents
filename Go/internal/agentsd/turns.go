@@ -43,6 +43,9 @@ type live struct {
 	// reported is whether this turn said how it went itself (a wait on agents), so its
 	// ending keeps that rather than one worked out from its last words.
 	reported bool
+	// showedFile is whether this turn called show_file (#1802): ending 2, which no
+	// archive_session puts away unseen.
+	showedFile bool
 	// messageText is the text of the agent's last message this turn, for its report.
 	lastMessageID string
 	lastMessage   strings.Builder
@@ -73,6 +76,13 @@ type live struct {
 type pendingPermission struct {
 	req    wire.PermissionRequest
 	answer chan string
+}
+
+// noteShown is show_file's mark on the turn in flight (#1802).
+func (l *live) noteShown() {
+	l.mu.Lock()
+	l.showedFile = true
+	l.mu.Unlock()
 }
 
 func (d *Daemon) live(id wire.UUID) *live {
@@ -417,7 +427,7 @@ func (l *live) turn() bool {
 	l.mu.Lock()
 	l.stop = cancel
 	l.turnSeq++
-	l.inTurn, l.prompting, l.stopped, l.reported = true, false, false, false
+	l.inTurn, l.prompting, l.stopped, l.reported, l.showedFile = true, false, false, false, false
 	l.mu.Unlock()
 	defer cancel()
 	defer func() {
@@ -803,7 +813,7 @@ func (d *Daemon) moveState(id wire.UUID, s wire.AgentState, fromArchive bool) {
 // question, done with its first sentence otherwise.
 func (d *Daemon) end(l *live, s wire.AgentState, why wire.EndedReason) {
 	l.mu.Lock()
-	last, reported := l.lastMessage.String(), l.reported
+	last, reported, showedFile := l.lastMessage.String(), l.reported, l.showedFile
 	l.mu.Unlock()
 	// A turn its archive cut off (#1611): the session stays archived, and the ending is not
 	// said, as a stop or a crash, nor picked up after a restart.
@@ -840,7 +850,7 @@ func (d *Daemon) end(l *live, s wire.AgentState, why wire.EndedReason) {
 			}
 			a.Report = &wire.WorkReport{Outcome: outcome, Message: message, At: now()}
 		}
-		requested, archiveNow = d.settleArchiveRequest(a, s, why)
+		requested, archiveNow = d.settleArchiveRequest(a, s, why, showedFile)
 	})
 	d.record(l.id, stateChanged(s, reason(why)))
 	// The event after the record (042): what a waiting agent hears and what the log keeps.

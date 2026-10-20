@@ -87,6 +87,13 @@ struct SidebarSessionRow: View {
                             // Said, as the workflow mark is and the Mac's row says it (#1326).
                             .accessibilityLabel(starter)
                     }
+                    // A file it showed that the person has not looked at (#1802), as on the Mac.
+                    if let file = FileToSeeWords.line(agent) {
+                        Image(systemName: FileToSeeWords.symbol)
+                            .appText(.fine)
+                            .foregroundStyle(.secondary)
+                            .accessibilityLabel(file)
+                    }
                 }
                 // The agent's own account of its last turn, one line, as on the Mac.
                 if let acting = model.acting(agent.id) {

@@ -296,7 +296,10 @@ that starts a helper decides what becomes of it.
   runs. Its worktree is cleaned up as when you archive a session.
 - A `triggering` workflow prompts somebody else's agent, so `when-done:` does nothing
   for it, and its page does not offer the menu.
-- Sessions you start can never archive themselves.
+- Sessions you start go by your setting, not by `when-done:`: with **Agents may archive the
+  chats I start** on (the default), one whose turn ends **Complete** or **Nothing to do**
+  after `archive_session` is archived, unless that turn showed you a file; off, it waits for
+  you to approve it. See the [settings reference](settings.md).
 
 The **Triggers** section of the workflow's page has a **When done** menu that writes this
 line. **Keep each run** takes it out.

@@ -11,6 +11,7 @@ import { blockWaitNames, openBlock } from "../model/block";
 import { backgroundMark } from "../model/background";
 import { drawsUnread, projectFolder } from "../model/groups";
 import { archiveLine, archiveMark } from "../model/archiveWords";
+import { fileToSeeLine } from "../model/fileToSeeWords";
 import { queuedLine, rowStatus, type StatusShape } from "../model/status";
 import { fromWireDate } from "../protocol/dates";
 import { Telling } from "./Telling";
@@ -122,6 +123,7 @@ export function SessionRow({ agent, chosen, onPick, going, extras, inSidebar = f
   const running = backgroundMark(agent.background ?? []);
   // The mark alone: the row is a button, so Archive is the menu's and the strip's, Keep Session the menu's (#584, #773).
   const asks = archiveLine(agent);
+  const fileToSee = fileToSeeLine(agent);
   const activity = fromWireDate(agent.lastActivityAt);
   const labels = agent.labels ?? [];
   return (
@@ -143,6 +145,8 @@ export function SessionRow({ agent, chosen, onPick, going, extras, inSidebar = f
           {extras?.startedByAgent && (
             <span class="started-by" role="img" title={extras.startedByAgent} aria-label={extras.startedByAgent}>⇆</span>
           )}
+          {/* A file it showed that the person has not looked at (#1802): a mark, never Needs you. */}
+          {fileToSee && <span class="started-by file-to-see" role="img" title={fileToSee} aria-label={fileToSee}>🗎&#xFE0E;</span>}
         </span>
         {/* In the report's place, as the window's row has it (#87). */}
         {going ? <span class="subtitle"><Telling recipient={going.recipient} doing={going.doing} /></span>
