@@ -631,6 +631,11 @@ function Queued({ store, host, agent, disabled, draftKey }: { store: Store; host
     && store.account(host, agent.runtimeID)?.canSteer === true;
   /** The prompt being changed and its words, while Edit is open (#1552). */
   const editing = useSignal<{ id: string; text: string } | null>(null);
+  // Focused once, when Edit opens it (#1678): a ref that focuses on every render took the caret
+  // back from the prompt bar each time a streamed entry drew the chat again.
+  const editor = useRef<HTMLTextAreaElement>(null);
+  const editingID = editing.value?.id;
+  useEffect(() => { if (editingID) editor.current?.focus(); }, [editingID]);
   const save = (id: string, before: string) => {
     const words = editing.value?.text ?? before;
     editing.value = null;
@@ -656,7 +661,7 @@ function Queued({ store, host, agent, disabled, draftKey }: { store: Store; host
           return (
             <div key={queued.id} class="queued editing">
               <textarea class="queued-editor" aria-label="Queued prompt" rows={Math.min(12, Math.max(2, editing.value.text.split("\n").length))}
-                value={editing.value.text} ref={(el) => el?.focus()}
+                value={editing.value.text} ref={editor}
                 onInput={(e) => (editing.value = { id: queued.id, text: (e.currentTarget as HTMLTextAreaElement).value })}
                 onKeyDown={(e) => {
                   if (e.key === "Escape") { e.preventDefault(); editing.value = null; }
@@ -818,6 +823,9 @@ function QuietLine({ since }: { since: Date }) {
  */
 function FindBar({ store, host, agentID, close }: { store: Store; host: string; agentID: string; close: () => void }) {
   const text = useSignal("");
+  // Focused once, when the bar opens (#1678), not on every render of the chat under it.
+  const field = useRef<HTMLInputElement>(null);
+  useEffect(() => { field.current?.focus(); }, []);
   const result = useSignal<FindResult | null>(null);
   const at = useSignal<number | null>(null);
   const go = async (match: FindMatch) => {
@@ -856,7 +864,7 @@ function FindBar({ store, host, agentID, close }: { store: Store; host: string; 
     : `${at.value + 1} of ${matches.length}${result.value.more ? "+" : ""}`;
   return (
     <div class="find-bar" role="search">
-      <input type="search" aria-label="Find in Chat" placeholder="Find in Chat" value={text.value} ref={(el) => el?.focus()}
+      <input type="search" aria-label="Find in Chat" placeholder="Find in Chat" value={text.value} ref={field}
         onInput={(e) => (text.value = (e.currentTarget as HTMLInputElement).value)}
         onKeyDown={(e) => {
           if (e.key === "Escape") { e.preventDefault(); close(); }
