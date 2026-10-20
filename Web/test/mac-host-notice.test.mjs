@@ -19,6 +19,13 @@ test("why this Mac's host is quiet is told apart as the window tells it", async 
   assert.equal(decide(false, undefined, undefined), null);
 });
 
+test("this Mac's host needing an update is up, not down (#1771)", async () => {
+  const { decideMacHostNotice: decide } = await load("src/model/macHostNotice.ts");
+  assert.equal(decide(true, "needsUpdate", undefined), null);
+  assert.equal(decide(true, "needsUpdate", { member: true, connected: true, at }), null);
+  assert.equal(decide(false, "needsUpdate", undefined), null);
+});
+
 test("not running and not joined say to open Agents Host", async () => {
   const { macHostNoticeTitle: title, macHostNoticeDetail: detail } = await load("src/model/macHostNotice.ts");
   assert.equal(title({ kind: "notRunning" }), "This Mac’s host isn’t running");

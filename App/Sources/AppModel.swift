@@ -1071,8 +1071,8 @@ final class AppModel {
     /// reach it has lost its own way there, not the host (#445).
     private var macHostUpAtControlPlane: Bool {
         guard controlLink != nil, controlPlaneReachable else { return false }
-        if let join = macHostJoin { return join.member && join.connected && (macHostState ?? "online") == "online" }
-        return macHostState == "online"
+        if let join = macHostJoin { return join.member && join.connected && DaemonAPI.ControlHost.answers(macHostState ?? "online") }
+        return DaemonAPI.ControlHost.answers(macHostState)
     }
 
     /// Tries in a row this Mac's host failed while the control plane said it was up (#445).
@@ -3040,7 +3040,7 @@ final class AppModel {
     /// goes back now, rather than up to half a minute after the host returned (#172). One
     /// dial each, when there is something to reach, in place of a dial every 100 ms.
     private func hostCameOnline(_ params: JSONValue?) {
-        guard !isConnected, params?["state"]?.stringValue == "online" else { return }
+        guard !isConnected, DaemonAPI.ControlHost.answers(params?["state"]?.stringValue) else { return }
         backoff.nudge()
     }
 
@@ -3191,14 +3191,14 @@ final class AppModel {
         // home host, gets a client of its own on the same link.
         // A relay host (`agents-relay`) runs no agents: nothing to reach there.
         let others = listed.filter { $0.id != .mac && $0.runsAgents }
-        hosts.controlled = Dictionary(uniqueKeysWithValues: others.map { ($0.id, (label: $0.name, online: $0.state == "online")) })
+        hosts.controlled = Dictionary(uniqueKeysWithValues: others.map { ($0.id, (label: $0.name, online: $0.answers)) })
         hosts.controlRows = Dictionary(uniqueKeysWithValues: others.map { ($0.id, $0) })
-        for host in others where host.state == "online" {
+        for host in others where host.answers {
             await reach(host, through: controlLink)
         }
         // One offline or stopped when this window started lists what it last did, greyed, as
         // one that went while it ran (#962).
-        for host in others where host.state != "online" && !work.holdsProjects(of: host.id) {
+        for host in others where !host.answers && !work.holdsProjects(of: host.id) {
             if let heard = try? await control.call(DaemonAPI.Method.hostsLastHeard, DaemonAPI.HostRequest(host: host.id),
                                                    returning: DaemonAPI.HostLastHeard.self) {
                 work.takeLastHeard(heard)

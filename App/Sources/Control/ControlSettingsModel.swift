@@ -69,7 +69,7 @@ final class ControlSettingsModel {
     /// Every other host, and this Mac's relay: it shares the Mac's machine but is not its host.
     var otherHosts: [DaemonAPI.ControlHost] { hosts.filter { $0.machineID != MachineID.current || $0.relay != nil } }
 
-    var onlineCount: Int { hosts.filter { $0.state == "online" }.count }
+    var onlineCount: Int { hosts.filter(\.answers).count }
 
     func start() async {
         await refresh()

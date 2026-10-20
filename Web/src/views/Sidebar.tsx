@@ -21,6 +21,7 @@ import { byStart, folderKey, projectFolder, showsUnread } from "../model/groups"
 import { folds } from "../model/folds";
 import { smartGroupsOn } from "../model/smartGroups";
 import { macHostNoticeDetail, macHostNoticeTitle } from "../model/macHostNotice";
+import { hostAnswers } from "../model/capabilities";
 import { parseQuery, queryMatches, type LabelQuery } from "../model/labels";
 import { keepsInUnread, newSessionProject, ownCount, pinnedSessions, pinnedWorkflows, projectSessions, rememberedProject, rememberProject,
   smartAgents, smartApprovals, smartRows, smartTitles, withKept, type ProjectKey, type SmartRow } from "../model/sidebar";
@@ -140,7 +141,7 @@ export function Sidebar({ session, store, linkDown }: { session: Session; store:
     && folderKey(project.project.folder) === folderKey(held.folder)) : every;
   const archived = held ? [] : archivedProjects(store.hosts.value, store.projects.value);
   const showsArchived = folds.showsArchivedProjects.value;
-  const offline = store.hosts.value.filter((h) => h.state !== "online");
+  const offline = store.hosts.value.filter((h) => !hostAnswers(h.state));
   const macHost = store.hosts.value.find((h) => h.id === store.macHostID.value);
   const macNotice = store.macHostNotice.value;
   const query = searched.value;

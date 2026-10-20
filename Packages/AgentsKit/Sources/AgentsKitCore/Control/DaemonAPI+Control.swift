@@ -258,6 +258,13 @@ public extension DaemonAPI {
         /// then `needsUpdate`.
         public var missing: [String]?
 
+        /// Whether the host answers calls: `online`, or `needsUpdate`, which is connected and
+        /// serves what its list says (#1771). Its features are gated by `has(_:)`.
+        public var answers: Bool { Self.answers(state) }
+
+        /// Whether a host in `state` answers calls (`answers`), for a state read from a notification.
+        public static func answers(_ state: String?) -> Bool { state == "online" || state == "needsUpdate" }
+
         /// Whether the host can do what `capability` names (`Capability.chatBranch1`). True for
         /// a host that said no list: it works as it did before capabilities (#1748).
         public func has(_ capability: String) -> Bool {

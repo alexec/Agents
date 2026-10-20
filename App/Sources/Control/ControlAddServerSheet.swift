@@ -158,7 +158,7 @@ struct ControlAddServerSheet: View {
             try? await Task.sleep(for: .seconds(2))
             await control.refresh()
             guard way == .command || outcome != nil else { continue }
-            if let new = control.hosts.first(where: { !before.contains($0.id) && $0.state == "online" }) {
+            if let new = control.hosts.first(where: { !before.contains($0.id) && $0.answers }) {
                 joined = new.name
                 // A moment to read "joined" on the page it happened on.
                 try? await Task.sleep(for: .seconds(1.5))

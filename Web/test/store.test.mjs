@@ -69,6 +69,14 @@ test("a host down is noted from when the page first heard it, and forgotten once
   assert.deepEqual(work.downSince.value, {});
 });
 
+test("a host that needs an update is up, so it is neither down nor greyed (#1771)", () => {
+  const work = new Work();
+  const mac = (state) => ({ id: "mac", name: "Mac", platform: "macOS", version: "1", state, reach: "local", missing: ["host.wire/1"] });
+  work.takeHosts([mac("needsUpdate")], 1000);
+  assert.deepEqual(work.downSince.value, {});
+  assert.equal(work.hostIsOnline("mac"), true);
+});
+
 test("a lean list keeps the open session's menus; agent/changed replaces them (#107)", () => {
   const work = new Work();
   const [{ input }] = cases("reducer/streams.json");

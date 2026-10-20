@@ -349,8 +349,8 @@ struct ControlHostsPage: View {
     private func chooseProjects(_ host: DaemonAPI.ControlHost) -> some View {
         Button("Choose Projects…") { choosing = host }
             .buttonStyle(.paper)
-            .disabled(host.state != "online")
-            .help(host.state == "online" ? "Pick folders on it to add as projects." : "It has to be online to be asked.")
+            .disabled(!host.answers)
+            .help(host.answers ? "Pick folders on it to add as projects." : "It has to be online to be asked.")
     }
 
     private func dot(_ host: DaemonAPI.ControlHost) -> ControlDot {
@@ -405,7 +405,7 @@ struct ControlHostsPage: View {
         Menu {
             // A relay runs no agents, so it has no projects.
             if host.relay == nil {
-                Button("Choose Projects…") { choosing = host }.disabled(host.state != "online")
+                Button("Choose Projects…") { choosing = host }.disabled(!host.answers)
             }
             if host.workspace != nil {
                 Button("Check again") { Task { await control.checkAgain(host.id) } }

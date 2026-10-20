@@ -123,7 +123,7 @@ public final class ControlLink: @unchecked Sendable {
             if message.contains(DaemonAPI.Notification.controlHostChanged),
                case .notification(_, let params)? = try? JSONRPCCodec.decode(line: message),
                let host = params?["host"]?.stringValue, let state = params?["state"]?.stringValue,
-               state != "online", state != "connecting" {
+               !DaemonAPI.ControlHost.answers(state), state != "connecting" {
                 let id = HostID(rawValue: host)
                 lock.lock()
                 let gone = routes.removeValue(forKey: id)
