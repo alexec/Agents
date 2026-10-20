@@ -592,10 +592,21 @@ func (l *live) turn() bool {
 	}
 	l.mu.Lock()
 	s, stopped := l.session, l.stopped
-	l.prompting = !stopped
+	l.prompting = !stopped && s != nil
 	l.mu.Unlock()
 	if stopped {
 		d.end(l, wire.AgentStateStopped, wire.EndedReasonCancelled)
+		return false
+	}
+	// The runtime went since it started (#1619): a stop, the host's going or an exit of its
+	// own, not a bug of the host's, so the host's going says it was cut off.
+	if s == nil {
+		if ctx.Err() != nil {
+			d.end(l, wire.AgentStateStopped, wire.EndedReasonCancelled)
+		} else {
+			d.record(l.id, notice("error", "The turn failed", "The runtime ended before it took the prompt."))
+			d.end(l, wire.AgentStateStopped, wire.EndedReasonProcessDied)
+		}
 		return false
 	}
 	r, err := s.Prompt(ctx, acpBlocks(bs))
