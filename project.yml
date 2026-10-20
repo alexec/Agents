@@ -27,6 +27,8 @@ settings:
     ENABLE_USER_SCRIPT_SANDBOXING: YES
     # Xcode warns on every build without this. There are no user headers to search.
     ALWAYS_SEARCH_USER_PATHS: NO
+    # Only a plain xcodebuild's: ship.sh sets it from scripts/version.sh, and a release from
+    # its tag (#1748, docs/explanation/versions.md).
     MARKETING_VERSION: "0.1.0"
     CURRENT_PROJECT_VERSION: "1"
   # This xcodegen install has no bundled setting presets, so the per-configuration

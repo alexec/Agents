@@ -229,7 +229,9 @@ run() { # name, then the command; quiet unless it fails
   fi
 }
 
-XFLAGS=(-skipPackagePluginValidation -skipMacroValidation)
+# The apps say the version of this commit, X.Y.Z after its tag (#1748): project.yml's is only
+# for a plain xcodebuild; a release sets its own from the tag.
+XFLAGS=(-skipPackagePluginValidation -skipMacroValidation MARKETING_VERSION=$("$REPO/scripts/version.sh" --marketing))
 if (( BUILD )); then
   # Sequential on purpose: the schemes share SwiftPM state. Each Mac app has build data
   # of its own; packages and compiled outputs come from the shared build cache.

@@ -60,8 +60,9 @@ and the version to update to.
   `x-fallback`.
 - **A breaking change makes a new number.** A part sends each number that it still supports
   (`files/1` and `files/2`) until the old one is removed.
-- **Deprecation is per capability.** A release marks `files/1` deprecated, in the schema and
-  in the release notes. A later release takes it out of the required set, and then removes it.
+- **Deprecation is per capability.** A release marks `files/1` deprecated, in the schema (a
+  document's `x-deprecated-capabilities`) and in the release notes, which list the
+  capabilities each release adds, deprecates and removes. A later release takes it out of the required set, and then removes it.
   Before 1.0 this can happen in the next minor release; after 1.0, only in the next major.
 
 The required set is the only window of versions that work together: it moves only when an old
@@ -71,5 +72,8 @@ capability number is removed.
 
 Versions follow [Semantic Versioning 2.0.0](https://semver.org). The tag `vX.Y.Z` gives the
 version of every part: `agentsd`, `agents-control`, the web page, the Mac app and the Remote.
-A build that is not on a tag is `X.Y.(Z+1)-dev.N+g<sha>`, which sorts after `X.Y.Z`. Before
+A build that is not on a tag is `X.Y.(Z+1)-dev.N+g<sha>`, which sorts after `X.Y.Z`;
+`scripts/version.sh` prints it, and every build script stamps it. The Mac app and the Remote
+say `X.Y.Z` (Apple takes digits and dots only): the tag's, or `X.Y.(Z+1)` after it. The web page
+has no version of its own: the control plane serves it, so it is the control plane's. Before
 1.0, a minor release can remove a capability number; a patch release never does.
