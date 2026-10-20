@@ -37,6 +37,9 @@ struct SourceEditor: View {
     @State private var diagnostics: DaemonAPI.FileDiagnostics?
     /// A line to move the caret to, from the problems list; a new id each time.
     @State private var jump: SourceJump?
+    /// Why a completion the person asked for brought nothing, shown for a moment (#1688).
+    @State private var completionNote: String?
+    @State private var noteShown: Task<Void, Never>?
 
     init(text: String, path: String, line: Int?) {
         self.text = text
@@ -61,6 +64,16 @@ struct SourceEditor: View {
                 commit()
             }
             .accessibilityLabel(URL(filePath: path).lastPathComponent)
+            if let completionNote {
+                Divider()
+                Text(completionNote)
+                    .appText(.fine)
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 4)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .accessibilityAddTraits(.updatesFrequently)
+            }
             if let diagnostics {
                 ProblemsList(diagnostics: diagnostics) { jump = SourceJump(line: $0) }
             }
@@ -90,10 +103,26 @@ struct SourceEditor: View {
     }
 
     /// The language server's completion at a place in the text (#844), for the text view.
-    private var completer: (@MainActor (String, Int, Int) async -> [String])? {
+    /// When the person asked and nothing comes, the reason shows for a moment (#1688); a
+    /// list asked for by a pause in the typing says nothing.
+    private var completer: SourceCompleter? {
         guard let complete = actions.complete else { return nil }
         let path = path
-        return { text, line, column in await complete(path, text, line, column).map(\.written) }
+        return { text, line, column, asked in
+            let found = await complete(path, text, line, column)
+            if asked, found.items.isEmpty { note(found.reason ?? "No completions here.") }
+            return found.items.map(\.written)
+        }
+    }
+
+    private func note(_ words: String) {
+        completionNote = words
+        noteShown?.cancel()
+        noteShown = Task {
+            try? await Task.sleep(for: .seconds(4))
+            guard !Task.isCancelled else { return }
+            completionNote = nil
+        }
     }
 
     private func commit() {
@@ -111,6 +140,10 @@ struct SourceEditor: View {
         }
     }
 }
+
+/// The language server's words for a line and column (from 1); `asked` when the person
+/// asked for them, not a pause in the typing (#1688).
+typealias SourceCompleter = @MainActor (_ text: String, _ line: Int, _ column: Int, _ asked: Bool) async -> [String]
 
 /// A move of the caret to a line, from the problems list: a new id each time, so the same
 /// line twice moves it twice.
@@ -208,9 +241,9 @@ private struct SourceTextView: NSViewRepresentable {
     let line: Int?
     var jump: SourceJump?
     let isEditable: Bool
-    /// The language server's words for the caret's place (#844): ⌥Esc or F5 asks, and the
-    /// text view's own completion list shows them.
-    var complete: (@MainActor (_ text: String, _ line: Int, _ column: Int) async -> [String])?
+    /// The language server's words for the caret's place (#844): ⌥Esc, F5 or Edit ▸ Complete
+    /// asks, and the text view's own completion list shows them.
+    var complete: SourceCompleter?
     /// Focus going elsewhere: what is typed goes now rather than after the pause.
     let onEnd: () -> Void
 
@@ -292,9 +325,9 @@ private struct SourceTextView: NSViewRepresentable {
             let place = Self.place(of: textView.selectedRange().location, in: textView.string)
             let text = textView.string
             Task { @MainActor [weak self, weak textView] in
-                let words = await complete(text, place.line, place.column)
-                guard let self, let textView, textView.string == text else { return }
-                guard !words.isEmpty else { NSSound.beep(); return }
+                let words = await complete(text, place.line, place.column, true)
+                // Nothing: the editor says why under the text (#1688).
+                guard let self, let textView, textView.string == text, !words.isEmpty else { return }
                 self.offered = words
                 textView.complete(nil)
             }
@@ -342,7 +375,7 @@ private struct SourceTextView: UIViewRepresentable {
     let isEditable: Bool
     /// The language server's words for the caret's place (#1603): a row of them above the
     /// keyboard once the typing stops in a word, or at Ctrl+Space on a hardware keyboard.
-    var complete: (@MainActor (_ text: String, _ line: Int, _ column: Int) async -> [String])?
+    var complete: SourceCompleter?
     let onEnd: () -> Void
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
@@ -352,7 +385,7 @@ private struct SourceTextView: UIViewRepresentable {
         view.delegate = context.coordinator
         view.askCompletion = { [weak coordinator = context.coordinator, weak view] in
             guard let coordinator, let view else { return }
-            coordinator.ask(view)
+            coordinator.ask(view, asked: true)
         }
         view.backgroundColor = .clear
         view.font = TextStep.code.uiFont
@@ -417,7 +450,7 @@ private struct SourceTextView: UIViewRepresentable {
             pause = Task { @MainActor [weak self, weak view] in
                 try? await Task.sleep(for: .milliseconds(600))
                 guard !Task.isCancelled, let self, let view else { return }
-                self.ask(view)
+                self.ask(view, asked: false)
             }
         }
 
@@ -433,13 +466,13 @@ private struct SourceTextView: UIViewRepresentable {
         }
 
         /// Asks the language server for the caret's place, then shows its words.
-        func ask(_ view: UITextView) {
+        func ask(_ view: UITextView, asked: Bool) {
             guard let complete = parent.complete, view.isEditable else { return }
             let text = view.text ?? ""
             let caret = view.selectedRange.location
             let place = Self.place(of: caret, in: text)
             Task { @MainActor [weak self, weak view] in
-                let words = await complete(text, place.line, place.column)
+                let words = await complete(text, place.line, place.column, asked)
                 guard let self, let view, view.text == text, view.selectedRange.location == caret else { return }
                 let partial = self.partialWord(in: view).map { (text as NSString).substring(with: $0).lowercased() } ?? ""
                 let matching = words.filter { $0.lowercased().hasPrefix(partial) }

@@ -42,9 +42,10 @@ struct PageActions {
     /// holds it (#844). Nil where nothing can ask, and then the editor lists nothing.
     var diagnose: (@MainActor (_ path: String, _ text: String) async -> DaemonAPI.FileDiagnostics?)? = nil
     /// What the language server would write at a line and column (from 1), for the editor's
-    /// completion (#844). Nil where nothing can ask.
+    /// completion (#844), with the host's reason when there is none. A request that fails
+    /// says why in `reason` too (#1688). Nil where nothing can ask.
     var complete: (@MainActor (_ path: String, _ text: String, _ line: Int, _ column: Int) async
-        -> [DaemonAPI.FileCompletion])? = nil
+        -> DaemonAPI.FileCompletions)? = nil
 
     init(save: @escaping @MainActor (String, String) async -> String? = { _, _ in
              "Nothing here can save this page."
@@ -61,4 +62,11 @@ struct PageActions {
 
 extension EnvironmentValues {
     @Entry var pageActions = PageActions()
+}
+
+extension DaemonAPI.FileCompletions {
+    /// The words for a completion request that failed, in the place of the host's reason (#1688).
+    static func failure(_ error: any Error) -> String {
+        "Couldn't ask for completions: \((error as? JSONRPCError)?.message ?? error.localizedDescription)"
+    }
 }

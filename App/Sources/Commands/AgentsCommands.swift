@@ -327,6 +327,21 @@ struct AgentsCommands: Commands {
             }
         }
 
+        // A source file's completion (#1688), named in a menu. As the system's own ⌥Esc, it
+        // goes to the text view's delegate first, which asks the language server; a plain
+        // `complete:` action would skip it.
+        CommandGroup(after: .textEditing) {
+            Button("Complete") {
+                let complete = #selector(NSResponder.complete(_:))
+                if let text = NSApp.keyWindow?.firstResponder as? NSTextView {
+                    text.doCommand(by: complete)
+                } else {
+                    NSApp.sendAction(complete, to: nil, from: nil)
+                }
+            }
+            .keyboardShortcut(.escape, modifiers: .option)
+        }
+
         // ⌘P is Open File…; there is nothing here to print.
         CommandGroup(replacing: .printItem) {}
 
