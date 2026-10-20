@@ -91,6 +91,26 @@ public final class AgentsModel {
             || turns.contains { $0.start <= index && index < $0.end }
     }
 
+    /// The most finished turns Find brings in to go to a match, as on the web page
+    /// (`historyTurnsCap`). A match further back is gone to as near as can be (#1649).
+    public static let revealTurnsCap = 200
+
+    /// Find goes to the match at `index` (#1532): earlier pages come in until it is in hand.
+    /// `loadEarlier` brings one page, of at most the turns it is told: what is still allowed
+    /// under `revealTurnsCap`, in one call rather than one 50-turn page at a time.
+    public func reveal(index: Int, loadEarlier: (_ turns: Int) async -> Void) async {
+        while !holds(index: index), hasMoreOfTheConversation {
+            let room = Self.revealTurnsCap - turns.count
+            if !hasMoreBefore, room <= 0 { return }
+            // Going back to a match leaves the end: what comes in is not trimmed away again.
+            isFollowingEnd = false
+            let before = (firstTurn, firstEntryIndex, turns.count)
+            await loadEarlier(min(max(room, 1), DaemonAPI.TurnsRequest.limitCeiling))
+            // Nothing came: the link, or the start of the chat.
+            if (firstTurn, firstEntryIndex, turns.count) == before { return }
+        }
+    }
+
     /// The prompts the person sent in the page, oldest first: what Up and Down in the
     /// prompt bar give back (#1551).
     public var sentPrompts: [String] { PromptHistory.sent(turns: turns, entries: entries) }
