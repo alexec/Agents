@@ -349,8 +349,13 @@ struct RemoteConnectSheet: View {
         while case .waiting(let shown) = step, shown.flowID == started.flowID {
             let flow: DaemonAPI.ConnectionSignIn
             switch await model.waitForSignIn(started.flowID, on: host) {
-            case .failure(let problem): step = .failed(problem.words); return
             case .success(let now): flow = now
+            case .failure(let problem):
+                // The link drops while the person is in Safari (#1683): the host may have the token.
+                let after = await afterFailedWait(started)
+                guard case .waiting(let still) = step, still.flowID == started.flowID else { return }
+                guard let after else { step = .failed(problem.words); return }
+                flow = after
             }
             switch flow.status {
             case .waiting: continue
@@ -368,6 +373,22 @@ struct RemoteConnectSheet: View {
             case .expired, .denied, .failed: step = .failed(ConnectorSetupWords.sheetStatus(flow))
             }
         }
+    }
+
+    /// A wait that failed, most often because the link dropped while the person was in Safari
+    /// (#1683). When the link is back, the host's connections say whether it has the token.
+    /// If not, the wait goes on once more. Nil: it failed.
+    private func afterFailedWait(_ started: DaemonAPI.ConnectionSignIn) async -> DaemonAPI.ConnectionSignIn? {
+        for _ in 0..<40 where !model.isConnected { try? await Task.sleep(for: .milliseconds(500)) }
+        if case .success(let list) = await model.connections(on: host),
+           let connection = list.first(where: { $0.provider == started.provider && $0.state == .connected }) {
+            var connected = started
+            connected.status = .connected
+            connected.connection = connection
+            return connected
+        }
+        if case .success(let now) = await model.waitForSignIn(started.flowID, on: host) { return now }
+        return nil
     }
 
     /// The code flow (Linear): the authentication session, then the host finishes it. The
