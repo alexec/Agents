@@ -217,7 +217,7 @@ public enum ConnectorSetupWords {
 
     // MARK: Your Connectors ▸ Connections
 
-    public static let noConnections = "No connections yet. Connect GitHub to give agents issues, pull requests and Actions in every project, Linear for its issues, and GitLab for merge requests, pipelines and issues."
+    public static let noConnections = "No connections yet. Connect GitHub to give agents issues, pull requests and Actions in every project, Linear for its issues, GitLab for merge requests, pipelines and issues, and Email for the mail they wait for."
 
     /// The provider's name: GitHub, Linear.
     public static func name(_ p: DaemonAPI.ConnectionProvider) -> String {
@@ -225,6 +225,7 @@ public enum ConnectorSetupWords {
         case .github: "GitHub"
         case .linear: "Linear"
         case .gitlab: "GitLab"
+        case .email: Email.name
         }
     }
 
@@ -234,6 +235,7 @@ public enum ConnectorSetupWords {
         case .github: "GH"
         case .linear: "L"
         case .gitlab: "GL"
+        case .email: Email.letters
         }
     }
 
@@ -242,6 +244,8 @@ public enum ConnectorSetupWords {
     }
 
     public static func connectionNote(_ c: DaemonAPI.Connection, now: Date = Date()) -> String {
+        // An app password does not end and is not renewed: the server and how it signs in.
+        if c.provider == .email { return [c.workspace, Email.how].compactMap { $0 }.joined(separator: " \u{00B7} ") }
         if c.state == .signInAgain {
             return c.expiresAt == nil ? "\(name(c.provider)) refused the renewal: sign in again"
                 : "The access token ended: connect again with a new one"
@@ -266,6 +270,7 @@ public enum ConnectorSetupWords {
         case .github: "Issues, pull requests and Actions in every project."
         case .linear: "Linear issues in every project, and their events."
         case .gitlab: "Merge requests, pipelines and issues on gitlab.com or your own GitLab."
+        case .email: Email.notConnectedNote
         }
     }
 
@@ -276,6 +281,7 @@ public enum ConnectorSetupWords {
         case .github: disconnectNote
         case .linear: "Disconnect deletes the host's tokens. Linear's events stop until you connect again or set LINEAR_API_KEY. To revoke Agents too, go to linear.app \u{25B8} Settings \u{25B8} Security & access."
         case .gitlab: GitLab.disconnectNote
+        case .email: Email.disconnectNote
         }
     }
 
@@ -335,12 +341,41 @@ public enum ConnectorSetupWords {
         }
     }
 
+    /// Connect Email (#1780): one IMAP mailbox and its app password. No device page.
+    public enum Email {
+        public static let name = "Email"
+        public static let letters = "EM"
+        public static let notConnectedNote = "One mailbox for agents: they wait for mail, such as a sign-up code, and read it."
+        public static let subtitle = "For you, in every project. Agents reads the mailbox over IMAP and never sends mail."
+        public static let abilities = [
+            "Know when mail comes, by sender and subject",
+            "List, search and read messages",
+            "Mark messages read and move them to another folder",
+        ]
+        public static let intro = "Use a mailbox made for agents, not your own. Make an app password for Agents at your mail provider, and give its IMAP server."
+        public static let serverLabel = "IMAP server"
+        public static let serverPrompt = "imap.fastmail.com"
+        public static let userLabel = "User"
+        public static let userPrompt = "agents@example.com"
+        public static let passwordLabel = "App password"
+        public static let passwordPrompt = "App password"
+        public static let button = "Connect"
+        public static let checking = "Signing in to the mail server\u{2026}"
+        public static let choose = "Agents can read every message in this mailbox. It never sends, answers or deletes mail. Take the app password back at your mail provider, or with Disconnect on Your Connectors."
+        public static let disconnectNote = "Disconnect deletes the host's app password. The email server's events stop until you connect again or set EMAIL_PASSWORD. To revoke it too, delete the app password at your mail provider."
+        /// The connection's note after its server: how it signs in.
+        public static let how = "App password"
+        /// When the host gives no words of its own for a failed sign-in.
+        public static let failed = "The mail server did not take the sign-in."
+    }
+
     /// The sheet's subtitle, list and button, by provider.
     public static func sheetSubtitle(_ p: DaemonAPI.ConnectionProvider) -> String {
         switch p {
         case .github: sheetSubtitle
         case .linear: Linear.subtitle
         case .gitlab: GitLab.subtitle
+        case .email: Email.subtitle
         }
     }
 
@@ -349,6 +384,7 @@ public enum ConnectorSetupWords {
         case .github: abilities
         case .linear: Linear.abilities
         case .gitlab: GitLab.abilities
+        case .email: Email.abilities
         }
     }
 
@@ -357,6 +393,7 @@ public enum ConnectorSetupWords {
         case .github: sheetChoose
         case .linear: Linear.choose
         case .gitlab: GitLab.choose
+        case .email: Email.choose
         }
     }
 
@@ -365,6 +402,7 @@ public enum ConnectorSetupWords {
         case .github: continueButton
         case .linear: Linear.continueButton
         case .gitlab: GitLab.continueButton
+        case .email: Email.button
         }
     }
 
@@ -374,6 +412,8 @@ public enum ConnectorSetupWords {
         case .github: "github.com"
         case .linear: "linear.app"
         case .gitlab: "gitlab.com"
+        // Email has no device page: the sheet never shows this.
+        case .email: ""
         }
     }
 

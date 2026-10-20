@@ -7,7 +7,8 @@ import Foundation
 /// waits. Linear (#1343) is the authorization code with PKCE: the host keeps the verifier, the
 /// client opens the address in an authentication session, and gives back the code that the
 /// hand-back page sends to agents://oauth/callback. GitLab (#1630) is the device flow on
-/// gitlab.com, or a personal access token on any GitLab. A project's set-up is the project's: its repository, four slots that each prove
+/// gitlab.com, or a personal access token on any GitLab. Email (#1780) is one IMAP mailbox and
+/// its app password, which the host checks once and keeps. A project's set-up is the project's: its repository, four slots that each prove
 /// themselves with one real read, and the github events it turned on.
 extension DaemonAPI.Method {
     public static let connectionsList = "connections/list"
@@ -20,6 +21,8 @@ extension DaemonAPI.Method {
     public static let connectionsSignInComplete = "connections/sign-in/complete"
     /// A personal access token the person made (GitLab, #1630): the host checks and keeps it.
     public static let connectionsSignInToken = "connections/sign-in/token"
+    /// An IMAP mailbox and its app password (Email, #1780): the host signs in once and keeps it.
+    public static let connectionsSignInEmail = "connections/sign-in/email"
     public static let connectionsDisconnect = "connections/disconnect"
     public static let connectorsSetup = "connectors/setup"
     public static let connectorsSetupSkip = "connectors/setup/skip"
@@ -27,7 +30,7 @@ extension DaemonAPI.Method {
 
 extension DaemonAPI {
     public enum ConnectionProvider: String, Codable, Sendable, Hashable, CaseIterable, Identifiable {
-        case github, linear, gitlab
+        case github, linear, gitlab, email
         public var id: String { rawValue }
     }
 
@@ -147,6 +150,19 @@ extension DaemonAPI {
         public var token: String
         public init(provider: ConnectionProvider, url: String? = nil, token: String) {
             self.provider = provider; self.url = url; self.token = token
+        }
+    }
+
+    /// One IMAP mailbox for the email server (#1780). The host signs in once to check it, keeps
+    /// the app password, and never gives it back. The answer is a ConnectionTokenAnswer.
+    public struct ConnectionEmailRequest: Codable, Sendable, Hashable {
+        /// The IMAP server, such as imap.fastmail.com.
+        public var server: String
+        /// Who signs in, usually the mail address.
+        public var user: String
+        public var password: String
+        public init(server: String, user: String, password: String) {
+            self.server = server; self.user = user; self.password = password
         }
     }
 

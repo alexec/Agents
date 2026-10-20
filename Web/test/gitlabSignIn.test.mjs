@@ -23,7 +23,7 @@ test("Make a Token opens the right GitLab with the api scope", () => {
 });
 
 test("GitLab is the third provider, and its device page is gitlab.com", () => {
-  assert.deepEqual(c.providers, ["github", "linear", "gitlab"]);
+  assert.deepEqual(c.providers.slice(0, 3), ["github", "linear", "gitlab"]);
   assert.equal(c.sheetStatus({ provider: "gitlab", status: "waiting", grant: "deviceCode" }),
     "Waiting for gitlab.com… Type the code there, then approve.");
 });

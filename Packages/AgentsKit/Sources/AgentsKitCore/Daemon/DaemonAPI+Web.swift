@@ -110,6 +110,8 @@ public extension DaemonAPI {
                     result: ConnectionSignIn.self, kind: .hostRequest),
                 Row(Method.connectionsSignInToken, params: ConnectionTokenRequest.self,
                     result: ConnectionTokenAnswer.self, kind: .hostRequest),
+                Row(Method.connectionsSignInEmail, params: ConnectionEmailRequest.self,
+                    result: ConnectionTokenAnswer.self, kind: .hostRequest),
                 Row(Method.connectionsDisconnect, params: ConnectionProviderRequest.self,
                     result: ConnectionDisconnectAnswer.self, kind: .hostRequest),
                 Row(Method.connectorsSetup, params: ConnectorSetupRequest.self, result: ConnectorSetup.self, kind: .hostRequest),

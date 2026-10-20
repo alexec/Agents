@@ -501,6 +501,109 @@ struct RemoteConnectSheet: View {
     }
 }
 
+/// Connect Email on the iPhone and iPad (#1780): the IMAP server, the user and an app
+/// password, which the host checks with one sign-in and keeps. No device page. The password
+/// stays in this sheet's state only, and is cleared once it is sent.
+struct RemoteConnectEmailSheet: View {
+    @Environment(RemoteModel.self) private var model
+    @Environment(\.dismiss) private var dismiss
+    let host: HostID
+    var onConnected: () -> Void = {}
+
+    private enum Step: Equatable {
+        case asking, checking
+        case failed(String)
+    }
+
+    @State private var step: Step = .asking
+    @State private var server = ""
+    @State private var user = ""
+    @State private var password = ""
+
+    var body: some View {
+        NavigationStack {
+            List {
+                Section {
+                    Text(ConnectorSetupWords.sheetSubtitle(.email)).foregroundStyle(.secondary)
+                }
+                .paperListRow()
+                Section("Agents will be able to") {
+                    ForEach(ConnectorSetupWords.abilities(.email), id: \.self) { Text($0) }
+                }
+                .paperListRow()
+                Section {
+                    TextField(ConnectorSetupWords.Email.serverLabel, text: $server,
+                              prompt: Text(ConnectorSetupWords.Email.serverPrompt))
+                        .keyboardType(.URL).textInputAutocapitalization(.never).autocorrectionDisabled()
+                    TextField(ConnectorSetupWords.Email.userLabel, text: $user,
+                              prompt: Text(ConnectorSetupWords.Email.userPrompt))
+                        .keyboardType(.emailAddress).textContentType(.username)
+                        .textInputAutocapitalization(.never).autocorrectionDisabled()
+                    SecureField(ConnectorSetupWords.Email.passwordLabel, text: $password,
+                                prompt: Text(ConnectorSetupWords.Email.passwordPrompt))
+                        .textContentType(.password)
+                        .onSubmit { Task { await connect() } }
+                } footer: {
+                    Text(ConnectorSetupWords.Email.intro)
+                }
+                .disabled(step == .checking)
+                .paperListRow()
+                Section {
+                    switch step {
+                    case .asking:
+                        connectButton
+                    case .checking:
+                        HStack(spacing: 8) {
+                            ProgressView()
+                            Text(ConnectorSetupWords.Email.checking).appText(.fine)
+                        }
+                    case .failed(let why):
+                        Text(why).tinted(.failure)
+                        connectButton
+                    }
+                } footer: {
+                    Text(ConnectorSetupWords.sheetChoose(.email) + " " + ConnectorSetupWords.sheetFoot)
+                }
+                .paperListRow()
+            }
+            .scrollContentBackground(.hidden)
+            .background(Paper.ground)
+            .navigationTitle("Connect \(ConnectorSetupWords.Email.name)")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                }
+            }
+        }
+    }
+
+    private var connectButton: some View {
+        Button(ConnectorSetupWords.Email.button) { Task { await connect() } }.fontWeight(.semibold)
+            .disabled(!isComplete)
+    }
+
+    private func trimmed(_ text: String) -> String { text.trimmingCharacters(in: .whitespacesAndNewlines) }
+
+    /// All three fields have text. The password is sent as typed: spaces can be part of it.
+    private var isComplete: Bool {
+        !trimmed(server).isEmpty && !trimmed(user).isEmpty && !password.isEmpty
+    }
+
+    private func connect() async {
+        guard isComplete, step != .checking else { return }
+        step = .checking
+        switch await model.signInWithEmail(server: trimmed(server), user: trimmed(user), password: password, on: host) {
+        case .success:
+            password = ""
+            onConnected()
+            dismiss()
+        case .failure(let problem):
+            step = .failed(problem.words)
+        }
+    }
+}
+
 /// Your Connectors ▸ Connections on the iPhone and iPad (frame E). The page that shows them
 /// reads them, as a project's set-up (#1684).
 struct RemoteConnections: View {
@@ -537,8 +640,8 @@ struct RemoteConnections: View {
                 if !has(.github, in: connections) {
                     Button(ConnectorSetupWords.connectButton) { connecting = .github }
                 }
-                // Linear (#1343) and GitLab (#1630): a row each while not connected.
-                ForEach([DaemonAPI.ConnectionProvider.linear, .gitlab].filter { !has($0, in: connections) }) { p in
+                // Linear (#1343), GitLab (#1630) and Email (#1780): a row each while not connected.
+                ForEach(others.filter { !has($0, in: connections) }) { p in
                     VStack(alignment: .leading, spacing: 2) {
                         Button("Connect \(ConnectorSetupWords.name(p))\u{2026}") { connecting = p }
                         Text(ConnectorSetupWords.notConnectedNote(p)).appText(.fine).foregroundStyle(.secondary)
@@ -552,7 +655,11 @@ struct RemoteConnections: View {
         }
         .paperListRow()
         .sheet(item: $connecting) { provider in
-            RemoteConnectSheet(provider: provider, host: .mac, onConnected: { Task { await reload() } })
+            if provider == .email {
+                RemoteConnectEmailSheet(host: .mac, onConnected: { Task { await reload() } })
+            } else {
+                RemoteConnectSheet(provider: provider, host: .mac, onConnected: { Task { await reload() } })
+            }
         }
         .confirmationDialog(disconnecting.map { "Disconnect \(ConnectorSetupWords.connectionTitle($0))?" } ?? "",
                             isPresented: Binding(get: { disconnecting != nil }, set: { if !$0 { disconnecting = nil } }),
@@ -563,6 +670,12 @@ struct RemoteConnections: View {
         } message: {
             Text(disconnecting.map { ConnectorSetupWords.disconnectNote($0.provider) } ?? "")
         }
+    }
+
+    /// The providers after GitHub. Email only on a host that can sign in to a mailbox (#1780);
+    /// an older host does not show it.
+    private var others: [DaemonAPI.ConnectionProvider] {
+        model.host(.mac, has: Capability.connectionsEmail1) ? [.linear, .gitlab, .email] : [.linear, .gitlab]
     }
 
     private func has(_ provider: DaemonAPI.ConnectionProvider, in list: [DaemonAPI.Connection]) -> Bool {

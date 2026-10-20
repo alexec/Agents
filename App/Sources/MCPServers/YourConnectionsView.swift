@@ -72,6 +72,7 @@ struct YourConnectionsView: View {
             case .github: ConnectGitHubSheet(host: .mac, onConnected: { Task { await load() } })
             case .linear: ConnectLinearSheet(host: .mac, onConnected: { Task { await load() } })
             case .gitlab: ConnectGitLabSheet(host: .mac, onConnected: { Task { await load() } })
+            case .email: ConnectEmailSheet(host: .mac, onConnected: { Task { await load() } })
             }
         }
         .confirmationDialog(disconnectTitle, isPresented: Binding(get: { disconnecting != nil },
@@ -136,10 +137,12 @@ struct YourConnectionsView: View {
         .padding(.horizontal, 14).padding(.vertical, 10)
     }
 
-    /// The providers with no working connection, for Connect….
+    /// The providers with no working connection, for Connect…. Email only on a host that can
+    /// sign in to a mailbox (#1780); an older host does not show it.
     private var unconnected: [DaemonAPI.ConnectionProvider] {
         DaemonAPI.ConnectionProvider.allCases.filter { p in
-            connections?.contains(where: { $0.provider == p && $0.state == .connected }) != true
+            if p == .email, !model.host(.mac, has: Capability.connectionsEmail1) { return false }
+            return connections?.contains(where: { $0.provider == p && $0.state == .connected }) != true
         }
     }
 
