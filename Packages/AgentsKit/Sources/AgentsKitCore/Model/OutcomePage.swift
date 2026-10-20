@@ -82,7 +82,7 @@ public struct TurnParts: Hashable, Sendable {
         var reports: [TranscriptItem] = []
         var steps = 0
         for (index, item) in shown.enumerated() {
-            if item.isReport {
+            if item.isReport || item.isBranch {
                 reports.append(item)
             } else if reply.contains(index) || item.isOutcome {
                 outcome.append(item)
@@ -92,7 +92,8 @@ public struct TurnParts: Hashable, Sendable {
                 steps += 1
             }
         }
-        // The report is the turn's last line, whatever the agent said after it.
+        // The report is the turn's last line, whatever the agent said after it, and where
+        // a branch was cut comes after that (#1749).
         self.outcome = outcome + reports
         self.stepCount = steps
         self.live = isLive && reply.isEmpty ? shown.last(where: { !$0.isOutcome }) : nil
@@ -305,6 +306,9 @@ extension TranscriptItem {
             return state == .stopped
         case .notice(let notice):
             return notice.isError
+        // Where a branch was cut (#1749): drawn at every level, after the reply it keeps.
+        case .runtimeNote(let text):
+            return RuntimeNote.isBranch(text)
         default:
             return false
         }
@@ -322,6 +326,12 @@ extension TranscriptItem {
 
     var isReport: Bool {
         if case .entry(let entry) = self, case .workReported = entry.kind { return true }
+        return false
+    }
+
+    /// The note that says where a branch was cut (#1749).
+    var isBranch: Bool {
+        if case .entry(let entry) = self, case .runtimeNote(let text) = entry.kind { return RuntimeNote.isBranch(text) }
         return false
     }
 

@@ -74,6 +74,24 @@ func TestATurnSummarised(t *testing.T) {
 	}
 }
 
+// A branch's note comes after the reply it keeps and the report, not among the steps (#1749).
+func TestABranchsNoteComesAfterTheReply(t *testing.T) {
+	es := entriesOf(t,
+		`{"userMessage":{"_0":"Remember APPLE"}}`,
+		`{"toolCall":{"_0":{"toolCallID":"c1","title":"ls","kind":"execute","content":[],"locations":[]}}}`,
+		`{"agentMessage":{"messageID":"m1","text":"OK APPLE"}}`,
+		`{"workReported":{"_0":{"outcome":"done","message":"Remembered","at":0}}}`,
+		`{"stateChanged":{"_0":"finished","reason":"endTurn"}}`,
+		`{"runtimeNote":{"_0":"Branched from APPLE before its prompt 2."}}`,
+	)
+	s := turnSummaryOf(es, 0)
+	if len(s.Outcome) != 3 || s.Outcome[0].Kind.AgentMessage == nil || s.Outcome[1].Kind.WorkReported == nil ||
+		s.Outcome[2].Kind.RuntimeNote == nil || *s.Steps != 1 {
+		b, _ := json.Marshal(s.Outcome)
+		t.Fatalf("%s %d", b, *s.Steps)
+	}
+}
+
 func TestAPageOfTurns(t *testing.T) {
 	fakeRuntimes(t)
 	d, c := start(t, t.TempDir())
