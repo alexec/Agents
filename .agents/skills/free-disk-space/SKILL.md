@@ -1,6 +1,6 @@
 ---
 name: free-disk-space
-description: Free disk space on this Mac (#199). Delete the build output that finished agents left in their worktrees, bound the shared build cache, and when the disk is critical, remove the worktrees of archived agents whose work is all on their branch. Nothing else. Use when the Free disk space workflow runs on machine.disk_low, or when Alex asks to free disk space.
+description: Free disk space on this Mac (#199, #1796) until 20% of the disk is free. Bound the shared build cache (Swift and Go), delete the build output that finished agents left in their worktrees, remove the worktrees of archived agents whose work is all on their branch, end leaked headless Chromes and their clones, and remove old Xcode device support and unavailable simulators. Nothing else. Use when the Free disk space workflow runs on machine.disk_low, or when Alex asks to free disk space.
 ---
 
 # Free disk space
@@ -9,6 +9,16 @@ This is the method of the Free disk space workflow
 (`.agents/workflows/free-disk-space.md`). The workflow says what the method is for and
 starts it. A person or an agent can also follow it by hand. Where it says that nobody is
 at the keyboard, that is true only of a run of the workflow.
+
+**Work to the target, not to the threshold (#1796).** The target is 20% of the disk free
+(about 92 GB on a 494 GB disk). After each of steps 3 to 6, run:
+
+```sh
+scripts/free-disk.sh status   # exits 0 at the target, 1 under it
+```
+
+When it says `reached`, go to step 7. Otherwise go on to the next step, until the steps
+run out. Stopping at the threshold brings the next low event a few hours later.
 
 ## Rules for the whole run
 
@@ -22,8 +32,12 @@ at the keyboard, that is true only of a run of the workflow.
   `Archived`, and none may say `Holding:`. `Working`, `Waiting`, `Blocked`,
   `Needs you` and `Paused` all leave it alone.
 - **Never source, and never uncommitted work.** `rm` only a folder that passes the check in
-  step 3. Never `git worktree remove --force`, `git clean`, `git reset`, `git checkout`,
+  step 4. Never `git worktree remove --force`, `git clean`, `git reset`, `git checkout`,
   `git branch -d` or `-D`.
+- **End a process only with `scripts/free-disk.sh chromes`.** It ends only headless
+  Chromes with a profile under `/tmp` that started more than 6 hours ago. Never `kill`,
+  `pkill` or `killall` anything yourself: not the person's own Chrome, not the sign-up
+  Chrome (`--user-data-dir=…/.agents/signups/chrome-profile`), not a build.
 - **Never turn workflows on or off**, this one included. Nobody is at the keyboard: do not
   ask; say what you left and why in your ending.
 
@@ -62,7 +76,21 @@ df -k "$P" | tail -1
 
    The last line proves it is a linked worktree, never a main checkout.
 
-## 3. Free build output (low and critical)
+## 3. Bound the build cache
+
+Bound the build cache every worktree shares (#234). It is outside every worktree,
+everything in it can be fetched or compiled again, and the script leaves each part alone
+while a build of that kind is running. The Swift part and Go's part each have a bound of
+their own, so a large Go cache never costs the Swift one:
+
+```sh
+scripts/build-cache.sh prune                                # low: Swift 30 GB, Go 10 GB
+scripts/build-cache.sh prune --max-gb 10 --go-max-gb 3      # critical
+```
+
+If it exits non-zero, say so with its output in the report, and go on.
+
+## 4. Free build output
 
 Call `list_sessions` again, every page, and drop any path whose sessions are no longer all finished,
 or now hold something. Then, for each finished path, with `W` set to it:
@@ -84,17 +112,9 @@ done
 A folder git ignores and tracks nothing in is build output, by the project's own
 `.gitignore`: deleting it loses nothing a build cannot make again. Anything else is kept.
 
-Then bound the build cache every worktree shares (#234). It is outside every worktree,
-everything in it can be fetched or compiled again, and the script leaves it alone while
-any build is running:
+## 5. Remove archived worktrees
 
-```sh
-scripts/build-cache.sh prune --max-gb 30    # at the critical level: --max-gb 10
-```
-
-## 4. Remove archived worktrees (critical only)
-
-At the critical level only, for each archived path `W` that passed step 2.4 and step 3:
+At both levels, for each archived path `W` that passed step 2.4 and step 4:
 
 ```sh
 git -C "$W" symbolic-ref -q HEAD                                   # on a branch
@@ -106,18 +126,37 @@ If any line fails, keep it and say why. A detached HEAD is kept: its commits are
 branch. The branch stays, with every commit: never delete it. Git itself refuses to remove
 a worktree with changes or untracked files, or one that is locked.
 
-## 5. Report
+## 6. Leaked Chromes and Xcode leftovers
+
+```sh
+scripts/free-disk.sh chromes   # ends leaked headless walk Chromes, then removes clones no process uses
+scripts/free-disk.sh xcode     # older iOS DeviceSupport builds per device, unavailable simulators
+```
+
+A walk's headless Chrome that was left running keeps an APFS clone of the Chrome app (up
+to 3 GB) until it ends. Walks end theirs now (`Web/test/walk/cdp.mjs`), but one stopped
+with `kill -9` still leaks. Xcode keeps a DeviceSupport folder (about 6.5 GB) for every
+OS build a device has run; only the newest per device model is kept, and Xcode makes it
+again when a device needs it.
+
+## 7. Report
 
 ```sh
 df -k "$P" | tail -1
 ```
 
-If the disk is still below the event's `threshold`, name the five largest worktrees left:
+```sh
+scripts/free-disk.sh status
+```
+
+If the target is not reached, say how far short it is, and name the five largest worktrees left:
 
 ```sh
 du -sk "$P"/.agents/worktrees/* 2>/dev/null | sort -rn | head -5
 ```
 
 End with one line per worktree touched (`freed <GB> from <name>` or `removed <name>,
-branch <branch> kept`), then the free space before and after, then what was kept and why
-(busy, holding, not named by a session, not clean). Then call `archive_session` with no id.
+branch <branch> kept`), then the build cache before and after, the Chromes ended and
+clones removed, the Xcode folders removed, then the free space before and after and how
+far from the target, then what was kept and why (busy, holding, not named by a session,
+not clean). Then call `archive_session` with no id.

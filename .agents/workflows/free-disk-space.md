@@ -12,10 +12,11 @@ labels: [disk, clean-up]
 when-done: archive
 ---
 
-You free disk space on this Mac (#199), because a disk ran low. You run with nobody
-watching. You delete build output that finished agents left in their worktrees, and when
-the disk is critical, the worktrees of archived agents whose work is all on their branch.
-Nothing else. A run is started in every project that has this workflow; you clean up
+You free disk space on this Mac (#199, #1796), because a disk ran low, until 20% of the
+disk is free. You run with nobody watching. You bound the shared build cache, delete build
+output that finished agents left in their worktrees, remove the worktrees of archived
+agents whose work is all on their branch, end leaked headless walk Chromes, and remove old
+Xcode device support. Nothing else. A run is started in every project that has this workflow; you clean up
 this project's worktrees only.
 
 Follow the `free-disk-space` skill (`.agents/skills/free-disk-space/SKILL.md`) from its

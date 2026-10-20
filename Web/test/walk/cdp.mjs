@@ -26,6 +26,13 @@ export async function launch({ profile, headed = false, path = chromePath, args:
     "--disable-background-networking", "--disable-sync", "--hide-scrollbars", ...extra, "about:blank"];
   if (!headed) args.unshift("--headless=new");
   const child = spawn(path, args, { stdio: "ignore" });
+  // A walk that throws, calls process.exit or is stopped ends its Chrome too: a Chrome left
+  // running keeps a code-sign clone of the app of up to 3 GB until a restart (#1796).
+  const end = () => { if (child.exitCode === null) child.kill(); };
+  process.on("exit", end);
+  for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"]) {
+    process.once(signal, () => { end(); process.exit(128 + ({ SIGINT: 2, SIGTERM: 15, SIGHUP: 1 })[signal]); });
+  }
   for (let i = 0; i < 150 && !existsSync(`${profile}/DevToolsActivePort`); i++) await sleep(100);
   const [port, wsPath] = readFileSync(`${profile}/DevToolsActivePort`, "utf8").trim().split("\n");
   const socket = new WebSocket(`ws://127.0.0.1:${port}${wsPath}`);
