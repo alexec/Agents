@@ -8,6 +8,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/alexec/agents/Go/internal/procgroup"
 )
 
 // DefaultSSH is SSHCommand.system.
@@ -102,7 +104,10 @@ func (s sshCommand) run(ctx context.Context, args []string) (output, error) {
 	var out, errs bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &out, &errs
 	cmd.WaitDelay = 5 * time.Second
+	// A ProxyCommand ssh leaves running, such as gh's relay, ends with it (#1643).
+	procgroup.Own(cmd)
 	err := cmd.Run()
+	procgroup.End(cmd)
 	if cmd.ProcessState == nil {
 		// It never started.
 		return output{}, err

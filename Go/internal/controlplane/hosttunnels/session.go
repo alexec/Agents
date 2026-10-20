@@ -11,6 +11,8 @@ import (
 	"sync/atomic"
 	"syscall"
 	"time"
+
+	"github.com/alexec/agents/Go/internal/procgroup"
 )
 
 // connecting is HostTunnels.connecting: how long a master has to come up. ssh's own
@@ -56,6 +58,7 @@ func session(ctx context.Context, record Record, base sshCommand, folder string,
 	cmd := exec.Command(ssh.executable, ssh.tunnelMasterArguments(control)...)
 	cmd.Env = ssh.env
 	cmd.Stderr = errorsWrite
+	procgroup.Own(cmd)
 	if err := cmd.Start(); err != nil {
 		errorsWrite.Close()
 		return "ssh could not be started: " + err.Error()
@@ -64,6 +67,8 @@ func session(ctx context.Context, record Record, base sshCommand, folder string,
 	master := &master{cmd: cmd, exited: make(chan struct{})}
 	go func() {
 		cmd.Wait()
+		// Its ProxyCommand, such as gh's relay, can outlive it (#1643).
+		procgroup.End(cmd)
 		master.ended.Store(true)
 		close(master.exited)
 	}()
