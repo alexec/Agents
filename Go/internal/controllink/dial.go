@@ -87,7 +87,7 @@ func dial(ctx context.Context, base, pin, origin string) (*Lines, error) {
 		tlsConfig.RootCAs = TestTrustRoots()
 	}
 	client := &http.Client{Transport: &http.Transport{TLSClientConfig: tlsConfig}}
-	dctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	dctx, cancel := context.WithTimeout(ctx, dialWait)
 	defer cancel()
 	options := &websocket.DialOptions{HTTPClient: client}
 	if origin != "" {
@@ -95,11 +95,19 @@ func dial(ctx context.Context, base, pin, origin string) (*Lines, error) {
 	}
 	ws, _, err := websocket.Dial(dctx, u.String(), options)
 	if err != nil {
+		if ctx.Err() == nil && errors.Is(dctx.Err(), context.DeadlineExceeded) {
+			// Such as a tunnel's dead remote forward, which takes the connection and never
+			// answers (#1770).
+			return nil, fmt.Errorf("%s took the connection but did not answer within %s", u.Host, dialWait)
+		}
 		return nil, err
 	}
 	ws.SetReadLimit(64 << 20)
 	return &Lines{ws: ws}, nil
 }
+
+// dialWait is how long a dial has to get the control plane's answer, TLS and the upgrade.
+var dialWait = 10 * time.Second
 
 // Join dials and proves credentials: hello, auth, ok.
 func Join(ctx context.Context, base, pin string, cr Credentials) (*Lines, *OK, error) {
