@@ -248,7 +248,9 @@ struct RemoteSidebar: View {
             if showsBanner { StaleBanner() }
         }
         .overlay {
-            if model.projects.isEmpty { Waiting() }
+            // Not over a machine's ask to join (#994): the card is the list's, and the
+            // waiting view in the middle would lie over the rows under it.
+            if model.projects.isEmpty, model.people.open().isEmpty { Waiting() }
         }
         // The catch-up leaves archived projects out; they are asked for here (#343), and
         // again once the list is pulled.

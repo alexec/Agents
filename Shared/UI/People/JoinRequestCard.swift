@@ -23,13 +23,14 @@ struct JoinRequestCard: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text("\(Text(request.name).fontWeight(.semibold)) \(PeopleWords.joinWants(request, you: you))")
                     .fixedSize(horizontal: false, vertical: true)
-                Text("\(PeopleWords.platform(request.platform)). \(PeopleWords.joinCode(request))")
+                Text(PeopleWords.platform(request.platform))
                     .appText(.fine)
                     .foregroundStyle(.secondary)
+                // The code once, in the code face, as the machine prints it.
+                Text("Check that the machine shows \(Text(request.code).monospaced().fontWeight(.semibold)).")
                     .fixedSize(horizontal: false, vertical: true)
-                Text(request.code)
-                    .appText(.code)
                     .textSelection(.enabled)
+                    .accessibilityLabel(PeopleWords.joinCode(request))
                 HStack(spacing: 8) {
                     Button("Approve") { answer(true) }
                         .buttonStyle(.borderedProminent)
