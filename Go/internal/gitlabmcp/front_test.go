@@ -86,12 +86,13 @@ func TestTheFrontOffersEventsAndTools(t *testing.T) {
 	}
 	for _, name := range []string{"list_merge_requests", "get_merge_request", "list_pipelines", "get_pipeline", "list_issues",
 		"get_issue", "comment_on_merge_request", "comment_on_issue", "merge_merge_request", "show_merge_requests", "show_issues",
-		"show_merge_request", "show_merge_request_diff", "failed_log", "retry_pipeline", "approve_merge_request"} {
+		"show_merge_request", "show_merge_request_diff", "failed_log", "retry_pipeline", "approve_merge_request",
+		"create_merge_request", "list_merge_request_comments", "reply_to_merge_request_comment"} {
 		if tools[name] == nil {
 			t.Fatalf("no tool %s in %v", name, tools)
 		}
 	}
-	equal(t, len(tools), 16, "tools")
+	equal(t, len(tools), 19, "tools")
 	equal(t, tools["merge_merge_request"]["_meta"], map[string]any{"ui": map[string]any{"visibility": []any{"app"}}}, "merge is a view's")
 
 	mrs := tool(3, "list_merge_requests", map[string]any{})["mergeRequests"].([]any)
@@ -119,8 +120,34 @@ func TestTheFrontOffersEventsAndTools(t *testing.T) {
 	badState := call(13, "tools/call", map[string]any{"name": "list_issues", "arguments": map[string]any{"state": "open"}})
 	equal(t, badState["result"].(map[string]any)["isError"], true, "a state GitLab has not")
 
+	// The ready-made workflows' tools (#1633): an issue's comments say whose are the project's
+	// own; open a merge request, list and answer line comments.
+	comments := tool(18, "get_issue", map[string]any{"number": 2})["issue"].(map[string]any)["comments"].([]any)
+	equal(t, len(comments), 2, "no system notes")
+	equal(t, comments[0].(map[string]any)["trusted"], false, "a stranger's")
+	equal(t, comments[1].(map[string]any)["trusted"], true, "a developer's")
+
+	opened := tool(14, "create_merge_request", map[string]any{"branch": "agent/issue-2", "title": "Fix it", "description": "Closes #2"})
+	equal(t, opened["number"], float64(12), "create_merge_request")
+	equal(t, opened["target"], "main", "the default branch")
+	f.set(func() {
+		f.discuss[1] = []obj{
+			{"id": "d1", "notes": []obj{{"id": 70, "type": "DiffNote", "body": "Rename this.", "author": dev, "created_at": at(1),
+				"position": obj{"new_path": "main.go", "new_line": 4}}}},
+			{"id": "d2", "notes": []obj{{"id": 71, "type": "DiffNote", "body": "Done.", "author": dev, "created_at": at(1), "resolved": true,
+				"position": obj{"new_path": "main.go", "new_line": 9}}}},
+		}
+	})
+	threads := tool(15, "list_merge_request_comments", map[string]any{"number": 1})["threads"].([]any)
+	equal(t, len(threads), 1, "the open threads only")
+	equal(t, tool(16, "reply_to_merge_request_comment", map[string]any{"number": 1, "commentId": 70, "body": "Renamed."})["commentId"],
+		float64(901), "reply_to_merge_request_comment")
+	missing := call(17, "tools/call", map[string]any{"name": "reply_to_merge_request_comment",
+		"arguments": map[string]any{"number": 1, "commentId": 5, "body": "x"}})
+	equal(t, missing["result"].(map[string]any)["isError"], true, "no such comment")
+
 	events := call(20, "events/list", map[string]any{})["result"].(map[string]any)["events"].([]any)
-	equal(t, len(events), 9, "events")
+	equal(t, len(events), 10, "events")
 	poll := call(21, "events/poll", map[string]any{"name": "pr.merged", "arguments": map[string]any{}, "cursor": nil})
 	equal(t, poll["result"].(map[string]any)["events"], []any{}, "first poll")
 	unknown := call(22, "events/poll", map[string]any{"name": "pr.reopened", "arguments": map[string]any{}, "cursor": nil})

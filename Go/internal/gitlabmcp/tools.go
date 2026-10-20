@@ -13,7 +13,8 @@ import (
 
 // The gitlab server's tools (#1629), over GitLab's REST API v4 with the same token as the
 // events: list and read merge requests, pipelines and issues, and comment on a merge request
-// or an issue. Merging is a person's, as on GitHub (#837): merge_merge_request is for a view
+// or an issue. For the ready-made workflows (#1633): open a merge request, list its line
+// comments, and answer one in its thread. Merging is a person's, as on GitHub (#837): merge_merge_request is for a view
 // only (#1631), never offered to an agent.
 
 const projectWords = "group/name or a project id; the project this folder pushes to when left out"
@@ -51,6 +52,22 @@ type commentArgs struct {
 	Project string `json:"project,omitempty" jsonschema:"group/name or a project id; the project this folder pushes to when left out"`
 	Number  int    `json:"number" jsonschema:"the merge request's or issue's number (its iid)"`
 	Body    string `json:"body" jsonschema:"the comment, in Markdown"`
+}
+
+type createMRArgs struct {
+	Project     string `json:"project,omitempty" jsonschema:"group/name or a project id; the project this folder pushes to when left out"`
+	Branch      string `json:"branch" jsonschema:"the branch to merge, already pushed"`
+	Target      string `json:"target,omitempty" jsonschema:"the branch to merge into; the project's default branch when left out"`
+	Title       string `json:"title" jsonschema:"the merge request's title"`
+	Description string `json:"description,omitempty" jsonschema:"its description, in Markdown; Closes #12 closes that issue when it merges"`
+	Draft       bool   `json:"draft,omitempty" jsonschema:"true: open it as a draft"`
+}
+
+type replyArgs struct {
+	Project   string `json:"project,omitempty" jsonschema:"group/name or a project id; the project this folder pushes to when left out"`
+	Number    int    `json:"number" jsonschema:"the merge request's number (its iid)"`
+	CommentID int    `json:"commentId" jsonschema:"the comment to answer: comment.id in a review.comment event, or a note's id from list_merge_request_comments"`
+	Body      string `json:"body" jsonschema:"the answer, in Markdown"`
 }
 
 type mergeArgs struct {
@@ -258,7 +275,9 @@ func AddTools(server *mcp.Server, g *RealGitLab) {
 		})
 
 	tool(server, &mcp.Tool{Name: "get_issue", Title: "Read an issue",
-		Description: "One issue, with its description.", Annotations: readOnly, Meta: agentsAndViews},
+		Description: "One issue, with its description and its first 100 comments, oldest first. A comment's trusted is true " +
+			"when its author is one of the project's members with Reporter access or more, never a bot (#728).",
+		Annotations: readOnly, Meta: agentsAndViews},
 		func(ctx context.Context, in numberArgs) (map[string]any, error) {
 			project, err := projectOf(ctx, in.Project)
 			if err != nil {
@@ -268,8 +287,26 @@ func AddTools(server *mcp.Server, g *RealGitLab) {
 			if err := g.get(ctx, fmt.Sprintf("projects/%s/issues/%d", pid(project), in.Number), false, &i); err != nil {
 				return nil, err
 			}
+			var notes []noteJSON
+			path := fmt.Sprintf("projects/%s/issues/%d/notes?sort=asc&order_by=created_at&per_page=100", pid(project), in.Number)
+			if err := g.get(ctx, path, false, &notes); err != nil {
+				return nil, err
+			}
+			comments := []any{}
+			for _, n := range notes {
+				if n.System {
+					continue
+				}
+				trusted, err := g.trusted(ctx, project, &n.Author)
+				if err != nil {
+					return nil, err
+				}
+				comments = append(comments, map[string]any{"id": n.ID, "author": n.Author.Username, "trusted": trusted,
+					"body": clip(n.Body), "at": n.CreatedAt})
+			}
 			r := issueSummary(i)
 			r["description"] = clipDescription(i.Description)
+			r["comments"] = comments
 			return map[string]any{"project": project, "issue": r}, nil
 		})
 
@@ -299,6 +336,102 @@ func AddTools(server *mcp.Server, g *RealGitLab) {
 	tool(server, &mcp.Tool{Name: "comment_on_issue", Title: "Comment on an issue",
 		Description: "Adds a comment to an issue, as the person whose token it is.", Meta: agentsAndViews},
 		comment("issues"))
+
+	tool(server, &mcp.Tool{Name: "create_merge_request", Title: "Open a merge request",
+		Description: "Opens a merge request from a branch already pushed, as the person whose token it is. Never merges it.",
+		Meta:        agentsAndViews},
+		func(ctx context.Context, in createMRArgs) (map[string]any, error) {
+			project, err := projectOf(ctx, in.Project)
+			if err != nil {
+				return nil, err
+			}
+			if strings.TrimSpace(in.Branch) == "" || strings.TrimSpace(in.Title) == "" {
+				return nil, fmt.Errorf("a merge request needs its branch and a title")
+			}
+			target := in.Target
+			if target == "" {
+				var p struct {
+					DefaultBranch string `json:"default_branch"`
+				}
+				if err := g.get(ctx, "projects/"+pid(project), false, &p); err != nil {
+					return nil, err
+				}
+				target = p.DefaultBranch
+			}
+			title := in.Title
+			if in.Draft && !strings.HasPrefix(strings.ToLower(title), "draft:") {
+				title = "Draft: " + title
+			}
+			var m mergeRequest
+			body := map[string]any{"source_branch": in.Branch, "target_branch": target, "title": title,
+				"description": in.Description, "remove_source_branch": true}
+			if err := g.send(ctx, http.MethodPost, fmt.Sprintf("projects/%s/merge_requests", pid(project)), body, &m); err != nil {
+				return nil, err
+			}
+			return map[string]any{"project": project, "number": m.IID, "url": m.WebURL, "branch": in.Branch, "target": target}, nil
+		})
+
+	tool(server, &mcp.Tool{Name: "list_merge_request_comments", Title: "List a merge request's line comments",
+		Description: "The threads on lines of a merge request's diff that are not resolved, each with its notes: id, author, " +
+			"path, line and body. A note's id answers with reply_to_merge_request_comment.",
+		Annotations: readOnly, Meta: agentsAndViews},
+		func(ctx context.Context, in numberArgs) (map[string]any, error) {
+			project, err := projectOf(ctx, in.Project)
+			if err != nil {
+				return nil, err
+			}
+			discussions, err := g.discussions(ctx, project, in.Number)
+			if err != nil {
+				return nil, err
+			}
+			threads := []any{}
+			for _, d := range discussions {
+				if len(d.Notes) == 0 || d.Notes[0].Position == nil || d.Notes[0].Resolved {
+					continue
+				}
+				notes := []any{}
+				for _, n := range d.Notes {
+					if n.System {
+						continue
+					}
+					notes = append(notes, map[string]any{"id": n.ID, "author": n.Author.Username, "body": clip(n.Body), "at": n.CreatedAt})
+				}
+				pos := d.Notes[0].Position
+				threads = append(threads, map[string]any{"path": pos.NewPath, "line": pos.NewLine, "notes": notes})
+			}
+			return map[string]any{"project": project, "number": in.Number, "threads": threads}, nil
+		})
+
+	tool(server, &mcp.Tool{Name: "reply_to_merge_request_comment", Title: "Answer a merge request's comment",
+		Description: "Answers a comment in its own thread on a merge request, as the person whose token it is.",
+		Meta:        agentsAndViews},
+		func(ctx context.Context, in replyArgs) (map[string]any, error) {
+			project, err := projectOf(ctx, in.Project)
+			if err != nil {
+				return nil, err
+			}
+			if strings.TrimSpace(in.Body) == "" {
+				return nil, fmt.Errorf("write the answer first")
+			}
+			discussions, err := g.discussions(ctx, project, in.Number)
+			if err != nil {
+				return nil, err
+			}
+			for _, d := range discussions {
+				for _, n := range d.Notes {
+					if n.ID != in.CommentID {
+						continue
+					}
+					var note noteJSON
+					path := fmt.Sprintf("projects/%s/merge_requests/%d/discussions/%s/notes", pid(project), in.Number, url.PathEscape(d.ID))
+					if err := g.send(ctx, http.MethodPost, path, map[string]any{"body": in.Body}, &note); err != nil {
+						return nil, err
+					}
+					return map[string]any{"project": project, "number": in.Number, "commentId": note.ID}, nil
+				}
+			}
+			return nil, fmt.Errorf("there is no comment %d on !%d", in.CommentID, in.Number)
+		})
 
 	tool(server, &mcp.Tool{Name: "merge_merge_request", Title: "Merge a merge request",
 		Description: "Merges a merge request and deletes its branch on GitLab, as the person whose token it is; squash squashes its " +

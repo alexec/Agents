@@ -53,21 +53,23 @@ another for its tools.
 
 ## Turn on a ready-made workflow
 
-Agents has ready-made workflows for the dev loop on GitHub (#1342). Each project that
-pushes to GitHub shows them on its **Workflows** page, off:
+Agents has ready-made workflows for the dev loop on GitHub (#1342) and GitLab (#1633). Each
+project that pushes to GitHub or GitLab shows them on its **Workflows** page, off. One
+workflow works on both forges: it listens to the `github` and the `gitlab` servers, and its
+agent uses the tools of the server that the event came from.
 
 | Workflow | It starts on | The agent |
 | --- | --- | --- |
-| **Work an issue** | `issue.labelled` with `label: agent`: someone adds the `agent` label to an issue | does what the issue asks on a branch of its own, and opens a pull request for it |
-| **Fix failed checks** | `checks.failed`: a pull request's checks failed | reads the failed jobs, fixes the cause on the PR's branch and pushes, or runs the jobs again when the change did not cause it |
-| **Address review comments** | `review.posted`: CodeRabbit finished a review of a pull request | fixes or answers each open review comment on the PR, a person's or CodeRabbit's, and pushes |
+| **Work an issue** | `issue.labelled` with `label: agent`: someone adds the `agent` label to an issue | does what the issue asks on a branch of its own, and opens a pull request or merge request for it |
+| **Fix failed checks** | `checks.failed`: a pull request's checks or a merge request's pipeline failed | reads the failed jobs, fixes the cause on the branch and pushes, or runs the jobs again when the change did not cause it |
+| **Address review comments** | `review.posted`: CodeRabbit finished a review of a pull request; on GitLab, `review.comment`: a line of a merge request was commented on (GitLab has no event for a whole review, so a 10-minute cooldown gathers a reviewer's comments) | fixes or answers each open review comment, a person's or CodeRabbit's, and pushes |
 
 1. Open the workflow and turn on its **Enabled** switch.
 2. The app writes the workflow to `.agents/workflows/<id>.md` and its method to
    `.agents/skills/<id>/SKILL.md`, approved. From then on they are your project's own
    files: change them as you like. A skill of the same name that the project has already
    is kept.
-3. For **Work an issue**, make an `agent` label in the repository, if it has none.
+3. For **Work an issue**, make an `agent` label in the repository or project, if it has none.
    Its agent asks before each tool it uses (`permission-mode: default`), because anyone
    can write an issue. It reads the issue as data, and uses only the comments of the
    repository's own people.

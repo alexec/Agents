@@ -113,6 +113,8 @@ func issueEvents() []event {
 	}{
 		{IssueOpened, "Issue opened", "An issue was opened.",
 			"Only issues opened with this label.", map[string]any{"openedAt": str}, "Only issues opened by"},
+		{IssueLabelled, "Issue labelled", "A label was added to an issue: one event per label added.",
+			"Only when this label is the one added.", map[string]any{"label": str, "by": str, "labelledAt": str}, "Only labels added by"},
 		{IssueCommented, "Issue commented on",
 			"A comment was left on an issue. Its body is the first 4000 characters. GitLab's own notes (a label added, a close) are not comments.",
 			"Only issues with this label.",
@@ -451,7 +453,8 @@ func candidates(ctx context.Context, gl GitLab, name string, a args, since strin
 		var list []candidate
 		for _, it := range items {
 			if (a.issue != 0 && it.Issue.Number != a.issue) || (!a.anyone && !it.Trusted) ||
-				(a.label != "" && !contains(it.Issue.Labels, a.label)) {
+				(a.label != "" && !contains(it.Issue.Labels, a.label)) ||
+				(a.label != "" && it.Kind == IssueLabelled && it.Label != a.label) {
 				continue
 			}
 			at := normalized(it.At)

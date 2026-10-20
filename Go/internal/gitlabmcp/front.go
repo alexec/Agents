@@ -21,9 +21,11 @@ import (
 // Instructions are the server's words.
 const Instructions = "This project's merge requests, their pipelines, and its issues on GitLab, as events polled as the person who connected GitLab: " +
 	"checks.failed (a failed pipeline), pr.opened, pr.merged, pr.closed, pr.conflicted, review.comment (a comment on a line of a merge request's diff), " +
-	"issue.opened, issue.commented, issue.closed. A merge request is a pr in their names and data, and its number is its iid (!12). " +
+	"issue.opened, issue.labelled, issue.commented, issue.closed. A merge request is a pr in their names and data, and its number is its iid (!12). " +
 	"list_merge_requests, get_merge_request, list_pipelines, get_pipeline, list_issues and get_issue read them; " +
 	"comment_on_merge_request and comment_on_issue comment; failed_log reads a failed pipeline's jobs' logs, retry_pipeline runs them again. " +
+	"create_merge_request opens a merge request from a pushed branch; list_merge_request_comments lists its open line threads, and " +
+	"reply_to_merge_request_comment answers one in its thread. " +
 	"show_merge_requests, show_issues and show_merge_request show a page to the person. " +
 	"Merging and approving a merge request are a person's, from its page: those tools are not for agents."
 

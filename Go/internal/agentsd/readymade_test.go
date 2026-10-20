@@ -42,15 +42,42 @@ func TestReadyMadeWorkflowsRead(t *testing.T) {
 	}
 }
 
-// One label is one agent (#1343): a GitHub issue's starts Work an issue, a Linear issue's
-// Work a Linear issue, as both servers raise issue.labelled.
-func TestEachIssueWorkflowTakesOneServer(t *testing.T) {
-	for id, server := range map[string]string{"work-an-issue": "github", "work-a-linear-issue": "linear"} {
+// One label is one agent (#1343): a GitHub or GitLab issue's starts Work an issue (#1633), a
+// Linear issue's Work a Linear issue, as all three servers raise issue.labelled.
+func TestEachIssueWorkflowTakesItsServers(t *testing.T) {
+	for id, servers := range map[string][]string{"work-an-issue": {"github", "gitlab"}, "work-a-linear-issue": {"linear"}} {
 		text, _ := readyMadeText(id)
 		w := parseWorkflow(text, id, "/p")
 		raw, _ := json.Marshal(w.Triggers)
-		if len(w.Triggers) != 1 || triggerName(w.Triggers[0]) != "issue.labelled" || !strings.Contains(string(raw), `"`+server+`"`) {
+		mt, ok := serverTrigger(w.Triggers[0])
+		if len(w.Triggers) != 1 || triggerName(w.Triggers[0]) != "issue.labelled" || !ok || !slices.Equal(mt.servers, servers) {
 			t.Fatalf("%s: %s", id, raw)
+		}
+	}
+}
+
+// The dev loop on both forges (#1633): each workflow hears the gitlab server too, and its
+// skill names the gitlab server's tools beside the github server's.
+func TestTheDevLoopWorkflowsHearGitLab(t *testing.T) {
+	for id, tools := range map[string][]string{
+		"work-an-issue":           {"get_issue", "comment_on_issue", "create_merge_request"},
+		"fix-failed-checks":       {"failed_log", "retry_pipeline", "comment_on_merge_request"},
+		"address-review-comments": {"list_merge_request_comments", "reply_to_merge_request_comment", "comment_on_merge_request"},
+	} {
+		text, skill := readyMadeText(id)
+		w := parseWorkflow(text, id, "/p")
+		hears := false
+		for _, tr := range w.Triggers {
+			mt, ok := serverTrigger(tr)
+			hears = hears || (ok && mt.hears("gitlab"))
+		}
+		if !hears {
+			t.Errorf("%s does not hear the gitlab server", id)
+		}
+		for _, tool := range tools {
+			if !strings.Contains(skill, "`"+tool+"`") {
+				t.Errorf("%s's skill does not name %s", id, tool)
+			}
 		}
 	}
 }
@@ -163,13 +190,23 @@ func fileHas(t *testing.T, path, want string) bool {
 	return err == nil && string(b) == want
 }
 
-func TestPushesToGitHubInAWorktree(t *testing.T) {
+func TestPushesToAForgeInAWorktree(t *testing.T) {
 	main, wt := t.TempDir(), t.TempDir()
 	os.MkdirAll(filepath.Join(main, ".git", "worktrees", "x"), 0o755)
 	os.WriteFile(filepath.Join(main, ".git", "config"), []byte("[remote \"origin\"]\n\turl = https://github.com/o/n\n"), 0o644)
 	os.WriteFile(filepath.Join(main, ".git", "worktrees", "x", "commondir"), []byte("../..\n"), 0o644)
 	os.WriteFile(filepath.Join(wt, ".git"), []byte("gitdir: "+filepath.Join(main, ".git", "worktrees", "x")+"\n"), 0o644)
-	if !pushesToGitHub(main) || !pushesToGitHub(wt) || pushesToGitHub(t.TempDir()) {
-		t.Fatal("pushesToGitHub")
+	if !pushesToForge(main) || !pushesToForge(wt) || pushesToForge(t.TempDir()) {
+		t.Fatal("pushesToForge")
+	}
+	// A GitLab remote, on gitlab.com or a self-managed GitLab (#1633); another host is not one.
+	for remote, want := range map[string]bool{"git@gitlab.com:g/app.git": true, "https://gitlab.example.com/g/app": true,
+		"https://code.example.org/g/app": false} {
+		dir := t.TempDir()
+		os.MkdirAll(filepath.Join(dir, ".git"), 0o755)
+		os.WriteFile(filepath.Join(dir, ".git", "config"), []byte("[remote \"origin\"]\n\turl = "+remote+"\n"), 0o644)
+		if pushesToForge(dir) != want {
+			t.Errorf("%s: %v", remote, !want)
+		}
 	}
 }
