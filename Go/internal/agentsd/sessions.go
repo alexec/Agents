@@ -32,6 +32,9 @@ type messageState struct {
 	messageMu    sync.Mutex
 	messagesSent map[wire.UUID][]time.Time
 	messageHops  map[wire.UUID]int // by agent: the messages in a row that began its turn
+	// The prompts a workflow's trigger queued, by id, with the agent each is for: their
+	// turns start the count again (#1728).
+	triggerPrompts map[wire.UUID]wire.UUID
 }
 
 var groupTitles = map[string]string{"needsAttention": "Needs you", "blocked": "Blocked", "waiting": "Waiting",
@@ -613,8 +616,9 @@ func (d *Daemon) messageSession(caller wire.UUID, args map[string]json.RawMessag
 	waitsOnPerson := target.Report != nil && target.Report.Outcome == wire.WorkOutcomeNeedsAnswer && target.State == wire.AgentStateFinished
 	stopped := target.State == wire.AgentStateStopped
 	// A target that may do more without asking than this session is not woken, and its
-	// turns pass the message over (nextTurn), until the person speaks to it.
-	looser := d.looserThan(target, me)
+	// turns pass the message over (nextTurn), until the person speaks to it; unless it set
+	// this session going (reportsTo).
+	looser := d.holdsMessageFrom(target, me)
 	wakes := !busy && !stopped && !waitsOnPerson && looser == ""
 	if wakes && target.StartedByAgent != nil {
 		limit := int64(defaultRunningCap)
