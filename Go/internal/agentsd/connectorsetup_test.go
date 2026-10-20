@@ -207,6 +207,7 @@ func TestEventsThatCannotBeTurnedOnSayWhy(t *testing.T) {
 	}
 }
 
+// A remote on neither forge (#1632: a gitlab.com one is GitLab's set-up now).
 func TestASetUpWithNoGitHubRemote(t *testing.T) {
 	t.Setenv("AGENTS_PERSONAL_HOME", t.TempDir())
 	d, c := start(t, t.TempDir())
@@ -217,7 +218,7 @@ func TestASetUpWithNoGitHubRemote(t *testing.T) {
 	d.connStoreFor = func() (connections.Store, error) { return file, nil }
 	gh := &fakeSetupGitHub{}
 	d.newSetupReader = func(string) setupReader { return gh }
-	project := gitProject(t, "https://gitlab.com/alexec/blog.git")
+	project := gitProject(t, "https://code.example.org/alexec/blog.git")
 	c.call(t, 1, "projects/add", map[string]any{"folder": "file://" + project})
 
 	var setup wire.ConnectorSetup
