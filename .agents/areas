@@ -313,6 +313,10 @@ specs/038-*/                                           ci-server
 Go/cmd/gitlab-mcp/                                     gitlab
 Go/internal/gitlabmcp/                                 gitlab
 
+# email: the email MCP server (#1780): one IMAP mailbox's new mail, read, never sent.
+Go/cmd/email-mcp/                                      email
+Go/internal/emailmcp/                                  email
+
 # control-plane: the control plane: joining, membership, grants, copies and handover,
 # its server and its deploy.
 App/Sources/Control/                                   control-plane
