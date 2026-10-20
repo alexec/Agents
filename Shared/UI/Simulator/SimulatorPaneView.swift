@@ -34,7 +34,10 @@ struct SimulatorPaneView: View {
     @State private var listProblem: String?
     /// Why the last screen read failed: the old frame is dimmed and says so (#1666).
     @State private var screenProblem: String?
-    @State private var busy = false
+    /// A boot or a shut-down sent and not yet done: said in the pane with a spinner (#1689).
+    @State private var pending: Pending?
+    /// The booted simulator that Shut Down asks about first (#1689).
+    @State private var askingShutDown: DaemonAPI.Simulator?
     /// How big the screen is drawn, for where a touch lands on it.
     @State private var shown: CGSize = .zero
     /// Counts touches, so the screen is read again at once after one.
@@ -53,6 +56,16 @@ struct SimulatorPaneView: View {
     /// only when it matters. The host keeps it at most 1200.
     private var maxHeight: Int {
         max(100, Int((room * displayScale / 100).rounded(.up)) * 100)
+    }
+
+    private enum Pending: Equatable {
+        case booting(String), shuttingDown(String)
+
+        var udid: String {
+            switch self {
+            case let .booting(udid), let .shuttingDown(udid): udid
+            }
+        }
     }
 
     private var simulator: DaemonAPI.Simulator? {
@@ -110,28 +123,45 @@ struct SimulatorPaneView: View {
             }
             Spacer(minLength: 0)
             if listProblem == nil, let simulator {
-                if simulator.booted {
+                if simulator.booted, pending == nil {
                     Button {
                         touch { try await calls.home(simulator.udid) }
                     } label: {
                         Image(systemName: "circle.circle")
+                            .tapTarget()
                     }
                     .help("Home")
                     .accessibilityLabel("Home")
                 }
-                Button(simulator.booted ? "Shut Down" : "Boot") { toggle(simulator) }
-                    .disabled(busy)
+                // Shut Down stops what runs on it: asked first (#1689).
+                Button {
+                    if simulator.booted { askingShutDown = simulator } else { toggle(simulator) }
+                } label: {
+                    Text(simulator.booted ? "Shut Down" : "Boot").tapTarget()
+                }
+                .disabled(pending != nil)
             }
             Button {
                 Task { await reload() }
             } label: {
                 Image(systemName: "arrow.clockwise")
+                    .tapTarget()
             }
             .help("List the simulators again")
             .accessibilityLabel("List the simulators again")
         }
         .appText(.supporting)
         .buttonStyle(.borderless)
+        .confirmationDialog(
+            "Shut down \(askingShutDown?.name ?? "the simulator")?",
+            isPresented: Binding(get: { askingShutDown != nil }, set: { if !$0 { askingShutDown = nil } }),
+            presenting: askingShutDown
+        ) { sim in
+            Button("Shut Down", role: .destructive) { toggle(sim) }
+            Button("Cancel", role: .cancel) {}
+        } message: { _ in
+            Text("The apps that run on it stop.")
+        }
     }
 
     @ViewBuilder
@@ -146,6 +176,14 @@ struct SimulatorPaneView: View {
             }
         } else if list == nil {
             ProgressView().controlSize(.small)
+        } else if let simulator, let pending, pending.udid == simulator.udid {
+            VStack(spacing: 8) {
+                ProgressView().controlSize(.small)
+                Text(pending == .booting(simulator.udid) ? "Booting \(simulator.name)…" : "Shutting Down \(simulator.name)…")
+                    .appText(.supporting)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+            }
         } else if let simulator {
             if simulator.booted, let screen, let image = Self.image(screen.jpeg) {
                 frame(image, screen: screen, simulator: simulator)
@@ -223,7 +261,7 @@ struct SimulatorPaneView: View {
     }
 
     private func toggle(_ simulator: DaemonAPI.Simulator) {
-        busy = true
+        pending = simulator.booted ? .shuttingDown(simulator.udid) : .booting(simulator.udid)
         Task {
             do {
                 if simulator.booted { try await calls.shutdown(simulator.udid) } else { try await calls.boot(simulator.udid) }
@@ -233,7 +271,7 @@ struct SimulatorPaneView: View {
             }
             chosen = simulator.udid
             await reload()
-            busy = false
+            pending = nil
         }
     }
 
@@ -246,6 +284,18 @@ struct SimulatorPaneView: View {
         NSImage(data: data).map(Image.init(nsImage:))
         #else
         UIImage(data: data).map(Image.init(uiImage:))
+        #endif
+    }
+}
+
+private extension View {
+    /// A button's label at least 44 points each way on a phone or an iPad (#1689).
+    @ViewBuilder
+    func tapTarget() -> some View {
+        #if os(iOS)
+        frame(minWidth: 44, minHeight: 44).contentShape(Rectangle())
+        #else
+        self
         #endif
     }
 }

@@ -16,7 +16,8 @@ export function SimulatorPane({ store, host }: { store: Store; host: string }) {
   const listProblem = useSignal<string | null>(null);
   /** Why the last screen read failed: the old frame is dimmed and says so (#1666). */
   const screenProblem = useSignal<string | null>(null);
-  const busy = useSignal(false);
+  /** A boot or a shut-down sent and not yet done: said in the pane with a spinner (#1689). */
+  const pending = useSignal<{ udid: string; booting: boolean } | null>(null);
   /** Counts touches, so the screen is read again at once after one. */
   const touches = useSignal(0);
   /** Whether the tab is hidden: then no screen is read (#1650). */
@@ -77,7 +78,9 @@ export function SimulatorPane({ store, host }: { store: Store; host: string }) {
 
   const toggle = async () => {
     if (!simulator) return;
-    busy.value = true;
+    // Shut Down stops what runs on it: asked first (#1689).
+    if (simulator.booted && !confirm(`Shut down ${simulator.name}?\n\nThe apps that run on it stop.`)) return;
+    pending.value = { udid: simulator.udid, booting: !simulator.booted };
     try {
       await store.link.call(simulator.booted ? "simulators/shutdown" : "simulators/boot", { udid: simulator.udid }, host);
       problem.value = null;
@@ -86,7 +89,7 @@ export function SimulatorPane({ store, host }: { store: Store; host: string }) {
     }
     chosen.value = simulator.udid;
     await reload();
-    busy.value = false;
+    pending.value = null;
   };
 
   return (
@@ -98,13 +101,15 @@ export function SimulatorPane({ store, host }: { store: Store; host: string }) {
           </select>
         )}
         <span class="spacer" />
-        {!listProblem.value && simulator?.booted && <button class="link" title="Home" aria-label="Home" onClick={() => void touch("simulators/home", { udid: simulator.udid })}>⌂</button>}
-        {!listProblem.value && simulator && <button class="link" disabled={busy.value} onClick={() => void toggle()}>{simulator.booted ? "Shut Down" : "Boot"}</button>}
+        {!listProblem.value && simulator?.booted && !pending.value && <button class="link" title="Home" aria-label="Home" onClick={() => void touch("simulators/home", { udid: simulator.udid })}>⌂</button>}
+        {!listProblem.value && simulator && <button class="link" disabled={pending.value !== null} onClick={() => void toggle()}>{simulator.booted ? "Shut Down" : "Boot"}</button>}
         <button class="link" title="List the simulators again" aria-label="List the simulators again" onClick={() => void reload()}>↻</button>
       </div>
       {listProblem.value ? <div class="simulator-problem"><p>Couldn't list the simulators: {listProblem.value}</p>
           <button onClick={() => void reload()}>Try Again</button></div>
         : list.value === null ? <p class="hint"><span class="spinner" /></p>
+        : simulator && pending.value?.udid === simulator.udid
+          ? <p class="hint"><span class="spinner" /> {pending.value.booting ? `Booting ${simulator.name}…` : `Shutting Down ${simulator.name}…`}</p>
         : !simulator ? <p class="hint">{list.value.reason ?? "This Mac has no iOS simulators. Make one in Xcode."}</p>
         : !simulator.booted ? <p class="hint">{simulator.name} is shut down. Boot it to see its screen.</p>
         : screen.value ? <>
