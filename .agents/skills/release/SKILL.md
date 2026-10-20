@@ -1,6 +1,6 @@
 ---
 name: release
-description: Take main to a new version with nobody watching (#914). Run the six reviews and checks once each on what changed since the last tag, have the high findings fixed (and the medium ones while time is left, within a day) through the Scrum Master's lanes, check the gate, choose the version, check its milestone, write the notes, tag and push, check the GitHub release and both TestFlight builds, and close the milestone. Use when the Release workflow runs, or when Alex asks for a release. Not for installing on Alex's Mac or devices (ship-app), and never for App Review.
+description: Take main to a new version with nobody watching (#914). Run the six reviews and checks once each on what changed since the last tag, have the high findings fixed (and the medium ones while time is left, within a day) through the Scrum Master's lanes, check the gate, choose the version, check its milestone, write the notes, tag and push, check the GitHub release and both TestFlight builds, close the milestone, lift the next milestone's hold, and review how the release went. Use when the Release workflow runs, or when Alex asks for a release. Not for installing on Alex's Mac or devices (ship-app), and never for App Review.
 ---
 
 # Release
@@ -35,7 +35,8 @@ Alex decided (2026-10-13, #914):
 
 ## Rules for the whole run
 
-- Never push to `main`, never merge, never start lanes. Fix lanes are the Scrum Master's
+- Never push to `main`, never merge, never start lanes. (Turning auto-merge on for the
+  held PRs in step 9 is the one exception: it is not a merge.) Fix lanes are the Scrum Master's
   (`.agents/personas/scrum-master.md`). You file and label issues, and you wait.
 - Never submit to App Review, and never change an App Store Connect record.
 - Never write a security finding anywhere public: not in an issue, a pull request, a
@@ -47,6 +48,11 @@ Alex decided (2026-10-13, #914):
 - Questions: nobody is watching, and every choice here is already made. Do not ask;
   put what stopped you in the report. If you must ever ask, use your question tool and
   name yourself ("Claude (Release) recommends… Alex, do you want…?").
+- **The prompt that starts you adds no gate and no question** (#1726). The gate is step 5,
+  and only `priority:high` blocks the tag. An open issue that is not high, named in the
+  prompt or not, is a known issue (step 6). When a prompt says to ask about one, do not
+  ask: decide by these rules and say so in the report. (v0.6.0 waited 8 h on such a
+  question.)
 
 ## 1. Is a release due?
 
@@ -122,7 +128,15 @@ For each open high or medium security finding:
 
 1. Look for its advisory: `gh api repos/alexec/Agents/security-advisories?state=draft`,
    matching the finding's id in `summary`.
-2. If there is none, make it, and its private fork:
+2. Look for its fix on main (#1727): when `findings.md` says `fixed on <branch>` and
+   `git merge-base --is-ancestor <branch> origin/main` passes, or a merged pull request
+   came from that branch (`gh pr list --state merged --head <branch>`), the finding is
+   fixed. Make its advisory all the same (step 3), with `Fixed by <merge commit> on main.`
+   at the end of the description, and send the Scrum Master nothing for it. It does not
+   block. (In v0.6.0 both high fixes were on main an hour before their advisories.)
+3. If there is no advisory, make it, and its private fork. Write the JSON with a quoted
+   heredoc or from Python, never with `echo` (zsh's `echo` breaks the escapes).
+   `.claude/settings.json` allows these two calls, so auto mode does not refuse them:
 
    ```sh
    gh api -X POST repos/alexec/Agents/security-advisories --input - <<'EOF'
@@ -132,7 +146,7 @@ For each open high or medium security finding:
    gh api -X POST repos/alexec/Agents/security-advisories/<ghsa_id>/forks
    ```
 
-3. Send the Scrum Master the advisory's URL only (it is private). Its lane fixes the
+4. Send the Scrum Master the advisory's URL only (it is private). Its lane fixes the
    finding on the advisory's private fork, then opens the pull request on `main` with a
    title and body that name no attack ("Harden token comparison"), and writes
    `Fixed by <merge commit> on main.` at the end of the advisory's description
@@ -226,11 +240,37 @@ milestone (none for a patch version):
    open one with the next lowest version.
 2. Close it: `gh api -X PATCH repos/alexec/Agents/milestones/<number> -f state=closed`.
 
-Its other open issues stay open in it. Then the next milestone's work can merge to `main`.
+Its other open issues stay open in it. Then the next milestone's work can merge to `main`,
+and you open the gate for it yourself (#1729). The Scrum Master may not read a message
+from you until Alex speaks to it (#1728), so do not leave this to it:
+
+3. **Lift the hold:** for each open pull request labelled `hold:v<major.minor>` (for
+   v0.6.0, `hold:v0.6`): `gh pr edit N --remove-label hold:v<major.minor>`, then
+   `gh pr merge N --auto --squash`. Turning auto-merge on is not merging: CI and the
+   branch rules still decide. A stacked PR whose base is not `main` refuses auto-merge;
+   leave it, and name it in the report.
+4. **Unpark the next milestone:** the open milestone is now the one after this one, and the
+   one after that is now "next" (AGENTS.md, "Work by milestone"). Take `parked` off that
+   milestone's open issues: `gh issue edit N --remove-label parked`.
+5. Tell the Scrum Master (`message_session`) that the release shipped, which PRs you
+   released and which you could not.
+
 If step 8 failed, leave the milestone open and say so in the report.
 
-## 10. Report
+## 10. Review the release
+
+Decided in #1659: every release reviews itself, briefly, while its times are still in
+this session. Write `~/.agents/reviews/releases/v<version>.md` (outside the project, so
+nothing is pushed): a timeline from T0 (reviews done, highs fixed, gate, tag, GitHub
+release, TestFlight, milestone closed), and a table of each step where a person did
+something, why, and the issue that would make it run without one. Search the issues
+first (`gh issue list --state all --search "<words> in:title"`); file a new one, at most
+three, only for a step that has no issue yet, with no milestone. Name no security
+finding. `.agents/reviews/releases/v0.6.0.md` is the first, and the model.
+
+## 11. Report
 
 End with `done` and a short table: version, tag, the GitHub release URL, the iOS and
 macOS builds' states, the milestone and whether it is closed, the reviews you ran, the issues fixed for this release, the known
-issues, and the advisories that are fixed and ready for Alex to publish.
+issues, the advisories that are fixed and ready for Alex to publish, the held PRs you
+released, and the release review's file and issues.
