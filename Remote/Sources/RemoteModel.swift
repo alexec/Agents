@@ -2155,7 +2155,7 @@ final class RemoteModel {
                         }
                         guard change.method == DaemonAPI.Notification.controlHostChanged else { continue }
                         // A host back while this phone waits out its backoff: go back now (#172).
-                        if !self.isConnected, change.params?["state"]?.stringValue == "online" { self.backoff.nudge() }
+                        if !self.isConnected, DaemonAPI.ControlHost.answers(change.params?["state"]?.stringValue) { self.backoff.nudge() }
                         await self.syncOtherHosts(control, link: link)
                     }
                     note("hosts: the control plane's watch closed")
@@ -2197,7 +2197,7 @@ final class RemoteModel {
         // The relay's key, from the control plane itself (T077): kept for when its address
         // cannot be reached.
         RemoteControl.keepRelayKey(status.relayKey)
-        let others = listed.filter { $0.id != status.homeHost && $0.state == "online" && $0.runsAgents }
+        let others = listed.filter { $0.id != status.homeHost && $0.answers && $0.runsAgents }
         for host in others {
             let other = otherHosts[host.id] ?? DaemonClient(link: link.link(for: host.id))
             otherHosts[host.id] = other
@@ -2261,7 +2261,7 @@ final class RemoteModel {
         }
         // One offline or stopped when this started lists what it last did, greyed, as one that
         // went while it ran (#962).
-        for host in controlHosts where host.id != status.homeHost && host.state != "online"
+        for host in controlHosts where host.id != status.homeHost && !host.answers
             && !work.holdsProjects(of: host.id) {
             if let heard = try? await control.call(DaemonAPI.Method.hostsLastHeard, DaemonAPI.HostRequest(host: host.id),
                                                    returning: DaemonAPI.HostLastHeard.self) {

@@ -7,6 +7,7 @@ import { useEffect, useRef } from "preact/hooks";
 import type { ControlHost, DirectoryEntry, DirectoryListing, RuntimeStatus } from "../protocol/generated";
 import type { Store } from "../model/store";
 import { gitRemote } from "../model/gitRemote";
+import { hostAnswers } from "../model/capabilities";
 import { chatProblem, chatProject, chatSwitchedOff } from "../model/chat";
 import { describe } from "../model/errors";
 import { emptyListRuntimeLine, noAgentRuntime } from "../model/runtimes";
@@ -53,7 +54,7 @@ export function hostLabel(store: Store, host: string): string {
 
 /** The window's menu item for a host that can't be asked: "This Mac — Not answering", a server's "— Offline". */
 function hostItem(host: ControlHost, macID: string): string {
-  if (host.state === "online") return host.id === macID ? "This Mac" : host.name;
+  if (hostAnswers(host.state)) return host.id === macID ? "This Mac" : host.name;
   return host.id === macID ? "This Mac — Not answering" : `${host.name} — Offline`;
 }
 
@@ -70,7 +71,7 @@ export function NewProjectItems({ store, onChoose }: { store: Store; onChoose?: 
   return (
     <>
       {hosts.map((host) => {
-        const offline = host.state !== "online";
+        const offline = !hostAnswers(host.state);
         return (
           <div class="new-project-host" role="group" aria-label={hostItem(host, store.macHostID.value)} key={host.id}>
             {hosts.length > 1 && <p class="menu-head">{hostItem(host, store.macHostID.value)}</p>}
@@ -120,7 +121,7 @@ export function NewProjectMenu({ store, newSession }: { store: Store; newSession
  * (#257). Install stays on the Mac.
  */
 export function EmptyProjects({ store }: { store: Store }) {
-  const online = store.hosts.value.filter((h) => h.state === "online");
+  const online = store.hosts.value.filter((h) => hostAnswers(h.state));
   const listed = online.every((h) => store.projects.value[h.id] !== undefined);
   // Archived ones are listed too (#343), and are not projects to work in.
   const none = online.every((h) => (store.projects.value[h.id] ?? []).every((p) => p.project.archivedAt !== undefined)

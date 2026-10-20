@@ -1,6 +1,7 @@
 // Why this Mac's host is quiet, in the window's words (MacHostNotice.swift, #303, #666): the
 // process is down, it is up and has no membership, its uplink keeps failing, or it isn't answering.
 import type { HostJoinStatus } from "../protocol/generated";
+import { hostAnswers } from "./capabilities";
 
 export type MacHostNotice =
   | { kind: "notRunning" }
@@ -22,12 +23,12 @@ export function decideMacHostNotice(planeOnThisMac: boolean, macState: string | 
       return { kind: "notAnswering" };
     }
     // The join says connected and the control plane's list says otherwise.
-    if (macState !== undefined && macState !== "online") return { kind: "notAnswering" };
+    if (macState !== undefined && !hostAnswers(macState)) return { kind: "notAnswering" };
     return null;
   }
-  if (!planeOnThisMac) return macState === undefined || macState === "online" ? null : { kind: "notAnswering" };
+  if (!planeOnThisMac) return macState === undefined || hostAnswers(macState) ? null : { kind: "notAnswering" };
   // Beside this Mac, a live host writes its join: no report, and not online, is the process down.
-  return macState === "online" ? null : { kind: "notRunning" };
+  return hostAnswers(macState) ? null : { kind: "notRunning" };
 }
 
 export function macHostNoticeTitle(notice: MacHostNotice): string {

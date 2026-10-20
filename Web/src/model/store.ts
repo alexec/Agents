@@ -37,7 +37,7 @@ import type { Method, Params, Result } from "../protocol/methods";
 import { dropboxRefusal, dropboxRequest } from "./dropbox";
 import { goOnRequest } from "./limits";
 import { milestonesSeen } from "./milestones";
-import { hostHas } from "./capabilities";
+import { hostAnswers, hostHas } from "./capabilities";
 import { Capability } from "../protocol/capabilities.generated";
 import type { ChartHint } from "./chart";
 
@@ -931,7 +931,7 @@ export class Work {
   /** The hosts as listed, with when each one went down noted. */
   takeHosts(hosts: ControlHost[], now = Date.now()): void {
     const since: Record<string, number> = {};
-    for (const host of hosts) if (host.state !== "online") since[host.id] = this.downSince.value[host.id] ?? now;
+    for (const host of hosts) if (!hostAnswers(host.state)) since[host.id] = this.downSince.value[host.id] ?? now;
     const still = waiting(hosts);
     batch(() => {
       this.hosts.value = hosts;
@@ -995,7 +995,7 @@ export class Work {
 
   /** Whether a host answers: online, or held back for a reason the page says. */
   hostIsOnline(host: string): boolean {
-    return this.hosts.value.find((h) => h.id === host)?.state === "online";
+    return hostAnswers(this.hosts.value.find((h) => h.id === host)?.state);
   }
 
   /** One agent: what reads it is redrawn when it changes, not when any agent on its host does (#170). */
@@ -1110,13 +1110,13 @@ export class Store extends Work {
     return this.once("*", async () => {
       const [hosts] = await Promise.all([this.link.call("hosts/list", {}), this.loadPlane(), this.loadKept()]);
       this.takeHosts(hosts);
-      await Promise.all(this.hosts.value.filter((host) => host.state === "online").map((host) => this.onHost(host.id, async () => {
+      await Promise.all(this.hosts.value.filter((host) => hostAnswers(host.state)).map((host) => this.onHost(host.id, async () => {
         // A removal that landed while this waited is not loaded back (#291).
         if (!this.hostIsOnline(host.id)) return;
         await this.loadHost(host.id);
       })));
       // One offline or stopped now lists what it last did, greyed, as the window keeps it (#962).
-      await Promise.all(this.hosts.value.filter((host) => host.state !== "online" && host.relay === undefined)
+      await Promise.all(this.hosts.value.filter((host) => !hostAnswers(host.state) && host.relay === undefined)
         .map((host) => this.onHost(host.id, () => this.loadLastHeard(host.id))));
       const watching = this.watching.value;
       if (watching) await this.loadTranscript(watching.host, watching.session);
@@ -1205,7 +1205,7 @@ export class Store extends Work {
     await this.onHost(host, async () => {
       const now = this.hosts.value.find((h) => h.id === host);
       if (!now) return this.forgetHost(host);
-      if (now.state !== "online") return this.loadLastHeard(host);
+      if (!hostAnswers(now.state)) return this.loadLastHeard(host);
       await this.loadHost(host);
       const watching = this.watching.value;
       if (watching?.host === host) await this.loadTranscript(host, watching.session);

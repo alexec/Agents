@@ -8,6 +8,7 @@ import { effect } from "@preact/signals";
 import type { Store } from "./model/store";
 import { alone } from "./route";
 import { faviconFor, iconMood, iconShowsMood, type MoodCounts } from "./model/iconMood";
+import { hostAnswers } from "./model/capabilities";
 
 const settle = 500;
 
@@ -52,7 +53,7 @@ export function startPresence(store: Store): void {
     // Every online host hears whether the person is here; the open session's host hears which
     // it is, which is where its entries come from (#203). Another host hears it shows nothing.
     for (const host of store.hosts.value) {
-      if (host.state !== "online") continue;
+      if (!hostAnswers(host.state)) continue;
       const session = shown?.host === host.id ? shown.session as never : undefined;
       void store.link.call("presence/report", { active, ...(session ? { watching: session, showing: session } : {}) }, host.id)
         .catch(() => {});

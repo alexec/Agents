@@ -24,6 +24,12 @@ test("a host without the required set says what to update it to", () => {
   assert.equal(caps.versionWords(row({ implementation: "go" })), "Agents 0.6.0 (Go)");
 });
 
+test("a host that needs an update still answers; one offline does not (#1771)", () => {
+  assert.equal(caps.hostAnswers("online"), true);
+  assert.equal(caps.hostAnswers("needsUpdate"), true);
+  for (const state of ["offline", "connecting", "failed", "stopped", undefined]) assert.equal(caps.hostAnswers(state), false, state);
+});
+
 test("the generated tables name a capability for each method", () => {
   assert.equal(generated.HostCapabilities["agents/branchFrom"], "chat.branch/1");
   assert.deepEqual(generated.DeclaredCapabilities.client, ["client.wire/1"]);

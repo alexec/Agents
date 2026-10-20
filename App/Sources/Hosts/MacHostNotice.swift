@@ -35,13 +35,13 @@ enum MacHostNotice: Equatable {
                 return .notAnswering
             }
             // The join says connected and the control plane's list says otherwise.
-            if let macState, macState != "online" { return .notAnswering }
+            if let macState, !DaemonAPI.ControlHost.answers(macState) { return .notAnswering }
             return up
         }
-        guard planeOnThisMac else { return macState == nil ? nil : (macState == "online" ? up : .notAnswering) }
+        guard planeOnThisMac else { return macState == nil ? nil : (DaemonAPI.ControlHost.answers(macState) ? up : .notAnswering) }
         // Beside this Mac, a live host writes its join. No report, and not online, means
         // the process is down. Online with no report yet is the window still connecting.
-        return macState == "online" ? up : .notRunning
+        return DaemonAPI.ControlHost.answers(macState) ? up : .notRunning
     }
 
     var title: String {

@@ -25,6 +25,20 @@ struct ControlHostCapabilitiesTests {
         #expect(host.has(Capability.chatBranch1))
     }
 
+    /// A host that needs an update is connected and answers, gated by its list (#1771).
+    @Test func aHostThatNeedsAnUpdateAnswers() throws {
+        let host = try row(#","capabilities":["agents/1"],"missing":["host.wire/1"]"#)
+        var old = host
+        old.state = "needsUpdate"
+        #expect(host.answers)
+        #expect(old.answers)
+        for state in ["offline", "connecting", "failed", "stopped"] {
+            old.state = state
+            #expect(!old.answers)
+        }
+        #expect(!DaemonAPI.ControlHost.answers(nil))
+    }
+
     @Test func theStatusSaysWhatItRequires() throws {
         let json = #"{"name":"t","version":"0.7.0","machineID":"M","capabilities":["hosts/1"],"required":{"host":["host.wire/1"],"client":["client.wire/1"]}}"#
         let status = try JSONDecoder().decode(DaemonAPI.ControlStatus.self, from: Data(json.utf8))

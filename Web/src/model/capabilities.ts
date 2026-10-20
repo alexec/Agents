@@ -7,6 +7,14 @@ import { DeclaredCapabilities } from "../protocol/capabilities.generated";
 /** Beside a feature that the host does not have. */
 export const hostNeedsUpdate = "This host needs an update to do this.";
 
+/**
+ * Whether a host in `state` answers calls: `online`, or `needsUpdate`, which is connected and
+ * serves what its list says (#1771). Its features are gated by `hostHas`.
+ */
+export function hostAnswers(state: string | undefined): boolean {
+  return state === "online" || state === "needsUpdate";
+}
+
 /** Whether a host can do what `capability` names. True for a host that said no list, or one not listed. */
 export function hostHas(hosts: readonly ControlHost[], host: string, capability: string): boolean {
   const row = hosts.find((h) => h.id === host);

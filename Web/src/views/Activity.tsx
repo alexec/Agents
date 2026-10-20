@@ -22,6 +22,7 @@ import { refusalMessage } from "../model/workflows";
 import { dayTokenLimitReached, money } from "../model/limits";
 import { UsageCharts } from "./UsageCharts";
 import { mergeUsage } from "../model/usage";
+import { hostAnswers } from "../model/capabilities";
 import { mergeTime } from "../model/time";
 import { TimeCharts } from "./TimeCharts";
 import { MilestonesSection, TimeMilestonesUnder } from "./Milestones";
@@ -150,7 +151,7 @@ function lastEvent(store: Store): Date | null {
   return times.length ? fromWireDate(Math.max(...times) as never) : null;
 }
 
-const onlineHosts = (store: Store): ControlHost[] => store.hosts.value.filter((h) => h.state === "online");
+const onlineHosts = (store: Store): ControlHost[] => store.hosts.value.filter((h) => hostAnswers(h.state));
 
 /** Asks each host for its events and its day again: on connecting, and every minute after. */
 function useActivity(store: Store): void {
@@ -479,7 +480,7 @@ function ConsequenceLine({ consequence, host, store, openAgent }: {
  * other online host, each moved into this browser's days.
  */
 function chartHosts(store: Store): string[] {
-  const online = store.hosts.value.filter((h) => h.state === "online" && h.relay === undefined).map((h) => h.id);
+  const online = store.hosts.value.filter((h) => hostAnswers(h.state) && h.relay === undefined).map((h) => h.id);
   const ids = online.length > 0 ? online : store.hosts.value.map((h) => h.id);
   const macID = store.macHostID.value;
   return [...ids.filter((id) => id === macID), ...ids.filter((id) => id !== macID)];
