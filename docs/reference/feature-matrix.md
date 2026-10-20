@@ -55,21 +55,14 @@ Agents' ◐ cells, and why:
 - **Spending limits:** in money or in tokens (#838), so only for runtimes that report a
   price or tokens. Cursor, Antigravity and Grok report neither, and run past every
   limit. See [Limit spending](../how-to/limit-spending.md).
-- **Task board:** the `github` server gives agents GitHub's issues, with nothing shown in
-  the app since the `ci` server's issues view went (#1231).
-- **Pull requests:** the `github` server gives agents GitHub's pull request tools, with
-  nothing shown in the app since the `ci` server's board and pull request page went
-  (#1231).
-- **A browser the agent drives, trackers beyond GitHub, git hosts beyond GitHub:** through
-  Playwright, Linear, Jira and GitLab servers from the MCP marketplace, with nothing shown
-  in the app. Agents' own `linear` server raises Linear's issue events for waits and
-  workflows (#839), and shows nothing either. A GitLab server of Agents' own is parked
-  (#813).
+- **Git hosts beyond GitHub:** through the GitLab server from the MCP marketplace, with
+  nothing shown in the app. A GitLab server of Agents' own is planned for 0.7 (#813).
+- **A browser the agent drives:** through the Playwright server from the MCP marketplace,
+  with nothing shown in the app.
 
 Agents has none of these at all:
 
 - Android app (#810), Windows or Linux desktop (#811).
-- Simulator panes, language servers.
 - Several accounts per runtime, teams.
 
 ## What each feature means
@@ -189,6 +182,7 @@ Agents has none of these at all:
 | Cursor | ● | ● | ○ | ● | ○ | ● | 67% |
 | Orca | ● | ◐ | ◐ | ◐ | ◐ | ● | 67% |
 | CodeAgentSwarm | ● | ◐ | ◐ | ◐ | ?⃝ | ● | 58% |
+| Nuphos | ● | ● | ◐ | ?⃝ | ○ | ● | 58% |
 | Warp | ● | ○ | ○ | ● | ◐ | ● | 58% |
 | Maestro | ● | ○ | ○ | ● | ○ | ● | 50% |
 | Roamgate | ◐ | ○ | ○ | ● | ◐ | ● | 50% |
@@ -196,7 +190,6 @@ Agents has none of these at all:
 | Vibe Kanban | ● | ○ | ○ | ● | ?⃝ | ● | 50% |
 | VibeiDE | ● | ○ | ○ | ● | ● | ?⃝ | 50% |
 | Agentastic | ○ | ◐ | ○ | ○ | ● | ● | 42% |
-| Nuphos | ● | ● | ◐ | ?⃝ | ○ | ?⃝ | 42% |
 | Superset | ◐ | ● | ○ | ○ | ?⃝ | ● | 42% |
 | DockTerm | ● | ○ | ○ | ○ | ○ | ● | 33% |
 | Emdash | ● | ○ | ○ | ○ | ○ | ● | 33% |
@@ -237,9 +230,9 @@ Agents has none of these at all:
 | Pragma | ● | ● | ◐ | ● | ?⃝ | ◐ | ?⃝ | 57% |
 | DockTerm | ● | ● | ◐ | ?⃝ | ● | ?⃝ | ?⃝ | 50% |
 | tuios | ● | ● | ◐ | ● | ?⃝ | ○ | ○ | 50% |
+| Ace | ● | ?⃝ | ● | ?⃝ | ● | ?⃝ | ?⃝ | 43% |
 | Conductor | ● | ?⃝ | ?⃝ | ● | ◐ | ◐ | ?⃝ | 43% |
 | CodeAgentSwarm | ● | ● | ◐ | ?⃝ | ?⃝ | ?⃝ | ?⃝ | 36% |
-| Ace | ● | ?⃝ | ● | ?⃝ | ?⃝ | ?⃝ | ?⃝ | 29% |
 | Helicon | ● | ?⃝ | ?⃝ | ● | ?⃝ | ?⃝ | ?⃝ | 29% |
 | ReevesAgents | ?⃝ | ● | ?⃝ | ● | ○ | ○ | ○ | 29% |
 | Roamgate | ● | ● | ?⃝ | ?⃝ | ?⃝ | ?⃝ | ○ | 29% |
@@ -257,9 +250,9 @@ Agents has none of these at all:
 | GitHub Copilot | ● | ● | ● | ● | ● | 100% |
 | Threadlines | ● | ● | ● | ● | ● | 100% |
 | Agentastic | ● | ● | ◐ | ● | ● | 90% |
+| **Agents** | ● | ● | ◐ | ● | ● | 90% |
 | Codeg | ● | ● | ● | ● | ◐ | 90% |
 | Paseo | ● | ● | ● | ● | ◐ | 90% |
-| **Agents** | ● | ◐ | ◐ | ● | ● | 80% |
 | Claude Code | ● | ● | ◐ | ● | ◐ | 80% |
 | Conductor | ● | ● | ?⃝ | ● | ● | 80% |
 | Orca | ● | ● | ● | ● | ○ | 80% |
@@ -292,6 +285,7 @@ Agents has none of these at all:
 
 | App | Terminal | Browser or preview (not scored) | A browser the agent drives | Simulator or emulator panes | File editor | Language servers in the editor | Score |
 |---|:-:|:-:|:-:|:-:|:-:|:-:|--:|
+| **Agents** | ● | ◐ | ◐ | ● | ● | ● | 90% |
 | Agentastic | ● | ● | ● | ?⃝ | ● | ● | 80% |
 | Cursor | ● | ● | ● | ?⃝ | ● | ● | 80% |
 | GitHub Copilot | ● | ● | ● | ?⃝ | ● | ● | 80% |
@@ -308,7 +302,6 @@ Agents has none of these at all:
 | Maestro | ● | ● | ● | ?⃝ | ● | ?⃝ | 60% |
 | Paseo | ● | ● | ● | ?⃝ | ● | ○ | 60% |
 | Pragma | ● | ● | ● | ?⃝ | ● | ?⃝ | 60% |
-| **Agents** | ● | ◐ | ◐ | ○ | ● | ○ | 50% |
 | Conductor | ● | ◐ | ?⃝ | ?⃝ | ● | ?⃝ | 40% |
 | DockTerm | ● | ?⃝ | ○ | ○ | ● | ○ | 40% |
 | Nuphos | ● | ● | ● | ?⃝ | ?⃝ | ?⃝ | 40% |
@@ -331,7 +324,7 @@ Agents has none of these at all:
 
 | App | Task board | Starts agents from issues | Trackers beyond GitHub | Scheduled or triggered runs | Agents start agents | The app's own tools for agents | Leases on shared resources | Wait for an event without polling | Workflows as files in the repository | Score |
 |---|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|--:|
-| **Agents** | ◐ | ● | ◐ | ● | ● | ● | ● | ● | ● | 89% |
+| **Agents** | ● | ● | ● | ● | ● | ● | ● | ● | ● | 100% |
 | Orca | ● | ● | ● | ● | ● | ● | ○ | ◐ | ○ | 72% |
 | Superset | ● | ● | ● | ● | ● | ● | ?⃝ | ◐ | ?⃝ | 72% |
 | Agentastic | ● | ● | ● | ● | ● | ● | ?⃝ | ?⃝ | ○ | 67% |
@@ -358,8 +351,8 @@ Agents has none of these at all:
 | tuios | ?⃝ | ?⃝ | ?⃝ | ◐ | ● | ● | ○ | ◐ | ○ | 33% |
 | Threadlines | ?⃝ | ?⃝ | ?⃝ | ◐ | ● | ● | ○ | ○ | ○ | 28% |
 | Vibe Kanban | ○ | ?⃝ | ◐ | ?⃝ | ● | ● | ○ | ○ | ○ | 28% |
+| Ace | ● | ?⃝ | ?⃝ | ?⃝ | ?⃝ | ● | ?⃝ | ?⃝ | ?⃝ | 22% |
 | ReevesAgents | ?⃝ | ○ | ?⃝ | ○ | ● | ● | ○ | ○ | ○ | 22% |
-| Ace | ◐ | ?⃝ | ?⃝ | ?⃝ | ?⃝ | ● | ?⃝ | ?⃝ | ?⃝ | 17% |
 | Roamgate | ?⃝ | ?⃝ | ?⃝ | ◐ | ◐ | ?⃝ | ○ | ○ | ○ | 11% |
 | VibeiDE | ● | ?⃝ | ?⃝ | ?⃝ | ?⃝ | ?⃝ | ?⃝ | ?⃝ | ?⃝ | 11% |
 | Helicon | ?⃝ | ?⃝ | ?⃝ | ?⃝ | ?⃝ | ?⃝ | ○ | ◐ | ○ | 6% |
@@ -450,8 +443,8 @@ Each app's score in every table, and overall: its points over the 49 scored feat
 
 | Rank | App | Running | Reach | Following | Reviewing | Tools | Tasks | Extensions | Organising | Overall |
 |--:|---|--:|--:|--:|--:|--:|--:|--:|--:|--:|
-| 1 | **Agents** | 100% | 67% | 100% | 80% | 50% | 89% | 70% | 83% | **82%** |
-| 1 | GitHub Copilot | 92% | 83% | 100% | 100% | 80% | 61% | 100% | 50% | **82%** |
+| 1 | **Agents** | 100% | 67% | 100% | 90% | 90% | 100% | 70% | 83% | **89%** |
+| 2 | GitHub Copilot | 92% | 83% | 100% | 100% | 80% | 61% | 100% | 50% | **82%** |
 | 3 | Paseo | 100% | 100% | 71% | 90% | 60% | 61% | 60% | 100% | **80%** |
 | 4 | Cursor | 83% | 67% | 86% | 100% | 80% | 67% | 80% | 50% | **76%** |
 | 5 | Claude Code | 67% | 83% | 79% | 80% | 70% | 67% | 80% | 67% | **73%** |
@@ -465,8 +458,8 @@ Each app's score in every table, and overall: its points over the 49 scored feat
 | 13 | T3 Code | 83% | 92% | 64% | 80% | 80% | 39% | 40% | 67% | **66%** |
 | 14 | Pragma | 75% | 83% | 57% | 60% | 60% | 50% | 60% | 50% | **61%** |
 | 15 | Threadlines | 83% | 50% | 71% | 100% | 40% | 28% | 60% | 67% | **60%** |
-| 16 | Happy | 92% | 100% | 64% | 30% | 20% | 33% | 40% | 67% | **56%** |
-| 16 | Nuphos | 83% | 42% | 64% | 70% | 40% | 44% | 20% | 83% | **56%** |
+| 16 | Nuphos | 83% | 58% | 64% | 70% | 40% | 44% | 20% | 83% | **58%** |
+| 17 | Happy | 92% | 100% | 64% | 30% | 20% | 33% | 40% | 67% | **56%** |
 | 18 | Emdash | 83% | 33% | 57% | 70% | 70% | 33% | 40% | 67% | **55%** |
 | 19 | Maestro | 50% | 50% | 57% | 50% | 60% | 56% | 60% | 50% | **54%** |
 | 20 | Parallel Code | 67% | 75% | 79% | 60% | 20% | 44% | 20% | 33% | **51%** |
@@ -477,8 +470,8 @@ Each app's score in every table, and overall: its points over the 49 scored feat
 | 25 | tuios | 83% | 33% | 50% | 60% | 20% | 33% | 30% | 33% | **43%** |
 | 25 | Vibe Kanban | 67% | 50% | 29% | 60% | 30% | 28% | 20% | 67% | **43%** |
 | 27 | Sculptor | 58% | 33% | 29% | 80% | 20% | 33% | 20% | 33% | **38%** |
+| 28 | Ace | 33% | 17% | 43% | 40% | 60% | 22% | 60% | 33% | **37%** |
 | 28 | Roamgate | 67% | 50% | 29% | 80% | 20% | 11% | 0% | 50% | **37%** |
-| 29 | Ace | 33% | 17% | 29% | 40% | 60% | 17% | 60% | 33% | **34%** |
 | 30 | Helicon | 42% | 33% | 29% | 20% | 0% | 6% | 40% | 67% | **29%** |
 | 30 | VibeiDE | 50% | 50% | 29% | 40% | 30% | 11% | 20% | 8% | **29%** |
 | 32 | DockTerm | 17% | 33% | 50% | 20% | 40% | 0% | 20% | 33% | **26%** |
