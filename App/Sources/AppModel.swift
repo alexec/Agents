@@ -4964,13 +4964,17 @@ final class AppModel {
             returning: DaemonAPI.FileDiagnostics.self)
     }
 
-    /// What the file's language server would write at a line and column (#844).
-    func complete(path: String, text: String, line: Int, column: Int, of agentID: UUID) async -> [DaemonAPI.FileCompletion] {
-        let found = try? await client(forAgent: agentID).call(
-            DaemonAPI.Method.filesComplete,
-            DaemonAPI.FileCompletionRequest(agentID: agentID, path: path, text: text, line: line, column: column),
-            returning: DaemonAPI.FileCompletions.self)
-        return found?.items ?? []
+    /// What the file's language server would write at a line and column (#844), or why
+    /// there is nothing: the host's reason, or the failure (#1688).
+    func complete(path: String, text: String, line: Int, column: Int, of agentID: UUID) async -> DaemonAPI.FileCompletions {
+        do {
+            return try await client(forAgent: agentID).call(
+                DaemonAPI.Method.filesComplete,
+                DaemonAPI.FileCompletionRequest(agentID: agentID, path: path, text: text, line: line, column: column),
+                returning: DaemonAPI.FileCompletions.self)
+        } catch {
+            return DaemonAPI.FileCompletions(items: [], reason: DaemonAPI.FileCompletions.failure(error))
+        }
     }
 
     // MARK: Simulators

@@ -7,6 +7,7 @@ import { useEffect, useLayoutEffect, useRef } from "preact/hooks";
 import type { Store } from "../../model/store";
 import type { FileCompletion, FileDiagnostic, FileDiagnostics } from "../../protocol/generated";
 import { nameOf } from "./paneState";
+import { describe } from "../../model/errors";
 
 const settle = 700;
 
@@ -47,6 +48,14 @@ export function SourceEditor({ store, host, agentID, path, text, line }: {
   /** The language server's words for the caret's place (#844), while the list is up. */
   const offered = useSignal<FileCompletion[] | null>(null);
   const chosen = useSignal(0);
+  /** Why an asked completion brought nothing, shown for a moment (#1688). */
+  const note = useSignal<string | null>(null);
+  const noteTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const say = (words: string) => {
+    note.value = words;
+    if (noteTimer.current) clearTimeout(noteTimer.current);
+    noteTimer.current = setTimeout(() => { note.value = null; }, 4000);
+  };
   const ask = async () => {
     const el = field.current;
     if (!el) return;
@@ -54,14 +63,15 @@ export function SourceEditor({ store, host, agentID, path, text, line }: {
     const line = before.split("\n").length;
     const column = before.length - (before.lastIndexOf("\n") + 1) + 1;
     const found = await store.link.call("files/complete", { agentID: agentID as never, path, text: el.value, line, column }, host)
-      .catch(() => null);
+      .catch((error: unknown) => ({ items: [], reason: `Couldn't ask for completions: ${describe(error)}` }));
     // As the Mac's list: those that start with the word being typed, or all when none do.
     const typedWord = (/[A-Za-z0-9_]*$/.exec(before)?.[0] ?? "").toLowerCase();
-    const items = found?.items ?? [];
+    const items = found.items;
     const matching = items.filter((item) => (item.insert ?? item.label).toLowerCase().startsWith(typedWord));
     const shown = matching.length ? matching : items;
     offered.value = shown.length ? shown : null;
     chosen.value = 0;
+    if (!shown.length) say(found.reason ?? "No completions here.");
   };
   /** The word being typed, before the caret, goes; the chosen one takes its place. */
   const take = (item: FileCompletion) => {
@@ -128,7 +138,8 @@ export function SourceEditor({ store, host, agentID, path, text, line }: {
         }}
         onKeyDown={(e) => {
           // Ctrl+Space asks the language server what to write here (#844); the list takes the arrows.
-          if (e.key === " " && e.ctrlKey) { e.preventDefault(); void ask(); return; }
+          // Alt+Esc too, the Mac's own key, as a Mac takes Ctrl+Space for the input source (#1688).
+          if ((e.key === " " && e.ctrlKey) || (e.key === "Escape" && e.altKey)) { e.preventDefault(); void ask(); return; }
           const list = offered.value;
           if (!list) return;
           if (e.key === "Escape") { e.preventDefault(); offered.value = null; }
@@ -139,7 +150,7 @@ export function SourceEditor({ store, host, agentID, path, text, line }: {
         }}
         onBlur={() => void save()} />
       {offered.value && (
-        <div class="completions" role="listbox" aria-label="Completions">
+        <div class="source-completions" role="listbox" aria-label="Completions">
           {offered.value.map((item, i) => (
             <button key={i} type="button" role="option" aria-selected={i === chosen.value} class={`completion${i === chosen.value ? " chosen" : ""}`}
               onMouseDown={(e) => { e.preventDefault(); take(item); }}>
@@ -148,6 +159,8 @@ export function SourceEditor({ store, host, agentID, path, text, line }: {
           ))}
         </div>
       )}
+      {note.value && <p class="faint small completion-note" role="status">{note.value}</p>}
+      {problems.value?.server && canEdit && !note.value && <p class="faint small completion-note">Ctrl+Space or Alt+Esc: complete</p>}
       {problems.value && <Problems found={problems.value} goTo={goTo} />}
     </>
   );
