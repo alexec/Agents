@@ -11,7 +11,7 @@ import (
 // where the control plane runs. An API preset (#1119, the -api ones) needs only a token,
 // given as the provider's secret. None asks for sudo.
 var PresetNames = []string{"docker", "doctl", "codespaces", "coder", "gcloud-workstations",
-	"digitalocean-api", "codespaces-api", "coder-api", "aws-ec2-api"}
+	"digitalocean-api", "codespaces-api", "coder-api", "aws-ec2-api", "gcp-compute-api"}
 
 // The secrets the API presets read their tokens from.
 const (
@@ -41,6 +41,8 @@ func expandPreset(name string, o map[string]any) (Config, error) {
 		return coderAPI(o)
 	case "aws-ec2-api":
 		return awsEC2API(o)
+	case "gcp-compute-api":
+		return gcpComputeAPI(o)
 	}
 	return Config{}, ConfigError("no preset " + name + "; there are " + strings.Join(PresetNames, ", "))
 }
@@ -162,6 +164,10 @@ func workstations(o map[string]any) (Config, error) {
 		}
 		flags += " --" + key + "=" + ShellQuoted(value)
 	}
+	// Without a project, gcloud's own default one (core/project).
+	if project, _ := o["project"].(string); project != "" {
+		flags += " --project=" + ShellQuoted(project)
+	}
 	return newConfig(nil, &Listing{
 		Command: "gcloud workstations list" + flags + " --format='value(name.basename(),state)'",
 		Shape:   Shape{Columns: []string{"id", "state"}},
@@ -169,7 +175,7 @@ func workstations(o map[string]any) (Config, error) {
 			Stop: "gcloud workstations stop ${id}" + flags,
 			SSH:  optional(o["ssh"]), Tunnel: true},
 	}, map[string]State{"state_running": Running, "state_starting": Starting, "state_stopping": Stopping,
-		"state_stopped": Stopped, "state_reconciling": Starting}, Making{}), nil
+		"state_stopped": Stopped, "state_reconciling": Starting, "reconciling": Starting}, Making{}), nil
 }
 
 // api is a preset's API address: the given one (a proxy, or a test's server), or its
@@ -373,4 +379,117 @@ func awsEC2API(o map[string]any) (Config, error) {
 			SSH:         ptr(user + "@${ip}"), Tunnel: tunnel},
 	}, map[string]State{"pending": Starting, "running": Running, "stopping": Stopping, "stopped": Stopped,
 		"shutting-down": Stopping, "terminated": Stopped}, Making{}), nil
+}
+
+// gcpName is a Google Cloud project or zone name: lower-case letters, digits and dashes.
+func gcpName(value, what string) error {
+	if value == "" {
+		return ConfigError("the gcp-compute-api preset needs a " + what)
+	}
+	for _, r := range value {
+		if !(r >= 'a' && r <= 'z' || r >= '0' && r <= '9' || r == '-') {
+			return ConfigError("the gcp-compute-api preset's " + what + " is lower-case letters, digits and dashes")
+		}
+	}
+	return nil
+}
+
+// gcpStartup is a new VM's startup script. Compute Engine runs it as root at every boot, so
+// it does its work once: it makes a user, agents, gives it the keys in the VM's
+// agents-ssh-keys metadata, and installs Agents as that user (a host never runs as root).
+// The keys are not in Google's ssh-keys metadata, whose user the guest agent puts in
+// google-sudoers. Linger starts the agents user's systemd at boot, so the host starts with
+// the VM.
+const gcpStartup = `#!/bin/sh
+[ -f /var/lib/agents-first-boot-done ] && exit 0
+touch /var/lib/agents-first-boot-done
+id -u agents >/dev/null 2>&1 || useradd -m -s /bin/bash agents
+mkdir -p /home/agents/.ssh
+curl -fsS -H 'Metadata-Flavor: Google' \
+  http://metadata.google.internal/computeMetadata/v1/instance/attributes/agents-ssh-keys \
+  >> /home/agents/.ssh/authorized_keys 2>/dev/null
+chown -R agents:agents /home/agents/.ssh
+chmod 700 /home/agents/.ssh
+chmod 600 /home/agents/.ssh/authorized_keys
+loginctl enable-linger agents
+uid=$(id -u agents)
+i=0
+while [ ! -S "/run/user/$uid/bus" ] && [ $i -lt 30 ]; do sleep 1; i=$((i + 1)); done
+cat > /home/agents/first-boot.sh <<'FIRSTBOOT'
+${firstBoot}
+FIRSTBOOT
+chown agents:agents /home/agents/first-boot.sh
+su - agents -c "XDG_RUNTIME_DIR=/run/user/$uid sh ~/first-boot.sh"
+rm -f /home/agents/first-boot.sh
+`
+
+// gcpComputeAPI is Compute Engine VMs with a label, in one project and zone, through the
+// Compute Engine API with a service account's key in GOOGLE_SERVICE_ACCOUNT_KEY (#1346):
+// nothing to install. Each is reached by plain ssh to its external address. New Workspace…
+// makes a VM with the label whose startup script installs Agents once, reachable as agents
+// with the keys in sshKeys (public key lines); Delete deletes it.
+// Only labelled VMs are listed, so a VM without the label is never started, stopped or
+// deleted.
+func gcpComputeAPI(o map[string]any) (Config, error) {
+	project, _ := o["project"].(string)
+	if err := gcpName(project, "project"); err != nil {
+		return Config{}, err
+	}
+	zone, _ := o["zone"].(string)
+	if err := gcpName(zone, "zone"); err != nil {
+		return Config{}, err
+	}
+	label, ok := o["label"].(string)
+	if !ok || label == "" {
+		label = "agents"
+	}
+	if err := gcpName(label, "label"); err != nil {
+		return Config{}, err
+	}
+	base, err := api(o, "https://compute.googleapis.com", "gcp-compute-api")
+	if err != nil {
+		return Config{}, err
+	}
+	user, ok := o["user"].(string)
+	if !ok || user == "" {
+		user = "agents"
+	}
+	tunnel, _ := o["tunnel"].(bool)
+	auth := &GoogleAuth{Scope: "https://www.googleapis.com/auth/compute"}
+	instances := base + "/compute/v1/projects/" + project + "/zones/" + zone + "/instances"
+	metadata := []any{map[string]any{"key": "startup-script", "value": gcpStartup}}
+	if keys := strings_(o["sshKeys"]); len(keys) > 0 {
+		metadata = append(metadata, map[string]any{"key": "agents-ssh-keys", "value": strings.Join(keys, "\n") + "\n"})
+	}
+	text := func(title, value, description string) map[string]any {
+		return map[string]any{"type": "string", "title": title, "default": value, "description": description}
+	}
+	return newConfig(nil, &Listing{
+		Request: &Request{Method: "GET", URL: instances + "?filter=" + url.QueryEscape("labels."+label+":*"), Google: auth},
+		Shape: Shape{Items: "items", Fields: map[string]string{"id": "name", "name": "name", "state": "status",
+			"ip": "networkInterfaces[0].accessConfigs[0].natIP"}},
+		Commands: Commands{
+			StartRequest: &Request{Method: "POST", URL: instances + "/${id}/start", Google: auth},
+			StopRequest:  &Request{Method: "POST", URL: instances + "/${id}/stop", Google: auth},
+			SSH:          ptr(user + "@${ip}"), Tunnel: tunnel},
+	}, map[string]State{"provisioning": Starting, "staging": Starting, "running": Running, "stopping": Stopping,
+		"suspending": Stopping, "terminated": Stopped, "stopped": Stopped, "suspended": Stopped}, Making{
+		CreateRequest: &Request{Method: "POST", URL: instances, Google: auth, Body: map[string]any{
+			"name":        "${name}",
+			"machineType": "zones/" + zone + "/machineTypes/${machineType}",
+			"labels":      map[string]any{label: ""},
+			"disks": []any{map[string]any{"boot": true, "autoDelete": true,
+				"initializeParams": map[string]any{"sourceImage": "${image}", "diskSizeGb": "${diskSizeGb}"}}},
+			"networkInterfaces": []any{map[string]any{"network": "global/networks/default",
+				"accessConfigs": []any{map[string]any{"type": "ONE_TO_ONE_NAT", "name": "External NAT"}}}},
+			"metadata": map[string]any{"items": metadata},
+		}},
+		DeleteRequest: &Request{Method: "DELETE", URL: instances + "/${id}", Google: auth},
+		Options: map[string]any{"type": "object", "properties": map[string]any{
+			"machineType": text("Machine type", "e2-small", "Such as e2-small or e2-standard-2."),
+			"image": text("Image", "projects/debian-cloud/global/images/family/debian-12",
+				"An image with systemd, such as projects/debian-cloud/global/images/family/debian-12."),
+			"diskSizeGb": text("Disk (GB)", "20", "The boot disk's size."),
+		}},
+	}), nil
 }

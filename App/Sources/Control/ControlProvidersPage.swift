@@ -25,7 +25,7 @@ struct ControlProvidersPage: View {
                     providerCard(provider)
                 }
                 Button("Add Provider…") { adding = true }.buttonStyle(.paper)
-                Text("A provider starts and stops the machines your hosts run on: Docker containers, DigitalOcean Droplets, GitHub Codespaces, Coder workspaces, Google Cloud Workstations, or anything with a command. It runs here, on the control plane, so it can start a host that is down.")
+                Text("A provider starts and stops the machines your hosts run on: Docker containers, DigitalOcean Droplets, GitHub Codespaces, Coder workspaces, Google Cloud Workstations and Compute Engine VMs, AWS EC2 instances, or anything with a command. It runs here, on the control plane, so it can start a host that is down.")
                     .appText(.supporting).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -197,7 +197,7 @@ struct AddProviderSheet: View {
     var editing: DaemonAPI.ProviderSummary?
 
     enum Kind: String, CaseIterable, Identifiable {
-        case docker, digitalOcean, codespaces, coder, workstations, aws, commands, mcp
+        case docker, digitalOcean, codespaces, coder, workstations, compute, aws, commands, mcp
         var id: String { rawValue }
 
         var title: String {
@@ -207,6 +207,7 @@ struct AddProviderSheet: View {
             case .codespaces: "GitHub Codespaces"
             case .coder: "Coder Workspaces"
             case .workstations: "Google Cloud Workstations"
+            case .compute: "Google Compute Engine VMs"
             case .aws: "AWS EC2 Instances"
             case .commands: "Your commands"
             case .mcp: "MCP server"
@@ -220,6 +221,7 @@ struct AddProviderSheet: View {
             case .codespaces: "chevron.left.forwardslash.chevron.right"
             case .coder: "terminal"
             case .workstations: "cloud"
+            case .compute: "cpu"
             case .aws: "server.rack"
             case .commands: "apple.terminal"
             case .mcp: "point.3.connected.trianglepath.dotted"
@@ -233,7 +235,9 @@ struct AddProviderSheet: View {
             case .digitalOcean: "Needs doctl, signed in, on the Mac that runs the control plane."
             case .codespaces: "Needs gh, signed in, on the Mac that runs the control plane."
             case .coder: "Needs coder, signed in, and `coder config-ssh` run, on the Mac that runs the control plane."
-            case .workstations: "Needs gcloud, signed in, on the Mac that runs the control plane."
+            case .workstations: "Needs gcloud, signed in, on the Mac that runs the control plane, and a host in its ssh config that reaches the workstation’s port 22 through `gcloud workstations start-tcp-tunnel`."
+            case .compute:
+                "Needs a service account’s JSON key, with the smallest role: compute.instances.list, start and stop, and for New Workspace… compute.instances.create, delete, setMetadata and setLabels, compute.disks.create, and compute.subnetworks.use and useExternalIp. ssh goes to each VM’s external address, so the network must let in port 22, and a static address keeps it the same after a stop (#1691). Nothing to install."
             case .aws:
                 "Needs an IAM user’s access key, with the smallest policy: ec2:DescribeInstances on all resources, and ec2:StartInstances and ec2:StopInstances only on instances that have the tag (the condition aws:ResourceTag/‹tag› not Null). Nothing to install."
             case .commands: "The commands run on the Mac that runs the control plane, as you."
@@ -249,6 +253,7 @@ struct AddProviderSheet: View {
             case "codespaces", "codespaces-api": .codespaces
             case "coder", "coder-api": .coder
             case "gcloud-workstations": .workstations
+            case "gcp-compute-api": .compute
             case "aws-ec2-api": .aws
             default: nil
             }
@@ -312,6 +317,11 @@ struct AddProviderSheet: View {
     @State private var deployment = ""
     @State private var accessKey = ""
     @State private var secretKey = ""
+    @State private var project = ""
+    @State private var sshKey = ""
+    @State private var serviceKey = ""
+    @State private var serviceAccount = ""
+    @State private var choosingKey = false
     // Your commands
     @State private var cli = ""
     @State private var workspace = ""
@@ -407,7 +417,12 @@ struct AddProviderSheet: View {
         kind = each
         problem = nil
         byCLI = false
-        user = each == .aws ? "ec2-user" : "root"
+        user = switch each {
+        case .aws: "ec2-user"
+        case .compute: "agents"
+        default: "root"
+        }
+        if each == .compute { region = "" }
         name = switch each {
         case .docker: "Docker Containers on this Mac"
         case .commands, .mcp: ""
@@ -458,6 +473,20 @@ struct AddProviderSheet: View {
                 TextField("Cluster", text: $cluster)
                 TextField("Configuration", text: $config)
                 TextField("Region", text: $region)
+                TextField("Project", text: $project, prompt: Text("gcloud’s default"))
+                TextField("ssh", text: $ssh, prompt: Text("A host in your ssh config"))
+            case .compute:
+                TextField("Project", text: $project)
+                TextField("Zone", text: $region, prompt: Text("us-west1-b"))
+                TextField("VMs labelled", text: $tag)
+                TextField("ssh as", text: $user)
+                TextField("ssh key for new VMs", text: $sshKey, prompt: Text(verbatim: "ssh-ed25519 AAAA…"))
+                LabeledContent("Service account key") {
+                    HStack {
+                        Text(serviceAccount.isEmpty ? "None" : serviceAccount).foregroundStyle(.secondary)
+                        Button("Choose Key File…") { choosingKey = true }
+                    }
+                }
             case .aws:
                 TextField("Region", text: $region, prompt: Text("us-east-1"))
                 TextField("Instances tagged", text: $tag)
@@ -469,9 +498,13 @@ struct AddProviderSheet: View {
             case .mcp:
                 mcpForm
             }
-            if editing == nil, !(kind.hasAPI && !byCLI), kind != .aws { secretsSection }
+            if editing == nil, !(kind.hasAPI && !byCLI), kind != .aws, kind != .compute { secretsSection }
         }
         .formStyle(.grouped)
+        .fileImporter(isPresented: $choosingKey, allowedContentTypes: [.json]) { result in
+            guard case .success(let file) = result else { return }
+            readServiceKey(file)
+        }
         if let needs = (kind.hasAPI && !byCLI ? kind.apiNeeds : kind.needs), editing == nil {
             Text(needs).appText(.supporting).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
         }
@@ -508,8 +541,23 @@ struct AddProviderSheet: View {
                 .keyboardShortcut(.defaultAction)
                 .disabled(working || writing || name.trimmingCharacters(in: .whitespaces).isEmpty
                           || (editing != nil && written == nil) || (kind.hasAPI && !byCLI && token.isEmpty)
-                          || (kind == .aws && (trimmed(accessKey).isEmpty || secretKey.isEmpty || trimmed(region).isEmpty)))
+                          || (kind == .aws && (trimmed(accessKey).isEmpty || secretKey.isEmpty || trimmed(region).isEmpty))
+                          || (kind == .compute && (serviceKey.isEmpty || trimmed(project).isEmpty || trimmed(region).isEmpty)))
         }
+    }
+
+    /// A Google service account's JSON key, read once: only its email is shown.
+    private func readServiceKey(_ file: URL) {
+        let opened = file.startAccessingSecurityScopedResource()
+        defer { if opened { file.stopAccessingSecurityScopedResource() } }
+        guard let data = try? Data(contentsOf: file),  // store-ok: a file chosen in the open panel
+              let email = (try? JSONValue.parse(data))?.objectValue?["client_email"]?.stringValue else {
+            problem = "That file isn’t a service account’s JSON key."
+            return
+        }
+        serviceKey = String(decoding: data, as: UTF8.self)
+        serviceAccount = email
+        problem = nil
     }
 
     /// API or CLI, for a kind that has both: the API first, as it needs nothing installed.
@@ -882,9 +930,19 @@ struct AddProviderSheet: View {
                         "user": .string(trimmed(user).isEmpty ? "ec2-user" : trimmed(user))]
             return DaemonAPI.ProviderAdd(name: name, kind: .commands, commands: .object(commands),
                                          secrets: ["AWS_ACCESS_KEY_ID": trimmed(accessKey), "AWS_SECRET_ACCESS_KEY": secretKey])
+        case .compute:
+            // The key goes in only as the provider's secret, never in its configuration.
+            commands = ["preset": "gcp-compute-api", "project": .string(trimmed(project)), "zone": .string(trimmed(region)),
+                        "label": .string(trimmed(tag).isEmpty ? "agents" : trimmed(tag)),
+                        "user": .string(trimmed(user).isEmpty ? "agents" : trimmed(user))]
+            if !trimmed(sshKey).isEmpty { commands["sshKeys"] = [.string(trimmed(sshKey))] }
+            return DaemonAPI.ProviderAdd(name: name, kind: .commands, commands: .object(commands),
+                                         secrets: ["GOOGLE_SERVICE_ACCOUNT_KEY": serviceKey])
         case .workstations:
             commands = ["preset": "gcloud-workstations", "cluster": .string(trimmed(cluster)),
                         "config": .string(trimmed(config)), "region": .string(trimmed(region))]
+            if !trimmed(project).isEmpty { commands["project"] = .string(trimmed(project)) }
+            if !trimmed(ssh).isEmpty { commands["ssh"] = .string(trimmed(ssh)) }
         case .commands:
             return DaemonAPI.ProviderAdd(name: name, kind: .commands, commands: try commandsJSON(), secrets: given)
         case .mcp:

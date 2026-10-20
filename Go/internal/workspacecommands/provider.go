@@ -82,6 +82,8 @@ type Provider struct {
 	// os.LookupEnv when nil.
 	Fetch Fetcher
 	Env   Environment
+	// google keeps Google Cloud's access tokens until they end.
+	google googleTokens
 
 	mu   sync.Mutex
 	left map[string]State
@@ -189,7 +191,12 @@ func (p *Provider) listed(listing Listing) ([]Workspace, error) {
 		}
 	} else {
 		value, err := read(outcome.Output)
-		array, ok := PathValue(listing.Shape.Items, value).([]any)
+		found := PathValue(listing.Shape.Items, value)
+		array, ok := found.([]any)
+		// An API leaves its list out when it is empty (Compute Engine's items).
+		if _, isObject := value.(map[string]any); err == nil && found == nil && isObject && listing.Request != nil {
+			array, ok = []any{}, true
+		}
 		if err != nil || !ok {
 			at := listing.Shape.Items
 			if at == "" {
