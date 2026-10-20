@@ -152,17 +152,17 @@ func failure(res *http.Response, body []byte) *GitLabError {
 	case http.StatusTooManyRequests:
 		return &GitLabError{Kind: RateLimited, Message: "GitLab rate limit", RetryAfterMs: retryAfter(res.Header)}
 	case http.StatusNotFound:
-		return &GitLabError{Kind: NotFound, Message: "not found on GitLab"}
+		return &GitLabError{Kind: NotFound, Message: "not found on GitLab", Refused: true}
 	case http.StatusForbidden:
 		if strings.Contains(words, "insufficient_scope") {
-			return &GitLabError{Kind: Failed, Message: "GitLab refused: the token needs the api scope"}
+			return &GitLabError{Kind: Failed, Message: "GitLab refused: the token needs the api scope", Refused: true}
 		}
 	}
 	message := fmt.Sprintf("GitLab: HTTP %d", res.StatusCode)
 	if words != "" {
 		message += ": " + words
 	}
-	return &GitLabError{Kind: Failed, Message: message}
+	return &GitLabError{Kind: Failed, Message: message, Refused: res.StatusCode == http.StatusForbidden}
 }
 
 func retryAfter(h http.Header) int {

@@ -949,13 +949,26 @@ export interface ConnectorProof {
 }
 
 /**
- * A project's Connectors set-up (#1336): its GitHub repository, the person's connection, four slots
- * that each prove themselves with one read, and the events.
+ * A project's Connectors set-up (#1336): its GitHub or GitLab repository (#1632), the person's
+ * connection to that forge, four slots that each prove themselves with one read, and the events.
  */
 export interface ConnectorSetup {
   folder: string;
-  /** owner/name, from the project's git remote (origin first). Absent with no GitHub remote. */
+  /**
+   * owner/name on GitHub, or group/project on GitLab, from the project's git remote (origin first).
+   * Absent with no GitHub or GitLab remote.
+   */
   repository?: string;
+  /**
+   * The forge the repository is on, which fills Tasks, Code review and CI: github or gitlab
+   * (#1632). Absent is github.
+   */
+  forge?: ConnectionProvider;
+  /**
+   * The repository's host, as the page says it before the repository: github.com, gitlab.com, or a
+   * self-managed GitLab's host.
+   */
+  site?: string;
   connection?: Connection;
   /** Whether the Agents App is installed on the repository. Absent when not known. */
   installed?: boolean;
@@ -5053,7 +5066,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ConnectionsList: { required: ["connections"], optional: [] },
   ConnectorEvents: { required: ["state", "names", "workflows"], optional: ["server", "message"] },
   ConnectorProof: { required: ["title"], optional: ["number", "outcome", "url", "at"] },
-  ConnectorSetup: { required: ["folder", "slots", "events", "done"], optional: ["repository", "connection", "installed", "installURL", "repositories"] },
+  ConnectorSetup: { required: ["folder", "slots", "events", "done"], optional: ["repository", "forge", "site", "connection", "installed", "installURL", "repositories"] },
   ConnectorSetupRequest: { required: ["folder"], optional: ["reading"] },
   ConnectorSkipRequest: { required: ["folder", "slot", "skipped"], optional: [] },
   ConnectorSlot: { required: ["slot", "choice", "state"], optional: ["proof", "readAt", "message"] },

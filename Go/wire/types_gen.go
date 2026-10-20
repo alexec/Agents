@@ -1102,11 +1102,15 @@ type ConnectorProof struct {
 	At      *Date   `json:"at,omitzero"`
 }
 
-// A project's Connectors set-up (#1336): its GitHub repository, the person's connection, four slots that each prove themselves with one read, and the events.
+// A project's Connectors set-up (#1336): its GitHub or GitLab repository (#1632), the person's connection to that forge, four slots that each prove themselves with one read, and the events.
 type ConnectorSetup struct {
 	Folder string `json:"folder"`
-	// owner/name, from the project's git remote (origin first). Absent with no GitHub remote.
-	Repository *string     `json:"repository,omitzero"`
+	// owner/name on GitHub, or group/project on GitLab, from the project's git remote (origin first). Absent with no GitHub or GitLab remote.
+	Repository *string `json:"repository,omitzero"`
+	// The forge the repository is on, which fills Tasks, Code review and CI: github or gitlab (#1632). Absent is github.
+	Forge *ConnectionProvider `json:"forge,omitzero"`
+	// The repository's host, as the page says it before the repository: github.com, gitlab.com, or a self-managed GitLab's host.
+	Site       *string     `json:"site,omitzero"`
 	Connection *Connection `json:"connection,omitzero"`
 	// Whether the Agents App is installed on the repository. Absent when not known.
 	Installed  *bool   `json:"installed,omitzero"`
