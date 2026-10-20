@@ -59,6 +59,9 @@ node $S eval '<js>'                 # list fields: inputs, ids, names
 node $S click '#id'                 # or 'text=Continue'
 node $S type '#email' 'name@example.com'
 node $S type-secret '#password' 'agents-signup:example.com#name@example.com'
+node $S keys '#email' 'name@example.com'   # real keystrokes, for forms that refuse set values
+node $S keys '#password' 'kc:agents-signup:example.com#name@example.com'
+node $S mclick 'text=Continue'      # a real mouse click
 node $S shot /tmp/x.png             # never while a card number shows
 node $S stop                        # when done
 ```
@@ -124,7 +127,25 @@ What the 0.7 sign-ups found (2026-10-19). Pages change; read the page before you
 
 ### AWS (EC2 only, $20/month)
 
-- Never make root access keys. Make an IAM user whose policy allows only EC2 describe,
-  start, stop and run/terminate on instances with an Agents tag. Its key goes in
-  `~/.agents/secrets/aws-ec2` (credentials-file format).
+- AWS's forms check how values arrive: values set by `type` fail with "Sorry, there was an
+  error processing your request". Use `keys` and `mclick` for every field and button.
+- Cookies: the `awsccc` banner starts with every optional group on in the US. Open Cookie
+  Preferences, turn off Performance, Functional and Advertising, save.
+- Choose the **Free plan**: it can go to Paid later, Paid cannot go back, and Free cannot
+  charge the card. No phone check or CAPTCHA came.
+- Card: AWS places a $1 hold. It refused one Privacy.com card ("problem with your payment
+  information") and took another. After a refusal the sign-up stops: go to Billing, Payment
+  preferences, Add payment method, make the other card the default, then open the sign-up
+  URL again and it finishes. If Alex lets the agent type the card, read it into an
+  environment variable inside the command (`CARD_NO=$(…) node $S keys '<css>' env:CARD_NO`)
+  so the number never reaches the transcript.
+- Never make root access keys. Root MFA is Alex's. Make an IAM user (`agents-ec2`) whose
+  policy allows only EC2 describe, start, stop and run/terminate on instances with an Agents
+  tag; keep a copy of the policy in `.agents/signups/`. Its key goes in
+  `~/.agents/secrets/aws-ec2` (credentials-file format, profile `agents-ec2`). The
+  access-key description refuses "~".
+- The IAM policy editor is Ace: never call `ace.edit()` from outside (it makes a second
+  editor the page does not see). Focus `.ace_text-input`, real ⌘A and Backspace, then
+  `Input.insertText` of the minified JSON.
+- Console tour pop-ups block clicks: press their Next or Done first.
 - Turn on a $20/month budget with an email alert (AWS Budgets).
