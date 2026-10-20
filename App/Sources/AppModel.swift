@@ -2849,9 +2849,12 @@ final class AppModel {
         // so the window and the phone cannot drift apart. What is left here is the
         // Mac's own: the shells and terminals a phone has no business with.
         if let update {
+            // A project added has workflows no notification brings (#1798).
+            let added = work.addsProject(update)
             work.apply(update)
             applyToPopouts(update)
             if case .projectChanged = update { settleProjectSelection() }
+            if added { await refreshWorkflows() }
             // And the other way: every server hears what the Mac learned about a plan it
             // relays (052, R6). Only a newer word changes anything there.
             if case .runtimeAllowancesChanged(let allowances) = update { await sendSharedAllowances(allowances) }
@@ -3329,9 +3332,11 @@ final class AppModel {
             break
         }
         if let update {
+            let added = work.addsProject(update, from: host)
             work.apply(update, from: host)
             applyToPopouts(update)
             if method == DaemonAPI.Notification.projectChanged { settleProjectSelection() }
+            if added { await refreshWorkflows() }
             return
         }
         // A server's shells print to this window the same way the Mac's do. Nothing

@@ -30,6 +30,18 @@ struct AgentsModelHostTests {
         #expect(model.project(ProjectKey(host: .mac, folder: path)) == nil)
     }
 
+    /// A project added brings workflows no notification carries, so the client lists them (#1798).
+    @Test func aProjectNotHeldYetIsAnAddition() {
+        let model = AgentsModel()
+        let added = AgentsModel.Update.projectChanged(summary(path))
+        #expect(model.addsProject(added))
+        #expect(model.addsProject(added, from: devbox))
+        model.apply(added, from: devbox)
+        #expect(!model.addsProject(added, from: devbox), "a change to a held project is not an addition")
+        #expect(model.addsProject(added), "the same folder on the Mac is another project")
+        #expect(!model.addsProject(.projectRemoved(ProjectKey(host: .mac, folder: path))))
+    }
+
     @Test func aHostIsNeverWrittenIntoTheRecord() throws {
         var one = agent(path)
         one.host = devbox

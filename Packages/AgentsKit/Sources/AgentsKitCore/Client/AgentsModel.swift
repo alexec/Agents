@@ -526,6 +526,14 @@ public final class AgentsModel {
         return true
     }
 
+    /// Whether this update brings a project the model does not hold yet (#1798). A project
+    /// added comes with its ready-made workflows but no `workflow/changed` for them, so a
+    /// client that listed the workflows at connect lists them again.
+    public func addsProject(_ update: Update, from host: HostID? = nil) -> Bool {
+        guard case .projectChanged(let summary) = host.map({ Self.stamp(update, host: $0) }) ?? update else { return false }
+        return !projects.contains { $0.folder == summary.folder && $0.host == summary.host }
+    }
+
     /// Apply one notification from one of several daemons, already read off the main actor.
     public func apply(_ update: Update, from host: HostID) {
         apply(Self.stamp(update, host: host))
