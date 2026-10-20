@@ -826,14 +826,14 @@ final class AppModel {
     /// Folders beyond the working one, and MCP servers, for the agent about to start.
     var draftFolders: [URL] = []
     var draftServers: [MCPServer] = []
-    /// Words handed to the prompt bar from elsewhere on the page — the workflows
-    /// section's example, today. Offered and then taken: the bar puts them in the
-    /// field and clears this, because the prompt itself is still the bar's own and
-    /// sending it is still the person's move.
-    var offeredPrompt: String?
-    /// Words quoted from a reply for the open chat's prompt bar (#1553): added to what is
+    /// Words handed to a prompt bar from elsewhere on the page: Clean up worktrees' words,
+    /// or a queued prompt's edit that came too late. Offered and then taken: the bar of that
+    /// agent (#1679) puts them in the field and clears this, because the prompt itself is
+    /// still the bar's own and sending it is still the person's move.
+    var offeredPrompt: PromptOffer?
+    /// Words quoted from a reply for that chat's prompt bar (#1553, #1679): added to what is
     /// there as a quote, then cleared.
-    var offeredQuote: String?
+    var offeredQuote: PromptOffer?
     /// A new agent a view filled in (#834), for the project page's bar to take once its
     /// folder is this one: the prompt, the labels and the worktree. Starting it is still
     /// the person's move.
@@ -4286,7 +4286,7 @@ final class AppModel {
     /// Clean up worktrees (030): a new session in the project, offered the words.
     func offerCleanUp(in project: URL) {
         showProject(ProjectKey(folder: project))
-        offeredPrompt = WorktreeTally.cleanUpPrompt
+        offeredPrompt = PromptOffer(agentID: nil, words: WorktreeTally.cleanUpPrompt)
     }
 
     /// What an agent changed (035). Asked by the Changes pane on its own triggers —
@@ -4713,11 +4713,11 @@ final class AppModel {
                 DaemonAPI.EditQueuedRequest(agentID: agentID, promptID: prompt.id, text: text),
                 returning: DaemonAPI.EditQueuedResult.self)
             guard !result.edited else { return }
-            self.offeredPrompt = text
+            self.offeredPrompt = PromptOffer(agentID: agentID, words: text)
             self.problem = QueuedPrompt.sentBeforeEdit
         }
         // The failure is said already; the words are not lost with it, as on the Remote.
-        if !reached { offeredPrompt = text }
+        if !reached { offeredPrompt = PromptOffer(agentID: agentID, words: text) }
     }
 
     /// Send a queued prompt into the turn that is running, where the runtime takes one.

@@ -41,12 +41,13 @@ final class RemoteModel {
     private(set) var relayTrouble: RelayTrouble?
     private(set) var lastHeardFrom: Date?
     private(set) var problem: String?
-    /// Words for the open chat's prompt bar, from elsewhere in the chat: an edit to a queued
-    /// prompt that came too late (#1552). The bar takes them and sets this back to nil.
-    var offeredPrompt: String?
-    /// Words quoted from a reply for the open chat's prompt bar (#1553): added to what is
+    /// Words for one chat's prompt bar, from elsewhere in the chat: an edit to a queued
+    /// prompt that came too late (#1552). That agent's bar (#1679) takes them and sets this
+    /// back to nil, so another iPad scene's bar leaves them.
+    var offeredPrompt: PromptOffer?
+    /// Words quoted from a reply for that chat's prompt bar (#1553, #1679): added to what is
     /// there as a quote, then cleared.
-    var offeredQuote: String?
+    var offeredQuote: PromptOffer?
     /// A message for the open chat to go to, and where it is in the transcript: Find in
     /// Chat's match (#1532). Cleared once the chat has gone to it.
     var focusedEntry: UUID?
@@ -4332,7 +4333,7 @@ final class RemoteModel {
     /// taken back first, the words go into the prompt bar, so nothing typed is lost.
     func editQueued(_ prompt: QueuedPrompt, text: String, of agentID: UUID) async {
         guard !isStale else {
-            offeredPrompt = text
+            offeredPrompt = PromptOffer(agentID: agentID, words: text)
             problem = "Your Mac is not answering, so that could not be changed. Your words are in the prompt bar."
             return
         }
@@ -4341,10 +4342,10 @@ final class RemoteModel {
             let result = try await client(for: request).call(DaemonAPI.Method.agentsEditQueued, request,
                                                              returning: DaemonAPI.EditQueuedResult.self)
             guard !result.edited else { return }
-            offeredPrompt = text
+            offeredPrompt = PromptOffer(agentID: agentID, words: text)
             problem = QueuedPrompt.sentBeforeEdit
         } catch {
-            offeredPrompt = text
+            offeredPrompt = PromptOffer(agentID: agentID, words: text)
             problem = "That did not reach your Mac. Your words are in the prompt bar."
         }
     }

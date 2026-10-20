@@ -259,8 +259,8 @@ struct AgentsCommands: Commands {
             // The words selected in a reply, into the prompt as a quote (#1553). The reply's
             // own menu is the text's, so the key is the way to it there.
             Button("Quote in Prompt") {
-                guard let words = ChatSelection.text() else { NSSound.beep(); return }
-                model.offeredQuote = words
+                guard let agent, let words = ChatSelection.text() else { NSSound.beep(); return }
+                model.offeredQuote = PromptOffer(agentID: agent.id, words: words)
             }
             .keyboardShortcut("'", modifiers: [.command, .shift])
             .disabled(agent == nil || agent?.state == .archived)
