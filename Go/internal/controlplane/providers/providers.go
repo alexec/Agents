@@ -1760,6 +1760,28 @@ func (p *Providers) finish(host, problem string) {
 	}
 }
 
+// Asleep is whether the host's workspace is stopped, or being stopped, so nothing should
+// dial it (#864): a stop is under way, or no start is and its provider lists it stopped or
+// stopping. A host with no link is never asleep.
+func (p *Providers) Asleep(host string) bool {
+	record := p.records.Host(host)
+	if record == nil {
+		return false
+	}
+	link := LinkOf(record)
+	if link == nil {
+		return false
+	}
+	p.mu.Lock()
+	a := p.activities[host]
+	found := p.workspaceLocked(*link)
+	p.mu.Unlock()
+	if a != nil {
+		return a.kind != starting
+	}
+	return found != nil && (found.State == "stopped" || found.State == "stopping")
+}
+
 // sshDestination is where agentsd is started over ssh: the provider's destination, or the
 // one the host was installed over (#965).
 func (p *Providers) sshDestination(link WorkspaceLink, host string) string {

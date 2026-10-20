@@ -636,3 +636,30 @@ func TestAnAgentCantAskAnythingElse(t *testing.T) {
 		}
 	}
 }
+
+// A stopped workspace is asleep, so its tunnel does not dial it and start it again (#864): from
+// the stop until a start.
+func TestAStoppedWorkspaceIsAsleepUntilAStart(t *testing.T) {
+	h := newHarness(t)
+	h.link(h.add(), devbox, "scratch-1")
+	h.router.setOnline(devbox, true)
+	if h.providers.Asleep(devbox) {
+		t.Error("a running one is asleep")
+	}
+	h.must(MethodHostsStop, HostStop{Host: devbox})
+	if !h.providers.Asleep(devbox) {
+		t.Error("not asleep while it stops")
+	}
+	h.router.setOnline(devbox, false)
+	h.waitFor("stopped", devbox, 5, func(r row) bool { return r.Workspace.CanStart })
+	if !h.providers.Asleep(devbox) {
+		t.Error("not asleep once stopped")
+	}
+	h.must(MethodHostsStart, map[string]string{"host": devbox})
+	if h.providers.Asleep(devbox) {
+		t.Error("asleep while it starts")
+	}
+	if h.providers.Asleep("nobody") {
+		t.Error("a host with no link is asleep")
+	}
+}

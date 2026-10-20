@@ -201,7 +201,9 @@ func New(cfg Config) (*Service, error) {
 	if cfg.PeerURL == "" {
 		s.tunnels = hosttunnels.New(hosttunnels.Config{Store: cfg.Store, Port: cfg.Port, Log: s.log,
 			Hosts:   func(context.Context) []records.HostRecord { return s.records.Hosts() },
-			Changed: func(change hosttunnels.Changed) { s.router.BroadcastControl("control/tunnelChanged", change) }})
+			Changed: func(change hosttunnels.Changed) { s.router.BroadcastControl("control/tunnelChanged", change) },
+			// Made after the tunnels: read when a tunnel asks.
+			Asleep: func(host string) bool { return s.providers != nil && s.providers.Asleep(host) }})
 	}
 	s.router.SetCopier(s.copies.take)
 	var tunnels hostinstall.Tunnels

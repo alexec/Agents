@@ -422,3 +422,40 @@ func (k *knownHosts) set(hosts []records.HostRecord) {
 	defer k.mu.Unlock()
 	k.hosts = hosts
 }
+
+// A host whose workspace is stopped is not dialled: through gh, a dial starts a codespace
+// again (#864). Once it is awake, the tunnel dials as before.
+func TestATunnelToAStoppedWorkspaceWaitsAndDoesNotDial(t *testing.T) {
+	was := asleepCheck
+	asleepCheck = 50 * time.Millisecond
+	defer func() { asleepCheck = was }()
+	folder := t.TempDir()
+	log := filepath.Join(folder, "argv")
+	ssh := fakeSSH(t, folder, "up", log, "exit 0", "exec sleep 30")
+	heard := &heardChanges{}
+	var mu sync.Mutex
+	asleep := true
+	tunnels := New(Config{Store: store.NewMemory(), SSH: ssh, Env: []string{}, Port: 8791,
+		Hosts:   func(context.Context) []records.HostRecord { return []records.HostRecord{{ID: "ws", Name: "ws"}} },
+		Changed: heard.add,
+		Asleep: func(host string) bool {
+			mu.Lock()
+			defer mu.Unlock()
+			return host == "ws" && asleep
+		}})
+	defer tunnels.Stop()
+	if err := tunnels.Add(ctx, record("ws")); err != nil {
+		t.Fatal(err)
+	}
+	heard.waitFor(t, func(c Changed) bool {
+		return c.Tunnel.Problem != nil && *c.Tunnel.Problem == "Its workspace is stopped: the tunnel waits for Start."
+	})
+	time.Sleep(300 * time.Millisecond)
+	if calls, _ := os.ReadFile(log); len(calls) != 0 {
+		t.Fatalf("dialled a stopped workspace: %s", calls)
+	}
+	mu.Lock()
+	asleep = false
+	mu.Unlock()
+	heard.waitFor(t, func(c Changed) bool { return c.Tunnel.Up })
+}
