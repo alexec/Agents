@@ -284,6 +284,12 @@ func (d *Daemon) addProject(folder wire.URL) (wire.ProjectSummary, error) {
 	for _, s := range d.projects(true) {
 		if store.FolderPath(s.Project.Folder) == path {
 			Broadcast(d, wire.NotifyProjectChanged, s)
+			// A pins.json already in the folder is said now (#1622): a client reads pins/list only
+			// when it connects, and the watcher says pins/changed only when the file changes.
+			if pp := d.projectPins(path); len(pp.Pins) > 0 || len(pp.Sessions) > 0 || len(pp.Workflows) > 0 {
+				Broadcast(d, wire.NotifyPinsChanged, wire.PinsChangedNotification{Folder: pp.Folder, Pins: pp.Pins,
+					Sessions: pp.Sessions, Workflows: pp.Workflows})
+			}
 			return s, nil
 		}
 	}
