@@ -205,7 +205,7 @@ struct ControlOverviewPage: View {
 
     private func hostName(_ host: DaemonAPI.ControlHost) -> String {
         let name = host.machineID == MachineID.current && host.runsAgents ? "This Mac" : host.name
-        return host.state == "online" ? name : "\(name) (\(host.state))"
+        return host.state == "online" ? name : "\(name) (\(UpdateWords.state(host)))"
     }
 }
 
@@ -523,7 +523,7 @@ struct ControlHostsPage: View {
     private func baseLine(_ host: DaemonAPI.ControlHost) -> String {
         // agents-relay (T096): it runs no agents, so the rest of the line is not its.
         if host.relay != nil {
-            let state = host.state == "online" ? "" : "\(host.state.capitalized) · "
+            let state = host.state == "online" ? "" : "\(UpdateWords.state(host)) · "
             return state + (host.relay == true ? "Relays your devices through iCloud" : "Relaying switched off")
         }
         var parts: [String] = []
