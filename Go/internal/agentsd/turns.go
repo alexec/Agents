@@ -183,12 +183,19 @@ func (d *Daemon) start(r wire.StartRequest) (wire.UUID, error) {
 	return d.startFor(r, startedBy{owner: wire.SessionLabelOwnerPerson})
 }
 
+// startAs is start for a person's call: agent.started names them (#1751).
+func (d *Daemon) startAs(r wire.StartRequest, actor *wire.AuditActor) (wire.UUID, error) {
+	return d.startFor(r, startedBy{owner: wire.SessionLabelOwnerPerson, actor: actor})
+}
+
 // startedBy is who a start is for: an agent that started it (a helper), the owner its
 // labels are given, and the queued record it takes the place of.
 type startedBy struct {
 	agent  *wire.UUID
 	owner  wire.SessionLabelOwner
 	queued *wire.Agent
+	// actor is the person whose call started it, when one did (#1751).
+	actor *wire.AuditActor
 }
 
 func (d *Daemon) startFor(r wire.StartRequest, by startedBy) (wire.UUID, error) {
@@ -267,6 +274,7 @@ func (d *Daemon) startFor(r wire.StartRequest, by startedBy) (wire.UUID, error) 
 		}
 		return "", err
 	}
+	d.actedOn(a.ID, by.actor)
 	d.tellChanged(a, nil)
 	d.projectChanged(projectFolder(&a))
 	if wt != nil {

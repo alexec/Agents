@@ -307,6 +307,14 @@ It is read only.
 - **The control plane writes the actor itself.** It uses the client it knows the call came
   from. It ignores an actor that a client puts in its request. It also gives the actor to
   the host when it opens the client's channel (`ChannelOpen.actor`).
+- **The host writes it into `events.jsonl` (#1751).** An event that a person's call
+  raised carries that channel's actor as `actor`, and its detail shows a **By** row on all
+  three clients: `agent.started` from `agents/start`, `agent.stopped` from `agents/stop`,
+  `agent.archived` from `agents/archive`, `agent.deleted` from `agents/delete`,
+  `server.offline` and `server.online`, and an event raised by hand. What an agent, a
+  workflow or the machine does has no actor, and neither does a call over `daemon.sock`.
+  Answering a card raises no event, so it is only in the audit. The same event from two
+  people is two events, not one with a count.
 - **What is kept**: start, stop, archive or delete an agent or session; answer an approval,
   permission, question or sandbox card; change a setting, a cost limit or a project's
   limits; approve, deny, run, turn on or off, or delete a workflow; approve a plugin; add,

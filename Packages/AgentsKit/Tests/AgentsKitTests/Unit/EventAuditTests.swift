@@ -19,6 +19,16 @@ struct EventAuditTests {
         #expect(AuditWords.call(entry) == "agents/stop · A1")
     }
 
+    /// An event a person's call raised carries their actor, as agentsd writes it (#1751).
+    @Test func anEventSaysWhoRaisedIt() throws {
+        let line = #"""
+        {"position":7,"name":"agent.started","at":782654400,"count":1,"scope":{"mac":{}},"sentence":"Fix started working.",
+        "details":{},"chainDepth":0,"consequences":[],"actor":{"user":"ana","userName":"Ana","clientName":"Ana's iPhone"}}
+        """#
+        let event = try JSONDecoder().decode(Event.self, from: Data(line.utf8))
+        #expect(event.actor.map(AuditWords.who) == "Ana · Ana's iPhone")
+    }
+
     @Test func theControlPlanesOwnAndABotsAreSaidSo() {
         var entry = DaemonAPI.AuditEntry(id: "x", at: .now, action: "Changed project detection",
                                          method: "control/setProjectDetection", actor: .init(user: "u"))

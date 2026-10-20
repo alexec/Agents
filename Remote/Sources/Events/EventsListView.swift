@@ -173,6 +173,7 @@ private struct EventSheet: View {
         if event.count > 1, let last = event.lastAt {
             rows.append(("Repeats", "\(event.count) times, last at \(LeaseWords.clock(last))"))
         }
+        if let actor = event.actor { rows.append(("By", AuditWords.who(actor))) }
         if let publisher = event.publisher { rows.append(("Published by", publisher.title)) }
         if let message = event.message { rows.append(("Message", message)) }
         for (key, value) in event.details.sorted(by: { $0.key < $1.key }) { rows.append((key, value)) }

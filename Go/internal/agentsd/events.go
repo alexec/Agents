@@ -419,7 +419,10 @@ func sameMessage(a, b *string) bool {
 
 // raise is DaemonCore.raise: the event its place (or folded into the last when it is the
 // same again within a minute), written down, then told.
-func (d *Daemon) raise(draft wire.EventDraft) wire.Event {
+func (d *Daemon) raise(draft wire.EventDraft) wire.Event { return d.raiseAs(draft, nil) }
+
+// raiseAs is raise for an event a person's call raised: it carries their actor (#1751).
+func (d *Daemon) raiseAs(draft wire.EventDraft, actor *wire.AuditActor) wire.Event {
 	if draft.Details == nil {
 		draft.Details = map[string]string{}
 	}
@@ -429,7 +432,7 @@ func (d *Daemon) raise(draft wire.EventDraft) wire.Event {
 	d.eventMu.Lock()
 	t := nowFunc()
 	var e wire.Event
-	if n := len(d.eventList); n > 0 && d.isRepeat(draft, d.eventList[n-1], t) {
+	if n := len(d.eventList); n > 0 && d.isRepeat(draft, actor, d.eventList[n-1], t) {
 		last := &d.eventList[n-1]
 		last.Count++
 		at := wire.DateOf(t)
@@ -443,7 +446,7 @@ func (d *Daemon) raise(draft wire.EventDraft) wire.Event {
 	} else {
 		e = wire.Event{Position: d.eventStateNow.NextPosition, Name: draft.Name, At: draft.At, Count: 1, Scope: draft.Scope,
 			Sentence: draft.Sentence, Details: draft.Details, Message: draft.Message, ChainDepth: draft.ChainDepth,
-			Consequences: []wire.Consequence{}}
+			Consequences: []wire.Consequence{}, Actor: actor}
 		// The next position is written before the event, a block at a time, so a host
 		// killed between the two leaves a gap, never one position given out twice.
 		d.eventStateNow.NextPosition = e.Position + 1
@@ -467,8 +470,9 @@ func (d *Daemon) raise(draft wire.EventDraft) wire.Event {
 	return e
 }
 
-func (d *Daemon) isRepeat(draft wire.EventDraft, last wire.Event, t time.Time) bool {
+func (d *Daemon) isRepeat(draft wire.EventDraft, actor *wire.AuditActor, last wire.Event, t time.Time) bool {
 	return last.Name == draft.Name && sameScope(last.Scope, draft.Scope) && sameDetails(last.Details, draft.Details) &&
+		sameActor(last.Actor, actor) &&
 		last.Publisher == nil && sameMessage(last.Message, draft.Message) && t.Sub(eventLatest(last)) < eventRepeatWindow
 }
 
@@ -634,8 +638,12 @@ func (d *Daemon) raiseAbout(a *wire.Agent, name, sentence string, extra map[stri
 	for k, v := range extra {
 		details[k] = v
 	}
-	d.raise(wire.EventDraft{Name: name, At: now(), Scope: projectScope(projectFolder(a)),
-		Sentence: agentName(a.Title) + " " + sentence, Details: details, ChainDepth: d.chainDepth(a)})
+	var actor *wire.AuditActor
+	if personMade(name, details) {
+		actor = d.takeActor(a.ID)
+	}
+	d.raiseAs(wire.EventDraft{Name: name, At: now(), Scope: projectScope(projectFolder(a)),
+		Sentence: agentName(a.Title) + " " + sentence, Details: details, ChainDepth: d.chainDepth(a)}, actor)
 }
 
 // chainDepth is workflowChainDepth: how deep in a chain of workflows anything fired from
@@ -812,7 +820,7 @@ func (d *Daemon) registerEvents() {
 		if p := draftProblem(r.Draft); p != "" {
 			return wire.Event{}, eventRefused(p)
 		}
-		e := d.raise(r.Draft)
+		e := d.raiseAs(r.Draft, c.actor)
 		for _, c := range r.Consequences {
 			d.addConsequence(c, e.Position)
 		}
@@ -834,7 +842,7 @@ func (d *Daemon) registerEvents() {
 		if r.Online {
 			name, sentence = "server.online", server+" came back."
 		}
-		return d.raise(wire.EventDraft{Name: name, At: now(), Scope: macScope(), Sentence: sentence,
-			Details: map[string]string{"server": server}}), nil
+		return d.raiseAs(wire.EventDraft{Name: name, At: now(), Scope: macScope(), Sentence: sentence,
+			Details: map[string]string{"server": server}}, c.actor), nil
 	})
 }

@@ -1840,6 +1840,12 @@ export interface Event {
   message?: string;
   chainDepth: number;
   consequences: Consequence[];
+  /**
+   * Who raised it, when a person's call through the control plane did (#1751, spec 736 FR-040): the
+   * actor the control plane gave the call's channel, never taken from the client. None for what an
+   * agent, a workflow or the machine did.
+   */
+  actor?: AuditActor;
 }
 
 export interface EventDraft {
@@ -5686,7 +5692,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ElicitationSchemaPropertyChoice: { required: ["value", "title"], optional: ["description"] },
   Empty: { required: [], optional: [] },
   EntryNotification: { required: ["agentID", "entry"], optional: ["index", "oversized"] },
-  Event: { required: ["position", "name", "at", "count", "scope", "sentence", "details", "chainDepth", "consequences"], optional: ["lastAt", "publisher", "message"] },
+  Event: { required: ["position", "name", "at", "count", "scope", "sentence", "details", "chainDepth", "consequences"], optional: ["lastAt", "publisher", "message", "actor"] },
   EventDraft: { required: ["name", "at", "scope", "sentence", "details", "chainDepth"], optional: ["message"] },
   EventPattern: { required: ["name", "filters"], optional: ["anyOf"] },
   EventPublisher: { required: ["agentID", "title"], optional: [] },

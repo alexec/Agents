@@ -7,6 +7,7 @@ import { useSignal } from "@preact/signals";
 import type { Store } from "../model/store";
 import type { AllowanceReading, AllowanceState, Consequence, ControlHost, CostState, Event, ProjectSummary, RuntimeAvailability, RuntimeStatus } from "../protocol/generated";
 import { fromWireDate } from "../protocol/dates";
+import { who } from "../model/audit";
 import type { ActivityPage } from "../route";
 import { Resources } from "./Resources";
 import { MCPServersList } from "./MCPServers";
@@ -360,6 +361,7 @@ export function eventDetailRows(event: Event, scopeName: string): [string, strin
     ["Where", scopeName],
   ];
   if (event.count > 1 && event.lastAt !== undefined) rows.push(["Repeats", `${event.count} times, last at ${clock(fromWireDate(event.lastAt))}`]);
+  if (event.actor) rows.push(["By", who(event.actor)]);
   if (event.publisher) rows.push(["Published by", event.publisher.title]);
   if (event.message) rows.push(["Message", event.message]);
   for (const key of Object.keys(event.details).sort()) rows.push([key, event.details[key]!]);

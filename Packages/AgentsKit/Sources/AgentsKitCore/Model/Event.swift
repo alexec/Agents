@@ -92,13 +92,17 @@ public struct Event: Codable, Hashable, Sendable, Identifiable {
     /// How deep in a workflow chain anything fired from this event would be (008 FR-021).
     public var chainDepth: Int
     public var consequences: [Consequence]
+    /// Who raised it, when a person's call through the control plane did (#1751): the
+    /// actor the control plane gave the call's channel. None for what an agent, a
+    /// workflow or the machine did.
+    public var actor: DaemonAPI.AuditActor?
 
     public var id: EventPosition { position }
 
     public init(position: EventPosition, name: String, at: Date, lastAt: Date? = nil, count: Int = 1,
                 scope: EventScope, sentence: String, details: [String: String] = [:],
                 publisher: EventPublisher? = nil, message: String? = nil, chainDepth: Int = 0,
-                consequences: [Consequence] = []) {
+                consequences: [Consequence] = [], actor: DaemonAPI.AuditActor? = nil) {
         self.position = position
         self.name = name
         self.at = at
@@ -111,6 +115,7 @@ public struct Event: Codable, Hashable, Sendable, Identifiable {
         self.message = message
         self.chainDepth = chainDepth
         self.consequences = consequences
+        self.actor = actor
     }
 
     public init(_ draft: EventDraft, position: EventPosition) {

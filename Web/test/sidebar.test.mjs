@@ -451,6 +451,8 @@ test("Events: where an event is, and everything it carries (#541)", async () => 
   assert.match(rows[2][1], /^3 times, last at \d\d:\d\d$/);
   assert.equal(rows.at(-1)[1], "7");
   assert.deepEqual(eventDetailRows(onMac, "This Mac").map(([name]) => name), ["When", "Where", "Position"]);
+  const byAna = eventDetailRows(event({ mac: {} }, { actor: { user: "ana", userName: "Ana", clientName: "Ana's iPhone" } }), "This Mac");
+  assert.deepEqual(byAna[2], ["By", "Ana · Ana's iPhone"], "a person's call names them (#1751)");
 });
 
 test("Archived projects: every host's, the latest worked on first, apart from the live ones (#343)", async () => {
