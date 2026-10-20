@@ -76,6 +76,8 @@ type Daemon struct {
 	localBook
 	connectionBook
 	setupBook
+	// pageEdits is what the person changed on live pages since each agent's last turn.
+	pageEdits  pageEdits
 	policyOnce sync.Once
 	policy     SocketPolicy
 	// SettingsDir is the person's settings on this host (StoreLocations.personalSettings):

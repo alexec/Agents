@@ -433,7 +433,8 @@ var toolPolicyFiles = map[string][]policyFile{
 var grokRemoved = []string{"scheduler_create", "scheduler_delete", "scheduler_list", "workflow", "monitor", "send_feedback"}
 
 // sessionMeta is the _meta on session/new, session/load and session/fork: Claude's tools
-// and Grok's tools the app takes away, Grok's as a profile (ToolPolicyCatalog.swift).
+// and Grok's tools the app takes away, Grok's as a profile (ToolPolicyCatalog.swift), and
+// Grok's rules with the app's tools written out (grokRules).
 func sessionMeta(runtimeID string) map[string]any {
 	switch runtimeID {
 	case "claude":
@@ -442,7 +443,7 @@ func sessionMeta(runtimeID string) map[string]any {
 			"EnterWorktree", "ExitWorktree"}}}}
 	case "grok":
 		return map[string]any{"agentProfile": map[string]any{"disallowedTools": grokRemoved, "name": "agents-app",
-			"description": "An agent hosted by the Agents app."}}
+			"description": "An agent hosted by the Agents app."}, "rules": grokRules()}
 	}
 	return nil
 }

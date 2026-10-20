@@ -347,10 +347,9 @@ func (d *Daemon) registerSettings() {
 		return d.rememberedOptions(r), nil
 	})
 	On(d, wire.CallPersonasList, func(ctx context.Context, c *Client, r wire.PersonasListRequest) ([]wire.Persona, error) {
-		home := ""
-		if h := os.Getenv("AGENTS_PERSONAL_HOME"); h != "" {
-			home = h
-		}
-		return personas(store.FolderPath(r.Folder), home), nil
+		return personas(store.FolderPath(r.Folder), personaHome()), nil
 	})
 }
+
+// personaHome is the folder whose .agents/personas are the person's own.
+func personaHome() string { return os.Getenv("AGENTS_PERSONAL_HOME") }

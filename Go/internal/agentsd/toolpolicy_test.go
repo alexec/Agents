@@ -45,7 +45,9 @@ func envValue(env []string, name string) (string, bool) {
 // Grok takes a deny list, as a profile in _meta, and reads its switches from a file of
 // the app's own, the person's GROK_CONFIG_PATH replaced.
 func TestGroksToolPolicy(t *testing.T) {
-	b, _ := json.Marshal(sessionMeta("grok"))
+	meta := sessionMeta("grok")
+	delete(meta, "rules") // grokRules, in brief_test.go
+	b, _ := json.Marshal(meta)
 	want := `{"agentProfile":{"description":"An agent hosted by the Agents app.","disallowedTools":["scheduler_create","scheduler_delete","scheduler_list","workflow","monitor","send_feedback"],"name":"agents-app"}}`
 	if string(b) != want {
 		t.Fatalf("%s", b)
