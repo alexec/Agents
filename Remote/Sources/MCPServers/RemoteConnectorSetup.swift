@@ -6,13 +6,15 @@ import SwiftUI
 /// the window's, in the same order, with the slots as a list. Each slot opens its own screen
 /// with its proof and its choices. The state is the host's, so all three clients show the
 /// same ticks. Other providers are set up on the Mac (Providers is the Mac's own page).
+/// The page that shows it reads it (MCPServersListView): at first, when the app comes back
+/// to the front, and on a pull (#1684).
 struct RemoteConnectorSetup: View {
-    @Environment(RemoteModel.self) private var model
     let project: ProjectKey
     let projectName: String
     @Binding var setup: DaemonAPI.ConnectorSetup?
+    let problem: String?
+    let reload: (DaemonAPI.ConnectorSetupReading) async -> Void
 
-    @State private var problem: String?
     @State private var connecting = false
 
     var body: some View {
@@ -28,9 +30,8 @@ struct RemoteConnectorSetup: View {
         } footer: {
             Text(ConnectorSetupWords.intro(project: projectName, repository: setup?.repository))
         }
-        .task(id: project) { await load(.cached) }
         .sheet(isPresented: $connecting) {
-            RemoteConnectSheet(host: project.host, project: project, onConnected: { Task { await load(.fresh) } })
+            RemoteConnectSheet(host: project.host, project: project, onConnected: { Task { await reload(.fresh) } })
         }
         if let setup {
             Section(ConnectorSetupWords.setUpHeading(setup)) {
@@ -82,13 +83,6 @@ struct RemoteConnectorSetup: View {
                 Button(ConnectorSetupWords.connectButton) { connecting = true }
                     .buttonStyle(.borderedProminent)
             }
-        }
-    }
-
-    private func load(_ how: DaemonAPI.ConnectorSetupReading) async {
-        switch await model.connectorSetup(project, reading: how) {
-        case .success(let fresh): setup = fresh; problem = nil
-        case .failure(let failure): problem = failure.words
         }
     }
 }
@@ -423,11 +417,13 @@ struct RemoteConnectSheet: View {
     }
 }
 
-/// Your Connectors ▸ Connections on the iPhone and iPad (frame E).
+/// Your Connectors ▸ Connections on the iPhone and iPad (frame E). The page that shows them
+/// reads them, as a project's set-up (#1684).
 struct RemoteConnections: View {
     @Environment(RemoteModel.self) private var model
-    @State private var connections: [DaemonAPI.Connection]?
-    @State private var problem: String?
+    let connections: [DaemonAPI.Connection]?
+    @Binding var problem: String?
+    let reload: () async -> Void
     @State private var connecting: DaemonAPI.ConnectionProvider?
     @State private var disconnecting: DaemonAPI.Connection?
 
@@ -464,9 +460,8 @@ struct RemoteConnections: View {
             Text("Connections")
         }
         .paperListRow()
-        .task { await load() }
         .sheet(item: $connecting) { provider in
-            RemoteConnectSheet(provider: provider, host: .mac, onConnected: { Task { await load() } })
+            RemoteConnectSheet(provider: provider, host: .mac, onConnected: { Task { await reload() } })
         }
         .confirmationDialog(disconnecting.map { "Disconnect \(ConnectorSetupWords.connectionTitle($0))?" } ?? "",
                             isPresented: Binding(get: { disconnecting != nil }, set: { if !$0 { disconnecting = nil } }),
@@ -483,16 +478,10 @@ struct RemoteConnections: View {
         list.contains { $0.provider == provider && $0.state == .connected }
     }
 
-    private func load() async {
-        switch await model.connections(on: .mac) {
-        case .success(let list): connections = list; problem = nil
-        case .failure(let failure): connections = []; problem = failure.words
-        }
-    }
-
     private func disconnect(_ c: DaemonAPI.Connection) async {
         disconnecting = nil
-        problem = await model.disconnect(c.provider, on: .mac)
-        await load()
+        let why = await model.disconnect(c.provider, on: .mac)
+        await reload()
+        if let why { problem = why }
     }
 }

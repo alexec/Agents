@@ -8,10 +8,14 @@ import SwiftUI
 /// Read-only but for Check Now: servers are edited in Settings.
 struct MCPServersListView: View {
     @Environment(RemoteModel.self) private var model
+    @Environment(\.scenePhase) private var scenePhase
     /// Nil for the person's own servers, on the Mac.
     var project: ProjectKey?
     @State private var checking = false
     @State private var setup: DaemonAPI.ConnectorSetup?
+    @State private var connections: [DaemonAPI.Connection]?
+    /// Why the set-up or the connections did not read.
+    @State private var setupProblem: String?
 
     private var snapshot: DaemonAPI.MCPHealthSnapshot? { model.work.mcpHealthSnapshot(project?.host ?? .mac) }
 
@@ -27,9 +31,10 @@ struct MCPServersListView: View {
             // The set-up first (#1336): a project's slots, or the person's connections.
             if let project {
                 RemoteConnectorSetup(project: project, projectName: model.work.project(project)?.name
-                                         ?? project.folder.lastPathComponent, setup: $setup)
+                                         ?? project.folder.lastPathComponent, setup: $setup,
+                                     problem: setupProblem, reload: readSetUp)
             } else {
-                RemoteConnections()
+                RemoteConnections(connections: connections, problem: $setupProblem, reload: { await readSetUp(.cached) })
             }
             Section {
                 if let problem {
@@ -62,6 +67,28 @@ struct MCPServersListView: View {
         }
         // The servers are read with the leases.
         .shows([.leases])
+        .task(id: project) { await readSetUp(.cached) }
+        // Back from github.com (an install, a grant): read again, as the window does (#1684).
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active { Task { await readSetUp(.cached) } }
+        }
+        // A pull reads each slot again from the provider, as Try Again does.
+        .refreshable { await readSetUp(.fresh) }
+    }
+
+    /// A project's set-up, or the person's connections.
+    private func readSetUp(_ how: DaemonAPI.ConnectorSetupReading) async {
+        if let project {
+            switch await model.connectorSetup(project, reading: how) {
+            case .success(let fresh): setup = fresh; setupProblem = nil
+            case .failure(let failure): setupProblem = failure.words
+            }
+        } else {
+            switch await model.connections(on: .mac) {
+            case .success(let list): connections = list; setupProblem = nil
+            case .failure(let failure): connections = connections ?? []; setupProblem = failure.words
+            }
+        }
     }
 }
 
