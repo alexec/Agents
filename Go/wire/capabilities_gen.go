@@ -37,6 +37,7 @@ const (
 	CapDisk1                 = "disk/1"
 	CapDropbox1              = "dropbox/1"
 	CapElicitations1         = "elicitations/1"
+	CapEventsAudit1          = "events.audit/1"
 	CapEvents1               = "events/1"
 	CapFilesComplete1        = "files.complete/1"
 	CapFilesDiagnostics1     = "files.diagnostics/1"
@@ -427,6 +428,8 @@ var HostNotifications = map[string]bool{
 var ControlCapabilities = map[string]string{
 	"attention/need":              "attention/1",
 	"attention/turn":              "liveactivity/1",
+	"audit/export":                "events.audit/1",
+	"audit/list":                  "events.audit/1",
 	"backups/commit":              "backups.store/1",
 	"backups/download":            "backups.store/1",
 	"backups/stored":              "backups.store/1",
@@ -442,6 +445,7 @@ var ControlCapabilities = map[string]string{
 	"clients/startPairing":        "clients/1",
 	"clients/stopPairing":         "clients/1",
 	"control/ping":                "control/1",
+	"control/setAuditDays":        "events.audit/1",
 	"control/setProjectDetection": "control/1",
 	"control/status":              "control/1",
 	"git/credential":              "git/1",

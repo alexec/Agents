@@ -36,6 +36,7 @@
     },
     {
       "name": "audit/export",
+      "x-capability": "events.audit/1",
       "tags": [
         {
           "name": "web"
@@ -60,6 +61,7 @@
     },
     {
       "name": "audit/list",
+      "x-capability": "events.audit/1",
       "tags": [
         {
           "name": "web"
@@ -426,6 +428,7 @@
     },
     {
       "name": "control/setAuditDays",
+      "x-capability": "events.audit/1",
       "tags": [
         {
           "name": "web"
