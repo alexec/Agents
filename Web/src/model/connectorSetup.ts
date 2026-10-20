@@ -138,6 +138,15 @@ export function workflowsLead(events: ConnectorEvents): string {
   return events.workflows.length === 0 ? "No workflow here starts on them yet." : "Now usable by";
 }
 
+/** The Tasks slot's way to Linear (#1682): the connection first, then its connector. */
+export const connectLinear = "Connect Linear…";
+
+/** The Tasks slot's other trackers: the page has no catalogue. */
+export function otherTrackers(linearConnected: boolean): string {
+  return linearConnected ? "Linear and other trackers: Add Connector on the Mac."
+    : "Then add its connector, or another tracker's, with Add Connector on the Mac.";
+}
+
 /** The providers a person connects with OAuth, in the order Your Connectors shows them. */
 export const providers: ConnectionProvider[] = ["github", "linear"];
 

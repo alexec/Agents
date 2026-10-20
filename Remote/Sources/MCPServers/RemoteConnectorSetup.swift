@@ -141,6 +141,9 @@ private struct RemoteSlotView: View {
     let kind: DaemonAPI.ConnectorSlotKind
     @Binding var setup: DaemonAPI.ConnectorSetup?
     @State private var problem: String?
+    /// Tasks only (#1682): whether the person's Linear connection is there, nil until read.
+    @State private var linearConnected: Bool?
+    @State private var connectingLinear = false
 
     private var slot: DaemonAPI.ConnectorSlot? { setup?.slot(kind) }
 
@@ -193,7 +196,10 @@ private struct RemoteSlotView: View {
                             Button("Skip") { Task { await skip(true) } }
                         }
                         if kind == .tasks {
-                            Text("Linear and other trackers: Add Connector on the Mac.")
+                            if linearConnected == false {
+                                Button(ConnectorSetupWords.connectLinear) { connectingLinear = true }
+                            }
+                            Text(ConnectorSetupWords.otherTrackers(linearConnected: linearConnected != false))
                                 .appText(.fine).foregroundStyle(.secondary)
                         }
                     } else {
@@ -207,6 +213,15 @@ private struct RemoteSlotView: View {
         .scrollContentBackground(.hidden)
         .background(Paper.ground)
         .navigationTitle(ConnectorSetupWords.heading(kind))
+        .task { if kind == .tasks { await readLinear() } }
+        .sheet(isPresented: $connectingLinear) {
+            RemoteConnectSheet(provider: .linear, host: project.host, onConnected: { Task { await readLinear() } })
+        }
+    }
+
+    private func readLinear() async {
+        guard case .success(let list) = await model.connections(on: project.host) else { return }
+        linearConnected = list.contains { $0.provider == .linear && $0.state == .connected }
     }
 
     private func skip(_ skipped: Bool) async {
