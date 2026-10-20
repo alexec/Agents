@@ -149,26 +149,41 @@ export function otherTrackers(linearConnected: boolean): string {
     : "Then add its connector, or another tracker's, with Add Connector on the Mac.";
 }
 
-/** The providers a person connects with OAuth, in the order Your Connectors shows them. */
-export const providers: ConnectionProvider[] = ["github", "linear"];
+/** The providers a person connects, in the order Your Connectors shows them. */
+export const providers: ConnectionProvider[] = ["github", "linear", "gitlab"];
 
-/** The provider's name: GitHub, Linear. */
+/** The provider's name: GitHub, Linear, GitLab. */
 export function name(p: ConnectionProvider): string {
-  return { github: "GitHub", linear: "Linear" }[p];
+  return { github: "GitHub", linear: "Linear", gitlab: "GitLab" }[p];
 }
 
 /** The provider's letters on its mark. */
 export function letters(p: ConnectionProvider): string {
-  return { github: "GH", linear: "L" }[p];
+  return { github: "GH", linear: "L", gitlab: "GL" }[p];
+}
+
+/** The device page's site, for "Open github.com Again". */
+export function site(p: ConnectionProvider): string {
+  return { github: "github.com", linear: "linear.app", gitlab: "gitlab.com" }[p];
 }
 
 export function connectionTitle(c: Connection): string {
   return c.login ? `${name(c.provider)} · ${c.login}` : name(c.provider);
 }
 
-export function connectionNote(c: Connection): string {
-  if (c.state === "signInAgain") return `${name(c.provider)} refused the renewal: sign in again`;
-  return [c.workspace, "OAuth · renews by itself"].filter((x): x is string => !!x).join(" · ");
+export function connectionNote(c: Connection, now: Date = new Date()): string {
+  if (c.state === "signInAgain") {
+    return c.expiresAt === undefined ? `${name(c.provider)} refused the renewal: sign in again`
+      : "The access token ended: connect again with a new one";
+  }
+  const how = c.expiresAt === undefined ? "OAuth · renews by itself" : `Access token · ${tokenEnds(fromWireDate(c.expiresAt), now)}`;
+  return [c.workspace, how].filter((x): x is string => !!x).join(" · ");
+}
+
+/** When an access token ends, such as "ends 18 Oct 2027", as the Mac says it. */
+export function tokenEnds(at: Date, now: Date = new Date()): string {
+  if (at <= now) return "ended";
+  return `ends ${at.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" })}`;
 }
 
 /** A provider with no connection yet, on Your Connectors. */
@@ -176,6 +191,7 @@ export function notConnectedNote(p: ConnectionProvider): string {
   return {
     github: "Issues, pull requests and Actions in every project.",
     linear: "Linear issues in every project, and their events.",
+    gitlab: "Merge requests, pipelines and issues on gitlab.com or your own GitLab.",
   }[p];
 }
 
@@ -186,6 +202,7 @@ export function connectButtonFor(p: ConnectionProvider): string {
 
 export function disconnectNoteFor(p: ConnectionProvider): string {
   if (p === "github") return disconnectNote;
+  if (p === "gitlab") return gitlab.disconnectNote;
   return "Disconnect deletes the host's tokens. Linear's events stop until you connect again or set LINEAR_API_KEY. To revoke Agents too, go to linear.app ▸ Settings ▸ Security & access.";
 }
 
@@ -209,27 +226,67 @@ export const linear = {
   finishing: "Finishing the sign-in…",
 };
 
+/** gitlab.com: the field's example, and where Make a Token goes with no address. */
+export const gitlabCom = "https://gitlab.com";
+
+/** Connect GitLab (#1630): gitlab.com by its device page, or any GitLab by an access token. */
+export const gitlab = {
+  abilities: [
+    "Read and write merge requests and their comments",
+    "Read pipelines and jobs",
+    "Read and write issues",
+  ],
+  subtitle: "For you, in every project. Agents talks to GitLab's API directly.",
+  choose: "GitLab asks for the api scope. You can take it back on GitLab ▸ Preferences ▸ Applications, or with Disconnect on Your Connectors.",
+  continueButton: "Continue on gitlab.com",
+  signInWay: "gitlab.com",
+  tokenWay: "Access token",
+  tokenIntro: "For a self-managed GitLab, or gitlab.com without the sign-in: make a personal access token with the api scope, and paste it here.",
+  addressLabel: "GitLab address",
+  addressPrompt: gitlabCom,
+  tokenLabel: "Access token",
+  tokenPrompt: "glpat-…",
+  tokenButton: "Connect",
+  checking: "Checking the token with GitLab…",
+  disconnectNote: "Disconnect deletes the host's token. GitLab's events stop until you connect again or set GITLAB_TOKEN. To revoke it too, go to GitLab ▸ Preferences ▸ Applications or Access tokens.",
+};
+
+/** Where the person makes a token on the GitLab at address (gitlab.com when empty), opened in a new tab. */
+export function newGitLabTokenURL(address: string): string {
+  const typed = address.trim();
+  let root = new URL(gitlabCom);
+  if (typed) {
+    try {
+      root = new URL(typed.includes("://") ? typed : `${root.protocol}//${typed}`);
+    } catch {
+      // Not an address: gitlab.com's page.
+    }
+  }
+  const path = root.pathname.replace(/\/+$/, "").replace(/\/api\/v4$/, "");
+  return `${root.origin}${path}/-/user_settings/personal_access_tokens?name=Agents&scopes=api`;
+}
+
 /** The sheet's subtitle, list and button, by provider. */
 export function sheetSubtitleFor(p: ConnectionProvider): string {
-  return p === "linear" ? linear.subtitle : sheetSubtitle;
+  return { github: sheetSubtitle, linear: linear.subtitle, gitlab: gitlab.subtitle }[p];
 }
 
 export function abilitiesFor(p: ConnectionProvider): string[] {
-  return p === "linear" ? linear.abilities : abilities;
+  return { github: abilities, linear: linear.abilities, gitlab: gitlab.abilities }[p];
 }
 
 export function sheetChooseFor(p: ConnectionProvider): string {
-  return p === "linear" ? linear.choose : sheetChoose;
+  return { github: sheetChoose, linear: linear.choose, gitlab: gitlab.choose }[p];
 }
 
 export function continueButtonFor(p: ConnectionProvider): string {
-  return p === "linear" ? linear.continueButton : continueButton;
+  return { github: continueButton, linear: linear.continueButton, gitlab: gitlab.continueButton }[p];
 }
 
 export function sheetStatus(s: ConnectionSignIn): string {
   switch (s.status) {
     case "waiting":
-      return s.grant === "authorizationCode" ? linear.waiting : "Waiting for github.com… Type the code there, then approve.";
+      return s.grant === "authorizationCode" ? linear.waiting : `Waiting for ${site(s.provider)}… Type the code there, then approve.`;
     case "connected": return "Connected.";
     case "expired": return s.message ?? "The code expired before it was approved. Try again.";
     case "denied": return s.message ?? `The sign-in was cancelled on ${name(s.provider)}.`;

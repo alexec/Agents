@@ -903,7 +903,10 @@ export interface ConnectionTokenAnswer {
  */
 export interface ConnectionTokenRequest {
   provider: ConnectionProvider;
-  /** The provider's address, such as https://gitlab.example.com. gitlab.com when left out. */
+  /**
+   * The provider's address, such as gitlab.example.com (https:// when it names no scheme).
+   * gitlab.com when left out.
+   */
   url?: string;
   token: string;
 }

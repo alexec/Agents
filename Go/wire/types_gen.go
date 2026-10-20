@@ -1060,7 +1060,7 @@ type ConnectionTokenAnswer struct {
 // connections/sign-in/token (#1630): a personal access token the person made, for a provider with no Agents application there (a self-managed GitLab). The host checks it with the provider, keeps it in its own store, and never logs it or gives it back.
 type ConnectionTokenRequest struct {
 	Provider ConnectionProvider `json:"provider"`
-	// The provider's address, such as https://gitlab.example.com. gitlab.com when left out.
+	// The provider's address, such as gitlab.example.com (https:// when it names no scheme). gitlab.com when left out.
 	URL   *string `json:"url,omitzero"`
 	Token string  `json:"token"`
 }

@@ -172,11 +172,14 @@ public enum ConnectorSetupWords {
 
     // MARK: Your Connectors ▸ Connections
 
+    public static let noConnections = "No connections yet. Connect GitHub to give agents issues, pull requests and Actions in every project, Linear for its issues, and GitLab for merge requests, pipelines and issues."
+
     /// The provider's name: GitHub, Linear.
     public static func name(_ p: DaemonAPI.ConnectionProvider) -> String {
         switch p {
         case .github: "GitHub"
         case .linear: "Linear"
+        case .gitlab: "GitLab"
         }
     }
 
@@ -185,6 +188,7 @@ public enum ConnectorSetupWords {
         switch p {
         case .github: "GH"
         case .linear: "L"
+        case .gitlab: "GL"
         }
     }
 
@@ -192,9 +196,22 @@ public enum ConnectorSetupWords {
         c.login.map { "\(name(c.provider)) \u{00B7} \($0)" } ?? name(c.provider)
     }
 
-    public static func connectionNote(_ c: DaemonAPI.Connection) -> String {
-        if c.state == .signInAgain { return "\(name(c.provider)) refused the renewal: sign in again" }
-        return [c.workspace, "OAuth \u{00B7} renews by itself"].compactMap { $0 }.joined(separator: " \u{00B7} ")
+    public static func connectionNote(_ c: DaemonAPI.Connection, now: Date = Date()) -> String {
+        if c.state == .signInAgain {
+            return c.expiresAt == nil ? "\(name(c.provider)) refused the renewal: sign in again"
+                : "The access token ended: connect again with a new one"
+        }
+        let how = c.expiresAt.map { "Access token \u{00B7} " + tokenEnds($0, now: now) } ?? "OAuth \u{00B7} renews by itself"
+        return [c.workspace, how].compactMap { $0 }.joined(separator: " \u{00B7} ")
+    }
+
+    /// When an access token ends, such as "ends 18 Oct 2027".
+    public static func tokenEnds(_ at: Date, now: Date = Date()) -> String {
+        // GitLab gives a day, in UTC; the same words as the web page's, in any locale.
+        var style = Date.VerbatimFormatStyle(format: "\(day: .defaultDigits) \(month: .abbreviated) \(year: .defaultDigits)",
+                                             timeZone: TimeZone(identifier: "UTC")!, calendar: Calendar(identifier: .gregorian))
+        style.locale = Locale(identifier: "en_GB")
+        return at <= now ? "ended" : "ends \(at.formatted(style))"
     }
 
     /// A provider with no connection yet, on Your Connectors.
@@ -202,6 +219,7 @@ public enum ConnectorSetupWords {
         switch p {
         case .github: "Issues, pull requests and Actions in every project."
         case .linear: "Linear issues in every project, and their events."
+        case .gitlab: "Merge requests, pipelines and issues on gitlab.com or your own GitLab."
         }
     }
 
@@ -211,6 +229,7 @@ public enum ConnectorSetupWords {
         switch p {
         case .github: disconnectNote
         case .linear: "Disconnect deletes the host's tokens. Linear's events stop until you connect again or set LINEAR_API_KEY. To revoke Agents too, go to linear.app \u{25B8} Settings \u{25B8} Security & access."
+        case .gitlab: GitLab.disconnectNote
         }
     }
 
@@ -237,27 +256,85 @@ public enum ConnectorSetupWords {
         public static let finishing = "Finishing the sign-in\u{2026}"
     }
 
+    /// Connect GitLab (#1630): gitlab.com by its device page, or any GitLab by an access token.
+    public enum GitLab {
+        public static let abilities = [
+            "Read and write merge requests and their comments",
+            "Read pipelines and jobs",
+            "Read and write issues",
+        ]
+        public static let subtitle = "For you, in every project. Agents talks to GitLab's API directly."
+        public static let choose = "GitLab asks for the api scope. You can take it back on GitLab \u{25B8} Preferences \u{25B8} Applications, or with Disconnect on Your Connectors."
+        public static let continueButton = "Continue on gitlab.com"
+        /// The two ways in, as the sheet's picker says them.
+        public static let signInWay = "gitlab.com"
+        public static let tokenWay = "Access token"
+        public static let tokenIntro = "For a self-managed GitLab, or gitlab.com without the sign-in: make a personal access token with the api scope, and paste it here."
+        public static let addressLabel = "GitLab address"
+        public static let addressPrompt = "https://gitlab.com"
+        public static let tokenLabel = "Access token"
+        public static let tokenPrompt = "glpat-\u{2026}"
+        public static let tokenButton = "Connect"
+        public static let checking = "Checking the token with GitLab\u{2026}"
+        public static let disconnectNote = "Disconnect deletes the host's token. GitLab's events stop until you connect again or set GITLAB_TOKEN. To revoke it too, go to GitLab \u{25B8} Preferences \u{25B8} Applications or Access tokens."
+
+        /// Where the person makes a token on the GitLab at address (gitlab.com when empty).
+        public static func newTokenURL(_ address: String) -> String {
+            var root = address.trimmingCharacters(in: .whitespacesAndNewlines)
+            if root.isEmpty { root = "https://gitlab.com" }
+            if !root.contains("://") { root = "https://" + root }
+            while root.hasSuffix("/") { root.removeLast() }
+            if root.hasSuffix("/api/v4") { root.removeLast("/api/v4".count) }
+            return root + "/-/user_settings/personal_access_tokens?name=Agents&scopes=api"
+        }
+    }
+
     /// The sheet's subtitle, list and button, by provider.
     public static func sheetSubtitle(_ p: DaemonAPI.ConnectionProvider) -> String {
-        p == .linear ? Linear.subtitle : sheetSubtitle
+        switch p {
+        case .github: sheetSubtitle
+        case .linear: Linear.subtitle
+        case .gitlab: GitLab.subtitle
+        }
     }
 
     public static func abilities(_ p: DaemonAPI.ConnectionProvider) -> [String] {
-        p == .linear ? Linear.abilities : abilities
+        switch p {
+        case .github: abilities
+        case .linear: Linear.abilities
+        case .gitlab: GitLab.abilities
+        }
     }
 
     public static func sheetChoose(_ p: DaemonAPI.ConnectionProvider) -> String {
-        p == .linear ? Linear.choose : sheetChoose
+        switch p {
+        case .github: sheetChoose
+        case .linear: Linear.choose
+        case .gitlab: GitLab.choose
+        }
     }
 
     public static func continueButton(_ p: DaemonAPI.ConnectionProvider) -> String {
-        p == .linear ? Linear.continueButton : continueButton
+        switch p {
+        case .github: continueButton
+        case .linear: Linear.continueButton
+        case .gitlab: GitLab.continueButton
+        }
+    }
+
+    /// The device page's site, for "Open github.com Again".
+    public static func site(_ p: DaemonAPI.ConnectionProvider) -> String {
+        switch p {
+        case .github: "github.com"
+        case .linear: "linear.app"
+        case .gitlab: "gitlab.com"
+        }
     }
 
     public static func sheetStatus(_ s: DaemonAPI.ConnectionSignIn) -> String {
         switch s.status {
         case .waiting where s.grant == .authorizationCode: Linear.waiting
-        case .waiting: "Waiting for github.com\u{2026} Type the code there, then approve."
+        case .waiting: "Waiting for \(site(s.provider))\u{2026} Type the code there, then approve."
         case .connected: "Connected."
         case .expired: s.message ?? "The code expired before it was approved. Try again."
         case .denied: s.message ?? "The sign-in was cancelled on \(name(s.provider))."

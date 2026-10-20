@@ -231,15 +231,21 @@ const signInWindow = "agents-sign-in";
 /**
  * Connect GitHub (frame B): the host's device flow, with the code, in a sheet. Connect Linear
  * (frame H): the same sheet. The host gives an authorize address; the page opens it in a window,
- * and the hand-back page sends the code back here by postMessage.
+ * and the hand-back page sends the code back here by postMessage. Connect GitLab (#1630): the
+ * device flow on gitlab.com, or an access token on any GitLab, which goes to the host only.
  */
 export function ConnectDialog({ store, host, provider, folder, connected, close }: {
   store: Store; host: string; provider: ConnectionProvider; folder?: string; connected: () => void; close: () => void;
 }) {
   type Step = { kind: "asking" } | { kind: "starting" } | { kind: "waiting"; flow: ConnectionSignIn }
     | { kind: "finishing" } | { kind: "install"; login: string; repository: string; url: string }
-    | { kind: "failed"; why: string };
+    | { kind: "checking" } | { kind: "failed"; why: string };
   const [step, setStep] = useState<Step>({ kind: "asking" });
+  /** GitLab only (#1630): an access token instead of the sign-in, for a self-managed GitLab. */
+  const [withToken, setWithToken] = useState(false);
+  const [address, setAddress] = useState("");
+  const [token, setToken] = useState("");
+  const busy = step.kind === "starting" || step.kind === "waiting" || step.kind === "finishing" || step.kind === "checking";
   const [flowID, setFlowID] = useState<UUID>();
   /** Removes the message listener of the sign-in under way. */
   const stopListening = useRef<(() => void) | undefined>(undefined);
@@ -334,6 +340,25 @@ export function ConnectDialog({ store, host, provider, folder, connected, close 
     }
   };
 
+  const connectWithToken = async () => {
+    const typed = token.trim();
+    if (!typed || busy) return;
+    setStep({ kind: "checking" });
+    const url = address.trim();
+    try {
+      const answer = await store.link.call("connections/sign-in/token", url ? { provider, url, token: typed } : { provider, token: typed }, host);
+      if (answer.connection) {
+        setToken("");
+        connected();
+        close();
+        return;
+      }
+      setStep({ kind: "failed", why: answer.error ?? "GitLab did not take the token." });
+    } catch (e) {
+      setStep({ kind: "failed", why: why(e) });
+    }
+  };
+
   const openAgain = (flow: ConnectionSignIn) => {
     if (flow.grant === "authorizationCode") window.open(flow.verificationURL, signInWindow);
     else openOut(flow.verificationURL);
@@ -349,11 +374,36 @@ export function ConnectDialog({ store, host, provider, folder, connected, close 
             <p class="quiet small">{words.sheetSubtitleFor(provider)}</p>
           </div>
         </div>
+        {provider === "gitlab" && (
+          <div class="segmented" role="radiogroup" aria-label="Connect with">
+            {([false, true] as const).map((t) => (
+              <button key={String(t)} type="button" role="radio" aria-checked={withToken === t} class={withToken === t ? "on" : ""}
+                disabled={busy} onClick={() => { setWithToken(t); if (step.kind === "failed") setStep({ kind: "asking" }); }}>
+                {t ? words.gitlab.tokenWay : words.gitlab.signInWay}
+              </button>
+            ))}
+          </div>
+        )}
         <h2 class="setup-heading">Agents will be able to</h2>
         <ul class="abilities">{words.abilitiesFor(provider).map((a) => <li key={a}>{a}</li>)}</ul>
+        {withToken && (
+          <form class="token-form" onSubmit={(e) => { e.preventDefault(); void connectWithToken(); }}>
+            <p class="small">{words.gitlab.tokenIntro}</p>
+            <label>{words.gitlab.addressLabel}
+              <input type="url" value={address} placeholder={words.gitlab.addressPrompt} disabled={busy}
+                autocomplete="off" autocapitalize="off" spellcheck={false}
+                onInput={(e) => setAddress((e.target as HTMLInputElement).value)} />
+            </label>
+            <label>{words.gitlab.tokenLabel}
+              <input type="password" value={token} placeholder={words.gitlab.tokenPrompt} disabled={busy} autocomplete="off"
+                onInput={(e) => setToken((e.target as HTMLInputElement).value)} />
+            </label>
+            <button type="button" class="link small" onClick={() => openOut(words.newGitLabTokenURL(address))}>Make a Token on GitLab</button>
+          </form>
+        )}
         <p class="quiet small">{words.sheetChooseFor(provider)}</p>
         {step.kind === "starting" && (
-          <p class="quiet small">{provider === "github" ? "Asking GitHub for a code…" : "Starting the sign-in…"}</p>
+          <p class="quiet small">{provider === "linear" ? "Starting the sign-in…" : `Asking ${providerName} for a code…`}</p>
         )}
         {step.kind === "waiting" && (
           <div class="sign-in-code">
@@ -363,11 +413,12 @@ export function ConnectDialog({ store, host, provider, folder, connected, close 
             )}
             <p class="small">{words.sheetStatus(step.flow)}</p>
             <button class="link small" onClick={() => openAgain(step.flow)}>
-              Open {step.flow.grant === "authorizationCode" ? "linear.app" : "github.com"} Again
+              Open {words.site(step.flow.provider)} Again
             </button>
           </div>
         )}
         {step.kind === "finishing" && <p class="quiet small">{words.linear.finishing}</p>}
+        {step.kind === "checking" && <p class="quiet small">{words.gitlab.checking}</p>}
         {step.kind === "install" && (
           <div class="sign-in-code">
             <p class="strong">Connected as {step.login}.</p>
@@ -385,8 +436,13 @@ export function ConnectDialog({ store, host, provider, folder, connected, close 
           ) : (
             <>
               <button onClick={close}>Cancel</button>
-              {step.kind === "asking" && <button class="prominent" onClick={() => void start()}>{words.continueButtonFor(provider)}</button>}
-              {step.kind === "failed" && <button class="prominent" onClick={() => void start()}>Try Again</button>}
+              {withToken
+                ? (step.kind === "asking" || step.kind === "failed") &&
+                  <button class="prominent" disabled={!token.trim()} onClick={() => void connectWithToken()}>{words.gitlab.tokenButton}</button>
+                : <>
+                  {step.kind === "asking" && <button class="prominent" onClick={() => void start()}>{words.continueButtonFor(provider)}</button>}
+                  {step.kind === "failed" && <button class="prominent" onClick={() => void start()}>Try Again</button>}
+                </>}
             </>
           )}
         </div>

@@ -48,7 +48,7 @@ struct YourConnectionsView: View {
                         connectionRow(c)
                     }
                 } else if connections != nil {
-                    Text("No connections yet. Connect GitHub to give agents issues, pull requests and Actions in every project, and Linear for its issues.")
+                    Text(ConnectorSetupWords.noConnections)
                         .appText(.supporting).foregroundStyle(.secondary)
                         .padding(.horizontal, 14).padding(.vertical, 12)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -71,6 +71,7 @@ struct YourConnectionsView: View {
             switch p {
             case .github: ConnectGitHubSheet(host: .mac, onConnected: { Task { await load() } })
             case .linear: ConnectLinearSheet(host: .mac, onConnected: { Task { await load() } })
+            case .gitlab: ConnectGitLabSheet(host: .mac, onConnected: { Task { await load() } })
             }
         }
         .confirmationDialog(disconnectTitle, isPresented: Binding(get: { disconnecting != nil },

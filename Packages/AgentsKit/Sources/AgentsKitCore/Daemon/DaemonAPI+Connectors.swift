@@ -6,7 +6,8 @@ import Foundation
 /// host does the device flow and keeps the tokens; a client shows the code and the links, and
 /// waits. Linear (#1343) is the authorization code with PKCE: the host keeps the verifier, the
 /// client opens the address in an authentication session, and gives back the code that the
-/// hand-back page sends to agents://oauth/callback. A project's set-up is the project's: its repository, four slots that each prove
+/// hand-back page sends to agents://oauth/callback. GitLab (#1630) is the device flow on
+/// gitlab.com, or a personal access token on any GitLab. A project's set-up is the project's: its repository, four slots that each prove
 /// themselves with one real read, and the github events it turned on.
 extension DaemonAPI.Method {
     public static let connectionsList = "connections/list"
@@ -17,6 +18,8 @@ extension DaemonAPI.Method {
     public static let connectionsSignInCancel = "connections/sign-in/cancel"
     /// The code and the state the hand-back page gave the client; the host spends the code.
     public static let connectionsSignInComplete = "connections/sign-in/complete"
+    /// A personal access token the person made (GitLab, #1630): the host checks and keeps it.
+    public static let connectionsSignInToken = "connections/sign-in/token"
     public static let connectionsDisconnect = "connections/disconnect"
     public static let connectorsSetup = "connectors/setup"
     public static let connectorsSetupSkip = "connectors/setup/skip"
@@ -24,7 +27,7 @@ extension DaemonAPI.Method {
 
 extension DaemonAPI {
     public enum ConnectionProvider: String, Codable, Sendable, Hashable, CaseIterable, Identifiable {
-        case github, linear
+        case github, linear, gitlab
         public var id: String { rawValue }
     }
 
@@ -43,13 +46,17 @@ extension DaemonAPI {
         public var connectedAt: Date
         /// Where the person installs the provider's App on more repositories.
         public var installURL: String?
-        /// The part of the provider the token reaches, such as a Linear workspace.
+        /// The part of the provider the token reaches, such as a Linear workspace, or a
+        /// self-managed GitLab's host.
         public var workspace: String?
+        /// When a token the host cannot renew ends: a GitLab access token's expiry.
+        public var expiresAt: Date?
 
         public init(provider: ConnectionProvider, login: String? = nil, state: ConnectionState = .connected,
-                    connectedAt: Date, installURL: String? = nil, workspace: String? = nil) {
+                    connectedAt: Date, installURL: String? = nil, workspace: String? = nil, expiresAt: Date? = nil) {
             self.provider = provider; self.login = login; self.state = state
             self.connectedAt = connectedAt; self.installURL = installURL; self.workspace = workspace
+            self.expiresAt = expiresAt
         }
     }
 
@@ -129,6 +136,25 @@ extension DaemonAPI {
             self.verificationURL = verificationURL; self.installURL = installURL; self.expiresAt = expiresAt
             self.connection = connection; self.message = message
         }
+    }
+
+    /// A personal access token for a provider with no Agents application there (a
+    /// self-managed GitLab). The host checks it, keeps it, and never gives it back.
+    public struct ConnectionTokenRequest: Codable, Sendable, Hashable {
+        public var provider: ConnectionProvider
+        /// The provider's address, such as gitlab.example.com; gitlab.com when nil.
+        public var url: String?
+        public var token: String
+        public init(provider: ConnectionProvider, url: String? = nil, token: String) {
+            self.provider = provider; self.url = url; self.token = token
+        }
+    }
+
+    /// The connection the token made, or why it made none.
+    public struct ConnectionTokenAnswer: Codable, Sendable, Hashable {
+        public var connection: Connection?
+        public var error: String?
+        public init(connection: Connection? = nil, error: String? = nil) { self.connection = connection; self.error = error }
     }
 
     public struct ConnectionDisconnectAnswer: Codable, Sendable, Hashable {

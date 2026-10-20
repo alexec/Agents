@@ -1256,6 +1256,10 @@ button.plain:hover { opacity: 1; }
 .connect-sheet ul.abilities li:first-child { border-top: 0; }
 .sign-in-code { padding: 10px 12px; border-radius: 8px; background: color-mix(in srgb, var(--accent) 10%, transparent); }
 .sign-in-code p { margin: 0 0 4px; }
+.connect-sheet .segmented { align-self: flex-start; margin-bottom: 8px; }
+.connect-sheet .token-form { display: flex; flex-direction: column; gap: 6px; margin: 0 0 8px; }
+.connect-sheet .token-form label { display: flex; flex-direction: column; gap: 2px; font-size: 0.8125rem; }
+.connect-sheet .token-form .link { align-self: flex-start; }
 .user-code { font-size: 1.5rem; font-weight: 600; letter-spacing: 0.06em; user-select: all; }
 
 /* The usage charts on Cost (#823), as Health draws them. */
