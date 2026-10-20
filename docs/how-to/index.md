@@ -31,6 +31,8 @@ something particular done.
   behind a load balancer, so it stays up when your Mac sleeps.
 - [Move an existing set-up across](move-an-existing-set-up.md): bring the earlier app's
   agents, devices and servers to a control plane, once.
+- [Back up and restore a machine](back-up-and-restore.md): keep a fixed number of backups
+  of a machine's agents and conversations in a folder, and restore one on a new machine.
 - [Release Agents Host](release-agents-host.md): publish the Developer ID download on
   GitHub by tagging main, and set up its signing secrets once.
 - [Fix Agents Host when it won't start](fix-agents-host-not-starting.md): see why a login

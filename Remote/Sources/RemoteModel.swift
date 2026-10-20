@@ -2246,9 +2246,11 @@ final class RemoteModel {
                         await self?.received(note.method, note.params, fromOther: id)
                         continue
                     }
+                    // Settings ▸ Backups is the Mac's (#1810).
                     if note.method == DaemonAPI.Notification.leasesChanged
                         || note.method == DaemonAPI.Notification.mcpHostedChanged
-                        || note.method == DaemonAPI.Notification.eventsChanged { continue }
+                        || note.method == DaemonAPI.Notification.eventsChanged
+                        || note.method == DaemonAPI.Notification.backupsChanged { continue }
                     guard let update = AgentsModel.read(note.method, note.params, showing: shown.id,
                                                          alsoShowing: shown.also) else { continue }
                     let added = await self?.work.addsProject(update, from: id) ?? false
@@ -3910,6 +3912,29 @@ final class RemoteModel {
         guard let modes = try? await client.call(DaemonAPI.Method.modesRemembered, Optional<Int>.none,
                                                  returning: DaemonAPI.RememberedModes.self) else { return }
         work.replaceRememberedModes(modes)
+    }
+
+    /// Settings ▸ Backups (#1810): the Mac's. A Mac too old to keep backups answers
+    /// nothing, which leaves the section out.
+    func refreshBackupState() async {
+        guard let state = try? await client.call(DaemonAPI.Method.backupsState, DaemonAPI.Empty(),
+                                                 returning: DaemonAPI.BackupState.self) else { return }
+        work.replaceBackupState(state)
+    }
+
+    func configureBackups(_ settings: DaemonAPI.BackupSettings) async throws {
+        work.replaceBackupState(try await client.call(DaemonAPI.Method.backupsConfigure, settings,
+                                                      returning: DaemonAPI.BackupState.self))
+    }
+
+    func makeBackup() async throws {
+        work.replaceBackupState(try await client.call(DaemonAPI.Method.backupsMake, DaemonAPI.Empty(),
+                                                      returning: DaemonAPI.BackupState.self))
+    }
+
+    func restoreBackup(_ backup: DaemonAPI.Backup) async throws -> DaemonAPI.BackupRestoreResult {
+        try await client.call(DaemonAPI.Method.backupsRestore, DaemonAPI.BackupRestoreRequest(id: backup.id),
+                              returning: DaemonAPI.BackupRestoreResult.self)
     }
 
     /// A Mac too old to know the method leaves every runtime as configured, which is

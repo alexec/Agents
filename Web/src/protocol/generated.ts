@@ -488,6 +488,41 @@ export type BackgroundItemKind = "task" | "subagent";
 
 export type BackgroundItemState = "running" | "paused" | "completed" | "failed" | "stopped" | "disconnected";
 
+export interface Backup {
+  id: string;
+  machine: string;
+  rootID: string;
+  madeAt: WireDate;
+  bytes: number;
+  agents: number;
+  thisMachine: boolean;
+}
+
+export type BackupEvery = "off" | "daily" | "weekly";
+
+export interface BackupRestoreRequest {
+  id: string;
+}
+
+export interface BackupRestoreResult {
+  restored: number;
+  skipped: number;
+}
+
+export interface BackupSettings {
+  every: BackupEvery;
+  keep: number;
+  folder?: string;
+}
+
+export interface BackupState {
+  settings: BackupSettings;
+  folder: string;
+  backups: Backup[];
+  making: boolean;
+  lastError?: string;
+}
+
 export interface Block {
   waits: Wait[];
   checkAgainAt?: WireDate;
@@ -4802,6 +4837,10 @@ export interface Methods {
   "approvals/read": { params: ApprovalReadRequest; result: GuardedChangeReading };
   "artifact/write": { params: ArtifactWriteRequest; result: Empty };
   "attention/pending": { params: Empty; result: AttentionPending };
+  "backups/configure": { params: BackupSettings; result: BackupState };
+  "backups/make": { params: Empty; result: BackupState };
+  "backups/restore": { params: BackupRestoreRequest; result: BackupRestoreResult };
+  "backups/state": { params: Empty; result: BackupState };
   "changes/file": { params: ChangesFileRequest; result: ChangedFileDetail };
   "changes/list": { params: ChangesListRequest; result: ChangesList };
   "clients/forgetSelf": { params: Empty; result: Empty };
@@ -4960,6 +4999,10 @@ export const MethodTarget = {
   "approvals/read": "host",
   "artifact/write": "host",
   "attention/pending": "host",
+  "backups/configure": "host",
+  "backups/make": "host",
+  "backups/restore": "host",
+  "backups/state": "host",
   "changes/file": "host",
   "changes/list": "host",
   "clients/forgetSelf": "control",
@@ -5091,6 +5134,7 @@ export interface Notifications {
   "agent/showFile": ShowFileNotification;
   "agents/draftOptions": DraftOptionsNotification;
   "attention/changed": AttentionNotification;
+  "backups/changed": BackupState;
   "clone/changed": CloneNotification;
   "control/hostChanged": JSONValue;
   "control/keptChanged": KeptList;
@@ -5155,6 +5199,11 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   AuthStatus: { required: ["kind", "label"], optional: [] },
   AuthenticateRequest: { required: ["runtimeID", "methodID"], optional: [] },
   BackgroundItem: { required: ["id", "kind", "name", "state", "canStop", "isStopping", "startedAt"], optional: ["taskType", "detail", "command", "parentID", "toolCallID", "outputFilePath", "summary", "lastToolName", "endedAt"] },
+  Backup: { required: ["id", "machine", "rootID", "madeAt", "bytes", "agents", "thisMachine"], optional: [] },
+  BackupRestoreRequest: { required: ["id"], optional: [] },
+  BackupRestoreResult: { required: ["restored", "skipped"], optional: [] },
+  BackupSettings: { required: ["every", "keep"], optional: ["folder"] },
+  BackupState: { required: ["settings", "folder", "backups", "making"], optional: ["lastError"] },
   Block: { required: ["waits"], optional: ["checkAgainAt", "wakeOn", "clearedAt", "clearedBy"] },
   BranchFromRequest: { required: ["agentID", "entryID"], optional: [] },
   BranchSummary: { required: ["name"], optional: ["remote"] },

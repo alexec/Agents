@@ -67,6 +67,7 @@ type Daemon struct {
 	attentionState
 	worktreeState
 	recoveryState
+	backupState
 	projectState
 	installBook
 	guardedStateHolder

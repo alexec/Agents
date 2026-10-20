@@ -13,6 +13,7 @@ public enum Capability {
     public static let approvals1 = "approvals/1"
     public static let artifact1 = "artifact/1"
     public static let attention1 = "attention/1"
+    public static let backups1 = "backups/1"
     public static let catalog1 = "catalog/1"
     public static let changes1 = "changes/1"
     public static let chatBranch1 = "chat.branch/1"
@@ -128,6 +129,10 @@ public enum Capability {
         "approvals/read": "approvals/1",
         "artifact/write": "artifact/1",
         "attention/pending": "attention/1",
+        "backups/configure": "backups/1",
+        "backups/make": "backups/1",
+        "backups/restore": "backups/1",
+        "backups/state": "backups/1",
         "catalog/destination-state": "catalog/1",
         "catalog/preview": "catalog/1",
         "catalog/search": "catalog/1",
@@ -336,6 +341,7 @@ public enum Capability {
         "agent/showFile": "agent/1",
         "agents/draftOptions": "agents/1",
         "attention/changed": "attention/1",
+        "backups/changed": "backups/1",
         "clone/changed": "clone/1",
         "cost/changed": "cost/1",
         "device/changed": "device/1",

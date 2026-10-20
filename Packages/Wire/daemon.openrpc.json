@@ -931,6 +931,106 @@
       }
     },
     {
+      "name": "backups/state",
+      "x-capability": "backups/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/BackupState"
+        }
+      }
+    },
+    {
+      "name": "backups/configure",
+      "x-capability": "backups/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/BackupSettings"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/BackupState"
+        }
+      }
+    },
+    {
+      "name": "backups/make",
+      "x-capability": "backups/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/BackupState"
+        }
+      }
+    },
+    {
+      "name": "backups/restore",
+      "x-capability": "backups/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/BackupRestoreRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/BackupRestoreResult"
+        }
+      }
+    },
+    {
       "name": "catalog/destination-state",
       "x-capability": "catalog/1",
       "paramStructure": "by-name",
@@ -5493,6 +5593,26 @@
           "required": true,
           "schema": {
             "$ref": "daemon.schema.json#/definitions/AttentionNotification"
+          }
+        }
+      ]
+    },
+    {
+      "name": "backups/changed",
+      "x-capability": "backups/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/BackupState"
           }
         }
       ]

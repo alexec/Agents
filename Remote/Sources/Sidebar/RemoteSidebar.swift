@@ -716,8 +716,9 @@ private extension View {
 /// Settings (#846): Sidebar, the same on every client (#1033), as the window's Settings
 /// pane of the same name and the page's Settings keep it, Show thoughts, as the
 /// window's Appearance pane (#1725), Live Activities, which only a phone or an iPad
-/// has (#1657), and the versions of the control plane and its hosts (#1748). Everything
-/// else follows the Mac.
+/// has (#1657), the versions of the control plane and its hosts (#1748), and the Mac's
+/// backups, as the window's Settings ▸ Mac draws them (#1810). Everything else follows
+/// the Mac.
 private struct RemoteSettings: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(RemoteModel.self) private var model
@@ -730,6 +731,11 @@ private struct RemoteSettings: View {
                 LiveActivitySettingsSection()
                 GitAccessSettingsSection()
                 VersionsSettingsSection()
+                // The folder is the Mac's disk, so it is chosen on the Mac.
+                if let backups = model.work.backupState {
+                    BackupsSection(state: backups, configure: model.configureBackups, make: model.makeBackup,
+                                   restore: model.restoreBackup)
+                }
                 // The docs site (#1327), as the Mac's Help ▸ Agents Help.
                 Section {
                     Link(destination: HelpSite.url) {
@@ -744,6 +750,7 @@ private struct RemoteSettings: View {
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } }
             }
+            .task { await model.refreshBackupState() }
         }
     }
 }

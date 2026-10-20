@@ -249,6 +249,14 @@ public enum DaemonAPI {
         public static let approvalsRead = "approvals/read"
         /// Every volume that is low on space, for the window's strip (#195).
         public static let diskState = "disk/state"
+        /// This machine's backups and their settings (#1810).
+        public static let backupsState = "backups/state"
+        /// How often, how many to keep, and the folder. Answers the state after.
+        public static let backupsConfigure = "backups/configure"
+        /// Start a backup now. Answers at once, `making` set; `backups/changed` says when it ends.
+        public static let backupsMake = "backups/make"
+        /// Bring a backup's agents back, archived. One already here is skipped.
+        public static let backupsRestore = "backups/restore"
         /// Clone a Git URL into the home folder and add it (027). Answers when the
         /// project exists, which for a big repository is minutes: the window shows the
         /// clone from `clone/changed`, not from waiting on this.
@@ -587,6 +595,8 @@ public enum DaemonAPI {
         public static let leasesChanged = "leases/changed"
         /// A volume went low or came back, or how much a low one has free moved (#195).
         public static let diskChanged = "disk/changed"
+        /// A backup started or ended, or the backup settings changed (#1810). A `BackupState`.
+        public static let backupsChanged = "backups/changed"
         /// Worktrees measured in the background (#790): each one's size as `worktrees/list`
         /// and `worktrees/all` will now give it, for a list already drawn to fill in.
         public static let worktreesSized = "worktrees/sized"
@@ -4199,6 +4209,87 @@ public extension DaemonAPI {
         public init(moved: [String], applied: Bool) {
             self.moved = moved
             self.applied = applied
+        }
+    }
+
+    // MARK: Backups of a machine (#1810)
+
+    enum BackupEvery: String, Codable, Hashable, Sendable, CaseIterable {
+        case off, daily, weekly
+
+        /// A value this build does not know reads as daily, as the host does.
+        public init(from decoder: Decoder) throws {
+            self = Self(rawValue: try decoder.singleValueContainer().decode(String.self)) ?? .daily
+        }
+    }
+
+    struct BackupSettings: Codable, Hashable, Sendable {
+        public var every: BackupEvery
+        /// How many of this machine's backups are kept, 1 to 10.
+        public var keep: Int
+        /// The folder, when not the host's own `<root>/backups`.
+        public var folder: String?
+
+        public init(every: BackupEvery, keep: Int, folder: String? = nil) {
+            self.every = every
+            self.keep = keep
+            self.folder = folder
+        }
+    }
+
+    /// One backup in the folder: this machine's, or another's that this one can restore.
+    struct Backup: Codable, Hashable, Sendable, Identifiable {
+        public var id: String
+        public var machine: String
+        public var rootID: String
+        public var madeAt: Date
+        public var bytes: Int
+        public var agents: Int
+        public var thisMachine: Bool
+
+        public init(id: String, machine: String, rootID: String, madeAt: Date, bytes: Int, agents: Int, thisMachine: Bool) {
+            self.id = id
+            self.machine = machine
+            self.rootID = rootID
+            self.madeAt = madeAt
+            self.bytes = bytes
+            self.agents = agents
+            self.thisMachine = thisMachine
+        }
+    }
+
+    /// `backups/state`, and what `backups/changed` carries.
+    struct BackupState: Codable, Hashable, Sendable {
+        public var settings: BackupSettings
+        /// The folder in use.
+        public var folder: String
+        /// Newest first.
+        public var backups: [Backup]
+        public var making: Bool
+        public var lastError: String?
+
+        public init(settings: BackupSettings, folder: String, backups: [Backup], making: Bool, lastError: String? = nil) {
+            self.settings = settings
+            self.folder = folder
+            self.backups = backups
+            self.making = making
+            self.lastError = lastError
+        }
+    }
+
+    struct BackupRestoreRequest: Codable, Sendable {
+        public var id: String
+
+        public init(id: String) { self.id = id }
+    }
+
+    struct BackupRestoreResult: Codable, Hashable, Sendable {
+        public var restored: Int
+        public var skipped: Int
+
+        public init(restored: Int, skipped: Int) {
+            self.restored = restored
+            self.skipped = skipped
         }
     }
 

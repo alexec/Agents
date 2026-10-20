@@ -288,6 +288,9 @@ public final class AgentsModel {
     /// warning, and the phone's Runtimes list.
     public private(set) var runtimeAllowances: RuntimeAllowances?
     public private(set) var retentionState: DaemonAPI.RetentionState?
+    /// This machine's backups and their settings (#1810). Nil until the host has said, or
+    /// from a host too old to keep backups, which leaves the section out.
+    public private(set) var backupState: DaemonAPI.BackupState?
     /// Every resource an agent can lease, who holds it and who is waiting (036), as
     /// the daemon last said. Replaced whole by each `leases/changed`, never merged. Nil
     /// from a daemon too old to have leases, which draws nothing.
@@ -427,6 +430,7 @@ public final class AgentsModel {
         case pluginsChanged(DaemonAPI.PluginsList)
         case costChanged(DaemonAPI.CostState)
         case retentionChanged(DaemonAPI.RetentionState)
+        case backupsChanged(DaemonAPI.BackupState)
         case runtimeAllowancesChanged(RuntimeAllowances)
         case agentRemoved(DaemonAPI.AgentRemovedNotification)
         case leasesChanged(DaemonAPI.LeaseSnapshot)
@@ -484,6 +488,7 @@ public final class AgentsModel {
         case DaemonAPI.Notification.pluginsChanged: return decode(DaemonAPI.PluginsList.self, Update.pluginsChanged)
         case DaemonAPI.Notification.costChanged: return decode(DaemonAPI.CostState.self, Update.costChanged)
         case DaemonAPI.Notification.retentionChanged: return decode(DaemonAPI.RetentionState.self, Update.retentionChanged)
+        case DaemonAPI.Notification.backupsChanged: return decode(DaemonAPI.BackupState.self, Update.backupsChanged)
         case DaemonAPI.Notification.runtimesAllowancesChanged:
             return decode(RuntimeAllowances.self, Update.runtimeAllowancesChanged)
         case DaemonAPI.Notification.agentRemoved: return decode(DaemonAPI.AgentRemovedNotification.self, Update.agentRemoved)
@@ -675,6 +680,9 @@ public final class AgentsModel {
 
         case .retentionChanged(let state):
             retentionState = state
+
+        case .backupsChanged(let state):
+            backupState = state
 
         case .runtimeAllowancesChanged(let allowances):
             runtimeAllowances = allowances
@@ -1002,6 +1010,7 @@ public final class AgentsModel {
 
     public func replaceCostState(_ state: DaemonAPI.CostState) { costState = state }
     public func replaceRetentionState(_ state: DaemonAPI.RetentionState) { retentionState = state }
+    public func replaceBackupState(_ state: DaemonAPI.BackupState) { backupState = state }
     public func replaceRuntimeAllowances(_ allowances: RuntimeAllowances) { runtimeAllowances = allowances }
     public func replaceHostedMCP(_ snapshot: DaemonAPI.HostedMCPSnapshot) { hostedMCP = snapshot }
     public func replaceMCPHealth(_ snapshot: DaemonAPI.MCPHealthSnapshot, from host: HostID = .mac) {

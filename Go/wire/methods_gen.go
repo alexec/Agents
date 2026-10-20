@@ -40,6 +40,10 @@ var (
 	CallApprovalsRead                  = Method[ApprovalReadRequest, GuardedChangeReading]{"approvals/read"}
 	CallArtifactWrite                  = Method[ArtifactWriteRequest, Empty]{"artifact/write"}
 	CallAttentionPending               = Method[Empty, AttentionPending]{"attention/pending"}
+	CallBackupsConfigure               = Method[BackupSettings, BackupState]{"backups/configure"}
+	CallBackupsMake                    = Method[Empty, BackupState]{"backups/make"}
+	CallBackupsRestore                 = Method[BackupRestoreRequest, BackupRestoreResult]{"backups/restore"}
+	CallBackupsState                   = Method[Empty, BackupState]{"backups/state"}
 	CallCatalogDestinationState        = Method[DestinationStateRequest, DestinationStateAnswer]{"catalog/destination-state"}
 	CallCatalogPreview                 = Method[CatalogPreviewRequest, CatalogPreviewAnswer]{"catalog/preview"}
 	CallCatalogSearch                  = Method[CatalogSearchRequest, JSONValue]{"catalog/search"}
@@ -248,6 +252,7 @@ var (
 	NotifyAgentShowFile                = Notification[ShowFileNotification]{"agent/showFile"}
 	NotifyAgentsDraftOptions           = Notification[DraftOptionsNotification]{"agents/draftOptions"}
 	NotifyAttentionChanged             = Notification[AttentionNotification]{"attention/changed"}
+	NotifyBackupsChanged               = Notification[BackupState]{"backups/changed"}
 	NotifyCloneChanged                 = Notification[CloneNotification]{"clone/changed"}
 	NotifyCostChanged                  = Notification[CostState]{"cost/changed"}
 	NotifyDeviceChanged                = Notification[DeviceNotification]{"device/changed"}
