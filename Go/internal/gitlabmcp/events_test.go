@@ -344,6 +344,52 @@ func TestLabelledCursorLosesNothingAtItsEdge(t *testing.T) {
 	}
 }
 
+// Two waits on one project share an issue's label events while it is unchanged, but a label
+// added since is read afresh, never hidden by what was shared.
+func TestLabelEventsAreSharedByTheIssuesUpdate(t *testing.T) {
+	f := newFake(t)
+	f.addMembers()
+	gl := f.gitlab()
+	gl.sharing = time.Hour
+	waits := []*poller{newPoller(t, f, "issue.labelled", map[string]any{"label": "agent"}),
+		newPoller(t, f, "issue.labelled", map[string]any{"label": "agent", "issue": 1})}
+	for _, w := range waits {
+		w.events.GitLab = gl
+		w.poll()
+	}
+	read := func() int {
+		n := 0
+		for _, r := range f.asked() {
+			if strings.Contains(r, "/resource_label_events") {
+				n++
+			}
+		}
+		return n
+	}
+	f.set(func() {
+		f.issues = []obj{issueObj(1, dev, obj{"updated_at": at(1), "labels": []string{"bug"}})}
+		f.labelled[1] = []obj{{"id": 10, "action": "add", "created_at": at(1), "user": dev, "label": obj{"name": "bug"}}}
+	})
+	for _, w := range waits {
+		ids, _ := w.poll()
+		same(t, ids, nil)
+	}
+	if read() != 1 {
+		t.Fatalf("label events read %d times, want once", read())
+	}
+	f.set(func() {
+		f.issues[0]["updated_at"], f.issues[0]["labels"] = at(2), []string{"bug", "agent"}
+		f.labelled[1] = append(f.labelled[1], obj{"id": 11, "action": "add", "created_at": at(2), "user": dev, "label": obj{"name": "agent"}})
+	})
+	for _, w := range waits {
+		ids, _ := w.poll()
+		same(t, ids, []string{"issue.labelled:group/app:label:11"})
+	}
+	if read() != 2 {
+		t.Fatalf("label events read %d times, want twice", read())
+	}
+}
+
 func TestReviewCommentIsALineOfTheDiff(t *testing.T) {
 	f := newFake(t)
 	f.addMembers()

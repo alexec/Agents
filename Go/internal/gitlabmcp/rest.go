@@ -194,6 +194,20 @@ func (g *RealGitLab) get(ctx context.Context, path string, shared bool, into any
 	return nil
 }
 
+// getAsOf is path's JSON shared as get shares it, but only with a fetch for the same asOf: a
+// time the thing at path changed at, or something newer than it was seen at, so what is
+// shared is never older than what the caller has seen.
+func (g *RealGitLab) getAsOf(ctx context.Context, path, asOf string, into any) error {
+	body, err := g.shared(path+" "+normalized(asOf), func() ([]byte, error) { return g.do(ctx, http.MethodGet, path, nil) })
+	if err != nil {
+		return err
+	}
+	if json.Unmarshal(body, into) != nil {
+		return &GitLabError{Kind: Failed, Message: "GitLab's answer is not JSON"}
+	}
+	return nil
+}
+
 func (g *RealGitLab) send(ctx context.Context, method, path string, body, into any) error {
 	data, err := g.do(ctx, method, path, body)
 	if err != nil {
@@ -277,7 +291,8 @@ func newest[T any](ctx context.Context, g *RealGitLab, path, since string, at fu
 
 // labelled is every label added to an issue at or after since: the issues updated since, and
 // each one's label events (GitLab has no project-wide list of them). Adding a label updates
-// the issue, so none is missed; an issue updated for another reason costs one more read.
+// the issue, so none is missed; an issue updated for another reason costs one more read. The
+// label events are shared by the issue's update time: unchanged, its labels are too.
 func (g *RealGitLab) labelled(ctx context.Context, project, since string) ([]IssueActivity, Listed, error) {
 	path := fmt.Sprintf("projects/%s/issues?updated_after=%s&order_by=updated_at&sort=desc", pid(project), url.QueryEscape(since))
 	items, listed, err := newest(ctx, g, path, since, func(i issueJSON) string { return i.UpdatedAt })
@@ -295,7 +310,7 @@ func (g *RealGitLab) labelled(ctx context.Context, project, since string) ([]Iss
 				Name string `json:"name"`
 			} `json:"label"`
 		}
-		if err := g.get(ctx, fmt.Sprintf("projects/%s/issues/%d/resource_label_events?per_page=%d", pid(project), i.IID, perPage), false, &events); err != nil {
+		if err := g.getAsOf(ctx, fmt.Sprintf("projects/%s/issues/%d/resource_label_events?per_page=%d", pid(project), i.IID, perPage), i.UpdatedAt, &events); err != nil {
 			return nil, Listed{}, err
 		}
 		for _, e := range events {
@@ -661,6 +676,8 @@ func (g *RealGitLab) IssueActivity(ctx context.Context, project string, kind Iss
 		return nil, Listed{}, err
 	}
 	var out []IssueActivity
+	// An issue is read once per poll, shared with other waits that saw the same newest comment
+	// on it (notes are newest first), so it is never older than that comment.
 	issues := map[int]issueJSON{}
 	for _, n := range notes {
 		if n.NoteableType != "Issue" {
@@ -668,7 +685,7 @@ func (g *RealGitLab) IssueActivity(ctx context.Context, project string, kind Iss
 		}
 		i, ok := issues[n.NoteableIID]
 		if !ok {
-			if err := g.get(ctx, fmt.Sprintf("projects/%s/issues/%d", pid(project), n.NoteableIID), false, &i); err != nil {
+			if err := g.getAsOf(ctx, fmt.Sprintf("projects/%s/issues/%d", pid(project), n.NoteableIID), n.CreatedAt, &i); err != nil {
 				return nil, Listed{}, err
 			}
 			issues[n.NoteableIID] = i
@@ -689,6 +706,7 @@ func (g *RealGitLab) ReviewComments(ctx context.Context, project, since string) 
 		return nil, Listed{}, err
 	}
 	var out []ReviewComment
+	// A merge request is read as an issue is in IssueActivity.
 	mrs := map[int]mergeRequest{}
 	for _, n := range notes {
 		if n.NoteableType != "MergeRequest" || n.Type != "DiffNote" {
@@ -696,7 +714,7 @@ func (g *RealGitLab) ReviewComments(ctx context.Context, project, since string) 
 		}
 		m, ok := mrs[n.NoteableIID]
 		if !ok {
-			if err := g.get(ctx, fmt.Sprintf("projects/%s/merge_requests/%d", pid(project), n.NoteableIID), false, &m); err != nil {
+			if err := g.getAsOf(ctx, fmt.Sprintf("projects/%s/merge_requests/%d", pid(project), n.NoteableIID), n.CreatedAt, &m); err != nil {
 				return nil, Listed{}, err
 			}
 			mrs[n.NoteableIID] = m
