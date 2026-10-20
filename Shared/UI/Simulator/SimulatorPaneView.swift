@@ -30,6 +30,10 @@ struct SimulatorPaneView: View {
     @State private var chosen: String?
     @State private var screen: DaemonAPI.SimulatorScreen?
     @State private var problem: String?
+    /// Why the list could not be asked for: said in the middle with Try Again, not as "no simulators" (#1666).
+    @State private var listProblem: String?
+    /// Why the last screen read failed: the old frame is dimmed and says so (#1666).
+    @State private var screenProblem: String?
     @State private var busy = false
     /// How big the screen is drawn, for where a touch lands on it.
     @State private var shown: CGSize = .zero
@@ -76,6 +80,7 @@ struct SimulatorPaneView: View {
         .task { await reload() }
         // Read again each second, while seen and booted, and never two at once.
         .task(id: "\(reading)-\(simulator?.udid ?? "")-\(simulator?.booted == true)-\(touches)") {
+            screenProblem = nil
             guard reading, let simulator, simulator.booted else {
                 if simulator?.booted != true { screen = nil }
                 return
@@ -83,9 +88,9 @@ struct SimulatorPaneView: View {
             while !Task.isCancelled {
                 do {
                     screen = try await calls.screen(simulator.udid, maxHeight)
-                    problem = nil
+                    screenProblem = nil
                 } catch {
-                    problem = describe(error)
+                    screenProblem = describe(error)
                 }
                 try? await Task.sleep(for: .seconds(1))
             }
@@ -94,7 +99,7 @@ struct SimulatorPaneView: View {
 
     private var bar: some View {
         HStack(spacing: 8) {
-            if let list, !list.simulators.isEmpty {
+            if listProblem == nil, let list, !list.simulators.isEmpty {
                 Picker("Simulator", selection: Binding(get: { simulator?.udid ?? "" }, set: { chosen = $0 })) {
                     ForEach(list.simulators) { sim in
                         Text("\(sim.name) · \(sim.os)\(sim.booted ? "" : " · Shut Down")").tag(sim.udid)
@@ -104,7 +109,7 @@ struct SimulatorPaneView: View {
                 .fixedSize()
             }
             Spacer(minLength: 0)
-            if let simulator {
+            if listProblem == nil, let simulator {
                 if simulator.booted {
                     Button {
                         touch { try await calls.home(simulator.udid) }
@@ -131,26 +136,24 @@ struct SimulatorPaneView: View {
 
     @ViewBuilder
     private var content: some View {
-        if list == nil {
+        if let listProblem {
+            VStack(spacing: 8) {
+                Text("Couldn't list the simulators: \(listProblem)")
+                    .appText(.supporting)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                Button("Try Again") { Task { await reload() } }
+            }
+        } else if list == nil {
             ProgressView().controlSize(.small)
         } else if let simulator {
             if simulator.booted, let screen, let image = Self.image(screen.jpeg) {
-                image
-                    .resizable()
-                    .interpolation(.medium)
-                    .aspectRatio(CGFloat(screen.width) / CGFloat(max(screen.height, 1)), contentMode: .fit)
-                    .clipShape(RoundedRectangle(cornerRadius: 18))
-                    .overlay { RoundedRectangle(cornerRadius: 18).strokeBorder(.quaternary) }
-                    .onGeometryChange(for: CGSize.self, of: \.size) { shown = $0 }
-                    // A touch where it was clicked or tapped, as a share of the screen.
-                    .onTapGesture { point in
-                        guard shown.width > 0, shown.height > 0 else { return }
-                        let x = min(max(point.x / shown.width, 0), 1)
-                        let y = min(max(point.y / shown.height, 0), 1)
-                        touch { try await calls.tap(simulator.udid, x, y) }
-                    }
-                    .accessibilityLabel("The screen of \(simulator.name)")
-                    .accessibilityHint("A tap here is a tap on the simulator")
+                frame(image, screen: screen, simulator: simulator)
+            } else if simulator.booted, let screenProblem {
+                Text("Not updating: \(screenProblem)")
+                    .appText(.supporting)
+                    .tinted(.failure)
+                    .multilineTextAlignment(.center)
             } else if simulator.booted {
                 ProgressView().controlSize(.small)
             } else {
@@ -164,6 +167,35 @@ struct SimulatorPaneView: View {
                 .appText(.supporting)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
+        }
+    }
+
+    /// The last frame read. When a read fails, it is dimmed and says why it is old (#1666).
+    private func frame(_ image: Image, screen: DaemonAPI.SimulatorScreen, simulator: DaemonAPI.Simulator) -> some View {
+        VStack(spacing: 6) {
+            image
+                .resizable()
+                .interpolation(.medium)
+                .aspectRatio(CGFloat(screen.width) / CGFloat(max(screen.height, 1)), contentMode: .fit)
+                .clipShape(RoundedRectangle(cornerRadius: 18))
+                .overlay { RoundedRectangle(cornerRadius: 18).strokeBorder(.quaternary) }
+                .onGeometryChange(for: CGSize.self, of: \.size) { shown = $0 }
+                // A touch where it was clicked or tapped, as a share of the screen.
+                .onTapGesture { point in
+                    guard shown.width > 0, shown.height > 0 else { return }
+                    let x = min(max(point.x / shown.width, 0), 1)
+                    let y = min(max(point.y / shown.height, 0), 1)
+                    touch { try await calls.tap(simulator.udid, x, y) }
+                }
+                .accessibilityLabel("The screen of \(simulator.name)")
+                .accessibilityHint("A tap here is a tap on the simulator")
+                .opacity(screenProblem == nil ? 1 : 0.4)
+            if let screenProblem {
+                Text("Not updating: \(screenProblem)")
+                    .appText(.fine)
+                    .tinted(.failure)
+                    .multilineTextAlignment(.center)
+            }
         }
     }
 
@@ -184,10 +216,9 @@ struct SimulatorPaneView: View {
     private func reload() async {
         do {
             list = try await calls.list()
-            problem = nil
+            listProblem = nil
         } catch {
-            list = DaemonAPI.SimulatorList(simulators: [])
-            problem = describe(error)
+            listProblem = describe(error)
         }
     }
 
