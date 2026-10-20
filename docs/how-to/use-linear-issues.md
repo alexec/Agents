@@ -60,13 +60,28 @@ Add Linear's own server from the registry, or by hand with the URL
 3. To keep the page in the sidebar, pin it in the project's `.agents/pins.json`:
 
    ```json
-   { "title": "Linear issues", "view": { "server": "linear", "tool": "show_issues",
-       "uri": "ui://linear/issues", "arguments": { "team": "ENG" } } }
+   { "pins": [ { "pinned_by": { "person": true }, "title": "Linear issues",
+       "view": { "server": "linear", "tool": "show_issues", "uri": "ui://linear/issues",
+                 "arguments": { "team": "ENG" } } } ] }
    ```
+
+   Or pin the page from the app, as any other page.
 
 **Start Agent** opens the new-agent form for the issue. The prompt tells the agent to put
 the issue's identifier (such as `ENG-12`) in its branch and pull request title, so that
 Linear's GitHub integration links the pull request to the issue.
+
+## Work a Linear issue with an agent
+
+A project that pushes to GitHub lists the ready-made workflow **Work a Linear issue**, off.
+Turn it on in the project's Workflows. Then, when a Linear issue gets the `agent` label, a
+new agent reads it with Linear's server, takes it, works on a branch `agent/eng-12`, opens a
+pull request whose title starts with `ENG-12`, and comments on the issue with the link. With
+Linear's GitHub integration on, the pull request shows on the issue, and `Fixes ENG-12` in its
+body closes the issue when it merges. The agent never merges.
+
+The GitHub **Work an issue** workflow takes only the `github` server's `issue.labelled`, so
+one label starts one agent.
 
 ## Start an agent on an event
 
