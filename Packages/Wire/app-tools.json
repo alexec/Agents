@@ -378,7 +378,7 @@
     "title" : "Read another session's history"
   },
   {
-    "description" : "Say something to another session in this project, which it reads as a prompt marked as yours, not the person's; the person sees it in that chat too. A session that is working gets it after its turn; one that is done or asking to be archived is woken by it, whoever started it, within the project's running limit for sessions started by sessions; one that is stopped waits until it is next started. It never answers a question that session is waiting on. A reply comes back the same way, as a message to you. Limits: 4000 characters, 30 an hour, and at most 3 messages between sessions in a row with no prompt from the person.",
+    "description" : "Say something to another session in this project, which it reads as a prompt marked as yours, not the person's; the person sees it in that chat too. A session that is working gets it after its turn; one that is done or asking to be archived is woken by it, within the project's running limit for sessions started by sessions; one that is stopped waits until it is next started. It never answers a question that session is waiting on. A session that another session started takes messages only from that session: send to its starter instead. A reply comes back the same way, as a message to you. Limits: 4000 characters, 30 an hour, and at most 3 messages between sessions in a row with no prompt from the person.",
     "inputSchema" : {
       "properties" : {
         "description" : {
