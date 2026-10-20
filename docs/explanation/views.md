@@ -186,7 +186,10 @@ Project**.
 
 Merge, review and comment are tools that only a view may call (`merge_pr`, `review_pr`,
 `comment_on_pr`): a person does them, from the page. The server reads GitHub as the
-person, with the host's GitHub connection (#1335).
+person, with the host's GitHub connection (#1335). Merge, auto-merge and review carry the
+head commit that the page shows (`sha`, from `headSha`). When the pull request has a newer
+commit, the server does nothing and says so: open the page again to see it. The diff is of
+that commit too.
 
 ## The test view
 

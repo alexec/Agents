@@ -30,7 +30,7 @@ const boardAnswer = `{"data":{"viewer":{"login":"alexec"},"repository":{"pullReq
    {"__typename":"CheckRun","name":"test","status":"IN_PROGRESS","conclusion":null,"detailsUrl":""}]}}}}]}}]}}}}`
 
 const pageAnswer = `{"data":{"viewer":{"login":"alexec"},"repository":{"pullRequest":{
- "number":7,"title":"Fix the mean","url":"https://github.com/o/r/pull/7","headRefName":"fix-mean","baseRefName":"main",
+ "number":7,"title":"Fix the mean","url":"https://github.com/o/r/pull/7","headRefName":"fix-mean","headRefOid":"c0ffee","baseRefName":"main",
  "state":"OPEN","isDraft":false,"body":"Divide by the count.","createdAt":"2026-10-18T08:00:00Z","additions":3,"deletions":1,
  "mergeable":"MERGEABLE","reviewDecision":"REVIEW_REQUIRED","author":{"login":"sam","__typename":"User"},"autoMergeRequest":null,
  "files":{"totalCount":1,"nodes":[{"path":"average.py","additions":3,"deletions":1,"changeType":"MODIFIED"}]},
@@ -49,6 +49,14 @@ type viewsAPI struct {
 	calls []string
 	// posted is each comment posted: its path and words.
 	posted []string
+	// sent is each write's method, path and body.
+	sent []string
+}
+
+func (a *viewsAPI) sentText() string {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return strings.Join(a.sent, "\n")
 }
 
 func (a *viewsAPI) serve(t *testing.T) *httptest.Server {
@@ -56,10 +64,15 @@ func (a *viewsAPI) serve(t *testing.T) *httptest.Server {
 		body, _ := io.ReadAll(r.Body)
 		a.mu.Lock()
 		a.calls = append(a.calls, r.Method+" "+r.URL.Path)
+		if r.Method != http.MethodGet && !strings.HasPrefix(string(body), `{"query":"query`) {
+			a.sent = append(a.sent, r.Method+" "+r.URL.Path+" "+string(body))
+		}
 		a.mu.Unlock()
 		switch {
 		case r.URL.Path == "/graphql" && strings.Contains(string(body), "pullRequests(states: OPEN"):
 			io.WriteString(w, boardAnswer)
+		case r.URL.Path == "/graphql" && strings.Contains(string(body), "enablePullRequestAutoMerge"):
+			io.WriteString(w, `{"data":{"enablePullRequestAutoMerge":{"pullRequest":{"number":7}}}}`)
 		case r.URL.Path == "/graphql" && strings.Contains(string(body), "pullRequest(number"):
 			io.WriteString(w, pageAnswer)
 		case r.URL.Path == "/repos/o/r/issues":
@@ -67,7 +80,7 @@ func (a *viewsAPI) serve(t *testing.T) *httptest.Server {
 			  "labels":[{"name":"bug"}],"assignees":[{"login":"sam"}],"comments":2,"updated_at":"2026-10-18T07:00:00Z"},
 			 {"number":7,"title":"a PR","pull_request":{"url":"x"}}]`)
 		case r.URL.Path == "/repos/o/r/pulls/7" && r.Method == http.MethodGet:
-			io.WriteString(w, `{"node_id":"PR_7","head":{"ref":"fix-mean","repo":{"full_name":"o/r"}}}`)
+			io.WriteString(w, `{"node_id":"PR_7","head":{"ref":"fix-mean","sha":"c0ffee","repo":{"full_name":"o/r"}}}`)
 		case r.URL.Path == "/repos/o/r/pulls/7/merge" && r.Method == http.MethodPut:
 			if !strings.Contains(string(body), `"squash"`) {
 				t.Errorf("merge: %s", body)
@@ -247,7 +260,7 @@ func TestAFailedLogIsItsFailedJobsEndInPlainText(t *testing.T) {
 
 func TestAPersonsMergeSquashesAndDeletesTheBranch(t *testing.T) {
 	c, api := viewsClient(t)
-	_, r := callTool(t, c, "merge_pr", map[string]any{"number": 7})
+	_, r := callTool(t, c, "merge_pr", map[string]any{"number": 7, "sha": "c0ffee"})
 	if r["merged"] != true {
 		t.Fatalf("merge: %v", r)
 	}
@@ -257,11 +270,56 @@ func TestAPersonsMergeSquashesAndDeletesTheBranch(t *testing.T) {
 	if !strings.Contains(calls, "PUT /repos/o/r/pulls/7/merge") || !strings.Contains(calls, "DELETE /repos/o/r/git/refs/heads/fix-mean") {
 		t.Errorf("calls: %s", calls)
 	}
-	if res, _ := callTool(t, c, "review_pr", map[string]any{"number": 7, "event": "request_changes"}); !res.IsError {
+	if res, _ := callTool(t, c, "review_pr", map[string]any{"number": 7, "event": "request_changes", "sha": "c0ffee"}); !res.IsError {
 		t.Error("changes were requested without saying what")
 	}
-	if _, rv := callTool(t, c, "review_pr", map[string]any{"number": 7, "event": "approve"}); rv["event"] != "approve" {
+	if _, rv := callTool(t, c, "review_pr", map[string]any{"number": 7, "event": "approve", "sha": "c0ffee"}); rv["event"] != "approve" {
 		t.Errorf("approve: %v", rv)
+	}
+	sent := api.sentText()
+	if !strings.Contains(sent, `"sha":"c0ffee"`) || !strings.Contains(sent, `"commit_id":"c0ffee"`) {
+		t.Errorf("sent: %s", sent)
+	}
+}
+
+// A person's merge, auto-merge, review and diff are of the head commit the page showed: with
+// none, or when the pull request has a newer one, GitHub is asked nothing.
+func TestAPersonActsOnTheCommitThePageShows(t *testing.T) {
+	c, api := viewsClient(t)
+	if _, p := callTool(t, c, "show_pull_request", map[string]any{"number": 7}); p["headSha"] != "c0ffee" {
+		t.Fatalf("page: %v", p)
+	}
+	for _, sha := range []string{"", "newer"} {
+		for _, call := range []struct {
+			tool string
+			args map[string]any
+		}{
+			{"merge_pr", map[string]any{"number": 7}},
+			{"merge_pr", map[string]any{"number": 7, "auto": true}},
+			{"review_pr", map[string]any{"number": 7, "event": "approve"}},
+		} {
+			if sha != "" {
+				call.args["sha"] = sha
+			}
+			if r, _ := callTool(t, c, call.tool, call.args); !r.IsError {
+				t.Errorf("%s %v with sha %q was not refused", call.tool, call.args, sha)
+			}
+		}
+	}
+	if sent := api.sentText(); sent != "" {
+		t.Fatalf("GitHub was asked: %s", sent)
+	}
+	if r, _ := callTool(t, c, "show_pull_request_diff", map[string]any{"number": 7, "sha": "newer"}); !r.IsError {
+		t.Error("a diff of another commit was shown")
+	}
+	if _, d := callTool(t, c, "show_pull_request_diff", map[string]any{"number": 7, "sha": "c0ffee"}); d["headSha"] != "c0ffee" {
+		t.Errorf("diff: %v", d)
+	}
+	if _, r := callTool(t, c, "merge_pr", map[string]any{"number": 7, "auto": true, "sha": "c0ffee"}); r["auto"] != true {
+		t.Fatalf("auto: %v", r)
+	}
+	if sent := api.sentText(); !strings.Contains(sent, "expectedHeadOid") || !strings.Contains(sent, `"sha":"c0ffee"`) {
+		t.Errorf("auto-merge: %s", sent)
 	}
 }
 

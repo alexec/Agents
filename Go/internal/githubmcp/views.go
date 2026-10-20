@@ -66,6 +66,12 @@ type prArgs struct {
 	Number int    `json:"number" jsonschema:"the pull request's number"`
 }
 
+type diffArgs struct {
+	Repo   string `json:"repo,omitempty" jsonschema:"owner/name; the repo this folder pushes to when left out"`
+	Number int    `json:"number" jsonschema:"the pull request's number"`
+	Sha    string `json:"sha,omitempty" jsonschema:"the head commit that the page shows (headSha); refused when the head is another"`
+}
+
 type runArgs struct {
 	Repo  string `json:"repo,omitempty" jsonschema:"owner/name; the repo this folder pushes to when left out"`
 	RunID int    `json:"runId" jsonschema:"the Actions run's id"`
@@ -75,12 +81,14 @@ type runArgs struct {
 type mergeArgs struct {
 	Repo   string `json:"repo,omitempty" jsonschema:"owner/name; the repo this folder pushes to when left out"`
 	Number int    `json:"number" jsonschema:"the pull request's number"`
+	Sha    string `json:"sha" jsonschema:"the head commit that the page shows (headSha); refused when the head is another"`
 	Auto   bool   `json:"auto,omitempty" jsonschema:"true: merge once its checks pass"`
 }
 
 type reviewArgs struct {
 	Repo   string `json:"repo,omitempty" jsonschema:"owner/name; the repo this folder pushes to when left out"`
 	Number int    `json:"number" jsonschema:"the pull request's number"`
+	Sha    string `json:"sha" jsonschema:"the head commit that the page shows (headSha); the review is of that commit"`
 	Event  string `json:"event" jsonschema:"approve or request_changes"`
 	Body   string `json:"body,omitempty" jsonschema:"the review's words, in Markdown; needed to request changes"`
 }
@@ -182,14 +190,14 @@ func AddViews(server *mcp.Server, gh Views) {
 
 	mcp.AddTool(server, &mcp.Tool{Name: "show_pull_request_diff", Title: "Show a pull request's diff",
 		Description: fmt.Sprintf("A pull request's changed files, each with its hunks of context, added and removed lines, at most %d lines "+
-			"in all. The pull request's page opens it in the app's own diff.", diffLines),
+			"in all, and the head commit it is of (headSha). The pull request's page opens it in the app's own diff.", diffLines),
 		Annotations: readOnly, Meta: uiMeta("", "model", "app")},
-		func(ctx context.Context, _ *mcp.CallToolRequest, in prArgs) (*mcp.CallToolResult, any, error) {
+		func(ctx context.Context, _ *mcp.CallToolRequest, in diffArgs) (*mcp.CallToolResult, any, error) {
 			repo, err := repoOf(ctx, in.Repo)
 			if err != nil {
 				return failed(err), nil, nil
 			}
-			d, err := gh.PRDiff(ctx, repo, in.Number)
+			d, err := gh.PRDiff(ctx, repo, in.Number, in.Sha)
 			if err != nil {
 				return failed(err), nil, nil
 			}
@@ -235,7 +243,7 @@ func AddViews(server *mcp.Server, gh Views) {
 			if err != nil {
 				return failed(err), nil, nil
 			}
-			r, err := gh.MergePR(ctx, repo, in.Number, in.Auto)
+			r, err := gh.MergePR(ctx, repo, in.Number, in.Sha, in.Auto)
 			if err != nil {
 				return failed(err), nil, nil
 			}
@@ -258,7 +266,7 @@ func AddViews(server *mcp.Server, gh Views) {
 			case in.Event == "request_changes" && body == "":
 				return failed(fmt.Errorf("say what is to change: body is needed to request changes")), nil, nil
 			}
-			r, err := gh.ReviewPR(ctx, repo, in.Number, in.Event == "approve", body)
+			r, err := gh.ReviewPR(ctx, repo, in.Number, in.Sha, in.Event == "approve", body)
 			if err != nil {
 				return failed(err), nil, nil
 			}
