@@ -17,11 +17,16 @@ enum MacPageActions {
             image: { url in await pictures.image(agentID: agentID, url: url) },
             stamp: { url in await pictures.stamp(agentID: agentID, url: url) },
             canEdit: !model.hosts.isOffline(host))
-        // A source file's problems, from its language server on the agent's host (#844).
-        actions.diagnose = { path, text in try await model.diagnose(path: path, text: text, of: agentID) }
+        // A source file's problems, from its language server on the agent's host (#844), when
+        // the host is new enough to ask (#1748).
+        if model.host(host, has: Capability.filesDiagnostics1) {
+            actions.diagnose = { path, text in try await model.diagnose(path: path, text: text, of: agentID) }
+        }
         // And what it would write at the caret, for the editor's completion list (#844).
-        actions.complete = { path, text, line, column in
-            await model.complete(path: path, text: text, line: line, column: column, of: agentID)
+        if model.host(host, has: Capability.filesComplete1) {
+            actions.complete = { path, text, line, column in
+                await model.complete(path: path, text: text, line: line, column: column, of: agentID)
+            }
         }
         return actions
     }

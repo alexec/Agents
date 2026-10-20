@@ -637,8 +637,9 @@ struct QueuedPromptRow: View {
                     .help("Send this into the turn that is running, without waiting for it to end")
                 }
 
-                // The person's own words only: another agent's are theirs (#560).
-                if prompt.from == .person {
+                // The person's own words only: another agent's are theirs (#560). Not on a
+                // host too old to change them (#1748).
+                if prompt.from == .person, actions.canEditQueued(agentID) {
                     Button {
                         draft = prompt.text
                     } label: {

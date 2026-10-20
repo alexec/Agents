@@ -129,7 +129,8 @@ struct ChatView: View {
     /// Branch from Here (#1658), on a prompt in the chat or in the Prompts list: as Branch,
     /// not on an archived session.
     private func branchFrom(_ agent: Agent?) -> (@MainActor (UUID, String) -> Void)? {
-        guard let agent, agent.state != .archived else { return nil }
+        // Not on a host too old to branch (#1748).
+        guard let agent, agent.state != .archived, model.host(agent.host, has: Capability.chatBranch1) else { return nil }
         return { [model] entryID, text in Task { await model.branch(from: entryID, of: agent.id, text: text) } }
     }
 
@@ -186,6 +187,7 @@ struct ChatView: View {
             terminalOutput: { [model, popped] id in (popped?.work.terminalOutput ?? model.terminalOutput)[id] ?? "" },
             unqueue: { [model] prompt, agentID in await model.unqueue(prompt, from: agentID) },
             editQueued: { [model] prompt, text, agentID in await model.editQueued(prompt, text: text, of: agentID) },
+            canEditQueued: { [model] agentID in model.agent(agentID, has: Capability.agentsEditQueued1) },
             quote: { [model, agent] words in model.offeredQuote = PromptOffer(agentID: agent?.id, words: words) },
             branchFrom: branchFrom(agent),
             runCommand: runCommand,

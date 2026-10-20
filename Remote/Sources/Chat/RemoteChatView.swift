@@ -59,7 +59,7 @@ struct RemoteChatView: View {
             // ⌘F finds in the chat with a keyboard attached, as on the Mac (#1532).
             Button("Find in Chat") { finding = true }
                 .keyboardShortcut("f")
-                .disabled(agent == nil || popped != nil)
+                .disabled(!findsInChat)
                 .opacity(0)
                 .accessibilityHidden(true)
             // ⇧⌘P, the Mac's Prompts (#1658).
@@ -290,7 +290,7 @@ struct RemoteChatView: View {
             }
             if let agent {
                 ToolbarItem(placement: .topBarTrailing) {
-                    ChatMenu(agent: agent, find: popped == nil ? { finding = true } : nil,
+                    ChatMenu(agent: agent, find: findsInChat ? { finding = true } : nil,
                              prompts: popped == nil ? { showingPrompts = true } : nil) { searchingFiles = true }
                 }
             }
@@ -410,6 +410,7 @@ struct RemoteChatView: View {
             },
             unqueue: { [model] prompt, agentID in await model.unqueue(prompt, from: agentID) },
             editQueued: { [model] prompt, text, agentID in await model.editQueued(prompt, text: text, of: agentID) },
+            canEditQueued: { [model] agentID in model.agent(agentID, has: Capability.agentsEditQueued1) },
             quote: { [model, agent] words in model.offeredQuote = PromptOffer(agentID: agent?.id, words: words) },
             branchFrom: branchFrom,
             runCommand: runCommand,
@@ -471,10 +472,16 @@ struct RemoteChatView: View {
             sendTo: { [model] id, text in await model.send(text, to: id) })
     }
 
+    /// Find in Chat (#1532): not in a popped-out chat, nor on a host too old to find (#1748).
+    private var findsInChat: Bool {
+        agent != nil && popped == nil && model.agent(agent?.id, has: Capability.agentsFind1)
+    }
+
     /// Branch from Here (#1658), on a prompt in the chat or in the Prompts list: as Branch,
     /// not on an archived session.
     private var branchFrom: (@MainActor (UUID, String) -> Void)? {
-        guard let agent, agent.state != .archived else { return nil }
+        // Not on a host too old to branch (#1748).
+        guard let agent, agent.state != .archived, model.host(agent.host, has: Capability.chatBranch1) else { return nil }
         return { [model] entryID, text in Task { await model.branch(from: entryID, of: agent.id, text: text) } }
     }
 

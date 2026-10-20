@@ -28,12 +28,13 @@ struct MCPServersListView: View {
 
     var body: some View {
         List {
-            // The set-up first (#1336): a project's slots, or the person's connections.
-            if let project {
+            // The set-up first (#1336): a project's slots, or the person's connections; neither
+            // on a host too old to have them (#1748).
+            if let project, model.host(project.host, has: Capability.connectorsSetup1) {
                 RemoteConnectorSetup(project: project, projectName: model.work.project(project)?.name
                                          ?? project.folder.lastPathComponent, setup: $setup,
                                      problem: setupProblem, reload: readSetUp)
-            } else {
+            } else if project == nil, model.host(.mac, has: Capability.connections1) {
                 RemoteConnections(connections: connections, problem: $setupProblem, reload: { await readSetUp(.cached) })
             }
             Section {
@@ -79,11 +80,13 @@ struct MCPServersListView: View {
     /// A project's set-up, or the person's connections.
     private func readSetUp(_ how: DaemonAPI.ConnectorSetupReading) async {
         if let project {
+            guard model.host(project.host, has: Capability.connectorsSetup1) else { return }
             switch await model.connectorSetup(project, reading: how) {
             case .success(let fresh): setup = fresh; setupProblem = nil
             case .failure(let failure): setupProblem = failure.words
             }
         } else {
+            guard model.host(.mac, has: Capability.connections1) else { return }
             switch await model.connections(on: .mac) {
             case .success(let list): connections = list; setupProblem = nil
             case .failure(let failure): connections = connections ?? []; setupProblem = failure.words

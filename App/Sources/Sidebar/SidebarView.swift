@@ -126,9 +126,16 @@ struct SidebarView: View {
             }
             // The session's Mac's simulators (#842): its screen is read only while shown.
             if shows(.simulator, state) {
-                SimulatorPaneView(calls: model.simulatorCalls(for: agent.id), isVisible: frame.pane == .simulator)
-                    .opacity(frame.pane == .simulator ? 1 : 0)
-                    .allowsHitTesting(frame.pane == .simulator)
+                // Not on a host too old to have them (#1748).
+                Group {
+                    if model.host(agent.host, has: Capability.simulators1) {
+                        SimulatorPaneView(calls: model.simulatorCalls(for: agent.id), isVisible: frame.pane == .simulator)
+                    } else {
+                        HostNeedsUpdateView()
+                    }
+                }
+                .opacity(frame.pane == .simulator ? 1 : 0)
+                .allowsHitTesting(frame.pane == .simulator)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)

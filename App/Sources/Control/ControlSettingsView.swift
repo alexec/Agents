@@ -199,7 +199,8 @@ struct ControlOverviewPage: View {
         // The port it listens on is its own; on the internet, a proxy in front of it has
         // the one devices use (#1498).
         if control.publicAddress == nil, let port = status.port { parts.append("port \(port)") }
-        return parts.joined(separator: " · ")
+        // This window too old for it (#1748), on a line of its own.
+        return ([parts.joined(separator: " · ")] + [UpdateWords.appMissing(status)].compactMap { $0 }).joined(separator: "\n")
     }
 
     private func hostName(_ host: DaemonAPI.ControlHost) -> String {
@@ -496,17 +497,12 @@ struct ControlHostsPage: View {
     private func thisMacLine(_ host: DaemonAPI.ControlHost) -> String {
         let projects = model.work.projects.filter { $0.host == host.id }.count
         let working = model.work.agents.filter { $0.host == host.id && ($0.state == .running || $0.state == .starting) }.count
-        var parts = [host.platform.replacingOccurrences(of: " ", with: " · "), Self.versionWords(host),
+        var parts = [host.platform.replacingOccurrences(of: " ", with: " · "), UpdateWords.version(host),
                      count(projects, "project")]
         if working > 0 { parts.append("\(count(working, "agent")) working") }
-        if host.state != "online" { parts.insert(host.state.capitalized, at: 0) }
-        return parts.joined(separator: " · ")
-    }
-
-    /// "Agents 0.9 (Go)" for a host written in Go (#1134), so the one being tried is never
-    /// taken for the other; the Swift host says only its version.
-    static func versionWords(_ host: DaemonAPI.ControlHost) -> String {
-        host.implementation == "go" ? "Agents \(host.version) (Go)" : "Agents \(host.version)"
+        if host.state != "online" { parts.insert(UpdateWords.state(host), at: 0) }
+        return ([parts.joined(separator: " · ")] + [UpdateWords.missing(host, controlVersion: control.status?.version)].compactMap { $0 })
+            .joined(separator: "\n")
     }
 
     private func unjoinedLine(_ tunnel: DaemonAPI.HostTunnel) -> String {
@@ -520,7 +516,8 @@ struct ControlHostsPage: View {
         let uses = GitLendWords.uses(host) { lender in
             lender == control.thisMacHost?.id ? nil : (control.hosts.first { $0.id == lender }?.name ?? lender.rawValue)
         }
-        return [baseLine(host), uses].compactMap { $0 }.joined(separator: "\n")
+        return [baseLine(host), UpdateWords.missing(host, controlVersion: control.status?.version), uses]
+            .compactMap { $0 }.joined(separator: "\n")
     }
 
     private func baseLine(_ host: DaemonAPI.ControlHost) -> String {
@@ -530,9 +527,9 @@ struct ControlHostsPage: View {
             return state + (host.relay == true ? "Relays your devices through iCloud" : "Relaying switched off")
         }
         var parts: [String] = []
-        if host.state != "online" { parts.append(host.state.capitalized) }
+        if host.state != "online" { parts.append(UpdateWords.state(host)) }
         if !host.platform.isEmpty { parts.append(host.platform.replacingOccurrences(of: " ", with: " · ")) }
-        if !host.version.isEmpty { parts.append(Self.versionWords(host)) }
+        if !host.version.isEmpty { parts.append(UpdateWords.version(host)) }
         if let workspace = host.workspace {
             // Linked (#691, L2): where it runs, and what Agents does with it, on a line of its own.
             parts.append("\(workspace.providerName): \(workspace.workspaceName)")

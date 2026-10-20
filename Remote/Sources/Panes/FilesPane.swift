@@ -551,11 +551,16 @@ struct FilesPane: View {
         var actions = PageActions(
             save: { path, document in await model.writeArtifact(agentID: agentID, path: path, text: document) },
             canEdit: !model.isStale)
-        // A source file's problems, from its language server on the agent's host (#844).
-        actions.diagnose = { path, text in try await model.diagnose(path: path, text: text, of: agentID) }
+        // A source file's problems, from its language server on the agent's host (#844), when
+        // the host is new enough to ask (#1748).
+        if model.agent(agentID, has: Capability.filesDiagnostics1) {
+            actions.diagnose = { path, text in try await model.diagnose(path: path, text: text, of: agentID) }
+        }
         // And what it would write at the caret (#1603).
-        actions.complete = { path, text, line, column in
-            await model.complete(path: path, text: text, line: line, column: column, of: agentID)
+        if model.agent(agentID, has: Capability.filesComplete1) {
+            actions.complete = { path, text, line, column in
+                await model.complete(path: path, text: text, line: line, column: column, of: agentID)
+            }
         }
         return actions
     }

@@ -715,8 +715,9 @@ private extension View {
 
 /// Settings (#846): Sidebar, the same on every client (#1033), as the window's Settings
 /// pane of the same name and the page's Settings keep it, Show thoughts, as the
-/// window's Appearance pane (#1725), and Live Activities, which only a phone or an iPad
-/// has (#1657). Everything else follows the Mac.
+/// window's Appearance pane (#1725), Live Activities, which only a phone or an iPad
+/// has (#1657), and the versions of the control plane and its hosts (#1748). Everything
+/// else follows the Mac.
 private struct RemoteSettings: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(RemoteModel.self) private var model
@@ -728,6 +729,7 @@ private struct RemoteSettings: View {
                 ThoughtsSettingsSection(header: "Appearance")
                 LiveActivitySettingsSection()
                 GitAccessSettingsSection()
+                VersionsSettingsSection()
                 // The docs site (#1327), as the Mac's Help ▸ Agents Help.
                 Section {
                     Link(destination: HelpSite.url) {

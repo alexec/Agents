@@ -17,6 +17,8 @@ import { fileToPin, nameOf, paneOf, pathOf, setPane, textShownAs, type Tab } fro
 import { LiveDocument } from "./LiveDocument";
 import { Exchanged } from "./Exchanged";
 import { SimulatorPane } from "./SimulatorPane";
+import { Capability } from "../protocol/capabilities.generated";
+import { hostNeedsUpdate } from "../model/capabilities";
 
 const tabs: { tab: Tab; label: string }[] = [
   { tab: "files", label: "Files" }, { tab: "changes", label: "Changes" }, { tab: "page", label: "Page" },
@@ -150,7 +152,9 @@ export function FilesPane({ store, host, session }: { store: Store; host: string
           ? <LiveDocument store={store} host={host} agentID={session} path={pane.page} line={pane.line} />
           : <p class="hint">A Markdown file the agent shows reads here.</p>)}
         {pane.tab === "exchanged" && <Exchanged store={store} host={host} session={session} />}
-        {pane.tab === "simulator" && <SimulatorPane store={store} host={host} />}
+        {pane.tab === "simulator" && (store.has(host, Capability.simulators1)
+          ? <SimulatorPane store={store} host={host} />
+          : <p class="hint">{hostNeedsUpdate}</p>)}
       </div>
     </aside>
   );
