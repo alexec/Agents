@@ -2247,8 +2247,10 @@ final class RemoteModel {
                         || note.method == DaemonAPI.Notification.eventsChanged { continue }
                     guard let update = AgentsModel.read(note.method, note.params, showing: shown.id,
                                                          alsoShowing: shown.also) else { continue }
+                    let added = await self?.work.addsProject(update, from: id) ?? false
                     await self?.work.apply(update, from: id)
                     await self?.applyToPopouts(update)
+                    if added { await self?.refreshWorkflows() }
                     if case .projectRemoved = update { await self?.forgetArchived(AgentsModel.stamp(update, host: id)) }
                 }
                 // Its connection ended: its cards are stale until the watch reaches it again.
@@ -2333,9 +2335,12 @@ final class RemoteModel {
         // Anything the shared model does not claim is the Mac's own — shells,
         // terminals — and a remote has no business with it.
         if let update {
+            // A project added has workflows no notification brings (#1798).
+            let added = self.work.addsProject(update)
             self.work.apply(update)
             applyToPopouts(update)
             forgetArchived(update)
+            if added { Task { await refreshWorkflows() } }
         }
         // Nothing below waits on the network: one slow answer would hold every
         // notification after it (#175). What needs asking is asked beside the loop.
