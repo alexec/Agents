@@ -244,7 +244,7 @@ func TestARefusedTokenIsSaidInTheProvidersWordsWithoutTheToken(t *testing.T) {
 	_, text := fakeDigitalOcean(t)
 	p, logged := apiProvider(t, text, DigitalOceanSecret, token+"-wrong")
 	_, err := p.List()
-	if err == nil || !strings.Contains(err.Error(), "answered 401: Unable to authenticate you. Check its token") {
+	if err == nil || !strings.Contains(err.Error(), "answered 401: Unable to authenticate you. Check its secrets, and what the token or key may do.") {
 		t.Fatalf("%v", err)
 	}
 	noToken(t, err.Error())
