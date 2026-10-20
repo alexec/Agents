@@ -1,22 +1,28 @@
 ---
 name: fix-failed-checks
-description: Find why a pull request's checks failed, fix it on the PR's branch and push, or run the failed jobs again when the failure is not caused by the change. Use when the Fix failed checks workflow starts on checks.failed, or when someone asks you to fix a PR's failed checks.
+description: Find why a pull request's checks or a merge request's pipeline failed, fix it on its branch and push, or run the failed jobs again when the failure is not caused by the change. Use when the Fix failed checks workflow starts on checks.failed, or when someone asks you to fix failed checks.
 ---
 
 # Fix failed checks
 
-A pull request's checks failed. You find why, and fix it on the pull request's own branch.
-You use the `github` server's tools for GitHub, not `gh`.
+A pull request's checks (GitHub) or a merge request's pipeline (GitLab) failed. You find
+why, and fix it on its own branch. The event's server says which forge: use the `github`
+server's tools for GitHub and the `gitlab` server's tools for GitLab, not `gh` or `glab`.
+On GitLab a merge request is `pr` in the event, and its number is its iid (`!12`).
 
-1. **Read the failure.** Use `get_job_logs` with the repo, `run_id` (the event's `run.id`)
-   and `failed_only: true`. Use `pull_request_read` (`method: get_diff`) to see what the
-   pull request changes.
+| Step | GitHub (`github` server) | GitLab (`gitlab` server) |
+|---|---|---|
+| Read the failure | `get_job_logs` with `run_id` (the event's `run.id`) and `failed_only: true` | `failed_log` with `pipelineId` (the event's `run.id`) |
+| See the change | `pull_request_read` (`method: get_diff`) | `git diff` of the branch against its target, after step 3 |
+| Run the failed jobs again | `actions_run_trigger` (`method: rerun_failed_jobs`, `run_id`) | `retry_pipeline` with `pipelineId` |
+| Comment | `add_issue_comment` on the pull request | `comment_on_merge_request` |
+
+1. **Read the failure.** Use the tools in the table.
 2. **Decide.** When the failure is not caused by the change (a test that fails on the
-   default branch too, a timeout, a runner or network problem), use `actions_run_trigger`
-   with `method: rerun_failed_jobs` and `run_id`, use `add_issue_comment` on the pull
-   request to say why, and stop.
+   default branch too, a timeout, a runner or network problem), run the failed jobs again,
+   comment to say why, and stop.
 3. **Get the branch.** Use the app's `move_worktree` tool to move into a worktree on the
-   pull request's branch (the event's `pr.branch`). When you do not have that tool, use
+   branch (the event's `pr.branch`). When you do not have that tool, use
    `git worktree add` beside the project's folder. Pull it first, so that you have its
    newest commit.
 4. **Fix it.** Change only what makes the check pass. Never turn off, skip or weaken a
@@ -24,9 +30,9 @@ You use the `github` server's tools for GitHub, not `gh`.
    can.
 5. **Push.** Commit with a message that says which check you fixed, and push to the same
    branch. Never force-push.
-6. **Tell the pull request.** Use `add_issue_comment` on the pull request to say what
-   failed and what you changed.
+6. **Tell the pull request or merge request.** Comment to say what failed and what you
+   changed.
 
-When the fix is not clear, or it needs a decision from a person, do not push. Use
-`add_issue_comment` to say what you found, and stop. Never merge, approve or close the
-pull request.
+When the fix is not clear, or it needs a decision from a person, do not push. Comment to
+say what you found, and stop. Never merge, approve or close the pull request or merge
+request.

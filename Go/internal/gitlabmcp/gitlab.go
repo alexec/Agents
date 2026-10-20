@@ -115,6 +115,7 @@ type IssueKind string
 
 const (
 	IssueOpened    IssueKind = "opened"
+	IssueLabelled  IssueKind = "labelled"
 	IssueCommented IssueKind = "commented"
 	IssueClosed    IssueKind = "closed"
 )
@@ -125,8 +126,8 @@ type IssueActivity struct {
 	At    string
 	Issue Issue
 	Kind  IssueKind
-	// By for a close.
-	By string
+	// By for a close or a label added; Label for a label added.
+	By, Label string
 	// CommentAuthor, CommentURL and CommentBody (clipped) for a comment.
 	CommentAuthor, CommentURL, CommentBody string
 	// Trusted says whether whoever did it is one of the project's own (#728).
@@ -138,6 +139,8 @@ func (a IssueActivity) data() map[string]any {
 	switch a.Kind {
 	case IssueOpened:
 		d["openedAt"] = a.At
+	case IssueLabelled:
+		d["label"], d["by"], d["labelledAt"] = a.Label, a.By, a.At
 	case IssueCommented:
 		d["comment"] = map[string]any{"author": a.CommentAuthor, "url": a.CommentURL, "body": a.CommentBody}
 		d["commentedAt"] = a.At

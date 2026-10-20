@@ -466,3 +466,32 @@ func TestServerEventDataStaysInsideItsFence(t *testing.T) {
 		}
 	}
 }
+
+// A workflow for both forges (#1633) listens to the server a project has and says nothing of
+// the other, or of an event no server here offers, once one of its triggers is heard.
+func TestAWorkflowForTwoServersSaysNothingOfTheOneNotHere(t *testing.T) {
+	d, c := start(t, t.TempDir())
+	defer d.Shutdown()
+	ci := newEventsServer(t)
+	serverHome(t, d, ci.URL)
+	quickPolls(d)
+	dir := project(t, c, 1)
+	folder := store.FolderURL(dir)
+	os.MkdirAll(workflowsFolder(dir), 0o755)
+	os.WriteFile(filepath.Join(workflowsFolder(dir), "both.md"),
+		[]byte("---\non:\n  - pr.merged:\n      server: [ci, gone]\n  - review.posted\n---\nLook.\n"), 0o644)
+	os.WriteFile(filepath.Join(workflowsFolder(dir), "none.md"),
+		[]byte("---\non:\n  - pr.merged:\n      server: [gone, away]\n---\nLook.\n"), 0o644)
+	approveAll(t, c, folder)
+	d.StartMCPEvents()
+	var lines []wire.MCPTriggerStatus
+	waitFor(t, "the heard line alone", func() bool {
+		lines = summaryOf(t, c, folder, "both").McpTriggers
+		return len(lines) == 1 && lines[0].Server != nil && *lines[0].Server == "ci" && lines[0].Failure == nil
+	})
+	var none []wire.MCPTriggerStatus
+	waitFor(t, "both lines when nothing is heard", func() bool {
+		none = summaryOf(t, c, folder, "none").McpTriggers
+		return len(none) == 2
+	})
+}

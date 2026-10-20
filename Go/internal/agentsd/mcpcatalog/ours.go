@@ -55,7 +55,7 @@ var (
 		"review.posted", "review.comment", "issue.opened", "issue.labelled", "issue.commented", "issue.closed"}
 	linearEvents = []string{"issue.opened", "issue.labelled", "issue.commented", "issue.closed"}
 	gitlabEvents = []string{"checks.failed", "pr.opened", "pr.merged", "pr.closed", "pr.conflicted", "review.comment",
-		"issue.opened", "issue.commented", "issue.closed"}
+		"issue.opened", "issue.labelled", "issue.commented", "issue.closed"}
 )
 
 // NameHere is the name its entry takes in an mcp.json: github, gitlab.
@@ -120,7 +120,7 @@ type Declared struct {
 // workflow names events, never a server, so any server that declares one of them reaches
 // the Workflows level. agentsd's readymade folder holds the workflows; a test there keeps
 // this list the same as their triggers.
-var ReadyMadeEvents = []string{"checks.failed", "issue.labelled", "review.posted"}
+var ReadyMadeEvents = []string{"checks.failed", "issue.labelled", "review.comment", "review.posted"}
 
 // Levels is the five levels (#1428) from what a server declares, and whether it was tested.
 func Levels(d Declared, tested bool) wire.MCPLevels {

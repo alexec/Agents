@@ -41,14 +41,15 @@ type fakeGitLab struct {
 	diffs    map[int][]obj // merge request → its files
 	discuss  map[int][]obj // merge request → its discussions
 	traces   map[int]string
-	status   int // answer every request with this, when set
+	labelled map[int][]obj // issue → its resource label events
+	status   int           // answer every request with this, when set
 	header   http.Header
 	server   *httptest.Server
 }
 
 func newFake(t *testing.T) *fakeGitLab {
 	f := &fakeGitLab{t: t, jobs: map[int][]obj{}, commits: map[string][]obj{}, members: map[int]int{}, diffs: map[int][]obj{},
-		discuss: map[int][]obj{}, traces: map[int]string{}}
+		discuss: map[int][]obj{}, traces: map[int]string{}, labelled: map[int][]obj{}}
 	f.server = httptest.NewServer(http.HandlerFunc(f.serve))
 	t.Cleanup(f.server.Close)
 	return f
@@ -97,7 +98,7 @@ func issueObj(iid int, author obj, extra obj) obj {
 
 var (
 	start = time.Date(2026, 10, 19, 12, 0, 0, 0, time.UTC)
-	path  = regexp.MustCompile(`^/api/v4/projects/group%2Fapp/(.*)$`)
+	path  = regexp.MustCompile(`^/api/v4/projects/group%2Fapp(?:/(.*))?$`)
 )
 
 func at(minutes int) string { return timeString(start.Add(time.Duration(minutes) * time.Minute)) }
@@ -174,6 +175,18 @@ func (f *fakeGitLab) serve(w http.ResponseWriter, r *http.Request) {
 		f.posted = append(f.posted, sent)
 	}
 	switch {
+	case len(parts) == 1 && parts[0] == "":
+		answer(200, obj{"id": projectID, "path_with_namespace": project, "default_branch": "main"})
+	case len(parts) == 1 && parts[0] == "merge_requests" && r.Method == http.MethodPost:
+		answer(201, mrJSON(12, "agent/issue-2", alex, nil))
+	case len(parts) == 5 && parts[0] == "merge_requests" && parts[2] == "discussions" && parts[4] == "notes" && r.Method == http.MethodPost:
+		answer(201, obj{"id": 901, "body": "x"})
+	case len(parts) == 3 && parts[0] == "issues" && parts[2] == "notes" && r.Method == http.MethodGet:
+		answer(200, []obj{{"id": 50, "body": "added ~bug", "system": true, "author": alex},
+			{"id": 51, "body": "Please also do this.", "author": stranger}, {"id": 52, "body": "Yes, do.", "author": dev}})
+	case len(parts) == 3 && parts[0] == "issues" && parts[2] == "resource_label_events":
+		id, _ := strconv.Atoi(parts[1])
+		answer(200, orEmpty(f.labelled[id]))
 	case len(parts) == 1 && parts[0] == "merge_requests":
 		answer(200, stated(f.mrs, "state", q.Get("state")))
 	case len(parts) == 2 && parts[0] == "merge_requests":

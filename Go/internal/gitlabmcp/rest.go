@@ -272,6 +272,44 @@ func newest[T any](ctx context.Context, g *RealGitLab, path, since string, at fu
 	return items, true, nil
 }
 
+// labelled is every label added to an issue at or after since: the issues updated since, and
+// each one's label events (GitLab has no project-wide list of them). Adding a label updates
+// the issue, so none is missed; an issue updated for another reason costs one more read.
+func (g *RealGitLab) labelled(ctx context.Context, project, since string) ([]IssueActivity, bool, error) {
+	path := fmt.Sprintf("projects/%s/issues?updated_after=%s&order_by=updated_at&sort=desc", pid(project), url.QueryEscape(since))
+	items, truncated, err := newest(ctx, g, path, since, func(i issueJSON) string { return i.UpdatedAt })
+	if err != nil {
+		return nil, false, err
+	}
+	var out []IssueActivity
+	for _, i := range items {
+		var events []struct {
+			ID        int    `json:"id"`
+			Action    string `json:"action"`
+			CreatedAt string `json:"created_at"`
+			User      user   `json:"user"`
+			Label     *struct {
+				Name string `json:"name"`
+			} `json:"label"`
+		}
+		if err := g.get(ctx, fmt.Sprintf("projects/%s/issues/%d/resource_label_events?per_page=%d", pid(project), i.IID, perPage), false, &events); err != nil {
+			return nil, false, err
+		}
+		for _, e := range events {
+			if e.Action != "add" || e.Label == nil || before(e.CreatedAt, since) {
+				continue
+			}
+			trusted, err := g.trusted(ctx, project, &e.User)
+			if err != nil {
+				return nil, false, err
+			}
+			out = append(out, IssueActivity{ID: "label:" + strconv.Itoa(e.ID), At: e.CreatedAt, Issue: i.issue(), Kind: IssueLabelled,
+				By: e.User.Username, Label: e.Label.Name, Trusted: trusted})
+		}
+	}
+	return out, truncated, nil
+}
+
 // MARK: GitLab's JSON
 
 type user struct {
@@ -588,6 +626,8 @@ func (g *RealGitLab) IssueActivity(ctx context.Context, project string, kind Iss
 			out = append(out, IssueActivity{ID: strconv.Itoa(i.IID), At: i.CreatedAt, Issue: i.issue(), Kind: IssueOpened, Trusted: trusted})
 		}
 		return out, truncated, nil
+	case IssueLabelled:
+		return g.labelled(ctx, project, since)
 	case IssueClosed:
 		path := fmt.Sprintf("projects/%s/issues?state=closed&updated_after=%s&order_by=updated_at&sort=desc", pid(project), url.QueryEscape(since))
 		items, truncated, err := newest(ctx, g, path, since, func(i issueJSON) string { return i.UpdatedAt })

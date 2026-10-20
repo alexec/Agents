@@ -10,9 +10,11 @@ import (
 	"github.com/alexec/agents/Go/wire"
 )
 
-// Ready-made workflows (#1342): Agents' own workflows for the dev loop on GitHub. Each is
-// readymade/<id>/workflow.md, short, and the method in readymade/<id>/SKILL.md (#1563).
-// A project that pushes to GitHub lists each one that it has no file for, off. Nothing is
+// Ready-made workflows (#1342): Agents' own workflows for the dev loop on GitHub, and on
+// GitLab too (#1633): one workflow for both forges, its skill using the server the event
+// came from. Each is readymade/<id>/workflow.md, short, and the method in
+// readymade/<id>/SKILL.md (#1563). A project that pushes to GitHub or GitLab lists each one
+// that it has no file for, off. Nothing is
 // written until a person (or an agent) turns one on or changes it: then the workflow goes
 // to .agents/workflows/<id>.md and its skill to .agents/skills/<id>/SKILL.md, and from
 // then on it is the project's own file.
@@ -38,9 +40,10 @@ func readyMadeText(id string) (workflow, skill string) {
 	return string(w), string(s)
 }
 
-// pushesToGitHub is whether a folder's git config names a github.com remote. It reads the
-// config, never runs git: the scan that asks runs often.
-func pushesToGitHub(folder string) bool {
+// pushesToForge is whether a folder's git config names a GitHub or GitLab remote: github.com,
+// or a host with gitlab in its name. It reads the config, never runs git: the scan that asks
+// runs often.
+func pushesToForge(folder string) bool {
 	gitDir := filepath.Join(folder, ".git")
 	if fi, err := os.Stat(gitDir); err != nil {
 		return false
@@ -69,7 +72,7 @@ func pushesToGitHub(folder string) bool {
 	}
 	for _, l := range strings.Split(string(b), "\n") {
 		if k, v, ok := strings.Cut(strings.TrimSpace(l), "="); ok && strings.TrimSpace(k) == "url" &&
-			strings.Contains(strings.TrimSpace(v), "github.com") {
+			(strings.Contains(strings.TrimSpace(v), "github.com") || strings.Contains(strings.ToLower(v), "gitlab")) {
 			return true
 		}
 	}
@@ -78,7 +81,7 @@ func pushesToGitHub(folder string) bool {
 
 // addReadyMadeLocked lists the ready-made workflows that a folder has no file for.
 func (d *Daemon) addReadyMadeLocked(folder string, files map[string]map[string]*workflowFile) {
-	if !pushesToGitHub(folder) || folder == d.chatFolder() || !ownFolders(folder, workflowsRel) {
+	if !pushesToForge(folder) || folder == d.chatFolder() || !ownFolders(folder, workflowsRel) {
 		return
 	}
 	for _, id := range readyMadeIDs() {

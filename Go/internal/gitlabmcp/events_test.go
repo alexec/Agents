@@ -61,7 +61,7 @@ func same(t *testing.T, got, want []string) {
 
 func TestTheEventsAreTheGitHubServersNames(t *testing.T) {
 	same(t, EventNames(), []string{"checks.failed", "pr.opened", "pr.merged", "pr.closed", "pr.conflicted", "review.comment",
-		"issue.opened", "issue.commented", "issue.closed"})
+		"issue.opened", "issue.labelled", "issue.commented", "issue.closed"})
 }
 
 func TestOpenedIsRaisedWhenReadyAndOnlyForTheProjectsOwn(t *testing.T) {
@@ -252,6 +252,36 @@ func TestIssueEvents(t *testing.T) {
 	}
 }
 
+// issue.labelled (#1633): one event per label added since the last poll, by the project's
+// own people unless anyone, and only the label asked for.
+func TestIssueLabelled(t *testing.T) {
+	f := newFake(t)
+	f.addMembers()
+	agent := newPoller(t, f, "issue.labelled", map[string]any{"label": "agent"})
+	agent.poll()
+	f.set(func() {
+		f.issues = []obj{
+			issueObj(1, stranger, obj{"updated_at": at(3), "labels": []string{"agent", "bug"}}),
+			issueObj(2, alex, obj{"updated_at": at(2), "labels": []string{"agent"}}),
+		}
+		f.labelled[1] = []obj{
+			{"id": 31, "action": "add", "created_at": at(3), "user": dev, "label": obj{"name": "agent"}},
+			{"id": 30, "action": "add", "created_at": at(2), "user": dev, "label": obj{"name": "bug"}},
+			{"id": 29, "action": "add", "created_at": at(-90), "user": dev, "label": obj{"name": "agent"}},
+		}
+		f.labelled[2] = []obj{
+			{"id": 40, "action": "add", "created_at": at(2), "user": stranger, "label": obj{"name": "agent"}},
+			{"id": 41, "action": "remove", "created_at": at(2), "user": alex, "label": obj{"name": "agent"}},
+		}
+	})
+	ids, result := agent.poll()
+	same(t, ids, []string{"issue.labelled:group/app:label:31"})
+	if d := data(t, result, 0); d["label"] != "agent" || d["by"] != "dev" || d["labelledAt"] != at(3) ||
+		d["issue"].(map[string]any)["number"] != 1 {
+		t.Fatalf("labelled %v", d)
+	}
+}
+
 func TestReviewCommentIsALineOfTheDiff(t *testing.T) {
 	f := newFake(t)
 	f.addMembers()
@@ -323,7 +353,7 @@ func TestFailuresAreTheDraftsErrors(t *testing.T) {
 			t.Fatalf("%v: %v", bad, err)
 		}
 	}
-	unknown := newPoller(t, f, "issue.labelled", nil)
+	unknown := newPoller(t, f, "issue.renamed", nil)
 	if _, err := unknown.try(); err == nil || err.Code != -32011 {
 		t.Fatalf("unknown: %v", err)
 	}

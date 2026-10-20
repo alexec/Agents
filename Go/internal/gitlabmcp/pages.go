@@ -127,6 +127,23 @@ type discussionJSON struct {
 	Notes []noteJSON `json:"notes"`
 }
 
+// discussions is every discussion on a merge request, a page of 100 at a time, maxPages at most.
+func (g *RealGitLab) discussions(ctx context.Context, project string, number int) ([]discussionJSON, error) {
+	var all []discussionJSON
+	for page := 1; page <= maxPages; page++ {
+		var list []discussionJSON
+		path := fmt.Sprintf("projects/%s/merge_requests/%d/discussions?per_page=100&page=%d", pid(project), number, page)
+		if err := g.get(ctx, path, false, &list); err != nil {
+			return nil, err
+		}
+		all = append(all, list...)
+		if len(list) < 100 {
+			break
+		}
+	}
+	return all, nil
+}
+
 func (n noteJSON) json(base string) map[string]any {
 	j := map[string]any{"author": n.Author.Username, "bot": isBot(n.Author.Username, n.Author.Bot), "body": n.Body, "at": n.CreatedAt,
 		"url": fmt.Sprintf("%s#note_%d", base, n.ID), "id": n.ID}

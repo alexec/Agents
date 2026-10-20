@@ -141,13 +141,16 @@ to the MCP server" turned on for the top-level group or the instance.
 - **Events**, polled every 30 s, with the github server's names, cursor and paging; a merge
   request is a `pr` (its iid is `number`): `checks.failed` (a merge request's failed
   pipeline), `pr.opened`, `pr.merged`, `pr.closed`, `pr.conflicted`, `review.comment` (a
-  comment on a line of the diff), `issue.opened`, `issue.commented`, `issue.closed`.
+  comment on a line of the diff), `issue.opened`, `issue.labelled` (one per label added, from
+  the issues updated since and their label events), `issue.commented`, `issue.closed`.
   Arguments `project` (a path, as `group/sub/app`, or an id; left out, the project this
   folder pushes to), `branch`, `pr`, `label`, `issue` and `anyone`; left out, only the
   project's members with Reporter access or more count, never a bot or a fork (#728).
 - **Tools:** `list_merge_requests`, `get_merge_request`, `list_pipelines`, `get_pipeline`,
-  `list_issues`, `get_issue`, `comment_on_merge_request`, `comment_on_issue`, and
-  `merge_merge_request`, which only a view may call (a person merges, as on GitHub).
+  `list_issues`, `get_issue` (with its comments, each marked `trusted` or not),
+  `comment_on_merge_request`, `comment_on_issue`; for the ready-made workflows (#1633)
+  `create_merge_request`, `list_merge_request_comments` and `reply_to_merge_request_comment`;
+  and `merge_merge_request`, which only a view may call (a person merges, as on GitHub).
 - **Views** (#1631), the github server's page shapes in GitLab's words (`pages/`; `bridge.js`,
   `common.css` and `mrpage.css` are the github server's, word for word, and a test keeps them
   so): Merge requests (`show_merge_requests`), Issues (`show_issues`) and a merge request's
