@@ -166,7 +166,7 @@ function Problems({ found, goTo }: { found: FileDiagnostics; goTo: (line: number
     <div class="problems" role="group" aria-label="Problems">
       <p class="faint small">{heading}</p>
       {found.diagnostics.map((p, i) => (
-        <button key={i} type="button" class="problem" title={`Go to line ${p.line}`} onClick={() => goTo(p.line)}>
+        <button key={i} type="button" class="source-problem" title={`Go to line ${p.line}`} onClick={() => goTo(p.line)}>
           <span aria-label={p.severity}>{mark(p)}</span> <span class="faint">{p.line}:{p.column}</span> {p.message}
         </button>
       ))}
