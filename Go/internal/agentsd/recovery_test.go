@@ -121,8 +121,8 @@ func TestAnAgentACleanStopCutOffIsPickedBackUp(t *testing.T) {
 		"prompt": "wait for me"}), &id)
 	c.until(t, "running", ended(id, wire.AgentStateRunning))
 	first.Shutdown()
-	if a := first.Store.Agent(id); a.State != wire.AgentStateStopped || *a.EndedReason != wire.EndedReasonDaemonGone {
-		t.Fatalf("%s %v", a.State, a.EndedReason)
+	if a := first.Store.Agent(id); a.State != wire.AgentStateStopped || a.EndedReason == nil || *a.EndedReason != wire.EndedReasonDaemonGone {
+		t.Fatalf("%s %v %q", a.State, endedAs(a.EndedReason), notices(first, id))
 	}
 
 	d, _ := start(t, root)
@@ -145,4 +145,24 @@ func TestAnAgentACleanStopCutOffIsPickedBackUp(t *testing.T) {
 	if gone != 1 {
 		t.Fatalf("stopped with the daemon %d times, want once", gone)
 	}
+}
+
+// endedAs is an ending reason for a failure's message, or "none".
+func endedAs(r *wire.EndedReason) string {
+	if r == nil {
+		return "none"
+	}
+	return string(*r)
+}
+
+// notices is the titles of the notices in an agent's record.
+func notices(d *Daemon, id wire.UUID) []string {
+	entries, _, _ := d.Store.Transcript(id, 0)
+	var out []string
+	for _, e := range entries {
+		if n := e.Kind.Notice; n != nil {
+			out = append(out, n.Value.Title)
+		}
+	}
+	return out
 }

@@ -292,7 +292,7 @@ func (d *Daemon) addProject(folder wire.URL) (wire.ProjectSummary, error) {
 
 // MARK: agents
 
-// archive puts an agent away: its turn stopped and its runtime ended first.
+// archive puts an agent away, then stops its turn and ends its runtime.
 func (d *Daemon) archive(id wire.UUID) error {
 	return d.archiveBy(id, wire.AgentArchivedReasonByUser)
 }
@@ -302,21 +302,15 @@ func (d *Daemon) archiveBy(id wire.UUID, by wire.AgentArchivedReason) error {
 	if d.Store.Agent(id) == nil {
 		return &Error{Code: CodeNoSuchAgent, Message: "no agent " + string(id)}
 	}
-	l := d.live(id)
-	l.cancel()
-	l.mu.Lock()
-	s := l.session
-	l.session = nil
-	l.mu.Unlock()
-	if s != nil {
-		s.Stop()
-	}
 	t := now()
 	d.change(id, func(a *wire.Agent) {
 		a.State, a.ArchivedAt, a.ArchivedReason = wire.AgentStateArchived, &t, &by
 		a.ArchiveRequest, a.AfterTurn = nil, nil
 	})
 	d.record(id, stateChanged(wire.AgentStateArchived, nil))
+	// Archived first, then its turn and runtime ended: the turn's ending finds it archived
+	// and leaves it so (#1611).
+	d.live(id).halt()
 	if a := d.Store.Agent(id); a != nil {
 		details := map[string]string{"by": "you"}
 		if by == wire.AgentArchivedReasonByAgent {

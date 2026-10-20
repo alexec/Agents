@@ -18,7 +18,7 @@ import (
 
 // The test binary is also a fake ACP runtime: with AGENTS_FAKE_ACP=1 it serves one on its
 // stdin and stdout. A prompt with "ask" in it asks for permission before it answers; one
-// with "wait for me" waits to be cancelled.
+// with "wait for me" waits to be cancelled, and one with "keep going" waits for a SIGTERM.
 func TestMain(m *testing.M) {
 	if os.Getenv("AGENTS_FAKE_MCP") == "1" {
 		fakeMCPServer()
@@ -124,6 +124,10 @@ func (f *fakeRuntime) Prompt(ctx context.Context, p sdk.PromptRequest) (sdk.Prom
 	}
 	say := func(s string) {
 		f.conn.SessionUpdate(ctx, sdk.SessionNotification{SessionId: p.SessionId, Update: sdk.UpdateAgentMessageText(s)})
+	}
+	// Deaf to session/cancel, as Claude was waiting on CI (#1611): only a SIGTERM ends it.
+	if strings.Contains(text, "keep going") {
+		select {}
 	}
 	if strings.Contains(text, "wait for me") {
 		<-ctx.Done()
