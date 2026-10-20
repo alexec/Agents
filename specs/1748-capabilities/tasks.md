@@ -25,11 +25,11 @@
 
 ## Phase 3: Clients, PR 3 (US1, US2)
 
-- [ ] T020 [US1] `has(_:)` on the host model in AgentsKit (Mac, Remote) and in `Web/src/model` (true when no list)
-- [ ] T021 [US1] Gate on all three: Branch from Here (`chat.branch/1`), find (`agents.find/1`), said search (`agents.said/1`), edit a queued prompt (`agents.edit-queued/1`), Connections (`connections/1`), connector set-up (`connectors.setup/1`), file completion and diagnostics (`files.complete/1`, `files.diagnostics/1`), Made by agents (`mcp.made-by-agents/1`), Simulators (`simulators/1`); "This host needs an update to do this"
-- [ ] T022 [US2] Settings ▸ Control plane on the Remote and the web page: the control plane's version and each host's; "Needs an update" with the missing names on all three
-- [ ] T023 [US3] One "Update this app" notice for `-32008` on all three
-- [ ] T024 Tests (web `node --test`, AgentsKit), `parity.md` row, walk on a scratch set-up; PR with parity lines, auto-merge
+- [x] T020 [US1] `has(_:)` on the host model in AgentsKit (Mac, Remote) and in `Web/src/model` (true when no list)
+- [x] T021 [US1] Gate on all three: Branch from Here (`chat.branch/1`), find (`agents.find/1`), said search (`agents.said/1`), edit a queued prompt (`agents.edit-queued/1`), Connections (`connections/1`), connector set-up (`connectors.setup/1`), file completion and diagnostics (`files.complete/1`, `files.diagnostics/1`), Made by agents (`mcp.made-by-agents/1`), Simulators (`simulators/1`); "This host needs an update to do this"
+- [x] T022 [US2] Settings ▸ Control plane on the Remote and the web page: the control plane's version and each host's; "Needs an update" with the missing names on all three
+- [x] T023 [US3] "Update this app" in Settings on all three, from `control/status.required.client` against the app's own list (`control/status` is never refused, so no error needs catching)
+- [x] T024 Tests (web `node --test`, AgentsKit), `parity.md` row; PR with parity lines, auto-merge. The walk on a scratch set-up waits for one that runs an older host
 
 ## Phase 4: Versions, PR 4 (US5)
 

@@ -12,6 +12,7 @@ import {
 import { BackToList } from "./BackToList";
 import { ConnectorSetupSection } from "./ConnectorSetup";
 import { go } from "../route";
+import { Capability } from "../protocol/capabilities.generated";
 
 /** One host's servers from one file: the person's (no folder) or a project's. */
 export function MCPServersList({ store, host, folder }: { store: Store; host: string; folder?: string }) {
@@ -78,8 +79,9 @@ export function MCPServersPage({ store, host, folder, projectName }: {
       <header class="column-head"><BackToList /><h1>{projectName}: Connectors</h1></header>
       <div class="scroll">
         <div class="activity-body">
-          <ConnectorSetupSection store={store} host={host} folder={folder} projectName={projectName}
-            go={(workflow) => go({ host, project: folder, workflow })} />
+          {/* Not on a host too old to have it (#1748). */}
+          {store.has(host, Capability.connectorsSetup1) && <ConnectorSetupSection store={store} host={host} folder={folder} projectName={projectName}
+            go={(workflow) => go({ host, project: folder, workflow })} />}
           <h2 class="setup-heading">All connectors</h2>
           <MCPServersList store={store} host={host} folder={folder} />
           {empty && <p class="hint">{projectEmpty}</p>}

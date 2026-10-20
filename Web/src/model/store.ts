@@ -11,7 +11,7 @@ import type {
   StartRequest, UUID, WorktreesListResponse, Persona, FileStamp, WriteFailure, CloneNotification, CloneSummary, DirectoryListing, LeaseSnapshot, HostedMCPSnapshot, MCPHealthSnapshot, DiskState, StoreNotes,
   ChatProjectState, CostState, EventsPage, Event as ActivityEvent, ConfigOption, WorkflowSettings,
   PagesChangedNotification, PinsChangedNotification, PinView, ViewPin, ListCursor, ListRequest, FileMentionDTO, SandboxChoice, RuntimeAllowances,
-  GuardedChange, GuardedChangeReading, HostJoinStatus, KeptDelivered, KeptList, KeptRequest, Approval, ApprovalAction, UsageHistory, TimeHistory, Milestones,
+  GuardedChange, GuardedChangeReading, HostJoinStatus, RequiredCapabilities, KeptDelivered, KeptList, KeptRequest, Approval, ApprovalAction, UsageHistory, TimeHistory, Milestones,
   BuildOutputRemoved, ProjectWorktrees, RemovalCheck, WorktreeSize, WorktreeSummary, WorktreesSized, FindResult } from "../protocol/generated";
 import { Failure } from "../protocol/generated";
 import { CallFailed, type Link } from "../wire/link";
@@ -37,6 +37,8 @@ import type { Method, Params, Result } from "../protocol/methods";
 import { dropboxRefusal, dropboxRequest } from "./dropbox";
 import { goOnRequest } from "./limits";
 import { milestonesSeen } from "./milestones";
+import { hostHas } from "./capabilities";
+import { Capability } from "../protocol/capabilities.generated";
 import type { ChartHint } from "./chart";
 
 export { folderKey } from "./groups";
@@ -369,7 +371,8 @@ export class Work {
    * The control plane's machine, its home host, and how this Mac's host says its join stands
    * (#666), from `control/status`.
    */
-  readonly plane = signal<{ machineID: string; homeHost?: string | undefined; thisMacHost?: HostJoinStatus | undefined } | null>(null);
+  readonly plane = signal<{ machineID: string; homeHost?: string | undefined; thisMacHost?: HostJoinStatus | undefined;
+    name?: string; version?: string; required?: RequiredCapabilities | undefined } | null>(null);
   /**
    * The person's Mac (#1501): the host that keeps their display choices (#1033) and that the page
    * calls "This Mac". It is `mac`, or, with a control plane elsewhere, where this Mac's host joins
@@ -920,6 +923,11 @@ export class Work {
    */
   readonly downSince = signal<Record<string, number>>({});
 
+  /** Whether a host can do what `capability` names (#1748): true when it said no list. */
+  has(host: string, capability: string): boolean {
+    return hostHas(this.hosts.value, host, capability);
+  }
+
   /** The hosts as listed, with when each one went down noted. */
   takeHosts(hosts: ControlHost[], now = Date.now()): void {
     const since: Record<string, number> = {};
@@ -1125,7 +1133,8 @@ export class Store extends Work {
   private async loadPlane(): Promise<void> {
     const status = await this.link.call("control/status", {}).catch(() => null);
     if (!status) return;
-    this.plane.value = { machineID: status.machineID, homeHost: status.homeHost, thisMacHost: status.thisMacHost };
+    this.plane.value = { machineID: status.machineID, homeHost: status.homeHost, thisMacHost: status.thisMacHost,
+      name: status.name, version: status.version, required: status.required };
     knowPublicViews(status.publicViews);
   }
 
@@ -1439,7 +1448,9 @@ export class Store extends Work {
       if (!this.hostIsOnline(host.id)) continue;
       await this.search(request, host.id, turn);
       if (turn !== this.searchTurn) return;
-      // What was said (#1585): the sessions whose prompts or replies hold the words.
+      // What was said (#1585): the sessions whose prompts or replies hold the words. Not asked of a
+      // host too old to say (#1748).
+      if (!this.has(host.id, Capability.agentsSaid1)) continue;
       const said = await this.link.call("agents/said", { text: words }, host.id).catch(() => null);
       if (Array.isArray(said?.matches) && turn === this.searchTurn) {
         this.saidLines.value = { ...this.saidLines.value, ...Object.fromEntries(said.matches.map((m) => [m.agentID, m.line])) };

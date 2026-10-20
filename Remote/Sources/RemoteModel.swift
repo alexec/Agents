@@ -304,6 +304,8 @@ final class RemoteModel {
     private var gitAsksAnswered: Set<String> = []
     /// The host this phone's own connection reaches. Its projects are stamped `.mac`.
     private(set) var controlHome: HostID?
+    /// What `control/status` last said: its version and capabilities, for Settings (#1748).
+    private(set) var controlStatus: DaemonAPI.ControlStatus?
 
     /// Each connected server's local daily ledger, matching the window's combined
     /// Today figure. Limits remain local to the host that owns them.
@@ -1963,6 +1965,19 @@ final class RemoteModel {
         startingIn.flatMap { work.project($0)?.host } ?? .mac
     }
 
+    /// Whether a host can do what `capability` names (#1748): its row's list, with `.mac`
+    /// read as this phone's home host. True when the host said no list, or is not a
+    /// control plane's.
+    func host(_ host: HostID, has capability: String) -> Bool {
+        let id = host == .mac ? (controlHome ?? host) : host
+        return controlHosts.first { $0.id == id }?.has(capability) ?? true
+    }
+
+    /// Whether the host of an agent can do what `capability` names.
+    func agent(_ id: UUID?, has capability: String) -> Bool {
+        host(work.agent(id)?.host ?? .mac, has: capability)
+    }
+
     /// A host's row as `hosts/list` last said it: its state, and the workspace it runs on (#691).
     func controlHost(_ host: HostID) -> DaemonAPI.ControlHost? {
         controlHosts.first { $0.id == host }
@@ -2178,6 +2193,7 @@ final class RemoteModel {
         controlHosts = listed.filter(\.runsAgents)
         gitAsksAnswered.formIntersection(GitLendAsk.waiting(in: listed))
         controlHome = status.homeHost
+        controlStatus = status
         // The relay's key, from the control plane itself (T077): kept for when its address
         // cannot be reached.
         RemoteControl.keepRelayKey(status.relayKey)
@@ -3139,8 +3155,9 @@ final class RemoteModel {
         let hosts: [HostID] = [.mac] + reachableHosts.sorted { $0.rawValue < $1.rawValue }
         for host in hosts {
             await search(request, on: host)
-            // What was said (#1585): the sessions whose prompts or replies hold the words.
-            if let target = hostClient(host),
+            // What was said (#1585): the sessions whose prompts or replies hold the words. Not
+            // asked of a host too old to say (#1748).
+            if self.host(host, has: Capability.agentsSaid1), let target = hostClient(host),
                let said = try? await target.call(DaemonAPI.Method.agentsSaid, DaemonAPI.SaidSearchRequest(text: words),
                                                  returning: DaemonAPI.SaidSearchResult.self),
                !Task.isCancelled {

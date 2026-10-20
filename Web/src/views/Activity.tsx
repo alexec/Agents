@@ -26,6 +26,7 @@ import { mergeTime } from "../model/time";
 import { TimeCharts } from "./TimeCharts";
 import { MilestonesSection, TimeMilestonesUnder } from "./Milestones";
 import { isComplete } from "../model/milestones";
+import { Capability } from "../protocol/capabilities.generated";
 
 function navigate(destination: { host: string; project: string; session?: string; workflow?: string }): void {
   const parts = ["h", destination.host, "p", destination.project];
@@ -292,7 +293,7 @@ export function ActivityPageView({ store, page }: { store: Store; page: Activity
               {store.hosts.value.map((host) => (
                 <section key={host.id}>
                   {several && <h2 class="section-head">{hostName(host.id)}</h2>}
-                  <YourConnections store={store} host={host.id} />
+                  {store.has(host.id, Capability.connections1) && <YourConnections store={store} host={host.id} />}
                   <h2 class="setup-heading">Your connectors</h2>
                   <MCPServersList store={store} host={host.id} />
                 </section>

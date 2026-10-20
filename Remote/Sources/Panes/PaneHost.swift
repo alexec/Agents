@@ -154,8 +154,13 @@ struct PaneView: View {
             case .exchanged:
                 ArtifactsList()
             case .simulator:
-                // The session's Mac's simulators (#842), its screen read while shown.
-                SimulatorPaneView(calls: model.simulatorCalls(for: agent.id))
+                // The session's Mac's simulators (#842), its screen read while shown; not on a
+                // host too old to have them (#1748).
+                if model.host(agent.host, has: Capability.simulators1) {
+                    SimulatorPaneView(calls: model.simulatorCalls(for: agent.id))
+                } else {
+                    HostNeedsUpdateView()
+                }
             }
         }
     }

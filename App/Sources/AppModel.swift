@@ -912,6 +912,17 @@ final class AppModel {
         return listed.contains { $0.id == .mac }
     }
 
+    /// Whether a host can do what `capability` names (#1748): its row's list. True when
+    /// the host said no list, or the window is not a control plane's client.
+    func host(_ host: HostID, has capability: String) -> Bool {
+        controlPlaneHosts?.first { $0.id == host }?.has(capability) ?? true
+    }
+
+    /// Whether the host of an agent can do what `capability` names.
+    func agent(_ id: UUID?, has capability: String) -> Bool {
+        host(host(ofAgent: id), has: capability)
+    }
+
     /// Where an agent lives: the host it was listed from, or, for one not yet listed
     /// (just started, say), the selected project's host when there is no Mac host.
     private func host(ofAgent id: UUID?) -> HostID {
@@ -1275,8 +1286,10 @@ final class AppModel {
         let hosts: [HostID] = (hasMacHost ? [.mac] : []) + self.hosts.servers.filter { !hostUnreachable($0) }
         for host in hosts {
             await search(request, on: host)
-            // What was said (#1585): the sessions whose prompts or replies hold the words.
-            if let said = try? await client(for: host).call(DaemonAPI.Method.agentsSaid,
+            // What was said (#1585): the sessions whose prompts or replies hold the words. Not
+            // asked of a host too old to say (#1748).
+            if self.host(host, has: Capability.agentsSaid1),
+               let said = try? await client(for: host).call(DaemonAPI.Method.agentsSaid,
                                                             DaemonAPI.SaidSearchRequest(text: words),
                                                             returning: DaemonAPI.SaidSearchResult.self),
                !Task.isCancelled {
@@ -3729,7 +3742,9 @@ final class AppModel {
 
     /// The connectors Agents makes, for the catalogue's first group (#1428).
     func mcpMadeByAgents() async -> [DaemonAPI.MCPCatalogResult] {
-        (try? await macClient.call(DaemonAPI.Method.mcpMadeByAgents, DaemonAPI.Empty(),
+        // None from a host too old to say (#1748).
+        guard host(.mac, has: Capability.mcpMadeByAgents1) else { return [] }
+        return (try? await macClient.call(DaemonAPI.Method.mcpMadeByAgents, DaemonAPI.Empty(),
                                    returning: DaemonAPI.MCPSearchAnswer.self))?.results ?? []
     }
 

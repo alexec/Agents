@@ -50,6 +50,7 @@ import { showsThoughts, shownItems } from "../model/thoughts";
 import { hasTurnInFlight, promptPlaceholder, willQueue } from "../model/promptWords";
 import { eventWaitCapsule, leaseMark } from "../model/rowLines";
 import { GuardedChangeCard } from "./GuardedChange";
+import { Capability } from "../protocol/capabilities.generated";
 
 /** One opened turn's entries, so an earlier page can be put in front and drawn again (#291). */
 interface HeldTurn {
@@ -119,12 +120,14 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
   useEffect(() => {
     const press = (e: KeyboardEvent) => {
       if (e.key.toLowerCase() !== "f" || !(e.metaKey || e.ctrlKey) || e.shiftKey || e.altKey) return;
+      // A host too old to find leaves ⌘F to the browser (#1748).
+      if (!store.has(host, Capability.agentsFind1)) return;
       e.preventDefault();
       finding.value = true;
     };
     document.addEventListener("keydown", press);
     return () => document.removeEventListener("keydown", press);
-  }, []);
+  }, [host]);
   /** The Prompts list is up over the chat (#1658). */
   const listingPrompts = useSignal(false);
   useEffect(() => {
@@ -168,8 +171,9 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
       },
       // Into this chat's prompt bar, after what is typed there (#1553).
       quote: (words) => { store.offeredQuote.value = { draftKey: `${host}|${session}`, words }; },
-      // Branch from Here on the person's prompt (#1658): never on an archived session, as Branch.
-      branchFrom: agent && agent.state !== "archived" && !down ? (entryID, text) => {
+      // Branch from Here on the person's prompt (#1658): never on an archived session, as Branch,
+      // nor on a host too old to branch (#1748).
+      branchFrom: agent && agent.state !== "archived" && !down && store.has(host, Capability.chatBranch1) ? (entryID, text) => {
         const now = store.agent(host, session);
         if (now) void branchFromPrompt(store, host, now, entryID, text);
       } : undefined,
@@ -490,7 +494,7 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
             focusedIndex.value = null;
             focusedEntry.value = prompt.id;
           }}
-          branchFrom={agent.state !== "archived" && !down ? (prompt) => void branchFromPrompt(store, host, agent, prompt.id, prompt.text) : undefined} />
+          branchFrom={agent.state !== "archived" && !down && store.has(host, Capability.chatBranch1) ? (prompt) => void branchFromPrompt(store, host, agent, prompt.id, prompt.text) : undefined} />
       )}
       <header class="column-head">
         <BackToList />
@@ -501,7 +505,7 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
           <button class="wide-only" onClick={() => replace({ ...r, files: !r.files })} aria-pressed={!!r.files}>Files</button>
           <SessionButtons store={store} host={host} agent={agent} disabled={down} />
           <SessionMenu store={store} host={host} agent={agent} disabled={down} inChat
-            find={() => (finding.value = true)} prompts={() => (listingPrompts.value = true)} openFile={() => (searchingFiles.value = true)}
+            find={store.has(host, Capability.agentsFind1) ? () => (finding.value = true) : undefined} prompts={() => (listingPrompts.value = true)} openFile={() => (searchingFiles.value = true)}
             narrow={[
               { label: "Files", checked: !!r.files, run: () => replace({ ...r, files: !r.files }) },
             ]} />
@@ -711,8 +715,8 @@ function Queued({ store, host, agent, disabled, draftKey }: { store: Store; host
               <button class="link" disabled={disabled || !!acting} title="Send this into the turn that is running, without waiting for it to end"
                 onClick={() => void store.sendNow(host, agent.id, queued.id)}>↑ Send now</button>
             ))}
-            {/* The person's own words only: another agent's are theirs (#560). */}
-            {(queued.from ?? "person") === "person" && (
+            {/* The person's own words only: another agent's are theirs (#560). Not on a host too old to change them (#1748). */}
+            {(queued.from ?? "person") === "person" && store.has(host, Capability.agentsEditQueued1) && (
               <button class="link" aria-label="Edit queued prompt" title="Change the words. It keeps its place in the queue." disabled={disabled || going}
                 onClick={() => (editing.value = { id: queued.id, text: queued.text })}>Edit</button>
             )}

@@ -8,6 +8,7 @@ import type { Store } from "../../model/store";
 import type { FileCompletion, FileDiagnostic, FileDiagnostics } from "../../protocol/generated";
 import { nameOf } from "./paneState";
 import { describe } from "../../model/errors";
+import { Capability } from "../../protocol/capabilities.generated";
 
 const settle = 700;
 
@@ -37,6 +38,8 @@ export function SourceEditor({ store, host, agentID, path, text, line }: {
   // The language server is asked a moment after the typing stops (#844).
   const typed = draft.value;
   useEffect(() => {
+    // Not asked of a host too old to have a language server here (#1748).
+    if (!store.has(host, Capability.filesDiagnostics1)) return;
     let gone = false;
     const timer = setTimeout(() => {
       void store.link.call("files/diagnostics", { agentID: agentID as never, path, text: typed }, host)
@@ -63,7 +66,7 @@ export function SourceEditor({ store, host, agentID, path, text, line }: {
   };
   const ask = async () => {
     const el = field.current;
-    if (!el) return;
+    if (!el || !store.has(host, Capability.filesComplete1)) return;
     const before = el.value.slice(0, el.selectionStart);
     const line = before.split("\n").length;
     const column = before.length - (before.lastIndexOf("\n") + 1) + 1;

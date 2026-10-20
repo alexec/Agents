@@ -158,6 +158,10 @@ public extension DaemonAPI {
         /// its tunnel stands: they have no host row, so this is where ssh's reason shows.
         /// Nil from a control plane older than that, or one that holds no tunnels.
         public var unjoinedTunnels: [HostTunnelChanged]?
+        /// The control plane's own capabilities, and what it requires of hosts and clients
+        /// (#1748). Nil from a control plane older than that.
+        public var capabilities: [String]?
+        public var required: RequiredCapabilities?
 
         public init(name: String, version: String, homeHost: HostID?, machineID: String,
                     startedAt: Date? = nil, port: Int? = nil, awayFromHome: Bool? = nil) {
@@ -206,6 +210,16 @@ public extension DaemonAPI {
         }
     }
 
+    /// What the control plane needs of a host and of a client to route for it (#1748).
+    struct RequiredCapabilities: Codable, Sendable, Hashable {
+        public var host: [String]
+        public var client: [String]
+        public init(host: [String], client: [String]) {
+            self.host = host
+            self.client = client
+        }
+    }
+
     /// One row of `hosts/list`.
     struct ControlHost: Codable, Sendable, Hashable, Identifiable {
         public var id: HostID
@@ -237,6 +251,18 @@ public extension DaemonAPI {
         public var workspace: HostWorkspace?
         /// `swift` or `go`, as the host said in `host/hello` (#1134); nil when it never said.
         public var implementation: String?
+        /// The capabilities the host said in its last `host/hello` (#1748); nil from a host
+        /// older than that, which is taken to have them all.
+        public var capabilities: [String]?
+        /// Of the control plane's required capabilities, the ones it does not have: it is
+        /// then `needsUpdate`.
+        public var missing: [String]?
+
+        /// Whether the host can do what `capability` names (`Capability.chatBranch1`). True for
+        /// a host that said no list: it works as it did before capabilities (#1748).
+        public func has(_ capability: String) -> Bool {
+            capabilities?.contains(capability) ?? true
+        }
 
         public init(id: HostID, name: String, platform: String, version: String, state: String,
                     reach: String, machineID: String?, relay: Bool? = nil) {
