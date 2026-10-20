@@ -19,13 +19,13 @@ same branch.
 
 The path a new person takes must be short, and must need only a browser:
 
-1. Sign up on the web.
-2. Get a control plane of their own. They type no command and hold no key.
-3. Connect a workspace provider, such as DigitalOcean, Codespaces, Coder or Docker.
-4. Pick a repository. A machine starts, clones it with a short-lived token and shows it as
-   a project.
-5. Work in the web page. Add the Mac app, the phone or a desktop machine later, by signing
-   in on each.
+- Sign up on the web.
+- Get a control plane of their own. They type no command and hold no key.
+- Connect a workspace provider, such as DigitalOcean, Codespaces, Coder or Docker.
+- Pick a repository. A machine starts, clones it with a short-lived token and shows it as
+  a project.
+- Work in the web page. Add the Mac app, the phone or a desktop machine later, by signing
+  in on each.
 
 Milestone 0.8 "Start on the web" builds this path. Each step that needs a CLI, a Mac or a
 second screen today is a gap.
