@@ -623,5 +623,144 @@
     "token": "b1b2c3d4",
     "environment": "development",
     "startedAt": 800000000
+  },
+  "ControlPerson": {
+    "id": "id",
+    "name": "name",
+    "role": "member",
+    "localOwner": true
+  },
+  "SignIn": {
+    "provider": "code",
+    "account": "account",
+    "email": "email",
+    "login": "login",
+    "added": 812345678.5
+  },
+  "PersonClient": {
+    "id": "6F9619FF-8B86-D011-B42D-00C04FC964FF",
+    "name": "name",
+    "kind": "iPhone"
+  },
+  "PersonMachine": {
+    "id": "host",
+    "name": "name",
+    "state": "online",
+    "platform": "linux"
+  },
+  "PersonRow": {
+    "id": "id",
+    "name": "name",
+    "kind": "person",
+    "role": "admin",
+    "localOwner": true,
+    "you": true,
+    "signIns": [
+      {
+        "provider": "code",
+        "account": "account",
+        "email": "email",
+        "login": "login",
+        "added": 812345678.5
+      }
+    ],
+    "clients": [
+      {
+        "id": "6F9619FF-8B86-D011-B42D-00C04FC964FF",
+        "name": "name",
+        "kind": "iPhone"
+      }
+    ],
+    "machines": [
+      {
+        "id": "host",
+        "name": "name",
+        "state": "online",
+        "platform": "linux"
+      }
+    ]
+  },
+  "PeopleList": {
+    "people": [
+      {
+        "id": "id",
+        "name": "name",
+        "kind": "person",
+        "role": "admin",
+        "localOwner": true,
+        "you": true,
+        "signIns": [
+          {
+            "provider": "code",
+            "account": "account",
+            "email": "email",
+            "login": "login",
+            "added": 812345678.5
+          }
+        ],
+        "clients": [
+          {
+            "id": "6F9619FF-8B86-D011-B42D-00C04FC964FF",
+            "name": "name",
+            "kind": "iPhone"
+          }
+        ],
+        "machines": [
+          {
+            "id": "host",
+            "name": "name",
+            "state": "online",
+            "platform": "linux"
+          }
+        ]
+      }
+    ],
+    "admin": true
+  },
+  "PersonInvite": {
+    "name": "name",
+    "role": "member"
+  },
+  "PersonInvited": {
+    "text": "text",
+    "expires": 812345678.5,
+    "name": "name",
+    "role": "admin"
+  },
+  "PersonRequest": {
+    "user": "user"
+  },
+  "PersonRoleRequest": {
+    "user": "user",
+    "role": "admin"
+  },
+  "PeopleChanged": {
+    "user": "user",
+    "removed": true
+  },
+  "JoinRequest": {
+    "request": "request",
+    "name": "name",
+    "platform": "linux",
+    "code": "code",
+    "expires": 812345678.5,
+    "for": "for",
+    "forName": "forName"
+  },
+  "JoinRequestDecide": {
+    "request": "request"
+  },
+  "JoinApproved": {
+    "host": "host"
+  },
+  "JoinDecided": {
+    "request": "request",
+    "result": "approved"
+  },
+  "HostJoinDecision": {
+    "result": "approved",
+    "host": "host",
+    "controlKey": "AQID",
+    "name": "name"
   }
 }

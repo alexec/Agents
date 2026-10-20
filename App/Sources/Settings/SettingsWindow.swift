@@ -142,6 +142,10 @@ struct SettingsWindow: View {
                     ControlSettingsView(control: control, page: $controlPage)
                 }
             }
+        case .people:
+            // Through the window's own connection to the control plane, which hears when
+            // people change (#994).
+            FormColumn { PeoplePane(control: model.controlRequests, revision: model.people.revision) }
         }
     }
 
@@ -155,6 +159,8 @@ enum SettingsPane: String, Hashable, CaseIterable {
     case appearance = "general"
     case sidebar, account, mac
     case runtimes, spending, resources, controlPlane
+    /// Who uses the control plane, and the machines and clients that belong to them (#994).
+    case people
     /// Was Shared (#754): the raw value is what a window left open on it kept.
     case agentConfiguration = "shared"
 
@@ -162,7 +168,7 @@ enum SettingsPane: String, Hashable, CaseIterable {
     var isThisMacs: Bool {
         switch self {
         case .runtimes, .agentConfiguration, .mac, .spending, .resources: true
-        case .appearance, .sidebar, .account, .controlPlane: false
+        case .appearance, .sidebar, .account, .controlPlane, .people: false
         }
     }
 
@@ -177,6 +183,7 @@ enum SettingsPane: String, Hashable, CaseIterable {
         case .spending: "Cost"
         case .resources: "Resources"
         case .controlPlane: "Control plane"
+        case .people: "People"
         }
     }
 
@@ -191,14 +198,15 @@ enum SettingsPane: String, Hashable, CaseIterable {
         case .spending: "dollarsign.circle"
         case .resources: "lock"
         case .controlPlane: "point.3.connected.trianglepath.dotted"
+        case .people: "person.2"
         }
     }
 
     /// The panes about this app and this Mac (#846); the panes about agents; Agent
     /// Configuration; the control plane, whose hosts are the servers and whose clients are
-    /// the devices (058, frame D).
+    /// the devices (058, frame D), and the people they belong to (#994).
     static var groups: [[SettingsPane]] {
-        [[.appearance, .sidebar, .account, .mac], [.runtimes, .spending, .resources], [.agentConfiguration], [.controlPlane]]
+        [[.appearance, .sidebar, .account, .mac], [.runtimes, .spending, .resources], [.agentConfiguration], [.controlPlane, .people]]
     }
 }
 

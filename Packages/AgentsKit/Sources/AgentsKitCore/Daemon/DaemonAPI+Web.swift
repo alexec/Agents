@@ -293,6 +293,16 @@ public extension DaemonAPI {
                 Row(Method.auditList, params: AuditQuery.self, result: AuditList.self, kind: .controlRequest),
                 Row(Method.auditExport, params: AuditQuery.self, result: AuditExport.self, kind: .controlRequest),
                 Row(Method.controlSetAuditDays, params: AuditDays.self, result: AuditDays.self, kind: .controlRequest),
+                // People and the machines that belong to them (#994): Settings ▸ People.
+                Row(Method.peopleList, params: Empty.self, result: PeopleList.self, kind: .controlRequest),
+                Row(Method.peopleInvite, params: PersonInvite.self, result: PersonInvited.self, kind: .controlRequest),
+                Row(Method.peopleSetRole, params: PersonRoleRequest.self, result: Empty.self, kind: .controlRequest),
+                Row(Method.peopleRemove, params: PersonRequest.self, result: Empty.self, kind: .controlRequest),
+                // A machine that asks to join, approved on a card (#994).
+                Row(Method.hostsJoinRequests, params: Empty.self, result: [JoinRequest].self, kind: .controlRequest),
+                Row(Method.hostsApproveJoin, params: JoinRequestDecide.self, result: JoinApproved.self,
+                    kind: .controlRequest),
+                Row(Method.hostsDenyJoin, params: JoinRequestDecide.self, result: Empty.self, kind: .controlRequest),
                 // Heard
                 Row(Notification.agentChanged, params: Agent.self, result: Empty.self, kind: .hostNotification),
                 Row(Notification.agentEntry, params: EntryNotification.self, result: Empty.self, kind: .hostNotification),
@@ -347,6 +357,12 @@ public extension DaemonAPI {
                 Row(Notification.controlProvidersChanged, params: JSONValue.self, result: Empty.self,
                     kind: .controlNotification),
                 Row(Notification.controlKeptDelivered, params: KeptDelivered.self, result: Empty.self,
+                    kind: .controlNotification),
+                Row(Notification.controlJoinRequested, params: JoinRequest.self, result: Empty.self,
+                    kind: .controlNotification),
+                Row(Notification.controlJoinDecided, params: JoinDecided.self, result: Empty.self,
+                    kind: .controlNotification),
+                Row(Notification.controlPeopleChanged, params: PeopleChanged.self, result: Empty.self,
                     kind: .controlNotification),
             ]
         }
