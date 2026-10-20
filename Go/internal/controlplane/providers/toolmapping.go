@@ -251,8 +251,12 @@ func (m ToolMapping) Workspaces(content any) []WorkspaceInfo {
 		items = items[:200]
 	}
 	out := []WorkspaceInfo{}
+	listed := map[string]bool{}
 	for _, item := range items {
-		if w := m.Workspace(item); w != nil {
+		// A second workspace with an id already listed is left out: a link and a start name
+		// one workspace by its id (#857).
+		if w := m.Workspace(item); w != nil && !listed[w.ID] {
+			listed[w.ID] = true
 			out = append(out, *w)
 		}
 	}

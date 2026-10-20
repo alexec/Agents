@@ -244,6 +244,7 @@ func fakeProvider(mode string) {
 			answer(id, map[string]any{"workspace": item(map[string]any{"state": state})}, nil, false)
 		}
 	}
+	dropped := false // drops-stop: once the provider was added (its first call), workspace_stop goes
 	in := bufio.NewReader(os.Stdin)
 	for {
 		line, err := in.ReadBytes('\n')
@@ -264,7 +265,7 @@ func fakeProvider(mode string) {
 					"capabilities": map[string]any{"tools": map[string]any{}}, "serverInfo": map[string]any{"name": "fake", "version": "1"}}})
 			case method == "tools/list":
 				names := []string{"workspaces_list", "workspace_start", "workspace_stop"}
-				if mode == "no-stop" {
+				if mode == "no-stop" || dropped {
 					names = names[:2]
 				}
 				var tools []any
@@ -275,6 +276,11 @@ func fakeProvider(mode string) {
 			case method == "tools/call":
 				params, _ := message["params"].(map[string]any)
 				name, _ := params["name"].(string)
+				if dropped && name == "workspace_stop" {
+					send(map[string]any{"jsonrpc": "2.0", "id": id, "error": map[string]any{"code": -32602, "message": "Unknown tool: workspace_stop"}})
+					continue
+				}
+				dropped = mode == "drops-stop"
 				go call(id, name)
 			case id != nil:
 				send(map[string]any{"jsonrpc": "2.0", "id": id, "result": map[string]any{}})
@@ -347,7 +353,8 @@ func TestOddItemsAreLeftOutOrReadAsUnknown(t *testing.T) {
 	for _, w := range listed {
 		names = append(names, w.Name)
 	}
-	if !reflect.DeepEqual(names, []string{"devbox", "twin", "numbered"}) || listed[0].State != "unknown" || listed[2].ID != "7" {
+	// "twin" has devbox's id: a second workspace with an id already listed is left out.
+	if !reflect.DeepEqual(names, []string{"devbox", "numbered"}) || listed[0].State != "unknown" || listed[1].ID != "7" {
 		t.Errorf("%+v", listed)
 	}
 }
@@ -394,6 +401,22 @@ func TestACrashMidStartIsSaidAndTheNextCallStartsItAgain(t *testing.T) {
 	c := fake(t, "crash", fiveSeconds)
 	if _, err := c.Start("devbox"); said(err) == "" {
 		t.Error("no failure")
+	}
+	if listed, err := c.List(); err != nil || len(listed) != 1 {
+		t.Errorf("%v", err)
+	}
+}
+
+func TestAToolDroppedAfterTheProviderWasAddedIsNamed(t *testing.T) {
+	c := fake(t, "drops-stop", fiveSeconds)
+	if _, err := c.Check(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := c.Stop("devbox"); said(err) != "Unknown tool: workspace_stop" {
+		t.Errorf("%v", err)
+	}
+	if _, err := c.Check(); said(err) != "It isn’t a workspace provider: it has no workspace_stop tool." {
+		t.Errorf("%v", err)
 	}
 	if listed, err := c.List(); err != nil || len(listed) != 1 {
 		t.Errorf("%v", err)
