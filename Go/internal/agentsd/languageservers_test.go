@@ -8,7 +8,10 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/alexec/agents/Go/wire"
 )
@@ -136,5 +139,68 @@ func TestLanguageServerCompletion(t *testing.T) {
 	if len(got.Items) != 3 || got.Items[0].Label != "Println" || got.Items[0].Insert == nil || *got.Items[0].Insert != "Println(" ||
 		got.Items[1].Insert == nil || *got.Items[1].Insert != "Sprint(" || got.Items[2].Insert != nil || got.Items[0].Detail == nil {
 		t.Fatalf("%+v", got)
+	}
+}
+
+// A server that starts slowly holds up no other (#1652): a completion from the running gopls
+// answers while sourcekit-lsp starts, and a second ask for sourcekit-lsp waits for the same
+// start rather than starting another.
+func TestSlowStartHoldsUpNoOtherServer(t *testing.T) {
+	t.Setenv("AGENTS_FAKE_LSP", "1")
+	var swiftStarts atomic.Int32
+	was := installedCommand
+	installedCommand = func(s languageServerSpec) []string {
+		if s.name == "sourcekit-lsp" {
+			swiftStarts.Add(1)
+			return []string{"/bin/sleep", "3"} // never answers initialize, and ends in 3 s
+		}
+		return []string{os.Args[0], "-test.run=^TestLanguageServerHelper$"}
+	}
+	defer func() { installedCommand = was }()
+	pool := &languageServers{running: map[string]*languageServer{}}
+	defer pool.stopAll()
+	root := t.TempDir()
+	goFile := filepath.Join(root, "main.go")
+	ask := wire.FileCompletionRequest{Text: "package main\nimport \"fmt\"\nfunc main() { fmt.P }\n", Line: 3, Column: 20}
+	if got := pool.complete(context.Background(), root, goFile, ask); len(got.Items) == 0 {
+		t.Fatalf("gopls: %+v", got)
+	}
+
+	var slow sync.WaitGroup
+	reasons := make(chan *string, 2)
+	for range 2 {
+		slow.Go(func() {
+			swift := "let a = 1\n"
+			reasons <- pool.diagnose(root, filepath.Join(root, "main.swift"), &swift).Reason
+		})
+	}
+	for deadline := time.Now().Add(2 * time.Second); ; {
+		pool.mu.Lock()
+		starting := len(pool.starting)
+		pool.mu.Unlock()
+		if starting == 1 {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("sourcekit-lsp did not start")
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	began := time.Now()
+	if got := pool.complete(context.Background(), root, goFile, ask); len(got.Items) == 0 {
+		t.Fatalf("gopls while sourcekit-lsp starts: %+v", got)
+	}
+	if took := time.Since(began); took > time.Second {
+		t.Fatalf("gopls waited %v for sourcekit-lsp to start", took)
+	}
+	slow.Wait()
+	close(reasons)
+	for reason := range reasons {
+		if reason == nil || !strings.Contains(*reason, "did not start") {
+			t.Fatalf("both asks have the start's failure: %v", reason)
+		}
+	}
+	if n := swiftStarts.Load(); n != 1 {
+		t.Fatalf("sourcekit-lsp started %d times", n)
 	}
 }
