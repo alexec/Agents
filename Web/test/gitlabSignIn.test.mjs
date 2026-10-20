@@ -27,3 +27,17 @@ test("GitLab is the third provider, and its device page is gitlab.com", () => {
   assert.equal(c.sheetStatus({ provider: "gitlab", status: "waiting", grant: "deviceCode" }),
     "Waiting for gitlab.com… Type the code there, then approve.");
 });
+
+// Connect your tools with GitLab (#1632): the set-up's words follow its forge.
+test("a GitLab project's set-up says GitLab, merge requests and pipelines", () => {
+  const setup = { folder: "/p", repository: "group/app", forge: "gitlab", site: "gitlab.example.com",
+    repositoryURL: "https://gitlab.example.com/group/app", slots: [], events: { state: "off", names: [], workflows: [] }, done: 1 };
+  assert.equal(c.intro("App", setup.repository, setup.site), "What agents in App can reach. Repository gitlab.example.com/group/app, from its git remote.");
+  assert.equal(c.connectButtonFor(c.forgeOf(setup)), "Connect GitLab…");
+  assert.equal(c.grantButton(setup), "Open on gitlab.example.com");
+  assert.equal(c.grantURL(setup), "https://gitlab.example.com/group/app");
+  const ci = { slot: "ci", choice: "GitLab pipelines", state: "read" };
+  assert.equal(c.line(ci, "App", "group/app", false, "gitlab"), "No pipelines yet in group/app.");
+  assert.equal(c.eventsLead(setup.events, "gitlab"), "Off. They go on once a slot has read from GitLab.");
+  assert.equal(c.forgeOf({ ...setup, forge: undefined }), "github");
+});

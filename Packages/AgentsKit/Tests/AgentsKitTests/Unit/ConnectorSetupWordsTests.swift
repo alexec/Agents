@@ -49,7 +49,7 @@ struct ConnectorSetupWordsTests {
         let slot = DaemonAPI.ConnectorSlot(slot: .tasks, choice: "GitHub Issues", state: .noRemote)
         #expect(ConnectorSetupWords.title(slot) == "Choose a tracker")
         #expect(ConnectorSetupWords.line(slot, project: "Blog", repository: nil)
-                == "Blog has no GitHub remote, so GitHub Issues can't be read for it.")
+                == "Blog has no GitHub or GitLab remote, so GitHub Issues can't be read for it.")
     }
 
     /// Connect Linear (#1343): the hand-back page's agents://oauth/callback, read for the host.
@@ -87,5 +87,23 @@ struct ConnectorSetupWordsTests {
                 == "https://gitlab.com/-/user_settings/personal_access_tokens?name=Agents&scopes=api")
         #expect(ConnectorSetupWords.GitLab.newTokenURL("gitlab.example.com/api/v4/")
                 == "https://gitlab.example.com/-/user_settings/personal_access_tokens?name=Agents&scopes=api")
+    }
+
+    /// Connect your tools with GitLab (#1632): the set-up's words follow its forge.
+    @Test func gitlabSetUpWords() {
+        let setup = DaemonAPI.ConnectorSetup(folder: "/p", repository: "group/app", forge: .gitlab, site: "gitlab.example.com",
+                                             repositoryURL: "https://gitlab.example.com/group/app", slots: [],
+                                             events: .init(state: .off), done: 1)
+        #expect(ConnectorSetupWords.intro(project: "App", repository: setup.repository, site: setup.siteOrGitHub)
+                == "What agents in App can reach. Repository gitlab.example.com/group/app, from its git remote.")
+        #expect(ConnectorSetupWords.connectButton(setup.forgeOrGitHub) == "Connect GitLab\u{2026}")
+        #expect(ConnectorSetupWords.grantButton(setup) == "Open on gitlab.example.com")
+        #expect(ConnectorSetupWords.grantURL(setup) == "https://gitlab.example.com/group/app")
+        let ci = DaemonAPI.ConnectorSlot(slot: .ci, choice: "GitLab pipelines", state: .read)
+        #expect(ConnectorSetupWords.line(ci, project: "App", repository: "group/app", forge: .gitlab) == "No pipelines yet in group/app.")
+        #expect(ConnectorSetupWords.eventsLead(setup.events, forge: .gitlab) == "Off. They go on once a slot has read from GitLab.")
+        var github = setup
+        github.forge = nil
+        #expect(github.forgeOrGitHub == .github)
     }
 }

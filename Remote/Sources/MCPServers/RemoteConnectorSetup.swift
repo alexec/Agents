@@ -28,10 +28,12 @@ struct RemoteConnectorSetup: View {
                 ProgressView().paperListRow()
             }
         } footer: {
-            Text(ConnectorSetupWords.intro(project: projectName, repository: setup?.repository))
+            Text(ConnectorSetupWords.intro(project: projectName, repository: setup?.repository,
+                                           site: setup?.siteOrGitHub ?? "github.com"))
         }
         .sheet(isPresented: $connecting) {
-            RemoteConnectSheet(host: project.host, project: project, onConnected: { Task { await reload(.fresh) } })
+            RemoteConnectSheet(provider: setup?.forgeOrGitHub ?? .github, host: project.host, project: project,
+                               onConnected: { Task { await reload(.fresh) } })
         }
         if let setup {
             Section(ConnectorSetupWords.setUpHeading(setup)) {
@@ -47,7 +49,7 @@ struct RemoteConnectorSetup: View {
             if setup.connection != nil || setup.events.state != .off {
                 Section("Events") {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text(ConnectorSetupWords.eventsLead(setup.events))
+                        Text(ConnectorSetupWords.eventsLead(setup.events, forge: setup.forgeOrGitHub))
                         if setup.events.state == .on {
                             Text(ConnectorSetupWords.eventNouns(setup.events.names).joined(separator: " "))
                                 .appText(.code).foregroundStyle(Paper.accent)
@@ -76,11 +78,11 @@ struct RemoteConnectorSetup: View {
             }
         } else {
             HStack(spacing: 12) {
-                Text(setup.connection?.state == .signInAgain ? "GitHub asks you to connect again."
-                     : ConnectorSetupWords.connectTitle)
+                Text(setup.connection?.state == .signInAgain ? ConnectorSetupWords.connectAgain(setup.forgeOrGitHub)
+                     : ConnectorSetupWords.connectTitle(setup.forgeOrGitHub))
                     .appText(.supporting).fontWeight(.semibold)
                 Spacer(minLength: 8)
-                Button(ConnectorSetupWords.connectButton) { connecting = true }
+                Button(ConnectorSetupWords.connectButton(setup.forgeOrGitHub)) { connecting = true }
                     .buttonStyle(.borderedProminent)
             }
         }
@@ -106,9 +108,9 @@ private struct RemoteSlotRow: View {
 
     private var subtitle: String {
         if let proof = ConnectorSetupWords.proof(slot) { return proof }
-        if slot.state == .notConnected, slot.slot != .workspace { return "Comes with GitHub" }
+        if slot.state == .notConnected, slot.slot != .workspace { return "Comes with \(ConnectorSetupWords.name(setup.forgeOrGitHub))" }
         if slot.slot == .workspace, slot.state == .read { return ConnectorSetupWords.otherProvidersElsewhere }
-        return ConnectorSetupWords.line(slot, project: projectName, repository: setup.repository)
+        return ConnectorSetupWords.line(slot, project: projectName, repository: setup.repository, forge: setup.forgeOrGitHub)
     }
 }
 
@@ -171,7 +173,8 @@ private struct RemoteSlotView: View {
                             .appText(.supporting)
                         } else {
                             Text(slot.slot == .workspace && slot.state == .read ? ConnectorSetupWords.otherProvidersElsewhere
-                                 : ConnectorSetupWords.line(slot, project: projectName, repository: setup.repository))
+                                 : ConnectorSetupWords.line(slot, project: projectName, repository: setup.repository,
+                                                            forge: setup.forgeOrGitHub))
                                 .appText(.supporting)
                                 .tinted([.failed, .refused, .noRemote].contains(slot.state) ? .attention : .none)
                                 .foregroundStyle(.secondary)
@@ -183,8 +186,8 @@ private struct RemoteSlotView: View {
                 Section {
                     if slot.state == .failed || slot.state == .refused {
                         if slot.state == .refused {
-                            Button("Grant on github.com") {
-                                openURL(URL(string: setup.installURL ?? ConnectorSetupWords.installURL)!)
+                            Button(ConnectorSetupWords.grantButton(setup)) {
+                                if let url = URL(string: ConnectorSetupWords.grantURL(setup)) { openURL(url) }
                             }
                         }
                         Button("Try Again") { Task { await reload() } }

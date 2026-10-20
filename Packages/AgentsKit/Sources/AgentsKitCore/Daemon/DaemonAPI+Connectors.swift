@@ -178,7 +178,7 @@ extension DaemonAPI {
         case failed
         /// The provider refused the read: the person grants it on the provider's site.
         case refused
-        /// The project has no GitHub remote.
+        /// The project has no GitHub or GitLab remote.
         case noRemote
         /// Skipped: it counts as done.
         case skipped
@@ -244,11 +244,18 @@ extension DaemonAPI {
         }
     }
 
-    /// A project's Connectors set-up (#1336).
+    /// A project's Connectors set-up (#1336), on GitHub or GitLab (#1632).
     public struct ConnectorSetup: Codable, Sendable, Hashable {
         public var folder: String
-        /// owner/name, from the project's git remote. Nil with no GitHub remote.
+        /// owner/name on GitHub, group/project on GitLab, from the project's git remote. Nil
+        /// with no GitHub or GitLab remote.
         public var repository: String?
+        /// The forge that fills Tasks, Code review and CI; nil is GitHub.
+        public var forge: ConnectionProvider?
+        /// The repository's host: github.com, gitlab.com, or a self-managed GitLab's.
+        public var site: String?
+        /// The repository's page on its forge.
+        public var repositoryURL: String?
         public var connection: Connection?
         /// Whether the Agents App is installed on the repository; nil when not known.
         public var installed: Bool?
@@ -260,15 +267,24 @@ extension DaemonAPI {
         /// Slots that read or were skipped, of the four.
         public var done: Int
 
-        public init(folder: String, repository: String? = nil, connection: Connection? = nil, installed: Bool? = nil,
+        public init(folder: String, repository: String? = nil, forge: ConnectionProvider? = nil, site: String? = nil,
+                    repositoryURL: String? = nil, connection: Connection? = nil, installed: Bool? = nil,
                     installURL: String? = nil, repositories: Int? = nil, slots: [ConnectorSlot],
                     events: ConnectorEvents, done: Int) {
-            self.folder = folder; self.repository = repository; self.connection = connection; self.installed = installed
+            self.folder = folder; self.repository = repository; self.forge = forge; self.site = site
+            self.repositoryURL = repositoryURL
+            self.connection = connection; self.installed = installed
             self.installURL = installURL; self.repositories = repositories; self.slots = slots; self.events = events
             self.done = done
         }
 
         public func slot(_ kind: ConnectorSlotKind) -> ConnectorSlot? { slots.first { $0.slot == kind } }
+
+        /// The forge, GitHub when the host did not say.
+        public var forgeOrGitHub: ConnectionProvider { forge ?? .github }
+
+        /// The repository's host, github.com when the host did not say.
+        public var siteOrGitHub: String { site ?? "github.com" }
     }
 
     public enum ConnectorSetupReading: String, Codable, Sendable, Hashable {

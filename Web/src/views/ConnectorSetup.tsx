@@ -74,11 +74,11 @@ export function ConnectorSetupSection({ store, host, folder, projectName, go }: 
 
   return (
     <div class="connector-setup">
-      <p class="hint">{words.intro(projectName, setup?.repository)}</p>
+      <p class="hint">{words.intro(projectName, setup?.repository, setup?.site)}</p>
       {problem && <p class="small failure">{problem}</p>}
       {setup && (
         <>
-          <ConnectionCard setup={setup} connect={() => setConnecting("github")} />
+          <ConnectionCard setup={setup} connect={() => setConnecting(words.forgeOf(setup))} />
           <h2 class="setup-heading">{words.setUpHeading(setup)}</h2>
           <div class="slot-grid">
             {setup.slots.map((slot) => (
@@ -92,7 +92,7 @@ export function ConnectorSetupSection({ store, host, folder, projectName, go }: 
               <h2 class="setup-heading">Events</h2>
               <div class="setup-card">
                 <p>
-                  {words.eventsLead(setup.events)}{" "}
+                  {words.eventsLead(setup.events, words.forgeOf(setup))}{" "}
                   {setup.events.state === "on" && <code title={setup.events.names.join(", ")}>{words.eventNouns(setup.events.names).join(" ")}</code>}
                 </p>
                 {setup.events.state === "on" && (
@@ -141,14 +141,15 @@ function ConnectionCard({ setup, connect }: { setup: ConnectorSetup; connect: ()
       </div>
     );
   }
+  const forge = words.forgeOf(setup);
   return (
     <div class="setup-card connection">
-      <span class="connector-mark" aria-hidden="true">GH</span>
+      <span class="connector-mark" aria-hidden="true">{words.letters(forge)}</span>
       <div class="grow">
-        <p class="strong">{c?.state === "signInAgain" ? "GitHub asks you to connect again." : words.connectTitle}</p>
-        <p class="quiet small">{words.connectNote}</p>
+        <p class="strong">{c?.state === "signInAgain" ? words.connectAgain(forge) : words.connectTitleFor(forge)}</p>
+        <p class="quiet small">{words.connectNoteFor(forge)}</p>
       </div>
-      <button class="prominent" onClick={connect}>{words.connectButton}</button>
+      <button class="prominent" onClick={connect}>{words.connectButtonFor(forge)}</button>
     </div>
   );
 }
@@ -156,7 +157,7 @@ function ConnectionCard({ setup, connect }: { setup: ConnectorSetup; connect: ()
 function SlotMark({ slot, reading }: { slot: ConnectorSlot; reading: boolean }) {
   const label = {
     read: "Read", failed: "Couldn't read", refused: "Refused", skipped: "Skipped", notRead: "Reading",
-    notConnected: "Not connected", noRemote: "No GitHub remote",
+    notConnected: "Not connected", noRemote: words.noRemote,
   }[slot.state];
   const mark = slot.state === "read" ? "✓"
     : slot.state === "failed" || slot.state === "refused" ? "!"
@@ -191,7 +192,7 @@ function SlotCard({ slot, setup, projectName, reading, tryAgain, skip, linearCon
         </p>
       ) : (
         <p class={`small ${["failed", "refused", "noRemote"].includes(slot.state) ? "attention" : "quiet"}`}>
-          {words.line(slot, projectName, setup.repository, false)}
+          {words.line(slot, projectName, setup.repository, false, words.forgeOf(setup))}
         </p>
       )}
       <p class="slot-actions small">
@@ -205,7 +206,7 @@ function SlotCard({ slot, setup, projectName, reading, tryAgain, skip, linearCon
         {slot.state === "failed" && <button onClick={tryAgain}>Try Again</button>}
         {slot.state === "refused" && (
           <>
-            {setup.installURL && <button onClick={() => openOut(setup.installURL!)}>Grant on github.com</button>}
+            {words.grantURL(setup) && <button onClick={() => openOut(words.grantURL(setup)!)}>{words.grantButton(setup)}</button>}
             <button onClick={tryAgain}>Try Again</button>
           </>
         )}

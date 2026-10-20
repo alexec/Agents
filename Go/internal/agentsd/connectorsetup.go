@@ -364,6 +364,11 @@ func (d *Daemon) connectorSetup(ctx context.Context, folder string, reading wire
 	}
 	if repo != "" {
 		out.Repository = &repo
+		page := "https://github.com/" + repo
+		if f.provider == wire.ConnectionProviderGitlab {
+			page = f.root + repo
+		}
+		out.RepositoryURL = &page
 	}
 	if connected {
 		w := wireConnection(conn)
