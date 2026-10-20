@@ -102,7 +102,9 @@ an agent finishes.
 A workflow runs only as you approved it. If its file changes afterwards, whether an
 agent edited it, you pulled a change or edited it outside Agents, its row says
 **Changed since you approved it — waiting for your OK** and it does not run until you
-approve it again. Changes you make on the workflow's page in Agents count as approved,
+approve it again. The same is true of each skill the workflow names as
+`.agents/skills/<name>/SKILL.md`: what you approve is the workflow with those skills, and
+**Review** shows their text under the workflow's. Changes you make on the workflow's page in Agents count as approved,
 unless the workflow was already waiting. Workflows that existed before this version
 were approved as they stood.
 

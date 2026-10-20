@@ -206,7 +206,10 @@ A workflow does not run, and its page says why, when:
   not mistaken for turning it on;
 - its file is new, or has changed since you approved it, and you have not approved it.
   Its row and page say **waiting for your OK** and offer **Approve**. Approval is of the
-  file as you saw it: a file that changes afterwards waits again. Changes made on the
+  file as you saw it: a file that changes afterwards waits again. It is of each skill the
+  file names as `.agents/skills/<name>/SKILL.md` too, shown under the file: a change to
+  one waits again in the same way. A workflow that names a skill that is not there, is a
+  link, or is outside `.agents/skills` does not run. Changes made on the
   workflow's page in Agents count as approved unless the workflow was already waiting,
   and workflows that existed before this version were approved as they stood;
 - you denied it on this Mac or server. See [Approve, Deny and Archive](#approve-deny-and-archive);
