@@ -17,6 +17,7 @@ control exchange. The Mac window, the Remote, `Shared/UI`, the web page, Agents 
 | `internal/safe/` | Recover helpers: one panic never takes a host or the control plane down | build |
 | `cmd/github-mcp/`, `internal/githubmcp/` | The `github` MCP server (#1232): the official github-mcp-server's tools, as a library, and the ci server's events | ci-server |
 | `cmd/linear-mcp/`, `internal/linearmcp/` | The `linear` MCP server (#839): Linear's issue events, in github-mcp's shape (tools are Linear's own server's) | ci-server |
+| `cmd/email-mcp/`, `internal/emailmcp/` | The `email` MCP server (#1780): one IMAP mailbox's new mail as `email.received`, and tools that read it; it never sends | email |
 | `cmd/gitlab-mcp/`, `internal/gitlabmcp/` | The `gitlab` MCP server (#1629): merge requests, pipelines and issues on GitLab, tools and events on REST v4 | gitlab |
 | `cmd/workspace-commands/`, `internal/workspacecommands/` | The command workspace provider (#691, in Go since #1364): workspaces as shell commands and presets, an MCP server the control plane runs | workspaces |
 
@@ -162,6 +163,28 @@ The tests run it against a fake GitLab over HTTP (`fake_test.go`). Agents Host c
 (`scripts/go-github-mcp.sh gitlab-mcp`) and every Linux host installs
 `gitlab-mcp-linux-<arch>` (#1636); the catalogue lists it as `agents/gitlab`, which asks for
 no secret: it reads the connection, as the linear server does.
+
+## The email MCP server (`email-mcp`, #1780)
+
+The gitlab server's shape for one IMAP mailbox (`github.com/emersion/go-imap/v2`): a stdio
+front (`emailmcp.Front`) answers `events/list` and `events/poll` and passes everything else to
+a go-sdk server with its tools. The account is the person's email connection (Connect Email:
+the IMAP server, the user and an app password), or `EMAIL_IMAP_URL`, `EMAIL_USER` and
+`EMAIL_PASSWORD`, which go first. It is read at each sign-in. `imaps://` (993) by default,
+`imap://` with STARTTLS, and `imap+insecure://` on this machine only, for a fake.
+
+- **Event** `email.received`, polled: arguments `from`, `to`, `subject` (globs, such as
+  `*@gitlab.com`) and `folder` (INBOX when left out). Its data is the message's id, folder,
+  from, to, subject and date, never its text. IDLE holds each folder asked about (four at
+  most), so a quiet poll asks the server nothing and the pace is 10 s; with no IDLE, 60 s.
+- **Tools:** `list_folders`, `list_messages`, `search_messages`, `read_message` (its text
+  inside `<untrusted-content source="email">`, as outside content), `mark_read` and
+  `move_message`. Reading leaves a message unread. Nothing sends, answers or deletes mail.
+
+The tests run it against go-imap's in-memory IMAP server (`fake_test.go`). Agents Host
+carries it (`scripts/go-github-mcp.sh email-mcp`) and every Linux host installs
+`email-mcp-linux-<arch>`; the catalogue lists it as `agents/email`, which asks for no secret:
+it reads the connection.
 
 ## The command workspace provider (`workspace-commands`, #691, #1364)
 

@@ -50,6 +50,12 @@ var Made = []Ours{
 		// Tested: the tools, the events and the three ready-made workflows on
 		// agentstest-group/agents-walk with a personal access token (#1634).
 		Command: "gitlab-mcp", Declares: Declared{Tools: true, Events: gitlabEvents, Views: true}, Tested: "2026-10-20"},
+	// No secret to ask for: it reads the person's email connection (Connect Email, #1780): the
+	// IMAP server, the user and an app password. EMAIL_IMAP_URL, EMAIL_USER and EMAIL_PASSWORD,
+	// set by hand in mcp.json's env, still go first. Read-only: it never sends mail. Not yet
+	// tested on a real mailbox (Alex's step on #1780).
+	{ID: "agents/email", Title: "Email", Description: "One mailbox over IMAP: an event when mail comes, and tools to list, search and read it, mark it read and move it. It never sends mail",
+		Command: "email-mcp", Declares: Declared{Tools: true, Events: emailEvents}},
 }
 
 var (
@@ -58,6 +64,7 @@ var (
 	linearEvents = []string{"issue.opened", "issue.labelled", "issue.commented", "issue.closed"}
 	gitlabEvents = []string{"checks.failed", "pr.opened", "pr.merged", "pr.closed", "pr.conflicted", "review.comment",
 		"issue.opened", "issue.labelled", "issue.commented", "issue.closed"}
+	emailEvents = []string{"email.received"}
 )
 
 // NameHere is the name its entry takes in an mcp.json: github, gitlab.
