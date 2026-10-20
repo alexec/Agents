@@ -235,7 +235,7 @@ struct AddProviderSheet: View {
             case .digitalOcean: "Needs doctl, signed in, on the Mac that runs the control plane."
             case .codespaces: "Needs gh, signed in, on the Mac that runs the control plane."
             case .coder: "Needs coder, signed in, and `coder config-ssh` run, on the Mac that runs the control plane."
-            case .workstations: "Needs gcloud, signed in, on the Mac that runs the control plane."
+            case .workstations: "Needs gcloud, signed in, on the Mac that runs the control plane, and a host in its ssh config that reaches the workstation’s port 22 through `gcloud workstations start-tcp-tunnel`."
             case .compute:
                 "Needs a service account’s JSON key, with the smallest role: compute.instances.list, start and stop, and for New Workspace… compute.instances.create, delete, setMetadata and setLabels, compute.disks.create, and compute.subnetworks.use and useExternalIp. ssh goes to each VM’s external address, so the network must let in port 22, and a static address keeps it the same after a stop (#1691). Nothing to install."
             case .aws:
@@ -473,6 +473,8 @@ struct AddProviderSheet: View {
                 TextField("Cluster", text: $cluster)
                 TextField("Configuration", text: $config)
                 TextField("Region", text: $region)
+                TextField("Project", text: $project, prompt: Text("gcloud’s default"))
+                TextField("ssh", text: $ssh, prompt: Text("A host in your ssh config"))
             case .compute:
                 TextField("Project", text: $project)
                 TextField("Zone", text: $region, prompt: Text("us-west1-b"))
@@ -939,6 +941,8 @@ struct AddProviderSheet: View {
         case .workstations:
             commands = ["preset": "gcloud-workstations", "cluster": .string(trimmed(cluster)),
                         "config": .string(trimmed(config)), "region": .string(trimmed(region))]
+            if !trimmed(project).isEmpty { commands["project"] = .string(trimmed(project)) }
+            if !trimmed(ssh).isEmpty { commands["ssh"] = .string(trimmed(ssh)) }
         case .commands:
             return DaemonAPI.ProviderAdd(name: name, kind: .commands, commands: try commandsJSON(), secrets: given)
         case .mcp:

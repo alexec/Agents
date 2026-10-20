@@ -48,3 +48,42 @@ not part of the walk. The Docker and Codespaces walks ran turns on the same host
   member of `google-sudoers`, so the host's user could become root. The keys now go in the
   metadata `agents-ssh-keys`, which the startup script copies into `agents`'s
   `authorized_keys`. The walk confirmed `agents` has no sudo.
+
+## Workstations: the `gcloud-workstations` preset
+
+The Workstations API was turned on for the walk. The smallest set-up: cluster `w1346-cluster`
+(us-west1, the default network), config `w1346-config` (e2-standard-2, a 10 GB pd-balanced
+disk, 30 minutes idle, 1 hour at most; pd-standard must be 200 GB or more), workstation
+`w1346-ws` on the default image (Ubuntu 24.04, x86_64). All labelled `agents-walk=1346`.
+ssh reached it through `gcloud workstations start-tcp-tunnel w1346-ws 22
+--local-host-port=localhost:2246`, as the host `w1346ws` in the walk's ssh config.
+
+`{"preset":"gcloud-workstations","cluster":"w1346-cluster","config":"w1346-config","region":"us-west1","ssh":"w1346ws"}`,
+with the secret `CLOUDSDK_CONFIG` set to the walk's gcloud config: a provider's commands get only
+an allowed list of the control plane's variables, and its secrets.
+
+| Step | Result |
+|---|---|
+| Add | **Failed, then passed.** Without a project, gcloud took its default one from the config it was given, and the Mac's had none: "Failed to find attribute [project]". **Fixed in this branch:** the preset takes `project`, and the Mac's form has it. With the walk's config: the workstation listed `running` (gcloud now prints `RUNNING`, not `STATE_RUNNING`), ssh `w1346ws`, tunnel. |
+| Install over ssh, tunnel | **Passed.** The host joined 25 s after the call. The workstation's `user` has sudo: that is Google's image. |
+| Link | **Passed.** `canStop`. |
+| Stop | **Passed.** `ok in 7s`, STOPPED. |
+| Start | **Failed.** The workstation was RUNNING again in about 2 minutes, but the tunnel and the ssh start were refused: "The server's host key has changed since your known_hosts last saw it". A workstation's container is made again at each start, and only `/home` is kept: `/etc/ssh/ssh_host_ed25519_key` was written at that start, while `~/.agents-server` was still there. **Filed: #1701**, with a proposal: a preset says its host keys are new at each start, and after a Start the control plane made, the first ssh pins the new key. |
+
+## Cost
+
+- **Compute Engine:** one e2-small VM for 10 minutes (21:51–22:01) and its 20 GB boot disk:
+  under $0.01.
+- **Workstations:** the cluster from 22:02 until it was gone at 22:35, 33 minutes, at $0.20 an
+  hour (the cluster's fee); the workstation running for about 6 minutes at about $0.07 an hour
+  (e2-standard-2) and the workstation fee; the 10 GB disk for 8 minutes. About $0.12.
+
+## Clean-up
+
+The VM and its disk were deleted through the provider (Delete Workspace); the workstation, the
+config and the cluster with `gcloud workstations … delete`. Afterwards
+`gcloud compute instances list` and `gcloud compute disks list` showed only `agents-control`,
+and `gcloud workstations clusters list --region us-west1` showed nothing. The Workstations API
+was left on (it costs nothing without a cluster). The scratch set-up was stopped (`stop.sh`), the
+walk's key, ssh config and gcloud config in `/tmp` removed, and no ssh or gcloud process of the
+walk was left.

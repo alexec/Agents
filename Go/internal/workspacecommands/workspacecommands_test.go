@@ -307,6 +307,10 @@ func TestPresetsCommandLines(t *testing.T) {
 		gcloud.Commands.Start != "gcloud workstations start ${id} --cluster='c' --config='f' --region='r'" {
 		t.Errorf("%+v", gcloud)
 	}
+	inProject := config(t, `{"preset":"gcloud-workstations","cluster":"c","config":"f","region":"r","project":"p"}`).Listing
+	if inProject.Commands.Stop != "gcloud workstations stop ${id} --cluster='c' --config='f' --region='r' --project='p'" {
+		t.Errorf("%+v", inProject)
+	}
 	refused(t, `{"preset":"doctl"}`, "the doctl preset needs a tag")
 	refused(t, `{"preset":"gcloud-workstations","cluster":"c","config":"f"}`, "the gcloud-workstations preset needs region")
 }

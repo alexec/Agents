@@ -164,6 +164,10 @@ func workstations(o map[string]any) (Config, error) {
 		}
 		flags += " --" + key + "=" + ShellQuoted(value)
 	}
+	// Without a project, gcloud's own default one (core/project).
+	if project, _ := o["project"].(string); project != "" {
+		flags += " --project=" + ShellQuoted(project)
+	}
 	return newConfig(nil, &Listing{
 		Command: "gcloud workstations list" + flags + " --format='value(name.basename(),state)'",
 		Shape:   Shape{Columns: []string{"id", "state"}},
@@ -171,7 +175,7 @@ func workstations(o map[string]any) (Config, error) {
 			Stop: "gcloud workstations stop ${id}" + flags,
 			SSH:  optional(o["ssh"]), Tunnel: true},
 	}, map[string]State{"state_running": Running, "state_starting": Starting, "state_stopping": Stopping,
-		"state_stopped": Stopped, "state_reconciling": Starting}, Making{}), nil
+		"state_stopped": Stopped, "state_reconciling": Starting, "reconciling": Starting}, Making{}), nil
 }
 
 // api is a preset's API address: the given one (a proxy, or a test's server), or its
