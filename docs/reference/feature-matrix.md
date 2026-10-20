@@ -38,7 +38,7 @@ down for a runtime that has none. [Overall score](#overall-score), after the
 tables, adds every feature up.
 
 The matrix was filled in on 2026-10-12 from each app's own docs, changelog, README,
-releases and, where open, source. Agents' row was last brought up to date on 2026-10-19. Every app is held to the same bar, Agents included: a ●
+releases and, where open, source. Agents' row was last brought up to date on 2026-10-20. Every app is held to the same bar, Agents included: a ●
 needs the whole feature, documented by the app itself, and a ○ needs evidence, such as an
 app that ships for macOS alone having no Android app. Once per release, after the
 Competitor check, the Feature matrix workflow (`.agents/workflows/feature-matrix.md`)
@@ -55,8 +55,6 @@ Agents' ◐ cells, and why:
 - **Spending limits:** in money or in tokens (#838), so only for runtimes that report a
   price or tokens. Cursor, Antigravity and Grok report neither, and run past every
   limit. See [Limit spending](../how-to/limit-spending.md).
-- **Git hosts beyond GitHub:** through the GitLab server from the MCP marketplace, with
-  nothing shown in the app. A GitLab server of Agents' own is planned for 0.7 (#813).
 - **A browser the agent drives:** through the Playwright server from the MCP marketplace,
   with nothing shown in the app.
 
@@ -246,11 +244,11 @@ Agents has none of these at all:
 
 | App | Diff review | Pull requests | Git hosts beyond GitHub | CI checks | A second agent reviews | Score |
 |---|:-:|:-:|:-:|:-:|:-:|--:|
+| **Agents** | ● | ● | ● | ● | ● | 100% |
 | Cursor | ● | ● | ● | ● | ● | 100% |
 | GitHub Copilot | ● | ● | ● | ● | ● | 100% |
 | Threadlines | ● | ● | ● | ● | ● | 100% |
 | Agentastic | ● | ● | ◐ | ● | ● | 90% |
-| **Agents** | ● | ● | ◐ | ● | ● | 90% |
 | Codeg | ● | ● | ● | ● | ◐ | 90% |
 | Paseo | ● | ● | ● | ● | ◐ | 90% |
 | Claude Code | ● | ● | ◐ | ● | ◐ | 80% |
@@ -443,7 +441,7 @@ Each app's score in every table, and overall: its points over the 49 scored feat
 
 | Rank | App | Running | Reach | Following | Reviewing | Tools | Tasks | Extensions | Organising | Overall |
 |--:|---|--:|--:|--:|--:|--:|--:|--:|--:|--:|
-| 1 | **Agents** | 100% | 67% | 100% | 90% | 90% | 100% | 70% | 83% | **89%** |
+| 1 | **Agents** | 100% | 67% | 100% | 100% | 90% | 100% | 70% | 83% | **90%** |
 | 2 | GitHub Copilot | 92% | 83% | 100% | 100% | 80% | 61% | 100% | 50% | **82%** |
 | 3 | Paseo | 100% | 100% | 71% | 90% | 60% | 61% | 60% | 100% | **80%** |
 | 4 | Cursor | 83% | 67% | 86% | 100% | 80% | 67% | 80% | 50% | **76%** |
