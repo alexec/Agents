@@ -272,9 +272,12 @@ finding is not published before it is fixed. Neither has a schedule; **Run now**
 **Free disk space** (`.agents/workflows/free-disk-space.md`, #199) runs on `machine.disk_low`. It
 deletes build output (the folders `.gitignore` ignores and git tracks nothing in, such as
 `build/`, `.build`, `DerivedData` and `Web/node_modules`) from the worktrees of agents that are
-Done or Archived and hold no lease. At the critical level it also removes archived
-agents' worktrees that have nothing uncommitted, keeping the branch. It never touches the
-project folder, a worktree no session names, or a busy agent's. It too arrives turned off.
+Done or Archived and hold no lease. It also removes archived agents' worktrees that have
+nothing uncommitted, keeping the branch, bounds the shared build cache (Swift and Go), ends
+headless walk Chromes left running over 6 hours, and removes older Xcode device support
+(`scripts/free-disk.sh`, #1796). It goes on until 20% of the disk is free or the steps run
+out. It never touches the project folder, a worktree no session names, or a busy agent's.
+It too arrives turned off.
 
 **Crash reports** (`.agents/workflows/crash-reports.md`, #392) runs once a day at 07:00. It
 reads the crash reports of Agents, Agents Host, `agentsd` and `agents-control` written on
