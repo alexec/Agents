@@ -1,0 +1,87 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Merge requests</title>
+<!-- The gitlab server's Merge requests (ui://gitlab/merge-requests, #1631): show_merge_requests's
+     result, each with its pipeline, conflict, approvals and auto-merge, and Retry on a failed one.
+     A merge request's title opens its page (show_merge_request) in place, with a way back to the
+     list. It has no network: it speaks only the MCP Apps bridge. -->
+<style>
+/*common.css*/
+/*mrpage.css*/
+#list { display: grid; gap: 8px; }
+#list[hidden], #page[hidden] { display: none; }
+</style></head>
+<body><main><div id="list">
+  <header><h1>Merge requests</h1><span id="project" class="muted"></span><span class="grow"></span>
+    <button id="refresh" type="button" disabled>Refresh</button></header>
+  <div id="state" class="muted">Waiting for the host…</div>
+  <ul id="mrs"></ul>
+</div><div id="page" hidden></div></main>
+<script>
+/*bridge.js*/
+/*mrpage.js*/
+(() => {
+  let project = "";
+  const ui = bridge("gitlab-merge-requests", {
+    input: (args) => { project = args.project || ""; ui.$("project").textContent = project; say("Listing…"); },
+    result: (result) => draw(result),
+    cancelled: (why) => say("Cancelled: " + why, true),
+    started: () => say("Waiting for the merge requests…"),
+  });
+  const { $, el, link, button } = ui;
+  const say = (text, isError) => { $("state").textContent = text; $("state").className = isError ? "error" : "muted"; ui.size(); };
+
+  const draw = (result) => {
+    const found = ui.data(result);
+    if (!found) { say("Couldn't list merge requests: " + ui.errorText(result), true); $("refresh").disabled = !project; return; }
+    if (found.project) { project = found.project; $("project").textContent = project; }
+    const mrs = Array.isArray(found.mergeRequests) ? found.mergeRequests : [];
+    $("mrs").replaceChildren(...mrs.map(row));
+    say(mrs.length ? `${mrs.length} open · as of ${new Date().toLocaleTimeString()}` : "No open merge requests.");
+    $("refresh").disabled = !project;
+  };
+
+  const row = (mr) => {
+    const action = el("span", { className: "meta" });
+    const retry = mr.checks === "failing" && mr.failedPipelineId
+      ? button("Retry", (event) => retryFailed(mr, event.target, action), { title: "Run the failed jobs again" }) : null;
+    const title = el("a", { className: "title", textContent: mr.title, title: "Open !" + mr.number, href: "#" });
+    title.onclick = (event) => { event.preventDefault(); open(mr.number); };
+    return el("li", {}, [
+      link(`!${mr.number}`, mr.url),
+      title,
+      el("span", { className: "pills" }, [...mrPills(ui, mr), retry]),
+      el("span", { className: "meta" }, [
+        el("span", { className: "branch", textContent: mr.branch, title: `${mr.branch} → ${mr.base}` }),
+        el("span", { textContent: `${mr.author || "someone"}${mr.updatedAt ? " · " + ui.ago(mr.updatedAt) : ""}` }),
+      ]),
+      action,
+    ]);
+  };
+
+  const page = mrPage(ui, () => project, () => back());
+  const open = (number) => { $("list").hidden = true; $("page").hidden = false; page.show(number); };
+  const back = () => { $("page").hidden = true; $("list").hidden = false; list(); };
+
+  const list = async () => {
+    $("refresh").disabled = true;
+    try { draw(await ui.request("tools/call", { name: "show_merge_requests", arguments: { project } })); }
+    catch (e) { say("Couldn't list merge requests: " + e.message, true); $("refresh").disabled = false; }
+  };
+
+  const retryFailed = async (mr, b, action) => {
+    b.disabled = true; b.textContent = "Retrying…";
+    try {
+      await ui.call("retry_pipeline", { project, pipelineId: mr.failedPipelineId });
+      ui.log(`retry !${mr.number} pipeline ${mr.failedPipelineId}`);
+      await list();
+    } catch (e) {
+      b.disabled = false; b.textContent = "Retry";
+      action.replaceChildren(el("span", { className: "error", textContent: e.message }));
+    }
+  };
+
+  $("refresh").onclick = list;
+  ui.start();
+})();
+</script>
+</body></html>

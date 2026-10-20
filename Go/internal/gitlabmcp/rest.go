@@ -281,30 +281,33 @@ type user struct {
 }
 
 type mergeRequest struct {
-	IID                 int      `json:"iid"`
-	Title               string   `json:"title"`
-	Description         string   `json:"description"`
-	State               string   `json:"state"`
-	SourceBranch        string   `json:"source_branch"`
-	TargetBranch        string   `json:"target_branch"`
-	WebURL              string   `json:"web_url"`
-	Author              user     `json:"author"`
-	Draft               bool     `json:"draft"`
-	WorkInProgress      bool     `json:"work_in_progress"`
-	SourceProjectID     int      `json:"source_project_id"`
-	TargetProjectID     int      `json:"target_project_id"`
-	HasConflicts        bool     `json:"has_conflicts"`
-	DetailedMergeStatus string   `json:"detailed_merge_status"`
-	MergeStatus         string   `json:"merge_status"`
-	MergedAt            *string  `json:"merged_at"`
-	ClosedAt            *string  `json:"closed_at"`
-	MergeCommitSHA      string   `json:"merge_commit_sha"`
-	SquashCommitSHA     string   `json:"squash_commit_sha"`
-	SHA                 string   `json:"sha"`
-	Labels              []string `json:"labels"`
-	CreatedAt           string   `json:"created_at"`
-	UpdatedAt           string   `json:"updated_at"`
-	HeadPipeline        *struct {
+	IID                 int    `json:"iid"`
+	Title               string `json:"title"`
+	Description         string `json:"description"`
+	State               string `json:"state"`
+	SourceBranch        string `json:"source_branch"`
+	TargetBranch        string `json:"target_branch"`
+	WebURL              string `json:"web_url"`
+	Author              user   `json:"author"`
+	Draft               bool   `json:"draft"`
+	WorkInProgress      bool   `json:"work_in_progress"`
+	SourceProjectID     int    `json:"source_project_id"`
+	TargetProjectID     int    `json:"target_project_id"`
+	HasConflicts        bool   `json:"has_conflicts"`
+	DetailedMergeStatus string `json:"detailed_merge_status"`
+	// MergeWhenPipelineSucceeds is auto-merge, on until it merges.
+	MergeWhenPipelineSucceeds bool     `json:"merge_when_pipeline_succeeds"`
+	Squash                    bool     `json:"squash"`
+	MergeStatus               string   `json:"merge_status"`
+	MergedAt                  *string  `json:"merged_at"`
+	ClosedAt                  *string  `json:"closed_at"`
+	MergeCommitSHA            string   `json:"merge_commit_sha"`
+	SquashCommitSHA           string   `json:"squash_commit_sha"`
+	SHA                       string   `json:"sha"`
+	Labels                    []string `json:"labels"`
+	CreatedAt                 string   `json:"created_at"`
+	UpdatedAt                 string   `json:"updated_at"`
+	HeadPipeline              *struct {
 		ID     int    `json:"id"`
 		Status string `json:"status"`
 		WebURL string `json:"web_url"`
@@ -354,6 +357,8 @@ type issueJSON struct {
 	UpdatedAt   string   `json:"updated_at"`
 	ClosedAt    *string  `json:"closed_at"`
 	ClosedBy    *user    `json:"closed_by"`
+	// UserNotesCount is how many comments people left on it.
+	UserNotesCount int `json:"user_notes_count"`
 }
 
 func (i issueJSON) issue() Issue {
@@ -677,6 +682,7 @@ type noteJSON struct {
 	Author       user   `json:"author"`
 	CreatedAt    string `json:"created_at"`
 	System       bool   `json:"system"`
+	Resolved     bool   `json:"resolved"`
 	NoteableType string `json:"noteable_type"`
 	NoteableIID  int    `json:"noteable_iid"`
 	Position     *struct {

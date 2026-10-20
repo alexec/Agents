@@ -37,14 +37,18 @@ type fakeGitLab struct {
 	activity []obj
 	members  map[int]int // user id → access level
 	requests []string
-	posted   []obj // what was POSTed or PUT, with its path
-	status   int   // answer every request with this, when set
+	posted   []obj         // what was POSTed or PUT, with its path
+	diffs    map[int][]obj // merge request → its files
+	discuss  map[int][]obj // merge request → its discussions
+	traces   map[int]string
+	status   int // answer every request with this, when set
 	header   http.Header
 	server   *httptest.Server
 }
 
 func newFake(t *testing.T) *fakeGitLab {
-	f := &fakeGitLab{t: t, jobs: map[int][]obj{}, commits: map[string][]obj{}, members: map[int]int{}}
+	f := &fakeGitLab{t: t, jobs: map[int][]obj{}, commits: map[string][]obj{}, members: map[int]int{}, diffs: map[int][]obj{},
+		discuss: map[int][]obj{}, traces: map[int]string{}}
 	f.server = httptest.NewServer(http.HandlerFunc(f.serve))
 	t.Cleanup(f.server.Close)
 	return f
@@ -130,6 +134,10 @@ func (f *fakeGitLab) serve(w http.ResponseWriter, r *http.Request) {
 		answer(f.status, obj{"message": "refused"})
 		return
 	}
+	if r.URL.Path == "/api/v4/user" {
+		answer(200, alex)
+		return
+	}
 	m := path.FindStringSubmatch(r.URL.EscapedPath())
 	if m == nil {
 		answer(404, obj{"message": "404 Project Not Found"})
@@ -176,6 +184,20 @@ func (f *fakeGitLab) serve(w http.ResponseWriter, r *http.Request) {
 		answer(404, obj{"message": "404 Not found"})
 	case len(parts) == 3 && parts[0] == "merge_requests" && parts[2] == "merge" && r.Method == http.MethodPut:
 		answer(200, obj{"iid": 1, "state": "merged", "merge_commit_sha": "merged1"})
+	case len(parts) == 3 && parts[0] == "merge_requests" && parts[2] == "diffs":
+		id, _ := strconv.Atoi(parts[1])
+		answer(200, orEmpty(f.diffs[id]))
+	case len(parts) == 3 && parts[0] == "merge_requests" && parts[2] == "discussions":
+		id, _ := strconv.Atoi(parts[1])
+		answer(200, orEmpty(f.discuss[id]))
+	case len(parts) == 3 && parts[0] == "merge_requests" && parts[2] == "approve" && r.Method == http.MethodPost:
+		answer(201, obj{"id": 1})
+	case len(parts) == 3 && parts[0] == "pipelines" && parts[2] == "retry" && r.Method == http.MethodPost:
+		answer(201, obj{"id": 100, "status": "pending", "web_url": "https://gitlab.test/p/100"})
+	case len(parts) == 3 && parts[0] == "jobs" && parts[2] == "trace":
+		id, _ := strconv.Atoi(parts[1])
+		w.WriteHeader(200)
+		_, _ = io.WriteString(w, f.traces[id])
 	case len(parts) == 3 && parts[2] == "notes" && r.Method == http.MethodPost:
 		answer(201, obj{"id": 900, "body": "x"})
 	case len(parts) == 1 && parts[0] == "pipelines":
@@ -222,4 +244,11 @@ func (f *fakeGitLab) serve(w http.ResponseWriter, r *http.Request) {
 	default:
 		answer(404, obj{"message": "404 Not found"})
 	}
+}
+
+func orEmpty(list []obj) []obj {
+	if list == nil {
+		return []obj{}
+	}
+	return list
 }
