@@ -309,6 +309,10 @@ docs/how-to/use-linear-issues.md                       ci-server
 scripts/go-github-mcp.sh                               ci-server
 specs/038-*/                                           ci-server
 
+# gitlab: the gitlab MCP server (#1629): merge requests, pipelines and issues on GitLab.
+Go/cmd/gitlab-mcp/                                     gitlab
+Go/internal/gitlabmcp/                                 gitlab
+
 # control-plane: the control plane: joining, membership, grants, copies and handover,
 # its server and its deploy.
 App/Sources/Control/                                   control-plane
