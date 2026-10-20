@@ -25,3 +25,11 @@ test("a restore says what came back and what was here already", () => {
 test("every schedule has words", () => {
   assert.deepEqual(backups.backupEveries.map(backups.everyLabel), ["Never", "Every day", "Every week"]);
 });
+
+test("where backups go has words, and the store's sentence only when they go there (#1815)", () => {
+  assert.deepEqual(backups.backupTargets.map(backups.targetLabel), ["A folder", "The control plane"]);
+  const state = (target) => ({ settings: { every: "daily", keep: 3, target }, folder: "/f", backups: [], making: false });
+  assert.equal(backups.backupTarget(state(undefined)), "folder");
+  assert.equal(backups.footerWords(state("folder")), backups.backupsFooter);
+  assert.match(backups.footerWords(state("control")), /control plane's store, sealed/);
+});

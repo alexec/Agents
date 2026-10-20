@@ -2019,7 +2019,7 @@ final class AppModel {
     }
 
     func makeBackup() async throws {
-        work.replaceBackupState(try await macClient.call(DaemonAPI.Method.backupsMake, DaemonAPI.Empty(),
+        work.replaceBackupState(try await macClient.call(DaemonAPI.Method.backupsMake, DaemonAPI.BackupMakeRequest(),
                                                          returning: DaemonAPI.BackupState.self))
     }
 

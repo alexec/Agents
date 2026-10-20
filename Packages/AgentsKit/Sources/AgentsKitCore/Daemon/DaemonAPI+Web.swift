@@ -122,7 +122,7 @@ public extension DaemonAPI {
                 // Backups of the machine, in Settings (#1810).
                 Row(Method.backupsState, params: Empty.self, result: BackupState.self, kind: .hostRequest),
                 Row(Method.backupsConfigure, params: BackupSettings.self, result: BackupState.self, kind: .hostRequest),
-                Row(Method.backupsMake, params: Empty.self, result: BackupState.self, kind: .hostRequest),
+                Row(Method.backupsMake, params: BackupMakeRequest.self, result: BackupState.self, kind: .hostRequest),
                 Row(Method.backupsRestore, params: BackupRestoreRequest.self, result: BackupRestoreResult.self,
                     kind: .hostRequest),
                 // The files the host could not read in this run (#205, #223), as the window's sidebar foot.

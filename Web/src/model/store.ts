@@ -1684,34 +1684,46 @@ export class Store extends Work {
 
   /** Settings ▸ Backups (#1810), asked when Settings is shown. */
   loadBackups(): void {
-    void this.link.call("backups/state", {}, this.macHostID.value).then((state) => {
-      this.backups.value = state;
-    }).catch(() => {
-      // A host too old to know backups/state leaves the section out.
+    void this.hostBackups(this.macHostID.value).then((state) => {
+      if (state) this.backups.value = state;
     });
   }
 
-  /** How often, how many kept: answered with the state after. A refusal is said. */
-  async configureBackups(settings: BackupSettings): Promise<void> {
+  /** A host's backups (#1815): the Mac's for Settings ▸ Backups, a server's for its own section.
+   * Null from a host too old to know backups/state, which leaves the section out. */
+  async hostBackups(host: string): Promise<BackupState | null> {
     try {
-      this.backups.value = await this.link.call("backups/configure", settings, this.macHostID.value);
-    } catch (error) {
-      this.say(describe(error));
+      return await this.link.call("backups/state", {}, host);
+    } catch {
+      return null;
     }
   }
 
-  async makeBackup(): Promise<void> {
+  /** How often, how many kept, where: answered with the state after, or null when refused, which is
+   * said. The Mac's is kept for every view of it. */
+  async configureBackups(settings: BackupSettings, host = this.macHostID.value): Promise<BackupState | null> {
+    return this.keepBackups(host, () => this.link.call("backups/configure", settings, host));
+  }
+
+  async makeBackup(host = this.macHostID.value): Promise<BackupState | null> {
+    return this.keepBackups(host, () => this.link.call("backups/make", {}, host));
+  }
+
+  private async keepBackups(host: string, call: () => Promise<BackupState>): Promise<BackupState | null> {
     try {
-      this.backups.value = await this.link.call("backups/make", {}, this.macHostID.value);
+      const state = await call();
+      if (this.isMac(host)) this.backups.value = state;
+      return state;
     } catch (error) {
       this.say(describe(error));
+      return null;
     }
   }
 
   /** The result, or null when it failed, which is said. */
-  async restoreBackup(id: string): Promise<BackupRestoreResult | null> {
+  async restoreBackup(id: string, host = this.macHostID.value): Promise<BackupRestoreResult | null> {
     try {
-      return await this.link.call("backups/restore", { id }, this.macHostID.value);
+      return await this.link.call("backups/restore", { id }, host);
     } catch (error) {
       this.say(describe(error));
       return null;

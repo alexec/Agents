@@ -254,6 +254,7 @@ public enum DaemonAPI {
         /// How often, how many to keep, and the folder. Answers the state after.
         public static let backupsConfigure = "backups/configure"
         /// Start a backup now. Answers at once, `making` set; `backups/changed` says when it ends.
+        /// With `wait`, answers once it is made (#1815).
         public static let backupsMake = "backups/make"
         /// Bring a backup's agents back, archived. One already here is skipped.
         public static let backupsRestore = "backups/restore"
@@ -4223,17 +4224,33 @@ public extension DaemonAPI {
         }
     }
 
+    /// Where a machine's backups go (#1815).
+    enum BackupTarget: String, Codable, Hashable, Sendable, CaseIterable {
+        /// A folder: the host's own `<root>/backups`, or the one in `folder`.
+        case folder
+        /// The control plane's store, in parts, under the machine's owner.
+        case control
+
+        /// A value this build does not know reads as the folder, as the host does.
+        public init(from decoder: Decoder) throws {
+            self = Self(rawValue: try decoder.singleValueContainer().decode(String.self)) ?? .folder
+        }
+    }
+
     struct BackupSettings: Codable, Hashable, Sendable {
         public var every: BackupEvery
         /// How many of this machine's backups are kept, 1 to 10.
         public var keep: Int
         /// The folder, when not the host's own `<root>/backups`.
         public var folder: String?
+        /// Where they go; nil is the machine's default (#1815). The state always says it.
+        public var target: BackupTarget?
 
-        public init(every: BackupEvery, keep: Int, folder: String? = nil) {
+        public init(every: BackupEvery, keep: Int, folder: String? = nil, target: BackupTarget? = nil) {
             self.every = every
             self.keep = keep
             self.folder = folder
+            self.target = target
         }
     }
 
@@ -4267,14 +4284,25 @@ public extension DaemonAPI {
         public var backups: [Backup]
         public var making: Bool
         public var lastError: String?
+        /// The machine is on a control plane, so it can back up to its store (#1815).
+        public var canUseControl: Bool?
 
-        public init(settings: BackupSettings, folder: String, backups: [Backup], making: Bool, lastError: String? = nil) {
+        public init(settings: BackupSettings, folder: String, backups: [Backup], making: Bool, lastError: String? = nil,
+                    canUseControl: Bool? = nil) {
             self.settings = settings
             self.folder = folder
             self.backups = backups
             self.making = making
             self.lastError = lastError
+            self.canUseControl = canUseControl
         }
+    }
+
+    /// `backups/make`: answer at once, or once the backup is made (#1815).
+    struct BackupMakeRequest: Codable, Sendable {
+        public var wait: Bool?
+
+        public init(wait: Bool? = nil) { self.wait = wait }
     }
 
     struct BackupRestoreRequest: Codable, Sendable {

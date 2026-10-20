@@ -262,6 +262,8 @@ struct ControlHostsPage: View {
     @State private var stoppingNames: [String] = []
     /// Delete Workspace… (US5, L9).
     @State private var deleting: DaemonAPI.ControlHost?
+    /// Backups… (#1815): the host's own backups page.
+    @State private var backingUp: DaemonAPI.ControlHost?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -324,6 +326,9 @@ struct ControlHostsPage: View {
         } message: { host in
             Text(stopWords(host))
         }
+        .sheet(item: $backingUp) { host in
+            HostBackupsSheet(host: host).paperSheet()
+        }
         .sheet(item: $choosing) { host in
             ChooseProjectsSheet(host: host.id, hostName: host.id == control.thisMacHost?.id ? "This Mac" : host.name,
                                 paths: control.suggestedPaths).paperSheet()
@@ -371,7 +376,7 @@ struct ControlHostsPage: View {
             if host.state == "starting" || host.state == "stopping" {
                 HStack(spacing: 6) {
                     ProgressView().controlSize(.small)
-                    Text(host.state == "starting" ? "Starting…" : "Stopping…").appText(.supporting).foregroundStyle(.secondary)
+                    Text(Self.underWay(host)).appText(.supporting).foregroundStyle(.secondary)
                 }
             } else if host.state == "online" || !workspace.canStart {
                 Button("Stop") {
@@ -401,11 +406,20 @@ struct ControlHostsPage: View {
         }
     }
 
+    /// What a start or stop under way says: a delete's backup is a stop of its own (#1815).
+    static func underWay(_ host: DaemonAPI.ControlHost) -> String {
+        if host.state == "starting" { return "Starting…" }
+        return host.workspace?.phase == "backing up" ? "Backing up to delete…" : "Stopping…"
+    }
+
     private func hostMenu(_ host: DaemonAPI.ControlHost) -> some View {
         Menu {
-            // A relay runs no agents, so it has no projects.
+            // A relay runs no agents, so it has no projects, and nothing to back up.
             if host.relay == nil {
                 Button("Choose Projects…") { choosing = host }.disabled(!host.answers)
+                if model.host(host.id, has: Capability.backups1) {
+                    Button("Backups…") { backingUp = host }.disabled(!host.answers)
+                }
             }
             if host.workspace != nil {
                 Button("Check again") { Task { await control.checkAgain(host.id) } }
@@ -456,12 +470,16 @@ struct ControlHostsPage: View {
         .accessibilityLabel("More for \(host.name)")
     }
 
-    /// What Delete Workspace… loses (L9): the workspace and its disk, and the host with its agents.
+    /// What Delete Workspace… loses (L9): the workspace and its disk, and the host with its
+    /// agents, and whether it backs up first (#1815).
     private func deleteWords(_ host: DaemonAPI.ControlHost) -> String {
         let agents = model.work.agents.filter { $0.host == host.id }.count
         let workspace = host.workspace.map { "\($0.workspaceName) at \($0.providerName)" } ?? "The workspace"
+        // An online host backs up first (#1815); an offline one keeps the backups it made.
+        let backup = host.answers ? " It is backed up first, and deleted once the backup is made."
+            : " It is offline, so it is not backed up first; the backups it made are kept."
         return "\(workspace) and everything on its disk are deleted, and host \(host.name) is removed"
-            + (agents == 0 ? "." : " with its \(agents == 1 ? "agent" : "\(agents) agents").")
+            + (agents == 0 ? "." : " with its \(agents == 1 ? "agent" : "\(agents) agents").") + backup
     }
 
     static func minutes(_ minutes: Int) -> String {
@@ -737,5 +755,23 @@ struct CodeSheet: View {
             : "\(web.summary) Try again in Agents Host, then open \(web.address) on this Mac and paste it in."
         guard let anywhere else { return here }
         return "In any browser, open \(anywhere) and paste it in. \(here)"
+    }
+}
+
+/// A server's backups (#1815), from its menu: the same section as Settings ▸ Mac ▸ Backups,
+/// sent to that host.
+private struct HostBackupsSheet: View {
+    @Environment(AppModel.self) private var model
+    @Environment(\.dismiss) private var dismiss
+    let host: DaemonAPI.ControlHost
+
+    var body: some View {
+        VStack(alignment: .trailing, spacing: 0) {
+            HostBackupsView(client: model.client(for: host.id), hostName: host.name)
+            Button("Done") { dismiss() }
+                .keyboardShortcut(.defaultAction)
+                .padding()
+        }
+        .frame(width: 520, height: 480)
     }
 }

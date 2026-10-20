@@ -1,6 +1,6 @@
 // Settings ▸ Backups (#1810): the words the section says, as the window's and the Remote's
 // BackupsSection says them (Shared/UI/BackupsSection.swift).
-import type { Backup, BackupEvery, BackupRestoreResult } from "../protocol/generated";
+import type { Backup, BackupEvery, BackupRestoreResult, BackupState, BackupTarget } from "../protocol/generated";
 
 export const backupEveries: readonly BackupEvery[] = ["off", "daily", "weekly"];
 
@@ -17,6 +17,27 @@ export function everyLabel(every: BackupEvery): string {
 export const backupsFooter = "A backup holds this machine's agents, their conversations, and its usage and time history. "
   + "It never holds a sign-in or a secret. Restore brings a backup's agents back archived; "
   + "one this machine has already is left as it is. An agent from another machine is shown, never run.";
+
+/** Where backups go (#1815): a folder, or the control plane's store. */
+export const backupTargets: readonly BackupTarget[] = ["folder", "control"];
+
+export function targetLabel(target: BackupTarget): string {
+  switch (target) {
+    case "folder": return "A folder";
+    case "control": return "The control plane";
+  }
+}
+
+export function backupTarget(state: BackupState): BackupTarget {
+  return state.settings.target ?? "folder";
+}
+
+/** The words under the section: the store's sentence only when backups go there. */
+export function footerWords(state: BackupState): string {
+  if (backupTarget(state) !== "control") return backupsFooter;
+  return backupsFooter + " Backups go to the control plane's store, sealed, where your other machines can restore them, even "
+    + "after this one is deleted.";
+}
 
 export const restoreMessage = "Its agents come back archived. Nothing on this machine is changed or deleted.";
 

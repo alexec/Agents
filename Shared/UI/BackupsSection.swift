@@ -2,9 +2,10 @@ import AgentsKitCore
 import SwiftUI
 
 /// Settings ▸ Backups (#1810): how often this machine backs up its agents and transcripts,
-/// how many backups it keeps, Back Up Now, and Restore for each backup in the folder, this
-/// machine's or another's. The Mac's Settings window and the Remote's Settings screen draw
-/// the same section; the web page draws the same in Web/src/views/Settings.tsx.
+/// how many backups it keeps, where they go, Back Up Now, and Restore for each backup
+/// there, this machine's or another's. The Mac's Settings window and the Remote's Settings
+/// screen draw the same section, as does each server's page (`HostBackupsView`, #1815); the
+/// web page draws the same in Web/src/views/Settings.tsx.
 ///
 /// What it shows is what the host last said; each change goes through the host and comes
 /// back. The restore being confirmed is held here, apart from the model, so a
@@ -14,6 +15,8 @@ struct BackupsSection: View {
     let configure: (DaemonAPI.BackupSettings) async throws -> Void
     let make: () async throws -> Void
     let restore: (DaemonAPI.Backup) async throws -> DaemonAPI.BackupRestoreResult
+    /// The section's heading: a server's page names the server.
+    var title = "Backups"
     /// The Mac's folder picker; nil where the folder is only shown.
     var chooseFolder: (() -> Void)?
 
@@ -32,14 +35,24 @@ struct BackupsSection: View {
                     Text(n == 1 ? "1 backup" : "\(n) backups").tag(n)
                 }
             }
-            LabeledContent("Folder") {
-                HStack {
-                    Text(state.folder)
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-                        .textSelection(.enabled)
-                    if let chooseFolder {
-                        Button("Choose…", action: chooseFolder)
+            // A machine on a control plane can back up to its store (#1815).
+            if state.canUseControl == true {
+                Picker("Back up to", selection: binding(\.target)) {
+                    ForEach(DaemonAPI.BackupTarget.allCases, id: \.self) { target in
+                        Text(Self.targetLabel(target)).tag(Optional(target))
+                    }
+                }
+            }
+            if Self.target(state) == .folder {
+                LabeledContent("Folder") {
+                    HStack {
+                        Text(state.folder)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                            .textSelection(.enabled)
+                        if let chooseFolder {
+                            Button("Choose…", action: chooseFolder)
+                        }
                     }
                 }
             }
@@ -60,15 +73,13 @@ struct BackupsSection: View {
                 }
             }
         } header: {
-            Text("Backups")
+            Text(title)
         } footer: {
             VStack(alignment: .leading, spacing: 4) {
                 if let error = said ?? state.lastError {
                     Text(error)
                 }
-                Text("A backup holds this machine's agents, their conversations, and its usage and time history. "
-                     + "It never holds a sign-in or a secret. Restore brings a backup's agents back archived; "
-                     + "one this machine has already is left as it is. An agent from another machine is shown, never run.")
+                Text(Self.footer(state))
             }
             .appText(.fine)
             .foregroundStyle(.secondary)
@@ -104,6 +115,26 @@ struct BackupsSection: View {
                 said = "That did not work: \(error.localizedDescription)"
             }
         }
+    }
+
+    static func target(_ state: DaemonAPI.BackupState) -> DaemonAPI.BackupTarget {
+        state.settings.target ?? .folder
+    }
+
+    static func targetLabel(_ target: DaemonAPI.BackupTarget) -> String {
+        switch target {
+        case .folder: "A folder"
+        case .control: "The control plane"
+        }
+    }
+
+    static func footer(_ state: DaemonAPI.BackupState) -> String {
+        let held = "A backup holds this machine's agents, their conversations, and its usage and time history. "
+            + "It never holds a sign-in or a secret. Restore brings a backup's agents back archived; "
+            + "one this machine has already is left as it is. An agent from another machine is shown, never run."
+        guard target(state) == .control else { return held }
+        return held + " Backups go to the control plane's store, sealed, where your other machines can restore them, even "
+            + "after this one is deleted."
     }
 
     static func everyLabel(_ every: DaemonAPI.BackupEvery) -> String {

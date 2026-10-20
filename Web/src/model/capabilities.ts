@@ -29,6 +29,8 @@ export function versionWords(host: ControlHost): string {
 /** A host's state as a row says it: "Needs an update" for `needsUpdate`. */
 export function stateWords(host: ControlHost): string {
   if (host.state === "needsUpdate") return "Needs an update";
+  // A delete's backup, before its workspace goes (#1815).
+  if (host.state === "stopping" && host.workspace?.phase === "backing up") return "Backing up to delete";
   return host.state.charAt(0).toUpperCase() + host.state.slice(1);
 }
 
