@@ -1319,12 +1319,18 @@ type ConnectorProof struct {
 	At      *Date   `json:"at,omitzero"`
 }
 
-// A project's Connectors set-up (#1336): its GitHub repository, the person's connection, four slots that each prove themselves with one read, and the events.
+// A project's Connectors set-up (#1336): its GitHub or GitLab repository (#1632), the person's connection to that forge, four slots that each prove themselves with one read, and the events.
 type ConnectorSetup struct {
 	Folder string `json:"folder"`
-	// owner/name, from the project's git remote (origin first). Absent with no GitHub remote.
-	Repository *string     `json:"repository,omitzero"`
-	Connection *Connection `json:"connection,omitzero"`
+	// owner/name on GitHub, or group/project on GitLab, from the project's git remote (origin first). Absent with no GitHub or GitLab remote.
+	Repository *string `json:"repository,omitzero"`
+	// The forge the repository is on, which fills Tasks, Code review and CI: github or gitlab (#1632). Absent is github.
+	Forge *ConnectionProvider `json:"forge,omitzero"`
+	// The repository's host, as the page says it before the repository: github.com, gitlab.com, or a self-managed GitLab's host.
+	Site *string `json:"site,omitzero"`
+	// The repository's page on its forge, where the person asks for access when a read is refused (GitLab).
+	RepositoryURL *string     `json:"repositoryURL,omitzero"`
+	Connection    *Connection `json:"connection,omitzero"`
 	// Whether the Agents App is installed on the repository. Absent when not known.
 	Installed  *bool   `json:"installed,omitzero"`
 	InstallURL *string `json:"installURL,omitzero"`
@@ -1379,7 +1385,7 @@ const (
 	ConnectorSlotKindWorkspace  ConnectorSlotKind = "workspace"
 )
 
-// notConnected: the slot comes with a connection that is not there yet. notRead: connected, but not read yet (a stored reading). read: its one read worked (a tick). failed: the read did not reach the provider; message says why. refused: the provider refused the read, so the person grants it on the provider's site. noRemote: the project has no GitHub remote. skipped: the person skipped it; it counts as done.
+// notConnected: the slot comes with a connection that is not there yet. notRead: connected, but not read yet (a stored reading). read: its one read worked (a tick). failed: the read did not reach the provider; message says why. refused: the provider refused the read, so the person grants it on the provider's site. noRemote: the project has no GitHub or GitLab remote. skipped: the person skipped it; it counts as done.
 type ConnectorSlotState string
 
 const (
@@ -1476,6 +1482,8 @@ type ControlAuth struct {
 	Kind  string  `json:"kind"`
 	For   *string `json:"for,omitzero"`
 	Epoch *int64  `json:"epoch,omitzero"`
+	// The capabilities this client has (#1748). None from a client older than #1748, or from a host, which says its own in host/hello.
+	Capabilities []string `json:"capabilities,omitzero"`
 }
 
 // control/clientChanged: a client paired, renamed, connected or went; nothing says list them all again.
@@ -1521,6 +1529,10 @@ type ControlHost struct {
 	Tunnel         *HostTunnel       `json:"tunnel,omitzero"`
 	Workspace      *HostWorkspace    `json:"workspace,omitzero"`
 	Implementation *string           `json:"implementation,omitzero"`
+	// The capabilities this host said in its last host/hello (#1748). None from a host older than #1748.
+	Capabilities []string `json:"capabilities,omitzero"`
+	// Of the control plane's required capabilities for hosts, the ones this host does not have (#1748). Its state is then needsUpdate.
+	Missing []string `json:"missing,omitzero"`
 	// The user who owns the machine (#994).
 	Owner *string `json:"owner,omitzero"`
 }
@@ -1587,6 +1599,9 @@ type ControlStatus struct {
 	ThisMacHost      *HostJoinStatus     `json:"thisMacHost,omitzero"`
 	ProjectDetection *ProjectDetection   `json:"projectDetection,omitzero"`
 	UnjoinedTunnels  []HostTunnelChanged `json:"unjoinedTunnels,omitzero"`
+	// The capabilities the control plane has (#1748).
+	Capabilities []string              `json:"capabilities,omitzero"`
+	Required     *RequiredCapabilities `json:"required,omitzero"`
 	// Who this client belongs to (#994).
 	Person *ControlPerson `json:"person,omitzero"`
 	// The one line to run on a server so that it asks to join as this client's person, with no code (#994).
@@ -2462,6 +2477,8 @@ type HostHello struct {
 	Name           *string `json:"name,omitzero"`
 	Relay          *bool   `json:"relay,omitzero"`
 	Implementation *string `json:"implementation,omitzero"`
+	// The capabilities this host has (#1748): each one whose methods it all serves, and the ones it declares. None from a host older than #1748.
+	Capabilities []string `json:"capabilities,omitzero"`
 }
 
 type HostID string
@@ -4225,6 +4242,12 @@ type ReportedEdit struct {
 	At         Date    `json:"at"`
 }
 
+// What the control plane needs of a peer to route for it (#1748): a host without each of host is needsUpdate, and a client without each of client is answered -32008.
+type RequiredCapabilities struct {
+	Host   []string `json:"host"`
+	Client []string `json:"client"`
+}
+
 type ResetRule struct {
 	DailyAt *ResetRuleDailyAt `json:"dailyAt,omitzero"`
 	Unknown *struct{}         `json:"unknown,omitzero"`
@@ -5954,8 +5977,10 @@ type WorkspaceInfo struct {
 	State  string  `json:"state"`
 	SSH    *string `json:"ssh,omitzero"`
 	Tunnel *bool   `json:"tunnel,omitzero"`
-	Cost   *string `json:"cost,omitzero"`
-	Host   *HostID `json:"host,omitzero"`
+	// Its ssh host key is made again at each start, as a Google Cloud workstation's is (#1701): after a Start the control plane made, the first ssh takes the key it is offered and pins it again.
+	HostKeyRenews *bool   `json:"hostKeyRenews,omitzero"`
+	Cost          *string `json:"cost,omitzero"`
+	Host          *HostID `json:"host,omitzero"`
 }
 
 type WorktreeChoice struct {

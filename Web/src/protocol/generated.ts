@@ -1082,13 +1082,31 @@ export interface ConnectorProof {
 }
 
 /**
- * A project's Connectors set-up (#1336): its GitHub repository, the person's connection, four slots
- * that each prove themselves with one read, and the events.
+ * A project's Connectors set-up (#1336): its GitHub or GitLab repository (#1632), the person's
+ * connection to that forge, four slots that each prove themselves with one read, and the events.
  */
 export interface ConnectorSetup {
   folder: string;
-  /** owner/name, from the project's git remote (origin first). Absent with no GitHub remote. */
+  /**
+   * owner/name on GitHub, or group/project on GitLab, from the project's git remote (origin first).
+   * Absent with no GitHub or GitLab remote.
+   */
   repository?: string;
+  /**
+   * The forge the repository is on, which fills Tasks, Code review and CI: github or gitlab
+   * (#1632). Absent is github.
+   */
+  forge?: ConnectionProvider;
+  /**
+   * The repository's host, as the page says it before the repository: github.com, gitlab.com, or a
+   * self-managed GitLab's host.
+   */
+  site?: string;
+  /**
+   * The repository's page on its forge, where the person asks for access when a read is refused
+   * (GitLab).
+   */
+  repositoryURL?: string;
   connection?: Connection;
   /** Whether the Agents App is installed on the repository. Absent when not known. */
   installed?: boolean;
@@ -1144,8 +1162,8 @@ export type ConnectorSlotKind = "tasks" | "codeReview" | "ci" | "workspace";
  * notConnected: the slot comes with a connection that is not there yet. notRead: connected, but not
  * read yet (a stored reading). read: its one read worked (a tick). failed: the read did not reach
  * the provider; message says why. refused: the provider refused the read, so the person grants it
- * on the provider's site. noRemote: the project has no GitHub remote. skipped: the person skipped
- * it; it counts as done.
+ * on the provider's site. noRemote: the project has no GitHub or GitLab remote. skipped: the person
+ * skipped it; it counts as done.
  */
 export type ConnectorSlotState = "notConnected" | "notRead" | "read" | "failed" | "refused" | "noRemote" | "skipped";
 
@@ -1205,6 +1223,11 @@ export interface ControlAuth {
   kind: string;
   for?: string;
   epoch?: number;
+  /**
+   * The capabilities this client has (#1748). None from a client older than #1748, or from a host,
+   * which says its own in host/hello.
+   */
+  capabilities?: string[];
 }
 
 /**
@@ -1256,6 +1279,16 @@ export interface ControlHost {
   tunnel?: HostTunnel;
   workspace?: HostWorkspace;
   implementation?: string;
+  /**
+   * The capabilities this host said in its last host/hello (#1748). None from a host older than
+   * #1748.
+   */
+  capabilities?: string[];
+  /**
+   * Of the control plane's required capabilities for hosts, the ones this host does not have
+   * (#1748). Its state is then needsUpdate.
+   */
+  missing?: string[];
   /** The user who owns the machine (#994). */
   owner?: string;
 }
@@ -1334,6 +1367,9 @@ export interface ControlStatus {
   thisMacHost?: HostJoinStatus;
   projectDetection?: ProjectDetection;
   unjoinedTunnels?: HostTunnelChanged[];
+  /** The capabilities the control plane has (#1748). */
+  capabilities?: string[];
+  required?: RequiredCapabilities;
   /** Who this client belongs to (#994). */
   person?: ControlPerson;
   /**
@@ -2074,6 +2110,11 @@ export interface HostHello {
   name?: string;
   relay?: boolean;
   implementation?: string;
+  /**
+   * The capabilities this host has (#1748): each one whose methods it all serves, and the ones it
+   * declares. None from a host older than #1748.
+   */
+  capabilities?: string[];
 }
 
 /**
@@ -3553,6 +3594,15 @@ export interface ReportedEdit {
   at: WireDate;
 }
 
+/**
+ * What the control plane needs of a peer to route for it (#1748): a host without each of host is
+ * needsUpdate, and a client without each of client is answered -32008.
+ */
+export interface RequiredCapabilities {
+  host: string[];
+  client: string[];
+}
+
 export type ResetRule =
   | { dailyAt: { hour: number; timeZone: string } }
   | { unknown: Record<string, never> };
@@ -4866,6 +4916,11 @@ export interface WorkspaceInfo {
   state: string;
   ssh?: string;
   tunnel?: boolean;
+  /**
+   * Its ssh host key is made again at each start, as a Google Cloud workstation's is (#1701): after
+   * a Start the control plane made, the first ssh takes the key it is offered and pins it again.
+   */
+  hostKeyRenews?: boolean;
   cost?: string;
   host?: HostID;
 }
@@ -5391,26 +5446,26 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ConnectionsList: { required: ["connections"], optional: [] },
   ConnectorEvents: { required: ["state", "names", "workflows"], optional: ["server", "message"] },
   ConnectorProof: { required: ["title"], optional: ["number", "outcome", "url", "at"] },
-  ConnectorSetup: { required: ["folder", "slots", "events", "done"], optional: ["repository", "connection", "installed", "installURL", "repositories"] },
+  ConnectorSetup: { required: ["folder", "slots", "events", "done"], optional: ["repository", "forge", "site", "repositoryURL", "connection", "installed", "installURL", "repositories"] },
   ConnectorSetupRequest: { required: ["folder"], optional: ["reading"] },
   ConnectorSkipRequest: { required: ["folder", "slot", "skipped"], optional: [] },
   ConnectorSlot: { required: ["slot", "choice", "state"], optional: ["proof", "readAt", "message"] },
   ConnectorWorkflow: { required: ["id", "name"], optional: [] },
   ContentBlockAnnotations: { required: [], optional: ["audience", "priority"] },
   ContinueInProjectRequest: { required: ["agentID", "text", "attachments"], optional: ["requestID"] },
-  ControlAuth: { required: ["id", "nonce", "mac", "kind"], optional: ["for", "epoch"] },
+  ControlAuth: { required: ["id", "nonce", "mac", "kind"], optional: ["for", "epoch", "capabilities"] },
   ControlClientChanged: { required: [], optional: ["client", "removed"] },
   ControlCodeShown: { required: ["text", "expires"], optional: ["command"] },
   ControlEndpoint: { required: ["url"], optional: ["pin"] },
   ControlHello: { required: ["v", "name", "control", "nonce", "copy"], optional: [] },
-  ControlHost: { required: ["id", "name", "platform", "version", "state", "reach"], optional: ["machineID", "relay", "signInFrom", "gitFrom", "gitAsks", "tunnel", "workspace", "implementation", "owner"] },
+  ControlHost: { required: ["id", "name", "platform", "version", "state", "reach"], optional: ["machineID", "relay", "signInFrom", "gitFrom", "gitAsks", "tunnel", "workspace", "implementation", "capabilities", "missing", "owner"] },
   ControlInstallProgress: { required: ["name", "step"], optional: [] },
   ControlMoved: { required: ["url", "controlKey", "name"], optional: ["pin"] },
   ControlOK: { required: ["mac"], optional: ["grant", "host", "relayed", "endpoints", "epoch"] },
   ControlPerson: { required: ["id", "name", "role"], optional: ["localOwner"] },
   ControlPush: { required: ["sealed"], optional: [] },
   ControlPushItem: { required: ["needID", "alert"], optional: ["headline"] },
-  ControlStatus: { required: ["name", "version", "machineID"], optional: ["homeHost", "startedAt", "port", "awayFromHome", "you", "relayKey", "web", "publicWeb", "publicViews", "thisMacHost", "projectDetection", "unjoinedTunnels", "person", "joinCommand"] },
+  ControlStatus: { required: ["name", "version", "machineID"], optional: ["homeHost", "startedAt", "port", "awayFromHome", "you", "relayKey", "web", "publicWeb", "publicViews", "thisMacHost", "projectDetection", "unjoinedTunnels", "capabilities", "required", "person", "joinCommand"] },
   Cost: { required: ["amount", "currency"], optional: [] },
   CostLimits: { required: [], optional: ["perAgent", "daily", "perAgentTokens", "dailyTokens"] },
   CostState: { required: ["limits", "today", "day", "tokensToday"], optional: ["note"] },
@@ -5503,7 +5558,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   HostAnnounce: { required: ["publicKey", "name", "platform", "version", "machineID"], optional: ["relay", "implementation"] },
   HostClient: { required: ["id", "kind", "publicKey"], optional: [] },
   HostClients: { required: ["clients"], optional: [] },
-  HostHello: { required: ["version", "platform", "machineID"], optional: ["host", "name", "relay", "implementation"] },
+  HostHello: { required: ["version", "platform", "machineID"], optional: ["host", "name", "relay", "implementation", "capabilities"] },
   HostInstall: { required: ["destination"], optional: ["name", "key", "trust", "tunnel"] },
   HostJoinAsk: { required: ["name", "platform", "publicKey"], optional: ["version", "machineID", "person"] },
   HostJoinDecision: { required: ["result"], optional: ["host", "controlKey", "name"] },
@@ -5693,6 +5748,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   RemoveResourceRequest: { required: ["name"], optional: [] },
   RenameRequest: { required: ["agentID", "title"], optional: [] },
   ReportedEdit: { required: ["path", "newText", "toolCallID", "index", "entryIndex", "replaceAll", "at"], optional: ["oldText"] },
+  RequiredCapabilities: { required: ["host", "client"], optional: [] },
   ResourceState: { required: ["name", "kind", "displayName", "isGone", "line", "endingSoon"], optional: ["holds", "lease", "places", "declared"] },
   ResumingNotification: { required: ["agentID", "isResuming"], optional: [] },
   ResumingResponse: { required: ["agentIDs"], optional: [] },
@@ -5840,7 +5896,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   WorkflowSettingsRequest: { required: ["folder", "workflowID", "settings"], optional: ["cooldown", "labels", "hosts", "whenDone"] },
   WorkflowSummary: { required: ["workflow", "isArchived", "isEnabled", "nextFireAtByTrigger", "isRunning", "holdsAFire", "queued"], optional: ["overLimit", "totalLimit", "nextFireAt", "lastOutcome", "causingEvent", "causingEventName", "awaitingApproval", "deniedHere", "lastFiredAt", "lastFiredBy", "cooldownEndsAt", "offReason", "standingAgentID", "mcpTriggers"] },
   WorkflowsListRequest: { required: [], optional: ["folder"] },
-  WorkspaceInfo: { required: ["id", "name", "state"], optional: ["ssh", "tunnel", "cost", "host"] },
+  WorkspaceInfo: { required: ["id", "name", "state"], optional: ["ssh", "tunnel", "hostKeyRenews", "cost", "host"] },
   WorktreeRemovalRequest: { required: ["project", "root", "confirmed"], optional: [] },
   WorktreeRemoved: { required: ["removedBranch"], optional: [] },
   WorktreeSize: { required: ["bytes", "partial"], optional: [] },

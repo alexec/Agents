@@ -645,6 +645,7 @@
     },
     {
       "name": "hosts/approveJoin",
+      "x-capability": "hosts.join/1",
       "tags": [
         {
           "name": "web"
@@ -709,6 +710,7 @@
     },
     {
       "name": "hosts/denyJoin",
+      "x-capability": "hosts.join/1",
       "tags": [
         {
           "name": "web"
@@ -801,6 +803,7 @@
     },
     {
       "name": "hosts/joinRequests",
+      "x-capability": "hosts.join/1",
       "tags": [
         {
           "name": "web"
@@ -1224,6 +1227,7 @@
     },
     {
       "name": "people/invite",
+      "x-capability": "people/1",
       "tags": [
         {
           "name": "web"
@@ -1248,6 +1252,7 @@
     },
     {
       "name": "people/list",
+      "x-capability": "people/1",
       "tags": [
         {
           "name": "web"
@@ -1272,6 +1277,7 @@
     },
     {
       "name": "people/remove",
+      "x-capability": "people/1",
       "tags": [
         {
           "name": "web"
@@ -1296,6 +1302,7 @@
     },
     {
       "name": "people/setRole",
+      "x-capability": "people/1",
       "tags": [
         {
           "name": "web"
@@ -1924,6 +1931,7 @@
     },
     {
       "name": "control/joinRequested",
+      "x-capability": "hosts.join/1",
       "tags": [
         {
           "name": "web"
@@ -1943,6 +1951,7 @@
     },
     {
       "name": "control/joinDecided",
+      "x-capability": "hosts.join/1",
       "tags": [
         {
           "name": "web"
@@ -1962,6 +1971,7 @@
     },
     {
       "name": "control/peopleChanged",
+      "x-capability": "people/1",
       "tags": [
         {
           "name": "web"
