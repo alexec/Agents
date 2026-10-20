@@ -108,15 +108,42 @@ func TestAnAgentRunsAWorkflow(t *testing.T) {
 		text != "Nothing was run: review did not run, as this chain is already 3 deep." {
 		t.Fatal(text)
 	}
-	// The session that ran it may archive it, as one it started; another may not (#1730).
-	if text, isErr := dm.tool(3, "archive_session", map[string]any{"id": string(ran.ID)}); !isErr ||
+}
+
+// The session that ran a workflow may archive its session, as one it started; another may
+// not (#1730). No workflow here answers agent.finished, which would prompt the run's
+// session again and take it out of the archive.
+func TestTheSessionThatRanAWorkflowArchivesIt(t *testing.T) {
+	fakeRuntimes(t)
+	d, c := start(t, t.TempDir())
+	defer d.Shutdown()
+	dir := project(t, c, 1)
+	os.MkdirAll(workflowsFolder(dir), 0o755)
+	os.WriteFile(filepath.Join(workflowsFolder(dir), "review.md"), []byte("---\nname: Review\non: manual\n---\nReview what changed.\n"), 0o644)
+	approveAll(t, c, store.FolderURL(dir))
+	a := seeded(t, d, dir, nil)
+	m := appClient(t, d, a.ID)
+	m.post("initialize", map[string]any{}, 1)
+	text, isErr := m.tool(2, "manage_workflows", map[string]any{"action": "run", "id": "review"})
+	if isErr || !strings.HasPrefix(text, "Ran review: it started agent ") {
+		t.Fatal(text)
+	}
+	ran := wire.UUID(strings.Fields(strings.TrimPrefix(text, "Ran review: it started agent "))[0][:36])
+	waitFor(t, "the run over", func() bool {
+		r := d.Store.Agent(ran)
+		return !d.runningOf(dir, "review") && r != nil && !helperRunning(r)
+	})
+	other := seeded(t, d, dir, nil)
+	om := appClient(t, d, other.ID)
+	om.post("initialize", map[string]any{}, 1)
+	if text, isErr := om.tool(2, "archive_session", map[string]any{"id": string(ran)}); !isErr ||
 		!strings.HasPrefix(text, "Nothing changed: a workflow started that one, and you did not run it.") {
 		t.Fatal(text)
 	}
-	if text, isErr := m.tool(7, "archive_session", map[string]any{"id": string(ran.ID)}); isErr || !strings.HasPrefix(text, "Archived “Review”") {
+	if text, isErr := m.tool(3, "archive_session", map[string]any{"id": string(ran)}); isErr || !strings.HasPrefix(text, "Archived “Review”") {
 		t.Fatal(text)
 	}
-	if a := d.Store.Agent(ran.ID); a.State != wire.AgentStateArchived {
-		t.Fatalf("%+v", a)
+	if r := d.Store.Agent(ran); r.State != wire.AgentStateArchived {
+		t.Fatalf("%+v", r)
 	}
 }
