@@ -95,7 +95,14 @@ type Config struct {
 	Changed func(Changed)
 	// Log takes a line for the log. Nil: none.
 	Log func(string)
+	// Asleep is whether a host's workspace is stopped, or being stopped, by its provider
+	// (#864). Its tunnel waits and does not dial: through gh, a connection to a codespace
+	// starts it again. Nil: never.
+	Asleep func(host string) bool
 }
+
+// asleepCheck is how often a tunnel whose host is asleep asks again.
+var asleepCheck = 5 * time.Second
 
 // Tunnels is the HostTunnels actor.
 type Tunnels struct {
@@ -105,6 +112,7 @@ type Tunnels struct {
 	hosts   func(ctx context.Context) []records.HostRecord
 	changed func(Changed)
 	log     func(string)
+	asleep  func(host string) bool
 	// folder is short: a control socket's path must fit in 104 bytes, with ssh's suffix.
 	folder string
 
@@ -150,6 +158,10 @@ func New(c Config) *Tunnels {
 	if changed == nil {
 		changed = func(Changed) {}
 	}
+	asleep := c.Asleep
+	if asleep == nil {
+		asleep = func(string) bool { return false }
+	}
 	return &Tunnels{
 		store:   c.Store,
 		ssh:     sshCommand{executable: executable, env: env, options: configFile(c.ConfigFile)},
@@ -157,6 +169,7 @@ func New(c Config) *Tunnels {
 		hosts:   hosts,
 		changed: changed,
 		log:     log,
+		asleep:  asleep,
 		folder:  fmt.Sprintf("/tmp/agents-tunnels-%d-%d", os.Getuid(), os.Getpid()),
 		records: map[string]Record{},
 		held:    map[string]*holding{},
@@ -460,6 +473,18 @@ func (t *Tunnels) holdLocked(record Record, after *holding) {
 		}
 		wait := 2 * time.Second
 		for ctx.Err() == nil {
+			// A stopped workspace is not dialled, or the dial would start it again (#864).
+			if record.Host != nil && t.asleep(*record.Host) {
+				words := "Its workspace is stopped: the tunnel waits for Start."
+				t.sayState(ctx, record.ID, Tunnel{Up: false, Problem: &words})
+				select {
+				case <-ctx.Done():
+					return
+				case <-time.After(asleepCheck):
+				}
+				wait = 2 * time.Second
+				continue
+			}
 			started := time.Now()
 			problem := session(ctx, record, ssh, t.folder, func() { t.sayState(ctx, record.ID, Tunnel{Up: true}) })
 			if ctx.Err() != nil {
