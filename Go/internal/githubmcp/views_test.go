@@ -116,12 +116,17 @@ func (a *viewsAPI) serve(t *testing.T) *httptest.Server {
 }
 
 func viewsClient(t *testing.T) (*mcp.ClientSession, *viewsAPI) {
+	return viewsClientAs(t, true)
+}
+
+// viewsClientAs is a client of a server with the person's tools (the host's copy) or not.
+func viewsClientAs(t *testing.T, person bool) (*mcp.ClientSession, *viewsAPI) {
 	t.Helper()
 	api := &viewsAPI{}
 	s := api.serve(t)
 	gh := NewRealGitHub(s.URL, func() string { return "token" }, func(context.Context) (string, error) { return "o/r", nil })
 	server := mcp.NewServer(&mcp.Implementation{Name: "github-mcp", Version: "test"}, nil)
-	AddViews(server, gh)
+	AddViews(server, gh, person)
 	ct, st := mcp.NewInMemoryTransports()
 	ctx := context.Background()
 	if _, err := server.Connect(ctx, st, nil); err != nil {
@@ -147,6 +152,29 @@ func callTool(t *testing.T, c *mcp.ClientSession, name string, args map[string]a
 		json.Unmarshal(b, &data)
 	}
 	return r, data
+}
+
+// A copy that the host does not run (a session's own) has no merge, review or comment.
+func TestOnlyTheHostsCopyHasThePersonsTools(t *testing.T) {
+	for _, person := range []bool{true, false} {
+		c, _ := viewsClientAs(t, person)
+		tools, err := c.ListTools(context.Background(), nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		names := map[string]bool{}
+		for _, tool := range tools.Tools {
+			names[tool.Name] = true
+		}
+		for _, name := range []string{"merge_pr", "review_pr", "comment_on_pr"} {
+			if names[name] != person {
+				t.Errorf("person %v: %s listed %v", person, name, names[name])
+			}
+		}
+		if !names["show_pull_request"] {
+			t.Errorf("person %v: no show_pull_request", person)
+		}
+	}
 }
 
 func TestEachViewHasAToolThatFeedsItAndAPage(t *testing.T) {
