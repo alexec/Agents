@@ -1,7 +1,6 @@
 package agentsd
 
 import (
-	"context"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -119,11 +118,7 @@ func (d *Daemon) suggestNextPrompt(id wire.UUID, args map[string]json.RawMessage
 	if d.Store.Agent(id) == nil {
 		return "", &Error{Code: CodeNoSuchAgent, Message: "That conversation is not open any more, so the suggestions were not shown."}
 	}
-	l := d.live(id)
-	l.mu.Lock()
-	waiting := len(l.pending) > 0 || len(l.elicitations) > 0
-	l.mu.Unlock()
-	if waiting {
+	if d.live(id).asking() {
 		return "", Invalid("Nothing was suggested: you have a question waiting to be answered.")
 	}
 	s := wire.SuggestedPrompt{ID: store.NewUUID(), Label: prefix(label, suggestionLabel), Prompt: prefix(prompt, suggestionPrompt)}
@@ -195,7 +190,10 @@ func (d *Daemon) askForm(id wire.UUID, args map[string]json.RawMessage) (string,
 	req := wire.ElicitationRequest{ID: store.NewUUID(), AgentID: id, Message: message,
 		Mode: wire.ElicitationRequestMode{Form: &wire.ElicitationRequestModeForm{Value: schema}}, Scope: wire.ElicitationRequestScopeSession,
 		AskedAt: now()}
-	r := l.holdForm(context.Background(), req)
+	r, answered := l.holdAskedForm(req)
+	if !answered {
+		return formStillOpen, nil
+	}
 	var said []wire.ElicitationAnswer
 	if r.action == wire.AnswerElicitationRequestActionAccept {
 		said = answers(schema, r.content, message)

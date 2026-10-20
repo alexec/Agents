@@ -219,10 +219,7 @@ func (d *Daemon) waitOn(caller wire.UUID, names []string, wakeOn string, minutes
 		return "", Invalid("Nothing is waited for: you asked to be archived once this turn ends, and an archived run is never woken.")
 	}
 	l := d.live(caller)
-	l.mu.Lock()
-	asking := len(l.pending) > 0 || len(l.elicitations) > 0
-	l.mu.Unlock()
-	if asking {
+	if l.asking() {
 		return "", Invalid("Nothing was recorded: you have a question waiting to be answered, so this work is not over. Answer it first, or let it be answered.")
 	}
 	if strings.TrimSpace(message) == "" {

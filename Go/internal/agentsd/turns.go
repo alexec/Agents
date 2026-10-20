@@ -616,7 +616,7 @@ func (l *live) turn() bool {
 			return false
 		}
 		log.Printf("agent %s: prompt: %v", l.id, err)
-		l.closeForms()
+		l.closeForms(false)
 		if detail := l.sandboxFailure(err.Error()); detail != "" {
 			d.end(l, wire.AgentStateStopped, wire.EndedReasonSandboxFailed)
 			return false
@@ -1166,7 +1166,7 @@ func (l *live) answer(permissionID wire.UUID, option string) bool {
 
 // cancel stops the turn: session/cancel to the runtime, and every open card let go.
 func (l *live) cancel() {
-	l.closeForms()
+	l.closeForms(false)
 	l.mu.Lock()
 	l.stops++
 	s, stop, seq := l.session, l.stop, l.turnSeq
@@ -1203,6 +1203,7 @@ func (l *live) cancel() {
 // taken for a crash (#1611).
 func (l *live) halt() {
 	l.cancel()
+	l.closeForms(true)
 	l.mu.Lock()
 	s, stop := l.session, l.stop
 	l.session = nil
