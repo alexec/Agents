@@ -17825,7 +17825,7 @@
     },
     "ConnectorSlotState": {
       "type": "string",
-      "description": "notConnected: the slot comes with a connection that is not there yet. notRead: connected, but not read yet (a stored reading). read: its one read worked (a tick). failed: the read did not reach the provider; message says why. refused: the provider refused the read, so the person grants it on the provider's site. noRemote: the project has no GitHub remote. skipped: the person skipped it; it counts as done.",
+      "description": "notConnected: the slot comes with a connection that is not there yet. notRead: connected, but not read yet (a stored reading). read: its one read worked (a tick). failed: the read did not reach the provider; message says why. refused: the provider refused the read, so the person grants it on the provider's site. noRemote: the project has no GitHub or GitLab remote. skipped: the person skipped it; it counts as done.",
       "enum": [
         "notConnected",
         "notRead",
@@ -17959,14 +17959,26 @@
     },
     "ConnectorSetup": {
       "type": "object",
-      "description": "A project's Connectors set-up (#1336): its GitHub repository, the person's connection, four slots that each prove themselves with one read, and the events.",
+      "description": "A project's Connectors set-up (#1336): its GitHub or GitLab repository (#1632), the person's connection to that forge, four slots that each prove themselves with one read, and the events.",
       "properties": {
         "folder": {
           "type": "string"
         },
         "repository": {
           "type": "string",
-          "description": "owner/name, from the project's git remote (origin first). Absent with no GitHub remote."
+          "description": "owner/name on GitHub, or group/project on GitLab, from the project's git remote (origin first). Absent with no GitHub or GitLab remote."
+        },
+        "forge": {
+          "$ref": "#/definitions/ConnectionProvider",
+          "description": "The forge the repository is on, which fills Tasks, Code review and CI: github or gitlab (#1632). Absent is github."
+        },
+        "site": {
+          "type": "string",
+          "description": "The repository's host, as the page says it before the repository: github.com, gitlab.com, or a self-managed GitLab's host."
+        },
+        "repositoryURL": {
+          "type": "string",
+          "description": "The repository's page on its forge, where the person asks for access when a read is refused (GitLab)."
         },
         "connection": {
           "$ref": "#/definitions/Connection"

@@ -23,13 +23,47 @@ export const installationsURL = "https://github.com/settings/installations";
 export const otherProvidersElsewhere = "Other providers are set up on the Mac.";
 export const disconnectNote = "Disconnect deletes the host's tokens. Every project's GitHub slots wait for a connection again. To revoke the App too, go to github.com ▸ Settings ▸ Applications.";
 
-export function intro(project: string, repository: string | undefined): string {
-  if (!repository) return `What agents in ${project} can reach. It has no GitHub remote.`;
-  return `What agents in ${project} can reach. Repository github.com/${repository}, from its git remote.`;
+export function intro(project: string, repository: string | undefined, site = "github.com"): string {
+  if (!repository) return `What agents in ${project} can reach. It has no GitHub or GitLab remote.`;
+  return `What agents in ${project} can reach. Repository ${site}/${repository}, from its git remote.`;
+}
+
+// The forge (#1632): GitHub or GitLab fills Tasks, Code review and CI, as the Mac's words.
+
+/** The forge, GitHub when the host did not say. */
+export function forgeOf(setup: ConnectorSetup): ConnectionProvider {
+  return setup.forge ?? "github";
+}
+
+export function connectTitleFor(forge: ConnectionProvider): string {
+  return forge === "gitlab" ? "Connect GitLab once: issues, merge requests and pipelines." : connectTitle;
+}
+
+export function connectNoteFor(forge: ConnectionProvider): string {
+  return forge === "gitlab" ? "Your connection, for every project. It reaches what your GitLab account can see." : connectNote;
+}
+
+export function connectAgain(forge: ConnectionProvider): string {
+  return `${name(forge)} asks you to connect again.`;
+}
+
+export function comesWith(forge: ConnectionProvider): string {
+  return `Comes with the ${name(forge)} connection.`;
+}
+
+export const noRemote = "No GitHub or GitLab remote";
+
+/** The button on a refused slot, and where it goes: the App's install on GitHub, the project on GitLab. */
+export function grantButton(setup: ConnectorSetup): string {
+  return forgeOf(setup) === "gitlab" ? `Open on ${setup.site ?? "gitlab.com"}` : "Grant on github.com";
+}
+
+export function grantURL(setup: ConnectorSetup): string | undefined {
+  return forgeOf(setup) === "gitlab" ? setup.repositoryURL : setup.installURL;
 }
 
 export function connected(c: Connection): string {
-  return c.state === "signInAgain" ? "GitHub asks you to sign in again" : `Connected to GitHub as ${c.login ?? "you"}`;
+  return c.state === "signInAgain" ? `${name(c.provider)} asks you to sign in again` : `Connected to ${name(c.provider)} as ${c.login ?? "you"}`;
 }
 
 export function connectedNote(setup: ConnectorSetup): string {
@@ -56,18 +90,20 @@ export function title(slot: ConnectorSlot): string {
   return slot.choice;
 }
 
-export function line(slot: ConnectorSlot, project: string, repository: string | undefined, onMac: boolean): string {
+export function line(slot: ConnectorSlot, project: string, repository: string | undefined, onMac: boolean,
+  forge: ConnectionProvider = "github"): string {
   const repo = repository ?? project;
+  const gitlab = forge === "gitlab";
   switch (slot.state) {
     case "skipped":
       return {
         tasks: "Agents won't use issues here. Nothing is turned on.",
-        codeReview: "Agents won't use pull requests here. Nothing is turned on.",
+        codeReview: gitlab ? "Agents won't use merge requests here. Nothing is turned on." : "Agents won't use pull requests here. Nothing is turned on.",
         ci: "Agents won't wait on checks here. Nothing is turned on.",
         workspace: "Agents run on this Mac.",
       }[slot.slot];
     case "noRemote":
-      return `${project} has no GitHub remote, so ${slot.choice} can't be read for it.`;
+      return `${project} has no GitHub or GitLab remote, so ${slot.choice} can't be read for it.`;
     case "failed":
     case "refused":
       return slot.message ?? "The read didn't work.";
@@ -76,15 +112,17 @@ export function line(slot: ConnectorSlot, project: string, repository: string | 
     case "read":
       return {
         tasks: `No issues yet in ${repo}.`,
-        codeReview: `No pull requests yet in ${repo}.`,
-        ci: `No workflow runs yet in ${repo}.`,
+        codeReview: gitlab ? `No merge requests yet in ${repo}.` : `No pull requests yet in ${repo}.`,
+        ci: gitlab ? `No pipelines yet in ${repo}.` : `No workflow runs yet in ${repo}.`,
         workspace: onMac ? "Nothing to set up. Other places are set up in Providers." : otherProvidersElsewhere,
       }[slot.slot];
     case "notConnected":
       return {
-        tasks: `Agents read, file and close issues in ${repo}. Comes with the GitHub connection.`,
-        codeReview: "Agents open pull requests and answer reviews. Comes with the GitHub connection.",
-        ci: "Agents see checks pass and fail, and wait on them. Comes with the GitHub connection.",
+        tasks: `Agents read, file and close issues in ${repo}. ${comesWith(forge)}`,
+        codeReview: gitlab ? `Agents read merge requests and answer their comments. ${comesWith(forge)}`
+          : `Agents open pull requests and answer reviews. ${comesWith(forge)}`,
+        ci: gitlab ? `Agents see pipelines pass and fail, and wait on them. ${comesWith(forge)}`
+          : `Agents see checks pass and fail, and wait on them. ${comesWith(forge)}`,
         workspace: "Nothing to set up.",
       }[slot.slot];
   }
@@ -119,10 +157,10 @@ export function proof(slot: ConnectorSlot, now: Date = new Date()): string | und
   return `${proofLead(slot.slot)}: ${number}${proofText(slot.proof, now)}`;
 }
 
-export function eventsLead(events: ConnectorEvents): string {
+export function eventsLead(events: ConnectorEvents, forge: ConnectionProvider = "github"): string {
   switch (events.state) {
     case "on": return "On for Agents:";
-    case "off": return "Off. They go on once a slot has read from GitHub.";
+    case "off": return `Off. They go on once a slot has read from ${name(forge)}.`;
     default: return events.message ?? "Not turned on.";
   }
 }
@@ -207,7 +245,7 @@ export function disconnectNoteFor(p: ConnectionProvider): string {
 }
 
 export function projectLine(setup: ConnectorSetup): string {
-  if (!setup.repository) return "No GitHub remote";
+  if (!setup.repository) return noRemote;
   const used = setup.slots.filter((s) => s.state === "read").map((s) => s.choice);
   return used.length === 0 ? "Not set up" : used.join(", ");
 }

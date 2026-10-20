@@ -29,7 +29,8 @@ struct ConnectorSetupView: View {
         VStack(alignment: .leading, spacing: 14) {
             VStack(alignment: .leading, spacing: 4) {
                 Text("Connectors").appText(.title).fontWeight(.semibold)
-                Text(ConnectorSetupWords.intro(project: projectName, repository: setup?.repository))
+                Text(ConnectorSetupWords.intro(project: projectName, repository: setup?.repository,
+                                               site: setup?.siteOrGitHub ?? "github.com"))
                     .appText(.supporting).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
                     .textSelection(.enabled)
@@ -43,7 +44,7 @@ struct ConnectorSetupView: View {
                 slots(setup)
                 if setup.connection != nil || setup.events.state != .off {
                     heading("Events")
-                    events(setup.events)
+                    events(setup.events, forge: setup.forgeOrGitHub)
                 }
             } else if problem == nil {
                 ProgressView().controlSize(.small)
@@ -55,7 +56,11 @@ struct ConnectorSetupView: View {
             Task { await load(.cached) }
         }
         .sheet(isPresented: $connecting) {
-            ConnectGitHubSheet(host: project.host, project: project, onConnected: { Task { await load(.fresh) } })
+            if setup?.forgeOrGitHub == .gitlab {
+                ConnectGitLabSheet(host: project.host, onConnected: { Task { await load(.fresh) } })
+            } else {
+                ConnectGitHubSheet(host: project.host, project: project, onConnected: { Task { await load(.fresh) } })
+            }
         }
         .sheet(isPresented: $connectingLinear, onDismiss: {
             if linearConnected { linearConnected = false; addConnector() }
@@ -98,16 +103,16 @@ struct ConnectorSetupView: View {
             .paperRaised(in: RoundedRectangle(cornerRadius: 10))
         } else {
             HStack(spacing: 12) {
-                ConnectorMark(letters: "GH", filled: true)
+                ConnectorMark(letters: ConnectorSetupWords.letters(setup.forgeOrGitHub), filled: true)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(setup.connection?.state == .signInAgain ? "GitHub asks you to connect again."
-                         : ConnectorSetupWords.connectTitle)
+                    Text(setup.connection?.state == .signInAgain ? ConnectorSetupWords.connectAgain(setup.forgeOrGitHub)
+                         : ConnectorSetupWords.connectTitle(setup.forgeOrGitHub))
                         .appText(.supporting).fontWeight(.semibold)
-                    Text(ConnectorSetupWords.connectNote).appText(.fine).foregroundStyle(.secondary)
+                    Text(ConnectorSetupWords.connectNote(setup.forgeOrGitHub)).appText(.fine).foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 Spacer(minLength: 8)
-                Button(ConnectorSetupWords.connectButton) { connecting = true }
+                Button(ConnectorSetupWords.connectButton(setup.forgeOrGitHub)) { connecting = true }
                     .buttonStyle(.paperProminent)
             }
             .padding(14)
@@ -133,10 +138,10 @@ struct ConnectorSetupView: View {
 
     // MARK: The events
 
-    private func events(_ events: DaemonAPI.ConnectorEvents) -> some View {
+    private func events(_ events: DaemonAPI.ConnectorEvents, forge: DaemonAPI.ConnectionProvider) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(alignment: .firstTextBaseline, spacing: 6) {
-                Text(ConnectorSetupWords.eventsLead(events)).appText(.supporting)
+                Text(ConnectorSetupWords.eventsLead(events, forge: forge)).appText(.supporting)
                     .fixedSize(horizontal: false, vertical: true)
                 if events.state == .on {
                     Text(ConnectorSetupWords.eventNouns(events.names).joined(separator: " "))
@@ -270,7 +275,7 @@ private struct SlotCard: View {
             .appText(.fine)
             .accessibilityElement(children: .combine)
         } else {
-            Text(ConnectorSetupWords.line(slot, project: projectName, repository: setup.repository))
+            Text(ConnectorSetupWords.line(slot, project: projectName, repository: setup.repository, forge: setup.forgeOrGitHub))
                 .appText(.fine)
                 .tinted([.failed, .refused, .noRemote].contains(slot.state) ? .attention : .none)
                 .foregroundStyle(.secondary)
@@ -296,7 +301,7 @@ private struct SlotCard: View {
             case .failed:
                 Button("Try Again") { act(.tryAgain) }.buttonStyle(.paper)
             case .refused:
-                Button("Grant on github.com") { act(.open(setup.installURL ?? ConnectorSetupWords.installURL)) }
+                Button(ConnectorSetupWords.grantButton(setup)) { act(.open(ConnectorSetupWords.grantURL(setup))) }
                     .buttonStyle(.paper)
                 Button("Try Again") { act(.tryAgain) }.buttonStyle(.paper)
             case .skipped:
@@ -347,7 +352,7 @@ private struct SlotMark: View {
         case .skipped: "Skipped"
         case .notRead: "Reading"
         case .notConnected: "Not connected"
-        case .noRemote: "No GitHub remote"
+        case .noRemote: ConnectorSetupWords.noRemote
         }
     }
 }
@@ -428,7 +433,7 @@ private struct SlotChange: View {
             ]
         case .tasks:
             return [
-                Choice(title: slot.choice, note: ConnectorSetupWords.proof(slot) ?? "Comes with the GitHub connection.",
+                Choice(title: slot.choice, note: ConnectorSetupWords.proof(slot) ?? ConnectorSetupWords.comesWith(setup.forgeOrGitHub),
                        chosen: !skipped, pick: { if skipped { act(.setUp(.tasks)) }; done() }),
                 Choice(title: "Linear\u{2026}", note: "Connect Linear, then add its connector.", chosen: false,
                        pick: { act(.linear) }),
@@ -439,7 +444,7 @@ private struct SlotChange: View {
             ]
         case .codeReview, .ci:
             return [
-                Choice(title: slot.choice, note: ConnectorSetupWords.proof(slot) ?? "Comes with the GitHub connection.",
+                Choice(title: slot.choice, note: ConnectorSetupWords.proof(slot) ?? ConnectorSetupWords.comesWith(setup.forgeOrGitHub),
                        chosen: !skipped, pick: { if skipped { act(.setUp(slot.slot)) }; done() }),
                 Choice(title: "From a catalogue\u{2026}", note: "Another tool's connector.", chosen: false,
                        pick: { act(.catalogue) }),

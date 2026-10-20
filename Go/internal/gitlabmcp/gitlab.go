@@ -198,6 +198,8 @@ type GitLabError struct {
 	Kind         ErrorKind
 	Message      string
 	RetryAfterMs int
+	// Refused is GitLab's no to this token for this project: 403 or 404, as a set-up says it.
+	Refused bool
 }
 
 func (e *GitLabError) Error() string { return e.Message }

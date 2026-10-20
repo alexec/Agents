@@ -27,14 +27,54 @@ public enum ConnectorSetupWords {
     public static let installationsURL = "https://github.com/settings/installations"
 
     /// The page's line under its title.
-    public static func intro(project: String, repository: String?) -> String {
-        guard let repository else { return "What agents in \(project) can reach. It has no GitHub remote." }
-        return "What agents in \(project) can reach. Repository github.com/\(repository), from its git remote."
+    public static func intro(project: String, repository: String?, site: String = "github.com") -> String {
+        guard let repository else { return "What agents in \(project) can reach. It has no GitHub or GitLab remote." }
+        return "What agents in \(project) can reach. Repository \(site)/\(repository), from its git remote."
     }
 
     /// The connection, as one line once connected.
     public static func connected(_ c: DaemonAPI.Connection) -> String {
-        c.state == .signInAgain ? "GitHub asks you to sign in again" : "Connected to GitHub as \(c.login ?? "you")"
+        c.state == .signInAgain ? "\(name(c.provider)) asks you to sign in again" : "Connected to \(name(c.provider)) as \(c.login ?? "you")"
+    }
+
+    // MARK: The forge (#1632): GitHub or GitLab fills Tasks, Code review and CI
+
+    /// The card's title before the forge is connected.
+    public static func connectTitle(_ forge: DaemonAPI.ConnectionProvider) -> String {
+        forge == .gitlab ? "Connect GitLab once: issues, merge requests and pipelines." : connectTitle
+    }
+
+    public static func connectNote(_ forge: DaemonAPI.ConnectionProvider) -> String {
+        forge == .gitlab ? "Your connection, for every project. It reaches what your GitLab account can see." : connectNote
+    }
+
+    public static func connectButton(_ forge: DaemonAPI.ConnectionProvider) -> String {
+        "Connect \(name(forge))\u{2026}"
+    }
+
+    /// The card's title when the forge asks to connect again.
+    public static func connectAgain(_ forge: DaemonAPI.ConnectionProvider) -> String {
+        "\(name(forge)) asks you to connect again."
+    }
+
+    /// A slot's choice note before it read.
+    public static func comesWith(_ forge: DaemonAPI.ConnectionProvider) -> String {
+        "Comes with the \(name(forge)) connection."
+    }
+
+    /// A slot's state in a word, for no remote.
+    public static let noRemote = "No GitHub or GitLab remote"
+
+    /// The button on a refused slot: GitHub's App is granted on github.com; on GitLab the
+    /// person asks for access to the project there.
+    public static func grantButton(_ setup: Setup) -> String {
+        setup.forgeOrGitHub == .gitlab ? "Open on \(setup.siteOrGitHub)" : "Grant on github.com"
+    }
+
+    /// Where the refused slot's button goes.
+    public static func grantURL(_ setup: Setup) -> String {
+        if setup.forgeOrGitHub == .gitlab, let page = setup.repositoryURL { return page }
+        return setup.installURL ?? installURL
     }
 
     public static func connectedNote(_ setup: Setup) -> String {
@@ -70,18 +110,21 @@ public enum ConnectorSetupWords {
     }
 
     /// What the slot says under its title, when it has no proof to show.
-    public static func line(_ slot: Slot, project: String, repository: String?) -> String {
+    public static func line(_ slot: Slot, project: String, repository: String?,
+                            forge: DaemonAPI.ConnectionProvider = .github) -> String {
         let repo = repository ?? project
+        let gitlab = forge == .gitlab
         switch slot.state {
         case .skipped:
             return switch slot.slot {
             case .tasks: "Agents won't use issues here. Nothing is turned on."
-            case .codeReview: "Agents won't use pull requests here. Nothing is turned on."
+            case .codeReview: gitlab ? "Agents won't use merge requests here. Nothing is turned on."
+                : "Agents won't use pull requests here. Nothing is turned on."
             case .ci: "Agents won't wait on checks here. Nothing is turned on."
             case .workspace: "Agents run on this Mac."
             }
         case .noRemote:
-            return "\(project) has no GitHub remote, so \(slot.choice) can't be read for it."
+            return "\(project) has no GitHub or GitLab remote, so \(slot.choice) can't be read for it."
         case .failed, .refused:
             return slot.message ?? "The read didn't work."
         case .notRead:
@@ -91,15 +134,17 @@ public enum ConnectorSetupWords {
         case .read:
             return switch slot.slot {
             case .tasks: "No issues yet in \(repo)."
-            case .codeReview: "No pull requests yet in \(repo)."
-            case .ci: "No workflow runs yet in \(repo)."
+            case .codeReview: gitlab ? "No merge requests yet in \(repo)." : "No pull requests yet in \(repo)."
+            case .ci: gitlab ? "No pipelines yet in \(repo)." : "No workflow runs yet in \(repo)."
             case .workspace: ""
             }
         case .notConnected:
             return switch slot.slot {
-            case .tasks: "Agents read, file and close issues in \(repo). Comes with the GitHub connection."
-            case .codeReview: "Agents open pull requests and answer reviews. Comes with the GitHub connection."
-            case .ci: "Agents see checks pass and fail, and wait on them. Comes with the GitHub connection."
+            case .tasks: "Agents read, file and close issues in \(repo). " + comesWith(forge)
+            case .codeReview: gitlab ? "Agents read merge requests and answer their comments. " + comesWith(forge)
+                : "Agents open pull requests and answer reviews. " + comesWith(forge)
+            case .ci: gitlab ? "Agents see pipelines pass and fail, and wait on them. " + comesWith(forge)
+                : "Agents see checks pass and fail, and wait on them. " + comesWith(forge)
             case .workspace: "Nothing to set up."
             }
         }
@@ -136,10 +181,10 @@ public enum ConnectorSetupWords {
     }
 
     /// The events line's lead.
-    public static func eventsLead(_ events: DaemonAPI.ConnectorEvents) -> String {
+    public static func eventsLead(_ events: DaemonAPI.ConnectorEvents, forge: DaemonAPI.ConnectionProvider = .github) -> String {
         switch events.state {
         case .on: "On for Agents:"
-        case .off: "Off. They go on once a slot has read from GitHub."
+        case .off: "Off. They go on once a slot has read from \(name(forge))."
         case .taken, .failed: events.message ?? "Not turned on."
         }
     }
@@ -235,7 +280,7 @@ public enum ConnectorSetupWords {
 
     /// A project on Your Connectors: what its set-up uses.
     public static func projectLine(_ setup: Setup) -> String {
-        if setup.repository == nil { return "No GitHub remote" }
+        if setup.repository == nil { return noRemote }
         let used = setup.slots.filter { $0.state == .read }.map(\.choice)
         return used.isEmpty ? "Not set up" : used.joined(separator: ", ")
     }

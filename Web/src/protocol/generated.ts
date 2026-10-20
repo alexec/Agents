@@ -963,13 +963,31 @@ export interface ConnectorProof {
 }
 
 /**
- * A project's Connectors set-up (#1336): its GitHub repository, the person's connection, four slots
- * that each prove themselves with one read, and the events.
+ * A project's Connectors set-up (#1336): its GitHub or GitLab repository (#1632), the person's
+ * connection to that forge, four slots that each prove themselves with one read, and the events.
  */
 export interface ConnectorSetup {
   folder: string;
-  /** owner/name, from the project's git remote (origin first). Absent with no GitHub remote. */
+  /**
+   * owner/name on GitHub, or group/project on GitLab, from the project's git remote (origin first).
+   * Absent with no GitHub or GitLab remote.
+   */
   repository?: string;
+  /**
+   * The forge the repository is on, which fills Tasks, Code review and CI: github or gitlab
+   * (#1632). Absent is github.
+   */
+  forge?: ConnectionProvider;
+  /**
+   * The repository's host, as the page says it before the repository: github.com, gitlab.com, or a
+   * self-managed GitLab's host.
+   */
+  site?: string;
+  /**
+   * The repository's page on its forge, where the person asks for access when a read is refused
+   * (GitLab).
+   */
+  repositoryURL?: string;
   connection?: Connection;
   /** Whether the Agents App is installed on the repository. Absent when not known. */
   installed?: boolean;
@@ -1025,8 +1043,8 @@ export type ConnectorSlotKind = "tasks" | "codeReview" | "ci" | "workspace";
  * notConnected: the slot comes with a connection that is not there yet. notRead: connected, but not
  * read yet (a stored reading). read: its one read worked (a tick). failed: the read did not reach
  * the provider; message says why. refused: the provider refused the read, so the person grants it
- * on the provider's site. noRemote: the project has no GitHub remote. skipped: the person skipped
- * it; it counts as done.
+ * on the provider's site. noRemote: the project has no GitHub or GitLab remote. skipped: the person
+ * skipped it; it counts as done.
  */
 export type ConnectorSlotState = "notConnected" | "notRead" | "read" | "failed" | "refused" | "noRemote" | "skipped";
 
@@ -5070,7 +5088,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ConnectionsList: { required: ["connections"], optional: [] },
   ConnectorEvents: { required: ["state", "names", "workflows"], optional: ["server", "message"] },
   ConnectorProof: { required: ["title"], optional: ["number", "outcome", "url", "at"] },
-  ConnectorSetup: { required: ["folder", "slots", "events", "done"], optional: ["repository", "connection", "installed", "installURL", "repositories"] },
+  ConnectorSetup: { required: ["folder", "slots", "events", "done"], optional: ["repository", "forge", "site", "repositoryURL", "connection", "installed", "installURL", "repositories"] },
   ConnectorSetupRequest: { required: ["folder"], optional: ["reading"] },
   ConnectorSkipRequest: { required: ["folder", "slot", "skipped"], optional: [] },
   ConnectorSlot: { required: ["slot", "choice", "state"], optional: ["proof", "readAt", "message"] },

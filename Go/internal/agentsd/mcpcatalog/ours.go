@@ -58,6 +58,9 @@ var (
 		"issue.opened", "issue.commented", "issue.closed"}
 )
 
+// NameHere is the name its entry takes in an mcp.json: github, gitlab.
+func (o Ours) NameHere() string { return slug(o.Title) }
+
 // OursByID is the connector with this catalogue id.
 func OursByID(id string) (Ours, bool) {
 	for _, o := range Made {

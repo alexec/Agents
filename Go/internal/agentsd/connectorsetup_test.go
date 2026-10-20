@@ -13,6 +13,7 @@ import (
 
 	"github.com/alexec/agents/Go/internal/connections"
 	"github.com/alexec/agents/Go/internal/githubmcp"
+	"github.com/alexec/agents/Go/internal/gitlabmcp"
 	"github.com/alexec/agents/Go/wire"
 )
 
@@ -206,6 +207,7 @@ func TestEventsThatCannotBeTurnedOnSayWhy(t *testing.T) {
 	}
 }
 
+// A remote on neither forge (#1632: a gitlab.com one is GitLab's set-up now).
 func TestASetUpWithNoGitHubRemote(t *testing.T) {
 	t.Setenv("AGENTS_PERSONAL_HOME", t.TempDir())
 	d, c := start(t, t.TempDir())
@@ -216,7 +218,7 @@ func TestASetUpWithNoGitHubRemote(t *testing.T) {
 	d.connStoreFor = func() (connections.Store, error) { return file, nil }
 	gh := &fakeSetupGitHub{}
 	d.newSetupReader = func(string) setupReader { return gh }
-	project := gitProject(t, "https://gitlab.com/alexec/blog.git")
+	project := gitProject(t, "https://code.example.org/alexec/blog.git")
 	c.call(t, 1, "projects/add", map[string]any{"folder": "file://" + project})
 
 	var setup wire.ConnectorSetup
@@ -227,5 +229,105 @@ func TestASetUpWithNoGitHubRemote(t *testing.T) {
 	}
 	if e := c.callError(t, 3, "connectors/setup", map[string]any{"folder": t.TempDir()}); e == nil {
 		t.Fatal("a folder that is not a project")
+	}
+}
+
+// fakeSetupGitLab answers a GitLab set-up's reads (#1632); refuse makes the pipeline read a 403.
+type fakeSetupGitLab struct {
+	mu     sync.Mutex
+	reads  int
+	refuse bool
+}
+
+func (f *fakeSetupGitLab) read() {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.reads++
+}
+
+func (f *fakeSetupGitLab) NewestIssue(ctx context.Context, project string) (*gitlabmcp.Newest, error) {
+	f.read()
+	return &gitlabmcp.Newest{Number: 3, Title: "Walk the views", URL: "https://gitlab.com/" + project + "/-/issues/3", At: "2026-10-20T10:00:00Z"}, nil
+}
+
+func (f *fakeSetupGitLab) NewestMergeRequest(ctx context.Context, project string) (*gitlabmcp.Newest, error) {
+	f.read()
+	return &gitlabmcp.Newest{Number: 2, Title: "Add a README", At: "2026-10-20T10:00:00Z"}, nil
+}
+
+func (f *fakeSetupGitLab) LastPipeline(ctx context.Context, project string) (*gitlabmcp.Newest, error) {
+	f.read()
+	if f.refuse {
+		return nil, &gitlabmcp.GitLabError{Kind: gitlabmcp.Failed, Message: "GitLab: HTTP 403", Refused: true}
+	}
+	return &gitlabmcp.Newest{Title: "Pipeline on main", Outcome: "passed", At: "2026-10-20T10:00:00Z"}, nil
+}
+
+// A GitLab project (#1632): its remote picks GitLab, the GitLab connection fills the three
+// slots, each proved by one read, the gitlab connector's events go on, and a connection to
+// another GitLab is not used here.
+func TestAGitLabProjectsConnectorSetUp(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("AGENTS_PERSONAL_HOME", home)
+	d, c := start(t, t.TempDir())
+	defer d.Shutdown()
+	file := &connections.File{Path: filepath.Join(t.TempDir(), ".agents-secrets", connections.FileName)}
+	d.connStoreFor = func() (connections.Store, error) { return file, nil }
+	gl := &fakeSetupGitLab{refuse: true}
+	d.newGitLabSetupReader = func(root, token string) gitlabSetupReader {
+		if root != connections.GitLabCom || token != "gloas-secret" {
+			t.Errorf("GitLab %q token %q", root, token)
+		}
+		return gl
+	}
+	d.newSetupReader = func(string) setupReader {
+		t.Error("GitHub was read for a GitLab project")
+		return &fakeSetupGitHub{}
+	}
+	project := gitProject(t, "git@gitlab.com:agentstest-group/agents-walk.git")
+	c.call(t, 1, "projects/add", map[string]any{"folder": "file://" + project})
+
+	var setup wire.ConnectorSetup
+	json.Unmarshal(c.call(t, 2, "connectors/setup", map[string]any{"folder": project}), &setup)
+	slots := slotsByKind(setup)
+	if setup.Forge == nil || *setup.Forge != wire.ConnectionProviderGitlab || deref(setup.Site) != "gitlab.com" ||
+		deref(setup.Repository) != "agentstest-group/agents-walk" || setup.InstallURL != nil ||
+		slots[wire.ConnectorSlotKindTasks].State != wire.ConnectorSlotStateNotConnected ||
+		slots[wire.ConnectorSlotKindTasks].Choice != "GitLab issues" || gl.reads != 0 {
+		t.Fatalf("before connecting: %+v", setup)
+	}
+
+	// A connection to a self-managed GitLab is not sent to gitlab.com.
+	file.Put(connections.Connection{Provider: connections.GitLab, Login: "agentstest", Access: "glpat-other",
+		URL: "https://gitlab.example.com/", ConnectedAt: time.Now()})
+	json.Unmarshal(c.call(t, 3, "connectors/setup", map[string]any{"folder": project, "reading": "fresh"}), &setup)
+	if setup.Connection != nil || gl.reads != 0 || slotsByKind(setup)[wire.ConnectorSlotKindCi].State != wire.ConnectorSlotStateNotConnected {
+		t.Fatalf("another GitLab's connection: %+v", setup)
+	}
+
+	file.Put(connections.Connection{Provider: connections.GitLab, Login: "agentstest", Access: "gloas-secret",
+		AccessExpiresAt: time.Now().Add(time.Hour), ConnectedAt: time.Now()})
+	raw := c.call(t, 4, "connectors/setup", map[string]any{"folder": project, "reading": "fresh"})
+	if strings.Contains(string(raw), "gloas-secret") {
+		t.Fatalf("a token went to the client: %s", raw)
+	}
+	json.Unmarshal(raw, &setup)
+	slots = slotsByKind(setup)
+	tasks, review, ci := slots[wire.ConnectorSlotKindTasks], slots[wire.ConnectorSlotKindCodeReview], slots[wire.ConnectorSlotKindCi]
+	if tasks.State != wire.ConnectorSlotStateRead || tasks.Proof == nil || *tasks.Proof.Number != 3 ||
+		review.State != wire.ConnectorSlotStateRead || review.Choice != "GitLab merge requests" {
+		t.Fatalf("tasks %+v review %+v", tasks, review)
+	}
+	if ci.State != wire.ConnectorSlotStateRefused || ci.Message == nil || *ci.Message != "GitLab refused: Agents can't see pipelines in agentstest-group/agents-walk." {
+		t.Fatalf("ci: %+v", ci)
+	}
+	if setup.Done != 3 || setup.Connection == nil || setup.Connection.Provider != wire.ConnectionProviderGitlab || setup.Installed != nil {
+		t.Fatalf("connected: %+v", setup)
+	}
+	if setup.Events.State != wire.ConnectorEventsStateOn || deref(setup.Events.Server) != "gitlab" {
+		t.Fatalf("events: %+v", setup.Events)
+	}
+	if b, _ := os.ReadFile(filepath.Join(project, ".agents", "mcp.json")); !strings.Contains(string(b), "gitlab-mcp") {
+		t.Fatalf("mcp.json: %s", b)
 	}
 }

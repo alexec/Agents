@@ -1110,12 +1110,18 @@ type ConnectorProof struct {
 	At      *Date   `json:"at,omitzero"`
 }
 
-// A project's Connectors set-up (#1336): its GitHub repository, the person's connection, four slots that each prove themselves with one read, and the events.
+// A project's Connectors set-up (#1336): its GitHub or GitLab repository (#1632), the person's connection to that forge, four slots that each prove themselves with one read, and the events.
 type ConnectorSetup struct {
 	Folder string `json:"folder"`
-	// owner/name, from the project's git remote (origin first). Absent with no GitHub remote.
-	Repository *string     `json:"repository,omitzero"`
-	Connection *Connection `json:"connection,omitzero"`
+	// owner/name on GitHub, or group/project on GitLab, from the project's git remote (origin first). Absent with no GitHub or GitLab remote.
+	Repository *string `json:"repository,omitzero"`
+	// The forge the repository is on, which fills Tasks, Code review and CI: github or gitlab (#1632). Absent is github.
+	Forge *ConnectionProvider `json:"forge,omitzero"`
+	// The repository's host, as the page says it before the repository: github.com, gitlab.com, or a self-managed GitLab's host.
+	Site *string `json:"site,omitzero"`
+	// The repository's page on its forge, where the person asks for access when a read is refused (GitLab).
+	RepositoryURL *string     `json:"repositoryURL,omitzero"`
+	Connection    *Connection `json:"connection,omitzero"`
 	// Whether the Agents App is installed on the repository. Absent when not known.
 	Installed  *bool   `json:"installed,omitzero"`
 	InstallURL *string `json:"installURL,omitzero"`
@@ -1170,7 +1176,7 @@ const (
 	ConnectorSlotKindWorkspace  ConnectorSlotKind = "workspace"
 )
 
-// notConnected: the slot comes with a connection that is not there yet. notRead: connected, but not read yet (a stored reading). read: its one read worked (a tick). failed: the read did not reach the provider; message says why. refused: the provider refused the read, so the person grants it on the provider's site. noRemote: the project has no GitHub remote. skipped: the person skipped it; it counts as done.
+// notConnected: the slot comes with a connection that is not there yet. notRead: connected, but not read yet (a stored reading). read: its one read worked (a tick). failed: the read did not reach the provider; message says why. refused: the provider refused the read, so the person grants it on the provider's site. noRemote: the project has no GitHub or GitLab remote. skipped: the person skipped it; it counts as done.
 type ConnectorSlotState string
 
 const (
