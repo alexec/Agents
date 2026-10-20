@@ -4956,9 +4956,10 @@ final class AppModel {
 
     // MARK: Language servers
 
-    /// A source file's problems, from its language server on the agent's host (#844).
-    func diagnose(path: String, text: String, of agentID: UUID) async -> DaemonAPI.FileDiagnostics? {
-        try? await client(forAgent: agentID).call(
+    /// A source file's problems, from its language server on the agent's host (#844). A
+    /// failure is thrown, for the editor to say (#1687).
+    func diagnose(path: String, text: String, of agentID: UUID) async throws -> DaemonAPI.FileDiagnostics {
+        try await client(forAgent: agentID).call(
             DaemonAPI.Method.filesDiagnostics,
             DaemonAPI.FileDiagnosticsRequest(agentID: agentID, path: path, text: text),
             returning: DaemonAPI.FileDiagnostics.self)

@@ -39,8 +39,9 @@ struct PageActions {
     /// looked at waits rather than taking the screen (034 FR-005).
     var typing: @MainActor (Bool) -> Void = { _ in }
     /// What the language server for a source file's language finds in it, as the editor
-    /// holds it (#844). Nil where nothing can ask, and then the editor lists nothing.
-    var diagnose: (@MainActor (_ path: String, _ text: String) async -> DaemonAPI.FileDiagnostics?)? = nil
+    /// holds it (#844). It throws when the request fails, and the editor says why (#1687).
+    /// Nil where nothing can ask, and then the editor lists nothing.
+    var diagnose: (@MainActor (_ path: String, _ text: String) async throws -> DaemonAPI.FileDiagnostics)? = nil
     /// What the language server would write at a line and column (from 1), for the editor's
     /// completion (#844), with the host's reason when there is none. A request that fails
     /// says why in `reason` too (#1688). Nil where nothing can ask.

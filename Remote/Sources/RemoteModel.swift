@@ -4004,10 +4004,11 @@ final class RemoteModel {
     /// Another page, backwards. Never the whole history: that is the difference
     /// between a conversation opening in a second and one opening on a train.
     /// A source file's problems, from its language server on the agent's host (#844).
-    func diagnose(path: String, text: String, of agentID: UUID) async -> DaemonAPI.FileDiagnostics? {
+    /// A failure is thrown, for the editor to say (#1687).
+    func diagnose(path: String, text: String, of agentID: UUID) async throws -> DaemonAPI.FileDiagnostics {
         let request = DaemonAPI.FileDiagnosticsRequest(agentID: agentID, path: path, text: text)
-        return try? await client(for: request).call(DaemonAPI.Method.filesDiagnostics, request,
-                                                    returning: DaemonAPI.FileDiagnostics.self)
+        return try await client(for: request).call(DaemonAPI.Method.filesDiagnostics, request,
+                                                   returning: DaemonAPI.FileDiagnostics.self)
     }
 
     /// What the file's language server would write at a line and column (#1603), or why

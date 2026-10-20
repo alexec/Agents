@@ -82,8 +82,18 @@ struct SourceEditor: View {
         .task(id: draft) {
             guard let diagnose = actions.diagnose else { return }
             try? await Task.sleep(for: .seconds(1))
-            guard !Task.isCancelled, let found = await diagnose(path, draft), !Task.isCancelled else { return }
-            diagnostics = found
+            guard !Task.isCancelled else { return }
+            do {
+                let found = try await diagnose(path, draft)
+                guard !Task.isCancelled else { return }
+                diagnostics = found
+            } catch {
+                // A failed request says so, not "no problems" (#1687).
+                guard !Task.isCancelled else { return }
+                let server = diagnostics?.server ?? "the language server"
+                let why = (error as? JSONRPCError)?.message ?? error.localizedDescription
+                diagnostics = DaemonAPI.FileDiagnostics(diagnostics: [], server: server, reason: "Couldn't ask \(server): \(why)")
+            }
         }
         .onChange(of: text) { _, disk in
             if draft == saved { draft = disk }
@@ -154,13 +164,14 @@ struct SourceJump: Equatable {
 
 /// What a file's language server found (#844), under the editor: each problem's place and
 /// words, a click away from its line. Nothing when the file's language has no server; a
-/// line saying why when its server is not installed or did not answer.
+/// line saying why when its server is not installed, is starting or did not answer, and
+/// "No problems · ‹server›" once it answered with none (#1687).
 private struct ProblemsList: View {
     let diagnostics: DaemonAPI.FileDiagnostics
     let goTo: (Int) -> Void
 
     var body: some View {
-        if diagnostics.server != nil, !diagnostics.diagnostics.isEmpty || diagnostics.reason != nil {
+        if diagnostics.server != nil {
             VStack(alignment: .leading, spacing: 0) {
                 Divider()
                 Text(heading)
@@ -186,6 +197,7 @@ private struct ProblemsList: View {
     private var heading: String {
         if let reason = diagnostics.reason, diagnostics.diagnostics.isEmpty { return reason }
         let count = diagnostics.diagnostics.count
+        if count == 0 { return "No problems · \(diagnostics.server ?? "")" }
         return "\(count) \(count == 1 ? "problem" : "problems") · \(diagnostics.server ?? "")"
     }
 
