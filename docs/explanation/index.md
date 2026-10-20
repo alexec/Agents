@@ -18,6 +18,8 @@ Nothing here needs doing; it is for understanding.
   app's sessions, what it keeps, and why your own setup is untouched.
 - [Views in a conversation](views.md): how a tool's `ui://` view is drawn on every device,
   what it may reach, and what its messages do.
+- [Versions and capabilities](versions.md): how the clients, the hosts and the control
+  plane work together at different versions, and what a version number means.
 - [Projects, hosts and worktrees](projects-hosts-worktrees.md): a project is a folder on
   one machine, and an agent can have a worktree of its own.
 - [Leases on shared resources](leases.md): how agents take turns with the screen, a

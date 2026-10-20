@@ -17,11 +17,15 @@ and the control plane (#1135, step 0 of the move to Go, #1134). It is not a Swif
   `Call…` or `Notify…` value per method, and the `Failure…` codes).
 - **TypeScript:** `Web/src/protocol/generated.ts`, for the web page: every type, and the
   methods and notifications tagged `web`.
+- **Capabilities (#1748):** `Go/wire/capabilities_gen.go`,
+  `Web/src/protocol/capabilities.generated.ts` and AgentsKitCore's
+  `Daemon/Capabilities.generated.swift`: a constant per capability, and the capability of each
+  method and notification.
 
 `scripts/wire.sh check` writes nothing and fails when one of them is stale; CI's `go` job runs
 the same check as a test.
 
-**Swift is not made from it.** The `Model` types stay written by hand, and `WireSchemaTests`
+**Swift's types are not made from it** (only its capabilities are). The `Model` types stay written by hand, and `WireSchemaTests`
 (in AgentsKit) reads every record in the web fixtures with today's decoder, writes it with
 today's encoder, and checks the output against the schema. It also checks that
 `DaemonAPI.WebSignatures` and the methods tagged `web` agree.
@@ -43,6 +47,9 @@ A conflict in a generated file is settled by running `gen` again, never by hand.
   answers (#1313), a host's on its channel 0 among them, and what it says to clients and
   hosts. `daemon.openrpc.json` has the host's, as far as the Go host has ported them: each Go
   step adds the methods it ports, with their types, schema first.
+- **`x-capability`** on each method and notification names its capability, `<name>/<n>`
+  (#1748, `docs/explanation/versions.md`). A method added for a new feature takes the feature's
+  name (`chat.branch/1`); the generator refuses a method without one.
 - **Numbers.** `integer` is Swift's `Int` (Go `int64`); `number` is `Double` (Go `float64`).
 - **The five meaning-types,** written by hand in each language and named by `x-swift-type`
   and `x-go-type` (Go's are in `Go/wire/meaning.go`):
