@@ -9,15 +9,19 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/alexec/agents/Go/internal/agentsd/store"
+	"github.com/alexec/agents/Go/wire"
 )
 
 // A project's attachments (#1556), in <agent folder>/.agents/attachments, are bound: one
 // that no kept agent's transcript names goes after attachmentDays, and the folder is kept
 // under attachmentFolderBytes, oldest first. A temporary file a cut-off write left goes
-// after a day.
+// after a day. A write applies only the size bound; the hourly sweep looks for the names
+// (#1651), and remembers which agent names each old file it keeps, so each old file is
+// looked for in the transcripts once, not at each sweep.
 
 const (
 	attachmentDays    = 7 * 24 * time.Hour
@@ -39,7 +43,7 @@ func (d *Daemon) writeAttachment(root, name string, data []byte) (string, error)
 	if err := store.WriteAtomically(path, data, 0o600); err != nil {
 		return "", err
 	}
-	d.boundAttachments(root, path)
+	d.boundAttachments(root, path, false)
 	return path, nil
 }
 
@@ -67,6 +71,13 @@ func attachmentsDir(root string, create bool) (string, error) {
 	return dir, nil
 }
 
+// attachmentBook is, per agent folder, which agent's transcript names each old
+// attachment the last sweep kept. It holds no more than the old files that folder keeps.
+type attachmentBook struct {
+	namedMu sync.Mutex
+	namedBy map[string]map[string]wire.UUID
+}
+
 // sweepAttachments bounds the attachments of every folder an agent here works in.
 func (d *Daemon) sweepAttachments() {
 	seen := map[string]bool{}
@@ -76,8 +87,15 @@ func (d *Daemon) sweepAttachments() {
 			continue
 		}
 		seen[root] = true
-		d.boundAttachments(root, "")
+		d.boundAttachments(root, "", true)
 	}
+	d.namedMu.Lock()
+	for root := range d.namedBy {
+		if !seen[root] {
+			delete(d.namedBy, root)
+		}
+	}
+	d.namedMu.Unlock()
 }
 
 type attachment struct {
@@ -87,8 +105,9 @@ type attachment struct {
 }
 
 // boundAttachments deletes from root's attachments what is past the bounds; keep is
-// the one just written, never deleted.
-func (d *Daemon) boundAttachments(root, keep string) (deleted int) {
+// the one just written, never deleted. Only with byAge does it delete an old file that no
+// transcript names: that reads transcripts, so a write does not.
+func (d *Daemon) boundAttachments(root, keep string, byAge bool) (deleted int) {
 	dir, err := attachmentsDir(root, false)
 	if err != nil {
 		if !os.IsNotExist(err) {
@@ -124,21 +143,31 @@ func (d *Daemon) boundAttachments(root, keep string) (deleted int) {
 			continue
 		}
 		f := attachment{path: path, size: info.Size(), at: info.ModTime()}
-		if path != keep && t.Sub(f.at) > attachmentDays {
+		if byAge && path != keep && t.Sub(f.at) > attachmentDays {
 			old = append(old, f)
 			continue
 		}
 		files = append(files, f)
 	}
-	if len(old) > 0 {
+	if byAge {
 		named := d.namedAttachments(root, old)
 		for _, f := range old {
-			if named[f.path] {
+			if _, ok := named[f.path]; ok {
 				files = append(files, f)
 			} else {
 				remove(f.path)
 			}
 		}
+		d.namedMu.Lock()
+		if d.namedBy == nil {
+			d.namedBy = map[string]map[string]wire.UUID{}
+		}
+		if len(named) > 0 {
+			d.namedBy[root] = named
+		} else {
+			delete(d.namedBy, root)
+		}
+		d.namedMu.Unlock()
 	}
 	var total int64
 	for _, f := range files {
@@ -158,19 +187,47 @@ func (d *Daemon) boundAttachments(root, keep string) (deleted int) {
 	return deleted
 }
 
-// namedAttachments is which of files a transcript of an agent kept here, in root, names.
-// An archived agent counts: it can be brought back. A name is looked for by its random
-// prefix ("1A2B3C4D-"), which no escaping changes.
-func (d *Daemon) namedAttachments(root string, files []attachment) map[string]bool {
-	named := map[string]bool{}
+// namedAttachments is, for each of files that a transcript of an agent kept here, in
+// root, names, the agent that names it. An archived agent counts: it can be brought back.
+// A file the last sweep found named by an agent still kept here is named still, as a
+// transcript only grows; only the others are looked for. A name is looked for by its
+// random prefix ("1A2B3C4D-"), which no escaping changes.
+func (d *Daemon) namedAttachments(root string, files []attachment) map[string]wire.UUID {
+	named := map[string]wire.UUID{}
+	var agents []wire.UUID
+	here := map[wire.UUID]bool{}
 	for _, a := range d.Store.Agents() {
-		if r, err := d.agentFolder(a.ID); err != nil || r != root {
-			continue
+		if r, err := d.agentFolder(a.ID); err == nil && r == root {
+			agents = append(agents, a.ID)
+			here[a.ID] = true
 		}
-		scanFor(d.Store.Loc.Transcript(string(a.ID)), files, named)
-		if len(named) == len(files) {
+	}
+	d.namedMu.Lock()
+	known := d.namedBy[root]
+	d.namedMu.Unlock()
+	var unknown []attachment
+	for _, f := range files {
+		if id, ok := known[f.path]; ok && here[id] {
+			named[f.path] = id
+		} else {
+			unknown = append(unknown, f)
+		}
+	}
+	for _, id := range agents {
+		if len(unknown) == 0 {
 			break
 		}
+		found := map[string]bool{}
+		scanFor(d.Store.Loc.Transcript(string(id)), unknown, found)
+		rest := unknown[:0:0]
+		for _, f := range unknown {
+			if found[f.path] {
+				named[f.path] = id
+			} else {
+				rest = append(rest, f)
+			}
+		}
+		unknown = rest
 	}
 	return named
 }
@@ -198,7 +255,7 @@ func scanFor(path string, files []attachment, named map[string]bool) {
 				named[a.path] = true
 			}
 		}
-		if err != nil {
+		if err != nil || len(named) == len(files) {
 			return
 		}
 		kept = min(overlap, len(window))
