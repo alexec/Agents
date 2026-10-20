@@ -86,3 +86,47 @@ func TestAttachmentsAreWrittenWholeAndBound(t *testing.T) {
 		t.Fatalf("by size: newest %v named %v young %v first %v", exists(newest), exists(named), exists(young), exists(first))
 	}
 }
+
+// A project can commit .agents/attachments, or .agents, as a link to a folder outside
+// it. The sweep deletes nothing there, and a write puts nothing there.
+func TestAttachmentsRefuseALinkedFolder(t *testing.T) {
+	clock := time.Date(2026, 10, 19, 12, 0, 0, 0, time.UTC)
+	atTime(t, &clock)
+	for _, linked := range []string{".agents", attachmentsFolder} {
+		t.Run(linked, func(t *testing.T) {
+			d, _ := start(t, t.TempDir())
+			defer d.Shutdown()
+			a := seeded(t, d, t.TempDir(), nil)
+			root, err := d.agentFolder(a.ID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			outside := t.TempDir()
+			victim := filepath.Join(outside, "4E5F6A7B-old.png")
+			if linked == ".agents" {
+				os.Mkdir(filepath.Join(outside, "attachments"), 0o700)
+				victim = filepath.Join(outside, "attachments", "4E5F6A7B-old.png")
+			}
+			os.WriteFile(victim, []byte("x"), 0o600)
+			old := clock.Add(-30 * 24 * time.Hour)
+			os.Chtimes(victim, old, old)
+			if linked == attachmentsFolder {
+				os.Mkdir(filepath.Join(root, ".agents"), 0o700)
+			}
+			if err := os.Symlink(outside, filepath.Join(root, linked)); err != nil {
+				t.Fatal(err)
+			}
+
+			d.sweepAttachments()
+			if _, err := os.Stat(victim); err != nil {
+				t.Fatal("the sweep deleted a file outside the project")
+			}
+			if path, err := d.writeAttachment(root, "a.png", []byte("x")); err == nil {
+				t.Fatalf("wrote %s through the link", path)
+			}
+			if entries, _ := os.ReadDir(filepath.Dir(victim)); len(entries) != 1 {
+				t.Fatalf("%d files outside the project", len(entries))
+			}
+		})
+	}
+}
