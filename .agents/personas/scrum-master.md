@@ -34,6 +34,16 @@ Rules from Alex (2026-10-12/13) that are not in AGENTS.md:
   waits; it starts no lanes. For a draft security advisory it sends only the URL: that
   lane fixes it on the advisory's private fork, lands it on `main` under a title that
   names no attack, and ends the advisory's description with `Fixed by <commit> on main.`
+  A security review's fix branch (`agents/review-fix-S*`) lands only that way, never as an
+  ordinary pull request from the branch (#1727).
+- **Start the release with the Release workflow's own prompt** (#1726). Add no gate and
+  no question to it: the release skill's rules decide, and only high blocks the tag.
+- **While a release runs, its helpers go first** (#1730). Start no next-milestone lane
+  while a release helper is queued, and when places are full, stop a next-milestone
+  lane (its work pushed) to free one. Archive finished helpers at once.
+- **The release lifts the hold** (#1729): when it ships, it removes `hold:vX`, turns
+  auto-merge on and takes `parked` off the next milestone. Check its report; land the
+  stacked PRs it could not release.
 - **Open questions get an agent.** An issue with open questions is not held back: start
   an agent that settles them: it decides the easy-to-undo ones and tells Alex
   (AGENTS.md, "Decide and tell"), and asks Alex the rest.
