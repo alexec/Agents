@@ -228,3 +228,83 @@ func TestConnectingLinearWithTheCodeFlow(t *testing.T) {
 		t.Fatalf("list: %s", raw)
 	}
 }
+
+// A self-managed GitLab (#1630): a personal access token is checked with that GitLab, kept with
+// its address, listed with its host and its end, and never given back or logged.
+func TestConnectingGitLabWithAnAccessToken(t *testing.T) {
+	gl := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if r.Header.Get("Authorization") != "Bearer glpat-secret" {
+			w.WriteHeader(http.StatusUnauthorized)
+			fmt.Fprint(w, `{"message":"401 Unauthorized"}`)
+			return
+		}
+		switch r.URL.Path {
+		case "/api/v4/user":
+			fmt.Fprint(w, `{"id":7,"username":"agentstest"}`)
+		case "/api/v4/personal_access_tokens/self":
+			fmt.Fprint(w, `{"expires_at":"2027-10-18","scopes":["api"]}`)
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer gl.Close()
+	d, c := start(t, t.TempDir())
+	defer d.Shutdown()
+	file := &connections.File{Path: filepath.Join(t.TempDir(), connections.FileName)}
+	d.connStoreFor = func() (connections.Store, error) { return file, nil }
+	d.gitlabHTTP = gl.Client()
+
+	var refused wire.ConnectionTokenAnswer
+	json.Unmarshal(c.call(t, 1, "connections/sign-in/token", map[string]any{"provider": "gitlab", "url": gl.URL, "token": "glpat-wrong"}), &refused)
+	if refused.Error == nil || refused.Connection != nil || strings.Contains(*refused.Error, "glpat-wrong") {
+		t.Fatalf("a wrong token: %+v", refused)
+	}
+	var plain wire.ConnectionTokenAnswer
+	json.Unmarshal(c.call(t, 2, "connections/sign-in/token", map[string]any{"provider": "gitlab", "url": "http://gitlab.example.com", "token": "glpat-secret"}), &plain)
+	if plain.Error == nil || !strings.Contains(*plain.Error, "https://") {
+		t.Fatalf("a token over http: %+v", plain)
+	}
+
+	raw := c.call(t, 3, "connections/sign-in/token", map[string]any{"provider": "gitlab", "url": gl.URL + "/api/v4", "token": " glpat-secret\n"})
+	if strings.Contains(string(raw), "glpat-secret") {
+		t.Fatalf("the token went back to the client: %s", raw)
+	}
+	var made wire.ConnectionTokenAnswer
+	json.Unmarshal(raw, &made)
+	host := strings.TrimPrefix(gl.URL, "http://")
+	if made.Error != nil || made.Connection == nil || deref(made.Connection.Login) != "agentstest" ||
+		deref(made.Connection.Workspace) != host || made.Connection.ExpiresAt == nil {
+		t.Fatalf("made: %+v", made)
+	}
+	kept, ok, _ := file.Get(connections.GitLab)
+	if !ok || kept.Access != "glpat-secret" || kept.URL != gl.URL+"/" || kept.Refresh != "" {
+		t.Fatalf("kept: %+v", kept)
+	}
+	var list wire.ConnectionsList
+	json.Unmarshal(c.call(t, 4, "connections/list", map[string]any{}), &list)
+	if len(list.Connections) != 1 || list.Connections[0].Provider != wire.ConnectionProviderGitlab {
+		t.Fatalf("list: %+v", list)
+	}
+	// Only GitLab takes a token.
+	if msg := c.callErr(t, 5, "connections/sign-in/token", map[string]any{"provider": "github", "token": "x"}); !strings.Contains(msg, "only for GitLab") {
+		t.Fatalf("github token: %s", msg)
+	}
+}
+
+// gitlab.com's device flow is GitHub's with GitLab's paths; a build with no application says
+// to use a token instead.
+func TestGitLabDeviceFlowNeedsTheApplication(t *testing.T) {
+	d, c := start(t, t.TempDir())
+	defer d.Shutdown()
+	file := &connections.File{Path: filepath.Join(t.TempDir(), connections.FileName)}
+	d.connStoreFor = func() (connections.Store, error) { return file, nil }
+	d.newDeviceFlow = func(wire.ConnectionProvider) *connections.DeviceFlow {
+		f := connections.NewGitLabFlow()
+		f.ClientID = ""
+		return f
+	}
+	if msg := c.callErr(t, 1, "connections/sign-in", map[string]any{"provider": "gitlab"}); !strings.Contains(msg, "personal access token") {
+		t.Fatalf("no application: %s", msg)
+	}
+}

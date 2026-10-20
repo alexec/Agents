@@ -968,20 +968,23 @@ type Connection struct {
 	ConnectedAt Date            `json:"connectedAt"`
 	// Where the person installs the provider's App: a GitHub user token reaches only the repositories where it is installed.
 	InstallURL *string `json:"installURL,omitzero"`
-	// The part of the provider the token reaches, such as a Linear workspace's name.
+	// The part of the provider the token reaches, such as a Linear workspace's name, or a self-managed GitLab's host.
 	Workspace *string `json:"workspace,omitzero"`
+	// When a token the host cannot renew ends: a GitLab personal access token's expiry. The person makes a new one before then.
+	ExpiresAt *Date `json:"expiresAt,omitzero"`
 }
 
 type ConnectionDisconnectAnswer struct {
 	Error *string `json:"error,omitzero"`
 }
 
-// A tool the person connects to with OAuth: GitHub (#1335) and Linear (#1343).
+// A tool the person connects to: GitHub (#1335) and Linear (#1343) with OAuth, GitLab (#1630) with OAuth on gitlab.com or a personal access token on any GitLab.
 type ConnectionProvider string
 
 const (
 	ConnectionProviderGithub ConnectionProvider = "github"
 	ConnectionProviderLinear ConnectionProvider = "linear"
+	ConnectionProviderGitlab ConnectionProvider = "gitlab"
 )
 
 type ConnectionProviderRequest struct {
@@ -1047,6 +1050,20 @@ const (
 	ConnectionStateConnected   ConnectionState = "connected"
 	ConnectionStateSignInAgain ConnectionState = "signInAgain"
 )
+
+// The connection the token made, or why it made none, in words.
+type ConnectionTokenAnswer struct {
+	Connection *Connection `json:"connection,omitzero"`
+	Error      *string     `json:"error,omitzero"`
+}
+
+// connections/sign-in/token (#1630): a personal access token the person made, for a provider with no Agents application there (a self-managed GitLab). The host checks it with the provider, keeps it in its own store, and never logs it or gives it back.
+type ConnectionTokenRequest struct {
+	Provider ConnectionProvider `json:"provider"`
+	// The provider's address, such as https://gitlab.example.com. gitlab.com when left out.
+	URL   *string `json:"url,omitzero"`
+	Token string  `json:"token"`
+}
 
 type ConnectionsList struct {
 	Connections []Connection `json:"connections"`

@@ -798,16 +798,27 @@ export interface Connection {
    * where it is installed.
    */
   installURL?: string;
-  /** The part of the provider the token reaches, such as a Linear workspace's name. */
+  /**
+   * The part of the provider the token reaches, such as a Linear workspace's name, or a
+   * self-managed GitLab's host.
+   */
   workspace?: string;
+  /**
+   * When a token the host cannot renew ends: a GitLab personal access token's expiry. The person
+   * makes a new one before then.
+   */
+  expiresAt?: WireDate;
 }
 
 export interface ConnectionDisconnectAnswer {
   error?: string;
 }
 
-/** A tool the person connects to with OAuth: GitHub (#1335) and Linear (#1343). */
-export type ConnectionProvider = "github" | "linear";
+/**
+ * A tool the person connects to: GitHub (#1335) and Linear (#1343) with OAuth, GitLab (#1630) with
+ * OAuth on gitlab.com or a personal access token on any GitLab.
+ */
+export type ConnectionProvider = "github" | "linear" | "gitlab";
 
 export interface ConnectionProviderRequest {
   provider: ConnectionProvider;
@@ -878,6 +889,24 @@ export type ConnectionSignInStatus = "waiting" | "connected" | "expired" | "deni
  * the person signs in again.
  */
 export type ConnectionState = "connected" | "signInAgain";
+
+/** The connection the token made, or why it made none, in words. */
+export interface ConnectionTokenAnswer {
+  connection?: Connection;
+  error?: string;
+}
+
+/**
+ * connections/sign-in/token (#1630): a personal access token the person made, for a provider with
+ * no Agents application there (a self-managed GitLab). The host checks it with the provider, keeps
+ * it in its own store, and never logs it or gives it back.
+ */
+export interface ConnectionTokenRequest {
+  provider: ConnectionProvider;
+  /** The provider's address, such as https://gitlab.example.com. gitlab.com when left out. */
+  url?: string;
+  token: string;
+}
 
 export interface ConnectionsList {
   connections: Connection[];
@@ -4653,6 +4682,7 @@ export interface Methods {
   "connections/sign-in": { params: ConnectionProviderRequest; result: ConnectionSignIn };
   "connections/sign-in/cancel": { params: ConnectionSignInFlowRequest; result: ConnectionSignIn };
   "connections/sign-in/complete": { params: ConnectionSignInCompleteRequest; result: ConnectionSignIn };
+  "connections/sign-in/token": { params: ConnectionTokenRequest; result: ConnectionTokenAnswer };
   "connections/sign-in/wait": { params: ConnectionSignInFlowRequest; result: ConnectionSignIn };
   "connectors/setup": { params: ConnectorSetupRequest; result: ConnectorSetup };
   "connectors/setup/skip": { params: ConnectorSkipRequest; result: ConnectorSetup };
@@ -4800,6 +4830,7 @@ export const MethodTarget = {
   "connections/sign-in": "host",
   "connections/sign-in/cancel": "host",
   "connections/sign-in/complete": "host",
+  "connections/sign-in/token": "host",
   "connections/sign-in/wait": "host",
   "connectors/setup": "host",
   "connectors/setup/skip": "host",
@@ -5008,12 +5039,14 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ConfigChoice: { required: ["value", "name"], optional: ["description"] },
   ConfigChoiceGroup: { required: ["options"], optional: ["name", "group"] },
   ConfigOption: { required: ["id", "name", "type"], optional: ["description", "category", "currentValue", "options"] },
-  Connection: { required: ["provider", "state", "connectedAt"], optional: ["login", "installURL", "workspace"] },
+  Connection: { required: ["provider", "state", "connectedAt"], optional: ["login", "installURL", "workspace", "expiresAt"] },
   ConnectionDisconnectAnswer: { required: [], optional: ["error"] },
   ConnectionProviderRequest: { required: ["provider"], optional: ["origin"] },
   ConnectionSignIn: { required: ["flowID", "provider", "status", "grant", "verificationURL", "expiresAt"], optional: ["userCode", "installURL", "connection", "message"] },
   ConnectionSignInCompleteRequest: { required: ["flowID", "state"], optional: ["code", "error"] },
   ConnectionSignInFlowRequest: { required: ["flowID"], optional: [] },
+  ConnectionTokenAnswer: { required: [], optional: ["connection", "error"] },
+  ConnectionTokenRequest: { required: ["provider", "token"], optional: ["url"] },
   ConnectionsList: { required: ["connections"], optional: [] },
   ConnectorEvents: { required: ["state", "names", "workflows"], optional: ["server", "message"] },
   ConnectorProof: { required: ["title"], optional: ["number", "outcome", "url", "at"] },

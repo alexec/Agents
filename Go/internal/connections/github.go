@@ -22,9 +22,15 @@ const (
 	GitHubInstallURL = "https://github.com/apps/" + GitHubAppSlug + "/installations/new"
 )
 
-// DeviceFlow is GitHub's device flow (RFC 8628) and its refresh, for a GitHub App.
+// DeviceFlow is the device flow (RFC 8628) and its refresh: GitHub's for a GitHub App, and
+// GitLab's for an OAuth application (gitlab.go). The paths and the name are GitHub's when empty.
 type DeviceFlow struct {
 	ClientID string
+	// Name is the provider in words, for errors: "GitHub".
+	Name string
+	// CodePath and TokenPath are on Base; UserPath, the account, is on API. Scope is asked for
+	// at the start (GitHub's App asks none: its permissions are the App's).
+	CodePath, TokenPath, UserPath, Scope string
 	// Base is github.com's root with a trailing slash; API is the REST API's. A test gives
 	// a fake of each.
 	Base, API string
@@ -62,20 +68,53 @@ type Token struct {
 var (
 	// ErrExpired: the code ended before the person approved it.
 	ErrExpired = errors.New("the code expired before it was approved")
-	// ErrDenied: the person pressed Cancel on github.com.
-	ErrDenied = errors.New("the sign-in was denied on GitHub")
-	// ErrRefused: GitHub refused the refresh token. The person signs in again.
-	ErrRefused = errors.New("GitHub refused the refresh: sign in again")
+	// ErrDenied: the person pressed Cancel on the provider's page.
+	ErrDenied = errors.New("the sign-in was denied")
+	// ErrRefused: the provider refused the refresh token. The person signs in again.
+	ErrRefused = errors.New("the refresh was refused: sign in again")
 )
 
-// Failure is any other answer GitHub gave, in words: its error code, never a token.
-type Failure struct{ Code, Words string }
+// Failure is any other answer the provider gave, in words: its error code, never a token.
+// Name is the provider ("GitHub" when empty).
+type Failure struct{ Name, Code, Words string }
 
 func (f *Failure) Error() string {
-	if f.Words != "" {
-		return "GitHub said " + f.Code + ": " + f.Words
+	name := f.Name
+	if name == "" {
+		name = "GitHub"
 	}
-	return "GitHub said " + f.Code
+	if f.Words != "" {
+		return name + " said " + f.Code + ": " + f.Words
+	}
+	return name + " said " + f.Code
+}
+
+func (f *DeviceFlow) name() string {
+	if f.Name != "" {
+		return f.Name
+	}
+	return "GitHub"
+}
+
+func (f *DeviceFlow) codePath() string {
+	if f.CodePath != "" {
+		return f.CodePath
+	}
+	return "login/device/code"
+}
+
+func (f *DeviceFlow) tokenPath() string {
+	if f.TokenPath != "" {
+		return f.TokenPath
+	}
+	return "login/oauth/access_token"
+}
+
+func (f *DeviceFlow) userPath() string {
+	if f.UserPath != "" {
+		return f.UserPath
+	}
+	return "user"
 }
 
 func (f *DeviceFlow) now() time.Time {
@@ -113,12 +152,12 @@ type oauthAnswer struct {
 	ErrorDescription      string `json:"error_description"`
 }
 
-// post sends form to path on Base and reads GitHub's JSON answer. A failure says what
+// post sends form to path on Base and reads the provider's JSON answer. A failure says what
 // failed, never the form (which holds the device code or the refresh token).
 func (f *DeviceFlow) post(ctx context.Context, path string, form url.Values) (oauthAnswer, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, f.Base+path, strings.NewReader(form.Encode()))
 	if err != nil {
-		return oauthAnswer{}, errors.New("the request to GitHub could not be made")
+		return oauthAnswer{}, errors.New("the request to " + f.name() + " could not be made")
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("Accept", "application/json")
@@ -127,31 +166,35 @@ func (f *DeviceFlow) post(ctx context.Context, path string, form url.Values) (oa
 		if ctx.Err() != nil {
 			return oauthAnswer{}, ctx.Err()
 		}
-		return oauthAnswer{}, errors.New("GitHub could not be reached")
+		return oauthAnswer{}, errors.New(f.name() + " could not be reached")
 	}
 	defer res.Body.Close()
 	b, _ := io.ReadAll(io.LimitReader(res.Body, 1<<20))
 	var a oauthAnswer
 	if json.Unmarshal(b, &a) != nil {
-		return oauthAnswer{}, fmt.Errorf("GitHub answered %d with no JSON", res.StatusCode)
+		return oauthAnswer{}, fmt.Errorf("%s answered %d with no JSON", f.name(), res.StatusCode)
 	}
 	if a.Error == "" && res.StatusCode != http.StatusOK {
-		return oauthAnswer{}, fmt.Errorf("GitHub answered %d", res.StatusCode)
+		return oauthAnswer{}, fmt.Errorf("%s answered %d", f.name(), res.StatusCode)
 	}
 	return a, nil
 }
 
 // Start asks for a device code and the code the person types.
 func (f *DeviceFlow) Start(ctx context.Context) (DeviceCode, error) {
-	a, err := f.post(ctx, "login/device/code", url.Values{"client_id": {f.ClientID}})
+	form := url.Values{"client_id": {f.ClientID}}
+	if f.Scope != "" {
+		form.Set("scope", f.Scope)
+	}
+	a, err := f.post(ctx, f.codePath(), form)
 	if err != nil {
 		return DeviceCode{}, err
 	}
 	if a.Error != "" {
-		return DeviceCode{}, &Failure{Code: a.Error, Words: a.ErrorDescription}
+		return DeviceCode{}, &Failure{Name: f.Name, Code: a.Error, Words: a.ErrorDescription}
 	}
 	if a.DeviceCode == "" || a.UserCode == "" || a.VerificationURI == "" {
-		return DeviceCode{}, errors.New("GitHub gave no code")
+		return DeviceCode{}, errors.New(f.name() + " gave no code")
 	}
 	interval := time.Duration(a.Interval) * time.Second
 	if interval <= 0 {
@@ -162,7 +205,7 @@ func (f *DeviceFlow) Start(ctx context.Context) (DeviceCode, error) {
 }
 
 // Wait polls at the code's interval until the person approves or denies it, or it
-// expires. slow_down adds the interval GitHub gives (5 s more when it gives none).
+// expires. slow_down adds the interval the provider gives (5 s more when it gives none).
 func (f *DeviceFlow) Wait(ctx context.Context, code DeviceCode) (Token, error) {
 	interval := code.Interval
 	for {
@@ -172,7 +215,7 @@ func (f *DeviceFlow) Wait(ctx context.Context, code DeviceCode) (Token, error) {
 		if !code.ExpiresAt.IsZero() && !f.now().Before(code.ExpiresAt) {
 			return Token{}, ErrExpired
 		}
-		a, err := f.post(ctx, "login/oauth/access_token", url.Values{"client_id": {f.ClientID},
+		a, err := f.post(ctx, f.tokenPath(), url.Values{"client_id": {f.ClientID},
 			"device_code": {code.DeviceCode}, "grant_type": {"urn:ietf:params:oauth:grant-type:device_code"}})
 		if err != nil {
 			if ctx.Err() != nil {
@@ -196,14 +239,15 @@ func (f *DeviceFlow) Wait(ctx context.Context, code DeviceCode) (Token, error) {
 		case "access_denied":
 			return Token{}, ErrDenied
 		default:
-			return Token{}, &Failure{Code: a.Error, Words: a.ErrorDescription}
+			return Token{}, &Failure{Name: f.Name, Code: a.Error, Words: a.ErrorDescription}
 		}
 	}
 }
 
-// Refresh spends the refresh token for a new pair: GitHub's refresh tokens are single use.
+// Refresh spends the refresh token for a new pair: GitHub's and GitLab's refresh tokens are
+// single use.
 func (f *DeviceFlow) Refresh(ctx context.Context, refresh string) (Token, error) {
-	a, err := f.post(ctx, "login/oauth/access_token", url.Values{"client_id": {f.ClientID},
+	a, err := f.post(ctx, f.tokenPath(), url.Values{"client_id": {f.ClientID},
 		"grant_type": {"refresh_token"}, "refresh_token": {refresh}})
 	if err != nil {
 		return Token{}, err
@@ -211,15 +255,15 @@ func (f *DeviceFlow) Refresh(ctx context.Context, refresh string) (Token, error)
 	switch a.Error {
 	case "":
 		return f.token(a)
-	case "bad_refresh_token", "unauthorized_client", "incorrect_client_credentials":
+	case "bad_refresh_token", "unauthorized_client", "incorrect_client_credentials", "invalid_grant":
 		return Token{}, ErrRefused
 	}
-	return Token{}, &Failure{Code: a.Error, Words: a.ErrorDescription}
+	return Token{}, &Failure{Name: f.Name, Code: a.Error, Words: a.ErrorDescription}
 }
 
 func (f *DeviceFlow) token(a oauthAnswer) (Token, error) {
 	if a.AccessToken == "" {
-		return Token{}, errors.New("GitHub gave no token")
+		return Token{}, errors.New(f.name() + " gave no token")
 	}
 	now := f.now()
 	t := Token{Access: a.AccessToken, Refresh: a.RefreshToken}
@@ -232,26 +276,38 @@ func (f *DeviceFlow) token(a oauthAnswer) (Token, error) {
 	return t, nil
 }
 
-// Login is the account the token is for: GET /user's login.
+// Login is the account the token is for: GET /user's login (GitHub) or username (GitLab).
 func (f *DeviceFlow) Login(ctx context.Context, access string) (string, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, f.API+"user", nil)
+	return accountName(ctx, f.HTTP, f.name(), f.API+f.userPath(), access)
+}
+
+// accountName is the login or username that GET address answers for the bearer token access.
+func accountName(ctx context.Context, client *http.Client, name, address, access string) (string, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, address, nil)
 	if err != nil {
-		return "", errors.New("the request to GitHub could not be made")
+		return "", errors.New("the request to " + name + " could not be made")
 	}
 	req.Header.Set("Authorization", "Bearer "+access)
-	req.Header.Set("Accept", "application/vnd.github+json")
-	res, err := f.HTTP.Do(req)
+	req.Header.Set("Accept", "application/json")
+	res, err := client.Do(req)
 	if err != nil {
-		return "", errors.New("GitHub could not be reached")
+		return "", errors.New(name + " could not be reached")
 	}
 	defer res.Body.Close()
 	var u struct {
-		Login string `json:"login"`
+		Login    string `json:"login"`
+		Username string `json:"username"`
 	}
-	if res.StatusCode != http.StatusOK || json.NewDecoder(io.LimitReader(res.Body, 1<<20)).Decode(&u) != nil || u.Login == "" {
-		return "", fmt.Errorf("GitHub answered %d for the account", res.StatusCode)
+	if res.StatusCode == http.StatusUnauthorized {
+		return "", errors.New(name + " did not take the token")
 	}
-	return u.Login, nil
+	if res.StatusCode != http.StatusOK || json.NewDecoder(io.LimitReader(res.Body, 1<<20)).Decode(&u) != nil || u.Login+u.Username == "" {
+		return "", fmt.Errorf("%s answered %d for the account", name, res.StatusCode)
+	}
+	if u.Login != "" {
+		return u.Login, nil
+	}
+	return u.Username, nil
 }
 
 // Connection is the connection a new token makes for login.

@@ -5,8 +5,10 @@ import (
 	"crypto/subtle"
 	"errors"
 	"log"
+	"net/http"
 	"os"
 	goruntime "runtime"
+	"strings"
 	"sync"
 	"time"
 
@@ -27,6 +29,10 @@ import (
 // the hand-back page (connections.HandBackURL) gives the code and the state back to it, and
 // it gives them to the host (connections/sign-in/complete), which checks the state and
 // spends the code.
+//
+// GitLab (#1630) signs in by the device flow on gitlab.com, as GitHub does, or by a personal
+// access token on any GitLab (connections/sign-in/token): the host checks the token with that
+// GitLab and keeps it with the GitLab's address. It has no refresh: the row says when it ends.
 
 var (
 	// connectionWaitLimit is one long poll of connections/sign-in/wait.
@@ -48,6 +54,8 @@ type connectionBook struct {
 	newCodeFlow func(provider wire.ConnectionProvider) *connections.CodeFlow
 	// connStoreFor is the host's store; a test gives a file.
 	connStoreFor func() (connections.Store, error)
+	// gitlabHTTP checks a GitLab access token; a test gives a fake GitLab's client.
+	gitlabHTTP *http.Client
 }
 
 // connectionFlow is one sign-in under way, read by every client that waits on it.
@@ -100,6 +108,9 @@ func (d *Daemon) registerConnections() {
 	On(d, wire.CallConnectionsSignInComplete, func(ctx context.Context, c *Client, r wire.ConnectionSignInCompleteRequest) (wire.ConnectionSignIn, error) {
 		return d.connectionSignInComplete(ctx, r)
 	})
+	On(d, wire.CallConnectionsSignInToken, func(ctx context.Context, c *Client, r wire.ConnectionTokenRequest) (wire.ConnectionTokenAnswer, error) {
+		return d.connectionSignInToken(ctx, r)
+	})
 	On(d, wire.CallConnectionsSignInCancel, func(ctx context.Context, c *Client, r wire.ConnectionSignInFlowRequest) (wire.ConnectionSignIn, error) {
 		f := d.connectionFlowNamed(r.FlowID)
 		if f == nil {
@@ -131,7 +142,7 @@ func (d *Daemon) registerConnections() {
 }
 
 func knownProvider(p wire.ConnectionProvider) bool {
-	return p == wire.ConnectionProviderGithub || p == wire.ConnectionProviderLinear
+	return p == wire.ConnectionProviderGithub || p == wire.ConnectionProviderLinear || p == wire.ConnectionProviderGitlab
 }
 
 // connectionLocator is this host's store, for the person whose home is personalHome.
@@ -152,6 +163,9 @@ func (d *Daemon) connectionStore() (connections.Store, error) {
 func (d *Daemon) deviceFlow(p wire.ConnectionProvider) *connections.DeviceFlow {
 	if d.newDeviceFlow != nil {
 		return d.newDeviceFlow(p)
+	}
+	if p == wire.ConnectionProviderGitlab {
+		return connections.NewGitLabFlow()
 	}
 	return connections.NewGitHubFlow()
 }
@@ -186,6 +200,9 @@ func wireConnection(c connections.Connection) wire.Connection {
 	if c.Provider == connections.GitHub {
 		install := connections.GitHubInstallURL
 		w.InstallURL = &install
+	}
+	if c.Refresh == "" && !c.AccessExpiresAt.IsZero() {
+		w.ExpiresAt = new(wire.DateOf(c.AccessExpiresAt))
 	}
 	return w
 }
@@ -254,16 +271,22 @@ func (d *Daemon) connectionSignIn(ctx context.Context, p wire.ConnectionProvider
 	}
 
 	flow := d.deviceFlow(p)
+	if flow.ClientID == "" {
+		return wire.ConnectionSignIn{}, invalid("This build has no Agents application on " + flow.Name + ": connect with a personal access token.")
+	}
 	code, err := flow.Start(ctx)
 	if err != nil {
 		log.Printf("connections: %s sign-in did not start", p)
 		return wire.ConnectionSignIn{}, invalid("The sign-in could not start: " + err.Error())
 	}
-	install := connections.GitHubInstallURL
 	f := &connectionFlow{changed: make(chan struct{}), state: wire.ConnectionSignIn{
 		FlowID: store.NewUUID(), Provider: p, Status: wire.ConnectionSignInStatusWaiting,
-		Grant: wire.ConnectionSignInGrantDeviceCode, UserCode: &code.UserCode, VerificationURL: code.VerificationURL, InstallURL: &install,
+		Grant: wire.ConnectionSignInGrantDeviceCode, UserCode: &code.UserCode, VerificationURL: code.VerificationURL,
 		ExpiresAt: wire.DateOf(code.ExpiresAt)}}
+	if p == wire.ConnectionProviderGithub {
+		install := connections.GitHubInstallURL
+		f.state.InstallURL = &install
+	}
 	run, cancel := context.WithDeadline(d.ctx, code.ExpiresAt.Add(time.Minute))
 	f.cancel = cancel
 	d.connMu.Lock()
@@ -288,7 +311,7 @@ func (d *Daemon) finishConnection(ctx context.Context, f *connectionFlow, flow *
 		return
 	case errors.Is(err, connections.ErrDenied):
 		log.Printf("connections: %s sign-in denied", p)
-		f.end(wire.ConnectionSignInStatusDenied, nil, "The sign-in was cancelled on GitHub.")
+		f.end(wire.ConnectionSignInStatusDenied, nil, "The sign-in was cancelled on "+flow.Name+".")
 		return
 	case err != nil:
 		if ctx.Err() == nil {
@@ -421,6 +444,62 @@ func (d *Daemon) spendCode(ctx context.Context, f *connectionFlow, code string) 
 	log.Printf("connections: %s connected", p)
 	w := wireConnection(c)
 	f.end(wire.ConnectionSignInStatusConnected, &w, "")
+}
+
+// connectionSignInToken checks a personal access token with the GitLab at r.URL and keeps it.
+// The token is in no log and no answer; a failure says what failed, in words.
+func (d *Daemon) connectionSignInToken(ctx context.Context, r wire.ConnectionTokenRequest) (wire.ConnectionTokenAnswer, error) {
+	if r.Provider != wire.ConnectionProviderGitlab {
+		return wire.ConnectionTokenAnswer{}, invalid("Agents takes an access token only for GitLab.")
+	}
+	fail := func(why string) (wire.ConnectionTokenAnswer, error) {
+		log.Printf("connections: %s token not taken", r.Provider)
+		return wire.ConnectionTokenAnswer{Error: &why}, nil
+	}
+	token := strings.TrimSpace(r.Token)
+	if token == "" || strings.ContainsAny(token, " \t\r\n") {
+		return fail("Paste the access token: one word, such as glpat-….")
+	}
+	root, err := connections.GitLabRoot(deref(r.URL))
+	if err != nil {
+		return fail(sentence(err.Error()))
+	}
+	s, err := d.connectionStore()
+	if err != nil {
+		return wire.ConnectionTokenAnswer{}, err
+	}
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+	client := d.gitlabHTTP
+	if client == nil {
+		client = &http.Client{Timeout: 30 * time.Second}
+	}
+	t, err := connections.CheckGitLabToken(ctx, client, root, token)
+	if err != nil {
+		return fail(sentence(err.Error()))
+	}
+	c := connections.GitLabConnection(root, token, t, time.Now())
+	d.connRenew.Lock()
+	err = s.Put(c)
+	d.connRenew.Unlock()
+	if err != nil {
+		return fail(sentence(err.Error()))
+	}
+	log.Printf("connections: %s connected with a token", r.Provider)
+	w := wireConnection(c)
+	return wire.ConnectionTokenAnswer{Connection: &w}, nil
+}
+
+// sentence is words with a capital and a full stop.
+func sentence(words string) string {
+	if words == "" {
+		return words
+	}
+	words = strings.ToUpper(words[:1]) + words[1:]
+	if !strings.HasSuffix(words, ".") {
+		words += "."
+	}
+	return words
 }
 
 // connectionSignInWait answers when the sign-in has ended, or after one long poll.
