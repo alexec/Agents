@@ -2,6 +2,7 @@ package agentsd
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"log"
 	"os"
@@ -30,8 +31,8 @@ var attachmentFolderBytes int64 = 500 << 20
 
 // writeAttachment writes data whole as a new attachment in root, then bounds the folder.
 func (d *Daemon) writeAttachment(root, name string, data []byte) (string, error) {
-	dir := filepath.Join(root, attachmentsFolder)
-	if err := os.MkdirAll(dir, 0o700); err != nil {
+	dir, err := attachmentsDir(root, true)
+	if err != nil {
 		return "", err
 	}
 	path := filepath.Join(dir, string(store.NewUUID())[:8]+"-"+filepath.Base(name))
@@ -40,6 +41,30 @@ func (d *Daemon) writeAttachment(root, name string, data []byte) (string, error)
 	}
 	d.boundAttachments(root, path)
 	return path, nil
+}
+
+// attachmentsDir is root's attachments folder, made when create is set. .agents and
+// .agents/attachments each have to be a real folder, not a link: a project can commit
+// either as a link to a folder outside it, and the sweep would delete what is there.
+func attachmentsDir(root string, create bool) (string, error) {
+	dir := root
+	for _, name := range strings.Split(attachmentsFolder, "/") {
+		dir = filepath.Join(dir, name)
+		info, err := os.Lstat(dir)
+		if os.IsNotExist(err) && create {
+			if err := os.Mkdir(dir, 0o700); err != nil && !os.IsExist(err) {
+				return "", err
+			}
+			info, err = os.Lstat(dir)
+		}
+		if err != nil {
+			return "", err
+		}
+		if !info.IsDir() {
+			return "", fmt.Errorf("%s is not a folder (a link is refused)", dir)
+		}
+	}
+	return dir, nil
 }
 
 // sweepAttachments bounds the attachments of every folder an agent here works in.
@@ -64,7 +89,13 @@ type attachment struct {
 // boundAttachments deletes from root's attachments what is past the bounds; keep is
 // the one just written, never deleted.
 func (d *Daemon) boundAttachments(root, keep string) (deleted int) {
-	dir := filepath.Join(root, attachmentsFolder)
+	dir, err := attachmentsDir(root, false)
+	if err != nil {
+		if !os.IsNotExist(err) {
+			log.Printf("attachments: %v", err)
+		}
+		return 0
+	}
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return 0
