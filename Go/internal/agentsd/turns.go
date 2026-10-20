@@ -234,7 +234,7 @@ func (d *Daemon) startFor(r wire.StartRequest, by startedBy) (wire.UUID, error) 
 		StartOptions:      wire.StartOptions{Values: values, ExtraArguments: extra},
 		AdvertisedOptions: []wire.ConfigOption{}, AvailableCommands: []wire.SlashCommand{},
 		CreatedAt: t, LastActivityAt: t, MadeInRoot: &d.Store.RootID, StartRequestID: r.RequestID,
-		StartedByAgent: by.agent, SandboxOverride: r.Sandbox,
+		StartedByAgent: by.agent, SandboxOverride: r.Sandbox, Persona: r.Persona,
 	}
 	if q := by.queued; q != nil {
 		// Out of the queue, the same agent: its id, its title and when it was asked for.
@@ -595,6 +595,11 @@ func (l *live) turn() bool {
 		return false
 	}
 	d.moveState(l.id, wire.AgentStateRunning, true)
+	// What the person changed on a live page since this agent's last turn (022 FR-016),
+	// whoever sent the prompt, told once: the edit itself is in the file.
+	if note := d.pageEdits.take(l.id); note != "" {
+		bs = append([]wire.ContentBlock{textBlock(note)}, bs...)
+	}
 	if q.Preface != nil {
 		bs = append([]wire.ContentBlock{textBlock(*q.Preface)}, bs...)
 	}

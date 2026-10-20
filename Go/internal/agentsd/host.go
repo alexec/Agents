@@ -416,12 +416,14 @@ func (d *Daemon) writeArtifact(r wire.ArtifactWriteRequest) error {
 	if !inScope(r.Path, folders) {
 		return Invalid("Outside this agent's folders (%s)", strings.Join(folders, ", "))
 	}
-	if old, err := os.ReadFile(r.Path); err == nil && string(old) == r.Text {
+	old, _ := os.ReadFile(r.Path)
+	if string(old) == r.Text {
 		return nil
 	}
 	if err := store.WriteAtomically(r.Path, []byte(r.Text), 0o644); err != nil {
 		return &Error{Code: CodeInternal, Message: "Could not save " + filepath.Base(r.Path) + ": " + err.Error()}
 	}
+	d.pageEdits.remember(r.AgentID, r.Path, string(old), r.Text)
 	return nil
 }
 
