@@ -1077,7 +1077,8 @@ dialog.sheet {
 dialog.sheet::backdrop { background: rgb(0 0 0 / 0.25); }
 .sheet-body { display: flex; flex-direction: column; gap: 10px; }
 .sheet h2 { margin: 0; font-size: 0.9375rem; font-weight: 600; }
-.sheet input[type="text"] {
+.sheet input[type="text"],
+.connect-sheet .token-form input {
   font: inherit;
   color: inherit;
   padding: 5px 8px;

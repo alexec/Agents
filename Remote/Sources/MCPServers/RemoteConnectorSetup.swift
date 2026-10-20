@@ -303,9 +303,11 @@ struct RemoteConnectSheet: View {
                         TextField(ConnectorSetupWords.GitLab.addressLabel, text: $address,
                                   prompt: Text(ConnectorSetupWords.GitLab.addressPrompt))
                             .keyboardType(.URL).textInputAutocapitalization(.never).autocorrectionDisabled()
+                            .captioned(ConnectorSetupWords.GitLab.addressLabel)
                         SecureField(ConnectorSetupWords.GitLab.tokenLabel, text: $token,
                                     prompt: Text(ConnectorSetupWords.GitLab.tokenPrompt))
                             .onSubmit { Task { await connectWithToken() } }
+                            .captioned(ConnectorSetupWords.GitLab.tokenLabel)
                         Button("Make a Token on GitLab") { open(ConnectorSetupWords.GitLab.newTokenURL(address)) }
                     } footer: {
                         Text(ConnectorSetupWords.GitLab.tokenIntro)
@@ -535,14 +537,17 @@ struct RemoteConnectEmailSheet: View {
                     TextField(ConnectorSetupWords.Email.serverLabel, text: $server,
                               prompt: Text(ConnectorSetupWords.Email.serverPrompt))
                         .keyboardType(.URL).textInputAutocapitalization(.never).autocorrectionDisabled()
+                        .captioned(ConnectorSetupWords.Email.serverLabel)
                     TextField(ConnectorSetupWords.Email.userLabel, text: $user,
                               prompt: Text(ConnectorSetupWords.Email.userPrompt))
                         .keyboardType(.emailAddress).textContentType(.username)
                         .textInputAutocapitalization(.never).autocorrectionDisabled()
+                        .captioned(ConnectorSetupWords.Email.userLabel)
                     SecureField(ConnectorSetupWords.Email.passwordLabel, text: $password,
                                 prompt: Text(ConnectorSetupWords.Email.passwordPrompt))
                         .textContentType(.password)
                         .onSubmit { Task { await connect() } }
+                        .captioned(ConnectorSetupWords.Email.passwordLabel)
                 } footer: {
                     Text(ConnectorSetupWords.Email.intro)
                 }
@@ -687,5 +692,16 @@ struct RemoteConnections: View {
         let why = await model.disconnect(c.provider, on: .mac)
         await reload()
         if let why { problem = why }
+    }
+}
+
+private extension View {
+    /// The field's name above it, so a filled field still says what it is (#1799). The
+    /// field's own title is its accessibility label, so VoiceOver skips the caption.
+    func captioned(_ caption: String) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(caption).appText(.fine).foregroundStyle(.secondary).accessibilityHidden(true)
+            self
+        }
     }
 }

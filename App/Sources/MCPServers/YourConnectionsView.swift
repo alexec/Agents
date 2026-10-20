@@ -30,12 +30,11 @@ struct YourConnectionsView: View {
                 heading("Connections")
                 Spacer()
                 if !unconnected.isEmpty {
-                    Menu("Connect\u{2026}") {
-                        ForEach(unconnected, id: \.self) { p in
-                            Button(ConnectorSetupWords.name(p)) { connecting = p }
-                        }
-                    }
-                    .menuStyle(.button).buttonStyle(.paper).fixedSize().appText(.fine)
+                    Menu("Connect\u{2026}") { connectItems }
+                        .menuStyle(.button).buttonStyle(.paper).fixedSize().appText(.fine)
+                        // Under the paper style the menu button has no name and takes no press, so
+                        // a plain menu stands in for it to VoiceOver and walks (#1799).
+                        .accessibilityRepresentation { Menu("Connect\u{2026}") { connectItems } }
                 }
             }
             if let problem {
@@ -135,6 +134,12 @@ struct YourConnectionsView: View {
                 .buttonStyle(.link).appText(.fine)
         }
         .padding(.horizontal, 14).padding(.vertical, 10)
+    }
+
+    @ViewBuilder private var connectItems: some View {
+        ForEach(unconnected, id: \.self) { p in
+            Button(ConnectorSetupWords.name(p)) { connecting = p }
+        }
     }
 
     /// The providers with no working connection, for Connect…. Email only on a host that can
