@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/url"
@@ -25,11 +26,14 @@ import (
 // it has been idle for languageServerIdle; at most languageServersMax run at once.
 
 const (
-	languageServersMax   = 4
-	languageServerIdle   = 10 * time.Minute
-	languageServerWait   = 5 * time.Second
-	diagnosticsMax       = 200
-	diagnosticsTextLimit = 1 << 20
+	languageServersMax = 4
+	languageServerIdle = 10 * time.Minute
+	languageServerWait = 5 * time.Second
+	// languageServerStarting is how long a server that has said nothing yet is taken to be
+	// starting (#1687): an empty list then is not "no problems".
+	languageServerStarting = time.Minute
+	diagnosticsMax         = 200
+	diagnosticsTextLimit   = 1 << 20
 )
 
 // languageServerSpec is a language's server: its name for the person, the commands tried
@@ -172,6 +176,11 @@ func (p *languageServers) diagnose(root, path string, text *string) wire.FileDia
 		return out
 	}
 	found, err := server.diagnose(path, languageID, body)
+	if errors.Is(err, errStarting) {
+		reason := "Starting " + spec.name + "…"
+		out.Reason = &reason
+		return out
+	}
 	if err != nil {
 		p.drop(server)
 		reason := spec.name + " stopped: " + err.Error()
@@ -299,7 +308,14 @@ type languageServer struct {
 	versions map[string]int
 	lastUsed time.Time
 	dead     chan struct{}
+	// started is when it was started, and answered whether it has published anything since
+	// (#1687): until then, an empty list says it is starting.
+	started  time.Time
+	answered bool
 }
+
+// errStarting is a diagnose that gave up before the server's first answer (#1687).
+var errStarting = errors.New("starting")
 
 func startLanguageServer(root string, command []string) (*languageServer, error) {
 	cmd := exec.Command(command[0], command[1:]...)
@@ -319,7 +335,7 @@ func startLanguageServer(root string, command []string) (*languageServer, error)
 	}
 	s := &languageServer{cmd: cmd, in: in, pending: map[int64]chan json.RawMessage{},
 		diags: map[string][]wire.FileDiagnostic{}, notify: map[string]chan struct{}{}, versions: map[string]int{},
-		lastUsed: time.Now(), dead: make(chan struct{})}
+		lastUsed: time.Now(), dead: make(chan struct{}), started: time.Now()}
 	go s.read(bufio.NewReader(outPipe))
 	go func() { _ = cmd.Wait(); s.markDead() }()
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
@@ -396,6 +412,9 @@ func (s *languageServer) diagnose(path, languageID, text string) ([]wire.FileDia
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if !s.answered && time.Since(s.started) < languageServerStarting {
+		return nil, errStarting
+	}
 	return append([]wire.FileDiagnostic{}, s.diags[uri]...), nil
 }
 
@@ -605,6 +624,7 @@ func (s *languageServer) published(params json.RawMessage) {
 	uri := normalURI(p.URI)
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	s.answered = true
 	s.diags[uri] = found
 	if c, ok := s.notify[uri]; ok {
 		close(c)

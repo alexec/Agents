@@ -552,7 +552,7 @@ struct FilesPane: View {
             save: { path, document in await model.writeArtifact(agentID: agentID, path: path, text: document) },
             canEdit: !model.isStale)
         // A source file's problems, from its language server on the agent's host (#844).
-        actions.diagnose = { path, text in await model.diagnose(path: path, text: text, of: agentID) }
+        actions.diagnose = { path, text in try await model.diagnose(path: path, text: text, of: agentID) }
         // And what it would write at the caret (#1603).
         actions.complete = { path, text, line, column in
             await model.complete(path: path, text: text, line: line, column: column, of: agentID)

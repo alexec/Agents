@@ -40,7 +40,12 @@ export function SourceEditor({ store, host, agentID, path, text, line }: {
     let gone = false;
     const timer = setTimeout(() => {
       void store.link.call("files/diagnostics", { agentID: agentID as never, path, text: typed }, host)
-        .then((found) => { if (!gone) problems.value = found; }, () => {});
+        .then((found) => { if (!gone) problems.value = found; }, (error: unknown) => {
+          // A failed request says so, not "no problems" (#1687).
+          if (gone) return;
+          const server = problems.peek()?.server ?? "the language server";
+          problems.value = { diagnostics: [], server, reason: `Couldn't ask ${server}: ${describe(error)}` };
+        });
     }, 1000);
     return () => { gone = true; clearTimeout(timer); };
   }, [typed, path, host]);
@@ -168,12 +173,13 @@ export function SourceEditor({ store, host, agentID, path, text, line }: {
 
 /**
  * What a file's language server found (ProblemsList, #844), under the editor: each problem's place
- * and words, a click away from its line. Nothing when the file's language has no server.
+ * and words, a click away from its line. Nothing when the file's language has no server; why when
+ * it is not installed, is starting or did not answer; "No problems · ‹server›" once it answered
+ * with none (#1687).
  */
 function Problems({ found, goTo }: { found: FileDiagnostics; goTo: (line: number) => void }) {
-  if (!found.server || (found.diagnostics.length === 0 && !found.reason)) return null;
-  const count = found.diagnostics.length;
-  const heading = found.reason && count === 0 ? found.reason : `${count} ${count === 1 ? "problem" : "problems"} · ${found.server}`;
+  if (!found.server) return null;
+  const heading = problemsHeading(found);
   const mark = (p: FileDiagnostic) => (p.severity === "error" ? "⛔" : p.severity === "warning" ? "⚠️" : "ℹ️");
   return (
     <div class="problems" role="group" aria-label="Problems">
@@ -185,4 +191,12 @@ function Problems({ found, goTo }: { found: FileDiagnostics; goTo: (line: number
       ))}
     </div>
   );
+}
+
+/** The problems list's first line (#1687): why, "No problems · ‹server›", or how many. */
+export function problemsHeading(found: FileDiagnostics): string {
+  const count = found.diagnostics.length;
+  if (found.reason && count === 0) return found.reason;
+  if (count === 0) return `No problems · ${found.server ?? ""}`;
+  return `${count} ${count === 1 ? "problem" : "problems"} · ${found.server ?? ""}`;
 }

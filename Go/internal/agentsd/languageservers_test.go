@@ -58,6 +58,9 @@ func TestLanguageServerHelper(t *testing.T) {
 				map[string]any{"label": "Printf"},
 			}}})
 		case "textDocument/didOpen", "textDocument/didChange":
+			if os.Getenv("AGENTS_FAKE_LSP_SILENT") == "1" {
+				continue // still starting: it says nothing (#1687)
+			}
 			text := m.Params.TextDocument.Text
 			if len(m.Params.ContentChanges) > 0 {
 				text = m.Params.ContentChanges[0].Text
@@ -112,6 +115,36 @@ func TestLanguageServerDiagnostics(t *testing.T) {
 	}
 	if got := pool.diagnose(root, filepath.Join(root, "app.py"), nil); got.Reason == nil || !strings.Contains(*got.Reason, "not installed") {
 		t.Fatalf("pyright is not here: %+v", got)
+	}
+}
+
+// A server that has said nothing yet is starting, not clean (#1687): its empty list comes with
+// "Starting gopls…", and it is kept for the next ask.
+func TestLanguageServerStartingIsNotNoProblems(t *testing.T) {
+	t.Setenv("AGENTS_FAKE_LSP", "1")
+	t.Setenv("AGENTS_FAKE_LSP_SILENT", "1")
+	was := installedCommand
+	installedCommand = func(s languageServerSpec) []string {
+		if s.name == "gopls" {
+			return []string{os.Args[0], "-test.run=^TestLanguageServerHelper$"}
+		}
+		return nil
+	}
+	defer func() { installedCommand = was }()
+	pool := &languageServers{running: map[string]*languageServer{}}
+	defer pool.stopAll()
+	root := t.TempDir()
+	file := filepath.Join(root, "main.go")
+	if err := os.WriteFile(file, []byte("package main\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	got := pool.diagnose(root, file, nil)
+	if got.Reason == nil || *got.Reason != "Starting gopls…" || len(got.Diagnostics) != 0 || *got.Server != "gopls" {
+		t.Fatalf("starting %+v", got)
+	}
+	if n := pool.count(); n != 1 {
+		t.Fatalf("a starting server is kept: %d", n)
 	}
 }
 
