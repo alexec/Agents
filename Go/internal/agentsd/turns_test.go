@@ -43,6 +43,19 @@ type fakeRuntime struct {
 	sandboxOff bool
 	// rateLimited is whether "rate limit me" was refused once already.
 	rateLimited bool
+	// systemPrompt is _meta.systemPrompt.append or _meta.rules from session/new or resume.
+	systemPrompt string
+}
+
+// systemPromptOf is the brief a runtime was given in _meta, as Claude or Grok take it.
+func systemPromptOf(meta any) string {
+	m, _ := meta.(map[string]any)
+	if sp, ok := m["systemPrompt"].(map[string]any); ok {
+		s, _ := sp["append"].(string)
+		return s
+	}
+	s, _ := m["rules"].(string)
+	return s
 }
 
 func (f *fakeRuntime) Initialize(context.Context, sdk.InitializeRequest) (sdk.InitializeResponse, error) {
@@ -85,6 +98,7 @@ func (f *fakeRuntime) ResumeSession(_ context.Context, r sdk.ResumeSessionReques
 	}
 	b, _ := json.Marshal(r.Meta)
 	f.sandboxOff = strings.Contains(string(b), `"sandbox":{"enabled":false}`)
+	f.systemPrompt = systemPromptOf(r.Meta)
 	return sdk.ResumeSessionResponse{}, nil
 }
 
@@ -97,6 +111,7 @@ func (f *fakeRuntime) NewSession(_ context.Context, r sdk.NewSessionRequest) (sd
 	}
 	b, _ := json.Marshal(r.Meta)
 	f.sandboxOff = strings.Contains(string(b), `"sandbox":{"enabled":false}`)
+	f.systemPrompt = systemPromptOf(r.Meta)
 	if filepath.Base(r.Cwd) != "offers" {
 		return sdk.NewSessionResponse{SessionId: "fake-session"}, nil
 	}
@@ -118,12 +133,24 @@ func (f *fakeRuntime) SetSessionConfigOption(context.Context, sdk.SetSessionConf
 
 func (f *fakeRuntime) Prompt(ctx context.Context, p sdk.PromptRequest) (sdk.PromptResponse, error) {
 	<-f.ready
+	// The person's words are the last text: ours (a preface, the brief) go before them.
 	text := ""
-	if len(p.Prompt) > 0 && p.Prompt[0].Text != nil {
-		text = p.Prompt[0].Text.Text
+	var before []string
+	for _, b := range p.Prompt {
+		if b.Text != nil {
+			if text != "" {
+				before = append(before, text)
+			}
+			text = b.Text.Text
+		}
 	}
 	say := func(s string) {
 		f.conn.SessionUpdate(ctx, sdk.SessionNotification{SessionId: p.SessionId, Update: sdk.UpdateAgentMessageText(s)})
+	}
+	// What it was told besides the words: its system prompt and what came before them.
+	if strings.Contains(text, "say your brief") {
+		say("System: " + f.systemPrompt + "\nBefore: " + strings.Join(before, "\n"))
+		return sdk.PromptResponse{StopReason: sdk.StopReasonEndTurn}, nil
 	}
 	// Deaf to session/cancel, as Claude was waiting on CI (#1611): only a SIGTERM ends it.
 	if strings.Contains(text, "keep going") {

@@ -65,6 +65,9 @@ type live struct {
 	rateLimitStreak   []time.Time
 	rateLimitAttempts int
 	stops             int
+	// briefDue is whether the next prompt carries the brief (brief.go): a new conversation
+	// on a runtime that takes no system prompt.
+	briefDue bool
 }
 
 type pendingPermission struct {
@@ -439,6 +442,8 @@ func (l *live) turn() bool {
 		}
 		sandbox, why := d.resolveSandbox(a.RuntimeID, a.SandboxOverride, a.StartedByAgent)
 		launch, meta := withSandbox(launch, sessionMeta(a.RuntimeID), a.RuntimeID, sandbox)
+		brief := d.briefFor(a)
+		meta = withSystemPrompt(meta, a.RuntimeID, brief)
 		s, err := acp.Start(ctx, launch, l, d.mcpServersFor(l.id), meta, continuing)
 		if err != nil {
 			d.dropAppTokens(l.id)
@@ -469,6 +474,9 @@ func (l *live) turn() bool {
 		}
 		l.mu.Lock()
 		l.session = s
+		// A conversation begun, or begun again because the runtime lost it: the brief it
+		// had lived in the history that is gone.
+		l.briefDue = !s.Continued && brief != "" && systemPromptDelivery[a.RuntimeID] == ""
 		l.mu.Unlock()
 		// Started as the host goes, after stopAll looked (#1272): it would be left running.
 		if d.going() {
@@ -590,8 +598,21 @@ func (l *live) turn() bool {
 	if q.Preface != nil {
 		bs = append([]wire.ContentBlock{textBlock(*q.Preface)}, bs...)
 	}
+	// The brief first of all (#763), once per conversation: our words before the person's,
+	// so theirs are the last thing the agent reads.
+	l.mu.Lock()
+	due := l.briefDue
+	l.mu.Unlock()
+	brief := ""
+	if a := d.Store.Agent(l.id); due && a != nil {
+		brief = d.briefFor(a)
+	}
 	l.mu.Lock()
 	s, stopped := l.session, l.stopped
+	if brief != "" && !stopped && s != nil {
+		l.briefDue = false
+		bs = append([]wire.ContentBlock{textBlock(brief)}, bs...)
+	}
 	l.prompting = !stopped && s != nil
 	l.mu.Unlock()
 	if stopped {

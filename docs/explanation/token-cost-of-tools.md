@@ -47,11 +47,13 @@ tools endpoint and count the bytes of the answer.
 | An agent the person started (23 tools) | 42,623 | 10,650 tokens |
 | An agent another agent started (19 tools) | 36,965 | 9,240 tokens |
 | Grok's rules, which repeat the tools in its system prompt | 7,436 | 1,860 tokens |
-| The briefing, sent once with the first prompt (Claude) | 2,024 | 510 tokens |
+| The briefing, once per conversation: Claude's and Grok's system prompt, the first prompt elsewhere (Claude) | 991 | 250 tokens |
 
 Measured on 2026-10-10, after `publish_event` was removed (#639). `manage_workflows` is the largest at 19,910 bytes, then
 `start_agent` (now `start_session`) at 3,398; every other tool is under 2,800. `suggest_next_prompt` adds
 476 bytes (~119 tokens). `finish_turn` was 8,509 until it was split (below).
+
+The briefing went with the Swift host (#1370) and came back in Go with three paragraphs, leases, events and how a turn ends (#1801); the rest is #1806. That made `archive_session` 207 bytes longer (~50 tokens), and the briefing above is measured from `brief.go` on 2026-10-20, with nothing declared.
 
 What a runtime does with the list differs:
 
