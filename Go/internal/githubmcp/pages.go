@@ -531,7 +531,11 @@ func (g *RealGitHub) PRPage(ctx context.Context, repo string, number int) (map[s
 // MARK: Logs and reruns
 
 // logLines is how much of each failed job's log is given: its end, where the failure is.
-const logLines = 300
+// Only the log's last logBytes are read and cleaned (#1655).
+const (
+	logLines = 300
+	logBytes = 256 << 10
+)
 
 var (
 	escapes  = regexp.MustCompile("\x1b\\[[0-9;?]*[ -/]*[@-~]|\x1b\\][^\x07\x1b]*(\x07|\x1b\\\\)")
@@ -572,7 +576,7 @@ func (g *RealGitHub) FailedLog(ctx context.Context, repo string, runID int, job 
 		if !isFailed(j.Conclusion) || (job != "" && j.Name != job) {
 			continue
 		}
-		body, err := g.do(ctx, http.MethodGet, fmt.Sprintf("repos/%s/actions/jobs/%d/logs", repo, j.ID), nil, false)
+		body, err := g.tailOf(ctx, fmt.Sprintf("repos/%s/actions/jobs/%d/logs", repo, j.ID), logBytes)
 		if err != nil {
 			return "", err
 		}

@@ -9,6 +9,7 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
+	"testing/iotest"
 	"time"
 )
 
@@ -265,4 +266,44 @@ func TestTheETagCacheHasAByteCap(t *testing.T) {
 	g.remember("diff/0", `"v2"`, "[1]")
 	equal(t, g.etags["diff/0"].etag, `"v2"`, "a path is kept once, with its newest ETag")
 	equal(t, g.etagBytes, (etagCap/etagLargest-1)*etagLargest+3, "and its bytes are counted once")
+}
+
+func TestLastBytesKeepsOnlyTheEndFromAWholeLine(t *testing.T) {
+	for _, c := range []struct {
+		in, want string
+		n        int
+	}{
+		{"one\ntwo\n", "one\ntwo\n", 16},
+		{"one\ntwo\nthree\n", "three\n", 8},
+		{strings.Repeat("ab\n", 1000) + "end\n", "ab\nend\n", 8},
+		{"", "", 8},
+	} {
+		got, err := lastBytes(iotest.OneByteReader(strings.NewReader(c.in)), c.n)
+		if err != nil {
+			t.Fatal(err)
+		}
+		equal(t, string(got), c.want, fmt.Sprintf("the last %d bytes of %d", c.n, len(c.in)))
+		got, _ = lastBytes(strings.NewReader(c.in), c.n)
+		equal(t, string(got), c.want, fmt.Sprintf("the last %d bytes of %d in one read", c.n, len(c.in)))
+	}
+}
+
+func TestAFailedLogReadsOnlyTheLogsEnd(t *testing.T) {
+	var log strings.Builder
+	for i := range 200_000 {
+		fmt.Fprintf(&log, "\x1b[32m2026-10-19T00:00:00Z\x1b[0m step line %d\n", i)
+	}
+	log.WriteString("FAIL: the end\n")
+	api := newFakeAPI(t, map[string]string{
+		"repos/" + repo + "/actions/runs/9/jobs": `{"jobs": [{"id": 5, "name": "test", "html_url": "j", "conclusion": "failure"}]}`,
+		"repos/" + repo + "/actions/jobs/5/logs": log.String(),
+	})
+	text, err := api.github().FailedLog(context.Background(), repo, 9, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	lines := strings.Split(text, "\n")
+	equal(t, len(lines), logLines+1, "a heading and the last lines")
+	equal(t, lines[len(lines)-1], "FAIL: the end", "the failure at the end")
+	equal(t, lines[1], "2026-10-19T00:00:00Z step line 199701", "the first line kept, clean")
 }

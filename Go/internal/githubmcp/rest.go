@@ -82,22 +82,10 @@ func NewRealGitHub(api string, token func() string, repo func(ctx context.Contex
 // MARK: HTTP
 
 func (g *RealGitHub) do(ctx context.Context, method, path string, body []byte, cache bool) ([]byte, error) {
-	token := g.Token()
-	if token == "" {
-		return nil, &GitHubError{Kind: NotSignedIn, Message: NotConnected}
-	}
-	var reader io.Reader
-	if body != nil {
-		reader = bytes.NewReader(body)
-	}
-	req, err := http.NewRequestWithContext(ctx, method, g.API+path, reader)
+	req, err := g.request(ctx, method, path, body)
 	if err != nil {
-		return nil, &GitHubError{Kind: Failed, Message: "GitHub: " + err.Error()}
+		return nil, err
 	}
-	req.Header.Set("Accept", "application/vnd.github+json")
-	req.Header.Set("Authorization", "Bearer "+token)
-	req.Header.Set("X-GitHub-Api-Version", "2022-11-28")
-	req.Header.Set("User-Agent", "agents-github-mcp")
 	var cached etagged
 	var have bool
 	if cache {
@@ -127,6 +115,80 @@ func (g *RealGitHub) do(ctx context.Context, method, path string, body []byte, c
 		return data, nil
 	}
 	return nil, failure(res, data)
+}
+
+// request is a request to GitHub's API as the person.
+func (g *RealGitHub) request(ctx context.Context, method, path string, body []byte) (*http.Request, error) {
+	token := g.Token()
+	if token == "" {
+		return nil, &GitHubError{Kind: NotSignedIn, Message: NotConnected}
+	}
+	var reader io.Reader
+	if body != nil {
+		reader = bytes.NewReader(body)
+	}
+	req, err := http.NewRequestWithContext(ctx, method, g.API+path, reader)
+	if err != nil {
+		return nil, &GitHubError{Kind: Failed, Message: "GitHub: " + err.Error()}
+	}
+	req.Header.Set("Accept", "application/vnd.github+json")
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("X-GitHub-Api-Version", "2022-11-28")
+	req.Header.Set("User-Agent", "agents-github-mcp")
+	return req, nil
+}
+
+// tailOf is the last n bytes of path's body, from its first whole line (#1655). The body is
+// streamed through, so a job's log of many MB is never held whole.
+func (g *RealGitHub) tailOf(ctx context.Context, path string, n int) ([]byte, error) {
+	req, err := g.request(ctx, http.MethodGet, path, nil)
+	if err != nil {
+		return nil, err
+	}
+	res, err := g.Client.Do(req)
+	if err != nil {
+		return nil, &GitHubError{Kind: Failed, Message: "GitHub: " + err.Error()}
+	}
+	defer res.Body.Close()
+	if res.StatusCode < 200 || res.StatusCode >= 300 {
+		data, _ := io.ReadAll(io.LimitReader(res.Body, 64<<10))
+		return nil, failure(res, data)
+	}
+	data, err := lastBytes(res.Body, n)
+	if err != nil {
+		return nil, &GitHubError{Kind: Failed, Message: "GitHub: " + err.Error()}
+	}
+	return data, nil
+}
+
+// lastBytes is r's last n bytes; when r is longer, the cut line at the start is left out.
+func lastBytes(r io.Reader, n int) ([]byte, error) {
+	buf := make([]byte, 0, 2*n)
+	cut := false
+	for {
+		if len(buf) == cap(buf) {
+			buf = append(buf[:0], buf[len(buf)-n:]...)
+			cut = true
+		}
+		read, err := r.Read(buf[len(buf):cap(buf)])
+		buf = buf[:len(buf)+read]
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return nil, err
+		}
+	}
+	if len(buf) > n {
+		buf = buf[len(buf)-n:]
+		cut = true
+	}
+	if cut {
+		if i := bytes.IndexByte(buf, '\n'); i >= 0 {
+			buf = buf[i+1:]
+		}
+	}
+	return buf, nil
 }
 
 func (g *RealGitHub) remember(path, etag, body string) {
