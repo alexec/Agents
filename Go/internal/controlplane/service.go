@@ -41,6 +41,8 @@ type Config struct {
 	Store store.Store
 	// The control plane's P-256 private key: raw, 32 bytes. Never in the store.
 	PrivateKey []byte
+	// How long a client's or machine's key lives unused (#997); 0 is DefaultKeyLifetime.
+	KeyLifetime time.Duration
 	// The one address clients and hosts are given (R8).
 	URL string
 	// The pin of this copy's certificate, when it is not publicly trusted.
@@ -1082,6 +1084,7 @@ func (s *Service) accept(conn *Conn, webOrigin string, proved func(failed bool))
 		if err := s.methods.Admit(context.Background(), *client); err != nil {
 			s.log("store: could not note " + client.Name + " connecting: " + err.Error())
 		}
+		s.renewClient(context.Background(), client.ID)
 		through := ""
 		if relayed {
 			through = " through the relay"
@@ -1176,6 +1179,10 @@ func (s *Service) key(id controllink.Identity) ([]byte, *records.ClientRecord, s
 		if c == nil || len(c.PublicKey) == 0 {
 			return nil, nil, "", controllink.Refuse(controllink.Unknown)
 		}
+		// Not used for its whole lifetime (#997): it pairs again.
+		if keyExpired(c.Expires, time.Now()) {
+			return nil, nil, "", controllink.Refuse(controllink.Expired)
+		}
 		key, err := controllink.ClientKey(s.cfg.PrivateKey, c.PublicKey, c.ID)
 		if err != nil {
 			return nil, nil, "", controllink.Refuse(controllink.Unknown)
@@ -1193,6 +1200,9 @@ func (s *Service) key(id controllink.Identity) ([]byte, *records.ClientRecord, s
 		}
 		if h == nil || len(h.PublicKey) == 0 {
 			return nil, nil, "", controllink.Refuse(controllink.Unknown)
+		}
+		if keyExpired(h.Expires, time.Now()) {
+			return nil, nil, "", controllink.Refuse(controllink.Expired)
 		}
 		key, err := controllink.HostKey(s.cfg.PrivateKey, h.PublicKey, h.ID)
 		if err != nil {
@@ -1308,6 +1318,7 @@ func (s *Service) hostArrived(host string, conn *Conn) {
 		return
 	}
 	s.router.AttachHost(host, conn)
+	s.renewHost(context.Background(), host)
 	// This copy holds the host now (T063): every peer reaches it through here.
 	if s.mesh != nil {
 		if epoch, err := s.mesh.leases.take(context.Background(), host); err == nil {
@@ -1419,7 +1430,7 @@ func (s *Service) spendCode(id, method string, params json.RawMessage, webOrigin
 			return result, nil
 		}
 		record := records.ClientRecord{ID: client, Name: name, Kind: a.Kind, PublicKey: a.PublicKey, Paired: records.Now(),
-			Owner: stored.Owner}
+			Owner: stored.Owner, Expires: s.newExpiry()}
 		// An invite's first client is a new person's (#994).
 		if stored.Invite != nil {
 			person, err := s.redeemInvite(ctx, id, *stored.Invite)
@@ -1465,7 +1476,7 @@ func (s *Service) spendCode(id, method string, params json.RawMessage, webOrigin
 		mid := a.MachineID
 		// The machine is the person's who made the code (FR-017).
 		record := records.HostRecord{ID: host, Name: a.Name, PublicKey: a.PublicKey, Platform: a.Platform,
-			Version: a.Version, MachineID: &mid, Owner: stored.Owner}
+			Version: a.Version, MachineID: &mid, Owner: stored.Owner, Expires: s.newExpiry()}
 		if relay {
 			record.Relay = &relay
 		}

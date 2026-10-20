@@ -311,7 +311,8 @@ export class Link {
         this.set({ kind: "open", name: admitted.name });
         this.startHeartbeat();
       } catch (error) {
-        if (error instanceof Refused && (error.reason === "forgotten" || this.unknownLasted(error.reason))) {
+        // Expired (#997): the key went unused for its whole lifetime, and pairs again as a forgotten one.
+        if (error instanceof Refused && (error.reason === "forgotten" || error.reason === "expired" || this.unknownLasted(error.reason))) {
           log("link.refused", error.reason);
           this.socket = null;
           socket.close(1000, "");

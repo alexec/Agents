@@ -504,6 +504,13 @@ func (m *Methods) admitOnce(ctx context.Context, client records.ClientRecord) (b
 	if m.records.Client(client.ID) != nil {
 		renamed := false
 		err := m.records.ChangeClient(ctx, client.ID, func(known *records.ClientRecord) bool {
+			// Paired again after its key expired (#997): the new pairing's key and life.
+			if client.Expires != nil && keyExpired(known.Expires, time.Now()) {
+				known.PublicKey, known.Paired, known.Expires, known.Owner = client.PublicKey, client.Paired, client.Expires, client.Owner
+				known.Name = client.Name
+				renamed = true
+				return true
+			}
 			stale := known.LastSeen == nil || time.Since(known.LastSeen.Time) > time.Hour
 			renamed = known.Name != client.Name
 			if !stale && !renamed {

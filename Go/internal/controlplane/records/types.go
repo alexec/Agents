@@ -52,7 +52,10 @@ type ClientRecord struct {
 	// The push tokens of its Live Activities (#1744), one for each session it shows,
 	// newest last, held to MostActivityTokens. Set only by the device, as PushToken is.
 	ActivityTokens []ActivityToken
-	Extra          Extra
+	// When its key stops being accepted (#997, spec 736 FR-042); renewed while in use.
+	// None on a record paired before #997, until the sweep or its next connection sets it.
+	Expires *Stamp
+	Extra   Extra
 }
 
 // ActivityToken is one Live Activity's push token on a device: for which session, from
@@ -94,13 +97,14 @@ type clientJSON struct {
 	PushToken   *PushToken `json:"pushToken,omitempty"`
 	// Activities: the push tokens of its Live Activities (#1744).
 	Activities []ActivityToken `json:"activityTokens,omitempty"`
+	Expires    *Stamp          `json:"expires,omitempty"`
 }
 
 // MarshalJSON writes grant: operator, which an older copy needs to read the record at
 // all, and which tells it the truth.
 func (c ClientRecord) MarshalJSON() ([]byte, error) {
 	return encodeKeeping(clientJSON{c.ID, c.Name, c.Kind, c.PublicKey, LegacyGrant, c.Paired, c.LastSeen, c.MayNotify,
-		c.Owner, c.Rev, c.Forgotten, c.ForgottenAt, c.KnownEpoch, c.PushToken, c.ActivityTokens}, c.Extra)
+		c.Owner, c.Rev, c.Forgotten, c.ForgottenAt, c.KnownEpoch, c.PushToken, c.ActivityTokens, c.Expires}, c.Extra)
 }
 
 // UnmarshalJSON does not read the grant: every client may do everything (#111).
@@ -119,7 +123,7 @@ func (c *ClientRecord) UnmarshalJSON(data []byte) error {
 		j.Kind = KindUnknown
 	}
 	*c = ClientRecord{strings.ToUpper(j.ID), j.Name, j.Kind, j.PublicKey, j.Paired, j.LastSeen, j.MayNotify, j.Owner,
-		j.Rev, j.Forgotten, j.ForgottenAt, j.KnownEpoch, j.PushToken, j.Activities, extra}
+		j.Rev, j.Forgotten, j.ForgottenAt, j.KnownEpoch, j.PushToken, j.Activities, j.Expires, extra}
 	return nil
 }
 
@@ -154,7 +158,9 @@ type HostRecord struct {
 	DetectProjects *bool
 	// The provider's workspace this host runs on (#691), as it was written.
 	Workspace json.RawMessage
-	Extra     Extra
+	// When its key stops being accepted (#997), as ClientRecord.Expires.
+	Expires *Stamp
+	Extra   Extra
 }
 
 type hostJSON struct {
@@ -176,6 +182,7 @@ type hostJSON struct {
 	KnownEpoch     *int              `json:"knownEpoch,omitempty"`
 	DetectProjects *bool             `json:"detectProjects,omitempty"`
 	Workspace      json.RawMessage   `json:"workspace,omitempty"`
+	Expires        *Stamp            `json:"expires,omitempty"`
 }
 
 // dialOut is HostReach.dialOut: every host connects out now (058, T073); a record that
@@ -185,7 +192,7 @@ var dialOut = json.RawMessage(`{"dialOut":{}}`)
 func (h HostRecord) MarshalJSON() ([]byte, error) {
 	return encodeKeeping(hostJSON{h.ID, h.Name, h.PublicKey, dialOut, h.Platform, h.Version, h.Installed, h.MachineID,
 		h.Relay, h.SignInFrom, h.GitFrom, h.Owner, h.Rev, h.Forgotten, h.ForgottenAt, h.KnownEpoch, h.DetectProjects,
-		h.Workspace}, h.Extra)
+		h.Workspace, h.Expires}, h.Extra)
 }
 
 func (h *HostRecord) UnmarshalJSON(data []byte) error {
@@ -195,7 +202,7 @@ func (h *HostRecord) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	*h = HostRecord{j.ID, j.Name, j.PublicKey, j.Platform, j.Version, j.Installed, j.MachineID, j.Relay, j.SignInFrom,
-		j.GitFrom, j.Owner, j.Rev, j.Forgotten, j.ForgottenAt, j.KnownEpoch, j.DetectProjects, j.Workspace, extra}
+		j.GitFrom, j.Owner, j.Rev, j.Forgotten, j.ForgottenAt, j.KnownEpoch, j.DetectProjects, j.Workspace, j.Expires, extra}
 	return nil
 }
 

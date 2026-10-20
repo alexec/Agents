@@ -11,6 +11,7 @@
 //	agents-control serve … [--store-credentials-fd N]
 //	agents-control serve … [--receive]          empty, for a handover to fill (AGENTS_CONTROL_RECEIVE=1)
 //	agents-control serve … [--no-forwarding]    serve, even if this copy was forwarding
+//	agents-control serve … [--key-days N]       how long a client's or machine's key lives unused (#997, AGENTS_CONTROL_KEY_DAYS); 90
 //	agents-control code (--client [--browser] | --host) [--minutes N] [--home DIR] [--command]
 //	agents-control hosts | clients
 //	agents-control key seal --key-fd N          seal a key handed in, with AGENTS_CONTROL_KMS
@@ -444,6 +445,17 @@ func serve() {
 	// Behind a load balancer that terminates TLS, the pin is its certificate's, given.
 	if cfg.Pin == "" {
 		cfg.Pin = os.Getenv("AGENTS_CONTROL_PIN")
+	}
+	// How long a client's or machine's key lives unused (#997): 90 days unless said.
+	if days := value("--key-days"); days != "" || os.Getenv("AGENTS_CONTROL_KEY_DAYS") != "" {
+		if days == "" {
+			days = os.Getenv("AGENTS_CONTROL_KEY_DAYS")
+		}
+		n, err := strconv.ParseFloat(days, 64)
+		if err != nil || n <= 0 {
+			fail("--key-days is a number of days, more than 0")
+		}
+		cfg.KeyLifetime = time.Duration(n * float64(24*time.Hour))
 	}
 	cfg.Name = value("--name")
 	if cfg.Name == "" {

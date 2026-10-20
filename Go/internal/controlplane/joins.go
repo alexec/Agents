@@ -318,7 +318,7 @@ func (j *joins) decide(ctx context.Context, id, user string, approve bool) (*wir
 		return nil, err
 	}
 	record := records.HostRecord{ID: host, Name: r.Name, PublicKey: r.PublicKey, Platform: r.Platform, Version: r.Version,
-		Owner: &owner}
+		Owner: &owner, Expires: j.s.newExpiry()}
 	if r.MachineID != "" {
 		mid := r.MachineID
 		record.MachineID = &mid

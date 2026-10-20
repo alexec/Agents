@@ -380,6 +380,18 @@ func (r *Router) ConnectedClients() []string {
 	return out
 }
 
+// ConnectedMembers is every client and host with a session here (#997: their keys are
+// in use).
+func (r *Router) ConnectedMembers() []string {
+	out := r.ConnectedClients()
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for id := range r.hosts {
+		out = append(out, id)
+	}
+	return out
+}
+
 // SetRelay says whether a host only relays (HostRecord.relay): nil for a host that runs
 // agents, false for a relay switched off, true for one relaying. A host found to be a
 // relay has its client channels closed.

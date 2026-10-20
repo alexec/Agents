@@ -133,6 +133,15 @@ test("refused as forgotten is forgotten too", async () => {
   assert.equal(keys.record, null);
 });
 
+test("refused as expired pairs again, as forgotten does (#997)", async () => {
+  const net = sockets();
+  const keys = paired();
+  const l = link(keys, net, { authenticate: async () => { throw new w.Refused("expired"); } });
+  const states = await opened(l);
+  assert.equal(states.at(-1), "forgotten");
+  assert.equal(keys.record, null);
+});
+
 test("unknown for a moment keeps the key and dials again (#171)", async () => {
   const net = sockets();
   const keys = paired();
