@@ -237,3 +237,32 @@ func TestTheRepoIsReadFromTheGitRemote(t *testing.T) {
 		}
 	}
 }
+
+func TestTheETagCacheHasAByteCap(t *testing.T) {
+	g := NewRealGitHub("", func() string { return "token" }, nil)
+	g.remember("big", `"v1"`, strings.Repeat("x", etagLargest+1))
+	_, kept := g.etags["big"]
+	equal(t, kept, false, "a body over the largest is not kept")
+	equal(t, g.etagBytes, 0, "and holds no bytes")
+
+	g.remember("listing", `"v1"`, "[]")
+	g.remember("listing", `"v2"`, strings.Repeat("x", etagLargest+1))
+	_, kept = g.etags["listing"]
+	equal(t, kept, false, "a body grown too large drops its old copy")
+
+	body := strings.Repeat("x", etagLargest)
+	for i := range 2 * etagCap / etagLargest {
+		g.remember(fmt.Sprintf("diff/%d", i), `"v1"`, body)
+	}
+	equal(t, g.etagBytes <= etagCap, true, "the cache holds no more than the cap")
+	equal(t, len(g.etags), etagCap/etagLargest, "the newest bodies are kept")
+	_, kept = g.etags["diff/0"]
+	equal(t, kept, false, "the oldest is dropped first")
+	_, kept = g.etags[fmt.Sprintf("diff/%d", 2*etagCap/etagLargest-1)]
+	equal(t, kept, true, "the newest is kept")
+
+	g.remember("diff/0", `"v1"`, "[]")
+	g.remember("diff/0", `"v2"`, "[1]")
+	equal(t, g.etags["diff/0"].etag, `"v2"`, "a path is kept once, with its newest ETag")
+	equal(t, g.etagBytes, (etagCap/etagLargest-1)*etagLargest+3, "and its bytes are counted once")
+}

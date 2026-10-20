@@ -34,6 +34,7 @@ type RealGitHub struct {
 	mu        sync.Mutex
 	etags     map[string]etagged
 	etagOrder []string
+	etagBytes int
 	recent    map[string]sharedBody
 	running   map[string]*fetch
 	sharing   time.Duration
@@ -57,6 +58,11 @@ const (
 	perPage  = 100
 	// sharedFor is under the 30 s poll, so each poll still sees a fresh page.
 	sharedFor = 25 * time.Second
+	// etagCount and etagCap bound the ETag cache (#1654): a PR's diff is many MB, and it would push
+	// the listings events poll out. A body over etagLargest is not kept.
+	etagCount   = 200
+	etagCap     = 8 << 20
+	etagLargest = 256 << 10
 	// rerunWindow is how far back past since a run may have been created and still be rerun into view.
 	rerunWindow = 24 * time.Hour
 )
@@ -126,15 +132,24 @@ func (g *RealGitHub) do(ctx context.Context, method, path string, body []byte, c
 func (g *RealGitHub) remember(path, etag, body string) {
 	g.mu.Lock()
 	defer g.mu.Unlock()
-	for i, p := range g.etagOrder {
-		if p == path {
-			g.etagOrder = append(g.etagOrder[:i], g.etagOrder[i+1:]...)
-			break
+	if old, ok := g.etags[path]; ok {
+		for i, p := range g.etagOrder {
+			if p == path {
+				g.etagOrder = append(g.etagOrder[:i], g.etagOrder[i+1:]...)
+				break
+			}
 		}
+		delete(g.etags, path)
+		g.etagBytes -= len(old.body)
+	}
+	if len(body) > etagLargest {
+		return
 	}
 	g.etagOrder = append(g.etagOrder, path)
 	g.etags[path] = etagged{etag, body}
-	if len(g.etagOrder) > 200 {
+	g.etagBytes += len(body)
+	for len(g.etagOrder) > etagCount || g.etagBytes > etagCap {
+		g.etagBytes -= len(g.etags[g.etagOrder[0]].body)
 		delete(g.etags, g.etagOrder[0])
 		g.etagOrder = g.etagOrder[1:]
 	}
