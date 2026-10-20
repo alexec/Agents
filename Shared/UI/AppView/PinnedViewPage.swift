@@ -33,6 +33,9 @@ struct PinnedViewPage: View {
     @State private var problem: String?
     /// Try Again and a reconnect make the feeding call again.
     @State private var attempt = 0
+    /// Torn down by a disappear that SwiftUI followed with an appear of the same page, as
+    /// the iPhone's navigation does on a push (#1797): it is fed and drawn again.
+    @State private var closed = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -46,7 +49,15 @@ struct PinnedViewPage: View {
             if problem != nil || answer == nil { attempt += 1 }
             store.reconnected()
         }
-        .onDisappear { store.tearDownAll(reason: "The pinned view was closed.") }
+        .onAppear {
+            guard closed else { return }
+            closed = false
+            attempt += 1
+        }
+        .onDisappear {
+            closed = true
+            store.tearDownAll(reason: "The pinned view was closed.")
+        }
     }
 
     private var header: some View {
@@ -83,7 +94,9 @@ struct PinnedViewPage: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .padding(24)
         } else {
-            AppViewPage(host: store.host(for: fedCall, actions: actions))
+            let host = store.host(for: fedCall, actions: actions)
+            // A new host after a teardown is a new page, so it starts (#1797).
+            AppViewPage(host: host).id(ObjectIdentifier(host))
         }
     }
 
