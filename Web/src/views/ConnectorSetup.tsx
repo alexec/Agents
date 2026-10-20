@@ -472,7 +472,7 @@ export function ConnectDialog({ store, host, provider, folder, connected, close 
         )}
         {step.kind === "failed" && <p class="small failure">{step.why}</p>}
         <div class="sheet-actions">
-          <span class="quiet small grow">{words.sheetFoot}</span>
+          <span class="quiet small grow">{provider === "email" ? words.email.sheetFoot : words.sheetFoot}</span>
           {step.kind === "install" ? (
             <>
               <button onClick={close}>Done</button>

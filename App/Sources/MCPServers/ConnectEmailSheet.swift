@@ -51,7 +51,7 @@ struct ConnectEmailSheet: View {
             .padding(20)
             Divider()
             HStack(spacing: 8) {
-                Text(ConnectorSetupWords.sheetFoot).appText(.fine).foregroundStyle(.secondary)
+                Text(ConnectorSetupWords.Email.sheetFoot).appText(.fine).foregroundStyle(.secondary)
                 Spacer()
                 Button("Cancel") { dismiss() }.buttonStyle(.paper).keyboardShortcut(.cancelAction)
                 Button(ConnectorSetupWords.Email.button) { Task { await connect() } }

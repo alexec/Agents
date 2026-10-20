@@ -96,6 +96,7 @@ struct ConnectorSetupWordsTests {
         #expect(ConnectorSetupWords.connectionTitle(c) == "Email \u{00B7} agents@example.com")
         #expect(ConnectorSetupWords.connectionNote(c) == "imap.fastmail.com \u{00B7} App password")
         #expect(ConnectorSetupWords.letters(.email) == "EM")
+        #expect(ConnectorSetupWords.Email.sheetFoot.contains("app password") && !ConnectorSetupWords.Email.sheetFoot.contains("token"))
         #expect(ConnectorSetupWords.noConnections.hasSuffix("and Email for the mail they wait for."))
     }
 

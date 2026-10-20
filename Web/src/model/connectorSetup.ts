@@ -316,6 +316,7 @@ export function newGitLabTokenURL(address: string): string {
 
 /** Connect Email (#1780): one IMAP mailbox, by an app password that goes to the host only. */
 export const email = {
+  sheetFoot: "The app password is kept by the host, never in a log.",
   abilities: [
     "Know when mail comes, by sender and subject",
     "List, search and read messages",

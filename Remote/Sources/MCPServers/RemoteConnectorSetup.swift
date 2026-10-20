@@ -562,7 +562,7 @@ struct RemoteConnectEmailSheet: View {
                         connectButton
                     }
                 } footer: {
-                    Text(ConnectorSetupWords.sheetChoose(.email) + " " + ConnectorSetupWords.sheetFoot)
+                    Text(ConnectorSetupWords.sheetChoose(.email) + " " + ConnectorSetupWords.Email.sheetFoot)
                 }
                 .paperListRow()
             }

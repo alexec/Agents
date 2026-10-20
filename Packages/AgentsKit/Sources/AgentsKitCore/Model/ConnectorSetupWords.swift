@@ -345,6 +345,8 @@ public enum ConnectorSetupWords {
     public enum Email {
         public static let name = "Email"
         public static let letters = "EM"
+        /// The sheet's foot: an app password, not a token.
+        public static let sheetFoot = "The app password is kept by the host, never in a log."
         public static let notConnectedNote = "One mailbox for agents: they wait for mail, such as a sign-up code, and read it."
         public static let subtitle = "For you, in every project. Agents reads the mailbox over IMAP and never sends mail."
         public static let abilities = [
