@@ -17,8 +17,9 @@ import (
 	"time"
 )
 
-// RealGitLab reads GitLab's REST API v4 as the person, with the token in GITLAB_TOKEN (a
-// personal, group or project access token with the api scope; the sign-in comes with #1630).
+// RealGitLab reads GitLab's REST API v4 as the person, with the token Token gives: the GitLab
+// connection's (#1630), or GITLAB_TOKEN (a personal, group or project access token with the
+// api scope).
 // Base is gitlab.com or a self-managed GitLab. The listings events poll are shared for
 // sharedFor, as the github server's (#932): every wait polls on its own, and ten waits on
 // one project would otherwise fetch the same page ten times.

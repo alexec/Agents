@@ -130,9 +130,11 @@ it (`scripts/go-github-mcp.sh linear-mcp`) and every Linux host installs
 
 The github server's shape for GitLab: a stdio front (`gitlabmcp.Front`) answers
 `events/list` and `events/poll` and passes everything else to a go-sdk server with our own
-tools, all over GitLab's REST API v4 with one token, `GITLAB_TOKEN` (an access token with the
-`api` scope; the sign-in comes with #1630). `GITLAB_URL` (or `--url`) is the GitLab:
-`https://gitlab.com` when empty, or a self-managed one. GitLab's own MCP server
+tools, all over GitLab's REST API v4 with one token: the person's GitLab connection (#1630,
+Your Connectors ▸ Connect GitLab: the device flow on gitlab.com, or an access token on any
+GitLab), or `GITLAB_TOKEN` (an access token with the `api` scope), which goes first.
+`GITLAB_URL` (or `--url`) is the GitLab: the connection's when empty, else
+`https://gitlab.com`. The connection's token goes only to the GitLab it was made on. GitLab's own MCP server
 (`/api/v4/mcp`) is not behind it: it takes no classic access token and needs "Allow access
 to the MCP server" turned on for the top-level group or the instance.
 
@@ -156,7 +158,7 @@ to the MCP server" turned on for the top-level group or the instance.
 The tests run it against a fake GitLab over HTTP (`fake_test.go`). Agents Host carries it
 (`scripts/go-github-mcp.sh gitlab-mcp`) and every Linux host installs
 `gitlab-mcp-linux-<arch>` (#1636); the catalogue lists it as `agents/gitlab`, which asks for
-`GITLAB_TOKEN`. For a self-managed GitLab, set `GITLAB_URL` in its `env` in `.agents/mcp.json`.
+no secret: it reads the connection, as the linear server does.
 
 ## The command workspace provider (`workspace-commands`, #691, #1364)
 
