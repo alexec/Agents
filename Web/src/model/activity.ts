@@ -12,10 +12,10 @@ export function shortAgo(date: Date, now = new Date()): string {
 }
 
 const quietMinutes = 5;
-const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+export const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 /** The year, month, day, hour and minute of `date` where the reader is (or in `timeZone`). */
-function parts(date: Date, timeZone?: string): { year: number; month: number; day: number; hour: number; minute: number } {
+export function parts(date: Date, timeZone?: string): { year: number; month: number; day: number; hour: number; minute: number } {
   const made: Record<string, number> = {};
   for (const part of new Intl.DateTimeFormat("en-GB", {
     timeZone, year: "numeric", month: "numeric", day: "numeric", hour: "numeric", minute: "numeric", hourCycle: "h23",

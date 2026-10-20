@@ -169,6 +169,8 @@ public extension DaemonAPI {
                 Row(Method.agentsRename, params: RenameRequest.self, result: Agent.self, kind: .hostRequest),
                 // Branch (#342): the new session's id, as the window's row and Session menu have it.
                 Row(Method.agentsFork, params: AgentRequest.self, result: UUID.self, kind: .hostRequest),
+                // Branch from here (#1658), from a prompt's menu and the Prompts list.
+                Row(Method.agentsBranchFrom, params: BranchFromRequest.self, result: UUID.self, kind: .hostRequest),
                 Row(Method.agentsPrewarm, params: PrewarmRequest.self, result: Empty.self, kind: .hostRequest),
                 Row(Method.agentsUnarchive, params: AgentRequest.self, result: Empty.self, kind: .hostRequest),
                 Row(Method.agentsSetLabels, params: SetLabelsRequest.self, result: Agent.self, kind: .hostRequest),

@@ -5313,6 +5313,22 @@ final class AppModel {
         }
     }
 
+    /// Branch from Here (#1658): a new session from just before one of the person's prompts,
+    /// opened as Branch opens one, with that prompt in its bar to change and send. The words
+    /// go in as the new session's draft, so its bar has them however it comes on screen.
+    func branch(from entryID: UUID, of agentID: UUID, text: String) async {
+        do {
+            let branch = try await client(forAgent: agentID).call(DaemonAPI.Method.agentsBranchFrom,
+                                               DaemonAPI.BranchFromRequest(agentID: agentID, entryID: entryID),
+                                               returning: UUID.self)
+            DraftKeeper.shared.note(text, [], for: .agent(branch))
+            await refreshAgents()
+            selection = branch
+        } catch {
+            problem = describe(error)
+        }
+    }
+
     /// An answer pressed on a banner (#1170): the card's own answer, through the same call.
     /// A question no longer held was answered somewhere else, and nothing is sent: the
     /// daemon would refuse it, and its banner goes with the next sweep.

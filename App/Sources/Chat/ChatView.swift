@@ -26,6 +26,8 @@ struct ChatView: View {
     @Environment(WindowRequests.self) private var requests
     /// Find in Chat is up over the chat (#1532).
     @State private var finding = false
+    /// The Prompts list is up over the chat (#1658).
+    @State private var showingPrompts = false
     @State private var formHeight: CGFloat = 0
     /// The open chat's views (#187), torn down when another chat opens.
     @State private var views = AppViewStore()
@@ -107,8 +109,28 @@ struct ChatView: View {
             requests.wantsChatFind = false
             finding = true
         }
+        .onChange(of: requests.wantsPrompts) {
+            guard requests.wantsPrompts, popped == nil else { return }
+            requests.wantsPrompts = false
+            showingPrompts = agent != nil
+        }
+        .sheet(isPresented: $showingPrompts) {
+            if let agent {
+                PromptsList(agent: agent, page: model.work,
+                            go: { [model] prompt in model.focusEntry(prompt.id) },
+                            branch: branchFrom(agent).map { branch in { branch($0.id, $0.text) } },
+                            close: { showingPrompts = false })
+            }
+        }
         // A view read when the link dropped may never be answered: read it again (#978).
         .onChange(of: model.isConnected) { if model.isConnected { views.reconnected() } }
+    }
+
+    /// Branch from Here (#1658), on a prompt in the chat or in the Prompts list: as Branch,
+    /// not on an archived session.
+    private func branchFrom(_ agent: Agent?) -> (@MainActor (UUID, String) -> Void)? {
+        guard let agent, agent.state != .archived else { return nil }
+        return { [model] entryID, text in Task { await model.branch(from: entryID, of: agent.id, text: text) } }
     }
 
     /// What a view in the chat may ask of the Mac (#187): the host the chat is on, the
@@ -165,6 +187,7 @@ struct ChatView: View {
             unqueue: { [model] prompt, agentID in await model.unqueue(prompt, from: agentID) },
             editQueued: { [model] prompt, text, agentID in await model.editQueued(prompt, text: text, of: agentID) },
             quote: { [model, agent] words in model.offeredQuote = PromptOffer(agentID: agent?.id, words: words) },
+            branchFrom: branchFrom(agent),
             runCommand: runCommand,
             tellAgent: tellAgent,
             sendNow: { [model] prompt, agentID in await model.sendNow(prompt, to: agentID) },

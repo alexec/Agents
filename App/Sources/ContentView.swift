@@ -218,6 +218,14 @@ struct ContentView: View {
                              : "Keep this session in Pinned, at the top of the sidebar")
                 // The title, edited where the window shows it (#751).
                 RenameButton(agent: agent, place: .mainWindow)
+                // The person's prompts, to go to one or branch from it (#1658). The Mac's
+                // chat has no ··· menu, so here, beside Rename, and in the Session menu.
+                Button {
+                    requests.wantsPrompts = true
+                } label: {
+                    Label("Prompts", systemImage: "list.number")
+                }
+                .help("Show the prompts in this session (⇧⌘P)")
                 if agent.state == .archived {
                     Button {
                         Task { await model.unarchive(agent.id) }

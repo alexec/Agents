@@ -739,6 +739,9 @@ func (d *Daemon) registerChanges() {
 	On(d, wire.CallAgentsFork, func(ctx context.Context, cl *Client, r wire.AgentRequest) (wire.UUID, error) {
 		return d.fork(ctx, r.AgentID)
 	})
+	On(d, wire.CallAgentsBranchFrom, func(ctx context.Context, cl *Client, r wire.BranchFromRequest) (wire.UUID, error) {
+		return d.branchFrom(r)
+	})
 	On(d, wire.CallChangesList, func(ctx context.Context, cl *Client, r wire.ChangesListRequest) (wire.ChangesList, error) {
 		a := d.Store.Agent(r.AgentID)
 		if a == nil {
@@ -859,4 +862,87 @@ func (d *Daemon) fork(ctx context.Context, id wire.UUID) (wire.UUID, error) {
 	d.record(b.ID, runtimeNote("Branched from "+from+"."))
 	d.change(b.ID, func(*wire.Agent) {})
 	return b.ID, nil
+}
+
+// branchFrom is agents/branchFrom (#1658): a new agent goes on from just before one of the
+// person's prompts, with the record up to there. ACP branches a conversation only at its
+// end (session/fork), so the new agent has no conversation of its own yet: its runtime
+// reads that record ahead of its first prompt (branchPreface), on every runtime.
+func (d *Daemon) branchFrom(r wire.BranchFromRequest) (wire.UUID, error) {
+	a := d.Store.Agent(r.AgentID)
+	if a == nil {
+		return "", noSuchAgent()
+	}
+	if err := d.refuseToRun(a); err != nil {
+		return "", err
+	}
+	entries, _, err := d.Store.Transcript(a.ID, 0)
+	if err != nil {
+		return "", err
+	}
+	at := -1
+	for i, e := range entries {
+		if e.ID == r.EntryID && e.Kind.UserMessage != nil {
+			at = i
+			break
+		}
+	}
+	if at < 0 {
+		return "", Invalid("That prompt is not in this session's record.")
+	}
+	t := now()
+	b := wire.Agent{ID: store.NewUUID(), RuntimeID: a.RuntimeID, Cwd: a.Cwd, State: wire.AgentStateFinished,
+		EndedReason: reason(wire.EndedReasonEndTurn), StartOptions: a.StartOptions,
+		AdvertisedOptions: a.AdvertisedOptions, AvailableCommands: a.AvailableCommands, AdditionalDirectories: a.AdditionalDirectories,
+		McpServers: a.McpServers, Worktree: a.Worktree, StartingPoint: a.StartingPoint, MadeInRoot: &d.Store.RootID,
+		SandboxOverride: a.SandboxOverride, BranchedFrom: &a.ID, CreatedAt: t, LastActivityAt: t}
+	if a.Title != nil {
+		title := *a.Title + " (branch)"
+		b.Title = &title
+	}
+	if err := d.Store.Save(b); err != nil {
+		return "", err
+	}
+	for _, e := range entries[:min(at, 10000)] {
+		if _, err := d.Store.Append(b.ID, e); err != nil {
+			return "", err
+		}
+	}
+	from := "another agent"
+	if a.Title != nil {
+		from = *a.Title
+	}
+	d.record(b.ID, runtimeNote("Branched from "+from+" before its prompt "+strconv.Itoa(promptNumber(entries[:at+1]))+"."))
+	d.change(b.ID, func(*wire.Agent) {})
+	return b.ID, nil
+}
+
+// promptNumber is how many of the person's prompts these entries hold, as the Prompts
+// list numbers them.
+func promptNumber(entries []wire.TranscriptEntry) int {
+	n := 0
+	for _, e := range entries {
+		if m := e.Kind.UserMessage; m != nil && (m.From == nil || *m.From == wire.PromptOriginPerson) {
+			n++
+		}
+	}
+	return n
+}
+
+// branchPreface is what a branch's runtime reads ahead of its first prompt: the record it
+// was branched with, as read_session writes a session. Nil for any other agent, and once
+// the branch has a conversation of its own.
+func (d *Daemon) branchPreface(a *wire.Agent) *string {
+	if a.BranchedFrom == nil || a.RuntimeSessionID != nil {
+		return nil
+	}
+	entries, _, err := d.Store.Transcript(a.ID, 0)
+	if err != nil {
+		return nil
+	}
+	header := "This conversation goes on from an earlier one: the person branched it from just before one of their prompts. " +
+		"Below is the app's record of that conversation up to there. Carry on from it as if it were your own; " +
+		"the person's next words follow it.\n\n"
+	p := history(a, entries, header)
+	return &p
 }

@@ -20,6 +20,9 @@ public enum DaemonAPI {
         public static let sessionsAdopt = "sessions/adopt"
         public static let sessionsDelete = "sessions/delete"
         public static let agentsFork = "agents/fork"
+        /// Takes a `BranchFromRequest` (#1658): a new session from just before one of the
+        /// person's prompts. Answered with its id.
+        public static let agentsBranchFrom = "agents/branchFrom"
         public static let agentsList = "agents/list"
         /// Which chats are still queued to be picked back up after a restart. A
         /// window that connects part-way through the batch asks this rather than
@@ -1004,6 +1007,17 @@ public enum DaemonAPI {
     public struct AgentRequest: Codable, Sendable {
         public var agentID: UUID
         public init(agentID: UUID) { self.agentID = agentID }
+    }
+
+    /// `agents/branchFrom` (#1658): `entryID` is the person's prompt the new session goes
+    /// on from just before.
+    public struct BranchFromRequest: Codable, Sendable {
+        public var agentID: UUID
+        public var entryID: UUID
+        public init(agentID: UUID, entryID: UUID) {
+            self.agentID = agentID
+            self.entryID = entryID
+        }
     }
 
     /// `agents/continueInProject` (#119): start a successor of an agent whose folder has

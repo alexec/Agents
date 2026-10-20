@@ -44,6 +44,20 @@ public enum ActivityWords {
         return "Last activity \(when) · \(time)"
     }
 
+    /// When a prompt was sent, on its row of the Prompts list (#1658): "14:05" today,
+    /// "3 Oct 14:05" this year, "3 Oct 2025 14:05" before. The page has its own copy
+    /// (`sentWords` in `Web/src/model/sessionPrompts.ts`).
+    public static func sent(_ date: Date, now: Date = Date(), timeZone: TimeZone = .current) -> String {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = timeZone
+        let at = calendar.dateComponents([.year, .month, .day, .hour, .minute], from: date)
+        let today = calendar.dateComponents([.year, .month, .day], from: now)
+        let time = String(format: "%02d:%02d", at.hour ?? 0, at.minute ?? 0)
+        if at.year == today.year, at.month == today.month, at.day == today.day { return time }
+        let day = "\(at.day ?? 1) \(months[((at.month ?? 1) - 1) % 12])"
+        return at.year == today.year ? "\(day) \(time)" : "\(day) \(at.year ?? 0) \(time)"
+    }
+
     /// How long a chat is quiet before its foot says so.
     public static let quietMinutes = 5
 

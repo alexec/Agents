@@ -32,6 +32,10 @@ final class WindowRequests {
     /// shows its find bar.
     var wantsChatFind = false
 
+    /// Set by Prompts (#1658), taken (and cleared) by the main window's chat, which shows
+    /// its Prompts list.
+    var wantsPrompts = false
+
     /// Open File… is up over the window (#415), searching the open session's folders.
     var showsFileSearch = false
 
@@ -264,6 +268,11 @@ struct AgentsCommands: Commands {
             }
             .keyboardShortcut("'", modifiers: [.command, .shift])
             .disabled(agent == nil || agent?.state == .archived)
+            // The person's prompts in the main window's chat, to go to one or branch from it
+            // (#1658). ⇧⌘P is free: Print is gone, and ⌘P is Open File….
+            Button("Prompts") { requests.wantsPrompts = true }
+                .keyboardShortcut("p", modifiers: [.command, .shift])
+                .disabled(popped != nil || projectWindow != nil || model.selectedAgent == nil)
             Divider()
             Button("Branch") { act { await model.fork($0.id) } }
                 .keyboardShortcut("b", modifiers: [.command, .option])
