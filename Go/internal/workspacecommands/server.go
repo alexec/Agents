@@ -158,7 +158,7 @@ func NewServer(config Config, timing Timing, run Runner, version string) *Server
 			Description: "Stops the workspace and answers once it is stopped, or with why it isn't.",
 			Properties:  id, Required: []string{"id"}},
 	}
-	if config.Making.Create != "" {
+	if config.Making.CanCreate() {
 		tools = append(tools,
 			Tool{Name: "workspace_options", Title: "New workspace options",
 				Description: "The choices for a new workspace, as a JSON Schema object.", Annotations: readOnly},
@@ -170,7 +170,7 @@ func NewServer(config Config, timing Timing, run Runner, version string) *Server
 					{Name: "firstBoot", Kind: "string", Description: "A command to run on its first boot.", MaxLength: 8192},
 				}, Required: []string{"name"}})
 	}
-	if config.Making.Delete != "" {
+	if config.Making.CanDelete() {
 		tools = append(tools, Tool{Name: "workspace_delete", Title: "Delete a workspace",
 			Description: "Deletes the workspace and everything on it.", Properties: id, Required: []string{"id"},
 			Annotations: map[string]any{"destructiveHint": true}})

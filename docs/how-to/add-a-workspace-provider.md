@@ -13,15 +13,25 @@ are three ways to make one, and only the last needs any code.
 ## A preset, or your own commands
 
 Agents ships one provider, the **command provider**. Each of its workspaces is a few
-shell commands, and its presets fill those in for the common tools:
+shell commands or web requests, and its presets fill those in for the common tools.
 
-| Preset | It needs, where the control plane runs | Workspaces |
-| --- | --- | --- |
-| Docker Containers | `docker` | the containers you name, or the containers labelled `agents.workspace` |
-| DigitalOcean Droplets | `doctl`, signed in | droplets with a tag |
-| GitHub Codespaces | `gh`, signed in | your codespaces, or one repository's |
-| Coder Workspaces | `coder`, signed in, after `coder config-ssh` | your Coder workspaces |
-| Google Cloud Workstations | `gcloud`, signed in | one cluster and configuration's workstations |
+DigitalOcean, GitHub Codespaces and Coder can be reached in two ways. Add Provider shows
+**Its API** first: a token, and nothing to install (#1119). **Its CLI** uses the CLI, signed
+in, as before.
+
+| Preset | Through its API, it needs | Through its CLI, it needs | Workspaces |
+| --- | --- | --- | --- |
+| Docker Containers | — | `docker` | the containers you name, or the containers labelled `agents.workspace` |
+| DigitalOcean Droplets | a token with custom scopes: droplet read and update (and create and delete, to make and delete droplets) | `doctl`, signed in | droplets with a tag |
+| GitHub Codespaces | a token: fine-grained with Codespaces lifecycle admin, or classic with `codespace`; and `gh` for ssh, after `gh codespace ssh --config >> ~/.ssh/config` | `gh`, signed in | your codespaces, or one repository's |
+| Coder Workspaces | the deployment's address and a session token (`coder tokens create`); and `coder` for ssh, after `coder config-ssh` | `coder`, signed in, after `coder config-ssh` | your Coder workspaces |
+| Google Cloud Workstations | — | `gcloud`, signed in | one cluster and configuration's workstations |
+
+The token goes in only as the provider's secret. It is sent in a request's header, never in
+an address, a log or an error. A codespace and a Coder workspace have no ssh port of their
+own, so ssh to them still goes through `gh` or `coder`, as the ssh ProxyCommand; the
+Providers page says "needs gh for ssh" or "needs coder for ssh". A droplet is reached with
+plain ssh to its public address.
 
 For anything else, choose **Your commands** and give:
 
@@ -50,7 +60,13 @@ The Docker preset makes workspaces when you give it an **Image** and no containe
 Workspace… runs `docker run -d --name <name> --label agents.workspace <image>`, then the
 install command in it with `docker exec`, so the container joins by itself. The image must
 keep running and have `curl`. Delete Workspace… runs `docker rm -f -v`, which also removes
-the container's anonymous volumes. Any other preset needs **An MCP server** or a provider
+the container's anonymous volumes.
+
+DigitalOcean through its API makes droplets too. New Workspace… makes a droplet with the
+tag, in the region, size and image you choose (an image with systemd, such as
+`ubuntu-24-04-x64`). Its first boot makes a user, `agents`, with root's ssh keys, and
+installs Agents as that user, never as root. The host starts with the droplet. Delete
+Workspace… deletes the droplet. Any other preset needs **An MCP server** or a provider
 configured by hand to make workspaces.
 
 The command provider is the `workspace-commands` binary. The control plane looks for it
@@ -87,7 +103,7 @@ secret for your token. It needs Node where the control plane runs.
 ```
 
 It lists every droplet in the account. Its server's `droplet-create` can't run a command on
-first boot, so make droplets in DigitalOcean, or use the `doctl` preset.
+first boot, so use the DigitalOcean preset through its API to make droplets.
 
 - A path is dotted keys, with `[0]` for an item of a list.
 - `{path}` inside text is filled in from the workspace.

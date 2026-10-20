@@ -78,6 +78,10 @@ type Provider struct {
 	Run    Runner
 	// Log is where a start, stop, create or delete is said; the standard logger when nil.
 	Log func(string)
+	// Fetch does a request (#1119); Fetch when nil. Env is where its secrets are;
+	// os.LookupEnv when nil.
+	Fetch Fetcher
+	Env   Environment
 
 	mu   sync.Mutex
 	left map[string]State
@@ -152,9 +156,18 @@ func (p *Provider) written(entry Entry) Workspace {
 }
 
 func (p *Provider) listed(listing Listing) ([]Workspace, error) {
-	outcome := p.Run(listing.Command, p.Timing.Quick)
-	if outcome.Status != 0 || outcome.TimedOut {
-		return nil, Failure{reason(outcome, listing.Command, "listing workspaces", p.Timing.Quick)}
+	var outcome Outcome
+	if listing.Request != nil {
+		answer, err := p.call(*listing.Request, map[string]string{}, p.Timing.Quick, "listing workspaces")
+		if err != nil {
+			return nil, err
+		}
+		outcome = Outcome{Output: answer}
+	} else {
+		outcome = p.Run(listing.Command, p.Timing.Quick)
+		if outcome.Status != 0 || outcome.TimedOut {
+			return nil, Failure{reason(outcome, listing.Command, "listing workspaces", p.Timing.Quick)}
+		}
 	}
 	var rows []map[string]string
 	if listing.Shape.Fields == nil {
@@ -180,7 +193,11 @@ func (p *Provider) listed(listing Listing) ([]Workspace, error) {
 			if at == "" {
 				at = "its top"
 			}
-			return nil, Failure{"The list command's output isn't a JSON array at " + at + "."}
+			what := "The list command's output"
+			if listing.Request != nil {
+				what = "The list request's answer"
+			}
+			return nil, Failure{what + " isn't a JSON array at " + at + "."}
 		}
 		for _, item := range array {
 			row := map[string]string{}
@@ -298,14 +315,12 @@ func (p *Provider) act(start bool, id string) (Workspace, error) {
 	if workspace.State == target {
 		return workspace, nil
 	}
-	template := workspace.Commands.Stop
+	template, request := workspace.Commands.Stop, workspace.Commands.StopRequest
 	if start {
-		template = workspace.Commands.Start
+		template, request = workspace.Commands.Start, workspace.Commands.StartRequest
 	}
-	p.log(fmt.Sprintf("workspace-commands: %s %s: %s", action, workspace.Name, template))
-	outcome := p.Run(Fill(template, workspace.Values, true), p.Timing.Long)
-	if outcome.Status != 0 || outcome.TimedOut {
-		return Workspace{}, Failure{reason(outcome, template, doing+" "+workspace.Name, p.Timing.Long)}
+	if err := p.do(template, request, workspace.Values, action+" "+workspace.Name, doing+" "+workspace.Name); err != nil {
+		return Workspace{}, err
 	}
 	if !p.canAsk(workspace) {
 		p.setLeft(id, target, true)
@@ -327,8 +342,8 @@ func (p *Provider) act(start bool, id string) (Workspace, error) {
 
 // Create makes a workspace (US5) with the choices given, and answers once it is listed.
 func (p *Provider) Create(name string, options map[string]any, firstBoot string) (Workspace, error) {
-	template := p.Config.Making.Create
-	if template == "" {
+	making := p.Config.Making
+	if !making.CanCreate() {
 		return Workspace{}, Failure{"It can't make workspaces."}
 	}
 	name = strings.TrimSpace(name)
@@ -347,7 +362,7 @@ func (p *Provider) Create(name string, options map[string]any, firstBoot string)
 	values := map[string]string{"name": name, "firstBoot": firstBoot}
 	// A choice left out takes the form's default, as the form showed it.
 	chosen := map[string]any{}
-	properties, _ := p.Config.Making.Options["properties"].(map[string]any)
+	properties, _ := making.Options["properties"].(map[string]any)
 	for key, property := range properties {
 		if d, ok := property.(map[string]any)["default"]; ok {
 			chosen[key] = d
@@ -369,10 +384,8 @@ func (p *Provider) Create(name string, options map[string]any, firstBoot string)
 		}
 	}
 	// The first-boot command carries a host code: logged as the template, never filled in.
-	p.log(fmt.Sprintf("workspace-commands: create %s: %s", name, template))
-	outcome := p.Run(Fill(template, values, true), p.Timing.Long)
-	if outcome.Status != 0 || outcome.TimedOut {
-		return Workspace{}, Failure{reason(outcome, template, "making "+name, p.Timing.Long)}
+	if err := p.do(making.Create, making.CreateRequest, values, "create "+name, "making "+name); err != nil {
+		return Workspace{}, err
 	}
 	all, err = p.List()
 	if err != nil {
@@ -388,20 +401,34 @@ func (p *Provider) Create(name string, options map[string]any, firstBoot string)
 
 // Delete deletes the workspace and everything on it.
 func (p *Provider) Delete(id string) error {
-	template := p.Config.Making.Delete
-	if template == "" {
+	making := p.Config.Making
+	if !making.CanDelete() {
 		return Failure{"It can't delete workspaces."}
 	}
 	workspace, err := p.find(id)
 	if err != nil {
 		return err
 	}
-	p.log(fmt.Sprintf("workspace-commands: delete %s: %s", workspace.Name, template))
-	outcome := p.Run(Fill(template, workspace.Values, true), p.Timing.Long)
-	if outcome.Status != 0 || outcome.TimedOut {
-		return Failure{reason(outcome, template, "deleting "+workspace.Name, p.Timing.Long)}
+	if err := p.do(making.Delete, making.DeleteRequest, workspace.Values, "delete "+workspace.Name, "deleting "+workspace.Name); err != nil {
+		return err
 	}
 	p.setLeft(id, "", false)
+	return nil
+}
+
+// do runs the command, or does the request in its place, with the values filled in. The log
+// says the template, never what was filled in: a first-boot command carries a host code.
+func (p *Provider) do(template string, request *Request, values map[string]string, what, doing string) error {
+	if request != nil {
+		p.log(fmt.Sprintf("workspace-commands: %s: %s", what, request.Said()))
+		_, err := p.call(*request, values, p.Timing.Long, doing)
+		return err
+	}
+	p.log(fmt.Sprintf("workspace-commands: %s: %s", what, template))
+	outcome := p.Run(Fill(template, values, true), p.Timing.Long)
+	if outcome.Status != 0 || outcome.TimedOut {
+		return Failure{reason(outcome, template, doing, p.Timing.Long)}
+	}
 	return nil
 }
 

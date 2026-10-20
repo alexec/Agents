@@ -89,11 +89,11 @@ Open issues: `is:open label:integration workspace`.
 
 | Integration | Clients that show it | State | Last checked | Where | Gaps |
 | --- | --- | --- | --- | --- | --- |
-| Docker | Mac, Remote, web, control plane | walked on scratch | 2026-10-19, on the Go control plane, Mac, Remote and web (`specs/691-workspace-providers/walks/857-go-docker.md`) | `presets.go` (`docker`) | #1119 |
-| Coder | Mac, Remote, web, control plane | built | — | `presets.go` (`coder`) | #1119 |
-| Codespaces | Mac, Remote, web, control plane | broken (Stop works, Start never brings the host back) | 2026-10-13, PR #966, with a real codespace | `presets.go` (`codespaces`) | #864, #1119 |
-| DigitalOcean | Mac, Remote, web, control plane | built | — | `presets.go` (`doctl`) | #865, #1119 |
-| Google Cloud Workstations | Mac, Remote, web, control plane | built | — | `presets.go` (`gcloud-workstations`) | #1119 |
+| Docker | Mac, Remote, web, control plane | walked on scratch | 2026-10-19, on the Go control plane, Mac, Remote and web (`specs/691-workspace-providers/walks/857-go-docker.md`) | `presets.go` (`docker`) | CLI only, by decision on #1119 |
+| Coder | Mac, Remote, web, control plane | built | 2026-10-19, API preset against a fake server only (#1119) | `presets.go` (`coder`, and `coder-api` through its API; `coder` still for ssh) | a walk with a real deployment |
+| Codespaces | Mac, Remote, web, control plane | broken (Stop works, Start never brings the host back) | 2026-10-13, PR #966, with a real codespace; the API preset (#1119) against a fake server only | `presets.go` (`codespaces`, and `codespaces-api` through its API; `gh` still for ssh) | #864 |
+| DigitalOcean | Mac, Remote, web, control plane | built | 2026-10-19, API preset (list, power on and off, create, delete) against a fake server only (#1119) | `presets.go` (`doctl`, and `digitalocean-api` through its API, nothing to install) | #865 |
+| Google Cloud Workstations | Mac, Remote, web, control plane | built | — | `presets.go` (`gcloud-workstations`) | CLI only for now (an API needs a signed JWT, #1119); #1346 |
 | Any MCP or CLI provider (map written by an agent) | Mac, control plane | built | — | `Go/internal/controlplane/providers/drafts.go` | |
 | The misbehaving fake provider | control plane | walked on scratch | 2026-10-19, on the Go control plane: a dropped tool and duplicate ids added | `connection_test.go` | |
 

@@ -159,9 +159,37 @@ WORKSPACE_COMMANDS_CONFIG='{"preset":"docker","containers":["devbox"],"ssh":"dev
   it answers `firstBootRuns: true`. `delete` fills in `${id}` and the workspace's columns.
   `options` is the New Workspace form's JSON Schema; a property's `default` fills in a
   choice left out.
-  Of the presets, only `docker` with an `image` has them.
+  Of the presets, `docker` with an `image` and `digitalocean-api` have them.
 - `states` maps the CLI's words to contract states. A status output is matched
   case-insensitively after trimming whitespace.
+- A path may pick an item of a list by a key's value: `networks.v4[type=public].ip_address`.
+
+#### A web request in place of a command (#1119)
+
+`list`, `start`, `stop`, `create` and `delete` may each be a request in place of a command:
+
+```json
+{
+  "list": { "url": "https://cws.example/v1/machines", "headers": { "X-Api-Key": "${CWS_KEY}" } },
+  "json": { "items": "machines", "id": "id", "state": "status" },
+  "start": { "method": "POST", "url": "https://cws.example/v1/machines/${id}/start",
+             "headers": { "X-Api-Key": "${CWS_KEY}" } },
+  "stop": { "method": "POST", "url": "https://cws.example/v1/machines/${id}/stop",
+            "headers": { "X-Api-Key": "${CWS_KEY}" }, "body": { "force": false } }
+}
+```
+
+- `method` defaults to `GET`. `url` must be `https://` (or `http://`).
+- `${…}` in `url` and in `body`'s text takes the workspace's values. Each value in `url` is
+  escaped as one path segment or query value.
+- Only `headers` take a secret: `${NAME}` that is not a value is the provider's secret of that
+  name. A secret is never put in an address, a log or an error. A secret that is not given
+  fails the call with "It needs the NAME secret."
+- A list request's answer is read as JSON: it needs `json`, not `columns`.
+- An answer other than 2xx is a failure, in the provider's own words (its JSON's `message`),
+  cut at 1 KB. A redirect is not followed, so a header never goes to another address.
+- An agent's draft with a request, or with a preset's `api` or `url`, is asked about before
+  its check runs (#858), as the request could send a secret anywhere.
 
 ### Presets
 
@@ -175,10 +203,15 @@ Its parameters fill them in.
 | `codespaces` | `repo` (optional) | `gh codespace list --json name,displayName,state` / `gh codespace ssh -c ${id} -- true` (a codespace starts when used) / `gh codespace stop -c ${id}`. States: Available→running, Shutdown→stopped, Starting→starting. | `gh codespace ssh --config` alias, `tunnel: true` |
 | `coder` | none | `coder list -o json` / `coder start -y ${id}` / `coder stop -y ${id}`. Read as JSON (`latest_build.status`). | `coder.${name}` (from `coder config-ssh`) |
 | `gcloud-workstations` | `cluster`, `config`, `region` | `gcloud workstations list … --format='value(name.basename(),state)'` / `start` / `stop`. States: STATE_RUNNING and so on. | `tunnel: true` |
+| `digitalocean-api` | `tag`, `user` (default `root`), `sshKeys` (optional, key ids or fingerprints), `tunnel`, `api` (optional) | Secret `DIGITALOCEAN_API_TOKEN`. `GET /v2/droplets?per_page=200&tag_name=${tag}` / `POST /v2/droplets/${id}/actions` `{"type":"power_on"}` / `power_off`. Create `POST /v2/droplets` with the tag and `user_data` that makes the user `agents` and runs `${firstBoot}` as it, with linger; options `region` (`nyc3`), `size` (`s-1vcpu-1gb`), `image` (`ubuntu-24-04-x64`). Delete `DELETE /v2/droplets/${id}`. States as `doctl`. | `${user}@` the public IPv4 |
+| `codespaces-api` | `repo` (optional, owner/name), `ssh` (optional), `api` (optional) | Secret `GITHUB_TOKEN`. `GET /user/codespaces` (or `/repos/${repo}/codespaces`) / `POST /user/codespaces/${id}/start` / `…/stop`. States as `codespaces`, and Queued, Awaiting, Rebuilding→starting. | `cs.${id}.${branch}` (gh's `--config` host, ProxyCommand gh) or `ssh`; `tunnel: true` |
+| `coder-api` | `url` (the deployment) | Secret `CODER_SESSION_TOKEN`. `GET /api/v2/workspaces?q=owner:me` / `POST /api/v2/workspaces/${id}/builds` `{"transition":"start"}` / `stop`. States as `coder`. | `coder.${name}` (from `coder config-ssh`, ProxyCommand coder) |
 
-A preset needs its CLI installed and signed in where the control plane runs. If the CLI
+A CLI preset needs its CLI installed and signed in where the control plane runs. If the CLI
 isn't there, its first command exits 127, and the error is "‹cli› isn't installed where the
-control plane runs".
+control plane runs". An API preset (`-api`) needs only its token, as the provider's secret.
+`api` sends it somewhere other than the provider's own address (a proxy); the API presets'
+tests point it at a fake server.
 
 ### Behaviour
 
