@@ -1,6 +1,6 @@
 // This browser's Settings (#846), opened from the sidebar's foot, in the chat's place: what the
-// window has in Settings ▸ Sidebar. Which smart groups are on is the person's, kept on their
-// Mac and the same on every client (#1033). Workspace providers are the control plane's (#1808).
+// window has in Settings ▸ Sidebar, and Settings ▸ People (#994). Which smart groups are on is the person's,
+// kept on their Mac and the same on every client (#1033). Workspace providers are the control plane's (#1808).
 // Versions are the control plane's and each host's (#1748).
 // Backups are the person's Mac's, as the window's Settings ▸ Mac draws them (#1810), and each server's (#1815).
 import { useEffect, useState } from "preact/hooks";
@@ -19,6 +19,7 @@ import { backupDetail, backupEveries, backupKeeps, backupTarget, backupTargets, 
 import { fromWireDate } from "../protocol/dates";
 import { Capability } from "../protocol/capabilities.generated";
 import type { BackupEvery, BackupRestoreResult, BackupSettings, BackupState, BackupTarget } from "../protocol/generated";
+import { PeopleSection } from "./People";
 
 /** The words under the Sidebar section, as the window's and the Remote's (#846). */
 export const sidebarSettingsFooter = "A group that is off is not shown. Its sessions go to the next group they fit, "
@@ -195,7 +196,7 @@ function ServerBackupsSection({ store }: { store: Store }) {
   );
 }
 
-export function SettingsPage({ store }: { store: Store }) {
+export function SettingsPage({ store, down = false }: { store: Store; down?: boolean }) {
   const on = smartGroupsOn.value;
   return (
     <section class="chat activity-page settings-page" aria-label="Settings">
@@ -242,6 +243,8 @@ export function SettingsPage({ store }: { store: Store }) {
           <VersionsSection store={store} />
           <BackupsSection store={store} />
           <ServerBackupsSection store={store} />
+          {/* Who belongs to the control plane, and their machines and clients (#994). */}
+          <PeopleSection store={store} down={down} />
         </div>
       </div>
     </section>
