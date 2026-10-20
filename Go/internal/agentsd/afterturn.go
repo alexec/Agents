@@ -44,8 +44,13 @@ func (d *Daemon) closeAfterTurns() {
 	d.afterTurnMu.Unlock()
 }
 
-// going is whether Shutdown has begun.
+// going is whether Shutdown has begun, or the daemon's context is done. A SIGTERM ends
+// that context, and with it every turn, before main reaches Shutdown (#1822): those turns
+// are cut off by the daemon's going too.
 func (d *Daemon) going() bool {
+	if d.ctx.Err() != nil {
+		return true
+	}
 	d.afterTurnMu.Lock()
 	defer d.afterTurnMu.Unlock()
 	return d.afterTurnClosed

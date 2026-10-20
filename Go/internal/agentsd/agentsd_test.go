@@ -61,7 +61,13 @@ func mustJSON(v any) []byte { b, _ := json.Marshal(v); return b }
 
 func start(t *testing.T, root string) (*Daemon, *conn) {
 	t.Helper()
-	d, err := New(context.Background(), root)
+	return startWith(t, context.Background(), root)
+}
+
+// startWith is start on a context of the test's, as main's that a signal ends.
+func startWith(t *testing.T, ctx context.Context, root string) (*Daemon, *conn) {
+	t.Helper()
+	d, err := New(ctx, root)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -1,6 +1,7 @@
 package agentsd
 
 import (
+	"context"
 	"encoding/json"
 	"strings"
 	"testing"
@@ -144,6 +145,38 @@ func TestAnAgentACleanStopCutOffIsPickedBackUp(t *testing.T) {
 	}
 	if gone != 1 {
 		t.Fatalf("stopped with the daemon %d times, want once", gone)
+	}
+}
+
+// A SIGTERM ends the daemon's context, and so every turn, before main calls Shutdown
+// (#1822): the turn is still the daemon's going, alive.json lists it, and the next start
+// picks it back up.
+func TestAnAgentASignalCutOffIsPickedBackUp(t *testing.T) {
+	fakeRuntimes(t)
+	root := t.TempDir()
+	ctx, signal := context.WithCancel(context.Background())
+	first, c := startWith(t, ctx, root)
+	var id wire.UUID
+	json.Unmarshal(c.call(t, 1, "agents/start", map[string]any{"runtimeID": "claude", "cwd": "file://" + t.TempDir(),
+		"prompt": "wait for me"}), &id)
+	c.until(t, "running", ended(id, wire.AgentStateRunning))
+	signal()
+	// The turn ends on the signal, before Shutdown, as in main.
+	waitFor(t, "stopped", func() bool { return first.Store.Agent(id).State == wire.AgentStateStopped })
+	first.Shutdown()
+	if a := first.Store.Agent(id); a.EndedReason == nil || *a.EndedReason != wire.EndedReasonDaemonGone {
+		t.Fatalf("%s %v %q", a.State, endedAs(a.EndedReason), notices(first, id))
+	}
+	if alive := first.readAlive(); alive == nil || alive.CutOff[id] != wire.AgentStateRunning {
+		t.Fatalf("alive.json: %+v", alive)
+	}
+
+	d, _ := start(t, root)
+	defer d.Shutdown()
+	d.PickUpAfterRestart()
+	waitFor(t, "finished", func() bool { return d.Store.Agent(id).State == wire.AgentStateFinished })
+	if m := userMessages(d, id); len(m) != 2 || !strings.HasPrefix(m[1], "(The app restarted while you were working") {
+		t.Fatalf("%q", m)
 	}
 }
 
