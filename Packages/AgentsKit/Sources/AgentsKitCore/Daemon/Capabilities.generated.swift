@@ -44,6 +44,7 @@ public enum Capability {
     public static let host1 = "host/1"
     public static let hosts1 = "hosts/1"
     public static let leases1 = "leases/1"
+    public static let liveactivity1 = "liveactivity/1"
     public static let mac1 = "mac/1"
     public static let mailbox1 = "mailbox/1"
     public static let marketplaces1 = "marketplaces/1"
@@ -370,11 +371,13 @@ public enum Capability {
     /// The capability of each method and notification in control.openrpc.json.
     public static let control: [String: String] = [
         "attention/need": "attention/1",
+        "attention/turn": "liveactivity/1",
         "clients/announce": "clients/1",
         "clients/connections": "clients/1",
         "clients/forget": "clients/1",
         "clients/forgetSelf": "clients/1",
         "clients/list": "clients/1",
+        "clients/setActivityToken": "liveactivity/1",
         "clients/setGrant": "clients/1",
         "clients/setPushToken": "clients/1",
         "clients/startPairing": "clients/1",

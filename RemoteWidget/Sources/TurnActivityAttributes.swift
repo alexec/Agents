@@ -17,4 +17,7 @@ struct TurnActivityAttributes: ActivityAttributes {
     var runtime: String
     /// The project's name.
     var project: String
+    /// The session's title when the activity started, for a pushed state, which has none
+    /// (#1744). Nil from a build before it.
+    var title: String?
 }

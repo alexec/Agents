@@ -349,11 +349,13 @@ const (
 // What the control plane answers (control.openrpc.json).
 var (
 	CallAttentionNeed               = Method[AttentionNeed, Empty]{"attention/need"}
+	CallAttentionTurn               = Method[AttentionTurn, Empty]{"attention/turn"}
 	CallClientsAnnounce             = Method[ClientAnnounce, Admitted]{"clients/announce"}
 	CallClientsConnections          = Method[Empty, []ClientConnection]{"clients/connections"}
 	CallClientsForget               = Method[ClientRequest, Empty]{"clients/forget"}
 	CallClientsForgetSelf           = Method[Empty, Empty]{"clients/forgetSelf"}
 	CallClientsList                 = Method[Empty, []ClientRecord]{"clients/list"}
+	CallClientsSetActivityToken     = Method[ActivityToken, Empty]{"clients/setActivityToken"}
 	CallClientsSetGrant             = Method[JSONValue, Empty]{"clients/setGrant"}
 	CallClientsSetPushToken         = Method[PushToken, Empty]{"clients/setPushToken"}
 	CallClientsStartPairing         = Method[ClientPairingRequest, ControlCodeShown]{"clients/startPairing"}

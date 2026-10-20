@@ -111,4 +111,32 @@ struct TurnActivityContentTests {
                                           line: String(repeating: "a", count: 4000), startedAt: sent)
         #expect(try JSONEncoder().encode(content).count < 1024, "ActivityKit refuses 4 KB")
     }
+
+    /// What the control plane pushes (#1744), as Go writes it: the phase and the times, no
+    /// words. ActivityKit decodes it with a plain JSONDecoder.
+    @Test func aPushedStateHasNoWordsAndKeepsTheTitleItStartedWith() throws {
+        let json = #"{"phase":"approval","startedAt":800000000}"#
+        let pushed = try JSONDecoder().decode(TurnActivityContent.self, from: Data(json.utf8))
+        #expect(pushed.phase == .approval)
+        #expect(pushed.startedAt == Date(timeIntervalSinceReferenceDate: 800_000_000))
+        #expect(pushed.title == nil && pushed.line == nil && pushed.endedAt == nil)
+        #expect(pushed.title(startedWith: "Fix the widget") == "Fix the widget")
+        #expect(pushed.title(startedWith: nil) == TurnActivityContent.untitled)
+        #expect(pushed.line(isStale: false) == "Open Agents to decide")
+
+        let ended = try JSONDecoder().decode(TurnActivityContent.self,
+                                             from: Data(#"{"phase":"done","startedAt":800000000,"endedAt":800000300}"#.utf8))
+        #expect(ended.isOver && ended.endedAt == Date(timeIntervalSinceReferenceDate: 800_000_300))
+        #expect(ended.line(isStale: true) == nil)
+    }
+
+    /// The app's own state keeps its title and its line; a stale one says to open the app.
+    @Test func theAppsOwnStateSaysItsOwnWords() {
+        let asking = TurnActivityContent(phase: .question, title: "Fix the widget", line: nil, startedAt: sent)
+        #expect(asking.title(startedWith: "Old name") == "Fix the widget")
+        #expect(asking.line(isStale: false) == nil)
+        let working = TurnActivityContent(phase: .working, title: "t", line: "Write the view", startedAt: sent)
+        #expect(working.line(isStale: false) == "Write the view")
+        #expect(working.line(isStale: true) == "Open Agents to see where it is")
+    }
 }

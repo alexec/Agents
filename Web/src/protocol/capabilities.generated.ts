@@ -44,6 +44,7 @@ export const Capability = {
   host1: "host/1",
   hosts1: "hosts/1",
   leases1: "leases/1",
+  liveactivity1: "liveactivity/1",
   mac1: "mac/1",
   mailbox1: "mailbox/1",
   marketplaces1: "marketplaces/1",
@@ -373,11 +374,13 @@ export const HostCapabilities: Readonly<Record<string, Capability>> = {
 /** The capability of each method and notification in control.openrpc.json. */
 export const ControlCapabilities: Readonly<Record<string, Capability>> = {
   "attention/need": "attention/1",
+  "attention/turn": "liveactivity/1",
   "clients/announce": "clients/1",
   "clients/connections": "clients/1",
   "clients/forget": "clients/1",
   "clients/forgetSelf": "clients/1",
   "clients/list": "clients/1",
+  "clients/setActivityToken": "liveactivity/1",
   "clients/setGrant": "clients/1",
   "clients/setPushToken": "clients/1",
   "clients/startPairing": "clients/1",

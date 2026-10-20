@@ -233,6 +233,16 @@ means the control plane posts to APNs itself, which adds a secret and a surface:
 - **Device tokens** are a field of the device's own client record (`pushToken`), set only by
   `clients/setPushToken` from that device's session, refused from a window or a browser, and
   never on `clients/list`. A token APNs says is gone is taken off the record.
+- *Built, #1744.* **Live Activity updates.** A Live Activity's state is not opened by an
+  extension, so Apple reads it. A `liveactivity` push (topic
+  `com.alexecollins.agents.remote.push-type.liveactivity`) carries only the phase (working,
+  question, approval, done, failed) and the turn's start and end times. It never carries the
+  session's title or a line: the activity shows the title it was started with, and "Open
+  Agents to answer it". The host says each move with `attention/turn` (no words). Only the
+  copy that holds that host sends it, with or without a relay host, because CloudKit cannot
+  update an activity. The tokens are the device's own record (`activityTokens`), set only by
+  `clients/setActivityToken`, at most 16, each dropped after 12 hours, when its turn ends,
+  or when APNs says it is gone.
 
 **Alex's other answers, 2026-10-02:** the machine is a **DigitalOcean** droplet, at a
 **subdomain of alexecollins.com** (an A record Alex makes), with records in a **folder on

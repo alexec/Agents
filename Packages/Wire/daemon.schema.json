@@ -16760,6 +16760,62 @@
       ],
       "additionalProperties": false
     },
+    "ActivityToken": {
+      "type": "object",
+      "description": "clients/setActivityToken (#1744): the push token of one session's Live Activity on this device, in hex, for the control plane to update it by APNs while the Remote is not running. startedAt is when the turn began, where the activity's timer counts from. No token takes it away.",
+      "properties": {
+        "agentID": {
+          "$ref": "#/definitions/UUID"
+        },
+        "token": {
+          "type": "string"
+        },
+        "environment": {
+          "$ref": "#/definitions/PushEnvironment"
+        },
+        "startedAt": {
+          "$ref": "#/definitions/WireDate"
+        }
+      },
+      "required": [
+        "agentID",
+        "environment",
+        "startedAt"
+      ],
+      "additionalProperties": false
+    },
+    "TurnPhase": {
+      "type": "string",
+      "enum": [
+        "working",
+        "question",
+        "approval",
+        "done",
+        "failed",
+        "gone"
+      ],
+      "description": "Where a session's turn is, as its Live Activity says it (#1744): working; a question or an approval waiting on the person; done; ended for another reason; or gone (archived or deleted)."
+    },
+    "AttentionTurn": {
+      "type": "object",
+      "description": "attention/turn (#1744): a host says that a session's turn moved to a new phase, so the control plane can update that session's Live Activity on a device by APNs. No words: the phase, and when it ended.",
+      "properties": {
+        "agentID": {
+          "$ref": "#/definitions/UUID"
+        },
+        "phase": {
+          "$ref": "#/definitions/TurnPhase"
+        },
+        "endedAt": {
+          "$ref": "#/definitions/WireDate"
+        }
+      },
+      "required": [
+        "agentID",
+        "phase"
+      ],
+      "additionalProperties": false
+    },
     "SealedEnvelope": {
       "type": "object",
       "description": "Envelope: HPKE (P-256, HKDF-SHA256, AES-256-GCM) to one device's key. Nothing in it is legible but to that device.",

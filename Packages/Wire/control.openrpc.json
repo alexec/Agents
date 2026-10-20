@@ -35,6 +35,27 @@
       }
     },
     {
+      "name": "attention/turn",
+      "x-capability": "liveactivity/1",
+      "description": "A host, on its channel 0 (#1744): a session's turn moved to a new phase.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/AttentionTurn"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
       "name": "clients/announce",
       "x-capability": "clients/1",
       "description": "On a pairing connection, before any other.",
@@ -179,6 +200,27 @@
           "required": true,
           "schema": {
             "$ref": "daemon.schema.json#/definitions/PushToken"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
+      "name": "clients/setActivityToken",
+      "x-capability": "liveactivity/1",
+      "description": "A device, over its own session (#1744): the push token of one session's Live Activity, kept in its own client record, which only it may set. Refused from a window or a browser.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/ActivityToken"
           }
         }
       ],

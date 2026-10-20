@@ -230,6 +230,39 @@ func TestAQuietPushIsABackgroundPush(t *testing.T) {
 	}
 }
 
+// A Live Activity's update goes to the activity's topic as a liveactivity push, with its
+// content state in the aps and a timestamp; an end says when it leaves the Lock Screen
+// (#1744).
+func TestALiveActivityPushHasItsOwnTopicAndType(t *testing.T) {
+	f := NewFakeAPNs(t)
+	c, _ := newClient(t, f, nil)
+	at := time.Unix(1_800_000_000, 0)
+	state := json.RawMessage(`{"phase":"working","startedAt":800000000}`)
+	if err := c.Send(context.Background(), Push{Token: deviceToken, Environment: wire.PushEnvironmentDevelopment,
+		Activity: &Activity{State: state, Timestamp: at}}); err != nil {
+		t.Fatal(err)
+	}
+	end := Push{Token: deviceToken, Environment: wire.PushEnvironmentDevelopment,
+		Activity: &Activity{State: state, Timestamp: at, End: true, Dismiss: at.Add(15 * time.Minute), Urgent: true}}
+	if err := c.Send(context.Background(), end); err != nil {
+		t.Fatal(err)
+	}
+	update, ended := f.Requests()[0], f.Requests()[1]
+	if update.Path != "/3/device/"+deviceToken || update.Header.Get("apns-topic") != "com.alexecollins.agents.remote.push-type.liveactivity" ||
+		update.Header.Get("apns-push-type") != "liveactivity" || update.Header.Get("apns-priority") != "5" {
+		t.Fatal(update.Path, update.Header)
+	}
+	if got := string(update.Body); got != `{"aps":{"content-state":{"phase":"working","startedAt":800000000},"event":"update","timestamp":1800000000}}` {
+		t.Fatal(got)
+	}
+	if ended.Header.Get("apns-priority") != "10" {
+		t.Fatal(ended.Header)
+	}
+	if got := string(ended.Body); !strings.Contains(got, `"event":"end"`) || !strings.Contains(got, `"dismissal-date":1800000900`) {
+		t.Fatal(got)
+	}
+}
+
 // One provider token for 40 minutes, then a new one; and a new one at once after Apple
 // says it has expired.
 func TestTheProviderTokenIsMadeAgain(t *testing.T) {

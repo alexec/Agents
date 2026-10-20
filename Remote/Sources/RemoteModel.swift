@@ -346,6 +346,10 @@ final class RemoteModel {
         work.onOversized = { [weak self] agentID, entryID, index in
             Task { await self?.loadOversized(entryID, of: agentID, at: index) }
         }
+        liveActivities.tokenChanged = { [weak self] agentID, token, startedAt in
+            guard let self, isConnected else { return }
+            Task { await self.sendActivityToken(agentID, token, startedAt) }
+        }
     }
 
     /// Away, and slower (046): what the screens read to show the Away line and to put
@@ -2699,6 +2703,7 @@ final class RemoteModel {
         }
         subscribeOnce()
         await sendPushToken()
+        liveActivities.sayTokens()
     }
 
     /// This device's APNs token (#1460), as the system gave it.
@@ -2723,6 +2728,20 @@ final class RemoteModel {
             note("push: token given to the control plane")
         } catch {
             note("push: the token was not taken: \(error)")
+        }
+    }
+
+    /// `clients/setActivityToken` (#1744): a Live Activity's push token, to the control plane
+    /// only, so it can update the activity while this app is not running; nil when it ended.
+    /// A Mac's own daemon does not know the method; the app's own updates go on.
+    private func sendActivityToken(_ agentID: UUID, _ token: Data?, _ startedAt: Date) async {
+        do {
+            try await client.call(DaemonAPI.Method.clientsSetActivityToken,
+                                  DaemonAPI.ActivityToken(agentID: agentID, token: token, environment: .ofThisBuild,
+                                                          startedAt: startedAt))
+            note("live activity: token for \(agentID) \(token == nil ? "taken back" : "given") to the control plane")
+        } catch {
+            note("live activity: the token for \(agentID) was not taken: \(error)")
         }
     }
 

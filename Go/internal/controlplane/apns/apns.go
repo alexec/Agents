@@ -166,11 +166,39 @@ type Push struct {
 	// apns-collapse-id: a later push for the same need replaces the banner.
 	CollapseID string
 	Sealed     wire.SealedEnvelope
+	// A Live Activity's update or end (#1744), in place of the sealed item: the token is
+	// the activity's own, not the device's.
+	Activity *Activity
 }
+
+// Activity is a liveactivity push: the activity's new content state, and an end.
+type Activity struct {
+	// The content state as the app's ActivityKit decodes it: TurnActivityContent's JSON.
+	State json.RawMessage
+	// When the state was true. The system keeps the newest state it was given.
+	Timestamp time.Time
+	// The activity ends with this state, and goes from the Lock Screen at Dismiss
+	// (at once when zero).
+	End     bool
+	Dismiss time.Time
+	// Urgent: priority 10, which Apple's budget for an activity counts. A working update is 5.
+	Urgent bool
+}
+
+// ActivityTopic is the topic of a liveactivity push: the app's, with the push type.
+func ActivityTopic(topic string) string { return topic + ".push-type.liveactivity" }
 
 // Payload is the JSON body: an aps that says only that an agent needs the person (or
 // nothing, for a background push), and the sealed item under "agents".
 func (p Push) Payload() []byte {
+	if a := p.Activity; a != nil {
+		aps := map[string]any{"timestamp": a.Timestamp.Unix(), "event": "update", "content-state": a.State}
+		if a.End {
+			aps["event"] = "end"
+			aps["dismissal-date"] = a.Dismiss.Unix()
+		}
+		return mustJSON(map[string]any{"aps": aps})
+	}
 	aps := map[string]any{"content-available": 1}
 	if p.Alert {
 		aps = map[string]any{"alert": map[string]string{"title": Title}, "sound": "default", "mutable-content": 1}
@@ -212,12 +240,22 @@ func (c *Client) Send(ctx context.Context, p Push) error {
 		return err
 	}
 	request.Header.Set("authorization", "bearer "+bearer)
-	request.Header.Set("apns-topic", c.topic)
 	request.Header.Set("content-type", "application/json")
-	if p.Alert {
+	switch {
+	case p.Activity != nil:
+		request.Header.Set("apns-topic", ActivityTopic(c.topic))
+		request.Header.Set("apns-push-type", "liveactivity")
+		if p.Activity.Urgent {
+			request.Header.Set("apns-priority", "10")
+		} else {
+			request.Header.Set("apns-priority", "5")
+		}
+	case p.Alert:
+		request.Header.Set("apns-topic", c.topic)
 		request.Header.Set("apns-push-type", "alert")
 		request.Header.Set("apns-priority", "10")
-	} else {
+	default:
+		request.Header.Set("apns-topic", c.topic)
 		request.Header.Set("apns-push-type", "background")
 		request.Header.Set("apns-priority", "5")
 	}

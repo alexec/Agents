@@ -617,5 +617,11 @@
   "SendRead": {
     "data": "aGVsbG8=",
     "end": true
+  },
+  "ActivityToken": {
+    "agentID": "A0000000-0000-4000-8000-000000000001",
+    "token": "b1b2c3d4",
+    "environment": "development",
+    "startedAt": 800000000
   }
 }

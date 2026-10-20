@@ -24,6 +24,14 @@ type ACPProviderInfo struct {
 	Configured *bool   `json:"configured,omitzero"`
 }
 
+// clients/setActivityToken (#1744): the push token of one session's Live Activity on this device, in hex, for the control plane to update it by APNs while the Remote is not running. startedAt is when the turn began, where the activity's timer counts from. No token takes it away.
+type ActivityToken struct {
+	AgentID     UUID            `json:"agentID"`
+	Token       *string         `json:"token,omitzero"`
+	Environment PushEnvironment `json:"environment"`
+	StartedAt   Date            `json:"startedAt"`
+}
+
 // What either announce is answered with: who the new party now is.
 type Admitted struct {
 	Client *UUID   `json:"client,omitzero"`
@@ -454,6 +462,13 @@ type AttentionNotification struct {
 type AttentionPending struct {
 	Needs      []Need              `json:"needs"`
 	Deliveries []AttentionDelivery `json:"deliveries"`
+}
+
+// attention/turn (#1744): a host says that a session's turn moved to a new phase, so the control plane can update that session's Live Activity on a device by APNs. No words: the phase, and when it ended.
+type AttentionTurn struct {
+	AgentID UUID      `json:"agentID"`
+	Phase   TurnPhase `json:"phase"`
+	EndedAt *Date     `json:"endedAt,omitzero"`
 }
 
 type AuthStatus struct {
@@ -5083,6 +5098,18 @@ type TunnelOpen struct {
 	Runtime string `json:"runtime"`
 	Ref     string `json:"ref"`
 }
+
+// Where a session's turn is, as its Live Activity says it (#1744): working; a question or an approval waiting on the person; done; ended for another reason; or gone (archived or deleted).
+type TurnPhase string
+
+const (
+	TurnPhaseWorking  TurnPhase = "working"
+	TurnPhaseQuestion TurnPhase = "question"
+	TurnPhaseApproval TurnPhase = "approval"
+	TurnPhaseDone     TurnPhase = "done"
+	TurnPhaseFailed   TurnPhase = "failed"
+	TurnPhaseGone     TurnPhase = "gone"
+)
 
 type TurnSummary struct {
 	ID      UUID              `json:"id"`
