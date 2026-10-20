@@ -33,17 +33,7 @@ func (s *Service) makeProviders(home string) *providers.Providers {
 		Store: s.cfg.Store, Records: s.records, Router: adapter, Methods: providerMethods{s.methods},
 		Secrets: providers.NewSecrets(home), Timing: timing, Log: s.log,
 		Hooks: providers.Hooks{
-			SSHStart: func(host records.HostRecord, destination string) error {
-				// The key trusted at the install, when it was installed over this
-				// destination; else the person's own known_hosts (#965).
-				known := ""
-				if s.tunnels != nil {
-					if over, keys, ok := s.tunnels.Installed(host.ID); ok && over == destination {
-						known = keys
-					}
-				}
-				return s.installer.StartDaemon(context.Background(), destination, known, host.Name)
-			},
+			SSHStart: s.sshStart,
 			OpenTunnel: func(string) {
 				if s.tunnels != nil {
 					s.tunnels.Reconcile(context.Background())
@@ -143,4 +133,18 @@ func rawOf(v any) json.RawMessage {
 // providersCaller is a client as the providers see it.
 func providersCaller(c Caller) providers.Caller {
 	return providers.Caller{Session: c.Session, Client: c.Client, Kind: c.Kind}
+}
+
+// sshStart is the providers' SSHStart hook: a host's agentsd started over ssh. The key
+// trusted at the install, when it was installed over this destination; else the person's
+// own known_hosts (#965).
+func (s *Service) sshStart(host records.HostRecord, destination string) error {
+	known := ""
+	if s.tunnels != nil {
+		if over, keys, ok := s.tunnels.Installed(host.ID); ok && over == destination {
+			known = keys
+		}
+	}
+	// A provider may give alex@127.0.0.1 -p 2222: ssh takes it as one word (#857).
+	return s.installer.StartDaemon(context.Background(), providers.SSHDestination(destination), known, host.Name)
 }
