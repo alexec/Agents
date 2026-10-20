@@ -221,7 +221,8 @@ export function connectionNote(c: Connection, now: Date = new Date()): string {
 /** When an access token ends, such as "ends 18 Oct 2027", as the Mac says it. */
 export function tokenEnds(at: Date, now: Date = new Date()): string {
   if (at <= now) return "ended";
-  return `ends ${at.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" })}`;
+  // The host keeps the end of GitLab's last day (midnight after it): say that day.
+  return `ends ${new Date(at.getTime() - 1000).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" })}`;
 }
 
 /** A provider with no connection yet, on Your Connectors. */

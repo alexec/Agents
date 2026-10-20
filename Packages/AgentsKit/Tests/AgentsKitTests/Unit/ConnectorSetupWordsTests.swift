@@ -79,7 +79,7 @@ struct ConnectorSetupWordsTests {
         let c = DaemonAPI.Connection(provider: .gitlab, login: "agentstest", connectedAt: now,
                                      workspace: "gitlab.example.com", expiresAt: end)
         #expect(ConnectorSetupWords.connectionTitle(c) == "GitLab \u{00B7} agentstest")
-        #expect(ConnectorSetupWords.connectionNote(c, now: now) == "gitlab.example.com \u{00B7} Access token \u{00B7} ends 19 Oct 2027")
+        #expect(ConnectorSetupWords.connectionNote(c, now: now) == "gitlab.example.com \u{00B7} Access token \u{00B7} ends 18 Oct 2027")
         var ended = c
         ended.state = .signInAgain
         #expect(ConnectorSetupWords.connectionNote(ended) == "The access token ended: connect again with a new one")

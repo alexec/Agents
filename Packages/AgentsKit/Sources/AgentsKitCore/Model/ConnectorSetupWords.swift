@@ -256,7 +256,8 @@ public enum ConnectorSetupWords {
         var style = Date.VerbatimFormatStyle(format: "\(day: .defaultDigits) \(month: .abbreviated) \(year: .defaultDigits)",
                                              timeZone: TimeZone(identifier: "UTC")!, calendar: Calendar(identifier: .gregorian))
         style.locale = Locale(identifier: "en_GB")
-        return at <= now ? "ended" : "ends \(at.formatted(style))"
+        // The host keeps the end of GitLab's last day (midnight after it): say that day.
+        return at <= now ? "ended" : "ends \(at.addingTimeInterval(-1).formatted(style))"
     }
 
     /// A provider with no connection yet, on Your Connectors.
