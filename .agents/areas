@@ -32,6 +32,8 @@ Go/                                                    build
 # The wire's schema (#1135): every client and host reads what it says.
 Packages/Wire/                                         build
 scripts/wire.sh                                        build
+# The scripted videos (#1078, #1793): their scenes, recording and upload.
+scripts/video/                                         video
 
 # docs: the docs site and the specs, where no feature below claims a page.
 docs/                                                  docs

@@ -1,6 +1,7 @@
 """Makes the docs site's narrated videos with no person (#1078).
 
-    scripts/video/make.sh <id>… [--no-build] [--keep] [--voice-only] [--compose-only]
+    scripts/video/make.sh <id>… [--no-build] [--keep] [--voice-only] [--compose-only] [--upload]
+    scripts/video/make.sh --sign-in <integration>
 
 For each scene in scenes/<id>.py it:
 1. speaks each narration line with Chatterbox, two takes, and keeps a take only when Whisper
@@ -16,12 +17,21 @@ For each scene in scenes/<id>.py it:
    the marker the scene wrote when it spoke, and writes <id>.mp4 and <id>.vtt to
    ~/Movies/agents-video/out/.
 
-Nothing is uploaded. Real Claude agents run in the scenes, on scratch projects: a few cents
-a video.
+An integration scene (GROUP "integration", scenes/i-<integration>.py, #1793) also shows the
+outside site in the video Chrome (a profile of its own, signed in once by the person), makes a
+token only for the video, and marks each place that shows one. Those places are hidden in
+every frame as it is kept; then every frame is read with OCR (tokens.py) and a take that shows
+any part of a token fails. After the take the scene revokes each token, and a token that the
+provider still takes fails the take too.
+
+Nothing is uploaded unless --upload is given (upload.py: private, to the playlist "Agents
+integrations"). Real Claude agents run in the scenes, on scratch projects: a few cents a
+video.
 """
 import argparse
 import base64
 import importlib.util
+import io
 import json
 import os
 import shutil
@@ -43,7 +53,12 @@ sys.path.insert(0, str(HERE))
 from rpc import Client  # noqa: E402
 from walk import Walk  # noqa: E402
 import frame  # noqa: E402
+import tokens  # noqa: E402
 import voice  # noqa: E402
+
+# The video Chrome's profiles (#1794): one per integration, signed in once by the person with
+# `make.sh --sign-in <integration>`. Never the person's own Chrome profile.
+CHROME_PROFILES = Path.home() / ".agents/video/chrome"
 
 
 def log(*parts):
@@ -69,6 +84,9 @@ class Recorder(threading.Thread):
         self.frames, self.size, self.error = [], None, None
         self.started, self.running = threading.Event(), True
         self.fast = False  # in a span cut short: a few frames do
+        # Labels of the window's elements that show a secret (#1794): hidden in each frame
+        # before it is written.
+        self.secret_labels = []
 
     def run(self):
         last = None
@@ -84,7 +102,7 @@ class Recorder(threading.Thread):
                     if self.size is None:
                         self.size = (reply["width"] * 2, reply["height"] * 2)
                     path = self.folder / f"{len(self.frames):06d}.png"
-                    path.write_bytes(png)
+                    path.write_bytes(self.hidden(png) if self.secret_labels else png)
                     self.frames.append((path, (began + time.time()) / 2))
                     last = digest
                 self.started.set()
@@ -96,17 +114,39 @@ class Recorder(threading.Thread):
             self.error = error
             self.started.set()
 
+    def hidden(self, png):
+        """The frame with every element a secret label names hidden (frame.hide). An element
+        the window cannot place hides the whole frame: a frame never shows one by mistake."""
+        from PIL import Image
+        img = Image.open(io.BytesIO(png)).convert("RGBA")
+        boxes = []
+        for label in self.secret_labels:
+            for line in self.walk.call("find", text=label).get("matches", []):
+                if " @" not in line:
+                    boxes.append((0, 0, img.width, img.height))
+                    continue
+                where, size = line.rsplit(" @", 1)[1].split(" ")[:2]
+                x, y = (float(n) * 2 for n in where.split(","))
+                w, h = (float(n) * 2 for n in size.split("x"))
+                boxes.append((x, y, w, h))
+        out = io.BytesIO()
+        frame.hide(img, boxes).save(out, "PNG")
+        return out.getvalue()
+
     def start_time(self):
         self.started.wait(20)
         if self.error or not self.frames:
             raise RuntimeError(f"recorder: {self.error or 'no frame'}")
         return self.frames[0][1]
 
-    def finish(self, out, end):
+    def finish(self, out, end, secrets=()):
         self.running = False
         self.join(10)
         if self.error:
             raise RuntimeError(f"recorder: {self.error}")
+        if secrets:
+            n = tokens.check([path for path, _ in self.frames], secrets, "the window")
+            log(f"token check: none of the window's {n} frames shows part of a token")
         # The concat demuxer shows each frame until the next one's time.
         times = [at for _, at in self.frames] + [max(end, self.frames[-1][1] + 0.1)]
         with open(self.folder / "frames.txt", "w") as listing:
@@ -126,9 +166,9 @@ class Recorder(threading.Thread):
 class Web:
     """The web page in headless Chrome, driven through web.mjs."""
 
-    def __init__(self, profile):
-        self.proc = subprocess.Popen(["node", str(HERE / "web.mjs"), profile], stdin=subprocess.PIPE,
-                                     stdout=subprocess.PIPE, text=True, cwd=HERE)
+    def __init__(self, profile, headed=False):
+        self.proc = subprocess.Popen(["node", str(HERE / "web.mjs"), profile, json.dumps({"headed": headed})],
+                                     stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True, cwd=HERE)
 
     def __call__(self, op, **args):
         self.proc.stdin.write(json.dumps({"op": op, **args}) + "\n")
@@ -162,6 +202,9 @@ class Video:
         self.recorder = None
         self.agents = {}
         self.answer_permissions = True
+        # Integration scenes (#1794): the tokens the scene made, each with how to prove the
+        # provider refuses it once it is revoked. Kept in memory only, never logged.
+        self.secrets = []
 
     # --- the scratch set-up -------------------------------------------------------------
     def launch(self, build):
@@ -402,6 +445,57 @@ class Video:
         out = run(control, "code", "--client", "--browser", "--home", f"{self.root}/control")
         return out.splitlines()[-1].strip()
 
+    # --- an integration's outside site (#1794) ------------------------------------------
+    def open_site(self, url, tab="site"):
+        """The outside site in the video Chrome, at the scene's BROWSER size, in a tab of its
+        own; the browser frame records whichever tab is in front. The profile is the scene's
+        CHROME_PROFILE, signed in once by the person: a take stops when it is not."""
+        if not self.web:
+            profile = CHROME_PROFILES / self.scene.CHROME_PROFILE
+            if not profile.exists():
+                raise RuntimeError(f"no video Chrome profile {profile}: the person signs in first, "
+                                   f"with scripts/video/make.sh --sign-in {self.scene.CHROME_PROFILE}")
+            self.web = Web(str(profile))
+        width, height = self.scene.BROWSER
+        self.web("open", url=url, width=width, height=height, mobile=False, tab=tab)
+        return self.web
+
+    def open_web_tab(self, tab="agents"):
+        """The scratch web page, paired, in another tab of the video Chrome. Its pairing is
+        forgotten after the take (forget_web_tab), so the profile keeps only the sign-in."""
+        width, height = self.scene.BROWSER
+        self.web("open", url=self.env["WEB_URL"], width=width, height=height, mobile=False, tab=tab)
+        self.web("pair", code=self.browser_code())
+
+    def forget_web_tab(self):
+        if self.web and self.env.get("WEB_URL"):
+            from urllib.parse import urlsplit
+            parts = urlsplit(self.env["WEB_URL"])
+            try:
+                self.web("forget", origin=f"{parts.scheme}://{parts.netloc}")
+            except Exception as error:
+                log("the scratch page's pairing was not forgotten:", error)
+
+    def secret(self, name, value, refused=None):
+        """A token the scene made for the video. `refused()` asks the provider with it and
+        says whether it was refused (401); after the take it must be. With no `refused`, the
+        value is only looked for in the frames: a code spent once, say."""
+        if value:
+            self.secrets.append({"name": name, "value": value, "refused": refused})
+
+    def hide_in_window(self, label):
+        """Hides the window's elements labelled `label` in every frame from now on."""
+        if self.recorder:
+            self.recorder.secret_labels.append(label)
+        self._hidden_labels = getattr(self, "_hidden_labels", []) + [label]
+
+    def hide_in_browser(self, selector):
+        """Hides what the DOM selector matches in every tab, from now on."""
+        self.web("secret", selector=selector)
+
+    def secret_values(self):
+        return [s["value"] for s in self.secrets]
+
     # --- the story ----------------------------------------------------------------------
     def mark(self, name):
         self.marks.append((name, time.time()))
@@ -460,6 +554,7 @@ def record_scene(scene, takes, work, build, keep):
         time.sleep(1.0)
         Path(work / "still.png").write_bytes(base64.b64decode(v.walk.call("shot")["png"]))
         recorder = v.recorder = Recorder(root, work / "frames")
+        recorder.secret_labels.extend(getattr(v, "_hidden_labels", []))
         recorder.start()
         mac_start = recorder.start_time()
         if v.web:
@@ -471,13 +566,53 @@ def record_scene(scene, takes, work, build, keep):
         time.sleep(0.5)
         if v.web:
             v.web("stop")
-        recorder.finish(work / "mac.mov", time.time())
+        recorder.finish(work / "mac.mov", time.time(), v.secret_values())
+        if v.web and v.secrets:
+            frame.hide_web_frames(work)
+            n = tokens.check(sorted((work / "web/frames").glob("*.jpg")), v.secret_values(), "the browser")
+            log(f"token check: none of the browser's {n} frames shows part of a token")
+            (work / "web/secrets.json").unlink()  # hidden now: compose need not hide them again
         (work / "marks.json").write_text(json.dumps({"mac_start": mac_start, "scale": 2, "marks": v.marks}, indent=1))
         contact_sheet(work)
     finally:
         if recorder:
             recorder.running = False
-        v.stop(keep=keep)
+        try:
+            revoke(scene, v)
+        finally:
+            v.forget_web_tab()
+            v.stop(keep=keep)
+    return v.secret_values()
+
+
+class TokenStillWorks(RuntimeError):
+    pass
+
+
+def revoke(scene, v):
+    """After every take, kept or not: the scene revokes what it made (scene.revoke), then each
+    token must be refused (#1794). A token that still works fails the take, loudly."""
+    if not hasattr(scene, "revoke"):
+        return
+    try:
+        scene.revoke(v)
+    except Exception as error:
+        log("revoke:", error)
+    live = []
+    for secret in v.secrets:
+        if secret["refused"] is None:
+            continue
+        try:
+            refused = secret["refused"]()
+        except Exception as error:
+            log(f"the {secret['name']} check could not ask:", error)
+            refused = False
+        log(f"{secret['name']}: {'refused (401)' if refused else 'STILL WORKS'}")
+        if not refused:
+            live.append(secret["name"])
+    if live:
+        raise TokenStillWorks(f"{scene.ID}: still working after the take: {', '.join(live)}. Revoke "
+                              f"them by hand on the provider's page now; the take is not kept")
 
 
 def check(scene, mp4, work):
@@ -518,19 +653,43 @@ def contact_sheet(work):
     log("contact sheet:", work / "sheet.png")
 
 
+def sign_in(profile, urls):
+    """The video Chrome on its own profile, in a window, for the person to sign in to the
+    site once (#1794). It quits when the person closes the window."""
+    folder = CHROME_PROFILES / profile
+    folder.mkdir(parents=True, exist_ok=True)
+    os.chmod(folder, 0o700)
+    from shutil import which
+    chrome = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+    if not Path(chrome).exists() and not which("google-chrome"):
+        raise SystemExit("Chrome is not installed")
+    log(f"sign in, then close the window: the profile is {folder}")
+    subprocess.run([chrome, f"--user-data-dir={folder}", "--no-first-run", "--no-default-browser-check",
+                    "--disable-sync", *(urls or [SIGN_IN.get(profile, "about:blank")])])
+
+
+SIGN_IN = {"linear": "https://linear.app/login"}
+
+
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("scenes", nargs="+")
+    parser.add_argument("scenes", nargs="*")
     parser.add_argument("--no-build", action="store_true", help="use the last build/DD")
     parser.add_argument("--keep", action="store_true", help="keep the scratch root to read")
     parser.add_argument("--voice-only", action="store_true")
     parser.add_argument("--compose-only", action="store_true", help="compose the last recording again")
+    parser.add_argument("--upload", action="store_true", help="upload each video made (upload.py)")
+    parser.add_argument("--sign-in", metavar="PROFILE", help="open the video Chrome on PROFILE for the person to sign in, then quit")
     args = parser.parse_args()
+    if args.sign_in:
+        sign_in(args.sign_in, args.scenes)
+        return
     OUT.mkdir(parents=True, exist_ok=True)
     built = args.no_build
     for scene_id in args.scenes:
         scene = load_scene(scene_id)
         work = CACHE / "work" / scene.ID
+        secrets = []
         takes = voice.speak(scene, CACHE / "voice")
         if args.voice_only:
             continue
@@ -538,11 +697,23 @@ def main():
             if work.exists():
                 shutil.rmtree(work)
             work.mkdir(parents=True)
-            record_scene(scene, takes, work, build=not built, keep=args.keep)
+            secrets = record_scene(scene, takes, work, build=not built, keep=args.keep)
             built = True
+        elif getattr(scene, "GROUP", "") == "integration":
+            raise SystemExit("--compose-only: an integration take's tokens are gone, so it cannot be checked again; make it again")
         mp4 = frame.compose(scene, takes, work, OUT)
-        check(scene, mp4, work)
+        try:
+            check(scene, mp4, work)
+            if secrets:
+                n = tokens.check_video(mp4, secrets)
+                log(f"token check: none of {n} frames of {mp4.name} shows part of a token")
+        except Exception:
+            mp4.unlink(missing_ok=True)
+            raise
         log(scene.ID, "made", mp4)
+        if args.upload:
+            import upload
+            upload.upload(scene, mp4)
 
 
 if __name__ == "__main__":

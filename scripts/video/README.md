@@ -8,11 +8,12 @@ marketing ones when the change matters.
 scripts/video/make.sh u1 u3          # build, then make each video in turn
 scripts/video/make.sh a2 --no-build  # with the last build in build/DD
 scripts/video/make.sh u4 --compose-only   # put the last recording together again
+scripts/video/make.sh i-linear --upload   # an integration video, made, checked and uploaded
 ```
 
 Each video is written to `~/Movies/agents-video/out/<id>.mp4`, 2560×1440 at 30 fps, with
-its captions in `<id>.vtt`. Nothing is uploaded. The videos go on YouTube, never in git,
-and Alex uploads them until the YouTube API project passes Google's audit.
+its captions in `<id>.vtt`. The videos go on YouTube, never in git. Alex uploads the usage
+and marketing videos; `--upload` uploads an integration video (below).
 
 ## What it does
 
@@ -46,9 +47,51 @@ free, so the real disk is never shown. A scratch agent still reads the person's 
 `~/.claude/CLAUDE.md`: each project tells it never to name an instructions file, and a
 take whose window shows the person's name or their own instructions fails.
 
+## Integration videos (#1793)
+
+One video per integration, on a real account, made by `scenes/i-<integration>.py` (`GROUP =
+"integration"`). Alex watches it to see that the integration works as Alex wants. When the UI
+changes, the same scene makes it again.
+
+- **The video Chrome.** The outside site (sign in, where to make a token, approve OAuth) is in
+  Chrome beside the window: Chrome on a profile of its own,
+  `~/.agents/video/chrome/<integration>`, that Alex signs in to once with
+  `scripts/video/make.sh --sign-in <integration>`. It is never Alex's own Chrome profile.
+  The take runs it headless (`web.mjs`), so nothing reaches the screen and a locked screen
+  does not stop it. The same Chrome can show the scratch web page in another tab; its pairing
+  is forgotten after the take.
+- **Tokens: three defences.**
+  1. The scene makes a token only for the video (`agents-video-<date>`), with the fewest
+     scopes.
+  2. Each place that shows a secret is marked: a DOM selector or a token pattern in Chrome
+     (`web("secret", pattern=…)`: the page blurs every element whose text or value holds one,
+     before it is drawn), an element of the window (`v.hide_in_window(label)`). `frame.hide`
+     makes each place unreadable again in every frame as it is kept. Then `tokens.py` reads
+     every distinct frame of the window and the browser, and the finished video twice a
+     second, with Vision (`ocr.swift`). A frame that shows any 6 characters of a token fails
+     the take, and its video is deleted. No check prints a token.
+  3. After every take, kept or not, the scene's `revoke(v)` revokes what it made, and each
+     token is asked of the provider again: one that is not refused (401) fails the take, and
+     the log says to revoke it by hand.
+- **Upload** (`upload.py`): the YouTube Data API v3, **private**, to the playlist `Agents
+  integrations`. The title names the integration and the app version (`git describe`); the
+  description gives the commit, the date and the scene file. A new take replaces the old one in
+  the playlist: the old video is made private and taken out of the playlist, never deleted.
+  The local file is deleted after a good upload. Until Alex's steps on #1793 are done (the
+  OAuth client in `~/.agents/secrets/youtube-client.json`, then `upload.py --sign-in`), the
+  video stays in `out/` and the log says why.
+- **Its walk hand-off.** A walk's Connect Linear sheet opens no authentication session (that
+  is Safari's sheet, on the person's screen): it writes the flow and its address to
+  `sign-in.json` in the walk's folder. The scene approves in the video Chrome, reads the code
+  from the hand-back page's address, and gives it to the host.
+
+`python3 scripts/video/tokens.py --self-test` (with the venv's Python) proves the check: a
+made-up token is read where it shows and not after `frame.hide`, and a page in Chrome with a
+pattern secret shows none of it.
+
 ## A scene
 
-`scenes/<id>.py` has `LINES` (the narration), `GROUP` (`usage` or `marketing`), `LAYOUT`
+`scenes/<id>.py` has `LINES` (the narration), `GROUP` (`usage`, `marketing` or `integration`), `LAYOUT`
 (`mac`, `mac+phone` or `mac+browser`), and two functions: `setup(v)` runs before the
 recording starts, and `run(v)` is the recording. `v` is the `Video` in `make.py`:
 
@@ -61,6 +104,12 @@ recording starts, and `run(v)` is the recording. `v` is the `Video` in `make.py`
 | `v.say(key)` | the line starts here; the scene waits until it has been said (`wait=False` goes on at once) |
 | `with v.fast(2.0):` | what happens inside is cut to two seconds |
 | `v.open_phone()`, `v.web(op, …)` | the web page at iPhone size, and what to do on it |
+| `v.open_site(url)`, `v.open_web_tab()` | an integration's site in the video Chrome, and the scratch web page in a tab beside it |
+| `v.secret(name, value, refused)` | a token the scene made: looked for in every frame, and `refused()` must be true after `revoke(v)` |
+| `v.hide_in_window(label)`, `v.web("secret", selector=…/pattern=…)` | places that show a secret, hidden in every frame |
+
+An integration scene also has `INTEGRATION`, `CHROME_PROFILE`, `BROWSER_ADDRESS` (the address
+drawn in the browser's bar) and `revoke(v)`, which runs after every take.
 
 Sheets and popovers are in the picture, where they sit on the window. The menu bar, a
 menu and anything outside the window are not.
@@ -87,6 +136,10 @@ menu and anything outside the window are not.
 | U5 | Follow a live document | `u5.py` | yes |
 | U8 | Start in a worktree | `u8.py` | yes |
 | U9 | Use Agents in a browser | `u9.py` | yes |
+
+| Integration | Scene | Made |
+|---|---|---|
+| Linear (#1794) | `i-linear.py` | not yet: Alex signs in to the video Chrome first (#1793) |
 
 The rest of the list in #1078 need something first: the native Remote in a simulator
 (XCUITest), a workflow, a faked limit, several runtimes, seeded usage, or the devbox.
