@@ -150,7 +150,7 @@ async function stopAll(store: Store, host: string, agent: Agent) {
 export type NarrowItem = { label: string; help?: string; checked: boolean; run: () => void };
 
 export function SessionMenu({ store, host, agent, disabled, find, prompts, openFile, inChat, narrow = [] }:
-  { store: Store; host: string; agent: Agent | undefined; disabled: boolean; find?: () => void; prompts?: () => void; openFile?: () => void; inChat?: boolean; narrow?: NarrowItem[] }) {
+  { store: Store; host: string; agent: Agent | undefined; disabled: boolean; find?: (() => void) | undefined; prompts?: () => void; openFile?: () => void; inChat?: boolean; narrow?: NarrowItem[] }) {
   const open = useSignal(false);
   const anchor = useRef<HTMLSpanElement>(null);
   useEffect(() => {
