@@ -357,8 +357,15 @@ struct RemoteChatView: View {
     private var runCommand: (@MainActor (String) -> Void)? {
         guard !model.macLacksPanes, let agent else { return nil }
         return { [model] command in
-            model.panes.state(for: agent.id).show(.terminal)
-            Task { await model.runCommand(command, in: agent.id) }
+            let state = model.panes.state(for: agent.id)
+            state.frontShellZero()
+            state.show(.terminal)
+            Task {
+                await model.runCommand(command, in: agent.id)
+                // The pane, shown just now, asks the Mac for its shells, and the answer may
+                // have come before shell 0 was open again.
+                state.frontShellZero()
+            }
         }
     }
 

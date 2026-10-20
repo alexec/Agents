@@ -137,10 +137,17 @@ struct ChatView: View {
     /// own has none.
     private var runCommand: (@MainActor (String) -> Void)? {
         guard hasInspector, let agent else { return nil }
-        return { [model, frame] command in
+        return { [model, frame, states] command in
+            let state = states.state(for: agent.id)
+            state.frontShellZero()
             frame.pane = .terminal
             if !frame.isOpen { frame.open() }
-            Task { await model.runCommand(command, in: agent.id) }
+            Task {
+                await model.runCommand(command, in: agent.id)
+                // The pane, shown just now, asks the host for its shells, and the answer
+                // may have come before shell 0 was open again.
+                state.frontShellZero()
+            }
         }
     }
 
