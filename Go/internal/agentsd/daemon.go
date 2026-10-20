@@ -37,6 +37,7 @@ type Daemon struct {
 	// agentMu orders every read-change-save of an agent record.
 	agentMu sync.Mutex
 	pinState
+	attachmentBook
 	settingsState
 	quitState
 	leaseState
