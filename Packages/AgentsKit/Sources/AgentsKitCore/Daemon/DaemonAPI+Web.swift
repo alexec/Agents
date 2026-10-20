@@ -261,6 +261,17 @@ public extension DaemonAPI {
                 // A linked host's workspace (#691): Start on the offline strip.
                 Row(Method.hostsStart, params: HostRequest.self, result: ControlHost.self, kind: .controlRequest),
                 Row(Method.hostsStop, params: HostStop.self, result: ControlHost.self, kind: .controlRequest),
+                // Settings ▸ Workspace providers (#1808): the API providers, and a workspace's host
+                // linked and unlinked.
+                Row(Method.providersList, params: Empty.self, result: JSONValue.self, kind: .controlRequest),
+                Row(Method.providersAdd, params: ProviderAdd.self, result: ProviderSummary.self, kind: .controlRequest),
+                Row(Method.providersUpdate, params: ProviderAdd.self, result: ProviderSummary.self, kind: .controlRequest),
+                Row(Method.providersRemove, params: ProviderRequest.self, result: Empty.self, kind: .controlRequest),
+                Row(Method.providersRefresh, params: ProviderRequest.self, result: Empty.self, kind: .controlRequest),
+                Row(Method.hostsLink, params: HostLink.self, result: ControlHost.self, kind: .controlRequest),
+                Row(Method.hostsUnlink, params: HostRequest.self, result: ControlHost.self, kind: .controlRequest),
+                Row(Method.hostsSetWorkspaceOptions, params: HostWorkspaceOptions.self, result: ControlHost.self,
+                    kind: .controlRequest),
                 // Prompts and starts kept for a stopped workspace (#691 US3).
                 Row(Method.hostsListKept, params: Empty.self, result: KeptList.self, kind: .controlRequest),
                 Row(Method.hostsDropKept, params: KeptRequestID.self, result: Empty.self, kind: .controlRequest),
@@ -317,6 +328,8 @@ public extension DaemonAPI {
                 // its `workspace` (#691) when it is linked.
                 Row(Notification.controlHostChanged, params: JSONValue.self, result: Empty.self, kind: .controlNotification),
                 Row(Notification.controlKeptChanged, params: KeptList.self, result: Empty.self, kind: .controlNotification),
+                Row(Notification.controlProvidersChanged, params: JSONValue.self, result: Empty.self,
+                    kind: .controlNotification),
                 Row(Notification.controlKeptDelivered, params: KeptDelivered.self, result: Empty.self,
                     kind: .controlNotification),
             ]
