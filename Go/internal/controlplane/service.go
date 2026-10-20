@@ -705,21 +705,28 @@ func (s *Service) keepMayNotify(client string, may bool) {
 
 // heard is a host's attention/need (R6): what to post where, told to the relay host held
 // here. With no relay host here, a need reaches only the clients connected to its host,
-// over their own channels.
-func (s *Service) heard(params json.RawMessage) {
+// over their own channels. It goes only to the devices of the host's owner (#994).
+func (s *Service) heard(host string, params json.RawMessage) {
 	var need notices.AttentionNeed
 	if json.Unmarshal(params, &need) != nil {
 		return
 	}
-	s.deliver(need, false)
+	s.deliver(need, false, s.ownerOf(host))
 }
 
 // deliver posts a need through the relay host if it is held here. With none here but one
 // online at another copy, it tells the other copies. With no relay host online anywhere,
 // the copy that heard the need from its host pushes it through APNs itself (#1460), and
 // no other copy does, so a notice goes one way and arrives once.
-func (s *Service) deliver(need notices.AttentionNeed, fromPeer bool) {
-	relays := s.router.RelaysHeldHere()
+//
+// owner is the person whose devices it goes to; "" (from an older copy) is every device.
+func (s *Service) deliver(need notices.AttentionNeed, fromPeer bool, owner string) {
+	relays := []string{}
+	for _, r := range s.router.RelaysHeldHere() {
+		if owner == "" || s.ownerOf(r) == owner {
+			relays = append(relays, r)
+		}
+	}
 	relay := ""
 	if len(relays) > 0 {
 		sort.Strings(relays)
@@ -730,7 +737,7 @@ func (s *Service) deliver(need notices.AttentionNeed, fromPeer bool) {
 		}
 		if s.pushes == nil || s.router.RelayOnline() {
 			if s.mesh != nil {
-				s.mesh.broadcast(encodePeer("need", need))
+				s.mesh.broadcast(encodeNeed(need, owner))
 			}
 			// Each way a need ends here with nothing sent is said (#1509).
 			if need.Need != nil {
@@ -750,7 +757,7 @@ func (s *Service) deliver(need notices.AttentionNeed, fromPeer bool) {
 	flags := s.router.NotifyFlags()
 	var devices []notices.Device
 	for _, c := range s.records.Clients() {
-		if !c.IsDevice() || len(c.PublicKey) == 0 {
+		if !c.IsDevice() || len(c.PublicKey) == 0 || owner != "" && s.PersonOf(c.ID) != owner {
 			continue
 		}
 		// Pushed from here, only a device that gave its token can be chosen.

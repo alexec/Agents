@@ -382,6 +382,15 @@ func encodePeer(tag string, body any) string {
 	return strings.TrimSuffix(b.String(), "\n")
 }
 
+// encodeNeed is a need for the other copies, with whose devices it goes to (#994).
+func encodeNeed(need notices.AttentionNeed, owner string) string {
+	var b bytes.Buffer
+	e := json.NewEncoder(&b)
+	e.SetEscapeHTML(false)
+	e.Encode(map[string]any{"need": need, "owner": owner})
+	return strings.TrimSuffix(b.String(), "\n")
+}
+
 // received is what a peer says (PeerWire.read).
 func (m *mesh) received(line string, link *peerLink) {
 	if strings.HasPrefix(line, `{"p":"`) {
@@ -451,8 +460,10 @@ func (m *mesh) received(line string, link *peerLink) {
 		}
 	case o["need"] != nil:
 		var need notices.AttentionNeed
+		var owner string
+		json.Unmarshal(o["owner"], &owner)
 		if json.Unmarshal(o["need"], &need) == nil {
-			m.s.deliver(need, true)
+			m.s.deliver(need, true, owner)
 		}
 	}
 }

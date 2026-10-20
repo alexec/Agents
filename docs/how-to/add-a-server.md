@@ -57,6 +57,14 @@ it is done, **Runtimes** says Claude is installing. Codex and Gemini install the
 when you click **Install** under **Runtimes**. The server needs glibc 2.28 or later. Alpine
 (musl) can't run them.
 
+### Or let it ask to join
+
+A server can join with no code, by your approval (#994). In **Settings ▸ People**, copy the
+line under **Add a machine without a code**, and run it on the server. It says **Waiting
+for approval** and a short code. On your client, a card says **devbox wants to join as
+you**, with the same code: click **Approve**. See
+[Invite someone](invite-someone.md#approve-a-machine-that-asks-to-join).
+
 ### Or add it over ssh
 
 1. In **Settings ▸ Control plane ▸ Hosts**, click **Add a Server…**, then choose

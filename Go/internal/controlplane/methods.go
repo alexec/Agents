@@ -721,7 +721,7 @@ func (m *Methods) HostSaid(host, method string, params json.RawMessage) (any, er
 		m.s.announce("hostEnrolled", host, host)
 		return map[string]any{}, nil
 	case "attention/need":
-		m.s.heard(params)
+		m.s.heard(host, params)
 		return map[string]any{}, nil
 	case "attention/turn":
 		turn, err := require[wire.AttentionTurn](params, "AttentionTurn")

@@ -77,10 +77,17 @@ Your agents, their conversations, files and terminals, and the runtimes' sign-in
 the host they belong to. The control plane's store only remembers who is paired and which
 hosts there are.
 
-## One grant for every client
+## People, and one grant for each person's clients
+
+Every client belongs to a person, and every host (a machine) to one user (#994). A person
+reaches only their own machines: the control plane opens a client's channels only to its
+person's machines, and a call to another person's machine is answered as if there were
+no such machine. The first person is the **local owner**, who holds the control plane's
+key, and an **admin**. With one person, everything below is as it was. See
+[People and machines](people-and-machines.md).
 
 Each client is paired once, with a code the control plane shows, and may then do
-everything the Mac's own window may: start and stop agents on any host, open terminals,
+everything its person's other clients may: start and stop agents on their hosts, open terminals,
 sign runtimes in, add and remove hosts and projects, set helper limits, and pair or forget
 other clients. A window, an iPhone, an iPad and a browser are all the same in this.
 
