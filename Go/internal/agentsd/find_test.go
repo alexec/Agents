@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"os"
-	"runtime"
+	goruntime "runtime"
 	"strings"
 	"testing"
 
@@ -95,11 +95,11 @@ func TestFindReadsOnlyMessages(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	var before, after runtime.MemStats
-	runtime.GC()
-	runtime.ReadMemStats(&before)
+	var before, after goruntime.MemStats
+	goruntime.GC()
+	goruntime.ReadMemStats(&before)
 	got, err := d.find(context.Background(), 1, wire.FindRequest{AgentID: id, Text: "NEEDLE"})
-	runtime.ReadMemStats(&after)
+	goruntime.ReadMemStats(&after)
 	if err != nil || len(got.Matches) != 1 || got.Matches[0].EntryID != first || got.Matches[0].Line != "the needle at the end" {
 		t.Fatalf("find %+v %v", got, err)
 	}
