@@ -161,6 +161,15 @@ public enum ConnectorSetupWords {
     /// The Change… slot's other places, on the Remote and the web page.
     public static let otherProvidersElsewhere = "Other providers are set up on the Mac."
 
+    /// The Tasks slot's way to Linear (#1682): the connection first, then its connector.
+    public static let connectLinear = "Connect Linear\u{2026}"
+
+    /// The Tasks slot's other trackers, on the Remote and the web page, which have no catalogue.
+    public static func otherTrackers(linearConnected: Bool) -> String {
+        linearConnected ? "Linear and other trackers: Add Connector on the Mac."
+            : "Then add its connector, or another tracker's, with Add Connector on the Mac."
+    }
+
     // MARK: Your Connectors ▸ Connections
 
     /// The provider's name: GitHub, Linear.

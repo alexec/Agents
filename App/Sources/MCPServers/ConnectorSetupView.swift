@@ -20,6 +20,10 @@ struct ConnectorSetupView: View {
     @State private var reading = false
     @State private var changing: DaemonAPI.ConnectorSlotKind?
     @State private var connecting = false
+    /// Connect Linear, from the Tasks slot (#1682).
+    @State private var connectingLinear = false
+    /// Linear connected in that sheet: the catalogue opens next, for its connector.
+    @State private var linearConnected = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -52,6 +56,11 @@ struct ConnectorSetupView: View {
         }
         .sheet(isPresented: $connecting) {
             ConnectGitHubSheet(host: project.host, project: project, onConnected: { Task { await load(.fresh) } })
+        }
+        .sheet(isPresented: $connectingLinear, onDismiss: {
+            if linearConnected { linearConnected = false; addConnector() }
+        }) {
+            ConnectLinearSheet(host: project.host, onConnected: { linearConnected = true })
         }
     }
 
@@ -157,6 +166,8 @@ struct ConnectorSetupView: View {
     enum Action {
         case connect, tryAgain, skip(DaemonAPI.ConnectorSlotKind), setUp(DaemonAPI.ConnectorSlotKind), catalogue, open(String),
              providers
+        /// Linear for Tasks: Connect Linear first when it is not connected, then the catalogue.
+        case linear
     }
 
     private func act(_ action: Action) {
@@ -166,11 +177,23 @@ struct ConnectorSetupView: View {
         case .skip(let slot): Task { await skip(slot, true) }
         case .setUp(let slot): Task { await skip(slot, false) }
         case .catalogue: addConnector()
+        case .linear: Task { await useLinear() }
         case .open(let address): open(address)
         case .providers:
             model.controlPageAsked = .providers
             model.settingsPaneAsked = .controlPlane
             openSettings()
+        }
+    }
+
+    /// The Linear connector reads the person's Linear connection (#1682): without one, it
+    /// has nothing to read, so the connection comes first.
+    private func useLinear() async {
+        if case .success(let list) = await model.connections(on: project.host),
+           list.contains(where: { $0.provider == .linear && $0.state == .connected }) {
+            addConnector()
+        } else {
+            connectingLinear = true
         }
     }
 
@@ -261,12 +284,12 @@ private struct SlotCard: View {
             switch slot.state {
             case .notConnected:
                 if slot.slot == .tasks {
-                    Button("Use Linear instead\u{2026}") { act(.catalogue) }.buttonStyle(.link)
+                    Button("Use Linear instead\u{2026}") { act(.linear) }.buttonStyle(.link)
                 }
                 skip
             case .noRemote:
                 if slot.slot == .tasks {
-                    Button("Linear\u{2026}") { act(.catalogue) }.buttonStyle(.paper)
+                    Button("Linear\u{2026}") { act(.linear) }.buttonStyle(.paper)
                     Button("From a catalogue\u{2026}") { act(.catalogue) }.buttonStyle(.link)
                 }
                 skip
@@ -407,7 +430,8 @@ private struct SlotChange: View {
             return [
                 Choice(title: slot.choice, note: ConnectorSetupWords.proof(slot) ?? "Comes with the GitHub connection.",
                        chosen: !skipped, pick: { if skipped { act(.setUp(.tasks)) }; done() }),
-                Choice(title: "Linear\u{2026}", note: "Add it from the catalogue.", chosen: false, pick: { act(.catalogue) }),
+                Choice(title: "Linear\u{2026}", note: "Connect Linear, then add its connector.", chosen: false,
+                       pick: { act(.linear) }),
                 Choice(title: "From a catalogue\u{2026}", note: "Another tracker's connector.", chosen: false,
                        pick: { act(.catalogue) }),
                 Choice(title: "None", note: "Skip: agents won't use a tracker here.", chosen: skipped,

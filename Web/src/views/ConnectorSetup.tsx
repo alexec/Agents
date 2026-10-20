@@ -30,8 +30,19 @@ export function ConnectorSetupSection({ store, host, folder, projectName, go }: 
   const [setup, setSetup] = useState<ConnectorSetup>();
   const [problem, setProblem] = useState<string>();
   const [reading, setReading] = useState(false);
-  const [connecting, setConnecting] = useState(false);
+  const [connecting, setConnecting] = useState<ConnectionProvider>();
+  /** Whether the person's Linear connection is there, for the Tasks slot (#1682); unknown until read. */
+  const [linearConnected, setLinearConnected] = useState<boolean>();
   const path = projectPath(folder);
+
+  const readLinear = async () => {
+    try {
+      const { connections } = await store.link.call("connections/list", {}, host);
+      setLinearConnected(connections.some((c) => c.provider === "linear" && c.state === "connected"));
+    } catch {
+      // Unknown: the slot says what it said before.
+    }
+  };
 
   const load = async (how: ConnectorSetupReading) => {
     setReading(true);
@@ -54,8 +65,9 @@ export function ConnectorSetupSection({ store, host, folder, projectName, go }: 
   };
   useEffect(() => {
     void load("cached");
+    void readLinear();
     // Back from github.com (an install, a grant): read again.
-    const back = () => { if (document.visibilityState === "visible") void load("cached"); };
+    const back = () => { if (document.visibilityState === "visible") { void load("cached"); void readLinear(); } };
     document.addEventListener("visibilitychange", back);
     return () => document.removeEventListener("visibilitychange", back);
   }, [host, path]);
@@ -66,12 +78,13 @@ export function ConnectorSetupSection({ store, host, folder, projectName, go }: 
       {problem && <p class="small failure">{problem}</p>}
       {setup && (
         <>
-          <ConnectionCard setup={setup} connect={() => setConnecting(true)} />
+          <ConnectionCard setup={setup} connect={() => setConnecting("github")} />
           <h2 class="setup-heading">{words.setUpHeading(setup)}</h2>
           <div class="slot-grid">
             {setup.slots.map((slot) => (
               <SlotCard key={slot.slot} slot={slot} setup={setup} projectName={projectName} reading={reading}
-                tryAgain={() => void load("fresh")} skip={(s) => void skip(slot.slot, s)} />
+                tryAgain={() => void load("fresh")} skip={(s) => void skip(slot.slot, s)}
+                linearConnected={linearConnected} connectLinear={() => setConnecting("linear")} />
             ))}
           </div>
           {(setup.connection || setup.events.state !== "off") && (
@@ -100,8 +113,9 @@ export function ConnectorSetupSection({ store, host, folder, projectName, go }: 
       )}
       {!setup && !problem && <p class="quiet small">Reading…</p>}
       {connecting && (
-        <ConnectDialog store={store} host={host} provider="github" folder={path}
-          connected={() => void load("fresh")} close={() => setConnecting(false)} />
+        <ConnectDialog store={store} host={host} provider={connecting} folder={path}
+          connected={() => void (connecting === "linear" ? readLinear() : load("fresh"))}
+          close={() => setConnecting(undefined)} />
       )}
     </div>
   );
@@ -150,9 +164,11 @@ function SlotMark({ slot, reading }: { slot: ConnectorSlot; reading: boolean }) 
   return <span class={`slot-mark ${slot.state}`} role="img" aria-label={label}>{mark}</span>;
 }
 
-function SlotCard({ slot, setup, projectName, reading, tryAgain, skip }: {
+function SlotCard({ slot, setup, projectName, reading, tryAgain, skip, linearConnected, connectLinear }: {
   slot: ConnectorSlot; setup: ConnectorSetup; projectName: string; reading: boolean;
   tryAgain: () => void; skip: (skipped: boolean) => void;
+  /** Tasks only: whether Linear is connected, unknown until read (#1682). */
+  linearConnected: boolean | undefined; connectLinear: () => void;
 }) {
   const [changing, setChanging] = useState(false);
   const canChange = slot.slot !== "workspace" && ["read", "refused", "failed"].includes(slot.state);
@@ -180,7 +196,10 @@ function SlotCard({ slot, setup, projectName, reading, tryAgain, skip }: {
       )}
       <p class="slot-actions small">
         {(slot.state === "notConnected" || slot.state === "noRemote") && slot.slot === "tasks" && (
-          <span class="quiet">Linear and other trackers: Add Connector on the Mac.</span>
+          <>
+            {linearConnected === false && <button class="link" onClick={connectLinear}>{words.connectLinear}</button>}
+            <span class="quiet">{words.otherTrackers(linearConnected !== false)}</span>
+          </>
         )}
         {(slot.state === "notConnected" || slot.state === "noRemote") && <button class="link" onClick={() => skip(true)}>Skip</button>}
         {slot.state === "failed" && <button onClick={tryAgain}>Try Again</button>}
@@ -195,6 +214,9 @@ function SlotCard({ slot, setup, projectName, reading, tryAgain, skip }: {
       {changing && (
         <div class="slot-change">
           <button onClick={() => setChanging(false)}>{slot.choice}</button>
+          {slot.slot === "tasks" && linearConnected === false && (
+            <button onClick={() => { connectLinear(); setChanging(false); }}>{words.connectLinear}</button>
+          )}
           <button onClick={() => { skip(true); setChanging(false); }}>None (skip)</button>
           <button class="link" onClick={() => setChanging(false)}>Cancel</button>
         </div>
