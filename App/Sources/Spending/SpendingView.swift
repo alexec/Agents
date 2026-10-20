@@ -128,7 +128,7 @@ private struct ShareRow: View {
                 .foregroundStyle(share.isArchived ? AnyShapeStyle(.secondary) : AnyShapeStyle(.primary))
         }
         .help(share.folder.path)
-        .accessibilityElement(children: .combine)
+        .accessibilityElement(children: .ignore)
         .accessibilityLabel(accessibilityLabel)
     }
 

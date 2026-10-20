@@ -53,6 +53,10 @@ struct FileDiffView: View {
                         .padding(.vertical, 2)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .background(.quaternary.opacity(0.3))
+                        // One element of its own: a label on the selectable Text sent the
+                        // first accessibility query round SwiftUI and AppKit until the
+                        // stack ran out (#1724, as #71).
+                        .accessibilityElement(children: .ignore)
                         .accessibilityLabel("Lines not in the change")
                 }
             }

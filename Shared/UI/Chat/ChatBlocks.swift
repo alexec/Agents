@@ -186,8 +186,9 @@ struct PlanView: View {
                         .fontWeight(entry.status == .inProgress && plan.state == .current ? .semibold : nil)
                         .strikethrough(plan.state == .withdrawn)
                 }
-                // The mark is a glyph; the status is said in words instead (FR-037).
-                .accessibilityElement(children: .combine)
+                // The mark is a glyph; the status is said in words instead (FR-037). Children
+                // ignored, not combined: a label over selectable Text overflows the stack (#1724).
+                .accessibilityElement(children: .ignore)
                 .accessibilityLabel("\(spoken(entry.status)): \(entry.content)")
             }
             if plan.state == .withdrawn {

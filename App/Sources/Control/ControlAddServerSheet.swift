@@ -114,7 +114,10 @@ struct ControlAddServerSheet: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(.background, in: RoundedRectangle(cornerRadius: 8))
                 .overlay { RoundedRectangle(cornerRadius: 8).strokeBorder(Color.secondary.opacity(0.3)) }
+                // One element of its own: a label on the selectable Text overflows the stack (#1724).
+                .accessibilityElement(children: .ignore)
                 .accessibilityLabel("Command")
+                .accessibilityValue(command)
             HStack(spacing: 12) {
                 Button("Copy") {
                     NSPasteboard.general.clearContents()
