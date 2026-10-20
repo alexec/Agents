@@ -714,7 +714,8 @@ private extension View {
 }
 
 /// Settings (#846): Sidebar, the same on every client (#1033), as the window's Settings
-/// pane of the same name and the page's Settings keep it. Everything else follows the Mac.
+/// pane of the same name and the page's Settings keep it, and Show thoughts, as the
+/// window's Appearance pane (#1725). Everything else follows the Mac.
 private struct RemoteSettings: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(RemoteModel.self) private var model
@@ -723,6 +724,7 @@ private struct RemoteSettings: View {
         NavigationStack {
             Form {
                 SidebarSettingsSection()
+                ThoughtsSettingsSection(header: "Appearance")
                 GitAccessSettingsSection()
                 // The docs site (#1327), as the Mac's Help ▸ Agents Help.
                 Section {

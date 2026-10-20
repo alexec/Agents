@@ -86,7 +86,8 @@ struct MacSettingsView: View {
     }
 }
 
-/// Settings ▸ Appearance: the theme, and whether the Dock icon shows the agents' mood.
+/// Settings ▸ Appearance: the theme, whether the Dock icon shows the agents' mood, and
+/// whether the chat shows the agent's thoughts (#1725).
 struct AppearanceSettingsView: View {
     @AppStorage(Appearance.defaultsKey, store: WindowDefaults.store) private var appearance = Appearance.system
     @AppStorage(IconMood.showsMoodKey, store: WindowDefaults.store) private var iconShowsMood = true
@@ -111,5 +112,6 @@ struct AppearanceSettingsView: View {
                 .foregroundStyle(.secondary)
         }
         .paperListRow()
+        ThoughtsSettingsSection()
     }
 }

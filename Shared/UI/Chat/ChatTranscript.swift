@@ -52,6 +52,8 @@ struct ChatTranscript: View {
     /// go only while it is, so nothing leaves from above somebody reading back.
     var onFollowing: (Bool) -> Void = { _ in }
 
+    /// Whether the agent's thoughts are drawn (#1725), from Settings ▸ Appearance.
+    @AppStorage(ChatThoughts.showsKey, store: WindowDefaults.store) private var showsThoughts = ChatThoughts.showsAtFirst
     /// The turns opened or closed by hand, by id. Kept until the chat is left (069).
     @State private var turnViews: [UUID: TurnDetail] = [:]
     /// The run of calls gone to from elsewhere: opened, with its first call (#1315).
@@ -175,6 +177,7 @@ struct ChatTranscript: View {
             folded.storedTurns = stored.map(ChatTurn.init)
             folded.stored = stored
         }
+        let items = ChatThoughts.shown(self.items, showsThoughts: showsThoughts)
         if folded.items != items {
             folded.itemTurns = items.turns(reusing: folded.itemTurns)
             folded.items = items
@@ -217,7 +220,7 @@ struct ChatTranscript: View {
                                     TurnView(turn: turn,
                                              detail: turnViews[turn.id] ?? .initial,
                                              focusedRun: focusedRun,
-                                             fetched: fetchedTurns[turn.id]?.items,
+                                             fetched: fetchedTurns[turn.id].map { ChatThoughts.shown($0.items, showsThoughts: showsThoughts) },
                                              hasEarlier: fetchedTurns[turn.id]?.hasEarlier(than: turn) ?? false,
                                              fetchFailed: failedTurns.contains(turn.id),
                                              isLive: turn.id == liveID,

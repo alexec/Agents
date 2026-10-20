@@ -44,6 +44,7 @@ import { offerStart } from "./NewAgent";
 import { BackToList } from "./BackToList";
 import { comingBackDescription } from "../model/status";
 import { ArchiveCard } from "./ArchiveCard";
+import { showsThoughts, shownItems } from "../model/thoughts";
 import { hasTurnInFlight, promptPlaceholder, willQueue } from "../model/promptWords";
 import { eventWaitCapsule, leaseMark } from "../model/rowLines";
 import { GuardedChangeCard } from "./GuardedChange";
@@ -515,7 +516,7 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
               const i = index++;
               return (
                 <TurnView key={turn.id} turn={turn} detail={chosen.value[turn.id] ?? initialDetail} focusedRun={focusedRun.value}
-                  fetched={fetched.value[turn.id]?.items} fetchFailed={!!failedTurns.value[turn.id]} hasEarlier={fetched.value[turn.id]?.hasEarlier ?? false}
+                  fetched={fetched.value[turn.id] && shownItems(fetched.value[turn.id]!.items)} fetchFailed={!!failedTurns.value[turn.id]} hasEarlier={fetched.value[turn.id]?.hasEarlier ?? false}
                   auto={i >= drawn - openTurnsHeld}
                   isLive={i === drawn - 1 && live} background={background}
                   toggle={turnActions.toggle} loadDetail={turnActions.loadDetail} loadEarlier={turnActions.loadEarlier} />
@@ -741,7 +742,8 @@ function SubagentSteps({ store, item, close }: {
     const timer = setInterval(() => (now.value = toWireDate(new Date())), 1_000);
     return () => clearInterval(timer);
   }, []);
-  const steps = useMemo(() => display(store.entries.value, item.id), [store.entries.value, item.id]);
+  const shows = showsThoughts.value;
+  const steps = useMemo(() => shownItems(display(store.entries.value, item.id), shows), [store.entries.value, item.id, shows]);
   return (
     <Modal label={`Subagent ${item.name}`} close={close}>
       <div class="sheet-body subagent-steps">
@@ -754,7 +756,7 @@ function SubagentSteps({ store, item, close }: {
           </div>
         )}
         {!steps.length && <p class="faint small">{subagentNoSteps(item)}</p>}
-        {/* Thinking too, each a folded line (#1315). */}
+        {/* Thinking too when Show thoughts is on, each a folded line (#1315, #1725). */}
         <div class="steps">{steps.map((step) => <ItemRow key={step.id} item={step} background={[]} />)}</div>
         <div class="sheet-actions"><button onClick={close}>Done</button></div>
       </div>

@@ -516,7 +516,7 @@ function stepsWords(count: number | undefined, open: boolean): string {
  * would fetch them all. One the chat has let go shows a button instead of fetching itself (#291).
  */
 export const TurnView = memo(function TurnView({ turn, detail, focusedRun, fetched, fetchFailed, hasEarlier, auto, isLive, background, toggle: toggleTurn, loadDetail: loadTurn, loadEarlier }: {
-  turn: ChatTurn; detail: TurnDetail; focusedRun: string | null; fetched: Item[] | undefined; fetchFailed: boolean; hasEarlier: boolean; auto: boolean; isLive: boolean;
+  turn: ChatTurn; detail: TurnDetail; focusedRun: string | null; fetched: readonly Item[] | undefined; fetchFailed: boolean; hasEarlier: boolean; auto: boolean; isLive: boolean;
   background: readonly BackgroundItem[]; toggle: (turn: ChatTurn) => void;
   loadDetail: (turn: ChatTurn) => Promise<void>; loadEarlier: (turn: ChatTurn) => Promise<void>;
 }) {

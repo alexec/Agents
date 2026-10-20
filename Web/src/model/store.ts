@@ -24,6 +24,7 @@ import { folderKey, projectFolder, projectView, type ProjectView } from "./group
 import { decideMacHostNotice, type MacHostNotice } from "./macHostNotice";
 import { DisplayBuilder, keepingTurns, storedTurn, turns, type ChatTurn, type Item } from "./turns";
 import { sortedRuntimes } from "./runtimes";
+import { shownItems } from "./thoughts";
 import { blockLines, openBlock } from "./block";
 import { Drafts } from "./drafts";
 import { scopeRoot, WatchCounts } from "./fileWatch";
@@ -208,7 +209,8 @@ export class Work {
    * so an entry redraws the one turn it landed in (#170).
    */
   readonly chatTurns: ReadonlySignal<ChatTurn[]> = computed(() => {
-    this.heardTurns = keepingTurns(turns(this.items.value), this.heardTurns);
+    // Thoughts left off unless Settings ▸ Appearance shows them (#1725).
+    this.heardTurns = keepingTurns(turns(shownItems(this.items.value)), this.heardTurns);
     return keepingLatestByID([...this.turns.value.map(storedTurnOf), ...this.heardTurns]);
   });
   private heardTurns: ChatTurn[] = [];
