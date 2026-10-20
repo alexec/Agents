@@ -75,6 +75,16 @@ var installedCommand = func(s languageServerSpec) []string {
 type languageServers struct {
 	mu      sync.Mutex
 	running map[string]*languageServer
+	// starting holds the servers that are starting, by key. A start takes up to 20 s, so it
+	// runs without mu: the servers that run already answer in the meantime (#1652).
+	starting map[string]*serverStart
+}
+
+// serverStart is one server's start; done closes when it has started or failed.
+type serverStart struct {
+	done   chan struct{}
+	server *languageServer
+	err    error
 }
 
 var languageServerPool = &languageServers{running: map[string]*languageServer{}}
@@ -172,21 +182,57 @@ func (p *languageServers) diagnose(root, path string, text *string) wire.FileDia
 	return out
 }
 
-// server is the running server for a folder and language, started when there is none.
+// server is the running server for a folder and language, started when there is none. A
+// second ask while it starts waits for that start; asks for other servers do not wait.
 func (p *languageServers) server(root string, spec languageServerSpec) (*languageServer, error) {
 	key := root + "\x00" + spec.name
 	p.mu.Lock()
-	defer p.mu.Unlock()
 	if s, ok := p.running[key]; ok && s.alive() {
+		p.mu.Unlock()
 		s.touch()
 		return s, nil
 	}
+	if start, ok := p.starting[key]; ok {
+		p.mu.Unlock()
+		<-start.done
+		return start.server, start.err
+	}
 	command := installedCommand(spec)
 	if command == nil {
+		p.mu.Unlock()
 		return nil, fmt.Errorf("%s is not installed on this host, so this file is not checked.", spec.name)
 	}
-	// At most languageServersMax: the one used longest ago goes.
-	if len(p.running) >= languageServersMax {
+	if p.starting == nil {
+		p.starting = map[string]*serverStart{}
+	}
+	start := &serverStart{done: make(chan struct{})}
+	p.starting[key] = start
+	p.makeRoom()
+	p.mu.Unlock()
+
+	s, err := startLanguageServer(root, command)
+
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	defer close(start.done)
+	if err != nil {
+		delete(p.starting, key)
+		start.err = fmt.Errorf("%s did not start: %v", spec.name, err)
+		return nil, start.err
+	}
+	s.key = key
+	p.makeRoom() // the start still counts, so the room is for it
+	delete(p.starting, key)
+	p.running[key] = s
+	start.server = s
+	go p.reapWhenIdle(s)
+	return s, nil
+}
+
+// makeRoom stops the server used longest ago while the running and starting ones are at
+// least languageServersMax. p.mu is held.
+func (p *languageServers) makeRoom() {
+	for len(p.running) > 0 && len(p.running)+len(p.starting) > languageServersMax {
 		oldest := ""
 		for k, s := range p.running {
 			if oldest == "" || s.used().Before(p.running[oldest].used()) {
@@ -196,14 +242,6 @@ func (p *languageServers) server(root string, spec languageServerSpec) (*languag
 		p.running[oldest].stop()
 		delete(p.running, oldest)
 	}
-	s, err := startLanguageServer(root, command)
-	if err != nil {
-		return nil, fmt.Errorf("%s did not start: %v", spec.name, err)
-	}
-	s.key = key
-	p.running[key] = s
-	go p.reapWhenIdle(s)
-	return s, nil
 }
 
 // stopAll stops every server: for a test, and a host going away.
