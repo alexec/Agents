@@ -25,10 +25,12 @@ import { Labels } from "./Labels";
 import { Prompt } from "./Prompt";
 import { PromptMenus } from "./PromptMenus";
 import { ContextMeter, CostLimitBanner, SandboxCapsule } from "./PromptStatus";
-import { RenameInput, SessionButtons, SessionMenu } from "./SessionMenu";
+import { branchFromPrompt, RenameInput, SessionButtons, SessionMenu } from "./SessionMenu";
 import { drawable } from "../model/options";
 import { quietLine } from "../model/activity";
 import { sentPrompts } from "../model/promptHistory";
+import { sessionPrompts } from "../model/sessionPrompts";
+import { PromptList } from "./chat/PromptList";
 import { asksToArchive, projectFolder } from "../model/groups";
 import { initialDetail, toggled } from "../model/turnDetail";
 import { CallActionsContext, fromLine, ItemRow, TurnView, type CallActions, type TurnDetail } from "./chat/Rows";
@@ -122,7 +124,12 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
     document.addEventListener("keydown", press);
     return () => document.removeEventListener("keydown", press);
   }, []);
-  useEffect(() => { finding.value = false; }, [host, session]);
+  /** The Prompts list is up over the chat (#1658). */
+  const listingPrompts = useSignal(false);
+  useEffect(() => {
+    finding.value = false;
+    listingPrompts.value = false;
+  }, [host, session]);
   /** The few opened turns whose entries are held, newest last (#291). */
   const fetched = useSignal<Record<string, HeldTurn>>({});
   /** Turns whose steps were asked for and did not come, until asked again (#544). */
@@ -160,6 +167,11 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
       },
       // Into this chat's prompt bar, after what is typed there (#1553).
       quote: (words) => { store.offeredQuote.value = { draftKey: `${host}|${session}`, words }; },
+      // Branch from Here on the person's prompt (#1658): never on an archived session, as Branch.
+      branchFrom: agent && agent.state !== "archived" && !down ? (entryID, text) => {
+        const now = store.agent(host, session);
+        if (now) void branchFromPrompt(store, host, now, entryID, text);
+      } : undefined,
       // Answered only while the agent waits on it, and while its host answers (#253).
       waitingSandbox: agent?.pendingSandboxFailure,
       answerSandbox: agent?.pendingSandboxFailure && !down ? (carryOn) => store.answerSandbox(host, session, carryOn) : undefined,
@@ -172,7 +184,7 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
       noteChart: (file) => store.noteChartHint(host, file.path, file.chart),
       readFile: (path) => store.readFile(host, session, path),
     };
-  }, [host, session, agent?.pendingSandboxFailure, down]);
+  }, [host, session, agent?.pendingSandboxFailure, down, !agent || agent.state === "archived"]);
 
   const scroller = useRef<HTMLDivElement>(null);
   const chatColumn = useRef<HTMLElement>(null);
@@ -469,6 +481,16 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
       {searchingFiles.value && agent && (
         <FileSearch place={nameOf(pathOf(agent.cwd))} search={findFiles} choose={openFound} close={() => (searchingFiles.value = false)} />
       )}
+      {listingPrompts.value && agent && (
+        <PromptList prompts={sessionPrompts(store.turns.value, store.entries.value, live)}
+          close={() => (listingPrompts.value = false)}
+          choose={(prompt) => {
+            // To the prompt in the transcript, as Find goes to a match (#1532).
+            focusedIndex.value = null;
+            focusedEntry.value = prompt.id;
+          }}
+          branchFrom={agent.state !== "archived" && !down ? (prompt) => void branchFromPrompt(store, host, agent, prompt.id, prompt.text) : undefined} />
+      )}
       <header class="column-head">
         <BackToList />
         {agent && store.renaming.value?.id === agent.id && store.renaming.value.inChat
@@ -478,7 +500,7 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
           <button class="wide-only" onClick={() => replace({ ...r, files: !r.files })} aria-pressed={!!r.files}>Files</button>
           <SessionButtons store={store} host={host} agent={agent} disabled={down} />
           <SessionMenu store={store} host={host} agent={agent} disabled={down} inChat
-            find={() => (finding.value = true)} openFile={() => (searchingFiles.value = true)}
+            find={() => (finding.value = true)} prompts={() => (listingPrompts.value = true)} openFile={() => (searchingFiles.value = true)}
             narrow={[
               { label: "Files", checked: !!r.files, run: () => replace({ ...r, files: !r.files }) },
             ]} />

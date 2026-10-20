@@ -28,6 +28,18 @@ public struct SessionPrompt: Identifiable, Hashable, Sendable {
             .map { $0.trimmingCharacters(in: .whitespaces) }
             .first { !$0.isEmpty } ?? ""
     }
+
+    /// The grey line under a row's title: "$0.14 · 3m · 14:05", its cost to the cent (a
+    /// turn's cost is mostly under a unit, which `money(in:)` rounds away), its length as the Time page says one, and when it was sent, with
+    /// the day when that is not today. A part with nothing to say is left out. The page has
+    /// its own copy (`promptLine` in `Web/src/model/sessionPrompts.ts`).
+    public func detail(now: Date = Date(), timeZone: TimeZone = .current) -> String {
+        var parts: [String] = []
+        if let cost { parts.append(cost.amount.formatted(.currency(code: cost.currency).precision(.fractionLength(2)))) }
+        if let seconds { parts.append(TimeChart.words(Double(seconds))) }
+        parts.append(ActivityWords.sent(at, now: now, timeZone: timeZone))
+        return parts.joined(separator: " · ")
+    }
 }
 
 /// The Prompts list (#1658): every prompt the person sent in a session, oldest first, each

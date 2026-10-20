@@ -26,6 +26,7 @@ import { DisplayBuilder, keepingTurns, storedTurn, turns, type ChatTurn, type It
 import { sortedRuntimes } from "./runtimes";
 import { blockLines, openBlock } from "./block";
 import { Drafts } from "./drafts";
+import { giveBackInto } from "./promptQuote";
 import { scopeRoot, WatchCounts } from "./fileWatch";
 import { workflowRunsOn } from "./workflows";
 import type { WhenDone } from "./workflowSettings";
@@ -1979,6 +1980,20 @@ export class Store extends Work {
    */
   async fork(host: string, agentID: string): Promise<string | null> {
     return this.act("agents/fork", { agentID: agentID as UUID }, host);
+  }
+
+  /**
+   * Branch from Here (#1658): a new session that goes on from just before the person's prompt
+   * `entryID`, with that prompt's `text` in its prompt bar to change and send. Answers its id, or
+   * null with `problem` saying why, in the host's words.
+   */
+  async branchFrom(host: string, agentID: string, entryID: string, text: string): Promise<string | null> {
+    const id = await this.act("agents/branchFrom", { agentID: agentID as UUID, entryID: entryID as UUID }, host);
+    if (!id) return null;
+    const key = `${host}|${id}`;
+    const draft = this.drafts.get(key);
+    this.drafts.set(key, { text: giveBackInto(text, draft?.text ?? ""), attachments: draft?.attachments ?? [] });
+    return id;
   }
 
   /** Recreate the worktree from its branch (#119); the row follows from `agent/changed`. */

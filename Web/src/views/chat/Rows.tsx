@@ -144,6 +144,8 @@ export interface CallActions {
   readFile?: ((path: string) => Promise<FileReading>) | undefined;
   /** Quote in Prompt (ChatActions.quote, #1553): words from a reply, into the prompt bar as a quote. */
   quote?: ((words: string) => void) | undefined;
+  /** Branch from Here (#1658): a new session from just before the person's prompt `entryID`. Not on an archived session. */
+  branchFrom?: ((entryID: string, text: string) => void) | undefined;
 }
 export const CallActionsContext = createContext<CallActions | null>(null);
 
@@ -286,9 +288,12 @@ export function fromLine(title: string | undefined): string {
  * Copy Message (#519): the whole message, as written, onto the clipboard. Shown while the pointer
  * is on the message or the button has focus; the Mac and the phone have it on the message's menu.
  */
-function CopyMessage({ entry, quotes = false }: { entry: TranscriptEntry; quotes?: boolean }) {
+function CopyMessage({ entry, quotes = false, branches = false }: { entry: TranscriptEntry; quotes?: boolean; branches?: boolean }) {
   const copied = useSignal(false);
-  const quote = useContext(CallActionsContext)?.quote;
+  const actions = useContext(CallActionsContext);
+  const quote = actions?.quote;
+  // The person's own prompt (#1658): a new session from just before it, with it to change and send.
+  const branchFrom = branches ? actions?.branchFrom : undefined;
   const selected = useRef("");
   const text = copiedText(entry);
   if (!text) return null;
@@ -298,11 +303,22 @@ function CopyMessage({ entry, quotes = false }: { entry: TranscriptEntry; quotes
       setTimeout(() => { copied.value = false; }, 1500);
     }, () => {});
   };
+  const grouped = (quotes && !!quote) || !!branchFrom;
   const copyButton = (
-    <button class={quotes && quote ? "steps-control" : "steps-control copy-message"} onClick={copy} title="Copy this message, as written">
+    <button class={grouped ? "steps-control" : "steps-control copy-message"} onClick={copy} title="Copy this message, as written">
       {copied.value ? "Copied" : "Copy"}
     </button>
   );
+  if (branchFrom) {
+    const words = fields(entry, "userMessage")?._0 ?? text;
+    return (
+      <span class="copy-message message-actions">
+        <button class="steps-control" title="Start a new session from just before this prompt, with the prompt in its prompt bar to change"
+          onClick={() => branchFrom(entry.id, words)}>Branch from Here</button>
+        {copyButton}
+      </span>
+    );
+  }
   if (!quotes || !quote) return copyButton;
   // Quote in Prompt (#1553): the words selected in this reply, or all of it. Taken on the press,
   // before the click can move the selection.
@@ -337,7 +353,7 @@ function entryBody(entry: TranscriptEntry) {
         // Another agent's message (#560): the person's bubble, named as the sender's.
         return <div class="from-agent"><p class="faint">{fromLine(entry.sender?.title)}</p><div class="bubble copyable"><Blocks blocks={message.blocks} text={message._0} /><CopyMessage entry={entry} /></div></div>;
       }
-      return <div class="bubble copyable"><Blocks blocks={message.blocks} text={message._0} /><CopyMessage entry={entry} /></div>;
+      return <div class="bubble copyable"><Blocks blocks={message.blocks} text={message._0} /><CopyMessage entry={entry} branches /></div>;
     }
     case "agentMessage": {
       const message = fields(entry, "agentMessage")!;

@@ -904,7 +904,9 @@ func (d *Daemon) branchFrom(r wire.BranchFromRequest) (wire.UUID, error) {
 		return "", err
 	}
 	for _, e := range entries[:min(at, 10000)] {
-		d.Store.Append(b.ID, e)
+		if _, err := d.Store.Append(b.ID, e); err != nil {
+			return "", err
+		}
 	}
 	from := "another agent"
 	if a.Title != nil {

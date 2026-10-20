@@ -21,6 +21,8 @@ struct RemoteChatView: View {
     @State private var searchingFiles = false
     /// Find in Chat is up over the chat (#1532).
     @State private var finding = false
+    /// The Prompts list is up over the chat (#1658).
+    @State private var showingPrompts = false
     /// How wide the conversation is, so a pull can be told from the right edge (#1560).
     @State private var conversationWidth: CGFloat = 0
     /// How near the right edge a pull starts to bring in the panes: about the width of
@@ -57,6 +59,12 @@ struct RemoteChatView: View {
             // ⌘F finds in the chat with a keyboard attached, as on the Mac (#1532).
             Button("Find in Chat") { finding = true }
                 .keyboardShortcut("f")
+                .disabled(agent == nil || popped != nil)
+                .opacity(0)
+                .accessibilityHidden(true)
+            // ⇧⌘P, the Mac's Prompts (#1658).
+            Button("Prompts") { showingPrompts = true }
+                .keyboardShortcut("p", modifiers: [.command, .shift])
                 .disabled(agent == nil || popped != nil)
                 .opacity(0)
                 .accessibilityHidden(true)
@@ -207,6 +215,18 @@ struct RemoteChatView: View {
             }
             .paperSheet()
         }
+        // The person's prompts (#1658): one goes to it in the chat, as Find does.
+        .sheet(isPresented: $showingPrompts) {
+            if let agent {
+                PromptsList(agent: agent, page: page,
+                            go: { [model] prompt in
+                                model.focusedIndex = nil
+                                model.focusedEntry = prompt.id
+                            },
+                            branch: branchFrom.map { branch in { branch($0.id, $0.text) } },
+                            close: { showingPrompts = false })
+            }
+        }
         .sheet(isPresented: Binding(get: { subagentOnScreen != nil },
                                     set: { if !$0 { subagentOnScreen = nil } })) {
             NavigationStack {
@@ -270,7 +290,8 @@ struct RemoteChatView: View {
             }
             if let agent {
                 ToolbarItem(placement: .topBarTrailing) {
-                    ChatMenu(agent: agent, find: popped == nil ? { finding = true } : nil) { searchingFiles = true }
+                    ChatMenu(agent: agent, find: popped == nil ? { finding = true } : nil,
+                             prompts: popped == nil ? { showingPrompts = true } : nil) { searchingFiles = true }
                 }
             }
         }
@@ -390,6 +411,7 @@ struct RemoteChatView: View {
             unqueue: { [model] prompt, agentID in await model.unqueue(prompt, from: agentID) },
             editQueued: { [model] prompt, text, agentID in await model.editQueued(prompt, text: text, of: agentID) },
             quote: { [model, agent] words in model.offeredQuote = PromptOffer(agentID: agent?.id, words: words) },
+            branchFrom: branchFrom,
             runCommand: runCommand,
             tellAgent: tellAgent,
             sendNow: { [model] prompt, agentID in await model.sendNow(prompt, to: agentID) },
@@ -449,6 +471,13 @@ struct RemoteChatView: View {
             sendTo: { [model] id, text in await model.send(text, to: id) })
     }
 
+    /// Branch from Here (#1658), on a prompt in the chat or in the Prompts list: as Branch,
+    /// not on an archived session.
+    private var branchFrom: (@MainActor (UUID, String) -> Void)? {
+        guard let agent, agent.state != .archived else { return nil }
+        return { [model] entryID, text in Task { await model.branch(from: entryID, of: agent.id, text: text) } }
+    }
+
     /// The open agent's sandbox card, while it waits (064).
     private var waitingSandbox: SandboxFailureRecord? {
         agent?.pendingSandboxFailure
@@ -470,6 +499,8 @@ private struct ChatMenu: View {
     let agent: Agent
     /// Find in Chat (#1532), over the chat. Nil in a scene of its own.
     var find: (() -> Void)? = nil
+    /// The Prompts list (#1658), over the chat. Nil in a scene of its own.
+    var prompts: (() -> Void)? = nil
     /// Open File… (#415), over the chat.
     let openFile: () -> Void
 
@@ -486,6 +517,9 @@ private struct ChatMenu: View {
             }
             if let find {
                 Button("Find in Chat", systemImage: "text.magnifyingglass", action: find)
+            }
+            if let prompts {
+                Button("Prompts", systemImage: "list.number", action: prompts)
             }
             Button("Open File…", systemImage: "magnifyingglass", action: openFile)
             // On a phone, the panes one item each, in place of the bar's Panes button

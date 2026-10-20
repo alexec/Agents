@@ -3,6 +3,15 @@
 import type { Agent, CostLimits, CostState, Cost } from "../protocol/generated";
 import { hasTurnInFlight } from "./promptWords";
 
+/** An amount in its currency, as the window's Spending says it. */
+export function money(amount: number, currency: string): string {
+  try {
+    return new Intl.NumberFormat(undefined, { style: "currency", currency }).format(amount);
+  } catch {
+    return `${amount.toFixed(2)} ${currency}`;
+  }
+}
+
 /** TurnUsage.limitTokens: fresh input and output, never a cache read. */
 export function limitTokens(usage: Agent["lastTurnUsage"]): number {
   if (!usage) return 0;

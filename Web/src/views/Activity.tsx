@@ -19,7 +19,7 @@ import { folderKey, projectFolder } from "../model/groups";
 import { runtimeTally } from "../model/runtimes";
 import { healthTally, personalEmpty, personalIntro, personalServers } from "../model/hostedMCP";
 import { refusalMessage } from "../model/workflows";
-import { dayTokenLimitReached } from "../model/limits";
+import { dayTokenLimitReached, money } from "../model/limits";
 import { UsageCharts } from "./UsageCharts";
 import { mergeUsage } from "../model/usage";
 import { mergeTime } from "../model/time";
@@ -37,15 +37,6 @@ function navigate(destination: { host: string; project: string; session?: string
 /** "14:05", twenty-four hours, as the window's Events row says it. */
 function clock(date: Date): string {
   return `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
-}
-
-/** An amount in its currency, as the window's Spending says it. */
-export function money(amount: number, currency: string): string {
-  try {
-    return new Intl.NumberFormat(undefined, { style: "currency", currency }).format(amount);
-  } catch {
-    return `${amount.toFixed(2)} ${currency}`;
-  }
 }
 
 /** Every host's day, added up by currency: what the work cost is the question, not where. */

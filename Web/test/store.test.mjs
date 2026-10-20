@@ -131,3 +131,28 @@ test("store/notesChanged replaces a host's unreadable files whole, and touches o
   work.apply("store/notesChanged", { notes: [] }, "A");
   assert.deepEqual(work.storeNotes.value, { A: [], B: ["projects.json is held."] });
 });
+
+test("Branch from Here asks the host, and puts the prompt in the new session's prompt bar (#1658)", async () => {
+  const { Store } = mod;
+  const calls = [];
+  const link = {
+    onNotification() {}, onState() {},
+    call(method, params, host) { calls.push([method, params, host]); return Promise.resolve("NEW"); },
+  };
+  const store = new Store(link);
+  assert.equal(await store.branchFrom(host, "OLD", "E1", "Fix the build"), "NEW");
+  assert.deepEqual(calls, [["agents/branchFrom", { agentID: "OLD", entryID: "E1" }, host]]);
+  assert.equal(store.drafts.get(`${host}|NEW`).text, "Fix the build");
+});
+
+test("Branch from Here refused: the host's words, and no draft (#1658)", async () => {
+  const { Store } = mod;
+  const link = {
+    onNotification() {}, onState() {},
+    call() { return Promise.reject(new Error("That prompt is not in this session.")); },
+  };
+  const store = new Store(link);
+  assert.equal(await store.branchFrom(host, "OLD", "E1", "Fix the build"), null);
+  assert.ok(store.problem.value);
+  assert.equal(store.drafts.get(`${host}|null`), undefined);
+});

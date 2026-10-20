@@ -1,7 +1,7 @@
 // A session's actions (071 FR-027): Carry on while it sits in an open block (#250), Stop while it
 // holds a runtime or a block, Branch (#342), and Archive, with Keep Session while an agent asks to
 // have it archived (#773), or Unarchive and Delete (#398). In the chat header's ··· menu, and the
-// sidebar row's menu. The chat's has Find in Chat (#1677) and Open File… first, as the Remote's ···
+// sidebar row's menu. The chat's has Find in Chat (#1677), Prompts… (#1658) and Open File… first, as the Remote's ···
 // menu does (#543), for a page with no keyboard to press ⌘F or ⌘P on. Below 760 it has the header's Turns and Files too, so the
 // header's right is the ··· alone, as on the iPhone (#981).
 import { undoLine } from "../model/archiveWords";
@@ -149,8 +149,8 @@ async function stopAll(store: Store, host: string, agent: Agent) {
 /** One of the chat header's own controls, in the ··· menu only below 760 (#981). */
 export type NarrowItem = { label: string; help?: string; checked: boolean; run: () => void };
 
-export function SessionMenu({ store, host, agent, disabled, find, openFile, inChat, narrow = [] }:
-  { store: Store; host: string; agent: Agent | undefined; disabled: boolean; find?: () => void; openFile?: () => void; inChat?: boolean; narrow?: NarrowItem[] }) {
+export function SessionMenu({ store, host, agent, disabled, find, prompts, openFile, inChat, narrow = [] }:
+  { store: Store; host: string; agent: Agent | undefined; disabled: boolean; find?: () => void; prompts?: () => void; openFile?: () => void; inChat?: boolean; narrow?: NarrowItem[] }) {
   const open = useSignal(false);
   const anchor = useRef<HTMLSpanElement>(null);
   useEffect(() => {
@@ -181,6 +181,13 @@ export function SessionMenu({ store, host, agent, disabled, find, openFile, inCh
                 open.value = false;
                 find();
               }}>Find in Chat</button>
+          )}
+          {prompts && (
+            <button role="menuitem" title="See each prompt you sent in this chat, and go to one"
+              onClick={() => {
+                open.value = false;
+                prompts();
+              }}>Prompts…</button>
           )}
           {openFile && (
             <button role="menuitem" title="Find a file in this session's folder by name"
@@ -247,6 +254,15 @@ async function remove(store: Store, host: string, agent: Agent) {
 /** Branch, then open the new session, as the window selects it (#342). */
 async function branch(store: Store, host: string, agent: Agent) {
   const id = await store.fork(host, agent.id);
+  if (id) go({ host, project: projectFolder(agent), session: id });
+}
+
+/**
+ * Branch from Here (#1658), then open the new session, as Branch does, with the prompt in its
+ * prompt bar to change and send.
+ */
+export async function branchFromPrompt(store: Store, host: string, agent: Agent, entryID: string, text: string): Promise<void> {
+  const id = await store.branchFrom(host, agent.id, entryID, text);
   if (id) go({ host, project: projectFolder(agent), session: id });
 }
 

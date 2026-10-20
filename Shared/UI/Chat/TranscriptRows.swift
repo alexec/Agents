@@ -1092,28 +1092,40 @@ extension View {
     /// way before, and in a collapsed turn what is drawn is not always all there is.
     func copiesMessage(_ entry: TranscriptEntry) -> some View {
         let isReply = if case .agentMessage = entry.kind { true } else { false }
-        return modifier(CopiesMessage(text: entry.copiedText, isReply: isReply))
+        let isPersons = if case .userMessage(_, _, .person) = entry.kind { true } else { false }
+        return modifier(CopiesMessage(text: entry.copiedText, isReply: isReply,
+                                      prompt: isPersons ? entry.id : nil))
     }
 }
 
-private struct CopiesMessage: ViewModifier {
+struct CopiesMessage: ViewModifier {
     @Environment(\.chatActions) private var actions
     let text: String?
     /// The agent's reply: it can be quoted in the prompt as well (#1553).
     var isReply = false
+    /// The person's own prompt, by its entry: a new session can branch from just before it
+    /// (#1658). Not another agent's message, nor the app's question.
+    var prompt: UUID? = nil
 
     func body(content: Content) -> some View {
         if let text {
             let quote = isReply ? actions.quote : nil
+            let branch = prompt.flatMap { id in actions.branchFrom.map { branch in { branch(id, text) } } }
             content
                 .contextMenu {
                     Button("Copy Message") { Self.copy(text) }
                     if let quote {
                         Button("Quote in Prompt") { quote(ChatSelection.text() ?? text) }
                     }
+                    if let branch {
+                        Button("Branch from Here", action: branch)
+                    }
                 }
                 .accessibilityAction(named: "Copy Message") { Self.copy(text) }
                 .accessibilityAction(named: "Quote in Prompt") { quote?(text) }
+                .accessibilityActions {
+                    if let branch { Button("Branch from Here", action: branch) }
+                }
         } else {
             content
         }

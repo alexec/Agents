@@ -326,6 +326,7 @@ button.link {
 .bubble.copyable > .copy-message { right: 100%; bottom: 0; margin-right: 6px; }
 .reply.copyable > .copy-message, .note.copyable > .copy-message { top: -2px; right: 0; }
 .copyable:hover > .copy-message, .copy-message:focus-visible, .copy-message:focus-within { display: block; }
+.message-actions { white-space: nowrap; }
 .message-actions > .steps-control + .steps-control { margin-left: 8px; }
 @media (hover: none) {
   .copyable > .copy-message, .bubble.copyable > .copy-message, .reply.copyable > .copy-message, .note.copyable > .copy-message {
@@ -900,6 +901,18 @@ button.remove:hover { opacity: 1; }
 .file-search input { width: 100%; box-sizing: border-box; padding: 10px 12px; font: inherit; font-size: 0.9375rem; border-radius: 12px; border: 1px solid var(--paper-rule); background: var(--paper-raised); color: inherit; }
 .file-search .completions { margin: 0; }
 .file-search .hint { margin: 0 12px; }
+/* The Prompts list (#1658): as Open File…, with a heading, and two lines and a ··· to a row. */
+.prompt-list { background: var(--paper-raised); border: 1px solid var(--paper-rule); border-radius: 14px; box-shadow: 0 6px 20px var(--paper-shadow); padding: 12px; }
+.prompt-list h2 { margin: 0 4px; font-size: 0.9375rem; }
+.prompt-list .completions { max-height: min(420px, 60vh); box-shadow: none; }
+.prompt-list .completions li { align-items: center; }
+.prompt-list .prompt-number { flex: none; min-width: 1.5em; text-align: right; font-variant-numeric: tabular-nums; }
+.prompt-list .prompt-words { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.prompt-list .prompt-title, .prompt-list .prompt-words > .small { overflow: hidden; text-overflow: ellipsis; }
+.prompt-list .prompt-ending { flex: none; font-size: 0.75rem; }
+.prompt-list .prompt-ending.failed { color: var(--tint-failure); font-weight: 700; }
+.prompt-list .prompt-ending.stopped { opacity: 0.6; }
+.prompt-list .prompt-row-menu { flex: none; margin-right: 0; overflow: visible; }
 .picture { max-width: 100%; height: auto; border-radius: var(--radius-control); background: var(--paper-well); }
 .picture-view { display: flex; flex-direction: column; gap: 8px; }
 .picture-view .picture { max-width: none; cursor: zoom-in; }

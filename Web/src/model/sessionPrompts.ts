@@ -1,6 +1,10 @@
 // The Prompts list (#1658): SessionPrompts (Model/SessionPrompts.swift), ported by hand and held to
 // Fixtures/web/prompts.
-import type { Cost, TranscriptEntry, TurnSummary } from "../protocol/generated";
+import type { Cost, TranscriptEntry, TurnSummary, WireDate } from "../protocol/generated";
+import { fromWireDate } from "../protocol/dates";
+import { months, parts } from "./activity";
+import { money } from "./limits";
+import { timeWords } from "./time";
 import { fields, kindOf } from "./turns";
 
 /** How a turn ended that did not end as asked: the mark on its row. */
@@ -81,8 +85,43 @@ export function filteredPrompts(prompts: readonly SessionPrompt[], query: string
   return wanted ? prompts.filter((prompt) => prompt.text.toLowerCase().includes(wanted)) : [...prompts];
 }
 
+/** The mark's words on a row whose turn did not end as asked: what a screen reader says. */
+export function endingLabel(ending: PromptEnding): string {
+  return ending === "stopped" ? "Stopped" : "Failed";
+}
+
+/**
+ * A row's grey line: "$0.12 · 3m · 14:05", each part left out when it is not known. The time is
+ * the hour alone on the day it was sent, with the day before it on another day, and the year in
+ * another year.
+ */
+export function promptLine(prompt: SessionPrompt, now = new Date(), timeZone?: string): string {
+  const found: string[] = [];
+  if (prompt.cost) found.push(money(prompt.cost.amount, prompt.cost.currency));
+  if (prompt.seconds !== null) found.push(timeWords(prompt.seconds));
+  found.push(sentWords(fromWireDate(prompt.at as WireDate), now, timeZone));
+  return found.join(" \u00B7 ");
+}
+
+/** "14:05" today, "3 Oct 14:05" this year, "3 Oct 2025 14:05" before. */
+function sentWords(date: Date, now: Date, timeZone?: string): string {
+  const at = parts(date, timeZone);
+  const today = parts(now, timeZone);
+  const time = `${String(at.hour).padStart(2, "0")}:${String(at.minute).padStart(2, "0")}`;
+  if (at.year === today.year && at.month === today.month && at.day === today.day) return time;
+  const day = `${at.day} ${months[at.month - 1]}`;
+  return at.year === today.year ? `${day} ${time}` : `${day} ${at.year} ${time}`;
+}
+
+/** Up or Down from `at` in a list of `count`, held at its ends; the last row when none is chosen. */
+export function movedTo(at: number | null, count: number, down: boolean): number | null {
+  if (count === 0) return null;
+  if (at === null) return count - 1;
+  return Math.max(0, Math.min(count - 1, at + (down ? 1 : -1)));
+}
+
 function titleOf(text: string): string {
-  return text.split(/\r\n|[\n\r\u000b\u000c\u0085\u2028\u2029]/).map((line) => line.trim()).find((line) => line !== "") ?? "";
+  return text.split(/\r\n|[\n\r\v\f\u0085\u2028\u2029]/).map((line) => line.trim()).find((line) => line !== "") ?? "";
 }
 
 function isAsk(entry: TranscriptEntry): boolean {

@@ -4493,6 +4493,29 @@ final class RemoteModel {
             problem = away(error, "that could not be sent.") ?? "That did not reach your Mac."
         }
     }
+    /// Branch from Here (#1658): a new session from just before one of the person's prompts,
+    /// opened as Branch opens one, with that prompt in its bar to change and send. The words
+    /// go in as the new session's draft, so its bar has them however it comes on screen.
+    func branch(from entryID: UUID, of agentID: UUID, text: String) async {
+        guard !isStale(on: work.agent(agentID)?.host ?? .mac) else {
+            problem = "Your Mac is not answering, so that could not be sent."
+            return
+        }
+        let folder = work.agent(agentID)?.projectFolder
+        do {
+            let id = try await sendOnce(DaemonAPI.Method.agentsBranchFrom,
+                                        DaemonAPI.BranchFromRequest(agentID: agentID, entryID: entryID))
+                .decode(UUID.self)
+            StartDraftKeeper.shared.note(text, [], for: .agent(id))
+            await loadWholeAgent(id)
+            if let folder { selectedProject = folder }
+            selection = id
+        } catch let error as JSONRPCError {
+            problem = error.message
+        } catch {
+            problem = away(error, "that could not be sent.") ?? "That did not reach your Mac."
+        }
+    }
     func unarchive(_ agentID: UUID) async { await act(DaemonAPI.Method.agentsUnarchive, agentID) }
 
     /// The archived session a menu's Delete… is asking about, until it is answered (#398).
