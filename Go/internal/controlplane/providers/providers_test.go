@@ -252,6 +252,25 @@ func TestWithoutTheProvidersSSHItStartsOverTheInstallsDestination(t *testing.T) 
 	}
 }
 
+// A workstation's host key is new at each start (#1701): the ssh start after the control
+// plane's own Start is told to take the new one.
+func TestTheSSHStartOfAWorkspaceThatRenewsItsKeyTakesTheNewOne(t *testing.T) {
+	renews := true
+	h := newHarness(t, func(o *harnessOptions) {
+		o.timing.SSHAfter, o.timing.GiveUp = 100*time.Millisecond, 2*time.Second
+		o.workspaces = []WorkspaceInfo{{ID: "ws-1", Name: "ws-1", State: "stopped", SSH: new("ws-1.alias"), HostKeyRenews: &renews}}
+	})
+	h.link(h.add(), devbox, "ws-1")
+	h.must(MethodHostsStart, map[string]string{"host": devbox})
+	h.waitFor("offline", devbox, 15, func(r row) bool { return deref(r.Workspace.Problem) != "" })
+	if !reflect.DeepEqual(h.ssh.all(), []string{"ws-1.alias (new key taken)"}) {
+		t.Errorf("%v", h.ssh.all())
+	}
+	if got := h.providers.Listed(devbox); got != "ws-1.alias" {
+		t.Errorf("listed %q", got)
+	}
+}
+
 func TestLinkingListsTheProviderAgain(t *testing.T) {
 	h := newHarness(t)
 	id := h.add()

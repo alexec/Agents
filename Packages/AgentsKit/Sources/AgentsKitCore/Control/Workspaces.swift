@@ -236,17 +236,20 @@ public extension DaemonAPI {
         public var state: String
         public var ssh: String?
         public var tunnel: Bool?
+        /// Its ssh host key is made again at each start (#1701).
+        public var hostKeyRenews: Bool?
         public var cost: String?
         /// The host it is linked to, in `providers/list`.
         public var host: HostID?
 
         public init(id: String, name: String, state: String, ssh: String? = nil, tunnel: Bool? = nil,
-                    cost: String? = nil, host: HostID? = nil) {
+                    hostKeyRenews: Bool? = nil, cost: String? = nil, host: HostID? = nil) {
             self.id = id
             self.name = name
             self.state = state
             self.ssh = ssh
             self.tunnel = tunnel
+            self.hostKeyRenews = hostKeyRenews
             self.cost = cost
             self.host = host
         }

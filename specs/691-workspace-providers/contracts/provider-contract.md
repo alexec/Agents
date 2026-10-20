@@ -37,6 +37,12 @@ It takes nothing. It returns:
   config of the machine running the control plane. It may have a `-p port` suffix.
 - `tunnel` is optional (default false). True means the workspace can't reach the control
   plane, so the control plane holds a reverse tunnel over `ssh`.
+- `ssh` may change between starts, as a VM's address can (#1691). The tunnel and the ssh
+  start use the one listed now, and check the host key trusted at the install.
+- `hostKeyRenews` is optional (default false). True means the workspace's ssh host key is
+  made again at each start (#1701). After a Start that the control plane made, its ssh
+  start takes the key it is offered and pins it again. At any other time, a changed key is
+  refused.
 - `cost` is optional, and is shown as given.
 
 **Limits**: at most 200 workspaces are read. Ids must be stable across restarts.

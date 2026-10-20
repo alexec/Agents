@@ -330,7 +330,10 @@ func newHarness(t *testing.T, opts ...func(*harnessOptions)) *harness {
 	provider, ssh := h.provider, h.ssh
 	h.providers = NewProviders(Config{Store: h.store, Records: h.records, Router: h.router, Methods: h.methods,
 		Secrets: NewSecrets(h.home), Timing: o.timing, Hooks: Hooks{
-			SSHStart: func(_ records.HostRecord, destination string) error {
+			SSHStart: func(_ records.HostRecord, destination string, renewKey bool) error {
+				if renewKey {
+					destination += " (new key taken)"
+				}
 				ssh.add(destination)
 				if o.sshFails != "" {
 					return &ProviderFailure{o.sshFails}

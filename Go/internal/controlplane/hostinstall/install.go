@@ -434,32 +434,52 @@ func knownHostsOverride(resolved string) []string {
 
 // StartDaemon is the workspace providers' sshStart hook (#691, #965): a host's agentsd
 // started over ssh as an install leaves it, without installing. knownHosts is the key
-// trusted at the install, in known_hosts form, when it was installed over this
-// destination; "" reads the person's own known_hosts. A failure is said in the install's
-// words, for the person.
-func (i *Installer) StartDaemon(ctx context.Context, destination, knownHosts, name string) error {
+// trusted at the install, in known_hosts form, checked whatever address the server has now
+// (#1691); "" reads the person's own known_hosts. With renew, the server's key is made again
+// at each start (#1701): the key it offers is taken and returned, in known_hosts form, to be
+// pinned again. A failure is said in the install's words, for the person.
+func (i *Installer) StartDaemon(ctx context.Context, destination, knownHosts, name string, renew bool) (string, error) {
 	ssh := sshCommand{executable: i.sshExecutable(), name: destination, env: i.env(true)}
 	file := ""
-	if knownHosts != "" {
+	if knownHosts != "" || renew {
 		folder, err := os.MkdirTemp("", "agents-start-")
 		if err != nil {
-			return err
+			return "", err
 		}
 		defer os.RemoveAll(folder)
 		file = filepath.Join(folder, "known_hosts")
-		if err := os.WriteFile(file, []byte(knownHosts), 0o600); err != nil {
-			return err
+		pinned := hosttunnels.Pinned(knownHosts)
+		if renew {
+			pinned = ""
+		}
+		if err := os.WriteFile(file, []byte(pinned), 0o600); err != nil {
+			return "", err
 		}
 	}
-	ssh.options = join(i.configFile(), options("", file))
+	ssh.options = i.configFile()
+	if file != "" {
+		ssh.options = append(ssh.options, "-o", "HostKeyAlias="+hosttunnels.PinnedAlias)
+	}
+	if renew {
+		// ssh takes the first value it is given: this one, over options' "yes".
+		ssh.options = append(ssh.options, "-o", "StrictHostKeyChecking=accept-new")
+	}
+	ssh.options = append(ssh.options, options("", file)...)
 	if file == "" {
 		ssh.options = append(ssh.options, personsKnownHostsOptions(ctx, ssh)...)
 	}
 	if err := (installer{ssh}).startDaemon(ctx, "--control-network", "--host-name", name); err != nil {
 		if p, ok := err.(*Problem); ok {
-			return errors.New(Say(p, false))
+			return "", errors.New(Say(p, false))
 		}
-		return err
+		return "", err
 	}
-	return nil
+	if !renew {
+		return "", nil
+	}
+	taken, err := os.ReadFile(file)
+	if err != nil {
+		return "", err
+	}
+	return hosttunnels.Pinned(string(taken)), nil
 }

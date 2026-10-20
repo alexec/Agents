@@ -52,7 +52,9 @@ type Commands struct {
 	// SSH is not a command: filled in without shell quoting. Nil for none.
 	SSH    *string
 	Tunnel bool
-	Cost   *string
+	// HostKeyRenews: the workspace's ssh host key is made again at each start (#1701).
+	HostKeyRenews bool
+	Cost          *string
 }
 
 // Entry is one workspace written out: its commands are run as they are, with ${id} and

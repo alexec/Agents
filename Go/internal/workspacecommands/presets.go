@@ -154,7 +154,9 @@ func coder() Config {
 		"deleting": Stopping, "deleted": Stopped}, Making{})
 }
 
-// workstations is Google Cloud Workstations in one cluster and configuration.
+// workstations is Google Cloud Workstations in one cluster and configuration. A
+// workstation's container is made again at each start and only /home is kept, so its ssh
+// host key is new each time (#1701).
 func workstations(o map[string]any) (Config, error) {
 	flags := ""
 	for _, key := range []string{"cluster", "config", "region"} {
@@ -173,7 +175,7 @@ func workstations(o map[string]any) (Config, error) {
 		Shape:   Shape{Columns: []string{"id", "state"}},
 		Commands: Commands{Start: "gcloud workstations start ${id}" + flags,
 			Stop: "gcloud workstations stop ${id}" + flags,
-			SSH:  optional(o["ssh"]), Tunnel: true},
+			SSH:  optional(o["ssh"]), Tunnel: true, HostKeyRenews: true},
 	}, map[string]State{"state_running": Running, "state_starting": Starting, "state_stopping": Stopping,
 		"state_stopped": Stopped, "state_reconciling": Starting, "reconciling": Starting}, Making{}), nil
 }

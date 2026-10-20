@@ -304,7 +304,9 @@ func TestPresetsCommandLines(t *testing.T) {
 	}
 	gcloud := config(t, `{"preset":"gcloud-workstations","cluster":"c","config":"f","region":"r"}`).Listing
 	if gcloud.Command != "gcloud workstations list --cluster='c' --config='f' --region='r' --format='value(name.basename(),state)'" ||
-		gcloud.Commands.Start != "gcloud workstations start ${id} --cluster='c' --config='f' --region='r'" {
+		gcloud.Commands.Start != "gcloud workstations start ${id} --cluster='c' --config='f' --region='r'" ||
+		// A workstation's host key is new at each start (#1701).
+		!gcloud.Commands.HostKeyRenews || codespaces.Commands.HostKeyRenews {
 		t.Errorf("%+v", gcloud)
 	}
 	inProject := config(t, `{"preset":"gcloud-workstations","cluster":"c","config":"f","region":"r","project":"p"}`).Listing
