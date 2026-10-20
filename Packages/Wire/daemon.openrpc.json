@@ -10,6 +10,11 @@
       "name": "host.wire/1",
       "by": "host",
       "description": "A host says host/hello with its capabilities on each connect (#1748). The control plane requires it of hosts."
+    },
+    {
+      "name": "agents.move-worktree/1",
+      "by": "host",
+      "description": "The host serves the app tool move_worktree to the runtimes that can move (#1821): an agent moves into a new or existing worktree of its project when its turn ends, and back with leave_worktree remove, which removes the worktree once its work is pushed. An app tool, not a method, so declared."
     }
   ],
   "methods": [

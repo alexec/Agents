@@ -7,6 +7,7 @@ public enum Capability {
     public static let agent1 = "agent/1"
     public static let agentsEditQueued1 = "agents.edit-queued/1"
     public static let agentsFind1 = "agents.find/1"
+    public static let agentsMoveWorktree1 = "agents.move-worktree/1"
     public static let agentsSaid1 = "agents.said/1"
     public static let agents1 = "agents/1"
     public static let approvals1 = "approvals/1"
@@ -446,6 +447,6 @@ public enum Capability {
     /// x-declared-capabilities: what a host, a client or the control plane declares by hand, by who.
     public static let declared: [String: [String]] = [
         "client": ["client.wire/1"],
-        "host": ["host.wire/1"],
+        "host": ["host.wire/1", "agents.move-worktree/1"],
     ]
 }

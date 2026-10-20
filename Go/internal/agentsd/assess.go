@@ -186,9 +186,6 @@ func (d *Daemon) assessmentsPath() string { return filepath.Join(d.Store.Loc.Roo
 var escalationTools = map[string]string{"claude": "AskUserQuestion", "cursor": "AskQuestion", "codex": "request_user_input",
 	"antigravity": "ask_question"}
 
-// movesFolders is the runtimes that carry a conversation into another folder (053).
-var movesFolders = map[string]bool{"claude": true, "copilot": true, "cursor": true, "codex": true}
-
 var cheapWords = []string{"haiku", "nano", "flash-lite", "lite", "mini", "flash", "small"}
 
 // assessModel is the model asked for, the runtime's own default for "default", or else

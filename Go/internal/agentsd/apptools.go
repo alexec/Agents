@@ -80,6 +80,7 @@ func appToolCalls() []appTool {
 		{"stop_workspace", (*Daemon).stopWorkspace},
 		{"make_workspace", (*Daemon).makeWorkspace},
 		{"delete_workspace", (*Daemon).deleteWorkspace},
+		{"move_worktree", (*Daemon).moveWorktree},
 	}
 }
 
@@ -173,10 +174,6 @@ func (d *Daemon) dropAppTokens(id wire.UUID) {
 		d.hostedRelease(t)
 	}
 }
-
-// runtimeCanMove is RuntimeCatalog.canMoveFolders: whether a runtime carries its
-// conversation into another folder. None on this host yet: move_worktree comes later.
-func runtimeCanMove(string) bool { return false }
 
 func bearer(h string) string {
 	if len(h) <= 7 || !strings.EqualFold(h[:7], "bearer ") {

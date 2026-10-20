@@ -153,6 +153,13 @@ func workingFolder(root, prefix string) string {
 // prepareWorktree is DaemonCore.prepareWorktree: the worktree a start asked for, made or
 // found, and the folder the agent works in.
 func (d *Daemon) prepareWorktree(project string, choice wire.WorktreeChoice, prompt string) (*wire.AgentWorktree, string, error) {
+	return d.prepareWorktreeFrom(project, project, choice, prompt)
+}
+
+// prepareWorktreeFrom is prepareWorktree with a new worktree made from what from has
+// checked out: the project folder for a start, or the worktree an agent moves out of
+// (053), so its commits come along.
+func (d *Daemon) prepareWorktreeFrom(project, from string, choice wire.WorktreeChoice, prompt string) (*wire.AgentWorktree, string, error) {
 	repo, ok := repositoryOf(project)
 	if !ok {
 		return nil, "", worktreeFailed(project + " is not in a git repository, so it has no worktrees.")
@@ -166,12 +173,12 @@ func (d *Daemon) prepareWorktree(project string, choice wire.WorktreeChoice, pro
 		} else {
 			wanted = worktreeName(prompt, false, time.Now())
 		}
-		if _, err := git(project, "rev-parse", "--verify", "-q", "HEAD"); err != nil {
+		if _, err := git(from, "rev-parse", "--verify", "-q", "HEAD"); err != nil {
 			return nil, "", worktreeFailed("There is no commit here yet to base a worktree on. Commit something first.")
 		}
-		base, _ := git(project, "rev-parse", "--abbrev-ref", "HEAD")
+		base, _ := git(from, "rev-parse", "--abbrev-ref", "HEAD")
 		if base == "HEAD" {
-			base, _ = git(project, "rev-parse", "HEAD")
+			base, _ = git(from, "rev-parse", "HEAD")
 		}
 		if err := ensureExcluded(repo.commonDir); err != nil {
 			return nil, "", err
@@ -187,7 +194,7 @@ func (d *Daemon) prepareWorktree(project string, choice wire.WorktreeChoice, pro
 				d.reservedMu.Unlock()
 				continue
 			}
-			_, err := git(project, "worktree", "add", "-b", branch, root, "HEAD")
+			_, err := git(from, "worktree", "add", "-b", branch, root, "HEAD")
 			d.release(name)
 			if err != nil {
 				if strings.Contains(err.Error(), "already exists") {

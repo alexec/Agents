@@ -7,6 +7,7 @@ export const Capability = {
   agent1: "agent/1",
   agentsEditQueued1: "agents.edit-queued/1",
   agentsFind1: "agents.find/1",
+  agentsMoveWorktree1: "agents.move-worktree/1",
   agentsSaid1: "agents.said/1",
   agents1: "agents/1",
   approvals1: "approvals/1",
@@ -449,5 +450,5 @@ export const ControlCapabilities: Readonly<Record<string, Capability>> = {
 /** x-declared-capabilities: what a host, a client or the control plane declares by hand, by who. */
 export const DeclaredCapabilities: Readonly<Record<string, readonly Capability[]>> = {
   client: ["client.wire/1"],
-  host: ["host.wire/1"],
+  host: ["host.wire/1", "agents.move-worktree/1"],
 };

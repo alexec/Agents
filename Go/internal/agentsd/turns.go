@@ -843,6 +843,9 @@ func (d *Daemon) end(l *live, s wire.AgentState, why wire.EndedReason) {
 		requested, archiveNow = d.settleArchiveRequest(a, s, why)
 	})
 	d.record(l.id, stateChanged(s, reason(why)))
+	// A move asked for in this turn is made now, before the ending is heard and before an
+	// archive, so the worktree left is removed either way (053).
+	d.afterTurnMove(l.id, s, requested || archiveNow)
 	// The event after the record (042): what a waiting agent hears and what the log keeps.
 	d.raiseAgentEnding(l.id, s, reason(why), archiveNow)
 	d.workflowRunFinished(l.id)
