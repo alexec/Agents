@@ -161,16 +161,17 @@ struct PromptBar: View {
         .onChange(of: agent.suggestedPrompts) { dismissedSuggestions = false }
         // Words offered from elsewhere in the chat (#1552): they land in the field, focused
         // and unsent, as on the Mac; after what is typed, never over it (#1665).
+        // Only this chat's (#1679): another scene's are left for its own bar.
         .onChange(of: model.offeredPrompt) {
-            guard let offered = model.offeredPrompt else { return }
-            text = PromptQuote.givingBack(offered, to: text)
+            guard let offered = model.offeredPrompt, offered.agentID == agent.id else { return }
+            text = PromptQuote.givingBack(offered.words, to: text)
             focused = true
             model.offeredPrompt = nil
         }
         // Quote in Prompt (#1553): added after what is typed, the caret after it.
         .onChange(of: model.offeredQuote) {
-            guard let quote = model.offeredQuote else { return }
-            text = PromptQuote.adding(quote, to: text)
+            guard let quote = model.offeredQuote, quote.agentID == agent.id else { return }
+            text = PromptQuote.adding(quote.words, to: text)
             focused = true
             model.offeredQuote = nil
         }

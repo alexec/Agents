@@ -246,14 +246,15 @@ struct PromptBar: View {
 
     /// Words offered from elsewhere: in place of an empty bar, else after what is typed
     /// (#1665), or, quoted from a reply (#1553), added after it with the caret after them.
+    /// Only those for this bar's own agent (#1679): another window's are left for its bar.
     private func takeOfferedWords() {
-        if let offered = model.offeredPrompt {
-            text = PromptQuote.givingBack(offered, to: text)
+        if let offered = model.offeredPrompt, offered.agentID == agent?.id {
+            text = PromptQuote.givingBack(offered.words, to: text)
             focused = true
             model.offeredPrompt = nil
         }
-        if let quote = model.offeredQuote, agent != nil {
-            text = PromptQuote.adding(quote, to: text)
+        if let quote = model.offeredQuote, let agent, quote.agentID == agent.id {
+            text = PromptQuote.adding(quote.words, to: text)
             focused = true
             model.offeredQuote = nil
         }

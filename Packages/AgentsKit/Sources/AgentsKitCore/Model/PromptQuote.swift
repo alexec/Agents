@@ -29,3 +29,16 @@ public enum PromptQuote {
         return before + words
     }
 }
+
+/// Words handed to one prompt bar from elsewhere (#1679): a quote, or an edit given back. Keyed
+/// by the agent whose bar takes them, so with a session in a window of its own, or two iPad
+/// scenes, they go to their own chat and not to the bar in front. Nil is the new-session bar.
+public struct PromptOffer: Equatable, Sendable {
+    public var agentID: UUID?
+    public var words: String
+
+    public init(agentID: UUID?, words: String) {
+        self.agentID = agentID
+        self.words = words
+    }
+}
