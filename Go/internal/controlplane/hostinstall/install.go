@@ -30,6 +30,9 @@ type CodeIssuer interface {
 type Tunnels interface {
 	// Port is the port on both ends: the server's loopback, and this machine's listener.
 	Port() int
+	// LetGo drops the tunnels held for this destination: the install replaces the host
+	// they carried, and their forward would take the port the new one needs.
+	LetGo(ctx context.Context, destination, name string)
 	// Add is HostTunnels.add: hold a tunnel for a server just installed, at once, so
 	// its first dial finds it.
 	Add(ctx context.Context, record TunnelRecord) error
@@ -267,10 +270,9 @@ func (i *Installer) install(ctx context.Context, request Request, personsKnownHo
 	i.installToolsets(ctx, server, found, folder, name)
 
 	// A host code, left in the host's root and read once, never on its command line.
-	// Through a tunnel, it names the server's end of the tunnel, which is held from now
-	// so the host's first dial finds it (#435, #610).
+	// Through a tunnel, it names the server's end of the tunnel (#435, #610).
 	var code string
-	tunnelled := false
+	var tunnel *TunnelRecord
 	wantsTunnel := false
 	if request.Tunnel != nil {
 		wantsTunnel = *request.Tunnel
@@ -296,13 +298,12 @@ func (i *Installer) install(ctx context.Context, request Request, personsKnownHo
 		} else {
 			trusted = personsKey(ctx, ssh, config, folder)
 		}
-		record := TunnelRecord{ID: newID(), Destination: destination, Name: name, Port: port, Code: id,
+		tunnel = &TunnelRecord{ID: newID(), Destination: destination, Name: name, Port: port, Code: id,
 			KnownHosts: trusted, Made: records.Now()}
-		if err := i.Tunnels.Add(ctx, record); err != nil {
-			return nil, err
-		}
+		// A tunnel held before for this server goes now, before the steps below: its
+		// master would dial again beside them, and its forward holds the port (#1769).
+		i.Tunnels.LetGo(ctx, destination, name)
 		code = text
-		tunnelled = true
 	} else {
 		text, _, err := i.Codes.HostCode(ctx, "")
 		if err != nil {
@@ -316,10 +317,19 @@ func (i *Installer) install(ctx context.Context, request Request, personsKnownHo
 	if err := server.startDaemon(ctx, "--control-network", "--host-name", name); err != nil {
 		return nil, words(err, keyGiven)
 	}
+	// The tunnel is held after the install's last ssh step (#1769). A provider's own
+	// tunnel, such as gcloud's start-tcp-tunnel, drops connections that open at the same
+	// time, and a failed install leaves no tunnel holding the port. The host dials again
+	// until the tunnel is up.
+	if tunnel != nil {
+		if err := i.Tunnels.Add(ctx, *tunnel); err != nil {
+			return nil, err
+		}
+	}
 	i.progress(name, "started")
 	// The host enrols over its own connection; control/hostChanged says when it is on.
 	return map[string]any{"started": true, "name": name,
-		"platform": found.system + " " + displayArchitecture(found.architecture), "tunnel": tunnelled}, nil
+		"platform": found.system + " " + displayArchitecture(found.architecture), "tunnel": tunnel != nil}, nil
 }
 
 // installToolsets puts each toolset the Installer names on the server, and points its

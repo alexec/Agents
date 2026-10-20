@@ -553,3 +553,36 @@ func TestOnlyAnAgentsdInTheLockIsStopped(t *testing.T) {
 		t.Fatal("the old agentsd was not stopped")
 	}
 }
+
+// #1769: through a provider's own tunnel (gcloud's start-tcp-tunnel), connections that
+// open at the same moment are dropped. The tunnel's master is held only after the
+// install's last ssh step, and a tunnel held before for that server goes first.
+func TestTheTunnelIsHeldAfterTheInstallsLastStep(t *testing.T) {
+	f := newFake(t)
+	f.env["FAKE_SSH_PERSON_KNOWS"] = "1"
+	log := filepath.Join(f.dir, "calls")
+	f.env["FAKE_SSH_LOG"] = log
+	var steps []string
+	tunnels := &fakeTunnels{}
+	callsAtAdd := ""
+	tunnels.onAdd = func() {
+		data, _ := os.ReadFile(log)
+		callsAtAdd = string(data)
+	}
+	i := f.installer(&fakeCodes{}, &steps)
+	i.Tunnels = tunnels
+	got := reply(t)(i.Install(context.Background(), json.RawMessage(`{"destination":"ws","tunnel":true}`)))
+	if got["tunnel"] != true || len(tunnels.added) != 1 {
+		t.Fatalf("%v %v", got, tunnels.added)
+	}
+	if !reflect.DeepEqual(tunnels.letGo, []string{"ws"}) {
+		t.Errorf("let go of %q", tunnels.letGo)
+	}
+	lines := strings.Split(strings.TrimSpace(callsAtAdd), "\n")
+	if last := lines[len(lines)-1]; !strings.Contains(last, "--detach") {
+		t.Errorf("the tunnel was held before the host was started; the last call then was %q", last)
+	}
+	if after, _ := os.ReadFile(log); string(after) != callsAtAdd {
+		t.Errorf("ssh calls after the tunnel was held: %q", strings.TrimPrefix(string(after), callsAtAdd))
+	}
+}

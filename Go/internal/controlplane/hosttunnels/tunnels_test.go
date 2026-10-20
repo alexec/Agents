@@ -123,6 +123,11 @@ func TestASessionIsUpWhenTheForwardIsOpenAndDownWithSSHsReasonWhenItIsRefused(t 
 	if !strings.Contains(string(calls), "-O forward -R 127.0.0.1:8791:127.0.0.1:8791") {
 		t.Errorf("no forward asked: %s", calls)
 	}
+	// #1769: the forward is cancelled before the master is ended, so a server behind a
+	// provider's tunnel, which may not see the close, lets go of the port.
+	if !strings.Contains(string(calls), "-O cancel -R 127.0.0.1:8791:127.0.0.1:8791") {
+		t.Errorf("the forward was not cancelled: %s", calls)
+	}
 	if !strings.Contains(string(calls), "ClearAllForwardings=yes") {
 		t.Errorf("forwards not cleared: %s", calls)
 	}
@@ -359,7 +364,7 @@ func fakeSSH(t *testing.T, folder, name, log, forward, master string) string {
 	script := "#!/bin/sh\n" + logging + `op=""
 for word in "$@"; do [ "$previous" = "-O" ] && op="$word"; previous="$word"; done
 case "$op" in
-    check) exit 0 ;;
+    check|cancel) exit 0 ;;
     forward)
 ` + forward + `
     ;;
