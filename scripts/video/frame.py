@@ -10,6 +10,10 @@ there is no recording badge. A layer render leaves out the window's buttons and 
 corners: the traffic lights of a window that is not key are drawn over each frame, and the
 corners are cut by a mask.
 
+Secrets (#1794): an integration scene marks each place that shows a token, an element of the
+window or a DOM selector in Chrome. `hide` makes each such place in a frame unreadable, before
+the frame is kept, and the OCR check (tokens.py) then reads every frame for any part of one.
+
 Time: t=0 is the Mac recording's first frame. The scene's markers are unix times. A `fast`
 span is cut to its most seconds, sped up; every marker after it moves with it. Each narration
 line starts at its `say` marker. The captions (WebVTT) are the lines, at the same times.
@@ -49,6 +53,38 @@ def font(size, weight=None):
         except Exception:
             pass
     return f
+
+
+# --- secrets ------------------------------------------------------------------------------
+def hide(img, boxes, margin=6):
+    """`img` with each box (x, y, w, h in its pixels) made unreadable: cut to blocks of 16
+    pixels, then blurred, with a margin round it. Blocks alone can still be read back; blur
+    alone, sharpened; the two together cannot."""
+    for x, y, w, h in boxes:
+        a = (max(0, int(x - margin)), max(0, int(y - margin)))
+        b = (min(img.width, int(x + w + margin) + 1), min(img.height, int(y + h + margin) + 1))
+        if b[0] <= a[0] or b[1] <= a[1]:
+            continue
+        part = img.crop((*a, *b))
+        small = part.resize((max(1, part.width // 16), max(1, part.height // 16)), Image.BILINEAR)
+        part = small.resize(part.size, Image.NEAREST).filter(ImageFilter.GaussianBlur(10))
+        img.paste(part, a)
+    return img
+
+
+def hide_web_frames(work):
+    """Each browser frame with the places web.mjs said show a secret made unreadable again
+    (the page has blurred them already, as it drew them)."""
+    path = work / "web/secrets.json"
+    if not path.exists():
+        return
+    places = json.loads(path.read_text())
+    for frame_path, boxes in zip(sorted((work / "web/frames").glob("*.jpg")), places):
+        if not boxes:
+            continue
+        img = Image.open(frame_path).convert("RGB")
+        hide(img, [(x * img.width, y * img.height, w * img.width, h * img.height) for x, y, w, h in boxes])
+        img.save(frame_path, quality=92)
 
 
 # --- the still pictures ------------------------------------------------------------------
@@ -173,6 +209,7 @@ def web_video(work, start, size, out):
     """The screencast frames as a 30 fps video starting at t=0 (the first frame held before)."""
     times = json.loads((work / "web/frames.json").read_text())
     frames = sorted((work / "web/frames").glob("*.jpg"))
+    hide_web_frames(work)
     lines = []
     for i, path in enumerate(frames):
         next_time = times[i + 1] if i + 1 < len(times) else times[i] + 1.0
@@ -286,7 +323,7 @@ def compose(scene, takes, work, out_dir):
         view_w, view_h = scene.BROWSER
         bw = 1500
         page_h = round(bw * view_h / view_w / 2) * 2
-        bar = browser_bar(bw, art / "browser-bar.png")
+        bar = browser_bar(bw, art / "browser-bar.png", getattr(scene, "BROWSER_ADDRESS", "localhost:8792"))
         bh = bar + page_h
         web_video(work, start, (bw, page_h), work / "web.mp4")
         bx0, by0 = W - bw - 110, H - bh - 90

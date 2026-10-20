@@ -106,9 +106,14 @@ struct ConnectLinearSheet: View {
         case .failure(let problem): step = .failed(problem.words); return
         }
         step = .waiting(flow)
-        let outcome = await CodeFlowSignIn.finish(flow, in: session) { request in
-            step = .finishing
-            return await model.completeSignIn(request, on: host).mapError { CodeFlowSignIn.Problem($0.words) }
+        let outcome: CodeFlowSignIn.Outcome
+        if let folder = ControlConfig.walkFolder {
+            outcome = await handOff(flow, to: folder)
+        } else {
+            outcome = await CodeFlowSignIn.finish(flow, in: session) { request in
+                step = .finishing
+                return await model.completeSignIn(request, on: host).mapError { CodeFlowSignIn.Problem($0.words) }
+            }
         }
         switch outcome {
         case .connected:
@@ -120,6 +125,33 @@ struct ConnectLinearSheet: View {
         case .failed(let why):
             step = .failed(why)
         }
+    }
+
+    /// A walk's window (#1794) opens no authentication session: that would be Safari's sheet
+    /// on the person's screen. It writes the flow and its address to `sign-in.json` in the
+    /// walk's folder, as Open in Browser writes `opened-url` (#109). The walk approves in its
+    /// own browser, gives the code to the host (`connections/sign-in/complete`), and this
+    /// waits for the host to say how the sign-in ended.
+    private func handOff(_ flow: DaemonAPI.ConnectionSignIn, to folder: URL) async -> CodeFlowSignIn.Outcome {
+        let note = ["flowID": flow.flowID.uuidString, "address": flow.verificationURL]
+        guard let data = try? JSONSerialization.data(withJSONObject: note),
+              (try? data.write(to: folder.appendingPathComponent("sign-in.json"), options: .atomic)) != nil  // store-ok: the window's own container
+        else { return .failed("The walk's sign-in could not be handed on.") }
+        while !Task.isCancelled {
+            switch await model.waitForSignIn(flow.flowID, on: host) {
+            case .failure(let problem):
+                return .failed(problem.words)
+            case .success(let ended) where ended.status == .waiting:
+                continue
+            case .success(let ended) where ended.status == .connected:
+                return .connected(ended)
+            case .success(let ended) where ended.status == .cancelled:
+                return .cancelled
+            case .success(let ended):
+                return .failed(ConnectorSetupWords.sheetStatus(ended))
+            }
+        }
+        return .cancelled
     }
 
     private func cancel() async {

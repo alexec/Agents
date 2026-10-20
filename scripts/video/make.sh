@@ -1,7 +1,8 @@
 #!/bin/sh
 # Makes the docs site's narrated videos with no person (#1078). See make.py and README.md.
 #
-#   scripts/video/make.sh u1 a2 …   [--no-build] [--keep] [--voice-only] [--compose-only]
+#   scripts/video/make.sh u1 a2 …   [--no-build] [--keep] [--voice-only] [--compose-only] [--upload]
+#   scripts/video/make.sh --sign-in linear   the video Chrome, for the person to sign in once
 #
 # The first run makes the voice and Whisper set-up in ~/.cache/agents-video/venv. Chatterbox's
 # watermarker needs pkg_resources, so setuptools stays below 81.
