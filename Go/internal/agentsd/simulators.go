@@ -3,8 +3,10 @@ package agentsd
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"image"
+	"image/color"
 	"image/jpeg"
 	"os"
 	"os/exec"
@@ -14,6 +16,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/alexec/agents/Go/wire"
@@ -29,6 +32,8 @@ const (
 	// simulatorScreenHeight is how tall a screen comes back when the pane does not say.
 	simulatorScreenHeight = 1200
 	simulatorTimeout      = 20 * time.Second
+	// simulatorFramesMax is how many last frames are kept, one for each simulator and height.
+	simulatorFramesMax = 8
 )
 
 var simulatorUDID = regexp.MustCompile(`^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}$`)
@@ -200,6 +205,36 @@ func simulatorScreen(ctx context.Context, udid string, height int) (wire.Simulat
 	if err != nil {
 		return wire.SimulatorScreen{}, err
 	}
+	return simulatorFrames.screen(udid, height, shot)
+}
+
+// simulatorFrames keeps the last frame of each simulator and height (#1650). A screen that
+// did not change since the last read is not decoded, made smaller and encoded again.
+var simulatorFrames = &frameCache{}
+
+type frameCache struct {
+	mu     sync.Mutex
+	frames map[string]keptFrame
+	// decodes counts the screenshots decoded, for the tests.
+	decodes int
+}
+
+type keptFrame struct {
+	sum    [32]byte
+	screen wire.SimulatorScreen
+}
+
+// screen is `shot` made smaller to `height` pixels tall, from the last frame when it is the same.
+func (c *frameCache) screen(udid string, height int, shot []byte) (wire.SimulatorScreen, error) {
+	key := udid + "@" + strconv.Itoa(height)
+	sum := sha256.Sum256(shot)
+	c.mu.Lock()
+	if kept, ok := c.frames[key]; ok && kept.sum == sum {
+		c.mu.Unlock()
+		return kept.screen, nil
+	}
+	c.decodes++
+	c.mu.Unlock()
 	picture, err := jpeg.Decode(bytes.NewReader(shot))
 	if err != nil {
 		return wire.SimulatorScreen{}, &Error{Code: CodeServer, Message: "the simulator's screen did not read: " + err.Error()}
@@ -210,10 +245,19 @@ func simulatorScreen(ctx context.Context, udid string, height int) (wire.Simulat
 		return wire.SimulatorScreen{}, err
 	}
 	size := smaller.Bounds().Size()
-	return wire.SimulatorScreen{Jpeg: b.Bytes(), Width: int64(size.X), Height: int64(size.Y)}, nil
+	screen := wire.SimulatorScreen{Jpeg: b.Bytes(), Width: int64(size.X), Height: int64(size.Y)}
+	c.mu.Lock()
+	if c.frames == nil || len(c.frames) >= simulatorFramesMax {
+		c.frames = map[string]keptFrame{}
+	}
+	c.frames[key] = keptFrame{sum: sum, screen: screen}
+	c.mu.Unlock()
+	return screen, nil
 }
 
 // shrink is `picture` at most `height` tall, each pixel the average of the ones it covers.
+// A JPEG's YCbCr planes and an RGBA picture are read directly: a call to At for each pixel
+// of a 3-million-pixel screen made an allocation for each one (#1650).
 func shrink(picture image.Image, height int) image.Image {
 	bounds := picture.Bounds()
 	if bounds.Dy() <= height || height <= 0 {
@@ -221,20 +265,60 @@ func shrink(picture image.Image, height int) image.Image {
 	}
 	width := max(1, bounds.Dx()*height/bounds.Dy())
 	out := image.NewRGBA(image.Rect(0, 0, width, height))
+	ycc, _ := picture.(*image.YCbCr)
+	rgba, _ := picture.(*image.RGBA)
 	for y := range height {
 		y0, y1 := bounds.Min.Y+y*bounds.Dy()/height, bounds.Min.Y+(y+1)*bounds.Dy()/height
+		y1 = max(y1, y0+1)
 		for x := range width {
 			x0, x1 := bounds.Min.X+x*bounds.Dx()/width, bounds.Min.X+(x+1)*bounds.Dx()/width
-			var r, g, bl, n uint32
-			for sy := y0; sy < max(y1, y0+1); sy++ {
-				for sx := x0; sx < max(x1, x0+1); sx++ {
-					pr, pg, pb, _ := picture.At(sx, sy).RGBA()
-					r, g, bl, n = r+pr, g+pg, bl+pb, n+1
-				}
+			x1 = max(x1, x0+1)
+			var r, g, bl uint8
+			switch {
+			case ycc != nil:
+				r, g, bl = averageYCbCr(ycc, x0, x1, y0, y1)
+			case rgba != nil:
+				r, g, bl = averageRGBA(rgba, x0, x1, y0, y1)
+			default:
+				r, g, bl = averageAny(picture, x0, x1, y0, y1)
 			}
 			i := out.PixOffset(x, y)
-			out.Pix[i], out.Pix[i+1], out.Pix[i+2], out.Pix[i+3] = uint8(r/n>>8), uint8(g/n>>8), uint8(bl/n>>8), 0xFF
+			out.Pix[i], out.Pix[i+1], out.Pix[i+2], out.Pix[i+3] = r, g, bl, 0xFF
 		}
 	}
 	return out
+}
+
+func averageYCbCr(p *image.YCbCr, x0, x1, y0, y1 int) (uint8, uint8, uint8) {
+	var ys, cbs, crs, n uint32
+	for sy := y0; sy < y1; sy++ {
+		for sx := x0; sx < x1; sx++ {
+			c := p.COffset(sx, sy)
+			ys, cbs, crs, n = ys+uint32(p.Y[p.YOffset(sx, sy)]), cbs+uint32(p.Cb[c]), crs+uint32(p.Cr[c]), n+1
+		}
+	}
+	return color.YCbCrToRGB(uint8(ys/n), uint8(cbs/n), uint8(crs/n))
+}
+
+func averageRGBA(p *image.RGBA, x0, x1, y0, y1 int) (uint8, uint8, uint8) {
+	var r, g, b, n uint32
+	for sy := y0; sy < y1; sy++ {
+		i := p.PixOffset(x0, sy)
+		for range x1 - x0 {
+			r, g, b, n = r+uint32(p.Pix[i]), g+uint32(p.Pix[i+1]), b+uint32(p.Pix[i+2]), n+1
+			i += 4
+		}
+	}
+	return uint8(r / n), uint8(g / n), uint8(b / n)
+}
+
+func averageAny(p image.Image, x0, x1, y0, y1 int) (uint8, uint8, uint8) {
+	var r, g, b, n uint32
+	for sy := y0; sy < y1; sy++ {
+		for sx := x0; sx < x1; sx++ {
+			pr, pg, pb, _ := p.At(sx, sy).RGBA()
+			r, g, b, n = r+pr, g+pg, b+pb, n+1
+		}
+	}
+	return uint8(r / n >> 8), uint8(g / n >> 8), uint8(b / n >> 8)
 }
