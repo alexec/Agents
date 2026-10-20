@@ -239,21 +239,11 @@ func join(ctx context.Context, cl commandLine, d *agentsd.Daemon) {
 			log.Printf("no membership in the root and no code to enrol with: not joining a control plane")
 			return
 		}
-		c, err := controllink.ParseCode(code)
-		if err != nil {
-			log.Fatalf("the host code: %v", err)
-		}
-		for {
-			member, err = controllink.Enroll(ctx, loc.Root, c, private, hello)
-			if err == nil {
-				break
-			}
-			log.Printf("could not enrol: %v; trying again in 5 s", err)
-			select {
-			case <-ctx.Done():
-				return
-			case <-time.After(5 * time.Second):
-			}
+		member = enrol(ctx, code, codeFile, func(ctx context.Context, c *controllink.Code) (*controllink.Membership, error) {
+			return controllink.Enroll(ctx, loc.Root, c, private, hello)
+		})
+		if member == nil {
+			return
 		}
 		os.Remove(codeFile)
 		log.Printf("enrolled as host %s with %s", member.Host, member.Name)
