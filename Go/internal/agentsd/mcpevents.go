@@ -79,6 +79,9 @@ type mcpLine struct {
 	server       *string
 	subscription string
 	fixed        *wire.MCPTriggerStatus
+	// notHere is a line that says only that no server here is the one it names, or offers its
+	// event: a workflow for two forges (#1633) has one in every project.
+	notHere bool
 }
 
 // mcpLive is what a subscription is doing now, beside what its record keeps.
@@ -537,6 +540,26 @@ func mcpFixed(event string, server *string, state wire.MCPTriggerStatusState, co
 		Failure: &wire.MCPTriggerFailure{Code: code, Message: message, Since: at}}}
 }
 
+// heardLines is a workflow's lines without those that say only that a server is not here,
+// once one of its triggers is heard: a workflow for both forges (#1633) listens to the forge
+// a project has, and says nothing about the other. With none heard, every line stays.
+func heardLines(lines []mcpLine) []mcpLine {
+	heard := false
+	for _, l := range lines {
+		heard = heard || l.subscription != ""
+	}
+	if !heard {
+		return lines
+	}
+	out := lines[:0:0]
+	for _, l := range lines {
+		if !l.notHere {
+			out = append(out, l)
+		}
+	}
+	return out
+}
+
 // reconcileMCPEvents works out the subscriptions from every workflow's triggers, starts
 // the new ones, ends the gone ones, and says each trigger's lines. Only from the clock.
 func (d *Daemon) reconcileMCPEvents(ctx context.Context) {
@@ -580,6 +603,9 @@ func (d *Daemon) reconcileMCPEvents(ctx context.Context) {
 				f, ok := resolved[w.folder][name]
 				if !ok {
 					fixed(wire.MCPTriggerFailureCodeServerNotFound, name+" is not set up here.", wire.MCPTriggerStatusStateStopped)
+					if named {
+						tl[len(tl)-1].notHere = true
+					}
 					continue
 				}
 				switch f.problem {
@@ -676,10 +702,11 @@ func (d *Daemon) reconcileMCPEvents(ctx context.Context) {
 				}
 				tl = append(tl, mcpFixed(t.event, nil, state, wire.MCPTriggerFailureCodeServerNotFound,
 					"No server here offers "+t.event+"."+why+guess, at))
+				tl[len(tl)-1].notHere = guess == "" && len(unreachable) == 0
 			}
 			workflowLines = append(workflowLines, tl...)
 		}
-		lines[workflowKey(w.folder, w.id)] = workflowLines
+		lines[workflowKey(w.folder, w.id)] = heardLines(workflowLines)
 	}
 	d.addMCPWaits(wanted, func(folder string) map[string]found {
 		if resolved[folder] == nil {
