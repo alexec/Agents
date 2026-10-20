@@ -115,6 +115,27 @@ func TestPinsAreTheSwiftFile(t *testing.T) {
 }
 
 // An entry this build cannot read is kept, written back after the rest, and counts.
+// A pins.json in the folder before it is a project is said when it is added (#1622), so a
+// window that read pins/list before then shows the pin at once.
+func TestPinsThereBeforeTheProjectAreSaidOnAdd(t *testing.T) {
+	d, c := start(t, t.TempDir())
+	defer d.Shutdown()
+	dir := t.TempDir()
+	os.MkdirAll(filepath.Join(dir, ".agents"), 0o755)
+	os.WriteFile(filepath.Join(dir, "plan.md"), []byte("# plan"), 0o644)
+	os.WriteFile(filepath.Join(dir, ".agents", "pins.json"),
+		[]byte(`{"pins":[{"path":"plan.md","pinned_by":{"person":true}}]}`), 0o644)
+	c.in <- `{"jsonrpc":"2.0","id":1,"method":"projects/add","params":{"folder":"` + string(store.FolderURL(dir)) + `"}}`
+	c.until(t, "pins/changed with plan.md", func(method string, p json.RawMessage) bool {
+		if method != "pins/changed" {
+			return false
+		}
+		var n wire.PinsChangedNotification
+		json.Unmarshal(p, &n)
+		return len(n.Pins) == 1 && n.Pins[0].Path == "plan.md"
+	})
+}
+
 func TestAnUnreadPinIsKept(t *testing.T) {
 	f, err := readPinsFile([]byte(`{"pins":[{"future":{"x":1},"pinned_by":{"person":true}},{"path":"a.md","pinned_by":{"agent":"A"}},{"path":"a.md","pinned_by":{"person":true}},{"path":"../b.md","pinned_by":{"person":true}}],"sessions":[{"session":"S","pinned_by":{"person":true}},{"session":"S","pinned_by":{"person":true}}]}`))
 	if err != nil || len(f.pins) != 1 || len(f.unread) != 1 || len(f.sessions) != 1 {
