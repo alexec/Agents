@@ -168,7 +168,7 @@ function SlotCard({ slot, setup, projectName, reading, tryAgain, skip, linearCon
   slot: ConnectorSlot; setup: ConnectorSetup; projectName: string; reading: boolean;
   tryAgain: () => void; skip: (skipped: boolean) => void;
   /** Tasks only: whether Linear is connected, unknown until read (#1682). */
-  linearConnected?: boolean; connectLinear: () => void;
+  linearConnected: boolean | undefined; connectLinear: () => void;
 }) {
   const [changing, setChanging] = useState(false);
   const canChange = slot.slot !== "workspace" && ["read", "refused", "failed"].includes(slot.state);
