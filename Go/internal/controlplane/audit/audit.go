@@ -115,6 +115,7 @@ var controlActions = map[string]string{
 	"hosts/detect":                "Added the machines it found",
 	"control/setProjectDetection": "Changed project detection",
 	"control/setAuditDays":        "Changed how long the audit is kept",
+	"control/rotate":              "Rotated the control key",
 	"providers/add":               "Added a workspace provider",
 	"providers/create":            "Added a workspace provider",
 	"providers/update":            "Changed a workspace provider",

@@ -52,20 +52,26 @@ public enum ControlCodeUse {
                                  name: code.name, url: code.url, pin: code.pin)
     }
 
-    /// How a moved device dials (T085): with the key it already shares with the control
-    /// plane, derived where its private key lives (a Secure Enclave key cannot leave).
-    /// `keep` is handed the membership whenever the control plane gives a newer list of
-    /// endpoints (R16), to save it.
-    public static func clientDial(_ membership: ControlMembership, sharedKey: Data, kind: String,
+    /// How a moved device dials (T085): with the key it shares with the control plane,
+    /// derived where its private key lives (a Secure Enclave key cannot leave), from the
+    /// control plane's key it trusts. Derived on each dial: after a rotation (#997) the
+    /// membership trusts the new key. `keep` is handed the membership whenever the control
+    /// plane gives a newer list of endpoints (R16), or a new key, to save it.
+    public static func clientDial(_ membership: ControlMembership,
+                                  sharedKey: @escaping @Sendable (_ controlKey: Data) throws -> Data, kind: String,
                                   dial: @escaping Dial, keep: EndpointBook.Keep? = nil)
         throws -> @Sendable () async throws -> any LineTransport {
         guard !membership.endpointsToDial.isEmpty, let client = membership.client else {
             throw Failure("that membership has no address; it is from the first build")
         }
-        let credentials = ControlAuth.Credentials(identity: .client(client), key: sharedKey, kind: kind,
-                                                  controlKey: membership.controlKey)
+        _ = try sharedKey(membership.controlKey)
         let book = EndpointBook(membership, keep: keep)
-        return { try await dialEach(book, as: credentials, dial: dial) }
+        return {
+            let controlKey = book.current.controlKey
+            let credentials = ControlAuth.Credentials(identity: .client(client), key: try sharedKey(controlKey), kind: kind,
+                                                      controlKey: controlKey)
+            return try await dialEach(book, as: credentials, dial: dial)
+        }
     }
 
     /// How a paired client dials, every time, as itself.
@@ -75,8 +81,8 @@ public enum ControlCodeUse {
         guard let client = membership.client else {
             throw Failure("that membership has no address; it is from the first build")
         }
-        let key = try ControlAuth.clientKey(privateKey: privateKey, peer: membership.controlKey, client: client)
-        return try clientDial(membership, sharedKey: key, kind: kind, dial: dial, keep: keep)
+        return try clientDial(membership, sharedKey: { try ControlAuth.clientKey(privateKey: privateKey, peer: $0, client: client) },
+                              kind: kind, dial: dial, keep: keep)
     }
 
     /// Dials the book's endpoints in turn, each with its own pin, and proves `credentials`
@@ -150,6 +156,11 @@ public final class EndpointBook: @unchecked Sendable {
             lastAnswered = endpoint
             if let newer = membership.adopting(ok.endpoints, epoch: ok.epoch) {
                 membership = newer
+                unsaved = true
+            }
+            // Rotated (#997): ControlAuth.join checked its proof.
+            if let offer = ok.newKey, let key = ControlCode.data(base64url: offer.key), key != membership.controlKey {
+                membership.controlKey = key
                 unsaved = true
             }
             return unsaved ? membership : nil

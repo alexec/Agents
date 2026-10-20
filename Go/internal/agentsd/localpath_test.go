@@ -223,3 +223,28 @@ func TestTheLocalClientsFileIsWrittenOnlyWhenItChanges(t *testing.T) {
 		t.Fatalf("the file holds %s", b)
 	}
 }
+
+// #997: the control plane rotated its key, and the socket moves to the name the windows
+// now look for.
+func TestTheLocalSocketMovesWithARotatedKey(t *testing.T) {
+	if !localPathHere() {
+		t.Skip("the local socket is a Mac's")
+	}
+	dir, err := os.MkdirTemp("", "local")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { os.RemoveAll(dir) })
+	t.Setenv("AGENTS_LOCAL_SOCKET_DIR", dir)
+	d, _ := start(t, t.TempDir())
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
+	d.StartLocal(ctx, &controllink.Membership{Host: "mac", ControlKey: []byte("old key")}, controllink.NewPrivateKey())
+	at := func(key string) func() bool {
+		return func() bool { _, err := os.Stat(filepath.Join(dir, LocalSocketName([]byte(key)))); return err == nil }
+	}
+	waitFor(t, "the socket at the old key's name", at("old key"))
+	d.MoveLocal([]byte("new key"))
+	waitFor(t, "the socket at the new key's name", at("new key"))
+	waitFor(t, "the old name gone", func() bool { return !at("old key")() })
+}

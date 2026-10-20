@@ -20,7 +20,7 @@ func TestAKeyInUseRenewsAndAnUnusedOneExpires(t *testing.T) {
 	window.Close()
 	ctx := context.Background()
 	c := p.s.records.Client(member.Client)
-	if c.Expires == nil || c.Expires.Sub(time.Now()) < life-time.Minute {
+	if c.Expires == nil || time.Until(c.Expires.Time) < life-time.Minute {
 		t.Fatalf("a client paired now lives its lifetime: %+v", c.Expires)
 	}
 
@@ -33,7 +33,7 @@ func TestAKeyInUseRenewsAndAnUnusedOneExpires(t *testing.T) {
 	again.Close()
 	p.waitFor(func() bool {
 		e := p.s.records.Client(member.Client).Expires
-		return e != nil && e.Sub(time.Now()) > life-time.Minute
+		return e != nil && time.Until(e.Time) > life-time.Minute
 	}, "the key to be renewed")
 
 	// Past its end, it is refused as expired, and kept so its person sees it.
@@ -51,13 +51,13 @@ func TestAMachinesKeyRenewsAndExpires(t *testing.T) {
 	p := startPlaneWith(t, store.NewMemory(), controllink.NewPrivateKey(), func(c *Config) { c.KeyLifetime = life })
 	h := p.host("MACHINE-2")
 	id := h.member.Host
-	if e := p.s.records.Host(id).Expires; e == nil || e.Sub(time.Now()) < life-time.Minute {
+	if e := p.s.records.Host(id).Expires; e == nil || time.Until(e.Time) < life-time.Minute {
 		t.Fatalf("a machine joined now lives its lifetime: %+v", e)
 	}
 	// Connected, it is renewed by the hour's round.
 	saveHostExpires(t, p, id, time.Now().Add(10*time.Minute))
 	p.s.renewConnected(context.Background())
-	if e := p.s.records.Host(id).Expires; e.Sub(time.Now()) < life-time.Minute {
+	if e := p.s.records.Host(id).Expires; time.Until(e.Time) < life-time.Minute {
 		t.Fatalf("a connected machine was not renewed: %v", e)
 	}
 	h.stop()

@@ -164,6 +164,11 @@ func Join(ctx context.Context, base, pin string, cr Credentials) (*Lines, *OK, e
 		l.Close()
 		return nil, nil, err
 	}
+	// Rotated (#997): the new key, only once its proof is checked; Adopt then keeps it.
+	if _, err := NewKey(m.OK, cr.Key); err != nil {
+		l.Close()
+		return nil, nil, err
+	}
 	return l, m.OK, nil
 }
 

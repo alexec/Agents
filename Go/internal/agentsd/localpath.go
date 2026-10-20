@@ -73,6 +73,24 @@ type localBook struct {
 	// localKept is what localClientsFile holds, read the first time; it is written only
 	// when host/clients differs from it (#1528).
 	localKept []byte
+	// localKey is the control plane's key the socket is named by, and localMove ends the
+	// socket at the old name when it changes (#997).
+	localKey  []byte
+	localMove context.CancelFunc
+}
+
+// MoveLocal is the control plane's new key after a rotation (#997): the socket moves to
+// the name the windows now look for.
+func (d *Daemon) MoveLocal(controlKey []byte) {
+	d.localMu.Lock()
+	defer d.localMu.Unlock()
+	if bytes.Equal(d.localKey, controlKey) {
+		return
+	}
+	d.localKey = controlKey
+	if d.localMove != nil {
+		d.localMove()
+	}
 }
 
 // SetLocalClients is host/clients: the windows the control plane lists as paired. It is
@@ -163,21 +181,35 @@ func (d *Daemon) StartLocal(ctx context.Context, member *controllink.Membership,
 		return
 	}
 	dir := LocalSocketDir(home)
-	path := filepath.Join(dir, LocalSocketName(member.ControlKey))
-	if len(path) >= 104 {
-		log.Printf("local: %s is too long for a socket; windows here go through the control plane", path)
-		return
-	}
+	d.localMu.Lock()
+	d.localKey = append([]byte(nil), member.ControlKey...)
+	d.localMu.Unlock()
+	host := member.Host
 	safe.Go("local", func() {
 		said := false
 		for ctx.Err() == nil {
+			d.localMu.Lock()
+			path := filepath.Join(dir, LocalSocketName(d.localKey))
+			serving, move := context.WithCancel(ctx)
+			d.localMove = move
+			d.localMu.Unlock()
+			if len(path) >= 104 {
+				move()
+				log.Printf("local: %s is too long for a socket; windows here go through the control plane", path)
+				return
+			}
 			if !isDir(dir) {
 				makeLocalGroup()
 			}
 			if isDir(dir) {
-				err := d.ServeLocal(ctx, path, member.Host, private)
+				err := d.ServeLocal(serving, path, host, private)
+				moved := serving.Err() != nil && ctx.Err() == nil
+				move()
 				if ctx.Err() != nil {
 					return
+				}
+				if moved {
+					continue // rotated: listen again at once, under the new key's name
 				}
 				log.Printf("local: %v", err)
 			} else if !said {

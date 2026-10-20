@@ -41,6 +41,9 @@ type Config struct {
 	Store store.Store
 	// The control plane's P-256 private key: raw, 32 bytes. Never in the store.
 	PrivateKey []byte
+	// Where the key is kept, so control/rotate can keep a new one (#997); nil for a key
+	// handed in, which is not rotated.
+	KeyKeeper KeyKeeper
 	// How long a client's or machine's key lives unused (#997); 0 is DefaultKeyLifetime.
 	KeyLifetime time.Duration
 	// The one address clients and hosts are given (R8).
@@ -118,8 +121,9 @@ type WebConfig struct {
 
 // Service is ControlService.
 type Service struct {
-	cfg     Config
-	public  []byte
+	cfg Config
+	// The control key, and the one before a rotation (#997): read with currentKeys.
+	keyBook
 	origin  string
 	copyID  string
 	records *records.Records
@@ -188,14 +192,15 @@ func New(cfg Config) (*Service, error) {
 	if cfg.Bind == "" {
 		cfg.Bind = "0.0.0.0"
 	}
-	s := &Service{cfg: cfg, public: public, origin: origin, copyID: strings.ToLower(records.NewUUID()[:8]),
+	s := &Service{cfg: cfg, keyBook: keyBook{keys: controlKeys{private: cfg.PrivateKey, public: public}}, origin: origin, copyID: strings.ToLower(records.NewUUID()[:8]),
 		records: records.New(cfg.Store), started: time.Now(), desk: notices.NewDesk(), phase: &phaseBox{phase: phaseServing}, sockets: map[*Conn]bool{}, stop: make(chan struct{}),
 		reads: readGate{every: readAgainEvery}}
 	s.sources = newSources(cfg.TrustedProxies, s.log)
 	if cfg.Push != nil {
 		s.pushes = newPushes(s, cfg.Push)
 	}
-	s.codes = &Codes{Store: cfg.Store, Private: cfg.PrivateKey, Public: public, URL: cfg.URL, Pin: cfg.Pin, Name: cfg.Name}
+	s.codes = &Codes{Store: cfg.Store, Private: cfg.PrivateKey, Public: public, URL: cfg.URL, Pin: cfg.Pin, Name: cfg.Name,
+		Keys: func() ([]byte, []byte) { k := s.currentKeys(); return k.private, k.public }}
 	s.router = NewRouter(nil, s.log)
 	s.router.OnPresence(s.presenceHeard)
 	s.methods = newMethods(s)
@@ -376,7 +381,7 @@ func (s *Service) takeUp(ctx context.Context) error {
 	if err := s.records.Load(ctx); err != nil {
 		return err
 	}
-	public := s.public
+	public := s.publicKey()
 	made, err := s.records.SettingsOrMake(ctx, func() records.Settings {
 		url := s.cfg.URL
 		settings := records.Settings{Name: s.cfg.Name, Port: 8790, MachineID: s.cfg.MachineID, URL: &url, ControlKey: public}
@@ -389,10 +394,16 @@ func (s *Service) takeUp(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	if made.ControlKey != nil && !bytes.Equal(made.ControlKey, public) {
-		return errors.New("this store belongs to a control plane with another key; give it that key, or another store")
+	// The key before a rotation (#997), and a rotation that stopped half way.
+	previous, err := s.takeUpPreviousKey(ctx, made)
+	if err != nil {
+		return err
 	}
 	if _, err := s.records.ChangeSettings(ctx, func(settings *records.Settings) {
+		if previous != nil && !bytes.Equal(settings.PreviousKey, previous) {
+			now := records.Now()
+			settings.PreviousKey, settings.RotatedAt = previous, &now
+		}
 		url := s.cfg.URL
 		settings.URL = &url
 		settings.Pin = nil
@@ -948,8 +959,12 @@ func (s *Service) accept(conn *Conn, webOrigin string, proved func(failed bool))
 	}
 	defer settle(false)
 	serverNonce := controllink.Nonce()
-	hello := controllink.Hello{V: int64(controllink.Version), Name: s.cfg.Name, Control: controllink.B64URL(s.public),
+	keys := s.currentKeys()
+	hello := controllink.Hello{V: int64(controllink.Version), Name: s.cfg.Name, Control: controllink.B64URL(keys.public),
 		Nonce: controllink.B64URL(serverNonce), Copy: s.copyID}
+	if keys.previousPublic != nil {
+		hello.Previous = new(controllink.B64URL(keys.previousPublic))
+	}
 	refuse := func(err error) {
 		var r *controllink.Refusal
 		refused := errors.As(err, &r)
@@ -998,11 +1013,24 @@ func (s *Service) accept(conn *Conn, webOrigin string, proved func(failed bool))
 		}
 		bound = []string{webOrigin}
 	}
-	id, mac, err := controllink.Verify(auth, serverNonce, bound, func(id controllink.Identity) ([]byte, error) {
-		key, c, h, err := s.key(id)
-		client, host, admittedAny = c, h, err == nil
-		return key, err
-	})
+	var shared []byte
+	verify := func(private []byte) (controllink.Identity, []byte, error) {
+		return controllink.Verify(auth, serverNonce, bound, func(id controllink.Identity) ([]byte, error) {
+			key, c, h, err := s.keyWith(id, private)
+			client, host, admittedAny, shared = c, h, err == nil, key
+			return key, err
+		})
+	}
+	id, mac, err := verify(keys.private)
+	// A member that still trusts the key before a rotation proves itself with it (#997),
+	// and is given the new one in ok.
+	var offer *controllink.NewKeyOffer
+	if r := (*controllink.Refusal)(nil); errors.As(err, &r) && r.Reason == controllink.BadProof && keys.previousPrivate != nil &&
+		(strings.HasPrefix(auth.ID, "c:") || strings.HasPrefix(auth.ID, "h:")) {
+		if id, mac, err = verify(keys.previousPrivate); err == nil {
+			offer = newKeyFor(shared, keys.public)
+		}
+	}
 	if err != nil {
 		refuse(err)
 		return
@@ -1043,7 +1071,7 @@ func (s *Service) accept(conn *Conn, webOrigin string, proved func(failed bool))
 	}
 	// Once a list has been announced, every member is given it (R16).
 	settings := s.records.Settings()
-	ok2 := controllink.OK{Mac: controllink.B64URL(mac), Host: optional(wire.HostID(host))}
+	ok2 := controllink.OK{Mac: controllink.B64URL(mac), Host: optional(wire.HostID(host)), NewKey: offer}
 	if client != nil {
 		ok2.Grant = new(records.LegacyGrant)
 	}
@@ -1153,6 +1181,11 @@ func currentEndpoints(settings *records.Settings) []records.Endpoint {
 
 // key is the key an identity proves, and what it is admitted as.
 func (s *Service) key(id controllink.Identity) ([]byte, *records.ClientRecord, string, error) {
+	return s.keyWith(id, s.privateKey())
+}
+
+// keyWith is key, with the control plane's key now or the one before a rotation (#997).
+func (s *Service) keyWith(id controllink.Identity, private []byte) ([]byte, *records.ClientRecord, string, error) {
 	// Being filled by a handover, its records are not whole yet: try again, which says
 	// nothing about the member (#81), where unknown would have a browser forget its key.
 	if id.Kind != 'x' && s.phase.now() == phaseReceiving {
@@ -1183,7 +1216,7 @@ func (s *Service) key(id controllink.Identity) ([]byte, *records.ClientRecord, s
 		if keyExpired(c.Expires, time.Now()) {
 			return nil, nil, "", controllink.Refuse(controllink.Expired)
 		}
-		key, err := controllink.ClientKey(s.cfg.PrivateKey, c.PublicKey, c.ID)
+		key, err := controllink.ClientKey(private, c.PublicKey, c.ID)
 		if err != nil {
 			return nil, nil, "", controllink.Refuse(controllink.Unknown)
 		}
@@ -1204,7 +1237,7 @@ func (s *Service) key(id controllink.Identity) ([]byte, *records.ClientRecord, s
 		if keyExpired(h.Expires, time.Now()) {
 			return nil, nil, "", controllink.Refuse(controllink.Expired)
 		}
-		key, err := controllink.HostKey(s.cfg.PrivateKey, h.PublicKey, h.ID)
+		key, err := controllink.HostKey(private, h.PublicKey, h.ID)
 		if err != nil {
 			return nil, nil, "", controllink.Refuse(controllink.Unknown)
 		}
@@ -1222,7 +1255,7 @@ func (s *Service) key(id controllink.Identity) ([]byte, *records.ClientRecord, s
 			return nil, nil, "", notTheirs{controllink.Refuse(controllink.Unavailable)}
 		}
 		wanted := (id.Kind == 'e') == (stored.Purpose == "host")
-		secret := controllink.CodeSecret(s.cfg.PrivateKey, id.ID)
+		secret := controllink.CodeSecret(s.privateKey(), id.ID)
 		if !wanted || secret == nil {
 			return nil, nil, "", controllink.Refuse(controllink.Unknown)
 		}
@@ -1233,7 +1266,7 @@ func (s *Service) key(id controllink.Identity) ([]byte, *records.ClientRecord, s
 		if s.mesh == nil && !strings.HasPrefix(id.ID, handoverPrefix) {
 			return nil, nil, "", controllink.Refuse(controllink.Unknown)
 		}
-		return controllink.CopyKey(s.cfg.PrivateKey), nil, "", nil
+		return controllink.CopyKey(s.privateKey()), nil, "", nil
 	}
 	return nil, nil, "", controllink.Refuse(controllink.Unknown)
 }

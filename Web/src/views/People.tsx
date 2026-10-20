@@ -9,7 +9,7 @@ import type { PeopleList, PersonInvited, PersonRow, UserRole } from "../protocol
 import { CallFailed } from "../wire/link";
 import { describe, methodNotFound } from "../model/errors";
 import { badges, canRemove, joinCommandNote, joinCommandTitle, canSetRole, clientLine, inviteNote, machineLine, memberNote, noPeople, ordered, removeLines,
-  removeTitle, roleNote, roleWord, roles } from "../model/people";
+  removeTitle, roleNote, roleWord, roles, rotateFoot, rotateMessage, rotateTitle, rotated } from "../model/people";
 import { JoinRequests } from "./JoinRequest";
 import { Modal } from "./Modal";
 
@@ -104,6 +104,37 @@ function RemoveSheet({ store, person, close }: { store: Store; person: PersonRow
   );
 }
 
+/** Rotate Control Key… (#997): this page's own connection closes a moment later, and it takes the new key as it connects again. */
+function RotateSheet({ store, close, done }: { store: Store; close: () => void; done: () => void }) {
+  const problem = useSignal<string | null>(null);
+  const busy = useSignal(false);
+  const rotate = async () => {
+    busy.value = true;
+    try {
+      await store.link.call("control/rotate", {});
+      done();
+      close();
+    } catch (error) {
+      problem.value = sentence(error);
+    } finally {
+      busy.value = false;
+    }
+  };
+  return (
+    <Modal label={rotateTitle} close={close}>
+      <div class="sheet-body">
+        <h2>{rotateTitle}</h2>
+        <p class="sheet-note">{rotateMessage}</p>
+        {problem.value && <p class="sheet-note failure" role="alert">{problem.value}</p>}
+        <div class="sheet-actions">
+          <button type="button" onClick={close}>Cancel</button>
+          <button type="button" class="prominent" disabled={busy.value} onClick={() => void rotate()}>Rotate</button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
 /** The one line a server runs to ask to join as you, with no code, and Copy (#994). */
 function JoinCommand({ command }: { command: string }) {
   const copied = useSignal(false);
@@ -159,6 +190,8 @@ export function PeopleSection({ store, down }: { store: Store; down: boolean }) 
   const problem = useSignal<string | null>(null);
   const inviting = useSignal(false);
   const removing = useSignal<PersonRow | null>(null);
+  const rotating = useSignal(false);
+  const wasRotated = useSignal(false);
   const load = async () => {
     try {
       list.value = await store.link.call("people/list", {});
@@ -197,8 +230,16 @@ export function PeopleSection({ store, down }: { store: Store; down: boolean }) 
           {shown.admin
             ? <button type="button" class="invite" disabled={down} onClick={() => { inviting.value = true; }}>Invite a Person…</button>
             : <p class="hint">{memberNote}</p>}
+          {shown.admin && (
+            <div class="rotate-key">
+              <button type="button" disabled={down} onClick={() => { rotating.value = true; }}>Rotate Control Key…</button>
+              {wasRotated.value && <p class="hint" role="status">{rotated}</p>}
+              <p class="hint">{rotateFoot}</p>
+            </div>
+          )}
         </>
       )}
+      {rotating.value && <RotateSheet store={store} close={() => { rotating.value = false; }} done={() => { wasRotated.value = true; }} />}
       {inviting.value && <InviteSheet store={store} close={() => { inviting.value = false; void load(); }} />}
       {removing.value && <RemoveSheet store={store} person={removing.value} close={() => { removing.value = null; void load(); }} />}
     </section>

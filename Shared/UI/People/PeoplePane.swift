@@ -23,6 +23,9 @@ struct PeoplePane: View {
     @State private var problem: String?
     @State private var isInviting = false
     @State private var removing: DaemonAPI.PersonRow?
+    @State private var isRotating = false
+    /// Said once the control key was rotated (#997).
+    @State private var rotated = false
     /// `control/status`'s line to run on a server so it asks to join as this person.
     @State private var joinCommand: String?
 
@@ -59,6 +62,20 @@ struct PeoplePane: View {
                         .foregroundStyle(.secondary)
                 }
                 .paperListRow()
+                if list.admin {
+                    Section {
+                        Button("Rotate Control Key…") { isRotating = true }
+                        if rotated {
+                            Text(PeopleWords.rotated).appText(.supporting)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    } footer: {
+                        Text(PeopleWords.rotateFoot)
+                            .appText(.fine)
+                            .foregroundStyle(.secondary)
+                    }
+                    .paperListRow()
+                }
             } else if problem == nil {
                 Text("Loading…").appText(.supporting).foregroundStyle(.secondary).paperListRow()
             }
@@ -84,6 +101,12 @@ struct PeoplePane: View {
             Button("Cancel", role: .cancel) {}
         } message: { person in
             Text(PeopleWords.removeMessage(person))
+        }
+        .confirmationDialog(PeopleWords.rotateTitle, isPresented: $isRotating, titleVisibility: .visible) {
+            Button("Rotate") { Task { await rotate() } }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text(PeopleWords.rotateMessage)
         }
     }
 
@@ -130,6 +153,19 @@ struct PeoplePane: View {
             problem = PeopleWords.refusal(error)
         }
         await reload()
+    }
+
+    /// control/rotate (#997). This client's own connection closes a moment later, and it
+    /// takes the new key as it connects again.
+    private func rotate() async {
+        guard let control else { return }
+        do {
+            _ = try await control.call(DaemonAPI.Method.controlRotate, DaemonAPI.Empty())
+            rotated = true
+            problem = nil
+        } catch {
+            problem = PeopleWords.refusal(error)
+        }
     }
 
     /// Loads again and keeps a refusal on show.

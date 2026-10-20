@@ -51,6 +51,9 @@ type Uplink struct {
 	// Told is handed what the control plane tells this host on channel 0, a method and its
 	// params, such as host/clients (#1118); nil hears none of it.
 	Told func(method string, params json.RawMessage)
+	// Rotated is handed the control plane's new key once this host has taken it (#997),
+	// for what is named by it, such as the local socket; nil hears nothing.
+	Rotated func(controlKey []byte)
 	// pingEvery is how often a quiet link is pinged, and how long its pong may take;
 	// upPing when 0.
 	pingEvery time.Duration
@@ -277,8 +280,16 @@ func (u *Uplink) join(ctx context.Context, key []byte, last string) (*Lines, str
 		if err != nil {
 			continue
 		}
+		before := u.Member.ControlKey
 		if u.Member.Adopt(ok) {
 			log.Printf("uplink: the control plane is now at %s", u.Member.URL)
+			rotated := !Same(before, u.Member.ControlKey)
+			if rotated {
+				log.Printf("uplink: the control plane rotated its key; this host trusts the new one")
+				if u.Rotated != nil {
+					u.Rotated(append([]byte(nil), u.Member.ControlKey...))
+				}
+			}
 			if u.Root != "" {
 				if err := u.Member.Save(u.Root); err != nil {
 					log.Printf("uplink: the new list could not be saved: %v", err)

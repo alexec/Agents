@@ -40,6 +40,9 @@ type Auth = wire.ControlAuth
 // answers now, and from when (R16).
 type OK = wire.ControlOK
 
+// NewKeyOffer is the control plane's new key in an ok, with its proof (#997).
+type NewKeyOffer = wire.ControlNewKey
+
 // Reasons a connection is refused, as ControlAuth.Reason says them.
 const (
 	Unknown           = "unknown"
@@ -252,10 +255,8 @@ func Answer(h *Hello, id Identity, key []byte, origin, kind string, controlKey [
 	if h.V != int64(Version) || err != nil || len(serverNonce) != 32 {
 		return nil, nil, Refuse(BadMessage)
 	}
-	if controlKey != nil {
-		if theirs, err := FromB64URL(h.Control); err != nil || !Same(theirs, controlKey) {
-			return nil, nil, Refuse(WrongControlPlane)
-		}
+	if controlKey != nil && !trusted(h, controlKey) {
+		return nil, nil, Refuse(WrongControlPlane)
 	}
 	peerNonce := Nonce()
 	text := id.Text()
@@ -269,6 +270,34 @@ func Answer(h *Hello, id Identity, key []byte, origin, kind string, controlKey [
 		auth.Epoch = new(int64(*epoch))
 	}
 	return auth, expect, nil
+}
+
+// trusted is whether a hello is from the control plane a member trusts: its key now, or
+// the one before it rotated (#997), which the member then proves itself with.
+func trusted(h *Hello, controlKey []byte) bool {
+	if theirs, err := FromB64URL(h.Control); err == nil && Same(theirs, controlKey) {
+		return true
+	}
+	if h.Previous == nil {
+		return false
+	}
+	before, err := FromB64URL(*h.Previous)
+	return err == nil && Same(before, controlKey)
+}
+
+// NewKey is the control plane's new key from an ok (#997), checked against the member's
+// shared key from the key it trusts: nil when the ok gives none, and a refusal when its
+// proof is not the previous key's holder's.
+func NewKey(ok *OK, shared []byte) ([]byte, error) {
+	if ok == nil || ok.NewKey == nil {
+		return nil, nil
+	}
+	key, err1 := FromB64URL(ok.NewKey.Key)
+	proof, err2 := FromB64URL(ok.NewKey.Proof)
+	if err1 != nil || err2 != nil || !ValidPublicKey(key) || !Same(proof, NewKeyProof(shared, key)) {
+		return nil, Refuse(WrongControlPlane)
+	}
+	return key, nil
 }
 
 // Check is the peer's side: the server's ok against what Answer said to expect.

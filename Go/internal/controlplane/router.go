@@ -392,6 +392,19 @@ func (r *Router) ConnectedMembers() []string {
 	return out
 }
 
+// CloseMembers closes every client's and host's connection here, so each connects again
+// (#997: and takes the control plane's new key).
+func (r *Router) CloseMembers() {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for id := range r.clients {
+		r.detachLocked(id, 0)
+	}
+	for _, h := range r.hosts {
+		h.conn.Close()
+	}
+}
+
 // SetRelay says whether a host only relays (HostRecord.relay): nil for a host that runs
 // agents, false for a relay switched off, true for one relaying. A host found to be a
 // relay has its client channels closed.

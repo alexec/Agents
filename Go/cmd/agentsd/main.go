@@ -265,7 +265,7 @@ func join(ctx context.Context, cl commandLine, d *agentsd.Daemon) {
 		log.Printf("enrolled as host %s with %s", member.Host, member.Name)
 	}
 	up := &controllink.Uplink{Root: loc.Root, Member: member, Private: private, Hello: hello, Accept: d.Accept,
-		Lend: d.LendingPort}
+		Lend: d.LendingPort, Rotated: d.MoveLocal}
 	d.Tunneler = up
 	// The needs it shows nowhere go to the control plane, offered again on each return (#1367).
 	up.OnChange = func(connected bool, _ string) {

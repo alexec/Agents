@@ -3436,6 +3436,10 @@
         },
         "copy": {
           "type": "string"
+        },
+        "previous": {
+          "type": "string",
+          "description": "The control plane's key before control/rotate (#997, spec 736 FR-043), for 30 days after: a member that still trusts it proves itself with it, and is given the new key in ok."
         }
       },
       "required": [
@@ -3595,10 +3599,30 @@
         },
         "epoch": {
           "type": "integer"
+        },
+        "newKey": {
+          "$ref": "#/definitions/ControlNewKey"
         }
       },
       "required": [
         "mac"
+      ],
+      "additionalProperties": false
+    },
+    "ControlNewKey": {
+      "type": "object",
+      "description": "The control plane's new key (#997, spec 736 FR-043), in ok to a member that proved itself with the previous one. proof is the HMAC of the new key under the member's shared key from the previous one, so only the holder of the previous key could have made it. The member trusts the new key from then on, with no new pairing.",
+      "properties": {
+        "key": {
+          "type": "string"
+        },
+        "proof": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "key",
+        "proof"
       ],
       "additionalProperties": false
     },

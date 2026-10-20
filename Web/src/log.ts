@@ -3,7 +3,7 @@
 
 export type LogEvent =
   | "link.connecting" | "link.open" | "link.down" | "link.forgotten" | "link.refused"
-  | "link.wrongControlPlane" | "link.unsupported" | "pair.ok" | "pair.fromLink" | "pair.failed" | "call.failed" | "call.timedOut";
+  | "link.wrongControlPlane" | "link.unsupported" | "link.newKey" | "pair.ok" | "pair.fromLink" | "pair.failed" | "call.failed" | "call.timedOut";
 
 /** `code` is a refusal reason, a JSON-RPC error number, or a close code. */
 export function log(event: LogEvent, code?: string | number): void {

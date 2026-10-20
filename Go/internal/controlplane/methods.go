@@ -65,7 +65,7 @@ var own = map[string]bool{
 	"clients/forgetSelf": true, "clients/setPushToken": true, "clients/setActivityToken": true,
 	"devices/list": true, "devices/startPairing": true, "devices/stopPairing": true,
 	"devices/forget": true, "hosts/lastHeard": true,
-	"audit/list": true, "audit/export": true, "control/setAuditDays": true,
+	"audit/list": true, "audit/export": true, "control/setAuditDays": true, "control/rotate": true,
 	"people/list": true, "people/invite": true, "people/setRole": true, "people/remove": true,
 	"hosts/joinRequests": true, "hosts/approveJoin": true, "hosts/denyJoin": true,
 }
@@ -90,7 +90,7 @@ var writes = map[string]bool{
 	"control/setProjectDetection": true, "clients/startPairing": true, "clients/forget": true,
 	"devices/startPairing": true, "devices/forget": true, "clients/setPushToken": true,
 	"clients/setActivityToken": true,
-	"control/setAuditDays": true, "people/invite": true, "people/setRole": true, "people/remove": true,
+	"control/setAuditDays": true, "control/rotate": true, "people/invite": true, "people/setRole": true, "people/remove": true,
 	"hosts/approveJoin": true, "hosts/denyJoin": true,
 }
 
@@ -250,6 +250,8 @@ func (m *Methods) Handle(method string, params json.RawMessage, from Caller) (an
 		return map[string]any{}, m.s.installer.CheckAgain(ctx, string(request.Host))
 	case "audit/list", "audit/export", "control/setAuditDays":
 		return m.auditMethod(ctx, method, params, from)
+	case "control/rotate":
+		return wire.Empty{}, m.s.rotate(ctx, from)
 	case "control/setProjectDetection":
 		request, err := require[wire.ProjectDetection](params, "ProjectDetection")
 		if err != nil {

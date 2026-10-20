@@ -302,6 +302,11 @@ export class Link {
     socket.onopen = async () => {
       try {
         const admitted = await this.options.authenticate(lines, record, this.options.origin);
+        // The control plane rotated its key (#997): trusted from now on, with no new pairing.
+        if (admitted.newKey && admitted.newKey !== record.control) {
+          await this.options.keys.save({ ...record, control: admitted.newKey });
+          log("link.newKey");
+        }
         authed = true;
         // Back to the first step only once it has stayed up: a link that drops straight after
         // each sign-in would otherwise redial, and reload everything, every second (#170).

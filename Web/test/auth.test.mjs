@@ -88,6 +88,36 @@ test("connecting proves the browser's key as Swift does", async () => {
   assert.equal("grant" in admitted, false);
 });
 
+test("after a rotation the browser proves itself with the previous key and takes the new one, with its proof (#997)", async () => {
+  // The proof is the same bytes as Go's and Swift's (TestTheNewKeyProofIsTheClientsOwn).
+  const ones = await crypto.subtle.importKey("raw", new Uint8Array(32).fill(1), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  const fresh = new Uint8Array(65).fill(2);
+  fresh[0] = 4;
+  const vector = new Uint8Array(await crypto.subtle.sign("HMAC", ones, w.newKeyMessage(fresh)));
+  assert.equal(w.base64url(vector), "v9-kYG-84IN39u6AMjxueMV9PJ0RFPVWlUAghG140Wg");
+
+  const privateKey = await crypto.subtle.importKey("jwk", v.client.jwk, curve, false, ["deriveBits"]);
+  const previous = w.base64url(w.unhex(v.control.public));
+  const record = { privateKey, publicKey: null, client: v.client.id, control: previous, paired: "" };
+  const shared = await w.clientKey(privateKey, w.unhex(v.control.public), v.client.id);
+  const proof = new Uint8Array(await crypto.subtle.sign("HMAC", shared, w.newKeyMessage(fresh)));
+  const rotated = (newKey) => {
+    const server = fakeServer(() => ({ ok: { mac: w.base64url(w.unhex(v.client.mac.server)), newKey } }));
+    // The hello names the new key, and the one the browser trusts as the previous.
+    server.socket.next = ((next) => async () => {
+      const line = JSON.parse(await next());
+      if (line.hello) line.hello = { ...line.hello, control: w.base64url(fresh), previous };
+      return JSON.stringify(line);
+    })(server.socket.next);
+    return server;
+  };
+  const admitted = await w.connect(rotated({ key: w.base64url(fresh), proof: w.base64url(proof) }).socket, record, v.origin,
+    w.unhex(v.peerNonce));
+  assert.equal(admitted.newKey, w.base64url(fresh));
+  await assert.rejects(w.connect(rotated({ key: w.base64url(fresh), proof: w.base64url(new Uint8Array(32)) }).socket, record,
+    v.origin, w.unhex(v.peerNonce)), w.WrongControlPlane);
+});
+
 test("a code for another control plane sends nothing", async () => {
   const other = code();
   other.controlKey = w.unhex("04" + "11".repeat(64));

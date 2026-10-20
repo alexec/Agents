@@ -115,6 +115,37 @@ struct ControlAuthTests {
         }
     }
 
+    /// After a rotation (#997) a member that trusts the previous key still knows its
+    /// control plane, and takes the new key only with the proof the previous key's holder
+    /// makes: the same bytes as Go's (TestTheNewKeyProofIsTheClientsOwn).
+    @Test func aRotatedKeyIsTakenOnlyWithItsProof() throws {
+        let previous = ControlAgreement.generate().publicKey
+        let hello = ControlAuth.Hello(name: "t", control: ControlCode.base64url(control.publicKey),
+                                      nonce: ControlCode.base64url(ControlAuth.nonce()), copy: "a",
+                                      previous: ControlCode.base64url(previous))
+        let key = Data(repeating: 7, count: 32)
+        _ = try ControlAuth.answer(hello, identity: .client(UUID()), key: key, origin: origin, kind: "mac", expecting: previous)
+        #expect(throws: ControlAuth.Refusal(.wrongControlPlane)) {
+            _ = try ControlAuth.answer(hello, identity: .client(UUID()), key: key, origin: origin, kind: "mac",
+                                       expecting: ControlAgreement.generate().publicKey)
+        }
+        let shared = Data(repeating: 1, count: 32)
+        let fresh = Data([4]) + Data(repeating: 2, count: 64)
+        let proof = ControlAuth.newKeyProof(shared: shared, newKey: fresh)
+        #expect(ControlCode.base64url(proof) == "v9-kYG-84IN39u6AMjxueMV9PJ0RFPVWlUAghG140Wg")
+        var ok = ControlAuth.OK(mac: "", newKey: .init(key: ControlCode.base64url(fresh), proof: ControlCode.base64url(proof)))
+        #expect(try ControlAuth.newKey(ok, shared: shared) == fresh)
+        ok.newKey?.proof = ControlCode.base64url(Data(repeating: 0, count: 32))
+        #expect(throws: ControlAuth.Refusal(.wrongControlPlane)) { _ = try ControlAuth.newKey(ok, shared: shared) }
+        // The book keeps it, for the next dial and the next launch.
+        let membership = ControlMembership(client: UUID(), controlKey: previous, addresses: [], name: "t",
+                                           url: "https://control.example:8790", pin: nil)
+        let book = EndpointBook(membership)
+        ok.newKey?.proof = ControlCode.base64url(proof)
+        book.answered(at: membership.endpointsToDial[0], ok: ok)
+        #expect(book.current.controlKey == fresh)
+    }
+
     /// A client says what it has (#1748); a host or a copy says nothing here.
     @Test func aClientSaysItsCapabilities() throws {
         let hello = ControlAuth.Hello(name: "t", control: ControlCode.base64url(control.publicKey),
