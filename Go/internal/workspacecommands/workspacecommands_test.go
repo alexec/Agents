@@ -133,7 +133,7 @@ func TestRefusesWhatCannotRun(t *testing.T) {
 	refused(t, `{"list":"x","columns":["name"],"start":"a","stop":"b"}`, "columns must name an id column")
 	refused(t, `{"workspaces":[{"name":"a","start":"x","stop":"y"}],"states":{"on":"up"}}`,
 		"states.on must be one of running, starting, stopping, stopped, unknown")
-	refused(t, `{"preset":"vagrant"}`, "no preset vagrant; there are docker, doctl, codespaces, coder, gcloud-workstations, digitalocean-api, codespaces-api, coder-api, aws-ec2-api")
+	refused(t, `{"preset":"vagrant"}`, "no preset vagrant; there are docker, doctl, codespaces, coder, gcloud-workstations, digitalocean-api, codespaces-api, coder-api, aws-ec2-api, gcp-compute-api")
 	refused(t, `[]`, "the configuration must be a JSON object")
 	refused(t, `{"list":"x","start":"a","stop":"b"}`, "a list needs columns, or json paths")
 	refused(t, `{"list":"x","json":{"name":"n"},"start":"a","stop":"b"}`, "json needs an id path")
@@ -202,6 +202,7 @@ func TestNoPresetAsksForSudo(t *testing.T) {
 		`{"preset":"codespaces-api"}`,
 		`{"preset":"coder-api","url":"https://coder.example"}`,
 		`{"preset":"aws-ec2-api","region":"us-east-1"}`,
+		`{"preset":"gcp-compute-api","project":"p","zone":"z"}`,
 	}
 	for _, text := range configs {
 		c := config(t, text)

@@ -32,6 +32,9 @@ type Request struct {
 	Answer string
 	// Sign, when set, signs the request for AWS with the AWS_* secrets (#1345).
 	Sign *AWSSign
+	// Google, when set, authorises the request with a token from the service account key
+	// in GOOGLE_SERVICE_ACCOUNT_KEY (#1346).
+	Google *GoogleAuth
 }
 
 // Said is the request as a log or an error says it: its method and its URL as written.
@@ -94,6 +97,9 @@ func (p *Provider) call(r Request, values map[string]string, deadline time.Durat
 	if r.Sign != nil {
 		needed = append(needed, AWSKeySecret, AWSSecretSecret)
 	}
+	if r.Google != nil {
+		needed = append(needed, GoogleSecret)
+	}
 	for _, name := range needed {
 		value, ok := lookup(name)
 		if !ok || value == "" {
@@ -125,6 +131,13 @@ func (p *Provider) call(r Request, values map[string]string, deadline time.Durat
 	}
 	for name, template := range r.Headers {
 		request.Header.Set(name, Fill(Fill(template, secrets, false), values, false))
+	}
+	if r.Google != nil {
+		token, err := p.googleToken(secrets[GoogleSecret], r.Google.Scope, deadline)
+		if err != nil {
+			return nil, err
+		}
+		request.Header.Set("Authorization", "Bearer "+token)
 	}
 	if r.Sign != nil {
 		session, _ := lookup(AWSSessionSecret)
@@ -251,6 +264,14 @@ func requestFrom(value any, what string) (*Request, error) {
 		if answer == "xml" {
 			r.Answer = answer
 		}
+	}
+	if google, present := o["googleAuth"]; present {
+		given, _ := google.(map[string]any)
+		scope, _ := given["scope"].(string)
+		if scope == "" {
+			return nil, ConfigError(what + ".googleAuth needs a scope")
+		}
+		r.Google = &GoogleAuth{Scope: scope}
 	}
 	if sign, present := o["awsSign"]; present {
 		given, _ := sign.(map[string]any)
