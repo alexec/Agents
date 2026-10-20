@@ -33,6 +33,11 @@ public struct ArchiveUndo: Equatable, Sendable, Identifiable {
     public static let seconds: Double = 5
     public static let undoLabel = "Undo"
 
+    /// What VoiceOver says when the strip comes (#1676): the line, then that Undo is there.
+    public var announcement: String {
+        (line.hasSuffix(".") ? line : line + ".") + " " + Self.undoLabel
+    }
+
     /// "Archived “Fix the parser”", and that it stays stopped when Archive stopped it.
     /// A selection is a count: "Archived 3 sessions and 1 workflow" (#1664).
     public var line: String {
