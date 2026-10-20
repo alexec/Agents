@@ -278,6 +278,23 @@ struct WireSchemaTests {
             #expect(documented[method] == kind, "\(method) goes to a different place")
         }
     }
+
+    /// Capability's tables, which scripts/wire.sh gen writes, say what x-capability says on each
+    /// method (#1748), and each method the web page calls or hears has one.
+    @Test func capabilitiesAreWhatTheMethodsName() throws {
+        for (file, table) in [("daemon.openrpc.json", Capability.host), ("control.openrpc.json", Capability.control)] {
+            var named: [String: String] = [:]
+            for method in try Self.read(file)["methods"]?.arrayValue ?? [] {
+                guard let name = method["name"]?.stringValue else { continue }
+                named[name] = method["x-capability"]?.stringValue
+            }
+            #expect(named == table, "\(file) and Capability disagree; run scripts/wire.sh gen")
+        }
+        for row in DaemonAPI.WebSignatures.rows {
+            let table = [.hostRequest, .hostNotification].contains(row.kind) ? Capability.host : Capability.control
+            #expect(table[row.method] != nil, "\(row.method) has no capability")
+        }
+    }
 }
 
 /// The part of JSON Schema draft-07 that daemon.schema.json uses, checked against a value.

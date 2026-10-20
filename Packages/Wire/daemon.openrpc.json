@@ -8,6 +8,7 @@
   "methods": [
     {
       "name": "agents/answerSandbox",
+      "x-capability": "agents/1",
       "tags": [
         {
           "name": "web"
@@ -32,6 +33,7 @@
     },
     {
       "name": "agents/archive",
+      "x-capability": "agents/1",
       "tags": [
         {
           "name": "web"
@@ -56,6 +58,7 @@
     },
     {
       "name": "agents/branchFrom",
+      "x-capability": "chat.branch/1",
       "tags": [
         {
           "name": "web"
@@ -80,6 +83,7 @@
     },
     {
       "name": "agents/continueInProject",
+      "x-capability": "agents/1",
       "tags": [
         {
           "name": "web"
@@ -104,6 +108,7 @@
     },
     {
       "name": "agents/delete",
+      "x-capability": "agents/1",
       "tags": [
         {
           "name": "web"
@@ -128,6 +133,7 @@
     },
     {
       "name": "agents/discardDraft",
+      "x-capability": "agents/1",
       "tags": [
         {
           "name": "web"
@@ -152,6 +158,7 @@
     },
     {
       "name": "agents/fork",
+      "x-capability": "agents/1",
       "tags": [
         {
           "name": "web"
@@ -176,6 +183,7 @@
     },
     {
       "name": "agents/labelVocabulary",
+      "x-capability": "agents/1",
       "tags": [
         {
           "name": "web"
@@ -203,6 +211,7 @@
     },
     {
       "name": "agents/list",
+      "x-capability": "agents/1",
       "tags": [
         {
           "name": "web"
@@ -230,6 +239,7 @@
     },
     {
       "name": "agents/options",
+      "x-capability": "agents/1",
       "tags": [
         {
           "name": "web"
@@ -254,6 +264,7 @@
     },
     {
       "name": "agents/prewarm",
+      "x-capability": "agents/1",
       "tags": [
         {
           "name": "web"
@@ -278,6 +289,7 @@
     },
     {
       "name": "agents/prompt",
+      "x-capability": "agents/1",
       "tags": [
         {
           "name": "web"
@@ -302,6 +314,7 @@
     },
     {
       "name": "agents/recreateWorktree",
+      "x-capability": "agents/1",
       "tags": [
         {
           "name": "web"
@@ -326,6 +339,7 @@
     },
     {
       "name": "agents/rename",
+      "x-capability": "agents/1",
       "tags": [
         {
           "name": "web"
@@ -350,6 +364,7 @@
     },
     {
       "name": "agents/resuming",
+      "x-capability": "agents/1",
       "tags": [
         {
           "name": "web"
@@ -374,6 +389,7 @@
     },
     {
       "name": "agents/sendNow",
+      "x-capability": "agents/1",
       "tags": [
         {
           "name": "web"
@@ -398,6 +414,7 @@
     },
     {
       "name": "agents/setCeiling",
+      "x-capability": "agents/1",
       "tags": [
         {
           "name": "web"
@@ -422,6 +439,7 @@
     },
     {
       "name": "agents/setLabels",
+      "x-capability": "agents/1",
       "tags": [
         {
           "name": "web"
@@ -446,6 +464,7 @@
     },
     {
       "name": "agents/setOption",
+      "x-capability": "agents/1",
       "tags": [
         {
           "name": "web"
@@ -473,6 +492,7 @@
     },
     {
       "name": "agents/setSandbox",
+      "x-capability": "agents/1",
       "tags": [
         {
           "name": "web"
@@ -497,6 +517,7 @@
     },
     {
       "name": "agents/setUnread",
+      "x-capability": "agents/1",
       "tags": [
         {
           "name": "web"
@@ -521,6 +542,7 @@
     },
     {
       "name": "agents/start",
+      "x-capability": "agents/1",
       "tags": [
         {
           "name": "web"
@@ -545,6 +567,7 @@
     },
     {
       "name": "agents/stop",
+      "x-capability": "agents/1",
       "tags": [
         {
           "name": "web"
@@ -569,6 +592,7 @@
     },
     {
       "name": "agents/stopBackground",
+      "x-capability": "agents/1",
       "tags": [
         {
           "name": "web"
@@ -593,6 +617,7 @@
     },
     {
       "name": "agents/touchedPaths",
+      "x-capability": "agents/1",
       "tags": [
         {
           "name": "web"
@@ -620,6 +645,7 @@
     },
     {
       "name": "agents/transcript",
+      "x-capability": "agents/1",
       "tags": [
         {
           "name": "web"
@@ -644,6 +670,7 @@
     },
     {
       "name": "agents/turns",
+      "x-capability": "agents/1",
       "tags": [
         {
           "name": "web"
@@ -668,6 +695,7 @@
     },
     {
       "name": "agents/unarchive",
+      "x-capability": "agents/1",
       "tags": [
         {
           "name": "web"
@@ -692,6 +720,7 @@
     },
     {
       "name": "agents/unqueue",
+      "x-capability": "agents/1",
       "tags": [
         {
           "name": "web"
@@ -716,6 +745,7 @@
     },
     {
       "name": "agents/editQueued",
+      "x-capability": "agents.edit-queued/1",
       "tags": [
         {
           "name": "web"
@@ -740,6 +770,7 @@
     },
     {
       "name": "agents/find",
+      "x-capability": "agents.find/1",
       "tags": [
         {
           "name": "web"
@@ -764,6 +795,7 @@
     },
     {
       "name": "agents/said",
+      "x-capability": "agents.said/1",
       "tags": [
         {
           "name": "web"
@@ -788,6 +820,7 @@
     },
     {
       "name": "approvals/answer",
+      "x-capability": "approvals/1",
       "tags": [
         {
           "name": "web"
@@ -812,6 +845,7 @@
     },
     {
       "name": "approvals/read",
+      "x-capability": "approvals/1",
       "tags": [
         {
           "name": "web"
@@ -836,6 +870,7 @@
     },
     {
       "name": "artifact/write",
+      "x-capability": "artifact/1",
       "tags": [
         {
           "name": "web"
@@ -860,6 +895,7 @@
     },
     {
       "name": "attention/pending",
+      "x-capability": "attention/1",
       "tags": [
         {
           "name": "web"
@@ -884,6 +920,7 @@
     },
     {
       "name": "catalog/destination-state",
+      "x-capability": "catalog/1",
       "paramStructure": "by-name",
       "params": [
         {
@@ -903,6 +940,7 @@
     },
     {
       "name": "catalog/preview",
+      "x-capability": "catalog/1",
       "paramStructure": "by-name",
       "params": [
         {
@@ -922,6 +960,7 @@
     },
     {
       "name": "catalog/search",
+      "x-capability": "catalog/1",
       "paramStructure": "by-name",
       "params": [
         {
@@ -941,6 +980,7 @@
     },
     {
       "name": "changes/file",
+      "x-capability": "changes/1",
       "tags": [
         {
           "name": "web"
@@ -965,6 +1005,7 @@
     },
     {
       "name": "changes/list",
+      "x-capability": "changes/1",
       "tags": [
         {
           "name": "web"
@@ -989,6 +1030,7 @@
     },
     {
       "name": "client/catchUp",
+      "x-capability": "client/1",
       "paramStructure": "by-name",
       "params": [
         {
@@ -1008,6 +1050,7 @@
     },
     {
       "name": "clientPermissions/state",
+      "x-capability": "client-permissions/1",
       "paramStructure": "by-name",
       "params": [
         {
@@ -1027,6 +1070,7 @@
     },
     {
       "name": "connection/bindDevice",
+      "x-capability": "connection/1",
       "paramStructure": "by-name",
       "params": [
         {
@@ -1046,6 +1090,7 @@
     },
     {
       "name": "connections/disconnect",
+      "x-capability": "connections/1",
       "tags": [
         {
           "name": "web"
@@ -1070,6 +1115,7 @@
     },
     {
       "name": "connections/list",
+      "x-capability": "connections/1",
       "tags": [
         {
           "name": "web"
@@ -1094,6 +1140,7 @@
     },
     {
       "name": "connections/sign-in",
+      "x-capability": "connections/1",
       "tags": [
         {
           "name": "web"
@@ -1118,6 +1165,7 @@
     },
     {
       "name": "connections/sign-in/cancel",
+      "x-capability": "connections/1",
       "tags": [
         {
           "name": "web"
@@ -1142,6 +1190,7 @@
     },
     {
       "name": "connections/sign-in/complete",
+      "x-capability": "connections/1",
       "tags": [
         {
           "name": "web"
@@ -1166,6 +1215,7 @@
     },
     {
       "name": "connections/sign-in/token",
+      "x-capability": "connections/1",
       "tags": [
         {
           "name": "web"
@@ -1190,6 +1240,7 @@
     },
     {
       "name": "connections/sign-in/wait",
+      "x-capability": "connections/1",
       "tags": [
         {
           "name": "web"
@@ -1214,6 +1265,7 @@
     },
     {
       "name": "connectors/setup",
+      "x-capability": "connectors.setup/1",
       "tags": [
         {
           "name": "web"
@@ -1238,6 +1290,7 @@
     },
     {
       "name": "connectors/setup/skip",
+      "x-capability": "connectors.setup/1",
       "tags": [
         {
           "name": "web"
@@ -1262,6 +1315,7 @@
     },
     {
       "name": "cost/setLimits",
+      "x-capability": "cost/1",
       "paramStructure": "by-name",
       "params": [
         {
@@ -1281,6 +1335,7 @@
     },
     {
       "name": "cost/state",
+      "x-capability": "cost/1",
       "tags": [
         {
           "name": "web"
@@ -1305,6 +1360,7 @@
     },
     {
       "name": "credentials/lend",
+      "x-capability": "credentials/1",
       "tags": [
         {
           "name": "web"
@@ -1329,6 +1385,7 @@
     },
     {
       "name": "credentials/offer",
+      "x-capability": "credentials/1",
       "tags": [
         {
           "name": "web"
@@ -1353,6 +1410,7 @@
     },
     {
       "name": "daemon/ping",
+      "x-capability": "daemon/1",
       "paramStructure": "by-name",
       "params": [
         {
@@ -1372,6 +1430,7 @@
     },
     {
       "name": "daemon/quit",
+      "x-capability": "daemon/1",
       "paramStructure": "by-name",
       "params": [
         {
@@ -1391,6 +1450,7 @@
     },
     {
       "name": "daemon/status",
+      "x-capability": "daemon/1",
       "paramStructure": "by-name",
       "params": [
         {
@@ -1410,6 +1470,7 @@
     },
     {
       "name": "disk/state",
+      "x-capability": "disk/1",
       "tags": [
         {
           "name": "web"
@@ -1434,6 +1495,7 @@
     },
     {
       "name": "dropbox/put",
+      "x-capability": "dropbox/1",
       "tags": [
         {
           "name": "web"
@@ -1458,6 +1520,7 @@
     },
     {
       "name": "elicitations/answer",
+      "x-capability": "elicitations/1",
       "tags": [
         {
           "name": "web"
@@ -1482,6 +1545,7 @@
     },
     {
       "name": "elicitations/pending",
+      "x-capability": "elicitations/1",
       "tags": [
         {
           "name": "web"
@@ -1509,6 +1573,7 @@
     },
     {
       "name": "events/cancelWait",
+      "x-capability": "events/1",
       "tags": [
         {
           "name": "web"
@@ -1536,6 +1601,7 @@
     },
     {
       "name": "events/list",
+      "x-capability": "events/1",
       "tags": [
         {
           "name": "web"
@@ -1560,6 +1626,7 @@
     },
     {
       "name": "events/raise",
+      "x-capability": "events/1",
       "paramStructure": "by-name",
       "params": [
         {
@@ -1579,6 +1646,7 @@
     },
     {
       "name": "events/server",
+      "x-capability": "events/1",
       "paramStructure": "by-name",
       "params": [
         {
@@ -1598,6 +1666,7 @@
     },
     {
       "name": "files/complete",
+      "x-capability": "files.complete/1",
       "tags": [
         {
           "name": "web"
@@ -1622,6 +1691,7 @@
     },
     {
       "name": "files/diagnostics",
+      "x-capability": "files.diagnostics/1",
       "tags": [
         {
           "name": "web"
@@ -1646,6 +1716,7 @@
     },
     {
       "name": "files/browse",
+      "x-capability": "files/1",
       "tags": [
         {
           "name": "web"
@@ -1670,6 +1741,7 @@
     },
     {
       "name": "files/list",
+      "x-capability": "files/1",
       "tags": [
         {
           "name": "web"
@@ -1694,6 +1766,7 @@
     },
     {
       "name": "files/mention",
+      "x-capability": "files/1",
       "tags": [
         {
           "name": "web"
@@ -1721,6 +1794,7 @@
     },
     {
       "name": "files/read",
+      "x-capability": "files/1",
       "tags": [
         {
           "name": "web"
@@ -1745,6 +1819,7 @@
     },
     {
       "name": "files/readText",
+      "x-capability": "files/1",
       "paramStructure": "by-name",
       "params": [
         {
@@ -1764,6 +1839,7 @@
     },
     {
       "name": "files/saveText",
+      "x-capability": "files/1",
       "paramStructure": "by-name",
       "params": [
         {
@@ -1783,6 +1859,7 @@
     },
     {
       "name": "files/unwatch",
+      "x-capability": "files/1",
       "tags": [
         {
           "name": "web"
@@ -1807,6 +1884,7 @@
     },
     {
       "name": "files/watch",
+      "x-capability": "files/1",
       "tags": [
         {
           "name": "web"
@@ -1831,6 +1909,7 @@
     },
     {
       "name": "files/write",
+      "x-capability": "files/1",
       "paramStructure": "by-name",
       "params": [
         {
@@ -1850,6 +1929,7 @@
     },
     {
       "name": "leases/end",
+      "x-capability": "leases/1",
       "paramStructure": "by-name",
       "params": [
         {
@@ -1869,6 +1949,7 @@
     },
     {
       "name": "leases/lease",
+      "x-capability": "leases/1",
       "paramStructure": "by-name",
       "params": [
         {
@@ -1888,6 +1969,7 @@
     },
     {
       "name": "leases/list",
+      "x-capability": "leases/1",
       "paramStructure": "by-name",
       "params": [
         {
@@ -1907,6 +1989,7 @@
     },
     {
       "name": "leases/release",
+      "x-capability": "leases/1",
       "paramStructure": "by-name",
       "params": [
         {
@@ -1926,6 +2009,7 @@
     },
     {
       "name": "leases/removeWaiter",
+      "x-capability": "leases/1",
       "paramStructure": "by-name",
       "params": [
         {
@@ -1945,6 +2029,7 @@
     },
     {
       "name": "leases/snapshot",
+      "x-capability": "leases/1",
       "tags": [
         {
           "name": "web"
@@ -1969,6 +2054,7 @@
     },
     {
       "name": "mac/open",
+      "x-capability": "mac/1",
       "paramStructure": "by-name",
       "params": [
         {
@@ -1988,6 +2074,7 @@
     },
     {
       "name": "mac/reveal",
+      "x-capability": "mac/1",
       "paramStructure": "by-name",
       "params": [
         {
@@ -2007,6 +2094,7 @@
     },
     {
       "name": "mac/terminal",
+      "x-capability": "mac/1",
       "paramStructure": "by-name",
       "params": [
         {
@@ -2026,6 +2114,7 @@
     },
     {
       "name": "mailbox/carry",
+      "x-capability": "mailbox/1",
       "paramStructure": "by-name",
       "params": [
         {
@@ -2045,6 +2134,7 @@
     },
     {
       "name": "marketplaces/add",
+      "x-capability": "marketplaces/1",
       "paramStructure": "by-name",
       "params": [
         {
@@ -2064,6 +2154,7 @@
     },
     {
       "name": "marketplaces/list",
+      "x-capability": "marketplaces/1",
       "paramStructure": "by-name",
       "params": [
         {
@@ -2083,6 +2174,7 @@
     },
     {
       "name": "marketplaces/remove",
+      "x-capability": "marketplaces/1",
       "paramStructure": "by-name",
       "params": [
         {
@@ -2102,6 +2194,7 @@
     },
     {
       "name": "marketplaces/set-enabled",
+      "x-capability": "marketplaces/1",
       "paramStructure": "by-name",
       "params": [
         {
@@ -2121,6 +2214,7 @@
     },
     {
       "name": "mcp/add",
+      "x-capability": "mcp/1",
       "paramStructure": "by-name",
       "params": [
         {
@@ -2140,6 +2234,7 @@
     },
     {
       "name": "mcp/add-by-hand",
+      "x-capability": "mcp/1",
       "paramStructure": "by-name",
       "params": [
         {
@@ -2159,6 +2254,7 @@
     },
     {
       "name": "mcp/approve",
+      "x-capability": "mcp/1",
       "paramStructure": "by-name",
       "params": [
         {
@@ -2178,6 +2274,7 @@
     },
     {
       "name": "mcp/forgetViews",
+      "x-capability": "mcp/1",
       "paramStructure": "by-name",
       "params": [
         {
@@ -2197,6 +2294,7 @@
     },
     {
       "name": "mcp/health",
+      "x-capability": "mcp/1",
       "tags": [
         {
           "name": "web"
@@ -2221,6 +2319,7 @@
     },
     {
       "name": "mcp/health/check",
+      "x-capability": "mcp/1",
       "tags": [
         {
           "name": "web"
@@ -2245,6 +2344,7 @@
     },
     {
       "name": "mcp/hosted",
+      "x-capability": "mcp/1",
       "tags": [
         {
           "name": "web"
@@ -2269,6 +2369,7 @@
     },
     {
       "name": "mcp/made-by-agents",
+      "x-capability": "mcp.made-by-agents/1",
       "paramStructure": "by-name",
       "params": [
         {
@@ -2288,6 +2389,7 @@
     },
     {
       "name": "mcp/list",
+      "x-capability": "mcp/1",
       "paramStructure": "by-name",
       "params": [
         {
@@ -2307,6 +2409,7 @@
     },
     {
       "name": "mcp/preview",
+      "x-capability": "mcp/1",
       "paramStructure": "by-name",
       "params": [
         {
@@ -2326,6 +2429,7 @@
     },
     {
       "name": "mcp/remove",
+      "x-capability": "mcp/1",
       "paramStructure": "by-name",
       "params": [
         {
@@ -2345,6 +2449,7 @@
     },
     {
       "name": "mcp/set-secret",
+      "x-capability": "mcp/1",
       "paramStructure": "by-name",
       "params": [
         {
@@ -2364,6 +2469,7 @@
     },
     {
       "name": "mcp/sign-in",
+      "x-capability": "mcp/1",
       "paramStructure": "by-name",
       "params": [
         {
@@ -2383,6 +2489,7 @@
     },
     {
       "name": "mcp/sign-in/cancel",
+      "x-capability": "mcp/1",
       "paramStructure": "by-name",
       "params": [
         {
@@ -2402,6 +2509,7 @@
     },
     {
       "name": "mcp/sign-in/wait",
+      "x-capability": "mcp/1",
       "paramStructure": "by-name",
       "params": [
         {
@@ -2421,6 +2529,7 @@
     },
     {
       "name": "mcp/sign-out",
+      "x-capability": "mcp/1",
       "paramStructure": "by-name",
       "params": [
         {
@@ -2440,6 +2549,7 @@
     },
     {
       "name": "mcp/verify",
+      "x-capability": "mcp/1",
       "paramStructure": "by-name",
       "params": [
         {
@@ -2459,6 +2569,7 @@
     },
     {
       "name": "milestones/state",
+      "x-capability": "milestones/1",
       "tags": [
         {
           "name": "web"
@@ -2483,6 +2594,7 @@
     },
     {
       "name": "modes/remembered",
+      "x-capability": "modes/1",
       "tags": [
         {
           "name": "web"
@@ -2510,6 +2622,7 @@
     },
     {
       "name": "options/remembered",
+      "x-capability": "options/1",
       "tags": [
         {
           "name": "web"
@@ -2537,6 +2650,7 @@
     },
     {
       "name": "permissions/answer",
+      "x-capability": "permissions/1",
       "tags": [
         {
           "name": "web"
@@ -2561,6 +2675,7 @@
     },
     {
       "name": "permissions/pending",
+      "x-capability": "permissions/1",
       "tags": [
         {
           "name": "web"
@@ -2588,6 +2703,7 @@
     },
     {
       "name": "person/set",
+      "x-capability": "person/1",
       "paramStructure": "by-name",
       "params": [
         {
@@ -2607,6 +2723,7 @@
     },
     {
       "name": "person/state",
+      "x-capability": "person/1",
       "paramStructure": "by-name",
       "params": [
         {
@@ -2626,6 +2743,7 @@
     },
     {
       "name": "personas/list",
+      "x-capability": "personas/1",
       "tags": [
         {
           "name": "web"
@@ -2653,6 +2771,7 @@
     },
     {
       "name": "pins/arrange",
+      "x-capability": "pins/1",
       "tags": [
         {
           "name": "web"
@@ -2677,6 +2796,7 @@
     },
     {
       "name": "pins/arrangeSessions",
+      "x-capability": "pins/1",
       "tags": [
         {
           "name": "web"
@@ -2701,6 +2821,7 @@
     },
     {
       "name": "pins/arrangeWorkflows",
+      "x-capability": "pins/1",
       "tags": [
         {
           "name": "web"
@@ -2725,6 +2846,7 @@
     },
     {
       "name": "pins/list",
+      "x-capability": "pins/1",
       "tags": [
         {
           "name": "web"
@@ -2752,6 +2874,7 @@
     },
     {
       "name": "pins/pin",
+      "x-capability": "pins/1",
       "tags": [
         {
           "name": "web"
@@ -2779,6 +2902,7 @@
     },
     {
       "name": "pins/pinSession",
+      "x-capability": "pins/1",
       "tags": [
         {
           "name": "web"
@@ -2803,6 +2927,7 @@
     },
     {
       "name": "pins/pinWorkflow",
+      "x-capability": "pins/1",
       "tags": [
         {
           "name": "web"
@@ -2827,6 +2952,7 @@
     },
     {
       "name": "pins/read",
+      "x-capability": "pins/1",
       "tags": [
         {
           "name": "web"
@@ -2851,6 +2977,7 @@
     },
     {
       "name": "pins/unpin",
+      "x-capability": "pins/1",
       "tags": [
         {
           "name": "web"
@@ -2875,6 +3002,7 @@
     },
     {
       "name": "pins/unpinSession",
+      "x-capability": "pins/1",
       "tags": [
         {
           "name": "web"
@@ -2899,6 +3027,7 @@
     },
     {
       "name": "pins/unpinWorkflow",
+      "x-capability": "pins/1",
       "tags": [
         {
           "name": "web"
@@ -2923,6 +3052,7 @@
     },
     {
       "name": "pins/write",
+      "x-capability": "pins/1",
       "tags": [
         {
           "name": "web"
@@ -2947,6 +3077,7 @@
     },
     {
       "name": "plugins/approve",
+      "x-capability": "plugins/1",
       "paramStructure": "by-name",
       "params": [
         {
@@ -2966,6 +3097,7 @@
     },
     {
       "name": "plugins/list",
+      "x-capability": "plugins/1",
       "paramStructure": "by-name",
       "params": [
         {
@@ -2985,6 +3117,7 @@
     },
     {
       "name": "pool/applyAllowances",
+      "x-capability": "pool/1",
       "paramStructure": "by-name",
       "params": [
         {
@@ -3004,6 +3137,7 @@
     },
     {
       "name": "preferences/get",
+      "x-capability": "preferences/1",
       "tags": [
         {
           "name": "web"
@@ -3031,6 +3165,7 @@
     },
     {
       "name": "preferences/set",
+      "x-capability": "preferences/1",
       "tags": [
         {
           "name": "web"
@@ -3061,6 +3196,7 @@
     },
     {
       "name": "presence/report",
+      "x-capability": "presence/1",
       "tags": [
         {
           "name": "web"
@@ -3085,6 +3221,7 @@
     },
     {
       "name": "projects/add",
+      "x-capability": "projects/1",
       "tags": [
         {
           "name": "web"
@@ -3109,6 +3246,7 @@
     },
     {
       "name": "projects/archive",
+      "x-capability": "projects/1",
       "tags": [
         {
           "name": "web"
@@ -3133,6 +3271,7 @@
     },
     {
       "name": "projects/chatState",
+      "x-capability": "projects/1",
       "tags": [
         {
           "name": "web"
@@ -3157,6 +3296,7 @@
     },
     {
       "name": "projects/clone",
+      "x-capability": "projects/1",
       "tags": [
         {
           "name": "web"
@@ -3181,6 +3321,7 @@
     },
     {
       "name": "projects/clones",
+      "x-capability": "projects/1",
       "tags": [
         {
           "name": "web"
@@ -3208,6 +3349,7 @@
     },
     {
       "name": "projects/receive",
+      "x-capability": "projects/1",
       "paramStructure": "by-name",
       "params": [
         {
@@ -3227,6 +3369,7 @@
     },
     {
       "name": "projects/receiveState",
+      "x-capability": "projects/1",
       "paramStructure": "by-name",
       "params": [
         {
@@ -3246,6 +3389,7 @@
     },
     {
       "name": "projects/receiveUpload",
+      "x-capability": "projects/1",
       "paramStructure": "by-name",
       "params": [
         {
@@ -3265,6 +3409,7 @@
     },
     {
       "name": "projects/bringBack",
+      "x-capability": "projects/1",
       "paramStructure": "by-name",
       "params": [
         {
@@ -3284,6 +3429,7 @@
     },
     {
       "name": "projects/sendFacts",
+      "x-capability": "projects/1",
       "paramStructure": "by-name",
       "params": [
         {
@@ -3303,6 +3449,7 @@
     },
     {
       "name": "projects/sendPack",
+      "x-capability": "projects/1",
       "paramStructure": "by-name",
       "params": [
         {
@@ -3322,6 +3469,7 @@
     },
     {
       "name": "projects/sendRead",
+      "x-capability": "projects/1",
       "paramStructure": "by-name",
       "params": [
         {
@@ -3341,6 +3489,7 @@
     },
     {
       "name": "projects/delete",
+      "x-capability": "projects/1",
       "tags": [
         {
           "name": "web"
@@ -3365,6 +3514,7 @@
     },
     {
       "name": "projects/find",
+      "x-capability": "projects/1",
       "paramStructure": "by-name",
       "params": [
         {
@@ -3387,6 +3537,7 @@
     },
     {
       "name": "projects/keepGuardedChange",
+      "x-capability": "projects/1",
       "tags": [
         {
           "name": "web"
@@ -3411,6 +3562,7 @@
     },
     {
       "name": "projects/list",
+      "x-capability": "projects/1",
       "tags": [
         {
           "name": "web"
@@ -3438,6 +3590,7 @@
     },
     {
       "name": "projects/readGuardedChange",
+      "x-capability": "projects/1",
       "tags": [
         {
           "name": "web"
@@ -3462,6 +3615,7 @@
     },
     {
       "name": "projects/setDiskSpace",
+      "x-capability": "projects/1",
       "paramStructure": "by-name",
       "params": [
         {
@@ -3481,6 +3635,7 @@
     },
     {
       "name": "projects/setHelperLimits",
+      "x-capability": "projects/1",
       "paramStructure": "by-name",
       "params": [
         {
@@ -3500,6 +3655,7 @@
     },
     {
       "name": "projects/setPinned",
+      "x-capability": "projects/1",
       "tags": [
         {
           "name": "web"
@@ -3524,6 +3680,7 @@
     },
     {
       "name": "projects/unarchive",
+      "x-capability": "projects/1",
       "tags": [
         {
           "name": "web"
@@ -3548,6 +3705,7 @@
     },
     {
       "name": "projects/undoGuardedChange",
+      "x-capability": "projects/1",
       "tags": [
         {
           "name": "web"
@@ -3572,6 +3730,7 @@
     },
     {
       "name": "relay/offer",
+      "x-capability": "relay/1",
       "paramStructure": "by-name",
       "params": [
         {
@@ -3591,6 +3750,7 @@
     },
     {
       "name": "relay/grant",
+      "x-capability": "relay/1",
       "paramStructure": "by-name",
       "params": [
         {
@@ -3610,6 +3770,7 @@
     },
     {
       "name": "resources/declare",
+      "x-capability": "resources/1",
       "paramStructure": "by-name",
       "params": [
         {
@@ -3629,6 +3790,7 @@
     },
     {
       "name": "resources/remove",
+      "x-capability": "resources/1",
       "paramStructure": "by-name",
       "params": [
         {
@@ -3648,6 +3810,7 @@
     },
     {
       "name": "retention/state",
+      "x-capability": "retention/1",
       "paramStructure": "by-name",
       "params": [
         {
@@ -3667,6 +3830,7 @@
     },
     {
       "name": "runtimes/accounts",
+      "x-capability": "runtimes/1",
       "tags": [
         {
           "name": "web"
@@ -3694,6 +3858,7 @@
     },
     {
       "name": "runtimes/allowances",
+      "x-capability": "runtimes/1",
       "tags": [
         {
           "name": "web"
@@ -3721,6 +3886,7 @@
     },
     {
       "name": "runtimes/assess",
+      "x-capability": "runtimes/1",
       "paramStructure": "by-name",
       "params": [
         {
@@ -3740,6 +3906,7 @@
     },
     {
       "name": "runtimes/assessment",
+      "x-capability": "runtimes/1",
       "paramStructure": "by-name",
       "params": [
         {
@@ -3759,6 +3926,7 @@
     },
     {
       "name": "runtimes/authenticate",
+      "x-capability": "runtimes/1",
       "paramStructure": "by-name",
       "params": [
         {
@@ -3778,6 +3946,7 @@
     },
     {
       "name": "runtimes/disableProvider",
+      "x-capability": "runtimes/1",
       "paramStructure": "by-name",
       "params": [
         {
@@ -3797,6 +3966,7 @@
     },
     {
       "name": "runtimes/install",
+      "x-capability": "runtimes/1",
       "paramStructure": "by-name",
       "params": [
         {
@@ -3816,6 +3986,7 @@
     },
     {
       "name": "runtimes/list",
+      "x-capability": "runtimes/1",
       "tags": [
         {
           "name": "web"
@@ -3843,6 +4014,7 @@
     },
     {
       "name": "runtimes/logout",
+      "x-capability": "runtimes/1",
       "paramStructure": "by-name",
       "params": [
         {
@@ -3865,6 +4037,7 @@
     },
     {
       "name": "runtimes/markAvailable",
+      "x-capability": "runtimes/1",
       "tags": [
         {
           "name": "web"
@@ -3889,6 +4062,7 @@
     },
     {
       "name": "runtimes/setProvider",
+      "x-capability": "runtimes/1",
       "paramStructure": "by-name",
       "params": [
         {
@@ -3908,6 +4082,7 @@
     },
     {
       "name": "sandbox/state",
+      "x-capability": "sandbox/1",
       "tags": [
         {
           "name": "web"
@@ -3932,6 +4107,7 @@
     },
     {
       "name": "sessions/adopt",
+      "x-capability": "sessions/1",
       "paramStructure": "by-name",
       "params": [
         {
@@ -3951,6 +4127,7 @@
     },
     {
       "name": "sessions/delete",
+      "x-capability": "sessions/1",
       "paramStructure": "by-name",
       "params": [
         {
@@ -3970,6 +4147,7 @@
     },
     {
       "name": "sessions/list",
+      "x-capability": "sessions/1",
       "paramStructure": "by-name",
       "params": [
         {
@@ -3992,6 +4170,7 @@
     },
     {
       "name": "shell/attach",
+      "x-capability": "shell/1",
       "paramStructure": "by-name",
       "params": [
         {
@@ -4011,6 +4190,7 @@
     },
     {
       "name": "shell/close",
+      "x-capability": "shell/1",
       "paramStructure": "by-name",
       "params": [
         {
@@ -4030,6 +4210,7 @@
     },
     {
       "name": "shell/detach",
+      "x-capability": "shell/1",
       "paramStructure": "by-name",
       "params": [
         {
@@ -4049,6 +4230,7 @@
     },
     {
       "name": "shell/input",
+      "x-capability": "shell/1",
       "paramStructure": "by-name",
       "params": [
         {
@@ -4068,6 +4250,7 @@
     },
     {
       "name": "shell/list",
+      "x-capability": "shell/1",
       "paramStructure": "by-name",
       "params": [
         {
@@ -4087,6 +4270,7 @@
     },
     {
       "name": "shell/open",
+      "x-capability": "shell/1",
       "paramStructure": "by-name",
       "params": [
         {
@@ -4106,6 +4290,7 @@
     },
     {
       "name": "shell/resize",
+      "x-capability": "shell/1",
       "paramStructure": "by-name",
       "params": [
         {
@@ -4125,6 +4310,7 @@
     },
     {
       "name": "shell/restart",
+      "x-capability": "shell/1",
       "paramStructure": "by-name",
       "params": [
         {
@@ -4144,6 +4330,7 @@
     },
     {
       "name": "shell/signal",
+      "x-capability": "shell/1",
       "paramStructure": "by-name",
       "params": [
         {
@@ -4163,6 +4350,7 @@
     },
     {
       "name": "simulators/list",
+      "x-capability": "simulators/1",
       "tags": [
         {
           "name": "web"
@@ -4187,6 +4375,7 @@
     },
     {
       "name": "simulators/boot",
+      "x-capability": "simulators/1",
       "tags": [
         {
           "name": "web"
@@ -4211,6 +4400,7 @@
     },
     {
       "name": "simulators/shutdown",
+      "x-capability": "simulators/1",
       "tags": [
         {
           "name": "web"
@@ -4235,6 +4425,7 @@
     },
     {
       "name": "simulators/screen",
+      "x-capability": "simulators/1",
       "tags": [
         {
           "name": "web"
@@ -4259,6 +4450,7 @@
     },
     {
       "name": "simulators/tap",
+      "x-capability": "simulators/1",
       "tags": [
         {
           "name": "web"
@@ -4283,6 +4475,7 @@
     },
     {
       "name": "simulators/home",
+      "x-capability": "simulators/1",
       "tags": [
         {
           "name": "web"
@@ -4307,6 +4500,7 @@
     },
     {
       "name": "skills/add",
+      "x-capability": "skills/1",
       "paramStructure": "by-name",
       "params": [
         {
@@ -4326,6 +4520,7 @@
     },
     {
       "name": "skills/check-updates",
+      "x-capability": "skills/1",
       "paramStructure": "by-name",
       "params": [
         {
@@ -4345,6 +4540,7 @@
     },
     {
       "name": "skills/list",
+      "x-capability": "skills/1",
       "paramStructure": "by-name",
       "params": [
         {
@@ -4364,6 +4560,7 @@
     },
     {
       "name": "skills/remove",
+      "x-capability": "skills/1",
       "paramStructure": "by-name",
       "params": [
         {
@@ -4383,6 +4580,7 @@
     },
     {
       "name": "skills/update-preview",
+      "x-capability": "skills/1",
       "paramStructure": "by-name",
       "params": [
         {
@@ -4402,6 +4600,7 @@
     },
     {
       "name": "store/notes",
+      "x-capability": "store/1",
       "tags": [
         {
           "name": "web"
@@ -4426,6 +4625,7 @@
     },
     {
       "name": "surface/identify",
+      "x-capability": "surface/1",
       "tags": [
         {
           "name": "web"
@@ -4450,6 +4650,7 @@
     },
     {
       "name": "time/history",
+      "x-capability": "time/1",
       "tags": [
         {
           "name": "web"
@@ -4474,6 +4675,7 @@
     },
     {
       "name": "usage/history",
+      "x-capability": "usage/1",
       "tags": [
         {
           "name": "web"
@@ -4498,6 +4700,7 @@
     },
     {
       "name": "views/call",
+      "x-capability": "views/1",
       "tags": [
         {
           "name": "web"
@@ -4522,6 +4725,7 @@
     },
     {
       "name": "views/context",
+      "x-capability": "views/1",
       "tags": [
         {
           "name": "web"
@@ -4546,6 +4750,7 @@
     },
     {
       "name": "views/log",
+      "x-capability": "views/1",
       "tags": [
         {
           "name": "web"
@@ -4570,6 +4775,7 @@
     },
     {
       "name": "views/read",
+      "x-capability": "views/1",
       "tags": [
         {
           "name": "web"
@@ -4594,6 +4800,7 @@
     },
     {
       "name": "views/show",
+      "x-capability": "views/1",
       "tags": [
         {
           "name": "web"
@@ -4618,6 +4825,7 @@
     },
     {
       "name": "views/toolCall",
+      "x-capability": "views/1",
       "paramStructure": "by-name",
       "params": [
         {
@@ -4637,6 +4845,7 @@
     },
     {
       "name": "wake/set",
+      "x-capability": "wake/1",
       "paramStructure": "by-name",
       "params": [
         {
@@ -4656,6 +4865,7 @@
     },
     {
       "name": "wake/settings",
+      "x-capability": "wake/1",
       "paramStructure": "by-name",
       "params": [
         {
@@ -4675,6 +4885,7 @@
     },
     {
       "name": "wake/state",
+      "x-capability": "wake/1",
       "paramStructure": "by-name",
       "params": [
         {
@@ -4694,6 +4905,7 @@
     },
     {
       "name": "workflows/approve",
+      "x-capability": "workflows/1",
       "tags": [
         {
           "name": "web"
@@ -4718,6 +4930,7 @@
     },
     {
       "name": "workflows/archive",
+      "x-capability": "workflows/1",
       "tags": [
         {
           "name": "web"
@@ -4742,6 +4955,7 @@
     },
     {
       "name": "workflows/delete",
+      "x-capability": "workflows/1",
       "tags": [
         {
           "name": "web"
@@ -4766,6 +4980,7 @@
     },
     {
       "name": "workflows/deny",
+      "x-capability": "workflows/1",
       "tags": [
         {
           "name": "web"
@@ -4790,6 +5005,7 @@
     },
     {
       "name": "workflows/enable",
+      "x-capability": "workflows/1",
       "tags": [
         {
           "name": "web"
@@ -4814,6 +5030,7 @@
     },
     {
       "name": "workflows/list",
+      "x-capability": "workflows/1",
       "tags": [
         {
           "name": "web"
@@ -4841,6 +5058,7 @@
     },
     {
       "name": "workflows/mcpTrigger/clearMissed",
+      "x-capability": "workflows/1",
       "tags": [
         {
           "name": "web"
@@ -4865,6 +5083,7 @@
     },
     {
       "name": "workflows/run",
+      "x-capability": "workflows/1",
       "tags": [
         {
           "name": "web"
@@ -4889,6 +5108,7 @@
     },
     {
       "name": "workflows/settings",
+      "x-capability": "workflows/1",
       "tags": [
         {
           "name": "web"
@@ -4913,6 +5133,7 @@
     },
     {
       "name": "worktrees/all",
+      "x-capability": "worktrees/1",
       "tags": [
         {
           "name": "web"
@@ -4940,6 +5161,7 @@
     },
     {
       "name": "worktrees/check",
+      "x-capability": "worktrees/1",
       "tags": [
         {
           "name": "web"
@@ -4964,6 +5186,7 @@
     },
     {
       "name": "worktrees/list",
+      "x-capability": "worktrees/1",
       "tags": [
         {
           "name": "web"
@@ -4988,6 +5211,7 @@
     },
     {
       "name": "worktrees/remove",
+      "x-capability": "worktrees/1",
       "tags": [
         {
           "name": "web"
@@ -5012,6 +5236,7 @@
     },
     {
       "name": "worktrees/removeBuildOutput",
+      "x-capability": "worktrees/1",
       "tags": [
         {
           "name": "web"
@@ -5036,6 +5261,7 @@
     },
     {
       "name": "git/fill",
+      "x-capability": "git/1",
       "description": "Asked by the control plane on the lending host's channel 0, for a lend a person allowed (#1122).",
       "paramStructure": "by-name",
       "params": [
@@ -5056,6 +5282,7 @@
     },
     {
       "name": "agent/changed",
+      "x-capability": "agent/1",
       "tags": [
         {
           "name": "web"
@@ -5075,6 +5302,7 @@
     },
     {
       "name": "agent/elicitation",
+      "x-capability": "agent/1",
       "tags": [
         {
           "name": "web"
@@ -5094,6 +5322,7 @@
     },
     {
       "name": "agent/entry",
+      "x-capability": "agent/1",
       "tags": [
         {
           "name": "web"
@@ -5113,6 +5342,7 @@
     },
     {
       "name": "agent/permission",
+      "x-capability": "agent/1",
       "tags": [
         {
           "name": "web"
@@ -5132,6 +5362,7 @@
     },
     {
       "name": "agent/removed",
+      "x-capability": "agent/1",
       "tags": [
         {
           "name": "web"
@@ -5151,6 +5382,7 @@
     },
     {
       "name": "agent/resuming",
+      "x-capability": "agent/1",
       "tags": [
         {
           "name": "web"
@@ -5170,6 +5402,7 @@
     },
     {
       "name": "agent/showFile",
+      "x-capability": "agent/1",
       "tags": [
         {
           "name": "web"
@@ -5189,6 +5422,7 @@
     },
     {
       "name": "agents/draftOptions",
+      "x-capability": "agents/1",
       "tags": [
         {
           "name": "web"
@@ -5208,6 +5442,7 @@
     },
     {
       "name": "attention/changed",
+      "x-capability": "attention/1",
       "tags": [
         {
           "name": "web"
@@ -5227,6 +5462,7 @@
     },
     {
       "name": "clone/changed",
+      "x-capability": "clone/1",
       "tags": [
         {
           "name": "web"
@@ -5246,6 +5482,7 @@
     },
     {
       "name": "cost/changed",
+      "x-capability": "cost/1",
       "x-notification": true,
       "paramStructure": "by-name",
       "params": [
@@ -5260,6 +5497,7 @@
     },
     {
       "name": "disk/changed",
+      "x-capability": "disk/1",
       "tags": [
         {
           "name": "web"
@@ -5279,6 +5517,7 @@
     },
     {
       "name": "events/changed",
+      "x-capability": "events/1",
       "x-notification": true,
       "paramStructure": "by-name",
       "params": [
@@ -5293,6 +5532,7 @@
     },
     {
       "name": "files/changed",
+      "x-capability": "files/1",
       "tags": [
         {
           "name": "web"
@@ -5312,6 +5552,7 @@
     },
     {
       "name": "leases/changed",
+      "x-capability": "leases/1",
       "tags": [
         {
           "name": "web"
@@ -5331,6 +5572,7 @@
     },
     {
       "name": "mcp/healthChanged",
+      "x-capability": "mcp/1",
       "tags": [
         {
           "name": "web"
@@ -5350,6 +5592,7 @@
     },
     {
       "name": "mcp/hostedChanged",
+      "x-capability": "mcp/1",
       "tags": [
         {
           "name": "web"
@@ -5369,6 +5612,7 @@
     },
     {
       "name": "milestones/changed",
+      "x-capability": "milestones/1",
       "tags": [
         {
           "name": "web"
@@ -5388,6 +5632,7 @@
     },
     {
       "name": "modes/changed",
+      "x-capability": "modes/1",
       "tags": [
         {
           "name": "web"
@@ -5410,6 +5655,7 @@
     },
     {
       "name": "pages/changed",
+      "x-capability": "pages/1",
       "tags": [
         {
           "name": "web"
@@ -5429,6 +5675,7 @@
     },
     {
       "name": "person/changed",
+      "x-capability": "person/1",
       "x-notification": true,
       "paramStructure": "by-name",
       "params": [
@@ -5443,6 +5690,7 @@
     },
     {
       "name": "pins/changed",
+      "x-capability": "pins/1",
       "tags": [
         {
           "name": "web"
@@ -5462,6 +5710,7 @@
     },
     {
       "name": "plugins/changed",
+      "x-capability": "plugins/1",
       "x-notification": true,
       "paramStructure": "by-name",
       "params": [
@@ -5476,6 +5725,7 @@
     },
     {
       "name": "preferences/changed",
+      "x-capability": "preferences/1",
       "tags": [
         {
           "name": "web"
@@ -5498,6 +5748,7 @@
     },
     {
       "name": "project/changed",
+      "x-capability": "project/1",
       "tags": [
         {
           "name": "web"
@@ -5517,6 +5768,7 @@
     },
     {
       "name": "project/removed",
+      "x-capability": "project/1",
       "tags": [
         {
           "name": "web"
@@ -5536,6 +5788,7 @@
     },
     {
       "name": "runtime/account",
+      "x-capability": "runtime/1",
       "x-notification": true,
       "paramStructure": "by-name",
       "params": [
@@ -5550,6 +5803,7 @@
     },
     {
       "name": "runtime/changed",
+      "x-capability": "runtime/1",
       "x-notification": true,
       "paramStructure": "by-name",
       "params": [
@@ -5564,6 +5818,7 @@
     },
     {
       "name": "runtimes/allowancesChanged",
+      "x-capability": "runtimes/1",
       "x-notification": true,
       "paramStructure": "by-name",
       "params": [
@@ -5578,6 +5833,7 @@
     },
     {
       "name": "shell/output",
+      "x-capability": "shell/1",
       "x-notification": true,
       "paramStructure": "by-name",
       "params": [
@@ -5592,6 +5848,7 @@
     },
     {
       "name": "shell/stateChanged",
+      "x-capability": "shell/1",
       "x-notification": true,
       "paramStructure": "by-name",
       "params": [
@@ -5606,6 +5863,7 @@
     },
     {
       "name": "storage/writeFailed",
+      "x-capability": "storage/1",
       "tags": [
         {
           "name": "web"
@@ -5625,6 +5883,7 @@
     },
     {
       "name": "store/notesChanged",
+      "x-capability": "store/1",
       "tags": [
         {
           "name": "web"
@@ -5644,6 +5903,7 @@
     },
     {
       "name": "wake/changed",
+      "x-capability": "wake/1",
       "x-notification": true,
       "paramStructure": "by-name",
       "params": [
@@ -5658,6 +5918,7 @@
     },
     {
       "name": "workflow/changed",
+      "x-capability": "workflow/1",
       "tags": [
         {
           "name": "web"
@@ -5677,6 +5938,7 @@
     },
     {
       "name": "workflow/removed",
+      "x-capability": "workflow/1",
       "tags": [
         {
           "name": "web"
@@ -5696,6 +5958,7 @@
     },
     {
       "name": "worktrees/sized",
+      "x-capability": "worktrees/1",
       "tags": [
         {
           "name": "web"
@@ -5715,6 +5978,7 @@
     },
     {
       "name": "devices/announce",
+      "x-capability": "devices/1",
       "paramStructure": "by-name",
       "params": [
         {
@@ -5734,6 +5998,7 @@
     },
     {
       "name": "devices/forget",
+      "x-capability": "devices/1",
       "paramStructure": "by-name",
       "params": [
         {
@@ -5753,6 +6018,7 @@
     },
     {
       "name": "devices/list",
+      "x-capability": "devices/1",
       "paramStructure": "by-name",
       "params": [
         {
@@ -5775,6 +6041,7 @@
     },
     {
       "name": "devices/startPairing",
+      "x-capability": "devices/1",
       "paramStructure": "by-name",
       "params": [
         {
@@ -5794,6 +6061,7 @@
     },
     {
       "name": "devices/stopPairing",
+      "x-capability": "devices/1",
       "paramStructure": "by-name",
       "params": [
         {
@@ -5813,6 +6081,7 @@
     },
     {
       "name": "pairing/current",
+      "x-capability": "pairing/1",
       "paramStructure": "by-name",
       "params": [
         {
@@ -5832,6 +6101,7 @@
     },
     {
       "name": "relay/register",
+      "x-capability": "relay/1",
       "paramStructure": "by-name",
       "params": [
         {
@@ -5851,6 +6121,7 @@
     },
     {
       "name": "device/changed",
+      "x-capability": "device/1",
       "x-notification": true,
       "paramStructure": "by-name",
       "params": [
@@ -5865,6 +6136,7 @@
     },
     {
       "name": "pairing/changed",
+      "x-capability": "pairing/1",
       "x-notification": true,
       "paramStructure": "by-name",
       "params": [
@@ -5879,6 +6151,7 @@
     },
     {
       "name": "personal/shared",
+      "x-capability": "personal/1",
       "paramStructure": "by-name",
       "params": [
         {

@@ -8,6 +8,7 @@
   "methods": [
     {
       "name": "attention/need",
+      "x-capability": "attention/1",
       "description": "A host, on its channel 0 (R6).",
       "paramStructure": "by-name",
       "params": [
@@ -28,6 +29,7 @@
     },
     {
       "name": "clients/announce",
+      "x-capability": "clients/1",
       "description": "On a pairing connection, before any other.",
       "paramStructure": "by-name",
       "params": [
@@ -48,6 +50,7 @@
     },
     {
       "name": "clients/connections",
+      "x-capability": "clients/1",
       "paramStructure": "by-name",
       "params": [
         {
@@ -70,6 +73,7 @@
     },
     {
       "name": "clients/forget",
+      "x-capability": "clients/1",
       "paramStructure": "by-name",
       "params": [
         {
@@ -89,6 +93,7 @@
     },
     {
       "name": "clients/forgetSelf",
+      "x-capability": "clients/1",
       "tags": [
         {
           "name": "web"
@@ -113,6 +118,7 @@
     },
     {
       "name": "clients/list",
+      "x-capability": "clients/1",
       "description": "devices/list, from a Remote of before the control plane, is answered the same; devices/startPairing as clients/startPairing, devices/forget with DeviceForget as clients/forget (daemon.openrpc.json has the host's own).",
       "paramStructure": "by-name",
       "params": [
@@ -136,6 +142,7 @@
     },
     {
       "name": "clients/setGrant",
+      "x-capability": "clients/1",
       "description": "Retired with grants (#111): always refused, in words.",
       "paramStructure": "by-name",
       "params": [
@@ -156,6 +163,7 @@
     },
     {
       "name": "clients/setPushToken",
+      "x-capability": "clients/1",
       "description": "A device, over its own session (#1460): its APNs token, kept in its own client record, which only it may set. Refused from a window or a browser.",
       "paramStructure": "by-name",
       "params": [
@@ -176,6 +184,7 @@
     },
     {
       "name": "clients/startPairing",
+      "x-capability": "clients/1",
       "paramStructure": "by-name",
       "params": [
         {
@@ -195,6 +204,7 @@
     },
     {
       "name": "clients/stopPairing",
+      "x-capability": "clients/1",
       "paramStructure": "by-name",
       "params": [
         {
@@ -214,6 +224,7 @@
     },
     {
       "name": "control/ping",
+      "x-capability": "control/1",
       "description": "A host, on its channel 0.",
       "paramStructure": "by-name",
       "params": [
@@ -234,6 +245,7 @@
     },
     {
       "name": "control/setProjectDetection",
+      "x-capability": "control/1",
       "paramStructure": "by-name",
       "params": [
         {
@@ -253,6 +265,7 @@
     },
     {
       "name": "control/status",
+      "x-capability": "control/1",
       "tags": [
         {
           "name": "web"
@@ -277,6 +290,7 @@
     },
     {
       "name": "git/credential",
+      "x-capability": "git/1",
       "description": "A host, on its channel 0, for its own git (#1122).",
       "paramStructure": "by-name",
       "params": [
@@ -297,6 +311,7 @@
     },
     {
       "name": "handover/status",
+      "x-capability": "handover/1",
       "description": "On a copy's session (x:handover-…) only: what this copy says of itself (R16).",
       "paramStructure": "by-name",
       "params": [
@@ -317,6 +332,7 @@
     },
     {
       "name": "host/hello",
+      "x-capability": "host/1",
       "description": "A host, on its channel 0, on every connect.",
       "paramStructure": "by-name",
       "params": [
@@ -337,6 +353,7 @@
     },
     {
       "name": "host/providerDraft",
+      "x-capability": "host/1",
       "description": "A host, on its channel 0, for a writing agent there (#858).",
       "paramStructure": "by-name",
       "params": [
@@ -357,6 +374,7 @@
     },
     {
       "name": "host/status",
+      "x-capability": "host/1",
       "description": "A host, on its channel 0 (#691 US4).",
       "paramStructure": "by-name",
       "params": [
@@ -377,6 +395,7 @@
     },
     {
       "name": "host/workspaces",
+      "x-capability": "host/1",
       "description": "A host, on its channel 0, for an agent there (#691 US6).",
       "paramStructure": "by-name",
       "params": [
@@ -397,6 +416,7 @@
     },
     {
       "name": "hosts/announce",
+      "x-capability": "hosts/1",
       "description": "On an enrolment connection, before any other.",
       "paramStructure": "by-name",
       "params": [
@@ -417,6 +437,7 @@
     },
     {
       "name": "hosts/checkAgain",
+      "x-capability": "hosts/1",
       "paramStructure": "by-name",
       "params": [
         {
@@ -436,6 +457,7 @@
     },
     {
       "name": "hosts/deleteWorkspace",
+      "x-capability": "hosts/1",
       "paramStructure": "by-name",
       "params": [
         {
@@ -455,6 +477,7 @@
     },
     {
       "name": "hosts/detect",
+      "x-capability": "hosts/1",
       "paramStructure": "by-name",
       "params": [
         {
@@ -477,6 +500,7 @@
     },
     {
       "name": "hosts/dropKept",
+      "x-capability": "hosts/1",
       "tags": [
         {
           "name": "web"
@@ -501,6 +525,7 @@
     },
     {
       "name": "hosts/install",
+      "x-capability": "hosts/1",
       "paramStructure": "by-name",
       "params": [
         {
@@ -520,6 +545,7 @@
     },
     {
       "name": "hosts/keep",
+      "x-capability": "hosts/1",
       "paramStructure": "by-name",
       "params": [
         {
@@ -539,6 +565,7 @@
     },
     {
       "name": "hosts/lastHeard",
+      "x-capability": "hosts/1",
       "tags": [
         {
           "name": "web"
@@ -563,6 +590,7 @@
     },
     {
       "name": "hosts/lendGit",
+      "x-capability": "hosts/1",
       "tags": [
         {
           "name": "web"
@@ -587,6 +615,7 @@
     },
     {
       "name": "hosts/lendSignIn",
+      "x-capability": "hosts/1",
       "paramStructure": "by-name",
       "params": [
         {
@@ -606,6 +635,7 @@
     },
     {
       "name": "hosts/link",
+      "x-capability": "hosts/1",
       "paramStructure": "by-name",
       "params": [
         {
@@ -625,6 +655,7 @@
     },
     {
       "name": "hosts/list",
+      "x-capability": "hosts/1",
       "tags": [
         {
           "name": "web"
@@ -652,6 +683,7 @@
     },
     {
       "name": "hosts/listKept",
+      "x-capability": "hosts/1",
       "tags": [
         {
           "name": "web"
@@ -676,6 +708,7 @@
     },
     {
       "name": "hosts/remove",
+      "x-capability": "hosts/1",
       "paramStructure": "by-name",
       "params": [
         {
@@ -695,6 +728,7 @@
     },
     {
       "name": "hosts/retryKept",
+      "x-capability": "hosts/1",
       "tags": [
         {
           "name": "web"
@@ -719,6 +753,7 @@
     },
     {
       "name": "hosts/setRelay",
+      "x-capability": "hosts/1",
       "paramStructure": "by-name",
       "params": [
         {
@@ -738,6 +773,7 @@
     },
     {
       "name": "hosts/setWorkspaceOptions",
+      "x-capability": "hosts/1",
       "paramStructure": "by-name",
       "params": [
         {
@@ -757,6 +793,7 @@
     },
     {
       "name": "hosts/sshHosts",
+      "x-capability": "hosts/1",
       "paramStructure": "by-name",
       "params": [
         {
@@ -779,6 +816,7 @@
     },
     {
       "name": "hosts/start",
+      "x-capability": "hosts/1",
       "tags": [
         {
           "name": "web"
@@ -803,6 +841,7 @@
     },
     {
       "name": "hosts/startEnroll",
+      "x-capability": "hosts/1",
       "paramStructure": "by-name",
       "params": [
         {
@@ -822,6 +861,7 @@
     },
     {
       "name": "hosts/stop",
+      "x-capability": "hosts/1",
       "tags": [
         {
           "name": "web"
@@ -846,6 +886,7 @@
     },
     {
       "name": "hosts/unlink",
+      "x-capability": "hosts/1",
       "paramStructure": "by-name",
       "params": [
         {
@@ -865,6 +906,7 @@
     },
     {
       "name": "hosts/update",
+      "x-capability": "hosts/1",
       "paramStructure": "by-name",
       "params": [
         {
@@ -884,6 +926,7 @@
     },
     {
       "name": "projects/detected",
+      "x-capability": "projects/1",
       "description": "A host, on its channel 0 (#429): its answer to projects/detect.",
       "paramStructure": "by-name",
       "params": [
@@ -904,6 +947,7 @@
     },
     {
       "name": "providers/add",
+      "x-capability": "providers/1",
       "paramStructure": "by-name",
       "params": [
         {
@@ -923,6 +967,7 @@
     },
     {
       "name": "providers/create",
+      "x-capability": "providers/1",
       "paramStructure": "by-name",
       "params": [
         {
@@ -942,6 +987,7 @@
     },
     {
       "name": "providers/draftAnswer",
+      "x-capability": "providers/1",
       "paramStructure": "by-name",
       "params": [
         {
@@ -961,6 +1007,7 @@
     },
     {
       "name": "providers/draftCancel",
+      "x-capability": "providers/1",
       "paramStructure": "by-name",
       "params": [
         {
@@ -980,6 +1027,7 @@
     },
     {
       "name": "providers/draftStart",
+      "x-capability": "providers/1",
       "paramStructure": "by-name",
       "params": [
         {
@@ -999,6 +1047,7 @@
     },
     {
       "name": "providers/list",
+      "x-capability": "providers/1",
       "paramStructure": "by-name",
       "params": [
         {
@@ -1018,6 +1067,7 @@
     },
     {
       "name": "providers/options",
+      "x-capability": "providers/1",
       "paramStructure": "by-name",
       "params": [
         {
@@ -1037,6 +1087,7 @@
     },
     {
       "name": "providers/refresh",
+      "x-capability": "providers/1",
       "paramStructure": "by-name",
       "params": [
         {
@@ -1056,6 +1107,7 @@
     },
     {
       "name": "providers/remove",
+      "x-capability": "providers/1",
       "paramStructure": "by-name",
       "params": [
         {
@@ -1075,6 +1127,7 @@
     },
     {
       "name": "providers/runtimes",
+      "x-capability": "providers/1",
       "paramStructure": "by-name",
       "params": [
         {
@@ -1094,6 +1147,7 @@
     },
     {
       "name": "providers/update",
+      "x-capability": "providers/1",
       "paramStructure": "by-name",
       "params": [
         {
@@ -1113,6 +1167,7 @@
     },
     {
       "name": "relay/switch",
+      "x-capability": "relay/1",
       "description": "A relay host, on its channel 0 (#824).",
       "paramStructure": "by-name",
       "params": [
@@ -1133,6 +1188,7 @@
     },
     {
       "name": "tunnel/open",
+      "x-capability": "tunnel/1",
       "description": "The borrowing host, on its channel 0 (T091).",
       "paramStructure": "by-name",
       "params": [
@@ -1153,6 +1209,7 @@
     },
     {
       "name": "workspaces/forAgent",
+      "x-capability": "workspaces/1",
       "description": "Through host/workspaces only.",
       "paramStructure": "by-name",
       "params": [
@@ -1173,6 +1230,7 @@
     },
     {
       "name": "control/clientChanged",
+      "x-capability": "control/1",
       "x-notification": true,
       "paramStructure": "by-name",
       "params": [
@@ -1187,6 +1245,7 @@
     },
     {
       "name": "control/hostChanged",
+      "x-capability": "control/1",
       "tags": [
         {
           "name": "web"
@@ -1206,6 +1265,7 @@
     },
     {
       "name": "control/installProgress",
+      "x-capability": "control/1",
       "x-notification": true,
       "paramStructure": "by-name",
       "params": [
@@ -1220,6 +1280,7 @@
     },
     {
       "name": "control/keptChanged",
+      "x-capability": "control/1",
       "tags": [
         {
           "name": "web"
@@ -1239,6 +1300,7 @@
     },
     {
       "name": "control/keptDelivered",
+      "x-capability": "control/1",
       "tags": [
         {
           "name": "web"
@@ -1258,6 +1320,7 @@
     },
     {
       "name": "control/moved",
+      "x-capability": "control/1",
       "x-notification": true,
       "paramStructure": "by-name",
       "params": [
@@ -1272,6 +1335,7 @@
     },
     {
       "name": "control/providerDraft",
+      "x-capability": "control/1",
       "x-notification": true,
       "paramStructure": "by-name",
       "params": [
@@ -1286,6 +1350,7 @@
     },
     {
       "name": "control/providersChanged",
+      "x-capability": "control/1",
       "x-notification": true,
       "paramStructure": "by-name",
       "params": [
@@ -1300,6 +1365,7 @@
     },
     {
       "name": "control/thisMacHostChanged",
+      "x-capability": "control/1",
       "x-notification": true,
       "paramStructure": "by-name",
       "params": [
@@ -1314,6 +1380,7 @@
     },
     {
       "name": "control/tunnelChanged",
+      "x-capability": "control/1",
       "x-notification": true,
       "paramStructure": "by-name",
       "params": [
@@ -1328,6 +1395,7 @@
     },
     {
       "name": "control/webChanged",
+      "x-capability": "control/1",
       "x-notification": true,
       "paramStructure": "by-name",
       "params": [
@@ -1342,6 +1410,7 @@
     },
     {
       "name": "projects/detect",
+      "x-capability": "projects/1",
       "description": "To a host just added, from a control plane before #656.",
       "x-notification": true,
       "paramStructure": "by-name",
@@ -1357,6 +1426,7 @@
     },
     {
       "name": "relay/count",
+      "x-capability": "relay/1",
       "description": "To a relay host, on its channel 0 (#1163).",
       "x-notification": true,
       "paramStructure": "by-name",
@@ -1372,6 +1442,7 @@
     },
     {
       "name": "relay/deliver",
+      "x-capability": "relay/1",
       "description": "To a relay host, on its channel 0 (T097).",
       "x-notification": true,
       "paramStructure": "by-name",
@@ -1387,6 +1458,7 @@
     },
     {
       "name": "host/clients",
+      "x-capability": "host/1",
       "description": "To every host, on its channel 0, when it connects and when a window is paired or forgotten (#1118): the windows it may let in on its local socket.",
       "x-notification": true,
       "paramStructure": "by-name",
@@ -1402,6 +1474,7 @@
     },
     {
       "name": "relay/devices",
+      "x-capability": "relay/1",
       "description": "To a relay host, on its channel 0 (T096).",
       "x-notification": true,
       "paramStructure": "by-name",

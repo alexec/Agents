@@ -298,6 +298,7 @@ type RPC struct {
 // Method is one method or notification. Params is its one `params` value, sent whole.
 type Method struct {
 	Name         string
+	Capability   string // x-capability: the capability that names it (#1748)
 	Notification bool
 	Web          bool
 	Params       *Schema
@@ -314,6 +315,7 @@ func readRPC(b []byte, target string, doc *Document) (*RPC, error) {
 	var top struct {
 		Methods []struct {
 			Name   string `json:"name"`
+			Cap    string `json:"x-capability"`
 			Tags   []struct{ Name string }
 			Note   bool `json:"x-notification"`
 			Params []struct {
@@ -341,7 +343,10 @@ func readRPC(b []byte, target string, doc *Document) (*RPC, error) {
 		if m.Note == (m.Result != nil) {
 			return nil, fmt.Errorf("%s: a notification has no result, and a method has one", m.Name)
 		}
-		method := Method{Name: m.Name, Notification: m.Note, Params: m.Params[0].Schema}
+		if !capabilityName.MatchString(m.Cap) {
+			return nil, fmt.Errorf("%s: x-capability is %q; each method names its capability as <name>/<n>, such as agents/1 (#1748)", m.Name, m.Cap)
+		}
+		method := Method{Name: m.Name, Capability: m.Cap, Notification: m.Note, Params: m.Params[0].Schema}
 		for _, t := range m.Tags {
 			method.Web = method.Web || t.Name == "web"
 		}

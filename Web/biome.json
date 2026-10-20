@@ -1,6 +1,6 @@
 {
   "$schema": "https://biomejs.dev/schemas/2.5.15/schema.json",
-  "files": { "includes": ["src/**", "test/**", "*.mjs", "!src/protocol/generated.ts"] },
+  "files": { "includes": ["src/**", "test/**", "*.mjs", "!src/protocol/generated.ts", "!src/protocol/capabilities.generated.ts"] },
   "formatter": { "enabled": false },
   "assist": { "enabled": false },
   "linter": {
