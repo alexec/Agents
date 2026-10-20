@@ -47,7 +47,9 @@ var Made = []Ours{
 	// which GitLab. An access token in GITLAB_TOKEN (and GITLAB_URL), set by hand in mcp.json's
 	// env, still goes first. Not yet tested on a real account (#1634).
 	{ID: "agents/gitlab", Title: "GitLab", Description: "Merge requests, pipelines and issues on gitlab.com or a self-managed GitLab: their pages, tools to read them and comment, and events",
-		Command: "gitlab-mcp", Declares: Declared{Tools: true, Events: gitlabEvents, Views: true}},
+		// Tested: the tools, the events and the three ready-made workflows on
+		// agentstest-group/agents-walk with a personal access token (#1634).
+		Command: "gitlab-mcp", Declares: Declared{Tools: true, Events: gitlabEvents, Views: true}, Tested: "2026-10-20"},
 }
 
 var (
