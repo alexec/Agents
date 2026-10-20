@@ -238,6 +238,7 @@ private struct WindowOcclusion: NSViewRepresentable {
 
         required init?(coder: NSCoder) { nil }
 
+        /// The observer goes when the view leaves its window, and holds the view weakly.
         override func viewDidMoveToWindow() {
             super.viewDidMoveToWindow()
             observer.map(NotificationCenter.default.removeObserver)
@@ -255,8 +256,6 @@ private struct WindowOcclusion: NSViewRepresentable {
             let seen = window?.occlusionState.contains(.visible) ?? true
             if visible.wrappedValue != seen { visible.wrappedValue = seen }
         }
-
-        deinit { observer.map(NotificationCenter.default.removeObserver) }
     }
 }
 #endif
