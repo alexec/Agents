@@ -105,8 +105,9 @@ func startOf(ends []int64, line int) int64 {
 	return ends[line-1]
 }
 
-// eachLine calls see with every line from from to to (not included), its bytes and its index.
-func (s *Store) eachLine(id wire.UUID, ends []int64, from, to int, see func(line []byte, i int)) error {
+// EachLine calls see with every line from from to to (not included), its bytes and its index,
+// until see says false. The bytes are only see's until it returns.
+func (s *Store) EachLine(id wire.UUID, ends []int64, from, to int, see func(line []byte, i int) bool) error {
 	to = min(to, len(ends))
 	if from >= to {
 		return nil
@@ -126,7 +127,9 @@ func (s *Store) eachLine(id wire.UUID, ends []int64, from, to int, see func(line
 			continue
 		}
 		if len(line) > 0 {
-			see(line, i)
+			if !see(line, i) {
+				return nil
+			}
 			i++
 			line = line[:0]
 		}
@@ -143,15 +146,16 @@ func (s *Store) eachLine(id wire.UUID, ends []int64, from, to int, see func(line
 func (s *Store) Entries(id wire.UUID, ends []int64, from, to int) ([]wire.TranscriptEntry, []int, error) {
 	var out []wire.TranscriptEntry
 	var at []int
-	err := s.eachLine(id, ends, from, to, func(line []byte, i int) {
+	err := s.EachLine(id, ends, from, to, func(line []byte, i int) bool {
 		if len(bytes.TrimSpace(line)) == 0 {
-			return
+			return true
 		}
 		var e wire.TranscriptEntry
 		if diskjson.Unmarshal(line, &e) == nil {
 			out = append(out, e)
 			at = append(at, i)
 		}
+		return true
 	})
 	return out, at, err
 }
@@ -162,10 +166,11 @@ func (s *Store) Entries(id wire.UUID, ends []int64, from, to int) ([]wire.Transc
 func (s *Store) LinesContaining(id wire.UUID, ends []int64, what string, from int) ([]int, error) {
 	var out []int
 	needle := []byte(what)
-	err := s.eachLine(id, ends, from, len(ends), func(line []byte, i int) {
+	err := s.EachLine(id, ends, from, len(ends), func(line []byte, i int) bool {
 		if bytes.Contains(line, needle) {
 			out = append(out, i)
 		}
+		return true
 	})
 	return out, err
 }

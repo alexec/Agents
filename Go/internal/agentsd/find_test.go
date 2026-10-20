@@ -1,7 +1,11 @@
 package agentsd
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
+	"os"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -60,5 +64,72 @@ func TestFindInChat(t *testing.T) {
 	}
 	if none := find(3, "  ", 0); len(none.Matches) != 0 {
 		t.Fatalf("blank %+v", none)
+	}
+}
+
+// P20261019-2: a find reads a long chat without decoding what is not a prompt or a reply, and
+// joins a reply's chunks without copying it again at each chunk. Before, 2,000 chunks of 1 KB
+// copied about 2 GB, and each tool output was decoded.
+func TestFindReadsOnlyMessages(t *testing.T) {
+	d, _ := start(t, t.TempDir())
+	defer d.Shutdown()
+	id := seeded(t, d, t.TempDir(), nil).ID
+	say := func(kind wire.TranscriptEntryKind) wire.UUID {
+		e := wire.TranscriptEntry{ID: store.NewUUID(), At: now(), Kind: kind}
+		d.Store.Append(id, e)
+		return e.ID
+	}
+	output := strings.Repeat("output ", 2000)
+	for range 1000 {
+		say(wire.TranscriptEntryKind{ToolCallUpdate: &wire.TranscriptEntryKindToolCallUpdate{Value: wire.ToolCall{Title: output}}})
+	}
+	messageID := "long"
+	chunk := strings.Repeat("streamed ", 110) + "\n"
+	first := say(wire.TranscriptEntryKind{AgentMessage: &wire.TranscriptEntryKindAgentMessage{MessageID: &messageID, Text: chunk}})
+	for range 2000 {
+		say(wire.TranscriptEntryKind{AgentMessage: &wire.TranscriptEntryKindAgentMessage{MessageID: &messageID, Text: chunk}})
+	}
+	say(wire.TranscriptEntryKind{AgentMessage: &wire.TranscriptEntryKindAgentMessage{MessageID: &messageID, Text: "the needle at the end"}})
+	info, err := os.Stat(d.Store.Loc.Transcript(string(id)))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var before, after runtime.MemStats
+	runtime.GC()
+	runtime.ReadMemStats(&before)
+	got, err := d.find(context.Background(), 1, wire.FindRequest{AgentID: id, Text: "NEEDLE"})
+	runtime.ReadMemStats(&after)
+	if err != nil || len(got.Matches) != 1 || got.Matches[0].EntryID != first || got.Matches[0].Line != "the needle at the end" {
+		t.Fatalf("find %+v %v", got, err)
+	}
+	if allocated := after.TotalAlloc - before.TotalAlloc; allocated > uint64(info.Size()) {
+		t.Fatalf("one find allocated %d bytes for a transcript of %d", allocated, info.Size())
+	}
+}
+
+// A find stops when its client asks again in the same chat, or when the host stops.
+func TestFindStops(t *testing.T) {
+	d, _ := start(t, t.TempDir())
+	defer d.Shutdown()
+	id := seeded(t, d, t.TempDir(), nil).ID
+	d.Store.Append(id, wire.TranscriptEntry{ID: store.NewUUID(), At: now(), Kind: wire.TranscriptEntryKind{UserMessage: &wire.TranscriptEntryKindUserMessage{Value: "cache"}}})
+	older, _ := d.startFind(findKey{client: 1, agent: id})
+	otherClient, _ := d.startFind(findKey{client: 2, agent: id})
+	newer, done := d.startFind(findKey{client: 1, agent: id})
+	if older() || !newer() || !otherClient() {
+		t.Fatal("only the newest find of a client in a chat is wanted")
+	}
+	done()
+	if len(d.finds) != 1 {
+		t.Fatalf("a finished find keeps its place: %v", d.finds)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if _, err := d.find(ctx, 1, wire.FindRequest{AgentID: id, Text: "cache"}); !errors.Is(err, context.Canceled) {
+		t.Fatalf("a stopped find %v", err)
+	}
+	if got, err := d.find(context.Background(), 1, wire.FindRequest{AgentID: id, Text: "cache"}); err != nil || len(got.Matches) != 1 {
+		t.Fatalf("find %+v %v", got, err)
 	}
 }
