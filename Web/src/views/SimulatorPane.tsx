@@ -12,6 +12,10 @@ export function SimulatorPane({ store, host }: { store: Store; host: string }) {
   const chosen = useSignal<string | null>(null);
   const screen = useSignal<SimulatorScreen | null>(null);
   const problem = useSignal<string | null>(null);
+  /** Why the list could not be asked for: said in the middle with Try Again, not as "no simulators" (#1666). */
+  const listProblem = useSignal<string | null>(null);
+  /** Why the last screen read failed: the old frame is dimmed and says so (#1666). */
+  const screenProblem = useSignal<string | null>(null);
   const busy = useSignal(false);
   /** Counts touches, so the screen is read again at once after one. */
   const touches = useSignal(0);
@@ -28,10 +32,9 @@ export function SimulatorPane({ store, host }: { store: Store; host: string }) {
   const reload = async () => {
     try {
       list.value = await store.link.call("simulators/list", {}, host);
-      problem.value = null;
+      listProblem.value = null;
     } catch (error) {
-      list.value = { simulators: [] };
-      problem.value = describe(error);
+      listProblem.value = describe(error);
     }
   };
   useEffect(() => { void reload(); }, [host]);
@@ -42,6 +45,7 @@ export function SimulatorPane({ store, host }: { store: Store; host: string }) {
   // A frame each second while this pane is on screen, its tab is not hidden and the simulator
   // is booted, as tall as the pane in pixels.
   useEffect(() => {
+    screenProblem.value = null;
     if (!simulator?.booted) { screen.value = null; return; }
     if (hidden.value) return;
     let gone = false;
@@ -49,9 +53,9 @@ export function SimulatorPane({ store, host }: { store: Store; host: string }) {
       while (!gone) {
         try {
           const shot = await store.link.call("simulators/screen", { udid: simulator.udid, maxHeight: maxHeight(pane.current) }, host);
-          if (!gone) { screen.value = shot; problem.value = null; }
+          if (!gone) { screen.value = shot; screenProblem.value = null; }
         } catch (error) {
-          if (!gone) problem.value = describe(error);
+          if (!gone) screenProblem.value = describe(error);
         }
         await new Promise((done) => setTimeout(done, 1000));
       }
@@ -88,20 +92,23 @@ export function SimulatorPane({ store, host }: { store: Store; host: string }) {
   return (
     <div class="simulator-pane" ref={pane}>
       <div class="simulator-bar">
-        {sims.length > 0 && (
+        {!listProblem.value && sims.length > 0 && (
           <select aria-label="Simulator" value={simulator?.udid} onChange={(e) => (chosen.value = (e.currentTarget as HTMLSelectElement).value)}>
             {sims.map((s) => <option key={s.udid} value={s.udid}>{`${s.name} · ${s.os}${s.booted ? "" : " · Shut Down"}`}</option>)}
           </select>
         )}
         <span class="spacer" />
-        {simulator?.booted && <button class="link" title="Home" aria-label="Home" onClick={() => void touch("simulators/home", { udid: simulator.udid })}>⌂</button>}
-        {simulator && <button class="link" disabled={busy.value} onClick={() => void toggle()}>{simulator.booted ? "Shut Down" : "Boot"}</button>}
+        {!listProblem.value && simulator?.booted && <button class="link" title="Home" aria-label="Home" onClick={() => void touch("simulators/home", { udid: simulator.udid })}>⌂</button>}
+        {!listProblem.value && simulator && <button class="link" disabled={busy.value} onClick={() => void toggle()}>{simulator.booted ? "Shut Down" : "Boot"}</button>}
         <button class="link" title="List the simulators again" aria-label="List the simulators again" onClick={() => void reload()}>↻</button>
       </div>
-      {list.value === null ? <p class="hint"><span class="spinner" /></p>
+      {listProblem.value ? <div class="simulator-problem"><p>Couldn't list the simulators: {listProblem.value}</p>
+          <button onClick={() => void reload()}>Try Again</button></div>
+        : list.value === null ? <p class="hint"><span class="spinner" /></p>
         : !simulator ? <p class="hint">{list.value.reason ?? "This Mac has no iOS simulators. Make one in Xcode."}</p>
         : !simulator.booted ? <p class="hint">{simulator.name} is shut down. Boot it to see its screen.</p>
-        : screen.value ? <img class="simulator-screen" alt={`The screen of ${simulator.name}`} width={screen.value.width} height={screen.value.height}
+        : screen.value ? <>
+          <img class={screenProblem.value ? "simulator-screen stale" : "simulator-screen"} alt={`The screen of ${simulator.name}`} width={screen.value.width} height={screen.value.height}
             title="A click here is a tap on the simulator" src={`data:image/jpeg;base64,${screen.value.jpeg}`}
             onClick={(e) => {
               const shown = (e.currentTarget as HTMLImageElement).getBoundingClientRect();
@@ -110,6 +117,9 @@ export function SimulatorPane({ store, host }: { store: Store; host: string }) {
               const y = Math.min(Math.max((e.clientY - shown.top) / shown.height, 0), 1);
               void touch("simulators/tap", { udid: simulator.udid, x, y });
             }} />
+          {screenProblem.value && <p class="failure small simulator-stale">Not updating: {screenProblem.value}</p>}
+        </>
+        : screenProblem.value ? <p class="failure simulator-stale">Not updating: {screenProblem.value}</p>
         : <p class="hint"><span class="spinner" /></p>}
       {problem.value && <p class="faint small">{problem.value}</p>}
     </div>
