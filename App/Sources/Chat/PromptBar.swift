@@ -218,8 +218,9 @@ struct PromptBar: View {
         // A persona is picked on the page's heading (#913); its labels go here.
         .onChange(of: model.draftPersona) { _, id in addLabels(ofPersona: id) }
         // And a quote from a reply (#1553). One modifier for both: the chain is at the
-        // type checker's limit.
-        .onChange(of: [model.offeredPrompt, model.offeredQuote]) { takeOfferedWords() }
+        // type checker's limit. From the start too (#1739): Clean up worktrees offers its
+        // words in the same update that makes the project page, and this bar with it.
+        .onChange(of: [model.offeredPrompt, model.offeredQuote], initial: true) { takeOfferedWords() }
         // A new one is a new turn's worth, so it comes back from having been dismissed.
         .onChange(of: agent?.suggestedPrompts ?? []) {
             dismissedSuggestions = false
@@ -247,7 +248,13 @@ struct PromptBar: View {
     /// Words offered from elsewhere: in place of an empty bar, else after what is typed
     /// (#1665), or, quoted from a reply (#1553), added after it with the caret after them.
     /// Only those for this bar's own agent (#1679): another window's are left for its bar.
+    /// On the next turn of the main queue (#1739), so a draft `KeepsDrafts` puts back as
+    /// the bar appears is in the field first, and the words go after it, not under it.
     private func takeOfferedWords() {
+        DispatchQueue.main.async { takeOfferedWordsNow() }
+    }
+
+    private func takeOfferedWordsNow() {
         if let offered = model.offeredPrompt, offered.agentID == agent?.id {
             text = PromptQuote.givingBack(offered.words, to: text)
             focused = true
