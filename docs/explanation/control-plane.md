@@ -77,7 +77,7 @@ Your agents, their conversations, files and terminals, and the runtimes' sign-in
 the host they belong to. The control plane's store only remembers who is paired and which
 hosts there are.
 
-## People, and one grant for each person's clients
+## People
 
 Every client belongs to a person, and every host (a machine) to one user (#994). A person
 reaches only their own machines: the control plane opens a client's channels only to its
@@ -85,6 +85,8 @@ person's machines, and a call to another person's machine is answered as if ther
 no such machine. The first person is the **local owner**, who holds the control plane's
 key, and an **admin**. With one person, everything below is as it was. See
 [People and machines](people-and-machines.md).
+
+## One grant for every client
 
 Each client is paired once, with a code the control plane shows, and may then do
 everything its person's other clients may: start and stop agents on their hosts, open terminals,
