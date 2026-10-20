@@ -1040,7 +1040,7 @@ func (s *Service) accept(conn *Conn, webOrigin string, proved func(failed bool))
 	}
 	switch id.Kind {
 	case 'c':
-		s.router.AttachClient(client, conn, relayed)
+		s.router.AttachClient(client, conn, relayed, clientRefusal(auth.Capabilities, s.cfg.Version))
 		// Forgotten while it joined (#1229): the forget's sweep of sessions may have come
 		// before this one was attached, and admitting it would write it back over its
 		// tombstone. It is closed as any forgotten client is.

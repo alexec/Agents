@@ -38,7 +38,21 @@ The schema owns the names. Each method and notification in `Packages/Wire/*.open
 - A method added after that has the name of its feature, so that a client can gate it:
   `agents/branchFrom` is `chat.branch/1`. The methods of one feature share its name.
 - A host's list has a capability when the host serves every method that names it. A
-  capability that no method names (such as `client.wire/1`) is declared by hand.
+  capability that no method names is declared by hand, in a document's
+  `x-declared-capabilities`: `host.wire/1` and `client.wire/1` say that a peer sends its list.
+
+## Where each part sends its list
+
+- A host sends its list in `host/hello`, each time it connects.
+- A client (the Mac window, the Remote, the web page) sends its list in the auth line of each
+  connection.
+- The control plane gives its own list and its required sets in `control/status`, and each
+  host's list, with what it is missing, in `hosts/list`. When a host's list changes,
+  `control/hostChanged` tells the clients.
+
+The required sets start as `host.wire/1` for hosts and `client.wire/1` for clients. A client
+without its set gets `-32008` on every call except `control/status`, with the missing names
+and the version to update to.
 
 ## Changing a capability
 

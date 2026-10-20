@@ -339,6 +339,7 @@ func (m *Methods) status(from Caller) wire.ControlStatus {
 		}
 	}
 	status.ProjectDetection = &detection
+	status.Capabilities, status.Required = capabilities(), &required
 	away := false
 	status.AwayFromHome = &away
 	for _, h := range m.records.Hosts() {
@@ -376,6 +377,9 @@ func (m *Methods) hostRow(h records.HostRecord) wire.ControlHost {
 		var impl string
 		json.Unmarshal(raw, &impl)
 		row.Implementation = optional(impl)
+	}
+	if list := hostCapabilities(h); list != nil {
+		row.Capabilities, row.Missing = list, wire.Missing(list, required.Host)
 	}
 	m.mu.Lock()
 	for server, ask := range m.gitAsks[h.ID] {
@@ -647,6 +651,7 @@ func (m *Methods) hello(ctx context.Context, host string, hello wire.HostHello) 
 		}
 		record.Extra = extra
 	}
+	record = withCapabilities(record, hello.Capabilities)
 	// Whether a host relays is settled when it enrols and changed only by a person
 	// (hosts/setRelay). A host's own hello never makes it a relay (T102).
 	changed := known == nil || !sameHost(*known, record)
@@ -677,6 +682,7 @@ func (m *Methods) hello(ctx context.Context, host string, hello wire.HostHello) 
 			}
 		}
 	}
+	m.noteCapabilities(host, hello)
 	if changed {
 		m.router.BroadcastControl("control/hostChanged", m.router.Described(host))
 	}

@@ -16,9 +16,9 @@ A string `<name>/<n>`. `name` matches `^[a-z][a-z0-9-]*(\.[a-z][a-z0-9-]*)*$`; `
 
 | Type | New field | Meaning |
 |---|---|---|
-| `HostHello`, `HostAnnounce` | `capabilities?: [string]` | the host's list |
+| `HostHello` | `capabilities?: [string]` | the host's list |
 | `ControlAuth` | `capabilities?: [string]` | the client's (or peer's) list |
-| `ControlStatus` | `capabilities?: [string]`, `required?: {host: [string], client: [string]}` | the control plane's list and its required sets |
+| `ControlStatus` | `capabilities?: [string]`, `required?: RequiredCapabilities` (`{host, client}`) | the control plane's list and its required sets |
 | `ControlHost` | `capabilities?: [string]`, `missing?: [string]` | the host's list as last sent, and the required ones it does not have |
 
 Each field is optional: a peer from before this feature does not send it (research R5).

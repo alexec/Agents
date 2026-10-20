@@ -110,6 +110,9 @@ type clientSession struct {
 	inFlight map[string]map[string]bool
 	// Of those, the whole lists whose answer is kept for when the host is offline (#962).
 	copying map[string]map[string]string
+	// What each request is answered with when the client is too old for this control
+	// plane (#1748); nil when it is not.
+	refusal *RPCError
 }
 
 // target is who a channel on a host's uplink is for: a client session here, or the other
@@ -1116,12 +1119,12 @@ func (r *Router) endKeptLocked(delivery string, m *message) {
 
 // AttachClient takes a paired client's socket, and returns its session, which ends when
 // the socket does.
-func (r *Router) AttachClient(client *records.ClientRecord, conn *Conn, relayed bool) string {
+func (r *Router) AttachClient(client *records.ClientRecord, conn *Conn, relayed bool, refusal *RPCError) string {
 	id := records.NewUUID()
 	r.mu.Lock()
 	r.clients[id] = &clientSession{caller: Caller{Session: id, Client: client.ID, Kind: client.Kind, Relayed: relayed},
 		conn: conn, channels: map[string]int{}, inFlight: map[string]map[string]bool{},
-		copying: map[string]map[string]string{}}
+		copying: map[string]map[string]string{}, refusal: refusal}
 	for host := range r.hosts {
 		r.openChannelLocked(id, host)
 	}
@@ -1295,6 +1298,9 @@ func readClientFrame(line string) (host, msg string, kind int) {
 
 func (r *Router) clientLine(line, sessionID string) {
 	host, msg, kind := readClientFrame(line)
+	if kind != frameBad && r.refusedOld(sessionID, host, msg, kind) {
+		return
+	}
 	switch kind {
 	case frameBad:
 		// JSON-RPC's answer to a request it cannot read is a parse error with no id, so

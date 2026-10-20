@@ -48,13 +48,18 @@ public enum ControlAuth {
         /// The epoch of the endpoints this peer holds (R16), so the control plane knows
         /// who has heard of a move. Nil from a build that keeps none.
         public var epoch: Int?
-        public init(id: String, nonce: String, mac: String, kind: String, for device: String? = nil, epoch: Int? = nil) {
+        /// What a client has (#1748), so the control plane can tell one too old for it. Nil
+        /// from a host, which says its own in `host/hello`.
+        public var capabilities: [String]?
+        public init(id: String, nonce: String, mac: String, kind: String, for device: String? = nil, epoch: Int? = nil,
+                    capabilities: [String]? = nil) {
             self.id = id
             self.nonce = nonce
             self.mac = mac
             self.kind = kind
             self.for = device
             self.epoch = epoch
+            self.capabilities = capabilities
         }
     }
 
@@ -270,8 +275,10 @@ public enum ControlAuth {
         let text = identity.text
         let mac = peerMAC(key: key, serverNonce: serverNonce, peerNonce: peerNonce, identity: text, origin: origin)
         let expect = serverMAC(key: key, serverNonce: serverNonce, peerNonce: peerNonce, identity: text, origin: origin)
+        var capabilities: [String]?
+        if case .client = identity { capabilities = Capability.declared["client"] }
         return (Auth(id: text, nonce: ControlCode.base64url(peerNonce), mac: ControlCode.base64url(mac), kind: kind,
-                     for: device?.uuidString, epoch: epoch), expect)
+                     for: device?.uuidString, epoch: epoch, capabilities: capabilities), expect)
     }
 
     /// Checks the server's `ok` against what `answer` said to expect.

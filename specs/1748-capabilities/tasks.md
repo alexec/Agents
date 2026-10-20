@@ -4,24 +4,24 @@
 
 ## Phase 1: Schema, PR 1 (US4) 🎯 first
 
-- [ ] T001 [US4] Add `"x-capability"` after each method's `"name"` in `Packages/Wire/daemon.openrpc.json` and `Packages/Wire/control.openrpc.json` (research R1, R3)
-- [ ] T002 [US4] Read `x-capability` in `Go/cmd/wiregen/schema.go`; fail on a missing or bad value, with the method's name
-- [ ] T003 [US4] Write `Go/wire/capabilities_gen.go`, `Web/src/protocol/capabilities.generated.ts` and `Packages/AgentsKit/Sources/AgentsKitCore/Daemon/Capabilities.generated.swift` in `Go/cmd/wiregen/capabilities.go`; add them to `-check`
-- [ ] T004 [US4] Tests in `Go/cmd/wiregen/main_test.go`: a missing and a bad `x-capability` fail; the table has each method
-- [ ] T005 [US4] `WireSchemaTests`: each `DaemonAPI` method name Swift sends has a capability in `Capability.host` or `Capability.control`
-- [ ] T006 [US4] `docs/explanation/versions.md` (the rule) and a line in `Packages/Wire/README.md`; link from `docs/explanation/index.md`
-- [ ] T007 Run `scripts/wire.sh gen`, the wiregen tests, `WireSchemaTests`, `scripts/lint.sh`; PR, auto-merge
+- [x] T001 [US4] Add `"x-capability"` after each method's `"name"` in `Packages/Wire/daemon.openrpc.json` and `Packages/Wire/control.openrpc.json` (research R1, R3)
+- [x] T002 [US4] Read `x-capability` in `Go/cmd/wiregen/schema.go`; fail on a missing or bad value, with the method's name
+- [x] T003 [US4] Write `Go/wire/capabilities_gen.go`, `Web/src/protocol/capabilities.generated.ts` and `Packages/AgentsKit/Sources/AgentsKitCore/Daemon/Capabilities.generated.swift` in `Go/cmd/wiregen/capabilities.go`; add them to `-check`
+- [x] T004 [US4] Tests in `Go/cmd/wiregen/main_test.go`: a missing and a bad `x-capability` fail; the table has each method
+- [x] T005 [US4] `WireSchemaTests`: each `DaemonAPI` method name Swift sends has a capability in `Capability.host` or `Capability.control`
+- [x] T006 [US4] `docs/explanation/versions.md` (the rule) and a line in `Packages/Wire/README.md`; link from `docs/explanation/index.md`
+- [x] T007 Run `scripts/wire.sh gen`, the wiregen tests, `WireSchemaTests`, `scripts/lint.sh`; PR, auto-merge
 
 ## Phase 2: Handshake, PR 2 (US2, US3)
 
-- [ ] T010 [US2] Schema: `capabilities` on `HostHello`, `HostAnnounce`, `ControlAuth`, `ControlHost`; `capabilities` and `required` on `ControlStatus`; `missing` on `ControlHost`; `gen`
-- [ ] T011 [US2] `Go/wire`: `Has(list, cap)` and `ListFor(table, served)` helpers, with tests
-- [ ] T012 [US2] `agentsd`: its list from `d.handlers` + declared; sent in `host/hello` and `hosts/announce` (`Go/internal/controllink/uplink.go` is in PR #1752: change only the hello's fields)
-- [ ] T013 [US2] Control plane: store a host's list on its record; `missing` and `needsUpdate` against the host required set; `capabilities` on `ControlHost`; `control/hostChanged` when it changes
-- [ ] T014 [US3] Control plane: a client's list from `ControlAuth`; `-32008` with `missing`/`update` for each call but `control/status` and `control/ping`; none for a client with no list
-- [ ] T015 [US2] `control/status`: the control plane's own list and its required sets
-- [ ] T016 [US3] Swift and web clients send `client.wire/1` in `ControlAuth`; `WireSchemaTests` for the new fields
-- [ ] T017 Tests: generated list = registered methods (agentsd, control plane); needsUpdate; -32008; golden wire file; PR, auto-merge
+- [x] T010 [US2] Schema: `capabilities` on `HostHello`, `ControlAuth`, `ControlHost`; `capabilities` and `required` on `ControlStatus`; `missing` on `ControlHost`; `gen`
+- [x] T011 [US2] `Go/wire`: `Has(list, cap)` and `ListFor(table, served)` helpers, with tests
+- [x] T012 [US2] `agentsd`: its list from `d.handlers` + declared; sent in `host/hello` (`Go/cmd/agentsd/main.go`)
+- [x] T013 [US2] Control plane: store a host's list on its record; `missing` and `needsUpdate` against the host required set; `capabilities` on `ControlHost`; `control/hostChanged` when it changes
+- [x] T014 [US3] Control plane: a client's list from `ControlAuth`; `-32008` with `missing`/`update` for each call but `control/status`; none for a client with no list
+- [x] T015 [US2] `control/status`: the control plane's own list and its required sets
+- [x] T016 [US3] Swift and web clients send `client.wire/1` in `ControlAuth`; `WireSchemaTests` for the new fields
+- [x] T017 Tests: generated list = registered methods (agentsd, control plane); needsUpdate; -32008; golden wire file; PR, auto-merge
 
 ## Phase 3: Clients, PR 3 (US1, US2)
 

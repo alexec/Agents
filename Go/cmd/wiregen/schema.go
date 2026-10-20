@@ -293,6 +293,14 @@ type RPC struct {
 	Target  string // "host" or "control"
 	Methods []Method
 	Errors  []RPCError // sorted by name
+	// Declared is x-declared-capabilities: the capabilities no method names, which a peer
+	// declares by hand (#1748).
+	Declared []Declared
+}
+
+// Declared is a capability that a peer (host, client or control) declares by hand.
+type Declared struct {
+	Name, By, Description string
 }
 
 // Method is one method or notification. Params is its one `params` value, sent whole.
@@ -326,6 +334,11 @@ func readRPC(b []byte, target string, doc *Document) (*RPC, error) {
 				Schema *Schema `json:"schema"`
 			} `json:"result"`
 		} `json:"methods"`
+		Declared []struct {
+			Name        string `json:"name"`
+			By          string `json:"by"`
+			Description string `json:"description"`
+		} `json:"x-declared-capabilities"`
 		Components struct {
 			Errors map[string]struct {
 				Code int `json:"code"`
@@ -336,6 +349,12 @@ func readRPC(b []byte, target string, doc *Document) (*RPC, error) {
 		return nil, err
 	}
 	rpc := &RPC{Target: target}
+	for _, d := range top.Declared {
+		if !capabilityName.MatchString(d.Name) || (d.By != "host" && d.By != "client" && d.By != "control") {
+			return nil, fmt.Errorf("x-declared-capabilities: %q by %q; each is <name>/<n>, by host, client or control (#1748)", d.Name, d.By)
+		}
+		rpc.Declared = append(rpc.Declared, Declared{d.Name, d.By, d.Description})
+	}
 	for _, m := range top.Methods {
 		if len(m.Params) != 1 || m.Params[0].Name != "params" {
 			return nil, fmt.Errorf("%s: a method has one param, `params`, the whole of JSON-RPC's params", m.Name)

@@ -5,6 +5,13 @@
     "version": "0",
     "description": "The methods the control plane answers itself, with no `h`. Every method's params are its one `params` value, sent as JSON-RPC's whole params (an object, or for a few a bare value), as DaemonAPI sends them. A method with `x-notification` has no result: the server sends it. The `web` tag marks what the web page calls and hears (DaemonAPI.WebSignatures); a method a Go step ports joins with its types, schema first."
   },
+  "x-declared-capabilities": [
+    {
+      "name": "client.wire/1",
+      "by": "client",
+      "description": "A client says its capabilities in ControlAuth on each connect, and reads -32008 as \"update this app\" (#1748). The control plane requires it of clients."
+    }
+  ],
   "methods": [
     {
       "name": "attention/need",

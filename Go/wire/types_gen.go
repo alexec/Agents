@@ -1265,6 +1265,8 @@ type ControlAuth struct {
 	Kind  string  `json:"kind"`
 	For   *string `json:"for,omitzero"`
 	Epoch *int64  `json:"epoch,omitzero"`
+	// The capabilities this client has (#1748). None from a client older than #1748, or from a host, which says its own in host/hello.
+	Capabilities []string `json:"capabilities,omitzero"`
 }
 
 // control/clientChanged: a client paired, renamed, connected or went; nothing says list them all again.
@@ -1310,6 +1312,10 @@ type ControlHost struct {
 	Tunnel         *HostTunnel       `json:"tunnel,omitzero"`
 	Workspace      *HostWorkspace    `json:"workspace,omitzero"`
 	Implementation *string           `json:"implementation,omitzero"`
+	// The capabilities this host said in its last host/hello (#1748). None from a host older than #1748.
+	Capabilities []string `json:"capabilities,omitzero"`
+	// Of the control plane's required capabilities for hosts, the ones this host does not have (#1748). Its state is then needsUpdate.
+	Missing []string `json:"missing,omitzero"`
 }
 
 // control/installProgress: a step of Add a Server.
@@ -1366,6 +1372,9 @@ type ControlStatus struct {
 	ThisMacHost      *HostJoinStatus     `json:"thisMacHost,omitzero"`
 	ProjectDetection *ProjectDetection   `json:"projectDetection,omitzero"`
 	UnjoinedTunnels  []HostTunnelChanged `json:"unjoinedTunnels,omitzero"`
+	// The capabilities the control plane has (#1748).
+	Capabilities []string              `json:"capabilities,omitzero"`
+	Required     *RequiredCapabilities `json:"required,omitzero"`
 }
 
 type Cost struct {
@@ -2237,6 +2246,8 @@ type HostHello struct {
 	Name           *string `json:"name,omitzero"`
 	Relay          *bool   `json:"relay,omitzero"`
 	Implementation *string `json:"implementation,omitzero"`
+	// The capabilities this host has (#1748): each one whose methods it all serves, and the ones it declares. None from a host older than #1748.
+	Capabilities []string `json:"capabilities,omitzero"`
 }
 
 type HostID string
@@ -3879,6 +3890,12 @@ type ReportedEdit struct {
 	EntryIndex int64   `json:"entryIndex"`
 	ReplaceAll bool    `json:"replaceAll"`
 	At         Date    `json:"at"`
+}
+
+// What the control plane needs of a peer to route for it (#1748): a host without each of host is needsUpdate, and a client without each of client is answered -32008.
+type RequiredCapabilities struct {
+	Host   []string `json:"host"`
+	Client []string `json:"client"`
 }
 
 type ResetRule struct {

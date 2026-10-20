@@ -23,6 +23,12 @@ func capabilities(rpcs []*RPC) []string {
 				all = append(all, m.Capability)
 			}
 		}
+		for _, d := range rpc.Declared {
+			if !seen[d.Name] {
+				seen[d.Name] = true
+				all = append(all, d.Name)
+			}
+		}
 	}
 	sort.Strings(all)
 	return all
@@ -40,6 +46,21 @@ func capabilityWord(c string) string {
 		b.WriteString(string(r))
 	}
 	return b.String()
+}
+
+// declared is each declared capability by who declares it, in the order of the documents.
+func declared(rpcs []*RPC) (by []string, names map[string][]string) {
+	names = map[string][]string{}
+	for _, rpc := range rpcs {
+		for _, d := range rpc.Declared {
+			if _, ok := names[d.By]; !ok {
+				by = append(by, d.By)
+			}
+			names[d.By] = append(names[d.By], d.Name)
+		}
+	}
+	sort.Strings(by)
+	return by, names
 }
 
 // rpcName is the name of a document's method table: Host or Control.
@@ -69,7 +90,28 @@ func goCapabilities(rpcs []*RPC) (string, error) {
 			fmt.Fprintf(&b, "\t%q: %q,\n", m.Name, m.Capability)
 		}
 		b.WriteString("}\n")
+		fmt.Fprintf(&b, "\n// %sNotifications is each notification in %s.openrpc.json: what its server sends, not serves.\nvar %sNotifications = map[string]bool{\n",
+			rpcName(rpc), rpcFile(rpc), rpcName(rpc))
+		for _, m := range rpc.Methods {
+			if m.Notification {
+				fmt.Fprintf(&b, "\t%q: true,\n", m.Name)
+			}
+		}
+		b.WriteString("}\n")
 	}
+	by, names := declared(rpcs)
+	b.WriteString("\n// DeclaredCapabilities is x-declared-capabilities: what a host, a client or the control plane\n// declares by hand, by who.\nvar DeclaredCapabilities = map[string][]string{\n")
+	for _, who := range by {
+		fmt.Fprintf(&b, "\t%q: {", who)
+		for i, n := range names[who] {
+			if i > 0 {
+				b.WriteString(", ")
+			}
+			fmt.Fprintf(&b, "%q", n)
+		}
+		b.WriteString("},\n")
+	}
+	b.WriteString("}\n")
 	return gofmt(b.String())
 }
 
@@ -95,6 +137,19 @@ export const Capability = {
 		}
 		b.WriteString("};\n")
 	}
+	by, names := declared(rpcs)
+	b.WriteString("\n/** x-declared-capabilities: what a host, a client or the control plane declares by hand, by who. */\nexport const DeclaredCapabilities: Readonly<Record<string, readonly Capability[]>> = {\n")
+	for _, who := range by {
+		fmt.Fprintf(&b, "  %s: [", who)
+		for i, n := range names[who] {
+			if i > 0 {
+				b.WriteString(", ")
+			}
+			fmt.Fprintf(&b, "%q", n)
+		}
+		b.WriteString("],\n")
+	}
+	b.WriteString("};\n")
 	return b.String()
 }
 
@@ -120,6 +175,18 @@ public enum Capability {
 		}
 		b.WriteString("    ]\n")
 	}
-	b.WriteString("}\n")
+	by, names := declared(rpcs)
+	b.WriteString("\n    /// x-declared-capabilities: what a host, a client or the control plane declares by hand, by who.\n    public static let declared: [String: [String]] = [\n")
+	for _, who := range by {
+		fmt.Fprintf(&b, "        %q: [", who)
+		for i, n := range names[who] {
+			if i > 0 {
+				b.WriteString(", ")
+			}
+			fmt.Fprintf(&b, "%q", n)
+		}
+		b.WriteString("],\n")
+	}
+	b.WriteString("    ]\n}\n")
 	return b.String()
 }

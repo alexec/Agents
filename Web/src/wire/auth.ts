@@ -1,5 +1,6 @@
 // The key exchange from the browser (071 contracts/browser-auth.md; 058 contracts/wire.md):
 // hello, auth, ok. Nothing but this is sent until the control plane has proved its key.
+import { DeclaredCapabilities } from "../protocol/capabilities.generated";
 import { base64, base64url, concat, fromBase64url, same, utf8 } from "./bytes";
 import { type ClientCode, codeIdentity } from "./code";
 import { clientKey, codeKey, type KeyRecord } from "./keys";
@@ -76,7 +77,9 @@ async function prove(socket: LineSocket, hello: Hello, identity: string, key: Cr
   if (!serverNonce) throw new Refused("bad-message");
   const said = transcript(serverNonce, peerNonce, identity, origin);
   const mac = new Uint8Array(await crypto.subtle.sign("HMAC", key, concat(utf8("c"), said) as BufferSource));
-  socket.send(JSON.stringify({ auth: { id: identity, nonce: base64url(peerNonce), mac: base64url(mac), kind } }));
+  // A paired client says what it has (#1748); a code's holder is not a client yet.
+  const capabilities = identity.startsWith("c:") ? DeclaredCapabilities["client"] : undefined;
+  socket.send(JSON.stringify({ auth: { id: identity, nonce: base64url(peerNonce), mac: base64url(mac), kind, capabilities } }));
   const answer = parse(await socket.next(15_000));
   const refused = answer["refused"] as { reason?: RefusalReason } | undefined;
   if (refused) throw new Refused(refused.reason ?? "unknown");

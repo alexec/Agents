@@ -1,5 +1,5 @@
 control/status
-{"name":"Test plane","version":"dev","homeHost":"mac","machineID":"MACHINE-1","startedAt":<date>,"port":<port>,"awayFromHome":true,"you":"<UUID>","relayKey":"<secret>","projectDetection":{"enabled":true,"paths":["~","~/src","~/code","~/projects","~/Developer","~/dev","~/git"]}}
+{"name":"Test plane","version":"dev","homeHost":"mac","machineID":"MACHINE-1","startedAt":<date>,"port":<port>,"awayFromHome":true,"you":"<UUID>","relayKey":"<secret>","projectDetection":{"enabled":true,"paths":["~","~/src","~/code","~/projects","~/Developer","~/dev","~/git"]},"capabilities":["attention/1","clients/1","control/1","git/1","handover/1","host/1","hosts/1","projects/1","providers/1","relay/1","tunnel/1","workspaces/1"],"required":{"host":["host.wire/1"],"client":["client.wire/1"]}}
 
 hosts/list
 [{"id":"<host a>","name":"box MACHINE-2","platform":"linux aarch64","version":"0.1","state":"online","reach":"dialOut","machineID":"MACHINE-2","implementation":"go"},{"id":"<host b>","name":"relay mac","platform":"macOS arm64","version":"1","state":"online","reach":"dialOut","machineID":"RELAY-MAC","relay":true},{"id":"<host c>","name":"plain mac","platform":"macOS arm64","version":"1","state":"online","reach":"dialOut","machineID":"RELAY-MAC"},{"id":"mac","name":"box MACHINE-1","platform":"linux aarch64","version":"0.1","state":"online","reach":"dialOut","machineID":"MACHINE-1","implementation":"go"}]
@@ -41,7 +41,7 @@ hosts/setRelay
 {}
 
 control/status
-{"name":"Test plane","version":"dev","homeHost":"mac","machineID":"MACHINE-1","startedAt":<date>,"port":<port>,"awayFromHome":true,"you":"<UUID>","relayKey":"<secret>","projectDetection":{"enabled":true,"paths":["~/src","~/work"]}}
+{"name":"Test plane","version":"dev","homeHost":"mac","machineID":"MACHINE-1","startedAt":<date>,"port":<port>,"awayFromHome":true,"you":"<UUID>","relayKey":"<secret>","projectDetection":{"enabled":true,"paths":["~/src","~/work"]},"capabilities":["attention/1","clients/1","control/1","git/1","handover/1","host/1","hosts/1","projects/1","providers/1","relay/1","tunnel/1","workspaces/1"],"required":{"host":["host.wire/1"],"client":["client.wire/1"]}}
 
 hosts/list
 [{"id":"<host a>","name":"box MACHINE-2","platform":"linux aarch64","version":"0.1","state":"online","reach":"dialOut","machineID":"MACHINE-2","signInFrom":{"claude":"mac"},"gitFrom":{"github.com":"mac"},"implementation":"go"},{"id":"<host b>","name":"relay mac","platform":"macOS arm64","version":"1","state":"online","reach":"dialOut","machineID":"RELAY-MAC","relay":true},{"id":"<host c>","name":"plain mac","platform":"macOS arm64","version":"1","state":"online","reach":"dialOut","machineID":"RELAY-MAC"},{"id":"mac","name":"box MACHINE-1","platform":"linux aarch64","version":"0.1","state":"online","reach":"dialOut","machineID":"MACHINE-1","implementation":"go"}]

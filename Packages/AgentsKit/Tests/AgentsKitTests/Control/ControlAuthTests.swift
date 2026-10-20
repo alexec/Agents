@@ -115,6 +115,24 @@ struct ControlAuthTests {
         }
     }
 
+    /// A client says what it has (#1748); a host or a copy says nothing here.
+    @Test func aClientSaysItsCapabilities() throws {
+        let hello = ControlAuth.Hello(name: "t", control: ControlCode.base64url(control.publicKey),
+                                      nonce: ControlCode.base64url(ControlAuth.nonce()), copy: "a")
+        let key = Data(repeating: 7, count: 32)
+        let (client, _) = try ControlAuth.answer(hello, identity: .client(UUID()), key: key, origin: origin, kind: "mac",
+                                                 expecting: nil)
+        #expect(client.capabilities == [Capability.clientWire1])
+        guard case .auth(let heard)? = ControlAuth.Message(line: ControlAuth.Message.auth(client).line) else {
+            Issue.record("the auth line did not read back")
+            return
+        }
+        #expect(heard.capabilities == [Capability.clientWire1])
+        let (copy, _) = try ControlAuth.answer(hello, identity: .copy("b"), key: key, origin: origin, kind: "copy",
+                                               expecting: nil)
+        #expect(copy.capabilities == nil)
+    }
+
     @Test func aFlippedNonceIsRefused() async throws {
         let key = Data(repeating: 7, count: 32)
         let serverNonce = ControlAuth.nonce()

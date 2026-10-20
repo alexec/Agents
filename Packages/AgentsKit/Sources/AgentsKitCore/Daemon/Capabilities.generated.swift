@@ -16,6 +16,7 @@ public enum Capability {
     public static let changes1 = "changes/1"
     public static let chatBranch1 = "chat.branch/1"
     public static let clientPermissions1 = "client-permissions/1"
+    public static let clientWire1 = "client.wire/1"
     public static let client1 = "client/1"
     public static let clients1 = "clients/1"
     public static let clone1 = "clone/1"
@@ -37,6 +38,7 @@ public enum Capability {
     public static let files1 = "files/1"
     public static let git1 = "git/1"
     public static let handover1 = "handover/1"
+    public static let hostWire1 = "host.wire/1"
     public static let host1 = "host/1"
     public static let hosts1 = "hosts/1"
     public static let leases1 = "leases/1"
@@ -437,5 +439,11 @@ public enum Capability {
         "relay/count": "relay/1",
         "relay/deliver": "relay/1",
         "relay/devices": "relay/1",
+    ]
+
+    /// x-declared-capabilities: what a host, a client or the control plane declares by hand, by who.
+    public static let declared: [String: [String]] = [
+        "client": ["client.wire/1"],
+        "host": ["host.wire/1"],
     ]
 }
