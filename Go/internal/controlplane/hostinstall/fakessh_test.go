@@ -190,12 +190,23 @@ func (c *fakeCodes) HostCode(ctx context.Context, url string) (string, string, e
 	return "agents-control:2:h:-:key:secret:" + url + ":-:test", "code-id", nil
 }
 
-// fakeTunnels is a Tunnels that keeps what it was given.
-type fakeTunnels struct{ added []TunnelRecord }
+// fakeTunnels is a Tunnels that keeps what it was given, and calls onAdd at each Add.
+type fakeTunnels struct {
+	added []TunnelRecord
+	letGo []string
+	onAdd func()
+}
 
 func (t *fakeTunnels) Port() int { return 8443 }
 
+func (t *fakeTunnels) LetGo(ctx context.Context, destination, name string) {
+	t.letGo = append(t.letGo, destination)
+}
+
 func (t *fakeTunnels) Add(ctx context.Context, record TunnelRecord) error {
+	if t.onAdd != nil {
+		t.onAdd()
+	}
 	t.added = append(t.added, record)
 	return nil
 }

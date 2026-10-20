@@ -90,7 +90,10 @@ func session(ctx context.Context, record Record, base sshCommand, folder string,
 	forwardCtx, cancelForward := context.WithCancel(context.Background())
 	defer cancelForward()
 	forwarded := make(chan *string, 1)
-	go func() { forwarded <- forward(forwardCtx, record, ssh, control, master, up) }()
+	var opened atomic.Bool
+	go func() {
+		forwarded <- forward(forwardCtx, record, ssh, control, master, func() { opened.Store(true); up() })
+	}()
 
 	// ssh can exit before its last words are read. The session ends when it has exited
 	// and its standard error is closed, or a moment after it exits if a child of its own
@@ -102,8 +105,11 @@ func session(ctx context.Context, record Record, base sshCommand, folder string,
 		select {
 		case <-done:
 			done = nil
-			master.terminate()
 			cancelForward()
+			if opened.Load() {
+				release(ssh, control, record.Port)
+			}
+			master.terminate()
 		case <-exited:
 			exited, hasExited = nil, true
 			grace = time.After(time.Second)
@@ -152,6 +158,19 @@ func Pinned(knownHosts string) string {
 		return ""
 	}
 	return strings.Join(out, "\n") + "\n"
+}
+
+// releasing is how long a master has to cancel its forward before it is ended.
+var releasing = 3 * time.Second
+
+// release asks the master to cancel the tunnel's forward before the session ends it
+// (#1769). Through a provider's own tunnel, such as gcloud's start-tcp-tunnel, the server
+// may never see the connection close: its sshd would hold the port, and the next tunnel's
+// forward would be refused.
+func release(ssh sshCommand, control string, port int) {
+	ctx, cancel := context.WithTimeout(context.Background(), releasing)
+	defer cancel()
+	ssh.run(ctx, ssh.tunnelCancelArguments(control, port, port))
 }
 
 // master is the session's ssh: ended is set once it has exited.

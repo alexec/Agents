@@ -74,6 +74,14 @@ func (s sshCommand) tunnelForwardArguments(control string, remotePort, localPort
 		"--", s.destination()}
 }
 
+// tunnelCancelArguments is tunnelForwardArguments' undoing: the master stops the
+// server's forward, and the server lets go of its port.
+func (s sshCommand) tunnelCancelArguments(control string, remotePort, localPort int) []string {
+	args := s.tunnelForwardArguments(control, remotePort, localPort)
+	args[3] = "cancel"
+	return args
+}
+
 // tunnelControlArguments is SSHCommand.tunnelControlArguments: "-O check" or "-O exit",
 // asked of a tunnel's master.
 func (s sshCommand) tunnelControlArguments(control, operation string) []string {

@@ -263,27 +263,39 @@ func (t *Tunnels) Stop() {
 	os.RemoveAll(t.folder)
 }
 
-// Add is HostTunnels.add: a tunnel for a server just installed, held at once so its
-// first dial finds it. One held before for the same destination goes: the install
-// replaced the host it carried, and its forward would take the port this one needs.
-func (t *Tunnels) Add(ctx context.Context, record Record) error {
+// LetGo drops every tunnel held for destination: name was installed on that server, so
+// the host they carried is replaced, and their forward would take the port the new one
+// needs. A session that goes cancels its forward first (#1769).
+func (t *Tunnels) LetGo(ctx context.Context, destination, name string) {
 	t.work.Lock()
 	defer t.work.Unlock()
+	t.letGoLocked(ctx, destination, name)
+}
+
+func (t *Tunnels) letGoLocked(ctx context.Context, destination, name string) {
 	t.mu.Lock()
 	var olds []Record
 	for _, old := range t.records {
-		if strings.EqualFold(old.Destination, record.Destination) {
+		if strings.EqualFold(old.Destination, destination) {
 			olds = append(olds, old)
 		}
 	}
 	t.mu.Unlock()
 	for _, old := range olds {
-		t.log("tunnel to " + old.Name + ": " + record.Name + " was installed on that server; letting go")
+		t.log("tunnel to " + old.Name + ": " + name + " was installed on that server; letting go")
 		t.store.Delete(ctx, Key(old.ID))
 		t.mu.Lock()
 		t.forgetLocked(old.ID)
 		t.mu.Unlock()
 	}
+}
+
+// Add is HostTunnels.add: a tunnel for a server just installed, held at once so its
+// first dial finds it. One held before for the same destination goes (LetGo).
+func (t *Tunnels) Add(ctx context.Context, record Record) error {
+	t.work.Lock()
+	defer t.work.Unlock()
+	t.letGoLocked(ctx, record.Destination, record.Name)
 	data, err := records.Encode(record)
 	if err != nil {
 		return err
