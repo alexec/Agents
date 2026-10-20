@@ -1,7 +1,7 @@
 // Package connections is the person's sign-ins to tools such as GitHub (#1335), Linear
-// (#1343) and GitLab (#1630): one connection per provider, kept by the host. The host signs in
-// (GitHub's and GitLab's device flow, Linear's authorization code with PKCE, or a GitLab
-// personal access token), keeps the
+// (#1343), GitLab (#1630) and one mailbox (#1780): one connection per provider, kept by the
+// host. The host signs in (GitHub's and GitLab's device flow, Linear's authorization code with
+// PKCE, a GitLab personal access token, or an IMAP app password), keeps the
 // tokens and refreshes them; a server that uses one (the github server) only reads it.
 //
 // Secrets are not configuration (#1035): a connection is kept in this Mac's Keychain, one
@@ -30,11 +30,11 @@ import (
 	"github.com/alexec/agents/Go/internal/agentsd/store"
 )
 
-// GitHub is the first provider (#1335). Linear is in linear.go, GitLab in gitlab.go.
+// GitHub is the first provider (#1335). Linear is in linear.go, GitLab in gitlab.go, Email in email.go.
 const GitHub = "github"
 
 // Providers is every provider a store is asked about when it lists.
-var Providers = []string{GitHub, Linear, GitLab}
+var Providers = []string{GitHub, Linear, GitLab, Email}
 
 // Connection is one provider's sign-in. Access and Refresh are secrets: they leave the
 // store only to the host's refresh and to a server's Authorization header.

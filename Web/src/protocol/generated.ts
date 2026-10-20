@@ -829,10 +829,28 @@ export interface ConnectionDisconnectAnswer {
 }
 
 /**
- * A tool the person connects to: GitHub (#1335) and Linear (#1343) with OAuth, GitLab (#1630) with
- * OAuth on gitlab.com or a personal access token on any GitLab.
+ * connections/sign-in/email (#1780): one IMAP mailbox for the email server. The host signs in once
+ * to check it, keeps the app password in its own store, and never logs it or gives it back. The
+ * answer is a ConnectionTokenAnswer.
  */
-export type ConnectionProvider = "github" | "linear" | "gitlab";
+export interface ConnectionEmailRequest {
+  /**
+   * The IMAP server, such as imap.fastmail.com (imaps:// on 993 when it names no scheme),
+   * imap://host for STARTTLS on 143, or with a port.
+   */
+  server: string;
+  /** Who signs in, usually the mail address. */
+  user: string;
+  /** An app password made for Agents at the mail provider. */
+  password: string;
+}
+
+/**
+ * A tool the person connects to: GitHub (#1335) and Linear (#1343) with OAuth, GitLab (#1630) with
+ * OAuth on gitlab.com or a personal access token on any GitLab, and email (#1780): one IMAP mailbox
+ * with an app password.
+ */
+export type ConnectionProvider = "github" | "linear" | "gitlab" | "email";
 
 export interface ConnectionProviderRequest {
   provider: ConnectionProvider;
@@ -4755,6 +4773,7 @@ export interface Methods {
   "connections/sign-in": { params: ConnectionProviderRequest; result: ConnectionSignIn };
   "connections/sign-in/cancel": { params: ConnectionSignInFlowRequest; result: ConnectionSignIn };
   "connections/sign-in/complete": { params: ConnectionSignInCompleteRequest; result: ConnectionSignIn };
+  "connections/sign-in/email": { params: ConnectionEmailRequest; result: ConnectionTokenAnswer };
   "connections/sign-in/token": { params: ConnectionTokenRequest; result: ConnectionTokenAnswer };
   "connections/sign-in/wait": { params: ConnectionSignInFlowRequest; result: ConnectionSignIn };
   "connectors/setup": { params: ConnectorSetupRequest; result: ConnectorSetup };
@@ -4904,6 +4923,7 @@ export const MethodTarget = {
   "connections/sign-in": "host",
   "connections/sign-in/cancel": "host",
   "connections/sign-in/complete": "host",
+  "connections/sign-in/email": "host",
   "connections/sign-in/token": "host",
   "connections/sign-in/wait": "host",
   "connectors/setup": "host",
@@ -5116,6 +5136,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ConfigOption: { required: ["id", "name", "type"], optional: ["description", "category", "currentValue", "options"] },
   Connection: { required: ["provider", "state", "connectedAt"], optional: ["login", "installURL", "workspace", "expiresAt"] },
   ConnectionDisconnectAnswer: { required: [], optional: ["error"] },
+  ConnectionEmailRequest: { required: ["server", "user", "password"], optional: [] },
   ConnectionProviderRequest: { required: ["provider"], optional: ["origin"] },
   ConnectionSignIn: { required: ["flowID", "provider", "status", "grant", "verificationURL", "expiresAt"], optional: ["userCode", "installURL", "connection", "message"] },
   ConnectionSignInCompleteRequest: { required: ["flowID", "state"], optional: ["code", "error"] },

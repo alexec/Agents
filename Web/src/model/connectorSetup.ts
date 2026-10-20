@@ -188,21 +188,26 @@ export function otherTrackers(linearConnected: boolean): string {
 }
 
 /** The providers a person connects, in the order Your Connectors shows them. */
-export const providers: ConnectionProvider[] = ["github", "linear", "gitlab"];
+export const providers: ConnectionProvider[] = ["github", "linear", "gitlab", "email"];
 
-/** The provider's name: GitHub, Linear, GitLab. */
+/** The providers that host can connect: Email only when it has connections.email/1 (#1780). */
+export function providersFor(hasEmail: boolean): ConnectionProvider[] {
+  return hasEmail ? providers : providers.filter((p) => p !== "email");
+}
+
+/** The provider's name: GitHub, Linear, GitLab, Email. */
 export function name(p: ConnectionProvider): string {
-  return { github: "GitHub", linear: "Linear", gitlab: "GitLab" }[p];
+  return { github: "GitHub", linear: "Linear", gitlab: "GitLab", email: "Email" }[p];
 }
 
 /** The provider's letters on its mark. */
 export function letters(p: ConnectionProvider): string {
-  return { github: "GH", linear: "L", gitlab: "GL" }[p];
+  return { github: "GH", linear: "L", gitlab: "GL", email: "EM" }[p];
 }
 
-/** The device page's site, for "Open github.com Again". */
+/** The device page's site, for "Open github.com Again". Email has no device page. */
 export function site(p: ConnectionProvider): string {
-  return { github: "github.com", linear: "linear.app", gitlab: "gitlab.com" }[p];
+  return { github: "github.com", linear: "linear.app", gitlab: "gitlab.com", email: "" }[p];
 }
 
 export function connectionTitle(c: Connection): string {
@@ -210,6 +215,8 @@ export function connectionTitle(c: Connection): string {
 }
 
 export function connectionNote(c: Connection, now: Date = new Date()): string {
+  // An email connection: the IMAP server and an app password, which does not end (#1780).
+  if (c.provider === "email") return [c.workspace, email.passwordLabel].filter((x): x is string => !!x).join(" · ");
   if (c.state === "signInAgain") {
     return c.expiresAt === undefined ? `${name(c.provider)} refused the renewal: sign in again`
       : "The access token ended: connect again with a new one";
@@ -231,6 +238,7 @@ export function notConnectedNote(p: ConnectionProvider): string {
     github: "Issues, pull requests and Actions in every project.",
     linear: "Linear issues in every project, and their events.",
     gitlab: "Merge requests, pipelines and issues on gitlab.com or your own GitLab.",
+    email: "One mailbox for agents: they wait for mail, such as a sign-up code, and read it.",
   }[p];
 }
 
@@ -242,6 +250,7 @@ export function connectButtonFor(p: ConnectionProvider): string {
 export function disconnectNoteFor(p: ConnectionProvider): string {
   if (p === "github") return disconnectNote;
   if (p === "gitlab") return gitlab.disconnectNote;
+  if (p === "email") return email.disconnectNote;
   return "Disconnect deletes the host's tokens. Linear's events stop until you connect again or set LINEAR_API_KEY. To revoke Agents too, go to linear.app ▸ Settings ▸ Security & access.";
 }
 
@@ -305,21 +314,52 @@ export function newGitLabTokenURL(address: string): string {
   return `${root.origin}${path}/-/user_settings/personal_access_tokens?name=Agents&scopes=api`;
 }
 
+/** Connect Email (#1780): one IMAP mailbox, by an app password that goes to the host only. */
+export const email = {
+  sheetFoot: "The app password is kept by the host, never in a log.",
+  abilities: [
+    "Know when mail comes, by sender and subject",
+    "List, search and read messages",
+    "Mark messages read and move them to another folder",
+  ],
+  subtitle: "For you, in every project. Agents reads the mailbox over IMAP and never sends mail.",
+  intro: "Use a mailbox made for agents, not your own. Make an app password for Agents at your mail provider, and give its IMAP server.",
+  serverLabel: "IMAP server",
+  serverPrompt: "imap.fastmail.com",
+  userLabel: "User",
+  userPrompt: "agents@example.com",
+  passwordLabel: "App password",
+  passwordPrompt: "App password",
+  button: "Connect",
+  checking: "Signing in to the mail server…",
+  choose: "Agents can read every message in this mailbox. It never sends, answers or deletes mail. Take the app password back at your mail provider, or with Disconnect on Your Connectors.",
+  disconnectNote: "Disconnect deletes the host's app password. The email server's events stop until you connect again or set EMAIL_PASSWORD. To revoke it too, delete the app password at your mail provider.",
+  failed: "The mail server did not take the sign-in.",
+};
+
+/** The connections/sign-in/email request, with the server and the user trimmed. The password goes as typed. */
+export function emailRequest(server: string, user: string, password: string): { server: string; user: string; password: string } | undefined {
+  const s = server.trim();
+  const u = user.trim();
+  if (!s || !u || !password) return undefined;
+  return { server: s, user: u, password };
+}
+
 /** The sheet's subtitle, list and button, by provider. */
 export function sheetSubtitleFor(p: ConnectionProvider): string {
-  return { github: sheetSubtitle, linear: linear.subtitle, gitlab: gitlab.subtitle }[p];
+  return { github: sheetSubtitle, linear: linear.subtitle, gitlab: gitlab.subtitle, email: email.subtitle }[p];
 }
 
 export function abilitiesFor(p: ConnectionProvider): string[] {
-  return { github: abilities, linear: linear.abilities, gitlab: gitlab.abilities }[p];
+  return { github: abilities, linear: linear.abilities, gitlab: gitlab.abilities, email: email.abilities }[p];
 }
 
 export function sheetChooseFor(p: ConnectionProvider): string {
-  return { github: sheetChoose, linear: linear.choose, gitlab: gitlab.choose }[p];
+  return { github: sheetChoose, linear: linear.choose, gitlab: gitlab.choose, email: email.choose }[p];
 }
 
 export function continueButtonFor(p: ConnectionProvider): string {
-  return { github: continueButton, linear: linear.continueButton, gitlab: gitlab.continueButton }[p];
+  return { github: continueButton, linear: linear.continueButton, gitlab: gitlab.continueButton, email: email.button }[p];
 }
 
 export function sheetStatus(s: ConnectionSignIn): string {

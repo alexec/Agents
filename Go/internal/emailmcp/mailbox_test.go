@@ -217,3 +217,22 @@ func TestTheFenceCannotBeClosedFromInside(t *testing.T) {
 		t.Fatalf("a mark inside survived:\n%s", got)
 	}
 }
+
+func TestCheckSignsInOnce(t *testing.T) {
+	f := newFakeMail(t, nil)
+	a, _ := f.account()
+	if err := Check(context.Background(), a); err != nil {
+		t.Fatal(err)
+	}
+	a.Password = "nope"
+	var mail *MailError
+	if err := Check(context.Background(), a); !errors.As(err, &mail) || mail.Kind != NotSignedIn {
+		t.Fatalf("a wrong password: %v", err)
+	}
+	for _, s := range []Security{TLS, StartTLS, Insecure} {
+		address, security, err := ParseServer(ServerURL("127.0.0.1:1993", s))
+		if err != nil || address != "127.0.0.1:1993" || security != s {
+			t.Fatalf("%s: %s %s %v", s, address, security, err)
+		}
+	}
+}

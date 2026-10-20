@@ -21,6 +21,7 @@ public enum Capability {
     public static let clients1 = "clients/1"
     public static let clone1 = "clone/1"
     public static let connection1 = "connection/1"
+    public static let connectionsEmail1 = "connections.email/1"
     public static let connections1 = "connections/1"
     public static let connectorsSetup1 = "connectors.setup/1"
     public static let control1 = "control/1"
@@ -138,6 +139,7 @@ public enum Capability {
         "connections/sign-in": "connections/1",
         "connections/sign-in/cancel": "connections/1",
         "connections/sign-in/complete": "connections/1",
+        "connections/sign-in/email": "connections.email/1",
         "connections/sign-in/token": "connections/1",
         "connections/sign-in/wait": "connections/1",
         "connectors/setup": "connectors.setup/1",

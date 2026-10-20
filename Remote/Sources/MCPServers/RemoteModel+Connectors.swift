@@ -68,6 +68,23 @@ extension RemoteModel {
         }
     }
 
+    /// One IMAP mailbox and its app password (Email, #1780): the connection it made, or why it
+    /// made none. The host signs in once to check it, and keeps the password.
+    func signInWithEmail(server: String, user: String, password: String, on host: HostID) async
+        -> Result<DaemonAPI.Connection, RemoteConnectorProblem> {
+        let answer = await connectorCall(host) {
+            try await $0.call(DaemonAPI.Method.connectionsSignInEmail,
+                              DaemonAPI.ConnectionEmailRequest(server: server, user: user, password: password),
+                              returning: DaemonAPI.ConnectionTokenAnswer.self)
+        }
+        switch answer {
+        case .success(let a):
+            if let connection = a.connection { return .success(connection) }
+            return .failure(RemoteConnectorProblem(words: a.error ?? ConnectorSetupWords.Email.failed))
+        case .failure(let problem): return .failure(problem)
+        }
+    }
+
     func cancelSignIn(_ flow: UUID, on host: HostID) async {
         _ = await connectorCall(host) {
             try await $0.call(DaemonAPI.Method.connectionsSignInCancel, DaemonAPI.ConnectionSignInFlowRequest(flowID: flow),

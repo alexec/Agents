@@ -9,6 +9,7 @@ import type {
   Connection, ConnectionProvider, ConnectionSignIn, ConnectorSetup, ConnectorSetupReading, ConnectorSlot, ConnectorSlotKind, UUID,
 } from "../protocol/generated";
 import { projectPath } from "../model/hostedMCP";
+import { Capability } from "../protocol/capabilities.generated";
 import * as words from "../model/connectorSetup";
 import { Modal } from "./Modal";
 
@@ -234,6 +235,7 @@ const signInWindow = "agents-sign-in";
  * (frame H): the same sheet. The host gives an authorize address; the page opens it in a window,
  * and the hand-back page sends the code back here by postMessage. Connect GitLab (#1630): the
  * device flow on gitlab.com, or an access token on any GitLab, which goes to the host only.
+ * Connect Email (#1780): an IMAP server, a user and an app password, which go to the host only.
  */
 export function ConnectDialog({ store, host, provider, folder, connected, close }: {
   store: Store; host: string; provider: ConnectionProvider; folder?: string; connected: () => void; close: () => void;
@@ -246,6 +248,11 @@ export function ConnectDialog({ store, host, provider, folder, connected, close 
   const [withToken, setWithToken] = useState(false);
   const [address, setAddress] = useState("");
   const [token, setToken] = useState("");
+  /** Email only (#1780). The app password stays in this state, and is cleared after the sign-in. */
+  const [server, setServer] = useState("");
+  const [user, setUser] = useState("");
+  const [password, setPassword] = useState("");
+  const isEmail = provider === "email";
   const busy = step.kind === "starting" || step.kind === "waiting" || step.kind === "finishing" || step.kind === "checking";
   const [flowID, setFlowID] = useState<UUID>();
   /** Removes the message listener of the sign-in under way. */
@@ -360,6 +367,24 @@ export function ConnectDialog({ store, host, provider, folder, connected, close 
     }
   };
 
+  const connectWithEmail = async () => {
+    const request = words.emailRequest(server, user, password);
+    if (!request || busy) return;
+    setStep({ kind: "checking" });
+    try {
+      const answer = await store.link.call("connections/sign-in/email", request, host);
+      if (answer.connection) {
+        setPassword("");
+        connected();
+        close();
+        return;
+      }
+      setStep({ kind: "failed", why: answer.error || words.email.failed });
+    } catch (e) {
+      setStep({ kind: "failed", why: why(e) });
+    }
+  };
+
   const openAgain = (flow: ConnectionSignIn) => {
     if (flow.grant === "authorizationCode") window.open(flow.verificationURL, signInWindow);
     else openOut(flow.verificationURL);
@@ -402,6 +427,25 @@ export function ConnectDialog({ store, host, provider, folder, connected, close 
             <button type="button" class="link small" onClick={() => openOut(words.newGitLabTokenURL(address))}>Make a Token on GitLab</button>
           </form>
         )}
+        {isEmail && (
+          <form class="token-form" onSubmit={(e) => { e.preventDefault(); void connectWithEmail(); }}>
+            <p class="small">{words.email.intro}</p>
+            <label>{words.email.serverLabel}
+              <input type="text" value={server} placeholder={words.email.serverPrompt} disabled={busy}
+                autocomplete="off" autocapitalize="off" spellcheck={false}
+                onInput={(e) => setServer((e.target as HTMLInputElement).value)} />
+            </label>
+            <label>{words.email.userLabel}
+              <input type="email" value={user} placeholder={words.email.userPrompt} disabled={busy}
+                autocomplete="username" autocapitalize="off" spellcheck={false}
+                onInput={(e) => setUser((e.target as HTMLInputElement).value)} />
+            </label>
+            <label>{words.email.passwordLabel}
+              <input type="password" value={password} placeholder={words.email.passwordPrompt} disabled={busy} autocomplete="new-password"
+                onInput={(e) => setPassword((e.target as HTMLInputElement).value)} />
+            </label>
+          </form>
+        )}
         <p class="quiet small">{words.sheetChooseFor(provider)}</p>
         {step.kind === "starting" && (
           <p class="quiet small">{provider === "linear" ? "Starting the sign-in…" : `Asking ${providerName} for a code…`}</p>
@@ -419,7 +463,7 @@ export function ConnectDialog({ store, host, provider, folder, connected, close 
           </div>
         )}
         {step.kind === "finishing" && <p class="quiet small">{words.linear.finishing}</p>}
-        {step.kind === "checking" && <p class="quiet small">{words.gitlab.checking}</p>}
+        {step.kind === "checking" && <p class="quiet small">{isEmail ? words.email.checking : words.gitlab.checking}</p>}
         {step.kind === "install" && (
           <div class="sign-in-code">
             <p class="strong">Connected as {step.login}.</p>
@@ -428,7 +472,7 @@ export function ConnectDialog({ store, host, provider, folder, connected, close 
         )}
         {step.kind === "failed" && <p class="small failure">{step.why}</p>}
         <div class="sheet-actions">
-          <span class="quiet small grow">{words.sheetFoot}</span>
+          <span class="quiet small grow">{provider === "email" ? words.email.sheetFoot : words.sheetFoot}</span>
           {step.kind === "install" ? (
             <>
               <button onClick={close}>Done</button>
@@ -437,7 +481,11 @@ export function ConnectDialog({ store, host, provider, folder, connected, close 
           ) : (
             <>
               <button onClick={close}>Cancel</button>
-              {withToken
+              {isEmail
+                ? (step.kind === "asking" || step.kind === "failed") &&
+                  <button class="prominent" disabled={!words.emailRequest(server, user, password)}
+                    onClick={() => void connectWithEmail()}>{words.email.button}</button>
+                : withToken
                 ? (step.kind === "asking" || step.kind === "failed") &&
                   <button class="prominent" disabled={!token.trim()} onClick={() => void connectWithToken()}>{words.gitlab.tokenButton}</button>
                 : <>
@@ -477,7 +525,8 @@ export function YourConnections({ store, host }: { store: Store; host: string })
     }
     await load();
   };
-  const notConnected = connections ? words.providers.filter((p) => !connections.some((c) => c.provider === p)) : [];
+  // Email only on a host with connections.email/1 (#1780): an older host does not show it.
+  const notConnected = connections ? words.providersFor(store.has(host, Capability.connectionsEmail1)).filter((p) => !connections.some((c) => c.provider === p)) : [];
   return (
     <div class="connections">
       <p class="setup-row">

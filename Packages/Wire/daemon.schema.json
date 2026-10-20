@@ -17646,11 +17646,12 @@
     },
     "ConnectionProvider": {
       "type": "string",
-      "description": "A tool the person connects to: GitHub (#1335) and Linear (#1343) with OAuth, GitLab (#1630) with OAuth on gitlab.com or a personal access token on any GitLab.",
+      "description": "A tool the person connects to: GitHub (#1335) and Linear (#1343) with OAuth, GitLab (#1630) with OAuth on gitlab.com or a personal access token on any GitLab, and email (#1780): one IMAP mailbox with an app password.",
       "enum": [
         "github",
         "linear",
-        "gitlab"
+        "gitlab",
+        "email"
       ]
     },
     "ConnectionState": {
@@ -17851,6 +17852,30 @@
       "required": [
         "provider",
         "token"
+      ],
+      "additionalProperties": false
+    },
+    "ConnectionEmailRequest": {
+      "type": "object",
+      "description": "connections/sign-in/email (#1780): one IMAP mailbox for the email server. The host signs in once to check it, keeps the app password in its own store, and never logs it or gives it back. The answer is a ConnectionTokenAnswer.",
+      "properties": {
+        "server": {
+          "type": "string",
+          "description": "The IMAP server, such as imap.fastmail.com (imaps:// on 993 when it names no scheme), imap://host for STARTTLS on 143, or with a port."
+        },
+        "user": {
+          "type": "string",
+          "description": "Who signs in, usually the mail address."
+        },
+        "password": {
+          "type": "string",
+          "description": "An app password made for Agents at the mail provider."
+        }
+      },
+      "required": [
+        "server",
+        "user",
+        "password"
       ],
       "additionalProperties": false
     },

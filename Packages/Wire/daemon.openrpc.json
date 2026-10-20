@@ -1246,6 +1246,31 @@
       }
     },
     {
+      "name": "connections/sign-in/email",
+      "x-capability": "connections.email/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/ConnectionEmailRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/ConnectionTokenAnswer"
+        }
+      }
+    },
+    {
       "name": "connections/sign-in/wait",
       "x-capability": "connections/1",
       "tags": [

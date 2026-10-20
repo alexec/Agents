@@ -89,6 +89,17 @@ struct ConnectorSetupWordsTests {
                 == "https://gitlab.example.com/-/user_settings/personal_access_tokens?name=Agents&scopes=api")
     }
 
+    /// Connect Email (#1780): the row says the IMAP server and the app password, and no end.
+    @Test func emailWords() {
+        let c = DaemonAPI.Connection(provider: .email, login: "agents@example.com", connectedAt: Date(),
+                                     workspace: "imap.fastmail.com")
+        #expect(ConnectorSetupWords.connectionTitle(c) == "Email \u{00B7} agents@example.com")
+        #expect(ConnectorSetupWords.connectionNote(c) == "imap.fastmail.com \u{00B7} App password")
+        #expect(ConnectorSetupWords.letters(.email) == "EM")
+        #expect(ConnectorSetupWords.Email.sheetFoot.contains("app password") && !ConnectorSetupWords.Email.sheetFoot.contains("token"))
+        #expect(ConnectorSetupWords.noConnections.hasSuffix("and Email for the mail they wait for."))
+    }
+
     /// Connect your tools with GitLab (#1632): the set-up's words follow its forge.
     @Test func gitlabSetUpWords() {
         let setup = DaemonAPI.ConnectorSetup(folder: "/p", repository: "group/app", forge: .gitlab, site: "gitlab.example.com",
