@@ -6,7 +6,7 @@ on:
       label: agent
 agent: new
 labels: [github]
-permission-mode: auto
+permission-mode: default
 enabled: false
 when-done: park
 ---
