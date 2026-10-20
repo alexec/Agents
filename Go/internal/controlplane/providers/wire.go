@@ -74,6 +74,8 @@ type Caller struct {
 	Client  string
 	// ClientRecord.Kind: mac, iPhone, iPad, browser or unknown.
 	Kind string
+	// The person the client belongs to (#994).
+	Person string
 }
 
 // dateOf is a time on the wire: seconds since 2001-01-01, as ControlRouter's dates were

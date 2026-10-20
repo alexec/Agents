@@ -24,6 +24,15 @@ type Caller struct {
 	Kind    string
 	// The device came through agents-relay (T096), not straight here.
 	Relayed bool
+	// The person the client belongs to (#994): it reaches only that person's machines.
+	Person string
+}
+
+// Ownership is who owns what (#994, spec 736 FR-018), from the records in memory: the
+// person of a client, and the user of a machine.
+type Ownership interface {
+	PersonOf(client string) string
+	OwnerOf(host string) string
 }
 
 // Handler is ControlHandling: what the control plane answers itself, handed to the
@@ -97,6 +106,8 @@ type Router struct {
 	// Who a client is (#996): written on each channel it opens, and on each entry the
 	// audit keeps. Told each call passed on or answered here, for the audit. Nil where
 	// there is no audit.
+	// Who owns each client and machine (#994); nil lets every client reach every host.
+	owners     Ownership
 	actorOf    func(Caller) *wire.AuditActor
 	audited    func(from Caller, host, method string, params json.RawMessage)
 	log        func(string)
@@ -297,7 +308,7 @@ func (r *Router) SetWorkspace(host string, ws *providers.HostWorkspace) {
 		r.workspaces[host] = ws
 	}
 	if r.known[host] {
-		r.broadcastControlLocked("control/hostChanged", r.describedLocked(host))
+		r.broadcastHostLocked(host, "control/hostChanged", r.describedLocked(host))
 	}
 }
 
@@ -327,7 +338,7 @@ func (r *Router) setStateLocked(host string, s hostState) {
 		return
 	}
 	r.states[host] = s
-	r.broadcastControlLocked("control/hostChanged", r.describedLocked(host))
+	r.broadcastHostLocked(host, "control/hostChanged", r.describedLocked(host))
 }
 
 // Holds says this copy has the host's real uplink.
@@ -583,7 +594,9 @@ func (r *Router) OpenFromPeer(peer, host string, c int, open wire.ChannelOpen) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	h := r.hosts[host]
-	if _, relay := r.relays[host]; relay || h == nil || !h.local {
+	// The peer checks its client's person too; a stream for another's machine opens nothing.
+	mine := r.owners == nil || r.owners.OwnerOf(host) == r.owners.PersonOf(open.Client)
+	if _, relay := r.relays[host]; relay || h == nil || !h.local || !mine {
 		r.tellPeerLocked(peer, peerFrame(host, closeFrame(c)))
 		return
 	}
@@ -592,13 +605,13 @@ func (r *Router) OpenFromPeer(peer, host string, c int, open wire.ChannelOpen) {
 		delete(h.channels, old)
 		h.conn.Send(closeFrame(old))
 	}
-	mine := h.next
+	channel := h.next
 	h.next++
-	h.channels[mine] = target{peer: peer, peerChannel: c}
-	h.proxied[key] = mine
+	h.channels[channel] = target{peer: peer, peerChannel: c}
+	h.proxied[key] = channel
 	yes := true
 	open.FanOut = &yes
-	h.conn.Send(openFrame(mine, open))
+	h.conn.Send(openFrame(channel, open))
 }
 
 // FromPeer is a message on a peer's stream, for the host.
@@ -717,9 +730,9 @@ func (r *Router) ForgetHost(host string) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.dropHostLocked(host, 0, nil)
+	r.broadcastHostLocked(host, "control/hostChanged", map[string]any{"host": host, "state": "removed"})
 	delete(r.known, host)
 	delete(r.states, host)
-	r.broadcastControlLocked("control/hostChanged", map[string]any{"host": host, "state": "removed"})
 }
 
 func (r *Router) dropHostLocked(host string, gen int64, newState *hostState) {
@@ -1138,7 +1151,11 @@ func (r *Router) endKeptLocked(delivery string, m *message) {
 func (r *Router) AttachClient(client *records.ClientRecord, conn *Conn, relayed bool, refusal *RPCError) string {
 	id := records.NewUUID()
 	r.mu.Lock()
-	r.clients[id] = &clientSession{caller: Caller{Session: id, Client: client.ID, Kind: client.Kind, Relayed: relayed},
+	person := ""
+	if r.owners != nil {
+		person = r.owners.PersonOf(client.ID)
+	}
+	r.clients[id] = &clientSession{caller: Caller{Session: id, Client: client.ID, Kind: client.Kind, Relayed: relayed, Person: person},
 		conn: conn, channels: map[string]int{}, inFlight: map[string]map[string]bool{},
 		copying: map[string]map[string]string{}, refusal: refusal}
 	for host := range r.hosts {
@@ -1254,6 +1271,9 @@ func (r *Router) openChannelLocked(sessionID, host string) {
 		return
 	}
 	if _, relay := r.relays[host]; relay {
+		return
+	}
+	if !r.mayReachLocked(s.caller, host) {
 		return
 	}
 	c := h.next
@@ -1410,7 +1430,8 @@ func (r *Router) toHostLocked(host, msg, sessionID string) {
 			}
 		}
 	}
-	if !r.known[host] {
+	// Another user's machine is not found, as one that is not there (FR-018).
+	if !r.known[host] || !r.mayReachLocked(s.caller, host) {
 		r.writeLocked(sessionID, s.wrap(host, replyError(m.ID, fail(noSuchHost, "No host is called %s.", host))))
 		return
 	}
@@ -1425,7 +1446,7 @@ func (r *Router) toHostLocked(host, msg, sessionID string) {
 			}
 			k, caller, id, wrapped, method, params := r.keeper, s.caller, m.ID, s.wrapped, m.Method, m.Params
 			r.keeping <- func() {
-				answer := k.Keep(host, method, params, providers.Caller{Session: caller.Session, Client: caller.Client, Kind: caller.Kind})
+				answer := k.Keep(host, method, params, providersCaller(caller))
 				var err error = refusal
 				if answer != nil {
 					err = answer
@@ -1461,6 +1482,75 @@ func (r *Router) toHostLocked(host, msg, sessionID string) {
 		}
 		s.copying[host][idKey(m.ID)] = m.Method
 	}
+}
+
+// SetOwnership says who owns each client and machine (#994). Sessions already here are
+// held to it at once.
+func (r *Router) SetOwnership(o Ownership) {
+	r.mu.Lock()
+	r.owners = o
+	r.mu.Unlock()
+	r.HoldToOwners()
+}
+
+// MayReach says a caller may reach a machine: it is their person's (FR-018).
+func (r *Router) MayReach(from Caller, host string) bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.mayReachLocked(from, host)
+}
+
+func (r *Router) mayReachLocked(from Caller, host string) bool {
+	return r.owners == nil || r.owners.OwnerOf(host) == from.Person
+}
+
+// HoldToOwners opens a channel to each machine a session's person owns now, and closes
+// the one to each it no longer owns: after a join is approved, or a machine changes hands.
+func (r *Router) HoldToOwners() {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for id, s := range r.clients {
+		for host, h := range r.hosts {
+			c, has := s.channels[host]
+			want := r.mayReachLocked(s.caller, host)
+			if want && !has {
+				r.openChannelLocked(id, host)
+			} else if !want && has {
+				delete(h.channels, c)
+				delete(s.channels, host)
+				h.conn.Send(closeFrame(c))
+			}
+		}
+	}
+}
+
+// TellPerson tells every session of a person here what only they are told.
+func (r *Router) TellPerson(person, method string, params any) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	line := wrap("", notification(method, params))
+	for id, s := range r.clients {
+		if s.wrapped && s.caller.Person == person {
+			r.writeLocked(id, line)
+		}
+	}
+}
+
+// broadcastHostLocked tells a machine's change only to the sessions that reach it.
+func (r *Router) broadcastHostLocked(host, method string, params any) {
+	line := wrap("", notification(method, params))
+	for id, s := range r.clients {
+		if s.wrapped && r.mayReachLocked(s.caller, host) {
+			r.writeLocked(id, line)
+		}
+	}
+}
+
+// BroadcastHost is broadcastHostLocked.
+func (r *Router) BroadcastHost(host, method string, params any) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.broadcastHostLocked(host, method, params)
 }
 
 // SetAudit says who each client is, and where each call goes for the audit (#996).

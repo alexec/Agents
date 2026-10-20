@@ -33,8 +33,18 @@ type storedCode struct {
 	// Made for a browser (071 R2): good only through a page, the loopback listener's or the
 	// page on the control plane's own domain (#1459).
 	Browser *bool         `json:"browser,omitempty"`
-	Owner   *string       `json:"owner,omitempty"`
+	// The person whose client or machine uses it (#994); none is the local owner.
+	Owner *string `json:"owner,omitempty"`
+	// An invite (#994): the client that uses it is a new person's first.
+	Invite  *invite       `json:"invite,omitempty"`
 	Expires records.Stamp `json:"expires"`
+}
+
+// invite is who an invite code makes: their name and role, and the admin who asked.
+type invite struct {
+	Name string `json:"name"`
+	Role string `json:"role"`
+	By   string `json:"by"`
 }
 
 // spent is ControlCodes.Spent: who spent a code, and as what (#212), so the same join
@@ -51,18 +61,30 @@ func codeKey(id string) string  { return "v1/codes/" + id + ".json" }
 func spentKey(id string) string { return "v1/codes/" + id + ".spent" }
 
 // Issue makes a code and writes it to the store, for clients/startPairing,
-// hosts/startEnroll or agents-control code.
+// hosts/startEnroll or agents-control code. What uses it is the person's that ctx names
+// (withCodeOwner), else the local owner's.
 func (c *Codes) Issue(ctx context.Context, host, browser bool, lifetime time.Duration) (*wire.ControlCodeShown, error) {
 	shown, _, err := c.issue(ctx, host, browser, lifetime, c.URL)
 	return shown, err
 }
+
+// Invite makes an invite code (#994): a client code whose first client is a new person's.
+func (c *Codes) Invite(ctx context.Context, in invite, lifetime time.Duration) (*wire.ControlCodeShown, error) {
+	shown, _, err := c.issue(context.WithValue(ctx, inviteKey{}, in), false, false, lifetime, c.URL)
+	return shown, err
+}
+
+type inviteKey struct{}
 
 // issue makes a code that carries url, and says its id: a server behind a bastion dials
 // its end of a reverse tunnel (#435).
 func (c *Codes) issue(ctx context.Context, host, browser bool, lifetime time.Duration, url string) (*wire.ControlCodeShown, string, error) {
 	id, secret := controllink.MakeCodeSecret(c.Private)
 	expires := records.At(time.Now().Add(lifetime))
-	stored := storedCode{Purpose: "client", Expires: expires}
+	stored := storedCode{Purpose: "client", Owner: codeOwnerOf(ctx), Expires: expires}
+	if in, ok := ctx.Value(inviteKey{}).(invite); ok && !host {
+		stored.Invite, stored.Owner = &in, nil
+	}
 	if host {
 		stored.Purpose = "host"
 	} else if browser {
@@ -161,16 +183,29 @@ var InstallScript string
 // InstallCommand is HostInstallScript.command: the one line a person runs on the server,
 // for a host code.
 func InstallCommand(url, pin, code string) string {
+	return fetchScript(url, pin) + " | sh -s -- '" + code + "'"
+}
+
+// JoinCommand is the one line that makes a server ask to join as a person, with no code
+// (#994): it shows a short code, and the person approves it on a client.
+func JoinCommand(url, pin, person string) string {
+	if pin == "" {
+		pin = "-"
+	}
+	return fetchScript(url, pin) + " | sh -s -- --join '" + strings.TrimSuffix(url, "/") + "' '" + pin + "' '" + person + "'"
+}
+
+func fetchScript(url, pin string) string {
 	base := strings.TrimSuffix(url, "/")
 	curl := "curl -fsSL"
-	if pin != "" {
+	if pin != "" && pin != "-" {
 		standard := strings.NewReplacer("-", "+", "_", "/").Replace(pin)
 		for len(standard)%4 != 0 {
 			standard += "="
 		}
 		curl += " --insecure --pinnedpubkey sha256//" + standard
 	}
-	return curl + " " + base + "/v1/install.sh | sh -s -- '" + code + "'"
+	return curl + " " + base + "/v1/install.sh"
 }
 
 // serverFileNames is ServerFiles.names: the only files /v1/servers/ hands out.

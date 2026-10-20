@@ -66,6 +66,8 @@ var own = map[string]bool{
 	"devices/list": true, "devices/startPairing": true, "devices/stopPairing": true,
 	"devices/forget": true, "hosts/lastHeard": true,
 	"audit/list": true, "audit/export": true, "control/setAuditDays": true,
+	"people/list": true, "people/invite": true, "people/setRole": true, "people/remove": true,
+	"hosts/joinRequests": true, "hosts/approveJoin": true, "hosts/denyJoin": true,
 }
 
 // Handles says whether a bare method is the control plane's. A bare daemon/ping from
@@ -88,7 +90,8 @@ var writes = map[string]bool{
 	"control/setProjectDetection": true, "clients/startPairing": true, "clients/forget": true,
 	"devices/startPairing": true, "devices/forget": true, "clients/setPushToken": true,
 	"clients/setActivityToken": true,
-	"control/setAuditDays": true,
+	"control/setAuditDays": true, "people/invite": true, "people/setRole": true, "people/remove": true,
+	"hosts/approveJoin": true, "hosts/denyJoin": true,
 }
 
 func (m *Methods) Handle(method string, params json.RawMessage, from Caller) (any, error) {
@@ -103,19 +106,42 @@ func (m *Methods) Handle(method string, params json.RawMessage, from Caller) (an
 	if m.s.cfg.Hosted && overSSH[method] {
 		return nil, noSSHHere
 	}
+	// Another user's machine is not there (#994, FR-018).
+	if err := m.refuseOthersHosts(params, from); err != nil {
+		return nil, err
+	}
+	// What a code makes is the caller's person's (FR-017).
+	ctx = withCodeOwner(ctx, m.callerPerson(from))
 	switch method {
 	case "daemon/ping":
 		return map[string]any{}, nil
 	case "control/status":
 		return m.status(from), nil
 	case "hosts/list":
-		return m.hostList(), nil
+		return m.hostList(from), nil
 	case "clients/list", "devices/list":
+		// The caller's person's own clients (#994).
 		out := []wire.ClientRecord{}
 		for _, c := range m.records.Clients() {
-			out = append(out, clientOnWire(c))
+			if m.s.PersonOf(c.ID) == m.callerPerson(from) {
+				out = append(out, clientOnWire(c))
+			}
 		}
 		return out, nil
+	case "people/list", "people/invite", "people/setRole", "people/remove":
+		return m.peopleMethod(ctx, method, params, from)
+	case "hosts/joinRequests":
+		return m.s.joins.list(ctx, m.callerPerson(from))
+	case "hosts/approveJoin", "hosts/denyJoin":
+		request, err := require[wire.JoinRequestDecide](params, "JoinRequestDecide")
+		if err != nil {
+			return nil, err
+		}
+		approved, err := m.s.joins.decide(ctx, request.Request, m.callerPerson(from), method == "hosts/approveJoin")
+		if err != nil || approved == nil {
+			return map[string]any{}, err
+		}
+		return approved, nil
 	case "clients/connections":
 		// The relaying host by name; with more than one, the first, as a relayed session
 		// does not say which carried it.
@@ -129,6 +155,9 @@ func (m *Methods) Handle(method string, params json.RawMessage, from Caller) (an
 		}
 		out := []wire.ClientConnection{}
 		for client, relayed := range m.router.Connections() {
+			if m.s.PersonOf(client) != m.callerPerson(from) {
+				continue
+			}
 			c := wire.ClientConnection{Client: wire.UUID(client), Relayed: relayed}
 			if relayed {
 				c.Through = relay
@@ -162,6 +191,10 @@ func (m *Methods) Handle(method string, params json.RawMessage, from Caller) (an
 		}
 		if !controllink.IsUUID(id) {
 			return nil, fail(invalidParams, "Which client?")
+		}
+		// Only the person's own; an admin removes another's with the person (#994).
+		if m.records.Client(id) != nil && m.s.PersonOf(id) != m.callerPerson(from) {
+			return nil, fail(invalidParams, "There is no such client.")
 		}
 		if err := m.forget(ctx, strings.ToUpper(id), 0); err != nil {
 			return nil, err
@@ -287,20 +320,13 @@ func (m *Methods) Handle(method string, params json.RawMessage, from Caller) (an
 			return nil, err
 		}
 		host := string(request.Host)
-		gone, err := m.records.RemoveHost(ctx, host)
+		gone, err := m.removeHost(ctx, host, from)
 		if err != nil {
 			return nil, err
 		}
 		if !gone {
 			return nil, fail(noSuchHost, "No host is called %s.", host)
 		}
-		m.router.ForgetHost(host)
-		m.s.copies.forget(host)
-		if m.s.providers != nil && m.s.providers.Kept() != nil {
-			m.s.providers.Kept().Forget(host)
-		}
-		m.s.announce("hostRemoved", host, from.Client)
-		m.s.log("host " + host + " removed")
 		return map[string]any{}, nil
 	case "hosts/lastHeard":
 		request, err := require[wire.HostRequest](params, "HostRequest")
@@ -332,7 +358,10 @@ func (m *Methods) status(from Caller) wire.ControlStatus {
 	}
 	status := wire.ControlStatus{Name: settings.Name, Version: m.s.cfg.Version, HomeHost: (*wire.HostID)(settings.HomeHost),
 		MachineID: settings.MachineID, StartedAt: new(dateOf(m.s.started)), Port: new(int64(m.s.cfg.Port)),
-		You: optional(wire.UUID(from.Client))}
+		You: optional(wire.UUID(from.Client)), Person: m.me(from)}
+	if command := m.s.joinCommand(m.callerPerson(from)); command != "" {
+		status.JoinCommand = &command
+	}
 	m.mu.Lock()
 	status.Web = m.web
 	m.mu.Unlock()
@@ -363,8 +392,8 @@ func (m *Methods) status(from Caller) wire.ControlStatus {
 	away := false
 	status.AwayFromHome = &away
 	for _, h := range m.records.Hosts() {
-		// A relay host is what takes devices out of the house (T096).
-		if h.Relay != nil && *h.Relay {
+		// A relay host is what takes devices out of the house (T096): the person's own.
+		if h.Relay != nil && *h.Relay && m.owns(from, h.ID) {
 			status.RelayKey = h.PublicKey
 			status.AwayFromHome = &[]bool{true}[0]
 			break
@@ -380,19 +409,40 @@ func (m *Methods) SetWeb(status *web.Status) {
 	m.mu.Unlock()
 }
 
-func (m *Methods) hostList() []wire.ControlHost {
+// hostList is the caller's own machines (#994): another's are in People, by name and
+// state only.
+func (m *Methods) hostList(from Caller) []wire.ControlHost {
 	out := []wire.ControlHost{}
 	for _, h := range m.records.Hosts() {
-		out = append(out, m.hostRow(h))
+		if m.owns(from, h.ID) {
+			out = append(out, m.hostRow(h))
+		}
 	}
 	return out
+}
+
+// removeHost takes a machine off the control plane: hosts/remove, or with its person.
+func (m *Methods) removeHost(ctx context.Context, host string, from Caller) (bool, error) {
+	gone, err := m.records.RemoveHost(ctx, host)
+	if err != nil || !gone {
+		return gone, err
+	}
+	m.router.ForgetHost(host)
+	m.s.copies.forget(host)
+	if m.s.providers != nil && m.s.providers.Kept() != nil {
+		m.s.providers.Kept().Forget(host)
+	}
+	m.s.announce("hostRemoved", host, from.Client)
+	m.s.log("host " + host + " removed")
+	return true, nil
 }
 
 // hostRow is one hosts/list row, as it stands now.
 func (m *Methods) hostRow(h records.HostRecord) wire.ControlHost {
 	state, _ := m.router.Described(h.ID)["state"].(string)
 	row := wire.ControlHost{ID: wire.HostID(h.ID), Name: h.Name, Platform: h.Platform, Version: h.Version, State: state,
-		Reach: "dialOut", MachineID: h.MachineID, Relay: h.Relay, SignInFrom: hostIDs(h.SignInFrom), GitFrom: hostIDs(h.GitFrom)}
+		Reach: "dialOut", MachineID: h.MachineID, Relay: h.Relay, SignInFrom: hostIDs(h.SignInFrom), GitFrom: hostIDs(h.GitFrom),
+		Owner: optional(m.s.ownerOf(h.ID))}
 	if raw, ok := h.Extra["implementation"]; ok {
 		var impl string
 		json.Unmarshal(raw, &impl)
@@ -793,7 +843,7 @@ func (m *Methods) hello(ctx context.Context, host string, hello wire.HostHello) 
 	}
 	m.noteCapabilities(host, hello)
 	if changed {
-		m.router.BroadcastControl("control/hostChanged", m.router.Described(host))
+		m.router.BroadcastHost(host, "control/hostChanged", m.router.Described(host))
 	}
 	if record.Relay != nil && *record.Relay {
 		m.s.tellRelayDevices()
@@ -997,7 +1047,7 @@ func (m *Methods) name(host string) string {
 // sayHostChanged tells every client to list the host's row again.
 func (m *Methods) sayHostChanged(host string) {
 	if _, ok := m.router.State(host); ok {
-		m.router.BroadcastControl("control/hostChanged", m.router.Described(host))
+		m.router.BroadcastHost(host, "control/hostChanged", m.router.Described(host))
 	}
 }
 

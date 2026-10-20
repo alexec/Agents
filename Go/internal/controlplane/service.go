@@ -154,6 +154,8 @@ type Service struct {
 	sources *sources
 	// The host/clients each host here was told last (#1528).
 	told toldClients
+	// Machines asking to join with no code (#994).
+	joins *joins
 
 	mu       sync.Mutex
 	servers  []*http.Server
@@ -196,6 +198,8 @@ func New(cfg Config) (*Service, error) {
 	s.router.OnPresence(s.presenceHeard)
 	s.methods = newMethods(s)
 	s.router.handler = s.methods
+	s.router.SetOwnership(s)
+	s.joins = newJoins(s)
 	s.copies = newHostCopies(cfg.Store)
 	if s.backups, err = newBackupStore(cfg.Store, s.records, cfg.PrivateKey); err != nil {
 		return nil, err
@@ -398,6 +402,10 @@ func (s *Service) takeUp(ctx context.Context) error {
 	}); err != nil {
 		return err
 	}
+	// People (#994): the existing person becomes the local owner and the admin.
+	if err := s.records.Migrate(ctx); err != nil {
+		return err
+	}
 	for _, h := range s.records.Hosts() {
 		s.router.Know(h.ID)
 	}
@@ -487,6 +495,7 @@ func (s *Service) refresh() {
 		s.router.Know(h.ID)
 	}
 	s.reconcile()
+	s.router.HoldToOwners()
 	s.syncRelays()
 }
 
@@ -551,12 +560,14 @@ func (s *Service) syncRelays() {
 	s.tellHostClients()
 }
 
-// hostClients is host/clients: every paired window and its key, which a host checks
-// its local socket against (#1118). Only a Mac's window is on the same machine as a host.
-func (s *Service) hostClients() wire.HostClients {
+// hostClients is host/clients: every paired window of the host's owner and its key,
+// which a host checks its local socket against (#1118). Only a Mac's window is on the
+// same machine as a host, and only its own person's reaches it there (FR-020).
+func (s *Service) hostClients(host string) wire.HostClients {
 	out := wire.HostClients{Clients: []wire.HostClient{}}
+	owner := s.ownerOf(host)
 	for _, c := range s.records.Clients() {
-		if c.Kind == records.KindMac && len(c.PublicKey) > 0 {
+		if c.Kind == records.KindMac && len(c.PublicKey) > 0 && s.PersonOf(c.ID) == owner {
 			out.Clients = append(out.Clients, wire.HostClient{ID: wire.UUID(c.ID), Kind: c.Kind, PublicKey: c.PublicKey})
 		}
 	}
@@ -590,13 +601,13 @@ func (s *Service) tellHostClients(only ...string) {
 	if len(hosts) == 0 {
 		return
 	}
-	clients := s.hostClients()
-	b, _ := json.Marshal(clients)
-	sum := sha256.Sum256(b)
 	if s.told.last == nil {
 		s.told.last = map[string][sha256.Size]byte{}
 	}
 	for _, host := range hosts {
+		clients := s.hostClients(host)
+		b, _ := json.Marshal(clients)
+		sum := sha256.Sum256(b)
 		if len(only) == 0 && s.told.last[host] == sum {
 			continue
 		}
@@ -619,14 +630,16 @@ func (s *Service) tellRelayDevices() {
 		ID        string `json:"id"`
 		PublicKey []byte `json:"publicKey"`
 	}
-	devices := []device{}
-	for _, c := range s.records.Clients() {
-		// A browser has no mailbox to carry for (071), and a Mac's window no relay.
-		if c.IsDevice() && len(c.PublicKey) > 0 {
-			devices = append(devices, device{c.ID, c.PublicKey})
-		}
-	}
 	for _, relay := range relays {
+		// A relay carries only its own person's devices (#994).
+		owner := s.ownerOf(relay)
+		devices := []device{}
+		for _, c := range s.records.Clients() {
+			// A browser has no mailbox to carry for (071), and a Mac's window no relay.
+			if c.IsDevice() && len(c.PublicKey) > 0 && s.PersonOf(c.ID) == owner {
+				devices = append(devices, device{c.ID, c.PublicKey})
+			}
+		}
 		s.router.Tell(relay, "relay/devices", map[string]any{"devices": devices})
 	}
 }
@@ -819,6 +832,8 @@ func (s *Service) serveHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		w.Header().Set("Content-Type", "application/json")
 		w.Write(data)
+	case path == "/v1/join" || strings.HasPrefix(path, "/v1/join/"):
+		s.joins.serve(w, r)
 	case path == "/v1/connect":
 		// Refused before the socket opens, so a refused source costs a reply and no more.
 		source := s.sources.of(r)
@@ -1346,6 +1361,12 @@ func (s *Service) spendCode(id, method string, params json.RawMessage, webOrigin
 	if err != nil {
 		return nil, err
 	}
+	// A code a removed person made does nothing now (FR-029).
+	if stored.Owner != nil {
+		if p := s.records.Person(*stored.Owner); p != nil && p.IsRemoved() {
+			return nil, controllink.Refuse(controllink.Unknown)
+		}
+	}
 	switch {
 	case stored.Purpose == "client" && method == "clients/announce":
 		var said wire.ClientAnnounce
@@ -1390,7 +1411,16 @@ func (s *Service) spendCode(id, method string, params json.RawMessage, webOrigin
 			s.log(name + " paired again with the code it spent (" + a.Kind + ")")
 			return result, nil
 		}
-		record := records.ClientRecord{ID: client, Name: name, Kind: a.Kind, PublicKey: a.PublicKey, Paired: records.Now()}
+		record := records.ClientRecord{ID: client, Name: name, Kind: a.Kind, PublicKey: a.PublicKey, Paired: records.Now(),
+			Owner: stored.Owner}
+		// An invite's first client is a new person's (#994).
+		if stored.Invite != nil {
+			person, err := s.redeemInvite(ctx, id, *stored.Invite)
+			if err != nil {
+				return nil, err
+			}
+			record.Owner = &person
+		}
 		if err := s.methods.Admit(ctx, record); err != nil {
 			return nil, err
 		}
@@ -1426,8 +1456,9 @@ func (s *Service) spendCode(id, method string, params json.RawMessage, webOrigin
 			return result, nil
 		}
 		mid := a.MachineID
+		// The machine is the person's who made the code (FR-017).
 		record := records.HostRecord{ID: host, Name: a.Name, PublicKey: a.PublicKey, Platform: a.Platform,
-			Version: a.Version, MachineID: &mid}
+			Version: a.Version, MachineID: &mid, Owner: stored.Owner}
 		if relay {
 			record.Relay = &relay
 		}
@@ -1444,6 +1475,7 @@ func (s *Service) spendCode(id, method string, params json.RawMessage, webOrigin
 		// Every other copy knows it at once.
 		s.announce("hostEnrolled", host, "code")
 		s.router.Know(host)
+		s.router.HoldToOwners()
 		s.log("host " + a.Name + " enrolled as " + host)
 		return result, nil
 	}

@@ -264,12 +264,6 @@ func (s *Settings) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-// Person is people/<id>.json: whom records belong to (FR-012).
-type Person struct {
-	ID   string `json:"id"`
-	Name string `json:"name"`
-}
-
 // NewUUID is a random (version 4) UUID, upper case, as Swift's UUID().uuidString.
 func NewUUID() string {
 	b := make([]byte, 16)

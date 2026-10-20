@@ -3668,6 +3668,10 @@
         "person": {
           "$ref": "#/definitions/ControlPerson",
           "description": "Who this client belongs to (#994)."
+        },
+        "joinCommand": {
+          "type": "string",
+          "description": "The one line to run on a server so that it asks to join as this client's person, with no code (#994)."
         }
       },
       "required": [
@@ -18991,6 +18995,14 @@
         },
         "host": {
           "$ref": "#/definitions/HostID"
+        },
+        "controlKey": {
+          "$ref": "#/definitions/Base64",
+          "description": "Once approved: the control plane's public key, which the machine keeps as a code's would give it."
+        },
+        "name": {
+          "type": "string",
+          "description": "Once approved: the control plane's name."
         }
       },
       "required": [

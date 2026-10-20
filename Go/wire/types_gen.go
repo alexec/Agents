@@ -1589,6 +1589,8 @@ type ControlStatus struct {
 	UnjoinedTunnels  []HostTunnelChanged `json:"unjoinedTunnels,omitzero"`
 	// Who this client belongs to (#994).
 	Person *ControlPerson `json:"person,omitzero"`
+	// The one line to run on a server so that it asks to join as this client's person, with no code (#994).
+	JoinCommand *string `json:"joinCommand,omitzero"`
 }
 
 type Cost struct {
@@ -2487,6 +2489,10 @@ type HostJoinAsk struct {
 type HostJoinDecision struct {
 	Result string  `json:"result"`
 	Host   *HostID `json:"host,omitzero"`
+	// Once approved: the control plane's public key, which the machine keeps as a code's would give it.
+	ControlKey Data `json:"controlKey,omitzero"`
+	// Once approved: the control plane's name.
+	Name *string `json:"name,omitzero"`
 }
 
 type HostJoinStatus struct {

@@ -365,3 +365,49 @@ func TestChangesHereDoNotConflictWithEachOther(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+// FR-003 (T007): the first start with people makes a v0.7 store's one person the local
+// owner and the admin, and gives every client and host without one that owner. It only
+// adds fields: what it does not know is kept, and no key moves.
+func TestMigrationMakesTheLocalOwner(t *testing.T) {
+	ctx := context.Background()
+	s := store.NewMemory()
+	owner := "0f8fad5b-d9cb-469f-a165-70867728950e"
+	put := func(key, text string) {
+		if _, err := s.Put(ctx, key, []byte(text), store.Absent); err != nil {
+			t.Fatal(err)
+		}
+	}
+	put(SettingsKey, `{"name":"Alex's control plane","port":8790,"machineID":"M1","owner":"`+owner+`","controlKey":"AQID"}`)
+	put(PersonKey(owner), `{"id":"`+owner+`","name":"Alex's control plane","later":true}`)
+	put(ClientKey("E621E1F8-C36C-495A-93FC-0C247A3E6E5F"), `{"id":"E621E1F8-C36C-495A-93FC-0C247A3E6E5F","name":"Mac","kind":"mac","publicKey":"AQID","grant":"operator","paired":"2026-10-01T00:00:00.000Z","rev":1}`)
+	put(HostKey("abcd1234"), `{"id":"abcd1234","name":"box","reach":{"dialOut":{}},"platform":"Linux","version":"1","installed":false,"rev":1}`)
+	r := New(s)
+	if err := r.Load(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if err := r.Migrate(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if err := r.Migrate(ctx); err != nil {
+		t.Fatal(err)
+	}
+	again := New(s)
+	if err := again.Load(ctx); err != nil {
+		t.Fatal(err)
+	}
+	p := again.Person(owner)
+	if p == nil || p.Role != RoleAdmin || p.Kind != KindPerson || !p.HasSignIn(ProviderLocal, ControlKeyID([]byte{1, 2, 3})) ||
+		len(p.SignIns) != 1 || string(p.Extra["later"]) != "true" || p.Rev != 1 {
+		t.Fatalf("%+v", p)
+	}
+	if c := again.Client("E621E1F8-C36C-495A-93FC-0C247A3E6E5F"); c == nil || c.Owner == nil || *c.Owner != owner {
+		t.Fatalf("%+v", c)
+	}
+	if h := again.Host("abcd1234"); h == nil || h.Owner == nil || *h.Owner != owner {
+		t.Fatalf("%+v", h)
+	}
+	if people := again.People(); len(people) != 1 {
+		t.Fatalf("%+v", people)
+	}
+}

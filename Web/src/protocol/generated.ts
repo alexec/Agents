@@ -1336,6 +1336,11 @@ export interface ControlStatus {
   unjoinedTunnels?: HostTunnelChanged[];
   /** Who this client belongs to (#994). */
   person?: ControlPerson;
+  /**
+   * The one line to run on a server so that it asks to join as this client's person, with no code
+   * (#994).
+   */
+  joinCommand?: string;
 }
 
 export interface Cost {
@@ -2100,6 +2105,13 @@ export interface HostJoinAsk {
 export interface HostJoinDecision {
   result: "waiting" | "approved" | "denied" | "expired";
   host?: HostID;
+  /**
+   * Once approved: the control plane's public key, which the machine keeps as a code's would give
+   * it.
+   */
+  controlKey?: Base64;
+  /** Once approved: the control plane's name. */
+  name?: string;
 }
 
 export interface HostJoinStatus {
@@ -5398,7 +5410,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ControlPerson: { required: ["id", "name", "role"], optional: ["localOwner"] },
   ControlPush: { required: ["sealed"], optional: [] },
   ControlPushItem: { required: ["needID", "alert"], optional: ["headline"] },
-  ControlStatus: { required: ["name", "version", "machineID"], optional: ["homeHost", "startedAt", "port", "awayFromHome", "you", "relayKey", "web", "publicWeb", "publicViews", "thisMacHost", "projectDetection", "unjoinedTunnels", "person"] },
+  ControlStatus: { required: ["name", "version", "machineID"], optional: ["homeHost", "startedAt", "port", "awayFromHome", "you", "relayKey", "web", "publicWeb", "publicViews", "thisMacHost", "projectDetection", "unjoinedTunnels", "person", "joinCommand"] },
   Cost: { required: ["amount", "currency"], optional: [] },
   CostLimits: { required: [], optional: ["perAgent", "daily", "perAgentTokens", "dailyTokens"] },
   CostState: { required: ["limits", "today", "day", "tokensToday"], optional: ["note"] },
@@ -5494,7 +5506,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   HostHello: { required: ["version", "platform", "machineID"], optional: ["host", "name", "relay", "implementation"] },
   HostInstall: { required: ["destination"], optional: ["name", "key", "trust", "tunnel"] },
   HostJoinAsk: { required: ["name", "platform", "publicKey"], optional: ["version", "machineID", "person"] },
-  HostJoinDecision: { required: ["result"], optional: ["host"] },
+  HostJoinDecision: { required: ["result"], optional: ["host", "controlKey", "name"] },
   HostJoinStatus: { required: ["member", "connected", "at"], optional: ["problem"] },
   HostJoinTicket: { required: ["request", "code", "expires"], optional: [] },
   HostLastHeard: { required: ["host"], optional: ["projects", "agents", "heardAt"] },

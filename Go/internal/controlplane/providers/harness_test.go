@@ -360,7 +360,7 @@ func newHarness(t *testing.T, opts ...func(*harnessOptions)) *harness {
 				h.router.mu.Unlock()
 				h.router.setOnline(host, false)
 			},
-			HostCommand: func() (string, error) {
+			HostCommand: func(string) (string, error) {
 				return "curl -fsSL https://cp.local/v1/install.sh | sh -s -- 'agents-control:2:h:secret'", nil
 			},
 			Connect: func(ProviderRecord, map[string]string) (Provider, error) { return provider, nil },

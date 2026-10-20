@@ -4,6 +4,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"log"
@@ -235,7 +236,21 @@ func join(ctx context.Context, cl commandLine, d *agentsd.Daemon) {
 		log.Fatal(err)
 	}
 	member, err := controllink.LoadMembership(loc.Root)
-	if code != "" || err != nil || member.Host == "" {
+	askFile := filepath.Join(loc.Root, "control-join-ask")
+	if code == "" && (err != nil || member.Host == "") {
+		if b, err := os.ReadFile(askFile); err == nil {
+			var ask controllink.JoinAsk
+			if err := json.Unmarshal(b, &ask); err != nil {
+				log.Fatalf("control-join-ask: %v", err)
+			}
+			if member = askToJoin(ctx, loc.Root, ask, private, hello); member == nil {
+				return
+			}
+			os.Remove(askFile)
+			os.Remove(filepath.Join(loc.Root, "control-join-shown"))
+		}
+	}
+	if code != "" || member == nil || member.Host == "" {
 		if code == "" {
 			log.Printf("no membership in the root and no code to enrol with: not joining a control plane")
 			return
@@ -267,6 +282,30 @@ func join(ctx context.Context, cl commandLine, d *agentsd.Daemon) {
 			time.Sleep(time.Second)
 		}
 	})
+}
+
+// askToJoin asks to join with no code (#994) until the person approves it, asking again
+// when a request is denied or runs out, or the control plane can't be reached.
+func askToJoin(ctx context.Context, root string, ask controllink.JoinAsk, private []byte, hello controllink.HostHello) *controllink.Membership {
+	for {
+		member, err := controllink.AskToJoin(ctx, root, ask, private, hello, func(code string) {
+			os.WriteFile(filepath.Join(root, "control-join-shown"), []byte(code+"\n"), 0o600)
+			log.Printf("asking to join %s as %s: approve it on a client; the code is %s", ask.URL, ask.Person, code)
+		})
+		if err == nil {
+			log.Printf("joined as host %s with %s, by approval", member.Host, member.Name)
+			return member
+		}
+		if ctx.Err() != nil {
+			return nil
+		}
+		log.Printf("could not join: %v; asking again in 30 s", err)
+		select {
+		case <-ctx.Done():
+			return nil
+		case <-time.After(30 * time.Second):
+		}
+	}
 }
 
 // platform is Daemon.platform: "Linux arm64" or "Linux x86-64".

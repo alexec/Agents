@@ -49,8 +49,9 @@ func (s *Service) makeProviders(home string) *providers.Providers {
 				return over
 			},
 			Connect: connect,
-			HostCommand: func() (string, error) {
-				shown, err := s.codes.Issue(context.Background(), true, false, 5*time.Minute)
+			OwnerOf: s.ownerOf,
+			HostCommand: func(person string) (string, error) {
+				shown, err := s.codes.Issue(withCodeOwner(context.Background(), person), true, false, 5*time.Minute)
 				if err != nil {
 					return "", err
 				}
@@ -148,7 +149,7 @@ func (a providerMethods) HostRow(h records.HostRecord) any { return a.m.hostRow(
 
 func (a providerMethods) RemoveHost(host string, from providers.Caller) error {
 	_, err := a.m.Handle("hosts/remove", rawOf(map[string]string{"host": host}),
-		Caller{Session: from.Session, Client: from.Client, Kind: from.Kind})
+		Caller{Session: from.Session, Client: from.Client, Kind: from.Kind, Person: from.Person})
 	return err
 }
 
@@ -159,7 +160,7 @@ func rawOf(v any) json.RawMessage {
 
 // providersCaller is a client as the providers see it.
 func providersCaller(c Caller) providers.Caller {
-	return providers.Caller{Session: c.Session, Client: c.Client, Kind: c.Kind}
+	return providers.Caller{Session: c.Session, Client: c.Client, Kind: c.Kind, Person: c.Person}
 }
 
 // sshStart is the providers' SSHStart hook: a host's agentsd started over ssh. The key
