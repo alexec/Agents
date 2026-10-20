@@ -33,6 +33,7 @@
 - **Lint with `scripts/lint.sh`** (#1224): shellcheck, `zsh -n` and our text checks fail CI's `lint` job; golangci-lint, govulncheck, ruff, Biome and SwiftLint only report, and say which findings are in your files (`LINT_BASE=origin/main`). On the Mac each runs in a container: nothing to install. `scripts/lint.sh --fix` runs the fix modes.
 - **Build through `scripts/build-cache.sh`** (`… xcodebuild …`, `… swift test …`): one package and compilation cache in `~/Library/Caches/Agents-build/` for every worktree, so a fresh worktree is not a cold build. Deleting a worktree's own `build/` and `.build` when done is still the rule; the cache stays. Its `swift test` sets `AGENTS_QUARANTINE=1`, so tests marked `.flakyUnderLoad` skip as on CI; `AGENTS_QUARANTINE=0` runs them.
 - **Before any xcodebuild, swift build, swift test, scripts/web.sh build or ship.sh, lease the resource "build" with lease_resource (minutes sized to the job, at most 60), and release it with release_resource the moment the command ends.** Never hold it while reading, editing or waiting on the screen.
+- **Close every scratch app you ran** (run-app, the walk simulator, headless Chrome) with the run-app skill's "When you are done" steps before you commit or end. A scratch app left running is a bug in the lane.
 - **A walk does not hold a place:** a lane that needs one commits, hands the walk on, and ends.
 
 ## Questions that already have an answer

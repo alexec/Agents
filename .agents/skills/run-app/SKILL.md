@@ -1,6 +1,6 @@
 ---
 name: run-app
-description: Build, launch and drive this Mac app (Agents) on a scratch set-up of its own (a control plane, this Mac's host and the window), so a change can be seen working without touching the real ones or asking the user to click anything. Use whenever asked to run, start, screenshot, walk or manually verify the app, or whenever a change to App/, Host/, Go/, Remote/ or Packages/AgentsKit needs proving beyond `swift test`.
+description: Build, launch and drive this Mac app (Agents) on a scratch set-up of its own (a control plane, this Mac's host and the window), so a change can be seen working without touching the real ones or asking the user to click anything. Use whenever asked to run, start, screenshot, walk or manually verify the app, or whenever a change to App/, Host/, Go/, Remote/ or Packages/AgentsKit needs proving beyond `swift test`. Close everything it started when done ("When you are done"), also when the walk failed.
 ---
 
 # Run and test this app
@@ -43,8 +43,8 @@ $S/rpc.py $ROOT start claude $ROOT/work "Write hello.txt with one line in it." 1
 # 4. look at it, if the change is visual
 $S/walk.py $ROOT shot /tmp/run-mychange-1.png    # then Read the png; works on a locked screen
 
-# 5. always, at the end
-$S/stop.sh $ROOT
+# 5. always, at the end: see "When you are done" below
+$S/stop.sh $ROOT                                  # must print clean
 ```
 
 `launch.sh` builds with `xcodegen generate`, then `xcodebuild -scheme AgentsHost`
@@ -357,3 +357,19 @@ opens it in headless Chrome. Run it once per press, on the same profile.
 2. Add or update the change's row in `specs/071-web-remote/walks/parity.md`: the page's shot, the
    window's shot, and has, partly, lacks or by design.
 3. A gap you don't close in the same branch gets a parity issue, named in the commit.
+
+## When you are done
+
+Before you commit, hand back or end your turn, close everything you started. Do this
+also when the walk failed. A scratch app left running is a bug in the lane: a headless
+Chrome from one web walk ran for 20 hours after its PR merged (#1624).
+
+1. For every root you launched: `$S/stop.sh $ROOT`. It must print `clean`.
+2. If you started the walk simulator: `$S/remote.sh down`.
+3. For every headless Chrome from `Web/test/walk/cdp.mjs`: `await chrome.close()`, then
+   remove its profile, `rm -rf /tmp/run-<slug>-chrome*`.
+4. Check that nothing is left. This must print nothing:
+
+   ```sh
+   pgrep -fl -- "--walk run-<slug>|/tmp/run-<slug>"
+   ```
