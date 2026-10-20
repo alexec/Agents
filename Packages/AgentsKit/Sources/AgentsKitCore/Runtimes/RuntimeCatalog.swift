@@ -190,28 +190,8 @@ public enum RuntimeCatalog {
         carriesConversationAcrossFolders.contains(runtimeID)
     }
 
-    /// How a runtime takes words of ours as its system prompt, for a session and not
-    /// for one turn (#1080).
-    public enum SystemPromptDelivery: Sendable, Equatable {
-        /// `_meta.systemPrompt.append` on `session/new`, `session/load` and
-        /// `session/resume`: Claude's adapter hands it to the Agent SDK's preset prompt.
-        case append
-        /// `_meta.rules`, appended to the system prompt on the same three: Grok.
-        case rules
-    }
-
-    /// The runtimes that take the briefing and the persona as system prompt rather than
-    /// as the first prompt's text (#1080). The first prompt is then the person's words
-    /// alone, and so is the title the runtime makes from it. Cursor and Gemini have no
-    /// append (Gemini's `GEMINI_SYSTEM_MD` replaces its own prompt): they keep the
-    /// words in the first prompt, and the app keeps the person's title until the second
-    /// turn. A runtime that gains an append comes here.
-    public static let systemPromptDelivery: [String: SystemPromptDelivery] = ["claude": .append, "grok": .rules]
-
-    /// How this runtime takes a system prompt, or nil when it takes none.
-    public static func systemPromptDelivery(runtimeID: String) -> SystemPromptDelivery? {
-        systemPromptDelivery[runtimeID]
-    }
+    // Which runtimes take the briefing as system prompt (#1080) is the Go daemon's,
+    // systemPromptDelivery in Go/internal/agentsd/brief.go (#1801).
 
     /// Why it cannot, in the words the page and the daemon use.
     public static func whyCannotMoveFolders(runtimeID: String) -> String {

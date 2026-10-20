@@ -170,25 +170,8 @@ public enum LeaseWords {
         "\(display) came to this agent but it could not be started (\(reason)), so it was passed on."
     }
 
-    // MARK: The briefing (FR-015)
-
-    public static let briefing = """
-        Lease a shared resource with lease_resource before using it and release_resource \
-        the moment you are done. Keep leases short and extend them, and take several in the \
-        same order every time. A simulator, a browser and the screen (mouse, keyboard, front \
-        window) are for one agent at a time. If told you are in line, you may end your turn; \
-        you will be started again when it is yours.
-        """
-
-    /// The briefing with what the person declared joined to it (#116, #599): each
-    /// resource with its description, and when to lease it. The paragraph alone when
-    /// nothing is declared.
-    public static func briefing(declared: [DeclaredResource]) -> String {
-        guard !declared.isEmpty else { return briefing }
-        let lines = declared.map { "- \($0.displayName) (\(placesWords($0.holders))): \($0.description)" }
-        return briefing + " Also declared, each to lease whenever its description applies:\n"
-            + lines.joined(separator: "\n")
-    }
+    // The briefing's paragraph (FR-015), with what the person declared (#116, #599), is the
+    // Go daemon's, leasesWithDeclared in Go/internal/agentsd/brief.go (#1801).
 
     /// "one at a time", "3 at once".
     public static func placesWords(_ places: Int) -> String {

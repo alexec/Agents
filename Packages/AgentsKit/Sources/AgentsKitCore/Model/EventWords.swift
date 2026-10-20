@@ -202,15 +202,8 @@ public enum EventWords {
         }
     }
 
-    // MARK: The briefing
-
-    /// The paragraph every agent is briefed with (042): wait rather than poll, the turn
-    /// may end while waiting.
-    public static let briefing = """
-        Wait for something to happen (checks passing, an agent finishing, this Mac waking) \
-        with wait_for_event, not repeated checks. If told you are still waiting, you may \
-        end your turn; you will be started again when it happens.
-        """
+    // The paragraph every agent is briefed with (042) is the Go daemon's, eventsBrief in
+    // Go/internal/agentsd/brief.go (#1801).
 
     // MARK: The person's side
 
