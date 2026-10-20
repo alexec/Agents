@@ -25,4 +25,12 @@ struct ArchiveUndoTests {
         #expect(ArchiveUndo.line(sessions: 3, workflows: 0, stopped: true)
             == "Archived 3 sessions. Undo does not start the stopped ones again.")
     }
+
+    /// VoiceOver is told that Undo is there (#1676).
+    @Test func theAnnouncementEndsWithUndo() {
+        #expect(ArchiveUndo(agentIDs: [], title: "Fix the parser", stopped: false).announcement
+            == "Archived “Fix the parser”. Undo")
+        #expect(ArchiveUndo(agentIDs: [], title: "Fix the parser", stopped: true).announcement
+            == "Archived “Fix the parser” and stopped it. Undo does not start it again. Undo")
+    }
 }

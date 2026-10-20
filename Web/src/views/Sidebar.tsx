@@ -894,15 +894,25 @@ function Elsewhere({ store, projects }: { store: Store; projects: Placed[] }) {
 
 /**
  * Undo after Archive (ArchiveUndoStrip, #1534): "Archived “Fix the parser”" with Undo for a few
- * seconds; ⌘Z (Ctrl+Z) does the same while it shows, outside a text field.
+ * seconds; ⌘Z (Ctrl+Z) does the same while it shows, outside a text field. A screen reader reads
+ * the line and Undo when it comes, and the seconds wait while the pointer or the focus is on it (#1676).
  */
 function ArchiveUndoStrip({ store }: { store: Store }) {
   const undo = store.archiveUndo.value;
+  const hovering = useSignal(false);
+  const focused = useSignal(false);
+  const held = hovering.value || focused.value;
+  // A strip that goes under the pointer gets no mouseleave: each Archive starts unheld.
+  useEffect(() => { hovering.value = false; focused.value = false; }, [undo?.key]);
   useEffect(() => {
-    if (!undo) return;
+    if (!undo || held) return;
     const timer = setTimeout(() => {
       if (store.archiveUndo.value?.key === undo.key) store.archiveUndo.value = null;
     }, undoMillis);
+    return () => clearTimeout(timer);
+  }, [undo?.key, held]);
+  useEffect(() => {
+    if (!undo) return;
     const press = (e: KeyboardEvent) => {
       if (e.key.toLowerCase() !== "z" || !(e.metaKey || e.ctrlKey) || e.shiftKey || e.altKey) return;
       const target = e.target as HTMLElement | null;
@@ -911,11 +921,13 @@ function ArchiveUndoStrip({ store }: { store: Store }) {
       void store.undoArchive();
     };
     document.addEventListener("keydown", press);
-    return () => { clearTimeout(timer); document.removeEventListener("keydown", press); };
+    return () => document.removeEventListener("keydown", press);
   }, [undo?.key]);
   if (!undo) return null;
   return (
-    <p class="foot-line archive-undo" role="status">
+    <p class="foot-line archive-undo" role="status" aria-live="polite" aria-atomic="true"
+      onMouseEnter={() => { hovering.value = true; }} onMouseLeave={() => { hovering.value = false; }}
+      onFocusIn={() => { focused.value = true; }} onFocusOut={() => { focused.value = false; }}>
       <span>{undo.line}</span>
       <button type="button" class="link" onClick={() => void store.undoArchive()}>{undoLabel}</button>
     </p>
