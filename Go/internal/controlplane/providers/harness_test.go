@@ -161,6 +161,9 @@ type standIn struct {
 	firstBootRuns bool
 	firstBoots    []string
 	deleted       []string
+	// fromRepository: its form asks for `repository`, as Codespaces' does (#1809).
+	fromRepository bool
+	madeWith       []any
 }
 
 func newStandIn(ws []WorkspaceInfo) *standIn { return &standIn{workspaces: ws, firstBootRuns: true} }
@@ -233,6 +236,12 @@ func (s *standIn) Stop(id string) (*WorkspaceInfo, error) {
 }
 
 func (s *standIn) Options() (any, error) {
+	s.mu.Lock()
+	fromRepository := s.fromRepository
+	s.mu.Unlock()
+	if fromRepository {
+		return mustParse(`{"type": "object", "properties": {"repository": {"type": "string", "title": "Repository"}}}`), nil
+	}
 	return mustParse(`{"type": "object", "properties": {"size": {"type": "string", "title": "Size", "enum": ["small", "big"],
 		"x-costs": {"small": "$0.01/hour", "big": "$0.05/hour"}}}}`), nil
 }
@@ -243,6 +252,7 @@ func (s *standIn) Create(name string, options any, firstBoot *string) (*Workspac
 	if firstBoot != nil {
 		s.firstBoots = append(s.firstBoots, *firstBoot)
 	}
+	s.madeWith = append(s.madeWith, options)
 	made := WorkspaceInfo{ID: "ws-" + name, Name: name, State: "starting", SSH: new("root@10.0.0.9")}
 	s.workspaces = append(s.workspaces, made)
 	return &made, s.firstBootRuns, nil

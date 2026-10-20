@@ -576,6 +576,64 @@ func TestANewWorkspaceClonesItsProjectsOnceItJoins(t *testing.T) {
 	}
 }
 
+// A machine from a repository (#1809).
+
+func (h *harness) createFrom(name, repository string, clones []string) (ProviderCreated, error) {
+	provider := h.must(MethodProvidersList, nil).(map[string]any)["providers"].([]ProviderSummary)[0].ID
+	out, err := h.call(MethodProvidersCreate, ProviderCreate{ID: provider, Name: name, Clones: clones, Repository: &repository})
+	if err != nil {
+		return ProviderCreated{}, err
+	}
+	return out.(ProviderCreated), nil
+}
+
+func TestAMachineFromARepositoryClonesItFirstOnceItJoins(t *testing.T) {
+	h := newHarness(t)
+	h.add()
+	h.router.answer = func(string, string, json.RawMessage) *Reply { return &Reply{Result: json.RawMessage(`{}`)} }
+	if _, err := h.createFrom("agents-1", " https://github.com/alexec/agents.git ", []string{"https://github.com/alexec/two"}); err != nil {
+		t.Fatal(err)
+	}
+	h.enroll("agents001", "agents-1")
+	eventually(t, func() bool { return len(h.router.deliveries()) == 2 })
+	var got []string
+	for _, d := range h.router.deliveries() {
+		var params map[string]string
+		json.Unmarshal(d.params, &params)
+		got = append(got, params["url"])
+	}
+	if !reflect.DeepEqual(got, []string{"https://github.com/alexec/agents.git", "https://github.com/alexec/two"}) {
+		t.Errorf("%v", got)
+	}
+}
+
+func TestAProviderThatMakesItFromTheRepositoryIsGivenOwnerAndName(t *testing.T) {
+	h := newHarness(t)
+	h.add()
+	h.provider.fromRepository = true
+	h.provider.firstBootRuns = false
+	if _, err := h.createFrom("agents-2", "https://github.com/alexec/agents", nil); err != nil {
+		t.Fatal(err)
+	}
+	if got := h.provider.madeWith; len(got) != 1 || !reflect.DeepEqual(got[0], map[string]any{"repository": "alexec/agents"}) {
+		t.Errorf("%v", got)
+	}
+}
+
+func TestARepositoryIsAnHTTPSAddress(t *testing.T) {
+	h := newHarness(t)
+	h.add()
+	for _, bad := range []string{"git@github.com:alexec/agents.git", "http://github.com/alexec/agents", "https://github.com/agents",
+		"https://token@github.com/alexec/agents"} {
+		if _, err := h.createFrom("agents-3", bad, nil); err == nil {
+			t.Errorf("took %s", bad)
+		}
+	}
+	if len(h.provider.firstBoots) != 0 {
+		t.Error("asked the provider")
+	}
+}
+
 func TestOneThatCantRunTheFirstBootIsLeftToAddOverSSH(t *testing.T) {
 	h := newHarness(t)
 	h.add()

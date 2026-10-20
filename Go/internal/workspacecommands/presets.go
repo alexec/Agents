@@ -304,7 +304,17 @@ func codespacesAPI(o map[string]any) (Config, error) {
 			SSH:          ssh, Tunnel: true},
 	}, map[string]State{"available": Running, "starting": Starting, "provisioning": Starting, "queued": Starting,
 		"awaiting": Starting, "rebuilding": Starting, "exporting": Stopping, "shuttingdown": Stopping,
-		"shutdown": Stopped}, Making{}), nil
+		"shutdown": Stopped}, Making{
+		// From a repository (#1809): the codespace clones it itself, with its own git
+		// credentials. It has no user data, so Agents is installed over ssh afterwards.
+		CreateRequest: &Request{Method: "POST", URL: base + "/repos/${repository.owner}/${repository.name}/codespaces",
+			Headers: headers, Body: map[string]any{"display_name": "${name}"}},
+		DeleteRequest: &Request{Method: "DELETE", URL: base + "/user/codespaces/${id}", Headers: headers},
+		Options: map[string]any{"type": "object", "required": []any{"repository"}, "properties": map[string]any{
+			"repository": map[string]any{"type": "string", "title": "Repository",
+				"description": "The repository to make the codespace from, as owner/name."},
+		}},
+	}), nil
 }
 
 // coderAPI is Coder workspaces through the deployment's API at url, with a session token

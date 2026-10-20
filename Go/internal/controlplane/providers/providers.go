@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/url"
 	"regexp"
 	"sort"
 	"strconv"
@@ -1397,6 +1398,27 @@ func (p *Providers) create(request ProviderCreate, who string, caller *Caller) (
 	if options == nil {
 		options = map[string]any{}
 	}
+	// A repository (#1809): the provider makes the workspace from it when its form asks for
+	// one (Codespaces), and otherwise the host clones it first once it joins.
+	var clones []string
+	if repository := trimSpaces(deref(request.Repository)); repository != "" {
+		path, ok := repositoryPath(repository)
+		if !ok {
+			return nil, invalid("A repository is an https address, such as https://github.com/owner/name.")
+		}
+		if p.formAsksForRepository(id) {
+			chosen, _ := options.(map[string]any)
+			if chosen == nil {
+				chosen = map[string]any{}
+			}
+			if _, given := chosen["repository"]; !given {
+				chosen["repository"] = path
+			}
+			options = chosen
+		} else {
+			clones = append(clones, repository)
+		}
+	}
 	var made *WorkspaceInfo
 	var runs bool
 	_, err = p.providerCall(id, func(c Provider) (any, error) {
@@ -1442,7 +1464,6 @@ func (p *Providers) create(request ProviderCreate, who string, caller *Caller) (
 	p.log(fmt.Sprintf("workspace: create %s (%s/%s) by %s: ok in %s%s", name, id, found.ID, who,
 		secondsSince(began), joiningWords))
 	if runs {
-		var clones []string
 		for _, c := range request.Clones {
 			if c = trimSpaces(c); c != "" {
 				clones = append(clones, c)
@@ -1454,6 +1475,33 @@ func (p *Providers) create(request ProviderCreate, who string, caller *Caller) (
 		go p.linkWhenJoined(name)
 	}
 	return ProviderCreated{Workspace: *found, Joining: runs}, nil
+}
+
+// repositoryPath is an https git address's owner/name path, such as alexec/agents for
+// https://github.com/alexec/agents.git; false for any other address.
+func repositoryPath(address string) (string, bool) {
+	parsed, err := url.Parse(address)
+	if err != nil || parsed.Scheme != "https" || parsed.Host == "" || parsed.User != nil || parsed.RawQuery != "" {
+		return "", false
+	}
+	path := strings.TrimSuffix(strings.Trim(parsed.Path, "/"), ".git")
+	if !strings.Contains(path, "/") || strings.Contains(path, "//") {
+		return "", false
+	}
+	return path, true
+}
+
+// formAsksForRepository is whether the provider's New Workspace form has `repository`: it
+// makes the workspace from the repository itself, as Codespaces does.
+func (p *Providers) formAsksForRepository(id string) bool {
+	schema, err := p.providerCall(id, func(c Provider) (any, error) { return c.Options() })
+	if err != nil {
+		return false
+	}
+	form, _ := valueOf(rawOf(schema)).(map[string]any)
+	properties, _ := form["properties"].(map[string]any)
+	_, ok := properties["repository"]
+	return ok
 }
 
 // linkWhenJoined links a made workspace's host once it has joined, within the start's time.

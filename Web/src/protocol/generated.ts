@@ -3171,6 +3171,12 @@ export interface ProviderCreate {
   name: string;
   options?: JSONValue;
   clones?: string[];
+  /**
+   * The repository to start it from (#1809), an https git address. A provider whose New Workspace
+   * form has `repository`, such as Codespaces, makes the workspace from it; any other has the host
+   * clone it once it joins, before `clones`.
+   */
+  repository?: string;
 }
 
 /** What providers/create made. */
@@ -4974,7 +4980,9 @@ export interface Methods {
   "projects/unarchive": { params: ProjectRequest; result: ProjectSummary };
   "projects/undoGuardedChange": { params: GuardedChangeRequest; result: ProjectSummary };
   "providers/add": { params: ProviderAdd; result: ProviderSummary };
+  "providers/create": { params: ProviderCreate; result: ProviderCreated };
   "providers/list": { params: Empty; result: ProviderList };
+  "providers/options": { params: ProviderRequest; result: ProviderOptions };
   "providers/refresh": { params: ProviderRequest; result: Empty };
   "providers/remove": { params: ProviderRequest; result: Empty };
   "providers/update": { params: ProviderAdd; result: ProviderSummary };
@@ -5136,7 +5144,9 @@ export const MethodTarget = {
   "projects/unarchive": "host",
   "projects/undoGuardedChange": "host",
   "providers/add": "control",
+  "providers/create": "control",
   "providers/list": "control",
+  "providers/options": "control",
   "providers/refresh": "control",
   "providers/remove": "control",
   "providers/update": "control",
@@ -5556,7 +5566,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ProjectsListRequest: { required: ["includeArchived"], optional: [] },
   PromptRequest: { required: ["agentID", "text", "attachments", "from"], optional: ["sendID"] },
   ProviderAdd: { required: ["name", "kind"], optional: ["id", "command", "args", "url", "headers", "commands", "map", "secrets", "cli", "draft"] },
-  ProviderCreate: { required: ["id", "name"], optional: ["options", "clones"] },
+  ProviderCreate: { required: ["id", "name"], optional: ["options", "clones", "repository"] },
   ProviderCreated: { required: ["workspace", "joining"], optional: [] },
   ProviderDraftAnswer: { required: ["draft", "question", "yes"], optional: [] },
   ProviderDraftAnswered: { required: ["note"], optional: ["map", "preset"] },

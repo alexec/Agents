@@ -9194,6 +9194,10 @@
           "items": {
             "type": "string"
           }
+        },
+        "repository": {
+          "type": "string",
+          "description": "The repository to start it from (#1809), an https git address. A provider whose New Workspace form has `repository`, such as Codespaces, makes the workspace from it; any other has the host clone it once it joins, before `clones`."
         }
       },
       "required": [

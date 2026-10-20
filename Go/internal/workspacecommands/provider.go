@@ -426,6 +426,13 @@ func (p *Provider) Create(name string, options map[string]any, firstBoot string)
 			values[key] = fmt.Sprint(v)
 		}
 	}
+	// A repository as owner/name (#1809) is also its two parts, for an address such as
+	// /repos/${repository.owner}/${repository.name}/codespaces.
+	if owner, name, ok := strings.Cut(values["repository"], "/"); ok && owner != "" && name != "" && !strings.Contains(name, "/") {
+		values["repository.owner"], values["repository.name"] = owner, name
+	} else if making.CreateRequest != nil && strings.Contains(making.CreateRequest.URL, "${repository.") {
+		return Workspace{}, Failure{"Give the repository as owner/name."}
+	}
 	// The first-boot command carries a host code: logged as the template, never filled in.
 	if err := p.do(making.Create, making.CreateRequest, values, "create "+name, "making "+name); err != nil {
 		return Workspace{}, err

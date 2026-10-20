@@ -469,11 +469,17 @@ public extension DaemonAPI {
         /// Git URLs the new host clones once it has joined (#1122), as File ▸ Clone Project
         /// does, one after another. Nil or empty for none.
         public var clones: [String]?
-        public init(id: ProviderID, name: String, options: JSONValue? = nil, clones: [String]? = nil) {
+        /// The repository to start it from (#1809), an https git address. A provider whose
+        /// New Workspace form has `repository`, such as Codespaces, makes the workspace from
+        /// it; any other has the host clone it once it joins, before `clones`.
+        public var repository: String?
+        public init(id: ProviderID, name: String, options: JSONValue? = nil, clones: [String]? = nil,
+                    repository: String? = nil) {
             self.id = id
             self.name = name
             self.options = options
             self.clones = clones
+            self.repository = repository
         }
     }
 

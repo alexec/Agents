@@ -14,8 +14,10 @@ import { emptyListRuntimeLine, noAgentRuntime } from "../model/runtimes";
 import { isSafeLink } from "../render/markdown";
 import { go } from "../route";
 import { Modal } from "./Modal";
+import { MachineDialog } from "./MachineDialog";
+import { machineWords } from "../model/machineFromRepository";
 
-type Adding = { kind: "folder" | "clone"; host: string };
+type Adding = { kind: "folder" | "clone"; host: string } | { kind: "machine" };
 
 /** The dialog open now, if any: one at a time, from the + menu, the empty list or the projects menu. */
 const adding = signal<Adding | null>(null);
@@ -64,7 +66,7 @@ function hostItem(host: ControlHost, macID: string): string {
  */
 export function NewProjectItems({ store, onChoose }: { store: Store; onChoose?: () => void }) {
   const hosts = store.hosts.value;
-  const choose = (kind: Adding["kind"], host: string) => {
+  const choose = (kind: "folder" | "clone", host: string) => {
     onChoose?.();
     adding.value = { kind, host };
   };
@@ -108,6 +110,8 @@ export function NewProjectMenu({ store, newSession }: { store: Store; newSession
           {/* As the sidebar's top row starts one, in the project last started in (#628). */}
           <button role="menuitem" disabled={!newSession} onClick={() => { open.value = false; newSession?.(); }}>New Session</button>
           <NewProjectItems store={store} onChoose={() => (open.value = false)} />
+          {/* A machine of its own for a repository (#1809), made by a workspace provider. */}
+          <button role="menuitem" onClick={() => { open.value = false; adding.value = { kind: "machine" }; }}>{machineWords.menuItem}</button>
         </div>
       )}
     </span>
@@ -121,6 +125,22 @@ export function NewProjectMenu({ store, newSession }: { store: Store; newSession
  * (#257). Install stays on the Mac.
  */
 export function EmptyProjects({ store }: { store: Store }) {
+  // No machine at all, as a control plane started in a browser has (#1809): start one from a repository.
+  if (store.plane.value && store.hosts.value.length === 0) {
+    return (
+      <div class="empty-projects">
+        <p class="strong">No machines yet</p>
+        <p class="quiet">A machine runs your agents. Start one from a repository with a workspace provider.</p>
+        <div class="empty-actions">
+          <button class="prominent" onClick={() => (adding.value = { kind: "machine" })}>{machineWords.menuItem}</button>
+        </div>
+      </div>
+    );
+  }
+  return <ProjectsEmpty store={store} />;
+}
+
+function ProjectsEmpty({ store }: { store: Store }) {
   const online = store.hosts.value.filter((h) => hostAnswers(h.state));
   const listed = online.every((h) => store.projects.value[h.id] !== undefined);
   // Archived ones are listed too (#343), and are not projects to work in.
@@ -220,6 +240,7 @@ export function NewProjectDialog({ store }: { store: Store }) {
   }
   if (!open) return null;
   const close = () => (adding.value = null);
+  if (open.kind === "machine") return <MachineDialog store={store} close={close} />;
   return open.kind === "folder"
     ? <FolderDialog key={`folder-${open.host}`} store={store} host={open.host} close={close} />
     : <CloneDialog key={`clone-${open.host}`} store={store} host={open.host} close={close} />;
