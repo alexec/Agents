@@ -1319,18 +1319,12 @@ type ConnectorProof struct {
 	At      *Date   `json:"at,omitzero"`
 }
 
-// A project's Connectors set-up (#1336): its GitHub or GitLab repository (#1632), the person's connection to that forge, four slots that each prove themselves with one read, and the events.
+// A project's Connectors set-up (#1336): its GitHub repository, the person's connection, four slots that each prove themselves with one read, and the events.
 type ConnectorSetup struct {
 	Folder string `json:"folder"`
-	// owner/name on GitHub, or group/project on GitLab, from the project's git remote (origin first). Absent with no GitHub or GitLab remote.
-	Repository *string `json:"repository,omitzero"`
-	// The forge the repository is on, which fills Tasks, Code review and CI: github or gitlab (#1632). Absent is github.
-	Forge *ConnectionProvider `json:"forge,omitzero"`
-	// The repository's host, as the page says it before the repository: github.com, gitlab.com, or a self-managed GitLab's host.
-	Site *string `json:"site,omitzero"`
-	// The repository's page on its forge, where the person asks for access when a read is refused (GitLab).
-	RepositoryURL *string     `json:"repositoryURL,omitzero"`
-	Connection    *Connection `json:"connection,omitzero"`
+	// owner/name, from the project's git remote (origin first). Absent with no GitHub remote.
+	Repository *string     `json:"repository,omitzero"`
+	Connection *Connection `json:"connection,omitzero"`
 	// Whether the Agents App is installed on the repository. Absent when not known.
 	Installed  *bool   `json:"installed,omitzero"`
 	InstallURL *string `json:"installURL,omitzero"`
@@ -1385,7 +1379,7 @@ const (
 	ConnectorSlotKindWorkspace  ConnectorSlotKind = "workspace"
 )
 
-// notConnected: the slot comes with a connection that is not there yet. notRead: connected, but not read yet (a stored reading). read: its one read worked (a tick). failed: the read did not reach the provider; message says why. refused: the provider refused the read, so the person grants it on the provider's site. noRemote: the project has no GitHub or GitLab remote. skipped: the person skipped it; it counts as done.
+// notConnected: the slot comes with a connection that is not there yet. notRead: connected, but not read yet (a stored reading). read: its one read worked (a tick). failed: the read did not reach the provider; message says why. refused: the provider refused the read, so the person grants it on the provider's site. noRemote: the project has no GitHub remote. skipped: the person skipped it; it counts as done.
 type ConnectorSlotState string
 
 const (
@@ -1482,8 +1476,6 @@ type ControlAuth struct {
 	Kind  string  `json:"kind"`
 	For   *string `json:"for,omitzero"`
 	Epoch *int64  `json:"epoch,omitzero"`
-	// The capabilities this client has (#1748). None from a client older than #1748, or from a host, which says its own in host/hello.
-	Capabilities []string `json:"capabilities,omitzero"`
 }
 
 // control/clientChanged: a client paired, renamed, connected or went; nothing says list them all again.
@@ -1529,10 +1521,8 @@ type ControlHost struct {
 	Tunnel         *HostTunnel       `json:"tunnel,omitzero"`
 	Workspace      *HostWorkspace    `json:"workspace,omitzero"`
 	Implementation *string           `json:"implementation,omitzero"`
-	// The capabilities this host said in its last host/hello (#1748). None from a host older than #1748.
-	Capabilities []string `json:"capabilities,omitzero"`
-	// Of the control plane's required capabilities for hosts, the ones this host does not have (#1748). Its state is then needsUpdate.
-	Missing []string `json:"missing,omitzero"`
+	// The user who owns the machine (#994).
+	Owner *string `json:"owner,omitzero"`
 }
 
 // control/installProgress: a step of Add a Server.
@@ -1557,6 +1547,14 @@ type ControlOK struct {
 	Relayed   *bool             `json:"relayed,omitzero"`
 	Endpoints []ControlEndpoint `json:"endpoints,omitzero"`
 	Epoch     *int64            `json:"epoch,omitzero"`
+}
+
+// Who a client belongs to (#994): its person, their role, and whether they are the local owner.
+type ControlPerson struct {
+	ID         string   `json:"id"`
+	Name       string   `json:"name"`
+	Role       UserRole `json:"role"`
+	LocalOwner *bool    `json:"localOwner,omitzero"`
 }
 
 // The `agents` key of a push the control plane sends through APNs (#1460), beside an `aps` that says only that an agent needs the person: a ControlPushItem, sealed.
@@ -1589,9 +1587,8 @@ type ControlStatus struct {
 	ThisMacHost      *HostJoinStatus     `json:"thisMacHost,omitzero"`
 	ProjectDetection *ProjectDetection   `json:"projectDetection,omitzero"`
 	UnjoinedTunnels  []HostTunnelChanged `json:"unjoinedTunnels,omitzero"`
-	// The capabilities the control plane has (#1748).
-	Capabilities []string              `json:"capabilities,omitzero"`
-	Required     *RequiredCapabilities `json:"required,omitzero"`
+	// Who this client belongs to (#994).
+	Person *ControlPerson `json:"person,omitzero"`
 }
 
 type Cost struct {
@@ -2463,8 +2460,6 @@ type HostHello struct {
 	Name           *string `json:"name,omitzero"`
 	Relay          *bool   `json:"relay,omitzero"`
 	Implementation *string `json:"implementation,omitzero"`
-	// The capabilities this host has (#1748): each one whose methods it all serves, and the ones it declares. None from a host older than #1748.
-	Capabilities []string `json:"capabilities,omitzero"`
 }
 
 type HostID string
@@ -2478,11 +2473,34 @@ type HostInstall struct {
 	Tunnel      *bool   `json:"tunnel,omitzero"`
 }
 
+// POST /v1/join (#994, spec 736 FR-017): a machine with no code asks to join. `person` names whose it is to be, by name or id; with none, an admin approves it.
+type HostJoinAsk struct {
+	Name      string  `json:"name"`
+	Platform  string  `json:"platform"`
+	Version   *string `json:"version,omitzero"`
+	PublicKey Data    `json:"publicKey"`
+	MachineID *string `json:"machineID,omitzero"`
+	Person    *string `json:"person,omitzero"`
+}
+
+// GET /v1/join/<request> (#994): waiting, or how it ended; `host` once approved.
+type HostJoinDecision struct {
+	Result string  `json:"result"`
+	Host   *HostID `json:"host,omitzero"`
+}
+
 type HostJoinStatus struct {
 	Member    bool    `json:"member"`
 	Connected bool    `json:"connected"`
 	Problem   *string `json:"problem,omitzero"`
 	At        Date    `json:"at"`
+}
+
+// POST /v1/join: the request, the short code the machine shows, and when it ends (10 minutes).
+type HostJoinTicket struct {
+	Request string `json:"request"`
+	Code    string `json:"code"`
+	Expires Date   `json:"expires"`
 }
 
 type HostLastHeard struct {
@@ -2611,6 +2629,32 @@ type HostedMCPStatus struct {
 	LastError *string        `json:"lastError,omitzero"`
 	Restarts  int64          `json:"restarts"`
 	Users     int64          `json:"users"`
+}
+
+type JoinApproved struct {
+	Host HostID `json:"host"`
+}
+
+// control/joinDecided (#994): a request ended, approved or not, so every card for it goes.
+type JoinDecided struct {
+	Request string `json:"request"`
+	Result  string `json:"result"`
+}
+
+// hosts/joinRequests, control/joinRequested (#994): a machine waiting for approval, with the code it shows.
+type JoinRequest struct {
+	Request  string  `json:"request"`
+	Name     string  `json:"name"`
+	Platform string  `json:"platform"`
+	Code     string  `json:"code"`
+	Expires  Date    `json:"expires"`
+	For      string  `json:"for"`
+	ForName  *string `json:"forName,omitzero"`
+}
+
+// hosts/approveJoin, hosts/denyJoin (#994).
+type JoinRequestDecide struct {
+	Request string `json:"request"`
 }
 
 // hosts/keep: a request for a stopped host, kept until it is up.
@@ -3455,6 +3499,18 @@ type PendingMove struct {
 	AskedAt        Date       `json:"askedAt"`
 }
 
+// control/peopleChanged (#994): a person was added, changed or removed.
+type PeopleChanged struct {
+	User    *string `json:"user,omitzero"`
+	Removed *bool   `json:"removed,omitzero"`
+}
+
+// people/list (#994): every user for an admin; for a member, only themselves.
+type PeopleList struct {
+	People []PersonRow `json:"people"`
+	Admin  bool        `json:"admin"`
+}
+
 type PermissionNotification struct {
 	AgentID   UUID               `json:"agentID"`
 	Request   *PermissionRequest `json:"request,omitzero"`
@@ -3486,14 +3542,66 @@ type PermissionRequest struct {
 	Subagent *string            `json:"subagent,omitzero"`
 }
 
+type PersonClient struct {
+	ID   UUID       `json:"id"`
+	Name string     `json:"name"`
+	Kind ClientKind `json:"kind"`
+}
+
 type PersonEndRequest struct {
 	Name    string  `json:"name"`
 	AgentID *string `json:"agentID,omitzero"`
 }
 
+// people/invite (#994): the new person's name and role.
+type PersonInvite struct {
+	Name string   `json:"name"`
+	Role UserRole `json:"role"`
+}
+
+// people/invite: the invite code to send, for one use within 7 days. Its first client pairs as the new person.
+type PersonInvited struct {
+	Text    string   `json:"text"`
+	Expires Date     `json:"expires"`
+	Name    string   `json:"name"`
+	Role    UserRole `json:"role"`
+}
+
+// A machine in People: its name, its state and nothing inside it (FR-019).
+type PersonMachine struct {
+	ID       HostID  `json:"id"`
+	Name     string  `json:"name"`
+	State    string  `json:"state"`
+	Platform *string `json:"platform,omitzero"`
+}
+
 type PersonRemoveRequest struct {
 	Name    string `json:"name"`
 	AgentID string `json:"agentID"`
+}
+
+// people/remove (#994): the user.
+type PersonRequest struct {
+	User string `json:"user"`
+}
+
+// people/setRole (#994). Refused when it would leave no admin.
+type PersonRoleRequest struct {
+	User string   `json:"user"`
+	Role UserRole `json:"role"`
+}
+
+// people/list (#994): a user, with their clients and machines.
+type PersonRow struct {
+	ID         string          `json:"id"`
+	Name       string          `json:"name"`
+	Kind       string          `json:"kind"`
+	Role       UserRole        `json:"role"`
+	LocalOwner *bool           `json:"localOwner,omitzero"`
+	You        *bool           `json:"you,omitzero"`
+	SignIns    []SignIn        `json:"signIns"`
+	Clients    []PersonClient  `json:"clients"`
+	Machines   []PersonMachine `json:"machines"`
 }
 
 // What agents call the person, and their pronouns (#121), as given: person.json in the person's settings.
@@ -4109,12 +4217,6 @@ type ReportedEdit struct {
 	EntryIndex int64   `json:"entryIndex"`
 	ReplaceAll bool    `json:"replaceAll"`
 	At         Date    `json:"at"`
-}
-
-// What the control plane needs of a peer to route for it (#1748): a host without each of host is needsUpdate, and a client without each of client is answered -32008.
-type RequiredCapabilities struct {
-	Host   []string `json:"host"`
-	Client []string `json:"client"`
 }
 
 type ResetRule struct {
@@ -4830,6 +4932,15 @@ type ShownFile struct {
 	Chart *ChartHint `json:"chart,omitzero"`
 }
 
+// One way a person signs in (#994, spec 736): `local` is the local owner's (codes, with the control plane's key), `code` an invite code redeemed; Google, Apple and GitHub come with #995.
+type SignIn struct {
+	Provider string  `json:"provider"`
+	Account  *string `json:"account,omitzero"`
+	Email    *string `json:"email,omitzero"`
+	Login    *string `json:"login,omitzero"`
+	Added    *Date   `json:"added,omitzero"`
+}
+
 type SignInWantedReason string
 
 const (
@@ -5382,6 +5493,14 @@ type UsageHistory struct {
 	TimeZone *string `json:"timeZone,omitzero"`
 }
 
+// A user's role (#994, spec 736 FR-001): an admin manages people; a member sees only their own.
+type UserRole string
+
+const (
+	UserRoleAdmin  UserRole = "admin"
+	UserRoleMember UserRole = "member"
+)
+
 // What a third-party server's view waits on before it is drawn: the person's Show (#191). The data of a viewNeedsShow failure.
 type ViewAsk struct {
 	Server string `json:"server"`
@@ -5829,10 +5948,8 @@ type WorkspaceInfo struct {
 	State  string  `json:"state"`
 	SSH    *string `json:"ssh,omitzero"`
 	Tunnel *bool   `json:"tunnel,omitzero"`
-	// Its ssh host key is made again at each start, as a Google Cloud workstation's is (#1701): after a Start the control plane made, the first ssh takes the key it is offered and pins it again.
-	HostKeyRenews *bool   `json:"hostKeyRenews,omitzero"`
-	Cost          *string `json:"cost,omitzero"`
-	Host          *HostID `json:"host,omitzero"`
+	Cost   *string `json:"cost,omitzero"`
+	Host   *HostID `json:"host,omitzero"`
 }
 
 type WorktreeChoice struct {

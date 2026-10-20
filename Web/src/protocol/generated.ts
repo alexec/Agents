@@ -32,7 +32,6 @@ export const Failure = {
   dayLimitReached: -32018,
   deleteRefused: -32051,
   eventRefused: -32050,
-  fileChanged: -32081,
   fileGone: -32032,
   fileNotReadable: -32033,
   folderGone: -32004,
@@ -198,19 +197,6 @@ export interface Agent {
    * row, never a group or a badge. Cleared when the person opens the conversation or marks it read.
    */
   fileToSee?: ShownFile;
-  /**
-   * The person asked a chat paused by a spent allowance to carry on when the allowance is back
-   * (#1859). At `at` the host sends "continue" in the same chat; a turn that works, any other
-   * message, Stop or Archive takes it away.
-   */
-  continueWhenBack?: ContinueWhenBack;
-  /**
-   * While a turn runs, the title of the tool the agent is running now, the newest when more than
-   * one is (#1902). Absent while it thinks or replies. It changes only once a new value has held
-   * for a second, so a short tool never shows and a short gap between two does not flash. Cleared
-   * when the turn ends.
-   */
-  runningTool?: string;
 }
 
 export type AgentArchivedReason = "byUser" | "byAgent";
@@ -408,12 +394,6 @@ export interface ArtifactWriteRequest {
   agentID: UUID;
   path: string;
   text: string;
-  /**
-   * The SHA-256, in lower-case hex, of the text the edit started from (#1858). When the file on
-   * disk is not that text any more, the write is refused with fileChanged and nothing is written.
-   * Left out, the text is written whatever is on disk.
-   */
-  base?: string;
 }
 
 export interface AssessRuntimeRequest {
@@ -578,94 +558,6 @@ export interface BackgroundItem {
 export type BackgroundItemKind = "task" | "subagent";
 
 export type BackgroundItemState = "running" | "paused" | "completed" | "failed" | "stopped" | "disconnected";
-
-export interface Backup {
-  id: string;
-  machine: string;
-  rootID: string;
-  madeAt: WireDate;
-  bytes: number;
-  agents: number;
-  thisMachine: boolean;
-}
-
-export type BackupEvery = "off" | "daily" | "weekly";
-
-export interface BackupMakeRequest {
-  /** Answer once the backup is made, not at once: a provider's delete waits for it (#1815). */
-  wait?: boolean;
-}
-
-export interface BackupRestoreRequest {
-  id: string;
-}
-
-export interface BackupRestoreResult {
-  restored: number;
-  skipped: number;
-}
-
-export interface BackupSettings {
-  every: BackupEvery;
-  keep: number;
-  folder?: string;
-  /**
-   * Where backups go (#1815): this machine's folder, or the control plane's store. Left out is the
-   * machine's default: the store for a server linked to a control plane, else the folder.
-   */
-  target?: BackupTarget;
-}
-
-export interface BackupState {
-  settings: BackupSettings;
-  folder: string;
-  backups: Backup[];
-  making: boolean;
-  lastError?: string;
-  /**
-   * The machine is linked to a control plane, so it can back up to the control plane's store
-   * (#1815).
-   */
-  canUseControl?: boolean;
-}
-
-/**
- * A host's backup whose parts are all uploaded: the control plane writes its .json last, then keeps
- * the newest keep of this host's (#1815).
- */
-export interface BackupStoreCommit {
-  name: string;
-  parts: number;
-  machine: string;
-  rootID: string;
-  madeAt: WireDate;
-  bytes: number;
-  agents: number;
-  keep: number;
-}
-
-export interface BackupStoreList {
-  backups: Backup[];
-}
-
-/**
- * One part of a backup, at most 8 MiB (#1815): a host's upload, or the control plane's answer to a
- * download.
- */
-export interface BackupStorePart {
-  /** On an upload, the backup's name; this host's own folder is the control plane's to say. */
-  name: string;
-  part: number;
-  data: Base64;
-}
-
-export interface BackupStorePartRequest {
-  /** A listed backup's id: <host>/<name>. */
-  id: string;
-  part: number;
-}
-
-export type BackupTarget = "folder" | "control";
 
 export interface Block {
   waits: Wait[];
@@ -1190,31 +1082,13 @@ export interface ConnectorProof {
 }
 
 /**
- * A project's Connectors set-up (#1336): its GitHub or GitLab repository (#1632), the person's
- * connection to that forge, four slots that each prove themselves with one read, and the events.
+ * A project's Connectors set-up (#1336): its GitHub repository, the person's connection, four slots
+ * that each prove themselves with one read, and the events.
  */
 export interface ConnectorSetup {
   folder: string;
-  /**
-   * owner/name on GitHub, or group/project on GitLab, from the project's git remote (origin first).
-   * Absent with no GitHub or GitLab remote.
-   */
+  /** owner/name, from the project's git remote (origin first). Absent with no GitHub remote. */
   repository?: string;
-  /**
-   * The forge the repository is on, which fills Tasks, Code review and CI: github or gitlab
-   * (#1632). Absent is github.
-   */
-  forge?: ConnectionProvider;
-  /**
-   * The repository's host, as the page says it before the repository: github.com, gitlab.com, or a
-   * self-managed GitLab's host.
-   */
-  site?: string;
-  /**
-   * The repository's page on its forge, where the person asks for access when a read is refused
-   * (GitLab).
-   */
-  repositoryURL?: string;
   connection?: Connection;
   /** Whether the Agents App is installed on the repository. Absent when not known. */
   installed?: boolean;
@@ -1270,8 +1144,8 @@ export type ConnectorSlotKind = "tasks" | "codeReview" | "ci" | "workspace";
  * notConnected: the slot comes with a connection that is not there yet. notRead: connected, but not
  * read yet (a stored reading). read: its one read worked (a tick). failed: the read did not reach
  * the provider; message says why. refused: the provider refused the read, so the person grants it
- * on the provider's site. noRemote: the project has no GitHub or GitLab remote. skipped: the person
- * skipped it; it counts as done.
+ * on the provider's site. noRemote: the project has no GitHub remote. skipped: the person skipped
+ * it; it counts as done.
  */
 export type ConnectorSlotState = "notConnected" | "notRead" | "read" | "failed" | "refused" | "noRemote" | "skipped";
 
@@ -1320,19 +1194,6 @@ export interface ContinueInProjectRequest {
   requestID?: UUID;
 }
 
-/** When a chat paused by a spent allowance carries on by itself (#1859). */
-export interface ContinueWhenBack {
-  /**
-   * When it sends "continue": the provider's reset time, or the app's next check of the runtime.
-   */
-  at: WireDate;
-  /**
-   * True when `at` is the time the provider said the allowance resets; false when it is only the
-   * app's next check.
-   */
-  resetKnown: boolean;
-}
-
 /**
  * The peer's answer: {"auth":…} (ControlAuth.Auth). `kind` is mac, iphone, ipad, browser, host,
  * relay or copy.
@@ -1344,11 +1205,6 @@ export interface ControlAuth {
   kind: string;
   for?: string;
   epoch?: number;
-  /**
-   * The capabilities this client has (#1748). None from a client older than #1748, or from a host,
-   * which says its own in host/hello.
-   */
-  capabilities?: string[];
 }
 
 /**
@@ -1400,16 +1256,8 @@ export interface ControlHost {
   tunnel?: HostTunnel;
   workspace?: HostWorkspace;
   implementation?: string;
-  /**
-   * The capabilities this host said in its last host/hello (#1748). None from a host older than
-   * #1748.
-   */
-  capabilities?: string[];
-  /**
-   * Of the control plane's required capabilities for hosts, the ones this host does not have
-   * (#1748). Its state is then needsUpdate.
-   */
-  missing?: string[];
+  /** The user who owns the machine (#994). */
+  owner?: string;
 }
 
 /** control/installProgress: a step of Add a Server. */
@@ -1434,6 +1282,14 @@ export interface ControlOK {
   relayed?: boolean;
   endpoints?: ControlEndpoint[];
   epoch?: number;
+}
+
+/** Who a client belongs to (#994): its person, their role, and whether they are the local owner. */
+export interface ControlPerson {
+  id: string;
+  name: string;
+  role: UserRole;
+  localOwner?: boolean;
 }
 
 /**
@@ -1478,9 +1334,8 @@ export interface ControlStatus {
   thisMacHost?: HostJoinStatus;
   projectDetection?: ProjectDetection;
   unjoinedTunnels?: HostTunnelChanged[];
-  /** The capabilities the control plane has (#1748). */
-  capabilities?: string[];
-  required?: RequiredCapabilities;
+  /** Who this client belongs to (#994). */
+  person?: ControlPerson;
 }
 
 export interface Cost {
@@ -2214,11 +2069,6 @@ export interface HostHello {
   name?: string;
   relay?: boolean;
   implementation?: string;
-  /**
-   * The capabilities this host has (#1748): each one whose methods it all serves, and the ones it
-   * declares. None from a host older than #1748.
-   */
-  capabilities?: string[];
 }
 
 /**
@@ -2233,11 +2083,37 @@ export interface HostInstall {
   tunnel?: boolean;
 }
 
+/**
+ * POST /v1/join (#994, spec 736 FR-017): a machine with no code asks to join. `person` names whose
+ * it is to be, by name or id; with none, an admin approves it.
+ */
+export interface HostJoinAsk {
+  name: string;
+  platform: string;
+  version?: string;
+  publicKey: Base64;
+  machineID?: string;
+  person?: string;
+}
+
+/** GET /v1/join/<request> (#994): waiting, or how it ended; `host` once approved. */
+export interface HostJoinDecision {
+  result: "waiting" | "approved" | "denied" | "expired";
+  host?: HostID;
+}
+
 export interface HostJoinStatus {
   member: boolean;
   connected: boolean;
   problem?: string;
   at: WireDate;
+}
+
+/** POST /v1/join: the request, the short code the machine shows, and when it ends (10 minutes). */
+export interface HostJoinTicket {
+  request: string;
+  code: string;
+  expires: WireDate;
 }
 
 export interface HostLastHeard {
@@ -2362,6 +2238,35 @@ export interface HostedMCPStatus {
   lastError?: string;
   restarts: number;
   users: number;
+}
+
+export interface JoinApproved {
+  host: HostID;
+}
+
+/** control/joinDecided (#994): a request ended, approved or not, so every card for it goes. */
+export interface JoinDecided {
+  request: string;
+  result: string;
+}
+
+/**
+ * hosts/joinRequests, control/joinRequested (#994): a machine waiting for approval, with the code
+ * it shows.
+ */
+export interface JoinRequest {
+  request: string;
+  name: string;
+  platform: string;
+  code: string;
+  expires: WireDate;
+  for: string;
+  forName?: string;
+}
+
+/** hosts/approveJoin, hosts/denyJoin (#994). */
+export interface JoinRequestDecide {
+  request: string;
 }
 
 /** hosts/keep: a request for a stopped host, kept until it is up. */
@@ -2970,6 +2875,18 @@ export interface PendingMove {
   askedAt: WireDate;
 }
 
+/** control/peopleChanged (#994): a person was added, changed or removed. */
+export interface PeopleChanged {
+  user?: string;
+  removed?: boolean;
+}
+
+/** people/list (#994): every user for an admin; for a member, only themselves. */
+export interface PeopleList {
+  people: PersonRow[];
+  admin: boolean;
+}
+
 export interface PermissionNotification {
   agentID: UUID;
   request?: PermissionRequest;
@@ -2993,14 +2910,69 @@ export interface PermissionRequest {
   subagent?: string;
 }
 
+export interface PersonClient {
+  id: UUID;
+  name: string;
+  kind: ClientKind;
+}
+
 export interface PersonEndRequest {
   name: string;
   agentID?: string;
 }
 
+/** people/invite (#994): the new person's name and role. */
+export interface PersonInvite {
+  name: string;
+  role: UserRole;
+}
+
+/**
+ * people/invite: the invite code to send, for one use within 7 days. Its first client pairs as the
+ * new person.
+ */
+export interface PersonInvited {
+  text: string;
+  expires: WireDate;
+  name: string;
+  role: UserRole;
+}
+
+/** A machine in People: its name, its state and nothing inside it (FR-019). */
+export interface PersonMachine {
+  id: HostID;
+  name: string;
+  state: string;
+  platform?: string;
+}
+
 export interface PersonRemoveRequest {
   name: string;
   agentID: string;
+}
+
+/** people/remove (#994): the user. */
+export interface PersonRequest {
+  user: string;
+}
+
+/** people/setRole (#994). Refused when it would leave no admin. */
+export interface PersonRoleRequest {
+  user: string;
+  role: UserRole;
+}
+
+/** people/list (#994): a user, with their clients and machines. */
+export interface PersonRow {
+  id: string;
+  name: string;
+  kind: "person" | "bot";
+  role: UserRole;
+  localOwner?: boolean;
+  you?: boolean;
+  signIns: SignIn[];
+  clients: PersonClient[];
+  machines: PersonMachine[];
 }
 
 /**
@@ -3277,12 +3249,6 @@ export interface ProviderCreate {
   name: string;
   options?: JSONValue;
   clones?: string[];
-  /**
-   * The repository to start it from (#1809), an https git address. A provider whose New Workspace
-   * form has `repository`, such as Codespaces, makes the workspace from it; any other has the host
-   * clone it once it joins, before `clones`.
-   */
-  repository?: string;
 }
 
 /** What providers/create made. */
@@ -3573,15 +3539,6 @@ export interface ReportedEdit {
   entryIndex: number;
   replaceAll: boolean;
   at: WireDate;
-}
-
-/**
- * What the control plane needs of a peer to route for it (#1748): a host without each of host is
- * needsUpdate, and a client without each of client is answered -32008.
- */
-export interface RequiredCapabilities {
-  host: string[];
-  client: string[];
 }
 
 export type ResetRule =
@@ -4161,6 +4118,18 @@ export interface ShownFile {
   chart?: ChartHint;
 }
 
+/**
+ * One way a person signs in (#994, spec 736): `local` is the local owner's (codes, with the control
+ * plane's key), `code` an invite code redeemed; Google, Apple and GitHub come with #995.
+ */
+export interface SignIn {
+  provider: string;
+  account?: string;
+  email?: string;
+  login?: string;
+  added?: WireDate;
+}
+
 export type SignInWantedReason = "notSignedIn" | "unreadable";
 
 /**
@@ -4481,11 +4450,9 @@ export interface TunnelOpen {
 
 /**
  * Where a session's turn is, as its Live Activity says it (#1744): working; a question or an
- * approval waiting on the person; done; ended cleanly but wanting the person, as Needs you in the
- * sidebars (#1861); stopped on purpose or out of allowance, as Paused in the sidebars (#1869);
- * ended for another reason; or gone (archived or deleted).
+ * approval waiting on the person; done; ended for another reason; or gone (archived or deleted).
  */
-export type TurnPhase = "working" | "question" | "approval" | "done" | "needs_you" | "paused" | "failed" | "gone";
+export type TurnPhase = "working" | "question" | "approval" | "done" | "failed" | "gone";
 
 export interface TurnSummary {
   id: UUID;
@@ -4513,7 +4480,6 @@ export interface TurnsPage {
   turns: TurnSummary[];
   firstTurn: number;
   openStart: number;
-  firstPrompt?: number;
 }
 
 export interface TurnsRequest {
@@ -4560,6 +4526,9 @@ export interface UsageHistory {
    */
   timeZone?: string;
 }
+
+/** A user's role (#994, spec 736 FR-001): an admin manages people; a member sees only their own. */
+export type UserRole = "admin" | "member";
 
 /**
  * What a third-party server's view waits on before it is drawn: the person's Show (#191). The data
@@ -4885,11 +4854,6 @@ export interface WorkspaceInfo {
   state: string;
   ssh?: string;
   tunnel?: boolean;
-  /**
-   * Its ssh host key is made again at each start, as a Google Cloud workstation's is (#1701): after
-   * a Start the control plane made, the first ssh takes the key it is offered and pins it again.
-   */
-  hostKeyRenews?: boolean;
   cost?: string;
   host?: HostID;
 }
@@ -4969,9 +4933,7 @@ export interface Methods {
   "agents/answerSandbox": { params: AnswerSandboxRequest; result: Agent };
   "agents/archive": { params: AgentRequest; result: Empty };
   "agents/branchFrom": { params: BranchFromRequest; result: UUID };
-  "agents/cancelContinue": { params: AgentRequest; result: Agent };
   "agents/continueInProject": { params: ContinueInProjectRequest; result: UUID };
-  "agents/continueWhenBack": { params: AgentRequest; result: Agent };
   "agents/delete": { params: AgentRequest; result: Empty };
   "agents/discardDraft": { params: DiscardDraftRequest; result: Empty };
   "agents/editQueued": { params: EditQueuedRequest; result: EditQueuedResult };
@@ -5006,10 +4968,6 @@ export interface Methods {
   "attention/pending": { params: Empty; result: AttentionPending };
   "audit/export": { params: AuditQuery; result: AuditExport };
   "audit/list": { params: AuditQuery; result: AuditList };
-  "backups/configure": { params: BackupSettings; result: BackupState };
-  "backups/make": { params: BackupMakeRequest; result: BackupState };
-  "backups/restore": { params: BackupRestoreRequest; result: BackupRestoreResult };
-  "backups/state": { params: Empty; result: BackupState };
   "changes/file": { params: ChangesFileRequest; result: ChangedFileDetail };
   "changes/list": { params: ChangesListRequest; result: ChangesList };
   "clients/forgetSelf": { params: Empty; result: Empty };
@@ -5042,17 +5000,17 @@ export interface Methods {
   "files/read": { params: FilesReadRequest; result: FileReading };
   "files/unwatch": { params: FilesWatchRequest; result: Empty };
   "files/watch": { params: FilesWatchRequest; result: Empty };
+  "hosts/approveJoin": { params: JoinRequestDecide; result: JoinApproved };
+  "hosts/denyJoin": { params: JoinRequestDecide; result: Empty };
   "hosts/dropKept": { params: KeptRequestID; result: Empty };
+  "hosts/joinRequests": { params: Empty; result: JoinRequest[] };
   "hosts/lastHeard": { params: HostRequest; result: HostLastHeard };
   "hosts/lendGit": { params: LendGit; result: Empty };
-  "hosts/link": { params: HostLink; result: ControlHost };
   "hosts/list": { params: Empty; result: ControlHost[] };
   "hosts/listKept": { params: Empty; result: KeptList };
   "hosts/retryKept": { params: KeptRequestID; result: Empty };
-  "hosts/setWorkspaceOptions": { params: HostWorkspaceOptions; result: ControlHost };
   "hosts/start": { params: HostRequest; result: ControlHost };
   "hosts/stop": { params: HostStop; result: ControlHost };
-  "hosts/unlink": { params: HostRequest; result: ControlHost };
   "leases/snapshot": { params: Empty; result: LeaseSnapshot };
   "mcp/health": { params: Empty; result: MCPHealthSnapshot };
   "mcp/health/check": { params: MCPHealthCheckRequest; result: MCPHealthSnapshot };
@@ -5060,6 +5018,10 @@ export interface Methods {
   "milestones/state": { params: Empty; result: Milestones };
   "modes/remembered": { params: Empty; result: Record<string, JSONValue> };
   "options/remembered": { params: RememberedOptionsRequest; result: ConfigOption[] };
+  "people/invite": { params: PersonInvite; result: PersonInvited };
+  "people/list": { params: Empty; result: PeopleList };
+  "people/remove": { params: PersonRequest; result: Empty };
+  "people/setRole": { params: PersonRoleRequest; result: Empty };
   "permissions/answer": { params: AnswerRequest; result: Empty };
   "permissions/pending": { params: Empty; result: PermissionRequest[] };
   "personas/list": { params: PersonasListRequest; result: Persona[] };
@@ -5090,13 +5052,6 @@ export interface Methods {
   "projects/setPinned": { params: SetPinnedRequest; result: ProjectSummary };
   "projects/unarchive": { params: ProjectRequest; result: ProjectSummary };
   "projects/undoGuardedChange": { params: GuardedChangeRequest; result: ProjectSummary };
-  "providers/add": { params: ProviderAdd; result: ProviderSummary };
-  "providers/create": { params: ProviderCreate; result: ProviderCreated };
-  "providers/list": { params: Empty; result: ProviderList };
-  "providers/options": { params: ProviderRequest; result: ProviderOptions };
-  "providers/refresh": { params: ProviderRequest; result: Empty };
-  "providers/remove": { params: ProviderRequest; result: Empty };
-  "providers/update": { params: ProviderAdd; result: ProviderSummary };
   "runtimes/accounts": { params: Empty; result: RuntimeAccount[] };
   "runtimes/allowances": { params: string | null; result: RuntimeAllowances };
   "runtimes/list": { params: Empty; result: RuntimeStatus[] };
@@ -5138,9 +5093,7 @@ export const MethodTarget = {
   "agents/answerSandbox": "host",
   "agents/archive": "host",
   "agents/branchFrom": "host",
-  "agents/cancelContinue": "host",
   "agents/continueInProject": "host",
-  "agents/continueWhenBack": "host",
   "agents/delete": "host",
   "agents/discardDraft": "host",
   "agents/editQueued": "host",
@@ -5175,10 +5128,6 @@ export const MethodTarget = {
   "attention/pending": "host",
   "audit/export": "control",
   "audit/list": "control",
-  "backups/configure": "host",
-  "backups/make": "host",
-  "backups/restore": "host",
-  "backups/state": "host",
   "changes/file": "host",
   "changes/list": "host",
   "clients/forgetSelf": "control",
@@ -5211,17 +5160,17 @@ export const MethodTarget = {
   "files/read": "host",
   "files/unwatch": "host",
   "files/watch": "host",
+  "hosts/approveJoin": "control",
+  "hosts/denyJoin": "control",
   "hosts/dropKept": "control",
+  "hosts/joinRequests": "control",
   "hosts/lastHeard": "control",
   "hosts/lendGit": "control",
-  "hosts/link": "control",
   "hosts/list": "control",
   "hosts/listKept": "control",
   "hosts/retryKept": "control",
-  "hosts/setWorkspaceOptions": "control",
   "hosts/start": "control",
   "hosts/stop": "control",
-  "hosts/unlink": "control",
   "leases/snapshot": "host",
   "mcp/health": "host",
   "mcp/health/check": "host",
@@ -5229,6 +5178,10 @@ export const MethodTarget = {
   "milestones/state": "host",
   "modes/remembered": "host",
   "options/remembered": "host",
+  "people/invite": "control",
+  "people/list": "control",
+  "people/remove": "control",
+  "people/setRole": "control",
   "permissions/answer": "host",
   "permissions/pending": "host",
   "personas/list": "host",
@@ -5259,13 +5212,6 @@ export const MethodTarget = {
   "projects/setPinned": "host",
   "projects/unarchive": "host",
   "projects/undoGuardedChange": "host",
-  "providers/add": "control",
-  "providers/create": "control",
-  "providers/list": "control",
-  "providers/options": "control",
-  "providers/refresh": "control",
-  "providers/remove": "control",
-  "providers/update": "control",
   "runtimes/accounts": "host",
   "runtimes/allowances": "host",
   "runtimes/list": "host",
@@ -5313,12 +5259,13 @@ export interface Notifications {
   "agent/showFile": ShowFileNotification;
   "agents/draftOptions": DraftOptionsNotification;
   "attention/changed": AttentionNotification;
-  "backups/changed": BackupState;
   "clone/changed": CloneNotification;
   "control/hostChanged": JSONValue;
+  "control/joinDecided": JoinDecided;
+  "control/joinRequested": JoinRequest;
   "control/keptChanged": KeptList;
   "control/keptDelivered": KeptDelivered;
-  "control/providersChanged": ProviderList;
+  "control/peopleChanged": PeopleChanged;
   "disk/changed": DiskState;
   "files/changed": FilesChangedNotification;
   "leases/changed": LeaseSnapshot;
@@ -5346,7 +5293,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ActivityToken: { required: ["agentID", "environment", "startedAt"], optional: ["token"] },
   Admitted: { required: [], optional: ["client", "host", "grant"] },
   AdoptRequest: { required: ["runtimeID", "sessionID", "cwd"], optional: [] },
-  Agent: { required: ["id", "runtimeID", "cwd", "state", "startOptions", "advertisedOptions", "availableCommands", "createdAt", "lastActivityAt"], optional: ["title", "labels", "runtimeSessionID", "isUnread", "reportSeenAt", "endedReason", "archivedReason", "usage", "lastTurnUsage", "costToDate", "costCeiling", "tokensToDate", "tokenCeiling", "plans", "background", "additionalDirectories", "mcpServers", "queuedPrompts", "suggestedPrompts", "startedByWorkflow", "purpose", "startedByRun", "startedByAgent", "chainDepth", "eventWait", "worktree", "pendingMove", "startingPoint", "startRequestID", "persona", "restartPickUps", "report", "outcomeAsked", "archiveRequest", "afterTurn", "archivedAt", "sandboxOverride", "effectiveSandbox", "pendingSandboxFailure", "missingFolder", "listsLeftOut", "titleIsPersons", "runtimeTitle", "madeInRoot", "queuedStart", "branchedFrom", "fileToSee", "continueWhenBack", "runningTool"] },
+  Agent: { required: ["id", "runtimeID", "cwd", "state", "startOptions", "advertisedOptions", "availableCommands", "createdAt", "lastActivityAt"], optional: ["title", "labels", "runtimeSessionID", "isUnread", "reportSeenAt", "endedReason", "archivedReason", "usage", "lastTurnUsage", "costToDate", "costCeiling", "tokensToDate", "tokenCeiling", "plans", "background", "additionalDirectories", "mcpServers", "queuedPrompts", "suggestedPrompts", "startedByWorkflow", "purpose", "startedByRun", "startedByAgent", "chainDepth", "eventWait", "worktree", "pendingMove", "startingPoint", "startRequestID", "persona", "restartPickUps", "report", "outcomeAsked", "archiveRequest", "afterTurn", "archivedAt", "sandboxOverride", "effectiveSandbox", "pendingSandboxFailure", "missingFolder", "listsLeftOut", "titleIsPersons", "runtimeTitle", "madeInRoot", "queuedStart", "branchedFrom", "fileToSee"] },
   AgentRemovedNotification: { required: ["agentID"], optional: [] },
   AgentRequest: { required: ["agentID"], optional: [] },
   AgentWorkspaces: { required: ["providers"], optional: [] },
@@ -5366,7 +5313,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   Approval: { required: ["kind", "key", "title", "line", "actions"], optional: ["digest", "since", "agentID"] },
   ApprovalAnswer: { required: ["folder", "kind", "key", "action"], optional: ["digest", "note"] },
   ApprovalReadRequest: { required: ["folder", "kind", "key"], optional: [] },
-  ArtifactWriteRequest: { required: ["agentID", "path", "text"], optional: ["base"] },
+  ArtifactWriteRequest: { required: ["agentID", "path", "text"], optional: [] },
   AssessRuntimeRequest: { required: ["runtimeID", "folder"], optional: ["model"] },
   AssessRuntimeResult: { required: ["agentID", "reportPath"], optional: ["model"] },
   Attachment: { required: ["id", "block", "displayName"], optional: ["byteCount"] },
@@ -5385,16 +5332,6 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   AuthStatus: { required: ["kind", "label"], optional: [] },
   AuthenticateRequest: { required: ["runtimeID", "methodID"], optional: [] },
   BackgroundItem: { required: ["id", "kind", "name", "state", "canStop", "isStopping", "startedAt"], optional: ["taskType", "detail", "command", "parentID", "toolCallID", "outputFilePath", "summary", "lastToolName", "endedAt"] },
-  Backup: { required: ["id", "machine", "rootID", "madeAt", "bytes", "agents", "thisMachine"], optional: [] },
-  BackupMakeRequest: { required: [], optional: ["wait"] },
-  BackupRestoreRequest: { required: ["id"], optional: [] },
-  BackupRestoreResult: { required: ["restored", "skipped"], optional: [] },
-  BackupSettings: { required: ["every", "keep"], optional: ["folder", "target"] },
-  BackupState: { required: ["settings", "folder", "backups", "making"], optional: ["lastError", "canUseControl"] },
-  BackupStoreCommit: { required: ["name", "parts", "machine", "rootID", "madeAt", "bytes", "agents", "keep"], optional: [] },
-  BackupStoreList: { required: ["backups"], optional: [] },
-  BackupStorePart: { required: ["name", "part", "data"], optional: [] },
-  BackupStorePartRequest: { required: ["id", "part"], optional: [] },
   Block: { required: ["waits"], optional: ["checkAgainAt", "wakeOn", "clearedAt", "clearedBy"] },
   BranchFromRequest: { required: ["agentID", "entryID"], optional: [] },
   BranchSummary: { required: ["name"], optional: ["remote"] },
@@ -5442,26 +5379,26 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ConnectionsList: { required: ["connections"], optional: [] },
   ConnectorEvents: { required: ["state", "names", "workflows"], optional: ["server", "message"] },
   ConnectorProof: { required: ["title"], optional: ["number", "outcome", "url", "at"] },
-  ConnectorSetup: { required: ["folder", "slots", "events", "done"], optional: ["repository", "forge", "site", "repositoryURL", "connection", "installed", "installURL", "repositories"] },
+  ConnectorSetup: { required: ["folder", "slots", "events", "done"], optional: ["repository", "connection", "installed", "installURL", "repositories"] },
   ConnectorSetupRequest: { required: ["folder"], optional: ["reading"] },
   ConnectorSkipRequest: { required: ["folder", "slot", "skipped"], optional: [] },
   ConnectorSlot: { required: ["slot", "choice", "state"], optional: ["proof", "readAt", "message"] },
   ConnectorWorkflow: { required: ["id", "name"], optional: [] },
   ContentBlockAnnotations: { required: [], optional: ["audience", "priority"] },
   ContinueInProjectRequest: { required: ["agentID", "text", "attachments"], optional: ["requestID"] },
-  ContinueWhenBack: { required: ["at", "resetKnown"], optional: [] },
-  ControlAuth: { required: ["id", "nonce", "mac", "kind"], optional: ["for", "epoch", "capabilities"] },
+  ControlAuth: { required: ["id", "nonce", "mac", "kind"], optional: ["for", "epoch"] },
   ControlClientChanged: { required: [], optional: ["client", "removed"] },
   ControlCodeShown: { required: ["text", "expires"], optional: ["command"] },
   ControlEndpoint: { required: ["url"], optional: ["pin"] },
   ControlHello: { required: ["v", "name", "control", "nonce", "copy"], optional: [] },
-  ControlHost: { required: ["id", "name", "platform", "version", "state", "reach"], optional: ["machineID", "relay", "signInFrom", "gitFrom", "gitAsks", "tunnel", "workspace", "implementation", "capabilities", "missing"] },
+  ControlHost: { required: ["id", "name", "platform", "version", "state", "reach"], optional: ["machineID", "relay", "signInFrom", "gitFrom", "gitAsks", "tunnel", "workspace", "implementation", "owner"] },
   ControlInstallProgress: { required: ["name", "step"], optional: [] },
   ControlMoved: { required: ["url", "controlKey", "name"], optional: ["pin"] },
   ControlOK: { required: ["mac"], optional: ["grant", "host", "relayed", "endpoints", "epoch"] },
+  ControlPerson: { required: ["id", "name", "role"], optional: ["localOwner"] },
   ControlPush: { required: ["sealed"], optional: [] },
   ControlPushItem: { required: ["needID", "alert"], optional: ["headline"] },
-  ControlStatus: { required: ["name", "version", "machineID"], optional: ["homeHost", "startedAt", "port", "awayFromHome", "you", "relayKey", "web", "publicWeb", "publicViews", "thisMacHost", "projectDetection", "unjoinedTunnels", "capabilities", "required"] },
+  ControlStatus: { required: ["name", "version", "machineID"], optional: ["homeHost", "startedAt", "port", "awayFromHome", "you", "relayKey", "web", "publicWeb", "publicViews", "thisMacHost", "projectDetection", "unjoinedTunnels", "person"] },
   Cost: { required: ["amount", "currency"], optional: [] },
   CostLimits: { required: [], optional: ["perAgent", "daily", "perAgentTokens", "dailyTokens"] },
   CostState: { required: ["limits", "today", "day", "tokensToday"], optional: ["note"] },
@@ -5554,9 +5491,12 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   HostAnnounce: { required: ["publicKey", "name", "platform", "version", "machineID"], optional: ["relay", "implementation"] },
   HostClient: { required: ["id", "kind", "publicKey"], optional: [] },
   HostClients: { required: ["clients"], optional: [] },
-  HostHello: { required: ["version", "platform", "machineID"], optional: ["host", "name", "relay", "implementation", "capabilities"] },
+  HostHello: { required: ["version", "platform", "machineID"], optional: ["host", "name", "relay", "implementation"] },
   HostInstall: { required: ["destination"], optional: ["name", "key", "trust", "tunnel"] },
+  HostJoinAsk: { required: ["name", "platform", "publicKey"], optional: ["version", "machineID", "person"] },
+  HostJoinDecision: { required: ["result"], optional: ["host"] },
   HostJoinStatus: { required: ["member", "connected", "at"], optional: ["problem"] },
+  HostJoinTicket: { required: ["request", "code", "expires"], optional: [] },
   HostLastHeard: { required: ["host"], optional: ["projects", "agents", "heardAt"] },
   HostLink: { required: ["host", "provider", "workspace"], optional: ["startWhenUsed", "stopWhenIdleMinutes"] },
   HostProviderDraftCall: { required: ["agentID", "draft", "tool"], optional: ["arguments"] },
@@ -5572,6 +5512,10 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   HostWorkspaceOptions: { required: ["host"], optional: ["startWhenUsed", "stopWhenIdleMinutes", "startForSchedules"] },
   HostedMCPSnapshot: { required: ["servers", "at"], optional: [] },
   HostedMCPStatus: { required: ["name", "state", "restarts", "users"], optional: ["project", "since", "retryAt", "lastError"] },
+  JoinApproved: { required: ["host"], optional: [] },
+  JoinDecided: { required: ["request", "result"], optional: [] },
+  JoinRequest: { required: ["request", "name", "platform", "code", "expires", "for"], optional: ["forName"] },
+  JoinRequestDecide: { required: ["request"], optional: [] },
   KeepRequest: { required: ["host", "method", "params"], optional: [] },
   KeptDelivered: { required: ["host", "id"], optional: ["agentID"] },
   KeptList: { required: ["kept"], optional: [] },
@@ -5649,11 +5593,20 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   PairingCode: { required: ["macKey", "secret", "name", "expires"], optional: [] },
   PairingSecret: { required: [], optional: ["secret", "expires"] },
   PendingMove: { required: ["target", "removeLeft", "discardChanges", "askedBy", "askedAt"], optional: [] },
+  PeopleChanged: { required: [], optional: ["user", "removed"] },
+  PeopleList: { required: ["people", "admin"], optional: [] },
   PermissionNotification: { required: ["agentID"], optional: ["request", "requestID"] },
   PermissionOption: { required: ["optionID", "name", "kind"], optional: [] },
   PermissionRequest: { required: ["id", "agentID", "toolCall", "options", "askedAt"], optional: ["subagent"] },
+  PersonClient: { required: ["id", "name", "kind"], optional: [] },
   PersonEndRequest: { required: ["name"], optional: ["agentID"] },
+  PersonInvite: { required: ["name", "role"], optional: [] },
+  PersonInvited: { required: ["text", "expires", "name", "role"], optional: [] },
+  PersonMachine: { required: ["id", "name", "state"], optional: ["platform"] },
   PersonRemoveRequest: { required: ["name", "agentID"], optional: [] },
+  PersonRequest: { required: ["user"], optional: [] },
+  PersonRoleRequest: { required: ["user", "role"], optional: [] },
+  PersonRow: { required: ["id", "name", "kind", "role", "signIns", "clients", "machines"], optional: ["localOwner", "you"] },
   PersonSettings: { required: [], optional: ["name", "pronouns"] },
   Persona: { required: ["id", "name", "origin", "settings"], optional: ["description", "problem"] },
   PersonasListRequest: { required: ["folder"], optional: [] },
@@ -5690,7 +5643,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ProjectsListRequest: { required: ["includeArchived"], optional: [] },
   PromptRequest: { required: ["agentID", "text", "attachments", "from"], optional: ["sendID"] },
   ProviderAdd: { required: ["name", "kind"], optional: ["id", "command", "args", "url", "headers", "commands", "map", "secrets", "cli", "draft"] },
-  ProviderCreate: { required: ["id", "name"], optional: ["options", "clones", "repository"] },
+  ProviderCreate: { required: ["id", "name"], optional: ["options", "clones"] },
   ProviderCreated: { required: ["workspace", "joining"], optional: [] },
   ProviderDraftAnswer: { required: ["draft", "question", "yes"], optional: [] },
   ProviderDraftAnswered: { required: ["note"], optional: ["map", "preset"] },
@@ -5728,7 +5681,6 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   RemoveResourceRequest: { required: ["name"], optional: [] },
   RenameRequest: { required: ["agentID", "title"], optional: [] },
   ReportedEdit: { required: ["path", "newText", "toolCallID", "index", "entryIndex", "replaceAll", "at"], optional: ["oldText"] },
-  RequiredCapabilities: { required: ["host", "client"], optional: [] },
   ResourceState: { required: ["name", "kind", "displayName", "isGone", "line", "endingSoon"], optional: ["holds", "lease", "places", "declared"] },
   ResumingNotification: { required: ["agentID", "isResuming"], optional: [] },
   ResumingResponse: { required: ["agentIDs"], optional: [] },
@@ -5799,6 +5751,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ShellStateNotification: { required: ["agentID", "shell", "state"], optional: [] },
   ShowFileNotification: { required: ["agentID", "file"], optional: [] },
   ShownFile: { required: ["path"], optional: ["line", "chart"] },
+  SignIn: { required: ["provider"], optional: ["account", "email", "login", "added"] },
   Simulator: { required: ["udid", "name", "os", "booted"], optional: [] },
   SimulatorList: { required: ["simulators"], optional: ["reason"] },
   SimulatorRequest: { required: ["udid"], optional: [] },
@@ -5838,7 +5791,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   TunnelOpen: { required: ["runtime", "ref"], optional: [] },
   TurnSummary: { required: ["id", "start", "end"], optional: ["ask", "last", "concise", "outcome", "steps", "usage"] },
   TurnUsage: { required: ["totalTokens", "inputTokens", "outputTokens"], optional: ["thoughtTokens", "cachedReadTokens", "cachedWriteTokens", "cost"] },
-  TurnsPage: { required: ["turns", "firstTurn", "openStart"], optional: ["firstPrompt"] },
+  TurnsPage: { required: ["turns", "firstTurn", "openStart"], optional: [] },
   TurnsRequest: { required: ["agentID", "limit"], optional: ["before"] },
   UnqueueRequest: { required: ["agentID", "promptID"], optional: [] },
   Usage: { required: ["used", "size", "at"], optional: ["cost"] },
@@ -5875,7 +5828,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   WorkflowSettingsRequest: { required: ["folder", "workflowID", "settings"], optional: ["cooldown", "labels", "hosts", "whenDone"] },
   WorkflowSummary: { required: ["workflow", "isArchived", "isEnabled", "nextFireAtByTrigger", "isRunning", "holdsAFire", "queued"], optional: ["overLimit", "totalLimit", "nextFireAt", "lastOutcome", "causingEvent", "causingEventName", "awaitingApproval", "deniedHere", "lastFiredAt", "lastFiredBy", "cooldownEndsAt", "offReason", "standingAgentID", "mcpTriggers"] },
   WorkflowsListRequest: { required: [], optional: ["folder"] },
-  WorkspaceInfo: { required: ["id", "name", "state"], optional: ["ssh", "tunnel", "hostKeyRenews", "cost", "host"] },
+  WorkspaceInfo: { required: ["id", "name", "state"], optional: ["ssh", "tunnel", "cost", "host"] },
   WorktreeRemovalRequest: { required: ["project", "root", "confirmed"], optional: [] },
   WorktreeRemoved: { required: ["removedBranch"], optional: [] },
   WorktreeSize: { required: ["bytes", "partial"], optional: [] },

@@ -3514,6 +3514,10 @@
           "items": {
             "type": "string"
           }
+        },
+        "owner": {
+          "type": "string",
+          "description": "The user who owns the machine (#994)."
         }
       },
       "required": [
@@ -3660,6 +3664,10 @@
         },
         "required": {
           "$ref": "#/definitions/RequiredCapabilities"
+        },
+        "person": {
+          "$ref": "#/definitions/ControlPerson",
+          "description": "Who this client belongs to (#994)."
         }
       },
       "required": [
@@ -18652,6 +18660,419 @@
       },
       "required": [
         "days"
+      ],
+      "additionalProperties": false
+    },
+    "UserRole": {
+      "type": "string",
+      "description": "A user's role (#994, spec 736 FR-001): an admin manages people; a member sees only their own.",
+      "enum": [
+        "admin",
+        "member"
+      ]
+    },
+    "SignIn": {
+      "type": "object",
+      "description": "One way a person signs in (#994, spec 736): `local` is the local owner's (codes, with the control plane's key), `code` an invite code redeemed; Google, Apple and GitHub come with #995.",
+      "properties": {
+        "provider": {
+          "type": "string"
+        },
+        "account": {
+          "type": "string"
+        },
+        "email": {
+          "type": "string"
+        },
+        "login": {
+          "type": "string"
+        },
+        "added": {
+          "$ref": "#/definitions/WireDate"
+        }
+      },
+      "required": [
+        "provider"
+      ],
+      "additionalProperties": false
+    },
+    "ControlPerson": {
+      "type": "object",
+      "description": "Who a client belongs to (#994): its person, their role, and whether they are the local owner.",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "role": {
+          "$ref": "#/definitions/UserRole"
+        },
+        "localOwner": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "role"
+      ],
+      "additionalProperties": false
+    },
+    "PersonClient": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/definitions/UUID"
+        },
+        "name": {
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/definitions/ClientKind"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "PersonMachine": {
+      "type": "object",
+      "description": "A machine in People: its name, its state and nothing inside it (FR-019).",
+      "properties": {
+        "id": {
+          "$ref": "#/definitions/HostID"
+        },
+        "name": {
+          "type": "string"
+        },
+        "state": {
+          "type": "string"
+        },
+        "platform": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "state"
+      ],
+      "additionalProperties": false
+    },
+    "PersonRow": {
+      "type": "object",
+      "description": "people/list (#994): a user, with their clients and machines.",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "person",
+            "bot"
+          ]
+        },
+        "role": {
+          "$ref": "#/definitions/UserRole"
+        },
+        "localOwner": {
+          "type": "boolean"
+        },
+        "you": {
+          "type": "boolean"
+        },
+        "signIns": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/SignIn"
+          }
+        },
+        "clients": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/PersonClient"
+          }
+        },
+        "machines": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/PersonMachine"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "kind",
+        "role",
+        "signIns",
+        "clients",
+        "machines"
+      ],
+      "additionalProperties": false
+    },
+    "PeopleList": {
+      "type": "object",
+      "description": "people/list (#994): every user for an admin; for a member, only themselves.",
+      "properties": {
+        "people": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/PersonRow"
+          }
+        },
+        "admin": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "people",
+        "admin"
+      ],
+      "additionalProperties": false
+    },
+    "PersonInvite": {
+      "type": "object",
+      "description": "people/invite (#994): the new person's name and role.",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "role": {
+          "$ref": "#/definitions/UserRole"
+        }
+      },
+      "required": [
+        "name",
+        "role"
+      ],
+      "additionalProperties": false
+    },
+    "PersonInvited": {
+      "type": "object",
+      "description": "people/invite: the invite code to send, for one use within 7 days. Its first client pairs as the new person.",
+      "properties": {
+        "text": {
+          "type": "string"
+        },
+        "expires": {
+          "$ref": "#/definitions/WireDate"
+        },
+        "name": {
+          "type": "string"
+        },
+        "role": {
+          "$ref": "#/definitions/UserRole"
+        }
+      },
+      "required": [
+        "text",
+        "expires",
+        "name",
+        "role"
+      ],
+      "additionalProperties": false
+    },
+    "PersonRequest": {
+      "type": "object",
+      "description": "people/remove (#994): the user.",
+      "properties": {
+        "user": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "user"
+      ],
+      "additionalProperties": false
+    },
+    "PersonRoleRequest": {
+      "type": "object",
+      "description": "people/setRole (#994). Refused when it would leave no admin.",
+      "properties": {
+        "user": {
+          "type": "string"
+        },
+        "role": {
+          "$ref": "#/definitions/UserRole"
+        }
+      },
+      "required": [
+        "user",
+        "role"
+      ],
+      "additionalProperties": false
+    },
+    "PeopleChanged": {
+      "type": "object",
+      "description": "control/peopleChanged (#994): a person was added, changed or removed.",
+      "properties": {
+        "user": {
+          "type": "string"
+        },
+        "removed": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "HostJoinAsk": {
+      "type": "object",
+      "description": "POST /v1/join (#994, spec 736 FR-017): a machine with no code asks to join. `person` names whose it is to be, by name or id; with none, an admin approves it.",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "platform": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        },
+        "publicKey": {
+          "$ref": "#/definitions/Base64"
+        },
+        "machineID": {
+          "type": "string"
+        },
+        "person": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "platform",
+        "publicKey"
+      ],
+      "additionalProperties": false
+    },
+    "HostJoinTicket": {
+      "type": "object",
+      "description": "POST /v1/join: the request, the short code the machine shows, and when it ends (10 minutes).",
+      "properties": {
+        "request": {
+          "type": "string"
+        },
+        "code": {
+          "type": "string"
+        },
+        "expires": {
+          "$ref": "#/definitions/WireDate"
+        }
+      },
+      "required": [
+        "request",
+        "code",
+        "expires"
+      ],
+      "additionalProperties": false
+    },
+    "HostJoinDecision": {
+      "type": "object",
+      "description": "GET /v1/join/<request> (#994): waiting, or how it ended; `host` once approved.",
+      "properties": {
+        "result": {
+          "type": "string",
+          "enum": [
+            "waiting",
+            "approved",
+            "denied",
+            "expired"
+          ]
+        },
+        "host": {
+          "$ref": "#/definitions/HostID"
+        }
+      },
+      "required": [
+        "result"
+      ],
+      "additionalProperties": false
+    },
+    "JoinRequest": {
+      "type": "object",
+      "description": "hosts/joinRequests, control/joinRequested (#994): a machine waiting for approval, with the code it shows.",
+      "properties": {
+        "request": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "platform": {
+          "type": "string"
+        },
+        "code": {
+          "type": "string"
+        },
+        "expires": {
+          "$ref": "#/definitions/WireDate"
+        },
+        "for": {
+          "type": "string"
+        },
+        "forName": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "request",
+        "name",
+        "platform",
+        "code",
+        "expires",
+        "for"
+      ],
+      "additionalProperties": false
+    },
+    "JoinRequestDecide": {
+      "type": "object",
+      "description": "hosts/approveJoin, hosts/denyJoin (#994).",
+      "properties": {
+        "request": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "request"
+      ],
+      "additionalProperties": false
+    },
+    "JoinApproved": {
+      "type": "object",
+      "properties": {
+        "host": {
+          "$ref": "#/definitions/HostID"
+        }
+      },
+      "required": [
+        "host"
+      ],
+      "additionalProperties": false
+    },
+    "JoinDecided": {
+      "type": "object",
+      "description": "control/joinDecided (#994): a request ended, approved or not, so every card for it goes.",
+      "properties": {
+        "request": {
+          "type": "string"
+        },
+        "result": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "request",
+        "result"
       ],
       "additionalProperties": false
     }
