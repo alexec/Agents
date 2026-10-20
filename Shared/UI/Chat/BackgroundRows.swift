@@ -268,6 +268,7 @@ struct SubagentStepsView: View {
     /// Back to the list, where there is one to go back to: the Mac's pane.
     var back: (() -> Void)?
     @State private var expanded: Set<UUID> = []
+    @AppStorage(ChatThoughts.showsKey, store: WindowDefaults.store) private var showsThoughts = ChatThoughts.showsAtFirst
 
     var body: some View {
         ScrollView {
@@ -295,14 +296,15 @@ struct SubagentStepsView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .paperWell(in: RoundedRectangle(cornerRadius: 8))
                 }
-                let steps = TranscriptEntry.display(entries, subagent: item.id)
+                let steps = ChatThoughts.shown(TranscriptEntry.display(entries, subagent: item.id),
+                                               showsThoughts: showsThoughts)
                 if steps.isEmpty {
                     Text(item.isRunning ? "Nothing yet. Its steps appear here as it takes them."
                                         : "Its steps are further back in the conversation than is loaded.")
                         .appText(.fine)
                         .foregroundStyle(.tertiary)
                 }
-                // Thinking too, each a folded line (#1315).
+                // Thinking too when Show thoughts is on, each a folded line (#1315, #1725).
                 ForEach(steps) { step in
                     TranscriptRow(item: step, isExpanded: expanded.contains(step.id)) {
                         if expanded.contains(step.id) { expanded.remove(step.id) } else { expanded.insert(step.id) }

@@ -7,6 +7,7 @@ import { setSmartGroup, smartGroupsOn } from "../model/smartGroups";
 import { BackToList } from "./BackToList";
 import { gitLendWords, lends } from "../model/gitLending";
 import { iconShowsMood, setIconShowsMood } from "../model/iconMood";
+import { setShowsThoughts, showsThoughts, thoughtsFooter } from "../model/thoughts";
 
 /** The words under the Sidebar section, as the window's and the Remote's (#846). */
 export const sidebarSettingsFooter = "A group that is off is not shown. Its sessions go to the next group they fit, "
@@ -49,6 +50,12 @@ export function SettingsPage({ store }: { store: Store }) {
                 onChange={(e) => setIconShowsMood(e.currentTarget.checked)} />
             </label>
             <p class="hint">{iconMoodFooter}</p>
+            <label class="setting">
+              <span>Show thoughts</span>
+              <input type="checkbox" role="switch" checked={showsThoughts.value}
+                onChange={(e) => setShowsThoughts(e.currentTarget.checked)} />
+            </label>
+            <p class="hint">{thoughtsFooter}</p>
           </section>
           <section aria-labelledby="settings-sidebar">
             <h2 class="section-head" id="settings-sidebar">Sidebar</h2>
