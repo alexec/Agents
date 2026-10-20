@@ -59,6 +59,7 @@ type Daemon struct {
 	hostStatusBook
 	idleBook
 	turnBook
+	findBook
 	optionBook
 	timeBook
 	milestoneBook

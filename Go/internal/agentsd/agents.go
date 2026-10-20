@@ -37,7 +37,7 @@ func (d *Daemon) registerAgents() {
 		return d.saidSearch(r), nil
 	})
 	On(d, wire.CallAgentsFind, func(ctx context.Context, c *Client, r wire.FindRequest) (wire.FindResult, error) {
-		return d.find(r)
+		return d.find(ctx, c.ID, r)
 	})
 	On(d, wire.CallAgentsSendNow, func(ctx context.Context, c *Client, r wire.UnqueueRequest) (wire.Empty, error) {
 		return wire.Empty{}, d.sendNow(ctx, r)
