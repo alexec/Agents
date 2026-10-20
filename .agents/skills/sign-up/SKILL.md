@@ -29,6 +29,9 @@ against. It is never Alex's personal account.
   `ask_form` and name who asks ("the <provider> sign-up lane asks: …"). `ask_form` can time
   out after about 60 seconds; then end the turn with the question in your reply instead of
   asking again and again.
+- **The private Chrome window is on Alex's screen.** For a code or a CAPTCHA, ask Alex to
+  type it straight into that window and reply. Then read the page (`text`, `url`) to see
+  that it moved on.
 - **The smallest scope** for every token or key, a spend cap or alert where money can be
   spent, and an expiry where the service allows one (a year at most).
 - **No secret** in a transcript, the repo, an issue, a message or the tracker. Read secrets
