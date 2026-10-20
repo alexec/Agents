@@ -20,7 +20,7 @@ const GitLab = "gitlab"
 // non-confidential application: the device flow needs no client secret, at sign-in or at
 // refresh, so there is none. The application ID is public.
 const (
-	GitLabClientID = ""
+	GitLabClientID = "bc94bdfe92adcbee709d4ed637b84c1604bd06aa3098f4aef0b4839004fef52d"
 	// GitLabCom is gitlab.com's root. A self-managed GitLab has no Agents application: it
 	// signs in with a personal access token.
 	GitLabCom = "https://gitlab.com/"
