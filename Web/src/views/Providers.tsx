@@ -125,7 +125,7 @@ function AddProviderDialog({ store, editing, close }: { store: Store; editing?: 
   const [problem, setProblem] = useState<string>();
   const [working, setWorking] = useState(false);
   const fields = kind ? kindFields(kind).filter((f) => !editing || f.secret) : [];
-  const valueOf = (id: string) => values[id] ?? fields.find((f) => f.id === id)?.value ?? "";
+  const shown = (id: string) => values[id] ?? fields.find((f) => f.id === id)?.value ?? "";
   const choose = (k: ProviderKind) => {
     setKind(k);
     setValues(Object.fromEntries(kindFields(k).filter((f) => f.value).map((f) => [f.id, f.value!])));
@@ -164,13 +164,13 @@ function AddProviderDialog({ store, editing, close }: { store: Store; editing?: 
             {fields.map((f) => (
               <label key={f.id}>{f.label}{f.optional ? " (optional)" : ""}
                 {f.id === "serviceKey"
-                  ? <textarea rows={4} value={valueOf(f.id)} disabled={working} autocomplete="off" spellcheck={false}
+                  ? <textarea rows={4} value={shown(f.id)} disabled={working} autocomplete="off" spellcheck={false}
                       placeholder={editing ? words.editSecret : undefined}
                       onInput={(e) => setValues({ ...values, [f.id]: (e.target as HTMLTextAreaElement).value })} />
                   : f.secret
-                  ? <input type="password" value={valueOf(f.id)} disabled={working} placeholder={editing ? words.editSecret : f.prompt}
+                  ? <input type="password" value={shown(f.id)} disabled={working} placeholder={editing ? words.editSecret : f.prompt}
                       autocomplete="new-password" onInput={(e) => setValues({ ...values, [f.id]: (e.target as HTMLInputElement).value })} />
-                  : <input type="text" value={valueOf(f.id)} disabled={working} placeholder={f.prompt} autocomplete="off"
+                  : <input type="text" value={shown(f.id)} disabled={working} placeholder={f.prompt} autocomplete="off"
                       autocapitalize="off" spellcheck={false}
                       onInput={(e) => setValues({ ...values, [f.id]: (e.target as HTMLInputElement).value })} />}
               </label>
