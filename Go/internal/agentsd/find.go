@@ -165,7 +165,9 @@ func (d *Daemon) find(ctx context.Context, client int64, r wire.FindRequest) (wi
 	return result, nil
 }
 
-func sameMessageID(a, b *string) bool { return a == nil && b == nil || a != nil && b != nil && *a == *b }
+func sameMessageID(a, b *string) bool {
+	return a == nil && b == nil || a != nil && b != nil && *a == *b
+}
 
 // findText is what an entry says, when it is a prompt or a reply: the person's, another
 // agent's, the app's question or the agent's own words. Nothing else is searched.
