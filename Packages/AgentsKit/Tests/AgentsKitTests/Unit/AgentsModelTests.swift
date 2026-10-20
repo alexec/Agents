@@ -594,6 +594,32 @@ struct AgentsModelTests {
         #expect(model.firstTurn == 5 + 40)
     }
 
+    /// Find goes to an old match in a long chat with one call for the turns, keeps what it
+    /// brought in while the chat followed the end, and stops at `revealTurnsCap` (#1649).
+    /// Before, it asked one 50-turn page at a time, with no cap, and the trim undid them.
+    @Test func revealAsksForTheTurnsOnceAndStopsAtTheCap() async {
+        let model = AgentsModel()
+        let chat = (0..<2_000).map { turnSummary($0) }
+        model.replaceTurns(with: TurnsPage(turns: Array(chat.suffix(12)), firstTurn: 1_988, openStart: 2_000))
+        var calls: [Int] = []
+        let load: (Int) async -> Void = { limit in
+            calls.append(limit)
+            let first = max(0, model.firstTurn - limit)
+            model.prependTurns(TurnsPage(turns: Array(chat[first..<model.firstTurn]), firstTurn: first,
+                                         openStart: 2_000))
+        }
+
+        await model.reveal(index: 1_900, loadEarlier: load)
+        #expect(calls == [AgentsModel.revealTurnsCap - 12])
+        #expect(model.holds(index: 1_900))
+
+        calls = []
+        await model.reveal(index: 10, loadEarlier: load)
+        #expect(calls.isEmpty, "the cap is reached: no more is brought in")
+        #expect(model.turns.count == AgentsModel.revealTurnsCap)
+        #expect(!model.holds(index: 10))
+    }
+
     /// One project's workflows changing leaves another's list as it was (#285).
     @Test func aWorkflowInOneProjectLeavesTheOther() {
         let model = AgentsModel()

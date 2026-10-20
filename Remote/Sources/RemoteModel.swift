@@ -4044,25 +4044,21 @@ final class RemoteModel {
                                                     returning: DaemonAPI.FindResult.self)
     }
 
-    /// Go to a match in the open chat: earlier pages come in until its turn is in hand,
-    /// then the chat goes to it.
+    /// Go to a match in the open chat: earlier pages come in until its turn is in hand
+    /// (`AgentsModel.reveal`, bounded), then the chat goes to it, or as near as it can.
     func reveal(_ match: DaemonAPI.FindMatch) async {
-        while !work.holds(index: match.index), work.hasMoreOfTheConversation {
-            let before = (work.firstTurn, work.firstEntryIndex)
-            await loadEarlier()
-            if work.firstTurn == before.0, work.firstEntryIndex == before.1 { break }
-        }
+        await work.reveal(index: match.index) { await self.loadEarlier(turns: $0) }
         focusedIndex = match.index
         focusedEntry = match.entryID
     }
 
-    func loadEarlier() async {
+    func loadEarlier(turns limit: Int = 50) async {
         guard let selection, work.hasMoreOfTheConversation, !isLoadingEarlier else { return }
         isLoadingEarlier = true
         defer { isLoadingEarlier = false }
         // Past the start of the turn in progress, the turns before it.
         if !work.hasMoreBefore {
-            let turnsRequest = DaemonAPI.TurnsRequest(agentID: selection, before: work.firstTurn)
+            let turnsRequest = DaemonAPI.TurnsRequest(agentID: selection, before: work.firstTurn, limit: limit)
             guard let turns = try? await client(for: turnsRequest).call(
                 DaemonAPI.Method.agentsTurns, turnsRequest, returning: TurnsPage.self),
                 self.selection == selection else { return }

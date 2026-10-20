@@ -4185,14 +4185,14 @@ final class AppModel {
 
     /// The window only ever asks for a page. A transcript that has been going for hours
     /// is not something to load whole.
-    func loadEarlier() async {
+    func loadEarlier(turns limit: Int = 50) async {
         guard let selection, work.hasMoreOfTheConversation else { return }
         // Past the start of the turn in progress, the turns before it.
         if !work.hasMoreBefore {
             await attempt {
                 let turns = try await self.client(forAgent: selection).call(
                     DaemonAPI.Method.agentsTurns,
-                    DaemonAPI.TurnsRequest(agentID: selection, before: self.work.firstTurn),
+                    DaemonAPI.TurnsRequest(agentID: selection, before: self.work.firstTurn, limit: limit),
                     returning: TurnsPage.self)
                 guard self.selection == selection else { return }
                 self.work.prependTurns(turns)
@@ -5150,14 +5150,9 @@ final class AppModel {
     }
 
     /// Go to a match in the open chat: earlier pages come in until its turn is in hand
-    /// (each the page Load Earlier would bring), then the chat goes to it.
+    /// (`AgentsModel.reveal`, bounded), then the chat goes to it, or as near as it can.
     func reveal(_ match: DaemonAPI.FindMatch) async {
-        while !work.holds(index: match.index), work.hasMoreOfTheConversation {
-            let before = (work.firstTurn, work.firstEntryIndex)
-            await loadEarlier()
-            // Nothing came: the link, or the end of the chat. Go as near as it can.
-            if work.firstTurn == before.0, work.firstEntryIndex == before.1 { break }
-        }
+        await work.reveal(index: match.index) { await self.loadEarlier(turns: $0) }
         focusEntry(match.entryID, at: match.index)
     }
 
