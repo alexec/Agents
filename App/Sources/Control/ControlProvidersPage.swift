@@ -135,7 +135,10 @@ struct ControlProvidersPage: View {
     }
 
     private func kindChip(_ provider: DaemonAPI.ProviderSummary) -> String {
-        if let preset = provider.preset { return "command provider · \(preset)" }
+        // An API preset needs only a token; a CLI one, its CLI signed in (#1119).
+        if let preset = provider.preset {
+            return "command provider · \(preset) · \(AddProviderSheet.Kind.byAPI(preset) ? "API" : "CLI")"
+        }
         switch provider.kind {
         case "commands": return "command provider"
         case "http": return provider.mapped ? "address · mapped" : "address"
@@ -152,6 +155,7 @@ struct ControlProvidersPage: View {
             parts.append("\(provider.current ? "Listed" : "Showing what it listed at") \(at.formatted(date: .omitted, time: .shortened))")
         }
         if provider.workspaces.isEmpty, provider.listedAt != nil { parts.append("No workspaces") }
+        if let tool = provider.preset.flatMap(AddProviderSheet.Kind.sshTool) { parts.append("needs \(tool) for ssh") }
         // A map or commands written for it that give no ssh (#975); a preset's own way in is its own.
         let written = provider.kind == "commands" ? provider.preset == nil : provider.mapped
         if written, !provider.workspaces.isEmpty, provider.workspaces.allSatisfy({ $0.ssh == nil }) {
@@ -237,10 +241,49 @@ struct AddProviderSheet: View {
         static func ofPreset(_ preset: String) -> Kind? {
             switch preset {
             case "docker": .docker
-            case "doctl": .digitalOcean
-            case "codespaces": .codespaces
-            case "coder": .coder
+            case "doctl", "digitalocean-api": .digitalOcean
+            case "codespaces", "codespaces-api": .codespaces
+            case "coder", "coder-api": .coder
             case "gcloud-workstations": .workstations
+            default: nil
+            }
+        }
+
+        /// Whether it can be reached through its API with a token, not only its CLI (#1119).
+        var hasAPI: Bool { self == .digitalOcean || self == .codespaces || self == .coder }
+
+        /// Whether a preset is an API one.
+        static func byAPI(_ preset: String) -> Bool { preset.hasSuffix("-api") }
+
+        /// The CLI an API preset still needs, only for ssh: a codespace or a Coder workspace
+        /// is reached through its CLI as the ssh ProxyCommand.
+        static func sshTool(_ preset: String) -> String? {
+            switch preset {
+            case "codespaces-api": "gh"
+            case "coder-api": "coder"
+            default: nil
+            }
+        }
+
+        /// The API preset's name and the secret its token goes in.
+        var api: (preset: String, secret: String)? {
+            switch self {
+            case .digitalOcean: ("digitalocean-api", "DIGITALOCEAN_API_TOKEN")
+            case .codespaces: ("codespaces-api", "GITHUB_TOKEN")
+            case .coder: ("coder-api", "CODER_SESSION_TOKEN")
+            default: nil
+            }
+        }
+
+        /// What the API form needs: a token with the smallest scope that does the work.
+        var apiNeeds: String? {
+            switch self {
+            case .digitalOcean:
+                "Needs a DigitalOcean API token with custom scopes: droplet read and update, and droplet create and delete to make and delete droplets. Nothing to install."
+            case .codespaces:
+                "Needs a GitHub token: fine-grained, with Codespaces lifecycle admin (read and write), or classic, with the codespace scope. ssh still goes through gh: run `gh codespace ssh --config >> ~/.ssh/config` on the Mac that runs the control plane."
+            case .coder:
+                "Needs your deployment’s address and a session token (`coder tokens create`). ssh still goes through coder: run `coder config-ssh` on the Mac that runs the control plane."
             default: nil
             }
         }
@@ -258,6 +301,10 @@ struct AddProviderSheet: View {
     @State private var cluster = ""
     @State private var config = ""
     @State private var region = ""
+    // Through the API (#1119): the default for a kind that has one.
+    @State private var byCLI = false
+    @State private var token = ""
+    @State private var deployment = ""
     // Your commands
     @State private var cli = ""
     @State private var workspace = ""
@@ -352,6 +399,7 @@ struct AddProviderSheet: View {
     private func choose(_ each: Kind) {
         kind = each
         problem = nil
+        byCLI = false
         name = switch each {
         case .docker: "Docker Containers on this Mac"
         case .commands, .mcp: ""
@@ -384,12 +432,20 @@ struct AddProviderSheet: View {
                 Text("For New Workspace… and Delete Workspace…: an image that keeps running and has curl. Empty: it only lists.")
                     .appText(.supporting).foregroundStyle(.secondary)
             case .digitalOcean:
+                reachPicker
+                if !byCLI { SecureField("API token", text: $token) }
                 TextField("Droplets tagged", text: $tag)
                 TextField("ssh as", text: $user)
             case .codespaces:
+                reachPicker
+                if !byCLI { SecureField("Token", text: $token) }
                 TextField("Repository", text: $repo, prompt: Text("Every codespace, or owner/repo"))
             case .coder:
-                EmptyView()
+                reachPicker
+                if !byCLI {
+                    TextField("Deployment", text: $deployment, prompt: Text(verbatim: "https://coder.example.com"))
+                    SecureField("Session token", text: $token)
+                }
             case .workstations:
                 TextField("Cluster", text: $cluster)
                 TextField("Configuration", text: $config)
@@ -399,10 +455,10 @@ struct AddProviderSheet: View {
             case .mcp:
                 mcpForm
             }
-            if editing == nil { secretsSection }
+            if editing == nil, !(kind.hasAPI && !byCLI) { secretsSection }
         }
         .formStyle(.grouped)
-        if let needs = kind.needs, editing == nil {
+        if let needs = (kind.hasAPI && !byCLI ? kind.apiNeeds : kind.needs), editing == nil {
             Text(needs).appText(.supporting).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
         }
         if let problem {
@@ -437,8 +493,17 @@ struct AddProviderSheet: View {
             Button(editing == nil ? "Add" : "Save") { add(kind) }
                 .keyboardShortcut(.defaultAction)
                 .disabled(working || writing || name.trimmingCharacters(in: .whitespaces).isEmpty
-                          || (editing != nil && written == nil))
+                          || (editing != nil && written == nil) || (kind.hasAPI && !byCLI && token.isEmpty))
         }
+    }
+
+    /// API or CLI, for a kind that has both: the API first, as it needs nothing installed.
+    private var reachPicker: some View {
+        Picker("Reach it with", selection: $byCLI) {
+            Text("Its API").tag(false)
+            Text("Its CLI").tag(true)
+        }
+        .pickerStyle(.segmented)
     }
 
     @ViewBuilder
@@ -507,6 +572,8 @@ struct AddProviderSheet: View {
                                 self.answered = nil
                                 self.presetKind = nil
                                 choose(presetKind)
+                                // Its CLI was what the agent read: the CLI form.
+                                byCLI = presetKind.hasAPI
                             }
                             .buttonStyle(.paper)
                         }
@@ -760,9 +827,25 @@ struct AddProviderSheet: View {
     }
 
     private func request(_ kind: Kind, map mapped: JSONValue?) throws -> DaemonAPI.ProviderAdd {
-        let given = givenSecrets
+        var given = givenSecrets
         let name = trimmed(self.name)
         var commands: [String: JSONValue] = [:]
+        if let api = kind.api, !byCLI {
+            // The token goes in only as the provider's secret, never in its configuration.
+            given = [api.secret: token]
+            commands = ["preset": .string(api.preset)]
+            switch kind {
+            case .digitalOcean:
+                commands["tag"] = .string(trimmed(tag))
+                commands["user"] = .string(trimmed(user).isEmpty ? "root" : trimmed(user))
+            case .codespaces:
+                if !trimmed(repo).isEmpty { commands["repo"] = .string(trimmed(repo)) }
+            default:
+                guard !trimmed(deployment).isEmpty else { throw Wrong(description: "Give the deployment’s address.") }
+                commands["url"] = .string(trimmed(deployment))
+            }
+            return DaemonAPI.ProviderAdd(name: name, kind: .commands, commands: .object(commands), secrets: given)
+        }
         switch kind {
         case .docker:
             let names = containers.split(separator: ",").map { trimmed(String($0)) }.filter { !$0.isEmpty }

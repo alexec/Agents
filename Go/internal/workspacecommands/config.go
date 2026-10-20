@@ -44,6 +44,9 @@ func stateNamed(word string) (State, bool) {
 type Commands struct {
 	Start string
 	Stop  string
+	// StartRequest and StopRequest are HTTP actions in place of Start and Stop (#1119).
+	StartRequest *Request
+	StopRequest  *Request
 	// Status prints the workspace's state; "" when only a listing (or nothing) says.
 	Status string
 	// SSH is not a command: filled in without shell quoting. Nil for none.
@@ -73,7 +76,9 @@ type Shape struct {
 
 // Listing is many workspaces from one command.
 type Listing struct {
-	Command  string
+	Command string
+	// Request is an HTTP action in place of Command (#1119): its answer is read as JSON.
+	Request  *Request
 	Shape    Shape
 	Commands Commands
 	// Defaults are values for a row that leaves a column or field empty, such as a
@@ -88,12 +93,27 @@ type Making struct {
 	Create string
 	// Delete deletes one: ${id} and its listing's values are filled in.
 	Delete string
+	// CreateRequest and DeleteRequest are HTTP actions in place of Create and Delete (#1119).
+	CreateRequest *Request
+	DeleteRequest *Request
 	// Options is the New Workspace form, as a flat JSON Schema object (workspace_options).
 	Options map[string]any
 }
 
 // FirstBootRuns is whether a made workspace runs the first-boot install itself.
-func (m Making) FirstBootRuns() bool { return strings.Contains(m.Create, "${firstBoot}") }
+func (m Making) FirstBootRuns() bool {
+	if m.CreateRequest != nil {
+		data, _ := json.Marshal(m.CreateRequest.Body)
+		return strings.Contains(string(data), "${firstBoot}")
+	}
+	return strings.Contains(m.Create, "${firstBoot}")
+}
+
+// CanCreate is whether it makes workspaces.
+func (m Making) CanCreate() bool { return m.Create != "" || m.CreateRequest != nil }
+
+// CanDelete is whether it deletes them.
+func (m Making) CanDelete() bool { return m.Delete != "" || m.DeleteRequest != nil }
 
 // Config is the command provider's whole configuration, from WORKSPACE_COMMANDS_CONFIG.
 //
@@ -170,8 +190,16 @@ func From(value any) (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
-	if list, ok := o["list"].(string); ok {
-		if list == "" {
+	if given, present := o["list"]; present {
+		list, isLine := given.(string)
+		var request *Request
+		if !isLine {
+			r, err := requestFrom(given, "list")
+			if err != nil {
+				return Config{}, err
+			}
+			request = r
+		} else if list == "" {
 			return Config{}, ConfigError("list is empty")
 		}
 		var shape Shape
@@ -197,8 +225,13 @@ func From(value any) (Config, error) {
 				return Config{}, ConfigError("columns must name an id column")
 			}
 			shape = Shape{Columns: columns}
+		} else if request != nil {
+			return Config{}, ConfigError("a list request needs json paths")
 		} else {
 			return Config{}, ConfigError("a list needs columns, or json paths")
+		}
+		if request != nil && shape.Fields == nil {
+			return Config{}, ConfigError("a list request needs json paths")
 		}
 		commands, err := commandsFrom(o, "")
 		if err != nil {
@@ -208,7 +241,7 @@ func From(value any) (Config, error) {
 		if err != nil {
 			return Config{}, err
 		}
-		return newConfig(nil, &Listing{Command: list, Shape: shape, Commands: commands}, states, making), nil
+		return newConfig(nil, &Listing{Command: list, Request: request, Shape: shape, Commands: commands}, states, making), nil
 	}
 	if _, ok := o["create"]; ok {
 		return Config{}, ConfigError("create and delete need a list command, which finds what they made")
@@ -248,18 +281,38 @@ func From(value any) (Config, error) {
 	return newConfig(entries, nil, states, Making{}), nil
 }
 
+// action is a command or a request at key: the line, the request, or neither.
+func action(o map[string]any, key, whose string) (string, *Request, error) {
+	given, present := o[key]
+	if !present {
+		return "", nil, nil
+	}
+	if line, ok := given.(string); ok {
+		return line, nil, nil
+	}
+	r, err := requestFrom(given, whose+key)
+	return "", r, err
+}
+
 func commandsFrom(o map[string]any, whose string) (Commands, error) {
-	start, _ := o["start"].(string)
-	if start == "" {
+	start, startRequest, err := action(o, "start", whose)
+	if err != nil {
+		return Commands{}, err
+	}
+	if start == "" && startRequest == nil {
 		return Commands{}, ConfigError(whose + "no start command")
 	}
-	stop, _ := o["stop"].(string)
-	if stop == "" {
+	stop, stopRequest, err := action(o, "stop", whose)
+	if err != nil {
+		return Commands{}, err
+	}
+	if stop == "" && stopRequest == nil {
 		return Commands{}, ConfigError(whose + "no stop command")
 	}
 	status, _ := o["status"].(string)
 	tunnel, _ := o["tunnel"].(bool)
-	c := Commands{Start: start, Stop: stop, Status: status, SSH: nonEmpty(o["ssh"]), Tunnel: tunnel}
+	c := Commands{Start: start, Stop: stop, StartRequest: startRequest, StopRequest: stopRequest,
+		Status: status, SSH: nonEmpty(o["ssh"]), Tunnel: tunnel}
 	if cost, ok := o["cost"].(string); ok {
 		cost = prefix(cost, 120)
 		c.Cost = &cost
@@ -269,18 +322,19 @@ func commandsFrom(o map[string]any, whose string) (Commands, error) {
 
 func makingFrom(o map[string]any) (Making, error) {
 	m := Making{}
-	if s := nonEmpty(o["create"]); s != nil {
-		m.Create = *s
+	var err error
+	if m.Create, m.CreateRequest, err = action(o, "create", ""); err != nil {
+		return Making{}, err
 	}
-	if s := nonEmpty(o["delete"]); s != nil {
-		m.Delete = *s
+	if m.Delete, m.DeleteRequest, err = action(o, "delete", ""); err != nil {
+		return Making{}, err
 	}
 	if options, present := o["options"]; present {
 		object, ok := options.(map[string]any)
 		if !ok {
 			return Making{}, ConfigError("options must be a JSON Schema object")
 		}
-		if m.Create == "" {
+		if !m.CanCreate() {
 			return Making{}, ConfigError("options are for a create command, and there is none")
 		}
 		m.Options = object
@@ -388,8 +442,9 @@ func ShellQuoted(value string) string {
 	return "'" + strings.ReplaceAll(value, "'", `'\''`) + "'"
 }
 
-// PathValue is the value at a path into JSON: dotted keys and [n] indexes, as in
-// networks.v4[0].ip_address. Empty is the value itself; nil when there is none.
+// PathValue is the value at a path into JSON: dotted keys, [n] indexes, and [key=value],
+// the first item whose key is that value, as in networks.v4[type=public].ip_address. Empty
+// is the value itself; nil when there is none.
 func PathValue(path string, value any) any {
 	current := value
 	for _, part := range strings.Split(path, ".") {
@@ -397,28 +452,36 @@ func PathValue(path string, value any) any {
 			continue
 		}
 		key := part
-		var indexes []int
+		var selectors []string
 		for strings.HasSuffix(key, "]") {
 			open := strings.LastIndexByte(key, '[')
 			if open < 0 {
 				break
 			}
-			n, err := strconv.Atoi(key[open+1 : len(key)-1])
-			if err != nil {
-				return nil
-			}
-			indexes = append([]int{n}, indexes...)
+			selectors = append([]string{key[open+1 : len(key)-1]}, selectors...)
 			key = key[:open]
 		}
 		if key != "" {
 			o, _ := current.(map[string]any)
 			current = o[key]
 		}
-		for _, n := range indexes {
+		for _, selector := range selectors {
 			array, _ := current.([]any)
-			if n < 0 || n >= len(array) {
-				current = nil
-			} else {
+			current = nil
+			if field, want, ok := strings.Cut(selector, "="); ok {
+				for _, item := range array {
+					if text, ok := PathText(field, item); ok && text == want {
+						current = item
+						break
+					}
+				}
+				continue
+			}
+			n, err := strconv.Atoi(selector)
+			if err != nil {
+				return nil
+			}
+			if n >= 0 && n < len(array) {
 				current = array[n]
 			}
 		}

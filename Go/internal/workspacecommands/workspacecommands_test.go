@@ -133,7 +133,7 @@ func TestRefusesWhatCannotRun(t *testing.T) {
 	refused(t, `{"list":"x","columns":["name"],"start":"a","stop":"b"}`, "columns must name an id column")
 	refused(t, `{"workspaces":[{"name":"a","start":"x","stop":"y"}],"states":{"on":"up"}}`,
 		"states.on must be one of running, starting, stopping, stopped, unknown")
-	refused(t, `{"preset":"vagrant"}`, "no preset vagrant; there are docker, doctl, codespaces, coder, gcloud-workstations")
+	refused(t, `{"preset":"vagrant"}`, "no preset vagrant; there are docker, doctl, codespaces, coder, gcloud-workstations, digitalocean-api, codespaces-api, coder-api")
 	refused(t, `[]`, "the configuration must be a JSON object")
 	refused(t, `{"list":"x","start":"a","stop":"b"}`, "a list needs columns, or json paths")
 	refused(t, `{"list":"x","json":{"name":"n"},"start":"a","stop":"b"}`, "json needs an id path")
@@ -198,6 +198,9 @@ func TestNoPresetAsksForSudo(t *testing.T) {
 		`{"preset":"codespaces"}`,
 		`{"preset":"coder"}`,
 		`{"preset":"gcloud-workstations","cluster":"c","config":"f","region":"r"}`,
+		`{"preset":"digitalocean-api","tag":"agents"}`,
+		`{"preset":"codespaces-api"}`,
+		`{"preset":"coder-api","url":"https://coder.example"}`,
 	}
 	for _, text := range configs {
 		c := config(t, text)

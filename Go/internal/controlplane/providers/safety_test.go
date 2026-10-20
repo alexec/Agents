@@ -73,6 +73,19 @@ func TestAConfigsCheckRunsItsListOrEachStatusOrAPresetsOwn(t *testing.T) {
 	}
 }
 
+// A request may carry a secret to any address (#1119): a draft's check asks first.
+func TestARequestOrAPresetsOwnAddressIsAskedAbout(t *testing.T) {
+	if v := CommandsVerdict(mustParse(`{"list": {"url": "https://x.example/w", "headers": {"A": "${TOKEN}"}}, "json": {"id": "id"}}`), "cws"); v.Ask != "its list is a request to https://x.example/w" {
+		t.Errorf("%+v", v)
+	}
+	if v := CommandsVerdict(mustParse(`{"preset": "digitalocean-api", "tag": "a", "api": "https://x.example"}`), ""); v.Ask != "it sends its token to https://x.example" {
+		t.Errorf("%+v", v)
+	}
+	if CommandsVerdict(mustParse(`{"preset": "digitalocean-api", "tag": "a"}`), "") != Run {
+		t.Error("a preset at its own provider's address runs")
+	}
+}
+
 func TestHelpWords(t *testing.T) {
 	seen := "Commands: list start stop destroy workspace-list"
 	for _, ok := range [][]string{{}, {"list"}, {"start"}, {"workspace-list"}} {

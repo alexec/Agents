@@ -80,6 +80,12 @@ run). A preset needs its CLI installed and signed in where the control plane run
 isn't there, its first command exits 127, and the error is "‹cli› isn't installed where the
 control plane runs".
 
+Since #1119, `list`, `start`, `stop`, `create` and `delete` may each be a web request, and three
+API presets use them: `digitalocean-api`, `codespaces-api` and `coder-api`. They need only a
+token as the provider's secret. Their requests are in
+[Workspace providers](../../../docs/reference/workspace-providers.md#a-web-request-in-place-of-a-command-1119),
+and fixed by tests against a fake server.
+
 ## Behaviour
 
 - Commands run through `/bin/sh -c`, using `ChildProcess`, from the server's working

@@ -116,10 +116,22 @@ func ListTool(draft any, tools []any) Verdict {
 
 // CommandsVerdict is DraftSafety.commands: whether a command-provider config's check may
 // run alone. What it runs is its list, or each workspace's status. A preset runs only its
-// own fixed commands.
+// own fixed commands. A request (#1119) is asked about: a header may carry a secret, and its
+// address is anywhere. So is a preset sent to an address of its own (api, url).
 func CommandsVerdict(config any, cli string) Verdict {
 	if _, ok := str(get(config, "preset")); ok {
+		for _, key := range []string{"api", "url"} {
+			if address, ok := str(get(config, key)); ok {
+				return ask("it sends its token to %s", address)
+			}
+		}
 		return Run
+	}
+	if list := get(config, "list"); list != nil {
+		if _, ok := obj(list); ok {
+			address, _ := str(get(list, "url"))
+			return ask("its list is a request to %s", address)
+		}
 	}
 	var lines []string
 	if list, ok := str(get(config, "list")); ok {
