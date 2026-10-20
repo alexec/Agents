@@ -66,6 +66,7 @@ nav:
       - how-to/connect-a-window-or-phone.md
       - how-to/use-agents-in-a-browser.md
       - how-to/add-a-server.md
+      - how-to/invite-someone.md
       - how-to/send-a-project-to-a-server.md
       - how-to/start-workspaces-from-agents.md
       - how-to/add-a-workspace-provider.md
@@ -131,6 +132,7 @@ nav:
       - explanation/direction.md
       - explanation/why-agents.md
       - explanation/control-plane.md
+      - explanation/people-and-machines.md
       - explanation/window-and-daemon.md
       - explanation/architecture.md
       - explanation/versions.md
