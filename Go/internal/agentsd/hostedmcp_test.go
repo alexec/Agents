@@ -5,12 +5,14 @@ import (
 	"encoding/json"
 	"net/http"
 	"os"
+	"slices"
 	"strconv"
 	"syscall"
 	"testing"
 
 	sdk "github.com/coder/acp-go-sdk"
 
+	"github.com/alexec/agents/Go/internal/githubmcp"
 	"github.com/alexec/agents/Go/wire"
 )
 
@@ -78,6 +80,13 @@ func TestAHostedServerIsSharedRestartedAndLetGo(t *testing.T) {
 		t.Fatalf("tools/list: %d tools", n)
 	}
 	pid := d.hostedPid(pathA)
+	// The host's copy is told it is the host's: only it has a server's person-only tools.
+	d.hostedMu.Lock()
+	env := d.hostedByPath(pathA).cmd.Env
+	d.hostedMu.Unlock()
+	if !slices.Contains(env, githubmcp.HostedEnv+"=1") {
+		t.Fatalf("the hosted copy has no %s", githubmcp.HostedEnv)
+	}
 	respB, _ := post("token-b", "", initialize)
 	if n := tools("token-b", respB.Header.Get("Mcp-Session-Id")); n != 2 || d.hostedPid(pathA) != pid {
 		t.Fatalf("the second session: %d tools, pid %d then %d", n, pid, d.hostedPid(pathA))
@@ -126,17 +135,22 @@ func TestAHostedServerIsSharedRestartedAndLetGo(t *testing.T) {
 func TestASessionIsHandedAHostedServersRoute(t *testing.T) {
 	d, _ := start(t, t.TempDir())
 	defer d.Shutdown()
-	stdio := sdk.McpServer{Stdio: &sdk.McpServerStdio{Name: "shared", Command: "/bin/cat", Args: []string{}, Env: []sdk.EnvVariable{}}}
+	// An entry that says it is the host's copy is not, in a session.
+	hostedEnv := []sdk.EnvVariable{{Name: githubmcp.HostedEnv, Value: "1"}, {Name: "KEEP", Value: "1"}}
+	stdio := sdk.McpServer{Stdio: &sdk.McpServerStdio{Name: "shared", Command: "/bin/cat", Args: []string{}, Env: hostedEnv}}
 	entries := []sessionEntry{
 		{mcpEntry: mcpEntry{name: "shared", server: stdio, hosted: true}, cwd: t.TempDir()},
-		{mcpEntry: mcpEntry{name: "own", server: sdk.McpServer{Stdio: &sdk.McpServerStdio{Name: "own", Command: "/bin/cat"}}}},
+		{mcpEntry: mcpEntry{name: "own", server: sdk.McpServer{Stdio: &sdk.McpServerStdio{Name: "own", Command: "/bin/cat", Env: hostedEnv}}}},
+	}
+	notHosts := func(s sdk.McpServer) bool {
+		return s.Stdio != nil && len(s.Stdio.Env) == 1 && s.Stdio.Env[0].Name == "KEEP"
 	}
 	got := d.hostedSwapped(entries, 4242, "tok", "claude")
 	if got[0].Http == nil || got[0].Http.Name != "shared" || got[0].Http.Headers[0].Value != "Bearer tok" ||
 		got[0].Http.Url[:len("http://127.0.0.1:4242/mcp/hosted/")] != "http://127.0.0.1:4242/mcp/hosted/" {
 		t.Fatalf("hosted: %+v", got[0])
 	}
-	if got[1].Stdio == nil {
+	if !notHosts(got[1]) {
 		t.Fatalf("not hosted: %+v", got[1])
 	}
 	// "shared" and seven others: the host's limit.
@@ -155,8 +169,11 @@ func TestASessionIsHandedAHostedServersRoute(t *testing.T) {
 	if _, err := d.hostedUse(sdk.McpServerStdio{Name: "last", Command: "/bin/cat"}, nil, "", "user"); err != nil {
 		t.Fatal(err)
 	}
-	if got := d.hostedSwapped(entries[:1], 4242, "tok3", "claude"); got[0].Stdio == nil {
-		t.Fatalf("over the limit, not handed as it is: %+v", got[0])
+	if got := d.hostedSwapped(entries[:1], 4242, "tok3", "claude"); !notHosts(got[0]) {
+		t.Fatalf("over the limit, not handed as it is without %s: %+v", githubmcp.HostedEnv, got[0])
+	}
+	if len(stdio.Stdio.Env) != 2 {
+		t.Fatal("the entry itself was changed")
 	}
 }
 

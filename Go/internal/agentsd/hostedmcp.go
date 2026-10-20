@@ -24,6 +24,7 @@ import (
 	sdk "github.com/coder/acp-go-sdk"
 
 	"github.com/alexec/agents/Go/internal/agentsd/store"
+	"github.com/alexec/agents/Go/internal/githubmcp"
 	"github.com/alexec/agents/Go/internal/safe"
 	"github.com/alexec/agents/Go/wire"
 )
@@ -294,18 +295,19 @@ func (d *Daemon) stopHosted() {
 
 // hostedSwapped is a session's servers with each hosted one swapped for its route, the
 // session's token as the bearer. One the host has no room for goes as it is, so the
-// runtime runs its own copy: the agent still has its tools.
+// runtime runs its own copy: the agent still has its tools, but not the person-only ones,
+// which only the host's copy has (githubmcp.HostedEnv is never in a session's copy).
 func (d *Daemon) hostedSwapped(entries []sessionEntry, port int, token, runtimeID string) []sdk.McpServer {
 	out := make([]sdk.McpServer, 0, len(entries))
 	for _, e := range entries {
 		if !e.hosted || e.server.Stdio == nil || token == "" {
-			out = append(out, e.server)
+			out = append(out, withoutHostedEnv(e.server))
 			continue
 		}
 		path, err := d.hostedUse(*e.server.Stdio, e.project, e.cwd, token)
 		if err != nil {
-			log.Printf("hosted mcp: %s runs in the %s session itself: %d hosted servers are in use", e.name, runtimeID, hostedLimit)
-			out = append(out, e.server)
+			log.Printf("hosted mcp: %s runs in the %s session itself, without its view-only tools: %d hosted servers are in use", e.name, runtimeID, hostedLimit)
+			out = append(out, withoutHostedEnv(e.server))
 			continue
 		}
 		out = append(out, sdk.McpServer{Http: &sdk.McpServerHttpInline{Name: e.name, Type: "http",
@@ -313,6 +315,23 @@ func (d *Daemon) hostedSwapped(entries []sessionEntry, port int, token, runtimeI
 			Headers: []sdk.HttpHeader{{Name: "Authorization", Value: "Bearer " + token}}}})
 	}
 	return out
+}
+
+// withoutHostedEnv is a stdio server without githubmcp.HostedEnv in its environment: a
+// session's own copy is never the host's.
+func withoutHostedEnv(s sdk.McpServer) sdk.McpServer {
+	if s.Stdio == nil {
+		return s
+	}
+	stdio := *s.Stdio
+	stdio.Env = make([]sdk.EnvVariable, 0, len(s.Stdio.Env))
+	for _, e := range s.Stdio.Env {
+		if e.Name != githubmcp.HostedEnv {
+			stdio.Env = append(stdio.Env, e)
+		}
+	}
+	s.Stdio = &stdio
+	return s
 }
 
 // MARK: http
@@ -495,6 +514,8 @@ func (d *Daemon) hostedStart(h *hostedServer) (json.RawMessage, *Error) {
 	for _, e := range s.Env {
 		cmd.Env = append(cmd.Env, e.Name+"="+e.Value)
 	}
+	// Only this copy has a server's person-only tools (githubmcp.HostedEnv).
+	cmd.Env = append(cmd.Env, githubmcp.HostedEnv+"=1")
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	cmd.Stderr = &hostedStderr{d: d, h: h, log: d.hostedLogLocked(h)}
 	in, inErr := cmd.StdinPipe()

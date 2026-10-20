@@ -115,8 +115,13 @@ func failed(err error) *mcp.CallToolResult {
 	return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: msg}}, IsError: true}
 }
 
-// AddViews puts the views' tools and pages on server.
-func AddViews(server *mcp.Server, gh Views) {
+// HostedEnv is set to "1" in the environment of an MCP server that the host runs for its
+// sessions and views (agentsd's hosted copy). Only that copy has the person's tools.
+const HostedEnv = "AGENTS_MCP_HOSTED"
+
+// AddViews puts the views' tools and pages on server; with person, also the tools that
+// only a view may call (merge_pr, review_pr, comment_on_pr).
+func AddViews(server *mcp.Server, gh Views, person bool) {
 	repoOf := func(ctx context.Context, repo string) (string, error) {
 		if repo != "" {
 			if _, _, err := ownerName(repo); err != nil {
@@ -234,63 +239,68 @@ func AddViews(server *mcp.Server, gh Views) {
 			return structured(r), nil, nil
 		})
 
-	mcp.AddTool(server, &mcp.Tool{Name: "merge_pr", Title: "Merge a pull request",
-		Description: "Squash-merges a pull request and deletes its branch on GitHub, as the signed-in person; auto: true turns on " +
-			"auto-merge, so it merges once its checks pass. Only a view may call it: a person merges.",
-		Meta: uiMeta("", "app")},
-		func(ctx context.Context, _ *mcp.CallToolRequest, in mergeArgs) (*mcp.CallToolResult, any, error) {
-			repo, err := repoOf(ctx, in.Repo)
-			if err != nil {
-				return failed(err), nil, nil
-			}
-			r, err := gh.MergePR(ctx, repo, in.Number, in.Sha, in.Auto)
-			if err != nil {
-				return failed(err), nil, nil
-			}
-			return structured(r), nil, nil
-		})
+	// Merge, review and comment are the person's, from a view. They are only on the copy the
+	// host runs (person), whose tools/list the host filters for an agent; a copy that a
+	// session runs itself has none of them.
+	if person {
+		mcp.AddTool(server, &mcp.Tool{Name: "merge_pr", Title: "Merge a pull request",
+			Description: "Squash-merges a pull request and deletes its branch on GitHub, as the signed-in person; auto: true turns on " +
+				"auto-merge, so it merges once its checks pass. Only a view may call it: a person merges.",
+			Meta: uiMeta("", "app")},
+			func(ctx context.Context, _ *mcp.CallToolRequest, in mergeArgs) (*mcp.CallToolResult, any, error) {
+				repo, err := repoOf(ctx, in.Repo)
+				if err != nil {
+					return failed(err), nil, nil
+				}
+				r, err := gh.MergePR(ctx, repo, in.Number, in.Sha, in.Auto)
+				if err != nil {
+					return failed(err), nil, nil
+				}
+				return structured(r), nil, nil
+			})
 
-	mcp.AddTool(server, &mcp.Tool{Name: "review_pr", Title: "Review a pull request",
-		Description: "Approves a pull request, or requests changes with a body that says what, as the signed-in person. " +
-			"GitHub refuses either on the person's own pull request. Only a view may call it: a person reviews.",
-		Meta: uiMeta("", "app")},
-		func(ctx context.Context, _ *mcp.CallToolRequest, in reviewArgs) (*mcp.CallToolResult, any, error) {
-			repo, err := repoOf(ctx, in.Repo)
-			if err != nil {
-				return failed(err), nil, nil
-			}
-			body := strings.TrimSpace(in.Body)
-			switch {
-			case in.Event != "approve" && in.Event != "request_changes":
-				return failed(fmt.Errorf("event is approve or request_changes")), nil, nil
-			case in.Event == "request_changes" && body == "":
-				return failed(fmt.Errorf("say what is to change: body is needed to request changes")), nil, nil
-			}
-			r, err := gh.ReviewPR(ctx, repo, in.Number, in.Sha, in.Event == "approve", body)
-			if err != nil {
-				return failed(err), nil, nil
-			}
-			return structured(r), nil, nil
-		})
+		mcp.AddTool(server, &mcp.Tool{Name: "review_pr", Title: "Review a pull request",
+			Description: "Approves a pull request, or requests changes with a body that says what, as the signed-in person. " +
+				"GitHub refuses either on the person's own pull request. Only a view may call it: a person reviews.",
+			Meta: uiMeta("", "app")},
+			func(ctx context.Context, _ *mcp.CallToolRequest, in reviewArgs) (*mcp.CallToolResult, any, error) {
+				repo, err := repoOf(ctx, in.Repo)
+				if err != nil {
+					return failed(err), nil, nil
+				}
+				body := strings.TrimSpace(in.Body)
+				switch {
+				case in.Event != "approve" && in.Event != "request_changes":
+					return failed(fmt.Errorf("event is approve or request_changes")), nil, nil
+				case in.Event == "request_changes" && body == "":
+					return failed(fmt.Errorf("say what is to change: body is needed to request changes")), nil, nil
+				}
+				r, err := gh.ReviewPR(ctx, repo, in.Number, in.Sha, in.Event == "approve", body)
+				if err != nil {
+					return failed(err), nil, nil
+				}
+				return structured(r), nil, nil
+			})
 
-	mcp.AddTool(server, &mcp.Tool{Name: "comment_on_pr", Title: "Comment on a pull request",
-		Description: "Adds a comment to a pull request, as the signed-in person, from its page. Only a view may call it; " +
-			"an agent comments with add_issue_comment.",
-		Meta: uiMeta("", "app")},
-		func(ctx context.Context, _ *mcp.CallToolRequest, in commentArgs) (*mcp.CallToolResult, any, error) {
-			repo, err := repoOf(ctx, in.Repo)
-			if err != nil {
-				return failed(err), nil, nil
-			}
-			if strings.TrimSpace(in.Body) == "" {
-				return failed(fmt.Errorf("write the comment first")), nil, nil
-			}
-			r, err := gh.CommentOnPR(ctx, repo, in.Number, in.Body)
-			if err != nil {
-				return failed(err), nil, nil
-			}
-			return structured(r), nil, nil
-		})
+		mcp.AddTool(server, &mcp.Tool{Name: "comment_on_pr", Title: "Comment on a pull request",
+			Description: "Adds a comment to a pull request, as the signed-in person, from its page. Only a view may call it; " +
+				"an agent comments with add_issue_comment.",
+			Meta: uiMeta("", "app")},
+			func(ctx context.Context, _ *mcp.CallToolRequest, in commentArgs) (*mcp.CallToolResult, any, error) {
+				repo, err := repoOf(ctx, in.Repo)
+				if err != nil {
+					return failed(err), nil, nil
+				}
+				if strings.TrimSpace(in.Body) == "" {
+					return failed(fmt.Errorf("write the comment first")), nil, nil
+				}
+				r, err := gh.CommentOnPR(ctx, repo, in.Number, in.Body)
+				if err != nil {
+					return failed(err), nil, nil
+				}
+				return structured(r), nil, nil
+			})
+	}
 
 	// No network at all: an empty csp, so the host draws them under its strictest policy.
 	meta := mcp.Meta{"ui": map[string]any{"csp": map[string]any{}, "prefersBorder": true}}

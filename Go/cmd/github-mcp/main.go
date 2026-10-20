@@ -59,7 +59,7 @@ func main() {
 		os.Exit(1)
 	}
 	gh := githubmcp.NewRealGitHub(os.Getenv("GITHUB_MCP_API_URL"), token, githubmcp.GitRepo())
-	githubmcp.AddViews(upstream, gh)
+	githubmcp.AddViews(upstream, gh, os.Getenv(githubmcp.HostedEnv) == "1")
 	front := &githubmcp.Front{
 		Events:   &githubmcp.Events{GitHub: gh},
 		Upstream: upstream, Version: buildinfo.Version, Logger: logger,
