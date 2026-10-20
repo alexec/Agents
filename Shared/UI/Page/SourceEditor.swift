@@ -544,38 +544,74 @@ private struct SourceTextView: UIViewRepresentable {
 }
 
 /// The source text view, with Ctrl+Space on a hardware keyboard asking for completion (#1603).
+/// While the row of words is up, ↑ and ↓ choose one, Return and Tab put it in, and Escape
+/// closes the row, as the Mac's list and the web's take them (#1686).
 private final class CompletingTextView: UITextView {
     var askCompletion: (() -> Void)?
+
+    private var row: CompletionRow? { inputAccessoryView as? CompletionRow }
 
     override var keyCommands: [UIKeyCommand]? {
         let ask = UIKeyCommand(title: "Complete", action: #selector(complete), input: " ", modifierFlags: .control)
         ask.wantsPriorityOverSystemBehavior = true
-        return (super.keyCommands ?? []) + [ask]
+        var commands = (super.keyCommands ?? []) + [ask]
+        if row != nil {
+            let keys: [(String, String, Selector)] = [
+                ("Previous Completion", UIKeyCommand.inputUpArrow, #selector(previousCompletion)),
+                ("Next Completion", UIKeyCommand.inputDownArrow, #selector(nextCompletion)),
+                ("Use Completion", "\r", #selector(take)),
+                ("Use Completion", "\t", #selector(take)),
+                ("Close Completions", UIKeyCommand.inputEscape, #selector(close)),
+            ]
+            for (title, input, action) in keys {
+                let command = UIKeyCommand(title: title, action: action, input: input)
+                command.wantsPriorityOverSystemBehavior = true
+                commands.append(command)
+            }
+        }
+        return commands
     }
 
     @objc private func complete() { askCompletion?() }
+    @objc private func previousCompletion() { row?.move(by: -1) }
+    @objc private func nextCompletion() { row?.move(by: 1) }
+    @objc private func take() { row?.takeChosen() }
+    @objc private func close() {
+        inputAccessoryView = nil
+        reloadInputViews()
+    }
 }
 
-/// The language server's words in a row above the keyboard (#1603); a tap puts one in.
+/// The language server's words in a row above the keyboard (#1603); a tap puts one in. Each
+/// word is at least 44 points high and grows with the text size; one is chosen, for the
+/// keyboard (#1686).
 private final class CompletionRow: UIInputView, UIInputViewAudioFeedback {
     private let words: [String]
     private let chosen: (String) -> Void
+    private var buttons: [UIButton] = []
+    private let scroll = UIScrollView()
+    /// The word Return or Tab puts in: the first, until ↑ or ↓ moves it.
+    private var choice = 0
 
     var enableInputClicksWhenVisible: Bool { true }
 
     init(words: [String], chosen: @escaping (String) -> Void) {
         self.words = words
         self.chosen = chosen
-        let short = UIDevice.current.userInterfaceIdiom == .phone
-        super.init(frame: CGRect(x: 0, y: 0, width: 320, height: short ? 40 : 48), inputViewStyle: .keyboard)
+        // A 44 point word and its margin, or more with a larger text size.
+        let height = max(52, (TextStep.code.uiFont.lineHeight + 12 + 8).rounded(.up))
+        super.init(frame: CGRect(x: 0, y: 0, width: 320, height: height), inputViewStyle: .keyboard)
         allowsSelfSizing = true
         build()
     }
 
     required init?(coder: NSCoder) { fatalError("made in code") }
 
+    override var intrinsicContentSize: CGSize {
+        CGSize(width: UIView.noIntrinsicMetric, height: max(52, (TextStep.code.uiFont.lineHeight + 12 + 8).rounded(.up)))
+    }
+
     private func build() {
-        let scroll = UIScrollView()
         scroll.showsHorizontalScrollIndicator = false
         scroll.translatesAutoresizingMaskIntoConstraints = false
         addSubview(scroll)
@@ -586,22 +622,16 @@ private final class CompletionRow: UIInputView, UIInputViewAudioFeedback {
         row.translatesAutoresizingMaskIntoConstraints = false
         scroll.addSubview(row)
 
-        for (index, word) in words.enumerated() {
+        for index in words.indices {
             let button = UIButton(type: .system)
-            var configuration = UIButton.Configuration.gray()
-            configuration.title = word
-            configuration.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer {
-                var attributes = $0
-                attributes.font = TextStep.code.uiFont
-                return attributes
-            }
-            configuration.contentInsets = NSDirectionalEdgeInsets(top: 6, leading: 12, bottom: 6, trailing: 12)
-            configuration.baseForegroundColor = .label
-            button.configuration = configuration
             button.tag = index
             button.addTarget(self, action: #selector(pressed(_:)), for: .touchUpInside)
+            button.heightAnchor.constraint(greaterThanOrEqualToConstant: 44).isActive = true
+            button.widthAnchor.constraint(greaterThanOrEqualToConstant: 44).isActive = true
             row.addArrangedSubview(button)
+            buttons.append(button)
         }
+        drawChoice()
 
         NSLayoutConstraint.activate([
             scroll.leadingAnchor.constraint(equalTo: leadingAnchor),
@@ -613,6 +643,38 @@ private final class CompletionRow: UIInputView, UIInputViewAudioFeedback {
             row.centerYAnchor.constraint(equalTo: scroll.centerYAnchor),
             row.heightAnchor.constraint(equalTo: scroll.frameLayoutGuide.heightAnchor, constant: -8),
         ])
+    }
+
+    /// The chosen word filled, the others grey.
+    private func drawChoice() {
+        for (index, button) in buttons.enumerated() {
+            var configuration = index == choice ? UIButton.Configuration.filled() : UIButton.Configuration.gray()
+            configuration.title = words[index]
+            configuration.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer {
+                var attributes = $0
+                attributes.font = TextStep.code.uiFont
+                return attributes
+            }
+            configuration.contentInsets = NSDirectionalEdgeInsets(top: 6, leading: 12, bottom: 6, trailing: 12)
+            if index != choice { configuration.baseForegroundColor = .label }
+            button.configuration = configuration
+            button.accessibilityTraits = index == choice ? [.button, .selected] : .button
+        }
+    }
+
+    /// ↑ or ↓: the word before or after, kept in view.
+    func move(by step: Int) {
+        guard !words.isEmpty else { return }
+        choice = min(max(choice + step, 0), words.count - 1)
+        drawChoice()
+        let button = buttons[choice]
+        scroll.scrollRectToVisible(button.convert(button.bounds, to: scroll).insetBy(dx: -8, dy: 0), animated: true)
+    }
+
+    /// Return or Tab: the chosen word put in.
+    func takeChosen() {
+        guard words.indices.contains(choice) else { return }
+        chosen(words[choice])
     }
 
     @objc private func pressed(_ sender: UIButton) {
