@@ -456,13 +456,20 @@ struct RemoteConnections: View {
                         Text(ConnectorSetupWords.connectionNote(c)).appText(.fine)
                             .tinted(c.state == .signInAgain ? .attention : .none).foregroundStyle(.secondary)
                     }
+                    // The window's row actions (#1685).
+                    if c.state == .signInAgain {
+                        Button("Connect Again\u{2026}") { connecting = c.provider }
+                    } else if c.provider == .github {
+                        Link("Repositories on github.com", destination: URL(string: ConnectorSetupWords.installationsURL)!)
+                    }
                     Button("Disconnect", role: .destructive) { disconnecting = c }
                 }
-                if !isConnected(.github, in: connections) {
+                // A provider with no row; one that asks to connect again has its own button.
+                if !has(.github, in: connections) {
                     Button(ConnectorSetupWords.connectButton) { connecting = .github }
                 }
                 // Linear (#1343): its own row while it is not connected.
-                if !isConnected(.linear, in: connections) {
+                if !has(.linear, in: connections) {
                     VStack(alignment: .leading, spacing: 2) {
                         Button("Connect Linear\u{2026}") { connecting = .linear }
                         Text(ConnectorSetupWords.notConnectedNote(.linear)).appText(.fine).foregroundStyle(.secondary)
@@ -489,8 +496,8 @@ struct RemoteConnections: View {
         }
     }
 
-    private func isConnected(_ provider: DaemonAPI.ConnectionProvider, in list: [DaemonAPI.Connection]) -> Bool {
-        list.contains { $0.provider == provider && $0.state == .connected }
+    private func has(_ provider: DaemonAPI.ConnectionProvider, in list: [DaemonAPI.Connection]) -> Bool {
+        list.contains { $0.provider == provider }
     }
 
     private func disconnect(_ c: DaemonAPI.Connection) async {
