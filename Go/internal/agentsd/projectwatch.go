@@ -230,7 +230,8 @@ func (d *Daemon) projectFilesChanged(folder string, paths []string) {
 		if !under(p, agents) {
 			continue
 		}
-		if p == agents || under(p, workflows) {
+		// A skill a workflow names is approved with it (S20261019-2).
+		if p == agents || under(p, workflows) || under(p, filepath.Join(folder, skillsRel)) {
 			rescan = true
 		}
 		for rel := range guardedFiles {

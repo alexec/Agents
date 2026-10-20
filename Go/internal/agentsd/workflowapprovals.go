@@ -54,6 +54,13 @@ func (d *Daemon) waitingWorkflowChanges(folder string) []wire.GuardedChange {
 				since = wire.DateOf(fi.ModTime())
 			}
 		}
+		for _, s := range f.skills {
+			if path, ok := skillPath(folder, s.name); ok {
+				if fi, err := os.Stat(path); err == nil && wire.DateOf(fi.ModTime()) > since {
+					since = wire.DateOf(fi.ModTime())
+				}
+			}
+		}
 		out = append(out, wire.GuardedChange{Path: workflowChangePath(id), Digest: &digest,
 			ChangedBy: []string{}, ChangedByIDs: []wire.UUID{}, Since: since})
 	}
@@ -85,7 +92,8 @@ func (d *Daemon) workflowApproval(folder string, c wire.GuardedChange) wire.Appr
 		Since: &since, Actions: []wire.ApprovalAction{wire.ApprovalActionApprove, wire.ApprovalActionDeny}}
 }
 
-// readWorkflowChange is a waiting workflow's lines against the copy last approved.
+// readWorkflowChange is a waiting workflow's lines against the copy last approved, each
+// with the skills it names under it (S20261019-2): what is approved is what is shown.
 func (d *Daemon) readWorkflowChange(folder, id string) (wire.GuardedChangeReading, error) {
 	d.workflowMu.Lock()
 	d.scanLocked()
@@ -94,8 +102,9 @@ func (d *Daemon) readWorkflowChange(folder, id string) (wire.GuardedChangeReadin
 		d.workflowMu.Unlock()
 		return wire.GuardedChangeReading{}, noSuchWorkflow(id)
 	}
-	current, digest := f.text, f.digest
-	approved, hasApproved := d.approvedCopyLocked(folder, id)
+	current, digest := shownWorkflow(f.text, f.skills), f.digest
+	approved, skills, hasApproved := d.approvedCopyLocked(folder, id)
+	approved = shownWorkflow(approved, skills)
 	d.workflowMu.Unlock()
 	out := wire.GuardedChangeReading{Path: workflowChangePath(id), Digest: &digest, Current: &current}
 	if hasApproved {
@@ -105,17 +114,27 @@ func (d *Daemon) readWorkflowChange(folder, id string) (wire.GuardedChangeReadin
 	return out, nil
 }
 
-// approvedCopyLocked is the text last approved, when a copy of it was kept.
-func (d *Daemon) approvedCopyLocked(folder, id string) (string, bool) {
+// approvedCopyLocked is the text last approved and the skills it named, when a copy of
+// each was kept.
+func (d *Daemon) approvedCopyLocked(folder, id string) (string, []workflowSkill, bool) {
 	st := d.stateLocked(folder, id, false)
 	if st == nil || st.ApprovedDigest == nil || st.ApprovedCopy == nil {
-		return "", false
+		return "", nil, false
 	}
 	b, err := os.ReadFile(filepath.Join(d.workflowCopies(), *st.ApprovedCopy))
 	if err != nil {
-		return "", false
+		return "", nil, false
 	}
-	return string(b), true
+	var skills []workflowSkill
+	for name, kept := range st.ApprovedSkills {
+		s, err := os.ReadFile(filepath.Join(d.workflowCopies(), kept))
+		if err != nil {
+			return "", nil, false
+		}
+		skills = append(skills, workflowSkill{name: name, text: string(s)})
+	}
+	sort.Slice(skills, func(i, j int) bool { return skills[i].name < skills[j].name })
+	return string(b), skills, true
 }
 
 // keepOrUndoWorkflow is Keep (Approve) or Undo of a waiting workflow, for the version the
@@ -138,7 +157,7 @@ func (d *Daemon) keepOrUndoWorkflow(folder, id string, digest *string, keep bool
 		d.workflowMu.Unlock()
 		return wire.ProjectSummary{}, &Error{Code: wire.FailureNotChanged, Message: f.wf.Name + " changed after you looked at it, so it was not undone. Look again."}
 	}
-	approved, had := d.approvedCopyLocked(folder, id)
+	approved, skills, had := d.approvedCopyLocked(folder, id)
 	d.workflowMu.Unlock()
 	path, ok := workflowPath(folder, id)
 	err := errors.New("that is not a workflow's name")
@@ -147,6 +166,17 @@ func (d *Daemon) keepOrUndoWorkflow(folder, id string, digest *string, keep bool
 			err = store.WriteAtomically(path, []byte(approved), 0o644)
 		} else if err = os.Remove(path); errors.Is(err, os.ErrNotExist) {
 			err = nil
+		}
+	}
+	// The skills it named go back too, each only into a folder of the project's own.
+	for _, s := range skills {
+		if err != nil {
+			break
+		}
+		if p, ok := skillPath(folder, s.name); !ok {
+			err = errors.New(skillChangePath(s.name) + " is not a file of the project's own")
+		} else if cur, _, _ := readWorkflowFile(p); cur != s.text {
+			err = store.WriteAtomically(p, []byte(s.text), 0o644)
 		}
 	}
 	if err != nil {

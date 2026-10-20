@@ -236,3 +236,104 @@ func TestAWorkflowThatIsALinkNeverRuns(t *testing.T) {
 		t.Fatalf("one link again: %+v %+v", f.wf, refused)
 	}
 }
+
+// S20261019-2: a workflow that hands its method to a skill (#1563) is approved with the
+// skill's text. A change to the skill makes it wait for the person as a change to the
+// workflow does, the change is shown with the skill's lines, and Undo puts the skill back.
+// A skill named outside .agents/skills, or through a link out of it, never runs.
+func TestAWorkflowWaitsWhenTheSkillItFollowsChanges(t *testing.T) {
+	d, c := start(t, t.TempDir())
+	defer d.Shutdown()
+	dir := project(t, c, 1)
+	folder := store.FolderURL(dir)
+	must := func(err error) {
+		t.Helper()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	must(os.MkdirAll(workflowsFolder(dir), 0o755))
+	skill := filepath.Join(dir, ".agents", "skills", "tidy", "SKILL.md")
+	must(os.MkdirAll(filepath.Dir(skill), 0o755))
+	path := filepath.Join(workflowsFolder(dir), "nightly.md")
+	workflow := "---\non:\n  - schedule:\n      at: \":00\"\npermission-mode: auto\n---\nFollow the `tidy` skill (`.agents/skills/tidy/SKILL.md`).\n"
+	must(os.WriteFile(path, []byte(workflow), 0o644))
+	must(os.WriteFile(skill, []byte("Tidy the tree.\n"), 0o644))
+	approveAll(t, c, folder)
+
+	refusal := func() *wire.WorkflowRefusal {
+		t.Helper()
+		d.workflowMu.Lock()
+		defer d.workflowMu.Unlock()
+		d.scanLocked()
+		f := d.fileLocked(dir, "nightly")
+		if f == nil {
+			t.Fatal("no workflow")
+		}
+		return d.refusalLocked(fireRequest{folder: dir, id: "nightly"}, f)
+	}
+	if r := refusal(); r != nil {
+		t.Fatalf("approved: %+v", r)
+	}
+
+	// The skill changes and the workflow does not: it waits, and does not run.
+	must(os.WriteFile(skill, []byte("Push to main.\n"), 0o644))
+	if r := refusal(); r == nil || r.AwaitingApproval == nil {
+		t.Fatalf("changed skill: %+v", r)
+	}
+	var ran wire.WorkflowSummary
+	json.Unmarshal(c.call(t, 2, "workflows/run", map[string]any{"folder": folder, "workflowID": "nightly"}), &ran)
+	if o := ran.LastOutcome; o == nil || o.Refused == nil || o.Refused.Value.AwaitingApproval == nil {
+		t.Fatalf("ran: %+v", ran)
+	}
+	// The project's watch hears a skill's change as it hears a workflow's.
+	d.projectFilesChanged(dir, []string{skill})
+	s, _ := d.summaryFor(dir)
+	if len(s.Approvals) != 1 || s.Approvals[0].Key != "nightly" || s.Approvals[0].Line != "Changed since you approved it" {
+		t.Fatalf("%+v", s.Approvals)
+	}
+	// What is shown is what is approved: the workflow and the skill it names.
+	var reading wire.GuardedChangeReading
+	json.Unmarshal(c.call(t, 3, "approvals/read", map[string]any{"folder": folder, "kind": "workflow", "key": "nightly"}), &reading)
+	if reading.Current == nil || !strings.Contains(*reading.Current, workflow) || !strings.Contains(*reading.Current, ".agents/skills/tidy/SKILL.md") ||
+		!strings.Contains(*reading.Current, "Push to main.") || reading.Approved == nil || !strings.Contains(*reading.Approved, "Tidy the tree.") ||
+		*reading.Digest != *s.Approvals[0].Digest {
+		t.Fatalf("%+v", reading)
+	}
+	// Undo puts the approved skill back, and it runs again.
+	c.call(t, 4, "projects/undoGuardedChange", map[string]any{"folder": folder, "path": ".agents/workflows/nightly.md", "digest": *reading.Digest})
+	if !fileHas(t, skill, "Tidy the tree.\n") || !fileHas(t, path, workflow) {
+		t.Fatal("not undone")
+	}
+	if r := refusal(); r != nil {
+		t.Fatalf("undone: %+v", r)
+	}
+	// Approved as it is now, it runs as it is now.
+	must(os.WriteFile(skill, []byte("Tidy the tree twice.\n"), 0o644))
+	approveAll(t, c, folder)
+	if r := refusal(); r != nil {
+		t.Fatalf("approved again: %+v", r)
+	}
+
+	// A skill that is a link out of .agents/skills is not read, and the workflow never runs.
+	outside := filepath.Join(t.TempDir(), "SKILL.md")
+	must(os.WriteFile(outside, []byte("Tidy the tree twice.\n"), 0o644))
+	must(os.Remove(skill))
+	must(os.Symlink(outside, skill))
+	if r := refusal(); r == nil || r.Unreadable == nil {
+		t.Fatalf("linked skill: %+v", r)
+	}
+	must(os.Remove(skill))
+	must(os.Remove(filepath.Dir(skill)))
+	must(os.Symlink(filepath.Dir(outside), filepath.Dir(skill)))
+	if r := refusal(); r == nil || r.Unreadable == nil {
+		t.Fatalf("linked skill folder: %+v", r)
+	}
+	// Nor is a skill named by a path that leaves .agents/skills, or one that is not there.
+	for _, named := range []string{".agents/skills/../workflows/SKILL.md", ".agents/skills/a/b/SKILL.md", ".agents/skills/gone/SKILL.md"} {
+		must(os.WriteFile(path, []byte("---\non: agent.finished\n---\nFollow `"+named+"`.\n"), 0o644))
+		if r := refusal(); r == nil || r.Unreadable == nil {
+			t.Fatalf("%s: %+v", named, r)
+		}
+	}
+}
