@@ -91,8 +91,28 @@ func (d *Daemon) looserThan(target, caller *wire.Agent) string {
 	return ""
 }
 
+// reportsTo is whether the target set the sender going: it started the sender, or ran the
+// workflow the sender belongs to. The sender's messages then go to it at once, whatever its
+// mode, as the work it asked for comes back (#1728).
+func (d *Daemon) reportsTo(sender, target *wire.Agent) bool {
+	if sender.StartedByAgent != nil && *sender.StartedByAgent == target.ID {
+		return true
+	}
+	ran := d.ranBy(sender)
+	return ran != nil && *ran == target.ID
+}
+
+// holdsMessageFrom is why a message from the sender waits for the person in the target's
+// chat, or "": the target is looser than the sender (looserThan), and did not set it going.
+func (d *Daemon) holdsMessageFrom(target, sender *wire.Agent) string {
+	if d.reportsTo(sender, target) {
+		return ""
+	}
+	return d.looserThan(target, sender)
+}
+
 // heldMessage is whether a message from another session waits in the target's queue
-// until the person speaks to it: its sender is gone, or the target is looser than it.
+// until the person speaks to it: its sender is gone, or the target holds its messages.
 func (d *Daemon) heldMessage(q wire.QueuedPrompt, target *wire.Agent) bool {
 	if q.From != wire.PromptOriginAgent {
 		return false
@@ -101,7 +121,7 @@ func (d *Daemon) heldMessage(q wire.QueuedPrompt, target *wire.Agent) bool {
 		return true
 	}
 	sender := d.Store.Agent(q.Sender.AgentID)
-	return sender == nil || d.looserThan(target, sender) != ""
+	return sender == nil || d.holdsMessageFrom(target, sender) != ""
 }
 
 // heldMessages is the ids of the messages in the agent's queue that wait for the person.

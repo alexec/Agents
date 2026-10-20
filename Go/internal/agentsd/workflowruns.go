@@ -398,7 +398,7 @@ func (d *Daemon) runAgent(w wire.Workflow, run workflowRun, fr fireRequest) (wir
 		if fr.triggeringAgent == nil {
 			return "", &wire.WorkflowRefusal{Unreadable: &wire.WorkflowRefusalUnreadable{Value: "Nothing triggered it, so there was no agent to resume."}}
 		}
-		if err := d.promptFromApp(*fr.triggeringAgent, prompt); err != nil {
+		if err := d.promptFromTrigger(*fr.triggeringAgent, prompt); err != nil {
 			_, msg := errMessage(err)
 			return "", &wire.WorkflowRefusal{Unreadable: &wire.WorkflowRefusalUnreadable{Value: msg}}
 		}
@@ -411,7 +411,7 @@ func (d *Daemon) runAgent(w wire.Workflow, run workflowRun, fr fireRequest) (wir
 		d.workflowMu.Unlock()
 		if standing != nil {
 			if a := d.Store.Agent(*standing); a != nil && a.State != wire.AgentStateArchived {
-				if err := d.promptFromApp(a.ID, prompt); err == nil {
+				if err := d.promptFromTrigger(a.ID, prompt); err == nil {
 					return a.ID, nil
 				}
 			}
@@ -450,6 +450,46 @@ func (d *Daemon) runAgent(w wire.Workflow, run workflowRun, fr fireRequest) (wir
 		d.workflowMu.Unlock()
 	}
 	return id, nil
+}
+
+// promptFromTrigger is promptFromApp for a run that prompts a session it did not start:
+// that turn starts the loop guard's count again (#1728). It forgets the marks of prompts
+// that left their queues without a turn.
+func (d *Daemon) promptFromTrigger(id wire.UUID, text string) error {
+	if d.Store.Agent(id) == nil {
+		return noSuchAgent()
+	}
+	q := wire.QueuedPrompt{ID: store.NewUUID(), Text: text, QueuedAt: now(), From: wire.PromptOriginApp}
+	d.messageMu.Lock()
+	for p, agent := range d.triggerPrompts {
+		if !queued(d.Store.Agent(agent), p) {
+			delete(d.triggerPrompts, p)
+		}
+	}
+	if d.triggerPrompts == nil {
+		d.triggerPrompts = map[wire.UUID]wire.UUID{}
+	}
+	d.triggerPrompts[q.ID] = id
+	d.messageMu.Unlock()
+	if err := d.enqueue(id, q, false); err != nil {
+		d.messageMu.Lock()
+		delete(d.triggerPrompts, q.ID)
+		d.messageMu.Unlock()
+		return err
+	}
+	return nil
+}
+
+func queued(a *wire.Agent, prompt wire.UUID) bool {
+	if a == nil {
+		return false
+	}
+	for _, q := range a.QueuedPrompts {
+		if q.ID == prompt {
+			return true
+		}
+	}
+	return false
 }
 
 // runPrompt is the file's prompt, and a note at its end that says why the run started

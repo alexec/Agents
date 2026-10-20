@@ -141,3 +141,69 @@ func TestNextTurnPassesHeldMessagesOver(t *testing.T) {
 		t.Fatal(turn, rest, ok)
 	}
 }
+
+// A session that set the sender going takes its messages at once, whatever its mode: it
+// started the sender, or ran the workflow the sender belongs to (#1728). Others still wait.
+func TestMessageWakesTheSessionThatSetTheSenderGoing(t *testing.T) {
+	fakeRuntimes(t)
+	d, c := start(t, t.TempDir())
+	defer d.Shutdown()
+	go func() {
+		for range c.out {
+		}
+	}()
+	dir := t.TempDir()
+	lead := seeded(t, d, dir, titledAs("Lead", inMode("bypassPermissions")))
+	runner := seeded(t, d, dir, titledAs("Runner", inMode("bypassPermissions")))
+	other := seeded(t, d, dir, titledAs("Other", inMode("bypassPermissions")))
+	lane := seeded(t, d, dir, titledAs("Lane", inMode("default"), func(a *wire.Agent) { a.StartedByAgent = &lead.ID }))
+	ran := seeded(t, d, dir, titledAs("Release", inMode("auto"), func(a *wire.Agent) {
+		wf := "release"
+		a.StartedByWorkflow = &wf
+	}))
+	scheduled := seeded(t, d, dir, titledAs("Nightly", inMode("auto"), func(a *wire.Agent) {
+		wf := "nightly"
+		a.StartedByWorkflow = &wf
+	}))
+	d.workflowMu.Lock()
+	d.noteRanByLocked(ran.ID, runner.ID)
+	d.workflowMu.Unlock()
+
+	send := func(from wire.UUID, to string) string {
+		t.Helper()
+		m := appClient(t, d, from)
+		m.post("initialize", map[string]any{}, 1)
+		text, isErr := m.tool(2, "message_session", map[string]any{"to": to, "message": "done: " + string(from)})
+		if isErr {
+			t.Fatal(text)
+		}
+		return text
+	}
+	delivered := func(from wire.UUID, to string, target wire.UUID) {
+		t.Helper()
+		if text := send(from, to); text != "Sent to “"+to+"”, which is working on it now. A reply, if it sends one, comes to this session as a message." {
+			t.Fatal(text)
+		}
+		waitFor(t, "the message in "+to+"'s chat", func() bool {
+			u := userMessages(d, target)
+			return len(u) > 0 && u[len(u)-1] == "done: "+string(from)
+		})
+		waitFor(t, to+"'s turn over", func() bool { return d.Store.Agent(target).State == wire.AgentStateFinished })
+	}
+	held := func(from wire.UUID, to string, target wire.UUID, why string) {
+		t.Helper()
+		if text := send(from, to); text != "Sent to “"+to+"”, but it waits in that chat until the person speaks to it: "+why+"." {
+			t.Fatal(text)
+		}
+		a := d.Store.Agent(target)
+		if len(a.QueuedPrompts) != 1 || d.hasTurn(a) {
+			t.Fatalf("%+v", a)
+		}
+	}
+	// Its starter, and the session that ran its workflow, take it at once.
+	delivered(lane.ID, "Lead", lead.ID)
+	delivered(ran.ID, "Runner", runner.ID)
+	// A session it did not start, and one whose workflow it did not run, still wait.
+	held(lane.ID, "Other", other.ID, "it runs in bypassPermissions, which lets it do more without asking than yours (default)")
+	held(scheduled.ID, "Runner", runner.ID, "it runs in bypassPermissions, which lets it do more without asking than yours (auto)")
+}

@@ -3,6 +3,7 @@ package agentsd
 import (
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/alexec/agents/Go/wire"
 )
@@ -82,5 +83,97 @@ func TestReadingAndMessagingSessions(t *testing.T) {
 	if text, isErr := m.tool(8, "message_session", map[string]any{"to": "Helper", "message": "again"}); !isErr ||
 		!strings.HasPrefix(text, "Nothing was sent: this turn began with the third message in a row between agents") {
 		t.Fatal(text)
+	}
+}
+
+// The count of messages in a row starts again when wait_for_event or a workflow's trigger
+// starts a turn, as the person's words do; the app's other words leave it (#1728).
+func TestEventAndTriggerTurnsStartTheHopCountAgain(t *testing.T) {
+	fakeRuntimes(t)
+	was := eventHoldLimit
+	eventHoldLimit = 300 * time.Millisecond
+	defer func() { eventHoldLimit = was }()
+	d, c := start(t, t.TempDir())
+	defer d.Shutdown()
+	go func() {
+		for range c.out {
+		}
+	}()
+	dir := t.TempDir()
+	lead := seeded(t, d, dir, titledAs("Lead"))
+	seeded(t, d, dir, titledAs("Peer"))
+	// A turn's new process drops the app's token, so each call has a client of its own.
+	tool := func(name string, args map[string]any) (string, bool) {
+		m := appClient(t, d, lead.ID)
+		m.post("initialize", map[string]any{}, 1)
+		return m.tool(2, name, args)
+	}
+	atTheLimit := func() {
+		d.messageMu.Lock()
+		d.messageHops = map[wire.UUID]int{lead.ID: messageHopLimit}
+		d.messageMu.Unlock()
+	}
+	hops := func() int {
+		d.messageMu.Lock()
+		defer d.messageMu.Unlock()
+		return d.messageHops[lead.ID]
+	}
+	turn := func(text string, queue func()) {
+		t.Helper()
+		queue()
+		waitFor(t, "the turn in its chat", func() bool {
+			for _, u := range userMessages(d, lead.ID) {
+				if strings.HasPrefix(u, text) {
+					return true
+				}
+			}
+			return false
+		})
+		waitFor(t, "its turn over", func() bool { return d.Store.Agent(lead.ID).State == wire.AgentStateFinished })
+	}
+
+	// The app's own words leave the count where it was, and a message is refused.
+	atTheLimit()
+	turn("A lease note", func() {
+		if err := d.promptFromApp(lead.ID, "A lease note"); err != nil {
+			t.Fatal(err)
+		}
+	})
+	if n := hops(); n != messageHopLimit {
+		t.Fatal(n)
+	}
+	if text, isErr := tool("message_session", map[string]any{"to": "Peer", "message": "again"}); !isErr ||
+		!strings.HasPrefix(text, "Nothing was sent: this turn began with the third message in a row between agents") {
+		t.Fatal(text)
+	}
+
+	// A workflow's trigger starts it again.
+	atTheLimit()
+	turn("Triggered", func() {
+		if err := d.promptFromTrigger(lead.ID, "Triggered"); err != nil {
+			t.Fatal(err)
+		}
+	})
+	if n := hops(); n != 0 {
+		t.Fatal(n)
+	}
+	d.messageMu.Lock()
+	marks := len(d.triggerPrompts)
+	d.messageMu.Unlock()
+	if marks != 0 {
+		t.Fatal(marks)
+	}
+
+	// So does a wake by wait_for_event.
+	text, _ := tool("wait_for_event", map[string]any{"events": "branch.moved", "until_minutes": 10})
+	if !strings.HasPrefix(text, "Still waiting for branch.moved") {
+		t.Fatal(text)
+	}
+	atTheLimit()
+	turn("The event you were waiting for happened.", func() {
+		d.raise(wire.EventDraft{Name: "branch.moved", At: now(), Scope: projectScope(dir), Sentence: "cd moved.", Details: map[string]string{"branch": "cd"}})
+	})
+	if n := hops(); n != 0 {
+		t.Fatal(n)
 	}
 }

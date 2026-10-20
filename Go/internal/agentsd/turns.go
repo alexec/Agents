@@ -542,6 +542,10 @@ func (l *live) turn() bool {
 	if a := d.Store.Agent(l.id); a != nil {
 		held = d.heldMessages(a)
 	}
+	// Read while the prompt is still queued, so promptFromTrigger cannot forget its mark.
+	d.messageMu.Lock()
+	triggers := maps.Clone(d.triggerPrompts)
+	d.messageMu.Unlock()
 	d.change(l.id, func(a *wire.Agent) { q, a.QueuedPrompts, taken = nextTurn(a.QueuedPrompts, held) })
 	if !taken {
 		return false
@@ -571,13 +575,20 @@ func (l *live) turn() bool {
 		d.recordFrom(l.id, wire.TranscriptEntryKind{UserMessage: um}, q.Sender)
 	}
 	// The loop guard's count: the person starts it again, another agent's message carries
-	// it on, and the app's own words leave it where it was.
+	// it on, and the app's own words leave it where it was; except a wake by wait_for_event
+	// or a workflow's trigger, which start it again as the person does (#1728).
+	woken := false
+	if a := d.Store.Agent(l.id); a != nil && a.EventWait != nil && a.EventWait.ResumePromptID != nil {
+		woken = *a.EventWait.ResumePromptID == q.ID
+	}
 	d.messageMu.Lock()
 	if d.messageHops == nil {
 		d.messageHops = map[wire.UUID]int{}
 	}
+	triggered := triggers[q.ID] != ""
+	delete(d.triggerPrompts, q.ID)
 	switch {
-	case from == wire.PromptOriginPerson:
+	case from == wire.PromptOriginPerson, woken, triggered:
 		delete(d.messageHops, l.id)
 	case from == wire.PromptOriginAgent && q.Hops != nil:
 		d.messageHops[l.id] = int(*q.Hops)
