@@ -166,6 +166,15 @@ struct AgentRow: View {
                         .appText(isCompact ? .fine : .supporting)
                         .foregroundStyle(.secondary)
                         .help(agent.folderGoneMessage)
+                } else if isCompact, let said = model.work.saidLines[agent.id] {
+                    // While the sidebar searches: the line it said that matches, in the
+                    // report's place, so a row found by what it said says why (#1663).
+                    // The page's row has it on a line of its own, below.
+                    Text(said)
+                        .appText(.fine)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .help(said)
                 } else if let report = agent.report?.message {
                     // Grey under the white title, in the sidebar as on the page (#587).
                     Text(report)

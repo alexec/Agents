@@ -147,6 +147,9 @@ export function SessionRow({ agent, chosen, onPick, going, extras, inSidebar = f
         {/* In the report's place, as the window's row has it (#87). */}
         {going ? <span class="subtitle"><Telling recipient={going.recipient} doing={going.doing} /></span>
           : extras?.queued ? <span class="subtitle queued">{extras.queued}</span>
+          // While the sidebar searches: the line it said that matches, in the report's place,
+          // so a row found by what it said says why (#1663). The page's row has it below.
+          : inSidebar && extras?.said && !folderIsMissing(agent) ? <span class="subtitle said" title={extras.said}>{extras.said}</span>
           : agent.report && !(inSidebar && folderIsMissing(agent)) && <span class="subtitle report">{agent.report.message}</span>}
         {/* Its folder gone (#119), as a project's row says it. */}
         {folderIsMissing(agent) && <span class="subtitle missing-folder" title={folderPath(agent)}>⚠ {missingFolderLabel}</span>}

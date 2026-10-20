@@ -100,6 +100,13 @@ struct SidebarSessionRow: View {
                     Text(MissingFolderWords.label)
                         .appText(.fine)
                         .foregroundStyle(.secondary)
+                } else if let said = model.work.saidLines[agent.id] {
+                    // While the sidebar searches: the line it said that matches, in the
+                    // report's place, so a row found by what it said says why (#1663).
+                    Text(said)
+                        .appText(.fine)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
                 } else if let report = agent.report?.message {
                     Text(report)
                         .appText(.fine)
