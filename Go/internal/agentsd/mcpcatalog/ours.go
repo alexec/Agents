@@ -43,12 +43,11 @@ var Made = []Ours{
 	{ID: "agents/linear", Title: "Linear", Description: "Linear issues: a page of open issues with Start Agent, and events when one is opened, labelled, commented on or closed",
 		// Tested: show_issues and the events on Alex's workspace with a personal API key (#1343).
 		Command: "linear-mcp", Declares: Declared{Tools: true, Events: linearEvents, Views: true}, Tested: "2026-10-19"},
-	// An access token in GITLAB_TOKEN until the sign-in (#1630); GITLAB_URL in mcp.json's env
-	// for a self-managed GitLab. Not yet tested on a real account (#1634).
+	// No secret to ask for: it reads the person's GitLab connection (#1630), which also says
+	// which GitLab. An access token in GITLAB_TOKEN (and GITLAB_URL), set by hand in mcp.json's
+	// env, still goes first. Not yet tested on a real account (#1634).
 	{ID: "agents/gitlab", Title: "GitLab", Description: "Merge requests, pipelines and issues on gitlab.com or a self-managed GitLab: their pages, tools to read them and comment, and events",
-		Command: "gitlab-mcp", Secret: "GITLAB_TOKEN",
-		SecretDescription: "A GitLab access token with the api scope (GitLab ▸ Edit profile ▸ Access tokens)",
-		Declares:          Declared{Tools: true, Events: gitlabEvents, Views: true}},
+		Command: "gitlab-mcp", Declares: Declared{Tools: true, Events: gitlabEvents, Views: true}},
 }
 
 var (

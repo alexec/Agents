@@ -148,7 +148,7 @@ func (f *CodeFlow) Exchange(ctx context.Context, code, verifier string) (Token, 
 		return Token{}, err
 	}
 	if a.Error != "" {
-		return Token{}, &Failure{Code: a.Error, Words: a.ErrorDescription}
+		return Token{}, &Failure{Name: f.Name, Code: a.Error, Words: a.ErrorDescription}
 	}
 	return f.token(a)
 }
@@ -166,7 +166,7 @@ func (f *CodeFlow) Refresh(ctx context.Context, refresh string) (Token, error) {
 	case "invalid_grant", "unauthorized_client", "invalid_client":
 		return Token{}, ErrRefused
 	}
-	return Token{}, &Failure{Code: a.Error, Words: a.ErrorDescription}
+	return Token{}, &Failure{Name: f.Name, Code: a.Error, Words: a.ErrorDescription}
 }
 
 func (f *CodeFlow) token(a oauthAnswer) (Token, error) {

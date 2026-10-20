@@ -4,16 +4,18 @@
 // issue.opened, issue.commented, issue.closed), and tools that read them and comment, over
 // GitLab's REST API v4. GitLab's own MCP server is not behind it: it takes no classic access
 // token and needs a setting turned on for the group or instance (see the PR of #1629). For
-// gitlab.com and a self-managed GitLab alike. As the person whose token is in GITLAB_TOKEN
-// (the sign-in comes with #1630), which `.agents/mcp.json` names as ${GITLAB_TOKEN} so its
-// value stays in ~/.agents-secrets/secrets.env.
+// gitlab.com and a self-managed GitLab alike. As the person who connected GitLab (#1630, in
+// the store connections.EnvName names), or whose token is in GITLAB_TOKEN, which
+// `.agents/mcp.json` names as ${GITLAB_TOKEN} so its value stays in
+// ~/.agents-secrets/secrets.env. The connection's token goes only to the GitLab it was made
+// on: with --url naming another, only GITLAB_TOKEN is used.
 //
 //	gitlab-mcp                       serve on stdio
 //	gitlab-mcp --url https://gitlab.example.com
 //	gitlab-mcp --version
 //
 //	GITLAB_TOKEN                     an access token with the api scope
-//	GITLAB_URL                       as --url: the GitLab (https://gitlab.com when empty), a fake in tests and walks
+//	GITLAB_URL                       as --url: the GitLab (the connection's, else https://gitlab.com), a fake in tests and walks
 package main
 
 import (
@@ -27,6 +29,7 @@ import (
 	"syscall"
 
 	"github.com/alexec/agents/Go/internal/buildinfo"
+	"github.com/alexec/agents/Go/internal/connections"
 	"github.com/alexec/agents/Go/internal/gitlabmcp"
 )
 
@@ -42,8 +45,23 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	token := func() string { return strings.TrimSpace(os.Getenv("GITLAB_TOKEN")) }
-	gl := gitlabmcp.NewRealGitLab(*base, token, gitlabmcp.GitProject(*base))
+	connected := connections.Reader(connections.FromEnv(), connections.GitLab)
+	if *base == "" {
+		if c, ok := connected(); ok {
+			*base = c.URL
+		}
+	}
+	root := gitlabmcp.BaseURL(*base)
+	token := func() string {
+		if t := strings.TrimSpace(os.Getenv("GITLAB_TOKEN")); t != "" {
+			return t
+		}
+		if c, ok := connected(); ok && gitlabmcp.BaseURL(c.URL) == root {
+			return c.Access
+		}
+		return ""
+	}
+	gl := gitlabmcp.NewRealGitLab(root, token, gitlabmcp.GitProject(root))
 	front := &gitlabmcp.Front{
 		Events:   &gitlabmcp.Events{GitLab: gl},
 		Upstream: gitlabmcp.NewServer(buildinfo.Version, gl), Version: buildinfo.Version, Logger: logger,

@@ -71,4 +71,21 @@ struct ConnectorSetupWordsTests {
         #expect(ConnectorSetupWords.connectionTitle(c) == "Linear \u{00B7} Alex")
         #expect(ConnectorSetupWords.connectionNote(c) == "Loops \u{00B7} OAuth \u{00B7} renews by itself")
     }
+
+    /// Connect GitLab (#1630): a token's row says its GitLab and when it ends, as the web page's.
+    @Test func gitlabWords() throws {
+        let now = try Date("2026-10-20T00:00:00Z", strategy: .iso8601)
+        let end = try Date("2027-10-19T00:00:00Z", strategy: .iso8601)
+        let c = DaemonAPI.Connection(provider: .gitlab, login: "agentstest", connectedAt: now,
+                                     workspace: "gitlab.example.com", expiresAt: end)
+        #expect(ConnectorSetupWords.connectionTitle(c) == "GitLab \u{00B7} agentstest")
+        #expect(ConnectorSetupWords.connectionNote(c, now: now) == "gitlab.example.com \u{00B7} Access token \u{00B7} ends 19 Oct 2027")
+        var ended = c
+        ended.state = .signInAgain
+        #expect(ConnectorSetupWords.connectionNote(ended) == "The access token ended: connect again with a new one")
+        #expect(ConnectorSetupWords.GitLab.newTokenURL("")
+                == "https://gitlab.com/-/user_settings/personal_access_tokens?name=Agents&scopes=api")
+        #expect(ConnectorSetupWords.GitLab.newTokenURL("gitlab.example.com/api/v4/")
+                == "https://gitlab.example.com/-/user_settings/personal_access_tokens?name=Agents&scopes=api")
+    }
 }

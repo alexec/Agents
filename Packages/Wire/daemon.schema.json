@@ -17560,10 +17560,11 @@
     },
     "ConnectionProvider": {
       "type": "string",
-      "description": "A tool the person connects to with OAuth: GitHub (#1335) and Linear (#1343).",
+      "description": "A tool the person connects to: GitHub (#1335) and Linear (#1343) with OAuth, GitLab (#1630) with OAuth on gitlab.com or a personal access token on any GitLab.",
       "enum": [
         "github",
-        "linear"
+        "linear",
+        "gitlab"
       ]
     },
     "ConnectionState": {
@@ -17597,7 +17598,11 @@
         },
         "workspace": {
           "type": "string",
-          "description": "The part of the provider the token reaches, such as a Linear workspace's name."
+          "description": "The part of the provider the token reaches, such as a Linear workspace's name, or a self-managed GitLab's host."
+        },
+        "expiresAt": {
+          "$ref": "#/definitions/WireDate",
+          "description": "When a token the host cannot renew ends: a GitLab personal access token's expiry. The person makes a new one before then."
         }
       },
       "required": [
@@ -17740,6 +17745,41 @@
         "verificationURL",
         "expiresAt"
       ],
+      "additionalProperties": false
+    },
+    "ConnectionTokenRequest": {
+      "type": "object",
+      "description": "connections/sign-in/token (#1630): a personal access token the person made, for a provider with no Agents application there (a self-managed GitLab). The host checks it with the provider, keeps it in its own store, and never logs it or gives it back.",
+      "properties": {
+        "provider": {
+          "$ref": "#/definitions/ConnectionProvider"
+        },
+        "url": {
+          "type": "string",
+          "description": "The provider's address, such as gitlab.example.com (https:// when it names no scheme). gitlab.com when left out."
+        },
+        "token": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "provider",
+        "token"
+      ],
+      "additionalProperties": false
+    },
+    "ConnectionTokenAnswer": {
+      "type": "object",
+      "description": "The connection the token made, or why it made none, in words.",
+      "properties": {
+        "connection": {
+          "$ref": "#/definitions/Connection"
+        },
+        "error": {
+          "type": "string"
+        }
+      },
+      "required": [],
       "additionalProperties": false
     },
     "ConnectionDisconnectAnswer": {

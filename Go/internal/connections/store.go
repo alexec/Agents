@@ -1,6 +1,7 @@
-// Package connections is the person's sign-ins to tools such as GitHub (#1335) and Linear
-// (#1343): one connection per provider, kept by the host. The host signs in (GitHub's device
-// flow, or Linear's authorization code with PKCE), keeps the
+// Package connections is the person's sign-ins to tools such as GitHub (#1335), Linear
+// (#1343) and GitLab (#1630): one connection per provider, kept by the host. The host signs in
+// (GitHub's and GitLab's device flow, Linear's authorization code with PKCE, or a GitLab
+// personal access token), keeps the
 // tokens and refreshes them; a server that uses one (the github server) only reads it.
 //
 // Secrets are not configuration (#1035): a connection is kept in this Mac's Keychain, one
@@ -29,11 +30,11 @@ import (
 	"github.com/alexec/agents/Go/internal/agentsd/store"
 )
 
-// GitHub is the first provider (#1335). Linear is in linear.go.
+// GitHub is the first provider (#1335). Linear is in linear.go, GitLab in gitlab.go.
 const GitHub = "github"
 
 // Providers is every provider a store is asked about when it lists.
-var Providers = []string{GitHub, Linear}
+var Providers = []string{GitHub, Linear, GitLab}
 
 // Connection is one provider's sign-in. Access and Refresh are secrets: they leave the
 // store only to the host's refresh and to a server's Authorization header.
@@ -42,7 +43,9 @@ type Connection struct {
 	// Login is the account's name on the provider, such as alexec.
 	Login string `json:"login,omitempty"`
 	// Workspace is the part of the provider the token reaches, such as a Linear workspace.
-	Workspace        string    `json:"workspace,omitempty"`
+	Workspace string `json:"workspace,omitempty"`
+	// URL is the provider's root when it is not the usual one: a self-managed GitLab's.
+	URL              string    `json:"url,omitempty"`
 	Access           string    `json:"access,omitempty"`
 	Refresh          string    `json:"refresh,omitempty"`
 	AccessExpiresAt  time.Time `json:"accessExpiresAt,omitzero"`

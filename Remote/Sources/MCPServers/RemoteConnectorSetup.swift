@@ -239,10 +239,11 @@ private struct RemoteSlotView: View {
     }
 }
 
-/// Connect GitHub or Linear on the iPhone and iPad (frames B and H). GitHub is the host's
-/// device flow: the sheet shows the code, copies it, opens github.com/login/device in Safari,
-/// waits, and closes by itself. Linear is the code flow: the sheet opens linear.app in an
-/// authentication session and gives the host what came back (CodeFlowSignIn).
+/// Connect GitHub, Linear or GitLab on the iPhone and iPad (frames B and H). GitHub is the
+/// host's device flow: the sheet shows the code, copies it, opens github.com/login/device in
+/// Safari, waits, and closes by itself. Linear is the code flow: the sheet opens linear.app in
+/// an authentication session and gives the host what came back (CodeFlowSignIn). GitLab
+/// (#1630) is the device flow on gitlab.com, or an access token on any GitLab.
 struct RemoteConnectSheet: View {
     @Environment(RemoteModel.self) private var model
     @Environment(\.dismiss) private var dismiss
@@ -261,10 +262,16 @@ struct RemoteConnectSheet: View {
         case finishing
         /// Linear only: the person closed linear.app's page.
         case cancelled
+        /// GitLab's access token: the host checks it.
+        case checking
         case failed(String)
     }
 
     @State private var step: Step = .asking
+    /// GitLab only: an access token instead of the sign-in.
+    @State private var withToken = false
+    @State private var address = ""
+    @State private var token = ""
 
     var body: some View {
         NavigationStack {
@@ -273,10 +280,36 @@ struct RemoteConnectSheet: View {
                     Text(ConnectorSetupWords.sheetSubtitle(provider)).foregroundStyle(.secondary)
                 }
                 .paperListRow()
+                if provider == .gitlab {
+                    Section {
+                        Picker("Connect with", selection: $withToken) {
+                            Text(ConnectorSetupWords.GitLab.signInWay).tag(false)
+                            Text(ConnectorSetupWords.GitLab.tokenWay).tag(true)
+                        }
+                        .pickerStyle(.segmented)
+                        .disabled(isBusy)
+                    }
+                    .paperListRow()
+                }
                 Section("Agents will be able to") {
                     ForEach(ConnectorSetupWords.abilities(provider), id: \.self) { Text($0) }
                 }
                 .paperListRow()
+                if withToken {
+                    Section {
+                        TextField(ConnectorSetupWords.GitLab.addressLabel, text: $address,
+                                  prompt: Text(ConnectorSetupWords.GitLab.addressPrompt))
+                            .keyboardType(.URL).textInputAutocapitalization(.never).autocorrectionDisabled()
+                        SecureField(ConnectorSetupWords.GitLab.tokenLabel, text: $token,
+                                    prompt: Text(ConnectorSetupWords.GitLab.tokenPrompt))
+                            .onSubmit { Task { await connectWithToken() } }
+                        Button("Make a Token on GitLab") { open(ConnectorSetupWords.GitLab.newTokenURL(address)) }
+                    } footer: {
+                        Text(ConnectorSetupWords.GitLab.tokenIntro)
+                    }
+                    .disabled(isBusy)
+                    .paperListRow()
+                }
                 Section {
                     switch step {
                     case .asking:
@@ -291,7 +324,7 @@ struct RemoteConnectSheet: View {
                                 Text(ConnectorSetupWords.sheetStatus(flow)).appText(.fine)
                             }
                             Button("Copy Code") { UIPasteboard.general.string = code }
-                            Button("Open github.com Again") { open(flow.verificationURL) }
+                            Button("Open \(ConnectorSetupWords.site(provider)) Again") { open(flow.verificationURL) }
                         } else {
                             HStack(spacing: 8) {
                                 ProgressView()
@@ -303,6 +336,11 @@ struct RemoteConnectSheet: View {
                             ProgressView()
                             Text(ConnectorSetupWords.Linear.finishing).appText(.fine)
                         }
+                    case .checking:
+                        HStack(spacing: 8) {
+                            ProgressView()
+                            Text(ConnectorSetupWords.GitLab.checking).appText(.fine)
+                        }
                     case .install(let login, let repository):
                         Text("Connected as \(login).").fontWeight(.semibold)
                         Text(ConnectorSetupWords.notInstalled(repository)).appText(.fine)
@@ -312,7 +350,7 @@ struct RemoteConnectSheet: View {
                         continueButton
                     case .failed(let why):
                         Text(why).tinted(.failure)
-                        Button("Try Again") { Task { await start() } }
+                        if withToken { continueButton } else { Button("Try Again") { Task { await start() } } }
                     }
                 } footer: {
                     Text(ConnectorSetupWords.sheetChoose(provider) + " " + ConnectorSetupWords.sheetFoot)
@@ -329,13 +367,41 @@ struct RemoteConnectSheet: View {
                 }
             }
         }
+        .onChange(of: withToken) { if case .failed = step { step = .asking } }
         .onDisappear {
             if case .waiting(let flow) = step { Task { await model.cancelSignIn(flow.flowID, on: host) } }
         }
     }
 
-    private var continueButton: some View {
-        Button(ConnectorSetupWords.continueButton(provider)) { Task { await start() } }.fontWeight(.semibold)
+    @ViewBuilder private var continueButton: some View {
+        if withToken {
+            Button(ConnectorSetupWords.GitLab.tokenButton) { Task { await connectWithToken() } }.fontWeight(.semibold)
+                .disabled(token.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+        } else {
+            Button(ConnectorSetupWords.continueButton(provider)) { Task { await start() } }.fontWeight(.semibold)
+        }
+    }
+
+    private var isBusy: Bool {
+        switch step {
+        case .starting, .waiting, .finishing, .checking: true
+        default: false
+        }
+    }
+
+    private func connectWithToken() async {
+        let typed = token.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !typed.isEmpty, !isBusy else { return }
+        step = .checking
+        let url = address.trimmingCharacters(in: .whitespacesAndNewlines)
+        switch await model.signInWithToken(provider, url: url.isEmpty ? nil : url, token: typed, on: host) {
+        case .success:
+            token = ""
+            onConnected()
+            dismiss()
+        case .failure(let problem):
+            step = .failed(problem.words)
+        }
     }
 
     private var isInstall: Bool { if case .install = step { true } else { false } }
@@ -352,7 +418,7 @@ struct RemoteConnectSheet: View {
             await finishCodeFlow(started)
             return
         }
-        // The device flow (GitHub): it always has a code.
+        // The device flow (GitHub, GitLab): it always has a code.
         UIPasteboard.general.string = started.userCode
         open(started.verificationURL)
         while case .waiting(let shown) = step, shown.flowID == started.flowID {
@@ -447,7 +513,7 @@ struct RemoteConnections: View {
             if let problem { Text(problem).tinted(.failure) }
             if let connections {
                 if connections.isEmpty {
-                    Text("No connections yet. Connect GitHub to give agents issues, pull requests and Actions in every project, and Linear for its issues.")
+                    Text(ConnectorSetupWords.noConnections)
                         .foregroundStyle(.secondary)
                 }
                 ForEach(connections, id: \.provider) { c in
@@ -468,11 +534,11 @@ struct RemoteConnections: View {
                 if !has(.github, in: connections) {
                     Button(ConnectorSetupWords.connectButton) { connecting = .github }
                 }
-                // Linear (#1343): its own row while it is not connected.
-                if !has(.linear, in: connections) {
+                // Linear (#1343) and GitLab (#1630): a row each while not connected.
+                ForEach([DaemonAPI.ConnectionProvider.linear, .gitlab].filter { !has($0, in: connections) }) { p in
                     VStack(alignment: .leading, spacing: 2) {
-                        Button("Connect Linear\u{2026}") { connecting = .linear }
-                        Text(ConnectorSetupWords.notConnectedNote(.linear)).appText(.fine).foregroundStyle(.secondary)
+                        Button("Connect \(ConnectorSetupWords.name(p))\u{2026}") { connecting = p }
+                        Text(ConnectorSetupWords.notConnectedNote(p)).appText(.fine).foregroundStyle(.secondary)
                     }
                 }
             } else {

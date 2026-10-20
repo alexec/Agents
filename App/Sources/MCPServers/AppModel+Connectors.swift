@@ -53,6 +53,22 @@ extension AppModel {
         }
     }
 
+    /// A personal access token (GitLab, #1630): the connection it made, or why it made none.
+    func signInWithToken(_ provider: DaemonAPI.ConnectionProvider, url: String?, token: String, on host: HostID) async
+        -> Result<DaemonAPI.Connection, ConnectorProblem> {
+        let answer = await connectorCall(host) {
+            try await $0.call(DaemonAPI.Method.connectionsSignInToken,
+                              DaemonAPI.ConnectionTokenRequest(provider: provider, url: url, token: token),
+                              returning: DaemonAPI.ConnectionTokenAnswer.self)
+        }
+        switch answer {
+        case .success(let a):
+            if let connection = a.connection { return .success(connection) }
+            return .failure(ConnectorProblem(words: a.error ?? "GitLab did not take the token."))
+        case .failure(let problem): return .failure(problem)
+        }
+    }
+
     func cancelSignIn(_ flow: UUID, on host: HostID) async {
         _ = await connectorCall(host) {
             try await $0.call(DaemonAPI.Method.connectionsSignInCancel, DaemonAPI.ConnectionSignInFlowRequest(flowID: flow),

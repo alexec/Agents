@@ -17,8 +17,9 @@ import (
 	"time"
 )
 
-// RealGitLab reads GitLab's REST API v4 as the person, with the token in GITLAB_TOKEN (a
-// personal, group or project access token with the api scope; the sign-in comes with #1630).
+// RealGitLab reads GitLab's REST API v4 as the person, with the token Token gives: the GitLab
+// connection's (#1630), or GITLAB_TOKEN (a personal, group or project access token with the
+// api scope).
 // Base is gitlab.com or a self-managed GitLab. The listings events poll are shared for
 // sharedFor, as the github server's (#932): every wait polls on its own, and ten waits on
 // one project would otherwise fetch the same page ten times.
@@ -89,7 +90,7 @@ func BaseURL(base string) string {
 // MARK: HTTP
 
 // NotConnected is what a call says with no token, or one GitLab no longer takes.
-const NotConnected = "GitLab is not connected, or its token ended: set GITLAB_TOKEN to an access token with the api scope"
+const NotConnected = "GitLab is not connected, or its token ended: connect GitLab in Your Connectors, or set GITLAB_TOKEN to an access token with the api scope"
 
 func (g *RealGitLab) do(ctx context.Context, method, path string, body any) ([]byte, error) {
 	token := g.Token()

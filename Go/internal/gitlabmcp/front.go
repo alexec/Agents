@@ -19,7 +19,7 @@ import (
 // `events` capability and the events' words to its answer to initialize.
 
 // Instructions are the server's words.
-const Instructions = "This project's merge requests, their pipelines, and its issues on GitLab, as events polled with GITLAB_TOKEN: " +
+const Instructions = "This project's merge requests, their pipelines, and its issues on GitLab, as events polled as the person who connected GitLab: " +
 	"checks.failed (a failed pipeline), pr.opened, pr.merged, pr.closed, pr.conflicted, review.comment (a comment on a line of a merge request's diff), " +
 	"issue.opened, issue.commented, issue.closed. A merge request is a pr in their names and data, and its number is its iid (!12). " +
 	"list_merge_requests, get_merge_request, list_pipelines, get_pipeline, list_issues and get_issue read them; " +

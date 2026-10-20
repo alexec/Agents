@@ -68,13 +68,13 @@ func TestOursAreAddedHostedWithNoSecretToAsk(t *testing.T) {
 	if _, ok := OursByCommand("npx"); ok {
 		t.Fatal("npx is not ours")
 	}
-	// GitLab asks for its token by name, until the sign-in (#1630).
+	// GitLab reads the person's connection (#1630), as Linear does: no secret to ask for.
 	gitlab, _ := OursByID("agents/gitlab")
 	built = BuildOurs(gitlab, func(string) bool { return false })
-	if got := strings.Join(strings.Fields(built.Entry.Stringified()), ""); got != `{"command":"gitlab-mcp","hosted":true,"env":{"GITLAB_TOKEN":"${GITLAB_TOKEN}"}}` {
+	if got := strings.Join(strings.Fields(built.Entry.Stringified()), ""); got != `{"command":"gitlab-mcp","hosted":true}` {
 		t.Fatalf("gitlab entry: %s", got)
 	}
-	if built.NameHere != "gitlab" || len(built.Variables) != 1 || built.Variables[0].Name != "GITLAB_TOKEN" || !built.Variables[0].Required {
+	if built.NameHere != "gitlab" || len(built.Variables) != 0 {
 		t.Fatalf("gitlab built: %+v", built)
 	}
 	r := OursResult(linear, linear.Declares)
