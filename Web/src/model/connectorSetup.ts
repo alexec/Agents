@@ -18,6 +18,8 @@ export const sheetSubtitle = "For you, in every project. Agents talks to GitHub'
 export const sheetChoose = "On github.com you choose which repositories. You can take it back there, or with Disconnect on Your Connectors.";
 export const sheetFoot = "The token is kept by the host, never in a log.";
 export const continueButton = "Continue on github.com";
+/** Where the person sees and changes which repositories the App reaches, as the Mac's (#1685). */
+export const installationsURL = "https://github.com/settings/installations";
 export const otherProvidersElsewhere = "Other providers are set up on the Mac.";
 export const disconnectNote = "Disconnect deletes the host's tokens. Every project's GitHub slots wait for a connection again. To revoke the App too, go to github.com ▸ Settings ▸ Applications.";
 

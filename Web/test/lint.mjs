@@ -39,6 +39,9 @@ const allowedURLs = new Set([
   "https://github.com/owner/repository.git",
   // Help (#1327): the docs site, a link the person opens in a new tab, never fetched by the page.
   "https://alexec.github.io/Agents/",
+  // Repositories on github.com (#1685): where the person changes which repositories the GitHub
+  // App reaches, the same for every person, as the window's; a link opened in a new tab, never fetched.
+  "https://github.com/settings/installations",
   // Connect Linear (#1343): the hand-back page, the one origin whose postMessage the page takes.
   "https://agentloops.dev",
   "http://www.w3.org/1998/Math/MathML",

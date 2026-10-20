@@ -437,7 +437,7 @@ export function YourConnections({ store, host }: { store: Store; host: string })
             </div>
             {c.state === "signInAgain"
               ? <button onClick={() => setConnecting(c.provider)}>Connect Again…</button>
-              : c.provider === "github" && c.installURL && <button class="link small" onClick={() => openOut(c.installURL!)}>Repositories on github.com</button>}
+              : c.provider === "github" && <button class="link small" onClick={() => openOut(words.installationsURL)}>Repositories on github.com</button>}
             <button class="destructive" onClick={() => void disconnect(c)}>Disconnect</button>
           </li>
         ))}
