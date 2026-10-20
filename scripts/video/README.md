@@ -57,6 +57,8 @@ changes, the same scene makes it again.
   Chrome beside the window: Chrome on a profile of its own,
   `~/.agents/video/chrome/<integration>`, that Alex signs in to once with
   `scripts/video/make.sh --sign-in <integration>`. It is never Alex's own Chrome profile.
+  Chrome quits by itself once the profile has the site's sign-in cookie (#1834); quit it
+  with ⌘Q otherwise, because closing the window does not quit Chrome on a Mac.
   The take runs it headless (`web.mjs`), so nothing reaches the screen and a locked screen
   does not stop it. The same Chrome can show the scratch web page in another tab; its pairing
   is forgotten after the take.

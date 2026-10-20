@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """Uploads a finished video to YouTube (#1793, #1794), with the YouTube Data API v3.
 
     scripts/video/upload.py --sign-in           once: the person approves with the Google

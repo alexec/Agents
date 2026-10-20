@@ -655,20 +655,75 @@ def contact_sheet(work):
 
 def sign_in(profile, urls):
     """The video Chrome on its own profile, in a window, for the person to sign in to the
-    site once (#1794). It quits when the person closes the window."""
+    site once (#1794). On a Mac, closing the window does not quit Chrome, so it watches the
+    profile's cookies and quits that Chrome itself once the site's session cookie is there
+    (#1834)."""
     folder = CHROME_PROFILES / profile
     folder.mkdir(parents=True, exist_ok=True)
     os.chmod(folder, 0o700)
     from shutil import which
     chrome = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
-    if not Path(chrome).exists() and not which("google-chrome"):
+    if not Path(chrome).exists():
+        chrome = which("google-chrome")
+    if not chrome:
         raise SystemExit("Chrome is not installed")
-    log(f"sign in, then close the window: the profile is {folder}")
-    subprocess.run([chrome, f"--user-data-dir={folder}", "--no-first-run", "--no-default-browser-check",
-                    "--disable-sync", *(urls or [SIGN_IN.get(profile, "about:blank")])])
+    site = SIGN_IN.get(profile, {})
+    host = site.get("host")
+    log(f"sign in, then quit this Chrome (⌘Q): closing the window leaves it running on a Mac. The profile is {folder}")
+    if host:
+        log(f"it quits by itself once the profile has the {host} sign-in")
+    proc = subprocess.Popen([chrome, f"--user-data-dir={folder}", "--no-first-run", "--no-default-browser-check",
+                             "--disable-sync", *(urls or [site.get("url", "about:blank")])],
+                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    try:
+        while proc.poll() is None:
+            if host and signed_in(folder, host):
+                # SIGTERM, not SIGKILL: Chrome writes its cookies to disk as it quits.
+                proc.terminate()
+                proc.wait(timeout=30)
+                break
+            time.sleep(3)
+    except KeyboardInterrupt:
+        proc.terminate()
+        proc.wait(timeout=30)
+    if not host:
+        log("Chrome quit")
+    elif signed_in(folder, host):
+        log(f"signed in to {host}")
+    else:
+        raise SystemExit(f"not signed in to {host}: run `scripts/video/make.sh --sign-in {profile}` again")
 
 
-SIGN_IN = {"linear": "https://linear.app/login"}
+# The cookies a site sets before anyone signs in: they say nothing about a sign-in.
+ANONYMOUS_COOKIES = ("__cf", "_cf", "cf_", "_ga", "_gid", "_gcl", "ajs_", "intercom-")
+
+
+def signed_in(folder, host):
+    """Whether the Chrome profile in folder has a cookie of host's that is not an anonymous
+    one. It reads a copy of the Cookies file (Chrome holds it open), and names only, never
+    values."""
+    import sqlite3
+    import tempfile
+    for db in (folder / "Default/Network/Cookies", folder / "Default/Cookies"):
+        if not db.exists():
+            continue
+        with tempfile.TemporaryDirectory() as tmp:
+            copy = Path(tmp) / "Cookies"
+            for suffix in ("", "-journal", "-wal"):
+                if Path(f"{db}{suffix}").exists():
+                    shutil.copy(f"{db}{suffix}", f"{copy}{suffix}")
+            try:
+                with sqlite3.connect(f"file:{copy}?mode=ro", uri=True) as conn:
+                    names = conn.execute("SELECT name FROM cookies WHERE host_key = ? OR host_key LIKE ?",
+                                         (host, f"%.{host}")).fetchall()
+            except sqlite3.Error:
+                continue
+        if any(not name.startswith(ANONYMOUS_COOKIES) for (name,) in names):
+            return True
+    return False
+
+
+SIGN_IN = {"linear": {"url": "https://linear.app/login", "host": "linear.app"}}
 
 
 def main():
