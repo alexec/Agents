@@ -132,6 +132,8 @@ enum WalkCommands {
                     return element.set("AXSelected", true)
                 }
                 unsafeBitCast(table.method(for: user), to: UserSelect.self)(table, user, row)
+                // The list has the keyboard after it, as after a click: ⇧↓ then picks more (#1664).
+                table.window?.makeFirstResponder(table)
                 return true
             }
         case "unfold", "fold":

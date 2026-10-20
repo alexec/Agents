@@ -1444,7 +1444,8 @@ final class AppModel {
 
     /// Put one away, or bring it back. The person's answer to a workflow an agent
     /// wrote, which is what makes writing one not need asking first.
-    func setWorkflowArchived(_ summary: WorkflowSummary, _ archived: Bool) async {
+    @discardableResult
+    func setWorkflowArchived(_ summary: WorkflowSummary, _ archived: Bool) async -> Bool {
         await attempt(on: selectedProjectHost) {
             try await self.client(for: self.selectedProjectHost).call(
                 DaemonAPI.Method.workflowsArchive,
@@ -4779,19 +4780,51 @@ final class AppModel {
     }
 
     func archive(_ id: UUID, andLeave: Bool = false) async {
-        // The sessions it started go with it (Alex, #835), named before it goes.
+        guard let undo = await archiveWithChildren(id, andLeave: andLeave) else { return }
+        // Undo for a few seconds, at the foot of the list (#1534).
+        archiveUndo = undo
+    }
+
+    /// ⌫ over a selection in the sidebar: every session and workflow in it, with one Undo
+    /// for all of them, "Archived 3 sessions" (#1664). Workflows go after the sessions.
+    func archive(sessions: [UUID], workflows: [WorkflowSummary]) async {
+        var agentIDs: [UUID] = []
+        var title: String?
+        var stopped = false
+        var count = 0
+        for id in sessions where work.agent(id)?.state != .archived {
+            guard let one = await archiveWithChildren(id, andLeave: false) else { continue }
+            agentIDs += one.agentIDs.filter { !agentIDs.contains($0) }
+            title = title ?? one.title
+            stopped = stopped || one.stopped
+            count += 1
+        }
+        var flows: [WorkflowSummary] = []
+        for summary in workflows {
+            guard await setWorkflowArchived(summary, true) else { continue }
+            flows.append(summary)
+            title = title ?? summary.workflow.name
+        }
+        guard count + flows.count > 0 else { return }
+        archiveUndo = ArchiveUndo(agentIDs: agentIDs, title: title, stopped: stopped,
+                                  sessions: count, workflows: flows)
+    }
+
+    /// Archive one session and the ones it started (Alex, #835): what Undo brings back, or
+    /// nil when Archive failed.
+    private func archiveWithChildren(_ id: UUID, andLeave: Bool) async -> ArchiveUndo? {
+        // Named before it goes.
         let children = work.liveDescendants(of: id).map(\.id)
         let agent = work.agent(id)
         let stops = ([agent] + children.map(work.agent)).contains { $0.map { ArchiveUndo.stops($0.state) } ?? false }
         let archived = await archiveOne(id, andLeave: andLeave)
-        guard archived else { return }
+        guard archived else { return nil }
         var put = [id]
         // One archived meanwhile (a ⌫ over parent and child together) is left as it is.
         for child in children where work.agent(child)?.state != .archived {
             if await archiveOne(child, andLeave: andLeave) { put.append(child) }
         }
-        // Undo for a few seconds, at the foot of the list (#1534).
-        archiveUndo = ArchiveUndo(agentIDs: put, title: agent?.title, stopped: stops)
+        return ArchiveUndo(agentIDs: put, title: agent?.title, stopped: stops)
     }
 
     /// The last Archive, while Undo is offered for it (#1534).
@@ -4803,6 +4836,7 @@ final class AppModel {
         guard let undo = archiveUndo else { return }
         archiveUndo = nil
         for id in undo.agentIDs { await unarchive(id) }
+        for summary in undo.workflows { await setWorkflowArchived(summary, false) }
     }
 
     /// The strip's seconds are over.

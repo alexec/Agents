@@ -395,12 +395,8 @@ struct ProjectListView: View {
         }
         guard !sessions.isEmpty || !flows.isEmpty else { return }
         Task {
-            for id in sessions {
-                await model.archive(id, andLeave: false)
-            }
-            for summary in flows {
-                await model.setWorkflowArchived(summary, true)
-            }
+            // One Undo for the whole selection (#1664).
+            await model.archive(sessions: sessions, workflows: flows)
             if case .session(let open) = selection, sessions.contains(open) { model.showNothing() }
             if case .workflow(let open, _) = selection, flows.contains(where: { $0.id == open }) { model.showNothing() }
             picked = picked.filter { pick in
