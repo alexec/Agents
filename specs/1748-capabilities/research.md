@@ -83,6 +83,9 @@ Each item is a decision for this lane. Those that change what Alex sees or the w
 ## R9. The version string
 
 - **Decision:** one script, `scripts/version.sh`, prints the version for HEAD in the form of
-  rule 8. Every build script, `MARKETING_VERSION` for local builds and the web manifest use it.
-  `release-store.sh` keeps setting `MARKETING_VERSION` from the tag.
+  rule 8. Every build script uses it, and ship.sh sets `MARKETING_VERSION` from
+  `version.sh --marketing` (`X.Y.Z` only: Apple takes digits and dots). `release-store.sh` and
+  `release-host.sh` keep setting it from the tag. The web page stamps no version: the control
+  plane serves it, so its version is the control plane's, and Web/dist's MANIFEST stays the
+  same for the same inputs.
 - **Rationale:** today `git describe` gives `0.6.0-12-gabc`, which SemVer sorts below `0.6.0`.

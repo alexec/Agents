@@ -13,7 +13,8 @@
 #   linear-mcp-linux-<arch>          the linear MCP server, and its .sha256
 #   gitlab-mcp-linux-<arch>          the gitlab MCP server (#1629), and its .sha256
 # and once:
-#   VERSION                          MARKETING_VERSION+CURRENT_PROJECT_VERSION
+#   VERSION                          the version, SemVer: scripts/version.sh, or on a release
+#                                    AGENTS_MARKETING_VERSION, the tag's (#1748)
 #
 # Go runs through Go/scripts/go.sh (a container on this Mac): lease "build, test or scratch app" first. It takes
 # seconds and needs no swift.org toolchain. The container mounts the repository, and Colima
@@ -24,9 +25,7 @@ root=${0:A:h:h}
 check=0
 [[ ${1:-} == --check ]] && { check=1; shift }
 
-marketing=${AGENTS_MARKETING_VERSION:-$(sed -nE 's/^ *MARKETING_VERSION: "?([^"]+)"?/\1/p' $root/project.yml | head -1)}
-build=${AGENTS_BUILD:-$(sed -nE 's/^ *CURRENT_PROJECT_VERSION: "?([^"]+)"?/\1/p' $root/project.yml | head -1)}
-version="$marketing+$build"
+version=${AGENTS_MARKETING_VERSION:-$($root/scripts/version.sh)}
 out=$root/App/Resources/servers
 work=$root/Go/out/servers
 mkdir -p $work

@@ -202,6 +202,11 @@ All of these, on the commit you will tag (`git rev-parse origin/main`, fetched a
      own review." when an advisory was fixed since the last tag. Nothing more;
    - `## Known issues`: the medium issues still open and the milestone's open issues,
      one line each with its number.
+   - `## Capabilities`, as `python3 .agents/skills/release/scripts/capability-changes.py
+     <last tag> <sha>` writes it: the capabilities added, deprecated and removed (#1748,
+     `docs/explanation/versions.md`). Nothing when it writes nothing. A minor before 1.0 may
+     remove a capability number; a patch never does: a patch whose list has `Removed` stops
+     the release with `partly_done`.
 
 ## 7. Tag and push
 
@@ -222,6 +227,10 @@ A tag that already exists for this version means another release ran: end with
    `wait_for_event` and `until_minutes: 30`, and look again).
 2. **GitHub:** `gh release view v<version> --json assets` has the `.dmg`, the `.zip`,
    both `agentsd-linux-*.tar.gz` and `SHA256SUMS`.
+   **The parts agree** (#1748): each asset's name says `<version>`, and so does the
+   `testflight` job's version. On this Mac, `git checkout --detach v<version>` in a scratch
+   worktree and `scripts/version.sh` there prints `<version>`, the version every build
+   script stamps (agentsd, agents-control, the Linux host's `VERSION`).
 3. **TestFlight:** the `testflight` job passed. It has already waited for both builds to
    reach VALID (`scripts/asc-builds.swift`). To look again from this Mac:
    `swift scripts/asc-builds.swift <version> <the run number>`.

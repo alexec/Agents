@@ -33,10 +33,10 @@
 
 ## Phase 4: Versions, PR 4 (US5)
 
-- [ ] T030 [US5] `scripts/version.sh`: rule 8, with a test for a tag and a commit after it
-- [ ] T031 [US5] `scripts/go-agentsd.sh`, `scripts/go-control.sh`, `scripts/build-linux-agentsd.sh`, the web manifest and local `MARKETING_VERSION` use it
-- [ ] T032 [US5] Release skill: check the parts agree; capabilities added, deprecated and removed in the notes
-- [ ] T033 PR, auto-merge; file `hosts/update` and the CI skew test; close #1748
+- [x] T030 [US5] `scripts/version.sh`: rule 8, with `--selftest` (in `scripts/lint.sh`) for a tag, a commit after it and a release candidate
+- [x] T031 [US5] `scripts/go-agentsd.sh`, `scripts/go-control.sh`, `scripts/build-linux-agentsd.sh` and ship.sh's `MARKETING_VERSION` use it; the web page has the control plane's version (research R9)
+- [x] T032 [US5] Release skill: check the parts agree; capabilities added, deprecated and removed in the notes (`capability-changes.py`)
+- [x] T033 PR, auto-merge; `hosts/update` is #1766 and the CI skew test #1767; the PR closes #1748
 
 ## Dependencies
 

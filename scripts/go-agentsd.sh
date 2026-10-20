@@ -45,7 +45,8 @@ if ! { command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; } && ! 
 	exit 1
 fi
 
-version=$(git -C "$root" describe --tags --always 2>/dev/null || echo dev)
+# SemVer from the tag (#1748): `git describe`'s 0.6.0-12-gabc sorts below 0.6.0.
+version=$("$root/scripts/version.sh" 2>/dev/null || echo 0.0.0-dev)
 mkdir -p "$root/Go/out/helpers"
 tmp=$(mktemp -d "$root/Go/out/helpers/.build.XXXXXX")
 trap 'rm -rf "$tmp"' EXIT
