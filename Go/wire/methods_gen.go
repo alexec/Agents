@@ -41,7 +41,7 @@ var (
 	CallArtifactWrite                  = Method[ArtifactWriteRequest, Empty]{"artifact/write"}
 	CallAttentionPending               = Method[Empty, AttentionPending]{"attention/pending"}
 	CallBackupsConfigure               = Method[BackupSettings, BackupState]{"backups/configure"}
-	CallBackupsMake                    = Method[Empty, BackupState]{"backups/make"}
+	CallBackupsMake                    = Method[BackupMakeRequest, BackupState]{"backups/make"}
 	CallBackupsRestore                 = Method[BackupRestoreRequest, BackupRestoreResult]{"backups/restore"}
 	CallBackupsState                   = Method[Empty, BackupState]{"backups/state"}
 	CallCatalogDestinationState        = Method[DestinationStateRequest, DestinationStateAnswer]{"catalog/destination-state"}
@@ -355,6 +355,10 @@ const (
 var (
 	CallAttentionNeed               = Method[AttentionNeed, Empty]{"attention/need"}
 	CallAttentionTurn               = Method[AttentionTurn, Empty]{"attention/turn"}
+	CallBackupsCommit               = Method[BackupStoreCommit, Backup]{"backups/commit"}
+	CallBackupsDownload             = Method[BackupStorePartRequest, BackupStorePart]{"backups/download"}
+	CallBackupsStored               = Method[Empty, BackupStoreList]{"backups/stored"}
+	CallBackupsUpload               = Method[BackupStorePart, Empty]{"backups/upload"}
 	CallClientsAnnounce             = Method[ClientAnnounce, Admitted]{"clients/announce"}
 	CallClientsConnections          = Method[Empty, []ClientConnection]{"clients/connections"}
 	CallClientsForget               = Method[ClientRequest, Empty]{"clients/forget"}

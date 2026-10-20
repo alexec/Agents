@@ -13,6 +13,7 @@ public enum Capability {
     public static let approvals1 = "approvals/1"
     public static let artifact1 = "artifact/1"
     public static let attention1 = "attention/1"
+    public static let backupsStore1 = "backups.store/1"
     public static let backups1 = "backups/1"
     public static let catalog1 = "catalog/1"
     public static let changes1 = "changes/1"
@@ -378,6 +379,10 @@ public enum Capability {
     public static let control: [String: String] = [
         "attention/need": "attention/1",
         "attention/turn": "liveactivity/1",
+        "backups/commit": "backups.store/1",
+        "backups/download": "backups.store/1",
+        "backups/stored": "backups.store/1",
+        "backups/upload": "backups.store/1",
         "clients/announce": "clients/1",
         "clients/connections": "clients/1",
         "clients/forget": "clients/1",

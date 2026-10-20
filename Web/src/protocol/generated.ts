@@ -500,6 +500,11 @@ export interface Backup {
 
 export type BackupEvery = "off" | "daily" | "weekly";
 
+export interface BackupMakeRequest {
+  /** Answer once the backup is made, not at once: a provider's delete waits for it (#1815). */
+  wait?: boolean;
+}
+
 export interface BackupRestoreRequest {
   id: string;
 }
@@ -513,6 +518,11 @@ export interface BackupSettings {
   every: BackupEvery;
   keep: number;
   folder?: string;
+  /**
+   * Where backups go (#1815): this machine's folder, or the control plane's store. Left out is the
+   * machine's default: the store for a server linked to a control plane, else the folder.
+   */
+  target?: BackupTarget;
 }
 
 export interface BackupState {
@@ -521,7 +531,50 @@ export interface BackupState {
   backups: Backup[];
   making: boolean;
   lastError?: string;
+  /**
+   * The machine is linked to a control plane, so it can back up to the control plane's store
+   * (#1815).
+   */
+  canUseControl?: boolean;
 }
+
+/**
+ * A host's backup whose parts are all uploaded: the control plane writes its .json last, then keeps
+ * the newest keep of this host's (#1815).
+ */
+export interface BackupStoreCommit {
+  name: string;
+  parts: number;
+  machine: string;
+  rootID: string;
+  madeAt: WireDate;
+  bytes: number;
+  agents: number;
+  keep: number;
+}
+
+export interface BackupStoreList {
+  backups: Backup[];
+}
+
+/**
+ * One part of a backup, at most 8 MiB (#1815): a host's upload, or the control plane's answer to a
+ * download.
+ */
+export interface BackupStorePart {
+  /** On an upload, the backup's name; this host's own folder is the control plane's to say. */
+  name: string;
+  part: number;
+  data: Base64;
+}
+
+export interface BackupStorePartRequest {
+  /** A listed backup's id: <host>/<name>. */
+  id: string;
+  part: number;
+}
+
+export type BackupTarget = "folder" | "control";
 
 export interface Block {
   waits: Wait[];
@@ -4838,7 +4891,7 @@ export interface Methods {
   "artifact/write": { params: ArtifactWriteRequest; result: Empty };
   "attention/pending": { params: Empty; result: AttentionPending };
   "backups/configure": { params: BackupSettings; result: BackupState };
-  "backups/make": { params: Empty; result: BackupState };
+  "backups/make": { params: BackupMakeRequest; result: BackupState };
   "backups/restore": { params: BackupRestoreRequest; result: BackupRestoreResult };
   "backups/state": { params: Empty; result: BackupState };
   "changes/file": { params: ChangesFileRequest; result: ChangedFileDetail };
@@ -5200,10 +5253,15 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   AuthenticateRequest: { required: ["runtimeID", "methodID"], optional: [] },
   BackgroundItem: { required: ["id", "kind", "name", "state", "canStop", "isStopping", "startedAt"], optional: ["taskType", "detail", "command", "parentID", "toolCallID", "outputFilePath", "summary", "lastToolName", "endedAt"] },
   Backup: { required: ["id", "machine", "rootID", "madeAt", "bytes", "agents", "thisMachine"], optional: [] },
+  BackupMakeRequest: { required: [], optional: ["wait"] },
   BackupRestoreRequest: { required: ["id"], optional: [] },
   BackupRestoreResult: { required: ["restored", "skipped"], optional: [] },
-  BackupSettings: { required: ["every", "keep"], optional: ["folder"] },
-  BackupState: { required: ["settings", "folder", "backups", "making"], optional: ["lastError"] },
+  BackupSettings: { required: ["every", "keep"], optional: ["folder", "target"] },
+  BackupState: { required: ["settings", "folder", "backups", "making"], optional: ["lastError", "canUseControl"] },
+  BackupStoreCommit: { required: ["name", "parts", "machine", "rootID", "madeAt", "bytes", "agents", "keep"], optional: [] },
+  BackupStoreList: { required: ["backups"], optional: [] },
+  BackupStorePart: { required: ["name", "part", "data"], optional: [] },
+  BackupStorePartRequest: { required: ["id", "part"], optional: [] },
   Block: { required: ["waits"], optional: ["checkAgainAt", "wakeOn", "clearedAt", "clearedBy"] },
   BranchFromRequest: { required: ["agentID", "entryID"], optional: [] },
   BranchSummary: { required: ["name"], optional: ["remote"] },

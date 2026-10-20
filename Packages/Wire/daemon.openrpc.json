@@ -994,7 +994,7 @@
           "name": "params",
           "required": true,
           "schema": {
-            "$ref": "daemon.schema.json#/definitions/Empty"
+            "$ref": "daemon.schema.json#/definitions/BackupMakeRequest"
           }
         }
       ],

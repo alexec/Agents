@@ -13,6 +13,7 @@ const (
 	CapApprovals1          = "approvals/1"
 	CapArtifact1           = "artifact/1"
 	CapAttention1          = "attention/1"
+	CapBackupsStore1       = "backups.store/1"
 	CapBackups1            = "backups/1"
 	CapCatalog1            = "catalog/1"
 	CapChanges1            = "changes/1"
@@ -423,6 +424,10 @@ var HostNotifications = map[string]bool{
 var ControlCapabilities = map[string]string{
 	"attention/need":              "attention/1",
 	"attention/turn":              "liveactivity/1",
+	"backups/commit":              "backups.store/1",
+	"backups/download":            "backups.store/1",
+	"backups/stored":              "backups.store/1",
+	"backups/upload":              "backups.store/1",
 	"clients/announce":            "clients/1",
 	"clients/connections":         "clients/1",
 	"clients/forget":              "clients/1",

@@ -3,14 +3,18 @@ package agentsd
 import (
 	"archive/tar"
 	"compress/gzip"
+	"context"
 	"encoding/json"
 	"io"
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
+	"sync"
 	"testing"
 	"time"
 
+	"github.com/alexec/agents/Go/internal/controllink"
 	"github.com/alexec/agents/Go/wire"
 )
 
@@ -225,7 +229,7 @@ func waitBackups(t *testing.T, d *Daemon, want int) {
 			break
 		}
 	}
-	if n := len(d.listBackups()); n != want {
+	if n := len(d.folderBackups()); n != want {
 		t.Fatalf("%d backups, want %d", n, want)
 	}
 }
@@ -252,5 +256,129 @@ func tarNames(t *testing.T, path string) []string {
 			t.Fatal(err)
 		}
 		names = append(names, h.Name)
+	}
+}
+
+// fakeStore is the control plane's side of backups.store/1, as far as a host sees it: one
+// owner's backups, each host's in its own folder.
+type fakeStore struct {
+	mu      sync.Mutex
+	parts   map[string]map[int64][]byte
+	backups []wire.Backup
+	uploads int
+}
+
+func (f *fakeStore) askFor(host string) askControl {
+	return func(_ context.Context, method string, params any) (json.RawMessage, error) {
+		f.mu.Lock()
+		defer f.mu.Unlock()
+		b, _ := json.Marshal(params)
+		var out any = map[string]any{}
+		switch method {
+		case "backups/stored":
+			list := []wire.Backup{}
+			for _, x := range f.backups {
+				x.ThisMachine = strings.HasPrefix(x.ID, host+"/")
+				list = append(list, x)
+			}
+			out = wire.BackupStoreList{Backups: list}
+		case "backups/upload":
+			var p wire.BackupStorePart
+			json.Unmarshal(b, &p)
+			if f.parts[host+"/"+p.Name] == nil {
+				f.parts[host+"/"+p.Name] = map[int64][]byte{}
+			}
+			f.parts[host+"/"+p.Name][p.Part] = p.Data
+			f.uploads++
+		case "backups/commit":
+			var c wire.BackupStoreCommit
+			json.Unmarshal(b, &c)
+			if int64(len(f.parts[host+"/"+c.Name])) != c.Parts {
+				return nil, &controllink.AskError{Code: -32602, Message: "a part is missing"}
+			}
+			made := wire.Backup{ID: host + "/" + c.Name, Machine: c.Machine, RootID: c.RootID, MadeAt: c.MadeAt, Bytes: c.Bytes, Agents: c.Agents}
+			f.backups = append([]wire.Backup{made}, f.backups...)
+			out = made
+		case "backups/download":
+			var r wire.BackupStorePartRequest
+			json.Unmarshal(b, &r)
+			data, ok := f.parts[r.ID][r.Part]
+			if !ok {
+				return nil, &controllink.AskError{Code: -32602, Message: "no such part"}
+			}
+			out = wire.BackupStorePart{Name: r.ID, Part: r.Part, Data: data}
+		default:
+			return nil, &controllink.AskError{Code: -32601, Message: "Method not found"}
+		}
+		return json.Marshal(out)
+	}
+}
+
+// A server backs up to the control plane's store in parts, waiting when asked to, and
+// leaves no archive behind; a new server of the same person lists it and restores it.
+func TestBackupToTheControlPlaneAndRestoreOnANewServer(t *testing.T) {
+	clock := time.Date(2026, 10, 20, 9, 0, 0, 0, time.UTC)
+	atTime(t, &clock)
+	was := backupPartBytes
+	backupPartBytes = 512
+	t.Cleanup(func() { backupPartBytes = was })
+	fake := &fakeStore{parts: map[string]map[int64][]byte{}}
+
+	rootA, rootB := t.TempDir(), t.TempDir()
+	a, ca := start(t, rootA)
+	if s := backupsIn(t, ca, 1); s.CanUseControl == nil || *s.CanUseControl {
+		t.Fatalf("a host on no control plane can use one: %+v", s)
+	}
+	a.SetControlAsk(fake.askFor("a"))
+	dir := project(t, ca, 2)
+	ca.call(t, 3, "backups/configure", map[string]any{"every": "off", "keep": 2, "target": "control"})
+	agent := seeded(t, a, dir, nil)
+	writeFile(t, a.Store.Loc.Transcript(string(agent.ID)), strings.Repeat("{\"line\":\"a turn of the conversation\"}\n", 100))
+
+	var s wire.BackupState
+	json.Unmarshal(ca.call(t, 4, "backups/make", map[string]any{"wait": true}), &s)
+	if s.Making || s.LastError != nil || len(s.Backups) != 1 || !s.Backups[0].ThisMachine || s.Backups[0].Agents != 1 ||
+		s.Settings.Target == nil || *s.Settings.Target != wire.BackupTargetControl || s.CanUseControl == nil || !*s.CanUseControl {
+		t.Fatalf("after a backup and wait: %+v", s)
+	}
+	if fake.uploads < 2 {
+		t.Fatalf("%d parts went up", fake.uploads)
+	}
+	if _, err := os.Stat(a.uploadFolder()); !os.IsNotExist(err) {
+		t.Fatalf("the archive was left here: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(rootA, "backups")); !os.IsNotExist(err) {
+		t.Fatalf("a backup went to the folder too: %v", err)
+	}
+
+	b, cb := start(t, rootB)
+	b.SetControlAsk(fake.askFor("b"))
+	cb.call(t, 1, "backups/configure", map[string]any{"every": "off", "keep": 3, "target": "control"})
+	list := backupsIn(t, cb, 2).Backups
+	if len(list) != 1 || list[0].ThisMachine || list[0].ID != s.Backups[0].ID {
+		t.Fatalf("b lists %+v", list)
+	}
+	var res wire.BackupRestoreResult
+	json.Unmarshal(cb.call(t, 3, "backups/restore", map[string]any{"id": list[0].ID}), &res)
+	if res.Restored != 1 {
+		t.Fatalf("restored %+v", res)
+	}
+	got := b.Store.Agent(agent.ID)
+	if got == nil || got.State != wire.AgentStateArchived || got.MadeInRoot == nil || *got.MadeInRoot != a.Store.RootID {
+		t.Fatalf("came back as %+v", got)
+	}
+	if tr, _ := os.ReadFile(b.Store.Loc.Transcript(string(agent.ID))); strings.Count(string(tr), "\n") != 100 {
+		t.Fatalf("transcript of %d lines", strings.Count(string(tr), "\n"))
+	}
+	if _, err := os.Stat(filepath.Join(rootB, "backups-download")); !os.IsNotExist(err) {
+		t.Fatalf("the download was left here: %v", err)
+	}
+
+	// A control plane that refuses says so in the state, and the backup is not listed.
+	b.SetControlAsk(func(context.Context, string, any) (json.RawMessage, error) {
+		return nil, &controllink.AskError{Code: -32601, Message: "Method not found"}
+	})
+	if s := backupsIn(t, cb, 4); s.LastError == nil || !strings.Contains(*s.LastError, "Method not found") || len(s.Backups) != 0 {
+		t.Fatalf("refused: %+v", s)
 	}
 }

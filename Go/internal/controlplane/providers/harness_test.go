@@ -310,6 +310,7 @@ type harnessOptions struct {
 	workspaces    []WorkspaceInfo
 	sshFails      string
 	installedOver string
+	backUp        func(host string, caller Caller) (bool, error)
 }
 
 func quickTiming() Timing {
@@ -353,6 +354,7 @@ func newHarness(t *testing.T, opts ...func(*harnessOptions)) *harness {
 				return "curl -fsSL https://cp.local/v1/install.sh | sh -s -- 'agents-control:2:h:secret'", nil
 			},
 			Connect: func(ProviderRecord, map[string]string) (Provider, error) { return provider, nil },
+			BackUp:  o.backUp,
 		}})
 	t.Cleanup(h.providers.Stop)
 	for _, host := range [][2]string{{devbox, "devbox"}, {other, "other"}} {

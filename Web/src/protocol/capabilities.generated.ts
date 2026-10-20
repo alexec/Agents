@@ -13,6 +13,7 @@ export const Capability = {
   approvals1: "approvals/1",
   artifact1: "artifact/1",
   attention1: "attention/1",
+  backupsStore1: "backups.store/1",
   backups1: "backups/1",
   catalog1: "catalog/1",
   changes1: "changes/1",
@@ -381,6 +382,10 @@ export const HostCapabilities: Readonly<Record<string, Capability>> = {
 export const ControlCapabilities: Readonly<Record<string, Capability>> = {
   "attention/need": "attention/1",
   "attention/turn": "liveactivity/1",
+  "backups/commit": "backups.store/1",
+  "backups/download": "backups.store/1",
+  "backups/stored": "backups.store/1",
+  "backups/upload": "backups.store/1",
   "clients/announce": "clients/1",
   "clients/connections": "clients/1",
   "clients/forget": "clients/1",

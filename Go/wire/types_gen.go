@@ -553,6 +553,11 @@ func (v *BackupEvery) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
+type BackupMakeRequest struct {
+	// Answer once the backup is made, not at once: a provider's delete waits for it (#1815).
+	Wait *bool `json:"wait,omitzero"`
+}
+
 type BackupRestoreRequest struct {
 	ID string `json:"id"`
 }
@@ -566,6 +571,8 @@ type BackupSettings struct {
 	Every  BackupEvery `json:"every"`
 	Keep   int64       `json:"keep"`
 	Folder *string     `json:"folder,omitzero"`
+	// Where backups go (#1815): this machine's folder, or the control plane's store. Left out is the machine's default: the store for a server linked to a control plane, else the folder.
+	Target *BackupTarget `json:"target,omitzero"`
 }
 
 type BackupState struct {
@@ -574,6 +581,60 @@ type BackupState struct {
 	Backups   []Backup       `json:"backups"`
 	Making    bool           `json:"making"`
 	LastError *string        `json:"lastError,omitzero"`
+	// The machine is linked to a control plane, so it can back up to the control plane's store (#1815).
+	CanUseControl *bool `json:"canUseControl,omitzero"`
+}
+
+// A host's backup whose parts are all uploaded: the control plane writes its .json last, then keeps the newest keep of this host's (#1815).
+type BackupStoreCommit struct {
+	Name    string `json:"name"`
+	Parts   int64  `json:"parts"`
+	Machine string `json:"machine"`
+	RootID  string `json:"rootID"`
+	MadeAt  Date   `json:"madeAt"`
+	Bytes   int64  `json:"bytes"`
+	Agents  int64  `json:"agents"`
+	Keep    int64  `json:"keep"`
+}
+
+type BackupStoreList struct {
+	Backups []Backup `json:"backups"`
+}
+
+// One part of a backup, at most 8 MiB (#1815): a host's upload, or the control plane's answer to a download.
+type BackupStorePart struct {
+	// On an upload, the backup's name; this host's own folder is the control plane's to say.
+	Name string `json:"name"`
+	Part int64  `json:"part"`
+	Data Data   `json:"data"`
+}
+
+type BackupStorePartRequest struct {
+	// A listed backup's id: <host>/<name>.
+	ID   string `json:"id"`
+	Part int64  `json:"part"`
+}
+
+type BackupTarget string
+
+const (
+	BackupTargetFolder  BackupTarget = "folder"
+	BackupTargetControl BackupTarget = "control"
+)
+
+// UnmarshalJSON reads a value this build does not know as "folder".
+func (v *BackupTarget) UnmarshalJSON(b []byte) error {
+	var s string
+	if err := json.Unmarshal(b, &s); err != nil {
+		return err
+	}
+	switch BackupTarget(s) {
+	case BackupTargetFolder, BackupTargetControl:
+		*v = BackupTarget(s)
+	default:
+		*v = BackupTargetFolder
+	}
+	return nil
 }
 
 type Block struct {
