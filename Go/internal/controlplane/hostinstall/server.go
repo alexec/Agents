@@ -292,7 +292,7 @@ func quote(text string) string {
 }
 
 // shippedServers is ServerFiles.shippedServers: the MCP servers Agents ships (#700).
-var shippedServers = []string{"github-mcp", "linear-mcp"}
+var shippedServers = []string{"github-mcp", "linear-mcp", "gitlab-mcp"}
 
 // serverFileNames is ServerFiles.names: the only files read from the server folder.
 var serverFileNames = func() map[string]bool {

@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/alexec/agents/Go/internal/githubmcp"
+	"github.com/alexec/agents/Go/internal/gitlabmcp"
 	"github.com/alexec/agents/Go/internal/linearmcp"
 	"github.com/alexec/agents/Go/wire"
 )
@@ -20,6 +21,10 @@ func TestOursDeclareWhatTheirServersDeclare(t *testing.T) {
 	}
 	if !reflect.DeepEqual(linear.Declares.Events, linearmcp.EventNames()) {
 		t.Fatalf("linear events: %v, the server's %v", linear.Declares.Events, linearmcp.EventNames())
+	}
+	gitlab, _ := OursByID("agents/gitlab")
+	if !reflect.DeepEqual(gitlab.Declares.Events, gitlabmcp.EventNames()) || !gitlab.Declares.Tools {
+		t.Fatalf("gitlab: %v, the server's %v", gitlab.Declares, gitlabmcp.EventNames())
 	}
 	// linear-mcp has show_issues (TestTheViewListsOpenIssues); github-mcp has the official ones.
 	if !linear.Declares.Tools || !linear.Declares.Views || !github.Declares.Tools {
@@ -62,6 +67,15 @@ func TestOursAreAddedHostedWithNoSecretToAsk(t *testing.T) {
 	}
 	if _, ok := OursByCommand("npx"); ok {
 		t.Fatal("npx is not ours")
+	}
+	// GitLab asks for its token by name, until the sign-in (#1630).
+	gitlab, _ := OursByID("agents/gitlab")
+	built = BuildOurs(gitlab, func(string) bool { return false })
+	if got := strings.Join(strings.Fields(built.Entry.Stringified()), ""); got != `{"command":"gitlab-mcp","hosted":true,"env":{"GITLAB_TOKEN":"${GITLAB_TOKEN}"}}` {
+		t.Fatalf("gitlab entry: %s", got)
+	}
+	if built.NameHere != "gitlab" || len(built.Variables) != 1 || built.Variables[0].Name != "GITLAB_TOKEN" || !built.Variables[0].Required {
+		t.Fatalf("gitlab built: %+v", built)
 	}
 	r := OursResult(linear, linear.Declares)
 	if r.MadeByAgents == nil || !*r.MadeByAgents || r.Levels == nil || !r.Levels.Tools || !r.Levels.Views || !r.Levels.Events {
