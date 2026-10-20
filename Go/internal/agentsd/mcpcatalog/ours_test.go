@@ -28,7 +28,7 @@ func TestOursDeclareWhatTheirServersDeclare(t *testing.T) {
 		t.Fatalf("gitlab: %v, the server's %v", gitlab.Declares, gitlabmcp.EventNames())
 	}
 	email, _ := OursByID("agents/email")
-	if !reflect.DeepEqual(email.Declares.Events, emailmcp.EventNames()) || !email.Declares.Tools || email.Declares.Views {
+	if !reflect.DeepEqual(email.Declares.Events, emailmcp.EventNames()) || !email.Declares.Tools || !email.Declares.Views {
 		t.Fatalf("email: %v, the server's %v", email.Declares, emailmcp.EventNames())
 	}
 	// linear-mcp has show_issues (TestTheViewListsOpenIssues); github-mcp has the official ones.

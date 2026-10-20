@@ -17,7 +17,7 @@ import (
 // events that mcpcatalog counts for the Workflows level.
 func TestReadyMadeWorkflowsRead(t *testing.T) {
 	ids := readyMadeIDs()
-	if !slices.Equal(ids, []string{"address-review-comments", "fix-failed-checks", "work-a-linear-issue", "work-an-issue"}) {
+	if !slices.Equal(ids, []string{"address-review-comments", "answer-a-sign-up-code", "fix-failed-checks", "work-a-linear-issue", "work-an-issue"}) {
 		t.Fatal(ids)
 	}
 	var events []string
@@ -113,7 +113,7 @@ func TestReadyMadeWorkflowsTurnOnWithOneSwitch(t *testing.T) {
 	}
 	// One that does lists them, off, and nothing is written.
 	json.Unmarshal(c.call(t, 4, "workflows/list", map[string]any{"folder": folder}), &list)
-	if len(list) != 4 || list[0].IsEnabled || list[0].AwaitingApproval != nil || list[3].Workflow.Name != "Work an issue" {
+	if len(list) != 5 || list[0].IsEnabled || list[0].AwaitingApproval != nil || list[4].Workflow.Name != "Work an issue" {
 		t.Fatalf("%+v", list)
 	}
 	if _, err := os.Stat(filepath.Join(dir, ".agents")); !os.IsNotExist(err) {
@@ -208,5 +208,30 @@ func TestPushesToAForgeInAWorktree(t *testing.T) {
 		if pushesToForge(dir) != want {
 			t.Errorf("%s: %v", remote, !want)
 		}
+	}
+}
+
+// Answer a sign-up code (#1780) hears only the email server, one trigger per allowlisted
+// sender, and its skill names the tools it uses and never one that sends mail.
+func TestAnswerASignUpCodeHearsOnlyItsSenders(t *testing.T) {
+	text, skill := readyMadeText("answer-a-sign-up-code")
+	w := parseWorkflow(text, "answer-a-sign-up-code", "/p")
+	if len(w.Triggers) < 2 {
+		t.Fatalf("triggers: %+v", w.Triggers)
+	}
+	for _, tr := range w.Triggers {
+		mt, ok := serverTrigger(tr)
+		raw, _ := json.Marshal(tr)
+		if triggerName(tr) != "email.received" || !ok || !slices.Equal(mt.servers, []string{"email"}) || !strings.Contains(string(raw), `"from"`) {
+			t.Fatalf("trigger: %s", raw)
+		}
+	}
+	for _, tool := range []string{"read_message", "mark_read", "list_sessions", "message_session"} {
+		if !strings.Contains(skill, "`"+tool+"`") {
+			t.Errorf("the skill does not name %s", tool)
+		}
+	}
+	if strings.Contains(skill, "send_") {
+		t.Error("the skill names a tool that sends")
 	}
 }

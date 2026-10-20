@@ -97,6 +97,8 @@ func TestAnMCPServerFoundAddedListedAndRemoved(t *testing.T) {
 	if list.Servers[0].Approval.Approved == nil || list.Servers[1].Approval.Approved == nil {
 		t.Fatalf("%+v", list)
 	}
+	// The project's pinned pages are said again: one of the server's waited for this (#1780).
+	c.until(t, "pins/changed after mcp/approve", func(method string, _ json.RawMessage) bool { return method == "pins/changed" })
 
 	// A hand-written server is not the app's to remove, and a secret another names stays.
 	if e := c.callError(t, 10, "mcp/remove", map[string]any{"destination": dest, "name": "mine"}); e.Code != wire.FailureCatalogRefused {

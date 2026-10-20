@@ -54,8 +54,8 @@ var Made = []Ours{
 	// IMAP server, the user and an app password. EMAIL_IMAP_URL, EMAIL_USER and EMAIL_PASSWORD,
 	// set by hand in mcp.json's env, still go first. Read-only: it never sends mail. Not yet
 	// tested on a real mailbox (Alex's step on #1780).
-	{ID: "agents/email", Title: "Email", Description: "One mailbox over IMAP: an event when mail comes, and tools to list, search and read it, mark it read and move it. It never sends mail",
-		Command: "email-mcp", Declares: Declared{Tools: true, Events: emailEvents}},
+	{ID: "agents/email", Title: "Email", Description: "One mailbox over IMAP: an event when mail comes, a Mail page, and tools to list, search and read it, mark it read and move it. It never sends mail",
+		Command: "email-mcp", Declares: Declared{Tools: true, Events: emailEvents, Views: true}},
 }
 
 var (
@@ -129,7 +129,7 @@ type Declared struct {
 // workflow names events, never a server, so any server that declares one of them reaches
 // the Workflows level. agentsd's readymade folder holds the workflows; a test there keeps
 // this list the same as their triggers.
-var ReadyMadeEvents = []string{"checks.failed", "issue.labelled", "review.comment", "review.posted"}
+var ReadyMadeEvents = []string{"checks.failed", "email.received", "issue.labelled", "review.comment", "review.posted"}
 
 // Levels is the five levels (#1428) from what a server declares, and whether it was tested.
 func Levels(d Declared, tested bool) wire.MCPLevels {

@@ -635,6 +635,8 @@ func (d *Daemon) mcpApprove(r wire.MCPApproveRequest) (wire.MCPListAnswer, error
 	}
 	log.Printf("mcp: approve %s in project", r.Name)
 	d.mcpChanged()
+	// A pinned page of this server waited for the approval: its clients draw it now (#1780).
+	d.pinsChanged(folder)
 	return d.mcpList(r.Destination)
 }
 
