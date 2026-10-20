@@ -87,7 +87,7 @@ func TestTheFrontOffersTheEventAndTools(t *testing.T) {
 	for _, tl := range tools {
 		names = append(names, tl.(map[string]any)["name"].(string))
 	}
-	want := []string{"list_folders", "list_messages", "mark_read", "move_message", "read_message", "search_messages"}
+	want := []string{"list_folders", "list_messages", "mark_read", "move_message", "read_message", "search_messages", "show_mail"}
 	if !reflect.DeepEqual(names, want) {
 		t.Fatalf("tools: %v", names)
 	}

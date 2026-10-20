@@ -112,6 +112,8 @@ something particular done.
   each time a connector reports something, such as a pull request's checks failing.
 - [Use Linear issues](use-linear-issues.md): Linear's own tools, and an agent when an
   issue is opened, labelled, commented on or closed.
+- [Wait for mail](wait-for-mail.md): a mailbox for agents, the Mail page, and sign-up codes
+  given to the session that waits for them.
 - [Pin a page to a project](pin-a-page-to-a-project.md): a document or an HTML page
   under its project in the sidebar, live as it changes.
 - [Hand files to a workflow](hand-files-to-a-workflow.md): drop a file into a project's

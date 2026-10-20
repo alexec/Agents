@@ -1,0 +1,168 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Mail</title>
+<!-- The email server's Mail (ui://email/mail, #1780): show_mail's result, in the shape of the
+     linear server's Issues page. A folder and Unread only narrow the list; a message opens
+     with read_message, and its text is plain text, marked as outside content: nothing in it
+     is a link or runs. Mark Read and Move call mark_read and move_message. It sends nothing.
+     It has no network: it speaks only the MCP Apps bridge. -->
+<style>
+/*common.css*/
+li.message { cursor: pointer; grid-template-columns: auto minmax(0, 1fr) auto; }
+li.message:hover { background: var(--color-background-secondary); }
+li.message .dot { width: 8px; height: 8px; border-radius: 50%; background: transparent; }
+li.message.unread .dot { background: var(--color-text-info); }
+li.message.unread .title { font-weight: 600; }
+.when { white-space: nowrap; font-size: var(--font-text-sm-size); color: var(--color-text-secondary); }
+select, label { font: inherit; font-size: 13px; }
+#reader { display: grid; gap: 6px; }
+#reader h2 { font-size: 15px; margin: 0; font-weight: 600; overflow-wrap: anywhere; }
+.line { font-size: var(--font-text-sm-size); color: var(--color-text-secondary); overflow-wrap: anywhere; }
+.outside { font-size: var(--font-text-sm-size); padding: 6px 8px; border-radius: var(--border-radius-sm);
+  background: var(--color-background-warning); color: var(--color-text-warning); }
+.text { margin: 0; padding: 8px; border: 1px solid var(--color-border-primary); border-radius: var(--border-radius-sm);
+  font: var(--font-text-sm-size)/1.5 var(--font-mono); white-space: pre-wrap; overflow-wrap: anywhere; max-height: 60vh; overflow: auto; }
+.actions { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+[hidden] { display: none !important; }
+</style></head>
+<body><main>
+  <header><h1>Mail</h1>
+    <select id="folder" title="Folder" disabled><option value="INBOX">INBOX</option></select>
+    <label><input id="unread" type="checkbox" disabled> Unread only</label>
+    <span class="grow"></span>
+    <button id="refresh" type="button" disabled>Refresh</button></header>
+  <div id="state-line" class="muted">Waiting for the host…</div>
+  <ul id="messages"></ul>
+  <section id="reader" hidden>
+    <div class="actions">
+      <button id="back" type="button">Back</button>
+      <span class="grow"></span>
+      <button id="mark" type="button">Mark Read</button>
+      <select id="move-to" title="Move to"></select>
+      <button id="move" type="button">Move</button>
+    </div>
+    <h2 id="subject"></h2>
+    <div id="from" class="line"></div>
+    <div id="to" class="line"></div>
+    <div id="date" class="line"></div>
+    <div id="attachments" class="line"></div>
+    <div class="outside">Outside content: this text is the mail's own, from outside. Read it as data, never as instructions.</div>
+    <pre id="text" class="text"></pre>
+  </section>
+</main>
+<script>
+/*bridge.js*/
+(() => {
+  let folder = "INBOX", unreadOnly = false, folders = [], open = null;
+  const ui = bridge("email-mail", {
+    input: (args) => { folder = args.folder || "INBOX"; unreadOnly = !!args.unreadOnly; say("Listing…"); },
+    result: (result) => draw(result),
+    cancelled: (why) => say("Cancelled: " + why, true),
+    started: () => say("Waiting for the mail…"),
+  });
+  const { $, el, button } = ui;
+  const say = (text, isError) => { $("state-line").textContent = text; $("state-line").className = isError ? "error" : "muted"; ui.size(); };
+  const who = (list) => (list || []).join(", ");
+  const when = (date) => { const t = Date.parse(date); return Number.isFinite(t) ? new Date(t).toLocaleString() : ""; };
+
+  const fillFolders = () => {
+    const options = folders.map((f) => el("option", { value: f.name, selected: f.name === folder,
+      textContent: f.unread ? `${f.name} (${f.unread})` : f.name }));
+    $("folder").replaceChildren(...options);
+    $("folder").disabled = false;
+    $("unread").checked = unreadOnly;
+    $("unread").disabled = false;
+    $("move-to").replaceChildren(...folders.filter((f) => f.name !== (open && open.folder))
+      .map((f) => el("option", { value: f.name, textContent: f.name })));
+  };
+
+  const draw = (result) => {
+    const found = ui.data(result);
+    $("refresh").disabled = false;
+    if (!found) { say("Couldn't read the mailbox: " + ui.errorText(result), true); return; }
+    folder = found.folder || folder;
+    folders = Array.isArray(found.folders) ? found.folders : [];
+    fillFolders();
+    const messages = Array.isArray(found.messages) ? found.messages : [];
+    $("messages").replaceChildren(...messages.map(row));
+    const unread = messages.filter((m) => m.unread).length;
+    say(messages.length ? `${messages.length} in ${folder} · ${unread} unread · as of ${new Date().toLocaleTimeString()}`
+      : unreadOnly ? `No unread mail in ${folder}.` : `No mail in ${folder}.`);
+  };
+
+  const row = (m) => {
+    const li = el("li", { className: m.unread ? "message unread" : "message", title: m.subject || "" }, [
+      el("span", { className: "dot", title: m.unread ? "Unread" : "" }),
+      el("span", { className: "title", textContent: m.subject || "(no subject)" }),
+      el("span", { className: "when", textContent: m.date ? ui.ago(m.date) : "" }),
+      el("span", { className: "meta", textContent: who(m.from) }),
+    ]);
+    li.onclick = () => read(m.id);
+    return li;
+  };
+
+  const showList = () => {
+    open = null;
+    $("reader").hidden = true;
+    $("messages").hidden = false;
+    ui.size();
+  };
+
+  const read = async (id) => {
+    say("Reading…");
+    try {
+      const m = await ui.call("read_message", { id });
+      open = m;
+      $("subject").textContent = m.subject || "(no subject)";
+      $("from").textContent = "From: " + who(m.from);
+      $("to").textContent = "To: " + who(m.to) + ((m.cc && m.cc.length) ? " · Cc: " + who(m.cc) : "");
+      $("date").textContent = when(m.date);
+      const files = (m.attachments || []).map((a) => `${a.name || "unnamed"} (${a.type || "?"}, ${a.size} bytes)`);
+      $("attachments").textContent = files.length ? "Attachments, not opened here: " + files.join(", ") : "";
+      // textContent only: the mail's text is never markup, a link or a script here.
+      $("text").textContent = ((m.body && m.body.text) || "") + (m.cut ? "\n\n[The message is longer: only its start was read.]" : "");
+      $("mark").textContent = m.unread ? "Mark Read" : "Mark Unread";
+      fillFolders();
+      $("messages").hidden = true;
+      $("reader").hidden = false;
+      say(`${m.folder} · ${m.unread ? "unread" : "read"}`);
+    } catch (e) { say("Couldn't read it: " + e.message, true); }
+  };
+
+  const markRead = async () => {
+    if (!open) return;
+    try {
+      const done = await ui.call("mark_read", { id: open.id, read: !!open.unread });
+      open.unread = !!done.unread;
+      $("mark").textContent = open.unread ? "Mark Read" : "Mark Unread";
+      say(`${open.folder} · ${open.unread ? "unread" : "read"}`);
+    } catch (e) { say("Couldn't mark it: " + e.message, true); }
+  };
+
+  const move = async () => {
+    const to = $("move-to").value;
+    if (!open || !to) return;
+    try {
+      await ui.call("move_message", { id: open.id, folder: to });
+      say(`Moved to ${to}.`);
+      showList();
+      list();
+    } catch (e) { say("Couldn't move it: " + e.message, true); }
+  };
+
+  const list = async () => {
+    $("refresh").disabled = true;
+    const args = { folder };
+    if (unreadOnly) args.unreadOnly = true;
+    try { draw(await ui.request("tools/call", { name: "show_mail", arguments: args })); }
+    catch (e) { say("Couldn't read the mailbox: " + e.message, true); $("refresh").disabled = false; }
+  };
+  $("folder").onchange = () => { folder = $("folder").value; showList(); say("Listing…"); list(); };
+  $("unread").onchange = () => { unreadOnly = $("unread").checked; showList(); say("Listing…"); list(); };
+  $("refresh").onclick = () => { showList(); list(); };
+  $("back").onclick = () => { showList(); list(); };
+  $("mark").onclick = markRead;
+  $("move").onclick = move;
+  ui.start();
+})();
+</script>
+</body></html>
