@@ -10,7 +10,7 @@
 //   node cdp.mjs click '<css or text=…>'   click an element
 //   node cdp.mjs type '<css>' '<text>'     set an input's value (fires input/change)
 //   node cdp.mjs type-secret '<css>' <service[#account]>  type a Keychain password, never printed
-//   node cdp.mjs keys '<css>' <text|kc:service|env:NAME>   real keystrokes, one per character
+//   node cdp.mjs keys '<css>' <text|kc:service[#account]|env:NAME>   real keystrokes, one per character
 //   node cdp.mjs mclick '<css or text=…>'  a real mouse click
 //   node cdp.mjs shot <file.png>           screenshot
 //   node cdp.mjs url                       print the current URL
@@ -174,7 +174,7 @@ try {
     case "keys": {
       // Types one real key event per character, with human gaps (for forms that fingerprint keystrokes).
       // b is the text, or kc:<service> for a Keychain password, or env:<NAME> for a value in the environment.
-      const text = b.startsWith("kc:") ? execFileSync("security", ["find-generic-password", "-s", b.slice(3), "-w"], { encoding: "utf8" }).trimEnd()
+      const text = b.startsWith("kc:") ? keychain(b.slice(3))
         : b.startsWith("env:") ? (process.env[b.slice(4)] ?? "") : b;
       await clickAt(c, a);
       await evaluate(c, `(() => { const el = ${finder(a)}; if (el && 'value' in el) { el.select && el.select(); } })()`);
