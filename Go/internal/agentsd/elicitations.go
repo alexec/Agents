@@ -3,8 +3,10 @@ package agentsd
 import (
 	"context"
 	"encoding/json"
+	"log"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/alexec/agents/Go/wire"
 )
@@ -15,9 +17,23 @@ import (
 // questionWentUnanswered is RuntimeNote.questionWentUnanswered.
 const questionWentUnanswered = "Nobody answered this question before the agent ended."
 
+// formHoldLimit is how long an ask_form call is held open (#1641): a runtime's MCP client
+// lets a tool call go at about a minute ("The operation timed out"), as eventHoldLimit
+// says for wait_for_event. After it, the call says the form is still open, and the answer
+// comes to the agent as a prompt.
+var formHoldLimit = 45 * time.Second
+
+// formStillOpen is what an ask_form call says when it is not answered within formHoldLimit.
+const formStillOpen = "The form is still open, and nobody has answered it yet. Your place is kept: end your turn " +
+	"(or go on with other work). You'll be started again with the answer when they answer, skip or cancel. " +
+	"Do not ask again."
+
 type pendingElicitation struct {
 	req   wire.ElicitationRequest
 	reply chan elicitationReply
+	// left is an ask_form whose call came back before the answer (formStillOpen): the
+	// form stays open after the turn, and its answer goes to the agent as a prompt.
+	left bool
 }
 
 type elicitationReply struct {
@@ -57,18 +73,10 @@ func (l *live) Elicitation(ctx context.Context, params json.RawMessage) (string,
 }
 
 // holdForm puts a form in front of the person and waits for the answer, the form taken
-// down, or ctx: the runtime's own questions and the app's ask_form are held the same way.
+// down, or ctx: the runtime's own questions are held so.
 func (l *live) holdForm(ctx context.Context, req wire.ElicitationRequest) elicitationReply {
 	d := l.d
-	pe := &pendingElicitation{req: req, reply: make(chan elicitationReply, 1)}
-	l.mu.Lock()
-	l.elicitations[req.ID] = pe
-	l.mu.Unlock()
-	d.record(l.id, wire.TranscriptEntryKind{ElicitationAsked: &wire.TranscriptEntryKindElicitationAsked{Value: req}})
-	d.moveIf(l.id, wire.AgentStateRunning, wire.AgentStateWaitingOnUser)
-	Broadcast(d, wire.NotifyAgentElicitation, wire.ElicitationNotification{AgentID: l.id, RequestID: req.ID, Request: &req})
-	d.raiseAgentEvent("agent.asked_form", l.id, "is asking for a form to be filled in.", nil)
-	d.reconsider()
+	pe := l.showForm(req)
 	select {
 	case r := <-pe.reply:
 		return r
@@ -80,6 +88,62 @@ func (l *live) holdForm(ctx context.Context, req wire.ElicitationRequest) elicit
 		}
 		return cancelled()
 	}
+}
+
+// showForm puts a form in front of the person, on every client.
+func (l *live) showForm(req wire.ElicitationRequest) *pendingElicitation {
+	d := l.d
+	pe := &pendingElicitation{req: req, reply: make(chan elicitationReply, 1)}
+	l.mu.Lock()
+	l.elicitations[req.ID] = pe
+	l.mu.Unlock()
+	d.record(l.id, wire.TranscriptEntryKind{ElicitationAsked: &wire.TranscriptEntryKindElicitationAsked{Value: req}})
+	d.moveIf(l.id, wire.AgentStateRunning, wire.AgentStateWaitingOnUser)
+	Broadcast(d, wire.NotifyAgentElicitation, wire.ElicitationNotification{AgentID: l.id, RequestID: req.ID, Request: &req})
+	d.raiseAgentEvent("agent.asked_form", l.id, "is asking for a form to be filled in.", nil)
+	d.reconsider()
+	return pe
+}
+
+// holdAskedForm is ask_form's form: held up to formHoldLimit, then left open, with false,
+// for the answer to come as a prompt (#1641).
+func (l *live) holdAskedForm(req wire.ElicitationRequest) (elicitationReply, bool) {
+	pe := l.showForm(req)
+	hold := time.NewTimer(formHoldLimit)
+	defer hold.Stop()
+	select {
+	case r := <-pe.reply:
+		return r, true
+	case <-hold.C:
+	}
+	l.mu.Lock()
+	_, open := l.elicitations[req.ID]
+	pe.left = open
+	l.mu.Unlock()
+	if !open {
+		return <-pe.reply, true // answered in the same instant
+	}
+	// The turn goes on: the agent is not held by this form any more.
+	if !l.asking() {
+		l.d.moveIf(l.id, wire.AgentStateWaitingOnUser, wire.AgentStateRunning)
+	}
+	return elicitationReply{}, false
+}
+
+// asking is whether a card holds the agent's turn: a permission or a form whose call
+// waits. A form left open (pendingElicitation.left) does not hold it.
+func (l *live) asking() bool {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if len(l.pending) > 0 {
+		return true
+	}
+	for _, pe := range l.elicitations {
+		if !pe.left {
+			return true
+		}
+	}
+	return false
 }
 
 // take removes a pending form, and is nil when it has gone already.
@@ -130,12 +194,16 @@ func (l *live) elicitationFor(id wire.UUID) *pendingElicitation {
 	return l.elicitations[id]
 }
 
-// closeForms takes every form of the agent down as its turn stops: the runtime hears
-// cancel, the record says nobody answered.
-func (l *live) closeForms() {
+// closeForms takes every form of the agent's turn down as the turn stops: the runtime
+// hears cancel, the record says nobody answered. A form left open (pendingElicitation.left)
+// is not the turn's, and stays, unless every one goes (the agent archived or deleted).
+func (l *live) closeForms(every bool) {
 	l.mu.Lock()
 	var pes []*pendingElicitation
 	for id, pe := range l.elicitations {
+		if pe.left && !every {
+			continue
+		}
 		pes = append(pes, pe)
 		delete(l.elicitations, id)
 	}
@@ -209,9 +277,25 @@ func (d *Daemon) answerElicitation(r wire.AnswerElicitationRequest) error {
 		Summary: outcomeSummary(action), Answers: said}})
 	d.moveIf(l.id, wire.AgentStateWaitingOnUser, wire.AgentStateRunning)
 	d.formDown(l.id, r.RequestID)
+	// A form whose call came back already (#1641): the answer starts the agent again.
+	if pe.left {
+		if err := d.promptFromApp(l.id, formAnsweredWords(pe.req, action, said)); err != nil {
+			log.Printf("agent %s: form answer: %v", l.id, err)
+		}
+		return nil
+	}
 	// The runtime hears last, so what it says next follows the answer in the record.
 	pe.reply <- elicitationReply{action: action, content: content}
 	return nil
+}
+
+// formAnsweredWords is the prompt that brings an answer to a form left open.
+func formAnsweredWords(req wire.ElicitationRequest, action wire.AnswerElicitationRequestAction, said []wire.ElicitationAnswer) string {
+	form := "your form"
+	if req.Message != nil && strings.TrimSpace(*req.Message) != "" {
+		form = "your form \"" + strings.TrimSpace(*req.Message) + "\""
+	}
+	return "The person replied to " + form + " (ask_form). " + askFormNote(action, said)
 }
 
 // moveIf moves an agent from one state to another, and does nothing from any other

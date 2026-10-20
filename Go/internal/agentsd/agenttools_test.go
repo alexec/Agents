@@ -4,8 +4,10 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/alexec/agents/Go/wire"
 )
@@ -96,5 +98,52 @@ func TestAskingThePersonAForm(t *testing.T) {
 	}
 	if text, isErr := m.tool(4, "ask_form", map[string]any{"questions": []any{map[string]any{"id": "x"}}}); !isErr || text != "Nothing was asked: each question needs an `id` and a `prompt`." {
 		t.Fatal(text)
+	}
+}
+
+// A form nobody answers in time (#1641): the call comes back before the runtime's own
+// limit, the form stays open past the turn and its stop, the agent can still wait, and the
+// answer starts it again.
+func TestAFormLeftOpenBringsItsAnswerLater(t *testing.T) {
+	fakeRuntimes(t)
+	was := formHoldLimit
+	formHoldLimit = 300 * time.Millisecond
+	defer func() { formHoldLimit = was }()
+	d, c := start(t, t.TempDir())
+	defer d.Shutdown()
+	a := seeded(t, d, t.TempDir(), func(a *wire.Agent) { a.State, a.EndedReason = wire.AgentStateRunning, nil })
+	m := appClient(t, d, a.ID)
+	m.post("initialize", map[string]any{}, 1)
+	l := d.live(a.ID)
+	l.mu.Lock()
+	l.inTurn = true
+	l.mu.Unlock()
+	question := map[string]any{"title": "Pick a colour", "questions": []any{map[string]any{"id": "colour", "prompt": "Which colour?",
+		"options": []any{map[string]any{"id": "red", "label": "Red"}}}}}
+	if text, isErr := m.tool(2, "ask_form", question); isErr || text != formStillOpen {
+		t.Fatal(text)
+	}
+	if s := d.Store.Agent(a.ID).State; s != wire.AgentStateRunning {
+		t.Fatalf("the turn is still held by the form: %s", s)
+	}
+	if l.asking() {
+		t.Fatal("a form left open holds the turn, so the agent cannot wait")
+	}
+	l.closeForms(false) // the turn stops
+	l.mu.Lock()
+	l.inTurn = false
+	l.mu.Unlock()
+	var pending []wire.ElicitationRequest
+	json.Unmarshal(c.call(t, 1, "elicitations/pending", nil), &pending)
+	if len(pending) != 1 {
+		t.Fatalf("the form was taken down: %+v", pending)
+	}
+	c.call(t, 2, "elicitations/answer", map[string]any{"requestID": pending[0].ID, "action": "accept", "content": map[string]any{"colour": "red"}})
+	waitFor(t, "the answer in its chat", func() bool {
+		return slices.Contains(userMessages(d, a.ID), "The person replied to your form \"Pick a colour\" (ask_form). They answered:\n- Which colour?: Red")
+	})
+	json.Unmarshal(c.call(t, 3, "elicitations/pending", nil), &pending)
+	if len(pending) != 0 {
+		t.Fatalf("%+v", pending)
 	}
 }
