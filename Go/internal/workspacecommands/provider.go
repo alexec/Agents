@@ -62,6 +62,9 @@ func (w Workspace) JSON() map[string]any {
 	if ssh := w.SSH(); ssh != nil {
 		o["ssh"] = *ssh
 	}
+	if w.Commands.HostKeyRenews {
+		o["hostKeyRenews"] = true
+	}
 	if w.Commands.Cost != nil {
 		o["cost"] = Fill(*w.Commands.Cost, w.Values, false)
 	}

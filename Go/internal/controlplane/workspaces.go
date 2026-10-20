@@ -136,15 +136,29 @@ func providersCaller(c Caller) providers.Caller {
 }
 
 // sshStart is the providers' SSHStart hook: a host's agentsd started over ssh. The key
-// trusted at the install, when it was installed over this destination; else the person's
-// own known_hosts (#965).
-func (s *Service) sshStart(host records.HostRecord, destination string) error {
+// trusted at the install, whatever address the host has now (#1691); else the person's own
+// known_hosts (#965). With renewKey, the key it is offered is taken and pinned again for
+// its tunnel (#1701).
+func (s *Service) sshStart(host records.HostRecord, destination string, renewKey bool) error {
 	known := ""
 	if s.tunnels != nil {
-		if over, keys, ok := s.tunnels.Installed(host.ID); ok && over == destination {
+		if _, keys, ok := s.tunnels.Installed(host.ID); ok {
 			known = keys
+		} else {
+			// No tunnel to pin a new key for: it is checked as before.
+			renewKey = false
 		}
+	} else {
+		renewKey = false
 	}
 	// A provider may give alex@127.0.0.1 -p 2222: ssh takes it as one word (#857).
-	return s.installer.StartDaemon(context.Background(), providers.SSHDestination(destination), known, host.Name)
+	taken, err := s.installer.StartDaemon(context.Background(), providers.SSHDestination(destination), known, host.Name, renewKey)
+	if err != nil || !renewKey {
+		return err
+	}
+	if taken != known {
+		s.log("workspace: ssh start " + host.Name + ": its host key is new, as its workspace's is at each start; kept")
+	}
+	_, err = s.tunnels.Repin(context.Background(), host.ID, taken)
+	return err
 }

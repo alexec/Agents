@@ -5578,8 +5578,10 @@ type WorkspaceInfo struct {
 	State  string  `json:"state"`
 	SSH    *string `json:"ssh,omitzero"`
 	Tunnel *bool   `json:"tunnel,omitzero"`
-	Cost   *string `json:"cost,omitzero"`
-	Host   *HostID `json:"host,omitzero"`
+	// Its ssh host key is made again at each start, as a Google Cloud workstation's is (#1701): after a Start the control plane made, the first ssh takes the key it is offered and pins it again.
+	HostKeyRenews *bool   `json:"hostKeyRenews,omitzero"`
+	Cost          *string `json:"cost,omitzero"`
+	Host          *HostID `json:"host,omitzero"`
 }
 
 type WorktreeChoice struct {

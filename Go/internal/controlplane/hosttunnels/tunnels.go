@@ -99,6 +99,10 @@ type Config struct {
 	// (#864). Its tunnel waits and does not dial: through gh, a connection to a codespace
 	// starts it again. Nil: never.
 	Asleep func(host string) bool
+	// Listed is the ssh destination a host's workspace is listed with now, as one word
+	// ssh takes, or "" for none (#1691). A VM can have a new address at each start: its
+	// tunnel dials the listed one, not the install's. Nil: none.
+	Listed func(host string) string
 }
 
 // asleepCheck is how often a tunnel whose host is asleep asks again.
@@ -113,6 +117,7 @@ type Tunnels struct {
 	changed func(Changed)
 	log     func(string)
 	asleep  func(host string) bool
+	listed  func(host string) string
 	// folder is short: a control socket's path must fit in 104 bytes, with ssh's suffix.
 	folder string
 
@@ -162,6 +167,10 @@ func New(c Config) *Tunnels {
 	if asleep == nil {
 		asleep = func(string) bool { return false }
 	}
+	listed := c.Listed
+	if listed == nil {
+		listed = func(string) string { return "" }
+	}
 	return &Tunnels{
 		store:   c.Store,
 		ssh:     sshCommand{executable: executable, env: env, options: configFile(c.ConfigFile)},
@@ -170,6 +179,7 @@ func New(c Config) *Tunnels {
 		changed: changed,
 		log:     log,
 		asleep:  asleep,
+		listed:  listed,
 		folder:  fmt.Sprintf("/tmp/agents-tunnels-%d-%d", os.Getuid(), os.Getpid()),
 		records: map[string]Record{},
 		held:    map[string]*holding{},
@@ -326,6 +336,47 @@ func (t *Tunnels) Installed(host string) (destination, knownHosts string, ok boo
 	return "", "", false
 }
 
+// Repin keeps a new host key for this host's tunnel, in known_hosts form (#1701): a
+// workspace whose host key is made again at each start, as an ssh start the control plane
+// made after its own Start has just taken it. Its session starts again at once with it.
+// ok is false when no tunnel carries the host.
+func (t *Tunnels) Repin(ctx context.Context, host, knownHosts string) (bool, error) {
+	t.work.Lock()
+	defer t.work.Unlock()
+	t.mu.Lock()
+	var record Record
+	found := false
+	for _, r := range t.records {
+		if r.Host != nil && *r.Host == host {
+			record, found = r, true
+			break
+		}
+	}
+	t.mu.Unlock()
+	if !found {
+		return false, nil
+	}
+	record.KnownHosts = knownHosts
+	data, err := records.Encode(record)
+	if err != nil {
+		return true, err
+	}
+	// Only this copy writes tunnels, so nobody else's write can be lost.
+	if _, err := t.store.Put(ctx, Key(record.ID), data, store.Always); err != nil {
+		return true, err
+	}
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.records[record.ID] = record
+	t.log("tunnel to " + record.Name + ": its workspace's new host key is kept")
+	if old := t.held[record.ID]; old != nil {
+		old.cancel()
+		delete(t.held, record.ID)
+		t.holdLocked(record, old)
+	}
+	return true, nil
+}
+
 // Unjoined is HostTunnels.unjoined(): the servers whose tunnel is held but who have not
 // joined yet, by name, oldest first (#660). They have no host row, so the window lists
 // them with how the tunnel stands.
@@ -458,8 +509,6 @@ func (t *Tunnels) holdLocked(record Record, after *holding) {
 	ctx, cancel := context.WithCancel(context.Background())
 	h := &holding{cancel: cancel, done: make(chan struct{})}
 	t.held[record.ID] = h
-	ssh := t.ssh
-	ssh.name = record.Destination
 	t.running.Add(1)
 	go func() {
 		defer t.running.Done()
@@ -473,6 +522,12 @@ func (t *Tunnels) holdLocked(record Record, after *holding) {
 		}
 		wait := 2 * time.Second
 		for ctx.Err() == nil {
+			// The record as it is now: Reconcile and Repin change it under a held session.
+			t.mu.Lock()
+			if now, ok := t.records[record.ID]; ok {
+				record = now
+			}
+			t.mu.Unlock()
 			// A stopped workspace is not dialled, or the dial would start it again (#864).
 			if record.Host != nil && t.asleep(*record.Host) {
 				words := "Its workspace is stopped: the tunnel waits for Start."
@@ -484,6 +539,13 @@ func (t *Tunnels) holdLocked(record Record, after *holding) {
 				}
 				wait = 2 * time.Second
 				continue
+			}
+			ssh := t.ssh
+			ssh.name = record.Destination
+			if record.Host != nil {
+				if listed := t.listed(*record.Host); listed != "" {
+					ssh.name = listed
+				}
 			}
 			started := time.Now()
 			problem := session(ctx, record, ssh, t.folder, func() { t.sayState(ctx, record.ID, Tunnel{Up: true}) })

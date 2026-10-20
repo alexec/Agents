@@ -4598,6 +4598,11 @@ export interface WorkspaceInfo {
   state: string;
   ssh?: string;
   tunnel?: boolean;
+  /**
+   * Its ssh host key is made again at each start, as a Google Cloud workstation's is (#1701): after
+   * a Start the control plane made, the first ssh takes the key it is offered and pins it again.
+   */
+  hostKeyRenews?: boolean;
   cost?: string;
   host?: HostID;
 }
@@ -5519,7 +5524,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   WorkflowSettingsRequest: { required: ["folder", "workflowID", "settings"], optional: ["cooldown", "labels", "hosts", "whenDone"] },
   WorkflowSummary: { required: ["workflow", "isArchived", "isEnabled", "nextFireAtByTrigger", "isRunning", "holdsAFire", "queued"], optional: ["overLimit", "totalLimit", "nextFireAt", "lastOutcome", "causingEvent", "causingEventName", "awaitingApproval", "deniedHere", "lastFiredAt", "lastFiredBy", "cooldownEndsAt", "offReason", "standingAgentID", "mcpTriggers"] },
   WorkflowsListRequest: { required: [], optional: ["folder"] },
-  WorkspaceInfo: { required: ["id", "name", "state"], optional: ["ssh", "tunnel", "cost", "host"] },
+  WorkspaceInfo: { required: ["id", "name", "state"], optional: ["ssh", "tunnel", "hostKeyRenews", "cost", "host"] },
   WorktreeRemovalRequest: { required: ["project", "root", "confirmed"], optional: [] },
   WorktreeRemoved: { required: ["removedBranch"], optional: [] },
   WorktreeSize: { required: ["bytes", "partial"], optional: [] },

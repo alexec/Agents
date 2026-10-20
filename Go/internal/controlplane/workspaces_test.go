@@ -1,13 +1,16 @@
 package controlplane
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/alexec/agents/Go/internal/controlplane/hostinstall"
+	"github.com/alexec/agents/Go/internal/controlplane/hosttunnels"
 	"github.com/alexec/agents/Go/internal/controlplane/records"
+	"github.com/alexec/agents/Go/internal/controlplane/store"
 )
 
 // A provider gives its ssh as a person types it, agents@127.0.0.1 -p 2224 (the Docker
@@ -22,7 +25,7 @@ func TestAStartOverSSHTakesAProvidersDestinationWithAPort(t *testing.T) {
 		t.Fatal(err)
 	}
 	s := &Service{installer: &hostinstall.Installer{SSH: ssh}}
-	if err := s.sshStart(records.HostRecord{ID: "box", Name: "w857-box"}, "agents@127.0.0.1 -p 2224"); err != nil {
+	if err := s.sshStart(records.HostRecord{ID: "box", Name: "w857-box"}, "agents@127.0.0.1 -p 2224", false); err != nil {
 		t.Fatal(err)
 	}
 	data, err := os.ReadFile(said)
@@ -39,5 +42,75 @@ func TestAStartOverSSHTakesAProvidersDestinationWithAPort(t *testing.T) {
 	}
 	if !found {
 		t.Errorf("ssh was not given ssh://agents@127.0.0.1:2224: %q", words)
+	}
+}
+
+// keyedSSH is an ssh that says its words to said and, as ssh with accept-new does, adds
+// the key it is "offered" to the known hosts file it is given.
+func keyedSSH(t *testing.T, key string) (ssh, said string) {
+	folder := t.TempDir()
+	said = filepath.Join(folder, "said")
+	ssh = filepath.Join(folder, "ssh")
+	script := "#!/bin/sh\nfor word in \"$@\"; do printf '%s\\n' \"$word\" >> '" + said + "'\n" +
+		"case \"$word\" in UserKnownHostsFile=*) file=\"${word#UserKnownHostsFile=}\";; esac; done\n" +
+		"grep -q ' " + key + "$' \"$file\" 2>/dev/null || echo 'agents-pinned-host ssh-ed25519 " + key + "' >> \"$file\"\n"
+	if err := os.WriteFile(ssh, []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	return ssh, said
+}
+
+// tunnelFor is the tunnels with one record, for host, installed over destination with key.
+func tunnelFor(t *testing.T, host, destination, key string) *hosttunnels.Tunnels {
+	tunnels := hosttunnels.New(hosttunnels.Config{Store: store.NewMemory(), SSH: "/usr/bin/false", Port: 1,
+		Hosts: func(context.Context) []records.HostRecord { return []records.HostRecord{{ID: host, Name: host}} }})
+	t.Cleanup(tunnels.Stop)
+	if err := tunnels.Add(context.Background(), hosttunnels.Record{ID: "t-" + host, Destination: destination, Name: host,
+		Port: 1, Code: "c", Host: &host, KnownHosts: destination + " ssh-ed25519 " + key + "\n", Made: records.Now()}); err != nil {
+		t.Fatal(err)
+	}
+	return tunnels
+}
+
+// A Google Cloud workstation's container is made again at each start, so its host key is
+// new (#1701). After the control plane's own Start, the ssh start takes the key it is
+// offered and pins it for the host's tunnel; the old one is not asked for.
+func TestAStartOverSSHPinsTheNewKeyOfAWorkspaceThatRenewsIt(t *testing.T) {
+	ssh, said := keyedSSH(t, "NEWKEY")
+	s := &Service{installer: &hostinstall.Installer{SSH: ssh}, tunnels: tunnelFor(t, "ws", "w1701-ws", "OLDKEY"),
+		cfg: Config{Log: func(string) {}}}
+	if err := s.sshStart(records.HostRecord{ID: "ws", Name: "w1701-ws"}, "w1701-ws", true); err != nil {
+		t.Fatal(err)
+	}
+	if _, keys, _ := s.tunnels.Installed("ws"); keys != "agents-pinned-host ssh-ed25519 NEWKEY\n" {
+		t.Errorf("pinned %q", keys)
+	}
+	data, _ := os.ReadFile(said)
+	if !strings.Contains(string(data), "StrictHostKeyChecking=accept-new") {
+		t.Errorf("ssh was not told to take a new key: %q", data)
+	}
+}
+
+// Without renewKey a key is never taken: the one trusted at the install is checked.
+func TestAStartOverSSHKeepsTheInstallsKeyOtherwise(t *testing.T) {
+	ssh, said := keyedSSH(t, "OLDKEY")
+	s := &Service{installer: &hostinstall.Installer{SSH: ssh}, tunnels: tunnelFor(t, "vm", "agents@10.0.0.1", "OLDKEY"),
+		cfg: Config{Log: func(string) {}}}
+	if err := s.sshStart(records.HostRecord{ID: "vm", Name: "w1691-vm"}, "agents@10.0.0.2", false); err != nil {
+		t.Fatal(err)
+	}
+	if _, keys, _ := s.tunnels.Installed("vm"); keys != "agents@10.0.0.1 ssh-ed25519 OLDKEY\n" {
+		t.Errorf("pinned %q", keys)
+	}
+	data, _ := os.ReadFile(said)
+	words := string(data)
+	// The new address, checked against the install's key under its alias (#1691).
+	for _, want := range []string{"agents@10.0.0.2", "HostKeyAlias=agents-pinned-host", "StrictHostKeyChecking=yes"} {
+		if !strings.Contains(words, want+"\n") {
+			t.Errorf("ssh was not given %q: %q", want, words)
+		}
+	}
+	if strings.Contains(words, "accept-new") {
+		t.Errorf("ssh was told to take a new key: %q", words)
 	}
 }

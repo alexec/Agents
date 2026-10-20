@@ -203,7 +203,13 @@ func New(cfg Config) (*Service, error) {
 			Hosts:   func(context.Context) []records.HostRecord { return s.records.Hosts() },
 			Changed: func(change hosttunnels.Changed) { s.router.BroadcastControl("control/tunnelChanged", change) },
 			// Made after the tunnels: read when a tunnel asks.
-			Asleep: func(host string) bool { return s.providers != nil && s.providers.Asleep(host) }})
+			Asleep: func(host string) bool { return s.providers != nil && s.providers.Asleep(host) },
+			Listed: func(host string) string {
+				if s.providers == nil {
+					return ""
+				}
+				return s.providers.Listed(host)
+			}})
 	}
 	s.router.SetCopier(s.copies.take)
 	var tunnels hostinstall.Tunnels

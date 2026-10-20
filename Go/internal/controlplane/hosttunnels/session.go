@@ -33,11 +33,12 @@ func session(ctx context.Context, record Record, base sshCommand, folder string,
 		ssh.options = join(ssh.options, personsKnownHosts(ctx, ssh), []string{"-o", "StrictHostKeyChecking=yes"})
 	} else {
 		knownHosts := filepath.Join(folder, record.ID+".known_hosts")
-		if err := writeAtomically(knownHosts, []byte(record.KnownHosts)); err != nil {
+		if err := writeAtomically(knownHosts, []byte(Pinned(record.KnownHosts))); err != nil {
 			return "its known hosts file could not be written: " + err.Error()
 		}
 		ssh.options = join(ssh.options, []string{"-o", "UserKnownHostsFile=" + knownHosts,
-			"-o", "GlobalKnownHostsFile=/dev/null", "-o", "StrictHostKeyChecking=yes"})
+			"-o", "GlobalKnownHostsFile=/dev/null", "-o", "HostKeyAlias=" + PinnedAlias,
+			"-o", "StrictHostKeyChecking=yes"})
 	}
 	id := record.ID
 	if len(id) > 8 {
@@ -116,6 +117,36 @@ func session(ctx context.Context, record Record, base sshCommand, folder string,
 		return *why
 	}
 	return ended
+}
+
+// PinnedAlias is the name a pinned key is kept under (ssh's HostKeyAlias): the known
+// hosts file holds only the one server's keys, so the key is checked whatever address
+// the server has now (#1691).
+const PinnedAlias = "agents-pinned-host"
+
+// Pinned is known_hosts lines with each one's host names written as PinnedAlias. A
+// marker (@cert-authority, @revoked) stays before them.
+func Pinned(knownHosts string) string {
+	var out []string
+	for _, line := range strings.Split(knownHosts, "\n") {
+		fields := strings.Fields(line)
+		if len(fields) == 0 || strings.HasPrefix(fields[0], "#") {
+			continue
+		}
+		names := 0
+		if strings.HasPrefix(fields[0], "@") {
+			names = 1
+		}
+		if len(fields) <= names+1 {
+			continue
+		}
+		fields[names] = PinnedAlias
+		out = append(out, strings.Join(fields, " "))
+	}
+	if len(out) == 0 {
+		return ""
+	}
+	return strings.Join(out, "\n") + "\n"
 }
 
 // master is the session's ssh: ended is set once it has exited.

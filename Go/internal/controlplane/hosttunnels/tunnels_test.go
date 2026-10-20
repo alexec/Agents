@@ -459,3 +459,78 @@ func TestATunnelToAStoppedWorkspaceWaitsAndDoesNotDial(t *testing.T) {
 	mu.Unlock()
 	heard.waitFor(t, func(c Changed) bool { return c.Tunnel.Up })
 }
+
+// A VM can have a new address at each start (#1691): the tunnel dials the address its
+// workspace is listed with now, and checks the install's key under its alias.
+func TestATunnelDialsTheListedAddressWithTheInstallsKey(t *testing.T) {
+	folder := t.TempDir()
+	log := filepath.Join(folder, "argv")
+	ssh := fakeSSH(t, folder, "up", log, "exit 0", "exec sleep 30")
+	heard := &heardChanges{}
+	tunnels := New(Config{Store: store.NewMemory(), SSH: ssh, Env: []string{}, Port: 8791,
+		Hosts:   func(context.Context) []records.HostRecord { return []records.HostRecord{{ID: "vm", Name: "ws"}} },
+		Changed: heard.add,
+		Listed: func(host string) string {
+			if host == "vm" {
+				return "agents@10.0.0.2"
+			}
+			return ""
+		}})
+	defer tunnels.Stop()
+	if err := tunnels.Add(ctx, record("vm")); err != nil {
+		t.Fatal(err)
+	}
+	heard.waitFor(t, func(c Changed) bool { return c.Tunnel.Up })
+	calls, _ := os.ReadFile(log)
+	if !strings.Contains(string(calls), "-- agents@10.0.0.2") || strings.Contains(string(calls), "-- agents@ws") {
+		t.Errorf("not the listed address: %s", calls)
+	}
+	if !strings.Contains(string(calls), "HostKeyAlias="+PinnedAlias) {
+		t.Errorf("no alias: %s", calls)
+	}
+}
+
+func TestAPinnedKeyIsKeptUnderTheAlias(t *testing.T) {
+	got := Pinned("# a comment\n10.0.0.1 ssh-ed25519 AAAA\n|1|salt|hash ecdsa-sha2-nistp256 BBBB\n\n@cert-authority *.x ssh-rsa CCCC\n")
+	want := "agents-pinned-host ssh-ed25519 AAAA\nagents-pinned-host ecdsa-sha2-nistp256 BBBB\n@cert-authority agents-pinned-host ssh-rsa CCCC\n"
+	if got != want {
+		t.Errorf("%q", got)
+	}
+	if Pinned(want) != want || Pinned("") != "" {
+		t.Error("not the same again")
+	}
+}
+
+// A workspace whose key is new at each start (#1701): a new key pinned for its host is
+// kept, and its session starts again at once with it.
+func TestARepinnedKeyIsKeptAndItsSessionStartsAgain(t *testing.T) {
+	folder := t.TempDir()
+	log := filepath.Join(folder, "argv")
+	ssh := fakeSSH(t, folder, "up", log, "exit 0", "exec sleep 30")
+	heard := &heardChanges{}
+	s := store.NewMemory()
+	tunnels := newTunnels(s, ssh, heard, []records.HostRecord{{ID: "ws", Name: "ws"}})
+	defer tunnels.Stop()
+	r := record("ws")
+	if err := tunnels.Add(ctx, r); err != nil {
+		t.Fatal(err)
+	}
+	heard.waitFor(t, func(c Changed) bool { return c.Tunnel.Up })
+	if ok, err := tunnels.Repin(ctx, "ws", "agents-pinned-host ssh-ed25519 NEW\n"); !ok || err != nil {
+		t.Fatalf("%v %v", ok, err)
+	}
+	if _, keys, _ := tunnels.Installed("ws"); keys != "agents-pinned-host ssh-ed25519 NEW\n" {
+		t.Errorf("kept %q", keys)
+	}
+	object, _ := s.Get(ctx, Key(r.ID))
+	if object == nil || !strings.Contains(string(object.Data), "NEW") {
+		t.Errorf("stored %v", object)
+	}
+	eventually(t, func() bool {
+		calls, _ := os.ReadFile(log)
+		return strings.Count(string(calls), "-O forward") == 2
+	})
+	if ok, _ := tunnels.Repin(ctx, "other", "x"); ok {
+		t.Error("pinned a host no tunnel carries")
+	}
+}

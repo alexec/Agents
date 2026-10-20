@@ -42,8 +42,9 @@ type Listing struct {
 	State string
 	SSH   string
 	// "" for none.
-	Tunnel string
-	Cost   string
+	Tunnel        string
+	HostKeyRenews string
+	Cost          string
 	// Its words for a state, lower-cased, to a contract state.
 	States map[string]string
 }
@@ -59,7 +60,7 @@ var ContractMapping = ToolMapping{
 		"name": "{name}", "options": "{options}", "firstBoot": "{firstBoot}"}},
 	Delete: &Call{Tool: "workspace_delete", Arguments: map[string]any{"id": "{id}"}},
 	Listing: Listing{Items: "workspaces", ID: "id", Name: "name", State: "state", SSH: "ssh", Tunnel: "tunnel",
-		Cost: "cost", States: map[string]string{}},
+		HostKeyRenews: "hostKeyRenews", Cost: "cost", States: map[string]string{}},
 	Native: true,
 }
 
@@ -143,7 +144,8 @@ func MapFrom(m any) (ToolMapping, error) {
 		into     *string
 		required bool
 	}{{"items", &l.Items, false}, {"id", &l.ID, true}, {"name", &l.Name, true}, {"state", &l.State, true},
-		{"ssh", &l.SSH, false}, {"tunnel", &l.Tunnel, false}, {"cost", &l.Cost, false}} {
+		{"ssh", &l.SSH, false}, {"tunnel", &l.Tunnel, false},
+		{"hostKeyRenews", &l.HostKeyRenews, false}, {"cost", &l.Cost, false}} {
 		if *p.into, err = path(p.key, p.required); err != nil {
 			return out, err
 		}
@@ -293,6 +295,11 @@ func (m ToolMapping) Workspace(item any) *WorkspaceInfo {
 	if m.Listing.Tunnel != "" {
 		if b, ok := boolean(pathValue(m.Listing.Tunnel, item)); ok {
 			w.Tunnel = &b
+		}
+	}
+	if m.Listing.HostKeyRenews != "" {
+		if b, ok := boolean(pathValue(m.Listing.HostKeyRenews, item)); ok && b {
+			w.HostKeyRenews = &b
 		}
 	}
 	if m.Listing.Cost != "" {

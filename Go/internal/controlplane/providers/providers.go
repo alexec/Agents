@@ -83,7 +83,9 @@ var StandardTiming = Timing{ListEvery: 300 * time.Second, SSHAfter: 120 * time.S
 // processes or the tunnels.
 type Hooks struct {
 	// SSHStart starts a host's agentsd over ssh, as an install leaves it, without installing.
-	SSHStart func(host records.HostRecord, destination string) error
+	// renewKey: its workspace's host key is made again at each start, and this start was
+	// the control plane's own, so the key it is offered is taken and pinned again (#1701).
+	SSHStart func(host records.HostRecord, destination string, renewKey bool) error
 	// OpenTunnel opens the host's reverse tunnel now, if it has one.
 	OpenTunnel func(host string)
 	// InstalledOver is the ssh destination the host was installed over, when its tunnel
@@ -209,7 +211,7 @@ func NewProviders(cfg Config) *Providers {
 	}
 	h := &cfg.Hooks
 	if h.SSHStart == nil {
-		h.SSHStart = func(records.HostRecord, string) error {
+		h.SSHStart = func(records.HostRecord, string, bool) error {
 			return providerFailure("This control plane can’t start agentsd over ssh.")
 		}
 	}
@@ -1309,7 +1311,9 @@ func (p *Providers) run(kind activityKind, host string, link WorkspaceLink, who 
 				if destination := p.sshDestination(link, host); destination != "" {
 					sshTried = true
 					p.setPhase(host, "sshStart")
-					if err := p.hooks.SSHStart(*record, destination); err != nil {
+					w := p.workspace(link)
+					renew := w != nil && w.HostKeyRenews != nil && *w.HostKeyRenews
+					if err := p.hooks.SSHStart(*record, destination, renew); err != nil {
 						// Nothing else will bring it online, so the start ends now, with why (#960).
 						reason := errorWords(err)
 						p.log(fmt.Sprintf("workspace: ssh start %s: failed: %s", name, reason))
@@ -1780,6 +1784,24 @@ func (p *Providers) Asleep(host string) bool {
 		return a.kind != starting
 	}
 	return found != nil && (found.State == "stopped" || found.State == "stopping")
+}
+
+// Listed is the ssh destination the host's workspace is listed with now, as one word ssh
+// takes, or "" when it has no link or its listing gives none. Its tunnel dials it (#1691):
+// a VM can have a new address at each start.
+func (p *Providers) Listed(host string) string {
+	record := p.records.Host(host)
+	if record == nil {
+		return ""
+	}
+	link := LinkOf(record)
+	if link == nil {
+		return ""
+	}
+	if w := p.workspace(*link); w != nil && deref(w.SSH) != "" {
+		return SSHDestination(*w.SSH)
+	}
+	return ""
 }
 
 // sshDestination is where agentsd is started over ssh: the provider's destination, or the
