@@ -78,6 +78,9 @@ type workflowRecords struct {
 	LastTickAt     *wire.Date      `json:"lastTickAt,omitempty"`
 	Runs           []workflowRun   `json:"runs"`
 	ApprovalsBegan *wire.Date      `json:"approvalsBegan,omitempty"`
+	// RanBy is, for a session a workflow started on manage_workflows run, the session that
+	// ran it: that one may stop and archive it as one it started (#1730).
+	RanBy map[wire.UUID]wire.UUID `json:"ranBy,omitempty"`
 }
 
 // workflowFile is one workflow as read now.

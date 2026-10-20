@@ -98,16 +98,23 @@ func (d *Daemon) helperPlaces(folder string) string {
 	return s
 }
 
-// starters is the chain of agents above one: who started it, who started that, and on.
+// starters is the chain of agents above one: who started it, who started that, and on. A
+// session a workflow started on manage_workflows run counts the session that ran it (#1730).
 func (d *Daemon) starters(a *wire.Agent) []wire.UUID {
 	var chain []wire.UUID
 	seen := map[wire.UUID]bool{a.ID: true}
-	next := a.StartedByAgent
+	above := func(a *wire.Agent) *wire.UUID {
+		if a.StartedByAgent != nil {
+			return a.StartedByAgent
+		}
+		return d.ranBy(a)
+	}
+	next := above(a)
 	for next != nil && !seen[*next] {
 		seen[*next] = true
 		chain = append(chain, *next)
 		if s := d.Store.Agent(*next); s != nil {
-			next = s.StartedByAgent
+			next = above(s)
 		} else {
 			next = nil
 		}
@@ -139,10 +146,10 @@ func (d *Daemon) helperTarget(caller, target wire.UUID, verb string) (*wire.Agen
 		if t.StartedByAgent != nil {
 			whose = "another agent started that one"
 		} else if t.StartedByWorkflow != nil {
-			whose = "a workflow started that one"
+			whose = "a workflow started that one, and you did not run it"
 		}
 		return nil, &Error{Code: wire.FailureNotYours, Message: "Nothing changed: " + whose +
-			". You can only stop or archive sessions you started and the sessions they started."}
+			". You can only stop or archive sessions you started (also with manage_workflows run) and the sessions they started."}
 	}
 	if t.State == wire.AgentStateArchived {
 		return nil, &Error{Code: wire.FailureNotYours, Message: "Nothing changed: " + quotedTitle(t.Title) + " is already archived."}

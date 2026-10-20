@@ -53,7 +53,7 @@ func TestALeadStopsAndArchivesItsHelpers(t *testing.T) {
 	m := appClient(t, d, lead.ID)
 	m.post("initialize", map[string]any{}, 1)
 	if text, isErr := m.tool(2, "stop_session", map[string]any{"id": string(person.ID)}); !isErr ||
-		text != "Nothing changed: that is one of the person's own sessions. You can only stop or archive sessions you started and the sessions they started." {
+		text != "Nothing changed: that is one of the person's own sessions. You can only stop or archive sessions you started (also with manage_workflows run) and the sessions they started." {
 		t.Fatal(text)
 	}
 	if text, _ := m.tool(3, "stop_session", map[string]any{"id": string(helper.ID)}); text != "“Helper” had already stopped; nothing changed." {
