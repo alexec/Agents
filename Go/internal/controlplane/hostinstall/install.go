@@ -287,11 +287,14 @@ func (i *Installer) install(ctx context.Context, request Request, personsKnownHo
 		if err != nil {
 			return nil, err
 		}
-		// Empty: the person's own known_hosts had the key.
+		// The key shown and trusted, or the one the person's own known_hosts trusts
+		// (#1691): pinned either way, so a new address at a start is still checked.
 		trusted := ""
 		if trusting != "" {
 			data, _ := os.ReadFile(knownHosts)
 			trusted = string(data)
+		} else {
+			trusted = personsKey(ctx, ssh, config, folder)
 		}
 		record := TunnelRecord{ID: newID(), Destination: destination, Name: name, Port: port, Code: id,
 			KnownHosts: trusted, Made: records.Now()}

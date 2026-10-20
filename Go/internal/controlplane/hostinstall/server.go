@@ -247,10 +247,18 @@ func (i installer) swapCurrent(ctx context.Context, sha, version, installedBy st
 // leaveJoinCode is ServerInstaller.leaveJoinCode: a one-time host code where the daemon
 // reads it on its next start, never on its command line, where ps would show it. A
 // host already running there stops; the one started next takes the code.
+//
+// The lock's pid is stopped only when it is an agentsd of .agents-server (#1701): a
+// workspace whose container is made again at each start keeps the lock in its home, and
+// in the new container that pid can be another process, such as the sshd of this very
+// connection.
 func (i installer) leaveJoinCode(ctx context.Context, code string) error {
 	return i.check(ctx, `umask 077; d="$HOME/.agents-server/root"; mkdir -p "$d"; `+
 		`if [ -f "$d/daemon.lock" ]; then p=$(cat "$d/daemon.lock" 2>/dev/null || true); `+
-		`[ -n "$p" ] && kill "$p" 2>/dev/null && sleep 1; fi; `+
+		`case "$p" in ''|*[!0-9]*) p="" ;; esac; `+
+		`if [ -n "$p" ] && { if [ -r "/proc/$p/cmdline" ]; then tr '\000' ' ' < "/proc/$p/cmdline"; `+
+		`else ps -o args= -p "$p" 2>/dev/null; fi; } | grep -q '\.agents-server/'; then `+
+		`kill "$p" 2>/dev/null && sleep 1; fi; fi; `+
 		`rm -f "$d/control-host.json"; printf %s `+quote(code)+` > "$d/control-join-code"`)
 }
 
