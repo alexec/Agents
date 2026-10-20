@@ -142,7 +142,7 @@ struct ControlAuthTests {
                                            url: "https://control.example:8790", pin: nil)
         let book = EndpointBook(membership)
         ok.newKey?.proof = ControlCode.base64url(proof)
-        book.answered(at: membership.endpointsToDial[0], ok: ok)
+        book.answered(at: try #require(membership.endpointsToDial.first), ok: ok)
         #expect(book.current.controlKey == fresh)
     }
 
