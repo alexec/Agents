@@ -147,7 +147,10 @@ to the MCP server" turned on for the top-level group or the instance.
   `list_issues`, `get_issue`, `comment_on_merge_request`, `comment_on_issue`, and
   `merge_merge_request`, which only a view may call (a person merges, as on GitHub).
 
-The tests run it against a fake GitLab over HTTP (`fake_test.go`).
+The tests run it against a fake GitLab over HTTP (`fake_test.go`). Agents Host carries it
+(`scripts/go-github-mcp.sh gitlab-mcp`) and every Linux host installs
+`gitlab-mcp-linux-<arch>` (#1636); the catalogue lists it as `agents/gitlab`, which asks for
+`GITLAB_TOKEN`. For a self-managed GitLab, set `GITLAB_URL` in its `env` in `.agents/mcp.json`.
 
 ## The command workspace provider (`workspace-commands`, #691, #1364)
 

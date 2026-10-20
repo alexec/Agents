@@ -43,12 +43,20 @@ var Made = []Ours{
 	{ID: "agents/linear", Title: "Linear", Description: "Linear issues: a page of open issues with Start Agent, and events when one is opened, labelled, commented on or closed",
 		// Tested: show_issues and the events on Alex's workspace with a personal API key (#1343).
 		Command: "linear-mcp", Declares: Declared{Tools: true, Events: linearEvents, Views: true}, Tested: "2026-10-19"},
+	// An access token in GITLAB_TOKEN until the sign-in (#1630); GITLAB_URL in mcp.json's env
+	// for a self-managed GitLab. Not yet tested on a real account (#1634).
+	{ID: "agents/gitlab", Title: "GitLab", Description: "Merge requests, pipelines and issues on gitlab.com or a self-managed GitLab: tools to read them and comment, and events",
+		Command: "gitlab-mcp", Secret: "GITLAB_TOKEN",
+		SecretDescription: "A GitLab access token with the api scope (GitLab ▸ Edit profile ▸ Access tokens)",
+		Declares:          Declared{Tools: true, Events: gitlabEvents}},
 }
 
 var (
 	githubEvents = []string{"checks.failed", "pr.opened", "pr.merged", "pr.closed", "pr.conflicted",
 		"review.posted", "review.comment", "issue.opened", "issue.labelled", "issue.commented", "issue.closed"}
 	linearEvents = []string{"issue.opened", "issue.labelled", "issue.commented", "issue.closed"}
+	gitlabEvents = []string{"checks.failed", "pr.opened", "pr.merged", "pr.closed", "pr.conflicted", "review.comment",
+		"issue.opened", "issue.commented", "issue.closed"}
 )
 
 // OursByID is the connector with this catalogue id.

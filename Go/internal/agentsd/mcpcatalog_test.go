@@ -217,7 +217,7 @@ func TestOursAreListedAndAddedLikeAnyConnector(t *testing.T) {
 
 	var ours wire.MCPSearchAnswer
 	json.Unmarshal(c.call(t, 2, "mcp/made-by-agents", map[string]any{}), &ours)
-	if len(ours.Results) != 2 || ours.Results[0].Title != "GitHub" || ours.Results[1].Title != "Linear" {
+	if len(ours.Results) != 3 || ours.Results[0].Title != "GitHub" || ours.Results[1].Title != "Linear" || ours.Results[2].Title != "GitLab" {
 		t.Fatalf("%+v", ours)
 	}
 	github, linear := ours.Results[0], ours.Results[1]
