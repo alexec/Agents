@@ -5,16 +5,21 @@
 package emailmcp
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net"
 	"net/url"
 	"strings"
+
+	"github.com/alexec/agents/Go/internal/connections"
+	"github.com/emersion/go-imap/v2"
+	"github.com/emersion/go-imap/v2/imapclient"
 )
 
 // Provider is the email connection's name in the host's store (connections): URL is the
 // IMAP server (imaps://imap.example.com), Login the user, Access the app password.
-const Provider = "email"
+const Provider = connections.Email
 
 // Security is how a connection to the IMAP server is kept private.
 type Security string
@@ -38,7 +43,7 @@ type Account struct {
 }
 
 // ErrNotConnected is a mailbox with no server, user or password yet.
-var ErrNotConnected = errors.New("no mailbox is connected: Connect Email in Settings, or set EMAIL_IMAP_URL, EMAIL_USER and EMAIL_PASSWORD")
+var ErrNotConnected = errors.New("no mailbox is connected: Connect Email on Your Connectors, or set EMAIL_IMAP_URL, EMAIL_USER and EMAIL_PASSWORD")
 
 // ParseServer reads the IMAP server's address: imaps://host[:993], imap://host[:143] (with
 // STARTTLS), imap+insecure://127.0.0.1:port (no TLS, this machine only), or a bare host,
@@ -70,6 +75,28 @@ func ParseServer(raw string) (address string, security Security, err error) {
 		return "", "", fmt.Errorf("the IMAP server must start imaps:// or imap://")
 	}
 	return net.JoinHostPort(u.Hostname(), port), security, nil
+}
+
+// ServerURL is address and security as ParseServer reads them back: the form a connection keeps.
+func ServerURL(address string, security Security) string {
+	switch security {
+	case StartTLS:
+		return "imap://" + address
+	case Insecure:
+		return "imap+insecure://" + address
+	}
+	return "imaps://" + address
+}
+
+// Check signs in to a once and out again: the host's check before it keeps a connection.
+// Its error says what failed, in words, and never holds the password.
+func Check(ctx context.Context, a Account) error {
+	m := &Mailbox{Account: func() (Account, error) { return a, nil }}
+	defer m.Close()
+	return m.with(ctx, func(c *imapclient.Client) error {
+		_, err := c.Status("INBOX", &imap.StatusOptions{NumMessages: true}).Wait()
+		return err
+	})
 }
 
 func orDefault(s, d string) string {

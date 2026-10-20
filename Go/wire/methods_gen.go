@@ -53,6 +53,7 @@ var (
 	CallConnectionsSignIn              = Method[ConnectionProviderRequest, ConnectionSignIn]{"connections/sign-in"}
 	CallConnectionsSignInCancel        = Method[ConnectionSignInFlowRequest, ConnectionSignIn]{"connections/sign-in/cancel"}
 	CallConnectionsSignInComplete      = Method[ConnectionSignInCompleteRequest, ConnectionSignIn]{"connections/sign-in/complete"}
+	CallConnectionsSignInEmail         = Method[ConnectionEmailRequest, ConnectionTokenAnswer]{"connections/sign-in/email"}
 	CallConnectionsSignInToken         = Method[ConnectionTokenRequest, ConnectionTokenAnswer]{"connections/sign-in/token"}
 	CallConnectionsSignInWait          = Method[ConnectionSignInFlowRequest, ConnectionSignIn]{"connections/sign-in/wait"}
 	CallConnectorsSetup                = Method[ConnectorSetupRequest, ConnectorSetup]{"connectors/setup"}

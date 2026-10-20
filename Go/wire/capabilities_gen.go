@@ -21,6 +21,7 @@ const (
 	CapClients1           = "clients/1"
 	CapClone1             = "clone/1"
 	CapConnection1        = "connection/1"
+	CapConnectionsEmail1  = "connections.email/1"
 	CapConnections1       = "connections/1"
 	CapConnectorsSetup1   = "connectors.setup/1"
 	CapControl1           = "control/1"
@@ -139,6 +140,7 @@ var HostCapabilities = map[string]string{
 	"connections/sign-in":              "connections/1",
 	"connections/sign-in/cancel":       "connections/1",
 	"connections/sign-in/complete":     "connections/1",
+	"connections/sign-in/email":        "connections.email/1",
 	"connections/sign-in/token":        "connections/1",
 	"connections/sign-in/wait":         "connections/1",
 	"connectors/setup":                 "connectors.setup/1",

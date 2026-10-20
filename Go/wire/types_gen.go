@@ -986,13 +986,24 @@ type ConnectionDisconnectAnswer struct {
 	Error *string `json:"error,omitzero"`
 }
 
-// A tool the person connects to: GitHub (#1335) and Linear (#1343) with OAuth, GitLab (#1630) with OAuth on gitlab.com or a personal access token on any GitLab.
+// connections/sign-in/email (#1780): one IMAP mailbox for the email server. The host signs in once to check it, keeps the app password in its own store, and never logs it or gives it back. The answer is a ConnectionTokenAnswer.
+type ConnectionEmailRequest struct {
+	// The IMAP server, such as imap.fastmail.com (imaps:// on 993 when it names no scheme), imap://host for STARTTLS on 143, or with a port.
+	Server string `json:"server"`
+	// Who signs in, usually the mail address.
+	User string `json:"user"`
+	// An app password made for Agents at the mail provider.
+	Password string `json:"password"`
+}
+
+// A tool the person connects to: GitHub (#1335) and Linear (#1343) with OAuth, GitLab (#1630) with OAuth on gitlab.com or a personal access token on any GitLab, and email (#1780): one IMAP mailbox with an app password.
 type ConnectionProvider string
 
 const (
 	ConnectionProviderGithub ConnectionProvider = "github"
 	ConnectionProviderLinear ConnectionProvider = "linear"
 	ConnectionProviderGitlab ConnectionProvider = "gitlab"
+	ConnectionProviderEmail  ConnectionProvider = "email"
 )
 
 type ConnectionProviderRequest struct {

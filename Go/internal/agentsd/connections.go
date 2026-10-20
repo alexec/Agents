@@ -5,6 +5,7 @@ import (
 	"crypto/subtle"
 	"errors"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	goruntime "runtime"
@@ -14,6 +15,7 @@ import (
 
 	"github.com/alexec/agents/Go/internal/agentsd/store"
 	"github.com/alexec/agents/Go/internal/connections"
+	"github.com/alexec/agents/Go/internal/emailmcp"
 	"github.com/alexec/agents/Go/internal/safe"
 	"github.com/alexec/agents/Go/wire"
 )
@@ -33,6 +35,10 @@ import (
 // GitLab (#1630) signs in by the device flow on gitlab.com, as GitHub does, or by a personal
 // access token on any GitLab (connections/sign-in/token): the host checks the token with that
 // GitLab and keeps it with the GitLab's address. It has no refresh: the row says when it ends.
+//
+// Email (#1780) has no sign-in page: the person gives an IMAP server, a user and an app
+// password (connections/sign-in/email). The host signs in once to check them, and keeps them
+// for the email server. An app password does not end.
 
 var (
 	// connectionWaitLimit is one long poll of connections/sign-in/wait.
@@ -56,6 +62,8 @@ type connectionBook struct {
 	connStoreFor func() (connections.Store, error)
 	// gitlabHTTP checks a GitLab access token; a test gives a fake GitLab's client.
 	gitlabHTTP *http.Client
+	// emailCheck signs in to an IMAP server once; emailmcp.Check when nil.
+	emailCheck func(context.Context, emailmcp.Account) error
 }
 
 // connectionFlow is one sign-in under way, read by every client that waits on it.
@@ -111,6 +119,9 @@ func (d *Daemon) registerConnections() {
 	On(d, wire.CallConnectionsSignInToken, func(ctx context.Context, c *Client, r wire.ConnectionTokenRequest) (wire.ConnectionTokenAnswer, error) {
 		return d.connectionSignInToken(ctx, r)
 	})
+	On(d, wire.CallConnectionsSignInEmail, func(ctx context.Context, c *Client, r wire.ConnectionEmailRequest) (wire.ConnectionTokenAnswer, error) {
+		return d.connectionSignInEmail(ctx, r)
+	})
 	On(d, wire.CallConnectionsSignInCancel, func(ctx context.Context, c *Client, r wire.ConnectionSignInFlowRequest) (wire.ConnectionSignIn, error) {
 		f := d.connectionFlowNamed(r.FlowID)
 		if f == nil {
@@ -142,7 +153,8 @@ func (d *Daemon) registerConnections() {
 }
 
 func knownProvider(p wire.ConnectionProvider) bool {
-	return p == wire.ConnectionProviderGithub || p == wire.ConnectionProviderLinear || p == wire.ConnectionProviderGitlab
+	return p == wire.ConnectionProviderGithub || p == wire.ConnectionProviderLinear || p == wire.ConnectionProviderGitlab ||
+		p == wire.ConnectionProviderEmail
 }
 
 // connectionLocator is this host's store, for the person whose home is personalHome.
@@ -235,6 +247,9 @@ func (d *Daemon) connectionFlowNamed(id wire.UUID) *connectionFlow {
 func (d *Daemon) connectionSignIn(ctx context.Context, p wire.ConnectionProvider, origin string) (wire.ConnectionSignIn, error) {
 	if !knownProvider(p) {
 		return wire.ConnectionSignIn{}, invalid("Agents does not connect to " + string(p) + ".")
+	}
+	if p == wire.ConnectionProviderEmail {
+		return wire.ConnectionSignIn{}, invalid("Email has no sign-in page: connect it with its IMAP server, user and app password.")
 	}
 	if origin != "" {
 		o, err := connections.CleanOrigin(origin)
@@ -486,6 +501,51 @@ func (d *Daemon) connectionSignInToken(ctx context.Context, r wire.ConnectionTok
 		return fail(sentence(err.Error()))
 	}
 	log.Printf("connections: %s connected with a token", r.Provider)
+	w := wireConnection(c)
+	return wire.ConnectionTokenAnswer{Connection: &w}, nil
+}
+
+// connectionSignInEmail signs in to the IMAP server once with r's user and app password, and
+// keeps them. The password is in no log and no answer; a failure says what failed, in words.
+func (d *Daemon) connectionSignInEmail(ctx context.Context, r wire.ConnectionEmailRequest) (wire.ConnectionTokenAnswer, error) {
+	fail := func(why string) (wire.ConnectionTokenAnswer, error) {
+		log.Printf("connections: email not connected")
+		return wire.ConnectionTokenAnswer{Error: &why}, nil
+	}
+	user, password := strings.TrimSpace(r.User), strings.TrimSpace(r.Password)
+	if user == "" || strings.ContainsAny(user, " \t\r\n") {
+		return fail("Give the user to sign in as: usually the mail address.")
+	}
+	if password == "" {
+		return fail("Paste the app password you made for Agents.")
+	}
+	address, security, err := emailmcp.ParseServer(r.Server)
+	if err != nil {
+		return fail(sentence(err.Error()))
+	}
+	s, err := d.connectionStore()
+	if err != nil {
+		return wire.ConnectionTokenAnswer{}, err
+	}
+	account := emailmcp.Account{Address: address, Security: security, User: user, Password: password}
+	check := d.emailCheck
+	if check == nil {
+		check = emailmcp.Check
+	}
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+	if err := check(ctx, account); err != nil {
+		return fail(sentence(err.Error()))
+	}
+	host, _, _ := net.SplitHostPort(address)
+	c := connections.EmailConnection(emailmcp.ServerURL(address, security), host, user, password, time.Now())
+	d.connRenew.Lock()
+	err = s.Put(c)
+	d.connRenew.Unlock()
+	if err != nil {
+		return fail(sentence(err.Error()))
+	}
+	log.Printf("connections: email connected")
 	w := wireConnection(c)
 	return wire.ConnectionTokenAnswer{Connection: &w}, nil
 }

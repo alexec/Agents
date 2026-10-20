@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/alexec/agents/Go/internal/connections"
+	"github.com/alexec/agents/Go/internal/emailmcp"
 	"github.com/alexec/agents/Go/wire"
 )
 
@@ -306,5 +307,80 @@ func TestGitLabDeviceFlowNeedsTheApplication(t *testing.T) {
 	}
 	if msg := c.callErr(t, 1, "connections/sign-in", map[string]any{"provider": "gitlab"}); !strings.Contains(msg, "personal access token") {
 		t.Fatalf("no application: %s", msg)
+	}
+}
+
+// Connect Email (#1780): the IMAP server, the user and an app password, checked by one
+// sign-in and kept; the password never goes back to a client or into an error.
+func TestConnectingEmailWithAnAppPassword(t *testing.T) {
+	d, c := start(t, t.TempDir())
+	defer d.Shutdown()
+	file := &connections.File{Path: filepath.Join(t.TempDir(), connections.FileName)}
+	d.connStoreFor = func() (connections.Store, error) { return file, nil }
+	var checked []emailmcp.Account
+	d.emailCheck = func(_ context.Context, a emailmcp.Account) error {
+		checked = append(checked, a)
+		if a.Password != "app-pass-123" {
+			return &emailmcp.MailError{Kind: emailmcp.NotSignedIn, Message: "the mail server refused the sign-in for " + a.User + ": check the app password"}
+		}
+		return nil
+	}
+
+	var refused wire.ConnectionTokenAnswer
+	json.Unmarshal(c.call(t, 1, "connections/sign-in/email", map[string]any{"server": "imap.example.com", "user": "agents@example.com", "password": "wrong-pass"}), &refused)
+	if refused.Error == nil || refused.Connection != nil || strings.Contains(*refused.Error, "wrong-pass") ||
+		!strings.HasPrefix(*refused.Error, "The mail server refused") {
+		t.Fatalf("a wrong password: %+v", refused)
+	}
+	for i, bad := range []map[string]any{
+		{"server": "imap+insecure://mail.example.com:143", "user": "a@example.com", "password": "app-pass-123"},
+		{"server": "https://mail.example.com", "user": "a@example.com", "password": "app-pass-123"},
+		{"server": "imap.example.com", "user": "", "password": "app-pass-123"},
+		{"server": "imap.example.com", "user": "a@example.com", "password": " "},
+	} {
+		var a wire.ConnectionTokenAnswer
+		json.Unmarshal(c.call(t, 10+i, "connections/sign-in/email", bad), &a)
+		if a.Error == nil || a.Connection != nil {
+			t.Fatalf("%v: %+v", bad, a)
+		}
+	}
+	if len(checked) != 1 {
+		t.Fatalf("checked what it should have refused first: %+v", checked)
+	}
+
+	raw := c.call(t, 2, "connections/sign-in/email", map[string]any{"server": "imap.example.com", "user": " agents@example.com ", "password": "app-pass-123\n"})
+	if strings.Contains(string(raw), "app-pass-123") {
+		t.Fatalf("the password went back to the client: %s", raw)
+	}
+	var made wire.ConnectionTokenAnswer
+	json.Unmarshal(raw, &made)
+	if made.Error != nil || made.Connection == nil || made.Connection.Provider != wire.ConnectionProviderEmail ||
+		deref(made.Connection.Login) != "agents@example.com" || deref(made.Connection.Workspace) != "imap.example.com" || made.Connection.ExpiresAt != nil {
+		t.Fatalf("made: %+v", made)
+	}
+	last := checked[len(checked)-1]
+	if last.Address != "imap.example.com:993" || last.Security != emailmcp.TLS || last.User != "agents@example.com" {
+		t.Fatalf("checked: %+v", last)
+	}
+	kept, ok, _ := file.Get(connections.Email)
+	if !ok || kept.Access != "app-pass-123" || kept.URL != "imaps://imap.example.com:993" || kept.Login != "agents@example.com" || !kept.Usable(time.Now()) {
+		t.Fatalf("kept: %+v", kept)
+	}
+	// What the email server reads back is the same mailbox.
+	if address, security, err := emailmcp.ParseServer(kept.URL); err != nil || address != last.Address || security != last.Security {
+		t.Fatalf("read back: %s %s %v", address, security, err)
+	}
+	var list wire.ConnectionsList
+	json.Unmarshal(c.call(t, 3, "connections/list", map[string]any{}), &list)
+	if len(list.Connections) != 1 || list.Connections[0].Provider != wire.ConnectionProviderEmail {
+		t.Fatalf("list: %+v", list)
+	}
+	if msg := c.callErr(t, 4, "connections/sign-in", map[string]any{"provider": "email"}); !strings.Contains(msg, "app password") {
+		t.Fatalf("email has no sign-in page: %s", msg)
+	}
+	var gone wire.ConnectionDisconnectAnswer
+	json.Unmarshal(c.call(t, 5, "connections/disconnect", map[string]any{"provider": "email"}), &gone)
+	if _, ok, _ := file.Get(connections.Email); gone.Error != nil || ok {
+		t.Fatalf("disconnect: %+v", gone)
 	}
 }
