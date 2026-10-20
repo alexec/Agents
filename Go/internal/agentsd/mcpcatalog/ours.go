@@ -41,7 +41,8 @@ var Made = []Ours{
 	// LINEAR_API_KEY, set by hand in mcp.json's env, still goes first. Tools and Views: its one
 	// tool, show_issues, and its page; Linear's own server (mcp.linear.app) changes issues.
 	{ID: "agents/linear", Title: "Linear", Description: "Linear issues: a page of open issues with Start Agent, and events when one is opened, labelled, commented on or closed",
-		Command: "linear-mcp", Declares: Declared{Tools: true, Events: linearEvents, Views: true}},
+		// Tested: show_issues and the events on Alex's workspace with a personal API key (#1343).
+		Command: "linear-mcp", Declares: Declared{Tools: true, Events: linearEvents, Views: true}, Tested: "2026-10-19"},
 }
 
 var (

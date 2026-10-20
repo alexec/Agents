@@ -224,7 +224,7 @@ func TestOursAreListedAndAddedLikeAnyConnector(t *testing.T) {
 	if github.MadeByAgents == nil || !*github.MadeByAgents || *github.Levels != (wire.MCPLevels{Tools: true, Events: true, Views: true, Workflows: true, Tested: true}) {
 		t.Fatalf("github: %+v", github)
 	}
-	if *linear.Levels != (wire.MCPLevels{Tools: true, Events: true, Views: true, Workflows: true}) {
+	if *linear.Levels != (wire.MCPLevels{Tools: true, Events: true, Views: true, Workflows: true, Tested: true}) {
 		t.Fatalf("linear: %+v", linear.Levels)
 	}
 
