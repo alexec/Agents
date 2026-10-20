@@ -136,6 +136,15 @@ struct AgentRow: View {
                             .help(starter)
                             .accessibilityLabel(starter)
                     }
+                    // A file it showed that the person has not looked at (#1802): ending 2,
+                    // "I have something for you", a mark and never Needs you.
+                    if let file = FileToSeeWords.line(agent) {
+                        Image(systemName: FileToSeeWords.symbol)
+                            .appText(.fine)
+                            .foregroundStyle(.secondary)
+                            .help(file)
+                            .accessibilityLabel(file)
+                    }
                 }
 
                 // The agent's own account of its last turn, and nothing else. This line

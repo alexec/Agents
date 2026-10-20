@@ -97,6 +97,12 @@ func (d *Daemon) showFile(id wire.UUID, args map[string]json.RawMessage) (string
 	}
 	Broadcast(d, wire.NotifyAgentShowFile, wire.ShowFileNotification{AgentID: id, File: file})
 	d.record(id, wire.TranscriptEntryKind{FileShown: &wire.TranscriptEntryKindFileShown{Value: file}})
+	// A file nobody has in front of them yet is a mark on the row until they look (#1802):
+	// ending 2, "I have something for you", never Needs you.
+	if !d.watched(id) {
+		d.change(id, func(a *wire.Agent) { a.FileToSee = &file })
+	}
+	d.live(id).noteShown()
 	name := filepath.Base(file.Path)
 	if !exists {
 		return name + " is open, empty, in the files pane beside this conversation, and will fill as you write it. " +

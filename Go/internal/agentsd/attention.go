@@ -690,7 +690,19 @@ func (d *Daemon) forgetPresence(c *Client) {
 	}
 }
 
-// markRead is DaemonCore.markRead: read, and its report seen.
+// watched is whether an active window has this conversation in front of the person.
+func (d *Daemon) watched(id wire.UUID) bool {
+	d.attentionMu.Lock()
+	defer d.attentionMu.Unlock()
+	for _, p := range d.presences {
+		if p.active && p.watching != nil && *p.watching == id {
+			return true
+		}
+	}
+	return false
+}
+
+// markRead is DaemonCore.markRead: read, its report seen, and its file to see seen (#1802).
 func (d *Daemon) markRead(id wire.UUID) {
 	a := d.Store.Agent(id)
 	if a == nil {
@@ -698,12 +710,13 @@ func (d *Daemon) markRead(id wire.UUID) {
 	}
 	unread := a.IsUnread != nil && *a.IsUnread
 	unseen := a.Report != nil && (a.ReportSeenAt == nil || *a.ReportSeenAt != a.Report.At)
-	if !unread && !unseen {
+	if !unread && !unseen && a.FileToSee == nil {
 		return
 	}
 	d.change(id, func(a *wire.Agent) {
 		no := false
 		a.IsUnread = &no
+		a.FileToSee = nil
 		if a.Report != nil {
 			seen := a.Report.At
 			a.ReportSeenAt = &seen

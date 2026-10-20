@@ -125,7 +125,12 @@ func (d *Daemon) register() {
 		return wire.Empty{}, d.archive(r.AgentID)
 	})
 	On(d, wire.CallAgentsSetUnread, func(ctx context.Context, c *Client, r wire.SetUnreadRequest) (wire.Empty, error) {
-		if d.change(r.AgentID, func(a *wire.Agent) { a.IsUnread = &r.Unread }) == nil {
+		if d.change(r.AgentID, func(a *wire.Agent) {
+			a.IsUnread = &r.Unread
+			if !r.Unread {
+				a.FileToSee = nil // Mark as Read clears the file's mark too (#1802)
+			}
+		}) == nil {
 			return wire.Empty{}, &Error{Code: CodeNoSuchAgent, Message: "no agent " + string(r.AgentID)}
 		}
 		return wire.Empty{}, nil

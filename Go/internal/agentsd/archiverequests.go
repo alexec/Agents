@@ -31,10 +31,28 @@ func (d *Daemon) agentsMayArchive(folder string) bool {
 	return true
 }
 
+// agentsMayArchiveMyChatsKey is the person's setting (#1802), in the display preferences
+// every client shows: whether a chat the person started may archive itself.
+const agentsMayArchiveMyChatsKey = "agentsMayArchiveMyChats"
+
+// agentsMayArchiveMyChats is that setting: true unless the person said not.
+func (d *Daemon) agentsMayArchiveMyChats() bool {
+	var on bool
+	if v, ok := d.preferences()[agentsMayArchiveMyChatsKey]; ok && json.Unmarshal(v, &on) == nil {
+		return on
+	}
+	return true
+}
+
+// startedByThePerson is a chat the person started: not a helper, and not a workflow's run.
+func startedByThePerson(a *wire.Agent) bool {
+	return a.StartedByAgent == nil && a.StartedByWorkflow == nil && a.StartedByRun == nil
+}
+
 // settleArchiveRequest is DaemonCore.move's archive request, on the record the turn's ending
 // is being written to. It says whether a request was made now, and whether the agent is to
-// be archived instead.
-func (d *Daemon) settleArchiveRequest(a *wire.Agent, next wire.AgentState, why wire.EndedReason) (requested, archiveNow bool) {
+// be archived instead. showedFile is whether the turn called show_file (#1802).
+func (d *Daemon) settleArchiveRequest(a *wire.Agent, next wire.AgentState, why wire.EndedReason, showedFile bool) (requested, archiveNow bool) {
 	wasRequested := a.ArchiveRequest != nil && a.ArchiveRequest.Requested != nil
 	endedAsAsked := next == wire.AgentStateFinished && why == wire.EndedReasonEndTurn && len(a.QueuedPrompts) == 0
 	asked := false
@@ -52,10 +70,16 @@ func (d *Daemon) settleArchiveRequest(a *wire.Agent, next wire.AgentState, why w
 	case wantsThePerson || next == wire.AgentStateStopped && Group(a) == "needsAttention":
 		a.ArchiveRequest = nil
 	case asked:
-		if endedAsAsked && a.StartedByAgent != nil && a.Report != nil && goesWithArchive(a.Report.Outcome) &&
-			d.agentsMayArchive(projectFolder(a)) {
+		done := endedAsAsked && a.Report != nil && goesWithArchive(a.Report.Outcome)
+		mine := startedByThePerson(a) && d.agentsMayArchiveMyChats()
+		switch {
+		case done && mine && showedFile:
+			// It has something for the person (#1802): unread under Done, with its file's
+			// mark, and nobody asked to approve anything.
+			a.ArchiveRequest = nil
+		case done && (mine || a.StartedByAgent != nil && d.agentsMayArchive(projectFolder(a))):
 			a.ArchiveRequest, archiveNow = nil, true
-		} else if !wasRequested {
+		case !wasRequested:
 			a.ArchiveRequest = &wire.ArchiveRequest{Requested: &wire.ArchiveRequestRequested{At: now()}}
 			requested = true
 		}
@@ -85,8 +109,12 @@ func (d *Daemon) afterArchiveRequest(id wire.UUID, requested, archiveNow bool) {
 		d.checkQueueSoon(projectFolder(a))
 	}
 	if archiveNow {
+		note := "Archived when it asked, as the agent that started it may archive it."
+		if startedByThePerson(a) {
+			note = "Archived when it asked, as the person lets agents archive the chats they start."
+		}
 		d.goAfterTurn("archive when done", func() {
-			d.record(id, runtimeNote("Archived when it asked, as the agent that started it may archive it."))
+			d.record(id, runtimeNote(note))
 			d.archiveBy(id, wire.AgentArchivedReasonByAgent)
 		})
 	}
@@ -108,7 +136,11 @@ func (d *Daemon) archiveSession(caller wire.UUID, args map[string]json.RawMessag
 	after := wire.AfterTurnRequestArchive
 	d.change(caller, func(a *wire.Agent) { a.AfterTurn = &after })
 	note := "Once this turn ends, this conversation waits for the person to approve archiving it."
-	if a.StartedByAgent != nil && d.agentsMayArchive(projectFolder(a)) {
+	switch {
+	case startedByThePerson(a) && d.agentsMayArchiveMyChats():
+		note = "Once this turn ends, this conversation will be archived if it ended done or with nothing to do, as the person lets agents archive the chats they start; " +
+			"not if this turn showed a file, which stays for the person to see. Otherwise it waits for the person to approve archiving it."
+	case a.StartedByAgent != nil && d.agentsMayArchive(projectFolder(a)):
 		note = "Once this turn ends, this conversation will be archived if it ended done or with nothing to do, as nobody needs to approve it; " +
 			"otherwise it waits for the person to approve archiving it."
 	}
