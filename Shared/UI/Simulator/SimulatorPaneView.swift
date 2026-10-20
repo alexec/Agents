@@ -11,14 +11,15 @@ struct SimulatorCalls {
     var list: @MainActor () async throws -> DaemonAPI.SimulatorList
     var boot: @MainActor (String) async throws -> Void
     var shutdown: @MainActor (String) async throws -> Void
-    var screen: @MainActor (String) async throws -> DaemonAPI.SimulatorScreen
+    /// A booted simulator's screen, at most `maxHeight` pixels tall.
+    var screen: @MainActor (_ udid: String, _ maxHeight: Int) async throws -> DaemonAPI.SimulatorScreen
     /// A touch at x and y, from 0 to 1 across and down, and the Home button.
     var tap: @MainActor (String, Double, Double) async throws -> Void
     var home: @MainActor (String) async throws -> Void
 }
 
 /// The iOS Simulator pane (#842): a simulator on the session's Mac, its screen shown and
-/// read again each second while the pane is on screen. Booting and shutting down are the
+/// read again each second while the pane is on screen and its window can be seen. Booting and shutting down are the
 /// person's press only. A click or a tap on the screen is a touch there; Home is its button.
 struct SimulatorPaneView: View {
     let calls: SimulatorCalls
@@ -34,6 +35,21 @@ struct SimulatorPaneView: View {
     @State private var shown: CGSize = .zero
     /// Counts touches, so the screen is read again at once after one.
     @State private var touches = 0
+    /// How tall the screen can be drawn, in points: the screen is asked for at that size (#1650).
+    @State private var room: CGFloat = 0
+    /// Whether the pane's window can be seen: not minimised, not covered, not in the background.
+    @State private var windowVisible = true
+    @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.displayScale) private var displayScale
+
+    /// The screen is read only while someone can see it (#1650).
+    private var reading: Bool { isVisible && windowVisible && scenePhase != .background }
+
+    /// The height to ask for: the room in pixels, up in steps of 100, so a resize asks again
+    /// only when it matters. The host keeps it at most 1200.
+    private var maxHeight: Int {
+        max(100, Int((room * displayScale / 100).rounded(.up)) * 100)
+    }
 
     private var simulator: DaemonAPI.Simulator? {
         list?.simulators.first { $0.udid == chosen } ?? list?.simulators.first
@@ -45,6 +61,7 @@ struct SimulatorPaneView: View {
             Divider()
             content
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .onGeometryChange(for: CGFloat.self, of: \.size.height) { room = $0 }
             if let problem {
                 Text(problem)
                     .appText(.fine)
@@ -53,16 +70,19 @@ struct SimulatorPaneView: View {
             }
         }
         .padding(12)
+        #if os(macOS)
+        .background(WindowOcclusion(visible: $windowVisible))
+        #endif
         .task { await reload() }
-        // Read again each second, while on screen and booted, and never two at once.
-        .task(id: "\(isVisible)-\(simulator?.udid ?? "")-\(simulator?.booted == true)-\(touches)") {
-            guard isVisible, let simulator, simulator.booted else {
-                screen = nil
+        // Read again each second, while seen and booted, and never two at once.
+        .task(id: "\(reading)-\(simulator?.udid ?? "")-\(simulator?.booted == true)-\(touches)") {
+            guard reading, let simulator, simulator.booted else {
+                if simulator?.booted != true { screen = nil }
                 return
             }
             while !Task.isCancelled {
                 do {
-                    screen = try await calls.screen(simulator.udid)
+                    screen = try await calls.screen(simulator.udid, maxHeight)
                     problem = nil
                 } catch {
                     problem = describe(error)
@@ -198,3 +218,44 @@ struct SimulatorPaneView: View {
         #endif
     }
 }
+
+#if os(macOS)
+/// Says whether the window that holds it can be seen: a minimised or covered window cannot (#1650).
+private struct WindowOcclusion: NSViewRepresentable {
+    @Binding var visible: Bool
+
+    func makeNSView(context: Context) -> Watcher { Watcher(visible: $visible) }
+    func updateNSView(_ view: Watcher, context: Context) { view.visible = $visible }
+
+    final class Watcher: NSView {
+        var visible: Binding<Bool>
+        private var observer: NSObjectProtocol?
+
+        init(visible: Binding<Bool>) {
+            self.visible = visible
+            super.init(frame: .zero)
+        }
+
+        required init?(coder: NSCoder) { nil }
+
+        /// The observer goes when the view leaves its window, and holds the view weakly.
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            observer.map(NotificationCenter.default.removeObserver)
+            observer = nil
+            guard let window else { return }
+            observer = NotificationCenter.default.addObserver(
+                forName: NSWindow.didChangeOcclusionStateNotification, object: window, queue: .main
+            ) { [weak self] _ in
+                MainActor.assumeIsolated { self?.update() }
+            }
+            update()
+        }
+
+        private func update() {
+            let seen = window?.occlusionState.contains(.visible) ?? true
+            if visible.wrappedValue != seen { visible.wrappedValue = seen }
+        }
+    }
+}
+#endif

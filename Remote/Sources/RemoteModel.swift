@@ -4028,8 +4028,8 @@ final class RemoteModel {
                                                       DaemonAPI.SimulatorRequest(udid: udid)) },
             shutdown: { udid in _ = try await host().call(DaemonAPI.Method.simulatorsShutdown,
                                                           DaemonAPI.SimulatorRequest(udid: udid)) },
-            screen: { udid in try await host().call(DaemonAPI.Method.simulatorsScreen,
-                                                    DaemonAPI.SimulatorScreenRequest(udid: udid),
+            screen: { udid, maxHeight in try await host().call(
+                DaemonAPI.Method.simulatorsScreen, DaemonAPI.SimulatorScreenRequest(udid: udid, maxHeight: maxHeight),
                                                     returning: DaemonAPI.SimulatorScreen.self) },
             tap: { udid, x, y in _ = try await host().call(
                 DaemonAPI.Method.simulatorsTap, DaemonAPI.SimulatorTapRequest(udid: udid, x: x, y: y)) },
