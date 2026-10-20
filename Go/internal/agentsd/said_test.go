@@ -69,3 +69,45 @@ func TestBoundSaid(t *testing.T) {
 		t.Fatalf("kept %d", len(kept))
 	}
 }
+
+// P20261019-1: a search does not push an open chat's line index out of the store's cache, as it
+// did when said() asked LineEnds for every session it read (the cache keeps 32): the chat's
+// next page would scan its transcript from byte 0 again. The chat's transcript is rewritten in
+// place at the same size with one line fewer, so a cached index still counts the old lines and
+// a fresh scan does not.
+func TestSaidSearchKeepsTheOpenChatsLineIndex(t *testing.T) {
+	d, c := start(t, t.TempDir())
+	defer d.Shutdown()
+	dir := t.TempDir()
+	user := func(text string) wire.TranscriptEntry {
+		return wire.TranscriptEntry{ID: store.NewUUID(), At: now(), Kind: wire.TranscriptEntryKind{
+			UserMessage: &wire.TranscriptEntryKindUserMessage{Value: text}}}
+	}
+	for range 40 {
+		id := seeded(t, d, dir, nil).ID
+		d.Store.Append(id, user("Make the build faster"))
+	}
+	open := seeded(t, d, dir, nil).ID
+	d.Store.Append(open, user("Write the docs"))
+	d.Store.Append(open, user("And the tests"))
+	ends, err := d.Store.LineEnds(open)
+	if err != nil || len(ends) != 2 {
+		t.Fatalf("ends %v %v", ends, err)
+	}
+	path := d.Store.Loc.Transcript(string(open))
+	b, _ := os.ReadFile(path)
+	b[ends[0]-1] = ' '
+	if err := os.WriteFile(path, b, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var said wire.SaidSearchResult
+	json.Unmarshal(c.call(t, 1, "agents/said", map[string]any{"text": "build"}), &said)
+	var listed []wire.Agent
+	json.Unmarshal(c.call(t, 2, "agents/list", map[string]any{"includeArchived": true, "query": "build"}), &listed)
+	if len(said.Matches) != 40 || len(listed) != 40 {
+		t.Fatalf("%d said, %d listed", len(said.Matches), len(listed))
+	}
+	if ends, _ := d.Store.LineEnds(open); len(ends) != 2 {
+		t.Fatalf("the search pushed the open chat's line index out: %d lines on a fresh scan", len(ends))
+	}
+}

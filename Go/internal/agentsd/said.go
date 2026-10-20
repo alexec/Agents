@@ -14,7 +14,8 @@ import (
 // What was said, for the session search (#1585): each session keeps its prompts and replies
 // in said.json beside its transcript, the newest saidBytes of them. It is brought up to date
 // from where it last stopped, only when a search asks, so a search costs a bounded read per
-// session and no transcript is read whole twice.
+// session and no transcript is read whole twice. A transcript the same size as last time is
+// not read at all, so agents/list{query} after agents/said reads only said.json (P20261019-1).
 
 const (
 	// saidBytes is the most text one session's index keeps: its newest messages.
@@ -25,12 +26,16 @@ const (
 	saidMatches = 100
 )
 
-// saidIndex is said.json: the messages kept, oldest first, and the line to read on from.
-// The last message may still be growing (a reply in chunks), so it is not kept: next is its
-// first line, and it is read again next time.
+// saidIndex is said.json: the messages kept, oldest first, the byte to read on from, and the
+// transcript's size when it was read, so a search over a transcript that has not grown reads
+// only said.json (P20261019-1). The last message may still be growing (a reply in chunks), so
+// it is not kept: offset is its first line, it is read again once the transcript grows, and
+// tail is it as of size.
 type saidIndex struct {
-	Next     int      `json:"next"`
+	Offset   int64    `json:"offset"`
+	Size     int64    `json:"size"`
 	Messages []string `json:"messages"`
+	Tail     string   `json:"tail,omitempty"`
 }
 
 var saidMu sync.Mutex
@@ -40,60 +45,66 @@ func saidFile(loc store.Locations, id wire.UUID) string {
 }
 
 // said is a session's messages as of now: said.json brought up to date, and the message
-// still growing at the end.
+// still growing at the end. The transcript is read from where said.json stopped, past the
+// store's kept line indexes, and not at all when its size is the same.
 func (d *Daemon) said(id wire.UUID) []string {
 	var index saidIndex
 	if b, err := os.ReadFile(saidFile(d.Store.Loc, id)); err == nil {
 		_ = json.Unmarshal(b, &index)
 	}
-	ends, err := d.Store.LineEnds(id)
-	if err != nil || index.Next > len(ends) {
-		index = saidIndex{}
-	}
+	info, err := os.Stat(d.Store.Loc.Transcript(string(id)))
 	if err != nil {
 		return nil
 	}
+	if index.Size > 0 && info.Size() == index.Size {
+		return index.messages()
+	}
+	// Shorter than what was read (some other transcript now), or a said.json from before sizes.
+	if info.Size() < index.Size || index.Size == 0 {
+		index = saidIndex{}
+	}
 	var current *wire.TranscriptEntry
-	currentAt := index.Next
+	currentAt := index.Offset
 	kept := index.Messages
-	changed := false
-	for from := index.Next; from < len(ends); from += findChunk {
-		entries, at, err := d.Store.Entries(id, ends, from, min(from+findChunk, len(ends)))
-		if err != nil {
-			break
+	end, size, err := d.Store.EntriesFrom(id, index.Offset, func(e wire.TranscriptEntry, start, end int64) {
+		if e.SubagentID != nil {
+			return
 		}
-		for i, e := range entries {
-			if e.SubagentID != nil {
-				continue
-			}
-			if joined := joinEntry(e, current); joined != nil {
-				current = joined
-				continue
-			}
-			if current != nil {
-				kept = append(kept, findText(*current))
-				changed = true
-			}
-			current, currentAt = nil, at[i]+1
-			if findText(e) != "" {
-				c := e
-				current, currentAt = &c, at[i]
-			}
+		if joined := joinEntry(e, current); joined != nil {
+			current = joined
+			return
 		}
+		if current != nil {
+			kept = append(kept, findText(*current))
+		}
+		current, currentAt = nil, end
+		if findText(e) != "" {
+			c := e
+			current, currentAt = &c, start
+		}
+	})
+	if err != nil {
+		return index.messages()
 	}
 	if current == nil {
-		currentAt = len(ends)
+		currentAt = end
 	}
-	kept = boundSaid(kept)
-	if changed || currentAt != index.Next {
-		if b, err := json.Marshal(saidIndex{Next: currentAt, Messages: kept}); err == nil {
-			_ = store.WriteAtomically(saidFile(d.Store.Loc, id), b, 0o644)
-		}
-	}
+	index = saidIndex{Offset: currentAt, Size: size, Messages: boundSaid(kept)}
 	if current != nil {
-		return append(kept, findText(*current))
+		index.Tail = findText(*current)
 	}
-	return kept
+	if b, err := json.Marshal(index); err == nil {
+		_ = store.WriteAtomically(saidFile(d.Store.Loc, id), b, 0o644)
+	}
+	return index.messages()
+}
+
+// messages is what was said: the messages kept and the one still growing.
+func (index saidIndex) messages() []string {
+	if index.Tail != "" {
+		return append(index.Messages[:len(index.Messages):len(index.Messages)], index.Tail)
+	}
+	return index.Messages
 }
 
 // boundSaid keeps the newest messages within saidBytes.

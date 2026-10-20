@@ -169,3 +169,47 @@ func (s *Store) LinesContaining(id wire.UUID, ends []int64, what string, from in
 	})
 	return out, err
 }
+
+// EntriesFrom calls see with each entry on the whole lines after byte from, with where its
+// line starts and ends, past the kept line indexes: a reader that keeps its own place (said.json,
+// P20261019-1) pushes no open chat's index out. end is where the last whole line ends and size
+// the transcript's size as read; under from, it is some other transcript now, and nothing is read.
+func (s *Store) EntriesFrom(id wire.UUID, from int64, see func(e wire.TranscriptEntry, start, end int64)) (end, size int64, err error) {
+	f, err := os.Open(s.Loc.Transcript(string(id)))
+	if err != nil {
+		return 0, 0, err
+	}
+	defer f.Close()
+	info, err := f.Stat()
+	if err != nil {
+		return 0, 0, err
+	}
+	if size = info.Size(); size <= from {
+		return min(from, size), size, nil
+	}
+	r := bufio.NewReaderSize(io.NewSectionReader(f, from, size-from), 1<<16)
+	end = from
+	var line []byte
+	for {
+		chunk, err := r.ReadSlice('\n')
+		line = append(line, chunk...)
+		if err == bufio.ErrBufferFull {
+			continue
+		}
+		if len(line) == 0 || line[len(line)-1] != '\n' {
+			return end, size, nil
+		}
+		start := end
+		end += int64(len(line))
+		if len(bytes.TrimSpace(line)) > 0 {
+			var e wire.TranscriptEntry
+			if diskjson.Unmarshal(line, &e) == nil {
+				see(e, start, end)
+			}
+		}
+		line = line[:0]
+		if err != nil {
+			return end, size, nil
+		}
+	}
+}
