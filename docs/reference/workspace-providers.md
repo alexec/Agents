@@ -163,6 +163,8 @@ WORKSPACE_COMMANDS_CONFIG='{"preset":"docker","containers":["devbox"],"ssh":"dev
 - `states` maps the CLI's words to contract states. A status output is matched
   case-insensitively after trimming whitespace.
 - A path may pick an item of a list by a key's value: `networks.v4[type=public].ip_address`.
+  `[]` takes the rest of the path in each item and joins the lists it finds:
+  `reservationSet[].instancesSet`.
 
 #### A web request in place of a command (#1119)
 
@@ -185,7 +187,13 @@ WORKSPACE_COMMANDS_CONFIG='{"preset":"docker","containers":["devbox"],"ssh":"dev
 - Only `headers` take a secret: `${NAME}` that is not a value is the provider's secret of that
   name. A secret is never put in an address, a log or an error. A secret that is not given
   fails the call with "It needs the NAME secret."
-- A list request's answer is read as JSON: it needs `json`, not `columns`.
+- A list request's answer is read as JSON: it needs `json`, not `columns`. With
+  `"answer": "xml"` it is read as XML, into the same values: an element with children is an
+  object, a list (children all `<item>`, or a name ending in `Set`) an array, and anything else
+  its text. A refusal's words come from `Errors.Error.Message`, as AWS gives them.
+- `"awsSign": {"service": "ec2", "region": "us-east-1"}` signs the request with AWS's
+  Signature Version 4 from the secrets `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` (and
+  `AWS_SESSION_TOKEN` when given). The secret key is never sent.
 - An answer other than 2xx is a failure, in the provider's own words (its JSON's `message`),
   cut at 1 KB. A redirect is not followed, so a header never goes to another address.
 - An agent's draft with a request, or with a preset's `api` or `url`, is asked about before
@@ -205,6 +213,7 @@ Its parameters fill them in.
 | `gcloud-workstations` | `cluster`, `config`, `region` | `gcloud workstations list … --format='value(name.basename(),state)'` / `start` / `stop`. States: STATE_RUNNING and so on. | `tunnel: true` |
 | `digitalocean-api` | `tag`, `user` (default `root`), `sshKeys` (optional, key ids or fingerprints), `tunnel`, `api` (optional) | Secret `DIGITALOCEAN_API_TOKEN`. `GET /v2/droplets?per_page=200&tag_name=${tag}` / `POST /v2/droplets/${id}/actions` `{"type":"power_on"}` / `power_off`. Create `POST /v2/droplets` with the tag and `user_data` that makes the user `agents` and runs `${firstBoot}` as it, with linger; options `region` (`nyc3`), `size` (`s-1vcpu-1gb`), `image` (`ubuntu-24-04-x64`). Delete `DELETE /v2/droplets/${id}`. States as `doctl`. | `${user}@` the public IPv4 |
 | `codespaces-api` | `repo` (optional, owner/name), `ssh` (optional), `api` (optional) | Secret `GITHUB_TOKEN`. `GET /user/codespaces` (or `/repos/${repo}/codespaces`) / `POST /user/codespaces/${id}/start` / `…/stop`. States as `codespaces`, and Queued, Awaiting, Rebuilding→starting. | `cs.${id}.${branch}` (gh's `--config` host, ProxyCommand gh) or `ssh`; `tunnel: true` |
+| `aws-ec2-api` | `region` (such as `us-east-1`), `tag` (a tag key, default `agents`), `user` (default `ec2-user`), `tunnel`, `api` (optional) | Secrets `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` (and `AWS_SESSION_TOKEN` for a role's keys); each request is signed with SigV4. EC2's Query API, answered in XML: `DescribeInstances` with the tag and every state but terminated, read at `reservationSet[].instancesSet` / `StartInstances` / `StopInstances` with `InstanceId.1=${id}`. Name from the `Name` tag. States: pending→starting, running, stopping and shutting-down→stopping, stopped. No create or delete. | `${user}@` the public IPv4 |
 | `coder-api` | `url` (the deployment) | Secret `CODER_SESSION_TOKEN`. `GET /api/v2/workspaces?q=owner:me` / `POST /api/v2/workspaces/${id}/builds` `{"transition":"start"}` / `stop`. States as `coder`. | `coder.${name}` (from `coder config-ssh`, ProxyCommand coder) |
 
 A CLI preset needs its CLI installed and signed in where the control plane runs. If the CLI

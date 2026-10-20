@@ -442,11 +442,12 @@ func ShellQuoted(value string) string {
 	return "'" + strings.ReplaceAll(value, "'", `'\''`) + "'"
 }
 
-// PathValue is the value at a path into JSON: dotted keys, [n] indexes, and [key=value],
-// the first item whose key is that value, as in networks.v4[type=public].ip_address. Empty
-// is the value itself; nil when there is none.
+// PathValue is the value at a path into JSON: dotted keys, [n] indexes, [key=value] (the
+// first item whose key is that value, as in networks.v4[type=public].ip_address), and []
+// (the rest of the path for each item, and the lists it finds joined into one, as in
+// reservationSet[].instancesSet). Empty is the value itself; nil when there is none.
 func PathValue(path string, value any) any {
-	current := value
+	var steps []string
 	for _, part := range strings.Split(path, ".") {
 		if part == "" {
 			continue
@@ -458,35 +459,59 @@ func PathValue(path string, value any) any {
 			if open < 0 {
 				break
 			}
-			selectors = append([]string{key[open+1 : len(key)-1]}, selectors...)
+			selectors = append([]string{"[" + key[open+1:len(key)-1]}, selectors...)
 			key = key[:open]
 		}
 		if key != "" {
-			o, _ := current.(map[string]any)
-			current = o[key]
+			steps = append(steps, key)
 		}
-		for _, selector := range selectors {
-			array, _ := current.([]any)
-			current = nil
-			if field, want, ok := strings.Cut(selector, "="); ok {
-				for _, item := range array {
-					if text, ok := PathText(field, item); ok && text == want {
-						current = item
-						break
-					}
-				}
-				continue
-			}
-			n, err := strconv.Atoi(selector)
-			if err != nil {
-				return nil
-			}
-			if n >= 0 && n < len(array) {
-				current = array[n]
-			}
-		}
+		steps = append(steps, selectors...)
+	}
+	return walk(steps, value)
+}
+
+// walk follows the steps of a path: a key, or "[" and what was between the brackets.
+func walk(steps []string, current any) any {
+	for i, step := range steps {
 		if current == nil {
 			return nil
+		}
+		if !strings.HasPrefix(step, "[") {
+			o, _ := current.(map[string]any)
+			current = o[step]
+			continue
+		}
+		array, _ := current.([]any)
+		selector := step[1:]
+		if selector == "" {
+			joined := []any{}
+			for _, item := range array {
+				switch found := walk(steps[i+1:], item).(type) {
+				case nil:
+				case []any:
+					joined = append(joined, found...)
+				default:
+					joined = append(joined, found)
+				}
+			}
+			return joined
+		}
+		current = nil
+		if field, want, ok := strings.Cut(selector, "="); ok {
+			for _, item := range array {
+				if text, ok := PathText(field, item); ok && text == want {
+					current = item
+					break
+				}
+			}
+			continue
+		}
+		n, err := strconv.Atoi(selector)
+		if err != nil {
+			return nil
+		}
+		if n >= 0 && n < len(array) {
+			current = array[n]
 		}
 	}
 	return current

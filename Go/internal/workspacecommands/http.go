@@ -27,6 +27,11 @@ type Request struct {
 	Headers map[string]string
 	// Body is JSON, sent when not nil: each string in it has the values filled in.
 	Body any
+	// Answer is "xml" for an API that answers XML (AWS's Query APIs), read into the same
+	// values as JSON; "" for JSON.
+	Answer string
+	// Sign, when set, signs the request for AWS with the AWS_* secrets (#1345).
+	Sign *AWSSign
 }
 
 // Said is the request as a log or an error says it: its method and its URL as written.
@@ -85,7 +90,11 @@ func (p *Provider) call(r Request, values map[string]string, deadline time.Durat
 		lookup = os.LookupEnv
 	}
 	secrets := map[string]string{}
-	for _, name := range r.needs(values) {
+	needed := r.needs(values)
+	if r.Sign != nil {
+		needed = append(needed, AWSKeySecret, AWSSecretSecret)
+	}
+	for _, name := range needed {
 		value, ok := lookup(name)
 		if !ok || value == "" {
 			return nil, Failure{"It needs the " + name + " secret."}
@@ -98,8 +107,9 @@ func (p *Provider) call(r Request, values map[string]string, deadline time.Durat
 		return nil, Failure{"Its address isn't a web address: " + r.URL}
 	}
 	var body io.Reader
+	var data []byte
 	if r.Body != nil {
-		data, err := json.Marshal(fillBody(r.Body, values))
+		data, err = json.Marshal(fillBody(r.Body, values))
 		if err != nil {
 			return nil, Failure{"Its request body isn't JSON."}
 		}
@@ -115,6 +125,10 @@ func (p *Provider) call(r Request, values map[string]string, deadline time.Durat
 	}
 	for name, template := range r.Headers {
 		request.Header.Set(name, Fill(Fill(template, secrets, false), values, false))
+	}
+	if r.Sign != nil {
+		session, _ := lookup(AWSSessionSecret)
+		signAWS(request, data, *r.Sign, secrets[AWSKeySecret], secrets[AWSSecretSecret], session, time.Now())
 	}
 	fetch := p.Fetch
 	if fetch == nil {
@@ -134,11 +148,24 @@ func (p *Provider) call(r Request, values map[string]string, deadline time.Durat
 	return answer, nil
 }
 
+// value is an answer read as the request says: JSON, or XML.
+func (r Request) value(answer []byte) (any, error) {
+	if r.Answer == "xml" {
+		return xmlValue(answer)
+	}
+	return decode(answer)
+}
+
 // refusal is a provider's no in its own words: the message its JSON gives, cut at 1 KB.
 func refusal(status int, answer []byte, host string) string {
 	said := ""
-	if value, err := decode(answer); err == nil {
-		for _, path := range []string{"message", "detail", "error.message", "error"} {
+	value, err := decode(answer)
+	if err != nil {
+		value, err = xmlValue(answer)
+	}
+	if err == nil {
+		// JSON's message, or AWS's XML <Errors><Error><Message>.
+		for _, path := range []string{"message", "detail", "error.message", "error", "Errors.Error.Message", "Error.Message", "Message"} {
 			if text, ok := PathText(path, value); ok && strings.TrimSpace(text) != "" {
 				said = strings.TrimSpace(text)
 				break
@@ -149,10 +176,11 @@ func refusal(status int, answer []byte, host string) string {
 	if said != "" {
 		text += ": " + said
 	}
-	if status == http.StatusUnauthorized || status == http.StatusForbidden {
-		text += " Check its token: its secret, and the scopes the token was given."
-	} else if !strings.HasSuffix(text, ".") {
+	if !strings.HasSuffix(text, ".") && !strings.HasSuffix(text, "!") && !strings.HasSuffix(text, "?") {
 		text += "."
+	}
+	if status == http.StatusUnauthorized || status == http.StatusForbidden {
+		text += " Check its secrets, and what the token or key may do."
 	}
 	if len(text) > 1024 {
 		text = strings.ToValidUTF8(text[:1024], "")
@@ -160,13 +188,20 @@ func refusal(status int, answer []byte, host string) string {
 	return text
 }
 
-// fillEscaped is Fill for an address: each value escaped as one path segment or query value.
+// fillEscaped is Fill for an address: each value escaped as one path segment, or after the
+// ? as one query value.
 func fillEscaped(template string, values map[string]string) string {
-	escaped := make(map[string]string, len(values))
+	path, query, hasQuery := strings.Cut(template, "?")
+	inPath := make(map[string]string, len(values))
+	inQuery := make(map[string]string, len(values))
 	for k, v := range values {
-		escaped[k] = url.PathEscape(v)
+		inPath[k] = url.PathEscape(v)
+		inQuery[k] = url.QueryEscape(v)
 	}
-	return Fill(template, escaped, false)
+	if !hasQuery {
+		return Fill(path, inPath, false)
+	}
+	return Fill(path, inPath, false) + "?" + Fill(query, inQuery, false)
 }
 
 // fillBody is a JSON template with the values filled into each string in it.
@@ -209,6 +244,23 @@ func requestFrom(value any, what string) (*Request, error) {
 	}
 	method = strings.ToUpper(method)
 	r := &Request{Method: method, URL: address, Headers: map[string]string{}, Body: o["body"]}
+	if answer, ok := o["answer"].(string); ok {
+		if answer != "json" && answer != "xml" {
+			return nil, ConfigError(what + ".answer must be json or xml")
+		}
+		if answer == "xml" {
+			r.Answer = answer
+		}
+	}
+	if sign, present := o["awsSign"]; present {
+		given, _ := sign.(map[string]any)
+		service, _ := given["service"].(string)
+		region, _ := given["region"].(string)
+		if service == "" || region == "" {
+			return nil, ConfigError(what + ".awsSign needs service and region")
+		}
+		r.Sign = &AWSSign{Service: service, Region: region}
+	}
 	if headers, present := o["headers"]; present {
 		given, ok := headers.(map[string]any)
 		if !ok {

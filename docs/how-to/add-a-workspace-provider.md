@@ -26,12 +26,32 @@ in, as before.
 | GitHub Codespaces | a token: fine-grained with Codespaces lifecycle admin, or classic with `codespace`; and `gh` for ssh, after `gh codespace ssh --config >> ~/.ssh/config` | `gh`, signed in | your codespaces, or one repository's |
 | Coder Workspaces | the deployment's address and a session token (`coder tokens create`); and `coder` for ssh, after `coder config-ssh` | `coder`, signed in, after `coder config-ssh` | your Coder workspaces |
 | Google Cloud Workstations | — | `gcloud`, signed in | one cluster and configuration's workstations |
+| AWS EC2 Instances | an IAM user's access key (the policy is below) | — | instances with a tag in one region |
 
 The token goes in only as the provider's secret. It is sent in a request's header, never in
 an address, a log or an error. A codespace and a Coder workspace have no ssh port of their
 own, so ssh to them still goes through `gh` or `coder`, as the ssh ProxyCommand; the
 Providers page says "needs gh for ssh" or "needs coder for ssh". A droplet is reached with
-plain ssh to its public address.
+plain ssh to its public address, and so is an EC2 instance.
+
+AWS EC2 Instances is through its API only, with an IAM user's access key ID and secret
+access key. The smallest policy lists the instances and starts and stops only the ones with
+the tag (here `agents`):
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    { "Effect": "Allow", "Action": "ec2:DescribeInstances", "Resource": "*" },
+    { "Effect": "Allow", "Action": ["ec2:StartInstances", "ec2:StopInstances"],
+      "Resource": "arn:aws:ec2:*:*:instance/*",
+      "Condition": { "Null": { "aws:ResourceTag/agents": "false" } } }
+  ]
+}
+```
+
+`ec2:DescribeInstances` can't be limited to some instances: AWS allows it on all or none.
+The preset makes and deletes no instances.
 
 For anything else, choose **Your commands** and give:
 

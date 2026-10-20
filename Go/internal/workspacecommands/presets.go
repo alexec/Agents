@@ -2,6 +2,7 @@ package workspacecommands
 
 import (
 	"net/url"
+	"strconv"
 	"strings"
 )
 
@@ -10,7 +11,7 @@ import (
 // where the control plane runs. An API preset (#1119, the -api ones) needs only a token,
 // given as the provider's secret. None asks for sudo.
 var PresetNames = []string{"docker", "doctl", "codespaces", "coder", "gcloud-workstations",
-	"digitalocean-api", "codespaces-api", "coder-api"}
+	"digitalocean-api", "codespaces-api", "coder-api", "aws-ec2-api"}
 
 // The secrets the API presets read their tokens from.
 const (
@@ -38,6 +39,8 @@ func expandPreset(name string, o map[string]any) (Config, error) {
 		return codespacesAPI(o)
 	case "coder-api":
 		return coderAPI(o)
+	case "aws-ec2-api":
+		return awsEC2API(o)
 	}
 	return Config{}, ConfigError("no preset " + name + "; there are " + strings.Join(PresetNames, ", "))
 }
@@ -318,4 +321,56 @@ func coderAPI(o map[string]any) (Config, error) {
 		Commands: Commands{StartRequest: build("start"), StopRequest: build("stop"), SSH: ptr("coder.${name}")},
 	}, map[string]State{"pending": Starting, "canceling": Stopping, "canceled": Stopped, "failed": Unknown,
 		"deleting": Stopping, "deleted": Stopped}, Making{}), nil
+}
+
+// ec2Version is the EC2 Query API's version.
+const ec2Version = "2016-11-15"
+
+// awsEC2API is EC2 instances with a tag, in one region, through EC2's Query API, signed with
+// SigV4 from an IAM user's keys in AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY (#1345):
+// nothing to install. Each is reached by plain ssh to its public address. It doesn't make
+// or delete instances.
+func awsEC2API(o map[string]any) (Config, error) {
+	region, _ := o["region"].(string)
+	if region == "" {
+		return Config{}, ConfigError("the aws-ec2-api preset needs a region, such as us-east-1")
+	}
+	for _, r := range region {
+		if !(r >= 'a' && r <= 'z' || r >= '0' && r <= '9' || r == '-') {
+			return Config{}, ConfigError("the aws-ec2-api preset's region is a name such as us-east-1")
+		}
+	}
+	tag, ok := o["tag"].(string)
+	if !ok || tag == "" {
+		tag = "agents"
+	}
+	base, err := api(o, "https://ec2."+region+".amazonaws.com", "aws-ec2-api")
+	if err != nil {
+		return Config{}, err
+	}
+	user, ok := o["user"].(string)
+	if !ok || user == "" {
+		user = "ec2-user"
+	}
+	tunnel, _ := o["tunnel"].(bool)
+	sign := &AWSSign{Service: "ec2", Region: region}
+	query := func(action string, rest string) *Request {
+		return &Request{Method: "GET", URL: base + "/?Action=" + action + "&Version=" + ec2Version + rest,
+			Answer: "xml", Sign: sign}
+	}
+	// Every instance with the tag that is not gone (terminated).
+	list := "&Filter.1.Name=tag-key&Filter.1.Value.1=" + url.QueryEscape(tag) +
+		"&Filter.2.Name=instance-state-name"
+	for i, state := range []string{"pending", "running", "stopping", "stopped", "shutting-down"} {
+		list += "&Filter.2.Value." + strconv.Itoa(i+1) + "=" + state
+	}
+	return newConfig(nil, &Listing{
+		Request: query("DescribeInstances", list),
+		Shape: Shape{Items: "reservationSet[].instancesSet", Fields: map[string]string{"id": "instanceId",
+			"name": "tagSet[key=Name].value", "state": "instanceState.name", "ip": "ipAddress"}},
+		Commands: Commands{StartRequest: query("StartInstances", "&InstanceId.1=${id}"),
+			StopRequest: query("StopInstances", "&InstanceId.1=${id}"),
+			SSH:         ptr(user + "@${ip}"), Tunnel: tunnel},
+	}, map[string]State{"pending": Starting, "running": Running, "stopping": Stopping, "stopped": Stopped,
+		"shutting-down": Stopping, "terminated": Stopped}, Making{}), nil
 }

@@ -157,12 +157,14 @@ func (p *Provider) written(entry Entry) Workspace {
 
 func (p *Provider) listed(listing Listing) ([]Workspace, error) {
 	var outcome Outcome
+	read := decode
 	if listing.Request != nil {
 		answer, err := p.call(*listing.Request, map[string]string{}, p.Timing.Quick, "listing workspaces")
 		if err != nil {
 			return nil, err
 		}
 		outcome = Outcome{Output: answer}
+		read = listing.Request.value
 	} else {
 		outcome = p.Run(listing.Command, p.Timing.Quick)
 		if outcome.Status != 0 || outcome.TimedOut {
@@ -186,7 +188,7 @@ func (p *Provider) listed(listing Listing) ([]Workspace, error) {
 			rows = append(rows, row)
 		}
 	} else {
-		value, err := decode(outcome.Output)
+		value, err := read(outcome.Output)
 		array, ok := PathValue(listing.Shape.Items, value).([]any)
 		if err != nil || !ok {
 			at := listing.Shape.Items
@@ -197,7 +199,11 @@ func (p *Provider) listed(listing Listing) ([]Workspace, error) {
 			if listing.Request != nil {
 				what = "The list request's answer"
 			}
-			return nil, Failure{what + " isn't a JSON array at " + at + "."}
+			format := "JSON"
+			if listing.Request != nil && listing.Request.Answer == "xml" {
+				format = "XML"
+			}
+			return nil, Failure{what + " isn't a " + format + " array at " + at + "."}
 		}
 		for _, item := range array {
 			row := map[string]string{}

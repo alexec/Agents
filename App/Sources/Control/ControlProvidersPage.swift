@@ -197,7 +197,7 @@ struct AddProviderSheet: View {
     var editing: DaemonAPI.ProviderSummary?
 
     enum Kind: String, CaseIterable, Identifiable {
-        case docker, digitalOcean, codespaces, coder, workstations, commands, mcp
+        case docker, digitalOcean, codespaces, coder, workstations, aws, commands, mcp
         var id: String { rawValue }
 
         var title: String {
@@ -207,6 +207,7 @@ struct AddProviderSheet: View {
             case .codespaces: "GitHub Codespaces"
             case .coder: "Coder Workspaces"
             case .workstations: "Google Cloud Workstations"
+            case .aws: "AWS EC2 Instances"
             case .commands: "Your commands"
             case .mcp: "MCP server"
             }
@@ -219,6 +220,7 @@ struct AddProviderSheet: View {
             case .codespaces: "chevron.left.forwardslash.chevron.right"
             case .coder: "terminal"
             case .workstations: "cloud"
+            case .aws: "server.rack"
             case .commands: "apple.terminal"
             case .mcp: "point.3.connected.trianglepath.dotted"
             }
@@ -232,6 +234,8 @@ struct AddProviderSheet: View {
             case .codespaces: "Needs gh, signed in, on the Mac that runs the control plane."
             case .coder: "Needs coder, signed in, and `coder config-ssh` run, on the Mac that runs the control plane."
             case .workstations: "Needs gcloud, signed in, on the Mac that runs the control plane."
+            case .aws:
+                "Needs an IAM user’s access key, with the smallest policy: ec2:DescribeInstances on all resources, and ec2:StartInstances and ec2:StopInstances only on instances that have the tag (the condition aws:ResourceTag/‹tag› not Null). Nothing to install."
             case .commands: "The commands run on the Mac that runs the control plane, as you."
             case .mcp: "An MCP server that offers workspaces_list, workspace_start and workspace_stop, or a tool map onto its own tools."
             }
@@ -245,6 +249,7 @@ struct AddProviderSheet: View {
             case "codespaces", "codespaces-api": .codespaces
             case "coder", "coder-api": .coder
             case "gcloud-workstations": .workstations
+            case "aws-ec2-api": .aws
             default: nil
             }
         }
@@ -305,6 +310,8 @@ struct AddProviderSheet: View {
     @State private var byCLI = false
     @State private var token = ""
     @State private var deployment = ""
+    @State private var accessKey = ""
+    @State private var secretKey = ""
     // Your commands
     @State private var cli = ""
     @State private var workspace = ""
@@ -400,6 +407,7 @@ struct AddProviderSheet: View {
         kind = each
         problem = nil
         byCLI = false
+        user = each == .aws ? "ec2-user" : "root"
         name = switch each {
         case .docker: "Docker Containers on this Mac"
         case .commands, .mcp: ""
@@ -450,12 +458,18 @@ struct AddProviderSheet: View {
                 TextField("Cluster", text: $cluster)
                 TextField("Configuration", text: $config)
                 TextField("Region", text: $region)
+            case .aws:
+                TextField("Region", text: $region, prompt: Text("us-east-1"))
+                TextField("Instances tagged", text: $tag)
+                TextField("ssh as", text: $user)
+                TextField("Access key ID", text: $accessKey)
+                SecureField("Secret access key", text: $secretKey)
             case .commands:
                 commandsForm
             case .mcp:
                 mcpForm
             }
-            if editing == nil, !(kind.hasAPI && !byCLI) { secretsSection }
+            if editing == nil, !(kind.hasAPI && !byCLI), kind != .aws { secretsSection }
         }
         .formStyle(.grouped)
         if let needs = (kind.hasAPI && !byCLI ? kind.apiNeeds : kind.needs), editing == nil {
@@ -493,7 +507,8 @@ struct AddProviderSheet: View {
             Button(editing == nil ? "Add" : "Save") { add(kind) }
                 .keyboardShortcut(.defaultAction)
                 .disabled(working || writing || name.trimmingCharacters(in: .whitespaces).isEmpty
-                          || (editing != nil && written == nil) || (kind.hasAPI && !byCLI && token.isEmpty))
+                          || (editing != nil && written == nil) || (kind.hasAPI && !byCLI && token.isEmpty)
+                          || (kind == .aws && (trimmed(accessKey).isEmpty || secretKey.isEmpty || trimmed(region).isEmpty)))
         }
     }
 
@@ -860,6 +875,13 @@ struct AddProviderSheet: View {
             if !trimmed(repo).isEmpty { commands["repo"] = .string(trimmed(repo)) }
         case .coder:
             commands = ["preset": "coder"]
+        case .aws:
+            // The keys go in only as the provider's secrets, never in its configuration.
+            commands = ["preset": "aws-ec2-api", "region": .string(trimmed(region)),
+                        "tag": .string(trimmed(tag).isEmpty ? "agents" : trimmed(tag)),
+                        "user": .string(trimmed(user).isEmpty ? "ec2-user" : trimmed(user))]
+            return DaemonAPI.ProviderAdd(name: name, kind: .commands, commands: .object(commands),
+                                         secrets: ["AWS_ACCESS_KEY_ID": trimmed(accessKey), "AWS_SECRET_ACCESS_KEY": secretKey])
         case .workstations:
             commands = ["preset": "gcloud-workstations", "cluster": .string(trimmed(cluster)),
                         "config": .string(trimmed(config)), "region": .string(trimmed(region))]
