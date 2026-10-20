@@ -1,20 +1,22 @@
 package gitlabmcp
 
 import (
-	"os"
+	"flag"
 	"strconv"
 	"testing"
 	"time"
 )
 
-// The measurement of P20261020-1, run by hand with GITLAB_MEASURE=1: HTTP requests per poll
+var measure = flag.Bool("measure", false, "run the measurements")
+
+// The measurement of P20261020-1, run by hand with `-args -measure`: HTTP requests per poll
 // of one `issue.labelled label=agent` wait over 100 polls, with N issues updated since it
 // started and none labelled agent.
 func TestMeasureLabelledRequestsPerPoll(t *testing.T) {
-	if os.Getenv("GITLAB_MEASURE") == "" {
-		t.Skip("set GITLAB_MEASURE=1 to measure")
+	if !*measure {
+		t.Skip("-args -measure to measure")
 	}
-	for _, n := range []int{10, 100, 1000} {
+	for _, n := range []int{10, 100, 500, 1000} {
 		f := newFake(t)
 		f.addMembers()
 		agent := newPoller(t, f, "issue.labelled", map[string]any{"label": "agent"})
