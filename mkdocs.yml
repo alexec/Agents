@@ -125,6 +125,7 @@ nav:
       - reference/feature-matrix.md
   - Explanation:
       - explanation/index.md
+      - explanation/direction.md
       - explanation/why-agents.md
       - explanation/control-plane.md
       - explanation/window-and-daemon.md
