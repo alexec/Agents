@@ -516,6 +516,14 @@ struct WebFixturesTests {
                 entry(6, .compaction(status: "in_progress", summary: [])),
                 finished,
             ], false),
+            ("a branch's note comes after the reply it keeps (#1749)", [
+                ask(1, "Remember APPLE"),
+                entry(2, .toolCall(call("t1", "ls", kind: "execute"))),
+                entry(3, .agentMessage(messageID: "a", text: "OK APPLE")),
+                entry(4, .workReported(WorkReport(outcome: .done, message: "Remembered", at: at(4)))),
+                finished,
+                entry(5, .runtimeNote("Branched from APPLE before its prompt 2.")),
+            ], false),
             ("a retried error the turn ended on stays (#394)", [
                 ask(1, "Fix it"),
                 entry(2, .agentMessage(messageID: "a", text: "Error: RetriableError: [unavailable] getaddrinfo ENOTFOUND api2.cursor.sh")),

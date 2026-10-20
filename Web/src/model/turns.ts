@@ -122,6 +122,11 @@ const startingSuffix = "…";
 export const pickedBackUp = "Picked the conversation back up.";
 const stoppedWithDaemon = "This agent was working when the daemon stopped, so it stopped too.";
 
+/** RuntimeNote.isBranch: where a branch was cut (#1749). */
+function noteIsBranch(text: string): boolean {
+  return text.startsWith("Branched from ");
+}
+
 /** RuntimeNote.isPassing. */
 function noteIsPassing(text: string): boolean {
   if (text === pickedBackUp || text === stoppedWithDaemon) return true;
@@ -480,6 +485,8 @@ export function isOutcome(item: Item): boolean {
   if (kind === "fileShown") return true;
   const state = fields(item.entry, "stateChanged");
   if (state) return state._0 === "stopped";
+  // Where a branch was cut (#1749): drawn at every level, after the reply it keeps.
+  if (isBranch(item)) return true;
   const notice = fields(item.entry, "notice");
   return notice ? notice._0.severity === "error" : false;
 }
@@ -493,6 +500,13 @@ export function isInTurn(item: Item): boolean {
 
 function isReport(item: Item): boolean {
   return item.kind === "entry" && kindOf(item.entry) === "workReported";
+}
+
+/** The note that says where a branch was cut (#1749). */
+function isBranch(item: Item): boolean {
+  if (item.kind !== "entry") return false;
+  const note = fields(item.entry, "runtimeNote");
+  return note ? noteIsBranch(note._0) : false;
 }
 
 export interface ChatTurn {
@@ -679,7 +693,8 @@ export function turnParts(items: readonly Item[], isLive: boolean): TurnParts {
   const reports: Item[] = [];
   let steps = 0;
   shown.forEach((item, index) => {
-    if (isReport(item)) reports.push(item);
+    // The report is the turn's last line, and where a branch was cut comes after that (#1749).
+    if (isReport(item) || isBranch(item)) reports.push(item);
     else if (replied.has(index) || isOutcome(item)) outcome.push(item);
     else if (item.kind === "run") steps += item.calls.length;
     else steps += 1;

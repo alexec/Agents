@@ -88,6 +88,12 @@ func (it item) isAgentMessage() bool { return it.kind().AgentMessage != nil }
 func (it item) isThought() bool      { return it.kind().AgentThought != nil }
 func (it item) isReport() bool       { return it.kind().WorkReported != nil }
 
+// isBranch is the note that says where a branch was cut (#1749).
+func (it item) isBranch() bool {
+	n := it.kind().RuntimeNote
+	return n != nil && strings.HasPrefix(n.Value, "Branched from ")
+}
+
 func (it item) isOutcome() bool {
 	k := it.kind()
 	switch {
@@ -99,6 +105,9 @@ func (it item) isOutcome() bool {
 		return k.StateChanged.Value == wire.AgentStateStopped
 	case k.Notice != nil:
 		return k.Notice.Value.Severity == "error"
+	case k.RuntimeNote != nil:
+		// Where a branch was cut (#1749): drawn at every level, after the reply it keeps.
+		return it.isBranch()
 	}
 	return false
 }
@@ -230,7 +239,7 @@ func turnParts(items []item) ([]item, int64) {
 	var steps int64
 	for k, it := range shown {
 		switch {
-		case it.isReport():
+		case it.isReport(), it.isBranch():
 			reports = append(reports, it)
 		case reply[k] || it.isOutcome():
 			outcome = append(outcome, it)
@@ -240,7 +249,8 @@ func turnParts(items []item) ([]item, int64) {
 			steps++
 		}
 	}
-	// The report is the turn's last line, whatever the agent said after it.
+	// The report is the turn's last line, whatever the agent said after it, and where a
+	// branch was cut comes after that (#1749).
 	return append(outcome, reports...), steps
 }
 

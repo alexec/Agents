@@ -103,6 +103,21 @@ struct OutcomePageTests {
         #expect(parts.stepCount == 1)
     }
 
+    /// The note a branch ends on says where it was cut: after the reply it keeps and the
+    /// report, never above the reply as a step (#1749).
+    @Test func aBranchsNoteComesAfterTheReplyItKeeps() {
+        let branched = TranscriptEntry(kind: .runtimeNote("Branched from APPLE before its prompt 2."))
+        let parts = TurnParts(turn([ask("Remember APPLE"), call("1", "Read"), said("OK APPLE"),
+                                    report("Remembered"), branched]).items, isLive: false)
+        #expect(parts.outcome.map(text) == ["OK APPLE", "Remembered", "Branched from APPLE before its prompt 2."])
+        #expect(parts.stepCount == 1)
+        // A note of any other kind is still a step.
+        let other = TranscriptEntry(kind: .runtimeNote("Leased build until 10:00."))
+        let leased = TurnParts(turn([ask("Go"), said("Done."), other]).items, isLive: false)
+        #expect(leased.outcome.map(text) == ["Done."])
+        #expect(leased.stepCount == 1)
+    }
+
     @Test func thinkingIsNotAStep() {
         let thought = TranscriptEntry(kind: .agentThought(messageID: nil, text: "Hmm"))
         let parts = TurnParts(turn([ask("Go"), thought, call("1", "Read"), said("Done")]).items, isLive: false)

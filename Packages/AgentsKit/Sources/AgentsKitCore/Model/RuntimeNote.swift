@@ -69,6 +69,13 @@ public enum RuntimeNote {
         }
     }
 
+    /// The note a branch starts with (#1658): "Branched from Plan before its prompt 2.".
+    /// It says where the branch was cut, so it is drawn after the last reply the branch
+    /// keeps, not among that turn's steps (#1749).
+    public static func isBranch(_ text: String) -> Bool {
+        text.hasPrefix(branchPrefix)
+    }
+
     /// Whether this note is about the moment it was written and nothing after.
     ///
     /// `questionWentUnanswered` is deliberately absent. See the note on it.
@@ -78,6 +85,7 @@ public enum RuntimeNote {
             && text.count > startingPrefix.count + startingSuffix.count
     }
 
+    private static let branchPrefix = "Branched from "
     private static let startingPrefix = "Starting "
     private static let startingSuffix = "…"
 }
