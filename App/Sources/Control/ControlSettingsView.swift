@@ -658,6 +658,8 @@ struct CodeSheet: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .background(Paper.raised, in: RoundedRectangle(cornerRadius: 8))
                     .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(Paper.rule, lineWidth: 1))
+                    // One element of its own: a label on the selectable Text overflows the stack (#1724).
+                    .accessibilityElement(children: .ignore)
                     .accessibilityLabel("Code")
                     .accessibilityValue(shown.text)
                 HStack(alignment: .firstTextBaseline) {

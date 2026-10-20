@@ -212,6 +212,8 @@ run_checks() {
 	python3 scripts/check-test-indexing.py || status=1
 	python3 scripts/check-window-defaults.py || status=1
 	python3 scripts/check-store-window.py || status=1
+	python3 scripts/check-stacked-labels.py --selftest || status=1
+	python3 scripts/check-stacked-labels.py || status=1
 	python3 scripts/check-workflow-github-reads.py --selftest || status=1
 	python3 scripts/check-workflow-github-reads.py || status=1
 	python3 -m unittest discover -s .agents/skills/ship-app/scripts -p 'test_*.py' -q || status=1
