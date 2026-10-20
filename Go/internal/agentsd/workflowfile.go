@@ -107,6 +107,98 @@ func readWorkflowFile(path string) (text, digest string, why string) {
 	return string(b), hex.EncodeToString(sum[:]), ""
 }
 
+// A workflow that hands its method to a skill (#1563) names it as
+// .agents/skills/<name>/SKILL.md, as scripts/check-workflow-github-reads.py finds it. What
+// is approved is the workflow and every skill it names, so a change to one of them waits
+// for the person as a change to the workflow does (S20261019-2). A name with a / or ..,
+// a skill that is a link or in a folder that is one, or one that is not there, is not
+// read, and the workflow does not run.
+
+const skillsRel = ".agents/skills"
+
+var (
+	namedSkill = regexp.MustCompile("\\.agents/skills/([^\\s`'\"()<>]*?)/SKILL\\.md")
+	skillName  = regexp.MustCompile(`^[\w-]+$`)
+)
+
+// workflowSkill is a skill a workflow names, as read now.
+type workflowSkill struct{ name, text string }
+
+func skillChangePath(name string) string { return skillsRel + "/" + name + "/SKILL.md" }
+
+// skillPath is a skill's file, when every folder down to it is a folder of the project's own.
+func skillPath(project, name string) (string, bool) {
+	if !skillName.MatchString(name) || !ownFolders(project, filepath.Join(skillsRel, name)) {
+		return "", false
+	}
+	return filepath.Join(project, skillsRel, name, "SKILL.md"), true
+}
+
+// readWorkflowSkills is the skills a workflow's text names, by name, or why one cannot be read.
+func readWorkflowSkills(project, text string) ([]workflowSkill, string) {
+	names := map[string]bool{}
+	for _, m := range namedSkill.FindAllStringSubmatch(text, -1) {
+		names[m[1]] = true
+	}
+	var skills []workflowSkill
+	for name := range names {
+		path, ok := skillPath(project, name)
+		if !ok {
+			return nil, "This workflow names " + skillChangePath(name) + ", which is not a file of the project's own in " + skillsRel
+		}
+		body, _, why := readWorkflowFile(path)
+		if why != "" {
+			return nil, "This workflow names " + skillChangePath(name) + ", which could not be read, or is a link"
+		}
+		skills = append(skills, workflowSkill{name: name, text: body})
+	}
+	sort.Slice(skills, func(i, j int) bool { return skills[i].name < skills[j].name })
+	return skills, ""
+}
+
+// workflowDigest is what approval checks: the file's digest, or with skills, one digest of
+// the workflow and each skill, every part with its length so that none runs into the next.
+func workflowDigest(fileDigest, text string, skills []workflowSkill) string {
+	if len(skills) == 0 {
+		return fileDigest
+	}
+	h := sha256.New()
+	part := func(s string) { h.Write([]byte(strconv.Itoa(len(s)) + ":" + s)) }
+	part(text)
+	for _, s := range skills {
+		part(s.name)
+		part(s.text)
+	}
+	return hex.EncodeToString(h.Sum(nil))
+}
+
+// shownWorkflow is what the person is shown to approve: the workflow, then each skill it names.
+func shownWorkflow(text string, skills []workflowSkill) string {
+	for _, s := range skills {
+		text += "\n\n――― " + skillChangePath(s.name) + " ―――\n\n" + s.text
+	}
+	return text
+}
+
+// workflowFileOf is a workflow as scanLocked lists it, from its file's bytes as
+// readWorkflowFile read them.
+func workflowFileOf(folder, id, text, digest, why string) *workflowFile {
+	if why != "" {
+		wf := parseWorkflow("", id, folder)
+		wf.Problem = &wire.WorkflowProblem{Unreadable: &wire.WorkflowProblemUnreadable{Value: why}}
+		return &workflowFile{wf: wf}
+	}
+	wf := parseWorkflow(text, id, folder)
+	skills, why := readWorkflowSkills(folder, text)
+	if why != "" {
+		if wf.Problem == nil {
+			wf.Problem = &wire.WorkflowProblem{Unreadable: &wire.WorkflowProblemUnreadable{Value: why}}
+		}
+		return &workflowFile{wf: wf, text: text}
+	}
+	return &workflowFile{wf: wf, digest: workflowDigest(digest, text, skills), text: text, skills: skills}
+}
+
 // stripFrontMatter is FrontMatter.strip: what is under the closing ---, blank lines at its
 // head left out.
 func stripFrontMatter(text string) string {

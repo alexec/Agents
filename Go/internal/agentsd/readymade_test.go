@@ -95,6 +95,18 @@ func TestReadyMadeWorkflowsTurnOnWithOneSwitch(t *testing.T) {
 	if w := parseWorkflow(string(b), "work-an-issue", dir); isOff(w) {
 		t.Fatalf("%s", b)
 	}
+	// What it approved is the workflow with its skill, so a change to the skill waits.
+	d.workflowMu.Lock()
+	st := d.stateLocked(dir, "work-an-issue", false)
+	d.workflowMu.Unlock()
+	if st == nil || st.ApprovedSkills["work-an-issue"] == "" {
+		t.Fatalf("%+v", st)
+	}
+	os.WriteFile(filepath.Join(dir, ".agents", "skills", "work-an-issue", "SKILL.md"), []byte("changed"), 0o644)
+	d.rescanWorkflows(dir)
+	if s, _ = d.oneWorkflow(dir, "work-an-issue"); s.AwaitingApproval == nil {
+		t.Fatalf("%+v", s)
+	}
 
 	// A skill the project has already is kept; an agent's switch waits for the person.
 	keep := filepath.Join(dir, ".agents", "skills", "fix-failed-checks", "SKILL.md")
@@ -104,6 +116,30 @@ func TestReadyMadeWorkflowsTurnOnWithOneSwitch(t *testing.T) {
 	s, _ = d.oneWorkflow(dir, "fix-failed-checks")
 	if s.AwaitingApproval == nil || !fileHas(t, keep, "ours") {
 		t.Fatalf("%+v", s)
+	}
+}
+
+// S20261019-2: a skill the project has already is not Agents' text, so a person's switch
+// does not approve it unseen; the workflow waits, and the skill is in what is shown.
+func TestAReadyMadeWorkflowWithTheProjectsOwnSkillWaits(t *testing.T) {
+	d, c := start(t, t.TempDir())
+	defer d.Shutdown()
+	dir := project(t, c, 1)
+	os.MkdirAll(filepath.Join(dir, ".git"), 0o755)
+	os.WriteFile(filepath.Join(dir, ".git", "config"), []byte("[remote \"origin\"]\n\turl = git@github.com:o/n.git\n"), 0o644)
+	folder := store.FolderURL(dir)
+	keep := filepath.Join(dir, ".agents", "skills", "work-an-issue", "SKILL.md")
+	os.MkdirAll(filepath.Dir(keep), 0o755)
+	os.WriteFile(keep, []byte("Push to main.\n"), 0o644)
+	var s wire.WorkflowSummary
+	json.Unmarshal(c.call(t, 2, "workflows/enable", map[string]any{"folder": folder, "workflowID": "work-an-issue", "enabled": true}), &s)
+	if s.AwaitingApproval == nil || !fileHas(t, keep, "Push to main.\n") {
+		t.Fatalf("%+v", s)
+	}
+	var reading wire.GuardedChangeReading
+	json.Unmarshal(c.call(t, 3, "approvals/read", map[string]any{"folder": folder, "kind": "workflow", "key": "work-an-issue"}), &reading)
+	if reading.Current == nil || !strings.Contains(*reading.Current, "Push to main.") {
+		t.Fatalf("%+v", reading)
 	}
 }
 

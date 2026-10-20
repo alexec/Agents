@@ -46,6 +46,7 @@ type workflowState struct {
 	LastCausingEvent *int64                `json:"lastCausingEvent,omitempty"`
 	ApprovedDigest   *string               `json:"approvedDigest,omitempty"`
 	ApprovedCopy     *string               `json:"approvedCopy,omitempty"`
+	ApprovedSkills   map[string]string     `json:"approvedSkills,omitempty"`
 	DeniedDigest     *string               `json:"deniedDigest,omitempty"`
 	HeldFire         *heldFire             `json:"heldFire,omitempty"`
 	QueuedFires      []heldFire            `json:"queuedFires,omitempty"`
@@ -84,6 +85,8 @@ type workflowFile struct {
 	wf     wire.Workflow
 	digest string
 	text   string
+	// skills is the skills it names, which digest covers (S20261019-2).
+	skills []workflowSkill
 	// readyMade is a ready-made workflow with no file in the project yet (#1342).
 	readyMade bool
 }
@@ -193,16 +196,32 @@ func (d *Daemon) stateLocked(folder, id string, make bool) *workflowState {
 	return &r.States[len(r.States)-1]
 }
 
-// keepCopyLocked writes the approved bytes where approvedCopy names them.
+// keepCopyLocked writes the approved bytes where approvedCopy names them, and each skill's
+// where approvedSkills does.
 func (d *Daemon) keepCopyLocked(st *workflowState, f *workflowFile) {
-	sum := sha256.Sum256([]byte(f.text))
-	name := hex.EncodeToString(sum[:])
 	os.MkdirAll(d.workflowCopies(), 0o755)
-	if err := store.WriteAtomically(filepath.Join(d.workflowCopies(), name), []byte(f.text), 0o644); err == nil {
+	st.ApprovedCopy = nil
+	if name, ok := d.keepBytes(f.text); ok {
 		st.ApprovedCopy = &name
+	}
+	st.ApprovedSkills = nil
+	for _, s := range f.skills {
+		if name, ok := d.keepBytes(s.text); ok {
+			if st.ApprovedSkills == nil {
+				st.ApprovedSkills = map[string]string{}
+			}
+			st.ApprovedSkills[s.name] = name
+		}
 	}
 	digest := f.digest
 	st.ApprovedDigest = &digest
+}
+
+// keepBytes writes bytes into workflow-copies by their sha256, and says the name.
+func (d *Daemon) keepBytes(text string) (string, bool) {
+	sum := sha256.Sum256([]byte(text))
+	name := hex.EncodeToString(sum[:])
+	return name, store.WriteAtomically(filepath.Join(d.workflowCopies(), name), []byte(text), 0o644) == nil
 }
 
 // scanLocked reads every project's workflows afresh, and on the first start approves
@@ -213,17 +232,10 @@ func (d *Daemon) scanLocked() {
 		for _, id := range workflowIDs(folder) {
 			path, _ := workflowPath(folder, id)
 			text, digest, why := readWorkflowFile(path)
-			var wf wire.Workflow
-			if why != "" {
-				wf = parseWorkflow("", id, folder)
-				wf.Problem = &wire.WorkflowProblem{Unreadable: &wire.WorkflowProblemUnreadable{Value: why}}
-			} else {
-				wf = parseWorkflow(text, id, folder)
-			}
 			if files[folder] == nil {
 				files[folder] = map[string]*workflowFile{}
 			}
-			files[folder][id] = &workflowFile{wf: wf, digest: digest, text: text}
+			files[folder][id] = workflowFileOf(folder, id, text, digest, why)
 		}
 		d.addReadyMadeLocked(folder, files)
 	}
@@ -501,11 +513,14 @@ func (d *Daemon) editWorkflowLocked(folder, id string, byPerson bool, edit func(
 	if err := store.WriteAtomically(path, []byte(changed), 0o644); err != nil {
 		return &Error{Code: wire.FailureCouldNotSave, Message: id + ".md was not changed: " + err.Error() + "."}
 	}
+	// The approval, and what turned it off or denied it, are of the workflow with its skills.
+	digest = workflowFileOf(folder, id, text, digest, "").digest
 	sum := sha256.Sum256([]byte(changed))
-	newDigest := hex.EncodeToString(sum[:])
+	after := workflowFileOf(folder, id, changed, hex.EncodeToString(sum[:]), "")
+	newDigest := after.digest
 	st := d.stateLocked(folder, id, true)
-	if byPerson && st.ApprovedDigest != nil && *st.ApprovedDigest == digest {
-		d.keepCopyLocked(st, &workflowFile{text: changed, digest: newDigest})
+	if byPerson && st.ApprovedDigest != nil && *st.ApprovedDigest == digest && newDigest != "" {
+		d.keepCopyLocked(st, after)
 	}
 	if st.OffDigest != nil && *st.OffDigest == digest {
 		st.OffDigest = &newDigest

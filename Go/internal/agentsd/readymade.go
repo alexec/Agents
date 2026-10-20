@@ -96,7 +96,8 @@ func (d *Daemon) addReadyMadeLocked(folder string, files map[string]map[string]*
 // writeReadyMadeLocked writes a ready-made workflow into its project, before the first
 // change to it. A person's change approves it at once: it is Agents' own text, and the
 // person chose it. An agent's waits for the person, as any file an agent writes does.
-// A skill of the same name that the project has already is kept.
+// A skill of the same name that the project has already is kept, and since it is not
+// Agents' own text, the workflow with it waits for the person too (S20261019-2).
 func (d *Daemon) writeReadyMadeLocked(folder, id string, byPerson bool) error {
 	path, ok := workflowPath(folder, id)
 	if !ok {
@@ -117,9 +118,19 @@ func (d *Daemon) writeReadyMadeLocked(folder, id string, byPerson bool) error {
 		return &Error{Code: wire.FailureCouldNotSave, Message: id + ".md was not written: " + err.Error() + "."}
 	}
 	d.scanLocked()
-	if f := d.fileLocked(folder, id); byPerson && f != nil && !f.readyMade {
+	if f := d.fileLocked(folder, id); byPerson && f != nil && !f.readyMade && f.digest != "" && onlyOwnSkill(f, id, skill) {
 		d.keepCopyLocked(d.stateLocked(folder, id, true), f)
 		d.saveRecordsLocked(false)
 	}
 	return nil
+}
+
+// onlyOwnSkill is whether the skills a ready-made workflow names are its own, as written.
+func onlyOwnSkill(f *workflowFile, id, skill string) bool {
+	for _, s := range f.skills {
+		if s.name != id || s.text != skill {
+			return false
+		}
+	}
+	return true
 }
