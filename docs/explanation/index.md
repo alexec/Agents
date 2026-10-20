@@ -8,6 +8,8 @@ description: Why the app works the way it does.
 Why the app works the way it does: the ideas behind it and the trade-offs it makes.
 Nothing here needs doing; it is for understanding.
 
+- [Direction](direction.md): what Agents is for, the three ways to run it, how one
+  organisation's data is kept apart, and where data lives and is backed up.
 - [Why Agents](why-agents.md): why you would run your coding agents here, alongside the
   editor you already use, and when something else is better.
 - [The control plane](control-plane.md): hosts, clients, copies and the store, where to
