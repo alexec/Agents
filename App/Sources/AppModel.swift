@@ -5005,8 +5005,11 @@ final class AppModel {
     func runCommand(_ command: String, in agentID: UUID) async {
         let shell = shellClient(for: agentID)
         for _ in 0..<30 where !shell.isAttached { try? await Task.sleep(for: .milliseconds(100)) }
+        // Shell 0 closed (#1681): attaching opens it again on the host. Ended: a new one.
+        if !shell.isAttached { await shell.attach(rows: 0, cols: 0) }
+        if shell.isAttached, !shell.state.isLive { await shell.startAgain() }
         guard shell.isAttached, shell.state.isLive else {
-            problem = "The session's shell is not running, so the command was not run. Start it again in Terminal."
+            problem = "The session's shell did not start, so the command did not run."
             return
         }
         shell.beginRecent()

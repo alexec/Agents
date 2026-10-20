@@ -68,6 +68,13 @@ final class PaneState {
     var shells: [Int] = [0]
     /// The tab on top.
     var frontShell = 0
+
+    /// Run from a reply types into shell 0 (#1681): its tab goes in front, and back into
+    /// the tabs when it was closed, so the command is seen going in.
+    func frontShellZero() {
+        if !shells.contains(0) { shells.insert(0, at: 0) }
+        frontShell = 0
+    }
     /// False when the agent's daemon holds only one shell — a server not yet updated.
     var canOpenMoreShells = true
 

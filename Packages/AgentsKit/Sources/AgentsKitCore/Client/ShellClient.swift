@@ -269,6 +269,12 @@ public final class ShellClient {
         }
     }
 
+    /// A new shell at the size its screen last said, or 24 by 80: Run from a reply (#1681)
+    /// starts shell 0 again this way when it has ended.
+    public func startAgain() async {
+        await restart(rows: rows > 0 ? rows : 24, cols: cols > 0 ? cols : 80)
+    }
+
     // MARK: Told by the daemon
 
     public func received(_ data: Data, at offset: Int? = nil) {

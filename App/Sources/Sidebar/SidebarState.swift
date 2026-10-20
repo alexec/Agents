@@ -187,6 +187,14 @@ final class AgentPaneState {
     var shells: [Int] = [0]
     /// The tab on top.
     var frontShell = 0
+
+    /// Run from a reply types into shell 0 (#1681): its tab goes in front, and back into
+    /// the tabs when it was closed, so the command is seen going in.
+    func frontShellZero() {
+        if !shells.contains(0) { shells.insert(0, at: 0) }
+        frontShell = 0
+    }
+
     /// A tab the user just chose or opened, whose screen should take the keyboard.
     var shellToFocus: Int?
     /// What the program in each tab calls it, as its screen last read (#401).
