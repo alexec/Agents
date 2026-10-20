@@ -554,6 +554,12 @@ func (d *Daemon) messageSession(caller wire.UUID, args map[string]json.RawMessag
 	if target.State == wire.AgentStateArchived {
 		return "", refusedMessage(name + " is archived. Only the person can unarchive it.")
 	}
+	// Another session's helper takes its words from that session only, which would not know
+	// of a message sent past it (#1695). This refuses siblings too.
+	if target.StartedByAgent != nil && *target.StartedByAgent != caller {
+		starter := d.holderName(*target.StartedByAgent)
+		return "", refusedMessage(name + " was started by " + starter + ", and a session started by another session takes messages only from it. Send this to " + starter + ".")
+	}
 	if err := d.refuseToRun(target); err != nil {
 		msg := err.Error()
 		if e, ok := err.(*Error); ok {

@@ -10,8 +10,8 @@ import (
 )
 
 // A message wakes a session only when it may do no more without asking than the sender:
-// one in a looser mode, with its sandbox not on while the sender's is, or, for a sender an
-// agent started, one that has started sessions, keeps it queued until the person speaks.
+// one in a looser mode, or with its sandbox not on while the sender's is, keeps it queued
+// until the person speaks. A session another session started takes messages only from it.
 
 func inMode(mode string) func(*wire.Agent) {
 	return func(a *wire.Agent) {
@@ -53,6 +53,7 @@ func TestMessageWakesOnlyAnAgentNoLooser(t *testing.T) {
 	open := seeded(t, d, dir, titledAs("Open"))
 	manager := seeded(t, d, dir, titledAs("Manager"))
 	helper := seeded(t, d, dir, titledAs("Helper", func(a *wire.Agent) { a.StartedByAgent = &manager.ID }))
+	sibling := seeded(t, d, dir, titledAs("Sibling", func(a *wire.Agent) { a.StartedByAgent = &manager.ID }))
 	peer := seeded(t, d, dir, titledAs("Peer"))
 
 	held := func(c *mcpClient, n int, to string, why string, target wire.UUID) {
@@ -91,12 +92,25 @@ func TestMessageWakesOnlyAnAgentNoLooser(t *testing.T) {
 	b.post("initialize", map[string]any{}, 1)
 	held(b, 2, "Open", "its command sandbox is not on, and yours is", open.ID)
 
-	// A helper may not wake a session that has started sessions, its own starter too.
+	// A helper wakes its own starter (#1695), and a session that has started none.
 	h := appClient(t, d, helper.ID)
 	h.post("initialize", map[string]any{}, 1)
-	held(h, 2, "Manager", "it has started sessions of its own, and you were started by a session", manager.ID)
-	// But it wakes one that has started none.
+	woken(h, 2, "Manager", manager.ID)
 	woken(h, 3, "Peer", peer.ID)
+
+	// Another session's helper, a sibling too, is refused, and nothing is queued.
+	refused := func(c *mcpClient, n int, to string, target wire.UUID) {
+		t.Helper()
+		text, isErr := c.tool(n, "message_session", map[string]any{"to": to, "message": "do the work"})
+		if !isErr || text != "Nothing was sent: “"+to+"” was started by “Manager”, and a session started by another session takes messages only from it. Send this to “Manager”." {
+			t.Fatal(text)
+		}
+		if a := d.Store.Agent(target); len(a.QueuedPrompts) != 0 || len(userMessages(d, target)) != 0 {
+			t.Fatalf("%+v", a)
+		}
+	}
+	refused(m, 4, "Helper", helper.ID)
+	refused(h, 4, "Sibling", sibling.ID)
 
 	// The person speaking to it sends the held message, then theirs.
 	if err := d.enqueue(loose.ID, wire.QueuedPrompt{ID: store.NewUUID(), Text: "go on", From: wire.PromptOriginPerson}, false); err != nil {

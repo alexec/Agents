@@ -69,9 +69,8 @@ func inheritedMode(caller *wire.Agent, runtime string) *string {
 }
 
 // looserThan is how the target may do more without asking than the caller, or "": a mode
-// looser than the caller's, its sandbox not on while the caller's is, or, for a caller an
-// agent started, a target that has started sessions still here. A message from the caller
-// then waits for the person, as start_session gives a helper no looser a mode.
+// looser than the caller's, or its sandbox not on while the caller's is. A message from the
+// caller then waits for the person, as start_session gives a helper no looser a mode.
 func (d *Daemon) looserThan(target, caller *wire.Agent) string {
 	theirs, own := inheritedMode(target, target.RuntimeID), inheritedMode(caller, caller.RuntimeID)
 	switch {
@@ -88,13 +87,6 @@ func (d *Daemon) looserThan(target, caller *wire.Agent) string {
 	}
 	if on(caller) && !on(target) {
 		return "its command sandbox is not on, and yours is"
-	}
-	if caller.StartedByAgent != nil {
-		for _, a := range d.Store.Agents() {
-			if a.StartedByAgent != nil && *a.StartedByAgent == target.ID && a.State != wire.AgentStateArchived {
-				return "it has started sessions of its own, and you were started by a session"
-			}
-		}
 	}
 	return ""
 }
