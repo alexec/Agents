@@ -2,7 +2,8 @@ import Foundation
 
 /// Quote in Prompt (#1553): words from a reply, added to the prompt bar as a Markdown quote
 /// with an empty line after it, where the caret goes. The page has its own copy (`quoteInto`
-/// in `Web/src/model/promptQuote.ts`), held to `Fixtures/web/prompt/quote.json`.
+/// and `giveBackInto` in `Web/src/model/promptQuote.ts`), held to `Fixtures/web/prompt/quote.json`
+/// and `Fixtures/web/prompt/give-back.json`.
 public enum PromptQuote {
     /// `text` with `quote` added at its end as a quote. Nothing to quote leaves it as it was.
     public static func adding(_ quote: String, to text: String) -> String {
@@ -15,5 +16,16 @@ public enum PromptQuote {
         let before = text.isEmpty || text.hasSuffix("\n\n") ? text
             : text.hasSuffix("\n") ? text + "\n" : text + "\n\n"
         return before + quoted + "\n\n"
+    }
+
+    /// Words given back to the prompt bar, such as a queued prompt's edit that came too late
+    /// (#1665): in place of an empty bar, else after what is typed with an empty line
+    /// between, so a draft is never written over.
+    public static func givingBack(_ words: String, to text: String) -> String {
+        guard !words.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return text }
+        let typed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !typed.isEmpty else { return words }
+        let before = text.hasSuffix("\n\n") ? text : text.hasSuffix("\n") ? text + "\n" : text + "\n\n"
+        return before + words
     }
 }

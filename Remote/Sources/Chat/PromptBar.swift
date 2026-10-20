@@ -160,10 +160,10 @@ struct PromptBar: View {
         // A new one is a new turn's worth, so it comes back from having been dismissed.
         .onChange(of: agent.suggestedPrompts) { dismissedSuggestions = false }
         // Words offered from elsewhere in the chat (#1552): they land in the field, focused
-        // and unsent, as on the Mac.
+        // and unsent, as on the Mac; after what is typed, never over it (#1665).
         .onChange(of: model.offeredPrompt) {
             guard let offered = model.offeredPrompt else { return }
-            text = offered
+            text = PromptQuote.givingBack(offered, to: text)
             focused = true
             model.offeredPrompt = nil
         }

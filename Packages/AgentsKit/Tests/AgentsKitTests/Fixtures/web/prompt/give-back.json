@@ -1,0 +1,50 @@
+[
+  {
+    "expected" : "Use the cache.",
+    "input" : {
+      "text" : "",
+      "words" : "Use the cache."
+    },
+    "name" : "into an empty prompt"
+  },
+  {
+    "expected" : "Use the cache.",
+    "input" : {
+      "text" : " \n",
+      "words" : "Use the cache."
+    },
+    "name" : "into a blank prompt"
+  },
+  {
+    "expected" : "Also check the logs.\n\nUse the cache.",
+    "input" : {
+      "text" : "Also check the logs.",
+      "words" : "Use the cache."
+    },
+    "name" : "after a draft"
+  },
+  {
+    "expected" : "Also check the logs.\n\nUse the cache.",
+    "input" : {
+      "text" : "Also check the logs.\n",
+      "words" : "Use the cache."
+    },
+    "name" : "after a draft and its break"
+  },
+  {
+    "expected" : "Also check the logs.\n\nUse the cache.",
+    "input" : {
+      "text" : "Also check the logs.\n\n",
+      "words" : "Use the cache."
+    },
+    "name" : "after a draft and an empty line"
+  },
+  {
+    "expected" : "Kept.",
+    "input" : {
+      "text" : "Kept.",
+      "words" : " \n"
+    },
+    "name" : "nothing to give back"
+  }
+]

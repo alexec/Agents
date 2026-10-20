@@ -11,7 +11,7 @@
 // A `/` at the start of a word lists the runtime's commands, and an `@` the files the host finds
 // under the agent's folders (#255), over the field as the window's CommandList and MentionList:
 // arrows move, Return or Tab takes one, Escape puts the list away for that word.
-import { quoteInto } from "../model/promptQuote";
+import { giveBackInto, quoteInto } from "../model/promptQuote";
 import { recall } from "../model/promptHistory";
 import { useSignal } from "@preact/signals";
 import { useEffect, useRef } from "preact/hooks";
@@ -125,11 +125,12 @@ export function Prompt({ store, draftKey, placeholder, capabilities, disabled, s
 
   const keep = () => store.drafts.set(draftKey, { text: text.value, attachments: attachments.value });
 
-  // Words offered from elsewhere in the chat (#1552): they land in the field, unsent.
+  // Words offered from elsewhere in the chat (#1552): they land in the field, unsent, after what
+  // is typed, never over it (#1665).
   const given = store.offeredPrompt.value;
   useEffect(() => {
     if (!given || given.draftKey !== draftKey) return;
-    text.value = given.text;
+    text.value = giveBackInto(given.text, text.value);
     keep();
     store.offeredPrompt.value = null;
   }, [given, draftKey]);

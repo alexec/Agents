@@ -885,6 +885,24 @@ struct WebFixturesTests {
         }
     }
 
+    /// Words given back to the bar (#1665): an empty bar takes them, a draft keeps its words.
+    @Test func promptGiveBack() throws {
+        let steps: [(String, String, String)] = [
+            ("into an empty prompt", "Use the cache.", ""),
+            ("into a blank prompt", "Use the cache.", " \n"),
+            ("after a draft", "Use the cache.", "Also check the logs."),
+            ("after a draft and its break", "Use the cache.", "Also check the logs.\n"),
+            ("after a draft and an empty line", "Use the cache.", "Also check the logs.\n\n"),
+            ("nothing to give back", " \n", "Kept."),
+        ]
+        let cases = steps.map { name, words, text in
+            Case(name: name, input: .object(["words": .string(words), "text": .string(text)]))
+        }
+        try pin("prompt/give-back.json", cases) { input in
+            .string(PromptQuote.givingBack(input["words"]?.stringValue ?? "", to: input["text"]?.stringValue ?? ""))
+        }
+    }
+
     // MARK: archive/
 
     /// Undo after Archive (#1534): the strip's line, with and without a stop.
