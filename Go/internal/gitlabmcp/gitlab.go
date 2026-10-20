@@ -168,6 +168,22 @@ func (c ReviewComment) data() map[string]any {
 		"comment": map[string]any{"id": c.ID, "author": c.Author, "path": c.Path, "line": c.Line, "body": c.Body, "url": c.URL}}
 }
 
+// Listed is how far a listing read: Newest is the newest time of anything it listed, wanted
+// or not (in timeLayout, "" when it listed nothing), and Truncated says it stopped at maxPages
+// before it reached since.
+type Listed struct {
+	Newest    string
+	Truncated bool
+}
+
+// saw is l with t seen too.
+func (l Listed) saw(t string) Listed {
+	if t = normalized(t); t > l.Newest {
+		l.Newest = t
+	}
+	return l
+}
+
 // GitLab is what the events ask of GitLab.
 type GitLab interface {
 	// DefaultProject is the project the server's folder pushes to, as group/name.
@@ -175,15 +191,15 @@ type GitLab interface {
 	// OpenMRs are the open merge requests, drafts too, with whether each conflicts.
 	OpenMRs(ctx context.Context, project string) ([]OpenMR, error)
 	// ClosedMRs are merge requests merged, and closed without merging, at or after since.
-	ClosedMRs(ctx context.Context, project, since string) (merged []MergedMR, closed []ClosedMR, truncated bool, err error)
+	ClosedMRs(ctx context.Context, project, since string) (merged []MergedMR, closed []ClosedMR, listed Listed, err error)
 	// FailedPipelines are failed pipelines updated at or after since, in any order.
-	FailedPipelines(ctx context.Context, project, since string) (pipelines []Pipeline, truncated bool, err error)
+	FailedPipelines(ctx context.Context, project, since string) (pipelines []Pipeline, listed Listed, err error)
 	// PipelineDetails is the pipeline's merge request and failed jobs, or nil when it belongs to none.
 	PipelineDetails(ctx context.Context, project string, p Pipeline) (*FailedPipelineData, error)
 	// IssueActivity is what happened to the project's issues at or after since, of one kind.
-	IssueActivity(ctx context.Context, project string, kind IssueKind, since string) (items []IssueActivity, truncated bool, err error)
+	IssueActivity(ctx context.Context, project string, kind IssueKind, since string) (items []IssueActivity, listed Listed, err error)
 	// ReviewComments are the comments on merge requests' diffs made at or after since.
-	ReviewComments(ctx context.Context, project, since string) (comments []ReviewComment, truncated bool, err error)
+	ReviewComments(ctx context.Context, project, since string) (comments []ReviewComment, listed Listed, err error)
 }
 
 // ErrorKind is why a GitLab call failed.

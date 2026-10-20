@@ -293,13 +293,15 @@ func (s *Events) Poll(ctx context.Context, raw json.RawMessage) (map[string]any,
 			return out, err
 		})
 	}
-	return s.poll(e, p, func(since string) ([]candidate, bool, error) { return candidates(ctx, s.GitLab, e.name, a, since) })
+	return s.poll(e, p, func(since string) ([]candidate, Listed, error) { return candidates(ctx, s.GitLab, e.name, a, since) })
 }
 
 // poll is events/poll over a cursor: the first poll (no cursor) gives none and starts from
 // now; later ones give what is new since, oldest first, at most maxEvents, with hasMore and a
-// cursor that goes on from the last one taken.
-func (s *Events) poll(e event, p pollParams, find func(since string) ([]candidate, bool, error)) (map[string]any, *rpcError) {
+// cursor that goes on from the last one taken. A poll that took all there was and was not
+// truncated goes on to the newest the listing saw, wanted or not (P20261020-1): a wait whose
+// filter drops everything would otherwise read all since its last event, every poll.
+func (s *Events) poll(e event, p pollParams, find func(since string) ([]candidate, Listed, error)) (map[string]any, *rpcError) {
 	limit := 50
 	if p.MaxEvents != nil {
 		limit = *p.MaxEvents
@@ -317,7 +319,7 @@ func (s *Events) poll(e event, p pollParams, find func(since string) ([]candidat
 	for _, id := range c.IDs {
 		seen[id] = true
 	}
-	found, truncated, err := find(c.Since)
+	found, listed, err := find(c.Since)
 	if err != nil {
 		return nil, eventsError(err)
 	}
@@ -337,6 +339,9 @@ func (s *Events) poll(e event, p pollParams, find func(since string) ([]candidat
 	since := c.Since
 	if len(taken) > 0 {
 		since = taken[len(taken)-1].time
+	}
+	if !listed.Truncated && len(taken) == len(fresh) && listed.Newest > since {
+		since = listed.Newest
 	}
 	var ids []string
 	if since == c.Since {
@@ -358,7 +363,7 @@ func (s *Events) poll(e event, p pollParams, find func(since string) ([]candidat
 		}
 	}
 	return map[string]any{"events": out, "cursor": cursor{Since: since, IDs: ids}.encoded(),
-		"truncated": truncated, "hasMore": len(fresh) > len(taken), "nextPollMs": nextPollMs}, nil
+		"truncated": listed.Truncated, "hasMore": len(fresh) > len(taken), "nextPollMs": nextPollMs}, nil
 }
 
 func contains(list []string, s string) bool {
@@ -440,15 +445,15 @@ func (s *Events) pollDiff(name, key string, a args, p pollParams, states func() 
 }
 
 // candidates finds what an event may raise at or after since.
-func candidates(ctx context.Context, gl GitLab, name string, a args, since string) ([]candidate, bool, error) {
+func candidates(ctx context.Context, gl GitLab, name string, a args, since string) ([]candidate, Listed, error) {
 	project := a.project
 	wanted := func(m MR, trusted bool) bool {
 		return (a.pr == 0 || m.Number == a.pr) && (a.branch == "" || m.Branch == a.branch) && (a.anyone || trusted)
 	}
 	if kind, ok := strings.CutPrefix(name, "issue."); ok {
-		items, truncated, err := gl.IssueActivity(ctx, project, IssueKind(kind), since)
+		items, listed, err := gl.IssueActivity(ctx, project, IssueKind(kind), since)
 		if err != nil {
-			return nil, false, err
+			return nil, Listed{}, err
 		}
 		var list []candidate
 		for _, it := range items {
@@ -464,13 +469,13 @@ func candidates(ctx context.Context, gl GitLab, name string, a args, since strin
 			list = append(list, candidate{eventID: name + ":" + project + ":" + it.ID, time: at,
 				data: func() (map[string]any, error) { return it.data(), nil }})
 		}
-		return list, truncated, nil
+		return list, listed, nil
 	}
 	switch name {
 	case "review.comment":
-		comments, truncated, err := gl.ReviewComments(ctx, project, since)
+		comments, listed, err := gl.ReviewComments(ctx, project, since)
 		if err != nil {
-			return nil, false, err
+			return nil, Listed{}, err
 		}
 		var list []candidate
 		for _, c := range comments {
@@ -479,11 +484,11 @@ func candidates(ctx context.Context, gl GitLab, name string, a args, since strin
 					data: func() (map[string]any, error) { return c.data(), nil }})
 			}
 		}
-		return list, truncated, nil
+		return list, listed, nil
 	case "checks.failed":
-		pipelines, truncated, err := gl.FailedPipelines(ctx, project, since)
+		pipelines, listed, err := gl.FailedPipelines(ctx, project, since)
 		if err != nil {
-			return nil, false, err
+			return nil, Listed{}, err
 		}
 		// A pipeline that names another merge request is skipped before its details are
 		// fetched; one that names none is checked against the one its details find. The cursor
@@ -509,11 +514,11 @@ func candidates(ctx context.Context, gl GitLab, name string, a args, since strin
 					return details.json(), nil
 				}})
 		}
-		return list, truncated, nil
+		return list, listed, nil
 	}
-	merged, closed, truncated, err := gl.ClosedMRs(ctx, project, since)
+	merged, closed, listed, err := gl.ClosedMRs(ctx, project, since)
 	if err != nil {
-		return nil, false, err
+		return nil, Listed{}, err
 	}
 	var list []candidate
 	if name == "pr.merged" {
@@ -525,7 +530,7 @@ func candidates(ctx context.Context, gl GitLab, name string, a args, since strin
 					}})
 			}
 		}
-		return list, truncated, nil
+		return list, listed, nil
 	}
 	// Its close time in the id: a merge request reopened and closed again is a new event.
 	for _, c := range closed {
@@ -536,7 +541,7 @@ func candidates(ctx context.Context, gl GitLab, name string, a args, since strin
 				}})
 		}
 	}
-	return list, truncated, nil
+	return list, listed, nil
 }
 
 // eventsError is a GitLab failure as the events draft's error codes.
