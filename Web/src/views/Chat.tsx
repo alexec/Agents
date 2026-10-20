@@ -821,6 +821,9 @@ function QuietLine({ since }: { since: Date }) {
  * Find in Chat (ChatFindBar, #1532): what was said in the open chat, found by its host, newest match
  * first. Enter and ↑ go back through the chat, Shift-Enter and ↓ come forward, Escape closes it.
  */
+/** Said in the count's place when the host could not search (#1680), as ChatFindBar.failed says it. */
+const findFailed = "Couldn't search this chat";
+
 function FindBar({ store, host, agentID, close }: { store: Store; host: string; agentID: string; close: () => void }) {
   const text = useSignal("");
   // Focused once, when the bar opens (#1678), not on every render of the chat under it.
@@ -828,6 +831,8 @@ function FindBar({ store, host, agentID, close }: { store: Store; host: string; 
   useEffect(() => { field.current?.focus(); }, []);
   const result = useSignal<FindResult | null>(null);
   const at = useSignal<number | null>(null);
+  /** The last search did not reach the host, or the host could not do it (#1680). */
+  const failed = useSignal(false);
   const go = async (match: FindMatch) => {
     await store.loadUntil(match.index);
     focusedIndex.value = match.index;
@@ -839,12 +844,20 @@ function FindBar({ store, host, agentID, close }: { store: Store; host: string; 
     if (!words) {
       result.value = null;
       at.value = null;
+      failed.value = false;
       return;
     }
     let gone = false;
     const timer = setTimeout(() => {
       void store.find(host, agentID, words).then((found) => {
-        if (gone || !found) return;
+        if (gone) return;
+        // Not the last search's count: that would be read as this one's (#1680).
+        failed.value = !found;
+        if (!found) {
+          result.value = null;
+          at.value = null;
+          return;
+        }
         result.value = found;
         at.value = found.matches.length ? found.matches.length - 1 : null;
         if (at.value !== null) void go(found.matches[at.value]!);
@@ -860,7 +873,7 @@ function FindBar({ store, host, agentID, close }: { store: Store; host: string; 
     at.value = next;
     void go(matches[next]!);
   };
-  const count = !result.value ? null : at.value === null ? "No matches"
+  const count = failed.value ? findFailed : !result.value ? null : at.value === null ? "No matches"
     : `${at.value + 1} of ${matches.length}${result.value.more ? "+" : ""}`;
   return (
     <div class="find-bar" role="search">

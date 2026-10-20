@@ -8,6 +8,10 @@ import SwiftUI
 /// Starts at the newest match. Return and ↑ go back through the chat, ⇧Return and ↓ come
 /// forward, Escape closes it.
 struct ChatFindBar: View {
+    /// Said in the count's place when the host could not search (#1680): away, or too old
+    /// for `agents/find`. The page says the same (`findFailed` in `Web/src/views/Chat.tsx`).
+    static let failed = "Couldn't search this chat"
+
     let agentID: UUID
     let search: @MainActor (String) async -> DaemonAPI.FindResult?
     let go: @MainActor (DaemonAPI.FindMatch) async -> Void
@@ -17,6 +21,8 @@ struct ChatFindBar: View {
     @State private var result: DaemonAPI.FindResult?
     /// The match on show, by its place in `result.matches`.
     @State private var at: Int?
+    /// The last search did not reach the host, or the host could not do it (#1680).
+    @State private var searchFailed = false
     @FocusState private var focused: Bool
 
     var body: some View {
@@ -62,20 +68,36 @@ struct ChatFindBar: View {
             guard !words.isEmpty else {
                 result = nil
                 at = nil
+                searchFailed = false
                 return
             }
             try? await Task.sleep(for: .milliseconds(250))
-            guard !Task.isCancelled, let found = await search(words), !Task.isCancelled else { return }
+            guard !Task.isCancelled else { return }
+            let found = await search(words)
+            guard !Task.isCancelled else { return }
+            // Not the last search's count: that would be read as this one's (#1680).
+            guard let found else {
+                result = nil
+                at = nil
+                searchFailed = true
+                return
+            }
+            searchFailed = false
             result = found
             at = found.matches.isEmpty ? nil : found.matches.count - 1
             if let at { await go(found.matches[at]) }
         }
         .onChange(of: agentID) { close() }
+        // Said to VoiceOver as it changes, as the page's aria-live says it (#1680).
+        .onChange(of: count) { _, words in
+            if let words { AccessibilityNotification.Announcement(words).post() }
+        }
     }
 
-    /// "3 of 12", "No matches", or nothing before anything is typed. "12+" when older
-    /// matches were left out.
+    /// "3 of 12", "No matches", "Couldn't search this chat", or nothing before anything is
+    /// typed. "12+" when older matches were left out.
     private var count: String? {
+        if searchFailed { return Self.failed }
         guard let result else { return nil }
         guard let at else { return "No matches" }
         return "\(at + 1) of \(result.matches.count)\(result.more ? "+" : "")"
