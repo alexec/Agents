@@ -17,6 +17,7 @@ control exchange. The Mac window, the Remote, `Shared/UI`, the web page, Agents 
 | `internal/safe/` | Recover helpers: one panic never takes a host or the control plane down | build |
 | `cmd/github-mcp/`, `internal/githubmcp/` | The `github` MCP server (#1232): the official github-mcp-server's tools, as a library, and the ci server's events | ci-server |
 | `cmd/linear-mcp/`, `internal/linearmcp/` | The `linear` MCP server (#839): Linear's issue events, in github-mcp's shape (tools are Linear's own server's) | ci-server |
+| `cmd/gitlab-mcp/`, `internal/gitlabmcp/` | The `gitlab` MCP server (#1629): merge requests, pipelines and issues on GitLab, tools and events on REST v4 | gitlab |
 | `cmd/workspace-commands/`, `internal/workspacecommands/` | The command workspace provider (#691, in Go since #1364): workspaces as shell commands and presets, an MCP server the control plane runs | workspaces |
 
 ## Building and testing
@@ -124,6 +125,29 @@ marketplace; this server runs beside agentsd with a personal API key in `LINEAR_
 It reads Linear's GraphQL API (`LINEAR_MCP_API_URL` moves it, for a fake). Agents Host carries
 it (`scripts/go-github-mcp.sh linear-mcp`) and every Linux host installs
 `linear-mcp-linux-<arch>`. See `docs/how-to/use-linear-issues.md`.
+
+## The gitlab MCP server (`gitlab-mcp`, #1629)
+
+The github server's shape for GitLab: a stdio front (`gitlabmcp.Front`) answers
+`events/list` and `events/poll` and passes everything else to a go-sdk server with our own
+tools, all over GitLab's REST API v4 with one token, `GITLAB_TOKEN` (an access token with the
+`api` scope; the sign-in comes with #1630). `GITLAB_URL` (or `--url`) is the GitLab:
+`https://gitlab.com` when empty, or a self-managed one. GitLab's own MCP server
+(`/api/v4/mcp`) is not behind it: it takes no classic access token and needs "Allow access
+to the MCP server" turned on for the top-level group or the instance.
+
+- **Events**, polled every 30 s, with the github server's names, cursor and paging; a merge
+  request is a `pr` (its iid is `number`): `checks.failed` (a merge request's failed
+  pipeline), `pr.opened`, `pr.merged`, `pr.closed`, `pr.conflicted`, `review.comment` (a
+  comment on a line of the diff), `issue.opened`, `issue.commented`, `issue.closed`.
+  Arguments `project` (a path, as `group/sub/app`, or an id; left out, the project this
+  folder pushes to), `branch`, `pr`, `label`, `issue` and `anyone`; left out, only the
+  project's members with Reporter access or more count, never a bot or a fork (#728).
+- **Tools:** `list_merge_requests`, `get_merge_request`, `list_pipelines`, `get_pipeline`,
+  `list_issues`, `get_issue`, `comment_on_merge_request`, `comment_on_issue`, and
+  `merge_merge_request`, which only a view may call (a person merges, as on GitHub).
+
+The tests run it against a fake GitLab over HTTP (`fake_test.go`).
 
 ## The command workspace provider (`workspace-commands`, #691, #1364)
 
