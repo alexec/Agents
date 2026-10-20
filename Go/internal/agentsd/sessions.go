@@ -458,6 +458,11 @@ func (d *Daemon) readSession(caller wire.UUID, args map[string]json.RawMessage) 
 	if err != nil {
 		return sessionUnavailable, nil
 	}
+	return history(a, entries, historyHeader(a)), nil
+}
+
+// history is a session's record as read_session gives it, under header.
+func history(a *wire.Agent, entries []wire.TranscriptEntry, header string) string {
 	// The first turn whole, then from the end back at most historyBytes of the rest
 	// (HistoryLines), so a long session is not read whole.
 	firstEnd := len(entries)
@@ -497,7 +502,7 @@ func (d *Daemon) readSession(caller wire.UUID, args map[string]json.RawMessage) 
 	for _, e := range entries[start:] {
 		b.add(e)
 	}
-	return b.document(historyHeader(a)), nil
+	return b.document(header)
 }
 
 // messagePreface is what the target's runtime reads before the words.

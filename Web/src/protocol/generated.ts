@@ -175,6 +175,11 @@ export interface Agent {
   runtimeTitle?: string;
   madeInRoot?: string;
   queuedStart?: QueuedStart;
+  /**
+   * The session this one was branched from at one of its prompts (#1658). Until it has a
+   * conversation of its own, its runtime reads the record it was given ahead of its first prompt.
+   */
+  branchedFrom?: UUID;
 }
 
 export type AgentArchivedReason = "byUser" | "byAgent";
@@ -466,6 +471,15 @@ export interface Block {
 export type BlockClearing = "waits" | "time" | "dropped";
 
 export type BlockWakeOn = "any" | "all";
+
+/**
+ * agents/branchFrom (#1658): a new session that goes on from just before the person's prompt
+ * `entryID` in `agentID`.
+ */
+export interface BranchFromRequest {
+  agentID: UUID;
+  entryID: UUID;
+}
 
 export interface BranchSummary {
   name: string;
@@ -4612,6 +4626,7 @@ export type WriteFailureCause = "diskFull" | "notAllowed" | "readOnly";
 export interface Methods {
   "agents/answerSandbox": { params: AnswerSandboxRequest; result: Agent };
   "agents/archive": { params: AgentRequest; result: Empty };
+  "agents/branchFrom": { params: BranchFromRequest; result: UUID };
   "agents/continueInProject": { params: ContinueInProjectRequest; result: UUID };
   "agents/delete": { params: AgentRequest; result: Empty };
   "agents/discardDraft": { params: DiscardDraftRequest; result: Empty };
@@ -4759,6 +4774,7 @@ export interface Methods {
 export const MethodTarget = {
   "agents/answerSandbox": "host",
   "agents/archive": "host",
+  "agents/branchFrom": "host",
   "agents/continueInProject": "host",
   "agents/delete": "host",
   "agents/discardDraft": "host",
@@ -4943,7 +4959,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ACPProviderInfo: { required: ["id"], optional: ["name", "protocol", "configured"] },
   Admitted: { required: [], optional: ["client", "host", "grant"] },
   AdoptRequest: { required: ["runtimeID", "sessionID", "cwd"], optional: [] },
-  Agent: { required: ["id", "runtimeID", "cwd", "state", "startOptions", "advertisedOptions", "availableCommands", "createdAt", "lastActivityAt"], optional: ["title", "labels", "runtimeSessionID", "isUnread", "reportSeenAt", "endedReason", "archivedReason", "usage", "lastTurnUsage", "costToDate", "costCeiling", "tokensToDate", "tokenCeiling", "plans", "background", "additionalDirectories", "mcpServers", "queuedPrompts", "suggestedPrompts", "startedByWorkflow", "purpose", "startedByRun", "startedByAgent", "chainDepth", "eventWait", "worktree", "pendingMove", "startingPoint", "startRequestID", "persona", "restartPickUps", "report", "outcomeAsked", "archiveRequest", "afterTurn", "archivedAt", "sandboxOverride", "effectiveSandbox", "pendingSandboxFailure", "missingFolder", "listsLeftOut", "titleIsPersons", "runtimeTitle", "madeInRoot", "queuedStart"] },
+  Agent: { required: ["id", "runtimeID", "cwd", "state", "startOptions", "advertisedOptions", "availableCommands", "createdAt", "lastActivityAt"], optional: ["title", "labels", "runtimeSessionID", "isUnread", "reportSeenAt", "endedReason", "archivedReason", "usage", "lastTurnUsage", "costToDate", "costCeiling", "tokensToDate", "tokenCeiling", "plans", "background", "additionalDirectories", "mcpServers", "queuedPrompts", "suggestedPrompts", "startedByWorkflow", "purpose", "startedByRun", "startedByAgent", "chainDepth", "eventWait", "worktree", "pendingMove", "startingPoint", "startRequestID", "persona", "restartPickUps", "report", "outcomeAsked", "archiveRequest", "afterTurn", "archivedAt", "sandboxOverride", "effectiveSandbox", "pendingSandboxFailure", "missingFolder", "listsLeftOut", "titleIsPersons", "runtimeTitle", "madeInRoot", "queuedStart", "branchedFrom"] },
   AgentRemovedNotification: { required: ["agentID"], optional: [] },
   AgentRequest: { required: ["agentID"], optional: [] },
   AgentWorkspaces: { required: ["providers"], optional: [] },
@@ -4975,6 +4991,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   AuthenticateRequest: { required: ["runtimeID", "methodID"], optional: [] },
   BackgroundItem: { required: ["id", "kind", "name", "state", "canStop", "isStopping", "startedAt"], optional: ["taskType", "detail", "command", "parentID", "toolCallID", "outputFilePath", "summary", "lastToolName", "endedAt"] },
   Block: { required: ["waits"], optional: ["checkAgainAt", "wakeOn", "clearedAt", "clearedBy"] },
+  BranchFromRequest: { required: ["agentID", "entryID"], optional: [] },
   BranchSummary: { required: ["name"], optional: ["remote"] },
   BringBack: { required: ["moved", "applied"], optional: [] },
   BringBackRequest: { required: ["folder", "branches"], optional: ["bundle", "patch", "patchOn"] },

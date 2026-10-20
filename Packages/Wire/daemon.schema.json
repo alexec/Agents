@@ -298,6 +298,10 @@
         },
         "queuedStart": {
           "$ref": "#/definitions/QueuedStart"
+        },
+        "branchedFrom": {
+          "$ref": "#/definitions/UUID",
+          "description": "The session this one was branched from at one of its prompts (#1658). Until it has a conversation of its own, its runtime reads the record it was given ahead of its first prompt."
         }
       },
       "required": [
@@ -1393,6 +1397,23 @@
         "any",
         "all"
       ]
+    },
+    "BranchFromRequest": {
+      "type": "object",
+      "description": "agents/branchFrom (#1658): a new session that goes on from just before the person's prompt `entryID` in `agentID`.",
+      "properties": {
+        "agentID": {
+          "$ref": "#/definitions/UUID"
+        },
+        "entryID": {
+          "$ref": "#/definitions/UUID"
+        }
+      },
+      "required": [
+        "agentID",
+        "entryID"
+      ],
+      "additionalProperties": false
     },
     "BranchSummary": {
       "type": "object",

@@ -73,6 +73,46 @@ func TestReplayAccountsForEdits(t *testing.T) {
 	}
 }
 
+func TestBranchingFromAPrompt(t *testing.T) {
+	d, c := start(t, t.TempDir())
+	defer d.Shutdown()
+	session := "fake-session"
+	title := "Plan"
+	a := seeded(t, d, t.TempDir(), func(a *wire.Agent) { a.RuntimeSessionID, a.Title = &session, &title })
+	ask := func(text string) wire.UUID {
+		id := store.NewUUID()
+		d.Store.Append(a.ID, wire.TranscriptEntry{ID: id, At: now(), Kind: wire.TranscriptEntryKind{UserMessage: &wire.TranscriptEntryKindUserMessage{Value: text}}})
+		d.Store.Append(a.ID, wire.TranscriptEntry{ID: store.NewUUID(), At: now(), Kind: wire.TranscriptEntryKind{AgentMessage: &wire.TranscriptEntryKindAgentMessage{Text: "Done: " + text}}})
+		return id
+	}
+	ask("Make the cache")
+	second := ask("Make it faster")
+	ask("Make it smaller")
+	var id wire.UUID
+	json.Unmarshal(c.call(t, 1, "agents/branchFrom", map[string]any{"agentID": a.ID, "entryID": second}), &id)
+	b := d.Store.Agent(id)
+	if b == nil || b.RuntimeSessionID != nil || b.BranchedFrom == nil || *b.BranchedFrom != a.ID || *b.Title != "Plan (branch)" {
+		t.Fatalf("%+v", b)
+	}
+	entries, _, _ := d.Store.Transcript(id, 0)
+	if len(entries) != 3 || entries[0].Kind.UserMessage.Value != "Make the cache" || entries[2].Kind.RuntimeNote.Value != "Branched from Plan before its prompt 2." {
+		t.Fatalf("%+v", entries)
+	}
+	// Its runtime reads the record ahead of the first prompt, and only until it has a conversation.
+	p := d.branchPreface(b)
+	if p == nil || !strings.Contains(*p, "Done: Make the cache") || strings.Contains(*p, "Make it faster") {
+		t.Fatalf("%v", p)
+	}
+	other := "theirs"
+	b.RuntimeSessionID = &other
+	if d.branchPreface(b) != nil || d.branchPreface(&a) != nil {
+		t.Fatal("a preface for a conversation of its own")
+	}
+	if e := c.callError(t, 2, "agents/branchFrom", map[string]any{"agentID": a.ID, "entryID": store.NewUUID()}); e.Message != "That prompt is not in this session's record." {
+		t.Fatalf("%+v", e)
+	}
+}
+
 func TestForkingAConversation(t *testing.T) {
 	fakeRuntimes(t)
 	d, c := start(t, t.TempDir())

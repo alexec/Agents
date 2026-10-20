@@ -228,6 +228,10 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
     /// asked for, kept so the daemon makes that agent later, after a restart too. Set
     /// only while `state` is `queued`. Its prompt is the first of `queuedPrompts`.
     public var queuedStart: QueuedStart?
+    /// The session this one was branched from at one of its prompts (#1658). Until it has a
+    /// conversation of its own, its runtime reads the record it was given ahead of its
+    /// first prompt.
+    public var branchedFrom: UUID?
     /// The three lists that are nearly all of a record — the options and commands the
     /// runtime advertised, and the plans — are empty here and still on disk (051). An
     /// archived agent nobody is reading is held this way: 1.4 KB rather than 24.
@@ -397,6 +401,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         runtimeTitle = (try? c.decodeIfPresent(String.self, forKey: .runtimeTitle)) ?? nil
         madeInRoot = (try? c.decodeIfPresent(String.self, forKey: .madeInRoot)) ?? nil
         queuedStart = (try? c.decodeIfPresent(QueuedStart.self, forKey: .queuedStart)) ?? nil
+        branchedFrom = (try? c.decodeIfPresent(UUID.self, forKey: .branchedFrom)) ?? nil
         // Only the keys this build does not know are read as open-ended values.
         // Reading the whole record that way too — which is what this did — decoded
         // every option, command and plan a second time, for every agent, on every
@@ -474,6 +479,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         try c.encodeIfPresent(runtimeTitle, forKey: .runtimeTitle)
         try c.encodeIfPresent(madeInRoot, forKey: .madeInRoot)
         try c.encodeIfPresent(queuedStart, forKey: .queuedStart)
+        try c.encodeIfPresent(branchedFrom, forKey: .branchedFrom)
         // Whatever a newer version wrote, written back out beside our own fields.
         if !unknownFields.isEmpty {
             var extra = encoder.container(keyedBy: AnyKey.self)
@@ -514,6 +520,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         case titleIsPersons, runtimeTitle
         case madeInRoot
         case queuedStart
+        case branchedFrom
     }
 
     struct AnyKey: CodingKey {

@@ -6,6 +6,7 @@ package wire
 var (
 	CallAgentsAnswerSandbox            = Method[AnswerSandboxRequest, Agent]{"agents/answerSandbox"}
 	CallAgentsArchive                  = Method[AgentRequest, Empty]{"agents/archive"}
+	CallAgentsBranchFrom               = Method[BranchFromRequest, UUID]{"agents/branchFrom"}
 	CallAgentsContinueInProject        = Method[ContinueInProjectRequest, UUID]{"agents/continueInProject"}
 	CallAgentsDelete                   = Method[AgentRequest, Empty]{"agents/delete"}
 	CallAgentsDiscardDraft             = Method[DiscardDraftRequest, Empty]{"agents/discardDraft"}

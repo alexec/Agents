@@ -865,6 +865,51 @@ struct WebFixturesTests {
         }
     }
 
+    /// The Prompts list (#1658): a row for each of the person's prompts, with its turn's cost,
+    /// time and ending, and the filter.
+    @Test func sessionPrompts() throws {
+        let ask = { (n: Int, text: String) in Self.entry(n, .userMessage(text)) }
+        let spent = { (n: Int, amount: Decimal) in
+            Self.entry(n, .usageRecorded(TurnUsage(cost: Cost(amount: amount, currency: "USD"))))
+        }
+        let turns = [
+            TurnSummary.of([ask(1, "\n  Make the cache\nwith a bound"), spent(2, 0.25), spent(3, 0.5),
+                            Self.entry(4, .agentMessage(messageID: nil, text: "Made."))], start: 0),
+            TurnSummary.of([ask(5, "Make it faster"), Self.entry(6, .stateChanged(.stopped, reason: .cancelled))], start: 4),
+            TurnSummary.of([Self.entry(7, .userMessage("from a helper", from: .agent)),
+                            Self.entry(8, .agentMessage(messageID: nil, text: "Noted."))], start: 6),
+            TurnSummary.of([ask(9, "Run the tests")], start: 8),
+        ]
+        // The held entries go on from the last stored turn, a copy of it first.
+        let entries = [ask(9, "Run the tests"), Self.entry(10, .stateChanged(.stopped, reason: .processDied)),
+                       ask(11, "Ship it"), Self.entry(12, .userMessage("Did it work?", from: .app)),
+                       Self.entry(13, .agentMessage(messageID: nil, text: "Shipping."))]
+        let input = { (running: Bool, query: String?) in
+            JSONValue.object(["turns": try Self.encode(turns), "entries": try Self.encode(entries), "isRunning": .bool(running),
+                              "query": query.map(JSONValue.string) ?? .null])
+        }
+        let encoded = { (prompts: [SessionPrompt]) -> JSONValue in
+            .array(try prompts.map { prompt in
+                .object(["id": .string(prompt.id.uuidString), "number": .int(prompt.number), "title": .string(prompt.title),
+                         "cost": try prompt.cost.map(Self.encode) ?? .null, "seconds": prompt.seconds.map { .int($0) } ?? .null,
+                         "ending": prompt.ending.map { .string($0.rawValue) } ?? .null])
+            })
+        }
+        func prompts(_ input: JSONValue) throws -> [SessionPrompt] {
+            SessionPrompts.of(turns: try (input["turns"] ?? .null).decode([TurnSummary].self),
+                              entries: try (input["entries"] ?? .null).decode([TranscriptEntry].self),
+                              isRunning: input["isRunning"]?.boolValue ?? false)
+        }
+        try pin("prompts/list.json", [Case(name: "the last turn running", input: try input(true, nil)),
+                                      Case(name: "every turn over", input: try input(false, nil))]) { input in
+            try encoded(try prompts(input))
+        }
+        let queries = [("words in two", "make"), ("another case", "SHIP"), ("nothing typed", "  "), ("no match", "deploy")]
+        try pin("prompts/filter.json", try queries.map { Case(name: $0, input: try input(false, $1)) }) { input in
+            .array(SessionPrompts.filtered(try prompts(input), by: input["query"]?.stringValue ?? "").map { .int($0.number) })
+        }
+    }
+
     /// Quote in Prompt (#1553): the quote after what is typed, an empty line between.
     @Test func promptQuote() throws {
         let steps: [(String, String, String)] = [

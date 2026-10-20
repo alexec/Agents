@@ -99,6 +99,8 @@ type Agent struct {
 	RuntimeTitle          *string               `json:"runtimeTitle,omitzero"`
 	MadeInRoot            *string               `json:"madeInRoot,omitzero"`
 	QueuedStart           *QueuedStart          `json:"queuedStart,omitzero"`
+	// The session this one was branched from at one of its prompts (#1658). Until it has a conversation of its own, its runtime reads the record it was given ahead of its first prompt.
+	BranchedFrom *UUID `json:"branchedFrom,omitzero"`
 }
 
 type AgentArchivedReason string
@@ -523,6 +525,12 @@ const (
 	BlockWakeOnAny BlockWakeOn = "any"
 	BlockWakeOnAll BlockWakeOn = "all"
 )
+
+// agents/branchFrom (#1658): a new session that goes on from just before the person's prompt `entryID` in `agentID`.
+type BranchFromRequest struct {
+	AgentID UUID `json:"agentID"`
+	EntryID UUID `json:"entryID"`
+}
 
 type BranchSummary struct {
 	Name   string  `json:"name"`
