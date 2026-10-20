@@ -3070,6 +3070,13 @@
         },
         "epoch": {
           "type": "integer"
+        },
+        "capabilities": {
+          "type": "array",
+          "description": "The capabilities this client has (#1748). None from a client older than #1748, or from a host, which says its own in host/hello.",
+          "items": {
+            "type": "string"
+          }
         }
       },
       "required": [
@@ -3211,6 +3218,20 @@
         },
         "implementation": {
           "type": "string"
+        },
+        "capabilities": {
+          "type": "array",
+          "description": "The capabilities this host said in its last host/hello (#1748). None from a host older than #1748.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "missing": {
+          "type": "array",
+          "description": "Of the control plane's required capabilities for hosts, the ones this host does not have (#1748). Its state is then needsUpdate.",
+          "items": {
+            "type": "string"
+          }
         }
       },
       "required": [
@@ -3347,6 +3368,16 @@
           "items": {
             "$ref": "#/definitions/HostTunnelChanged"
           }
+        },
+        "capabilities": {
+          "type": "array",
+          "description": "The capabilities the control plane has (#1748).",
+          "items": {
+            "type": "string"
+          }
+        },
+        "required": {
+          "$ref": "#/definitions/RequiredCapabilities"
         }
       },
       "required": [
@@ -5957,6 +5988,13 @@
         },
         "implementation": {
           "type": "string"
+        },
+        "capabilities": {
+          "type": "array",
+          "description": "The capabilities this host has (#1748): each one whose methods it all serves, and the ones it declares. None from a host older than #1748.",
+          "items": {
+            "type": "string"
+          }
         }
       },
       "required": [
@@ -9621,6 +9659,29 @@
         "entryIndex",
         "replaceAll",
         "at"
+      ],
+      "additionalProperties": false
+    },
+    "RequiredCapabilities": {
+      "type": "object",
+      "description": "What the control plane needs of a peer to route for it (#1748): a host without each of host is needsUpdate, and a client without each of client is answered -32008.",
+      "properties": {
+        "host": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "client": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "host",
+        "client"
       ],
       "additionalProperties": false
     },

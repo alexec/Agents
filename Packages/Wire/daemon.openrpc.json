@@ -5,6 +5,13 @@
     "version": "0",
     "description": "The methods a host (agentsd) answers, sent to it with `h`. Every method's params are its one `params` value, sent as JSON-RPC's whole params (an object, or for a few a bare value), as DaemonAPI sends them. A method with `x-notification` has no result: the server sends it. The `web` tag marks what the web page calls and hears (DaemonAPI.WebSignatures); a method a Go step ports joins with its types, schema first."
   },
+  "x-declared-capabilities": [
+    {
+      "name": "host.wire/1",
+      "by": "host",
+      "description": "A host says host/hello with its capabilities on each connect (#1748). The control plane requires it of hosts."
+    }
+  ],
   "methods": [
     {
       "name": "agents/answerSandbox",

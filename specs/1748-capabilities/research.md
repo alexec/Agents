@@ -34,7 +34,8 @@ Each item is a decision for this lane. Those that change what Alex sees or the w
 ## R4. Where each peer sends its list
 
 - **Decision:**
-  - a host: `capabilities` in `HostHello` (each connect) and `HostAnnounce` (enrolment);
+  - a host: `capabilities` in `HostHello`, on each connect (not in `HostAnnounce`: a
+    `host/hello` follows each enrolment);
   - a client: `capabilities` in `ControlAuth`, the auth line of every connection;
   - the control plane: `capabilities` and `required` (`{host, client}`) in `ControlStatus`, and
     each host's list as `capabilities` on `ControlHost`.
@@ -57,21 +58,24 @@ Each item is a decision for this lane. Those that change what Alex sees or the w
 - **Decision:** a capability is in a Go server's list when it registers each method of its own
   document that names it (`d.handlers` for `agentsd`; the control plane's dispatch for
   `agents-control`). Notifications do not take part: the server's document says what it sends.
-  Capabilities with no method (`client.wire/1`, and others later) are declared by hand.
+  Capabilities with no method are declared by hand, in each document's top-level
+  `x-declared-capabilities` (`{name, by, description}`, `by` is host, client or control), so
+  the generator makes their constants too: `host.wire/1` (daemon) and `client.wire/1` (control).
 - **Rationale:** FR-007; a host that ports only part of a feature does not claim it.
 
 ## R7. The required sets
 
-- **Decision:** for hosts, every capability of a method that the control plane calls on a host
-  (`host/*` on channel 0); for clients, `client.wire/1`. Both are a hand-kept list in
-  `Go/internal/controlplane`, which a test checks against the generated names.
+- **Decision:** `host.wire/1` for hosts and `client.wire/1` for clients, in
+  `Go/internal/controlplane/capabilities.go`. Each says the peer speaks today's wire with a list.
 - **Rationale:** rule 6: the required set is the minimum the control plane routes, and it moves
-  only when a capability number is removed.
+  only when a capability number is removed. Today every peer with a list can be routed, so the
+  set is the two declared names; the day a release removes `files/1`, `files/2` joins it.
+- **Alternatives:** every method capability a host serves today (a host that ports a little less
+  on Linux, such as `devices/1`, would show "Needs an update" for a feature it never had).
 
 ## R8. `-32008` for a client
 
-- **Decision:** the exchange still succeeds. Each call except `control/status` and
-  `control/ping` is answered `-32008` with `data: {missing: [...], update: "<version>"}`.
+- **Decision:** the exchange still succeeds. Each call except `control/status` is answered `-32008` with `data: {missing: [...], update: "<version>"}`.
   The clients show one "Update this app" notice for it.
 - **Rationale:** the exchange's refusals are reasons for a bad identity, not for an old build,
   and a refused socket gives the client nothing to show.

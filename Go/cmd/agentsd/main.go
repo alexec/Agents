@@ -218,7 +218,7 @@ func join(ctx context.Context, cl commandLine, d *agentsd.Daemon) {
 		name, _ = os.Hostname()
 	}
 	hello := controllink.HostHello{Version: buildinfo.Version, Platform: platform(), MachineID: machine.ID(),
-		Implementation: new(buildinfo.Implementation)}
+		Implementation: new(buildinfo.Implementation), Capabilities: d.Capabilities()}
 	if name != "" {
 		hello.Name = &name
 	}

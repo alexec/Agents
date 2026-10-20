@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/alexec/agents/Go/internal/safe"
+	"github.com/alexec/agents/Go/wire"
 )
 
 // ClientMembership is what a paired client keeps to dial again.
@@ -21,6 +22,8 @@ type ClientMembership struct {
 	URL        string `json:"url"`
 	Pin        string `json:"pin,omitempty"`
 	Name       string `json:"name"`
+	// What it says it has when it connects (#1748); nil says what a client declares.
+	Capabilities []string `json:"-"`
 }
 
 // PairClient uses a client code once (clients/announce), as a window does.
@@ -91,7 +94,12 @@ func DialClient(ctx context.Context, m *ClientMembership) (*Session, error) {
 		return nil, err
 	}
 	epoch := 0
-	l, _, err := Join(ctx, m.URL, m.Pin, Credentials{Identity: "c:" + m.Client, Key: key, Kind: "mac", ControlKey: m.ControlKey, Epoch: &epoch})
+	capabilities := m.Capabilities
+	if capabilities == nil {
+		capabilities = wire.DeclaredCapabilities["client"]
+	}
+	l, _, err := Join(ctx, m.URL, m.Pin, Credentials{Identity: "c:" + m.Client, Key: key, Kind: "mac", ControlKey: m.ControlKey, Epoch: &epoch,
+		Capabilities: capabilities})
 	if err != nil {
 		return nil, err
 	}

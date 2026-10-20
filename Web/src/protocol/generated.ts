@@ -1104,6 +1104,11 @@ export interface ControlAuth {
   kind: string;
   for?: string;
   epoch?: number;
+  /**
+   * The capabilities this client has (#1748). None from a client older than #1748, or from a host,
+   * which says its own in host/hello.
+   */
+  capabilities?: string[];
 }
 
 /**
@@ -1155,6 +1160,16 @@ export interface ControlHost {
   tunnel?: HostTunnel;
   workspace?: HostWorkspace;
   implementation?: string;
+  /**
+   * The capabilities this host said in its last host/hello (#1748). None from a host older than
+   * #1748.
+   */
+  capabilities?: string[];
+  /**
+   * Of the control plane's required capabilities for hosts, the ones this host does not have
+   * (#1748). Its state is then needsUpdate.
+   */
+  missing?: string[];
 }
 
 /** control/installProgress: a step of Add a Server. */
@@ -1223,6 +1238,9 @@ export interface ControlStatus {
   thisMacHost?: HostJoinStatus;
   projectDetection?: ProjectDetection;
   unjoinedTunnels?: HostTunnelChanged[];
+  /** The capabilities the control plane has (#1748). */
+  capabilities?: string[];
+  required?: RequiredCapabilities;
 }
 
 export interface Cost {
@@ -1956,6 +1974,11 @@ export interface HostHello {
   name?: string;
   relay?: boolean;
   implementation?: string;
+  /**
+   * The capabilities this host has (#1748): each one whose methods it all serves, and the ones it
+   * declares. None from a host older than #1748.
+   */
+  capabilities?: string[];
 }
 
 /**
@@ -3304,6 +3327,15 @@ export interface ReportedEdit {
   entryIndex: number;
   replaceAll: boolean;
   at: WireDate;
+}
+
+/**
+ * What the control plane needs of a peer to route for it (#1748): a host without each of host is
+ * needsUpdate, and a client without each of client is answered -32008.
+ */
+export interface RequiredCapabilities {
+  host: string[];
+  client: string[];
 }
 
 export type ResetRule =
@@ -5100,18 +5132,18 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ConnectorWorkflow: { required: ["id", "name"], optional: [] },
   ContentBlockAnnotations: { required: [], optional: ["audience", "priority"] },
   ContinueInProjectRequest: { required: ["agentID", "text", "attachments"], optional: ["requestID"] },
-  ControlAuth: { required: ["id", "nonce", "mac", "kind"], optional: ["for", "epoch"] },
+  ControlAuth: { required: ["id", "nonce", "mac", "kind"], optional: ["for", "epoch", "capabilities"] },
   ControlClientChanged: { required: [], optional: ["client", "removed"] },
   ControlCodeShown: { required: ["text", "expires"], optional: ["command"] },
   ControlEndpoint: { required: ["url"], optional: ["pin"] },
   ControlHello: { required: ["v", "name", "control", "nonce", "copy"], optional: [] },
-  ControlHost: { required: ["id", "name", "platform", "version", "state", "reach"], optional: ["machineID", "relay", "signInFrom", "gitFrom", "gitAsks", "tunnel", "workspace", "implementation"] },
+  ControlHost: { required: ["id", "name", "platform", "version", "state", "reach"], optional: ["machineID", "relay", "signInFrom", "gitFrom", "gitAsks", "tunnel", "workspace", "implementation", "capabilities", "missing"] },
   ControlInstallProgress: { required: ["name", "step"], optional: [] },
   ControlMoved: { required: ["url", "controlKey", "name"], optional: ["pin"] },
   ControlOK: { required: ["mac"], optional: ["grant", "host", "relayed", "endpoints", "epoch"] },
   ControlPush: { required: ["sealed"], optional: [] },
   ControlPushItem: { required: ["needID", "alert"], optional: ["headline"] },
-  ControlStatus: { required: ["name", "version", "machineID"], optional: ["homeHost", "startedAt", "port", "awayFromHome", "you", "relayKey", "web", "publicWeb", "publicViews", "thisMacHost", "projectDetection", "unjoinedTunnels"] },
+  ControlStatus: { required: ["name", "version", "machineID"], optional: ["homeHost", "startedAt", "port", "awayFromHome", "you", "relayKey", "web", "publicWeb", "publicViews", "thisMacHost", "projectDetection", "unjoinedTunnels", "capabilities", "required"] },
   Cost: { required: ["amount", "currency"], optional: [] },
   CostLimits: { required: [], optional: ["perAgent", "daily", "perAgentTokens", "dailyTokens"] },
   CostState: { required: ["limits", "today", "day", "tokensToday"], optional: ["note"] },
@@ -5204,7 +5236,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   HostAnnounce: { required: ["publicKey", "name", "platform", "version", "machineID"], optional: ["relay", "implementation"] },
   HostClient: { required: ["id", "kind", "publicKey"], optional: [] },
   HostClients: { required: ["clients"], optional: [] },
-  HostHello: { required: ["version", "platform", "machineID"], optional: ["host", "name", "relay", "implementation"] },
+  HostHello: { required: ["version", "platform", "machineID"], optional: ["host", "name", "relay", "implementation", "capabilities"] },
   HostInstall: { required: ["destination"], optional: ["name", "key", "trust", "tunnel"] },
   HostJoinStatus: { required: ["member", "connected", "at"], optional: ["problem"] },
   HostLastHeard: { required: ["host"], optional: ["projects", "agents", "heardAt"] },
@@ -5378,6 +5410,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   RemoveResourceRequest: { required: ["name"], optional: [] },
   RenameRequest: { required: ["agentID", "title"], optional: [] },
   ReportedEdit: { required: ["path", "newText", "toolCallID", "index", "entryIndex", "replaceAll", "at"], optional: ["oldText"] },
+  RequiredCapabilities: { required: ["host", "client"], optional: [] },
   ResourceState: { required: ["name", "kind", "displayName", "isGone", "line", "endingSoon"], optional: ["holds", "lease", "places", "declared"] },
   ResumingNotification: { required: ["agentID", "isResuming"], optional: [] },
   ResumingResponse: { required: ["agentIDs"], optional: [] },

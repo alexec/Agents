@@ -83,6 +83,8 @@ test("connecting proves the browser's key as Swift does", async () => {
   const admitted = await w.connect(server.socket, record, v.origin, w.unhex(v.peerNonce));
   assert.equal(server.heard[0].auth.id, v.client.identity);
   assert.equal(server.heard[0].auth.mac, w.base64url(w.unhex(v.client.mac.peer)));
+  // A paired client says what it has (#1748).
+  assert.deepEqual(server.heard[0].auth.capabilities, ["client.wire/1"]);
   assert.equal("grant" in admitted, false);
 });
 

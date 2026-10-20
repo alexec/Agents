@@ -16,6 +16,7 @@ const (
 	CapChanges1           = "changes/1"
 	CapChatBranch1        = "chat.branch/1"
 	CapClientPermissions1 = "client-permissions/1"
+	CapClientWire1        = "client.wire/1"
 	CapClient1            = "client/1"
 	CapClients1           = "clients/1"
 	CapClone1             = "clone/1"
@@ -37,6 +38,7 @@ const (
 	CapFiles1             = "files/1"
 	CapGit1               = "git/1"
 	CapHandover1          = "handover/1"
+	CapHostWire1          = "host.wire/1"
 	CapHost1              = "host/1"
 	CapHosts1             = "hosts/1"
 	CapLeases1            = "leases/1"
@@ -363,6 +365,49 @@ var HostCapabilities = map[string]string{
 	"worktrees/sized":                  "worktrees/1",
 }
 
+// HostNotifications is each notification in daemon.openrpc.json: what its server sends, not serves.
+var HostNotifications = map[string]bool{
+	"agent/changed":              true,
+	"agent/elicitation":          true,
+	"agent/entry":                true,
+	"agent/permission":           true,
+	"agent/removed":              true,
+	"agent/resuming":             true,
+	"agent/showFile":             true,
+	"agents/draftOptions":        true,
+	"attention/changed":          true,
+	"clone/changed":              true,
+	"cost/changed":               true,
+	"device/changed":             true,
+	"disk/changed":               true,
+	"events/changed":             true,
+	"files/changed":              true,
+	"leases/changed":             true,
+	"mcp/healthChanged":          true,
+	"mcp/hostedChanged":          true,
+	"milestones/changed":         true,
+	"modes/changed":              true,
+	"pages/changed":              true,
+	"pairing/changed":            true,
+	"person/changed":             true,
+	"pins/changed":               true,
+	"plugins/changed":            true,
+	"preferences/changed":        true,
+	"project/changed":            true,
+	"project/removed":            true,
+	"runtime/account":            true,
+	"runtime/changed":            true,
+	"runtimes/allowancesChanged": true,
+	"shell/output":               true,
+	"shell/stateChanged":         true,
+	"storage/writeFailed":        true,
+	"store/notesChanged":         true,
+	"wake/changed":               true,
+	"workflow/changed":           true,
+	"workflow/removed":           true,
+	"worktrees/sized":            true,
+}
+
 // ControlCapabilities is the capability of each method and notification in control.openrpc.json.
 var ControlCapabilities = map[string]string{
 	"attention/need":              "attention/1",
@@ -438,4 +483,31 @@ var ControlCapabilities = map[string]string{
 	"relay/count":                 "relay/1",
 	"relay/deliver":               "relay/1",
 	"relay/devices":               "relay/1",
+}
+
+// ControlNotifications is each notification in control.openrpc.json: what its server sends, not serves.
+var ControlNotifications = map[string]bool{
+	"control/clientChanged":      true,
+	"control/hostChanged":        true,
+	"control/installProgress":    true,
+	"control/keptChanged":        true,
+	"control/keptDelivered":      true,
+	"control/moved":              true,
+	"control/providerDraft":      true,
+	"control/providersChanged":   true,
+	"control/thisMacHostChanged": true,
+	"control/tunnelChanged":      true,
+	"control/webChanged":         true,
+	"host/clients":               true,
+	"projects/detect":            true,
+	"relay/count":                true,
+	"relay/deliver":              true,
+	"relay/devices":              true,
+}
+
+// DeclaredCapabilities is x-declared-capabilities: what a host, a client or the control plane
+// declares by hand, by who.
+var DeclaredCapabilities = map[string][]string{
+	"client": {"client.wire/1"},
+	"host":   {"host.wire/1"},
 }

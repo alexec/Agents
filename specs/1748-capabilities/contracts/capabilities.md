@@ -10,6 +10,12 @@ Each entry of `methods` in `Packages/Wire/daemon.openrpc.json` and `control.open
 
 `scripts/wire.sh check` fails when a method has none, or when its value is not `<name>/<n>`.
 
+Capabilities that no method names are at the top of a document:
+
+```json
+"x-declared-capabilities": [{ "name": "host.wire/1", "by": "host", "description": "…" }]
+```
+
 ## The handshake
 
 ```text

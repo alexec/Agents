@@ -133,6 +133,7 @@ func Join(ctx context.Context, base, pin string, cr Credentials) (*Lines, *OK, e
 		l.Close()
 		return nil, nil, err
 	}
+	auth.Capabilities = cr.Capabilities
 	if err := l.Write(ctx, Message{Auth: auth}.Line()); err != nil {
 		l.Close()
 		return nil, nil, err
@@ -165,6 +166,8 @@ type Credentials struct {
 	Kind       string
 	ControlKey []byte // the control plane's key the peer already trusts, or nil
 	Epoch      *int
+	// What a client says it has (#1748); nil from a host, which says its own in host/hello.
+	Capabilities []string
 }
 
 // TestTrustRoots is TestTrustRoot.swift: a walk's stand-in for a publicly trusted root

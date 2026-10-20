@@ -90,7 +90,7 @@ version to update to. The client shows that to Alex, not a list of failed calls.
 then say "Update the app", not fail in many places.
 
 **Independent Test**: Connect a test client that sends a list without a required capability.
-Every call except the status call gets `-32008` with the missing names.
+Every call except `control/status` gets `-32008` with the missing names.
 
 **Acceptance Scenarios**:
 
@@ -158,7 +158,7 @@ the output with SemVer's order.
 - **FR-002**: `scripts/wire.sh gen` MUST make the capability constants and the
   method-to-capability table for Go, Swift and TypeScript; `scripts/wire.sh check` MUST fail
   when one is stale or when a method has no `x-capability`.
-- **FR-003**: A host MUST send its list in `host/hello` (and `hosts/announce`) on each connect.
+- **FR-003**: A host MUST send its list in `host/hello` on each connect.
 - **FR-004**: A client MUST send its list in the auth exchange (`ControlAuth`) on each connect.
 - **FR-005**: The control plane MUST give its own list and its required set in
   `control/status`, and each host's list on its `ControlHost` record (`hosts/list`).
@@ -209,8 +209,8 @@ the output with SemVer's order.
     changes.
   - **A peer that sends no list** is a build from before this feature: nothing is gated or
     refused for it, as today.
-  - **A client's own list** is declared by hand; it starts as `client.wire/1`, which is the
-    first required set for clients.
+  - **The required sets** start as `host.wire/1` for hosts and `client.wire/1` for clients,
+    capabilities each peer declares by hand (in the documents' `x-declared-capabilities`).
 - Not in this feature (from #1748): `hosts/update` (the push of a new `agentsd`) and a CI skew
   test against the last release. They are filed after this lands.
 - The held 0.8 audit lane (#996, PR #1752) changes the same wire files. This lane does not
