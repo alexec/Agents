@@ -477,7 +477,8 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
         <span class="actions">
           <button class="wide-only" onClick={() => replace({ ...r, files: !r.files })} aria-pressed={!!r.files}>Files</button>
           <SessionButtons store={store} host={host} agent={agent} disabled={down} />
-          <SessionMenu store={store} host={host} agent={agent} disabled={down} inChat openFile={() => (searchingFiles.value = true)}
+          <SessionMenu store={store} host={host} agent={agent} disabled={down} inChat
+            find={() => (finding.value = true)} openFile={() => (searchingFiles.value = true)}
             narrow={[
               { label: "Files", checked: !!r.files, run: () => replace({ ...r, files: !r.files }) },
             ]} />
