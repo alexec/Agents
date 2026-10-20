@@ -53,6 +53,8 @@
 	<string>To hear what you say while you dictate into your prompt.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
 	<string>To turn what you say into words for your prompt.</string>
+	<key>NSSupportsLiveActivities</key>
+	<true/>
 	<key>NSUserActivityTypes</key>
 	<array>
 		<string>com.alexecollins.agents.remote.session</string>

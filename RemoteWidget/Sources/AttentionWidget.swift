@@ -15,7 +15,11 @@ import WidgetKit
 /// Out of Scope.
 @main
 struct AttentionWidgetBundle: WidgetBundle {
-    var body: some Widget { AttentionWidget() }
+    var body: some Widget {
+        AttentionWidget()
+        // A turn sent from here, on the Lock Screen and in the Dynamic Island (#1657).
+        TurnActivityWidget()
+    }
 }
 
 struct AttentionWidget: Widget {

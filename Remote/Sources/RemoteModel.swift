@@ -106,6 +106,8 @@ final class RemoteModel {
     /// 021: this device's banner, and its report of where the person is. Neither
     /// decides anything; the Mac routes and these two obey.
     private let notifier = DeviceNotifier()
+    /// A turn sent from here, on the Lock Screen and in the Dynamic Island (#1657).
+    @ObservationIgnored let liveActivities = TurnActivities()
     var presence: PresenceReporter?
     /// Which device this is, minted once and kept. Told to the Mac right after every
     /// connection (`surface/identify`), so every later request on it is this device's.
@@ -1410,6 +1412,8 @@ final class RemoteModel {
         isStarting = true
         defer { isStarting = false }
         startRefusal = nil
+        // Its Live Activity begins once the Mac says which session it made (#1657).
+        if let requestID = request.requestID { liveActivities.askedToStart(requestID) }
         // A stopped workspace that starts when used: kept, and shown on this page until the
         // agent it makes opens (#691 US3, layouts.md L6a).
         if let host = work.project(request.cwd)?.host, host != .mac, isStale(on: host), startsWhenUsed(host) {
@@ -2333,6 +2337,14 @@ final class RemoteModel {
         if Self.attentionNotifications.contains(notification.method) {
             self.publishAttentionSoon()
         }
+        // The Live Activity of a turn sent from here (#1657): what the session does, and asks.
+        if case .agentChanged(let agent)? = update {
+            liveActivities.changed(agent.id, in: work)
+        } else if case .agentRemoved(let removed)? = update {
+            liveActivities.changed(removed.agentID, in: work)
+        } else if case .attention(let change)? = update, let agentID = change.need?.agentID {
+            liveActivities.changed(agentID, in: work)
+        }
         if case .attention(let change)? = update {
             self.toNotifier { [deviceID = self.deviceID] notifier in
                 await notifier.apply(change, me: .device(deviceID))
@@ -2530,6 +2542,7 @@ final class RemoteModel {
         // Against the file, not the last write: a push may have laid a guess over it (#1046).
         lastPublished = nil
         publishAttention()
+        liveActivities.settle(with: work)
         if let pendingOpen { open(pendingOpen) }
         if let pendingNeed {
             self.pendingNeed = nil
@@ -2626,6 +2639,7 @@ final class RemoteModel {
                 // A silent push is best effort, so a need that moved while the app was
                 // shut may have been missed; the model is now as true as it can be.
                 publishAttention()
+                liveActivities.settle(with: work)
             }
         } else {
             attentionRefreshTask?.cancel()
@@ -4217,8 +4231,11 @@ final class RemoteModel {
                 problem = "Attachments can’t wait for \(hostName(host)) to start. Send the words alone, or start it first."
                 return false
             }
-            return await keepThroughControl(host, DaemonAPI.Method.agentsPrompt,
-                                            DaemonAPI.PromptRequest(agentID: agentID, text: what, sendID: UUID())) != nil
+            guard await keepThroughControl(host, DaemonAPI.Method.agentsPrompt,
+                                           DaemonAPI.PromptRequest(agentID: agentID, text: what, sendID: UUID())) != nil
+            else { return false }
+            turnSent(to: agentID)
+            return true
         }
         guard !isStale(on: host) else {
             problem = notAnswering(host, "that was not sent.")
@@ -4237,6 +4254,7 @@ final class RemoteModel {
             try await sendOnce(DaemonAPI.Method.agentsPrompt,
                                DaemonAPI.PromptRequest(agentID: agentID, text: what,
                                                        attachments: attachments, sendID: UUID()))
+            turnSent(to: agentID)
             return true
         } catch let error as JSONRPCError where error.code == DaemonAPI.Failure.couldNotSave {
             // It reached the Mac, which could not write it down (#88).
@@ -4251,6 +4269,13 @@ final class RemoteModel {
             problem = (away(error, "that was not sent.") ?? "That did not reach your Mac.") + " What you typed is still there."
             return false
         }
+    }
+
+    /// A prompt went from here: its turn as a Live Activity (#1657).
+    private func turnSent(to agentID: UUID) {
+        let agent = work.agent(agentID)
+        let project = agent.map { work.project($0.projectFolder)?.name ?? $0.projectFolder.lastPathComponent } ?? ""
+        liveActivities.sent(to: agent, id: agentID, project: project)
     }
 
     /// Back to the end of the conversation, as the Mac does when a prompt goes.

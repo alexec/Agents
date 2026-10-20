@@ -1,0 +1,114 @@
+import Foundation
+import Testing
+@testable import AgentsKitCore
+
+/// What a turn's Live Activity says (#1657). The activity is drawn by the widget extension
+/// on a phone, so these are the words it is handed.
+@Suite("What a turn's Live Activity says")
+struct TurnActivityContentTests {
+
+    private let folder = URL(filePath: "/tmp/work/api")
+    private let sent = Date(timeIntervalSince1970: 1_000_000)
+
+    private func agent(_ state: AgentState, title: String? = "Fix the widget") -> Agent {
+        Agent(runtimeID: "claude", cwd: folder, title: title, state: state,
+              lastActivityAt: sent.addingTimeInterval(90))
+    }
+
+    private func need(for agent: Agent, kind: Need.Kind, h3: String = "which branch to use",
+                      at: Date = Date()) -> Need {
+        Need(id: .elicitation(UUID()), agentID: agent.id, folder: folder, kind: kind, raisedAt: at,
+             headline: Headline(h1: "api", h2: "Fix the widget", h3: h3))
+    }
+
+    @Test func aWorkingTurnSaysTheStepItIsOn() throws {
+        var working = agent(.running)
+        working.plans = [Plan(entries: [PlanEntry(content: "Read the code", status: .completed),
+                                        PlanEntry(content: "Write the view", status: .inProgress)])]
+        let content = try #require(TurnActivityContent.make(agent: working, needs: [], startedAt: sent))
+        #expect(content.phase == .working)
+        #expect(content.line == "Write the view")
+        #expect(content.startedAt == sent, "the timer counts from the send")
+        #expect(content.endedAt == nil)
+    }
+
+    @Test func aQuestionAndAPermissionSayWhatTheyAsk() throws {
+        let asking = agent(.waitingOnUser)
+        let question = try #require(TurnActivityContent.make(
+            agent: asking, needs: [need(for: asking, kind: .elicitation)], startedAt: sent))
+        #expect(question.phase == .question)
+        #expect(question.word == "Question waiting")
+        #expect(question.line == "which branch to use")
+        let approval = try #require(TurnActivityContent.make(
+            agent: asking, needs: [need(for: asking, kind: .permission, h3: "run swift test")], startedAt: sent))
+        #expect(approval.phase == .approval)
+        #expect(approval.word == "Needs approval")
+        #expect(approval.line == "run swift test")
+    }
+
+    @Test func anotherSessionsNeedIsNotThisOnes() throws {
+        let working = agent(.running)
+        let other = agent(.waitingOnUser)
+        let content = try #require(TurnActivityContent.make(
+            agent: working, needs: [need(for: other, kind: .permission)], startedAt: sent))
+        #expect(content.phase == .working)
+    }
+
+    @Test func theNewestNeedWins() throws {
+        let asking = agent(.waitingOnUser)
+        let content = try #require(TurnActivityContent.make(
+            agent: asking,
+            needs: [need(for: asking, kind: .permission, at: sent),
+                    need(for: asking, kind: .elicitation, h3: "newer", at: sent.addingTimeInterval(10))],
+            startedAt: sent))
+        #expect(content.phase == .question)
+        #expect(content.line == "newer")
+    }
+
+    @Test func aCleanEndIsDoneWithItsReport() throws {
+        var done = agent(.finished)
+        done.endedReason = .endTurn
+        done.report = WorkReport(outcome: .done, message: "Added the view.\nAnd its tests.", at: Date())
+        let content = try #require(TurnActivityContent.make(agent: done, needs: [], startedAt: sent))
+        #expect(content.phase == .done)
+        #expect(content.isOver)
+        #expect(content.line == "Added the view.", "one line")
+        #expect(content.endedAt == sent.addingTimeInterval(90), "the timer stops where the turn ended")
+    }
+
+    @Test func anEndForAReasonIsAFailureThatSaysIt() throws {
+        var died = agent(.finished)
+        died.endedReason = .processDied
+        let content = try #require(TurnActivityContent.make(agent: died, needs: [], startedAt: sent))
+        #expect(content.phase == .failed)
+        #expect(content.line == "The runtime crashed")
+        let stopped = try #require(TurnActivityContent.make(agent: agent(.stopped), needs: [], startedAt: sent))
+        #expect(stopped.phase == .failed)
+        #expect(stopped.word == "Stopped")
+    }
+
+    @Test func anArchivedOrMissingSessionEndsTheActivity() {
+        #expect(TurnActivityContent.make(agent: agent(.archived), needs: [], startedAt: sent) == nil)
+        #expect(TurnActivityContent.make(agent: nil, needs: [Need](), startedAt: sent) == nil)
+    }
+
+    @Test func anUntitledSessionHasAName() throws {
+        let content = try #require(TurnActivityContent.make(agent: agent(.running, title: nil), needs: [], startedAt: sent))
+        #expect(content.title == TurnActivityContent.untitled)
+        #expect(TurnActivityContent.sent(title: nil, at: sent).phase == .working)
+    }
+
+    @Test func aLongLineIsCut() {
+        let long = String(repeating: "a", count: 1000)
+        let content = TurnActivityContent(phase: .done, title: "t", line: long, startedAt: sent)
+        #expect(content.line?.count == TurnActivityContent.lineLimit)
+        #expect(content.line?.hasSuffix("…") == true)
+        #expect(TurnActivityContent(phase: .done, title: "t", line: "  \n", startedAt: sent).line == nil)
+    }
+
+    @Test func theStateStaysSmall() throws {
+        let content = TurnActivityContent(phase: .working, title: String(repeating: "t", count: 200),
+                                          line: String(repeating: "a", count: 4000), startedAt: sent)
+        #expect(try JSONEncoder().encode(content).count < 1024, "ActivityKit refuses 4 KB")
+    }
+}
