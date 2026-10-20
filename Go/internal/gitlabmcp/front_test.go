@@ -85,12 +85,13 @@ func TestTheFrontOffersEventsAndTools(t *testing.T) {
 		tools[tool["name"].(string)] = tool
 	}
 	for _, name := range []string{"list_merge_requests", "get_merge_request", "list_pipelines", "get_pipeline", "list_issues",
-		"get_issue", "comment_on_merge_request", "comment_on_issue", "merge_merge_request"} {
+		"get_issue", "comment_on_merge_request", "comment_on_issue", "merge_merge_request", "show_merge_requests", "show_issues",
+		"show_merge_request", "show_merge_request_diff", "failed_log", "retry_pipeline", "approve_merge_request"} {
 		if tools[name] == nil {
 			t.Fatalf("no tool %s in %v", name, tools)
 		}
 	}
-	equal(t, len(tools), 9, "tools")
+	equal(t, len(tools), 16, "tools")
 	equal(t, tools["merge_merge_request"]["_meta"], map[string]any{"ui": map[string]any{"visibility": []any{"app"}}}, "merge is a view's")
 
 	mrs := tool(3, "list_merge_requests", map[string]any{})["mergeRequests"].([]any)

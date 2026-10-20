@@ -146,6 +146,12 @@ to the MCP server" turned on for the top-level group or the instance.
 - **Tools:** `list_merge_requests`, `get_merge_request`, `list_pipelines`, `get_pipeline`,
   `list_issues`, `get_issue`, `comment_on_merge_request`, `comment_on_issue`, and
   `merge_merge_request`, which only a view may call (a person merges, as on GitHub).
+- **Views** (#1631), the github server's page shapes in GitLab's words (`pages/`; `bridge.js`,
+  `common.css` and `mrpage.css` are the github server's, word for word, and a test keeps them
+  so): Merge requests (`show_merge_requests`), Issues (`show_issues`) and a merge request's
+  page (`show_merge_request`), with `show_merge_request_diff` for the app's diff,
+  `failed_log`, `retry_pipeline`, and `approve_merge_request` for a view only.
+  `walk/walk.mjs` draws them in headless Chrome against a stand-in GitLab.
 
 The tests run it against a fake GitLab over HTTP (`fake_test.go`). Agents Host carries it
 (`scripts/go-github-mcp.sh gitlab-mcp`) and every Linux host installs

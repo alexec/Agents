@@ -1,0 +1,27 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Merge request</title>
+<!-- The gitlab server's merge request page (ui://gitlab/mr, #1631): show_merge_request's result.
+     It has no network: it speaks only the MCP Apps bridge. -->
+<style>
+/*common.css*/
+/*mrpage.css*/
+</style></head>
+<body><main><div id="page"><div class="muted">Waiting for the host…</div></div></main>
+<script>
+/*bridge.js*/
+/*mrpage.js*/
+(() => {
+  let project = "";
+  const say = (text, isError) => document.getElementById("page").replaceChildren(
+    Object.assign(document.createElement("div"), { className: isError ? "error" : "muted", textContent: text }));
+  const ui = bridge("gitlab-mr", {
+    input: (args) => { project = args.project || ""; say(args.number ? `Loading !${args.number}…` : "Loading…"); },
+    result: (result) => page.draw(result),
+    cancelled: (why) => say("Cancelled: " + why, true),
+    started: () => say("Waiting for the merge request…"),
+  });
+  const page = mrPage(ui, () => project, null);
+  ui.start();
+})();
+</script>
+</body></html>

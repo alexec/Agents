@@ -45,10 +45,10 @@ var Made = []Ours{
 		Command: "linear-mcp", Declares: Declared{Tools: true, Events: linearEvents, Views: true}, Tested: "2026-10-19"},
 	// An access token in GITLAB_TOKEN until the sign-in (#1630); GITLAB_URL in mcp.json's env
 	// for a self-managed GitLab. Not yet tested on a real account (#1634).
-	{ID: "agents/gitlab", Title: "GitLab", Description: "Merge requests, pipelines and issues on gitlab.com or a self-managed GitLab: tools to read them and comment, and events",
+	{ID: "agents/gitlab", Title: "GitLab", Description: "Merge requests, pipelines and issues on gitlab.com or a self-managed GitLab: their pages, tools to read them and comment, and events",
 		Command: "gitlab-mcp", Secret: "GITLAB_TOKEN",
 		SecretDescription: "A GitLab access token with the api scope (GitLab ▸ Edit profile ▸ Access tokens)",
-		Declares:          Declared{Tools: true, Events: gitlabEvents}},
+		Declares:          Declared{Tools: true, Events: gitlabEvents, Views: true}},
 }
 
 var (

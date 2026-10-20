@@ -100,7 +100,7 @@ func tool[In any](server *mcp.Server, t *mcp.Tool, f func(context.Context, In) (
 	})
 }
 
-// AddTools puts the tools on server.
+// AddTools puts the tools and the views (views.go) on server.
 func AddTools(server *mcp.Server, g *RealGitLab) {
 	projectOf := func(ctx context.Context, project string) (string, error) {
 		if project != "" {
@@ -113,6 +113,7 @@ func AddTools(server *mcp.Server, g *RealGitLab) {
 	}
 	readOnly := &mcp.ToolAnnotations{ReadOnlyHint: true}
 	agentsAndViews := visibility("model", "app")
+	addViews(server, g, projectOf)
 
 	tool(server, &mcp.Tool{Name: "list_merge_requests", Title: "List merge requests",
 		Description: "The project's merge requests, newest updated first, at most 100: number, title, branch, target, author, draft, " +

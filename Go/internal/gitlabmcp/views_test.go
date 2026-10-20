@@ -1,0 +1,248 @@
+package gitlabmcp
+
+import (
+	"context"
+	"encoding/json"
+	"os"
+	"strings"
+	"testing"
+
+	"github.com/modelcontextprotocol/go-sdk/mcp"
+)
+
+// The views (#1631) over the fake GitLab, through an MCP client: what each tool gives a page,
+// who may call what, and the pages themselves.
+
+func viewsClient(t *testing.T, f *fakeGitLab) *mcp.ClientSession {
+	t.Helper()
+	server := NewServer("test", f.gitlab())
+	ct, st := mcp.NewInMemoryTransports()
+	ctx := context.Background()
+	if _, err := server.Connect(ctx, st, nil); err != nil {
+		t.Fatal(err)
+	}
+	c, err := mcp.NewClient(&mcp.Implementation{Name: "test"}, nil).Connect(ctx, ct, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = c.Close() })
+	return c
+}
+
+func callTool(t *testing.T, c *mcp.ClientSession, name string, args map[string]any) (*mcp.CallToolResult, map[string]any) {
+	t.Helper()
+	r, err := c.CallTool(context.Background(), &mcp.CallToolParams{Name: name, Arguments: args})
+	if err != nil {
+		t.Fatalf("%s: %v", name, err)
+	}
+	if r.IsError {
+		t.Fatalf("%s: %v", name, r.Content[0].(*mcp.TextContent).Text)
+	}
+	var data map[string]any
+	if r.StructuredContent != nil {
+		b, _ := json.Marshal(r.StructuredContent)
+		_ = json.Unmarshal(b, &data)
+	}
+	return r, data
+}
+
+func viewsFake(t *testing.T) *fakeGitLab {
+	f := newFake(t)
+	f.addMembers()
+	f.mrs = []obj{
+		mrJSON(3, "fix-mean", dev, obj{"title": "Fix the mean", "description": "Divide by the count.", "sha": "s3",
+			"detailed_merge_status": "not_approved", "head_pipeline": obj{"id": 100, "status": "failed", "web_url": "https://gitlab.test/p/100"},
+			"updated_at": at(2)}),
+		mrJSON(4, "docs", alex, obj{"draft": true, "sha": "s4", "merge_when_pipeline_succeeds": true, "updated_at": at(1)}),
+	}
+	f.pipes = []obj{
+		{"id": 101, "status": "running", "ref": "docs", "sha": "s4", "web_url": "https://gitlab.test/p/101", "updated_at": at(1)},
+		{"id": 100, "status": "failed", "ref": "fix-mean", "sha": "s3", "web_url": "https://gitlab.test/p/100", "updated_at": at(1)},
+		{"id": 90, "status": "success", "ref": "fix-mean", "sha": "s3", "web_url": "https://gitlab.test/p/90", "updated_at": at(-10)},
+	}
+	f.jobs[100] = []obj{{"id": 7, "name": "test", "stage": "test", "status": "failed", "web_url": "https://gitlab.test/j/7"},
+		{"id": 8, "name": "lint", "stage": "test", "status": "failed", "allow_failure": true, "web_url": "https://gitlab.test/j/8"},
+		{"id": 9, "name": "build", "stage": "build", "status": "success", "web_url": "https://gitlab.test/j/9"}}
+	f.traces[7] = "\x1b[0Ksection_start:1700000000:step_script\r\x1b[0K\x1b[31mline one\x1b[0m\nFAIL: mean\n"
+	f.diffs[3] = []obj{
+		{"old_path": "average.py", "new_path": "average.py", "diff": "@@ -1,3 +1,4 @@\n def mean(xs):\n-    return sum(xs)\n+    n = len(xs)\n+    return sum(xs) / n\n"},
+		{"old_path": "logo.png", "new_path": "logo.png", "new_file": true, "diff": ""},
+	}
+	f.discuss[3] = []obj{
+		{"id": "d1", "notes": []obj{{"id": 31, "body": "Looks right.", "author": alex, "created_at": at(1)}}},
+		{"id": "d2", "notes": []obj{{"id": 32, "type": "DiffNote", "body": "What if xs is empty?", "author": alex, "created_at": at(2),
+			"resolved": false, "position": obj{"new_path": "average.py", "new_line": 3}},
+			{"id": 33, "type": "DiffNote", "body": "Then it raises.", "author": dev, "created_at": at(3)}}},
+		{"id": "d3", "notes": []obj{{"id": 34, "body": "added 1 commit", "system": true, "author": dev, "created_at": at(0)}}},
+	}
+	f.issues = []obj{issueObj(5, dev, obj{"labels": []string{"bug"}, "assignees": []obj{alex}, "user_notes_count": 2})}
+	return f
+}
+
+func TestEachViewHasAToolThatFeedsItAndAPage(t *testing.T) {
+	c := viewsClient(t, viewsFake(t))
+	tools, err := c.ListTools(context.Background(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	visibility := map[string][]any{}
+	feeds := map[string]string{}
+	for _, tool := range tools.Tools {
+		ui, _ := tool.Meta["ui"].(map[string]any)
+		visibility[tool.Name], _ = ui["visibility"].([]any)
+		if uri, _ := ui["resourceUri"].(string); uri != "" {
+			feeds[tool.Name] = uri
+			if tool.Annotations == nil || !tool.Annotations.ReadOnlyHint {
+				t.Errorf("%s feeds a view but is not read-only, so it can't feed a pin", tool.Name)
+			}
+		}
+	}
+	for name, uri := range map[string]string{"show_merge_requests": mrsURI, "show_issues": issuesURI, "show_merge_request": mrURI} {
+		if feeds[name] != uri {
+			t.Errorf("%s feeds %q, not %s", name, feeds[name], uri)
+		}
+	}
+	// A person merges and approves from a page: no agent is offered those.
+	for _, name := range []string{"merge_merge_request", "approve_merge_request"} {
+		if v := visibility[name]; len(v) != 1 || v[0] != "app" {
+			t.Errorf("%s's visibility is %v, not [app]", name, v)
+		}
+	}
+	for _, uri := range []string{mrsURI, issuesURI, mrURI} {
+		r, err := c.ReadResource(context.Background(), &mcp.ReadResourceParams{URI: uri})
+		if err != nil || len(r.Contents) != 1 {
+			t.Fatalf("%s: %v", uri, err)
+		}
+		html := r.Contents[0].Text
+		if r.Contents[0].MIMEType != viewMime || !strings.HasPrefix(html, "<!doctype html>") ||
+			strings.Contains(html, "/*common.css*/") || strings.Contains(html, "/*bridge.js*/") || !strings.Contains(html, "const bridge") {
+			t.Errorf("%s is not a whole page", uri)
+		}
+		if uri != issuesURI && !strings.Contains(html, "const mrPage") {
+			t.Errorf("%s has no merge request page in it", uri)
+		}
+		// Every tool a page calls is one this server has.
+		for _, called := range []string{"show_merge_requests", "show_merge_request", "show_merge_request_diff", "failed_log",
+			"retry_pipeline", "comment_on_merge_request", "approve_merge_request", "merge_merge_request", "show_issues"} {
+			if strings.Contains(html, `"`+called+`"`) && visibility[called] == nil {
+				t.Errorf("%s calls %s, which is not a tool", uri, called)
+			}
+		}
+		if strings.Contains(html, "GitHub") || strings.Contains(html, "gh pr") || strings.Contains(html, "CodeRabbit") {
+			t.Errorf("%s still speaks of GitHub", uri)
+		}
+	}
+}
+
+// The bridge and the styles are the github server's, word for word: one host draws both.
+func TestThePagesShareTheGitHubServersBridge(t *testing.T) {
+	for _, pair := range [][2]string{{"bridge.js", "bridge.js"}, {"common.css", "common.css"}, {"mrpage.css", "prpage.css"}} {
+		ours, err := pageFiles.ReadFile("pages/" + pair[0])
+		if err != nil {
+			t.Fatal(err)
+		}
+		theirs, err := os.ReadFile("../githubmcp/pages/" + pair[1])
+		if err != nil {
+			t.Fatal(err)
+		}
+		if string(ours) != string(theirs) {
+			t.Errorf("pages/%s is not the github server's %s: copy it again", pair[0], pair[1])
+		}
+	}
+}
+
+func TestTheMergeRequestsListSaysEachOnesState(t *testing.T) {
+	c := viewsClient(t, viewsFake(t))
+	_, data := callTool(t, c, "show_merge_requests", map[string]any{})
+	mrs, _ := data["mergeRequests"].([]any)
+	if data["project"] != project || data["viewer"] != "alex" || len(mrs) != 2 {
+		t.Fatalf("board: %v", data)
+	}
+	first, second := mrs[0].(map[string]any), mrs[1].(map[string]any)
+	if first["checks"] != "failing" || first["failedPipelineId"] != 100.0 || first["review"] != "review_required" ||
+		first["autoMerge"] != false || first["author"] != "dev" || first["base"] != "main" {
+		t.Errorf("!3: %v", first)
+	}
+	if second["checks"] != "running" || second["draft"] != true || second["autoMerge"] != true || second["review"] != nil {
+		t.Errorf("!4: %v", second)
+	}
+}
+
+func TestTheIssuesListHasLabelsAndAssignees(t *testing.T) {
+	f := viewsFake(t)
+	c := viewsClient(t, f)
+	_, data := callTool(t, c, "show_issues", map[string]any{"label": "bug"})
+	issue := data["issues"].([]any)[0].(map[string]any)
+	if issue["number"] != 5.0 || issue["comments"] != 2.0 || issue["assignees"].([]any)[0] != "alex" {
+		t.Fatalf("issue %v", issue)
+	}
+	asked := f.asked()
+	if last := asked[len(asked)-1]; !strings.Contains(last, "state=opened") || !strings.Contains(last, "labels=bug") {
+		t.Fatalf("asked %s", last)
+	}
+}
+
+func TestAMergeRequestsPageHasItsConversationDiscussionsAndPipeline(t *testing.T) {
+	c := viewsClient(t, viewsFake(t))
+	_, page := callTool(t, c, "show_merge_request", map[string]any{"number": 3})
+	if page["title"] != "Fix the mean" || page["checks"] != "failing" || page["failedPipelineId"] != 100.0 || page["viewer"] != "alex" ||
+		page["additions"] != 2.0 || page["deletions"] != 1.0 || page["filesTotal"] != 2.0 || page["state"] != "open" {
+		t.Fatalf("page %v", page)
+	}
+	comments := page["comments"].([]any)
+	if len(comments) != 1 || comments[0].(map[string]any)["body"] != "Looks right." {
+		t.Fatalf("conversation %v", comments)
+	}
+	threads := page["threads"].([]any)
+	thread := threads[0].(map[string]any)
+	if len(threads) != 1 || thread["path"] != "average.py" || thread["line"] != 3.0 || len(thread["comments"].([]any)) != 2 {
+		t.Fatalf("threads %v", threads)
+	}
+	runs := page["checkRuns"].([]any)
+	states := []string{}
+	for _, r := range runs {
+		states = append(states, r.(map[string]any)["state"].(string))
+	}
+	same(t, states, []string{"failing", "skipped", "passing"})
+	files := page["files"].([]any)
+	if f := files[1].(map[string]any); f["change"] != "added" {
+		t.Fatalf("files %v", files)
+	}
+}
+
+func TestADiffIsEachFilesHunks(t *testing.T) {
+	c := viewsClient(t, viewsFake(t))
+	_, diff := callTool(t, c, "show_merge_request_diff", map[string]any{"number": 3})
+	files := diff["files"].([]any)
+	first := files[0].(map[string]any)
+	hunk := first["hunks"].([]any)[0].(map[string]any)
+	lines := hunk["lines"].([]any)
+	if diff["url"] != "https://gitlab.test/group/app/-/merge_requests/3/diffs" || hunk["oldStart"] != 1.0 || hunk["newStart"] != 1.0 ||
+		len(lines) != 4 || lines[1].(map[string]any)["kind"] != "removed" || lines[2].(map[string]any)["kind"] != "added" {
+		t.Fatalf("diff %v", diff)
+	}
+	if second := files[1].(map[string]any); len(second["hunks"].([]any)) != 0 || second["note"] == nil {
+		t.Fatalf("a file with no lines: %v", second)
+	}
+}
+
+func TestAFailedLogIsItsFailedJobsEndInPlainText(t *testing.T) {
+	c := viewsClient(t, viewsFake(t))
+	r, _ := callTool(t, c, "failed_log", map[string]any{"pipelineId": 100})
+	text := r.Content[0].(*mcp.TextContent).Text
+	if !strings.Contains(text, "== test (https://gitlab.test/j/7)") || !strings.Contains(text, "line one\nFAIL: mean") ||
+		strings.Contains(text, "\x1b") || strings.Contains(text, "section_start") || strings.Contains(text, "lint") {
+		t.Fatalf("log %q", text)
+	}
+}
+
+func TestAPersonsActionsFromThePage(t *testing.T) {
+	f := viewsFake(t)
+	c := viewsClient(t, f)
+	callTool(t, c, "retry_pipeline", map[string]any{"pipelineId": 100})
+	callTool(t, c, "approve_merge_request", map[string]any{"number": 3})
+	f.set(func() {
+		equal(t, f.posted[0]["path"], "pipelines/100/retry", "retry")
+		equal(t, f.posted[1]["path"], "merge_requests/3/approve", "approve")
+	})
+}
