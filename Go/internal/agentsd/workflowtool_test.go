@@ -108,4 +108,15 @@ func TestAnAgentRunsAWorkflow(t *testing.T) {
 		text != "Nothing was run: review did not run, as this chain is already 3 deep." {
 		t.Fatal(text)
 	}
+	// The session that ran it may archive it, as one it started; another may not (#1730).
+	if text, isErr := dm.tool(3, "archive_session", map[string]any{"id": string(ran.ID)}); !isErr ||
+		!strings.HasPrefix(text, "Nothing changed: a workflow started that one, and you did not run it.") {
+		t.Fatal(text)
+	}
+	if text, isErr := m.tool(7, "archive_session", map[string]any{"id": string(ran.ID)}); isErr || !strings.HasPrefix(text, "Archived “Review”") {
+		t.Fatal(text)
+	}
+	if a := d.Store.Agent(ran.ID); a.State != wire.AgentStateArchived {
+		t.Fatalf("%+v", a)
+	}
 }

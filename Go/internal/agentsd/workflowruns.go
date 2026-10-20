@@ -352,9 +352,40 @@ func (d *Daemon) fire(fr fireRequest) {
 			d.workflowRecs.Runs[i].AgentID = &agent
 		}
 	}
+	if fr.byAgent != nil && w.Mode != wire.WorkflowModeStanding && w.Mode != wire.WorkflowModeTriggering {
+		d.noteRanByLocked(agent, *fr.byAgent)
+	}
 	d.saveRecordsLocked(false)
 	d.workflowMu.Unlock()
 	d.recordOutcome(fr, w.Name, wire.WorkflowOutcome{Ran: &wire.WorkflowOutcomeRan{AgentID: agent, At: now()}}, &agent)
+}
+
+// noteRanByLocked records that ran started agent with manage_workflows run, and forgets
+// the sessions that are gone or archived.
+func (d *Daemon) noteRanByLocked(agent, ran wire.UUID) {
+	rec := d.recordsLocked()
+	for id := range rec.RanBy {
+		if a := d.Store.Agent(id); a == nil || a.State == wire.AgentStateArchived {
+			delete(rec.RanBy, id)
+		}
+	}
+	if rec.RanBy == nil {
+		rec.RanBy = map[wire.UUID]wire.UUID{}
+	}
+	rec.RanBy[agent] = ran
+}
+
+// ranBy is the session that started this one with manage_workflows run, if one did.
+func (d *Daemon) ranBy(a *wire.Agent) *wire.UUID {
+	if a.StartedByWorkflow == nil {
+		return nil
+	}
+	d.workflowMu.Lock()
+	defer d.workflowMu.Unlock()
+	if r, ok := d.recordsLocked().RanBy[a.ID]; ok {
+		return &r
+	}
+	return nil
 }
 
 // runAgent starts or prompts the run's agent, as the workflow's mode says.
