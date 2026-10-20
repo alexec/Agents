@@ -65,7 +65,8 @@ func TestShrinkReadsAJPEGsPlanesDirectly(t *testing.T) {
 	for i := range picture.Cb {
 		picture.Cb[i], picture.Cr[i] = uint8(112+i%32), uint8(120+i%16)
 	}
-	if allocs := testing.AllocsPerRun(1, func() { shrink(picture, 1200) }); allocs > 10 {
+	// One for each pixel is about 3 million; -race and coverage add a few dozen of their own.
+	if allocs := testing.AllocsPerRun(1, func() { shrink(picture, 1200) }); allocs > 1000 {
 		t.Fatalf("%v allocations to shrink one screen", allocs)
 	}
 	// The same averages as a pixel-by-pixel read, within rounding.
