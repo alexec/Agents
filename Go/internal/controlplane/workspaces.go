@@ -39,6 +39,7 @@ func (s *Service) makeProviders(home string) *providers.Providers {
 					s.tunnels.Reconcile(context.Background())
 				}
 			},
+			Stopped: s.router.CloseStopped,
 			InstalledOver: func(host string) string {
 				if s.tunnels == nil {
 					return ""

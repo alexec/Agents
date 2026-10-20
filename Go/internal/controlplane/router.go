@@ -514,6 +514,17 @@ func (r *Router) CloseLocal(host string) {
 	}
 }
 
+// CloseStopped closes a host's real uplink here when its workspace was stopped (#1701), and
+// shows it offline. A tunnel through a provider's own (gcloud's start-tcp-tunnel) can hold a
+// stopped host's connection open for a minute, and a Start then took it for the new one.
+func (r *Router) CloseStopped(host string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if h := r.hosts[host]; h != nil && h.local {
+		r.dropHostLocked(host, 0, &hostState{State: "offline", Since: time.Now()})
+	}
+}
+
 // MARK: Streams carried for peer copies (T065)
 
 // SetPeer says a peer copy's link is up: streams it asks for are answered through send.

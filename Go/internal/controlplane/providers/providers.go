@@ -88,6 +88,10 @@ type Hooks struct {
 	SSHStart func(host records.HostRecord, destination string, renewKey bool) error
 	// OpenTunnel opens the host's reverse tunnel now, if it has one.
 	OpenTunnel func(host string)
+	// Stopped: the host's workspace was stopped. Its connection, if one is still here, is
+	// old (a tunnel can hold a stopped one open for a minute), and is closed, so a Start
+	// waits for a new one (#1701). Nil does nothing.
+	Stopped func(host string)
 	// InstalledOver is the ssh destination the host was installed over, when its tunnel
 	// keeps it (#965); "" for none.
 	InstalledOver func(host string) string
@@ -1280,6 +1284,9 @@ func (p *Providers) run(kind activityKind, host string, link WorkspaceLink, who 
 	p.Refresh(link.Provider)
 	if kind == stopping {
 		p.log(fmt.Sprintf("workspace: stop %s by %s: ok in %s", what, who, secondsSince(began)))
+		if p.hooks.Stopped != nil {
+			p.hooks.Stopped(host)
+		}
 		// Said on its row and strip until it is started again (US4 AS1).
 		p.mu.Lock()
 		if minutes, ok := p.idleStopping[host]; ok {

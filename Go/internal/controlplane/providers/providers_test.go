@@ -300,6 +300,26 @@ func TestStopStopsTheWorkspace(t *testing.T) {
 	}
 }
 
+// #1701: a stopped host's connection can stay open a minute through a provider's tunnel.
+// It is closed when the stop is done, so a Start waits for a new one and does not take
+// the old one for it.
+func TestAStoppedHostsOldConnectionIsClosed(t *testing.T) {
+	h := newHarness(t)
+	h.link(h.add(), devbox, "scratch-1")
+	h.router.setOnline(devbox, true)
+	h.must(MethodHostsStop, HostStop{Host: devbox})
+	h.waitFor("stopped", devbox, 5, func(r row) bool { return r.Workspace.CanStart })
+	h.router.mu.Lock()
+	stopped := append([]string{}, h.router.stopped...)
+	h.router.mu.Unlock()
+	if len(stopped) != 1 || stopped[0] != devbox {
+		t.Fatalf("closed %q", stopped)
+	}
+	if h.router.Online(devbox) {
+		t.Fatal("still online after its stop")
+	}
+}
+
 func TestStopWhileAgentsWorkIsAskedFirst(t *testing.T) {
 	h := newHarness(t)
 	h.link(h.add(), devbox, "scratch-1")

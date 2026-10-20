@@ -8,10 +8,12 @@ import (
 	"os/exec"
 	"path/filepath"
 	"reflect"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/alexec/agents/Go/internal/controlplane/hosttunnels"
 	"github.com/alexec/agents/Go/internal/controlplane/records"
 )
 
@@ -441,6 +443,44 @@ func TestAServerBehindABastionIsTunnelled(t *testing.T) {
 	}
 }
 
+// #1691: a key the person's own known_hosts trusts is pinned in the tunnel's record too, so
+// a start that gives the server a new address still checks it. A key it does not trust for
+// that server is not pinned.
+func TestAKeyThePersonTrustsIsPinnedForTheTunnel(t *testing.T) {
+	const otherKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEL3lSUEpy9oadQzatbOZWbb0TPETJeDST0hnTePctLd"
+	for _, c := range []struct {
+		known string
+		want  string
+	}{
+		{"gpu " + hostKey + "\n", pinnedLine(hostKey)},
+		{"other " + hostKey + "\n", ""},
+		{"gpu " + otherKey + "\n", ""},
+	} {
+		f := newFake(t)
+		person := filepath.Join(f.dir, "person_known_hosts")
+		f.write("person_known_hosts", c.known, 0o600)
+		f.env["FAKE_SSH_KNOWN_HOSTS"] = person
+		f.env["FAKE_SSH_PERSON_KNOWS"] = "1"
+		var steps []string
+		tunnels := &fakeTunnels{}
+		i := f.installer(&fakeCodes{}, &steps)
+		i.Tunnels = tunnels
+		got := reply(t)(i.Install(context.Background(), json.RawMessage(`{"destination":"gpu","tunnel":true}`)))
+		if got["tunnel"] != true || len(tunnels.added) != 1 {
+			t.Fatalf("%v %v", got, tunnels.added)
+		}
+		if r := tunnels.added[0]; strings.TrimSpace(hosttunnels.Pinned(r.KnownHosts)) != c.want {
+			t.Fatalf("known %q: pinned %q, want %q", c.known, r.KnownHosts, c.want)
+		}
+		if left := f.leftInstallFolders(); len(left) != 0 {
+			t.Fatalf("left %v", left)
+		}
+	}
+}
+
+// pinnedLine is a key as hosttunnels.Pinned writes it.
+func pinnedLine(key string) string { return hosttunnels.PinnedAlias + " " + key }
+
 func TestUpdateIsNotHereAndCheckAgainDoesNothing(t *testing.T) {
 	i := &Installer{}
 	if err := i.Update(context.Background(), "h"); err != NotHere {
@@ -466,5 +506,50 @@ func TestTheHostIsServedByItsNames(t *testing.T) {
 	}
 	if _, ok := binaryFor("x86_64", folder); ok {
 		t.Error("an old agentsd-go file served as the host")
+	}
+}
+
+// #1701: a workspace whose container is made again at each start keeps daemon.lock in its
+// home. In the new container its pid can be any process, once the sshd of the install's own
+// connection. Only an agentsd of .agents-server is stopped.
+func TestOnlyAnAgentsdInTheLockIsStopped(t *testing.T) {
+	f := newFake(t)
+	f.env["FAKE_SSH_PERSON_KNOWS"] = "1"
+	if err := os.MkdirAll(f.server("root"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	runs := func(command *exec.Cmd) chan struct{} {
+		if err := command.Start(); err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { command.Process.Kill() })
+		ended := make(chan struct{})
+		go func() { command.Wait(); close(ended) }()
+		os.WriteFile(f.server("root/daemon.lock"), []byte(strconv.Itoa(command.Process.Pid)), 0o600)
+		return ended
+	}
+	install := func() {
+		var steps []string
+		reply(t)(f.installer(&fakeCodes{}, &steps).Install(context.Background(), json.RawMessage(`{"destination":"devbox"}`)))
+	}
+
+	bystander := runs(exec.Command("/bin/sh", "-c", "sleep 30"))
+	install()
+	select {
+	case <-bystander:
+		t.Fatal("a process that is not agentsd was stopped")
+	case <-time.After(200 * time.Millisecond):
+	}
+
+	old := f.server("bin/agentsd-old")
+	if err := os.WriteFile(old, []byte("while :; do sleep 1; done\n"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	daemon := runs(exec.Command("/bin/sh", old))
+	install()
+	select {
+	case <-daemon:
+	case <-time.After(5 * time.Second):
+		t.Fatal("the old agentsd was not stopped")
 	}
 }

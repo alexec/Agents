@@ -114,3 +114,40 @@ func TestAStartOverSSHKeepsTheInstallsKeyOtherwise(t *testing.T) {
 		t.Errorf("ssh was told to take a new key: %q", words)
 	}
 }
+
+// uplinkStandIn is a host's uplink that reads nothing until it is closed.
+type uplinkStandIn struct{ closed chan struct{} }
+
+func (u *uplinkStandIn) Send(string) bool { return true }
+func (u *uplinkStandIn) Read(ctx context.Context) (string, error) {
+	<-u.closed
+	return "", context.Canceled
+}
+func (u *uplinkStandIn) Close() {
+	select {
+	case <-u.closed:
+	default:
+		close(u.closed)
+	}
+}
+
+// #1701: a host whose workspace was stopped is closed and shown offline, so a Start waits
+// for its new connection.
+func TestAStoppedHostsUplinkIsClosedAndOffline(t *testing.T) {
+	r := NewRouter(nil, nil)
+	up := &uplinkStandIn{closed: make(chan struct{})}
+	r.AttachHost("ws", up)
+	if state, _ := r.State("ws"); !state.online() {
+		t.Fatalf("%+v", state)
+	}
+	r.CloseStopped("ws")
+	select {
+	case <-up.closed:
+	default:
+		t.Fatal("its uplink is still open")
+	}
+	if state, _ := r.State("ws"); state.online() || r.Reaches("ws") {
+		t.Fatalf("%+v", state)
+	}
+	r.CloseStopped("nobody")
+}

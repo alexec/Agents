@@ -28,6 +28,8 @@ type fakeRouter struct {
 	// answer is the host's end: nil for a host that is not there.
 	answer    func(host, method string, params json.RawMessage) *Reply
 	delivered []delivered
+	// stopped: the hosts the Stopped hook closed (#1701).
+	stopped []string
 }
 
 type delivered struct {
@@ -341,6 +343,12 @@ func newHarness(t *testing.T, opts ...func(*harnessOptions)) *harness {
 				return nil
 			},
 			InstalledOver: func(string) string { return o.installedOver },
+			Stopped: func(host string) {
+				h.router.mu.Lock()
+				h.router.stopped = append(h.router.stopped, host)
+				h.router.mu.Unlock()
+				h.router.setOnline(host, false)
+			},
 			HostCommand: func() (string, error) {
 				return "curl -fsSL https://cp.local/v1/install.sh | sh -s -- 'agents-control:2:h:secret'", nil
 			},
