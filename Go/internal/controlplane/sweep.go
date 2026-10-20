@@ -7,13 +7,14 @@ import (
 	"strings"
 	"time"
 
+	"github.com/alexec/agents/Go/internal/controlplane/audit"
 	"github.com/alexec/agents/Go/internal/controlplane/records"
 	"github.com/alexec/agents/Go/internal/controlplane/store"
 )
 
 // What the store keeps, and for how long (StoreSweep, #174, contracts/store.md rule 11).
+// Events are the audit (#996), kept for control.json's auditDays.
 const (
-	eventsKept           = 7 * 24 * time.Hour
 	codesKeptAfterExpiry = 24 * time.Hour
 	tombstonesKept       = 7 * 24 * time.Hour
 	leftoversKept        = time.Hour
@@ -47,8 +48,8 @@ func sweep(ctx context.Context, rs *records.Records, now time.Time, most int) (s
 	s := rs.Store
 	left := most
 
-	// Events, by the day in their key.
-	oldestDay := now.Add(-eventsKept).UTC().Format(sweptDayLayout)
+	// Events, by the day in their key: the audit's days (#996).
+	days := audit.Days(rs.Settings())
 	events, err := s.List(ctx, eventsPrefix)
 	if err != nil {
 		return report, err
@@ -57,8 +58,7 @@ func sweep(ctx context.Context, rs *records.Records, now time.Time, most int) (s
 		if left <= 0 {
 			break
 		}
-		day, _, _ := strings.Cut(strings.TrimPrefix(e.Key, eventsPrefix), "/")
-		if day >= oldestDay {
+		if !audit.Expired(e.Key, days, now) {
 			continue
 		}
 		if err := s.Delete(ctx, e.Key); err != nil {

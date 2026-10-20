@@ -68,7 +68,7 @@ relay reads
 {"c":0,"m":{"jsonrpc":"2.0","method":"relay/deliver","params":{"needID":{"permission":"<UUID>"},"device":"<UUID>","alert":false}}}
 
 host reads
-{"c":1,"open":{"grant":"operator","client":"<UUID>","fanOut":true}}
+{"c":1,"open":{"grant":"operator","client":"<UUID>","fanOut":true,"actor":{"user":"<uuid>","userName":"Local owner","client":"<UUID>","clientName":"Golden window"}}}
 
 # notifications
 

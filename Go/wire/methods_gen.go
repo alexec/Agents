@@ -43,7 +43,7 @@ var (
 	CallArtifactWrite                  = Method[ArtifactWriteRequest, Empty]{"artifact/write"}
 	CallAttentionPending               = Method[Empty, AttentionPending]{"attention/pending"}
 	CallBackupsConfigure               = Method[BackupSettings, BackupState]{"backups/configure"}
-	CallBackupsMake                    = Method[BackupMakeRequest, BackupState]{"backups/make"}
+	CallBackupsMake                    = Method[Empty, BackupState]{"backups/make"}
 	CallBackupsRestore                 = Method[BackupRestoreRequest, BackupRestoreResult]{"backups/restore"}
 	CallBackupsState                   = Method[Empty, BackupState]{"backups/state"}
 	CallCatalogDestinationState        = Method[DestinationStateRequest, DestinationStateAnswer]{"catalog/destination-state"}
@@ -59,7 +59,6 @@ var (
 	CallConnectionsSignIn              = Method[ConnectionProviderRequest, ConnectionSignIn]{"connections/sign-in"}
 	CallConnectionsSignInCancel        = Method[ConnectionSignInFlowRequest, ConnectionSignIn]{"connections/sign-in/cancel"}
 	CallConnectionsSignInComplete      = Method[ConnectionSignInCompleteRequest, ConnectionSignIn]{"connections/sign-in/complete"}
-	CallConnectionsSignInEmail         = Method[ConnectionEmailRequest, ConnectionTokenAnswer]{"connections/sign-in/email"}
 	CallConnectionsSignInToken         = Method[ConnectionTokenRequest, ConnectionTokenAnswer]{"connections/sign-in/token"}
 	CallConnectionsSignInWait          = Method[ConnectionSignInFlowRequest, ConnectionSignIn]{"connections/sign-in/wait"}
 	CallConnectorsSetup                = Method[ConnectorSetupRequest, ConnectorSetup]{"connectors/setup"}
@@ -356,22 +355,19 @@ const (
 // What the control plane answers (control.openrpc.json).
 var (
 	CallAttentionNeed               = Method[AttentionNeed, Empty]{"attention/need"}
-	CallAttentionTurn               = Method[AttentionTurn, Empty]{"attention/turn"}
-	CallBackupsCommit               = Method[BackupStoreCommit, Backup]{"backups/commit"}
-	CallBackupsDownload             = Method[BackupStorePartRequest, BackupStorePart]{"backups/download"}
-	CallBackupsStored               = Method[Empty, BackupStoreList]{"backups/stored"}
-	CallBackupsUpload               = Method[BackupStorePart, Empty]{"backups/upload"}
+	CallAuditExport                 = Method[AuditQuery, AuditExport]{"audit/export"}
+	CallAuditList                   = Method[AuditQuery, AuditList]{"audit/list"}
 	CallClientsAnnounce             = Method[ClientAnnounce, Admitted]{"clients/announce"}
 	CallClientsConnections          = Method[Empty, []ClientConnection]{"clients/connections"}
 	CallClientsForget               = Method[ClientRequest, Empty]{"clients/forget"}
 	CallClientsForgetSelf           = Method[Empty, Empty]{"clients/forgetSelf"}
 	CallClientsList                 = Method[Empty, []ClientRecord]{"clients/list"}
-	CallClientsSetActivityToken     = Method[ActivityToken, Empty]{"clients/setActivityToken"}
 	CallClientsSetGrant             = Method[JSONValue, Empty]{"clients/setGrant"}
 	CallClientsSetPushToken         = Method[PushToken, Empty]{"clients/setPushToken"}
 	CallClientsStartPairing         = Method[ClientPairingRequest, ControlCodeShown]{"clients/startPairing"}
 	CallClientsStopPairing          = Method[Empty, Empty]{"clients/stopPairing"}
 	CallControlPing                 = Method[Empty, Empty]{"control/ping"}
+	CallControlSetAuditDays         = Method[AuditDays, AuditDays]{"control/setAuditDays"}
 	CallControlSetProjectDetection  = Method[ProjectDetection, ProjectDetection]{"control/setProjectDetection"}
 	CallControlStatus               = Method[Empty, ControlStatus]{"control/status"}
 	CallGitCredential               = Method[GitCredentialRequest, GitCredential]{"git/credential"}

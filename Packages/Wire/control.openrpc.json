@@ -35,6 +35,54 @@
       }
     },
     {
+      "name": "audit/export",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/AuditQuery"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/AuditExport"
+        }
+      }
+    },
+    {
+      "name": "audit/list",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/AuditQuery"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/AuditList"
+        }
+      }
+    },
+    {
       "name": "attention/turn",
       "x-capability": "liveactivity/1",
       "description": "A host, on its channel 0 (#1744): a session's turn moved to a new phase.",
@@ -373,6 +421,30 @@
         "name": "result",
         "schema": {
           "$ref": "daemon.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
+      "name": "control/setAuditDays",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/AuditDays"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/AuditDays"
         }
       }
     },

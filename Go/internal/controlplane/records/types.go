@@ -225,7 +225,9 @@ type Settings struct {
 	ProjectDetection json.RawMessage
 	// Chat apps that reach the person's agents (#1012), as written.
 	Channels json.RawMessage
-	Extra    Extra
+	// How many days audit entries are kept (#996); nil is the default, 90.
+	AuditDays *int
+	Extra     Extra
 }
 
 type settingsJSON struct {
@@ -243,11 +245,12 @@ type settingsJSON struct {
 	Rev              *int            `json:"rev,omitempty"`
 	ProjectDetection json.RawMessage `json:"projectDetection,omitempty"`
 	Channels         json.RawMessage `json:"channels,omitempty"`
+	AuditDays        *int            `json:"auditDays,omitempty"`
 }
 
 func (s Settings) MarshalJSON() ([]byte, error) {
 	return encodeKeeping(settingsJSON{s.Name, s.Port, s.HomeHost, s.MachineID, s.URL, s.Pin, s.Endpoints, s.Epoch,
-		s.ControlKey, s.Owner, s.Created, s.Rev, s.ProjectDetection, s.Channels}, s.Extra)
+		s.ControlKey, s.Owner, s.Created, s.Rev, s.ProjectDetection, s.Channels, s.AuditDays}, s.Extra)
 }
 
 func (s *Settings) UnmarshalJSON(data []byte) error {
@@ -257,7 +260,7 @@ func (s *Settings) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	*s = Settings{j.Name, j.Port, j.HomeHost, j.MachineID, j.URL, j.Pin, j.Endpoints, j.Epoch, j.ControlKey, j.Owner,
-		j.Created, j.Rev, j.ProjectDetection, j.Channels, extra}
+		j.Created, j.Rev, j.ProjectDetection, j.Channels, j.AuditDays, extra}
 	return nil
 }
 

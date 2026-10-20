@@ -1,0 +1,347 @@
+// Package audit is who did what (#996, spec 736 US8, T3): the control plane writes an
+// entry for each action a client takes through it, with the actor it knows the client by,
+// never one the client names. Entries are the control plane's events, under
+// <prefix>/v1/events/<day>/, kept for auditDays (90 by default) and swept by day.
+//
+// Until people (#994) are built, a control plane has one person, the local owner, and
+// every client is theirs: every actor is the local owner and the client it used.
+package audit
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"fmt"
+	"sort"
+	"strings"
+	"time"
+
+	"github.com/alexec/agents/Go/internal/controlplane/records"
+	"github.com/alexec/agents/Go/internal/controlplane/store"
+	"github.com/alexec/agents/Go/wire"
+)
+
+const (
+	// DefaultDays is how long entries are kept when control.json says nothing (FR-040).
+	DefaultDays = 90
+	// MostDays bounds what an admin may set: ten years.
+	MostDays = 3650
+	// Prefix is where entries live: the control plane's events.
+	Prefix    = "v1/events/"
+	dayLayout = "2006-01-02"
+	// Kind is an entry's kind, beside the control plane's own events (clientPaired, …).
+	Kind = "audit"
+
+	defaultLimit = 200
+	mostLimit    = 1000
+	// mostExported bounds an export, so that one answer stays a size a client can hold.
+	mostExported = 50_000
+	mostTarget   = 120
+	// LocalOwnerName is the one person's name until people have names of their own (#994).
+	LocalOwnerName = "Local owner"
+)
+
+// hostActions are the calls passed to a host that the audit keeps (spec 736 US8 #1): start,
+// stop or delete an agent; answer a card; change a setting; approve a workflow, a plugin
+// or an MCP server. Reads, prompts and presence are not kept.
+var hostActions = map[string]string{
+	"agents/start":             "Started an agent",
+	"agents/stop":              "Stopped an agent",
+	"agents/stopBackground":    "Stopped an agent's background work",
+	"agents/delete":            "Deleted an agent",
+	"agents/archive":           "Archived an agent",
+	"agents/unarchive":         "Unarchived an agent",
+	"agents/fork":              "Forked an agent",
+	"agents/branchFrom":        "Branched an agent",
+	"agents/continueInProject": "Continued an agent in a project",
+	"sessions/delete":          "Deleted a session",
+	"approvals/answer":         "Answered an approval",
+	"permissions/answer":       "Answered a permission card",
+	"elicitations/answer":      "Answered a question card",
+	"agents/answerSandbox":     "Answered a sandbox card",
+	"agents/setSandbox":        "Changed an agent's sandbox",
+	"agents/setCeiling":        "Changed an agent's cost ceiling",
+	"preferences/set":          "Changed a setting",
+	"cost/setLimits":           "Changed the cost limits",
+	"wake/set":                 "Changed the wake settings",
+	"projects/setDiskSpace":    "Changed a project's disk space",
+	"projects/setHelperLimits": "Changed a project's helper limits",
+	"runtimes/setProvider":     "Changed a runtime's provider",
+	"runtimes/disableProvider": "Turned off a runtime's provider",
+	"runtimes/install":         "Installed a runtime",
+	"runtimes/logout":          "Signed a runtime out",
+	"workflows/approve":        "Approved a workflow",
+	"workflows/deny":           "Denied a workflow",
+	"workflows/enable":         "Turned a workflow on or off",
+	"workflows/run":            "Ran a workflow",
+	"workflows/archive":        "Archived a workflow",
+	"workflows/delete":         "Deleted a workflow",
+	"plugins/approve":          "Approved a plugin",
+	"mcp/approve":              "Approved an MCP server",
+	"mcp/add":                  "Added an MCP server",
+	"mcp/add-by-hand":          "Added an MCP server",
+	"mcp/remove":               "Removed an MCP server",
+	"mcp/set-secret":           "Set an MCP server's secret",
+	"skills/add":               "Added a skill",
+	"skills/remove":            "Removed a skill",
+	"marketplaces/add":         "Added a marketplace",
+	"marketplaces/remove":      "Removed a marketplace",
+	"marketplaces/set-enabled": "Turned a marketplace on or off",
+	"projects/add":             "Added a project",
+	"projects/delete":          "Deleted a project",
+	"projects/archive":         "Archived a project",
+	"worktrees/remove":         "Removed a worktree",
+	"resources/declare":        "Declared a resource",
+	"resources/remove":         "Removed a resource",
+	"connections/disconnect":   "Disconnected an account",
+	"credentials/lend":         "Lent a sign-in",
+	"daemon/quit":              "Quit a host",
+}
+
+// controlActions are the control plane's own methods that the audit keeps.
+var controlActions = map[string]string{
+	"clients/forget":              "Forgot a client",
+	"clients/forgetSelf":          "Forgot a client",
+	"devices/forget":              "Forgot a client",
+	"hosts/remove":                "Removed a machine",
+	"clients/startPairing":        "Made a pairing code",
+	"devices/startPairing":        "Made a pairing code",
+	"hosts/startEnroll":           "Made a machine code",
+	"hosts/install":               "Installed a machine over ssh",
+	"hosts/update":                "Updated a machine",
+	"hosts/setRelay":              "Changed a machine's relay",
+	"hosts/lendSignIn":            "Lent a sign-in to a machine",
+	"hosts/lendGit":               "Lent git access to a machine",
+	"hosts/detect":                "Added the machines it found",
+	"control/setProjectDetection": "Changed project detection",
+	"control/setAuditDays":        "Changed how long the audit is kept",
+	"providers/add":               "Added a workspace provider",
+	"providers/create":            "Added a workspace provider",
+	"providers/update":            "Changed a workspace provider",
+	"providers/remove":            "Removed a workspace provider",
+	"hosts/start":                 "Started a workspace",
+	"hosts/stop":                  "Stopped a workspace",
+	"hosts/deleteWorkspace":       "Deleted a workspace",
+	"hosts/link":                  "Linked a machine to a workspace",
+	"hosts/unlink":                "Unlinked a machine from its workspace",
+}
+
+// Action is what a call is in words, and whether the audit keeps it at all. toHost is a
+// call passed to a host; otherwise it is the control plane's own.
+func Action(method string, toHost bool) (string, bool) {
+	if toHost {
+		a, ok := hostActions[method]
+		return a, ok
+	}
+	a, ok := controlActions[method]
+	return a, ok
+}
+
+// targetKeys are where a call names what it acts on, most telling first.
+var targetKeys = []string{"agentID", "id", "workflowID", "key", "server", "name", "host", "provider",
+	"permissionID", "requestID", "cwd", "folder", "path"}
+
+// Target is what a call acts on, as its params name it: an agent, a workflow, a server,
+// a folder. Never a prompt or a secret's value.
+func Target(params json.RawMessage) *string {
+	var o map[string]json.RawMessage
+	if json.Unmarshal(params, &o) != nil {
+		return nil
+	}
+	for _, k := range targetKeys {
+		var s string
+		if json.Unmarshal(o[k], &s) == nil && strings.TrimSpace(s) != "" {
+			s = strings.TrimPrefix(strings.TrimSpace(s), "file://")
+			if len(s) > mostTarget {
+				s = s[:mostTarget] + "…"
+			}
+			return &s
+		}
+	}
+	return nil
+}
+
+// Days is how long entries are kept: what control.json says, or the default.
+func Days(settings *records.Settings) int {
+	if settings != nil && settings.AuditDays != nil && *settings.AuditDays > 0 {
+		return *settings.AuditDays
+	}
+	return DefaultDays
+}
+
+// stored is an entry as the store keeps it, beside the control plane's own events.
+type stored struct {
+	Kind   string           `json:"kind"`
+	Action string           `json:"action,omitempty"`
+	Method string           `json:"method,omitempty"`
+	Host   *string          `json:"host,omitempty"`
+	Target *string          `json:"target,omitempty"`
+	At     records.Stamp    `json:"at"`
+	By     string           `json:"by,omitempty"`
+	Actor  *wire.AuditActor `json:"actor,omitempty"`
+}
+
+// Log writes and reads the entries.
+type Log struct {
+	Store store.Store
+	Now   func() time.Time
+}
+
+func (l *Log) now() time.Time {
+	if l.Now != nil {
+		return l.Now()
+	}
+	return time.Now()
+}
+
+// Key is where an entry made at t goes: by day, then by the millisecond, so a day's
+// keys sort by time.
+func Key(t time.Time) string {
+	t = t.UTC()
+	return fmt.Sprintf("%s%s/%013d-%s.json", Prefix, t.Format(dayLayout), t.UnixMilli(), strings.ToLower(records.NewUUID()[:8]))
+}
+
+// Write keeps one action. The store's create-only write means two copies never write
+// over each other.
+func (l *Log) Write(ctx context.Context, actor wire.AuditActor, method, action string, host string, target *string) error {
+	at := l.now()
+	e := stored{Kind: Kind, Action: action, Method: method, Target: target, At: records.At(at), Actor: &actor}
+	if actor.Client != nil {
+		e.By = string(*actor.Client)
+	}
+	if host != "" {
+		e.Host = &host
+	}
+	data, err := records.Encode(e)
+	if err != nil {
+		return err
+	}
+	_, err = l.Store.Put(ctx, Key(at), data, store.Absent)
+	return err
+}
+
+// decode reads one stored event as an entry. The control plane's own events between
+// copies (clientPaired, hostRemoved, …) are not entries: the call that made each is.
+func decode(key string, data []byte, owner func(by string) wire.AuditActor) (wire.AuditEntry, bool) {
+	var s stored
+	if json.Unmarshal(data, &s) != nil || s.At.IsZero() {
+		return wire.AuditEntry{}, false
+	}
+	e := wire.AuditEntry{ID: strings.TrimSuffix(strings.TrimPrefix(key, Prefix), ".json"), At: wire.DateOf(s.At.Time),
+		Action: s.Action, Method: s.Method, Target: s.Target}
+	if s.Host != nil {
+		h := wire.HostID(*s.Host)
+		e.Host = &h
+	}
+	if s.Kind != Kind {
+		return wire.AuditEntry{}, false
+	}
+	if s.Actor != nil {
+		e.Actor = *s.Actor
+	} else {
+		e.Actor = owner(s.By)
+	}
+	return e, true
+}
+
+// Query is a list or an export asked for: the range, and whose entries. Only is set for
+// a caller who sees only their own.
+type Query struct {
+	Since, Until time.Time
+	User         string
+	Limit        int
+	Oldest       bool
+}
+
+// NewQuery is a wire query bounded: at most days back, at most mostLimit entries.
+func NewQuery(q wire.AuditQuery, days int, now time.Time, export bool) Query {
+	out := Query{Since: now.Add(-time.Duration(days) * 24 * time.Hour), Until: now, Limit: defaultLimit}
+	if q.Since != nil && q.Since.Time().After(out.Since) {
+		out.Since = q.Since.Time()
+	}
+	if q.Until != nil && q.Until.Time().Before(out.Until) {
+		out.Until = q.Until.Time()
+	}
+	if q.User != nil {
+		out.User = *q.User
+	}
+	if q.Limit != nil && *q.Limit > 0 {
+		out.Limit = int(*q.Limit)
+	}
+	out.Limit = min(out.Limit, mostLimit)
+	if export {
+		out.Limit, out.Oldest = mostExported, true
+	}
+	return out
+}
+
+// List is the entries in the query's range, newest first (or oldest first for an
+// export), and whether more were left out. It reads a day's keys at a time, from the
+// newest day, and stops once it has enough.
+func (l *Log) List(ctx context.Context, q Query, owner func(by string) wire.AuditActor) ([]wire.AuditEntry, bool, error) {
+	var days []string
+	for d := q.Until.UTC(); !d.Before(q.Since.UTC().Truncate(24 * time.Hour)); d = d.Add(-24 * time.Hour) {
+		days = append(days, d.Format(dayLayout))
+	}
+	if q.Oldest {
+		for i, j := 0, len(days)-1; i < j; i, j = i+1, j-1 {
+			days[i], days[j] = days[j], days[i]
+		}
+	}
+	out := []wire.AuditEntry{}
+	for _, day := range days {
+		keys, err := l.Store.List(ctx, Prefix+day+"/")
+		if err != nil {
+			return nil, false, err
+		}
+		sort.Slice(keys, func(i, j int) bool {
+			if q.Oldest {
+				return keys[i].Key < keys[j].Key
+			}
+			return keys[i].Key > keys[j].Key
+		})
+		for _, k := range keys {
+			object, err := l.Store.Get(ctx, k.Key)
+			if err != nil {
+				return nil, false, err
+			}
+			if object == nil {
+				continue
+			}
+			e, ok := decode(k.Key, object.Data, owner)
+			if !ok {
+				continue
+			}
+			at := e.At.Time()
+			if at.Before(q.Since) || at.After(q.Until) || q.User != "" && e.Actor.User != q.User {
+				continue
+			}
+			if len(out) == q.Limit {
+				return out, true, nil
+			}
+			out = append(out, e)
+		}
+	}
+	return out, false, nil
+}
+
+// Lines is entries as JSON lines (FR-041's export).
+func Lines(entries []wire.AuditEntry) string {
+	var b bytes.Buffer
+	for _, e := range entries {
+		line, err := json.Marshal(e)
+		if err != nil {
+			continue
+		}
+		b.Write(line)
+		b.WriteByte('\n')
+	}
+	return b.String()
+}
+
+// Expired says whether an event's key is older than days before now: what the sweep
+// deletes.
+func Expired(key string, days int, now time.Time) bool {
+	day, _, _ := strings.Cut(strings.TrimPrefix(key, Prefix), "/")
+	return day < now.Add(-time.Duration(days)*24*time.Hour).UTC().Format(dayLayout)
+}

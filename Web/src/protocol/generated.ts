@@ -105,18 +105,6 @@ export interface ACPProviderInfo {
   configured?: boolean;
 }
 
-/**
- * clients/setActivityToken (#1744): the push token of one session's Live Activity on this device,
- * in hex, for the control plane to update it by APNs while the Remote is not running. startedAt is
- * when the turn began, where the activity's timer counts from. No token takes it away.
- */
-export interface ActivityToken {
-  agentID: UUID;
-  token?: string;
-  environment: PushEnvironment;
-  startedAt: WireDate;
-}
-
 /** What either announce is answered with: who the new party now is. */
 export interface Admitted {
   client?: UUID;
@@ -192,17 +180,6 @@ export interface Agent {
    * conversation of its own, its runtime reads the record it was given ahead of its first prompt.
    */
   branchedFrom?: UUID;
-  /**
-   * The last file it showed with show_file that the person has not looked at (#1802): a mark on its
-   * row, never a group or a badge. Cleared when the person opens the conversation or marks it read.
-   */
-  fileToSee?: ShownFile;
-  /**
-   * The person asked a chat paused by a spent allowance to carry on when the allowance is back
-   * (#1859). At `at` the host sends "continue" in the same chat; a turn that works, any other
-   * message, Stop or Archive takes it away.
-   */
-  continueWhenBack?: ContinueWhenBack;
 }
 
 export type AgentArchivedReason = "byUser" | "byAgent";
@@ -451,14 +428,74 @@ export interface AttentionPending {
 }
 
 /**
- * attention/turn (#1744): a host says that a session's turn moved to a new phase, so the control
- * plane can update that session's Live Activity on a device by APNs. No words: the phase, and when
- * it ended.
+ * Who did something through the control plane (#996, spec 736 FR-039), as the control plane wrote
+ * it: never taken from a client. A person and their client, or a bot and the event that started it.
+ * On a control plane with one person, the user is always the local owner.
  */
-export interface AttentionTurn {
-  agentID: UUID;
-  phase: TurnPhase;
-  endedAt?: WireDate;
+export interface AuditActor {
+  /** The person's id (people/<id>.json). */
+  user: string;
+  userName?: string;
+  client?: UUID;
+  clientName?: string;
+  event?: AuditCause;
+}
+
+/** The event that started a bot's action (#996). */
+export interface AuditCause {
+  kind: string;
+  id: string;
+}
+
+/**
+ * control/setAuditDays (#996): how many days audit entries are kept, 1 to 3,650. The default is 90.
+ */
+export interface AuditDays {
+  days: number;
+}
+
+/**
+ * One audit entry (#996): who did what, on which machine, and when. `action` is in words; `method`
+ * is the call it came from.
+ */
+export interface AuditEntry {
+  id: string;
+  at: WireDate;
+  action: string;
+  method: string;
+  host?: HostID;
+  target?: string;
+  actor: AuditActor;
+}
+
+/** audit/export's answer (#996): the entries as JSON lines, oldest first, at most 50,000. */
+export interface AuditExport {
+  lines: string;
+  count: number;
+}
+
+/**
+ * audit/list's answer (#996): entries newest first, how many days the control plane keeps them, and
+ * whether older ones were left out.
+ */
+export interface AuditList {
+  entries: AuditEntry[];
+  days: number;
+  more: boolean;
+  /** Whether the caller sees every person's entries. */
+  admin: boolean;
+}
+
+/**
+ * audit/list and audit/export (#996): a time range and, for an admin, one person. A member sees
+ * only their own entries, whatever `user` says.
+ */
+export interface AuditQuery {
+  since?: WireDate;
+  until?: WireDate;
+  user?: string;
+  /** At most this many, newest first; 200 when absent, never more than 1,000. */
+  limit?: number;
 }
 
 export interface AuthStatus {
@@ -493,94 +530,6 @@ export interface BackgroundItem {
 export type BackgroundItemKind = "task" | "subagent";
 
 export type BackgroundItemState = "running" | "paused" | "completed" | "failed" | "stopped" | "disconnected";
-
-export interface Backup {
-  id: string;
-  machine: string;
-  rootID: string;
-  madeAt: WireDate;
-  bytes: number;
-  agents: number;
-  thisMachine: boolean;
-}
-
-export type BackupEvery = "off" | "daily" | "weekly";
-
-export interface BackupMakeRequest {
-  /** Answer once the backup is made, not at once: a provider's delete waits for it (#1815). */
-  wait?: boolean;
-}
-
-export interface BackupRestoreRequest {
-  id: string;
-}
-
-export interface BackupRestoreResult {
-  restored: number;
-  skipped: number;
-}
-
-export interface BackupSettings {
-  every: BackupEvery;
-  keep: number;
-  folder?: string;
-  /**
-   * Where backups go (#1815): this machine's folder, or the control plane's store. Left out is the
-   * machine's default: the store for a server linked to a control plane, else the folder.
-   */
-  target?: BackupTarget;
-}
-
-export interface BackupState {
-  settings: BackupSettings;
-  folder: string;
-  backups: Backup[];
-  making: boolean;
-  lastError?: string;
-  /**
-   * The machine is linked to a control plane, so it can back up to the control plane's store
-   * (#1815).
-   */
-  canUseControl?: boolean;
-}
-
-/**
- * A host's backup whose parts are all uploaded: the control plane writes its .json last, then keeps
- * the newest keep of this host's (#1815).
- */
-export interface BackupStoreCommit {
-  name: string;
-  parts: number;
-  machine: string;
-  rootID: string;
-  madeAt: WireDate;
-  bytes: number;
-  agents: number;
-  keep: number;
-}
-
-export interface BackupStoreList {
-  backups: Backup[];
-}
-
-/**
- * One part of a backup, at most 8 MiB (#1815): a host's upload, or the control plane's answer to a
- * download.
- */
-export interface BackupStorePart {
-  /** On an upload, the backup's name; this host's own folder is the control plane's to say. */
-  name: string;
-  part: number;
-  data: Base64;
-}
-
-export interface BackupStorePartRequest {
-  /** A listed backup's id: <host>/<name>. */
-  id: string;
-  part: number;
-}
-
-export type BackupTarget = "folder" | "control";
 
 export interface Block {
   waits: Wait[];
@@ -800,6 +749,8 @@ export interface ChannelOpen {
   tunnel?: string;
   tunnelRef?: string;
   fanOut?: boolean;
+  /** Who the channel's calls are from, written by the control plane (#996). */
+  actor?: AuditActor;
 }
 
 export interface ChartHint {
@@ -951,28 +902,10 @@ export interface ConnectionDisconnectAnswer {
 }
 
 /**
- * connections/sign-in/email (#1780): one IMAP mailbox for the email server. The host signs in once
- * to check it, keeps the app password in its own store, and never logs it or gives it back. The
- * answer is a ConnectionTokenAnswer.
- */
-export interface ConnectionEmailRequest {
-  /**
-   * The IMAP server, such as imap.fastmail.com (imaps:// on 993 when it names no scheme),
-   * imap://host for STARTTLS on 143, or with a port.
-   */
-  server: string;
-  /** Who signs in, usually the mail address. */
-  user: string;
-  /** An app password made for Agents at the mail provider. */
-  password: string;
-}
-
-/**
  * A tool the person connects to: GitHub (#1335) and Linear (#1343) with OAuth, GitLab (#1630) with
- * OAuth on gitlab.com or a personal access token on any GitLab, and email (#1780): one IMAP mailbox
- * with an app password.
+ * OAuth on gitlab.com or a personal access token on any GitLab.
  */
-export type ConnectionProvider = "github" | "linear" | "gitlab" | "email";
+export type ConnectionProvider = "github" | "linear" | "gitlab";
 
 export interface ConnectionProviderRequest {
   provider: ConnectionProvider;
@@ -1231,19 +1164,6 @@ export interface ContinueInProjectRequest {
   text: string;
   attachments: Attachment[];
   requestID?: UUID;
-}
-
-/** When a chat paused by a spent allowance carries on by itself (#1859). */
-export interface ContinueWhenBack {
-  /**
-   * When it sends "continue": the provider's reset time, or the app's next check of the runtime.
-   */
-  at: WireDate;
-  /**
-   * True when `at` is the time the provider said the allowance resets; false when it is only the
-   * app's next check.
-   */
-  resetKnown: boolean;
 }
 
 /**
@@ -3190,12 +3110,6 @@ export interface ProviderCreate {
   name: string;
   options?: JSONValue;
   clones?: string[];
-  /**
-   * The repository to start it from (#1809), an https git address. A provider whose New Workspace
-   * form has `repository`, such as Codespaces, makes the workspace from it; any other has the host
-   * clone it once it joins, before `clones`.
-   */
-  repository?: string;
 }
 
 /** What providers/create made. */
@@ -4392,14 +4306,6 @@ export interface TunnelOpen {
   ref: string;
 }
 
-/**
- * Where a session's turn is, as its Live Activity says it (#1744): working; a question or an
- * approval waiting on the person; done; ended cleanly but wanting the person, as Needs you in the
- * sidebars (#1861); stopped on purpose or out of allowance, as Paused in the sidebars (#1869);
- * ended for another reason; or gone (archived or deleted).
- */
-export type TurnPhase = "working" | "question" | "approval" | "done" | "needs_you" | "paused" | "failed" | "gone";
-
 export interface TurnSummary {
   id: UUID;
   start: number;
@@ -4426,7 +4332,6 @@ export interface TurnsPage {
   turns: TurnSummary[];
   firstTurn: number;
   openStart: number;
-  firstPrompt?: number;
 }
 
 export interface TurnsRequest {
@@ -4882,9 +4787,7 @@ export interface Methods {
   "agents/answerSandbox": { params: AnswerSandboxRequest; result: Agent };
   "agents/archive": { params: AgentRequest; result: Empty };
   "agents/branchFrom": { params: BranchFromRequest; result: UUID };
-  "agents/cancelContinue": { params: AgentRequest; result: Agent };
   "agents/continueInProject": { params: ContinueInProjectRequest; result: UUID };
-  "agents/continueWhenBack": { params: AgentRequest; result: Agent };
   "agents/delete": { params: AgentRequest; result: Empty };
   "agents/discardDraft": { params: DiscardDraftRequest; result: Empty };
   "agents/editQueued": { params: EditQueuedRequest; result: EditQueuedResult };
@@ -4917,10 +4820,8 @@ export interface Methods {
   "approvals/read": { params: ApprovalReadRequest; result: GuardedChangeReading };
   "artifact/write": { params: ArtifactWriteRequest; result: Empty };
   "attention/pending": { params: Empty; result: AttentionPending };
-  "backups/configure": { params: BackupSettings; result: BackupState };
-  "backups/make": { params: BackupMakeRequest; result: BackupState };
-  "backups/restore": { params: BackupRestoreRequest; result: BackupRestoreResult };
-  "backups/state": { params: Empty; result: BackupState };
+  "audit/export": { params: AuditQuery; result: AuditExport };
+  "audit/list": { params: AuditQuery; result: AuditList };
   "changes/file": { params: ChangesFileRequest; result: ChangedFileDetail };
   "changes/list": { params: ChangesListRequest; result: ChangesList };
   "clients/forgetSelf": { params: Empty; result: Empty };
@@ -4929,11 +4830,11 @@ export interface Methods {
   "connections/sign-in": { params: ConnectionProviderRequest; result: ConnectionSignIn };
   "connections/sign-in/cancel": { params: ConnectionSignInFlowRequest; result: ConnectionSignIn };
   "connections/sign-in/complete": { params: ConnectionSignInCompleteRequest; result: ConnectionSignIn };
-  "connections/sign-in/email": { params: ConnectionEmailRequest; result: ConnectionTokenAnswer };
   "connections/sign-in/token": { params: ConnectionTokenRequest; result: ConnectionTokenAnswer };
   "connections/sign-in/wait": { params: ConnectionSignInFlowRequest; result: ConnectionSignIn };
   "connectors/setup": { params: ConnectorSetupRequest; result: ConnectorSetup };
   "connectors/setup/skip": { params: ConnectorSkipRequest; result: ConnectorSetup };
+  "control/setAuditDays": { params: AuditDays; result: AuditDays };
   "control/status": { params: Empty; result: ControlStatus };
   "cost/state": { params: Empty; result: CostState };
   "credentials/lend": { params: CredentialsLend; result: Empty };
@@ -4955,14 +4856,11 @@ export interface Methods {
   "hosts/dropKept": { params: KeptRequestID; result: Empty };
   "hosts/lastHeard": { params: HostRequest; result: HostLastHeard };
   "hosts/lendGit": { params: LendGit; result: Empty };
-  "hosts/link": { params: HostLink; result: ControlHost };
   "hosts/list": { params: Empty; result: ControlHost[] };
   "hosts/listKept": { params: Empty; result: KeptList };
   "hosts/retryKept": { params: KeptRequestID; result: Empty };
-  "hosts/setWorkspaceOptions": { params: HostWorkspaceOptions; result: ControlHost };
   "hosts/start": { params: HostRequest; result: ControlHost };
   "hosts/stop": { params: HostStop; result: ControlHost };
-  "hosts/unlink": { params: HostRequest; result: ControlHost };
   "leases/snapshot": { params: Empty; result: LeaseSnapshot };
   "mcp/health": { params: Empty; result: MCPHealthSnapshot };
   "mcp/health/check": { params: MCPHealthCheckRequest; result: MCPHealthSnapshot };
@@ -5000,13 +4898,6 @@ export interface Methods {
   "projects/setPinned": { params: SetPinnedRequest; result: ProjectSummary };
   "projects/unarchive": { params: ProjectRequest; result: ProjectSummary };
   "projects/undoGuardedChange": { params: GuardedChangeRequest; result: ProjectSummary };
-  "providers/add": { params: ProviderAdd; result: ProviderSummary };
-  "providers/create": { params: ProviderCreate; result: ProviderCreated };
-  "providers/list": { params: Empty; result: ProviderList };
-  "providers/options": { params: ProviderRequest; result: ProviderOptions };
-  "providers/refresh": { params: ProviderRequest; result: Empty };
-  "providers/remove": { params: ProviderRequest; result: Empty };
-  "providers/update": { params: ProviderAdd; result: ProviderSummary };
   "runtimes/accounts": { params: Empty; result: RuntimeAccount[] };
   "runtimes/allowances": { params: string | null; result: RuntimeAllowances };
   "runtimes/list": { params: Empty; result: RuntimeStatus[] };
@@ -5048,9 +4939,7 @@ export const MethodTarget = {
   "agents/answerSandbox": "host",
   "agents/archive": "host",
   "agents/branchFrom": "host",
-  "agents/cancelContinue": "host",
   "agents/continueInProject": "host",
-  "agents/continueWhenBack": "host",
   "agents/delete": "host",
   "agents/discardDraft": "host",
   "agents/editQueued": "host",
@@ -5083,10 +4972,8 @@ export const MethodTarget = {
   "approvals/read": "host",
   "artifact/write": "host",
   "attention/pending": "host",
-  "backups/configure": "host",
-  "backups/make": "host",
-  "backups/restore": "host",
-  "backups/state": "host",
+  "audit/export": "control",
+  "audit/list": "control",
   "changes/file": "host",
   "changes/list": "host",
   "clients/forgetSelf": "control",
@@ -5095,11 +4982,11 @@ export const MethodTarget = {
   "connections/sign-in": "host",
   "connections/sign-in/cancel": "host",
   "connections/sign-in/complete": "host",
-  "connections/sign-in/email": "host",
   "connections/sign-in/token": "host",
   "connections/sign-in/wait": "host",
   "connectors/setup": "host",
   "connectors/setup/skip": "host",
+  "control/setAuditDays": "control",
   "control/status": "control",
   "cost/state": "host",
   "credentials/lend": "host",
@@ -5121,14 +5008,11 @@ export const MethodTarget = {
   "hosts/dropKept": "control",
   "hosts/lastHeard": "control",
   "hosts/lendGit": "control",
-  "hosts/link": "control",
   "hosts/list": "control",
   "hosts/listKept": "control",
   "hosts/retryKept": "control",
-  "hosts/setWorkspaceOptions": "control",
   "hosts/start": "control",
   "hosts/stop": "control",
-  "hosts/unlink": "control",
   "leases/snapshot": "host",
   "mcp/health": "host",
   "mcp/health/check": "host",
@@ -5166,13 +5050,6 @@ export const MethodTarget = {
   "projects/setPinned": "host",
   "projects/unarchive": "host",
   "projects/undoGuardedChange": "host",
-  "providers/add": "control",
-  "providers/create": "control",
-  "providers/list": "control",
-  "providers/options": "control",
-  "providers/refresh": "control",
-  "providers/remove": "control",
-  "providers/update": "control",
   "runtimes/accounts": "host",
   "runtimes/allowances": "host",
   "runtimes/list": "host",
@@ -5220,12 +5097,10 @@ export interface Notifications {
   "agent/showFile": ShowFileNotification;
   "agents/draftOptions": DraftOptionsNotification;
   "attention/changed": AttentionNotification;
-  "backups/changed": BackupState;
   "clone/changed": CloneNotification;
   "control/hostChanged": JSONValue;
   "control/keptChanged": KeptList;
   "control/keptDelivered": KeptDelivered;
-  "control/providersChanged": ProviderList;
   "disk/changed": DiskState;
   "files/changed": FilesChangedNotification;
   "leases/changed": LeaseSnapshot;
@@ -5250,10 +5125,9 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ACPAuthMethod: { required: ["id"], optional: ["name", "description", "_meta"] },
   ACPPromptCapabilities: { required: [], optional: ["image", "audio", "embeddedContext"] },
   ACPProviderInfo: { required: ["id"], optional: ["name", "protocol", "configured"] },
-  ActivityToken: { required: ["agentID", "environment", "startedAt"], optional: ["token"] },
   Admitted: { required: [], optional: ["client", "host", "grant"] },
   AdoptRequest: { required: ["runtimeID", "sessionID", "cwd"], optional: [] },
-  Agent: { required: ["id", "runtimeID", "cwd", "state", "startOptions", "advertisedOptions", "availableCommands", "createdAt", "lastActivityAt"], optional: ["title", "labels", "runtimeSessionID", "isUnread", "reportSeenAt", "endedReason", "archivedReason", "usage", "lastTurnUsage", "costToDate", "costCeiling", "tokensToDate", "tokenCeiling", "plans", "background", "additionalDirectories", "mcpServers", "queuedPrompts", "suggestedPrompts", "startedByWorkflow", "purpose", "startedByRun", "startedByAgent", "chainDepth", "eventWait", "worktree", "pendingMove", "startingPoint", "startRequestID", "persona", "restartPickUps", "report", "outcomeAsked", "archiveRequest", "afterTurn", "archivedAt", "sandboxOverride", "effectiveSandbox", "pendingSandboxFailure", "missingFolder", "listsLeftOut", "titleIsPersons", "runtimeTitle", "madeInRoot", "queuedStart", "branchedFrom", "fileToSee", "continueWhenBack"] },
+  Agent: { required: ["id", "runtimeID", "cwd", "state", "startOptions", "advertisedOptions", "availableCommands", "createdAt", "lastActivityAt"], optional: ["title", "labels", "runtimeSessionID", "isUnread", "reportSeenAt", "endedReason", "archivedReason", "usage", "lastTurnUsage", "costToDate", "costCeiling", "tokensToDate", "tokenCeiling", "plans", "background", "additionalDirectories", "mcpServers", "queuedPrompts", "suggestedPrompts", "startedByWorkflow", "purpose", "startedByRun", "startedByAgent", "chainDepth", "eventWait", "worktree", "pendingMove", "startingPoint", "startRequestID", "persona", "restartPickUps", "report", "outcomeAsked", "archiveRequest", "afterTurn", "archivedAt", "sandboxOverride", "effectiveSandbox", "pendingSandboxFailure", "missingFolder", "listsLeftOut", "titleIsPersons", "runtimeTitle", "madeInRoot", "queuedStart", "branchedFrom"] },
   AgentRemovedNotification: { required: ["agentID"], optional: [] },
   AgentRequest: { required: ["agentID"], optional: [] },
   AgentWorkspaces: { required: ["providers"], optional: [] },
@@ -5281,20 +5155,16 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   AttentionNeed: { required: [], optional: ["need", "headline", "buzz", "withdraw", "waiting"] },
   AttentionNotification: { required: ["needID", "alert"], optional: ["need", "to"] },
   AttentionPending: { required: ["needs", "deliveries"], optional: [] },
-  AttentionTurn: { required: ["agentID", "phase"], optional: ["endedAt"] },
+  AuditActor: { required: ["user"], optional: ["userName", "client", "clientName", "event"] },
+  AuditCause: { required: ["kind", "id"], optional: [] },
+  AuditDays: { required: ["days"], optional: [] },
+  AuditEntry: { required: ["id", "at", "action", "method", "actor"], optional: ["host", "target"] },
+  AuditExport: { required: ["lines", "count"], optional: [] },
+  AuditList: { required: ["entries", "days", "more", "admin"], optional: [] },
+  AuditQuery: { required: [], optional: ["since", "until", "user", "limit"] },
   AuthStatus: { required: ["kind", "label"], optional: [] },
   AuthenticateRequest: { required: ["runtimeID", "methodID"], optional: [] },
   BackgroundItem: { required: ["id", "kind", "name", "state", "canStop", "isStopping", "startedAt"], optional: ["taskType", "detail", "command", "parentID", "toolCallID", "outputFilePath", "summary", "lastToolName", "endedAt"] },
-  Backup: { required: ["id", "machine", "rootID", "madeAt", "bytes", "agents", "thisMachine"], optional: [] },
-  BackupMakeRequest: { required: [], optional: ["wait"] },
-  BackupRestoreRequest: { required: ["id"], optional: [] },
-  BackupRestoreResult: { required: ["restored", "skipped"], optional: [] },
-  BackupSettings: { required: ["every", "keep"], optional: ["folder", "target"] },
-  BackupState: { required: ["settings", "folder", "backups", "making"], optional: ["lastError", "canUseControl"] },
-  BackupStoreCommit: { required: ["name", "parts", "machine", "rootID", "madeAt", "bytes", "agents", "keep"], optional: [] },
-  BackupStoreList: { required: ["backups"], optional: [] },
-  BackupStorePart: { required: ["name", "part", "data"], optional: [] },
-  BackupStorePartRequest: { required: ["id", "part"], optional: [] },
   Block: { required: ["waits"], optional: ["checkAgainAt", "wakeOn", "clearedAt", "clearedBy"] },
   BranchFromRequest: { required: ["agentID", "entryID"], optional: [] },
   BranchSummary: { required: ["name"], optional: ["remote"] },
@@ -5316,7 +5186,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ChangesFileRequest: { required: ["agentID", "path", "whole"], optional: [] },
   ChangesList: { required: ["files", "git", "reportsEdits"], optional: ["more"] },
   ChangesListRequest: { required: ["agentID"], optional: [] },
-  ChannelOpen: { required: ["grant", "client"], optional: ["device", "relayed", "tunnel", "tunnelRef", "fanOut"] },
+  ChannelOpen: { required: ["grant", "client"], optional: ["device", "relayed", "tunnel", "tunnelRef", "fanOut", "actor"] },
   ChartHint: { required: ["mark", "x", "y"], optional: ["color", "title"] },
   ClientAnnounce: { required: ["id", "publicKey", "name", "kind"], optional: [] },
   ClientConnection: { required: ["client", "relayed"], optional: ["through"] },
@@ -5332,7 +5202,6 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ConfigOption: { required: ["id", "name", "type"], optional: ["description", "category", "currentValue", "options"] },
   Connection: { required: ["provider", "state", "connectedAt"], optional: ["login", "installURL", "workspace", "expiresAt"] },
   ConnectionDisconnectAnswer: { required: [], optional: ["error"] },
-  ConnectionEmailRequest: { required: ["server", "user", "password"], optional: [] },
   ConnectionProviderRequest: { required: ["provider"], optional: ["origin"] },
   ConnectionSignIn: { required: ["flowID", "provider", "status", "grant", "verificationURL", "expiresAt"], optional: ["userCode", "installURL", "connection", "message"] },
   ConnectionSignInCompleteRequest: { required: ["flowID", "state"], optional: ["code", "error"] },
@@ -5349,7 +5218,6 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ConnectorWorkflow: { required: ["id", "name"], optional: [] },
   ContentBlockAnnotations: { required: [], optional: ["audience", "priority"] },
   ContinueInProjectRequest: { required: ["agentID", "text", "attachments"], optional: ["requestID"] },
-  ContinueWhenBack: { required: ["at", "resetKnown"], optional: [] },
   ControlAuth: { required: ["id", "nonce", "mac", "kind"], optional: ["for", "epoch", "capabilities"] },
   ControlClientChanged: { required: [], optional: ["client", "removed"] },
   ControlCodeShown: { required: ["text", "expires"], optional: ["command"] },
@@ -5590,7 +5458,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ProjectsListRequest: { required: ["includeArchived"], optional: [] },
   PromptRequest: { required: ["agentID", "text", "attachments", "from"], optional: ["sendID"] },
   ProviderAdd: { required: ["name", "kind"], optional: ["id", "command", "args", "url", "headers", "commands", "map", "secrets", "cli", "draft"] },
-  ProviderCreate: { required: ["id", "name"], optional: ["options", "clones", "repository"] },
+  ProviderCreate: { required: ["id", "name"], optional: ["options", "clones"] },
   ProviderCreated: { required: ["workspace", "joining"], optional: [] },
   ProviderDraftAnswer: { required: ["draft", "question", "yes"], optional: [] },
   ProviderDraftAnswered: { required: ["note"], optional: ["map", "preset"] },
@@ -5738,7 +5606,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   TunnelOpen: { required: ["runtime", "ref"], optional: [] },
   TurnSummary: { required: ["id", "start", "end"], optional: ["ask", "last", "concise", "outcome", "steps", "usage"] },
   TurnUsage: { required: ["totalTokens", "inputTokens", "outputTokens"], optional: ["thoughtTokens", "cachedReadTokens", "cachedWriteTokens", "cost"] },
-  TurnsPage: { required: ["turns", "firstTurn", "openStart"], optional: ["firstPrompt"] },
+  TurnsPage: { required: ["turns", "firstTurn", "openStart"], optional: [] },
   TurnsRequest: { required: ["agentID", "limit"], optional: ["before"] },
   UnqueueRequest: { required: ["agentID", "promptID"], optional: [] },
   Usage: { required: ["used", "size", "at"], optional: ["cost"] },

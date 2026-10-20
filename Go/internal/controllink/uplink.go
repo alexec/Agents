@@ -465,6 +465,7 @@ func (u *Uplink) receive(line string) {
 			c.device = string(*frame.Open.Device)
 		}
 		c.fanOut = frame.Open.FanOut != nil && *frame.Open.FanOut
+		c.actor = frame.Open.Actor
 		u.mu.Lock()
 		old := u.channels[c.number]
 		if u.channels != nil {
@@ -522,9 +523,20 @@ type channel struct {
 	device string
 	// fanOut is whether the control plane reads fan-out frames on this channel's uplink.
 	fanOut bool
+	// Who the channel's calls are from, as the control plane wrote it (#996).
+	actor  *wire.AuditActor
 	once   sync.Once
 	closed atomic.Bool
 }
+
+// Actored is a connection whose calls the control plane says are from someone (#996).
+type Actored interface {
+	Actor() *wire.AuditActor
+}
+
+// Actor is who the control plane says this channel's calls are from; nil from a control
+// plane before #996.
+func (c *channel) Actor() *wire.AuditActor { return c.actor }
 
 // FanOuter is a connection a broadcast can reach in one frame with the others on its
 // uplink (#167).

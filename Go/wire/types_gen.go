@@ -24,14 +24,6 @@ type ACPProviderInfo struct {
 	Configured *bool   `json:"configured,omitzero"`
 }
 
-// clients/setActivityToken (#1744): the push token of one session's Live Activity on this device, in hex, for the control plane to update it by APNs while the Remote is not running. startedAt is when the turn began, where the activity's timer counts from. No token takes it away.
-type ActivityToken struct {
-	AgentID     UUID            `json:"agentID"`
-	Token       *string         `json:"token,omitzero"`
-	Environment PushEnvironment `json:"environment"`
-	StartedAt   Date            `json:"startedAt"`
-}
-
 // What either announce is answered with: who the new party now is.
 type Admitted struct {
 	Client *UUID   `json:"client,omitzero"`
@@ -109,10 +101,6 @@ type Agent struct {
 	QueuedStart           *QueuedStart          `json:"queuedStart,omitzero"`
 	// The session this one was branched from at one of its prompts (#1658). Until it has a conversation of its own, its runtime reads the record it was given ahead of its first prompt.
 	BranchedFrom *UUID `json:"branchedFrom,omitzero"`
-	// The last file it showed with show_file that the person has not looked at (#1802): a mark on its row, never a group or a badge. Cleared when the person opens the conversation or marks it read.
-	FileToSee *ShownFile `json:"fileToSee,omitzero"`
-	// The person asked a chat paused by a spent allowance to carry on when the allowance is back (#1859). At `at` the host sends "continue" in the same chat; a turn that works, any other message, Stop or Archive takes it away.
-	ContinueWhenBack *ContinueWhenBack `json:"continueWhenBack,omitzero"`
 }
 
 type AgentArchivedReason string
@@ -468,11 +456,60 @@ type AttentionPending struct {
 	Deliveries []AttentionDelivery `json:"deliveries"`
 }
 
-// attention/turn (#1744): a host says that a session's turn moved to a new phase, so the control plane can update that session's Live Activity on a device by APNs. No words: the phase, and when it ended.
-type AttentionTurn struct {
-	AgentID UUID      `json:"agentID"`
-	Phase   TurnPhase `json:"phase"`
-	EndedAt *Date     `json:"endedAt,omitzero"`
+// Who did something through the control plane (#996, spec 736 FR-039), as the control plane wrote it: never taken from a client. A person and their client, or a bot and the event that started it. On a control plane with one person, the user is always the local owner.
+type AuditActor struct {
+	// The person's id (people/<id>.json).
+	User       string      `json:"user"`
+	UserName   *string     `json:"userName,omitzero"`
+	Client     *UUID       `json:"client,omitzero"`
+	ClientName *string     `json:"clientName,omitzero"`
+	Event      *AuditCause `json:"event,omitzero"`
+}
+
+// The event that started a bot's action (#996).
+type AuditCause struct {
+	Kind string `json:"kind"`
+	ID   string `json:"id"`
+}
+
+// control/setAuditDays (#996): how many days audit entries are kept, 1 to 3,650. The default is 90.
+type AuditDays struct {
+	Days int64 `json:"days"`
+}
+
+// One audit entry (#996): who did what, on which machine, and when. `action` is in words; `method` is the call it came from.
+type AuditEntry struct {
+	ID     string     `json:"id"`
+	At     Date       `json:"at"`
+	Action string     `json:"action"`
+	Method string     `json:"method"`
+	Host   *HostID    `json:"host,omitzero"`
+	Target *string    `json:"target,omitzero"`
+	Actor  AuditActor `json:"actor"`
+}
+
+// audit/export's answer (#996): the entries as JSON lines, oldest first, at most 50,000.
+type AuditExport struct {
+	Lines string `json:"lines"`
+	Count int64  `json:"count"`
+}
+
+// audit/list's answer (#996): entries newest first, how many days the control plane keeps them, and whether older ones were left out.
+type AuditList struct {
+	Entries []AuditEntry `json:"entries"`
+	Days    int64        `json:"days"`
+	More    bool         `json:"more"`
+	// Whether the caller sees every person's entries.
+	Admin bool `json:"admin"`
+}
+
+// audit/list and audit/export (#996): a time range and, for an admin, one person. A member sees only their own entries, whatever `user` says.
+type AuditQuery struct {
+	Since *Date   `json:"since,omitzero"`
+	Until *Date   `json:"until,omitzero"`
+	User  *string `json:"user,omitzero"`
+	// At most this many, newest first; 200 when absent, never more than 1,000.
+	Limit *int64 `json:"limit,omitzero"`
 }
 
 type AuthStatus struct {
@@ -521,123 +558,6 @@ const (
 	BackgroundItemStateStopped      BackgroundItemState = "stopped"
 	BackgroundItemStateDisconnected BackgroundItemState = "disconnected"
 )
-
-type Backup struct {
-	ID          string `json:"id"`
-	Machine     string `json:"machine"`
-	RootID      string `json:"rootID"`
-	MadeAt      Date   `json:"madeAt"`
-	Bytes       int64  `json:"bytes"`
-	Agents      int64  `json:"agents"`
-	ThisMachine bool   `json:"thisMachine"`
-}
-
-type BackupEvery string
-
-const (
-	BackupEveryOff    BackupEvery = "off"
-	BackupEveryDaily  BackupEvery = "daily"
-	BackupEveryWeekly BackupEvery = "weekly"
-)
-
-// UnmarshalJSON reads a value this build does not know as "daily".
-func (v *BackupEvery) UnmarshalJSON(b []byte) error {
-	var s string
-	if err := json.Unmarshal(b, &s); err != nil {
-		return err
-	}
-	switch BackupEvery(s) {
-	case BackupEveryOff, BackupEveryDaily, BackupEveryWeekly:
-		*v = BackupEvery(s)
-	default:
-		*v = BackupEveryDaily
-	}
-	return nil
-}
-
-type BackupMakeRequest struct {
-	// Answer once the backup is made, not at once: a provider's delete waits for it (#1815).
-	Wait *bool `json:"wait,omitzero"`
-}
-
-type BackupRestoreRequest struct {
-	ID string `json:"id"`
-}
-
-type BackupRestoreResult struct {
-	Restored int64 `json:"restored"`
-	Skipped  int64 `json:"skipped"`
-}
-
-type BackupSettings struct {
-	Every  BackupEvery `json:"every"`
-	Keep   int64       `json:"keep"`
-	Folder *string     `json:"folder,omitzero"`
-	// Where backups go (#1815): this machine's folder, or the control plane's store. Left out is the machine's default: the store for a server linked to a control plane, else the folder.
-	Target *BackupTarget `json:"target,omitzero"`
-}
-
-type BackupState struct {
-	Settings  BackupSettings `json:"settings"`
-	Folder    string         `json:"folder"`
-	Backups   []Backup       `json:"backups"`
-	Making    bool           `json:"making"`
-	LastError *string        `json:"lastError,omitzero"`
-	// The machine is linked to a control plane, so it can back up to the control plane's store (#1815).
-	CanUseControl *bool `json:"canUseControl,omitzero"`
-}
-
-// A host's backup whose parts are all uploaded: the control plane writes its .json last, then keeps the newest keep of this host's (#1815).
-type BackupStoreCommit struct {
-	Name    string `json:"name"`
-	Parts   int64  `json:"parts"`
-	Machine string `json:"machine"`
-	RootID  string `json:"rootID"`
-	MadeAt  Date   `json:"madeAt"`
-	Bytes   int64  `json:"bytes"`
-	Agents  int64  `json:"agents"`
-	Keep    int64  `json:"keep"`
-}
-
-type BackupStoreList struct {
-	Backups []Backup `json:"backups"`
-}
-
-// One part of a backup, at most 8 MiB (#1815): a host's upload, or the control plane's answer to a download.
-type BackupStorePart struct {
-	// On an upload, the backup's name; this host's own folder is the control plane's to say.
-	Name string `json:"name"`
-	Part int64  `json:"part"`
-	Data Data   `json:"data"`
-}
-
-type BackupStorePartRequest struct {
-	// A listed backup's id: <host>/<name>.
-	ID   string `json:"id"`
-	Part int64  `json:"part"`
-}
-
-type BackupTarget string
-
-const (
-	BackupTargetFolder  BackupTarget = "folder"
-	BackupTargetControl BackupTarget = "control"
-)
-
-// UnmarshalJSON reads a value this build does not know as "folder".
-func (v *BackupTarget) UnmarshalJSON(b []byte) error {
-	var s string
-	if err := json.Unmarshal(b, &s); err != nil {
-		return err
-	}
-	switch BackupTarget(s) {
-	case BackupTargetFolder, BackupTargetControl:
-		*v = BackupTarget(s)
-	default:
-		*v = BackupTargetFolder
-	}
-	return nil
-}
 
 type Block struct {
 	Waits        []Wait         `json:"waits"`
@@ -927,6 +847,8 @@ type ChannelOpen struct {
 	Tunnel    *string `json:"tunnel,omitzero"`
 	TunnelRef *string `json:"tunnelRef,omitzero"`
 	FanOut    *bool   `json:"fanOut,omitzero"`
+	// Who the channel's calls are from, written by the control plane (#996).
+	Actor *AuditActor `json:"actor,omitzero"`
 }
 
 type ChartHint struct {
@@ -1122,24 +1044,13 @@ type ConnectionDisconnectAnswer struct {
 	Error *string `json:"error,omitzero"`
 }
 
-// connections/sign-in/email (#1780): one IMAP mailbox for the email server. The host signs in once to check it, keeps the app password in its own store, and never logs it or gives it back. The answer is a ConnectionTokenAnswer.
-type ConnectionEmailRequest struct {
-	// The IMAP server, such as imap.fastmail.com (imaps:// on 993 when it names no scheme), imap://host for STARTTLS on 143, or with a port.
-	Server string `json:"server"`
-	// Who signs in, usually the mail address.
-	User string `json:"user"`
-	// An app password made for Agents at the mail provider.
-	Password string `json:"password"`
-}
-
-// A tool the person connects to: GitHub (#1335) and Linear (#1343) with OAuth, GitLab (#1630) with OAuth on gitlab.com or a personal access token on any GitLab, and email (#1780): one IMAP mailbox with an app password.
+// A tool the person connects to: GitHub (#1335) and Linear (#1343) with OAuth, GitLab (#1630) with OAuth on gitlab.com or a personal access token on any GitLab.
 type ConnectionProvider string
 
 const (
 	ConnectionProviderGithub ConnectionProvider = "github"
 	ConnectionProviderLinear ConnectionProvider = "linear"
 	ConnectionProviderGitlab ConnectionProvider = "gitlab"
-	ConnectionProviderEmail  ConnectionProvider = "email"
 )
 
 type ConnectionProviderRequest struct {
@@ -1402,14 +1313,6 @@ type ContinueInProjectRequest struct {
 	Text        string       `json:"text"`
 	Attachments []Attachment `json:"attachments"`
 	RequestID   *UUID        `json:"requestID,omitzero"`
-}
-
-// When a chat paused by a spent allowance carries on by itself (#1859).
-type ContinueWhenBack struct {
-	// When it sends "continue": the provider's reset time, or the app's next check of the runtime.
-	At Date `json:"at"`
-	// True when `at` is the time the provider said the allowance resets; false when it is only the app's next check.
-	ResetKnown bool `json:"resetKnown"`
 }
 
 // The peer's answer: {"auth":…} (ControlAuth.Auth). `kind` is mac, iphone, ipad, browser, host, relay or copy.
@@ -3767,8 +3670,6 @@ type ProviderCreate struct {
 	Name    string     `json:"name"`
 	Options JSONValue  `json:"options,omitzero"`
 	Clones  []string   `json:"clones,omitzero"`
-	// The repository to start it from (#1809), an https git address. A provider whose New Workspace form has `repository`, such as Codespaces, makes the workspace from it; any other has the host clone it once it joins, before `clones`.
-	Repository *string `json:"repository,omitzero"`
 }
 
 // What providers/create made.
@@ -5230,20 +5131,6 @@ type TunnelOpen struct {
 	Ref     string `json:"ref"`
 }
 
-// Where a session's turn is, as its Live Activity says it (#1744): working; a question or an approval waiting on the person; done; ended cleanly but wanting the person, as Needs you in the sidebars (#1861); stopped on purpose or out of allowance, as Paused in the sidebars (#1869); ended for another reason; or gone (archived or deleted).
-type TurnPhase string
-
-const (
-	TurnPhaseWorking  TurnPhase = "working"
-	TurnPhaseQuestion TurnPhase = "question"
-	TurnPhaseApproval TurnPhase = "approval"
-	TurnPhaseDone     TurnPhase = "done"
-	TurnPhaseNeedsYou TurnPhase = "needs_you"
-	TurnPhasePaused   TurnPhase = "paused"
-	TurnPhaseFailed   TurnPhase = "failed"
-	TurnPhaseGone     TurnPhase = "gone"
-)
-
 type TurnSummary struct {
 	ID      UUID              `json:"id"`
 	Start   int64             `json:"start"`
@@ -5267,10 +5154,9 @@ type TurnUsage struct {
 }
 
 type TurnsPage struct {
-	Turns       []TurnSummary `json:"turns"`
-	FirstTurn   int64         `json:"firstTurn"`
-	OpenStart   int64         `json:"openStart"`
-	FirstPrompt *int64        `json:"firstPrompt,omitzero"`
+	Turns     []TurnSummary `json:"turns"`
+	FirstTurn int64         `json:"firstTurn"`
+	OpenStart int64         `json:"openStart"`
 }
 
 type TurnsRequest struct {
