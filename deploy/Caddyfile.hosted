@@ -1,0 +1,31 @@
+# The front door for the hosted service (#1807, compose.hosted.yaml): the sign-up pages at
+# AGENTS_HOSTED_DOMAIN, and each account's control plane at <account>.AGENTS_HOSTED_ACCOUNTS_DOMAIN,
+# all passed to agents-hosted, which routes by name. A name gets its certificate from Let's
+# Encrypt the first time it is asked for (on-demand TLS), only once agents-hosted says the
+# name is its pages' or an account's, so nobody can have it fetch one for every name.
+#
+# DNS: AGENTS_HOSTED_DOMAIN and *.AGENTS_HOSTED_ACCOUNTS_DOMAIN point at this machine. Ports
+# 443 and 80 must be open.
+{
+	email {$ACME_EMAIL}
+	admin off
+	on_demand_tls {
+		ask http://hosted:8795/v1/tls-allowed
+	}
+}
+
+https:// {
+	tls {
+		on_demand
+	}
+	# Forms and WebSocket upgrades only: no big bodies.
+	request_body {
+		max_size 1MB
+	}
+	# Caddy writes X-Forwarded-For with the address it saw; agents-hosted and each control
+	# plane believe it from Caddy's address only (AGENTS_CONTROL_TRUSTED_PROXIES).
+	reverse_proxy hosted:8795 {
+		health_uri /healthz
+		health_interval 5s
+	}
+}

@@ -72,6 +72,10 @@ type Config struct {
 	// Told whenever the web remote's listener starts or fails to (071 R3): serve --home
 	// writes it beside the log for Agents Host.
 	WebChanged func(web.Status)
+	// Hosted is a copy we run for an account on our servers (#1807): it has no ssh, so no
+	// tunnels, and it installs, finds and updates no machine over ssh. Machines join by a
+	// code, their join command, or a provider.
+	Hosted bool
 	// Where other copies reach this one (several copies over one store, US3). "" for a
 	// single copy (Agents Host's), which links with nobody and takes no leases (#206).
 	PeerURL string
@@ -198,7 +202,7 @@ func New(cfg Config) (*Service, error) {
 		s.mesh = newMesh(s, cfg.PeerURL, cfg.CopyBeat)
 	}
 	// Tunnels belong to a single copy: its ssh is the person's on this machine.
-	if cfg.PeerURL == "" {
+	if cfg.PeerURL == "" && !cfg.Hosted {
 		s.tunnels = hosttunnels.New(hosttunnels.Config{Store: cfg.Store, Port: cfg.Port, Log: s.log,
 			Hosts:   func(context.Context) []records.HostRecord { return s.records.Hosts() },
 			Changed: func(change hosttunnels.Changed) { s.router.BroadcastControl("control/tunnelChanged", change) },

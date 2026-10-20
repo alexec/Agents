@@ -30,7 +30,7 @@ COPY Go/go.mod Go/go.sum ./
 RUN go mod download
 COPY Go/ ./
 ARG VERSION=dev
-RUN for cmd in agents-control workspace-commands; do \
+RUN for cmd in agents-control workspace-commands agents-hosted; do \
       CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -trimpath \
         -ldflags "-s -w -X github.com/alexec/agents/Go/internal/buildinfo.Version=$VERSION" \
         -o /out/$cmd ./cmd/$cmd || exit 1; \
@@ -54,7 +54,7 @@ FROM alpine:3.20 AS base
 RUN apk add --no-cache ca-certificates && adduser -D -H -u 10001 control \
  && mkdir /data && chown control /data
 # workspace-commands sits beside agents-control, where it looks first.
-COPY --from=go /out/agents-control /out/workspace-commands /
+COPY --from=go /out/agents-control /out/workspace-commands /out/agents-hosted /
 COPY --from=web /src/Web/dist/ /web/
 USER control
 EXPOSE 8791
