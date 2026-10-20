@@ -170,3 +170,37 @@ func TestRootIDFileIsSwifts(t *testing.T) {
 		t.Fatalf("slashes not escaped as Swift escapes them: %s", b)
 	}
 }
+
+// EntriesFrom reads whole lines from a byte on, leaves a line still being written for next
+// time, and keeps no line index (P20261019-1).
+func TestEntriesFrom(t *testing.T) {
+	s, _ := Open(t.TempDir())
+	id := NewUUID()
+	for _, text := range []string{"one", "two"} {
+		s.Append(id, wire.TranscriptEntry{ID: NewUUID(), Kind: wire.TranscriptEntryKind{AgentMessage: &wire.TranscriptEntryKindAgentMessage{Text: text}}})
+	}
+	path := s.Loc.Transcript(string(id))
+	f, _ := os.OpenFile(path, os.O_APPEND|os.O_WRONLY, 0)
+	f.WriteString(`{"half`)
+	f.Close()
+	var texts []string
+	var starts []int64
+	end, size, err := s.EntriesFrom(id, 0, func(e wire.TranscriptEntry, start, _ int64) {
+		texts, starts = append(texts, e.Kind.AgentMessage.Text), append(starts, start)
+	})
+	if err != nil || strings.Join(texts, ",") != "one,two" || starts[0] != 0 || size != end+6 {
+		t.Fatalf("%v %v end %d size %d %v", texts, starts, end, size, err)
+	}
+	texts = nil
+	if again, _, _ := s.EntriesFrom(id, starts[1], func(e wire.TranscriptEntry, _, _ int64) {
+		texts = append(texts, e.Kind.AgentMessage.Text)
+	}); again != end || strings.Join(texts, ",") != "two" {
+		t.Fatalf("from the second line: %v end %d", texts, again)
+	}
+	if _, size, _ := s.EntriesFrom(id, size+10, func(wire.TranscriptEntry, int64, int64) { t.Fatal("read past the end") }); size == 0 {
+		t.Fatal("size")
+	}
+	if len(s.ib.indexes) != 0 {
+		t.Fatalf("kept %d line indexes", len(s.ib.indexes))
+	}
+}
