@@ -68,6 +68,9 @@ pushes to GitHub shows them on its **Workflows** page, off:
    files: change them as you like. A skill of the same name that the project has already
    is kept.
 3. For **Work an issue**, make an `agent` label in the repository, if it has none.
+   Its agent asks before each tool it uses (`permission-mode: default`), because anyone
+   can write an issue. It reads the issue as data, and uses only the comments of the
+   repository's own people.
 
 Nothing runs before you turn a workflow on, and a workflow that an agent turns on waits
 for your OK. Without `repo:` they listen to the repository that the project's folder

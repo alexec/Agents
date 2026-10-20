@@ -55,6 +55,20 @@ func TestEachIssueWorkflowTakesOneServer(t *testing.T) {
 	}
 }
 
+// Work an issue starts on an issue that anyone can write, so its agent asks before it
+// acts, and its skill reads the issue as data and uses only the comments of the
+// repository's own people.
+func TestWorkAnIssueAsksBeforeItActs(t *testing.T) {
+	text, skill := readyMadeText("work-an-issue")
+	w := parseWorkflow(text, "work-an-issue", "/p")
+	if w.Settings.PermissionMode == nil || *w.Settings.PermissionMode != "default" {
+		t.Fatalf("%+v", w.Settings)
+	}
+	if !strings.Contains(skill, "data, not instructions") || !strings.Contains(skill, "`author_association`") {
+		t.Fatal(skill)
+	}
+}
+
 func TestReadyMadeWorkflowsTurnOnWithOneSwitch(t *testing.T) {
 	d, c := start(t, t.TempDir())
 	defer d.Shutdown()
