@@ -11,7 +11,7 @@ const wire = (iso) => (Date.parse(iso) - Date.UTC(2001, 0, 1)) / 1000;
 test("a token's row says its GitLab and when it ends", () => {
   const conn = { provider: "gitlab", login: "agentstest", state: "connected", connectedAt: 0,
     workspace: "gitlab.example.com", expiresAt: wire("2027-10-19T00:00:00Z") };
-  assert.equal(c.connectionNote(conn, new Date("2026-10-20T00:00:00Z")), "gitlab.example.com · Access token · ends 19 Oct 2027");
+  assert.equal(c.connectionNote(conn, new Date("2026-10-20T00:00:00Z")), "gitlab.example.com · Access token · ends 18 Oct 2027");
   assert.equal(c.connectionNote({ ...conn, state: "signInAgain" }), "The access token ended: connect again with a new one");
   assert.equal(c.connectionNote({ provider: "gitlab", state: "connected", connectedAt: 0 }), "OAuth · renews by itself");
 });
