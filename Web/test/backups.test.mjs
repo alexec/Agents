@@ -16,8 +16,10 @@ test("a backup says whose it is, how many agents and its size", () => {
 
 test("a restore says what came back and what was here already", () => {
   assert.equal(backups.restoredWords({ restored: 3, skipped: 0 }), "Restored 3 agents, archived.");
-  assert.equal(backups.restoredWords({ restored: 1, skipped: 1 }), "Restored 1 agent, archived. 1 was here already.");
-  assert.equal(backups.restoredWords({ restored: 0, skipped: 4 }), "Restored 0 agents, archived. 4 were here already.");
+  assert.equal(backups.restoredWords({ restored: 1, skipped: 1 }), "Restored 1 agent, archived. 1 agent was here already.");
+  assert.equal(backups.restoredWords({ restored: 0, skipped: 4 }), "Nothing to restore: 4 agents were here already.");
+  assert.equal(backups.restoredWords({ restored: 0, skipped: 1 }), "Nothing to restore: 1 agent was here already.");
+  assert.equal(backups.restoredWords({ restored: 0, skipped: 0 }), "The backup holds no agents.");
 });
 
 test("every schedule has words", () => {

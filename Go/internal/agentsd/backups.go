@@ -427,7 +427,8 @@ func (d *Daemon) pruneBackups(keep int64) {
 // that has none of its own.
 func (d *Daemon) restoreBackup(id string) (wire.BackupRestoreResult, error) {
 	res := wire.BackupRestoreResult{}
-	if _, ok := d.readBackup(id); !ok {
+	listed, ok := d.readBackup(id)
+	if !ok {
 		return res, &Error{Code: CodeInvalidParams, Message: "There is no backup " + id + "."}
 	}
 	archive, _, _ := d.backupPaths(id)
@@ -441,7 +442,9 @@ func (d *Daemon) restoreBackup(id string) (wire.BackupRestoreResult, error) {
 		return res, fmt.Errorf("the backup can't be read: %w", err)
 	}
 	tr := tar.NewReader(gz)
-	var m backupManifest
+	// The root that made it, from the .json the list read: a record that names none is
+	// stamped with it, so one from another machine is never run here.
+	madeIn := listed.RootID
 	// One agent's files are held until the next agent's begin: a backup is written agent
 	// by agent. Its record goes in last, so a restore cut off leaves a folder with no
 	// record, which the store does not load.
@@ -451,7 +454,7 @@ func (d *Daemon) restoreBackup(id string) (wire.BackupRestoreResult, error) {
 		if held == "" {
 			return nil
 		}
-		restored, err := d.restoreAgent(held, files, m.RootID)
+		restored, err := d.restoreAgent(held, files, madeIn)
 		held, files = "", map[string][]byte{}
 		if err != nil {
 			return err
@@ -479,8 +482,6 @@ func (d *Daemon) restoreBackup(id string) (wire.BackupRestoreResult, error) {
 			return res, err
 		}
 		switch {
-		case h.Name == "manifest.json":
-			json.Unmarshal(b, &m)
 		case slices.Contains(backupRootFiles, h.Name):
 			p := filepath.Join(d.Store.Loc.Root, h.Name)
 			if _, err := os.Stat(p); errors.Is(err, os.ErrNotExist) {

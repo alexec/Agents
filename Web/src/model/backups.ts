@@ -40,6 +40,7 @@ export function confirmTitle(backup: Backup): string {
 
 export function restoredWords(result: BackupRestoreResult): string {
   const back = result.restored === 1 ? "1 agent" : `${result.restored} agents`;
-  const here = result.skipped === 0 ? "" : result.skipped === 1 ? " 1 was here already." : ` ${result.skipped} were here already.`;
-  return `Restored ${back}, archived.${here}`;
+  const here = result.skipped === 1 ? "1 agent was here already." : `${result.skipped} agents were here already.`;
+  if (result.restored === 0) return result.skipped === 0 ? "The backup holds no agents." : `Nothing to restore: ${here}`;
+  return result.skipped === 0 ? `Restored ${back}, archived.` : `Restored ${back}, archived. ${here}`;
 }

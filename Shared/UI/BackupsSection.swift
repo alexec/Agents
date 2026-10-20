@@ -126,7 +126,8 @@ struct BackupsSection: View {
 
     static func restored(_ result: DaemonAPI.BackupRestoreResult) -> String {
         let back = result.restored == 1 ? "1 agent" : "\(result.restored) agents"
-        let here = result.skipped == 0 ? "" : result.skipped == 1 ? " 1 was here already." : " \(result.skipped) were here already."
-        return "Restored \(back), archived.\(here)"
+        let here = result.skipped == 1 ? "1 agent was here already." : "\(result.skipped) agents were here already."
+        if result.restored == 0 { return result.skipped == 0 ? "The backup holds no agents." : "Nothing to restore: \(here)" }
+        return result.skipped == 0 ? "Restored \(back), archived." : "Restored \(back), archived. \(here)"
     }
 }

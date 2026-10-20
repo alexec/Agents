@@ -47,7 +47,8 @@ made. If a backup fails, the section says why.
 
 It says, for example, **Restored 42 agents, archived.** An agent that is on this machine
 already is left as it is, and counted as **was here already**, so you can restore the
-same backup again safely. Nothing on the new machine is changed or deleted. The usage and
+same backup again safely: then it says **Nothing to restore: 42 agents were here
+already.** Nothing on the new machine is changed or deleted. The usage and
 time history come back only to a machine that has none of its own.
 
 A restored agent is kept for your **Archived agents** time from the day you restore it.
