@@ -11,6 +11,15 @@ struct EventsListView: View {
     /// Nil: every project and the Mac.
     @State private var scope: EventScope?
     @State private var picked: Event?
+    /// Events, or Audit: who did what through the control plane (#996).
+    @State private var pane: Pane = .events
+
+    enum Pane: String, CaseIterable, Identifiable {
+        case events = "Events"
+        case audit = "Audit"
+
+        var id: Self { self }
+    }
 
     private struct Ask: Equatable {
         var filter: EventFilter
@@ -27,8 +36,30 @@ struct EventsListView: View {
     }
 
     var body: some View {
+        Group {
+            switch pane {
+            case .events: events
+            case .audit:
+                AuditPane(control: model.controlPlane) { model.hostName($0) }
+                    .paperGround()
+                    .navigationTitle("Audit")
+            }
+        }
+        .toolbar {
+            ToolbarItem(placement: .principal) {
+                Picker("Show", selection: $pane) {
+                    ForEach(Pane.allCases) { Text($0.rawValue).tag($0) }
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .fixedSize()
+            }
+        }
+    }
+
+    private var events: some View {
         let shown = self.shown
-        List {
+        return List {
             if !model.work.waitingAgents.isEmpty {
                 Section("Waiting now") {
                     ForEach(model.work.waitingAgents) { agent in

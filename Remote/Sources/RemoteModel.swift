@@ -296,7 +296,7 @@ final class RemoteModel {
     @ObservationIgnored private var hostWatch: Task<Void, Never>?
     /// The watch's own client of the control plane while it is connected, for the control
     /// plane's own requests (`hosts/start`, #691). Nil against a bridge with no control plane.
-    @ObservationIgnored private var controlPlane: DaemonClient?
+    @ObservationIgnored private(set) var controlPlane: DaemonClient?
     /// What `hosts/list` last said, so the project list can name each host (058, frame H).
     /// Empty when this phone is not a client of a control plane.
     private(set) var controlHosts: [DaemonAPI.ControlHost] = []

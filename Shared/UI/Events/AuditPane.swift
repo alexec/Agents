@@ -1,0 +1,202 @@
+import AgentsKitCore
+import SwiftUI
+import UniformTypeIdentifiers
+
+/// Events ▸ Audit (#996, spec 736 US8): who did what through the control plane, newest
+/// first in days. Read only. An admin also sets how long entries are kept and exports
+/// them as JSON lines; a member sees only their own.
+///
+/// One view for the Mac's page and the Remote's (the web page's is `Web/src/views/Audit.tsx`).
+struct AuditPane: View {
+    /// The control plane, or nil while it cannot be reached.
+    let control: DaemonClient?
+    /// A host's name, as the client shows it.
+    let hostName: (HostID) -> String
+
+    @State private var list: DaemonAPI.AuditList?
+    @State private var problem: String?
+    @State private var export: AuditFile?
+    @State private var isExporting = false
+
+    private static let page = 200
+
+    var body: some View {
+        List {
+            if let problem {
+                Text(problem).appText(.supporting).foregroundStyle(.secondary).paperListRow()
+            }
+            if let list {
+                Section {
+                    footLine(list)
+                }
+                .paperListRow()
+                if list.entries.isEmpty {
+                    Text(AuditWords.empty).appText(.supporting).foregroundStyle(.secondary).paperListRow()
+                }
+                ForEach(AuditWords.days(list.entries), id: \.day) { day in
+                    Section(EventDay.heading(for: day.day)) {
+                        ForEach(day.entries) { AuditRow(entry: $0, hostName: hostName).paperListRow() }
+                    }
+                }
+                if list.more {
+                    Button("Show older") { Task { await loadOlder() } }
+                        .buttonStyle(.plain)
+                        .appText(.fine)
+                        .foregroundStyle(.secondary)
+                        .paperListRow()
+                }
+            } else if problem == nil {
+                Text("Loading…").appText(.supporting).foregroundStyle(.secondary).paperListRow()
+            }
+        }
+        #if os(iOS)
+        .listStyle(.insetGrouped)
+        #endif
+        .scrollContentBackground(.hidden)
+        .refreshable { await load() }
+        .task(id: control == nil) { await load() }
+        .fileExporter(isPresented: $isExporting, document: export, contentType: AuditFile.type,
+                      defaultFilename: AuditWords.exportName()) { result in
+            if case .failure(let error) = result { problem = "Not exported: \(error.localizedDescription)" }
+        }
+    }
+
+    /// How long entries are kept, and for an admin the menu to change it and Export.
+    @ViewBuilder private func footLine(_ list: DaemonAPI.AuditList) -> some View {
+        HStack(spacing: 12) {
+            if list.admin {
+                Menu {
+                    ForEach(AuditWords.dayChoices, id: \.self) { days in
+                        Button(AuditWords.kept(days)) { Task { await setDays(days) } }
+                    }
+                } label: {
+                    Text(AuditWords.kept(list.days)).appText(.fine)
+                }
+                .fixedSize()
+                .help("How long the control plane keeps who did what")
+                Spacer()
+                Button("Export…") { Task { await exportAll() } }
+                    .appText(.fine)
+                    .help("Save every entry kept as JSON lines")
+            } else {
+                Text("\(AuditWords.kept(list.days)). You see what you did.")
+                    .appText(.fine)
+                    .foregroundStyle(.secondary)
+                Spacer()
+            }
+        }
+    }
+
+    // MARK: Asking
+
+    private func load() async {
+        guard let control else {
+            problem = "The control plane can’t be reached."
+            return
+        }
+        do {
+            list = try await control.call(DaemonAPI.Method.auditList, DaemonAPI.AuditQuery(limit: Self.page),
+                                          returning: DaemonAPI.AuditList.self)
+            problem = nil
+        } catch {
+            problem = Self.sentence(error)
+        }
+    }
+
+    private func loadOlder() async {
+        guard let control, let current = list, let last = current.entries.last else { return }
+        do {
+            let older = try await control.call(DaemonAPI.Method.auditList,
+                                               DaemonAPI.AuditQuery(until: last.at.addingTimeInterval(-0.001), limit: Self.page),
+                                               returning: DaemonAPI.AuditList.self)
+            var next = current
+            let seen = Set(current.entries.map(\.id))
+            next.entries += older.entries.filter { !seen.contains($0.id) }
+            next.more = older.more
+            list = next
+        } catch {
+            problem = Self.sentence(error)
+        }
+    }
+
+    private func setDays(_ days: Int) async {
+        guard let control else { return }
+        do {
+            _ = try await control.call(DaemonAPI.Method.controlSetAuditDays, DaemonAPI.AuditDays(days: days))
+            await load()
+        } catch {
+            problem = Self.sentence(error)
+        }
+    }
+
+    private func exportAll() async {
+        guard let control else { return }
+        do {
+            let got = try await control.call(DaemonAPI.Method.auditExport, DaemonAPI.AuditQuery(),
+                                             returning: DaemonAPI.AuditExport.self)
+            export = AuditFile(lines: got.lines)
+            isExporting = true
+        } catch {
+            problem = Self.sentence(error)
+        }
+    }
+
+    private static func sentence(_ error: Error) -> String {
+        if let error = error as? JSONRPCError {
+            // A control plane before #996 does not know the audit.
+            return error.code == -32601 ? "This control plane keeps no audit. Update it to see who did what." : error.message
+        }
+        return "The control plane can’t be reached."
+    }
+}
+
+/// One entry: the time, what was done, then who and where, then the call in monospace.
+struct AuditRow: View {
+    let entry: DaemonAPI.AuditEntry
+    let hostName: (HostID) -> String
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 10) {
+            Text(LeaseWords.clock(entry.at))
+                .appText(.fine)
+                .monospacedDigit()
+                .foregroundStyle(.secondary)
+                .frame(minWidth: 38, alignment: .leading)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(entry.action)
+                    .appText(.reading)
+                    .fixedSize(horizontal: false, vertical: true)
+                Text("\(AuditWords.who(entry.actor)) \(AuditWords.place(entry, hostName: hostName))")
+                    .appText(.supporting)
+                    .foregroundStyle(.secondary)
+                Text(AuditWords.call(entry))
+                    .appText(.fine)
+                    .monospaced()
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.vertical, 4)
+        .accessibilityElement(children: .combine)
+    }
+}
+
+/// An export, as the file it is saved as.
+struct AuditFile: FileDocument {
+    static let type = UTType(filenameExtension: "jsonl", conformingTo: .plainText) ?? .plainText
+    static var readableContentTypes: [UTType] { [type] }
+
+    var lines: String
+
+    init(lines: String) { self.lines = lines }
+
+    init(configuration: ReadConfiguration) throws {
+        lines = String(decoding: configuration.file.regularFileContents ?? Data(), as: UTF8.self)
+    }
+
+    func fileWrapper(configuration: WriteConfiguration) throws -> FileWrapper {
+        FileWrapper(regularFileWithContents: Data(lines.utf8))
+    }
+}
