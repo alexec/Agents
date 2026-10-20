@@ -4704,9 +4704,10 @@ final class AppModel {
     }
 
     /// New words for a queued prompt, in its place in the queue (#1552). When it was sent or
-    /// taken back first, the words go into the prompt bar, so nothing typed is lost.
+    /// taken back first, or the call failed, the words go into the prompt bar, so nothing
+    /// typed is lost (#1665).
     func editQueued(_ prompt: QueuedPrompt, text: String, of agentID: UUID) async {
-        await attempt {
+        let reached = await attempt {
             let result = try await self.client(forAgent: agentID).call(
                 DaemonAPI.Method.agentsEditQueued,
                 DaemonAPI.EditQueuedRequest(agentID: agentID, promptID: prompt.id, text: text),
@@ -4715,6 +4716,8 @@ final class AppModel {
             self.offeredPrompt = text
             self.problem = QueuedPrompt.sentBeforeEdit
         }
+        // The failure is said already; the words are not lost with it, as on the Remote.
+        if !reached { offeredPrompt = text }
     }
 
     /// Send a queued prompt into the turn that is running, where the runtime takes one.

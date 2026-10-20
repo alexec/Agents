@@ -11,3 +11,10 @@ for (const { name, input, expected } of cases("prompt/quote.json")) {
     assert.equal(q.quoteInto(input.quote, input.text), expected);
   });
 }
+
+// Given back (#1665), as PromptQuote.givingBack says it.
+for (const { name, input, expected } of cases("prompt/give-back.json")) {
+  test(`give back: ${name}`, () => {
+    assert.equal(q.giveBackInto(input.words, input.text), expected);
+  });
+}

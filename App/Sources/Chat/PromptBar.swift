@@ -244,11 +244,11 @@ struct PromptBar: View {
                               lostSomething: $draftLostSomething, key: draftKey))
     }
 
-    /// Words offered from elsewhere: in place of what is typed, or, quoted from a reply
-    /// (#1553), added after it with the caret after them.
+    /// Words offered from elsewhere: in place of an empty bar, else after what is typed
+    /// (#1665), or, quoted from a reply (#1553), added after it with the caret after them.
     private func takeOfferedWords() {
         if let offered = model.offeredPrompt {
-            text = offered
+            text = PromptQuote.givingBack(offered, to: text)
             focused = true
             model.offeredPrompt = nil
         }

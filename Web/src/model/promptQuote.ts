@@ -10,3 +10,14 @@ export function quoteInto(quote: string, text: string): string {
   const before = text === "" || text.endsWith("\n\n") ? text : text.endsWith("\n") ? `${text}\n` : `${text}\n\n`;
   return `${before}${quoted}\n\n`;
 }
+
+/**
+ * Words given back to the prompt bar, such as a queued prompt's edit that came too late (#1665): in
+ * place of an empty bar, else after what is typed with an empty line between. PromptQuote.givingBack.
+ */
+export function giveBackInto(words: string, text: string): string {
+  if (!words.trim()) return text;
+  if (!text.trim()) return words;
+  const before = text.endsWith("\n\n") ? text : text.endsWith("\n") ? `${text}\n` : `${text}\n\n`;
+  return `${before}${words}`;
+}
