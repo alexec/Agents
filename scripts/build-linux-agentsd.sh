@@ -12,6 +12,7 @@
 #   github-mcp-linux-<arch>          the github MCP server, and its .sha256
 #   linear-mcp-linux-<arch>          the linear MCP server, and its .sha256
 #   gitlab-mcp-linux-<arch>          the gitlab MCP server (#1629), and its .sha256
+#   email-mcp-linux-<arch>           the email MCP server (#1780), and its .sha256
 # and once:
 #   VERSION                          the version, SemVer: scripts/version.sh, or on a release
 #                                    AGENTS_MARKETING_VERSION, the tag's (#1748)
@@ -33,7 +34,7 @@ mkdir -p $work
 sha256() { if (( $+commands[shasum] )); then shasum -a 256 $1; else sha256sum $1; fi | cut -d' ' -f1 }
 
 for arch goarch in x86_64 amd64 aarch64 arm64; do
-    for product cmd in agentsd agentsd github-mcp github-mcp linear-mcp linear-mcp gitlab-mcp gitlab-mcp; do
+    for product cmd in agentsd agentsd github-mcp github-mcp linear-mcp linear-mcp gitlab-mcp gitlab-mcp email-mcp email-mcp; do
         print "building $product for $arch-linux…"
         GOOS=linux GOARCH=$goarch $root/Go/scripts/go.sh build -trimpath \
             -ldflags "-s -w -X github.com/alexec/agents/Go/internal/buildinfo.Version=$version" \
@@ -45,11 +46,11 @@ done
 (( check )) && exit 0
 mkdir -p $out
 for arch in x86_64 aarch64; do
-    for product in agentsd github-mcp linear-mcp gitlab-mcp; do
+    for product in agentsd github-mcp linear-mcp gitlab-mcp email-mcp; do
         cp $work/$product-linux-$arch $out/$product-linux-$arch
         sha256 $out/$product-linux-$arch > $out/$product-linux-$arch.sha256
     done
 done
 print -n "$version" > $out/VERSION
 rm -f $out/VERSION-go $out/agentsd-go-linux-*(N)  # the names before #1381
-print "wrote the Go host, github-mcp, linear-mcp and gitlab-mcp into $out (version $version)"
+print "wrote the Go host, github-mcp, linear-mcp, gitlab-mcp and email-mcp into $out (version $version)"

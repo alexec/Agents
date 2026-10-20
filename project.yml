@@ -470,6 +470,10 @@ targets:
       - name: Build the gitlab MCP server
         script: sh "$SRCROOT/scripts/go-github-mcp.sh" gitlab-mcp
         basedOnDependencyAnalysis: false
+      # The email MCP server (#1780), built and carried the same way.
+      - name: Build the email MCP server
+        script: sh "$SRCROOT/scripts/go-github-mcp.sh" email-mcp
+        basedOnDependencyAnalysis: false
       # The command workspace provider (#691, in Go since #1364), which agents-control looks
       # for beside itself, built and carried the same way.
       - name: Build the command workspace provider
@@ -492,6 +496,9 @@ targets:
         basedOnDependencyAnalysis: false
       - name: Carry the gitlab MCP server
         script: sh "$SRCROOT/scripts/go-github-mcp.sh" --carry gitlab-mcp
+        basedOnDependencyAnalysis: false
+      - name: Carry the email MCP server
+        script: sh "$SRCROOT/scripts/go-github-mcp.sh" --carry email-mcp
         basedOnDependencyAnalysis: false
       - name: Carry the command workspace provider
         script: sh "$SRCROOT/scripts/go-github-mcp.sh" --carry workspace-commands

@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/alexec/agents/Go/internal/emailmcp"
 	"github.com/alexec/agents/Go/internal/githubmcp"
 	"github.com/alexec/agents/Go/internal/gitlabmcp"
 	"github.com/alexec/agents/Go/internal/linearmcp"
@@ -25,6 +26,10 @@ func TestOursDeclareWhatTheirServersDeclare(t *testing.T) {
 	gitlab, _ := OursByID("agents/gitlab")
 	if !reflect.DeepEqual(gitlab.Declares.Events, gitlabmcp.EventNames()) || !gitlab.Declares.Tools {
 		t.Fatalf("gitlab: %v, the server's %v", gitlab.Declares, gitlabmcp.EventNames())
+	}
+	email, _ := OursByID("agents/email")
+	if !reflect.DeepEqual(email.Declares.Events, emailmcp.EventNames()) || !email.Declares.Tools || email.Declares.Views {
+		t.Fatalf("email: %v, the server's %v", email.Declares, emailmcp.EventNames())
 	}
 	// linear-mcp has show_issues (TestTheViewListsOpenIssues); github-mcp has the official ones.
 	if !linear.Declares.Tools || !linear.Declares.Views || !github.Declares.Tools {
@@ -76,6 +81,15 @@ func TestOursAreAddedHostedWithNoSecretToAsk(t *testing.T) {
 	}
 	if built.NameHere != "gitlab" || len(built.Variables) != 0 {
 		t.Fatalf("gitlab built: %+v", built)
+	}
+	// Email reads the person's email connection (#1780): no secret to ask for.
+	email, _ := OursByID("agents/email")
+	built = BuildOurs(email, func(string) bool { return false })
+	if got := strings.Join(strings.Fields(built.Entry.Stringified()), ""); got != `{"command":"email-mcp","hosted":true}` {
+		t.Fatalf("email entry: %s", got)
+	}
+	if built.NameHere != "email" || len(built.Variables) != 0 {
+		t.Fatalf("email built: %+v", built)
 	}
 	r := OursResult(linear, linear.Declares)
 	if r.MadeByAgents == nil || !*r.MadeByAgents || r.Levels == nil || !r.Levels.Tools || !r.Levels.Views || !r.Levels.Events {
