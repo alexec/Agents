@@ -133,7 +133,9 @@ export interface AdoptRequest {
   cwd: URLString;
 }
 
-export type AfterTurn = "request_archive" | "archive";
+export type AfterTurn =
+  | "request_archive"
+  | "archive";
 
 export interface Agent {
   id: UUID;
@@ -220,9 +222,18 @@ export interface Agent {
   runningTool?: string;
 }
 
-export type AgentArchivedReason = "byUser" | "byAgent";
+export type AgentArchivedReason =
+  | "byUser"
+  | "byAgent";
 
-export type AgentGroup = "needsAttention" | "blocked" | "waiting" | "running" | "finished" | "stopped" | "archived";
+export type AgentGroup =
+  | "needsAttention"
+  | "blocked"
+  | "waiting"
+  | "running"
+  | "finished"
+  | "stopped"
+  | "archived";
 
 export type AgentPurpose =
   | { providerDraft: { id: UUID } };
@@ -239,7 +250,14 @@ export interface AgentRequest {
  * A state this build does not know reads as `stopped` (Agent's init(from:)), with endedReason
  * `unrecognised`.
  */
-export type AgentState = "starting" | "running" | "waitingOnUser" | "finished" | "stopped" | "archived" | "queued";
+export type AgentState =
+  | "starting"
+  | "running"
+  | "waitingOnUser"
+  | "finished"
+  | "stopped"
+  | "archived"
+  | "queued";
 
 /** workspaces/forAgent: what list_workspaces shows an agent. */
 export interface AgentWorkspaces {
@@ -303,9 +321,22 @@ export interface AllowanceStateModelOut {
   retryAfter: WireDate;
 }
 
-export type AllowanceStateOutReason = "allowanceSpent" | "overage" | "creditUsedUp" | "creditExpired" | "rateLimitPersisted" | "runtimeFailed";
+export type AllowanceStateOutReason =
+  | "allowanceSpent"
+  | "overage"
+  | "creditUsedUp"
+  | "creditExpired"
+  | "rateLimitPersisted"
+  | "runtimeFailed";
 
-export type AllowanceStateSource = "typedFailure" | "words" | "overageReport" | "ledger" | "expiry" | "person" | "runtimeFailure";
+export type AllowanceStateSource =
+  | "typedFailure"
+  | "words"
+  | "overageReport"
+  | "ledger"
+  | "expiry"
+  | "person"
+  | "runtimeFailure";
 
 export type AllowanceStateSpent =
   | { known: { _0?: Cost } }
@@ -338,7 +369,10 @@ export interface AnswerElicitationRequest {
   sendID?: UUID;
 }
 
-export type AnswerElicitationRequestAction = "accept" | "decline" | "cancel";
+export type AnswerElicitationRequestAction =
+  | "accept"
+  | "decline"
+  | "cancel";
 
 export interface AnswerRequest {
   permissionID: UUID;
@@ -363,7 +397,10 @@ export interface AppViewCall {
   pinnable?: boolean;
 }
 
-export type AppViewCallState = "running" | "done" | "cancelled";
+export type AppViewCallState =
+  | "running"
+  | "done"
+  | "cancelled";
 
 export interface AppViewPolicy {
   connectDomains: string[];
@@ -388,7 +425,11 @@ export interface Approval {
   agentID?: UUID;
 }
 
-export type ApprovalAction = "approve" | "deny" | "requestChanges" | "dismiss";
+export type ApprovalAction =
+  | "approve"
+  | "deny"
+  | "requestChanges"
+  | "dismiss";
 
 export interface ApprovalAnswer {
   folder: URLString;
@@ -399,7 +440,13 @@ export interface ApprovalAnswer {
   note?: string;
 }
 
-export type ApprovalKind = "mcpServer" | "workflow" | "plugin" | "file" | "archive" | "workflowFailed";
+export type ApprovalKind =
+  | "mcpServer"
+  | "workflow"
+  | "plugin"
+  | "file"
+  | "archive"
+  | "workflowFailed";
 
 export interface ApprovalReadRequest {
   folder: URLString;
@@ -582,9 +629,17 @@ export interface BackgroundItem {
   endedAt?: WireDate;
 }
 
-export type BackgroundItemKind = "task" | "subagent";
+export type BackgroundItemKind =
+  | "task"
+  | "subagent";
 
-export type BackgroundItemState = "running" | "paused" | "completed" | "failed" | "stopped" | "disconnected";
+export type BackgroundItemState =
+  | "running"
+  | "paused"
+  | "completed"
+  | "failed"
+  | "stopped"
+  | "disconnected";
 
 export interface Backup {
   id: string;
@@ -596,7 +651,10 @@ export interface Backup {
   thisMachine: boolean;
 }
 
-export type BackupEvery = "off" | "daily" | "weekly";
+export type BackupEvery =
+  | "off"
+  | "daily"
+  | "weekly";
 
 export interface BackupMakeRequest {
   /** Answer once the backup is made, not at once: a provider's delete waits for it (#1815). */
@@ -672,7 +730,9 @@ export interface BackupStorePartRequest {
   part: number;
 }
 
-export type BackupTarget = "folder" | "control";
+export type BackupTarget =
+  | "folder"
+  | "control";
 
 export interface Block {
   waits: Wait[];
@@ -682,9 +742,14 @@ export interface Block {
   clearedBy?: BlockClearing;
 }
 
-export type BlockClearing = "waits" | "time" | "dropped";
+export type BlockClearing =
+  | "waits"
+  | "time"
+  | "dropped";
 
-export type BlockWakeOn = "any" | "all";
+export type BlockWakeOn =
+  | "any"
+  | "all";
 
 /** bots/setCaps (#1761): the bot's caps, and optionally its group. */
 export interface BotCaps {
@@ -808,7 +873,9 @@ export type CatalogError =
   | { notManaged: { name: string } }
   | { failed: { _0: string } };
 
-export type CatalogKind = "skills" | "mcp";
+export type CatalogKind =
+  | "skills"
+  | "mcp";
 
 export interface CatalogPreviewAnswer {
   preview?: SkillPreview;
@@ -851,7 +918,15 @@ export interface CatchUpLeases {
 }
 
 /** A part this host does not know is left out of CatchUpRequest.parts. */
-export type CatchUpPart = "workflows" | "pins" | "leases" | "runtimes" | "allowances" | "modes" | "sandbox" | "costs";
+export type CatchUpPart =
+  | "workflows"
+  | "pins"
+  | "leases"
+  | "runtimes"
+  | "allowances"
+  | "modes"
+  | "sandbox"
+  | "costs";
 
 export interface CatchUpRequest {
   agents?: ListRequest;
@@ -873,9 +948,18 @@ export interface CatchUpSnapshot {
   leases?: CatchUpLeases;
 }
 
-export type ChangeSource = "reported" | "reportedAndSeen" | "seen";
+export type ChangeSource =
+  | "reported"
+  | "reportedAndSeen"
+  | "seen";
 
-export type ChangeState = "modified" | "added" | "deleted" | "binary" | "renamed" | "untracked";
+export type ChangeState =
+  | "modified"
+  | "added"
+  | "deleted"
+  | "binary"
+  | "renamed"
+  | "untracked";
 
 export type Changed = boolean;
 
@@ -1032,7 +1116,11 @@ export interface ChartHint {
   title?: string;
 }
 
-export type ChartMark = "bar" | "line" | "point" | "area";
+export type ChartMark =
+  | "bar"
+  | "line"
+  | "point"
+  | "area";
 
 export type ChatProjectState =
   | { ready: { folder: URLString } }
@@ -1056,7 +1144,12 @@ export interface ClientConnection {
 }
 
 /** ClientRecord.Kind: a kind a later build added reads as `unknown`. */
-export type ClientKind = "mac" | "iPhone" | "iPad" | "unknown" | "browser";
+export type ClientKind =
+  | "mac"
+  | "iPhone"
+  | "iPad"
+  | "unknown"
+  | "browser";
 
 /**
  * clients/startPairing: `browser` for the web remote's code (071); a grant an older window sends is
@@ -1068,7 +1161,9 @@ export interface ClientPairingRequest {
 }
 
 /** The older autoReview reads as alwaysApprove. */
-export type ClientPermissionMode = "default" | "alwaysApprove";
+export type ClientPermissionMode =
+  | "default"
+  | "alwaysApprove";
 
 export interface ClientPermissionSettings {
   cursor: ClientPermissionMode;
@@ -1194,7 +1289,11 @@ export interface ConnectionEmailRequest {
  * OAuth on gitlab.com or a personal access token on any GitLab, and email (#1780): one IMAP mailbox
  * with an app password.
  */
-export type ConnectionProvider = "github" | "linear" | "gitlab" | "email";
+export type ConnectionProvider =
+  | "github"
+  | "linear"
+  | "gitlab"
+  | "email";
 
 export interface ConnectionProviderRequest {
   provider: ConnectionProvider;
@@ -1251,20 +1350,30 @@ export interface ConnectionSignInFlowRequest {
  * on the Mac and the Remote, a pop-up on the web page); the hand-back page gives the code back to
  * the client, which gives it to the host with connections/sign-in/complete (Linear).
  */
-export type ConnectionSignInGrant = "deviceCode" | "authorizationCode";
+export type ConnectionSignInGrant =
+  | "deviceCode"
+  | "authorizationCode";
 
 /**
  * waiting: for the person to approve on the provider's page. connected: done. expired: the code or
  * the sign-in ended. denied: the person pressed Cancel on the provider's page. cancelled: a client
  * stopped it. failed: see message.
  */
-export type ConnectionSignInStatus = "waiting" | "connected" | "expired" | "denied" | "cancelled" | "failed";
+export type ConnectionSignInStatus =
+  | "waiting"
+  | "connected"
+  | "expired"
+  | "denied"
+  | "cancelled"
+  | "failed";
 
 /**
  * connected: the host has a token and renews it. signInAgain: the provider refused the renewal, so
  * the person signs in again.
  */
-export type ConnectionState = "connected" | "signInAgain";
+export type ConnectionState =
+  | "connected"
+  | "signInAgain";
 
 /** The connection the token made, or why it made none, in words. */
 export interface ConnectionTokenAnswer {
@@ -1310,7 +1419,11 @@ export interface ConnectorEvents {
  * not made by Agents already has the name github, and it is left alone. failed: the entry could not
  * be written; message says why.
  */
-export type ConnectorEventsState = "on" | "off" | "taken" | "failed";
+export type ConnectorEventsState =
+  | "on"
+  | "off"
+  | "taken"
+  | "failed";
 
 /** The one real thing a slot read: the newest issue or pull request, or the last workflow run. */
 export interface ConnectorProof {
@@ -1366,7 +1479,10 @@ export interface ConnectorSetup {
  * stored: no call to the provider, only what was read before (for a list of every project). cached:
  * a read at most five minutes old is used again. fresh: read now (Try Again).
  */
-export type ConnectorSetupReading = "stored" | "cached" | "fresh";
+export type ConnectorSetupReading =
+  | "stored"
+  | "cached"
+  | "fresh";
 
 export interface ConnectorSetupRequest {
   folder: string;
@@ -1399,7 +1515,11 @@ export interface ConnectorSlot {
  * One slot of a project's set-up (#1336), in the page's order: tasks (the tracker), codeReview, ci,
  * and workspace (where agents run).
  */
-export type ConnectorSlotKind = "tasks" | "codeReview" | "ci" | "workspace";
+export type ConnectorSlotKind =
+  | "tasks"
+  | "codeReview"
+  | "ci"
+  | "workspace";
 
 /**
  * notConnected: the slot comes with a connection that is not there yet. notRead: connected, but not
@@ -1408,7 +1528,14 @@ export type ConnectorSlotKind = "tasks" | "codeReview" | "ci" | "workspace";
  * on the provider's site. noRemote: the project has no GitHub or GitLab remote. skipped: the person
  * skipped it; it counts as done.
  */
-export type ConnectorSlotState = "notConnected" | "notRead" | "read" | "failed" | "refused" | "noRemote" | "skipped";
+export type ConnectorSlotState =
+  | "notConnected"
+  | "notRead"
+  | "read"
+  | "failed"
+  | "refused"
+  | "noRemote"
+  | "skipped";
 
 export interface ConnectorWorkflow {
   id: string;
@@ -1782,7 +1909,10 @@ export interface DeviceForget {
   id: UUID;
 }
 
-export type DeviceKind = "iPhone" | "iPad" | "unknown";
+export type DeviceKind =
+  | "iPhone"
+  | "iPad"
+  | "unknown";
 
 /** device/changed: the whole record, or that it was forgotten (046). */
 export interface DeviceNotification {
@@ -1797,7 +1927,10 @@ export interface DiffLine {
   newLine?: number;
 }
 
-export type DiffLineKind = "context" | "added" | "removed";
+export type DiffLineKind =
+  | "context"
+  | "added"
+  | "removed";
 
 export interface DirectoryEntry {
   url: URLString;
@@ -1824,7 +1957,10 @@ export interface DiskAlarm {
   worktrees: DiskWorktree[];
 }
 
-export type DiskLevel = "ok" | "low" | "critical";
+export type DiskLevel =
+  | "ok"
+  | "low"
+  | "critical";
 
 export interface DiskReading {
   volume: string;
@@ -1946,7 +2082,9 @@ export type ElicitationRequestMode =
   | { form: { _0: ElicitationSchema } }
   | { url: { _0: string } };
 
-export type ElicitationRequestScope = "session" | "request";
+export type ElicitationRequestScope =
+  | "session"
+  | "request";
 
 export interface ElicitationSchema {
   title?: string;
@@ -1969,7 +2107,11 @@ export interface ElicitationSchemaPropertyChoice {
   description?: string;
 }
 
-export type ElicitationSchemaPropertyFormat = "email" | "uri" | "date" | "date-time";
+export type ElicitationSchemaPropertyFormat =
+  | "email"
+  | "uri"
+  | "date"
+  | "date-time";
 
 export type ElicitationSchemaPropertyKind =
   | { string: { format?: ElicitationSchemaPropertyFormat; minLength?: number; maxLength?: number; choices?: ElicitationSchemaPropertyChoice[] } }
@@ -1981,7 +2123,23 @@ export type ElicitationSchemaPropertyKind =
 export interface Empty {}
 
 /** A reason this build does not know reads as `unrecognised`. */
-export type EndedReason = "endTurn" | "maxTokens" | "maxTurnRequests" | "refusal" | "cancelled" | "processDied" | "daemonGone" | "costLimit" | "unrecognised" | "stoppedByAgent" | "signInRefused" | "runtimeError" | "allowanceSpent" | "rateLimited" | "sandboxFailed" | "imported";
+export type EndedReason =
+  | "endTurn"
+  | "maxTokens"
+  | "maxTurnRequests"
+  | "refusal"
+  | "cancelled"
+  | "processDied"
+  | "daemonGone"
+  | "costLimit"
+  | "unrecognised"
+  | "stoppedByAgent"
+  | "signInRefused"
+  | "runtimeError"
+  | "allowanceSpent"
+  | "rateLimited"
+  | "sandboxFailed"
+  | "imported";
 
 export interface EntryNotification {
   agentID: UUID;
@@ -2021,7 +2179,12 @@ export interface EventDraft {
   chainDepth: number;
 }
 
-export type EventGroup = "agents" | "workflows" | "branches" | "dropbox" | "mac";
+export type EventGroup =
+  | "agents"
+  | "workflows"
+  | "branches"
+  | "dropbox"
+  | "mac";
 
 /**
  * EventPattern (Model/EventPattern.swift), as its encode(to:) writes it (073): `filters` holds
@@ -2065,7 +2228,13 @@ export type EventWaitEnding =
   | { cancelled: { by: EventWaitEndingCanceller } }
   | { couldNotWake: { reason: string } };
 
-export type EventWaitEndingCanceller = "agent" | "person" | "prompt" | "stopped" | "archived" | "archiveRequested";
+export type EventWaitEndingCanceller =
+  | "agent"
+  | "person"
+  | "prompt"
+  | "stopped"
+  | "archived"
+  | "archiveRequested";
 
 export interface EventsChange {
   event?: Event;
@@ -2379,7 +2548,10 @@ export interface GuardedDiffLine {
   text: string;
 }
 
-export type GuardedDiffLineKind = "same" | "removed" | "added";
+export type GuardedDiffLineKind =
+  | "same"
+  | "removed"
+  | "added";
 
 /** A member as a copy says it, for the one driving a handover (Handover.Status.Member). */
 export interface HandoverMember {
@@ -2687,7 +2859,11 @@ export interface HostedMCPSnapshot {
   at: WireDate;
 }
 
-export type HostedMCPState = "idle" | "starting" | "running" | "restarting";
+export type HostedMCPState =
+  | "idle"
+  | "starting"
+  | "running"
+  | "restarting";
 
 export interface HostedMCPStatus {
   name: string;
@@ -2906,7 +3082,15 @@ export interface MCPCatalogResult {
   madeByAgents?: boolean;
 }
 
-export type MCPCheckState = "unchecked" | "checking" | "answered" | "failed" | "waiting" | "missingSecret" | "signIn" | "oldTransport";
+export type MCPCheckState =
+  | "unchecked"
+  | "checking"
+  | "answered"
+  | "failed"
+  | "waiting"
+  | "missingSecret"
+  | "signIn"
+  | "oldTransport";
 
 export type MCPDestinationState =
   | { free: Record<string, never> }
@@ -2931,7 +3115,9 @@ export interface MCPHandServer {
   headers: MCPHandValue[];
 }
 
-export type MCPHandServerKind = "command" | "url";
+export type MCPHandServerKind =
+  | "command"
+  | "url";
 
 export interface MCPHandValue {
   name: string;
@@ -3026,7 +3212,12 @@ export interface MCPRemoveRequest {
   forgetSecret?: string;
 }
 
-export type MCPRunKind = "remote" | "npx" | "uvx" | "docker" | "command";
+export type MCPRunKind =
+  | "remote"
+  | "npx"
+  | "uvx"
+  | "docker"
+  | "command";
 
 export interface MCPSearchAnswer {
   results: MCPCatalogResult[];
@@ -3088,7 +3279,9 @@ export interface MCPSignInRequest {
   client?: MCPSignInClient;
 }
 
-export type MCPSignInState = "signedIn" | "needsSignIn";
+export type MCPSignInState =
+  | "signedIn"
+  | "needsSignIn";
 
 export type MCPSignInStatus =
   | { waiting: Record<string, never> }
@@ -3112,7 +3305,10 @@ export interface MCPSignOutRequest {
   target: MCPSignInTarget;
 }
 
-export type MCPTransportName = "stdio" | "http" | "sse";
+export type MCPTransportName =
+  | "stdio"
+  | "http"
+  | "sse";
 
 export interface MCPTriggerFailure {
   code: MCPTriggerFailureCode;
@@ -3120,7 +3316,19 @@ export interface MCPTriggerFailure {
   since: WireDate;
 }
 
-export type MCPTriggerFailureCode = "serverNotFound" | "badEventName" | "waitingForApproval" | "secretMissing" | "needsSignIn" | "unreachable" | "noEvents" | "eventNotOffered" | "noPollMode" | "badArguments" | "refused" | "serverError";
+export type MCPTriggerFailureCode =
+  | "serverNotFound"
+  | "badEventName"
+  | "waitingForApproval"
+  | "secretMissing"
+  | "needsSignIn"
+  | "unreachable"
+  | "noEvents"
+  | "eventNotOffered"
+  | "noPollMode"
+  | "badArguments"
+  | "refused"
+  | "serverError";
 
 export interface MCPTriggerStatus {
   name: string;
@@ -3133,7 +3341,12 @@ export interface MCPTriggerStatus {
   retryAt?: WireDate;
 }
 
-export type MCPTriggerStatusState = "pending" | "active" | "retrying" | "stopped" | "notThisHost";
+export type MCPTriggerStatusState =
+  | "pending"
+  | "active"
+  | "retrying"
+  | "stopped"
+  | "notThisHost";
 
 export interface MCPVariable {
   name: string;
@@ -3144,7 +3357,9 @@ export interface MCPVariable {
   placeholder?: string;
 }
 
-export type MCPVariableKind = "secret" | "plain";
+export type MCPVariableKind =
+  | "secret"
+  | "plain";
 
 export interface MCPVerifyAnswer {
   verifyID?: UUID;
@@ -3226,13 +3441,19 @@ export interface MarketplaceAddRequest {
   tokenValue?: string;
 }
 
-export type MarketplaceFormat = "mcp-registry" | "skills.sh" | "github-skills";
+export type MarketplaceFormat =
+  | "mcp-registry"
+  | "skills.sh"
+  | "github-skills";
 
 export interface MarketplaceIDRequest {
   id: string;
 }
 
-export type MarketplaceOrigin = "provided" | "personal" | "project";
+export type MarketplaceOrigin =
+  | "provided"
+  | "personal"
+  | "project";
 
 export interface MarketplaceSetEnabledRequest {
   id: string;
@@ -3262,7 +3483,9 @@ export interface MissingFolder {
   branchKept: boolean;
 }
 
-export type MoveAsker = "agent" | "person";
+export type MoveAsker =
+  | "agent"
+  | "person";
 
 export type MoveTarget =
   | { newWorktree: { name?: string } }
@@ -3285,7 +3508,11 @@ export type NeedID =
   | { report: { agentID: UUID; at: WireDate } }
   | { guardedChange: { folder: URLString; path: string } };
 
-export type NeedKind = "permission" | "elicitation" | "report" | "guardedChange";
+export type NeedKind =
+  | "permission"
+  | "elicitation"
+  | "report"
+  | "guardedChange";
 
 export interface OptionsRequest {
   runtimeID: string;
@@ -3359,7 +3586,12 @@ export interface PermissionOption {
   kind: PermissionOptionKind;
 }
 
-export type PermissionOptionKind = "allow_once" | "allow_always" | "reject_once" | "reject_always" | "unknown";
+export type PermissionOptionKind =
+  | "allow_once"
+  | "allow_always"
+  | "reject_once"
+  | "reject_always"
+  | "unknown";
 
 export interface PermissionRequest {
   id: UUID;
@@ -3469,7 +3701,9 @@ export interface Persona {
   problem?: string;
 }
 
-export type PersonaOrigin = "project" | "personal";
+export type PersonaOrigin =
+  | "project"
+  | "personal";
 
 export interface PersonasListRequest {
   folder: URLString;
@@ -3490,7 +3724,10 @@ export interface PinArrangeWorkflowsRequest {
   workflowIDs: string[];
 }
 
-export type PinKind = "markdown" | "html" | "view";
+export type PinKind =
+  | "markdown"
+  | "html"
+  | "view";
 
 export interface PinPathRequest {
   folder: URLString;
@@ -3535,7 +3772,10 @@ export interface PingResponse {
   ok: boolean;
 }
 
-export type PinnerKind = "person" | "agent" | "workflow";
+export type PinnerKind =
+  | "person"
+  | "agent"
+  | "workflow";
 
 export interface PinnerView {
   kind: PinnerKind;
@@ -3563,11 +3803,19 @@ export interface PlanEntry {
   status: PlanEntryStatus;
 }
 
-export type PlanEntryPriority = "high" | "medium" | "low";
+export type PlanEntryPriority =
+  | "high"
+  | "medium"
+  | "low";
 
-export type PlanEntryStatus = "pending" | "in_progress" | "completed";
+export type PlanEntryStatus =
+  | "pending"
+  | "in_progress"
+  | "completed";
 
-export type PlanState = "current" | "withdrawn";
+export type PlanState =
+  | "current"
+  | "withdrawn";
 
 export interface PluginApproveRequest {
   plugin: URLString;
@@ -3609,7 +3857,9 @@ export interface PrewarmRequest {
   why: PrewarmRequestWhy;
 }
 
-export type PrewarmRequestWhy = "opened" | "typing";
+export type PrewarmRequestWhy =
+  | "opened"
+  | "typing";
 
 export interface Project {
   folder: URLString;
@@ -3690,7 +3940,10 @@ export interface ProjectsListRequest {
   includeArchived: boolean;
 }
 
-export type PromptOrigin = "person" | "app" | "agent";
+export type PromptOrigin =
+  | "person"
+  | "app"
+  | "agent";
 
 export interface PromptRequest {
   agentID: UUID;
@@ -3848,7 +4101,9 @@ export interface ProviderSummary {
  * Which APNs a device token belongs to (#1460): a Debug build's (sandbox) or a TestFlight and App
  * Store build's.
  */
-export type PushEnvironment = "development" | "production";
+export type PushEnvironment =
+  | "development"
+  | "production";
 
 /**
  * clients/setPushToken (#1460): a device's own APNs token, in hex, for the control plane to push to
@@ -3886,7 +4141,9 @@ export interface QuickAnswer {
   isDestructive: boolean;
 }
 
-export type QuickAnswerKind = "choice" | "reply";
+export type QuickAnswerKind =
+  | "choice"
+  | "reply";
 
 export interface QuitRequest {
   stopAgents: boolean;
@@ -4035,7 +4292,9 @@ export interface ReportExport {
   format: ReportFormat;
 }
 
-export type ReportFormat = "csv" | "jsonl";
+export type ReportFormat =
+  | "csv"
+  | "jsonl";
 
 /** Who sees what in Reports (#1804), set by an admin in Console ▸ Report Policy. */
 export interface ReportPolicy {
@@ -4063,7 +4322,11 @@ export interface ReportQuery {
 }
 
 /** D is the last 24 hours by the hour; W, M and 3M the last 7, 30 and 90 days by the day (UTC). */
-export type ReportRange = "day" | "week" | "month" | "threeMonths";
+export type ReportRange =
+  | "day"
+  | "week"
+  | "month"
+  | "threeMonths";
 
 /** One hour or day of one machine's project and runtime, with its person (#1811). */
 export interface ReportRow {
@@ -4103,7 +4366,10 @@ export interface ReportScope {
 }
 
 /** Me (the caller's own machines), a group's people, or every person (#1804). */
-export type ReportScopeKind = "me" | "group" | "org";
+export type ReportScopeKind =
+  | "me"
+  | "group"
+  | "org";
 
 /** A scope the caller may see, with its name (#1804). */
 export interface ReportScopeOption {
@@ -4144,7 +4410,11 @@ export type ResetRule =
   | { dailyAt: { hour: number; timeZone: string } }
   | { unknown: Record<string, never> };
 
-export type ResourceKind = "screen" | "simulator" | "browser" | "named";
+export type ResourceKind =
+  | "screen"
+  | "simulator"
+  | "browser"
+  | "named";
 
 /**
  * ResourceState (Daemon/DaemonAPI.swift), as its encode(to:) writes it (#116): every holder in
@@ -4173,7 +4443,12 @@ export interface ResumingResponse {
   agentIDs: UUID[];
 }
 
-export type RetentionKeepFor = "days7" | "days14" | "days30" | "days90" | "forever";
+export type RetentionKeepFor =
+  | "days7"
+  | "days14"
+  | "days30"
+  | "days90"
+  | "forever";
 
 export interface RetentionSettings {
   keepFor: RetentionKeepFor;
@@ -4208,7 +4483,10 @@ export interface RuntimeAccount {
   checkedAt: WireDate;
 }
 
-export type RuntimeAccountState = "ready" | "needsSignIn" | "unknown";
+export type RuntimeAccountState =
+  | "ready"
+  | "needsSignIn"
+  | "unknown";
 
 export interface RuntimeAllowances {
   rows: RuntimeAllowancesRow[];
@@ -4245,7 +4523,10 @@ export interface RuntimeAssessmentScore {
   checks: RuntimeAssessmentCheck[];
 }
 
-export type RuntimeAssessmentVerdict = "passed" | "failed" | "not_offered";
+export type RuntimeAssessmentVerdict =
+  | "passed"
+  | "failed"
+  | "not_offered";
 
 export type RuntimeAvailability =
   | { available: { path: string; supportsResume: boolean } }
@@ -4317,7 +4598,10 @@ export interface SaidSearchResult {
   matches: SaidMatch[];
 }
 
-export type SandboxChoice = "runtime" | "on" | "off";
+export type SandboxChoice =
+  | "runtime"
+  | "on"
+  | "off";
 
 export interface SandboxFailureRecord {
   runtimeID: string;
@@ -4331,7 +4615,11 @@ export interface SandboxSettings {
   defaults: Record<string, SandboxChoice>;
 }
 
-export type SandboxState = "on" | "off" | "runtimeControlled" | "none";
+export type SandboxState =
+  | "on"
+  | "off"
+  | "runtimeControlled"
+  | "none";
 
 /**
  * Envelope: HPKE (P-256, HKDF-SHA256, AES-256-GCM) to one device's key. Nothing in it is legible
@@ -4453,7 +4741,9 @@ export interface SessionLabel {
   addedAt: WireDate;
 }
 
-export type SessionLabelOwner = "person" | "agent";
+export type SessionLabelOwner =
+  | "person"
+  | "agent";
 
 export interface SessionNotice {
   severity: string;
@@ -4541,9 +4831,19 @@ export interface SharedLook {
   text: string;
 }
 
-export type SharedLookKind = "clash" | "leftOut" | "noWay" | "noFile" | "problem";
+export type SharedLookKind =
+  | "clash"
+  | "leftOut"
+  | "noWay"
+  | "noFile"
+  | "problem";
 
-export type SharedLookPage = "instructions" | "skills" | "mcp" | "plugins" | "other";
+export type SharedLookPage =
+  | "instructions"
+  | "skills"
+  | "mcp"
+  | "plugins"
+  | "other";
 
 export interface SharedMCP {
   file: string;
@@ -4562,7 +4862,12 @@ export interface SharedOtherFile {
   kind: SharedOtherFileKind;
 }
 
-export type SharedOtherFileKind = "persona" | "git" | "managed" | "unused" | "app";
+export type SharedOtherFileKind =
+  | "persona"
+  | "git"
+  | "managed"
+  | "unused"
+  | "app";
 
 export interface SharedPlugin {
   name: string;
@@ -4863,7 +5168,9 @@ export interface SignInWaiting {
   expires: WireDate;
 }
 
-export type SignInWantedReason = "notSignedIn" | "unreadable";
+export type SignInWantedReason =
+  | "notSignedIn"
+  | "unreadable";
 
 /**
  * An iOS simulator on a Mac host (#842): its UDID, its name, its system and whether it is booted.
@@ -4936,7 +5243,9 @@ export interface SkillDestination {
   folder?: string;
 }
 
-export type SkillDestinationKind = "personal" | "project";
+export type SkillDestinationKind =
+  | "personal"
+  | "project";
 
 export interface SkillNameRequest {
   destination: SkillDestination;
@@ -5076,7 +5385,14 @@ export interface SwitchRecord {
   fromReturnsAt?: WireDate;
 }
 
-export type SwitchRecordReason = "allowanceSpent" | "overage" | "creditUsedUp" | "rateLimitPersisted" | "runtimeFailed" | "everyoneOutResumed" | "byHand";
+export type SwitchRecordReason =
+  | "allowanceSpent"
+  | "overage"
+  | "creditUsedUp"
+  | "rateLimitPersisted"
+  | "runtimeFailed"
+  | "everyoneOutResumed"
+  | "byHand";
 
 export interface SwitchRecordSide {
   entryID?: UUID;
@@ -5286,7 +5602,15 @@ export interface TunnelOpen {
  * sidebars (#1861); stopped on purpose or out of allowance, as Paused in the sidebars (#1869);
  * ended for another reason; or gone (archived or deleted).
  */
-export type TurnPhase = "working" | "question" | "approval" | "done" | "needs_you" | "paused" | "failed" | "gone";
+export type TurnPhase =
+  | "working"
+  | "question"
+  | "approval"
+  | "done"
+  | "needs_you"
+  | "paused"
+  | "failed"
+  | "gone";
 
 export interface TurnSummary {
   id: UUID;
@@ -5466,7 +5790,9 @@ export interface UserPartRequest {
 }
 
 /** A user's role (#994, spec 736 FR-001): an admin manages people; a member sees only their own. */
-export type UserRole = "admin" | "member";
+export type UserRole =
+  | "admin"
+  | "member";
 
 /**
  * user/setSecret (#1760, FR-025): a secret the control plane keeps sealed, and sends only to its
@@ -5539,7 +5865,12 @@ export interface UserSettingsPart {
  * a machine today: mcpServers is mcp.json's mcpServers, agentConfig is UserAgentConfig, runtimes is
  * each runtime's choices, costLimits is CostLimits, resources is a list of DeclaredResource.
  */
-export type UserSettingsPartName = "mcpServers" | "agentConfig" | "runtimes" | "costLimits" | "resources";
+export type UserSettingsPartName =
+  | "mcpServers"
+  | "agentConfig"
+  | "runtimes"
+  | "costLimits"
+  | "resources";
 
 /**
  * What a third-party server's view waits on before it is drawn: the person's Show (#191). The data
@@ -5680,9 +6011,22 @@ export interface WebRemoteStatus {
   detail?: string;
 }
 
-export type Weekday = "sun" | "mon" | "tue" | "wed" | "thu" | "fri" | "sat";
+export type Weekday =
+  | "sun"
+  | "mon"
+  | "tue"
+  | "wed"
+  | "thu"
+  | "fri"
+  | "sat";
 
-export type WorkOutcome = "done" | "nothing_to_do" | "needs_answer" | "partly_done" | "stuck" | "blocked";
+export type WorkOutcome =
+  | "done"
+  | "nothing_to_do"
+  | "needs_answer"
+  | "partly_done"
+  | "stuck"
+  | "blocked";
 
 export interface WorkReport {
   outcome: WorkOutcome;
@@ -5765,7 +6109,9 @@ export interface WorkflowEnableRequest {
   enabled: boolean;
 }
 
-export type WorkflowLimit = "project" | "total";
+export type WorkflowLimit =
+  | "project"
+  | "total";
 
 export interface WorkflowMCPClearMissedRequest {
   folder: URLString;
@@ -5774,7 +6120,10 @@ export interface WorkflowMCPClearMissedRequest {
   server?: string;
 }
 
-export type WorkflowMode = "new" | "standing" | "triggering";
+export type WorkflowMode =
+  | "new"
+  | "standing"
+  | "triggering";
 
 export interface WorkflowMuteRequest {
   folder: URLString;
@@ -5782,7 +6131,11 @@ export interface WorkflowMuteRequest {
   muted: boolean;
 }
 
-export type WorkflowOffReason = "file" | "writtenByAgent" | "agent" | "person";
+export type WorkflowOffReason =
+  | "file"
+  | "writtenByAgent"
+  | "agent"
+  | "person";
 
 export type WorkflowOutcome =
   | { ran: { agentID: UUID; at: WireDate } }
@@ -5890,7 +6243,10 @@ export type WorkflowTriggerStored =
   | { schedule: { _0: WorkflowSchedule } }
   | { unrecognised: { name: string; keys: Record<string, JSONValue> } };
 
-export type WorkflowWhenDone = "keep" | "archive-allowed" | "archive";
+export type WorkflowWhenDone =
+  | "keep"
+  | "archive-allowed"
+  | "archive";
 
 export interface WorkflowsListRequest {
   folder?: URLString;
@@ -5983,7 +6339,10 @@ export interface WriteFailure {
   message: string;
 }
 
-export type WriteFailureCause = "diskFull" | "notAllowed" | "readOnly";
+export type WriteFailureCause =
+  | "diskFull"
+  | "notAllowed"
+  | "readOnly";
 
 /** Every method the web remote may call: its params and its result. */
 export interface Methods {

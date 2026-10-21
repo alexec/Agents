@@ -63,6 +63,15 @@ func (g *goGen) comment(text, indent string) {
 	}
 }
 
+// apart puts a blank line before each field but the first: gofmt aligns a run of fields,
+// so a field with a longer name would change every line of its struct, and two features
+// that each add one would conflict (#2020).
+func (g *goGen) apart(i int) {
+	if i > 0 {
+		g.out.WriteString("\n")
+	}
+}
+
 // definition writes a named type for a definition or an inline schema.
 func (g *goGen) definition(name string, s *Schema) {
 	g.out.WriteString("\n")
@@ -97,7 +106,8 @@ func (g *goGen) object(name string, s *Schema) {
 	fmt.Fprintf(&g.out, "type %s struct {\n", name)
 	seen := map[string]bool{}
 	var defaults []string
-	for _, p := range s.Properties {
+	for i, p := range s.Properties {
+		g.apart(i)
 		field := goName(p.Name)
 		if seen[field] {
 			panic(fmt.Sprintf("%s: two properties are both %s in Go", name, field))
@@ -165,7 +175,7 @@ func (g *goGen) nilable(t string) bool {
 }
 
 func (g *goGen) enum(name string, s *Schema) {
-	fmt.Fprintf(&g.out, "type %s string\n\nconst (\n", name)
+	fmt.Fprintf(&g.out, "type %s string\n\n", name)
 	var values []string
 	seen := map[string]bool{}
 	for _, v := range s.Enum {
@@ -176,9 +186,9 @@ func (g *goGen) enum(name string, s *Schema) {
 		}
 		seen[c] = true
 		values = append(values, c)
-		fmt.Fprintf(&g.out, "\t%s %s = %q\n", c, name, str)
+		// One declaration each, not a block that gofmt aligns (#2020).
+		fmt.Fprintf(&g.out, "const %s %s = %q\n", c, name, str)
 	}
-	g.out.WriteString(")\n")
 	if s.Fallback != "" {
 		fmt.Fprintf(&g.out, `
 // UnmarshalJSON reads a value this build does not know as %[3]q.
@@ -195,7 +205,7 @@ func (v *%[1]s) UnmarshalJSON(b []byte) error {
 	}
 	return nil
 }
-`, name, strings.Join(values, ", "), s.Fallback, goName(s.Fallback))
+`, name, strings.Join(values, ",\n\t\t"), s.Fallback, goName(s.Fallback))
 	}
 }
 
@@ -207,6 +217,7 @@ func (g *goGen) cases(name string, s *Schema, names []string, payloads []*Schema
 	for i, c := range names {
 		field := goName(c)
 		fields = append(fields, field)
+		g.apart(i)
 		t := g.typeOf(payloads[i], name+field)
 		if !g.nilable(t) {
 			t = "*" + t
@@ -214,6 +225,7 @@ func (g *goGen) cases(name string, s *Schema, names []string, payloads []*Schema
 		fmt.Fprintf(&g.out, "\t%s %s `json:%q`\n", field, t, c+",omitzero")
 	}
 	if s.Fallback == "keep" {
+		g.apart(len(names))
 		g.out.WriteString("\t// Unrecognised is a case this build does not know, written back as it was read.\n")
 		g.out.WriteString("\tUnrecognised JSONValue `json:\"-\"`\n")
 	}
@@ -283,6 +295,7 @@ func (g *goGen) tagged(name string, s *Schema, tag string) {
 	fmt.Fprintf(&g.out, "\t// %s is one of %s.\n", goName(tag), strings.Join(tags, ", "))
 	fmt.Fprintf(&g.out, "\t%s string `json:%q`\n", goName(tag), tag)
 	for _, n := range order {
+		g.apart(1)
 		f := fields[n]
 		field := goName(n)
 		t := "JSONValue"
@@ -412,24 +425,23 @@ func goMethods(doc *Document, rpcs []*RPC) (string, error) {
 	}
 	var body strings.Builder
 	for _, rpc := range rpcs {
-		fmt.Fprintf(&body, "\n// What %s answers (%s.openrpc.json).\nvar (\n", map[string]string{"host": "a host", "control": "the control plane"}[rpc.Target],
+		// One declaration each, not a block that gofmt aligns (#2020).
+		fmt.Fprintf(&body, "\n// What %s answers (%s.openrpc.json).\n", map[string]string{"host": "a host", "control": "the control plane"}[rpc.Target],
 			map[string]string{"host": "daemon", "control": "control"}[rpc.Target])
 		for _, m := range rpc.Methods {
 			name := goName(m.Name)
 			params := g.typeOf(m.Params, name+"Params")
 			if m.Notification {
-				fmt.Fprintf(&body, "\tNotify%s = Notification[%s]{%q}\n", name, params, m.Name)
+				fmt.Fprintf(&body, "var Notify%s = Notification[%s]{%q}\n", name, params, m.Name)
 			} else {
-				fmt.Fprintf(&body, "\tCall%s = Method[%s, %s]{%q}\n", name, params, g.typeOf(m.Result, name+"Result"), m.Name)
+				fmt.Fprintf(&body, "var Call%s = Method[%s, %s]{%q}\n", name, params, g.typeOf(m.Result, name+"Result"), m.Name)
 			}
 		}
-		body.WriteString(")\n")
 		if len(rpc.Errors) > 0 {
-			body.WriteString("\n// The codes a call can fail with (DaemonAPI.Failure).\nconst (\n")
+			body.WriteString("\n// The codes a call can fail with (DaemonAPI.Failure).\n")
 			for _, e := range rpc.Errors {
-				fmt.Fprintf(&body, "\tFailure%s = %d\n", goName(e.Name), e.Code)
+				fmt.Fprintf(&body, "const Failure%s = %d\n", goName(e.Name), e.Code)
 			}
-			body.WriteString(")\n")
 		}
 	}
 	g.out.WriteString(body.String())

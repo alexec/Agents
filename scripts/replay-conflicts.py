@@ -2,6 +2,7 @@
 """Count the merge conflicts pull requests met, to see whether areas help (#873).
 
   scripts/replay-conflicts.py [--since YYYY-MM-DD] [--until YYYY-MM-DD] [--last N]
+                              [--fixed GLOB ...]
 
 For each pull request merged in the window (the last 150 by default), every force-push
 is replayed: the head from before the push is merged against main as it was at the time
@@ -10,11 +11,14 @@ pull request's head is also merged against main now. Merges are done with
 `git merge-tree`, so nothing in the working tree changes.
 
 The report gives each conflict with its files and their areas (.agents/areas), then the
-total, and the conflicts by area. 10–13 October 2026, before areas: 30 conflicts in
+total, the conflicts by area and the files that conflict most. With --fixed, a file that
+matches no longer counts (a change made it merge by itself, #2020), so the total is what
+the same pull requests would have met with it. 10–13 October 2026, before areas: 30 conflicts in
 150 pull requests (28 rebases, 2 open).
 """
 
 import argparse
+import fnmatch
 import json
 import os
 import subprocess
@@ -89,11 +93,18 @@ def conflicts(main, head):
     return [line for line in result.stdout.splitlines()[1:] if line]
 
 
+def unfixed(files, fixed):
+    """The files that still conflict once those matching a --fixed glob merge by themselves."""
+    return [f for f in files if not any(fnmatch.fnmatch(f, g) for g in fixed)]
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("--since", help="merged on or after this date")
     parser.add_argument("--until", help="merged on or before this date")
     parser.add_argument("--last", type=int, default=150, help="at most this many merged PRs")
+    parser.add_argument("--fixed", nargs="*", default=[], metavar="GLOB",
+                        help="files that now merge by themselves: leave them out")
     options = parser.parse_args()
 
     owner, repo = gh_json("repo", "view", "--json", "owner,name", "--jq",
@@ -116,19 +127,20 @@ def main():
             if not have(before):
                 skipped += 1
                 continue
-            files = conflicts(main_at(push["createdAt"]), before)
+            files = unfixed(conflicts(main_at(push["createdAt"]), before), options.fixed)
             if files:
                 found.append(("rebase", pr, push["createdAt"], files))
     for pr in opened:
         if have(pr["headRefOid"]):
-            files = conflicts("origin/main", pr["headRefOid"])
+            files = unfixed(conflicts("origin/main", pr["headRefOid"]), options.fixed)
             if files:
                 found.append(("open", pr, "now", files))
 
-    by_area = Counter()
+    by_area, by_file = Counter(), Counter()
     for kind, pr, when, files in found:
         held = areas.areas_of(files, rules)
         by_area.update(held or ["(none)"])
+        by_file.update(files)
         print(f"#{pr['number']} {kind} {when}: {pr['title']}")
         for path in files:
             print(f"    {path}  [{areas.area_of(path, rules) or '-'}]")
@@ -140,6 +152,9 @@ def main():
     if skipped:
         print(f"{skipped} force-pushes skipped: GitHub no longer serves their old head.")
     print("By area: " + ", ".join(f"{a} {n}" for a, n in by_area.most_common()))
+    print("Most: " + ", ".join(f"{f} {n}" for f, n in by_file.most_common(10)))
+    if options.fixed:
+        print("Left out, as fixed: " + ", ".join(options.fixed))
     print("Before areas (10–13 October 2026): 30 conflicts in 150 merged PRs.")
 
 

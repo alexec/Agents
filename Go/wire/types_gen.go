@@ -5,138 +5,205 @@ package wire
 import "encoding/json"
 
 type ACPAuthMethod struct {
-	ID          string    `json:"id"`
-	Name        *string   `json:"name,omitzero"`
-	Description *string   `json:"description,omitzero"`
-	Meta        JSONValue `json:"_meta,omitzero"`
+	ID string `json:"id"`
+
+	Name *string `json:"name,omitzero"`
+
+	Description *string `json:"description,omitzero"`
+
+	Meta JSONValue `json:"_meta,omitzero"`
 }
 
 type ACPPromptCapabilities struct {
-	Image           *bool `json:"image,omitzero"`
-	Audio           *bool `json:"audio,omitzero"`
+	Image *bool `json:"image,omitzero"`
+
+	Audio *bool `json:"audio,omitzero"`
+
 	EmbeddedContext *bool `json:"embeddedContext,omitzero"`
 }
 
 type ACPProviderInfo struct {
-	ID         string  `json:"id"`
-	Name       *string `json:"name,omitzero"`
-	Protocol   *string `json:"protocol,omitzero"`
-	Configured *bool   `json:"configured,omitzero"`
+	ID string `json:"id"`
+
+	Name *string `json:"name,omitzero"`
+
+	Protocol *string `json:"protocol,omitzero"`
+
+	Configured *bool `json:"configured,omitzero"`
 }
 
 // clients/setActivityToken (#1744): the push token of one session's Live Activity on this device, in hex, for the control plane to update it by APNs while the Remote is not running. startedAt is when the turn began, where the activity's timer counts from. No token takes it away.
 type ActivityToken struct {
-	AgentID     UUID            `json:"agentID"`
-	Token       *string         `json:"token,omitzero"`
+	AgentID UUID `json:"agentID"`
+
+	Token *string `json:"token,omitzero"`
+
 	Environment PushEnvironment `json:"environment"`
-	StartedAt   Date            `json:"startedAt"`
+
+	StartedAt Date `json:"startedAt"`
 }
 
 // What either announce is answered with: who the new party now is.
 type Admitted struct {
-	Client *UUID   `json:"client,omitzero"`
-	Host   *HostID `json:"host,omitzero"`
-	Grant  *string `json:"grant,omitzero"`
+	Client *UUID `json:"client,omitzero"`
+
+	Host *HostID `json:"host,omitzero"`
+
+	Grant *string `json:"grant,omitzero"`
 }
 
 type AdoptRequest struct {
 	RuntimeID string `json:"runtimeID"`
+
 	SessionID string `json:"sessionID"`
-	Cwd       URL    `json:"cwd"`
+
+	Cwd URL `json:"cwd"`
 }
 
 type AfterTurn string
 
-const (
-	AfterTurnRequestArchive AfterTurn = "request_archive"
-	AfterTurnArchive        AfterTurn = "archive"
-)
+const AfterTurnRequestArchive AfterTurn = "request_archive"
+const AfterTurnArchive AfterTurn = "archive"
 
 type Agent struct {
-	ID                UUID           `json:"id"`
-	RuntimeID         string         `json:"runtimeID"`
-	Cwd               URL            `json:"cwd"`
-	Title             *string        `json:"title,omitzero"`
-	Labels            []SessionLabel `json:"labels,omitzero"`
-	State             AgentState     `json:"state"`
-	RuntimeSessionID  *string        `json:"runtimeSessionID,omitzero"`
-	StartOptions      StartOptions   `json:"startOptions"`
+	ID UUID `json:"id"`
+
+	RuntimeID string `json:"runtimeID"`
+
+	Cwd URL `json:"cwd"`
+
+	Title *string `json:"title,omitzero"`
+
+	Labels []SessionLabel `json:"labels,omitzero"`
+
+	State AgentState `json:"state"`
+
+	RuntimeSessionID *string `json:"runtimeSessionID,omitzero"`
+
+	StartOptions StartOptions `json:"startOptions"`
+
 	AdvertisedOptions []ConfigOption `json:"advertisedOptions"`
+
 	AvailableCommands []SlashCommand `json:"availableCommands"`
-	CreatedAt         Date           `json:"createdAt"`
-	LastActivityAt    Date           `json:"lastActivityAt"`
-	IsUnread          *bool          `json:"isUnread,omitzero"`
+
+	CreatedAt Date `json:"createdAt"`
+
+	LastActivityAt Date `json:"lastActivityAt"`
+
+	IsUnread *bool `json:"isUnread,omitzero"`
+
 	// Mute Notifications (#2003): the session still goes under Needs you and counts in the badge, but sends no push, no Mac notification and no banner. A muted workflow's runs start muted.
-	IsMuted               *bool                 `json:"isMuted,omitzero"`
-	ReportSeenAt          *Date                 `json:"reportSeenAt,omitzero"`
-	EndedReason           *EndedReason          `json:"endedReason,omitzero"`
-	ArchivedReason        *AgentArchivedReason  `json:"archivedReason,omitzero"`
-	Usage                 *Usage                `json:"usage,omitzero"`
-	LastTurnUsage         *TurnUsage            `json:"lastTurnUsage,omitzero"`
-	CostToDate            map[string]float64    `json:"costToDate,omitzero"`
-	CostCeiling           *Cost                 `json:"costCeiling,omitzero"`
-	TokensToDate          *int64                `json:"tokensToDate,omitzero"`
-	TokenCeiling          *int64                `json:"tokenCeiling,omitzero"`
-	Plans                 []Plan                `json:"plans,omitzero"`
-	Background            []BackgroundItem      `json:"background,omitzero"`
-	AdditionalDirectories []URL                 `json:"additionalDirectories,omitzero"`
-	McpServers            []MCPServer           `json:"mcpServers,omitzero"`
-	QueuedPrompts         []QueuedPrompt        `json:"queuedPrompts,omitzero"`
-	SuggestedPrompts      []SuggestedPrompt     `json:"suggestedPrompts,omitzero"`
-	StartedByWorkflow     *string               `json:"startedByWorkflow,omitzero"`
-	Purpose               *AgentPurpose         `json:"purpose,omitzero"`
-	StartedByRun          *UUID                 `json:"startedByRun,omitzero"`
-	StartedByAgent        *UUID                 `json:"startedByAgent,omitzero"`
-	ChainDepth            *int64                `json:"chainDepth,omitzero"`
-	EventWait             *EventWait            `json:"eventWait,omitzero"`
-	Worktree              *AgentWorktree        `json:"worktree,omitzero"`
-	PendingMove           *PendingMove          `json:"pendingMove,omitzero"`
-	StartingPoint         *StartingPoint        `json:"startingPoint,omitzero"`
-	StartRequestID        *UUID                 `json:"startRequestID,omitzero"`
-	Persona               *string               `json:"persona,omitzero"`
-	RestartPickUps        *int64                `json:"restartPickUps,omitzero"`
-	Report                *WorkReport           `json:"report,omitzero"`
-	OutcomeAsked          *bool                 `json:"outcomeAsked,omitzero"`
-	ArchiveRequest        *ArchiveRequest       `json:"archiveRequest,omitzero"`
-	AfterTurn             *AfterTurn            `json:"afterTurn,omitzero"`
-	ArchivedAt            *Date                 `json:"archivedAt,omitzero"`
-	SandboxOverride       *SandboxChoice        `json:"sandboxOverride,omitzero"`
-	EffectiveSandbox      *EffectiveSandbox     `json:"effectiveSandbox,omitzero"`
+	IsMuted *bool `json:"isMuted,omitzero"`
+
+	ReportSeenAt *Date `json:"reportSeenAt,omitzero"`
+
+	EndedReason *EndedReason `json:"endedReason,omitzero"`
+
+	ArchivedReason *AgentArchivedReason `json:"archivedReason,omitzero"`
+
+	Usage *Usage `json:"usage,omitzero"`
+
+	LastTurnUsage *TurnUsage `json:"lastTurnUsage,omitzero"`
+
+	CostToDate map[string]float64 `json:"costToDate,omitzero"`
+
+	CostCeiling *Cost `json:"costCeiling,omitzero"`
+
+	TokensToDate *int64 `json:"tokensToDate,omitzero"`
+
+	TokenCeiling *int64 `json:"tokenCeiling,omitzero"`
+
+	Plans []Plan `json:"plans,omitzero"`
+
+	Background []BackgroundItem `json:"background,omitzero"`
+
+	AdditionalDirectories []URL `json:"additionalDirectories,omitzero"`
+
+	McpServers []MCPServer `json:"mcpServers,omitzero"`
+
+	QueuedPrompts []QueuedPrompt `json:"queuedPrompts,omitzero"`
+
+	SuggestedPrompts []SuggestedPrompt `json:"suggestedPrompts,omitzero"`
+
+	StartedByWorkflow *string `json:"startedByWorkflow,omitzero"`
+
+	Purpose *AgentPurpose `json:"purpose,omitzero"`
+
+	StartedByRun *UUID `json:"startedByRun,omitzero"`
+
+	StartedByAgent *UUID `json:"startedByAgent,omitzero"`
+
+	ChainDepth *int64 `json:"chainDepth,omitzero"`
+
+	EventWait *EventWait `json:"eventWait,omitzero"`
+
+	Worktree *AgentWorktree `json:"worktree,omitzero"`
+
+	PendingMove *PendingMove `json:"pendingMove,omitzero"`
+
+	StartingPoint *StartingPoint `json:"startingPoint,omitzero"`
+
+	StartRequestID *UUID `json:"startRequestID,omitzero"`
+
+	Persona *string `json:"persona,omitzero"`
+
+	RestartPickUps *int64 `json:"restartPickUps,omitzero"`
+
+	Report *WorkReport `json:"report,omitzero"`
+
+	OutcomeAsked *bool `json:"outcomeAsked,omitzero"`
+
+	ArchiveRequest *ArchiveRequest `json:"archiveRequest,omitzero"`
+
+	AfterTurn *AfterTurn `json:"afterTurn,omitzero"`
+
+	ArchivedAt *Date `json:"archivedAt,omitzero"`
+
+	SandboxOverride *SandboxChoice `json:"sandboxOverride,omitzero"`
+
+	EffectiveSandbox *EffectiveSandbox `json:"effectiveSandbox,omitzero"`
+
 	PendingSandboxFailure *SandboxFailureRecord `json:"pendingSandboxFailure,omitzero"`
-	MissingFolder         *MissingFolder        `json:"missingFolder,omitzero"`
-	ListsLeftOut          *bool                 `json:"listsLeftOut,omitzero"`
-	TitleIsPersons        *bool                 `json:"titleIsPersons,omitzero"`
-	RuntimeTitle          *string               `json:"runtimeTitle,omitzero"`
-	MadeInRoot            *string               `json:"madeInRoot,omitzero"`
-	QueuedStart           *QueuedStart          `json:"queuedStart,omitzero"`
+
+	MissingFolder *MissingFolder `json:"missingFolder,omitzero"`
+
+	ListsLeftOut *bool `json:"listsLeftOut,omitzero"`
+
+	TitleIsPersons *bool `json:"titleIsPersons,omitzero"`
+
+	RuntimeTitle *string `json:"runtimeTitle,omitzero"`
+
+	MadeInRoot *string `json:"madeInRoot,omitzero"`
+
+	QueuedStart *QueuedStart `json:"queuedStart,omitzero"`
+
 	// The session this one was branched from at one of its prompts (#1658). Until it has a conversation of its own, its runtime reads the record it was given ahead of its first prompt.
 	BranchedFrom *UUID `json:"branchedFrom,omitzero"`
+
 	// The last file it showed with show_file that the person has not looked at (#1802): a mark on its row, never a group or a badge. Cleared when the person opens the conversation or marks it read.
 	FileToSee *ShownFile `json:"fileToSee,omitzero"`
+
 	// The person asked a chat paused by a spent allowance to carry on when the allowance is back (#1859). At `at` the host sends "continue" in the same chat; a turn that works, any other message, Stop or Archive takes it away.
 	ContinueWhenBack *ContinueWhenBack `json:"continueWhenBack,omitzero"`
+
 	// While a turn runs, the title of the tool the agent is running now, the newest when more than one is (#1902). Absent while it thinks or replies. It changes only once a new value has held for a second, so a short tool never shows and a short gap between two does not flash. Cleared when the turn ends.
 	RunningTool *string `json:"runningTool,omitzero"`
 }
 
 type AgentArchivedReason string
 
-const (
-	AgentArchivedReasonByUser  AgentArchivedReason = "byUser"
-	AgentArchivedReasonByAgent AgentArchivedReason = "byAgent"
-)
+const AgentArchivedReasonByUser AgentArchivedReason = "byUser"
+const AgentArchivedReasonByAgent AgentArchivedReason = "byAgent"
 
 type AgentGroup string
 
-const (
-	AgentGroupNeedsAttention AgentGroup = "needsAttention"
-	AgentGroupBlocked        AgentGroup = "blocked"
-	AgentGroupWaiting        AgentGroup = "waiting"
-	AgentGroupRunning        AgentGroup = "running"
-	AgentGroupFinished       AgentGroup = "finished"
-	AgentGroupStopped        AgentGroup = "stopped"
-	AgentGroupArchived       AgentGroup = "archived"
-)
+const AgentGroupNeedsAttention AgentGroup = "needsAttention"
+const AgentGroupBlocked AgentGroup = "blocked"
+const AgentGroupWaiting AgentGroup = "waiting"
+const AgentGroupRunning AgentGroup = "running"
+const AgentGroupFinished AgentGroup = "finished"
+const AgentGroupStopped AgentGroup = "stopped"
+const AgentGroupArchived AgentGroup = "archived"
 
 type AgentPurpose struct {
 	ProviderDraft *AgentPurposeProviderDraft `json:"providerDraft,omitzero"`
@@ -157,15 +224,13 @@ type AgentRequest struct {
 // A state this build does not know reads as `stopped` (Agent's init(from:)), with endedReason `unrecognised`.
 type AgentState string
 
-const (
-	AgentStateStarting      AgentState = "starting"
-	AgentStateRunning       AgentState = "running"
-	AgentStateWaitingOnUser AgentState = "waitingOnUser"
-	AgentStateFinished      AgentState = "finished"
-	AgentStateStopped       AgentState = "stopped"
-	AgentStateArchived      AgentState = "archived"
-	AgentStateQueued        AgentState = "queued"
-)
+const AgentStateStarting AgentState = "starting"
+const AgentStateRunning AgentState = "running"
+const AgentStateWaitingOnUser AgentState = "waitingOnUser"
+const AgentStateFinished AgentState = "finished"
+const AgentStateStopped AgentState = "stopped"
+const AgentStateArchived AgentState = "archived"
+const AgentStateQueued AgentState = "queued"
 
 // UnmarshalJSON reads a value this build does not know as "stopped".
 func (v *AgentState) UnmarshalJSON(b []byte) error {
@@ -174,7 +239,13 @@ func (v *AgentState) UnmarshalJSON(b []byte) error {
 		return err
 	}
 	switch AgentState(s) {
-	case AgentStateStarting, AgentStateRunning, AgentStateWaitingOnUser, AgentStateFinished, AgentStateStopped, AgentStateArchived, AgentStateQueued:
+	case AgentStateStarting,
+		AgentStateRunning,
+		AgentStateWaitingOnUser,
+		AgentStateFinished,
+		AgentStateStopped,
+		AgentStateArchived,
+		AgentStateQueued:
 		*v = AgentState(s)
 	default:
 		*v = AgentStateStopped
@@ -188,88 +259,118 @@ type AgentWorkspaces struct {
 }
 
 type AgentWorkspacesProvider struct {
-	ID         ProviderID                 `json:"id"`
-	Name       string                     `json:"name"`
-	CanMake    bool                       `json:"canMake"`
-	CanDelete  bool                       `json:"canDelete"`
-	Options    JSONValue                  `json:"options,omitzero"`
+	ID ProviderID `json:"id"`
+
+	Name string `json:"name"`
+
+	CanMake bool `json:"canMake"`
+
+	CanDelete bool `json:"canDelete"`
+
+	Options JSONValue `json:"options,omitzero"`
+
 	Workspaces []AgentWorkspacesWorkspace `json:"workspaces"`
 }
 
 type AgentWorkspacesWorkspace struct {
-	ID        string  `json:"id"`
-	Name      string  `json:"name"`
-	State     string  `json:"state"`
-	Host      *string `json:"host,omitzero"`
+	ID string `json:"id"`
+
+	Name string `json:"name"`
+
+	State string `json:"state"`
+
+	Host *string `json:"host,omitzero"`
+
 	HostState *string `json:"hostState,omitzero"`
-	Cost      *string `json:"cost,omitzero"`
+
+	Cost *string `json:"cost,omitzero"`
 }
 
 type AgentWorktree struct {
-	Name      string  `json:"name"`
-	Root      URL     `json:"root"`
-	Branch    *string `json:"branch,omitzero"`
-	Project   URL     `json:"project"`
-	Base      *string `json:"base,omitzero"`
-	MadeByApp bool    `json:"madeByApp"`
+	Name string `json:"name"`
+
+	Root URL `json:"root"`
+
+	Branch *string `json:"branch,omitzero"`
+
+	Project URL `json:"project"`
+
+	Base *string `json:"base,omitzero"`
+
+	MadeByApp bool `json:"madeByApp"`
 }
 
 type AllowanceReading struct {
-	Window      *string  `json:"window,omitzero"`
-	Used        *float64 `json:"used,omitzero"`
-	ResetsAt    *Date    `json:"resetsAt,omitzero"`
-	Spent       bool     `json:"spent"`
-	NearlySpent bool     `json:"nearlySpent"`
-	At          Date     `json:"at"`
+	Window *string `json:"window,omitzero"`
+
+	Used *float64 `json:"used,omitzero"`
+
+	ResetsAt *Date `json:"resetsAt,omitzero"`
+
+	Spent bool `json:"spent"`
+
+	NearlySpent bool `json:"nearlySpent"`
+
+	At Date `json:"at"`
 }
 
 type AllowanceState struct {
-	CredentialKey   string                   `json:"credentialKey"`
-	EntryID         UUID                     `json:"entryID"`
-	Status          AllowanceStateStatus     `json:"status"`
-	Since           Date                     `json:"since"`
-	ChangedAt       Date                     `json:"changedAt"`
-	LearnedFrom     AllowanceStateSource     `json:"learnedFrom"`
-	LastRateLimit   *RateLimitInfo           `json:"lastRateLimit,omitzero"`
-	Reading         *AllowanceReading        `json:"reading,omitzero"`
-	Spent           AllowanceStateSpent      `json:"spent"`
-	RateLimitStreak []Date                   `json:"rateLimitStreak"`
-	ModelsOut       []AllowanceStateModelOut `json:"modelsOut,omitzero"`
+	CredentialKey string `json:"credentialKey"`
+
+	EntryID UUID `json:"entryID"`
+
+	Status AllowanceStateStatus `json:"status"`
+
+	Since Date `json:"since"`
+
+	ChangedAt Date `json:"changedAt"`
+
+	LearnedFrom AllowanceStateSource `json:"learnedFrom"`
+
+	LastRateLimit *RateLimitInfo `json:"lastRateLimit,omitzero"`
+
+	Reading *AllowanceReading `json:"reading,omitzero"`
+
+	Spent AllowanceStateSpent `json:"spent"`
+
+	RateLimitStreak []Date `json:"rateLimitStreak"`
+
+	ModelsOut []AllowanceStateModelOut `json:"modelsOut,omitzero"`
 }
 
 type AllowanceStateModelOut struct {
-	Model      string  `json:"model"`
-	Name       *string `json:"name,omitzero"`
-	Since      Date    `json:"since"`
-	RetryAfter Date    `json:"retryAfter"`
+	Model string `json:"model"`
+
+	Name *string `json:"name,omitzero"`
+
+	Since Date `json:"since"`
+
+	RetryAfter Date `json:"retryAfter"`
 }
 
 type AllowanceStateOutReason string
 
-const (
-	AllowanceStateOutReasonAllowanceSpent     AllowanceStateOutReason = "allowanceSpent"
-	AllowanceStateOutReasonOverage            AllowanceStateOutReason = "overage"
-	AllowanceStateOutReasonCreditUsedUp       AllowanceStateOutReason = "creditUsedUp"
-	AllowanceStateOutReasonCreditExpired      AllowanceStateOutReason = "creditExpired"
-	AllowanceStateOutReasonRateLimitPersisted AllowanceStateOutReason = "rateLimitPersisted"
-	AllowanceStateOutReasonRuntimeFailed      AllowanceStateOutReason = "runtimeFailed"
-)
+const AllowanceStateOutReasonAllowanceSpent AllowanceStateOutReason = "allowanceSpent"
+const AllowanceStateOutReasonOverage AllowanceStateOutReason = "overage"
+const AllowanceStateOutReasonCreditUsedUp AllowanceStateOutReason = "creditUsedUp"
+const AllowanceStateOutReasonCreditExpired AllowanceStateOutReason = "creditExpired"
+const AllowanceStateOutReasonRateLimitPersisted AllowanceStateOutReason = "rateLimitPersisted"
+const AllowanceStateOutReasonRuntimeFailed AllowanceStateOutReason = "runtimeFailed"
 
 type AllowanceStateSource string
 
-const (
-	AllowanceStateSourceTypedFailure   AllowanceStateSource = "typedFailure"
-	AllowanceStateSourceWords          AllowanceStateSource = "words"
-	AllowanceStateSourceOverageReport  AllowanceStateSource = "overageReport"
-	AllowanceStateSourceLedger         AllowanceStateSource = "ledger"
-	AllowanceStateSourceExpiry         AllowanceStateSource = "expiry"
-	AllowanceStateSourcePerson         AllowanceStateSource = "person"
-	AllowanceStateSourceRuntimeFailure AllowanceStateSource = "runtimeFailure"
-)
+const AllowanceStateSourceTypedFailure AllowanceStateSource = "typedFailure"
+const AllowanceStateSourceWords AllowanceStateSource = "words"
+const AllowanceStateSourceOverageReport AllowanceStateSource = "overageReport"
+const AllowanceStateSourceLedger AllowanceStateSource = "ledger"
+const AllowanceStateSourceExpiry AllowanceStateSource = "expiry"
+const AllowanceStateSourcePerson AllowanceStateSource = "person"
+const AllowanceStateSourceRuntimeFailure AllowanceStateSource = "runtimeFailure"
 
 type AllowanceStateSpent struct {
-	Known   *AllowanceStateSpentKnown `json:"known,omitzero"`
-	Unknown *struct{}                 `json:"unknown,omitzero"`
+	Known *AllowanceStateSpentKnown `json:"known,omitzero"`
+
+	Unknown *struct{} `json:"unknown,omitzero"`
 }
 
 type AllowanceStateSpentKnown struct {
@@ -277,9 +378,11 @@ type AllowanceStateSpentKnown struct {
 }
 
 type AllowanceStateStatus struct {
-	Available   *struct{}                        `json:"available,omitzero"`
+	Available *struct{} `json:"available,omitzero"`
+
 	RateLimited *AllowanceStateStatusRateLimited `json:"rateLimited,omitzero"`
-	Out         *AllowanceStateStatusOut         `json:"out,omitzero"`
+
+	Out *AllowanceStateStatusOut `json:"out,omitzero"`
 }
 
 type AllowanceStateStatusRateLimited struct {
@@ -287,75 +390,98 @@ type AllowanceStateStatusRateLimited struct {
 }
 
 type AllowanceStateStatusOut struct {
-	Until      *Date                   `json:"until,omitzero"`
-	RetryAfter *Date                   `json:"retryAfter,omitzero"`
-	Why        AllowanceStateOutReason `json:"why"`
+	Until *Date `json:"until,omitzero"`
+
+	RetryAfter *Date `json:"retryAfter,omitzero"`
+
+	Why AllowanceStateOutReason `json:"why"`
 }
 
 // What devices/announce answers: the device's record, with the Mac's relay key beside its fields when a bridge has registered one (046).
 type AnnounceReply struct {
-	ID          UUID       `json:"id"`
-	PublicKey   Data       `json:"publicKey"`
-	Name        string     `json:"name"`
-	Kind        DeviceKind `json:"kind"`
-	AnnouncedAt Date       `json:"announcedAt"`
-	LastSeenAt  *Date      `json:"lastSeenAt,omitzero"`
-	MayNotify   *bool      `json:"mayNotify,omitzero"`
-	MacKey      Data       `json:"macKey,omitzero"`
+	ID UUID `json:"id"`
+
+	PublicKey Data `json:"publicKey"`
+
+	Name string `json:"name"`
+
+	Kind DeviceKind `json:"kind"`
+
+	AnnouncedAt Date `json:"announcedAt"`
+
+	LastSeenAt *Date `json:"lastSeenAt,omitzero"`
+
+	MayNotify *bool `json:"mayNotify,omitzero"`
+
+	MacKey Data `json:"macKey,omitzero"`
 }
 
 type AnswerElicitationRequest struct {
-	RequestID UUID                           `json:"requestID"`
-	Action    AnswerElicitationRequestAction `json:"action"`
-	Content   map[string]JSONValue           `json:"content"`
-	SendID    *UUID                          `json:"sendID,omitzero"`
+	RequestID UUID `json:"requestID"`
+
+	Action AnswerElicitationRequestAction `json:"action"`
+
+	Content map[string]JSONValue `json:"content"`
+
+	SendID *UUID `json:"sendID,omitzero"`
 }
 
 type AnswerElicitationRequestAction string
 
-const (
-	AnswerElicitationRequestActionAccept  AnswerElicitationRequestAction = "accept"
-	AnswerElicitationRequestActionDecline AnswerElicitationRequestAction = "decline"
-	AnswerElicitationRequestActionCancel  AnswerElicitationRequestAction = "cancel"
-)
+const AnswerElicitationRequestActionAccept AnswerElicitationRequestAction = "accept"
+const AnswerElicitationRequestActionDecline AnswerElicitationRequestAction = "decline"
+const AnswerElicitationRequestActionCancel AnswerElicitationRequestAction = "cancel"
 
 type AnswerRequest struct {
-	PermissionID UUID   `json:"permissionID"`
-	OptionID     string `json:"optionID"`
-	SendID       *UUID  `json:"sendID,omitzero"`
+	PermissionID UUID `json:"permissionID"`
+
+	OptionID string `json:"optionID"`
+
+	SendID *UUID `json:"sendID,omitzero"`
 }
 
 type AnswerSandboxRequest struct {
 	AgentID UUID `json:"agentID"`
+
 	CarryOn bool `json:"carryOn"`
 }
 
 type AppViewCall struct {
-	ID          UUID             `json:"id"`
-	Server      string           `json:"server"`
-	Tool        string           `json:"tool"`
-	ResourceUri string           `json:"resourceUri"`
-	Arguments   JSONValue        `json:"arguments,omitzero"`
-	Result      JSONValue        `json:"result,omitzero"`
-	State       AppViewCallState `json:"state"`
-	Reason      *string          `json:"reason,omitzero"`
-	Pinnable    *bool            `json:"pinnable,omitzero"`
+	ID UUID `json:"id"`
+
+	Server string `json:"server"`
+
+	Tool string `json:"tool"`
+
+	ResourceUri string `json:"resourceUri"`
+
+	Arguments JSONValue `json:"arguments,omitzero"`
+
+	Result JSONValue `json:"result,omitzero"`
+
+	State AppViewCallState `json:"state"`
+
+	Reason *string `json:"reason,omitzero"`
+
+	Pinnable *bool `json:"pinnable,omitzero"`
 }
 
 type AppViewCallState string
 
-const (
-	AppViewCallStateRunning   AppViewCallState = "running"
-	AppViewCallStateDone      AppViewCallState = "done"
-	AppViewCallStateCancelled AppViewCallState = "cancelled"
-)
+const AppViewCallStateRunning AppViewCallState = "running"
+const AppViewCallStateDone AppViewCallState = "done"
+const AppViewCallStateCancelled AppViewCallState = "cancelled"
 
 type AppViewPolicy struct {
-	ConnectDomains  []string `json:"connectDomains"`
+	ConnectDomains []string `json:"connectDomains"`
+
 	ResourceDomains []string `json:"resourceDomains"`
-	FrameDomains    []string `json:"frameDomains"`
-	BaseUriDomains  []string `json:"baseUriDomains"`
-	Refused         []string `json:"refused"`
+
+	FrameDomains []string `json:"frameDomains"`
+
+	BaseUriDomains []string `json:"baseUriDomains"`
+
+	Refused []string `json:"refused"`
 }
 
 type ApplyAllowancesRequest struct {
@@ -363,54 +489,65 @@ type ApplyAllowancesRequest struct {
 }
 
 type Approval struct {
-	Kind    ApprovalKind     `json:"kind"`
-	Key     string           `json:"key"`
-	Title   string           `json:"title"`
-	Digest  *string          `json:"digest,omitzero"`
-	Line    string           `json:"line"`
-	Since   *Date            `json:"since,omitzero"`
+	Kind ApprovalKind `json:"kind"`
+
+	Key string `json:"key"`
+
+	Title string `json:"title"`
+
+	Digest *string `json:"digest,omitzero"`
+
+	Line string `json:"line"`
+
+	Since *Date `json:"since,omitzero"`
+
 	Actions []ApprovalAction `json:"actions"`
-	AgentID *UUID            `json:"agentID,omitzero"`
+
+	AgentID *UUID `json:"agentID,omitzero"`
 }
 
 type ApprovalAction string
 
-const (
-	ApprovalActionApprove        ApprovalAction = "approve"
-	ApprovalActionDeny           ApprovalAction = "deny"
-	ApprovalActionRequestChanges ApprovalAction = "requestChanges"
-	ApprovalActionDismiss        ApprovalAction = "dismiss"
-)
+const ApprovalActionApprove ApprovalAction = "approve"
+const ApprovalActionDeny ApprovalAction = "deny"
+const ApprovalActionRequestChanges ApprovalAction = "requestChanges"
+const ApprovalActionDismiss ApprovalAction = "dismiss"
 
 type ApprovalAnswer struct {
-	Folder URL            `json:"folder"`
-	Kind   ApprovalKind   `json:"kind"`
-	Key    string         `json:"key"`
-	Digest *string        `json:"digest,omitzero"`
+	Folder URL `json:"folder"`
+
+	Kind ApprovalKind `json:"kind"`
+
+	Key string `json:"key"`
+
+	Digest *string `json:"digest,omitzero"`
+
 	Action ApprovalAction `json:"action"`
-	Note   *string        `json:"note,omitzero"`
+
+	Note *string `json:"note,omitzero"`
 }
 
 type ApprovalKind string
 
-const (
-	ApprovalKindMcpServer      ApprovalKind = "mcpServer"
-	ApprovalKindWorkflow       ApprovalKind = "workflow"
-	ApprovalKindPlugin         ApprovalKind = "plugin"
-	ApprovalKindFile           ApprovalKind = "file"
-	ApprovalKindArchive        ApprovalKind = "archive"
-	ApprovalKindWorkflowFailed ApprovalKind = "workflowFailed"
-)
+const ApprovalKindMcpServer ApprovalKind = "mcpServer"
+const ApprovalKindWorkflow ApprovalKind = "workflow"
+const ApprovalKindPlugin ApprovalKind = "plugin"
+const ApprovalKindFile ApprovalKind = "file"
+const ApprovalKindArchive ApprovalKind = "archive"
+const ApprovalKindWorkflowFailed ApprovalKind = "workflowFailed"
 
 type ApprovalReadRequest struct {
-	Folder URL          `json:"folder"`
-	Kind   ApprovalKind `json:"kind"`
-	Key    string       `json:"key"`
+	Folder URL `json:"folder"`
+
+	Kind ApprovalKind `json:"kind"`
+
+	Key string `json:"key"`
 }
 
 type ArchiveRequest struct {
 	WhenTurnEnds *ArchiveRequestWhenTurnEnds `json:"whenTurnEnds,omitzero"`
-	Requested    *ArchiveRequestRequested    `json:"requested,omitzero"`
+
+	Requested *ArchiveRequestRequested `json:"requested,omitzero"`
 }
 
 type ArchiveRequestWhenTurnEnds struct {
@@ -422,79 +559,105 @@ type ArchiveRequestRequested struct {
 }
 
 type ArtifactWriteRequest struct {
-	AgentID UUID   `json:"agentID"`
-	Path    string `json:"path"`
-	Text    string `json:"text"`
+	AgentID UUID `json:"agentID"`
+
+	Path string `json:"path"`
+
+	Text string `json:"text"`
+
 	// The SHA-256, in lower-case hex, of the text the edit started from (#1858). When the file on disk is not that text any more, the write is refused with fileChanged and nothing is written. Left out, the text is written whatever is on disk.
 	Base *string `json:"base,omitzero"`
 }
 
 type AssessRuntimeRequest struct {
-	RuntimeID string  `json:"runtimeID"`
-	Folder    URL     `json:"folder"`
-	Model     *string `json:"model,omitzero"`
+	RuntimeID string `json:"runtimeID"`
+
+	Folder URL `json:"folder"`
+
+	Model *string `json:"model,omitzero"`
 }
 
 type AssessRuntimeResult struct {
-	AgentID    UUID    `json:"agentID"`
-	Model      *string `json:"model,omitzero"`
-	ReportPath string  `json:"reportPath"`
+	AgentID UUID `json:"agentID"`
+
+	Model *string `json:"model,omitzero"`
+
+	ReportPath string `json:"reportPath"`
 }
 
 type Attachment struct {
-	ID          UUID         `json:"id"`
-	Block       ContentBlock `json:"block"`
-	DisplayName string       `json:"displayName"`
-	ByteCount   *int64       `json:"byteCount,omitzero"`
+	ID UUID `json:"id"`
+
+	Block ContentBlock `json:"block"`
+
+	DisplayName string `json:"displayName"`
+
+	ByteCount *int64 `json:"byteCount,omitzero"`
 }
 
 type AttentionDelivery struct {
-	NeedID NeedID   `json:"needID"`
-	To     *Surface `json:"to,omitzero"`
+	NeedID NeedID `json:"needID"`
+
+	To *Surface `json:"to,omitzero"`
 }
 
 // attention/need, unsealed, on a host's channel 0 (R6): a need to offer, or `withdraw`, and the host's whole Needs you count (#1163).
 type AttentionNeed struct {
-	Need     *Need     `json:"need,omitzero"`
+	Need *Need `json:"need,omitzero"`
+
 	Headline *Headline `json:"headline,omitzero"`
-	Buzz     *bool     `json:"buzz,omitzero"`
-	Withdraw *NeedID   `json:"withdraw,omitzero"`
-	Waiting  *int64    `json:"waiting,omitzero"`
+
+	Buzz *bool `json:"buzz,omitzero"`
+
+	Withdraw *NeedID `json:"withdraw,omitzero"`
+
+	Waiting *int64 `json:"waiting,omitzero"`
 }
 
 type AttentionNotification struct {
-	NeedID NeedID   `json:"needID"`
-	Need   *Need    `json:"need,omitzero"`
-	To     *Surface `json:"to,omitzero"`
-	Alert  bool     `json:"alert"`
+	NeedID NeedID `json:"needID"`
+
+	Need *Need `json:"need,omitzero"`
+
+	To *Surface `json:"to,omitzero"`
+
+	Alert bool `json:"alert"`
 }
 
 type AttentionPending struct {
-	Needs      []Need              `json:"needs"`
+	Needs []Need `json:"needs"`
+
 	Deliveries []AttentionDelivery `json:"deliveries"`
 }
 
 // attention/turn (#1744): a host says that a session's turn moved to a new phase, so the control plane can update that session's Live Activity on a device by APNs. No words: the phase, and when it ended.
 type AttentionTurn struct {
-	AgentID UUID      `json:"agentID"`
-	Phase   TurnPhase `json:"phase"`
-	EndedAt *Date     `json:"endedAt,omitzero"`
+	AgentID UUID `json:"agentID"`
+
+	Phase TurnPhase `json:"phase"`
+
+	EndedAt *Date `json:"endedAt,omitzero"`
 }
 
 // Who did something through the control plane (#996, spec 736 FR-039), as the control plane wrote it: never taken from a client. A person and their client, or a bot and the event that started it. On a control plane with one person, the user is always the local owner.
 type AuditActor struct {
 	// The person's id (people/<id>.json).
-	User       string      `json:"user"`
-	UserName   *string     `json:"userName,omitzero"`
-	Client     *UUID       `json:"client,omitzero"`
-	ClientName *string     `json:"clientName,omitzero"`
-	Event      *AuditCause `json:"event,omitzero"`
+	User string `json:"user"`
+
+	UserName *string `json:"userName,omitzero"`
+
+	Client *UUID `json:"client,omitzero"`
+
+	ClientName *string `json:"clientName,omitzero"`
+
+	Event *AuditCause `json:"event,omitzero"`
 }
 
 // The event that started a bot's action (#996).
 type AuditCause struct {
 	Kind string `json:"kind"`
-	ID   string `json:"id"`
+
+	ID string `json:"id"`
 }
 
 // control/setAuditDays (#996): how many days audit entries are kept, 1 to 3,650. The default is 90.
@@ -504,103 +667,133 @@ type AuditDays struct {
 
 // One audit entry (#996): who did what, on which machine, and when. `action` is in words; `method` is the call it came from.
 type AuditEntry struct {
-	ID     string     `json:"id"`
-	At     Date       `json:"at"`
-	Action string     `json:"action"`
-	Method string     `json:"method"`
-	Host   *HostID    `json:"host,omitzero"`
-	Target *string    `json:"target,omitzero"`
-	Actor  AuditActor `json:"actor"`
+	ID string `json:"id"`
+
+	At Date `json:"at"`
+
+	Action string `json:"action"`
+
+	Method string `json:"method"`
+
+	Host *HostID `json:"host,omitzero"`
+
+	Target *string `json:"target,omitzero"`
+
+	Actor AuditActor `json:"actor"`
 }
 
 // audit/export's answer (#996): the entries as JSON lines, oldest first, at most 50,000.
 type AuditExport struct {
 	Lines string `json:"lines"`
-	Count int64  `json:"count"`
+
+	Count int64 `json:"count"`
 }
 
 // audit/list's answer (#996): entries newest first, how many days the control plane keeps them, and whether older ones were left out.
 type AuditList struct {
 	Entries []AuditEntry `json:"entries"`
-	Days    int64        `json:"days"`
-	More    bool         `json:"more"`
+
+	Days int64 `json:"days"`
+
+	More bool `json:"more"`
+
 	// Whether the caller sees every person's entries.
 	Admin bool `json:"admin"`
 }
 
 // audit/list and audit/export (#996): a time range and, for an admin, one person. A member sees only their own entries, whatever `user` says.
 type AuditQuery struct {
-	Since *Date   `json:"since,omitzero"`
-	Until *Date   `json:"until,omitzero"`
-	User  *string `json:"user,omitzero"`
+	Since *Date `json:"since,omitzero"`
+
+	Until *Date `json:"until,omitzero"`
+
+	User *string `json:"user,omitzero"`
+
 	// At most this many, newest first; 200 when absent, never more than 1,000.
 	Limit *int64 `json:"limit,omitzero"`
 }
 
 type AuthStatus struct {
-	Kind  string `json:"kind"`
+	Kind string `json:"kind"`
+
 	Label string `json:"label"`
 }
 
 type AuthenticateRequest struct {
 	RuntimeID string `json:"runtimeID"`
-	MethodID  string `json:"methodID"`
+
+	MethodID string `json:"methodID"`
 }
 
 type BackgroundItem struct {
-	ID             string              `json:"id"`
-	Kind           BackgroundItemKind  `json:"kind"`
-	Name           string              `json:"name"`
-	TaskType       *string             `json:"taskType,omitzero"`
-	Detail         *string             `json:"detail,omitzero"`
-	Command        *string             `json:"command,omitzero"`
-	State          BackgroundItemState `json:"state"`
-	CanStop        bool                `json:"canStop"`
-	IsStopping     bool                `json:"isStopping"`
-	ParentID       *string             `json:"parentID,omitzero"`
-	ToolCallID     *string             `json:"toolCallID,omitzero"`
-	OutputFilePath *string             `json:"outputFilePath,omitzero"`
-	Summary        *string             `json:"summary,omitzero"`
-	LastToolName   *string             `json:"lastToolName,omitzero"`
-	StartedAt      Date                `json:"startedAt"`
-	EndedAt        *Date               `json:"endedAt,omitzero"`
+	ID string `json:"id"`
+
+	Kind BackgroundItemKind `json:"kind"`
+
+	Name string `json:"name"`
+
+	TaskType *string `json:"taskType,omitzero"`
+
+	Detail *string `json:"detail,omitzero"`
+
+	Command *string `json:"command,omitzero"`
+
+	State BackgroundItemState `json:"state"`
+
+	CanStop bool `json:"canStop"`
+
+	IsStopping bool `json:"isStopping"`
+
+	ParentID *string `json:"parentID,omitzero"`
+
+	ToolCallID *string `json:"toolCallID,omitzero"`
+
+	OutputFilePath *string `json:"outputFilePath,omitzero"`
+
+	Summary *string `json:"summary,omitzero"`
+
+	LastToolName *string `json:"lastToolName,omitzero"`
+
+	StartedAt Date `json:"startedAt"`
+
+	EndedAt *Date `json:"endedAt,omitzero"`
 }
 
 type BackgroundItemKind string
 
-const (
-	BackgroundItemKindTask     BackgroundItemKind = "task"
-	BackgroundItemKindSubagent BackgroundItemKind = "subagent"
-)
+const BackgroundItemKindTask BackgroundItemKind = "task"
+const BackgroundItemKindSubagent BackgroundItemKind = "subagent"
 
 type BackgroundItemState string
 
-const (
-	BackgroundItemStateRunning      BackgroundItemState = "running"
-	BackgroundItemStatePaused       BackgroundItemState = "paused"
-	BackgroundItemStateCompleted    BackgroundItemState = "completed"
-	BackgroundItemStateFailed       BackgroundItemState = "failed"
-	BackgroundItemStateStopped      BackgroundItemState = "stopped"
-	BackgroundItemStateDisconnected BackgroundItemState = "disconnected"
-)
+const BackgroundItemStateRunning BackgroundItemState = "running"
+const BackgroundItemStatePaused BackgroundItemState = "paused"
+const BackgroundItemStateCompleted BackgroundItemState = "completed"
+const BackgroundItemStateFailed BackgroundItemState = "failed"
+const BackgroundItemStateStopped BackgroundItemState = "stopped"
+const BackgroundItemStateDisconnected BackgroundItemState = "disconnected"
 
 type Backup struct {
-	ID          string `json:"id"`
-	Machine     string `json:"machine"`
-	RootID      string `json:"rootID"`
-	MadeAt      Date   `json:"madeAt"`
-	Bytes       int64  `json:"bytes"`
-	Agents      int64  `json:"agents"`
-	ThisMachine bool   `json:"thisMachine"`
+	ID string `json:"id"`
+
+	Machine string `json:"machine"`
+
+	RootID string `json:"rootID"`
+
+	MadeAt Date `json:"madeAt"`
+
+	Bytes int64 `json:"bytes"`
+
+	Agents int64 `json:"agents"`
+
+	ThisMachine bool `json:"thisMachine"`
 }
 
 type BackupEvery string
 
-const (
-	BackupEveryOff    BackupEvery = "off"
-	BackupEveryDaily  BackupEvery = "daily"
-	BackupEveryWeekly BackupEvery = "weekly"
-)
+const BackupEveryOff BackupEvery = "off"
+const BackupEveryDaily BackupEvery = "daily"
+const BackupEveryWeekly BackupEvery = "weekly"
 
 // UnmarshalJSON reads a value this build does not know as "daily".
 func (v *BackupEvery) UnmarshalJSON(b []byte) error {
@@ -609,7 +802,9 @@ func (v *BackupEvery) UnmarshalJSON(b []byte) error {
 		return err
 	}
 	switch BackupEvery(s) {
-	case BackupEveryOff, BackupEveryDaily, BackupEveryWeekly:
+	case BackupEveryOff,
+		BackupEveryDaily,
+		BackupEveryWeekly:
 		*v = BackupEvery(s)
 	default:
 		*v = BackupEveryDaily
@@ -628,37 +823,53 @@ type BackupRestoreRequest struct {
 
 type BackupRestoreResult struct {
 	Restored int64 `json:"restored"`
-	Skipped  int64 `json:"skipped"`
+
+	Skipped int64 `json:"skipped"`
 }
 
 type BackupSettings struct {
-	Every  BackupEvery `json:"every"`
-	Keep   int64       `json:"keep"`
-	Folder *string     `json:"folder,omitzero"`
+	Every BackupEvery `json:"every"`
+
+	Keep int64 `json:"keep"`
+
+	Folder *string `json:"folder,omitzero"`
+
 	// Where backups go (#1815): this machine's folder, or the control plane's store. Left out is the machine's default: the store for a server linked to a control plane, else the folder.
 	Target *BackupTarget `json:"target,omitzero"`
 }
 
 type BackupState struct {
-	Settings  BackupSettings `json:"settings"`
-	Folder    string         `json:"folder"`
-	Backups   []Backup       `json:"backups"`
-	Making    bool           `json:"making"`
-	LastError *string        `json:"lastError,omitzero"`
+	Settings BackupSettings `json:"settings"`
+
+	Folder string `json:"folder"`
+
+	Backups []Backup `json:"backups"`
+
+	Making bool `json:"making"`
+
+	LastError *string `json:"lastError,omitzero"`
+
 	// The machine is linked to a control plane, so it can back up to the control plane's store (#1815).
 	CanUseControl *bool `json:"canUseControl,omitzero"`
 }
 
 // A host's backup whose parts are all uploaded: the control plane writes its .json last, then keeps the newest keep of this host's (#1815).
 type BackupStoreCommit struct {
-	Name    string `json:"name"`
-	Parts   int64  `json:"parts"`
+	Name string `json:"name"`
+
+	Parts int64 `json:"parts"`
+
 	Machine string `json:"machine"`
-	RootID  string `json:"rootID"`
-	MadeAt  Date   `json:"madeAt"`
-	Bytes   int64  `json:"bytes"`
-	Agents  int64  `json:"agents"`
-	Keep    int64  `json:"keep"`
+
+	RootID string `json:"rootID"`
+
+	MadeAt Date `json:"madeAt"`
+
+	Bytes int64 `json:"bytes"`
+
+	Agents int64 `json:"agents"`
+
+	Keep int64 `json:"keep"`
 }
 
 type BackupStoreList struct {
@@ -669,22 +880,23 @@ type BackupStoreList struct {
 type BackupStorePart struct {
 	// On an upload, the backup's name; this host's own folder is the control plane's to say.
 	Name string `json:"name"`
-	Part int64  `json:"part"`
-	Data Data   `json:"data"`
+
+	Part int64 `json:"part"`
+
+	Data Data `json:"data"`
 }
 
 type BackupStorePartRequest struct {
 	// A listed backup's id: <host>/<name>.
-	ID   string `json:"id"`
-	Part int64  `json:"part"`
+	ID string `json:"id"`
+
+	Part int64 `json:"part"`
 }
 
 type BackupTarget string
 
-const (
-	BackupTargetFolder  BackupTarget = "folder"
-	BackupTargetControl BackupTarget = "control"
-)
+const BackupTargetFolder BackupTarget = "folder"
+const BackupTargetControl BackupTarget = "control"
 
 // UnmarshalJSON reads a value this build does not know as "folder".
 func (v *BackupTarget) UnmarshalJSON(b []byte) error {
@@ -693,7 +905,8 @@ func (v *BackupTarget) UnmarshalJSON(b []byte) error {
 		return err
 	}
 	switch BackupTarget(s) {
-	case BackupTargetFolder, BackupTargetControl:
+	case BackupTargetFolder,
+		BackupTargetControl:
 		*v = BackupTarget(s)
 	default:
 		*v = BackupTargetFolder
@@ -702,33 +915,35 @@ func (v *BackupTarget) UnmarshalJSON(b []byte) error {
 }
 
 type Block struct {
-	Waits        []Wait         `json:"waits"`
-	CheckAgainAt *Date          `json:"checkAgainAt,omitzero"`
-	WakeOn       *BlockWakeOn   `json:"wakeOn,omitzero"`
-	ClearedAt    *Date          `json:"clearedAt,omitzero"`
-	ClearedBy    *BlockClearing `json:"clearedBy,omitzero"`
+	Waits []Wait `json:"waits"`
+
+	CheckAgainAt *Date `json:"checkAgainAt,omitzero"`
+
+	WakeOn *BlockWakeOn `json:"wakeOn,omitzero"`
+
+	ClearedAt *Date `json:"clearedAt,omitzero"`
+
+	ClearedBy *BlockClearing `json:"clearedBy,omitzero"`
 }
 
 type BlockClearing string
 
-const (
-	BlockClearingWaits   BlockClearing = "waits"
-	BlockClearingTime    BlockClearing = "time"
-	BlockClearingDropped BlockClearing = "dropped"
-)
+const BlockClearingWaits BlockClearing = "waits"
+const BlockClearingTime BlockClearing = "time"
+const BlockClearingDropped BlockClearing = "dropped"
 
 type BlockWakeOn string
 
-const (
-	BlockWakeOnAny BlockWakeOn = "any"
-	BlockWakeOnAll BlockWakeOn = "all"
-)
+const BlockWakeOnAny BlockWakeOn = "any"
+const BlockWakeOnAll BlockWakeOn = "all"
 
 // bots/setCaps (#1761): the bot's caps, and optionally its group.
 type BotCaps struct {
-	User  string    `json:"user"`
-	Caps  SpendCaps `json:"caps"`
-	Group *string   `json:"group,omitzero"`
+	User string `json:"user"`
+
+	Caps SpendCaps `json:"caps"`
+
+	Group *string `json:"group,omitzero"`
 }
 
 // bots/make's answer: the bot's user id.
@@ -738,46 +953,57 @@ type BotMade struct {
 
 // bots/make (#1761, FR-030): a bot, in a group, with caps. It has no clients and no sign-in; admins approve its machines.
 type BotMake struct {
-	Name  string     `json:"name"`
-	Group string     `json:"group"`
-	Caps  *SpendCaps `json:"caps,omitzero"`
+	Name string `json:"name"`
+
+	Group string `json:"group"`
+
+	Caps *SpendCaps `json:"caps,omitzero"`
 }
 
 // bots/stopRun (#1761, FR-031): an admin stops an agent on a bot's machine, the one way a client acts there.
 type BotStopRun struct {
-	Host  HostID `json:"host"`
-	Agent UUID   `json:"agent"`
+	Host HostID `json:"host"`
+
+	Agent UUID `json:"agent"`
 }
 
 // agents/branchFrom (#1658): a new session that goes on from just before the person's prompt `entryID` in `agentID`.
 type BranchFromRequest struct {
 	AgentID UUID `json:"agentID"`
+
 	EntryID UUID `json:"entryID"`
 }
 
 type BranchSummary struct {
-	Name   string  `json:"name"`
+	Name string `json:"name"`
+
 	Remote *string `json:"remote,omitzero"`
 }
 
 // What projects/bringBack did (#1473): the branches that moved forward or were made, and whether the uncommitted changes were applied.
 type BringBack struct {
-	Moved   []string `json:"moved"`
-	Applied bool     `json:"applied"`
+	Moved []string `json:"moved"`
+
+	Applied bool `json:"applied"`
 }
 
 // Brings a host's branches back into this Mac's repository at `folder` (Bring back from ‹host›…, #1473): fetches the `bundle` upload, moves `branches` forward only, also where a worktree has one checked out, and applies the `patch` upload (the host's uncommitted changes) in `folder`, whose checked-out branch must be `patchOn`. It stops, and changes nothing, when a branch here has commits of its own or a worktree with a branch that moves has uncommitted changes.
 type BringBackRequest struct {
-	Folder   URL          `json:"folder"`
-	Bundle   *UUID        `json:"bundle,omitzero"`
-	Patch    *UUID        `json:"patch,omitzero"`
-	PatchOn  *string      `json:"patchOn,omitzero"`
+	Folder URL `json:"folder"`
+
+	Bundle *UUID `json:"bundle,omitzero"`
+
+	Patch *UUID `json:"patch,omitzero"`
+
+	PatchOn *string `json:"patchOn,omitzero"`
+
 	Branches []SentBranch `json:"branches"`
 }
 
 type BuildOutputRemoved struct {
-	Removed []string     `json:"removed"`
-	Freed   WorktreeSize `json:"freed"`
+	Removed []string `json:"removed"`
+
+	Freed WorktreeSize `json:"freed"`
 }
 
 type CancelWaitRequest struct {
@@ -786,31 +1012,47 @@ type CancelWaitRequest struct {
 
 // control/capReached (#1761, FR-033): to admins, a bot stopped starting work at its own or its group's cap.
 type CapReached struct {
-	User     string  `json:"user"`
-	Name     string  `json:"name"`
-	Group    *string `json:"group,omitzero"`
+	User string `json:"user"`
+
+	Name string `json:"name"`
+
+	Group *string `json:"group,omitzero"`
+
 	SpentUSD float64 `json:"spentUSD"`
-	CapUSD   float64 `json:"capUSD"`
-	Until    Date    `json:"until"`
+
+	CapUSD float64 `json:"capUSD"`
+
+	Until Date `json:"until"`
 }
 
 type CarriedSetting struct {
-	OptionID string               `json:"optionID"`
-	Name     string               `json:"name"`
-	From     JSONValue            `json:"from,omitzero"`
-	To       JSONValue            `json:"to,omitzero"`
-	Source   CarriedSettingSource `json:"source"`
+	OptionID string `json:"optionID"`
+
+	Name string `json:"name"`
+
+	From JSONValue `json:"from,omitzero"`
+
+	To JSONValue `json:"to,omitzero"`
+
+	Source CarriedSettingSource `json:"source"`
 }
 
 type CarriedSettingSource struct {
-	Level           *CarriedSettingSourceLevel `json:"level,omitzero"`
-	SameValue       *struct{}                  `json:"sameValue,omitzero"`
-	PoolEntry       *struct{}                  `json:"poolEntry,omitzero"`
-	Remembered      *struct{}                  `json:"remembered,omitzero"`
-	RuntimeDefault  *struct{}                  `json:"runtimeDefault,omitzero"`
-	StrictestMode   *struct{}                  `json:"strictestMode,omitzero"`
-	ClosestNoLooser *struct{}                  `json:"closestNoLooser,omitzero"`
-	Person          *struct{}                  `json:"person,omitzero"`
+	Level *CarriedSettingSourceLevel `json:"level,omitzero"`
+
+	SameValue *struct{} `json:"sameValue,omitzero"`
+
+	PoolEntry *struct{} `json:"poolEntry,omitzero"`
+
+	Remembered *struct{} `json:"remembered,omitzero"`
+
+	RuntimeDefault *struct{} `json:"runtimeDefault,omitzero"`
+
+	StrictestMode *struct{} `json:"strictestMode,omitzero"`
+
+	ClosestNoLooser *struct{} `json:"closestNoLooser,omitzero"`
+
+	Person *struct{} `json:"person,omitzero"`
 }
 
 type CarriedSettingSourceLevel struct {
@@ -818,17 +1060,27 @@ type CarriedSettingSourceLevel struct {
 }
 
 type CatalogError struct {
-	Unreachable     *CatalogErrorUnreachable    `json:"unreachable,omitzero"`
-	RateLimited     *CatalogErrorRateLimited    `json:"rateLimited,omitzero"`
-	Unmanaged       *CatalogErrorUnmanaged      `json:"unmanaged,omitzero"`
-	LockUnreadable  *CatalogErrorLockUnreadable `json:"lockUnreadable,omitzero"`
-	NoPersonalHome  *struct{}                   `json:"noPersonalHome,omitzero"`
-	PreviewExpired  *struct{}                   `json:"previewExpired,omitzero"`
-	NotAProject     *CatalogErrorNotAProject    `json:"notAProject,omitzero"`
-	ReplaceMismatch *struct{}                   `json:"replaceMismatch,omitzero"`
-	CannotAdd       *CatalogErrorCannotAdd      `json:"cannotAdd,omitzero"`
-	NotManaged      *CatalogErrorNotManaged     `json:"notManaged,omitzero"`
-	Failed          *CatalogErrorFailed         `json:"failed,omitzero"`
+	Unreachable *CatalogErrorUnreachable `json:"unreachable,omitzero"`
+
+	RateLimited *CatalogErrorRateLimited `json:"rateLimited,omitzero"`
+
+	Unmanaged *CatalogErrorUnmanaged `json:"unmanaged,omitzero"`
+
+	LockUnreadable *CatalogErrorLockUnreadable `json:"lockUnreadable,omitzero"`
+
+	NoPersonalHome *struct{} `json:"noPersonalHome,omitzero"`
+
+	PreviewExpired *struct{} `json:"previewExpired,omitzero"`
+
+	NotAProject *CatalogErrorNotAProject `json:"notAProject,omitzero"`
+
+	ReplaceMismatch *struct{} `json:"replaceMismatch,omitzero"`
+
+	CannotAdd *CatalogErrorCannotAdd `json:"cannotAdd,omitzero"`
+
+	NotManaged *CatalogErrorNotManaged `json:"notManaged,omitzero"`
+
+	Failed *CatalogErrorFailed `json:"failed,omitzero"`
 }
 
 type CatalogErrorUnreachable struct {
@@ -865,139 +1117,178 @@ type CatalogErrorFailed struct {
 
 type CatalogKind string
 
-const (
-	CatalogKindSkills CatalogKind = "skills"
-	CatalogKindMCP    CatalogKind = "mcp"
-)
+const CatalogKindSkills CatalogKind = "skills"
+const CatalogKindMCP CatalogKind = "mcp"
 
 type CatalogPreviewAnswer struct {
 	Preview *SkillPreview `json:"preview,omitzero"`
-	Error   *CatalogError `json:"error,omitzero"`
+
+	Error *CatalogError `json:"error,omitzero"`
 }
 
 type CatalogPreviewRequest struct {
-	Result      CatalogResult    `json:"result"`
+	Result CatalogResult `json:"result"`
+
 	Destination SkillDestination `json:"destination"`
 }
 
 type CatalogResult struct {
-	ID          string  `json:"id"`
-	Name        string  `json:"name"`
-	Owner       string  `json:"owner"`
-	Repo        string  `json:"repo"`
-	SkillID     string  `json:"skillID"`
-	Installs    int64   `json:"installs"`
-	Known       bool    `json:"known"`
+	ID string `json:"id"`
+
+	Name string `json:"name"`
+
+	Owner string `json:"owner"`
+
+	Repo string `json:"repo"`
+
+	SkillID string `json:"skillID"`
+
+	Installs int64 `json:"installs"`
+
+	Known bool `json:"known"`
+
 	Marketplace *string `json:"marketplace,omitzero"`
-	SkillPath   *string `json:"skillPath,omitzero"`
+
+	SkillPath *string `json:"skillPath,omitzero"`
 }
 
 type CatalogSearchAnswer struct {
 	Results []CatalogResult `json:"results"`
-	Error   *CatalogError   `json:"error,omitzero"`
+
+	Error *CatalogError `json:"error,omitzero"`
 }
 
 type CatalogSearchRequest struct {
-	Query       string            `json:"query"`
-	Kind        *CatalogKind      `json:"kind,omitzero"`
-	Marketplace *string           `json:"marketplace,omitzero"`
+	Query string `json:"query"`
+
+	Kind *CatalogKind `json:"kind,omitzero"`
+
+	Marketplace *string `json:"marketplace,omitzero"`
+
 	Destination *SkillDestination `json:"destination,omitzero"`
 }
 
 type CatchUpLeases struct {
-	Leases LeaseSnapshot     `json:"leases"`
+	Leases LeaseSnapshot `json:"leases"`
+
 	Hosted HostedMCPSnapshot `json:"hosted"`
+
 	Health MCPHealthSnapshot `json:"health"`
 }
 
 // A part this host does not know is left out of CatchUpRequest.parts.
 type CatchUpPart string
 
-const (
-	CatchUpPartWorkflows  CatchUpPart = "workflows"
-	CatchUpPartPins       CatchUpPart = "pins"
-	CatchUpPartLeases     CatchUpPart = "leases"
-	CatchUpPartRuntimes   CatchUpPart = "runtimes"
-	CatchUpPartAllowances CatchUpPart = "allowances"
-	CatchUpPartModes      CatchUpPart = "modes"
-	CatchUpPartSandbox    CatchUpPart = "sandbox"
-	CatchUpPartCosts      CatchUpPart = "costs"
-)
+const CatchUpPartWorkflows CatchUpPart = "workflows"
+const CatchUpPartPins CatchUpPart = "pins"
+const CatchUpPartLeases CatchUpPart = "leases"
+const CatchUpPartRuntimes CatchUpPart = "runtimes"
+const CatchUpPartAllowances CatchUpPart = "allowances"
+const CatchUpPartModes CatchUpPart = "modes"
+const CatchUpPartSandbox CatchUpPart = "sandbox"
+const CatchUpPartCosts CatchUpPart = "costs"
 
 type CatchUpRequest struct {
 	Agents *ListRequest `json:"agents,omitzero"`
-	Parts  []string     `json:"parts,omitzero"`
+
+	Parts []string `json:"parts,omitzero"`
 }
 
 type CatchUpSnapshot struct {
-	Projects     []ProjectSummary     `json:"projects"`
-	Agents       []Agent              `json:"agents"`
-	Permissions  []PermissionRequest  `json:"permissions"`
+	Projects []ProjectSummary `json:"projects"`
+
+	Agents []Agent `json:"agents"`
+
+	Permissions []PermissionRequest `json:"permissions"`
+
 	Elicitations []ElicitationRequest `json:"elicitations"`
-	Attention    AttentionPending     `json:"attention"`
-	Resuming     []UUID               `json:"resuming"`
-	Disk         *DiskState           `json:"disk,omitzero"`
-	StoreNotes   *StoreNotes          `json:"storeNotes,omitzero"`
-	Milestones   *Milestones          `json:"milestones,omitzero"`
-	Workflows    []WorkflowSummary    `json:"workflows,omitzero"`
-	Pins         []ProjectPins        `json:"pins,omitzero"`
-	Leases       *CatchUpLeases       `json:"leases,omitzero"`
+
+	Attention AttentionPending `json:"attention"`
+
+	Resuming []UUID `json:"resuming"`
+
+	Disk *DiskState `json:"disk,omitzero"`
+
+	StoreNotes *StoreNotes `json:"storeNotes,omitzero"`
+
+	Milestones *Milestones `json:"milestones,omitzero"`
+
+	Workflows []WorkflowSummary `json:"workflows,omitzero"`
+
+	Pins []ProjectPins `json:"pins,omitzero"`
+
+	Leases *CatchUpLeases `json:"leases,omitzero"`
 }
 
 type ChangeSource string
 
-const (
-	ChangeSourceReported        ChangeSource = "reported"
-	ChangeSourceReportedAndSeen ChangeSource = "reportedAndSeen"
-	ChangeSourceSeen            ChangeSource = "seen"
-)
+const ChangeSourceReported ChangeSource = "reported"
+const ChangeSourceReportedAndSeen ChangeSource = "reportedAndSeen"
+const ChangeSourceSeen ChangeSource = "seen"
 
 type ChangeState string
 
-const (
-	ChangeStateModified  ChangeState = "modified"
-	ChangeStateAdded     ChangeState = "added"
-	ChangeStateDeleted   ChangeState = "deleted"
-	ChangeStateBinary    ChangeState = "binary"
-	ChangeStateRenamed   ChangeState = "renamed"
-	ChangeStateUntracked ChangeState = "untracked"
-)
+const ChangeStateModified ChangeState = "modified"
+const ChangeStateAdded ChangeState = "added"
+const ChangeStateDeleted ChangeState = "deleted"
+const ChangeStateBinary ChangeState = "binary"
+const ChangeStateRenamed ChangeState = "renamed"
+const ChangeStateUntracked ChangeState = "untracked"
 
 type Changed bool
 
 type ChangedFile struct {
-	Path           string       `json:"path"`
-	RelativePath   *string      `json:"relativePath,omitzero"`
-	Source         ChangeSource `json:"source"`
-	State          ChangeState  `json:"state"`
-	EditCount      int64        `json:"editCount"`
-	Added          *int64       `json:"added,omitzero"`
-	Removed        *int64       `json:"removed,omitzero"`
-	BeyondReported bool         `json:"beyondReported"`
-	InProgress     bool         `json:"inProgress"`
-	OutsideFolder  bool         `json:"outsideFolder"`
-	FirstLine      *int64       `json:"firstLine,omitzero"`
-	OldPath        *string      `json:"oldPath,omitzero"`
+	Path string `json:"path"`
+
+	RelativePath *string `json:"relativePath,omitzero"`
+
+	Source ChangeSource `json:"source"`
+
+	State ChangeState `json:"state"`
+
+	EditCount int64 `json:"editCount"`
+
+	Added *int64 `json:"added,omitzero"`
+
+	Removed *int64 `json:"removed,omitzero"`
+
+	BeyondReported bool `json:"beyondReported"`
+
+	InProgress bool `json:"inProgress"`
+
+	OutsideFolder bool `json:"outsideFolder"`
+
+	FirstLine *int64 `json:"firstLine,omitzero"`
+
+	OldPath *string `json:"oldPath,omitzero"`
 }
 
 type ChangedFileDetail struct {
-	File  ChangedFile    `json:"file"`
+	File ChangedFile `json:"file"`
+
 	Edits []ReportedEdit `json:"edits"`
-	Hunks []FolderHunk   `json:"hunks,omitzero"`
-	Whole []DiffLine     `json:"whole,omitzero"`
+
+	Hunks []FolderHunk `json:"hunks,omitzero"`
+
+	Whole []DiffLine `json:"whole,omitzero"`
 }
 
 type ChangesFileRequest struct {
-	AgentID UUID   `json:"agentID"`
-	Path    string `json:"path"`
-	Whole   bool   `json:"whole"`
+	AgentID UUID `json:"agentID"`
+
+	Path string `json:"path"`
+
+	Whole bool `json:"whole"`
 }
 
 type ChangesList struct {
-	Files        []ChangedFile `json:"files"`
-	Git          GitView       `json:"git"`
-	ReportsEdits bool          `json:"reportsEdits"`
-	More         *int64        `json:"more,omitzero"`
+	Files []ChangedFile `json:"files"`
+
+	Git GitView `json:"git"`
+
+	ReportsEdits bool `json:"reportsEdits"`
+
+	More *int64 `json:"more,omitzero"`
 }
 
 type ChangesListRequest struct {
@@ -1005,10 +1296,13 @@ type ChangesListRequest struct {
 }
 
 type ChangesUnavailable struct {
-	NotARepository  *struct{}                 `json:"notARepository,omitzero"`
-	GitNotInstalled *struct{}                 `json:"gitNotInstalled,omitzero"`
-	FolderGone      *struct{}                 `json:"folderGone,omitzero"`
-	Failed          *ChangesUnavailableFailed `json:"failed,omitzero"`
+	NotARepository *struct{} `json:"notARepository,omitzero"`
+
+	GitNotInstalled *struct{} `json:"gitNotInstalled,omitzero"`
+
+	FolderGone *struct{} `json:"folderGone,omitzero"`
+
+	Failed *ChangesUnavailableFailed `json:"failed,omitzero"`
 }
 
 type ChangesUnavailableFailed struct {
@@ -1017,102 +1311,137 @@ type ChangesUnavailableFailed struct {
 
 // ChannelSender.dkim (#1762, FR-037): the DKIM result the email server read for a message, from its own Authentication-Results.
 type ChannelDKIM struct {
-	Result string  `json:"result"`
+	Result string `json:"result"`
+
 	Domain *string `json:"domain,omitzero"`
 }
 
 // links/list (#1762, data-model.md "Channel link"): a channel identity linked to a person, and who approved it when.
 type ChannelLink struct {
-	Channel    string  `json:"channel"`
-	Identity   string  `json:"identity"`
-	Name       *string `json:"name,omitzero"`
-	User       string  `json:"user"`
-	UserName   *string `json:"userName,omitzero"`
-	ApprovedBy string  `json:"approvedBy"`
-	ApprovedAt Date    `json:"approvedAt"`
+	Channel string `json:"channel"`
+
+	Identity string `json:"identity"`
+
+	Name *string `json:"name,omitzero"`
+
+	User string `json:"user"`
+
+	UserName *string `json:"userName,omitzero"`
+
+	ApprovedBy string `json:"approvedBy"`
+
+	ApprovedAt Date `json:"approvedAt"`
 }
 
 // links/check's answer (#1762): user is the linked person; with none, nothing starts, and refused says why when it is not only that the identity is not linked yet.
 type ChannelLinkChecked struct {
-	User     *string `json:"user,omitzero"`
+	User *string `json:"user,omitzero"`
+
 	UserName *string `json:"userName,omitzero"`
-	Refused  *string `json:"refused,omitzero"`
+
+	Refused *string `json:"refused,omitzero"`
 }
 
 // links/approve, links/deny (#1762). An admin approving a request that names nobody names the person in for, and the request goes to them.
 type ChannelLinkDecide struct {
-	Request string  `json:"request"`
-	For     *string `json:"for,omitzero"`
+	Request string `json:"request"`
+
+	For *string `json:"for,omitzero"`
 }
 
 // control/linkDecided (#1762): a request ended (approved, denied, expired) or went to another person (sent), so every card for it goes.
 type ChannelLinkDecided struct {
 	Request string `json:"request"`
-	Result  string `json:"result"`
+
+	Result string `json:"result"`
 }
 
 // links/remove (#1762): unlink a channel identity.
 type ChannelLinkRemove struct {
-	Channel  string `json:"channel"`
+	Channel string `json:"channel"`
+
 	Identity string `json:"identity"`
 }
 
 // links/requests, control/linkRequested (#1762): a channel identity waiting to be linked. for is the person asked; with none, the admins send it on to a person.
 type ChannelLinkRequest struct {
-	Request  string  `json:"request"`
-	Channel  string  `json:"channel"`
-	Identity string  `json:"identity"`
-	Name     *string `json:"name,omitzero"`
-	Email    *string `json:"email,omitzero"`
-	For      *string `json:"for,omitzero"`
-	ForName  *string `json:"forName,omitzero"`
-	Expires  Date    `json:"expires"`
+	Request string `json:"request"`
+
+	Channel string `json:"channel"`
+
+	Identity string `json:"identity"`
+
+	Name *string `json:"name,omitzero"`
+
+	Email *string `json:"email,omitzero"`
+
+	For *string `json:"for,omitzero"`
+
+	ForName *string `json:"forName,omitzero"`
+
+	Expires Date `json:"expires"`
 }
 
 // What a channel on a host's uplink is opened as (ControlWire.ChannelOpen). `grant` is always `operator`, for an older host (#111).
 type ChannelOpen struct {
-	Grant     string  `json:"grant"`
-	Client    string  `json:"client"`
-	Device    *UUID   `json:"device,omitzero"`
-	Relayed   *bool   `json:"relayed,omitzero"`
-	Tunnel    *string `json:"tunnel,omitzero"`
+	Grant string `json:"grant"`
+
+	Client string `json:"client"`
+
+	Device *UUID `json:"device,omitzero"`
+
+	Relayed *bool `json:"relayed,omitzero"`
+
+	Tunnel *string `json:"tunnel,omitzero"`
+
 	TunnelRef *string `json:"tunnelRef,omitzero"`
-	FanOut    *bool   `json:"fanOut,omitzero"`
+
+	FanOut *bool `json:"fanOut,omitzero"`
+
 	// Who the channel's calls are from, written by the control plane (#996).
 	Actor *AuditActor `json:"actor,omitzero"`
 }
 
 // links/check (#1762, FR-037), and an MCP event's sender: who sent a channel message. channel is the channel's kind (slack, email), identity the sender on it (for email, the address).
 type ChannelSender struct {
-	Channel  string       `json:"channel"`
-	Identity string       `json:"identity"`
-	Name     *string      `json:"name,omitzero"`
-	Email    *string      `json:"email,omitzero"`
-	Dkim     *ChannelDKIM `json:"dkim,omitzero"`
+	Channel string `json:"channel"`
+
+	Identity string `json:"identity"`
+
+	Name *string `json:"name,omitzero"`
+
+	Email *string `json:"email,omitzero"`
+
+	Dkim *ChannelDKIM `json:"dkim,omitzero"`
 }
 
 type ChartHint struct {
-	Mark  ChartMark `json:"mark"`
-	X     string    `json:"x"`
-	Y     string    `json:"y"`
-	Color *string   `json:"color,omitzero"`
-	Title *string   `json:"title,omitzero"`
+	Mark ChartMark `json:"mark"`
+
+	X string `json:"x"`
+
+	Y string `json:"y"`
+
+	Color *string `json:"color,omitzero"`
+
+	Title *string `json:"title,omitzero"`
 }
 
 type ChartMark string
 
-const (
-	ChartMarkBar   ChartMark = "bar"
-	ChartMarkLine  ChartMark = "line"
-	ChartMarkPoint ChartMark = "point"
-	ChartMarkArea  ChartMark = "area"
-)
+const ChartMarkBar ChartMark = "bar"
+const ChartMarkLine ChartMark = "line"
+const ChartMarkPoint ChartMark = "point"
+const ChartMarkArea ChartMark = "area"
 
 type ChatProjectState struct {
-	Ready          *ChatProjectStateReady    `json:"ready,omitzero"`
-	Archived       *ChatProjectStateArchived `json:"archived,omitzero"`
-	NoPersonalHome *struct{}                 `json:"noPersonalHome,omitzero"`
-	Failed         *ChatProjectStateFailed   `json:"failed,omitzero"`
+	Ready *ChatProjectStateReady `json:"ready,omitzero"`
+
+	Archived *ChatProjectStateArchived `json:"archived,omitzero"`
+
+	NoPersonalHome *struct{} `json:"noPersonalHome,omitzero"`
+
+	Failed *ChatProjectStateFailed `json:"failed,omitzero"`
 }
 
 type ChatProjectStateReady struct {
@@ -1129,29 +1458,32 @@ type ChatProjectStateFailed struct {
 
 // clients/announce, on a pairing connection.
 type ClientAnnounce struct {
-	ID        UUID       `json:"id"`
-	PublicKey Data       `json:"publicKey"`
-	Name      string     `json:"name"`
-	Kind      ClientKind `json:"kind"`
+	ID UUID `json:"id"`
+
+	PublicKey Data `json:"publicKey"`
+
+	Name string `json:"name"`
+
+	Kind ClientKind `json:"kind"`
 }
 
 // One row of clients/connections: a client connected now, and how.
 type ClientConnection struct {
-	Client  UUID    `json:"client"`
-	Relayed bool    `json:"relayed"`
+	Client UUID `json:"client"`
+
+	Relayed bool `json:"relayed"`
+
 	Through *string `json:"through,omitzero"`
 }
 
 // ClientRecord.Kind: a kind a later build added reads as `unknown`.
 type ClientKind string
 
-const (
-	ClientKindMac     ClientKind = "mac"
-	ClientKindIPhone  ClientKind = "iPhone"
-	ClientKindIPad    ClientKind = "iPad"
-	ClientKindUnknown ClientKind = "unknown"
-	ClientKindBrowser ClientKind = "browser"
-)
+const ClientKindMac ClientKind = "mac"
+const ClientKindIPhone ClientKind = "iPhone"
+const ClientKindIPad ClientKind = "iPad"
+const ClientKindUnknown ClientKind = "unknown"
+const ClientKindBrowser ClientKind = "browser"
 
 // UnmarshalJSON reads a value this build does not know as "unknown".
 func (v *ClientKind) UnmarshalJSON(b []byte) error {
@@ -1160,7 +1492,11 @@ func (v *ClientKind) UnmarshalJSON(b []byte) error {
 		return err
 	}
 	switch ClientKind(s) {
-	case ClientKindMac, ClientKindIPhone, ClientKindIPad, ClientKindUnknown, ClientKindBrowser:
+	case ClientKindMac,
+		ClientKindIPhone,
+		ClientKindIPad,
+		ClientKindUnknown,
+		ClientKindBrowser:
 		*v = ClientKind(s)
 	default:
 		*v = ClientKindUnknown
@@ -1170,17 +1506,16 @@ func (v *ClientKind) UnmarshalJSON(b []byte) error {
 
 // clients/startPairing: `browser` for the web remote's code (071); a grant an older window sends is not read.
 type ClientPairingRequest struct {
-	Kind  *string `json:"kind,omitzero"`
+	Kind *string `json:"kind,omitzero"`
+
 	Grant *string `json:"grant,omitzero"`
 }
 
 // The older autoReview reads as alwaysApprove.
 type ClientPermissionMode string
 
-const (
-	ClientPermissionModeDefault       ClientPermissionMode = "default"
-	ClientPermissionModeAlwaysApprove ClientPermissionMode = "alwaysApprove"
-)
+const ClientPermissionModeDefault ClientPermissionMode = "default"
+const ClientPermissionModeAlwaysApprove ClientPermissionMode = "alwaysApprove"
 
 // UnmarshalJSON reads a value this build does not know as "default".
 func (v *ClientPermissionMode) UnmarshalJSON(b []byte) error {
@@ -1189,7 +1524,8 @@ func (v *ClientPermissionMode) UnmarshalJSON(b []byte) error {
 		return err
 	}
 	switch ClientPermissionMode(s) {
-	case ClientPermissionModeDefault, ClientPermissionModeAlwaysApprove:
+	case ClientPermissionModeDefault,
+		ClientPermissionModeAlwaysApprove:
 		*v = ClientPermissionMode(s)
 	default:
 		*v = ClientPermissionModeDefault
@@ -1198,26 +1534,40 @@ func (v *ClientPermissionMode) UnmarshalJSON(b []byte) error {
 }
 
 type ClientPermissionSettings struct {
-	Cursor   ClientPermissionMode `json:"cursor"`
-	Grok     ClientPermissionMode `json:"grok"`
+	Cursor ClientPermissionMode `json:"cursor"`
+
+	Grok ClientPermissionMode `json:"grok"`
+
 	Opencode ClientPermissionMode `json:"opencode"`
 }
 
 // A paired screen, as clients/list says it (ClientRecord). `grant` is always `operator`, for an older build (#111).
 type ClientRecord struct {
-	ID          UUID       `json:"id"`
-	Name        string     `json:"name"`
-	Kind        ClientKind `json:"kind"`
-	PublicKey   Data       `json:"publicKey"`
-	Grant       string     `json:"grant"`
-	Paired      Date       `json:"paired"`
-	LastSeen    *Date      `json:"lastSeen,omitzero"`
-	MayNotify   *bool      `json:"mayNotify,omitzero"`
-	Owner       *string    `json:"owner,omitzero"`
-	Rev         int64      `json:"rev"`
-	Forgotten   *bool      `json:"forgotten,omitzero"`
-	ForgottenAt *Date      `json:"forgottenAt,omitzero"`
-	KnownEpoch  *int64     `json:"knownEpoch,omitzero"`
+	ID UUID `json:"id"`
+
+	Name string `json:"name"`
+
+	Kind ClientKind `json:"kind"`
+
+	PublicKey Data `json:"publicKey"`
+
+	Grant string `json:"grant"`
+
+	Paired Date `json:"paired"`
+
+	LastSeen *Date `json:"lastSeen,omitzero"`
+
+	MayNotify *bool `json:"mayNotify,omitzero"`
+
+	Owner *string `json:"owner,omitzero"`
+
+	Rev int64 `json:"rev"`
+
+	Forgotten *bool `json:"forgotten,omitzero"`
+
+	ForgottenAt *Date `json:"forgottenAt,omitzero"`
+
+	KnownEpoch *int64 `json:"knownEpoch,omitzero"`
 }
 
 // clients/forget.
@@ -1226,8 +1576,9 @@ type ClientRequest struct {
 }
 
 type CloneNotification struct {
-	Clone    CloneSummary `json:"clone"`
-	Finished bool         `json:"finished"`
+	Clone CloneSummary `json:"clone"`
+
+	Finished bool `json:"finished"`
 }
 
 type CloneRequest struct {
@@ -1235,47 +1586,66 @@ type CloneRequest struct {
 }
 
 type CloneSummary struct {
-	ID        UUID   `json:"id"`
-	URL       string `json:"url"`
-	Folder    URL    `json:"folder"`
-	StartedAt Date   `json:"startedAt"`
+	ID UUID `json:"id"`
+
+	URL string `json:"url"`
+
+	Folder URL `json:"folder"`
+
+	StartedAt Date `json:"startedAt"`
 }
 
 type ConfigChoice struct {
-	Value       JSONValue `json:"value"`
-	Name        string    `json:"name"`
-	Description *string   `json:"description,omitzero"`
+	Value JSONValue `json:"value"`
+
+	Name string `json:"name"`
+
+	Description *string `json:"description,omitzero"`
 }
 
 type ConfigChoiceGroup struct {
-	Name    *string        `json:"name,omitzero"`
-	Group   *string        `json:"group,omitzero"`
+	Name *string `json:"name,omitzero"`
+
+	Group *string `json:"group,omitzero"`
+
 	Options []ConfigChoice `json:"options"`
 }
 
 // ConfigOption (Model/Options.swift), as its encode(to:) writes it: `type` is the kind's wire name, and `options` is a flat list for one unnamed group, else the groups.
 type ConfigOption struct {
-	ID          string  `json:"id"`
-	Name        string  `json:"name"`
+	ID string `json:"id"`
+
+	Name string `json:"name"`
+
 	Description *string `json:"description,omitzero"`
-	Category    *string `json:"category,omitzero"`
+
+	Category *string `json:"category,omitzero"`
+
 	// "select", "boolean", or a kind this build doesn't know, carried as itself.
-	Type         string    `json:"type"`
+	Type string `json:"type"`
+
 	CurrentValue JSONValue `json:"currentValue,omitzero"`
-	Options      JSONValue `json:"options,omitzero"`
+
+	Options JSONValue `json:"options,omitzero"`
 }
 
 // The person's sign-in to one provider, as the host keeps it. Never its tokens.
 type Connection struct {
 	Provider ConnectionProvider `json:"provider"`
+
 	// The account's name on the provider, such as alexec.
-	Login       *string         `json:"login,omitzero"`
-	State       ConnectionState `json:"state"`
-	ConnectedAt Date            `json:"connectedAt"`
+	Login *string `json:"login,omitzero"`
+
+	State ConnectionState `json:"state"`
+
+	ConnectedAt Date `json:"connectedAt"`
+
 	// Where the person installs the provider's App: a GitHub user token reaches only the repositories where it is installed.
 	InstallURL *string `json:"installURL,omitzero"`
+
 	// The part of the provider the token reaches, such as a Linear workspace's name, or a self-managed GitLab's host.
 	Workspace *string `json:"workspace,omitzero"`
+
 	// When a token the host cannot renew ends: a GitLab personal access token's expiry. The person makes a new one before then.
 	ExpiresAt *Date `json:"expiresAt,omitzero"`
 }
@@ -1288,8 +1658,10 @@ type ConnectionDisconnectAnswer struct {
 type ConnectionEmailRequest struct {
 	// The IMAP server, such as imap.fastmail.com (imaps:// on 993 when it names no scheme), imap://host for STARTTLS on 143, or with a port.
 	Server string `json:"server"`
+
 	// Who signs in, usually the mail address.
 	User string `json:"user"`
+
 	// An app password made for Agents at the mail provider.
 	Password string `json:"password"`
 }
@@ -1297,41 +1669,52 @@ type ConnectionEmailRequest struct {
 // A tool the person connects to: GitHub (#1335) and Linear (#1343) with OAuth, GitLab (#1630) with OAuth on gitlab.com or a personal access token on any GitLab, and email (#1780): one IMAP mailbox with an app password.
 type ConnectionProvider string
 
-const (
-	ConnectionProviderGithub ConnectionProvider = "github"
-	ConnectionProviderLinear ConnectionProvider = "linear"
-	ConnectionProviderGitlab ConnectionProvider = "gitlab"
-	ConnectionProviderEmail  ConnectionProvider = "email"
-)
+const ConnectionProviderGithub ConnectionProvider = "github"
+const ConnectionProviderLinear ConnectionProvider = "linear"
+const ConnectionProviderGitlab ConnectionProvider = "gitlab"
+const ConnectionProviderEmail ConnectionProvider = "email"
 
 type ConnectionProviderRequest struct {
 	Provider ConnectionProvider `json:"provider"`
+
 	// For connections/sign-in from the web page: the page's origin. The hand-back page sends the code to this origin only, by postMessage. Without it, the hand-back page sends the code to agents://oauth/callback (the Mac and the Remote).
 	Origin *string `json:"origin,omitzero"`
 }
 
 // A sign-in under way on the host (#1335, #1343). The host keeps the secrets (the device code, the PKCE verifier); a client shows the code or opens the address, and waits.
 type ConnectionSignIn struct {
-	FlowID   UUID                   `json:"flowID"`
-	Provider ConnectionProvider     `json:"provider"`
-	Status   ConnectionSignInStatus `json:"status"`
-	Grant    ConnectionSignInGrant  `json:"grant"`
+	FlowID UUID `json:"flowID"`
+
+	Provider ConnectionProvider `json:"provider"`
+
+	Status ConnectionSignInStatus `json:"status"`
+
+	Grant ConnectionSignInGrant `json:"grant"`
+
 	// deviceCode only: the code the person types at verificationURL, such as WDJB-MJHT.
 	UserCode *string `json:"userCode,omitzero"`
+
 	// Where the person goes: the device page, or the provider's authorize page (with the state and the PKCE challenge, never the verifier).
-	VerificationURL string      `json:"verificationURL"`
-	InstallURL      *string     `json:"installURL,omitzero"`
-	ExpiresAt       Date        `json:"expiresAt"`
-	Connection      *Connection `json:"connection,omitzero"`
+	VerificationURL string `json:"verificationURL"`
+
+	InstallURL *string `json:"installURL,omitzero"`
+
+	ExpiresAt Date `json:"expiresAt"`
+
+	Connection *Connection `json:"connection,omitzero"`
+
 	// Why it failed, in words. Never a token.
 	Message *string `json:"message,omitzero"`
 }
 
 // What the hand-back page gave the client (#1343): the code and the state, or the provider's error. The host checks the state, then spends the code with its own verifier.
 type ConnectionSignInCompleteRequest struct {
-	FlowID UUID    `json:"flowID"`
-	State  string  `json:"state"`
-	Code   *string `json:"code,omitzero"`
+	FlowID UUID `json:"flowID"`
+
+	State string `json:"state"`
+
+	Code *string `json:"code,omitzero"`
+
 	// The provider's error code, such as access_denied.
 	Error *string `json:"error,omitzero"`
 }
@@ -1343,43 +1726,40 @@ type ConnectionSignInFlowRequest struct {
 // deviceCode: the person types userCode at verificationURL (GitHub), and the host polls. authorizationCode: the person approves at verificationURL in an authentication session (agents:// on the Mac and the Remote, a pop-up on the web page); the hand-back page gives the code back to the client, which gives it to the host with connections/sign-in/complete (Linear).
 type ConnectionSignInGrant string
 
-const (
-	ConnectionSignInGrantDeviceCode        ConnectionSignInGrant = "deviceCode"
-	ConnectionSignInGrantAuthorizationCode ConnectionSignInGrant = "authorizationCode"
-)
+const ConnectionSignInGrantDeviceCode ConnectionSignInGrant = "deviceCode"
+const ConnectionSignInGrantAuthorizationCode ConnectionSignInGrant = "authorizationCode"
 
 // waiting: for the person to approve on the provider's page. connected: done. expired: the code or the sign-in ended. denied: the person pressed Cancel on the provider's page. cancelled: a client stopped it. failed: see message.
 type ConnectionSignInStatus string
 
-const (
-	ConnectionSignInStatusWaiting   ConnectionSignInStatus = "waiting"
-	ConnectionSignInStatusConnected ConnectionSignInStatus = "connected"
-	ConnectionSignInStatusExpired   ConnectionSignInStatus = "expired"
-	ConnectionSignInStatusDenied    ConnectionSignInStatus = "denied"
-	ConnectionSignInStatusCancelled ConnectionSignInStatus = "cancelled"
-	ConnectionSignInStatusFailed    ConnectionSignInStatus = "failed"
-)
+const ConnectionSignInStatusWaiting ConnectionSignInStatus = "waiting"
+const ConnectionSignInStatusConnected ConnectionSignInStatus = "connected"
+const ConnectionSignInStatusExpired ConnectionSignInStatus = "expired"
+const ConnectionSignInStatusDenied ConnectionSignInStatus = "denied"
+const ConnectionSignInStatusCancelled ConnectionSignInStatus = "cancelled"
+const ConnectionSignInStatusFailed ConnectionSignInStatus = "failed"
 
 // connected: the host has a token and renews it. signInAgain: the provider refused the renewal, so the person signs in again.
 type ConnectionState string
 
-const (
-	ConnectionStateConnected   ConnectionState = "connected"
-	ConnectionStateSignInAgain ConnectionState = "signInAgain"
-)
+const ConnectionStateConnected ConnectionState = "connected"
+const ConnectionStateSignInAgain ConnectionState = "signInAgain"
 
 // The connection the token made, or why it made none, in words.
 type ConnectionTokenAnswer struct {
 	Connection *Connection `json:"connection,omitzero"`
-	Error      *string     `json:"error,omitzero"`
+
+	Error *string `json:"error,omitzero"`
 }
 
 // connections/sign-in/token (#1630): a personal access token the person made, for a provider with no Agents application there (a self-managed GitLab). The host checks it with the provider, keeps it in its own store, and never logs it or gives it back.
 type ConnectionTokenRequest struct {
 	Provider ConnectionProvider `json:"provider"`
+
 	// The provider's address, such as gitlab.example.com (https:// when it names no scheme). gitlab.com when left out.
-	URL   *string `json:"url,omitzero"`
-	Token string  `json:"token"`
+	URL *string `json:"url,omitzero"`
+
+	Token string `json:"token"`
 }
 
 type ConnectionsList struct {
@@ -1389,55 +1769,72 @@ type ConnectionsList struct {
 // The github events the set-up turned on, and the project's workflows that start on one of them.
 type ConnectorEvents struct {
 	State ConnectorEventsState `json:"state"`
+
 	// The events, such as pr.opened.
 	Names []string `json:"names"`
+
 	// The mcp.json name that offers them.
-	Server    *string             `json:"server,omitzero"`
+	Server *string `json:"server,omitzero"`
+
 	Workflows []ConnectorWorkflow `json:"workflows"`
-	Message   *string             `json:"message,omitzero"`
+
+	Message *string `json:"message,omitzero"`
 }
 
 // on: the github connector is in the project's or the person's mcp.json, so its events reach this project. off: not yet (nothing connected, or every GitHub slot skipped). taken: an mcp.json entry not made by Agents already has the name github, and it is left alone. failed: the entry could not be written; message says why.
 type ConnectorEventsState string
 
-const (
-	ConnectorEventsStateOn     ConnectorEventsState = "on"
-	ConnectorEventsStateOff    ConnectorEventsState = "off"
-	ConnectorEventsStateTaken  ConnectorEventsState = "taken"
-	ConnectorEventsStateFailed ConnectorEventsState = "failed"
-)
+const ConnectorEventsStateOn ConnectorEventsState = "on"
+const ConnectorEventsStateOff ConnectorEventsState = "off"
+const ConnectorEventsStateTaken ConnectorEventsState = "taken"
+const ConnectorEventsStateFailed ConnectorEventsState = "failed"
 
 // The one real thing a slot read: the newest issue or pull request, or the last workflow run.
 type ConnectorProof struct {
 	// The issue or pull request number.
 	Number *int64 `json:"number,omitzero"`
+
 	// Its title, or the run's workflow and branch, such as "CI on main".
 	Title string `json:"title"`
+
 	// A run's outcome in a word: passed, failed, running, cancelled.
 	Outcome *string `json:"outcome,omitzero"`
-	URL     *string `json:"url,omitzero"`
-	At      *Date   `json:"at,omitzero"`
+
+	URL *string `json:"url,omitzero"`
+
+	At *Date `json:"at,omitzero"`
 }
 
 // A project's Connectors set-up (#1336): its GitHub or GitLab repository (#1632), the person's connection to that forge, four slots that each prove themselves with one read, and the events.
 type ConnectorSetup struct {
 	Folder string `json:"folder"`
+
 	// owner/name on GitHub, or group/project on GitLab, from the project's git remote (origin first). Absent with no GitHub or GitLab remote.
 	Repository *string `json:"repository,omitzero"`
+
 	// The forge the repository is on, which fills Tasks, Code review and CI: github or gitlab (#1632). Absent is github.
 	Forge *ConnectionProvider `json:"forge,omitzero"`
+
 	// The repository's host, as the page says it before the repository: github.com, gitlab.com, or a self-managed GitLab's host.
 	Site *string `json:"site,omitzero"`
+
 	// The repository's page on its forge, where the person asks for access when a read is refused (GitLab).
-	RepositoryURL *string     `json:"repositoryURL,omitzero"`
-	Connection    *Connection `json:"connection,omitzero"`
+	RepositoryURL *string `json:"repositoryURL,omitzero"`
+
+	Connection *Connection `json:"connection,omitzero"`
+
 	// Whether the Agents App is installed on the repository. Absent when not known.
-	Installed  *bool   `json:"installed,omitzero"`
+	Installed *bool `json:"installed,omitzero"`
+
 	InstallURL *string `json:"installURL,omitzero"`
+
 	// How many repositories the connection sees through the App.
-	Repositories *int64          `json:"repositories,omitzero"`
-	Slots        []ConnectorSlot `json:"slots"`
-	Events       ConnectorEvents `json:"events"`
+	Repositories *int64 `json:"repositories,omitzero"`
+
+	Slots []ConnectorSlot `json:"slots"`
+
+	Events ConnectorEvents `json:"events"`
+
 	// Slots that read or were skipped, of the four.
 	Done int64 `json:"done"`
 }
@@ -1445,32 +1842,38 @@ type ConnectorSetup struct {
 // stored: no call to the provider, only what was read before (for a list of every project). cached: a read at most five minutes old is used again. fresh: read now (Try Again).
 type ConnectorSetupReading string
 
-const (
-	ConnectorSetupReadingStored ConnectorSetupReading = "stored"
-	ConnectorSetupReadingCached ConnectorSetupReading = "cached"
-	ConnectorSetupReadingFresh  ConnectorSetupReading = "fresh"
-)
+const ConnectorSetupReadingStored ConnectorSetupReading = "stored"
+const ConnectorSetupReadingCached ConnectorSetupReading = "cached"
+const ConnectorSetupReadingFresh ConnectorSetupReading = "fresh"
 
 type ConnectorSetupRequest struct {
-	Folder  string                 `json:"folder"`
+	Folder string `json:"folder"`
+
 	Reading *ConnectorSetupReading `json:"reading,omitzero"`
 }
 
 // Skip a slot, or set it up again. Kept in the project's .agents/project.json.
 type ConnectorSkipRequest struct {
-	Folder  string            `json:"folder"`
-	Slot    ConnectorSlotKind `json:"slot"`
-	Skipped bool              `json:"skipped"`
+	Folder string `json:"folder"`
+
+	Slot ConnectorSlotKind `json:"slot"`
+
+	Skipped bool `json:"skipped"`
 }
 
 // One slot and what it read. A slot that has read keeps its proof when a later read cannot reach the provider; only a refusal unticks it.
 type ConnectorSlot struct {
 	Slot ConnectorSlotKind `json:"slot"`
+
 	// What fills it, in words: GitHub Issues, GitHub pull requests, GitHub Actions, This Mac.
-	Choice string             `json:"choice"`
-	State  ConnectorSlotState `json:"state"`
-	Proof  *ConnectorProof    `json:"proof,omitzero"`
-	ReadAt *Date              `json:"readAt,omitzero"`
+	Choice string `json:"choice"`
+
+	State ConnectorSlotState `json:"state"`
+
+	Proof *ConnectorProof `json:"proof,omitzero"`
+
+	ReadAt *Date `json:"readAt,omitzero"`
+
 	// Why a read failed or was refused, in words. Never a token.
 	Message *string `json:"message,omitzero"`
 }
@@ -1478,167 +1881,223 @@ type ConnectorSlot struct {
 // One slot of a project's set-up (#1336), in the page's order: tasks (the tracker), codeReview, ci, and workspace (where agents run).
 type ConnectorSlotKind string
 
-const (
-	ConnectorSlotKindTasks      ConnectorSlotKind = "tasks"
-	ConnectorSlotKindCodeReview ConnectorSlotKind = "codeReview"
-	ConnectorSlotKindCi         ConnectorSlotKind = "ci"
-	ConnectorSlotKindWorkspace  ConnectorSlotKind = "workspace"
-)
+const ConnectorSlotKindTasks ConnectorSlotKind = "tasks"
+const ConnectorSlotKindCodeReview ConnectorSlotKind = "codeReview"
+const ConnectorSlotKindCi ConnectorSlotKind = "ci"
+const ConnectorSlotKindWorkspace ConnectorSlotKind = "workspace"
 
 // notConnected: the slot comes with a connection that is not there yet. notRead: connected, but not read yet (a stored reading). read: its one read worked (a tick). failed: the read did not reach the provider; message says why. refused: the provider refused the read, so the person grants it on the provider's site. noRemote: the project has no GitHub or GitLab remote. skipped: the person skipped it; it counts as done.
 type ConnectorSlotState string
 
-const (
-	ConnectorSlotStateNotConnected ConnectorSlotState = "notConnected"
-	ConnectorSlotStateNotRead      ConnectorSlotState = "notRead"
-	ConnectorSlotStateRead         ConnectorSlotState = "read"
-	ConnectorSlotStateFailed       ConnectorSlotState = "failed"
-	ConnectorSlotStateRefused      ConnectorSlotState = "refused"
-	ConnectorSlotStateNoRemote     ConnectorSlotState = "noRemote"
-	ConnectorSlotStateSkipped      ConnectorSlotState = "skipped"
-)
+const ConnectorSlotStateNotConnected ConnectorSlotState = "notConnected"
+const ConnectorSlotStateNotRead ConnectorSlotState = "notRead"
+const ConnectorSlotStateRead ConnectorSlotState = "read"
+const ConnectorSlotStateFailed ConnectorSlotState = "failed"
+const ConnectorSlotStateRefused ConnectorSlotState = "refused"
+const ConnectorSlotStateNoRemote ConnectorSlotState = "noRemote"
+const ConnectorSlotStateSkipped ConnectorSlotState = "skipped"
 
 type ConnectorWorkflow struct {
-	ID   string `json:"id"`
+	ID string `json:"id"`
+
 	Name string `json:"name"`
 }
 
 type Consequence struct {
-	Woke         *ConsequenceWoke         `json:"woke,omitzero"`
-	Fired        *ConsequenceFired        `json:"fired,omitzero"`
-	Refused      *ConsequenceRefused      `json:"refused,omitzero"`
+	Woke *ConsequenceWoke `json:"woke,omitzero"`
+
+	Fired *ConsequenceFired `json:"fired,omitzero"`
+
+	Refused *ConsequenceRefused `json:"refused,omitzero"`
+
 	CouldNotWake *ConsequenceCouldNotWake `json:"couldNotWake,omitzero"`
 }
 
 type ConsequenceWoke struct {
-	AgentID UUID   `json:"agentID"`
-	Title   string `json:"title"`
+	AgentID UUID `json:"agentID"`
+
+	Title string `json:"title"`
 }
 
 type ConsequenceFired struct {
 	WorkflowID string `json:"workflowID"`
-	Folder     URL    `json:"folder"`
-	AgentID    *UUID  `json:"agentID,omitzero"`
+
+	Folder URL `json:"folder"`
+
+	AgentID *UUID `json:"agentID,omitzero"`
 }
 
 type ConsequenceRefused struct {
-	WorkflowID string          `json:"workflowID"`
-	Folder     URL             `json:"folder"`
-	Reason     WorkflowRefusal `json:"reason"`
+	WorkflowID string `json:"workflowID"`
+
+	Folder URL `json:"folder"`
+
+	Reason WorkflowRefusal `json:"reason"`
 }
 
 type ConsequenceCouldNotWake struct {
-	AgentID UUID   `json:"agentID"`
-	Title   string `json:"title"`
-	Reason  string `json:"reason"`
+	AgentID UUID `json:"agentID"`
+
+	Title string `json:"title"`
+
+	Reason string `json:"reason"`
 }
 
 // ContentBlock (ACP/ContentBlock.swift): the protocol's own block shapes, as sent. A block of a kind this build doesn't know is written back as it came, so any other `type` may arrive.
 type ContentBlock struct {
 	// Type is one of "text", "image", "audio", "resource_link", "resource".
-	Type        string                   `json:"type"`
-	Text        *string                  `json:"text,omitzero"`
-	MimeType    *string                  `json:"mimeType,omitzero"`
-	Data        *string                  `json:"data,omitzero"`
-	URI         *string                  `json:"uri,omitzero"`
-	Name        *string                  `json:"name,omitzero"`
-	Size        *float64                 `json:"size,omitzero"`
+	Type string `json:"type"`
+
+	Text *string `json:"text,omitzero"`
+
+	MimeType *string `json:"mimeType,omitzero"`
+
+	Data *string `json:"data,omitzero"`
+
+	URI *string `json:"uri,omitzero"`
+
+	Name *string `json:"name,omitzero"`
+
+	Size *float64 `json:"size,omitzero"`
+
 	Annotations *ContentBlockAnnotations `json:"annotations,omitzero"`
-	Resource    *ContentBlockResource    `json:"resource,omitzero"`
+
+	Resource *ContentBlockResource `json:"resource,omitzero"`
 }
 
 type ContentBlockResource struct {
-	URI      string  `json:"uri"`
-	Text     *string `json:"text,omitzero"`
-	Blob     *string `json:"blob,omitzero"`
+	URI string `json:"uri"`
+
+	Text *string `json:"text,omitzero"`
+
+	Blob *string `json:"blob,omitzero"`
+
 	MimeType *string `json:"mimeType,omitzero"`
 }
 
 type ContentBlockAnnotations struct {
 	Audience []string `json:"audience,omitzero"`
+
 	Priority *float64 `json:"priority,omitzero"`
 }
 
 type ContinueInProjectRequest struct {
-	AgentID     UUID         `json:"agentID"`
-	Text        string       `json:"text"`
+	AgentID UUID `json:"agentID"`
+
+	Text string `json:"text"`
+
 	Attachments []Attachment `json:"attachments"`
-	RequestID   *UUID        `json:"requestID,omitzero"`
+
+	RequestID *UUID `json:"requestID,omitzero"`
 }
 
 // When a chat paused by a spent allowance carries on by itself (#1859).
 type ContinueWhenBack struct {
 	// When it sends "continue": the provider's reset time, or the app's next check of the runtime.
 	At Date `json:"at"`
+
 	// True when `at` is the time the provider said the allowance resets; false when it is only the app's next check.
 	ResetKnown bool `json:"resetKnown"`
 }
 
 // The peer's answer: {"auth":…} (ControlAuth.Auth). `kind` is mac, iphone, ipad, browser, host, relay, copy or page.
 type ControlAuth struct {
-	ID    string  `json:"id"`
-	Nonce string  `json:"nonce"`
-	Mac   string  `json:"mac"`
-	Kind  string  `json:"kind"`
-	For   *string `json:"for,omitzero"`
-	Epoch *int64  `json:"epoch,omitzero"`
+	ID string `json:"id"`
+
+	Nonce string `json:"nonce"`
+
+	Mac string `json:"mac"`
+
+	Kind string `json:"kind"`
+
+	For *string `json:"for,omitzero"`
+
+	Epoch *int64 `json:"epoch,omitzero"`
+
 	// The capabilities this client has (#1748). None from a client older than #1748, or from a host, which says its own in host/hello.
 	Capabilities []string `json:"capabilities,omitzero"`
+
 	// With a `w:<host>` identity (#1480): the port of that host's loopback listener. The socket then carries a page from the loopback origin on port <page>, whose own exchange follows the ok, bound to that origin.
 	Page *int64 `json:"page,omitzero"`
+
 	// With an `s:<client>` identity (#995): the key of the client that signs in, X9.63. The exchange's MAC is under the ECDH of it and the control plane's key, as a paired client's is.
 	PublicKey Data `json:"publicKey,omitzero"`
 }
 
 // control/clientChanged: a client paired, renamed, connected or went; nothing says list them all again.
 type ControlClientChanged struct {
-	Client  *UUID `json:"client,omitzero"`
+	Client *UUID `json:"client,omitzero"`
+
 	Removed *bool `json:"removed,omitzero"`
 }
 
 // clients/startPairing, hosts/startEnroll: the code, until when it works, and for a host the one line to run on the server.
 type ControlCodeShown struct {
-	Text    string  `json:"text"`
-	Expires Date    `json:"expires"`
+	Text string `json:"text"`
+
+	Expires Date `json:"expires"`
+
 	Command *string `json:"command,omitzero"`
 }
 
 // One place a control plane answers (R16).
 type ControlEndpoint struct {
-	URL string  `json:"url"`
+	URL string `json:"url"`
+
 	Pin *string `json:"pin,omitzero"`
 }
 
 // The control plane's first line of the exchange: {"hello":…} (ControlAuth.Hello).
 type ControlHello struct {
-	V       int64  `json:"v"`
-	Name    string `json:"name"`
+	V int64 `json:"v"`
+
+	Name string `json:"name"`
+
 	Control string `json:"control"`
-	Nonce   string `json:"nonce"`
-	Copy    string `json:"copy"`
+
+	Nonce string `json:"nonce"`
+
+	Copy string `json:"copy"`
+
 	// The control plane's key before control/rotate (#997, spec 736 FR-043), for 30 days after: a member that still trusts it proves itself with it, and is given the new key in ok.
 	Previous *string `json:"previous,omitzero"`
 }
 
 type ControlHost struct {
-	ID             HostID            `json:"id"`
-	Name           string            `json:"name"`
-	Platform       string            `json:"platform"`
-	Version        string            `json:"version"`
-	State          string            `json:"state"`
-	Reach          string            `json:"reach"`
-	MachineID      *string           `json:"machineID,omitzero"`
-	Relay          *bool             `json:"relay,omitzero"`
-	SignInFrom     map[string]HostID `json:"signInFrom,omitzero"`
-	GitFrom        map[string]HostID `json:"gitFrom,omitzero"`
-	GitAsks        []GitAsk          `json:"gitAsks,omitzero"`
-	Tunnel         *HostTunnel       `json:"tunnel,omitzero"`
-	Workspace      *HostWorkspace    `json:"workspace,omitzero"`
-	Implementation *string           `json:"implementation,omitzero"`
+	ID HostID `json:"id"`
+
+	Name string `json:"name"`
+
+	Platform string `json:"platform"`
+
+	Version string `json:"version"`
+
+	State string `json:"state"`
+
+	Reach string `json:"reach"`
+
+	MachineID *string `json:"machineID,omitzero"`
+
+	Relay *bool `json:"relay,omitzero"`
+
+	SignInFrom map[string]HostID `json:"signInFrom,omitzero"`
+
+	GitFrom map[string]HostID `json:"gitFrom,omitzero"`
+
+	GitAsks []GitAsk `json:"gitAsks,omitzero"`
+
+	Tunnel *HostTunnel `json:"tunnel,omitzero"`
+
+	Workspace *HostWorkspace `json:"workspace,omitzero"`
+
+	Implementation *string `json:"implementation,omitzero"`
+
 	// The capabilities this host said in its last host/hello (#1748). None from a host older than #1748.
 	Capabilities []string `json:"capabilities,omitzero"`
+
 	// Of the control plane's required capabilities for hosts, the ones this host does not have (#1748). Its state is then needsUpdate.
 	Missing []string `json:"missing,omitzero"`
+
 	// The user who owns the machine (#994).
 	Owner *string `json:"owner,omitzero"`
 }
@@ -1646,40 +2105,54 @@ type ControlHost struct {
 // control/installProgress: a step of Add a Server.
 type ControlInstallProgress struct {
 	Name string `json:"name"`
+
 	Step string `json:"step"`
 }
 
 // control/moved: where the control plane is now (T085).
 type ControlMoved struct {
-	URL        string  `json:"url"`
-	Pin        *string `json:"pin,omitzero"`
-	ControlKey Data    `json:"controlKey"`
-	Name       string  `json:"name"`
+	URL string `json:"url"`
+
+	Pin *string `json:"pin,omitzero"`
+
+	ControlKey Data `json:"controlKey"`
+
+	Name string `json:"name"`
 }
 
 // The control plane's new key (#997, spec 736 FR-043), in ok to a member that proved itself with the previous one. proof is the HMAC of the new key under the member's shared key from the previous one, so only the holder of the previous key could have made it. The member trusts the new key from then on, with no new pairing.
 type ControlNewKey struct {
-	Key   string `json:"key"`
+	Key string `json:"key"`
+
 	Proof string `json:"proof"`
 }
 
 // The control plane's proof back: {"ok":…} (ControlAuth.OK).
 type ControlOK struct {
-	Mac       string            `json:"mac"`
-	Grant     *string           `json:"grant,omitzero"`
-	Host      *HostID           `json:"host,omitzero"`
-	Relayed   *bool             `json:"relayed,omitzero"`
+	Mac string `json:"mac"`
+
+	Grant *string `json:"grant,omitzero"`
+
+	Host *HostID `json:"host,omitzero"`
+
+	Relayed *bool `json:"relayed,omitzero"`
+
 	Endpoints []ControlEndpoint `json:"endpoints,omitzero"`
-	Epoch     *int64            `json:"epoch,omitzero"`
-	NewKey    *ControlNewKey    `json:"newKey,omitzero"`
+
+	Epoch *int64 `json:"epoch,omitzero"`
+
+	NewKey *ControlNewKey `json:"newKey,omitzero"`
 }
 
 // Who a client belongs to (#994): its person, their role, and whether they are the local owner.
 type ControlPerson struct {
-	ID         string   `json:"id"`
-	Name       string   `json:"name"`
-	Role       UserRole `json:"role"`
-	LocalOwner *bool    `json:"localOwner,omitzero"`
+	ID string `json:"id"`
+
+	Name string `json:"name"`
+
+	Role UserRole `json:"role"`
+
+	LocalOwner *bool `json:"localOwner,omitzero"`
 }
 
 // The `agents` key of a push the control plane sends through APNs (#1460), beside an `aps` that says only that an agent needs the person: a ControlPushItem, sealed.
@@ -1689,111 +2162,160 @@ type ControlPush struct {
 
 // What a control plane's push carries, sealed whole to the device (#1460): the need, whether to buzz, and the banner's words. No headline is a withdrawal.
 type ControlPushItem struct {
-	NeedID   NeedID    `json:"needID"`
-	Alert    bool      `json:"alert"`
+	NeedID NeedID `json:"needID"`
+
+	Alert bool `json:"alert"`
+
 	Headline *Headline `json:"headline,omitzero"`
 }
 
 type ControlStatus struct {
-	Name         string           `json:"name"`
-	Version      string           `json:"version"`
-	HomeHost     *HostID          `json:"homeHost,omitzero"`
-	MachineID    string           `json:"machineID"`
-	StartedAt    *Date            `json:"startedAt,omitzero"`
-	Port         *int64           `json:"port,omitzero"`
-	AwayFromHome *bool            `json:"awayFromHome,omitzero"`
-	You          *UUID            `json:"you,omitzero"`
-	RelayKey     Data             `json:"relayKey,omitzero"`
-	Web          *WebRemoteStatus `json:"web,omitzero"`
+	Name string `json:"name"`
+
+	Version string `json:"version"`
+
+	HomeHost *HostID `json:"homeHost,omitzero"`
+
+	MachineID string `json:"machineID"`
+
+	StartedAt *Date `json:"startedAt,omitzero"`
+
+	Port *int64 `json:"port,omitzero"`
+
+	AwayFromHome *bool `json:"awayFromHome,omitzero"`
+
+	You *UUID `json:"you,omitzero"`
+
+	RelayKey Data `json:"relayKey,omitzero"`
+
+	Web *WebRemoteStatus `json:"web,omitzero"`
+
 	// Where a browser anywhere opens the page, on the control plane's own domain (#1459): its https address, when it serves the page there.
 	PublicWeb *string `json:"publicWeb,omitzero"`
+
 	// The origin of the sandbox proxy that draws MCP Apps views on the page at publicWeb (#1484): a second name in front of the same control plane. None when it draws no views there.
-	PublicViews      *string             `json:"publicViews,omitzero"`
-	ThisMacHost      *HostJoinStatus     `json:"thisMacHost,omitzero"`
-	ProjectDetection *ProjectDetection   `json:"projectDetection,omitzero"`
-	UnjoinedTunnels  []HostTunnelChanged `json:"unjoinedTunnels,omitzero"`
+	PublicViews *string `json:"publicViews,omitzero"`
+
+	ThisMacHost *HostJoinStatus `json:"thisMacHost,omitzero"`
+
+	ProjectDetection *ProjectDetection `json:"projectDetection,omitzero"`
+
+	UnjoinedTunnels []HostTunnelChanged `json:"unjoinedTunnels,omitzero"`
+
 	// The capabilities the control plane has (#1748).
-	Capabilities []string              `json:"capabilities,omitzero"`
-	Required     *RequiredCapabilities `json:"required,omitzero"`
+	Capabilities []string `json:"capabilities,omitzero"`
+
+	Required *RequiredCapabilities `json:"required,omitzero"`
+
 	// Who this client belongs to (#994).
 	Person *ControlPerson `json:"person,omitzero"`
+
 	// The one line to run on a server so that it asks to join as this client's person, with no code (#994).
 	JoinCommand *string `json:"joinCommand,omitzero"`
 }
 
 type Cost struct {
-	Amount   float64 `json:"amount"`
-	Currency string  `json:"currency"`
+	Amount float64 `json:"amount"`
+
+	Currency string `json:"currency"`
 }
 
 type CostLimits struct {
-	PerAgent       *Cost  `json:"perAgent,omitzero"`
-	Daily          *Cost  `json:"daily,omitzero"`
+	PerAgent *Cost `json:"perAgent,omitzero"`
+
+	Daily *Cost `json:"daily,omitzero"`
+
 	PerAgentTokens *int64 `json:"perAgentTokens,omitzero"`
-	DailyTokens    *int64 `json:"dailyTokens,omitzero"`
+
+	DailyTokens *int64 `json:"dailyTokens,omitzero"`
 }
 
 type CostState struct {
-	Limits      CostLimits         `json:"limits"`
-	Today       map[string]float64 `json:"today"`
-	Day         string             `json:"day"`
-	Note        *string            `json:"note,omitzero"`
-	TokensToday int64              `json:"tokensToday"`
+	Limits CostLimits `json:"limits"`
+
+	Today map[string]float64 `json:"today"`
+
+	Day string `json:"day"`
+
+	Note *string `json:"note,omitzero"`
+
+	TokensToday int64 `json:"tokensToday"`
 }
 
 type CredentialKind string
 
 type CredentialsLend struct {
-	Runtime string         `json:"runtime"`
-	Kind    CredentialKind `json:"kind"`
-	Secret  string         `json:"secret"`
+	Runtime string `json:"runtime"`
+
+	Kind CredentialKind `json:"kind"`
+
+	Secret string `json:"secret"`
 }
 
 type CredentialsOffer struct {
-	Runtimes      []string                      `json:"runtimes"`
-	OwnSignInOnly bool                          `json:"ownSignInOnly"`
-	NotRelayed    map[string]SignInWantedReason `json:"notRelayed,omitzero"`
-	SignIns       []string                      `json:"signIns,omitzero"`
+	Runtimes []string `json:"runtimes"`
+
+	OwnSignInOnly bool `json:"ownSignInOnly"`
+
+	NotRelayed map[string]SignInWantedReason `json:"notRelayed,omitzero"`
+
+	SignIns []string `json:"signIns,omitzero"`
 }
 
 type DaemonStatus struct {
 	TurnsInFlight int64 `json:"turnsInFlight"`
-	AgentsLive    int64 `json:"agentsLive"`
+
+	AgentsLive int64 `json:"agentsLive"`
 }
 
 type DayRecap struct {
-	PrsMerged    *int64  `json:"prsMerged,omitzero"`
-	Agents       int64   `json:"agents"`
-	PeakAgents   int64   `json:"peakAgents"`
+	PrsMerged *int64 `json:"prsMerged,omitzero"`
+
+	Agents int64 `json:"agents"`
+
+	PeakAgents int64 `json:"peakAgents"`
+
 	LongestClear float64 `json:"longestClear"`
 }
 
 type DeclareResourceRequest struct {
-	Resource  DeclaredResource `json:"resource"`
-	Replacing *string          `json:"replacing,omitzero"`
+	Resource DeclaredResource `json:"resource"`
+
+	Replacing *string `json:"replacing,omitzero"`
 }
 
 type DeclaredResource struct {
-	Name           ResourceName `json:"name"`
-	DisplayName    string       `json:"displayName"`
-	Description    string       `json:"description"`
-	Holders        int64        `json:"holders"`
-	DefaultMinutes *int64       `json:"defaultMinutes,omitzero"`
-	MaximumMinutes *int64       `json:"maximumMinutes,omitzero"`
+	Name ResourceName `json:"name"`
+
+	DisplayName string `json:"displayName"`
+
+	Description string `json:"description"`
+
+	Holders int64 `json:"holders"`
+
+	DefaultMinutes *int64 `json:"defaultMinutes,omitzero"`
+
+	MaximumMinutes *int64 `json:"maximumMinutes,omitzero"`
 }
 
 type DeleteSessionRequest struct {
 	RuntimeID string `json:"runtimeID"`
+
 	SessionID string `json:"sessionID"`
-	Confirmed *bool  `json:"confirmed,omitzero"`
+
+	Confirmed *bool `json:"confirmed,omitzero"`
 }
 
 type DestinationState struct {
-	Free         *struct{}                     `json:"free,omitzero"`
-	SameSkill    *DestinationStateSameSkill    `json:"sameSkill,omitzero"`
+	Free *struct{} `json:"free,omitzero"`
+
+	SameSkill *DestinationStateSameSkill `json:"sameSkill,omitzero"`
+
 	ManagedOther *DestinationStateManagedOther `json:"managedOther,omitzero"`
-	Unmanaged    *DestinationStateUnmanaged    `json:"unmanaged,omitzero"`
-	Unavailable  *DestinationStateUnavailable  `json:"unavailable,omitzero"`
+
+	Unmanaged *DestinationStateUnmanaged `json:"unmanaged,omitzero"`
+
+	Unavailable *DestinationStateUnavailable `json:"unavailable,omitzero"`
 }
 
 type DestinationStateSameSkill struct {
@@ -1817,39 +2339,53 @@ type DestinationStateAnswer struct {
 }
 
 type DestinationStateRequest struct {
-	PreviewID   UUID             `json:"previewID"`
+	PreviewID UUID `json:"previewID"`
+
 	Destination SkillDestination `json:"destination"`
 }
 
 // One host in the ssh config, and what hosts/detect did with it (#429).
 type DetectedServer struct {
-	Alias    string  `json:"alias"`
-	Resolved string  `json:"resolved"`
-	Outcome  string  `json:"outcome"`
-	Detail   *string `json:"detail,omitzero"`
+	Alias string `json:"alias"`
+
+	Resolved string `json:"resolved"`
+
+	Outcome string `json:"outcome"`
+
+	Detail *string `json:"detail,omitzero"`
 }
 
 // A paired device (021 US5), as devices.json keeps it.
 type Device struct {
-	ID          UUID       `json:"id"`
-	PublicKey   Data       `json:"publicKey"`
-	Name        string     `json:"name"`
-	Kind        DeviceKind `json:"kind"`
-	AnnouncedAt Date       `json:"announcedAt"`
-	LastSeenAt  *Date      `json:"lastSeenAt,omitzero"`
-	MayNotify   *bool      `json:"mayNotify,omitzero"`
+	ID UUID `json:"id"`
+
+	PublicKey Data `json:"publicKey"`
+
+	Name string `json:"name"`
+
+	Kind DeviceKind `json:"kind"`
+
+	AnnouncedAt Date `json:"announcedAt"`
+
+	LastSeenAt *Date `json:"lastSeenAt,omitzero"`
+
+	MayNotify *bool `json:"mayNotify,omitzero"`
 }
 
 // devices/announce: this device, and the public half of its key.
 type DeviceAnnouncement struct {
-	ID        UUID       `json:"id"`
-	PublicKey Data       `json:"publicKey"`
-	Name      string     `json:"name"`
-	Kind      DeviceKind `json:"kind"`
+	ID UUID `json:"id"`
+
+	PublicKey Data `json:"publicKey"`
+
+	Name string `json:"name"`
+
+	Kind DeviceKind `json:"kind"`
 }
 
 type DeviceBinding struct {
-	ID      *UUID `json:"id,omitzero"`
+	ID *UUID `json:"id,omitzero"`
+
 	Pairing *bool `json:"pairing,omitzero"`
 }
 
@@ -1859,45 +2395,51 @@ type DeviceForget struct {
 
 type DeviceKind string
 
-const (
-	DeviceKindIPhone  DeviceKind = "iPhone"
-	DeviceKindIPad    DeviceKind = "iPad"
-	DeviceKindUnknown DeviceKind = "unknown"
-)
+const DeviceKindIPhone DeviceKind = "iPhone"
+const DeviceKindIPad DeviceKind = "iPad"
+const DeviceKindUnknown DeviceKind = "unknown"
 
 // device/changed: the whole record, or that it was forgotten (046).
 type DeviceNotification struct {
-	ID      UUID    `json:"id"`
-	Device  *Device `json:"device,omitzero"`
-	Removed *bool   `json:"removed,omitzero"`
+	ID UUID `json:"id"`
+
+	Device *Device `json:"device,omitzero"`
+
+	Removed *bool `json:"removed,omitzero"`
 }
 
 type DiffLine struct {
-	Kind    DiffLineKind `json:"kind"`
-	Text    string       `json:"text"`
-	NewLine *int64       `json:"newLine,omitzero"`
+	Kind DiffLineKind `json:"kind"`
+
+	Text string `json:"text"`
+
+	NewLine *int64 `json:"newLine,omitzero"`
 }
 
 type DiffLineKind string
 
-const (
-	DiffLineKindContext DiffLineKind = "context"
-	DiffLineKindAdded   DiffLineKind = "added"
-	DiffLineKindRemoved DiffLineKind = "removed"
-)
+const DiffLineKindContext DiffLineKind = "context"
+const DiffLineKindAdded DiffLineKind = "added"
+const DiffLineKindRemoved DiffLineKind = "removed"
 
 type DirectoryEntry struct {
-	URL         URL    `json:"url"`
-	Name        string `json:"name"`
-	IsDirectory bool   `json:"isDirectory"`
-	Size        *int64 `json:"size,omitzero"`
-	ModifiedAt  *Date  `json:"modifiedAt,omitzero"`
+	URL URL `json:"url"`
+
+	Name string `json:"name"`
+
+	IsDirectory bool `json:"isDirectory"`
+
+	Size *int64 `json:"size,omitzero"`
+
+	ModifiedAt *Date `json:"modifiedAt,omitzero"`
 }
 
 type DirectoryListing struct {
-	URL     URL              `json:"url"`
+	URL URL `json:"url"`
+
 	Entries []DirectoryEntry `json:"entries"`
-	Omitted int64            `json:"omitted"`
+
+	Omitted int64 `json:"omitted"`
 }
 
 type DiscardDraftRequest struct {
@@ -1905,25 +2447,29 @@ type DiscardDraftRequest struct {
 }
 
 type DiskAlarm struct {
-	Reading   DiskReading    `json:"reading"`
-	Level     DiskLevel      `json:"level"`
-	Threshold int64          `json:"threshold"`
+	Reading DiskReading `json:"reading"`
+
+	Level DiskLevel `json:"level"`
+
+	Threshold int64 `json:"threshold"`
+
 	Worktrees []DiskWorktree `json:"worktrees"`
 }
 
 type DiskLevel string
 
-const (
-	DiskLevelOk       DiskLevel = "ok"
-	DiskLevelLow      DiskLevel = "low"
-	DiskLevelCritical DiskLevel = "critical"
-)
+const DiskLevelOk DiskLevel = "ok"
+const DiskLevelLow DiskLevel = "low"
+const DiskLevelCritical DiskLevel = "critical"
 
 type DiskReading struct {
-	Volume     string `json:"volume"`
-	Mount      string `json:"mount"`
-	FreeBytes  int64  `json:"freeBytes"`
-	TotalBytes int64  `json:"totalBytes"`
+	Volume string `json:"volume"`
+
+	Mount string `json:"mount"`
+
+	FreeBytes int64 `json:"freeBytes"`
+
+	TotalBytes int64 `json:"totalBytes"`
 }
 
 type DiskState struct {
@@ -1931,52 +2477,73 @@ type DiskState struct {
 }
 
 type DiskThresholds struct {
-	LowGB      *int64 `json:"lowGB,omitzero"`
+	LowGB *int64 `json:"lowGB,omitzero"`
+
 	LowPercent *int64 `json:"lowPercent,omitzero"`
+
 	CriticalGB *int64 `json:"criticalGB,omitzero"`
 }
 
 type DiskWorktree struct {
-	Name    string `json:"name"`
-	Bytes   int64  `json:"bytes"`
-	Partial bool   `json:"partial"`
+	Name string `json:"name"`
+
+	Bytes int64 `json:"bytes"`
+
+	Partial bool `json:"partial"`
 }
 
 type DraftCheck struct {
-	Passed     bool            `json:"passed"`
+	Passed bool `json:"passed"`
+
 	Workspaces []WorkspaceInfo `json:"workspaces,omitzero"`
-	Problem    *string         `json:"problem,omitzero"`
-	SSH        *string         `json:"ssh,omitzero"`
-	NoSSH      *bool           `json:"noSSH,omitzero"`
+
+	Problem *string `json:"problem,omitzero"`
+
+	SSH *string `json:"ssh,omitzero"`
+
+	NoSSH *bool `json:"noSSH,omitzero"`
 }
 
 type DraftOptionsNotification struct {
-	DraftID  UUID           `json:"draftID"`
-	Options  []ConfigOption `json:"options"`
+	DraftID UUID `json:"draftID"`
+
+	Options []ConfigOption `json:"options"`
+
 	Commands []SlashCommand `json:"commands"`
-	Failure  *string        `json:"failure,omitzero"`
+
+	Failure *string `json:"failure,omitzero"`
 }
 
 type DraftQuestion struct {
-	ID        UUID    `json:"id"`
-	Kind      string  `json:"kind"`
+	ID UUID `json:"id"`
+
+	Kind string `json:"kind"`
+
 	Workspace *string `json:"workspace,omitzero"`
-	Cost      *string `json:"cost,omitzero"`
-	Text      string  `json:"text"`
-	Yes       string  `json:"yes"`
+
+	Cost *string `json:"cost,omitzero"`
+
+	Text string `json:"text"`
+
+	Yes string `json:"yes"`
 }
 
 type DraftStep struct {
-	At   Date   `json:"at"`
+	At Date `json:"at"`
+
 	Kind string `json:"kind"`
+
 	Text string `json:"text"`
 }
 
 type DropboxPutRequest struct {
-	Folder    URL     `json:"folder"`
+	Folder URL `json:"folder"`
+
 	Subfolder *string `json:"subfolder,omitzero"`
-	Name      string  `json:"name"`
-	Data      Data    `json:"data"`
+
+	Name string `json:"name"`
+
+	Data Data `json:"data"`
 }
 
 type DropboxPutResponse struct {
@@ -1984,8 +2551,10 @@ type DropboxPutResponse struct {
 }
 
 type Dropped struct {
-	ExtraArguments     *DroppedExtraArguments     `json:"extraArguments,omitzero"`
-	AlwaysAllow        *DroppedAlwaysAllow        `json:"alwaysAllow,omitzero"`
+	ExtraArguments *DroppedExtraArguments `json:"extraArguments,omitzero"`
+
+	AlwaysAllow *DroppedAlwaysAllow `json:"alwaysAllow,omitzero"`
+
 	QueuedSlashCommand *DroppedQueuedSlashCommand `json:"queuedSlashCommand,omitzero"`
 }
 
@@ -2003,14 +2572,17 @@ type DroppedQueuedSlashCommand struct {
 
 type EarnedMilestone struct {
 	ID string `json:"id"`
-	At Date   `json:"at"`
+
+	At Date `json:"at"`
 }
 
 // agents/editQueued (#1552): a queued prompt's new words, in its place in the queue.
 type EditQueuedRequest struct {
-	AgentID  UUID   `json:"agentID"`
-	PromptID UUID   `json:"promptID"`
-	Text     string `json:"text"`
+	AgentID UUID `json:"agentID"`
+
+	PromptID UUID `json:"promptID"`
+
+	Text string `json:"text"`
 }
 
 // Whether the prompt was still waiting and now has the new words. False: it was sent, or taken back, first.
@@ -2019,35 +2591,47 @@ type EditQueuedResult struct {
 }
 
 type EffectiveSandbox struct {
-	State     SandboxState  `json:"state"`
+	State SandboxState `json:"state"`
+
 	Requested SandboxChoice `json:"requested"`
-	Reason    *string       `json:"reason,omitzero"`
+
+	Reason *string `json:"reason,omitzero"`
 }
 
 type ElicitationAnswer struct {
 	Question string `json:"question"`
-	Answer   string `json:"answer"`
+
+	Answer string `json:"answer"`
 }
 
 type ElicitationNotification struct {
-	AgentID   UUID                `json:"agentID"`
-	RequestID UUID                `json:"requestID"`
-	Request   *ElicitationRequest `json:"request,omitzero"`
+	AgentID UUID `json:"agentID"`
+
+	RequestID UUID `json:"requestID"`
+
+	Request *ElicitationRequest `json:"request,omitzero"`
 }
 
 type ElicitationRequest struct {
-	ID            UUID                    `json:"id"`
-	ElicitationID *string                 `json:"elicitationID,omitzero"`
-	AgentID       UUID                    `json:"agentID"`
-	Message       *string                 `json:"message,omitzero"`
-	Mode          ElicitationRequestMode  `json:"mode"`
-	Scope         ElicitationRequestScope `json:"scope"`
-	AskedAt       Date                    `json:"askedAt"`
+	ID UUID `json:"id"`
+
+	ElicitationID *string `json:"elicitationID,omitzero"`
+
+	AgentID UUID `json:"agentID"`
+
+	Message *string `json:"message,omitzero"`
+
+	Mode ElicitationRequestMode `json:"mode"`
+
+	Scope ElicitationRequestScope `json:"scope"`
+
+	AskedAt Date `json:"askedAt"`
 }
 
 type ElicitationRequestMode struct {
 	Form *ElicitationRequestModeForm `json:"form,omitzero"`
-	URL  *ElicitationRequestModeURL  `json:"url,omitzero"`
+
+	URL *ElicitationRequestModeURL `json:"url,omitzero"`
 }
 
 type ElicitationRequestModeForm struct {
@@ -2060,70 +2644,86 @@ type ElicitationRequestModeURL struct {
 
 type ElicitationRequestScope string
 
-const (
-	ElicitationRequestScopeSession ElicitationRequestScope = "session"
-	ElicitationRequestScopeRequest ElicitationRequestScope = "request"
-)
+const ElicitationRequestScopeSession ElicitationRequestScope = "session"
+const ElicitationRequestScopeRequest ElicitationRequestScope = "request"
 
 type ElicitationSchema struct {
-	Title       *string                     `json:"title,omitzero"`
-	Description *string                     `json:"description,omitzero"`
-	Properties  []ElicitationSchemaProperty `json:"properties"`
+	Title *string `json:"title,omitzero"`
+
+	Description *string `json:"description,omitzero"`
+
+	Properties []ElicitationSchemaProperty `json:"properties"`
 }
 
 type ElicitationSchemaProperty struct {
-	Name         string                        `json:"name"`
-	Title        *string                       `json:"title,omitzero"`
-	Description  *string                       `json:"description,omitzero"`
-	IsRequired   bool                          `json:"isRequired"`
-	Kind         ElicitationSchemaPropertyKind `json:"kind"`
-	DefaultValue JSONValue                     `json:"defaultValue,omitzero"`
+	Name string `json:"name"`
+
+	Title *string `json:"title,omitzero"`
+
+	Description *string `json:"description,omitzero"`
+
+	IsRequired bool `json:"isRequired"`
+
+	Kind ElicitationSchemaPropertyKind `json:"kind"`
+
+	DefaultValue JSONValue `json:"defaultValue,omitzero"`
 }
 
 type ElicitationSchemaPropertyChoice struct {
-	Value       string  `json:"value"`
-	Title       string  `json:"title"`
+	Value string `json:"value"`
+
+	Title string `json:"title"`
+
 	Description *string `json:"description,omitzero"`
 }
 
 type ElicitationSchemaPropertyFormat string
 
-const (
-	ElicitationSchemaPropertyFormatEmail    ElicitationSchemaPropertyFormat = "email"
-	ElicitationSchemaPropertyFormatURI      ElicitationSchemaPropertyFormat = "uri"
-	ElicitationSchemaPropertyFormatDate     ElicitationSchemaPropertyFormat = "date"
-	ElicitationSchemaPropertyFormatDateTime ElicitationSchemaPropertyFormat = "date-time"
-)
+const ElicitationSchemaPropertyFormatEmail ElicitationSchemaPropertyFormat = "email"
+const ElicitationSchemaPropertyFormatURI ElicitationSchemaPropertyFormat = "uri"
+const ElicitationSchemaPropertyFormatDate ElicitationSchemaPropertyFormat = "date"
+const ElicitationSchemaPropertyFormatDateTime ElicitationSchemaPropertyFormat = "date-time"
 
 type ElicitationSchemaPropertyKind struct {
-	String      *ElicitationSchemaPropertyKindString      `json:"string,omitzero"`
-	Number      *ElicitationSchemaPropertyKindNumber      `json:"number,omitzero"`
-	Integer     *ElicitationSchemaPropertyKindInteger     `json:"integer,omitzero"`
-	Boolean     *struct{}                                 `json:"boolean,omitzero"`
+	String *ElicitationSchemaPropertyKindString `json:"string,omitzero"`
+
+	Number *ElicitationSchemaPropertyKindNumber `json:"number,omitzero"`
+
+	Integer *ElicitationSchemaPropertyKindInteger `json:"integer,omitzero"`
+
+	Boolean *struct{} `json:"boolean,omitzero"`
+
 	MultiSelect *ElicitationSchemaPropertyKindMultiSelect `json:"multiSelect,omitzero"`
 }
 
 type ElicitationSchemaPropertyKindString struct {
-	Format    *ElicitationSchemaPropertyFormat  `json:"format,omitzero"`
-	MinLength *int64                            `json:"minLength,omitzero"`
-	MaxLength *int64                            `json:"maxLength,omitzero"`
-	Choices   []ElicitationSchemaPropertyChoice `json:"choices,omitzero"`
+	Format *ElicitationSchemaPropertyFormat `json:"format,omitzero"`
+
+	MinLength *int64 `json:"minLength,omitzero"`
+
+	MaxLength *int64 `json:"maxLength,omitzero"`
+
+	Choices []ElicitationSchemaPropertyChoice `json:"choices,omitzero"`
 }
 
 type ElicitationSchemaPropertyKindNumber struct {
 	Minimum *float64 `json:"minimum,omitzero"`
+
 	Maximum *float64 `json:"maximum,omitzero"`
 }
 
 type ElicitationSchemaPropertyKindInteger struct {
 	Minimum *int64 `json:"minimum,omitzero"`
+
 	Maximum *int64 `json:"maximum,omitzero"`
 }
 
 type ElicitationSchemaPropertyKindMultiSelect struct {
-	Items    []ElicitationSchemaPropertyChoice `json:"items"`
-	MinItems *int64                            `json:"minItems,omitzero"`
-	MaxItems *int64                            `json:"maxItems,omitzero"`
+	Items []ElicitationSchemaPropertyChoice `json:"items"`
+
+	MinItems *int64 `json:"minItems,omitzero"`
+
+	MaxItems *int64 `json:"maxItems,omitzero"`
 }
 
 type Empty struct {
@@ -2132,24 +2732,22 @@ type Empty struct {
 // A reason this build does not know reads as `unrecognised`.
 type EndedReason string
 
-const (
-	EndedReasonEndTurn         EndedReason = "endTurn"
-	EndedReasonMaxTokens       EndedReason = "maxTokens"
-	EndedReasonMaxTurnRequests EndedReason = "maxTurnRequests"
-	EndedReasonRefusal         EndedReason = "refusal"
-	EndedReasonCancelled       EndedReason = "cancelled"
-	EndedReasonProcessDied     EndedReason = "processDied"
-	EndedReasonDaemonGone      EndedReason = "daemonGone"
-	EndedReasonCostLimit       EndedReason = "costLimit"
-	EndedReasonUnrecognised    EndedReason = "unrecognised"
-	EndedReasonStoppedByAgent  EndedReason = "stoppedByAgent"
-	EndedReasonSignInRefused   EndedReason = "signInRefused"
-	EndedReasonRuntimeError    EndedReason = "runtimeError"
-	EndedReasonAllowanceSpent  EndedReason = "allowanceSpent"
-	EndedReasonRateLimited     EndedReason = "rateLimited"
-	EndedReasonSandboxFailed   EndedReason = "sandboxFailed"
-	EndedReasonImported        EndedReason = "imported"
-)
+const EndedReasonEndTurn EndedReason = "endTurn"
+const EndedReasonMaxTokens EndedReason = "maxTokens"
+const EndedReasonMaxTurnRequests EndedReason = "maxTurnRequests"
+const EndedReasonRefusal EndedReason = "refusal"
+const EndedReasonCancelled EndedReason = "cancelled"
+const EndedReasonProcessDied EndedReason = "processDied"
+const EndedReasonDaemonGone EndedReason = "daemonGone"
+const EndedReasonCostLimit EndedReason = "costLimit"
+const EndedReasonUnrecognised EndedReason = "unrecognised"
+const EndedReasonStoppedByAgent EndedReason = "stoppedByAgent"
+const EndedReasonSignInRefused EndedReason = "signInRefused"
+const EndedReasonRuntimeError EndedReason = "runtimeError"
+const EndedReasonAllowanceSpent EndedReason = "allowanceSpent"
+const EndedReasonRateLimited EndedReason = "rateLimited"
+const EndedReasonSandboxFailed EndedReason = "sandboxFailed"
+const EndedReasonImported EndedReason = "imported"
 
 // UnmarshalJSON reads a value this build does not know as "unrecognised".
 func (v *EndedReason) UnmarshalJSON(b []byte) error {
@@ -2158,7 +2756,22 @@ func (v *EndedReason) UnmarshalJSON(b []byte) error {
 		return err
 	}
 	switch EndedReason(s) {
-	case EndedReasonEndTurn, EndedReasonMaxTokens, EndedReasonMaxTurnRequests, EndedReasonRefusal, EndedReasonCancelled, EndedReasonProcessDied, EndedReasonDaemonGone, EndedReasonCostLimit, EndedReasonUnrecognised, EndedReasonStoppedByAgent, EndedReasonSignInRefused, EndedReasonRuntimeError, EndedReasonAllowanceSpent, EndedReasonRateLimited, EndedReasonSandboxFailed, EndedReasonImported:
+	case EndedReasonEndTurn,
+		EndedReasonMaxTokens,
+		EndedReasonMaxTurnRequests,
+		EndedReasonRefusal,
+		EndedReasonCancelled,
+		EndedReasonProcessDied,
+		EndedReasonDaemonGone,
+		EndedReasonCostLimit,
+		EndedReasonUnrecognised,
+		EndedReasonStoppedByAgent,
+		EndedReasonSignInRefused,
+		EndedReasonRuntimeError,
+		EndedReasonAllowanceSpent,
+		EndedReasonRateLimited,
+		EndedReasonSandboxFailed,
+		EndedReasonImported:
 		*v = EndedReason(s)
 	default:
 		*v = EndedReasonUnrecognised
@@ -2167,68 +2780,92 @@ func (v *EndedReason) UnmarshalJSON(b []byte) error {
 }
 
 type EntryNotification struct {
-	AgentID   UUID            `json:"agentID"`
-	Entry     TranscriptEntry `json:"entry"`
-	Index     *int64          `json:"index,omitzero"`
-	Oversized *int64          `json:"oversized,omitzero"`
+	AgentID UUID `json:"agentID"`
+
+	Entry TranscriptEntry `json:"entry"`
+
+	Index *int64 `json:"index,omitzero"`
+
+	Oversized *int64 `json:"oversized,omitzero"`
 }
 
 type Event struct {
-	Position     int64             `json:"position"`
-	Name         string            `json:"name"`
-	At           Date              `json:"at"`
-	LastAt       *Date             `json:"lastAt,omitzero"`
-	Count        int64             `json:"count"`
-	Scope        EventScope        `json:"scope"`
-	Sentence     string            `json:"sentence"`
-	Details      map[string]string `json:"details"`
-	Publisher    *EventPublisher   `json:"publisher,omitzero"`
-	Message      *string           `json:"message,omitzero"`
-	ChainDepth   int64             `json:"chainDepth"`
-	Consequences []Consequence     `json:"consequences"`
+	Position int64 `json:"position"`
+
+	Name string `json:"name"`
+
+	At Date `json:"at"`
+
+	LastAt *Date `json:"lastAt,omitzero"`
+
+	Count int64 `json:"count"`
+
+	Scope EventScope `json:"scope"`
+
+	Sentence string `json:"sentence"`
+
+	Details map[string]string `json:"details"`
+
+	Publisher *EventPublisher `json:"publisher,omitzero"`
+
+	Message *string `json:"message,omitzero"`
+
+	ChainDepth int64 `json:"chainDepth"`
+
+	Consequences []Consequence `json:"consequences"`
+
 	// Who raised it, when a person's call through the control plane did (#1751, spec 736 FR-040): the actor the control plane gave the call's channel, never taken from the client. None for what an agent, a workflow or the machine did.
 	Actor *AuditActor `json:"actor,omitzero"`
 }
 
 type EventDraft struct {
-	Name       string            `json:"name"`
-	At         Date              `json:"at"`
-	Scope      EventScope        `json:"scope"`
-	Sentence   string            `json:"sentence"`
-	Details    map[string]string `json:"details"`
-	Message    *string           `json:"message,omitzero"`
-	ChainDepth int64             `json:"chainDepth"`
+	Name string `json:"name"`
+
+	At Date `json:"at"`
+
+	Scope EventScope `json:"scope"`
+
+	Sentence string `json:"sentence"`
+
+	Details map[string]string `json:"details"`
+
+	Message *string `json:"message,omitzero"`
+
+	ChainDepth int64 `json:"chainDepth"`
 }
 
 type EventGroup string
 
-const (
-	EventGroupAgents    EventGroup = "agents"
-	EventGroupWorkflows EventGroup = "workflows"
-	EventGroupBranches  EventGroup = "branches"
-	EventGroupDropbox   EventGroup = "dropbox"
-	EventGroupMac       EventGroup = "mac"
-)
+const EventGroupAgents EventGroup = "agents"
+const EventGroupWorkflows EventGroup = "workflows"
+const EventGroupBranches EventGroup = "branches"
+const EventGroupDropbox EventGroup = "dropbox"
+const EventGroupMac EventGroup = "mac"
 
 // EventPattern (Model/EventPattern.swift), as its encode(to:) writes it (073): `filters` holds every filter as one string, a list joined by `|` so an older build reads it as a value that never matches, and `anyOf` holds the lists whole. Read `anyOf` over `filters`.
 type EventPattern struct {
-	Name    string              `json:"name"`
-	Filters map[string]string   `json:"filters"`
-	AnyOf   map[string][]string `json:"anyOf,omitzero"`
+	Name string `json:"name"`
+
+	Filters map[string]string `json:"filters"`
+
+	AnyOf map[string][]string `json:"anyOf,omitzero"`
 }
 
 type EventPublisher struct {
-	AgentID UUID   `json:"agentID"`
-	Title   string `json:"title"`
+	AgentID UUID `json:"agentID"`
+
+	Title string `json:"title"`
 }
 
 type EventRaiseRequest struct {
-	Draft        EventDraft    `json:"draft"`
+	Draft EventDraft `json:"draft"`
+
 	Consequences []Consequence `json:"consequences,omitzero"`
 }
 
 type EventScope struct {
-	Mac     *struct{}          `json:"mac,omitzero"`
+	Mac *struct{} `json:"mac,omitzero"`
+
 	Project *EventScopeProject `json:"project,omitzero"`
 }
 
@@ -2237,25 +2874,36 @@ type EventScopeProject struct {
 }
 
 type EventWait struct {
-	ID             UUID              `json:"id"`
-	Patterns       []EventPattern    `json:"patterns"`
-	From           int64             `json:"from"`
-	Deadline       *Date             `json:"deadline,omitzero"`
-	Since          Date              `json:"since"`
-	Ending         *EventWaitEnding  `json:"ending,omitzero"`
-	ResumePromptID *UUID             `json:"resumePromptID,omitzero"`
-	ServerEvents   []WaitServerEvent `json:"serverEvents,omitzero"`
+	ID UUID `json:"id"`
+
+	Patterns []EventPattern `json:"patterns"`
+
+	From int64 `json:"from"`
+
+	Deadline *Date `json:"deadline,omitzero"`
+
+	Since Date `json:"since"`
+
+	Ending *EventWaitEnding `json:"ending,omitzero"`
+
+	ResumePromptID *UUID `json:"resumePromptID,omitzero"`
+
+	ServerEvents []WaitServerEvent `json:"serverEvents,omitzero"`
 }
 
 type EventWaitEnding struct {
-	Matched      *EventWaitEndingMatched      `json:"matched,omitzero"`
-	TimedOut     *struct{}                    `json:"timedOut,omitzero"`
-	Cancelled    *EventWaitEndingCancelled    `json:"cancelled,omitzero"`
+	Matched *EventWaitEndingMatched `json:"matched,omitzero"`
+
+	TimedOut *struct{} `json:"timedOut,omitzero"`
+
+	Cancelled *EventWaitEndingCancelled `json:"cancelled,omitzero"`
+
 	CouldNotWake *EventWaitEndingCouldNotWake `json:"couldNotWake,omitzero"`
 }
 
 type EventWaitEndingMatched struct {
-	Position     int64 `json:"position"`
+	Position int64 `json:"position"`
+
 	ExtraMatches int64 `json:"extraMatches"`
 }
 
@@ -2269,103 +2917,131 @@ type EventWaitEndingCouldNotWake struct {
 
 type EventWaitEndingCanceller string
 
-const (
-	EventWaitEndingCancellerAgent            EventWaitEndingCanceller = "agent"
-	EventWaitEndingCancellerPerson           EventWaitEndingCanceller = "person"
-	EventWaitEndingCancellerPrompt           EventWaitEndingCanceller = "prompt"
-	EventWaitEndingCancellerStopped          EventWaitEndingCanceller = "stopped"
-	EventWaitEndingCancellerArchived         EventWaitEndingCanceller = "archived"
-	EventWaitEndingCancellerArchiveRequested EventWaitEndingCanceller = "archiveRequested"
-)
+const EventWaitEndingCancellerAgent EventWaitEndingCanceller = "agent"
+const EventWaitEndingCancellerPerson EventWaitEndingCanceller = "person"
+const EventWaitEndingCancellerPrompt EventWaitEndingCanceller = "prompt"
+const EventWaitEndingCancellerStopped EventWaitEndingCanceller = "stopped"
+const EventWaitEndingCancellerArchived EventWaitEndingCanceller = "archived"
+const EventWaitEndingCancellerArchiveRequested EventWaitEndingCanceller = "archiveRequested"
 
 type EventsChange struct {
-	Event   *Event         `json:"event,omitzero"`
+	Event *Event `json:"event,omitzero"`
+
 	Waiting []WaitingAgent `json:"waiting"`
 }
 
 type EventsListRequest struct {
-	Before *int64       `json:"before,omitzero"`
-	Limit  int64        `json:"limit"`
-	Scope  *EventScope  `json:"scope,omitzero"`
+	Before *int64 `json:"before,omitzero"`
+
+	Limit int64 `json:"limit"`
+
+	Scope *EventScope `json:"scope,omitzero"`
+
 	Groups []EventGroup `json:"groups,omitzero"`
 }
 
 type EventsPage struct {
-	Events  []Event        `json:"events"`
+	Events []Event `json:"events"`
+
 	Waiting []WaitingAgent `json:"waiting"`
-	HasMore bool           `json:"hasMore"`
+
+	HasMore bool `json:"hasMore"`
 }
 
 // One thing to write: what the list shows, what goes in the text (the label when left out), and a line about it.
 type FileCompletion struct {
-	Label  string  `json:"label"`
+	Label string `json:"label"`
+
 	Insert *string `json:"insert,omitzero"`
+
 	Detail *string `json:"detail,omitzero"`
 }
 
 // files/complete (#844): what the language server would write at a place in a file, as the editor holds it. line from 1; column from 1, in UTF-16 units as the text views count.
 type FileCompletionRequest struct {
-	AgentID UUID   `json:"agentID"`
-	Path    string `json:"path"`
-	Text    string `json:"text"`
-	Line    int64  `json:"line"`
-	Column  int64  `json:"column"`
+	AgentID UUID `json:"agentID"`
+
+	Path string `json:"path"`
+
+	Text string `json:"text"`
+
+	Line int64 `json:"line"`
+
+	Column int64 `json:"column"`
 }
 
 // At most 50 completions, in the server's order; reason says why there are none (no server, or none installed).
 type FileCompletions struct {
-	Items  []FileCompletion `json:"items"`
-	Reason *string          `json:"reason,omitzero"`
+	Items []FileCompletion `json:"items"`
+
+	Reason *string `json:"reason,omitzero"`
 }
 
 // One problem a language server found: where (line and column from 1), how bad (error, warning, info or hint), and what.
 type FileDiagnostic struct {
-	Line     int64   `json:"line"`
-	Column   int64   `json:"column"`
-	Severity string  `json:"severity"`
-	Message  string  `json:"message"`
-	Source   *string `json:"source,omitzero"`
+	Line int64 `json:"line"`
+
+	Column int64 `json:"column"`
+
+	Severity string `json:"severity"`
+
+	Message string `json:"message"`
+
+	Source *string `json:"source,omitzero"`
 }
 
 // A file's problems, at most 200, and the server that found them. Reason says why there is no server for it (none installed for the language, or the file too big).
 type FileDiagnostics struct {
 	Diagnostics []FileDiagnostic `json:"diagnostics"`
-	Server      *string          `json:"server,omitzero"`
-	Reason      *string          `json:"reason,omitzero"`
+
+	Server *string `json:"server,omitzero"`
+
+	Reason *string `json:"reason,omitzero"`
 }
 
 // files/diagnostics (#844): what the language server for a file's language says of it, as the editor holds it (text) or as it is on disk.
 type FileDiagnosticsRequest struct {
-	AgentID UUID    `json:"agentID"`
-	Path    string  `json:"path"`
-	Text    *string `json:"text,omitzero"`
+	AgentID UUID `json:"agentID"`
+
+	Path string `json:"path"`
+
+	Text *string `json:"text,omitzero"`
 }
 
 type FileMentionDTO struct {
-	Path         string `json:"path"`
+	Path string `json:"path"`
+
 	RelativePath string `json:"relativePath"`
 }
 
 type FileMentionRequest struct {
-	AgentID UUID   `json:"agentID"`
-	Term    string `json:"term"`
+	AgentID UUID `json:"agentID"`
+
+	Term string `json:"term"`
 }
 
 // FileReading (Model/FileReading.swift), as its encode(to:) writes it: one shape per `kind`.
 type FileReading struct {
 	// Kind is one of "text", "image", "other", "unchanged".
-	Kind        string    `json:"kind"`
-	Stamp       FileStamp `json:"stamp"`
-	Text        *string   `json:"text,omitzero"`
-	IsTruncated *bool     `json:"isTruncated,omitzero"`
-	Size        *float64  `json:"size,omitzero"`
-	Bytes       Data      `json:"bytes,omitzero"`
-	DescribedAs *string   `json:"describedAs,omitzero"`
+	Kind string `json:"kind"`
+
+	Stamp FileStamp `json:"stamp"`
+
+	Text *string `json:"text,omitzero"`
+
+	IsTruncated *bool `json:"isTruncated,omitzero"`
+
+	Size *float64 `json:"size,omitzero"`
+
+	Bytes Data `json:"bytes,omitzero"`
+
+	DescribedAs *string `json:"describedAs,omitzero"`
 }
 
 type FileStamp struct {
-	Size       int64 `json:"size"`
-	ModifiedAt Date  `json:"modifiedAt"`
+	Size int64 `json:"size"`
+
+	ModifiedAt Date `json:"modifiedAt"`
 }
 
 type FilesBrowseRequest struct {
@@ -2373,26 +3049,33 @@ type FilesBrowseRequest struct {
 }
 
 type FilesChangedNotification struct {
-	AgentID UUID     `json:"agentID"`
+	AgentID UUID `json:"agentID"`
+
 	Folders []string `json:"folders"`
-	Many    *bool    `json:"many,omitzero"`
+
+	Many *bool `json:"many,omitzero"`
 }
 
 type FilesListRequest struct {
-	AgentID UUID   `json:"agentID"`
-	Folder  string `json:"folder"`
+	AgentID UUID `json:"agentID"`
+
+	Folder string `json:"folder"`
 }
 
 type FilesReadRequest struct {
-	AgentID    UUID       `json:"agentID"`
-	Path       string     `json:"path"`
+	AgentID UUID `json:"agentID"`
+
+	Path string `json:"path"`
+
 	KnownStamp *FileStamp `json:"knownStamp,omitzero"`
 }
 
 type FilesSaveTextRequest struct {
-	Path         string `json:"path"`
-	Text         string `json:"text"`
-	OnlyIfAbsent *bool  `json:"onlyIfAbsent,omitzero"`
+	Path string `json:"path"`
+
+	Text string `json:"text"`
+
+	OnlyIfAbsent *bool `json:"onlyIfAbsent,omitzero"`
 }
 
 type FilesText struct {
@@ -2404,14 +3087,17 @@ type FilesTextRequest struct {
 }
 
 type FilesWatchRequest struct {
-	AgentID UUID   `json:"agentID"`
-	Folder  string `json:"folder"`
+	AgentID UUID `json:"agentID"`
+
+	Folder string `json:"folder"`
 }
 
 type FilesWriteRequest struct {
-	AgentID UUID   `json:"agentID"`
-	Name    string `json:"name"`
-	Data    Data   `json:"data"`
+	AgentID UUID `json:"agentID"`
+
+	Name string `json:"name"`
+
+	Data Data `json:"data"`
 }
 
 type FilesWriteResponse struct {
@@ -2420,22 +3106,27 @@ type FilesWriteResponse struct {
 
 // One message that holds the text: where it is in the transcript (its first chunk), and the line it is on.
 type FindMatch struct {
-	Index   int64  `json:"index"`
-	EntryID UUID   `json:"entryID"`
-	Line    string `json:"line"`
+	Index int64 `json:"index"`
+
+	EntryID UUID `json:"entryID"`
+
+	Line string `json:"line"`
 }
 
 // agents/find (#1532): what was said in one chat, prompts and replies, that holds the text, any case.
 type FindRequest struct {
-	AgentID UUID   `json:"agentID"`
-	Text    string `json:"text"`
-	Limit   *int64 `json:"limit,omitzero"`
+	AgentID UUID `json:"agentID"`
+
+	Text string `json:"text"`
+
+	Limit *int64 `json:"limit,omitzero"`
 }
 
 // The matches, oldest first: the newest `limit` of them. More is true when older ones were left out.
 type FindResult struct {
 	Matches []FindMatch `json:"matches"`
-	More    bool        `json:"more"`
+
+	More bool `json:"more"`
 }
 
 // console/fleet's answer (#1804): every machine on the control plane, for an admin.
@@ -2446,55 +3137,73 @@ type FleetBoard struct {
 // One machine on Console ▸ Machines (#1804): its hosts/list row, whose it is, and how many of its agents were running when it last listed them. Numbers only, never what the agents said.
 type FleetMachine struct {
 	Host ControlHost `json:"host"`
+
 	// Its person's or bot's name; empty when nobody owns it.
 	OwnerName string `json:"ownerName"`
+
 	// Whether its owner is a bot (#1761).
 	Bot bool `json:"bot"`
+
 	// Its agents running when it last listed them; absent when it never has.
 	Running *int64 `json:"running,omitzero"`
+
 	// When it last listed its agents.
 	HeardAt *Date `json:"heardAt,omitzero"`
 }
 
 type FolderHunk struct {
-	OldStart       int64      `json:"oldStart"`
-	NewStart       int64      `json:"newStart"`
-	NoNewlineAtEnd bool       `json:"noNewlineAtEnd"`
-	Lines          []DiffLine `json:"lines"`
+	OldStart int64 `json:"oldStart"`
+
+	NewStart int64 `json:"newStart"`
+
+	NoNewlineAtEnd bool `json:"noNewlineAtEnd"`
+
+	Lines []DiffLine `json:"lines"`
 }
 
 type FoundFolder struct {
-	Typed        *string `json:"typed,omitzero"`
-	Folder       URL     `json:"folder"`
-	Exists       bool    `json:"exists"`
-	IsRepository bool    `json:"isRepository"`
-	IsProject    bool    `json:"isProject"`
+	Typed *string `json:"typed,omitzero"`
+
+	Folder URL `json:"folder"`
+
+	Exists bool `json:"exists"`
+
+	IsRepository bool `json:"isRepository"`
+
+	IsProject bool `json:"isProject"`
 }
 
 type GitAsk struct {
 	Server string `json:"server"`
-	From   HostID `json:"from"`
+
+	From HostID `json:"from"`
 }
 
 // A credential for one git command. Never printed, logged or kept.
 type GitCredential struct {
 	Username string `json:"username"`
+
 	Password string `json:"password"`
 }
 
 // git/credential, git/fill (#1122): only https, and only the server. `path` is the Go host's, unread by Swift.
 type GitCredentialRequest struct {
-	Protocol string  `json:"protocol"`
-	Host     string  `json:"host"`
-	Path     *string `json:"path,omitzero"`
+	Protocol string `json:"protocol"`
+
+	Host string `json:"host"`
+
+	Path *string `json:"path,omitzero"`
 }
 
 // GitView (Model/AgentChanges.swift): `{ shared: { since } }`, `{ unavailable: … }` and so on.
 type GitView struct {
-	Owned          *GitViewOwned       `json:"owned,omitzero"`
-	Shared         *GitViewShared      `json:"shared,omitzero"`
-	SharedFromHead *struct{}           `json:"sharedFromHead,omitzero"`
-	Unavailable    *ChangesUnavailable `json:"unavailable,omitzero"`
+	Owned *GitViewOwned `json:"owned,omitzero"`
+
+	Shared *GitViewShared `json:"shared,omitzero"`
+
+	SharedFromHead *struct{} `json:"sharedFromHead,omitzero"`
+
+	Unavailable *ChangesUnavailable `json:"unavailable,omitzero"`
 }
 
 type GitViewOwned struct {
@@ -2507,11 +3216,15 @@ type GitViewShared struct {
 
 // A group (#1761, spec 736 FR-027): everyone, or named users. It owns workspace providers: only its users see them and start machines from them (FR-028).
 type Group struct {
-	ID       string     `json:"id"`
-	Name     string     `json:"name"`
-	Everyone bool       `json:"everyone"`
-	Members  []string   `json:"members"`
-	Caps     *SpendCaps `json:"caps,omitzero"`
+	ID string `json:"id"`
+
+	Name string `json:"name"`
+
+	Everyone bool `json:"everyone"`
+
+	Members []string `json:"members"`
+
+	Caps *SpendCaps `json:"caps,omitzero"`
 }
 
 // groups/list (#1761): every group for an admin; for a member, the groups they are in.
@@ -2526,110 +3239,154 @@ type GroupRequest struct {
 
 // groups/set (#1761): makes a group, or with id changes one. One user is a list of one.
 type GroupSet struct {
-	ID       *string    `json:"id,omitzero"`
-	Name     string     `json:"name"`
-	Everyone *bool      `json:"everyone,omitzero"`
-	Members  []string   `json:"members,omitzero"`
-	Caps     *SpendCaps `json:"caps,omitzero"`
+	ID *string `json:"id,omitzero"`
+
+	Name string `json:"name"`
+
+	Everyone *bool `json:"everyone,omitzero"`
+
+	Members []string `json:"members,omitzero"`
+
+	Caps *SpendCaps `json:"caps,omitzero"`
 }
 
 // control/groupsChanged (#1761): a group was made, changed or removed.
 type GroupsChanged struct {
-	ID      *string `json:"id,omitzero"`
-	Removed *bool   `json:"removed,omitzero"`
+	ID *string `json:"id,omitzero"`
+
+	Removed *bool `json:"removed,omitzero"`
 }
 
 type GuardedChange struct {
-	Path         string   `json:"path"`
-	Digest       *string  `json:"digest,omitzero"`
-	ChangedBy    []string `json:"changedBy"`
-	ChangedByIDs []UUID   `json:"changedByIDs"`
-	ByGit        bool     `json:"byGit"`
-	Since        Date     `json:"since"`
-	AskedIn      *UUID    `json:"askedIn,omitzero"`
+	Path string `json:"path"`
+
+	Digest *string `json:"digest,omitzero"`
+
+	ChangedBy []string `json:"changedBy"`
+
+	ChangedByIDs []UUID `json:"changedByIDs"`
+
+	ByGit bool `json:"byGit"`
+
+	Since Date `json:"since"`
+
+	AskedIn *UUID `json:"askedIn,omitzero"`
 }
 
 type GuardedChangeReading struct {
-	Path     string            `json:"path"`
-	Digest   *string           `json:"digest,omitzero"`
-	Approved *string           `json:"approved,omitzero"`
-	Current  *string           `json:"current,omitzero"`
-	Lines    []GuardedDiffLine `json:"lines"`
+	Path string `json:"path"`
+
+	Digest *string `json:"digest,omitzero"`
+
+	Approved *string `json:"approved,omitzero"`
+
+	Current *string `json:"current,omitzero"`
+
+	Lines []GuardedDiffLine `json:"lines"`
 }
 
 type GuardedChangeRequest struct {
-	Folder URL     `json:"folder"`
-	Path   string  `json:"path"`
+	Folder URL `json:"folder"`
+
+	Path string `json:"path"`
+
 	Digest *string `json:"digest,omitzero"`
 }
 
 type GuardedDiffLine struct {
 	Kind GuardedDiffLineKind `json:"kind"`
-	Text string              `json:"text"`
+
+	Text string `json:"text"`
 }
 
 type GuardedDiffLineKind string
 
-const (
-	GuardedDiffLineKindSame    GuardedDiffLineKind = "same"
-	GuardedDiffLineKindRemoved GuardedDiffLineKind = "removed"
-	GuardedDiffLineKindAdded   GuardedDiffLineKind = "added"
-)
+const GuardedDiffLineKindSame GuardedDiffLineKind = "same"
+const GuardedDiffLineKindRemoved GuardedDiffLineKind = "removed"
+const GuardedDiffLineKindAdded GuardedDiffLineKind = "added"
 
 // A member as a copy says it, for the one driving a handover (Handover.Status.Member).
 type HandoverMember struct {
-	ID         string  `json:"id"`
-	Name       string  `json:"name"`
-	Kind       string  `json:"kind"`
-	KnownEpoch *int64  `json:"knownEpoch,omitzero"`
-	Version    *string `json:"version,omitzero"`
-	Online     *bool   `json:"online,omitzero"`
-	LastSeen   *Date   `json:"lastSeen,omitzero"`
+	ID string `json:"id"`
+
+	Name string `json:"name"`
+
+	Kind string `json:"kind"`
+
+	KnownEpoch *int64 `json:"knownEpoch,omitzero"`
+
+	Version *string `json:"version,omitzero"`
+
+	Online *bool `json:"online,omitzero"`
+
+	LastSeen *Date `json:"lastSeen,omitzero"`
 }
 
 // handover/status: what a copy says of itself, for the one driving a handover to check before each step (R16).
 type HandoverStatus struct {
-	Phase           string            `json:"phase"`
-	ControlKey      Data              `json:"controlKey"`
-	HasRecords      bool              `json:"hasRecords"`
-	Endpoints       []ControlEndpoint `json:"endpoints"`
-	Epoch           *int64            `json:"epoch,omitzero"`
-	Members         []HandoverMember  `json:"members"`
-	ForwardingUntil *Date             `json:"forwardingUntil,omitzero"`
+	Phase string `json:"phase"`
+
+	ControlKey Data `json:"controlKey"`
+
+	HasRecords bool `json:"hasRecords"`
+
+	Endpoints []ControlEndpoint `json:"endpoints"`
+
+	Epoch *int64 `json:"epoch,omitzero"`
+
+	Members []HandoverMember `json:"members"`
+
+	ForwardingUntil *Date `json:"forwardingUntil,omitzero"`
 }
 
 type Headline struct {
-	H1      string        `json:"h1"`
-	H2      string        `json:"h2"`
-	H3      string        `json:"h3"`
+	H1 string `json:"h1"`
+
+	H2 string `json:"h2"`
+
+	H3 string `json:"h3"`
+
 	Answers []QuickAnswer `json:"answers,omitzero"`
 }
 
 type HelperLimits struct {
-	Running          *int64 `json:"running,omitzero"`
-	NotArchived      *int64 `json:"notArchived,omitzero"`
-	Queued           *int64 `json:"queued,omitzero"`
-	AgentsMayArchive *bool  `json:"agentsMayArchive,omitzero"`
+	Running *int64 `json:"running,omitzero"`
+
+	NotArchived *int64 `json:"notArchived,omitzero"`
+
+	Queued *int64 `json:"queued,omitzero"`
+
+	AgentsMayArchive *bool `json:"agentsMayArchive,omitzero"`
+
 	// A helper's turn refused for a spent allowance waits for it at once, as if the person had chosen Continue (#1918). Off unless set.
 	ContinueWhenBack *bool `json:"continueWhenBack,omitzero"`
 }
 
 // hosts/announce, on an enrolment connection.
 type HostAnnounce struct {
-	PublicKey      Data    `json:"publicKey"`
-	Name           string  `json:"name"`
-	Platform       string  `json:"platform"`
-	Version        string  `json:"version"`
-	MachineID      string  `json:"machineID"`
-	Relay          *bool   `json:"relay,omitzero"`
+	PublicKey Data `json:"publicKey"`
+
+	Name string `json:"name"`
+
+	Platform string `json:"platform"`
+
+	Version string `json:"version"`
+
+	MachineID string `json:"machineID"`
+
+	Relay *bool `json:"relay,omitzero"`
+
 	Implementation *string `json:"implementation,omitzero"`
 }
 
 // A paired window a host may let in on its local socket (#1118), with the key it proves itself with.
 type HostClient struct {
-	ID        UUID   `json:"id"`
-	Kind      string `json:"kind"`
-	PublicKey Data   `json:"publicKey"`
+	ID UUID `json:"id"`
+
+	Kind string `json:"kind"`
+
+	PublicKey Data `json:"publicKey"`
+
 	// The person the window belongs to (#994). The host lets it in only when it is the host's own user (FR-020).
 	Person *string `json:"person,omitzero"`
 }
@@ -2637,6 +3394,7 @@ type HostClient struct {
 // host/clients: every window paired with the control plane, which a host checks its local socket against (#1118).
 type HostClients struct {
 	Clients []HostClient `json:"clients"`
+
 	// The user the host belongs to (#994). With it, the host lets in only a window whose person is that user (FR-020); without it (an older control plane), every window listed.
 	User *string `json:"user,omitzero"`
 }
@@ -2648,13 +3406,20 @@ type HostEnroll struct {
 
 // host/hello, on every connect of an uplink. `implementation` is `swift` or `go` (#1134).
 type HostHello struct {
-	Host           *HostID `json:"host,omitzero"`
-	Version        string  `json:"version"`
-	Platform       string  `json:"platform"`
-	MachineID      string  `json:"machineID"`
-	Name           *string `json:"name,omitzero"`
-	Relay          *bool   `json:"relay,omitzero"`
+	Host *HostID `json:"host,omitzero"`
+
+	Version string `json:"version"`
+
+	Platform string `json:"platform"`
+
+	MachineID string `json:"machineID"`
+
+	Name *string `json:"name,omitzero"`
+
+	Relay *bool `json:"relay,omitzero"`
+
 	Implementation *string `json:"implementation,omitzero"`
+
 	// The capabilities this host has (#1748): each one whose methods it all serves, and the ones it declares. None from a host older than #1748.
 	Capabilities []string `json:"capabilities,omitzero"`
 }
@@ -2663,197 +3428,273 @@ type HostID string
 
 // hosts/install (HostInstall.Request): a server over ssh, with its key, the fingerprint trusted, a tunnel.
 type HostInstall struct {
-	Destination string  `json:"destination"`
-	Name        *string `json:"name,omitzero"`
-	Key         *string `json:"key,omitzero"`
-	Trust       *string `json:"trust,omitzero"`
-	Tunnel      *bool   `json:"tunnel,omitzero"`
+	Destination string `json:"destination"`
+
+	Name *string `json:"name,omitzero"`
+
+	Key *string `json:"key,omitzero"`
+
+	Trust *string `json:"trust,omitzero"`
+
+	Tunnel *bool `json:"tunnel,omitzero"`
 }
 
 // POST /v1/join (#994, spec 736 FR-017): a machine with no code asks to join. `person` names whose it is to be, by name or id; with none, an admin approves it.
 type HostJoinAsk struct {
-	Name      string  `json:"name"`
-	Platform  string  `json:"platform"`
-	Version   *string `json:"version,omitzero"`
-	PublicKey Data    `json:"publicKey"`
+	Name string `json:"name"`
+
+	Platform string `json:"platform"`
+
+	Version *string `json:"version,omitzero"`
+
+	PublicKey Data `json:"publicKey"`
+
 	MachineID *string `json:"machineID,omitzero"`
-	Person    *string `json:"person,omitzero"`
+
+	Person *string `json:"person,omitzero"`
 }
 
 // GET /v1/join/<request> (#994): waiting, or how it ended; `host` once approved.
 type HostJoinDecision struct {
-	Result string  `json:"result"`
-	Host   *HostID `json:"host,omitzero"`
+	Result string `json:"result"`
+
+	Host *HostID `json:"host,omitzero"`
+
 	// Once approved: the control plane's public key, which the machine keeps as a code's would give it.
 	ControlKey Data `json:"controlKey,omitzero"`
+
 	// Once approved: the control plane's name.
 	Name *string `json:"name,omitzero"`
 }
 
 type HostJoinStatus struct {
-	Member    bool    `json:"member"`
-	Connected bool    `json:"connected"`
-	Problem   *string `json:"problem,omitzero"`
-	At        Date    `json:"at"`
+	Member bool `json:"member"`
+
+	Connected bool `json:"connected"`
+
+	Problem *string `json:"problem,omitzero"`
+
+	At Date `json:"at"`
 }
 
 // POST /v1/join: the request, the short code the machine shows, and when it ends (10 minutes).
 type HostJoinTicket struct {
 	Request string `json:"request"`
-	Code    string `json:"code"`
-	Expires Date   `json:"expires"`
+
+	Code string `json:"code"`
+
+	Expires Date `json:"expires"`
 }
 
 type HostLastHeard struct {
-	Host     HostID           `json:"host"`
+	Host HostID `json:"host"`
+
 	Projects []ProjectSummary `json:"projects,omitzero"`
-	Agents   []Agent          `json:"agents,omitzero"`
-	HeardAt  *Date            `json:"heardAt,omitzero"`
+
+	Agents []Agent `json:"agents,omitzero"`
+
+	HeardAt *Date `json:"heardAt,omitzero"`
 }
 
 // hosts/link.
 type HostLink struct {
-	Host                HostID     `json:"host"`
-	Provider            ProviderID `json:"provider"`
-	Workspace           string     `json:"workspace"`
-	StartWhenUsed       *bool      `json:"startWhenUsed,omitzero"`
-	StopWhenIdleMinutes *int64     `json:"stopWhenIdleMinutes,omitzero"`
+	Host HostID `json:"host"`
+
+	Provider ProviderID `json:"provider"`
+
+	Workspace string `json:"workspace"`
+
+	StartWhenUsed *bool `json:"startWhenUsed,omitzero"`
+
+	StopWhenIdleMinutes *int64 `json:"stopWhenIdleMinutes,omitzero"`
 }
 
 // host/providerDraft: a writing agent called one of the writer's tools (#858).
 type HostProviderDraftCall struct {
-	AgentID   UUID      `json:"agentID"`
-	Draft     UUID      `json:"draft"`
-	Tool      string    `json:"tool"`
+	AgentID UUID `json:"agentID"`
+
+	Draft UUID `json:"draft"`
+
+	Tool string `json:"tool"`
+
 	Arguments JSONValue `json:"arguments,omitzero"`
 }
 
 // hosts/setRelay.
 type HostRelayRequest struct {
-	Host  HostID `json:"host"`
-	Relay bool   `json:"relay"`
+	Host HostID `json:"host"`
+
+	Relay bool `json:"relay"`
 }
 
 type HostRequest struct {
-	Host  HostID `json:"host"`
-	Purge *bool  `json:"purge,omitzero"`
+	Host HostID `json:"host"`
+
+	Purge *bool `json:"purge,omitzero"`
 }
 
 // A host's next scheduled workflow (#1004).
 type HostSchedule struct {
-	At       *Date   `json:"at,omitzero"`
+	At *Date `json:"at,omitzero"`
+
 	Workflow *string `json:"workflow,omitzero"`
 }
 
 // host/status on channel 0 (#691 US4): each agent working or waiting on a person, and the next scheduled workflow.
 type HostStatus struct {
-	Idle     bool          `json:"idle"`
-	Running  []string      `json:"running"`
+	Idle bool `json:"idle"`
+
+	Running []string `json:"running"`
+
 	Schedule *HostSchedule `json:"schedule,omitzero"`
 }
 
 type HostStop struct {
-	Host           HostID `json:"host"`
-	ConfirmRunning *bool  `json:"confirmRunning,omitzero"`
+	Host HostID `json:"host"`
+
+	ConfirmRunning *bool `json:"confirmRunning,omitzero"`
 }
 
 type HostTunnel struct {
-	Up      bool    `json:"up"`
+	Up bool `json:"up"`
+
 	Problem *string `json:"problem,omitzero"`
 }
 
 type HostTunnelChanged struct {
-	Name   string     `json:"name"`
-	Host   *HostID    `json:"host,omitzero"`
+	Name string `json:"name"`
+
+	Host *HostID `json:"host,omitzero"`
+
 	Tunnel HostTunnel `json:"tunnel"`
 }
 
 // hosts/update (#1766): a host the control plane installed over ssh, updated the same way. The server and its key are given again, as at the install, because the control plane keeps neither; the host's own root and membership stay.
 type HostUpdate struct {
-	Host        HostID  `json:"host"`
-	Destination string  `json:"destination"`
-	Key         *string `json:"key,omitzero"`
-	Trust       *string `json:"trust,omitzero"`
+	Host HostID `json:"host"`
+
+	Destination string `json:"destination"`
+
+	Key *string `json:"key,omitzero"`
+
+	Trust *string `json:"trust,omitzero"`
 }
 
 // host/user (#1761): to a machine on its channel 0, at each join and when its user changes. Its user, their kind, and the labels runs-on: matches (FR-034); for a bot at its cap, until when it starts no work (FR-033).
 type HostUser struct {
-	User            string   `json:"user"`
-	Kind            string   `json:"kind"`
-	Name            string   `json:"name"`
-	Labels          []string `json:"labels"`
-	CapReachedUntil *Date    `json:"capReachedUntil,omitzero"`
+	User string `json:"user"`
+
+	Kind string `json:"kind"`
+
+	Name string `json:"name"`
+
+	Labels []string `json:"labels"`
+
+	CapReachedUntil *Date `json:"capReachedUntil,omitzero"`
 }
 
 // host/userSettings (#1760, FR-024, FR-025): to a machine, on its channel 0, when it joins and when its user's settings or secrets change. Sent only on the links of that user's own machines. secrets is every secret the user has: a name missing from it was removed.
 type HostUserSettings struct {
-	User     string       `json:"user"`
+	User string `json:"user"`
+
 	Settings UserSettings `json:"settings"`
-	Secrets  []UserSecret `json:"secrets"`
+
+	Secrets []UserSecret `json:"secrets"`
 }
 
 type HostWorkspace struct {
-	Provider            ProviderID `json:"provider"`
-	ProviderName        string     `json:"providerName"`
-	Workspace           string     `json:"workspace"`
-	WorkspaceName       string     `json:"workspaceName"`
-	WorkspaceState      string     `json:"workspaceState"`
-	HostState           *string    `json:"hostState,omitzero"`
-	Phase               *string    `json:"phase,omitzero"`
-	Since               *Date      `json:"since,omitzero"`
-	Problem             *string    `json:"problem,omitzero"`
-	StoppedBy           *string    `json:"stoppedBy,omitzero"`
-	CanStart            bool       `json:"canStart"`
-	CanStop             bool       `json:"canStop"`
-	StartWhenUsed       bool       `json:"startWhenUsed"`
-	StopWhenIdleMinutes *int64     `json:"stopWhenIdleMinutes,omitzero"`
-	Cost                *string    `json:"cost,omitzero"`
-	Current             bool       `json:"current"`
-	StartForSchedules   *bool      `json:"startForSchedules,omitzero"`
-	TellsSchedule       *bool      `json:"tellsSchedule,omitzero"`
-	NextWorkflow        *string    `json:"nextWorkflow,omitzero"`
-	NextWorkflowAt      *Date      `json:"nextWorkflowAt,omitzero"`
-	WakeAt              *Date      `json:"wakeAt,omitzero"`
+	Provider ProviderID `json:"provider"`
+
+	ProviderName string `json:"providerName"`
+
+	Workspace string `json:"workspace"`
+
+	WorkspaceName string `json:"workspaceName"`
+
+	WorkspaceState string `json:"workspaceState"`
+
+	HostState *string `json:"hostState,omitzero"`
+
+	Phase *string `json:"phase,omitzero"`
+
+	Since *Date `json:"since,omitzero"`
+
+	Problem *string `json:"problem,omitzero"`
+
+	StoppedBy *string `json:"stoppedBy,omitzero"`
+
+	CanStart bool `json:"canStart"`
+
+	CanStop bool `json:"canStop"`
+
+	StartWhenUsed bool `json:"startWhenUsed"`
+
+	StopWhenIdleMinutes *int64 `json:"stopWhenIdleMinutes,omitzero"`
+
+	Cost *string `json:"cost,omitzero"`
+
+	Current bool `json:"current"`
+
+	StartForSchedules *bool `json:"startForSchedules,omitzero"`
+
+	TellsSchedule *bool `json:"tellsSchedule,omitzero"`
+
+	NextWorkflow *string `json:"nextWorkflow,omitzero"`
+
+	NextWorkflowAt *Date `json:"nextWorkflowAt,omitzero"`
+
+	WakeAt *Date `json:"wakeAt,omitzero"`
 }
 
 // host/workspaces, for an agent there: who asked, for the log, and its call.
 type HostWorkspaceCall struct {
-	Agent  string    `json:"agent"`
-	Method string    `json:"method"`
+	Agent string `json:"agent"`
+
+	Method string `json:"method"`
+
 	Params JSONValue `json:"params"`
 }
 
 // hosts/setWorkspaceOptions. stopWhenIdleMinutes 0 turns it off.
 type HostWorkspaceOptions struct {
-	Host                HostID `json:"host"`
-	StartWhenUsed       *bool  `json:"startWhenUsed,omitzero"`
+	Host HostID `json:"host"`
+
+	StartWhenUsed *bool `json:"startWhenUsed,omitzero"`
+
 	StopWhenIdleMinutes *int64 `json:"stopWhenIdleMinutes,omitzero"`
-	StartForSchedules   *bool  `json:"startForSchedules,omitzero"`
+
+	StartForSchedules *bool `json:"startForSchedules,omitzero"`
 }
 
 type HostedMCPSnapshot struct {
 	Servers []HostedMCPStatus `json:"servers"`
-	At      Date              `json:"at"`
+
+	At Date `json:"at"`
 }
 
 type HostedMCPState string
 
-const (
-	HostedMCPStateIdle       HostedMCPState = "idle"
-	HostedMCPStateStarting   HostedMCPState = "starting"
-	HostedMCPStateRunning    HostedMCPState = "running"
-	HostedMCPStateRestarting HostedMCPState = "restarting"
-)
+const HostedMCPStateIdle HostedMCPState = "idle"
+const HostedMCPStateStarting HostedMCPState = "starting"
+const HostedMCPStateRunning HostedMCPState = "running"
+const HostedMCPStateRestarting HostedMCPState = "restarting"
 
 type HostedMCPStatus struct {
-	Name      string         `json:"name"`
-	Project   *string        `json:"project,omitzero"`
-	State     HostedMCPState `json:"state"`
-	Since     *Date          `json:"since,omitzero"`
-	RetryAt   *Date          `json:"retryAt,omitzero"`
-	LastError *string        `json:"lastError,omitzero"`
-	Restarts  int64          `json:"restarts"`
-	Users     int64          `json:"users"`
+	Name string `json:"name"`
+
+	Project *string `json:"project,omitzero"`
+
+	State HostedMCPState `json:"state"`
+
+	Since *Date `json:"since,omitzero"`
+
+	RetryAt *Date `json:"retryAt,omitzero"`
+
+	LastError *string `json:"lastError,omitzero"`
+
+	Restarts int64 `json:"restarts"`
+
+	Users int64 `json:"users"`
 }
 
 type JoinApproved struct {
@@ -2863,18 +3704,25 @@ type JoinApproved struct {
 // control/joinDecided (#994): a request ended, approved or not, so every card for it goes.
 type JoinDecided struct {
 	Request string `json:"request"`
-	Result  string `json:"result"`
+
+	Result string `json:"result"`
 }
 
 // hosts/joinRequests, control/joinRequested (#994): a machine waiting for approval, with the code it shows.
 type JoinRequest struct {
-	Request  string  `json:"request"`
-	Name     string  `json:"name"`
-	Platform string  `json:"platform"`
-	Code     string  `json:"code"`
-	Expires  Date    `json:"expires"`
-	For      string  `json:"for"`
-	ForName  *string `json:"forName,omitzero"`
+	Request string `json:"request"`
+
+	Name string `json:"name"`
+
+	Platform string `json:"platform"`
+
+	Code string `json:"code"`
+
+	Expires Date `json:"expires"`
+
+	For string `json:"for"`
+
+	ForName *string `json:"forName,omitzero"`
 }
 
 // hosts/approveJoin, hosts/denyJoin (#994).
@@ -2884,15 +3732,19 @@ type JoinRequestDecide struct {
 
 // hosts/keep: a request for a stopped host, kept until it is up.
 type KeepRequest struct {
-	Host   HostID    `json:"host"`
-	Method string    `json:"method"`
+	Host HostID `json:"host"`
+
+	Method string `json:"method"`
+
 	Params JSONValue `json:"params"`
 }
 
 type KeptDelivered struct {
-	Host    HostID `json:"host"`
-	ID      UUID   `json:"id"`
-	AgentID *UUID  `json:"agentID,omitzero"`
+	Host HostID `json:"host"`
+
+	ID UUID `json:"id"`
+
+	AgentID *UUID `json:"agentID,omitzero"`
 }
 
 type KeptList struct {
@@ -2900,20 +3752,29 @@ type KeptList struct {
 }
 
 type KeptRequest struct {
-	ID        UUID    `json:"id"`
-	Host      HostID  `json:"host"`
-	Kind      string  `json:"kind"`
-	AgentID   *UUID   `json:"agentID,omitzero"`
-	Text      string  `json:"text"`
-	Folder    *URL    `json:"folder,omitzero"`
+	ID UUID `json:"id"`
+
+	Host HostID `json:"host"`
+
+	Kind string `json:"kind"`
+
+	AgentID *UUID `json:"agentID,omitzero"`
+
+	Text string `json:"text"`
+
+	Folder *URL `json:"folder,omitzero"`
+
 	RuntimeID *string `json:"runtimeID,omitzero"`
-	At        Date    `json:"at"`
-	Failed    *string `json:"failed,omitzero"`
+
+	At Date `json:"at"`
+
+	Failed *string `json:"failed,omitzero"`
 }
 
 type KeptRequestID struct {
 	Host HostID `json:"host"`
-	ID   UUID   `json:"id"`
+
+	ID UUID `json:"id"`
 }
 
 type LabelVocabularyRequest struct {
@@ -2921,17 +3782,23 @@ type LabelVocabularyRequest struct {
 }
 
 type Lease struct {
-	Resource    ResourceName `json:"resource"`
-	DisplayName string       `json:"displayName"`
-	Holder      UUID         `json:"holder"`
-	GrantedAt   Date         `json:"grantedAt"`
-	ExpiresAt   Date         `json:"expiresAt"`
-	Warned      bool         `json:"warned"`
+	Resource ResourceName `json:"resource"`
+
+	DisplayName string `json:"displayName"`
+
+	Holder UUID `json:"holder"`
+
+	GrantedAt Date `json:"grantedAt"`
+
+	ExpiresAt Date `json:"expiresAt"`
+
+	Warned bool `json:"warned"`
 }
 
 type LeaseNameRequest struct {
 	Token string `json:"token"`
-	Name  string `json:"name"`
+
+	Name string `json:"name"`
 }
 
 type LeaseNote struct {
@@ -2939,15 +3806,19 @@ type LeaseNote struct {
 }
 
 type LeaseRequest struct {
-	Token   string `json:"token"`
-	Name    string `json:"name"`
+	Token string `json:"token"`
+
+	Name string `json:"name"`
+
 	Minutes *int64 `json:"minutes,omitzero"`
-	Wait    *bool  `json:"wait,omitzero"`
+
+	Wait *bool `json:"wait,omitzero"`
 }
 
 type LeaseSnapshot struct {
 	Resources []ResourceState `json:"resources"`
-	At        Date            `json:"at"`
+
+	At Date `json:"at"`
 }
 
 type LeaseTokenRequest struct {
@@ -2955,101 +3826,146 @@ type LeaseTokenRequest struct {
 }
 
 type LendGit struct {
-	Host    HostID `json:"host"`
-	From    HostID `json:"from"`
-	Server  string `json:"server"`
-	Allowed bool   `json:"allowed"`
+	Host HostID `json:"host"`
+
+	From HostID `json:"from"`
+
+	Server string `json:"server"`
+
+	Allowed bool `json:"allowed"`
 }
 
 // hosts/lendSignIn (T091).
 type LendSignIn struct {
-	Host    HostID `json:"host"`
-	From    HostID `json:"from"`
+	Host HostID `json:"host"`
+
+	From HostID `json:"from"`
+
 	Runtime string `json:"runtime"`
-	Allowed bool   `json:"allowed"`
+
+	Allowed bool `json:"allowed"`
 }
 
 type LineMember struct {
-	AgentID    UUID `json:"agentID"`
-	AskedAt    Date `json:"askedAt"`
+	AgentID UUID `json:"agentID"`
+
+	AskedAt Date `json:"askedAt"`
+
 	IsCallOpen bool `json:"isCallOpen"`
 }
 
 type ListCursor struct {
 	LastActivityAt Date `json:"lastActivityAt"`
-	ID             UUID `json:"id"`
+
+	ID UUID `json:"id"`
 }
 
 type ListRequest struct {
-	IncludeArchived   bool        `json:"includeArchived"`
-	ArchivedCommands  bool        `json:"archivedCommands"`
-	ArchivedOnly      bool        `json:"archivedOnly"`
-	Folder            *URL        `json:"folder,omitzero"`
-	StartedByWorkflow *string     `json:"startedByWorkflow,omitzero"`
-	Limit             *int64      `json:"limit,omitzero"`
-	Lean              bool        `json:"lean"`
-	AgentID           *UUID       `json:"agentID,omitzero"`
-	After             *ListCursor `json:"after,omitzero"`
-	Query             *string     `json:"query,omitzero"`
+	IncludeArchived bool `json:"includeArchived"`
+
+	ArchivedCommands bool `json:"archivedCommands"`
+
+	ArchivedOnly bool `json:"archivedOnly"`
+
+	Folder *URL `json:"folder,omitzero"`
+
+	StartedByWorkflow *string `json:"startedByWorkflow,omitzero"`
+
+	Limit *int64 `json:"limit,omitzero"`
+
+	Lean bool `json:"lean"`
+
+	AgentID *UUID `json:"agentID,omitzero"`
+
+	After *ListCursor `json:"after,omitzero"`
+
+	Query *string `json:"query,omitzero"`
 }
 
 type ListedSkill struct {
-	Name        string        `json:"name"`
-	Description *string       `json:"description,omitzero"`
-	Folder      string        `json:"folder"`
-	Managed     *ManagedSkill `json:"managed,omitzero"`
+	Name string `json:"name"`
+
+	Description *string `json:"description,omitzero"`
+
+	Folder string `json:"folder"`
+
+	Managed *ManagedSkill `json:"managed,omitzero"`
 }
 
 type MCPAddAnswer struct {
 	Server *ManagedMCPServer `json:"server,omitzero"`
-	Error  *MCPCatalogError  `json:"error,omitzero"`
+
+	Error *MCPCatalogError `json:"error,omitzero"`
 }
 
 type MCPAddByHandRequest struct {
-	VerifyID    UUID             `json:"verifyID"`
+	VerifyID UUID `json:"verifyID"`
+
 	Destination SkillDestination `json:"destination"`
 }
 
 type MCPAddRequest struct {
-	PreviewID   UUID              `json:"previewID"`
-	Destination SkillDestination  `json:"destination"`
-	Secrets     map[string]string `json:"secrets"`
-	Plain       map[string]string `json:"plain"`
-	Replace     bool              `json:"replace"`
+	PreviewID UUID `json:"previewID"`
+
+	Destination SkillDestination `json:"destination"`
+
+	Secrets map[string]string `json:"secrets"`
+
+	Plain map[string]string `json:"plain"`
+
+	Replace bool `json:"replace"`
 }
 
 type MCPApprovalState struct {
-	Approved *struct{}                `json:"approved,omitzero"`
-	Waiting  *MCPApprovalStateWaiting `json:"waiting,omitzero"`
+	Approved *struct{} `json:"approved,omitzero"`
+
+	Waiting *MCPApprovalStateWaiting `json:"waiting,omitzero"`
 }
 
 type MCPApprovalStateWaiting struct {
 	Digest string `json:"digest"`
-	IsNew  bool   `json:"isNew"`
+
+	IsNew bool `json:"isNew"`
 }
 
 type MCPApproveRequest struct {
 	Destination SkillDestination `json:"destination"`
-	Name        string           `json:"name"`
-	Digest      string           `json:"digest"`
+
+	Name string `json:"name"`
+
+	Digest string `json:"digest"`
 }
 
 type MCPCatalogError struct {
-	Unreachable      *MCPCatalogErrorUnreachable      `json:"unreachable,omitzero"`
-	TimedOut         *MCPCatalogErrorTimedOut         `json:"timedOut,omitzero"`
-	NoPersonalHome   *struct{}                        `json:"noPersonalHome,omitzero"`
-	Unmanaged        *MCPCatalogErrorUnmanaged        `json:"unmanaged,omitzero"`
-	McpUnreadable    *MCPCatalogErrorMcpUnreadable    `json:"mcpUnreadable,omitzero"`
-	MissingSecret    *MCPCatalogErrorMissingSecret    `json:"missingSecret,omitzero"`
-	StaleDigest      *struct{}                        `json:"staleDigest,omitzero"`
+	Unreachable *MCPCatalogErrorUnreachable `json:"unreachable,omitzero"`
+
+	TimedOut *MCPCatalogErrorTimedOut `json:"timedOut,omitzero"`
+
+	NoPersonalHome *struct{} `json:"noPersonalHome,omitzero"`
+
+	Unmanaged *MCPCatalogErrorUnmanaged `json:"unmanaged,omitzero"`
+
+	McpUnreadable *MCPCatalogErrorMcpUnreadable `json:"mcpUnreadable,omitzero"`
+
+	MissingSecret *MCPCatalogErrorMissingSecret `json:"missingSecret,omitzero"`
+
+	StaleDigest *struct{} `json:"staleDigest,omitzero"`
+
 	SecretStillInUse *MCPCatalogErrorSecretStillInUse `json:"secretStillInUse,omitzero"`
-	PreviewExpired   *struct{}                        `json:"previewExpired,omitzero"`
-	NoRunnableWay    *struct{}                        `json:"noRunnableWay,omitzero"`
-	ReplaceMismatch  *struct{}                        `json:"replaceMismatch,omitzero"`
-	NotAProject      *MCPCatalogErrorNotAProject      `json:"notAProject,omitzero"`
-	NameTaken        *MCPCatalogErrorNameTaken        `json:"nameTaken,omitzero"`
-	Invalid          *MCPCatalogErrorInvalid          `json:"invalid,omitzero"`
-	Failed           *MCPCatalogErrorFailed           `json:"failed,omitzero"`
+
+	PreviewExpired *struct{} `json:"previewExpired,omitzero"`
+
+	NoRunnableWay *struct{} `json:"noRunnableWay,omitzero"`
+
+	ReplaceMismatch *struct{} `json:"replaceMismatch,omitzero"`
+
+	NotAProject *MCPCatalogErrorNotAProject `json:"notAProject,omitzero"`
+
+	NameTaken *MCPCatalogErrorNameTaken `json:"nameTaken,omitzero"`
+
+	Invalid *MCPCatalogErrorInvalid `json:"invalid,omitzero"`
+
+	Failed *MCPCatalogErrorFailed `json:"failed,omitzero"`
 }
 
 type MCPCatalogErrorUnreachable struct {
@@ -3093,38 +4009,50 @@ type MCPCatalogErrorFailed struct {
 }
 
 type MCPCatalogResult struct {
-	ID           string           `json:"id"`
-	Title        string           `json:"title"`
-	Description  string           `json:"description"`
-	Version      string           `json:"version"`
-	Publisher    MCPPublisherInfo `json:"publisher"`
-	Known        bool             `json:"known"`
-	Runs         []MCPRunKind     `json:"runs"`
-	RemoteHost   *string          `json:"remoteHost,omitzero"`
-	Marketplace  *string          `json:"marketplace,omitzero"`
-	Levels       *MCPLevels       `json:"levels,omitzero"`
-	MadeByAgents *bool            `json:"madeByAgents,omitzero"`
+	ID string `json:"id"`
+
+	Title string `json:"title"`
+
+	Description string `json:"description"`
+
+	Version string `json:"version"`
+
+	Publisher MCPPublisherInfo `json:"publisher"`
+
+	Known bool `json:"known"`
+
+	Runs []MCPRunKind `json:"runs"`
+
+	RemoteHost *string `json:"remoteHost,omitzero"`
+
+	Marketplace *string `json:"marketplace,omitzero"`
+
+	Levels *MCPLevels `json:"levels,omitzero"`
+
+	MadeByAgents *bool `json:"madeByAgents,omitzero"`
 }
 
 type MCPCheckState string
 
-const (
-	MCPCheckStateUnchecked     MCPCheckState = "unchecked"
-	MCPCheckStateChecking      MCPCheckState = "checking"
-	MCPCheckStateAnswered      MCPCheckState = "answered"
-	MCPCheckStateFailed        MCPCheckState = "failed"
-	MCPCheckStateWaiting       MCPCheckState = "waiting"
-	MCPCheckStateMissingSecret MCPCheckState = "missingSecret"
-	MCPCheckStateSignIn        MCPCheckState = "signIn"
-	MCPCheckStateOldTransport  MCPCheckState = "oldTransport"
-)
+const MCPCheckStateUnchecked MCPCheckState = "unchecked"
+const MCPCheckStateChecking MCPCheckState = "checking"
+const MCPCheckStateAnswered MCPCheckState = "answered"
+const MCPCheckStateFailed MCPCheckState = "failed"
+const MCPCheckStateWaiting MCPCheckState = "waiting"
+const MCPCheckStateMissingSecret MCPCheckState = "missingSecret"
+const MCPCheckStateSignIn MCPCheckState = "signIn"
+const MCPCheckStateOldTransport MCPCheckState = "oldTransport"
 
 type MCPDestinationState struct {
-	Free         *struct{}                        `json:"free,omitzero"`
-	ManagedSame  *struct{}                        `json:"managedSame,omitzero"`
+	Free *struct{} `json:"free,omitzero"`
+
+	ManagedSame *struct{} `json:"managedSame,omitzero"`
+
 	ManagedOther *MCPDestinationStateManagedOther `json:"managedOther,omitzero"`
-	Unmanaged    *MCPDestinationStateUnmanaged    `json:"unmanaged,omitzero"`
-	Unavailable  *MCPDestinationStateUnavailable  `json:"unavailable,omitzero"`
+
+	Unmanaged *MCPDestinationStateUnmanaged `json:"unmanaged,omitzero"`
+
+	Unavailable *MCPDestinationStateUnavailable `json:"unavailable,omitzero"`
 }
 
 type MCPDestinationStateManagedOther struct {
@@ -3140,32 +4068,41 @@ type MCPDestinationStateUnavailable struct {
 }
 
 type MCPEventTrigger struct {
-	Event     string               `json:"event"`
-	Servers   []string             `json:"servers,omitzero"`
+	Event string `json:"event"`
+
+	Servers []string `json:"servers,omitzero"`
+
 	Arguments map[string]JSONValue `json:"arguments"`
 }
 
 type MCPHandServer struct {
-	Name    string            `json:"name"`
-	Kind    MCPHandServerKind `json:"kind"`
-	Command string            `json:"command"`
-	Args    []string          `json:"args"`
-	Env     []MCPHandValue    `json:"env"`
-	URL     string            `json:"url"`
-	Headers []MCPHandValue    `json:"headers"`
+	Name string `json:"name"`
+
+	Kind MCPHandServerKind `json:"kind"`
+
+	Command string `json:"command"`
+
+	Args []string `json:"args"`
+
+	Env []MCPHandValue `json:"env"`
+
+	URL string `json:"url"`
+
+	Headers []MCPHandValue `json:"headers"`
 }
 
 type MCPHandServerKind string
 
-const (
-	MCPHandServerKindCommand MCPHandServerKind = "command"
-	MCPHandServerKindURL     MCPHandServerKind = "url"
-)
+const MCPHandServerKindCommand MCPHandServerKind = "command"
+const MCPHandServerKindURL MCPHandServerKind = "url"
 
 type MCPHandValue struct {
-	Name       string  `json:"name"`
-	Value      string  `json:"value"`
-	Secret     bool    `json:"secret"`
+	Name string `json:"name"`
+
+	Value string `json:"value"`
+
+	Secret bool `json:"secret"`
+
 	SecretName *string `json:"secretName,omitzero"`
 }
 
@@ -3175,28 +4112,37 @@ type MCPHealthCheckRequest struct {
 
 type MCPHealthFileProblem struct {
 	Project *string `json:"project,omitzero"`
-	Message string  `json:"message"`
+
+	Message string `json:"message"`
 }
 
 type MCPHealthSnapshot struct {
-	Servers  []MCPServerHealth      `json:"servers"`
+	Servers []MCPServerHealth `json:"servers"`
+
 	Problems []MCPHealthFileProblem `json:"problems"`
-	At       Date                   `json:"at"`
+
+	At Date `json:"at"`
 }
 
 // The five levels a connector reaches (#1428): tools, events and views from what the server declares, workflows when a ready-made workflow names one of its events, tested when it was tested on a real account.
 type MCPLevels struct {
-	Tools     bool `json:"tools"`
-	Events    bool `json:"events"`
-	Views     bool `json:"views"`
+	Tools bool `json:"tools"`
+
+	Events bool `json:"events"`
+
+	Views bool `json:"views"`
+
 	Workflows bool `json:"workflows"`
-	Tested    bool `json:"tested"`
+
+	Tested bool `json:"tested"`
 }
 
 type MCPListAnswer struct {
-	Servers          []ProjectMCPServer `json:"servers"`
-	Problem          *string            `json:"problem,omitzero"`
-	ApprovalsProblem *string            `json:"approvalsProblem,omitzero"`
+	Servers []ProjectMCPServer `json:"servers"`
+
+	Problem *string `json:"problem,omitzero"`
+
+	ApprovalsProblem *string `json:"approvalsProblem,omitzero"`
 }
 
 type MCPListRequest struct {
@@ -3204,30 +4150,45 @@ type MCPListRequest struct {
 }
 
 type MCPPreview struct {
-	PreviewID        UUID                 `json:"previewID"`
-	Result           MCPCatalogResult     `json:"result"`
-	NameHere         string               `json:"nameHere"`
-	ChosenRun        MCPRunKind           `json:"chosenRun"`
-	CommandOrURL     string               `json:"commandOrURL"`
-	Host             *string              `json:"host,omitzero"`
-	Entry            map[string]JSONValue `json:"entry"`
-	Variables        []MCPVariable        `json:"variables"`
-	Reach            map[string]JSONValue `json:"reach"`
-	DestinationState MCPDestinationState  `json:"destinationState"`
-	Problems         []MCPPreviewProblem  `json:"problems"`
+	PreviewID UUID `json:"previewID"`
+
+	Result MCPCatalogResult `json:"result"`
+
+	NameHere string `json:"nameHere"`
+
+	ChosenRun MCPRunKind `json:"chosenRun"`
+
+	CommandOrURL string `json:"commandOrURL"`
+
+	Host *string `json:"host,omitzero"`
+
+	Entry map[string]JSONValue `json:"entry"`
+
+	Variables []MCPVariable `json:"variables"`
+
+	Reach map[string]JSONValue `json:"reach"`
+
+	DestinationState MCPDestinationState `json:"destinationState"`
+
+	Problems []MCPPreviewProblem `json:"problems"`
 }
 
 type MCPPreviewAnswer struct {
-	Preview *MCPPreview      `json:"preview,omitzero"`
-	Error   *MCPCatalogError `json:"error,omitzero"`
+	Preview *MCPPreview `json:"preview,omitzero"`
+
+	Error *MCPCatalogError `json:"error,omitzero"`
 }
 
 type MCPPreviewProblem struct {
-	Unreachable        *MCPPreviewProblemUnreachable   `json:"unreachable,omitzero"`
-	NoRunnableWay      *struct{}                       `json:"noRunnableWay,omitzero"`
-	NameTakenUnmanaged *struct{}                       `json:"nameTakenUnmanaged,omitzero"`
-	McpUnreadable      *MCPPreviewProblemMcpUnreadable `json:"mcpUnreadable,omitzero"`
-	NoPersonalHome     *struct{}                       `json:"noPersonalHome,omitzero"`
+	Unreachable *MCPPreviewProblemUnreachable `json:"unreachable,omitzero"`
+
+	NoRunnableWay *struct{} `json:"noRunnableWay,omitzero"`
+
+	NameTakenUnmanaged *struct{} `json:"nameTakenUnmanaged,omitzero"`
+
+	McpUnreadable *MCPPreviewProblemMcpUnreadable `json:"mcpUnreadable,omitzero"`
+
+	NoPersonalHome *struct{} `json:"noPersonalHome,omitzero"`
 }
 
 type MCPPreviewProblemUnreachable struct {
@@ -3239,15 +4200,19 @@ type MCPPreviewProblemMcpUnreadable struct {
 }
 
 type MCPPreviewRequest struct {
-	Result      MCPCatalogResult `json:"result"`
+	Result MCPCatalogResult `json:"result"`
+
 	Destination SkillDestination `json:"destination"`
-	Run         *MCPRunKind      `json:"run,omitzero"`
+
+	Run *MCPRunKind `json:"run,omitzero"`
 }
 
 type MCPPublisherInfo struct {
-	Label     string `json:"label"`
+	Label string `json:"label"`
+
 	Namespace string `json:"namespace"`
-	Known     bool   `json:"known"`
+
+	Known bool `json:"known"`
 }
 
 type MCPRemoveAnswer struct {
@@ -3255,64 +4220,82 @@ type MCPRemoveAnswer struct {
 }
 
 type MCPRemoveRequest struct {
-	Destination  SkillDestination `json:"destination"`
-	Name         string           `json:"name"`
-	ForgetSecret *string          `json:"forgetSecret,omitzero"`
+	Destination SkillDestination `json:"destination"`
+
+	Name string `json:"name"`
+
+	ForgetSecret *string `json:"forgetSecret,omitzero"`
 }
 
 type MCPRunKind string
 
-const (
-	MCPRunKindRemote  MCPRunKind = "remote"
-	MCPRunKindNpx     MCPRunKind = "npx"
-	MCPRunKindUvx     MCPRunKind = "uvx"
-	MCPRunKindDocker  MCPRunKind = "docker"
-	MCPRunKindCommand MCPRunKind = "command"
-)
+const MCPRunKindRemote MCPRunKind = "remote"
+const MCPRunKindNpx MCPRunKind = "npx"
+const MCPRunKindUvx MCPRunKind = "uvx"
+const MCPRunKindDocker MCPRunKind = "docker"
+const MCPRunKindCommand MCPRunKind = "command"
 
 type MCPSearchAnswer struct {
 	Results []MCPCatalogResult `json:"results"`
-	Error   *MCPCatalogError   `json:"error,omitzero"`
+
+	Error *MCPCatalogError `json:"error,omitzero"`
 }
 
 type MCPServer struct {
-	Name      string             `json:"name"`
+	Name string `json:"name"`
+
 	Transport MCPServerTransport `json:"transport"`
 }
 
 type MCPServerHealth struct {
-	Name         string           `json:"name"`
-	Project      *string          `json:"project,omitzero"`
-	Transport    MCPTransportName `json:"transport"`
-	Hosted       bool             `json:"hosted"`
-	Live         *HostedMCPStatus `json:"live,omitzero"`
-	Check        MCPCheckState    `json:"check"`
-	CheckedAt    *Date            `json:"checkedAt,omitzero"`
-	LastError    *string          `json:"lastError,omitzero"`
-	Tools        *int64           `json:"tools,omitzero"`
-	Levels       *MCPLevels       `json:"levels,omitzero"`
-	MadeByAgents *bool            `json:"madeByAgents,omitzero"`
+	Name string `json:"name"`
+
+	Project *string `json:"project,omitzero"`
+
+	Transport MCPTransportName `json:"transport"`
+
+	Hosted bool `json:"hosted"`
+
+	Live *HostedMCPStatus `json:"live,omitzero"`
+
+	Check MCPCheckState `json:"check"`
+
+	CheckedAt *Date `json:"checkedAt,omitzero"`
+
+	LastError *string `json:"lastError,omitzero"`
+
+	Tools *int64 `json:"tools,omitzero"`
+
+	Levels *MCPLevels `json:"levels,omitzero"`
+
+	MadeByAgents *bool `json:"madeByAgents,omitzero"`
 }
 
 type MCPServerTransport struct {
 	Stdio *MCPServerTransportStdio `json:"stdio,omitzero"`
-	Http  *MCPServerTransportHttp  `json:"http,omitzero"`
-	Sse   *MCPServerTransportSse   `json:"sse,omitzero"`
+
+	Http *MCPServerTransportHttp `json:"http,omitzero"`
+
+	Sse *MCPServerTransportSse `json:"sse,omitzero"`
 }
 
 type MCPServerTransportStdio struct {
-	Command string            `json:"command"`
-	Args    []string          `json:"args"`
-	Env     map[string]string `json:"env"`
+	Command string `json:"command"`
+
+	Args []string `json:"args"`
+
+	Env map[string]string `json:"env"`
 }
 
 type MCPServerTransportHttp struct {
-	URL     string            `json:"url"`
+	URL string `json:"url"`
+
 	Headers map[string]string `json:"headers"`
 }
 
 type MCPServerTransportSse struct {
-	URL     string            `json:"url"`
+	URL string `json:"url"`
+
 	Headers map[string]string `json:"headers"`
 }
 
@@ -3321,20 +4304,26 @@ type MCPSetSecretAnswer struct {
 }
 
 type MCPSetSecretRequest struct {
-	Name  string `json:"name"`
+	Name string `json:"name"`
+
 	Value string `json:"value"`
 }
 
 type MCPSignInAnswer struct {
-	FlowID           *UUID   `json:"flowID,omitzero"`
+	FlowID *UUID `json:"flowID,omitzero"`
+
 	AuthorizationURL *string `json:"authorizationURL,omitzero"`
-	NeedsClient      *string `json:"needsClient,omitzero"`
-	Callback         *string `json:"callback,omitzero"`
-	Error            *string `json:"error,omitzero"`
+
+	NeedsClient *string `json:"needsClient,omitzero"`
+
+	Callback *string `json:"callback,omitzero"`
+
+	Error *string `json:"error,omitzero"`
 }
 
 type MCPSignInClient struct {
-	ID     string  `json:"id"`
+	ID string `json:"id"`
+
 	Secret *string `json:"secret,omitzero"`
 }
 
@@ -3343,22 +4332,24 @@ type MCPSignInFlowRequest struct {
 }
 
 type MCPSignInRequest struct {
-	Target MCPSignInTarget  `json:"target"`
+	Target MCPSignInTarget `json:"target"`
+
 	Client *MCPSignInClient `json:"client,omitzero"`
 }
 
 type MCPSignInState string
 
-const (
-	MCPSignInStateSignedIn    MCPSignInState = "signedIn"
-	MCPSignInStateNeedsSignIn MCPSignInState = "needsSignIn"
-)
+const MCPSignInStateSignedIn MCPSignInState = "signedIn"
+const MCPSignInStateNeedsSignIn MCPSignInState = "needsSignIn"
 
 type MCPSignInStatus struct {
-	Waiting   *struct{}              `json:"waiting,omitzero"`
-	SignedIn  *struct{}              `json:"signedIn,omitzero"`
-	Failed    *MCPSignInStatusFailed `json:"failed,omitzero"`
-	Cancelled *struct{}              `json:"cancelled,omitzero"`
+	Waiting *struct{} `json:"waiting,omitzero"`
+
+	SignedIn *struct{} `json:"signedIn,omitzero"`
+
+	Failed *MCPSignInStatusFailed `json:"failed,omitzero"`
+
+	Cancelled *struct{} `json:"cancelled,omitzero"`
 }
 
 type MCPSignInStatusFailed struct {
@@ -3367,17 +4358,20 @@ type MCPSignInStatusFailed struct {
 
 type MCPSignInTarget struct {
 	Entry *MCPSignInTargetEntry `json:"entry,omitzero"`
-	URL   *MCPSignInTargetURL   `json:"url,omitzero"`
+
+	URL *MCPSignInTargetURL `json:"url,omitzero"`
 }
 
 type MCPSignInTargetEntry struct {
 	Destination SkillDestination `json:"destination"`
-	Name        string           `json:"name"`
+
+	Name string `json:"name"`
 }
 
 type MCPSignInTargetURL struct {
 	Name string `json:"name"`
-	URL  string `json:"url"`
+
+	URL string `json:"url"`
 }
 
 type MCPSignInWaitAnswer struct {
@@ -3394,89 +4388,102 @@ type MCPSignOutRequest struct {
 
 type MCPTransportName string
 
-const (
-	MCPTransportNameStdio MCPTransportName = "stdio"
-	MCPTransportNameHttp  MCPTransportName = "http"
-	MCPTransportNameSse   MCPTransportName = "sse"
-)
+const MCPTransportNameStdio MCPTransportName = "stdio"
+const MCPTransportNameHttp MCPTransportName = "http"
+const MCPTransportNameSse MCPTransportName = "sse"
 
 type MCPTriggerFailure struct {
-	Code    MCPTriggerFailureCode `json:"code"`
-	Message string                `json:"message"`
-	Since   Date                  `json:"since"`
+	Code MCPTriggerFailureCode `json:"code"`
+
+	Message string `json:"message"`
+
+	Since Date `json:"since"`
 }
 
 type MCPTriggerFailureCode string
 
-const (
-	MCPTriggerFailureCodeServerNotFound     MCPTriggerFailureCode = "serverNotFound"
-	MCPTriggerFailureCodeBadEventName       MCPTriggerFailureCode = "badEventName"
-	MCPTriggerFailureCodeWaitingForApproval MCPTriggerFailureCode = "waitingForApproval"
-	MCPTriggerFailureCodeSecretMissing      MCPTriggerFailureCode = "secretMissing"
-	MCPTriggerFailureCodeNeedsSignIn        MCPTriggerFailureCode = "needsSignIn"
-	MCPTriggerFailureCodeUnreachable        MCPTriggerFailureCode = "unreachable"
-	MCPTriggerFailureCodeNoEvents           MCPTriggerFailureCode = "noEvents"
-	MCPTriggerFailureCodeEventNotOffered    MCPTriggerFailureCode = "eventNotOffered"
-	MCPTriggerFailureCodeNoPollMode         MCPTriggerFailureCode = "noPollMode"
-	MCPTriggerFailureCodeBadArguments       MCPTriggerFailureCode = "badArguments"
-	MCPTriggerFailureCodeRefused            MCPTriggerFailureCode = "refused"
-	MCPTriggerFailureCodeServerError        MCPTriggerFailureCode = "serverError"
-)
+const MCPTriggerFailureCodeServerNotFound MCPTriggerFailureCode = "serverNotFound"
+const MCPTriggerFailureCodeBadEventName MCPTriggerFailureCode = "badEventName"
+const MCPTriggerFailureCodeWaitingForApproval MCPTriggerFailureCode = "waitingForApproval"
+const MCPTriggerFailureCodeSecretMissing MCPTriggerFailureCode = "secretMissing"
+const MCPTriggerFailureCodeNeedsSignIn MCPTriggerFailureCode = "needsSignIn"
+const MCPTriggerFailureCodeUnreachable MCPTriggerFailureCode = "unreachable"
+const MCPTriggerFailureCodeNoEvents MCPTriggerFailureCode = "noEvents"
+const MCPTriggerFailureCodeEventNotOffered MCPTriggerFailureCode = "eventNotOffered"
+const MCPTriggerFailureCodeNoPollMode MCPTriggerFailureCode = "noPollMode"
+const MCPTriggerFailureCodeBadArguments MCPTriggerFailureCode = "badArguments"
+const MCPTriggerFailureCodeRefused MCPTriggerFailureCode = "refused"
+const MCPTriggerFailureCodeServerError MCPTriggerFailureCode = "serverError"
 
 type MCPTriggerStatus struct {
-	Name         string                `json:"name"`
-	Server       *string               `json:"server,omitzero"`
-	State        MCPTriggerStatusState `json:"state"`
-	LastPolledAt *Date                 `json:"lastPolledAt,omitzero"`
-	LastEventAt  *Date                 `json:"lastEventAt,omitzero"`
-	MissedSince  *Date                 `json:"missedSince,omitzero"`
-	Failure      *MCPTriggerFailure    `json:"failure,omitzero"`
-	RetryAt      *Date                 `json:"retryAt,omitzero"`
+	Name string `json:"name"`
+
+	Server *string `json:"server,omitzero"`
+
+	State MCPTriggerStatusState `json:"state"`
+
+	LastPolledAt *Date `json:"lastPolledAt,omitzero"`
+
+	LastEventAt *Date `json:"lastEventAt,omitzero"`
+
+	MissedSince *Date `json:"missedSince,omitzero"`
+
+	Failure *MCPTriggerFailure `json:"failure,omitzero"`
+
+	RetryAt *Date `json:"retryAt,omitzero"`
 }
 
 type MCPTriggerStatusState string
 
-const (
-	MCPTriggerStatusStatePending     MCPTriggerStatusState = "pending"
-	MCPTriggerStatusStateActive      MCPTriggerStatusState = "active"
-	MCPTriggerStatusStateRetrying    MCPTriggerStatusState = "retrying"
-	MCPTriggerStatusStateStopped     MCPTriggerStatusState = "stopped"
-	MCPTriggerStatusStateNotThisHost MCPTriggerStatusState = "notThisHost"
-)
+const MCPTriggerStatusStatePending MCPTriggerStatusState = "pending"
+const MCPTriggerStatusStateActive MCPTriggerStatusState = "active"
+const MCPTriggerStatusStateRetrying MCPTriggerStatusState = "retrying"
+const MCPTriggerStatusStateStopped MCPTriggerStatusState = "stopped"
+const MCPTriggerStatusStateNotThisHost MCPTriggerStatusState = "notThisHost"
 
 type MCPVariable struct {
-	Name        string          `json:"name"`
-	Description string          `json:"description"`
-	Kind        MCPVariableKind `json:"kind"`
-	Required    bool            `json:"required"`
-	AlreadySet  bool            `json:"alreadySet"`
-	Placeholder *string         `json:"placeholder,omitzero"`
+	Name string `json:"name"`
+
+	Description string `json:"description"`
+
+	Kind MCPVariableKind `json:"kind"`
+
+	Required bool `json:"required"`
+
+	AlreadySet bool `json:"alreadySet"`
+
+	Placeholder *string `json:"placeholder,omitzero"`
 }
 
 type MCPVariableKind string
 
-const (
-	MCPVariableKindSecret MCPVariableKind = "secret"
-	MCPVariableKindPlain  MCPVariableKind = "plain"
-)
+const MCPVariableKindSecret MCPVariableKind = "secret"
+const MCPVariableKindPlain MCPVariableKind = "plain"
 
 type MCPVerifyAnswer struct {
-	VerifyID *UUID                `json:"verifyID,omitzero"`
-	Outcome  *MCPVerifyOutcome    `json:"outcome,omitzero"`
-	Entry    map[string]JSONValue `json:"entry,omitzero"`
-	Error    *MCPCatalogError     `json:"error,omitzero"`
+	VerifyID *UUID `json:"verifyID,omitzero"`
+
+	Outcome *MCPVerifyOutcome `json:"outcome,omitzero"`
+
+	Entry map[string]JSONValue `json:"entry,omitzero"`
+
+	Error *MCPCatalogError `json:"error,omitzero"`
 }
 
 type MCPVerifyOutcome struct {
-	Answered     *MCPVerifyOutcomeAnswered     `json:"answered,omitzero"`
+	Answered *MCPVerifyOutcomeAnswered `json:"answered,omitzero"`
+
 	AuthRequired *MCPVerifyOutcomeAuthRequired `json:"authRequired,omitzero"`
-	Failed       *MCPVerifyOutcomeFailed       `json:"failed,omitzero"`
+
+	Failed *MCPVerifyOutcomeFailed `json:"failed,omitzero"`
 }
 
 type MCPVerifyOutcomeAnswered struct {
-	ServerName *string  `json:"serverName,omitzero"`
-	Version    *string  `json:"version,omitzero"`
-	Tools      []string `json:"tools"`
+	ServerName *string `json:"serverName,omitzero"`
+
+	Version *string `json:"version,omitzero"`
+
+	Tools []string `json:"tools"`
 }
 
 type MCPVerifyOutcomeAuthRequired struct {
@@ -3489,18 +4496,21 @@ type MCPVerifyOutcomeFailed struct {
 
 type MCPVerifyRequest struct {
 	Destination SkillDestination `json:"destination"`
-	Server      MCPHandServer    `json:"server"`
+
+	Server MCPHandServer `json:"server"`
 }
 
 type MCPViewsForgetRequest struct {
 	Destination SkillDestination `json:"destination"`
-	Name        string           `json:"name"`
+
+	Name string `json:"name"`
 }
 
 // mac/reveal, mac/open: a path on the host; app names the app to open it with.
 type MacPathRequest struct {
-	Path string  `json:"path"`
-	App  *string `json:"app,omitzero"`
+	Path string `json:"path"`
+
+	App *string `json:"app,omitzero"`
 }
 
 // mac/terminal: Terminal, in path if given.
@@ -3509,26 +4519,41 @@ type MacTerminalRequest struct {
 }
 
 type ManagedMCPServer struct {
-	Name         string           `json:"name"`
-	RegistryName string           `json:"registryName"`
-	Version      string           `json:"version"`
-	Run          MCPRunKind       `json:"run"`
-	AddedAt      Date             `json:"addedAt"`
-	Destination  SkillDestination `json:"destination"`
-	ByHand       *bool            `json:"byHand,omitzero"`
+	Name string `json:"name"`
+
+	RegistryName string `json:"registryName"`
+
+	Version string `json:"version"`
+
+	Run MCPRunKind `json:"run"`
+
+	AddedAt Date `json:"addedAt"`
+
+	Destination SkillDestination `json:"destination"`
+
+	ByHand *bool `json:"byHand,omitzero"`
 }
 
 type ManagedSkill struct {
-	Destination  SkillDestination `json:"destination"`
-	Name         string           `json:"name"`
-	Source       string           `json:"source"`
-	SkillPath    *string          `json:"skillPath,omitzero"`
-	RecordedHash *string          `json:"recordedHash,omitzero"`
-	Commit       *string          `json:"commit,omitzero"`
-	CommittedAt  *Date            `json:"committedAt,omitzero"`
-	Catalogue    *string          `json:"catalogue,omitzero"`
-	Edited       bool             `json:"edited"`
-	Update       UpdateState      `json:"update"`
+	Destination SkillDestination `json:"destination"`
+
+	Name string `json:"name"`
+
+	Source string `json:"source"`
+
+	SkillPath *string `json:"skillPath,omitzero"`
+
+	RecordedHash *string `json:"recordedHash,omitzero"`
+
+	Commit *string `json:"commit,omitzero"`
+
+	CommittedAt *Date `json:"committedAt,omitzero"`
+
+	Catalogue *string `json:"catalogue,omitzero"`
+
+	Edited bool `json:"edited"`
+
+	Update UpdateState `json:"update"`
 }
 
 type MarkRuntimeAvailable struct {
@@ -3536,32 +4561,42 @@ type MarkRuntimeAvailable struct {
 }
 
 type Marketplace struct {
-	ID           string            `json:"id"`
-	Name         string            `json:"name"`
-	Format       MarketplaceFormat `json:"format"`
-	URL          string            `json:"url"`
-	Token        *string           `json:"token,omitzero"`
-	TokenMissing bool              `json:"tokenMissing"`
-	Origin       MarketplaceOrigin `json:"origin"`
-	Enabled      bool              `json:"enabled"`
-	About        *string           `json:"about,omitzero"`
+	ID string `json:"id"`
+
+	Name string `json:"name"`
+
+	Format MarketplaceFormat `json:"format"`
+
+	URL string `json:"url"`
+
+	Token *string `json:"token,omitzero"`
+
+	TokenMissing bool `json:"tokenMissing"`
+
+	Origin MarketplaceOrigin `json:"origin"`
+
+	Enabled bool `json:"enabled"`
+
+	About *string `json:"about,omitzero"`
 }
 
 type MarketplaceAddRequest struct {
-	Name       string            `json:"name"`
-	Format     MarketplaceFormat `json:"format"`
-	URL        string            `json:"url"`
-	Token      *string           `json:"token,omitzero"`
-	TokenValue *string           `json:"tokenValue,omitzero"`
+	Name string `json:"name"`
+
+	Format MarketplaceFormat `json:"format"`
+
+	URL string `json:"url"`
+
+	Token *string `json:"token,omitzero"`
+
+	TokenValue *string `json:"tokenValue,omitzero"`
 }
 
 type MarketplaceFormat string
 
-const (
-	MarketplaceFormatMCPRegistry  MarketplaceFormat = "mcp-registry"
-	MarketplaceFormatSkillsSh     MarketplaceFormat = "skills.sh"
-	MarketplaceFormatGithubSkills MarketplaceFormat = "github-skills"
-)
+const MarketplaceFormatMCPRegistry MarketplaceFormat = "mcp-registry"
+const MarketplaceFormatSkillsSh MarketplaceFormat = "skills.sh"
+const MarketplaceFormatGithubSkills MarketplaceFormat = "github-skills"
 
 type MarketplaceIDRequest struct {
 	ID string `json:"id"`
@@ -3569,30 +4604,32 @@ type MarketplaceIDRequest struct {
 
 type MarketplaceOrigin string
 
-const (
-	MarketplaceOriginProvided MarketplaceOrigin = "provided"
-	MarketplaceOriginPersonal MarketplaceOrigin = "personal"
-	MarketplaceOriginProject  MarketplaceOrigin = "project"
-)
+const MarketplaceOriginProvided MarketplaceOrigin = "provided"
+const MarketplaceOriginPersonal MarketplaceOrigin = "personal"
+const MarketplaceOriginProject MarketplaceOrigin = "project"
 
 type MarketplaceSetEnabledRequest struct {
-	ID      string `json:"id"`
-	Enabled bool   `json:"enabled"`
+	ID string `json:"id"`
+
+	Enabled bool `json:"enabled"`
 }
 
 type MarketplacesListAnswer struct {
 	Marketplaces []Marketplace `json:"marketplaces"`
-	Problem      *string       `json:"problem,omitzero"`
+
+	Problem *string `json:"problem,omitzero"`
 }
 
 type MarketplacesListRequest struct {
-	Kind        *CatalogKind      `json:"kind,omitzero"`
+	Kind *CatalogKind `json:"kind,omitzero"`
+
 	Destination *SkillDestination `json:"destination,omitzero"`
 }
 
 type MessageSender struct {
-	AgentID UUID   `json:"agentID"`
-	Title   string `json:"title"`
+	AgentID UUID `json:"agentID"`
+
+	Title string `json:"title"`
 }
 
 type Milestones struct {
@@ -3605,15 +4642,15 @@ type MissingFolder struct {
 
 type MoveAsker string
 
-const (
-	MoveAskerAgent  MoveAsker = "agent"
-	MoveAskerPerson MoveAsker = "person"
-)
+const MoveAskerAgent MoveAsker = "agent"
+const MoveAskerPerson MoveAsker = "person"
 
 type MoveTarget struct {
-	NewWorktree   *MoveTargetNewWorktree `json:"newWorktree,omitzero"`
-	Existing      *MoveTargetExisting    `json:"existing,omitzero"`
-	ProjectFolder *struct{}              `json:"projectFolder,omitzero"`
+	NewWorktree *MoveTargetNewWorktree `json:"newWorktree,omitzero"`
+
+	Existing *MoveTargetExisting `json:"existing,omitzero"`
+
+	ProjectFolder *struct{} `json:"projectFolder,omitzero"`
 }
 
 type MoveTargetNewWorktree struct {
@@ -3625,77 +4662,97 @@ type MoveTargetExisting struct {
 }
 
 type Need struct {
-	ID       NeedID   `json:"id"`
-	AgentID  *UUID    `json:"agentID,omitzero"`
-	Folder   URL      `json:"folder"`
-	Kind     NeedKind `json:"kind"`
-	RaisedAt Date     `json:"raisedAt"`
+	ID NeedID `json:"id"`
+
+	AgentID *UUID `json:"agentID,omitzero"`
+
+	Folder URL `json:"folder"`
+
+	Kind NeedKind `json:"kind"`
+
+	RaisedAt Date `json:"raisedAt"`
+
 	Headline Headline `json:"headline"`
 }
 
 // NeedID (Attention/Need.swift): what is being answered, one key per kind.
 type NeedID struct {
-	Permission    *UUID                `json:"permission,omitzero"`
-	Elicitation   *UUID                `json:"elicitation,omitzero"`
-	Report        *NeedIDReport        `json:"report,omitzero"`
+	Permission *UUID `json:"permission,omitzero"`
+
+	Elicitation *UUID `json:"elicitation,omitzero"`
+
+	Report *NeedIDReport `json:"report,omitzero"`
+
 	GuardedChange *NeedIDGuardedChange `json:"guardedChange,omitzero"`
 }
 
 type NeedIDReport struct {
 	AgentID UUID `json:"agentID"`
-	At      Date `json:"at"`
+
+	At Date `json:"at"`
 }
 
 type NeedIDGuardedChange struct {
-	Folder URL    `json:"folder"`
-	Path   string `json:"path"`
+	Folder URL `json:"folder"`
+
+	Path string `json:"path"`
 }
 
 type NeedKind string
 
-const (
-	NeedKindPermission    NeedKind = "permission"
-	NeedKindElicitation   NeedKind = "elicitation"
-	NeedKindReport        NeedKind = "report"
-	NeedKindGuardedChange NeedKind = "guardedChange"
-)
+const NeedKindPermission NeedKind = "permission"
+const NeedKindElicitation NeedKind = "elicitation"
+const NeedKindReport NeedKind = "report"
+const NeedKindGuardedChange NeedKind = "guardedChange"
 
 type OptionsRequest struct {
-	RuntimeID  string      `json:"runtimeID"`
-	Cwd        URL         `json:"cwd"`
+	RuntimeID string `json:"runtimeID"`
+
+	Cwd URL `json:"cwd"`
+
 	McpServers []MCPServer `json:"mcpServers"`
 }
 
 type OptionsResponse struct {
-	DraftID  UUID           `json:"draftID"`
-	Options  []ConfigOption `json:"options"`
+	DraftID UUID `json:"draftID"`
+
+	Options []ConfigOption `json:"options"`
+
 	Commands []SlashCommand `json:"commands"`
 }
 
 type PagesChangedNotification struct {
-	Folder  URL      `json:"folder"`
+	Folder URL `json:"folder"`
+
 	Folders []string `json:"folders"`
 }
 
 // devices/startPairing: the Mac's relay key, a one-time secret and this Mac's name, good for five minutes or one device.
 type PairingCode struct {
-	MacKey  Data   `json:"macKey"`
-	Secret  Data   `json:"secret"`
-	Name    string `json:"name"`
-	Expires Date   `json:"expires"`
+	MacKey Data `json:"macKey"`
+
+	Secret Data `json:"secret"`
+
+	Name string `json:"name"`
+
+	Expires Date `json:"expires"`
 }
 
 // pairing/current: the secret the bridge's listener should take, if any.
 type PairingSecret struct {
-	Secret  Data  `json:"secret,omitzero"`
+	Secret Data `json:"secret,omitzero"`
+
 	Expires *Date `json:"expires,omitzero"`
 }
 
 type Payment struct {
-	Allowance  *PaymentAllowance  `json:"allowance,omitzero"`
-	FreeTier   *PaymentFreeTier   `json:"freeTier,omitzero"`
+	Allowance *PaymentAllowance `json:"allowance,omitzero"`
+
+	FreeTier *PaymentFreeTier `json:"freeTier,omitzero"`
+
 	FreeCredit *PaymentFreeCredit `json:"freeCredit,omitzero"`
-	Prepaid    *PaymentPrepaid    `json:"prepaid,omitzero"`
+
+	Prepaid *PaymentPrepaid `json:"prepaid,omitzero"`
 }
 
 type PaymentAllowance struct {
@@ -3707,107 +4764,134 @@ type PaymentFreeTier struct {
 }
 
 type PaymentFreeCredit struct {
-	Amount  *Cost `json:"amount,omitzero"`
+	Amount *Cost `json:"amount,omitzero"`
+
 	Expires *Date `json:"expires,omitzero"`
 }
 
 type PaymentPrepaid struct {
-	Amount  *Cost `json:"amount,omitzero"`
+	Amount *Cost `json:"amount,omitzero"`
+
 	Expires *Date `json:"expires,omitzero"`
 }
 
 type PendingMove struct {
-	Target         MoveTarget `json:"target"`
-	RemoveLeft     bool       `json:"removeLeft"`
-	DiscardChanges bool       `json:"discardChanges"`
-	AskedBy        MoveAsker  `json:"askedBy"`
-	AskedAt        Date       `json:"askedAt"`
+	Target MoveTarget `json:"target"`
+
+	RemoveLeft bool `json:"removeLeft"`
+
+	DiscardChanges bool `json:"discardChanges"`
+
+	AskedBy MoveAsker `json:"askedBy"`
+
+	AskedAt Date `json:"askedAt"`
 }
 
 // control/peopleChanged (#994): a person was added, changed or removed.
 type PeopleChanged struct {
-	User    *string `json:"user,omitzero"`
-	Removed *bool   `json:"removed,omitzero"`
+	User *string `json:"user,omitzero"`
+
+	Removed *bool `json:"removed,omitzero"`
 }
 
 // people/list (#994): every user for an admin; for a member, only themselves.
 type PeopleList struct {
 	People []PersonRow `json:"people"`
-	Admin  bool        `json:"admin"`
+
+	Admin bool `json:"admin"`
 }
 
 type PermissionNotification struct {
-	AgentID   UUID               `json:"agentID"`
-	Request   *PermissionRequest `json:"request,omitzero"`
-	RequestID *UUID              `json:"requestID,omitzero"`
+	AgentID UUID `json:"agentID"`
+
+	Request *PermissionRequest `json:"request,omitzero"`
+
+	RequestID *UUID `json:"requestID,omitzero"`
 }
 
 type PermissionOption struct {
-	OptionID string               `json:"optionID"`
-	Name     string               `json:"name"`
-	Kind     PermissionOptionKind `json:"kind"`
+	OptionID string `json:"optionID"`
+
+	Name string `json:"name"`
+
+	Kind PermissionOptionKind `json:"kind"`
 }
 
 type PermissionOptionKind string
 
-const (
-	PermissionOptionKindAllowOnce    PermissionOptionKind = "allow_once"
-	PermissionOptionKindAllowAlways  PermissionOptionKind = "allow_always"
-	PermissionOptionKindRejectOnce   PermissionOptionKind = "reject_once"
-	PermissionOptionKindRejectAlways PermissionOptionKind = "reject_always"
-	PermissionOptionKindUnknown      PermissionOptionKind = "unknown"
-)
+const PermissionOptionKindAllowOnce PermissionOptionKind = "allow_once"
+const PermissionOptionKindAllowAlways PermissionOptionKind = "allow_always"
+const PermissionOptionKindRejectOnce PermissionOptionKind = "reject_once"
+const PermissionOptionKindRejectAlways PermissionOptionKind = "reject_always"
+const PermissionOptionKindUnknown PermissionOptionKind = "unknown"
 
 type PermissionRequest struct {
-	ID       UUID               `json:"id"`
-	AgentID  UUID               `json:"agentID"`
-	ToolCall ToolCall           `json:"toolCall"`
-	Options  []PermissionOption `json:"options"`
-	AskedAt  Date               `json:"askedAt"`
-	Subagent *string            `json:"subagent,omitzero"`
+	ID UUID `json:"id"`
+
+	AgentID UUID `json:"agentID"`
+
+	ToolCall ToolCall `json:"toolCall"`
+
+	Options []PermissionOption `json:"options"`
+
+	AskedAt Date `json:"askedAt"`
+
+	Subagent *string `json:"subagent,omitzero"`
 }
 
 type PersonClient struct {
-	ID   UUID       `json:"id"`
-	Name string     `json:"name"`
+	ID UUID `json:"id"`
+
+	Name string `json:"name"`
+
 	Kind ClientKind `json:"kind"`
 }
 
 type PersonEndRequest struct {
-	Name    string  `json:"name"`
+	Name string `json:"name"`
+
 	AgentID *string `json:"agentID,omitzero"`
 }
 
 // people/invite (#994): the new person's name and role.
 type PersonInvite struct {
-	Name string   `json:"name"`
+	Name string `json:"name"`
+
 	Role UserRole `json:"role"`
 }
 
 // people/invite: the invite code to send, for one use within 7 days. Its first client pairs as the new person.
 type PersonInvited struct {
-	Text    string   `json:"text"`
-	Expires Date     `json:"expires"`
-	Name    string   `json:"name"`
-	Role    UserRole `json:"role"`
+	Text string `json:"text"`
+
+	Expires Date `json:"expires"`
+
+	Name string `json:"name"`
+
+	Role UserRole `json:"role"`
 }
 
 // A machine in People: its name, its state and nothing inside it (FR-019).
 type PersonMachine struct {
-	ID       HostID  `json:"id"`
-	Name     string  `json:"name"`
-	State    string  `json:"state"`
+	ID HostID `json:"id"`
+
+	Name string `json:"name"`
+
+	State string `json:"state"`
+
 	Platform *string `json:"platform,omitzero"`
 }
 
 // people/removePreview (FR-029, #1763): what Remove would take, for the admin to confirm. Started machines are stopped and deleted through their providers, each with the work on it that is not pushed; registered machines leave the control plane.
 type PersonRemovePreview struct {
-	StartedMachines    []StartedMachinePreview `json:"startedMachines"`
-	RegisteredMachines []PersonMachine         `json:"registeredMachines"`
+	StartedMachines []StartedMachinePreview `json:"startedMachines"`
+
+	RegisteredMachines []PersonMachine `json:"registeredMachines"`
 }
 
 type PersonRemoveRequest struct {
-	Name    string `json:"name"`
+	Name string `json:"name"`
+
 	AgentID string `json:"agentID"`
 }
 
@@ -3818,115 +4902,147 @@ type PersonRequest struct {
 
 // people/setRole (#994). Refused when it would leave no admin.
 type PersonRoleRequest struct {
-	User string   `json:"user"`
+	User string `json:"user"`
+
 	Role UserRole `json:"role"`
 }
 
 // people/list (#994): a user, with their clients and machines.
 type PersonRow struct {
-	ID         string          `json:"id"`
-	Name       string          `json:"name"`
-	Kind       string          `json:"kind"`
-	Role       UserRole        `json:"role"`
-	LocalOwner *bool           `json:"localOwner,omitzero"`
-	You        *bool           `json:"you,omitzero"`
-	SignIns    []SignIn        `json:"signIns"`
-	Clients    []PersonClient  `json:"clients"`
-	Machines   []PersonMachine `json:"machines"`
+	ID string `json:"id"`
+
+	Name string `json:"name"`
+
+	Kind string `json:"kind"`
+
+	Role UserRole `json:"role"`
+
+	LocalOwner *bool `json:"localOwner,omitzero"`
+
+	You *bool `json:"you,omitzero"`
+
+	SignIns []SignIn `json:"signIns"`
+
+	Clients []PersonClient `json:"clients"`
+
+	Machines []PersonMachine `json:"machines"`
+
 	// A bot's group (#1761).
 	Group *string `json:"group,omitzero"`
+
 	// A bot's caps (#1761).
 	Caps *SpendCaps `json:"caps,omitzero"`
+
 	// A bot's spend today, UTC, as its machines reported it (#1761).
 	SpentTodayUSD *float64 `json:"spentTodayUSD,omitzero"`
 }
 
 // What agents call the person, and their pronouns (#121), as given: person.json in the person's settings.
 type PersonSettings struct {
-	Name     *string `json:"name,omitzero"`
+	Name *string `json:"name,omitzero"`
+
 	Pronouns *string `json:"pronouns,omitzero"`
 }
 
 type Persona struct {
-	ID          string           `json:"id"`
-	Name        string           `json:"name"`
-	Description *string          `json:"description,omitzero"`
-	Origin      PersonaOrigin    `json:"origin"`
-	Settings    WorkflowSettings `json:"settings"`
-	Problem     *string          `json:"problem,omitzero"`
+	ID string `json:"id"`
+
+	Name string `json:"name"`
+
+	Description *string `json:"description,omitzero"`
+
+	Origin PersonaOrigin `json:"origin"`
+
+	Settings WorkflowSettings `json:"settings"`
+
+	Problem *string `json:"problem,omitzero"`
 }
 
 type PersonaOrigin string
 
-const (
-	PersonaOriginProject  PersonaOrigin = "project"
-	PersonaOriginPersonal PersonaOrigin = "personal"
-)
+const PersonaOriginProject PersonaOrigin = "project"
+const PersonaOriginPersonal PersonaOrigin = "personal"
 
 type PersonasListRequest struct {
 	Folder URL `json:"folder"`
 }
 
 type PinArrangeRequest struct {
-	Folder URL      `json:"folder"`
-	Paths  []string `json:"paths"`
+	Folder URL `json:"folder"`
+
+	Paths []string `json:"paths"`
 }
 
 type PinArrangeSessionsRequest struct {
-	Folder   URL    `json:"folder"`
+	Folder URL `json:"folder"`
+
 	AgentIDs []UUID `json:"agentIDs"`
 }
 
 type PinArrangeWorkflowsRequest struct {
-	Folder      URL      `json:"folder"`
+	Folder URL `json:"folder"`
+
 	WorkflowIDs []string `json:"workflowIDs"`
 }
 
 type PinKind string
 
-const (
-	PinKindMarkdown PinKind = "markdown"
-	PinKindHTML     PinKind = "html"
-	PinKindView     PinKind = "view"
-)
+const PinKindMarkdown PinKind = "markdown"
+const PinKindHTML PinKind = "html"
+const PinKindView PinKind = "view"
 
 type PinPathRequest struct {
-	Folder URL    `json:"folder"`
-	Path   string `json:"path"`
+	Folder URL `json:"folder"`
+
+	Path string `json:"path"`
 }
 
 type PinReadRequest struct {
-	Folder     URL        `json:"folder"`
-	Path       string     `json:"path"`
+	Folder URL `json:"folder"`
+
+	Path string `json:"path"`
+
 	KnownStamp *FileStamp `json:"knownStamp,omitzero"`
 }
 
 type PinRequest struct {
-	Folder URL      `json:"folder"`
-	Path   string   `json:"path"`
-	Title  *string  `json:"title,omitzero"`
-	View   *ViewPin `json:"view,omitzero"`
+	Folder URL `json:"folder"`
+
+	Path string `json:"path"`
+
+	Title *string `json:"title,omitzero"`
+
+	View *ViewPin `json:"view,omitzero"`
 }
 
 type PinSessionRequest struct {
-	Folder  URL  `json:"folder"`
+	Folder URL `json:"folder"`
+
 	AgentID UUID `json:"agentID"`
 }
 
 type PinView struct {
-	Path          string     `json:"path"`
-	Title         string     `json:"title"`
-	Kind          PinKind    `json:"kind"`
-	Missing       bool       `json:"missing"`
-	PinnedBy      PinnerView `json:"pinnedBy"`
-	View          *ViewPin   `json:"view,omitzero"`
-	MissingReason *string    `json:"missingReason,omitzero"`
+	Path string `json:"path"`
+
+	Title string `json:"title"`
+
+	Kind PinKind `json:"kind"`
+
+	Missing bool `json:"missing"`
+
+	PinnedBy PinnerView `json:"pinnedBy"`
+
+	View *ViewPin `json:"view,omitzero"`
+
+	MissingReason *string `json:"missingReason,omitzero"`
 }
 
 type PinWriteRequest struct {
-	Folder URL    `json:"folder"`
-	Path   string `json:"path"`
-	Text   string `json:"text"`
+	Folder URL `json:"folder"`
+
+	Path string `json:"path"`
+
+	Text string `json:"text"`
 }
 
 type PingResponse struct {
@@ -3935,68 +5051,72 @@ type PingResponse struct {
 
 type PinnerKind string
 
-const (
-	PinnerKindPerson   PinnerKind = "person"
-	PinnerKindAgent    PinnerKind = "agent"
-	PinnerKindWorkflow PinnerKind = "workflow"
-)
+const PinnerKindPerson PinnerKind = "person"
+const PinnerKindAgent PinnerKind = "agent"
+const PinnerKindWorkflow PinnerKind = "workflow"
 
 type PinnerView struct {
 	Kind PinnerKind `json:"kind"`
-	ID   string     `json:"id"`
-	Name string     `json:"name"`
+
+	ID string `json:"id"`
+
+	Name string `json:"name"`
 }
 
 type PinsChangedNotification struct {
-	Folder    URL       `json:"folder"`
-	Pins      []PinView `json:"pins"`
-	Sessions  []UUID    `json:"sessions,omitzero"`
-	Workflows []string  `json:"workflows,omitzero"`
+	Folder URL `json:"folder"`
+
+	Pins []PinView `json:"pins"`
+
+	Sessions []UUID `json:"sessions,omitzero"`
+
+	Workflows []string `json:"workflows,omitzero"`
 }
 
 type Plan struct {
-	PlanID  *string     `json:"planID,omitzero"`
+	PlanID *string `json:"planID,omitzero"`
+
 	Entries []PlanEntry `json:"entries"`
-	State   PlanState   `json:"state"`
-	At      Date        `json:"at"`
+
+	State PlanState `json:"state"`
+
+	At Date `json:"at"`
 }
 
 type PlanEntry struct {
-	Content  string            `json:"content"`
+	Content string `json:"content"`
+
 	Priority PlanEntryPriority `json:"priority"`
-	Status   PlanEntryStatus   `json:"status"`
+
+	Status PlanEntryStatus `json:"status"`
 }
 
 type PlanEntryPriority string
 
-const (
-	PlanEntryPriorityHigh   PlanEntryPriority = "high"
-	PlanEntryPriorityMedium PlanEntryPriority = "medium"
-	PlanEntryPriorityLow    PlanEntryPriority = "low"
-)
+const PlanEntryPriorityHigh PlanEntryPriority = "high"
+const PlanEntryPriorityMedium PlanEntryPriority = "medium"
+const PlanEntryPriorityLow PlanEntryPriority = "low"
 
 type PlanEntryStatus string
 
-const (
-	PlanEntryStatusPending    PlanEntryStatus = "pending"
-	PlanEntryStatusInProgress PlanEntryStatus = "in_progress"
-	PlanEntryStatusCompleted  PlanEntryStatus = "completed"
-)
+const PlanEntryStatusPending PlanEntryStatus = "pending"
+const PlanEntryStatusInProgress PlanEntryStatus = "in_progress"
+const PlanEntryStatusCompleted PlanEntryStatus = "completed"
 
 type PlanState string
 
-const (
-	PlanStateCurrent   PlanState = "current"
-	PlanStateWithdrawn PlanState = "withdrawn"
-)
+const PlanStateCurrent PlanState = "current"
+const PlanStateWithdrawn PlanState = "withdrawn"
 
 type PluginApproveRequest struct {
-	Plugin URL    `json:"plugin"`
+	Plugin URL `json:"plugin"`
+
 	Digest string `json:"digest"`
 }
 
 type PluginsList struct {
-	Folder  URL             `json:"folder"`
+	Folder URL `json:"folder"`
+
 	Plugins []ProjectPlugin `json:"plugins"`
 }
 
@@ -4005,29 +5125,40 @@ type PluginsListRequest struct {
 }
 
 type PresenceReport struct {
-	Watching    *UUID  `json:"watching,omitzero"`
-	Active      bool   `json:"active"`
-	MayNotify   *bool  `json:"mayNotify,omitzero"`
-	Showing     *UUID  `json:"showing,omitzero"`
+	Watching *UUID `json:"watching,omitzero"`
+
+	Active bool `json:"active"`
+
+	MayNotify *bool `json:"mayNotify,omitzero"`
+
+	Showing *UUID `json:"showing,omitzero"`
+
 	AlsoShowing []UUID `json:"alsoShowing,omitzero"`
 }
 
 type PreviewFile struct {
-	Path     string `json:"path"`
-	Bytes    int64  `json:"bytes"`
-	Runnable bool   `json:"runnable"`
-	Via      string `json:"via"`
+	Path string `json:"path"`
+
+	Bytes int64 `json:"bytes"`
+
+	Runnable bool `json:"runnable"`
+
+	Via string `json:"via"`
 }
 
 type PreviewProblem struct {
-	NoSkillFile    *struct{}               `json:"noSkillFile,omitzero"`
-	NotFoundInRepo *struct{}               `json:"notFoundInRepo,omitzero"`
-	TooLarge       *PreviewProblemTooLarge `json:"tooLarge,omitzero"`
-	Skipped        *PreviewProblemSkipped  `json:"skipped,omitzero"`
+	NoSkillFile *struct{} `json:"noSkillFile,omitzero"`
+
+	NotFoundInRepo *struct{} `json:"notFoundInRepo,omitzero"`
+
+	TooLarge *PreviewProblemTooLarge `json:"tooLarge,omitzero"`
+
+	Skipped *PreviewProblemSkipped `json:"skipped,omitzero"`
 }
 
 type PreviewProblemTooLarge struct {
 	Bytes int64 `json:"bytes"`
+
 	Files int64 `json:"files"`
 }
 
@@ -4036,57 +5167,79 @@ type PreviewProblemSkipped struct {
 }
 
 type PrewarmRequest struct {
-	AgentID UUID              `json:"agentID"`
-	Why     PrewarmRequestWhy `json:"why"`
+	AgentID UUID `json:"agentID"`
+
+	Why PrewarmRequestWhy `json:"why"`
 }
 
 type PrewarmRequestWhy string
 
-const (
-	PrewarmRequestWhyOpened PrewarmRequestWhy = "opened"
-	PrewarmRequestWhyTyping PrewarmRequestWhy = "typing"
-)
+const PrewarmRequestWhyOpened PrewarmRequestWhy = "opened"
+const PrewarmRequestWhyTyping PrewarmRequestWhy = "typing"
 
 type Project struct {
-	Folder        URL             `json:"folder"`
-	ArchivedAt    *Date           `json:"archivedAt,omitzero"`
-	AddedAt       Date            `json:"addedAt"`
-	LaidOutAt     *Date           `json:"laidOutAt,omitzero"`
-	LayoutVersion *int64          `json:"layoutVersion,omitzero"`
-	HelperLimits  *HelperLimits   `json:"helperLimits,omitzero"`
-	DiskSpace     *DiskThresholds `json:"diskSpace,omitzero"`
-	Pinned        *bool           `json:"pinned,omitzero"`
+	Folder URL `json:"folder"`
+
+	ArchivedAt *Date `json:"archivedAt,omitzero"`
+
+	AddedAt Date `json:"addedAt"`
+
+	LaidOutAt *Date `json:"laidOutAt,omitzero"`
+
+	LayoutVersion *int64 `json:"layoutVersion,omitzero"`
+
+	HelperLimits *HelperLimits `json:"helperLimits,omitzero"`
+
+	DiskSpace *DiskThresholds `json:"diskSpace,omitzero"`
+
+	Pinned *bool `json:"pinned,omitzero"`
 }
 
 type ProjectDetection struct {
-	Enabled bool     `json:"enabled"`
-	Paths   []string `json:"paths"`
+	Enabled bool `json:"enabled"`
+
+	Paths []string `json:"paths"`
 }
 
 type ProjectMCPServer struct {
-	Name           string            `json:"name"`
-	Summary        string            `json:"summary"`
-	Managed        *ManagedMCPServer `json:"managed,omitzero"`
-	Approval       MCPApprovalState  `json:"approval"`
-	MissingSecrets []string          `json:"missingSecrets"`
-	SecretNames    []string          `json:"secretNames"`
-	EntryDigest    string            `json:"entryDigest"`
-	SignIn         *MCPSignInState   `json:"signIn,omitzero"`
-	Views          *string           `json:"views,omitzero"`
+	Name string `json:"name"`
+
+	Summary string `json:"summary"`
+
+	Managed *ManagedMCPServer `json:"managed,omitzero"`
+
+	Approval MCPApprovalState `json:"approval"`
+
+	MissingSecrets []string `json:"missingSecrets"`
+
+	SecretNames []string `json:"secretNames"`
+
+	EntryDigest string `json:"entryDigest"`
+
+	SignIn *MCPSignInState `json:"signIn,omitzero"`
+
+	Views *string `json:"views,omitzero"`
 }
 
 type ProjectPins struct {
-	Folder    URL       `json:"folder"`
-	Pins      []PinView `json:"pins"`
-	Sessions  []UUID    `json:"sessions,omitzero"`
-	Workflows []string  `json:"workflows,omitzero"`
+	Folder URL `json:"folder"`
+
+	Pins []PinView `json:"pins"`
+
+	Sessions []UUID `json:"sessions,omitzero"`
+
+	Workflows []string `json:"workflows,omitzero"`
 }
 
 type ProjectPlugin struct {
-	Project          URL               `json:"project"`
-	Folder           URL               `json:"folder"`
-	Name             string            `json:"name"`
-	Carries          []string          `json:"carries"`
+	Project URL `json:"project"`
+
+	Folder URL `json:"folder"`
+
+	Name string `json:"name"`
+
+	Carries []string `json:"carries"`
+
 	AwaitingApproval *WorkflowApproval `json:"awaitingApproval,omitzero"`
 }
 
@@ -4099,36 +5252,54 @@ type ProjectRequest struct {
 }
 
 type ProjectSummary struct {
-	Project          Project              `json:"project"`
-	Name             string               `json:"name"`
-	Exists           bool                 `json:"exists"`
-	LastActivityAt   Date                 `json:"lastActivityAt"`
-	Counts           ProjectSummaryCounts `json:"counts"`
-	CostToDate       map[string]float64   `json:"costToDate"`
-	UnmeasuredAgents int64                `json:"unmeasuredAgents"`
-	RetiredCount     int64                `json:"retiredCount"`
-	IsChat           *bool                `json:"isChat,omitzero"`
-	GuardedChanges   []GuardedChange      `json:"guardedChanges,omitzero"`
-	Approvals        []Approval           `json:"approvals,omitzero"`
+	Project Project `json:"project"`
+
+	Name string `json:"name"`
+
+	Exists bool `json:"exists"`
+
+	LastActivityAt Date `json:"lastActivityAt"`
+
+	Counts ProjectSummaryCounts `json:"counts"`
+
+	CostToDate map[string]float64 `json:"costToDate"`
+
+	UnmeasuredAgents int64 `json:"unmeasuredAgents"`
+
+	RetiredCount int64 `json:"retiredCount"`
+
+	IsChat *bool `json:"isChat,omitzero"`
+
+	GuardedChanges []GuardedChange `json:"guardedChanges,omitzero"`
+
+	Approvals []Approval `json:"approvals,omitzero"`
 }
 
 type ProjectSummaryCounts struct {
 	NeedsAttention *int64 `json:"needsAttention,omitzero"`
-	Blocked        *int64 `json:"blocked,omitzero"`
-	Waiting        *int64 `json:"waiting,omitzero"`
-	Running        *int64 `json:"running,omitzero"`
-	Finished       *int64 `json:"finished,omitzero"`
-	Stopped        *int64 `json:"stopped,omitzero"`
-	Archived       *int64 `json:"archived,omitzero"`
+
+	Blocked *int64 `json:"blocked,omitzero"`
+
+	Waiting *int64 `json:"waiting,omitzero"`
+
+	Running *int64 `json:"running,omitzero"`
+
+	Finished *int64 `json:"finished,omitzero"`
+
+	Stopped *int64 `json:"stopped,omitzero"`
+
+	Archived *int64 `json:"archived,omitzero"`
 }
 
 type ProjectWorktrees struct {
-	Project   URL               `json:"project"`
+	Project URL `json:"project"`
+
 	Worktrees []WorktreeSummary `json:"worktrees"`
 }
 
 type ProjectsFindRequest struct {
-	Paths   []string `json:"paths,omitzero"`
+	Paths []string `json:"paths,omitzero"`
+
 	Folders []string `json:"folders,omitzero"`
 }
 
@@ -4138,42 +5309,59 @@ type ProjectsListRequest struct {
 
 type PromptOrigin string
 
-const (
-	PromptOriginPerson PromptOrigin = "person"
-	PromptOriginApp    PromptOrigin = "app"
-	PromptOriginAgent  PromptOrigin = "agent"
-)
+const PromptOriginPerson PromptOrigin = "person"
+const PromptOriginApp PromptOrigin = "app"
+const PromptOriginAgent PromptOrigin = "agent"
 
 type PromptRequest struct {
-	AgentID     UUID         `json:"agentID"`
-	Text        string       `json:"text"`
+	AgentID UUID `json:"agentID"`
+
+	Text string `json:"text"`
+
 	Attachments []Attachment `json:"attachments"`
-	From        PromptOrigin `json:"from"`
-	SendID      *UUID        `json:"sendID,omitzero"`
+
+	From PromptOrigin `json:"from"`
+
+	SendID *UUID `json:"sendID,omitzero"`
 }
 
 // providers/add and providers/update. `secrets` only ever goes to the control plane; `cli` is not kept; `draft` is the draft this accepts (#858).
 type ProviderAdd struct {
-	ID       *ProviderID       `json:"id,omitzero"`
-	Name     string            `json:"name"`
-	Kind     string            `json:"kind"`
-	Command  *string           `json:"command,omitzero"`
-	Args     []string          `json:"args,omitzero"`
-	URL      *string           `json:"url,omitzero"`
-	Headers  map[string]string `json:"headers,omitzero"`
-	Commands JSONValue         `json:"commands,omitzero"`
-	Map      JSONValue         `json:"map,omitzero"`
-	Secrets  map[string]string `json:"secrets,omitzero"`
-	CLI      *string           `json:"cli,omitzero"`
-	Draft    *UUID             `json:"draft,omitzero"`
+	ID *ProviderID `json:"id,omitzero"`
+
+	Name string `json:"name"`
+
+	Kind string `json:"kind"`
+
+	Command *string `json:"command,omitzero"`
+
+	Args []string `json:"args,omitzero"`
+
+	URL *string `json:"url,omitzero"`
+
+	Headers map[string]string `json:"headers,omitzero"`
+
+	Commands JSONValue `json:"commands,omitzero"`
+
+	Map JSONValue `json:"map,omitzero"`
+
+	Secrets map[string]string `json:"secrets,omitzero"`
+
+	CLI *string `json:"cli,omitzero"`
+
+	Draft *UUID `json:"draft,omitzero"`
 }
 
 // providers/create.
 type ProviderCreate struct {
-	ID      ProviderID `json:"id"`
-	Name    string     `json:"name"`
-	Options JSONValue  `json:"options,omitzero"`
-	Clones  []string   `json:"clones,omitzero"`
+	ID ProviderID `json:"id"`
+
+	Name string `json:"name"`
+
+	Options JSONValue `json:"options,omitzero"`
+
+	Clones []string `json:"clones,omitzero"`
+
 	// The repository to start it from (#1809), an https git address. A provider whose New Workspace form has `repository`, such as Codespaces, makes the workspace from it; any other has the host clone it once it joins, before `clones`.
 	Repository *string `json:"repository,omitzero"`
 }
@@ -4181,21 +5369,26 @@ type ProviderCreate struct {
 // What providers/create made.
 type ProviderCreated struct {
 	Workspace WorkspaceInfo `json:"workspace"`
-	Joining   bool          `json:"joining"`
+
+	Joining bool `json:"joining"`
 }
 
 // providers/draftAnswer: yes or no to a question.
 type ProviderDraftAnswer struct {
-	Draft    UUID `json:"draft"`
+	Draft UUID `json:"draft"`
+
 	Question UUID `json:"question"`
-	Yes      bool `json:"yes"`
+
+	Yes bool `json:"yes"`
 }
 
 // A draft answered with no agent: the server follows the contract, or a shipped map fits.
 type ProviderDraftAnswered struct {
-	Note   string    `json:"note"`
-	Map    JSONValue `json:"map,omitzero"`
-	Preset *string   `json:"preset,omitzero"`
+	Note string `json:"note"`
+
+	Map JSONValue `json:"map,omitzero"`
+
+	Preset *string `json:"preset,omitzero"`
 }
 
 // providers/draftCancel.
@@ -4205,34 +5398,47 @@ type ProviderDraftRequest struct {
 
 // providers/draftStart (#858).
 type ProviderDraftStart struct {
-	Form      ProviderAdd       `json:"form"`
-	Secrets   map[string]string `json:"secrets,omitzero"`
-	Provider  *ProviderID       `json:"provider,omitzero"`
-	RuntimeID string            `json:"runtimeID"`
+	Form ProviderAdd `json:"form"`
+
+	Secrets map[string]string `json:"secrets,omitzero"`
+
+	Provider *ProviderID `json:"provider,omitzero"`
+
+	RuntimeID string `json:"runtimeID"`
 }
 
 type ProviderDraftStarted struct {
-	Draft    UUID                   `json:"draft"`
+	Draft UUID `json:"draft"`
+
 	Answered *ProviderDraftAnswered `json:"answered,omitzero"`
 }
 
 // control/providerDraft: how a draft stands, to the client that started it.
 type ProviderDraftUpdate struct {
-	Draft       UUID           `json:"draft"`
-	State       string         `json:"state"`
-	RuntimeName string         `json:"runtimeName"`
-	Steps       []DraftStep    `json:"steps"`
-	Cost        *string        `json:"cost,omitzero"`
-	DraftJSON   JSONValue      `json:"draftJSON,omitzero"`
-	Check       *DraftCheck    `json:"check,omitzero"`
-	Question    *DraftQuestion `json:"question,omitzero"`
-	Note        *string        `json:"note,omitzero"`
+	Draft UUID `json:"draft"`
+
+	State string `json:"state"`
+
+	RuntimeName string `json:"runtimeName"`
+
+	Steps []DraftStep `json:"steps"`
+
+	Cost *string `json:"cost,omitzero"`
+
+	DraftJSON JSONValue `json:"draftJSON,omitzero"`
+
+	Check *DraftCheck `json:"check,omitzero"`
+
+	Question *DraftQuestion `json:"question,omitzero"`
+
+	Note *string `json:"note,omitzero"`
 }
 
 // providers/setGroup (#1761): the group whose users may use the provider. No group is the admins' alone.
 type ProviderGroup struct {
 	Provider ProviderID `json:"provider"`
-	Group    *string    `json:"group,omitzero"`
+
+	Group *string `json:"group,omitzero"`
 }
 
 type ProviderID string
@@ -4253,34 +5459,51 @@ type ProviderRequest struct {
 }
 
 type ProviderRuntime struct {
-	ID        string `json:"id"`
-	Name      string `json:"name"`
-	IsDefault bool   `json:"isDefault"`
+	ID string `json:"id"`
+
+	Name string `json:"name"`
+
+	IsDefault bool `json:"isDefault"`
 }
 
 // providers/runtimes: what may write, on which host, or why none.
 type ProviderRuntimes struct {
 	Runtimes []ProviderRuntime `json:"runtimes"`
-	Host     *string           `json:"host,omitzero"`
-	Why      *string           `json:"why,omitzero"`
+
+	Host *string `json:"host,omitzero"`
+
+	Why *string `json:"why,omitzero"`
 }
 
 // A provider for the Providers page, never its commands, headers or secrets' values.
 type ProviderSummary struct {
-	ID           ProviderID      `json:"id"`
-	Name         string          `json:"name"`
-	Kind         string          `json:"kind"`
-	Secrets      map[string]bool `json:"secrets"`
-	Capabilities []string        `json:"capabilities"`
-	Contract     int64           `json:"contract"`
-	Mapped       bool            `json:"mapped"`
-	Preset       *string         `json:"preset,omitzero"`
-	Workspaces   []WorkspaceInfo `json:"workspaces"`
-	ListedAt     *Date           `json:"listedAt,omitzero"`
-	Current      bool            `json:"current"`
-	Problem      *string         `json:"problem,omitzero"`
+	ID ProviderID `json:"id"`
+
+	Name string `json:"name"`
+
+	Kind string `json:"kind"`
+
+	Secrets map[string]bool `json:"secrets"`
+
+	Capabilities []string `json:"capabilities"`
+
+	Contract int64 `json:"contract"`
+
+	Mapped bool `json:"mapped"`
+
+	Preset *string `json:"preset,omitzero"`
+
+	Workspaces []WorkspaceInfo `json:"workspaces"`
+
+	ListedAt *Date `json:"listedAt,omitzero"`
+
+	Current bool `json:"current"`
+
+	Problem *string `json:"problem,omitzero"`
+
 	// The group whose users may use it (#1761); none is the admins' alone.
 	Group *string `json:"group,omitzero"`
+
 	// The caller may start machines from it (#1761): they are in its group. Absent from an older control plane, which lets everyone.
 	MayUse *bool `json:"mayUse,omitzero"`
 }
@@ -4288,84 +5511,113 @@ type ProviderSummary struct {
 // Which APNs a device token belongs to (#1460): a Debug build's (sandbox) or a TestFlight and App Store build's.
 type PushEnvironment string
 
-const (
-	PushEnvironmentDevelopment PushEnvironment = "development"
-	PushEnvironmentProduction  PushEnvironment = "production"
-)
+const PushEnvironmentDevelopment PushEnvironment = "development"
+const PushEnvironmentProduction PushEnvironment = "production"
 
 // clients/setPushToken (#1460): a device's own APNs token, in hex, for the control plane to push to when no Mac host relays its notices. No token takes it away.
 type PushToken struct {
-	Token       *string         `json:"token,omitzero"`
+	Token *string `json:"token,omitzero"`
+
 	Environment PushEnvironment `json:"environment"`
 }
 
 type QueuedPrompt struct {
-	ID          UUID           `json:"id"`
-	Text        string         `json:"text"`
-	Attachments []Attachment   `json:"attachments"`
-	QueuedAt    Date           `json:"queuedAt"`
-	From        PromptOrigin   `json:"from"`
-	Preface     *string        `json:"preface,omitzero"`
-	Sender      *MessageSender `json:"sender,omitzero"`
-	Hops        *int64         `json:"hops,omitzero"`
+	ID UUID `json:"id"`
+
+	Text string `json:"text"`
+
+	Attachments []Attachment `json:"attachments"`
+
+	QueuedAt Date `json:"queuedAt"`
+
+	From PromptOrigin `json:"from"`
+
+	Preface *string `json:"preface,omitzero"`
+
+	Sender *MessageSender `json:"sender,omitzero"`
+
+	Hops *int64 `json:"hops,omitzero"`
 }
 
 type QueuedStart struct {
-	RuntimeID      *string         `json:"runtimeID,omitzero"`
-	PermissionMode *string         `json:"permissionMode,omitzero"`
-	Model          *string         `json:"model,omitzero"`
-	Worktree       *WorktreeChoice `json:"worktree,omitzero"`
-	Labels         []string        `json:"labels"`
+	RuntimeID *string `json:"runtimeID,omitzero"`
+
+	PermissionMode *string `json:"permissionMode,omitzero"`
+
+	Model *string `json:"model,omitzero"`
+
+	Worktree *WorktreeChoice `json:"worktree,omitzero"`
+
+	Labels []string `json:"labels"`
 }
 
 type QuickAnswer struct {
-	Kind          QuickAnswerKind `json:"kind"`
-	ID            string          `json:"id"`
-	Title         string          `json:"title"`
-	Field         *string         `json:"field,omitzero"`
-	IsDestructive bool            `json:"isDestructive"`
+	Kind QuickAnswerKind `json:"kind"`
+
+	ID string `json:"id"`
+
+	Title string `json:"title"`
+
+	Field *string `json:"field,omitzero"`
+
+	IsDestructive bool `json:"isDestructive"`
 }
 
 type QuickAnswerKind string
 
-const (
-	QuickAnswerKindChoice QuickAnswerKind = "choice"
-	QuickAnswerKindReply  QuickAnswerKind = "reply"
-)
+const QuickAnswerKindChoice QuickAnswerKind = "choice"
+const QuickAnswerKindReply QuickAnswerKind = "reply"
 
 type QuitRequest struct {
 	StopAgents bool `json:"stopAgents"`
 }
 
 type RateLimitInfo struct {
-	Status                *string  `json:"status,omitzero"`
-	ResetsAt              *Date    `json:"resetsAt,omitzero"`
-	RateLimitType         *string  `json:"rateLimitType,omitzero"`
-	Utilization           *float64 `json:"utilization,omitzero"`
-	OverageStatus         *string  `json:"overageStatus,omitzero"`
-	OverageResetsAt       *Date    `json:"overageResetsAt,omitzero"`
-	IsUsingOverage        *bool    `json:"isUsingOverage,omitzero"`
-	OverageInUse          *bool    `json:"overageInUse,omitzero"`
-	OverageDisabledReason *string  `json:"overageDisabledReason,omitzero"`
+	Status *string `json:"status,omitzero"`
+
+	ResetsAt *Date `json:"resetsAt,omitzero"`
+
+	RateLimitType *string `json:"rateLimitType,omitzero"`
+
+	Utilization *float64 `json:"utilization,omitzero"`
+
+	OverageStatus *string `json:"overageStatus,omitzero"`
+
+	OverageResetsAt *Date `json:"overageResetsAt,omitzero"`
+
+	IsUsingOverage *bool `json:"isUsingOverage,omitzero"`
+
+	OverageInUse *bool `json:"overageInUse,omitzero"`
+
+	OverageDisabledReason *string `json:"overageDisabledReason,omitzero"`
 }
 
 // Makes or brings up to date a host's copy of a Mac's repository (#1123): fetches the `bundle` upload, moves `branches` forward only, checks out `checkout`, sets `origin`, applies the `patch` upload (uncommitted changes), and adds the folder as a project. It stops, and changes nothing, when the host has changes or commits of its own.
 type ReceiveRequest struct {
-	Folder   string       `json:"folder"`
-	Bundle   *UUID        `json:"bundle,omitzero"`
-	Patch    *UUID        `json:"patch,omitzero"`
+	Folder string `json:"folder"`
+
+	Bundle *UUID `json:"bundle,omitzero"`
+
+	Patch *UUID `json:"patch,omitzero"`
+
 	Branches []SentBranch `json:"branches"`
-	Checkout string       `json:"checkout"`
-	Origin   *string      `json:"origin,omitzero"`
+
+	Checkout string `json:"checkout"`
+
+	Origin *string `json:"origin,omitzero"`
 }
 
 // What a host has at a folder before a send (#1123). `heads` are the commits of its branches, so the Mac's bundle carries only what the host lacks. `ownChanges` is true when the folder has changes that the last send did not put there.
 type ReceiveState struct {
-	Folder     URL      `json:"folder"`
-	Exists     bool     `json:"exists"`
-	Repository bool     `json:"repository"`
-	OwnChanges bool     `json:"ownChanges"`
-	Heads      []string `json:"heads"`
+	Folder URL `json:"folder"`
+
+	Exists bool `json:"exists"`
+
+	Repository bool `json:"repository"`
+
+	OwnChanges bool `json:"ownChanges"`
+
+	Heads []string `json:"heads"`
 }
 
 // Asks a host about a folder a Mac will send a repository to (Send to ‹host›…, #1123). `folder` may start with ~/.
@@ -4375,31 +5627,41 @@ type ReceiveStateRequest struct {
 
 // One part of a file a Mac sends (#1123), at `offset` in the upload. A part is at most 16 MB; the host keeps the upload until projects/receive uses it.
 type ReceiveUploadRequest struct {
-	Upload UUID  `json:"upload"`
+	Upload UUID `json:"upload"`
+
 	Offset int64 `json:"offset"`
-	Data   Data  `json:"data"`
+
+	Data Data `json:"data"`
 }
 
 // relay/count (#1163): one device's Needs you count, posted as a silent push.
 type RelayCount struct {
-	Device    UUID  `json:"device"`
-	Waiting   int64 `json:"waiting"`
-	CountedAt Date  `json:"countedAt"`
+	Device UUID `json:"device"`
+
+	Waiting int64 `json:"waiting"`
+
+	CountedAt Date `json:"countedAt"`
 }
 
 // relay/deliver (T097): seal the headline to `publicKey` and post it for `device`; no headline is a withdrawal.
 type RelayDelivery struct {
-	NeedID    NeedID    `json:"needID"`
-	Device    UUID      `json:"device"`
-	PublicKey Data      `json:"publicKey,omitzero"`
-	Headline  *Headline `json:"headline,omitzero"`
-	Alert     bool      `json:"alert"`
-	Waiting   *int64    `json:"waiting,omitzero"`
+	NeedID NeedID `json:"needID"`
+
+	Device UUID `json:"device"`
+
+	PublicKey Data `json:"publicKey,omitzero"`
+
+	Headline *Headline `json:"headline,omitzero"`
+
+	Alert bool `json:"alert"`
+
+	Waiting *int64 `json:"waiting,omitzero"`
 }
 
 // A device a relay host may carry for, with the key its frames are sealed to.
 type RelayDevice struct {
-	ID        UUID `json:"id"`
+	ID UUID `json:"id"`
+
 	PublicKey Data `json:"publicKey"`
 }
 
@@ -4409,9 +5671,11 @@ type RelayDevices struct {
 }
 
 type RelayGrantReply struct {
-	Runtime       string `json:"runtime"`
+	Runtime string `json:"runtime"`
+
 	CaCertificate string `json:"caCertificate"`
-	StandIn       string `json:"standIn"`
+
+	StandIn string `json:"standIn"`
 }
 
 type RelayGrantRequest struct {
@@ -4419,10 +5683,13 @@ type RelayGrantRequest struct {
 }
 
 type RelayOffer struct {
-	Runtime       string `json:"runtime"`
-	SocketPath    string `json:"socketPath"`
+	Runtime string `json:"runtime"`
+
+	SocketPath string `json:"socketPath"`
+
 	CaCertificate string `json:"caCertificate"`
-	StandIn       string `json:"standIn"`
+
+	StandIn string `json:"standIn"`
 }
 
 // relay/register: the public half of the Mac's relay key, X9.63.
@@ -4437,13 +5704,16 @@ type RelaySwitch struct {
 
 type RememberedOptionsRequest struct {
 	RuntimeID string `json:"runtimeID"`
-	Cwd       URL    `json:"cwd"`
+
+	Cwd URL `json:"cwd"`
 }
 
 type RemovalCheck struct {
-	BlockedBy   []UUID `json:"blockedBy"`
-	Uncommitted int64  `json:"uncommitted"`
-	Unmerged    bool   `json:"unmerged"`
+	BlockedBy []UUID `json:"blockedBy"`
+
+	Uncommitted int64 `json:"uncommitted"`
+
+	Unmerged bool `json:"unmerged"`
 }
 
 type RemoveResourceRequest struct {
@@ -4451,30 +5721,33 @@ type RemoveResourceRequest struct {
 }
 
 type RenameRequest struct {
-	AgentID UUID   `json:"agentID"`
-	Title   string `json:"title"`
+	AgentID UUID `json:"agentID"`
+
+	Title string `json:"title"`
 }
 
 // reports/export's answer (#1811): the rows as CSV or JSON lines.
 type ReportExport struct {
-	Text   string       `json:"text"`
-	Count  int64        `json:"count"`
+	Text string `json:"text"`
+
+	Count int64 `json:"count"`
+
 	Format ReportFormat `json:"format"`
 }
 
 type ReportFormat string
 
-const (
-	ReportFormatCsv   ReportFormat = "csv"
-	ReportFormatJsonl ReportFormat = "jsonl"
-)
+const ReportFormatCsv ReportFormat = "csv"
+const ReportFormatJsonl ReportFormat = "jsonl"
 
 // Who sees what in Reports (#1804), set by an admin in Console ▸ Report Policy.
 type ReportPolicy struct {
 	// A group lead sees the group's totals only, with no person or machine named. An admin always sees each person.
 	TotalsOnly bool `json:"totalsOnly"`
+
 	// Each group's leads, by group id: users who see the group's reports.
 	Leads map[string][]string `json:"leads"`
+
 	// A budget for a calendar month in US dollars, by group id, or "org" for the organisation.
 	BudgetsUSD map[string]float64 `json:"budgetsUSD"`
 }
@@ -4482,8 +5755,10 @@ type ReportPolicy struct {
 // reports/usage and reports/export (#1811). With no scope, an admin sees every person and a member their own machines; a scope (#1804) is one the caller may see (reports/scopes).
 type ReportQuery struct {
 	Range ReportRange `json:"range"`
+
 	// For reports/export; CSV when absent.
 	Format *ReportFormat `json:"format,omitzero"`
+
 	// Me, a group or the organisation (#1804).
 	Scope *ReportScope `json:"scope,omitzero"`
 }
@@ -4491,36 +5766,51 @@ type ReportQuery struct {
 // D is the last 24 hours by the hour; W, M and 3M the last 7, 30 and 90 days by the day (UTC).
 type ReportRange string
 
-const (
-	ReportRangeDay         ReportRange = "day"
-	ReportRangeWeek        ReportRange = "week"
-	ReportRangeMonth       ReportRange = "month"
-	ReportRangeThreeMonths ReportRange = "threeMonths"
-)
+const ReportRangeDay ReportRange = "day"
+const ReportRangeWeek ReportRange = "week"
+const ReportRangeMonth ReportRange = "month"
+const ReportRangeThreeMonths ReportRange = "threeMonths"
 
 // One hour or day of one machine's project and runtime, with its person (#1811).
 type ReportRow struct {
 	// The UTC hour ("2026-10-21T15") or day ("2026-10-21").
-	At         string `json:"at"`
-	Person     string `json:"person"`
+	At string `json:"at"`
+
+	Person string `json:"person"`
+
 	PersonName string `json:"personName"`
-	Host       HostID `json:"host"`
-	HostName   string `json:"hostName"`
-	Project    string `json:"project"`
-	Runtime    string `json:"runtime"`
+
+	Host HostID `json:"host"`
+
+	HostName string `json:"hostName"`
+
+	Project string `json:"project"`
+
+	Runtime string `json:"runtime"`
+
 	// By currency.
-	Cost              map[string]float64 `json:"cost"`
-	InputTokens       int64              `json:"inputTokens"`
-	OutputTokens      int64              `json:"outputTokens"`
-	ThoughtTokens     int64              `json:"thoughtTokens"`
-	CachedReadTokens  int64              `json:"cachedReadTokens"`
-	CachedWriteTokens int64              `json:"cachedWriteTokens"`
-	Turns             int64              `json:"turns"`
-	UnpricedTurns     int64              `json:"unpricedTurns"`
+	Cost map[string]float64 `json:"cost"`
+
+	InputTokens int64 `json:"inputTokens"`
+
+	OutputTokens int64 `json:"outputTokens"`
+
+	ThoughtTokens int64 `json:"thoughtTokens"`
+
+	CachedReadTokens int64 `json:"cachedReadTokens"`
+
+	CachedWriteTokens int64 `json:"cachedWriteTokens"`
+
+	Turns int64 `json:"turns"`
+
+	UnpricedTurns int64 `json:"unpricedTurns"`
+
 	// The agent, its tools and waiting on others: TimeBucket's agent + tools + others.
 	WorkingSeconds float64 `json:"workingSeconds"`
+
 	// Waiting for the person: TimeBucket's person.
 	WaitingSeconds float64 `json:"waitingSeconds"`
+
 	// The groups the person is in (#1804), by id, for a group or organisation scope; absent when the person is hidden.
 	Groups []string `json:"groups,omitzero"`
 }
@@ -4528,6 +5818,7 @@ type ReportRow struct {
 // Whose rows a report adds up (#1804).
 type ReportScope struct {
 	Kind ReportScopeKind `json:"kind"`
+
 	// The group's id, for kind group.
 	Group *string `json:"group,omitzero"`
 }
@@ -4535,79 +5826,97 @@ type ReportScope struct {
 // Me (the caller's own machines), a group's people, or every person (#1804).
 type ReportScopeKind string
 
-const (
-	ReportScopeKindMe    ReportScopeKind = "me"
-	ReportScopeKindGroup ReportScopeKind = "group"
-	ReportScopeKindOrg   ReportScopeKind = "org"
-)
+const ReportScopeKindMe ReportScopeKind = "me"
+const ReportScopeKindGroup ReportScopeKind = "group"
+const ReportScopeKindOrg ReportScopeKind = "org"
 
 // A scope the caller may see, with its name (#1804).
 type ReportScopeOption struct {
 	Scope ReportScope `json:"scope"`
-	Name  string      `json:"name"`
+
+	Name string `json:"name"`
 }
 
 // reports/scopes' answer (#1804): Me, each group the caller leads (every group for an admin), and the organisation for an admin.
 type ReportScopes struct {
 	Scopes []ReportScopeOption `json:"scopes"`
-	Admin  bool                `json:"admin"`
+
+	Admin bool `json:"admin"`
 }
 
 type ReportedEdit struct {
-	Path       string  `json:"path"`
-	OldText    *string `json:"oldText,omitzero"`
-	NewText    string  `json:"newText"`
-	ToolCallID string  `json:"toolCallID"`
-	Index      int64   `json:"index"`
-	EntryIndex int64   `json:"entryIndex"`
-	ReplaceAll bool    `json:"replaceAll"`
-	At         Date    `json:"at"`
+	Path string `json:"path"`
+
+	OldText *string `json:"oldText,omitzero"`
+
+	NewText string `json:"newText"`
+
+	ToolCallID string `json:"toolCallID"`
+
+	Index int64 `json:"index"`
+
+	EntryIndex int64 `json:"entryIndex"`
+
+	ReplaceAll bool `json:"replaceAll"`
+
+	At Date `json:"at"`
 }
 
 // What the control plane needs of a peer to route for it (#1748): a host without each of host is needsUpdate, and a client without each of client is answered -32008.
 type RequiredCapabilities struct {
-	Host   []string `json:"host"`
+	Host []string `json:"host"`
+
 	Client []string `json:"client"`
 }
 
 type ResetRule struct {
 	DailyAt *ResetRuleDailyAt `json:"dailyAt,omitzero"`
-	Unknown *struct{}         `json:"unknown,omitzero"`
+
+	Unknown *struct{} `json:"unknown,omitzero"`
 }
 
 type ResetRuleDailyAt struct {
-	Hour     int64  `json:"hour"`
+	Hour int64 `json:"hour"`
+
 	TimeZone string `json:"timeZone"`
 }
 
 type ResourceKind string
 
-const (
-	ResourceKindScreen    ResourceKind = "screen"
-	ResourceKindSimulator ResourceKind = "simulator"
-	ResourceKindBrowser   ResourceKind = "browser"
-	ResourceKindNamed     ResourceKind = "named"
-)
+const ResourceKindScreen ResourceKind = "screen"
+const ResourceKindSimulator ResourceKind = "simulator"
+const ResourceKindBrowser ResourceKind = "browser"
+const ResourceKindNamed ResourceKind = "named"
 
 // ResourceName (Model/Lease.swift): the name, trimmed and lower-cased, as a single string.
 type ResourceName string
 
 // ResourceState (Daemon/DaemonAPI.swift), as its encode(to:) writes it (#116): every holder in `holds`, and the first again as `lease` for a reader from before counted holders. A host from before #116 sends only `lease`, so `holds`, `places` and `declared` may be missing.
 type ResourceState struct {
-	Name        ResourceName      `json:"name"`
-	Kind        ResourceKind      `json:"kind"`
-	DisplayName string            `json:"displayName"`
-	IsGone      bool              `json:"isGone"`
-	Holds       []Lease           `json:"holds,omitzero"`
-	Lease       *Lease            `json:"lease,omitzero"`
-	Places      *float64          `json:"places,omitzero"`
-	Declared    *DeclaredResource `json:"declared,omitzero"`
-	Line        []LineMember      `json:"line"`
-	EndingSoon  bool              `json:"endingSoon"`
+	Name ResourceName `json:"name"`
+
+	Kind ResourceKind `json:"kind"`
+
+	DisplayName string `json:"displayName"`
+
+	IsGone bool `json:"isGone"`
+
+	Holds []Lease `json:"holds,omitzero"`
+
+	Lease *Lease `json:"lease,omitzero"`
+
+	Places *float64 `json:"places,omitzero"`
+
+	Declared *DeclaredResource `json:"declared,omitzero"`
+
+	Line []LineMember `json:"line"`
+
+	EndingSoon bool `json:"endingSoon"`
 }
 
 type ResumingNotification struct {
-	AgentID    UUID `json:"agentID"`
+	AgentID UUID `json:"agentID"`
+
 	IsResuming bool `json:"isResuming"`
 }
 
@@ -4617,13 +5926,11 @@ type ResumingResponse struct {
 
 type RetentionKeepFor string
 
-const (
-	RetentionKeepForDays7   RetentionKeepFor = "days7"
-	RetentionKeepForDays14  RetentionKeepFor = "days14"
-	RetentionKeepForDays30  RetentionKeepFor = "days30"
-	RetentionKeepForDays90  RetentionKeepFor = "days90"
-	RetentionKeepForForever RetentionKeepFor = "forever"
-)
+const RetentionKeepForDays7 RetentionKeepFor = "days7"
+const RetentionKeepForDays14 RetentionKeepFor = "days14"
+const RetentionKeepForDays30 RetentionKeepFor = "days30"
+const RetentionKeepForDays90 RetentionKeepFor = "days90"
+const RetentionKeepForForever RetentionKeepFor = "forever"
 
 // UnmarshalJSON reads a value this build does not know as "days30".
 func (v *RetentionKeepFor) UnmarshalJSON(b []byte) error {
@@ -4632,7 +5939,11 @@ func (v *RetentionKeepFor) UnmarshalJSON(b []byte) error {
 		return err
 	}
 	switch RetentionKeepFor(s) {
-	case RetentionKeepForDays7, RetentionKeepForDays14, RetentionKeepForDays30, RetentionKeepForDays90, RetentionKeepForForever:
+	case RetentionKeepForDays7,
+		RetentionKeepForDays14,
+		RetentionKeepForDays30,
+		RetentionKeepForDays90,
+		RetentionKeepForForever:
 		*v = RetentionKeepFor(s)
 	default:
 		*v = RetentionKeepForDays30
@@ -4645,94 +5956,128 @@ type RetentionSettings struct {
 }
 
 type RetentionState struct {
-	Settings      RetentionSettings `json:"settings"`
-	ArchivedCount int64             `json:"archivedCount"`
-	ArchivedBytes int64             `json:"archivedBytes"`
+	Settings RetentionSettings `json:"settings"`
+
+	ArchivedCount int64 `json:"archivedCount"`
+
+	ArchivedBytes int64 `json:"archivedBytes"`
 }
 
 type Runtime struct {
-	ID              string          `json:"id"`
-	Name            string          `json:"name"`
-	Executable      string          `json:"executable"`
-	Arguments       []string        `json:"arguments"`
-	Install         *RuntimeInstall `json:"install,omitzero"`
-	InstallPage     URL             `json:"installPage"`
-	UsesAppCopyOnly bool            `json:"usesAppCopyOnly"`
+	ID string `json:"id"`
+
+	Name string `json:"name"`
+
+	Executable string `json:"executable"`
+
+	Arguments []string `json:"arguments"`
+
+	Install *RuntimeInstall `json:"install,omitzero"`
+
+	InstallPage URL `json:"installPage"`
+
+	UsesAppCopyOnly bool `json:"usesAppCopyOnly"`
 }
 
 type RuntimeAccount struct {
-	RuntimeID          string                `json:"runtimeID"`
-	State              RuntimeAccountState   `json:"state"`
-	AuthMethods        []ACPAuthMethod       `json:"authMethods"`
-	CanLogOut          bool                  `json:"canLogOut"`
-	Providers          []ACPProviderInfo     `json:"providers"`
-	CurrentProviderID  *string               `json:"currentProviderID,omitzero"`
-	SignedInAs         *AuthStatus           `json:"signedInAs,omitzero"`
+	RuntimeID string `json:"runtimeID"`
+
+	State RuntimeAccountState `json:"state"`
+
+	AuthMethods []ACPAuthMethod `json:"authMethods"`
+
+	CanLogOut bool `json:"canLogOut"`
+
+	Providers []ACPProviderInfo `json:"providers"`
+
+	CurrentProviderID *string `json:"currentProviderID,omitzero"`
+
+	SignedInAs *AuthStatus `json:"signedInAs,omitzero"`
+
 	PromptCapabilities ACPPromptCapabilities `json:"promptCapabilities"`
-	CanSteer           bool                  `json:"canSteer"`
-	CheckedAt          Date                  `json:"checkedAt"`
+
+	CanSteer bool `json:"canSteer"`
+
+	CheckedAt Date `json:"checkedAt"`
 }
 
 type RuntimeAccountState string
 
-const (
-	RuntimeAccountStateReady       RuntimeAccountState = "ready"
-	RuntimeAccountStateNeedsSignIn RuntimeAccountState = "needsSignIn"
-	RuntimeAccountStateUnknown     RuntimeAccountState = "unknown"
-)
+const RuntimeAccountStateReady RuntimeAccountState = "ready"
+const RuntimeAccountStateNeedsSignIn RuntimeAccountState = "needsSignIn"
+const RuntimeAccountStateUnknown RuntimeAccountState = "unknown"
 
 type RuntimeAllowances struct {
-	Rows   []RuntimeAllowancesRow `json:"rows"`
-	At     Date                   `json:"at"`
-	Shared []AllowanceState       `json:"shared,omitzero"`
+	Rows []RuntimeAllowancesRow `json:"rows"`
+
+	At Date `json:"at"`
+
+	Shared []AllowanceState `json:"shared,omitzero"`
 }
 
 type RuntimeAllowancesRow struct {
-	CredentialKey string         `json:"credentialKey"`
-	State         AllowanceState `json:"state"`
-	Unusable      *string        `json:"unusable,omitzero"`
+	CredentialKey string `json:"credentialKey"`
+
+	State AllowanceState `json:"state"`
+
+	Unusable *string `json:"unusable,omitzero"`
+
 	// Something one of the runtime's features needs on this host and lacks, with the step that fixes it (#1946). Only on the runtime's own sign-in row.
 	SetupNote *string `json:"setupNote,omitzero"`
 }
 
 type RuntimeAssessmentCheck struct {
-	ID       string                   `json:"id"`
-	Area     string                   `json:"area"`
-	Verdict  RuntimeAssessmentVerdict `json:"verdict"`
-	Evidence string                   `json:"evidence"`
+	ID string `json:"id"`
+
+	Area string `json:"area"`
+
+	Verdict RuntimeAssessmentVerdict `json:"verdict"`
+
+	Evidence string `json:"evidence"`
 }
 
 type RuntimeAssessmentScore struct {
-	AgentID        UUID                     `json:"agentID"`
-	RuntimeID      string                   `json:"runtimeID"`
-	Model          *string                  `json:"model,omitzero"`
-	RuntimeVersion *string                  `json:"runtimeVersion,omitzero"`
-	Host           *string                  `json:"host,omitzero"`
-	ScoredAt       Date                     `json:"scoredAt"`
-	ReportPath     *string                  `json:"reportPath,omitzero"`
-	Checks         []RuntimeAssessmentCheck `json:"checks"`
+	AgentID UUID `json:"agentID"`
+
+	RuntimeID string `json:"runtimeID"`
+
+	Model *string `json:"model,omitzero"`
+
+	RuntimeVersion *string `json:"runtimeVersion,omitzero"`
+
+	Host *string `json:"host,omitzero"`
+
+	ScoredAt Date `json:"scoredAt"`
+
+	ReportPath *string `json:"reportPath,omitzero"`
+
+	Checks []RuntimeAssessmentCheck `json:"checks"`
 }
 
 type RuntimeAssessmentVerdict string
 
-const (
-	RuntimeAssessmentVerdictPassed     RuntimeAssessmentVerdict = "passed"
-	RuntimeAssessmentVerdictFailed     RuntimeAssessmentVerdict = "failed"
-	RuntimeAssessmentVerdictNotOffered RuntimeAssessmentVerdict = "not_offered"
-)
+const RuntimeAssessmentVerdictPassed RuntimeAssessmentVerdict = "passed"
+const RuntimeAssessmentVerdictFailed RuntimeAssessmentVerdict = "failed"
+const RuntimeAssessmentVerdictNotOffered RuntimeAssessmentVerdict = "not_offered"
 
 type RuntimeAvailability struct {
-	Available     *RuntimeAvailabilityAvailable     `json:"available,omitzero"`
-	Missing       *RuntimeAvailabilityMissing       `json:"missing,omitzero"`
-	NeedsSignIn   *RuntimeAvailabilityNeedsSignIn   `json:"needsSignIn,omitzero"`
-	Failed        *RuntimeAvailabilityFailed        `json:"failed,omitzero"`
-	Installing    *RuntimeAvailabilityInstalling    `json:"installing,omitzero"`
+	Available *RuntimeAvailabilityAvailable `json:"available,omitzero"`
+
+	Missing *RuntimeAvailabilityMissing `json:"missing,omitzero"`
+
+	NeedsSignIn *RuntimeAvailabilityNeedsSignIn `json:"needsSignIn,omitzero"`
+
+	Failed *RuntimeAvailabilityFailed `json:"failed,omitzero"`
+
+	Installing *RuntimeAvailabilityInstalling `json:"installing,omitzero"`
+
 	InstallFailed *RuntimeAvailabilityInstallFailed `json:"installFailed,omitzero"`
 }
 
 type RuntimeAvailabilityAvailable struct {
-	Path           string `json:"path"`
-	SupportsResume bool   `json:"supportsResume"`
+	Path string `json:"path"`
+
+	SupportsResume bool `json:"supportsResume"`
 }
 
 type RuntimeAvailabilityMissing struct {
@@ -4741,7 +6086,8 @@ type RuntimeAvailabilityMissing struct {
 
 type RuntimeAvailabilityNeedsSignIn struct {
 	AuthMethods []string `json:"authMethods"`
-	FixCommand  *string  `json:"fixCommand,omitzero"`
+
+	FixCommand *string `json:"fixCommand,omitzero"`
 }
 
 type RuntimeAvailabilityFailed struct {
@@ -4757,8 +6103,10 @@ type RuntimeAvailabilityInstallFailed struct {
 }
 
 type RuntimeInstall struct {
-	Toolset   *RuntimeInstallToolset   `json:"toolset,omitzero"`
-	Script    *RuntimeInstallScript    `json:"script,omitzero"`
+	Toolset *RuntimeInstallToolset `json:"toolset,omitzero"`
+
+	Script *RuntimeInstallScript `json:"script,omitzero"`
+
 	NpmGlobal *RuntimeInstallNpmGlobal `json:"npmGlobal,omitzero"`
 }
 
@@ -4767,7 +6115,8 @@ type RuntimeInstallToolset struct {
 }
 
 type RuntimeInstallScript struct {
-	URL   URL    `json:"url"`
+	URL URL `json:"url"`
+
 	Shell string `json:"shell"`
 }
 
@@ -4780,30 +6129,44 @@ type RuntimeRequest struct {
 }
 
 type RuntimeSession struct {
-	SessionID             string  `json:"sessionID"`
-	Cwd                   URL     `json:"cwd"`
-	AdditionalDirectories []URL   `json:"additionalDirectories,omitzero"`
-	Title                 *string `json:"title,omitzero"`
-	UpdatedAt             *Date   `json:"updatedAt,omitzero"`
-	IsHeld                *bool   `json:"isHeld,omitzero"`
+	SessionID string `json:"sessionID"`
+
+	Cwd URL `json:"cwd"`
+
+	AdditionalDirectories []URL `json:"additionalDirectories,omitzero"`
+
+	Title *string `json:"title,omitzero"`
+
+	UpdatedAt *Date `json:"updatedAt,omitzero"`
+
+	IsHeld *bool `json:"isHeld,omitzero"`
 }
 
 type RuntimeStatus struct {
-	Runtime      Runtime             `json:"runtime"`
+	Runtime Runtime `json:"runtime"`
+
 	Availability RuntimeAvailability `json:"availability"`
-	CheckedAt    Date                `json:"checkedAt"`
-	Outdated     bool                `json:"outdated"`
-	PoolNote     *string             `json:"poolNote,omitzero"`
-	IsOut        *bool               `json:"isOut,omitzero"`
+
+	CheckedAt Date `json:"checkedAt"`
+
+	Outdated bool `json:"outdated"`
+
+	PoolNote *string `json:"poolNote,omitzero"`
+
+	IsOut *bool `json:"isOut,omitzero"`
 }
 
 // A server ssh knows by a name, for Add a Server's server box (#610).
 type SSHHost struct {
-	Alias          string `json:"alias"`
-	Resolved       string `json:"resolved"`
-	ThroughBastion bool   `json:"throughBastion"`
-	IsBastion      bool   `json:"isBastion"`
-	Known          bool   `json:"known"`
+	Alias string `json:"alias"`
+
+	Resolved string `json:"resolved"`
+
+	ThroughBastion bool `json:"throughBastion"`
+
+	IsBastion bool `json:"isBastion"`
+
+	Known bool `json:"known"`
 }
 
 // hosts/sshHosts (#610): with a destination, just that, as typed.
@@ -4813,15 +6176,18 @@ type SSHHostsRequest struct {
 
 // A session that said the text, and the line it is on.
 type SaidMatch struct {
-	AgentID UUID   `json:"agentID"`
-	Line    string `json:"line"`
+	AgentID UUID `json:"agentID"`
+
+	Line string `json:"line"`
 }
 
 // agents/said (#1585): the sessions whose prompts or replies hold the text, any case, in one project when folder says.
 type SaidSearchRequest struct {
-	Text   string `json:"text"`
-	Folder *URL   `json:"folder,omitzero"`
-	Limit  *int64 `json:"limit,omitzero"`
+	Text string `json:"text"`
+
+	Folder *URL `json:"folder,omitzero"`
+
+	Limit *int64 `json:"limit,omitzero"`
 }
 
 // The sessions that said it, the most recently active first.
@@ -4831,18 +6197,20 @@ type SaidSearchResult struct {
 
 type SandboxChoice string
 
-const (
-	SandboxChoiceRuntime SandboxChoice = "runtime"
-	SandboxChoiceOn      SandboxChoice = "on"
-	SandboxChoiceOff     SandboxChoice = "off"
-)
+const SandboxChoiceRuntime SandboxChoice = "runtime"
+const SandboxChoiceOn SandboxChoice = "on"
+const SandboxChoiceOff SandboxChoice = "off"
 
 type SandboxFailureRecord struct {
-	RuntimeID          string `json:"runtimeID"`
-	Detail             string `json:"detail"`
-	Hang               bool   `json:"hang"`
-	RecoveryOffered    bool   `json:"recoveryOffered"`
-	CompletedToolCalls int64  `json:"completedToolCalls"`
+	RuntimeID string `json:"runtimeID"`
+
+	Detail string `json:"detail"`
+
+	Hang bool `json:"hang"`
+
+	RecoveryOffered bool `json:"recoveryOffered"`
+
+	CompletedToolCalls int64 `json:"completedToolCalls"`
 }
 
 type SandboxSettings struct {
@@ -4851,40 +6219,46 @@ type SandboxSettings struct {
 
 type SandboxState string
 
-const (
-	SandboxStateOn                SandboxState = "on"
-	SandboxStateOff               SandboxState = "off"
-	SandboxStateRuntimeControlled SandboxState = "runtimeControlled"
-	SandboxStateNone              SandboxState = "none"
-)
+const SandboxStateOn SandboxState = "on"
+const SandboxStateOff SandboxState = "off"
+const SandboxStateRuntimeControlled SandboxState = "runtimeControlled"
+const SandboxStateNone SandboxState = "none"
 
 // Envelope: HPKE (P-256, HKDF-SHA256, AES-256-GCM) to one device's key. Nothing in it is legible but to that device.
 type SealedEnvelope struct {
 	Encapsulated Data `json:"encapsulated"`
-	Ciphertext   Data `json:"ciphertext"`
+
+	Ciphertext Data `json:"ciphertext"`
 }
 
 // A machine that was removed with a secret on it (#1760, FR-026): change the secret where it was issued.
 type SecretLeftOn struct {
 	Host HostID `json:"host"`
+
 	// The machine's name when it was removed.
 	Name string `json:"name"`
-	At   string `json:"at"`
+
+	At string `json:"at"`
 }
 
 // control/secretsLeft (#1760, FR-026): to the person's own clients, when one of their machines was removed with secrets on it.
 type SecretsLeft struct {
-	Host    HostID           `json:"host"`
-	Name    string           `json:"name"`
+	Host HostID `json:"host"`
+
+	Name string `json:"name"`
+
 	Secrets []UserSecretName `json:"secrets"`
 }
 
 // What the Send sheet shows (#1123): the local branches, the one checked out (none when detached), the origin, and whether anything is uncommitted.
 type SendFacts struct {
-	Branches   []string `json:"branches"`
-	Current    *string  `json:"current,omitzero"`
-	Origin     *string  `json:"origin,omitzero"`
-	HasChanges bool     `json:"hasChanges"`
+	Branches []string `json:"branches"`
+
+	Current *string `json:"current,omitzero"`
+
+	Origin *string `json:"origin,omitzero"`
+
+	HasChanges bool `json:"hasChanges"`
 }
 
 // Asks this Mac's host about a repository to send (Send to ‹host›…, #1123).
@@ -4894,51 +6268,63 @@ type SendFactsRequest struct {
 
 // A file the host made for a send, read with projects/sendRead (#1123).
 type SendFile struct {
-	ID   UUID  `json:"id"`
+	ID UUID `json:"id"`
+
 	Size int64 `json:"size"`
 }
 
 // What projects/sendPack made (#1123): each branch at its commit, the bundle (none when the receiving host has every commit) and the patch (none when nothing is uncommitted).
 type SendPack struct {
 	Commits []SentBranch `json:"commits"`
-	Bundle  *SendFile    `json:"bundle,omitzero"`
-	Patch   *SendFile    `json:"patch,omitzero"`
+
+	Bundle *SendFile `json:"bundle,omitzero"`
+
+	Patch *SendFile `json:"patch,omitzero"`
 }
 
 // Makes what a send carries (#1123): a bundle of `branches` without the commits in `leavingOut` (the receiving host's), and with `includeChanges` a patch of the uncommitted changes, new files git does not ignore among them.
 type SendPackRequest struct {
-	Folder         URL      `json:"folder"`
-	Branches       []string `json:"branches"`
-	LeavingOut     []string `json:"leavingOut"`
-	IncludeChanges bool     `json:"includeChanges"`
+	Folder URL `json:"folder"`
+
+	Branches []string `json:"branches"`
+
+	LeavingOut []string `json:"leavingOut"`
+
+	IncludeChanges bool `json:"includeChanges"`
 }
 
 // A part of at most 1 MB (#1530). `end` is true for the last, and then the host removes the file.
 type SendRead struct {
 	Data Data `json:"data"`
-	End  bool `json:"end"`
+
+	End bool `json:"end"`
 }
 
 // One part of a file projects/sendPack made, from `offset` (#1123).
 type SendReadRequest struct {
-	ID     UUID  `json:"id"`
+	ID UUID `json:"id"`
+
 	Offset int64 `json:"offset"`
 }
 
 // A branch the Mac sends, at the commit it has (#1123).
 type SentBranch struct {
-	Name   string `json:"name"`
+	Name string `json:"name"`
+
 	Commit string `json:"commit"`
 }
 
 type ServedRequest struct {
-	Kind    ServedRequestKind    `json:"kind"`
+	Kind ServedRequestKind `json:"kind"`
+
 	Outcome ServedRequestOutcome `json:"outcome"`
 }
 
 type ServedRequestKind struct {
-	ReadFile   *ServedRequestKindReadFile   `json:"readFile,omitzero"`
-	WriteFile  *ServedRequestKindWriteFile  `json:"writeFile,omitzero"`
+	ReadFile *ServedRequestKindReadFile `json:"readFile,omitzero"`
+
+	WriteFile *ServedRequestKindWriteFile `json:"writeFile,omitzero"`
+
 	RunCommand *ServedRequestKindRunCommand `json:"runCommand,omitzero"`
 }
 
@@ -4947,19 +6333,23 @@ type ServedRequestKindReadFile struct {
 }
 
 type ServedRequestKindWriteFile struct {
-	Path      string `json:"path"`
-	ByteCount int64  `json:"byteCount"`
+	Path string `json:"path"`
+
+	ByteCount int64 `json:"byteCount"`
 }
 
 type ServedRequestKindRunCommand struct {
-	Command string   `json:"command"`
-	Args    []string `json:"args"`
+	Command string `json:"command"`
+
+	Args []string `json:"args"`
 }
 
 type ServedRequestOutcome struct {
-	Served  *struct{}                    `json:"served,omitzero"`
+	Served *struct{} `json:"served,omitzero"`
+
 	Refused *ServedRequestOutcomeRefused `json:"refused,omitzero"`
-	Failed  *ServedRequestOutcomeFailed  `json:"failed,omitzero"`
+
+	Failed *ServedRequestOutcomeFailed `json:"failed,omitzero"`
 }
 
 type ServedRequestOutcomeRefused struct {
@@ -4972,178 +6362,214 @@ type ServedRequestOutcomeFailed struct {
 
 type ServerReachabilityChange struct {
 	Server string `json:"server"`
-	Online bool   `json:"online"`
+
+	Online bool `json:"online"`
 }
 
 type SessionLabel struct {
-	Value   string            `json:"value"`
-	Owner   SessionLabelOwner `json:"owner"`
-	AddedAt Date              `json:"addedAt"`
+	Value string `json:"value"`
+
+	Owner SessionLabelOwner `json:"owner"`
+
+	AddedAt Date `json:"addedAt"`
 }
 
 type SessionLabelOwner string
 
-const (
-	SessionLabelOwnerPerson SessionLabelOwner = "person"
-	SessionLabelOwnerAgent  SessionLabelOwner = "agent"
-)
+const SessionLabelOwnerPerson SessionLabelOwner = "person"
+const SessionLabelOwnerAgent SessionLabelOwner = "agent"
 
 type SessionNotice struct {
-	Severity string  `json:"severity"`
-	Title    string  `json:"title"`
-	Detail   *string `json:"detail,omitzero"`
+	Severity string `json:"severity"`
+
+	Title string `json:"title"`
+
+	Detail *string `json:"detail,omitzero"`
 }
 
 type SessionsListRequest struct {
 	RuntimeID string `json:"runtimeID"`
-	Cwd       URL    `json:"cwd"`
+
+	Cwd URL `json:"cwd"`
 }
 
 type SetCeilingRequest struct {
-	AgentID      UUID   `json:"agentID"`
-	Ceiling      *Cost  `json:"ceiling,omitzero"`
+	AgentID UUID `json:"agentID"`
+
+	Ceiling *Cost `json:"ceiling,omitzero"`
+
 	TokenCeiling *int64 `json:"tokenCeiling,omitzero"`
 }
 
 type SetDiskSpaceRequest struct {
-	Folder    URL            `json:"folder"`
+	Folder URL `json:"folder"`
+
 	DiskSpace DiskThresholds `json:"diskSpace"`
 }
 
 type SetHelperLimitsRequest struct {
-	Folder URL          `json:"folder"`
+	Folder URL `json:"folder"`
+
 	Limits HelperLimits `json:"limits"`
 }
 
 type SetLabelsRequest struct {
-	AgentID UUID     `json:"agentID"`
-	Add     []string `json:"add"`
-	Remove  []string `json:"remove"`
+	AgentID UUID `json:"agentID"`
+
+	Add []string `json:"add"`
+
+	Remove []string `json:"remove"`
 }
 
 type SetLimitsRequest struct {
-	PerAgent       *Cost  `json:"perAgent,omitzero"`
-	Daily          *Cost  `json:"daily,omitzero"`
+	PerAgent *Cost `json:"perAgent,omitzero"`
+
+	Daily *Cost `json:"daily,omitzero"`
+
 	PerAgentTokens *int64 `json:"perAgentTokens,omitzero"`
-	DailyTokens    *int64 `json:"dailyTokens,omitzero"`
+
+	DailyTokens *int64 `json:"dailyTokens,omitzero"`
 }
 
 type SetMutedRequest struct {
 	AgentID UUID `json:"agentID"`
-	Muted   bool `json:"muted"`
+
+	Muted bool `json:"muted"`
 }
 
 type SetOptionRequest struct {
-	AgentID  UUID      `json:"agentID"`
-	OptionID string    `json:"optionID"`
-	Value    JSONValue `json:"value"`
+	AgentID UUID `json:"agentID"`
+
+	OptionID string `json:"optionID"`
+
+	Value JSONValue `json:"value"`
 }
 
 type SetPinnedRequest struct {
-	Folder URL  `json:"folder"`
+	Folder URL `json:"folder"`
+
 	Pinned bool `json:"pinned"`
 }
 
 type SetProviderRequest struct {
-	RuntimeID  string `json:"runtimeID"`
+	RuntimeID string `json:"runtimeID"`
+
 	ProviderID string `json:"providerID"`
 }
 
 type SetSandboxRequest struct {
-	AgentID UUID           `json:"agentID"`
-	Choice  *SandboxChoice `json:"choice,omitzero"`
+	AgentID UUID `json:"agentID"`
+
+	Choice *SandboxChoice `json:"choice,omitzero"`
 }
 
 type SetUnreadRequest struct {
 	AgentID UUID `json:"agentID"`
-	Unread  bool `json:"unread"`
+
+	Unread bool `json:"unread"`
 }
 
 type SharedInstructions struct {
-	Path   string                 `json:"path"`
-	Exists bool                   `json:"exists"`
-	Reach  map[string]SharedReach `json:"reach"`
+	Path string `json:"path"`
+
+	Exists bool `json:"exists"`
+
+	Reach map[string]SharedReach `json:"reach"`
 }
 
 // Something the overview lists under Needs a look, and the page it opens.
 type SharedLook struct {
 	Kind SharedLookKind `json:"kind"`
+
 	Page SharedLookPage `json:"page"`
+
 	// What it is about: a skill, a server, a runtime's name.
 	Item string `json:"item"`
+
 	Text string `json:"text"`
 }
 
 type SharedLookKind string
 
-const (
-	SharedLookKindClash   SharedLookKind = "clash"
-	SharedLookKindLeftOut SharedLookKind = "leftOut"
-	SharedLookKindNoWay   SharedLookKind = "noWay"
-	SharedLookKindNoFile  SharedLookKind = "noFile"
-	SharedLookKindProblem SharedLookKind = "problem"
-)
+const SharedLookKindClash SharedLookKind = "clash"
+const SharedLookKindLeftOut SharedLookKind = "leftOut"
+const SharedLookKindNoWay SharedLookKind = "noWay"
+const SharedLookKindNoFile SharedLookKind = "noFile"
+const SharedLookKindProblem SharedLookKind = "problem"
 
 type SharedLookPage string
 
-const (
-	SharedLookPageInstructions SharedLookPage = "instructions"
-	SharedLookPageSkills       SharedLookPage = "skills"
-	SharedLookPageMCP          SharedLookPage = "mcp"
-	SharedLookPagePlugins      SharedLookPage = "plugins"
-	SharedLookPageOther        SharedLookPage = "other"
-)
+const SharedLookPageInstructions SharedLookPage = "instructions"
+const SharedLookPageSkills SharedLookPage = "skills"
+const SharedLookPageMCP SharedLookPage = "mcp"
+const SharedLookPagePlugins SharedLookPage = "plugins"
+const SharedLookPageOther SharedLookPage = "other"
 
 type SharedMCP struct {
-	File    string         `json:"file"`
+	File string `json:"file"`
+
 	Problem *SharedProblem `json:"problem,omitzero"`
+
 	// The person's, from `mcp.json`.
 	Servers []SharedServer `json:"servers"`
+
 	// The app's own, sent to every agent.
 	App []SharedServer `json:"app"`
+
 	// Set up in one runtime's own config and nowhere else.
 	RuntimeOnly []SharedRuntimeOnlyServer `json:"runtimeOnly"`
 }
 
 type SharedOtherFile struct {
 	// Relative to `~/.agents`, or to a project's `.agents`.
-	Path string              `json:"path"`
+	Path string `json:"path"`
+
 	Kind SharedOtherFileKind `json:"kind"`
 }
 
 type SharedOtherFileKind string
 
-const (
-	SharedOtherFileKindPersona SharedOtherFileKind = "persona"
-	SharedOtherFileKindGit     SharedOtherFileKind = "git"
-	SharedOtherFileKindManaged SharedOtherFileKind = "managed"
-	SharedOtherFileKindUnused  SharedOtherFileKind = "unused"
-	SharedOtherFileKindApp     SharedOtherFileKind = "app"
-)
+const SharedOtherFileKindPersona SharedOtherFileKind = "persona"
+const SharedOtherFileKindGit SharedOtherFileKind = "git"
+const SharedOtherFileKindManaged SharedOtherFileKind = "managed"
+const SharedOtherFileKindUnused SharedOtherFileKind = "unused"
+const SharedOtherFileKindApp SharedOtherFileKind = "app"
 
 type SharedPlugin struct {
-	Name        string               `json:"name"`
-	Version     *string              `json:"version,omitzero"`
-	Description *string              `json:"description,omitzero"`
-	Path        string               `json:"path"`
-	Contents    SharedPluginContents `json:"contents"`
+	Name string `json:"name"`
+
+	Version *string `json:"version,omitzero"`
+
+	Description *string `json:"description,omitzero"`
+
+	Path string `json:"path"`
+
+	Contents SharedPluginContents `json:"contents"`
+
 	// Its files, relative to its folder, for the detail's tree: at most 40.
-	Files       []string               `json:"files"`
-	ServerNames []string               `json:"serverNames"`
-	Reach       map[string]SharedReach `json:"reach"`
+	Files []string `json:"files"`
+
+	ServerNames []string `json:"serverNames"`
+
+	Reach map[string]SharedReach `json:"reach"`
 }
 
 type SharedPluginContents struct {
-	Skills     int64 `json:"skills"`
-	Commands   int64 `json:"commands"`
-	Agents     int64 `json:"agents"`
-	Hooks      int64 `json:"hooks"`
+	Skills int64 `json:"skills"`
+
+	Commands int64 `json:"commands"`
+
+	Agents int64 `json:"agents"`
+
+	Hooks int64 `json:"hooks"`
+
 	McpServers int64 `json:"mcpServers"`
 }
 
 type SharedProblem struct {
 	Message string `json:"message"`
-	Line    *int64 `json:"line,omitzero"`
+
+	Line *int64 `json:"line,omitzero"`
 }
 
 // What one runtime does with one thing: it gets it (how), uses its own copy at a path, is left out (why), has no way to take it, or is not measured yet (`"unchecked"`, or with a note).
@@ -5155,37 +6581,52 @@ type SharedRequest struct {
 }
 
 type SharedRuntimeName struct {
-	ID   string `json:"id"`
+	ID string `json:"id"`
+
 	Name string `json:"name"`
 }
 
 type SharedRuntimeOnlyServer struct {
-	Name      string `json:"name"`
+	Name string `json:"name"`
+
 	RuntimeID string `json:"runtimeID"`
-	File      string `json:"file"`
+
+	File string `json:"file"`
 }
 
 type SharedServer struct {
 	Name string `json:"name"`
+
 	// `stdio`, `http` or `sse`.
 	Transport string `json:"transport"`
+
 	// The command and its first arguments, or the URL without its query.
-	Summary     string   `json:"summary"`
-	EnvNames    []string `json:"envNames"`
+	Summary string `json:"summary"`
+
+	EnvNames []string `json:"envNames"`
+
 	HeaderNames []string `json:"headerNames"`
+
 	// The runtimes with a server of this name in their own config, and that file.
-	Clash map[string]string      `json:"clash"`
+	Clash map[string]string `json:"clash"`
+
 	Reach map[string]SharedReach `json:"reach"`
 }
 
 type SharedSkill struct {
-	Name        string            `json:"name"`
-	Path        string            `json:"path"`
-	Description *string           `json:"description,omitzero"`
-	Source      SharedSkillSource `json:"source"`
+	Name string `json:"name"`
+
+	Path string `json:"path"`
+
+	Description *string `json:"description,omitzero"`
+
+	Source SharedSkillSource `json:"source"`
+
 	// The other copy of a skill of this name, left where it was.
-	Clash *string                `json:"clash,omitzero"`
+	Clash *string `json:"clash,omitzero"`
+
 	Reach map[string]SharedReach `json:"reach"`
+
 	// Where a lock says it came from (059); none for the person's own.
 	Managed *ManagedSkill `json:"managed,omitzero"`
 }
@@ -5197,43 +6638,66 @@ type SharedSkillSource = JSONValue
 type SharedSnapshot struct {
 	// `~/.agents`, or a project's `.agents` (#754).
 	Home string `json:"home"`
+
 	// False for a copy of the app with no personal home (a scratch root), when everything else is empty.
 	LaidOut bool `json:"laidOut"`
+
 	// The installed runtimes with a rule, by name: the columns.
-	Runtimes     []SharedRuntimeName `json:"runtimes"`
+	Runtimes []SharedRuntimeName `json:"runtimes"`
+
 	Instructions *SharedInstructions `json:"instructions,omitzero"`
-	Skills       []SharedSkill       `json:"skills"`
-	MCP          SharedMCP           `json:"mcp"`
-	Plugins      []SharedPlugin      `json:"plugins"`
-	OtherFiles   []SharedOtherFile   `json:"otherFiles"`
-	NeedsALook   []SharedLook        `json:"needsALook"`
+
+	Skills []SharedSkill `json:"skills"`
+
+	MCP SharedMCP `json:"mcp"`
+
+	Plugins []SharedPlugin `json:"plugins"`
+
+	OtherFiles []SharedOtherFile `json:"otherFiles"`
+
+	NeedsALook []SharedLook `json:"needsALook"`
 }
 
 type ShellAttachRequest struct {
-	AgentID   UUID   `json:"agentID"`
-	Shell     *int64 `json:"shell,omitzero"`
-	Rows      *int64 `json:"rows,omitzero"`
-	Cols      *int64 `json:"cols,omitzero"`
-	Since     *int64 `json:"since,omitzero"`
-	StartedAt *Date  `json:"startedAt,omitzero"`
-	Folder    *URL   `json:"folder,omitzero"`
+	AgentID UUID `json:"agentID"`
+
+	Shell *int64 `json:"shell,omitzero"`
+
+	Rows *int64 `json:"rows,omitzero"`
+
+	Cols *int64 `json:"cols,omitzero"`
+
+	Since *int64 `json:"since,omitzero"`
+
+	StartedAt *Date `json:"startedAt,omitzero"`
+
+	Folder *URL `json:"folder,omitzero"`
 }
 
 type ShellAttachResponse struct {
-	State      ShellState `json:"state"`
-	Scrollback Data       `json:"scrollback"`
-	Dropped    int64      `json:"dropped"`
-	StartedAt  Date       `json:"startedAt"`
-	Folder     *URL       `json:"folder,omitzero"`
-	Offset     *int64     `json:"offset,omitzero"`
+	State ShellState `json:"state"`
+
+	Scrollback Data `json:"scrollback"`
+
+	Dropped int64 `json:"dropped"`
+
+	StartedAt Date `json:"startedAt"`
+
+	Folder *URL `json:"folder,omitzero"`
+
+	Offset *int64 `json:"offset,omitzero"`
 }
 
 type ShellInputRequest struct {
-	AgentID UUID   `json:"agentID"`
-	Shell   *int64 `json:"shell,omitzero"`
-	Bytes   Data   `json:"bytes"`
-	Rows    *int64 `json:"rows,omitzero"`
-	Cols    *int64 `json:"cols,omitzero"`
+	AgentID UUID `json:"agentID"`
+
+	Shell *int64 `json:"shell,omitzero"`
+
+	Bytes Data `json:"bytes"`
+
+	Rows *int64 `json:"rows,omitzero"`
+
+	Cols *int64 `json:"cols,omitzero"`
 }
 
 type ShellListResponse struct {
@@ -5245,34 +6709,46 @@ type ShellOpenResponse struct {
 }
 
 type ShellOutputNotification struct {
-	AgentID UUID   `json:"agentID"`
-	Shell   int64  `json:"shell"`
-	Bytes   Data   `json:"bytes"`
-	Offset  *int64 `json:"offset,omitzero"`
+	AgentID UUID `json:"agentID"`
+
+	Shell int64 `json:"shell"`
+
+	Bytes Data `json:"bytes"`
+
+	Offset *int64 `json:"offset,omitzero"`
 }
 
 type ShellRequest struct {
-	AgentID UUID   `json:"agentID"`
-	Shell   *int64 `json:"shell,omitzero"`
+	AgentID UUID `json:"agentID"`
+
+	Shell *int64 `json:"shell,omitzero"`
 }
 
 type ShellResizeRequest struct {
-	AgentID UUID   `json:"agentID"`
-	Shell   *int64 `json:"shell,omitzero"`
-	Rows    int64  `json:"rows"`
-	Cols    int64  `json:"cols"`
+	AgentID UUID `json:"agentID"`
+
+	Shell *int64 `json:"shell,omitzero"`
+
+	Rows int64 `json:"rows"`
+
+	Cols int64 `json:"cols"`
 }
 
 type ShellSignalRequest struct {
-	AgentID UUID   `json:"agentID"`
-	Shell   *int64 `json:"shell,omitzero"`
-	Signal  int64  `json:"signal"`
+	AgentID UUID `json:"agentID"`
+
+	Shell *int64 `json:"shell,omitzero"`
+
+	Signal int64 `json:"signal"`
 }
 
 type ShellState struct {
-	Live     *struct{}           `json:"live,omitzero"`
-	Exited   *ShellStateExited   `json:"exited,omitzero"`
-	Failed   *ShellStateFailed   `json:"failed,omitzero"`
+	Live *struct{} `json:"live,omitzero"`
+
+	Exited *ShellStateExited `json:"exited,omitzero"`
+
+	Failed *ShellStateFailed `json:"failed,omitzero"`
+
 	Released *ShellStateReleased `json:"released,omitzero"`
 }
 
@@ -5289,42 +6765,55 @@ type ShellStateReleased struct {
 }
 
 type ShellStateNotification struct {
-	AgentID UUID       `json:"agentID"`
-	Shell   int64      `json:"shell"`
-	State   ShellState `json:"state"`
+	AgentID UUID `json:"agentID"`
+
+	Shell int64 `json:"shell"`
+
+	State ShellState `json:"state"`
 }
 
 type ShowFileNotification struct {
-	AgentID UUID      `json:"agentID"`
-	File    ShownFile `json:"file"`
+	AgentID UUID `json:"agentID"`
+
+	File ShownFile `json:"file"`
 }
 
 type ShownFile struct {
-	Path  string     `json:"path"`
-	Line  *int64     `json:"line,omitzero"`
+	Path string `json:"path"`
+
+	Line *int64 `json:"line,omitzero"`
+
 	Chart *ChartHint `json:"chart,omitzero"`
 }
 
 // One way a person signs in (#994, spec 736): `local` is the local owner's (codes, with the control plane's key), `code` an invite code redeemed; Google, Apple and GitHub come with #995.
 type SignIn struct {
-	Provider string  `json:"provider"`
-	Account  *string `json:"account,omitzero"`
-	Email    *string `json:"email,omitzero"`
-	Login    *string `json:"login,omitzero"`
-	Added    *Date   `json:"added,omitzero"`
+	Provider string `json:"provider"`
+
+	Account *string `json:"account,omitzero"`
+
+	Email *string `json:"email,omitzero"`
+
+	Login *string `json:"login,omitzero"`
+
+	Added *Date `json:"added,omitzero"`
 }
 
 // signIn/addToMe (#995, FR-005): a sign-in to add to the caller's person: an ID token made with signIn/providers' nonce, or a GitHub user access token.
 type SignInAdd struct {
 	Provider string `json:"provider"`
-	Token    string `json:"token"`
+
+	Token string `json:"token"`
 }
 
 // signIn/configure (#995, admins): turn a provider on or off, and set Google's allowed Workspace domains or GitHub's allowed organisations. What is left out stays as it was.
 type SignInConfigure struct {
-	Provider      string   `json:"provider"`
-	On            *bool    `json:"on,omitzero"`
-	Domains       []string `json:"domains,omitzero"`
+	Provider string `json:"provider"`
+
+	On *bool `json:"on,omitzero"`
+
+	Domains []string `json:"domains,omitzero"`
+
 	Organisations []string `json:"organisations,omitzero"`
 }
 
@@ -5336,76 +6825,97 @@ type SignInDecide struct {
 // control/signInDecided (#995): how a request ended: approved, denied or expired.
 type SignInDecided struct {
 	Request string `json:"request"`
-	Result  string `json:"result"`
+
+	Result string `json:"result"`
 }
 
 // signIn/pair, on an `s:` connection (#995): the client's name and kind, and its provider's token: an ID token for google and apple, a user access token for github. The control plane checks it and forgets it (FR-008, FR-010).
 type SignInPair struct {
-	Provider string     `json:"provider"`
-	Token    string     `json:"token"`
-	Name     string     `json:"name"`
-	Kind     ClientKind `json:"kind"`
+	Provider string `json:"provider"`
+
+	Token string `json:"token"`
+
+	Name string `json:"name"`
+
+	Kind ClientKind `json:"kind"`
 }
 
 // One sign-in provider (#995, spec 736 FR-004): google, apple or github. `on` is the admin's switch; `available` is false when this build has no client id for it, with `why`. `clientID` is the app's own, what a client signs in with (FR-012).
 type SignInProvider struct {
-	Provider  string  `json:"provider"`
-	On        bool    `json:"on"`
-	Available bool    `json:"available"`
-	ClientID  *string `json:"clientID,omitzero"`
-	Why       *string `json:"why,omitzero"`
+	Provider string `json:"provider"`
+
+	On bool `json:"on"`
+
+	Available bool `json:"available"`
+
+	ClientID *string `json:"clientID,omitzero"`
+
+	Why *string `json:"why,omitzero"`
 }
 
 // signIn/providers, signIn/configure (#995): the providers. `challenge` (base64url) is what a client's nonce is made from on this connection: the hello's nonce on an `s:` connection, or a fresh one used once on a paired client's. The client makes the nonce itself, from the control key it trusts and the challenge (R2), so a token cannot be passed on to another control plane (FR-008, FR-011). `domains` (Google Workspace) and `organisations` (GitHub) are for admins only (FR-006).
 type SignInProviders struct {
-	Providers     []SignInProvider `json:"providers"`
-	Challenge     *string          `json:"challenge,omitzero"`
-	Domains       []string         `json:"domains,omitzero"`
-	Organisations []string         `json:"organisations,omitzero"`
+	Providers []SignInProvider `json:"providers"`
+
+	Challenge *string `json:"challenge,omitzero"`
+
+	Domains []string `json:"domains,omitzero"`
+
+	Organisations []string `json:"organisations,omitzero"`
 }
 
 // signIn/removeFromMe (#995): an outside sign-in to take off the caller's person. The local owner's stays.
 type SignInRemove struct {
 	Provider string `json:"provider"`
-	Account  string `json:"account"`
+
+	Account string `json:"account"`
 }
 
 // signIn/requests, control/signInRequested (#995, FR-010): a new client that signed in with GitHub, waiting for Approve on one of the person's clients, with the code it shows.
 type SignInRequest struct {
-	Request  string     `json:"request"`
-	Name     string     `json:"name"`
-	Kind     ClientKind `json:"kind"`
-	Provider string     `json:"provider"`
-	Login    *string    `json:"login,omitzero"`
-	Code     string     `json:"code"`
-	Expires  Date       `json:"expires"`
+	Request string `json:"request"`
+
+	Name string `json:"name"`
+
+	Kind ClientKind `json:"kind"`
+
+	Provider string `json:"provider"`
+
+	Login *string `json:"login,omitzero"`
+
+	Code string `json:"code"`
+
+	Expires Date `json:"expires"`
 }
 
 // control/signInWaiting, on an `s:` connection (#995, FR-010): a GitHub sign-in waits for Approve on another client of the person, which shows the same code.
 type SignInWaiting struct {
-	Code    string `json:"code"`
-	Expires Date   `json:"expires"`
+	Code string `json:"code"`
+
+	Expires Date `json:"expires"`
 }
 
 type SignInWantedReason string
 
-const (
-	SignInWantedReasonNotSignedIn SignInWantedReason = "notSignedIn"
-	SignInWantedReasonUnreadable  SignInWantedReason = "unreadable"
-)
+const SignInWantedReasonNotSignedIn SignInWantedReason = "notSignedIn"
+const SignInWantedReasonUnreadable SignInWantedReason = "unreadable"
 
 // An iOS simulator on a Mac host (#842): its UDID, its name, its system and whether it is booted.
 type Simulator struct {
-	Udid   string `json:"udid"`
-	Name   string `json:"name"`
-	Os     string `json:"os"`
-	Booted bool   `json:"booted"`
+	Udid string `json:"udid"`
+
+	Name string `json:"name"`
+
+	Os string `json:"os"`
+
+	Booted bool `json:"booted"`
 }
 
 // simulators/list: the host's simulators, booted first. Reason says why there are none to list, when a host has no simulators (not a Mac, no Xcode).
 type SimulatorList struct {
 	Simulators []Simulator `json:"simulators"`
-	Reason     *string     `json:"reason,omitzero"`
+
+	Reason *string `json:"reason,omitzero"`
 }
 
 // simulators/boot and simulators/shutdown: one simulator, by its UDID.
@@ -5415,22 +6925,27 @@ type SimulatorRequest struct {
 
 // A booted simulator's screen as a JPEG, and its size in pixels.
 type SimulatorScreen struct {
-	Jpeg   Data  `json:"jpeg"`
-	Width  int64 `json:"width"`
+	Jpeg Data `json:"jpeg"`
+
+	Width int64 `json:"width"`
+
 	Height int64 `json:"height"`
 }
 
 // simulators/screen: a booted simulator's screen, at most maxHeight pixels tall (1200 when left out).
 type SimulatorScreenRequest struct {
-	Udid      string `json:"udid"`
+	Udid string `json:"udid"`
+
 	MaxHeight *int64 `json:"maxHeight,omitzero"`
 }
 
 // simulators/tap: a touch on a booted simulator's screen, where from 0 to 1 across (x) and down (y).
 type SimulatorTapRequest struct {
-	Udid string  `json:"udid"`
-	X    float64 `json:"x"`
-	Y    float64 `json:"y"`
+	Udid string `json:"udid"`
+
+	X float64 `json:"x"`
+
+	Y float64 `json:"y"`
 }
 
 type SkillAddAnswer struct {
@@ -5438,48 +6953,65 @@ type SkillAddAnswer struct {
 }
 
 type SkillAddRequest struct {
-	PreviewID   UUID             `json:"previewID"`
+	PreviewID UUID `json:"previewID"`
+
 	Destination SkillDestination `json:"destination"`
-	Replace     bool             `json:"replace"`
+
+	Replace bool `json:"replace"`
 }
 
 type SkillChanges struct {
-	Added   []string `json:"added"`
+	Added []string `json:"added"`
+
 	Changed []string `json:"changed"`
+
 	Removed []string `json:"removed"`
 }
 
 type SkillDestination struct {
-	Kind   SkillDestinationKind `json:"kind"`
-	Folder *string              `json:"folder,omitzero"`
+	Kind SkillDestinationKind `json:"kind"`
+
+	Folder *string `json:"folder,omitzero"`
 }
 
 type SkillDestinationKind string
 
-const (
-	SkillDestinationKindPersonal SkillDestinationKind = "personal"
-	SkillDestinationKindProject  SkillDestinationKind = "project"
-)
+const SkillDestinationKindPersonal SkillDestinationKind = "personal"
+const SkillDestinationKindProject SkillDestinationKind = "project"
 
 type SkillNameRequest struct {
 	Destination SkillDestination `json:"destination"`
-	Name        string           `json:"name"`
+
+	Name string `json:"name"`
 }
 
 type SkillPreview struct {
-	PreviewID        UUID             `json:"previewID"`
-	Result           CatalogResult    `json:"result"`
-	Name             string           `json:"name"`
-	Description      string           `json:"description"`
-	SkillPath        string           `json:"skillPath"`
-	Commit           string           `json:"commit"`
-	CommittedAt      *Date            `json:"committedAt,omitzero"`
-	TreeSHA          string           `json:"treeSHA"`
-	ComputedHash     string           `json:"computedHash"`
-	Files            []PreviewFile    `json:"files"`
-	SkillMarkdown    string           `json:"skillMarkdown"`
-	TotalBytes       int64            `json:"totalBytes"`
-	Problems         []PreviewProblem `json:"problems"`
+	PreviewID UUID `json:"previewID"`
+
+	Result CatalogResult `json:"result"`
+
+	Name string `json:"name"`
+
+	Description string `json:"description"`
+
+	SkillPath string `json:"skillPath"`
+
+	Commit string `json:"commit"`
+
+	CommittedAt *Date `json:"committedAt,omitzero"`
+
+	TreeSHA string `json:"treeSHA"`
+
+	ComputedHash string `json:"computedHash"`
+
+	Files []PreviewFile `json:"files"`
+
+	SkillMarkdown string `json:"skillMarkdown"`
+
+	TotalBytes int64 `json:"totalBytes"`
+
+	Problems []PreviewProblem `json:"problems"`
+
 	DestinationState DestinationState `json:"destinationState"`
 }
 
@@ -5489,8 +7021,10 @@ type SkillRemoveAnswer struct {
 
 type SkillUpdatePreviewAnswer struct {
 	Preview SkillPreview `json:"preview"`
+
 	Changes SkillChanges `json:"changes"`
-	Edited  bool         `json:"edited"`
+
+	Edited bool `json:"edited"`
 }
 
 type SkillUpdatesAnswer struct {
@@ -5506,9 +7040,11 @@ type SkillsListRequest struct {
 }
 
 type SlashCommand struct {
-	Name        string  `json:"name"`
+	Name string `json:"name"`
+
 	Description *string `json:"description,omitzero"`
-	InputHint   *string `json:"inputHint,omitzero"`
+
+	InputHint *string `json:"inputHint,omitzero"`
 }
 
 // Spend caps (#1761, spec 736 FR-033): a bot or a group stops starting work once its spend today (UTC) reaches one. None is no cap.
@@ -5517,44 +7053,64 @@ type SpendCaps struct {
 }
 
 type StartOptions struct {
-	Values         map[string]JSONValue `json:"values"`
-	ExtraArguments []string             `json:"extraArguments"`
+	Values map[string]JSONValue `json:"values"`
+
+	ExtraArguments []string `json:"extraArguments"`
 }
 
 type StartRequest struct {
-	RuntimeID             string          `json:"runtimeID"`
-	Cwd                   URL             `json:"cwd"`
-	Prompt                string          `json:"prompt"`
-	Attachments           []Attachment    `json:"attachments"`
-	StartOptions          StartOptions    `json:"startOptions"`
-	DraftID               *UUID           `json:"draftID,omitzero"`
-	AdditionalDirectories []URL           `json:"additionalDirectories"`
-	McpServers            []MCPServer     `json:"mcpServers"`
-	Worktree              *WorktreeChoice `json:"worktree,omitzero"`
-	RequestID             *UUID           `json:"requestID,omitzero"`
-	Sandbox               *SandboxChoice  `json:"sandbox,omitzero"`
-	Labels                []string        `json:"labels"`
-	Persona               *string         `json:"persona,omitzero"`
-	Purpose               *AgentPurpose   `json:"purpose,omitzero"`
+	RuntimeID string `json:"runtimeID"`
+
+	Cwd URL `json:"cwd"`
+
+	Prompt string `json:"prompt"`
+
+	Attachments []Attachment `json:"attachments"`
+
+	StartOptions StartOptions `json:"startOptions"`
+
+	DraftID *UUID `json:"draftID,omitzero"`
+
+	AdditionalDirectories []URL `json:"additionalDirectories"`
+
+	McpServers []MCPServer `json:"mcpServers"`
+
+	Worktree *WorktreeChoice `json:"worktree,omitzero"`
+
+	RequestID *UUID `json:"requestID,omitzero"`
+
+	Sandbox *SandboxChoice `json:"sandbox,omitzero"`
+
+	Labels []string `json:"labels"`
+
+	Persona *string `json:"persona,omitzero"`
+
+	Purpose *AgentPurpose `json:"purpose,omitzero"`
 }
 
 // A started machine in people/removePreview: the branches and worktrees on it with work that is not pushed. `unknown` says why it could not be asked (offline, or it did not answer), and then `unpushed` is empty.
 type StartedMachinePreview struct {
-	Host     HostID         `json:"host"`
-	Name     string         `json:"name"`
-	State    string         `json:"state"`
+	Host HostID `json:"host"`
+
+	Name string `json:"name"`
+
+	State string `json:"state"`
+
 	Unpushed []UnpushedWork `json:"unpushed"`
-	Unknown  *string        `json:"unknown,omitzero"`
+
+	Unknown *string `json:"unknown,omitzero"`
 }
 
 type StartingPoint struct {
-	Repository URL    `json:"repository"`
-	Commit     string `json:"commit"`
+	Repository URL `json:"repository"`
+
+	Commit string `json:"commit"`
 }
 
 type StopBackgroundRequest struct {
-	AgentID UUID   `json:"agentID"`
-	ItemID  string `json:"itemID"`
+	AgentID UUID `json:"agentID"`
+
+	ItemID string `json:"itemID"`
 }
 
 type StoreNotes struct {
@@ -5562,89 +7118,123 @@ type StoreNotes struct {
 }
 
 type SuggestedPrompt struct {
-	ID     UUID   `json:"id"`
-	Label  string `json:"label"`
+	ID UUID `json:"id"`
+
+	Label string `json:"label"`
+
 	Prompt string `json:"prompt"`
 }
 
 // Surface (Attention/Surface.swift): a tagged object, `{ mac: {} }` or `{ device: "<uuid>" }`.
 type Surface struct {
-	Mac    *struct{} `json:"mac,omitzero"`
-	Device *UUID     `json:"device,omitzero"`
+	Mac *struct{} `json:"mac,omitzero"`
+
+	Device *UUID `json:"device,omitzero"`
 }
 
 type SurfaceIdentification struct {
-	ID   UUID       `json:"id"`
-	Name string     `json:"name"`
+	ID UUID `json:"id"`
+
+	Name string `json:"name"`
+
 	Kind DeviceKind `json:"kind"`
 }
 
 type SwitchRecord struct {
-	ID            UUID               `json:"id"`
-	At            Date               `json:"at"`
-	AgentID       UUID               `json:"agentID"`
-	From          SwitchRecordSide   `json:"from"`
-	To            SwitchRecordSide   `json:"to"`
-	Reason        SwitchRecordReason `json:"reason"`
-	Carried       []CarriedSetting   `json:"carried"`
-	Dropped       []Dropped          `json:"dropped"`
-	Shortened     *int64             `json:"shortened,omitzero"`
-	Billing       Payment            `json:"billing"`
-	FromReturnsAt *Date              `json:"fromReturnsAt,omitzero"`
+	ID UUID `json:"id"`
+
+	At Date `json:"at"`
+
+	AgentID UUID `json:"agentID"`
+
+	From SwitchRecordSide `json:"from"`
+
+	To SwitchRecordSide `json:"to"`
+
+	Reason SwitchRecordReason `json:"reason"`
+
+	Carried []CarriedSetting `json:"carried"`
+
+	Dropped []Dropped `json:"dropped"`
+
+	Shortened *int64 `json:"shortened,omitzero"`
+
+	Billing Payment `json:"billing"`
+
+	FromReturnsAt *Date `json:"fromReturnsAt,omitzero"`
 }
 
 type SwitchRecordReason string
 
-const (
-	SwitchRecordReasonAllowanceSpent     SwitchRecordReason = "allowanceSpent"
-	SwitchRecordReasonOverage            SwitchRecordReason = "overage"
-	SwitchRecordReasonCreditUsedUp       SwitchRecordReason = "creditUsedUp"
-	SwitchRecordReasonRateLimitPersisted SwitchRecordReason = "rateLimitPersisted"
-	SwitchRecordReasonRuntimeFailed      SwitchRecordReason = "runtimeFailed"
-	SwitchRecordReasonEveryoneOutResumed SwitchRecordReason = "everyoneOutResumed"
-	SwitchRecordReasonByHand             SwitchRecordReason = "byHand"
-)
+const SwitchRecordReasonAllowanceSpent SwitchRecordReason = "allowanceSpent"
+const SwitchRecordReasonOverage SwitchRecordReason = "overage"
+const SwitchRecordReasonCreditUsedUp SwitchRecordReason = "creditUsedUp"
+const SwitchRecordReasonRateLimitPersisted SwitchRecordReason = "rateLimitPersisted"
+const SwitchRecordReasonRuntimeFailed SwitchRecordReason = "runtimeFailed"
+const SwitchRecordReasonEveryoneOutResumed SwitchRecordReason = "everyoneOutResumed"
+const SwitchRecordReasonByHand SwitchRecordReason = "byHand"
 
 type SwitchRecordSide struct {
-	EntryID   *UUID     `json:"entryID,omitzero"`
-	RuntimeID string    `json:"runtimeID"`
-	Model     JSONValue `json:"model,omitzero"`
-	Mode      JSONValue `json:"mode,omitzero"`
+	EntryID *UUID `json:"entryID,omitzero"`
+
+	RuntimeID string `json:"runtimeID"`
+
+	Model JSONValue `json:"model,omitzero"`
+
+	Mode JSONValue `json:"mode,omitzero"`
 }
 
 // A bot on Console ▸ Team Workflows (#1804, M6): its group, caps and spend today, its machines, the workflows it ran and what runs now.
 type TeamBot struct {
-	User          string     `json:"user"`
-	Name          string     `json:"name"`
-	Group         *string    `json:"group,omitzero"`
-	GroupName     *string    `json:"groupName,omitzero"`
-	Caps          *SpendCaps `json:"caps,omitzero"`
-	SpentTodayUSD float64    `json:"spentTodayUSD"`
+	User string `json:"user"`
+
+	Name string `json:"name"`
+
+	Group *string `json:"group,omitzero"`
+
+	GroupName *string `json:"groupName,omitzero"`
+
+	Caps *SpendCaps `json:"caps,omitzero"`
+
+	SpentTodayUSD float64 `json:"spentTodayUSD"`
+
 	// It is at its own or its group's cap until midnight UTC.
-	Capped    bool               `json:"capped"`
-	Machines  int64              `json:"machines"`
-	Online    int64              `json:"online"`
+	Capped bool `json:"capped"`
+
+	Machines int64 `json:"machines"`
+
+	Online int64 `json:"online"`
+
 	Workflows []TeamWorkflowRuns `json:"workflows"`
-	Live      []TeamBotRun       `json:"live"`
+
+	Live []TeamBotRun `json:"live"`
 }
 
 // An agent running on a bot's machine (#1804, M6), as the machine last listed it, for bots/stopRun. No title, nothing it said.
 type TeamBotRun struct {
-	Host     HostID `json:"host"`
+	Host HostID `json:"host"`
+
 	HostName string `json:"hostName"`
-	Agent    UUID   `json:"agent"`
+
+	Agent UUID `json:"agent"`
+
 	// The workflow that started it.
 	Workflow *string `json:"workflow,omitzero"`
-	Since    *Date   `json:"since,omitzero"`
+
+	Since *Date `json:"since,omitzero"`
 }
 
 // workflows/trigger and workflows/fire (#2011, spec 736 FR-035): a project or control-plane event (a server's, such as github or a channel's) or a schedule that a runs-on: workflow's trigger matched. A machine sends it to the control plane, which sends it once to one of the bot's machines. workflow is the project folder's name and the workflow's id; trigger, the same words on every machine that heard it; event, the event (none for a schedule); dueAt, a schedule's due time.
 type TeamTrigger struct {
-	Workflow string   `json:"workflow"`
-	Trigger  string   `json:"trigger"`
-	RunsOn   []string `json:"runsOn"`
-	Event    *Event   `json:"event,omitzero"`
-	DueAt    *Date    `json:"dueAt,omitzero"`
+	Workflow string `json:"workflow"`
+
+	Trigger string `json:"trigger"`
+
+	RunsOn []string `json:"runsOn"`
+
+	Event *Event `json:"event,omitzero"`
+
+	DueAt *Date `json:"dueAt,omitzero"`
 }
 
 // workflows/fire's answer: ran is true when the machine took the trigger (it runs it, or records why not, as for any trigger); false when it cannot take it here (no such workflow, or runs-on: does not match this machine), and the control plane tries another.
@@ -5659,9 +7249,11 @@ type TeamTriggerSent struct {
 
 // One workflow a bot ran in the last 7 days (#1804, M6): how many times, and when last.
 type TeamWorkflowRuns struct {
-	Workflow  string `json:"workflow"`
-	Runs      int64  `json:"runs"`
-	LastRunAt *Date  `json:"lastRunAt,omitzero"`
+	Workflow string `json:"workflow"`
+
+	Runs int64 `json:"runs"`
+
+	LastRunAt *Date `json:"lastRunAt,omitzero"`
 }
 
 // console/teamWorkflows' answer (#1804, M6): every bot, for an admin.
@@ -5670,98 +7262,154 @@ type TeamWorkflows struct {
 }
 
 type TimeBucket struct {
-	Agent  float64 `json:"agent"`
-	Tools  float64 `json:"tools"`
+	Agent float64 `json:"agent"`
+
+	Tools float64 `json:"tools"`
+
 	Others float64 `json:"others"`
+
 	Person float64 `json:"person"`
-	Turns  int64   `json:"turns"`
+
+	Turns int64 `json:"turns"`
 }
 
 type TimeHistory struct {
 	Hours map[string]map[string]TimeBucket `json:"hours"`
-	Days  map[string]map[string]TimeBucket `json:"days"`
-	Now   string                           `json:"now"`
+
+	Days map[string]map[string]TimeBucket `json:"days"`
+
+	Now string `json:"now"`
+
 	// The host's time zone, an IANA identifier such as America/Los_Angeles, that its hour and day stamps are in (#1267). Absent from a host too old to say: read as the viewer's own.
-	TimeZone *string             `json:"timeZone,omitzero"`
-	Recap    map[string]DayRecap `json:"recap"`
-	Records  TimeRecords         `json:"records"`
+	TimeZone *string `json:"timeZone,omitzero"`
+
+	Recap map[string]DayRecap `json:"recap"`
+
+	Records TimeRecords `json:"records"`
 }
 
 type TimeRecord struct {
 	Value float64 `json:"value"`
-	Day   string  `json:"day"`
+
+	Day string `json:"day"`
 }
 
 type TimeRecords struct {
-	MostAgents   *TimeRecord `json:"mostAgents,omitzero"`
-	MostPRs      *TimeRecord `json:"mostPRs,omitzero"`
+	MostAgents *TimeRecord `json:"mostAgents,omitzero"`
+
+	MostPRs *TimeRecord `json:"mostPRs,omitzero"`
+
 	LongestClear *TimeRecord `json:"longestClear,omitzero"`
 }
 
 type ToolCall struct {
-	ToolCallID *string            `json:"toolCallID,omitzero"`
-	Title      string             `json:"title"`
-	Name       *string            `json:"name,omitzero"`
-	Kind       *string            `json:"kind,omitzero"`
-	Status     *string            `json:"status,omitzero"`
-	Content    []ToolCallContent  `json:"content"`
-	Locations  []ToolCallLocation `json:"locations"`
-	RawInput   JSONValue          `json:"rawInput,omitzero"`
-	RawOutput  JSONValue          `json:"rawOutput,omitzero"`
-	Raw        JSONValue          `json:"raw,omitzero"`
+	ToolCallID *string `json:"toolCallID,omitzero"`
+
+	Title string `json:"title"`
+
+	Name *string `json:"name,omitzero"`
+
+	Kind *string `json:"kind,omitzero"`
+
+	Status *string `json:"status,omitzero"`
+
+	Content []ToolCallContent `json:"content"`
+
+	Locations []ToolCallLocation `json:"locations"`
+
+	RawInput JSONValue `json:"rawInput,omitzero"`
+
+	RawOutput JSONValue `json:"rawOutput,omitzero"`
+
+	Raw JSONValue `json:"raw,omitzero"`
 }
 
 // ToolCallContent (ACP/ToolCallContent.swift): the protocol's shapes, as sent. Anything else is written back as it came, so another `type` may arrive.
 type ToolCallContent struct {
 	// Type is one of "content", "diff", "terminal".
-	Type       string        `json:"type"`
-	Content    *ContentBlock `json:"content,omitzero"`
-	Path       *string       `json:"path,omitzero"`
-	NewText    *string       `json:"newText,omitzero"`
-	OldText    *string       `json:"oldText,omitzero"`
-	TerminalId *string       `json:"terminalId,omitzero"`
+	Type string `json:"type"`
+
+	Content *ContentBlock `json:"content,omitzero"`
+
+	Path *string `json:"path,omitzero"`
+
+	NewText *string `json:"newText,omitzero"`
+
+	OldText *string `json:"oldText,omitzero"`
+
+	TerminalId *string `json:"terminalId,omitzero"`
 }
 
 type ToolCallLocation struct {
 	Path string `json:"path"`
+
 	Line *int64 `json:"line,omitzero"`
 }
 
 type TranscriptEntry struct {
-	ID         UUID                `json:"id"`
-	At         Date                `json:"at"`
-	Kind       TranscriptEntryKind `json:"kind"`
-	SubagentID *string             `json:"subagentID,omitzero"`
-	Sender     *MessageSender      `json:"sender,omitzero"`
+	ID UUID `json:"id"`
+
+	At Date `json:"at"`
+
+	Kind TranscriptEntryKind `json:"kind"`
+
+	SubagentID *string `json:"subagentID,omitzero"`
+
+	Sender *MessageSender `json:"sender,omitzero"`
 }
 
 // One key, the kind's name, holding its fields. A kind this build does not know is kept whole and written back as it was read (TranscriptEntry+Coding.swift).
 type TranscriptEntryKind struct {
-	UserMessage         *TranscriptEntryKindUserMessage         `json:"userMessage,omitzero"`
-	AgentMessage        *TranscriptEntryKindAgentMessage        `json:"agentMessage,omitzero"`
-	AgentThought        *TranscriptEntryKindAgentThought        `json:"agentThought,omitzero"`
-	ToolCall            *TranscriptEntryKindToolCall            `json:"toolCall,omitzero"`
-	ToolCallUpdate      *TranscriptEntryKindToolCallUpdate      `json:"toolCallUpdate,omitzero"`
-	PlanUpdated         *TranscriptEntryKindPlanUpdated         `json:"planUpdated,omitzero"`
-	UsageRecorded       *TranscriptEntryKindUsageRecorded       `json:"usageRecorded,omitzero"`
-	ServedRequest       *TranscriptEntryKindServedRequest       `json:"servedRequest,omitzero"`
-	ElicitationAsked    *TranscriptEntryKindElicitationAsked    `json:"elicitationAsked,omitzero"`
+	UserMessage *TranscriptEntryKindUserMessage `json:"userMessage,omitzero"`
+
+	AgentMessage *TranscriptEntryKindAgentMessage `json:"agentMessage,omitzero"`
+
+	AgentThought *TranscriptEntryKindAgentThought `json:"agentThought,omitzero"`
+
+	ToolCall *TranscriptEntryKindToolCall `json:"toolCall,omitzero"`
+
+	ToolCallUpdate *TranscriptEntryKindToolCallUpdate `json:"toolCallUpdate,omitzero"`
+
+	PlanUpdated *TranscriptEntryKindPlanUpdated `json:"planUpdated,omitzero"`
+
+	UsageRecorded *TranscriptEntryKindUsageRecorded `json:"usageRecorded,omitzero"`
+
+	ServedRequest *TranscriptEntryKindServedRequest `json:"servedRequest,omitzero"`
+
+	ElicitationAsked *TranscriptEntryKindElicitationAsked `json:"elicitationAsked,omitzero"`
+
 	ElicitationAnswered *TranscriptEntryKindElicitationAnswered `json:"elicitationAnswered,omitzero"`
-	Compaction          *TranscriptEntryKindCompaction          `json:"compaction,omitzero"`
-	Notice              *TranscriptEntryKindNotice              `json:"notice,omitzero"`
-	PermissionAsked     *TranscriptEntryKindPermissionAsked     `json:"permissionAsked,omitzero"`
-	PermissionAnswered  *TranscriptEntryKindPermissionAnswered  `json:"permissionAnswered,omitzero"`
-	OptionChanged       *TranscriptEntryKindOptionChanged       `json:"optionChanged,omitzero"`
-	StateChanged        *TranscriptEntryKindStateChanged        `json:"stateChanged,omitzero"`
-	Background          *TranscriptEntryKindBackground          `json:"background,omitzero"`
-	WorkReported        *TranscriptEntryKindWorkReported        `json:"workReported,omitzero"`
-	RuntimeNote         *TranscriptEntryKindRuntimeNote         `json:"runtimeNote,omitzero"`
-	PoolSwitch          *TranscriptEntryKindPoolSwitch          `json:"poolSwitch,omitzero"`
-	SandboxFailure      *TranscriptEntryKindSandboxFailure      `json:"sandboxFailure,omitzero"`
-	Handoff             *TranscriptEntryKindHandoff             `json:"handoff,omitzero"`
-	SettingsChanged     *TranscriptEntryKindSettingsChanged     `json:"settingsChanged,omitzero"`
-	AppView             *TranscriptEntryKindAppView             `json:"appView,omitzero"`
-	FileShown           *TranscriptEntryKindFileShown           `json:"fileShown,omitzero"`
+
+	Compaction *TranscriptEntryKindCompaction `json:"compaction,omitzero"`
+
+	Notice *TranscriptEntryKindNotice `json:"notice,omitzero"`
+
+	PermissionAsked *TranscriptEntryKindPermissionAsked `json:"permissionAsked,omitzero"`
+
+	PermissionAnswered *TranscriptEntryKindPermissionAnswered `json:"permissionAnswered,omitzero"`
+
+	OptionChanged *TranscriptEntryKindOptionChanged `json:"optionChanged,omitzero"`
+
+	StateChanged *TranscriptEntryKindStateChanged `json:"stateChanged,omitzero"`
+
+	Background *TranscriptEntryKindBackground `json:"background,omitzero"`
+
+	WorkReported *TranscriptEntryKindWorkReported `json:"workReported,omitzero"`
+
+	RuntimeNote *TranscriptEntryKindRuntimeNote `json:"runtimeNote,omitzero"`
+
+	PoolSwitch *TranscriptEntryKindPoolSwitch `json:"poolSwitch,omitzero"`
+
+	SandboxFailure *TranscriptEntryKindSandboxFailure `json:"sandboxFailure,omitzero"`
+
+	Handoff *TranscriptEntryKindHandoff `json:"handoff,omitzero"`
+
+	SettingsChanged *TranscriptEntryKindSettingsChanged `json:"settingsChanged,omitzero"`
+
+	AppView *TranscriptEntryKindAppView `json:"appView,omitzero"`
+
+	FileShown *TranscriptEntryKindFileShown `json:"fileShown,omitzero"`
+
 	// Unrecognised is a case this build does not know, written back as it was read.
 	Unrecognised JSONValue `json:"-"`
 }
@@ -5788,20 +7436,25 @@ func (v *TranscriptEntryKind) UnmarshalJSON(b []byte) error {
 }
 
 type TranscriptEntryKindUserMessage struct {
-	Value  string         `json:"_0"`
+	Value string `json:"_0"`
+
 	Blocks []ContentBlock `json:"blocks,omitzero"`
-	From   *PromptOrigin  `json:"from,omitzero"`
+
+	From *PromptOrigin `json:"from,omitzero"`
 }
 
 type TranscriptEntryKindAgentMessage struct {
-	MessageID *string        `json:"messageID,omitzero"`
-	Text      string         `json:"text"`
-	Blocks    []ContentBlock `json:"blocks,omitzero"`
+	MessageID *string `json:"messageID,omitzero"`
+
+	Text string `json:"text"`
+
+	Blocks []ContentBlock `json:"blocks,omitzero"`
 }
 
 type TranscriptEntryKindAgentThought struct {
 	MessageID *string `json:"messageID,omitzero"`
-	Text      string  `json:"text"`
+
+	Text string `json:"text"`
 }
 
 type TranscriptEntryKindToolCall struct {
@@ -5829,16 +7482,21 @@ type TranscriptEntryKindElicitationAsked struct {
 }
 
 type TranscriptEntryKindElicitationAnswered struct {
-	ID      UUID                `json:"id"`
-	Summary string              `json:"summary"`
+	ID UUID `json:"id"`
+
+	Summary string `json:"summary"`
+
 	Answers []ElicitationAnswer `json:"answers,omitzero"`
 }
 
 type TranscriptEntryKindCompaction struct {
-	Status  string         `json:"status"`
+	Status string `json:"status"`
+
 	Summary []ContentBlock `json:"summary"`
-	ID      *string        `json:"id,omitzero"`
-	Error   *string        `json:"error,omitzero"`
+
+	ID *string `json:"id,omitzero"`
+
+	Error *string `json:"error,omitzero"`
 }
 
 type TranscriptEntryKindNotice struct {
@@ -5850,17 +7508,20 @@ type TranscriptEntryKindPermissionAsked struct {
 }
 
 type TranscriptEntryKindPermissionAnswered struct {
-	OptionID   string  `json:"optionID"`
+	OptionID string `json:"optionID"`
+
 	OptionName *string `json:"optionName,omitzero"`
 }
 
 type TranscriptEntryKindOptionChanged struct {
-	ID    string    `json:"id"`
+	ID string `json:"id"`
+
 	Value JSONValue `json:"value"`
 }
 
 type TranscriptEntryKindStateChanged struct {
-	Value  AgentState   `json:"_0"`
+	Value AgentState `json:"_0"`
+
 	Reason *EndedReason `json:"reason,omitzero"`
 }
 
@@ -5885,8 +7546,9 @@ type TranscriptEntryKindSandboxFailure struct {
 }
 
 type TranscriptEntryKindHandoff struct {
-	Markdown   string `json:"markdown"`
-	Characters int64  `json:"characters"`
+	Markdown string `json:"markdown"`
+
+	Characters int64 `json:"characters"`
 }
 
 type TranscriptEntryKindSettingsChanged struct {
@@ -5902,91 +7564,122 @@ type TranscriptEntryKindFileShown struct {
 }
 
 type TranscriptPage struct {
-	FirstIndex int64             `json:"firstIndex"`
-	Total      int64             `json:"total"`
-	Entries    []TranscriptEntry `json:"entries"`
+	FirstIndex int64 `json:"firstIndex"`
+
+	Total int64 `json:"total"`
+
+	Entries []TranscriptEntry `json:"entries"`
 }
 
 type TranscriptRequest struct {
-	AgentID UUID   `json:"agentID"`
-	Before  *int64 `json:"before,omitzero"`
-	Limit   int64  `json:"limit"`
-	From    *int64 `json:"from,omitzero"`
+	AgentID UUID `json:"agentID"`
+
+	Before *int64 `json:"before,omitzero"`
+
+	Limit int64 `json:"limit"`
+
+	From *int64 `json:"from,omitzero"`
 }
 
 // tunnel/open, from the borrowing host (T091).
 type TunnelOpen struct {
 	Runtime string `json:"runtime"`
-	Ref     string `json:"ref"`
+
+	Ref string `json:"ref"`
 }
 
 // Where a session's turn is, as its Live Activity says it (#1744): working; a question or an approval waiting on the person; done; ended cleanly but wanting the person, as Needs you in the sidebars (#1861); stopped on purpose or out of allowance, as Paused in the sidebars (#1869); ended for another reason; or gone (archived or deleted).
 type TurnPhase string
 
-const (
-	TurnPhaseWorking  TurnPhase = "working"
-	TurnPhaseQuestion TurnPhase = "question"
-	TurnPhaseApproval TurnPhase = "approval"
-	TurnPhaseDone     TurnPhase = "done"
-	TurnPhaseNeedsYou TurnPhase = "needs_you"
-	TurnPhasePaused   TurnPhase = "paused"
-	TurnPhaseFailed   TurnPhase = "failed"
-	TurnPhaseGone     TurnPhase = "gone"
-)
+const TurnPhaseWorking TurnPhase = "working"
+const TurnPhaseQuestion TurnPhase = "question"
+const TurnPhaseApproval TurnPhase = "approval"
+const TurnPhaseDone TurnPhase = "done"
+const TurnPhaseNeedsYou TurnPhase = "needs_you"
+const TurnPhasePaused TurnPhase = "paused"
+const TurnPhaseFailed TurnPhase = "failed"
+const TurnPhaseGone TurnPhase = "gone"
 
 type TurnSummary struct {
-	ID      UUID              `json:"id"`
-	Start   int64             `json:"start"`
-	End     int64             `json:"end"`
-	Ask     *TranscriptEntry  `json:"ask,omitzero"`
-	Last    *TranscriptEntry  `json:"last,omitzero"`
+	ID UUID `json:"id"`
+
+	Start int64 `json:"start"`
+
+	End int64 `json:"end"`
+
+	Ask *TranscriptEntry `json:"ask,omitzero"`
+
+	Last *TranscriptEntry `json:"last,omitzero"`
+
 	Concise []TranscriptEntry `json:"concise,omitzero"`
+
 	Outcome []TranscriptEntry `json:"outcome,omitzero"`
-	Steps   *int64            `json:"steps,omitzero"`
-	Usage   *TurnUsage        `json:"usage,omitzero"`
+
+	Steps *int64 `json:"steps,omitzero"`
+
+	Usage *TurnUsage `json:"usage,omitzero"`
 }
 
 type TurnUsage struct {
-	TotalTokens       int64  `json:"totalTokens"`
-	InputTokens       int64  `json:"inputTokens"`
-	OutputTokens      int64  `json:"outputTokens"`
-	ThoughtTokens     *int64 `json:"thoughtTokens,omitzero"`
-	CachedReadTokens  *int64 `json:"cachedReadTokens,omitzero"`
+	TotalTokens int64 `json:"totalTokens"`
+
+	InputTokens int64 `json:"inputTokens"`
+
+	OutputTokens int64 `json:"outputTokens"`
+
+	ThoughtTokens *int64 `json:"thoughtTokens,omitzero"`
+
+	CachedReadTokens *int64 `json:"cachedReadTokens,omitzero"`
+
 	CachedWriteTokens *int64 `json:"cachedWriteTokens,omitzero"`
-	Cost              *Cost  `json:"cost,omitzero"`
+
+	Cost *Cost `json:"cost,omitzero"`
 }
 
 type TurnsPage struct {
-	Turns       []TurnSummary `json:"turns"`
-	FirstTurn   int64         `json:"firstTurn"`
-	OpenStart   int64         `json:"openStart"`
-	FirstPrompt *int64        `json:"firstPrompt,omitzero"`
+	Turns []TurnSummary `json:"turns"`
+
+	FirstTurn int64 `json:"firstTurn"`
+
+	OpenStart int64 `json:"openStart"`
+
+	FirstPrompt *int64 `json:"firstPrompt,omitzero"`
 }
 
 type TurnsRequest struct {
-	AgentID UUID   `json:"agentID"`
-	Before  *int64 `json:"before,omitzero"`
-	Limit   int64  `json:"limit"`
+	AgentID UUID `json:"agentID"`
+
+	Before *int64 `json:"before,omitzero"`
+
+	Limit int64 `json:"limit"`
 }
 
 // A worktree with work that is not pushed: commits ahead of its upstream (`ahead`), or on a branch with no upstream (`unmerged`, commits not on the base), and changes not committed (`uncommitted`).
 type UnpushedWork struct {
-	Project     URL     `json:"project"`
-	Worktree    URL     `json:"worktree"`
-	Branch      *string `json:"branch,omitzero"`
-	Ahead       *int64  `json:"ahead,omitzero"`
-	Unmerged    *int64  `json:"unmerged,omitzero"`
-	Uncommitted *int64  `json:"uncommitted,omitzero"`
+	Project URL `json:"project"`
+
+	Worktree URL `json:"worktree"`
+
+	Branch *string `json:"branch,omitzero"`
+
+	Ahead *int64 `json:"ahead,omitzero"`
+
+	Unmerged *int64 `json:"unmerged,omitzero"`
+
+	Uncommitted *int64 `json:"uncommitted,omitzero"`
 }
 
 type UnqueueRequest struct {
-	AgentID  UUID `json:"agentID"`
+	AgentID UUID `json:"agentID"`
+
 	PromptID UUID `json:"promptID"`
 }
 
 type UpdateState struct {
-	Unknown   *struct{}             `json:"unknown,omitzero"`
-	Current   *struct{}             `json:"current,omitzero"`
+	Unknown *struct{} `json:"unknown,omitzero"`
+
+	Current *struct{} `json:"current,omitzero"`
+
 	Available *UpdateStateAvailable `json:"available,omitzero"`
 }
 
@@ -5996,26 +7689,39 @@ type UpdateStateAvailable struct {
 
 type Usage struct {
 	Used int64 `json:"used"`
+
 	Size int64 `json:"size"`
+
 	Cost *Cost `json:"cost,omitzero"`
-	At   Date  `json:"at"`
+
+	At Date `json:"at"`
 }
 
 type UsageBucket struct {
-	Cost              map[string]float64 `json:"cost"`
-	InputTokens       int64              `json:"inputTokens"`
-	OutputTokens      int64              `json:"outputTokens"`
-	ThoughtTokens     int64              `json:"thoughtTokens"`
-	CachedReadTokens  int64              `json:"cachedReadTokens"`
-	CachedWriteTokens int64              `json:"cachedWriteTokens"`
-	Turns             int64              `json:"turns"`
-	UnpricedTurns     int64              `json:"unpricedTurns"`
+	Cost map[string]float64 `json:"cost"`
+
+	InputTokens int64 `json:"inputTokens"`
+
+	OutputTokens int64 `json:"outputTokens"`
+
+	ThoughtTokens int64 `json:"thoughtTokens"`
+
+	CachedReadTokens int64 `json:"cachedReadTokens"`
+
+	CachedWriteTokens int64 `json:"cachedWriteTokens"`
+
+	Turns int64 `json:"turns"`
+
+	UnpricedTurns int64 `json:"unpricedTurns"`
 }
 
 type UsageHistory struct {
 	Hours map[string]map[string]UsageBucket `json:"hours"`
-	Days  map[string]map[string]UsageBucket `json:"days"`
-	Now   string                            `json:"now"`
+
+	Days map[string]map[string]UsageBucket `json:"days"`
+
+	Now string `json:"now"`
+
 	// The host's time zone, an IANA identifier such as America/Los_Angeles, that its hour and day stamps are in (#1267). Absent from a host too old to say: read as the viewer's own.
 	TimeZone *string `json:"timeZone,omitzero"`
 }
@@ -6023,15 +7729,21 @@ type UsageHistory struct {
 // reports/usage's answer (#1811): rows oldest first, by the hour for D and by the day otherwise.
 type UsageReport struct {
 	Range ReportRange `json:"range"`
-	Rows  []ReportRow `json:"rows"`
+
+	Rows []ReportRow `json:"rows"`
+
 	// Whether the caller sees every person's machines.
 	Admin bool `json:"admin"`
+
 	// The scope the rows are of (#1804).
 	Scope *ReportScope `json:"scope,omitzero"`
+
 	// The rows say no person and no machine (#1804): a group lead's view when the policy says totals only.
 	PersonsHidden *bool `json:"personsHidden,omitzero"`
+
 	// The name of each group the rows name (#1804).
 	GroupNames map[string]string `json:"groupNames,omitzero"`
+
 	// The scope's budget for a calendar month, in US dollars (#1804); absent when it has none.
 	BudgetUSD *float64 `json:"budgetUSD,omitzero"`
 }
@@ -6039,12 +7751,14 @@ type UsageReport struct {
 // usage/rollup (#1811): a machine's hours and days that changed since it last sent them, sent each hour on its channel 0. The control plane keeps hours 7 days and days 90.
 type UsageRollup struct {
 	Hours []UsageRollupPeriod `json:"hours"`
-	Days  []UsageRollupPeriod `json:"days"`
+
+	Days []UsageRollupPeriod `json:"days"`
 }
 
 // An hour ("2026-10-21T15") or a day ("2026-10-21"), in UTC, and its rows: the whole of that period on this machine, which replaces what was sent before.
 type UsageRollupPeriod struct {
-	At   string           `json:"at"`
+	At string `json:"at"`
+
 	Rows []UsageRollupRow `json:"rows"`
 }
 
@@ -6052,18 +7766,29 @@ type UsageRollupPeriod struct {
 type UsageRollupRow struct {
 	// The project's folder name, so the same repository on two machines adds up.
 	Project string `json:"project"`
+
 	Runtime string `json:"runtime"`
+
 	// By currency.
-	Cost              map[string]float64 `json:"cost"`
-	InputTokens       int64              `json:"inputTokens"`
-	OutputTokens      int64              `json:"outputTokens"`
-	ThoughtTokens     int64              `json:"thoughtTokens"`
-	CachedReadTokens  int64              `json:"cachedReadTokens"`
-	CachedWriteTokens int64              `json:"cachedWriteTokens"`
-	Turns             int64              `json:"turns"`
-	UnpricedTurns     int64              `json:"unpricedTurns"`
+	Cost map[string]float64 `json:"cost"`
+
+	InputTokens int64 `json:"inputTokens"`
+
+	OutputTokens int64 `json:"outputTokens"`
+
+	ThoughtTokens int64 `json:"thoughtTokens"`
+
+	CachedReadTokens int64 `json:"cachedReadTokens"`
+
+	CachedWriteTokens int64 `json:"cachedWriteTokens"`
+
+	Turns int64 `json:"turns"`
+
+	UnpricedTurns int64 `json:"unpricedTurns"`
+
 	// The agent, its tools and waiting on others: TimeBucket's agent + tools + others.
 	WorkingSeconds float64 `json:"workingSeconds"`
+
 	// Waiting for the person: TimeBucket's person.
 	WaitingSeconds float64 `json:"waitingSeconds"`
 }
@@ -6072,16 +7797,20 @@ type UsageRollupRow struct {
 type UserAgentConfig struct {
 	// ~/.agents/AGENTS.md.
 	Instructions *string `json:"instructions,omitzero"`
+
 	// ~/.agents/personas/<name>.md, by name.
 	Personas map[string]string `json:"personas,omitzero"`
+
 	// ~/.agents/skills/<name>/SKILL.md, by name.
 	Skills map[string]string `json:"skills,omitzero"`
 }
 
 // settings/userPart's answer (#1760): this machine's own part, for a client to set at the user scope with Use This Mac's. An MCP server with a token in clear is refused, so no secret goes into the user settings unsealed.
 type UserPartHere struct {
-	Part  UserSettingsPartName `json:"part"`
-	Value JSONValue            `json:"value"`
+	Part UserSettingsPartName `json:"part"`
+
+	Value JSONValue `json:"value"`
+
 	// What could not be taken, by name: a skill with files beside its SKILL.md.
 	LeftOut []string `json:"leftOut,omitzero"`
 }
@@ -6094,15 +7823,14 @@ type UserPartRequest struct {
 // A user's role (#994, spec 736 FR-001): an admin manages people; a member sees only their own.
 type UserRole string
 
-const (
-	UserRoleAdmin  UserRole = "admin"
-	UserRoleMember UserRole = "member"
-)
+const UserRoleAdmin UserRole = "admin"
+const UserRoleMember UserRole = "member"
 
 // user/setSecret (#1760, FR-025): a secret the control plane keeps sealed, and sends only to its person's own machines. The value is never sent back to a client.
 type UserSecret struct {
-	Name  UserSecretName `json:"name"`
-	Value string         `json:"value"`
+	Name UserSecretName `json:"name"`
+
+	Value string `json:"value"`
 }
 
 // A secret's name, as ${NAME} in mcp.json and NAME= in ~/.agents-secrets/secrets.env.
@@ -6111,6 +7839,7 @@ type UserSecretName string
 // user/secretNames (#1760).
 type UserSecretNames struct {
 	Secrets []UserSecretRow `json:"secrets"`
+
 	// False when this control plane has no key to seal secrets with, and user/setSecret is refused.
 	Sealing bool `json:"sealing"`
 }
@@ -6122,141 +7851,190 @@ type UserSecretRequest struct {
 
 // One row of user/secretNames (#1760): a secret's name, never its value.
 type UserSecretRow struct {
-	Name    UserSecretName `json:"name"`
-	Updated string         `json:"updated"`
+	Name UserSecretName `json:"name"`
+
+	Updated string `json:"updated"`
+
 	// The machines it was sent to.
 	Machines []HostID `json:"machines"`
+
 	// Machines removed with it on them, since it was last set.
 	LeftOn []SecretLeftOn `json:"leftOn,omitzero"`
 }
 
 // user/settings (#1760, spec 736 FR-023, FR-024): what the control plane keeps for a person and sends to each of that person's machines. A part that is absent is not set at the user scope, and each machine keeps its own. The control plane does not read inside a part.
 type UserSettings struct {
-	McpServers  JSONValue `json:"mcpServers,omitzero"`
+	McpServers JSONValue `json:"mcpServers,omitzero"`
+
 	AgentConfig JSONValue `json:"agentConfig,omitzero"`
-	Runtimes    JSONValue `json:"runtimes,omitzero"`
-	CostLimits  JSONValue `json:"costLimits,omitzero"`
-	Resources   JSONValue `json:"resources,omitzero"`
+
+	Runtimes JSONValue `json:"runtimes,omitzero"`
+
+	CostLimits JSONValue `json:"costLimits,omitzero"`
+
+	Resources JSONValue `json:"resources,omitzero"`
+
 	// When a part last changed.
 	Updated *string `json:"updated,omitzero"`
 }
 
 // control/userSettingsChanged (#1760): to the person's own clients, when a part or a secret changed, so a pane reads again.
 type UserSettingsChanged struct {
-	Parts   []UserSettingsPartName `json:"parts,omitzero"`
-	Secrets *bool                  `json:"secrets,omitzero"`
+	Parts []UserSettingsPartName `json:"parts,omitzero"`
+
+	Secrets *bool `json:"secrets,omitzero"`
 }
 
 // user/setSettings (#1760): one part set, or with a null value removed from the user scope.
 type UserSettingsPart struct {
-	Part  UserSettingsPartName `json:"part"`
-	Value JSONValue            `json:"value"`
+	Part UserSettingsPartName `json:"part"`
+
+	Value JSONValue `json:"value"`
 }
 
 // A part of a person's user settings (#1760, spec 736 FR-023). Each keeps the shape its file has on a machine today: mcpServers is mcp.json's mcpServers, agentConfig is UserAgentConfig, runtimes is each runtime's choices, costLimits is CostLimits, resources is a list of DeclaredResource.
 type UserSettingsPartName string
 
-const (
-	UserSettingsPartNameMcpServers  UserSettingsPartName = "mcpServers"
-	UserSettingsPartNameAgentConfig UserSettingsPartName = "agentConfig"
-	UserSettingsPartNameRuntimes    UserSettingsPartName = "runtimes"
-	UserSettingsPartNameCostLimits  UserSettingsPartName = "costLimits"
-	UserSettingsPartNameResources   UserSettingsPartName = "resources"
-)
+const UserSettingsPartNameMcpServers UserSettingsPartName = "mcpServers"
+const UserSettingsPartNameAgentConfig UserSettingsPartName = "agentConfig"
+const UserSettingsPartNameRuntimes UserSettingsPartName = "runtimes"
+const UserSettingsPartNameCostLimits UserSettingsPartName = "costLimits"
+const UserSettingsPartNameResources UserSettingsPartName = "resources"
 
 // What a third-party server's view waits on before it is drawn: the person's Show (#191). The data of a viewNeedsShow failure.
 type ViewAsk struct {
 	Server string `json:"server"`
-	URI    string `json:"uri"`
-	Hash   string `json:"hash"`
-	IsNew  bool   `json:"isNew"`
+
+	URI string `json:"uri"`
+
+	Hash string `json:"hash"`
+
+	IsNew bool `json:"isNew"`
 }
 
 type ViewCallRequest struct {
-	AgentID   UUID      `json:"agentID"`
-	Project   *URL      `json:"project,omitzero"`
-	ViewID    UUID      `json:"viewID"`
-	Name      string    `json:"name"`
+	AgentID UUID `json:"agentID"`
+
+	Project *URL `json:"project,omitzero"`
+
+	ViewID UUID `json:"viewID"`
+
+	Name string `json:"name"`
+
 	Arguments JSONValue `json:"arguments,omitzero"`
-	Feed      *bool     `json:"feed,omitzero"`
-	Server    *string   `json:"server,omitzero"`
+
+	Feed *bool `json:"feed,omitzero"`
+
+	Server *string `json:"server,omitzero"`
 }
 
 type ViewContextRequest struct {
-	AgentID           UUID      `json:"agentID"`
-	ViewID            UUID      `json:"viewID"`
-	URI               *string   `json:"uri,omitzero"`
-	Content           JSONValue `json:"content,omitzero"`
+	AgentID UUID `json:"agentID"`
+
+	ViewID UUID `json:"viewID"`
+
+	URI *string `json:"uri,omitzero"`
+
+	Content JSONValue `json:"content,omitzero"`
+
 	StructuredContent JSONValue `json:"structuredContent,omitzero"`
 }
 
 type ViewLogRequest struct {
-	AgentID UUID      `json:"agentID"`
-	ViewID  UUID      `json:"viewID"`
-	Level   *string   `json:"level,omitzero"`
-	Data    JSONValue `json:"data,omitzero"`
+	AgentID UUID `json:"agentID"`
+
+	ViewID UUID `json:"viewID"`
+
+	Level *string `json:"level,omitzero"`
+
+	Data JSONValue `json:"data,omitzero"`
 }
 
 type ViewPin struct {
-	Server    string    `json:"server"`
-	URI       string    `json:"uri"`
-	Tool      string    `json:"tool"`
+	Server string `json:"server"`
+
+	URI string `json:"uri"`
+
+	Tool string `json:"tool"`
+
 	Arguments JSONValue `json:"arguments,omitzero"`
 }
 
 type ViewReadRequest struct {
-	AgentID UUID    `json:"agentID"`
-	URI     string  `json:"uri"`
-	Server  *string `json:"server,omitzero"`
-	Project *URL    `json:"project,omitzero"`
+	AgentID UUID `json:"agentID"`
+
+	URI string `json:"uri"`
+
+	Server *string `json:"server,omitzero"`
+
+	Project *URL `json:"project,omitzero"`
 }
 
 type ViewResource struct {
-	URI           string            `json:"uri"`
-	MimeType      string            `json:"mimeType"`
-	HTML          string            `json:"html"`
-	Policy        AppViewPolicy     `json:"policy"`
-	PrefersBorder *bool             `json:"prefersBorder,omitzero"`
-	Variables     map[string]string `json:"variables"`
+	URI string `json:"uri"`
+
+	MimeType string `json:"mimeType"`
+
+	HTML string `json:"html"`
+
+	Policy AppViewPolicy `json:"policy"`
+
+	PrefersBorder *bool `json:"prefersBorder,omitzero"`
+
+	Variables map[string]string `json:"variables"`
 }
 
 type ViewShowRequest struct {
-	AgentID UUID   `json:"agentID"`
-	Project *URL   `json:"project,omitzero"`
-	Server  string `json:"server"`
-	URI     string `json:"uri"`
-	Hash    string `json:"hash"`
-	Show    bool   `json:"show"`
+	AgentID UUID `json:"agentID"`
+
+	Project *URL `json:"project,omitzero"`
+
+	Server string `json:"server"`
+
+	URI string `json:"uri"`
+
+	Hash string `json:"hash"`
+
+	Show bool `json:"show"`
 }
 
 // An agent's call of one of the agents server's tools that has a view, relayed with its token.
 type ViewToolCallRequest struct {
-	Token     string    `json:"token"`
-	Name      string    `json:"name"`
+	Token string `json:"token"`
+
+	Name string `json:"name"`
+
 	Arguments JSONValue `json:"arguments,omitzero"`
 }
 
 type Wait struct {
-	AgentID      UUID        `json:"agentID"`
-	NameAtReport string      `json:"nameAtReport"`
-	Ending       *WaitEnding `json:"ending,omitzero"`
+	AgentID UUID `json:"agentID"`
+
+	NameAtReport string `json:"nameAtReport"`
+
+	Ending *WaitEnding `json:"ending,omitzero"`
 }
 
 type WaitEnding struct {
-	At  Date          `json:"at"`
+	At Date `json:"at"`
+
 	How WaitEndingHow `json:"how"`
 }
 
 type WaitEndingHow struct {
 	Finished *WaitEndingHowFinished `json:"finished,omitzero"`
-	Stopped  *WaitEndingHowStopped  `json:"stopped,omitzero"`
-	Archived *struct{}              `json:"archived,omitzero"`
-	Gone     *struct{}              `json:"gone,omitzero"`
+
+	Stopped *WaitEndingHowStopped `json:"stopped,omitzero"`
+
+	Archived *struct{} `json:"archived,omitzero"`
+
+	Gone *struct{} `json:"gone,omitzero"`
 }
 
 type WaitEndingHowFinished struct {
 	Outcome *WorkOutcome `json:"outcome,omitzero"`
-	Message *string      `json:"message,omitzero"`
+
+	Message *string `json:"message,omitzero"`
 }
 
 type WaitEndingHowStopped struct {
@@ -6265,120 +8043,159 @@ type WaitEndingHowStopped struct {
 
 type WaitServerEvent struct {
 	Trigger MCPEventTrigger `json:"trigger"`
-	Servers []string        `json:"servers"`
+
+	Servers []string `json:"servers"`
 }
 
 type WaitStatus struct {
-	Line        string `json:"line"`
-	Mark        string `json:"mark"`
-	Cancellable bool   `json:"cancellable"`
+	Line string `json:"line"`
+
+	Mark string `json:"mark"`
+
+	Cancellable bool `json:"cancellable"`
 }
 
 type WaitingAgent struct {
-	AgentID UUID       `json:"agentID"`
-	Title   string     `json:"title"`
-	Folder  URL        `json:"folder"`
-	Status  WaitStatus `json:"status"`
+	AgentID UUID `json:"agentID"`
+
+	Title string `json:"title"`
+
+	Folder URL `json:"folder"`
+
+	Status WaitStatus `json:"status"`
 }
 
 // Whether this Mac is kept awake for agents, and for how long after they stop (024), as wake.json in the root.
 type WakeSettings struct {
-	KeepsAwake   bool  `json:"keepsAwake"`
-	GraceHours   int64 `json:"graceHours"`
+	KeepsAwake bool `json:"keepsAwake"`
+
+	GraceHours int64 `json:"graceHours"`
+
 	WarmRuntimes int64 `json:"warmRuntimes"`
-	AwakeOnPower bool  `json:"awakeOnPower"`
+
+	AwakeOnPower bool `json:"awakeOnPower"`
 }
 
 // Why the Mac is, or is not, being kept awake (024).
 type WakeState struct {
-	IsHolding         bool   `json:"isHolding"`
-	AgentsInFlight    int64  `json:"agentsInFlight"`
-	HeldBackByBattery bool   `json:"heldBackByBattery"`
-	BatteryPercent    *int64 `json:"batteryPercent,omitzero"`
-	Since             *Date  `json:"since,omitzero"`
-	GraceUntil        *Date  `json:"graceUntil,omitzero"`
-	OnPower           bool   `json:"onPower"`
+	IsHolding bool `json:"isHolding"`
+
+	AgentsInFlight int64 `json:"agentsInFlight"`
+
+	HeldBackByBattery bool `json:"heldBackByBattery"`
+
+	BatteryPercent *int64 `json:"batteryPercent,omitzero"`
+
+	Since *Date `json:"since,omitzero"`
+
+	GraceUntil *Date `json:"graceUntil,omitzero"`
+
+	OnPower bool `json:"onPower"`
 }
 
 type WebRemoteStatus struct {
-	Port   int64   `json:"port"`
-	Served bool    `json:"served"`
+	Port int64 `json:"port"`
+
+	Served bool `json:"served"`
+
 	Reason *string `json:"reason,omitzero"`
+
 	Detail *string `json:"detail,omitzero"`
 }
 
 type Weekday string
 
-const (
-	WeekdaySun Weekday = "sun"
-	WeekdayMon Weekday = "mon"
-	WeekdayTue Weekday = "tue"
-	WeekdayWed Weekday = "wed"
-	WeekdayThu Weekday = "thu"
-	WeekdayFri Weekday = "fri"
-	WeekdaySat Weekday = "sat"
-)
+const WeekdaySun Weekday = "sun"
+const WeekdayMon Weekday = "mon"
+const WeekdayTue Weekday = "tue"
+const WeekdayWed Weekday = "wed"
+const WeekdayThu Weekday = "thu"
+const WeekdayFri Weekday = "fri"
+const WeekdaySat Weekday = "sat"
 
 type WorkOutcome string
 
-const (
-	WorkOutcomeDone        WorkOutcome = "done"
-	WorkOutcomeNothingToDo WorkOutcome = "nothing_to_do"
-	WorkOutcomeNeedsAnswer WorkOutcome = "needs_answer"
-	WorkOutcomePartlyDone  WorkOutcome = "partly_done"
-	WorkOutcomeStuck       WorkOutcome = "stuck"
-	WorkOutcomeBlocked     WorkOutcome = "blocked"
-)
+const WorkOutcomeDone WorkOutcome = "done"
+const WorkOutcomeNothingToDo WorkOutcome = "nothing_to_do"
+const WorkOutcomeNeedsAnswer WorkOutcome = "needs_answer"
+const WorkOutcomePartlyDone WorkOutcome = "partly_done"
+const WorkOutcomeStuck WorkOutcome = "stuck"
+const WorkOutcomeBlocked WorkOutcome = "blocked"
 
 type WorkReport struct {
 	Outcome WorkOutcome `json:"outcome"`
-	Message string      `json:"message"`
-	At      Date        `json:"at"`
-	Block   *Block      `json:"block,omitzero"`
+
+	Message string `json:"message"`
+
+	At Date `json:"at"`
+
+	Block *Block `json:"block,omitzero"`
 }
 
 type Workflow struct {
-	WorkflowID    string               `json:"workflowID"`
-	Folder        URL                  `json:"folder"`
-	Name          string               `json:"name"`
-	Triggers      []WorkflowTrigger    `json:"triggers"`
-	Mode          WorkflowMode         `json:"mode"`
-	Prompt        string               `json:"prompt"`
-	Problem       *WorkflowProblem     `json:"problem,omitzero"`
+	WorkflowID string `json:"workflowID"`
+
+	Folder URL `json:"folder"`
+
+	Name string `json:"name"`
+
+	Triggers []WorkflowTrigger `json:"triggers"`
+
+	Mode WorkflowMode `json:"mode"`
+
+	Prompt string `json:"prompt"`
+
+	Problem *WorkflowProblem `json:"problem,omitzero"`
+
 	UnknownFields map[string]JSONValue `json:"unknownFields"`
-	Settings      WorkflowSettings     `json:"settings"`
-	Cooldown      *float64             `json:"cooldown,omitzero"`
-	Enabled       *bool                `json:"enabled,omitzero"`
-	Archived      *bool                `json:"archived,omitzero"`
-	WhenDone      *WorkflowWhenDone    `json:"whenDone,omitzero"`
+
+	Settings WorkflowSettings `json:"settings"`
+
+	Cooldown *float64 `json:"cooldown,omitzero"`
+
+	Enabled *bool `json:"enabled,omitzero"`
+
+	Archived *bool `json:"archived,omitzero"`
+
+	WhenDone *WorkflowWhenDone `json:"whenDone,omitzero"`
+
 	// `continue-when-back: true`: a run's turn refused for a spent allowance waits for it at once, as if the person had chosen Continue (#1918).
 	ContinueWhenBack *bool `json:"continueWhenBack,omitzero"`
+
 	// `muted: true`: every run of the workflow starts muted (#2003), and muting or unmuting the workflow mutes or unmutes its runs.
 	Muted *bool `json:"muted,omitzero"`
+
 	// runs-on: (#1761, FR-034), which replaced hosts:: labels a machine must all have to run it: its id, its os (macos, linux), its provider, and its user's or bot's name. None runs on every machine of each person who turned it on.
 	RunsOn []string `json:"runsOn,omitzero"`
 }
 
 type WorkflowApproval struct {
-	Digest string  `json:"digest"`
-	IsNew  bool    `json:"isNew"`
-	Note   *string `json:"note,omitzero"`
+	Digest string `json:"digest"`
+
+	IsNew bool `json:"isNew"`
+
+	Note *string `json:"note,omitzero"`
 }
 
 type WorkflowApproveRequest struct {
-	Folder     URL    `json:"folder"`
+	Folder URL `json:"folder"`
+
 	WorkflowID string `json:"workflowID"`
-	Digest     string `json:"digest"`
+
+	Digest string `json:"digest"`
 }
 
 type WorkflowArchiveRequest struct {
-	Folder     URL    `json:"folder"`
+	Folder URL `json:"folder"`
+
 	WorkflowID string `json:"workflowID"`
-	Archived   bool   `json:"archived"`
+
+	Archived bool `json:"archived"`
 }
 
 type WorkflowCause struct {
-	ByHand  *struct{}             `json:"byHand,omitzero"`
+	ByHand *struct{} `json:"byHand,omitzero"`
+
 	Trigger *WorkflowCauseTrigger `json:"trigger,omitzero"`
 }
 
@@ -6389,7 +8206,8 @@ type WorkflowCauseTrigger struct {
 // workflows/claimRun (#1761, FR-034): a machine asks to run a runs-on: workflow for one trigger. The first to ask wins; the trigger is the same words on every machine that heard it.
 type WorkflowClaim struct {
 	Workflow string `json:"workflow"`
-	Trigger  string `json:"trigger"`
+
+	Trigger string `json:"trigger"`
 }
 
 // workflows/claimRun's answer: won is false when another machine runs it.
@@ -6398,68 +8216,75 @@ type WorkflowClaimed struct {
 }
 
 type WorkflowEnableRequest struct {
-	Folder     URL    `json:"folder"`
+	Folder URL `json:"folder"`
+
 	WorkflowID string `json:"workflowID"`
-	Enabled    bool   `json:"enabled"`
+
+	Enabled bool `json:"enabled"`
 }
 
 type WorkflowLimit string
 
-const (
-	WorkflowLimitProject WorkflowLimit = "project"
-	WorkflowLimitTotal   WorkflowLimit = "total"
-)
+const WorkflowLimitProject WorkflowLimit = "project"
+const WorkflowLimitTotal WorkflowLimit = "total"
 
 type WorkflowMCPClearMissedRequest struct {
-	Folder     URL     `json:"folder"`
-	WorkflowID string  `json:"workflowID"`
-	Name       string  `json:"name"`
-	Server     *string `json:"server,omitzero"`
+	Folder URL `json:"folder"`
+
+	WorkflowID string `json:"workflowID"`
+
+	Name string `json:"name"`
+
+	Server *string `json:"server,omitzero"`
 }
 
 type WorkflowMode string
 
-const (
-	WorkflowModeNew        WorkflowMode = "new"
-	WorkflowModeStanding   WorkflowMode = "standing"
-	WorkflowModeTriggering WorkflowMode = "triggering"
-)
+const WorkflowModeNew WorkflowMode = "new"
+const WorkflowModeStanding WorkflowMode = "standing"
+const WorkflowModeTriggering WorkflowMode = "triggering"
 
 type WorkflowMuteRequest struct {
-	Folder     URL    `json:"folder"`
+	Folder URL `json:"folder"`
+
 	WorkflowID string `json:"workflowID"`
-	Muted      bool   `json:"muted"`
+
+	Muted bool `json:"muted"`
 }
 
 type WorkflowOffReason string
 
-const (
-	WorkflowOffReasonFile           WorkflowOffReason = "file"
-	WorkflowOffReasonWrittenByAgent WorkflowOffReason = "writtenByAgent"
-	WorkflowOffReasonAgent          WorkflowOffReason = "agent"
-	WorkflowOffReasonPerson         WorkflowOffReason = "person"
-)
+const WorkflowOffReasonFile WorkflowOffReason = "file"
+const WorkflowOffReasonWrittenByAgent WorkflowOffReason = "writtenByAgent"
+const WorkflowOffReasonAgent WorkflowOffReason = "agent"
+const WorkflowOffReasonPerson WorkflowOffReason = "person"
 
 type WorkflowOutcome struct {
-	Ran     *WorkflowOutcomeRan     `json:"ran,omitzero"`
+	Ran *WorkflowOutcomeRan `json:"ran,omitzero"`
+
 	Refused *WorkflowOutcomeRefused `json:"refused,omitzero"`
 }
 
 type WorkflowOutcomeRan struct {
 	AgentID UUID `json:"agentID"`
-	At      Date `json:"at"`
+
+	At Date `json:"at"`
 }
 
 type WorkflowOutcomeRefused struct {
-	Value   WorkflowRefusal `json:"_0"`
-	At      Date            `json:"at"`
-	Repeats int64           `json:"repeats"`
+	Value WorkflowRefusal `json:"_0"`
+
+	At Date `json:"at"`
+
+	Repeats int64 `json:"repeats"`
 }
 
 type WorkflowProblem struct {
-	Unreadable          *WorkflowProblemUnreadable          `json:"unreadable,omitzero"`
+	Unreadable *WorkflowProblemUnreadable `json:"unreadable,omitzero"`
+
 	TriggerNotSupported *WorkflowProblemTriggerNotSupported `json:"triggerNotSupported,omitzero"`
-	UnsupportedMode     *WorkflowProblemUnsupportedMode     `json:"unsupportedMode,omitzero"`
+
+	UnsupportedMode *WorkflowProblemUnsupportedMode `json:"unsupportedMode,omitzero"`
 }
 
 type WorkflowProblemUnreadable struct {
@@ -6475,24 +8300,41 @@ type WorkflowProblemUnsupportedMode struct {
 }
 
 type WorkflowRefusal struct {
-	ChainTooDeep        *WorkflowRefusalChainTooDeep        `json:"chainTooDeep,omitzero"`
-	RunInFlight         *struct{}                           `json:"runInFlight,omitzero"`
-	Queued              *struct{}                           `json:"queued,omitzero"`
-	QueueFull           *WorkflowRefusalQueueFull           `json:"queueFull,omitzero"`
-	Archived            *struct{}                           `json:"archived,omitzero"`
-	Disabled            *struct{}                           `json:"disabled,omitzero"`
-	OverLimit           *WorkflowRefusalOverLimit           `json:"overLimit,omitzero"`
-	Unreadable          *WorkflowRefusalUnreadable          `json:"unreadable,omitzero"`
+	ChainTooDeep *WorkflowRefusalChainTooDeep `json:"chainTooDeep,omitzero"`
+
+	RunInFlight *struct{} `json:"runInFlight,omitzero"`
+
+	Queued *struct{} `json:"queued,omitzero"`
+
+	QueueFull *WorkflowRefusalQueueFull `json:"queueFull,omitzero"`
+
+	Archived *struct{} `json:"archived,omitzero"`
+
+	Disabled *struct{} `json:"disabled,omitzero"`
+
+	OverLimit *WorkflowRefusalOverLimit `json:"overLimit,omitzero"`
+
+	Unreadable *WorkflowRefusalUnreadable `json:"unreadable,omitzero"`
+
 	TriggerNotSupported *WorkflowRefusalTriggerNotSupported `json:"triggerNotSupported,omitzero"`
-	AgentUnavailable    *struct{}                           `json:"agentUnavailable,omitzero"`
-	NoTriggeringAgent   *struct{}                           `json:"noTriggeringAgent,omitzero"`
-	MissedWhileClosed   *struct{}                           `json:"missedWhileClosed,omitzero"`
-	FolderGone          *struct{}                           `json:"folderGone,omitzero"`
-	DayLimitReached     *struct{}                           `json:"dayLimitReached,omitzero"`
-	SettingRefused      *WorkflowRefusalSettingRefused      `json:"settingRefused,omitzero"`
-	AwaitingApproval    *struct{}                           `json:"awaitingApproval,omitzero"`
-	DeniedHere          *struct{}                           `json:"deniedHere,omitzero"`
-	CoolingDown         *WorkflowRefusalCoolingDown         `json:"coolingDown,omitzero"`
+
+	AgentUnavailable *struct{} `json:"agentUnavailable,omitzero"`
+
+	NoTriggeringAgent *struct{} `json:"noTriggeringAgent,omitzero"`
+
+	MissedWhileClosed *struct{} `json:"missedWhileClosed,omitzero"`
+
+	FolderGone *struct{} `json:"folderGone,omitzero"`
+
+	DayLimitReached *struct{} `json:"dayLimitReached,omitzero"`
+
+	SettingRefused *WorkflowRefusalSettingRefused `json:"settingRefused,omitzero"`
+
+	AwaitingApproval *struct{} `json:"awaitingApproval,omitzero"`
+
+	DeniedHere *struct{} `json:"deniedHere,omitzero"`
+
+	CoolingDown *WorkflowRefusalCoolingDown `json:"coolingDown,omitzero"`
 }
 
 type WorkflowRefusalChainTooDeep struct {
@@ -6504,8 +8346,9 @@ type WorkflowRefusalQueueFull struct {
 }
 
 type WorkflowRefusalOverLimit struct {
-	Value   WorkflowLimit `json:"_0"`
-	Allowed *int64        `json:"allowed,omitzero"`
+	Value WorkflowLimit `json:"_0"`
+
+	Allowed *int64 `json:"allowed,omitzero"`
 }
 
 type WorkflowRefusalUnreadable struct {
@@ -6518,7 +8361,8 @@ type WorkflowRefusalTriggerNotSupported struct {
 
 type WorkflowRefusalSettingRefused struct {
 	Setting string `json:"setting"`
-	Detail  string `json:"detail"`
+
+	Detail string `json:"detail"`
 }
 
 type WorkflowRefusalCoolingDown struct {
@@ -6526,67 +8370,105 @@ type WorkflowRefusalCoolingDown struct {
 }
 
 type WorkflowRemovedNotification struct {
-	Folder     URL    `json:"folder"`
+	Folder URL `json:"folder"`
+
 	WorkflowID string `json:"workflowID"`
 }
 
 type WorkflowRequest struct {
-	Folder     URL    `json:"folder"`
+	Folder URL `json:"folder"`
+
 	WorkflowID string `json:"workflowID"`
 }
 
 type WorkflowSchedule struct {
-	Minutes     []int64   `json:"minutes"`
-	Hours       [2]int64  `json:"hours"`
-	StartMinute int64     `json:"startMinute"`
-	EndMinute   int64     `json:"endMinute"`
-	Days        []Weekday `json:"days"`
+	Minutes []int64 `json:"minutes"`
+
+	Hours [2]int64 `json:"hours"`
+
+	StartMinute int64 `json:"startMinute"`
+
+	EndMinute int64 `json:"endMinute"`
+
+	Days []Weekday `json:"days"`
 }
 
 type WorkflowSettings struct {
-	PermissionMode *string           `json:"permissionMode,omitzero"`
-	RuntimeID      *string           `json:"runtimeID,omitzero"`
-	Model          *string           `json:"model,omitzero"`
-	Effort         *string           `json:"effort,omitzero"`
-	Options        map[string]string `json:"options"`
-	Labels         []string          `json:"labels"`
+	PermissionMode *string `json:"permissionMode,omitzero"`
+
+	RuntimeID *string `json:"runtimeID,omitzero"`
+
+	Model *string `json:"model,omitzero"`
+
+	Effort *string `json:"effort,omitzero"`
+
+	Options map[string]string `json:"options"`
+
+	Labels []string `json:"labels"`
 }
 
 type WorkflowSettingsRequest struct {
-	Folder           URL              `json:"folder"`
-	WorkflowID       string           `json:"workflowID"`
-	Settings         WorkflowSettings `json:"settings"`
-	Cooldown         *string          `json:"cooldown,omitzero"`
-	Labels           []string         `json:"labels,omitzero"`
-	WhenDone         *string          `json:"whenDone,omitzero"`
-	ContinueWhenBack *bool            `json:"continueWhenBack,omitzero"`
+	Folder URL `json:"folder"`
+
+	WorkflowID string `json:"workflowID"`
+
+	Settings WorkflowSettings `json:"settings"`
+
+	Cooldown *string `json:"cooldown,omitzero"`
+
+	Labels []string `json:"labels,omitzero"`
+
+	WhenDone *string `json:"whenDone,omitzero"`
+
+	ContinueWhenBack *bool `json:"continueWhenBack,omitzero"`
+
 	// runs-on: (#1761, FR-034), which replaced hosts:: labels a machine must all have to run it: its id, its os (macos, linux), its provider, and its user's or bot's name. None runs on every machine of each person who turned it on.
 	RunsOn []string `json:"runsOn,omitzero"`
 }
 
 // Read forgivingly (Workflow.swift's init(from:)): a field that is missing or does not read takes its default (`isEnabled` true; false, 0, [] or absent for the rest).
 type WorkflowSummary struct {
-	Workflow            Workflow           `json:"workflow"`
-	IsArchived          bool               `json:"isArchived"`
-	IsEnabled           bool               `json:"isEnabled"`
-	OverLimit           *WorkflowLimit     `json:"overLimit,omitzero"`
-	TotalLimit          *int64             `json:"totalLimit,omitzero"`
-	NextFireAt          *Date              `json:"nextFireAt,omitzero"`
-	NextFireAtByTrigger []*Date            `json:"nextFireAtByTrigger"`
-	LastOutcome         *WorkflowOutcome   `json:"lastOutcome,omitzero"`
-	CausingEvent        *int64             `json:"causingEvent,omitzero"`
-	CausingEventName    *string            `json:"causingEventName,omitzero"`
-	IsRunning           bool               `json:"isRunning"`
-	AwaitingApproval    *WorkflowApproval  `json:"awaitingApproval,omitzero"`
-	DeniedHere          *WorkflowApproval  `json:"deniedHere,omitzero"`
-	LastFiredAt         *Date              `json:"lastFiredAt,omitzero"`
-	LastFiredBy         *WorkflowCause     `json:"lastFiredBy,omitzero"`
-	CooldownEndsAt      *Date              `json:"cooldownEndsAt,omitzero"`
-	HoldsAFire          bool               `json:"holdsAFire"`
-	Queued              int64              `json:"queued"`
-	OffReason           *WorkflowOffReason `json:"offReason,omitzero"`
-	StandingAgentID     *UUID              `json:"standingAgentID,omitzero"`
-	McpTriggers         []MCPTriggerStatus `json:"mcpTriggers,omitzero"`
+	Workflow Workflow `json:"workflow"`
+
+	IsArchived bool `json:"isArchived"`
+
+	IsEnabled bool `json:"isEnabled"`
+
+	OverLimit *WorkflowLimit `json:"overLimit,omitzero"`
+
+	TotalLimit *int64 `json:"totalLimit,omitzero"`
+
+	NextFireAt *Date `json:"nextFireAt,omitzero"`
+
+	NextFireAtByTrigger []*Date `json:"nextFireAtByTrigger"`
+
+	LastOutcome *WorkflowOutcome `json:"lastOutcome,omitzero"`
+
+	CausingEvent *int64 `json:"causingEvent,omitzero"`
+
+	CausingEventName *string `json:"causingEventName,omitzero"`
+
+	IsRunning bool `json:"isRunning"`
+
+	AwaitingApproval *WorkflowApproval `json:"awaitingApproval,omitzero"`
+
+	DeniedHere *WorkflowApproval `json:"deniedHere,omitzero"`
+
+	LastFiredAt *Date `json:"lastFiredAt,omitzero"`
+
+	LastFiredBy *WorkflowCause `json:"lastFiredBy,omitzero"`
+
+	CooldownEndsAt *Date `json:"cooldownEndsAt,omitzero"`
+
+	HoldsAFire bool `json:"holdsAFire"`
+
+	Queued int64 `json:"queued"`
+
+	OffReason *WorkflowOffReason `json:"offReason,omitzero"`
+
+	StandingAgentID *UUID `json:"standingAgentID,omitzero"`
+
+	McpTriggers []MCPTriggerStatus `json:"mcpTriggers,omitzero"`
 }
 
 // UnmarshalJSON reads a field that is missing as its default.
@@ -6603,7 +8485,8 @@ func (v *WorkflowSummary) UnmarshalJSON(b []byte) error {
 type WorkflowTrigger WorkflowTriggerStored
 
 type WorkflowTriggerStored struct {
-	Schedule     *WorkflowTriggerStoredSchedule     `json:"schedule,omitzero"`
+	Schedule *WorkflowTriggerStoredSchedule `json:"schedule,omitzero"`
+
 	Unrecognised *WorkflowTriggerStoredUnrecognised `json:"unrecognised,omitzero"`
 }
 
@@ -6612,17 +8495,16 @@ type WorkflowTriggerStoredSchedule struct {
 }
 
 type WorkflowTriggerStoredUnrecognised struct {
-	Name string               `json:"name"`
+	Name string `json:"name"`
+
 	Keys map[string]JSONValue `json:"keys"`
 }
 
 type WorkflowWhenDone string
 
-const (
-	WorkflowWhenDoneKeep           WorkflowWhenDone = "keep"
-	WorkflowWhenDoneArchiveAllowed WorkflowWhenDone = "archive-allowed"
-	WorkflowWhenDoneArchive        WorkflowWhenDone = "archive"
-)
+const WorkflowWhenDoneKeep WorkflowWhenDone = "keep"
+const WorkflowWhenDoneArchiveAllowed WorkflowWhenDone = "archive-allowed"
+const WorkflowWhenDoneArchive WorkflowWhenDone = "archive"
 
 type WorkflowsListRequest struct {
 	Folder *URL `json:"folder,omitzero"`
@@ -6630,22 +8512,32 @@ type WorkflowsListRequest struct {
 
 // One workspace, as its provider last listed it. `state` is running, starting, stopping, stopped or unknown.
 type WorkspaceInfo struct {
-	ID     string  `json:"id"`
-	Name   string  `json:"name"`
-	State  string  `json:"state"`
-	SSH    *string `json:"ssh,omitzero"`
-	Tunnel *bool   `json:"tunnel,omitzero"`
+	ID string `json:"id"`
+
+	Name string `json:"name"`
+
+	State string `json:"state"`
+
+	SSH *string `json:"ssh,omitzero"`
+
+	Tunnel *bool `json:"tunnel,omitzero"`
+
 	// Its ssh host key is made again at each start, as a Google Cloud workstation's is (#1701): after a Start the control plane made, the first ssh takes the key it is offered and pins it again.
-	HostKeyRenews *bool   `json:"hostKeyRenews,omitzero"`
-	Cost          *string `json:"cost,omitzero"`
-	Host          *HostID `json:"host,omitzero"`
+	HostKeyRenews *bool `json:"hostKeyRenews,omitzero"`
+
+	Cost *string `json:"cost,omitzero"`
+
+	Host *HostID `json:"host,omitzero"`
 }
 
 type WorktreeChoice struct {
-	New      *struct{}               `json:"new,omitzero"`
+	New *struct{} `json:"new,omitzero"`
+
 	Existing *WorktreeChoiceExisting `json:"existing,omitzero"`
-	Named    *WorktreeChoiceNamed    `json:"named,omitzero"`
-	Branch   *WorktreeChoiceBranch   `json:"branch,omitzero"`
+
+	Named *WorktreeChoiceNamed `json:"named,omitzero"`
+
+	Branch *WorktreeChoiceBranch `json:"branch,omitzero"`
 }
 
 type WorktreeChoiceExisting struct {
@@ -6661,8 +8553,10 @@ type WorktreeChoiceBranch struct {
 }
 
 type WorktreeRemovalRequest struct {
-	Project   URL  `json:"project"`
-	Root      URL  `json:"root"`
+	Project URL `json:"project"`
+
+	Root URL `json:"root"`
+
 	Confirmed bool `json:"confirmed"`
 }
 
@@ -6671,32 +8565,45 @@ type WorktreeRemoved struct {
 }
 
 type WorktreeSize struct {
-	Bytes   int64 `json:"bytes"`
-	Partial bool  `json:"partial"`
+	Bytes int64 `json:"bytes"`
+
+	Partial bool `json:"partial"`
 }
 
 type WorktreeSizeNote struct {
-	Root URL          `json:"root"`
+	Root URL `json:"root"`
+
 	Size WorktreeSize `json:"size"`
 }
 
 type WorktreeStatus struct {
-	Uncommitted int64  `json:"uncommitted"`
-	Ahead       *int64 `json:"ahead,omitzero"`
-	Behind      *int64 `json:"behind,omitzero"`
-	Unmerged    *int64 `json:"unmerged,omitzero"`
+	Uncommitted int64 `json:"uncommitted"`
+
+	Ahead *int64 `json:"ahead,omitzero"`
+
+	Behind *int64 `json:"behind,omitzero"`
+
+	Unmerged *int64 `json:"unmerged,omitzero"`
 }
 
 type WorktreeSummary struct {
-	Name            string          `json:"name"`
-	Root            URL             `json:"root"`
-	Branch          *string         `json:"branch,omitzero"`
-	IsProjectFolder bool            `json:"isProjectFolder"`
-	Exists          bool            `json:"exists"`
-	MadeByApp       bool            `json:"madeByApp"`
-	Agents          []UUID          `json:"agents"`
-	Status          *WorktreeStatus `json:"status,omitzero"`
-	Size            *WorktreeSize   `json:"size,omitzero"`
+	Name string `json:"name"`
+
+	Root URL `json:"root"`
+
+	Branch *string `json:"branch,omitzero"`
+
+	IsProjectFolder bool `json:"isProjectFolder"`
+
+	Exists bool `json:"exists"`
+
+	MadeByApp bool `json:"madeByApp"`
+
+	Agents []UUID `json:"agents"`
+
+	Status *WorktreeStatus `json:"status,omitzero"`
+
+	Size *WorktreeSize `json:"size,omitzero"`
 }
 
 type WorktreesListRequest struct {
@@ -6704,11 +8611,15 @@ type WorktreesListRequest struct {
 }
 
 type WorktreesListResponse struct {
-	IsRepository bool              `json:"isRepository"`
-	CanMakeNew   bool              `json:"canMakeNew"`
-	WhyNot       *string           `json:"whyNot,omitzero"`
-	Worktrees    []WorktreeSummary `json:"worktrees"`
-	Branches     []BranchSummary   `json:"branches"`
+	IsRepository bool `json:"isRepository"`
+
+	CanMakeNew bool `json:"canMakeNew"`
+
+	WhyNot *string `json:"whyNot,omitzero"`
+
+	Worktrees []WorktreeSummary `json:"worktrees"`
+
+	Branches []BranchSummary `json:"branches"`
 }
 
 type WorktreesSized struct {
@@ -6716,16 +8627,17 @@ type WorktreesSized struct {
 }
 
 type WriteFailure struct {
-	Cause   WriteFailureCause `json:"cause"`
-	Path    *string           `json:"path,omitzero"`
-	What    string            `json:"what"`
-	Message string            `json:"message"`
+	Cause WriteFailureCause `json:"cause"`
+
+	Path *string `json:"path,omitzero"`
+
+	What string `json:"what"`
+
+	Message string `json:"message"`
 }
 
 type WriteFailureCause string
 
-const (
-	WriteFailureCauseDiskFull   WriteFailureCause = "diskFull"
-	WriteFailureCauseNotAllowed WriteFailureCause = "notAllowed"
-	WriteFailureCauseReadOnly   WriteFailureCause = "readOnly"
-)
+const WriteFailureCauseDiskFull WriteFailureCause = "diskFull"
+const WriteFailureCauseNotAllowed WriteFailureCause = "notAllowed"
+const WriteFailureCauseReadOnly WriteFailureCause = "readOnly"
