@@ -80,7 +80,10 @@ func TestAnAgentsWorkspaceTools(t *testing.T) {
 	l.inTurn = true
 	l.mu.Unlock()
 	answered := make(chan string, 1)
-	go func() { text, _ := m.tool(7, "make_workspace", map[string]any{"provider": "do", "name": "second"}); answered <- text }()
+	go func() {
+		text, _ := m.tool(7, "make_workspace", map[string]any{"provider": "do", "name": "second"})
+		answered <- text
+	}()
 	var pending []wire.ElicitationRequest
 	waitFor(t, "the card", func() bool {
 		json.Unmarshal(c.call(t, 1, "elicitations/pending", nil), &pending)

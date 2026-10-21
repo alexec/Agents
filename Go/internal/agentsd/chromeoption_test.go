@@ -14,7 +14,9 @@ import (
 // offered beside Claude's own, and a chat's switch is kept without asking Claude.
 
 func TestChromeIsAskedForOnlyByTrue(t *testing.T) {
-	raw := func(s string) map[string]wire.JSONValue { return map[string]wire.JSONValue{"chrome": wire.JSONValue(s)} }
+	raw := func(s string) map[string]wire.JSONValue {
+		return map[string]wire.JSONValue{"chrome": wire.JSONValue(s)}
+	}
 	for _, tc := range []struct {
 		values map[string]wire.JSONValue
 		want   bool

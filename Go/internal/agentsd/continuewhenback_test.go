@@ -46,7 +46,9 @@ func TestAWaitThatIsDueGoesAndCancelStopsOne(t *testing.T) {
 	d, c := start(t, t.TempDir())
 	defer d.Shutdown()
 	cwd := t.TempDir()
-	paused := func(a *wire.Agent) { a.State, a.EndedReason = wire.AgentStateStopped, reason(wire.EndedReasonAllowanceSpent) }
+	paused := func(a *wire.Agent) {
+		a.State, a.EndedReason = wire.AgentStateStopped, reason(wire.EndedReasonAllowanceSpent)
+	}
 	// Not paused by an allowance: refused.
 	done := seeded(t, d, cwd, nil)
 	if e := c.callError(t, 1, "agents/continueWhenBack", map[string]any{"agentID": done.ID}); e == nil {

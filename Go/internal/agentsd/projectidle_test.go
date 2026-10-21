@@ -32,7 +32,9 @@ func TestAProjectThatStopsWorkingIsIdleOnce(t *testing.T) {
 	if n := countEvents(d, "project.idle"); n != 0 {
 		t.Fatalf("%d", n)
 	}
-	d.change(two.ID, func(a *wire.Agent) { a.State, a.EndedReason = wire.AgentStateStopped, reason(wire.EndedReasonProcessDied) })
+	d.change(two.ID, func(a *wire.Agent) {
+		a.State, a.EndedReason = wire.AgentStateStopped, reason(wire.EndedReasonProcessDied)
+	})
 	waitFor(t, "project.idle", func() bool { return countEvents(d, "project.idle") == 1 })
 	e := lastEvent(d, "project.idle")
 	if e.Scope.Project == nil || store.FolderPath(e.Scope.Project.Value) != dir || e.Details["agents"] != "2" ||

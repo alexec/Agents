@@ -36,7 +36,7 @@ func TestReadingAWorkflowFile(t *testing.T) {
 		"---\non:\n  - schedule:\n      at: \":15\"\n---\nGo": `":15" is not a time a workflow can run at — only ":00" and ":30"`,
 		"---\ncooldown: 10s\n---\nGo":                         "`cooldown:` must be a length of time, like 15m, 2h or 1d, not \"10s\"",
 		"---\nenabled: maybe\n---\nGo":                        "`enabled:` must be true or false",
-		"---\ncontinue-when-back: soon\n---\nGo":             "`continue-when-back:` must be true or false",
+		"---\ncontinue-when-back: soon\n---\nGo":              "`continue-when-back:` must be true or false",
 		"---\non:\n  - agent.finished:\n      x: 1\n---\nGo":  `agent.finished takes no arguments; "x" is not one of its arguments.`,
 	} {
 		w := parseWorkflow(text, "x", "/p")

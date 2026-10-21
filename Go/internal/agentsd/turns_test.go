@@ -31,6 +31,8 @@ func TestMain(m *testing.M) {
 		<-f.conn.Done()
 		return
 	}
+	// No test asks the person's gh about merged pull requests unless it says so.
+	findGH = func() string { return "" }
 	os.Exit(m.Run())
 }
 

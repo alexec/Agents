@@ -42,11 +42,11 @@ type dropStamp struct {
 }
 
 type projectWatchState struct {
-	pwMu         sync.Mutex
-	pwSyncMu     sync.Mutex
-	pwWatches    map[string]*folderWatch
-	pwKicked     bool
-	pwStopped    bool
+	pwMu      sync.Mutex
+	pwSyncMu  sync.Mutex
+	pwWatches map[string]*folderWatch
+	pwKicked  bool
+	pwStopped bool
 	// pwBusy is what a watch or its timers is doing now: stopProjectWatches waits for it, so
 	// nothing writes into the root after the host is gone.
 	pwBusy       sync.WaitGroup
