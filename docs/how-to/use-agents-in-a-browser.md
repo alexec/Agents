@@ -16,7 +16,7 @@ serving it at a public address (issue #61).
 
 ## Before you start
 
-- Agents Host on this Mac, running the control plane here. See
+- Agents Host on this Mac, running the control plane here or joined to one elsewhere. See
   [Set up Agents on this Mac](set-up-on-this-mac.md).
 - A paired window, or Agents Host itself, to get a code from.
 
@@ -55,6 +55,23 @@ says **Connect this browser to your agents**.
 
 The browser keeps a key of its own, which can't be copied out of it. Next time you open the
 address, it connects with that key, and nothing needs pasting.
+
+### With the control plane elsewhere
+
+When this Mac joins a control plane that runs somewhere else, such as in the cloud, this Mac's
+host serves the page at the same address, **http://localhost:8792**. **Serve Agents to browsers
+on this Mac** in Agents Host turns it on and off, as before.
+
+The page works as it does with the control plane here, with two differences:
+
+- **Open in Browser** is not offered. Pair the browser by hand, as above: get the code from
+  **Add a Browser…** in the window, or at the foot of the Remote's sidebar.
+- The page needs the control plane. This Mac's host passes the page through to it, and the
+  control plane checks the browser. When the control plane can't be reached, the page says it
+  is offline, and connects again once it can.
+
+A browser paired at this address while the control plane ran on this Mac keeps working after
+the control plane moves, because its key and the address stay the same.
 
 ### A browser on another computer
 
