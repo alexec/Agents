@@ -1120,6 +1120,7 @@ struct CopiesMessage: ViewModifier {
                     }
                     if let branch {
                         Button("Branch from Here", action: branch)
+                            .help(SessionPrompt.branchHelp)
                     }
                 }
                 .accessibilityAction(named: "Copy Message") { Self.copy(text) }

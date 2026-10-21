@@ -910,10 +910,14 @@ func (d *Daemon) branchFrom(r wire.BranchFromRequest) (wire.UUID, error) {
 	if a.Title != nil {
 		from = *a.Title
 	}
-	d.record(b.ID, runtimeNote("Branched from "+from+" before its prompt "+strconv.Itoa(promptNumber(entries[:at+1]))+"."))
+	d.record(b.ID, runtimeNote("Branched from "+from+" before its prompt "+strconv.Itoa(promptNumber(entries[:at+1]))+". "+branchFilesNote))
 	d.change(b.ID, func(*wire.Agent) {})
 	return b.ID, nil
 }
+
+// branchFilesNote ends a Branch from Here note (#1871): the branch shares the folder and
+// worktree, so the record goes back and the files do not. The clients' help says it too.
+const branchFilesNote = "The files stay as they are now."
 
 // promptNumber is how many of the person's prompts these entries hold, as the Prompts
 // list numbers them.

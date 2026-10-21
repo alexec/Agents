@@ -190,6 +190,7 @@ private struct PromptsListRow: View {
         Button("Copy", systemImage: "doc.on.doc") { CopiesMessage.copy(prompt.text) }
         if let branch {
             Button("Branch from Here", systemImage: "arrow.triangle.branch", action: branch)
+                .help(SessionPrompt.branchHelp)
         }
     }
 

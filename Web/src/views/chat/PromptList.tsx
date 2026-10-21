@@ -138,7 +138,7 @@ function RowMenu({ open, at, toggle, copy, branch, number }: {
         <div class="popover right" role="menu" style={{ position: "fixed", top: `${at.top}px`, right: `${at.right}px`, left: "auto" }}>
           <button role="menuitem" title="Copy the whole prompt" onClick={copy}>Copy</button>
           {branch && (
-            <button role="menuitem" title="Start a new session from just before this prompt, with the prompt in its prompt bar to change"
+            <button role="menuitem" title="Start a new session from just before this prompt, with the prompt in its bar to change. The files stay as they are now."
               onClick={branch}>Branch from Here</button>
           )}
         </div>
