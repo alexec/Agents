@@ -1490,6 +1490,11 @@ export interface ControlAuth {
    * bound to that origin.
    */
   page?: number;
+  /**
+   * With an `s:<client>` identity (#995): the key of the client that signs in, X9.63. The
+   * exchange's MAC is under the ECDH of it and the control plane's key, as a paired client's is.
+   */
+  publicKey?: Base64;
 }
 
 /**
@@ -4755,6 +4760,109 @@ export interface SignIn {
   added?: WireDate;
 }
 
+/**
+ * signIn/addToMe (#995, FR-005): a sign-in to add to the caller's person: an ID token made with
+ * signIn/providers' nonce, or a GitHub user access token.
+ */
+export interface SignInAdd {
+  provider: string;
+  token: string;
+}
+
+/**
+ * signIn/configure (#995, admins): turn a provider on or off, and set Google's allowed Workspace
+ * domains or GitHub's allowed organisations. What is left out stays as it was.
+ */
+export interface SignInConfigure {
+  provider: string;
+  on?: boolean;
+  domains?: string[];
+  organisations?: string[];
+}
+
+/** signIn/approve, signIn/deny (#995). */
+export interface SignInDecide {
+  request: string;
+}
+
+/** control/signInDecided (#995): how a request ended: approved, denied or expired. */
+export interface SignInDecided {
+  request: string;
+  result: string;
+}
+
+/**
+ * signIn/pair, on an `s:` connection (#995): the client's name and kind, and its provider's token:
+ * an ID token for google and apple, a user access token for github. The control plane checks it and
+ * forgets it (FR-008, FR-010).
+ */
+export interface SignInPair {
+  provider: string;
+  token: string;
+  name: string;
+  kind: ClientKind;
+}
+
+/**
+ * One sign-in provider (#995, spec 736 FR-004): google, apple or github. `on` is the admin's
+ * switch; `available` is false when this build has no client id for it, with `why`. `clientID` is
+ * the app's own, what a client signs in with (FR-012).
+ */
+export interface SignInProvider {
+  provider: string;
+  on: boolean;
+  available: boolean;
+  clientID?: string;
+  why?: string;
+}
+
+/**
+ * signIn/providers, signIn/configure (#995): the providers. `challenge` (base64url) is what a
+ * client's nonce is made from on this connection: the hello's nonce on an `s:` connection, or a
+ * fresh one used once on a paired client's. The client makes the nonce itself, from the control key
+ * it trusts and the challenge (R2), so a token cannot be passed on to another control plane
+ * (FR-008, FR-011). `domains` (Google Workspace) and `organisations` (GitHub) are for admins only
+ * (FR-006).
+ */
+export interface SignInProviders {
+  providers: SignInProvider[];
+  challenge?: string;
+  domains?: string[];
+  organisations?: string[];
+}
+
+/**
+ * signIn/removeFromMe (#995): an outside sign-in to take off the caller's person. The local owner's
+ * stays.
+ */
+export interface SignInRemove {
+  provider: string;
+  account: string;
+}
+
+/**
+ * signIn/requests, control/signInRequested (#995, FR-010): a new client that signed in with GitHub,
+ * waiting for Approve on one of the person's clients, with the code it shows.
+ */
+export interface SignInRequest {
+  request: string;
+  name: string;
+  kind: ClientKind;
+  provider: string;
+  login?: string;
+  code: string;
+  expires: WireDate;
+}
+
+/**
+ * control/signInWaiting, on an `s:` connection (#995, FR-010): a GitHub sign-in waits for Approve
+ * on another client of the person, which shows the same code.
+ */
+export interface SignInWaiting {
+  code: string;
+  expires: WireDate;
+}
+
 export type SignInWantedReason = "notSignedIn" | "unreadable";
 
 /**
@@ -6000,6 +6108,12 @@ export interface Methods {
   "runtimes/list": { params: Empty; result: RuntimeStatus[] };
   "runtimes/markAvailable": { params: MarkRuntimeAvailable; result: RuntimeAllowances };
   "sandbox/state": { params: Empty; result: SandboxSettings };
+  "signIn/approve": { params: SignInDecide; result: Empty };
+  "signIn/configure": { params: SignInConfigure; result: SignInProviders };
+  "signIn/deny": { params: SignInDecide; result: Empty };
+  "signIn/providers": { params: Empty; result: SignInProviders };
+  "signIn/removeFromMe": { params: SignInRemove; result: Empty };
+  "signIn/requests": { params: Empty; result: SignInRequest[] };
   "simulators/boot": { params: SimulatorRequest; result: Empty };
   "simulators/home": { params: SimulatorRequest; result: Empty };
   "simulators/list": { params: Empty; result: SimulatorList };
@@ -6204,6 +6318,12 @@ export const MethodTarget = {
   "runtimes/list": "host",
   "runtimes/markAvailable": "host",
   "sandbox/state": "host",
+  "signIn/approve": "control",
+  "signIn/configure": "control",
+  "signIn/deny": "control",
+  "signIn/providers": "control",
+  "signIn/removeFromMe": "control",
+  "signIn/requests": "control",
   "simulators/boot": "host",
   "simulators/home": "host",
   "simulators/list": "host",
@@ -6267,6 +6387,8 @@ export interface Notifications {
   "control/peopleChanged": PeopleChanged;
   "control/providersChanged": ProviderList;
   "control/secretsLeft": SecretsLeft;
+  "control/signInDecided": SignInDecided;
+  "control/signInRequested": SignInRequest;
   "control/userSettingsChanged": UserSettingsChanged;
   "disk/changed": DiskState;
   "files/changed": FilesChangedNotification;
@@ -6412,7 +6534,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ContentBlockAnnotations: { required: [], optional: ["audience", "priority"] },
   ContinueInProjectRequest: { required: ["agentID", "text", "attachments"], optional: ["requestID"] },
   ContinueWhenBack: { required: ["at", "resetKnown"], optional: [] },
-  ControlAuth: { required: ["id", "nonce", "mac", "kind"], optional: ["for", "epoch", "capabilities", "page"] },
+  ControlAuth: { required: ["id", "nonce", "mac", "kind"], optional: ["for", "epoch", "capabilities", "page", "publicKey"] },
   ControlClientChanged: { required: [], optional: ["client", "removed"] },
   ControlCodeShown: { required: ["text", "expires"], optional: ["command"] },
   ControlEndpoint: { required: ["url"], optional: ["pin"] },
@@ -6803,6 +6925,16 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ShowFileNotification: { required: ["agentID", "file"], optional: [] },
   ShownFile: { required: ["path"], optional: ["line", "chart"] },
   SignIn: { required: ["provider"], optional: ["account", "email", "login", "added"] },
+  SignInAdd: { required: ["provider", "token"], optional: [] },
+  SignInConfigure: { required: ["provider"], optional: ["on", "domains", "organisations"] },
+  SignInDecide: { required: ["request"], optional: [] },
+  SignInDecided: { required: ["request", "result"], optional: [] },
+  SignInPair: { required: ["provider", "token", "name", "kind"], optional: [] },
+  SignInProvider: { required: ["provider", "on", "available"], optional: ["clientID", "why"] },
+  SignInProviders: { required: ["providers"], optional: ["challenge", "domains", "organisations"] },
+  SignInRemove: { required: ["provider", "account"], optional: [] },
+  SignInRequest: { required: ["request", "name", "kind", "provider", "code", "expires"], optional: ["login"] },
+  SignInWaiting: { required: ["code", "expires"], optional: [] },
   Simulator: { required: ["udid", "name", "os", "booted"], optional: [] },
   SimulatorList: { required: ["simulators"], optional: ["reason"] },
   SimulatorRequest: { required: ["udid"], optional: [] },

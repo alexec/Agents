@@ -93,6 +93,7 @@ public enum Capability {
     public static let sandbox1 = "sandbox/1"
     public static let sessions1 = "sessions/1"
     public static let shell1 = "shell/1"
+    public static let signin1 = "signin/1"
     public static let simulators1 = "simulators/1"
     public static let skills1 = "skills/1"
     public static let storage1 = "storage/1"
@@ -491,6 +492,14 @@ public enum Capability {
         "reports/scopes": "reports.scope/1",
         "reports/setPolicy": "reports.scope/1",
         "reports/usage": "reports/1",
+        "signIn/addToMe": "signin/1",
+        "signIn/approve": "signin/1",
+        "signIn/configure": "signin/1",
+        "signIn/deny": "signin/1",
+        "signIn/pair": "signin/1",
+        "signIn/providers": "signin/1",
+        "signIn/removeFromMe": "signin/1",
+        "signIn/requests": "signin/1",
         "tunnel/open": "tunnel/1",
         "usage/rollup": "reports/1",
         "user/removeSecret": "user/1",
@@ -519,6 +528,9 @@ public enum Capability {
         "control/providerDraft": "control/1",
         "control/providersChanged": "control/1",
         "control/secretsLeft": "user/1",
+        "control/signInDecided": "signin/1",
+        "control/signInRequested": "signin/1",
+        "control/signInWaiting": "signin/1",
         "control/thisMacHostChanged": "control/1",
         "control/tunnelChanged": "control/1",
         "control/userSettingsChanged": "user/1",

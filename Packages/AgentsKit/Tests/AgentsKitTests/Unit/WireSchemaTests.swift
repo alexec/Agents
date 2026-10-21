@@ -240,6 +240,17 @@ struct WireSchemaTests {
             "ChannelLinkDecide": Self.through(DaemonAPI.ChannelLinkDecide.self),
             "ChannelLinkDecided": Self.through(DaemonAPI.ChannelLinkDecided.self),
             "ChannelLinkRemove": Self.through(DaemonAPI.ChannelLinkRemove.self),
+            // Sign-in (#995).
+            "SignInProvider": Self.through(DaemonAPI.SignInProvider.self),
+            "SignInProviders": Self.through(DaemonAPI.SignInProviders.self),
+            "SignInConfigure": Self.through(DaemonAPI.SignInConfigure.self),
+            "SignInPair": Self.through(DaemonAPI.SignInPair.self),
+            "SignInWaiting": Self.through(DaemonAPI.SignInWaiting.self),
+            "SignInAdd": Self.through(DaemonAPI.SignInAdd.self),
+            "SignInRemove": Self.through(DaemonAPI.SignInRemove.self),
+            "SignInRequest": Self.through(DaemonAPI.SignInRequest.self),
+            "SignInDecide": Self.through(DaemonAPI.SignInDecide.self),
+            "SignInDecided": Self.through(DaemonAPI.SignInDecided.self),
             // Reports (#1811).
             "ReportQuery": Self.through(DaemonAPI.ReportQuery.self),
             "UsageReport": Self.through(DaemonAPI.UsageReport.self),
