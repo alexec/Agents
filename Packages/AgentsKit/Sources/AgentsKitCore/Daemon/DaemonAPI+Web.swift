@@ -324,6 +324,8 @@ public extension DaemonAPI {
                 Row(Method.botsMake, params: BotMake.self, result: BotMade.self, kind: .controlRequest),
                 Row(Method.botsSetCaps, params: BotCaps.self, result: Empty.self, kind: .controlRequest),
                 Row(Method.botsStopRun, params: BotStopRun.self, result: Empty.self, kind: .controlRequest),
+                // A host code, the page's for a bot's machine (#1761).
+                Row(Method.hostsStartEnroll, params: HostEnroll.self, result: ControlCodeShown.self, kind: .controlRequest),
                 // A machine that asks to join, approved on a card (#994).
                 Row(Method.hostsJoinRequests, params: Empty.self, result: [JoinRequest].self, kind: .controlRequest),
                 Row(Method.hostsApproveJoin, params: JoinRequestDecide.self, result: JoinApproved.self,

@@ -13,7 +13,7 @@ import type {
   PagesChangedNotification, PinsChangedNotification, PinView, ViewPin, ListCursor, ListRequest, FileMentionDTO, SandboxChoice, RuntimeAllowances,
   GuardedChange, GuardedChangeReading, HostJoinStatus, RequiredCapabilities, KeptDelivered, KeptList, KeptRequest, Approval, ApprovalAction, UsageHistory, TimeHistory, Milestones,
   BuildOutputRemoved, ProjectWorktrees, RemovalCheck, WorktreeSize, WorktreeSummary, WorktreesSized, FindResult,
-  BackupRestoreResult, BackupSettings, BackupState, ControlPerson, JoinDecided, JoinRequest, SecretsLeft } from "../protocol/generated";
+  BackupRestoreResult, BackupSettings, BackupState, CapReached, ControlPerson, JoinDecided, JoinRequest, SecretsLeft } from "../protocol/generated";
 import { Failure } from "../protocol/generated";
 import { CallFailed, type Link } from "../wire/link";
 import type { FolderGoneAsk } from "./missingFolder";
@@ -416,6 +416,8 @@ export class Work {
   readonly joinRequests = signal<JoinRequest[]>([]);
   /** Counts each control/peopleChanged (#994): Settings ▸ People loads its list again when it moves. */
   readonly peopleChanges = signal(0);
+  /** The last bot that stopped at a cap (#1761, control/capReached), for an admin's Settings ▸ People. */
+  readonly capReached = signal<CapReached | null>(null);
   /** Counts each control/userSettingsChanged (#1760): You ▸ On Every Machine loads again when it moves. */
   readonly userScopeChanges = signal(0);
   /** The last machine of the person's removed with secrets on it (#1760, control/secretsLeft), until read. */
@@ -1126,6 +1128,11 @@ export class Store extends Work {
         return;
       }
       if (method === "control/peopleChanged") {
+        this.peopleChanges.value += 1;
+        return;
+      }
+      if (method === "control/capReached") {
+        this.capReached.value = (params as CapReached | null) ?? null;
         this.peopleChanges.value += 1;
         return;
       }

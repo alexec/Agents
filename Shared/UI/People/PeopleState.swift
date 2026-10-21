@@ -16,6 +16,8 @@ final class PeopleState {
     private(set) var you: DaemonAPI.ControlPerson?
     /// Goes up on `control/peopleChanged` and `control/groupsChanged` (#1761).
     private(set) var revision = 0
+    /// The last bot that stopped at a cap (#1761, `control/capReached`), shown to admins.
+    private(set) var capReached: DaemonAPI.CapReached?
     /// Requests answered from here and not decided yet: their buttons wait.
     private(set) var answering: Set<String> = []
 
@@ -46,6 +48,9 @@ final class PeopleState {
             // A role changed or a person went: who this is, and what they may approve.
             await connected(control)
         case DaemonAPI.Notification.controlGroupsChanged:
+            revision += 1
+        case DaemonAPI.Notification.controlCapReached:
+            capReached = try? params?.decode(DaemonAPI.CapReached.self)
             revision += 1
         default:
             return false

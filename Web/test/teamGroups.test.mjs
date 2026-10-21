@@ -26,3 +26,14 @@ test("groups: a provider is for its group or the admins", () => {
   assert.equal(g.usable(given), false);
   assert.equal(g.usable(none), true);
 });
+
+test("bots: a bot's line says its group, cap and spend", () => {
+  const platform = { id: "g1", name: "Platform", everyone: false, members: [] };
+  assert.equal(g.botLine({ id: "b", name: "review-bot", kind: "bot", group: "g1", caps: { dailyUSD: 50 }, spentTodayUSD: 3.2 }, [platform]),
+    "In Platform · $50 a day · $3.20 today");
+  assert.equal(g.capWords(undefined), "No cap");
+  assert.equal(g.parseCap(" $12.5 "), 12.5);
+  assert.equal(g.parseCap("none"), undefined);
+  assert.equal(g.capReachedWords({ user: "b", name: "review-bot", group: "Platform", spentUSD: 51, capUSD: 50, until: 0 }),
+    "review-bot stopped at Platform’s cap: $51 of $50 today. It starts work again at midnight UTC.");
+});

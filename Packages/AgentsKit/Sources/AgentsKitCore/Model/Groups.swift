@@ -236,3 +236,47 @@ public enum GroupWords {
 
     public static let removeMessage = "Its people keep their machines. A provider must go to another group first."
 }
+
+/// The words a bot is shown in, in Settings ▸ People (#1761), the same on the Mac and the
+/// Remote (the web page's are in `Web/src/model/teamGroups.ts`).
+public enum BotWords {
+    public static let make = "Make a Bot…"
+    public static let addMachine = "Add a Machine…"
+    public static let setCap = "Group and Cap…"
+
+    /// "$50 a day", or "No cap".
+    public static func cap(_ caps: DaemonAPI.SpendCaps?) -> String {
+        guard let usd = caps?.dailyUSD, usd > 0 else { return "No cap" }
+        return "\(dollars(usd)) a day"
+    }
+
+    /// "In Platform · $50 a day · $3.20 today".
+    public static func line(_ bot: DaemonAPI.PersonRow, groups: [DaemonAPI.Group]) -> String {
+        let group = groups.first { $0.id == bot.group }?.name ?? "a group not shown to you"
+        var parts = ["In \(group)", cap(bot.caps)]
+        if let spent = bot.spentTodayUSD { parts.append("\(dollars(spent)) today") }
+        return parts.joined(separator: " · ")
+    }
+
+    /// The notice an admin is shown when a bot stopped at a cap.
+    public static func capReached(_ reached: DaemonAPI.CapReached) -> String {
+        let whose = reached.group.map { "\($0)’s cap" } ?? "its cap"
+        return "\(reached.name) stopped at \(whose): \(dollars(reached.spentUSD)) of \(dollars(reached.capUSD)) today. It starts work again at midnight UTC."
+    }
+
+    public static let foot = "A bot runs the team’s workflows: a workflow whose runs-on: names it runs on its machines, once per trigger. Nobody can start, message or answer its agents; an admin can stop a run. Its spend counts against its own cap and its group’s."
+
+    public static let machineFoot = "Run this on the machine for the bot. It joins as the bot’s machine; the code works once, for 10 minutes."
+
+    /// "$3.20", "$50".
+    public static func dollars(_ usd: Double) -> String {
+        usd == usd.rounded() ? "$\(Int(usd))" : String(format: "$%.2f", usd)
+    }
+
+    /// A cap typed in: dollars, or nil for no cap. A bad number is no cap too.
+    public static func parseCap(_ text: String) -> Double? {
+        let trimmed = text.trimmingCharacters(in: .whitespaces).replacingOccurrences(of: "$", with: "")
+        guard let usd = Double(trimmed), usd > 0 else { return nil }
+        return usd
+    }
+}

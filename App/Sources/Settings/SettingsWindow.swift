@@ -177,7 +177,8 @@ struct SettingsWindow: View {
         case .people:
             // Through the window's own connection to the control plane, which hears when
             // people change (#994).
-            FormColumn { PeoplePane(control: model.controlRequests, revision: model.people.revision) }
+            FormColumn { PeoplePane(control: model.controlRequests, revision: model.people.revision,
+                                   capReached: model.people.capReached) }
         case .groups:
             FormColumn { GroupsPane(control: model.controlRequests, revision: model.people.revision) }
         }

@@ -277,6 +277,8 @@
 /* Make a Group… (#1761): the people to name, one checkbox each. */
 .group-people { border: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
 .group-people legend { padding: 0; font-size: 0.8125rem; opacity: 0.7; }
+/* A bot stopped at its cap (#1761), for an admin. */
+.with-sidebar .settings-body .hint.attention { color: var(--tint-attention); }
 button.destructive { color: var(--tint-failure); }
 button.prominent.destructive { background: var(--tint-failure); border-color: var(--tint-failure); color: var(--paper-ground); }
 .invite-code .code-text { font-family: var(--font-mono); padding: 6px 8px; border: 1px solid var(--paper-rule);

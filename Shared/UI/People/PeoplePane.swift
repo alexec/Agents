@@ -18,6 +18,8 @@ struct PeoplePane: View {
     let control: DaemonClient?
     /// Goes up when the control plane says people changed, to load them again.
     let revision: Int
+    /// The last bot that stopped at a cap, for an admin (#1761).
+    var capReached: DaemonAPI.CapReached?
 
     @State private var list: DaemonAPI.PeopleList?
     @State private var problem: String?
@@ -33,6 +35,16 @@ struct PeoplePane: View {
     @State private var rotated = false
     /// `control/status`'s line to run on a server so it asks to join as this person.
     @State private var joinCommand: String?
+    /// The groups a bot may be in (#1761).
+    @State private var groups: [DaemonAPI.Group] = []
+    /// Make a Bot… (nil bot) and Group and Cap… (#1761).
+    @State private var botSheet: BotSheetItem?
+    @State private var machineFor: DaemonAPI.PersonRow?
+
+    struct BotSheetItem: Identifiable {
+        var bot: DaemonAPI.PersonRow?
+        var id: String { bot?.id ?? "new" }
+    }
 
     private struct Load: Hashable {
         var reachable: Bool
@@ -48,6 +60,13 @@ struct PeoplePane: View {
                 }
                 .paperListRow()
             }
+            if let capReached, list?.admin == true {
+                Section {
+                    Text(BotWords.capReached(capReached)).appText(.supporting).tinted(.attention)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .paperListRow()
+            }
             if let asking {
                 Section {
                     Text(PeopleWords.asking(asking)).appText(.supporting).foregroundStyle(.secondary)
@@ -56,9 +75,11 @@ struct PeoplePane: View {
             }
             if let list {
                 ForEach(list.people) { person in
-                    PersonSection(person: person, admin: list.admin,
+                    PersonSection(person: person, admin: list.admin, groups: groups,
                                   setRole: { role in Task { await setRole(person, role) } },
-                                  remove: { Task { await askBeforeRemoving(person) } })
+                                  remove: { Task { await askBeforeRemoving(person) } },
+                                  setCap: { botSheet = BotSheetItem(bot: person) },
+                                  addMachine: { machineFor = person })
                     if person.isYou, let joinCommand, !joinCommand.isEmpty {
                         JoinCommandSection(command: joinCommand)
                     }
@@ -66,6 +87,8 @@ struct PeoplePane: View {
                 Section {
                     if list.admin {
                         Button("Invite a Person…") { isInviting = true }
+                        // A bot runs the team's workflows (#1761).
+                        Button(BotWords.make) { botSheet = BotSheetItem(bot: nil) }
                     }
                 } footer: {
                     Text(PeopleWords.foot(admin: list.admin))
@@ -105,6 +128,13 @@ struct PeoplePane: View {
                 .paperSheet()
         }
         .onChange(of: isInviting) { _, open in if !open { Task { await load() } } }
+        .sheet(item: $botSheet) { item in
+            BotSheet(control: control, bot: item.bot, groups: groups) { Task { await load() } }
+                .paperSheet()
+        }
+        .sheet(item: $machineFor) { bot in
+            BotMachineSheet(control: control, bot: bot).paperSheet()
+        }
         .confirmationDialog(removing.map(PeopleWords.removeTitle) ?? "",
                             isPresented: Binding(get: { removing != nil }, set: { if !$0 { removing = nil } }),
                             titleVisibility: .visible, presenting: removing) { person in
@@ -135,6 +165,9 @@ struct PeoplePane: View {
                                           returning: DaemonAPI.PeopleList.self)
             joinCommand = (try? await control.call(DaemonAPI.Method.controlStatus,
                                                    returning: DaemonAPI.ControlStatus.self))?.joinCommand
+            // A control plane before groups has none: no bot can be made.
+            groups = (try? await control.call(DaemonAPI.Method.groupsList, DaemonAPI.Empty(),
+                                              returning: DaemonAPI.GroupList.self))?.groups ?? []
             problem = nil
         } catch {
             problem = PeopleWords.refusal(error)
@@ -212,8 +245,11 @@ struct PeoplePane: View {
 private struct PersonSection: View {
     let person: DaemonAPI.PersonRow
     let admin: Bool
+    let groups: [DaemonAPI.Group]
     let setRole: (DaemonAPI.UserRole) -> Void
     let remove: () -> Void
+    let setCap: () -> Void
+    let addMachine: () -> Void
 
     var body: some View {
         Section {
@@ -224,14 +260,24 @@ private struct PersonSection: View {
                     .foregroundStyle(.secondary)
             }
             .accessibilityElement(children: .combine)
-            if admin {
-                Picker("Role", selection: Binding(get: { person.role }, set: setRole)) {
-                    ForEach(DaemonAPI.UserRole.allCases) { Text($0.title).tag($0) }
+            if person.kind == .bot {
+                // A bot has no role, clients or sign-in: its group, cap and spend (#1761).
+                ListLine(title: "Group and cap", words: BotWords.line(person, groups: groups))
+                ListLine(title: "Machines", words: PeopleWords.machines(person) ?? "None")
+                if admin {
+                    Button(BotWords.setCap, action: setCap)
+                    Button(BotWords.addMachine, action: addMachine)
                 }
-                .pickerStyle(.menu)
+            } else {
+                if admin {
+                    Picker("Role", selection: Binding(get: { person.role }, set: setRole)) {
+                        ForEach(DaemonAPI.UserRole.allCases) { Text($0.title).tag($0) }
+                    }
+                    .pickerStyle(.menu)
+                }
+                ListLine(title: "Machines", words: PeopleWords.machines(person) ?? "None")
+                ListLine(title: "Clients", words: PeopleWords.clients(person) ?? "None")
             }
-            ListLine(title: "Machines", words: PeopleWords.machines(person) ?? "None")
-            ListLine(title: "Clients", words: PeopleWords.clients(person) ?? "None")
             if admin, PeopleWords.canRemove(person) {
                 Button("Remove…", role: .destructive, action: remove)
             }
