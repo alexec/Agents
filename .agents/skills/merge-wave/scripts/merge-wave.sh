@@ -136,6 +136,8 @@ resolve() {
 # it conflicts with its removal, and the removal wins.
 is_web_generated() { case $1 in Web/dist/* | Web/src/protocol/generated.ts | Go/wire/*_gen.go) return 0 ;; *) return 1 ;; esac; }
 PARITY=specs/071-web-remote/walks/parity.md
+# Its screens, a file each (#2020), are settled the same way.
+is_parity() { case $1 in "$PARITY" | specs/071-web-remote/walks/parity/*.md) return 0 ;; *) return 1 ;; esac; }
 
 # --- plan -------------------------------------------------------------------------------
 
@@ -170,7 +172,7 @@ plan() {
 			conflicts=$(echo "$tree" | sed 1d | sed '/^$/d')
 			kind=settled
 			while IFS= read -r c; do
-				is_web_generated "$c" || [ "$c" = "$PARITY" ] || kind=stops
+				is_web_generated "$c" || is_parity "$c" || kind=stops
 			done <<<"$conflicts"
 			if [ $kind = stops ]; then
 				echo "  $name ${sha:0:10}: merges with a conflict a person must settle:"
@@ -266,7 +268,7 @@ settle() {
 	local name=$1 sha=$2 c web=0 other=""
 	while IFS= read -r c; do
 		[ -n "$c" ] || continue
-		if [ "$c" = "$PARITY" ]; then
+		if is_parity "$c"; then
 			keep_both "$c"
 		elif is_web_generated "$c"; then
 			web=1
@@ -291,7 +293,7 @@ settle() {
 	g commit -q --no-edit
 	echo "$name $sha $(g rev-parse HEAD)" >>"$ST/merged"
 	pop_pending
-	say "merged $name (kept both sides' rows in $PARITY)"
+	say "merged $name (kept both sides' rows in the parity table)"
 }
 
 keep_both() { # path: the union of both sides, as git's union merge driver would

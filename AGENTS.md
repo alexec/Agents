@@ -20,7 +20,7 @@
   - a parity issue filed: `web: #NNN`;
   - left out on purpose: `mac: by design (no swipe on Mac)`.
 - **For example,** a Mac sidebar change ends with `remote: #226` and `web: same`; a web-only fix ends with `mac: same, remote: same` when both already do it. A change to docs only says `mac: docs only, remote: docs only, web: docs only`.
-- **The table of where each client stands** is `specs/071-web-remote/walks/parity.md` (Mac / Remote / web, a row per screen and feature). A parity line that changes a row updates it in the same branch.
+- **The table of where each client stands** is `specs/071-web-remote/walks/parity.md`, a file per screen under `walks/parity/` (Mac / Remote / web, a row per feature; #2020). `scripts/parity-counts.py` counts the verdicts. A parity line that changes a row updates it in the same branch.
 
 ## Web/dist and generated.ts
 

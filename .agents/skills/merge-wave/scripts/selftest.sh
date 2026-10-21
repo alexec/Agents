@@ -89,7 +89,7 @@ scenario_web() {
 	[ -z "$(git ls-files Web/dist)" ] || fail "main tracks Web/dist"
 	row() { sed -i '' "/^| Assess a runtime/a\\
 | wave row $1 | #0 | lacks | has | — | — | self-test |
-" specs/071-web-remote/walks/parity.md; }
+" specs/071-web-remote/walks/parity/pool-runtimes-and-spending.md; }
 	w1() { sed -i '' '1i\\
 console.debug("wave one");
 ' Web/src/main.tsx && row one; }
@@ -105,8 +105,8 @@ console.debug("wave one");
 	echo "$log$out" | grep -q 'Web/dist conflicts' && fail "no Web/dist to conflict over"
 	git show main:Web/src/main.tsx | grep -q 'wave one' && git show main:Web/src/main.tsx | grep -q 'wave two' || fail "both source changes"
 	[ -z "$(git ls-tree -r --name-only main -- Web/dist)" ] || fail "the wave committed Web/dist"
-	git show main:specs/071-web-remote/walks/parity.md | grep -q 'wave row one' &&
-		git show main:specs/071-web-remote/walks/parity.md | grep -q 'wave row two' || fail "both parity rows"
+	git show main:specs/071-web-remote/walks/parity/pool-runtimes-and-spending.md | grep -q 'wave row one' &&
+		git show main:specs/071-web-remote/walks/parity/pool-runtimes-and-spending.md | grep -q 'wave row two' || fail "both parity rows"
 	echo "$log" | grep -q 'SHIP=yes' || fail "a Web change ships"
 	[ "$(git rev-list --merges "$M2"..main | wc -l | tr -d ' ')" = 2 ] || fail "one merge commit per branch"
 	"$MW" clean "$wave"

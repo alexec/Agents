@@ -22,7 +22,7 @@ at the keyboard, that is true only of a run of the workflow.
 - **Never delete a worktree or a branch.** Alex reads them.
 - **Never turn workflows on or off**, this one included.
 - **Write only under `.agents/reviews/usability/`**, plus
-  `specs/071-web-remote/walks/parity.md` on your branch.
+  `specs/071-web-remote/walks/parity.md` and its screens in `walks/parity/*.md` on your branch.
 - **GitHub issues** are the one thing you publish. File one only for a finding that
   passes step 4, after searching open and closed issues for it. Never comment on or
   close anyone else's issue.
@@ -55,7 +55,7 @@ at the keyboard, that is true only of a run of the workflow.
 2. Read every file in `.agents/reviews/usability/`. The newest run file (`YYYY-MM-DD.md`)
    has `reviewed-through:` (a commit of `main`, your last-run marker) in its front
    matter. `findings.md` there is the running list of every finding ever recorded.
-3. Read `specs/071-web-remote/walks/parity.md` (the table of where each client stands)
+3. Read `specs/071-web-remote/walks/parity.md` and its screens, `walks/parity/*.md` (the table of where each client stands),
    and the "Keeping the three clients in step" section of `AGENTS.md`. Search GitHub for
    open issues about parity and usability, so nothing is reported twice.
 4. **Scope** is:
@@ -120,8 +120,8 @@ In the review worktree:
   nothing still writes the file, saying what it read and saw.
 - Append one line per new finding to `.agents/reviews/usability/findings.md`:
   `- U…-n · severity · clients · title · status`, where status starts as `open`.
-- Correct `specs/071-web-remote/walks/parity.md` where a row is wrong or missing, and its
-  Counts to match, citing the finding.
+- Correct the screen's file in `specs/071-web-remote/walks/parity/` where a row is wrong or
+  missing, citing the finding. `scripts/parity-counts.py` gives the counts.
 - Commit on `agents/reviews-usability` ("Usability check <date>: <n>
   findings").
 

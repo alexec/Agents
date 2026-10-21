@@ -66,7 +66,7 @@ It prints a line per branch (merge sha, checks, or why it was dropped) and `SHIP
   is `rebuild-web` (under the lease). It runs `scripts/wire.sh gen` in the wave and commits the
   merge with the regenerated files. `Web/dist` is not checked in (#473); a branch from before that which
   still carries it conflicts with its removal, and the wave keeps it removed.
-- **`specs/071-web-remote/walks/parity.md`:** both sides' rows are kept, as a union. If
+- **`specs/071-web-remote/walks/parity.md` and its screens, `walks/parity/*.md`:** both sides' rows are kept, as a union. If
   both lanes edited the same row, both copies stay: read the merged table before
   you finish and fix it in a follow-up if needed.
 - **Any other conflict stops the wave** (`next` exits 3) and names the files. Either:
