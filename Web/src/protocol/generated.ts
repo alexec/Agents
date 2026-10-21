@@ -4282,9 +4282,10 @@ export interface TunnelOpen {
 /**
  * Where a session's turn is, as its Live Activity says it (#1744): working; a question or an
  * approval waiting on the person; done; ended cleanly but wanting the person, as Needs you in the
- * sidebars (#1861); ended for another reason; or gone (archived or deleted).
+ * sidebars (#1861); stopped on purpose or out of allowance, as Paused in the sidebars (#1869);
+ * ended for another reason; or gone (archived or deleted).
  */
-export type TurnPhase = "working" | "question" | "approval" | "done" | "needs_you" | "failed" | "gone";
+export type TurnPhase = "working" | "question" | "approval" | "done" | "needs_you" | "paused" | "failed" | "gone";
 
 export interface TurnSummary {
   id: UUID;

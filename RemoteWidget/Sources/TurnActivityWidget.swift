@@ -91,7 +91,7 @@ struct TurnLockScreen: View {
 }
 
 /// The sidebar's marks (#495), as symbols, because a Live Activity does not animate a
-/// spinner: an orange hand when it needs the person, a ring once done.
+/// spinner: an orange hand when it needs the person, a ring once done, a grey stop once paused.
 struct TurnMark: View {
     let phase: TurnActivityContent.Phase
 
@@ -106,9 +106,13 @@ struct TurnMark: View {
         case .done:
             Image(systemName: "circle").foregroundStyle(Paper.accent)
                 .accessibilityLabel("Done")
+        case .paused:
+            // A stop the person chose, or a spent allowance: the sidebars' stop mark, not an alarm (#1869).
+            Image(systemName: "stop.circle").foregroundStyle(.secondary)
+                .accessibilityLabel("Paused")
         case .failed:
             Image(systemName: "exclamationmark.triangle.fill").tinted(.failure)
-                .accessibilityLabel("Stopped")
+                .accessibilityLabel("Unexpected stop")
         }
     }
 }

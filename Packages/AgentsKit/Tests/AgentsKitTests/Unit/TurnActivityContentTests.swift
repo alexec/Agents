@@ -123,9 +123,27 @@ struct TurnActivityContentTests {
         let content = try #require(TurnActivityContent.make(agent: died, needs: [], startedAt: sent))
         #expect(content.phase == .failed)
         #expect(content.line == "The runtime crashed")
+        #expect(content.word == "Unexpected stop")
         let stopped = try #require(TurnActivityContent.make(agent: agent(.stopped), needs: [], startedAt: sent))
         #expect(stopped.phase == .failed)
-        #expect(stopped.word == "Stopped")
+        #expect(stopped.word == "Unexpected stop" && stopped.line == nil)
+    }
+
+    /// The docs' Paused endings (#1869): a neutral word, and the reason once, not "Stopped" twice.
+    @Test func aStopSomeoneChoseIsPausedNotAFailure() throws {
+        for (reason, line) in [(EndedReason.cancelled, "Stopped by you"),
+                               (.stoppedByAgent, "Stopped by the agent that started it"),
+                               (.allowanceSpent, "Its allowance ran out")] {
+            var stopped = agent(.stopped)
+            stopped.endedReason = reason
+            let content = try #require(TurnActivityContent.make(agent: stopped, needs: [], startedAt: sent))
+            #expect(content.phase == .paused && content.isOver)
+            #expect(content.word == "Paused" && content.line == line)
+            #expect(content.endedAt != nil)
+        }
+        let json = #"{"phase":"paused","startedAt":800000000,"endedAt":800000300}"#
+        let pushed = try JSONDecoder().decode(TurnActivityContent.self, from: Data(json.utf8))
+        #expect(pushed.phase == .paused && pushed.line(isStale: false) == nil)
     }
 
     @Test func anArchivedOrMissingSessionEndsTheActivity() {

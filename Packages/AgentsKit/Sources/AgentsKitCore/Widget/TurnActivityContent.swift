@@ -26,7 +26,10 @@ public struct TurnActivityContent: Codable, Hashable, Sendable {
         /// It ended cleanly, but wanting the person: Partly done, Stuck, Blocked, Outcome
         /// unknown, or a question in its report (#1861). The sidebars put it under Needs you.
         case needsYou = "needs_you"
-        /// It ended for a reason that is not a clean end of turn.
+        /// Cut short on purpose, or its allowance ran out: Paused in the sidebars, so a
+        /// neutral mark and not the failure's (#1869).
+        case paused
+        /// It ended for a reason that is not a clean end of turn, and nobody chose it.
         case failed
     }
 
@@ -50,7 +53,7 @@ public struct TurnActivityContent: Codable, Hashable, Sendable {
     }
 
     /// Whether the turn is over, and the activity ends with this.
-    public var isOver: Bool { phase == .done || phase == .needsYou || phase == .failed }
+    public var isOver: Bool { phase == .done || phase == .needsYou || phase == .paused || phase == .failed }
 
     /// Whether it waits on the person.
     public var asks: Bool { phase == .question || phase == .approval }
@@ -63,7 +66,8 @@ public struct TurnActivityContent: Codable, Hashable, Sendable {
         case .approval: "Needs approval"
         case .done: "Done"
         case .needsYou: "Needs you"
-        case .failed: "Stopped"
+        case .paused: "Paused"
+        case .failed: "Unexpected stop"
         }
     }
 
@@ -82,11 +86,14 @@ public struct TurnActivityContent: Codable, Hashable, Sendable {
             case .question: return "Open Agents to answer it"
             case .approval: return "Open Agents to decide"
             case .needsYou: return "Open Agents to see what it needs"
-            case .working, .done, .failed: return nil
+            case .working, .done, .paused, .failed: return nil
             }
         }
         return line
     }
+
+    /// The endings the sidebars show as Paused (StatusShape): nobody is surprised by them.
+    public static let pausingReasons: Set<EndedReason> = [.cancelled, .stoppedByAgent, .allowanceSpent]
 
     /// The line for a turn that ended without a report saying how the work went.
     public static let outcomeUnknown = "Outcome unknown"
@@ -128,11 +135,12 @@ public struct TurnActivityContent: Codable, Hashable, Sendable {
             return TurnActivityContent(phase: .question, title: title, line: nil, startedAt: startedAt)
         case .finished, .stopped:
             let ended = max(agent.lastActivityAt, startedAt)
-            if let reason = agent.endedReason?.summary {
-                return TurnActivityContent(phase: .failed, title: title, line: reason, startedAt: startedAt, endedAt: ended)
-            }
-            if agent.state == .stopped {
-                return TurnActivityContent(phase: .failed, title: title, line: "Stopped", startedAt: startedAt, endedAt: ended)
+            // The docs' words for the reason (statuses.md), and the word says which kind:
+            // Paused for a stop someone chose or a spent allowance, else Unexpected stop.
+            if agent.state == .stopped || agent.endedReason?.summary != nil {
+                let paused = agent.endedReason.map(pausingReasons.contains) ?? false
+                return TurnActivityContent(phase: paused ? .paused : .failed, title: title, line: agent.endedReason?.summary,
+                                           startedAt: startedAt, endedAt: ended)
             }
             // The sidebars' rule (StatusShape): a clean end that still wants the person.
             if StatusShape(row: agent, isComingBack: false) == .needsYou {
