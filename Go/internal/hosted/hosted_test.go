@@ -253,6 +253,22 @@ func TestTheCopyCountsEachClientNotTheProxy(t *testing.T) {
 	}
 }
 
+// With no trusted proxy in front, what a client says in X-Forwarded-For is not believed.
+func TestTheCopyBelievesNoClientsForwardedFor(t *testing.T) {
+	s, _ := start(t, store.NewMemory())
+	r := httptest.NewRequest(http.MethodGet, "/", nil)
+	r.RemoteAddr = "192.0.2.4:5000"
+	r.Header.Set("X-Forwarded-For", "203.0.113.7")
+	if got := s.clientOf(r); got != "192.0.2.4" {
+		t.Fatal(got)
+	}
+	s.cfg.TrustedProxies = []netip.Prefix{netip.MustParsePrefix("192.0.2.0/24")}
+	r.Header.Add("X-Forwarded-For", "10.0.0.1, 198.51.100.9")
+	if got := s.clientOf(r); got != "198.51.100.9" {
+		t.Fatal(got)
+	}
+}
+
 // A callback that this browser did not start, or that GitHub refused, signs nobody in.
 func TestASignInMustBeThisBrowsers(t *testing.T) {
 	_, b := start(t, store.NewMemory())
