@@ -3,7 +3,8 @@
 // One web bundle; the switcher at the top moves between them. The Mac window and the Remote draw
 // the Me scope of Reports already (Cost, Time, Pool), and leave the Console to the web.
 import type { SubApp } from "../route";
-import type { ChannelLinkRequest, FleetMachine, Group, PersonRow } from "../protocol/generated";
+import type { ChannelLinkRequest, FleetMachine, Group, PersonRow, TeamBot } from "../protocol/generated";
+import { dollars } from "./teamGroups";
 import { CallFailed } from "../wire/link";
 
 export type AppName = "workspace" | SubApp;
@@ -28,7 +29,7 @@ export const consoleSections: readonly Section[] = [
   { id: "people", title: "People and Groups", about: "Who belongs, their roles, bots and groups.", group: "Organisation", built: true },
   { id: "machines", title: "Machines", about: "Every machine: its owner, state, version and agents.", group: "Organisation", built: true },
   { id: "reportPolicy", title: "Report Policy", about: "Who leads each group, what leads see, and each budget.", group: "Rules", built: true },
-  { id: "workflows", title: "Team Workflows", about: "The bots that run the team’s workflows, and their runs.", group: "Rules", built: false },
+  { id: "workflows", title: "Team Workflows", about: "The bots that run the team’s workflows, and their runs.", group: "Rules", built: true },
   { id: "requests", title: "Requests", about: "Machines asking to join, channel identities to link, and bots stopped at a cap.", group: "Records", built: true },
   { id: "audit", title: "Audit", about: "Who did what on each machine, for one person or everyone.", group: "Records", built: true },
 ];
@@ -161,4 +162,27 @@ export function linkWords(r: ChannelLinkRequest): string {
   const who = r.name ? (r.email ? `${r.name} (${r.email})` : r.name) : r.identity;
   const to = r.forName ? ` to ${r.forName}` : "";
   return `${who} on ${r.channel} wants to be linked${to}`;
+}
+
+// Console ▸ Team Workflows (M6): each bot, the workflows it ran this week, and what runs now.
+
+export const noBots = "No bots yet. Make one in People and Groups: a bot runs a workflow whose runs-on: names it.";
+export const teamWorkflowsFoot = "Runs are the triggers each bot claimed in the last 7 days, once each across its machines. Stop ends one agent on a bot’s machine; the workflow runs again at its next trigger.";
+
+/** "2 of 3 machines online". */
+export function machineWords(bot: TeamBot): string {
+  if (bot.machines === 0) return "No machines";
+  return `${bot.online} of ${bot.machines} ${bot.machines === 1 ? "machine" : "machines"} online`;
+}
+
+/** "$4.20 today of $50 a day", "$4.20 today", or "At its cap until midnight UTC". */
+export function spendWords(bot: TeamBot): string {
+  if (bot.capped) return "At its cap until midnight UTC";
+  const cap = bot.caps?.dailyUSD;
+  return cap !== undefined ? `${dollars(bot.spentTodayUSD)} today of ${dollars(cap)} a day` : `${dollars(bot.spentTodayUSD)} today`;
+}
+
+/** "3 runs", "1 run". */
+export function runsWords(runs: number): string {
+  return runs === 1 ? "1 run" : `${runs} runs`;
 }

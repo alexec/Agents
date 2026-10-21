@@ -21,6 +21,7 @@ import { PeopleSection } from "./People";
 import { GroupsSection } from "./Groups";
 import { ReportPolicyPage } from "./ConsolePolicy";
 import { AuditPage, RequestsPage, requestCount } from "./ConsoleRecords";
+import { TeamWorkflowsPage } from "./ConsoleWorkflows";
 
 /** Whether this person is an admin of the control plane: null until people/list answers. */
 export const isAdmin = signal<boolean | null>(null);
@@ -97,6 +98,7 @@ function ConsoleSection({ store, section, down }: { store: Store; section: Secti
     case "machines": return <MachinesPage store={store} down={down} />;
     case "reportPolicy": return <ReportPolicyPage store={store} down={down} />;
     case "requests": return <RequestsPage store={store} down={down} />;
+    case "workflows": return <TeamWorkflowsPage store={store} down={down} />;
     case "audit": return <AuditPage store={store} down={down} />;
     default: return <Overview />;
   }

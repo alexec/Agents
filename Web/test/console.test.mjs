@@ -75,3 +75,15 @@ test("Requests: a channel identity's words", () => {
     "Sam (sam@acme.dev) on Slack wants to be linked to Sam");
   assert.equal(c.linkWords({ identity: "U1", channel: "Discord" }), "U1 on Discord wants to be linked");
 });
+
+test("Team Workflows: a bot's machines, spend and runs in words", () => {
+  const bot = (over = {}) => ({ user: "b", name: "review-bot", spentTodayUSD: 4.2, capped: false, machines: 3, online: 2, workflows: [], live: [], ...over });
+  assert.equal(c.machineWords(bot()), "2 of 3 machines online");
+  assert.equal(c.machineWords(bot({ machines: 1, online: 1 })), "1 of 1 machine online");
+  assert.equal(c.machineWords(bot({ machines: 0 })), "No machines");
+  assert.equal(c.spendWords(bot({ caps: { dailyUSD: 50 } })), "$4.20 today of $50 a day");
+  assert.equal(c.spendWords(bot()), "$4.20 today");
+  assert.equal(c.spendWords(bot({ capped: true })), "At its cap until midnight UTC");
+  assert.equal(c.runsWords(1), "1 run");
+  assert.equal(c.runsWords(3), "3 runs");
+});

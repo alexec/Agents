@@ -15,7 +15,7 @@
 
 ## Counts
 
-Of 246 rows: **160 same**, **58 by design**, **28 delta** (after #188, #189, #191, #221, #238–#244, #249, #252–#255, #257, #259–#261, #263–#266, #291, #254, #317, #341, #342, #343, #345, #344, #357, #366, #375, #377, #381, #378, #400, #396, #394, #436, #433, #432, #506, #545, #548, #791, #790, #846, #826, #888, #982, #1089, #1109, #1122, #1419, #1123, #1118, #1473, #1459, #1460, #1336, #1658, #1862, #1810, #1804). A row with any open delta counts as delta, even where another side's difference is by design.
+Of 247 rows: **160 same**, **59 by design**, **28 delta** (after #188, #189, #191, #221, #238–#244, #249, #252–#255, #257, #259–#261, #263–#266, #291, #254, #317, #341, #342, #343, #345, #344, #357, #366, #375, #377, #381, #378, #400, #396, #394, #436, #433, #432, #506, #545, #548, #791, #790, #846, #826, #888, #982, #1089, #1109, #1122, #1419, #1123, #1118, #1473, #1459, #1460, #1336, #1658, #1862, #1810, #1804). A row with any open delta counts as delta, even where another side's difference is by design.
 
 | Screen | Same | By design | Delta |
 |---|---|---|---|
@@ -35,7 +35,7 @@ Of 246 rows: **160 same**, **58 by design**, **28 delta** (after #188, #189, #19
 | Disk strip | 2 | 1 | 0 |
 | Hosts, connection and pairing | 5 | 3 | 1 |
 | MCP Apps views | 5 | 1 | 0 |
-| Console and Reports | 0 | 8 | 0 |
+| Console and Reports | 0 | 9 | 0 |
 
 The deltas are tracked by 31 issues:
 - **Already open:** #226 (the Remote's one sidebar) and #235 (the page's one sidebar at phone width).
@@ -472,6 +472,7 @@ The control plane's two apps beside the Workspace, on the web only: the Console 
 | Console ▸ Report Policy: Totals Only, each group's leads, a budget a month per group and for the organisation (`reports/policy`, `reports/setPolicy`, admins only) | None | None | `W/views/ConsolePolicy.tsx`, `W/model/console.ts` | **by design**: the Console is the web's; walked on a scratch control plane |
 | Console ▸ Audit (M8): every person's entries or one person's (`audit/list` with `user`), how long they are kept, Export CSV (made from `audit/export`) and JSON lines | Events ▸ Audit, JSON lines: `S/Events/AuditPane.swift` | Events ▸ Audit, JSON lines: `S/Events/AuditPane.swift` | `W/views/ConsoleRecords.tsx` (`AuditPage`), `W/views/Audit.tsx` with `people`, `W/model/audit.ts` (`auditCSV`) | **by design**: the person filter and CSV are the Console's; Events ▸ Audit is the same on all three |
 | Console ▸ Requests (M7): machines waiting to join (approve or refuse), channel identities waiting to be linked (`links/requests`), a bot stopped at its cap; the count beside Requests | Join cards and the cap notice as they come | Join cards and the cap notice as they come | `W/views/ConsoleRecords.tsx` (`RequestsPage`), `W/model/console.ts` (`linkWords`) | **by design**: the inbox is the Console's; a join request already reaches the window, the Remote and the page as a card; walked (empty) on a scratch control plane |
+| Console ▸ Team Workflows (M6): each bot (`console/teamWorkflows`, admins only), its group, machines online, spend today against its cap, the workflows it ran in the last 7 days (from `workflows/claimRun`'s claims) and the agents running on its machines with Stop (`bots/stopRun`) | None | None | `W/views/ConsoleWorkflows.tsx`, `W/model/console.ts`, `Go/internal/controlplane/console.go` | **by design**: the Console is the web's; bots are listed in Settings ▸ People on all three; walked on a scratch control plane |
 | Reports ▸ Spend: the rows of `reports/usage` by person, project, machine or runtime, with CSV and JSON lines | Cost ▸ Reports: `S/ReportsPane.swift` | Cost ▸ Reports: `S/ReportsPane.swift` | Reports ▸ Spend, and Cost ▸ Reports: `W/views/Reports.tsx` | **by design**: the Me scope is on all three; group and organisation scope are the web's (#1804) |
 
 ## Live sync

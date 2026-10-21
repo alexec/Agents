@@ -32,7 +32,82 @@ public extension DaemonAPI {
     }
 }
 
+public extension DaemonAPI {
+    /// One workflow a bot ran in the last 7 days (M6): how many times, and when last.
+    struct TeamWorkflowRuns: Codable, Sendable, Hashable {
+        public var workflow: String
+        public var runs: Int
+        public var lastRunAt: Date?
+
+        public init(workflow: String, runs: Int, lastRunAt: Date? = nil) {
+            self.workflow = workflow
+            self.runs = runs
+            self.lastRunAt = lastRunAt
+        }
+    }
+
+    /// An agent running on a bot's machine, by id, for `bots/stopRun`. No title.
+    struct TeamBotRun: Codable, Sendable, Hashable {
+        public var host: String
+        public var hostName: String
+        public var agent: UUID
+        public var workflow: String?
+        public var since: Date?
+
+        public init(host: String, hostName: String, agent: UUID, workflow: String? = nil, since: Date? = nil) {
+            self.host = host
+            self.hostName = hostName
+            self.agent = agent
+            self.workflow = workflow
+            self.since = since
+        }
+    }
+
+    /// A bot on Console ▸ Team Workflows (M6).
+    struct TeamBot: Codable, Sendable, Hashable {
+        public var user: String
+        public var name: String
+        public var group: String?
+        public var groupName: String?
+        public var caps: SpendCaps?
+        public var spentTodayUSD: Double
+        /// At its own or its group's cap until midnight UTC.
+        public var capped: Bool
+        public var machines: Int
+        public var online: Int
+        public var workflows: [TeamWorkflowRuns]
+        public var live: [TeamBotRun]
+
+        public init(user: String, name: String, group: String? = nil, groupName: String? = nil, caps: SpendCaps? = nil,
+                    spentTodayUSD: Double = 0, capped: Bool = false, machines: Int = 0, online: Int = 0,
+                    workflows: [TeamWorkflowRuns] = [], live: [TeamBotRun] = []) {
+            self.user = user
+            self.name = name
+            self.group = group
+            self.groupName = groupName
+            self.caps = caps
+            self.spentTodayUSD = spentTodayUSD
+            self.capped = capped
+            self.machines = machines
+            self.online = online
+            self.workflows = workflows
+            self.live = live
+        }
+    }
+
+    /// `console/teamWorkflows`' answer: every bot, for an admin.
+    struct TeamWorkflows: Codable, Sendable, Hashable {
+        public var bots: [TeamBot]
+
+        public init(bots: [TeamBot]) {
+            self.bots = bots
+        }
+    }
+}
+
 public extension DaemonAPI.Method {
     /// `Empty` → `FleetBoard` (#1804, M1). Admins only.
     static let consoleFleet = "console/fleet"
+    /// `Empty` → `TeamWorkflows` (#1804, M6). Admins only.
+    static let consoleTeamWorkflows = "console/teamWorkflows"
 }
