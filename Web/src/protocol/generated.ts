@@ -4032,14 +4032,29 @@ export interface ReportExport {
 
 export type ReportFormat = "csv" | "jsonl";
 
+/** Who sees what in Reports (#1804), set by an admin in Console ▸ Report Policy. */
+export interface ReportPolicy {
+  /**
+   * A group lead sees the group's totals only, with no person or machine named. An admin always
+   * sees each person.
+   */
+  totalsOnly: boolean;
+  /** Each group's leads, by group id: users who see the group's reports. */
+  leads: Record<string, string[]>;
+  /** A budget for a calendar month in US dollars, by group id, or "org" for the organisation. */
+  budgetsUSD: Record<string, number>;
+}
+
 /**
- * reports/usage and reports/export (#1811). An admin sees every person; a member only their own
- * machines.
+ * reports/usage and reports/export (#1811). With no scope, an admin sees every person and a member
+ * their own machines; a scope (#1804) is one the caller may see (reports/scopes).
  */
 export interface ReportQuery {
   range: ReportRange;
   /** For reports/export; CSV when absent. */
   format?: ReportFormat;
+  /** Me, a group or the organisation (#1804). */
+  scope?: ReportScope;
 }
 
 /** D is the last 24 hours by the hour; W, M and 3M the last 7, 30 and 90 days by the day (UTC). */
@@ -4068,6 +4083,36 @@ export interface ReportRow {
   workingSeconds: number;
   /** Waiting for the person: TimeBucket's person. */
   waitingSeconds: number;
+  /**
+   * The groups the person is in (#1804), by id, for a group or organisation scope; absent when the
+   * person is hidden.
+   */
+  groups?: string[];
+}
+
+/** Whose rows a report adds up (#1804). */
+export interface ReportScope {
+  kind: ReportScopeKind;
+  /** The group's id, for kind group. */
+  group?: string;
+}
+
+/** Me (the caller's own machines), a group's people, or every person (#1804). */
+export type ReportScopeKind = "me" | "group" | "org";
+
+/** A scope the caller may see, with its name (#1804). */
+export interface ReportScopeOption {
+  scope: ReportScope;
+  name: string;
+}
+
+/**
+ * reports/scopes' answer (#1804): Me, each group the caller leads (every group for an admin), and
+ * the organisation for an admin.
+ */
+export interface ReportScopes {
+  scopes: ReportScopeOption[];
+  admin: boolean;
 }
 
 export interface ReportedEdit {
@@ -5187,6 +5232,17 @@ export interface UsageReport {
   rows: ReportRow[];
   /** Whether the caller sees every person's machines. */
   admin: boolean;
+  /** The scope the rows are of (#1804). */
+  scope?: ReportScope;
+  /**
+   * The rows say no person and no machine (#1804): a group lead's view when the policy says totals
+   * only.
+   */
+  personsHidden?: boolean;
+  /** The name of each group the rows name (#1804). */
+  groupNames?: Record<string, string>;
+  /** The scope's budget for a calendar month, in US dollars (#1804); absent when it has none. */
+  budgetUSD?: number;
 }
 
 /**
@@ -5935,6 +5991,9 @@ export interface Methods {
   "providers/setGroup": { params: ProviderGroup; result: Empty };
   "providers/update": { params: ProviderAdd; result: ProviderSummary };
   "reports/export": { params: ReportQuery; result: ReportExport };
+  "reports/policy": { params: Empty; result: ReportPolicy };
+  "reports/scopes": { params: Empty; result: ReportScopes };
+  "reports/setPolicy": { params: ReportPolicy; result: ReportPolicy };
   "reports/usage": { params: ReportQuery; result: UsageReport };
   "runtimes/accounts": { params: Empty; result: RuntimeAccount[] };
   "runtimes/allowances": { params: string | null; result: RuntimeAllowances };
@@ -6136,6 +6195,9 @@ export const MethodTarget = {
   "providers/setGroup": "control",
   "providers/update": "control",
   "reports/export": "control",
+  "reports/policy": "control",
+  "reports/scopes": "control",
+  "reports/setPolicy": "control",
   "reports/usage": "control",
   "runtimes/accounts": "host",
   "runtimes/allowances": "host",
@@ -6659,8 +6721,12 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   RemoveResourceRequest: { required: ["name"], optional: [] },
   RenameRequest: { required: ["agentID", "title"], optional: [] },
   ReportExport: { required: ["text", "count", "format"], optional: [] },
-  ReportQuery: { required: ["range"], optional: ["format"] },
-  ReportRow: { required: ["at", "person", "personName", "host", "hostName", "project", "runtime", "cost", "inputTokens", "outputTokens", "thoughtTokens", "cachedReadTokens", "cachedWriteTokens", "turns", "unpricedTurns", "workingSeconds", "waitingSeconds"], optional: [] },
+  ReportPolicy: { required: ["totalsOnly", "leads", "budgetsUSD"], optional: [] },
+  ReportQuery: { required: ["range"], optional: ["format", "scope"] },
+  ReportRow: { required: ["at", "person", "personName", "host", "hostName", "project", "runtime", "cost", "inputTokens", "outputTokens", "thoughtTokens", "cachedReadTokens", "cachedWriteTokens", "turns", "unpricedTurns", "workingSeconds", "waitingSeconds"], optional: ["groups"] },
+  ReportScope: { required: ["kind"], optional: ["group"] },
+  ReportScopeOption: { required: ["scope", "name"], optional: [] },
+  ReportScopes: { required: ["scopes", "admin"], optional: [] },
   ReportedEdit: { required: ["path", "newText", "toolCallID", "index", "entryIndex", "replaceAll", "at"], optional: ["oldText"] },
   RequiredCapabilities: { required: ["host", "client"], optional: [] },
   ResourceState: { required: ["name", "kind", "displayName", "isGone", "line", "endingSoon"], optional: ["holds", "lease", "places", "declared"] },
@@ -6788,7 +6854,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   Usage: { required: ["used", "size", "at"], optional: ["cost"] },
   UsageBucket: { required: ["cost", "inputTokens", "outputTokens", "thoughtTokens", "cachedReadTokens", "cachedWriteTokens", "turns", "unpricedTurns"], optional: [] },
   UsageHistory: { required: ["hours", "days", "now"], optional: ["timeZone"] },
-  UsageReport: { required: ["range", "rows", "admin"], optional: [] },
+  UsageReport: { required: ["range", "rows", "admin"], optional: ["scope", "personsHidden", "groupNames", "budgetUSD"] },
   UsageRollup: { required: ["hours", "days"], optional: [] },
   UsageRollupPeriod: { required: ["at", "rows"], optional: [] },
   UsageRollupRow: { required: ["project", "runtime", "cost", "inputTokens", "outputTokens", "thoughtTokens", "cachedReadTokens", "cachedWriteTokens", "turns", "unpricedTurns", "workingSeconds", "waitingSeconds"], optional: [] },

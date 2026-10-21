@@ -1005,6 +1005,34 @@ button.remove:hover { opacity: 1; }
 .report-list li { display: flex; flex-direction: column; gap: 2px; }
 .report-bar { display: block; height: 3px; background: var(--paper-rule); border-radius: 2px; overflow: hidden; }
 .report-bar span { display: block; height: 100%; background: var(--accent, currentColor); opacity: 0.6; }
+.report-bar.over span { background: var(--tint-failure); opacity: 1; }
+.report-budget { display: flex; flex-direction: column; gap: 4px; border: 1px solid var(--paper-rule); border-radius: var(--radius-card);
+  padding: 10px 12px; background: var(--paper-raised); }
+.report-scopes { margin-bottom: 8px; }
+/* The Console's pages draw Settings' sections (People, Groups): Settings' rows, as sidebar.css has them under .with-sidebar. */
+.sub-app .settings-body > section { margin-bottom: 12px; }
+.sub-app .settings-body .setting { display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  max-width: 420px; padding: 6px 8px; border-bottom: 1px solid var(--paper-rule); }
+.sub-app .settings-body select { font: inherit; color: inherit; background: var(--paper-raised); border: 1px solid var(--paper-rule); border-radius: var(--radius-control); }
+.sub-app .settings-body .hint { max-width: 420px; font-size: 0.75rem; line-height: 1.45; }
+.sub-app .settings-body .join-requests { max-width: 420px; }
+.sub-app .settings-body .people-list { list-style: none; margin: 0 0 8px; padding: 0; max-width: 420px; }
+.sub-app .settings-body .person .badge { margin-left: 6px; padding: 0 6px; font-size: 0.6875rem; border-radius: 8px;
+  border: 1px solid var(--paper-rule); opacity: 0.75; }
+.sub-app .settings-body .person-things { display: flex; flex-direction: column; gap: 2px; padding: 4px 8px 8px; }
+.sub-app .settings-body button.invite { margin: 4px 8px; }
+.sub-app .settings-body .hint.attention { color: var(--tint-attention); }
+.sub-app .settings-body .join-command { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; }
+.sub-app .settings-body .join-command-line { display: flex; align-items: flex-start; gap: 6px; }
+.sub-app .settings-body .join-command .code-text { flex: 1; min-width: 0; font-family: var(--font-mono); font-size: 0.6875rem;
+  padding: 4px 6px; border: 1px solid var(--paper-rule); border-radius: var(--radius-control); background: var(--paper-ground);
+  user-select: all; overflow-wrap: anywhere; }
+.sub-app .settings-body .settings-scope { margin-bottom: 20px; }
+.sub-app .settings-body .scope-head { font-size: 0.875rem; font-weight: 600; margin: 8px 8px 4px; }
+.report-policy { display: flex; flex-direction: column; gap: 4px; max-width: 436px; }
+.report-policy .budget-field { display: inline-flex; gap: 4px; align-items: center; }
+.report-policy .budget-field input { width: 7em; text-align: right; }
+.report-policy .sheet-actions { display: flex; gap: 8px; align-items: center; justify-content: flex-end; }
 
 /* The control plane's three apps (#1804): Workspace | Console | Reports at the top, and the Console
    and Reports as a list of pages beside the page open. */

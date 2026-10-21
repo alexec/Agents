@@ -15,7 +15,7 @@
 
 ## Counts
 
-Of 242 rows: **160 same**, **54 by design**, **28 delta** (after #188, #189, #191, #221, #238–#244, #249, #252–#255, #257, #259–#261, #263–#266, #291, #254, #317, #341, #342, #343, #345, #344, #357, #366, #375, #377, #381, #378, #400, #396, #394, #436, #433, #432, #506, #545, #548, #791, #790, #846, #826, #888, #982, #1089, #1109, #1122, #1419, #1123, #1118, #1473, #1459, #1460, #1336, #1658, #1862, #1810, #1804). A row with any open delta counts as delta, even where another side's difference is by design.
+Of 244 rows: **160 same**, **56 by design**, **28 delta** (after #188, #189, #191, #221, #238–#244, #249, #252–#255, #257, #259–#261, #263–#266, #291, #254, #317, #341, #342, #343, #345, #344, #357, #366, #375, #377, #381, #378, #400, #396, #394, #436, #433, #432, #506, #545, #548, #791, #790, #846, #826, #888, #982, #1089, #1109, #1122, #1419, #1123, #1118, #1473, #1459, #1460, #1336, #1658, #1862, #1810, #1804). A row with any open delta counts as delta, even where another side's difference is by design.
 
 | Screen | Same | By design | Delta |
 |---|---|---|---|
@@ -35,7 +35,7 @@ Of 242 rows: **160 same**, **54 by design**, **28 delta** (after #188, #189, #19
 | Disk strip | 2 | 1 | 0 |
 | Hosts, connection and pairing | 5 | 3 | 1 |
 | MCP Apps views | 5 | 1 | 0 |
-| Console and Reports | 0 | 4 | 0 |
+| Console and Reports | 0 | 6 | 0 |
 
 The deltas are tracked by 31 issues:
 - **Already open:** #226 (the Remote's one sidebar) and #235 (the page's one sidebar at phone width).
@@ -465,6 +465,8 @@ The control plane's two apps beside the Workspace, on the web only: the Console 
 | Workspace \| Console \| Reports at the top of the page, `#/console/‹page›` and `#/reports/‹page›`; Console only for an admin (`people/list`'s `admin`), a member who opens it is told why | None | None | `W/views/ConsoleApp.tsx` (`AppSwitcher`, `SubAppPage`), `W/model/console.ts`, `W/route.ts` | **by design**: the Console and Reports are the control plane's web apps (#1804, decision 1); walked on a scratch control plane in headless Chrome |
 | Console ▸ People and Groups (M2): people, roles, machines, bots and groups, the same sections as Settings ▸ People and Groups | Settings ▸ People | Settings ▸ People | `W/views/ConsoleApp.tsx` (`PeoplePage`), drawn by `W/views/People.tsx` and `W/views/Groups.tsx` | **by design**: the Console is the web's; the Mac and the Remote keep them in Settings |
 | Console ▸ Machines (M1): every machine (`console/fleet`, admins only), its owner, state, version, out of date, running agents and when it last listed them; All, Offline and Out of Date | None | None | `W/views/ConsoleApp.tsx` (`MachinesPage`), `W/model/console.ts`, `Go/internal/controlplane/console.go` | **by design**: the Console is the web's; walked on a scratch control plane |
+| Reports ▸ Spend scopes (R1): Me, each group the person leads (every group for an admin) and the organisation (`reports/scopes`); by Group past Me; a lead sees each person, or with Totals Only nobody and no machine named; this month against the scope's budget with a forecast; CSV with each person's groups | Me only (Cost ▸ Reports) | Me only (Cost ▸ Reports) | `W/views/Reports.tsx` (`ReportsPage`, `Budget`), `W/model/reports.ts`, `Go/internal/controlplane/reports_scope.go` | **by design**: group and organisation scope start on the web (#1804); walked on a scratch control plane |
+| Console ▸ Report Policy: Totals Only, each group's leads, a budget a month per group and for the organisation (`reports/policy`, `reports/setPolicy`, admins only) | None | None | `W/views/ConsolePolicy.tsx`, `W/model/console.ts` | **by design**: the Console is the web's; walked on a scratch control plane |
 | Reports ▸ Spend: the rows of `reports/usage` by person, project, machine or runtime, with CSV and JSON lines | Cost ▸ Reports: `S/ReportsPane.swift` | Cost ▸ Reports: `S/ReportsPane.swift` | Reports ▸ Spend, and Cost ▸ Reports: `W/views/Reports.tsx` | **by design**: the Me scope is on all three; group and organisation scope are the web's (#1804) |
 
 ## Live sync

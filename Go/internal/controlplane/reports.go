@@ -131,9 +131,8 @@ func reportSpan(r wire.ReportRange, now time.Time) (prefix, first string, ok boo
 	return "", "", false
 }
 
-// report is the range's rows, oldest first, every person's for an admin and the caller's
-// own machines' otherwise.
-func (s *Service) report(ctx context.Context, r wire.ReportRange, only string, now time.Time) ([]wire.ReportRow, error) {
+// report is the range's rows, oldest first, of the people keep says (reports_scope.go).
+func (s *Service) report(ctx context.Context, r wire.ReportRange, keep func(person string) bool, now time.Time) ([]wire.ReportRow, error) {
 	prefix, first, ok := reportSpan(r, now)
 	if !ok {
 		return nil, fail(invalidParams, "Say a range: day, week, month or threeMonths.")
@@ -162,7 +161,7 @@ func (s *Service) report(ctx context.Context, r wire.ReportRange, only string, n
 		if known {
 			person = s.ownerOf(host.ID)
 		}
-		if only != "" && person != only {
+		if !keep(person) {
 			continue
 		}
 		object, err := s.cfg.Store.Get(ctx, k.Key)
@@ -209,33 +208,46 @@ func (s *Service) report(ctx context.Context, r wire.ReportRange, only string, n
 	return out, nil
 }
 
-// reportMethod answers reports/usage and reports/export. A member sees their own
-// machines; an admin every person's.
+// reportMethod answers reports/usage and reports/export for a scope (#1804), and the
+// scopes and their policy. With no scope, a member sees their own machines and an admin
+// every person's.
 func (m *Methods) reportMethod(ctx context.Context, method string, params json.RawMessage, from Caller) (any, error) {
+	user := m.s.actorFor(from.Client).User
+	switch method {
+	case "reports/scopes":
+		return m.s.reportScopes(ctx, user)
+	case "reports/policy", "reports/setPolicy":
+		if !m.s.isAdmin(user) {
+			return nil, fail(notPermitted, "Only an admin can see or change the report policy.")
+		}
+		if method == "reports/policy" {
+			return m.s.reportPolicy(ctx)
+		}
+		policy, err := require[wire.ReportPolicy](params, "ReportPolicy")
+		if err != nil {
+			return nil, err
+		}
+		return m.s.setReportPolicy(ctx, policy)
+	}
 	request, err := require[wire.ReportQuery](params, "ReportQuery")
 	if err != nil {
 		return nil, err
 	}
-	actor := m.s.actorFor(from.Client)
-	admin := m.s.isAdmin(actor.User)
-	only := ""
-	if !admin {
-		only = actor.User
-	}
-	rows, err := m.s.report(ctx, request.Range, only, time.Now())
+	report, err := m.s.scopedReport(ctx, request.Range, request.Scope, user)
 	if err != nil {
 		return nil, err
 	}
 	if method == "reports/usage" {
-		return wire.UsageReport{Range: request.Range, Rows: rows, Admin: admin}, nil
+		return report, nil
 	}
+	rows := report.Rows
 	format := wire.ReportFormatCsv
 	if request.Format != nil {
 		format = *request.Format
 	}
 	switch format {
 	case wire.ReportFormatCsv:
-		return wire.ReportExport{Text: reportCSV(rows), Count: int64(len(rows)), Format: format}, nil
+		return wire.ReportExport{Text: reportCSV(rows, report.GroupNames), Count: int64(len(rows)), Format: format}, nil
 	case wire.ReportFormatJsonl:
 		var b bytes.Buffer
 		for _, r := range rows {
@@ -251,8 +263,9 @@ func (m *Methods) reportMethod(ctx context.Context, method string, params json.R
 	return nil, fail(invalidParams, "Export as csv or jsonl.")
 }
 
-// reportCSV is the rows as CSV, with a cost column for each currency that any row has.
-func reportCSV(rows []wire.ReportRow) string {
+// reportCSV is the rows as CSV, with a cost column for each currency that any row has, and
+// the person's groups by name, as a chargeback wants them (#1804).
+func reportCSV(rows []wire.ReportRow, groupNames map[string]string) string {
 	currencies := map[string]bool{}
 	for _, r := range rows {
 		for c := range r.Cost {
@@ -269,7 +282,7 @@ func reportCSV(rows []wire.ReportRow) string {
 		header = append(header, "cost"+c)
 	}
 	header = append(header, "inputTokens", "outputTokens", "thoughtTokens", "cachedReadTokens",
-		"cachedWriteTokens", "turns", "unpricedTurns", "workingSeconds", "waitingSeconds")
+		"cachedWriteTokens", "turns", "unpricedTurns", "workingSeconds", "waitingSeconds", "groups")
 	var b bytes.Buffer
 	w := csv.NewWriter(&b)
 	w.Write(header)
@@ -282,6 +295,11 @@ func reportCSV(rows []wire.ReportRow) string {
 		}
 		line = append(line, i(r.InputTokens), i(r.OutputTokens), i(r.ThoughtTokens), i(r.CachedReadTokens),
 			i(r.CachedWriteTokens), i(r.Turns), i(r.UnpricedTurns), f(r.WorkingSeconds), f(r.WaitingSeconds))
+		var groups []string
+		for _, id := range r.Groups {
+			groups = append(groups, groupNames[id])
+		}
+		line = append(line, strings.Join(groups, "; "))
 		w.Write(line)
 	}
 	w.Flush()

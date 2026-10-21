@@ -19441,7 +19441,7 @@
     },
     "ReportQuery": {
       "type": "object",
-      "description": "reports/usage and reports/export (#1811). An admin sees every person; a member only their own machines.",
+      "description": "reports/usage and reports/export (#1811). With no scope, an admin sees every person and a member their own machines; a scope (#1804) is one the caller may see (reports/scopes).",
       "properties": {
         "range": {
           "$ref": "#/definitions/ReportRange"
@@ -19449,6 +19449,10 @@
         "format": {
           "$ref": "#/definitions/ReportFormat",
           "description": "For reports/export; CSV when absent."
+        },
+        "scope": {
+          "$ref": "#/definitions/ReportScope",
+          "description": "Me, a group or the organisation (#1804)."
         }
       },
       "required": [
@@ -19517,6 +19521,13 @@
         "waitingSeconds": {
           "type": "number",
           "description": "Waiting for the person: TimeBucket's person."
+        },
+        "groups": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "The groups the person is in (#1804), by id, for a group or organisation scope; absent when the person is hidden."
         }
       },
       "required": [
@@ -19556,6 +19567,25 @@
         "admin": {
           "type": "boolean",
           "description": "Whether the caller sees every person's machines."
+        },
+        "scope": {
+          "$ref": "#/definitions/ReportScope",
+          "description": "The scope the rows are of (#1804)."
+        },
+        "personsHidden": {
+          "type": "boolean",
+          "description": "The rows say no person and no machine (#1804): a group lead's view when the policy says totals only."
+        },
+        "groupNames": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "The name of each group the rows name (#1804)."
+        },
+        "budgetUSD": {
+          "type": "number",
+          "description": "The scope's budget for a calendar month, in US dollars (#1804); absent when it has none."
         }
       },
       "required": [
@@ -20466,6 +20496,102 @@
       },
       "required": [
         "machines"
+      ],
+      "additionalProperties": false
+    },
+    "ReportScopeKind": {
+      "type": "string",
+      "enum": [
+        "me",
+        "group",
+        "org"
+      ],
+      "description": "Me (the caller's own machines), a group's people, or every person (#1804)."
+    },
+    "ReportScope": {
+      "type": "object",
+      "description": "Whose rows a report adds up (#1804).",
+      "properties": {
+        "kind": {
+          "$ref": "#/definitions/ReportScopeKind"
+        },
+        "group": {
+          "type": "string",
+          "description": "The group's id, for kind group."
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "ReportScopeOption": {
+      "type": "object",
+      "description": "A scope the caller may see, with its name (#1804).",
+      "properties": {
+        "scope": {
+          "$ref": "#/definitions/ReportScope"
+        },
+        "name": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "scope",
+        "name"
+      ],
+      "additionalProperties": false
+    },
+    "ReportScopes": {
+      "type": "object",
+      "description": "reports/scopes' answer (#1804): Me, each group the caller leads (every group for an admin), and the organisation for an admin.",
+      "properties": {
+        "scopes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ReportScopeOption"
+          }
+        },
+        "admin": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "scopes",
+        "admin"
+      ],
+      "additionalProperties": false
+    },
+    "ReportPolicy": {
+      "type": "object",
+      "description": "Who sees what in Reports (#1804), set by an admin in Console ▸ Report Policy.",
+      "properties": {
+        "totalsOnly": {
+          "type": "boolean",
+          "description": "A group lead sees the group's totals only, with no person or machine named. An admin always sees each person."
+        },
+        "leads": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "description": "Each group's leads, by group id: users who see the group's reports."
+        },
+        "budgetsUSD": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "number"
+          },
+          "description": "A budget for a calendar month in US dollars, by group id, or \"org\" for the organisation."
+        }
+      },
+      "required": [
+        "totalsOnly",
+        "leads",
+        "budgetsUSD"
       ],
       "additionalProperties": false
     }

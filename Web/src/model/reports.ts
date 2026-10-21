@@ -1,13 +1,13 @@
 // Cost ▸ Reports (#1811), as ReportTotals and ReportWords have it on the window and the
 // Remote: a report's rows added up by person, project, machine or runtime, largest first.
-import type { ReportFormat, ReportRange, ReportRow } from "../protocol/generated";
+import type { ReportFormat, ReportRange, ReportRow, ReportScope, UsageReport } from "../protocol/generated";
 import { money } from "./limits";
 import { timeWords } from "./time";
 import { tokenWords } from "./usage";
 
-export type ReportDimension = "person" | "project" | "machine" | "runtime";
+export type ReportDimension = "person" | "project" | "machine" | "runtime" | "group";
 export const dimensions: readonly ReportDimension[] = ["person", "project", "machine", "runtime"];
-export const dimensionTitle: Record<ReportDimension, string> = { person: "Person", project: "Project", machine: "Machine", runtime: "Runtime" };
+export const dimensionTitle: Record<ReportDimension, string> = { person: "Person", project: "Project", machine: "Machine", runtime: "Runtime", group: "Group" };
 export const ranges: readonly ReportRange[] = ["day", "week", "month", "threeMonths"];
 export const rangeShort: Record<ReportRange, string> = { day: "D", week: "W", month: "M", threeMonths: "3M" };
 export const rangeSpan: Record<ReportRange, string> = { day: "The last 24 hours", week: "The last 7 days", month: "The last 30 days", threeMonths: "The last 90 days" };
@@ -15,6 +15,7 @@ export const rangeSpan: Record<ReportRange, string> = { day: "The last 24 hours"
 export const removedOwner = "A removed machine";
 export const noProject = "No project";
 export const noRuntime = "No runtime";
+export const noGroup = "No group";
 export const empty = "Nothing was used in this time. Each machine sends what it used once an hour.";
 export const memberNote = "You see your own machines. An admin sees everyone's.";
 export const utcNote = "Hours and days are UTC, so machines in other time zones add up.";
@@ -47,7 +48,13 @@ function add(g: ReportGroup, r: ReportRow) {
   g.waitingSeconds += r.waitingSeconds;
 }
 
-function key(r: ReportRow, by: ReportDimension, runtimeName: (id: string) => string): [string, string] {
+function keys(r: ReportRow, by: ReportDimension, runtimeName: (id: string) => string, groupNames: Record<string, string>): [string, string][] {
+  // A person in two groups counts in each (#1804).
+  if (by === "group") return r.groups?.length ? r.groups.map((g) => [g, groupNames[g] ?? g]) : [["", noGroup]];
+  return [key(r, by, runtimeName)];
+}
+
+function key(r: ReportRow, by: Exclude<ReportDimension, "group">, runtimeName: (id: string) => string): [string, string] {
   switch (by) {
     case "person": return [r.person, r.person ? r.personName || r.person : removedOwner];
     case "project": return [r.project, r.project || noProject];
@@ -56,14 +63,16 @@ function key(r: ReportRow, by: ReportDimension, runtimeName: (id: string) => str
   }
 }
 
-export function reportTotals(rows: readonly ReportRow[], by: ReportDimension, runtimeName: (id: string) => string = (id) => id): ReportTotals {
+export function reportTotals(rows: readonly ReportRow[], by: ReportDimension, runtimeName: (id: string) => string = (id) => id,
+  groupNames: Record<string, string> = {}): ReportTotals {
   const groups = new Map<string, ReportGroup>();
   const total = blank("", "Total");
   for (const r of rows) {
-    const [id, name] = key(r, by, runtimeName);
-    const g = groups.get(id) ?? blank(id, name);
-    groups.set(id, g);
-    add(g, r);
+    for (const [id, name] of keys(r, by, runtimeName, groupNames)) {
+      const g = groups.get(id) ?? blank(id, name);
+      groups.set(id, g);
+      add(g, r);
+    }
     add(total, r);
   }
   const currencies = Object.entries(total.cost).sort(([a, x], [b, y]) => y - x || a.localeCompare(b)).map(([c]) => c);
@@ -98,4 +107,42 @@ const pad = (n: number) => String(n).padStart(2, "0");
 /** "report-week-2026-10-21.csv". */
 export function exportName(range: ReportRange, format: ReportFormat, now: Date = new Date()): string {
   return `report-${range}-${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}.${format}`;
+}
+
+// Scopes (#1804): one report, three zoom levels. Me is on all three clients; a group and the
+// organisation are the web's, in Reports.
+
+/** What a scope is called in a picker's value: "me", "org" or "group:<id>". */
+export function scopeKey(scope: ReportScope): string {
+  return scope.kind === "group" ? `group:${scope.group ?? ""}` : scope.kind;
+}
+
+/** The ways to add a report up: with nobody named, neither person nor machine; past Me, by group too. */
+export function scopedDimensions(report: Pick<UsageReport, "scope" | "personsHidden"> | null): ReportDimension[] {
+  const hidden = report?.personsHidden === true;
+  const list = dimensions.filter((d) => !hidden || (d !== "person" && d !== "machine"));
+  return report?.scope && report.scope.kind !== "me" ? [...list, "group"] : list;
+}
+
+export const hiddenNote = "You see this group’s totals. An admin’s policy names no person or machine to a group’s leads.";
+export const groupNote = "A person in more than one group counts in each.";
+
+/** The US dollars spent in this calendar month (UTC) by rows of days. */
+export function monthSpentUSD(rows: readonly ReportRow[], now: Date = new Date()): number {
+  const first = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, "0")}-01`;
+  return rows.filter((r) => r.at.slice(0, 10) >= first).reduce((sum, r) => sum + (r.cost["USD"] ?? 0), 0);
+}
+
+/** This month's spend at today's pace, to its last day (UTC). */
+export function forecastUSD(spent: number, now: Date = new Date()): number {
+  const days = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0)).getUTCDate();
+  const elapsed = (now.getTime() - Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)) / 86_400_000;
+  return elapsed > 0 ? spent / Math.min(days, elapsed) * days : spent;
+}
+
+/** "$182.40 of $250 this month · forecast $310.00, over budget". */
+export function budgetWords(spent: number, budget: number, now: Date = new Date()): string {
+  const forecast = forecastUSD(spent, now);
+  const over = forecast > budget ? ", over budget" : "";
+  return `${money(spent, "USD")} of ${money(budget, "USD")} this month · forecast ${money(forecast, "USD")}${over}`;
 }
