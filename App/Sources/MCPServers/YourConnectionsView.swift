@@ -155,17 +155,12 @@ struct YourConnectionsView: View {
         disconnecting.map { "Disconnect \(ConnectorSetupWords.connectionTitle($0))?" } ?? ""
     }
 
-    /// Which projects lose which slots, before it goes. Only GitHub fills a project's slots.
+    /// Which projects lose which slots, before it goes: only those on the connection's forge (#1868).
     private var disconnectMessage: String {
         guard let c = disconnecting else { return "" }
-        if c.provider != .github { return ConnectorSetupWords.disconnectNote(c.provider) }
-        let losing = projects.compactMap { p -> String? in
-            guard let s = setups[p.key] else { return nil }
-            let slots = s.slots.filter { $0.slot != .workspace && $0.state == .read }
-                .map { ConnectorSetupWords.heading($0.slot) }
-            return slots.isEmpty ? nil : "\(p.name) loses \(slots.joined(separator: ", "))."
-        }
-        return (losing + [ConnectorSetupWords.disconnectNote]).joined(separator: " ")
+        return ConnectorSetupWords.disconnectMessage(c.provider, projects: projects.compactMap { p in
+            setups[p.key].map { (name: p.name, setup: $0) }
+        })
     }
 
     private func load() async {
