@@ -46,6 +46,7 @@ import { PinnedPageRows } from "./Pins";
 import { ApprovalRow, FailedWorkflowRow } from "./Approval";
 import { JoinRequests } from "./JoinRequest";
 import { LinkRequests } from "./ChannelLinks";
+import { SignInRequests } from "./SignInRequests";
 import { approvalID, failedRuns, opensItsSubject } from "../model/approvals";
 import { memo } from "../render/memo";
 
@@ -167,6 +168,8 @@ export function Sidebar({ session, store, linkDown }: { session: Session; store:
         {!held && <JoinRequests store={store} down={linkDown} />}
         {/* A channel identity asking to act as this person (#1762), beside the machines. */}
         {!held && <LinkRequests store={store} down={linkDown} />}
+        {/* A new client that signed in with GitHub as this person (#995), beside them. */}
+        {!held && <SignInRequests store={store} down={linkDown} />}
         {/* Pages about all the work rather than one project, above the smart groups, as the
             window's (#495): Status, what goes on now, and Usage, the past (#915). Each folds, as
             a project does, and stays while searching, as the window's and the Remote's do (#547). */}

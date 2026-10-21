@@ -24,6 +24,7 @@ import type { BackupEvery, BackupRestoreResult, BackupSettings, BackupState, Bac
 import { PeopleSection } from "./People";
 import { GroupsSection } from "./Groups";
 import { ChannelsSection } from "./ChannelLinks";
+import { SignInSection, SignInsSection } from "./SignInSection";
 import { UserScopeSection } from "./UserScope";
 
 /** The words under the Sidebar section, as the window's and the Remote's (#846). */
@@ -268,6 +269,8 @@ export function SettingsPage({ store, down = false }: { store: Store; down?: boo
             <ServerBackupsSection store={store} />
             {/* The settings and secrets the control plane keeps for you (#1760). */}
             <UserScopeSection store={store} down={down} />
+            {/* How you sign in on your Macs, iPhones and iPads (#995). */}
+            <SignInsSection store={store} down={down} />
           </Scope>
           <Scope id="settings-scope-control" title={scopeTitles.controlPlane}>
             {/* Who belongs to the control plane, and their machines and clients (#994). */}
@@ -276,6 +279,8 @@ export function SettingsPage({ store, down = false }: { store: Store; down?: boo
             <GroupsSection store={store} down={down} />
             {/* Channel identities linked to people (#1762). */}
             <ChannelsSection store={store} down={down} />
+            {/* Which providers people sign in with (#995): an admin's. */}
+            {store.person.value?.role === "admin" && <SignInSection store={store} down={down} />}
             <ProvidersSection store={store} />
           </Scope>
         </div>

@@ -113,4 +113,23 @@ enum ControlConfig {
         try membership.save(membershipFile, backedUp: false)
         return membership
     }
+
+    /// Connect with no code, by signing in with Google, Apple or GitHub (#995): the window
+    /// pairs as the person the sign-in names, and keeps what it was told, as `pair` does.
+    static func signIn(at url: URL, with signIn: @escaping ControlSignIn.Provider,
+                       waiting: @escaping @Sendable (DaemonAPI.SignInWaiting) -> Void) async throws -> ControlMembership {
+        let key = try ControlClientKey.loadOrMake(account: keyAccount)
+        let membership = try await ControlSignIn.pair(url: url, pin: nil, controlKey: nil, privateKey: key, id: UUID(),
+                                                      name: Host.current().localizedName ?? "A Mac", kind: .mac, dial: dial,
+                                                      signIn: signIn, waiting: waiting)
+        try Task.checkCancellation()
+        try membership.save(membershipFile, backedUp: false)
+        return membership
+    }
+
+    /// The control key this window trusts, which a sign-in's nonce is bound to (#995).
+    static var controlKey: Data? {
+        guard case .remote(let membership)? = endpoint else { return nil }
+        return membership.controlKey
+    }
 }

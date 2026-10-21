@@ -299,6 +299,8 @@ final class RemoteModel {
     @ObservationIgnored private(set) var controlPlane: DaemonClient?
     /// People (#994): the machines waiting for this person's approval, fed from the watch.
     let people = PeopleState()
+    /// The GitHub sign-ins waiting for this person's Approve (#995).
+    let signIn = SignInState()
     /// The settings and secrets that follow the person to their machines (#1760).
     let userScope = UserScopeState()
     /// What `hosts/list` last said, so the project list can name each host (058, frame H).
@@ -2064,6 +2066,23 @@ final class RemoteModel {
         }
     }
 
+    /// Approve or Deny on a GitHub sign-in's card (#995): a refusal is the app's alert.
+    func answerSignIn(_ request: DaemonAPI.SignInRequest, approve: Bool) async {
+        if let refused = await signIn.answer(request, approve: approve, on: controlPlane) {
+            problem = refused
+        }
+    }
+
+    /// Pair with no code, by signing in (#995): as `pair(scanned:)` does once paired.
+    func pairBySigningIn(at url: URL, with signIn: @escaping ControlSignIn.Provider,
+                         waiting: @escaping @Sendable (DaemonAPI.SignInWaiting) -> Void) async throws {
+        let id = deviceID
+        _ = try await RemoteControl.signIn(at: url, id: id, with: signIn, waiting: waiting)
+        pairing = .paired
+        note("pairing: paired with the control plane at \(url.host() ?? "?") by signing in")
+        pairedWithControlPlane = true
+    }
+
     /// Approve, Deny or Send on a channel link's card (#1762): a refusal is the app's alert.
     func answerLink(_ request: DaemonAPI.ChannelLinkRequest, approve: Bool, to person: String?) async {
         if let refused = await people.answerLink(request, approve: approve, to: person, on: controlPlane) {
@@ -2294,6 +2313,7 @@ final class RemoteModel {
                     await self?.syncOtherHosts(control, link: link)
                     await self?.loadKept(control)
                     await self?.people.connected(control)
+                    await self?.signIn.connected(control)
                     for await change in control.notifications() {
                         guard let self, !Task.isCancelled else { return }
                         // A provider's group's name, on Settings ▸ Workspace providers (#1761).
@@ -2303,6 +2323,7 @@ final class RemoteModel {
                                 ?? self.providerGroups
                         }
                         if await self.people.heard(change.method, change.params, on: control) { continue }
+                        if self.signIn.heard(change.method, change.params) { continue }
                         if await self.userScope.heard(change.method, change.params, on: control) { continue }
                         if change.method == DaemonAPI.Notification.controlKeptChanged
                             || change.method == DaemonAPI.Notification.controlKeptDelivered {
@@ -2325,6 +2346,7 @@ final class RemoteModel {
                     if self?.controlPlane === control {
                         self?.controlPlane = nil
                         self?.people.went()
+                        self?.signIn.went()
                     }
                 }
                 guard !Task.isCancelled, self != nil else { return }
@@ -2345,6 +2367,7 @@ final class RemoteModel {
         hostWatch = nil
         controlPlane = nil
         people.went()
+        signIn.went()
         listening?.cancel()
         listening = nil
         for (_, other) in otherHosts { await other.disconnect() }

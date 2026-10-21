@@ -67,8 +67,10 @@ public enum ControlAuth {
         /// What a client has (#1748), so the control plane can tell one too old for it. Nil
         /// from a host, which says its own in `host/hello`.
         public var capabilities: [String]?
+        /// With an `s:` identity (#995): the key of the client that signs in, X9.63.
+        public var publicKey: Data?
         public init(id: String, nonce: String, mac: String, kind: String, for device: String? = nil, epoch: Int? = nil,
-                    capabilities: [String]? = nil) {
+                    capabilities: [String]? = nil, publicKey: Data? = nil) {
             self.id = id
             self.nonce = nonce
             self.mac = mac
@@ -76,6 +78,7 @@ public enum ControlAuth {
             self.for = device
             self.epoch = epoch
             self.capabilities = capabilities
+            self.publicKey = publicKey
         }
     }
 
@@ -157,6 +160,8 @@ public enum ControlAuth {
 
     public enum Identity: Sendable, Hashable {
         case client(UUID)
+        /// A client signing in with no code (#995): the UUID it will pair as.
+        case signingIn(UUID)
         case host(HostID)
         /// A client code's id (hex), or a host code's.
         case pairing(String)
@@ -166,6 +171,7 @@ public enum ControlAuth {
         public var text: String {
             switch self {
             case .client(let id): "c:" + id.uuidString
+            case .signingIn(let id): "s:" + id.uuidString
             case .host(let id): "h:" + id.rawValue
             case .pairing(let id): "p:" + id
             case .enrolling(let id): "e:" + id
@@ -177,6 +183,7 @@ public enum ControlAuth {
             let rest = String(text.dropFirst(2))
             switch text.prefix(2) {
             case "c:": guard let id = UUID(uuidString: rest) else { return nil }; self = .client(id)
+            case "s:": guard let id = UUID(uuidString: rest) else { return nil }; self = .signingIn(id)
             case "h:": guard ControlWire.isHostID(rest) else { return nil }; self = .host(HostID(rawValue: rest))
             case "p:": guard ControlAuth.isCodeID(rest) else { return nil }; self = .pairing(rest)
             case "e:": guard ControlAuth.isCodeID(rest) else { return nil }; self = .enrolling(rest)

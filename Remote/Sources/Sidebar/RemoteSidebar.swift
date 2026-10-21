@@ -84,6 +84,19 @@ struct RemoteSidebar: View {
                     }
                 }
             }
+            // A new client that signed in with GitHub as this person (#995), beside them.
+            let signingIn = model.signIn.open()
+            if !signingIn.isEmpty {
+                Section {
+                    ForEach(signingIn) { request in
+                        SignInRequestCard(request: request, isAnswering: model.signIn.answering.contains(request.request),
+                                          answer: { approve in Task { await model.answerSignIn(request, approve: approve) } })
+                            .listRowSeparator(.hidden)
+                            .listRowBackground(Color.clear)
+                            .listRowInsets(EdgeInsets(top: 4, leading: 12, bottom: 4, trailing: 12))
+                    }
+                }
+            }
             // A channel identity asking to act as this person (#1762), beside the machines.
             let linking = model.people.openLinks()
             if !linking.isEmpty {
@@ -264,7 +277,9 @@ struct RemoteSidebar: View {
         .overlay {
             // Not over a machine's ask to join (#994): the card is the list's, and the
             // waiting view in the middle would lie over the rows under it.
-            if model.projects.isEmpty, model.people.open().isEmpty, model.people.openLinks().isEmpty { Waiting() }
+            if model.projects.isEmpty, model.people.open().isEmpty, model.people.openLinks().isEmpty, model.signIn.open().isEmpty {
+                Waiting()
+            }
         }
         // The catch-up leaves archived projects out; they are asked for here (#343), and
         // again once the list is pulled.
@@ -786,6 +801,19 @@ private struct RemoteSettings: View {
                         } label: {
                             Label(UserScopeWords.title, systemImage: "arrow.triangle.2.circlepath")
                         }
+                        // How you sign in on your other clients (#995).
+                        NavigationLink {
+                            Form {
+                                SignInsSection(control: model.controlPlane, controlKey: RemoteControl.controlKey,
+                                               revision: model.people.revision)
+                                    .paperListRow()
+                            }
+                            .paperForm()
+                            .navigationTitle(SignInWords.signInsTitle)
+                            .navigationBarTitleDisplayMode(.inline)
+                        } label: {
+                            Label(SignInWords.signInsTitle, systemImage: "person.badge.key")
+                        }
                     }
                 }
                 .paperListRow()
@@ -807,6 +835,16 @@ private struct RemoteSettings: View {
                                 .navigationBarTitleDisplayMode(.inline)
                         } label: {
                             Label(ChannelLinkWords.title, systemImage: "bubble.left.and.bubble.right")
+                        }
+                        // Which providers people sign in with (#995): an admin's.
+                        if model.people.you?.isAdmin == true {
+                            NavigationLink {
+                                SignInPane(control: model.controlPlane, revision: model.people.revision)
+                                    .navigationTitle(SignInWords.paneTitle)
+                                    .navigationBarTitleDisplayMode(.inline)
+                            } label: {
+                                Label(SignInWords.paneTitle, systemImage: "person.badge.key")
+                            }
                         }
                         // Groups own workspace providers (#1761): an admin's.
                         if model.people.you?.isAdmin != false {

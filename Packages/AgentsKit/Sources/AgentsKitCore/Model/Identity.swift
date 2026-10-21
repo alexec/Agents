@@ -236,3 +236,52 @@ public struct SignInRequestQueue: Sendable, Hashable {
         requests.filter { $0.expires > now }
     }
 }
+
+/// What the clients say about sign-in (#995), the same on the Mac and the Remote; the web
+/// page's are in `Web/src/model/signIn.ts`.
+public enum SignInWords {
+    public static let paneTitle = "Sign-in"
+    public static let paneFoot = "People sign in with these to pair a window or a phone with no code. "
+        + "A person not known joins only through an allowed Google Workspace domain; "
+        + "everyone else is invited first, and adds the sign-in under Account."
+    public static let signInsTitle = "Sign-ins"
+    public static let signInsFoot = "Sign in with one of these on another Mac, iPhone or iPad to pair it with no code. "
+        + "A GitHub sign-in waits for Approve here."
+    public static let domainsTitle = "Allowed Google Workspace domains"
+    public static let domainsFoot = "Anyone with a Workspace account on one of these joins as a member with no invite."
+    public static let organisationsTitle = "Allowed GitHub organisations"
+    public static let organisationsFoot = "A GitHub sign-in must be in one of these. "
+        + "It does not let anyone join with no invite."
+    public static let noneOn = "No sign-in provider is turned on for this control plane. Use a pairing code."
+
+    /// "Sam’s iPhone wants to sign in as you with GitHub (sam)."
+    public static func wants(_ request: DaemonAPI.SignInRequest) -> String {
+        let with = SignInProviderName.title(request.provider) + (request.login.map { " (\($0))" } ?? "")
+        return "wants to sign in as you with \(with)."
+    }
+
+    public static func title(_ request: DaemonAPI.SignInRequest) -> String {
+        "\(request.name) \(wants(request))"
+    }
+
+    public static func code(_ request: DaemonAPI.SignInRequest) -> String {
+        "Check that it shows \(request.code.map(String.init).joined(separator: " "))."
+    }
+
+    /// One sign-in as Account lists it: "GitHub · sam", "Google · sam@example.com".
+    public static func row(_ signIn: DaemonAPI.SignIn) -> String {
+        let detail = signIn.email ?? signIn.login ?? (SignInProviderName.isOutside(signIn.provider) ? signIn.account : nil)
+        return [SignInProviderName.title(signIn.provider), detail].compactMap { $0 }.joined(separator: " · ")
+    }
+
+    /// The button that signs in with a provider.
+    public static func button(_ provider: String) -> String { "Sign in with \(SignInProviderName.title(provider))" }
+
+    public static func removeTitle(_ signIn: DaemonAPI.SignIn) -> String { "Remove \(row(signIn))?" }
+    public static let removeMessage = "You can no longer pair a client with this sign-in. Your clients stay paired."
+
+    /// While a GitHub sign-in waits for another client.
+    public static func waiting(_ code: String) -> String {
+        "On one of your other clients, approve this sign-in. It shows \(code)."
+    }
+}

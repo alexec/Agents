@@ -887,6 +887,8 @@ final class AppModel {
     @ObservationIgnored private(set) var controlRequests: DaemonClient?
     /// People (#994): the machines waiting for this person's approval, fed from the watch.
     let people = PeopleState()
+    /// The GitHub sign-ins waiting for this person's Approve (#995).
+    let signIn = SignInState()
     /// The settings and secrets that follow the person to their machines (#1760).
     let userScope = UserScopeState()
     /// Hosts whose Start was pressed here and not answered yet.
@@ -3115,8 +3117,10 @@ final class AppModel {
                     await self?.syncControlHosts(control)
                     await self?.loadKept(control)
                     await self?.people.connected(control)
+                    await self?.signIn.connected(control)
                     for await note in control.notifications() {
                         if await self?.people.heard(note.method, note.params, on: control) == true { continue }
+                        if self?.signIn.heard(note.method, note.params) == true { continue }
                         if await self?.userScope.heard(note.method, note.params, on: control) == true {
                             // The host writes what it is sent a moment later: its panes read again.
                             try? await Task.sleep(for: .milliseconds(500))
@@ -3162,6 +3166,7 @@ final class AppModel {
     private func controlPlaneWent() {
         guard controlLink != nil else { return }
         people.went()
+        signIn.went()
         controlPlaneReachable = false
         controlPlaneMissed = true
     }
@@ -3194,6 +3199,13 @@ final class AppModel {
     /// Approve or Deny on a machine's card (#994): a refusal is the window's alert.
     func answerJoin(_ request: DaemonAPI.JoinRequest, approve: Bool) async {
         if let refused = await people.answer(request, approve: approve, on: controlRequests) {
+            problem = refused
+        }
+    }
+
+    /// Approve or Deny on a GitHub sign-in's card (#995): a refusal is the window's alert.
+    func answerSignIn(_ request: DaemonAPI.SignInRequest, approve: Bool) async {
+        if let refused = await signIn.answer(request, approve: approve, on: controlRequests) {
             problem = refused
         }
     }

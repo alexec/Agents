@@ -125,6 +125,8 @@ struct SettingsWindow: View {
         case .controlPlane, .clients, .onEveryMachine, .channels: control != nil
         // An admin's: a member sees the groups they are in on their providers (#1761).
         case .groups: control != nil && model.people.you?.isAdmin != false
+        // An admin's: which providers people sign in with (#995).
+        case .signIn: control != nil && model.people.you?.isAdmin == true
         case .providers: control?.providersHere ?? false
         default: true
         }
@@ -184,6 +186,8 @@ struct SettingsWindow: View {
         case .channels:
             // Through the window's own connection, which hears links change (#1762).
             FormColumn { ChannelsPane(control: model.controlRequests, people: model.people) }
+        case .signIn:
+            FormColumn { SignInPane(control: model.controlRequests, revision: model.people.revision) }
         }
     }
 
@@ -198,7 +202,7 @@ extension SettingsScope {
         switch self {
         case .thisDevice: [.appearance, .sidebar]
         case .you: [.account, .runtimes, .agentConfiguration, .spending, .resources, .onEveryMachine, .machines]
-        case .controlPlane: [.people, .groups, .channels, .providers, .clients, .controlPlane]
+        case .controlPlane: [.people, .groups, .channels, .signIn, .providers, .clients, .controlPlane]
         }
     }
 }
@@ -222,6 +226,8 @@ enum SettingsPane: String, Hashable, CaseIterable {
     case groups
     /// Channel identities linked to people (#1762).
     case channels
+    /// Which providers people sign in with (#995).
+    case signIn
     /// Was Shared (#754): the raw value is what a window left open on it kept.
     case agentConfiguration = "shared"
     /// The settings and secrets the control plane keeps for the person (#1760).
@@ -233,7 +239,7 @@ enum SettingsPane: String, Hashable, CaseIterable {
         switch self {
         case .runtimes, .agentConfiguration, .spending, .resources: true
         case .appearance, .sidebar, .account, .machines, .controlPlane, .providers, .clients, .people, .groups,
-             .channels, .onEveryMachine: false
+             .channels, .signIn, .onEveryMachine: false
         }
     }
 
@@ -256,6 +262,7 @@ enum SettingsPane: String, Hashable, CaseIterable {
         case .people: "People"
         case .groups: GroupWords.title
         case .channels: ChannelLinkWords.title
+        case .signIn: SignInWords.paneTitle
         case .onEveryMachine: UserScopeWords.title
         }
     }
@@ -276,6 +283,7 @@ enum SettingsPane: String, Hashable, CaseIterable {
         case .people: "person.2"
         case .groups: "person.3"
         case .channels: "bubble.left.and.bubble.right"
+        case .signIn: "person.badge.key"
         case .onEveryMachine: "arrow.triangle.2.circlepath"
         }
     }

@@ -13,7 +13,8 @@ import type {
   PagesChangedNotification, PinsChangedNotification, PinView, ViewPin, ListCursor, ListRequest, FileMentionDTO, SandboxChoice, RuntimeAllowances,
   GuardedChange, GuardedChangeReading, HostJoinStatus, RequiredCapabilities, KeptDelivered, KeptList, KeptRequest, Approval, ApprovalAction, UsageHistory, TimeHistory, Milestones,
   BuildOutputRemoved, ProjectWorktrees, RemovalCheck, WorktreeSize, WorktreeSummary, WorktreesSized, FindResult,
-  BackupRestoreResult, BackupSettings, BackupState, CapReached, ChannelLinkDecided, ChannelLinkRequest, ControlPerson, JoinDecided, JoinRequest, PersonRow, SecretsLeft } from "../protocol/generated";
+  BackupRestoreResult, BackupSettings, BackupState, CapReached, ChannelLinkDecided, ChannelLinkRequest, ControlPerson, JoinDecided, JoinRequest, PersonRow, SecretsLeft, SignInDecided,
+  SignInRequest } from "../protocol/generated";
 import { Failure } from "../protocol/generated";
 import { CallFailed, type Link } from "../wire/link";
 import type { FolderGoneAsk } from "./missingFolder";
@@ -44,6 +45,7 @@ import { hostAnswers, hostHas } from "./capabilities";
 import { Capability } from "../protocol/capabilities.generated";
 import { withJoin, withoutJoin } from "./people";
 import { withRequest, withoutRequest } from "./channelLinks";
+import { withSignIn, withoutSignIn } from "./signIn";
 import type { ChartHint } from "./chart";
 import { Providers } from "./providers";
 
@@ -419,6 +421,8 @@ export class Work {
   readonly linkRequests = signal<ChannelLinkRequest[]>([]);
   /** Whom an admin may send a link request on to (#1762); empty for a member. */
   readonly linkPeople = signal<PersonRow[]>([]);
+  /** GitHub sign-ins on new clients waiting for the person's Approve (#995). */
+  readonly signInRequests = signal<SignInRequest[]>([]);
   /** Goes up on control/linksChanged, so Settings ▸ Channels loads again. */
   readonly linksChanges = signal(0);
   /** Counts each control/peopleChanged (#994): Settings ▸ People loads its list again when it moves. */
@@ -1146,6 +1150,16 @@ export class Store extends Work {
         if (decided?.request) this.linkRequests.value = withoutRequest(this.linkRequests.value, decided.request);
         return;
       }
+      if (method === "control/signInRequested") {
+        const request = params as SignInRequest | null;
+        if (request?.request) this.signInRequests.value = withSignIn(this.signInRequests.value, request);
+        return;
+      }
+      if (method === "control/signInDecided") {
+        const decided = params as SignInDecided | null;
+        if (decided?.request) this.signInRequests.value = withoutSignIn(this.signInRequests.value, decided.request);
+        return;
+      }
       if (method === "control/linksChanged") {
         this.linksChanges.value += 1;
         return;
@@ -1205,7 +1219,8 @@ export class Store extends Work {
    */
   load(): Promise<void> {
     return this.once("*", async () => {
-      const [hosts] = await Promise.all([this.link.call("hosts/list", {}), this.loadPlane(), this.loadKept(), this.loadJoinRequests(), this.loadLinkRequests()]);
+      const [hosts] = await Promise.all([this.link.call("hosts/list", {}), this.loadPlane(), this.loadKept(), this.loadJoinRequests(), this.loadLinkRequests(),
+        this.loadSignInRequests()]);
       this.takeHosts(hosts);
       await Promise.all(this.hosts.value.filter((host) => hostAnswers(host.state)).map((host) => this.onHost(host.id, async () => {
         // A removal that landed while this waited is not loaded back (#291).
@@ -1241,6 +1256,25 @@ export class Store extends Work {
   private async loadJoinRequests(): Promise<void> {
     const listed = await this.link.call("hosts/joinRequests", {}).catch(() => null);
     this.joinRequests.value = listed ?? [];
+  }
+
+  /** GitHub sign-ins waiting (#995); a control plane before sign-in has none to say. */
+  private async loadSignInRequests(): Promise<void> {
+    const listed = await this.link.call("signIn/requests", {}).catch(() => null);
+    this.signInRequests.value = listed ?? [];
+  }
+
+  /**
+   * Approve or deny a GitHub sign-in on a new client (#995). The card goes at once; a refusal is
+   * said, and the card stays.
+   */
+  async decideSignIn(request: string, approve: boolean): Promise<void> {
+    try {
+      await this.link.call(approve ? "signIn/approve" : "signIn/deny", { request });
+      this.signInRequests.value = withoutSignIn(this.signInRequests.value, request);
+    } catch (error) {
+      this.say(describe(error));
+    }
   }
 
   /** Link requests (#1762), and for an admin whom to send them on to; a control plane before links has none. */

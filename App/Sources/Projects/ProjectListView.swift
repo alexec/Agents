@@ -95,6 +95,18 @@ struct ProjectListView: View {
                     }
                 }
             }
+            // A new client that signed in with GitHub as this person (#995), beside them.
+            let signingIn = model.signIn.open()
+            if !signingIn.isEmpty {
+                Section {
+                    ForEach(signingIn) { request in
+                        SignInRequestCard(request: request, isAnswering: model.signIn.answering.contains(request.request),
+                                          answer: { approve in Task { await model.answerSignIn(request, approve: approve) } })
+                            .listRowSeparator(.hidden)
+                            .selectionDisabled()
+                    }
+                }
+            }
             // A newcomer's checklist (#982), above everything until it has gone.
             if model.showsGetStarted {
                 Section {

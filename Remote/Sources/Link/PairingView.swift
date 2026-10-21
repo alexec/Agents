@@ -9,6 +9,8 @@ import VisionKit
 struct PairingView: View {
     @Environment(RemoteModel.self) private var model
     @State private var scanning = false
+    /// Sign In… with no code (#995).
+    @State private var signingIn = false
 
     private var device: String { UIDevice.current.userInterfaceIdiom == .pad ? "iPad" : "iPhone" }
 
@@ -43,10 +45,36 @@ struct PairingView: View {
                 Task { await model.pair(scanned: text) }
             }
             .disabled(model.pairing == .pairing)
+            // With no code (#995): sign in as a person the control plane knows.
+            Button("Sign In Instead…") { signingIn = true }
+                .disabled(model.pairing == .pairing)
+                .padding(.top, 4)
         }
         .padding(32)
         .frame(maxWidth: 420)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .sheet(isPresented: $signingIn) {
+            NavigationStack {
+                Form {
+                    Section {
+                        SignInToPair(pair: { url, signIn, waiting in
+                            try await model.pairBySigningIn(at: url, with: signIn, waiting: waiting)
+                        }, sentence: { error in
+                            SignInToPair.words(error) ?? PairingAttempt.sentence(for: error, device: "this \(device)")
+                        }, done: { signingIn = false })
+                    } footer: {
+                        Text("Type your control plane’s address. Sign in with an account added to your person there.")
+                    }
+                }
+                .navigationTitle("Sign In")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Cancel") { signingIn = false }
+                    }
+                }
+            }
+        }
         .sheet(isPresented: $scanning) {
             ScanSheet { text in
                 scanning = false
