@@ -125,8 +125,10 @@ menu and anything outside the window are not.
   [Apple Design Resources](https://developer.apple.com/design/resources/), in
   `~/.agents/video/assets/`. Its licence lets it be shown in our videos but not given
   away, so it is not in the repository.
-- A main screen at 2× (Retina): the window is put on it, and a take on a 1× screen stops.
-  No Accessibility or Screen Recording permission, and the screen may be locked.
+- Any main screen. On a 2× (Retina) one the window draws at 2× as it is; on a 1× one it
+  draws each frame at 2× by itself, through the walk socket's `shot` with `scale` 2 (#1855).
+  No screen's mode changes. No Accessibility or Screen Recording permission, and the
+  screen may be locked.
 
 ## The videos
 
