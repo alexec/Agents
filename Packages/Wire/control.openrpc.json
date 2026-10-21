@@ -40,6 +40,27 @@
       }
     },
     {
+      "name": "attention/turn",
+      "x-capability": "liveactivity/1",
+      "description": "A host, on its channel 0 (#1744): a session's turn moved to a new phase.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/AttentionTurn"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
       "name": "audit/export",
       "x-capability": "events.audit/1",
       "tags": [
@@ -90,23 +111,44 @@
       }
     },
     {
-      "name": "attention/turn",
-      "x-capability": "liveactivity/1",
-      "description": "A host, on its channel 0 (#1744): a session's turn moved to a new phase.",
+      "name": "backups/commit",
+      "x-capability": "backups.store/1",
+      "description": "A host, on its channel 0 (#1815): a backup's parts are all there; write its .json and keep the newest keep.",
       "paramStructure": "by-name",
       "params": [
         {
           "name": "params",
           "required": true,
           "schema": {
-            "$ref": "daemon.schema.json#/definitions/AttentionTurn"
+            "$ref": "daemon.schema.json#/definitions/BackupStoreCommit"
           }
         }
       ],
       "result": {
         "name": "result",
         "schema": {
-          "$ref": "daemon.schema.json#/definitions/Empty"
+          "$ref": "daemon.schema.json#/definitions/Backup"
+        }
+      }
+    },
+    {
+      "name": "backups/download",
+      "x-capability": "backups.store/1",
+      "description": "A host, on its channel 0 (#1815): one part of a listed backup, for a restore.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/BackupStorePartRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/BackupStorePart"
         }
       }
     },
@@ -153,44 +195,77 @@
       }
     },
     {
-      "name": "backups/commit",
-      "x-capability": "backups.store/1",
-      "description": "A host, on its channel 0 (#1815): a backup's parts are all there; write its .json and keep the newest keep.",
+      "name": "bots/make",
+      "x-capability": "bots/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
       "paramStructure": "by-name",
       "params": [
         {
           "name": "params",
           "required": true,
           "schema": {
-            "$ref": "daemon.schema.json#/definitions/BackupStoreCommit"
+            "$ref": "daemon.schema.json#/definitions/BotMake"
           }
         }
       ],
       "result": {
         "name": "result",
         "schema": {
-          "$ref": "daemon.schema.json#/definitions/Backup"
+          "$ref": "daemon.schema.json#/definitions/BotMade"
         }
       }
     },
     {
-      "name": "backups/download",
-      "x-capability": "backups.store/1",
-      "description": "A host, on its channel 0 (#1815): one part of a listed backup, for a restore.",
+      "name": "bots/setCaps",
+      "x-capability": "bots/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
       "paramStructure": "by-name",
       "params": [
         {
           "name": "params",
           "required": true,
           "schema": {
-            "$ref": "daemon.schema.json#/definitions/BackupStorePartRequest"
+            "$ref": "daemon.schema.json#/definitions/BotCaps"
           }
         }
       ],
       "result": {
         "name": "result",
         "schema": {
-          "$ref": "daemon.schema.json#/definitions/BackupStorePart"
+          "$ref": "daemon.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
+      "name": "bots/stopRun",
+      "x-capability": "bots/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/BotStopRun"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Empty"
         }
       }
     },
@@ -308,6 +383,27 @@
       }
     },
     {
+      "name": "clients/setActivityToken",
+      "x-capability": "liveactivity/1",
+      "description": "A device, over its own session (#1744): the push token of one session's Live Activity, kept in its own client record, which only it may set. Refused from a window or a browser.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/ActivityToken"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
       "name": "clients/setGrant",
       "x-capability": "clients/1",
       "description": "Retired with grants (#111): always refused, in words.",
@@ -339,27 +435,6 @@
           "required": true,
           "schema": {
             "$ref": "daemon.schema.json#/definitions/PushToken"
-          }
-        }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "$ref": "daemon.schema.json#/definitions/Empty"
-        }
-      }
-    },
-    {
-      "name": "clients/setActivityToken",
-      "x-capability": "liveactivity/1",
-      "description": "A device, over its own session (#1744): the push token of one session's Live Activity, kept in its own client record, which only it may set. Refused from a window or a browser.",
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/ActivityToken"
           }
         }
       ],
@@ -411,6 +486,323 @@
       }
     },
     {
+      "name": "console/fleet",
+      "x-capability": "console/1",
+      "description": "Console ▸ Machines (#1804, M1): every machine, its owner and state. Admins only.",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/FleetBoard"
+        }
+      }
+    },
+    {
+      "name": "console/teamWorkflows",
+      "x-capability": "console/1",
+      "description": "Console ▸ Team Workflows (#1804, M6): each bot, the workflows it ran and what runs now. Admins only.",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/TeamWorkflows"
+        }
+      }
+    },
+    {
+      "name": "control/capReached",
+      "x-capability": "bots/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/CapReached"
+          }
+        }
+      ]
+    },
+    {
+      "name": "control/clientChanged",
+      "x-capability": "control/1",
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/ControlClientChanged"
+          }
+        }
+      ]
+    },
+    {
+      "name": "control/groupsChanged",
+      "x-capability": "groups/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/GroupsChanged"
+          }
+        }
+      ]
+    },
+    {
+      "name": "control/hostChanged",
+      "x-capability": "control/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/JSONValue"
+          }
+        }
+      ]
+    },
+    {
+      "name": "control/installProgress",
+      "x-capability": "control/1",
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/ControlInstallProgress"
+          }
+        }
+      ]
+    },
+    {
+      "name": "control/joinDecided",
+      "x-capability": "hosts.join/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/JoinDecided"
+          }
+        }
+      ]
+    },
+    {
+      "name": "control/joinRequested",
+      "x-capability": "hosts.join/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/JoinRequest"
+          }
+        }
+      ]
+    },
+    {
+      "name": "control/keptChanged",
+      "x-capability": "control/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/KeptList"
+          }
+        }
+      ]
+    },
+    {
+      "name": "control/keptDelivered",
+      "x-capability": "control/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/KeptDelivered"
+          }
+        }
+      ]
+    },
+    {
+      "name": "control/linkDecided",
+      "x-capability": "links/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/ChannelLinkDecided"
+          }
+        }
+      ]
+    },
+    {
+      "name": "control/linkRequested",
+      "x-capability": "links/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/ChannelLinkRequest"
+          }
+        }
+      ]
+    },
+    {
+      "name": "control/linksChanged",
+      "x-capability": "links/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/Empty"
+          }
+        }
+      ]
+    },
+    {
+      "name": "control/moved",
+      "x-capability": "control/1",
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/ControlMoved"
+          }
+        }
+      ]
+    },
+    {
+      "name": "control/peopleChanged",
+      "x-capability": "people/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/PeopleChanged"
+          }
+        }
+      ]
+    },
+    {
       "name": "control/ping",
       "x-capability": "control/1",
       "description": "A host, on its channel 0.",
@@ -432,29 +824,39 @@
       }
     },
     {
-      "name": "control/setAuditDays",
-      "x-capability": "events.audit/1",
-      "tags": [
-        {
-          "name": "web"
-        }
-      ],
+      "name": "control/providerDraft",
+      "x-capability": "control/1",
+      "x-notification": true,
       "paramStructure": "by-name",
       "params": [
         {
           "name": "params",
           "required": true,
           "schema": {
-            "$ref": "daemon.schema.json#/definitions/AuditDays"
+            "$ref": "daemon.schema.json#/definitions/ProviderDraftUpdate"
           }
         }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "$ref": "daemon.schema.json#/definitions/AuditDays"
+      ]
+    },
+    {
+      "name": "control/providersChanged",
+      "x-capability": "control/1",
+      "tags": [
+        {
+          "name": "web"
         }
-      }
+      ],
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/ProviderList"
+          }
+        }
+      ]
     },
     {
       "name": "control/rotate",
@@ -483,6 +885,51 @@
       }
     },
     {
+      "name": "control/secretsLeft",
+      "x-capability": "user/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/SecretsLeft"
+          }
+        }
+      ]
+    },
+    {
+      "name": "control/setAuditDays",
+      "x-capability": "events.audit/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/AuditDays"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/AuditDays"
+        }
+      }
+    },
+    {
       "name": "control/setProjectDetection",
       "x-capability": "control/1",
       "paramStructure": "by-name",
@@ -501,6 +948,64 @@
           "$ref": "daemon.schema.json#/definitions/ProjectDetection"
         }
       }
+    },
+    {
+      "name": "control/signInDecided",
+      "x-capability": "signin/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/SignInDecided"
+          }
+        }
+      ],
+      "description": "A waiting GitHub sign-in was approved, denied or ran out (#995)."
+    },
+    {
+      "name": "control/signInRequested",
+      "x-capability": "signin/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/SignInRequest"
+          }
+        }
+      ],
+      "description": "A GitHub sign-in waits for this person's Approve (#995)."
+    },
+    {
+      "name": "control/signInWaiting",
+      "x-capability": "signin/1",
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/SignInWaiting"
+          }
+        }
+      ],
+      "description": "On an `s:` connection: the sign-in waits for Approve, with the code to compare (#995)."
     },
     {
       "name": "control/status",
@@ -528,6 +1033,71 @@
       }
     },
     {
+      "name": "control/thisMacHostChanged",
+      "x-capability": "control/1",
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/HostJoinStatus"
+          }
+        }
+      ]
+    },
+    {
+      "name": "control/tunnelChanged",
+      "x-capability": "control/1",
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/HostTunnelChanged"
+          }
+        }
+      ]
+    },
+    {
+      "name": "control/userSettingsChanged",
+      "x-capability": "user/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/UserSettingsChanged"
+          }
+        }
+      ]
+    },
+    {
+      "name": "control/webChanged",
+      "x-capability": "control/1",
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/WebRemoteStatus"
+          }
+        }
+      ]
+    },
+    {
       "name": "git/credential",
       "x-capability": "git/1",
       "description": "A host, on its channel 0, for its own git (#1122).",
@@ -545,6 +1115,81 @@
         "name": "result",
         "schema": {
           "$ref": "daemon.schema.json#/definitions/GitCredential"
+        }
+      }
+    },
+    {
+      "name": "groups/list",
+      "x-capability": "groups/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/GroupList"
+        }
+      }
+    },
+    {
+      "name": "groups/remove",
+      "x-capability": "groups/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/GroupRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
+      "name": "groups/set",
+      "x-capability": "groups/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/GroupSet"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Group"
         }
       }
     },
@@ -568,6 +1213,22 @@
           "$ref": "daemon.schema.json#/definitions/HandoverStatus"
         }
       }
+    },
+    {
+      "name": "host/clients",
+      "x-capability": "host/1",
+      "description": "To every host, on its channel 0, when it connects and when a window is paired or forgotten (#1118): the windows it may let in on its local socket.",
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/HostClients"
+          }
+        }
+      ]
     },
     {
       "name": "host/hello",
@@ -631,6 +1292,38 @@
           "$ref": "daemon.schema.json#/definitions/Empty"
         }
       }
+    },
+    {
+      "name": "host/user",
+      "x-capability": "bots/1",
+      "description": "To a machine, on its channel 0, at each join and when its user changes (#1761): its user, their kind, its labels, and a bot's cap.",
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/HostUser"
+          }
+        }
+      ]
+    },
+    {
+      "name": "host/userSettings",
+      "x-capability": "user/1",
+      "description": "To a machine that says host.user-settings/1, on its channel 0, at join and on each change (#1760): its user's settings and secrets.",
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/HostUserSettings"
+          }
+        }
+      ]
     },
     {
       "name": "host/workspaces",
@@ -1263,6 +1956,158 @@
       "description": "Update a server's host over ssh (#1766): its server and key given again, the host key checked as at an install, the server's root checked to be this host's, then the control plane's agentsd, MCP servers and toolsets copied and the host started again. The answer is an install's: {needsTrust, name} first for a key not yet trusted, then {updated: true, name}."
     },
     {
+      "name": "links/approve",
+      "x-capability": "links/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/ChannelLinkDecide"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
+      "name": "links/check",
+      "x-capability": "links/1",
+      "description": "A machine, on its channel 0 (#1762, FR-037): may a channel message from this sender start work? Answers the linked person; an identity not linked asks its person to link it, and starts nothing.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/ChannelSender"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/ChannelLinkChecked"
+        }
+      }
+    },
+    {
+      "name": "links/deny",
+      "x-capability": "links/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/ChannelLinkDecide"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
+      "name": "links/list",
+      "x-capability": "links/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "type": "array",
+          "items": {
+            "$ref": "daemon.schema.json#/definitions/ChannelLink"
+          }
+        }
+      }
+    },
+    {
+      "name": "links/remove",
+      "x-capability": "links/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/ChannelLinkRemove"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
+      "name": "links/requests",
+      "x-capability": "links/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "type": "array",
+          "items": {
+            "$ref": "daemon.schema.json#/definitions/ChannelLinkRequest"
+          }
+        }
+      }
+    },
+    {
       "name": "people/invite",
       "x-capability": "people/1",
       "tags": [
@@ -1388,179 +2233,20 @@
       }
     },
     {
-      "name": "groups/list",
-      "x-capability": "groups/1",
-      "tags": [
-        {
-          "name": "web"
-        }
-      ],
+      "name": "projects/detect",
+      "x-capability": "projects/1",
+      "description": "To a host just added, from a control plane before #656.",
+      "x-notification": true,
       "paramStructure": "by-name",
       "params": [
         {
           "name": "params",
           "required": true,
           "schema": {
-            "$ref": "daemon.schema.json#/definitions/Empty"
+            "$ref": "daemon.schema.json#/definitions/ProjectDetection"
           }
         }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "$ref": "daemon.schema.json#/definitions/GroupList"
-        }
-      }
-    },
-    {
-      "name": "groups/set",
-      "x-capability": "groups/1",
-      "tags": [
-        {
-          "name": "web"
-        }
-      ],
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/GroupSet"
-          }
-        }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "$ref": "daemon.schema.json#/definitions/Group"
-        }
-      }
-    },
-    {
-      "name": "groups/remove",
-      "x-capability": "groups/1",
-      "tags": [
-        {
-          "name": "web"
-        }
-      ],
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/GroupRequest"
-          }
-        }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "$ref": "daemon.schema.json#/definitions/Empty"
-        }
-      }
-    },
-    {
-      "name": "providers/setGroup",
-      "x-capability": "groups/1",
-      "tags": [
-        {
-          "name": "web"
-        }
-      ],
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/ProviderGroup"
-          }
-        }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "$ref": "daemon.schema.json#/definitions/Empty"
-        }
-      }
-    },
-    {
-      "name": "bots/make",
-      "x-capability": "bots/1",
-      "tags": [
-        {
-          "name": "web"
-        }
-      ],
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/BotMake"
-          }
-        }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "$ref": "daemon.schema.json#/definitions/BotMade"
-        }
-      }
-    },
-    {
-      "name": "bots/setCaps",
-      "x-capability": "bots/1",
-      "tags": [
-        {
-          "name": "web"
-        }
-      ],
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/BotCaps"
-          }
-        }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "$ref": "daemon.schema.json#/definitions/Empty"
-        }
-      }
-    },
-    {
-      "name": "bots/stopRun",
-      "x-capability": "bots/1",
-      "tags": [
-        {
-          "name": "web"
-        }
-      ],
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/BotStopRun"
-          }
-        }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "$ref": "daemon.schema.json#/definitions/Empty"
-        }
-      }
+      ]
     },
     {
       "name": "projects/detected",
@@ -1814,6 +2500,31 @@
       }
     },
     {
+      "name": "providers/setGroup",
+      "x-capability": "groups/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/ProviderGroup"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
       "name": "providers/update",
       "x-capability": "providers/1",
       "tags": [
@@ -1837,270 +2548,6 @@
           "$ref": "daemon.schema.json#/definitions/ProviderSummary"
         }
       }
-    },
-    {
-      "name": "relay/switch",
-      "x-capability": "relay/1",
-      "description": "A relay host, on its channel 0 (#824).",
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/RelaySwitch"
-          }
-        }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "$ref": "daemon.schema.json#/definitions/Empty"
-        }
-      }
-    },
-    {
-      "name": "tunnel/open",
-      "x-capability": "tunnel/1",
-      "description": "The borrowing host, on its channel 0 (T091).",
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/TunnelOpen"
-          }
-        }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "$ref": "daemon.schema.json#/definitions/Empty"
-        }
-      }
-    },
-    {
-      "name": "workspaces/forAgent",
-      "x-capability": "workspaces/1",
-      "description": "Through host/workspaces only.",
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/Empty"
-          }
-        }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "$ref": "daemon.schema.json#/definitions/AgentWorkspaces"
-        }
-      }
-    },
-    {
-      "name": "control/clientChanged",
-      "x-capability": "control/1",
-      "x-notification": true,
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/ControlClientChanged"
-          }
-        }
-      ]
-    },
-    {
-      "name": "control/hostChanged",
-      "x-capability": "control/1",
-      "tags": [
-        {
-          "name": "web"
-        }
-      ],
-      "x-notification": true,
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/JSONValue"
-          }
-        }
-      ]
-    },
-    {
-      "name": "control/installProgress",
-      "x-capability": "control/1",
-      "x-notification": true,
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/ControlInstallProgress"
-          }
-        }
-      ]
-    },
-    {
-      "name": "control/keptChanged",
-      "x-capability": "control/1",
-      "tags": [
-        {
-          "name": "web"
-        }
-      ],
-      "x-notification": true,
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/KeptList"
-          }
-        }
-      ]
-    },
-    {
-      "name": "control/keptDelivered",
-      "x-capability": "control/1",
-      "tags": [
-        {
-          "name": "web"
-        }
-      ],
-      "x-notification": true,
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/KeptDelivered"
-          }
-        }
-      ]
-    },
-    {
-      "name": "control/moved",
-      "x-capability": "control/1",
-      "x-notification": true,
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/ControlMoved"
-          }
-        }
-      ]
-    },
-    {
-      "name": "control/providerDraft",
-      "x-capability": "control/1",
-      "x-notification": true,
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/ProviderDraftUpdate"
-          }
-        }
-      ]
-    },
-    {
-      "name": "control/providersChanged",
-      "x-capability": "control/1",
-      "tags": [
-        {
-          "name": "web"
-        }
-      ],
-      "x-notification": true,
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/ProviderList"
-          }
-        }
-      ]
-    },
-    {
-      "name": "control/thisMacHostChanged",
-      "x-capability": "control/1",
-      "x-notification": true,
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/HostJoinStatus"
-          }
-        }
-      ]
-    },
-    {
-      "name": "control/tunnelChanged",
-      "x-capability": "control/1",
-      "x-notification": true,
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/HostTunnelChanged"
-          }
-        }
-      ]
-    },
-    {
-      "name": "control/webChanged",
-      "x-capability": "control/1",
-      "x-notification": true,
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/WebRemoteStatus"
-          }
-        }
-      ]
-    },
-    {
-      "name": "projects/detect",
-      "x-capability": "projects/1",
-      "description": "To a host just added, from a control plane before #656.",
-      "x-notification": true,
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/ProjectDetection"
-          }
-        }
-      ]
     },
     {
       "name": "relay/count",
@@ -2135,22 +2582,6 @@
       ]
     },
     {
-      "name": "host/clients",
-      "x-capability": "host/1",
-      "description": "To every host, on its channel 0, when it connects and when a window is paired or forgotten (#1118): the windows it may let in on its local socket.",
-      "x-notification": true,
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/HostClients"
-          }
-        }
-      ]
-    },
-    {
       "name": "relay/devices",
       "x-capability": "relay/1",
       "description": "To a relay host, on its channel 0 (T096).",
@@ -2167,116 +2598,16 @@
       ]
     },
     {
-      "name": "control/joinRequested",
-      "x-capability": "hosts.join/1",
-      "tags": [
-        {
-          "name": "web"
-        }
-      ],
-      "x-notification": true,
+      "name": "relay/switch",
+      "x-capability": "relay/1",
+      "description": "A relay host, on its channel 0 (#824).",
       "paramStructure": "by-name",
       "params": [
         {
           "name": "params",
           "required": true,
           "schema": {
-            "$ref": "daemon.schema.json#/definitions/JoinRequest"
-          }
-        }
-      ]
-    },
-    {
-      "name": "control/joinDecided",
-      "x-capability": "hosts.join/1",
-      "tags": [
-        {
-          "name": "web"
-        }
-      ],
-      "x-notification": true,
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/JoinDecided"
-          }
-        }
-      ]
-    },
-    {
-      "name": "control/peopleChanged",
-      "x-capability": "people/1",
-      "tags": [
-        {
-          "name": "web"
-        }
-      ],
-      "x-notification": true,
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/PeopleChanged"
-          }
-        }
-      ]
-    },
-    {
-      "name": "control/groupsChanged",
-      "x-capability": "groups/1",
-      "tags": [
-        {
-          "name": "web"
-        }
-      ],
-      "x-notification": true,
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/GroupsChanged"
-          }
-        }
-      ]
-    },
-    {
-      "name": "control/capReached",
-      "x-capability": "bots/1",
-      "tags": [
-        {
-          "name": "web"
-        }
-      ],
-      "x-notification": true,
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/CapReached"
-          }
-        }
-      ]
-    },
-    {
-      "name": "usage/rollup",
-      "x-capability": "reports/1",
-      "description": "A host, on its channel 0 (#1811): its usage by the hour and the day.",
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/UsageRollup"
+            "$ref": "daemon.schema.json#/definitions/RelaySwitch"
           }
         }
       ],
@@ -2284,31 +2615,6 @@
         "name": "result",
         "schema": {
           "$ref": "daemon.schema.json#/definitions/Empty"
-        }
-      }
-    },
-    {
-      "name": "reports/usage",
-      "x-capability": "reports/1",
-      "tags": [
-        {
-          "name": "web"
-        }
-      ],
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/ReportQuery"
-          }
-        }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "$ref": "daemon.schema.json#/definitions/UsageReport"
         }
       }
     },
@@ -2334,32 +2640,6 @@
         "name": "result",
         "schema": {
           "$ref": "daemon.schema.json#/definitions/ReportExport"
-        }
-      }
-    },
-    {
-      "name": "reports/scopes",
-      "x-capability": "reports.scope/1",
-      "description": "The scopes the caller may see in Reports (#1804).",
-      "tags": [
-        {
-          "name": "web"
-        }
-      ],
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/Empty"
-          }
-        }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "$ref": "daemon.schema.json#/definitions/ReportScopes"
         }
       }
     },
@@ -2390,6 +2670,32 @@
       }
     },
     {
+      "name": "reports/scopes",
+      "x-capability": "reports.scope/1",
+      "description": "The scopes the caller may see in Reports (#1804).",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/ReportScopes"
+        }
+      }
+    },
+    {
       "name": "reports/setPolicy",
       "x-capability": "reports.scope/1",
       "description": "Changes who sees what in Reports (#1804): totals only, group leads and budgets. Admins only.",
@@ -2416,9 +2722,153 @@
       }
     },
     {
-      "name": "console/fleet",
-      "x-capability": "console/1",
-      "description": "Console ▸ Machines (#1804, M1): every machine, its owner and state. Admins only.",
+      "name": "reports/usage",
+      "x-capability": "reports/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/ReportQuery"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/UsageReport"
+        }
+      }
+    },
+    {
+      "name": "signIn/addToMe",
+      "x-capability": "signin/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/SignInAdd"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/SignIn"
+        }
+      },
+      "description": "Add a Google, Apple or GitHub sign-in to the caller's person (#995, FR-005): an ID token whose nonce is made from signIn/providers' challenge. Refused when it is another person's."
+    },
+    {
+      "name": "signIn/approve",
+      "x-capability": "signin/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/SignInDecide"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Empty"
+        }
+      },
+      "description": "Approve a waiting GitHub sign-in: the new client pairs as the caller's person (#995)."
+    },
+    {
+      "name": "signIn/configure",
+      "x-capability": "signin/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/SignInConfigure"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/SignInProviders"
+        }
+      },
+      "description": "Admins (#995, FR-004, FR-006): turn a provider on or off, and allow Google Workspace domains or GitHub organisations."
+    },
+    {
+      "name": "signIn/deny",
+      "x-capability": "signin/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/SignInDecide"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Empty"
+        }
+      },
+      "description": "Deny a waiting GitHub sign-in (#995)."
+    },
+    {
+      "name": "signIn/pair",
+      "x-capability": "signin/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/SignInPair"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Admitted"
+        }
+      },
+      "description": "On an `s:` connection only (#995): sign in with Google or Apple (an ID token with the nonce) or GitHub (a user token), and pair as the person it names. A person not known joins only through an allowed Google Workspace domain; anyone else joins by an invite first. A GitHub sign-in waits for Approve on another client of the person (control/signInWaiting) before it is answered."
+    },
+    {
+      "name": "signIn/providers",
+      "x-capability": "signin/1",
       "tags": [
         {
           "name": "web"
@@ -2437,14 +2887,40 @@
       "result": {
         "name": "result",
         "schema": {
-          "$ref": "daemon.schema.json#/definitions/FleetBoard"
+          "$ref": "daemon.schema.json#/definitions/SignInProviders"
         }
-      }
+      },
+      "description": "The sign-in providers, and the challenge a client makes its nonce from on this connection (#995): on an `s:` connection before signIn/pair, or on a paired client's before signIn/addToMe."
     },
     {
-      "name": "console/teamWorkflows",
-      "x-capability": "console/1",
-      "description": "Console ▸ Team Workflows (#1804, M6): each bot, the workflows it ran and what runs now. Admins only.",
+      "name": "signIn/removeFromMe",
+      "x-capability": "signin/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/SignInRemove"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Empty"
+        }
+      },
+      "description": "Take an outside sign-in off the caller's person (#995)."
+    },
+    {
+      "name": "signIn/requests",
+      "x-capability": "signin/1",
       "tags": [
         {
           "name": "web"
@@ -2463,50 +2939,25 @@
       "result": {
         "name": "result",
         "schema": {
-          "$ref": "daemon.schema.json#/definitions/TeamWorkflows"
-        }
-      }
-    },
-    {
-      "name": "user/settings",
-      "x-capability": "user/1",
-      "tags": [
-        {
-          "name": "web"
-        }
-      ],
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/Empty"
+          "type": "array",
+          "items": {
+            "$ref": "daemon.schema.json#/definitions/SignInRequest"
           }
         }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "$ref": "daemon.schema.json#/definitions/UserSettings"
-        }
-      }
+      },
+      "description": "The GitHub sign-ins waiting for the caller's Approve (#995, FR-010)."
     },
     {
-      "name": "user/setSettings",
-      "x-capability": "user/1",
-      "tags": [
-        {
-          "name": "web"
-        }
-      ],
+      "name": "tunnel/open",
+      "x-capability": "tunnel/1",
+      "description": "The borrowing host, on its channel 0 (T091).",
       "paramStructure": "by-name",
       "params": [
         {
           "name": "params",
           "required": true,
           "schema": {
-            "$ref": "daemon.schema.json#/definitions/UserSettingsPart"
+            "$ref": "daemon.schema.json#/definitions/TunnelOpen"
           }
         }
       ],
@@ -2518,20 +2969,16 @@
       }
     },
     {
-      "name": "user/setSecret",
-      "x-capability": "user/1",
-      "tags": [
-        {
-          "name": "web"
-        }
-      ],
+      "name": "usage/rollup",
+      "x-capability": "reports/1",
+      "description": "A host, on its channel 0 (#1811): its usage by the hour and the day.",
       "paramStructure": "by-name",
       "params": [
         {
           "name": "params",
           "required": true,
           "schema": {
-            "$ref": "daemon.schema.json#/definitions/UserSecret"
+            "$ref": "daemon.schema.json#/definitions/UsageRollup"
           }
         }
       ],
@@ -2593,76 +3040,79 @@
       }
     },
     {
-      "name": "control/userSettingsChanged",
+      "name": "user/setSecret",
       "x-capability": "user/1",
       "tags": [
         {
           "name": "web"
         }
       ],
-      "x-notification": true,
       "paramStructure": "by-name",
       "params": [
         {
           "name": "params",
           "required": true,
           "schema": {
-            "$ref": "daemon.schema.json#/definitions/UserSettingsChanged"
+            "$ref": "daemon.schema.json#/definitions/UserSecret"
           }
         }
-      ]
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Empty"
+        }
+      }
     },
     {
-      "name": "control/secretsLeft",
+      "name": "user/setSettings",
       "x-capability": "user/1",
       "tags": [
         {
           "name": "web"
         }
       ],
-      "x-notification": true,
       "paramStructure": "by-name",
       "params": [
         {
           "name": "params",
           "required": true,
           "schema": {
-            "$ref": "daemon.schema.json#/definitions/SecretsLeft"
+            "$ref": "daemon.schema.json#/definitions/UserSettingsPart"
           }
         }
-      ]
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Empty"
+        }
+      }
     },
     {
-      "name": "host/userSettings",
+      "name": "user/settings",
       "x-capability": "user/1",
-      "description": "To a machine that says host.user-settings/1, on its channel 0, at join and on each change (#1760): its user's settings and secrets.",
-      "x-notification": true,
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
       "paramStructure": "by-name",
       "params": [
         {
           "name": "params",
           "required": true,
           "schema": {
-            "$ref": "daemon.schema.json#/definitions/HostUserSettings"
+            "$ref": "daemon.schema.json#/definitions/Empty"
           }
         }
-      ]
-    },
-    {
-      "name": "host/user",
-      "x-capability": "bots/1",
-      "description": "To a machine, on its channel 0, at each join and when its user changes (#1761): its user, their kind, its labels, and a bot's cap.",
-      "x-notification": true,
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/HostUser"
-          }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/UserSettings"
         }
-      ]
+      }
     },
     {
       "name": "workflows/claimRun",
@@ -2682,27 +3132,6 @@
         "name": "result",
         "schema": {
           "$ref": "daemon.schema.json#/definitions/WorkflowClaimed"
-        }
-      }
-    },
-    {
-      "name": "workflows/trigger",
-      "x-capability": "events.team/1",
-      "description": "A machine, on its channel 0 (#2011, FR-035): a server's event or a schedule matched a runs-on: workflow. When runs-on: names a bot, the control plane sends it once, to one of the bot's machines (workflows/fire).",
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/TeamTrigger"
-          }
-        }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "$ref": "daemon.schema.json#/definitions/TeamTriggerSent"
         }
       }
     },
@@ -2728,13 +3157,30 @@
       }
     },
     {
-      "name": "links/list",
-      "x-capability": "links/1",
-      "tags": [
+      "name": "workflows/trigger",
+      "x-capability": "events.team/1",
+      "description": "A machine, on its channel 0 (#2011, FR-035): a server's event or a schedule matched a runs-on: workflow. When runs-on: names a bot, the control plane sends it once, to one of the bot's machines (workflows/fire).",
+      "paramStructure": "by-name",
+      "params": [
         {
-          "name": "web"
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/TeamTrigger"
+          }
         }
       ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/TeamTriggerSent"
+        }
+      }
+    },
+    {
+      "name": "workspaces/forAgent",
+      "x-capability": "workspaces/1",
+      "description": "Through host/workspaces only.",
       "paramStructure": "by-name",
       "params": [
         {
@@ -2748,455 +3194,9 @@
       "result": {
         "name": "result",
         "schema": {
-          "type": "array",
-          "items": {
-            "$ref": "daemon.schema.json#/definitions/ChannelLink"
-          }
+          "$ref": "daemon.schema.json#/definitions/AgentWorkspaces"
         }
       }
-    },
-    {
-      "name": "links/requests",
-      "x-capability": "links/1",
-      "tags": [
-        {
-          "name": "web"
-        }
-      ],
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/Empty"
-          }
-        }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "type": "array",
-          "items": {
-            "$ref": "daemon.schema.json#/definitions/ChannelLinkRequest"
-          }
-        }
-      }
-    },
-    {
-      "name": "links/approve",
-      "x-capability": "links/1",
-      "tags": [
-        {
-          "name": "web"
-        }
-      ],
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/ChannelLinkDecide"
-          }
-        }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "$ref": "daemon.schema.json#/definitions/Empty"
-        }
-      }
-    },
-    {
-      "name": "links/deny",
-      "x-capability": "links/1",
-      "tags": [
-        {
-          "name": "web"
-        }
-      ],
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/ChannelLinkDecide"
-          }
-        }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "$ref": "daemon.schema.json#/definitions/Empty"
-        }
-      }
-    },
-    {
-      "name": "links/remove",
-      "x-capability": "links/1",
-      "tags": [
-        {
-          "name": "web"
-        }
-      ],
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/ChannelLinkRemove"
-          }
-        }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "$ref": "daemon.schema.json#/definitions/Empty"
-        }
-      }
-    },
-    {
-      "name": "control/linkRequested",
-      "x-capability": "links/1",
-      "tags": [
-        {
-          "name": "web"
-        }
-      ],
-      "x-notification": true,
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/ChannelLinkRequest"
-          }
-        }
-      ]
-    },
-    {
-      "name": "control/linkDecided",
-      "x-capability": "links/1",
-      "tags": [
-        {
-          "name": "web"
-        }
-      ],
-      "x-notification": true,
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/ChannelLinkDecided"
-          }
-        }
-      ]
-    },
-    {
-      "name": "control/linksChanged",
-      "x-capability": "links/1",
-      "tags": [
-        {
-          "name": "web"
-        }
-      ],
-      "x-notification": true,
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/Empty"
-          }
-        }
-      ]
-    },
-    {
-      "name": "links/check",
-      "x-capability": "links/1",
-      "description": "A machine, on its channel 0 (#1762, FR-037): may a channel message from this sender start work? Answers the linked person; an identity not linked asks its person to link it, and starts nothing.",
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/ChannelSender"
-          }
-        }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "$ref": "daemon.schema.json#/definitions/ChannelLinkChecked"
-        }
-      }
-    },
-    {
-      "name": "signIn/providers",
-      "x-capability": "signin/1",
-      "tags": [
-        {
-          "name": "web"
-        }
-      ],
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/Empty"
-          }
-        }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "$ref": "daemon.schema.json#/definitions/SignInProviders"
-        }
-      },
-      "description": "The sign-in providers, and the challenge a client makes its nonce from on this connection (#995): on an `s:` connection before signIn/pair, or on a paired client's before signIn/addToMe."
-    },
-    {
-      "name": "signIn/pair",
-      "x-capability": "signin/1",
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/SignInPair"
-          }
-        }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "$ref": "daemon.schema.json#/definitions/Admitted"
-        }
-      },
-      "description": "On an `s:` connection only (#995): sign in with Google or Apple (an ID token with the nonce) or GitHub (a user token), and pair as the person it names. A person not known joins only through an allowed Google Workspace domain; anyone else joins by an invite first. A GitHub sign-in waits for Approve on another client of the person (control/signInWaiting) before it is answered."
-    },
-    {
-      "name": "signIn/addToMe",
-      "x-capability": "signin/1",
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/SignInAdd"
-          }
-        }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "$ref": "daemon.schema.json#/definitions/SignIn"
-        }
-      },
-      "description": "Add a Google, Apple or GitHub sign-in to the caller's person (#995, FR-005): an ID token whose nonce is made from signIn/providers' challenge. Refused when it is another person's."
-    },
-    {
-      "name": "signIn/removeFromMe",
-      "x-capability": "signin/1",
-      "tags": [
-        {
-          "name": "web"
-        }
-      ],
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/SignInRemove"
-          }
-        }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "$ref": "daemon.schema.json#/definitions/Empty"
-        }
-      },
-      "description": "Take an outside sign-in off the caller's person (#995)."
-    },
-    {
-      "name": "signIn/configure",
-      "x-capability": "signin/1",
-      "tags": [
-        {
-          "name": "web"
-        }
-      ],
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/SignInConfigure"
-          }
-        }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "$ref": "daemon.schema.json#/definitions/SignInProviders"
-        }
-      },
-      "description": "Admins (#995, FR-004, FR-006): turn a provider on or off, and allow Google Workspace domains or GitHub organisations."
-    },
-    {
-      "name": "signIn/requests",
-      "x-capability": "signin/1",
-      "tags": [
-        {
-          "name": "web"
-        }
-      ],
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/Empty"
-          }
-        }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "type": "array",
-          "items": {
-            "$ref": "daemon.schema.json#/definitions/SignInRequest"
-          }
-        }
-      },
-      "description": "The GitHub sign-ins waiting for the caller's Approve (#995, FR-010)."
-    },
-    {
-      "name": "signIn/approve",
-      "x-capability": "signin/1",
-      "tags": [
-        {
-          "name": "web"
-        }
-      ],
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/SignInDecide"
-          }
-        }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "$ref": "daemon.schema.json#/definitions/Empty"
-        }
-      },
-      "description": "Approve a waiting GitHub sign-in: the new client pairs as the caller's person (#995)."
-    },
-    {
-      "name": "signIn/deny",
-      "x-capability": "signin/1",
-      "tags": [
-        {
-          "name": "web"
-        }
-      ],
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/SignInDecide"
-          }
-        }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "$ref": "daemon.schema.json#/definitions/Empty"
-        }
-      },
-      "description": "Deny a waiting GitHub sign-in (#995)."
-    },
-    {
-      "name": "control/signInRequested",
-      "x-capability": "signin/1",
-      "tags": [
-        {
-          "name": "web"
-        }
-      ],
-      "x-notification": true,
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/SignInRequest"
-          }
-        }
-      ],
-      "description": "A GitHub sign-in waits for this person's Approve (#995)."
-    },
-    {
-      "name": "control/signInDecided",
-      "x-capability": "signin/1",
-      "tags": [
-        {
-          "name": "web"
-        }
-      ],
-      "x-notification": true,
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/SignInDecided"
-          }
-        }
-      ],
-      "description": "A waiting GitHub sign-in was approved, denied or ran out (#995)."
-    },
-    {
-      "name": "control/signInWaiting",
-      "x-capability": "signin/1",
-      "x-notification": true,
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/SignInWaiting"
-          }
-        }
-      ],
-      "description": "On an `s:` connection: the sign-in waits for Approve, with the code to compare (#995)."
     }
   ]
 }

@@ -32,7 +32,9 @@ today's encoder, and checks the output against the schema. It also checks that
 
 ## Changing a type
 
-1. Change the definition in `daemon.schema.json` (or a method in an `*.openrpc.json`).
+1. Change the definition in `daemon.schema.json` (or a method in an `*.openrpc.json`). A new
+   definition or method goes where its name sorts, not at the end: `gen` refuses one out of
+   name order, so two features that each add one touch different lines (#2020).
 2. Run `scripts/wire.sh gen` and commit what it writes.
 3. Change the Swift by hand until `WireSchemaTests` passes.
 
