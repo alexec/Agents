@@ -156,5 +156,6 @@ func (d *Daemon) restoreStored(id string) (wire.BackupRestoreResult, error) {
 	if got != listed.Bytes {
 		return wire.BackupRestoreResult{}, fmt.Errorf("the backup came down as %d bytes, not %d", got, listed.Bytes)
 	}
-	return d.restoreArchive(archive, listed.RootID)
+	// This machine's own as the control plane says, from the host's proof.
+	return d.restoreArchive(archive, listed.RootID, listed.ThisMachine)
 }
