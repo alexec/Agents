@@ -398,6 +398,17 @@ struct ConsistencyTests {
             """)
     }
 
+    /// "Agents may archive the chats I start" says, on every client, that a server's host
+    /// does not read it (#1872), in the docs' words, so a server project's chat that archives
+    /// itself with the switch off is not a surprise.
+    @Test func theArchiveSwitchSaysServersDoNotReadIt() async throws {
+        let sentence = "A server's host does not read this switch, so a chat in a server project may still archive itself."
+        for path in ["Shared/UI/SidebarSettingsSection.swift", "Web/src/model/fileToSeeWords.ts"] {
+            let text = try String(contentsOf: Self.root.appending(path: path), encoding: .utf8)
+            #expect(text.contains(sentence), "\(path) does not say that a server's host ignores the switch")
+        }
+    }
+
     @Test func neitherAppHasAPageOfItsOwn() async throws {
         var violations: [String] = []
         var scanned = 0

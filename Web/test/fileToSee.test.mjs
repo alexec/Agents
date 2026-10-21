@@ -32,3 +32,7 @@ test("a shown file leaves the session under Done, unread", () => {
 test("agents may archive the person's chats unless the person said not", () => {
   assert.equal(w.mayArchiveMyChats.value, true);
 });
+
+test("the switch's footer says a server's host does not read it (#1872)", () => {
+  assert.match(w.mayArchiveMyChatsFooter, /A server's host does not read this switch, so a chat in a server project may still archive itself\.$/);
+});
