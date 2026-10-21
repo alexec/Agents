@@ -166,6 +166,13 @@ public enum WorkspaceProviderWords {
     public static func removeTitle(_ name: String) -> String { "Remove \(name)?" }
     public static let removeNote = "Its hosts stay, unlinked: nothing here can start or stop them any more. Its workspaces are left as they are."
     public static let noHosts = "No host to link: add one in the Mac app, or start one from a repository."
+    public static let notAHostYet = "Not a host yet: add it as a host in the Mac app, in Settings ▸ Control plane ▸ Providers."
+
+    /// What a workspace with no host says when no host is free to link to it (#1931): this
+    /// device can't install Agents on it, so the person is told where to (the Mac's Add as Host…).
+    public static func noHostLine(_ workspace: DaemonAPI.WorkspaceInfo, hosts: [DaemonAPI.ControlHost]) -> String? {
+        workspace.host == nil && linkableHosts(workspace, hosts: hosts).isEmpty ? notAHostYet : nil
+    }
 
     /// The chip on a card: "command provider · digitalocean-api · API".
     public static func kindChip(_ provider: DaemonAPI.ProviderSummary) -> String {

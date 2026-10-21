@@ -5,7 +5,7 @@ import { useEffect, useState } from "preact/hooks";
 import type { ControlHost, ProviderSummary, WorkspaceInfo } from "../protocol/generated";
 import type { Store } from "../model/store";
 import {
-  defaultIdleMinutes, idleChoices, kindChip, kindFields, kindNeeds, kindOfPreset, kindTitle, linkableHosts, mayBe,
+  defaultIdleMinutes, idleChoices, kindChip, kindFields, kindNeeds, kindOfPreset, kindTitle, linkableHosts, mayBe, noHostLine,
   providerKinds, providerLine, providerRequest, providerWords as words, workspaceLine, type ProviderKind,
 } from "../model/workspaceProviders";
 import { Modal } from "./Modal";
@@ -95,12 +95,14 @@ function WorkspaceRow({ store, provider, workspace, hosts, say, link }: {
     say(await store.providers.unlink(host.id));
   };
   const free = linkableHosts(workspace, hosts);
+  const noHost = noHostLine(workspace, hosts);
   return (
     <li class="connection workspace-row">
       <span class={`dot ${workspace.state === "running" ? "online" : workspace.state === "unknown" ? "attention" : "offline"}`} aria-hidden="true" />
       <div class="grow">
         <p>{workspace.name}</p>
         <p class="small quiet">{linked?.phase ?? workspaceLine(workspace, hosts)}</p>
+        {noHost && <p class="small quiet">{noHost}</p>}
       </div>
       {host && linked?.canStart && (
         <button type="button" disabled={starting} onClick={() => void store.startHost(host.id)}>{starting ? "Starting…" : "Start"}</button>

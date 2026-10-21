@@ -128,6 +128,12 @@ private struct WorkspaceProviderRow: View {
                     Text(linked?.phase ?? WorkspaceProviderWords.workspaceLine(workspace, hosts: model.controlHosts))
                         .appText(.supporting)
                         .foregroundStyle(.secondary)
+                    if let noHost = WorkspaceProviderWords.noHostLine(workspace, hosts: model.controlHosts) {
+                        Text(noHost)
+                            .appText(.supporting)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                 }
             }
             HStack(spacing: 8) {

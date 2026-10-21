@@ -96,6 +96,7 @@ export const providerWords = {
   removeTitle: (name: string) => `Remove ${name}?`,
   removeNote: "Its hosts stay, unlinked: nothing here can start or stop them any more. Its workspaces are left as they are.",
   noHosts: "No host to link: add one in the Mac app, or start one from a repository.",
+  notAHostYet: "Not a host yet: add it as a host in the Mac app, in Settings ▸ Control plane ▸ Providers.",
 };
 
 export function kindTitle(kind: ProviderKind): string { return kinds[kind].title; }
@@ -193,6 +194,14 @@ export function workspaceLine(workspace: WorkspaceInfo, hosts: readonly ControlH
   parts.push(workspace.host ? `linked to ${hosts.find((h) => h.id === workspace.host)?.name ?? "a host"}` : "not a host");
   if (workspace.cost) parts.push(workspace.cost);
   return parts.join(" · ");
+}
+
+/**
+ * What a workspace with no host says when no host is free to link to it (#1931): this page can
+ * not install Agents on it, so the person is told where to (the Mac's Add as Host…).
+ */
+export function noHostLine(workspace: WorkspaceInfo, hosts: readonly ControlHost[]): string | undefined {
+  return !workspace.host && linkableHosts(workspace, hosts).length === 0 ? providerWords.notAHostYet : undefined;
 }
 
 /** Whether a host named `hostName` may be this workspace (WorkspaceInfo.mayBe, #976). */

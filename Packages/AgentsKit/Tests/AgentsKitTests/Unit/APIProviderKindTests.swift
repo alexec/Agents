@@ -53,4 +53,17 @@ struct APIProviderKindTests {
         #expect(r?.commands == nil)
         #expect(r?.secrets == [:])
     }
+
+    @Test func aWorkspaceNoHostCanBeLinkedToSaysWhereToMakeItOne() {
+        func host(_ id: String, relay: Bool? = nil) -> DaemonAPI.ControlHost {
+            DaemonAPI.ControlHost(id: HostID(rawValue: id), name: id, platform: "linux", version: "1",
+                                  state: "online", reach: "local", machineID: id, relay: relay)
+        }
+        let workspace = DaemonAPI.WorkspaceInfo(id: "w", name: "dev", state: "stopped")
+        #expect(WorkspaceProviderWords.noHostLine(workspace, hosts: [host("relay", relay: true)]) == WorkspaceProviderWords.notAHostYet)
+        #expect(WorkspaceProviderWords.noHostLine(workspace, hosts: [host("free")]) == nil)
+        var linked = workspace
+        linked.host = HostID(rawValue: "free")
+        #expect(WorkspaceProviderWords.noHostLine(linked, hosts: []) == nil)
+    }
 }
