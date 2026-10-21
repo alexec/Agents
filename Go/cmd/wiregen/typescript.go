@@ -159,6 +159,17 @@ func tsDefinition(name string, s *Schema) string {
 				}
 				fmt.Fprintf(&b, "  | %s%s\n", member, end)
 			}
+		} else if len(s.Enum) > 1 {
+			// A value per line, so that two features that each add one do not touch the
+			// same line (#2020).
+			fmt.Fprintf(&b, "export type %s =\n", name)
+			for i, v := range s.Enum {
+				end := ""
+				if i == len(s.Enum)-1 {
+					end = ";"
+				}
+				fmt.Fprintf(&b, "  | %s%s\n", tsLiteral(v), end)
+			}
 		} else {
 			fmt.Fprintf(&b, "export type %s = %s;\n", name, tsType(s))
 		}

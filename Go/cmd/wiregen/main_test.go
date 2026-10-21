@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 )
@@ -71,3 +72,21 @@ func TestCapabilityWord(t *testing.T) {
 	}
 }
 
+
+// Nothing in a generated Go file is aligned by gofmt: an aligned block changes every line
+// when a longer name joins it, so two features that each add one conflict (#2020).
+func TestGeneratedGoIsNotAligned(t *testing.T) {
+	files, err := generate(filepath.Join("..", "..", ".."))
+	if err != nil {
+		t.Fatal(err)
+	}
+	aligned := regexp.MustCompile(`^\s*[^/\s].*\S {2,}\S`)
+	for _, path := range []string{GoTypes, GoMethods, GoCapabilities} {
+		for i, line := range strings.Split(files[path], "\n") {
+			if aligned.MatchString(line) {
+				t.Errorf("%s:%d is aligned: %s", path, i+1, line)
+				break
+			}
+		}
+	}
+}

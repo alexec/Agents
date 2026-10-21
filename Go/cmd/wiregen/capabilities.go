@@ -73,43 +73,41 @@ func rpcFile(rpc *RPC) string {
 }
 
 // goCapabilities is Go/wire/capabilities_gen.go: a constant per capability, and a table per
-// document of each method's capability.
+// document of each method's capability. Nothing in it is a block that gofmt aligns: one
+// declaration per constant, and tables of plain pairs, so a new entry is one new line and
+// two features that each add one do not touch the same lines (#2020).
 func goCapabilities(rpcs []*RPC) (string, error) {
 	var b strings.Builder
-	b.WriteString(header + "\npackage wire\n\n// The capabilities that Packages/Wire names (#1748): x-capability on each method.\nconst (\n")
+	b.WriteString(header + "\npackage wire\n\n// The capabilities that Packages/Wire names (#1748): x-capability on each method.\n")
 	for _, c := range capabilities(rpcs) {
 		w := []rune(capabilityWord(c))
 		w[0] = unicode.ToUpper(w[0])
-		fmt.Fprintf(&b, "\tCap%s = %q\n", string(w), c)
+		fmt.Fprintf(&b, "const Cap%s = %q\n", string(w), c)
 	}
-	b.WriteString(")\n")
 	for _, rpc := range rpcs {
-		fmt.Fprintf(&b, "\n// %sCapabilities is the capability of each method and notification in %s.openrpc.json.\nvar %sCapabilities = map[string]string{\n",
+		fmt.Fprintf(&b, "\n// %sCapabilities is the capability of each method and notification in %s.openrpc.json.\nvar %sCapabilities = pairs([][2]string{\n",
 			rpcName(rpc), rpcFile(rpc), rpcName(rpc))
 		for _, m := range rpc.Methods {
-			fmt.Fprintf(&b, "\t%q: %q,\n", m.Name, m.Capability)
+			fmt.Fprintf(&b, "\t{%q, %q},\n", m.Name, m.Capability)
 		}
-		b.WriteString("}\n")
-		fmt.Fprintf(&b, "\n// %sNotifications is each notification in %s.openrpc.json: what its server sends, not serves.\nvar %sNotifications = map[string]bool{\n",
+		b.WriteString("})\n")
+		fmt.Fprintf(&b, "\n// %sNotifications is each notification in %s.openrpc.json: what its server sends, not serves.\nvar %sNotifications = set([]string{\n",
 			rpcName(rpc), rpcFile(rpc), rpcName(rpc))
 		for _, m := range rpc.Methods {
 			if m.Notification {
-				fmt.Fprintf(&b, "\t%q: true,\n", m.Name)
+				fmt.Fprintf(&b, "\t%q,\n", m.Name)
 			}
 		}
-		b.WriteString("}\n")
+		b.WriteString("})\n")
 	}
 	by, names := declared(rpcs)
 	b.WriteString("\n// DeclaredCapabilities is x-declared-capabilities: what a host, a client or the control plane\n// declares by hand, by who.\nvar DeclaredCapabilities = map[string][]string{\n")
 	for _, who := range by {
-		fmt.Fprintf(&b, "\t%q: {", who)
-		for i, n := range names[who] {
-			if i > 0 {
-				b.WriteString(", ")
-			}
-			fmt.Fprintf(&b, "%q", n)
+		fmt.Fprintf(&b, "\t%q: {\n", who)
+		for _, n := range names[who] {
+			fmt.Fprintf(&b, "\t\t%q,\n", n)
 		}
-		b.WriteString("},\n")
+		b.WriteString("\t},\n")
 	}
 	b.WriteString("}\n")
 	return gofmt(b.String())
@@ -140,14 +138,11 @@ export const Capability = {
 	by, names := declared(rpcs)
 	b.WriteString("\n/** x-declared-capabilities: what a host, a client or the control plane declares by hand, by who. */\nexport const DeclaredCapabilities: Readonly<Record<string, readonly Capability[]>> = {\n")
 	for _, who := range by {
-		fmt.Fprintf(&b, "  %s: [", who)
-		for i, n := range names[who] {
-			if i > 0 {
-				b.WriteString(", ")
-			}
-			fmt.Fprintf(&b, "%q", n)
+		fmt.Fprintf(&b, "  %s: [\n", who)
+		for _, n := range names[who] {
+			fmt.Fprintf(&b, "    %q,\n", n)
 		}
-		b.WriteString("],\n")
+		b.WriteString("  ],\n")
 	}
 	b.WriteString("};\n")
 	return b.String()
@@ -178,14 +173,11 @@ public enum Capability {
 	by, names := declared(rpcs)
 	b.WriteString("\n    /// x-declared-capabilities: what a host, a client or the control plane declares by hand, by who.\n    public static let declared: [String: [String]] = [\n")
 	for _, who := range by {
-		fmt.Fprintf(&b, "        %q: [", who)
-		for i, n := range names[who] {
-			if i > 0 {
-				b.WriteString(", ")
-			}
-			fmt.Fprintf(&b, "%q", n)
+		fmt.Fprintf(&b, "        %q: [\n", who)
+		for _, n := range names[who] {
+			fmt.Fprintf(&b, "            %q,\n", n)
 		}
-		b.WriteString("],\n")
+		b.WriteString("        ],\n")
 	}
 	b.WriteString("    ]\n}\n")
 	return b.String()

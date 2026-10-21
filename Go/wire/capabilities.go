@@ -51,3 +51,22 @@ func Missing(list, required []string) []string {
 	}
 	return out
 }
+
+// pairs is a table of capabilities, written as plain pairs so that gofmt does not align it
+// and a new method is one new line (#2020).
+func pairs(rows [][2]string) map[string]string {
+	out := make(map[string]string, len(rows))
+	for _, r := range rows {
+		out[r[0]] = r[1]
+	}
+	return out
+}
+
+// set is a list of names as a set.
+func set(names []string) map[string]bool {
+	out := make(map[string]bool, len(names))
+	for _, n := range names {
+		out[n] = true
+	}
+	return out
+}

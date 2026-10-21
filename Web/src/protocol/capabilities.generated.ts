@@ -550,6 +550,13 @@ export const ControlCapabilities: Readonly<Record<string, Capability>> = {
 
 /** x-declared-capabilities: what a host, a client or the control plane declares by hand, by who. */
 export const DeclaredCapabilities: Readonly<Record<string, readonly Capability[]>> = {
-  client: ["client.wire/1", "client.team/1"],
-  host: ["host.wire/1", "agents.move-worktree/1", "host.team/1"],
+  client: [
+    "client.wire/1",
+    "client.team/1",
+  ],
+  host: [
+    "host.wire/1",
+    "agents.move-worktree/1",
+    "host.team/1",
+  ],
 };
