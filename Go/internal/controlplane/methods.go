@@ -65,7 +65,7 @@ var own = map[string]bool{
 	"clients/forgetSelf": true, "clients/setPushToken": true, "clients/setActivityToken": true,
 	"devices/list": true, "devices/startPairing": true, "devices/stopPairing": true,
 	"devices/forget": true, "hosts/lastHeard": true,
-	"audit/list": true, "audit/export": true, "control/setAuditDays": true,
+	"audit/list": true, "audit/export": true, "control/setAuditDays": true, "control/rotate": true,
 	"people/list": true, "people/invite": true, "people/setRole": true, "people/remove": true,
 	"hosts/joinRequests": true, "hosts/approveJoin": true, "hosts/denyJoin": true,
 }
@@ -90,7 +90,7 @@ var writes = map[string]bool{
 	"control/setProjectDetection": true, "clients/startPairing": true, "clients/forget": true,
 	"devices/startPairing": true, "devices/forget": true, "clients/setPushToken": true,
 	"clients/setActivityToken": true,
-	"control/setAuditDays": true, "people/invite": true, "people/setRole": true, "people/remove": true,
+	"control/setAuditDays": true, "control/rotate": true, "people/invite": true, "people/setRole": true, "people/remove": true,
 	"hosts/approveJoin": true, "hosts/denyJoin": true,
 }
 
@@ -250,6 +250,8 @@ func (m *Methods) Handle(method string, params json.RawMessage, from Caller) (an
 		return map[string]any{}, m.s.installer.CheckAgain(ctx, string(request.Host))
 	case "audit/list", "audit/export", "control/setAuditDays":
 		return m.auditMethod(ctx, method, params, from)
+	case "control/rotate":
+		return wire.Empty{}, m.s.rotate(ctx, from)
 	case "control/setProjectDetection":
 		request, err := require[wire.ProjectDetection](params, "ProjectDetection")
 		if err != nil {
@@ -504,6 +506,13 @@ func (m *Methods) admitOnce(ctx context.Context, client records.ClientRecord) (b
 	if m.records.Client(client.ID) != nil {
 		renamed := false
 		err := m.records.ChangeClient(ctx, client.ID, func(known *records.ClientRecord) bool {
+			// Paired again after its key expired (#997): the new pairing's key and life.
+			if client.Expires != nil && keyExpired(known.Expires, time.Now()) {
+				known.PublicKey, known.Paired, known.Expires, known.Owner = client.PublicKey, client.Paired, client.Expires, client.Owner
+				known.Name = client.Name
+				renamed = true
+				return true
+			}
 			stale := known.LastSeen == nil || time.Since(known.LastSeen.Time) > time.Hour
 			renamed = known.Name != client.Name
 			if !stale && !renamed {

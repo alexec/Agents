@@ -98,10 +98,14 @@ func DialClient(ctx context.Context, m *ClientMembership) (*Session, error) {
 	if capabilities == nil {
 		capabilities = wire.DeclaredCapabilities["client"]
 	}
-	l, _, err := Join(ctx, m.URL, m.Pin, Credentials{Identity: "c:" + m.Client, Key: key, Kind: "mac", ControlKey: m.ControlKey, Epoch: &epoch,
+	l, ok, err := Join(ctx, m.URL, m.Pin, Credentials{Identity: "c:" + m.Client, Key: key, Kind: "mac", ControlKey: m.ControlKey, Epoch: &epoch,
 		Capabilities: capabilities})
 	if err != nil {
 		return nil, err
+	}
+	// The control plane rotated its key (#997): trusted from now on.
+	if fresh, _ := NewKey(ok, key); fresh != nil {
+		m.ControlKey = fresh
 	}
 	s := &Session{l: l, waiting: map[int64]chan json.RawMessage{}, Notes: make(chan Note, 4096), done: make(chan struct{})}
 	safe.Go("client read", func() { s.read(ctx) })

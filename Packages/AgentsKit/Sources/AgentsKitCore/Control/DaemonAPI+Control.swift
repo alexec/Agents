@@ -28,6 +28,9 @@ public extension DaemonAPI.Method {
     /// `ProjectDetection` (#429, #656): whether the window suggests projects on a host, and
     /// where it looks for them. Nothing is added unless the person picks it.
     static let controlSetProjectDetection = "control/setProjectDetection"
+    /// `Empty` → `Empty`, an admin's only (#997): a new control key; members take it as
+    /// they connect again, with no new pairing.
+    static let controlRotate = "control/rotate"
     /// A host, on its channel 0 (T091): a tunnel to the host that lends it a sign-in.
     static let tunnelOpen = "tunnel/open"
     /// On the Mac's host (T091): start relaying a runtime's sign-in, and say what a server

@@ -97,6 +97,8 @@ public extension ControlAuth {
             switch message {
             case .ok(let ok):
                 try check(ok, expect: expect)
+                // Rotated (#997): a new key only with the previous key's holder's proof.
+                _ = try newKey(ok, shared: credentials.key)
                 return (reader, hello, ok)
             case .refused(let reason):
                 throw Refusal(reason)

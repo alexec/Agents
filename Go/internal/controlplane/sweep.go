@@ -216,6 +216,8 @@ func (s *Service) sweepEveryHour() {
 		var err error
 		if s.phase.now() == phaseServing {
 			report, err = sweep(context.Background(), s.records, time.Now(), mostPerSweep)
+			s.renewConnected(context.Background())
+			s.dropPreviousKey(context.Background())
 		}
 		switch {
 		case err != nil:

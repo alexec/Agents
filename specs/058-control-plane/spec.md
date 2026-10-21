@@ -391,8 +391,10 @@ Mac, and see its projects under their own heading.
 
 **Clients and grants**
 
-- **FR-013**: Every client MUST pair with a code and be given one grant: `operator` (everything
-  the Mac window may do today) or `device` (what a paired phone may do today).
+- **FR-013**: Every client MUST pair with a code. Its key, and a host's, expires and renews
+  while in use, and the control key rotates without a new pairing: see spec 736 FR-042 and
+  FR-043 (#997). The two grants this said (`operator` and `device`) were retired in #111;
+  what a client may do now comes from its person's role (spec 736).
 - **FR-014**: The control plane MUST refuse any call a client's grant does not allow before it
   reaches a host. Each host MUST refuse it again, on the grant the control plane passes on.
 - **FR-015**: From an operator client, the person MUST be able to see every client, change its

@@ -47,11 +47,21 @@ interface Hello {
   name: string;
   control: string;
   nonce: string;
+  /** The control plane's key before it rotated (#997), for 30 days after. */
+  previous?: string;
 }
 
 export interface Admitted {
   /** The control plane's name, from its hello. */
   name: string;
+  /** The control plane's new key, base64url, given to a browser that proved itself with the previous one (#997). */
+  newKey?: string;
+}
+
+/** An ok's new key (#997): the HMAC of it under the shared key from the previous one. */
+interface NewKeyOffer {
+  key?: string;
+  proof?: string;
 }
 
 function parse(line: string): Record<string, unknown> {
@@ -63,16 +73,18 @@ function parse(line: string): Record<string, unknown> {
 async function readHello(socket: LineSocket): Promise<Hello> {
   const hello = parse(await socket.next(15_000))["hello"] as Partial<Hello> | undefined;
   if (!hello || typeof hello.control !== "string" || typeof hello.nonce !== "string") throw new Refused("bad-message");
-  return { name: String(hello.name ?? ""), control: hello.control, nonce: hello.nonce };
+  const read: Hello = { name: String(hello.name ?? ""), control: hello.control, nonce: hello.nonce };
+  if (typeof hello.previous === "string") read.previous = hello.previous;
+  return read;
 }
 
 function transcript(serverNonce: Uint8Array, peerNonce: Uint8Array, identity: string, origin: string): Uint8Array {
   return concat(utf8("agents-auth-v1"), serverNonce, peerNonce, utf8(identity), utf8(origin));
 }
 
-/** Proves `key` as `identity`, and checks the control plane proves it back. */
+/** Proves `key` as `identity`, and checks the control plane proves it back; the ok's new key, if it gave one. */
 async function prove(socket: LineSocket, hello: Hello, identity: string, key: CryptoKey, origin: string,
-                     peerNonce: Uint8Array, kind: string): Promise<void> {
+                     peerNonce: Uint8Array, kind: string): Promise<NewKeyOffer | undefined> {
   const serverNonce = fromBase64url(hello.nonce);
   if (!serverNonce) throw new Refused("bad-message");
   const said = transcript(serverNonce, peerNonce, identity, origin);
@@ -83,11 +95,27 @@ async function prove(socket: LineSocket, hello: Hello, identity: string, key: Cr
   const answer = parse(await socket.next(15_000));
   const refused = answer["refused"] as { reason?: RefusalReason } | undefined;
   if (refused) throw new Refused(refused.reason ?? "unknown");
-  const ok = answer["ok"] as { mac?: string } | undefined;
+  const ok = answer["ok"] as { mac?: string; newKey?: NewKeyOffer } | undefined;
   const theirs = ok?.mac ? fromBase64url(ok.mac) : null;
   if (!ok || !theirs) throw new Refused("bad-message");
   const proved = await crypto.subtle.verify("HMAC", key, theirs as BufferSource, concat(utf8("s"), said) as BufferSource);
   if (!proved) throw new BadServerProof();
+  return ok.newKey;
+}
+
+/** The proof of a rotated key (#997): HMAC("k" ‖ "agents-newkey-v1" ‖ the new key) under the shared key. */
+export function newKeyMessage(key: Uint8Array): Uint8Array {
+  return concat(utf8("k"), utf8("agents-newkey-v1"), key);
+}
+
+/** The new key from an ok, once its proof is the previous key's holder's; a wrong one is not this control plane. */
+async function checkedNewKey(offer: NewKeyOffer, shared: CryptoKey): Promise<string> {
+  const key = offer.key ? fromBase64url(offer.key) : null;
+  const proof = offer.proof ? fromBase64url(offer.proof) : null;
+  if (!key || key.length !== 65 || !proof) throw new WrongControlPlane();
+  const proved = await crypto.subtle.verify("HMAC", shared, proof as BufferSource, newKeyMessage(key) as BufferSource);
+  if (!proved) throw new WrongControlPlane();
+  return base64url(key);
 }
 
 function nonce(): Uint8Array {
@@ -125,10 +153,12 @@ export async function pair(socket: LineSocket, code: ClientCode, origin: string,
 export async function connect(socket: LineSocket, record: KeyRecord, origin: string,
                               peerNonce: Uint8Array = nonce(), kind = "browser"): Promise<Admitted> {
   const hello = await readHello(socket);
-  if (hello.control !== record.control) throw new WrongControlPlane();
+  // The key it trusts, or the one before a rotation (#997), which it then proves itself with.
+  if (hello.control !== record.control && hello.previous !== record.control) throw new WrongControlPlane();
   const control = fromBase64url(record.control);
   if (!control) throw new WrongControlPlane();
   const key = await clientKey(record.privateKey, control, record.client);
-  await prove(socket, hello, "c:" + record.client, key, origin, peerNonce, kind);
-  return { name: hello.name };
+  const offer = await prove(socket, hello, "c:" + record.client, key, origin, peerNonce, kind);
+  if (!offer) return { name: hello.name };
+  return { name: hello.name, newKey: await checkedNewKey(offer, key) };
 }

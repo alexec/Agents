@@ -375,6 +375,7 @@ var (
 	CallClientsStartPairing         = Method[ClientPairingRequest, ControlCodeShown]{"clients/startPairing"}
 	CallClientsStopPairing          = Method[Empty, Empty]{"clients/stopPairing"}
 	CallControlPing                 = Method[Empty, Empty]{"control/ping"}
+	CallControlRotate               = Method[Empty, Empty]{"control/rotate"}
 	CallControlSetAuditDays         = Method[AuditDays, AuditDays]{"control/setAuditDays"}
 	CallControlSetProjectDetection  = Method[ProjectDetection, ProjectDetection]{"control/setProjectDetection"}
 	CallControlStatus               = Method[Empty, ControlStatus]{"control/status"}

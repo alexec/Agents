@@ -2,7 +2,8 @@ import Foundation
 
 /// Whether a device forgets its pairing over a refusal, or dials again (#81).
 ///
-/// `forgotten` is a person's decision in a window, and is final. `unknown` is final only
+/// `forgotten` is a person's decision in a window, and is final. So is `expired`: the
+/// device's key went unused for its whole lifetime (#997). `unknown` is final only
 /// when it lasts: a control plane starting up, or one copy that has not yet read a pairing
 /// made at another, said it for a moment, and a phone that forgot then had to be paired
 /// again by QR. Everything else, `unavailable` included, is a dial that failed.
@@ -19,7 +20,7 @@ public struct RefusalPatience: Sendable {
     /// True when the device should forget its pairing and ask for a new code.
     public mutating func forgets(after reason: ControlAuth.Reason, at now: Date = Date()) -> Bool {
         switch reason {
-        case .forgotten:
+        case .forgotten, .expired:
             return true
         case .unknown:
             guard let first = firstUnknown else {

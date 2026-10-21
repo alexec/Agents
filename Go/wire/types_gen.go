@@ -1512,6 +1512,8 @@ type ControlHello struct {
 	Control string `json:"control"`
 	Nonce   string `json:"nonce"`
 	Copy    string `json:"copy"`
+	// The control plane's key before control/rotate (#997, spec 736 FR-043), for 30 days after: a member that still trusts it proves itself with it, and is given the new key in ok.
+	Previous *string `json:"previous,omitzero"`
 }
 
 type ControlHost struct {
@@ -1551,6 +1553,12 @@ type ControlMoved struct {
 	Name       string  `json:"name"`
 }
 
+// The control plane's new key (#997, spec 736 FR-043), in ok to a member that proved itself with the previous one. proof is the HMAC of the new key under the member's shared key from the previous one, so only the holder of the previous key could have made it. The member trusts the new key from then on, with no new pairing.
+type ControlNewKey struct {
+	Key   string `json:"key"`
+	Proof string `json:"proof"`
+}
+
 // The control plane's proof back: {"ok":…} (ControlAuth.OK).
 type ControlOK struct {
 	Mac       string            `json:"mac"`
@@ -1559,6 +1567,7 @@ type ControlOK struct {
 	Relayed   *bool             `json:"relayed,omitzero"`
 	Endpoints []ControlEndpoint `json:"endpoints,omitzero"`
 	Epoch     *int64            `json:"epoch,omitzero"`
+	NewKey    *ControlNewKey    `json:"newKey,omitzero"`
 }
 
 // Who a client belongs to (#994): its person, their role, and whether they are the local owner.

@@ -64,6 +64,12 @@ export const noPeople = "No people yet.";
 /** The words for a member, who sees only themselves. */
 export const memberNote = "You see only yourself. An admin invites people and changes roles.";
 
+/** Rotate Control Key… (#997, spec 736 FR-043), as PeopleWords has it on the window and the Remote. */
+export const rotateTitle = "Rotate the control key?";
+export const rotateMessage = "Every client and machine connects again and takes the new key, with no new pairing. One that does not connect in the next 30 days has to pair again.";
+export const rotateFoot = "Rotate the control plane’s key if you think someone copied it.";
+export const rotated = "The control key was rotated. Each client and machine takes the new key when it connects again.";
+
 /** What Remove takes away, a line each, for its confirmation. */
 export function removeLines(person: Pick<PersonRow, "name" | "clients" | "machines">): string[] {
   const lines: string[] = [];

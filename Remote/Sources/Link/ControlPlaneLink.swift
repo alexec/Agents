@@ -127,8 +127,9 @@ extension RemoteControl {
         guard let client = membership.client,
               let key = try? DeviceKey.load(accessGroup: DeviceKey.sharedAccessGroup),
               let shared = try? key.controlClientKey(controlKey: membership.controlKey, client: client),
-              let dial = try? ControlCodeUse.clientDial(membership, sharedKey: shared, kind: kind.rawValue, dial: dial,
-                                                        keep: keepNewer) else {
+              let dial = try? ControlCodeUse.clientDial(membership,
+                                                        sharedKey: { try key.controlClientKey(controlKey: $0, client: client) },
+                                                        kind: kind.rawValue, dial: dial, keep: keepNewer) else {
             return nil
         }
         let relayed: @Sendable () async throws -> any LineTransport = {

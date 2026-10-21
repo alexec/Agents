@@ -22,9 +22,18 @@ type Codes struct {
 	Store   store.Store
 	Private []byte
 	Public  []byte
+	// The control plane's keys now, after any rotation (#997); nil uses Private and Public.
+	Keys func() (private, public []byte)
 	URL     string
 	Pin     string
 	Name    string
+}
+
+func (c *Codes) keys() (private, public []byte) {
+	if c.Keys != nil {
+		return c.Keys()
+	}
+	return c.Private, c.Public
 }
 
 // storedCode is ControlCodes.Stored.
@@ -79,7 +88,8 @@ type inviteKey struct{}
 // issue makes a code that carries url, and says its id: a server behind a bastion dials
 // its end of a reverse tunnel (#435).
 func (c *Codes) issue(ctx context.Context, host, browser bool, lifetime time.Duration, url string) (*wire.ControlCodeShown, string, error) {
-	id, secret := controllink.MakeCodeSecret(c.Private)
+	private, public := c.keys()
+	id, secret := controllink.MakeCodeSecret(private)
 	expires := records.At(time.Now().Add(lifetime))
 	stored := storedCode{Purpose: "client", Owner: codeOwnerOf(ctx), Expires: expires}
 	if in, ok := ctx.Value(inviteKey{}).(invite); ok && !host {
@@ -98,7 +108,7 @@ func (c *Codes) issue(ctx context.Context, host, browser bool, lifetime time.Dur
 	if _, err := c.Store.Put(ctx, codeKey(id), data, store.Absent); err != nil {
 		return nil, "", err
 	}
-	code := &controllink.Code{Host: host, ControlKey: c.Public, Secret: secret, URL: url, Pin: c.Pin, Name: c.Name}
+	code := &controllink.Code{Host: host, ControlKey: public, Secret: secret, URL: url, Pin: c.Pin, Name: c.Name}
 	shown := &wire.ControlCodeShown{Text: code.Text(), Expires: dateOf(expires.Time)}
 	if host {
 		command := InstallCommand(url, c.Pin, shown.Text)

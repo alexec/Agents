@@ -452,6 +452,32 @@
       }
     },
     {
+      "name": "control/rotate",
+      "description": "An admin rotates the control plane's key (#997, spec 736 FR-043). Every member's connection is closed; each connects again with the previous key and is given the new one in ok. The previous key is accepted for 30 days. Refused on a control plane of several copies, or one whose key is handed in (AGENTS_CONTROL_KEY, --key-fd).",
+      "x-capability": "control.rotate/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
       "name": "control/setProjectDetection",
       "x-capability": "control/1",
       "paramStructure": "by-name",

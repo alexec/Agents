@@ -212,7 +212,7 @@ func TestEveryClientMethodChecksTheOwner(t *testing.T) {
 		"devices/startPairing": true, "devices/stopPairing": true, "devices/forget": true, "audit/list": true,
 		"audit/export": true, "control/setAuditDays": true, "people/list": true, "people/invite": true,
 		"people/setRole": true, "people/remove": true, "hosts/joinRequests": true, "hosts/approveJoin": true,
-		"hosts/denyJoin": true,
+		"hosts/denyJoin": true, "control/rotate": true,
 		"providers/list": true, "providers/refresh": true, "providers/add": true, "providers/update": true,
 		"providers/remove": true, "providers/options": true, "providers/runtimes": true, "providers/draftStart": true,
 		"providers/draftAnswer": true, "providers/draftCancel": true, "providers/create": true, "hosts/listKept": true,

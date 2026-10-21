@@ -50,6 +50,24 @@ func (m *Membership) EndpointsToDial() []wire.ControlEndpoint {
 // Adopt is ControlMembership.adopting: the list an ok gave, when it is newer than the one
 // kept and every entry is one a code could carry. It says whether anything changed.
 func (m *Membership) Adopt(ok *OK) bool {
+	rotated := m.adoptKey(ok)
+	return m.adoptEndpoints(ok) || rotated
+}
+
+// adoptKey takes the control plane's new key from an ok (#997), which Join has checked.
+func (m *Membership) adoptKey(ok *OK) bool {
+	if ok == nil || ok.NewKey == nil {
+		return false
+	}
+	key, err := FromB64URL(ok.NewKey.Key)
+	if err != nil || Same(key, m.ControlKey) {
+		return false
+	}
+	m.ControlKey = key
+	return true
+}
+
+func (m *Membership) adoptEndpoints(ok *OK) bool {
 	if ok == nil || ok.Epoch == nil || len(ok.Endpoints) == 0 {
 		return false
 	}

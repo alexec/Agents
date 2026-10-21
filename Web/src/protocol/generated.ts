@@ -1383,6 +1383,11 @@ export interface ControlHello {
   control: string;
   nonce: string;
   copy: string;
+  /**
+   * The control plane's key before control/rotate (#997, spec 736 FR-043), for 30 days after: a
+   * member that still trusts it proves itself with it, and is given the new key in ok.
+   */
+  previous?: string;
 }
 
 export interface ControlHost {
@@ -1428,6 +1433,17 @@ export interface ControlMoved {
   name: string;
 }
 
+/**
+ * The control plane's new key (#997, spec 736 FR-043), in ok to a member that proved itself with
+ * the previous one. proof is the HMAC of the new key under the member's shared key from the
+ * previous one, so only the holder of the previous key could have made it. The member trusts the
+ * new key from then on, with no new pairing.
+ */
+export interface ControlNewKey {
+  key: string;
+  proof: string;
+}
+
 /** The control plane's proof back: {"ok":…} (ControlAuth.OK). */
 export interface ControlOK {
   mac: string;
@@ -1436,6 +1452,7 @@ export interface ControlOK {
   relayed?: boolean;
   endpoints?: ControlEndpoint[];
   epoch?: number;
+  newKey?: ControlNewKey;
 }
 
 /** Who a client belongs to (#994): its person, their role, and whether they are the local owner. */
@@ -5190,6 +5207,7 @@ export interface Methods {
   "connections/sign-in/wait": { params: ConnectionSignInFlowRequest; result: ConnectionSignIn };
   "connectors/setup": { params: ConnectorSetupRequest; result: ConnectorSetup };
   "connectors/setup/skip": { params: ConnectorSkipRequest; result: ConnectorSetup };
+  "control/rotate": { params: Empty; result: Empty };
   "control/setAuditDays": { params: AuditDays; result: AuditDays };
   "control/status": { params: Empty; result: ControlStatus };
   "cost/state": { params: Empty; result: CostState };
@@ -5366,6 +5384,7 @@ export const MethodTarget = {
   "connections/sign-in/wait": "host",
   "connectors/setup": "host",
   "connectors/setup/skip": "host",
+  "control/rotate": "control",
   "control/setAuditDays": "control",
   "control/status": "control",
   "cost/state": "host",
@@ -5638,11 +5657,12 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ControlClientChanged: { required: [], optional: ["client", "removed"] },
   ControlCodeShown: { required: ["text", "expires"], optional: ["command"] },
   ControlEndpoint: { required: ["url"], optional: ["pin"] },
-  ControlHello: { required: ["v", "name", "control", "nonce", "copy"], optional: [] },
+  ControlHello: { required: ["v", "name", "control", "nonce", "copy"], optional: ["previous"] },
   ControlHost: { required: ["id", "name", "platform", "version", "state", "reach"], optional: ["machineID", "relay", "signInFrom", "gitFrom", "gitAsks", "tunnel", "workspace", "implementation", "capabilities", "missing", "owner"] },
   ControlInstallProgress: { required: ["name", "step"], optional: [] },
   ControlMoved: { required: ["url", "controlKey", "name"], optional: ["pin"] },
-  ControlOK: { required: ["mac"], optional: ["grant", "host", "relayed", "endpoints", "epoch"] },
+  ControlNewKey: { required: ["key", "proof"], optional: [] },
+  ControlOK: { required: ["mac"], optional: ["grant", "host", "relayed", "endpoints", "epoch", "newKey"] },
   ControlPerson: { required: ["id", "name", "role"], optional: ["localOwner"] },
   ControlPush: { required: ["sealed"], optional: [] },
   ControlPushItem: { required: ["needID", "alert"], optional: ["headline"] },

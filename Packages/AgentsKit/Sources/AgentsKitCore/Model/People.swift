@@ -456,6 +456,12 @@ public enum PeopleWords {
     public static let joinCommandTitle = "Add a machine without a code"
     public static let joinCommandFoot = "Run it on the machine. It shows a code; approve it here."
 
+    /// Rotate Control Key… (#997, spec 736 FR-043): an admin's, with a confirmation.
+    public static let rotateTitle = "Rotate the control key?"
+    public static let rotateMessage = "Every client and machine connects again and takes the new key, with no new pairing. One that does not connect in the next 30 days has to pair again."
+    public static let rotateFoot = "Rotate the control plane’s key if you think someone copied it."
+    public static let rotated = "The control key was rotated. Each client and machine takes the new key when it connects again."
+
     /// The pane's foot: who sees what.
     public static func foot(admin: Bool) -> String {
         admin

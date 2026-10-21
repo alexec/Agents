@@ -28,6 +28,7 @@ public enum Capability {
     public static let connectionsEmail1 = "connections.email/1"
     public static let connections1 = "connections/1"
     public static let connectorsSetup1 = "connectors.setup/1"
+    public static let controlRotate1 = "control.rotate/1"
     public static let control1 = "control/1"
     public static let cost1 = "cost/1"
     public static let credentials1 = "credentials/1"
@@ -402,6 +403,7 @@ public enum Capability {
         "clients/startPairing": "clients/1",
         "clients/stopPairing": "clients/1",
         "control/ping": "control/1",
+        "control/rotate": "control.rotate/1",
         "control/setAuditDays": "events.audit/1",
         "control/setProjectDetection": "control/1",
         "control/status": "control/1",

@@ -50,6 +50,13 @@ func HMAC(key []byte, parts ...[]byte) []byte {
 	return m.Sum(nil)
 }
 
+// NewKeyProof is how a control plane that rotated its key (#997, spec 736 FR-043) shows a
+// member the new key comes from it: an HMAC of the new public key under the member's
+// shared key from the previous one, which only the previous key's holder can derive.
+func NewKeyProof(shared, newKey []byte) []byte {
+	return HMAC(shared, []byte("k"), []byte("agents-newkey-v1"), newKey)
+}
+
 // NewPrivateKey is a new P-256 private key, 32 bytes.
 func NewPrivateKey() []byte {
 	k, err := ecdh.P256().GenerateKey(rand.Reader)
@@ -63,6 +70,12 @@ func NewPrivateKey() []byte {
 // and below the group order.
 func ValidPrivateKey(b []byte) bool {
 	_, err := ecdh.P256().NewPrivateKey(b)
+	return err == nil
+}
+
+// ValidPublicKey says whether b is a P-256 point, X9.63.
+func ValidPublicKey(b []byte) bool {
+	_, err := ecdh.P256().NewPublicKey(b)
 	return err == nil
 }
 

@@ -28,12 +28,28 @@ public enum ControlAuth {
         public var control: String
         public var nonce: String
         public var copy: String
-        public init(v: Int = ControlAuth.version, name: String, control: String, nonce: String, copy: String) {
+        /// The control plane's key before it rotated (#997), for 30 days after: a member
+        /// that still trusts it proves itself with it, and is given the new key in `ok`.
+        public var previous: String?
+        public init(v: Int = ControlAuth.version, name: String, control: String, nonce: String, copy: String,
+                    previous: String? = nil) {
             self.v = v
             self.name = name
             self.control = control
             self.nonce = nonce
             self.copy = copy
+            self.previous = previous
+        }
+    }
+
+    /// The control plane's new key in `ok` (#997), with the HMAC of it under the member's
+    /// shared key from the previous one: only the previous key's holder could make it.
+    public struct NewKey: Codable, Sendable, Equatable {
+        public var key: String
+        public var proof: String
+        public init(key: String, proof: String) {
+            self.key = key
+            self.proof = proof
         }
     }
 
@@ -73,14 +89,18 @@ public enum ControlAuth {
         /// epoch keeps this list in place of its own. Sent once one has been announced.
         public var endpoints: [ControlEndpoint]?
         public var epoch: Int?
+        /// The control plane's new key, to a member that proved itself with the previous
+        /// one (#997).
+        public var newKey: NewKey?
         public init(mac: String, client: Bool = false, host: HostID? = nil, relayed: Bool? = nil,
-                    endpoints: [ControlEndpoint]? = nil, epoch: Int? = nil) {
+                    endpoints: [ControlEndpoint]? = nil, epoch: Int? = nil, newKey: NewKey? = nil) {
             self.mac = mac
             self.grant = client ? LegacyGrant.everything : nil
             self.host = host
             self.relayed = relayed
             self.endpoints = endpoints
             self.epoch = epoch
+            self.newKey = newKey
         }
     }
 
@@ -268,7 +288,7 @@ public enum ControlAuth {
         guard hello.v == version, let serverNonce = ControlCode.data(base64url: hello.nonce), serverNonce.count == 32 else {
             throw Refusal(.badMessage)
         }
-        if let controlKey, ControlCode.data(base64url: hello.control) != controlKey {
+        if let controlKey, !trusts(hello, controlKey: controlKey) {
             throw Refusal(.wrongControlPlane)
         }
         let peerNonce = nonce()
@@ -279,6 +299,31 @@ public enum ControlAuth {
         if case .client = identity { capabilities = Capability.declared["client"] }
         return (Auth(id: text, nonce: ControlCode.base64url(peerNonce), mac: ControlCode.base64url(mac), kind: kind,
                      for: device?.uuidString, epoch: epoch, capabilities: capabilities), expect)
+    }
+
+    /// Whether a hello is from the control plane a member trusts: its key now, or the one
+    /// before it rotated (#997), which the member then proves itself with.
+    static func trusts(_ hello: Hello, controlKey: Data) -> Bool {
+        ControlCode.data(base64url: hello.control) == controlKey
+            || hello.previous.flatMap { ControlCode.data(base64url: $0) } == controlKey
+    }
+
+    /// The proof of a rotated key (#997): HMAC of the new key under the member's shared key.
+    public static func newKeyProof(shared: Data, newKey: Data) -> Data {
+        ControlAgreement.hmacSHA256(key: shared, message: Data("k".utf8) + Data("agents-newkey-v1".utf8) + newKey)
+    }
+
+    /// The control plane's new key from an `ok` (#997), checked against the member's shared
+    /// key: nil when it gives none, and a refusal when its proof is not the previous key's
+    /// holder's.
+    public static func newKey(_ ok: OK, shared: Data) throws -> Data? {
+        guard let offer = ok.newKey else { return nil }
+        guard let key = ControlCode.data(base64url: offer.key), key.count == 65,
+              let proof = ControlCode.data(base64url: offer.proof),
+              same(proof, newKeyProof(shared: shared, newKey: key)) else {
+            throw Refusal(.wrongControlPlane)
+        }
+        return key
     }
 
     /// Checks the server's `ok` against what `answer` said to expect.

@@ -11,6 +11,7 @@
 //	agents-control serve … [--store-credentials-fd N]
 //	agents-control serve … [--receive]          empty, for a handover to fill (AGENTS_CONTROL_RECEIVE=1)
 //	agents-control serve … [--no-forwarding]    serve, even if this copy was forwarding
+//	agents-control serve … [--key-days N]       how long a client's or machine's key lives unused (#997, AGENTS_CONTROL_KEY_DAYS); 90
 //	agents-control code (--client [--browser] | --host) [--minutes N] [--home DIR] [--command]
 //	agents-control hosts | clients
 //	agents-control key seal --key-fd N          seal a key handed in, with AGENTS_CONTROL_KMS
@@ -261,6 +262,13 @@ func webConfig() *controlplane.WebConfig {
 // clear. A key given by --key-fd or AGENTS_CONTROL_KEY is used as it is, or with a keeper
 // is sealed the first time, as is a key file found. Otherwise a keeper makes a new one.
 func privateKey(st store.Store) []byte {
+	key, _ := keyAndKeeper(st)
+	return key
+}
+
+// keyAndKeeper is privateKey, and where it is kept so control/rotate can keep a new one
+// (#997): nil for a key handed in.
+func keyAndKeeper(st store.Store) ([]byte, controlplane.KeyKeeper) {
 	keeper := os.Getenv("AGENTS_CONTROL_KMS")
 	given, file := givenKey(), keyFile()
 	var source kms.Source
@@ -275,7 +283,7 @@ func privateKey(st store.Store) []byte {
 		}
 		source = kms.Kept{Store: st, Keeper: keeper, Given: given}
 	case given != nil:
-		return given
+		return given, nil
 	case file == "":
 		fail("say where the control plane's key is: AGENTS_CONTROL_KEY_FILE, AGENTS_CONTROL_KEY, --key-fd or AGENTS_CONTROL_KMS")
 	default:
@@ -288,7 +296,7 @@ func privateKey(st store.Store) []byte {
 	if found != "" {
 		say("the control key is sealed in the store: delete " + found + ", which holds it in clear")
 	}
-	return key
+	return key, source.(controlplane.KeyKeeper)
 }
 
 // givenKey is the key handed in by --key-fd or AGENTS_CONTROL_KEY, or nil.
@@ -445,6 +453,17 @@ func serve() {
 	if cfg.Pin == "" {
 		cfg.Pin = os.Getenv("AGENTS_CONTROL_PIN")
 	}
+	// How long a client's or machine's key lives unused (#997): 90 days unless said.
+	if days := value("--key-days"); days != "" || os.Getenv("AGENTS_CONTROL_KEY_DAYS") != "" {
+		if days == "" {
+			days = os.Getenv("AGENTS_CONTROL_KEY_DAYS")
+		}
+		n, err := strconv.ParseFloat(days, 64)
+		if err != nil || n <= 0 {
+			fail("--key-days is a number of days, more than 0")
+		}
+		cfg.KeyLifetime = time.Duration(n * float64(24*time.Hour))
+	}
 	cfg.Name = value("--name")
 	if cfg.Name == "" {
 		cfg.Name = os.Getenv("AGENTS_CONTROL_NAME")
@@ -498,7 +517,7 @@ func serve() {
 		}
 	}
 	cfg.Store = openStore("")
-	cfg.PrivateKey = privateKey(cfg.Store)
+	cfg.PrivateKey, cfg.KeyKeeper = keyAndKeeper(cfg.Store)
 	s, err := controlplane.New(cfg)
 	if err != nil {
 		fail("%v", err)

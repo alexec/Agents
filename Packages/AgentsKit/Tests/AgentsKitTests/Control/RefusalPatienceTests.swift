@@ -14,6 +14,13 @@ struct RefusalPatienceTests {
         #expect(forgets)
     }
 
+    /// A key unused for its whole lifetime pairs again, as a forgotten one does (#997).
+    @Test func expiredIsFinalAtOnce() {
+        var patience = RefusalPatience()
+        let forgets = patience.forgets(after: .expired, at: start)
+        #expect(forgets)
+    }
+
     @Test func oneUnknownIsDialledAgain() {
         var patience = RefusalPatience(patience: 120)
         let verdicts = [0.0, 60, 121].map { patience.forgets(after: .unknown, at: start.addingTimeInterval($0)) }
@@ -31,7 +38,7 @@ struct RefusalPatienceTests {
 
     @Test func unavailableAndTheRestAreOnlyFailedDials() {
         var patience = RefusalPatience(patience: 0)
-        let reasons: [ControlAuth.Reason] = [.unavailable, .expired, .spent, .badProof, .badMessage, .wrongControlPlane]
+        let reasons: [ControlAuth.Reason] = [.unavailable, .spent, .badProof, .badMessage, .wrongControlPlane]
         let verdicts = reasons.map { patience.forgets(after: $0, at: start) }
         #expect(!verdicts.contains(true))
     }

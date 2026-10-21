@@ -299,7 +299,7 @@ func (m *mesh) dial(id, peerURL string) {
 		pin = m.s.cfg.Pin
 	}
 	lines, _, err := controllink.Join(context.Background(), peerURL, pin, controllink.Credentials{
-		Identity: "x:" + m.s.copyID, Key: controllink.CopyKey(m.s.cfg.PrivateKey), Kind: "copy", ControlKey: m.s.public})
+		Identity: "x:" + m.s.copyID, Key: controllink.CopyKey(m.s.privateKey()), Kind: "copy", ControlKey: m.s.publicKey()})
 	if err != nil {
 		m.s.log(fmt.Sprintf("could not reach copy %s at %s: %v", id, peerURL, err))
 		return

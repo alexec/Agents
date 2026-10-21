@@ -399,7 +399,7 @@ func (s *Service) closeMembers() {
 func (s *Service) handoverStatus() wire.HandoverStatus {
 	phase := s.phase.now()
 	object, _ := s.cfg.Store.Get(context.Background(), records.SettingsKey)
-	status := wire.HandoverStatus{Phase: phase, ControlKey: s.public, HasRecords: object != nil,
+	status := wire.HandoverStatus{Phase: phase, ControlKey: s.publicKey(), HasRecords: object != nil,
 		Endpoints: []records.Endpoint{}, Members: []wire.HandoverMember{}}
 	if phase != phaseReceiving {
 		connected := map[string]bool{}

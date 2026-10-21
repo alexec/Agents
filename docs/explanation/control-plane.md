@@ -114,6 +114,32 @@ always `operator`, which an older copy, host, Remote or web page reads as everyt
 record written before as `device` is read as a full client. An older window that tries to
 change a grant is told there is nothing to change.
 
+## Key lifetimes and rotation
+
+A client's or a machine's key expires 90 days after it was paired (#997). The control
+plane renews it while it is in use: on each connection, and every hour for a connection
+that stays open, once the key is in its last 30 days. Every connection already proves the
+key, so renewal needs nothing from the client and shows no screen. A key that nobody used
+for 90 days is refused as expired. The Remote and the web page then ask for a new code, as
+they do for a forgotten one. A key paired before this counts from when it was last used.
+`agents-control serve --key-days N` (or `AGENTS_CONTROL_KEY_DAYS`) sets another lifetime.
+
+An admin can rotate the control plane's own key with **Rotate Control Key…** in
+**Settings ▸ People**, on the Mac, the Remote and the web page. Nobody pairs again:
+
+- The control plane makes a new key, keeps it where it kept the old one (the key file, or
+  sealed in the store), and keeps the old one beside it for 30 days.
+- It closes every connection. Each client and machine connects again with the key it
+  trusts, and its `ok` gives it the new key, with a proof that only the holder of the old
+  key could make. From then on it trusts the new key.
+- A client or machine that was away connects the same way when it is back. One away for
+  more than 30 days pairs again.
+
+A control plane that is given its key (`AGENTS_CONTROL_KEY` or `--key-fd`) has nowhere to
+keep a new one, and one that runs as several copies proves itself to its copies with the
+key. Both refuse to rotate, and say why. Rotating does not change who anyone is: the local
+owner is still the admin.
+
 ## A browser on this Mac
 
 Agents Host's copy of the control plane has a second, smaller listener: plain HTTP on the
