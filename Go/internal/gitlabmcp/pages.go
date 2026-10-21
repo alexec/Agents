@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // What the views read and do on GitLab (#1631), in the github server's shapes
@@ -161,16 +162,15 @@ func (g *RealGitLab) MRPage(ctx context.Context, project string, number int) (ma
 	if err != nil {
 		return nil, err
 	}
-	diff, err := g.diffs(ctx, project, number)
+	diff, err := g.parsedDiffs(ctx, project, number, m.SHA)
 	if err != nil {
 		return nil, err
 	}
 	additions, deletions := 0, 0
 	files := make([]any, len(diff))
 	for i, f := range diff {
-		a, d := f.counts()
-		additions, deletions = additions+a, deletions+d
-		files[i] = map[string]any{"path": f.NewPath, "additions": a, "deletions": d, "change": f.change()}
+		additions, deletions = additions+f.additions, deletions+f.deletions
+		files[i] = map[string]any{"path": f.NewPath, "additions": f.additions, "deletions": f.deletions, "change": f.change()}
 	}
 	var discussions []discussionJSON
 	if err := g.get(ctx, fmt.Sprintf("projects/%s/merge_requests/%d/discussions?per_page=100", pid(project), number), false, &discussions); err != nil {
@@ -319,18 +319,76 @@ func (f fileDiff) change() string {
 	return "modified"
 }
 
-func (f fileDiff) counts() (additions, deletions int) {
-	for _, h := range hunks(f.Diff) {
+// parsedFile is a changed file with its hunks parsed once, and without the diff's text.
+type parsedFile struct {
+	fileDiff
+	hunks                []Hunk
+	lines                int
+	empty                bool
+	additions, deletions int
+}
+
+func parse(f fileDiff) parsedFile {
+	p := parsedFile{hunks: hunks(f.Diff)}
+	for _, h := range p.hunks {
+		p.lines += len(h.Lines)
 		for _, l := range h.Lines {
 			switch l.Kind {
 			case "added":
-				additions++
+				p.additions++
 			case "removed":
-				deletions++
+				p.deletions++
 			}
 		}
 	}
-	return additions, deletions
+	p.fileDiff, p.empty = f, f.Diff == ""
+	p.Diff = ""
+	return p
+}
+
+// keptDiff is a merge request's parsed diff at one head.
+type keptDiff struct {
+	at    time.Time
+	files []parsedFile
+}
+
+const (
+	// diffFor is how long a merge request's parsed diff is kept at one head (P20261020-3): its
+	// page reads it again on Refresh, a retry, a comment and an approval, and Show Diff once more.
+	diffFor = 5 * time.Minute
+	// maxKeptDiffs bounds how many merge requests' diffs are kept.
+	maxKeptDiffs = 10
+)
+
+// parsedDiffs are a merge request's changed files at head, parsed, kept for diffFor.
+func (g *RealGitLab) parsedDiffs(ctx context.Context, project string, number int, head string) ([]parsedFile, error) {
+	key := fmt.Sprintf("%s\x00%d\x00%s", project, number, head)
+	g.mu.Lock()
+	kept, ok := g.kept[key]
+	g.mu.Unlock()
+	if ok && head != "" && time.Since(kept.at) < diffFor {
+		return kept.files, nil
+	}
+	all, err := g.diffs(ctx, project, number)
+	if err != nil {
+		return nil, err
+	}
+	files := make([]parsedFile, len(all))
+	for i, f := range all {
+		files[i] = parse(f)
+	}
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	for k, v := range g.kept {
+		if time.Since(v.at) >= diffFor {
+			delete(g.kept, k)
+		}
+	}
+	if len(g.kept) >= maxKeptDiffs {
+		g.kept = map[string]keptDiff{}
+	}
+	g.kept[key] = keptDiff{time.Now(), files}
+	return files, nil
 }
 
 // diffs are a merge request's changed files, at most 1000.
@@ -355,25 +413,20 @@ func (g *RealGitLab) MRDiff(ctx context.Context, project string, number int) (ma
 	if err := g.get(ctx, fmt.Sprintf("projects/%s/merge_requests/%d", pid(project), number), false, &m); err != nil {
 		return nil, err
 	}
-	all, err := g.diffs(ctx, project, number)
+	all, err := g.parsedDiffs(ctx, project, number, m.SHA)
 	if err != nil {
 		return nil, err
 	}
 	files := make([]any, 0, len(all))
 	left, cut := diffLines, false
 	for _, f := range all {
-		a, d := f.counts()
-		j := map[string]any{"path": f.NewPath, "change": f.change(), "additions": a, "deletions": d}
+		j := map[string]any{"path": f.NewPath, "change": f.change(), "additions": f.additions, "deletions": f.deletions}
 		if f.RenamedFile && f.OldPath != f.NewPath {
 			j["previousPath"] = f.OldPath
 		}
-		h := hunks(f.Diff)
-		n := 0
-		for _, hunk := range h {
-			n += len(hunk.Lines)
-		}
+		h, n := f.hunks, f.lines
 		switch {
-		case f.TooLarge || f.Collapsed || f.Diff == "":
+		case f.TooLarge || f.Collapsed || f.empty:
 			j["hunks"], j["note"] = []Hunk{}, "No lines to show: a binary file, a rename, or too long for GitLab to give."
 		case n > left:
 			j["hunks"], j["note"], cut = []Hunk{}, "Not shown: the diff is too long. Open it on GitLab.", true

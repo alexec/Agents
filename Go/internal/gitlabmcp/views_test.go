@@ -3,6 +3,7 @@ package gitlabmcp
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"strings"
 	"testing"
@@ -245,4 +246,42 @@ func TestAPersonsActionsFromThePage(t *testing.T) {
 		equal(t, f.posted[0]["path"], "pipelines/100/retry", "retry")
 		equal(t, f.posted[1]["path"], "merge_requests/3/approve", "approve")
 	})
+}
+
+// P20261020-3: a merge request's page reads its diff once at a head. Refresh, a comment and
+// Show Diff use the parsed diff again; a new head reads it again.
+func TestAMergeRequestsDiffIsReadOnceAtAHead(t *testing.T) {
+	f := viewsFake(t)
+	for i := 0; i < 300; i++ {
+		f.diffs[3] = append(f.diffs[3], obj{"old_path": fmt.Sprintf("f%d.go", i), "new_path": fmt.Sprintf("f%d.go", i),
+			"diff": "@@ -1,2 +1,2 @@\n-" + strings.Repeat("old ", 200) + "\n+" + strings.Repeat("new ", 200) + "\n"})
+	}
+	c := viewsClient(t, f)
+	diffReads := func() int {
+		n := 0
+		for _, r := range f.asked() {
+			if strings.Contains(r, "/merge_requests/3/diffs") {
+				n++
+			}
+		}
+		return n
+	}
+	callTool(t, c, "show_merge_request", map[string]any{"number": 3})
+	first, sent := diffReads(), f.sent
+	for range 3 { // Refresh, and after a comment and an approval
+		callTool(t, c, "show_merge_request", map[string]any{"number": 3})
+	}
+	_, diff := callTool(t, c, "show_merge_request_diff", map[string]any{"number": 3})
+	if first != 4 || diffReads() != first {
+		t.Fatalf("diff pages read: %d at first, %d after Refresh and Show Diff; want 4 and 4", first, diffReads())
+	}
+	t.Logf("300 files: %d bytes at first, %d after three Refreshes and Show Diff", sent, f.sent-sent)
+	if files := diff["files"].([]any); len(files) != 302 || files[2].(map[string]any)["additions"] != 1.0 {
+		t.Fatalf("diff %d files", len(files))
+	}
+	f.set(func() { f.mrs[0]["sha"] = "s3-new" })
+	callTool(t, c, "show_merge_request", map[string]any{"number": 3})
+	if diffReads() != first+4 {
+		t.Fatalf("a new head read %d diff pages, want 4", diffReads()-first)
+	}
 }
