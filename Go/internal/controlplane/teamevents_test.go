@@ -5,6 +5,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/alexec/agents/Go/internal/controllink"
 	"github.com/alexec/agents/Go/internal/controlplane/store"
@@ -121,5 +122,137 @@ func TestATeamTriggerHeardByEveryMachineRunsOnce(t *testing.T) {
 	}
 	if asked2, _ := f.total(); asked2 != asked {
 		t.Fatalf("asked %d after, %d before", asked2, asked)
+	}
+}
+
+// starter is a fake of the workspace providers: which machines may be started, and the
+// starts asked for.
+type starter struct {
+	mu      sync.Mutex
+	may     map[string]bool
+	started []string
+}
+
+func (s *starter) MayStartFor(_, host string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.may[host]
+}
+func (s *starter) Workspace(string) *wire.HostWorkspace { return nil }
+func (s *starter) StartForUse(host, _ string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.started = append(s.started, host)
+}
+func (s *starter) starts() []string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return append([]string(nil), s.started...)
+}
+
+// T042 (#2011, FR-034): with none of a bot's machines online, a trigger starts one of its
+// stopped workspaces and waits for it; many triggers start it once, at most 20 wait, and
+// what waited runs when it joins. A machine that joins and does not take a trigger, or a
+// start that never joins, starts nothing more for 15 minutes; with no machine that may be
+// started, nothing is.
+func TestABotsMachineIsStartedOnceForItsTriggers(t *testing.T) {
+	p := startPlaneWith(t, store.NewMemory(), controllink.NewPrivateKey(), nil)
+	f := &fires{asked: map[string]int{}, ran: map[string]int{}, takes: func(string) bool { return true }}
+	p.asked = f.answer
+	clock := time.Now()
+	var clockMu sync.Mutex
+	at := func() time.Time { clockMu.Lock(); defer clockMu.Unlock(); return clock }
+	later := func(d time.Duration) { clockMu.Lock(); clock = clock.Add(d); clockMu.Unlock() }
+	fake := &starter{may: map[string]bool{}}
+	p.s.starts.starter, p.s.starts.now = fake, at
+
+	_, admin := p.client("Alex's Mac")
+	sam := p.invite(admin, "Sam", wire.UserRoleMember)
+	var platform wire.Group
+	json.Unmarshal(call(t, admin, "", "groups/set", wire.GroupSet{Name: "Platform", Members: []string{sam.id}}), &platform)
+	var made wire.BotMade
+	json.Unmarshal(call(t, admin, "", "bots/make", wire.BotMake{Name: "review-bot", Group: platform.ID}), &made)
+	b1, b2 := p.botMachine(admin, made.User, "MACHINE-B1"), p.botMachine(admin, made.User, "MACHINE-B2")
+	for _, m := range []*fakeHost{b1, b2} {
+		fake.may[m.member.Host] = true
+		m.stop()
+		host := m.member.Host
+		p.waitFor(func() bool { s, _ := p.s.Router().State(host); return !s.online() }, "the bot's machine offline")
+	}
+	first := min(b1.member.Host, b2.member.Host)
+	samsMac := p.machine(sam, "MACHINE-S")
+	send := func(i int) {
+		t.Helper()
+		trigger, _ := json.Marshal(wire.TeamTrigger{Workflow: "app/nightly", Trigger: "schedule:" + itoa(i), RunsOn: []string{"review-bot"}})
+		out, err := p.s.methods.HostSaid(samsMac.member.Host, "workflows/trigger", trigger)
+		if err != nil || !out.(wire.TeamTriggerSent).Taken {
+			t.Fatalf("%v %v", out, err)
+		}
+	}
+	waitStarts := func(n int) {
+		t.Helper()
+		p.waitFor(func() bool { return len(fake.starts()) >= n }, "a start")
+		time.Sleep(100 * time.Millisecond)
+		if got := fake.starts(); len(got) != n {
+			t.Fatalf("started %v, want %d starts", got, n)
+		}
+	}
+	waiting := func() int {
+		p.s.starts.mu.Lock()
+		defer p.s.starts.mu.Unlock()
+		if b := p.s.starts.byBot[made.User]; b != nil {
+			return len(b.waiting)
+		}
+		return 0
+	}
+
+	// 30 triggers: one start, of the first machine; 20 wait, the rest are dropped.
+	for i := range 30 {
+		send(i)
+	}
+	p.waitFor(func() bool { return waiting() == waitingMost }, "20 waiting")
+	waitStarts(1)
+	if fake.starts()[0] != first {
+		t.Fatalf("started %v", fake.starts())
+	}
+
+	// It joins (a machine of the bot's comes online): the 20 run there, once each.
+	joined := p.botMachine(admin, made.User, "MACHINE-B3")
+	p.waitFor(func() bool { _, ran := f.total(); return ran == waitingMost }, "what waited run")
+	if waiting() != 0 || f.ran[joined.member.Host] != waitingMost {
+		t.Fatalf("waiting %d, ran %v", waiting(), f.ran)
+	}
+
+	// Online and taking: no start.
+	send(100)
+	p.waitFor(func() bool { _, ran := f.total(); return ran == waitingMost+1 }, "run on the machine online")
+	waitStarts(1)
+
+	// Gone again, and within 15 minutes of the start: no second start, nothing kept.
+	joined.stop()
+	p.waitFor(func() bool { s, _ := p.s.Router().State(joined.member.Host); return !s.online() }, "offline")
+	send(101)
+	waitStarts(1)
+
+	// Past it: one start again; a start that never joins is not tried again within 15 minutes.
+	later(startPatience + time.Minute)
+	send(102)
+	waitStarts(2)
+	later(5 * time.Minute)
+	send(103)
+	waitStarts(2)
+	later(startPatience)
+	send(104)
+	waitStarts(3)
+
+	// No machine that may be started: nothing is.
+	fake.mu.Lock()
+	fake.may = map[string]bool{}
+	fake.mu.Unlock()
+	later(startPatience + time.Minute)
+	send(105)
+	waitStarts(3)
+	if _, ran := f.total(); ran != waitingMost+1 {
+		t.Fatalf("ran %d", ran)
 	}
 }

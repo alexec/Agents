@@ -196,3 +196,14 @@ func (p *Providers) tellProviders() {
 // Republish tells each person the providers they are shown again: after a group or a
 // role changed, what each is shown may have.
 func (p *Providers) Republish() { p.tellProviders() }
+
+// MayStartFor says the host's workspace may be started now for a user's work (#2011,
+// FR-034): it would keep a prompt (Keepable), and the user may use its provider.
+func (p *Providers) MayStartFor(person, host string) bool {
+	if p.Keepable(host) == "" {
+		return false
+	}
+	link := LinkOf(p.records.Host(host))
+	r, ok := p.record(link.Provider)
+	return ok && p.MayUse(person, r)
+}

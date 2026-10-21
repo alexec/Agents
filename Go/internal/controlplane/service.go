@@ -173,6 +173,8 @@ type Service struct {
 	toldUsers toldUsers
 	// Which bots are at a spend cap today (#1761).
 	caps botCaps
+	// A bot's machine started for its triggers (#2011, FR-034).
+	starts botStarts
 
 	mu       sync.Mutex
 	servers  []*http.Server
