@@ -18,18 +18,24 @@ import (
 )
 
 // Each account's control plane is a copy in this process, on a port of its own on
-// loopback, started the first time it is asked for and kept running.
+// loopback, started the first time it is asked for and stopped when it has had no
+// request for idleLimit (P20261020-23). A request still open (a host's uplink, a
+// client's WebSocket: the proxy holds it until it ends) keeps it in use.
 
 type copyRunning struct {
 	service *controlplane.Service
 	proxy   *httputil.ReverseProxy
+	// Under Service.mu: the requests open now, and when the last one ended.
+	open int
+	last time.Time
 }
 
 // loopback is where this service reaches its copies from: they believe its
 // X-Forwarded-For, which is one address, decided by clientOf.
 var loopback = []netip.Prefix{netip.MustParsePrefix("127.0.0.1/32"), netip.MustParsePrefix("::1/128")}
 
-// copyFor is an account's running copy, started if it is not running.
+// copyFor is an account's running copy, started if it is not running, and in use until
+// done is called with it.
 func (s *Service) copyFor(ctx context.Context, id string) (*copyRunning, error) {
 	for {
 		s.mu.Lock()
@@ -38,6 +44,7 @@ func (s *Service) copyFor(ctx context.Context, id string) (*copyRunning, error) 
 			return nil, errors.New("the service is stopping")
 		}
 		if c := s.copies[id]; c != nil {
+			c.open++
 			s.mu.Unlock()
 			return c, nil
 		}
@@ -54,6 +61,7 @@ func (s *Service) copyFor(ctx context.Context, id string) (*copyRunning, error) 
 					c.service.Stop()
 					err = errors.New("the service is stopping")
 				} else {
+					c.open = 1
 					s.copies[id] = c
 				}
 			}
@@ -158,6 +166,7 @@ func (s *Service) toAccount(w http.ResponseWriter, r *http.Request, id string) {
 		plain(w, http.StatusServiceUnavailable, "Your control plane could not start. Try again in a moment.\n")
 		return
 	}
+	defer s.done(c)
 	c.proxy.ServeHTTP(w, r)
 }
 
@@ -179,6 +188,7 @@ func (s *Service) firstCode(ctx context.Context, id string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	defer s.done(c)
 	shown, err := c.service.Codes().Issue(ctx, false, true, controllink.CodeLifetime)
 	if err != nil {
 		return "", err
@@ -205,7 +215,48 @@ func escapeCode(code string) string {
 const idleLimit = 15 * time.Minute
 
 // done says a request to c has ended.
-func (s *Service) done(c *copyRunning) {}
+func (s *Service) done(c *copyRunning) {
+	s.mu.Lock()
+	c.open--
+	c.last = s.cfg.Now()
+	s.mu.Unlock()
+}
 
-// sweepIdle stops every copy that has been idle for idleLimit.
-func (s *Service) sweepIdle() {}
+// sweepIdle stops every copy with no request open that has had none for idleLimit. Each
+// stays in starting while it stops, so a request for it waits and then starts it again.
+func (s *Service) sweepIdle() {
+	now := s.cfg.Now()
+	idle := map[string]*copyRunning{}
+	s.mu.Lock()
+	for id, c := range s.copies {
+		if c.open == 0 && now.Sub(c.last) >= idleLimit {
+			idle[id] = c
+			delete(s.copies, id)
+			s.starting[id] = make(chan struct{})
+		}
+	}
+	s.mu.Unlock()
+	for id, c := range idle {
+		c.service.Stop()
+		s.log(id + ": stopped, idle")
+		s.mu.Lock()
+		done := s.starting[id]
+		delete(s.starting, id)
+		s.mu.Unlock()
+		close(done)
+	}
+}
+
+// sweepIdleEvery sweeps idle copies until the service stops.
+func (s *Service) sweepIdleEvery(every time.Duration) {
+	t := time.NewTicker(every)
+	defer t.Stop()
+	for {
+		select {
+		case <-s.stop:
+			return
+		case <-t.C:
+			s.sweepIdle()
+		}
+	}
+}

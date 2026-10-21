@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/base64"
+	"flag"
 	"net/http"
 	"net/http/httptest"
 	"sync"
@@ -140,4 +141,20 @@ func TestACopyInUseKeepsRunning(t *testing.T) {
 	if n := s.running(); n != 0 {
 		t.Fatalf("%d running after the idle limit, want 0", n)
 	}
+}
+
+// The cost of 100 idle accounts: store List calls over 30 s, after the clock has passed
+// the idle limit and the sweep has run. Only with -args -measure: it takes 30 s.
+var measure = flag.Bool("measure", false, "measure the cost of idle accounts")
+
+func TestMeasureIdleAccounts(t *testing.T) {
+	if !*measure {
+		t.Skip("-args -measure measures")
+	}
+	s, st, now, _ := idleService(t, 100)
+	now.add(idleLimit + time.Minute)
+	s.sweepIdle()
+	before := st.lists.Load()
+	time.Sleep(30 * time.Second)
+	t.Logf("MEASURE running=%d lists=%d", s.running(), st.lists.Load()-before)
 }
