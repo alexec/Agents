@@ -37,6 +37,7 @@ type RealGitLab struct {
 	sharing time.Duration
 	members map[string]member
 	pages   map[string]openList
+	kept    map[string]keptDiff
 }
 
 // openList is a page of open merge requests as GitLab last gave it, with its ETag.
@@ -80,7 +81,7 @@ const DefaultBase = "https://gitlab.com/"
 // NewRealGitLab reads the GitLab at base (gitlab.com when empty) with token's answer.
 func NewRealGitLab(base string, token func() string, project func(ctx context.Context) (string, error)) *RealGitLab {
 	return &RealGitLab{Base: BaseURL(base), Token: token, Project: project, Client: &http.Client{Timeout: 30 * time.Second},
-		recent: map[string]sharedBody{}, running: map[string]*fetch{}, sharing: sharedFor, members: map[string]member{}, pages: map[string]openList{}}
+		recent: map[string]sharedBody{}, running: map[string]*fetch{}, sharing: sharedFor, members: map[string]member{}, pages: map[string]openList{}, kept: map[string]keptDiff{}}
 }
 
 // BaseURL is base as GitLab's root with a trailing slash: gitlab.com when empty, https:// when

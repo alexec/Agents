@@ -219,7 +219,7 @@ func (f *fakeGitLab) serve(w http.ResponseWriter, r *http.Request) {
 		answer(200, obj{"iid": 1, "state": "merged", "merge_commit_sha": "merged1"})
 	case len(parts) == 3 && parts[0] == "merge_requests" && parts[2] == "diffs":
 		id, _ := strconv.Atoi(parts[1])
-		answer(200, orEmpty(f.diffs[id]))
+		answer(200, stated(orEmpty(f.diffs[id]), "", ""))
 	case len(parts) == 3 && parts[0] == "merge_requests" && parts[2] == "discussions":
 		id, _ := strconv.Atoi(parts[1])
 		answer(200, orEmpty(f.discuss[id]))
