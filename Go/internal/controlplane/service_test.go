@@ -35,6 +35,8 @@ type plane struct {
 	lines   chan string
 	// told hears what each host is told on its channel 0, when set before it connects.
 	told func(host, method string, params json.RawMessage)
+	// asked answers what the control plane asks a fake host on channel 0 (#2011).
+	asked func(host, method string, params json.RawMessage) (any, bool)
 }
 
 func freePort(t *testing.T) int {
@@ -135,7 +137,7 @@ func fakeHello(machine string) controllink.HostHello {
 func (p *plane) serveHost(root string, member *controllink.Membership, private []byte, hello controllink.HostHello, opened func(controllink.Conn)) *fakeHost {
 	ctx, cancel := context.WithCancel(context.Background())
 	h := &fakeHost{root: root, member: member, cancel: cancel, done: make(chan struct{})}
-	told := p.told
+	told, asked := p.told, p.asked
 	u := &controllink.Uplink{Root: root, Member: member, Private: private, Hello: hello, Told: func(method string, params json.RawMessage) {
 		if told != nil {
 			told(member.Host, method, params)
@@ -165,6 +167,9 @@ func (p *plane) serveHost(root string, member *controllink.Membership, private [
 			}
 		}
 	}}
+	if asked != nil {
+		u.Asked = func(method string, params json.RawMessage) (any, bool) { return asked(member.Host, method, params) }
+	}
 	go func() {
 		defer close(h.done)
 		u.Run(ctx)

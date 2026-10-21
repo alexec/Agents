@@ -41,6 +41,7 @@ public enum Capability {
     public static let dropbox1 = "dropbox/1"
     public static let elicitations1 = "elicitations/1"
     public static let eventsAudit1 = "events.audit/1"
+    public static let eventsTeam1 = "events.team/1"
     public static let events1 = "events/1"
     public static let filesComplete1 = "files.complete/1"
     public static let filesDiagnostics1 = "files.diagnostics/1"
@@ -492,6 +493,8 @@ public enum Capability {
         "user/setSettings": "user/1",
         "user/settings": "user/1",
         "workflows/claimRun": "bots/1",
+        "workflows/fire": "events.team/1",
+        "workflows/trigger": "events.team/1",
         "workspaces/forAgent": "workspaces/1",
         "control/capReached": "bots/1",
         "control/clientChanged": "control/1",

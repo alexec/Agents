@@ -140,6 +140,11 @@ func triggerID(fr fireRequest, event *wire.Event) string {
 	}
 	keys := make([]string, 0, len(event.Details))
 	for k := range event.Details {
+		// A server's event is the same on every machine by its id; when it was heard, and
+		// what was missed before it, are each machine's own (#2011).
+		if event.Details["mcp_event_id"] != "" && (k == "time" || k == "missed_since") {
+			continue
+		}
 		keys = append(keys, k)
 	}
 	sort.Strings(keys)
@@ -163,8 +168,7 @@ func (d *Daemon) claimRun(folder, id, trigger string) bool {
 	if ask == nil {
 		return true
 	}
-	// By the project folder's name: each machine keeps its own copy of the project, at a path of its own.
-	out, err := (*ask)(d.ctx, wire.CallWorkflowsClaimRun.Name, wire.WorkflowClaim{Workflow: filepath.Base(folder) + "/" + id, Trigger: trigger})
+	out, err := (*ask)(d.ctx, wire.CallWorkflowsClaimRun.Name, wire.WorkflowClaim{Workflow: workflowName(folder, id), Trigger: trigger})
 	if err != nil {
 		log.Printf("workflow %s: the claim for %s was not answered: %v", id, trigger, err)
 		return false

@@ -2556,6 +2556,48 @@
       }
     },
     {
+      "name": "workflows/trigger",
+      "x-capability": "events.team/1",
+      "description": "A machine, on its channel 0 (#2011, FR-035): a server's event or a schedule matched a runs-on: workflow. When runs-on: names a bot, the control plane sends it once, to one of the bot's machines (workflows/fire).",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/TeamTrigger"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/TeamTriggerSent"
+        }
+      }
+    },
+    {
+      "name": "workflows/fire",
+      "x-capability": "events.team/1",
+      "description": "To a bot's machine, on its channel 0, which only the control plane writes (#2011, FR-035): run a runs-on: workflow for a trigger the control plane took once.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/TeamTrigger"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/TeamTriggerFired"
+        }
+      }
+    },
+    {
       "name": "links/list",
       "x-capability": "links/1",
       "tags": [

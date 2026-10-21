@@ -280,6 +280,7 @@ func join(ctx context.Context, cl commandLine, d *agentsd.Daemon) {
 		safe.Go("attention uplink", func() { d.ControlUplinkChanged(connected) })
 	}
 	up.Told = d.Told
+	up.Asked = d.Asked
 	// A window on this Mac reaches this host directly (#1118).
 	d.StartLocal(ctx, member, private)
 	// And a browser on it, through the page this host serves (#1951).

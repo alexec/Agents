@@ -200,10 +200,17 @@ func (s *Service) tellUsersMachines(user string) {
 // runs it. A claim is kept by the UTC day it was made; yesterday's counts too, so a trigger
 // heard either side of midnight is run once.
 func (s *Service) claimRun(ctx context.Context, host string, claim wire.WorkflowClaim, now time.Time) (wire.WorkflowClaimed, error) {
+	return s.claimAs(ctx, s.ownerOf(host), host, claim, now)
+}
+
+// claimAs claims a trigger of a user's workflow for host: a machine of theirs, or, for a
+// trigger sent to the control plane (workflows/trigger), the machine that sent it. The key
+// is the same either way, so a machine that still claims and one that sends run it once.
+func (s *Service) claimAs(ctx context.Context, owner, host string, claim wire.WorkflowClaim, now time.Time) (wire.WorkflowClaimed, error) {
 	if strings.TrimSpace(claim.Workflow) == "" || strings.TrimSpace(claim.Trigger) == "" {
 		return wire.WorkflowClaimed{}, fail(invalidParams, "Say the workflow and the trigger.")
 	}
-	sum := sha256.Sum256([]byte(s.ownerOf(host) + "\x00" + claim.Workflow + "\x00" + claim.Trigger))
+	sum := sha256.Sum256([]byte(owner + "\x00" + claim.Workflow + "\x00" + claim.Trigger))
 	name := hex.EncodeToString(sum[:16]) + ".json"
 	today, yesterday := now.UTC().Format(usageDayLayout), now.UTC().Add(-24*time.Hour).Format(usageDayLayout)
 	if before, err := s.cfg.Store.Get(ctx, runsPrefix+yesterday+"/"+name); err != nil {
