@@ -108,6 +108,12 @@ type Router struct {
 	// there is no audit.
 	// Who owns each client and machine (#994); nil lets every client reach every host.
 	owners     Ownership
+	// Whether the control plane has more than one person (#1763, R14), the version a build
+	// from before the team tier is told to update to, and the list each host last said:
+	// on a team, a client or host without the team capability is refused.
+	team             bool
+	version          string
+	hostCapabilities map[string][]string
 	actorOf    func(Caller) *wire.AuditActor
 	audited    func(from Caller, host, method string, params json.RawMessage)
 	log        func(string)
@@ -126,9 +132,9 @@ type clientSession struct {
 	inFlight map[string]map[string]bool
 	// Of those, the whole lists whose answer is kept for when the host is offline (#962).
 	copying map[string]map[string]string
-	// What each request is answered with when the client is too old for this control
-	// plane (#1748); nil when it is not.
-	refusal *RPCError
+	// The capabilities the client said in its auth line (#1748); nil from one older than
+	// that. Each request of a client too old for this control plane is refused.
+	capabilities []string
 }
 
 // target is who a channel on a host's uplink is for: a client session here, or the other
@@ -1173,7 +1179,7 @@ func (r *Router) endKeptLocked(delivery string, m *message) {
 
 // AttachClient takes a paired client's socket, and returns its session, which ends when
 // the socket does.
-func (r *Router) AttachClient(client *records.ClientRecord, conn *Conn, relayed bool, refusal *RPCError) string {
+func (r *Router) AttachClient(client *records.ClientRecord, conn *Conn, relayed bool, capabilities []string) string {
 	id := records.NewUUID()
 	r.mu.Lock()
 	person := ""
@@ -1182,7 +1188,7 @@ func (r *Router) AttachClient(client *records.ClientRecord, conn *Conn, relayed 
 	}
 	r.clients[id] = &clientSession{caller: Caller{Session: id, Client: client.ID, Kind: client.Kind, Relayed: relayed, Person: person},
 		conn: conn, channels: map[string]int{}, inFlight: map[string]map[string]bool{},
-		copying: map[string]map[string]string{}, refusal: refusal}
+		copying: map[string]map[string]string{}, capabilities: capabilities}
 	for host := range r.hosts {
 		r.openChannelLocked(id, host)
 	}
@@ -1459,6 +1465,13 @@ func (r *Router) toHostLocked(host, msg, sessionID string) {
 	if !r.known[host] || !r.mayReachLocked(s.caller, host) {
 		r.writeLocked(sessionID, s.wrap(host, replyError(m.ID, fail(noSuchHost, "No host is called %s.", host))))
 		return
+	}
+	// A host from before the team tier, on a team, would act for every person (R14).
+	if list, known := r.hostCapabilities[host]; known {
+		if refusal := hostRefusal(list, r.version, r.team); refusal != nil {
+			r.writeLocked(sessionID, s.wrap(host, replyError(m.ID, refusal)))
+			return
+		}
 	}
 	c, ok := s.channels[host]
 	h := r.hosts[host]

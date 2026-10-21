@@ -32,7 +32,7 @@ test("a host that needs an update still answers; one offline does not (#1771)", 
 
 test("the generated tables name a capability for each method", () => {
   assert.equal(generated.HostCapabilities["agents/branchFrom"], "chat.branch/1");
-  assert.deepEqual(generated.DeclaredCapabilities.client, ["client.wire/1"]);
+  assert.deepEqual(generated.DeclaredCapabilities.client, ["client.wire/1", "client.team/1"]);
 });
 
 test("the page says when it is too old for the control plane", () => {

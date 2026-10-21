@@ -54,6 +54,13 @@ The required sets start as `host.wire/1` for hosts and `client.wire/1` for clien
 without its set gets `-32008` on every call except `control/status`, with the missing names
 and the version to update to.
 
+On a control plane with more than one person (a team), the required sets also have
+`host.team/1` and `client.team/1` (#1763). A build from before the team tier cannot tell
+people apart, so it is refused. A client without `client.team/1`, or with no list, gets
+`-32074` (`updateToJoinTeam`, "Update Agents to join this team") on every call except
+`control/status`. A host without `host.team/1` is "Needs an update", and each call to it
+gets `-32074`. When only one person is left, they work again.
+
 ## Changing a capability
 
 - **A compatible change keeps the number:** a new optional field, or a new enum value with

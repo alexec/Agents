@@ -206,6 +206,7 @@ func New(cfg Config) (*Service, error) {
 	s.methods = newMethods(s)
 	s.router.handler = s.methods
 	s.router.SetOwnership(s)
+	s.router.SetTeam(false, cfg.Version)
 	s.joins = newJoins(s)
 	s.copies = newHostCopies(cfg.Store)
 	if s.backups, err = newBackupStore(cfg.Store, s.records, cfg.PrivateKey); err != nil {
@@ -319,6 +320,7 @@ func (s *Service) Start(ctx context.Context) (int, error) {
 		if err := s.resumeForwardingIfMarked(ctx); err != nil {
 			return 0, err
 		}
+		s.noteTeam()
 	}
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", s.serveHTTP)
@@ -509,6 +511,7 @@ func (s *Service) refresh() {
 	}
 	s.reconcile()
 	s.router.HoldToOwners()
+	s.noteTeam()
 	s.syncRelays()
 }
 
@@ -1130,7 +1133,7 @@ func (s *Service) acceptVia(conn *Conn, webOrigin string, proved func(failed boo
 	}
 	switch id.Kind {
 	case 'c':
-		s.router.AttachClient(client, conn, relayed, clientRefusal(auth.Capabilities, s.cfg.Version))
+		s.router.AttachClient(client, conn, relayed, auth.Capabilities)
 		// Forgotten while it joined (#1229): the forget's sweep of sessions may have come
 		// before this one was attached, and admitting it would write it back over its
 		// tombstone. It is closed as any forgotten client is.

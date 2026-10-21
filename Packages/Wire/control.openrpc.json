@@ -10,6 +10,11 @@
       "name": "client.wire/1",
       "by": "client",
       "description": "A client says its capabilities in ControlAuth on each connect, and reads -32008 as \"update this app\" (#1748). The control plane requires it of clients."
+    },
+    {
+      "name": "client.team/1",
+      "by": "client",
+      "description": "A client knows it belongs to one person of a team (#994, #1763). On a control plane with more than one person, the control plane answers a client without it -32074 updateToJoinTeam (R14)."
     }
   ],
   "methods": [

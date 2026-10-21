@@ -29,8 +29,9 @@ var update = flag.Bool("update", false, "write testdata/wire.golden from what th
 func TestTheWireIsWhatItWas(t *testing.T) {
 	p := startPlane(t, store.NewMemory(), controllink.NewPrivateKey())
 	ctx := context.Background()
-	home := p.host("MACHINE-1")
-	box := p.host("MACHINE-2")
+	// Hosts that say no list, as the golden was made before capabilities (#1748).
+	home := p.olderHost("MACHINE-1")
+	box := p.olderHost("MACHINE-2")
 	relayID, relay := p.rawHost("relay mac", true)
 	plainID, plain := p.rawHost("plain mac", false)
 	member, window := p.client("Golden window")

@@ -343,6 +343,7 @@ const (
 	FailureShellWillNotStart         = -32010
 	FailureSignInWanted              = -32070
 	FailureStoreUnavailable          = -32094
+	FailureUpdateToJoinTeam          = -32074
 	FailureViewNeedsShow             = -32063
 	FailureViewRefused               = -32062
 	FailureWorkflowLimitReached      = -32017

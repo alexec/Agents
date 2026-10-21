@@ -153,12 +153,12 @@ struct ControlAuthTests {
         let key = Data(repeating: 7, count: 32)
         let (client, _) = try ControlAuth.answer(hello, identity: .client(UUID()), key: key, origin: origin, kind: "mac",
                                                  expecting: nil)
-        #expect(client.capabilities == [Capability.clientWire1])
+        #expect(client.capabilities == [Capability.clientWire1, Capability.clientTeam1])
         guard case .auth(let heard)? = ControlAuth.Message(line: ControlAuth.Message.auth(client).line) else {
             Issue.record("the auth line did not read back")
             return
         }
-        #expect(heard.capabilities == [Capability.clientWire1])
+        #expect(heard.capabilities == [Capability.clientWire1, Capability.clientTeam1])
         let (copy, _) = try ControlAuth.answer(hello, identity: .copy("b"), key: key, origin: origin, kind: "copy",
                                                expecting: nil)
         #expect(copy.capabilities == nil)

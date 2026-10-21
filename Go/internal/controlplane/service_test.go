@@ -101,18 +101,30 @@ func (p *plane) host(machine string) *fakeHost { return p.hostWith(machine, nil)
 
 // hostWith is host, told each channel as it opens.
 func (p *plane) hostWith(machine string, opened func(controllink.Conn)) *fakeHost {
+	return p.hostSaying(fakeHello(machine), opened)
+}
+
+// olderHost is a host from before #1748: it says no capabilities.
+func (p *plane) olderHost(machine string) *fakeHost {
+	hello := fakeHello(machine)
+	hello.Capabilities = nil
+	return p.hostSaying(hello, nil)
+}
+
+func (p *plane) hostSaying(hello controllink.HostHello, opened func(controllink.Conn)) *fakeHost {
 	root := p.t.TempDir()
 	private := controllink.NewPrivateKey()
-	member, err := controllink.Enroll(context.Background(), root, p.code(true), private, fakeHello(machine))
+	member, err := controllink.Enroll(context.Background(), root, p.code(true), private, hello)
 	if err != nil {
 		p.t.Fatal(err)
 	}
-	return p.serveHost(root, member, private, fakeHello(machine), opened)
+	return p.serveHost(root, member, private, hello, opened)
 }
 
+// fakeHello is a host of this build: it says the capabilities a host declares.
 func fakeHello(machine string) controllink.HostHello {
 	return controllink.HostHello{Version: "0.1", Platform: "linux aarch64", MachineID: machine, Name: new("box " + machine),
-		Implementation: new("go")}
+		Implementation: new("go"), Capabilities: wire.DeclaredCapabilities["host"]}
 }
 
 // serveHost connects a host that has joined, and answers its channels as host does.

@@ -393,7 +393,8 @@ func (m *Methods) status(from Caller) wire.ControlStatus {
 		}
 	}
 	status.ProjectDetection = &detection
-	status.Capabilities, status.Required = capabilities(), &required
+	needed := requiredNow(m.router.Team())
+	status.Capabilities, status.Required = capabilities(), &needed
 	away := false
 	status.AwayFromHome = &away
 	for _, h := range m.records.Hosts() {
@@ -455,7 +456,9 @@ func (m *Methods) hostRow(h records.HostRecord) wire.ControlHost {
 		row.Implementation = optional(impl)
 	}
 	if list := hostCapabilities(h); list != nil {
-		row.Capabilities, row.Missing = list, wire.Missing(list, required.Host)
+		row.Capabilities, row.Missing = list, wire.Missing(list, requiredNow(m.router.Team()).Host)
+	} else if m.router.Team() {
+		row.Missing = []string{wire.CapHostTeam1}
 	}
 	m.mu.Lock()
 	for server, ask := range m.gitAsks[h.ID] {
@@ -860,7 +863,7 @@ func (m *Methods) hello(ctx context.Context, host string, hello wire.HostHello) 
 			}
 		}
 	}
-	m.noteCapabilities(host, hello)
+	m.noteCapabilities(host, hello.Capabilities, hello.Version)
 	if changed {
 		m.router.BroadcastHost(host, "control/hostChanged", m.router.Described(host))
 	}

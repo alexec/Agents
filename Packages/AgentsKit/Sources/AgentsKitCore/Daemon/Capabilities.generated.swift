@@ -20,6 +20,7 @@ public enum Capability {
     public static let chatBranch1 = "chat.branch/1"
     public static let chatContinueWhenBack1 = "chat.continue-when-back/1"
     public static let clientPermissions1 = "client-permissions/1"
+    public static let clientTeam1 = "client.team/1"
     public static let clientWire1 = "client.wire/1"
     public static let client1 = "client/1"
     public static let clients1 = "clients/1"
@@ -45,6 +46,7 @@ public enum Capability {
     public static let files1 = "files/1"
     public static let git1 = "git/1"
     public static let handover1 = "handover/1"
+    public static let hostTeam1 = "host.team/1"
     public static let hostWire1 = "host.wire/1"
     public static let host1 = "host/1"
     public static let hostsJoin1 = "hosts.join/1"
@@ -485,7 +487,7 @@ public enum Capability {
 
     /// x-declared-capabilities: what a host, a client or the control plane declares by hand, by who.
     public static let declared: [String: [String]] = [
-        "client": ["client.wire/1"],
-        "host": ["host.wire/1", "agents.move-worktree/1"],
+        "client": ["client.wire/1", "client.team/1"],
+        "host": ["host.wire/1", "agents.move-worktree/1", "host.team/1"],
     ]
 }

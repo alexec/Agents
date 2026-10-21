@@ -75,6 +75,7 @@ export const Failure = {
   shellWillNotStart: -32010,
   signInWanted: -32070,
   storeUnavailable: -32094,
+  updateToJoinTeam: -32074,
   viewNeedsShow: -32063,
   viewRefused: -32062,
   workflowLimitReached: -32017,

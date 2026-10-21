@@ -33,7 +33,7 @@ func TestControlPlaneAnswersItsDocument(t *testing.T) {
 // list each host said.
 func TestStatusAndHostsSayCapabilities(t *testing.T) {
 	p := startPlane(t, store.NewMemory(), controllink.NewPrivateKey())
-	box := p.host("MACHINE-2")
+	box := p.olderHost("MACHINE-2")
 	_, window := p.client("Window")
 	var status wire.ControlStatus
 	json.Unmarshal(call(t, window, "", "control/status", map[string]any{}), &status)
@@ -109,10 +109,69 @@ func TestAClientWithoutTheRequiredSetIsToldToUpdate(t *testing.T) {
 		t.Fatalf("hosts/list: %s", e)
 	}
 	call(t, old, "", "control/status", map[string]any{})
-	if clientRefusal(nil, "0.7.0") != nil {
+	if clientRefusal(nil, "0.7.0", false) != nil {
 		t.Fatal("a client that says no list is refused")
 	}
-	if clientRefusal([]string{wire.CapClientWire1}, "0.7.0") != nil {
+	if clientRefusal([]string{wire.CapClientWire1}, "0.7.0", false) != nil {
 		t.Fatal("a client with the required set is refused")
+	}
+}
+
+// On a control plane with more than one person, a client or host from before the team
+// tier is refused with -32074, and is let in again once only one person is left (#1763,
+// R14). This build's client and host are not.
+func TestOlderBuildsAreRefusedOnATeam(t *testing.T) {
+	p := startPlane(t, store.NewMemory(), controllink.NewPrivateKey())
+	_, owner := p.client("Owner's Mac")
+	older := p.olderHost("OLD-BOX")
+	current := p.host("NEW-BOX")
+	m, err := controllink.PairClient(context.Background(), p.code(false), "Older window")
+	if err != nil {
+		t.Fatal(err)
+	}
+	m.Capabilities = []string{wire.CapClientWire1}
+	window, err := controllink.DialClient(context.Background(), m)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(window.Close)
+	// One person: nothing is refused.
+	call(t, window, "", "hosts/list", map[string]any{})
+	call(t, owner, older.member.Host, "daemon/ping", map[string]any{})
+
+	sam := p.invite(owner, "Sam", wire.UserRoleMember)
+	if e := callError(t, window, "", "hosts/list", map[string]any{}); !strings.Contains(e, "-32074") ||
+		!strings.Contains(e, "Update Agents to join this team") || !strings.Contains(e, wire.CapClientTeam1) {
+		t.Fatalf("an older client on a team: %s", e)
+	}
+	call(t, window, "", "control/status", map[string]any{})
+	if e := callError(t, owner, older.member.Host, "daemon/ping", map[string]any{}); !strings.Contains(e, "-32074") {
+		t.Fatalf("an older host on a team: %s", e)
+	}
+	call(t, owner, current.member.Host, "daemon/ping", map[string]any{})
+	if state, _ := p.s.Router().State(older.member.Host); state.State != "needsUpdate" {
+		t.Fatalf("an older host's state: %+v", state)
+	}
+	var status wire.ControlStatus
+	json.Unmarshal(call(t, owner, "", "control/status", map[string]any{}), &status)
+	if !slices.Contains(status.Required.Client, wire.CapClientTeam1) || !slices.Contains(status.Required.Host, wire.CapHostTeam1) {
+		t.Fatalf("required on a team: %+v", status.Required)
+	}
+	var hosts []wire.ControlHost
+	json.Unmarshal(call(t, owner, "", "hosts/list", map[string]any{}), &hosts)
+	for _, h := range hosts {
+		if string(h.ID) == older.member.Host && !slices.Equal(h.Missing, []string{wire.CapHostTeam1}) {
+			t.Fatalf("an older host's row: %+v", h)
+		}
+		if string(h.ID) == current.member.Host && (h.Missing != nil || h.State != "online") {
+			t.Fatalf("this build's host's row: %+v", h)
+		}
+	}
+
+	call(t, owner, "", "people/remove", wire.PersonRequest{User: sam.id})
+	call(t, window, "", "hosts/list", map[string]any{})
+	call(t, owner, older.member.Host, "daemon/ping", map[string]any{})
+	if state, _ := p.s.Router().State(older.member.Host); state.State != "online" {
+		t.Fatalf("an older host once one person is left: %+v", state)
 	}
 }

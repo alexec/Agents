@@ -23,7 +23,7 @@
 - [ ] T008 Add the in-memory owner index (host → user, client → person), refreshed on record change, in `Go/internal/controlplane/router.go`.
 - [ ] T009 Add the owner check for every client method in `router.go` and `methods.go`. Another user's machine is `notFound`. Admins get name, user and state only.
 - [x] T010 Write a table test over **every** client method in `Go/internal/controlplane/security_test.go`: 10 users and 30 hosts, and no request reaches a host that is not the caller's (SC-003). A new method with no entry fails the test.
-- [ ] T011 Refuse older builds on a control plane with more than one person with `updateToJoinTeam` (R14), in `conn.go`.
+- [x] T011 Refuse older builds on a control plane with more than one person with `updateToJoinTeam` (R14), in `conn.go`.
 
 **Checkpoint**: one person sees no change, and the owner check is in force.
 
