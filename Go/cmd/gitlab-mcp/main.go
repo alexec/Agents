@@ -64,7 +64,7 @@ func main() {
 	gl := gitlabmcp.NewRealGitLab(root, token, gitlabmcp.GitProject(root))
 	front := &gitlabmcp.Front{
 		Events:   &gitlabmcp.Events{GitLab: gl},
-		Upstream: gitlabmcp.NewServer(buildinfo.Version, gl), Version: buildinfo.Version, Logger: logger,
+		Upstream: gitlabmcp.NewServer(buildinfo.Version, gl, os.Getenv(gitlabmcp.HostedEnv) == "1"), Version: buildinfo.Version, Logger: logger,
 	}
 	// A signal ends it at once: the front would otherwise wait on stdin.
 	go func() {

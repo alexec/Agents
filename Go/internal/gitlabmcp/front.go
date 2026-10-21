@@ -29,10 +29,16 @@ const Instructions = "This project's merge requests, their pipelines, and its is
 	"show_merge_requests, show_issues and show_merge_request show a page to the person. " +
 	"Merging and approving a merge request are a person's, from its page: those tools are not for agents."
 
-// NewServer is the server behind the front: it answers initialize and ping, and has the tools.
-func NewServer(version string, g *RealGitLab) *mcp.Server {
+// HostedEnv is set to "1" in the environment of an MCP server that the host runs for its
+// sessions and views (agentsd's hosted copy, githubmcp.HostedEnv). Only that copy has the
+// person's tools.
+const HostedEnv = "AGENTS_MCP_HOSTED"
+
+// NewServer is the server behind the front: it answers initialize and ping, and has the
+// tools; with person, also the tools only a view may call (merge and approve).
+func NewServer(version string, g *RealGitLab, person bool) *mcp.Server {
 	server := mcp.NewServer(&mcp.Implementation{Name: "gitlab-mcp", Title: "GitLab", Version: version}, nil)
-	AddTools(server, g)
+	AddTools(server, g, person)
 	return server
 }
 

@@ -13,6 +13,7 @@ import (
 	sdk "github.com/coder/acp-go-sdk"
 
 	"github.com/alexec/agents/Go/internal/githubmcp"
+	"github.com/alexec/agents/Go/internal/gitlabmcp"
 	"github.com/alexec/agents/Go/wire"
 )
 
@@ -197,4 +198,12 @@ func (d *Daemon) hostedState(path string) wire.HostedMCPState {
 		return h.state
 	}
 	return ""
+}
+
+// The host's copy of each server is told by one name: the GitLab server's person-only tools
+// are kept out of a session's copy as the GitHub server's are.
+func TestEveryServerKnowsTheHostsCopyByOneName(t *testing.T) {
+	if gitlabmcp.HostedEnv != githubmcp.HostedEnv {
+		t.Fatalf("%s is not %s", gitlabmcp.HostedEnv, githubmcp.HostedEnv)
+	}
 }

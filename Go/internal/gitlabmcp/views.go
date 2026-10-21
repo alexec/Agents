@@ -72,7 +72,7 @@ type retryArgs struct {
 }
 
 // addViews puts the views' tools and pages on server.
-func addViews(server *mcp.Server, g *RealGitLab, projectOf func(context.Context, string) (string, error)) {
+func addViews(server *mcp.Server, g *RealGitLab, projectOf func(context.Context, string) (string, error), person bool) {
 	readOnly := &mcp.ToolAnnotations{ReadOnlyHint: true}
 
 	tool(server, &mcp.Tool{Name: "show_merge_requests", Title: "Show merge requests",
@@ -151,16 +151,19 @@ func addViews(server *mcp.Server, g *RealGitLab, projectOf func(context.Context,
 			return g.RetryPipeline(ctx, project, in.PipelineID)
 		})
 
-	tool(server, &mcp.Tool{Name: "approve_merge_request", Title: "Approve a merge request",
-		Description: "Approves a merge request as the person whose token it is. Only a view may call it: a person approves.",
-		Meta:        uiMeta("", "app")},
-		func(ctx context.Context, in numberArgs) (map[string]any, error) {
-			project, err := projectOf(ctx, in.Project)
-			if err != nil {
-				return nil, err
-			}
-			return g.Approve(ctx, project, in.Number)
-		})
+	// Approve is the person's, from a view, and only on the host's copy (AddTools).
+	if person {
+		tool(server, &mcp.Tool{Name: "approve_merge_request", Title: "Approve a merge request",
+			Description: "Approves a merge request as the person whose token it is. Only a view may call it: a person approves.",
+			Meta:        uiMeta("", "app")},
+			func(ctx context.Context, in numberArgs) (map[string]any, error) {
+				project, err := projectOf(ctx, in.Project)
+				if err != nil {
+					return nil, err
+				}
+				return g.Approve(ctx, project, in.Number)
+			})
+	}
 
 	// No network at all: an empty csp, so the host draws them under its strictest policy.
 	meta := mcp.Meta{"ui": map[string]any{"csp": map[string]any{}, "prefersBorder": true}}

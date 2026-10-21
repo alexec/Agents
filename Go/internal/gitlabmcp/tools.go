@@ -117,8 +117,9 @@ func tool[In any](server *mcp.Server, t *mcp.Tool, f func(context.Context, In) (
 	})
 }
 
-// AddTools puts the tools and the views (views.go) on server.
-func AddTools(server *mcp.Server, g *RealGitLab) {
+// AddTools puts the tools and the views (views.go) on server; with person, also the tools
+// only a view may call.
+func AddTools(server *mcp.Server, g *RealGitLab, person bool) {
 	projectOf := func(ctx context.Context, project string) (string, error) {
 		if project != "" {
 			if !projectPattern.MatchString(project) {
@@ -130,7 +131,7 @@ func AddTools(server *mcp.Server, g *RealGitLab) {
 	}
 	readOnly := &mcp.ToolAnnotations{ReadOnlyHint: true}
 	agentsAndViews := visibility("model", "app")
-	addViews(server, g, projectOf)
+	addViews(server, g, projectOf, person)
 
 	tool(server, &mcp.Tool{Name: "list_merge_requests", Title: "List merge requests",
 		Description: "The project's merge requests, newest updated first, at most 100: number, title, branch, target, author, draft, " +
@@ -439,27 +440,31 @@ func AddTools(server *mcp.Server, g *RealGitLab) {
 			return nil, fmt.Errorf("there is no comment %d on !%d", in.CommentID, in.Number)
 		})
 
-	tool(server, &mcp.Tool{Name: "merge_merge_request", Title: "Merge a merge request",
-		Description: "Merges a merge request and deletes its branch on GitLab, as the person whose token it is; squash squashes its " +
-			"commits, auto merges once its pipeline succeeds. Only a view may call it: a person merges.",
-		Meta: visibility("app")},
-		func(ctx context.Context, in mergeArgs) (map[string]any, error) {
-			project, err := projectOf(ctx, in.Project)
-			if err != nil {
-				return nil, err
-			}
-			body := map[string]any{"squash": in.Squash, "should_remove_source_branch": true}
-			if in.Auto {
-				// auto_merge since GitLab 17.11; merge_when_pipeline_succeeds before it.
-				body["auto_merge"], body["merge_when_pipeline_succeeds"] = true, true
-			}
-			var m mergeRequest
-			path := fmt.Sprintf("projects/%s/merge_requests/%d/merge", pid(project), in.Number)
-			if err := g.send(ctx, http.MethodPut, path, body, &m); err != nil {
-				return nil, err
-			}
-			return map[string]any{"project": project, "number": in.Number, "state": m.State, "mergeSha": m.mergeSHA(), "auto": in.Auto}, nil
-		})
+	// Merge is the person's, from a view. It is only on the copy the host runs (person), whose
+	// tools/list the host filters for an agent; a copy that a session runs itself has none.
+	if person {
+		tool(server, &mcp.Tool{Name: "merge_merge_request", Title: "Merge a merge request",
+			Description: "Merges a merge request and deletes its branch on GitLab, as the person whose token it is; squash squashes its " +
+				"commits, auto merges once its pipeline succeeds. Only a view may call it: a person merges.",
+			Meta: visibility("app")},
+			func(ctx context.Context, in mergeArgs) (map[string]any, error) {
+				project, err := projectOf(ctx, in.Project)
+				if err != nil {
+					return nil, err
+				}
+				body := map[string]any{"squash": in.Squash, "should_remove_source_branch": true}
+				if in.Auto {
+					// auto_merge since GitLab 17.11; merge_when_pipeline_succeeds before it.
+					body["auto_merge"], body["merge_when_pipeline_succeeds"] = true, true
+				}
+				var m mergeRequest
+				path := fmt.Sprintf("projects/%s/merge_requests/%d/merge", pid(project), in.Number)
+				if err := g.send(ctx, http.MethodPut, path, body, &m); err != nil {
+					return nil, err
+				}
+				return map[string]any{"project": project, "number": in.Number, "state": m.State, "mergeSha": m.mergeSHA(), "auto": in.Auto}, nil
+			})
+	}
 }
 
 func mrSummary(m mergeRequest) map[string]any {
