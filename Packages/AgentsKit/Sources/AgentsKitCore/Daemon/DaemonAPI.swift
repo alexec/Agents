@@ -2873,9 +2873,10 @@ public enum DaemonAPI {
         /// left alone, as the cooldown is, so a phone or page from before the labels
         /// field cannot remove them by saving a mode.
         public var labels: [String]?
-        /// The `hosts:` to write (#317): machine ids, or empty to take the line out so
-        /// every host runs it. Left out means left alone, as the labels are.
-        public var hosts: [String]?
+        /// The `runs-on:` to write (#1761, was `hosts:`, #317): labels, such as machine ids,
+        /// or empty to take the line out so every machine runs it. Left out means left alone,
+        /// as the labels are.
+        public var runsOn: [String]?
         /// The `when-done:` to write (#433): `keep`, `archive-allowed` or `archive`, and
         /// `keep` or empty takes the line out. Left out means left alone, as the hosts are.
         public var whenDone: String?
@@ -2883,7 +2884,7 @@ public enum DaemonAPI {
         /// out means left alone, as `whenDone` is.
         public var continueWhenBack: Bool?
         public init(folder: URL, workflowID: String, settings: WorkflowSettings, cooldown: String? = nil,
-                    labels: [String]? = nil, hosts: [String]? = nil, whenDone: String? = nil,
+                    labels: [String]? = nil, runsOn: [String]? = nil, whenDone: String? = nil,
                     continueWhenBack: Bool? = nil) {
             self.whenDone = whenDone
             self.continueWhenBack = continueWhenBack
@@ -2892,7 +2893,7 @@ public enum DaemonAPI {
             self.settings = settings
             self.cooldown = cooldown
             self.labels = labels
-            self.hosts = hosts
+            self.runsOn = runsOn
         }
     }
 

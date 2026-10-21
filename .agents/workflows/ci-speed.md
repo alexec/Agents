@@ -8,7 +8,7 @@ agent: new
 runtime: claude
 permission-mode: auto
 cooldown: 20h
-hosts: [8AB85821-9D24-59CE-9737-8FC556923733]
+runs-on: [8AB85821-9D24-59CE-9737-8FC556923733]
 labels: [nightly, ci]
 when-done: archive
 ---

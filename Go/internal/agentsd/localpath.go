@@ -172,6 +172,10 @@ func (d *Daemon) Told(method string, params json.RawMessage) {
 		d.toldUserSettings(params)
 		return
 	}
+	if method == wire.NotifyHostUser.Name {
+		d.toldHostUser(params)
+		return
+	}
 	if method != wire.NotifyHostClients.Name {
 		return
 	}

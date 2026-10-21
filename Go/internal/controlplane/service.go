@@ -170,6 +170,8 @@ type Service struct {
 	// Each person's settings and secrets (#1760), and what each machine here was sent.
 	users     *usersettings.Book
 	toldUsers toldUsers
+	// Which bots are at a spend cap today (#1761).
+	caps botCaps
 
 	mu       sync.Mutex
 	servers  []*http.Server
@@ -737,6 +739,15 @@ func (s *Service) keepMayNotify(client string, may bool) {
 func (s *Service) heard(host string, params json.RawMessage) {
 	var need notices.AttentionNeed
 	if json.Unmarshal(params, &need) != nil {
+		return
+	}
+	// A bot has no devices: its machines' needs go to the admins (#1761, FR-032).
+	if owner := s.ownerOf(host); s.isBot(owner) {
+		for _, p := range s.records.People() {
+			if p.IsAdmin() {
+				s.deliver(need, false, p.ID)
+			}
+		}
 		return
 	}
 	s.deliver(need, false, s.ownerOf(host))

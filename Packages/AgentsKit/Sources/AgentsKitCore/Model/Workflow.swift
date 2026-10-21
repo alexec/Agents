@@ -76,10 +76,11 @@ public struct Workflow: Codable, Hashable, Sendable, Identifiable {
     /// Archived, from the file's `archived: true` (#125). Archive writes the line and
     /// Unarchive takes it out; `nil` is a file that does not say, which is not archived.
     public var archived: Bool?
-    /// Machine ids allowed to run this workflow (#317). `nil` or empty is every host,
-    /// which is a file that does not say. Each id is a `MachineID`: a Mac's hardware
-    /// UUID, Linux `/etc/machine-id`, the host name only when neither exists.
-    public var hosts: [String]?
+    /// The file's `runs-on:` (#1761, was `hosts:`, #317): labels a machine must all have to
+    /// run it. `nil` or empty is every machine, which is a file that does not say. A label
+    /// is a machine's id (a `MachineID`: a Mac's hardware UUID, Linux `/etc/machine-id`),
+    /// its os (`macos`, `linux`), its provider, or its user's or bot's name.
+    public var runsOn: [String]?
     /// What a run may do with its session when it is done, from the file's
     /// `when-done:` (#433). `nil` is a file that does not say, which is `keep`.
     public var whenDone: WorkflowWhenDone?
@@ -97,7 +98,7 @@ public struct Workflow: Codable, Hashable, Sendable, Identifiable {
 
     private enum CodingKeys: String, CodingKey {
         case workflowID, folder, name, triggers, mode, prompt, problem, unknownFields, settings,
-             cooldown, enabled, archived, hosts, whenDone, continueWhenBack, muted
+             cooldown, enabled, archived, runsOn, whenDone, continueWhenBack, muted
     }
 
     /// Whether it is put away.
@@ -116,10 +117,10 @@ public struct Workflow: Codable, Hashable, Sendable, Identifiable {
                 unknownFields: [String: JSONValue] = [:],
                 settings: WorkflowSettings = WorkflowSettings(),
                 cooldown: TimeInterval? = nil, enabled: Bool? = nil, archived: Bool? = nil,
-                hosts: [String]? = nil, whenDone: WorkflowWhenDone? = nil, continueWhenBack: Bool? = nil,
+                runsOn: [String]? = nil, whenDone: WorkflowWhenDone? = nil, continueWhenBack: Bool? = nil,
                 muted: Bool? = nil) {
         self.muted = muted
-        self.hosts = hosts
+        self.runsOn = runsOn
         self.whenDone = whenDone
         self.continueWhenBack = continueWhenBack
         self.cooldown = cooldown
@@ -152,12 +153,20 @@ public struct Workflow: Codable, Hashable, Sendable, Identifiable {
 
     /// Whether `machineID` may fire this workflow (#317).
     ///
-    /// Absent or empty `hosts:` is every host. A listed workflow runs only where the
-    /// id matches, on a schedule, on an event, or by hand.
+    /// Absent or empty `runs-on:` is every machine. One that names machine ids runs only
+    /// where the id matches, on a schedule, on an event, or by hand. Its other labels (an
+    /// os, a provider, a user's name) are the machine's to match: a client cannot tell.
     public func runs(on machineID: String?) -> Bool {
-        guard let hosts, !hosts.isEmpty else { return true }
+        let ids = (runsOn ?? []).filter(Self.isMachineID)
+        guard !ids.isEmpty else { return true }
         guard let machineID, !machineID.isEmpty else { return false }
-        return hosts.contains(machineID)
+        return ids.contains { $0.caseInsensitiveCompare(machineID) == .orderedSame }
+    }
+
+    /// A label that is a machine's id: a UUID, or 32 hex digits (Linux `/etc/machine-id`).
+    static func isMachineID(_ label: String) -> Bool {
+        if UUID(uuidString: label) != nil { return true }
+        return label.count == 32 && label.allSatisfy(\.isHexDigit)
     }
 
     /// The row's words for a workflow run only by hand (#432), as a trigger's are.

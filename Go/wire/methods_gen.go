@@ -294,6 +294,7 @@ var (
 const (
 	FailureAgentLimitReached         = -32023
 	FailureAgentsWorking             = -32068
+	FailureBotMachine                = -32073
 	FailureBusy                      = -32040
 	FailureCatalogRefused            = -32080
 	FailureChangedElsewhere          = -32093
@@ -368,6 +369,9 @@ var (
 	CallBackupsDownload              = Method[BackupStorePartRequest, BackupStorePart]{"backups/download"}
 	CallBackupsStored                = Method[Empty, BackupStoreList]{"backups/stored"}
 	CallBackupsUpload                = Method[BackupStorePart, Empty]{"backups/upload"}
+	CallBotsMake                     = Method[BotMake, BotMade]{"bots/make"}
+	CallBotsSetCaps                  = Method[BotCaps, Empty]{"bots/setCaps"}
+	CallBotsStopRun                  = Method[BotStopRun, Empty]{"bots/stopRun"}
 	CallClientsAnnounce              = Method[ClientAnnounce, Admitted]{"clients/announce"}
 	CallClientsConnections           = Method[Empty, []ClientConnection]{"clients/connections"}
 	CallClientsForget                = Method[ClientRequest, Empty]{"clients/forget"}
@@ -414,7 +418,7 @@ var (
 	CallHostsSetWorkspaceOptions     = Method[HostWorkspaceOptions, ControlHost]{"hosts/setWorkspaceOptions"}
 	CallHostsSshHosts                = Method[SSHHostsRequest, []SSHHost]{"hosts/sshHosts"}
 	CallHostsStart                   = Method[HostRequest, ControlHost]{"hosts/start"}
-	CallHostsStartEnroll             = Method[Empty, ControlCodeShown]{"hosts/startEnroll"}
+	CallHostsStartEnroll             = Method[HostEnroll, ControlCodeShown]{"hosts/startEnroll"}
 	CallHostsStop                    = Method[HostStop, ControlHost]{"hosts/stop"}
 	CallHostsUnlink                  = Method[HostRequest, ControlHost]{"hosts/unlink"}
 	CallHostsUpdate                  = Method[HostUpdate, JSONValue]{"hosts/update"}
@@ -446,7 +450,9 @@ var (
 	CallUserSetSecret                = Method[UserSecret, Empty]{"user/setSecret"}
 	CallUserSetSettings              = Method[UserSettingsPart, Empty]{"user/setSettings"}
 	CallUserSettings                 = Method[Empty, UserSettings]{"user/settings"}
+	CallWorkflowsClaimRun            = Method[WorkflowClaim, WorkflowClaimed]{"workflows/claimRun"}
 	CallWorkspacesForAgent           = Method[Empty, AgentWorkspaces]{"workspaces/forAgent"}
+	NotifyControlCapReached          = Notification[CapReached]{"control/capReached"}
 	NotifyControlClientChanged       = Notification[ControlClientChanged]{"control/clientChanged"}
 	NotifyControlGroupsChanged       = Notification[GroupsChanged]{"control/groupsChanged"}
 	NotifyControlHostChanged         = Notification[JSONValue]{"control/hostChanged"}
@@ -465,6 +471,7 @@ var (
 	NotifyControlUserSettingsChanged = Notification[UserSettingsChanged]{"control/userSettingsChanged"}
 	NotifyControlWebChanged          = Notification[WebRemoteStatus]{"control/webChanged"}
 	NotifyHostClients                = Notification[HostClients]{"host/clients"}
+	NotifyHostUser                   = Notification[HostUser]{"host/user"}
 	NotifyHostUserSettings           = Notification[HostUserSettings]{"host/userSettings"}
 	NotifyProjectsDetect             = Notification[ProjectDetection]{"projects/detect"}
 	NotifyRelayCount                 = Notification[RelayCount]{"relay/count"}

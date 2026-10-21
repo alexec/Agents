@@ -1175,7 +1175,7 @@
           "name": "params",
           "required": true,
           "schema": {
-            "$ref": "daemon.schema.json#/definitions/Empty"
+            "$ref": "daemon.schema.json#/definitions/HostEnroll"
           }
         }
       ],
@@ -1472,6 +1472,81 @@
           "required": true,
           "schema": {
             "$ref": "daemon.schema.json#/definitions/ProviderGroup"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
+      "name": "bots/make",
+      "x-capability": "bots/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/BotMake"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/BotMade"
+        }
+      }
+    },
+    {
+      "name": "bots/setCaps",
+      "x-capability": "bots/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/BotCaps"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
+      "name": "bots/stopRun",
+      "x-capability": "bots/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/BotStopRun"
           }
         }
       ],
@@ -2167,6 +2242,26 @@
       ]
     },
     {
+      "name": "control/capReached",
+      "x-capability": "bots/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/CapReached"
+          }
+        }
+      ]
+    },
+    {
       "name": "usage/rollup",
       "x-capability": "reports/1",
       "description": "A host, on its channel 0 (#1811): its usage by the hour and the day.",
@@ -2417,6 +2512,43 @@
           }
         }
       ]
+    },
+    {
+      "name": "host/user",
+      "x-capability": "bots/1",
+      "description": "To a machine, on its channel 0, at each join and when its user changes (#1761): its user, their kind, its labels, and a bot's cap.",
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/HostUser"
+          }
+        }
+      ]
+    },
+    {
+      "name": "workflows/claimRun",
+      "x-capability": "bots/1",
+      "description": "A machine, on its channel 0 (#1761): asks to run a runs-on: workflow for one trigger; the first machine to ask runs it.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/WorkflowClaim"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/WorkflowClaimed"
+        }
+      }
     }
   ]
 }

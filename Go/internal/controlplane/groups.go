@@ -20,8 +20,13 @@ func (s *Service) inGroup(user, group string) bool {
 	if g == nil {
 		return false
 	}
-	if p := s.records.Person(user); p != nil && p.IsRemoved() {
+	p := s.records.Person(user)
+	if p != nil && p.IsRemoved() {
 		return false
+	}
+	// A bot is in its own group (#1761).
+	if p != nil && p.IsBot() {
+		return p.Group == group
 	}
 	return g.Has(user)
 }
@@ -39,7 +44,7 @@ func groupOnWire(g records.Group) wire.Group {
 	if members == nil || g.Everyone {
 		members = []string{}
 	}
-	return wire.Group{ID: g.ID, Name: g.Name, Everyone: g.Everyone, Members: members}
+	return wire.Group{ID: g.ID, Name: g.Name, Everyone: g.Everyone, Members: members, Caps: capsOnWire(g.Caps)}
 }
 
 // groupsMethod answers groups/list, groups/set, groups/remove and providers/setGroup.
@@ -121,9 +126,12 @@ func (m *Methods) setGroup(ctx context.Context, request wire.GroupSet) (wire.Gro
 		if g == nil && !making {
 			return nil, fail(invalidParams, "There is no such group.")
 		}
-		next := records.Group{ID: id, Name: name, Everyone: everyone, Members: members}
+		next := records.Group{ID: id, Name: name, Everyone: everyone, Members: members, Caps: capsOf(request.Caps)}
 		if g != nil {
 			next.Extra = g.Extra
+			if request.Caps == nil {
+				next.Caps = g.Caps
+			}
 		}
 		return &next, nil
 	})
@@ -137,6 +145,11 @@ func (m *Methods) setGroup(ctx context.Context, request wire.GroupSet) (wire.Gro
 func (m *Methods) removeGroup(ctx context.Context, id string) error {
 	if m.records.Group(id) == nil {
 		return fail(invalidParams, "There is no such group.")
+	}
+	for _, p := range m.records.People() {
+		if p.IsBot() && p.Group == id {
+			return fail(notPermitted, "The bot %s is in this group. Give it another group first.", p.Name)
+		}
 	}
 	if m.s.providers != nil {
 		if provider := m.s.providers.HasGroup(id); provider != "" {

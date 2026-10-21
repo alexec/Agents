@@ -10,8 +10,11 @@ public extension DaemonAPI {
         public var name: String
         public var everyone: Bool
         public var members: [String]
+        /// Caps for the group's bots together (#1761, FR-033).
+        public var caps: SpendCaps?
 
-        public init(id: String, name: String, everyone: Bool = false, members: [String] = []) {
+        public init(id: String, name: String, everyone: Bool = false, members: [String] = [], caps: SpendCaps? = nil) {
+            self.caps = caps
             self.id = id
             self.name = name
             self.everyone = everyone
@@ -35,8 +38,12 @@ public extension DaemonAPI {
         public var name: String
         public var everyone: Bool?
         public var members: [String]?
+        /// Left out keeps the caps it had.
+        public var caps: SpendCaps?
 
-        public init(id: String? = nil, name: String, everyone: Bool? = nil, members: [String]? = nil) {
+        public init(id: String? = nil, name: String, everyone: Bool? = nil, members: [String]? = nil,
+                    caps: SpendCaps? = nil) {
+            self.caps = caps
             self.id = id
             self.name = name
             self.everyone = everyone
@@ -62,6 +69,84 @@ public extension DaemonAPI {
         }
     }
 
+    /// Spend caps (#1761, FR-033): a bot or a group starts no work once its spend today
+    /// (UTC) reaches one. None is no cap.
+    struct SpendCaps: Codable, Sendable, Hashable {
+        public var dailyUSD: Double?
+
+        public init(dailyUSD: Double? = nil) { self.dailyUSD = dailyUSD }
+    }
+
+    /// `bots/make` (#1761, FR-030): a bot, in a group, with caps.
+    struct BotMake: Codable, Sendable, Hashable {
+        public var name: String
+        public var group: String
+        public var caps: SpendCaps?
+
+        public init(name: String, group: String, caps: SpendCaps? = nil) {
+            self.name = name
+            self.group = group
+            self.caps = caps
+        }
+    }
+
+    /// `bots/make`'s answer: the bot's user id.
+    struct BotMade: Codable, Sendable, Hashable {
+        public var user: String
+
+        public init(user: String) { self.user = user }
+    }
+
+    /// `bots/setCaps`: the bot's caps, and optionally its group.
+    struct BotCaps: Codable, Sendable, Hashable {
+        public var user: String
+        public var caps: SpendCaps
+        public var group: String?
+
+        public init(user: String, caps: SpendCaps, group: String? = nil) {
+            self.user = user
+            self.caps = caps
+            self.group = group
+        }
+    }
+
+    /// `bots/stopRun` (FR-031): an admin stops an agent on a bot's machine.
+    struct BotStopRun: Codable, Sendable, Hashable {
+        public var host: HostID
+        public var agent: UUID
+
+        public init(host: HostID, agent: UUID) {
+            self.host = host
+            self.agent = agent
+        }
+    }
+
+    /// `hosts/startEnroll` with `as`: a code for a bot's machine, an admin's only (#1761).
+    struct HostEnroll: Codable, Sendable, Hashable {
+        public var `as`: String?
+
+        public init(as bot: String? = nil) { self.as = bot }
+    }
+
+    /// `control/capReached` (FR-033): to admins, a bot stopped starting work at a cap.
+    struct CapReached: Codable, Sendable, Hashable {
+        public var user: String
+        public var name: String
+        public var group: String?
+        public var spentUSD: Double
+        public var capUSD: Double
+        public var until: Date
+
+        public init(user: String, name: String, group: String? = nil, spentUSD: Double, capUSD: Double, until: Date) {
+            self.user = user
+            self.name = name
+            self.group = group
+            self.spentUSD = spentUSD
+            self.capUSD = capUSD
+            self.until = until
+        }
+    }
+
     /// `control/groupsChanged`: a group was made, changed or removed.
     struct GroupsChanged: Codable, Sendable, Hashable {
         public var id: String?
@@ -83,11 +168,19 @@ public extension DaemonAPI.Method {
     static let groupsRemove = "groups/remove"
     /// `ProviderGroup` → `{}`, an admin's only (#1761).
     static let providersSetGroup = "providers/setGroup"
+    /// `BotMake` → `BotMade`, an admin's only (#1761).
+    static let botsMake = "bots/make"
+    /// `BotCaps` → `{}`, an admin's only (#1761).
+    static let botsSetCaps = "bots/setCaps"
+    /// `BotStopRun` → `{}`, an admin's only (#1761).
+    static let botsStopRun = "bots/stopRun"
 }
 
 public extension DaemonAPI.Notification {
     /// `GroupsChanged`: load Groups again (#1761).
     static let controlGroupsChanged = "control/groupsChanged"
+    /// `CapReached`: a bot is at its cap (#1761).
+    static let controlCapReached = "control/capReached"
 }
 
 /// The words Settings ▸ Groups and a provider's group are shown in, the same on the Mac and

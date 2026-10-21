@@ -45,6 +45,7 @@ type Daemon struct {
 	eventBook
 	actorBook
 	appToolsState
+	hostUserState
 	hostedPool
 	eventWaitState
 	messageState
