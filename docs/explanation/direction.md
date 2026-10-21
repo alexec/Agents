@@ -44,7 +44,7 @@ organisations it serves, changes.
 - The control plane is free in every shape. It is open source like the rest.
 - Hosted starts small (0.8): **one control plane per account**, each a separate copy with
   its own store and key. That uses the single-organisation design as it is today. Many
-  organisations on one shared copy (T10, #1003) comes later, in 0.11.
+  organisations on one shared copy (T10, #1003) comes later, in 0.12.
 - A feature is built for all three shapes, or it says which shape it leaves out and why.
 
 ## Tenancy: what belongs to what
@@ -145,5 +145,5 @@ from features taken out of the open source.
 ## Milestones
 
 The milestones to 1.0 are in issue #1340. The order follows this page: the cloud way in
-first (0.8), then teams (0.9), enterprises (0.10) and many organisations on one service
-(0.11).
+first (0.8), then teams (0.9), the docs, promotion and videos (0.10), enterprises (0.11) and
+many organisations on one service (0.12).
