@@ -13,6 +13,8 @@ struct YourConnectionsView: View {
     @State private var problem: String?
     @State private var connecting: DaemonAPI.ConnectionProvider?
     @State private var disconnecting: DaemonAPI.Connection?
+    /// The ended connection Connect Again\u{2026} is for, so its sheet opens the way it was made.
+    @State private var again: DaemonAPI.Connection?
 
     private var projects: [DaemonAPI.ProjectSummary] {
         model.work.projects.filter { $0.host == .mac && !$0.project.isArchived && $0.isChat != true }
@@ -70,7 +72,7 @@ struct YourConnectionsView: View {
             switch p {
             case .github: ConnectGitHubSheet(host: .mac, onConnected: { Task { await load() } })
             case .linear: ConnectLinearSheet(host: .mac, onConnected: { Task { await load() } })
-            case .gitlab: ConnectGitLabSheet(host: .mac, onConnected: { Task { await load() } })
+            case .gitlab: ConnectGitLabSheet(host: .mac, again: again, onConnected: { Task { await load() } })
             case .email: ConnectEmailSheet(host: .mac, onConnected: { Task { await load() } })
             }
         }
@@ -108,7 +110,7 @@ struct YourConnectionsView: View {
             }
             Spacer(minLength: 8)
             if c.state == .signInAgain {
-                Button("Connect Again\u{2026}") { connecting = c.provider }.buttonStyle(.paper).appText(.fine)
+                Button("Connect Again\u{2026}") { again = c; connecting = c.provider }.buttonStyle(.paper).appText(.fine)
             } else if c.provider == .github {
                 Button("Repositories on github.com") { open(ConnectorSetupWords.installationsURL) }
                     .buttonStyle(.link).appText(.fine)
@@ -138,7 +140,7 @@ struct YourConnectionsView: View {
 
     @ViewBuilder private var connectItems: some View {
         ForEach(unconnected, id: \.self) { p in
-            Button(ConnectorSetupWords.name(p)) { connecting = p }
+            Button(ConnectorSetupWords.name(p)) { again = nil; connecting = p }
         }
     }
 

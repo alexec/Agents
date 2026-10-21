@@ -14,6 +14,16 @@ struct ConnectGitLabSheet: View {
     var host: HostID
     var onConnected: () -> Void = {}
 
+    /// again is the ended connection Connect Again\u{2026} is for: the sheet opens the way it
+    /// was made, with its address (#1865).
+    init(host: HostID, again: DaemonAPI.Connection? = nil, onConnected: @escaping () -> Void = {}) {
+        self.host = host
+        self.onConnected = onConnected
+        let start = again.map(ConnectorSetupWords.GitLab.again)
+        _way = State(initialValue: start?.withToken == true ? .token : .signIn)
+        _address = State(initialValue: start?.address ?? "")
+    }
+
     private enum Way: Hashable { case signIn, token }
 
     private enum Step: Equatable {
@@ -24,9 +34,9 @@ struct ConnectGitLabSheet: View {
         case failed(String)
     }
 
-    @State private var way: Way = .signIn
+    @State private var way: Way
     @State private var step: Step = .asking
-    @State private var address = ""
+    @State private var address: String
     @State private var token = ""
 
     var body: some View {

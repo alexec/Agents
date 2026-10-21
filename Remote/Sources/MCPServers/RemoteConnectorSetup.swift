@@ -257,6 +257,19 @@ struct RemoteConnectSheet: View {
     var project: ProjectKey?
     var onConnected: () -> Void = {}
 
+    /// again is the ended GitLab connection Connect Again\u{2026} is for: the sheet opens the way
+    /// it was made, with its address (#1865).
+    init(provider: DaemonAPI.ConnectionProvider = .github, host: HostID, project: ProjectKey? = nil,
+         again: DaemonAPI.Connection? = nil, onConnected: @escaping () -> Void = {}) {
+        self.provider = provider
+        self.host = host
+        self.project = project
+        self.onConnected = onConnected
+        let start = provider == .gitlab ? again.map(ConnectorSetupWords.GitLab.again) : nil
+        _withToken = State(initialValue: start?.withToken ?? false)
+        _address = State(initialValue: start?.address ?? "")
+    }
+
     private enum Step: Equatable {
         case asking, starting
         case waiting(DaemonAPI.ConnectionSignIn)
@@ -272,8 +285,8 @@ struct RemoteConnectSheet: View {
 
     @State private var step: Step = .asking
     /// GitLab only: an access token instead of the sign-in.
-    @State private var withToken = false
-    @State private var address = ""
+    @State private var withToken: Bool
+    @State private var address: String
     @State private var token = ""
 
     var body: some View {
@@ -618,6 +631,8 @@ struct RemoteConnections: View {
     let reload: () async -> Void
     @State private var connecting: DaemonAPI.ConnectionProvider?
     @State private var disconnecting: DaemonAPI.Connection?
+    /// The ended connection Connect Again\u{2026} is for, so its sheet opens the way it was made.
+    @State private var again: DaemonAPI.Connection?
 
     var body: some View {
         Section {
@@ -635,7 +650,7 @@ struct RemoteConnections: View {
                     }
                     // The window's row actions (#1685).
                     if c.state == .signInAgain {
-                        Button("Connect Again\u{2026}") { connecting = c.provider }
+                        Button("Connect Again\u{2026}") { again = c; connecting = c.provider }
                     } else if c.provider == .github {
                         Link("Repositories on github.com", destination: URL(string: ConnectorSetupWords.installationsURL)!)
                     }
@@ -643,12 +658,12 @@ struct RemoteConnections: View {
                 }
                 // A provider with no row; one that asks to connect again has its own button.
                 if !has(.github, in: connections) {
-                    Button(ConnectorSetupWords.connectButton) { connecting = .github }
+                    Button(ConnectorSetupWords.connectButton) { again = nil; connecting = .github }
                 }
                 // Linear (#1343), GitLab (#1630) and Email (#1780): a row each while not connected.
                 ForEach(others.filter { !has($0, in: connections) }) { p in
                     VStack(alignment: .leading, spacing: 2) {
-                        Button("Connect \(ConnectorSetupWords.name(p))\u{2026}") { connecting = p }
+                        Button("Connect \(ConnectorSetupWords.name(p))\u{2026}") { again = nil; connecting = p }
                         Text(ConnectorSetupWords.notConnectedNote(p)).appText(.fine).foregroundStyle(.secondary)
                     }
                 }
@@ -663,7 +678,7 @@ struct RemoteConnections: View {
             if provider == .email {
                 RemoteConnectEmailSheet(host: .mac, onConnected: { Task { await reload() } })
             } else {
-                RemoteConnectSheet(provider: provider, host: .mac, onConnected: { Task { await reload() } })
+                RemoteConnectSheet(provider: provider, host: .mac, again: again, onConnected: { Task { await reload() } })
             }
         }
         .confirmationDialog(disconnecting.map { "Disconnect \(ConnectorSetupWords.connectionTitle($0))?" } ?? "",

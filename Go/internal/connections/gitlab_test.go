@@ -190,7 +190,8 @@ func TestAnEndedGitLabTokenAsksToSignInAgain(t *testing.T) {
 		t.Fatalf("got %v %v", r, err)
 	}
 	c, _, _ := s.Get(GitLab)
-	if !c.SignInAgain || c.Access != "" || c.URL != "https://gitlab.example.com/" {
+	// Its end is kept, so the row says the token ended, not that a renewal was refused (#1865).
+	if !c.SignInAgain || c.Access != "" || c.URL != "https://gitlab.example.com/" || !c.AccessExpiresAt.Equal(end) {
 		t.Fatalf("kept %+v", c)
 	}
 }

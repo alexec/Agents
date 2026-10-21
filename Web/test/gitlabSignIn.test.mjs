@@ -16,6 +16,13 @@ test("a token's row says its GitLab and when it ends", () => {
   assert.equal(c.connectionNote({ provider: "gitlab", state: "connected", connectedAt: 0 }), "OAuth · renews by itself");
 });
 
+test("Connect Again on an ended GitLab connection opens the way it was made (#1865)", () => {
+  const ended = { provider: "gitlab", state: "signInAgain", connectedAt: 0, workspace: "gitlab.example.com", expiresAt: 0 };
+  assert.deepEqual(c.gitlabAgain(ended), { withToken: true, address: "https://gitlab.example.com" });
+  assert.deepEqual(c.gitlabAgain({ ...ended, workspace: undefined }), { withToken: true, address: "https://gitlab.com" });
+  assert.deepEqual(c.gitlabAgain({ ...ended, workspace: undefined, expiresAt: undefined }), { withToken: false, address: "" });
+});
+
 test("Make a Token opens the right GitLab with the api scope", () => {
   assert.equal(c.newGitLabTokenURL(""), "https://gitlab.com/-/user_settings/personal_access_tokens?name=Agents&scopes=api");
   assert.equal(c.newGitLabTokenURL("gitlab.example.com/api/v4/"),
