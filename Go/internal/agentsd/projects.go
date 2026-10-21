@@ -699,6 +699,7 @@ func (d *Daemon) dress(s *wire.ProjectSummary) {
 		}
 	}
 	s.Approvals = append(s.Approvals, d.archiveApprovals(folder)...)
+	s.Approvals = append(s.Approvals, d.workflowFailures(folder)...)
 	if m, err := d.approvedConfig(folder); err == nil {
 		if v, ok := m["helperLimits"]; ok {
 			var l wire.HelperLimits

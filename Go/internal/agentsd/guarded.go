@@ -480,13 +480,19 @@ func (d *Daemon) registerGuarded() {
 }
 
 // answerApproval is approvals/answer for what this host asks: a file's change, a workflow
-// waiting for an OK, and a session asking to be archived.
+// waiting for an OK, a session asking to be archived, and a workflow that failed (#989).
 func (d *Daemon) answerApproval(r wire.ApprovalAnswer) (wire.ProjectSummary, error) {
 	folder := store.FolderPath(r.Folder)
-	if r.Action == wire.ApprovalActionDismiss {
+	// A failed workflow takes Dismiss and nothing else; nothing else takes Dismiss.
+	if failed := r.Kind == wire.ApprovalKindWorkflowFailed; failed != (r.Action == wire.ApprovalActionDismiss) {
+		if failed {
+			return wire.ProjectSummary{}, Invalid("A failed workflow can only be dismissed.")
+		}
 		return wire.ProjectSummary{}, Invalid("Only a failed workflow can be dismissed.")
 	}
 	switch r.Kind {
+	case wire.ApprovalKindWorkflowFailed:
+		return d.dismissWorkflowFailure(folder, r.Key, r.Digest)
 	case wire.ApprovalKindFile:
 		if r.Action == wire.ApprovalActionRequestChanges {
 			if r.Note == nil || strings.TrimSpace(*r.Note) == "" {
