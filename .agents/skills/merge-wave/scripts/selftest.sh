@@ -90,9 +90,7 @@ scenario_web() {
 	row() { sed -i '' "/^| Assess a runtime/a\\
 | wave row $1 | #0 | lacks | has | — | — | self-test |
 " specs/071-web-remote/walks/parity/pool-runtimes-and-spending.md; }
-	w1() { sed -i '' '1i\\
-console.debug("wave one");
-' Web/src/main.tsx && row one; }
+	w1() { { echo 'console.debug("wave one");'; cat Web/src/main.tsx; } >"$T-main.tsx" && mv "$T-main.tsx" Web/src/main.tsx && row one; }
 	w2() { echo 'console.debug("wave two");' >>Web/src/main.tsx && row two; }
 	branch s2-one w1
 	branch s2-two w2
