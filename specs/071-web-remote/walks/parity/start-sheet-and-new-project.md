@@ -1,0 +1,29 @@
+# Parity: Start sheet and new project
+
+A screen of [the parity table](../parity.md), which says what the paths and verdicts mean.
+
+| Feature | Mac | Remote | Web | Verdict |
+|---|---|---|---|---|
+| Its shape | A bar on the project: `A/Chat/PromptBar.swift:242-347` | A sheet: `R/StartAgent/StartAgentView.swift:25-46` | A bar: `W/views/NewAgent.tsx:154-210` | **by design** |
+| Persona (#760, #913) | A menu under the project's name in the middle of the page, the same control a size smaller, "No persona" for none, the description under it; sets what it names, keeps the rest, adds its labels: `A/Projects/ProjectAgentsView.swift` (`personaMenu`), `A/AppModel.swift` (`choosePersona`) | A heading-style menu at the top of the start page, the project staying the title, the same: `R/StartAgent/StartAgentView.swift` (`personaHeading`), `R/RemoteModel.swift` (`choosePersona`) | Under the project's name as its control, a size smaller, the same: `W/views/NewAgent.tsx` (`PersonaSwitch`), `W/model/personas.ts` | **same** |
+| Runtimes listed by name (#154) | `RuntimeCatalog.sortedByName` | The same | `W/model/runtimes.ts` | **same** |
+| Available and Out groups | For this Mac's projects: `A/Chat/PromptBar.swift:310-346, 1065-1087` | The project's host's runtimes, split only for this Mac's projects: `R/StartAgent/ChoiceRows.swift:57-140`, `R/RemoteModel.swift` `startRuntimes` (#240); under an available one's name, *Needs signing in* or its account, as the window's `signInNote` says it (#538) | Available, Out and Can't start, from the host's `isOut`, in runs only when one is out; under each, *Needs signing in* or its account (`runtimeNote`): `W/views/NewAgent.tsx:289-292`, `W/model/runtimes.ts` | **same** (#240, #257, #538) |
+| Default runtime | `RuntimeCatalog.newSessionRuntime`: the kept form's, else Claude, else the first: `A/Chat/PromptBar.swift:1119`, `K/Runtimes/RuntimeCatalog.swift:127-136` | The same rule, on this project's host, its kept choice in its defaults: `R/RemoteModel.swift:472-479, 527` | Its twin, held to the same fixture: `W/model/runtimes.ts`, `W/views/NewAgent.tsx` | **same** (#264) |
+| A model out of the pool (#140) | In the chooser | In the menu row | A line under the menus | **by design** (#140) |
+| Model, effort, permission | `A/Chat/PromptBar.swift:788-887` | `R/StartAgent/ChoiceRows.swift:22-50, 186-290` | Pills: `W/views/NewAgent.tsx:203-206` | **same** |
+| Sandbox choice, and *Start without sandbox* | `A/Chat/PromptBar.swift:854-878, 952-974` | Choice menu, including *Start without sandbox*: `R/StartAgent/ChoiceRows.swift` | Both: `W/views/NewAgent.tsx:363` | **same** (web #257) |
+| Options that fail to load | Retry: `A/Chat/PromptBar.swift:745-751` | *Try again*: `R/StartAgent/ChoiceRows.swift:28-33` | *Try again*: `W/views/NewAgent.tsx:219` | **same** (#257) |
+| Labels (tag input) | `S/LabelTagField.swift` | Shared | `W/views/Labels.tsx` | **same** |
+| Where it runs | Folder; new worktree (or why not); worktrees, missing ones off, *· N agents*; on a branch: `A/Chat/PromptBar.swift:1129-1178` | The same, with git status: `R/StartAgent/ChoiceRows.swift:133-182` | The window's: `W/views/NewAgent.tsx:250-266` | **same** (#257) |
+| Reach: extra folders | `A/StartAgent/AgentReachView.swift` | Folder paths on the start page: `R/StartAgent/StartAgentView.swift` | Typed paths: `W/views/Reach.tsx` | **same** |
+| Reach: Connectors (#1422) | `A/StartAgent/AgentReachView.swift` | None | *chosen in the window* | **by design** (the window's) |
+| The project's host offline | Send off: `A/Chat/PromptBar.swift:365-372` | Send off, with the strip: `R/StartAgent/StartAgentView.swift:45, 135-139` | Off: `W/views/NewAgent.tsx:144-146` | **same** (#239) |
+| Starting, in flight (#87) | Words held, *Starting — telling …* | Spinner, *telling* the project's host | Held: `W/views/Prompt.tsx:92-120` | **same** |
+| Attachments, refused before sending | `A/Chat/AttachmentStrip.swift` | `R/StartAgent/PhoneAttachments.swift` | `W/model/attachments.ts` | **same** |
+| The form kept between starts | Text, attachments, folder, runtime, reach, options: `A/Chat/DraftKeeper.swift:125-170` | Text, attachments, runtime, reach folders and options: `R/StartAgent/StartDraftKeeper.swift`, `R/RemoteModel.swift` | Text, runtime, reach, options: `W/model/startForm.ts` | **same** (web #257; the folder is not kept, as the window keeps none for the page's places) |
+| Prewarm on typing (#183) | Yes | Yes, to the agent's host | Yes | **same** (#238) |
+| Add Folder…, Clone Git URL… (#115) | `A/Projects/ProjectListView.swift:150-180`, `A/Projects/CloneSheet.swift` | The sidebar's + at any time, per host, browsing the host's folders over `files/browse`, and the empty list's two buttons (#537): `R/Projects/NewProjectSheet.swift`, `R/Sidebar/RemoteSidebar.swift`, `R/RemoteModel.swift` | `W/views/NewProject.tsx:34-260` | **same** |
+| Add Server… | `A/Control/ControlAddServerSheet.swift` | None | None | **by design** (installs over ssh from the Mac) |
+| Add Folder on this Mac: Finder drag, the clipboard's URL | Yes | n/a | Browses the host instead | **by design** (#115: no drag from Finder, no clipboard read) |
+| No projects yet | Words and buttons, or *No agent runtime found* and each runtime's standing: `A/Projects/ProjectListView.swift:593-623` | Empty-state words and Add Project… / Clone Project from Git URL… buttons opening the + menu's sheets on this Mac: `R/Sidebar/ProjectRow.swift` | *No projects yet*, or *No agent runtime found* when this Mac has none that can start: `W/views/NewProject.tsx:89-156` | **same** (#257; Install stays on the Mac. The Remote's empty list does not switch, by design: a phone does not install a runtime) |
+| Continue in the project folder (#119, 065) | `A/AppModel.swift:2944-2958` | `R/RemoteModel.swift:2387-2407` | `W/model/store.ts:1088-1091` | **same** |

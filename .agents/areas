@@ -585,6 +585,7 @@ docs/how-to/sign-in-with-*                             sign-in
 
 # Shared files every lane touches: no area, last so that nothing above claims them.
 specs/071-web-remote/walks/parity.md                   -
+specs/071-web-remote/walks/parity/                     -
 Web/src/protocol/generated.ts                          -
 # The control plane's method table and its wire: each feature adds a line or two, and
 # the golden files are made again (#2017).
