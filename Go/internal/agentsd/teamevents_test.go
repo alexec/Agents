@@ -137,3 +137,51 @@ func TestABotsMachineSendsTeamEventsAndKeepsItsOwn(t *testing.T) {
 		return len(d.recordsLocked().Runs) == 0
 	})
 }
+
+// A person's machine sends the schedule of a bot's runs-on: workflow to the control plane,
+// which starts a machine of the bot's when none is online (#2011, FR-034); it runs nothing
+// of it, and a bot's machine sends none of another's.
+func TestAPersonsMachineSendsABotsSchedule(t *testing.T) {
+	d, c := start(t, t.TempDir())
+	defer d.Shutdown()
+	dir := project(t, c, 1)
+	os.MkdirAll(workflowsFolder(dir), 0o755)
+	os.WriteFile(filepath.Join(workflowsFolder(dir), "nightly.md"), []byte("---\nname: Nightly\non:\n  - schedule:\n      at: \":00\"\nruns-on: [review-bot]\n---\nTidy up.\n"), 0o644)
+	var mu sync.Mutex
+	var sent []wire.TeamTrigger
+	d.SetControlAsk(askControl(func(_ context.Context, method string, params any) (json.RawMessage, error) {
+		if method == wire.CallWorkflowsTrigger.Name {
+			mu.Lock()
+			sent = append(sent, params.(wire.TeamTrigger))
+			mu.Unlock()
+		}
+		return json.Marshal(wire.TeamTriggerSent{Taken: true})
+	}))
+	hour := time.Date(2026, 10, 21, 11, 0, 0, 0, time.Local)
+	d.workflowTickOnce(hour.Add(-time.Minute))
+	d.workflowTickOnce(hour.Add(30 * time.Second))
+	waitFor(t, "the schedule sent", func() bool { mu.Lock(); defer mu.Unlock(); return len(sent) == 1 })
+	mu.Lock()
+	got := sent[0]
+	mu.Unlock()
+	if got.Workflow != filepath.Base(dir)+"/nightly" || got.DueAt == nil || !got.DueAt.Time().Equal(hour) || got.Trigger != "schedule:"+hour.UTC().Format(time.RFC3339) {
+		t.Fatalf("%+v", got)
+	}
+	for _, n := range names(d) {
+		if n == "workflow.ran" || n == "workflow.refused" {
+			t.Fatalf("%s here", n)
+		}
+	}
+
+	// A bot's machine, another bot's workflow: nothing sent.
+	told, _ := json.Marshal(wire.HostUser{User: "b2", Kind: "bot", Name: "other-bot", Labels: []string{}})
+	d.toldHostUser(told)
+	d.workflowTickOnce(hour.Add(59 * time.Minute))
+	d.workflowTickOnce(hour.Add(60*time.Minute + 30*time.Second))
+	time.Sleep(200 * time.Millisecond)
+	mu.Lock()
+	defer mu.Unlock()
+	if len(sent) != 1 {
+		t.Fatalf("%+v", sent)
+	}
+}

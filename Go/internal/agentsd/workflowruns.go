@@ -825,16 +825,36 @@ func (d *Daemon) workflowTickOnce(at time.Time) {
 	d.scanLocked()
 	var fires []fireRequest
 	var missed []fireRequest
+	var sends []fireRequest
 	held := map[string]bool{}
 	if since != nil && since.Before(at) {
 		away := at.Sub(*since) > workflowAway
+		bot := d.isBot()
 		for folder, ws := range d.workflowFiles {
 			for id, f := range ws {
 				if st := d.stateLocked(folder, id, false); st != nil && st.HeldFire != nil {
 					held[workflowKey(folder, id)] = true
 				}
 				w := f.wf
-				if !d.runsHere(w) || w.Problem != nil || isArchived(w) {
+				if w.Problem != nil || isArchived(w) {
+					continue
+				}
+				// Another's runs-on: workflow, a bot's perhaps: a person's machine sends its
+				// schedule to the control plane, which starts a machine of the bot's for it
+				// when none is online (#2011, FR-034). Nothing of it runs here.
+				if !d.runsHere(w) {
+					if bot || away || isOff(w) || len(w.RunsOn) == 0 {
+						continue
+					}
+					for _, t := range w.Triggers {
+						if t.Schedule == nil {
+							continue
+						}
+						if due, ok := nextDue(t.Schedule.Value, *since); ok && !due.After(at) {
+							sends = append(sends, fireRequest{folder: folder, id: id, trigger: t, dueAt: &due})
+							break
+						}
+					}
 					continue
 				}
 				for _, t := range w.Triggers {
@@ -871,6 +891,10 @@ func (d *Daemon) workflowTickOnce(at time.Time) {
 	for _, fr := range fires {
 		fr := fr
 		safe.Go("workflow schedule", func() { d.fire(fr) })
+	}
+	for _, fr := range sends {
+		fr := fr
+		safe.Go("workflow schedule sent", func() { d.sendOthers(fr) })
 	}
 }
 

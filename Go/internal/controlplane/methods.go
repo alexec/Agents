@@ -963,6 +963,8 @@ func (m *Methods) hello(ctx context.Context, host string, hello wire.HostHello) 
 		m.s.sendHostUser(host)
 		if owner := m.s.ownerOf(host); m.s.isBot(owner) {
 			m.s.checkCaps(owner)
+			// What waited for a bot's machine (#2011, FR-034).
+			m.s.botMachineJoined(host)
 		}
 	}()
 	// A host marked before #656 to add the projects it found: the mark goes, unsaid.

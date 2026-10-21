@@ -176,3 +176,16 @@ func (d *Daemon) teamFire(fr fireRequest, w wire.Workflow) bool {
 	}
 	return d.claimRun(fr.folder, fr.id, triggerID(fr, fr.event))
 }
+
+// sendOthers sends the control plane a schedule of a runs-on: workflow that does not run
+// here (#2011, FR-034): when it names a bot of this machine's user's group, the control
+// plane sends it once, starting a machine of the bot's if none is online.
+func (d *Daemon) sendOthers(fr fireRequest) {
+	d.workflowMu.Lock()
+	f := d.fileLocked(fr.folder, fr.id)
+	d.workflowMu.Unlock()
+	if f == nil || d.askControl.Load() == nil {
+		return
+	}
+	d.sendTrigger(fr, f.wf)
+}
