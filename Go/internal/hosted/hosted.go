@@ -59,6 +59,8 @@ type Service struct {
 	// Copies being started, so two requests start one.
 	starting map[string]chan struct{}
 	stopped  bool
+	// Closed by Stop, for the idle sweep.
+	stop chan struct{}
 }
 
 // New makes the service: its session key comes from its own key, sealed in the store
@@ -90,13 +92,17 @@ func New(ctx context.Context, cfg Config) (*Service, error) {
 		sessions: sessions{key: controllink.HKDF(own, []byte("agents-hosted-session-v1"), nil, 32), now: cfg.Now},
 		github: gitHub{clientID: cfg.GitHubClientID, secret: cfg.GitHubSecret, web: cfg.GitHubWeb, api: cfg.GitHubAPI,
 			redirect: "https://" + cfg.Domain + "/signin/callback"},
-		copies: map[string]*copyRunning{}, starting: map[string]chan struct{}{}}
+		copies: map[string]*copyRunning{}, starting: map[string]chan struct{}{}, stop: make(chan struct{})}
+	go s.sweepIdleEvery(time.Minute)
 	return s, nil
 }
 
 // Stop stops every account's copy.
 func (s *Service) Stop() {
 	s.mu.Lock()
+	if !s.stopped {
+		close(s.stop)
+	}
 	s.stopped = true
 	copies := s.copies
 	s.copies = map[string]*copyRunning{}
