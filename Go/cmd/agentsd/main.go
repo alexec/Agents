@@ -13,6 +13,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -126,7 +127,11 @@ type commandLine struct {
 	network  bool
 	code     string
 	hostName string
-	args     []string
+	// web and webPort: the page to serve on loopback, when the control plane runs elsewhere
+	// (#1951). Agents Host gives them only then.
+	web     string
+	webPort int
+	args    []string
 }
 
 func parse(args []string) commandLine {
@@ -158,6 +163,8 @@ func parse(args []string) commandLine {
 		cl.code = value("--control-code")
 	}
 	cl.hostName = value("--host-name")
+	cl.web = value("--web")
+	cl.webPort, _ = strconv.Atoi(value("--web-port"))
 	if cl.root == "" {
 		cl.root = os.Getenv("AGENTS_ROOT")
 	}
@@ -274,6 +281,10 @@ func join(ctx context.Context, cl commandLine, d *agentsd.Daemon) {
 	up.Told = d.Told
 	// A window on this Mac reaches this host directly (#1118).
 	d.StartLocal(ctx, member, private)
+	// And a browser on it, through the page this host serves (#1951).
+	if cl.web != "" {
+		d.StartPage(ctx, private, cl.web, cl.webPort)
+	}
 	d.SetControl(up.Tell)
 	d.SetControlAsk(up.Ask)
 	safe.Go("uplink", func() {
