@@ -22,7 +22,7 @@ import { refusalMessage } from "../model/workflows";
 import { dayTokenLimitReached, money } from "../model/limits";
 import { UsageCharts } from "./UsageCharts";
 import { mergeUsage } from "../model/usage";
-import { hostAnswers } from "../model/capabilities";
+import { hostAnswers, hostNeedsUpdate } from "../model/capabilities";
 import { mergeTime } from "../model/time";
 import { TimeCharts } from "./TimeCharts";
 import { MilestonesSection, TimeMilestonesUnder } from "./Milestones";
@@ -294,7 +294,9 @@ export function ActivityPageView({ store, page }: { store: Store; page: Activity
               {store.hosts.value.map((host) => (
                 <section key={host.id}>
                   {several && <h2 class="section-head">{hostName(host.id)}</h2>}
-                  {store.has(host.id, Capability.connections1) && <YourConnections store={store} host={host.id} />}
+                  {store.has(host.id, Capability.connections1)
+                    ? <YourConnections store={store} host={host.id} />
+                    : <p class="hint">{hostNeedsUpdate}</p>}
                   <h2 class="setup-heading">Your connectors</h2>
                   <MCPServersList store={store} host={host.id} />
                 </section>

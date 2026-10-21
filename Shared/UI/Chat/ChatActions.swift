@@ -28,6 +28,9 @@ struct ChatActions {
     /// entry, with the prompt's words in its prompt bar. Nil where Branch is not offered (an
     /// archived session), and then a prompt offers nothing.
     var branchFrom: (@MainActor (UUID, String) -> Void)? = nil
+    /// The host is too old to branch (#1748): Branch from Here stays on a prompt, greyed,
+    /// and says so (#1866), rather than leaving with no word.
+    var branchNeedsUpdate = false
     /// Run a command from a reply in the session's shell, and show the shell (#1533). Nil
     /// where there is no shell, and then a reply offers nothing.
     var runCommand: (@MainActor (String) -> Void)? = nil

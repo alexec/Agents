@@ -51,6 +51,7 @@ import { hasTurnInFlight, promptPlaceholder, willQueue } from "../model/promptWo
 import { eventWaitCapsule, leaseMark } from "../model/rowLines";
 import { GuardedChangeCard } from "./GuardedChange";
 import { Capability } from "../protocol/capabilities.generated";
+import { hostNeedsUpdate } from "../model/capabilities";
 
 /** One opened turn's entries, so an earlier page can be put in front and drawn again (#291). */
 interface HeldTurn {
@@ -177,6 +178,8 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
         const now = store.agent(host, session);
         if (now) void branchFromPrompt(store, host, now, entryID, text);
       } : undefined,
+      // On a host too old to branch, Branch from Here stays, greyed, and says so (#1866).
+      branchNeedsUpdate: !!agent && agent.state !== "archived" && !store.has(host, Capability.chatBranch1),
       // Answered only while the agent waits on it, and while its host answers (#253).
       waitingSandbox: agent?.pendingSandboxFailure,
       answerSandbox: agent?.pendingSandboxFailure && !down ? (carryOn) => store.answerSandbox(host, session, carryOn) : undefined,
@@ -189,7 +192,7 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
       noteChart: (file) => store.noteChartHint(host, file.path, file.chart),
       readFile: (path) => store.readFile(host, session, path),
     };
-  }, [host, session, agent?.pendingSandboxFailure, down, !agent || agent.state === "archived"]);
+  }, [host, session, agent?.pendingSandboxFailure, down, !agent || agent.state === "archived", store.has(host, Capability.chatBranch1)]);
 
   const scroller = useRef<HTMLDivElement>(null);
   const chatColumn = useRef<HTMLElement>(null);
@@ -496,7 +499,8 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
             focusedIndex.value = null;
             focusedEntry.value = prompt.id;
           }}
-          branchFrom={agent.state !== "archived" && !down && store.has(host, Capability.chatBranch1) ? (prompt) => void branchFromPrompt(store, host, agent, prompt.id, prompt.text) : undefined} />
+          branchFrom={agent.state !== "archived" && !down && store.has(host, Capability.chatBranch1) ? (prompt) => void branchFromPrompt(store, host, agent, prompt.id, prompt.text) : undefined}
+          branchNeedsUpdate={agent.state !== "archived" && !store.has(host, Capability.chatBranch1)} />
       )}
       <header class="column-head">
         <BackToList />
@@ -717,9 +721,11 @@ function Queued({ store, host, agent, disabled, draftKey }: { store: Store; host
               <button class="link" disabled={disabled || !!acting} title="Send this into the turn that is running, without waiting for it to end"
                 onClick={() => void store.sendNow(host, agent.id, queued.id)}>↑ Send now</button>
             ))}
-            {/* The person's own words only: another agent's are theirs (#560). Not on a host too old to change them (#1748). */}
-            {(queued.from ?? "person") === "person" && store.has(host, Capability.agentsEditQueued1) && (
-              <button class="link" aria-label="Edit queued prompt" title="Change the words. It keeps its place in the queue." disabled={disabled || going}
+            {/* The person's own words only: another agent's are theirs (#560). On a host too old to change them (#1748), greyed and saying why (#1866). */}
+            {(queued.from ?? "person") === "person" && (
+              <button class="link" aria-label="Edit queued prompt"
+                title={store.has(host, Capability.agentsEditQueued1) ? "Change the words. It keeps its place in the queue." : hostNeedsUpdate}
+                disabled={disabled || going || !store.has(host, Capability.agentsEditQueued1)}
                 onClick={() => (editing.value = { id: queued.id, text: queued.text })}>Edit</button>
             )}
             <button class="remove" aria-label="Remove queued prompt" title="Do not send this" disabled={disabled || going}

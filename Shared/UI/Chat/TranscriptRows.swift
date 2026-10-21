@@ -637,9 +637,10 @@ struct QueuedPromptRow: View {
                     .help("Send this into the turn that is running, without waiting for it to end")
                 }
 
-                // The person's own words only: another agent's are theirs (#560). Not on a
-                // host too old to change them (#1748).
-                if prompt.from == .person, actions.canEditQueued(agentID) {
+                // The person's own words only: another agent's are theirs (#560). On a host
+                // too old to change them (#1748), greyed and saying why (#1866).
+                if prompt.from == .person {
+                    let canEdit = actions.canEditQueued(agentID)
                     Button {
                         draft = prompt.text
                     } label: {
@@ -653,8 +654,8 @@ struct QueuedPromptRow: View {
                     }
                     .buttonStyle(.borderless)
                     .foregroundStyle(.tertiary)
-                    .disabled(going)
-                    .help("Change the words. It keeps its place in the queue.")
+                    .disabled(going || !canEdit)
+                    .help(canEdit ? "Change the words. It keeps its place in the queue." : UpdateWords.hostNeedsUpdate)
                     .accessibilityLabel("Edit queued prompt")
                 }
 
@@ -1112,6 +1113,8 @@ struct CopiesMessage: ViewModifier {
         if let text {
             let quote = isReply ? actions.quote : nil
             let branch = prompt.flatMap { id in actions.branchFrom.map { branch in { branch(id, text) } } }
+            // On a host too old to branch, greyed and saying why (#1866).
+            let greyedBranch = prompt != nil && branch == nil && actions.branchNeedsUpdate
             content
                 .contextMenu {
                     Button("Copy Message") { Self.copy(text) }
@@ -1121,6 +1124,10 @@ struct CopiesMessage: ViewModifier {
                     if let branch {
                         Button("Branch from Here", action: branch)
                             .help(SessionPrompt.branchHelp)
+                    } else if greyedBranch {
+                        Button("Branch from Here") {}
+                            .disabled(true)
+                            .help(UpdateWords.hostNeedsUpdate)
                     }
                 }
                 .accessibilityAction(named: "Copy Message") { Self.copy(text) }

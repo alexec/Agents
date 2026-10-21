@@ -29,15 +29,19 @@ struct MCPServersView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
-                // The set-up (#1336): a project's slots, or the person's connections; neither on
-                // a host too old to have them (#1748).
+                // The set-up (#1336): a project's slots, or the person's connections; on a host
+                // too old to have them (#1748), the line that says so in their place (#1866).
                 if let project {
                     if model.host(host, has: Capability.connectorsSetup1) {
                         ConnectorSetupView(project: project, projectName: projectName ?? project.folder.lastPathComponent,
                                            addConnector: { adding = true })
+                    } else {
+                        Text(UpdateWords.hostNeedsUpdate).foregroundStyle(.secondary)
                     }
                 } else if model.host(host, has: Capability.connections1) {
                     YourConnectionsView()
+                } else {
+                    Text(UpdateWords.hostNeedsUpdate).foregroundStyle(.secondary)
                 }
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     Text(project == nil ? "Your connectors" : "All connectors")

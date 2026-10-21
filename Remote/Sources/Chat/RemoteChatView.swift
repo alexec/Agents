@@ -225,7 +225,8 @@ struct RemoteChatView: View {
                             },
                             branch: branchFrom.map { branch in { branch($0.id, $0.text) } },
                             loadEarlier: { [model] in await model.loadEarlier() },
-                            close: { showingPrompts = false })
+                            close: { showingPrompts = false },
+                            branchNeedsUpdate: branchNeedsUpdate)
             }
         }
         .sheet(isPresented: Binding(get: { subagentOnScreen != nil },
@@ -414,6 +415,7 @@ struct RemoteChatView: View {
             canEditQueued: { [model] agentID in model.agent(agentID, has: Capability.agentsEditQueued1) },
             quote: { [model, agent] words in model.offeredQuote = PromptOffer(agentID: agent?.id, words: words) },
             branchFrom: branchFrom,
+            branchNeedsUpdate: branchNeedsUpdate,
             runCommand: runCommand,
             tellAgent: tellAgent,
             sendNow: { [model] prompt, agentID in await model.sendNow(prompt, to: agentID) },
@@ -484,6 +486,12 @@ struct RemoteChatView: View {
         // Not on a host too old to branch (#1748).
         guard let agent, agent.state != .archived, model.host(agent.host, has: Capability.chatBranch1) else { return nil }
         return { [model] entryID, text in Task { await model.branch(from: entryID, of: agent.id, text: text) } }
+    }
+
+    /// Branch from Here kept, greyed, on a host too old to branch (#1866).
+    private var branchNeedsUpdate: Bool {
+        guard let agent, agent.state != .archived else { return false }
+        return !model.host(agent.host, has: Capability.chatBranch1)
     }
 
     /// The open agent's sandbox card, while it waits (064).
