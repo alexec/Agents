@@ -51,6 +51,10 @@ type Uplink struct {
 	// Told is handed what the control plane tells this host on channel 0, a method and its
 	// params, such as host/clients (#1118); nil hears none of it.
 	Told func(method string, params json.RawMessage)
+	// Asked answers what the control plane asks this host on channel 0, such as
+	// workflows/fire (#2011): the result, or false to leave it unanswered, as a host that
+	// does not know the method; nil answers nothing.
+	Asked func(method string, params json.RawMessage) (any, bool)
 	// Rotated is handed the control plane's new key once this host has taken it (#997),
 	// for what is named by it, such as the local socket; nil hears nothing.
 	Rotated func(controlKey []byte)
@@ -526,8 +530,25 @@ func (u *Uplink) message(n int, message string) {
 			Method string          `json:"method"`
 			Params json.RawMessage `json:"params"`
 		}
-		if u.Told != nil && json.Unmarshal([]byte(message), &told) == nil && told.ID == nil && told.Method != "" {
-			u.Told(told.Method, told.Params)
+		if json.Unmarshal([]byte(message), &told) != nil || told.Method == "" {
+			return
+		}
+		if told.ID == nil {
+			if u.Told != nil {
+				u.Told(told.Method, told.Params)
+			}
+			return
+		}
+		if asked := u.Asked; asked != nil {
+			safe.Go("control asked", func() {
+				result, ok := asked(told.Method, told.Params)
+				if !ok {
+					return
+				}
+				r, _ := json.Marshal(result)
+				m, _ := json.Marshal(map[string]any{"jsonrpc": "2.0", "id": told.ID, "result": json.RawMessage(r)})
+				_ = u.write(channelLine(0, string(m)))
+			})
 		}
 		return
 	}

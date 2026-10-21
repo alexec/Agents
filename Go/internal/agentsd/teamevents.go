@@ -1,0 +1,178 @@
+package agentsd
+
+import (
+	"encoding/json"
+	"log"
+	"path/filepath"
+	"sort"
+	"strings"
+
+	"github.com/alexec/agents/Go/wire"
+)
+
+// Scoped events (#2011, spec 736 FR-035). On a bot's machine, a runs-on: workflow's
+// trigger is one of three scopes:
+//
+//   - a machine event (machine.*, dropbox.*) stays on its machine: it runs here, unclaimed;
+//   - a project or control-plane event (a server's, such as github or a channel's) or a
+//     schedule is sent to the control plane (workflows/trigger), which sends it once, to one
+//     of the bot's machines (workflows/fire);
+//   - anything else this machine raised itself (its agents, its workflows, its branches) is
+//     claimed, as before (#1761).
+//
+// A control plane that does not take it (an older one, or runs-on: names no bot) leaves
+// the claim to keep the run to one.
+
+type triggerScope int
+
+const (
+	scopeClaimed triggerScope = iota
+	scopeMachine
+	scopeTeam
+)
+
+// scopeOf is the scope of the trigger a fire answers.
+func scopeOf(fr fireRequest) triggerScope {
+	if fr.dueAt != nil {
+		return scopeTeam
+	}
+	if fr.event == nil {
+		return scopeClaimed
+	}
+	noun, _, _ := strings.Cut(fr.event.Name, ".")
+	switch {
+	case noun == "machine" || noun == "dropbox":
+		return scopeMachine
+	case fr.event.Details["server"] != "" && isServerEventName(fr.event.Name):
+		return scopeTeam
+	}
+	return scopeClaimed
+}
+
+// workflowName is a workflow as every machine names it: by the project folder's name, as
+// each keeps its own copy of the project at a path of its own.
+func workflowName(folder, id string) string { return filepath.Base(folder) + "/" + id }
+
+// sendTrigger is workflows/trigger. taken is true when the control plane sends it once;
+// ok is false when it could not be asked or did not answer.
+func (d *Daemon) sendTrigger(fr fireRequest, w wire.Workflow) (taken, ok bool) {
+	ask := d.askControl.Load()
+	if ask == nil {
+		return false, false
+	}
+	t := wire.TeamTrigger{Workflow: workflowName(fr.folder, fr.id), Trigger: triggerID(fr, fr.event), RunsOn: w.RunsOn, Event: fr.event}
+	if fr.dueAt != nil {
+		due := wire.DateOf(*fr.dueAt)
+		t.DueAt = &due
+	}
+	out, err := (*ask)(d.ctx, wire.CallWorkflowsTrigger.Name, t)
+	if err != nil {
+		log.Printf("workflow %s: the control plane did not take %s: %v", fr.id, t.Trigger, err)
+		return false, false
+	}
+	var sent wire.TeamTriggerSent
+	if json.Unmarshal(out, &sent) != nil {
+		return false, false
+	}
+	if sent.Taken {
+		log.Printf("workflow %s: the control plane sends %s once", fr.id, t.Trigger)
+	}
+	return sent.Taken, true
+}
+
+// Asked answers what the control plane asks on channel 0: workflows/fire.
+func (d *Daemon) Asked(method string, params json.RawMessage) (any, bool) {
+	if method != wire.CallWorkflowsFire.Name {
+		return nil, false
+	}
+	var t wire.TeamTrigger
+	if err := json.Unmarshal(params, &t); err != nil {
+		log.Printf("workflows/fire: %v", err)
+		return wire.TeamTriggerFired{Ran: false}, true
+	}
+	return wire.TeamTriggerFired{Ran: d.fireFromControl(t)}, true
+}
+
+// fireFromControl runs a trigger the control plane took once: true when this machine has
+// the workflow, runs it here, and one of its triggers matches. Its refusals (a run still
+// going, the cap) are recorded here as for any trigger.
+func (d *Daemon) fireFromControl(t wire.TeamTrigger) bool {
+	project, id, ok := strings.Cut(t.Workflow, "/")
+	if !ok || project == "" || id == "" {
+		return false
+	}
+	d.workflowMu.Lock()
+	if d.workflowFiles == nil {
+		d.scanLocked()
+	}
+	folders := make([]string, 0, len(d.workflowFiles))
+	for folder := range d.workflowFiles {
+		if filepath.Base(folder) == project && d.workflowFiles[folder][id] != nil {
+			folders = append(folders, folder)
+		}
+	}
+	sort.Strings(folders)
+	var fr *fireRequest
+	for _, folder := range folders {
+		w := d.workflowFiles[folder][id].wf
+		if !d.runsHere(w) || w.Problem != nil || isArchived(w) {
+			continue
+		}
+		if f, matched := matchTeamTrigger(folder, id, w, t); matched {
+			fr = &f
+			break
+		}
+	}
+	d.workflowMu.Unlock()
+	if fr == nil {
+		log.Printf("workflows/fire: %s does not run %s here", t.Workflow, t.Trigger)
+		return false
+	}
+	f := *fr
+	d.goAfterTurn("workflow fire", func() { d.fire(f) })
+	return true
+}
+
+// matchTeamTrigger is the fire for a trigger sent by the control plane: a schedule's, or
+// the trigger the event matches, with the event's project made this machine's own folder.
+func matchTeamTrigger(folder, id string, w wire.Workflow, t wire.TeamTrigger) (fireRequest, bool) {
+	fr := fireRequest{folder: folder, id: id, fromControl: true}
+	if t.DueAt != nil {
+		for _, trig := range w.Triggers {
+			if trig.Schedule != nil {
+				due := t.DueAt.Time()
+				fr.trigger, fr.dueAt = trig, &due
+				return fr, true
+			}
+		}
+		return fr, false
+	}
+	if t.Event == nil {
+		return fr, false
+	}
+	e := *t.Event
+	e.Scope = projectScope(folder)
+	for _, trig := range w.Triggers {
+		p, isPattern := triggerPattern(trig)
+		mt, isServer := serverTrigger(trig)
+		if isPattern && p.matches(e) || isServer && mt.matches(e) {
+			fr.trigger, fr.event, fr.depth = trig, &e, e.ChainDepth
+			return fr, true
+		}
+	}
+	return fr, false
+}
+
+// teamFire decides how a bot's machine runs a runs-on: trigger it heard itself: true to go
+// on and run it here.
+func (d *Daemon) teamFire(fr fireRequest, w wire.Workflow) bool {
+	switch scopeOf(fr) {
+	case scopeMachine:
+		return true
+	case scopeTeam:
+		if taken, ok := d.sendTrigger(fr, w); ok && taken {
+			return false
+		}
+	}
+	return d.claimRun(fr.folder, fr.id, triggerID(fr, fr.event))
+}

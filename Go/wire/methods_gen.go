@@ -457,6 +457,8 @@ var (
 	CallUserSetSettings              = Method[UserSettingsPart, Empty]{"user/setSettings"}
 	CallUserSettings                 = Method[Empty, UserSettings]{"user/settings"}
 	CallWorkflowsClaimRun            = Method[WorkflowClaim, WorkflowClaimed]{"workflows/claimRun"}
+	CallWorkflowsFire                = Method[TeamTrigger, TeamTriggerFired]{"workflows/fire"}
+	CallWorkflowsTrigger             = Method[TeamTrigger, TeamTriggerSent]{"workflows/trigger"}
 	CallWorkspacesForAgent           = Method[Empty, AgentWorkspaces]{"workspaces/forAgent"}
 	NotifyControlCapReached          = Notification[CapReached]{"control/capReached"}
 	NotifyControlClientChanged       = Notification[ControlClientChanged]{"control/clientChanged"}

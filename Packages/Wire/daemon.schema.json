@@ -20153,6 +20153,62 @@
       ],
       "additionalProperties": false
     },
+    "TeamTrigger": {
+      "type": "object",
+      "description": "workflows/trigger and workflows/fire (#2011, spec 736 FR-035): a project or control-plane event (a server's, such as github or a channel's) or a schedule that a runs-on: workflow's trigger matched. A machine sends it to the control plane, which sends it once to one of the bot's machines. workflow is the project folder's name and the workflow's id; trigger, the same words on every machine that heard it; event, the event (none for a schedule); dueAt, a schedule's due time.",
+      "properties": {
+        "workflow": {
+          "type": "string"
+        },
+        "trigger": {
+          "type": "string"
+        },
+        "runsOn": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "event": {
+          "$ref": "#/definitions/Event"
+        },
+        "dueAt": {
+          "$ref": "#/definitions/WireDate"
+        }
+      },
+      "required": [
+        "workflow",
+        "trigger",
+        "runsOn"
+      ],
+      "additionalProperties": false
+    },
+    "TeamTriggerSent": {
+      "type": "object",
+      "description": "workflows/trigger's answer: taken is true when runs-on: names a bot, and the control plane sends the trigger once to one of its machines; false when it names none, and the machine goes on as before.",
+      "properties": {
+        "taken": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "taken"
+      ],
+      "additionalProperties": false
+    },
+    "TeamTriggerFired": {
+      "type": "object",
+      "description": "workflows/fire's answer: ran is true when the machine took the trigger (it runs it, or records why not, as for any trigger); false when it cannot take it here (no such workflow, or runs-on: does not match this machine), and the control plane tries another.",
+      "properties": {
+        "ran": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "ran"
+      ],
+      "additionalProperties": false
+    },
     "CapReached": {
       "type": "object",
       "description": "control/capReached (#1761, FR-033): to admins, a bot stopped starting work at its own or its group's cap.",

@@ -810,6 +810,16 @@ func (m *Methods) HostSaid(host, method string, params json.RawMessage) (any, er
 			return nil, err
 		}
 		return m.s.claimRun(ctx, host, claim, time.Now())
+	case "workflows/trigger":
+		// A team event, sent once by the control plane (#2011, FR-035).
+		trigger, err := require[wire.TeamTrigger](params, "TeamTrigger")
+		if err != nil {
+			return nil, err
+		}
+		if strings.TrimSpace(trigger.Workflow) == "" || strings.TrimSpace(trigger.Trigger) == "" {
+			return nil, fail(invalidParams, "Say the workflow and the trigger.")
+		}
+		return m.s.teamTrigger(ctx, host, trigger, time.Now())
 	case "links/check":
 		// May a channel message start work (#1762, FR-037)?
 		sender, err := require[wire.ChannelSender](params, "ChannelSender")

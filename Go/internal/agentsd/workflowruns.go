@@ -38,6 +38,7 @@ type fireRequest struct {
 	causingEvent    *int64
 	fromQueue       bool
 	event           *wire.Event // the event that fired it, for a bot's claim (#1761)
+	fromControl     bool        // sent by the control plane, which took it once (#2011)
 }
 
 // refusalWords is WorkflowRefusal.message.
@@ -316,7 +317,8 @@ func (d *Daemon) fire(fr fireRequest) {
 		return
 	}
 	// A bot's machine at the bot's spend cap starts no work (#1761, FR-033), and a runs-on:
-	// workflow runs once per trigger across the bot's machines (FR-034).
+	// workflow runs once per trigger across the bot's machines (FR-034), by the trigger's
+	// scope (#2011, FR-035).
 	if d.isBot() && !fr.fromQueue {
 		w := f.wf
 		d.workflowMu.Unlock()
@@ -325,7 +327,7 @@ func (d *Daemon) fire(fr fireRequest) {
 				Value: wire.WorkflowRefusal{DayLimitReached: &struct{}{}}, At: now()}}, nil)
 			return
 		}
-		if d.claimsRuns(w) && !fr.byHand && !d.claimRun(fr.folder, fr.id, triggerID(fr, fr.event)) {
+		if d.claimsRuns(w) && !fr.byHand && !fr.fromControl && !d.teamFire(fr, w) {
 			return
 		}
 		d.workflowMu.Lock()

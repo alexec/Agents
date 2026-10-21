@@ -77,7 +77,7 @@
 - [x] T040 [US6] Add `bots/make`, `bots/setCaps` and `bots/stopRun`. Admins approve a bot's machines (FR-030, FR-031).
 - [x] T041 [US6] `agentsd`: no ask tools when `userKind` is bot. Permissions come from policy alone, and a blocked run ends as `needsAttention` with a notice to admins (FR-032). Files: `elicitations.go`, `apptools.go`.
 - [x] T042 [US6] `runs-on:` replaces `hosts:` in `workflowfile.go`, with machine labels. Add `workflows/claimRun` with a create-only `runs/<workflow>/<trigger>.json`. With no bot machine online, the control plane starts one (#1004) (FR-034). Starting a machine when none is online: #2011.
-- [ ] T043 [US6] Scoped events: machine events stay on the machine. Project and control-plane events are sent once by the control plane (FR-035). The claim keeps a bot's run to one meanwhile: #2011.
+- [x] T043 [US6] Scoped events: machine events stay on the machine. Project and control-plane events are sent once by the control plane (FR-035): `workflows/trigger` and `workflows/fire` (#2011). The claim stays for other events and an older control plane.
 - [x] T044 [US6] Spend: machines send `cost/report`. The control plane adds it up per bot and per group, and sends `user/capReached` (FR-033).
 - [x] T045 [P] [US6] Bots in People, and **Needs attention** for a bot's run, on all three clients.
 

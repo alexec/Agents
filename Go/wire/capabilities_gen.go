@@ -41,6 +41,7 @@ const (
 	CapDropbox1              = "dropbox/1"
 	CapElicitations1         = "elicitations/1"
 	CapEventsAudit1          = "events.audit/1"
+	CapEventsTeam1           = "events.team/1"
 	CapEvents1               = "events/1"
 	CapFilesComplete1        = "files.complete/1"
 	CapFilesDiagnostics1     = "files.diagnostics/1"
@@ -537,6 +538,8 @@ var ControlCapabilities = map[string]string{
 	"user/setSettings":            "user/1",
 	"user/settings":               "user/1",
 	"workflows/claimRun":          "bots/1",
+	"workflows/fire":              "events.team/1",
+	"workflows/trigger":           "events.team/1",
 	"workspaces/forAgent":         "workspaces/1",
 	"control/capReached":          "bots/1",
 	"control/clientChanged":       "control/1",

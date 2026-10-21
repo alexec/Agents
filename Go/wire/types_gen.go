@@ -5477,6 +5477,25 @@ type SwitchRecordSide struct {
 	Mode      JSONValue `json:"mode,omitzero"`
 }
 
+// workflows/trigger and workflows/fire (#2011, spec 736 FR-035): a project or control-plane event (a server's, such as github or a channel's) or a schedule that a runs-on: workflow's trigger matched. A machine sends it to the control plane, which sends it once to one of the bot's machines. workflow is the project folder's name and the workflow's id; trigger, the same words on every machine that heard it; event, the event (none for a schedule); dueAt, a schedule's due time.
+type TeamTrigger struct {
+	Workflow string   `json:"workflow"`
+	Trigger  string   `json:"trigger"`
+	RunsOn   []string `json:"runsOn"`
+	Event    *Event   `json:"event,omitzero"`
+	DueAt    *Date    `json:"dueAt,omitzero"`
+}
+
+// workflows/fire's answer: ran is true when the machine took the trigger (it runs it, or records why not, as for any trigger); false when it cannot take it here (no such workflow, or runs-on: does not match this machine), and the control plane tries another.
+type TeamTriggerFired struct {
+	Ran bool `json:"ran"`
+}
+
+// workflows/trigger's answer: taken is true when runs-on: names a bot, and the control plane sends the trigger once to one of its machines; false when it names none, and the machine goes on as before.
+type TeamTriggerSent struct {
+	Taken bool `json:"taken"`
+}
+
 type TimeBucket struct {
 	Agent  float64 `json:"agent"`
 	Tools  float64 `json:"tools"`

@@ -4911,6 +4911,40 @@ export interface SwitchRecordSide {
   mode?: JSONValue;
 }
 
+/**
+ * workflows/trigger and workflows/fire (#2011, spec 736 FR-035): a project or control-plane event
+ * (a server's, such as github or a channel's) or a schedule that a runs-on: workflow's trigger
+ * matched. A machine sends it to the control plane, which sends it once to one of the bot's
+ * machines. workflow is the project folder's name and the workflow's id; trigger, the same words on
+ * every machine that heard it; event, the event (none for a schedule); dueAt, a schedule's due
+ * time.
+ */
+export interface TeamTrigger {
+  workflow: string;
+  trigger: string;
+  runsOn: string[];
+  event?: Event;
+  dueAt?: WireDate;
+}
+
+/**
+ * workflows/fire's answer: ran is true when the machine took the trigger (it runs it, or records
+ * why not, as for any trigger); false when it cannot take it here (no such workflow, or runs-on:
+ * does not match this machine), and the control plane tries another.
+ */
+export interface TeamTriggerFired {
+  ran: boolean;
+}
+
+/**
+ * workflows/trigger's answer: taken is true when runs-on: names a bot, and the control plane sends
+ * the trigger once to one of its machines; false when it names none, and the machine goes on as
+ * before.
+ */
+export interface TeamTriggerSent {
+  taken: boolean;
+}
+
 export interface TimeBucket {
   agent: number;
   tools: number;
@@ -6707,6 +6741,9 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   SurfaceIdentification: { required: ["id", "name", "kind"], optional: [] },
   SwitchRecord: { required: ["id", "at", "agentID", "from", "to", "reason", "carried", "dropped", "billing"], optional: ["shortened", "fromReturnsAt"] },
   SwitchRecordSide: { required: ["runtimeID"], optional: ["entryID", "model", "mode"] },
+  TeamTrigger: { required: ["workflow", "trigger", "runsOn"], optional: ["event", "dueAt"] },
+  TeamTriggerFired: { required: ["ran"], optional: [] },
+  TeamTriggerSent: { required: ["taken"], optional: [] },
   TimeBucket: { required: ["agent", "tools", "others", "person", "turns"], optional: [] },
   TimeHistory: { required: ["hours", "days", "now", "recap", "records"], optional: ["timeZone"] },
   TimeRecord: { required: ["value", "day"], optional: [] },
