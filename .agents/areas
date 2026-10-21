@@ -581,6 +581,11 @@ Web/src/views/SignIn*.tsx                              sign-in
 Web/test/signIn*                                       sign-in
 docs/how-to/sign-in-with-*                             sign-in
 
+# promo: the promotional site and the store and launch copy (#1550, #1912, #1913).
+www/                                                   promo
+promo/                                                 promo
+.github/workflows/www-publish.yml                      promo
+
 # Shared files every lane touches: no area, last so that nothing above claims them.
 specs/071-web-remote/walks/parity.md                   -
 Web/src/protocol/generated.ts                          -

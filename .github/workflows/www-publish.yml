@@ -1,0 +1,58 @@
+# Publishes the promotional site in www/ (#1550) to Cloudflare Pages, project
+# `agentloops`, from main. The custom domains agentloops.dev and www.agentloops.dev
+# point at that project. The site is static: the files in www/ are the site, with no build.
+#
+# Needs two repository secrets (Alex's steps on #1550):
+#   CLOUDFLARE_API_TOKEN   a token with Account ▸ Cloudflare Pages ▸ Edit
+#   CLOUDFLARE_ACCOUNT_ID  the account that holds agentloops.dev
+# Until both are set, the run says so and passes, so main stays green.
+name: www-publish
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - www/**
+      - .github/workflows/www-publish.yml
+  workflow_dispatch:
+
+concurrency:
+  group: www-publish
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      PROJECT: agentloops
+    steps:
+      - name: Is there a token?
+        id: token
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
+            echo "::notice::No CLOUDFLARE_API_TOKEN or CLOUDFLARE_ACCOUNT_ID secret yet (#1550); nothing published."
+            echo ready=false >> "$GITHUB_OUTPUT"
+          else
+            echo ready=true >> "$GITHUB_OUTPUT"
+          fi
+      - if: steps.token.outputs.ready == 'true'
+        uses: actions/checkout@v4
+      - if: steps.token.outputs.ready == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Make the Pages project the first time
+        if: steps.token.outputs.ready == 'true'
+        run: |
+          if ! npx -y wrangler@4 pages project list | grep -qw "$PROJECT"; then
+            npx -y wrangler@4 pages project create "$PROJECT" --production-branch main
+          fi
+      - name: Publish www/
+        if: steps.token.outputs.ready == 'true'
+        run: npx -y wrangler@4 pages deploy www --project-name "$PROJECT" --branch main --commit-hash "$GITHUB_SHA"
