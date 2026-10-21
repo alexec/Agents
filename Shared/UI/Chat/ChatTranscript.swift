@@ -76,6 +76,8 @@ struct ChatTranscript: View {
         var storedTurns: [ChatTurn] = []
         var items: [TranscriptItem] = []
         var itemTurns: [ChatTurn] = []
+        /// The in-hand items without their thoughts, made again only when they change (#1849).
+        let shown = ShownItems()
     }
 
     /// A stored turn's entries as far back as they have been fetched, folded once.
@@ -86,12 +88,20 @@ struct ChatTranscript: View {
         let firstIndex: Int
         /// The ask is the turn's own and is drawn already.
         let items: [TranscriptItem]
+        /// `items` with the thoughts left off, made once, so a turn drawn again compares the
+        /// same array (#1849).
+        let itemsWithoutThoughts: [TranscriptItem]
 
         init(entries: [TranscriptEntry], firstIndex: Int) {
             self.entries = entries
             self.firstIndex = firstIndex
             let items = TranscriptEntry.display(entries)
             self.items = items.first?.isPersonsAsk == true ? Array(items.dropFirst()) : items
+            itemsWithoutThoughts = self.items.omittingThoughts()
+        }
+
+        func items(showsThoughts: Bool) -> [TranscriptItem] {
+            showsThoughts ? items : itemsWithoutThoughts
         }
 
         func hasEarlier(than turn: ChatTurn) -> Bool {
@@ -177,7 +187,7 @@ struct ChatTranscript: View {
             folded.storedTurns = stored.map(ChatTurn.init)
             folded.stored = stored
         }
-        let items = ChatThoughts.shown(self.items, showsThoughts: showsThoughts)
+        let items = folded.shown.of(self.items, showsThoughts: showsThoughts)
         if folded.items != items {
             folded.itemTurns = items.turns(reusing: folded.itemTurns)
             folded.items = items
@@ -220,7 +230,7 @@ struct ChatTranscript: View {
                                     TurnView(turn: turn,
                                              detail: turnViews[turn.id] ?? .initial,
                                              focusedRun: focusedRun,
-                                             fetched: fetchedTurns[turn.id].map { ChatThoughts.shown($0.items, showsThoughts: showsThoughts) },
+                                             fetched: fetchedTurns[turn.id]?.items(showsThoughts: showsThoughts),
                                              hasEarlier: fetchedTurns[turn.id]?.hasEarlier(than: turn) ?? false,
                                              fetchFailed: failedTurns.contains(turn.id),
                                              isLive: turn.id == liveID,
