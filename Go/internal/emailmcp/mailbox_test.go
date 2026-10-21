@@ -3,8 +3,11 @@ package emailmcp
 import (
 	"context"
 	"errors"
+	"fmt"
+	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/emersion/go-imap/v2"
 )
@@ -297,5 +300,74 @@ func fetchOnlyTheNewest(t *testing.T, caps imap.CapSet) {
 
 	if empty, err := m.List(ctx, "Archive", false, 5); err != nil || len(empty) != 0 {
 		t.Fatalf("empty folder: %+v %v", empty, err)
+	}
+}
+
+// Folders asks for every folder's counts in one LIST when the server offers LIST-STATUS, and
+// keeps them, so show_mail on every Back, folder change and Refresh does not ask again until
+// they are old or a message is marked or moved (#1847).
+func TestFoldersAskOnceAndAreKept(t *testing.T) {
+	for name, tc := range map[string]struct {
+		caps     imap.CapSet
+		statuses int
+	}{
+		"IMAP4rev2":   {nil, 0},
+		"LIST-STATUS": {imap.CapSet{imap.CapIMAP4rev1: {}, imap.CapListStatus: {}}, 0},
+		"IMAP4rev1":   {imap.CapSet{imap.CapIMAP4rev1: {}}, 102}, // a STATUS for each
+	} {
+		t.Run(name, func(t *testing.T) {
+			ctx := context.Background()
+			f := newFakeMail(t, tc.caps)
+			for i := range 100 {
+				if err := f.user.Create(fmt.Sprintf("Folder %d", i), nil); err != nil {
+					t.Fatal(err)
+				}
+			}
+			f.deliver("INBOX", plain("news@example.org", fakeUser, "Weekly news", "Nothing much."))
+			m := f.mailbox()
+
+			folders, err := m.Folders(ctx)
+			if err != nil {
+				t.Fatal(err)
+			}
+			inbox := slices.IndexFunc(folders, func(f Folder) bool { return f.Name == "INBOX" })
+			if len(folders) != 102 || inbox < 0 || folders[inbox].Total != 1 || folders[inbox].Unread != 1 {
+				t.Fatalf("%d folders, INBOX %d", len(folders), inbox)
+			}
+			if lists, statuses := f.commands(); lists != 1 || statuses != tc.statuses {
+				t.Fatalf("first: %d LIST, %d STATUS; want 1 and %d", lists, statuses, tc.statuses)
+			}
+
+			folders[inbox].Unread = 99 // a caller's copy
+			if again, err := m.Folders(ctx); err != nil || again[inbox].Unread != 1 {
+				t.Fatalf("kept: %+v %v", again[inbox], err)
+			}
+			if lists, statuses := f.commands(); lists != 0 || statuses != 0 {
+				t.Fatalf("kept: %d LIST, %d STATUS; want none", lists, statuses)
+			}
+
+			list, err := m.List(ctx, "INBOX", false, 0)
+			if err != nil || len(list) != 1 {
+				t.Fatalf("list: %+v %v", list, err)
+			}
+			if err := m.MarkRead(ctx, list[0].ID, true); err != nil {
+				t.Fatal(err)
+			}
+			f.commands()
+			if after, err := m.Folders(ctx); err != nil || after[inbox].Unread != 0 {
+				t.Fatalf("after mark_read: %+v %v", after[inbox], err)
+			}
+			if lists, _ := f.commands(); lists != 1 {
+				t.Fatalf("after mark_read: %d LIST; want 1", lists)
+			}
+
+			m.foldersAt = time.Now().Add(-foldersFor)
+			if _, err := m.Folders(ctx); err != nil {
+				t.Fatal(err)
+			}
+			if lists, _ := f.commands(); lists != 1 {
+				t.Fatalf("old: %d LIST; want 1", lists)
+			}
+		})
 	}
 }
