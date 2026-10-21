@@ -313,7 +313,7 @@ function CopyMessage({ entry, quotes = false, branches = false }: { entry: Trans
     const words = fields(entry, "userMessage")?._0 ?? text;
     return (
       <span class="copy-message message-actions">
-        <button class="steps-control" title="Start a new session from just before this prompt, with the prompt in its prompt bar to change"
+        <button class="steps-control" title="Start a new session from just before this prompt, with the prompt in its bar to change. The files stay as they are now."
           onClick={() => branchFrom(entry.id, words)}>Branch from Here</button>
         {copyButton}
       </span>

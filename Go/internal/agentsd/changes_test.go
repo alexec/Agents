@@ -95,7 +95,7 @@ func TestBranchingFromAPrompt(t *testing.T) {
 		t.Fatalf("%+v", b)
 	}
 	entries, _, _ := d.Store.Transcript(id, 0)
-	if len(entries) != 3 || entries[0].Kind.UserMessage.Value != "Make the cache" || entries[2].Kind.RuntimeNote.Value != "Branched from Plan before its prompt 2." {
+	if len(entries) != 3 || entries[0].Kind.UserMessage.Value != "Make the cache" || entries[2].Kind.RuntimeNote.Value != "Branched from Plan before its prompt 2. The files stay as they are now." {
 		t.Fatalf("%+v", entries)
 	}
 	// Its runtime reads the record ahead of the first prompt, and only until it has a conversation.

@@ -22,6 +22,10 @@ public struct SessionPrompt: Identifiable, Hashable, Sendable {
     public var seconds: Int?
     public var ending: Ending?
 
+    /// Branch from Here's help (#1871), on its menu items: the branch shares the folder, so its
+    /// record goes back and the files do not. The host's note and the page say the same.
+    public static let branchHelp = "Start a new session from just before this prompt, with the prompt in its bar to change. The files stay as they are now."
+
     /// The first line with words on it: what a row shows.
     public var title: String {
         text.split(whereSeparator: \.isNewline)

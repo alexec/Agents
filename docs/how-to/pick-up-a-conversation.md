@@ -41,6 +41,12 @@ To try something else from a conversation without changing it, branch it instead
 and choose **Session ▸ Branch** (Option-Command-B). See
 [Keyboard shortcuts](../reference/keyboard-shortcuts.md).
 
+To go back to just before one of your prompts, choose **Branch from Here** in the prompt's
+menu, or in a row's menu in **Session ▸ Prompts** (Shift-Command-P). The new session's
+record stops before that prompt, and the prompt is in its prompt bar to change. The files
+stay as they are now: the branch works in the same folder, with every edit made after
+that prompt.
+
 ## If it doesn't work
 
 - **The runtime is holding nothing here.** The runtime has no conversation in that folder,
