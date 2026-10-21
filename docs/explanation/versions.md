@@ -68,6 +68,11 @@ and the version to update to.
 The required set is the only window of versions that work together: it moves only when an old
 capability number is removed.
 
+CI's `skew` job (`scripts/skew-test.sh`, #1767) checks this on every change to the Go code. It joins
+the last release's `agentsd` to the new control plane, which must not call it out of date
+unless the required set moved, and pairs the new client with the last release's control plane,
+which must answer it. It also lists what the clients hide for the older host.
+
 ## Version numbers
 
 Versions follow [Semantic Versioning 2.0.0](https://semver.org). The tag `vX.Y.Z` gives the

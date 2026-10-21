@@ -550,6 +550,25 @@ jobs:
       - name: Test
         run: go test -race ./...
 
+  # Mixed versions (#1767): the last release's agentsd joined to this tree's control plane,
+  # and the last release's control plane with this tree's client, as a person meets them
+  # while an update rolls out (docs/explanation/versions.md). It needs the tags.
+  skew:
+    needs: select
+    if: ${{ always() && !cancelled() && (needs.select.result != 'success' || needs.select.outputs.go != 'skip') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: Go/go.mod
+          cache-dependency-path: Go/go.mod
+      - name: Last release against this tree
+        run: scripts/skew-test.sh
+
   # The Go agentsd on a Mac (#1138): the same module built and tested on macOS, so a
   # Mac-only path (its root, its folders, a *_darwin.go file) is held as Linux's is. TMPDIR
   # is resolved, because a Mac's temporary folder is reached through the /var link and the
