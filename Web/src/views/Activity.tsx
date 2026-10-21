@@ -14,6 +14,7 @@ import { MCPServersList } from "./MCPServers";
 import { YourConnections } from "./ConnectorSetup";
 import { WorktreesList } from "./Worktrees";
 import { AuditPane } from "./Audit";
+import { ReportsPane } from "./Reports";
 import { forCleanup, pageLine, rowWords, tally as worktreeTally, worktreesIntro } from "../model/worktrees";
 import { BackToList } from "./BackToList";
 import { Modal } from "./Modal";
@@ -250,6 +251,8 @@ export function ActivityPageView({ store, page }: { store: Store; page: Activity
   const hostName = (host: string) => (store.isMac(host) ? "This Mac" : store.hosts.value.find((h) => h.id === host)?.name ?? host);
   // Events, or Audit: who did what through the control plane (#996).
   const pane = useSignal<"events" | "audit">("events");
+  // Cost, or Reports: every person's machines, from the control plane (#1811).
+  const costPane = useSignal<"cost" | "reports">("cost");
   return (
     <section class={`chat activity-page ${page}-page`} aria-label={pageTitles[page]}>
       <header class="column-head"><BackToList /><h1>{pageTitles[page]}</h1></header>
@@ -334,7 +337,16 @@ export function ActivityPageView({ store, page }: { store: Store; page: Activity
             </>
           )}
           {page === "runtimes" && <p class="hint">Installing and signing in are managed on the Mac, in Settings ▸ Agent Runtimes.</p>}
-          {page === "spending" && <SpendingPage store={store} hostName={hostName} />}
+          {page === "spending" && (
+            <div class="segmented events-panes" role="radiogroup" aria-label="Show">
+              {(["cost", "reports"] as const).map((p) => (
+                <button key={p} role="radio" aria-checked={costPane.value === p} class={costPane.value === p ? "on" : ""}
+                  onClick={() => { costPane.value = p; }}>{p === "cost" ? "Cost" : "Reports"}</button>
+              ))}
+            </div>
+          )}
+          {page === "spending" && costPane.value === "cost" && <SpendingPage store={store} hostName={hostName} />}
+          {page === "spending" && costPane.value === "reports" && <ReportsPane store={store} runtimeName={chartRuntimeName(store, chartHosts(store))} />}
           {page === "tokens" && <TokensPage store={store} hostName={hostName} />}
           {page === "time" && <TimePage store={store} />}
           {page === "milestones" && <MilestonesPage store={store} />}
