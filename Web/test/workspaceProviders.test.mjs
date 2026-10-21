@@ -66,6 +66,13 @@ test("Link to Host offers free hosts that run agents, the likely one first", () 
   assert.deepEqual(w.linkableHosts({ id: "x", name: "devbox", state: "running", host: "4" }, hosts), []);
 });
 
+test("a workspace no host can be linked to says where to make it one (#1931)", () => {
+  const taken = [{ id: "4", name: "devbox", workspace: { provider: "p" } }, { id: "3", name: "relay", relay: true }];
+  assert.equal(w.noHostLine({ id: "x", name: "other", state: "stopped" }, taken), w.providerWords.notAHostYet);
+  assert.equal(w.noHostLine({ id: "x", name: "other", state: "running" }, [...taken, { id: "1", name: "free" }]), undefined);
+  assert.equal(w.noHostLine({ id: "x", name: "devbox", state: "running", host: "4" }, taken), undefined);
+});
+
 function plane({ oneCopy = true, working = false } = {}) {
   const asked = [];
   return {
