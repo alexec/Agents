@@ -76,6 +76,47 @@ struct TurnActivityContentTests {
         #expect(content.endedAt == sent.addingTimeInterval(90), "the timer stops where the turn ended")
     }
 
+    /// A clean end that still wants the person is Needs you, as the sidebars say (#1861).
+    private func endedNeedingYou(_ outcome: WorkOutcome?, block: Block? = nil) throws -> TurnActivityContent {
+        var ended = agent(.finished)
+        ended.endedReason = .endTurn
+        ended.outcomeAsked = true
+        ended.report = outcome.map { WorkReport(outcome: $0, message: "The rest is yours.", at: Date(), block: block) }
+        let content = try #require(TurnActivityContent.make(agent: ended, needs: [], startedAt: sent))
+        #expect(content.phase == .needsYou)
+        #expect(content.word == "Needs you")
+        #expect(content.isOver && !content.asks)
+        #expect(content.endedAt == sent.addingTimeInterval(90))
+        return content
+    }
+
+    @Test func partlyDoneNeedsYou() throws {
+        #expect(try endedNeedingYou(.partlyDone).line == "Partly done: The rest is yours.")
+    }
+
+    @Test func stuckNeedsYou() throws {
+        #expect(try endedNeedingYou(.stuck).line == "Stuck: The rest is yours.")
+    }
+
+    @Test func blockedOnWhatTheAppCannotWatchNeedsYou() throws {
+        #expect(try endedNeedingYou(.blocked, block: Block()).line == "Blocked: The rest is yours.")
+    }
+
+    @Test func outcomeUnknownNeedsYou() throws {
+        #expect(try endedNeedingYou(nil).line == "Outcome unknown")
+    }
+
+    @Test func aQuestionInTheReportNeedsYou() throws {
+        #expect(try endedNeedingYou(.needsAnswer).line == "Waiting on your answer: The rest is yours.")
+    }
+
+    @Test func aPushedNeedsYouSaysToOpenTheApp() throws {
+        let json = #"{"phase":"needs_you","startedAt":800000000,"endedAt":800000300}"#
+        let pushed = try JSONDecoder().decode(TurnActivityContent.self, from: Data(json.utf8))
+        #expect(pushed.phase == .needsYou && pushed.isOver)
+        #expect(pushed.line(isStale: false) == "Open Agents to see what it needs")
+    }
+
     @Test func anEndForAReasonIsAFailureThatSaysIt() throws {
         var died = agent(.finished)
         died.endedReason = .processDied

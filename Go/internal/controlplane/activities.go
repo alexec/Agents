@@ -59,7 +59,7 @@ func activityPush(turn wire.AttentionTurn, t records.ActivityToken, now time.Tim
 	state := turnActivityState{Phase: string(turn.Phase), StartedAt: t.StartedAt}
 	a := apns.Activity{Timestamp: now, Urgent: turn.Phase != wire.TurnPhaseWorking}
 	switch turn.Phase {
-	case wire.TurnPhaseDone, wire.TurnPhaseFailed, wire.TurnPhaseGone:
+	case wire.TurnPhaseDone, wire.TurnPhaseNeedsYou, wire.TurnPhaseFailed, wire.TurnPhaseGone:
 		ended := wire.DateOf(now)
 		if turn.EndedAt != nil {
 			ended = *turn.EndedAt

@@ -39,6 +39,9 @@ func turnPhase(a wire.Agent, needs []wire.Need) wire.AttentionTurn {
 		// Any ending but a clean end of turn says why (EndedReason.summary).
 		if a.EndedReason != nil && *a.EndedReason != wire.EndedReasonEndTurn || a.State == wire.AgentStateStopped {
 			turn.Phase = wire.TurnPhaseFailed
+		} else if Group(&a) == "needsAttention" {
+			// A clean end that still wants the person, as the sidebars say (#1861).
+			turn.Phase = wire.TurnPhaseNeedsYou
 		}
 		ended := a.LastActivityAt
 		turn.EndedAt = &ended

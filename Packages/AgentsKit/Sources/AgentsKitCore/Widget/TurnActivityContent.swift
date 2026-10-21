@@ -23,6 +23,9 @@ public struct TurnActivityContent: Codable, Hashable, Sendable {
         /// A permission, or a guarded change to keep or undo.
         case approval
         case done
+        /// It ended cleanly, but wanting the person: Partly done, Stuck, Blocked, Outcome
+        /// unknown, or a question in its report (#1861). The sidebars put it under Needs you.
+        case needsYou = "needs_you"
         /// It ended for a reason that is not a clean end of turn.
         case failed
     }
@@ -47,7 +50,7 @@ public struct TurnActivityContent: Codable, Hashable, Sendable {
     }
 
     /// Whether the turn is over, and the activity ends with this.
-    public var isOver: Bool { phase == .done || phase == .failed }
+    public var isOver: Bool { phase == .done || phase == .needsYou || phase == .failed }
 
     /// Whether it waits on the person.
     public var asks: Bool { phase == .question || phase == .approval }
@@ -59,6 +62,7 @@ public struct TurnActivityContent: Codable, Hashable, Sendable {
         case .question: "Question waiting"
         case .approval: "Needs approval"
         case .done: "Done"
+        case .needsYou: "Needs you"
         case .failed: "Stopped"
         }
     }
@@ -77,11 +81,15 @@ public struct TurnActivityContent: Codable, Hashable, Sendable {
             switch phase {
             case .question: return "Open Agents to answer it"
             case .approval: return "Open Agents to decide"
+            case .needsYou: return "Open Agents to see what it needs"
             case .working, .done, .failed: return nil
             }
         }
         return line
     }
+
+    /// The line for a turn that ended without a report saying how the work went.
+    public static let outcomeUnknown = "Outcome unknown"
 
     /// The title a session with none yet is shown with.
     public static let untitled = "New session"
@@ -125,6 +133,12 @@ public struct TurnActivityContent: Codable, Hashable, Sendable {
             }
             if agent.state == .stopped {
                 return TurnActivityContent(phase: .failed, title: title, line: "Stopped", startedAt: startedAt, endedAt: ended)
+            }
+            // The sidebars' rule (StatusShape): a clean end that still wants the person.
+            if StatusShape(row: agent, isComingBack: false) == .needsYou {
+                let line = agent.report.map { "\($0.outcome.heading): \($0.message)" } ?? outcomeUnknown
+                return TurnActivityContent(phase: .needsYou, title: title, line: line, startedAt: startedAt,
+                                           endedAt: ended)
             }
             return TurnActivityContent(phase: .done, title: title, line: agent.report?.message, startedAt: startedAt,
                                        endedAt: ended)

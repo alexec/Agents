@@ -9,12 +9,21 @@ import (
 )
 
 // The phase is TurnActivityContent.make's (#1744): what waits on the person first, then
-// the state; a clean end is done, any other ending failed.
+// the state; a clean end is done, or needs you as the sidebars say, any other ending failed.
 func TestATurnsPhaseIsWhatItsActivitySays(t *testing.T) {
 	id := wire.UUID("A0000000-0000-4000-8000-000000000001")
 	agent := func(s wire.AgentState, r *wire.EndedReason) wire.Agent {
 		return wire.Agent{ID: id, State: s, EndedReason: r, LastActivityAt: 800000300}
 	}
+	// A clean end with a report, and one asked how it went that never said (#1861).
+	asked := true
+	reported := func(o wire.WorkOutcome, b *wire.Block) wire.Agent {
+		a := agent(wire.AgentStateFinished, reason(wire.EndedReasonEndTurn))
+		a.OutcomeAsked, a.Report = &asked, &wire.WorkReport{Outcome: o, Message: "The rest is yours.", Block: b}
+		return a
+	}
+	unknown := agent(wire.AgentStateFinished, reason(wire.EndedReasonEndTurn))
+	unknown.OutcomeAsked = &asked
 	elicitation, permission := wire.UUID("E0000000-0000-4000-8000-000000000001"), wire.UUID("E0000000-0000-4000-8000-000000000002")
 	asks := []wire.Need{
 		{ID: wire.NeedID{Permission: &permission}, AgentID: &id, Kind: wire.NeedKindPermission, RaisedAt: 1},
@@ -32,6 +41,12 @@ func TestATurnsPhaseIsWhatItsActivitySays(t *testing.T) {
 		{agent(wire.AgentStateWaitingOnUser, nil), nil, wire.TurnPhaseQuestion},
 		{agent(wire.AgentStateFinished, reason(wire.EndedReasonEndTurn)), nil, wire.TurnPhaseDone},
 		{agent(wire.AgentStateFinished, reason(wire.EndedReasonProcessDied)), nil, wire.TurnPhaseFailed},
+		{reported(wire.WorkOutcomeDone, nil), nil, wire.TurnPhaseDone},
+		{reported(wire.WorkOutcomePartlyDone, nil), nil, wire.TurnPhaseNeedsYou},
+		{reported(wire.WorkOutcomeStuck, nil), nil, wire.TurnPhaseNeedsYou},
+		{reported(wire.WorkOutcomeBlocked, &wire.Block{}), nil, wire.TurnPhaseNeedsYou},
+		{reported(wire.WorkOutcomeNeedsAnswer, nil), nil, wire.TurnPhaseNeedsYou},
+		{unknown, nil, wire.TurnPhaseNeedsYou},
 		{agent(wire.AgentStateStopped, nil), nil, wire.TurnPhaseFailed},
 		{agent(wire.AgentStateArchived, nil), asks, wire.TurnPhaseGone},
 	} {
@@ -39,7 +54,7 @@ func TestATurnsPhaseIsWhatItsActivitySays(t *testing.T) {
 		if turn.Phase != c.want {
 			t.Errorf("%s with %d needs: %s, not %s", c.agent.State, len(c.needs), turn.Phase, c.want)
 		}
-		if ended := turn.EndedAt != nil; ended != (c.want == wire.TurnPhaseDone || c.want == wire.TurnPhaseFailed) {
+		if ended := turn.EndedAt != nil; ended != (c.want == wire.TurnPhaseDone || c.want == wire.TurnPhaseNeedsYou || c.want == wire.TurnPhaseFailed) {
 			t.Errorf("%s: endedAt %v", c.want, turn.EndedAt)
 		}
 	}
