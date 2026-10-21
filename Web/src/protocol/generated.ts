@@ -2409,6 +2409,17 @@ export interface HostUpdate {
   trust?: string;
 }
 
+/**
+ * host/userSettings (#1760, FR-024, FR-025): to a machine, on its channel 0, when it joins and when
+ * its user's settings or secrets change. Sent only on the links of that user's own machines.
+ * secrets is every secret the user has: a name missing from it was removed.
+ */
+export interface HostUserSettings {
+  user: string;
+  settings: UserSettings;
+  secrets: UserSecret[];
+}
+
 export interface HostWorkspace {
   provider: ProviderID;
   providerName: string;
@@ -4037,6 +4048,27 @@ export interface SealedEnvelope {
 }
 
 /**
+ * A machine that was removed with a secret on it (#1760, FR-026): change the secret where it was
+ * issued.
+ */
+export interface SecretLeftOn {
+  host: HostID;
+  /** The machine's name when it was removed. */
+  name: string;
+  at: string;
+}
+
+/**
+ * control/secretsLeft (#1760, FR-026): to the person's own clients, when one of their machines was
+ * removed with secrets on it.
+ */
+export interface SecretsLeft {
+  host: HostID;
+  name: string;
+  secrets: UserSecretName[];
+}
+
+/**
  * What the Send sheet shows (#1123): the local branches, the one checked out (none when detached),
  * the origin, and whether anything is uncommitted.
  */
@@ -4903,8 +4935,94 @@ export interface UsageRollupRow {
   waitingSeconds: number;
 }
 
+/**
+ * The agentConfig part (#1760): the person's own instructions, personas and skills, as ~/.agents
+ * keeps them on each machine.
+ */
+export interface UserAgentConfig {
+  /** ~/.agents/AGENTS.md. */
+  instructions?: string;
+  /** ~/.agents/personas/<name>.md, by name. */
+  personas?: Record<string, string>;
+  /** ~/.agents/skills/<name>/SKILL.md, by name. */
+  skills?: Record<string, string>;
+}
+
 /** A user's role (#994, spec 736 FR-001): an admin manages people; a member sees only their own. */
 export type UserRole = "admin" | "member";
+
+/**
+ * user/setSecret (#1760, FR-025): a secret the control plane keeps sealed, and sends only to its
+ * person's own machines. The value is never sent back to a client.
+ */
+export interface UserSecret {
+  name: UserSecretName;
+  value: string;
+}
+
+/** A secret's name, as ${NAME} in mcp.json and NAME= in ~/.agents-secrets/secrets.env. */
+export type UserSecretName = string;
+
+/** user/secretNames (#1760). */
+export interface UserSecretNames {
+  secrets: UserSecretRow[];
+  /**
+   * False when this control plane has no key to seal secrets with, and user/setSecret is refused.
+   */
+  sealing: boolean;
+}
+
+/** user/removeSecret (#1760). */
+export interface UserSecretRequest {
+  name: UserSecretName;
+}
+
+/** One row of user/secretNames (#1760): a secret's name, never its value. */
+export interface UserSecretRow {
+  name: UserSecretName;
+  updated: string;
+  /** The machines it was sent to. */
+  machines: HostID[];
+  /** Machines removed with it on them, since it was last set. */
+  leftOn?: SecretLeftOn[];
+}
+
+/**
+ * user/settings (#1760, spec 736 FR-023, FR-024): what the control plane keeps for a person and
+ * sends to each of that person's machines. A part that is absent is not set at the user scope, and
+ * each machine keeps its own. The control plane does not read inside a part.
+ */
+export interface UserSettings {
+  mcpServers?: JSONValue;
+  agentConfig?: JSONValue;
+  runtimes?: JSONValue;
+  costLimits?: JSONValue;
+  resources?: JSONValue;
+  /** When a part last changed. */
+  updated?: string;
+}
+
+/**
+ * control/userSettingsChanged (#1760): to the person's own clients, when a part or a secret
+ * changed, so a pane reads again.
+ */
+export interface UserSettingsChanged {
+  parts?: UserSettingsPartName[];
+  secrets?: boolean;
+}
+
+/** user/setSettings (#1760): one part set, or with a null value removed from the user scope. */
+export interface UserSettingsPart {
+  part: UserSettingsPartName;
+  value: JSONValue;
+}
+
+/**
+ * A part of a person's user settings (#1760, spec 736 FR-023). Each keeps the shape its file has on
+ * a machine today: mcpServers is mcp.json's mcpServers, agentConfig is UserAgentConfig, runtimes is
+ * each runtime's choices, costLimits is CostLimits, resources is a list of DeclaredResource.
+ */
+export type UserSettingsPartName = "mcpServers" | "agentConfig" | "runtimes" | "costLimits" | "resources";
 
 /**
  * What a third-party server's view waits on before it is drawn: the person's Show (#191). The data
@@ -5468,6 +5586,11 @@ export interface Methods {
   "surface/identify": { params: SurfaceIdentification; result: Empty };
   "time/history": { params: Empty; result: TimeHistory };
   "usage/history": { params: Empty; result: UsageHistory };
+  "user/removeSecret": { params: UserSecretRequest; result: Empty };
+  "user/secretNames": { params: Empty; result: UserSecretNames };
+  "user/setSecret": { params: UserSecret; result: Empty };
+  "user/setSettings": { params: UserSettingsPart; result: Empty };
+  "user/settings": { params: Empty; result: UserSettings };
   "views/call": { params: ViewCallRequest; result: JSONValue };
   "views/context": { params: ViewContextRequest; result: Empty };
   "views/log": { params: ViewLogRequest; result: Empty };
@@ -5648,6 +5771,11 @@ export const MethodTarget = {
   "surface/identify": "host",
   "time/history": "host",
   "usage/history": "host",
+  "user/removeSecret": "control",
+  "user/secretNames": "control",
+  "user/setSecret": "control",
+  "user/setSettings": "control",
+  "user/settings": "control",
   "views/call": "host",
   "views/context": "host",
   "views/log": "host",
@@ -5689,6 +5817,8 @@ export interface Notifications {
   "control/keptDelivered": KeptDelivered;
   "control/peopleChanged": PeopleChanged;
   "control/providersChanged": ProviderList;
+  "control/secretsLeft": SecretsLeft;
+  "control/userSettingsChanged": UserSettingsChanged;
   "disk/changed": DiskState;
   "files/changed": FilesChangedNotification;
   "leases/changed": LeaseSnapshot;
@@ -5943,6 +6073,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   HostTunnel: { required: ["up"], optional: ["problem"] },
   HostTunnelChanged: { required: ["name", "tunnel"], optional: ["host"] },
   HostUpdate: { required: ["host", "destination"], optional: ["key", "trust"] },
+  HostUserSettings: { required: ["user", "settings", "secrets"], optional: [] },
   HostWorkspace: { required: ["provider", "providerName", "workspace", "workspaceName", "workspaceState", "canStart", "canStop", "startWhenUsed", "current"], optional: ["hostState", "phase", "since", "problem", "stoppedBy", "stopWhenIdleMinutes", "cost", "startForSchedules", "tellsSchedule", "nextWorkflow", "nextWorkflowAt", "wakeAt"] },
   HostWorkspaceCall: { required: ["agent", "method", "params"], optional: [] },
   HostWorkspaceOptions: { required: ["host"], optional: ["startWhenUsed", "stopWhenIdleMinutes", "startForSchedules"] },
@@ -6144,6 +6275,8 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   SandboxFailureRecord: { required: ["runtimeID", "detail", "hang", "recoveryOffered", "completedToolCalls"], optional: [] },
   SandboxSettings: { required: ["defaults"], optional: [] },
   SealedEnvelope: { required: ["encapsulated", "ciphertext"], optional: [] },
+  SecretLeftOn: { required: ["host", "name", "at"], optional: [] },
+  SecretsLeft: { required: ["host", "name", "secrets"], optional: [] },
   SendFacts: { required: ["branches", "hasChanges"], optional: ["current", "origin"] },
   SendFactsRequest: { required: ["folder"], optional: [] },
   SendFile: { required: ["id", "size"], optional: [] },
@@ -6244,6 +6377,14 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   UsageRollup: { required: ["hours", "days"], optional: [] },
   UsageRollupPeriod: { required: ["at", "rows"], optional: [] },
   UsageRollupRow: { required: ["project", "runtime", "cost", "inputTokens", "outputTokens", "thoughtTokens", "cachedReadTokens", "cachedWriteTokens", "turns", "unpricedTurns", "workingSeconds", "waitingSeconds"], optional: [] },
+  UserAgentConfig: { required: [], optional: ["instructions", "personas", "skills"] },
+  UserSecret: { required: ["name", "value"], optional: [] },
+  UserSecretNames: { required: ["secrets", "sealing"], optional: [] },
+  UserSecretRequest: { required: ["name"], optional: [] },
+  UserSecretRow: { required: ["name", "updated", "machines"], optional: ["leftOn"] },
+  UserSettings: { required: [], optional: ["mcpServers", "agentConfig", "runtimes", "costLimits", "resources", "updated"] },
+  UserSettingsChanged: { required: [], optional: ["parts", "secrets"] },
+  UserSettingsPart: { required: ["part", "value"], optional: [] },
   ViewAsk: { required: ["server", "uri", "hash", "isNew"], optional: [] },
   ViewCallRequest: { required: ["agentID", "viewID", "name"], optional: ["project", "arguments", "feed", "server"] },
   ViewContextRequest: { required: ["agentID", "viewID"], optional: ["uri", "content", "structuredContent"] },

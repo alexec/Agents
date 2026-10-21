@@ -238,6 +238,15 @@ struct WireSchemaTests {
             "ReportQuery": Self.through(DaemonAPI.ReportQuery.self),
             "UsageReport": Self.through(DaemonAPI.UsageReport.self),
             "ReportExport": Self.through(DaemonAPI.ReportExport.self),
+            // The user scope (#1760).
+            "UserSettings": Self.through(DaemonAPI.UserSettings.self),
+            "UserSettingsPart": Self.through(DaemonAPI.UserSettingsPart.self),
+            "UserAgentConfig": Self.through(DaemonAPI.UserAgentConfig.self),
+            "UserSecret": Self.through(DaemonAPI.UserSecret.self),
+            "UserSecretRequest": Self.through(DaemonAPI.UserSecretRequest.self),
+            "UserSecretNames": Self.through(DaemonAPI.UserSecretNames.self),
+            "UserSettingsChanged": Self.through(DaemonAPI.UserSettingsChanged.self),
+            "SecretsLeft": Self.through(DaemonAPI.SecretsLeft.self),
         ]
         let all = samples.objectValue ?? [:]
         #expect(Set(all.keys) == Set(types.keys), "a sample with no Swift type, or a type with no sample")

@@ -798,5 +798,84 @@
     "text": "text",
     "count": 7,
     "format": "jsonl"
+  },
+  "UserSettings": {
+    "mcpServers": {
+      "github": {
+        "url": "https://api.githubcopilot.com/mcp/",
+        "headers": {
+          "Authorization": "Bearer ${GITHUB_TOKEN}"
+        }
+      }
+    },
+    "costLimits": {
+      "dailyTokens": 100000
+    },
+    "resources": [
+      {
+        "name": "build",
+        "displayName": "Build",
+        "description": "When building.",
+        "holders": 3
+      }
+    ],
+    "updated": "2026-10-21T14:00:00Z"
+  },
+  "UserSettingsPart": {
+    "part": "agentConfig",
+    "value": {
+      "instructions": "Use ASD-STE100.",
+      "personas": {
+        "reviewer": "You review."
+      }
+    }
+  },
+  "UserAgentConfig": {
+    "instructions": "Use ASD-STE100.",
+    "personas": {
+      "reviewer": "You review."
+    },
+    "skills": {
+      "release": "---\nname: release\n---\n"
+    }
+  },
+  "UserSecret": {
+    "name": "GITHUB_TOKEN",
+    "value": "ghp_example"
+  },
+  "UserSecretRequest": {
+    "name": "GITHUB_TOKEN"
+  },
+  "UserSecretNames": {
+    "secrets": [
+      {
+        "name": "GITHUB_TOKEN",
+        "updated": "2026-10-21T14:00:00Z",
+        "machines": [
+          "mac"
+        ],
+        "leftOn": [
+          {
+            "host": "box",
+            "name": "Sam's box",
+            "at": "2026-10-21T15:00:00Z"
+          }
+        ]
+      }
+    ],
+    "sealing": true
+  },
+  "UserSettingsChanged": {
+    "parts": [
+      "mcpServers"
+    ],
+    "secrets": true
+  },
+  "SecretsLeft": {
+    "host": "box",
+    "name": "Sam's box",
+    "secrets": [
+      "GITHUB_TOKEN"
+    ]
   }
 }

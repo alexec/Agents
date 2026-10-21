@@ -3,6 +3,8 @@ package kms
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
+	"encoding/base64"
 	"errors"
 	"os"
 
@@ -76,4 +78,25 @@ func NoCredentialsFile() {
 	if info, err := os.Stat(file); err == nil && info.Size() == 0 {
 		os.Unsetenv("GOOGLE_APPLICATION_CREDENTIALS")
 	}
+}
+
+// LocalKeeper is the keeper of people's secrets on a control plane with no cloud keeper
+// (#1760, FR-025): a local key in a 0600 file of its own, outside the store, made if
+// missing. It gives the keeper's URL, which holds the key: never write it down whole
+// (Describe).
+func LocalKeeper(path string) (string, error) {
+	key, err := os.ReadFile(path)
+	if errors.Is(err, os.ErrNotExist) {
+		key = make([]byte, 32)
+		rand.Read(key)
+		if err = writeKeyFile(path, key); err != nil {
+			return "", err
+		}
+	} else if err != nil {
+		return "", err
+	}
+	if len(key) != 32 {
+		return "", errors.New(path + " is not a key for secrets: it must be 32 bytes")
+	}
+	return "base64key://" + base64.URLEncoding.EncodeToString(key), nil
 }

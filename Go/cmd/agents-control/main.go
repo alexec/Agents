@@ -342,6 +342,24 @@ func keyFile() string {
 	return ""
 }
 
+// secretKeeper is the keeper that seals people's secrets (#1760, FR-025): AGENTS_CONTROL_KMS
+// on a cloud machine, else a local key in secrets-key beside the control key's file, 0600
+// and outside the store. A control plane with neither keeps no secrets.
+func secretKeeper() string {
+	if keeper := os.Getenv("AGENTS_CONTROL_KMS"); keeper != "" {
+		return keeper
+	}
+	file := keyFile()
+	if file == "" {
+		return ""
+	}
+	keeper, err := kms.LocalKeeper(filepath.Join(filepath.Dir(file), "secrets-key"))
+	if err != nil {
+		fail("the key for secrets: %v", err)
+	}
+	return keeper
+}
+
 // sealKey seals a key handed in, such as a Mac's for a move to a cloud machine, in the
 // store with AGENTS_CONTROL_KMS (#1458). Piped in on --key-fd 0, the key is never on the
 // cloud machine's disk:
@@ -518,6 +536,7 @@ func serve() {
 	}
 	cfg.Store = openStore("")
 	cfg.PrivateKey, cfg.KeyKeeper = keyAndKeeper(cfg.Store)
+	cfg.SecretKeeper = secretKeeper()
 	s, err := controlplane.New(cfg)
 	if err != nil {
 		fail("%v", err)

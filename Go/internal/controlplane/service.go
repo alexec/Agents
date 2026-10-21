@@ -31,6 +31,7 @@ import (
 	"github.com/alexec/agents/Go/internal/controlplane/providers"
 	"github.com/alexec/agents/Go/internal/controlplane/records"
 	"github.com/alexec/agents/Go/internal/controlplane/store"
+	"github.com/alexec/agents/Go/internal/controlplane/usersettings"
 	"github.com/alexec/agents/Go/internal/controlplane/web"
 	"github.com/alexec/agents/Go/wire"
 	"github.com/coder/websocket"
@@ -103,6 +104,10 @@ type Config struct {
 	// machine): the per-source budget counts by it (public-security.md P3). Empty trusts
 	// none, and counts by the peer's own address.
 	TrustedProxies []netip.Prefix
+	// The keeper that seals each person's secrets (#1760, FR-025): gcpkms://… on a cloud
+	// machine, or base64key://… from a 0600 file outside the store on a Mac. "" keeps no
+	// secrets: user/setSecret is refused, and settings still follow the person.
+	SecretKeeper string
 	// Where each log line goes, already marked with this copy. No line may hold a code,
 	// a key, a MAC or a message (071 FR-033).
 	Log func(string)
@@ -162,6 +167,9 @@ type Service struct {
 	told toldClients
 	// Machines asking to join with no code (#994).
 	joins *joins
+	// Each person's settings and secrets (#1760), and what each machine here was sent.
+	users     *usersettings.Book
+	toldUsers toldUsers
 
 	mu       sync.Mutex
 	servers  []*http.Server
@@ -209,6 +217,9 @@ func New(cfg Config) (*Service, error) {
 	s.router.SetTeam(false, cfg.Version)
 	s.joins = newJoins(s)
 	s.copies = newHostCopies(cfg.Store)
+	if s.users, err = openUserBook(cfg); err != nil {
+		return nil, err
+	}
 	if s.backups, err = newBackupStore(cfg.Store, s.records, cfg.PrivateKey); err != nil {
 		return nil, err
 	}

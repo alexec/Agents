@@ -68,7 +68,7 @@ The client ids of the built-in providers are compiled into the apps and the cont
 
 ## User secret (`users/<id>/secrets/<name>.json`)
 
-`{name, keyVersion, dataKeyWrapped: base64, nonce: base64, ciphertext: base64, updated}`. It is never readable without `kms.Keeper` (FR-025, SC-007).
+`{name, sealed: {keeper, wrappedKey, nonce, ciphertext, sealed}, updated, machines: [host], leftOn?: [{host, name, at}]}`. `sealed` is `kms.SealFor`'s envelope, bound to the record's own key in the store, so a record copied to another person does not open. It is never readable without the keeper (FR-025, SC-007). A removed secret keeps its record with no `sealed` (#1760).
 
 ## Channel link (`links/<channel>/<sha256(identity)>.json`)
 

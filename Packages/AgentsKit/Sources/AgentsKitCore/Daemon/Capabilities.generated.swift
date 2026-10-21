@@ -93,6 +93,7 @@ public enum Capability {
     public static let time1 = "time/1"
     public static let tunnel1 = "tunnel/1"
     public static let usage1 = "usage/1"
+    public static let user1 = "user/1"
     public static let views1 = "views/1"
     public static let wake1 = "wake/1"
     public static let workflow1 = "workflow/1"
@@ -464,6 +465,11 @@ public enum Capability {
         "reports/usage": "reports/1",
         "tunnel/open": "tunnel/1",
         "usage/rollup": "reports/1",
+        "user/removeSecret": "user/1",
+        "user/secretNames": "user/1",
+        "user/setSecret": "user/1",
+        "user/setSettings": "user/1",
+        "user/settings": "user/1",
         "workspaces/forAgent": "workspaces/1",
         "control/clientChanged": "control/1",
         "control/hostChanged": "control/1",
@@ -476,10 +482,13 @@ public enum Capability {
         "control/peopleChanged": "people/1",
         "control/providerDraft": "control/1",
         "control/providersChanged": "control/1",
+        "control/secretsLeft": "user/1",
         "control/thisMacHostChanged": "control/1",
         "control/tunnelChanged": "control/1",
+        "control/userSettingsChanged": "user/1",
         "control/webChanged": "control/1",
         "host/clients": "host/1",
+        "host/userSettings": "user/1",
         "projects/detect": "projects/1",
         "relay/count": "relay/1",
         "relay/deliver": "relay/1",

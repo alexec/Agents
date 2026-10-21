@@ -700,6 +700,9 @@ func (s *Service) apply(e controlEvent) {
 	case "hostRemoved":
 		s.router.ForgetHost(e.Subject)
 		s.copies.forget(e.Subject)
+	case "userSettingsChanged":
+		// A person's settings or secrets changed at another copy (#1760).
+		s.userChangedHere(e.Subject, nil, true)
 	case "peopleChanged":
 		// Another copy's invite or removal makes this one a team, or not (#1763).
 		s.noteTeam()

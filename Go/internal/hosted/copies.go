@@ -91,7 +91,7 @@ func (s *Service) startCopy(ctx context.Context, id string) (*copyRunning, error
 	}
 	cfg := controlplane.Config{Store: st, PrivateKey: key, URL: s.accountURL(id), Bind: "127.0.0.1", Port: 0,
 		Name: "Your control plane", MachineID: "hosted-" + id, PublicWeb: s.cfg.Web, PublicViews: views,
-		TrustedProxies: trusted, Hosted: true, Log: func(line string) { s.log(id + ": " + line) }}
+		TrustedProxies: trusted, Hosted: true, SecretKeeper: s.cfg.Keeper, Log: func(line string) { s.log(id + ": " + line) }}
 	service, err := controlplane.New(cfg)
 	if err != nil {
 		return nil, err

@@ -2615,6 +2615,13 @@ type HostUpdate struct {
 	Trust       *string `json:"trust,omitzero"`
 }
 
+// host/userSettings (#1760, FR-024, FR-025): to a machine, on its channel 0, when it joins and when its user's settings or secrets change. Sent only on the links of that user's own machines. secrets is every secret the user has: a name missing from it was removed.
+type HostUserSettings struct {
+	User     string       `json:"user"`
+	Settings UserSettings `json:"settings"`
+	Secrets  []UserSecret `json:"secrets"`
+}
+
 type HostWorkspace struct {
 	Provider            ProviderID `json:"provider"`
 	ProviderName        string     `json:"providerName"`
@@ -4627,6 +4634,21 @@ type SealedEnvelope struct {
 	Ciphertext   Data `json:"ciphertext"`
 }
 
+// A machine that was removed with a secret on it (#1760, FR-026): change the secret where it was issued.
+type SecretLeftOn struct {
+	Host HostID `json:"host"`
+	// The machine's name when it was removed.
+	Name string `json:"name"`
+	At   string `json:"at"`
+}
+
+// control/secretsLeft (#1760, FR-026): to the person's own clients, when one of their machines was removed with secrets on it.
+type SecretsLeft struct {
+	Host    HostID           `json:"host"`
+	Name    string           `json:"name"`
+	Secrets []UserSecretName `json:"secrets"`
+}
+
 // What the Send sheet shows (#1123): the local branches, the one checked out (none when detached), the origin, and whether anything is uncommitted.
 type SendFacts struct {
 	Branches   []string `json:"branches"`
@@ -5668,12 +5690,87 @@ type UsageRollupRow struct {
 	WaitingSeconds float64 `json:"waitingSeconds"`
 }
 
+// The agentConfig part (#1760): the person's own instructions, personas and skills, as ~/.agents keeps them on each machine.
+type UserAgentConfig struct {
+	// ~/.agents/AGENTS.md.
+	Instructions *string `json:"instructions,omitzero"`
+	// ~/.agents/personas/<name>.md, by name.
+	Personas map[string]string `json:"personas,omitzero"`
+	// ~/.agents/skills/<name>/SKILL.md, by name.
+	Skills map[string]string `json:"skills,omitzero"`
+}
+
 // A user's role (#994, spec 736 FR-001): an admin manages people; a member sees only their own.
 type UserRole string
 
 const (
 	UserRoleAdmin  UserRole = "admin"
 	UserRoleMember UserRole = "member"
+)
+
+// user/setSecret (#1760, FR-025): a secret the control plane keeps sealed, and sends only to its person's own machines. The value is never sent back to a client.
+type UserSecret struct {
+	Name  UserSecretName `json:"name"`
+	Value string         `json:"value"`
+}
+
+// A secret's name, as ${NAME} in mcp.json and NAME= in ~/.agents-secrets/secrets.env.
+type UserSecretName string
+
+// user/secretNames (#1760).
+type UserSecretNames struct {
+	Secrets []UserSecretRow `json:"secrets"`
+	// False when this control plane has no key to seal secrets with, and user/setSecret is refused.
+	Sealing bool `json:"sealing"`
+}
+
+// user/removeSecret (#1760).
+type UserSecretRequest struct {
+	Name UserSecretName `json:"name"`
+}
+
+// One row of user/secretNames (#1760): a secret's name, never its value.
+type UserSecretRow struct {
+	Name    UserSecretName `json:"name"`
+	Updated string         `json:"updated"`
+	// The machines it was sent to.
+	Machines []HostID `json:"machines"`
+	// Machines removed with it on them, since it was last set.
+	LeftOn []SecretLeftOn `json:"leftOn,omitzero"`
+}
+
+// user/settings (#1760, spec 736 FR-023, FR-024): what the control plane keeps for a person and sends to each of that person's machines. A part that is absent is not set at the user scope, and each machine keeps its own. The control plane does not read inside a part.
+type UserSettings struct {
+	McpServers  JSONValue `json:"mcpServers,omitzero"`
+	AgentConfig JSONValue `json:"agentConfig,omitzero"`
+	Runtimes    JSONValue `json:"runtimes,omitzero"`
+	CostLimits  JSONValue `json:"costLimits,omitzero"`
+	Resources   JSONValue `json:"resources,omitzero"`
+	// When a part last changed.
+	Updated *string `json:"updated,omitzero"`
+}
+
+// control/userSettingsChanged (#1760): to the person's own clients, when a part or a secret changed, so a pane reads again.
+type UserSettingsChanged struct {
+	Parts   []UserSettingsPartName `json:"parts,omitzero"`
+	Secrets *bool                  `json:"secrets,omitzero"`
+}
+
+// user/setSettings (#1760): one part set, or with a null value removed from the user scope.
+type UserSettingsPart struct {
+	Part  UserSettingsPartName `json:"part"`
+	Value JSONValue            `json:"value"`
+}
+
+// A part of a person's user settings (#1760, spec 736 FR-023). Each keeps the shape its file has on a machine today: mcpServers is mcp.json's mcpServers, agentConfig is UserAgentConfig, runtimes is each runtime's choices, costLimits is CostLimits, resources is a list of DeclaredResource.
+type UserSettingsPartName string
+
+const (
+	UserSettingsPartNameMcpServers  UserSettingsPartName = "mcpServers"
+	UserSettingsPartNameAgentConfig UserSettingsPartName = "agentConfig"
+	UserSettingsPartNameRuntimes    UserSettingsPartName = "runtimes"
+	UserSettingsPartNameCostLimits  UserSettingsPartName = "costLimits"
+	UserSettingsPartNameResources   UserSettingsPartName = "resources"
 )
 
 // What a third-party server's view waits on before it is drawn: the person's Show (#191). The data of a viewNeedsShow failure.

@@ -69,6 +69,8 @@ var own = map[string]bool{
 	"people/list": true, "people/invite": true, "people/setRole": true, "people/remove": true,
 	"people/removePreview": true, "hosts/joinRequests": true, "hosts/approveJoin": true, "hosts/denyJoin": true,
 	"reports/usage": true, "reports/export": true,
+	"user/settings": true, "user/setSettings": true, "user/setSecret": true, "user/removeSecret": true,
+	"user/secretNames": true,
 }
 
 // Handles says whether a bare method is the control plane's. A bare daemon/ping from
@@ -93,6 +95,7 @@ var writes = map[string]bool{
 	"clients/setActivityToken": true,
 	"control/setAuditDays":     true, "control/rotate": true, "people/invite": true, "people/setRole": true, "people/remove": true,
 	"hosts/approveJoin": true, "hosts/denyJoin": true,
+	"user/setSettings": true, "user/setSecret": true, "user/removeSecret": true,
 }
 
 func (m *Methods) Handle(method string, params json.RawMessage, from Caller) (any, error) {
@@ -133,6 +136,8 @@ func (m *Methods) Handle(method string, params json.RawMessage, from Caller) (an
 		return m.peopleMethod(ctx, method, params, from)
 	case "reports/usage", "reports/export":
 		return m.reportMethod(ctx, method, params, from)
+	case "user/settings", "user/setSettings", "user/setSecret", "user/removeSecret", "user/secretNames":
+		return m.userMethod(ctx, method, params, from)
 	case "hosts/joinRequests":
 		return m.s.joins.list(ctx, m.callerPerson(from))
 	case "hosts/approveJoin", "hosts/denyJoin":
@@ -433,10 +438,16 @@ func (m *Methods) hostList(from Caller) []wire.ControlHost {
 
 // removeHost takes a machine off the control plane: hosts/remove, or with its person.
 func (m *Methods) removeHost(ctx context.Context, host string, from Caller) (bool, error) {
+	owner, name := m.s.ownerOf(host), host
+	if h := m.records.Host(host); h != nil && h.Name != "" {
+		name = h.Name
+	}
 	gone, err := m.records.RemoveHost(ctx, host)
 	if err != nil || !gone {
 		return gone, err
 	}
+	// No more secrets go to it, and its person hears which it had (FR-026).
+	defer m.s.machineLeft(host, owner, name)
 	m.router.ForgetHost(host)
 	m.s.copies.forget(host)
 	if m.s.providers != nil && m.s.providers.Kept() != nil {
@@ -888,6 +899,8 @@ func (m *Methods) hello(ctx context.Context, host string, hello wire.HostHello) 
 	} else {
 		m.s.tellHostClients(host)
 	}
+	// Its person's settings and secrets, at every join (#1760, FR-024).
+	go m.s.sendUserSettings(host, true)
 	// A host marked before #656 to add the projects it found: the mark goes, unsaid.
 	m.records.ChangeHost(ctx, host, func(r *records.HostRecord) bool {
 		if r.DetectProjects == nil || !*r.DetectProjects {

@@ -77,6 +77,13 @@ func Describe(url string) string {
 
 // Seal makes an envelope for plaintext.
 func Seal(ctx context.Context, k *secrets.Keeper, keeperURL string, plaintext []byte) (*Sealed, error) {
+	return SealFor(ctx, k, keeperURL, plaintext, []byte(Key))
+}
+
+// SealFor is Seal bound to what the envelope is for, such as a person's secret by its name
+// (#1760): it opens only with the same words, so an envelope moved to another person's
+// key in the store does not open.
+func SealFor(ctx context.Context, k *secrets.Keeper, keeperURL string, plaintext, boundTo []byte) (*Sealed, error) {
 	dataKey := make([]byte, 32)
 	rand.Read(dataKey)
 	wrapped, err := bounded(ctx, func() ([]byte, error) { return k.Encrypt(ctx, dataKey) })
@@ -93,13 +100,24 @@ func Seal(ctx context.Context, k *secrets.Keeper, keeperURL string, plaintext []
 		Keeper:     Describe(keeperURL),
 		WrappedKey: wrapped,
 		Nonce:      nonce,
-		Ciphertext: gcm.Seal(nil, nonce, plaintext, []byte(Key)),
+		Ciphertext: gcm.Seal(nil, nonce, plaintext, boundTo),
 		Sealed:     time.Now().UTC(),
 	}, nil
 }
 
 // Open unwraps the data key with the keeper and decrypts the envelope.
 func Open(ctx context.Context, k *secrets.Keeper, s *Sealed) ([]byte, error) {
+	plain, err := OpenFor(ctx, k, s, []byte(Key))
+	if errors.Is(err, errBound) {
+		return nil, errors.New("the sealed control key does not open with its data key")
+	}
+	return plain, err
+}
+
+var errBound = errors.New("the envelope does not open with its data key")
+
+// OpenFor opens what SealFor sealed for boundTo.
+func OpenFor(ctx context.Context, k *secrets.Keeper, s *Sealed, boundTo []byte) ([]byte, error) {
 	dataKey, err := bounded(ctx, func() ([]byte, error) { return k.Decrypt(ctx, s.WrappedKey) })
 	if err != nil {
 		return nil, fmt.Errorf("the KMS would not unwrap the data key (sealed by %s): %w", s.Keeper, err)
@@ -108,9 +126,9 @@ func Open(ctx context.Context, k *secrets.Keeper, s *Sealed) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("the KMS gave a data key that is not usable: %w", err)
 	}
-	plain, err := gcm.Open(nil, s.Nonce, s.Ciphertext, []byte(Key))
+	plain, err := gcm.Open(nil, s.Nonce, s.Ciphertext, boundTo)
 	if err != nil {
-		return nil, errors.New("the sealed control key does not open with its data key")
+		return nil, errBound
 	}
 	return plain, nil
 }
