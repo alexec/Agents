@@ -3591,6 +3591,9 @@ type HostUser struct {
 	Labels []string `json:"labels"`
 
 	CapReachedUntil *Date `json:"capReachedUntil,omitzero"`
+
+	// For a person: the names of the bots in their groups (#2027). A runs-on: workflow that names one is heard here, once approved here, and its matches are sent to the control plane, never run here.
+	Bots []string `json:"bots,omitzero"`
 }
 
 // host/userSettings (#1760, FR-024, FR-025): to a machine, on its channel 0, when it joins and when its user's settings or secrets change. Sent only on the links of that user's own machines. secrets is every secret the user has: a name missing from it was removed.
@@ -8449,6 +8452,9 @@ type WorkflowSummary struct {
 	CausingEventName *string `json:"causingEventName,omitzero"`
 
 	IsRunning bool `json:"isRunning"`
+
+	// A bot's workflow that does not run here (#2027): the bot's name. This machine hears its server triggers with its own servers, once approved here, and sends each match to the control plane, which runs it on one of the bot's machines. Nothing of it runs here.
+	HearsFor *string `json:"hearsFor,omitzero"`
 
 	AwaitingApproval *WorkflowApproval `json:"awaitingApproval,omitzero"`
 

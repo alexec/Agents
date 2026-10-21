@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -182,7 +183,34 @@ func (s *Service) sendHostUser(host string) {
 	if link := providers.LinkOf(h); link != nil {
 		u.Labels = append(u.Labels, link.Provider)
 	}
+	if u.Kind == records.KindPerson {
+		u.Bots = s.botsOfGroups(user)
+	}
 	s.router.Tell(host, wire.NotifyHostUser.Name, u)
+}
+
+// botsOfGroups is the names of the bots in a person's groups, sorted (#2027): a runs-on:
+// workflow that names one is heard on the person's machines, once approved there, and its
+// matches are sent here, as workflows/trigger takes them from the bot's group.
+func (s *Service) botsOfGroups(user string) []string {
+	names := []string{}
+	for _, p := range s.records.People() {
+		if p.IsBot() && !p.IsRemoved() && p.Name != "" && s.inGroup(user, p.Group) {
+			names = append(names, p.Name)
+		}
+	}
+	sort.Strings(names)
+	return names
+}
+
+// tellPeoplesMachines sends host/user again to each person's machine held here: a bot or a
+// group changed, and so which bots' workflows each hears (#2027).
+func (s *Service) tellPeoplesMachines() {
+	for _, host := range s.router.HostsHeldHere() {
+		if !s.isBot(s.ownerOf(host)) {
+			s.sendHostUser(host)
+		}
+	}
 }
 
 // tellUsersMachines sends host/user again to each machine of a user held here.

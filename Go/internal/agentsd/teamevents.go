@@ -189,3 +189,23 @@ func (d *Daemon) sendOthers(fr fireRequest) {
 	}
 	d.sendTrigger(fr, f.wf)
 }
+
+// heardForBotLocked is the trigger a server's event makes of a bot's workflow heard here
+// (#2027): on, approved here, and one of its server triggers matches. It is only ever sent
+// to the control plane.
+func (d *Daemon) heardForBotLocked(folder, id string, f *workflowFile, e wire.Event) (fireRequest, bool) {
+	w := f.wf
+	if isOff(w) || d.hearsFor(w) == "" || e.Details["server"] == "" || !isServerEventName(e.Name) {
+		return fireRequest{}, false
+	}
+	if awaiting, denied := d.approvalOf(folder, id, f); awaiting != nil || denied != nil {
+		return fireRequest{}, false
+	}
+	for _, t := range w.Triggers {
+		if mt, ok := serverTrigger(t); ok && mt.matches(e) {
+			ev := e
+			return fireRequest{folder: folder, id: id, trigger: t, event: &ev, depth: e.ChainDepth}, true
+		}
+	}
+	return fireRequest{}, false
+}

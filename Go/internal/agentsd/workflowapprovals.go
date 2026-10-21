@@ -40,7 +40,7 @@ func (d *Daemon) waitingWorkflowChanges(folder string) []wire.GuardedChange {
 	}
 	out := []wire.GuardedChange{}
 	for id, f := range d.workflowFiles[folder] {
-		if !d.runsHere(f.wf) || isArchived(f.wf) {
+		if !d.listedHere(f.wf) || isArchived(f.wf) {
 			continue
 		}
 		awaiting, _ := d.approvalOf(folder, id, f)
@@ -72,7 +72,7 @@ func (d *Daemon) waitingWorkflowChanges(folder string) []wire.GuardedChange {
 // it has been approved once.
 func (d *Daemon) workflowApproval(folder string, c wire.GuardedChange) wire.Approval {
 	id, _ := workflowIDInPath(c.Path)
-	title, isNew := id, true
+	title, isNew, bot := id, true, ""
 	d.workflowMu.Lock()
 	if f := d.fileLocked(folder, id); f != nil {
 		if f.wf.Name != "" {
@@ -81,11 +81,16 @@ func (d *Daemon) workflowApproval(folder string, c wire.GuardedChange) wire.Appr
 		if awaiting, _ := d.approvalOf(folder, id, f); awaiting != nil {
 			isNew = awaiting.IsNew
 		}
+		bot = d.hearsFor(f.wf)
 	}
 	d.workflowMu.Unlock()
 	line := "Changed since you approved it"
 	if isNew {
 		line = "New"
+	}
+	// A bot's workflow heard here (#2027): what approving it does.
+	if bot != "" {
+		line += ". Your servers hear its triggers for " + bot + ", which runs it"
 	}
 	since := c.Since
 	return wire.Approval{Kind: wire.ApprovalKindWorkflow, Key: id, Title: title, Digest: c.Digest, Line: line,

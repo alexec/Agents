@@ -256,3 +256,40 @@ func TestABotsMachineIsStartedOnceForItsTriggers(t *testing.T) {
 		t.Fatalf("ran %d", ran)
 	}
 }
+
+// #2027: host/user tells a person's machine the bots of their groups, so it hears a bot's
+// workflow's server triggers for it, and again when a bot or a group changes; a bot's
+// machine and someone outside the group are told none.
+func TestAPersonsMachineIsToldTheBotsOfItsGroups(t *testing.T) {
+	p := startPlaneWith(t, store.NewMemory(), controllink.NewPrivateKey(), nil)
+	users := &hostUsers{}
+	p.told = users.heard
+	_, admin := p.client("Alex's Mac")
+	sam := p.invite(admin, "Sam", wire.UserRoleMember)
+	lee := p.invite(admin, "Lee", wire.UserRoleMember)
+	var platform wire.Group
+	json.Unmarshal(call(t, admin, "", "groups/set", wire.GroupSet{Name: "Platform", Members: []string{sam.id}}), &platform)
+	samsMac, leesMac := p.machine(sam, "MACHINE-S"), p.machine(lee, "MACHINE-L")
+	botsOf := func(host string) string {
+		u, _ := users.of(host)
+		return strings.Join(u.Bots, ",")
+	}
+
+	var made wire.BotMade
+	json.Unmarshal(call(t, admin, "", "bots/make", wire.BotMake{Name: "review-bot", Group: platform.ID}), &made)
+	p.waitFor(func() bool { return botsOf(samsMac.member.Host) == "review-bot" }, "Sam's machine told the bot")
+	bot := p.botMachine(admin, made.User, "MACHINE-B1")
+	p.waitFor(func() bool { u, ok := users.of(bot.member.Host); return ok && u.Kind == "bot" }, "the bot's machine told")
+	if got := botsOf(bot.member.Host); got != "" {
+		t.Fatalf("a bot's machine told bots %q", got)
+	}
+	if got := botsOf(leesMac.member.Host); got != "" {
+		t.Fatalf("Lee, outside the group, told %q", got)
+	}
+
+	// Lee joins the group, Sam leaves it.
+	call(t, admin, "", "groups/set", wire.GroupSet{ID: &platform.ID, Name: "Platform", Members: []string{lee.id}})
+	p.waitFor(func() bool {
+		return botsOf(leesMac.member.Host) == "review-bot" && botsOf(samsMac.member.Host) == ""
+	}, "the group's change told")
+}

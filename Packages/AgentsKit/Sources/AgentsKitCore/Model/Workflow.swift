@@ -300,6 +300,10 @@ public struct WorkflowSummary: Codable, Hashable, Sendable, Identifiable {
     /// in file order and then by server; nil when it names no server's event this host
     /// asks for. An older client ignores it.
     public var mcpTriggers: [MCPTriggerStatus]?
+    /// A bot's workflow that does not run on this host (#2027): the bot's name. Once
+    /// approved here, this host's servers hear its triggers and send each match to the
+    /// control plane, which runs it on one of the bot's machines. Nothing of it runs here.
+    public var hearsFor: String?
 
     public var id: String { workflow.id }
     public var folder: URL { workflow.folder }
@@ -315,8 +319,9 @@ public struct WorkflowSummary: Codable, Hashable, Sendable, Identifiable {
                 nextFireAtByTrigger: [Date?] = [],
                 cooldownEndsAt: Date? = nil, holdsAFire: Bool = false, queued: Int = 0,
                 offReason: WorkflowOffReason? = nil, standingAgentID: UUID? = nil,
-                mcpTriggers: [MCPTriggerStatus]? = nil) {
+                mcpTriggers: [MCPTriggerStatus]? = nil, hearsFor: String? = nil) {
         self.mcpTriggers = mcpTriggers
+        self.hearsFor = hearsFor
         self.offReason = offReason
         self.standingAgentID = standingAgentID
         self.cooldownEndsAt = cooldownEndsAt
@@ -437,6 +442,7 @@ public struct WorkflowSummary: Codable, Hashable, Sendable, Identifiable {
         standingAgentID = try c.decodeIfPresent(UUID.self, forKey: .standingAgentID)
         // A state or failure this version does not know costs the lines, not the list (#383).
         mcpTriggers = (try? c.decodeIfPresent([MCPTriggerStatus].self, forKey: .mcpTriggers)) ?? nil
+        hearsFor = try c.decodeIfPresent(String.self, forKey: .hearsFor)
     }
 
     /// What its cooldown is doing, in one sentence, for the pages that show triggers

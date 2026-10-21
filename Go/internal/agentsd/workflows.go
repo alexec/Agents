@@ -48,9 +48,13 @@ type workflowState struct {
 	ApprovedCopy     *string               `json:"approvedCopy,omitempty"`
 	ApprovedSkills   map[string]string     `json:"approvedSkills,omitempty"`
 	DeniedDigest     *string               `json:"deniedDigest,omitempty"`
-	HeldFire         *heldFire             `json:"heldFire,omitempty"`
-	QueuedFires      []heldFire            `json:"queuedFires,omitempty"`
-	GoneSince        *wire.Date            `json:"goneSince,omitempty"`
+	// HeardDigest is the file a person approved to be heard here for a bot (#2027). It is
+	// apart from ApprovedDigest, which every file gets at the first start: hearing a bot's
+	// workflow with this machine's servers waits for the person, always.
+	HeardDigest *string    `json:"heardDigest,omitempty"`
+	HeldFire    *heldFire  `json:"heldFire,omitempty"`
+	QueuedFires []heldFire `json:"queuedFires,omitempty"`
+	GoneSince   *wire.Date `json:"goneSince,omitempty"`
 	// DismissedFailure is the failure the person dismissed from Needs You (#989): its key.
 	// A new failure has a new key, and an outcome that is not the same refusal again clears it.
 	DismissedFailure *string `json:"dismissedFailure,omitempty"`
@@ -281,13 +285,17 @@ func (d *Daemon) approvalOf(folder, id string, f *workflowFile) (awaiting, denie
 	if f.digest == "" {
 		return nil, nil
 	}
-	if st != nil && st.DeniedDigest != nil && *st.DeniedDigest == f.digest {
-		return nil, &wire.WorkflowApproval{Digest: f.digest, IsNew: st.ApprovedDigest == nil}
+	approved := func(st *workflowState) *string { return st.ApprovedDigest }
+	if d.hearsFor(f.wf) != "" {
+		approved = func(st *workflowState) *string { return st.HeardDigest }
 	}
-	if st != nil && st.ApprovedDigest != nil && *st.ApprovedDigest == f.digest {
+	if st != nil && st.DeniedDigest != nil && *st.DeniedDigest == f.digest {
+		return nil, &wire.WorkflowApproval{Digest: f.digest, IsNew: approved(st) == nil}
+	}
+	if st != nil && approved(st) != nil && *approved(st) == f.digest {
 		return nil, nil
 	}
-	return &wire.WorkflowApproval{Digest: f.digest, IsNew: st == nil || st.ApprovedDigest == nil}, nil
+	return &wire.WorkflowApproval{Digest: f.digest, IsNew: st == nil || approved(st) == nil}, nil
 }
 
 func (d *Daemon) workflowTotal() int64 {
@@ -320,7 +328,7 @@ func (d *Daemon) ceilingsLocked() map[string]wire.WorkflowLimit {
 		waiting := 0
 		for _, id := range ids {
 			f := d.workflowFiles[folder][id]
-			if isArchived(f.wf) || !d.runsHere(f.wf) {
+			if isArchived(f.wf) || !d.listedHere(f.wf) {
 				continue
 			}
 			awaiting, denied := d.approvalOf(folder, id, f)
@@ -366,6 +374,9 @@ func (d *Daemon) summaryLocked(folder, id string, over map[string]wire.WorkflowL
 	}
 	s.AwaitingApproval, s.DeniedHere = d.approvalOf(folder, id, f)
 	s.IsRunning = d.runningLocked(folder, id)
+	if bot := d.hearsFor(f.wf); bot != "" {
+		s.HearsFor = &bot
+	}
 	s.McpTriggers = d.mcpTriggerStatuses(folder, id)
 	st := d.stateLocked(folder, id, false)
 	if st != nil {
@@ -464,7 +475,7 @@ func (d *Daemon) workflowSummaries(folder string) []wire.WorkflowSummary {
 			continue
 		}
 		for id, wf := range ws {
-			if d.runsHere(wf.wf) {
+			if d.listedHere(wf.wf) {
 				out = append(out, d.summaryLocked(f, id, over))
 			}
 		}
@@ -588,7 +599,7 @@ func (d *Daemon) enableWorkflow(r wire.WorkflowEnableRequest, by string) (wire.W
 			approved := 0
 			for fo, ws := range d.workflowFiles {
 				for id, g := range ws {
-					if a, dd := d.approvalOf(fo, id, g); a == nil && dd == nil && !isOff(g.wf) && !isArchived(g.wf) && d.runsHere(g.wf) {
+					if a, dd := d.approvalOf(fo, id, g); a == nil && dd == nil && !isOff(g.wf) && !isArchived(g.wf) && d.listedHere(g.wf) {
 						approved++
 					}
 				}
@@ -848,7 +859,13 @@ func (d *Daemon) approveWorkflow(r wire.WorkflowApproveRequest, approve bool) (w
 			t := now()
 			d.workflowRecs.ApprovalsBegan = &t
 		}
-		d.keepCopyLocked(st, f)
+		digest := f.digest
+		if d.hearsFor(f.wf) != "" {
+			// Heard here for a bot (#2027): approved to hear, not to run.
+			st.HeardDigest = &digest
+		} else {
+			d.keepCopyLocked(st, f)
+		}
 		st.DeniedDigest = nil
 		if o := st.LastOutcome; o != nil && o.Refused != nil && (o.Refused.Value.AwaitingApproval != nil || o.Refused.Value.DeniedHere != nil) {
 			st.LastOutcome = nil
@@ -858,6 +875,9 @@ func (d *Daemon) approveWorkflow(r wire.WorkflowApproveRequest, approve bool) (w
 		st.DeniedDigest = &digest
 		if st.ApprovedDigest != nil && *st.ApprovedDigest == digest {
 			st.ApprovedDigest, st.ApprovedCopy = nil, nil
+		}
+		if st.HeardDigest != nil && *st.HeardDigest == digest {
+			st.HeardDigest = nil
 		}
 		if o := st.LastOutcome; o != nil && o.Refused != nil && o.Refused.Value.AwaitingApproval != nil {
 			st.LastOutcome = nil
