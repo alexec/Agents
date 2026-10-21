@@ -15,7 +15,7 @@
 
 ## Counts
 
-Of 238 rows: **160 same**, **50 by design**, **28 delta** (after #188, #189, #191, #221, #238–#244, #249, #252–#255, #257, #259–#261, #263–#266, #291, #254, #317, #341, #342, #343, #345, #344, #357, #366, #375, #377, #381, #378, #400, #396, #394, #436, #433, #432, #506, #545, #548, #791, #790, #846, #826, #888, #982, #1089, #1109, #1122, #1419, #1123, #1118, #1473, #1459, #1460, #1336, #1658, #1862, #1810). A row with any open delta counts as delta, even where another side's difference is by design.
+Of 240 rows: **160 same**, **52 by design**, **28 delta** (after #188, #189, #191, #221, #238–#244, #249, #252–#255, #257, #259–#261, #263–#266, #291, #254, #317, #341, #342, #343, #345, #344, #357, #366, #375, #377, #381, #378, #400, #396, #394, #436, #433, #432, #506, #545, #548, #791, #790, #846, #826, #888, #982, #1089, #1109, #1122, #1419, #1123, #1118, #1473, #1459, #1460, #1336, #1658, #1862, #1810, #1804). A row with any open delta counts as delta, even where another side's difference is by design.
 
 | Screen | Same | By design | Delta |
 |---|---|---|---|
@@ -35,6 +35,7 @@ Of 238 rows: **160 same**, **50 by design**, **28 delta** (after #188, #189, #19
 | Disk strip | 2 | 1 | 0 |
 | Hosts, connection and pairing | 5 | 3 | 1 |
 | MCP Apps views | 5 | 1 | 0 |
+| Console and Reports | 0 | 2 | 0 |
 
 The deltas are tracked by 31 issues:
 - **Already open:** #226 (the Remote's one sidebar) and #235 (the page's one sidebar at phone width).
@@ -453,6 +454,15 @@ The deltas are tracked by 31 issues:
 | The email server's Mail page (#1780): **Mail** (`ui://email/mail`, fed by `show_mail`): a folder choice with unread counts, **Unread only**, the newest messages (an unread dot, subject, sender, age), and a message opened in place: its headers, attachments named but not opened, a line that says the text is outside content, the text as plain text (never markup or links), **Mark Read** / **Mark Unread** and **Move** to another folder; nothing on it sends mail | The server's HTML (`Go/internal/emailmcp/pages/mail.html`) in `S/AppView/AppViewHost.swift`, no Mac code of its own | The same HTML in the same host | The same HTML in `W/views/chat/viewLayer.ts` | **same** (one page for all three); walk on a scratch set-up with a stand-in IMAP server; a real mailbox is Alex's test (#1780) |
 | A view from the person's own http MCP server (#191): drawn in the turn that called its tool and as a pin; asks **Show** / **Don't Show** in the view's place first and again when the view changes; the caption names the server; reaches only its own server; stdio servers' views not shown yet | `S/AppView/AppViewHost.swift` (`asking`, `answerShow`), `S/AppView/AppViewRow.swift` (`AppViewShowAsk`); walked 2026-10-06 on a scratch window with a real Claude call of the ext-apps `basic-server-vanillajs` example: Show, inline, pinned and fed afresh, `example.com` blocked (`specs/188-mcp-apps-rest/walks/mac-191-*.png`) | The same shared host and row; builds, look not walked (Alex's) | `W/views/chat/viewLayer.ts`, `W/views/chat/AppView.tsx`, `W/views/PinnedViewPage.tsx`; walked in headless Chrome (`Web/test/walk/views191.mjs`, `specs/188-mcp-apps-rest/walks/web-191-*.png`) | **same**
 | **Ask Again** for a server's views, with what was said (views shown / not shown), on its row in the project's Connectors (#191) | `A/Projects/ProjectMCPSection.swift` | None | None | **by design** (a server's settings are the Mac's) |
+
+## Console and Reports (#1804)
+
+The control plane's two apps beside the Workspace, on the web only: the Console (admins) and Reports (scoped by role). The Mac and the Remote draw the Me scope of Reports (Cost, Time, Pool) and leave the group and organisation scopes and the Console to the web.
+
+| Feature | Mac | Remote | Web | Verdict |
+|---|---|---|---|---|
+| Workspace \| Console \| Reports at the top of the page, `#/console/‹page›` and `#/reports/‹page›`; Console only for an admin (`people/list`'s `admin`), a member who opens it is told why | None | None | `W/views/ConsoleApp.tsx` (`AppSwitcher`, `SubAppPage`), `W/model/console.ts`, `W/route.ts` | **by design**: the Console and Reports are the control plane's web apps (#1804, decision 1); walked on a scratch control plane in headless Chrome |
+| Reports ▸ Spend: the rows of `reports/usage` by person, project, machine or runtime, with CSV and JSON lines | Cost ▸ Reports: `S/ReportsPane.swift` | Cost ▸ Reports: `S/ReportsPane.swift` | Reports ▸ Spend, and Cost ▸ Reports: `W/views/Reports.tsx` | **by design**: the Me scope is on all three; group and organisation scope are the web's (#1804) |
 
 ## Live sync
 

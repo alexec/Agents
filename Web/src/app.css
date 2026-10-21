@@ -1005,6 +1005,28 @@ button.remove:hover { opacity: 1; }
 .report-list li { display: flex; flex-direction: column; gap: 2px; }
 .report-bar { display: block; height: 3px; background: var(--paper-rule); border-radius: 2px; overflow: hidden; }
 .report-bar span { display: block; height: 100%; background: var(--accent, currentColor); opacity: 0.6; }
+
+/* The control plane's three apps (#1804): Workspace | Console | Reports at the top, and the Console
+   and Reports as a list of pages beside the page open. */
+.app-switcher { display: flex; justify-content: center; padding: 6px 8px; border-bottom: 1px solid var(--paper-rule);
+  background: var(--paper-sidebar); }
+.columns.sub-app { grid-template-columns: 220px minmax(0, 1fr); }
+.sub-app-list { overflow-y: auto; padding: 4px 6px 8px; }
+.sub-app-group { display: flex; flex-direction: column; }
+.sub-app-group .section-head { opacity: 0.5; margin: 12px 8px 4px; }
+.sub-app-row { text-align: left; border: 0; border-radius: 6px; background: none; font: inherit; color: inherit; padding: 5px 10px; cursor: pointer; }
+.sub-app-row.on { background: var(--paper-selection); font-weight: 600; }
+.sub-app-row:disabled { opacity: 0.45; cursor: default; }
+.console-cards { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
+.console-card { display: flex; flex-direction: column; gap: 4px; align-items: flex-start; border: 1px solid var(--paper-rule);
+  border-radius: var(--radius-card); padding: 10px 12px; background: var(--paper-raised); }
+.console-card .link, .sub-app-page .link { border: 0; background: none; padding: 0; color: var(--accent); cursor: pointer; font: inherit; }
+@media (max-width: 759px) {
+  .columns.sub-app { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
+  .sub-app-list { display: flex; flex-wrap: wrap; gap: 4px; border-right: none; border-bottom: 1px solid var(--paper-rule); }
+  .sub-app-group { flex-direction: row; flex-wrap: wrap; }
+  .sub-app-group .section-head { display: none; }
+}
 .triggers { list-style: none; margin: 0; padding: 0; background: var(--paper-raised); border: 1px solid var(--paper-rule); border-radius: var(--radius-card); }
 .trigger { display: grid; grid-template-columns: 18px minmax(0, 1fr) auto; column-gap: 10px; padding: 10px 14px; align-items: start; }
 .trigger + .trigger { border-top: 1px solid var(--paper-rule); }
