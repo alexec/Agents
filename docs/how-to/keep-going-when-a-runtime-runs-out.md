@@ -1,16 +1,17 @@
 ---
 diataxis: how-to
 devices: [mac, iphone, ipad, server]
-description: When a chat's allowance runs out, see which runtimes are free and start a new chat that continues its work.
+description: When a chat's allowance runs out, let it carry on when the allowance is back, or start a new chat on a free runtime that continues its work.
 ---
 
 # Keep going when a runtime runs out
 
 Plans such as Claude Max, ChatGPT and Copilot come with a generous allowance, and then stop
 you for a few hours. When a chat's allowance runs out, the chat stops on its runtime and says
-so. To go on, start a new chat on a runtime that isn't out and ask it to continue the first
-one. The new agent reads what the first chat asked, said and did, and carries on from there.
-The first chat stays as it was.
+so. To go on, let the chat carry on by itself when the allowance is back. Or, to go on now,
+start a new chat on a runtime that isn't out and ask it to continue the first one. The new
+agent reads what the first chat asked, said and did, and carries on from there. The first
+chat stays as it was.
 
 ## Before you start
 
@@ -23,11 +24,24 @@ The first chat stays as it was.
 The turn ends, and a note in the conversation says so: **Claude's allowance ran out, until
 07:00.** The time is there only when the runtime gave one. The chat moves to **Paused**, with
 **Its allowance ran out** under its name. Nothing else happens: no other runtime is started,
-and the chat does not wait to carry on.
+and the chat does not carry on until you ask it to.
 
 The runtime is marked out for every chat, so you can see it before you pick it again. Other
 chats on it are not stopped. You can still send one a message. If that turn works, the
 runtime is back.
+
+## Carry on when the allowance is back
+
+1. Open the chat. Under its head, choose **Continue at 07:00**. When the runtime gave no time,
+   the button is **Continue when it is back**.
+2. The chat moves to **Waiting**, and its row says **Continues at 07:00**. When the runtime
+   gave no time, it says **Continues when it is back · tries at 11:00**: the app's next check.
+3. At that time, the app sends "continue" in the same chat. It goes sooner when another turn on
+   that runtime works, or when you choose **Mark available** on the **Runtimes** page.
+
+If the allowance is still out when the chat tries, the chat waits again, for the next time.
+To stop waiting, choose **Cancel** in the chat. A message you send, **Stop** or **Archive**
+also cancels it. The wait is kept over a restart of the Mac.
 
 A rate limit is different. The same chat tries again on the same runtime after a short wait,
 and says when. Three rate limits in ten minutes on one chat count as the allowance running

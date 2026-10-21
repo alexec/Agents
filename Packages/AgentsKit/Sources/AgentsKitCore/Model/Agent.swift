@@ -235,6 +235,9 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
     /// The last file it showed that the person has not looked at (#1802): a mark on its
     /// row, never a group or a badge. The daemon clears it when the conversation is read.
     public var fileToSee: ShownFile?
+    /// Paused by a spent allowance, and asked to carry on when it is back (#1859): the
+    /// daemon sends "continue" in this chat at `at`, or sooner when the runtime is back.
+    public var continueWhenBack: ContinueWhenBack?
     /// The three lists that are nearly all of a record — the options and commands the
     /// runtime advertised, and the plans — are empty here and still on disk (051). An
     /// archived agent nobody is reading is held this way: 1.4 KB rather than 24.
@@ -406,6 +409,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         queuedStart = (try? c.decodeIfPresent(QueuedStart.self, forKey: .queuedStart)) ?? nil
         branchedFrom = (try? c.decodeIfPresent(UUID.self, forKey: .branchedFrom)) ?? nil
         fileToSee = (try? c.decodeIfPresent(ShownFile.self, forKey: .fileToSee)) ?? nil
+        continueWhenBack = (try? c.decodeIfPresent(ContinueWhenBack.self, forKey: .continueWhenBack)) ?? nil
         // Only the keys this build does not know are read as open-ended values.
         // Reading the whole record that way too — which is what this did — decoded
         // every option, command and plan a second time, for every agent, on every
@@ -485,6 +489,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         try c.encodeIfPresent(queuedStart, forKey: .queuedStart)
         try c.encodeIfPresent(branchedFrom, forKey: .branchedFrom)
         try c.encodeIfPresent(fileToSee, forKey: .fileToSee)
+        try c.encodeIfPresent(continueWhenBack, forKey: .continueWhenBack)
         // Whatever a newer version wrote, written back out beside our own fields.
         if !unknownFields.isEmpty {
             var extra = encoder.container(keyedBy: AnyKey.self)
@@ -527,6 +532,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         case queuedStart
         case branchedFrom
         case fileToSee
+        case continueWhenBack
     }
 
     struct AnyKey: CodingKey {

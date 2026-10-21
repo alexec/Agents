@@ -57,6 +57,7 @@ export function shapeOf(agent: Agent, isComingBack = false): StatusShape {
       if (outcome === "blocked") return "needsYou";
       return "done";
     case "stopped":
+      if (agent.continueWhenBack) return "waiting";
       return pausedEndings.includes(agent.endedReason) ? "stopped" : "needsYou";
     case "archived": return "stopped";
     // Starts by itself when a place frees (#362).
@@ -75,6 +76,7 @@ export function statusWords(agent: Agent, isComingBack = false): string {
   const outcome = agent.report?.outcome;
   if (isComingBack) return comingBackDescription;
   if (agent.isUnread === true && state === "finished") return `Unread · ${outcome ? outcomeHeadings[outcome] : "Finished"}`;
+  if (agent.continueWhenBack) return "Waiting for an allowance";
   if (state === "queued") return queuedLabel(null);
   if (shapeOf(agent, isComingBack) === "waiting") return waitingLabel;
   if (state === "finished" && outcome) return outcomeHeadings[outcome];

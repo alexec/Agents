@@ -182,6 +182,12 @@ struct RemoteChatView: View {
                 if let agent, agent.missingFolder != nil, agent.state != .archived {
                     RemoteMissingFolderStrip(agent: agent)
                 }
+                // Paused by a spent allowance (#1859): Continue when it is back, or Cancel.
+                if let agent, ContinueWhenBackWords.offers(agent) || agent.continueWhenBack != nil,
+                   model.host(agent.host, has: Capability.chatContinueWhenBack1) {
+                    RemoteContinueWhenBackStrip(agent: agent)
+                        .background(Paper.ground)
+                }
                 // Blocked (039): what it waits on, as the row says it (#341). Carry on is
                 // the toolbar's, in the ··· menu on a phone (#981).
                 if let agent, model.isBlocked(agent) {

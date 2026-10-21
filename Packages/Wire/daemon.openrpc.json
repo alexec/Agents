@@ -350,6 +350,58 @@
       }
     },
     {
+      "name": "agents/continueWhenBack",
+      "description": "A chat paused by a spent allowance carries on when the allowance is back (#1859): at the provider's reset time, or the app's next check, or as soon as a turn on that runtime works or the person marks it available. Refused for a chat that is not paused by a spent allowance.",
+      "x-capability": "chat.continue-when-back/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/AgentRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Agent"
+        }
+      }
+    },
+    {
+      "name": "agents/cancelContinue",
+      "description": "The chat no longer carries on by itself (#1859). Nothing happens when it was not waiting to.",
+      "x-capability": "chat.continue-when-back/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/AgentRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Agent"
+        }
+      }
+    },
+    {
       "name": "agents/rename",
       "x-capability": "agents/1",
       "tags": [

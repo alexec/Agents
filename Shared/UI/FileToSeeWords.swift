@@ -18,6 +18,6 @@ enum FileToSeeWords {
     /// the report. Said in words, not only by the mark, because a touch screen has no
     /// hover to name it (#1873).
     static func reportLine(_ agent: Agent) -> String? {
-        line(agent) ?? agent.report?.message
+        line(agent) ?? ContinueWhenBackWords.line(agent) ?? agent.report?.message
     }
 }

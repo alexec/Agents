@@ -294,6 +294,9 @@ struct ChatView: View {
             }
             .chatColumn()
             .padding(.vertical, 8)
+        } else if ContinueWhenBackWords.offers(agent) || agent.continueWhenBack != nil,
+                  model.host(agent.host, has: Capability.chatContinueWhenBack1) {
+            ContinueWhenBackStrip(agent: agent)
         } else if model.isBlocked(agent) {
             // Stop is the prompt's own button while the agent works; Archive is on the
             // session's row and in the toolbar. What is left here is only what the page

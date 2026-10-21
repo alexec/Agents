@@ -305,6 +305,8 @@ func (d *Daemon) enqueue(id wire.UUID, q wire.QueuedPrompt, first bool) error {
 		if q.From == wire.PromptOriginPerson {
 			a.Report, a.OutcomeAsked = nil, nil
 		}
+		// Any message goes now, so the chat no longer waits for its allowance (#1859).
+		a.ContinueWhenBack = nil
 	})
 	if a == nil {
 		return &Error{Code: CodeNoSuchAgent, Message: "That agent is not here."}

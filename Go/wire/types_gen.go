@@ -111,6 +111,8 @@ type Agent struct {
 	BranchedFrom *UUID `json:"branchedFrom,omitzero"`
 	// The last file it showed with show_file that the person has not looked at (#1802): a mark on its row, never a group or a badge. Cleared when the person opens the conversation or marks it read.
 	FileToSee *ShownFile `json:"fileToSee,omitzero"`
+	// The person asked a chat paused by a spent allowance to carry on when the allowance is back (#1859). At `at` the host sends "continue" in the same chat; a turn that works, any other message, Stop or Archive takes it away.
+	ContinueWhenBack *ContinueWhenBack `json:"continueWhenBack,omitzero"`
 }
 
 type AgentArchivedReason string
@@ -1400,6 +1402,14 @@ type ContinueInProjectRequest struct {
 	Text        string       `json:"text"`
 	Attachments []Attachment `json:"attachments"`
 	RequestID   *UUID        `json:"requestID,omitzero"`
+}
+
+// When a chat paused by a spent allowance carries on by itself (#1859).
+type ContinueWhenBack struct {
+	// When it sends "continue": the provider's reset time, or the app's next check of the runtime.
+	At Date `json:"at"`
+	// True when `at` is the time the provider said the allowance resets; false when it is only the app's next check.
+	ResetKnown bool `json:"resetKnown"`
 }
 
 // The peer's answer: {"auth":…} (ControlAuth.Auth). `kind` is mac, iphone, ipad, browser, host, relay or copy.

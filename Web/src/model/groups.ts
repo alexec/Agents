@@ -90,7 +90,8 @@ export function groupOf(agent: Agent): AgentGroup {
     case "finished":
       return settled(wantsAnswer || (outcomeAsked && report === undefined), report, waitingOnEvents);
     case "stopped":
-      // The daemon never sends allowanceWait, so the Mac's "waiting for an allowance" arm is absent.
+      // Waiting for its allowance to carry on (#1859), as the Mac's "waiting for an allowance" arm.
+      if (agent.continueWhenBack) return "waiting";
       return pausedEndings.includes(agent.endedReason) ? "stopped" : "needsAttention";
     case "archived": return "archived";
     // Starts by itself when a place frees (#362): nobody has to do anything.
