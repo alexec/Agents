@@ -105,3 +105,66 @@ func TestOldEntriesExpireByTheDaysKept(t *testing.T) {
 		t.Fatal(Days(nil))
 	}
 }
+
+// counting is a store that counts its reads.
+type counting struct {
+	store.Store
+	gets, lists int
+}
+
+func (c *counting) Get(ctx context.Context, key string) (*store.Object, error) {
+	c.gets++
+	return c.Store.Get(ctx, key)
+}
+
+func (c *counting) List(ctx context.Context, prefix string) ([]store.Key, error) {
+	c.lists++
+	return c.Store.List(ctx, prefix)
+}
+
+// A member's list reads only their own entries, never the team's (#2051): 90 days of
+// 500 entries a day from ten people, and one member who acts once in ten days. Before,
+// that member's list read all 45,000 entries; now it reads their 9.
+func TestAMembersListReadsOnlyTheirOwnEntries(t *testing.T) {
+	ctx := context.Background()
+	s := &counting{Store: store.NewMemory()}
+	now := time.Date(2026, 10, 20, 12, 0, 0, 0, time.UTC)
+	var at time.Time
+	l := &Log{Store: s, Now: func() time.Time { return at }}
+	for d := range 90 {
+		for i := range 500 {
+			at = now.Add(-time.Duration(d)*24*time.Hour - time.Duration(i)*time.Second)
+			if err := l.Write(ctx, wire.AuditActor{User: string(rune('a' + i%10))}, "agents/stop", "Stopped an agent", "", nil); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if d%10 == 0 {
+			l.Write(ctx, wire.AuditActor{User: "sam"}, "agents/stop", "Stopped an agent", "", nil)
+		}
+	}
+
+	s.gets, s.lists = 0, 0
+	sams, more, err := l.List(ctx, NewQuery(wire.AuditQuery{User: new("sam")}, 90, now, false), owner)
+	if err != nil || more || len(sams) != 9 || s.gets != 9 || s.lists > 91 {
+		t.Fatalf("%v %v %d entries, %d gets, %d lists", err, more, len(sams), s.gets, s.lists)
+	}
+	s.gets = 0
+	as, more, _ := l.List(ctx, NewQuery(wire.AuditQuery{User: new("a")}, 90, now, false), owner)
+	if !more || len(as) != defaultLimit || s.gets != defaultLimit+1 || as[0].Actor.User != "a" || !as[0].At.Time().After(as[1].At.Time()) {
+		t.Fatalf("%v %d entries, %d gets", more, len(as), s.gets)
+	}
+	// An admin's list of everyone still stops at its limit, newest first across people.
+	s.gets = 0
+	all, more, _ := l.List(ctx, NewQuery(wire.AuditQuery{}, 90, now, false), owner)
+	if !more || len(all) != defaultLimit || s.gets != defaultLimit+1 || all[0].Actor.User != "a" || all[1].Actor.User != "b" {
+		t.Fatalf("%v %d entries, %d gets, %+v", more, len(all), s.gets, all[:3])
+	}
+}
+
+// A name cannot make a path of its own.
+func TestANameStaysInItsFolder(t *testing.T) {
+	k := Key(time.Date(2026, 10, 20, 0, 0, 0, 0, time.UTC), "../x/y")
+	if strings.Count(k, "/") != 5 || strings.Contains(k, "..") || !strings.HasPrefix(k, Prefix+"2026-10-20/by/") {
+		t.Fatal(k)
+	}
+}
