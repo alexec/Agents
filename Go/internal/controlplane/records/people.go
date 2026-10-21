@@ -49,10 +49,18 @@ type Person struct {
 	Kind      string
 	Role      string
 	SignIns   []SignIn
+	// A bot's group and spend caps (#1761); none for a person.
+	Group     string
+	Caps      *Caps
 	Rev       int
 	Removed   *bool
 	RemovedAt *Stamp
 	Extra     Extra
+}
+
+// Caps are a bot's or a group's spend caps (#1761, FR-033): none is no cap.
+type Caps struct {
+	DailyUSD *float64 `json:"dailyUSD,omitempty"`
 }
 
 type personJSON struct {
@@ -61,13 +69,15 @@ type personJSON struct {
 	Kind      string   `json:"kind,omitempty"`
 	Role      string   `json:"role,omitempty"`
 	SignIns   []SignIn `json:"signIns,omitempty"`
+	Group     string   `json:"group,omitempty"`
+	Caps      *Caps    `json:"caps,omitempty"`
 	Rev       int      `json:"rev,omitempty"`
 	Removed   *bool    `json:"removed,omitempty"`
 	RemovedAt *Stamp   `json:"removedAt,omitempty"`
 }
 
 func (p Person) MarshalJSON() ([]byte, error) {
-	return encodeKeeping(personJSON{p.ID, p.Name, p.Kind, p.Role, p.SignIns, p.Rev, p.Removed, p.RemovedAt}, p.Extra)
+	return encodeKeeping(personJSON{p.ID, p.Name, p.Kind, p.Role, p.SignIns, p.Group, p.Caps, p.Rev, p.Removed, p.RemovedAt}, p.Extra)
 }
 
 func (p *Person) UnmarshalJSON(data []byte) error {
@@ -76,12 +86,15 @@ func (p *Person) UnmarshalJSON(data []byte) error {
 	if err != nil {
 		return err
 	}
-	*p = Person{j.ID, j.Name, j.Kind, j.Role, j.SignIns, j.Rev, j.Removed, j.RemovedAt, extra}
+	*p = Person{j.ID, j.Name, j.Kind, j.Role, j.SignIns, j.Group, j.Caps, j.Rev, j.Removed, j.RemovedAt, extra}
 	return nil
 }
 
-// IsAdmin is a role of admin, or none.
-func (p *Person) IsAdmin() bool { return p.Role == "" || p.Role == RoleAdmin }
+// IsAdmin is a role of admin, or none. A bot never is.
+func (p *Person) IsAdmin() bool { return p.Kind != KindBot && (p.Role == "" || p.Role == RoleAdmin) }
+
+// IsBot says the user is a bot (#1761).
+func (p *Person) IsBot() bool { return p.Kind == KindBot }
 
 // RoleOrAdmin is the role, with none read as admin.
 func (p *Person) RoleOrAdmin() string {

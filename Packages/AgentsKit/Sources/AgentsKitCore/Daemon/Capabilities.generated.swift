@@ -15,6 +15,7 @@ public enum Capability {
     public static let attention1 = "attention/1"
     public static let backupsStore1 = "backups.store/1"
     public static let backups1 = "backups/1"
+    public static let bots1 = "bots/1"
     public static let catalog1 = "catalog/1"
     public static let changes1 = "changes/1"
     public static let chatBranch1 = "chat.branch/1"
@@ -402,6 +403,9 @@ public enum Capability {
         "backups/download": "backups.store/1",
         "backups/stored": "backups.store/1",
         "backups/upload": "backups.store/1",
+        "bots/make": "bots/1",
+        "bots/setCaps": "bots/1",
+        "bots/stopRun": "bots/1",
         "clients/announce": "clients/1",
         "clients/connections": "clients/1",
         "clients/forget": "clients/1",
@@ -480,7 +484,9 @@ public enum Capability {
         "user/setSecret": "user/1",
         "user/setSettings": "user/1",
         "user/settings": "user/1",
+        "workflows/claimRun": "bots/1",
         "workspaces/forAgent": "workspaces/1",
+        "control/capReached": "bots/1",
         "control/clientChanged": "control/1",
         "control/groupsChanged": "groups/1",
         "control/hostChanged": "control/1",
@@ -499,6 +505,7 @@ public enum Capability {
         "control/userSettingsChanged": "user/1",
         "control/webChanged": "control/1",
         "host/clients": "host/1",
+        "host/user": "bots/1",
         "host/userSettings": "user/1",
         "projects/detect": "projects/1",
         "relay/count": "relay/1",

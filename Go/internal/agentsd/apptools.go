@@ -84,6 +84,9 @@ func appToolCalls() []appTool {
 	}
 }
 
+// askTools put a question to a person: none on a bot's machine (#1761, FR-032).
+var askTools = map[string]bool{"ask_form": true}
+
 // startAppTools listens on loopback, once, for every session's tools.
 func (d *Daemon) startAppTools() (int, error) {
 	d.appMu.Lock()
@@ -345,7 +348,7 @@ func writeJSON(w http.ResponseWriter, v any, session string) {
 
 // offeredTools is the tools this host lists to a session: the Swift host's, those it does,
 // each with the optional description AppService adds to every schema.
-func offeredTools(movesItself bool) []json.RawMessage {
+func offeredTools(movesItself, bot bool) []json.RawMessage {
 	var all []map[string]json.RawMessage
 	if err := json.Unmarshal(wire.AppTools, &all); err != nil {
 		log.Printf("app tools: %v", err)
@@ -359,7 +362,8 @@ func offeredTools(movesItself bool) []json.RawMessage {
 	for _, t := range all {
 		var name string
 		json.Unmarshal(t["name"], &name)
-		if !done[name] || name == "move_worktree" && !movesItself {
+		// A bot's machine has no ask tools: nobody answers there (#1761, FR-032).
+		if !done[name] || name == "move_worktree" && !movesItself || askTools[name] && bot {
 			continue
 		}
 		b, _ := json.Marshal(t)
@@ -386,7 +390,7 @@ func (d *Daemon) appToolsHandle(ctx context.Context, g *appGrant, method string,
 	case "ping":
 		return map[string]any{}, nil
 	case "tools/list":
-		return map[string]any{"tools": offeredTools(g.movesItself)}, nil
+		return map[string]any{"tools": offeredTools(g.movesItself, d.isBot())}, nil
 	case "resources/list":
 		return map[string]any{"resources": []any{}}, nil
 	case "resources/read":
@@ -415,6 +419,9 @@ func (d *Daemon) appToolsHandle(ctx context.Context, g *appGrant, method string,
 				name = "that"
 			}
 			return nil, Invalid("No tool called %s.", name)
+		}
+		if askTools[tool.name] && d.isBot() {
+			return toolReply(noOneAnswersWords, true), nil
 		}
 		began := time.Now()
 		note, err := tool.call(d, g.agent, p.Arguments)

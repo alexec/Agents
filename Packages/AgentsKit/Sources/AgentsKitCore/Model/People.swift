@@ -108,10 +108,18 @@ public extension DaemonAPI {
         public var signIns: [SignIn]
         public var clients: [PersonClient]
         public var machines: [PersonMachine]
+        /// A bot's group, caps and spend today, UTC (#1761).
+        public var group: String?
+        public var caps: SpendCaps?
+        public var spentTodayUSD: Double?
 
         public init(id: String, name: String, kind: Kind = .person, role: UserRole, localOwner: Bool? = nil,
                     you: Bool? = nil, signIns: [SignIn] = [], clients: [PersonClient] = [],
-                    machines: [PersonMachine] = []) {
+                    machines: [PersonMachine] = [], group: String? = nil, caps: SpendCaps? = nil,
+                    spentTodayUSD: Double? = nil) {
+            self.group = group
+            self.caps = caps
+            self.spentTodayUSD = spentTodayUSD
             self.id = id
             self.name = name
             self.kind = kind

@@ -72,6 +72,7 @@ var own = map[string]bool{
 	"user/settings": true, "user/setSettings": true, "user/setSecret": true, "user/removeSecret": true,
 	"user/secretNames": true,
 	"groups/list": true, "groups/set": true, "groups/remove": true, "providers/setGroup": true,
+	"bots/make": true, "bots/setCaps": true, "bots/stopRun": true,
 }
 
 // Handles says whether a bare method is the control plane's. A bare daemon/ping from
@@ -98,6 +99,7 @@ var writes = map[string]bool{
 	"hosts/approveJoin": true, "hosts/denyJoin": true,
 	"user/setSettings": true, "user/setSecret": true, "user/removeSecret": true,
 	"groups/set": true, "groups/remove": true, "providers/setGroup": true,
+	"bots/make": true, "bots/setCaps": true,
 }
 
 func (m *Methods) Handle(method string, params json.RawMessage, from Caller) (any, error) {
@@ -112,9 +114,12 @@ func (m *Methods) Handle(method string, params json.RawMessage, from Caller) (an
 	if m.s.cfg.Hosted && overSSH[method] {
 		return nil, noSSHHere
 	}
-	// Another user's machine is not there (#994, FR-018).
-	if err := m.refuseOthersHosts(params, from); err != nil {
-		return nil, err
+	// Another user's machine is not there (#994, FR-018); bots/stopRun names a bot's, an
+	// admin's to stop (#1761).
+	if method != "bots/stopRun" {
+		if err := m.refuseOthersHosts(params, from); err != nil {
+			return nil, err
+		}
 	}
 	// What a code makes is the caller's person's (FR-017).
 	ctx = withCodeOwner(ctx, m.callerPerson(from))
@@ -138,6 +143,8 @@ func (m *Methods) Handle(method string, params json.RawMessage, from Caller) (an
 		return m.peopleMethod(ctx, method, params, from)
 	case "groups/list", "groups/set", "groups/remove", "providers/setGroup":
 		return m.groupsMethod(ctx, method, params, from)
+	case "bots/make", "bots/setCaps", "bots/stopRun":
+		return m.botsMethod(ctx, method, params, from)
 	case "reports/usage", "reports/export":
 		return m.reportMethod(ctx, method, params, from)
 	case "user/settings", "user/setSettings", "user/setSecret", "user/removeSecret", "user/secretNames":
@@ -239,6 +246,18 @@ func (m *Methods) Handle(method string, params json.RawMessage, from Caller) (an
 		}
 		return map[string]any{}, nil
 	case "hosts/startEnroll":
+		// With as, a machine for a bot, which an admin enrols (#1761, FR-030).
+		var enroll wire.HostEnroll
+		json.Unmarshal(params, &enroll)
+		if bot := deref(enroll.As); bot != "" {
+			if !m.s.isAdmin(m.callerPerson(from)) {
+				return nil, fail(notPermitted, "Only an admin can add a machine for a bot.")
+			}
+			if !m.s.isBot(bot) {
+				return nil, fail(invalidParams, "There is no such bot.")
+			}
+			ctx = withCodeOwner(ctx, bot)
+		}
 		return m.s.codes.Issue(ctx, true, false, controllink.CodeLifetime)
 	case "hosts/install":
 		return m.s.installer.Install(ctx, params)
@@ -773,7 +792,20 @@ func (m *Methods) HostSaid(host, method string, params json.RawMessage) (any, er
 		if err != nil {
 			return nil, err
 		}
-		return map[string]any{}, m.s.keepRollup(ctx, host, rollup, time.Now())
+		if err := m.s.keepRollup(ctx, host, rollup, time.Now()); err != nil {
+			return nil, err
+		}
+		// A bot's spend against its caps (#1761, FR-033).
+		if owner := m.s.ownerOf(host); m.s.isBot(owner) {
+			go m.s.checkCaps(owner)
+		}
+		return map[string]any{}, nil
+	case "workflows/claimRun":
+		claim, err := require[wire.WorkflowClaim](params, "WorkflowClaim")
+		if err != nil {
+			return nil, err
+		}
+		return m.s.claimRun(ctx, host, claim, time.Now())
 	case "host/workspaces", "host/providerDraft", "host/status":
 		if m.s.providers == nil {
 			if method == "host/status" {
@@ -905,6 +937,13 @@ func (m *Methods) hello(ctx context.Context, host string, hello wire.HostHello) 
 	}
 	// Its person's settings and secrets, at every join (#1760, FR-024).
 	go m.s.sendUserSettings(host, true)
+	// Its user, their kind and labels (#1761); a bot's cap is weighed again.
+	go func() {
+		m.s.sendHostUser(host)
+		if owner := m.s.ownerOf(host); m.s.isBot(owner) {
+			m.s.checkCaps(owner)
+		}
+	}()
 	// A host marked before #656 to add the projects it found: the mark goes, unsaid.
 	m.records.ChangeHost(ctx, host, func(r *records.HostRecord) bool {
 		if r.DetectProjects == nil || !*r.DetectProjects {

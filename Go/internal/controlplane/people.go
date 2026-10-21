@@ -256,6 +256,13 @@ func (m *Methods) peopleList(user string, admin bool) wire.PeopleList {
 		}
 		row := wire.PersonRow{ID: p.ID, Name: p.Name, Kind: kindOf(p), Role: wire.UserRole(p.RoleOrAdmin()),
 			SignIns: []wire.SignIn{}, Clients: clients[p.ID], Machines: machines[p.ID]}
+		// A bot's group, caps and spend today (#1761).
+		if p.IsBot() {
+			row.Role = wire.UserRoleMember
+			row.Group = optional(p.Group)
+			row.Caps = capsOnWire(p.Caps)
+			row.SpentTodayUSD = new(m.s.spentToday(context.Background(), p.ID, time.Now()))
+		}
 		if row.Clients == nil {
 			row.Clients = []wire.PersonClient{}
 		}

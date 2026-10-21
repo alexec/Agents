@@ -1173,6 +1173,11 @@ func (l *live) Permission(ctx context.Context, p sdk.RequestPermissionRequest) s
 			}
 		}
 	}
+	// On a bot's machine the policy alone answers (#1761, FR-032): what it did not allow
+	// already is refused, and the agent carries on.
+	if d.isBot() {
+		return l.refuseForBot(req)
+	}
 	pp := &pendingPermission{req: req, answer: make(chan string, 1)}
 	l.mu.Lock()
 	l.pending[req.ID] = pp
@@ -1205,6 +1210,23 @@ func (l *live) Permission(ctx context.Context, p sdk.RequestPermissionRequest) s
 	if ctx.Err() == nil {
 		d.setState(l.id, wire.AgentStateRunning)
 	}
+	return option
+}
+
+// refuseForBot answers a permission on a bot's machine: its reject option, said in the
+// transcript; "" (the turn's own refusal) when it offers none.
+func (l *live) refuseForBot(req wire.PermissionRequest) string {
+	option := ""
+	for _, kind := range []wire.PermissionOptionKind{"reject_once", "reject_always"} {
+		for _, o := range req.Options {
+			if o.Kind == kind && option == "" {
+				option = o.OptionID
+			}
+		}
+	}
+	l.d.record(l.id, wire.TranscriptEntryKind{PermissionAsked: &wire.TranscriptEntryKindPermissionAsked{Value: req}})
+	name := noOneAnswersWords
+	l.d.record(l.id, wire.TranscriptEntryKind{PermissionAnswered: &wire.TranscriptEntryKindPermissionAnswered{OptionID: option, OptionName: &name}})
 	return option
 }
 

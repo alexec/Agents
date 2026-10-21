@@ -17,9 +17,9 @@ import (
 // file new or changed since it was approved waiting for the person.
 
 func TestReadingAWorkflowFile(t *testing.T) {
-	w := parseWorkflow("---\nname: Morning check\non:\n  - schedule:\n      at: [\":00\", \":30\"]\n      between: 9-17:30\n      days: [mon, fri]\n  - agent.finished\ncooldown: 1h30m\nwhen-done: archive\nhosts: [a, a, b]\nfancy: yes\n---\n\nCheck the build.\n", "morning-check", "/p")
+	w := parseWorkflow("---\nname: Morning check\non:\n  - schedule:\n      at: [\":00\", \":30\"]\n      between: 9-17:30\n      days: [mon, fri]\n  - agent.finished\ncooldown: 1h30m\nwhen-done: archive\nruns-on: [a, a, b]\nfancy: yes\n---\n\nCheck the build.\n", "morning-check", "/p")
 	if w.Problem != nil || w.Name != "Morning check" || len(w.Triggers) != 2 || *w.Cooldown != 5400 || *w.WhenDone != wire.WorkflowWhenDoneArchive ||
-		len(w.Hosts) != 2 || w.Prompt != "Check the build.\n" || string(w.UnknownFields["fancy"]) != `"yes"` {
+		len(w.RunsOn) != 2 || w.Prompt != "Check the build.\n" || string(w.UnknownFields["fancy"]) != `"yes"` {
 		t.Fatalf("%+v", w)
 	}
 	s := w.Triggers[0].Schedule.Value
@@ -70,8 +70,8 @@ func TestOneKeyChangedAndNothingElse(t *testing.T) {
 	if strings.Contains(got, "options") {
 		t.Fatalf("%q", got)
 	}
-	got, _ = setFrontMatterList("hosts", []string{"a", "b,c"}, src)
-	if !strings.Contains(got, `hosts: [a, "b,c"]`) {
+	got, _ = setFrontMatterList("runs-on", []string{"a", "b,c"}, src)
+	if !strings.Contains(got, `runs-on: [a, "b,c"]`) {
 		t.Fatalf("%q", got)
 	}
 	if _, err := setFrontMatter("options", strPtr("x"), src); err == nil {

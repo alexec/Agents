@@ -37,6 +37,7 @@ type fireRequest struct {
 	depth           int64
 	causingEvent    *int64
 	fromQueue       bool
+	event           *wire.Event // the event that fired it, for a bot's claim (#1761)
 }
 
 // refusalWords is WorkflowRefusal.message.
@@ -171,7 +172,9 @@ func (d *Daemon) fireWorkflows(e wire.Event) {
 				mt, isServer := serverTrigger(t)
 				if isPattern && p.matches(e) || isServer && mt.matches(e) {
 					pos := e.Position
-					fires = append(fires, fireRequest{folder: folder, id: id, trigger: t, triggeringAgent: triggering, depth: e.ChainDepth, causingEvent: &pos})
+					ev := e
+					fires = append(fires, fireRequest{folder: folder, id: id, trigger: t, triggeringAgent: triggering, depth: e.ChainDepth,
+						causingEvent: &pos, event: &ev})
 					break
 				}
 			}
@@ -311,6 +314,25 @@ func (d *Daemon) fire(fr fireRequest) {
 	if f == nil || !d.runsHere(f.wf) {
 		d.workflowMu.Unlock()
 		return
+	}
+	// A bot's machine at the bot's spend cap starts no work (#1761, FR-033), and a runs-on:
+	// workflow runs once per trigger across the bot's machines (FR-034).
+	if d.isBot() && !fr.fromQueue {
+		w := f.wf
+		d.workflowMu.Unlock()
+		if _, capped := d.capped(time.Now()); capped {
+			d.recordOutcome(fr, w.Name, wire.WorkflowOutcome{Refused: &wire.WorkflowOutcomeRefused{
+				Value: wire.WorkflowRefusal{DayLimitReached: &struct{}{}}, At: now()}}, nil)
+			return
+		}
+		if d.claimsRuns(w) && !fr.byHand && !d.claimRun(fr.folder, fr.id, triggerID(fr, fr.event)) {
+			return
+		}
+		d.workflowMu.Lock()
+		if f = d.fileLocked(fr.folder, fr.id); f == nil {
+			d.workflowMu.Unlock()
+			return
+		}
 	}
 	if refused := d.refusalLocked(fr, f); refused != nil {
 		st := d.stateLocked(fr.folder, fr.id, true)
@@ -635,6 +657,10 @@ func (d *Daemon) releaseRun(id wire.UUID) *workflowRun {
 // workflowRunFinished is called as an agent's turn ends: its run is over, said with
 // workflow.completed, and what was queued behind it goes, oldest first.
 func (d *Daemon) workflowRunFinished(agent wire.UUID) {
+	// A bot's spend is sent as each run ends, not on the hour, so its cap holds (#1761).
+	if d.isBot() {
+		safe.Go("usage/rollup after a bot's run", d.sendReport)
+	}
 	d.workflowMu.Lock()
 	var run *workflowRun
 	for _, r := range d.recordsLocked().Runs {

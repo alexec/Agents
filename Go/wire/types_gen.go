@@ -724,6 +724,31 @@ const (
 	BlockWakeOnAll BlockWakeOn = "all"
 )
 
+// bots/setCaps (#1761): the bot's caps, and optionally its group.
+type BotCaps struct {
+	User  string    `json:"user"`
+	Caps  SpendCaps `json:"caps"`
+	Group *string   `json:"group,omitzero"`
+}
+
+// bots/make's answer: the bot's user id.
+type BotMade struct {
+	User string `json:"user"`
+}
+
+// bots/make (#1761, FR-030): a bot, in a group, with caps. It has no clients and no sign-in; admins approve its machines.
+type BotMake struct {
+	Name  string     `json:"name"`
+	Group string     `json:"group"`
+	Caps  *SpendCaps `json:"caps,omitzero"`
+}
+
+// bots/stopRun (#1761, FR-031): an admin stops an agent on a bot's machine, the one way a client acts there.
+type BotStopRun struct {
+	Host  HostID `json:"host"`
+	Agent UUID   `json:"agent"`
+}
+
 // agents/branchFrom (#1658): a new session that goes on from just before the person's prompt `entryID` in `agentID`.
 type BranchFromRequest struct {
 	AgentID UUID `json:"agentID"`
@@ -757,6 +782,16 @@ type BuildOutputRemoved struct {
 
 type CancelWaitRequest struct {
 	AgentID UUID `json:"agentID"`
+}
+
+// control/capReached (#1761, FR-033): to admins, a bot stopped starting work at its own or its group's cap.
+type CapReached struct {
+	User     string  `json:"user"`
+	Name     string  `json:"name"`
+	Group    *string `json:"group,omitzero"`
+	SpentUSD float64 `json:"spentUSD"`
+	CapUSD   float64 `json:"capUSD"`
+	Until    Date    `json:"until"`
 }
 
 type CarriedSetting struct {
@@ -2389,10 +2424,11 @@ type GitViewShared struct {
 
 // A group (#1761, spec 736 FR-027): everyone, or named users. It owns workspace providers: only its users see them and start machines from them (FR-028).
 type Group struct {
-	ID       string   `json:"id"`
-	Name     string   `json:"name"`
-	Everyone bool     `json:"everyone"`
-	Members  []string `json:"members"`
+	ID       string     `json:"id"`
+	Name     string     `json:"name"`
+	Everyone bool       `json:"everyone"`
+	Members  []string   `json:"members"`
+	Caps     *SpendCaps `json:"caps,omitzero"`
 }
 
 // groups/list (#1761): every group for an admin; for a member, the groups they are in.
@@ -2407,10 +2443,11 @@ type GroupRequest struct {
 
 // groups/set (#1761): makes a group, or with id changes one. One user is a list of one.
 type GroupSet struct {
-	ID       *string  `json:"id,omitzero"`
-	Name     string   `json:"name"`
-	Everyone *bool    `json:"everyone,omitzero"`
-	Members  []string `json:"members,omitzero"`
+	ID       *string    `json:"id,omitzero"`
+	Name     string     `json:"name"`
+	Everyone *bool      `json:"everyone,omitzero"`
+	Members  []string   `json:"members,omitzero"`
+	Caps     *SpendCaps `json:"caps,omitzero"`
 }
 
 // control/groupsChanged (#1761): a group was made, changed or removed.
@@ -2519,6 +2556,11 @@ type HostClients struct {
 	Clients []HostClient `json:"clients"`
 	// The user the host belongs to (#994). With it, the host lets in only a window whose person is that user (FR-020); without it (an older control plane), every window listed.
 	User *string `json:"user,omitzero"`
+}
+
+// hosts/startEnroll (#1761): with as, a bot's machine code, an admin's only. Without, the caller's own, as before.
+type HostEnroll struct {
+	As *string `json:"as,omitzero"`
 }
 
 // host/hello, on every connect of an uplink. `implementation` is `swift` or `go` (#1134).
@@ -2649,6 +2691,15 @@ type HostUpdate struct {
 	Destination string  `json:"destination"`
 	Key         *string `json:"key,omitzero"`
 	Trust       *string `json:"trust,omitzero"`
+}
+
+// host/user (#1761): to a machine on its channel 0, at each join and when its user changes. Its user, their kind, and the labels runs-on: matches (FR-034); for a bot at its cap, until when it starts no work (FR-033).
+type HostUser struct {
+	User            string   `json:"user"`
+	Kind            string   `json:"kind"`
+	Name            string   `json:"name"`
+	Labels          []string `json:"labels"`
+	CapReachedUntil *Date    `json:"capReachedUntil,omitzero"`
 }
 
 // host/userSettings (#1760, FR-024, FR-025): to a machine, on its channel 0, when it joins and when its user's settings or secrets change. Sent only on the links of that user's own machines. secrets is every secret the user has: a name missing from it was removed.
@@ -3699,6 +3750,12 @@ type PersonRow struct {
 	SignIns    []SignIn        `json:"signIns"`
 	Clients    []PersonClient  `json:"clients"`
 	Machines   []PersonMachine `json:"machines"`
+	// A bot's group (#1761).
+	Group *string `json:"group,omitzero"`
+	// A bot's caps (#1761).
+	Caps *SpendCaps `json:"caps,omitzero"`
+	// A bot's spend today, UTC, as its machines reported it (#1761).
+	SpentTodayUSD *float64 `json:"spentTodayUSD,omitzero"`
 }
 
 // What agents call the person, and their pronouns (#121), as given: person.json in the person's settings.
@@ -5256,6 +5313,11 @@ type SlashCommand struct {
 	InputHint   *string `json:"inputHint,omitzero"`
 }
 
+// Spend caps (#1761, spec 736 FR-033): a bot or a group stops starting work once its spend today (UTC) reaches one. None is no cap.
+type SpendCaps struct {
+	DailyUSD *float64 `json:"dailyUSD,omitzero"`
+}
+
 type StartOptions struct {
 	Values         map[string]JSONValue `json:"values"`
 	ExtraArguments []string             `json:"extraArguments"`
@@ -6025,12 +6087,13 @@ type Workflow struct {
 	Cooldown      *float64             `json:"cooldown,omitzero"`
 	Enabled       *bool                `json:"enabled,omitzero"`
 	Archived      *bool                `json:"archived,omitzero"`
-	Hosts         []string             `json:"hosts,omitzero"`
 	WhenDone      *WorkflowWhenDone    `json:"whenDone,omitzero"`
 	// `continue-when-back: true`: a run's turn refused for a spent allowance waits for it at once, as if the person had chosen Continue (#1918).
 	ContinueWhenBack *bool `json:"continueWhenBack,omitzero"`
 	// `muted: true`: every run of the workflow starts muted (#2003), and muting or unmuting the workflow mutes or unmutes its runs.
 	Muted *bool `json:"muted,omitzero"`
+	// runs-on: (#1761, FR-034), which replaced hosts:: labels a machine must all have to run it: its id, its os (macos, linux), its provider, and its user's or bot's name. None runs on every machine of each person who turned it on.
+	RunsOn []string `json:"runsOn,omitzero"`
 }
 
 type WorkflowApproval struct {
@@ -6058,6 +6121,17 @@ type WorkflowCause struct {
 
 type WorkflowCauseTrigger struct {
 	Value WorkflowTrigger `json:"_0"`
+}
+
+// workflows/claimRun (#1761, FR-034): a machine asks to run a runs-on: workflow for one trigger. The first to ask wins; the trigger is the same words on every machine that heard it.
+type WorkflowClaim struct {
+	Workflow string `json:"workflow"`
+	Trigger  string `json:"trigger"`
+}
+
+// workflows/claimRun's answer: won is false when another machine runs it.
+type WorkflowClaimed struct {
+	Won bool `json:"won"`
 }
 
 type WorkflowEnableRequest struct {
@@ -6221,9 +6295,10 @@ type WorkflowSettingsRequest struct {
 	Settings         WorkflowSettings `json:"settings"`
 	Cooldown         *string          `json:"cooldown,omitzero"`
 	Labels           []string         `json:"labels,omitzero"`
-	Hosts            []string         `json:"hosts,omitzero"`
 	WhenDone         *string          `json:"whenDone,omitzero"`
 	ContinueWhenBack *bool            `json:"continueWhenBack,omitzero"`
+	// runs-on: (#1761, FR-034), which replaced hosts:: labels a machine must all have to run it: its id, its os (macos, linux), its provider, and its user's or bot's name. None runs on every machine of each person who turned it on.
+	RunsOn []string `json:"runsOn,omitzero"`
 }
 
 // Read forgivingly (Workflow.swift's init(from:)): a field that is missing or does not read takes its default (`isEnabled` true; false, 0, [] or absent for the rest).

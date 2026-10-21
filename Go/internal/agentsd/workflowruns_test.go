@@ -129,8 +129,8 @@ func TestAFireWhileARunGoesQueues(t *testing.T) {
 	})
 }
 
-// A workflow pinned to this computer's id is listed and runs; one pinned to another is
-// neither (#1404: a Mac's id is its hardware UUID, which the Go host never read).
+// A workflow whose runs-on: names this computer's id is listed and runs; one naming another
+// is neither (#1761, was hosts:; #1404: a Mac's id is its hardware UUID, which the Go host never read).
 func TestAWorkflowPinnedHereRuns(t *testing.T) {
 	fakeRuntimes(t)
 	t.Setenv("AGENTS_MACHINE_ID", "")
@@ -139,8 +139,8 @@ func TestAWorkflowPinnedHereRuns(t *testing.T) {
 	dir := project(t, c, 1)
 	folder := store.FolderURL(dir)
 	os.MkdirAll(workflowsFolder(dir), 0o755)
-	os.WriteFile(filepath.Join(workflowsFolder(dir), "here.md"), []byte("---\nname: Here\non: lease.granted\nhosts: ["+machine.ID()+"]\n---\nLook.\n"), 0o644)
-	os.WriteFile(filepath.Join(workflowsFolder(dir), "there.md"), []byte("---\nname: There\non: lease.granted\nhosts: [another-computer]\n---\nLook.\n"), 0o644)
+	os.WriteFile(filepath.Join(workflowsFolder(dir), "here.md"), []byte("---\nname: Here\non: lease.granted\nruns-on: ["+machine.ID()+"]\n---\nLook.\n"), 0o644)
+	os.WriteFile(filepath.Join(workflowsFolder(dir), "there.md"), []byte("---\nname: There\non: lease.granted\nruns-on: [another-computer]\n---\nLook.\n"), 0o644)
 	approveAll(t, c, folder)
 	var list []wire.WorkflowSummary
 	json.Unmarshal(c.call(t, 2, "workflows/list", map[string]any{"folder": folder}), &list)

@@ -1733,7 +1733,7 @@ final class AppModel {
     /// `nil`, the file's is left as it is.
     func setWorkflowSettings(_ summary: WorkflowSummary, _ settings: WorkflowSettings,
                              cooldown: String? = nil, labels: [String]? = nil,
-                             hosts: [String]? = nil, whenDone: String? = nil,
+                             runsOn: [String]? = nil, whenDone: String? = nil,
                              continueWhenBack: Bool? = nil) async {
         let host = selectedProjectHost
         do {
@@ -1742,7 +1742,7 @@ final class AppModel {
                 DaemonAPI.WorkflowSettingsRequest(folder: summary.folder,
                                                   workflowID: summary.workflowID,
                                                   settings: settings, cooldown: cooldown,
-                                                  labels: labels, hosts: hosts, whenDone: whenDone,
+                                                  labels: labels, runsOn: runsOn, whenDone: whenDone,
                                                   continueWhenBack: continueWhenBack),
                 returning: WorkflowSummary.self)
             keepWorkflow(updated, on: host)

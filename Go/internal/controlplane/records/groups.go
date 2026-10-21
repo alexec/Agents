@@ -22,6 +22,8 @@ type Group struct {
 	Name      string
 	Everyone  bool
 	Members   []string
+	// Spend caps for the group's bots together (#1761, FR-033).
+	Caps      *Caps
 	Rev       int
 	Removed   *bool
 	RemovedAt *Stamp
@@ -33,6 +35,7 @@ type groupJSON struct {
 	Name      string   `json:"name"`
 	Everyone  bool     `json:"everyone,omitempty"`
 	Members   []string `json:"members"`
+	Caps      *Caps    `json:"caps,omitempty"`
 	Rev       int      `json:"rev,omitempty"`
 	Removed   *bool    `json:"removed,omitempty"`
 	RemovedAt *Stamp   `json:"removedAt,omitempty"`
@@ -43,7 +46,7 @@ func (g Group) MarshalJSON() ([]byte, error) {
 	if members == nil {
 		members = []string{}
 	}
-	return encodeKeeping(groupJSON{g.ID, g.Name, g.Everyone, members, g.Rev, g.Removed, g.RemovedAt}, g.Extra)
+	return encodeKeeping(groupJSON{g.ID, g.Name, g.Everyone, members, g.Caps, g.Rev, g.Removed, g.RemovedAt}, g.Extra)
 }
 
 func (g *Group) UnmarshalJSON(data []byte) error {
@@ -52,7 +55,7 @@ func (g *Group) UnmarshalJSON(data []byte) error {
 	if err != nil {
 		return err
 	}
-	*g = Group{j.ID, j.Name, j.Everyone, j.Members, j.Rev, j.Removed, j.RemovedAt, extra}
+	*g = Group{j.ID, j.Name, j.Everyone, j.Members, j.Caps, j.Rev, j.Removed, j.RemovedAt, extra}
 	return nil
 }
 

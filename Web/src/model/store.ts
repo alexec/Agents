@@ -337,7 +337,7 @@ export class Work {
    * does not run.
    */
   protected placeWorkflow(summary: WorkflowSummary, host: string): void {
-    if (workflowRunsOn(summary.workflow.hosts, this.hostMachineID(host))) this.upsertWorkflow(summary, host);
+    if (workflowRunsOn(summary.workflow.runsOn, this.hostMachineID(host))) this.upsertWorkflow(summary, host);
     else this.removeWorkflow(summary.workflow.workflowID, summary.workflow.folder, host);
   }
 
@@ -2471,7 +2471,7 @@ export class Store extends Work {
    * the controls, or null.
    */
   setWorkflowSettings(host: string, summary: WorkflowSummary,
-                      change: { settings?: (s: WorkflowSettings) => WorkflowSettings; cooldown?: string; labels?: (labels: string[]) => string[]; hosts?: string[]; whenDone?: WhenDone; continueWhenBack?: boolean }): Promise<string | null> {
+                      change: { settings?: (s: WorkflowSettings) => WorkflowSettings; cooldown?: string; labels?: (labels: string[]) => string[]; runsOn?: string[]; whenDone?: WhenDone; continueWhenBack?: boolean }): Promise<string | null> {
     const { folder, workflowID } = summary.workflow;
     const key = `${host}|${folderKey(folder)}|${workflowID}`;
     const send = async (): Promise<string | null> => {
@@ -2483,7 +2483,7 @@ export class Store extends Work {
           folder, workflowID, settings,
           ...(change.cooldown !== undefined ? { cooldown: change.cooldown } : {}),
           ...(change.labels !== undefined ? { labels: change.labels(current.labels) } : {}),
-          ...(change.hosts !== undefined ? { hosts: change.hosts } : {}),
+          ...(change.runsOn !== undefined ? { runsOn: change.runsOn } : {}),
           ...(change.whenDone !== undefined ? { whenDone: change.whenDone } : {}),
           ...(change.continueWhenBack !== undefined ? { continueWhenBack: change.continueWhenBack } : {}),
         }, host);

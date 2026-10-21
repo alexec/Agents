@@ -14251,12 +14251,6 @@
         "archived": {
           "type": "boolean"
         },
-        "hosts": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
         "whenDone": {
           "$ref": "#/definitions/WorkflowWhenDone"
         },
@@ -14267,6 +14261,13 @@
         "muted": {
           "description": "`muted: true`: every run of the workflow starts muted (#2003), and muting or unmuting the workflow mutes or unmutes its runs.",
           "type": "boolean"
+        },
+        "runsOn": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "runs-on: (#1761, FR-034), which replaced hosts:: labels a machine must all have to run it: its id, its os (macos, linux), its provider, and its user's or bot's name. None runs on every machine of each person who turned it on."
         }
       },
       "required": [
@@ -15038,17 +15039,18 @@
             "type": "string"
           }
         },
-        "hosts": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
         "whenDone": {
           "type": "string"
         },
         "continueWhenBack": {
           "type": "boolean"
+        },
+        "runsOn": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "runs-on: (#1761, FR-034), which replaced hosts:: labels a machine must all have to run it: its id, its os (macos, linux), its provider, and its user's or bot's name. None runs on every machine of each person who turned it on."
         }
       },
       "required": [
@@ -19024,6 +19026,18 @@
           "items": {
             "$ref": "#/definitions/PersonMachine"
           }
+        },
+        "group": {
+          "type": "string",
+          "description": "A bot's group (#1761)."
+        },
+        "caps": {
+          "$ref": "#/definitions/SpendCaps",
+          "description": "A bot's caps (#1761)."
+        },
+        "spentTodayUSD": {
+          "type": "number",
+          "description": "A bot's spend today, UTC, as its machines reported it (#1761)."
         }
       },
       "required": [
@@ -19883,6 +19897,9 @@
           "items": {
             "type": "string"
           }
+        },
+        "caps": {
+          "$ref": "#/definitions/SpendCaps"
         }
       },
       "required": [
@@ -19927,6 +19944,9 @@
           "items": {
             "type": "string"
           }
+        },
+        "caps": {
+          "$ref": "#/definitions/SpendCaps"
         }
       },
       "required": [
@@ -19974,6 +19994,195 @@
           "type": "boolean"
         }
       },
+      "additionalProperties": false
+    },
+    "SpendCaps": {
+      "type": "object",
+      "description": "Spend caps (#1761, spec 736 FR-033): a bot or a group stops starting work once its spend today (UTC) reaches one. None is no cap.",
+      "properties": {
+        "dailyUSD": {
+          "type": "number"
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    },
+    "BotMake": {
+      "type": "object",
+      "description": "bots/make (#1761, FR-030): a bot, in a group, with caps. It has no clients and no sign-in; admins approve its machines.",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "group": {
+          "type": "string"
+        },
+        "caps": {
+          "$ref": "#/definitions/SpendCaps"
+        }
+      },
+      "required": [
+        "name",
+        "group"
+      ],
+      "additionalProperties": false
+    },
+    "BotMade": {
+      "type": "object",
+      "description": "bots/make's answer: the bot's user id.",
+      "properties": {
+        "user": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "user"
+      ],
+      "additionalProperties": false
+    },
+    "BotCaps": {
+      "type": "object",
+      "description": "bots/setCaps (#1761): the bot's caps, and optionally its group.",
+      "properties": {
+        "user": {
+          "type": "string"
+        },
+        "caps": {
+          "$ref": "#/definitions/SpendCaps"
+        },
+        "group": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "user",
+        "caps"
+      ],
+      "additionalProperties": false
+    },
+    "BotStopRun": {
+      "type": "object",
+      "description": "bots/stopRun (#1761, FR-031): an admin stops an agent on a bot's machine, the one way a client acts there.",
+      "properties": {
+        "host": {
+          "$ref": "#/definitions/HostID"
+        },
+        "agent": {
+          "$ref": "#/definitions/UUID"
+        }
+      },
+      "required": [
+        "host",
+        "agent"
+      ],
+      "additionalProperties": false
+    },
+    "HostEnroll": {
+      "type": "object",
+      "description": "hosts/startEnroll (#1761): with as, a bot's machine code, an admin's only. Without, the caller's own, as before.",
+      "properties": {
+        "as": {
+          "type": "string"
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    },
+    "HostUser": {
+      "type": "object",
+      "description": "host/user (#1761): to a machine on its channel 0, at each join and when its user changes. Its user, their kind, and the labels runs-on: matches (FR-034); for a bot at its cap, until when it starts no work (FR-033).",
+      "properties": {
+        "user": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "person",
+            "bot"
+          ]
+        },
+        "name": {
+          "type": "string"
+        },
+        "labels": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "capReachedUntil": {
+          "$ref": "#/definitions/WireDate"
+        }
+      },
+      "required": [
+        "user",
+        "kind",
+        "name",
+        "labels"
+      ],
+      "additionalProperties": false
+    },
+    "WorkflowClaim": {
+      "type": "object",
+      "description": "workflows/claimRun (#1761, FR-034): a machine asks to run a runs-on: workflow for one trigger. The first to ask wins; the trigger is the same words on every machine that heard it.",
+      "properties": {
+        "workflow": {
+          "type": "string"
+        },
+        "trigger": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "workflow",
+        "trigger"
+      ],
+      "additionalProperties": false
+    },
+    "WorkflowClaimed": {
+      "type": "object",
+      "description": "workflows/claimRun's answer: won is false when another machine runs it.",
+      "properties": {
+        "won": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "won"
+      ],
+      "additionalProperties": false
+    },
+    "CapReached": {
+      "type": "object",
+      "description": "control/capReached (#1761, FR-033): to admins, a bot stopped starting work at its own or its group's cap.",
+      "properties": {
+        "user": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "group": {
+          "type": "string"
+        },
+        "spentUSD": {
+          "type": "number"
+        },
+        "capUSD": {
+          "type": "number"
+        },
+        "until": {
+          "$ref": "#/definitions/WireDate"
+        }
+      },
+      "required": [
+        "user",
+        "name",
+        "spentUSD",
+        "capUSD",
+        "until"
+      ],
       "additionalProperties": false
     }
   }

@@ -282,16 +282,17 @@ func flag(n yamlnode.Node, ok bool) *bool {
 	return nil
 }
 
-func hostIDs(n yamlnode.Node) ([]string, error) {
+// runsOnLabels is runs-on: (#1761), which replaced hosts:: one label or a list of them.
+func runsOnLabels(n yamlnode.Node) ([]string, error) {
 	var texts []string
 	switch {
 	case n.IsMapping():
-		return nil, failure("`hosts:` must be a list of machine ids")
+		return nil, failure("`runs-on:` must be a list of labels")
 	case n.IsSequence():
 		for _, e := range n.Sequence {
 			t, ok := e.Text()
 			if !ok {
-				return nil, failure("`hosts:` must be a list of machine ids")
+				return nil, failure("`runs-on:` must be a list of labels")
 			}
 			texts = append(texts, t)
 		}
@@ -346,9 +347,9 @@ func parseWorkflow(text, id, project string) wire.Workflow {
 						b.WhenDone = &wd
 					}
 				}
-				if h, ok := m["hosts"]; ok {
-					if ids, err := hostIDs(h); err == nil && len(ids) > 0 {
-						b.Hosts = ids
+				if h, ok := m["runs-on"]; ok {
+					if labels, err := runsOnLabels(h); err == nil && len(labels) > 0 {
+						b.RunsOn = labels
 					}
 				}
 			}
@@ -461,13 +462,13 @@ func parseWorkflow(text, id, project string) wire.Workflow {
 			w.WhenDone = &wd
 		}
 	}
-	if n, ok := m["hosts"]; ok {
-		ids, err := hostIDs(n)
+	if n, ok := m["runs-on"]; ok {
+		labels, err := runsOnLabels(n)
 		if err != nil {
 			return broken(failureMessage(err, ""))
 		}
-		if len(ids) > 0 {
-			w.Hosts = ids
+		if len(labels) > 0 {
+			w.RunsOn = labels
 		}
 	}
 	s, err := workflowSettings(m)
@@ -476,7 +477,7 @@ func parseWorkflow(text, id, project string) wire.Workflow {
 	}
 	w.Settings = s
 	known := map[string]bool{"on": true, "agent": true, "name": true, "permission-mode": true, "runtime": true, "model": true,
-		"labels": true, "effort": true, "options": true, "enabled": true, "archived": true, "cooldown": true, "hosts": true, "when-done": true,
+		"labels": true, "effort": true, "options": true, "enabled": true, "archived": true, "cooldown": true, "runs-on": true, "when-done": true,
 		"continue-when-back": true}
 	for k, v := range m {
 		if !known[k] {

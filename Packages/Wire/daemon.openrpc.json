@@ -6466,6 +6466,10 @@
         "code": -32068,
         "message": "agentsWorking"
       },
+      "botMachine": {
+        "code": -32073,
+        "message": "botMachine"
+      },
       "busy": {
         "code": -32040,
         "message": "busy"

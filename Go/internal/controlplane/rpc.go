@@ -26,6 +26,7 @@ const (
 	notSupported         = -32009
 	notPermitted         = -32045
 	providersNeedOneCopy = -32064
+	botMachine           = -32073
 	hostOffline          = -32090
 	noSuchHost           = -32091
 	changedElsewhere     = -32093

@@ -15,6 +15,7 @@ const (
 	CapAttention1            = "attention/1"
 	CapBackupsStore1         = "backups.store/1"
 	CapBackups1              = "backups/1"
+	CapBots1                 = "bots/1"
 	CapCatalog1              = "catalog/1"
 	CapChanges1              = "changes/1"
 	CapChatBranch1           = "chat.branch/1"
@@ -447,6 +448,9 @@ var ControlCapabilities = map[string]string{
 	"backups/download":            "backups.store/1",
 	"backups/stored":              "backups.store/1",
 	"backups/upload":              "backups.store/1",
+	"bots/make":                   "bots/1",
+	"bots/setCaps":                "bots/1",
+	"bots/stopRun":                "bots/1",
 	"clients/announce":            "clients/1",
 	"clients/connections":         "clients/1",
 	"clients/forget":              "clients/1",
@@ -525,7 +529,9 @@ var ControlCapabilities = map[string]string{
 	"user/setSecret":              "user/1",
 	"user/setSettings":            "user/1",
 	"user/settings":               "user/1",
+	"workflows/claimRun":          "bots/1",
 	"workspaces/forAgent":         "workspaces/1",
+	"control/capReached":          "bots/1",
 	"control/clientChanged":       "control/1",
 	"control/groupsChanged":       "groups/1",
 	"control/hostChanged":         "control/1",
@@ -544,6 +550,7 @@ var ControlCapabilities = map[string]string{
 	"control/userSettingsChanged": "user/1",
 	"control/webChanged":          "control/1",
 	"host/clients":                "host/1",
+	"host/user":                   "bots/1",
 	"host/userSettings":           "user/1",
 	"projects/detect":             "projects/1",
 	"relay/count":                 "relay/1",
@@ -553,6 +560,7 @@ var ControlCapabilities = map[string]string{
 
 // ControlNotifications is each notification in control.openrpc.json: what its server sends, not serves.
 var ControlNotifications = map[string]bool{
+	"control/capReached":          true,
 	"control/clientChanged":       true,
 	"control/groupsChanged":       true,
 	"control/hostChanged":         true,
@@ -571,6 +579,7 @@ var ControlNotifications = map[string]bool{
 	"control/userSettingsChanged": true,
 	"control/webChanged":          true,
 	"host/clients":                true,
+	"host/user":                   true,
 	"host/userSettings":           true,
 	"projects/detect":             true,
 	"relay/count":                 true,

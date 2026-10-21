@@ -80,7 +80,7 @@ export function WorkflowPage({ store, host, folder, projectName, workflowID, dow
     ? [store.agent(host, summary.standingAgentID)].find((a) => a !== undefined && a.archivedAt === undefined) : undefined;
   const cooldown = cooldownSentence(summary);
   const unknown = unknownLines(workflow);
-  const pinned = workflow.hosts ?? [];
+  const pinned = workflow.runsOn ?? [];
   const choices = workflowHostChoices(store.hosts.value, store.macHostID.value);
   const knownHosts = new Set(choices.map((choice) => choice.machineID));
   const rows = [...choices, ...pinned.filter((id) => !knownHosts.has(id)).map((id) => ({ machineID: id, name: id }))];
@@ -269,7 +269,7 @@ export function WorkflowPage({ store, host, folder, projectName, workflowID, dow
             <div class="host-pins">
               <label class="switch">
                 <input type="checkbox" role="switch" aria-label="Every machine" checked={pinned.length === 0} disabled={locked || pinned.length === 0}
-                  onChange={() => change({ hosts: [] })} />
+                  onChange={() => change({ runsOn: [] })} />
                 Every machine
               </label>
               {rows.map((row) => (
@@ -278,7 +278,7 @@ export function WorkflowPage({ store, host, folder, projectName, workflowID, dow
                     onChange={(event) => {
                       const on = (event.currentTarget as HTMLInputElement).checked;
                       const next = on ? [...pinned, row.machineID] : pinned.filter((id) => id !== row.machineID);
-                      change({ hosts: next });
+                      change({ runsOn: next });
                     }} />
                   {row.name}
                 </label>

@@ -162,6 +162,12 @@ func sweep(ctx context.Context, rs *records.Records, now time.Time, most int) (s
 	if err != nil {
 		return report, err
 	}
+	// Bots' run claims (#1761), counted with the usage periods.
+	runs, err := sweepRuns(ctx, s, now, left-usage)
+	report.usage += runs
+	if err != nil {
+		return report, err
+	}
 
 	if folder, ok := s.(*store.Folder); ok {
 		report.leftovers = folder.RemoveLeftovers(now.Add(-leftoversKept))

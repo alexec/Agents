@@ -23,6 +23,7 @@ export type ResourceName = string & { readonly __brand: "ResourceName" };
 export const Failure = {
   agentLimitReached: -32023,
   agentsWorking: -32068,
+  botMachine: -32073,
   busy: -32040,
   catalogRefused: -32080,
   changedElsewhere: -32093,
@@ -685,6 +686,37 @@ export type BlockClearing = "waits" | "time" | "dropped";
 
 export type BlockWakeOn = "any" | "all";
 
+/** bots/setCaps (#1761): the bot's caps, and optionally its group. */
+export interface BotCaps {
+  user: string;
+  caps: SpendCaps;
+  group?: string;
+}
+
+/** bots/make's answer: the bot's user id. */
+export interface BotMade {
+  user: string;
+}
+
+/**
+ * bots/make (#1761, FR-030): a bot, in a group, with caps. It has no clients and no sign-in; admins
+ * approve its machines.
+ */
+export interface BotMake {
+  name: string;
+  group: string;
+  caps?: SpendCaps;
+}
+
+/**
+ * bots/stopRun (#1761, FR-031): an admin stops an agent on a bot's machine, the one way a client
+ * acts there.
+ */
+export interface BotStopRun {
+  host: HostID;
+  agent: UUID;
+}
+
 /**
  * agents/branchFrom (#1658): a new session that goes on from just before the person's prompt
  * `entryID` in `agentID`.
@@ -730,6 +762,19 @@ export interface BuildOutputRemoved {
 
 export interface CancelWaitRequest {
   agentID: UUID;
+}
+
+/**
+ * control/capReached (#1761, FR-033): to admins, a bot stopped starting work at its own or its
+ * group's cap.
+ */
+export interface CapReached {
+  user: string;
+  name: string;
+  group?: string;
+  spentUSD: number;
+  capUSD: number;
+  until: WireDate;
 }
 
 export interface CarriedSetting {
@@ -2167,6 +2212,7 @@ export interface Group {
   name: string;
   everyone: boolean;
   members: string[];
+  caps?: SpendCaps;
 }
 
 /** groups/list (#1761): every group for an admin; for a member, the groups they are in. */
@@ -2185,6 +2231,7 @@ export interface GroupSet {
   name: string;
   everyone?: boolean;
   members?: string[];
+  caps?: SpendCaps;
 }
 
 /** control/groupsChanged (#1761): a group was made, changed or removed. */
@@ -2305,6 +2352,14 @@ export interface HostClients {
    * that user (FR-020); without it (an older control plane), every window listed.
    */
   user?: string;
+}
+
+/**
+ * hosts/startEnroll (#1761): with as, a bot's machine code, an admin's only. Without, the caller's
+ * own, as before.
+ */
+export interface HostEnroll {
+  as?: string;
 }
 
 /** host/hello, on every connect of an uplink. `implementation` is `swift` or `go` (#1134). */
@@ -2452,6 +2507,19 @@ export interface HostUpdate {
   destination: string;
   key?: string;
   trust?: string;
+}
+
+/**
+ * host/user (#1761): to a machine on its channel 0, at each join and when its user changes. Its
+ * user, their kind, and the labels runs-on: matches (FR-034); for a bot at its cap, until when it
+ * starts no work (FR-033).
+ */
+export interface HostUser {
+  user: string;
+  kind: "person" | "bot";
+  name: string;
+  labels: string[];
+  capReachedUntil?: WireDate;
 }
 
 /**
@@ -3265,6 +3333,12 @@ export interface PersonRow {
   signIns: SignIn[];
   clients: PersonClient[];
   machines: PersonMachine[];
+  /** A bot's group (#1761). */
+  group?: string;
+  /** A bot's caps (#1761). */
+  caps?: SpendCaps;
+  /** A bot's spend today, UTC, as its machines reported it (#1761). */
+  spentTodayUSD?: number;
 }
 
 /**
@@ -4656,6 +4730,14 @@ export interface SlashCommand {
   inputHint?: string;
 }
 
+/**
+ * Spend caps (#1761, spec 736 FR-033): a bot or a group stops starting work once its spend today
+ * (UTC) reaches one. None is no cap.
+ */
+export interface SpendCaps {
+  dailyUSD?: number;
+}
+
 export interface StartOptions {
   values: Record<string, JSONValue>;
   extraArguments: string[];
@@ -5275,7 +5357,6 @@ export interface Workflow {
   cooldown?: number;
   enabled?: boolean;
   archived?: boolean;
-  hosts?: string[];
   whenDone?: WorkflowWhenDone;
   /**
    * `continue-when-back: true`: a run's turn refused for a spent allowance waits for it at once, as
@@ -5287,6 +5368,12 @@ export interface Workflow {
    * workflow mutes or unmutes its runs.
    */
   muted?: boolean;
+  /**
+   * runs-on: (#1761, FR-034), which replaced hosts:: labels a machine must all have to run it: its
+   * id, its os (macos, linux), its provider, and its user's or bot's name. None runs on every
+   * machine of each person who turned it on.
+   */
+  runsOn?: string[];
 }
 
 export interface WorkflowApproval {
@@ -5310,6 +5397,20 @@ export interface WorkflowArchiveRequest {
 export type WorkflowCause =
   | { byHand: Record<string, never> }
   | { trigger: { _0: WorkflowTrigger } };
+
+/**
+ * workflows/claimRun (#1761, FR-034): a machine asks to run a runs-on: workflow for one trigger.
+ * The first to ask wins; the trigger is the same words on every machine that heard it.
+ */
+export interface WorkflowClaim {
+  workflow: string;
+  trigger: string;
+}
+
+/** workflows/claimRun's answer: won is false when another machine runs it. */
+export interface WorkflowClaimed {
+  won: boolean;
+}
 
 export interface WorkflowEnableRequest {
   folder: URLString;
@@ -5398,9 +5499,14 @@ export interface WorkflowSettingsRequest {
   settings: WorkflowSettings;
   cooldown?: string;
   labels?: string[];
-  hosts?: string[];
   whenDone?: string;
   continueWhenBack?: boolean;
+  /**
+   * runs-on: (#1761, FR-034), which replaced hosts:: labels a machine must all have to run it: its
+   * id, its os (macos, linux), its provider, and its user's or bot's name. None runs on every
+   * machine of each person who turned it on.
+   */
+  runsOn?: string[];
 }
 
 /**
@@ -5579,6 +5685,9 @@ export interface Methods {
   "backups/make": { params: BackupMakeRequest; result: BackupState };
   "backups/restore": { params: BackupRestoreRequest; result: BackupRestoreResult };
   "backups/state": { params: Empty; result: BackupState };
+  "bots/make": { params: BotMake; result: BotMade };
+  "bots/setCaps": { params: BotCaps; result: Empty };
+  "bots/stopRun": { params: BotStopRun; result: Empty };
   "changes/file": { params: ChangesFileRequest; result: ChangedFileDetail };
   "changes/list": { params: ChangesListRequest; result: ChangesList };
   "clients/forgetSelf": { params: Empty; result: Empty };
@@ -5770,6 +5879,9 @@ export const MethodTarget = {
   "backups/make": "host",
   "backups/restore": "host",
   "backups/state": "host",
+  "bots/make": "control",
+  "bots/setCaps": "control",
+  "bots/stopRun": "control",
   "changes/file": "host",
   "changes/list": "host",
   "clients/forgetSelf": "control",
@@ -5927,6 +6039,7 @@ export interface Notifications {
   "attention/changed": AttentionNotification;
   "backups/changed": BackupState;
   "clone/changed": CloneNotification;
+  "control/capReached": CapReached;
   "control/groupsChanged": GroupsChanged;
   "control/hostChanged": JSONValue;
   "control/joinDecided": JoinDecided;
@@ -6014,12 +6127,17 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   BackupStorePart: { required: ["name", "part", "data"], optional: [] },
   BackupStorePartRequest: { required: ["id", "part"], optional: [] },
   Block: { required: ["waits"], optional: ["checkAgainAt", "wakeOn", "clearedAt", "clearedBy"] },
+  BotCaps: { required: ["user", "caps"], optional: ["group"] },
+  BotMade: { required: ["user"], optional: [] },
+  BotMake: { required: ["name", "group"], optional: ["caps"] },
+  BotStopRun: { required: ["host", "agent"], optional: [] },
   BranchFromRequest: { required: ["agentID", "entryID"], optional: [] },
   BranchSummary: { required: ["name"], optional: ["remote"] },
   BringBack: { required: ["moved", "applied"], optional: [] },
   BringBackRequest: { required: ["folder", "branches"], optional: ["bundle", "patch", "patchOn"] },
   BuildOutputRemoved: { required: ["removed", "freed"], optional: [] },
   CancelWaitRequest: { required: ["agentID"], optional: [] },
+  CapReached: { required: ["user", "name", "spentUSD", "capUSD", "until"], optional: ["group"] },
   CarriedSetting: { required: ["optionID", "name", "source"], optional: ["from", "to"] },
   CatalogPreviewAnswer: { required: [], optional: ["preview", "error"] },
   CatalogPreviewRequest: { required: ["result", "destination"], optional: [] },
@@ -6163,10 +6281,10 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   GitAsk: { required: ["server", "from"], optional: [] },
   GitCredential: { required: ["username", "password"], optional: [] },
   GitCredentialRequest: { required: ["protocol", "host"], optional: ["path"] },
-  Group: { required: ["id", "name", "everyone", "members"], optional: [] },
+  Group: { required: ["id", "name", "everyone", "members"], optional: ["caps"] },
   GroupList: { required: ["groups"], optional: [] },
   GroupRequest: { required: ["id"], optional: [] },
-  GroupSet: { required: ["name"], optional: ["id", "everyone", "members"] },
+  GroupSet: { required: ["name"], optional: ["id", "everyone", "members", "caps"] },
   GroupsChanged: { required: [], optional: ["id", "removed"] },
   GuardedChange: { required: ["path", "changedBy", "changedByIDs", "byGit", "since"], optional: ["digest", "askedIn"] },
   GuardedChangeReading: { required: ["path", "lines"], optional: ["digest", "approved", "current"] },
@@ -6179,6 +6297,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   HostAnnounce: { required: ["publicKey", "name", "platform", "version", "machineID"], optional: ["relay", "implementation"] },
   HostClient: { required: ["id", "kind", "publicKey"], optional: ["person"] },
   HostClients: { required: ["clients"], optional: ["user"] },
+  HostEnroll: { required: [], optional: ["as"] },
   HostHello: { required: ["version", "platform", "machineID"], optional: ["host", "name", "relay", "implementation", "capabilities"] },
   HostInstall: { required: ["destination"], optional: ["name", "key", "trust", "tunnel"] },
   HostJoinAsk: { required: ["name", "platform", "publicKey"], optional: ["version", "machineID", "person"] },
@@ -6196,6 +6315,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   HostTunnel: { required: ["up"], optional: ["problem"] },
   HostTunnelChanged: { required: ["name", "tunnel"], optional: ["host"] },
   HostUpdate: { required: ["host", "destination"], optional: ["key", "trust"] },
+  HostUser: { required: ["user", "kind", "name", "labels"], optional: ["capReachedUntil"] },
   HostUserSettings: { required: ["user", "settings", "secrets"], optional: [] },
   HostWorkspace: { required: ["provider", "providerName", "workspace", "workspaceName", "workspaceState", "canStart", "canStop", "startWhenUsed", "current"], optional: ["hostState", "phase", "since", "problem", "stoppedBy", "stopWhenIdleMinutes", "cost", "startForSchedules", "tellsSchedule", "nextWorkflow", "nextWorkflowAt", "wakeAt"] },
   HostWorkspaceCall: { required: ["agent", "method", "params"], optional: [] },
@@ -6297,7 +6417,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   PersonRemoveRequest: { required: ["name", "agentID"], optional: [] },
   PersonRequest: { required: ["user"], optional: [] },
   PersonRoleRequest: { required: ["user", "role"], optional: [] },
-  PersonRow: { required: ["id", "name", "kind", "role", "signIns", "clients", "machines"], optional: ["localOwner", "you"] },
+  PersonRow: { required: ["id", "name", "kind", "role", "signIns", "clients", "machines"], optional: ["localOwner", "you", "group", "caps", "spentTodayUSD"] },
   PersonSettings: { required: [], optional: ["name", "pronouns"] },
   Persona: { required: ["id", "name", "origin", "settings"], optional: ["description", "problem"] },
   PersonasListRequest: { required: ["folder"], optional: [] },
@@ -6469,6 +6589,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   SkillsListAnswer: { required: ["skills"], optional: [] },
   SkillsListRequest: { required: ["destination"], optional: [] },
   SlashCommand: { required: ["name"], optional: ["description", "inputHint"] },
+  SpendCaps: { required: [], optional: ["dailyUSD"] },
   StartOptions: { required: ["values", "extraArguments"], optional: [] },
   StartRequest: { required: ["runtimeID", "cwd", "prompt", "attachments", "startOptions", "additionalDirectories", "mcpServers", "labels"], optional: ["draftID", "worktree", "requestID", "sandbox", "persona", "purpose"] },
   StartedMachinePreview: { required: ["host", "name", "state", "unpushed"], optional: ["unknown"] },
@@ -6530,10 +6651,12 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   WakeState: { required: ["isHolding", "agentsInFlight", "heldBackByBattery", "onPower"], optional: ["batteryPercent", "since", "graceUntil"] },
   WebRemoteStatus: { required: ["port", "served"], optional: ["reason", "detail"] },
   WorkReport: { required: ["outcome", "message", "at"], optional: ["block"] },
-  Workflow: { required: ["workflowID", "folder", "name", "triggers", "mode", "prompt", "unknownFields", "settings"], optional: ["problem", "cooldown", "enabled", "archived", "hosts", "whenDone", "continueWhenBack", "muted"] },
+  Workflow: { required: ["workflowID", "folder", "name", "triggers", "mode", "prompt", "unknownFields", "settings"], optional: ["problem", "cooldown", "enabled", "archived", "whenDone", "continueWhenBack", "muted", "runsOn"] },
   WorkflowApproval: { required: ["digest", "isNew"], optional: ["note"] },
   WorkflowApproveRequest: { required: ["folder", "workflowID", "digest"], optional: [] },
   WorkflowArchiveRequest: { required: ["folder", "workflowID", "archived"], optional: [] },
+  WorkflowClaim: { required: ["workflow", "trigger"], optional: [] },
+  WorkflowClaimed: { required: ["won"], optional: [] },
   WorkflowEnableRequest: { required: ["folder", "workflowID", "enabled"], optional: [] },
   WorkflowMCPClearMissedRequest: { required: ["folder", "workflowID", "name"], optional: ["server"] },
   WorkflowMuteRequest: { required: ["folder", "workflowID", "muted"], optional: [] },
@@ -6541,7 +6664,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   WorkflowRequest: { required: ["folder", "workflowID"], optional: [] },
   WorkflowSchedule: { required: ["minutes", "hours", "startMinute", "endMinute", "days"], optional: [] },
   WorkflowSettings: { required: ["options", "labels"], optional: ["permissionMode", "runtimeID", "model", "effort"] },
-  WorkflowSettingsRequest: { required: ["folder", "workflowID", "settings"], optional: ["cooldown", "labels", "hosts", "whenDone", "continueWhenBack"] },
+  WorkflowSettingsRequest: { required: ["folder", "workflowID", "settings"], optional: ["cooldown", "labels", "whenDone", "continueWhenBack", "runsOn"] },
   WorkflowSummary: { required: ["workflow", "isArchived", "isEnabled", "nextFireAtByTrigger", "isRunning", "holdsAFire", "queued"], optional: ["overLimit", "totalLimit", "nextFireAt", "lastOutcome", "causingEvent", "causingEventName", "awaitingApproval", "deniedHere", "lastFiredAt", "lastFiredBy", "cooldownEndsAt", "offReason", "standingAgentID", "mcpTriggers"] },
   WorkflowsListRequest: { required: [], optional: ["folder"] },
   WorkspaceInfo: { required: ["id", "name", "state"], optional: ["ssh", "tunnel", "hostKeyRenews", "cost", "host"] },

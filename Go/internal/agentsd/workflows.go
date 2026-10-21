@@ -118,16 +118,10 @@ func (d *Daemon) machineID() string {
 	return d.machineValue
 }
 
+// runsHere says this machine has every label the workflow's runs-on: names (#1761); one
+// with none runs on every machine of the person who turned it on, as before.
 func (d *Daemon) runsHere(w wire.Workflow) bool {
-	if len(w.Hosts) == 0 {
-		return true
-	}
-	for _, h := range w.Hosts {
-		if h == d.machineID() {
-			return true
-		}
-	}
-	return false
+	return len(w.RunsOn) == 0 || d.runsOnHere(w.RunsOn)
 }
 
 // recordsLocked is workflows.json, read once; one that cannot be read approves nothing.
@@ -785,10 +779,10 @@ func (d *Daemon) workflowSettingsChange(r wire.WorkflowSettingsRequest, byPerson
 				return "", err
 			}
 		}
-		if r.Hosts != nil {
-			if text, err = setFrontMatterList("hosts", r.Hosts, text); err != nil {
-				if text2, err2 := setFrontMatter("hosts", nil, text); err2 == nil {
-					text, err = setFrontMatterList("hosts", r.Hosts, text2)
+		if r.RunsOn != nil {
+			if text, err = setFrontMatterList("runs-on", r.RunsOn, text); err != nil {
+				if text2, err2 := setFrontMatter("runs-on", nil, text); err2 == nil {
+					text, err = setFrontMatterList("runs-on", r.RunsOn, text2)
 				}
 				if err != nil {
 					return "", err

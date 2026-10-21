@@ -245,7 +245,7 @@ func personaPrompt(a *wire.Agent) string {
 // tools this host offers it, under the names Grok calls.
 func grokRules() string {
 	var cards []string
-	for _, raw := range offeredTools(runtimeCanMove("grok")) {
+	for _, raw := range offeredTools(runtimeCanMove("grok"), false) {
 		var t map[string]any
 		if json.Unmarshal(raw, &t) != nil {
 			continue

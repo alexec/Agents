@@ -5,7 +5,7 @@ agent: new
 runtime: claude
 model: sonnet
 permission-mode: auto
-hosts: [8AB85821-9D24-59CE-9737-8FC556923733]
+runs-on: [8AB85821-9D24-59CE-9737-8FC556923733]
 labels: [release, runtimes]
 when-done: archive
 ---

@@ -57,6 +57,11 @@ func (l *live) Elicitation(ctx context.Context, params json.RawMessage) (string,
 	l.mu.Lock()
 	inTurn := l.inTurn
 	l.mu.Unlock()
+	// On a bot's machine nobody answers (#1761, FR-032): declined, and the agent carries on.
+	if d.isBot() {
+		d.record(l.id, wire.TranscriptEntryKind{RuntimeNote: &wire.TranscriptEntryKindRuntimeNote{Value: noOneAnswersWords}})
+		return string(wire.AnswerElicitationRequestActionDecline), nil
+	}
 	if a := d.Store.Agent(l.id); !inTurn || a == nil || a.Purpose != nil {
 		d.record(l.id, wire.TranscriptEntryKind{RuntimeNote: &wire.TranscriptEntryKindRuntimeNote{Value: questionWentUnanswered}})
 		return string(wire.AnswerElicitationRequestActionCancel), nil

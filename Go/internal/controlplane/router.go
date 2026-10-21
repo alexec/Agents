@@ -35,6 +35,11 @@ type Ownership interface {
 	OwnerOf(host string) string
 }
 
+// botOwners says a machine is a bot's and the person an admin, who is told so (#1761).
+type botOwners interface {
+	BotMachineFor(person, host string) bool
+}
+
 // Handler is ControlHandling: what the control plane answers itself, handed to the
 // router so the router stays ignorant of pairing, stores and ssh.
 type Handler interface {
@@ -1460,6 +1465,12 @@ func (r *Router) toHostLocked(host, msg, sessionID string) {
 				go r.presenceHeard(s.caller.Client, device, m.Params)
 			}
 		}
+	}
+	// A bot's machine is the bot's alone: an admin, who may know it is there, is told so
+	// (#1761, FR-031); bots/stopRun is the one way to act on it.
+	if bots, ok := r.owners.(botOwners); ok && r.known[host] && bots.BotMachineFor(s.caller.Person, host) {
+		r.writeLocked(sessionID, s.wrap(host, replyError(m.ID, fail(botMachine, "That machine is a bot's: only its workflows start work there. An admin can stop a run."))))
+		return
 	}
 	// Another user's machine is not found, as one that is not there (FR-018).
 	if !r.known[host] || !r.mayReachLocked(s.caller, host) {

@@ -76,11 +76,14 @@ test("the host list offers This Mac first and leaves out a relay, on or off (#31
     { machineID: "mac-id", name: "This Mac" },
     { machineID: "z", name: "Zebra" },
   ]);
-  assert.equal(w.workflowRunsOn(undefined, "mac-id"), true);
-  assert.equal(w.workflowRunsOn([], "mac-id"), true);
-  assert.equal(w.workflowRunsOn(["other"], undefined), false);
-  assert.equal(w.workflowRunsOn(["mac-id"], "mac-id"), true);
-  assert.equal(w.workflowRunsOn(["other"], "mac-id"), false);
+  // runs-on: (#1761): machine ids must match; other labels are the machine's to match.
+  const mac = "0f1e2d3c-4b5a-6978-8796-a5b4c3d2e1f0", other = "1234567890abcdef1234567890abcdef";
+  assert.equal(w.workflowRunsOn(undefined, mac), true);
+  assert.equal(w.workflowRunsOn([], mac), true);
+  assert.equal(w.workflowRunsOn([other], undefined), false);
+  assert.equal(w.workflowRunsOn([mac.toUpperCase()], mac), true);
+  assert.equal(w.workflowRunsOn([other], mac), false);
+  assert.equal(w.workflowRunsOn(["review-bot", "linux"], mac), true);
 });
 
 test("the cooldown is written as the file writes it", () => {

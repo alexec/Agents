@@ -765,11 +765,21 @@ export function cooldownSentence(s: WorkflowSummary): string | null {
   return sentence;
 }
 
-/** Whether this host may run the workflow (#317). A pinned workflow needs a known matching id. */
-export function workflowRunsOn(hosts: readonly string[] | undefined, machineID: string | undefined): boolean {
-  if (!hosts || hosts.length === 0) return true;
+/** A runs-on: label that is a machine's id: a UUID, or 32 hex digits (Linux /etc/machine-id). */
+export function isMachineID(label: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(label) || /^[0-9a-f]{32}$/i.test(label);
+}
+
+/**
+ * Whether this host may run the workflow, by its runs-on: (#1761, was hosts:, #317). One that names
+ * machine ids needs a known matching id; its other labels (an os, a provider, a user's name) are the
+ * machine's to match, as Workflow.runs(on:) in Swift says.
+ */
+export function workflowRunsOn(runsOn: readonly string[] | undefined, machineID: string | undefined): boolean {
+  const ids = (runsOn ?? []).filter(isMachineID);
+  if (ids.length === 0) return true;
   if (!machineID) return false;
-  return hosts.includes(machineID);
+  return ids.some((id) => id.toLowerCase() === machineID.toLowerCase());
 }
 
 /** One computer the workflow page can pin to. The name is the one already on screen. */
