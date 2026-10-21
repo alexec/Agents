@@ -304,3 +304,14 @@ func TestMembershipAdoptsOnlyANewerAcceptableList(t *testing.T) {
 		t.Fatal("an ok with no list changed the membership")
 	}
 }
+
+// #1996: a refused proof says what it means, where a person looks; anything else as it was.
+func TestABadProofIsSaidInWords(t *testing.T) {
+	u := &Uplink{Member: &Membership{Host: "mac"}}
+	if said := u.problem(Refuse(BadProof)); !strings.Contains(said, "key as mac") || !strings.Contains(said, "new host code") {
+		t.Fatal(said)
+	}
+	if said := u.problem(errors.New("dial: refused")); said != "dial: refused" {
+		t.Fatal(said)
+	}
+}

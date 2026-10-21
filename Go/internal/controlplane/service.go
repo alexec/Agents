@@ -986,6 +986,8 @@ func (s *Service) acceptVia(conn *Conn, webOrigin string, proved func(failed boo
 	if keys.previousPublic != nil {
 		hello.Previous = new(controllink.B64URL(keys.previousPublic))
 	}
+	// why says more of a refusal in the log, where the reason alone says too little.
+	why := ""
 	refuse := func(err error) {
 		var r *controllink.Refusal
 		refused := errors.As(err, &r)
@@ -994,7 +996,7 @@ func (s *Service) acceptVia(conn *Conn, webOrigin string, proved func(failed boo
 		settle(refused && !errors.As(err, &theirs))
 		if refused {
 			conn.SendNow(controllink.Message{Refused: r.Reason}.Line())
-			s.log(fmt.Sprintf("refused a connection from %s: %s", conn.Remote, r.Reason))
+			s.log(fmt.Sprintf("refused a connection from %s: %s%s", conn.Remote, r.Reason, why))
 		} else {
 			s.log(fmt.Sprintf("a connection from %s ended: %v", conn.Remote, err))
 		}
@@ -1053,6 +1055,10 @@ func (s *Service) acceptVia(conn *Conn, webOrigin string, proved func(failed boo
 		}
 	}
 	if err != nil {
+		// A host refused for ever, and nothing else would say why (#1996).
+		if r := (*controllink.Refusal)(nil); errors.As(err, &r) && r.Reason == controllink.BadProof && id.Kind == 'h' {
+			why = " (host " + id.ID + " proved a key that is not the one it enrolled with; it must join again with a new host code)"
+		}
 		refuse(err)
 		return
 	}
@@ -1567,7 +1573,25 @@ func (s *Service) spendCode(id, method string, params json.RawMessage, webOrigin
 			impl, _ := json.Marshal(*a.Implementation)
 			record.Extra = records.Extra{"implementation": impl}
 		}
-		if err := s.records.SaveHost(ctx, record); err != nil {
+		// Only ever a new record (#1996): another host's, or its key, is never written over.
+		err = s.records.AddHost(ctx, record)
+		if errors.Is(err, records.ErrHostTaken) && host == "mac" {
+			// Another host on this machine enrolled as mac first, at this copy or another: this
+			// one gets an id of its own, and the code says so to a replay.
+			other := records.NewHostID()
+			if err := s.codes.Respend(ctx, id, spent{PublicKey: a.PublicKey, Host: &other}); err != nil {
+				return nil, err
+			}
+			s.log("host " + a.Name + " joined from this machine as another host enrolled as mac: it enrols as " + other)
+			host, record.ID = other, other
+			result.Host = new(wire.HostID(host))
+			err = s.records.AddHost(ctx, record)
+		}
+		if errors.Is(err, records.ErrHostTaken) {
+			s.log("refused host " + a.Name + ": another host is already enrolled as " + host)
+			return nil, fail(invalidParams, "Another host is already enrolled as %s. Make a new host code and join again.", host)
+		}
+		if err != nil {
 			return nil, err
 		}
 		if relay {

@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
@@ -111,4 +112,35 @@ func (s *syncBuffer) String() string {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.b.String()
+}
+
+// #1996: the uplink's problem goes to control-join.json, as HostJoinFile reads it, so
+// Agents Host and the control plane beside it show it.
+func TestTheJoinStatusSaysTheProblem(t *testing.T) {
+	root := t.TempDir()
+	writeJoinStatus(root, false, "it does not take this host's key")
+	data, err := os.ReadFile(filepath.Join(root, joinStatusFile))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var read struct {
+		PID    int `json:"pid"`
+		Status struct {
+			Member, Connected bool
+			Problem           *string
+			At                string
+		}
+	}
+	if err := json.Unmarshal(data, &read); err != nil || read.PID != os.Getpid() || !read.Status.Member || read.Status.Connected ||
+		read.Status.Problem == nil || *read.Status.Problem != "it does not take this host's key" {
+		t.Fatalf("%s", data)
+	}
+	if _, err := time.Parse(time.RFC3339, read.Status.At); err != nil || strings.Contains(read.Status.At, ".") {
+		t.Fatalf("%s", read.Status.At)
+	}
+	writeJoinStatus(root, true, "")
+	data, _ = os.ReadFile(filepath.Join(root, joinStatusFile))
+	if strings.Contains(string(data), "problem") {
+		t.Fatalf("%s", data)
+	}
 }

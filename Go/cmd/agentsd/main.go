@@ -275,7 +275,8 @@ func join(ctx context.Context, cl commandLine, d *agentsd.Daemon) {
 		Lend: d.LendingPort, Rotated: d.MoveLocal}
 	d.Tunneler = up
 	// The needs it shows nowhere go to the control plane, offered again on each return (#1367).
-	up.OnChange = func(connected bool, _ string) {
+	up.OnChange = func(connected bool, problem string) {
+		writeJoinStatus(loc.Root, connected, problem)
 		safe.Go("attention uplink", func() { d.ControlUplinkChanged(connected) })
 	}
 	up.Told = d.Told
