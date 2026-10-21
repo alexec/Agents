@@ -22,7 +22,7 @@
 - [ ] T007 Write the migration on first start: the existing person becomes the local owner and admin, gets `{local, <control-key id>}`, and every client, host and provider record gets that person as `owner` (FR-003). It only adds fields. Test it on a copy of a v0.7 store in `records_test.go`.
 - [ ] T008 Add the in-memory owner index (host → user, client → person), refreshed on record change, in `Go/internal/controlplane/router.go`.
 - [ ] T009 Add the owner check for every client method in `router.go` and `methods.go`. Another user's machine is `notFound`. Admins get name, user and state only.
-- [ ] T010 Write a table test over **every** client method in `Go/internal/controlplane/security_test.go`: 10 users and 30 hosts, and no request reaches a host that is not the caller's (SC-003). A new method with no entry fails the test.
+- [x] T010 Write a table test over **every** client method in `Go/internal/controlplane/security_test.go`: 10 users and 30 hosts, and no request reaches a host that is not the caller's (SC-003). A new method with no entry fails the test.
 - [ ] T011 Refuse older builds on a control plane with more than one person with `updateToJoinTeam` (R14), in `conn.go`.
 
 **Checkpoint**: one person sees no change, and the owner check is in force.

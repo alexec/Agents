@@ -703,19 +703,33 @@ func (r *Records) RemoveHost(ctx context.Context, id string) (bool, error) {
 			return false, err
 		}
 	}
-	r.mu.Lock()
-	h, ok := r.hosts[id]
-	r.mu.Unlock()
-	if !ok {
-		return false, nil
-	}
-	tombstone := h.record
-	yes, now := true, Now()
-	tombstone.Forgotten, tombstone.ForgottenAt = &yes, &now
-	tombstone.Rev++
-	_, etag, err := write(ctx, r.Store, tombstone, HostKey(id), store.Matching(h.etag))
-	if err != nil {
-		return false, err
+	// Another copy may have noted the host's hello or epoch since it was read (it is held
+	// there): a removal means the same whatever changed, so it is read again and tried once
+	// more, as a forget is (#1763).
+	var etag string
+	for attempt := 1; ; attempt++ {
+		r.mu.Lock()
+		h, ok := r.hosts[id]
+		r.mu.Unlock()
+		if !ok {
+			return false, nil
+		}
+		tombstone := h.record
+		yes, now := true, Now()
+		tombstone.Forgotten, tombstone.ForgottenAt = &yes, &now
+		tombstone.Rev++
+		var err error
+		_, etag, err = write(ctx, r.Store, tombstone, HostKey(id), store.Matching(h.etag))
+		if store.IsConflict(err) && attempt < 2 {
+			if err := r.load(ctx); err != nil {
+				return false, err
+			}
+			continue
+		}
+		if err != nil {
+			return false, err
+		}
+		break
 	}
 	r.mu.Lock()
 	r.tombstones[HostKey(id)] = etag

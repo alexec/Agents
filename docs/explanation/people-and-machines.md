@@ -27,12 +27,39 @@ Machines are not shared, also not to see. A machine runs agents with its user's 
 keys and files: a second person on it could act as the first. Two people who want to
 work on the same code each use their own machine, and git between them.
 
+This holds on the machine too:
+
+- **The direct path.** The Mac window reaches this Mac's machine over a local socket
+  (#1118). The machine lets in only a window of its own user, even if a control plane
+  were to list another.
+- **Lending.** A machine borrows a sign-in or git access only from a machine of the same
+  user. A lend made before people came, from another user's machine, is not used.
+- **An agent's tools.** `list_sessions`, `read_session`, `message_session`,
+  `start_session` and the leases act on the machine they run on. They never reach
+  through the control plane to another machine, so an agent acts as its machine's user,
+  and reaches only that user's sessions.
+
 ## What an admin sees
 
 An admin sees every person in **Settings ▸ People**, with their clients by name, and their
 machines by name and state (online, offline). Nothing inside another person's machine:
 not its projects, its agents or its files. An admin invites people, changes roles and
 removes people. A control plane always keeps one admin at least.
+
+## Removing a person
+
+**Remove** first lists what it takes: the person's clients, the machines started for them
+by a workspace provider, and their other machines. Each started machine is asked for the
+work on it that is not pushed (commits not pushed, a branch never pushed, changes not
+committed), because Remove deletes it. Within 5 seconds on every copy of the control
+plane, their clients are cut off and every machine of theirs leaves. Each started machine
+is then stopped and deleted through its provider.
+
+## Older builds
+
+A build from before people came cannot tell people apart. With one person it works as
+it did. When a second person joins, the control plane refuses it with "Update Agents to
+join this team" (`docs/explanation/versions.md`).
 
 ## How a machine becomes someone's
 
