@@ -56,7 +56,7 @@ struct IdentityProvidersTests {
     @Test func signInWords() {
         let request = DaemonAPI.SignInRequest(request: "r", name: "Sam’s iPhone", kind: .iPhone, provider: "github", login: "sam",
                                               code: "K7M2QX", expires: Date())
-        #expect(SignInWords.title(request) == "Sam’s iPhone wants to sign in as you with GitHub (sam).")
+        #expect(SignInWords.title(request) == "Sam’s iPhone wants to sign in as you. GitHub · sam")
         #expect(SignInWords.row(.init(provider: "google", account: "1", email: "sam@example.com")) == "Google · sam@example.com")
         #expect(SignInWords.row(.init(provider: "local", account: "k")) == "This control plane")
     }

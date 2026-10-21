@@ -4,16 +4,17 @@
 // cards. A GitHub token carries no nonce, so only the person's own client says the new one is theirs.
 import type { Store } from "../model/store";
 import type { SignInRequest } from "../protocol/generated";
-import { liveSignIns, wants } from "../model/signIn";
+import { account, liveSignIns, wants } from "../model/signIn";
 import { ApprovalMark } from "./Approval";
 
 function SignInCard({ store, request, down }: { store: Store; request: SignInRequest; down: boolean }) {
-  const title = `${request.name} ${wants(request)}`;
+  const title = `${request.name} ${wants} ${account(request)}`;
   return (
     <li class="join-request" aria-label={title}>
       <ApprovalMark />
       <div class="body">
-        <span class="title"><strong>{request.name}</strong> {wants(request)}</span>
+        <span class="title"><strong>{request.name}</strong> {wants}</span>
+        <span class="subtitle">{account(request)}</span>
         <span class="subtitle">Check that it shows <code>{request.code}</code>.</span>
         <div class="join-actions">
           <button type="button" disabled={down} onClick={() => void store.decideSignIn(request.request, false)}>Deny</button>

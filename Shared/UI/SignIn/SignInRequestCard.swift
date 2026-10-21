@@ -20,8 +20,11 @@ struct SignInRequestCard: View {
                 .foregroundStyle(StateTint.attention.style(or: .primary))
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 4) {
-                Text("\(Text(request.name).fontWeight(.semibold)) \(SignInWords.wants(request))")
+                Text("\(Text(request.name).fontWeight(.semibold)) \(SignInWords.wants)")
                     .fixedSize(horizontal: false, vertical: true)
+                Text(SignInWords.account(request))
+                    .appText(.fine)
+                    .foregroundStyle(.secondary)
                 // The code once, in the code face, as the new client shows it.
                 Text("Check that it shows \(Text(request.code).monospaced().fontWeight(.semibold)).")
                     .fixedSize(horizontal: false, vertical: true)

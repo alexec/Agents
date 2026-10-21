@@ -254,14 +254,16 @@ public enum SignInWords {
         + "It does not let anyone join with no invite."
     public static let noneOn = "No sign-in provider is turned on for this control plane. Use a pairing code."
 
-    /// "Sam’s iPhone wants to sign in as you with GitHub (sam)."
-    public static func wants(_ request: DaemonAPI.SignInRequest) -> String {
-        let with = SignInProviderName.title(request.provider) + (request.login.map { " (\($0))" } ?? "")
-        return "wants to sign in as you with \(with)."
+    /// After the client's name: "Sam’s iPhone wants to sign in as you."
+    public static let wants = "wants to sign in as you."
+
+    /// The card's second line: "GitHub · sam".
+    public static func account(_ request: DaemonAPI.SignInRequest) -> String {
+        [SignInProviderName.title(request.provider), request.login].compactMap { $0 }.joined(separator: " · ")
     }
 
     public static func title(_ request: DaemonAPI.SignInRequest) -> String {
-        "\(request.name) \(wants(request))"
+        "\(request.name) \(wants) \(account(request))"
     }
 
     public static func code(_ request: DaemonAPI.SignInRequest) -> String {

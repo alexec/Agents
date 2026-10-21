@@ -36,22 +36,22 @@ struct SignInPane: View {
             if let providers {
                 Section {
                     ForEach(providers.providers) { row in
-                        VStack(alignment: .leading, spacing: 2) {
-                            Toggle(SignInProviderName.title(row.provider), isOn: Binding(
-                                get: { row.on },
-                                set: { on in Task { await configure(.init(provider: row.provider, on: on)) } }))
-                                .disabled(!row.available || isSaving)
+                        Toggle(isOn: Binding(
+                            get: { row.on },
+                            set: { on in Task { await configure(.init(provider: row.provider, on: on)) } })) {
+                            Text(SignInProviderName.title(row.provider))
                             if let why = row.why {
-                                Text(why).appText(.fine).foregroundStyle(.secondary)
+                                Text(why)
                             }
                         }
+                        .disabled(!row.available || isSaving)
                     }
                 } footer: {
                     Text(SignInWords.paneFoot).appText(.fine).foregroundStyle(.secondary)
                 }
                 .paperListRow()
                 Section {
-                    TextField("example.com, example.org", text: $domains)
+                    TextField("Domains", text: $domains, prompt: Text("example.com, example.org"))
                         .onSubmit { Task { await saveDomains() } }
                     Button("Save Domains") { Task { await saveDomains() } }
                         .disabled(isSaving || list(domains) == (providers.domains ?? []))
@@ -62,7 +62,7 @@ struct SignInPane: View {
                 }
                 .paperListRow()
                 Section {
-                    TextField("acme", text: $organisations)
+                    TextField("Organisations", text: $organisations, prompt: Text("acme"))
                         .onSubmit { Task { await saveOrganisations() } }
                     Button("Save Organisations") { Task { await saveOrganisations() } }
                         .disabled(isSaving || list(organisations) == (providers.organisations ?? []))

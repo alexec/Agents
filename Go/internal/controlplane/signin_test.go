@@ -131,6 +131,12 @@ func TestASignInPairsAKnownPersonWithNoCode(t *testing.T) {
 	if len(people.People) != 1 || len(people.People[0].SignIns) != 3 {
 		t.Fatalf("%+v", people.People)
 	}
+	// An outside sign-in says its account, to take it off; the local owner's says none.
+	for _, in := range people.People[0].SignIns {
+		if (in.Provider == "local") != (in.Account == nil) {
+			t.Fatalf("%+v", in)
+		}
+	}
 }
 
 // Every refusal (#995): a bad signature, another app, expired, a nonce from an earlier
@@ -261,6 +267,14 @@ func TestAGitHubSignInWaitsForThePersonsApprove(t *testing.T) {
 	json.Unmarshal(got, &in)
 	if e != "" || deref(in.Account) != "4242" || deref(in.Login) != "sam" {
 		t.Fatalf("%s %+v", e, in)
+	}
+	// people/list never says an invite code's id, which is part of its secret.
+	var list wire.PeopleList
+	json.Unmarshal(call(t, sam.window, "", "people/list", nil), &list)
+	for _, in := range list.People[0].SignIns {
+		if in.Provider == "code" && in.Account != nil {
+			t.Fatalf("a code's account is listed: %+v", in)
+		}
 	}
 	// Kim cannot add Sam's GitHub to herself.
 	if _, e := addToMe(t, kim.window, kim.member, signin.GitHub, func(string) string { return token }); !strings.Contains(e, "another person's") {

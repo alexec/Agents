@@ -20,9 +20,12 @@ export function isOutside(provider: string): boolean {
   return provider === "google" || provider === "apple" || provider === "github";
 }
 
-/** "wants to sign in as you with GitHub (sam)." */
-export function wants(request: SignInRequest): string {
-  return `wants to sign in as you with ${providerTitle(request.provider)}${request.login ? ` (${request.login})` : ""}.`;
+/** After the client's name: "Sam's iPhone wants to sign in as you." */
+export const wants = "wants to sign in as you.";
+
+/** The card's second line: "GitHub · sam". */
+export function account(request: SignInRequest): string {
+  return [providerTitle(request.provider), request.login].filter(Boolean).join(" · ");
 }
 
 /** One sign-in as Settings lists it: "GitHub · sam", "Google · sam@example.com". */

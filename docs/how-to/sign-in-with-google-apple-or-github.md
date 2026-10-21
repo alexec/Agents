@@ -51,7 +51,7 @@ invite's code, then add their sign-in in the same way.
 3. Sign in with a provider that you added to yourself.
 
 With Apple or Google, the client pairs at once. With GitHub, the new client shows a code. On
-one of your other clients, a card says **wants to sign in as you with GitHub**, with the same
+one of your other clients, a card says **wants to sign in as you**, with your GitHub account and the same
 code. Make sure that the codes are the same, then select **Approve**. The request stops
 after 10 minutes.
 

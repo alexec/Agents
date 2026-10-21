@@ -17,7 +17,7 @@ test("one card per GitHub sign-in, gone when decided or past its end", () => {
 });
 
 test("the words are the window's", () => {
-  assert.equal(s.wants(request()), "wants to sign in as you with GitHub (sam).");
+  assert.equal(s.account(request()), "GitHub · sam");
   assert.equal(s.row({ provider: "google", account: "1", email: "sam@example.com" }), "Google · sam@example.com");
   assert.equal(s.row({ provider: "github", account: "42", login: "sam" }), "GitHub · sam");
   assert.equal(s.row({ provider: "local", account: "k" }), "This control plane");
