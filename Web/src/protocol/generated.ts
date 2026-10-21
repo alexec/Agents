@@ -4836,11 +4836,14 @@ export interface Methods {
   "hosts/dropKept": { params: KeptRequestID; result: Empty };
   "hosts/lastHeard": { params: HostRequest; result: HostLastHeard };
   "hosts/lendGit": { params: LendGit; result: Empty };
+  "hosts/link": { params: HostLink; result: ControlHost };
   "hosts/list": { params: Empty; result: ControlHost[] };
   "hosts/listKept": { params: Empty; result: KeptList };
   "hosts/retryKept": { params: KeptRequestID; result: Empty };
+  "hosts/setWorkspaceOptions": { params: HostWorkspaceOptions; result: ControlHost };
   "hosts/start": { params: HostRequest; result: ControlHost };
   "hosts/stop": { params: HostStop; result: ControlHost };
+  "hosts/unlink": { params: HostRequest; result: ControlHost };
   "leases/snapshot": { params: Empty; result: LeaseSnapshot };
   "mcp/health": { params: Empty; result: MCPHealthSnapshot };
   "mcp/health/check": { params: MCPHealthCheckRequest; result: MCPHealthSnapshot };
@@ -4878,6 +4881,11 @@ export interface Methods {
   "projects/setPinned": { params: SetPinnedRequest; result: ProjectSummary };
   "projects/unarchive": { params: ProjectRequest; result: ProjectSummary };
   "projects/undoGuardedChange": { params: GuardedChangeRequest; result: ProjectSummary };
+  "providers/add": { params: ProviderAdd; result: ProviderSummary };
+  "providers/list": { params: Empty; result: ProviderList };
+  "providers/refresh": { params: ProviderRequest; result: Empty };
+  "providers/remove": { params: ProviderRequest; result: Empty };
+  "providers/update": { params: ProviderAdd; result: ProviderSummary };
   "runtimes/accounts": { params: Empty; result: RuntimeAccount[] };
   "runtimes/allowances": { params: string | null; result: RuntimeAllowances };
   "runtimes/list": { params: Empty; result: RuntimeStatus[] };
@@ -4986,11 +4994,14 @@ export const MethodTarget = {
   "hosts/dropKept": "control",
   "hosts/lastHeard": "control",
   "hosts/lendGit": "control",
+  "hosts/link": "control",
   "hosts/list": "control",
   "hosts/listKept": "control",
   "hosts/retryKept": "control",
+  "hosts/setWorkspaceOptions": "control",
   "hosts/start": "control",
   "hosts/stop": "control",
+  "hosts/unlink": "control",
   "leases/snapshot": "host",
   "mcp/health": "host",
   "mcp/health/check": "host",
@@ -5028,6 +5039,11 @@ export const MethodTarget = {
   "projects/setPinned": "host",
   "projects/unarchive": "host",
   "projects/undoGuardedChange": "host",
+  "providers/add": "control",
+  "providers/list": "control",
+  "providers/refresh": "control",
+  "providers/remove": "control",
+  "providers/update": "control",
   "runtimes/accounts": "host",
   "runtimes/allowances": "host",
   "runtimes/list": "host",
@@ -5079,6 +5095,7 @@ export interface Notifications {
   "control/hostChanged": JSONValue;
   "control/keptChanged": KeptList;
   "control/keptDelivered": KeptDelivered;
+  "control/providersChanged": ProviderList;
   "disk/changed": DiskState;
   "files/changed": FilesChangedNotification;
   "leases/changed": LeaseSnapshot;

@@ -685,6 +685,11 @@
     {
       "name": "hosts/link",
       "x-capability": "hosts/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
       "paramStructure": "by-name",
       "params": [
         {
@@ -823,6 +828,11 @@
     {
       "name": "hosts/setWorkspaceOptions",
       "x-capability": "hosts/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
       "paramStructure": "by-name",
       "params": [
         {
@@ -936,6 +946,11 @@
     {
       "name": "hosts/unlink",
       "x-capability": "hosts/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
       "paramStructure": "by-name",
       "params": [
         {
@@ -997,6 +1012,11 @@
     {
       "name": "providers/add",
       "x-capability": "providers/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
       "paramStructure": "by-name",
       "params": [
         {
@@ -1097,6 +1117,11 @@
     {
       "name": "providers/list",
       "x-capability": "providers/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
       "paramStructure": "by-name",
       "params": [
         {
@@ -1137,6 +1162,11 @@
     {
       "name": "providers/refresh",
       "x-capability": "providers/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
       "paramStructure": "by-name",
       "params": [
         {
@@ -1157,6 +1187,11 @@
     {
       "name": "providers/remove",
       "x-capability": "providers/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
       "paramStructure": "by-name",
       "params": [
         {
@@ -1197,6 +1232,11 @@
     {
       "name": "providers/update",
       "x-capability": "providers/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
       "paramStructure": "by-name",
       "params": [
         {
@@ -1400,6 +1440,11 @@
     {
       "name": "control/providersChanged",
       "x-capability": "control/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
       "x-notification": true,
       "paramStructure": "by-name",
       "params": [

@@ -41,6 +41,7 @@ import { milestonesSeen } from "./milestones";
 import { hostAnswers, hostHas } from "./capabilities";
 import { Capability } from "../protocol/capabilities.generated";
 import type { ChartHint } from "./chart";
+import { Providers } from "./providers";
 
 export { folderKey } from "./groups";
 
@@ -1065,6 +1066,9 @@ export function tellingWords(doing: string | null, recipient: string): string {
 export const sentBeforeEdit = "That prompt was sent before your change. Your words are in the prompt bar.";
 
 export class Store extends Work {
+  /** The control plane's workspace providers (#1808), for Settings ▸ Control plane. */
+  readonly providers: Providers;
+
   constructor(readonly link: Link) {
     super();
     // The person's display choices are kept on their Mac (#1033).
@@ -1072,7 +1076,12 @@ export class Store extends Work {
       void this.link.call("preferences/set", changes as Record<string, JSONValue>, this.macHostID.peek())
         .then((said) => preferencesSaid(said)).catch(() => undefined);
     });
+    this.providers = new Providers(link);
     link.onNotification((method, params, host) => {
+      if (method === "control/providersChanged") {
+        this.providers.take(params);
+        return;
+      }
       if (method === "control/hostChanged") {
         this.hostChanged(params);
         return;

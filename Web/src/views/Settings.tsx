@@ -1,6 +1,7 @@
 // This browser's Settings (#846), opened from the sidebar's foot, in the chat's place: what the
 // window has in Settings ▸ Sidebar. Which smart groups are on is the person's, kept on their
-// Mac and the same on every client (#1033). Versions are the control plane's and each host's (#1748).
+// Mac and the same on every client (#1033). Workspace providers are the control plane's (#1808).
+// Versions are the control plane's and each host's (#1748).
 import type { Store } from "../model/store";
 import { smartRows, smartTitles } from "../model/sidebar";
 import { setSmartGroup, smartGroupsOn } from "../model/smartGroups";
@@ -10,6 +11,7 @@ import { gitLendWords, lends } from "../model/gitLending";
 import { iconShowsMood, setIconShowsMood } from "../model/iconMood";
 import { setShowsThoughts, showsThoughts, thoughtsFooter } from "../model/thoughts";
 import { appMissingWords, missingWords, stateWords, versionWords } from "../model/capabilities";
+import { ProvidersSection } from "./Providers";
 
 /** The words under the Sidebar section, as the window's and the Remote's (#846). */
 export const sidebarSettingsFooter = "A group that is off is not shown. Its sessions go to the next group they fit, "
@@ -102,6 +104,7 @@ export function SettingsPage({ store }: { store: Store }) {
             </label>
             <p class="hint">{mayArchiveMyChatsFooter}</p>
           </section>
+          <ProvidersSection store={store} />
           <GitAccessSection store={store} />
           <VersionsSection store={store} />
         </div>

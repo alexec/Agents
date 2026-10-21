@@ -1404,3 +1404,15 @@ button.file-card:hover { border-color: color-mix(in srgb, var(--paper-ink) 25%, 
 .simulator-stale { align-self: center; text-align: center; }
 .simulator-problem { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 8px; text-align: center; }
 .simulator-problem p { margin: 0; opacity: 0.55; }
+
+/* Settings ▸ Workspace providers (#1808): a card per provider, a row per workspace with its dot. */
+.provider-card { margin-bottom: 10px; max-width: 640px; }
+.provider-add { margin: 4px 0 6px; }
+.provider-card .grow { flex: 1; min-width: 0; }
+.provider-card .chip { font-weight: normal; }
+.workspace-row .dot { flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--paper-rule); }
+.workspace-row .dot.online { background: var(--tint-vouched); }
+.workspace-row .dot.attention { background: var(--tint-attention); }
+.provider-sheet { max-width: 560px; }
+.provider-sheet .token-form textarea { font: inherit; font-family: var(--font-mono); font-size: 0.75rem; }
+.provider-sheet .token-form label.setting { flex-direction: row; justify-content: space-between; align-items: center; }

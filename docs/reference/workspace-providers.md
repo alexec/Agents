@@ -1,6 +1,6 @@
 ---
 diataxis: reference
-devices: [mac, server]
+devices: [mac, web, server]
 description: The tools a workspace provider offers - contract 1 - their arguments, their answers, the states, and how the control plane checks and calls them.
 ---
 
@@ -10,6 +10,11 @@ A workspace provider is an ordinary MCP server, over stdio or streamable http, t
 control plane uses to start and stop the machines hosts run on. This page is the contract
 it follows, version 1. The control plane recognises a provider by its tool names and the
 version its list reports; it needs no MCP extension.
+
+The Mac adds every kind in Settings ▸ Control plane ▸ Providers. The web page adds the API
+presets (`digitalocean-api`, `codespaces-api`, `coder-api`, `aws-ec2-api`,
+`gcp-compute-api`) in Settings ▸ Workspace providers, because a person in a browser has no
+shell where the control plane runs to sign a CLI in (#1808).
 
 ## Tools
 
