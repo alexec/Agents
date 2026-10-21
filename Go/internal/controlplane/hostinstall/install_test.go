@@ -1,6 +1,7 @@
 package hostinstall
 
 import (
+	"github.com/alexec/agents/Go/wire"
 	"context"
 	"encoding/json"
 	"errors"
@@ -481,13 +482,71 @@ func TestAKeyThePersonTrustsIsPinnedForTheTunnel(t *testing.T) {
 // pinnedLine is a key as hosttunnels.Pinned writes it.
 func pinnedLine(key string) string { return hosttunnels.PinnedAlias + " " + key }
 
-func TestUpdateIsNotHereAndCheckAgainDoesNothing(t *testing.T) {
-	i := &Installer{}
-	if err := i.Update(context.Background(), "h"); err != NotHere {
+func TestCheckAgainDoesNothing(t *testing.T) {
+	if err := (&Installer{}).CheckAgain(context.Background(), "h"); err != nil {
 		t.Fatal(err)
 	}
-	if err := i.CheckAgain(context.Background(), "h"); err != nil {
-		t.Fatal(err)
+}
+
+// hosts/update (#1766): the server given again, its host key trusted as at an install, and
+// its root this host's. Then the files are copied and the host starts again as itself: its
+// membership stays, and no code is left.
+func TestAnUpdateCopiesTheHostAndStartsItAgainAsItself(t *testing.T) {
+	f := newFake(t)
+	os.MkdirAll(f.server("root"), 0o700)
+	member := `{"host":"dev-box","controlKey":"k","name":"Plane"}`
+	os.WriteFile(f.server("root/control-host.json"), []byte(member), 0o600)
+	var steps []string
+	codes := &fakeCodes{}
+	trust := hostKeyFingerprint
+	update := wire.HostUpdate{Host: "dev-box", Destination: "agents@devbox.lan", Trust: &trust}
+	got := reply(t)(f.installer(codes, &steps).Update(context.Background(), update, "Dev box"))
+	if !reflect.DeepEqual(got, map[string]any{"updated": true, "name": "Dev box"}) {
+		t.Fatalf("%v", got)
+	}
+	if len(codes.urls) != 0 {
+		t.Fatalf("an update made a host code: %q", codes.urls)
+	}
+	if b, _ := os.ReadFile(f.server("root/control-host.json")); string(b) != member {
+		t.Fatalf("the membership changed: %s", b)
+	}
+	if _, err := os.Stat(f.server("root/control-join-code")); !os.IsNotExist(err) {
+		t.Fatal("a join code was left")
+	}
+	current, err := os.Readlink(f.server("bin/current"))
+	if err != nil || current != binaryName(f.sha) {
+		t.Fatalf("current %s %v", current, err)
+	}
+	args, _ := os.ReadFile(filepath.Join(f.home, "started-args"))
+	if !strings.Contains(string(args), "--detach\n--control-network\n--host-name\nDev box\n") {
+		t.Fatalf("started with %q", args)
+	}
+	if left := f.leftInstallFolders(); len(left) != 0 {
+		t.Fatalf("left %v", left)
+	}
+}
+
+// An update goes to no other server: one whose root is another host's, or no host's.
+func TestAnUpdateToAnotherServerIsRefused(t *testing.T) {
+	for _, c := range []struct{ member, want string }{
+		{`{"host":"other-box"}`, "another host"},
+		{"", "no host of this control plane"},
+	} {
+		f := newFake(t)
+		if c.member != "" {
+			os.MkdirAll(f.server("root"), 0o700)
+			os.WriteFile(f.server("root/control-host.json"), []byte(c.member), 0o600)
+		}
+		var steps []string
+		trust := hostKeyFingerprint
+		_, err := f.installer(&fakeCodes{}, &steps).Update(context.Background(),
+			wire.HostUpdate{Host: "dev-box", Destination: "devbox", Trust: &trust}, "Dev box")
+		if err == nil || !strings.Contains(err.Error(), c.want) {
+			t.Fatalf("%q: %v", c.member, err)
+		}
+		if _, err := os.Stat(f.server("bin/current")); !os.IsNotExist(err) {
+			t.Fatalf("%q: something was installed", c.member)
+		}
 	}
 }
 

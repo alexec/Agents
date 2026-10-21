@@ -1245,16 +1245,17 @@
           "name": "params",
           "required": true,
           "schema": {
-            "$ref": "daemon.schema.json#/definitions/HostRequest"
+            "$ref": "daemon.schema.json#/definitions/HostUpdate"
           }
         }
       ],
       "result": {
         "name": "result",
         "schema": {
-          "$ref": "daemon.schema.json#/definitions/Empty"
+          "$ref": "daemon.schema.json#/definitions/JSONValue"
         }
-      }
+      },
+      "description": "Update a server's host over ssh (#1766): its server and key given again, the host key checked as at an install, the server's root checked to be this host's, then the control plane's agentsd, MCP servers and toolsets copied and the host started again. The answer is an install's: {needsTrust, name} first for a key not yet trusted, then {updated: true, name}."
     },
     {
       "name": "people/invite",

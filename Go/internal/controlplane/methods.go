@@ -240,11 +240,15 @@ func (m *Methods) Handle(method string, params json.RawMessage, from Caller) (an
 		json.Unmarshal(params, &p)
 		return m.s.installer.SSHHosts(ctx, strings.TrimSpace(deref(p.Destination)))
 	case "hosts/update":
-		request, err := require[wire.HostRequest](params, "HostRequest")
+		request, err := require[wire.HostUpdate](params, "HostUpdate")
 		if err != nil {
 			return nil, err
 		}
-		return map[string]any{}, m.s.installer.Update(ctx, string(request.Host))
+		h := m.s.records.Host(string(request.Host))
+		if h == nil {
+			return nil, &RPCError{Code: wire.FailureNoSuchHost, Message: "There is no such host."}
+		}
+		return m.s.installer.Update(ctx, request, h.Name)
 	case "hosts/checkAgain":
 		request, err := require[wire.HostRequest](params, "HostRequest")
 		if err != nil {

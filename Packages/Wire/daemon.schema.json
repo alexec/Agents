@@ -6367,6 +6367,29 @@
       ],
       "additionalProperties": false
     },
+    "HostUpdate": {
+      "type": "object",
+      "description": "hosts/update (#1766): a host the control plane installed over ssh, updated the same way. The server and its key are given again, as at the install, because the control plane keeps neither; the host's own root and membership stay.",
+      "properties": {
+        "host": {
+          "$ref": "#/definitions/HostID"
+        },
+        "destination": {
+          "type": "string"
+        },
+        "key": {
+          "type": "string"
+        },
+        "trust": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "host",
+        "destination"
+      ],
+      "additionalProperties": false
+    },
     "HostJoinStatus": {
       "type": "object",
       "properties": {

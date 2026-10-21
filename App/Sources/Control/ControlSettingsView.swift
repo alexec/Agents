@@ -264,6 +264,8 @@ struct ControlHostsPage: View {
     @State private var deleting: DaemonAPI.ControlHost?
     /// Backups… (#1815): the host's own backups page.
     @State private var backingUp: DaemonAPI.ControlHost?
+    /// Update… (#1766): a host that needs an update, updated over ssh.
+    @State private var updating: DaemonAPI.ControlHost?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -307,6 +309,7 @@ struct ControlHostsPage: View {
         }
         .sheet(isPresented: $addingByCode) { CodeSheet(control: control, purpose: .host).paperSheet() }
         .sheet(isPresented: $addingServer) { ControlAddServerSheet(control: control).paperSheet() }
+        .sheet(item: $updating) { host in ControlAddServerSheet(control: control, updating: host).paperSheet() }
         .sheet(item: $linking) { host in
             LinkWorkspaceSheet(control: control, host: host).paperSheet()
         }
@@ -414,6 +417,11 @@ struct ControlHostsPage: View {
 
     private func hostMenu(_ host: DaemonAPI.ControlHost) -> some View {
         Menu {
+            // Older than the control plane needs (#1748): updated over ssh, as installed (#1766).
+            if host.state == "needsUpdate" {
+                Button("Update…") { updating = host }
+                Divider()
+            }
             // A relay runs no agents, so it has no projects, and nothing to back up.
             if host.relay == nil {
                 Button("Choose Projects…") { choosing = host }.disabled(!host.answers)

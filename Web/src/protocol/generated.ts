@@ -2397,6 +2397,18 @@ export interface HostTunnelChanged {
   tunnel: HostTunnel;
 }
 
+/**
+ * hosts/update (#1766): a host the control plane installed over ssh, updated the same way. The
+ * server and its key are given again, as at the install, because the control plane keeps neither;
+ * the host's own root and membership stay.
+ */
+export interface HostUpdate {
+  host: HostID;
+  destination: string;
+  key?: string;
+  trust?: string;
+}
+
 export interface HostWorkspace {
   provider: ProviderID;
   providerName: string;
@@ -5930,6 +5942,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   HostStop: { required: ["host"], optional: ["confirmRunning"] },
   HostTunnel: { required: ["up"], optional: ["problem"] },
   HostTunnelChanged: { required: ["name", "tunnel"], optional: ["host"] },
+  HostUpdate: { required: ["host", "destination"], optional: ["key", "trust"] },
   HostWorkspace: { required: ["provider", "providerName", "workspace", "workspaceName", "workspaceState", "canStart", "canStop", "startWhenUsed", "current"], optional: ["hostState", "phase", "since", "problem", "stoppedBy", "stopWhenIdleMinutes", "cost", "startForSchedules", "tellsSchedule", "nextWorkflow", "nextWorkflowAt", "wakeAt"] },
   HostWorkspaceCall: { required: ["agent", "method", "params"], optional: [] },
   HostWorkspaceOptions: { required: ["host"], optional: ["startWhenUsed", "stopWhenIdleMinutes", "startForSchedules"] },

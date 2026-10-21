@@ -253,13 +253,41 @@ func (i installer) swapCurrent(ctx context.Context, sha, version, installedBy st
 // in the new container that pid can be another process, such as the sshd of this very
 // connection.
 func (i installer) leaveJoinCode(ctx context.Context, code string) error {
-	return i.check(ctx, `umask 077; d="$HOME/.agents-server/root"; mkdir -p "$d"; `+
-		`if [ -f "$d/daemon.lock" ]; then p=$(cat "$d/daemon.lock" 2>/dev/null || true); `+
-		`case "$p" in ''|*[!0-9]*) p="" ;; esac; `+
-		`if [ -n "$p" ] && { if [ -r "/proc/$p/cmdline" ]; then tr '\000' ' ' < "/proc/$p/cmdline"; `+
-		`else ps -o args= -p "$p" 2>/dev/null; fi; } | grep -q '\.agents-server/'; then `+
-		`kill "$p" 2>/dev/null && sleep 1; fi; fi; `+
+	return i.check(ctx, `umask 077; d="$HOME/.agents-server/root"; mkdir -p "$d"; `+stopScript+
 		`rm -f "$d/control-host.json"; printf %s `+quote(code)+` > "$d/control-join-code"`)
+}
+
+// stopScript stops the host running in $d, the root, when there is one: by the lock's
+// pid, and only when that pid is an agentsd of .agents-server.
+const stopScript = `if [ -f "$d/daemon.lock" ]; then p=$(cat "$d/daemon.lock" 2>/dev/null || true); ` +
+	`case "$p" in ''|*[!0-9]*) p="" ;; esac; ` +
+	`if [ -n "$p" ] && { if [ -r "/proc/$p/cmdline" ]; then tr '\000' ' ' < "/proc/$p/cmdline"; ` +
+	`else ps -o args= -p "$p" 2>/dev/null; fi; } | grep -q '\.agents-server/'; then ` +
+	`kill "$p" 2>/dev/null && sleep 1; fi; fi; `
+
+// stopRunning stops the host running on the server, for an update (#1766): its root and
+// membership stay, so the one started next is the same host.
+func (i installer) stopRunning(ctx context.Context) error {
+	return i.check(ctx, `d="$HOME/.agents-server/root"; `+stopScript+`true`)
+}
+
+// isHost is whether the server's root holds this host's membership (#1766): an update
+// goes to no other server.
+func (i installer) isHost(ctx context.Context, host, name string) error {
+	out, err := i.run(ctx, `cat "$HOME/.agents-server/root/control-host.json" 2>/dev/null || true`)
+	if err != nil {
+		return err
+	}
+	var member struct {
+		Host string `json:"host"`
+	}
+	if json.Unmarshal([]byte(out.stdout), &member) != nil || member.Host == "" {
+		return &Failure{Code: NotAllowed, Message: "That server has no host of this control plane, so it is not " + name + ". Check the server and try again."}
+	}
+	if member.Host != host {
+		return &Failure{Code: NotAllowed, Message: "That server is another host of this control plane, not " + name + ". Check the server and try again."}
+	}
+	return nil
 }
 
 // startDaemon is ServerInstaller.startDaemon: the server's daemon, in the background.

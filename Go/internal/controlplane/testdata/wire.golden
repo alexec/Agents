@@ -53,7 +53,7 @@ hosts/remove refused
 {"code":-32091,"message":"No host is called nobody."}
 
 hosts/update refused
-{"code":-32009,"message":"This control plane cannot do that yet."}
+{"code":-32091,"message":"There is no such host."}
 
 providers/list refused
 {"code":-32064,"message":"Workspace providers need a control plane with one copy, for now."}

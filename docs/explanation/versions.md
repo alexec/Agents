@@ -21,8 +21,9 @@ list, never the version:
   feature is disabled with "This host needs an update to do this". The client does not send the
   call and then show an empty pane.
 - The control plane keeps a **required set**: the capabilities that it needs to route. A host
-  without one of them shows "Needs an update", with the names that it does not have. A client
-  without one of them is told to update the app.
+  without one of them shows "Needs an update", with the names that it does not have, and
+  **Update…** in its menu, which updates it over ssh (#1766). A client without one of them is
+  told to update the app.
 - A part from before capabilities sends no list. Nothing is hidden or refused for it.
 
 The version is for people: Settings, logs, "update to 0.8.0", and the release notes.

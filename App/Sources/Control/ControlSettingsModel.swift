@@ -390,6 +390,8 @@ final class ControlSettingsModel {
         case added(name: String, tunnel: Bool)
         /// The server's key is new to this Mac: the person looks at it and says so.
         case needsTrust(fingerprint: String)
+        /// A host updated over ssh (#1766): it starts again with the control plane's version.
+        case updated(name: String)
         case failed(String)
     }
 
@@ -411,6 +413,26 @@ final class ControlSettingsModel {
             if let fingerprint = answer["needsTrust"]?.stringValue { return .needsTrust(fingerprint: fingerprint) }
             return .added(name: answer["name"]?.stringValue ?? name ?? destination,
                           tunnel: answer["tunnel"]?.boolValue ?? false)
+        } catch let error as JSONRPCError {
+            return .failed(HostProblem.controlRefusal(error))
+        } catch {
+            return .failed("The control plane can’t be reached.")
+        }
+    }
+
+    /// Update a host over ssh (#1766): its server and key given again, as at its install,
+    /// because the control plane keeps neither. The control plane checks the server's root
+    /// is this host's, copies its agentsd there, and starts the host again.
+    func update(host: HostID, destination: String, key: String? = nil, trust: String? = nil) async -> InstallOutcome {
+        installStep = nil
+        var params: [String: JSONValue] = ["host": .string(host.rawValue), "destination": .string(destination)]
+        if let key { params["key"] = .string(key) }
+        if let trust { params["trust"] = .string(trust) }
+        do {
+            let answer = try await client.call(DaemonAPI.Method.hostsUpdate, JSONValue.object(params))
+            await refresh()
+            if let fingerprint = answer["needsTrust"]?.stringValue { return .needsTrust(fingerprint: fingerprint) }
+            return .updated(name: answer["name"]?.stringValue ?? destination)
         } catch let error as JSONRPCError {
             return .failed(HostProblem.controlRefusal(error))
         } catch {

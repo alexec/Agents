@@ -212,9 +212,22 @@ stopped, with **Start** on its row and over its chats on every screen.
 
 ## Updating a server
 
-A server's host does not update itself yet. To update it, add it again: click **Add a
-Server…** and run the new command on the server. It stops the host running there and starts
-the new one on the same folder, so do it when no agent there is in the middle of a turn.
+A server whose host is older than the control plane needs says **Needs an update** in
+**Settings ▸ Control plane ▸ Hosts**. To update it over ssh:
+
+1. Click the server's **···**, then **Update…**.
+2. In **Server**, type the server as you reach it over ssh, as when you added it. Give a key
+   if the control plane needs one. The control plane keeps neither from the install, so you
+   give them again.
+3. Click **Update**. If the server's key is new to this Mac, check it, then click **Trust and
+   Update**.
+
+The control plane checks that the server is that host, copies its version of Agents there,
+and starts the host again. Its agents, projects and membership stay. It stops the host for a
+moment, so do it when no agent there is in the middle of a turn.
+
+A server you added with a command can be updated the same way when you can ssh to it.
+Otherwise, add it again: click **Add a Server…** and run the new command on the server.
 
 ## If it doesn't work
 
