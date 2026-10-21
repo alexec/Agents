@@ -1,7 +1,8 @@
 // Package audit is who did what (#996, spec 736 US8, T3): the control plane writes an
 // entry for each action a client takes through it, with the actor it knows the client by,
 // never one the client names. Entries are the control plane's events, under
-// <prefix>/v1/events/<day>/, kept for auditDays (90 by default) and swept by day.
+// <prefix>/v1/events/<day>/by/<person>/, kept for auditDays (90 by default) and swept by
+// day. The person in the key lets a member's list read only their own entries (#2051).
 //
 // Until people (#994) are built, a control plane has one person, the local owner, and
 // every client is theirs: every actor is the local owner and the client it used.
@@ -10,8 +11,10 @@ package audit
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"path"
 	"sort"
 	"strings"
 	"time"
@@ -29,6 +32,8 @@ const (
 	// Prefix is where entries live: the control plane's events.
 	Prefix    = "v1/events/"
 	dayLayout = "2006-01-02"
+	// byPerson is the folder under a day that holds each person's entries.
+	byPerson = "by/"
 	// Kind is an entry's kind, beside the control plane's own events (clientPaired, …).
 	Kind = "audit"
 
@@ -195,11 +200,20 @@ func (l *Log) now() time.Time {
 	return time.Now()
 }
 
-// Key is where an entry made at t goes: by day, then by the millisecond, so a day's
-// keys sort by time.
-func Key(t time.Time) string {
+// Key is where an entry made at t by user goes: by day, then by person, then by the
+// millisecond, so a person's keys for a day sort by time.
+func Key(t time.Time, user string) string {
 	t = t.UTC()
-	return fmt.Sprintf("%s%s/%013d-%s.json", Prefix, t.Format(dayLayout), t.UnixMilli(), strings.ToLower(records.NewUUID()[:8]))
+	return fmt.Sprintf("%s%013d-%s.json", dayPrefix(t.Format(dayLayout), user), t.UnixMilli(), strings.ToLower(records.NewUUID()[:8]))
+}
+
+// dayPrefix is the folder of a day's entries, or of one person's entries that day. The
+// name is base64, so that no name makes a path of its own ("..", "/").
+func dayPrefix(day, user string) string {
+	if user == "" {
+		return Prefix + day + "/"
+	}
+	return Prefix + day + "/" + byPerson + base64.RawURLEncoding.EncodeToString([]byte(user)) + "/"
 }
 
 // Write keeps one action. The store's create-only write means two copies never write
@@ -217,7 +231,7 @@ func (l *Log) Write(ctx context.Context, actor wire.AuditActor, method, action s
 	if err != nil {
 		return err
 	}
-	_, err = l.Store.Put(ctx, Key(at), data, store.Absent)
+	_, err = l.Store.Put(ctx, Key(at, actor.User), data, store.Absent)
 	return err
 }
 
@@ -278,7 +292,8 @@ func NewQuery(q wire.AuditQuery, days int, now time.Time, export bool) Query {
 
 // List is the entries in the query's range, newest first (or oldest first for an
 // export), and whether more were left out. It reads a day's keys at a time, from the
-// newest day, and stops once it has enough.
+// newest day, and stops once it has enough. A query for one person lists and reads only
+// that person's folder of each day, never the team's entries (#2051).
 func (l *Log) List(ctx context.Context, q Query, owner func(by string) wire.AuditActor) ([]wire.AuditEntry, bool, error) {
 	var days []string
 	for d := q.Until.UTC(); !d.Before(q.Since.UTC().Truncate(24 * time.Hour)); d = d.Add(-24 * time.Hour) {
@@ -291,15 +306,17 @@ func (l *Log) List(ctx context.Context, q Query, owner func(by string) wire.Audi
 	}
 	out := []wire.AuditEntry{}
 	for _, day := range days {
-		keys, err := l.Store.List(ctx, Prefix+day+"/")
+		keys, err := l.Store.List(ctx, dayPrefix(day, q.User))
 		if err != nil {
 			return nil, false, err
 		}
+		// A day's keys are in folders by person: the file's name is the time.
 		sort.Slice(keys, func(i, j int) bool {
+			a, b := path.Base(keys[i].Key), path.Base(keys[j].Key)
 			if q.Oldest {
-				return keys[i].Key < keys[j].Key
+				return a < b
 			}
-			return keys[i].Key > keys[j].Key
+			return a > b
 		})
 		for _, k := range keys {
 			object, err := l.Store.Get(ctx, k.Key)
