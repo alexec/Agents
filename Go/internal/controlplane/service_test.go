@@ -548,7 +548,7 @@ func TestHostsInstallAnswersInItsWords(t *testing.T) {
 	if e := callError(t, window, "", "hosts/install", map[string]string{"destination": " "}); !strings.Contains(e, "Say which server.") {
 		t.Fatal(e)
 	}
-	if e := callError(t, window, "", "hosts/update", map[string]string{"host": "x"}); !strings.Contains(e, "-32009") {
+	if e := callError(t, window, "", "hosts/update", map[string]string{"host": "x", "destination": "devbox"}); !strings.Contains(e, "There is no such host.") {
 		t.Fatal(e)
 	}
 	call(t, window, "", "hosts/checkAgain", map[string]string{"host": "x"})

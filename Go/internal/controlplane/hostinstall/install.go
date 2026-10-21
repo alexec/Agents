@@ -142,9 +142,17 @@ func (i *Installer) Install(ctx context.Context, params json.RawMessage) (any, e
 	return i.install(ctx, request.Request, false)
 }
 
-// Update is hosts/update. The Swift control plane does not do it yet (ControlMethods'
-// default hook), so neither does this.
-func (i *Installer) Update(ctx context.Context, host string) error { return NotHere }
+// Update is hosts/update (#1766): a host this control plane installed over ssh, updated
+// the same way, with its server and key given again (the control plane keeps neither).
+// The host key is checked as at an install. The server's root must hold this host's own
+// membership, so no other server is touched; then its agentsd, MCP servers and toolsets
+// are copied, and the host starts again with its root, membership and agents as they were.
+// name is the host's, as the control plane knows it. The answer is an install's:
+// {needsTrust, name} for a key to trust first, then {updated: true, name}.
+func (i *Installer) Update(ctx context.Context, update wire.HostUpdate, name string) (any, error) {
+	request := Request{Destination: update.Destination, Key: update.Key, Trust: update.Trust, Name: &name}
+	return i.run(ctx, request, false, string(update.Host))
+}
 
 // CheckAgain is hosts/checkAgain. The Swift control plane does nothing for it
 // (ControlMethods' default hook), so neither does this.
@@ -166,6 +174,12 @@ func trimSpaces(s string) string {
 // personsKnownHosts: a server found in the ssh config (#429), which ssh has just logged
 // into that way. It never asks.
 func (i *Installer) install(ctx context.Context, request Request, personsKnownHosts bool) (any, error) {
+	return i.run(ctx, request, personsKnownHosts, "")
+}
+
+// run is install, or with updating (a host's id) its update: the same connection and
+// checks, then the same files, and the host started again in place of a new one joining.
+func (i *Installer) run(ctx context.Context, request Request, personsKnownHosts bool, updating string) (any, error) {
 	if trimSpaces(request.Destination) == "" {
 		return nil, &Failure{Code: InvalidParams, Message: "Say which server."}
 	}
@@ -246,6 +260,12 @@ func (i *Installer) install(ctx context.Context, request Request, personsKnownHo
 	}
 
 	server := installer{ssh}
+	// An update goes only to the server whose root is this host's (#1766).
+	if updating != "" {
+		if err := server.isHost(ctx, updating, name); err != nil {
+			return nil, err
+		}
+	}
 	arch := binarySuffix(found.architecture)
 	binary, ok := binaryFor(arch, i.ServerFolder)
 	if arch == "" || !ok {
@@ -268,6 +288,18 @@ func (i *Installer) install(ctx context.Context, request Request, personsKnownHo
 	// it holds. One that cannot be installed leaves the host without that runtime, not
 	// without a host: the runtime says why when it is chosen.
 	i.installToolsets(ctx, server, found, folder, name)
+
+	// An update keeps the host's membership and root: it stops and starts again, as itself.
+	if updating != "" {
+		if err := server.stopRunning(ctx); err != nil {
+			return nil, words(err, keyGiven)
+		}
+		if err := server.startDaemon(ctx, "--control-network", "--host-name", name); err != nil {
+			return nil, words(err, keyGiven)
+		}
+		i.progress(name, "started")
+		return map[string]any{"updated": true, "name": name}, nil
+	}
 
 	// A host code, left in the host's root and read once, never on its command line.
 	// Through a tunnel, it names the server's end of the tunnel (#435, #610).

@@ -411,7 +411,7 @@ var (
 	CallHostsStartEnroll            = Method[Empty, ControlCodeShown]{"hosts/startEnroll"}
 	CallHostsStop                   = Method[HostStop, ControlHost]{"hosts/stop"}
 	CallHostsUnlink                 = Method[HostRequest, ControlHost]{"hosts/unlink"}
-	CallHostsUpdate                 = Method[HostRequest, Empty]{"hosts/update"}
+	CallHostsUpdate                 = Method[HostUpdate, JSONValue]{"hosts/update"}
 	CallPeopleInvite                = Method[PersonInvite, PersonInvited]{"people/invite"}
 	CallPeopleList                  = Method[Empty, PeopleList]{"people/list"}
 	CallPeopleRemove                = Method[PersonRequest, Empty]{"people/remove"}

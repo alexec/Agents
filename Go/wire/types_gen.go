@@ -2607,6 +2607,14 @@ type HostTunnelChanged struct {
 	Tunnel HostTunnel `json:"tunnel"`
 }
 
+// hosts/update (#1766): a host the control plane installed over ssh, updated the same way. The server and its key are given again, as at the install, because the control plane keeps neither; the host's own root and membership stay.
+type HostUpdate struct {
+	Host        HostID  `json:"host"`
+	Destination string  `json:"destination"`
+	Key         *string `json:"key,omitzero"`
+	Trust       *string `json:"trust,omitzero"`
+}
+
 type HostWorkspace struct {
 	Provider            ProviderID `json:"provider"`
 	ProviderName        string     `json:"providerName"`

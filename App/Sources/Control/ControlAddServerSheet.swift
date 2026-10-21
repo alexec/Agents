@@ -24,6 +24,9 @@ struct ControlAddServerSheet: View {
     /// A provider's workspace being added as a host (#691, Add as Host…): over ssh, with what
     /// the provider gave filled in, and linked to it once it joins.
     var prefill: Prefill?
+    /// A host that needs an update, updated over ssh as it was installed (#1766): the
+    /// server and key asked again, and no code, name or tunnel.
+    var updating: DaemonAPI.ControlHost?
 
     struct Prefill: Identifiable {
         var destination: String
@@ -69,8 +72,10 @@ struct ControlAddServerSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("Add a Server").appText(.title).fontWeight(.semibold)
-            if let joinedHost, let joined {
+            Text(updating.map { "Update \($0.name)" } ?? "Add a Server").appText(.title).fontWeight(.semibold)
+            if updating != nil {
+                sshPage
+            } else if let joinedHost, let joined {
                 Label("\(joined) joined.", systemImage: "checkmark.circle.fill").appText(.reading).tinted(.vouched)
                 HostProjectsPicker(host: joinedHost, hostName: joined, paths: control.suggestedPaths,
                                    leaveTitle: "Skip") { dismiss() }
@@ -88,8 +93,14 @@ struct ControlAddServerSheet: View {
         }
         .padding(28)
         .frame(width: 620)
-        .task { await watchForJoin() }
+        // An update makes no host code: the host keeps its membership.
+        .task { if updating == nil { await watchForJoin() } }
         .onAppear {
+            if let updating {
+                way = .ssh
+                name = updating.name
+                return
+            }
             guard let prefill else { return }
             way = .ssh
             destination = prefill.sshDestination
@@ -206,10 +217,12 @@ struct ControlAddServerSheet: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
-            GridRow {
-                Text("Name").foregroundStyle(.secondary)
-                TextField(HostNameGuess.from(destination), text: $name).textFieldStyle(.roundedBorder)
-                    .accessibilityLabel("Name").disabled(working)
+            if updating == nil {
+                GridRow {
+                    Text("Name").foregroundStyle(.secondary)
+                    TextField(HostNameGuess.from(destination), text: $name).textFieldStyle(.roundedBorder)
+                        .accessibilityLabel("Name").disabled(working)
+                }
             }
             GridRow {
                 Text("Key").foregroundStyle(.secondary)
@@ -220,7 +233,7 @@ struct ControlAddServerSheet: View {
                     Button("Choose…") { chooseKey() }.buttonStyle(.paper).disabled(working)
                 }
             }
-            if control.isOnThisMac {
+            if control.isOnThisMac, updating == nil {
                 GridRow {
                     Color.clear.frame(width: 1, height: 1)
                     Toggle("Use an ssh tunnel", isOn: Binding(get: { tunnel }, set: { tunnel = $0; tunnelChosen = true }))
@@ -231,11 +244,17 @@ struct ControlAddServerSheet: View {
         }
         .task { configHosts = control.isOnThisMac ? await control.sshHosts() : [] }
         .task(id: destination) { await resolveTyped() }
+        if let updating {
+            Text("The server \(updating.name) runs on, as you reach it over ssh. The control plane checks it is \(updating.name), copies its version of Agents there and starts it again. Its agents and projects stay. The key is used for this update only and not kept.")
+                .appText(.supporting).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        } else {
         Text(keyOptional
              ? "With no key, ssh logs in as it does from Terminal: your agent, ~/.ssh/config or default key. A key chosen here is used instead, for this install only. Afterwards the server connects to the control plane by itself, or, with a tunnel, through ssh the control plane keeps open."
              : "The control plane runs on another machine, so it needs the key: it is used for this install only and not kept. Afterwards the server connects to the control plane by itself.")
             .appText(.supporting).foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)
+        }
         if let fingerprint {
             VStack(alignment: .leading, spacing: 6) {
                 Text("This server’s key isn’t in your known_hosts. Its key is:").appText(.supporting)
@@ -256,6 +275,9 @@ struct ControlAddServerSheet: View {
             Text(joined.map { "\($0) joined." } ?? "Installed on \(named). Waiting for it to connect…")
                 .appText(.supporting).tinted(.vouched)
             if tunnel { tunnelLine(named) }
+        case .updated(let named)?:
+            Text("Updated \(named). It starts again with this control plane’s version.")
+                .appText(.supporting).tinted(.vouched)
         case .failed(let why)?:
             Text(why).appText(.supporting).tinted(.failure).fixedSize(horizontal: false, vertical: true)
         default:
@@ -265,7 +287,8 @@ struct ControlAddServerSheet: View {
             Spacer()
             Button(isDone ? "Done" : "Cancel") { dismiss() }.buttonStyle(.paper)
             if !isDone {
-                Button(fingerprint == nil ? "Install" : "Trust and Install") { install() }
+                Button(updating != nil ? (fingerprint == nil ? "Update" : "Trust and Update")
+                       : (fingerprint == nil ? "Install" : "Trust and Install")) { install() }
                     .buttonStyle(.paperProminent)
                     .keyboardShortcut(.defaultAction)
                     .disabled(working || destination.trimmingCharacters(in: .whitespaces).isEmpty || (keyPath.isEmpty && !keyOptional))
@@ -330,7 +353,12 @@ struct ControlAddServerSheet: View {
         if !tunnelChosen { tunnel = typed?.throughBastion ?? false }
     }
 
-    private var isDone: Bool { if case .added = outcome { true } else { false } }
+    private var isDone: Bool {
+        switch outcome {
+        case .added?, .updated?: true
+        default: false
+        }
+    }
 
     private func chooseKey() {
         let panel = NSOpenPanel()
@@ -360,6 +388,18 @@ struct ControlAddServerSheet: View {
         outcome = nil
         let trusting = fingerprint
         Task {
+            if let updating {
+                let result = await control.update(host: updating.id, destination: destination.trimmingCharacters(in: .whitespaces),
+                                                  key: key, trust: trusting)
+                working = false
+                if case .needsTrust(let shownKey) = result {
+                    fingerprint = shownKey
+                } else {
+                    fingerprint = nil
+                    outcome = result
+                }
+                return
+            }
             let result = await control.install(destination: destination.trimmingCharacters(in: .whitespaces),
                                                name: name.trimmingCharacters(in: .whitespaces), key: key, trust: trusting,
                                                tunnel: control.isOnThisMac ? tunnel : nil)
