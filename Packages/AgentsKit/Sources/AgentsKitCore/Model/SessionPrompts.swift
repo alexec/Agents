@@ -1,4 +1,5 @@
 import Foundation
+import Synchronization
 
 /// One row of a session's Prompts list (#1658): a prompt the person sent, and how its turn went.
 public struct SessionPrompt: Identifiable, Hashable, Sendable {
@@ -39,11 +40,23 @@ public struct SessionPrompt: Identifiable, Hashable, Sendable {
     /// its own copy (`promptLine` in `Web/src/model/sessionPrompts.ts`).
     public func detail(now: Date = Date(), timeZone: TimeZone = .current) -> String {
         var parts: [String] = []
-        if let cost { parts.append(cost.amount.formatted(.currency(code: cost.currency).precision(.fractionLength(2)))) }
+        if let cost { parts.append(cost.amount.formatted(Self.currencyStyle(cost.currency))) }
         if let seconds { parts.append(TimeChart.words(Double(seconds))) }
         parts.append(ActivityWords.sent(at, now: now, timeZone: timeZone))
         return parts.joined(separator: " · ")
     }
+
+    /// One currency style per currency (#1850), not one per row each time it is drawn.
+    private static func currencyStyle(_ code: String) -> Decimal.FormatStyle.Currency {
+        currencyStyles.withLock { styles in
+            if let style = styles[code] { return style }
+            let style = Decimal.FormatStyle.Currency(code: code).precision(.fractionLength(2))
+            styles[code] = style
+            return style
+        }
+    }
+
+    private static let currencyStyles = Mutex<[String: Decimal.FormatStyle.Currency]>([:])
 }
 
 /// The Prompts list (#1658): every prompt the person sent in a session, oldest first, each
@@ -96,6 +109,29 @@ public enum SessionPrompts {
                 ending: going ? nil : turn.ending))
         }
         return prompts
+    }
+
+    /// `of`, worked out again only when what it reads changes (#1850): the open Prompts list
+    /// asks on every body, which is every keystroke in its filter and every streamed entry.
+    /// Arrays that share their storage compare at once, so an unchanged chat costs nothing.
+    @MainActor
+    public final class Memo {
+        private var key: (turns: [TurnSummary], entries: [TranscriptEntry], isRunning: Bool, earlier: Int)?
+        private var prompts: [SessionPrompt] = []
+        /// How many times `of` ran: for tests.
+        public private(set) var worked = 0
+
+        public init() {}
+
+        public func of(turns: [TurnSummary], entries: [TranscriptEntry], isRunning: Bool, earlier: Int = 0) -> [SessionPrompt] {
+            if let key, key.isRunning == isRunning, key.earlier == earlier, key.turns == turns, key.entries == entries {
+                return prompts
+            }
+            worked += 1
+            prompts = SessionPrompts.of(turns: turns, entries: entries, isRunning: isRunning, earlier: earlier)
+            key = (turns, entries, isRunning, earlier)
+            return prompts
+        }
     }
 
     /// How many of the person's prompts these turns start with: what the chat lets go of

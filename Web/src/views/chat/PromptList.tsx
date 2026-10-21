@@ -6,7 +6,7 @@
 // the rows says so and loads them (#1862).
 import { useSignal } from "@preact/signals";
 import { hostNeedsUpdate } from "../../model/capabilities";
-import { useEffect, useRef } from "preact/hooks";
+import { useEffect, useMemo, useRef } from "preact/hooks";
 import { endingLabel, filteredPrompts, movedTo, promptLine, type SessionPrompt } from "../../model/sessionPrompts";
 
 export function PromptList({ prompts, hasEarlier, loadEarlier, choose, branchFrom, branchNeedsUpdate = false, close }: {
@@ -33,7 +33,11 @@ export function PromptList({ prompts, hasEarlier, loadEarlier, choose, branchFro
   /** The row whose ··· menu is open, and where: over the list, which would clip it, so placed on the page. */
   const menu = useSignal<string | null>(null);
   const menuAt = useSignal<{ top: number; right: number }>({ top: 0, right: 0 });
-  const now = new Date();
+  // Each row's grey line once per list of prompts, not per keystroke (#1850).
+  const lines = useMemo(() => {
+    const now = new Date();
+    return new Map(prompts.map((prompt) => [prompt.id, promptLine(prompt, now)]));
+  }, [prompts]);
 
   const go = (prompt: SessionPrompt | undefined) => {
     if (!prompt) return;
@@ -94,7 +98,7 @@ export function PromptList({ prompts, hasEarlier, loadEarlier, choose, branchFro
                 <span class="prompt-number faint">{prompt.number}</span>
                 <span class="prompt-words">
                   <span class="prompt-title">{prompt.title}</span>
-                  <span class="quiet small">{promptLine(prompt, now)}</span>
+                  <span class="quiet small">{lines.get(prompt.id)}</span>
                 </span>
                 {prompt.ending && (
                   <span class={`prompt-ending ${prompt.ending}`} role="img" aria-label={endingLabel(prompt.ending)} title={endingLabel(prompt.ending)}>

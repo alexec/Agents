@@ -14,12 +14,20 @@ export function shortAgo(date: Date, now = new Date()): string {
 const quietMinutes = 5;
 export const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
+/** One format per time zone ("" for the reader's), made once (#1850). */
+const partFormats = new Map<string, Intl.DateTimeFormat>();
+
 /** The year, month, day, hour and minute of `date` where the reader is (or in `timeZone`). */
 export function parts(date: Date, timeZone?: string): { year: number; month: number; day: number; hour: number; minute: number } {
   const made: Record<string, number> = {};
-  for (const part of new Intl.DateTimeFormat("en-GB", {
-    timeZone, year: "numeric", month: "numeric", day: "numeric", hour: "numeric", minute: "numeric", hourCycle: "h23",
-  }).formatToParts(date)) {
+  let format = partFormats.get(timeZone ?? "");
+  if (!format) {
+    format = new Intl.DateTimeFormat("en-GB", {
+      timeZone, year: "numeric", month: "numeric", day: "numeric", hour: "numeric", minute: "numeric", hourCycle: "h23",
+    });
+    partFormats.set(timeZone ?? "", format);
+  }
+  for (const part of format.formatToParts(date)) {
     if (part.type !== "literal") made[part.type] = Number(part.value);
   }
   return { year: made.year!, month: made.month!, day: made.day!, hour: made.hour!, minute: made.minute! };
