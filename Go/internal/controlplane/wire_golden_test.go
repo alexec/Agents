@@ -1,6 +1,7 @@
 package controlplane
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"flag"
@@ -51,7 +52,7 @@ func TestTheWireIsWhatItWas(t *testing.T) {
 	readUntil(t, relay, phone.Client)
 
 	var out []string
-	say := func(what, line string) { out = append(out, what+"\n"+line) }
+	say := func(what, line string) { out = append(out, what+"\n"+pretty(line, "")) }
 	answer := func(method string, params any) {
 		c, cancel := context.WithTimeout(ctx, 10*time.Second)
 		defer cancel()
@@ -65,10 +66,10 @@ func TestTheWireIsWhatItWas(t *testing.T) {
 		if strings.HasPrefix(string(got), "[") && json.Unmarshal(got, &rows) == nil {
 			masked := make([]string, len(rows))
 			for i, r := range rows {
-				masked[i] = mask(string(r), p, box.member.Host, relayID, plainID)
+				masked[i] = "  " + mask(pretty(string(r), "  "), p, box.member.Host, relayID, plainID)
 			}
 			sort.Strings(masked)
-			say(method, "["+strings.Join(masked, ",")+"]")
+			out = append(out, method+"\n[\n"+strings.Join(masked, ",\n")+"\n]")
 			return
 		}
 		say(method, string(got))
@@ -117,7 +118,7 @@ func TestTheWireIsWhatItWas(t *testing.T) {
 		select {
 		case n := <-window.Notes:
 			if n.Host == "" {
-				heard[n.Method+"\n"+string(n.Params)] = true
+				heard[n.Method+"\n"+pretty(string(n.Params), "")] = true
 			}
 			continue
 		default:
@@ -156,14 +157,25 @@ func TestTheWireIsWhatItWas(t *testing.T) {
 	}
 }
 
+// pretty is a JSON value with one key or item per line, so that two changes to one answer
+// (a capability each, say) touch different lines of the golden file (#2020). It only adds
+// space: the keys, their order and every value stay as written. Anything else is as it was.
+func pretty(s, prefix string) string {
+	var b bytes.Buffer
+	if json.Indent(&b, []byte(s), prefix, "  ") != nil {
+		return s
+	}
+	return b.String()
+}
+
 var (
 	upperUUID = regexp.MustCompile(`[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}`)
 	lowerUUID = regexp.MustCompile(`[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}`)
 	// A date's value changes; that it is a number, and where, does not.
-	dates = regexp.MustCompile(`"(startedAt|paired|lastSeen|expires|at|heardAt|since|countedAt|forgottenAt)":-?[0-9][0-9.eE+-]*`)
+	dates = regexp.MustCompile(`"(startedAt|paired|lastSeen|expires|at|heardAt|since|countedAt|forgottenAt)":( ?)-?[0-9][0-9.eE+-]*`)
 	// Base64 keys and codes, which are new each run.
-	secrets = regexp.MustCompile(`"(publicKey|relayKey|text|command)":"[^"]*"`)
-	ports   = regexp.MustCompile(`"port":[0-9]+`)
+	secrets = regexp.MustCompile(`"(publicKey|relayKey|text|command)":( ?)"[^"]*"`)
+	ports   = regexp.MustCompile(`"port":( ?)[0-9]+`)
 )
 
 func mask(s string, p *plane, hosts ...string) string {
@@ -173,7 +185,7 @@ func mask(s string, p *plane, hosts ...string) string {
 	}
 	s = upperUUID.ReplaceAllString(s, "<UUID>")
 	s = lowerUUID.ReplaceAllString(s, "<uuid>")
-	s = dates.ReplaceAllString(s, `"$1":<date>`)
-	s = secrets.ReplaceAllString(s, `"$1":"<secret>"`)
-	return ports.ReplaceAllString(s, `"port":<port>`)
+	s = dates.ReplaceAllString(s, `"$1":$2<date>`)
+	s = secrets.ReplaceAllString(s, `"$1":$2"<secret>"`)
+	return ports.ReplaceAllString(s, `"port":$1<port>`)
 }
