@@ -154,7 +154,8 @@ func (f *fakeGitLab) serve(w http.ResponseWriter, r *http.Request) {
 		}
 		return nil, false
 	}
-	// stated is list's items in that state, in the order asked for, as GitLab answers.
+	// stated is list's items in that state, in the order asked for and the page asked for, as
+	// GitLab answers.
 	stated := func(list []obj, key, want string) []obj {
 		out := []obj{}
 		for _, o := range list {
@@ -164,6 +165,11 @@ func (f *fakeGitLab) serve(w http.ResponseWriter, r *http.Request) {
 		}
 		if by := q.Get("order_by"); strings.HasSuffix(by, "_at") && q.Get("sort") == "desc" {
 			sort.SliceStable(out, func(i, j int) bool { s, _ := out[i][by].(string); t, _ := out[j][by].(string); return s > t })
+		}
+		if size, _ := strconv.Atoi(q.Get("per_page")); size > 0 {
+			page, _ := strconv.Atoi(q.Get("page"))
+			first := min(len(out), max(0, page-1)*size)
+			out = out[first:min(len(out), first+size)]
 		}
 		return out
 	}

@@ -282,6 +282,114 @@ func TestIssueLabelled(t *testing.T) {
 	}
 }
 
+// A wait whose label nobody adds still moves on (P20261020-1): each poll reads what changed
+// since the last poll, not everything since the last label it raised.
+func TestLabelledWaitReadsOnlyWhatIsNew(t *testing.T) {
+	f := newFake(t)
+	f.addMembers()
+	agent := newPoller(t, f, "issue.labelled", map[string]any{"label": "agent"})
+	agent.poll()
+	var asked []int
+	for i := 1; i <= 20; i++ {
+		f.set(func() {
+			f.issues = append(f.issues, issueObj(i, dev, obj{"updated_at": timeString(agent.now), "labels": []string{"bug"}}))
+			f.labelled[i] = []obj{{"id": 100 + i, "action": "add", "created_at": timeString(agent.now), "user": dev, "label": obj{"name": "bug"}}}
+		})
+		before := len(f.asked())
+		ids, _ := agent.poll()
+		same(t, ids, nil)
+		asked = append(asked, len(f.asked())-before)
+	}
+	if asked[len(asked)-1] > asked[1] {
+		t.Fatalf("requests per poll grow: %v", asked)
+	}
+}
+
+// The cursor moves past what the wait does not want, but never past one it does: a label at
+// the second the cursor stopped is raised once, and a truncated poll keeps its old cursor.
+func TestLabelledCursorLosesNothingAtItsEdge(t *testing.T) {
+	f := newFake(t)
+	f.addMembers()
+	agent := newPoller(t, f, "issue.labelled", map[string]any{"label": "agent"})
+	agent.poll()
+	f.set(func() {
+		f.issues = []obj{issueObj(1, dev, obj{"updated_at": at(2), "labels": []string{"bug"}})}
+		f.labelled[1] = []obj{{"id": 10, "action": "add", "created_at": at(2), "user": dev, "label": obj{"name": "bug"}}}
+	})
+	ids, _ := agent.poll()
+	same(t, ids, nil)
+	// A label added in the same second, seen only now.
+	f.set(func() {
+		f.issues = append(f.issues, issueObj(2, dev, obj{"updated_at": at(2), "labels": []string{"agent"}}))
+		f.labelled[2] = []obj{{"id": 11, "action": "add", "created_at": at(2), "user": dev, "label": obj{"name": "agent"}}}
+	})
+	ids, _ = agent.poll()
+	same(t, ids, []string{"issue.labelled:group/app:label:11"})
+	ids, _ = agent.poll()
+	same(t, ids, nil)
+
+	// More than ten pages: the cursor stays at the last label raised, as before.
+	f.set(func() {
+		for i := 3; i < 3+maxPages*perPage+1; i++ {
+			f.issues = append(f.issues, issueObj(i, dev, obj{"updated_at": at(10 + i), "labels": []string{"bug"}}))
+		}
+	})
+	_, result := agent.poll()
+	if result["truncated"] != true {
+		t.Fatalf("not truncated: %v", result)
+	}
+	c, _ := decodeCursor(json.RawMessage(`"` + result["cursor"].(string) + `"`))
+	if c.Since != at(2) || strings.Join(c.IDs, ",") != "issue.labelled:group/app:label:11" {
+		t.Fatalf("cursor %+v", c)
+	}
+}
+
+// Two waits on one project share an issue's label events while it is unchanged, but a label
+// added since is read afresh, never hidden by what was shared.
+func TestLabelEventsAreSharedByTheIssuesUpdate(t *testing.T) {
+	f := newFake(t)
+	f.addMembers()
+	gl := f.gitlab()
+	gl.sharing = time.Hour
+	waits := []*poller{newPoller(t, f, "issue.labelled", map[string]any{"label": "agent"}),
+		newPoller(t, f, "issue.labelled", map[string]any{"label": "agent", "issue": 1})}
+	for _, w := range waits {
+		w.events.GitLab = gl
+		w.poll()
+	}
+	read := func() int {
+		n := 0
+		for _, r := range f.asked() {
+			if strings.Contains(r, "/resource_label_events") {
+				n++
+			}
+		}
+		return n
+	}
+	f.set(func() {
+		f.issues = []obj{issueObj(1, dev, obj{"updated_at": at(1), "labels": []string{"bug"}})}
+		f.labelled[1] = []obj{{"id": 10, "action": "add", "created_at": at(1), "user": dev, "label": obj{"name": "bug"}}}
+	})
+	for _, w := range waits {
+		ids, _ := w.poll()
+		same(t, ids, nil)
+	}
+	if read() != 1 {
+		t.Fatalf("label events read %d times, want once", read())
+	}
+	f.set(func() {
+		f.issues[0]["updated_at"], f.issues[0]["labels"] = at(2), []string{"bug", "agent"}
+		f.labelled[1] = append(f.labelled[1], obj{"id": 11, "action": "add", "created_at": at(2), "user": dev, "label": obj{"name": "agent"}})
+	})
+	for _, w := range waits {
+		ids, _ := w.poll()
+		same(t, ids, []string{"issue.labelled:group/app:label:11"})
+	}
+	if read() != 2 {
+		t.Fatalf("label events read %d times, want twice", read())
+	}
+}
+
 func TestReviewCommentIsALineOfTheDiff(t *testing.T) {
 	f := newFake(t)
 	f.addMembers()

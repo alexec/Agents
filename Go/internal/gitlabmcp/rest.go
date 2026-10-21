@@ -194,6 +194,20 @@ func (g *RealGitLab) get(ctx context.Context, path string, shared bool, into any
 	return nil
 }
 
+// getAsOf is path's JSON shared as get shares it, but only with a fetch for the same asOf: a
+// time the thing at path changed at, or something newer than it was seen at, so what is
+// shared is never older than what the caller has seen.
+func (g *RealGitLab) getAsOf(ctx context.Context, path, asOf string, into any) error {
+	body, err := g.shared(path+" "+normalized(asOf), func() ([]byte, error) { return g.do(ctx, http.MethodGet, path, nil) })
+	if err != nil {
+		return err
+	}
+	if json.Unmarshal(body, into) != nil {
+		return &GitLabError{Kind: Failed, Message: "GitLab's answer is not JSON"}
+	}
+	return nil
+}
+
 func (g *RealGitLab) send(ctx context.Context, method, path string, body, into any) error {
 	data, err := g.do(ctx, method, path, body)
 	if err != nil {
@@ -252,34 +266,38 @@ func query(path string, page int) string {
 }
 
 // newest pages path (newest first) until an item older than since by its time.
-func newest[T any](ctx context.Context, g *RealGitLab, path, since string, at func(T) string) ([]T, bool, error) {
+func newest[T any](ctx context.Context, g *RealGitLab, path, since string, at func(T) string) ([]T, Listed, error) {
 	var items []T
+	var listed Listed
 	for page := 1; page <= maxPages; page++ {
 		var list []T
 		if err := g.get(ctx, query(path, page), true, &list); err != nil {
-			return nil, false, err
+			return nil, Listed{}, err
 		}
 		for _, item := range list {
 			if before(at(item), since) {
-				return items, false, nil
+				return items, listed, nil
 			}
 			items = append(items, item)
+			listed = listed.saw(at(item))
 		}
 		if len(list) < perPage {
-			return items, false, nil
+			return items, listed, nil
 		}
 	}
-	return items, true, nil
+	listed.Truncated = true
+	return items, listed, nil
 }
 
 // labelled is every label added to an issue at or after since: the issues updated since, and
 // each one's label events (GitLab has no project-wide list of them). Adding a label updates
-// the issue, so none is missed; an issue updated for another reason costs one more read.
-func (g *RealGitLab) labelled(ctx context.Context, project, since string) ([]IssueActivity, bool, error) {
+// the issue, so none is missed; an issue updated for another reason costs one more read. The
+// label events are shared by the issue's update time: unchanged, its labels are too.
+func (g *RealGitLab) labelled(ctx context.Context, project, since string) ([]IssueActivity, Listed, error) {
 	path := fmt.Sprintf("projects/%s/issues?updated_after=%s&order_by=updated_at&sort=desc", pid(project), url.QueryEscape(since))
-	items, truncated, err := newest(ctx, g, path, since, func(i issueJSON) string { return i.UpdatedAt })
+	items, listed, err := newest(ctx, g, path, since, func(i issueJSON) string { return i.UpdatedAt })
 	if err != nil {
-		return nil, false, err
+		return nil, Listed{}, err
 	}
 	var out []IssueActivity
 	for _, i := range items {
@@ -292,8 +310,8 @@ func (g *RealGitLab) labelled(ctx context.Context, project, since string) ([]Iss
 				Name string `json:"name"`
 			} `json:"label"`
 		}
-		if err := g.get(ctx, fmt.Sprintf("projects/%s/issues/%d/resource_label_events?per_page=%d", pid(project), i.IID, perPage), false, &events); err != nil {
-			return nil, false, err
+		if err := g.getAsOf(ctx, fmt.Sprintf("projects/%s/issues/%d/resource_label_events?per_page=%d", pid(project), i.IID, perPage), i.UpdatedAt, &events); err != nil {
+			return nil, Listed{}, err
 		}
 		for _, e := range events {
 			if e.Action != "add" || e.Label == nil || before(e.CreatedAt, since) {
@@ -301,13 +319,13 @@ func (g *RealGitLab) labelled(ctx context.Context, project, since string) ([]Iss
 			}
 			trusted, err := g.trusted(ctx, project, &e.User)
 			if err != nil {
-				return nil, false, err
+				return nil, Listed{}, err
 			}
 			out = append(out, IssueActivity{ID: "label:" + strconv.Itoa(e.ID), At: e.CreatedAt, Issue: i.issue(), Kind: IssueLabelled,
 				By: e.User.Username, Label: e.Label.Name, Trusted: trusted})
 		}
 	}
-	return out, truncated, nil
+	return out, listed, nil
 }
 
 // MARK: GitLab's JSON
@@ -481,36 +499,37 @@ func (g *RealGitLab) OpenMRs(ctx context.Context, project string) ([]OpenMR, err
 	return out, nil
 }
 
-func (g *RealGitLab) ClosedMRs(ctx context.Context, project, since string) ([]MergedMR, []ClosedMR, bool, error) {
+func (g *RealGitLab) ClosedMRs(ctx context.Context, project, since string) ([]MergedMR, []ClosedMR, Listed, error) {
 	var merged []MergedMR
 	var closed []ClosedMR
-	truncated := false
+	var listed Listed
 	for _, st := range []string{"merged", "closed"} {
 		path := fmt.Sprintf("projects/%s/merge_requests?state=%s&order_by=updated_at&sort=desc&updated_after=%s",
 			pid(project), st, url.QueryEscape(since))
 		list, more, err := newest(ctx, g, path, since, func(m mergeRequest) string { return m.UpdatedAt })
 		if err != nil {
-			return nil, nil, false, err
+			return nil, nil, Listed{}, err
 		}
-		truncated = truncated || more
+		listed = listed.saw(more.Newest)
+		listed.Truncated = listed.Truncated || more.Truncated
 		for _, m := range list {
 			switch {
 			case st == "merged" && m.MergedAt != nil && !before(*m.MergedAt, since):
 				trusted, err := g.trustedMR(ctx, project, m)
 				if err != nil {
-					return nil, nil, false, err
+					return nil, nil, Listed{}, err
 				}
 				merged = append(merged, MergedMR{MR: m.mr(), MergedAt: *m.MergedAt, MergeSHA: m.mergeSHA(), Trusted: trusted})
 			case st == "closed" && m.ClosedAt != nil && !before(*m.ClosedAt, since):
 				trusted, err := g.trustedMR(ctx, project, m)
 				if err != nil {
-					return nil, nil, false, err
+					return nil, nil, Listed{}, err
 				}
 				closed = append(closed, ClosedMR{MR: m.mr(), ClosedAt: *m.ClosedAt, Trusted: trusted})
 			}
 		}
 	}
-	return merged, closed, truncated, nil
+	return merged, closed, listed, nil
 }
 
 // mrRef is a merge request pipeline's ref: refs/merge-requests/12/head (or /merge, /train).
@@ -541,12 +560,12 @@ func (p pipelineJSON) pipeline() Pipeline {
 	return out
 }
 
-func (g *RealGitLab) FailedPipelines(ctx context.Context, project, since string) ([]Pipeline, bool, error) {
+func (g *RealGitLab) FailedPipelines(ctx context.Context, project, since string) ([]Pipeline, Listed, error) {
 	path := fmt.Sprintf("projects/%s/pipelines?status=failed&order_by=updated_at&sort=desc&updated_after=%s",
 		pid(project), url.QueryEscape(since))
-	list, truncated, err := newest(ctx, g, path, since, func(p pipelineJSON) string { return p.UpdatedAt })
+	list, listed, err := newest(ctx, g, path, since, func(p pipelineJSON) string { return p.UpdatedAt })
 	if err != nil {
-		return nil, false, err
+		return nil, Listed{}, err
 	}
 	out := make([]Pipeline, 0, len(list))
 	for _, p := range list {
@@ -554,7 +573,7 @@ func (g *RealGitLab) FailedPipelines(ctx context.Context, project, since string)
 			out = append(out, p.pipeline())
 		}
 	}
-	return out, truncated, nil
+	return out, listed, nil
 }
 
 type jobJSON struct {
@@ -609,30 +628,30 @@ func (g *RealGitLab) PipelineDetails(ctx context.Context, project string, p Pipe
 	return &FailedPipelineData{MR: mr, Pipeline: p, FailedJobs: failed, Trusted: trusted}, nil
 }
 
-func (g *RealGitLab) IssueActivity(ctx context.Context, project string, kind IssueKind, since string) ([]IssueActivity, bool, error) {
+func (g *RealGitLab) IssueActivity(ctx context.Context, project string, kind IssueKind, since string) ([]IssueActivity, Listed, error) {
 	switch kind {
 	case IssueOpened:
 		path := fmt.Sprintf("projects/%s/issues?created_after=%s&order_by=created_at&sort=desc", pid(project), url.QueryEscape(since))
-		items, truncated, err := newest(ctx, g, path, since, func(i issueJSON) string { return i.CreatedAt })
+		items, listed, err := newest(ctx, g, path, since, func(i issueJSON) string { return i.CreatedAt })
 		if err != nil {
-			return nil, false, err
+			return nil, Listed{}, err
 		}
 		var out []IssueActivity
 		for _, i := range items {
 			trusted, err := g.trusted(ctx, project, &i.Author)
 			if err != nil {
-				return nil, false, err
+				return nil, Listed{}, err
 			}
 			out = append(out, IssueActivity{ID: strconv.Itoa(i.IID), At: i.CreatedAt, Issue: i.issue(), Kind: IssueOpened, Trusted: trusted})
 		}
-		return out, truncated, nil
+		return out, listed, nil
 	case IssueLabelled:
 		return g.labelled(ctx, project, since)
 	case IssueClosed:
 		path := fmt.Sprintf("projects/%s/issues?state=closed&updated_after=%s&order_by=updated_at&sort=desc", pid(project), url.QueryEscape(since))
-		items, truncated, err := newest(ctx, g, path, since, func(i issueJSON) string { return i.UpdatedAt })
+		items, listed, err := newest(ctx, g, path, since, func(i issueJSON) string { return i.UpdatedAt })
 		if err != nil {
-			return nil, false, err
+			return nil, Listed{}, err
 		}
 		var out []IssueActivity
 		for _, i := range items {
@@ -641,7 +660,7 @@ func (g *RealGitLab) IssueActivity(ctx context.Context, project string, kind Iss
 			}
 			trusted, err := g.trusted(ctx, project, i.ClosedBy)
 			if err != nil {
-				return nil, false, err
+				return nil, Listed{}, err
 			}
 			by := ""
 			if i.ClosedBy != nil {
@@ -650,13 +669,15 @@ func (g *RealGitLab) IssueActivity(ctx context.Context, project string, kind Iss
 			out = append(out, IssueActivity{ID: strconv.Itoa(i.IID) + ":" + normalized(*i.ClosedAt), At: *i.ClosedAt, Issue: i.issue(),
 				Kind: IssueClosed, By: by, Trusted: trusted})
 		}
-		return out, truncated, nil
+		return out, listed, nil
 	}
-	notes, truncated, err := g.notes(ctx, project, since)
+	notes, listed, err := g.notes(ctx, project, since)
 	if err != nil {
-		return nil, false, err
+		return nil, Listed{}, err
 	}
 	var out []IssueActivity
+	// An issue is read once per poll, shared with other waits that saw the same newest comment
+	// on it (notes are newest first), so it is never older than that comment.
 	issues := map[int]issueJSON{}
 	for _, n := range notes {
 		if n.NoteableType != "Issue" {
@@ -664,27 +685,28 @@ func (g *RealGitLab) IssueActivity(ctx context.Context, project string, kind Iss
 		}
 		i, ok := issues[n.NoteableIID]
 		if !ok {
-			if err := g.get(ctx, fmt.Sprintf("projects/%s/issues/%d", pid(project), n.NoteableIID), false, &i); err != nil {
-				return nil, false, err
+			if err := g.getAsOf(ctx, fmt.Sprintf("projects/%s/issues/%d", pid(project), n.NoteableIID), n.CreatedAt, &i); err != nil {
+				return nil, Listed{}, err
 			}
 			issues[n.NoteableIID] = i
 		}
 		trusted, err := g.trusted(ctx, project, &n.Author)
 		if err != nil {
-			return nil, false, err
+			return nil, Listed{}, err
 		}
 		out = append(out, IssueActivity{ID: strconv.Itoa(n.ID), At: n.CreatedAt, Issue: i.issue(), Kind: IssueCommented,
 			CommentAuthor: n.Author.Username, CommentURL: fmt.Sprintf("%s#note_%d", i.WebURL, n.ID), CommentBody: clip(n.Body), Trusted: trusted})
 	}
-	return out, truncated, nil
+	return out, listed, nil
 }
 
-func (g *RealGitLab) ReviewComments(ctx context.Context, project, since string) ([]ReviewComment, bool, error) {
-	notes, truncated, err := g.notes(ctx, project, since)
+func (g *RealGitLab) ReviewComments(ctx context.Context, project, since string) ([]ReviewComment, Listed, error) {
+	notes, listed, err := g.notes(ctx, project, since)
 	if err != nil {
-		return nil, false, err
+		return nil, Listed{}, err
 	}
 	var out []ReviewComment
+	// A merge request is read as an issue is in IssueActivity.
 	mrs := map[int]mergeRequest{}
 	for _, n := range notes {
 		if n.NoteableType != "MergeRequest" || n.Type != "DiffNote" {
@@ -692,15 +714,15 @@ func (g *RealGitLab) ReviewComments(ctx context.Context, project, since string) 
 		}
 		m, ok := mrs[n.NoteableIID]
 		if !ok {
-			if err := g.get(ctx, fmt.Sprintf("projects/%s/merge_requests/%d", pid(project), n.NoteableIID), false, &m); err != nil {
-				return nil, false, err
+			if err := g.getAsOf(ctx, fmt.Sprintf("projects/%s/merge_requests/%d", pid(project), n.NoteableIID), n.CreatedAt, &m); err != nil {
+				return nil, Listed{}, err
 			}
 			mrs[n.NoteableIID] = m
 		}
 		trusted := m.SourceProjectID == m.TargetProjectID
 		if trusted {
 			if trusted, err = g.trusted(ctx, project, &n.Author); err != nil {
-				return nil, false, err
+				return nil, Listed{}, err
 			}
 		}
 		c := ReviewComment{ID: n.ID, At: n.CreatedAt, MR: m.mr(), Author: n.Author.Username, Body: clip(n.Body),
@@ -713,7 +735,7 @@ func (g *RealGitLab) ReviewComments(ctx context.Context, project, since string) 
 		}
 		out = append(out, c)
 	}
-	return out, truncated, nil
+	return out, listed, nil
 }
 
 type noteJSON struct {
@@ -737,7 +759,7 @@ type noteJSON struct {
 // notes are the people's comments on the project's issues and merge requests made at or
 // after since, read from its activity (one listing for the whole project, not one per issue).
 // GitLab's own notes (a label, a close) are left out.
-func (g *RealGitLab) notes(ctx context.Context, project, since string) ([]noteJSON, bool, error) {
+func (g *RealGitLab) notes(ctx context.Context, project, since string) ([]noteJSON, Listed, error) {
 	type activity struct {
 		CreatedAt string    `json:"created_at"`
 		Note      *noteJSON `json:"note"`
@@ -748,9 +770,9 @@ func (g *RealGitLab) notes(ctx context.Context, project, since string) ([]noteJS
 		after = "&after=" + t.UTC().AddDate(0, 0, -1).Format("2006-01-02")
 	}
 	path := fmt.Sprintf("projects/%s/events?action=commented&sort=desc%s", pid(project), after)
-	items, truncated, err := newest(ctx, g, path, since, func(a activity) string { return a.CreatedAt })
+	items, listed, err := newest(ctx, g, path, since, func(a activity) string { return a.CreatedAt })
 	if err != nil {
-		return nil, false, err
+		return nil, Listed{}, err
 	}
 	var out []noteJSON
 	for _, a := range items {
@@ -763,7 +785,7 @@ func (g *RealGitLab) notes(ctx context.Context, project, since string) ([]noteJS
 		}
 		out = append(out, n)
 	}
-	return out, truncated, nil
+	return out, listed, nil
 }
 
 // MARK: The folder's project
