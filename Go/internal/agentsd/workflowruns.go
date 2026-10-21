@@ -572,6 +572,11 @@ func (d *Daemon) recordOutcome(fr fireRequest, name string, o wire.WorkflowOutco
 			o.Refused.Repeats = st.LastOutcome.Refused.Repeats + 1
 		}
 	}
+	// A refusal for the same reason again is the failure dismissed; anything else is news,
+	// and a later failure is listed again (#989).
+	if o.Refused == nil || o.Refused.Repeats <= 1 {
+		st.DismissedFailure = nil
+	}
 	st.LastOutcome, st.LastCausingEvent = &o, fr.causingEvent
 	if o.Ran != nil {
 		t := now()

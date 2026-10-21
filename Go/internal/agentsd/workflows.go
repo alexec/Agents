@@ -51,6 +51,9 @@ type workflowState struct {
 	HeldFire         *heldFire             `json:"heldFire,omitempty"`
 	QueuedFires      []heldFire            `json:"queuedFires,omitempty"`
 	GoneSince        *wire.Date            `json:"goneSince,omitempty"`
+	// DismissedFailure is the failure the person dismissed from Needs You (#989): its key.
+	// A new failure has a new key, and an outcome that is not the same refusal again clears it.
+	DismissedFailure *string `json:"dismissedFailure,omitempty"`
 }
 
 type heldFire struct {
