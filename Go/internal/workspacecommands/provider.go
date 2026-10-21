@@ -2,6 +2,7 @@ package workspacecommands
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"strings"
@@ -17,19 +18,27 @@ const Contract = 1
 const ListLimit = 200
 
 // Timing is how long a command may take, and how often a start or stop asks whether it is
-// done.
+// done: first after PollEvery, then twice as long each time, up to PollMost (#1854).
 type Timing struct {
 	Quick     time.Duration
 	Long      time.Duration
 	PollEvery time.Duration
+	PollMost  time.Duration
 }
 
 // StandardTiming is under the control plane's own 30 seconds and 10 minutes, so its failure
-// is ours, with our reason, rather than its timeout.
-var StandardTiming = Timing{Quick: 25 * time.Second, Long: 595 * time.Second, PollEvery: 5 * time.Second}
+// is ours, with our reason, rather than its timeout. A start asks at 2, 6, 14 and 30 seconds,
+// then every 20: a cloud's list is a real API call (#1854).
+var StandardTiming = Timing{Quick: 25 * time.Second, Long: 595 * time.Second, PollEvery: 2 * time.Second, PollMost: 20 * time.Second}
 
-// Failure is a failure in words for the person who pressed Start.
-type Failure struct{ Reason string }
+// Failure is a failure in words for the person who pressed Start. Again is a refusal worth
+// asking again while a start or stop waits (a 429, a 5xx, a provider that can't be reached),
+// and After how long the provider asked to wait first (Retry-After) (#1854).
+type Failure struct {
+	Reason string
+	Again  bool
+	After  time.Duration
+}
 
 func (f Failure) Error() string { return f.Reason }
 
@@ -173,7 +182,7 @@ func (p *Provider) listed(listing Listing) ([]Workspace, error) {
 	} else {
 		outcome = p.Run(listing.Command, p.Timing.Quick)
 		if outcome.Status != 0 || outcome.TimedOut {
-			return nil, Failure{reason(outcome, listing.Command, "listing workspaces", p.Timing.Quick)}
+			return nil, Failure{Reason: reason(outcome, listing.Command, "listing workspaces", p.Timing.Quick)}
 		}
 	}
 	var rows []map[string]string
@@ -213,7 +222,7 @@ func (p *Provider) listed(listing Listing) ([]Workspace, error) {
 			if listing.Request != nil && listing.Request.Answer == "xml" {
 				format = "XML"
 			}
-			return nil, Failure{what + " isn't a " + format + " array at " + at + "."}
+			return nil, Failure{Reason: what + " isn't a " + format + " array at " + at + "."}
 		}
 		for _, item := range array {
 			row := map[string]string{}
@@ -304,7 +313,7 @@ func (p *Provider) find(id string) (Workspace, error) {
 			return w, nil
 		}
 	}
-	return Workspace{}, Failure{"There is no workspace " + id + "."}
+	return Workspace{}, Failure{Reason: "There is no workspace " + id + "."}
 }
 
 // canAsk is whether anything but our own memory can say how the workspace stands.
@@ -343,28 +352,46 @@ func (p *Provider) act(start bool, id string) (Workspace, error) {
 		workspace.State = target
 		return workspace, nil
 	}
-	for time.Since(began) < p.Timing.Long {
-		workspace, err = p.find(id)
-		if err != nil {
+	// Asked less often as it goes on, and a refusal worth asking again is asked again, after
+	// what the provider asked for, until Long is up (#1854).
+	wait, most := p.Timing.PollEvery, max(p.Timing.PollMost, p.Timing.PollEvery)
+	var refused error
+	for {
+		found, err := p.find(id)
+		var failure Failure
+		switch {
+		case err == nil && found.State == target:
+			return found, nil
+		case err == nil:
+			workspace, refused = found, nil
+		case errors.As(err, &failure) && failure.Again:
+			refused = err
+			wait = max(wait, failure.After)
+		default:
 			return Workspace{}, err
 		}
-		if workspace.State == target {
-			return workspace, nil
+		left := p.Timing.Long - time.Since(began)
+		if left <= 0 {
+			break
 		}
-		time.Sleep(p.Timing.PollEvery)
+		time.Sleep(min(wait, left))
+		wait = min(wait*2, most)
 	}
-	return Workspace{}, Failure{fmt.Sprintf("%s was still %s after %s.", workspace.Name, workspace.State, words(p.Timing.Long))}
+	if refused != nil {
+		return Workspace{}, refused
+	}
+	return Workspace{}, Failure{Reason: fmt.Sprintf("%s was still %s after %s.", workspace.Name, workspace.State, words(p.Timing.Long))}
 }
 
 // Create makes a workspace (US5) with the choices given, and answers once it is listed.
 func (p *Provider) Create(name string, options map[string]any, firstBoot string) (Workspace, error) {
 	making := p.Config.Making
 	if !making.CanCreate() {
-		return Workspace{}, Failure{"It can't make workspaces."}
+		return Workspace{}, Failure{Reason: "It can't make workspaces."}
 	}
 	name = strings.TrimSpace(name)
 	if name == "" {
-		return Workspace{}, Failure{"A new workspace needs a name."}
+		return Workspace{}, Failure{Reason: "A new workspace needs a name."}
 	}
 	all, err := p.List()
 	if err != nil {
@@ -372,7 +399,7 @@ func (p *Provider) Create(name string, options map[string]any, firstBoot string)
 	}
 	for _, w := range all {
 		if w.Name == name || w.ID == name {
-			return Workspace{}, Failure{"There is already a workspace called " + name + "."}
+			return Workspace{}, Failure{Reason: "There is already a workspace called " + name + "."}
 		}
 	}
 	values := map[string]string{"name": name, "firstBoot": firstBoot}
@@ -412,14 +439,14 @@ func (p *Provider) Create(name string, options map[string]any, firstBoot string)
 			return w, nil
 		}
 	}
-	return Workspace{}, Failure{name + " was made, but the list doesn't show it yet."}
+	return Workspace{}, Failure{Reason: name + " was made, but the list doesn't show it yet."}
 }
 
 // Delete deletes the workspace and everything on it.
 func (p *Provider) Delete(id string) error {
 	making := p.Config.Making
 	if !making.CanDelete() {
-		return Failure{"It can't delete workspaces."}
+		return Failure{Reason: "It can't delete workspaces."}
 	}
 	workspace, err := p.find(id)
 	if err != nil {
@@ -443,7 +470,7 @@ func (p *Provider) do(template string, request *Request, values map[string]strin
 	p.log(fmt.Sprintf("workspace-commands: %s: %s", what, template))
 	outcome := p.Run(Fill(template, values, true), p.Timing.Long)
 	if outcome.Status != 0 || outcome.TimedOut {
-		return Failure{reason(outcome, template, doing, p.Timing.Long)}
+		return Failure{Reason: reason(outcome, template, doing, p.Timing.Long)}
 	}
 	return nil
 }

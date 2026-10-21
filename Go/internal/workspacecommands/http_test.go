@@ -464,3 +464,122 @@ func TestAnAPIPresetOffersCreateOnlyWhenItCan(t *testing.T) {
 		t.Errorf("%v", names)
 	}
 }
+
+// A start's wait (#1854): a droplet that comes up on the third list, with a 429 and a 503 on
+// the way, still starts, after what Retry-After asked; asks less often as it goes on; and a
+// refusal that will not pass ends it at once.
+func TestAStartWaitsOutA429AndA503AndAsksLessOften(t *testing.T) {
+	f, text := fakeDigitalOcean(t)
+	powerOn := f.answer
+	lists := 0
+	var asked []time.Time
+	f.answer = func(w http.ResponseWriter, r *http.Request, body string) bool {
+		if r.Method != http.MethodGet {
+			// Powered on, it is "new" until the fifth list finds it active.
+			handled := powerOn(w, r, body)
+			f.set("3164494", "new")
+			return handled
+		}
+		lists++
+		asked = append(asked, time.Now())
+		switch lists {
+		case 1: // the find before the start
+			return false
+		case 2:
+			w.Header().Set("Retry-After", "0")
+			w.WriteHeader(http.StatusTooManyRequests)
+			fmt.Fprint(w, `{"id":"too_many_requests","message":"API rate limit exceeded."}`)
+			return true
+		case 3:
+			w.WriteHeader(http.StatusServiceUnavailable)
+			return true
+		case 5:
+			f.set("3164494", "active")
+		}
+		return false
+	}
+	p, _ := apiProvider(t, text, DigitalOceanSecret, token)
+	p.Timing = Timing{Quick: 5 * time.Second, Long: 5 * time.Second, PollEvery: 10 * time.Millisecond, PollMost: 40 * time.Millisecond}
+	w, err := p.Start("3164494")
+	if err != nil || w.State != Running {
+		t.Fatalf("%v %+v", err, w)
+	}
+	if lists != 5 {
+		t.Errorf("listed %d times, want 5: %q", lists, f.requests())
+	}
+	// 10, 20, 40, 40 ms between the waits' lists: growing, never past PollMost.
+	for i := 2; i < len(asked); i++ {
+		if gap := asked[i].Sub(asked[i-1]); gap < 8*time.Millisecond {
+			t.Errorf("list %d came %v after the one before", i+1, gap)
+		}
+	}
+	if first, last := asked[2].Sub(asked[1]), asked[4].Sub(asked[3]); last < first+15*time.Millisecond {
+		t.Errorf("the waits did not grow: %v then %v", first, last)
+	}
+}
+
+func TestAStartEndsOnARefusalThatWillNotPass(t *testing.T) {
+	f, text := fakeDigitalOcean(t)
+	powerOn := f.answer
+	lists := 0
+	f.answer = func(w http.ResponseWriter, r *http.Request, body string) bool {
+		if r.Method != http.MethodGet {
+			return powerOn(w, r, body)
+		}
+		if lists++; lists == 1 {
+			return false
+		}
+		w.WriteHeader(http.StatusForbidden)
+		fmt.Fprint(w, `{"id":"forbidden","message":"You do not have access."}`)
+		return true
+	}
+	p, _ := apiProvider(t, text, DigitalOceanSecret, token)
+	_, err := p.Start("3164494")
+	if err == nil || !strings.Contains(err.Error(), "answered 403: You do not have access.") || lists != 2 {
+		t.Errorf("%v after %d lists", err, lists)
+	}
+}
+
+func TestAStartThatOnlyMeets503sSaysTheProvidersWords(t *testing.T) {
+	f, text := fakeDigitalOcean(t)
+	powerOn := f.answer
+	lists := 0
+	f.answer = func(w http.ResponseWriter, r *http.Request, body string) bool {
+		if r.Method != http.MethodGet {
+			return powerOn(w, r, body)
+		}
+		if lists++; lists == 1 {
+			f.set("3164494", "off")
+			return false
+		}
+		w.WriteHeader(http.StatusServiceUnavailable)
+		fmt.Fprint(w, `{"message":"Service is down for maintenance."}`)
+		return true
+	}
+	p, _ := apiProvider(t, text, DigitalOceanSecret, token)
+	p.Timing = Timing{Quick: 5 * time.Second, Long: 200 * time.Millisecond, PollEvery: 10 * time.Millisecond, PollMost: 50 * time.Millisecond}
+	_, err := p.Start("3164494")
+	if err == nil || !strings.Contains(err.Error(), "answered 503: Service is down for maintenance.") {
+		t.Errorf("%v", err)
+	}
+	// 200 ms at 10, 20, 40, 50, 50 … ms: a handful, not one every 10 ms.
+	if lists > 8 {
+		t.Errorf("listed %d times in 200 ms", lists)
+	}
+}
+
+func TestRetryAfterInSecondsOrADate(t *testing.T) {
+	now := time.Date(2026, 10, 21, 1, 0, 0, 0, time.UTC)
+	for said, want := range map[string]time.Duration{
+		"": 0, "7": 7 * time.Second, "-3": 0, "soon": 0, "86400": 10 * time.Minute,
+		now.Add(90 * time.Second).Format(http.TimeFormat): 90 * time.Second,
+	} {
+		header := http.Header{}
+		if said != "" {
+			header.Set("Retry-After", said)
+		}
+		if got := retryAfter(header, now); got != want {
+			t.Errorf("Retry-After %q: %v, want %v", said, got, want)
+		}
+	}
+}
