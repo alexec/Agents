@@ -1,6 +1,6 @@
 ---
 diataxis: how-to
-devices: [mac]
+devices: [mac, web]
 description: Open Agents in Safari or Chrome on the Mac that runs Agents Host, pair the browser once, and forget it when you are done.
 ---
 
@@ -82,31 +82,44 @@ at the foot of the Remote's sidebar, gives the code and says the address. See
 
 ### What you can do there
 
-A paired browser may do everything the window may (#111). The page itself shows what the
-iPhone and iPad do, on every host:
+A paired browser may do everything the window may (#111). The page shows what the iPhone
+and iPad show, on every host:
 
-- read a conversation as it happens, at **Outcome**, **Steps** or **Details**, and answer
-  permission requests and questions;
+- read a conversation as it happens, and answer permission requests and questions. With
+  **Show thoughts** on, each of the agent's thoughts is one folded line; off, they are not
+  shown;
 - send a prompt with files or pictures attached, use **Send now** on a queued prompt, and
   change the mode, model or runtime;
 - start a chat with **New Chat** at the top of the **+** menu, in the host's **chat**
   project (see [Chat without a project](chat-without-a-project.md));
 - add a project with **+** at the head of the projects column: **Add Project…** chooses a
-  folder on the host by typing a path or clicking into folders, and **Clone Project from Git URL…** clones
-  an HTTPS or SSH address into the host's home folder. With more than one host, the menu
-  names each one;
+  folder on the host by typing a path or clicking into folders, and **Clone Project from Git
+  URL…** clones an HTTPS or SSH address into the host's home folder. With more than one
+  host, the menu names each one;
 - start an agent in the project folder or in a new or existing worktree;
-- stop, archive and unarchive a session, archive one that asks to be archived, mark it read or unread, and add or
-  remove its labels;
-- see a project's workflows and run one now;
+- stop, archive and unarchive a session, archive one that asks to be archived, mark it read
+  or unread, and add or remove its labels;
+- open a workflow's page, see its runs and run it now;
 - open the agent's files and its changes, and follow a live page as the agent writes it, and
-  type on it.
+  type on it;
+- answer a change that waits for an OK on its **Review** page;
+- see a simulator on the session's Mac in the **Simulator** pane, and touch its screen;
+- use a project's connector views, such as the GitHub **Pull requests** and **Issues**, the
+  GitLab merge requests and pipelines, and **Linear issues** (see
+  [Use Linear issues](use-linear-issues.md));
+- see **Cost**, **Tokens**, **Time**, **Events**, **Resources**, **Runtimes**, **Your
+  Connectors** and **Worktrees** from the sidebar's Activity rows;
+- open **Settings**: **Appearance** (with **Show thoughts**), **Sidebar** (which smart
+  groups show), **Finished chats**, **Workspace providers**, **Git access**, **Versions**,
+  **Backups** and **People**.
 
 The tab's title counts the sessions that need you, as **(2) Agents**.
 
-Settings, signing runtimes in, pairing and hosts have no screens on the page yet, so do them
-in the window. A folder can't be dragged in from Finder, and **Clone Project from Git URL…** doesn't fill
-in a copied address, because the page doesn't read the clipboard. The page has no terminal and no dictation.
+A folder can't be dragged in from Finder to add a project. Signing runtimes in, pairing a
+window or a phone, and adding a server by ssh have no screens on the page yet, so do them in
+the window. **Clone Project from Git URL…** doesn't fill in a
+copied address, because the page doesn't read the clipboard. The page has no terminal and no
+dictation.
 
 ### Install it as an app
 

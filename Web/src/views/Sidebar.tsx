@@ -51,7 +51,7 @@ import { approvalID, failedRuns, opensItsSubject } from "../model/approvals";
 import { memo } from "../render/memo";
 
 /** The docs site: the guides and the statuses reference (#1327), as the window's Help ▸ Agents Help. */
-const helpSite = "https://alexec.github.io/Agents/";
+const helpSite = "https://docs.agentloops.dev/";
 
 /** The most archived matches a fold shows before Show all, as the window's (#176). */
 const matchesShown = 10;
