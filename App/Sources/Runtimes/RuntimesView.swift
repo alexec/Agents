@@ -86,6 +86,11 @@ private struct RuntimeStatusRow: View {
                         AllowanceBar(reading: current)
                     }
                 }
+                if let note = allowance?.setupNote {
+                    Text(LocalizedStringKey(note))
+                        .appText(.fine)
+                        .foregroundStyle(.secondary)
+                }
             }
             Spacer()
             if isOut, let allowance {

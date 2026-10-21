@@ -10363,6 +10363,10 @@
         },
         "unusable": {
           "type": "string"
+        },
+        "setupNote": {
+          "description": "Something one of the runtime's features needs on this host and lacks, with the step that fixes it (#1946). Only on the runtime's own sign-in row.",
+          "type": "string"
         }
       },
       "required": [

@@ -72,6 +72,9 @@ private struct RuntimeAllowanceRow: View {
                 Text(reading).appText(.fine).foregroundStyle(.secondary)
                 if let current = row.state.reading { AllowanceBar(reading: current) }
             }
+            if let note = row.setupNote {
+                Text(LocalizedStringKey(note)).appText(.fine).foregroundStyle(.secondary)
+            }
         }
         .accessibilityElement(children: .combine)
     }

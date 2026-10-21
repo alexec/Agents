@@ -3919,6 +3919,11 @@ export interface RuntimeAllowancesRow {
   credentialKey: string;
   state: AllowanceState;
   unusable?: string;
+  /**
+   * Something one of the runtime's features needs on this host and lacks, with the step that fixes
+   * it (#1946). Only on the runtime's own sign-in row.
+   */
+  setupNote?: string;
 }
 
 export interface RuntimeAssessmentCheck {
@@ -6130,7 +6135,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   Runtime: { required: ["id", "name", "executable", "arguments", "installPage", "usesAppCopyOnly"], optional: ["install"] },
   RuntimeAccount: { required: ["runtimeID", "state", "authMethods", "canLogOut", "providers", "promptCapabilities", "canSteer", "checkedAt"], optional: ["currentProviderID", "signedInAs"] },
   RuntimeAllowances: { required: ["rows", "at"], optional: ["shared"] },
-  RuntimeAllowancesRow: { required: ["credentialKey", "state"], optional: ["unusable"] },
+  RuntimeAllowancesRow: { required: ["credentialKey", "state"], optional: ["unusable", "setupNote"] },
   RuntimeAssessmentCheck: { required: ["id", "area", "verdict", "evidence"], optional: [] },
   RuntimeAssessmentScore: { required: ["agentID", "runtimeID", "scoredAt", "checks"], optional: ["model", "runtimeVersion", "host", "reportPath"] },
   RuntimeRequest: { required: ["runtimeID"], optional: [] },
