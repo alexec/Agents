@@ -45,6 +45,7 @@ import { footLine, offersStart } from "./OfflineStrip";
 import { PinnedPageRows } from "./Pins";
 import { ApprovalRow, FailedWorkflowRow } from "./Approval";
 import { JoinRequests } from "./JoinRequest";
+import { LinkRequests } from "./ChannelLinks";
 import { approvalID, failedRuns, opensItsSubject } from "../model/approvals";
 import { memo } from "../render/memo";
 
@@ -164,6 +165,8 @@ export function Sidebar({ session, store, linkDown }: { session: Session; store:
         {projects.length > 0 && <NewSessionTopRow store={store} projects={projects} linkDown={linkDown} />}
         {/* A machine asking to join (#994): at the top, whatever groups are on, and with no project yet. */}
         {!held && <JoinRequests store={store} down={linkDown} />}
+        {/* A channel identity asking to act as this person (#1762), beside the machines. */}
+        {!held && <LinkRequests store={store} down={linkDown} />}
         {/* Pages about all the work rather than one project, above the smart groups, as the
             window's (#495): Status, what goes on now, and Usage, the past (#915). Each folds, as
             a project does, and stays while searching, as the window's and the Remote's do (#547). */}

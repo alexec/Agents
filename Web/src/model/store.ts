@@ -13,7 +13,7 @@ import type {
   PagesChangedNotification, PinsChangedNotification, PinView, ViewPin, ListCursor, ListRequest, FileMentionDTO, SandboxChoice, RuntimeAllowances,
   GuardedChange, GuardedChangeReading, HostJoinStatus, RequiredCapabilities, KeptDelivered, KeptList, KeptRequest, Approval, ApprovalAction, UsageHistory, TimeHistory, Milestones,
   BuildOutputRemoved, ProjectWorktrees, RemovalCheck, WorktreeSize, WorktreeSummary, WorktreesSized, FindResult,
-  BackupRestoreResult, BackupSettings, BackupState, CapReached, ControlPerson, JoinDecided, JoinRequest, SecretsLeft } from "../protocol/generated";
+  BackupRestoreResult, BackupSettings, BackupState, CapReached, ChannelLinkDecided, ChannelLinkRequest, ControlPerson, JoinDecided, JoinRequest, PersonRow, SecretsLeft } from "../protocol/generated";
 import { Failure } from "../protocol/generated";
 import { CallFailed, type Link } from "../wire/link";
 import type { FolderGoneAsk } from "./missingFolder";
@@ -43,6 +43,7 @@ import { milestonesSeen } from "./milestones";
 import { hostAnswers, hostHas } from "./capabilities";
 import { Capability } from "../protocol/capabilities.generated";
 import { withJoin, withoutJoin } from "./people";
+import { withRequest, withoutRequest } from "./channelLinks";
 import type { ChartHint } from "./chart";
 import { Providers } from "./providers";
 
@@ -414,6 +415,12 @@ export class Work {
   readonly joinCommand = signal<string | null>(null);
   /** Machines waiting for the person's approval to join (#994), kept by control/joinRequested and joinDecided. */
   readonly joinRequests = signal<JoinRequest[]>([]);
+  /** Channel identities waiting for the person to link them, or an admin to send on (#1762). */
+  readonly linkRequests = signal<ChannelLinkRequest[]>([]);
+  /** Whom an admin may send a link request on to (#1762); empty for a member. */
+  readonly linkPeople = signal<PersonRow[]>([]);
+  /** Goes up on control/linksChanged, so Settings ▸ Channels loads again. */
+  readonly linksChanges = signal(0);
   /** Counts each control/peopleChanged (#994): Settings ▸ People loads its list again when it moves. */
   readonly peopleChanges = signal(0);
   /** The last bot that stopped at a cap (#1761, control/capReached), for an admin's Settings ▸ People. */
@@ -1127,8 +1134,25 @@ export class Store extends Work {
         if (decided?.request) this.joinRequests.value = withoutJoin(this.joinRequests.value, decided.request);
         return;
       }
+      if (method === "control/linkRequested") {
+        const request = params as ChannelLinkRequest | null;
+        if (request?.request) this.linkRequests.value = withRequest(this.linkRequests.value, request);
+        // One that names nobody is an admin's to send on: whom to, if not loaded yet.
+        if (request && !request.for && this.linkPeople.value.length === 0) void this.loadLinkRequests();
+        return;
+      }
+      if (method === "control/linkDecided") {
+        const decided = params as ChannelLinkDecided | null;
+        if (decided?.request) this.linkRequests.value = withoutRequest(this.linkRequests.value, decided.request);
+        return;
+      }
+      if (method === "control/linksChanged") {
+        this.linksChanges.value += 1;
+        return;
+      }
       if (method === "control/peopleChanged") {
         this.peopleChanges.value += 1;
+        void this.loadLinkRequests();
         return;
       }
       if (method === "control/capReached") {
@@ -1181,7 +1205,7 @@ export class Store extends Work {
    */
   load(): Promise<void> {
     return this.once("*", async () => {
-      const [hosts] = await Promise.all([this.link.call("hosts/list", {}), this.loadPlane(), this.loadKept(), this.loadJoinRequests()]);
+      const [hosts] = await Promise.all([this.link.call("hosts/list", {}), this.loadPlane(), this.loadKept(), this.loadJoinRequests(), this.loadLinkRequests()]);
       this.takeHosts(hosts);
       await Promise.all(this.hosts.value.filter((host) => hostAnswers(host.state)).map((host) => this.onHost(host.id, async () => {
         // A removal that landed while this waited is not loaded back (#291).
@@ -1217,6 +1241,27 @@ export class Store extends Work {
   private async loadJoinRequests(): Promise<void> {
     const listed = await this.link.call("hosts/joinRequests", {}).catch(() => null);
     this.joinRequests.value = listed ?? [];
+  }
+
+  /** Link requests (#1762), and for an admin whom to send them on to; a control plane before links has none. */
+  private async loadLinkRequests(): Promise<void> {
+    const listed = await this.link.call("links/requests", {}).catch(() => null);
+    this.linkRequests.value = listed ?? [];
+    const people = listed && listed.some((r) => !r.for) ? await this.link.call("people/list", {}).catch(() => null) : null;
+    this.linkPeople.value = people?.admin ? people.people.filter((p) => p.kind === "person") : [];
+  }
+
+  /**
+   * Approve, deny or send on a channel link's request (#1762). `to` is the person an admin sends a
+   * request that names nobody on to. The card goes at once; a refusal is said, and the card stays.
+   */
+  async decideLink(request: string, approve: boolean, to?: string): Promise<void> {
+    try {
+      await this.link.call(approve ? "links/approve" : "links/deny", { request, ...(to ? { for: to } : {}) });
+      this.linkRequests.value = withoutRequest(this.linkRequests.value, request);
+    } catch (error) {
+      this.say(describe(error));
+    }
   }
 
   /**

@@ -3198,6 +3198,13 @@ final class AppModel {
         }
     }
 
+    /// Approve, Deny or Send on a channel link's card (#1762): a refusal is the window's alert.
+    func answerLink(_ request: DaemonAPI.ChannelLinkRequest, approve: Bool, to person: String?) async {
+        if let refused = await people.answerLink(request, approve: approve, to: person, on: controlRequests) {
+            problem = refused
+        }
+    }
+
     // MARK: Kept for a stopped workspace (#691 US3)
 
     /// Whether a prompt or a start for `host` now is kept rather than refused: it is linked

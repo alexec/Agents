@@ -97,3 +97,44 @@ struct PeopleTests {
         #expect(foot.hasSuffix("Send it to Sam; they paste it where a code is asked for."))
     }
 }
+
+/// The link card's and Control plane ▸ Channels' words (#1762).
+@Suite("Channel link words")
+struct ChannelLinkWordsTests {
+    private let expires = Date(timeIntervalSinceReferenceDate: 812_345_678)
+
+    @Test func askNamesTheIdentity() {
+        let slack = DaemonAPI.ChannelLinkRequest(request: "r", channel: "slack", identity: "T1/U42", name: "@sam",
+                                                 email: "sam@example.com", forUser: "sam", expires: expires)
+        #expect(ChannelLinkWords.ask(slack) == "Link Slack user @sam to you?")
+        #expect(ChannelLinkWords.detail(slack) == "T1/U42 · sam@example.com")
+        let email = DaemonAPI.ChannelLinkRequest(request: "r", channel: "email", identity: "sam@example.com",
+                                                 email: "sam@example.com", forUser: "sam", expires: expires)
+        #expect(ChannelLinkWords.ask(email) == "Link the email address sam@example.com to you?")
+        #expect(ChannelLinkWords.detail(email) == nil)
+        let nobody = DaemonAPI.ChannelLinkRequest(request: "r", channel: "discord", identity: "1234", expires: expires)
+        #expect(ChannelLinkWords.ask(nobody) == "Discord user 1234 is not linked to anyone.")
+        #expect(ChannelLinkWords.explanation(nobody).hasPrefix("Send asks"))
+    }
+
+    @Test func aLinkSaysWhoseItIs() {
+        let link = DaemonAPI.ChannelLink(channel: "slack", identity: "T1/U42", name: "@sam", user: "sam", userName: "Sam",
+                                         approvedBy: "sam", approvedAt: expires)
+        #expect(ChannelLinkWords.linkTitle(link) == "Slack user @sam")
+        #expect(ChannelLinkWords.linkDetail(link, you: "sam") == "T1/U42 · linked to you")
+        #expect(ChannelLinkWords.linkDetail(link, you: "alex") == "T1/U42 · linked to Sam")
+        #expect(ChannelLinkWords.removeTitle(link) == "Unlink Slack user @sam?")
+    }
+
+    @Test func aQueueKeepsOneCardEach() {
+        var queue = ChannelLinkRequestQueue()
+        let request = DaemonAPI.ChannelLinkRequest(request: "r", channel: "slack", identity: "U1", expires: .distantFuture)
+        queue.add(request)
+        queue.add(request)
+        #expect(queue.open().count == 1)
+        queue.add(DaemonAPI.ChannelLinkRequest(request: "old", channel: "slack", identity: "U2", expires: .distantPast))
+        #expect(queue.open().count == 1)
+        queue.remove("r")
+        #expect(queue.open().isEmpty)
+    }
+}
