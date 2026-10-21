@@ -22,6 +22,7 @@ import { folds } from "../model/folds";
 import { smartGroupsOn } from "../model/smartGroups";
 import { macHostNoticeDetail, macHostNoticeTitle } from "../model/macHostNotice";
 import { hostAnswers } from "../model/capabilities";
+import { Capability } from "../protocol/capabilities.generated";
 import { parseQuery, queryMatches, type LabelQuery } from "../model/labels";
 import { keepsInUnread, newSessionProject, ownCount, pinnedSessions, pinnedWorkflows, projectSessions, rememberedProject, rememberProject,
   smartAgents, smartApprovals, smartRows, smartTitles, withKept, type ProjectKey, type SmartRow } from "../model/sidebar";
@@ -740,7 +741,8 @@ export const SidebarSession = memo(function SidebarSession({ store, host, folder
   const menu = (): MenuItem[] => [
     // Beside this tab or in a window of its own (#826), as the Mac's Open in New Window.
     { label: "Open in New Tab", help: "Open this session in a new browser tab", run: () => openInNewTab(host, agent) },
-    ...sessionActions(agent, store.sessionPinsIn(host, folder).includes(agent.id), startedBy(store, host, agent)).map(({ action, label: words, help }) => ({
+    ...sessionActions(agent, store.sessionPinsIn(host, folder).includes(agent.id), startedBy(store, host, agent),
+      store.has(host, Capability.mute1)).map(({ action, label: words, help }) => ({
       label: words, help, disabled: down || !!store.onItsWay.value[agent.id],
       run: () => runSessionAction(store, host, agent, action),
     })),

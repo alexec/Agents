@@ -61,6 +61,7 @@ const (
 	CapMcp1                  = "mcp/1"
 	CapMilestones1           = "milestones/1"
 	CapModes1                = "modes/1"
+	CapMute1                 = "mute/1"
 	CapOptions1              = "options/1"
 	CapPages1                = "pages/1"
 	CapPairing1              = "pairing/1"
@@ -128,6 +129,7 @@ var HostCapabilities = map[string]string{
 	"agents/sendNow":                   "agents/1",
 	"agents/setCeiling":                "agents/1",
 	"agents/setLabels":                 "agents/1",
+	"agents/setMuted":                  "mute/1",
 	"agents/setOption":                 "agents/1",
 	"agents/setSandbox":                "agents/1",
 	"agents/setUnread":                 "agents/1",
@@ -341,6 +343,7 @@ var HostCapabilities = map[string]string{
 	"workflows/list":                   "workflows/1",
 	"workflows/mcpTrigger/clearMissed": "workflows/1",
 	"workflows/run":                    "workflows/1",
+	"workflows/setMuted":               "mute/1",
 	"workflows/settings":               "workflows/1",
 	"worktrees/all":                    "worktrees/1",
 	"worktrees/check":                  "worktrees/1",

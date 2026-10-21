@@ -610,6 +610,31 @@
       }
     },
     {
+      "name": "agents/setMuted",
+      "x-capability": "mute/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/SetMutedRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
       "name": "agents/start",
       "x-capability": "agents/1",
       "tags": [
@@ -5213,6 +5238,31 @@
           "required": true,
           "schema": {
             "$ref": "daemon.schema.json#/definitions/WorkflowEnableRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/WorkflowSummary"
+        }
+      }
+    },
+    {
+      "name": "workflows/setMuted",
+      "x-capability": "mute/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/WorkflowMuteRequest"
           }
         }
       ],

@@ -583,6 +583,7 @@ private struct ChatMenu: View {
             if agent.state != .archived {
                 // As the Mac's Session menu has them (#342, #751).
                 RenameAgentButton(agent: agent)
+                MuteAgentButton(agent: agent)
                 BranchAgentButton(agent: agent)
                 if sizeClass != .regular {
                     Divider()

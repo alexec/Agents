@@ -15,16 +15,18 @@ import { keepLabel } from "../model/archiveWords";
 import { carryOnHelp, carryOnLabel, carryOnPrompt, openBlock } from "../model/block";
 import { go, routeHash } from "../route";
 import { canStop, liveDescendants } from "../model/tree";
+import { isMuted, muteHelp, muteLabel, unmuteLabel } from "../model/mute";
+import { Capability } from "../protocol/capabilities.generated";
 
 export type Action = "carryOn" | "agents/stop" | "stopAll" | "agents/archive" | "agents/unarchive"
-  | "markRead" | "markUnread" | "rename" | "pin" | "unpin" | "fork" | "delete" | "keep";
+  | "markRead" | "markUnread" | "mute" | "unmute" | "rename" | "pin" | "unpin" | "fork" | "delete" | "keep";
 
 /**
  * What the menu offers, in order, with the window's words (AgentRow's menu). Given
  * whether it is pinned, Pin or Unpin too (#180); given the sessions it started, Stop All
  * while one of them can stop (#835).
  */
-export function sessionActions(agent: Agent, pinned?: boolean, started: readonly Agent[] = [])
+export function sessionActions(agent: Agent, pinned?: boolean, started: readonly Agent[] = [], canMute = false)
   : { action: Action; label: string; help: string }[] {
   const found: { action: Action; label: string; help: string }[] = [];
   const holds = agent.state === "starting" || agent.state === "running" || agent.state === "waitingOnUser";
@@ -45,6 +47,12 @@ export function sessionActions(agent: Agent, pinned?: boolean, started: readonly
     found.push(agent.isUnread === true
       ? { action: "markRead", label: "Mark as Read", help: "Clear the unread mark" }
       : { action: "markUnread", label: "Mark as Unread", help: "Leave this to come back to" });
+  }
+  // No push, banner or Mac notification for it, and still in Needs You (#2003), on a host that can.
+  if (canMute && agent.state !== "archived") {
+    found.push(isMuted(agent)
+      ? { action: "unmute", label: unmuteLabel, help: muteHelp(true) }
+      : { action: "mute", label: muteLabel, help: muteHelp(false) });
   }
   // The person's title, which the runtime's no longer replaces (#751), edited where it is shown.
   if (agent.state !== "archived") {
@@ -208,7 +216,8 @@ export function SessionMenu({ store, host, agent, disabled, find, findsOnHost = 
                 openFile();
               }}>Open File…</button>
           )}
-          {sessionActions(agent, store.sessionPinsIn(host, projectFolder(agent)).includes(agent.id), startedBy(store, host, agent)).map(({ action, label, help }) => (
+          {sessionActions(agent, store.sessionPinsIn(host, projectFolder(agent)).includes(agent.id), startedBy(store, host, agent),
+            store.has(host, Capability.mute1)).map(({ action, label, help }) => (
             <button key={action} role="menuitem" title={help}
               onClick={() => {
                 open.value = false;
@@ -240,6 +249,7 @@ export function runSessionAction(store: Store, host: string, agent: Agent, actio
   if (action === "rename") store.renaming.value = { id: agent.id, inChat };
   else if (action === "carryOn") void store.prompt(host, agent.id, carryOnPrompt, []);
   else if (action === "markRead" || action === "markUnread") void store.setUnread(host, agent.id, action === "markUnread");
+  else if (action === "mute" || action === "unmute") void store.setMuted(host, agent.id, action === "mute");
   else if (action === "pin" || action === "unpin") void store.setPinned(host, projectFolder(agent), agent.id, action === "pin");
   else if (action === "fork") void branch(store, host, agent);
   else if (action === "keep") void store.keepSession(host, agent);

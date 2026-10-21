@@ -61,6 +61,7 @@ public enum Capability {
     public static let mcp1 = "mcp/1"
     public static let milestones1 = "milestones/1"
     public static let modes1 = "modes/1"
+    public static let mute1 = "mute/1"
     public static let options1 = "options/1"
     public static let pages1 = "pages/1"
     public static let pairing1 = "pairing/1"
@@ -127,6 +128,7 @@ public enum Capability {
         "agents/sendNow": "agents/1",
         "agents/setCeiling": "agents/1",
         "agents/setLabels": "agents/1",
+        "agents/setMuted": "mute/1",
         "agents/setOption": "agents/1",
         "agents/setSandbox": "agents/1",
         "agents/setUnread": "agents/1",
@@ -340,6 +342,7 @@ public enum Capability {
         "workflows/list": "workflows/1",
         "workflows/mcpTrigger/clearMissed": "workflows/1",
         "workflows/run": "workflows/1",
+        "workflows/setMuted": "mute/1",
         "workflows/settings": "workflows/1",
         "worktrees/all": "worktrees/1",
         "worktrees/check": "worktrees/1",

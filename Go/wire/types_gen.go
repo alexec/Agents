@@ -53,19 +53,21 @@ const (
 )
 
 type Agent struct {
-	ID                    UUID                  `json:"id"`
-	RuntimeID             string                `json:"runtimeID"`
-	Cwd                   URL                   `json:"cwd"`
-	Title                 *string               `json:"title,omitzero"`
-	Labels                []SessionLabel        `json:"labels,omitzero"`
-	State                 AgentState            `json:"state"`
-	RuntimeSessionID      *string               `json:"runtimeSessionID,omitzero"`
-	StartOptions          StartOptions          `json:"startOptions"`
-	AdvertisedOptions     []ConfigOption        `json:"advertisedOptions"`
-	AvailableCommands     []SlashCommand        `json:"availableCommands"`
-	CreatedAt             Date                  `json:"createdAt"`
-	LastActivityAt        Date                  `json:"lastActivityAt"`
-	IsUnread              *bool                 `json:"isUnread,omitzero"`
+	ID                UUID           `json:"id"`
+	RuntimeID         string         `json:"runtimeID"`
+	Cwd               URL            `json:"cwd"`
+	Title             *string        `json:"title,omitzero"`
+	Labels            []SessionLabel `json:"labels,omitzero"`
+	State             AgentState     `json:"state"`
+	RuntimeSessionID  *string        `json:"runtimeSessionID,omitzero"`
+	StartOptions      StartOptions   `json:"startOptions"`
+	AdvertisedOptions []ConfigOption `json:"advertisedOptions"`
+	AvailableCommands []SlashCommand `json:"availableCommands"`
+	CreatedAt         Date           `json:"createdAt"`
+	LastActivityAt    Date           `json:"lastActivityAt"`
+	IsUnread          *bool          `json:"isUnread,omitzero"`
+	// Mute Notifications (#2003): the session still goes under Needs you and counts in the badge, but sends no push, no Mac notification and no banner. A muted workflow's runs start muted.
+	IsMuted               *bool                 `json:"isMuted,omitzero"`
 	ReportSeenAt          *Date                 `json:"reportSeenAt,omitzero"`
 	EndedReason           *EndedReason          `json:"endedReason,omitzero"`
 	ArchivedReason        *AgentArchivedReason  `json:"archivedReason,omitzero"`
@@ -4802,6 +4804,11 @@ type SetLimitsRequest struct {
 	DailyTokens    *int64 `json:"dailyTokens,omitzero"`
 }
 
+type SetMutedRequest struct {
+	AgentID UUID `json:"agentID"`
+	Muted   bool `json:"muted"`
+}
+
 type SetOptionRequest struct {
 	AgentID  UUID      `json:"agentID"`
 	OptionID string    `json:"optionID"`
@@ -5980,6 +5987,8 @@ type Workflow struct {
 	WhenDone      *WorkflowWhenDone    `json:"whenDone,omitzero"`
 	// `continue-when-back: true`: a run's turn refused for a spent allowance waits for it at once, as if the person had chosen Continue (#1918).
 	ContinueWhenBack *bool `json:"continueWhenBack,omitzero"`
+	// `muted: true`: every run of the workflow starts muted (#2003), and muting or unmuting the workflow mutes or unmutes its runs.
+	Muted *bool `json:"muted,omitzero"`
 }
 
 type WorkflowApproval struct {
@@ -6036,6 +6045,12 @@ const (
 	WorkflowModeStanding   WorkflowMode = "standing"
 	WorkflowModeTriggering WorkflowMode = "triggering"
 )
+
+type WorkflowMuteRequest struct {
+	Folder     URL    `json:"folder"`
+	WorkflowID string `json:"workflowID"`
+	Muted      bool   `json:"muted"`
+}
 
 type WorkflowOffReason string
 

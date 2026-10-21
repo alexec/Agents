@@ -13,6 +13,8 @@ import { canBeApproved, canBeDenied, isOn, isUnapproved, workflowStatus } from "
 import { holdForMenu, isMenuKey, openContextMenu, type MenuItem } from "./ContextMenu";
 import { fromWireDate } from "../protocol/dates";
 import { shortAgo } from "../model/activity";
+import { isWorkflowMuted, muteLabel, muteMark, mutedWords, unmuteLabel, workflowMuteHelp } from "../model/mute";
+import { Capability } from "../protocol/capabilities.generated";
 
 export function WorkflowRow({ store, host, summary, disabled, chosen, onPick, pinnedAt, place }: {
   store: Store; host: string; summary: WorkflowSummary; disabled: boolean; chosen: boolean; onPick: () => void;
@@ -36,6 +38,10 @@ export function WorkflowRow({ store, host, summary, disabled, chosen, onPick, pi
           {place ? <span class="name">{summary.workflow.name}</span> : summary.workflow.name}
           {place && <span class="place"> {place}</span>}
         </span>
+        {/* Its runs send no notifications (#2003), marked as a muted session is. */}
+        {isWorkflowMuted(summary) && !summary.isArchived && (
+          <span class="started-by muted" role="img" title={mutedWords} aria-label={mutedWords}>{muteMark}</span>
+        )}
         {ran && <time class="when" dateTime={ran.toISOString()} title={ran.toLocaleString()}>{shortAgo(ran)}</time>}
       </button>
     </div>
@@ -66,9 +72,9 @@ export function RunNow({ store, host, summary, disabled, wide }: {
 
 /** What a workflow row's menu offers, in the window's order (ProjectWorkRows.swift `WorkflowListRow`). */
 export type WorkflowAction = "open" | "unarchive" | "approve" | "deny" | "runNow" | "pin" | "unpin" | "moveUp" | "moveDown"
-  | "turnOff" | "turnOn" | "archive" | "delete";
+  | "turnOff" | "turnOn" | "mute" | "unmute" | "archive" | "delete";
 
-export function workflowActions(summary: WorkflowSummary, pinned: boolean, pinnedAt?: string[]): WorkflowAction[] {
+export function workflowActions(summary: WorkflowSummary, pinned: boolean, pinnedAt?: string[], canMute = false): WorkflowAction[] {
   const actions: WorkflowAction[] = ["open"];
   if (summary.isArchived) return [...actions, "unarchive", "delete"];
   if (isUnapproved(summary)) {
@@ -81,20 +87,24 @@ export function workflowActions(summary: WorkflowSummary, pinned: boolean, pinne
   actions.push(pinned ? "unpin" : "pin");
   // The window orders the pinned by drag; the page has no drag, so its menu moves them.
   if (pinned && pinnedAt) actions.push("moveUp", "moveDown");
-  actions.push(isOn(summary) ? "turnOff" : "turnOn", "archive", "delete");
+  actions.push(isOn(summary) ? "turnOff" : "turnOn");
+  // Its runs send no notifications, and still go under Needs You (#2003).
+  if (canMute) actions.push(isWorkflowMuted(summary) ? "unmute" : "mute");
+  actions.push("archive", "delete");
   return actions;
 }
 
 const words: Record<WorkflowAction, string> = {
   open: "Open", unarchive: "Unarchive", approve: "Approve", deny: "Deny on This Machine", runNow: "Run Now",
   pin: "Pin", unpin: "Unpin", moveUp: "Move Up", moveDown: "Move Down", turnOff: "Turn Off", turnOn: "Turn On",
-  archive: "Archive", delete: "Delete…",
+  mute: muteLabel, unmute: unmuteLabel, archive: "Archive", delete: "Delete…",
 };
 
 const helps: Partial<Record<WorkflowAction, string>> = {
   pin: "Keep it in Pinned, at the top of its project", unpin: "Take it out of Pinned",
   turnOff: "None of its triggers run it until it is turned on again; Run Now still does",
   turnOn: "Let its triggers run it again",
+  mute: workflowMuteHelp(false), unmute: workflowMuteHelp(true),
 };
 
 function workflowMenu(store: Store, host: string, summary: WorkflowSummary, disabled: boolean, onPick: () => void,
@@ -121,6 +131,8 @@ function workflowMenu(store: Store, host: string, summary: WorkflowSummary, disa
     moveDown: () => step(1),
     turnOff: () => void store.setWorkflowEnabled(host, summary, false),
     turnOn: () => void store.setWorkflowEnabled(host, summary, true),
+    mute: () => void store.setWorkflowMuted(host, summary, true),
+    unmute: () => void store.setWorkflowMuted(host, summary, false),
     archive: () => void store.setWorkflowArchived(host, summary, true),
     delete: () => {
       if (confirm(`Delete “${summary.workflow.name}”? Its file is removed from disk.\n\nThe file can be restored from the project's git history.`)) {
@@ -134,7 +146,7 @@ function workflowMenu(store: Store, host: string, summary: WorkflowSummary, disa
     moveUp: pinnedAt?.[0] === id,
     moveDown: pinnedAt?.[pinnedAt.length - 1] === id,
   };
-  return workflowActions(summary, pinned, pinnedAt).map((action) => ({
+  return workflowActions(summary, pinned, pinnedAt, store.has(host, Capability.mute1)).map((action) => ({
     label: words[action], ...(helps[action] ? { help: helps[action] } : {}), run: run[action],
     disabled: action !== "open" && (disabled || !!off[action]),
   }));

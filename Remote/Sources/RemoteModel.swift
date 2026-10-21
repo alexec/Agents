@@ -3972,6 +3972,22 @@ final class RemoteModel {
         }
     }
 
+    /// Whether a workflow's host can mute its runs: one from before #2003 cannot.
+    func canMute(_ summary: WorkflowSummary) -> Bool {
+        let host = work.projects.first { $0.folder.absoluteString == summary.folder.absoluteString }?.host ?? .mac
+        return !summary.isArchived && self.host(host, has: Capability.mute1)
+    }
+
+    /// Mute Notifications for a workflow's runs, or Unmute (#2003): `muted: true` in its file.
+    func setWorkflowMuted(_ summary: WorkflowSummary, _ muted: Bool) async {
+        do {
+            let request = DaemonAPI.WorkflowMuteRequest(folder: summary.folder, workflowID: summary.workflowID, muted: muted)
+            try await client(for: request).call(DaemonAPI.Method.workflowsSetMuted, request)
+        } catch {
+            problem = sentence(for: error)
+        }
+    }
+
     /// Clear a server's event trigger's missed-events mark (#383).
     func clearMCPMissed(_ summary: WorkflowSummary, _ status: MCPTriggerStatus) async {
         do {
@@ -4849,6 +4865,27 @@ final class RemoteModel {
         } catch {
             problem = away(error, "that could not be sent.") ?? "That did not reach your Mac."
         }
+    }
+
+    /// Mute Notifications, or Unmute, from the row's menu or the chat's ··· (#2003).
+    func setMuted(_ agentID: UUID, _ muted: Bool) async {
+        let host = work.agent(agentID)?.host ?? .mac
+        guard !isStale(on: host) else {
+            problem = notAnswering(host, "that could not be sent.")
+            return
+        }
+        do {
+            // The mark is kept by the agent's own host, which sends no push for it.
+            let request = DaemonAPI.SetMutedRequest(agentID: agentID, muted: muted)
+            try await client(for: request).call(DaemonAPI.Method.agentsSetMuted, request)
+        } catch {
+            problem = away(error, "that could not be sent.") ?? "That did not reach your Mac."
+        }
+    }
+
+    /// Whether this session's host can mute it: one from before #2003 cannot.
+    func canMute(_ agent: Agent) -> Bool {
+        agent.state != .archived && host(agent.host, has: Capability.mute1)
     }
 
     /// Something asked of a whole agent, sent once (#87): held in `work.acting` until the

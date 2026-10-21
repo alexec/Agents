@@ -148,6 +148,11 @@ export interface Agent {
   createdAt: WireDate;
   lastActivityAt: WireDate;
   isUnread?: boolean;
+  /**
+   * Mute Notifications (#2003): the session still goes under Needs you and counts in the badge, but
+   * sends no push, no Mac notification and no banner. A muted workflow's runs start muted.
+   */
+  isMuted?: boolean;
   reportSeenAt?: WireDate;
   endedReason?: EndedReason;
   archivedReason?: AgentArchivedReason;
@@ -4210,6 +4215,11 @@ export interface SetLimitsRequest {
   dailyTokens?: number | null;
 }
 
+export interface SetMutedRequest {
+  agentID: UUID;
+  muted: boolean;
+}
+
 export interface SetOptionRequest {
   agentID: UUID;
   optionID: string;
@@ -5221,6 +5231,11 @@ export interface Workflow {
    * if the person had chosen Continue (#1918).
    */
   continueWhenBack?: boolean;
+  /**
+   * `muted: true`: every run of the workflow starts muted (#2003), and muting or unmuting the
+   * workflow mutes or unmutes its runs.
+   */
+  muted?: boolean;
 }
 
 export interface WorkflowApproval {
@@ -5261,6 +5276,12 @@ export interface WorkflowMCPClearMissedRequest {
 }
 
 export type WorkflowMode = "new" | "standing" | "triggering";
+
+export interface WorkflowMuteRequest {
+  folder: URLString;
+  workflowID: string;
+  muted: boolean;
+}
 
 export type WorkflowOffReason = "file" | "writtenByAgent" | "agent" | "person";
 
@@ -5485,6 +5506,7 @@ export interface Methods {
   "agents/sendNow": { params: UnqueueRequest; result: Empty };
   "agents/setCeiling": { params: SetCeilingRequest; result: Agent };
   "agents/setLabels": { params: SetLabelsRequest; result: Agent };
+  "agents/setMuted": { params: SetMutedRequest; result: Empty };
   "agents/setOption": { params: SetOptionRequest; result: ConfigOption[] };
   "agents/setSandbox": { params: SetSandboxRequest; result: Agent };
   "agents/setUnread": { params: SetUnreadRequest; result: Empty };
@@ -5637,6 +5659,7 @@ export interface Methods {
   "workflows/list": { params: WorkflowsListRequest; result: WorkflowSummary[] };
   "workflows/mcpTrigger/clearMissed": { params: WorkflowMCPClearMissedRequest; result: WorkflowSummary };
   "workflows/run": { params: WorkflowRequest; result: WorkflowSummary };
+  "workflows/setMuted": { params: WorkflowMuteRequest; result: WorkflowSummary };
   "workflows/settings": { params: WorkflowSettingsRequest; result: WorkflowSummary };
   "worktrees/all": { params: Empty; result: ProjectWorktrees[] };
   "worktrees/check": { params: WorktreeRemovalRequest; result: RemovalCheck };
@@ -5670,6 +5693,7 @@ export const MethodTarget = {
   "agents/sendNow": "host",
   "agents/setCeiling": "host",
   "agents/setLabels": "host",
+  "agents/setMuted": "host",
   "agents/setOption": "host",
   "agents/setSandbox": "host",
   "agents/setUnread": "host",
@@ -5822,6 +5846,7 @@ export const MethodTarget = {
   "workflows/list": "host",
   "workflows/mcpTrigger/clearMissed": "host",
   "workflows/run": "host",
+  "workflows/setMuted": "host",
   "workflows/settings": "host",
   "worktrees/all": "host",
   "worktrees/check": "host",
@@ -5879,7 +5904,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ActivityToken: { required: ["agentID", "environment", "startedAt"], optional: ["token"] },
   Admitted: { required: [], optional: ["client", "host", "grant"] },
   AdoptRequest: { required: ["runtimeID", "sessionID", "cwd"], optional: [] },
-  Agent: { required: ["id", "runtimeID", "cwd", "state", "startOptions", "advertisedOptions", "availableCommands", "createdAt", "lastActivityAt"], optional: ["title", "labels", "runtimeSessionID", "isUnread", "reportSeenAt", "endedReason", "archivedReason", "usage", "lastTurnUsage", "costToDate", "costCeiling", "tokensToDate", "tokenCeiling", "plans", "background", "additionalDirectories", "mcpServers", "queuedPrompts", "suggestedPrompts", "startedByWorkflow", "purpose", "startedByRun", "startedByAgent", "chainDepth", "eventWait", "worktree", "pendingMove", "startingPoint", "startRequestID", "persona", "restartPickUps", "report", "outcomeAsked", "archiveRequest", "afterTurn", "archivedAt", "sandboxOverride", "effectiveSandbox", "pendingSandboxFailure", "missingFolder", "listsLeftOut", "titleIsPersons", "runtimeTitle", "madeInRoot", "queuedStart", "branchedFrom", "fileToSee", "continueWhenBack", "runningTool"] },
+  Agent: { required: ["id", "runtimeID", "cwd", "state", "startOptions", "advertisedOptions", "availableCommands", "createdAt", "lastActivityAt"], optional: ["title", "labels", "runtimeSessionID", "isUnread", "isMuted", "reportSeenAt", "endedReason", "archivedReason", "usage", "lastTurnUsage", "costToDate", "costCeiling", "tokensToDate", "tokenCeiling", "plans", "background", "additionalDirectories", "mcpServers", "queuedPrompts", "suggestedPrompts", "startedByWorkflow", "purpose", "startedByRun", "startedByAgent", "chainDepth", "eventWait", "worktree", "pendingMove", "startingPoint", "startRequestID", "persona", "restartPickUps", "report", "outcomeAsked", "archiveRequest", "afterTurn", "archivedAt", "sandboxOverride", "effectiveSandbox", "pendingSandboxFailure", "missingFolder", "listsLeftOut", "titleIsPersons", "runtimeTitle", "madeInRoot", "queuedStart", "branchedFrom", "fileToSee", "continueWhenBack", "runningTool"] },
   AgentRemovedNotification: { required: ["agentID"], optional: [] },
   AgentRequest: { required: ["agentID"], optional: [] },
   AgentWorkspaces: { required: ["providers"], optional: [] },
@@ -6328,6 +6353,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   SetHelperLimitsRequest: { required: ["folder", "limits"], optional: [] },
   SetLabelsRequest: { required: ["agentID", "add", "remove"], optional: [] },
   SetLimitsRequest: { required: [], optional: ["perAgent", "daily", "perAgentTokens", "dailyTokens"] },
+  SetMutedRequest: { required: ["agentID", "muted"], optional: [] },
   SetOptionRequest: { required: ["agentID", "optionID", "value"], optional: [] },
   SetPinnedRequest: { required: ["folder", "pinned"], optional: [] },
   SetProviderRequest: { required: ["runtimeID", "providerID"], optional: [] },
@@ -6438,12 +6464,13 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   WakeState: { required: ["isHolding", "agentsInFlight", "heldBackByBattery", "onPower"], optional: ["batteryPercent", "since", "graceUntil"] },
   WebRemoteStatus: { required: ["port", "served"], optional: ["reason", "detail"] },
   WorkReport: { required: ["outcome", "message", "at"], optional: ["block"] },
-  Workflow: { required: ["workflowID", "folder", "name", "triggers", "mode", "prompt", "unknownFields", "settings"], optional: ["problem", "cooldown", "enabled", "archived", "hosts", "whenDone", "continueWhenBack"] },
+  Workflow: { required: ["workflowID", "folder", "name", "triggers", "mode", "prompt", "unknownFields", "settings"], optional: ["problem", "cooldown", "enabled", "archived", "hosts", "whenDone", "continueWhenBack", "muted"] },
   WorkflowApproval: { required: ["digest", "isNew"], optional: ["note"] },
   WorkflowApproveRequest: { required: ["folder", "workflowID", "digest"], optional: [] },
   WorkflowArchiveRequest: { required: ["folder", "workflowID", "archived"], optional: [] },
   WorkflowEnableRequest: { required: ["folder", "workflowID", "enabled"], optional: [] },
   WorkflowMCPClearMissedRequest: { required: ["folder", "workflowID", "name"], optional: ["server"] },
+  WorkflowMuteRequest: { required: ["folder", "workflowID", "muted"], optional: [] },
   WorkflowRemovedNotification: { required: ["folder", "workflowID"], optional: [] },
   WorkflowRequest: { required: ["folder", "workflowID"], optional: [] },
   WorkflowSchedule: { required: ["minutes", "hours", "startMinute", "endMinute", "days"], optional: [] },

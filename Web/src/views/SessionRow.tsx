@@ -18,6 +18,7 @@ import { Telling } from "./Telling";
 import { folderIsMissing, folderPath, missingFolderLabel } from "../model/missingFolder";
 import { shortAgo } from "../model/activity";
 import { runningTool, runningToolLabel, sessionMark, type SessionMark } from "../model/sidebar";
+import { isMuted, muteMark, mutedWords } from "../model/mute";
 
 const glyphs: Record<StatusShape, string> = { working: "", needsYou: "!", waiting: "ᶻᶻ", done: "✓", stopped: "■" };
 
@@ -163,6 +164,8 @@ export function SessionRow({ agent, chosen, onPick, going, extras, inSidebar = f
           {extras?.startedByAgent && (
             <span class="started-by" role="img" title={extras.startedByAgent} aria-label={extras.startedByAgent}>⇆</span>
           )}
+          {/* Mute Notifications (#2003): a bell with a slash, as the window's row has it. */}
+          {isMuted(agent) && <span class="started-by muted" role="img" title={mutedWords} aria-label={mutedWords}>{muteMark}</span>}
           {/* A file it showed that the person has not looked at (#1802): a mark, never Needs you. */}
           {fileToSee && <span class="started-by file-to-see" role="img" title={fileToSee} aria-label={fileToSee}>🗎&#xFE0E;</span>}
         </span>

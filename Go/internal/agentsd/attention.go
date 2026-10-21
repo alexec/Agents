@@ -393,6 +393,16 @@ func (d *Daemon) needs() []wire.Need {
 	return found
 }
 
+// muted says whether the need's session is muted (#2003): it sends no banner and no push,
+// yet stays in the model that Needs you and the badge are drawn from.
+func (d *Daemon) muted(id *wire.UUID) bool {
+	if id == nil {
+		return false
+	}
+	a := d.Store.Agent(*id)
+	return a != nil && a.IsMuted != nil && *a.IsMuted
+}
+
 func (d *Daemon) attentionPending() wire.AttentionPending {
 	d.attentionMu.Lock()
 	defer d.attentionMu.Unlock()
@@ -487,7 +497,9 @@ func (d *Daemon) reconsider() {
 		for _, p := range d.presences {
 			watched = watched || (p.active && p.watching != nil && n.AgentID != nil && *p.watching == *n.AgentID)
 		}
+		muted := d.muted(n.AgentID)
 		switch {
+		case muted: // Mute Notifications (#2003): under Needs you, and nowhere else
 		case watched: // rung 1: it is on screen already
 		case here: // rung 2: at the window, after a moment to look
 			if at.Sub(n.RaisedAt.Time()) < settlingPause {
@@ -508,7 +520,7 @@ func (d *Daemon) reconsider() {
 		// forward: a need shown nowhere this host can see goes to the control plane, which
 		// chooses the device; one being looked at, or about to be, is withdrawn from it.
 		if tell != nil {
-			if wait || to != nil || watched {
+			if wait || to != nil || watched || muted {
 				withdraw(t)
 			} else if _, ok := d.forwarded[t]; !ok {
 				need, buzz, headline := n, true, n.Headline

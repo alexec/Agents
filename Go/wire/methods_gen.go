@@ -27,6 +27,7 @@ var (
 	CallAgentsSendNow                  = Method[UnqueueRequest, Empty]{"agents/sendNow"}
 	CallAgentsSetCeiling               = Method[SetCeilingRequest, Agent]{"agents/setCeiling"}
 	CallAgentsSetLabels                = Method[SetLabelsRequest, Agent]{"agents/setLabels"}
+	CallAgentsSetMuted                 = Method[SetMutedRequest, Empty]{"agents/setMuted"}
 	CallAgentsSetOption                = Method[SetOptionRequest, []ConfigOption]{"agents/setOption"}
 	CallAgentsSetSandbox               = Method[SetSandboxRequest, Agent]{"agents/setSandbox"}
 	CallAgentsSetUnread                = Method[SetUnreadRequest, Empty]{"agents/setUnread"}
@@ -240,6 +241,7 @@ var (
 	CallWorkflowsList                  = Method[WorkflowsListRequest, []WorkflowSummary]{"workflows/list"}
 	CallWorkflowsMcpTriggerClearMissed = Method[WorkflowMCPClearMissedRequest, WorkflowSummary]{"workflows/mcpTrigger/clearMissed"}
 	CallWorkflowsRun                   = Method[WorkflowRequest, WorkflowSummary]{"workflows/run"}
+	CallWorkflowsSetMuted              = Method[WorkflowMuteRequest, WorkflowSummary]{"workflows/setMuted"}
 	CallWorkflowsSettings              = Method[WorkflowSettingsRequest, WorkflowSummary]{"workflows/settings"}
 	CallWorktreesAll                   = Method[Empty, []ProjectWorktrees]{"worktrees/all"}
 	CallWorktreesCheck                 = Method[WorktreeRemovalRequest, RemovalCheck]{"worktrees/check"}

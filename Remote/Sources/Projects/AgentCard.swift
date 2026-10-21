@@ -282,6 +282,8 @@ struct AgentMenuItems: View {
         }
         // At the top of its project whatever its state (#180), and where among the pinned.
         if agent.state != .archived {
+            // No push or banner for it, and still in Needs You (#2003).
+            MuteAgentButton(agent: agent)
             RenameAgentButton(agent: agent)
             PinAgentButton(agent: agent)
             if model.isPinned(agent) {
@@ -389,6 +391,23 @@ struct UnarchiveAgentButton: View {
             Label("Unarchive", systemImage: "arrow.uturn.backward")
         }
         .disabled(model.isStale(agent))
+    }
+}
+
+/// Mute Notifications or Unmute (#2003): in a row's menu, and the chat's ···.
+struct MuteAgentButton: View {
+    @Environment(RemoteModel.self) private var model
+    let agent: Agent
+
+    var body: some View {
+        if model.canMute(agent) {
+            Button {
+                Task { await model.setMuted(agent.id, !agent.isMuted) }
+            } label: {
+                Label(MuteWords.label(muted: agent.isMuted), systemImage: MuteWords.symbol(muted: agent.isMuted))
+            }
+            .disabled(model.isStale(agent))
+        }
     }
 }
 
