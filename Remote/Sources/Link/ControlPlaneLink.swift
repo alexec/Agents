@@ -78,6 +78,23 @@ enum RemoteControl {
         return membership
     }
 
+    /// Pair with no code, by signing in with Google, Apple or GitHub (#995): kept as `pair` keeps it.
+    @discardableResult
+    static func signIn(at url: URL, id: UUID, with signIn: @escaping ControlSignIn.Provider,
+                       waiting: @escaping @Sendable (DaemonAPI.SignInWaiting) -> Void) async throws -> ControlMembership {
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let key = try ControlClientKey.loadOrMake()
+        let membership = try await ControlSignIn.pair(url: url, pin: nil, controlKey: nil, privateKey: key, id: id,
+                                                      name: UIDevice.current.name, kind: kind, dial: dial, signIn: signIn,
+                                                      waiting: waiting)
+        try Task.checkCancellation()
+        try membership.save(membershipFile, backedUp: false)
+        return membership
+    }
+
+    /// The control key this device trusts, which a sign-in's nonce is bound to (#995).
+    static var controlKey: Data? { membership?.controlKey }
+
     /// An older build kept the key in `control-client-key`, which went into backups
     /// (#1031). It goes, once, with the pairing made under it, so the device asks for a
     /// code again (v0.x, no migration); a moved device's pairing never used it.

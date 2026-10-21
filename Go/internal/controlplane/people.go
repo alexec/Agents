@@ -274,6 +274,11 @@ func (m *Methods) peopleList(user string, admin bool) wire.PeopleList {
 			if sign.Added != nil {
 				in.Added = new(dateOf(sign.Added.Time))
 			}
+			// An outside account, so its person can take it off (#995); never a code's, which
+			// is part of the code's secret.
+			if outsideProvider(sign.Provider) {
+				in.Account = optional(sign.Account)
+			}
 			row.SignIns = append(row.SignIns, in)
 		}
 		yes := true

@@ -195,6 +195,9 @@ func (si *signIns) check(ctx context.Context, settings signInSettings, provider,
 	return nil, fail(invalidParams, "There is no sign-in provider called %q.", provider)
 }
 
+// outsideProvider says a sign-in is Google's, Apple's or GitHub's.
+func outsideProvider(provider string) bool { return slices.Contains(signin.Providers, provider) }
+
 // signInFailure says a refused sign-in or an unreachable provider to the person (FR-015).
 func signInFailure(err error) error {
 	if signin.IsRefused(err) || signin.IsUnavailable(err) {
@@ -435,7 +438,7 @@ func (si *signIns) addToMe(ctx context.Context, a wire.SignInAdd, from Caller, u
 
 // removeFromMe is signIn/removeFromMe: an outside sign-in leaves the caller's person.
 func (si *signIns) removeFromMe(ctx context.Context, r wire.SignInRemove, user string) error {
-	if !slices.Contains(signin.Providers, r.Provider) {
+	if !outsideProvider(r.Provider) {
 		return fail(invalidParams, "Only a Google, Apple or GitHub sign-in can be taken off.")
 	}
 	found := false

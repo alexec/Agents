@@ -61,6 +61,18 @@ struct ConnectSheet: View {
                 .appText(.code)
             Text("Paste the code, or its link. It works once, for five minutes.")
                 .appText(.supporting).foregroundStyle(.secondary)
+            // With no code (#995): sign in as a person the control plane knows.
+            if joined == nil {
+                Text("OR SIGN IN").appText(.fine).fontWeight(.semibold).foregroundStyle(.secondary)
+                SignInToPair(pair: { url, signIn, waiting in
+                    let membership = try await ControlConfig.signIn(at: url, with: signIn, waiting: waiting)
+                    Task { await model.adopt(.remote(membership)) }
+                }, sentence: { error in
+                    SignInToPair.words(error) ?? PairingAttempt.sentence(for: error, device: "this Mac")
+                }, done: { dismiss() })
+                Text("Type the control plane’s address. Sign in with an account added to your person there.")
+                    .appText(.supporting).foregroundStyle(.secondary)
+            }
             if isHostCode, joined == nil {
                 Text(hostCodeWords)
                     .appText(.supporting)

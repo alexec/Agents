@@ -104,6 +104,7 @@ Host on the Mac that runs the control plane.
 
 ## Related
 
+- [Sign in with Google, Apple or GitHub](sign-in-with-google-apple-or-github.md): pair with no code.
 - [The control plane](../explanation/control-plane.md).
 - [Use Agents in a browser](use-agents-in-a-browser.md).
 - [Answer a question or a permission request](answer-a-question.md).
