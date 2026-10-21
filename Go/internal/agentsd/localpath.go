@@ -168,6 +168,10 @@ func (d *Daemon) localClient(id string) (wire.HostClient, bool) {
 
 // Told is what the control plane tells this host on its uplink's channel 0.
 func (d *Daemon) Told(method string, params json.RawMessage) {
+	if method == wire.NotifyHostUserSettings.Name {
+		d.toldUserSettings(params)
+		return
+	}
 	if method != wire.NotifyHostClients.Name {
 		return
 	}

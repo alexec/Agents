@@ -47,6 +47,7 @@ public enum Capability {
     public static let git1 = "git/1"
     public static let handover1 = "handover/1"
     public static let hostTeam1 = "host.team/1"
+    public static let hostUserSettings1 = "host.user-settings/1"
     public static let hostWire1 = "host.wire/1"
     public static let host1 = "host/1"
     public static let hostsJoin1 = "hosts.join/1"
@@ -498,6 +499,6 @@ public enum Capability {
     /// x-declared-capabilities: what a host, a client or the control plane declares by hand, by who.
     public static let declared: [String: [String]] = [
         "client": ["client.wire/1", "client.team/1"],
-        "host": ["host.wire/1", "agents.move-worktree/1", "host.team/1"],
+        "host": ["host.wire/1", "agents.move-worktree/1", "host.team/1", "host.user-settings/1"],
     ]
 }

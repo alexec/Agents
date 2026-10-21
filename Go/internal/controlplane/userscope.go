@@ -24,7 +24,7 @@ import (
 // CapHostUserSettings is what a machine says when it writes host/userSettings into its
 // ~/.agents and ~/.agents-secrets. A machine that does not say it is sent nothing: no
 // secret goes where it would not be used.
-const CapHostUserSettings = "host.user-settings/1"
+const CapHostUserSettings = wire.CapHostUserSettings1
 
 // userDeliveryTimeout bounds opening a person's secrets for one machine.
 const userDeliveryTimeout = 30 * time.Second
