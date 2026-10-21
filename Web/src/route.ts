@@ -3,6 +3,8 @@
 // /rv/<kind:key> for a change waiting for an OK, on its Review page (#1472),
 // or #/a/<page> for an Activity page of the sidebar (#151): events, resources, runtimes, mcp (#589),
 // worktrees (#790), spending, tokens (#956) or time, or #/settings for this browser's Settings (#846).
+// The Console and Reports (#1804), the control plane's other two apps beside this Workspace, are
+// #/console/<section> and #/reports/<section>.
 // A tab holding one project alone (#1089) starts #/o/1/…: Open in New Tab on its heading. It keeps
 // to that project until ‹ All.
 // Every step is a history entry, so the browser's own Back moves between columns (US6).
@@ -12,7 +14,14 @@ export type ActivityPage = "events" | "resources" | "runtimes" | "mcp" | "worktr
 
 export const activityPages: readonly ActivityPage[] = ["events", "resources", "runtimes", "mcp", "worktrees", "spending", "tokens", "time", "milestones"];
 
+/** The control plane's three apps (#1804): this Workspace, the admins' Console and Reports. */
+export type SubApp = "console" | "reports";
+
 export interface Route {
+  /** The Console or Reports (#1804), in place of the sidebar and the chat. */
+  app?: SubApp | undefined;
+  /** The page of the Console or Reports; its first when absent. */
+  section?: string | undefined;
   /** This browser's Settings (#846): which smart groups are on. */
   settings?: boolean | undefined;
   /** An Activity page (#151): about all the work rather than one project. */
@@ -45,6 +54,10 @@ export interface AloneProject { host: string; folder: string }
 export function parseRoute(hash: string): Route {
   const path = hash.replace(/^#\/?/, "");
   if (path === "settings") return { settings: true };
+  const [first, section] = path.split("/");
+  if (first === "console" || first === "reports") {
+    return section ? { app: first, section: decodeURIComponent(section) } : { app: first };
+  }
   const parts = path.split("/").map((part) => decodeURIComponent(part));
   const route: Route = {};
   for (let i = 0; i + 1 < parts.length; i += 2) {
@@ -74,6 +87,7 @@ export function routeHash(route: Route, aloneIn: AloneProject | undefined = alon
     && sameFolder(route.project, aloneIn.folder);
   if (held || (route.alone && route.host && route.project)) parts.push("o", "1");
   if (route.settings) return "#/settings";
+  if (route.app) return `#/${route.app}` + (route.section ? "/" + encodeURIComponent(route.section) : "");
   if (route.activity) return "#/a/" + route.activity;
   if (route.host) parts.push("h", route.host);
   if (route.host && route.project) parts.push("p", route.project);

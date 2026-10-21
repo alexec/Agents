@@ -8,6 +8,7 @@ import type { ReportFormat, ReportRange, UsageReport } from "../protocol/generat
 import { CallFailed } from "../wire/link";
 import { dimensionTitle, dimensions, empty, exportName, line, memberNote, rangeShort, rangeSpan, ranges, reportTotals, share, utcNote } from "../model/reports";
 import type { ReportDimension, ReportGroup } from "../model/reports";
+import type { Section } from "../model/console";
 
 function sentence(error: unknown): string {
   if (error instanceof CallFailed) {
@@ -89,4 +90,17 @@ export function ReportsPane({ store, runtimeName }: { store: Store; runtimeName:
       )}
     </div>
   );
+}
+
+/** A runtime's name, from the first host that knows it. */
+function runtimeNameIn(store: Store) {
+  return (id: string) => Object.values(store.runtimes.value).map((list) => list.find((s) => s.runtime.id === id)?.runtime.name)
+    .find((name) => name) || id;
+}
+
+/** A page of Reports (#1804), the control plane's app beside the Workspace and the Console. */
+export function ReportsPage({ store, down }: { store: Store; section: Section; down: boolean }) {
+  // The runtimes' names, from each machine that answers.
+  useEffect(() => { if (!down) for (const host of store.hosts.value) void store.loadRuntimes(host.id); }, [down]);
+  return <ReportsPane store={store} runtimeName={runtimeNameIn(store)} />;
 }
