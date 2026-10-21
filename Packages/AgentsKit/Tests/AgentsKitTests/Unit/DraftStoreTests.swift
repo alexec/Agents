@@ -226,4 +226,15 @@ struct DraftStoreTests {
         #expect(ordinary.draft(for: .newAgent(folder: nil))?.text == "the real one")
         #expect(ordinary.startDraft()?.runtimeID == "claude")
     }
+
+    /// Clean up worktrees on the Remote (#1863): its words go after a half-typed draft, and
+    /// the draft's files stay.
+    @Test func wordsGivenBackGoAfterAKeptDraft() {
+        let words = "Remove worktrees."
+        let alone = Draft.givingBack(words, to: nil)
+        #expect(alone.text == words && alone.attachments.isEmpty)
+        let given = Draft.givingBack(words, to: draft("Half a thought", attachments: [aFile]))
+        #expect(given.text == "Half a thought\n\n" + words)
+        #expect(given.attachments == [aFile])
+    }
 }

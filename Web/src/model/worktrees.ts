@@ -4,6 +4,8 @@ import type {
   BuildOutputRemoved, ProjectWorktrees, RemovalCheck, WorktreeSize, WorktreeStatus, WorktreeSummary,
 } from "../protocol/generated";
 import { diskWords } from "./disk";
+import type { Draft } from "./drafts";
+import { giveBackInto } from "./promptQuote";
 
 /** "4.1 GB", or "over 4.1 GB" when the walk ran out: WorktreeSize.words. */
 export function sizeWords(size: WorktreeSize): string {
@@ -51,6 +53,14 @@ export const worktreesEmpty = "No worktrees. A session started in a new worktree
 export const worktreesIntro = "Every project's worktrees and how much each holds on disk. Idle ones, with no session in them, come first, largest first.";
 export const measuring = "Measuring…";
 export const cleanUpPrompt = "Remove worktrees and delete branches for any work that has been merged to the default branch.";
+
+/**
+ * Clean up worktrees' new-session draft (#1863): the words after what was half-typed there, and its
+ * attachments kept, as the window's bar gives words back (PromptQuote.givingBack, #1739).
+ */
+export function cleanUpDraft(kept: Draft | undefined): Draft {
+  return { text: giveBackInto(cleanUpPrompt, kept?.text ?? ""), attachments: kept?.attachments ?? [] };
+}
 
 /** The line at the top of the page: "Worktrees hold 38.2 GB, 30.1 GB of it idle." */
 export function pageLine(t: WorktreeTally): string {

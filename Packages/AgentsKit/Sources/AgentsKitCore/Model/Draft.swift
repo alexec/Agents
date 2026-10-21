@@ -53,6 +53,12 @@ public struct Draft: Codable, Hashable, Sendable {
     /// Nothing typed and nothing staged: not a draft at all.
     public var isEmpty: Bool { text.isEmpty && attachments.isEmpty }
 
+    /// `words` offered to a kept draft, or to none (#1863): after what was typed, as the
+    /// window's bar takes them (`PromptQuote.givingBack`, #1739), the attachments kept.
+    public static func givingBack(_ words: String, to kept: Draft?) -> Draft {
+        Draft(text: PromptQuote.givingBack(words, to: kept?.text ?? ""), attachments: kept?.attachments ?? [])
+    }
+
     /// The bytes held by value, which is what the cap is about. A file sent by reference
     /// is a path and costs nothing to keep.
     var inlineBytes: Int {
