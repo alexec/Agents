@@ -404,6 +404,31 @@ struct WorkflowPage: View {
             }
             cooldown(summary)
             whenDone(summary)
+            continueWhenBack(summary)
+        }
+    }
+
+    /// Whether a run carries on by itself when a spent allowance is back (#1918), writing
+    /// `continue-when-back:`. Not for a triggering workflow, whose agent is somebody else's.
+    @ViewBuilder
+    private func continueWhenBack(_ summary: WorkflowSummary) -> some View {
+        if summary.workflow.mode != .triggering {
+            let on = summary.workflow.continueWhenBack == true
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Image(systemName: ContinueWhenBackWords.symbol)
+                    .appText(.fine)
+                    .foregroundStyle(.secondary)
+                note(ContinueWhenBackWords.workflowSentence(on))
+                Spacer(minLength: 12)
+                Toggle(ContinueWhenBackWords.workflowSwitch, isOn: Binding(get: { on }, set: { chosen in
+                    guard chosen != on else { return }
+                    Task { await model.setWorkflowSettings(summary, summary.workflow.settings, continueWhenBack: chosen) }
+                }))
+                .labelsHidden()
+                .toggleStyle(.switch)
+                .controlSize(.small)
+                .disabled(summary.workflow.settingsLocked)
+            }
         }
     }
 

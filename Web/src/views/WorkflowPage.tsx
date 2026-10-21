@@ -19,6 +19,7 @@ import { RunNow } from "./WorkflowRow";
 import { rowExtras, SessionRow } from "./SessionRow";
 import { CooldownMenu, RuntimeRow, WhenDoneMenu, WorkflowSettingsForm } from "./WorkflowSettings";
 import { whenDoneSentence } from "../model/workflowSettings";
+import { workflowContinueSentence, workflowContinueSwitch } from "../model/continueWhenBack";
 import { BackToList } from "./BackToList";
 
 export function WorkflowPage({ store, host, folder, projectName, workflowID, down }: {
@@ -244,6 +245,12 @@ export function WorkflowPage({ store, host, folder, projectName, workflowID, dow
               <>
                 <WhenDoneMenu summary={summary} disabled={locked} change={change} />
                 <p class="quiet small">{whenDoneSentence(workflow.whenDone ?? "keep")}</p>
+                <label class="setting">
+                  <span>{workflowContinueSwitch}</span>
+                  <input type="checkbox" role="switch" checked={workflow.continueWhenBack === true} disabled={locked}
+                    onChange={(e) => change({ continueWhenBack: e.currentTarget.checked })} />
+                </label>
+                <p class="quiet small">{workflowContinueSentence(workflow.continueWhenBack === true)}</p>
               </>
             )}
 

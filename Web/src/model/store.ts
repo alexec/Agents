@@ -2452,7 +2452,7 @@ export class Store extends Work {
    * the controls, or null.
    */
   setWorkflowSettings(host: string, summary: WorkflowSummary,
-                      change: { settings?: (s: WorkflowSettings) => WorkflowSettings; cooldown?: string; labels?: (labels: string[]) => string[]; hosts?: string[]; whenDone?: WhenDone }): Promise<string | null> {
+                      change: { settings?: (s: WorkflowSettings) => WorkflowSettings; cooldown?: string; labels?: (labels: string[]) => string[]; hosts?: string[]; whenDone?: WhenDone; continueWhenBack?: boolean }): Promise<string | null> {
     const { folder, workflowID } = summary.workflow;
     const key = `${host}|${folderKey(folder)}|${workflowID}`;
     const send = async (): Promise<string | null> => {
@@ -2466,6 +2466,7 @@ export class Store extends Work {
           ...(change.labels !== undefined ? { labels: change.labels(current.labels) } : {}),
           ...(change.hosts !== undefined ? { hosts: change.hosts } : {}),
           ...(change.whenDone !== undefined ? { whenDone: change.whenDone } : {}),
+          ...(change.continueWhenBack !== undefined ? { continueWhenBack: change.continueWhenBack } : {}),
         }, host);
         this.placeWorkflow(updated, host);
         return null;

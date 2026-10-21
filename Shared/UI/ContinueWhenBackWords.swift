@@ -31,6 +31,17 @@ enum ContinueWhenBackWords {
     }
 }
 
+extension ContinueWhenBackWords {
+    /// The workflow page's switch (#1918), writing `continue-when-back:`.
+    static let workflowSwitch = "Continue when the allowance is back"
+
+    /// What the switch means for this workflow's runs.
+    static func workflowSentence(_ on: Bool) -> String {
+        on ? "A run whose allowance is spent waits, and carries on when it is back."
+           : "A run whose allowance is spent stops until somebody chooses Continue."
+    }
+}
+
 extension RuntimeAllowances {
     /// When the provider said this runtime's allowance resets, for the button (#1859).
     func resetsAt(_ runtimeID: String) -> Date? {
