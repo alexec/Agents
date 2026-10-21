@@ -5,8 +5,8 @@
 
 Run it after run-app's launch.sh has started a scratch set-up on that root (see README.md).
 It adds three made-up projects under the root and starts small real Claude agents in them,
-so that the list has an agent in each group: one that needs you (a question), one working,
-and some done, one with a live document and one with code changes. Nothing comes from the
+so that the list has one agent that needs you (a question) and some done: one with a live
+document and one with code changes. Nothing comes from the
 real set-up (run-app rule 6). The agents cost a few cents.
 """
 import subprocess
@@ -134,7 +134,6 @@ AGENTS = [
     ("recipe-box", "Write PLAN.md: a short plan, with a Mermaid flowchart, for adding a shopping list "
      "built from the recipes. Show it to me with show_file as you write it. Do not change any code.",
      "Plan a shopping list"),
-    ("recipe-box", "Run `sleep 900` in the shell, then say done.", "Check the recipe links"),
     ("billing-service", "Before you change anything, ask me one question with your question tool: "
      "should invoices default to USD or EUR? Offer the two as options. Then wait for my answer.",
      "Add a default currency"),
