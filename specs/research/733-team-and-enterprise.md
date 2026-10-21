@@ -9,8 +9,8 @@
 | Question | Answer |
 |---|---|
 | Tenancy | **Both, self-hosted first.** One org per control plane now, shaped so a hosted multi-org service needs no migration later. |
-| Who sees and drives a host | **Its owner only, unless shared.** A shared server can be opened to the team or to named people. Admins manage people and policy; they do not drive other people's hosts. |
-| Identity | **Google and Apple**, through generic OpenID Connect (OIDC), so Okta and Entra fit the same slot. |
+| Who sees and drives a host | **Its owner only.** One user per machine, no sharing (Alex, 2026-10-15, #1117; this replaces "unless shared"). Admins manage people and policy; they do not drive other people's machines. |
+| Identity | **Google, Apple and GitHub**, and the built-in local owner, in one model (2026-10-18, #995). OIDC is generic, so Okta and Entra fit the same slot. |
 | Admin policy | **From the control plane.** Hosts enforce it. MDM only pins which control plane a Mac must join. |
 
 ## Summary
@@ -22,52 +22,30 @@
 - **The control plane already has most of the shape.**
   - `people/<id>.json` exists, and every record carries an `owner` (FR-012). Nothing reads `owner` yet; T1 makes it real.
   - Every store key already sits under a `<prefix>/v1/` set when a copy starts (`contracts/store.md`). **One org = one prefix**, so T10 routes a request to its org's prefix and the records inside are unchanged.
-- **The first slice is T1 + T2:** a second person can join a control plane by signing in with Google or Apple. They see only their own hosts and the servers shared with them.
+- **The first slice is T1 + T2:** a second person can join a control plane by signing in with Google or Apple. They see only their own machines (#1117: one user per machine, no sharing).
 
 ## The tiers
 
 ### Team tier: a few people share a control plane
 
-**T1 · People, roles and ownership** (spec)
-- **People and roles.**
-  - A `Person` gains a role: `admin` or `member`.
-  - Today's single person becomes the first admin, by a migration that only adds fields.
-- **Clients and hosts belong to a person.**
-  - A client is bound to a person at pairing.
-  - A host is owned by the person who enrolled it.
-  - Every record's `owner` is checked on every call.
-- **Sharing a host.** A host can be shared with the team or with named people. Each share carries a level:
-  - **see:** its agents and transcripts, read only;
-  - **drive:** start agents, answer cards, open terminals.
-  - A developer's Mac is unshared by default.
-- **What each role may do.**
-  - **Admins:** invite, remove and change roles of people; see every host's name and status, but not its contents unless it is shared with them; set policy (T5).
-  - **Members:** pair their own clients, enrol their own hosts, share them.
-- **Removing a person** forgets their clients at once and takes their hosts off the control plane. Shares they were given end.
-- **Retires #111's one grant for a team.** For one person nothing changes: the only person is an admin who owns everything.
-- **On screen, all three clients:**
-  - Settings gains People.
-  - A host's menu gains Share.
-  - The sidebar shows shared hosts in a group of their own, named for their owner.
+**T1 · People, roles and machines** (spec 736, re-specified 2026-10-20, #1117)
+- **One user per machine** (Alex, 2026-10-15). A user is a person or a bot. Machines are not shared, also not at see.
+- **A host and a workspace are one thing, a machine.** The screen says "machine". The code keeps `host`.
+- **Settings have three scopes:** this device, you, and the control plane, in one Settings window with a rail grouped by scope. Projects keep their own.
+- **Machines join** by approval on a signed-in client, by a machine code, or by a one-time token from a workspace provider. A started machine belongs to the user who started it.
+- **The control plane keeps user settings and secrets.** Secrets are encrypted with a key in Google Cloud KMS (or a 0600 file on a Mac), and sent only to the user's own machines.
+- **Groups** (a set of users, one user, or everyone) own workspace providers and bot cost.
+- **Bots** are users that admins configure. They start work only on events, they have no ask tools, and team workflows name them in `runs-on:`.
+- **Channels** run on the control plane, and each channel identity is linked by approval.
+- **Admins** manage people, groups, providers, bots and channels. They see machines' names and states only.
+- **Removing a person** cuts off their clients, and stops and deletes their started machines after a confirmation that lists work not pushed.
 
-**T2 · Sign in with Google and Apple** (spec)
-- **Sign-in becomes the way a person joins or pairs another client.** Codes stay for a control plane with no identity provider, and for hosts.
-- **The client does the OIDC sign-in itself; the control plane only checks the result.**
-  - **Mac and iPhone/iPad:** `ASAuthorizationAppleIDProvider` for Apple; Google through `ASWebAuthenticationSession` with PKCE.
-  - **Result:** an ID token, sent over the R6 socket.
-  - **The control plane checks:**
-    - the signature, against the provider's published keys (JWKS), fetched and cached;
-    - `iss`, `aud` and expiry;
-    - that `nonce` equals a hash of this control plane's key id and the R6 hello nonce. A token minted for one control plane cannot be replayed to another.
-- **The audience is the app's own client ids** (Alex's Google OAuth client and Apple bundle and Services ids). So a self-hosted control plane needs **no registration of its own** with Google or Apple. It only needs to reach their key endpoints.
-- **Who may join:**
-  - **Google:** anyone whose `hd` claim is a domain the admin allowed (Workspace accounts only), or anyone invited by email.
-  - **Apple:** by invite only. Apple gives no org claim, and may hide the email behind a relay address. An invite is a code the person redeems once, signed in, binding their Apple `sub`.
-  - Every person is keyed by `(iss, sub)`, never by email.
-- **The web page:**
-  - It cannot use the app's Google or Apple redirect on an arbitrary self-hosted domain. It pairs as today, from a code shown on a signed-in client, and the code makes it that person's client.
-  - An org that registers its own OIDC client (T9) gets direct web sign-in.
-- **Generic OIDC from the start:** a provider is `issuer + client id`, so Okta and Entra are configuration, not code. That configuration is an enterprise-tier setting (T9).
+**T2 · Sign in with Google, Apple, GitHub or the local owner** (spec 736)
+- **One identity model** (Alex, 2026-10-18, #995). Every client and machine belongs to a person, from a provider. The local owner provider needs no account. Codes are its sign-in.
+- **Google and Apple:** as before. The client signs in, and the control plane checks the ID token with a nonce bound to itself. A self-hosted control plane registers nothing.
+- **GitHub:** a GitHub App with the device flow and tokens that expire. A token cannot carry a nonce, so a GitHub person joins only by invite, and each later client needs approval on a signed-in client (decided 2026-10-20).
+- **The web page** pairs by a code from a signed-in client, until the operator registers an OIDC client (T9).
+- **An outside provider is never mandatory,** also on a public control plane (decided 2026-10-20).
 
 **T3 · Who did what** (spec)
 - **Every host-side action carries its actor:** the person, the client and the time. That means starting, stopping or deleting an agent, answering a permission card, changing a setting, approving a workflow, plugin or MCP server, and sharing a host.
@@ -153,6 +131,6 @@
 ## Still to decide
 
 - **Direction.** Should the team tier become a goal in `direction.md` after the alpha? (Not changed here.)
-- **Google and Apple client ids.** T2 needs a Google OAuth client and a Sign in with Apple Services id under Alex's accounts. Creating them is Alex's to do.
-- **Whether admins may see shared-to-team hosts' transcripts by default.** T1 says only if shared with them.
+- **Google, Apple and GitHub client ids.** T2 needs a Google OAuth client, a Sign in with Apple Services id and a GitHub App with the device flow, under Alex's accounts. Creating them is Alex's to do (#995).
+- ~~Whether admins may see shared-to-team hosts' transcripts by default.~~ Moot: machines are not shared, and admins reading transcripts is not in the first cut (Alex, 2026-10-15).
 - **Budgets for subscription runtimes.** Counting tokens rather than money (T5) needs every runtime to report tokens, and #395 found not all do.

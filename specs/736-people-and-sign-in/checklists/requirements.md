@@ -1,7 +1,7 @@
-# Specification Quality Checklist: People, roles and sign-in
+# Specification Quality Checklist: Team tier: people, machines and sign-in
 
 **Purpose**: Validate specification completeness and quality before proceeding to planning
-**Created**: 2026-10-11
+**Created**: 2026-10-11. **Re-checked**: 2026-10-20 (#1117 re-spec).
 **Feature**: [spec.md](../spec.md)
 
 ## Content Quality
@@ -31,9 +31,6 @@
 
 ## Notes
 
-- **FR-017–FR-019 name the shape of a check, not a technology.** That is a sign-in bound to one control plane, keys the provider publishes, and an issuer plus a client id. The roadmap (`specs/research/733-team-and-enterprise.md`, T2) records the intended mechanism for the plan.
-- **No questions are left open.** Choices made without asking are listed under Assumptions:
-  - admins are not super-users;
-  - invites expire after 7 days;
-  - shares do not travel with a handover;
-  - Apple invites need not match the email.
+- **Some FRs name a mechanism on purpose.** FR-008, FR-010 and FR-025 name the sign-in APIs and the key service, because Alex chose them (#995, #1117). The rest of the mechanism is in `research.md`.
+- **The 2026-10-11 draft's sharing (see and drive) is gone.** The draft's T1 user stories for it were removed: Alex decided on one user per machine (2026-10-15).
+- **Every open question has an answer.** Alex answered them on #1117 and #995. The rest were decided on 2026-10-20 and are listed under Clarifications.
