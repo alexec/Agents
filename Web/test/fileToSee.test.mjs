@@ -17,6 +17,12 @@ test("a shown file is named on the row", () => {
   assert.equal(w.fileToSeeLine(finished), null);
 });
 
+test("a shown file is the row's grey line, in words, then the report (#1873)", () => {
+  assert.equal(w.reportLine({ ...finished, fileToSee: { path: "/p/docs/report.md" } }), "File to see: report.md");
+  assert.equal(w.reportLine(finished), "Wrote the report.");
+  assert.equal(w.reportLine({ ...finished, report: undefined }), null);
+});
+
 test("a shown file leaves the session under Done, unread", () => {
   const agent = { ...finished, fileToSee: { path: "/p/docs/report.md" } };
   assert.equal(g.groupOf(agent), "finished");

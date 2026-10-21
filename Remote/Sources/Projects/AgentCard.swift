@@ -144,7 +144,8 @@ struct AgentCard: View {
                         Text(queued)
                             .appText(.supporting)
                             .foregroundStyle(.secondary)
-                    } else if let report = agent.report?.message {
+                    } else if let report = FileToSeeWords.reportLine(agent) {
+                        // A file to see is named here first, as on the Mac (#1873).
                         Text(report)
                             .appText(.supporting)
                             .foregroundStyle(.secondary)

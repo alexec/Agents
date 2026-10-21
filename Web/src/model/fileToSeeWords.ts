@@ -13,6 +13,14 @@ export function fileToSeeLine(agent: Agent): string | null {
 }
 
 /**
+ * The row's grey line in the report's place (FileToSeeWords.reportLine): the file to see while it
+ * is unseen, then the report. In words, because a touch screen has no hover for the mark's title (#1873).
+ */
+export function reportLine(agent: Agent): string | null {
+  return fileToSeeLine(agent) ?? agent.report?.message ?? null;
+}
+
+/**
  * Settings ▸ Finished chats (#1802): whether a chat the person started may archive itself, kept
  * on the Mac's host with the other display choices (DisplayPreference.agentsMayArchiveMyChats).
  */

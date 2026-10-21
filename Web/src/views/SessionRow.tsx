@@ -11,7 +11,7 @@ import { blockWaitNames, openBlock } from "../model/block";
 import { backgroundMark } from "../model/background";
 import { drawsUnread, projectFolder } from "../model/groups";
 import { archiveLine, archiveMark } from "../model/archiveWords";
-import { fileToSeeLine } from "../model/fileToSeeWords";
+import { fileToSeeLine, reportLine } from "../model/fileToSeeWords";
 import { queuedLine, rowStatus, type StatusShape } from "../model/status";
 import { fromWireDate } from "../protocol/dates";
 import { Telling } from "./Telling";
@@ -124,6 +124,7 @@ export function SessionRow({ agent, chosen, onPick, going, extras, inSidebar = f
   // The mark alone: the row is a button, so Archive is the menu's and the strip's, Keep Session the menu's (#584, #773).
   const asks = archiveLine(agent);
   const fileToSee = fileToSeeLine(agent);
+  const report = reportLine(agent);
   const activity = fromWireDate(agent.lastActivityAt);
   const labels = agent.labels ?? [];
   return (
@@ -154,7 +155,7 @@ export function SessionRow({ agent, chosen, onPick, going, extras, inSidebar = f
           // While the sidebar searches: the line it said that matches, in the report's place,
           // so a row found by what it said says why (#1663). The page's row has it below.
           : inSidebar && extras?.said && !folderIsMissing(agent) ? <span class="subtitle said" title={extras.said}>{extras.said}</span>
-          : agent.report && !(inSidebar && folderIsMissing(agent)) && <span class="subtitle report">{agent.report.message}</span>}
+          : report && !(inSidebar && folderIsMissing(agent)) && <span class="subtitle report">{report}</span>}
         {/* Its folder gone (#119), as a project's row says it. */}
         {folderIsMissing(agent) && <span class="subtitle missing-folder" title={folderPath(agent)}>⚠ {missingFolderLabel}</span>}
         {/* In the sidebar, that one line is all (#587): what it holds, waits on, runs or is
