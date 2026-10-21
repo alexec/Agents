@@ -1111,6 +1111,10 @@
         },
         "text": {
           "type": "string"
+        },
+        "base": {
+          "type": "string",
+          "description": "The SHA-256, in lower-case hex, of the text the edit started from (#1858). When the file on disk is not that text any more, the write is refused with fileChanged and nothing is written. Left out, the text is written whatever is on disk."
         }
       },
       "required": [

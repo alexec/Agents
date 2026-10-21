@@ -5206,6 +5206,21 @@ final class AppModel {
     /// The daemon writes rather than the window so that it knows the person did. Nil
     /// on success; on failure, the sentence to show beside the passage, with the draft
     /// kept.
+    /// The editor's save that checks the file first (#1858).
+    func writeArtifact(agentID: UUID, path: String, text: String, base: String) async -> SaveOutcome {
+        do {
+            try await client(forAgent: agentID).call(DaemonAPI.Method.artifactWrite,
+                                  DaemonAPI.ArtifactWriteRequest(agentID: agentID, path: path, text: text, base: base))
+            return .saved
+        } catch let error as JSONRPCError where error.code == DaemonAPI.Failure.fileChanged {
+            return .changedOnDisk
+        } catch let error as JSONRPCError {
+            return .failed(error.message)
+        } catch {
+            return .failed(error.localizedDescription)
+        }
+    }
+
     func writeArtifact(agentID: UUID, path: String, text: String) async -> String? {
         do {
             try await client(forAgent: agentID).call(DaemonAPI.Method.artifactWrite,

@@ -1,4 +1,5 @@
 import AgentsKitCore
+import CodeText
 import SwiftUI
 #if os(macOS)
 import AppKit
@@ -14,8 +15,11 @@ import UIKit
 /// the file is left, so there is no Save to forget.
 ///
 /// The file can change under it — an agent writing the same file. While nothing typed is
-/// waiting to go to disk, what is on disk is taken in place; while something is, the
-/// person's text wins, and what they typed is written over it when the pause comes.
+/// waiting to go to disk, what is on disk is taken in place. While something is, nothing
+/// is saved over it (#1858): the editor says the file changed, with Compare, Keep Mine and
+/// Take Theirs, and Undo after Take Theirs gives the typing back. Each save also sends the
+/// digest of the text the edit began from, so a change the watch has not reported yet is
+/// refused by the host and asked about the same way.
 ///
 /// Plain, not coloured: colour is drawn a line at a time by `FileLines`, and a text view
 /// the person types in is one run of text. A file only partly read is not this view at
@@ -40,6 +44,12 @@ struct SourceEditor: View {
     /// Why a completion the person asked for brought nothing, shown for a moment (#1688).
     @State private var completionNote: String?
     @State private var noteShown: Task<Void, Never>?
+    /// What is on disk now, when it changed while something typed waited to be saved
+    /// (#1858). Nothing is saved while it is set: the person chooses.
+    @State private var theirs: String?
+    @State private var comparing = false
+    /// What was typed before Take Theirs, for Undo.
+    @State private var mine: String?
 
     init(text: String, path: String, line: Int?) {
         self.text = text
@@ -51,6 +61,39 @@ struct SourceEditor: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
+            if let theirs {
+                ChangedOnDiskStrip(comparing: $comparing,
+                                   keepMine: { saved = theirs; self.theirs = nil; comparing = false; commit() },
+                                   takeTheirs: {
+                                       mine = draft
+                                       saved = theirs
+                                       draft = theirs
+                                       self.theirs = nil
+                                       comparing = false
+                                   })
+                if comparing {
+                    ScrollView {
+                        FileDiffView(rows: LineDiff.rows(old: theirs, new: draft), path: path,
+                                     oldText: theirs, newText: draft)
+                    }
+                    .frame(maxHeight: 240)
+                    Divider()
+                }
+            } else if let mine, draft == saved {
+                HStack(spacing: 8) {
+                    Text(SourceEditorWords.tookTheirs)
+                        .foregroundStyle(.secondary)
+                    Spacer(minLength: 0)
+                    Button(SourceEditorWords.undo) {
+                        draft = mine
+                        self.mine = nil
+                    }
+                }
+                .appText(.fine)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                Divider()
+            }
             if let problem {
                 Text(problem)
                     .appText(.fine)
@@ -96,12 +139,24 @@ struct SourceEditor: View {
             }
         }
         .onChange(of: text) { _, disk in
-            if draft == saved { draft = disk }
-            saved = disk
+            guard disk != saved else { return }
+            if draft == saved {
+                draft = disk
+                saved = disk
+                theirs = nil
+            } else if draft == disk {
+                saved = disk
+                theirs = nil
+            } else {
+                // Typed text waits, and the file changed under it: asked, not written over.
+                pause?.cancel()
+                theirs = disk
+            }
         }
         .onChange(of: draft) {
             pause?.cancel()
-            guard draft != saved else { return }
+            if let mine, draft != saved, draft != mine { self.mine = nil }
+            guard draft != saved, theirs == nil else { return }
             pause = Task {
                 try? await Task.sleep(for: PassageEditor.pauseBeforeSaving)
                 guard !Task.isCancelled else { return }
@@ -135,17 +190,36 @@ struct SourceEditor: View {
         }
     }
 
+    /// Saves what is typed, unless the file changed under it and the person has not chosen
+    /// yet: then the agent's change stays on disk, also when the file is left.
     private func commit() {
         pause?.cancel()
-        guard draft != saved, actions.canEdit else { return }
+        guard draft != saved, theirs == nil, actions.canEdit else { return }
         let sending = draft
-        let save = actions.save
+        guard let saveOver = actions.saveOver else {
+            let save = actions.save
+            Task {
+                if let why = await save(path, sending) {
+                    problem = why
+                } else {
+                    problem = nil
+                    saved = sending
+                }
+            }
+            return
+        }
+        let base = DaemonAPI.ArtifactWriteRequest.digest(saved)
         Task {
-            if let why = await save(path, sending) {
-                problem = why
-            } else {
+            switch await saveOver(path, sending, base) {
+            case .saved:
                 problem = nil
                 saved = sending
+            case .changedOnDisk:
+                // The watch may not have said yet; what it reads next replaces this.
+                problem = nil
+                theirs = text
+            case .failed(let why):
+                problem = why
             }
         }
     }
@@ -684,3 +758,42 @@ private final class CompletionRow: UIInputView, UIInputViewAudioFeedback {
     }
 }
 #endif
+
+/// The words for a file that changed on disk while something typed waited (#1858), once for
+/// both apps. The web page says the same in `files/SourceEditor.tsx`.
+enum SourceEditorWords {
+    static let changed = "This file changed on disk while you were typing. Nothing was saved over it."
+    static let compare = "Compare"
+    static let hideCompare = "Hide Comparison"
+    static let keepMine = "Keep Mine"
+    static let takeTheirs = "Take Theirs"
+    static let tookTheirs = "You took the version on disk."
+    static let undo = "Undo"
+}
+
+/// Over the editor while the file changed under the person's typing (#1858).
+private struct ChangedOnDiskStrip: View {
+    @Binding var comparing: Bool
+    let keepMine: () -> Void
+    let takeTheirs: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Label(SourceEditorWords.changed, systemImage: "exclamationmark.triangle")
+                .tinted(.attention)
+            HStack(spacing: 8) {
+                Button(comparing ? SourceEditorWords.hideCompare : SourceEditorWords.compare) { comparing.toggle() }
+                    .help("Your text beside the file on disk")
+                Button(SourceEditorWords.keepMine, action: keepMine)
+                    .help("Save your text over the file on disk")
+                Button(SourceEditorWords.takeTheirs, action: takeTheirs)
+                    .help("Take the file on disk; Undo gives your text back")
+                Spacer(minLength: 0)
+            }
+        }
+        .appText(.fine)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        Divider()
+    }
+}

@@ -17,6 +17,9 @@ enum MacPageActions {
             image: { url in await pictures.image(agentID: agentID, url: url) },
             stamp: { url in await pictures.stamp(agentID: agentID, url: url) },
             canEdit: !model.hosts.isOffline(host))
+        actions.saveOver = { path, document, base in
+            await model.writeArtifact(agentID: agentID, path: path, text: document, base: base)
+        }
         // A source file's problems, from its language server on the agent's host (#844), when
         // the host is new enough to ask (#1748).
         if model.host(host, has: Capability.filesDiagnostics1) {

@@ -687,6 +687,11 @@ dialog.sheet:has(.subagent-steps) { width: min(720px, calc(100vw - 32px)); max-h
 .missing-folder-strip .what { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .missing-folder-strip .quiet { opacity: 0.6; }
 .ways-on { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+/* Open File: the file changed on disk under unsaved typing (#1858). */
+.changed-on-disk { padding: 6px 10px; font-size: 0.8rem; background: var(--paper-well); border-bottom: 1px solid var(--paper-rule);
+  display: flex; flex-direction: column; gap: 6px; }
+.changed-on-disk p { margin: 0; }
+.changed-on-disk-diff { max-height: 240px; overflow: auto; }
 .problem.folder-gone { flex-wrap: wrap; }
 .subtitle.missing-folder { opacity: 0.7; }
 /* A blocked agent (039, #157): what it waits on, on its row and under its chat's head. */

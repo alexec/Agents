@@ -421,6 +421,8 @@ type ArtifactWriteRequest struct {
 	AgentID UUID   `json:"agentID"`
 	Path    string `json:"path"`
 	Text    string `json:"text"`
+	// The SHA-256, in lower-case hex, of the text the edit started from (#1858). When the file on disk is not that text any more, the write is refused with fileChanged and nothing is written. Left out, the text is written whatever is on disk.
+	Base *string `json:"base,omitzero"`
 }
 
 type AssessRuntimeRequest struct {

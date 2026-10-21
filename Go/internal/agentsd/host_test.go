@@ -132,4 +132,14 @@ func TestADropBoxAndAnArtifact(t *testing.T) {
 	if e := c.callError(t, 22, "artifact/write", map[string]any{"agentID": a.ID, "path": "rel.md", "text": ""}); e.Message != "The path has to be absolute, starting at `/`." {
 		t.Fatal(e.Message)
 	}
+	// With a base (#1858): written over the text the edit began from, refused over any other.
+	c.call(t, 23, "artifact/write", map[string]any{"agentID": a.ID, "path": path, "text": "# mine", "base": textDigest("# hi")})
+	os.WriteFile(path, []byte("# an agent's"), 0o644)
+	e := c.callError(t, 24, "artifact/write", map[string]any{"agentID": a.ID, "path": path, "text": "# mine again", "base": textDigest("# mine")})
+	if e == nil || e.Code != wire.FailureFileChanged {
+		t.Fatalf("written over a change made since: %+v", e)
+	}
+	if b, _ := os.ReadFile(path); string(b) != "# an agent's" {
+		t.Fatal(string(b))
+	}
 }

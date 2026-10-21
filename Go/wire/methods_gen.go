@@ -300,6 +300,7 @@ const (
 	FailureDayLimitReached           = -32018
 	FailureDeleteRefused             = -32051
 	FailureEventRefused              = -32050
+	FailureFileChanged               = -32081
 	FailureFileGone                  = -32032
 	FailureFileNotReadable           = -32033
 	FailureFolderGone                = -32004

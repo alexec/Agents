@@ -955,7 +955,8 @@
         "schema": {
           "$ref": "daemon.schema.json#/definitions/Empty"
         }
-      }
+      },
+      "description": "Write a file an agent may read, whole (#415). With `base`, refused with fileChanged when the file changed on disk since the edit began (#1858), so nobody's change is written over unseen."
     },
     {
       "name": "attention/pending",
@@ -6424,6 +6425,10 @@
       "eventRefused": {
         "code": -32050,
         "message": "eventRefused"
+      },
+      "fileChanged": {
+        "code": -32081,
+        "message": "fileChanged"
       },
       "fileGone": {
         "code": -32032,

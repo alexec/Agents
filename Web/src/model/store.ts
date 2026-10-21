@@ -18,6 +18,7 @@ import { Failure } from "../protocol/generated";
 import { CallFailed, type Link } from "../wire/link";
 import type { FolderGoneAsk } from "./missingFolder";
 import { describe, methodNotFound } from "./errors";
+import type { SaveOutcome } from "./sourceEdit";
 import { artifactsIn, withArtifactsOf, type Artifact } from "./artifacts";
 import { log } from "../log";
 import { knowPublicViews } from "../place";
@@ -2225,6 +2226,18 @@ export class Store extends Work {
   }
 
   /** What the person typed on a live page, written to the file as the window writes it. */
+  /** The editor's save that checks the file first (#1858): refused when it changed since `base`. */
+  async writeArtifactOver(host: string, agentID: string, path: string, text: string, base: string): Promise<SaveOutcome> {
+    try {
+      await this.link.call("artifact/write", { agentID: agentID as UUID, path, text, base }, host);
+      return "saved";
+    } catch (error) {
+      if (error instanceof CallFailed && error.code === Failure.fileChanged) return "changedOnDisk";
+      this.say(describe(error));
+      return "failed";
+    }
+  }
+
   async writeArtifact(host: string, agentID: string, path: string, text: string): Promise<boolean> {
     return (await this.act("artifact/write", { agentID: agentID as UUID, path, text }, host)) !== null;
   }
