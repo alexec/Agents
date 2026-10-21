@@ -239,26 +239,32 @@ func lineDiff(old, new []string) (inserted, removed map[int]bool) {
 		}
 		return
 	}
-	// lcs[i][j] is the longest common run of a[i:] and b[j:].
-	lcs := make([][]int, len(a)+1)
-	for i := range lcs {
-		lcs[i] = make([]int, len(b)+1)
-	}
+	// The longest common run of a[i:] and b[j:] is filled a row at a time, two rows kept;
+	// of each cell only the way back is kept, one bit (#1853): whether
+	// an insertion goes before a removal there. A 4M-cell table is ~500 KB, not 32 MB.
+	n := len(b)
+	below, row := make([]int32, n+1), make([]int32, n+1)
+	insertFirst := make([]uint64, (len(a)*n+63)/64)
 	for i := len(a) - 1; i >= 0; i-- {
-		for j := len(b) - 1; j >= 0; j-- {
+		for j := n - 1; j >= 0; j-- {
 			if a[i] == b[j] {
-				lcs[i][j] = lcs[i+1][j+1] + 1
-			} else {
-				lcs[i][j] = max(lcs[i+1][j], lcs[i][j+1])
+				row[j] = below[j+1] + 1
+				continue
+			}
+			row[j] = max(below[j], row[j+1])
+			if row[j+1] >= below[j] {
+				c := i*n + j
+				insertFirst[c/64] |= 1 << (c % 64)
 			}
 		}
+		below, row = row, below
 	}
 	i, j := 0, 0
 	for i < len(a) || j < len(b) {
 		switch {
 		case i < len(a) && j < len(b) && a[i] == b[j]:
 			i, j = i+1, j+1
-		case j < len(b) && (i == len(a) || lcs[i][j+1] >= lcs[i+1][j]):
+		case j < len(b) && (i == len(a) || insertFirst[(i*n+j)/64]&(1<<((i*n+j)%64)) != 0):
 			inserted[pre+j] = true
 			j++
 		default:
