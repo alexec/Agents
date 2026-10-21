@@ -1,6 +1,6 @@
 ---
 name: release
-description: Take main to a new version with nobody watching (#914). Run the six reviews and checks once each on what changed since the last tag, have the high findings fixed (and the medium ones while time is left, within a day) through the Scrum Master's lanes, check the gate, choose the version, check its milestone, write the notes, tag and push, check the GitHub release and both TestFlight builds, close the milestone, lift the next milestone's hold, and review how the release went. Use when the Release workflow runs, or when Alex asks for a release. Not for installing on Alex's Mac or devices (ship-app), and never for App Review.
+description: Take main to a new version with nobody watching (#914). Run the six reviews and checks once each on what changed since the last tag, have the high findings fixed through the Scrum Master's lanes (the medium ones are filed, listed as known issues and left to the lanes after the release), check the gate, choose the version, check its milestone, write the notes, tag and push, check the GitHub release and both TestFlight builds, close the milestone, lift the next milestone's hold, and review how the release went. Use when the Release workflow runs, or when Alex asks for a release. Not for installing on Alex's Mac or devices (ship-app), and never for App Review.
 ---
 
 # Release
@@ -24,9 +24,10 @@ Alex decided (2026-10-13, #914):
   fit in it.
 - **Priority is a label:** `priority:high` and `priority:medium`. Within each, security
   goes before performance, before usability, before runtimes, before the rest.
-- **High always blocks.** Medium is worked only once no high is open, while the day
-  lasts; at T0 + 1 day the release goes out, and the medium ones still open are listed
-  as known issues. Low is recorded and not worked.
+- **Only high blocks** (Alex, 2026-10-19, #1661). The release tags as soon as no high is
+  open; it never waits for a medium fix. Medium is filed with `priority:medium`, listed as
+  a known issue, and worked by the ordinary lanes after the release (a bug in the next
+  milestone, the rest as labelled). Low is recorded and not worked.
 - **A version has a milestone** (#1348): `0.5.0` is the milestone whose title starts
   with `0.5 `. A patch version has none. The milestone is done when its release has
   shipped, and this skill closes it then (step 9).
@@ -86,7 +87,7 @@ for its findings at once, so their fixes start while the others still run. One t
 failed, or is still running at T0 + 1 day (stop it with `stop_session`), is a note in
 your report, not a reason to stop, and it is not started again until the next release.
 
-## 3. Have high and medium fixed
+## 3. Have the high ones fixed, and file the medium ones
 
 Collect the open findings with severity high or critical (both are "high" here) or
 medium **that this release's runs recorded**: the ones in their run files (front matter
@@ -116,15 +117,16 @@ For each finding that is not security:
    have one.
 
 Then send the Scrum Master one message (`list_sessions`, then `message_session` to the
-session titled Scrum Master): the issues in priority order (high before medium; within
-each, security, performance, usability, runtimes, the rest), that the release waits for
-the high ones, and that the medium ones are worked only once no high is open, until
-T0 + 1 day. If no Scrum Master is running, go on to step 4 and say so in the report: the
-issues are labelled, and the next Scrum Master takes them.
+session titled Scrum Master): the high issues in priority order (security, performance,
+usability, runtimes, the rest), and that the release waits for them. Send no medium one:
+the release does not wait for it, and the lanes take it after the release as its label
+and milestone say. If no Scrum Master is running, go on to step 4 and say so in the
+report: the issues are labelled, and the next Scrum Master takes them.
 
 ### Security findings
 
-For each open high or medium security finding:
+For each open high or medium security finding (a medium one still gets its draft
+advisory, but does not block, and the Scrum Master is not sent it):
 
 1. Look for its advisory: `gh api repos/alexec/Agents/security-advisories?state=draft`,
    matching the finding's id in `summary`.
@@ -148,7 +150,7 @@ For each open high or medium security finding:
    python3 .agents/skills/release/scripts/advisory.py fork <ghsa_id>
    ```
 
-4. Send the Scrum Master the advisory's URL only (it is private). Its lane fixes the
+4. For a high one, send the Scrum Master the advisory's URL only (it is private). Its lane fixes the
    finding on the advisory's private fork, then opens the pull request on `main` with a
    title and body that name no attack ("Harden token comparison"), and writes
    `Fixed by <merge commit> on main.` at the end of the advisory's description
@@ -163,8 +165,8 @@ Until the gate can pass:
 
 - Recount what is still open of what step 3 collected: its issues, and its security
   advisories without their fix on `origin/main`.
-- Go on when nothing high is open, and nothing medium is open or T0 + 1 day has come.
-  The medium ones still open go into the notes as known issues.
+- Go on as soon as nothing high is open. Never wait for a medium one: those still open
+  go into the notes as known issues.
 - Otherwise wait with `wait_for_event` for `issue.closed` and `pr.merged`, with
   `until_minutes` at most the time left to T0 + 1 day.
 - High always blocks. At T0 + 1 day with a high one still open, end with `partly_done`,
