@@ -422,6 +422,7 @@ public enum Capability {
         "clients/startPairing": "clients/1",
         "clients/stopPairing": "clients/1",
         "console/fleet": "console/1",
+        "console/teamWorkflows": "console/1",
         "control/ping": "control/1",
         "control/rotate": "control.rotate/1",
         "control/setAuditDays": "events.audit/1",

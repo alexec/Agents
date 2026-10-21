@@ -2442,6 +2442,32 @@
       }
     },
     {
+      "name": "console/teamWorkflows",
+      "x-capability": "console/1",
+      "description": "Console ▸ Team Workflows (#1804, M6): each bot, the workflows it ran and what runs now. Admins only.",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/TeamWorkflows"
+        }
+      }
+    },
+    {
       "name": "user/settings",
       "x-capability": "user/1",
       "tags": [

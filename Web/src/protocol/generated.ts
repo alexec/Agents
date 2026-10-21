@@ -5086,6 +5086,38 @@ export interface SwitchRecordSide {
 }
 
 /**
+ * A bot on Console ▸ Team Workflows (#1804, M6): its group, caps and spend today, its machines, the
+ * workflows it ran and what runs now.
+ */
+export interface TeamBot {
+  user: string;
+  name: string;
+  group?: string;
+  groupName?: string;
+  caps?: SpendCaps;
+  spentTodayUSD: number;
+  /** It is at its own or its group's cap until midnight UTC. */
+  capped: boolean;
+  machines: number;
+  online: number;
+  workflows: TeamWorkflowRuns[];
+  live: TeamBotRun[];
+}
+
+/**
+ * An agent running on a bot's machine (#1804, M6), as the machine last listed it, for bots/stopRun.
+ * No title, nothing it said.
+ */
+export interface TeamBotRun {
+  host: HostID;
+  hostName: string;
+  agent: UUID;
+  /** The workflow that started it. */
+  workflow?: string;
+  since?: WireDate;
+}
+
+/**
  * workflows/trigger and workflows/fire (#2011, spec 736 FR-035): a project or control-plane event
  * (a server's, such as github or a channel's) or a schedule that a runs-on: workflow's trigger
  * matched. A machine sends it to the control plane, which sends it once to one of the bot's
@@ -5117,6 +5149,18 @@ export interface TeamTriggerFired {
  */
 export interface TeamTriggerSent {
   taken: boolean;
+}
+
+/** One workflow a bot ran in the last 7 days (#1804, M6): how many times, and when last. */
+export interface TeamWorkflowRuns {
+  workflow: string;
+  runs: number;
+  lastRunAt?: WireDate;
+}
+
+/** console/teamWorkflows' answer (#1804, M6): every bot, for an admin. */
+export interface TeamWorkflows {
+  bots: TeamBot[];
 }
 
 export interface TimeBucket {
@@ -6005,6 +6049,7 @@ export interface Methods {
   "connectors/setup": { params: ConnectorSetupRequest; result: ConnectorSetup };
   "connectors/setup/skip": { params: ConnectorSkipRequest; result: ConnectorSetup };
   "console/fleet": { params: Empty; result: FleetBoard };
+  "console/teamWorkflows": { params: Empty; result: TeamWorkflows };
   "control/rotate": { params: Empty; result: Empty };
   "control/setAuditDays": { params: AuditDays; result: AuditDays };
   "control/status": { params: Empty; result: ControlStatus };
@@ -6215,6 +6260,7 @@ export const MethodTarget = {
   "connectors/setup": "host",
   "connectors/setup/skip": "host",
   "console/fleet": "control",
+  "console/teamWorkflows": "control",
   "control/rotate": "control",
   "control/setAuditDays": "control",
   "control/status": "control",
@@ -6964,9 +7010,13 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   SurfaceIdentification: { required: ["id", "name", "kind"], optional: [] },
   SwitchRecord: { required: ["id", "at", "agentID", "from", "to", "reason", "carried", "dropped", "billing"], optional: ["shortened", "fromReturnsAt"] },
   SwitchRecordSide: { required: ["runtimeID"], optional: ["entryID", "model", "mode"] },
+  TeamBot: { required: ["user", "name", "spentTodayUSD", "capped", "machines", "online", "workflows", "live"], optional: ["group", "groupName", "caps"] },
+  TeamBotRun: { required: ["host", "hostName", "agent"], optional: ["workflow", "since"] },
   TeamTrigger: { required: ["workflow", "trigger", "runsOn"], optional: ["event", "dueAt"] },
   TeamTriggerFired: { required: ["ran"], optional: [] },
   TeamTriggerSent: { required: ["taken"], optional: [] },
+  TeamWorkflowRuns: { required: ["workflow", "runs"], optional: ["lastRunAt"] },
+  TeamWorkflows: { required: ["bots"], optional: [] },
   TimeBucket: { required: ["agent", "tools", "others", "person", "turns"], optional: [] },
   TimeHistory: { required: ["hours", "days", "now", "recap", "records"], optional: ["timeZone"] },
   TimeRecord: { required: ["value", "day"], optional: [] },

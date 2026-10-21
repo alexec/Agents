@@ -20826,6 +20826,127 @@
         "result"
       ],
       "additionalProperties": false
+    },
+    "TeamWorkflowRuns": {
+      "type": "object",
+      "description": "One workflow a bot ran in the last 7 days (#1804, M6): how many times, and when last.",
+      "properties": {
+        "workflow": {
+          "type": "string"
+        },
+        "runs": {
+          "type": "integer"
+        },
+        "lastRunAt": {
+          "$ref": "#/definitions/WireDate"
+        }
+      },
+      "required": [
+        "workflow",
+        "runs"
+      ],
+      "additionalProperties": false
+    },
+    "TeamBotRun": {
+      "type": "object",
+      "description": "An agent running on a bot's machine (#1804, M6), as the machine last listed it, for bots/stopRun. No title, nothing it said.",
+      "properties": {
+        "host": {
+          "$ref": "#/definitions/HostID"
+        },
+        "hostName": {
+          "type": "string"
+        },
+        "agent": {
+          "$ref": "#/definitions/UUID"
+        },
+        "workflow": {
+          "type": "string",
+          "description": "The workflow that started it."
+        },
+        "since": {
+          "$ref": "#/definitions/WireDate"
+        }
+      },
+      "required": [
+        "host",
+        "hostName",
+        "agent"
+      ],
+      "additionalProperties": false
+    },
+    "TeamBot": {
+      "type": "object",
+      "description": "A bot on Console ▸ Team Workflows (#1804, M6): its group, caps and spend today, its machines, the workflows it ran and what runs now.",
+      "properties": {
+        "user": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "group": {
+          "type": "string"
+        },
+        "groupName": {
+          "type": "string"
+        },
+        "caps": {
+          "$ref": "#/definitions/SpendCaps"
+        },
+        "spentTodayUSD": {
+          "type": "number"
+        },
+        "capped": {
+          "type": "boolean",
+          "description": "It is at its own or its group's cap until midnight UTC."
+        },
+        "machines": {
+          "type": "integer"
+        },
+        "online": {
+          "type": "integer"
+        },
+        "workflows": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/TeamWorkflowRuns"
+          }
+        },
+        "live": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/TeamBotRun"
+          }
+        }
+      },
+      "required": [
+        "user",
+        "name",
+        "spentTodayUSD",
+        "capped",
+        "machines",
+        "online",
+        "workflows",
+        "live"
+      ],
+      "additionalProperties": false
+    },
+    "TeamWorkflows": {
+      "type": "object",
+      "description": "console/teamWorkflows' answer (#1804, M6): every bot, for an admin.",
+      "properties": {
+        "bots": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/TeamBot"
+          }
+        }
+      },
+      "required": [
+        "bots"
+      ],
+      "additionalProperties": false
     }
   }
 }

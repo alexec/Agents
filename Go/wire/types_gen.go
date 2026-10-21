@@ -5612,6 +5612,32 @@ type SwitchRecordSide struct {
 	Mode      JSONValue `json:"mode,omitzero"`
 }
 
+// A bot on Console ▸ Team Workflows (#1804, M6): its group, caps and spend today, its machines, the workflows it ran and what runs now.
+type TeamBot struct {
+	User          string     `json:"user"`
+	Name          string     `json:"name"`
+	Group         *string    `json:"group,omitzero"`
+	GroupName     *string    `json:"groupName,omitzero"`
+	Caps          *SpendCaps `json:"caps,omitzero"`
+	SpentTodayUSD float64    `json:"spentTodayUSD"`
+	// It is at its own or its group's cap until midnight UTC.
+	Capped    bool               `json:"capped"`
+	Machines  int64              `json:"machines"`
+	Online    int64              `json:"online"`
+	Workflows []TeamWorkflowRuns `json:"workflows"`
+	Live      []TeamBotRun       `json:"live"`
+}
+
+// An agent running on a bot's machine (#1804, M6), as the machine last listed it, for bots/stopRun. No title, nothing it said.
+type TeamBotRun struct {
+	Host     HostID `json:"host"`
+	HostName string `json:"hostName"`
+	Agent    UUID   `json:"agent"`
+	// The workflow that started it.
+	Workflow *string `json:"workflow,omitzero"`
+	Since    *Date   `json:"since,omitzero"`
+}
+
 // workflows/trigger and workflows/fire (#2011, spec 736 FR-035): a project or control-plane event (a server's, such as github or a channel's) or a schedule that a runs-on: workflow's trigger matched. A machine sends it to the control plane, which sends it once to one of the bot's machines. workflow is the project folder's name and the workflow's id; trigger, the same words on every machine that heard it; event, the event (none for a schedule); dueAt, a schedule's due time.
 type TeamTrigger struct {
 	Workflow string   `json:"workflow"`
@@ -5629,6 +5655,18 @@ type TeamTriggerFired struct {
 // workflows/trigger's answer: taken is true when runs-on: names a bot, and the control plane sends the trigger once to one of its machines; false when it names none, and the machine goes on as before.
 type TeamTriggerSent struct {
 	Taken bool `json:"taken"`
+}
+
+// One workflow a bot ran in the last 7 days (#1804, M6): how many times, and when last.
+type TeamWorkflowRuns struct {
+	Workflow  string `json:"workflow"`
+	Runs      int64  `json:"runs"`
+	LastRunAt *Date  `json:"lastRunAt,omitzero"`
+}
+
+// console/teamWorkflows' answer (#1804, M6): every bot, for an admin.
+type TeamWorkflows struct {
+	Bots []TeamBot `json:"bots"`
 }
 
 type TimeBucket struct {
