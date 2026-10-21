@@ -64,7 +64,9 @@ func TestAPageThroughThisHost(t *testing.T) {
 		t.Fatal(err)
 	}
 	up := &controllink.Uplink{Root: root, Member: member, Private: private, Hello: hello, Accept: d.Accept}
-	go up.Run(ctx)
+	upCtx, stopUplink := context.WithCancel(ctx)
+	defer stopUplink()
+	go up.Run(upCtx)
 
 	listener := d.StartPage(ctx, private, dist, 0)
 	if listener == nil {
@@ -124,6 +126,27 @@ func TestAPageThroughThisHost(t *testing.T) {
 		}
 		if strings.Contains(line, `"id":7`) {
 			if !strings.Contains(line, `"result"`) {
+				t.Fatal(line)
+			}
+			break
+		}
+	}
+
+	// Its calls to this host are answered here (#1970): with the uplink gone, so the control
+	// plane could not have, they are still answered, framed as the control plane frames them.
+	stopUplink()
+	time.Sleep(300 * time.Millisecond)
+	host, _ := json.Marshal(member.Host)
+	l.Write(ctx, `{"h":`+string(host)+`,"m":{"jsonrpc":"2.0","id":8,"method":"daemon/status"}}`)
+	for {
+		rctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+		line, err := l.Read(rctx)
+		cancel()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if strings.Contains(line, `"id":8`) {
+			if !strings.Contains(line, `"result"`) || !strings.HasPrefix(line, `{"h":`+string(host)+`,"m":`) {
 				t.Fatal(line)
 			}
 			break
