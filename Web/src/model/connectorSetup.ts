@@ -296,7 +296,7 @@ export const gitlab = {
   tokenPrompt: "glpat-…",
   tokenButton: "Connect",
   checking: "Checking the token with GitLab…",
-  disconnectNote: "Disconnect deletes the host's token. GitLab's events stop until you connect again or set GITLAB_TOKEN. To revoke it too, go to GitLab ▸ Preferences ▸ Applications or Access tokens.",
+  disconnectNote: "Disconnect deletes the host's token. Every project's GitLab slots wait for a connection again. GitLab's events stop until you connect again or set GITLAB_TOKEN. To revoke it too, go to GitLab ▸ Preferences ▸ Applications or Access tokens.",
 };
 
 /** Where the person makes a token on the GitLab at address (gitlab.com when empty), opened in a new tab. */

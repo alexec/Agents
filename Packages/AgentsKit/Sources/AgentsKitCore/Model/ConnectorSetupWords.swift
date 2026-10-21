@@ -285,6 +285,20 @@ public enum ConnectorSetupWords {
         }
     }
 
+    /// Disconnect's message: which projects lose which slots, before it goes, then the note.
+    /// Only a project on that connection's forge loses anything (#1868): GitHub fills a GitHub
+    /// project's slots and GitLab a GitLab project's (#1632); other connections fill none.
+    public static func disconnectMessage(_ p: DaemonAPI.ConnectionProvider,
+                                         projects: [(name: String, setup: Setup)]) -> String {
+        guard p == .github || p == .gitlab else { return disconnectNote(p) }
+        let losing = projects.compactMap { project -> String? in
+            guard project.setup.forgeOrGitHub == p else { return nil }
+            let slots = project.setup.slots.filter { $0.slot != .workspace && $0.state == .read }.map { heading($0.slot) }
+            return slots.isEmpty ? nil : "\(project.name) loses \(slots.joined(separator: ", "))."
+        }
+        return (losing + [disconnectNote(p)]).joined(separator: " ")
+    }
+
     /// A project on Your Connectors: what its set-up uses.
     public static func projectLine(_ setup: Setup) -> String {
         if setup.repository == nil { return noRemote }
@@ -328,7 +342,7 @@ public enum ConnectorSetupWords {
         public static let tokenPrompt = "glpat-\u{2026}"
         public static let tokenButton = "Connect"
         public static let checking = "Checking the token with GitLab\u{2026}"
-        public static let disconnectNote = "Disconnect deletes the host's token. GitLab's events stop until you connect again or set GITLAB_TOKEN. To revoke it too, go to GitLab \u{25B8} Preferences \u{25B8} Applications or Access tokens."
+        public static let disconnectNote = "Disconnect deletes the host's token. Every project's GitLab slots wait for a connection again. GitLab's events stop until you connect again or set GITLAB_TOKEN. To revoke it too, go to GitLab \u{25B8} Preferences \u{25B8} Applications or Access tokens."
 
         /// Where the person makes a token on the GitLab at address (gitlab.com when empty).
         public static func newTokenURL(_ address: String) -> String {

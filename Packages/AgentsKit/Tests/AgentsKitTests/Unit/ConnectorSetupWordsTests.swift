@@ -117,4 +117,22 @@ struct ConnectorSetupWordsTests {
         github.forge = nil
         #expect(github.forgeOrGitHub == .github)
     }
+
+    /// Disconnect names only the projects on that connection's forge (#1868), GitLab's too.
+    @Test func disconnectNamesOnlyTheProjectsOnItsForge() {
+        let read: [DaemonAPI.ConnectorSlot] = [.init(slot: .tasks, choice: "Issues", state: .read),
+                                               .init(slot: .ci, choice: "CI", state: .read),
+                                               .init(slot: .workspace, choice: "This Mac", state: .read)]
+        let hub = DaemonAPI.ConnectorSetup(folder: "/hub", repository: "me/hub", slots: read, events: .init(state: .off), done: 3)
+        let lab = DaemonAPI.ConnectorSetup(folder: "/lab", repository: "me/lab", forge: .gitlab, slots: read,
+                                           events: .init(state: .off), done: 3)
+        let projects = [(name: "Hub", setup: hub), (name: "Lab", setup: lab)]
+        #expect(ConnectorSetupWords.disconnectMessage(.github, projects: projects)
+                == "Hub loses Tasks, CI. " + ConnectorSetupWords.disconnectNote)
+        #expect(ConnectorSetupWords.disconnectMessage(.gitlab, projects: projects)
+                == "Lab loses Tasks, CI. " + ConnectorSetupWords.GitLab.disconnectNote)
+        #expect(ConnectorSetupWords.GitLab.disconnectNote.contains("Every project's GitLab slots wait for a connection again."))
+        #expect(ConnectorSetupWords.disconnectMessage(.linear, projects: projects)
+                == ConnectorSetupWords.disconnectNote(.linear))
+    }
 }
