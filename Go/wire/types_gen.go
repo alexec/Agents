@@ -3757,6 +3757,8 @@ type ProviderCreate struct {
 	Name    string     `json:"name"`
 	Options JSONValue  `json:"options,omitzero"`
 	Clones  []string   `json:"clones,omitzero"`
+	// The repository to start it from (#1809), an https git address. A provider whose New Workspace form has `repository`, such as Codespaces, makes the workspace from it; any other has the host clone it once it joins, before `clones`.
+	Repository *string `json:"repository,omitzero"`
 }
 
 // What providers/create made.

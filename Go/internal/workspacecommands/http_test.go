@@ -298,15 +298,39 @@ func TestAnUnreachableAPIIsSaidByItsHostOnly(t *testing.T) {
 
 func fakeCodespaces(t *testing.T, repo string) (*fakeAPI, string) {
 	f := &fakeAPI{states: map[string]string{"psychic-train-7v9": "Shutdown"}, header: "Authorization", expected: "Bearer " + token}
+	// Display names by codespace, as made from a repository (#1809); "psychic train" otherwise.
+	shown := map[string]string{}
 	f.listing = func(states map[string]string) any {
 		var all []any
 		for name, state := range states {
-			all = append(all, map[string]any{"name": name, "display_name": "psychic train", "state": state,
+			display := shown[name]
+			if display == "" {
+				display = "psychic train"
+			}
+			all = append(all, map[string]any{"name": name, "display_name": display, "state": state,
 				"git_status": map[string]any{"ref": "main"}})
 		}
 		return map[string]any{"total_count": len(all), "codespaces": all}
 	}
-	f.answer = func(w http.ResponseWriter, r *http.Request, _ string) bool {
+	f.answer = func(w http.ResponseWriter, r *http.Request, body string) bool {
+		if r.Method == http.MethodPost && strings.HasPrefix(r.URL.Path, "/repos/") && strings.HasSuffix(r.URL.Path, "/codespaces") {
+			var made map[string]any
+			_ = json.Unmarshal([]byte(body), &made)
+			f.mu.Lock()
+			shown["fluffy-octo-1"] = fmt.Sprint(made["display_name"])
+			f.states["fluffy-octo-1"] = "Provisioning"
+			f.mu.Unlock()
+			w.WriteHeader(http.StatusCreated)
+			fmt.Fprint(w, `{"name":"fluffy-octo-1","state":"Provisioning"}`)
+			return true
+		}
+		if r.Method == http.MethodDelete {
+			f.mu.Lock()
+			delete(f.states, strings.Split(r.URL.Path, "/")[3])
+			f.mu.Unlock()
+			w.WriteHeader(http.StatusAccepted)
+			return true
+		}
 		if r.Method != http.MethodPost {
 			return false
 		}
@@ -460,7 +484,11 @@ func TestAnAPIPresetOffersCreateOnlyWhenItCan(t *testing.T) {
 		t.Errorf("%v", names)
 	}
 	_, cs := fakeCodespaces(t, "")
-	if names := toolNames(t, NewServer(config(t, cs), quick, nil, "test")); contains(names, "workspace_create") {
+	if names := toolNames(t, NewServer(config(t, cs), quick, nil, "test")); !contains(names, "workspace_create") || !contains(names, "workspace_delete") {
+		t.Errorf("%v", names)
+	}
+	coder := `{"preset":"coder-api","url":"http://127.0.0.1:9"}`
+	if names := toolNames(t, NewServer(config(t, coder), quick, nil, "test")); contains(names, "workspace_create") {
 		t.Errorf("%v", names)
 	}
 }
@@ -581,5 +609,26 @@ func TestRetryAfterInSecondsOrADate(t *testing.T) {
 		if got := retryAfter(header, now); got != want {
 			t.Errorf("Retry-After %q: %v, want %v", said, got, want)
 		}
+	}
+}
+
+func TestACodespaceIsMadeFromItsRepository(t *testing.T) {
+	f, text := fakeCodespaces(t, "")
+	p, _ := apiProvider(t, text, GitHubSecret, token)
+	if p.Config.Making.FirstBootRuns() {
+		t.Error("a codespace has no user data for the first boot")
+	}
+	if _, err := p.Create("agents-1", map[string]any{}, "curl … | sh"); err == nil || err.Error() != "Give the repository as owner/name." {
+		t.Errorf("%v", err)
+	}
+	made, err := p.Create("agents-1", map[string]any{"repository": "alexec/agents"}, "curl … | sh")
+	if err != nil || made.ID != "fluffy-octo-1" || made.Name != "agents-1" || made.State != Starting {
+		t.Fatalf("%v %+v", err, made)
+	}
+	if !contains(f.requests(), `POST /repos/alexec/agents/codespaces {"display_name":"agents-1"}`) {
+		t.Errorf("%q", f.requests())
+	}
+	if err := p.Delete("fluffy-octo-1"); err != nil || !contains(f.requests(), "DELETE /user/codespaces/fluffy-octo-1") {
+		t.Errorf("%v %q", err, f.requests())
 	}
 }

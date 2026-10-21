@@ -1121,6 +1121,11 @@
     {
       "name": "providers/create",
       "x-capability": "providers/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
       "paramStructure": "by-name",
       "params": [
         {
@@ -1226,6 +1231,11 @@
     {
       "name": "providers/options",
       "x-capability": "providers/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
       "paramStructure": "by-name",
       "params": [
         {

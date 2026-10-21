@@ -7,6 +7,8 @@ import SwiftUI
 enum NewProject: Identifiable, Hashable {
     case folder(HostID)
     case clone(HostID)
+    /// A machine of its own for a repository, made by a workspace provider (#1809).
+    case machine
 
     var id: Self { self }
 }
@@ -32,6 +34,9 @@ struct NewProjectMenu: View {
                 }
                 .disabled(model.isStale(on: host.id))
             }
+            Section {
+                Button(MachineFromRepository.Words.menuItem, systemImage: "server.rack") { adding = .machine }
+            }
         } label: {
             Label("New Project", systemImage: "plus")
         }
@@ -46,6 +51,25 @@ struct NewProjectSheet: View {
         switch adding {
         case .folder(let host): FolderPickerSheet(host: host)
         case .clone(let host): CloneProjectSheet(host: host)
+        case .machine: MachineSheet()
+        }
+    }
+}
+
+/// Start a Machine from a Repository (#1809): the shared sheet, over the Remote's control plane.
+private struct MachineSheet: View {
+    @Environment(RemoteModel.self) private var model
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                if let calls = model.machineCalls {
+                    MachineFromRepositorySheet(calls: calls, close: { dismiss() }, sentence: model.refusal)
+                } else {
+                    Text("The control plane isn’t answering.").padding()
+                }
+            }
         }
     }
 }

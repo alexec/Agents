@@ -13,6 +13,8 @@ struct ControlProvidersPage: View {
     @State private var making: DaemonAPI.ProviderSummary?
     /// Write the Map Again… (#858 US4, L10f).
     @State private var rewriting: DaemonAPI.ProviderSummary?
+    /// Start a Machine from a Repository… (#1809).
+    @State private var startingMachine = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -24,7 +26,13 @@ struct ControlProvidersPage: View {
                 ForEach(control.providers) { provider in
                     providerCard(provider)
                 }
-                Button("Add Provider…") { adding = true }.buttonStyle(.paper)
+                HStack(spacing: 8) {
+                    Button("Add Provider…") { adding = true }.buttonStyle(.paper)
+                    // A machine of its own for a repository (#1809), from a provider that makes them.
+                    Button(MachineFromRepository.Words.menuItem) { startingMachine = true }
+                        .buttonStyle(.paper)
+                        .disabled(!control.providers.contains { $0.capabilities.contains("create") })
+                }
                 Text("A provider starts and stops the machines your hosts run on: Docker containers, DigitalOcean Droplets, GitHub Codespaces, Coder workspaces, Google Cloud Workstations and Compute Engine VMs, AWS EC2 instances, or anything with a command. It runs here, on the control plane, so it can start a host that is down.")
                     .appText(.supporting).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -33,6 +41,11 @@ struct ControlProvidersPage: View {
         // Lists every provider again when the page opens (FR-004).
         .task { await control.listWorkspacesAgain() }
         .sheet(isPresented: $adding) { AddProviderSheet(control: control).paperSheet() }
+        .sheet(isPresented: $startingMachine) {
+            MachineFromRepositorySheet(calls: control.machineCalls, close: { startingMachine = false },
+                                       sentence: ControlSettingsModel.refusal)
+                .paperSheet()
+        }
         .sheet(item: $rewriting) { provider in AddProviderSheet(control: control, editing: provider).paperSheet() }
         .sheet(item: $addingHost) { prefill in ControlAddServerSheet(control: control, prefill: prefill).paperSheet() }
         .sheet(item: $making) { provider in

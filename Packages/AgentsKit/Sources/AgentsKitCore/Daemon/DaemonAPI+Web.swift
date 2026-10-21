@@ -278,6 +278,9 @@ public extension DaemonAPI {
                 Row(Method.hostsUnlink, params: HostRequest.self, result: ControlHost.self, kind: .controlRequest),
                 Row(Method.hostsSetWorkspaceOptions, params: HostWorkspaceOptions.self, result: ControlHost.self,
                     kind: .controlRequest),
+                // Start a Machine from a Repository (#1809): the provider's form, then the machine.
+                Row(Method.providersOptions, params: ProviderRequest.self, result: ProviderOptions.self, kind: .controlRequest),
+                Row(Method.providersCreate, params: ProviderCreate.self, result: ProviderCreated.self, kind: .controlRequest),
                 // Prompts and starts kept for a stopped workspace (#691 US3).
                 Row(Method.hostsListKept, params: Empty.self, result: KeptList.self, kind: .controlRequest),
                 Row(Method.hostsDropKept, params: KeptRequestID.self, result: Empty.self, kind: .controlRequest),

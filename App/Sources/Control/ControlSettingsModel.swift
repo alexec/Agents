@@ -291,6 +291,14 @@ final class ControlSettingsModel {
         }
     }
 
+    /// Start a Machine from a Repository (#1809): the shared sheet's calls, on this connection.
+    var machineCalls: MachineFromRepositorySheet.Calls { .through(client) }
+
+    /// A refusal from the control plane, in the window's words.
+    nonisolated static func refusal(_ error: any Error) -> String {
+        (error as? JSONRPCError).map(HostProblem.controlRefusal) ?? "The control plane can’t be reached."
+    }
+
     func isJoining(_ provider: ProviderID, _ workspace: DaemonAPI.WorkspaceInfo) -> Bool {
         workspace.host == nil && joiningWorkspaces.contains("\(provider.rawValue)/\(workspace.id)")
     }

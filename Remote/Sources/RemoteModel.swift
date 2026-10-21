@@ -1509,6 +1509,13 @@ final class RemoteModel {
         (error as? JSONRPCError)?.message ?? "Your Mac did not answer."
     }
 
+    /// Start a Machine from a Repository (#1809): its calls over the control plane, or nil
+    /// while it isn't answering.
+    var machineCalls: MachineFromRepositorySheet.Calls? { controlPlane.map(MachineFromRepositorySheet.Calls.through) }
+
+    /// A refusal in the Remote's words.
+    func refusal(_ error: any Error) -> String { sentence(for: error) }
+
     // MARK: The Mac's runtimes (029)
 
     /// Every runtime the Mac knows, in the Mac's order, startable or not. The start
