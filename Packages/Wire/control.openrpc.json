@@ -2912,6 +2912,265 @@
           "$ref": "daemon.schema.json#/definitions/ChannelLinkChecked"
         }
       }
+    },
+    {
+      "name": "signIn/providers",
+      "x-capability": "signin/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/SignInProviders"
+        }
+      },
+      "description": "The sign-in providers, and the challenge a client makes its nonce from on this connection (#995): on an `s:` connection before signIn/pair, or on a paired client's before signIn/addToMe."
+    },
+    {
+      "name": "signIn/pair",
+      "x-capability": "signin/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/SignInPair"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Admitted"
+        }
+      },
+      "description": "On an `s:` connection only (#995): sign in with Google or Apple (an ID token with the nonce) or GitHub (a user token), and pair as the person it names. A person not known joins only through an allowed Google Workspace domain; anyone else joins by an invite first. A GitHub sign-in waits for Approve on another client of the person (control/signInWaiting) before it is answered."
+    },
+    {
+      "name": "signIn/addToMe",
+      "x-capability": "signin/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/SignInAdd"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/SignIn"
+        }
+      },
+      "description": "Add a Google, Apple or GitHub sign-in to the caller's person (#995, FR-005): an ID token whose nonce is made from signIn/providers' challenge. Refused when it is another person's."
+    },
+    {
+      "name": "signIn/removeFromMe",
+      "x-capability": "signin/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/SignInRemove"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Empty"
+        }
+      },
+      "description": "Take an outside sign-in off the caller's person (#995)."
+    },
+    {
+      "name": "signIn/configure",
+      "x-capability": "signin/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/SignInConfigure"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/SignInProviders"
+        }
+      },
+      "description": "Admins (#995, FR-004, FR-006): turn a provider on or off, and allow Google Workspace domains or GitHub organisations."
+    },
+    {
+      "name": "signIn/requests",
+      "x-capability": "signin/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "type": "array",
+          "items": {
+            "$ref": "daemon.schema.json#/definitions/SignInRequest"
+          }
+        }
+      },
+      "description": "The GitHub sign-ins waiting for the caller's Approve (#995, FR-010)."
+    },
+    {
+      "name": "signIn/approve",
+      "x-capability": "signin/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/SignInDecide"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Empty"
+        }
+      },
+      "description": "Approve a waiting GitHub sign-in: the new client pairs as the caller's person (#995)."
+    },
+    {
+      "name": "signIn/deny",
+      "x-capability": "signin/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/SignInDecide"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Empty"
+        }
+      },
+      "description": "Deny a waiting GitHub sign-in (#995)."
+    },
+    {
+      "name": "control/signInRequested",
+      "x-capability": "signin/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/SignInRequest"
+          }
+        }
+      ],
+      "description": "A GitHub sign-in waits for this person's Approve (#995)."
+    },
+    {
+      "name": "control/signInDecided",
+      "x-capability": "signin/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/SignInDecided"
+          }
+        }
+      ],
+      "description": "A waiting GitHub sign-in was approved, denied or ran out (#995)."
+    },
+    {
+      "name": "control/signInWaiting",
+      "x-capability": "signin/1",
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/SignInWaiting"
+          }
+        }
+      ],
+      "description": "On an `s:` connection: the sign-in waits for Approve, with the code to compare (#995)."
     }
   ]
 }

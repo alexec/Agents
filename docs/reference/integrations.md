@@ -171,6 +171,16 @@ Open issues: `is:open label:integration "control plane"`.
 | Google Cloud (Compute Engine VM and Cloud KMS) for the control plane | control plane | tested on a real account | 2026-10-18, `up.sh` made the VM `agents-control`, the live control plane moved there and back (`specs/058-control-plane/walks/1461.md`) | `deploy/gcp/up.sh`, `deploy/gcp/down.sh`, `deploy/gcp/startup.sh` | |
 | Cloudflare DNS for the control plane's names | control plane | tested on a real account | 2026-10-18, `dns.sh` made the A records for control.agentloops.dev and views.agentloops.dev (`specs/058-control-plane/walks/1461.md`) | `deploy/cloudflare/dns.sh` | |
 
+## Signing a person in to the control plane
+
+Open issues: `is:open label:integration sign-in`. Not a runtime's sign-in or a connector's: this is how a person pairs a client with no code, or adds a sign-in to themselves (#995, spec 736 T2). The client ids are the app's own (`Go/internal/controlplane/signin/config.go`, or `AGENTS_SIGNIN_*` on the control plane), so no operator registers anything.
+
+| Integration | Clients that show it | State | Last checked | Where | Gaps |
+| --- | --- | --- | --- | --- | --- |
+| Sign in with Google (an ID token from the app's Google OAuth client, checked against Google's JWKS, `iss`, `aud`, the expiry and a nonce bound to the control plane's key id and the hello; allowed Workspace domains) | control plane | built, tested with a fake issuer | 2026-10-21, `Go/internal/controlplane/signin_test.go` and `signin/signin_test.go` (every refusal, a replay to a second control plane, key rotation) | `Go/internal/controlplane/signin/oidc.go`, `Go/internal/controlplane/signin.go` | the Google OAuth client (Alex, #995); the Mac and Remote sign-in sheet (#995) |
+| Sign in with Apple (a native `ASAuthorizationAppleIDProvider` ID token, checked against Apple's JWKS; invite only) | control plane | built, tested with a fake issuer | 2026-10-21, as Google's | `Go/internal/controlplane/signin/oidc.go`, `Go/internal/controlplane/signin.go` | the Services id and the capability (Alex, #995); the sheet (#995) |
+| Sign in with GitHub (the device flow of a sign-in GitHub App with user tokens that expire; `GET /user` once, then the token is forgotten; allowed organisations; each further client approved on a card) | control plane | built, tested with a fake GitHub | 2026-10-21, `Go/internal/controlplane/signin_test.go` (the approval, a replay to a second control plane, organisations, no token in the store or the log) | `Go/internal/controlplane/signin/github.go`, `Go/internal/controlplane/signin_approvals.go` | the GitHub App (Alex, #995); the sheet and the card (#995) |
+
 ## Model gateways
 
 Open issues: `is:open label:integration gateway`.
@@ -187,7 +197,6 @@ Open issues: `is:open label:integration`.
 | Integration | Clients that show it | State | Last checked | Where | Gaps |
 | --- | --- | --- | --- | --- | --- |
 | Forgejo | — | planned | — | — | #813 |
-| Google and Apple sign-in | — | planned | — | — | #995 |
 | Enterprise OIDC and SCIM | — | planned | — | — | #1002 |
 | Google Chat | — | planned (parked) | — | — | #1016 |
 

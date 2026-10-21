@@ -453,6 +453,14 @@ var (
 	CallReportsScopes                = Method[Empty, ReportScopes]{"reports/scopes"}
 	CallReportsSetPolicy             = Method[ReportPolicy, ReportPolicy]{"reports/setPolicy"}
 	CallReportsUsage                 = Method[ReportQuery, UsageReport]{"reports/usage"}
+	CallSignInAddToMe                = Method[SignInAdd, SignIn]{"signIn/addToMe"}
+	CallSignInApprove                = Method[SignInDecide, Empty]{"signIn/approve"}
+	CallSignInConfigure              = Method[SignInConfigure, SignInProviders]{"signIn/configure"}
+	CallSignInDeny                   = Method[SignInDecide, Empty]{"signIn/deny"}
+	CallSignInPair                   = Method[SignInPair, Admitted]{"signIn/pair"}
+	CallSignInProviders              = Method[Empty, SignInProviders]{"signIn/providers"}
+	CallSignInRemoveFromMe           = Method[SignInRemove, Empty]{"signIn/removeFromMe"}
+	CallSignInRequests               = Method[Empty, []SignInRequest]{"signIn/requests"}
 	CallTunnelOpen                   = Method[TunnelOpen, Empty]{"tunnel/open"}
 	CallUsageRollup                  = Method[UsageRollup, Empty]{"usage/rollup"}
 	CallUserRemoveSecret             = Method[UserSecretRequest, Empty]{"user/removeSecret"}
@@ -481,6 +489,9 @@ var (
 	NotifyControlProviderDraft       = Notification[ProviderDraftUpdate]{"control/providerDraft"}
 	NotifyControlProvidersChanged    = Notification[ProviderList]{"control/providersChanged"}
 	NotifyControlSecretsLeft         = Notification[SecretsLeft]{"control/secretsLeft"}
+	NotifyControlSignInDecided       = Notification[SignInDecided]{"control/signInDecided"}
+	NotifyControlSignInRequested     = Notification[SignInRequest]{"control/signInRequested"}
+	NotifyControlSignInWaiting       = Notification[SignInWaiting]{"control/signInWaiting"}
 	NotifyControlThisMacHostChanged  = Notification[HostJoinStatus]{"control/thisMacHostChanged"}
 	NotifyControlTunnelChanged       = Notification[HostTunnelChanged]{"control/tunnelChanged"}
 	NotifyControlUserSettingsChanged = Notification[UserSettingsChanged]{"control/userSettingsChanged"}

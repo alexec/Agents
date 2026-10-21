@@ -30,6 +30,7 @@ import (
 	"github.com/alexec/agents/Go/internal/controlplane/notices"
 	"github.com/alexec/agents/Go/internal/controlplane/providers"
 	"github.com/alexec/agents/Go/internal/controlplane/records"
+	"github.com/alexec/agents/Go/internal/controlplane/signin"
 	"github.com/alexec/agents/Go/internal/controlplane/store"
 	"github.com/alexec/agents/Go/internal/controlplane/usersettings"
 	"github.com/alexec/agents/Go/internal/controlplane/web"
@@ -114,6 +115,9 @@ type Config struct {
 	// Posts this copy's own pushes through APNs (#1460) when no Mac host relays a notice.
 	// Nil, with no key on the machine, sends none.
 	Push Pusher
+	// The sign-in providers this copy can check, and where it asks them (#995); nil is the
+	// app's own client ids, or AGENTS_SIGNIN_* over them.
+	SignIn *signin.Config
 }
 
 // WebConfig is ControlService.Configuration.Web.
@@ -168,6 +172,9 @@ type Service struct {
 	// Machines asking to join with no code (#994).
 	joins *joins
 	links *links
+	// Sign-in with Google, Apple and GitHub (#995), and the GitHub sign-ins waiting.
+	signIns         *signIns
+	signInApprovals *signInApprovals
 	// Each person's settings and secrets (#1760), and what each machine here was sent.
 	users     *usersettings.Book
 	toldUsers toldUsers
@@ -222,6 +229,8 @@ func New(cfg Config) (*Service, error) {
 	s.router.SetTeam(false, cfg.Version)
 	s.joins = newJoins(s)
 	s.links = newLinks(s)
+	s.signIns = newSignIns(s, cfg.SignIn)
+	s.signInApprovals = newSignInApprovals(s)
 	s.copies = newHostCopies(cfg.Store)
 	if s.users, err = openUserBook(cfg); err != nil {
 		return nil, err
@@ -1054,6 +1063,12 @@ func (s *Service) acceptVia(conn *Conn, webOrigin string, proved func(failed boo
 	var shared []byte
 	verify := func(private []byte) (controllink.Identity, []byte, error) {
 		return controllink.Verify(auth, serverNonce, bound, func(id controllink.Identity) ([]byte, error) {
+			// A client signing in with no code (#995): its new key, which it proves here.
+			if id.Kind == 's' {
+				key, err := s.signIns.key(id, auth.PublicKey, private)
+				admittedAny, shared = err == nil, key
+				return key, err
+			}
 			key, c, h, err := s.keyWith(id, private)
 			client, host, admittedAny, shared = c, h, err == nil, key
 			return key, err
@@ -1090,7 +1105,7 @@ func (s *Service) acceptVia(conn *Conn, webOrigin string, proved func(failed boo
 		// Being filled, so its records are not whole yet: not a verdict on anyone (#81).
 		refuse(controllink.Refuse(controllink.Unavailable))
 		return
-	case (phase == phaseFrozen || phase == phaseForwarding) && (id.Kind == 'p' || id.Kind == 'e' || id.Kind == 'w'):
+	case (phase == phaseFrozen || phase == phaseForwarding) && (id.Kind == 'p' || id.Kind == 'e' || id.Kind == 'w' || id.Kind == 's'):
 		refuse(controllink.Refuse(controllink.Unknown))
 		return
 	case phase == phaseForwarding && (id.Kind == 'c' || id.Kind == 'h') && s.phase.forwardingUntil().Before(time.Now()):
@@ -1123,6 +1138,11 @@ func (s *Service) acceptVia(conn *Conn, webOrigin string, proved func(failed boo
 		}
 		pageOrigin = web.OriginFor(int(*auth.Page))
 	} else if auth.Page != nil {
+		refuse(controllink.Refuse(controllink.BadMessage))
+		return
+	}
+	// Only a client signing in says its key in the auth line.
+	if (id.Kind == 's') != (len(auth.PublicKey) > 0) {
 		refuse(controllink.Refuse(controllink.BadMessage))
 		return
 	}
@@ -1193,6 +1213,8 @@ func (s *Service) acceptVia(conn *Conn, webOrigin string, proved func(failed boo
 		s.acceptVia(conn, pageOrigin, nil, host)
 	case 'p', 'e':
 		s.spend(conn, id.ID, webOrigin)
+	case 's':
+		s.signIns.pairing(conn, id.ID, auth.PublicKey, serverNonce)
 	case 'x':
 		if strings.HasPrefix(id.ID, handoverPrefix) {
 			s.handoverSession(conn)

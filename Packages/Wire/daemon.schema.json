@@ -3367,6 +3367,10 @@
         "page": {
           "type": "integer",
           "description": "With a `w:<host>` identity (#1480): the port of that host's loopback listener. The socket then carries a page from the loopback origin on port <page>, whose own exchange follows the ok, bound to that origin."
+        },
+        "publicKey": {
+          "$ref": "#/definitions/Base64",
+          "description": "With an `s:<client>` identity (#995): the key of the client that signs in, X9.63. The exchange's MAC is under the ECDH of it and the control plane's key, as a paired client's is."
         }
       },
       "required": [
@@ -20592,6 +20596,234 @@
         "totalsOnly",
         "leads",
         "budgetsUSD"
+      ],
+      "additionalProperties": false
+    },
+    "SignInProvider": {
+      "type": "object",
+      "description": "One sign-in provider (#995, spec 736 FR-004): google, apple or github. `on` is the admin's switch; `available` is false when this build has no client id for it, with `why`. `clientID` is the app's own, what a client signs in with (FR-012).",
+      "properties": {
+        "provider": {
+          "type": "string"
+        },
+        "on": {
+          "type": "boolean"
+        },
+        "available": {
+          "type": "boolean"
+        },
+        "clientID": {
+          "type": "string"
+        },
+        "why": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "provider",
+        "on",
+        "available"
+      ],
+      "additionalProperties": false
+    },
+    "SignInProviders": {
+      "type": "object",
+      "description": "signIn/providers, signIn/configure (#995): the providers. `challenge` (base64url) is what a client's nonce is made from on this connection: the hello's nonce on an `s:` connection, or a fresh one used once on a paired client's. The client makes the nonce itself, from the control key it trusts and the challenge (R2), so a token cannot be passed on to another control plane (FR-008, FR-011). `domains` (Google Workspace) and `organisations` (GitHub) are for admins only (FR-006).",
+      "properties": {
+        "providers": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/SignInProvider"
+          }
+        },
+        "challenge": {
+          "type": "string"
+        },
+        "domains": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "organisations": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "providers"
+      ],
+      "additionalProperties": false
+    },
+    "SignInConfigure": {
+      "type": "object",
+      "description": "signIn/configure (#995, admins): turn a provider on or off, and set Google's allowed Workspace domains or GitHub's allowed organisations. What is left out stays as it was.",
+      "properties": {
+        "provider": {
+          "type": "string"
+        },
+        "on": {
+          "type": "boolean"
+        },
+        "domains": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "organisations": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "provider"
+      ],
+      "additionalProperties": false
+    },
+    "SignInPair": {
+      "type": "object",
+      "description": "signIn/pair, on an `s:` connection (#995): the client's name and kind, and its provider's token: an ID token for google and apple, a user access token for github. The control plane checks it and forgets it (FR-008, FR-010).",
+      "properties": {
+        "provider": {
+          "type": "string"
+        },
+        "token": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/definitions/ClientKind"
+        }
+      },
+      "required": [
+        "provider",
+        "token",
+        "name",
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "SignInWaiting": {
+      "type": "object",
+      "description": "control/signInWaiting, on an `s:` connection (#995, FR-010): a GitHub sign-in waits for Approve on another client of the person, which shows the same code.",
+      "properties": {
+        "code": {
+          "type": "string"
+        },
+        "expires": {
+          "$ref": "#/definitions/WireDate"
+        }
+      },
+      "required": [
+        "code",
+        "expires"
+      ],
+      "additionalProperties": false
+    },
+    "SignInAdd": {
+      "type": "object",
+      "description": "signIn/addToMe (#995, FR-005): a sign-in to add to the caller's person: an ID token made with signIn/providers' nonce, or a GitHub user access token.",
+      "properties": {
+        "provider": {
+          "type": "string"
+        },
+        "token": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "provider",
+        "token"
+      ],
+      "additionalProperties": false
+    },
+    "SignInRemove": {
+      "type": "object",
+      "description": "signIn/removeFromMe (#995): an outside sign-in to take off the caller's person. The local owner's stays.",
+      "properties": {
+        "provider": {
+          "type": "string"
+        },
+        "account": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "provider",
+        "account"
+      ],
+      "additionalProperties": false
+    },
+    "SignInRequest": {
+      "type": "object",
+      "description": "signIn/requests, control/signInRequested (#995, FR-010): a new client that signed in with GitHub, waiting for Approve on one of the person's clients, with the code it shows.",
+      "properties": {
+        "request": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/definitions/ClientKind"
+        },
+        "provider": {
+          "type": "string"
+        },
+        "login": {
+          "type": "string"
+        },
+        "code": {
+          "type": "string"
+        },
+        "expires": {
+          "$ref": "#/definitions/WireDate"
+        }
+      },
+      "required": [
+        "request",
+        "name",
+        "kind",
+        "provider",
+        "code",
+        "expires"
+      ],
+      "additionalProperties": false
+    },
+    "SignInDecide": {
+      "type": "object",
+      "description": "signIn/approve, signIn/deny (#995).",
+      "properties": {
+        "request": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "request"
+      ],
+      "additionalProperties": false
+    },
+    "SignInDecided": {
+      "type": "object",
+      "description": "control/signInDecided (#995): how a request ended: approved, denied or expired.",
+      "properties": {
+        "request": {
+          "type": "string"
+        },
+        "result": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "request",
+        "result"
       ],
       "additionalProperties": false
     }

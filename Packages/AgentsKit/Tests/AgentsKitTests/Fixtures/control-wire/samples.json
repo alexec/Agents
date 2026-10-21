@@ -908,5 +908,75 @@
   "ChannelLinkRemove": {
     "channel": "slack",
     "identity": "T1/U42"
+  },
+  "SignInProvider": {
+    "provider": "google",
+    "on": true,
+    "available": true,
+    "clientID": "app.apps.example"
+  },
+  "SignInProviders": {
+    "providers": [
+      {
+        "provider": "apple",
+        "on": false,
+        "available": false,
+        "why": "This build has no Sign in with Apple id yet."
+      },
+      {
+        "provider": "google",
+        "on": true,
+        "available": true,
+        "clientID": "app.apps.example"
+      }
+    ],
+    "challenge": "bm9uY2U",
+    "domains": [
+      "example.com"
+    ],
+    "organisations": [
+      "acme"
+    ]
+  },
+  "SignInConfigure": {
+    "provider": "github",
+    "on": true,
+    "organisations": [
+      "acme"
+    ]
+  },
+  "SignInPair": {
+    "provider": "github",
+    "token": "token",
+    "name": "Sam's iPhone",
+    "kind": "iPhone"
+  },
+  "SignInWaiting": {
+    "code": "K7M2QX",
+    "expires": 812345678.5
+  },
+  "SignInAdd": {
+    "provider": "google",
+    "token": "token"
+  },
+  "SignInRemove": {
+    "provider": "google",
+    "account": "1234"
+  },
+  "SignInRequest": {
+    "request": "request",
+    "name": "Sam's iPhone",
+    "kind": "iPhone",
+    "provider": "github",
+    "login": "sam",
+    "code": "K7M2QX",
+    "expires": 812345678.5
+  },
+  "SignInDecide": {
+    "request": "request"
+  },
+  "SignInDecided": {
+    "request": "request",
+    "result": "approved"
   }
 }

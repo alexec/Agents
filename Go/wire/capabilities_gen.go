@@ -93,6 +93,7 @@ const (
 	CapSandbox1              = "sandbox/1"
 	CapSessions1             = "sessions/1"
 	CapShell1                = "shell/1"
+	CapSignin1               = "signin/1"
 	CapSimulators1           = "simulators/1"
 	CapSkills1               = "skills/1"
 	CapStorage1              = "storage/1"
@@ -536,6 +537,14 @@ var ControlCapabilities = map[string]string{
 	"reports/scopes":              "reports.scope/1",
 	"reports/setPolicy":           "reports.scope/1",
 	"reports/usage":               "reports/1",
+	"signIn/addToMe":              "signin/1",
+	"signIn/approve":              "signin/1",
+	"signIn/configure":            "signin/1",
+	"signIn/deny":                 "signin/1",
+	"signIn/pair":                 "signin/1",
+	"signIn/providers":            "signin/1",
+	"signIn/removeFromMe":         "signin/1",
+	"signIn/requests":             "signin/1",
 	"tunnel/open":                 "tunnel/1",
 	"usage/rollup":                "reports/1",
 	"user/removeSecret":           "user/1",
@@ -564,6 +573,9 @@ var ControlCapabilities = map[string]string{
 	"control/providerDraft":       "control/1",
 	"control/providersChanged":    "control/1",
 	"control/secretsLeft":         "user/1",
+	"control/signInDecided":       "signin/1",
+	"control/signInRequested":     "signin/1",
+	"control/signInWaiting":       "signin/1",
 	"control/thisMacHostChanged":  "control/1",
 	"control/tunnelChanged":       "control/1",
 	"control/userSettingsChanged": "user/1",
@@ -596,6 +608,9 @@ var ControlNotifications = map[string]bool{
 	"control/providerDraft":       true,
 	"control/providersChanged":    true,
 	"control/secretsLeft":         true,
+	"control/signInDecided":       true,
+	"control/signInRequested":     true,
+	"control/signInWaiting":       true,
 	"control/thisMacHostChanged":  true,
 	"control/tunnelChanged":       true,
 	"control/userSettingsChanged": true,

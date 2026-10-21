@@ -74,6 +74,8 @@ var own = map[string]bool{
 	"groups/list": true, "groups/set": true, "groups/remove": true, "providers/setGroup": true,
 	"bots/make": true, "bots/setCaps": true, "bots/stopRun": true,
 	"links/list": true, "links/requests": true, "links/approve": true, "links/deny": true, "links/remove": true,
+	"signIn/providers": true, "signIn/pair": true, "signIn/addToMe": true, "signIn/removeFromMe": true, "signIn/configure": true,
+	"signIn/requests": true, "signIn/approve": true, "signIn/deny": true,
 }
 
 // Handles says whether a bare method is the control plane's. A bare daemon/ping from
@@ -102,6 +104,7 @@ var writes = map[string]bool{
 	"groups/set": true, "groups/remove": true, "providers/setGroup": true,
 	"bots/make": true, "bots/setCaps": true, "reports/setPolicy": true,
 	"links/approve": true, "links/deny": true, "links/remove": true,
+	"signIn/addToMe": true, "signIn/removeFromMe": true, "signIn/configure": true, "signIn/approve": true, "signIn/deny": true,
 }
 
 func (m *Methods) Handle(method string, params json.RawMessage, from Caller) (any, error) {
@@ -155,6 +158,9 @@ func (m *Methods) Handle(method string, params json.RawMessage, from Caller) (an
 		return m.botsMethod(ctx, method, params, from)
 	case "links/list", "links/requests", "links/approve", "links/deny", "links/remove":
 		return m.linksMethod(ctx, method, params, from)
+	case "signIn/providers", "signIn/pair", "signIn/addToMe", "signIn/removeFromMe", "signIn/configure",
+		"signIn/requests", "signIn/approve", "signIn/deny":
+		return m.signInMethod(ctx, method, params, from)
 	case "reports/usage", "reports/export":
 		return m.reportMethod(ctx, method, params, from)
 	case "user/settings", "user/setSettings", "user/setSecret", "user/removeSecret", "user/secretNames":
