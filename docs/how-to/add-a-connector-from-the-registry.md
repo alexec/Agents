@@ -70,7 +70,7 @@ the new value is not shown again.
 
 **Remove…** is offered only for a connector the app added. One from the registry shows
 **registry** and the version it was added at; one added on the sheet by hand shows
-**added by hand** (see [Add a connector by hand](add-an-mcp-server-by-hand.md)). Confirming takes the entry out of `mcp.json`. The secret stays in
+**added by hand** (see [Add a connector by hand](add-a-connector-by-hand.md)). Confirming takes the entry out of `mcp.json`. The secret stays in
 `secrets.env` unless nothing else names it, in which case you can tick **Also forget** that
 name. If another server still names it, the secret stays and the sheet says so.
 
@@ -79,6 +79,6 @@ wanted to add, the app leaves it alone.
 
 A connector that is not on the registry can be added from the same sheet with **Add by
 hand…**, which connects to it before anything is written: see
-[Add a connector by hand](add-an-mcp-server-by-hand.md).
+[Add a connector by hand](add-a-connector-by-hand.md).
 
 If `mcp.json` cannot be read, Add is refused and the file is not written.

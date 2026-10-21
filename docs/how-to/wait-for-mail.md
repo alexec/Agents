@@ -52,7 +52,7 @@ You can use variables in place of the connection: set `EMAIL_IMAP_URL`, `EMAIL_U
    ```
 
 2. In **Project Settings ▸ Agent Configuration ▸ Connectors**, choose **Approve** on
-   `email`. See [Add a connector by hand](add-an-mcp-server-by-hand.md).
+   `email`. See [Add a connector by hand](add-a-connector-by-hand.md).
 
 3. To keep the Mail page in the sidebar, pin it in the project's `.agents/pins.json`:
 

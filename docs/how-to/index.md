@@ -87,14 +87,14 @@ something particular done.
   before it goes in, and add it for yourself or to a project.
 - [Choose marketplaces](choose-marketplaces.md): which marketplaces Add Connector… and Add
   skill… search, and adding your own, such as your company's MCP registry.
-- [Add a connector from the registry](add-an-mcp-server-from-the-registry.md): search
+- [Add a connector from the registry](add-a-connector-from-the-registry.md): search
   GitHub's MCP registry or another, see what would run, and add it for yourself or to a project. Secrets stay
   in your own `secrets.env`.
-- [Add a connector by hand](add-an-mcp-server-by-hand.md): a local command or a remote
+- [Add a connector by hand](add-a-connector-by-hand.md): a local command or a remote
   URL that is not on the registry, verified to answer before anything is written.
-- [Share one copy of a local connector](share-one-copy-of-a-local-mcp-server.md): mark a
+- [Share one copy of a local connector](share-one-copy-of-a-local-connector.md): mark a
   connector `"hosted": true` so the app runs it once per host for every agent and workflow.
-- [Sign in to a connector](sign-in-to-an-mcp-server.md): a remote connector that asks for
+- [Sign in to a connector](sign-in-to-a-connector.md): a remote connector that asks for
   OAuth, such as GitHub's, signed in to in your browser so agents start with it.
 - [Keep going when a runtime runs out](keep-going-when-a-runtime-runs-out.md): see which
   runtimes are out, and continue a chat's work in a new chat on another.

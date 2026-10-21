@@ -42,7 +42,11 @@ plugins:
   - search
   # A page that moves leaves its old path here, pointing at the new one: old.md: new.md
   - redirects:
-      redirect_maps: {}
+      redirect_maps:
+        how-to/add-an-mcp-server-by-hand.md: how-to/add-a-connector-by-hand.md
+        how-to/add-an-mcp-server-from-the-registry.md: how-to/add-a-connector-from-the-registry.md
+        how-to/share-one-copy-of-a-local-mcp-server.md: how-to/share-one-copy-of-a-local-connector.md
+        how-to/sign-in-to-an-mcp-server.md: how-to/sign-in-to-a-connector.md
 
 markdown_extensions:
   - admonition
@@ -102,10 +106,10 @@ nav:
       - how-to/share-skills-across-agents.md
       - how-to/add-a-skill-from-a-catalogue.md
       - how-to/choose-marketplaces.md
-      - how-to/add-an-mcp-server-from-the-registry.md
-      - how-to/add-an-mcp-server-by-hand.md
-      - how-to/sign-in-to-an-mcp-server.md
-      - how-to/share-one-copy-of-a-local-mcp-server.md
+      - how-to/add-a-connector-from-the-registry.md
+      - how-to/add-a-connector-by-hand.md
+      - how-to/sign-in-to-a-connector.md
+      - how-to/share-one-copy-of-a-local-connector.md
       - how-to/keep-going-when-a-runtime-runs-out.md
       - how-to/limit-spending.md
       - how-to/archive-and-stop.md

@@ -41,11 +41,11 @@ this project's `.agents/mcp.json` as `github`, a local server the app hosts:
 1. In **Project Settings ▸ Agent Configuration ▸ Connectors**, `github` arrived with the project, so it is
    **waiting for your OK**: choose **Approve**. Until you do, it is asked for nothing, and
    the workflow's page says it is waiting for approval. See
-   [Add a connector from the registry](add-an-mcp-server-from-the-registry.md).
+   [Add a connector from the registry](add-a-connector-from-the-registry.md).
 2. There is nothing to start. The app runs one copy of it on the host, the first time a
    workflow or an agent asks it something, and every agent shares that copy. It holds no
    token of its own: it reads the host's GitHub connection, which the host renews. See
-   [Share one copy of a local connector](share-one-copy-of-a-local-mcp-server.md).
+   [Share one copy of a local connector](share-one-copy-of-a-local-connector.md).
 
 A local server without `"hosted": true` works too: the app runs its own copy of it to ask
 for events, with the same environment and secrets an agent gets, and each agent runs

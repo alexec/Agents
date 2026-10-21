@@ -42,7 +42,7 @@ the sheet shows the tools it listed.
      or what the URL answered with. Change something and choose **Verify** again.
    - **It asks you to sign in**: the server wants a sign-in, an OAuth one, before it answers.
      The sign-in sheet opens, and once you have signed in in your browser, Verify runs
-     again with it: see [Sign in to a connector](sign-in-to-an-mcp-server.md).
+     again with it: see [Sign in to a connector](sign-in-to-a-connector.md).
 7. Choose **Add to ~/.agents**, or **Add to project**. It is offered only once the server
    has answered, and only while the form still says what was verified. Change anything and
    you verify again.
@@ -53,7 +53,7 @@ as a registry one is.
 ## Take it out
 
 The row shows **added by hand**, and has **Remove…**, as a registry connector's does: see
-[Take a connector out](add-an-mcp-server-from-the-registry.md#take-a-connector-out).
+[Take a connector out](add-a-connector-from-the-registry.md#take-a-connector-out).
 
 ## Where Verify runs
 

@@ -47,7 +47,7 @@ The client is kept for that server's sign-in, so the next sign-in doesn't ask ag
 
 ## Add a connector that asks, by hand
 
-On [Add by hand](add-an-mcp-server-by-hand.md), **Verify** finds out the server wants a
+On [Add by hand](add-a-connector-by-hand.md), **Verify** finds out the server wants a
 sign-in and opens the same sheet. Once you have signed in, it verifies again, with your
 sign-in, and **Add** is offered as usual. The entry that is written has no token in it.
 
