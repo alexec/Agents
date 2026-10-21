@@ -1,0 +1,94 @@
+<!doctype html>
+<!--
+  #1792: Paradee-8M 1.1 in the browser, with no eSpeak NG.
+  The Mac makes the misaki phonemes (`voice-demo phonemes`, into phonemes.json beside
+  this page); the page runs only the 8.5 MB int8 ONNX graph through onnxruntime-web
+  (WASM, no WebGPU). Serve this folder with serve.py and open it.
+  The numbers land in #result as JSON; Play speaks reply 1 (a click is needed for sound).
+-->
+<html lang="en">
+<meta charset="utf-8">
+<title>Paradee in the browser (#1792)</title>
+<script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.20.1/dist/ort.min.js"></script>
+<body>
+<h1>Paradee in the browser</h1>
+<p id="status">Loading…</p>
+<button id="play" disabled>Play reply 1</button>
+<pre id="result"></pre>
+<script>
+const HUB = "https://huggingface.co/sahilmahendrakar/Paradee-8M-v1.1/resolve/main/";
+const RATE = 24000;
+const now = () => performance.now();
+let session, vocab, phonemes;
+
+function ids(ps) {
+  const out = [0];
+  for (const ch of ps) if (vocab[ch] !== undefined) out.push(vocab[ch]);
+  out.push(0);
+  return out.slice(0, 512);
+}
+
+async function say(ps) {
+  const input = ids(ps);
+  const feeds = {
+    input_ids: new ort.Tensor("int64", BigInt64Array.from(input.map(BigInt)), [1, input.length]),
+    speed: new ort.Tensor("float32", Float32Array.from([1]), [1]),
+  };
+  const out = await session.run(feeds);
+  return out[session.outputNames[0]].data;
+}
+
+async function main() {
+  const result = { userAgent: navigator.userAgent, webgpu: "gpu" in navigator };
+  const t0 = now();
+  vocab = (await (await fetch(HUB + "config.json")).json()).vocab;
+  phonemes = await (await fetch("phonemes.json")).json();
+  ort.env.wasm.numThreads = 1;
+  session = await ort.InferenceSession.create(HUB + "onnx/paradee_int8.onnx", { executionProviders: ["wasm"] });
+  result.loadMs = Math.round(now() - t0);
+  result.replies = [];
+  for (const [index, sentences] of phonemes.entries()) {
+    const begin = now();
+    let first = 0, samples = 0;
+    for (const ps of sentences) {
+      samples += (await say(ps)).length;
+      if (!first) first = now() - begin;
+    }
+    const synth = now() - begin;
+    result.replies.push({
+      reply: index + 1, firstSoundMs: Math.round(first), synthMs: Math.round(synth),
+      audioSeconds: +(samples / RATE).toFixed(1), realTimeFactor: +(synth / 1000 / (samples / RATE)).toFixed(3),
+    });
+    document.getElementById("status").textContent = `Reply ${index + 1} of ${phonemes.length}…`;
+  }
+  document.getElementById("result").textContent = JSON.stringify(result, null, 1);
+  document.getElementById("status").textContent = "Done.";
+  // serve.py keeps what a headless run measured; a plain http.server answers 501, which is fine.
+  fetch("result", { method: "POST", body: JSON.stringify(result) }).catch(() => {});
+  document.getElementById("play").disabled = false;
+}
+
+document.getElementById("play").onclick = async () => {
+  const context = new AudioContext({ sampleRate: RATE });
+  let at = context.currentTime;
+  for (const ps of phonemes[0]) {
+    const audio = await say(ps);
+    const buffer = context.createBuffer(1, audio.length, RATE);
+    buffer.copyToChannel(audio, 0);
+    const source = context.createBufferSource();
+    source.buffer = buffer;
+    source.connect(context.destination);
+    at = Math.max(at, context.currentTime);
+    source.start(at);
+    at += buffer.duration + 0.15;
+  }
+};
+
+main().catch((e) => {
+  document.getElementById("status").textContent = "Failed: " + e;
+  document.getElementById("result").textContent = JSON.stringify({ error: String(e) });
+  fetch("result", { method: "POST", body: JSON.stringify({ error: String(e) }) }).catch(() => {});
+});
+</script>
+</body>
+</html>

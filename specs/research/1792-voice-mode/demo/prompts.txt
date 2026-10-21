@@ -1,0 +1,10 @@
+What does this project contain?
+Is there a bug in wordCount? Do not change anything.
+Fix the bug in wordCount.
+Add a test for readingSeconds.
+How long would it take to read a 340-word reply at the default speed?
+Rename readingSeconds to speakingSeconds everywhere.
+Should wordsPerMinute be 150 or 170? Ask me if you need to.
+Explain what git status says now.
+Write a short README section on how to use wordCount.
+What changed in the last commit?
