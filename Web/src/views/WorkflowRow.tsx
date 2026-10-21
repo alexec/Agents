@@ -9,7 +9,7 @@
 import { useSignal } from "@preact/signals";
 import type { WorkflowSummary } from "../protocol/generated";
 import type { Store } from "../model/store";
-import { canBeApproved, canBeDenied, isOn, isUnapproved, workflowStatus } from "../model/workflows";
+import { canBeApproved, canBeDenied, isOn, isUnapproved, runsHere, workflowStatus } from "../model/workflows";
 import { holdForMenu, isMenuKey, openContextMenu, type MenuItem } from "./ContextMenu";
 import { fromWireDate } from "../protocol/dates";
 import { shortAgo } from "../model/activity";
@@ -58,7 +58,7 @@ export function RunNow({ store, host, summary, disabled, wide }: {
   store: Store; host: string; summary: WorkflowSummary; disabled: boolean; wide?: boolean;
 }) {
   const running = useSignal(false);
-  if (summary.isArchived || isUnapproved(summary)) return null;
+  if (summary.isArchived || isUnapproved(summary) || !runsHere(summary)) return null;
   return (
     <button class={`run-now${wide ? " prominent" : ""}`} disabled={disabled || running.value || summary.isRunning}
       title={`Run ${summary.workflow.name} now`} aria-label={`Run ${summary.workflow.name} now`}
@@ -81,7 +81,7 @@ export function workflowActions(summary: WorkflowSummary, pinned: boolean, pinne
     if (canBeApproved(summary)) actions.push("approve");
     // Not on this host, without archiving it everywhere (#391).
     if (canBeDenied(summary)) actions.push("deny");
-  } else {
+  } else if (runsHere(summary)) {
     actions.push("runNow");
   }
   actions.push(pinned ? "unpin" : "pin");

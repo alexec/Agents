@@ -38,7 +38,7 @@ extension WorkflowSummary {
             lines.append(WorkflowStatusLine(symbol: "checkmark.shield",
                                             text: waiting.note.map { "Waiting for your OK — \($0)" }
                                                 ?? (waiting.isNew ? "New — waiting for your OK" : "Changed since you approved it — waiting for your OK"),
-                                            detail: "Read the prompt and settings below, then Approve to let it run",
+                                            detail: approveDetail,
                                             tint: .attention))
         } else if deniedHere != nil {
             lines.append(WorkflowStatusLine(symbol: "hand.raised.slash",
@@ -100,6 +100,10 @@ extension WorkflowSummary {
 
     /// When it next runs, or that nothing will until something changes.
     private var nextLine: WorkflowStatusLine {
+        // A bot's workflow heard here (#2027): nothing of it runs here.
+        if let heard = hearsForText {
+            return WorkflowStatusLine(symbol: "ear", text: heard, detail: Self.hearsForDetail)
+        }
         let blocked = isArchived || !isEnabled || workflow.problem != nil
             || awaitingApproval != nil || deniedHere != nil || overLimit != nil
         if let next = nextFireAt, !blocked {

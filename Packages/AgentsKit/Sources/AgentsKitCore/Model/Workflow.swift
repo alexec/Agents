@@ -369,6 +369,20 @@ public struct WorkflowSummary: Codable, Hashable, Sendable, Identifiable {
     /// it is approved here, and Approve is where Run now would be.
     public var isUnapproved: Bool { awaitingApproval != nil || deniedHere != nil }
 
+    /// Whether Run now is offered: not for a bot's workflow heard here (#2027), which
+    /// only the bot's machines run.
+    public var runsHere: Bool { hearsFor == nil }
+
+    /// What a bot's workflow heard here says (#2027), on every client alike.
+    public var hearsForText: String? { hearsFor.map { "Heard here for \($0) — \($0)'s machines run it" } }
+    public static let hearsForDetail = "Your servers here hear its triggers and send each match to the control plane. It never runs here"
+
+    /// What Approve does, under the waiting line.
+    public var approveDetail: String {
+        guard let bot = hearsFor else { return "Read the prompt and settings below, then Approve to let it run" }
+        return "Read its triggers below, then Approve to let your servers hear them for \(bot)"
+    }
+
     /// The file Approve approves: the one waiting, or the one denied here.
     public var approvable: WorkflowApproval? { awaitingApproval ?? deniedHere }
 
