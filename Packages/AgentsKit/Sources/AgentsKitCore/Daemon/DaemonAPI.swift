@@ -2851,9 +2851,14 @@ public enum DaemonAPI {
         /// The `when-done:` to write (#433): `keep`, `archive-allowed` or `archive`, and
         /// `keep` or empty takes the line out. Left out means left alone, as the hosts are.
         public var whenDone: String?
+        /// `continue-when-back: true` to write (#1918), or false to take the line out. Left
+        /// out means left alone, as `whenDone` is.
+        public var continueWhenBack: Bool?
         public init(folder: URL, workflowID: String, settings: WorkflowSettings, cooldown: String? = nil,
-                    labels: [String]? = nil, hosts: [String]? = nil, whenDone: String? = nil) {
+                    labels: [String]? = nil, hosts: [String]? = nil, whenDone: String? = nil,
+                    continueWhenBack: Bool? = nil) {
             self.whenDone = whenDone
+            self.continueWhenBack = continueWhenBack
             self.folder = folder
             self.workflowID = workflowID
             self.settings = settings

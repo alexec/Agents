@@ -2221,6 +2221,11 @@ export interface HelperLimits {
   notArchived?: number;
   queued?: number;
   agentsMayArchive?: boolean;
+  /**
+   * A helper's turn refused for a spent allowance waits for it at once, as if the person had chosen
+   * Continue (#1918). Off unless set.
+   */
+  continueWhenBack?: boolean;
 }
 
 /** hosts/announce, on an enrolment connection. */
@@ -5076,6 +5081,11 @@ export interface Workflow {
   archived?: boolean;
   hosts?: string[];
   whenDone?: WorkflowWhenDone;
+  /**
+   * `continue-when-back: true`: a run's turn refused for a spent allowance waits for it at once, as
+   * if the person had chosen Continue (#1918).
+   */
+  continueWhenBack?: boolean;
 }
 
 export interface WorkflowApproval {
@@ -5183,6 +5193,7 @@ export interface WorkflowSettingsRequest {
   labels?: string[];
   hosts?: string[];
   whenDone?: string;
+  continueWhenBack?: boolean;
 }
 
 /**
@@ -5927,7 +5938,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   HandoverMember: { required: ["id", "name", "kind"], optional: ["knownEpoch", "version", "online", "lastSeen"] },
   HandoverStatus: { required: ["phase", "controlKey", "hasRecords", "endpoints", "members"], optional: ["epoch", "forwardingUntil"] },
   Headline: { required: ["h1", "h2", "h3"], optional: ["answers"] },
-  HelperLimits: { required: [], optional: ["running", "notArchived", "queued", "agentsMayArchive"] },
+  HelperLimits: { required: [], optional: ["running", "notArchived", "queued", "agentsMayArchive", "continueWhenBack"] },
   HostAnnounce: { required: ["publicKey", "name", "platform", "version", "machineID"], optional: ["relay", "implementation"] },
   HostClient: { required: ["id", "kind", "publicKey"], optional: ["person"] },
   HostClients: { required: ["clients"], optional: ["user"] },
@@ -6267,7 +6278,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   WakeState: { required: ["isHolding", "agentsInFlight", "heldBackByBattery", "onPower"], optional: ["batteryPercent", "since", "graceUntil"] },
   WebRemoteStatus: { required: ["port", "served"], optional: ["reason", "detail"] },
   WorkReport: { required: ["outcome", "message", "at"], optional: ["block"] },
-  Workflow: { required: ["workflowID", "folder", "name", "triggers", "mode", "prompt", "unknownFields", "settings"], optional: ["problem", "cooldown", "enabled", "archived", "hosts", "whenDone"] },
+  Workflow: { required: ["workflowID", "folder", "name", "triggers", "mode", "prompt", "unknownFields", "settings"], optional: ["problem", "cooldown", "enabled", "archived", "hosts", "whenDone", "continueWhenBack"] },
   WorkflowApproval: { required: ["digest", "isNew"], optional: ["note"] },
   WorkflowApproveRequest: { required: ["folder", "workflowID", "digest"], optional: [] },
   WorkflowArchiveRequest: { required: ["folder", "workflowID", "archived"], optional: [] },
@@ -6277,7 +6288,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   WorkflowRequest: { required: ["folder", "workflowID"], optional: [] },
   WorkflowSchedule: { required: ["minutes", "hours", "startMinute", "endMinute", "days"], optional: [] },
   WorkflowSettings: { required: ["options", "labels"], optional: ["permissionMode", "runtimeID", "model", "effort"] },
-  WorkflowSettingsRequest: { required: ["folder", "workflowID", "settings"], optional: ["cooldown", "labels", "hosts", "whenDone"] },
+  WorkflowSettingsRequest: { required: ["folder", "workflowID", "settings"], optional: ["cooldown", "labels", "hosts", "whenDone", "continueWhenBack"] },
   WorkflowSummary: { required: ["workflow", "isArchived", "isEnabled", "nextFireAtByTrigger", "isRunning", "holdsAFire", "queued"], optional: ["overLimit", "totalLimit", "nextFireAt", "lastOutcome", "causingEvent", "causingEventName", "awaitingApproval", "deniedHere", "lastFiredAt", "lastFiredBy", "cooldownEndsAt", "offReason", "standingAgentID", "mcpTriggers"] },
   WorkflowsListRequest: { required: [], optional: ["folder"] },
   WorkspaceInfo: { required: ["id", "name", "state"], optional: ["ssh", "tunnel", "hostKeyRenews", "cost", "host"] },

@@ -801,6 +801,16 @@ func (d *Daemon) workflowSettingsChange(r wire.WorkflowSettingsRequest, byPerson
 				return "", err
 			}
 		}
+		if r.ContinueWhenBack != nil {
+			var v *string
+			if *r.ContinueWhenBack {
+				t := "true"
+				v = &t
+			}
+			if text, err = setFrontMatter("continue-when-back", v, text); err != nil {
+				return "", err
+			}
+		}
 		return text, nil
 	})
 	d.workflowMu.Unlock()

@@ -364,7 +364,8 @@ func (d *Daemon) applyLimit(l *live, lim limit, worked bool) (why wire.EndedReas
 		l.mu.Lock()
 		sent := l.lastSent
 		l.mu.Unlock()
-		if sentToContinue(sent) {
+		// So does a workflow's run or a helper set to (#1918): nobody watches those.
+		if sentToContinue(sent) || d.continuesByItself(a) {
 			d.waitForAllowance(l.id, a.RuntimeID)
 		}
 		return wire.EndedReasonAllowanceSpent, true, time.Time{}

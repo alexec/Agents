@@ -43,6 +43,18 @@ If the allowance is still out when the chat tries, the chat waits again, for the
 To stop waiting, choose **Cancel** in the chat. A message you send, **Stop** or **Archive**
 also cancels it. The wait is kept over a restart of the Mac.
 
+### Workflows and helpers that nobody watches
+
+A workflow's run or a session started by a session can wait by itself, with nobody to choose
+**Continue**:
+
+- **A workflow:** add `continue-when-back: true` to its file's front matter. Each run whose
+  turn is refused for a spent allowance waits at once, and its row says **Continues at 07:00**.
+- **Helpers:** on the Mac, open the project's **Project Settings ▸ General** and turn on
+  **Helpers continue when the allowance is back**. It is kept in `.agents/project.json`.
+
+Both are off unless you set them. A chat you started waits only when you choose **Continue**.
+
 A rate limit is different. The same chat tries again on the same runtime after a short wait,
 and says when. Three rate limits in ten minutes on one chat count as the allowance running
 out.

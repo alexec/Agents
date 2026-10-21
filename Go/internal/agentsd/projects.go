@@ -314,8 +314,11 @@ func (d *Daemon) setHelperLimits(r wire.SetHelperLimitsRequest) (wire.ProjectSum
 	if l.AgentsMayArchive != nil && *l.AgentsMayArchive {
 		l.AgentsMayArchive = nil
 	}
+	if l.ContinueWhenBack != nil && !*l.ContinueWhenBack {
+		l.ContinueWhenBack = nil
+	}
 	var v any
-	if l.Running != nil || l.NotArchived != nil || l.Queued != nil || l.AgentsMayArchive != nil {
+	if l.Running != nil || l.NotArchived != nil || l.Queued != nil || l.AgentsMayArchive != nil || l.ContinueWhenBack != nil {
 		v = l
 	}
 	if err := setProjectConfig(folder, "helperLimits", v); err != nil {

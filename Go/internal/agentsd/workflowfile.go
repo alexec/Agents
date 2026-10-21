@@ -415,7 +415,7 @@ func parseWorkflow(text, id, project string) wire.Workflow {
 			w.Cooldown = &c
 		}
 	}
-	for _, key := range []string{"enabled", "archived"} {
+	for _, key := range []string{"enabled", "archived", "continue-when-back"} {
 		if n, ok := m[key]; ok {
 			t, _ := n.Text()
 			var v *bool
@@ -430,10 +430,16 @@ func parseWorkflow(text, id, project string) wire.Workflow {
 			default:
 				return broken("`" + key + ":` must be true or false")
 			}
-			if key == "enabled" {
+			switch key {
+			case "enabled":
 				w.Enabled = v
-			} else {
+			case "archived":
 				w.Archived = v
+			default:
+				// Off is no choice at all, as when-done's keep is.
+				if v != nil && *v {
+					w.ContinueWhenBack = v
+				}
 			}
 		}
 	}
@@ -465,7 +471,8 @@ func parseWorkflow(text, id, project string) wire.Workflow {
 	}
 	w.Settings = s
 	known := map[string]bool{"on": true, "agent": true, "name": true, "permission-mode": true, "runtime": true, "model": true,
-		"labels": true, "effort": true, "options": true, "enabled": true, "archived": true, "cooldown": true, "hosts": true, "when-done": true}
+		"labels": true, "effort": true, "options": true, "enabled": true, "archived": true, "cooldown": true, "hosts": true, "when-done": true,
+		"continue-when-back": true}
 	for k, v := range m {
 		if !known[k] {
 			b, _ := json.Marshal(v.JSON())
