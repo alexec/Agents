@@ -36,6 +36,14 @@ type RealGitLab struct {
 	running map[string]*fetch
 	sharing time.Duration
 	members map[string]member
+	pages   map[string]openList
+}
+
+// openList is a page of open merge requests as GitLab last gave it, with its ETag.
+type openList struct {
+	at   time.Time
+	etag string
+	list []mergeRequest
 }
 
 type sharedBody struct {
@@ -62,6 +70,8 @@ const (
 	// memberFor is how long a person's access to a project is kept; maxMembers bounds how many.
 	memberFor  = 10 * time.Minute
 	maxMembers = 1000
+	// maxKeptPages bounds the pages of open merge requests kept: ten for each of 50 projects.
+	maxKeptPages = 500
 )
 
 // DefaultBase is gitlab.com.
@@ -70,7 +80,7 @@ const DefaultBase = "https://gitlab.com/"
 // NewRealGitLab reads the GitLab at base (gitlab.com when empty) with token's answer.
 func NewRealGitLab(base string, token func() string, project func(ctx context.Context) (string, error)) *RealGitLab {
 	return &RealGitLab{Base: BaseURL(base), Token: token, Project: project, Client: &http.Client{Timeout: 30 * time.Second},
-		recent: map[string]sharedBody{}, running: map[string]*fetch{}, sharing: sharedFor, members: map[string]member{}}
+		recent: map[string]sharedBody{}, running: map[string]*fetch{}, sharing: sharedFor, members: map[string]member{}, pages: map[string]openList{}}
 }
 
 // BaseURL is base as GitLab's root with a trailing slash: gitlab.com when empty, https:// when
@@ -93,6 +103,16 @@ func BaseURL(base string) string {
 const NotConnected = "GitLab is not connected, or its token ended: connect GitLab in Your Connectors, or set GITLAB_TOKEN to an access token with the api scope"
 
 func (g *RealGitLab) do(ctx context.Context, method, path string, body any) ([]byte, error) {
+	res, err := g.request(ctx, method, path, body, "")
+	if err != nil {
+		return nil, err
+	}
+	defer res.Body.Close()
+	return answer(res)
+}
+
+// request asks GitLab, with If-None-Match when etag is set; the caller closes the answer's body.
+func (g *RealGitLab) request(ctx context.Context, method, path string, body any, etag string) (*http.Response, error) {
 	token := g.Token()
 	if token == "" {
 		return nil, &GitLabError{Kind: NotSignedIn, Message: NotConnected}
@@ -113,6 +133,9 @@ func (g *RealGitLab) do(ctx context.Context, method, path string, body any) ([]b
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")
 	}
+	if etag != "" {
+		req.Header.Set("If-None-Match", etag)
+	}
 	// A personal access token and an OAuth token both go as a bearer token; Go drops it on a
 	// redirect to another host.
 	req.Header.Set("Authorization", "Bearer "+token)
@@ -121,7 +144,11 @@ func (g *RealGitLab) do(ctx context.Context, method, path string, body any) ([]b
 	if err != nil {
 		return nil, &GitLabError{Kind: Failed, Message: "GitLab: " + err.Error()}
 	}
-	defer res.Body.Close()
+	return res, nil
+}
+
+// answer is a response's body when GitLab took the request, and what went wrong when not.
+func answer(res *http.Response) ([]byte, error) {
 	data, err := io.ReadAll(io.LimitReader(res.Body, 64<<20))
 	if err != nil {
 		return nil, &GitLabError{Kind: Failed, Message: "GitLab: " + err.Error()}
@@ -481,8 +508,8 @@ func (g *RealGitLab) OpenMRs(ctx context.Context, project string) ([]OpenMR, err
 	var out []OpenMR
 	path := fmt.Sprintf("projects/%s/merge_requests?state=opened&order_by=created_at&sort=desc", pid(project))
 	for page := 1; page <= maxPages; page++ {
-		var list []mergeRequest
-		if err := g.get(ctx, query(path, page), true, &list); err != nil {
+		list, err := g.openPage(ctx, query(path, page))
+		if err != nil {
 			return nil, err
 		}
 		for _, m := range list {
@@ -497,6 +524,49 @@ func (g *RealGitLab) OpenMRs(ctx context.Context, project string) ([]OpenMR, err
 		}
 	}
 	return out, nil
+}
+
+// openPage is a page of open merge requests. It is asked for with the ETag of the last answer
+// (P20261020-2): pr.opened and pr.conflicted list every open merge request each poll, and
+// GitLab answers 304 with no body while none changed, so the kept page is used again.
+func (g *RealGitLab) openPage(ctx context.Context, path string) ([]mergeRequest, error) {
+	g.mu.Lock()
+	kept, ok := g.pages[path]
+	g.mu.Unlock()
+	if ok && time.Since(kept.at) < g.sharing {
+		return kept.list, nil
+	}
+	res, err := g.request(ctx, http.MethodGet, path, nil, kept.etag)
+	if err != nil {
+		return nil, err
+	}
+	defer res.Body.Close()
+	if res.StatusCode == http.StatusNotModified && ok {
+		g.keepPage(path, openList{at: time.Now(), etag: kept.etag, list: kept.list})
+		return kept.list, nil
+	}
+	body, err := answer(res)
+	if err != nil {
+		return nil, err
+	}
+	var list []mergeRequest
+	if json.Unmarshal(body, &list) != nil {
+		return nil, &GitLabError{Kind: Failed, Message: "GitLab's answer is not JSON"}
+	}
+	for i := range list {
+		list[i].Description = "" // not used by the events, and the most of a page
+	}
+	g.keepPage(path, openList{at: time.Now(), etag: res.Header.Get("ETag"), list: list})
+	return list, nil
+}
+
+func (g *RealGitLab) keepPage(path string, page openList) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	if _, ok := g.pages[path]; !ok && len(g.pages) >= maxKeptPages {
+		g.pages = map[string]openList{}
+	}
+	g.pages[path] = page
 }
 
 func (g *RealGitLab) ClosedMRs(ctx context.Context, project, since string) ([]MergedMR, []ClosedMR, Listed, error) {
