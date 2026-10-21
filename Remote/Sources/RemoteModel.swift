@@ -2064,6 +2064,13 @@ final class RemoteModel {
         }
     }
 
+    /// Approve, Deny or Send on a channel link's card (#1762): a refusal is the app's alert.
+    func answerLink(_ request: DaemonAPI.ChannelLinkRequest, approve: Bool, to person: String?) async {
+        if let refused = await people.answerLink(request, approve: approve, to: person, on: controlPlane) {
+            problem = refused
+        }
+    }
+
     private func loadKept(_ control: DaemonClient) async {
         kept = (try? await control.call(DaemonAPI.Method.hostsListKept, returning: DaemonAPI.KeptList.self))?.kept ?? []
     }

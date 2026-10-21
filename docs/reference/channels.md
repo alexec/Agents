@@ -35,11 +35,18 @@ signed by the address's domain, or a parent of it (`mail.example.com` signed by
 for no link. The email server (`agents/email`) reads the result from the topmost
 `Authentication-Results` header, which is the receiving server's.
 
+## Approving a link
+
+The request shows as a card at the top of the sidebar, on the Mac, the iPhone and iPad and the
+web page: **Link Slack user @sam to you?**, with **Approve** and **Deny**. An admin's card for
+a request that names nobody has a person to choose and **Send**: that person then gets the
+card. **Settings ▸ Control plane ▸ Channels** shows the cards waiting too, and each link.
+
 ## Links
 
 A link is a channel, an identity on it, the person, and who approved it when. A person sees
 and removes their own links; an admin sees and removes everyone's. A removed person's links
-go with them.
+go with them. **Remove…** in Settings ▸ Control plane ▸ Channels unlinks one, asked first.
 
 ## On the wire
 

@@ -82,6 +82,19 @@ struct ProjectListView: View {
                     }
                 }
             }
+            // A channel identity asking to act as this person (#1762), beside the machines.
+            let linking = model.people.openLinks()
+            if !linking.isEmpty {
+                Section {
+                    ForEach(linking) { request in
+                        ChannelLinkCard(request: request, people: model.people.linkPeople,
+                                        isAnswering: model.people.answering.contains(request.request),
+                                        answer: { approve, to in Task { await model.answerLink(request, approve: approve, to: to) } })
+                            .listRowSeparator(.hidden)
+                            .selectionDisabled()
+                    }
+                }
+            }
             // A newcomer's checklist (#982), above everything until it has gone.
             if model.showsGetStarted {
                 Section {

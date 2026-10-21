@@ -23,6 +23,7 @@ import { Capability } from "../protocol/capabilities.generated";
 import type { BackupEvery, BackupRestoreResult, BackupSettings, BackupState, BackupTarget } from "../protocol/generated";
 import { PeopleSection } from "./People";
 import { GroupsSection } from "./Groups";
+import { ChannelsSection } from "./ChannelLinks";
 import { UserScopeSection } from "./UserScope";
 
 /** The words under the Sidebar section, as the window's and the Remote's (#846). */
@@ -273,6 +274,8 @@ export function SettingsPage({ store, down = false }: { store: Store; down?: boo
             <PeopleSection store={store} down={down} />
             {/* Groups own workspace providers (#1761). */}
             <GroupsSection store={store} down={down} />
+            {/* Channel identities linked to people (#1762). */}
+            <ChannelsSection store={store} down={down} />
             <ProvidersSection store={store} />
           </Scope>
         </div>

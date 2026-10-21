@@ -159,3 +159,80 @@ public struct ChannelLinkRequestQueue: Sendable, Hashable {
         requests.filter { $0.expires > now }
     }
 }
+
+/// The words of the link card and Control plane ▸ Channels, the same on the Mac and the
+/// Remote; the web page's are `Web/src/model/channelLinks.ts` (#1762).
+public enum ChannelLinkWords {
+    public static let title = "Channels"
+
+    /// A channel's name as people say it: Slack, Discord; an unknown one as it is sent.
+    public static func channel(_ channel: String) -> String {
+        switch channel {
+        case "slack": "Slack"
+        case "discord": "Discord"
+        case "teams": "Teams"
+        case "whatsapp": "WhatsApp"
+        case "email": "Email"
+        default: channel.prefix(1).uppercased() + channel.dropFirst()
+        }
+    }
+
+    /// "Slack user @sam", or "the email address sam@example.com".
+    public static func who(channel: String, identity: String, name: String?) -> String {
+        if channel == "email" { return "the email address \(identity)" }
+        let shown = name.flatMap { $0.isEmpty ? nil : $0 } ?? identity
+        return "\(Self.channel(channel)) user \(shown)"
+    }
+
+    /// The card's question: "Link Slack user @sam to you?"; for an admin with a request that
+    /// names nobody, "Slack user @sam is not linked to anyone."
+    public static func ask(_ request: DaemonAPI.ChannelLinkRequest) -> String {
+        let who = who(channel: request.channel, identity: request.identity, name: request.name)
+        guard request.forUser != nil else {
+            return "\(who.prefix(1).uppercased() + who.dropFirst()) is not linked to anyone."
+        }
+        return "Link \(who) to you?"
+    }
+
+    /// The card's second line: the identity, when the name hid it, and the email the
+    /// channel gave.
+    public static func detail(_ request: DaemonAPI.ChannelLinkRequest) -> String? {
+        var parts: [String] = []
+        if request.channel != "email", let name = request.name, !name.isEmpty, name != request.identity {
+            parts.append(request.identity)
+        }
+        if request.channel != "email", let email = request.email, !email.isEmpty { parts.append(email) }
+        return parts.isEmpty ? nil : parts.joined(separator: " · ")
+    }
+
+    /// Under the buttons: what they do.
+    public static func explanation(_ request: DaemonAPI.ChannelLinkRequest) -> String {
+        request.forUser == nil
+            ? "Send asks that person to approve it. Only they can link it to themselves."
+            : "Approve lets its messages start work as you. Deny ignores it for a day."
+    }
+
+    /// A link's line in Control plane ▸ Channels: "Slack user @sam".
+    public static func linkTitle(_ link: DaemonAPI.ChannelLink) -> String {
+        let who = who(channel: link.channel, identity: link.identity, name: link.name)
+        return who.prefix(1).uppercased() + who.dropFirst()
+    }
+
+    /// "T1/U42 · linked to Sam": whose it is, for an admin who sees everyone's.
+    public static func linkDetail(_ link: DaemonAPI.ChannelLink, you: String?) -> String {
+        var parts: [String] = []
+        if link.channel != "email", let name = link.name, !name.isEmpty, name != link.identity { parts.append(link.identity) }
+        parts.append(link.user == you ? "linked to you" : "linked to \(link.userName.flatMap { $0.isEmpty ? nil : $0 } ?? link.user)")
+        return parts.joined(separator: " · ")
+    }
+
+    public static func removeTitle(_ link: DaemonAPI.ChannelLink) -> String {
+        "Unlink \(who(channel: link.channel, identity: link.identity, name: link.name))?"
+    }
+
+    public static let removeMessage = "Its messages start nothing until it is linked again."
+
+    public static let none = "No channel identity is linked."
+
+    public static let foot = "A message from Slack, email or another channel starts work only once its person links it here. Email also needs a DKIM pass for its address."
+}

@@ -84,6 +84,20 @@ struct RemoteSidebar: View {
                     }
                 }
             }
+            // A channel identity asking to act as this person (#1762), beside the machines.
+            let linking = model.people.openLinks()
+            if !linking.isEmpty {
+                Section {
+                    ForEach(linking) { request in
+                        ChannelLinkCard(request: request, people: model.people.linkPeople,
+                                        isAnswering: model.people.answering.contains(request.request),
+                                        answer: { approve, to in Task { await model.answerLink(request, approve: approve, to: to) } })
+                            .listRowSeparator(.hidden)
+                            .listRowBackground(Color.clear)
+                            .listRowInsets(EdgeInsets(top: 4, leading: 12, bottom: 4, trailing: 12))
+                    }
+                }
+            }
 
             if !model.projects.isEmpty {
                 // One way to start a session (#495), in the project last started in.
@@ -250,7 +264,7 @@ struct RemoteSidebar: View {
         .overlay {
             // Not over a machine's ask to join (#994): the card is the list's, and the
             // waiting view in the middle would lie over the rows under it.
-            if model.projects.isEmpty, model.people.open().isEmpty { Waiting() }
+            if model.projects.isEmpty, model.people.open().isEmpty, model.people.openLinks().isEmpty { Waiting() }
         }
         // The catch-up leaves archived projects out; they are asked for here (#343), and
         // again once the list is pulled.
@@ -785,6 +799,14 @@ private struct RemoteSettings: View {
                                 .navigationBarTitleDisplayMode(.inline)
                         } label: {
                             Label("People", systemImage: "person.2")
+                        }
+                        // Channel identities linked to people (#1762).
+                        NavigationLink {
+                            ChannelsPane(control: model.controlPlane, people: model.people)
+                                .navigationTitle(ChannelLinkWords.title)
+                                .navigationBarTitleDisplayMode(.inline)
+                        } label: {
+                            Label(ChannelLinkWords.title, systemImage: "bubble.left.and.bubble.right")
                         }
                         // Groups own workspace providers (#1761): an admin's.
                         if model.people.you?.isAdmin != false {
