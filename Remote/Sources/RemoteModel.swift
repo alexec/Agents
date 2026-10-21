@@ -2129,6 +2129,10 @@ final class RemoteModel {
     var workspaceProviders: [DaemonAPI.ProviderSummary]?
     /// Why none are shown: a control plane with several copies, or a list that failed.
     var workspaceProvidersProblem: String?
+    /// The groups providers are given to (#1761): every one for an admin, a member's own.
+    var providerGroups: [DaemonAPI.Group] = []
+    /// Whether this person is an admin, who adds and changes providers (#1761).
+    var isAdmin: Bool { people.you?.isAdmin ?? true }
 
     /// Lists them, and asks every provider to list again (FR-004), as the page opens.
     func loadWorkspaceProviders() async {
@@ -2140,6 +2144,8 @@ final class RemoteModel {
             let answer = try await control.call(DaemonAPI.Method.providersList, DaemonAPI.Empty())
             workspaceProviders = (try? answer["providers"]?.decode([DaemonAPI.ProviderSummary].self)) ?? []
             workspaceProvidersProblem = nil
+            providerGroups = (try? await control.call(DaemonAPI.Method.groupsList, DaemonAPI.Empty(),
+                                                      returning: DaemonAPI.GroupList.self))?.groups ?? []
         } catch let error as JSONRPCError where error.code == DaemonAPI.Failure.providersNeedOneCopy {
             workspaceProviders = []
             workspaceProvidersProblem = WorkspaceProviderWords.oneCopy
@@ -2170,6 +2176,11 @@ final class RemoteModel {
         } catch {
             return sentence(for: error)
         }
+    }
+
+    /// Gives a provider to a group, or with nil to the admins alone (#1761): nil, or why not.
+    func setProviderGroup(_ provider: ProviderID, _ group: String?) async -> String? {
+        await controlRequest(DaemonAPI.Method.providersSetGroup, DaemonAPI.ProviderGroup(provider: provider, group: group))
     }
 
     /// Remove, Link, Unlink: nil, or why the control plane refused it.
@@ -2278,6 +2289,12 @@ final class RemoteModel {
                     await self?.people.connected(control)
                     for await change in control.notifications() {
                         guard let self, !Task.isCancelled else { return }
+                        // A provider's group's name, on Settings ▸ Workspace providers (#1761).
+                        if change.method == DaemonAPI.Notification.controlGroupsChanged {
+                            self.providerGroups = (try? await control.call(DaemonAPI.Method.groupsList, DaemonAPI.Empty(),
+                                                                           returning: DaemonAPI.GroupList.self))?.groups
+                                ?? self.providerGroups
+                        }
                         if await self.people.heard(change.method, change.params, on: control) { continue }
                         if await self.userScope.heard(change.method, change.params, on: control) { continue }
                         if change.method == DaemonAPI.Notification.controlKeptChanged

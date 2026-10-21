@@ -45,7 +45,8 @@ export function nameSuffix(random: () => number = Math.random): string {
 
 /** The providers that can make a machine. */
 export function makers(providers: readonly ProviderSummary[]): ProviderSummary[] {
-  return providers.filter((p) => p.capabilities.includes("create"));
+  // Only those the person may start machines from (#1761); a control plane before groups lets everyone.
+  return providers.filter((p) => p.capabilities.includes("create") && p.mayUse !== false);
 }
 
 /** One field of a provider's New Workspace form, a flat JSON Schema object's property. */

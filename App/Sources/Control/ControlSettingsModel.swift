@@ -16,6 +16,11 @@ final class ControlSettingsModel {
     private(set) var providers: [DaemonAPI.ProviderSummary] = []
     /// False on a control plane that can't run providers (several copies, research R4).
     private(set) var providersHere = true
+    /// The groups providers are given to (#1761): every one for an admin, a member's own.
+    /// Empty from a control plane before groups.
+    private(set) var groups: [DaemonAPI.Group] = []
+    /// Whether this window's person is an admin, who adds and changes providers (#1761).
+    var isAdmin: Bool { status?.person?.isAdmin ?? true }
     /// Write It for Me (#858): where each draft this window started stands, by its id.
     private(set) var drafts: [UUID: DaemonAPI.ProviderDraftUpdate] = [:]
     /// Servers added from a provider's workspace (Add as Host…), by name: linked to it once
@@ -124,6 +129,8 @@ final class ControlSettingsModel {
                                                 returning: [DaemonAPI.ClientConnection].self)) ?? []
             connections = Dictionary(links.map { ($0.client, $0) }, uniquingKeysWith: { $1 })
             await refreshProviderList()
+            groups = (try? await client.call(DaemonAPI.Method.groupsList, DaemonAPI.Empty(),
+                                             returning: DaemonAPI.GroupList.self))?.groups ?? []
             await linkJoined()
             isReachable = true
         } catch {
@@ -201,6 +208,11 @@ final class ControlSettingsModel {
     }
 
     func forgetDraft(_ id: UUID) { drafts[id] = nil }
+
+    /// Gives a provider to a group, or with nil to the admins alone (#1761).
+    func setGroup(_ provider: ProviderID, _ group: String?) async {
+        await perform(DaemonAPI.Method.providersSetGroup, DaemonAPI.ProviderGroup(provider: provider, group: group))
+    }
 
     func removeProvider(_ id: ProviderID) async {
         await perform(DaemonAPI.Method.providersRemove, DaemonAPI.ProviderRequest(id: id))

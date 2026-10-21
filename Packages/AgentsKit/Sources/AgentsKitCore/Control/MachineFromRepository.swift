@@ -51,7 +51,8 @@ public enum MachineFromRepository {
 
     /// The providers that can make a machine.
     public static func makers(_ providers: [DaemonAPI.ProviderSummary]) -> [DaemonAPI.ProviderSummary] {
-        providers.filter { $0.capabilities.contains("create") }
+        // Only those the person may start machines from (#1761).
+        providers.filter { $0.capabilities.contains("create") && $0.usable }
     }
 
     /// One field of a provider's New Workspace form.

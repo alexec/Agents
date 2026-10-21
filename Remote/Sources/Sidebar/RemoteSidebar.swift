@@ -785,6 +785,16 @@ private struct RemoteSettings: View {
                         } label: {
                             Label("People", systemImage: "person.2")
                         }
+                        // Groups own workspace providers (#1761): an admin's.
+                        if model.people.you?.isAdmin != false {
+                            NavigationLink {
+                                GroupsPane(control: model.controlPlane, revision: model.people.revision)
+                                    .navigationTitle(GroupWords.title)
+                                    .navigationBarTitleDisplayMode(.inline)
+                            } label: {
+                                Label(GroupWords.title, systemImage: "person.3")
+                            }
+                        }
                     }
                     // The control plane's workspace providers (#1819), as the page's Settings has them.
                     NavigationLink { WorkspaceProvidersView() } label: {

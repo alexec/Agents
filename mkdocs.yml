@@ -122,6 +122,7 @@ nav:
       - reference/workflows.md
       - reference/personas.md
       - reference/events.md
+      - reference/groups.md
       - reference/on-every-machine.md
       - reference/reports.md
       - reference/workspace-providers.md

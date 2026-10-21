@@ -69,7 +69,7 @@
 
 - [ ] T036 [US5] `people/list`, `people/setRole` (refused if it leaves no admin, with `matching`), `people/removePreview` (asks each started machine for unpushed work) and `people/remove` (FR-029). Test that a removal is in force on two copies within 5 s.
 - [x] T037 [US5] Add `groups/*` and `providers/setGroup`. Only a group's users see and start its providers (FR-027, FR-028).
-- [ ] T038 [P] [US5] Control plane ▸ People, Groups and Workspace Providers panes on all three clients. Members see themselves and Overview, read only.
+- [x] T038 [P] [US5] Control plane ▸ People, Groups and Workspace Providers panes on all three clients. Members see themselves and Overview, read only.
 
 ## Phase 8: US6, bots (P2)
 

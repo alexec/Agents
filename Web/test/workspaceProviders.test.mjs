@@ -99,7 +99,8 @@ test("the model lists, asks for a fresh list, adds, removes, and takes the notic
   const link = plane();
   const p = new w.Providers(link);
   await p.load();
-  assert.deepEqual(link.asked.map((a) => a.method), ["providers/list", "providers/refresh"]);
+  // The groups too, for each provider's group (#1761).
+  assert.deepEqual(link.asked.map((a) => a.method), ["providers/list", "groups/list", "providers/refresh"]);
   assert.deepEqual(p.list.value.map((x) => x.id), ["do"]);
   assert.equal(await p.save({ name: "N", kind: "commands", secrets: { T: "s" } }), null);
   assert.deepEqual(p.list.value.map((x) => x.id), ["do", "new"]);

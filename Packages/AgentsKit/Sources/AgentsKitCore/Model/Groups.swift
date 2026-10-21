@@ -89,3 +89,57 @@ public extension DaemonAPI.Notification {
     /// `GroupsChanged`: load Groups again (#1761).
     static let controlGroupsChanged = "control/groupsChanged"
 }
+
+/// The words Settings ▸ Groups and a provider's group are shown in, the same on the Mac and
+/// the Remote (the web page's are in `Web/src/model/teamGroups.ts`).
+public enum GroupWords {
+    public static let title = "Groups"
+    /// A provider with no group.
+    public static let adminsOnly = "Admins only"
+
+    /// "Everyone", "Sam, Kim", or "No one".
+    public static func members(_ group: DaemonAPI.Group, people: [DaemonAPI.PersonRow]) -> String {
+        if group.everyone { return "Everyone" }
+        guard !group.members.isEmpty else { return "No one" }
+        return group.members.map { id in people.first { $0.id == id }?.name ?? "Someone removed" }
+            .joined(separator: ", ")
+    }
+
+    /// "DigitalOcean, Docker", or nil with none.
+    public static func providers(_ group: DaemonAPI.Group, of all: [DaemonAPI.ProviderSummary]) -> String? {
+        let names = all.filter { $0.group == group.id }.map(\.name)
+        return names.isEmpty ? nil : names.joined(separator: ", ")
+    }
+
+    /// Who a provider is for: its group's name, or the admins alone.
+    public static func provider(_ provider: DaemonAPI.ProviderSummary, groups: [DaemonAPI.Group]) -> String {
+        guard let id = provider.group, !id.isEmpty else { return adminsOnly }
+        return groups.first { $0.id == id }?.name ?? "A group not shown to you"
+    }
+
+    /// "For Platform": a provider's line, said only when there are groups.
+    public static func providerLine(_ provider: DaemonAPI.ProviderSummary, groups: [DaemonAPI.Group]) -> String? {
+        guard !groups.isEmpty || provider.group != nil else { return nil }
+        guard provider.group?.isEmpty == false else { return "For admins only" }
+        return "For \(self.provider(provider, groups: groups))"
+    }
+
+    /// Why New Machine… is not there for a provider the caller sees but may not use.
+    public static func mayNotUse(_ provider: DaemonAPI.ProviderSummary, groups: [DaemonAPI.Group]) -> String {
+        guard let id = provider.group, !id.isEmpty else {
+            return "Give \(provider.name) to a group to start machines from it."
+        }
+        let name = groups.first { $0.id == id }?.name ?? "its group"
+        return "Only \(name) can start machines from \(provider.name)."
+    }
+
+    public static func foot(admin: Bool) -> String {
+        admin
+            ? "A group is everyone, or the people you name. Give a workspace provider to a group, and only its people see it and start machines from it. A provider with no group is for admins only."
+            : "The groups you are in. Their workspace providers are the ones you can start machines from."
+    }
+
+    public static func removeTitle(_ group: DaemonAPI.Group) -> String { "Remove \(group.name)?" }
+
+    public static let removeMessage = "Its people keep their machines. A provider must go to another group first."
+}

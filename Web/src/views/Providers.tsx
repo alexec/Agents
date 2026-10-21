@@ -9,6 +9,7 @@ import {
   providerKinds, providerLine, providerRequest, providerWords as words, workspaceLine, type ProviderKind,
 } from "../model/workspaceProviders";
 import { Modal } from "./Modal";
+import { adminsOnly, providerLine as groupLine } from "../model/teamGroups";
 
 const time = (at: Date) => at.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
 
@@ -33,7 +34,10 @@ export function ProvidersSection({ store }: { store: Store }) {
       ))}
       {!oneCopy && (
         <>
-          <div class="provider-add"><button type="button" onClick={() => setAdding(true)}>{words.add}</button></div>
+          {/* Only an admin adds one (#1761). */}
+          {store.person.value?.role !== "member" && (
+            <div class="provider-add"><button type="button" onClick={() => setAdding(true)}>{words.add}</button></div>
+          )}
           <p class="hint">{words.footer}</p>
         </>
       )}
@@ -51,7 +55,10 @@ function ProviderCard({ store, provider, say, edit, link }: {
   store: Store; provider: ProviderSummary; say: (why: string | null) => void; edit: () => void; link: (w: WorkspaceInfo) => void;
 }) {
   const hosts = store.hosts.value;
-  const line = providerLine(provider, time);
+  const groups = store.providers.groups.value;
+  const admin = store.person.value?.role !== "member";
+  const line = [providerLine(provider, time), groupLine(provider, groups)].filter(Boolean).join(" · ");
+  const setGroup = async (group: string) => say(await store.providers.setGroup(provider.id, group || null));
   const remove = async () => {
     if (!window.confirm(`${words.removeTitle(provider.name)} ${words.removeNote}`)) return;
     say(await store.providers.remove(provider.id));
@@ -64,8 +71,16 @@ function ProviderCard({ store, provider, say, edit, link }: {
           {line && <p class="small quiet">{line}</p>}
         </div>
         <button type="button" class="link small" onClick={() => void store.providers.refresh(provider.id)}>List Again</button>
-        {kindOfPreset(provider.preset) && <button type="button" onClick={edit}>Edit…</button>}
-        <button type="button" class="destructive" onClick={() => void remove()}>Remove…</button>
+        {/* Who may start machines from it (#1761): an admin gives it to a group. */}
+        {admin && (
+          <select aria-label={`${provider.name}’s group`} value={provider.group ?? ""}
+            onChange={(e) => void setGroup((e.currentTarget as HTMLSelectElement).value)}>
+            <option value="">{adminsOnly}</option>
+            {groups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
+          </select>
+        )}
+        {admin && kindOfPreset(provider.preset) && <button type="button" onClick={edit}>Edit…</button>}
+        {admin && <button type="button" class="destructive" onClick={() => void remove()}>Remove…</button>}
       </li>
       {provider.workspaces.map((w) => (
         <WorkspaceRow key={w.id} store={store} provider={provider} workspace={w} hosts={hosts} say={say} link={() => link(w)} />
