@@ -30,3 +30,21 @@ struct GroupWordsTests {
         #expect(!given.usable && none.usable)
     }
 }
+
+/// A bot's words in Settings ▸ People (#1761), as `teamGroups.ts` says them.
+@Suite("Bot words")
+struct BotWordsTests {
+    @Test func aBotsLineSaysItsGroupCapAndSpend() {
+        let platform = DaemonAPI.Group(id: "g1", name: "Platform")
+        let bot = DaemonAPI.PersonRow(id: "b", name: "review-bot", kind: .bot, role: .member, group: "g1",
+                                      caps: DaemonAPI.SpendCaps(dailyUSD: 50), spentTodayUSD: 3.2)
+        #expect(BotWords.line(bot, groups: [platform]) == "In Platform · $50 a day · $3.20 today")
+        #expect(BotWords.cap(nil) == "No cap")
+        #expect(BotWords.parseCap(" $12.5 ") == 12.5)
+        #expect(BotWords.parseCap("none") == nil)
+        let reached = DaemonAPI.CapReached(user: "b", name: "review-bot", group: "Platform", spentUSD: 51, capUSD: 50,
+                                           until: Date())
+        #expect(BotWords.capReached(reached)
+            == "review-bot stopped at Platform’s cap: $51 of $50 today. It starts work again at midnight UTC.")
+    }
+}

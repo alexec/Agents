@@ -1,7 +1,7 @@
 // Settings ▸ Groups (#1761, spec 736 FR-027, FR-028): the same words as GroupWords in
 // Packages/AgentsKit. A group is everyone, or the people named; it owns workspace providers, and
 // only its people see them and start machines from them. A provider with no group is the admins'.
-import type { Group, PersonRow, ProviderSummary } from "../protocol/generated";
+import type { CapReached, Group, PersonRow, ProviderSummary, SpendCaps } from "../protocol/generated";
 
 export const title = "Groups";
 export const adminsOnly = "Admins only";
@@ -52,3 +52,42 @@ export function foot(admin: boolean): string {
 
 export const removeTitle = (group: Group) => `Remove ${group.name}?`;
 export const removeMessage = "Its people keep their machines. A provider must go to another group first.";
+
+// A bot in Settings ▸ People (#1761): the same words as BotWords in Packages/AgentsKit.
+export const botWords = {
+  make: "Make a Bot…",
+  addMachine: "Add a Machine…",
+  setCap: "Group and Cap…",
+  foot: "A bot runs the team’s workflows: a workflow whose runs-on: names it runs on its machines, once per trigger. Nobody can start, message or answer its agents; an admin can stop a run. Its spend counts against its own cap and its group’s.",
+  machineFoot: "Run this on the machine for the bot. It joins as the bot’s machine; the code works once, for 10 minutes.",
+};
+
+/** "$3.20", "$50". */
+export function dollars(usd: number): string {
+  return usd === Math.round(usd) ? `$${usd}` : `$${usd.toFixed(2)}`;
+}
+
+/** "$50 a day", or "No cap". */
+export function capWords(caps: SpendCaps | undefined): string {
+  return caps?.dailyUSD && caps.dailyUSD > 0 ? `${dollars(caps.dailyUSD)} a day` : "No cap";
+}
+
+/** "In Platform · $50 a day · $3.20 today". */
+export function botLine(bot: PersonRow, groups: readonly Group[]): string {
+  const group = groups.find((g) => g.id === bot.group)?.name ?? "a group not shown to you";
+  const parts = [`In ${group}`, capWords(bot.caps)];
+  if (bot.spentTodayUSD !== undefined) parts.push(`${dollars(bot.spentTodayUSD)} today`);
+  return parts.join(" · ");
+}
+
+/** The notice an admin is shown when a bot stopped at a cap. */
+export function capReachedWords(reached: CapReached): string {
+  const whose = reached.group ? `${reached.group}’s cap` : "its cap";
+  return `${reached.name} stopped at ${whose}: ${dollars(reached.spentUSD)} of ${dollars(reached.capUSD)} today. It starts work again at midnight UTC.`;
+}
+
+/** A cap typed in: dollars, or undefined for no cap. A bad number is no cap too. */
+export function parseCap(text: string): number | undefined {
+  const usd = Number(text.trim().replace("$", ""));
+  return text.trim() !== "" && Number.isFinite(usd) && usd > 0 ? usd : undefined;
+}

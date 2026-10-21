@@ -779,7 +779,8 @@ private struct RemoteSettings: View {
                     // Who uses the control plane, and what belongs to them (#994).
                     if !model.needsPairing {
                         NavigationLink {
-                            PeoplePane(control: model.controlPlane, revision: model.people.revision)
+                            PeoplePane(control: model.controlPlane, revision: model.people.revision,
+                                       capReached: model.people.capReached)
                                 .navigationTitle("People")
                                 .navigationBarTitleDisplayMode(.inline)
                         } label: {

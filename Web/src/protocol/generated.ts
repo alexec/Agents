@@ -5736,6 +5736,7 @@ export interface Methods {
   "hosts/retryKept": { params: KeptRequestID; result: Empty };
   "hosts/setWorkspaceOptions": { params: HostWorkspaceOptions; result: ControlHost };
   "hosts/start": { params: HostRequest; result: ControlHost };
+  "hosts/startEnroll": { params: HostEnroll; result: ControlCodeShown };
   "hosts/stop": { params: HostStop; result: ControlHost };
   "hosts/unlink": { params: HostRequest; result: ControlHost };
   "leases/snapshot": { params: Empty; result: LeaseSnapshot };
@@ -5930,6 +5931,7 @@ export const MethodTarget = {
   "hosts/retryKept": "control",
   "hosts/setWorkspaceOptions": "control",
   "hosts/start": "control",
+  "hosts/startEnroll": "control",
   "hosts/stop": "control",
   "hosts/unlink": "control",
   "leases/snapshot": "host",

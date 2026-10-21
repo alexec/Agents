@@ -1169,6 +1169,11 @@
     {
       "name": "hosts/startEnroll",
       "x-capability": "hosts/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
       "paramStructure": "by-name",
       "params": [
         {
