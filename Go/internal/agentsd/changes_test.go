@@ -113,6 +113,56 @@ func TestBranchingFromAPrompt(t *testing.T) {
 	}
 }
 
+// A branch's record goes to its runtime with its first prompt, and is never kept on the
+// queued prompt, which every client is sent on each change (#1851).
+func TestABranchsRecordIsNotQueued(t *testing.T) {
+	fakeRuntimes(t)
+	d, c := start(t, t.TempDir())
+	defer d.Shutdown()
+	a := seeded(t, d, t.TempDir(), nil)
+	first, second := store.NewUUID(), store.NewUUID()
+	d.Store.AppendMany(a.ID, []wire.TranscriptEntry{
+		{ID: first, At: now(), Kind: wire.TranscriptEntryKind{UserMessage: &wire.TranscriptEntryKindUserMessage{Value: "Make the cache"}}},
+		{ID: store.NewUUID(), At: now(), Kind: wire.TranscriptEntryKind{AgentMessage: &wire.TranscriptEntryKindAgentMessage{Text: "Done: " + strings.Repeat("cache ", 20000)}}},
+		{ID: second, At: now(), Kind: wire.TranscriptEntryKind{UserMessage: &wire.TranscriptEntryKindUserMessage{Value: "Make it faster"}}},
+	})
+	var id wire.UUID
+	json.Unmarshal(c.call(t, 1, "agents/branchFrom", map[string]any{"agentID": a.ID, "entryID": second}), &id)
+	c.call(t, 2, "agents/prompt", map[string]any{"agentID": id, "text": "say your brief", "from": "person"})
+	queued, ran := false, false
+	c.until(t, "the branch's turn end", func(method string, p json.RawMessage) bool {
+		if method != "agent/changed" {
+			return false
+		}
+		var b wire.Agent
+		json.Unmarshal(p, &b)
+		if b.ID != id {
+			return false
+		}
+		for _, q := range b.QueuedPrompts {
+			queued = true
+			if q.Preface != nil || len(p) > 10_000 {
+				t.Fatalf("queued with %d bytes: %v", len(p), q.Preface != nil)
+			}
+		}
+		ran = ran || b.State == wire.AgentStateRunning
+		return ran && b.State == wire.AgentStateFinished
+	})
+	if !queued {
+		t.Fatal("never saw the prompt queued")
+	}
+	said := agentMessages(d, id)
+	if !strings.Contains(said, "Before: This conversation goes on from an earlier one") || !strings.Contains(said, "Done: cache cache") {
+		t.Fatalf("said %.300q", said)
+	}
+	// Its next prompt has a conversation of its own to go on, and no record.
+	c.call(t, 3, "agents/prompt", map[string]any{"agentID": id, "text": "say your brief again", "from": "person"})
+	waitFor(t, "the second answer", func() bool { return strings.Count(agentMessages(d, id), "Before: ") == 2 })
+	if said := agentMessages(d, id); strings.Count(said, "goes on from an earlier one") != 1 {
+		t.Fatalf("told twice")
+	}
+}
+
 func TestForkingAConversation(t *testing.T) {
 	fakeRuntimes(t)
 	d, c := start(t, t.TempDir())

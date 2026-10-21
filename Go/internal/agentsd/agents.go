@@ -160,13 +160,6 @@ func (d *Daemon) prompt(r wire.PromptRequest) error {
 			preface = &p
 		}
 	}
-	// A branch's first prompt carries the record it was branched with (#1658).
-	if branch := d.branchPreface(a); branch != nil {
-		if preface != nil {
-			*branch += "\n\n" + *preface
-		}
-		preface = branch
-	}
 	return d.enqueue(a.ID, wire.QueuedPrompt{ID: store.NewUUID(), Text: r.Text, Attachments: r.Attachments,
 		QueuedAt: now(), From: from, Preface: preface}, false)
 }

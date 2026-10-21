@@ -571,6 +571,10 @@ func (l *live) turn() bool {
 	sent := q
 	l.lastSent = &sent
 	l.mu.Unlock()
+	// A branch's first prompt carries the record it was branched with (#1658), read here
+	// as it goes rather than kept on the queued prompt, which every client is sent on each
+	// change (#1851); before the prompt is recorded, so the record is the one it went on from.
+	branch := d.branchPreface(a)
 	if !resent {
 		d.recordFrom(l.id, wire.TranscriptEntryKind{UserMessage: um}, q.Sender)
 	}
@@ -623,6 +627,9 @@ func (l *live) turn() bool {
 	}
 	if q.Preface != nil {
 		bs = append([]wire.ContentBlock{textBlock(*q.Preface)}, bs...)
+	}
+	if branch != nil {
+		bs = append([]wire.ContentBlock{textBlock(*branch)}, bs...)
 	}
 	// The brief first of all (#763), once per conversation: our words before the person's,
 	// so theirs are the last thing the agent reads.
