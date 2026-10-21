@@ -117,11 +117,18 @@ For each finding that is not security:
    have one.
 
 Then send the Scrum Master one message (`list_sessions`, then `message_session` to the
-session titled Scrum Master): the high issues in priority order (security, performance,
-usability, runtimes, the rest), and that the release waits for them. Send no medium one:
-the release does not wait for it, and the lanes take it after the release as its label
-and milestone say. If no Scrum Master is running, go on to step 4 and say so in the
-report: the issues are labelled, and the next Scrum Master takes them.
+session not archived whose title has "scrum master" in it, any case, and that is labelled
+`lead`): the high issues in priority order (security, performance, usability, runtimes,
+the rest), and that the release waits for them. Send no medium one: the release does not
+wait for it, and the lanes take it after the release as its label and milestone say.
+
+**No Scrum Master running, and high issues to hand over** (#1908; in v0.7.0 the highs sat
+40 minutes with no owner): start one. Call `start_session` with the persona in
+`.agents/personas/scrum-master.md` (its prompt, `runtime:` and `labels:`), the title
+`<x.y> scrum master` for the version being released, and a prompt that names the milestone,
+the high issues in the order above, that the release waits for them, and that it reports to
+the release session (this one, by its id). The release still starts no fix lane itself:
+the Scrum Master does. With nothing high to hand over, start none, and say so in the report.
 
 ### Security findings
 
