@@ -1,6 +1,6 @@
 // The chosen session's chat (071 US2, FR-023): concise turns at the chosen level (069), tool
 // calls, plans and background tasks (057), live from agent/entry and agent/changed; the cards
-// where each was asked (#973); the prompt pinned to the foot at every width (US6 scenario 4), with where
+// at the end, with the agent's wait on events under them (#1995); the prompt pinned to the foot at every width (US6 scenario 4), with where
 // the session works, its labels and its runtime over it, as in the window (#108). Long
 // conversations come a page at a time as the top is reached, and the pane follows the end
 // unless the person has scrolled up.
@@ -9,7 +9,7 @@ import { useSignal } from "@preact/signals";
 import { useEffect, useLayoutEffect, useMemo, useRef } from "preact/hooks";
 import { openTurnsHeld, rememberOpen, type Store } from "../model/store";
 import { backgroundAge, backgroundEnded, backgroundNoun, isRunning, subagentNoSteps, subagentStatus } from "../model/background";
-import { display, isPersonsAsk, isWorking, placing, type ChatTurn, type Item } from "../model/turns";
+import { display, isPersonsAsk, isWorking, type ChatTurn, type Item } from "../model/turns";
 import { fromWireDate, toWireDate } from "../protocol/dates";
 import type { Agent, AppViewCall, BackgroundItem, FileMentionDTO, FindMatch, FindResult, TranscriptEntry, TurnSummary } from "../protocol/generated";
 import { replace, route } from "../route";
@@ -49,7 +49,8 @@ import { comingBackDescription } from "../model/status";
 import { ArchiveCard } from "./ArchiveCard";
 import { showsThoughts, shownItems } from "../model/thoughts";
 import { hasTurnInFlight, promptPlaceholder, willQueue } from "../model/promptWords";
-import { eventWaitCapsule, leaseMark } from "../model/rowLines";
+import { eventWaitLine, leaseMark } from "../model/rowLines";
+import { routeHash } from "../route";
 import { GuardedChangeCard } from "./GuardedChange";
 import { Capability } from "../protocol/capabilities.generated";
 import { hostNeedsUpdate } from "../model/capabilities";
@@ -371,25 +372,27 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
     }
   }, [focus, rows, chosen.value, fetched.value]);
 
-  // What waits on the person is in the conversation, not over it (#723), each where it was asked:
-  // what came after it is below it (#973). Scrolled out of sight, the way back says a question is
-  // waiting, and which way.
+  // What waits on the person is in the conversation, not over it (#723), after all of it (#1995),
+  // and the agent's wait on events under it.
   const asked = useWaitingCards({ store, host, session, down });
+  const waitLine = agent && eventWaitLine(agent, (id) => store.agent(host, id)?.title);
   const cards: WaitingCard[] = [
     // A change its agent made to the project's own files, asked here (#531).
     ...store.guardedChanges(host, { session }).map(({ folder, change }) => ({
-      key: `guarded:${folder}|${change.path}`, at: change.since,
+      key: `guarded:${folder}|${change.path}`,
       node: <div class="cards"><GuardedChangeCard store={store} host={host} folder={folder} change={change} down={down} /></div>,
     })),
     ...asked,
-    // An ask to be archived waits the same way, last when asked at once (#827).
+    // An ask to be archived waits the same way (#827).
     ...(agent && asksToArchive(agent) ? [{
       key: `archive:${agent.id}`,
-      at: agent.archiveRequest && "requested" in agent.archiveRequest ? agent.archiveRequest.requested.at : Infinity,
       node: <ArchiveCard store={store} host={host} agent={agent} disabled={down} />,
     }] : []),
+    ...(agent && waitLine ? [{
+      key: `wait:${agent.id}`,
+      node: <WaitCard line={waitLine} disabled={down} stop={() => store.cancelWait(host, agent.id)} />,
+    }] : []),
   ];
-  const stretches = placing(rows, cards, (card) => card.at);
 
   const toEnd = () => {
     const el = scroller.current;
@@ -546,35 +549,25 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
           </p>
         )}
         {store.hasMoreOfTheConversation && <p class="more" aria-label="Loading earlier"><span class="spinner" /></p>}
-        {(() => {
-          // Each stretch's turns, then the cards asked after them, in one keyed list: a card answered
-          // lets the turns around it join up without drawing them again (#973).
-          const drawn = stretches.reduce((n, stretch) => n + stretch.turns.length, 0);
-          let index = 0;
-          return stretches.flatMap((stretch) => [
-            ...stretch.turns.map((turn) => {
-              const i = index++;
-              return (
-                <TurnView key={turn.id} turn={turn} detail={chosen.value[turn.id] ?? initialDetail} focusedRun={focusedRun.value}
-                  fetched={fetched.value[turn.id] && shownItems(fetched.value[turn.id]!.items)} fetchFailed={!!failedTurns.value[turn.id]} hasEarlier={fetched.value[turn.id]?.hasEarlier ?? false}
-                  auto={i >= drawn - openTurnsHeld}
-                  isLive={i === drawn - 1 && live} background={background}
-                  toggle={turnActions.toggle} loadDetail={turnActions.loadDetail} loadEarlier={turnActions.loadEarlier} />
-              );
-            }),
-            ...(stretch.cards.length ? [
-              <div key={`waiting:${stretch.cards[0]!.key}`} class="waiting" aria-label="Waiting for you">
-                {stretch.cards.map((card) => <Fragment key={card.key}>{card.node}</Fragment>)}
-              </div>,
-            ] : []),
-          ]);
-        })()}
+        {rows.map((turn, i) => (
+          <TurnView key={turn.id} turn={turn} detail={chosen.value[turn.id] ?? initialDetail} focusedRun={focusedRun.value}
+            fetched={fetched.value[turn.id] && shownItems(fetched.value[turn.id]!.items)} fetchFailed={!!failedTurns.value[turn.id]} hasEarlier={fetched.value[turn.id]?.hasEarlier ?? false}
+            auto={i >= rows.length - openTurnsHeld}
+            isLive={i === rows.length - 1 && live} background={background}
+            toggle={turnActions.toggle} loadDetail={turnActions.loadDetail} loadEarlier={turnActions.loadEarlier} />
+        ))}
         {agent && <Queued store={store} host={host} agent={agent} disabled={down} draftKey={`${host}|${session}`} />}
         {agent && <KeptBubbles store={store} kept={store.keptFor(host, agent.id)} />}
         {/* Live, at the foot: what the row says, until the prompt lands (ChatTranscript, #251). */}
         {agent && store.isComingBack(host, agent.id) ? <p class="working coming-back" role="status">↻ {comingBackDescription}</p>
           : agent && (agent.state === "running" || agent.state === "starting") && (
           <p class="working" aria-label="Working"><span class="spinner" /></p>
+        )}
+        {/* After all of it, where the reader is (#1995). */}
+        {cards.length > 0 && (
+          <div class="waiting" aria-label="Waiting for you">
+            {cards.map((card) => <Fragment key={card.key}>{card.node}</Fragment>)}
+          </div>
         )}
         {agent && !store.isComingBack(host, agent.id) && agent.state !== "running" && agent.state !== "starting" && (
           <QuietLine since={lastEntryAt(store.entries.value, store.turns.value) ?? fromWireDate(agent.lastActivityAt)} />
@@ -747,27 +740,37 @@ function Queued({ store, host, agent, disabled, draftKey }: { store: Store; host
 }
 
 /**
- * What the open agent holds and waits for, and the events it waits on, over the prompt (036,
- * 042; LeaseRow and WaitCapsule, #254): one capsule each, and that sending takes a wait's place.
+ * What the open agent holds, over the prompt (036; LeaseRow, #254): one capsule each. What it waits
+ * for on events is a card at the end of the chat (#1995).
  */
 function Capsules({ store, host, agent }: { store: Store; host: string; agent: Agent }) {
-  const title = (id: string) => store.agent(host, id)?.title;
-  const leases = leaseMark(agent.id, store.leases.value[host], title);
-  const wait = eventWaitCapsule(agent, title);
-  if (!leases && !wait) return null;
+  const leases = leaseMark(agent.id, store.leases.value[host], (id) => store.agent(host, id)?.title);
+  if (!leases) return null;
   return (
     <div class="capsules">
-      {leases && (
-        <p class="capsule-row" role="note" aria-label={leases.full}>
-          {leases.capsules.map((text) => <span key={text} class="capsule" title={leases.full}>{text}</span>)}
+      <p class="capsule-row" role="note" aria-label={leases.full}>
+        {leases.capsules.map((text) => <span key={text} class="capsule" title={leases.full}>{text}</span>)}
+      </p>
+    </div>
+  );
+}
+
+/**
+ * The agent's wait on events, as a card under the questions (WaitCard.swift, #1995): what, since
+ * when, until when, a way to it on the Events page, and Stop Waiting. Not tinted.
+ */
+function WaitCard({ line, disabled, stop }: { line: string; disabled: boolean; stop: () => Promise<void> }) {
+  const busy = useSignal(false);
+  return (
+    <div class="cards">
+      <div class="card wait-card" role="status" aria-label={line}>
+        <p class="strong">{line}</p>
+        <p class="wait-answers">
+          <button onClick={() => { location.hash = routeHash({ activity: "events" }); }}>Show in Events</button>
+          <button disabled={disabled || busy.value} title="Stop waiting. Nothing will start it again for this wait."
+            onClick={() => { busy.value = true; void stop().finally(() => (busy.value = false)); }}>Stop Waiting</button>
         </p>
-      )}
-      {wait && (
-        <>
-          <p class="capsule-row"><span class="capsule" title={wait.line}>{wait.line}</span></p>
-          <p class="faint small hint">{wait.hint}</p>
-        </>
-      )}
+      </div>
     </div>
   );
 }

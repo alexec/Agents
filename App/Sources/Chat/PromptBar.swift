@@ -330,10 +330,6 @@ struct PromptBar: View {
                 PromptHeader(agent: agent,
                              leaseStatus: model.work.leaseStatus(of: agent.id),
                              openLease: { model.showResources(at: $0) },
-                             waitStatus: agent.eventWait?.isOpen == true ? model.work.waitStatus(of: agent) : nil,
-                             waitHint: agent.eventWait.map(EventWords.hint) ?? "",
-                             openWait: { model.showEvents(at: .waitingNow) },
-                             cancelWait: { Task { await model.cancelWait(of: agent.id) } },
                              background: agent.background,
                              backgroundActions: backgroundActions(agent))
                 }

@@ -306,9 +306,8 @@ struct RemoteChatView: View {
         }
     }
 
-    /// What waits on the person, each where it was asked in the conversation, as on the
-    /// Mac (#723, #973): none when nothing does, so the conversation has no way back to
-    /// one to offer.
+    /// What waits on the person, then the agent's wait on events, at the end of the
+    /// conversation, as on the Mac (#723, #1995). None when nothing waits.
     ///
     /// The question card keeps the phone's own shape — its options stacked and what it
     /// covers shown in full — because a row of buttons at a large text size is a row of
@@ -317,7 +316,7 @@ struct RemoteChatView: View {
         guard let agent else { return [] }
         var cards: [WaitingCard] = []
         for request in model.work.permissions(for: agent.id) {
-            cards.append(WaitingCard(id: request.id.uuidString, at: request.askedAt) {
+            cards.append(WaitingCard(id: request.id.uuidString) {
                 // A fresh sheet per question, so a tap in flight on the last one is not
                 // carried over to the next.
                 PermissionSheet(request: request)
@@ -327,7 +326,7 @@ struct RemoteChatView: View {
         }
         // A change its agent made to the project's own files waits the same way (#531).
         for change in model.work.guardedChanges(askedIn: agent.id) {
-            cards.append(WaitingCard(id: "guarded:" + change.id, at: change.since) {
+            cards.append(WaitingCard(id: "guarded:" + change.id) {
                 GuardedChangeQuestion(change: change, key: ProjectKey(host: agent.host, folder: agent.projectFolder))
                     .chatColumn()
                     .transition(.move(edge: .bottom).combined(with: .opacity))
@@ -336,7 +335,7 @@ struct RemoteChatView: View {
         // A form waits the same way a permission does, never hidden behind one (#243),
         // as on the Mac.
         if let form = model.work.elicitation(for: agent.id) {
-            cards.append(WaitingCard(id: form.id.uuidString, at: form.askedAt) {
+            cards.append(WaitingCard(id: form.id.uuidString) {
                 ElicitationSheet(request: form)
                     .id(form.id)
                     .transition(.move(edge: .bottom).combined(with: .opacity))
@@ -345,12 +344,22 @@ struct RemoteChatView: View {
         // An ask to be archived waits the same way, last when asked at once, as on the
         // Mac (#827).
         if agent.asksToArchive {
-            cards.append(WaitingCard(id: "archive:" + agent.id.uuidString,
-                                     at: agent.archiveRequest?.requestedAt ?? .distantFuture) {
+            cards.append(WaitingCard(id: "archive:" + agent.id.uuidString) {
                 ArchiveRequestCard(agent: agent,
                                    approve: { await model.archive(agent.id) },
                                    keep: { await model.keepSession(agent) },
                                    isDisabled: model.isStale(agent) || model.acting(agent.id) != nil)
+                    .chatColumn()
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            })
+        }
+        // The agent's wait on events, under the questions, as on the Mac (#1995). No
+        // Events page here, so only Stop Waiting.
+        if agent.eventWait?.isOpen == true, let status = model.work.waitStatus(of: agent) {
+            cards.append(WaitingCard(id: "wait:" + agent.id.uuidString) {
+                WaitCard(status: status,
+                         stop: { await model.cancelWait(of: agent.id) },
+                         isDisabled: model.isStale(agent))
                     .chatColumn()
                     .transition(.move(edge: .bottom).combined(with: .opacity))
             })

@@ -329,13 +329,13 @@ struct ChatView: View {
         model.offlineHelp(for: agent?.host ?? .mac)
     }
 
-    /// What waits on the person, each where it was asked in the transcript (#723, #973):
-    /// none when nothing does, so the transcript has no way back to a question to offer.
+    /// What waits on the person, then the agent's wait on events, at the end of the
+    /// transcript (#723, #1995). None when nothing waits.
     private var cards: [WaitingCard] {
         guard let agent else { return [] }
         var cards: [WaitingCard] = []
         for request in model.work.permissions(for: agent.id) {
-            cards.append(WaitingCard(id: request.id.uuidString, at: request.askedAt) {
+            cards.append(WaitingCard(id: request.id.uuidString) {
                 PermissionView(request: request)
                     .disabled(selectedHostOffline)
                     .help(selectedHostOffline ? offlineHelp : "")
@@ -343,14 +343,14 @@ struct ChatView: View {
         }
         // A change its agent made to the project's own files waits the same way (#531).
         for change in model.work.guardedChanges(askedIn: agent.id) {
-            cards.append(WaitingCard(id: "guarded:" + change.id, at: change.since) {
+            cards.append(WaitingCard(id: "guarded:" + change.id) {
                 GuardedChangeQuestion(change: change, key: ProjectKey(host: agent.host, folder: agent.projectFolder))
                     .chatColumn()
             })
         }
         // A form waits the same way a permission question does.
         if let request = model.work.elicitation(for: agent.id) {
-            cards.append(WaitingCard(id: request.id.uuidString, at: request.askedAt) {
+            cards.append(WaitingCard(id: request.id.uuidString) {
                 // A fresh card per form, so the answers and the step reached on one
                 // are not carried into the next.
                 ElicitationView(request: request)
@@ -361,12 +361,23 @@ struct ChatView: View {
         }
         // An ask to be archived waits the same way, last when asked at once (#827).
         if agent.asksToArchive {
-            cards.append(WaitingCard(id: "archive:" + agent.id.uuidString,
-                                     at: agent.archiveRequest?.requestedAt ?? .distantFuture) {
+            cards.append(WaitingCard(id: "archive:" + agent.id.uuidString) {
                 ArchiveRequestCard(agent: agent,
                                    approve: { await model.archive(agent.id, andLeave: true) },
                                    keep: { await model.keepSession(agent) },
                                    isDisabled: selectedHostOffline || model.acting(agent.id) != nil)
+                    .chatColumn()
+                    .help(selectedHostOffline ? offlineHelp : "")
+            })
+        }
+        // The agent's wait on events, under the questions (#1995): it was a capsule over
+        // the prompt.
+        if agent.eventWait?.isOpen == true, let status = model.work.waitStatus(of: agent) {
+            cards.append(WaitingCard(id: "wait:" + agent.id.uuidString) {
+                WaitCard(status: status,
+                         open: { model.showEvents(at: .waitingNow) },
+                         stop: { await model.cancelWait(of: agent.id) },
+                         isDisabled: selectedHostOffline)
                     .chatColumn()
                     .help(selectedHostOffline ? offlineHelp : "")
             })
