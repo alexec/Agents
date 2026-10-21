@@ -552,10 +552,13 @@ func (m *Methods) NoteEpoch(ctx context.Context, id controllink.Identity, epoch 
 			return true
 		})
 	case 'h':
-		if h := m.records.Host(id.ID); h != nil && (h.KnownEpoch == nil || *h.KnownEpoch != epoch) {
+		m.records.ChangeHost(ctx, id.ID, func(h *records.HostRecord) bool {
+			if h.KnownEpoch != nil && *h.KnownEpoch == epoch {
+				return false
+			}
 			h.KnownEpoch = &epoch
-			m.records.SaveHost(ctx, *h)
-		}
+			return true
+		})
 	}
 }
 
@@ -799,45 +802,54 @@ func (m *Methods) HostSaid(host, method string, params json.RawMessage) (any, er
 // something, and the home host settled.
 func (m *Methods) hello(ctx context.Context, host string, hello wire.HostHello) error {
 	known := m.records.Host(host)
-	record := records.HostRecord{ID: host, Name: host}
-	if hello.Name != nil {
-		record.Name = *hello.Name
-	}
-	if known != nil {
-		record = *known
-	}
-	record.Version = hello.Version
-	record.Platform = hello.Platform
-	mid := hello.MachineID
-	record.MachineID = &mid
-	if hello.Name != nil {
-		record.Name = *hello.Name
-	}
-	// Which language the host is written in (#1134), kept beside the record's own fields
-	// so a Swift copy keeps it too.
-	if deref(hello.Implementation) != "" {
-		impl, _ := json.Marshal(*hello.Implementation)
-		extra := records.Extra{}
-		for k, v := range record.Extra {
-			extra[k] = v
+	said := func(record *records.HostRecord) {
+		record.Version = hello.Version
+		record.Platform = hello.Platform
+		mid := hello.MachineID
+		record.MachineID = &mid
+		if hello.Name != nil {
+			record.Name = *hello.Name
 		}
-		extra["implementation"] = impl
-		record.Extra = extra
-	} else if _, had := record.Extra["implementation"]; had {
-		extra := records.Extra{}
-		for k, v := range record.Extra {
-			if k != "implementation" {
+		// Which language the host is written in (#1134), kept beside the record's own fields
+		// so a Swift copy keeps it too.
+		if deref(hello.Implementation) != "" {
+			impl, _ := json.Marshal(*hello.Implementation)
+			extra := records.Extra{}
+			for k, v := range record.Extra {
 				extra[k] = v
 			}
+			extra["implementation"] = impl
+			record.Extra = extra
+		} else if _, had := record.Extra["implementation"]; had {
+			extra := records.Extra{}
+			for k, v := range record.Extra {
+				if k != "implementation" {
+					extra[k] = v
+				}
+			}
+			record.Extra = extra
 		}
-		record.Extra = extra
+		*record = withCapabilities(*record, hello.Capabilities)
 	}
-	record = withCapabilities(record, hello.Capabilities)
 	// Whether a host relays is settled when it enrols and changed only by a person
 	// (hosts/setRelay). A host's own hello never makes it a relay (T102).
-	changed := known == nil || !sameHost(*known, record)
-	if changed {
+	changed := known == nil
+	if known == nil {
+		record := records.HostRecord{ID: host, Name: host}
+		said(&record)
 		if err := m.records.SaveHost(ctx, record); err != nil {
+			return err
+		}
+	} else {
+		// Changed on the record as it is when written: a connect noting its epoch at the
+		// same moment is kept (#1763).
+		err := m.records.ChangeHost(ctx, host, func(record *records.HostRecord) bool {
+			before := *record
+			said(record)
+			changed = !sameHost(before, *record)
+			return changed
+		})
+		if err != nil {
 			return err
 		}
 	}
@@ -867,16 +879,19 @@ func (m *Methods) hello(ctx context.Context, host string, hello wire.HostHello) 
 	if changed {
 		m.router.BroadcastHost(host, "control/hostChanged", m.router.Described(host))
 	}
-	if record.Relay != nil && *record.Relay {
+	if r := m.records.Host(host); r != nil && r.Relay != nil && *r.Relay {
 		m.s.tellRelayDevices()
 	} else {
 		m.s.tellHostClients(host)
 	}
 	// A host marked before #656 to add the projects it found: the mark goes, unsaid.
-	if r := m.records.Host(host); r != nil && r.DetectProjects != nil && *r.DetectProjects {
+	m.records.ChangeHost(ctx, host, func(r *records.HostRecord) bool {
+		if r.DetectProjects == nil || !*r.DetectProjects {
+			return false
+		}
 		r.DetectProjects = nil
-		m.records.SaveHost(ctx, *r)
-	}
+		return true
+	})
 	return nil
 }
 
