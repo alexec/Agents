@@ -2635,6 +2635,10 @@ public enum DaemonAPI {
         /// and there was no relay, the server is not "own sign-in only", and it has no
         /// sign-in of its own. Nothing was started. `data`: `SignInWanted`.
         public static let signInWanted = -32070
+        /// A client or host from before the team tier, on a control plane with more than one
+        /// person (#1763, R14): it cannot tell people apart, so it is refused with "Update
+        /// Agents to join this team". Never said to a build that has `client.team/1`.
+        public static let updateToJoinTeam = -32074
         /// `presence/report` from a connection with no identity: not a window and not a
         /// device the bridge opened on behalf of. The surface is taken from the
         /// connection and never from the parameters, so there is nothing to report as.

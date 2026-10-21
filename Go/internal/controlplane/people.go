@@ -341,6 +341,7 @@ func (s *Service) peopleChanged(user string, removed bool) {
 	if !told[s.localOwner()] {
 		s.router.TellPerson(s.localOwner(), "control/peopleChanged", change)
 	}
+	s.noteTeam()
 	s.announce("peopleChanged", user, "")
 }
 

@@ -700,6 +700,9 @@ func (s *Service) apply(e controlEvent) {
 	case "hostRemoved":
 		s.router.ForgetHost(e.Subject)
 		s.copies.forget(e.Subject)
+	case "peopleChanged":
+		// Another copy's invite or removal makes this one a team, or not (#1763).
+		s.noteTeam()
 	case "clientPaired", "hostEnrolled", "hostMoved":
 		for _, h := range s.records.Hosts() {
 			s.router.Know(h.ID)

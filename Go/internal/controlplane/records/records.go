@@ -694,6 +694,40 @@ func (r *Records) SaveHost(ctx context.Context, h HostRecord) error {
 	return nil
 }
 
+// ChangeHost changes a host already known on the copy held now, read and written under
+// the write lock, as ChangeClient does: a change made since the caller looked (a hello
+// and a connect noting its epoch at once) is kept. change says whether there is anything
+// to write. Nothing happens for a host not known.
+func (r *Records) ChangeHost(ctx context.Context, id string, change func(*HostRecord) bool) error {
+	r.writing.Lock()
+	defer r.writing.Unlock()
+	r.mu.Lock()
+	h, ok := r.hosts[id]
+	r.mu.Unlock()
+	if !ok {
+		return nil
+	}
+	c := h.record
+	if !change(&c) {
+		return nil
+	}
+	a, b := h.record, c
+	a.Rev, b.Rev = 0, 0
+	if same(a, b) {
+		return nil
+	}
+	c.ID = id
+	c.Rev = h.record.Rev + 1
+	kept, etag, err := write(ctx, r.Store, c, HostKey(id), store.Matching(h.etag))
+	if err != nil {
+		return err
+	}
+	r.mu.Lock()
+	r.hosts[id] = held[HostRecord]{kept, etag}
+	r.mu.Unlock()
+	return nil
+}
+
 // RemoveHost is hosts/remove: a tombstone. It says whether there was such a host.
 func (r *Records) RemoveHost(ctx context.Context, id string) (bool, error) {
 	r.writing.Lock()

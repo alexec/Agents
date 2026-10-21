@@ -20,6 +20,7 @@ const (
 	CapChatBranch1           = "chat.branch/1"
 	CapChatContinueWhenBack1 = "chat.continue-when-back/1"
 	CapClientPermissions1    = "client-permissions/1"
+	CapClientTeam1           = "client.team/1"
 	CapClientWire1           = "client.wire/1"
 	CapClient1               = "client/1"
 	CapClients1              = "clients/1"
@@ -45,6 +46,7 @@ const (
 	CapFiles1                = "files/1"
 	CapGit1                  = "git/1"
 	CapHandover1             = "handover/1"
+	CapHostTeam1             = "host.team/1"
 	CapHostWire1             = "host.wire/1"
 	CapHost1                 = "host/1"
 	CapHostsJoin1            = "hosts.join/1"
@@ -554,6 +556,6 @@ var ControlNotifications = map[string]bool{
 // DeclaredCapabilities is x-declared-capabilities: what a host, a client or the control plane
 // declares by hand, by who.
 var DeclaredCapabilities = map[string][]string{
-	"client": {"client.wire/1"},
-	"host":   {"host.wire/1", "agents.move-worktree/1"},
+	"client": {"client.wire/1", "client.team/1"},
+	"host":   {"host.wire/1", "agents.move-worktree/1", "host.team/1"},
 }

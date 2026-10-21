@@ -15,6 +15,11 @@
       "name": "agents.move-worktree/1",
       "by": "host",
       "description": "The host serves the app tool move_worktree to the runtimes that can move (#1821): an agent moves into a new or existing worktree of its project when its turn ends, and back with leave_worktree remove, which removes the worktree once its work is pushed. An app tool, not a method, so declared."
+    },
+    {
+      "name": "host.team/1",
+      "by": "host",
+      "description": "A host knows the user it belongs to (#994, #1763). On a control plane with more than one person, a host without it is needsUpdate, and calls to it are answered -32074 updateToJoinTeam (R14)."
     }
   ],
   "methods": [
@@ -6597,6 +6602,10 @@
       "storeUnavailable": {
         "code": -32094,
         "message": "storeUnavailable"
+      },
+      "updateToJoinTeam": {
+        "code": -32074,
+        "message": "updateToJoinTeam"
       },
       "viewNeedsShow": {
         "code": -32063,

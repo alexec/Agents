@@ -20,6 +20,7 @@ export const Capability = {
   chatBranch1: "chat.branch/1",
   chatContinueWhenBack1: "chat.continue-when-back/1",
   clientPermissions1: "client-permissions/1",
+  clientTeam1: "client.team/1",
   clientWire1: "client.wire/1",
   client1: "client/1",
   clients1: "clients/1",
@@ -45,6 +46,7 @@ export const Capability = {
   files1: "files/1",
   git1: "git/1",
   handover1: "handover/1",
+  hostTeam1: "host.team/1",
   hostWire1: "host.wire/1",
   host1: "host/1",
   hostsJoin1: "hosts.join/1",
@@ -488,6 +490,6 @@ export const ControlCapabilities: Readonly<Record<string, Capability>> = {
 
 /** x-declared-capabilities: what a host, a client or the control plane declares by hand, by who. */
 export const DeclaredCapabilities: Readonly<Record<string, readonly Capability[]>> = {
-  client: ["client.wire/1"],
-  host: ["host.wire/1", "agents.move-worktree/1"],
+  client: ["client.wire/1", "client.team/1"],
+  host: ["host.wire/1", "agents.move-worktree/1", "host.team/1"],
 };

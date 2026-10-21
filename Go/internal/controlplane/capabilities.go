@@ -2,6 +2,8 @@ package controlplane
 
 import (
 	"encoding/json"
+	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/alexec/agents/Go/internal/controlplane/records"
@@ -18,6 +20,27 @@ var required = wire.RequiredCapabilities{
 // wrongProtocolVersion is DaemonAPI.Failure.wrongProtocolVersion.
 const wrongProtocolVersion = wire.FailureWrongProtocolVersion
 
+// updateToJoinTeam is DaemonAPI.Failure.updateToJoinTeam (#1763, R14).
+const updateToJoinTeam = wire.FailureUpdateToJoinTeam
+
+// requiredNow is required, and on a control plane with more than one person (a team) the
+// team capabilities too: a build from before them cannot tell people apart (R14).
+func requiredNow(team bool) wire.RequiredCapabilities {
+	if !team {
+		return required
+	}
+	return wire.RequiredCapabilities{
+		Host:   append(slices.Clone(required.Host), wire.CapHostTeam1),
+		Client: append(slices.Clone(required.Client), wire.CapClientTeam1),
+	}
+}
+
+// joinTeamRefusal is -32074 with what is missing and the version to update to.
+func joinTeamRefusal(message, version string, missing []string) *RPCError {
+	data, _ := json.Marshal(map[string]any{"missing": missing, "update": version})
+	return &RPCError{Code: updateToJoinTeam, Message: message, Data: data}
+}
+
 // capabilities is the control plane's own list: it answers every method of
 // control.openrpc.json (TestControlPlaneAnswersItsDocument), and declares the rest.
 func capabilities() []string {
@@ -27,17 +50,28 @@ func capabilities() []string {
 
 // clientRefusal is what each call of a client without the required set is answered with:
 // -32008, with what it is missing and the version to update to. Nil for a client that has
-// the set, or that says no list at all, as one older than #1748 does.
-func clientRefusal(list []string, version string) *RPCError {
-	if list == nil {
+// the set, or that says no list at all, as one older than #1748 does. On a team, a client
+// without client.team/1, or with no list, is answered -32074 (#1763, R14).
+func clientRefusal(list []string, version string, team bool) *RPCError {
+	if list != nil {
+		if missing := wire.Missing(list, required.Client); missing != nil {
+			data, _ := json.Marshal(map[string]any{"missing": missing, "update": version})
+			return &RPCError{Code: wrongProtocolVersion, Message: "This app needs an update to work with this control plane.", Data: data}
+		}
+	}
+	if team && !slices.Contains(list, wire.CapClientTeam1) {
+		return joinTeamRefusal("Update Agents to join this team.", version, []string{wire.CapClientTeam1})
+	}
+	return nil
+}
+
+// hostRefusal is what a call to a host from before the team tier is answered with, on a
+// team: it would act for every person alike (#1763, R14). Nil for any other host.
+func hostRefusal(list []string, version string, team bool) *RPCError {
+	if !team || slices.Contains(list, wire.CapHostTeam1) {
 		return nil
 	}
-	missing := wire.Missing(list, required.Client)
-	if missing == nil {
-		return nil
-	}
-	data, _ := json.Marshal(map[string]any{"missing": missing, "update": version})
-	return &RPCError{Code: wrongProtocolVersion, Message: "This app needs an update to work with this control plane.", Data: data}
+	return joinTeamRefusal("This host needs an update to join this team.", version, []string{wire.CapHostTeam1})
 }
 
 // refusedOld answers a request from a client too old for this control plane (#1748), and
@@ -46,14 +80,18 @@ func (r *Router) refusedOld(sessionID, host, msg string, kind int) bool {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	s := r.clients[sessionID]
-	if s == nil || s.refusal == nil {
+	if s == nil {
+		return false
+	}
+	refusal := clientRefusal(s.capabilities, r.version, r.team)
+	if refusal == nil {
 		return false
 	}
 	m, ok := decode(msg)
 	if !ok || !m.isRequest() || m.Method == "control/status" {
 		return false
 	}
-	e := replyError(m.ID, s.refusal)
+	e := replyError(m.ID, refusal)
 	if kind != frameLegacy {
 		e = wrap(host, e)
 	}
@@ -111,15 +149,77 @@ func withCapabilities(h records.HostRecord, list []string) records.HostRecord {
 }
 
 // noteCapabilities settles a host's state from the list it said: needsUpdate when it lacks
-// a required capability, and online again when it no longer does.
-func (m *Methods) noteCapabilities(host string, hello wire.HostHello) {
-	if hello.Capabilities == nil {
+// a required capability, and online again when it no longer does. On a team, a host that
+// says no list needs one too (R14).
+func (m *Methods) noteCapabilities(host string, list []string, version string) {
+	team := m.router.Team()
+	m.router.SetHostCapabilities(host, list)
+	if list == nil && !team {
+		m.router.SetNeedsUpdate(host, "", "")
 		return
 	}
-	if missing := wire.Missing(hello.Capabilities, required.Host); missing != nil {
-		m.router.SetNeedsUpdate(host, hello.Version, m.s.cfg.Version)
+	if missing := wire.Missing(list, requiredNow(team).Host); missing != nil {
+		m.router.SetNeedsUpdate(host, version, m.s.cfg.Version)
 		m.s.log("control: host " + host + " needs an update: " + strings.Join(missing, ", "))
 		return
 	}
 	m.router.SetNeedsUpdate(host, "", "")
+}
+
+// MARK: A team (#1763, R14)
+
+// isTeam says the control plane has more than one person: bots too, as they are users.
+func (s *Service) isTeam() bool {
+	n := 0
+	for _, p := range s.records.People() {
+		if !p.IsRemoved() {
+			n++
+		}
+	}
+	return n > 1
+}
+
+// noteTeam holds every session here to whether the control plane is a team now: a client
+// or host from before the team tier is refused from the moment a second person joins,
+// and let in again once only one is left.
+func (s *Service) noteTeam() {
+	team := s.isTeam()
+	was := s.router.SetTeam(team, s.cfg.Version)
+	for _, h := range s.records.Hosts() {
+		if was != team && s.router.Holds(h.ID) {
+			s.methods.noteCapabilities(h.ID, hostCapabilities(h), h.Version)
+		} else {
+			s.router.SetHostCapabilities(h.ID, hostCapabilities(h))
+		}
+	}
+	if was != team {
+		s.log(fmt.Sprintf("control: a team: %v", team))
+	}
+}
+
+// Team says whether the control plane has more than one person, as last noted.
+func (r *Router) Team() bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.team
+}
+
+// SetTeam says whether the control plane is a team, and the version a build from before
+// the team tier is told to update to; it returns what it was.
+func (r *Router) SetTeam(team bool, version string) bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	was := r.team
+	r.team, r.version = team, version
+	return was
+}
+
+// SetHostCapabilities keeps the list a connected host said, for hostRefusal.
+func (r *Router) SetHostCapabilities(host string, list []string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.hostCapabilities == nil {
+		r.hostCapabilities = map[string][]string{}
+	}
+	r.hostCapabilities[host] = list
 }
