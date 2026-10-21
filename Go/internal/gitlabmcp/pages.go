@@ -2,7 +2,6 @@ package gitlabmcp
 
 import (
 	"bufio"
-	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -484,7 +483,10 @@ func traceTail(r io.Reader, n int) (string, error) {
 			continue
 		}
 		if len(chunk) > 0 && chunk[len(chunk)-1] == '\n' || (err == io.EOF && len(line) > 0) {
-			ring[next] = append(ring[next][:0], bytes.TrimSuffix(line, []byte("\n"))...)
+			if line[len(line)-1] == '\n' {
+				line = line[:len(line)-1]
+			}
+			ring[next] = append(ring[next][:0], line...)
 			next, count = (next+1)%len(ring), count+1
 			line = line[:0]
 		}

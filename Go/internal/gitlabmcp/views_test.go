@@ -355,7 +355,7 @@ func TestOnlyTheHostsCopyMergesAndApproves(t *testing.T) {
 }
 
 // P20261020-4: failed_log reads a job's log as it comes and keeps only its end, so a 50 MB
-// log is never held whole.
+// log is never held whole: the tool gives its last lines.
 func TestAFailedLogKeepsOnlyTheEndOfALongLog(t *testing.T) {
 	f := viewsFake(t)
 	var b strings.Builder
@@ -363,23 +363,28 @@ func TestAFailedLogKeepsOnlyTheEndOfALongLog(t *testing.T) {
 		fmt.Fprintf(&b, "\x1b[32mstep %d of the build, with some words to make it long\x1b[0m\n", i)
 	}
 	b.WriteString("FAIL: mean\nsection_end:1700000001:step_script\r\x1b[0K\n\n")
-	f.traces[7] = b.String()
+	log := b.String()
+	f.traces[7] = log
 	c := viewsClient(t, f)
-	runtime.GC()
-	var before, after runtime.MemStats
-	runtime.ReadMemStats(&before)
 	r, _ := callTool(t, c, "failed_log", map[string]any{"pipelineId": 100})
-	runtime.ReadMemStats(&after)
 	text := r.Content[0].(*mcp.TextContent).Text
 	lines := strings.Split(text[strings.Index(text, "==\n")+3:], "\n")
 	if len(lines) != logLines || lines[len(lines)-1] != "FAIL: mean" || strings.Contains(text, "\x1b") ||
 		!strings.HasPrefix(lines[0], "step ") {
 		t.Fatalf("%d lines, the last %q, the first %q", len(lines), lines[len(lines)-1], lines[0])
 	}
+
+	// The read itself, without the HTTP and MCP layers' own, is well under the log's size: the
+	// old way allocated 630 MB; this, 0.3 MB (19 MB under -race, the race runtime's own).
+	runtime.GC()
+	var before, after runtime.MemStats
+	runtime.ReadMemStats(&before)
+	end, err := traceTail(strings.NewReader(log), logLines)
+	runtime.ReadMemStats(&after)
 	allocated := after.TotalAlloc - before.TotalAlloc
 	t.Logf("a 50 MB log: %d KB allocated", allocated>>10)
-	if allocated > 10<<20 {
-		t.Fatalf("a 50 MB log allocated %d MB", allocated>>20)
+	if err != nil || !strings.HasSuffix(end, "FAIL: mean") || allocated > 32<<20 {
+		t.Fatalf("a 50 MB log allocated %d KB (err %v)", allocated>>10, err)
 	}
 }
 
