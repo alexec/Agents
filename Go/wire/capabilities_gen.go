@@ -93,6 +93,7 @@ const (
 	CapTime1                 = "time/1"
 	CapTunnel1               = "tunnel/1"
 	CapUsage1                = "usage/1"
+	CapUser1                 = "user/1"
 	CapViews1                = "views/1"
 	CapWake1                 = "wake/1"
 	CapWorkflow1             = "workflow/1"
@@ -509,6 +510,11 @@ var ControlCapabilities = map[string]string{
 	"reports/usage":               "reports/1",
 	"tunnel/open":                 "tunnel/1",
 	"usage/rollup":                "reports/1",
+	"user/removeSecret":           "user/1",
+	"user/secretNames":            "user/1",
+	"user/setSecret":              "user/1",
+	"user/setSettings":            "user/1",
+	"user/settings":               "user/1",
 	"workspaces/forAgent":         "workspaces/1",
 	"control/clientChanged":       "control/1",
 	"control/hostChanged":         "control/1",
@@ -521,10 +527,13 @@ var ControlCapabilities = map[string]string{
 	"control/peopleChanged":       "people/1",
 	"control/providerDraft":       "control/1",
 	"control/providersChanged":    "control/1",
+	"control/secretsLeft":         "user/1",
 	"control/thisMacHostChanged":  "control/1",
 	"control/tunnelChanged":       "control/1",
+	"control/userSettingsChanged": "user/1",
 	"control/webChanged":          "control/1",
 	"host/clients":                "host/1",
+	"host/userSettings":           "user/1",
 	"projects/detect":             "projects/1",
 	"relay/count":                 "relay/1",
 	"relay/deliver":               "relay/1",
@@ -533,25 +542,28 @@ var ControlCapabilities = map[string]string{
 
 // ControlNotifications is each notification in control.openrpc.json: what its server sends, not serves.
 var ControlNotifications = map[string]bool{
-	"control/clientChanged":      true,
-	"control/hostChanged":        true,
-	"control/installProgress":    true,
-	"control/joinDecided":        true,
-	"control/joinRequested":      true,
-	"control/keptChanged":        true,
-	"control/keptDelivered":      true,
-	"control/moved":              true,
-	"control/peopleChanged":      true,
-	"control/providerDraft":      true,
-	"control/providersChanged":   true,
-	"control/thisMacHostChanged": true,
-	"control/tunnelChanged":      true,
-	"control/webChanged":         true,
-	"host/clients":               true,
-	"projects/detect":            true,
-	"relay/count":                true,
-	"relay/deliver":              true,
-	"relay/devices":              true,
+	"control/clientChanged":       true,
+	"control/hostChanged":         true,
+	"control/installProgress":     true,
+	"control/joinDecided":         true,
+	"control/joinRequested":       true,
+	"control/keptChanged":         true,
+	"control/keptDelivered":       true,
+	"control/moved":               true,
+	"control/peopleChanged":       true,
+	"control/providerDraft":       true,
+	"control/providersChanged":    true,
+	"control/secretsLeft":         true,
+	"control/thisMacHostChanged":  true,
+	"control/tunnelChanged":       true,
+	"control/userSettingsChanged": true,
+	"control/webChanged":          true,
+	"host/clients":                true,
+	"host/userSettings":           true,
+	"projects/detect":             true,
+	"relay/count":                 true,
+	"relay/deliver":               true,
+	"relay/devices":               true,
 }
 
 // DeclaredCapabilities is x-declared-capabilities: what a host, a client or the control plane

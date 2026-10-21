@@ -19519,6 +19519,262 @@
         "format"
       ],
       "additionalProperties": false
+    },
+    "UserSettingsPartName": {
+      "type": "string",
+      "enum": [
+        "mcpServers",
+        "agentConfig",
+        "runtimes",
+        "costLimits",
+        "resources"
+      ],
+      "description": "A part of a person's user settings (#1760, spec 736 FR-023). Each keeps the shape its file has on a machine today: mcpServers is mcp.json's mcpServers, agentConfig is UserAgentConfig, runtimes is each runtime's choices, costLimits is CostLimits, resources is a list of DeclaredResource."
+    },
+    "UserAgentConfig": {
+      "type": "object",
+      "description": "The agentConfig part (#1760): the person's own instructions, personas and skills, as ~/.agents keeps them on each machine.",
+      "properties": {
+        "instructions": {
+          "type": "string",
+          "description": "~/.agents/AGENTS.md."
+        },
+        "personas": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "~/.agents/personas/<name>.md, by name."
+        },
+        "skills": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "~/.agents/skills/<name>/SKILL.md, by name."
+        }
+      },
+      "additionalProperties": false
+    },
+    "UserSettings": {
+      "type": "object",
+      "description": "user/settings (#1760, spec 736 FR-023, FR-024): what the control plane keeps for a person and sends to each of that person's machines. A part that is absent is not set at the user scope, and each machine keeps its own. The control plane does not read inside a part.",
+      "properties": {
+        "mcpServers": {
+          "$ref": "#/definitions/JSONValue"
+        },
+        "agentConfig": {
+          "$ref": "#/definitions/JSONValue"
+        },
+        "runtimes": {
+          "$ref": "#/definitions/JSONValue"
+        },
+        "costLimits": {
+          "$ref": "#/definitions/JSONValue"
+        },
+        "resources": {
+          "$ref": "#/definitions/JSONValue"
+        },
+        "updated": {
+          "type": "string",
+          "format": "date-time",
+          "description": "When a part last changed."
+        }
+      },
+      "additionalProperties": false
+    },
+    "UserSettingsPart": {
+      "type": "object",
+      "description": "user/setSettings (#1760): one part set, or with a null value removed from the user scope.",
+      "properties": {
+        "part": {
+          "$ref": "#/definitions/UserSettingsPartName"
+        },
+        "value": {
+          "$ref": "#/definitions/JSONValue"
+        }
+      },
+      "required": [
+        "part",
+        "value"
+      ],
+      "additionalProperties": false
+    },
+    "UserSecretName": {
+      "type": "string",
+      "pattern": "^[A-Z_][A-Z0-9_]{0,63}$",
+      "description": "A secret's name, as ${NAME} in mcp.json and NAME= in ~/.agents-secrets/secrets.env."
+    },
+    "UserSecret": {
+      "type": "object",
+      "description": "user/setSecret (#1760, FR-025): a secret the control plane keeps sealed, and sends only to its person's own machines. The value is never sent back to a client.",
+      "properties": {
+        "name": {
+          "$ref": "#/definitions/UserSecretName"
+        },
+        "value": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "value"
+      ],
+      "additionalProperties": false
+    },
+    "UserSecretRequest": {
+      "type": "object",
+      "description": "user/removeSecret (#1760).",
+      "properties": {
+        "name": {
+          "$ref": "#/definitions/UserSecretName"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "additionalProperties": false
+    },
+    "SecretLeftOn": {
+      "type": "object",
+      "description": "A machine that was removed with a secret on it (#1760, FR-026): change the secret where it was issued.",
+      "properties": {
+        "host": {
+          "$ref": "#/definitions/HostID"
+        },
+        "name": {
+          "type": "string",
+          "description": "The machine's name when it was removed."
+        },
+        "at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "host",
+        "name",
+        "at"
+      ],
+      "additionalProperties": false
+    },
+    "UserSecretRow": {
+      "type": "object",
+      "description": "One row of user/secretNames (#1760): a secret's name, never its value.",
+      "properties": {
+        "name": {
+          "$ref": "#/definitions/UserSecretName"
+        },
+        "updated": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "machines": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/HostID"
+          },
+          "description": "The machines it was sent to."
+        },
+        "leftOn": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/SecretLeftOn"
+          },
+          "description": "Machines removed with it on them, since it was last set."
+        }
+      },
+      "required": [
+        "name",
+        "updated",
+        "machines"
+      ],
+      "additionalProperties": false
+    },
+    "UserSecretNames": {
+      "type": "object",
+      "description": "user/secretNames (#1760).",
+      "properties": {
+        "secrets": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/UserSecretRow"
+          }
+        },
+        "sealing": {
+          "type": "boolean",
+          "description": "False when this control plane has no key to seal secrets with, and user/setSecret is refused."
+        }
+      },
+      "required": [
+        "secrets",
+        "sealing"
+      ],
+      "additionalProperties": false
+    },
+    "HostUserSettings": {
+      "type": "object",
+      "description": "host/userSettings (#1760, FR-024, FR-025): to a machine, on its channel 0, when it joins and when its user's settings or secrets change. Sent only on the links of that user's own machines. secrets is every secret the user has: a name missing from it was removed.",
+      "properties": {
+        "user": {
+          "type": "string"
+        },
+        "settings": {
+          "$ref": "#/definitions/UserSettings"
+        },
+        "secrets": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/UserSecret"
+          }
+        }
+      },
+      "required": [
+        "user",
+        "settings",
+        "secrets"
+      ],
+      "additionalProperties": false
+    },
+    "UserSettingsChanged": {
+      "type": "object",
+      "description": "control/userSettingsChanged (#1760): to the person's own clients, when a part or a secret changed, so a pane reads again.",
+      "properties": {
+        "parts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/UserSettingsPartName"
+          }
+        },
+        "secrets": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "SecretsLeft": {
+      "type": "object",
+      "description": "control/secretsLeft (#1760, FR-026): to the person's own clients, when one of their machines was removed with secrets on it.",
+      "properties": {
+        "host": {
+          "$ref": "#/definitions/HostID"
+        },
+        "name": {
+          "type": "string"
+        },
+        "secrets": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/UserSecretName"
+          }
+        }
+      },
+      "required": [
+        "host",
+        "name",
+        "secrets"
+      ],
+      "additionalProperties": false
     }
   }
 }

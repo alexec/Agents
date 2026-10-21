@@ -58,6 +58,12 @@ func (p *plane) invite(owner *controllink.Session, name string, role wire.UserRo
 // machine joins a machine with a code the person's window made.
 func (p *plane) machine(who *person, name string) *fakeHost {
 	p.t.Helper()
+	return p.machineSaying(who, fakeHello(name))
+}
+
+// machineSaying is machine, with its own hello.
+func (p *plane) machineSaying(who *person, hello controllink.HostHello) *fakeHost {
+	p.t.Helper()
 	var shown wire.ControlCodeShown
 	json.Unmarshal(call(p.t, who.window, "", "hosts/startEnroll", nil), &shown)
 	code, err := controllink.ParseCode(shown.Text)
@@ -65,11 +71,11 @@ func (p *plane) machine(who *person, name string) *fakeHost {
 		p.t.Fatal(err)
 	}
 	root, private := p.t.TempDir(), controllink.NewPrivateKey()
-	member, err := controllink.Enroll(context.Background(), root, code, private, fakeHello(name))
+	member, err := controllink.Enroll(context.Background(), root, code, private, hello)
 	if err != nil {
 		p.t.Fatal(err)
 	}
-	h := p.serveHost(root, member, private, fakeHello(name), func(c controllink.Conn) {
+	h := p.serveHost(root, member, private, hello, func(c controllink.Conn) {
 		if a, ok := c.(controllink.Actored); ok && a.Actor() != nil {
 			who.mu.Lock()
 			who.actors = append(who.actors, a.Actor().User)
@@ -233,6 +239,8 @@ func TestEveryClientMethodChecksTheOwner(t *testing.T) {
 		"providers/remove": true, "providers/options": true, "providers/runtimes": true, "providers/draftStart": true,
 		"providers/draftAnswer": true, "providers/draftCancel": true, "providers/create": true, "hosts/listKept": true,
 		"hosts/retryKept": true, "hosts/dropKept": true, "reports/usage": true, "reports/export": true,
+		"user/settings": true, "user/setSettings": true, "user/setSecret": true, "user/removeSecret": true,
+		"user/secretNames": true,
 	}
 	namesHost := hostNamingMethods
 	all := map[string]bool{}

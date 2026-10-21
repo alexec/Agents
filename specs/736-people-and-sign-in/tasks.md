@@ -59,10 +59,10 @@
 
 ## Phase 6: US4, settings follow you (P2)
 
-- [ ] T031 [US4] Write tests first: an envelope round trip with the local keeper, no readable secret under the prefix (SC-007), and a secret sent only on its user's machines' links, in `Go/internal/controlplane/usersettings/usersettings_test.go`.
-- [ ] T032 [US4] Add `usersettings/`: `user/settings`, `user/setSettings`, `user/setSecret`, `user/removeSecret` and `user/secretNames` over `kms.Keeper` (FR-024, FR-025).
+- [x] T031 [US4] Write tests first: an envelope round trip with the local keeper, no readable secret under the prefix (SC-007), and a secret sent only on its user's machines' links, in `Go/internal/controlplane/usersettings/usersettings_test.go`.
+- [x] T032 [US4] Add `usersettings/`: `user/settings`, `user/setSettings`, `user/setSecret`, `user/removeSecret` and `user/secretNames` over `kms.Keeper` (FR-024, FR-025).
 - [ ] T033 [US4] Send `user/settings` at join and on change over channel 0 (`Go/internal/controllink/`). `agentsd` writes the items into `~/.agents` and `~/.agents-secrets`, marks them as from the control plane, and refuses local edits to them.
-- [ ] T034 [US4] When a machine is removed: stop sending secrets to it, and tell the user which secrets it had (FR-026).
+- [x] T034 [US4] When a machine is removed: stop sending secrets to it, and tell the user which secrets it had (FR-026).
 - [ ] T035 [P] [US4] Move MCP servers, Agent Configuration, runtime choices, Cost and Resources under You on all three clients. Each pane reads and writes the user scope.
 
 ## Phase 7: US5, admins manage people, groups and providers (P2)

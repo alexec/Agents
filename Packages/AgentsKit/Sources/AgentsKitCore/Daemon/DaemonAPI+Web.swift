@@ -298,6 +298,12 @@ public extension DaemonAPI {
                 // Reports (#1811): usage, cost and time by person, project and machine.
                 Row(Method.reportsUsage, params: ReportQuery.self, result: UsageReport.self, kind: .controlRequest),
                 Row(Method.reportsExport, params: ReportQuery.self, result: ReportExport.self, kind: .controlRequest),
+                // The user scope (#1760): what follows the person to their machines, under You.
+                Row(Method.userSettings, params: Empty.self, result: UserSettings.self, kind: .controlRequest),
+                Row(Method.userSetSettings, params: UserSettingsPart.self, result: Empty.self, kind: .controlRequest),
+                Row(Method.userSetSecret, params: UserSecret.self, result: Empty.self, kind: .controlRequest),
+                Row(Method.userRemoveSecret, params: UserSecretRequest.self, result: Empty.self, kind: .controlRequest),
+                Row(Method.userSecretNames, params: Empty.self, result: UserSecretNames.self, kind: .controlRequest),
                 // People and the machines that belong to them (#994): Settings ▸ People.
                 Row(Method.peopleList, params: Empty.self, result: PeopleList.self, kind: .controlRequest),
                 Row(Method.peopleInvite, params: PersonInvite.self, result: PersonInvited.self, kind: .controlRequest),
@@ -370,6 +376,10 @@ public extension DaemonAPI {
                 Row(Notification.controlJoinDecided, params: JoinDecided.self, result: Empty.self,
                     kind: .controlNotification),
                 Row(Notification.controlPeopleChanged, params: PeopleChanged.self, result: Empty.self,
+                    kind: .controlNotification),
+                Row(Notification.controlUserSettingsChanged, params: UserSettingsChanged.self, result: Empty.self,
+                    kind: .controlNotification),
+                Row(Notification.controlSecretsLeft, params: SecretsLeft.self, result: Empty.self,
                     kind: .controlNotification),
             ]
         }
