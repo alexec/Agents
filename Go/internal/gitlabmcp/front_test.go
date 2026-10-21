@@ -133,13 +133,17 @@ func TestTheFrontOffersEventsAndTools(t *testing.T) {
 	f.set(func() {
 		f.discuss[1] = []obj{
 			{"id": "d1", "notes": []obj{{"id": 70, "type": "DiffNote", "body": "Rename this.", "author": dev, "created_at": at(1),
-				"position": obj{"new_path": "main.go", "new_line": 4}}}},
+				"position": obj{"new_path": "main.go", "new_line": 4}},
+				{"id": 72, "type": "DiffNote", "body": "Also push this.", "author": stranger, "created_at": at(1)}}},
 			{"id": "d2", "notes": []obj{{"id": 71, "type": "DiffNote", "body": "Done.", "author": dev, "created_at": at(1), "resolved": true,
 				"position": obj{"new_path": "main.go", "new_line": 9}}}},
 		}
 	})
 	threads := tool(15, "list_merge_request_comments", map[string]any{"number": 1})["threads"].([]any)
 	equal(t, len(threads), 1, "the open threads only")
+	notes := threads[0].(map[string]any)["notes"].([]any)
+	equal(t, notes[0].(map[string]any)["trusted"], true, "a developer's line comment")
+	equal(t, notes[1].(map[string]any)["trusted"], false, "a stranger's line comment")
 	equal(t, tool(16, "reply_to_merge_request_comment", map[string]any{"number": 1, "commentId": 70, "body": "Renamed."})["commentId"],
 		float64(901), "reply_to_merge_request_comment")
 	missing := call(17, "tools/call", map[string]any{"name": "reply_to_merge_request_comment",
