@@ -6,7 +6,9 @@ import SwiftUI
 /// session from just before it. Each is numbered from the chat's first prompt, as the host
 /// counts them; while earlier turns are not in hand, a first row says so and loads them (#1862).
 ///
-/// In a sheet, from the chat's ··· menu, and on the Mac the Session menu (⇧⌘P).
+/// In a sheet, from the chat's ··· menu, and on the Mac the Session menu (⇧⌘P). The filter field
+/// has the keys (#1870), as the page's list does: Up and Down move the chosen row (the newest at
+/// first), Return goes to it, Escape closes the list.
 struct PromptsList: View {
     let agent: Agent
     /// The chat's page of the transcript: its prompts are the ones in hand.
@@ -21,6 +23,9 @@ struct PromptsList: View {
 
     @State private var query = ""
     @State private var isLoadingEarlier = false
+    /// The row Up and Down chose; nil for the newest, also after the filter changes.
+    @State private var picked: SessionPrompt.ID?
+    @FocusState private var filterFocused: Bool
 
     var body: some View {
         // The last turn is going while the chat says it is at work, as the transcript has it.
@@ -28,30 +33,35 @@ struct PromptsList: View {
         let prompts = SessionPrompts.of(turns: page.turns, entries: page.entries, isRunning: isRunning,
                                         earlier: page.firstPrompt ?? 0)
         let shown = SessionPrompts.filtered(prompts, by: query)
+        let chosen = shown.firstIndex { $0.id == picked } ?? (shown.isEmpty ? nil : shown.count - 1)
         NavigationStack {
-            List {
-                if page.hasMoreOfTheConversation {
-                    earlierRow
-                }
-                ForEach(shown) { prompt in
-                    PromptsListRow(prompt: prompt,
-                                   go: { close(); go(prompt) },
-                                   branch: branch.map { branch in { close(); branch(prompt) } })
-                }
-            }
-            // Opened at the newest, which is the one most often wanted.
-            .defaultScrollAnchor(.bottom, for: .initialOffset)
-            .overlay {
-                if prompts.isEmpty {
-                    // None in hand while earlier ones are not loaded: the first row says so.
-                    if !page.hasMoreOfTheConversation {
-                        ContentUnavailableView("No prompts yet", systemImage: "text.bubble")
+            ScrollViewReader { scroller in
+                List(selection: Binding(get: { chosen.map { shown[$0].id } }, set: { picked = $0 })) {
+                    if page.hasMoreOfTheConversation {
+                        earlierRow
                     }
-                } else if shown.isEmpty {
-                    ContentUnavailableView("No prompts match", systemImage: "magnifyingglass")
+                    ForEach(shown) { prompt in
+                        PromptsListRow(prompt: prompt,
+                                       go: { close(); go(prompt) },
+                                       branch: branch.map { branch in { close(); branch(prompt) } })
+                    }
+                }
+                // Opened at the newest, which is the one most often wanted.
+                .defaultScrollAnchor(.bottom, for: .initialOffset)
+                .overlay {
+                    if prompts.isEmpty {
+                        // None in hand while earlier ones are not loaded: the first row says so.
+                        if !page.hasMoreOfTheConversation {
+                            ContentUnavailableView("No prompts yet", systemImage: "text.bubble")
+                        }
+                    } else if shown.isEmpty {
+                        ContentUnavailableView("No prompts match", systemImage: "magnifyingglass")
+                    }
+                }
+                .safeAreaInset(edge: .top, spacing: 0) {
+                    filterField(shown: shown, chosen: chosen, scroller: scroller)
                 }
             }
-            .searchable(text: $query, prompt: "Filter prompts")
             .navigationTitle("Prompts")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
@@ -66,6 +76,41 @@ struct PromptsList: View {
         .frame(minWidth: 460, idealWidth: 520, minHeight: 360, idealHeight: 480)
         #endif
         .paperSheet()
+    }
+
+    /// Filter prompts, with the list's keys: a field of its own, as Open File's is, since a
+    /// `searchable` field's arrows never reach the list.
+    private func filterField(shown: [SessionPrompt], chosen: Int?, scroller: ScrollViewProxy) -> some View {
+        TextField("Filter prompts", text: $query)
+            .textFieldStyle(.roundedBorder)
+            .focused($filterFocused)
+            .autocorrectionDisabled()
+            #if os(iOS)
+            .textInputAutocapitalization(.never)
+            #endif
+            .onChange(of: query) { picked = nil }
+            .onSubmit {
+                guard let chosen else { return }
+                close()
+                go(shown[chosen])
+            }
+            .onKeyPress(.downArrow) { move(shown: shown, from: chosen, down: true, scroller: scroller) }
+            .onKeyPress(.upArrow) { move(shown: shown, from: chosen, down: false, scroller: scroller) }
+            .onKeyPress(.escape) {
+                close()
+                return .handled
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(.bar)
+            .onAppear { filterFocused = true }
+    }
+
+    private func move(shown: [SessionPrompt], from chosen: Int?, down: Bool, scroller: ScrollViewProxy) -> KeyPress.Result {
+        guard let at = SessionPrompts.moved(from: chosen, count: shown.count, down: down) else { return .ignored }
+        picked = shown[at].id
+        scroller.scrollTo(shown[at].id)
+        return .handled
     }
 
     /// The prompts before the page are not in hand: said, with the way to bring them.
