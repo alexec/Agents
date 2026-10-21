@@ -29,7 +29,7 @@ Web/package*.json                                      build
 Web/.node-version                                      build
 # The Go module (#1135): its tooling and the wire types the daemon and control plane share.
 Go/                                                    build
-# The wire's schema (#1135): every client and host reads what it says.
+# The wire's generator (#1135). Its schema and what it makes hold no area: see the end.
 Packages/Wire/                                         build
 scripts/wire.sh                                        build
 # The scripted videos (#1078, #1793): their scenes, recording and upload.
@@ -319,8 +319,10 @@ Go/internal/gitlabmcp/                                 gitlab
 Go/cmd/email-mcp/                                      email
 Go/internal/emailmcp/                                  email
 
-# control-plane: the control plane: joining, membership, grants, copies and handover,
-# its server and its deploy.
+# control-plane: the control plane's core: joining, membership, grants, copies and
+# handover, routing, its store, keys, its server and its deploy. Team, reports, channels
+# and sign-in are areas of their own below (#2017), so that more lanes can work on the
+# control plane at once.
 App/Sources/Control/                                   control-plane
 Packages/AgentsKit/Sources/ControlDial/                control-plane
 Packages/AgentsKit/Sources/AgentsKit/Control/          control-plane
@@ -489,6 +491,109 @@ docs/how-to/start-workspaces-from-agents.md            workspaces
 specs/691-*/                                           workspaces
 specs/858-*/                                           workspaces
 
+# workspaces also takes the control plane's providers and its workspaces (#2017), and
+# Start a Machine from a Repository (#1809).
+Go/internal/controlplane/providers/                    workspaces
+Go/internal/controlplane/workspaces*.go                workspaces
+Packages/AgentsKit/Sources/AgentsKitCore/Control/MachineFromRepository.swift  workspaces
+Web/src/model/machineFromRepository.ts                 workspaces
+Web/src/views/MachineDialog.tsx                        workspaces
+Web/test/machineFromRepository.test.mjs                workspaces
+
+# team: people, groups, bots, the user scope and the person's settings on every machine
+# (spec 736, #994, #1760, #1761), on the control plane and on the three clients (#2017).
+Go/internal/controlplane/people*.go                    team
+Go/internal/controlplane/groups*.go                    team
+Go/internal/controlplane/bots*.go                      team
+Go/internal/controlplane/userscope*.go                 team
+Go/internal/controlplane/team*.go                      team
+Go/internal/controlplane/records/people.go             team
+Go/internal/controlplane/records/groups.go             team
+Go/internal/controlplane/usersettings/                 team
+Go/internal/agentsd/usersettings*.go                   team
+Packages/AgentsKit/Sources/AgentsKitCore/Model/People.swift  team
+Packages/AgentsKit/Sources/AgentsKitCore/Model/Groups.swift  team
+Packages/AgentsKit/Sources/AgentsKitCore/Model/UserScope.swift  team
+Packages/AgentsKit/Tests/AgentsKitTests/Unit/PeopleTests.swift  team
+Packages/AgentsKit/Tests/AgentsKitTests/Unit/GroupWordsTests.swift  team
+Packages/AgentsKit/Tests/AgentsKitTests/Unit/UserScopeWordsTests.swift  team
+Shared/UI/People/                                      team
+Shared/UI/UserScope/                                   team
+Web/src/model/people.ts                                team
+Web/src/model/teamGroups.ts                            team
+Web/src/model/userScope.ts                             team
+Web/src/views/People.tsx                               team
+Web/src/views/Groups.tsx                               team
+Web/src/views/UserScope.tsx                            team
+Web/test/people.test.mjs                               team
+Web/test/teamGroups.test.mjs                           team
+Web/test/userScope.test.mjs                            team
+docs/explanation/people-and-machines.md                team
+docs/reference/groups.md                               team
+specs/736-*/                                           team
+specs/research/733-*                                   team
+
+# reports: the audit, activities, reports and what the machines add up for them (#996,
+# #1811), and the Console and Reports sub-apps (#1804).
+Go/internal/controlplane/audit/                        reports
+Go/internal/controlplane/auditing*.go                  reports
+Go/internal/controlplane/activities*.go                reports
+Go/internal/controlplane/reports*.go                   reports
+Go/internal/controlplane/console*                      reports
+Go/internal/agentsd/reportledger*.go                   reports
+Packages/AgentsKit/Sources/AgentsKitCore/Model/EventAudit.swift  reports
+Packages/AgentsKit/Sources/AgentsKitCore/Model/Reports.swift  reports
+Packages/AgentsKit/Sources/AgentsKitCore/Model/ReportTotals.swift  reports
+Packages/AgentsKit/Tests/AgentsKitTests/Unit/EventAuditTests.swift  reports
+Packages/AgentsKit/Tests/AgentsKitTests/Unit/ReportTotalsTests.swift  reports
+Shared/UI/Events/AuditPane.swift                       reports
+Shared/UI/ReportsPane.swift                            reports
+Shared/UI/Console/                                     reports
+Web/src/model/audit.ts                                 reports
+Web/src/model/reports.ts                               reports
+Web/src/views/Audit.tsx                                reports
+Web/src/views/Reports.tsx                              reports
+Web/src/views/Console*.tsx                             reports
+Web/test/audit.test.mjs                                reports
+Web/test/reports.test.mjs                              reports
+docs/reference/reports.md                              reports
+specs/research/1804-*/                                 reports
+
+# channels: a channel identity linked to a person (#1762), and Control plane ▸ Channels.
+Go/internal/controlplane/links*.go                     channels
+Packages/AgentsKit/Sources/AgentsKitCore/Model/ChannelLinks.swift  channels
+Shared/UI/People/ChannelLink*.swift                    channels
+Shared/UI/People/ChannelsPane.swift                    channels
+Web/src/model/channelLinks.ts                          channels
+Web/src/views/ChannelLinks.tsx                         channels
+Web/test/channel-links.test.mjs                        channels
+docs/reference/channels.md                             channels
+
+# sign-in: signing a person in to the control plane with Google, Apple or GitHub (#995).
+# Not an agent runtime's sign-in (runtimes) or an MCP server's (marketplace).
+Go/internal/controlplane/signin/                       sign-in
+Go/internal/controlplane/signin*.go                    sign-in
+Go/internal/controlplane/identity*                     sign-in
+Packages/AgentsKit/Sources/AgentsKitCore/Model/Identity*.swift  sign-in
+Shared/UI/SignIn/                                      sign-in
+Web/src/model/signIn*.ts                               sign-in
+Web/src/views/SignIn*.tsx                              sign-in
+Web/test/signIn*                                       sign-in
+docs/how-to/sign-in-with-*                             sign-in
+
 # Shared files every lane touches: no area, last so that nothing above claims them.
 specs/071-web-remote/walks/parity.md                   -
 Web/src/protocol/generated.ts                          -
+# The control plane's method table and its wire: each feature adds a line or two, and
+# the golden files are made again (#2017).
+Go/internal/controlplane/methods.go                    -
+Go/internal/controlplane/wire.go                       -
+Go/internal/controlplane/wire_*test.go                 -
+Go/internal/controlplane/testdata/wire*.golden         -
+# The wire's schema and what scripts/wire.sh gen makes from it (#2017). Most features add
+# a type, a method or a capability, and a conflict in what is made is settled by running
+# it again (AGENTS.md), so the wire holding build would hold back every such lane.
+Packages/Wire/*.json                                   -
+Go/wire/*_gen.go                                       -
+Packages/AgentsKit/Sources/AgentsKitCore/Daemon/Capabilities.generated.swift  -
+Web/src/protocol/capabilities.generated.ts             -
