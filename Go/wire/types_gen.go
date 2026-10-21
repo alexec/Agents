@@ -1484,7 +1484,7 @@ type ControlAuth struct {
 	Epoch *int64  `json:"epoch,omitzero"`
 	// The capabilities this client has (#1748). None from a client older than #1748, or from a host, which says its own in host/hello.
 	Capabilities []string `json:"capabilities,omitzero"`
-	// With a `w:<host>` identity (#1480): the port of that host's loopback listener. The socket then carries a page from http://localhost:<page>, whose own exchange follows the ok, bound to that origin.
+	// With a `w:<host>` identity (#1480): the port of that host's loopback listener. The socket then carries a page from localhost at that port, whose own exchange follows the ok, bound to that origin.
 	Page *int64 `json:"page,omitzero"`
 }
 

@@ -1351,7 +1351,7 @@ export interface ControlAuth {
   capabilities?: string[];
   /**
    * With a `w:<host>` identity (#1480): the port of that host's loopback listener. The socket then
-   * carries a page from http://localhost:<page>, whose own exchange follows the ok, bound to that
+   * carries a page from localhost at that port, whose own exchange follows the ok, bound to that
    * origin.
    */
   page?: number;
