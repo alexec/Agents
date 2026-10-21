@@ -193,6 +193,21 @@ func TestEachPersonReachesOnlyTheirOwnMachines(t *testing.T) {
 	}
 }
 
+// hostNamingMethods are the control-plane methods that name a machine by host (and
+// lendSignIn and lendGit by from too): each refuses another person's as not found.
+var hostNamingMethods = map[string]bool{
+	"hosts/update": true, "hosts/checkAgain": true, "hosts/remove": true, "hosts/setRelay": true,
+	"hosts/lendSignIn": true, "hosts/lendGit": true, "hosts/lastHeard": true,
+	"hosts/link": true, "hosts/unlink": true, "hosts/start": true, "hosts/stop": true, "hosts/keep": true,
+	"hosts/deleteWorkspace": true, "hosts/setWorkspaceOptions": true,
+}
+
+// hostNamingParams are params that would do something with host for each of them.
+func hostNamingParams(host string) map[string]any {
+	return map[string]any{"host": host, "from": host, "runtime": "claude", "allowed": true, "server": "github.com",
+		"relay": false, "provider": "x", "method": "agents/start", "params": map[string]any{}}
+}
+
 // T010: every control-plane method a client may call says whether it names a machine,
 // and each that does refuses another person's as not found. A method added with no
 // entry here fails.
@@ -218,13 +233,7 @@ func TestEveryClientMethodChecksTheOwner(t *testing.T) {
 		"providers/draftAnswer": true, "providers/draftCancel": true, "providers/create": true, "hosts/listKept": true,
 		"hosts/retryKept": true, "hosts/dropKept": true, "reports/usage": true, "reports/export": true,
 	}
-	// Methods that name one by host (and lendSignIn and lendGit by from too).
-	namesHost := map[string]bool{
-		"hosts/update": true, "hosts/checkAgain": true, "hosts/remove": true, "hosts/setRelay": true,
-		"hosts/lendSignIn": true, "hosts/lendGit": true, "hosts/lastHeard": true,
-		"hosts/link": true, "hosts/unlink": true, "hosts/start": true, "hosts/stop": true, "hosts/keep": true,
-		"hosts/deleteWorkspace": true, "hosts/setWorkspaceOptions": true,
-	}
+	namesHost := hostNamingMethods
 	all := map[string]bool{}
 	for method := range own {
 		all[method] = true
@@ -242,8 +251,7 @@ func TestEveryClientMethodChecksTheOwner(t *testing.T) {
 			t.Errorf("%s is not a method any more", method)
 		}
 		for _, field := range []string{"host", "from"} {
-			params := map[string]any{"host": samMachine.member.Host, "from": samMachine.member.Host, "runtime": "claude",
-				"allowed": true, "server": "github.com", "relay": false, "provider": "x", "method": "agents/start", "params": map[string]any{}}
+			params := hostNamingParams(samMachine.member.Host)
 			params[field] = alexMachine.member.Host
 			e := callError(t, sam.window, "", method, params)
 			if !strings.Contains(e, "-32091") {
