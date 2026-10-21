@@ -39,7 +39,9 @@ struct SidebarSettingsSection: View {
         } footer: {
             Text("On, a chat you started that asks to be archived is archived when its turn ends Complete or "
                  + "Nothing to do, unless it showed you a file. Off, it waits for you to approve it. "
-                 + "Archived chats come back with Unarchive.")
+                 + "Archived chats come back with Unarchive. "
+                 // Each host reads its own preferences (#1872): the docs' sentence.
+                 + "A server's host does not read this switch, so a chat in a server project may still archive itself.")
                 .appText(.fine)
                 .foregroundStyle(.secondary)
         }
