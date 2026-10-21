@@ -32,6 +32,7 @@ export const Failure = {
   dayLimitReached: -32018,
   deleteRefused: -32051,
   eventRefused: -32050,
+  fileChanged: -32081,
   fileGone: -32032,
   fileNotReadable: -32033,
   folderGone: -32004,
@@ -197,6 +198,19 @@ export interface Agent {
    * row, never a group or a badge. Cleared when the person opens the conversation or marks it read.
    */
   fileToSee?: ShownFile;
+  /**
+   * The person asked a chat paused by a spent allowance to carry on when the allowance is back
+   * (#1859). At `at` the host sends "continue" in the same chat; a turn that works, any other
+   * message, Stop or Archive takes it away.
+   */
+  continueWhenBack?: ContinueWhenBack;
+  /**
+   * While a turn runs, the title of the tool the agent is running now, the newest when more than
+   * one is (#1902). Absent while it thinks or replies. It changes only once a new value has held
+   * for a second, so a short tool never shows and a short gap between two does not flash. Cleared
+   * when the turn ends.
+   */
+  runningTool?: string;
 }
 
 export type AgentArchivedReason = "byUser" | "byAgent";
@@ -394,6 +408,12 @@ export interface ArtifactWriteRequest {
   agentID: UUID;
   path: string;
   text: string;
+  /**
+   * The SHA-256, in lower-case hex, of the text the edit started from (#1858). When the file on
+   * disk is not that text any more, the write is refused with fileChanged and nothing is written.
+   * Left out, the text is written whatever is on disk.
+   */
+  base?: string;
 }
 
 export interface AssessRuntimeRequest {
@@ -1298,6 +1318,19 @@ export interface ContinueInProjectRequest {
   text: string;
   attachments: Attachment[];
   requestID?: UUID;
+}
+
+/** When a chat paused by a spent allowance carries on by itself (#1859). */
+export interface ContinueWhenBack {
+  /**
+   * When it sends "continue": the provider's reset time, or the app's next check of the runtime.
+   */
+  at: WireDate;
+  /**
+   * True when `at` is the time the provider said the allowance resets; false when it is only the
+   * app's next check.
+   */
+  resetKnown: boolean;
 }
 
 /**
@@ -3390,6 +3423,12 @@ export interface ProviderCreate {
   name: string;
   options?: JSONValue;
   clones?: string[];
+  /**
+   * The repository to start it from (#1809), an https git address. A provider whose New Workspace
+   * form has `repository`, such as Codespaces, makes the workspace from it; any other has the host
+   * clone it once it joins, before `clones`.
+   */
+  repository?: string;
 }
 
 /** What providers/create made. */
@@ -5091,7 +5130,9 @@ export interface Methods {
   "agents/answerSandbox": { params: AnswerSandboxRequest; result: Agent };
   "agents/archive": { params: AgentRequest; result: Empty };
   "agents/branchFrom": { params: BranchFromRequest; result: UUID };
+  "agents/cancelContinue": { params: AgentRequest; result: Agent };
   "agents/continueInProject": { params: ContinueInProjectRequest; result: UUID };
+  "agents/continueWhenBack": { params: AgentRequest; result: Agent };
   "agents/delete": { params: AgentRequest; result: Empty };
   "agents/discardDraft": { params: DiscardDraftRequest; result: Empty };
   "agents/editQueued": { params: EditQueuedRequest; result: EditQueuedResult };
@@ -5218,7 +5259,9 @@ export interface Methods {
   "projects/unarchive": { params: ProjectRequest; result: ProjectSummary };
   "projects/undoGuardedChange": { params: GuardedChangeRequest; result: ProjectSummary };
   "providers/add": { params: ProviderAdd; result: ProviderSummary };
+  "providers/create": { params: ProviderCreate; result: ProviderCreated };
   "providers/list": { params: Empty; result: ProviderList };
+  "providers/options": { params: ProviderRequest; result: ProviderOptions };
   "providers/refresh": { params: ProviderRequest; result: Empty };
   "providers/remove": { params: ProviderRequest; result: Empty };
   "providers/update": { params: ProviderAdd; result: ProviderSummary };
@@ -5263,7 +5306,9 @@ export const MethodTarget = {
   "agents/answerSandbox": "host",
   "agents/archive": "host",
   "agents/branchFrom": "host",
+  "agents/cancelContinue": "host",
   "agents/continueInProject": "host",
+  "agents/continueWhenBack": "host",
   "agents/delete": "host",
   "agents/discardDraft": "host",
   "agents/editQueued": "host",
@@ -5390,7 +5435,9 @@ export const MethodTarget = {
   "projects/unarchive": "host",
   "projects/undoGuardedChange": "host",
   "providers/add": "control",
+  "providers/create": "control",
   "providers/list": "control",
+  "providers/options": "control",
   "providers/refresh": "control",
   "providers/remove": "control",
   "providers/update": "control",
@@ -5477,7 +5524,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ActivityToken: { required: ["agentID", "environment", "startedAt"], optional: ["token"] },
   Admitted: { required: [], optional: ["client", "host", "grant"] },
   AdoptRequest: { required: ["runtimeID", "sessionID", "cwd"], optional: [] },
-  Agent: { required: ["id", "runtimeID", "cwd", "state", "startOptions", "advertisedOptions", "availableCommands", "createdAt", "lastActivityAt"], optional: ["title", "labels", "runtimeSessionID", "isUnread", "reportSeenAt", "endedReason", "archivedReason", "usage", "lastTurnUsage", "costToDate", "costCeiling", "tokensToDate", "tokenCeiling", "plans", "background", "additionalDirectories", "mcpServers", "queuedPrompts", "suggestedPrompts", "startedByWorkflow", "purpose", "startedByRun", "startedByAgent", "chainDepth", "eventWait", "worktree", "pendingMove", "startingPoint", "startRequestID", "persona", "restartPickUps", "report", "outcomeAsked", "archiveRequest", "afterTurn", "archivedAt", "sandboxOverride", "effectiveSandbox", "pendingSandboxFailure", "missingFolder", "listsLeftOut", "titleIsPersons", "runtimeTitle", "madeInRoot", "queuedStart", "branchedFrom", "fileToSee"] },
+  Agent: { required: ["id", "runtimeID", "cwd", "state", "startOptions", "advertisedOptions", "availableCommands", "createdAt", "lastActivityAt"], optional: ["title", "labels", "runtimeSessionID", "isUnread", "reportSeenAt", "endedReason", "archivedReason", "usage", "lastTurnUsage", "costToDate", "costCeiling", "tokensToDate", "tokenCeiling", "plans", "background", "additionalDirectories", "mcpServers", "queuedPrompts", "suggestedPrompts", "startedByWorkflow", "purpose", "startedByRun", "startedByAgent", "chainDepth", "eventWait", "worktree", "pendingMove", "startingPoint", "startRequestID", "persona", "restartPickUps", "report", "outcomeAsked", "archiveRequest", "afterTurn", "archivedAt", "sandboxOverride", "effectiveSandbox", "pendingSandboxFailure", "missingFolder", "listsLeftOut", "titleIsPersons", "runtimeTitle", "madeInRoot", "queuedStart", "branchedFrom", "fileToSee", "continueWhenBack", "runningTool"] },
   AgentRemovedNotification: { required: ["agentID"], optional: [] },
   AgentRequest: { required: ["agentID"], optional: [] },
   AgentWorkspaces: { required: ["providers"], optional: [] },
@@ -5497,7 +5544,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   Approval: { required: ["kind", "key", "title", "line", "actions"], optional: ["digest", "since", "agentID"] },
   ApprovalAnswer: { required: ["folder", "kind", "key", "action"], optional: ["digest", "note"] },
   ApprovalReadRequest: { required: ["folder", "kind", "key"], optional: [] },
-  ArtifactWriteRequest: { required: ["agentID", "path", "text"], optional: [] },
+  ArtifactWriteRequest: { required: ["agentID", "path", "text"], optional: ["base"] },
   AssessRuntimeRequest: { required: ["runtimeID", "folder"], optional: ["model"] },
   AssessRuntimeResult: { required: ["agentID", "reportPath"], optional: ["model"] },
   Attachment: { required: ["id", "block", "displayName"], optional: ["byteCount"] },
@@ -5580,6 +5627,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ConnectorWorkflow: { required: ["id", "name"], optional: [] },
   ContentBlockAnnotations: { required: [], optional: ["audience", "priority"] },
   ContinueInProjectRequest: { required: ["agentID", "text", "attachments"], optional: ["requestID"] },
+  ContinueWhenBack: { required: ["at", "resetKnown"], optional: [] },
   ControlAuth: { required: ["id", "nonce", "mac", "kind"], optional: ["for", "epoch", "capabilities"] },
   ControlClientChanged: { required: [], optional: ["client", "removed"] },
   ControlCodeShown: { required: ["text", "expires"], optional: ["command"] },
@@ -5837,7 +5885,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ProjectsListRequest: { required: ["includeArchived"], optional: [] },
   PromptRequest: { required: ["agentID", "text", "attachments", "from"], optional: ["sendID"] },
   ProviderAdd: { required: ["name", "kind"], optional: ["id", "command", "args", "url", "headers", "commands", "map", "secrets", "cli", "draft"] },
-  ProviderCreate: { required: ["id", "name"], optional: ["options", "clones"] },
+  ProviderCreate: { required: ["id", "name"], optional: ["options", "clones", "repository"] },
   ProviderCreated: { required: ["workspace", "joining"], optional: [] },
   ProviderDraftAnswer: { required: ["draft", "question", "yes"], optional: [] },
   ProviderDraftAnswered: { required: ["note"], optional: ["map", "preset"] },

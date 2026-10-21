@@ -30,6 +30,8 @@ struct JoinRequestCard: View {
                 Text("Check that the machine shows \(Text(request.code).monospaced().fontWeight(.semibold)).")
                     .fixedSize(horizontal: false, vertical: true)
                     .textSelection(.enabled)
+                    // One element, so the label does not stack on the selectable Text's (#1724).
+                    .accessibilityElement(children: .ignore)
                     .accessibilityLabel(PeopleWords.joinCode(request))
                 HStack(spacing: 8) {
                     Button("Approve") { answer(true) }
