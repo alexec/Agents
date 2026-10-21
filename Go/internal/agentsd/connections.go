@@ -167,7 +167,7 @@ func (d *Daemon) connectionStore() (connections.Store, error) {
 		return d.connStoreFor()
 	}
 	if goruntime.GOOS != "darwin" && d.personalHome() == "" {
-		return nil, invalid("This host has no home folder to keep connections in.")
+		return nil, invalid("This machine has no home folder to keep connections in.")
 	}
 	return connections.Open(d.connectionLocator())
 }

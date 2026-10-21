@@ -25,7 +25,7 @@ func TestAnAgentsWorkspaceTools(t *testing.T) {
 	m := appClient(t, d, a.ID)
 	m.post("initialize", map[string]any{}, 1)
 
-	if text, isErr := m.tool(2, "list_workspaces", map[string]any{}); !isErr || text != "This host isn’t on a control plane, so it has no workspaces." {
+	if text, isErr := m.tool(2, "list_workspaces", map[string]any{}); !isErr || text != "This machine isn’t on a control plane, so it has no workspaces." {
 		t.Fatal(text)
 	}
 

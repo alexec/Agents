@@ -197,7 +197,7 @@ func (d *Daemon) receive(r wire.ReceiveRequest) (summary wire.ProjectSummary, er
 	checkoutSent := false
 	for _, b := range r.Branches {
 		if !validBranch(b.Name) || len(b.Commit) < 40 || strings.HasPrefix(b.Commit, "-") {
-			return summary, Invalid("%q is not a branch this host can take.", b.Name)
+			return summary, Invalid("%q is not a branch this machine can take.", b.Name)
 		}
 		checkoutSent = checkoutSent || b.Name == r.Checkout
 	}
@@ -242,14 +242,14 @@ func (d *Daemon) receive(r wire.ReceiveRequest) (summary wire.ProjectSummary, er
 			return summary, err
 		}
 		if own {
-			return summary, &Error{Code: wire.FailureFolderInTheWay, Message: here + " has changes of its own on this host. Commit or remove them there, then send again. Nothing was changed."}
+			return summary, &Error{Code: wire.FailureFolderInTheWay, Message: here + " has changes of its own on this machine. Commit or remove them there, then send again. Nothing was changed."}
 		}
 	}
 
 	if bundle != "" {
 		if _, err := git(path, "fetch", "-q", "--no-tags", "--", bundle, "+refs/heads/*:refs/agents-send/*"); err != nil {
 			if strings.Contains(err.Error(), "prerequisite") {
-				return summary, Invalid("The copy on this host is not what the Mac expected. Send again. Nothing was changed.")
+				return summary, Invalid("The copy on this machine is not what the Mac expected. Send again. Nothing was changed.")
 			}
 			return summary, err
 		}
@@ -267,7 +267,7 @@ func (d *Daemon) receive(r wire.ReceiveRequest) (summary wire.ProjectSummary, er
 	var moves []move
 	for _, b := range r.Branches {
 		if _, err := git(path, "cat-file", "-e", b.Commit+"^{commit}"); err != nil {
-			return summary, Invalid("This host does not have the commits of %s. Send again. Nothing was changed.", b.Name)
+			return summary, Invalid("This machine does not have the commits of %s. Send again. Nothing was changed.", b.Name)
 		}
 		ref := "refs/heads/" + b.Name
 		have, _ := git(path, "rev-parse", "-q", "--verify", ref)
@@ -277,7 +277,7 @@ func (d *Daemon) receive(r wire.ReceiveRequest) (summary wire.ProjectSummary, er
 			moves = append(moves, move{ref, "", b.Commit})
 		default:
 			if _, err := git(path, "merge-base", "--is-ancestor", have, b.Commit); err != nil {
-				return summary, &Error{Code: wire.FailureFolderInTheWay, Message: b.Name + " in " + here + " has commits of its own on this host. Nothing was changed."}
+				return summary, &Error{Code: wire.FailureFolderInTheWay, Message: b.Name + " in " + here + " has commits of its own on this machine. Nothing was changed."}
 			}
 			moves = append(moves, move{ref, have, b.Commit})
 		}

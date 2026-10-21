@@ -40,7 +40,7 @@ func (d *Daemon) relayFor(runtime string) *relay {
 
 func (d *Daemon) offerRelay(o wire.RelayOffer) error {
 	if d.Tunneler == nil {
-		return &Error{Code: CodeServer, Message: "this host has no control plane to tunnel through"}
+		return &Error{Code: CodeServer, Message: "this machine has no control plane to tunnel through"}
 	}
 	dir := filepath.Join(d.Store.Loc.Root, "runtimes")
 	os.MkdirAll(dir, 0o700)

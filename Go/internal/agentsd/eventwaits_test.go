@@ -31,7 +31,7 @@ func TestAWaitSaysWhatIsWrongWithIt(t *testing.T) {
 		{map[string]any{"events": "person.away", "where": map[string]any{"why": "asleep"}, "until_minutes": 5},
 			"person.away: why is one of locked, idle, not asleep."},
 		{map[string]any{"events": []string{"mac.wake", "person.back"}, "until_minutes": 5},
-			"mac.wake, person.back are only raised on a Mac, and this host is a Linux server, so they never happen here. Nothing is waiting."},
+			"mac.wake, person.back are only raised on a Mac, and this machine is a Linux server, so they never happen here. Nothing is waiting."},
 		{map[string]any{"events": "pr.merged", "until_minutes": 5}, "No server here offers pr.merged. This project has no MCP server that offers events."},
 		{map[string]any{"action": "sing"}, "action is wait, recent or list."},
 	} {

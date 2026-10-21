@@ -87,17 +87,17 @@ To go back, set **Keeps its store** to **On this Mac** and click **Switch Store�
 - Quitting Agents Host from the menu bar stops neither the control plane nor your agents.
 - If this Mac's host can't join the control plane at first, for example because the
   control plane isn't listening yet or the network is down, **This Mac** says **Couldn't
-  join the control plane:** and why, then **Trying again…**. It keeps its host code and
+  join the control plane:** and why, then **Trying again…**. It keeps its machine code and
   tries again by itself, at once when the Mac wakes or the network changes. Click **Try
   Again** to try now. The window shows the same line in **Settings ▸ Control plane**.
 - If you already run a control plane elsewhere, choose **Join one elsewhere** in Agents
-  Host instead, and paste a host code from it. See
+  Host instead, and paste a machine code from it. See
   [Add a server](add-a-server.md#add-another-mac).
 - If you used the earlier Agents app on this Mac, Agents Host offers to move your agents,
   devices and servers across. See [Move an existing set-up across](move-an-existing-set-up.md).
 - To reach your agents from your iPhone and iPad away from home, and to be notified on
   them, turn on **Relay for my devices**. It is off until you do. Under **Join one
-  elsewhere**, it asks for a host code from that control plane the first time. See
+  elsewhere**, it asks for a machine code from that control plane the first time. See
   [Phone and iPad](../explanation/phone-and-ipad.md).
 
 ## Related

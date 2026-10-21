@@ -209,7 +209,7 @@ func (p *languageServers) server(root string, spec languageServerSpec) (*languag
 	command := installedCommand(spec)
 	if command == nil {
 		p.mu.Unlock()
-		return nil, fmt.Errorf("%s is not installed on this host, so this file is not checked.", spec.name)
+		return nil, fmt.Errorf("%s is not installed on this machine, so this file is not checked.", spec.name)
 	}
 	if p.starting == nil {
 		p.starting = map[string]*serverStart{}

@@ -136,7 +136,7 @@ func (d *Daemon) carryPage(ctx context.Context, page *websocket.Conn, private []
 func (d *Daemon) dialForPage(ctx context.Context, private []byte, port int) (*controllink.Lines, string, error) {
 	member, err := controllink.LoadMembership(d.Store.Loc.Root)
 	if err != nil || member == nil || member.Host == "" {
-		return nil, "", fmt.Errorf("this host has not joined a control plane")
+		return nil, "", fmt.Errorf("this machine has not joined a control plane")
 	}
 	key, err := controllink.HostKey(private, member.ControlKey, member.Host)
 	if err != nil {

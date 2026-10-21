@@ -469,7 +469,7 @@ func (d *Daemon) mcpEventListing(s eventServer) mcpListing {
 	d.mcpEvMu.Lock()
 	if !d.mcpEvStarted {
 		d.mcpEvMu.Unlock()
-		return mcpListing{at: at, failure: &mcpEventsError{kind: "transport", message: "This host is not asking servers for events yet."}}
+		return mcpListing{at: at, failure: &mcpEventsError{kind: "transport", message: "This machine is not asking servers for events yet."}}
 	}
 	kept := d.mcpListings[pool]
 	conns := d.mcpConns

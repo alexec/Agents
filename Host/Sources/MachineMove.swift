@@ -297,7 +297,7 @@ struct MachineMoveSheet: View {
         switch move.step {
         case .key:
             Text("Move the control plane to another machine").font(.title3.weight(.semibold))
-            Text("Your windows, phones and servers stay paired, and this Mac stays a host. Agents keep working while it moves.")
+            Text("Your windows, phones and servers stay paired, and this Mac stays a machine. Agents keep working while it moves.")
                 .foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             Self.stepTitle("1 · Give the other machine this control plane's key")
             Self.numbered(1) {
@@ -370,7 +370,7 @@ struct MachineMoveSheet: View {
             Self.stage(move.stages[0], "Holding records still", note: "Pairing and changes wait. Agents keep working.")
             Self.stage(move.stages[1], move.copied ?? "Copying records")
             Self.stage(move.stages[2], "\(URL(string: move.address)?.host ?? "It") takes over")
-            Self.stage(move.stages[3], "This Mac's host and relay go there")
+            Self.stage(move.stages[3], "The machine and relay on this Mac go there")
             Self.stage(move.stages[4], "This Mac sends anyone still coming here on to it")
             Self.problemLine(move.problem)
             Self.buttons {

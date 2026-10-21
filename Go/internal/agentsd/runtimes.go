@@ -269,7 +269,7 @@ var locateFor = func(r *runtimeDef) (string, []string, []string) { return r.loca
 func (d *Daemon) launchFor(r *runtimeDef, dir string) (acp.Launch, error) {
 	path, args, looked := locateFor(r)
 	if path == "" {
-		return acp.Launch{}, &Error{Code: CodeRuntimeNotFound, Message: r.Name + " is not installed on this host (looked in " + strings.Join(looked, ", ") + ")"}
+		return acp.Launch{}, &Error{Code: CodeRuntimeNotFound, Message: r.Name + " is not installed on this machine (looked in " + strings.Join(looked, ", ") + ")"}
 	}
 	env := environment(r, loginEnvironment())
 	// The shipped MCP servers sit beside agentsd (~/.agents-server/bin), last on PATH.

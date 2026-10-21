@@ -82,7 +82,7 @@ func refusalWords(r wire.WorkflowRefusal) string {
 	case r.AwaitingApproval != nil:
 		return "it is waiting for your OK"
 	case r.DeniedHere != nil:
-		return "it is denied on this host"
+		return "it is denied on this machine"
 	case r.CoolingDown != nil:
 		if r.CoolingDown.Until != nil {
 			return "it is cooling down until " + clock(*r.CoolingDown.Until) + ", and runs once then"

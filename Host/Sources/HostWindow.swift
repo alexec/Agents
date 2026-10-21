@@ -78,7 +78,7 @@ struct HostWindow: View {
         .confirmationDialog("Switch where the control plane keeps its store?", isPresented: $confirmingSwitch) {
             Button("Switch Store") { Task { await model.switchStore() } }
         } message: {
-            Text("The control plane stops for a moment while every record is copied across. Windows, phones and hosts reconnect by themselves. The old store is kept.")
+            Text("The control plane stops for a moment while every record is copied across. Windows, phones and machines reconnect by themselves. The old store is kept.")
         }
     }
 
@@ -227,7 +227,7 @@ struct HostWindow: View {
             card {
                 VStack(alignment: .leading, spacing: 10) {
                     Text("Join one elsewhere").font(.headline)
-                    Text("You already run a control plane on another Mac or a server. Paste a host code from it: this Mac then runs only its own agents for it.")
+                    Text("You already run a control plane on another Mac or a server. Paste a machine code from it: this Mac then runs only its own agents for it.")
                         .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                     joinField
                 }
@@ -241,7 +241,7 @@ struct HostWindow: View {
         HStack {
             TextField("agents-control:2:h:…", text: $joinCode).textFieldStyle(.roundedBorder)
                 .font(.system(.body, design: .monospaced))
-                .accessibilityLabel("Host code")
+                .accessibilityLabel("Machine code")
             Button("Join") { Task { await model.joinElsewhere(code: joinCode) } }
                 .disabled(joinCode.isEmpty || model.busy != nil)
         }
@@ -284,7 +284,7 @@ struct HostWindow: View {
                         VStack(alignment: .leading, spacing: 8) {
                             Text(model.settings.role == .joinElsewhere && !pickingJoin
                                  ? (model.daemonRunning ? "This Mac runs its agents for a control plane elsewhere." : "Joining…")
-                                 : "Paste a host code from the other control plane.")
+                                 : "Paste a machine code from the other control plane.")
                                 .font(.callout).foregroundStyle(.secondary)
                             if pickingJoin || model.settings.role != .joinElsewhere { joinField }
                         }
@@ -393,7 +393,7 @@ struct HostWindow: View {
     private var movedLine: String {
         var parts: [String] = []
         if let at = model.settings.movedAt { parts.append("moved \(at.formatted(date: .omitted, time: .shortened))") }
-        parts.append("this Mac is a host there")
+        parts.append("this Mac is a machine there")
         return parts.joined(separator: " · ")
     }
 
@@ -422,7 +422,7 @@ struct HostWindow: View {
         var parts: [String] = []
         if let since = model.runningSince { parts.append("since \(since.formatted(date: .omitted, time: .shortened))") }
         if let clients = model.clients { parts.append("\(clients) client\(clients == 1 ? "" : "s")") }
-        if let hosts = model.hosts { parts.append("\(hosts) host\(hosts == 1 ? "" : "s")") }
+        if let hosts = model.hosts { parts.append("\(hosts) machine\(hosts == 1 ? "" : "s")") }
         return parts.isEmpty ? " " : parts.joined(separator: " · ")
     }
 
@@ -544,11 +544,11 @@ struct RelayCodeSheet: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             Text("Relay for My Devices").font(.title3.weight(.semibold))
-            Text("Paste a host code from your control plane: in Agents, Settings ▸ Machines ▸ Add a Mac. The relay joins it as a host that runs no agents.")
+            Text("Paste a machine code from your control plane: in Agents, Settings ▸ Machines ▸ Add a Mac. The relay joins it as a machine that runs no agents.")
                 .foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-            TextField("Host code", text: $code, prompt: Text("agents-control:2:h:…"))
+            TextField("Machine code", text: $code, prompt: Text("agents-control:2:h:…"))
                 .textFieldStyle(.roundedBorder).labelsHidden()
-                .accessibilityLabel("Host code")
+                .accessibilityLabel("Machine code")
                 .onSubmit(start)
             if let problem = model.problem {
                 Label(problem, systemImage: "exclamationmark.triangle").foregroundStyle(.red)

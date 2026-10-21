@@ -95,7 +95,7 @@ Task {
             .trimmingCharacters(in: .whitespacesAndNewlines)
         if let text = argument("--join") ?? left {
             guard let code = ControlCode(text: text) else {
-                log("that is not a host code")
+                log("that is not a machine code")
                 exit(64)
             }
             let membership = try await ControlRelay.enroll(code, files: files, name: name)

@@ -480,7 +480,7 @@ func (d *Daemon) putInDropbox(r wire.DropboxPutRequest) (wire.DropboxPutResponse
 		return wire.DropboxPutResponse{}, Invalid("That is not a project here.")
 	}
 	if len(r.Data) > dropboxLimit {
-		return wire.DropboxPutResponse{}, Invalid("That file is too big to send. Copy it into .agents/dropbox/ on its host instead.")
+		return wire.DropboxPutResponse{}, Invalid("That file is too big to send. Copy it into .agents/dropbox/ on its machine instead.")
 	}
 	name := filepath.Base(r.Name)
 	if name == "" || name == "/" || name == "." || strings.HasPrefix(name, ".") {

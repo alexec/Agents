@@ -40,7 +40,7 @@ func (d *Daemon) outgoingFolder() string { return filepath.Join(d.Store.Loc.Root
 func (d *Daemon) outgoingFile(id wire.UUID) (string, error) {
 	name := string(id)
 	if name == "" || strings.ContainsAny(name, "/\\.") {
-		return "", Invalid("That is not a file this host made to send.")
+		return "", Invalid("That is not a file this machine made to send.")
 	}
 	return filepath.Join(d.outgoingFolder(), name), nil
 }

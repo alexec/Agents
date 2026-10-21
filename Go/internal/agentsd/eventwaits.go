@@ -501,9 +501,9 @@ func deadlineRequiredWords() string {
 
 func neverHereWords(names []string) string {
 	if len(names) == 1 {
-		return names[0] + " is only raised on a Mac, and this host is a Linux server, so it never happens here."
+		return names[0] + " is only raised on a Mac, and this machine is a Linux server, so it never happens here."
 	}
-	return strings.Join(names, ", ") + " are only raised on a Mac, and this host is a Linux server, so they never happen here."
+	return strings.Join(names, ", ") + " are only raised on a Mac, and this machine is a Linux server, so they never happen here."
 }
 
 func wakeWords(e wire.Event, extra int) string {

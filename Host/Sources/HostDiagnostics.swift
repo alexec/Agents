@@ -46,12 +46,12 @@ struct HostDiagnostics {
                      + (services.relayHost.map { ", joined as \($0.rawValue)" } ?? ", not joined"))
         if let moved = settings.movedTo { lines.append("Moved to: \(moved)") }
         if let from = settings.returnedFrom { lines.append("Returned from: \(from)") }
-        lines.append("Host joined: \(services.hostJoined ? "yes" : "no")")
+        lines.append("Machine joined: \(services.hostJoined ? "yes" : "no")")
         if let join = HostJoinFile.read(paths.hostLocations.controlJoinStatus) {
-            lines.append("Host join: \(join.summary)")
+            lines.append("Machine join: \(join.summary)")
         }
 
-        for (job, name) in [(LocalServices.Job.control, "Control plane"), (.daemon, "This Mac’s host"), (.relay, "Relay")] {
+        for (job, name) in [(LocalServices.Job.control, "Control plane"), (.daemon, "The machine on this Mac"), (.relay, "Relay")] {
             section("\(name) (\(services.label(job)))")
             let state = await services.state(job)
             let login = services.loginStatus(job)

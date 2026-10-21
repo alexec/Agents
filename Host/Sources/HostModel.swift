@@ -297,7 +297,7 @@ final class HostModel {
 
     /// The reason, as long as it holds: on every full look, not only after a button.
     var failureReason: String? {
-        let reasons = [controlFailure?.reason("The control plane"), daemonFailure?.reason("This Mac’s host")].compactMap { $0 }
+        let reasons = [controlFailure?.reason("The control plane"), daemonFailure?.reason("The machine on this Mac")].compactMap { $0 }
         guard !reasons.isEmpty else { return nil }
         var said = reasons.joined(separator: " ")
         if !otherCopies.isEmpty {
@@ -348,8 +348,8 @@ final class HostModel {
             problem = "Repair didn’t fix it. \(failureReason) Copy Diagnostics and send them with what you see."
         } else if daemonRunning, !jobs.contains(.control) || controlRunning {
             repaired = jobs.contains(.control)
-                ? "Repaired: the control plane is running at \(controlURL), and this Mac’s host is running."
-                : "Repaired: this Mac’s host is running."
+                ? "Repaired: the control plane is running at \(controlURL), and this Mac is running as a machine."
+                : "Repaired: this Mac is running as a machine."
         }
     }
 
@@ -425,7 +425,7 @@ final class HostModel {
             return
         }
         lastHostCode = ControlCode(text: text)
-        busy = "Starting this Mac's host…"
+        busy = "Starting this Mac as a machine…"
         if !services.hostJoined {
             do { try services.leaveCode(text) } catch { problem = "\(error)"; return }
         }
@@ -469,7 +469,7 @@ final class HostModel {
     func joinElsewhere(code: String) async {
         let code = code.trimmingCharacters(in: .whitespacesAndNewlines)
         guard ControlCode(text: code)?.purpose == .host else {
-            problem = "That isn't a host code. Ask the other control plane for one: Settings ▸ Machines ▸ Add a Mac."
+            problem = "That isn't a machine code. Ask the other control plane for one: Settings ▸ Machines ▸ Add a Mac."
             return
         }
         busy = "Joining…"
@@ -484,7 +484,7 @@ final class HostModel {
                 try FileManager.default.removeItem(at: membership)
             } catch {
                 try? FileManager.default.removeItem(at: paths.hostLocations.controlJoinCode)
-                problem = "This Mac's host could not leave its control plane: \(error.localizedDescription)"
+                problem = "This Mac could not leave its control plane: \(error.localizedDescription)"
                 return
             }
         }
@@ -810,7 +810,7 @@ final class HostModel {
             } else if let given {
                 let code = given.trimmingCharacters(in: .whitespacesAndNewlines)
                 guard ControlCode(text: code)?.purpose == .host else {
-                    problem = "That isn't a host code. Ask your control plane for one: Settings ▸ Machines ▸ Add a Mac."
+                    problem = "That isn't a machine code. Ask your control plane for one: Settings ▸ Machines ▸ Add a Mac."
                     return
                 }
                 do { try services.leaveRelayCode(code) } catch { problem = "\(error)"; return }

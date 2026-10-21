@@ -37,7 +37,7 @@ func (d *Daemon) SetControlAsk(ask askControl) { d.askControl.Store(&ask) }
 func (d *Daemon) askWorkspaces(agent wire.UUID, method string, params any) (json.RawMessage, error) {
 	ask := d.askControl.Load()
 	if ask == nil {
-		return nil, &Error{Code: wire.FailureNotSupported, Message: "This host isn’t on a control plane, so it has no workspaces."}
+		return nil, &Error{Code: wire.FailureNotSupported, Message: "This machine isn’t on a control plane, so it has no workspaces."}
 	}
 	p, _ := json.Marshal(params)
 	out, err := (*ask)(d.ctx, "host/workspaces", wire.HostWorkspaceCall{Agent: d.agentWho(agent), Method: method, Params: json.RawMessage(p)})
@@ -184,7 +184,7 @@ func (d *Daemon) makeWorkspace(agent wire.UUID, args map[string]json.RawMessage)
 		return "Made " + made.Workspace.Name + ". It joins as the host " + made.Workspace.Name + " on its first boot: wait for server.online.", nil
 	}
 	return "Made " + made.Workspace.Name + ". It can’t install Agents on its first boot, so the person adds it from " +
-		"Settings ▸ Workspace Providers with Add as Host….", nil
+		"Settings ▸ Workspace Providers with Add as Machine….", nil
 }
 
 // deleteWorkspace is delete_workspace.
@@ -208,13 +208,13 @@ func (d *Daemon) deleteWorkspace(agent wire.UUID, args map[string]json.RawMessag
 	}
 	if provider == nil {
 		return "", &Error{Code: wire.FailureNoSuchHost,
-			Message: "Nothing was deleted: no workspace runs a host called " + given + ". list_workspaces names the ones that do."}
+			Message: "Nothing was deleted: no workspace runs a machine called " + given + ". list_workspaces names the ones that do."}
 	}
 	if !provider.CanDelete {
 		return "", Invalid("Nothing was deleted: %s runs on %s, which can’t delete workspaces.", host, provider.Name)
 	}
 	yes, err := d.personSaysYes(agent, d.agentWho(agent)+" wants to delete a workspace",
-		"Delete the workspace "+host+" runs on, with everything on its disk, and remove the host "+host+" with its agents?", "Delete it")
+		"Delete the workspace "+host+" runs on, with everything on its disk, and remove the machine "+host+" with its agents?", "Delete it")
 	if err != nil {
 		return "", err
 	}
@@ -224,7 +224,7 @@ func (d *Daemon) deleteWorkspace(agent wire.UUID, args map[string]json.RawMessag
 	if _, err := d.askWorkspaces(agent, hostsDeleteWorkspace, map[string]any{"host": host}); err != nil {
 		return "", err
 	}
-	return "Deleted the workspace " + host + " ran on, and removed the host.", nil
+	return "Deleted the workspace " + host + " ran on, and removed the machine.", nil
 }
 
 // agentWho is an agent as the control plane's log and the card name it: "Claude (fix-login)".
