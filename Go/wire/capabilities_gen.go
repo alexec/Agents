@@ -84,6 +84,7 @@ const (
 	CapProjects1             = "projects/1"
 	CapProviders1            = "providers/1"
 	CapRelay1                = "relay/1"
+	CapReportsScope1         = "reports.scope/1"
 	CapReports1              = "reports/1"
 	CapResources1            = "resources/1"
 	CapRetention1            = "retention/1"
@@ -531,6 +532,9 @@ var ControlCapabilities = map[string]string{
 	"providers/update":            "providers/1",
 	"relay/switch":                "relay/1",
 	"reports/export":              "reports/1",
+	"reports/policy":              "reports.scope/1",
+	"reports/scopes":              "reports.scope/1",
+	"reports/setPolicy":           "reports.scope/1",
 	"reports/usage":               "reports/1",
 	"tunnel/open":                 "tunnel/1",
 	"usage/rollup":                "reports/1",

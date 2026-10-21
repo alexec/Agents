@@ -9,7 +9,7 @@ import type { Store } from "../model/store";
 import { go, route } from "../route";
 import type { SubApp } from "../route";
 import { CallFailed } from "../wire/link";
-import { adminsOnly, appTitle, apps, consoleFoot, fleetFilterTitle, fleetFilters, fleetFoot, fleetShown, fleetSummary, grouped,
+import { adminsOnly, appTitle, apps, consoleFoot, failedWords, fleetFilterTitle, fleetFilters, fleetFoot, fleetShown, fleetSummary, grouped,
   kindWords, noMachines, noRoles, notBuilt, openSection, outOfDate, ownerWords, runningWords, sectionsOf } from "../model/console";
 import type { AppName, FleetFilter, Section } from "../model/console";
 import type { FleetBoard } from "../protocol/generated";
@@ -19,6 +19,7 @@ import { missingWords, stateWords, versionWords } from "../model/capabilities";
 import { ReportsPage } from "./Reports";
 import { PeopleSection } from "./People";
 import { GroupsSection } from "./Groups";
+import { ReportPolicyPage } from "./ConsolePolicy";
 
 /** Whether this person is an admin of the control plane: null until people/list answers. */
 export const isAdmin = signal<boolean | null>(null);
@@ -74,7 +75,7 @@ export function SubAppPage({ store, app, down }: { store: Store; app: SubApp; do
       <section class="chat activity-page sub-app-page" aria-label={open.title}>
         <header class="column-head"><h1>{open.title}</h1></header>
         <div class="scroll">
-          <div class="activity-body">
+          <div class="activity-body settings-body">
             {gated
               ? <p class="hint">{isAdmin.value === null ? "Loading…" : roleProblem.value ?? adminsOnly}</p>
               : app === "console" ? <ConsoleSection store={store} section={open} down={down} />
@@ -90,16 +91,9 @@ function ConsoleSection({ store, section, down }: { store: Store; section: Secti
   switch (section.id) {
     case "people": return <PeoplePage store={store} down={down} />;
     case "machines": return <MachinesPage store={store} down={down} />;
+    case "reportPolicy": return <ReportPolicyPage store={store} down={down} />;
     default: return <Overview />;
   }
-}
-
-/** The words of a call that failed, for the page. */
-export function failedWords(error: unknown): string {
-  if (error instanceof CallFailed) {
-    return error.code === -32601 ? "This control plane does not have this page. Update it to use it." : error.message;
-  }
-  return "The control plane can’t be reached.";
 }
 
 /** M2: who belongs, their roles and machines, bots and groups. The same sections as Settings ▸ People and Groups. */

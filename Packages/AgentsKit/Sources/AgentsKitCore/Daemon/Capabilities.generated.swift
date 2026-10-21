@@ -84,6 +84,7 @@ public enum Capability {
     public static let projects1 = "projects/1"
     public static let providers1 = "providers/1"
     public static let relay1 = "relay/1"
+    public static let reportsScope1 = "reports.scope/1"
     public static let reports1 = "reports/1"
     public static let resources1 = "resources/1"
     public static let retention1 = "retention/1"
@@ -486,6 +487,9 @@ public enum Capability {
         "providers/update": "providers/1",
         "relay/switch": "relay/1",
         "reports/export": "reports/1",
+        "reports/policy": "reports.scope/1",
+        "reports/scopes": "reports.scope/1",
+        "reports/setPolicy": "reports.scope/1",
         "reports/usage": "reports/1",
         "tunnel/open": "tunnel/1",
         "usage/rollup": "reports/1",

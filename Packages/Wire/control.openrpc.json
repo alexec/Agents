@@ -2338,6 +2338,84 @@
       }
     },
     {
+      "name": "reports/scopes",
+      "x-capability": "reports.scope/1",
+      "description": "The scopes the caller may see in Reports (#1804).",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/ReportScopes"
+        }
+      }
+    },
+    {
+      "name": "reports/policy",
+      "x-capability": "reports.scope/1",
+      "description": "Who sees what in Reports (#1804). Admins only.",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/ReportPolicy"
+        }
+      }
+    },
+    {
+      "name": "reports/setPolicy",
+      "x-capability": "reports.scope/1",
+      "description": "Changes who sees what in Reports (#1804): totals only, group leads and budgets. Admins only.",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/ReportPolicy"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/ReportPolicy"
+        }
+      }
+    },
+    {
       "name": "console/fleet",
       "x-capability": "console/1",
       "description": "Console ▸ Machines (#1804, M1): every machine, its owner and state. Admins only.",

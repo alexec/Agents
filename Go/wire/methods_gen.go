@@ -449,6 +449,9 @@ var (
 	CallProvidersUpdate              = Method[ProviderAdd, ProviderSummary]{"providers/update"}
 	CallRelaySwitch                  = Method[RelaySwitch, Empty]{"relay/switch"}
 	CallReportsExport                = Method[ReportQuery, ReportExport]{"reports/export"}
+	CallReportsPolicy                = Method[Empty, ReportPolicy]{"reports/policy"}
+	CallReportsScopes                = Method[Empty, ReportScopes]{"reports/scopes"}
+	CallReportsSetPolicy             = Method[ReportPolicy, ReportPolicy]{"reports/setPolicy"}
 	CallReportsUsage                 = Method[ReportQuery, UsageReport]{"reports/usage"}
 	CallTunnelOpen                   = Method[TunnelOpen, Empty]{"tunnel/open"}
 	CallUsageRollup                  = Method[UsageRollup, Empty]{"usage/rollup"}

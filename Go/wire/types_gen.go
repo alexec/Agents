@@ -4467,11 +4467,23 @@ const (
 	ReportFormatJsonl ReportFormat = "jsonl"
 )
 
-// reports/usage and reports/export (#1811). An admin sees every person; a member only their own machines.
+// Who sees what in Reports (#1804), set by an admin in Console ▸ Report Policy.
+type ReportPolicy struct {
+	// A group lead sees the group's totals only, with no person or machine named. An admin always sees each person.
+	TotalsOnly bool `json:"totalsOnly"`
+	// Each group's leads, by group id: users who see the group's reports.
+	Leads map[string][]string `json:"leads"`
+	// A budget for a calendar month in US dollars, by group id, or "org" for the organisation.
+	BudgetsUSD map[string]float64 `json:"budgetsUSD"`
+}
+
+// reports/usage and reports/export (#1811). With no scope, an admin sees every person and a member their own machines; a scope (#1804) is one the caller may see (reports/scopes).
 type ReportQuery struct {
 	Range ReportRange `json:"range"`
 	// For reports/export; CSV when absent.
 	Format *ReportFormat `json:"format,omitzero"`
+	// Me, a group or the organisation (#1804).
+	Scope *ReportScope `json:"scope,omitzero"`
 }
 
 // D is the last 24 hours by the hour; W, M and 3M the last 7, 30 and 90 days by the day (UTC).
@@ -4507,6 +4519,36 @@ type ReportRow struct {
 	WorkingSeconds float64 `json:"workingSeconds"`
 	// Waiting for the person: TimeBucket's person.
 	WaitingSeconds float64 `json:"waitingSeconds"`
+	// The groups the person is in (#1804), by id, for a group or organisation scope; absent when the person is hidden.
+	Groups []string `json:"groups,omitzero"`
+}
+
+// Whose rows a report adds up (#1804).
+type ReportScope struct {
+	Kind ReportScopeKind `json:"kind"`
+	// The group's id, for kind group.
+	Group *string `json:"group,omitzero"`
+}
+
+// Me (the caller's own machines), a group's people, or every person (#1804).
+type ReportScopeKind string
+
+const (
+	ReportScopeKindMe    ReportScopeKind = "me"
+	ReportScopeKindGroup ReportScopeKind = "group"
+	ReportScopeKindOrg   ReportScopeKind = "org"
+)
+
+// A scope the caller may see, with its name (#1804).
+type ReportScopeOption struct {
+	Scope ReportScope `json:"scope"`
+	Name  string      `json:"name"`
+}
+
+// reports/scopes' answer (#1804): Me, each group the caller leads (every group for an admin), and the organisation for an admin.
+type ReportScopes struct {
+	Scopes []ReportScopeOption `json:"scopes"`
+	Admin  bool                `json:"admin"`
 }
 
 type ReportedEdit struct {
@@ -5871,6 +5913,14 @@ type UsageReport struct {
 	Rows  []ReportRow `json:"rows"`
 	// Whether the caller sees every person's machines.
 	Admin bool `json:"admin"`
+	// The scope the rows are of (#1804).
+	Scope *ReportScope `json:"scope,omitzero"`
+	// The rows say no person and no machine (#1804): a group lead's view when the policy says totals only.
+	PersonsHidden *bool `json:"personsHidden,omitzero"`
+	// The name of each group the rows name (#1804).
+	GroupNames map[string]string `json:"groupNames,omitzero"`
+	// The scope's budget for a calendar month, in US dollars (#1804); absent when it has none.
+	BudgetUSD *float64 `json:"budgetUSD,omitzero"`
 }
 
 // usage/rollup (#1811): a machine's hours and days that changed since it last sent them, sent each hour on its channel 0. The control plane keeps hours 7 days and days 90.

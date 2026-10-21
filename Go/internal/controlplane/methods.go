@@ -80,7 +80,7 @@ var own = map[string]bool{
 // today's Remote is the home host's to answer: that is how the Remote knows its Mac is
 // there.
 func (m *Methods) Handles(method string) bool {
-	return method != "daemon/ping" && (own[method] || workspaceMethods[method] || consoleMethods[method])
+	return method != "daemon/ping" && (own[method] || workspaceMethods[method] || consoleMethods[method] || scopeMethods[method])
 }
 
 func (m *Methods) setFrozen(frozen bool) {
@@ -100,7 +100,7 @@ var writes = map[string]bool{
 	"hosts/approveJoin": true, "hosts/denyJoin": true,
 	"user/setSettings": true, "user/setSecret": true, "user/removeSecret": true,
 	"groups/set": true, "groups/remove": true, "providers/setGroup": true,
-	"bots/make": true, "bots/setCaps": true,
+	"bots/make": true, "bots/setCaps": true, "reports/setPolicy": true,
 	"links/approve": true, "links/deny": true, "links/remove": true,
 }
 
@@ -127,6 +127,9 @@ func (m *Methods) Handle(method string, params json.RawMessage, from Caller) (an
 	ctx = withCodeOwner(ctx, m.callerPerson(from))
 	if consoleMethods[method] {
 		return m.consoleMethod(ctx, method, params, from)
+	}
+	if scopeMethods[method] {
+		return m.reportMethod(ctx, method, params, from)
 	}
 	switch method {
 	case "daemon/ping":

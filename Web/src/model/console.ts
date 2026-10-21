@@ -3,7 +3,8 @@
 // One web bundle; the switcher at the top moves between them. The Mac window and the Remote draw
 // the Me scope of Reports already (Cost, Time, Pool), and leave the Console to the web.
 import type { SubApp } from "../route";
-import type { FleetMachine } from "../protocol/generated";
+import type { FleetMachine, Group, PersonRow } from "../protocol/generated";
+import { CallFailed } from "../wire/link";
 
 export type AppName = "workspace" | SubApp;
 
@@ -26,6 +27,7 @@ export const consoleSections: readonly Section[] = [
   { id: "overview", title: "Overview", about: "What the Console has, and what waits for you.", group: "Organisation", built: true },
   { id: "people", title: "People and Groups", about: "Who belongs, their roles, bots and groups.", group: "Organisation", built: true },
   { id: "machines", title: "Machines", about: "Every machine: its owner, state, version and agents.", group: "Organisation", built: true },
+  { id: "reportPolicy", title: "Report Policy", about: "Who leads each group, what leads see, and each budget.", group: "Rules", built: true },
   { id: "workflows", title: "Team Workflows", about: "The bots that run the team’s workflows, and their runs.", group: "Rules", built: false },
   { id: "requests", title: "Requests", about: "Machines asking to join, and bots stopped at a cap.", group: "Records", built: false },
   { id: "audit", title: "Audit", about: "Who did what on each machine.", group: "Records", built: false },
@@ -51,6 +53,14 @@ export function grouped(list: readonly Section[]): [string, Section[]][] {
   const out = new Map<string, Section[]>();
   for (const s of list) out.set(s.group, [...(out.get(s.group) ?? []), s]);
   return [...out];
+}
+
+/** The words of a call that failed, for the page. */
+export function failedWords(error: unknown): string {
+  if (error instanceof CallFailed) {
+    return error.code === -32601 ? "This control plane does not have this page. Update it to use it." : error.message;
+  }
+  return "The control plane can’t be reached.";
 }
 
 export const notBuilt = "Comes in a later release.";
@@ -115,4 +125,28 @@ export function kindWords(m: FleetMachine): string {
 /** Its running agents, or a dash when it never listed them. */
 export function runningWords(m: FleetMachine): string {
   return m.running === undefined ? "—" : String(m.running);
+}
+
+// Console ▸ Report Policy: group leads, Totals Only and budgets.
+
+export const orgKey = "org";
+export const totalsOnlyFoot = "On, a group’s leads see its spend and time added up, with no person or machine named. Off, they see each person’s. An admin always sees each person.";
+export const policyFoot = "A group’s leads see its reports in Reports, beside their own. A budget is for a calendar month in US dollars, drawn with a forecast on Reports ▸ Spend.";
+
+/** Who may lead a group: its people (everyone, for Everyone), never a bot. */
+export function leadCandidates(group: Group, people: readonly PersonRow[]): PersonRow[] {
+  return people.filter((p) => p.kind === "person" && (group.everyone || group.members.includes(p.id)));
+}
+
+/** A budget as typed: "250", "1,200.50", "$90"; null for anything else; 0 for nothing. */
+export function budgetValue(text: string): number | null {
+  const plain = text.trim().replace(/^\$/, "").replace(/,/g, "");
+  if (plain === "") return 0;
+  if (!/^\d+(\.\d{1,2})?$/.test(plain)) return null;
+  return Number(plain);
+}
+
+/** A budget as the field shows it. */
+export function budgetInput(usd: number): string {
+  return Number.isInteger(usd) ? String(usd) : usd.toFixed(2);
 }
