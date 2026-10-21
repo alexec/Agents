@@ -2158,6 +2158,41 @@ export type GitView =
   | { sharedFromHead: Record<string, never> }
   | { unavailable: ChangesUnavailable };
 
+/**
+ * A group (#1761, spec 736 FR-027): everyone, or named users. It owns workspace providers: only its
+ * users see them and start machines from them (FR-028).
+ */
+export interface Group {
+  id: string;
+  name: string;
+  everyone: boolean;
+  members: string[];
+}
+
+/** groups/list (#1761): every group for an admin; for a member, the groups they are in. */
+export interface GroupList {
+  groups: Group[];
+}
+
+/** groups/remove (#1761): the group. Refused while a workspace provider or a bot has it. */
+export interface GroupRequest {
+  id: string;
+}
+
+/** groups/set (#1761): makes a group, or with id changes one. One user is a list of one. */
+export interface GroupSet {
+  id?: string;
+  name: string;
+  everyone?: boolean;
+  members?: string[];
+}
+
+/** control/groupsChanged (#1761): a group was made, changed or removed. */
+export interface GroupsChanged {
+  id?: string;
+  removed?: boolean;
+}
+
 export interface GuardedChange {
   path: string;
   digest?: string;
@@ -3565,6 +3600,15 @@ export interface ProviderDraftUpdate {
   note?: string;
 }
 
+/**
+ * providers/setGroup (#1761): the group whose users may use the provider. No group is the admins'
+ * alone.
+ */
+export interface ProviderGroup {
+  provider: ProviderID;
+  group?: string;
+}
+
 /** providers/list and control/providersChanged. */
 export interface ProviderList {
   providers: ProviderSummary[];
@@ -3607,6 +3651,13 @@ export interface ProviderSummary {
   listedAt?: WireDate;
   current: boolean;
   problem?: string;
+  /** The group whose users may use it (#1761); none is the admins' alone. */
+  group?: string;
+  /**
+   * The caller may start machines from it (#1761): they are in its group. Absent from an older
+   * control plane, which lets everyone.
+   */
+  mayUse?: boolean;
 }
 
 /**
@@ -5561,6 +5612,9 @@ export interface Methods {
   "files/read": { params: FilesReadRequest; result: FileReading };
   "files/unwatch": { params: FilesWatchRequest; result: Empty };
   "files/watch": { params: FilesWatchRequest; result: Empty };
+  "groups/list": { params: Empty; result: GroupList };
+  "groups/remove": { params: GroupRequest; result: Empty };
+  "groups/set": { params: GroupSet; result: Group };
   "hosts/approveJoin": { params: JoinRequestDecide; result: JoinApproved };
   "hosts/denyJoin": { params: JoinRequestDecide; result: Empty };
   "hosts/dropKept": { params: KeptRequestID; result: Empty };
@@ -5623,6 +5677,7 @@ export interface Methods {
   "providers/options": { params: ProviderRequest; result: ProviderOptions };
   "providers/refresh": { params: ProviderRequest; result: Empty };
   "providers/remove": { params: ProviderRequest; result: Empty };
+  "providers/setGroup": { params: ProviderGroup; result: Empty };
   "providers/update": { params: ProviderAdd; result: ProviderSummary };
   "reports/export": { params: ReportQuery; result: ReportExport };
   "reports/usage": { params: ReportQuery; result: UsageReport };
@@ -5748,6 +5803,9 @@ export const MethodTarget = {
   "files/read": "host",
   "files/unwatch": "host",
   "files/watch": "host",
+  "groups/list": "control",
+  "groups/remove": "control",
+  "groups/set": "control",
   "hosts/approveJoin": "control",
   "hosts/denyJoin": "control",
   "hosts/dropKept": "control",
@@ -5810,6 +5868,7 @@ export const MethodTarget = {
   "providers/options": "control",
   "providers/refresh": "control",
   "providers/remove": "control",
+  "providers/setGroup": "control",
   "providers/update": "control",
   "reports/export": "control",
   "reports/usage": "control",
@@ -5868,6 +5927,7 @@ export interface Notifications {
   "attention/changed": AttentionNotification;
   "backups/changed": BackupState;
   "clone/changed": CloneNotification;
+  "control/groupsChanged": GroupsChanged;
   "control/hostChanged": JSONValue;
   "control/joinDecided": JoinDecided;
   "control/joinRequested": JoinRequest;
@@ -6103,6 +6163,11 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   GitAsk: { required: ["server", "from"], optional: [] },
   GitCredential: { required: ["username", "password"], optional: [] },
   GitCredentialRequest: { required: ["protocol", "host"], optional: ["path"] },
+  Group: { required: ["id", "name", "everyone", "members"], optional: [] },
+  GroupList: { required: ["groups"], optional: [] },
+  GroupRequest: { required: ["id"], optional: [] },
+  GroupSet: { required: ["name"], optional: ["id", "everyone", "members"] },
+  GroupsChanged: { required: [], optional: ["id", "removed"] },
   GuardedChange: { required: ["path", "changedBy", "changedByIDs", "byGit", "since"], optional: ["digest", "askedIn"] },
   GuardedChangeReading: { required: ["path", "lines"], optional: ["digest", "approved", "current"] },
   GuardedChangeRequest: { required: ["folder", "path"], optional: ["digest"] },
@@ -6277,12 +6342,13 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ProviderDraftStart: { required: ["form", "runtimeID"], optional: ["secrets", "provider"] },
   ProviderDraftStarted: { required: ["draft"], optional: ["answered"] },
   ProviderDraftUpdate: { required: ["draft", "state", "runtimeName", "steps"], optional: ["cost", "draftJSON", "check", "question", "note"] },
+  ProviderGroup: { required: ["provider"], optional: ["group"] },
   ProviderList: { required: ["providers"], optional: [] },
   ProviderOptions: { required: ["schema"], optional: [] },
   ProviderRequest: { required: [], optional: ["id"] },
   ProviderRuntime: { required: ["id", "name", "isDefault"], optional: [] },
   ProviderRuntimes: { required: ["runtimes"], optional: ["host", "why"] },
-  ProviderSummary: { required: ["id", "name", "kind", "secrets", "capabilities", "contract", "mapped", "workspaces", "current"], optional: ["preset", "listedAt", "problem"] },
+  ProviderSummary: { required: ["id", "name", "kind", "secrets", "capabilities", "contract", "mapped", "workspaces", "current"], optional: ["preset", "listedAt", "problem", "group", "mayUse"] },
   PushToken: { required: ["environment"], optional: ["token"] },
   QueuedPrompt: { required: ["id", "text", "attachments", "queuedAt", "from"], optional: ["preface", "sender", "hops"] },
   QueuedStart: { required: ["labels"], optional: ["runtimeID", "permissionMode", "model", "worktree"] },

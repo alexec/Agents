@@ -384,6 +384,9 @@ var (
 	CallControlSetProjectDetection   = Method[ProjectDetection, ProjectDetection]{"control/setProjectDetection"}
 	CallControlStatus                = Method[Empty, ControlStatus]{"control/status"}
 	CallGitCredential                = Method[GitCredentialRequest, GitCredential]{"git/credential"}
+	CallGroupsList                   = Method[Empty, GroupList]{"groups/list"}
+	CallGroupsRemove                 = Method[GroupRequest, Empty]{"groups/remove"}
+	CallGroupsSet                    = Method[GroupSet, Group]{"groups/set"}
 	CallHandoverStatus               = Method[Empty, HandoverStatus]{"handover/status"}
 	CallHostHello                    = Method[HostHello, Empty]{"host/hello"}
 	CallHostProviderDraft            = Method[HostProviderDraftCall, JSONValue]{"host/providerDraft"}
@@ -431,6 +434,7 @@ var (
 	CallProvidersRefresh             = Method[ProviderRequest, Empty]{"providers/refresh"}
 	CallProvidersRemove              = Method[ProviderRequest, Empty]{"providers/remove"}
 	CallProvidersRuntimes            = Method[Empty, ProviderRuntimes]{"providers/runtimes"}
+	CallProvidersSetGroup            = Method[ProviderGroup, Empty]{"providers/setGroup"}
 	CallProvidersUpdate              = Method[ProviderAdd, ProviderSummary]{"providers/update"}
 	CallRelaySwitch                  = Method[RelaySwitch, Empty]{"relay/switch"}
 	CallReportsExport                = Method[ReportQuery, ReportExport]{"reports/export"}
@@ -444,6 +448,7 @@ var (
 	CallUserSettings                 = Method[Empty, UserSettings]{"user/settings"}
 	CallWorkspacesForAgent           = Method[Empty, AgentWorkspaces]{"workspaces/forAgent"}
 	NotifyControlClientChanged       = Notification[ControlClientChanged]{"control/clientChanged"}
+	NotifyControlGroupsChanged       = Notification[GroupsChanged]{"control/groupsChanged"}
 	NotifyControlHostChanged         = Notification[JSONValue]{"control/hostChanged"}
 	NotifyControlInstallProgress     = Notification[ControlInstallProgress]{"control/installProgress"}
 	NotifyControlJoinDecided         = Notification[JoinDecided]{"control/joinDecided"}

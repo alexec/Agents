@@ -315,6 +315,11 @@ public extension DaemonAPI {
                 Row(Method.peopleRemove, params: PersonRequest.self, result: Empty.self, kind: .controlRequest),
                 Row(Method.peopleRemovePreview, params: PersonRequest.self, result: PersonRemovePreview.self,
                     kind: .controlRequest),
+                // Groups own workspace providers (#1761): Settings ▸ Groups.
+                Row(Method.groupsList, params: Empty.self, result: GroupList.self, kind: .controlRequest),
+                Row(Method.groupsSet, params: GroupSet.self, result: Group.self, kind: .controlRequest),
+                Row(Method.groupsRemove, params: GroupRequest.self, result: Empty.self, kind: .controlRequest),
+                Row(Method.providersSetGroup, params: ProviderGroup.self, result: Empty.self, kind: .controlRequest),
                 // A machine that asks to join, approved on a card (#994).
                 Row(Method.hostsJoinRequests, params: Empty.self, result: [JoinRequest].self, kind: .controlRequest),
                 Row(Method.hostsApproveJoin, params: JoinRequestDecide.self, result: JoinApproved.self,
@@ -378,6 +383,8 @@ public extension DaemonAPI {
                 Row(Notification.controlJoinRequested, params: JoinRequest.self, result: Empty.self,
                     kind: .controlNotification),
                 Row(Notification.controlJoinDecided, params: JoinDecided.self, result: Empty.self,
+                    kind: .controlNotification),
+                Row(Notification.controlGroupsChanged, params: GroupsChanged.self, result: Empty.self,
                     kind: .controlNotification),
                 Row(Notification.controlPeopleChanged, params: PeopleChanged.self, result: Empty.self,
                     kind: .controlNotification),

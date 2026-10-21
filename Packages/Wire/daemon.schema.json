@@ -9611,6 +9611,14 @@
         },
         "problem": {
           "type": "string"
+        },
+        "group": {
+          "type": "string",
+          "description": "The group whose users may use it (#1761); none is the admins' alone."
+        },
+        "mayUse": {
+          "type": "boolean",
+          "description": "The caller may start machines from it (#1761): they are in its group. Absent from an older control plane, which lets everyone."
         }
       },
       "required": [
@@ -19855,6 +19863,117 @@
         "part",
         "value"
       ],
+      "additionalProperties": false
+    },
+    "Group": {
+      "type": "object",
+      "description": "A group (#1761, spec 736 FR-027): everyone, or named users. It owns workspace providers: only its users see them and start machines from them (FR-028).",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "everyone": {
+          "type": "boolean"
+        },
+        "members": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "everyone",
+        "members"
+      ],
+      "additionalProperties": false
+    },
+    "GroupList": {
+      "type": "object",
+      "description": "groups/list (#1761): every group for an admin; for a member, the groups they are in.",
+      "properties": {
+        "groups": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Group"
+          }
+        }
+      },
+      "required": [
+        "groups"
+      ],
+      "additionalProperties": false
+    },
+    "GroupSet": {
+      "type": "object",
+      "description": "groups/set (#1761): makes a group, or with id changes one. One user is a list of one.",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "everyone": {
+          "type": "boolean"
+        },
+        "members": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "additionalProperties": false
+    },
+    "GroupRequest": {
+      "type": "object",
+      "description": "groups/remove (#1761): the group. Refused while a workspace provider or a bot has it.",
+      "properties": {
+        "id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "additionalProperties": false
+    },
+    "ProviderGroup": {
+      "type": "object",
+      "description": "providers/setGroup (#1761): the group whose users may use the provider. No group is the admins' alone.",
+      "properties": {
+        "provider": {
+          "$ref": "#/definitions/ProviderID"
+        },
+        "group": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "provider"
+      ],
+      "additionalProperties": false
+    },
+    "GroupsChanged": {
+      "type": "object",
+      "description": "control/groupsChanged (#1761): a group was made, changed or removed.",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "removed": {
+          "type": "boolean"
+        }
+      },
       "additionalProperties": false
     }
   }

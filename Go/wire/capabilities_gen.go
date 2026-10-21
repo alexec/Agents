@@ -45,6 +45,7 @@ const (
 	CapFilesDiagnostics1     = "files.diagnostics/1"
 	CapFiles1                = "files/1"
 	CapGit1                  = "git/1"
+	CapGroups1               = "groups/1"
 	CapHandover1             = "handover/1"
 	CapHostTeam1             = "host.team/1"
 	CapHostUserSettings1     = "host.user-settings/1"
@@ -462,6 +463,9 @@ var ControlCapabilities = map[string]string{
 	"control/setProjectDetection": "control/1",
 	"control/status":              "control/1",
 	"git/credential":              "git/1",
+	"groups/list":                 "groups/1",
+	"groups/remove":               "groups/1",
+	"groups/set":                  "groups/1",
 	"handover/status":             "handover/1",
 	"host/hello":                  "host/1",
 	"host/providerDraft":          "host/1",
@@ -509,6 +513,7 @@ var ControlCapabilities = map[string]string{
 	"providers/refresh":           "providers/1",
 	"providers/remove":            "providers/1",
 	"providers/runtimes":          "providers/1",
+	"providers/setGroup":          "groups/1",
 	"providers/update":            "providers/1",
 	"relay/switch":                "relay/1",
 	"reports/export":              "reports/1",
@@ -522,6 +527,7 @@ var ControlCapabilities = map[string]string{
 	"user/settings":               "user/1",
 	"workspaces/forAgent":         "workspaces/1",
 	"control/clientChanged":       "control/1",
+	"control/groupsChanged":       "groups/1",
 	"control/hostChanged":         "control/1",
 	"control/installProgress":     "control/1",
 	"control/joinDecided":         "hosts.join/1",
@@ -548,6 +554,7 @@ var ControlCapabilities = map[string]string{
 // ControlNotifications is each notification in control.openrpc.json: what its server sends, not serves.
 var ControlNotifications = map[string]bool{
 	"control/clientChanged":       true,
+	"control/groupsChanged":       true,
 	"control/hostChanged":         true,
 	"control/installProgress":     true,
 	"control/joinDecided":         true,

@@ -59,6 +59,8 @@ type Records struct {
 	settings *held[Settings]
 	// Every user, removed ones too (#994).
 	people map[string]held[Person]
+	// Every group, removed ones too (#1761).
+	groups map[string]held[Group]
 	// Tags of tombstones, so a refresh does not read them again and again.
 	tombstones map[string]string
 	// Keys listed whose object could not be read or decoded, by entity tag (#171). Such
@@ -71,7 +73,7 @@ type Records struct {
 
 func New(s store.Store) *Records {
 	return &Records{Store: s, clients: map[string]held[ClientRecord]{}, hosts: map[string]held[HostRecord]{},
-		people: map[string]held[Person]{}, tombstones: map[string]string{}, unreadable: map[string]string{}}
+		people: map[string]held[Person]{}, groups: map[string]held[Group]{}, tombstones: map[string]string{}, unreadable: map[string]string{}}
 }
 
 // OnUnreadable sets where an unreadable record is said, once per version (the log).
@@ -161,6 +163,9 @@ func (r *Records) load(ctx context.Context) error {
 	r.mu.Unlock()
 
 	if err := r.loadPeople(ctx); err != nil {
+		return err
+	}
+	if err := r.loadGroups(ctx); err != nil {
 		return err
 	}
 	if object, ok := r.read(ctx, store.Key{Key: SettingsKey, ETag: "unreadable"}); ok && object != nil {

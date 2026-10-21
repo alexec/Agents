@@ -703,6 +703,9 @@ func (s *Service) apply(e controlEvent) {
 	case "userSettingsChanged":
 		// A person's settings or secrets changed at another copy (#1760).
 		s.userChangedHere(e.Subject, nil, true)
+	case "groupsChanged":
+		// A group made, changed or removed at another copy (#1761).
+		s.tellGroupsChanged(e.Subject, s.records.Group(e.Subject) == nil)
 	case "peopleChanged":
 		// Another copy's invite or removal makes this one a team, or not (#1763).
 		s.noteTeam()

@@ -67,9 +67,9 @@ func TestUnknownIDsReadTheStoreOnce(t *testing.T) {
 	}
 	before := st.lists.Load()
 	crowd()
-	// One read lists the clients, the hosts and the people (#994).
-	if got := st.lists.Load() - before; got > 3 {
-		t.Fatalf("200 made-up ids made %d lists; one read is 3", got)
+	// One read lists the clients, the hosts, the people (#994) and the groups (#1761).
+	if got := st.lists.Load() - before; got > 4 {
+		t.Fatalf("200 made-up ids made %d lists; one read is 4", got)
 	}
 	before = st.lists.Load()
 	crowd()

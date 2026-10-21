@@ -286,11 +286,16 @@ public extension DaemonAPI {
         /// False once a list has failed after a good one: `workspaces` is what it last said.
         public var current: Bool
         public var problem: String?
+        /// The group whose users may use it (#1761); none is the admins' alone.
+        public var group: String?
+        /// The caller may start machines from it (#1761). Nil from an older control plane,
+        /// which lets everyone.
+        public var mayUse: Bool?
 
         public init(id: ProviderID, name: String, kind: String, secrets: [String: Bool] = [:],
                     capabilities: [String] = [], contract: Int = 1, mapped: Bool = false, preset: String? = nil,
                     workspaces: [WorkspaceInfo] = [], listedAt: Date? = nil, current: Bool = true,
-                    problem: String? = nil) {
+                    problem: String? = nil, group: String? = nil, mayUse: Bool? = nil) {
             self.id = id
             self.name = name
             self.kind = kind
@@ -303,7 +308,12 @@ public extension DaemonAPI {
             self.listedAt = listedAt
             self.current = current
             self.problem = problem
+            self.group = group
+            self.mayUse = mayUse
         }
+
+        /// Whether the caller may start machines from it.
+        public var usable: Bool { mayUse ?? true }
     }
 
     /// A linked host's workspace, on its `hosts/list` row and in `control/hostChanged`.
