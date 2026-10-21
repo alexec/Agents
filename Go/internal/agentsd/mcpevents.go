@@ -1164,8 +1164,17 @@ func (d *Daemon) deliverMCPEvents(result mcpPollResult, s *mcpSubscription, used
 }
 
 // raiseMCPEvent puts one event on the log, which fires the workflows whose triggers it
-// matches.
+// matches. A channel message (one with a sender) is raised only when its sender is linked
+// to a person (#1762, FR-037); otherwise nothing starts, and it is not tried again.
 func (d *Daemon) raiseMCPEvent(e mcpPolled, s *mcpSubscription) wire.Event {
+	var linked wire.ChannelLinkChecked
+	if e.Sender != nil {
+		var ok bool
+		if linked, ok = d.senderLinked(*e.Sender); !ok {
+			log.Printf("mcp events: %s %s evt %s is from a sender not linked to a person: nothing started", s.server, s.event, *e.EventID)
+			return wire.Event{}
+		}
+	}
 	payload := "null"
 	if len(e.Data) > 0 {
 		payload = canonicalJSON(e.Data)
@@ -1180,6 +1189,16 @@ func (d *Daemon) raiseMCPEvent(e mcpPolled, s *mcpSubscription) wire.Event {
 		details["payload_cut"] = "true"
 	}
 	details["payload"] = payload
+	sentence := s.server + " reported " + s.event
+	if e.Sender != nil {
+		details["sender_channel"], details["sender_identity"], details["sender_user"] = e.Sender.Channel, e.Sender.Identity, *linked.User
+		name := *linked.User
+		if linked.UserName != nil && *linked.UserName != "" {
+			name = *linked.UserName
+		}
+		details["sender_name"] = name
+		sentence += " from " + name
+	}
 	d.mcpEvMu.Lock()
 	if d.mcpToTell[s.id] {
 		delete(d.mcpToTell, s.id)
@@ -1189,7 +1208,7 @@ func (d *Daemon) raiseMCPEvent(e mcpPolled, s *mcpSubscription) wire.Event {
 	}
 	d.mcpEvMu.Unlock()
 	raised := d.raise(wire.EventDraft{Name: s.event, At: now(), Scope: projectScope(s.project),
-		Sentence: s.server + " reported " + s.event, Details: details})
+		Sentence: sentence, Details: details})
 	log.Printf("mcp events: %s %s evt %s raised (position %d, workflows: %s)", s.server, s.event, *e.EventID, raised.Position, strings.Join(s.workflows, ", "))
 	return raised
 }

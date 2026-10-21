@@ -179,6 +179,30 @@ func (d *Daemon) claimRun(folder, id, trigger string) bool {
 	return claimed.Won
 }
 
+// senderLinked asks the control plane whether a channel message's sender is linked to a
+// person (#1762, FR-037). False, so nothing starts, when it is not, when it is refused (an
+// email that fails DKIM), and when there is no control plane to ask or it does not answer.
+func (d *Daemon) senderLinked(sender wire.ChannelSender) (wire.ChannelLinkChecked, bool) {
+	ask := d.askControl.Load()
+	if ask == nil {
+		log.Printf("channel message from %s: no control plane to say whom it is from", sender.Channel)
+		return wire.ChannelLinkChecked{}, false
+	}
+	out, err := (*ask)(d.ctx, wire.CallLinksCheck.Name, sender)
+	if err != nil {
+		log.Printf("channel message from %s: the link check was not answered: %v", sender.Channel, err)
+		return wire.ChannelLinkChecked{}, false
+	}
+	var checked wire.ChannelLinkChecked
+	if json.Unmarshal(out, &checked) != nil || checked.User == nil || *checked.User == "" {
+		if checked.Refused != nil {
+			log.Printf("channel message from %s refused: %s", sender.Channel, *checked.Refused)
+		}
+		return wire.ChannelLinkChecked{}, false
+	}
+	return checked, true
+}
+
 // noOneAnswersWords is said in an agent's transcript on a bot's machine, where a question
 // or a permission has no one to answer it.
 const noOneAnswersWords = "No one answers on a bot's machine: the bot's policy refused it, and the agent carries on."

@@ -925,6 +925,78 @@ export type ChangesUnavailable =
   | { failed: { message: string } };
 
 /**
+ * ChannelSender.dkim (#1762, FR-037): the DKIM result the email server read for a message, from its
+ * own Authentication-Results.
+ */
+export interface ChannelDKIM {
+  result: string;
+  domain?: string;
+}
+
+/**
+ * links/list (#1762, data-model.md "Channel link"): a channel identity linked to a person, and who
+ * approved it when.
+ */
+export interface ChannelLink {
+  channel: string;
+  identity: string;
+  name?: string;
+  user: string;
+  userName?: string;
+  approvedBy: string;
+  approvedAt: WireDate;
+}
+
+/**
+ * links/check's answer (#1762): user is the linked person; with none, nothing starts, and refused
+ * says why when it is not only that the identity is not linked yet.
+ */
+export interface ChannelLinkChecked {
+  user?: string;
+  userName?: string;
+  refused?: string;
+}
+
+/**
+ * links/approve, links/deny (#1762). An admin approving a request that names nobody names the
+ * person in for, and the request goes to them.
+ */
+export interface ChannelLinkDecide {
+  request: string;
+  for?: string;
+}
+
+/**
+ * control/linkDecided (#1762): a request ended (approved, denied, expired) or went to another
+ * person (sent), so every card for it goes.
+ */
+export interface ChannelLinkDecided {
+  request: string;
+  result: string;
+}
+
+/** links/remove (#1762): unlink a channel identity. */
+export interface ChannelLinkRemove {
+  channel: string;
+  identity: string;
+}
+
+/**
+ * links/requests, control/linkRequested (#1762): a channel identity waiting to be linked. for is
+ * the person asked; with none, the admins send it on to a person.
+ */
+export interface ChannelLinkRequest {
+  request: string;
+  channel: string;
+  identity: string;
+  name?: string;
+  email?: string;
+  for?: string;
+  forName?: string;
+  expires: WireDate;
+}
+
+/**
  * What a channel on a host's uplink is opened as (ControlWire.ChannelOpen). `grant` is always
  * `operator`, for an older host (#111).
  */
@@ -938,6 +1010,18 @@ export interface ChannelOpen {
   fanOut?: boolean;
   /** Who the channel's calls are from, written by the control plane (#996). */
   actor?: AuditActor;
+}
+
+/**
+ * links/check (#1762, FR-037), and an MCP event's sender: who sent a channel message. channel is
+ * the channel's kind (slack, email), identity the sender on it (for email, the address).
+ */
+export interface ChannelSender {
+  channel: string;
+  identity: string;
+  name?: string;
+  email?: string;
+  dkim?: ChannelDKIM;
 }
 
 export interface ChartHint {
@@ -5740,6 +5824,11 @@ export interface Methods {
   "hosts/stop": { params: HostStop; result: ControlHost };
   "hosts/unlink": { params: HostRequest; result: ControlHost };
   "leases/snapshot": { params: Empty; result: LeaseSnapshot };
+  "links/approve": { params: ChannelLinkDecide; result: Empty };
+  "links/deny": { params: ChannelLinkDecide; result: Empty };
+  "links/list": { params: Empty; result: ChannelLink[] };
+  "links/remove": { params: ChannelLinkRemove; result: Empty };
+  "links/requests": { params: Empty; result: ChannelLinkRequest[] };
   "mcp/health": { params: Empty; result: MCPHealthSnapshot };
   "mcp/health/check": { params: MCPHealthCheckRequest; result: MCPHealthSnapshot };
   "mcp/hosted": { params: Empty; result: HostedMCPSnapshot };
@@ -5935,6 +6024,11 @@ export const MethodTarget = {
   "hosts/stop": "control",
   "hosts/unlink": "control",
   "leases/snapshot": "host",
+  "links/approve": "control",
+  "links/deny": "control",
+  "links/list": "control",
+  "links/remove": "control",
+  "links/requests": "control",
   "mcp/health": "host",
   "mcp/health/check": "host",
   "mcp/hosted": "host",
@@ -6048,6 +6142,9 @@ export interface Notifications {
   "control/joinRequested": JoinRequest;
   "control/keptChanged": KeptList;
   "control/keptDelivered": KeptDelivered;
+  "control/linkDecided": ChannelLinkDecided;
+  "control/linkRequested": ChannelLinkRequest;
+  "control/linksChanged": Empty;
   "control/peopleChanged": PeopleChanged;
   "control/providersChanged": ProviderList;
   "control/secretsLeft": SecretsLeft;
@@ -6154,7 +6251,15 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ChangesFileRequest: { required: ["agentID", "path", "whole"], optional: [] },
   ChangesList: { required: ["files", "git", "reportsEdits"], optional: ["more"] },
   ChangesListRequest: { required: ["agentID"], optional: [] },
+  ChannelDKIM: { required: ["result"], optional: ["domain"] },
+  ChannelLink: { required: ["channel", "identity", "user", "approvedBy", "approvedAt"], optional: ["name", "userName"] },
+  ChannelLinkChecked: { required: [], optional: ["user", "userName", "refused"] },
+  ChannelLinkDecide: { required: ["request"], optional: ["for"] },
+  ChannelLinkDecided: { required: ["request", "result"], optional: [] },
+  ChannelLinkRemove: { required: ["channel", "identity"], optional: [] },
+  ChannelLinkRequest: { required: ["request", "channel", "identity", "expires"], optional: ["name", "email", "for", "forName"] },
   ChannelOpen: { required: ["grant", "client"], optional: ["device", "relayed", "tunnel", "tunnelRef", "fanOut", "actor"] },
+  ChannelSender: { required: ["channel", "identity"], optional: ["name", "email", "dkim"] },
   ChartHint: { required: ["mark", "x", "y"], optional: ["color", "title"] },
   ClientAnnounce: { required: ["id", "publicKey", "name", "kind"], optional: [] },
   ClientConnection: { required: ["client", "relayed"], optional: ["through"] },

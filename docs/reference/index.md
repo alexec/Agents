@@ -29,6 +29,8 @@ something up, not for reading through.
 - [Personas](personas.md): the persona file format, where personas live, and what picking one does.
 - [Events](events.md): everything the app records, for waits, workflow triggers and the
   Events page.
+- [Channels](channels.md): channel identities linked to people, so a chat or email message
+  acts only as the person who approved it.
 - [Groups](groups.md): groups of people, and the workspace providers each group may start
   machines from.
 - [On Every Machine](on-every-machine.md): the settings and secrets the control plane keeps

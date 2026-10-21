@@ -55,6 +55,7 @@ const (
 	CapHostsJoin1            = "hosts.join/1"
 	CapHosts1                = "hosts/1"
 	CapLeases1               = "leases/1"
+	CapLinks1                = "links/1"
 	CapLiveactivity1         = "liveactivity/1"
 	CapMac1                  = "mac/1"
 	CapMailbox1              = "mailbox/1"
@@ -501,6 +502,12 @@ var ControlCapabilities = map[string]string{
 	"hosts/stop":                  "hosts/1",
 	"hosts/unlink":                "hosts/1",
 	"hosts/update":                "hosts/1",
+	"links/approve":               "links/1",
+	"links/check":                 "links/1",
+	"links/deny":                  "links/1",
+	"links/list":                  "links/1",
+	"links/remove":                "links/1",
+	"links/requests":              "links/1",
 	"people/invite":               "people/1",
 	"people/list":                 "people/1",
 	"people/remove":               "people/1",
@@ -540,6 +547,9 @@ var ControlCapabilities = map[string]string{
 	"control/joinRequested":       "hosts.join/1",
 	"control/keptChanged":         "control/1",
 	"control/keptDelivered":       "control/1",
+	"control/linkDecided":         "links/1",
+	"control/linkRequested":       "links/1",
+	"control/linksChanged":        "links/1",
 	"control/moved":               "control/1",
 	"control/peopleChanged":       "people/1",
 	"control/providerDraft":       "control/1",
@@ -569,6 +579,9 @@ var ControlNotifications = map[string]bool{
 	"control/joinRequested":       true,
 	"control/keptChanged":         true,
 	"control/keptDelivered":       true,
+	"control/linkDecided":         true,
+	"control/linkRequested":       true,
+	"control/linksChanged":        true,
 	"control/moved":               true,
 	"control/peopleChanged":       true,
 	"control/providerDraft":       true,

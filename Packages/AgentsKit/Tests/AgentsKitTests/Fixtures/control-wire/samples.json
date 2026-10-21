@@ -877,5 +877,36 @@
     "secrets": [
       "GITHUB_TOKEN"
     ]
+  },
+  "ChannelLink": {
+    "channel": "slack",
+    "identity": "T1/U42",
+    "name": "@sam",
+    "user": "user",
+    "userName": "Sam",
+    "approvedBy": "user",
+    "approvedAt": 812345678.5
+  },
+  "ChannelLinkRequest": {
+    "request": "request",
+    "channel": "slack",
+    "identity": "T1/U42",
+    "name": "@sam",
+    "email": "sam@example.com",
+    "for": "for",
+    "forName": "forName",
+    "expires": 812345678.5
+  },
+  "ChannelLinkDecide": {
+    "request": "request",
+    "for": "for"
+  },
+  "ChannelLinkDecided": {
+    "request": "request",
+    "result": "approved"
+  },
+  "ChannelLinkRemove": {
+    "channel": "slack",
+    "identity": "T1/U42"
   }
 }

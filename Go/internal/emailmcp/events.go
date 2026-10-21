@@ -164,6 +164,21 @@ func bare(address string) string {
 	return address
 }
 
+// senderOf is who sent a message, for a channel link (#1762, FR-037): its one From
+// address, and the DKIM result the receiving server found for it. Nil for a message with
+// no From, or more than one.
+func senderOf(m Summary) map[string]any {
+	if len(m.From) != 1 {
+		return nil
+	}
+	address := strings.ToLower(bare(m.From[0]))
+	dkim := map[string]any{"result": "none"}
+	if m.dkim != "" {
+		dkim = map[string]any{"result": "pass", "domain": m.dkim}
+	}
+	return map[string]any{"channel": "email", "identity": address, "email": address, "dkim": dkim}
+}
+
 func anyMatches(re *regexp.Regexp, addresses []string) bool {
 	for _, a := range addresses {
 		if re.MatchString(bare(a)) {
@@ -308,13 +323,17 @@ func (s *Events) Poll(ctx context.Context, raw json.RawMessage) (map[string]any,
 		if !a.match(m) {
 			continue
 		}
-		out = append(out, map[string]any{
+		event := map[string]any{
 			"eventId":   fmt.Sprintf("%s:%s", EventName, m.ID),
 			"name":      EventName,
 			"timestamp": m.Date.Format(time.RFC3339),
 			"data": map[string]any{"id": m.ID, "folder": m.Folder, "from": m.From, "to": m.To,
 				"subject": m.Subject, "date": m.Date.Format(time.RFC3339), "authenticated": m.Authenticated},
-		})
+		}
+		if sender := senderOf(m); sender != nil {
+			event["sender"] = sender
+		}
+		out = append(out, event)
 	}
 	return answer(out, next, more), nil
 }

@@ -28,3 +28,24 @@ func TestAuthenticatedReadsOnlyTheTopmostResult(t *testing.T) {
 		}
 	}
 }
+
+// A channel link needs DKIM itself (#1762): a DMARC pass without an aligned DKIM pass (SPF
+// alone) gives no signing domain.
+func TestAlignedDKIMIsTheSigningDomain(t *testing.T) {
+	github := []string{"GitHub <noreply@github.com>"}
+	for _, c := range []struct {
+		header string
+		from   []string
+		want   string
+	}{
+		{"Authentication-Results: mx.example.com; dkim=pass header.d=github.com; dmarc=pass header.from=github.com\r\n", github, "github.com"},
+		{"Authentication-Results: mx.example.com; dkim=pass header.i=@gitlab.com\r\n", []string{"gitlab@mg.gitlab.com"}, "gitlab.com"},
+		{"Authentication-Results: mx.example.com; spf=pass; dmarc=pass header.from=github.com\r\n", github, ""},
+		{"Authentication-Results: mx.example.com; dkim=pass header.d=evil.example\r\n", github, ""},
+		{"Authentication-Results: mx.example.com; dkim=fail header.d=github.com\r\n", github, ""},
+	} {
+		if got := alignedDKIM([]byte(c.header), c.from); got != c.want {
+			t.Errorf("%q: %q", c.header, got)
+		}
+	}
+}

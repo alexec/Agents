@@ -167,6 +167,7 @@ type Service struct {
 	told toldClients
 	// Machines asking to join with no code (#994).
 	joins *joins
+	links *links
 	// Each person's settings and secrets (#1760), and what each machine here was sent.
 	users     *usersettings.Book
 	toldUsers toldUsers
@@ -218,6 +219,7 @@ func New(cfg Config) (*Service, error) {
 	s.router.SetOwnership(s)
 	s.router.SetTeam(false, cfg.Version)
 	s.joins = newJoins(s)
+	s.links = newLinks(s)
 	s.copies = newHostCopies(cfg.Store)
 	if s.users, err = openUserBook(cfg); err != nil {
 		return nil, err

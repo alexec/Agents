@@ -22,20 +22,34 @@ var authSection = &imap.FetchItemBodySection{Specifier: imap.PartSpecifierHeader
 // authenticated is true when header (the fetched Authentication-Results lines) says the
 // sender of from (the message's From, exactly one address) is who it says.
 func authenticated(header []byte, from []string) bool {
+	dmarc, dkim := authResults(header, from)
+	return dmarc || dkim != ""
+}
+
+// alignedDKIM is the signing domain of a dkim=pass aligned with From's one address, or ""
+// (#1762): what a channel link checks for an email, which DMARC alone does not give.
+func alignedDKIM(header []byte, from []string) string {
+	_, dkim := authResults(header, from)
+	return dkim
+}
+
+// authResults reads the receiving server's Authentication-Results for From's one address:
+// whether DMARC passed for its domain, and the domain of a DKIM pass aligned with it.
+func authResults(header []byte, from []string) (dmarc bool, dkim string) {
 	if len(from) != 1 {
-		return false
+		return false, ""
 	}
 	_, domain, ok := strings.Cut(strings.ToLower(bare(from[0])), "@")
 	if !ok || domain == "" {
-		return false
+		return false, ""
 	}
 	fields, err := textproto.NewReader(bufio.NewReader(bytes.NewReader(append(header, '\r', '\n')))).ReadMIMEHeader()
 	if err != nil && len(fields) == 0 {
-		return false
+		return false, ""
 	}
 	results := fields.Values("Authentication-Results")
 	if len(results) == 0 {
-		return false
+		return false, ""
 	}
 	for _, result := range strings.Split(uncomment(results[0]), ";")[1:] {
 		words := strings.Fields(strings.ToLower(result))
@@ -51,19 +65,19 @@ func authenticated(header []byte, from []string) bool {
 		switch words[0] {
 		case "dmarc=pass":
 			if d, ok := props["header.from"]; !ok || d == domain {
-				return true
+				dmarc = true
 			}
 		case "dkim=pass":
 			d := props["header.d"]
 			if d == "" {
 				_, d, _ = strings.Cut(props["header.i"], "@")
 			}
-			if d != "" && (d == domain || strings.HasSuffix(domain, "."+d)) {
-				return true
+			if d != "" && dkim == "" && (d == domain || strings.HasSuffix(domain, "."+d)) {
+				dkim = d
 			}
 		}
 	}
-	return false
+	return dmarc, dkim
 }
 
 // uncomment drops the (comments) from a header value, which can hold any text.

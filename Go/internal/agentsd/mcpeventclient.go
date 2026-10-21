@@ -10,6 +10,8 @@ import (
 	"time"
 
 	sdk "github.com/coder/acp-go-sdk"
+
+	"github.com/alexec/agents/Go/wire"
 )
 
 // The host's connections for servers' events (#383, MCPEventClients and MCPEventsWire): the
@@ -61,6 +63,9 @@ type mcpPolled struct {
 	Name      *string         `json:"name"`
 	Timestamp *string         `json:"timestamp"`
 	Data      json.RawMessage `json:"data"`
+	// Sender is who sent a channel message (#1762): such an event starts work only as the
+	// person the identity is linked to.
+	Sender *wire.ChannelSender `json:"sender"`
 }
 
 // mcpPollResult is events/poll's answer; a nil cursor keeps the one before.

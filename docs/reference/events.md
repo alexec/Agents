@@ -249,6 +249,12 @@ A server's event carries:
 | `payload` | The event's data, as compact JSON, at most 256 KB |
 | `payload_cut` | `true` when the data was cut |
 | `missed_since` | On the first event after a gap, when events may have been missed from |
+| `sender_channel`, `sender_identity` | On a channel message: who sent it (#1762) |
+| `sender_user`, `sender_name` | On a channel message: the person its sender is linked to |
+
+A server's event that carries `sender` is a channel message. It is raised only when its
+sender is linked to a person, and an email only with an aligned DKIM pass. See
+[Channels](channels.md).
 
 A wait on a server's event, such as `checks.failed` or `checks.*`, is a subscription, as a
 trigger is:

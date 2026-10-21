@@ -495,3 +495,74 @@ func TestAWorkflowForTwoServersSaysNothingOfTheOneNotHere(t *testing.T) {
 		return len(none) == 2
 	})
 }
+
+// US7 AS1 (#1762, FR-037): a channel message whose sender is not linked starts nothing;
+// one from a linked sender fires the workflow and names the person. With no control plane
+// to ask, nothing starts either.
+func TestAChannelMessageStartsWorkOnlyFromALinkedSender(t *testing.T) {
+	fakeRuntimes(t)
+	d, c := start(t, t.TempDir())
+	defer d.Shutdown()
+	ci := newEventsServer(t)
+	serverHome(t, d, ci.URL)
+	quickPolls(d)
+	dir := project(t, c, 1)
+	folder := store.FolderURL(dir)
+	os.MkdirAll(workflowsFolder(dir), 0o755)
+	os.WriteFile(filepath.Join(workflowsFolder(dir), "merged.md"), []byte("---\nname: Merged\non:\n  - pr.merged:\n      server: ci\n---\nTidy up.\n"), 0o644)
+	approveAll(t, c, folder)
+
+	var mu sync.Mutex
+	var asked []wire.ChannelSender
+	d.SetControlAsk(func(_ context.Context, method string, params any) (json.RawMessage, error) {
+		if method != "links/check" {
+			return json.RawMessage(`{}`), nil
+		}
+		sender := params.(wire.ChannelSender)
+		mu.Lock()
+		asked = append(asked, sender)
+		mu.Unlock()
+		if sender.Identity == "U-SAM" {
+			return json.RawMessage(`{"user":"sam-id","userName":"Sam"}`), nil
+		}
+		return json.RawMessage(`{}`), nil
+	})
+	d.StartMCPEvents()
+	waitFor(t, "the first poll", func() bool { return ci.polled("c1") })
+
+	from := func(id, identity string) map[string]any {
+		return map[string]any{"eventId": id, "name": "pr.merged", "data": map[string]any{"text": "look at #412"},
+			"sender": map[string]any{"channel": "slack", "identity": identity}}
+	}
+	ci.mu.Lock()
+	ci.queued = []map[string]any{from("stranger", "U-EVE"), from("sam", "U-SAM")}
+	ci.mu.Unlock()
+	var e wire.Event
+	waitFor(t, "Sam's message raised and its run", func() bool {
+		got := mcpEventsRaised(d, "sam")
+		if len(got) == 1 {
+			e = *d.event(got[0].Position)
+		}
+		return len(got) == 1 && len(e.Consequences) == 1 && e.Consequences[0].Fired != nil
+	})
+	if e.Details["sender_user"] != "sam-id" || e.Details["sender_name"] != "Sam" || e.Details["sender_identity"] != "U-SAM" ||
+		e.Sentence != "ci reported pr.merged from Sam" {
+		t.Fatalf("%+v", e)
+	}
+	if got := mcpEventsRaised(d, "stranger"); len(got) != 0 {
+		t.Fatalf("a sender not linked started %+v", got)
+	}
+	mu.Lock()
+	n := len(asked)
+	mu.Unlock()
+	if n != 2 {
+		t.Fatalf("asked %d times", n)
+	}
+
+	// No control plane: nothing starts.
+	d.askControl.Store(nil)
+	if got := d.raiseMCPEvent(mcpPolled{EventID: new("lone"), Name: new("pr.merged"), Sender: &wire.ChannelSender{Channel: "slack", Identity: "U-SAM"}},
+		&mcpSubscription{server: "ci", event: "pr.merged"}); got.Name != "" {
+		t.Fatalf("raised with no control plane: %+v", got)
+	}
+}

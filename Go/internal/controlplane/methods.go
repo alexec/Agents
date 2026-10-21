@@ -73,6 +73,7 @@ var own = map[string]bool{
 	"user/secretNames": true,
 	"groups/list": true, "groups/set": true, "groups/remove": true, "providers/setGroup": true,
 	"bots/make": true, "bots/setCaps": true, "bots/stopRun": true,
+	"links/list": true, "links/requests": true, "links/approve": true, "links/deny": true, "links/remove": true,
 }
 
 // Handles says whether a bare method is the control plane's. A bare daemon/ping from
@@ -100,6 +101,7 @@ var writes = map[string]bool{
 	"user/setSettings": true, "user/setSecret": true, "user/removeSecret": true,
 	"groups/set": true, "groups/remove": true, "providers/setGroup": true,
 	"bots/make": true, "bots/setCaps": true,
+	"links/approve": true, "links/deny": true, "links/remove": true,
 }
 
 func (m *Methods) Handle(method string, params json.RawMessage, from Caller) (any, error) {
@@ -145,6 +147,8 @@ func (m *Methods) Handle(method string, params json.RawMessage, from Caller) (an
 		return m.groupsMethod(ctx, method, params, from)
 	case "bots/make", "bots/setCaps", "bots/stopRun":
 		return m.botsMethod(ctx, method, params, from)
+	case "links/list", "links/requests", "links/approve", "links/deny", "links/remove":
+		return m.linksMethod(ctx, method, params, from)
 	case "reports/usage", "reports/export":
 		return m.reportMethod(ctx, method, params, from)
 	case "user/settings", "user/setSettings", "user/setSecret", "user/removeSecret", "user/secretNames":
@@ -806,6 +810,13 @@ func (m *Methods) HostSaid(host, method string, params json.RawMessage) (any, er
 			return nil, err
 		}
 		return m.s.claimRun(ctx, host, claim, time.Now())
+	case "links/check":
+		// May a channel message start work (#1762, FR-037)?
+		sender, err := require[wire.ChannelSender](params, "ChannelSender")
+		if err != nil {
+			return nil, err
+		}
+		return m.s.links.check(ctx, sender)
 	case "host/workspaces", "host/providerDraft", "host/status":
 		if m.s.providers == nil {
 			if method == "host/status" {
