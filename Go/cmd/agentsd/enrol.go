@@ -2,9 +2,11 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"log"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -63,4 +65,35 @@ func refusedForGood(err error) (string, bool) {
 		return r.Reason, true
 	}
 	return "", false
+}
+
+// joinStatusFile is HostJoinFile.name (#113): how this host's join stands, for Agents Host
+// and the control plane beside it, which show its problem while it keeps failing.
+const joinStatusFile = "control-join.json"
+
+// writeJoinStatus is HostJoinFile.write: the uplink's state and why its last dial failed,
+// so a host refused for ever says why where a person looks (#1996). Dates without
+// fractions, as Swift's ISO 8601 decoder reads them.
+func writeJoinStatus(root string, connected bool, problem string) {
+	type status struct {
+		Member    bool    `json:"member"`
+		Connected bool    `json:"connected"`
+		Problem   *string `json:"problem,omitempty"`
+		At        string  `json:"at"`
+	}
+	said := status{Member: true, Connected: connected, At: time.Now().UTC().Format(time.RFC3339)}
+	if problem != "" {
+		said.Problem = &problem
+	}
+	data, err := json.Marshal(struct {
+		PID    int    `json:"pid"`
+		Status status `json:"status"`
+	}{os.Getpid(), said})
+	if err != nil {
+		return
+	}
+	file := filepath.Join(root, joinStatusFile)
+	if err := os.WriteFile(file+".tmp", data, 0o600); err == nil {
+		os.Rename(file+".tmp", file)
+	}
 }

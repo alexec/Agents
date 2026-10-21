@@ -1,10 +1,12 @@
 package controlplane
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net"
 	"os"
@@ -810,5 +812,99 @@ func TestAHostHearsThePairedWindowsOnlyWhenTheyChange(t *testing.T) {
 	}
 	if line := readUntil(t, host, "host/clients"); !strings.Contains(line, m.Client) {
 		t.Fatal("the refreshes told the host an unchanged list:", line)
+	}
+}
+
+// #1996: hosts on the control plane's own machine that join at once, each with a code of
+// its own, are one mac and the rest ids of their own, each kept with its own key, and
+// each proves it. None writes over another's record.
+func TestHostsJoiningAtOnceFromItsMachineAreOneMac(t *testing.T) {
+	p := startPlane(t, store.NewMemory(), controllink.NewPrivateKey())
+	const n = 6
+	codes := make([]*controllink.Code, n)
+	for i := range codes {
+		codes[i] = p.code(true)
+	}
+	keys := make([][]byte, n)
+	members := make([]*controllink.Membership, n)
+	errs := make([]error, n)
+	start := make(chan struct{})
+	var wg sync.WaitGroup
+	for i := range n {
+		keys[i] = controllink.NewPrivateKey()
+		wg.Go(func() {
+			<-start
+			members[i], errs[i] = controllink.Enroll(context.Background(), t.TempDir(), codes[i], keys[i],
+				controllink.HostHello{Name: new("host " + itoa(i)), MachineID: "MACHINE-1"})
+		})
+	}
+	close(start)
+	wg.Wait()
+	seen := map[string]bool{}
+	macs := 0
+	for i := range n {
+		if errs[i] != nil {
+			t.Fatal(errs[i])
+		}
+		host := members[i].Host
+		if seen[host] {
+			t.Fatalf("two hosts enrolled as %s", host)
+		}
+		seen[host] = true
+		if host == "mac" {
+			macs++
+		}
+		public, _ := controllink.PublicKey(keys[i])
+		if r := p.s.Records().Host(host); r == nil || !bytes.Equal(r.PublicKey, public) {
+			t.Fatalf("%s is not kept with its own key: %+v", host, r)
+		}
+		key, _ := controllink.HostKey(keys[i], codes[i].ControlKey, host)
+		l, _, err := controllink.Join(context.Background(), p.url, "", controllink.Credentials{Identity: "h:" + host, Key: key,
+			Kind: "host", ControlKey: codes[i].ControlKey})
+		if err != nil {
+			t.Fatalf("%s could not prove its key: %v", host, err)
+		}
+		l.Close()
+	}
+	if macs != 1 {
+		t.Fatalf("%d hosts are mac", macs)
+	}
+	// A replay of a join that could not be mac is given the id it was given.
+	for i := range n {
+		again, err := controllink.Enroll(context.Background(), t.TempDir(), codes[i], keys[i],
+			controllink.HostHello{Name: new("host " + itoa(i)), MachineID: "MACHINE-1"})
+		if err != nil || again.Host != members[i].Host {
+			t.Fatalf("replay of %s: %v %v", members[i].Host, again, err)
+		}
+	}
+}
+
+// #1996: a host proving a key that is not the one it enrolled with is refused, and the
+// log says which host and why.
+func TestABadProofSaysWhichHostAndWhy(t *testing.T) {
+	p := startPlane(t, store.NewMemory(), controllink.NewPrivateKey())
+	code := p.code(true)
+	member, err := controllink.Enroll(context.Background(), t.TempDir(), code, controllink.NewPrivateKey(),
+		controllink.HostHello{Name: new("a"), MachineID: "X"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	key, _ := controllink.HostKey(controllink.NewPrivateKey(), code.ControlKey, member.Host)
+	_, _, err = controllink.Join(context.Background(), p.url, "", controllink.Credentials{Identity: "h:" + member.Host, Key: key,
+		Kind: "host", ControlKey: code.ControlKey})
+	if r := (*controllink.Refusal)(nil); !errors.As(err, &r) || r.Reason != controllink.BadProof {
+		t.Fatalf("%v", err)
+	}
+	want := "host " + member.Host + " proved a key that is not the one it enrolled with"
+	timeout := time.After(10 * time.Second)
+	for {
+		select {
+		case line := <-p.lines:
+			if strings.Contains(line, want) && strings.Contains(line, "bad-proof") {
+				return
+			}
+		case <-timeout:
+			t.Fatal("the bad proof was not logged with its host and why")
+		}
 	}
 }

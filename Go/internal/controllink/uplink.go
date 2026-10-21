@@ -175,6 +175,17 @@ func (s *sender) drop() {
 	})
 }
 
+// problem is why a dial failed, in words: a refused proof says what it means, as it is
+// tried again for ever and nothing else would say it (#1996).
+func (u *Uplink) problem(err error) string {
+	var r *Refusal
+	if errors.As(err, &r) && r.Reason == BadProof {
+		return "it does not take this host's key as " + u.Member.Host +
+			" (another host may have enrolled under that id); make a new host code and join again"
+	}
+	return err.Error()
+}
+
 func (u *Uplink) Run(ctx context.Context) {
 	first, longest, steady := cmp.Or(u.firstWait, upFirstWait), cmp.Or(u.lastWait, upLastWait), cmp.Or(u.steadyFor, upSteady)
 	wait := first
@@ -188,9 +199,10 @@ func (u *Uplink) Run(ctx context.Context) {
 		}
 		l, at, err := u.join(ctx, key, last)
 		if err != nil {
-			log.Printf("uplink: could not reach the control plane: %v", err)
+			problem := u.problem(err)
+			log.Printf("uplink: could not reach the control plane: %s", problem)
 			if u.OnChange != nil {
-				u.OnChange(false, err.Error())
+				u.OnChange(false, problem)
 			}
 			select {
 			case <-ctx.Done():

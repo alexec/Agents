@@ -16,6 +16,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"sort"
 	"strings"
@@ -724,6 +725,42 @@ func (r *Records) ChangeHost(ctx context.Context, id string, change func(*HostRe
 	}
 	r.mu.Lock()
 	r.hosts[id] = held[HostRecord]{kept, etag}
+	r.mu.Unlock()
+	return nil
+}
+
+// ErrHostTaken is AddHost's refusal: a host of that id is already kept, here or at
+// another copy (#1996).
+var ErrHostTaken = errors.New("a host of that id is already enrolled")
+
+// AddHost saves a host that has just enrolled, only if no host has its id: one write
+// that never replaces another machine's record or key, at this copy or another (#1996).
+// It is ErrHostTaken otherwise.
+func (r *Records) AddHost(ctx context.Context, h HostRecord) error {
+	r.writing.Lock()
+	defer r.writing.Unlock()
+	r.mu.Lock()
+	if h.Owner == nil {
+		h.Owner = r.owner()
+	}
+	key := HostKey(h.ID)
+	if _, ok := r.hosts[h.ID]; ok {
+		r.mu.Unlock()
+		return ErrHostTaken
+	}
+	h.Rev = 1
+	etag, ok := r.tombstones[key]
+	r.mu.Unlock()
+	kept, etag, err := write(ctx, r.Store, h, key, overTombstone(etag, ok))
+	if store.IsConflict(err) {
+		return ErrHostTaken
+	}
+	if err != nil {
+		return err
+	}
+	r.mu.Lock()
+	r.hosts[h.ID] = held[HostRecord]{kept, etag}
+	delete(r.tombstones, key)
 	r.mu.Unlock()
 	return nil
 }

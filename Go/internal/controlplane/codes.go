@@ -184,6 +184,18 @@ func (c *Codes) Spend(ctx context.Context, id string, by spent) (*spent, error) 
 	return &earlier, nil
 }
 
+// Respend says the code was spent as something else after all: the join that spent it,
+// and only that one, is given a host id of its own when the one it asked for was taken
+// (#1996), so a replay of it is given the same.
+func (c *Codes) Respend(ctx context.Context, id string, by spent) error {
+	data, err := records.Encode(by)
+	if err != nil {
+		return err
+	}
+	_, err = c.Store.Put(ctx, spentKey(id), data, store.Always)
+	return err
+}
+
 // InstallScript is HostInstallScript.text: what a server runs to become a host, served at
 // GET /v1/install.sh. scripts/host-install.sh is the same text.
 //
