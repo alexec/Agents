@@ -157,6 +157,55 @@ func TestBackupAndRestoreOnAnotherMachine(t *testing.T) {
 	}
 }
 
+// A record in another machine's backup is stamped with that machine's root, whatever it
+// says it was made under, and brings no MCP servers. A backup whose manifest names this
+// root, but that is not in this machine's folder, is never run here either.
+func TestARestoreFromAnotherMachineNeverRunsHere(t *testing.T) {
+	clock := time.Date(2026, 10, 20, 9, 0, 0, 0, time.UTC)
+	atTime(t, &clock)
+	shared := t.TempDir()
+	a, ca := start(t, t.TempDir())
+	b, cb := start(t, t.TempDir())
+	dir := project(t, ca, 1)
+	ca.call(t, 2, "backups/configure", map[string]any{"every": "off", "keep": 2, "folder": shared})
+	bRoot := b.Store.RootID
+	agent := seeded(t, a, dir, func(x *wire.Agent) {
+		x.MadeInRoot = &bRoot
+		x.McpServers = []wire.MCPServer{{Name: "tool", Transport: wire.MCPServerTransport{
+			Stdio: &wire.MCPServerTransportStdio{Command: "/bin/echo", Args: []string{}, Env: map[string]string{}}}}}
+	})
+	made, err := a.makeBackup()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	cb.call(t, 1, "backups/configure", map[string]any{"every": "off", "keep": 2, "folder": shared})
+	var res wire.BackupRestoreResult
+	json.Unmarshal(cb.call(t, 2, "backups/restore", map[string]any{"id": made.ID}), &res)
+	got := b.Store.Agent(agent.ID)
+	if res.Restored != 1 || got == nil || got.MadeInRoot == nil || *got.MadeInRoot != a.Store.RootID || len(got.McpServers) != 0 {
+		t.Fatalf("restored %+v as %+v", res, got)
+	}
+	if err := b.refuseToRun(got); err == nil {
+		t.Fatal("it may run on B")
+	}
+
+	// The same backup, its manifest now naming C's root, restored on C.
+	c, cc := start(t, t.TempDir())
+	manifest := filepath.Join(shared, a.Store.RootID, "20261020T090000Z.json")
+	raw, _ := os.ReadFile(manifest)
+	writeFile(t, manifest, strings.Replace(string(raw), a.Store.RootID, c.Store.RootID, 1))
+	cc.call(t, 1, "backups/configure", map[string]any{"every": "off", "keep": 2, "folder": shared})
+	json.Unmarshal(cc.call(t, 2, "backups/restore", map[string]any{"id": made.ID}), &res)
+	got = c.Store.Agent(agent.ID)
+	if res.Restored != 1 || got == nil || got.MadeInRoot == nil || *got.MadeInRoot != restoredElsewhere {
+		t.Fatalf("on C %+v as %+v", res, got)
+	}
+	if err := c.refuseToRun(got); err == nil {
+		t.Fatal("it may run on C")
+	}
+}
+
 func TestBackupsKeepTheNewestOfThisMachine(t *testing.T) {
 	clock := time.Date(2026, 10, 20, 9, 0, 0, 0, time.UTC)
 	atTime(t, &clock)

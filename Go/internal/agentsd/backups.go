@@ -538,11 +538,18 @@ func (d *Daemon) restoreBackup(id string) (wire.BackupRestoreResult, error) {
 		return wire.BackupRestoreResult{}, &Error{Code: CodeInvalidParams, Message: "There is no backup " + id + "."}
 	}
 	archive, _, _ := d.backupPaths(id)
-	return d.restoreArchive(archive, listed.RootID)
+	// The folder, not the manifest, says whose backup it is.
+	folder, _, _ := strings.Cut(id, "/")
+	return d.restoreArchive(archive, listed.RootID, folder == d.Store.RootID)
 }
 
-// restoreArchive restores the archive at path; madeIn is the root that made it.
-func (d *Daemon) restoreArchive(archive, madeIn string) (wire.BackupRestoreResult, error) {
+// restoredElsewhere is the root a record from another machine's backup is stamped with
+// when that backup names this root: never this one, so it is never run here.
+const restoredElsewhere = "restored"
+
+// restoreArchive restores the archive at path; madeIn is the root that made it, and mine
+// whether it is this machine's own backup.
+func (d *Daemon) restoreArchive(archive, madeIn string, mine bool) (wire.BackupRestoreResult, error) {
 	res := wire.BackupRestoreResult{}
 	f, err := os.Open(archive)
 	if err != nil {
@@ -554,8 +561,9 @@ func (d *Daemon) restoreArchive(archive, madeIn string) (wire.BackupRestoreResul
 		return res, fmt.Errorf("the backup can't be read: %w", err)
 	}
 	tr := tar.NewReader(gz)
-	// madeIn, the root that made it, is from the .json the list read: a record that names
-	// none is stamped with it, so one from another machine is never run here.
+	// madeIn, the root that made it, is from the .json the list read. A record from
+	// another machine's backup is stamped with it, whatever it says, so it is never run
+	// here.
 	// One agent's files are held until the next agent's begin: a backup is written agent
 	// by agent. Its record goes in last, so a restore cut off leaves a folder with no
 	// record, which the store does not load.
@@ -565,7 +573,7 @@ func (d *Daemon) restoreArchive(archive, madeIn string) (wire.BackupRestoreResul
 		if held == "" {
 			return nil
 		}
-		restored, err := d.restoreAgent(held, files, madeIn)
+		restored, err := d.restoreAgent(held, files, madeIn, mine)
 		held, files = "", map[string][]byte{}
 		if err != nil {
 			return err
@@ -620,7 +628,7 @@ func (d *Daemon) restoreArchive(archive, madeIn string) (wire.BackupRestoreResul
 
 // restoreAgent writes one agent's folder and saves its record archived; false when this
 // machine has it already or the record can't be read.
-func (d *Daemon) restoreAgent(id wire.UUID, files map[string][]byte, madeIn string) (bool, error) {
+func (d *Daemon) restoreAgent(id wire.UUID, files map[string][]byte, madeIn string, mine bool) (bool, error) {
 	raw, ok := files["agent.json"]
 	if !ok || d.Store.Agent(id) != nil {
 		return false, nil
@@ -633,10 +641,19 @@ func (d *Daemon) restoreAgent(id wire.UUID, files map[string][]byte, madeIn stri
 		return false, nil
 	}
 	a.ID = id
-	// Made under the root that made the backup, if the record does not say: then a record
-	// from another machine is never run here.
-	if a.MadeInRoot == nil && madeIn != "" {
-		a.MadeInRoot = &madeIn
+	// Made under the root that made the backup. This machine's own record keeps what it
+	// says; one from another machine never names this root, and brings no MCP servers.
+	if mine {
+		if a.MadeInRoot == nil && madeIn != "" {
+			a.MadeInRoot = &madeIn
+		}
+	} else {
+		from := madeIn
+		if from == "" || from == d.Store.RootID {
+			from = restoredElsewhere
+		}
+		a.MadeInRoot = &from
+		a.McpServers = nil
 	}
 	if a.State != wire.AgentStateArchived {
 		r := wire.AgentArchivedReasonByUser
