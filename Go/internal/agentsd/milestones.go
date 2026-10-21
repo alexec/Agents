@@ -1,6 +1,7 @@
 package agentsd
 
 import (
+	"encoding/json"
 	"log"
 	"os"
 	"path/filepath"
@@ -13,10 +14,13 @@ import (
 )
 
 // The milestones (#984): earned once, when the facts first say so, kept in
-// <root>/achievements.json and told to every client. A server host earns those its own
-// work shows: the first agent to run a turn, the first workflow, five agents at once and
-// the first pull request landed. Pairing a device and answering from one are earned where
-// the device connects, and a cloud host where workspaces are started (#1136).
+// <root>/achievements.json and told to every client. A host earns those its own work
+// shows: the first agent to run a turn, the first workflow, five agents at once and the
+// first pull request landed (counted with the person's gh, mergedprs.go). A phone or a
+// browser is paired when one calls this host at all, through the control plane or the
+// bridge, and answering a question from one is answering from away from the Mac (#1987).
+// A cloud machine is started when an agent starts one, or when the control plane lists
+// one running, asked with the hourly count of merged pull requests.
 
 type milestoneBook struct {
 	milestoneMu    sync.Mutex
@@ -26,10 +30,13 @@ type milestoneBook struct {
 }
 
 const (
-	firstAgent    = "firstAgent"
-	firstWorkflow = "firstWorkflow"
-	firstLandedPR = "firstLandedPR"
-	fiveAtOnce    = "fiveAtOnce"
+	firstAgent        = "firstAgent"
+	firstPairing      = "firstPairing"
+	firstRemoteAnswer = "firstRemoteAnswer"
+	firstWorkflow     = "firstWorkflow"
+	firstCloudHost    = "firstCloudHost"
+	firstLandedPR     = "firstLandedPR"
+	fiveAtOnce        = "fiveAtOnce"
 )
 
 func (d *Daemon) achievementsPath() string {
@@ -107,7 +114,7 @@ func (d *Daemon) checkMilestones() {
 	held := *d.milestonesLocked()
 	d.milestoneMu.Unlock()
 	want := func(id string) bool { return !hasMilestone(&held, id) }
-	if !want(firstAgent) && !want(firstWorkflow) && !want(firstLandedPR) && !want(fiveAtOnce) {
+	if !want(firstAgent) && !want(firstPairing) && !want(firstWorkflow) && !want(firstLandedPR) && !want(fiveAtOnce) {
 		return
 	}
 	at := time.Now()
@@ -123,6 +130,22 @@ func (d *Daemon) checkMilestones() {
 		}
 		if first != nil {
 			found[firstAgent] = *first
+		}
+	}
+	if want(firstPairing) {
+		// The first device paired, read from devices.json as it is, which holds the
+		// devices' own table to when one is first asked for.
+		var raws []json.RawMessage
+		if b, err := os.ReadFile(d.devicesFile()); err == nil && json.Unmarshal(b, &raws) == nil {
+			for _, raw := range raws {
+				var dev wire.Device
+				if json.Unmarshal(raw, &dev) != nil || dev.ID == "" {
+					continue
+				}
+				if t := dev.AnnouncedAt.Time(); found[firstPairing].IsZero() || t.Before(found[firstPairing]) {
+					found[firstPairing] = t
+				}
+			}
 		}
 	}
 	if want(firstWorkflow) && d.hasWorkflowHere() {
@@ -155,6 +178,22 @@ func (d *Daemon) checkMilestones() {
 			}
 		}
 	}
+	d.earnMilestones(found, at)
+}
+
+// earnNow earns each of ids, now, when it is not yet.
+func (d *Daemon) earnNow(ids ...string) {
+	at := time.Now()
+	found := map[string]time.Time{}
+	for _, id := range ids {
+		found[id] = at
+	}
+	d.earnMilestones(found, at)
+}
+
+// earnMilestones earns each found that is not yet, at its date (never ahead of at), keeps
+// them and tells every client.
+func (d *Daemon) earnMilestones(found map[string]time.Time, at time.Time) {
 	if len(found) == 0 {
 		return
 	}
@@ -188,6 +227,70 @@ func (d *Daemon) checkMilestones() {
 	out.Earned = append([]wire.EarnedMilestone{}, m.Earned...)
 	d.milestoneMu.Unlock()
 	Broadcast(d, wire.NotifyMilestonesChanged, out)
+}
+
+// noteMilestones is what a call says once it has been answered: a phone, an iPad or a
+// browser is paired when one calls at all, and answering a question from one is answering
+// from away from the Mac. A browser on this Mac's own page (pagerelay.go) is the Mac.
+func (d *Daemon) noteMilestones(c *Client, method string) {
+	answer := method == wire.CallElicitationsAnswer.Name || method == wire.CallPermissionsAnswer.Name ||
+		method == wire.CallAgentsAnswerSandbox.Name
+	d.milestoneMu.Lock()
+	m := d.milestonesLocked()
+	wanted := !hasMilestone(m, firstPairing) || answer && !hasMilestone(m, firstRemoteAnswer)
+	d.milestoneMu.Unlock()
+	if !wanted || !d.fromDevice(c) {
+		return
+	}
+	if answer {
+		d.earnNow(firstPairing, firstRemoteAnswer)
+	} else {
+		d.earnNow(firstPairing)
+	}
+}
+
+// fromDevice is whether a connection is a device's: a control-plane channel for one, or
+// one the bridge bound.
+func (d *Daemon) fromDevice(c *Client) bool {
+	if c.conn.Device() != "" {
+		return true
+	}
+	d.devMu.Lock()
+	defer d.devMu.Unlock()
+	b := d.devBound[c]
+	return b != nil && b.device != ""
+}
+
+// checkCloudHosts earns firstCloudHost when any workspace a cloud provider made is
+// running, as the control plane lists them: a machine started from a window, which this
+// host is not told of, is found within the hour.
+func (d *Daemon) checkCloudHosts() {
+	d.milestoneMu.Lock()
+	held := hasMilestone(d.milestonesLocked(), firstCloudHost)
+	d.milestoneMu.Unlock()
+	ask := d.askControl.Load()
+	if held || ask == nil {
+		return
+	}
+	out, err := (*ask)(d.ctx, "host/workspaces", wire.HostWorkspaceCall{Agent: "Agents Host", Method: workspacesForAgent, Params: json.RawMessage("{}")})
+	var listed wire.AgentWorkspaces
+	if err != nil || json.Unmarshal(out, &listed) != nil {
+		return
+	}
+	if anyRunning(listed) {
+		d.earnNow(firstCloudHost)
+	}
+}
+
+func anyRunning(listed wire.AgentWorkspaces) bool {
+	for _, p := range listed.Providers {
+		for _, w := range p.Workspaces {
+			if w.State == "running" || w.HostState != nil && *w.HostState == "online" {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // hasWorkflowHere is whether a project has a workflow that runs on this host.

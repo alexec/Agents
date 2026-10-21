@@ -84,7 +84,9 @@ func TestNamedZone(t *testing.T) {
 	pdt := func() time.Time { return time.Date(2026, 10, 16, 19, 41, 0, 0, time.FixedZone("PDT", -7*3600)) }
 	noLink := func(string) (string, error) { return "", os.ErrNotExist }
 	link := func(to string) func(string) (string, error) { return func(string) (string, error) { return to, nil } }
-	env := func(tz string, set bool) func(string) (string, bool) { return func(string) (string, bool) { return tz, set } }
+	env := func(tz string, set bool) func(string) (string, bool) {
+		return func(string) (string, bool) { return tz, set }
+	}
 	for _, c := range []struct {
 		name     string
 		env      func(string) (string, bool)

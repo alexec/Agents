@@ -121,6 +121,7 @@ func New(ctx context.Context, root string) (*Daemon, error) {
 		safe.Go("project watches end", func() { <-done; d.stopProjectWatches() })
 	}
 	d.checkMilestonesSoon()
+	d.countMergedPRsEveryHour()
 	d.watchDisk()
 	d.installDefaultToolsets()
 	return d, nil

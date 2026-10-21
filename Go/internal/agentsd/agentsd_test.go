@@ -19,7 +19,8 @@ type conn struct {
 	out chan string
 }
 
-func newConn() *conn                    { return &conn{in: make(chan string, 64), out: make(chan string, 64)} }
+func newConn() *conn { return &conn{in: make(chan string, 64), out: make(chan string, 64)} }
+
 // Write gives up on a line nobody reads within 5 s: a test that has its answer stops
 // reading, and a watch's notification blocked on it held Shutdown for ever.
 func (c *conn) Write(line string) error {
@@ -29,9 +30,9 @@ func (c *conn) Write(line string) error {
 	}
 	return nil
 }
-func (c *conn) In() <-chan string       { return c.in }
-func (c *conn) Close()                  {}
-func (c *conn) Device() string          { return "" }
+func (c *conn) In() <-chan string { return c.in }
+func (c *conn) Close()            {}
+func (c *conn) Device() string    { return "" }
 
 func (c *conn) call(t *testing.T, id int, method string, params any) json.RawMessage {
 	t.Helper()

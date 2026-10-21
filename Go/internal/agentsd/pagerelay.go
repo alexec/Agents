@@ -2,8 +2,8 @@ package agentsd
 
 import (
 	"context"
-	"fmt"
 	"encoding/json"
+	"fmt"
 	"log"
 	"sync"
 	"sync/atomic"
@@ -42,7 +42,9 @@ func (d *Daemon) StartPage(ctx context.Context, private []byte, folder string, p
 	// The port the pages came in on, once the listener has one: what their origin names.
 	var served atomic.Int64
 	listener, err := web.Start(web.Config{Folder: folder, Port: port, Log: func(s string) { log.Printf("page: %s", s) },
-		Accept: func(ws *websocket.Conn, remote, origin string) { d.carryPage(ctx, ws, private, int(served.Load()), remote) }})
+		Accept: func(ws *websocket.Conn, remote, origin string) {
+			d.carryPage(ctx, ws, private, int(served.Load()), remote)
+		}})
 	if err != nil {
 		log.Printf("page: not served: %v", err)
 		return nil

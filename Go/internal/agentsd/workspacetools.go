@@ -95,6 +95,7 @@ func (d *Daemon) startWorkspace(agent wire.UUID, args map[string]json.RawMessage
 	if json.Unmarshal(out, &row) == nil && row.State == "online" {
 		return host + " is running already.", nil
 	}
+	d.earnNow(firstCloudHost)
 	return "Starting " + host + ". It is up when it connects: wait for the server.online event " +
 		"(with wait_for_event) before you start anything there.", nil
 }

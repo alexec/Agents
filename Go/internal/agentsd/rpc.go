@@ -150,6 +150,9 @@ func (d *Daemon) dispatch(c *Client, m message) {
 	} else if v := safe.Catch("rpc "+m.Method, func() { result, err = h(d.ctx, c, m.Params) }); v != nil {
 		err = &Error{Code: CodeInternal, Message: fmt.Sprintf("the host hit a bug in %s: %v", m.Method, v)}
 	}
+	if err == nil && h != nil {
+		d.noteMilestones(c, m.Method)
+	}
 	if m.ID == nil {
 		return // a notification
 	}
