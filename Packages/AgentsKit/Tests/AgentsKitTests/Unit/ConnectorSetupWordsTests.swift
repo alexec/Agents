@@ -89,6 +89,22 @@ struct ConnectorSetupWordsTests {
                 == "https://gitlab.example.com/-/user_settings/personal_access_tokens?name=Agents&scopes=api")
     }
 
+    /// Connect Again\u{2026} on an ended GitLab connection opens the way it was made (#1865), as the
+    /// web page's.
+    @Test func gitlabConnectsAgainTheWayItWasMade() {
+        let token = DaemonAPI.Connection(provider: .gitlab, state: .signInAgain, connectedAt: Date(),
+                                         workspace: "gitlab.example.com", expiresAt: Date())
+        let selfManaged = ConnectorSetupWords.GitLab.again(token)
+        #expect(selfManaged.withToken && selfManaged.address == "https://gitlab.example.com")
+        var com = token
+        com.workspace = nil
+        let comToken = ConnectorSetupWords.GitLab.again(com)
+        #expect(comToken.withToken && comToken.address == "https://gitlab.com")
+        com.expiresAt = nil
+        let signIn = ConnectorSetupWords.GitLab.again(com)
+        #expect(!signIn.withToken && signIn.address.isEmpty)
+    }
+
     /// Connect Email (#1780): the row says the IMAP server and the app password, and no end.
     @Test func emailWords() {
         let c = DaemonAPI.Connection(provider: .email, login: "agents@example.com", connectedAt: Date(),

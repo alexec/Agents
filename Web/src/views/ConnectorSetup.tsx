@@ -237,16 +237,19 @@ const signInWindow = "agents-sign-in";
  * device flow on gitlab.com, or an access token on any GitLab, which goes to the host only.
  * Connect Email (#1780): an IMAP server, a user and an app password, which go to the host only.
  */
-export function ConnectDialog({ store, host, provider, folder, connected, close }: {
-  store: Store; host: string; provider: ConnectionProvider; folder?: string; connected: () => void; close: () => void;
+export function ConnectDialog({ store, host, provider, folder, again, connected, close }: {
+  store: Store; host: string; provider: ConnectionProvider; folder?: string;
+  /** The ended connection Connect Again… is for: GitLab's opens the way it was made, with its address (#1865). */
+  again?: Connection | undefined; connected: () => void; close: () => void;
 }) {
+  const opening = provider === "gitlab" && again ? words.gitlabAgain(again) : undefined;
   type Step = { kind: "asking" } | { kind: "starting" } | { kind: "waiting"; flow: ConnectionSignIn }
     | { kind: "finishing" } | { kind: "install"; login: string; repository: string; url: string }
     | { kind: "checking" } | { kind: "failed"; why: string };
   const [step, setStep] = useState<Step>({ kind: "asking" });
   /** GitLab only (#1630): an access token instead of the sign-in, for a self-managed GitLab. */
-  const [withToken, setWithToken] = useState(false);
-  const [address, setAddress] = useState("");
+  const [withToken, setWithToken] = useState(opening?.withToken ?? false);
+  const [address, setAddress] = useState(opening?.address ?? "");
   const [token, setToken] = useState("");
   /** Email only (#1780). The app password stays in this state, and is cleared after the sign-in. */
   const [server, setServer] = useState("");
@@ -505,6 +508,8 @@ export function YourConnections({ store, host }: { store: Store; host: string })
   const [connections, setConnections] = useState<Connection[]>();
   const [problem, setProblem] = useState<string>();
   const [connecting, setConnecting] = useState<ConnectionProvider>();
+  /** The ended connection Connect Again… is for, so its dialog opens the way it was made. */
+  const [again, setAgain] = useState<Connection>();
   const load = async () => {
     try {
       setConnections((await store.link.call("connections/list", {}, host)).connections);
@@ -542,7 +547,7 @@ export function YourConnections({ store, host }: { store: Store; host: string })
               <p class={`small ${c.state === "signInAgain" ? "attention" : "quiet"}`}>{words.connectionNote(c)}</p>
             </div>
             {c.state === "signInAgain"
-              ? <button onClick={() => setConnecting(c.provider)}>Connect Again…</button>
+              ? <button onClick={() => { setAgain(c); setConnecting(c.provider); }}>Connect Again…</button>
               : c.provider === "github" && <button class="link small" onClick={() => openOut(words.installationsURL)}>Repositories on github.com</button>}
             <button class="destructive" onClick={() => void disconnect(c)}>Disconnect</button>
           </li>
@@ -554,12 +559,12 @@ export function YourConnections({ store, host }: { store: Store; host: string })
               <p class="strong">{words.name(p)}</p>
               <p class="small quiet">{words.notConnectedNote(p)}</p>
             </div>
-            <button onClick={() => setConnecting(p)}>{words.connectButtonFor(p)}</button>
+            <button onClick={() => { setAgain(undefined); setConnecting(p); }}>{words.connectButtonFor(p)}</button>
           </li>
         ))}
       </ul>
       {connecting && (
-        <ConnectDialog store={store} host={host} provider={connecting} connected={() => void load()} close={() => setConnecting(undefined)} />
+        <ConnectDialog store={store} host={host} provider={connecting} again={again} connected={() => void load()} close={() => setConnecting(undefined)} />
       )}
     </div>
   );

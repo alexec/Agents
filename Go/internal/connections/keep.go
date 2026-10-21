@@ -37,7 +37,14 @@ func RefreshIfDue(ctx context.Context, s Store, f Refresher, provider string, no
 	if err != nil || !ok || c.SignInAgain || c.AccessExpiresAt.IsZero() || now.Add(RefreshMargin).Before(c.AccessExpiresAt) {
 		return Unchanged, err
 	}
-	if c.Refresh == "" || (!c.RefreshExpiresAt.IsZero() && !now.Before(c.RefreshExpiresAt)) {
+	if c.Refresh == "" {
+		// An access token with no renewal (a GitLab personal access token) has ended: its end
+		// is kept, so the row says the token ended, not that a renewal was refused (#1865).
+		again := signInAgain(c)
+		again.AccessExpiresAt = c.AccessExpiresAt
+		return Refused, s.Put(again)
+	}
+	if !c.RefreshExpiresAt.IsZero() && !now.Before(c.RefreshExpiresAt) {
 		return Refused, s.Put(signInAgain(c))
 	}
 	t, err := f.Refresh(ctx, c.Refresh)

@@ -344,6 +344,14 @@ public enum ConnectorSetupWords {
         public static let checking = "Checking the token with GitLab\u{2026}"
         public static let disconnectNote = "Disconnect deletes the host's token. Every project's GitLab slots wait for a connection again. GitLab's events stop until you connect again or set GITLAB_TOKEN. To revoke it too, go to GitLab \u{25B8} Preferences \u{25B8} Applications or Access tokens."
 
+        /// How Connect Again\u{2026} opens for an ended GitLab connection (#1865): on Access token,
+        /// with its GitLab's address, when it was an access token or a self-managed GitLab; on the
+        /// gitlab.com sign-in when it was that sign-in.
+        public static func again(_ c: DaemonAPI.Connection) -> (withToken: Bool, address: String) {
+            if let host = c.workspace { return (true, "https://" + host) }
+            return c.expiresAt == nil ? (false, "") : (true, addressPrompt)
+        }
+
         /// Where the person makes a token on the GitLab at address (gitlab.com when empty).
         public static func newTokenURL(_ address: String) -> String {
             var root = address.trimmingCharacters(in: .whitespacesAndNewlines)

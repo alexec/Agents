@@ -299,6 +299,16 @@ export const gitlab = {
   disconnectNote: "Disconnect deletes the host's token. Every project's GitLab slots wait for a connection again. GitLab's events stop until you connect again or set GITLAB_TOKEN. To revoke it too, go to GitLab ▸ Preferences ▸ Applications or Access tokens.",
 };
 
+/**
+ * How Connect Again… opens for an ended GitLab connection (#1865): on Access token, with its
+ * GitLab's address, when it was an access token or a self-managed GitLab; on the gitlab.com
+ * sign-in when it was that sign-in. The Mac's ConnectorSetupWords.GitLab.again.
+ */
+export function gitlabAgain(c: Connection): { withToken: boolean; address: string } {
+  if (c.workspace) return { withToken: true, address: `${new URL(gitlabCom).protocol}//${c.workspace}` };
+  return c.expiresAt === undefined ? { withToken: false, address: "" } : { withToken: true, address: gitlabCom };
+}
+
 /** Where the person makes a token on the GitLab at address (gitlab.com when empty), opened in a new tab. */
 export function newGitLabTokenURL(address: string): string {
   const typed = address.trim();
