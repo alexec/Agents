@@ -59,7 +59,9 @@ type Summary struct {
 	// Authenticated is true when the receiving server found the sender is who From says
 	// (auth.go).
 	Authenticated bool `json:"authenticated"`
-	uid           imap.UID
+	// dkim is the domain of a DKIM pass aligned with From, or "" (#1762).
+	dkim string
+	uid  imap.UID
 }
 
 // Message is a message with its text, which is outside content (body.go).
@@ -501,7 +503,8 @@ func (m *Mailbox) summary(folder string, msg *imapclient.FetchMessageBuffer) Sum
 			s.Date = e.Date.UTC()
 		}
 	}
-	s.Authenticated = authenticated(msg.FindBodySection(authSection), s.From)
+	header := msg.FindBodySection(authSection)
+	s.Authenticated, s.dkim = authenticated(header, s.From), alignedDKIM(header, s.From)
 	return s
 }
 

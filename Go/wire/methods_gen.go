@@ -422,6 +422,12 @@ var (
 	CallHostsStop                    = Method[HostStop, ControlHost]{"hosts/stop"}
 	CallHostsUnlink                  = Method[HostRequest, ControlHost]{"hosts/unlink"}
 	CallHostsUpdate                  = Method[HostUpdate, JSONValue]{"hosts/update"}
+	CallLinksApprove                 = Method[ChannelLinkDecide, Empty]{"links/approve"}
+	CallLinksCheck                   = Method[ChannelSender, ChannelLinkChecked]{"links/check"}
+	CallLinksDeny                    = Method[ChannelLinkDecide, Empty]{"links/deny"}
+	CallLinksList                    = Method[Empty, []ChannelLink]{"links/list"}
+	CallLinksRemove                  = Method[ChannelLinkRemove, Empty]{"links/remove"}
+	CallLinksRequests                = Method[Empty, []ChannelLinkRequest]{"links/requests"}
 	CallPeopleInvite                 = Method[PersonInvite, PersonInvited]{"people/invite"}
 	CallPeopleList                   = Method[Empty, PeopleList]{"people/list"}
 	CallPeopleRemove                 = Method[PersonRequest, Empty]{"people/remove"}
@@ -461,6 +467,9 @@ var (
 	NotifyControlJoinRequested       = Notification[JoinRequest]{"control/joinRequested"}
 	NotifyControlKeptChanged         = Notification[KeptList]{"control/keptChanged"}
 	NotifyControlKeptDelivered       = Notification[KeptDelivered]{"control/keptDelivered"}
+	NotifyControlLinkDecided         = Notification[ChannelLinkDecided]{"control/linkDecided"}
+	NotifyControlLinkRequested       = Notification[ChannelLinkRequest]{"control/linkRequested"}
+	NotifyControlLinksChanged        = Notification[Empty]{"control/linksChanged"}
 	NotifyControlMoved               = Notification[ControlMoved]{"control/moved"}
 	NotifyControlPeopleChanged       = Notification[PeopleChanged]{"control/peopleChanged"}
 	NotifyControlProviderDraft       = Notification[ProviderDraftUpdate]{"control/providerDraft"}

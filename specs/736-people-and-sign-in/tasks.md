@@ -83,7 +83,7 @@
 
 ## Phase 9: US7, channels (P2)
 
-- [ ] T046 [US7] Add `links/*` and `control/linkRequested`. A message from an identity that is not linked starts nothing. Email checks DKIM (FR-036, FR-037).
+- [x] T046 [US7] Add `links/*` and `control/linkRequested`. A message from an identity that is not linked starts nothing. Email checks DKIM (FR-036, FR-037).
 - [ ] T047 [P] [US7] The link approval card on all three clients, and Control plane ▸ Channels.
 
 ## Phase 10: US8, who did what (P3, T3)

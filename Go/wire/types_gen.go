@@ -1015,6 +1015,60 @@ type ChangesUnavailableFailed struct {
 	Message string `json:"message"`
 }
 
+// ChannelSender.dkim (#1762, FR-037): the DKIM result the email server read for a message, from its own Authentication-Results.
+type ChannelDKIM struct {
+	Result string  `json:"result"`
+	Domain *string `json:"domain,omitzero"`
+}
+
+// links/list (#1762, data-model.md "Channel link"): a channel identity linked to a person, and who approved it when.
+type ChannelLink struct {
+	Channel    string  `json:"channel"`
+	Identity   string  `json:"identity"`
+	Name       *string `json:"name,omitzero"`
+	User       string  `json:"user"`
+	UserName   *string `json:"userName,omitzero"`
+	ApprovedBy string  `json:"approvedBy"`
+	ApprovedAt Date    `json:"approvedAt"`
+}
+
+// links/check's answer (#1762): user is the linked person; with none, nothing starts, and refused says why when it is not only that the identity is not linked yet.
+type ChannelLinkChecked struct {
+	User     *string `json:"user,omitzero"`
+	UserName *string `json:"userName,omitzero"`
+	Refused  *string `json:"refused,omitzero"`
+}
+
+// links/approve, links/deny (#1762). An admin approving a request that names nobody names the person in for, and the request goes to them.
+type ChannelLinkDecide struct {
+	Request string  `json:"request"`
+	For     *string `json:"for,omitzero"`
+}
+
+// control/linkDecided (#1762): a request ended (approved, denied, expired) or went to another person (sent), so every card for it goes.
+type ChannelLinkDecided struct {
+	Request string `json:"request"`
+	Result  string `json:"result"`
+}
+
+// links/remove (#1762): unlink a channel identity.
+type ChannelLinkRemove struct {
+	Channel  string `json:"channel"`
+	Identity string `json:"identity"`
+}
+
+// links/requests, control/linkRequested (#1762): a channel identity waiting to be linked. for is the person asked; with none, the admins send it on to a person.
+type ChannelLinkRequest struct {
+	Request  string  `json:"request"`
+	Channel  string  `json:"channel"`
+	Identity string  `json:"identity"`
+	Name     *string `json:"name,omitzero"`
+	Email    *string `json:"email,omitzero"`
+	For      *string `json:"for,omitzero"`
+	ForName  *string `json:"forName,omitzero"`
+	Expires  Date    `json:"expires"`
+}
+
 // What a channel on a host's uplink is opened as (ControlWire.ChannelOpen). `grant` is always `operator`, for an older host (#111).
 type ChannelOpen struct {
 	Grant     string  `json:"grant"`
@@ -1026,6 +1080,15 @@ type ChannelOpen struct {
 	FanOut    *bool   `json:"fanOut,omitzero"`
 	// Who the channel's calls are from, written by the control plane (#996).
 	Actor *AuditActor `json:"actor,omitzero"`
+}
+
+// links/check (#1762, FR-037), and an MCP event's sender: who sent a channel message. channel is the channel's kind (slack, email), identity the sender on it (for email, the address).
+type ChannelSender struct {
+	Channel  string       `json:"channel"`
+	Identity string       `json:"identity"`
+	Name     *string      `json:"name,omitzero"`
+	Email    *string      `json:"email,omitzero"`
+	Dkim     *ChannelDKIM `json:"dkim,omitzero"`
 }
 
 type ChartHint struct {

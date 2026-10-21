@@ -20184,6 +20184,187 @@
         "until"
       ],
       "additionalProperties": false
+    },
+    "ChannelDKIM": {
+      "type": "object",
+      "description": "ChannelSender.dkim (#1762, FR-037): the DKIM result the email server read for a message, from its own Authentication-Results.",
+      "properties": {
+        "result": {
+          "type": "string"
+        },
+        "domain": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "result"
+      ],
+      "additionalProperties": false
+    },
+    "ChannelSender": {
+      "type": "object",
+      "description": "links/check (#1762, FR-037), and an MCP event's sender: who sent a channel message. channel is the channel's kind (slack, email), identity the sender on it (for email, the address).",
+      "properties": {
+        "channel": {
+          "type": "string"
+        },
+        "identity": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "email": {
+          "type": "string"
+        },
+        "dkim": {
+          "$ref": "#/definitions/ChannelDKIM"
+        }
+      },
+      "required": [
+        "channel",
+        "identity"
+      ],
+      "additionalProperties": false
+    },
+    "ChannelLinkChecked": {
+      "type": "object",
+      "description": "links/check's answer (#1762): user is the linked person; with none, nothing starts, and refused says why when it is not only that the identity is not linked yet.",
+      "properties": {
+        "user": {
+          "type": "string"
+        },
+        "userName": {
+          "type": "string"
+        },
+        "refused": {
+          "type": "string"
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    },
+    "ChannelLink": {
+      "type": "object",
+      "description": "links/list (#1762, data-model.md \"Channel link\"): a channel identity linked to a person, and who approved it when.",
+      "properties": {
+        "channel": {
+          "type": "string"
+        },
+        "identity": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "user": {
+          "type": "string"
+        },
+        "userName": {
+          "type": "string"
+        },
+        "approvedBy": {
+          "type": "string"
+        },
+        "approvedAt": {
+          "$ref": "#/definitions/WireDate"
+        }
+      },
+      "required": [
+        "channel",
+        "identity",
+        "user",
+        "approvedBy",
+        "approvedAt"
+      ],
+      "additionalProperties": false
+    },
+    "ChannelLinkRequest": {
+      "type": "object",
+      "description": "links/requests, control/linkRequested (#1762): a channel identity waiting to be linked. for is the person asked; with none, the admins send it on to a person.",
+      "properties": {
+        "request": {
+          "type": "string"
+        },
+        "channel": {
+          "type": "string"
+        },
+        "identity": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "email": {
+          "type": "string"
+        },
+        "for": {
+          "type": "string"
+        },
+        "forName": {
+          "type": "string"
+        },
+        "expires": {
+          "$ref": "#/definitions/WireDate"
+        }
+      },
+      "required": [
+        "request",
+        "channel",
+        "identity",
+        "expires"
+      ],
+      "additionalProperties": false
+    },
+    "ChannelLinkDecide": {
+      "type": "object",
+      "description": "links/approve, links/deny (#1762). An admin approving a request that names nobody names the person in for, and the request goes to them.",
+      "properties": {
+        "request": {
+          "type": "string"
+        },
+        "for": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "request"
+      ],
+      "additionalProperties": false
+    },
+    "ChannelLinkDecided": {
+      "type": "object",
+      "description": "control/linkDecided (#1762): a request ended (approved, denied, expired) or went to another person (sent), so every card for it goes.",
+      "properties": {
+        "request": {
+          "type": "string"
+        },
+        "result": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "request",
+        "result"
+      ],
+      "additionalProperties": false
+    },
+    "ChannelLinkRemove": {
+      "type": "object",
+      "description": "links/remove (#1762): unlink a channel identity.",
+      "properties": {
+        "channel": {
+          "type": "string"
+        },
+        "identity": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "channel",
+        "identity"
+      ],
+      "additionalProperties": false
     }
   }
 }

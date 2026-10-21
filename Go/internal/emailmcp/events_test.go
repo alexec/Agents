@@ -226,9 +226,21 @@ func TestReceivedAuthenticatedOnly(t *testing.T) {
 	if data["subject"] != "Your code" || data["authenticated"] != true {
 		t.Fatalf("event: %v", data)
 	}
+	// Its sender, for a channel link (#1762): the address, and the aligned DKIM pass.
+	sender := events[0].(map[string]any)["sender"].(map[string]any)
+	if sender["channel"] != "email" || sender["identity"] != "noreply@github.com" ||
+		sender["dkim"].(map[string]any)["result"] != "pass" || sender["dkim"].(map[string]any)["domain"] != "github.com" {
+		t.Fatalf("sender: %v", sender)
+	}
 	events, _ = mustPoll(t, s, map[string]any{"from": "noreply@github.com"}, allCursor)
 	if len(events) != 3 || events[0].(map[string]any)["data"].(map[string]any)["authenticated"] != false {
 		t.Fatalf("without the filter: %v", events)
+	}
+	// A forged From has no DKIM pass, whatever the sender wrote below the server's line.
+	for _, e := range events[:2] {
+		if dkim := e.(map[string]any)["sender"].(map[string]any)["dkim"].(map[string]any); dkim["result"] != "none" {
+			t.Fatalf("forged: %v", e)
+		}
 	}
 	if _, err := poll(t, s, map[string]any{"authenticated": "maybe"}, ""); err == nil {
 		t.Fatal("authenticated takes true or false")

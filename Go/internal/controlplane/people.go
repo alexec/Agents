@@ -341,6 +341,7 @@ func (m *Methods) removePerson(ctx context.Context, user string, from Caller) er
 		}
 	}
 	m.s.joins.dropFor(ctx, user)
+	m.s.links.dropFor(ctx, user)
 	m.s.peopleChanged(user, true)
 	m.s.log("person " + user + " removed")
 	return nil

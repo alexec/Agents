@@ -234,6 +234,12 @@ struct WireSchemaTests {
             "JoinApproved": Self.through(DaemonAPI.JoinApproved.self),
             "JoinDecided": Self.through(DaemonAPI.JoinDecided.self),
             "HostJoinDecision": Self.through(DaemonAPI.HostJoinDecision.self),
+            // Channel links (#1762).
+            "ChannelLink": Self.through(DaemonAPI.ChannelLink.self),
+            "ChannelLinkRequest": Self.through(DaemonAPI.ChannelLinkRequest.self),
+            "ChannelLinkDecide": Self.through(DaemonAPI.ChannelLinkDecide.self),
+            "ChannelLinkDecided": Self.through(DaemonAPI.ChannelLinkDecided.self),
+            "ChannelLinkRemove": Self.through(DaemonAPI.ChannelLinkRemove.self),
             // Reports (#1811).
             "ReportQuery": Self.through(DaemonAPI.ReportQuery.self),
             "UsageReport": Self.through(DaemonAPI.UsageReport.self),
