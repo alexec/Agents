@@ -134,9 +134,10 @@ struct HostWindow: View {
                 }
                 .padding(16)
             }
-            if model.settings.role == .runHere {
+            if model.settings.role == .runHere || model.settings.role == .joinElsewhere {
                 Divider()
                 // The web remote (071 FR-002): on unless turned off, and only ever on loopback.
+                // With the control plane elsewhere, this Mac's host serves it (#1952).
                 // Its line says what the control plane says: never the address of a page it
                 // isn't serving (071 R3). The switch sits at the trailing edge, as Relay's does,
                 // named by its own title.
@@ -151,7 +152,7 @@ struct HostWindow: View {
                     Spacer()
                     if model.webRemoteFailed {
                         Button("Try Again") { Task { await model.retryWebRemote() } }
-                    } else if model.webRemote?.served == true, model.settings.servesWebRemote {
+                    } else if model.settings.role == .runHere, model.webRemote?.served == true, model.settings.servesWebRemote {
                         // The page itself, paired the first time (#109).
                         Button("Open in Browser") { Task { await model.openInBrowser() } }
                     }

@@ -631,12 +631,17 @@ final class HostModel {
     // MARK: The web remote (071)
 
     /// Serve Agents to browsers on this Mac, or stop (071 FR-002): the control plane starts
-    /// again with or without its loopback listener.
+    /// again with or without its loopback listener; with the control plane elsewhere, this
+    /// Mac's host does, which serves the page then (#1952).
     func setServeWebRemote(_ on: Bool) async {
         guard settings.servesWebRemote != on else { return }
         settings.serveWebRemote = on
         settings.save(paths)
-        await restartControl()
+        if settings.role == .joinElsewhere {
+            _ = await services.restart(.daemon)
+        } else {
+            await restartControl()
+        }
     }
 
     /// Where the web remote is, while it is served.

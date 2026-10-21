@@ -193,6 +193,7 @@ struct LocalServices {
             // Named here (#1138): a scratch job's launcher would take the host's root for the
             // set-up's.
             arguments = [paths.agentsd.path, "--control-network"]
+                + DaemonLauncher.pageArguments(HostSettings.load(paths), paths: paths)
             variables = [StoreLocations.rootVariable: paths.hostRoot.path, "PATH": path]
         case .relay:
             // `<root>/relay`, and a walk's folder standing in for iCloud when it gives one.
