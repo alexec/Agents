@@ -2,6 +2,8 @@
 
     scripts/video/make.sh <id>… [--no-build] [--keep] [--voice-only] [--compose-only] [--upload]
     scripts/video/make.sh --sign-in <integration>
+    scripts/video/make.sh --preflight <id>…        what needs Alex's hands, before a take (#1857)
+    scripts/video/make.sh --changed <from> [<to>]  the integration scenes a release changed
 
 For each scene in scenes/<id>.py it:
 1. speaks each narration line with Chatterbox, two takes, and keeps a take only when Whisper
@@ -34,6 +36,7 @@ import importlib.util
 import io
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -741,7 +744,106 @@ def signed_in(folder, host):
     return False
 
 
-SIGN_IN = {"linear": {"url": "https://linear.app/login", "host": "linear.app"}}
+# `home`: an address that a signed-in profile leaves for one matching `in`.
+SIGN_IN = {"linear": {"url": "https://linear.app/login", "host": "linear.app",
+                      "home": "https://linear.app/", "in": r"https://linear\.app/(?!login)[^/]+/"}}
+
+
+# --- the Integration videos workflow (#1857) ------------------------------------------
+TODO_ISSUE = 1793
+INTEGRATIONS = REPO / "docs/reference/integrations.md"
+
+
+def preflight(scene_ids):
+    """Checks what a take needs from Alex's hands: the YouTube refresh token works, and the
+    scene's video Chrome profile is signed in to its site. Each failure adds one line to
+    Alex's checklist on #1793 (once) and fails that scene. Prints `ready <id>` or
+    `skip <id>: <why>` per scene; exits 3 when any is skipped."""
+    import upload
+    youtube = None
+    try:
+        yt = upload.YouTube()
+        mine = yt.call("GET", "channels", {"part": "snippet", "mine": "true"}).get("items", [])
+        if not mine:
+            youtube = "the YouTube sign-in has no channel"
+    except upload.NotSignedIn as why:
+        youtube = str(why)
+    except Exception as error:
+        youtube = f"the YouTube refresh token does not work ({error})"
+    skipped = 0
+    for scene_id in scene_ids:
+        scene = load_scene(scene_id)
+        why = []
+        if youtube:
+            why.append(youtube)
+            todo("Run `scripts/video/upload.py --sign-in` and approve with the Google account of the YouTube channel (#1856).",
+                 key="upload.py --sign-in")
+        profile = getattr(scene, "CHROME_PROFILE", None)
+        site = SIGN_IN.get(profile or "", {})
+        if profile and site.get("host") and not (signed_in(CHROME_PROFILES / profile, site["host"])
+                                                  and site_signed_in(CHROME_PROFILES / profile, site)):
+            why.append(f"the video Chrome is not signed in to {site['host']}")
+            todo(f"Run `scripts/video/make.sh --sign-in {profile}` and sign in to {site['host']} (the {scene.ID} video).",
+                 key=f"make.sh --sign-in {profile}")
+        if why:
+            skipped += 1
+            print(f"skip {scene.ID}: {'; '.join(why)}", flush=True)
+        else:
+            print(f"ready {scene.ID}", flush=True)
+    if skipped:
+        raise SystemExit(3)
+
+
+def site_signed_in(profile, site):
+    """Whether the site, opened on the profile in headless Chrome, lands signed in: a session
+    cookie can be there and the site still send the profile to its sign-in page (#1857)."""
+    web = Web(str(profile))
+    try:
+        web("open", url=site["home"], width=1280, height=800, mobile=False, tab="site")
+        end = time.time() + 20
+        while time.time() < end:
+            if re.match(site["in"], web("url")):
+                return True
+            time.sleep(1)
+        return False
+    finally:
+        web.close()
+
+
+def todo(line, key):
+    """One line on Alex's checklist on #1793 (`## What Alex does`, alex-todo, assigned
+    alexec), unless an open item there already holds `key`."""
+    issue = json.loads(run("gh", "issue", "view", str(TODO_ISSUE), "--json", "body"))
+    body = issue.get("body") or ""
+    if any(item.startswith("- [ ]") and key in item for item in body.splitlines()):
+        return
+    head = "## What Alex does"
+    if head in body:
+        before, after = body.split(head, 1)
+        body = f"{before}{head}\n\n- [ ] {line}\n{after.lstrip(chr(10))}"
+    else:
+        body = f"{head}\n\n- [ ] {line}\n\n{body}"
+    run("gh", "issue", "edit", str(TODO_ISSUE), "--body", body, "--add-assignee", "alexec", "--add-label", "alex-todo")
+    log(f"on Alex's list (#{TODO_ISSUE}): {line}")
+
+
+def changed(since, until="HEAD"):
+    """The integration scenes whose integration a range of commits changed: each scene's
+    rows in docs/reference/integrations.md are the ones whose first cell names its TITLE,
+    and their Where cells give the paths."""
+    rows = [line for line in INTEGRATIONS.read_text().splitlines() if line.startswith("| ") and "`" in line]
+    for path in sorted((HERE / "scenes").glob("i-*.py")):
+        scene = load_scene(path.stem)
+        if getattr(scene, "GROUP", "") != "integration":
+            continue
+        title = getattr(scene, "TITLE", scene.ID).lower()
+        paths = {f"scripts/video/scenes/{scene.ID}.py"}
+        for row in rows:
+            cells = [cell.strip() for cell in row.strip("|").split("|")]
+            if len(cells) > 2 and title in cells[0].lower():
+                paths.update(p.rstrip("/") for p in re.findall(r"`([\w./-]+/[\w./-]*)`", cells[-2]))
+        if run("git", "-C", str(REPO), "diff", "--name-only", f"{since}..{until}", "--", *sorted(paths)).strip():
+            print(scene.ID)
 
 
 def main():
@@ -753,7 +855,17 @@ def main():
     parser.add_argument("--compose-only", action="store_true", help="compose the last recording again")
     parser.add_argument("--upload", action="store_true", help="upload each video made (upload.py)")
     parser.add_argument("--sign-in", metavar="PROFILE", help="open the video Chrome on PROFILE for the person to sign in, then quit")
+    parser.add_argument("--preflight", action="store_true", help="check what each scene needs of Alex's hands; take nothing")
+    parser.add_argument("--changed", action="store_true", help="list the integration scenes changed between two refs (the scenes argument)")
     args = parser.parse_args()
+    if args.preflight:
+        preflight(args.scenes)
+        return
+    if args.changed:
+        if not 1 <= len(args.scenes) <= 2:
+            raise SystemExit("--changed <from> [<to>]")
+        changed(*args.scenes)
+        return
     if args.sign_in:
         sign_in(args.sign_in, args.scenes)
         return

@@ -92,6 +92,20 @@ changes, the same scene makes it again.
 made-up token is read where it shows and not after `frame.hide`, and a page in Chrome with a
 pattern secret shows none of it.
 
+### The workflow (#1857)
+
+The `Integration videos` workflow (`.agents/workflows/integration-videos.md`, manual) makes
+and uploads them with nobody watching, one at a time under the "build" lease. The release
+skill starts it when `make.sh --changed <last tag> <new tag>` lists a scene: the scenes
+whose rows in `docs/reference/integrations.md` (the rows whose first cell names the scene's
+`TITLE`) have a path in their Where cell that the release changed.
+
+Before each take, `make.sh --preflight <id>` checks what needs Alex's hands: the YouTube
+refresh token works (`channels?mine=true`), and the scene's video Chrome profile has the
+site's sign-in cookie and lands signed in when the site is opened. Each failure puts one
+line on Alex's list on #1793 (once) and exits 3, so the workflow skips that video and goes
+on with the others.
+
 ## A scene
 
 `scenes/<id>.py` has `LINES` (the narration), `GROUP` (`usage`, `marketing` or `integration`), `LAYOUT`
