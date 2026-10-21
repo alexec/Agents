@@ -1474,7 +1474,7 @@ type ContinueWhenBack struct {
 	ResetKnown bool `json:"resetKnown"`
 }
 
-// The peer's answer: {"auth":…} (ControlAuth.Auth). `kind` is mac, iphone, ipad, browser, host, relay or copy.
+// The peer's answer: {"auth":…} (ControlAuth.Auth). `kind` is mac, iphone, ipad, browser, host, relay, copy or page.
 type ControlAuth struct {
 	ID    string  `json:"id"`
 	Nonce string  `json:"nonce"`
@@ -1484,6 +1484,8 @@ type ControlAuth struct {
 	Epoch *int64  `json:"epoch,omitzero"`
 	// The capabilities this client has (#1748). None from a client older than #1748, or from a host, which says its own in host/hello.
 	Capabilities []string `json:"capabilities,omitzero"`
+	// With a `w:<host>` identity (#1480): the port of that host's loopback listener. The socket then carries a page from http://localhost:<page>, whose own exchange follows the ok, bound to that origin.
+	Page *int64 `json:"page,omitzero"`
 }
 
 // control/clientChanged: a client paired, renamed, connected or went; nothing says list them all again.

@@ -530,6 +530,12 @@ func TestHostsInstallAnswersInItsWords(t *testing.T) {
 // rawHost enrols and connects a host by hand, and returns its uplink's lines: for a
 // relay host (agents-relay), whose channel 0 the test reads itself.
 func (p *plane) rawHost(name string, relay bool) (string, *controllink.Lines) {
+	host, l, _ := p.rawHostKey(name, relay)
+	return host, l
+}
+
+// rawHostKey is rawHost, with the key the host proves itself with.
+func (p *plane) rawHostKey(name string, relay bool) (string, *controllink.Lines, []byte) {
 	ctx := context.Background()
 	code := p.code(true)
 	private := controllink.NewPrivateKey()
@@ -561,7 +567,7 @@ func (p *plane) rawHost(name string, relay bool) (string, *controllink.Lines) {
 	hello, _ := json.Marshal(wire.HostHello{Version: "1", Platform: "macOS arm64", MachineID: "RELAY-MAC", Relay: &relay})
 	l.Write(ctx, channelFrame(0, `{"jsonrpc":"2.0","id":1,"method":"host/hello","params":`+string(hello)+`}`))
 	p.t.Cleanup(l.Close)
-	return host, l
+	return host, l, key
 }
 
 // readUntil reads a host's lines until one holds want.

@@ -140,7 +140,8 @@ func knownReason(r string) bool {
 // Identity is who a peer says it is.
 type Identity struct {
 	// 'c' client (a UUID, upper case), 'h' host, 'p' a client code's id, 'e' a host
-	// code's id, 'x' another copy.
+	// code's id, 'x' another copy, 'w' a host carrying a page from its loopback listener
+	// (#1480), proved with the host's own key.
 	Kind byte
 	ID   string
 }
@@ -156,8 +157,8 @@ func ParseIdentity(text string) (Identity, bool) {
 	switch text[0] {
 	case 'c':
 		return Identity{'c', strings.ToUpper(rest)}, IsUUID(rest)
-	case 'h':
-		return Identity{'h', rest}, IsHostID(rest)
+	case 'h', 'w':
+		return Identity{text[0], rest}, IsHostID(rest)
 	case 'p', 'e':
 		return Identity{text[0], rest}, IsCodeID(rest)
 	case 'x':

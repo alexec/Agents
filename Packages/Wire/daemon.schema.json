@@ -3333,7 +3333,7 @@
     },
     "ControlAuth": {
       "type": "object",
-      "description": "The peer's answer: {\"auth\":…} (ControlAuth.Auth). `kind` is mac, iphone, ipad, browser, host, relay or copy.",
+      "description": "The peer's answer: {\"auth\":…} (ControlAuth.Auth). `kind` is mac, iphone, ipad, browser, host, relay, copy or page.",
       "properties": {
         "id": {
           "type": "string"
@@ -3359,6 +3359,10 @@
           "items": {
             "type": "string"
           }
+        },
+        "page": {
+          "type": "integer",
+          "description": "With a `w:<host>` identity (#1480): the port of that host's loopback listener. The socket then carries a page from http://localhost:<page>, whose own exchange follows the ok, bound to that origin."
         }
       },
       "required": [
