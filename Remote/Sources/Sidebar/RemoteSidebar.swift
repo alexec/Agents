@@ -731,13 +731,13 @@ private extension View {
     }
 }
 
-/// Settings (#846): Sidebar, the same on every client (#1033), as the window's Settings
-/// pane of the same name and the page's Settings keep it, Show thoughts, as the
-/// window's Appearance pane (#1725), Live Activities, which only a phone or an iPad
-/// has (#1657), the versions of the control plane and its hosts (#1748), and the Mac's
-/// backups, as the window's Settings ▸ Mac draws them (#1810), and each server's (#1815),
-/// and the workspace providers (#1819).
-/// Everything else follows the Mac.
+/// Settings (#846), in the window's three groups (#1759): This device (Appearance, with
+/// Show thoughts as the window's Appearance pane has it (#1725); Sidebar, the same on every
+/// client (#1033); and Live Activities, which only a phone or an iPad has (#1657)); You
+/// (Machines: the versions of the control plane and its machines (#1748), git access, and
+/// the Mac's backups, as the window's Settings ▸ Machines ▸ This Mac draws them (#1810), and
+/// each server's (#1815)); and Control plane (People (#994) and the workspace providers
+/// (#1819)). Each row opens its page. Everything else follows the Mac.
 private struct RemoteSettings: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(RemoteModel.self) private var model
@@ -745,24 +745,29 @@ private struct RemoteSettings: View {
     var body: some View {
         NavigationStack {
             Form {
-                SidebarSettingsSection()
-                ThoughtsSettingsSection(header: "Appearance")
-                LiveActivitySettingsSection()
-                GitAccessSettingsSection()
-                VersionsSettingsSection()
-                // The folder is the Mac's disk, so it is chosen on the Mac.
-                if let backups = model.work.backupState {
-                    BackupsSection(state: backups, configure: model.configureBackups, make: model.makeBackup,
-                                   restore: model.restoreBackup)
+                Section(SettingsScope.thisDevice.title) {
+                    page("Appearance", systemImage: "paintbrush") { ThoughtsSettingsSection() }
+                    page("Sidebar", systemImage: "sidebar.left") { SidebarSettingsSection() }
+                    page("Notifications", systemImage: "bell") { LiveActivitySettingsSection() }
                 }
-                ServerBackupsSettingsSection()
-                // The control plane's workspace providers (#1819), as the page's Settings has them.
+                .paperListRow()
+                Section(SettingsScope.you.title) {
+                    page("Machines", systemImage: "desktopcomputer") {
+                        VersionsSettingsSection()
+                        GitAccessSettingsSection()
+                        // The folder is the Mac's disk, so it is chosen on the Mac.
+                        if let backups = model.work.backupState {
+                            BackupsSection(state: backups, configure: model.configureBackups, make: model.makeBackup,
+                                           restore: model.restoreBackup)
+                        }
+                        ServerBackupsSettingsSection()
+                    }
+                    .task { await model.refreshBackupState() }
+                }
+                .paperListRow()
                 Section {
-                    NavigationLink(WorkspaceProviderWords.heading) { WorkspaceProvidersView() }
-                }
-                // Who uses the control plane, and what belongs to them (#994).
-                if !model.needsPairing {
-                    Section {
+                    // Who uses the control plane, and what belongs to them (#994).
+                    if !model.needsPairing {
                         NavigationLink {
                             PeoplePane(control: model.controlPlane, revision: model.people.revision)
                                 .navigationTitle("People")
@@ -770,11 +775,17 @@ private struct RemoteSettings: View {
                         } label: {
                             Label("People", systemImage: "person.2")
                         }
-                    } footer: {
-                        Text("The people who use this control plane, and their machines and clients.")
                     }
-                    .paperListRow()
+                    // The control plane's workspace providers (#1819), as the page's Settings has them.
+                    NavigationLink { WorkspaceProvidersView() } label: {
+                        Label(WorkspaceProviderWords.heading, systemImage: "cloud")
+                    }
+                } header: {
+                    Text(SettingsScope.controlPlane.title)
+                } footer: {
+                    Text("The people who use this control plane, and their machines and clients.")
                 }
+                .paperListRow()
                 // The docs site (#1327), as the Mac's Help ▸ Agents Help.
                 Section {
                     Link(destination: HelpSite.url) {
@@ -789,7 +800,20 @@ private struct RemoteSettings: View {
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } }
             }
-            .task { await model.refreshBackupState() }
+        }
+    }
+
+    /// A row that opens one page of Settings, as a pane of the window's rail.
+    private func page<Content: View>(_ title: String, systemImage: String,
+                                     @ViewBuilder content: @escaping () -> Content) -> some View {
+        NavigationLink {
+            Form { content() }
+                .scrollContentBackground(.hidden)
+                .background(Paper.ground)
+                .navigationTitle(title)
+                .navigationBarTitleDisplayMode(.inline)
+        } label: {
+            Label(title, systemImage: systemImage)
         }
     }
 }

@@ -120,7 +120,7 @@ final class AppModel {
     var wakeState: DaemonAPI.WakeState? { work.wakeState }
     /// What this Mac's host could not read in this run (#205), said at the sidebar's foot.
     var storeNotes: [String] { work.storeNotes }
-    /// The switch and the hours (Settings ▸ Mac ▸ Sleep). Nil until the daemon has
+    /// The switch and the hours (Settings ▸ Machines ▸ This Mac ▸ Sleep). Nil until the daemon has
     /// said, including a daemon too old to know the method.
     private(set) var wakeSettings: WakeSettings?
     /// How many workflows turned on may run across every project (#506): the Mac's,
@@ -1786,7 +1786,7 @@ final class AppModel {
     }
 
     /// The switch and the hours. A daemon too old to know the method leaves this nil,
-    /// and Settings ▸ Mac draws Archived agents alone.
+    /// and Settings ▸ Machines ▸ This Mac draws Archived agents alone.
     func refreshWakeSettings() async {
         wakeSettings = try? await macClient.call(DaemonAPI.Method.wakeSettings,
                                               Optional<String>.none,
@@ -1965,8 +1965,6 @@ final class AppModel {
     /// A Settings pane to open on, asked for by a link elsewhere (052): read and cleared
     /// by the Settings window.
     var settingsPaneAsked: SettingsPane?
-    /// The Control plane page asked for with it, such as Providers from a project's set-up (#1336).
-    var controlPageAsked: ControlPage?
 
     /// Every runtime's state on this Mac (065, US4). Asking also asks Grok what is left.
     func refreshRuntimeAllowances() async {
@@ -2014,7 +2012,7 @@ final class AppModel {
         work.replaceBackupState(state)
     }
 
-    /// Settings ▸ Mac ▸ Backups (#1810): each throws the host's refusal, for the section to say.
+    /// Settings ▸ Machines ▸ This Mac ▸ Backups (#1810): each throws the host's refusal, for the section to say.
     func configureBackups(_ settings: DaemonAPI.BackupSettings) async throws {
         work.replaceBackupState(try await macClient.call(DaemonAPI.Method.backupsConfigure, settings,
                                                          returning: DaemonAPI.BackupState.self))
@@ -3361,7 +3359,7 @@ final class AppModel {
              DaemonAPI.Notification.milestonesChanged, DaemonAPI.Notification.preferencesChanged,
              DaemonAPI.Notification.backupsChanged:
             // The milestones and display choices are the person's, kept on the Mac's own
-            // host (#984, #1033). Settings ▸ Mac ▸ Backups is this Mac's (#1810).
+            // host (#984, #1033). Settings ▸ Machines ▸ This Mac ▸ Backups is this Mac's (#1810).
             return
         default:
             break

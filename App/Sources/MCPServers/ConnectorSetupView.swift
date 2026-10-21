@@ -185,8 +185,7 @@ struct ConnectorSetupView: View {
         case .linear: Task { await useLinear() }
         case .open(let address): open(address)
         case .providers:
-            model.controlPageAsked = .providers
-            model.settingsPaneAsked = .controlPlane
+            model.settingsPaneAsked = .providers
             openSettings()
         }
     }

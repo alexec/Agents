@@ -1,7 +1,7 @@
 import AgentsKitCore
 import SwiftUI
 
-/// Settings ▸ Mac ▸ Archived agents (051, #398): how long archived agents are kept
+/// Settings ▸ Machines ▸ This Mac ▸ Archived agents (051, #398): how long archived agents are kept
 /// before they are deleted.
 ///
 /// The picker shows what the daemon holds, not what was last clicked. A change that would

@@ -1,29 +1,39 @@
 import AgentsKitCore
 import SwiftUI
 
-/// Settings ▸ Versions (#1748): the control plane's version and each host's, as the window's
-/// Control plane pane says them, and what a host too old for the control plane is missing.
-/// Nothing when this device is not a control plane's client.
+/// Settings ▸ Machines (#1759): every machine, with its version (#1748) and what one too old
+/// for the control plane is missing, as the window's Machines pane lists them. The control
+/// plane's own version is under the list.
 struct VersionsSettingsSection: View {
     @Environment(RemoteModel.self) private var model
 
     var body: some View {
-        if let status = model.controlStatus {
-            Section("Versions") {
-                LabeledContent(status.name, value: "agents-control \(status.version)")
-                if let missing = UpdateWords.appMissing(status) {
-                    Text(missing).appText(.fine).tinted(.failure)
-                }
-                ForEach(model.controlHosts) { host in
-                    VStack(alignment: .leading, spacing: 2) {
-                        LabeledContent(host.name, value: versionWords(host))
-                        if let missing = UpdateWords.missing(host, controlVersion: status.version) {
-                            Text(missing).appText(.fine).tinted(.failure)
-                        }
+        Section {
+            if model.controlHosts.isEmpty {
+                Text("No machines yet. Add one on the Mac, in Settings ▸ Machines.")
+                    .appText(.supporting).foregroundStyle(.secondary)
+            }
+            ForEach(model.controlHosts) { host in
+                VStack(alignment: .leading, spacing: 2) {
+                    LabeledContent(host.name, value: versionWords(host))
+                    if let status = model.controlStatus,
+                       let missing = UpdateWords.missing(host, controlVersion: status.version) {
+                        Text(missing).appText(.fine).tinted(.failure)
                     }
                 }
             }
+        } footer: {
+            if let status = model.controlStatus {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("\(status.name): agents-control \(status.version)")
+                    if let missing = UpdateWords.appMissing(status) {
+                        Text(missing).tinted(.failure)
+                    }
+                }
+                .appText(.fine)
+            }
         }
+        .paperListRow()
     }
 
     private func versionWords(_ host: DaemonAPI.ControlHost) -> String {

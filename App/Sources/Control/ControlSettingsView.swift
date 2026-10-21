@@ -10,8 +10,8 @@ enum ControlPage: Hashable {
     var title: String {
         switch self {
         case .overview: "Overview"
-        case .hosts: "Hosts"
-        case .providers: "Providers"
+        case .hosts: "Machines"
+        case .providers: "Workspace Providers"
         case .clients: "Clients"
         }
     }
@@ -19,13 +19,16 @@ enum ControlPage: Hashable {
 
 struct ControlSettingsView: View {
     let control: ControlSettingsModel
-    @Binding var page: ControlPage
+    let page: ControlPage
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
+                // Where the page is in the rail (#1759): Machines is the person's, the rest the
+                // control plane's.
                 HStack(spacing: 6) {
-                    Text("Control plane").appText(.reading).fontWeight(.semibold)
+                    Text(page == .hosts ? SettingsScope.you.title : SettingsScope.controlPlane.title)
+                        .appText(.reading).fontWeight(.semibold)
                     Text("›").foregroundStyle(.secondary)
                     Text(page.title).appText(.reading).foregroundStyle(.secondary)
                 }
@@ -37,7 +40,7 @@ struct ControlSettingsView: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 switch page {
-                case .overview: ControlOverviewPage(control: control, page: $page)
+                case .overview: ControlOverviewPage(control: control)
                 case .hosts: ControlHostsPage(control: control)
                 case .providers: ControlProvidersPage(control: control)
                 case .clients: ControlClientsPage(control: control)
@@ -115,8 +118,8 @@ struct ControlRow<Trailing: View>: View {
 // MARK: - D · Overview
 
 struct ControlOverviewPage: View {
+    @Environment(AppModel.self) private var model
     let control: ControlSettingsModel
-    @Binding var page: ControlPage
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -164,7 +167,7 @@ struct ControlOverviewPage: View {
             ControlCard {
                 ControlRow(dot: .none, title: "\(count(control.hosts.count, "host")) · \(control.onlineCount) online",
                            detail: control.hosts.map(hostName).joined(separator: ", ")) {
-                    Button("Show") { page = .hosts }.buttonStyle(.link)
+                    Button("Show") { model.settingsPaneAsked = .machines }.buttonStyle(.link)
                 }
             }
             SharedSectionLabel("Clients")
@@ -173,7 +176,7 @@ struct ControlOverviewPage: View {
                            title: count(control.clients.count, "client"),
                            detail: control.clients.map { $0.id == control.status?.you ? "This window" : $0.name }
                                .joined(separator: ", ")) {
-                    Button("Show") { page = .clients }.buttonStyle(.link)
+                    Button("Show") { model.settingsPaneAsked = .clients }.buttonStyle(.link)
                 }
             }
         }
@@ -758,7 +761,7 @@ struct CodeSheet: View {
     }
 }
 
-/// A server's backups (#1815), from its menu: the same section as Settings ▸ Mac ▸ Backups,
+/// A server's backups (#1815), from its menu: the same section as Settings ▸ Machines ▸ This Mac ▸ Backups,
 /// sent to that host.
 private struct HostBackupsSheet: View {
     @Environment(AppModel.self) private var model

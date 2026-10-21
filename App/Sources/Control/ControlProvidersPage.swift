@@ -1,7 +1,7 @@
 import AgentsKitCore
 import SwiftUI
 
-/// Settings ▸ Control plane ▸ Providers (#691, layouts.md L3): each workspace provider as a
+/// Settings ▸ Workspace Providers (#691, layouts.md L3): each workspace provider as a
 /// card of its workspaces, which are hosts already or can be added as one. A provider runs on
 /// the control plane, so it can start a host that is down.
 struct ControlProvidersPage: View {

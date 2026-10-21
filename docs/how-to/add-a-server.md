@@ -67,7 +67,7 @@ you**, with the same code: click **Approve**. See
 
 ### Or add it over ssh
 
-1. In **Settings ▸ Control plane ▸ Hosts**, click **Add a Server…**, then choose
+1. In **Settings ▸ Machines**, click **Add a Server…**, then choose
    **Over ssh**.
 2. In **Server**, type the server. The box offers the hosts in your `~/.ssh/config`, each with
    the `user@host` ssh resolves it to; choose one, or type any `user@host`,
@@ -161,7 +161,7 @@ own, its git asks this Mac for one, through the control plane, over https only.
    The clone, pull or push goes on. This Mac answers from its own git (the Keychain,
    `gh auth git-credential` and the like). The credential is used for that one git command
    and is not kept on the server or logged. A push uses the same approval.
-2. To take it back, in **Settings ▸ Control plane ▸ Hosts**, open the server's `···` menu
+2. To take it back, in **Settings ▸ Machines**, open the server's `···` menu
    and choose **Stop Lending Git Access for github.com**. On a phone or the web page, it is
    **Settings ▸ Git access**.
 
@@ -173,7 +173,7 @@ own access and asks nothing.
 
 A second Mac joins the same way, with Agents Host.
 
-1. In **Settings ▸ Control plane ▸ Hosts**, click **Add by Code…**, then **Copy**.
+1. In **Settings ▸ Machines**, click **Add by Code…**, then **Copy**.
 2. On the other Mac, install and open Agents Host. Under **Join one elsewhere**, paste the
    code and click **Join**.
 
@@ -182,7 +182,7 @@ A second Mac joins the same way, with Agents Host.
 
 ### Remove a server
 
-1. In **Settings ▸ Control plane ▸ Hosts**, find the server, open its `···` menu and choose
+1. In **Settings ▸ Machines**, find the server, open its `···` menu and choose
    **Remove…**, then **Remove**.
 
    It stops connecting, and every window and device stops seeing it. Its agents are left
@@ -191,7 +191,7 @@ A second Mac joins the same way, with Agents Host.
 ### Or add it from a workspace provider
 
 If the server is a workspace of a provider you have added (a Docker container, a DigitalOcean
-droplet, a Codespace), open **Settings ▸ Control plane ▸ Providers** and choose **Add as
+droplet, a Codespace), open **Settings ▸ Workspace Providers** and choose **Add as
 Host…** beside it. Add a Server opens over ssh, with the address the provider gives already
 filled in. Once the server joins, it is linked to its workspace, so it can be started and
 stopped from Agents. See [Start workspaces from Agents](start-workspaces-from-agents.md).

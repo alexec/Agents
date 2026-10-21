@@ -5,8 +5,8 @@ import SwiftUI
 /// The Settings window (055, look/ frames A–G): one rail down the left and the chosen pane
 /// beside it. It opens at one size for every pane, so choosing another never makes the
 /// window jump, and it can be resized larger than that. The rail has one row for each pane
-/// (#1076); Agent Runtimes, Agent Configuration and Control plane list their own pages in a
-/// column inside the pane.
+/// (#1076), grouped by scope (#1759): This device, You and Control plane. Agent Runtimes,
+/// Agent Configuration and Machines list their own pages in a column inside the pane.
 struct SettingsWindow: View {
     @Environment(AppModel.self) private var model
     @AppStorage("settingsPane", store: WindowDefaults.store) private var paneRaw = SettingsPane.appearance.rawValue
@@ -16,7 +16,7 @@ struct SettingsWindow: View {
     /// pane is chosen. Asked for when the window appears, when it is chosen, and whenever the app comes
     /// back to the front, which is when an edit made elsewhere shows.
     @State private var sharedSnapshot: DaemonAPI.SharedSnapshot?
-    @State private var controlPage: ControlPage = .overview
+    @State private var machinesPage: MachinesPage = .list
     /// Settings ▸ Control plane's own view of the control plane, while the window has one
     /// (058). Without one, Devices and Servers are listed as they always were.
     @State private var control: ControlSettingsModel? = ControlConfig.endpoint.flatMap { ControlSettingsModel(endpoint: $0) }
@@ -50,15 +50,15 @@ struct SettingsWindow: View {
 
     var body: some View {
         HStack(spacing: 0) {
-            SettingsRail(pane: pane)
+            SettingsRail(pane: pane, shows: shows)
             Divider()
             VStack(alignment: .leading, spacing: 0) {
                 // A pane of this Mac's own things, with no host on this Mac (#1503): what is
                 // true, and what to do, over a pane that has nothing to show.
-                if model.noHostOnThisMac, pane.wrappedValue.isThisMacs {
+                if model.noHostOnThisMac, isThisMacs {
                     NoMacHostNotice {
-                        controlPage = .hosts
-                        pane.wrappedValue = .controlPlane
+                        machinesPage = .list
+                        pane.wrappedValue = .machines
                     }
                     Divider()
                 }
@@ -89,7 +89,7 @@ struct SettingsWindow: View {
         .onChange(of: model.needsFirstRun) { _, unpaired in
             control?.stop()
             control = unpaired ? nil : ControlConfig.endpoint.flatMap { ControlSettingsModel(endpoint: $0) }
-            if unpaired, pane.wrappedValue == .controlPlane { pane.wrappedValue = .appearance }
+            if unpaired, pane.wrappedValue.needsControlPlane { pane.wrappedValue = .appearance }
             if let control { Task { await control.start() } }
         }
         // Asked for from elsewhere in the app: a link that names a Settings pane.
@@ -97,10 +97,7 @@ struct SettingsWindow: View {
             guard let asked else { return }
             pane.wrappedValue = asked
             model.settingsPaneAsked = nil
-            if let page = model.controlPageAsked {
-                controlPage = page
-                model.controlPageAsked = nil
-            }
+            if asked == .machines { machinesPage = .list }
         }
         .onChange(of: pane.wrappedValue) { _, chosen in
             if chosen == .agentConfiguration { Task { await refreshShared() } }
@@ -111,6 +108,21 @@ struct SettingsWindow: View {
                 await refreshShared()
                 if pane.wrappedValue == .runtimes { await model.refreshRuntimes() }
             }
+        }
+    }
+
+    /// A pane of this Mac's own things is showing: one of them, or Machines ▸ This Mac.
+    private var isThisMacs: Bool {
+        pane.wrappedValue.isThisMacs || (pane.wrappedValue == .machines && (control == nil || machinesPage == .thisMac))
+    }
+
+    /// Whether the rail lists a pane: those of the control plane need one, and Workspace
+    /// Providers one that can run them (#691).
+    private func shows(_ each: SettingsPane) -> Bool {
+        switch each {
+        case .controlPlane, .clients: control != nil
+        case .providers: control?.providersHere ?? false
+        default: true
         }
     }
 
@@ -126,7 +138,18 @@ struct SettingsWindow: View {
         case .appearance: FormColumn { Form { AppearanceSettingsView() }.paperForm() }
         case .sidebar: FormColumn { Form { SidebarSettingsSection() }.paperForm() }
         case .account: FormColumn { AccountSettingsView() }
-        case .mac: FormColumn { MacSettingsView() }
+        case .machines:
+            if let control {
+                HStack(spacing: 0) {
+                    MachinesPageList(control: control, page: $machinesPage)
+                    switch machinesPage {
+                    case .list: ControlSettingsView(control: control, page: .hosts)
+                    case .thisMac: FormColumn { MacSettingsView() }
+                    }
+                }
+            } else {
+                FormColumn { MacSettingsView() }
+            }
         case .runtimes:
             HStack(spacing: 0) {
                 RuntimePageList(runtimeID: runtimeID)
@@ -136,12 +159,11 @@ struct SettingsWindow: View {
         case .spending: FormColumn { CostSettingsView() }
         case .resources: FormColumn { ResourcesSettingsView() }
         case .controlPlane:
-            if let control {
-                HStack(spacing: 0) {
-                    ControlPageList(control: control, page: $controlPage)
-                    ControlSettingsView(control: control, page: $controlPage)
-                }
-            }
+            if let control { ControlSettingsView(control: control, page: .overview) }
+        case .providers:
+            if let control { ControlSettingsView(control: control, page: .providers) }
+        case .clients:
+            if let control { ControlSettingsView(control: control, page: .clients) }
         case .people:
             // Through the window's own connection to the control plane, which hears when
             // people change (#994).
@@ -154,35 +176,60 @@ struct SettingsWindow: View {
     }
 }
 
+/// The panes in each of the rail's groups (#1759).
+extension SettingsScope {
+    var panes: [SettingsPane] {
+        switch self {
+        case .thisDevice: [.appearance, .sidebar]
+        case .you: [.account, .runtimes, .agentConfiguration, .spending, .resources, .machines]
+        case .controlPlane: [.people, .providers, .clients, .controlPlane]
+        }
+    }
+}
+
 enum SettingsPane: String, Hashable, CaseIterable {
     /// Was General (#846), split in four: its raw value is what a window left open on it kept.
     case appearance = "general"
-    case sidebar, account, mac
-    case runtimes, spending, resources, controlPlane
+    case sidebar, account
+    /// Every machine, and this Mac's own settings (#1759). Was the Mac pane: its raw value is
+    /// what a window left open on it kept.
+    case machines = "mac"
+    case runtimes, spending, resources
+    /// The control plane's Overview.
+    case controlPlane
+    /// The control plane's workspace providers (#691) and its clients, pages of Control plane
+    /// before #1759.
+    case providers, clients
     /// Who uses the control plane, and the machines and clients that belong to them (#994).
     case people
     /// Was Shared (#754): the raw value is what a window left open on it kept.
     case agentConfiguration = "shared"
 
     /// A pane of what this Mac's host keeps: its runtimes, settings, cost and resources.
+    /// Machines is one only on its This Mac page.
     var isThisMacs: Bool {
         switch self {
-        case .runtimes, .agentConfiguration, .mac, .spending, .resources: true
-        case .appearance, .sidebar, .account, .controlPlane, .people: false
+        case .runtimes, .agentConfiguration, .spending, .resources: true
+        case .appearance, .sidebar, .account, .machines, .controlPlane, .providers, .clients, .people: false
         }
     }
+
+    /// A pane drawn only with a control plane to show.
+    var needsControlPlane: Bool { [.controlPlane, .providers, .clients].contains(self) }
 
     var title: String {
         switch self {
         case .appearance: "Appearance"
         case .sidebar: "Sidebar"
         case .account: "Account"
-        case .mac: "Mac"
+        case .machines: "Machines"
         case .runtimes: "Agent Runtimes"
         case .agentConfiguration: "Agent Configuration"
         case .spending: "Cost"
         case .resources: "Resources"
-        case .controlPlane: "Control plane"
+        case .controlPlane: "Overview"
+        case .providers: "Workspace Providers"
+        case .clients: "Clients"
         case .people: "People"
         }
     }
@@ -192,21 +239,29 @@ enum SettingsPane: String, Hashable, CaseIterable {
         case .appearance: "paintbrush"
         case .sidebar: "sidebar.left"
         case .account: "person.crop.circle"
-        case .mac: "desktopcomputer"
+        case .machines: "desktopcomputer"
         case .runtimes: "cpu"
         case .agentConfiguration: "square.on.square"
         case .spending: "dollarsign.circle"
         case .resources: "lock"
         case .controlPlane: "point.3.connected.trianglepath.dotted"
+        case .providers: "cloud"
+        case .clients: "iphone"
         case .people: "person.2"
         }
     }
+}
 
-    /// The panes about this app and this Mac (#846); the panes about agents; Agent
-    /// Configuration; the control plane, whose hosts are the servers and whose clients are
-    /// the devices (058, frame D), and the people they belong to (#994).
-    static var groups: [[SettingsPane]] {
-        [[.appearance, .sidebar, .account, .mac], [.runtimes, .spending, .resources], [.agentConfiguration], [.controlPlane, .people]]
+/// Machines' pages (#1759): every machine, as Control plane ▸ Hosts listed them, and this
+/// Mac's own settings, as the Mac pane had them.
+enum MachinesPage: Hashable {
+    case list, thisMac
+
+    var title: String {
+        switch self {
+        case .list: "All Machines"
+        case .thisMac: "This Mac"
+        }
     }
 }
 
@@ -271,7 +326,7 @@ private struct NoMacHostNotice: View {
             Label("There is no host on this Mac", systemImage: "exclamationmark.triangle")
                 .appText(.supporting).fontWeight(.semibold)
                 .tinted(.attention)
-            Text("This Mac’s runtimes and settings are on its host, and the control plane has no host on this Mac. Agents on your servers are not changed. To add this Mac, make a code in Control plane ▸ Hosts ▸ Add by Code…, then paste it in Agents Host under Join one elsewhere.")
+            Text("This Mac’s runtimes and settings are on its host, and the control plane has no host on this Mac. Agents on your servers are not changed. To add this Mac, make a code in Machines ▸ Add by Code…, then paste it in Agents Host under Join one elsewhere.")
                 .appText(.fine).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             Button("Show Hosts", action: showHosts)
@@ -301,14 +356,24 @@ private struct FormColumn<Content: View>: View {
 /// `PageList` beside the page, so the rail stays the same length as runtimes and pages are added.
 private struct SettingsRail: View {
     @Binding var pane: SettingsPane
+    let shows: (SettingsPane) -> Bool
 
     var body: some View {
         // Scrolls (#1077): the rows are taller than a small window or large text leaves room for.
         ScrollView(.vertical) {
             VStack(alignment: .leading, spacing: 2) {
-                ForEach(Array(SettingsPane.groups.enumerated()), id: \.offset) { index, group in
-                    if index > 0 { Spacer().frame(height: 10) }
-                    ForEach(group, id: \.self) { paneItem($0) }
+                ForEach(Array(SettingsScope.allCases.enumerated()), id: \.offset) { index, scope in
+                    let panes = scope.panes.filter(shows)
+                    if !panes.isEmpty {
+                        Text(scope.title)
+                            .appText(.fine).fontWeight(.semibold)
+                            .foregroundStyle(.secondary)
+                            .padding(.horizontal, 10)
+                            .padding(.top, index > 0 ? 12 : 0)
+                            .padding(.bottom, 2)
+                            .accessibilityAddTraits(.isHeader)
+                        ForEach(panes, id: \.self) { paneItem($0) }
+                    }
                 }
             }
             .padding(12)
@@ -413,25 +478,18 @@ private struct RuntimePageList: View {
     }
 }
 
-/// The control plane's pages (058, #1076). Providers only where the control plane can
-/// run them (#691).
-private struct ControlPageList: View {
+/// Machines' pages (#1759): every machine, with its count, and this Mac's own settings.
+private struct MachinesPageList: View {
     let control: ControlSettingsModel
-    @Binding var page: ControlPage
+    @Binding var page: MachinesPage
 
     var body: some View {
         PageList {
-            line(.overview, count: nil)
-            line(.hosts, count: control.hosts.count)
-            if control.providersHere {
-                line(.providers, count: control.providers.count)
-            }
-            line(.clients, count: control.clients.count)
+            PageLine(title: MachinesPage.list.title, lit: page == .list, count: control.hosts.count,
+                     action: { page = .list })
+            PageLine(title: MachinesPage.thisMac.title, lit: page == .thisMac, count: nil,
+                     action: { page = .thisMac })
         }
-    }
-
-    private func line(_ target: ControlPage, count: Int?) -> some View {
-        PageLine(title: target.title, lit: page == target, count: count, action: { page = target })
     }
 }
 

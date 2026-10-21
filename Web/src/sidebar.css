@@ -285,3 +285,6 @@ button.prominent.destructive { background: var(--tint-failure); border-color: va
 .with-sidebar .settings-body .join-command .code-text { flex: 1; min-width: 0; font-family: var(--font-mono); font-size: 0.6875rem;
   padding: 4px 6px; border: 1px solid var(--paper-rule); border-radius: var(--radius-control); background: var(--paper-ground);
   user-select: all; overflow-wrap: anywhere; }
+/* Settings' groups (#1759): This device, You and Control plane, each under its heading. */
+.with-sidebar .settings-body .settings-scope { margin-bottom: 20px; }
+.with-sidebar .settings-body .scope-head { font-size: 0.875rem; font-weight: 600; margin: 8px 8px 4px; }

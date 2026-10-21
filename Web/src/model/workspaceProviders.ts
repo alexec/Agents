@@ -1,4 +1,4 @@
-// Settings ▸ Control plane ▸ Providers on the web (#1808), as the window's ControlProvidersPage:
+// Settings ▸ Workspace Providers on the web (#1808), as the window's ControlProvidersPage:
 // each workspace provider as a card of its workspaces, Add Provider, Edit, List Again, Remove,
 // and a workspace's host linked, started and stopped. Only the providers that work through
 // their API with a token (#1119) are offered here: a CLI preset needs its CLI signed in where
@@ -96,7 +96,7 @@ export const providerWords = {
   removeTitle: (name: string) => `Remove ${name}?`,
   removeNote: "Its hosts stay, unlinked: nothing here can start or stop them any more. Its workspaces are left as they are.",
   noHosts: "No host to link: add one in the Mac app, or start one from a repository.",
-  notAHostYet: "Not a host yet: add it as a host in the Mac app, in Settings ▸ Control plane ▸ Providers.",
+  notAHostYet: "Not a host yet: add it as a host in the Mac app, in Settings ▸ Workspace Providers.",
 };
 
 export function kindTitle(kind: ProviderKind): string { return kinds[kind].title; }

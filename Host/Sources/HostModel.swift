@@ -469,7 +469,7 @@ final class HostModel {
     func joinElsewhere(code: String) async {
         let code = code.trimmingCharacters(in: .whitespacesAndNewlines)
         guard ControlCode(text: code)?.purpose == .host else {
-            problem = "That isn't a host code. Ask the other control plane for one: Settings ▸ Control plane ▸ Hosts ▸ Add a Mac."
+            problem = "That isn't a host code. Ask the other control plane for one: Settings ▸ Machines ▸ Add a Mac."
             return
         }
         busy = "Joining…"
@@ -810,7 +810,7 @@ final class HostModel {
             } else if let given {
                 let code = given.trimmingCharacters(in: .whitespacesAndNewlines)
                 guard ControlCode(text: code)?.purpose == .host else {
-                    problem = "That isn't a host code. Ask your control plane for one: Settings ▸ Control plane ▸ Hosts ▸ Add a Mac."
+                    problem = "That isn't a host code. Ask your control plane for one: Settings ▸ Machines ▸ Add a Mac."
                     return
                 }
                 do { try services.leaveRelayCode(code) } catch { problem = "\(error)"; return }

@@ -1,4 +1,4 @@
-// Settings ▸ Workspace providers (#1808), the window's Settings ▸ Control plane ▸ Providers: each
+// Settings ▸ Workspace providers (#1808), the window's Settings ▸ Workspace Providers: each
 // provider as a card of its workspaces, Add Provider… (kind first, then its short form), Edit…,
 // List Again and Remove…, and on a workspace Link to Host…, Start, Stop and Unlink.
 import { useEffect, useState } from "preact/hooks";
@@ -24,7 +24,7 @@ export function ProvidersSection({ store }: { store: Store }) {
   const oneCopy = problem === words.oneCopy;
   return (
     <section aria-labelledby="settings-providers">
-      <h2 class="section-head" id="settings-providers">{words.heading}</h2>
+      <h3 class="section-head" id="settings-providers">{words.heading}</h3>
       {problem && <p class={oneCopy ? "hint" : "hint failure"}>{problem}</p>}
       {said && <p class="hint failure">{said}</p>}
       {!oneCopy && providers?.map((p) => (
