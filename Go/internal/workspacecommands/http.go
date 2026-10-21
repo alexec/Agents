@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -64,22 +65,22 @@ func (r Request) needs(values map[string]string) []string {
 	return names
 }
 
-// Fetcher does one request within a deadline: its status and body.
-type Fetcher func(r *http.Request, deadline time.Duration) (int, []byte, error)
+// Fetcher does one request within a deadline: its status, headers and body.
+type Fetcher func(r *http.Request, deadline time.Duration) (int, http.Header, []byte, error)
 
 // Fetch is the standard Fetcher: Go's own client, a body read up to a megabyte, and no
 // redirect followed, so a header carrying a token never goes to another address.
-func Fetch(r *http.Request, deadline time.Duration) (int, []byte, error) {
+func Fetch(r *http.Request, deadline time.Duration) (int, http.Header, []byte, error) {
 	ctx, cancel := context.WithTimeout(r.Context(), deadline)
 	defer cancel()
 	client := &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
 	response, err := client.Do(r.WithContext(ctx))
 	if err != nil {
-		return 0, nil, err
+		return 0, nil, nil, err
 	}
 	defer response.Body.Close()
 	body, err := io.ReadAll(io.LimitReader(response.Body, outputLimit))
-	return response.StatusCode, body, err
+	return response.StatusCode, response.Header, body, err
 }
 
 // Environment looks up a secret the control plane passed; os.LookupEnv when nil.
@@ -103,27 +104,27 @@ func (p *Provider) call(r Request, values map[string]string, deadline time.Durat
 	for _, name := range needed {
 		value, ok := lookup(name)
 		if !ok || value == "" {
-			return nil, Failure{"It needs the " + name + " secret."}
+			return nil, Failure{Reason: "It needs the " + name + " secret."}
 		}
 		secrets[name] = value
 	}
 	address := fillEscaped(r.URL, values)
 	parsed, err := url.Parse(address)
 	if err != nil || (parsed.Scheme != "https" && parsed.Scheme != "http") || parsed.Host == "" {
-		return nil, Failure{"Its address isn't a web address: " + r.URL}
+		return nil, Failure{Reason: "Its address isn't a web address: " + r.URL}
 	}
 	var body io.Reader
 	var data []byte
 	if r.Body != nil {
 		data, err = json.Marshal(fillBody(r.Body, values))
 		if err != nil {
-			return nil, Failure{"Its request body isn't JSON."}
+			return nil, Failure{Reason: "Its request body isn't JSON."}
 		}
 		body = bytes.NewReader(data)
 	}
 	request, err := http.NewRequest(r.Method, address, body)
 	if err != nil {
-		return nil, Failure{"Its request can't be made: " + r.Said()}
+		return nil, Failure{Reason: "Its request can't be made: " + r.Said()}
 	}
 	request.Header.Set("Accept", "application/json")
 	if body != nil {
@@ -147,18 +148,36 @@ func (p *Provider) call(r Request, values map[string]string, deadline time.Durat
 	if fetch == nil {
 		fetch = Fetch
 	}
-	status, answer, err := fetch(request, deadline)
+	status, header, answer, err := fetch(request, deadline)
 	if err != nil {
 		if errors.Is(err, context.DeadlineExceeded) {
-			return nil, Failure{strings.ToUpper(doing[:1]) + doing[1:] + " took longer than " + words(deadline) + "."}
+			return nil, Failure{Reason: strings.ToUpper(doing[:1]) + doing[1:] + " took longer than " + words(deadline) + "."}
 		}
 		// Go's words name the address and the method, never a header.
-		return nil, Failure{"It can't be reached: " + parsed.Host + "."}
+		return nil, Failure{Reason: "It can't be reached: " + parsed.Host + ".", Again: true}
 	}
 	if status < 200 || status > 299 {
-		return nil, Failure{refusal(status, answer, parsed.Host)}
+		// Too many requests, or the provider's own trouble, may pass (#1854).
+		again := status == http.StatusTooManyRequests || status >= 500
+		return nil, Failure{Reason: refusal(status, answer, parsed.Host), Again: again, After: retryAfter(header, time.Now())}
 	}
 	return answer, nil
+}
+
+// retryAfter is how long a Retry-After header asks to wait, in seconds or until a date; none
+// when it says nothing, and at most ten minutes.
+func retryAfter(header http.Header, now time.Time) time.Duration {
+	said := strings.TrimSpace(header.Get("Retry-After"))
+	if said == "" {
+		return 0
+	}
+	var after time.Duration
+	if seconds, err := strconv.Atoi(said); err == nil {
+		after = time.Duration(seconds) * time.Second
+	} else if at, err := http.ParseTime(said); err == nil {
+		after = at.Sub(now)
+	}
+	return min(max(after, 0), 10*time.Minute)
 }
 
 // value is an answer read as the request says: JSON, or XML.

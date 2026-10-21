@@ -49,14 +49,14 @@ type googleToken struct {
 func (p *Provider) googleToken(key string, scope string, deadline time.Duration) (string, error) {
 	var account serviceAccount
 	if err := json.Unmarshal([]byte(key), &account); err != nil || account.Email == "" || account.Key == "" {
-		return "", Failure{"Its " + GoogleSecret + " secret isn't a service account's JSON key."}
+		return "", Failure{Reason: "Its " + GoogleSecret + " secret isn't a service account's JSON key."}
 	}
 	if account.TokenURI == "" {
 		account.TokenURI = "https://oauth2.googleapis.com/token"
 	}
 	parsed, err := url.Parse(account.TokenURI)
 	if err != nil || (parsed.Scheme != "https" && parsed.Scheme != "http") || parsed.Host == "" {
-		return "", Failure{"Its service account key's token_uri isn't a web address."}
+		return "", Failure{Reason: "Its service account key's token_uri isn't a web address."}
 	}
 	id := account.Email + " " + scope
 	p.google.mu.Lock()
@@ -67,21 +67,21 @@ func (p *Provider) googleToken(key string, scope string, deadline time.Duration)
 	p.google.mu.Unlock()
 	assertion, err := googleJWT(account, scope, time.Now())
 	if err != nil {
-		return "", Failure{"Its service account key can't sign: " + err.Error()}
+		return "", Failure{Reason: "Its service account key can't sign: " + err.Error()}
 	}
 	form := url.Values{"grant_type": {"urn:ietf:params:oauth:grant-type:jwt-bearer"}, "assertion": {assertion}}
 	request, err := http.NewRequest(http.MethodPost, account.TokenURI, strings.NewReader(form.Encode()))
 	if err != nil {
-		return "", Failure{"Its service account key's token_uri can't be asked."}
+		return "", Failure{Reason: "Its service account key's token_uri can't be asked."}
 	}
 	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	fetch := p.Fetch
 	if fetch == nil {
 		fetch = Fetch
 	}
-	status, answer, err := fetch(request, deadline)
+	status, _, answer, err := fetch(request, deadline)
 	if err != nil {
-		return "", Failure{"It can't get a token: " + parsed.Host + " can't be reached."}
+		return "", Failure{Reason: "It can't get a token: " + parsed.Host + " can't be reached."}
 	}
 	if status < 200 || status > 299 {
 		var said struct {
@@ -93,14 +93,14 @@ func (p *Provider) googleToken(key string, scope string, deadline time.Duration)
 		if said.Error == "" {
 			words = http.StatusText(status)
 		}
-		return "", Failure{"It can't get a token: " + parsed.Host + " answered " + words}
+		return "", Failure{Reason: "It can't get a token: " + parsed.Host + " answered " + words}
 	}
 	var got struct {
 		Token   string `json:"access_token"`
 		Expires int    `json:"expires_in"`
 	}
 	if json.Unmarshal(answer, &got) != nil || got.Token == "" {
-		return "", Failure{"It can't get a token: " + parsed.Host + " gave none."}
+		return "", Failure{Reason: "It can't get a token: " + parsed.Host + " gave none."}
 	}
 	life := time.Duration(got.Expires) * time.Second
 	if life <= 0 {
