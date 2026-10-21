@@ -172,6 +172,57 @@ public extension DaemonAPI {
         public init(user: String) { self.user = user }
     }
 
+    /// `people/removePreview` (FR-029, #1763): what Remove would take, for the admin to
+    /// confirm. Started machines are stopped and deleted through their providers, each with
+    /// the work on it that is not pushed; registered machines leave the control plane.
+    struct PersonRemovePreview: Codable, Sendable, Hashable {
+        public var startedMachines: [StartedMachinePreview]
+        public var registeredMachines: [PersonMachine]
+
+        public init(startedMachines: [StartedMachinePreview] = [], registeredMachines: [PersonMachine] = []) {
+            self.startedMachines = startedMachines
+            self.registeredMachines = registeredMachines
+        }
+    }
+
+    /// A started machine in `people/removePreview`. `unknown` says why it could not be asked.
+    struct StartedMachinePreview: Codable, Sendable, Hashable {
+        public var host: HostID
+        public var name: String
+        public var state: String
+        public var unpushed: [UnpushedWork]
+        public var unknown: String?
+
+        public init(host: HostID, name: String, state: String, unpushed: [UnpushedWork] = [], unknown: String? = nil) {
+            self.host = host
+            self.name = name
+            self.state = state
+            self.unpushed = unpushed
+            self.unknown = unknown
+        }
+    }
+
+    /// A worktree with work that is not pushed: commits ahead of its upstream, commits on a
+    /// branch with no upstream (`unmerged`), or changes not committed.
+    struct UnpushedWork: Codable, Sendable, Hashable {
+        public var project: URL
+        public var worktree: URL
+        public var branch: String?
+        public var ahead: Int?
+        public var unmerged: Int?
+        public var uncommitted: Int?
+
+        public init(project: URL, worktree: URL, branch: String? = nil, ahead: Int? = nil, unmerged: Int? = nil,
+                    uncommitted: Int? = nil) {
+            self.project = project
+            self.worktree = worktree
+            self.branch = branch
+            self.ahead = ahead
+            self.unmerged = unmerged
+            self.uncommitted = uncommitted
+        }
+    }
+
     /// `people/setRole`. Refused when it would leave no admin.
     struct PersonRoleRequest: Codable, Sendable, Hashable {
         public var user: String
@@ -282,6 +333,9 @@ public extension DaemonAPI.Method {
     /// `PersonRequest` → `{}`, an admin's only: their clients are forgotten and their
     /// machines leave the control plane (#994).
     static let peopleRemove = "people/remove"
+    /// `PersonRequest` → `PersonRemovePreview`, an admin's only: the person's started
+    /// machines with their work that is not pushed, and their registered machines (#1763).
+    static let peopleRemovePreview = "people/removePreview"
     /// `Empty` → `[JoinRequest]`: the machines waiting for this person's approval; for an
     /// admin, also those that name no person (#994).
     static let hostsJoinRequests = "hosts/joinRequests"
@@ -381,23 +435,61 @@ public enum PeopleWords {
         !person.isYou && !person.isLocalOwner
     }
 
+    /// Said while Remove asks the person's machines what work on them is not pushed.
+    public static func asking(_ person: DaemonAPI.PersonRow) -> String {
+        "Asking \(person.name)’s machines what work on them is not pushed…"
+    }
+
     public static func removeTitle(_ person: DaemonAPI.PersonRow) -> String {
         "Remove \(person.name)?"
     }
 
-    /// What goes with them: their clients are forgotten, their machines leave.
-    public static func removeMessage(_ person: DaemonAPI.PersonRow) -> String {
+    /// What goes with them: their clients are forgotten, their started machines are deleted
+    /// with the work on them that is not pushed, and their other machines leave. Without a
+    /// preview (a control plane from before #1763), every machine only leaves.
+    public static func removeMessage(_ person: DaemonAPI.PersonRow, preview: DaemonAPI.PersonRemovePreview? = nil) -> String {
         var lines = ["\(person.name) can no longer reach the control plane."]
         if let clients = clients(person) {
             lines.append("These clients are forgotten: \(clients).")
         }
-        if !person.machines.isEmpty {
+        if let preview {
+            if !preview.startedMachines.isEmpty {
+                lines.append("These machines are stopped and deleted: \(preview.startedMachines.map(\.name).joined(separator: ", ")).")
+            }
+            for machine in preview.startedMachines {
+                if let unknown = machine.unknown {
+                    lines.append(unknown)
+                } else if !machine.unpushed.isEmpty {
+                    let work = machine.unpushed.map(unpushedWords).joined(separator: "; ")
+                    lines.append("On \(machine.name), this work is not pushed and is lost: \(work).")
+                }
+            }
+            if !preview.registeredMachines.isEmpty {
+                lines.append("These machines leave the control plane: \(preview.registeredMachines.map(\.name).joined(separator: ", ")).")
+            }
+        } else if !person.machines.isEmpty {
             lines.append("These machines leave the control plane: \(person.machines.map(\.name).joined(separator: ", ")).")
         }
         if person.clients.isEmpty, person.machines.isEmpty {
             lines.append("They have no clients and no machines.")
         }
         return lines.joined(separator: " ")
+    }
+
+    /// "agents/fix (2 commits not pushed, changes not committed)": a worktree by its branch,
+    /// or its folder's name when it has none.
+    public static func unpushedWords(_ work: DaemonAPI.UnpushedWork) -> String {
+        let name = work.branch ?? work.worktree.lastPathComponent
+        var what: [String] = []
+        if let ahead = work.ahead, ahead > 0 {
+            what.append("\(ahead) \(ahead == 1 ? "commit" : "commits") not pushed")
+        } else if work.ahead == nil, let unmerged = work.unmerged, unmerged > 0 {
+            what.append("\(unmerged) \(unmerged == 1 ? "commit" : "commits") never pushed")
+        }
+        if let uncommitted = work.uncommitted, uncommitted > 0 {
+            what.append("changes not committed")
+        }
+        return what.isEmpty ? name : "\(name) (\(what.joined(separator: ", ")))"
     }
 
     /// Under the invite code: when it stops working, and what to do with it.

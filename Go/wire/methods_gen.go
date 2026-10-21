@@ -415,6 +415,7 @@ var (
 	CallPeopleInvite                = Method[PersonInvite, PersonInvited]{"people/invite"}
 	CallPeopleList                  = Method[Empty, PeopleList]{"people/list"}
 	CallPeopleRemove                = Method[PersonRequest, Empty]{"people/remove"}
+	CallPeopleRemovePreview         = Method[PersonRequest, PersonRemovePreview]{"people/removePreview"}
 	CallPeopleSetRole               = Method[PersonRoleRequest, Empty]{"people/setRole"}
 	CallProjectsDetected            = Method[JSONValue, Empty]{"projects/detected"}
 	CallProvidersAdd                = Method[ProviderAdd, ProviderSummary]{"providers/add"}

@@ -67,7 +67,7 @@ var own = map[string]bool{
 	"devices/forget": true, "hosts/lastHeard": true,
 	"audit/list": true, "audit/export": true, "control/setAuditDays": true, "control/rotate": true,
 	"people/list": true, "people/invite": true, "people/setRole": true, "people/remove": true,
-	"hosts/joinRequests": true, "hosts/approveJoin": true, "hosts/denyJoin": true,
+	"people/removePreview": true, "hosts/joinRequests": true, "hosts/approveJoin": true, "hosts/denyJoin": true,
 	"reports/usage": true, "reports/export": true,
 }
 
@@ -129,7 +129,7 @@ func (m *Methods) Handle(method string, params json.RawMessage, from Caller) (an
 			}
 		}
 		return out, nil
-	case "people/list", "people/invite", "people/setRole", "people/remove":
+	case "people/list", "people/invite", "people/setRole", "people/remove", "people/removePreview":
 		return m.peopleMethod(ctx, method, params, from)
 	case "reports/usage", "reports/export":
 		return m.reportMethod(ctx, method, params, from)

@@ -38,6 +38,25 @@ struct PeopleTests {
         #expect(PeopleWords.badges(sam) == "Member")
     }
 
+    /// Remove's preview (#1763): started machines are deleted, with the work on each that is
+    /// not pushed, and the others leave. It reads as the control plane writes it.
+    @Test func removingSaysWhatWorkIsNotPushed() throws {
+        var sam = DaemonAPI.PersonRow(id: "sam", name: "Sam", role: .member)
+        sam.machines = [.init(id: HostID(rawValue: "h1"), name: "studio", state: "online")]
+        let line = #"{"startedMachines":[{"host":"w1","name":"sam-ws","state":"online","unpushed":["#
+            + #"{"project":"file:///p","worktree":"file:///p-fix","branch":"agents/fix","ahead":2,"uncommitted":3},"#
+            + #"{"project":"file:///p","worktree":"file:///p-new","unmerged":1}]},"#
+            + #"{"host":"w2","name":"sam-old","state":"offline","unpushed":[],"unknown":"sam-old is not online, so it could not be asked."}],"#
+            + #""registeredMachines":[{"id":"h1","name":"studio","state":"online"}]}"#
+        let preview = try JSONDecoder().decode(DaemonAPI.PersonRemovePreview.self, from: Data(line.utf8))
+        #expect(PeopleWords.removeMessage(sam, preview: preview)
+            == "Sam can no longer reach the control plane. These machines are stopped and deleted: sam-ws, sam-old. "
+            + "On sam-ws, this work is not pushed and is lost: agents/fix (2 commits not pushed, changes not committed); "
+            + "p-new (1 commit never pushed). sam-old is not online, so it could not be asked. "
+            + "These machines leave the control plane: studio.")
+        #expect(PeopleWords.asking(sam) == "Asking Sam’s machines what work on them is not pushed…")
+    }
+
     @Test func theCardSaysWhoTheMachineIsFor() throws {
         let line = #"{"request":"r1","name":"studio","platform":"linux","code":"4F7-2KQ","expires":782654400,"for":"owner"}"#
         var request = try JSONDecoder().decode(DaemonAPI.JoinRequest.self, from: Data(line.utf8))

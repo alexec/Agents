@@ -490,6 +490,7 @@ var ControlCapabilities = map[string]string{
 	"people/invite":               "people/1",
 	"people/list":                 "people/1",
 	"people/remove":               "people/1",
+	"people/removePreview":        "people/1",
 	"people/setRole":              "people/1",
 	"projects/detected":           "projects/1",
 	"providers/add":               "providers/1",

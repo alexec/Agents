@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -815,5 +816,25 @@ func TestAStoppedWorkspaceIsAsleepUntilAStart(t *testing.T) {
 	}
 	if h.providers.Asleep("nobody") {
 		t.Error("a host with no link is asleep")
+	}
+}
+
+// A removed person's started machine is deleted through its provider, with no backup
+// (FR-029, #1763); the host's record is the remover's to take off.
+func TestARemovedPersonsMachineIsDeletedThroughItsProvider(t *testing.T) {
+	h := newHarness(t)
+	h.link(h.add(), devbox, "agents-devbox")
+	link := LinkOf(h.records.Host(devbox))
+	if link == nil {
+		t.Fatal("not linked")
+	}
+	if err := h.providers.DeleteForRemoval(*link, "devbox", "sam"); err != nil {
+		t.Fatal(err)
+	}
+	h.provider.mu.Lock()
+	deleted := slices.Clone(h.provider.deleted)
+	h.provider.mu.Unlock()
+	if !reflect.DeepEqual(deleted, []string{"agents-devbox"}) {
+		t.Errorf("%v", deleted)
 	}
 }

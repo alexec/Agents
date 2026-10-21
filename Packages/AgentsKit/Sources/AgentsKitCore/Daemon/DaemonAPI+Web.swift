@@ -303,6 +303,8 @@ public extension DaemonAPI {
                 Row(Method.peopleInvite, params: PersonInvite.self, result: PersonInvited.self, kind: .controlRequest),
                 Row(Method.peopleSetRole, params: PersonRoleRequest.self, result: Empty.self, kind: .controlRequest),
                 Row(Method.peopleRemove, params: PersonRequest.self, result: Empty.self, kind: .controlRequest),
+                Row(Method.peopleRemovePreview, params: PersonRequest.self, result: PersonRemovePreview.self,
+                    kind: .controlRequest),
                 // A machine that asks to join, approved on a card (#994).
                 Row(Method.hostsJoinRequests, params: Empty.self, result: [JoinRequest].self, kind: .controlRequest),
                 Row(Method.hostsApproveJoin, params: JoinRequestDecide.self, result: JoinApproved.self,

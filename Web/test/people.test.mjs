@@ -46,6 +46,26 @@ test("Remove says what goes", () => {
   assert.equal(p.removeTitle("Sam"), "Remove Sam?");
 });
 
+test("Remove says which machines are deleted and the work on them that is not pushed (#1763)", () => {
+  const preview = {
+    startedMachines: [
+      { host: "w", name: "sam-ws", state: "online", unpushed: [
+        { project: "file:///p", worktree: "file:///p-fix", branch: "agents/fix", ahead: 2, uncommitted: 3 },
+        { project: "file:///p", worktree: "file:///p-new/", unmerged: 1 },
+      ] },
+      { host: "x", name: "sam-old", state: "offline", unpushed: [], unknown: "sam-old is not online, so it could not be asked." },
+    ],
+    registeredMachines: [{ id: "h", name: "box-1", state: "online" }],
+  };
+  assert.deepEqual(p.removeLines(person({ machines: [{ id: "h", name: "box-1", state: "online" }] }), preview), [
+    "2 machines are stopped and deleted: sam-ws, sam-old.",
+    "On sam-ws, this work is not pushed and is lost: agents/fix (2 commits not pushed, changes not committed); p-new (1 commit never pushed).",
+    "sam-old is not online, so it could not be asked.",
+    "1 machine is taken off: box-1.",
+  ]);
+  assert.equal(p.askingLine("Sam"), "Asking Sam’s machines what work on them is not pushed…");
+});
+
 test("an invite says how long it works and where it goes", () => {
   const note = p.inviteNote({ name: "Sam", expires: 782654400 }, "en-US");
   assert.match(note, /^Works once, until [A-Z][a-z]+day, October \d+\. Send it to Sam; they paste it where a code is asked for in the Mac window or the Remote\.$/);
