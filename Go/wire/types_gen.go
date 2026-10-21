@@ -3615,6 +3615,12 @@ type PersonMachine struct {
 	Platform *string `json:"platform,omitzero"`
 }
 
+// people/removePreview (FR-029, #1763): what Remove would take, for the admin to confirm. Started machines are stopped and deleted through their providers, each with the work on it that is not pushed; registered machines leave the control plane.
+type PersonRemovePreview struct {
+	StartedMachines    []StartedMachinePreview `json:"startedMachines"`
+	RegisteredMachines []PersonMachine         `json:"registeredMachines"`
+}
+
 type PersonRemoveRequest struct {
 	Name    string `json:"name"`
 	AgentID string `json:"agentID"`
@@ -5189,6 +5195,15 @@ type StartRequest struct {
 	Purpose               *AgentPurpose   `json:"purpose,omitzero"`
 }
 
+// A started machine in people/removePreview: the branches and worktrees on it with work that is not pushed. `unknown` says why it could not be asked (offline, or it did not answer), and then `unpushed` is empty.
+type StartedMachinePreview struct {
+	Host     HostID         `json:"host"`
+	Name     string         `json:"name"`
+	State    string         `json:"state"`
+	Unpushed []UnpushedWork `json:"unpushed"`
+	Unknown  *string        `json:"unknown,omitzero"`
+}
+
 type StartingPoint struct {
 	Repository URL    `json:"repository"`
 	Commit     string `json:"commit"`
@@ -5552,6 +5567,16 @@ type TurnsRequest struct {
 	AgentID UUID   `json:"agentID"`
 	Before  *int64 `json:"before,omitzero"`
 	Limit   int64  `json:"limit"`
+}
+
+// A worktree with work that is not pushed: commits ahead of its upstream (`ahead`), or on a branch with no upstream (`unmerged`, commits not on the base), and changes not committed (`uncommitted`).
+type UnpushedWork struct {
+	Project     URL     `json:"project"`
+	Worktree    URL     `json:"worktree"`
+	Branch      *string `json:"branch,omitzero"`
+	Ahead       *int64  `json:"ahead,omitzero"`
+	Unmerged    *int64  `json:"unmerged,omitzero"`
+	Uncommitted *int64  `json:"uncommitted,omitzero"`
 }
 
 type UnqueueRequest struct {

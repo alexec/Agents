@@ -5,10 +5,10 @@
 import { useEffect } from "preact/hooks";
 import { useSignal } from "@preact/signals";
 import type { Store } from "../model/store";
-import type { PeopleList, PersonInvited, PersonRow, UserRole } from "../protocol/generated";
+import type { PeopleList, PersonInvited, PersonRemovePreview, PersonRow, UserRole } from "../protocol/generated";
 import { CallFailed } from "../wire/link";
 import { describe, methodNotFound } from "../model/errors";
-import { badges, canRemove, joinCommandNote, joinCommandTitle, canSetRole, clientLine, inviteNote, machineLine, memberNote, noPeople, ordered, removeLines,
+import { askingLine, badges, canRemove, joinCommandNote, joinCommandTitle, canSetRole, clientLine, inviteNote, machineLine, memberNote, noPeople, ordered, removeLines,
   removeTitle, roleNote, roleWord, roles, rotateFoot, rotateMessage, rotateTitle, rotated } from "../model/people";
 import { JoinRequests } from "./JoinRequest";
 import { Modal } from "./Modal";
@@ -78,6 +78,19 @@ function InviteSheet({ store, close }: { store: Store; close: () => void }) {
 function RemoveSheet({ store, person, close }: { store: Store; person: PersonRow; close: () => void }) {
   const problem = useSignal<string | null>(null);
   const busy = useSignal(false);
+  // What Remove would take (#1763), asked first; null from a control plane from before it.
+  const preview = useSignal<PersonRemovePreview | null>(null);
+  const asking = useSignal(true);
+  useEffect(() => {
+    let live = true;
+    store.link.call("people/removePreview", { user: person.id })
+      .then((answer) => { if (live) preview.value = answer; })
+      .catch((error) => {
+        if (live && !(error instanceof CallFailed && error.code === methodNotFound)) problem.value = sentence(error);
+      })
+      .finally(() => { if (live) asking.value = false; });
+    return () => { live = false; };
+  }, [person.id]);
   const remove = async () => {
     busy.value = true;
     try {
@@ -93,11 +106,13 @@ function RemoveSheet({ store, person, close }: { store: Store; person: PersonRow
     <Modal label={removeTitle(person.name)} close={close}>
       <div class="sheet-body">
         <h2>{removeTitle(person.name)}</h2>
-        <ul class="sheet-note remove-lines">{removeLines(person).map((line) => <li key={line}>{line}</li>)}</ul>
+        {asking.value
+          ? <p class="sheet-note" role="status">{askingLine(person.name)}</p>
+          : <ul class="sheet-note remove-lines">{removeLines(person, preview.value).map((line) => <li key={line}>{line}</li>)}</ul>}
         {problem.value && <p class="sheet-note failure" role="alert">{problem.value}</p>}
         <div class="sheet-actions">
           <button type="button" onClick={close}>Cancel</button>
-          <button type="button" class="prominent destructive" disabled={busy.value} onClick={() => void remove()}>Remove</button>
+          <button type="button" class="prominent destructive" disabled={busy.value || asking.value} onClick={() => void remove()}>Remove</button>
         </div>
       </div>
     </Modal>

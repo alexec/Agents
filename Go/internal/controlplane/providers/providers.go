@@ -1633,6 +1633,20 @@ func (p *Providers) deleteWorkspace(host, who string, caller Caller) error {
 	return p.removeWorkspace(host, *link, what, who, caller)
 }
 
+// DeleteForRemoval deletes a removed person's started machine through its provider
+// (FR-029). There is no backup first: the admin was shown its unpushed work before they
+// confirmed. The host's record is the caller's to remove, at once; this may take a while,
+// so the caller runs it in the background.
+func (p *Providers) DeleteForRemoval(link WorkspaceLink, what, who string) error {
+	if _, err := p.providerCall(link.Provider, func(c Provider) (any, error) { return nil, c.Delete(link.Workspace) }); err != nil {
+		p.log(fmt.Sprintf("workspace: delete %s (%s/%s), as %s was removed: failed: %s", what, link.Provider, link.Workspace, who, errorWords(err)))
+		return err
+	}
+	p.log(fmt.Sprintf("workspace: delete %s (%s/%s), as %s was removed: ok", what, link.Provider, link.Workspace, who))
+	p.Refresh(link.Provider)
+	return nil
+}
+
 // removeWorkspace is the delete itself: the provider's, then the host's record.
 func (p *Providers) removeWorkspace(host string, link WorkspaceLink, what, who string, caller Caller) error {
 	if _, err := p.providerCall(link.Provider, func(c Provider) (any, error) { return nil, c.Delete(link.Workspace) }); err != nil {

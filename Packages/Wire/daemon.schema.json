@@ -15318,6 +15318,66 @@
       ],
       "additionalProperties": false
     },
+    "StartedMachinePreview": {
+      "type": "object",
+      "description": "A started machine in people/removePreview: the branches and worktrees on it with work that is not pushed. `unknown` says why it could not be asked (offline, or it did not answer), and then `unpushed` is empty.",
+      "properties": {
+        "host": {
+          "$ref": "#/definitions/HostID"
+        },
+        "name": {
+          "type": "string"
+        },
+        "state": {
+          "type": "string"
+        },
+        "unpushed": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/UnpushedWork"
+          }
+        },
+        "unknown": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "host",
+        "name",
+        "state",
+        "unpushed"
+      ],
+      "additionalProperties": false
+    },
+    "UnpushedWork": {
+      "type": "object",
+      "description": "A worktree with work that is not pushed: commits ahead of its upstream (`ahead`), or on a branch with no upstream (`unmerged`, commits not on the base), and changes not committed (`uncommitted`).",
+      "properties": {
+        "project": {
+          "$ref": "#/definitions/URLString"
+        },
+        "worktree": {
+          "$ref": "#/definitions/URLString"
+        },
+        "branch": {
+          "type": "string"
+        },
+        "ahead": {
+          "type": "integer"
+        },
+        "unmerged": {
+          "type": "integer"
+        },
+        "uncommitted": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "project",
+        "worktree"
+      ],
+      "additionalProperties": false
+    },
     "WorktreeStatus": {
       "type": "object",
       "properties": {
@@ -18805,6 +18865,29 @@
         "id",
         "name",
         "state"
+      ],
+      "additionalProperties": false
+    },
+    "PersonRemovePreview": {
+      "type": "object",
+      "description": "people/removePreview (FR-029, #1763): what Remove would take, for the admin to confirm. Started machines are stopped and deleted through their providers, each with the work on it that is not pushed; registered machines leave the control plane.",
+      "properties": {
+        "startedMachines": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/StartedMachinePreview"
+          }
+        },
+        "registeredMachines": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/PersonMachine"
+          }
+        }
+      },
+      "required": [
+        "startedMachines",
+        "registeredMachines"
       ],
       "additionalProperties": false
     },

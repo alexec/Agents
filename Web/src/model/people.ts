@@ -1,7 +1,7 @@
 // Settings ▸ People's words and a machine's ask to join (#994, Team T1), as the window and the
 // Remote have them: each client belongs to a person, each machine to one person. With one person,
 // the local owner, nothing changes.
-import type { ClientKind, JoinRequest, PersonClient, PersonInvited, PersonMachine, PersonRow, UserRole } from "../protocol/generated";
+import type { ClientKind, JoinRequest, PersonClient, PersonInvited, PersonMachine, PersonRemovePreview, PersonRow, UnpushedWork, UserRole } from "../protocol/generated";
 import { fromWireDate } from "../protocol/dates";
 
 /** The roles, in the order the menu shows them. */
@@ -70,17 +70,51 @@ export const rotateMessage = "Every client and machine connects again and takes 
 export const rotateFoot = "Rotate the control plane’s key if you think someone copied it.";
 export const rotated = "The control key was rotated. Each client and machine takes the new key when it connects again.";
 
-/** What Remove takes away, a line each, for its confirmation. */
-export function removeLines(person: Pick<PersonRow, "name" | "clients" | "machines">): string[] {
+/** What Remove takes away, a line each, for its confirmation. With the control plane's preview (#1763),
+ * started machines are deleted, with the work on each that is not pushed; without one (an older control
+ * plane), every machine is only taken off. */
+export function removeLines(person: Pick<PersonRow, "name" | "clients" | "machines">, preview?: PersonRemovePreview | null): string[] {
   const lines: string[] = [];
   if (person.clients.length > 0) {
     lines.push(`${counted(person.clients.length, "client")} can no longer connect: ${person.clients.map((c) => c.name || clientKinds[c.kind]).join(", ")}.`);
   }
-  if (person.machines.length > 0) {
+  if (preview) {
+    const started = preview.startedMachines;
+    if (started.length > 0) {
+      lines.push(`${counted(started.length, "machine")} ${started.length === 1 ? "is" : "are"} stopped and deleted: ${started.map((m) => m.name).join(", ")}.`);
+    }
+    for (const machine of started) {
+      if (machine.unknown) lines.push(machine.unknown);
+      else if (machine.unpushed.length > 0) {
+        lines.push(`On ${machine.name}, this work is not pushed and is lost: ${machine.unpushed.map(unpushedWords).join("; ")}.`);
+      }
+    }
+    const registered = preview.registeredMachines;
+    if (registered.length > 0) {
+      lines.push(`${counted(registered.length, "machine")} ${registered.length === 1 ? "is" : "are"} taken off: ${registered.map((m) => m.name).join(", ")}.`);
+    }
+  } else if (person.machines.length > 0) {
     lines.push(`${counted(person.machines.length, "machine")} ${person.machines.length === 1 ? "is" : "are"} taken off: ${person.machines.map((m) => m.name).join(", ")}.`);
   }
   if (lines.length === 0) lines.push(`${person.name} has no clients or machines.`);
   return lines;
+}
+
+/** "agents/fix (2 commits not pushed, changes not committed)", as PeopleWords.unpushedWords has it. */
+export function unpushedWords(work: UnpushedWork): string {
+  const name = work.branch ?? work.worktree.replace(/\/+$/, "").split("/").pop() ?? work.worktree;
+  const what: string[] = [];
+  if (work.ahead !== undefined && work.ahead > 0) what.push(`${work.ahead} ${work.ahead === 1 ? "commit" : "commits"} not pushed`);
+  else if (work.ahead === undefined && work.unmerged !== undefined && work.unmerged > 0) {
+    what.push(`${work.unmerged} ${work.unmerged === 1 ? "commit" : "commits"} never pushed`);
+  }
+  if (work.uncommitted !== undefined && work.uncommitted > 0) what.push("changes not committed");
+  return what.length === 0 ? name : `${name} (${what.join(", ")})`;
+}
+
+/** Said while Remove asks the person's machines what work on them is not pushed. */
+export function askingLine(name: string): string {
+  return `Asking ${name}’s machines what work on them is not pushed…`;
 }
 
 /** The title of the Remove confirmation. */

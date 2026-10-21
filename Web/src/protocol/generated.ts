@@ -3160,6 +3160,16 @@ export interface PersonMachine {
   platform?: string;
 }
 
+/**
+ * people/removePreview (FR-029, #1763): what Remove would take, for the admin to confirm. Started
+ * machines are stopped and deleted through their providers, each with the work on it that is not
+ * pushed; registered machines leave the control plane.
+ */
+export interface PersonRemovePreview {
+  startedMachines: StartedMachinePreview[];
+  registeredMachines: PersonMachine[];
+}
+
 export interface PersonRemoveRequest {
   name: string;
   agentID: string;
@@ -4553,6 +4563,19 @@ export interface StartRequest {
   purpose?: AgentPurpose;
 }
 
+/**
+ * A started machine in people/removePreview: the branches and worktrees on it with work that is not
+ * pushed. `unknown` says why it could not be asked (offline, or it did not answer), and then
+ * `unpushed` is empty.
+ */
+export interface StartedMachinePreview {
+  host: HostID;
+  name: string;
+  state: string;
+  unpushed: UnpushedWork[];
+  unknown?: string;
+}
+
 export interface StartingPoint {
   repository: URLString;
   commit: string;
@@ -4765,6 +4788,20 @@ export interface TurnsRequest {
   agentID: UUID;
   before?: number;
   limit: number;
+}
+
+/**
+ * A worktree with work that is not pushed: commits ahead of its upstream (`ahead`), or on a branch
+ * with no upstream (`unmerged`, commits not on the base), and changes not committed
+ * (`uncommitted`).
+ */
+export interface UnpushedWork {
+  project: URLString;
+  worktree: URLString;
+  branch?: string;
+  ahead?: number;
+  unmerged?: number;
+  uncommitted?: number;
 }
 
 export interface UnqueueRequest {
@@ -5363,6 +5400,7 @@ export interface Methods {
   "people/invite": { params: PersonInvite; result: PersonInvited };
   "people/list": { params: Empty; result: PeopleList };
   "people/remove": { params: PersonRequest; result: Empty };
+  "people/removePreview": { params: PersonRequest; result: PersonRemovePreview };
   "people/setRole": { params: PersonRoleRequest; result: Empty };
   "permissions/answer": { params: AnswerRequest; result: Empty };
   "permissions/pending": { params: Empty; result: PermissionRequest[] };
@@ -5542,6 +5580,7 @@ export const MethodTarget = {
   "people/invite": "control",
   "people/list": "control",
   "people/remove": "control",
+  "people/removePreview": "control",
   "people/setRole": "control",
   "permissions/answer": "host",
   "permissions/pending": "host",
@@ -5987,6 +6026,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   PersonInvite: { required: ["name", "role"], optional: [] },
   PersonInvited: { required: ["text", "expires", "name", "role"], optional: [] },
   PersonMachine: { required: ["id", "name", "state"], optional: ["platform"] },
+  PersonRemovePreview: { required: ["startedMachines", "registeredMachines"], optional: [] },
   PersonRemoveRequest: { required: ["name", "agentID"], optional: [] },
   PersonRequest: { required: ["user"], optional: [] },
   PersonRoleRequest: { required: ["user", "role"], optional: [] },
@@ -6160,6 +6200,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   SlashCommand: { required: ["name"], optional: ["description", "inputHint"] },
   StartOptions: { required: ["values", "extraArguments"], optional: [] },
   StartRequest: { required: ["runtimeID", "cwd", "prompt", "attachments", "startOptions", "additionalDirectories", "mcpServers", "labels"], optional: ["draftID", "worktree", "requestID", "sandbox", "persona", "purpose"] },
+  StartedMachinePreview: { required: ["host", "name", "state", "unpushed"], optional: ["unknown"] },
   StartingPoint: { required: ["repository", "commit"], optional: [] },
   StopBackgroundRequest: { required: ["agentID", "itemID"], optional: [] },
   StoreNotes: { required: ["notes"], optional: [] },
@@ -6181,6 +6222,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   TurnUsage: { required: ["totalTokens", "inputTokens", "outputTokens"], optional: ["thoughtTokens", "cachedReadTokens", "cachedWriteTokens", "cost"] },
   TurnsPage: { required: ["turns", "firstTurn", "openStart"], optional: ["firstPrompt"] },
   TurnsRequest: { required: ["agentID", "limit"], optional: ["before"] },
+  UnpushedWork: { required: ["project", "worktree"], optional: ["branch", "ahead", "unmerged", "uncommitted"] },
   UnqueueRequest: { required: ["agentID", "promptID"], optional: [] },
   Usage: { required: ["used", "size", "at"], optional: ["cost"] },
   UsageBucket: { required: ["cost", "inputTokens", "outputTokens", "thoughtTokens", "cachedReadTokens", "cachedWriteTokens", "turns", "unpricedTurns"], optional: [] },

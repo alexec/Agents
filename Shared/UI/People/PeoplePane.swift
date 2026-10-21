@@ -23,6 +23,11 @@ struct PeoplePane: View {
     @State private var problem: String?
     @State private var isInviting = false
     @State private var removing: DaemonAPI.PersonRow?
+    /// What Remove would take (#1763): the person's started machines with their work that
+    /// is not pushed. Nil from a control plane from before it.
+    @State private var removal: DaemonAPI.PersonRemovePreview?
+    /// The person whose machines are being asked, before the confirmation shows.
+    @State private var asking: DaemonAPI.PersonRow?
     @State private var isRotating = false
     /// Said once the control key was rotated (#997).
     @State private var rotated = false
@@ -43,11 +48,17 @@ struct PeoplePane: View {
                 }
                 .paperListRow()
             }
+            if let asking {
+                Section {
+                    Text(PeopleWords.asking(asking)).appText(.supporting).foregroundStyle(.secondary)
+                }
+                .paperListRow()
+            }
             if let list {
                 ForEach(list.people) { person in
                     PersonSection(person: person, admin: list.admin,
                                   setRole: { role in Task { await setRole(person, role) } },
-                                  remove: { removing = person })
+                                  remove: { Task { await askBeforeRemoving(person) } })
                     if person.isYou, let joinCommand, !joinCommand.isEmpty {
                         JoinCommandSection(command: joinCommand)
                     }
@@ -100,7 +111,7 @@ struct PeoplePane: View {
             Button("Remove", role: .destructive) { Task { await remove(person) } }
             Button("Cancel", role: .cancel) {}
         } message: { person in
-            Text(PeopleWords.removeMessage(person))
+            Text(PeopleWords.removeMessage(person, preview: removal))
         }
         .confirmationDialog(PeopleWords.rotateTitle, isPresented: $isRotating, titleVisibility: .visible) {
             Button("Rotate") { Task { await rotate() } }
@@ -142,6 +153,26 @@ struct PeoplePane: View {
             problem = PeopleWords.refusal(error)
         }
         await reload()
+    }
+
+    /// Asks the control plane what Remove would take, then asks to confirm it (FR-029). An
+    /// older control plane does not know `people/removePreview`: the confirmation then says
+    /// what it did before.
+    private func askBeforeRemoving(_ person: DaemonAPI.PersonRow) async {
+        guard let control, asking == nil else { return }
+        asking = person
+        defer { asking = nil }
+        do {
+            removal = try await control.call(DaemonAPI.Method.peopleRemovePreview, DaemonAPI.PersonRequest(user: person.id),
+                                             returning: DaemonAPI.PersonRemovePreview.self)
+        } catch let error as JSONRPCError where error.code == JSONRPCError.methodNotFound {
+            removal = nil
+        } catch {
+            problem = PeopleWords.refusal(error)
+            return
+        }
+        problem = nil
+        removing = person
     }
 
     private func remove(_ person: DaemonAPI.PersonRow) async {

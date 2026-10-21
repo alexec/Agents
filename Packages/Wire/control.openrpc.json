@@ -1332,6 +1332,31 @@
       }
     },
     {
+      "name": "people/removePreview",
+      "x-capability": "people/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/PersonRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/PersonRemovePreview"
+        }
+      }
+    },
+    {
       "name": "people/setRole",
       "x-capability": "people/1",
       "tags": [

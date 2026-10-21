@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/alexec/agents/Go/internal/controllink"
+	"github.com/alexec/agents/Go/internal/controlplane/providers"
 	"github.com/alexec/agents/Go/internal/controlplane/records"
 	"github.com/alexec/agents/Go/internal/controlplane/store"
 	"github.com/alexec/agents/Go/wire"
@@ -226,7 +227,7 @@ func TestEveryClientMethodChecksTheOwner(t *testing.T) {
 		"clients/connections": true, "clients/forgetSelf": true, "clients/setPushToken": true, "clients/setActivityToken": true, "devices/list": true,
 		"devices/startPairing": true, "devices/stopPairing": true, "devices/forget": true, "audit/list": true,
 		"audit/export": true, "control/setAuditDays": true, "people/list": true, "people/invite": true,
-		"people/setRole": true, "people/remove": true, "hosts/joinRequests": true, "hosts/approveJoin": true,
+		"people/setRole": true, "people/remove": true, "people/removePreview": true, "hosts/joinRequests": true, "hosts/approveJoin": true,
 		"hosts/denyJoin": true, "control/rotate": true,
 		"providers/list": true, "providers/refresh": true, "providers/add": true, "providers/update": true,
 		"providers/remove": true, "providers/options": true, "providers/runtimes": true, "providers/draftStart": true,
@@ -504,5 +505,49 @@ func TestLendsAndWindowsStayWithinOneUser(t *testing.T) {
 	// Git access is asked of Sam's own Mac only, never Alex's.
 	if lender := p.s.methods.gitLender(samBox); lender != samMac {
 		t.Fatalf("git lender: %s", lender)
+	}
+}
+
+// FR-029, T036: Remove first lists the person's started machines, each with the work on it
+// that is not pushed, and their registered machines. Only an admin may ask. Remove then
+// takes every machine off at once.
+func TestRemoveFirstSaysWhatWorkIsNotPushed(t *testing.T) {
+	p := startPlane(t, store.NewMemory(), controllink.NewPrivateKey())
+	ctx := context.Background()
+	_, alexWindow := p.client("Alex's Mac")
+	sam := p.invite(alexWindow, "Sam", wire.UserRoleMember)
+	started := p.machine(sam, "SAM-WS").member.Host
+	registered := p.machine(sam, "SAM-MAC").member.Host
+	record := *p.s.Records().Host(started)
+	record.Workspace, _ = json.Marshal(providers.WorkspaceLink{Provider: "docker", Workspace: "sam-ws"})
+	if err := p.s.Records().SaveHost(ctx, record); err != nil {
+		t.Fatal(err)
+	}
+
+	if e := callError(t, sam.window, "", "people/removePreview", wire.PersonRequest{User: sam.id}); !strings.Contains(e, "-32045") {
+		t.Fatalf("a member asked: %s", e)
+	}
+	var preview wire.PersonRemovePreview
+	json.Unmarshal(call(t, alexWindow, "", "people/removePreview", wire.PersonRequest{User: sam.id}), &preview)
+	if len(preview.RegisteredMachines) != 1 || string(preview.RegisteredMachines[0].ID) != registered {
+		t.Fatalf("registered: %+v", preview.RegisteredMachines)
+	}
+	if len(preview.StartedMachines) != 1 || string(preview.StartedMachines[0].Host) != started || preview.StartedMachines[0].Unknown != nil {
+		t.Fatalf("started: %+v", preview.StartedMachines)
+	}
+	// The fake host's worktrees: one ahead, one with no upstream and commits not on main,
+	// one with changes not committed, and one pushed, which is left out.
+	work := preview.StartedMachines[0].Unpushed
+	if len(work) != 3 || deref(work[0].Branch) != "agents/ahead" || deref(work[0].Ahead) != 2 ||
+		deref(work[1].Unmerged) != 4 || deref(work[2].Uncommitted) != 1 {
+		t.Fatalf("unpushed: %+v", work)
+	}
+
+	call(t, alexWindow, "", "people/remove", wire.PersonRequest{User: sam.id})
+	if p.s.Records().Host(started) != nil || p.s.Records().Host(registered) != nil {
+		t.Fatal("a machine of Sam's is still there")
+	}
+	if e := callError(t, alexWindow, "", "people/removePreview", wire.PersonRequest{User: sam.id}); !strings.Contains(e, "no such person") {
+		t.Fatalf("a removed person: %s", e)
 	}
 }

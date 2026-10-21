@@ -6,9 +6,12 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"strings"
+	"sync"
 	"time"
 
+	"github.com/alexec/agents/Go/internal/controlplane/providers"
 	"github.com/alexec/agents/Go/internal/controlplane/records"
+	"github.com/alexec/agents/Go/internal/safe"
 	"github.com/alexec/agents/Go/wire"
 )
 
@@ -191,7 +194,7 @@ func (m *Methods) peopleMethod(ctx context.Context, method string, params json.R
 		}
 		m.s.peopleChanged(request.User, false)
 		return map[string]any{}, nil
-	case "people/remove":
+	case "people/remove", "people/removePreview":
 		if !admin {
 			return nil, fail(notPermitted, "Only an admin can remove a person.")
 		}
@@ -204,6 +207,12 @@ func (m *Methods) peopleMethod(ctx context.Context, method string, params json.R
 		}
 		if request.User == m.s.localOwner() {
 			return nil, fail(notPermitted, "The local owner holds the control plane's key, and stays.")
+		}
+		if method == "people/removePreview" {
+			if p := m.records.Person(request.User); p == nil || p.IsRemoved() {
+				return nil, fail(invalidParams, "There is no such person.")
+			}
+			return m.removePreview(request.User, from), nil
 		}
 		return map[string]any{}, m.removePerson(ctx, request.User, from)
 	}
@@ -310,16 +319,99 @@ func (m *Methods) removePerson(ctx context.Context, user string, from Caller) er
 		}
 	}
 	for _, h := range m.records.Hosts() {
-		if m.s.ownerOf(h.ID) == user {
-			if _, err := m.removeHost(ctx, h.ID, from); err != nil {
-				return err
-			}
+		if m.s.ownerOf(h.ID) != user {
+			continue
+		}
+		// A started machine is stopped and deleted through its provider (FR-029), after it
+		// has left the control plane: that may take minutes, and the removal may not wait.
+		link := providers.LinkOf(&h)
+		if _, err := m.removeHost(ctx, h.ID, from); err != nil {
+			return err
+		}
+		if link != nil && m.s.providers != nil {
+			name, provided := h.Name, m.s.providers
+			safe.Go("delete a removed person's machine", func() { provided.DeleteForRemoval(*link, name, user) })
 		}
 	}
 	m.s.joins.dropFor(ctx, user)
 	m.s.peopleChanged(user, true)
 	m.s.log("person " + user + " removed")
 	return nil
+}
+
+// previewPatience is how long Remove's preview waits for each started machine to say what
+// work on it is not pushed.
+var previewPatience = 10 * time.Second
+
+// removePreview is people/removePreview (FR-029): the person's started machines, each
+// asked at once for the work on it that is not pushed, and their registered machines.
+func (m *Methods) removePreview(user string, from Caller) wire.PersonRemovePreview {
+	out := wire.PersonRemovePreview{StartedMachines: []wire.StartedMachinePreview{}, RegisteredMachines: []wire.PersonMachine{}}
+	var started []records.HostRecord
+	for _, h := range m.records.Hosts() {
+		if m.s.ownerOf(h.ID) != user {
+			continue
+		}
+		if providers.LinkOf(&h) != nil {
+			started = append(started, h)
+			continue
+		}
+		state, _ := m.router.Described(h.ID)["state"].(string)
+		out.RegisteredMachines = append(out.RegisteredMachines, wire.PersonMachine{ID: wire.HostID(h.ID), Name: h.Name,
+			State: state, Platform: optional(h.Platform)})
+	}
+	previews := make([]wire.StartedMachinePreview, len(started))
+	var wg sync.WaitGroup
+	for i, h := range started {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			previews[i] = m.unpushedOn(h, from)
+		}()
+	}
+	wg.Wait()
+	out.StartedMachines = append(out.StartedMachines, previews...)
+	return out
+}
+
+// unpushedOn asks a started machine for its worktrees, on a channel bound to the admin
+// who asked, and keeps those with work that is not pushed.
+func (m *Methods) unpushedOn(h records.HostRecord, from Caller) wire.StartedMachinePreview {
+	state, _ := m.router.Described(h.ID)["state"].(string)
+	preview := wire.StartedMachinePreview{Host: wire.HostID(h.ID), Name: h.Name, State: state, Unpushed: []wire.UnpushedWork{}}
+	if s, ok := m.router.State(h.ID); !ok || !s.online() {
+		preview.Unknown = optional(h.Name + " is not online, so it could not be asked.")
+		return preview
+	}
+	answer := m.router.DeliverKept(wire.CallWorktreesAll.Name, wire.Empty{}, from.Client, from.Kind, h.ID, previewPatience)
+	var projects []wire.ProjectWorktrees
+	if answer == nil || len(answer.Error) > 0 || json.Unmarshal(answer.Result, &projects) != nil {
+		preview.Unknown = optional(h.Name + " did not say what work on it is not pushed.")
+		return preview
+	}
+	for _, p := range projects {
+		for _, w := range p.Worktrees {
+			if w.Status == nil || !unpushed(*w.Status) {
+				continue
+			}
+			work := wire.UnpushedWork{Project: p.Project, Worktree: w.Root, Branch: w.Branch, Ahead: w.Status.Ahead,
+				Unmerged: w.Status.Unmerged}
+			if w.Status.Uncommitted > 0 {
+				work.Uncommitted = new(w.Status.Uncommitted)
+			}
+			preview.Unpushed = append(preview.Unpushed, work)
+		}
+	}
+	return preview
+}
+
+// unpushed says a worktree has work that would be lost: changes not committed, commits
+// ahead of its upstream, or, with no upstream, commits not on the base.
+func unpushed(s wire.WorktreeStatus) bool {
+	if s.Uncommitted > 0 || (s.Ahead != nil && *s.Ahead > 0) {
+		return true
+	}
+	return s.Ahead == nil && s.Unmerged != nil && *s.Unmerged > 0
 }
 
 // peopleChanged tells every admin's sessions, and the person changed.
