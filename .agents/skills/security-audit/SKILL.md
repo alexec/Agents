@@ -1,6 +1,6 @@
 ---
 name: security-audit
-description: Review what changed on main since the last release tag for security threats (tokens, socket roles, servers, foreign files, git, Keychain, logs), write the findings under .agents/reviews/security/ and never publish them, and have helpers fix the critical and high ones on branches for Alex. Use when the Security review workflow runs in a release (#1462), or when Alex asks for this project's security audit. It is not the general security-review skill, but it uses the method of that skill.
+description: Review what changed on main since the last release tag for security threats (tokens, socket roles, servers, foreign files, git, Keychain, logs) and read the open Dependabot alerts, write the findings under .agents/reviews/security/ and never publish them (an alert, which is public already, goes to an issue), and have helpers fix the critical and high ones on branches for Alex. Use when the Security review workflow runs in a release (#1462), or when Alex asks for this project's security audit. It is not the general security-review skill, but it uses the method of that skill.
 ---
 
 # Security audit
@@ -16,7 +16,10 @@ at the keyboard, that is true only of a run of the workflow.
   Do everything in the review worktree below, and have helpers work in their own.
 - **Never** merge, push, rebase `main`, open pull requests, file GitHub issues, ship or
   restart the app, or call the live app's `daemon.sock`. The repository is public and
-  a security finding must not be published before it is fixed.
+  a security finding must not be published before it is fixed. The one exception is a
+  Dependabot alert (step 1.4, `dependencies`): its advisory is public already, so it gets
+  an issue (step 3). Never dismiss an alert yourself: that changes the repository, and it
+  is Alex's to decide.
 - **Never delete a worktree or a branch**, yours or a helper's. Alex reads them.
 - **Never turn workflows on or off**, this one included.
 - **Write only under `.agents/reviews/security/`.** Never change
@@ -81,11 +84,29 @@ at the keyboard, that is true only of a run of the workflow.
         be in it;
      7. `logs`: what gets into logs, events, crash notes and transcripts: tokens,
         prompts, file contents, paths with secrets.
+   - `dependencies` (#1910): every **open** Dependabot alert, whatever the diff touches:
+     `gh api --paginate 'repos/alexec/Agents/dependabot/alerts?state=open'`. That is every
+     manifest (`Web/`, `Go/`, `App/Resources/toolsets/*`). For each alert, note its number,
+     the package and manifest, its severity (`security_advisory.severity`), the advisory
+     (`security_advisory.ghsa_id`), the first patched version
+     (`security_vulnerability.first_patched_version`) and Dependabot's own pull request,
+     if any (`gh pr list --author app/dependabot --search <package>`). Whether the
+     vulnerable code is reached helps say how urgent it is: the govulncheck lines of
+     `scripts/lint.sh` for Go, and `npm audit --omit=dev` in `Web/` for the page. That is
+     optional, and never lowers the alert's severity on its own.
 
 ## 2. Review
 
 Apply the method of the `security-review` skill: high-confidence, exploitable problems
 with a concrete attack path; no style nits, no theoretical hardening.
+
+A Dependabot alert is a finding with the alert's own severity. Its evidence is the
+manifest and the advisory, its attack is the advisory's summary, and its fix is the
+patched version (or Dependabot's pull request). One whose package has no patched version,
+or whose vulnerable code the app cannot reach, is still a finding: say why, and record it
+as "needs a decision: dismiss alert <n> as <no_bandwidth | tolerable_risk | inaccurate |
+not_used>?". Only Alex dismisses one (`gh api -X PATCH
+repos/alexec/Agents/dependabot/alerts/<n> -f state=dismissed -f dismissed_reason=…`).
 
 For each finding, give **severity** (critical, high, medium, low), **evidence**
 (`file:line` and the code), **the attack** in one or two sentences (who, from where,
@@ -103,10 +124,25 @@ In the review worktree:
 - Append one line per new finding to `.agents/reviews/security/findings.md`:
   `- S…-n · severity · title · status`, where status starts as `open`.
 - Commit both on `agents/reviews-security` ("Security review <date>: <n> findings").
+- **Dependency alerts** go in the run file only, in a section `## Dependency alerts`
+  with ids `D<YYYYMMDD>-<n>`, not in `findings.md`: that list is the private findings the
+  release keeps as draft advisories, and an alert is public already. Each critical, high
+  or medium alert gets an issue, unless one is open for it already (`gh issue list
+  --search "<ghsa_id> in:body"`): title `Dependency (<severity>): <package> <advisory
+  title>`, a body with the alert's number and link, the advisory, the manifest, the
+  patched version, Dependabot's pull request if any, and the finding's id; the labels
+  `priority:high` (critical and high) or `priority:medium`, `bug`, `dependencies`, and its
+  `area:<name>` from `.agents/areas` when the manifest has one. The release (its step 3)
+  collects these issues with its other high and medium ones, so a high alert blocks the
+  release as any high finding does, and the Scrum Master's lanes fix it: they bump the
+  dependency, or land Dependabot's own pull request when it is green. A low alert is only
+  recorded. The run file says each alert's issue (`filed #NNN`).
 
 ## 4. Fix the critical and high ones
 
-Only **critical** and **high** findings are fixed; medium and low stay recorded.
+Only **critical** and **high** findings are fixed; medium and low stay recorded. A
+dependency alert is not given a helper: its issue goes to the Scrum Master's lanes
+through the release (step 3).
 
 - At most **2 helpers per run**. Call `list_sessions` with `started_by: me` first and start no more than
   the free running places allow (the project's helper limits are 3 running and 5 not
@@ -151,11 +187,12 @@ When the helpers are done (or if none were started):
    has commits, and its report names the test that failed first and the proof.
 2. Update each finding's status in `findings.md` and in the run file: `fixed on
    <branch> (<commits>)`, `needs a decision: <the choice>`, `won't fix: <why>`, or
-   `recorded` (medium and low). Commit on `agents/reviews-security`.
+   `recorded` (medium and low). Commit on `agents/reviews-security`. A dependency alert's
+   status is its issue (`filed #NNN`), or `needs a decision: dismiss …`.
 3. Archive each helper you started with `archive_session`. Never delete its worktree or
    branch yourself: the work is there for Alex. (Archiving lets the app tidy away a
    worktree it made once everything in it is committed; the unmerged branch stays.)
-4. End with one line per finding:
-   `<id> <severity> <title> — fixed on <branch> | needs a decision: … | won't fix: … | recorded`,
+4. End with one line per finding, dependency alerts included:
+   `<id> <severity> <title> — fixed on <branch> | filed #NNN | needs a decision: … | won't fix: … | recorded`,
    then the review file `.agents/reviews/security/<date>.md` on branch `agents/reviews-security`.
    If any finding needs a decision, ask Alex with your question tool.
