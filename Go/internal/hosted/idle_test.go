@@ -7,6 +7,7 @@ import (
 	"flag"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -19,6 +20,15 @@ import (
 type countingStore struct {
 	store.Store
 	lists atomic.Int64
+	// Reads of an account record, the one toAccount makes before a copy runs.
+	gets atomic.Int64
+}
+
+func (c *countingStore) Get(ctx context.Context, key string) (*store.Object, error) {
+	if strings.HasPrefix(key, hostedPrefix+"v1/accounts/") {
+		c.gets.Add(1)
+	}
+	return c.Store.Get(ctx, key)
 }
 
 func (c *countingStore) List(ctx context.Context, prefix string) ([]store.Key, error) {
@@ -140,6 +150,26 @@ func TestACopyInUseKeepsRunning(t *testing.T) {
 	s.sweepIdle()
 	if n := s.running(); n != 0 {
 		t.Fatalf("%d running after the idle limit, want 0", n)
+	}
+}
+
+// P20261020-24: a request to a running copy reads no account record, so 100 of
+// them cost no store reads for it; one to a stopped copy reads the account and starts it.
+func TestARunningCopyReadsNoAccount(t *testing.T) {
+	s, st, now, ids := idleService(t, 1)
+	before := st.gets.Load()
+	for range 100 {
+		open(t, s, ids[0])
+	}
+	if gets := st.gets.Load() - before; gets != 0 {
+		t.Fatalf("%d account reads for 100 requests to a running copy, want 0", gets)
+	}
+	now.add(idleLimit + time.Minute)
+	s.sweepIdle()
+	before = st.gets.Load()
+	open(t, s, ids[0])
+	if gets := st.gets.Load() - before; gets == 0 {
+		t.Fatal("no account read for a request to a stopped copy")
 	}
 }
 
