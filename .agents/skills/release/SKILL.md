@@ -1,6 +1,6 @@
 ---
 name: release
-description: Take main to a new version with nobody watching (#914). Run the six reviews and checks once each on what changed since the last tag, have the high findings fixed through the Scrum Master's lanes (the medium ones are filed, listed as known issues and left to the lanes after the release), check the gate, choose the version, check its milestone, write the notes, tag and push, check the GitHub release and both TestFlight builds, close the milestone, lift the next milestone's hold, and review how the release went. Use when the Release workflow runs, or when Alex asks for a release. Not for installing on Alex's Mac or devices (ship-app), and never for App Review.
+description: Take main to a new version with nobody watching (#914), started by Alex or by itself once the open milestone is ready (#1729). Run the six reviews and checks once each on what changed since the last tag, have the high findings fixed through the Scrum Master's lanes (the medium ones are filed, listed as known issues and left to the lanes after the release), check the gate, choose the version, check its milestone, write the notes, tag and push, check the GitHub release and both TestFlight builds, close the milestone, lift the next milestone's hold, and review how the release went. Use when the Release workflow runs, or when Alex asks for a release. Not for installing on Alex's Mac or devices (ship-app), and never for App Review.
 ---
 
 # Release
@@ -54,6 +54,28 @@ Alex decided (2026-10-13, #914):
   prompt or not, is a known issue (step 6). When a prompt says to ask about one, do not
   ask: decide by these rules and say so in the report. (v0.6.0 waited 8 h on such a
   question.)
+
+## 0. Is the milestone ready? (a run a trigger started)
+
+Alex chose on 2026-10-21 that the release starts on its own when it is ready (#1729). The
+workflow runs when an issue closes and once a day, so most runs find it is not, and end at
+once. Skip this step when Alex started the run (Run now, or a message): the note at the end
+of the prompt says why it started.
+
+1. The open milestone is the earliest open one by its version:
+   `gh api 'repos/alexec/Agents/milestones?state=open' --jq '.[]|[.number,.title]|@tsv'`,
+   the lowest `0.x` first.
+2. It is ready when all of these hold:
+   - none of its open issues is labelled `priority:high`
+     (`gh issue list --milestone "<title>" --state open --label priority:high`);
+   - none of its open issues is labelled `needs-walk`: its walks are done;
+   - no other release is running: no session not archived, other than this one, labelled
+     `release` and working (`list_sessions`).
+   Open issues that are not high are fine: they go into the notes as known issues (step 6).
+3. Not ready: end with `nothing_to_do`, and one line that says what it waits for ("0.9: 2
+   high issues open, #1990 and #1991"). Change nothing and start nothing.
+4. Ready: go on to step 1, which still ends `nothing_to_do` when nothing merged since the
+   last tag.
 
 ## 1. Is a release due?
 
