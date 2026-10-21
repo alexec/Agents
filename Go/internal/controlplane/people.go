@@ -434,6 +434,10 @@ func (s *Service) peopleChanged(user string, removed bool) {
 		s.router.TellPerson(s.localOwner(), "control/peopleChanged", change)
 	}
 	s.noteTeam()
+	if s.providers != nil {
+		// A role or a removal changes which providers each person is shown (#1761).
+		s.providers.Republish()
+	}
 	s.announce("peopleChanged", user, "")
 }
 

@@ -50,6 +50,9 @@ func (s *Service) makeProviders(home string) *providers.Providers {
 			},
 			Connect: connect,
 			OwnerOf: s.ownerOf,
+			IsAdmin:   s.isAdmin,
+			InGroup:   s.inGroup,
+			GroupName: s.groupName,
 			HostCommand: func(person string) (string, error) {
 				shown, err := s.codes.Issue(withCodeOwner(context.Background(), person), true, false, 5*time.Minute)
 				if err != nil {
@@ -118,6 +121,10 @@ func (a providerRouter) SetWorkspace(host string, ws *providers.HostWorkspace) {
 
 func (a providerRouter) BroadcastControl(method string, params any) {
 	a.r.BroadcastControl(method, params)
+}
+
+func (a providerRouter) BroadcastControlEach(method string, params func(person string) any) {
+	a.r.BroadcastControlEach(method, params)
 }
 
 func (a providerRouter) DeliverKept(method string, params json.RawMessage, client, kind, host string, patience time.Duration) *providers.Reply {

@@ -1,5 +1,5 @@
 providers/list
-{"providers":[{"id":"<provider>","name":"DigitalOcean","kind":"commands","secrets":{"DIGITALOCEAN_TOKEN":true},"capabilities":["create","delete","options"],"contract":1,"mapped":false,"preset":"doctl","workspaces":[{"id":"agents-devbox","name":"agents-devbox","state":"stopped","ssh":"alex@127.0.0.1 -p 2222"},{"id":"scratch-1","name":"scratch-1","state":"running"}],"listedAt":<date>,"current":true}]}
+{"providers":[{"id":"<provider>","name":"DigitalOcean","kind":"commands","secrets":{"DIGITALOCEAN_TOKEN":true},"capabilities":["create","delete","options"],"contract":1,"mapped":false,"preset":"doctl","workspaces":[{"id":"agents-devbox","name":"agents-devbox","state":"stopped","ssh":"alex@127.0.0.1 -p 2222"},{"id":"scratch-1","name":"scratch-1","state":"running"}],"listedAt":<date>,"current":true,"mayUse":true}]}
 
 hosts/link
 {"ID":"devbox01","State":"online","Workspace":{"provider":"<provider>","providerName":"DigitalOcean","workspace":"agents-devbox","workspaceName":"agents-devbox","workspaceState":"stopped","hostState":"stopped","canStart":true,"canStop":false,"startWhenUsed":true,"stopWhenIdleMinutes":30,"current":true,"startForSchedules":true,"tellsSchedule":false}}
@@ -38,7 +38,7 @@ host/workspaces (host) refused
 {"code":-32045,"message":"Agents can’t ask that of the control plane."}
 
 providers/list
-{"providers":[{"id":"<provider>","name":"DigitalOcean","kind":"commands","secrets":{"DIGITALOCEAN_TOKEN":true},"capabilities":["create","delete","options"],"contract":1,"mapped":false,"preset":"doctl","workspaces":[{"id":"agents-devbox","name":"agents-devbox","state":"stopped","ssh":"alex@127.0.0.1 -p 2222"},{"id":"scratch-1","name":"scratch-1","state":"running"}],"listedAt":<date>,"current":true}]}
+{"providers":[{"id":"<provider>","name":"DigitalOcean","kind":"commands","secrets":{"DIGITALOCEAN_TOKEN":true},"capabilities":["create","delete","options"],"contract":1,"mapped":false,"preset":"doctl","workspaces":[{"id":"agents-devbox","name":"agents-devbox","state":"stopped","ssh":"alex@127.0.0.1 -p 2222"},{"id":"scratch-1","name":"scratch-1","state":"running"}],"listedAt":<date>,"current":true,"mayUse":true}]}
 
 # told every window
 

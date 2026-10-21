@@ -2387,6 +2387,38 @@ type GitViewShared struct {
 	Since string `json:"since"`
 }
 
+// A group (#1761, spec 736 FR-027): everyone, or named users. It owns workspace providers: only its users see them and start machines from them (FR-028).
+type Group struct {
+	ID       string   `json:"id"`
+	Name     string   `json:"name"`
+	Everyone bool     `json:"everyone"`
+	Members  []string `json:"members"`
+}
+
+// groups/list (#1761): every group for an admin; for a member, the groups they are in.
+type GroupList struct {
+	Groups []Group `json:"groups"`
+}
+
+// groups/remove (#1761): the group. Refused while a workspace provider or a bot has it.
+type GroupRequest struct {
+	ID string `json:"id"`
+}
+
+// groups/set (#1761): makes a group, or with id changes one. One user is a list of one.
+type GroupSet struct {
+	ID       *string  `json:"id,omitzero"`
+	Name     string   `json:"name"`
+	Everyone *bool    `json:"everyone,omitzero"`
+	Members  []string `json:"members,omitzero"`
+}
+
+// control/groupsChanged (#1761): a group was made, changed or removed.
+type GroupsChanged struct {
+	ID      *string `json:"id,omitzero"`
+	Removed *bool   `json:"removed,omitzero"`
+}
+
 type GuardedChange struct {
 	Path         string   `json:"path"`
 	Digest       *string  `json:"digest,omitzero"`
@@ -4057,6 +4089,12 @@ type ProviderDraftUpdate struct {
 	Note        *string        `json:"note,omitzero"`
 }
 
+// providers/setGroup (#1761): the group whose users may use the provider. No group is the admins' alone.
+type ProviderGroup struct {
+	Provider ProviderID `json:"provider"`
+	Group    *string    `json:"group,omitzero"`
+}
+
 type ProviderID string
 
 // providers/list and control/providersChanged.
@@ -4101,6 +4139,10 @@ type ProviderSummary struct {
 	ListedAt     *Date           `json:"listedAt,omitzero"`
 	Current      bool            `json:"current"`
 	Problem      *string         `json:"problem,omitzero"`
+	// The group whose users may use it (#1761); none is the admins' alone.
+	Group *string `json:"group,omitzero"`
+	// The caller may start machines from it (#1761): they are in its group. Absent from an older control plane, which lets everyone.
+	MayUse *bool `json:"mayUse,omitzero"`
 }
 
 // Which APNs a device token belongs to (#1460): a Debug build's (sandbox) or a TestFlight and App Store build's.

@@ -71,6 +71,7 @@ var own = map[string]bool{
 	"reports/usage": true, "reports/export": true,
 	"user/settings": true, "user/setSettings": true, "user/setSecret": true, "user/removeSecret": true,
 	"user/secretNames": true,
+	"groups/list": true, "groups/set": true, "groups/remove": true, "providers/setGroup": true,
 }
 
 // Handles says whether a bare method is the control plane's. A bare daemon/ping from
@@ -96,6 +97,7 @@ var writes = map[string]bool{
 	"control/setAuditDays":     true, "control/rotate": true, "people/invite": true, "people/setRole": true, "people/remove": true,
 	"hosts/approveJoin": true, "hosts/denyJoin": true,
 	"user/setSettings": true, "user/setSecret": true, "user/removeSecret": true,
+	"groups/set": true, "groups/remove": true, "providers/setGroup": true,
 }
 
 func (m *Methods) Handle(method string, params json.RawMessage, from Caller) (any, error) {
@@ -134,6 +136,8 @@ func (m *Methods) Handle(method string, params json.RawMessage, from Caller) (an
 		return out, nil
 	case "people/list", "people/invite", "people/setRole", "people/remove", "people/removePreview":
 		return m.peopleMethod(ctx, method, params, from)
+	case "groups/list", "groups/set", "groups/remove", "providers/setGroup":
+		return m.groupsMethod(ctx, method, params, from)
 	case "reports/usage", "reports/export":
 		return m.reportMethod(ctx, method, params, from)
 	case "user/settings", "user/setSettings", "user/setSecret", "user/removeSecret", "user/secretNames":

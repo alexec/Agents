@@ -56,6 +56,9 @@ type ProviderRecord struct {
 	Forgotten    *bool
 	// Set when the map or commands were kept as an agent wrote them (#858).
 	WrittenBy *WrittenBy
+	// The group whose users may see it and start machines from it (#1761, FR-028); nil
+	// for the admins' alone, as every provider made before groups is.
+	Group *string
 	// What a later build wrote that this one does not know, written back as it was.
 	Extra records.Extra
 }
@@ -82,11 +85,12 @@ type providerJSON struct {
 	Rev          int               `json:"rev"`
 	Forgotten    *bool             `json:"forgotten,omitempty"`
 	WrittenBy    *WrittenBy        `json:"writtenBy,omitempty"`
+	Group        *string           `json:"group,omitempty"`
 }
 
 func (p ProviderRecord) MarshalJSON() ([]byte, error) {
 	j := providerJSON{p.ID, p.Name, p.Kind, p.Command, p.Args, p.URL, p.Headers, p.Commands, p.SecretNames, p.Map,
-		p.Capabilities, p.Contract, p.Rev, p.Forgotten, p.WrittenBy}
+		p.Capabilities, p.Contract, p.Rev, p.Forgotten, p.WrittenBy, p.Group}
 	if j.SecretNames == nil {
 		j.SecretNames = []string{}
 	}
@@ -106,7 +110,7 @@ func (p *ProviderRecord) UnmarshalJSON(data []byte) error {
 		return fmt.Errorf("no provider kind %q", j.Kind)
 	}
 	*p = ProviderRecord{j.ID, j.Name, j.Kind, j.Command, j.Args, j.URL, j.Headers, j.Commands, j.SecretNames, j.Map,
-		j.Capabilities, j.Contract, j.Rev, j.Forgotten, j.WrittenBy, extra}
+		j.Capabilities, j.Contract, j.Rev, j.Forgotten, j.WrittenBy, j.Group, extra}
 	return nil
 }
 

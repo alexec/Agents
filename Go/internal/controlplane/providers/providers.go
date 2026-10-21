@@ -107,6 +107,12 @@ type Hooks struct {
 	BackUp func(host string, caller Caller) (bool, error)
 	// OwnerOf is the user who owns a host (#994): an agent reaches only its own user's.
 	OwnerOf func(host string) string
+	// IsAdmin says a user is an admin (#1761). Nil: everyone is.
+	IsAdmin func(user string) bool
+	// InGroup says a user is in a group (#1761). Nil: everyone is.
+	InGroup func(user, group string) bool
+	// GroupName is a group's name, for a refusal; "" for none.
+	GroupName func(group string) string
 }
 
 // Config is what NewProviders is given.
@@ -431,7 +437,7 @@ func (p *Providers) AgentCall(host, agent, method string, params json.RawMessage
 	// No client: the host's own channel.
 	caller := Caller{Session: records.NewUUID(), Client: records.NewUUID(), Kind: "unknown", Person: p.hooks.OwnerOf(host)}
 	if method == MethodWorkspacesAgent {
-		return p.forAgent(), nil
+		return p.forAgent(caller.Person), nil
 	}
 	var given map[string]any
 	if decodeJSON(params, &given) != nil || given == nil {
@@ -480,10 +486,14 @@ func (p *Providers) AgentCall(host, agent, method string, params json.RawMessage
 
 // forAgent is what an agent is shown (US6 AS1): every provider's workspaces and their
 // hosts, and what a new one could be, never a secret or its name.
-func (p *Providers) forAgent() AgentWorkspaces {
+func (p *Providers) forAgent(person string) AgentWorkspaces {
 	hosts := p.records.Hosts()
 	out := AgentWorkspaces{Providers: []AgentProvider{}}
-	for _, summary := range p.Summaries() {
+	for _, summary := range p.SummariesFor(person) {
+		// Only the providers its user may start machines from (#1761).
+		if summary.MayUse != nil && !*summary.MayUse {
+			continue
+		}
 		canMake, canDelete := contains(summary.Capabilities, "create"), contains(summary.Capabilities, "delete")
 		var options any
 		if canMake {
@@ -516,10 +526,13 @@ func contains(list []string, s string) bool {
 }
 
 func (p *Providers) answer(method string, params json.RawMessage, caller Caller, who string) (any, error) {
+	if err := p.refuse(method, params, caller); err != nil {
+		return nil, err
+	}
 	switch method {
 	case MethodProvidersList:
 		// As last listed: a page that opens asks for providers/refresh too (FR-004).
-		return map[string]any{"providers": p.Summaries()}, nil
+		return map[string]any{"providers": p.SummariesFor(caller.Person)}, nil
 	case MethodProvidersRefresh:
 		var request providerRequest
 		decodeJSON(params, &request)
@@ -773,7 +786,7 @@ func (p *Providers) Summaries() []ProviderSummary {
 		}
 		s := ProviderSummary{ID: wire.ProviderID(r.ID), Name: r.Name, Kind: r.Kind, Secrets: secrets, Capabilities: caps,
 			Contract: int64(r.Contract), Mapped: r.Map != nil, Preset: optional(r.preset()), Workspaces: workspaces,
-			Current: l.current, Problem: optional(l.problem)}
+			Current: l.current, Problem: optional(l.problem), Group: r.Group}
 		if l.listedAt != nil {
 			s.ListedAt = dateOf(*l.listedAt)
 		}
@@ -873,6 +886,7 @@ func (p *Providers) save(request ProviderAdd, updating bool) (ProviderSummary, e
 	record.Rev = 1
 	if heldBefore != nil {
 		record.Rev = heldBefore.Rev + 1
+		record.Group = heldBefore.Group
 	}
 	data, err := records.Encode(record)
 	if err != nil {
@@ -1975,7 +1989,7 @@ func (p *Providers) changed() {
 	for _, h := range p.records.Hosts() {
 		p.router.SetWorkspace(h.ID, p.overlay(h))
 	}
-	p.router.BroadcastControl(NoticeProvidersChanged, map[string]any{"providers": p.Summaries()})
+	p.tellProviders()
 }
 
 // Workspace is a host's workspace as it is laid over its state now, or nil.

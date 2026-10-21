@@ -1658,6 +1658,31 @@ func (r *Router) BroadcastControl(method string, params any) {
 	r.broadcastControlLocked(method, params)
 }
 
+// BroadcastControlEach tells every client session a control notification of its person's
+// own (#1761): params is asked once per person.
+func (r *Router) BroadcastControlEach(method string, params func(person string) any) {
+	r.mu.Lock()
+	persons := map[string]bool{}
+	for _, s := range r.clients {
+		if s.wrapped {
+			persons[s.caller.Person] = true
+		}
+	}
+	r.mu.Unlock()
+	// Asked outside the lock: it reads records and the providers.
+	lines := map[string]string{}
+	for person := range persons {
+		lines[person] = wrap("", notification(method, params(person)))
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for id, s := range r.clients {
+		if line, ok := lines[s.caller.Person]; ok && s.wrapped {
+			r.writeLocked(id, line)
+		}
+	}
+}
+
 func (r *Router) broadcastControlLocked(method string, params any) {
 	line := wrap("", notification(method, params))
 	for id, s := range r.clients {

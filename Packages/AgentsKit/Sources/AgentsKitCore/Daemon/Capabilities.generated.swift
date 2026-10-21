@@ -45,6 +45,7 @@ public enum Capability {
     public static let filesDiagnostics1 = "files.diagnostics/1"
     public static let files1 = "files/1"
     public static let git1 = "git/1"
+    public static let groups1 = "groups/1"
     public static let handover1 = "handover/1"
     public static let hostTeam1 = "host.team/1"
     public static let hostUserSettings1 = "host.user-settings/1"
@@ -417,6 +418,9 @@ public enum Capability {
         "control/setProjectDetection": "control/1",
         "control/status": "control/1",
         "git/credential": "git/1",
+        "groups/list": "groups/1",
+        "groups/remove": "groups/1",
+        "groups/set": "groups/1",
         "handover/status": "handover/1",
         "host/hello": "host/1",
         "host/providerDraft": "host/1",
@@ -464,6 +468,7 @@ public enum Capability {
         "providers/refresh": "providers/1",
         "providers/remove": "providers/1",
         "providers/runtimes": "providers/1",
+        "providers/setGroup": "groups/1",
         "providers/update": "providers/1",
         "relay/switch": "relay/1",
         "reports/export": "reports/1",
@@ -477,6 +482,7 @@ public enum Capability {
         "user/settings": "user/1",
         "workspaces/forAgent": "workspaces/1",
         "control/clientChanged": "control/1",
+        "control/groupsChanged": "groups/1",
         "control/hostChanged": "control/1",
         "control/installProgress": "control/1",
         "control/joinDecided": "hosts.join/1",
