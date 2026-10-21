@@ -53,7 +53,9 @@ func TestAWaitThatIsDueGoesAndCancelStopsOne(t *testing.T) {
 	// Cancelled: no longer waits, and nothing is sent.
 	waiting := seeded(t, d, cwd, paused)
 	d.allowMu.Lock()
-	until := wire.DateOf(time.Now().Add(time.Hour))
+	// A whole second: the daemon keeps it as a time, and a Date with a fraction does not come
+	// back from Time() to the same float.
+	until := wire.DateOf(time.Now().Add(time.Hour).Truncate(time.Second))
 	s := availableState(ownKey("claude"))
 	s.Status = wire.AllowanceStateStatus{Out: &wire.AllowanceStateStatusOut{Until: &until, Why: wire.AllowanceStateOutReasonAllowanceSpent}}
 	d.allowancesLocked()[ownKey("claude")] = s
