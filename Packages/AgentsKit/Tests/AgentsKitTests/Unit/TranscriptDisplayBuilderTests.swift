@@ -89,6 +89,24 @@ struct TranscriptDisplayBuilderTests {
         #expect(shown.count == items.count - 1, "the two chunks are one thought, and only that goes")
     }
 
+    /// With thoughts hidden, an unchanged page is left as it was, the same array, so the
+    /// chat's comparisons after it are at once (#1849).
+    @Test func shownItemsKeepTheSamePageUntilItChanges() {
+        let memo = ShownItems()
+        let items = TranscriptEntry.display(story)
+        let first = memo.of(items, showsThoughts: false)
+        let again = memo.of(items, showsThoughts: false)
+        #expect(first == items.omittingThoughts())
+        #expect(memo.worked == 1)
+        first.withUnsafeBufferPointer { a in
+            again.withUnsafeBufferPointer { b in #expect(a.baseAddress == b.baseAddress) }
+        }
+        #expect(memo.of(items, showsThoughts: true) == items)
+        _ = memo.of(items, showsThoughts: false)
+        _ = memo.of(TranscriptEntry.display(story + [message("More", "m9")]), showsThoughts: false)
+        #expect(memo.worked == 2, "the switch on and off again keeps the page; a new entry makes it again")
+    }
+
     /// A thought folds to one line: "Thought:" and its first words (#1315).
     @Test func aThoughtFoldsToItsFirstWords() {
         #expect(TranscriptItem.thoughtLine("**Planning the fix**\n\nRead   the file first.")

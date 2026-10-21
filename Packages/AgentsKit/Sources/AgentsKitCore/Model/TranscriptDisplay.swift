@@ -439,3 +439,29 @@ public struct TranscriptDisplayBuilder: Sendable {
         return TranscriptEntry.withoutSupersededPassingLines(all)
     }
 }
+
+/// The page as the chat draws it, with its thoughts or without, kept until the page or the
+/// switch changes (#1849). Leaving the thoughts off makes a new array, so worked out on each
+/// draw it made every comparison after it an element-by-element one; kept, an unchanged page
+/// is the same array, and compares at once.
+public final class ShownItems {
+    private var source: [TranscriptItem] = []
+    private var showsThoughts = true
+    private var shown: [TranscriptItem] = []
+    /// How many times the thoughts were left off: for tests.
+    public private(set) var worked = 0
+
+    public init() {}
+
+    public func of(_ items: [TranscriptItem], showsThoughts: Bool) -> [TranscriptItem] {
+        if showsThoughts { return items }
+        if self.showsThoughts || source != items {
+            worked += 1
+            source = items
+            shown = items.omittingThoughts()
+            self.showsThoughts = false
+        }
+        return shown
+    }
+}
+
