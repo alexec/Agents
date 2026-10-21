@@ -85,6 +85,8 @@ const (
 	maxFolders = 200
 	// maxRaw is the most of one message read: a larger one is read in part and says so.
 	maxRaw = 4 << 20
+	// foldersFor is how long the folders and their counts are kept (#1847).
+	foldersFor = 30 * time.Second
 	// callTimeout bounds one call: a server that stops answering closes the connection.
 	callTimeout = 60 * time.Second
 )
@@ -98,6 +100,9 @@ type Mailbox struct {
 	c        *imapclient.Client
 	selected string
 	validity uint32
+	// folders is the last Folders, from foldersAt; nil when it is to be asked again.
+	folders   []Folder
+	foldersAt time.Time
 }
 
 func clientOptions(handler *imapclient.UnilateralDataHandler) *imapclient.Options {
@@ -167,7 +172,7 @@ func (m *Mailbox) with(ctx context.Context, f func(c *imapclient.Client) error) 
 			if derr != nil {
 				return derr
 			}
-			m.c, m.selected = c, ""
+			m.c, m.selected, m.folders = c, "", nil
 		}
 		c := m.c
 		stop := context.AfterFunc(ctx, func() { _ = c.Close() })
@@ -201,6 +206,7 @@ func (m *Mailbox) with(ctx context.Context, f func(c *imapclient.Client) error) 
 func (m *Mailbox) Close() {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	m.folders = nil
 	if m.c != nil {
 		_ = m.c.Close()
 		m.c = nil
@@ -282,46 +288,73 @@ var roles = map[imap.MailboxAttr]string{
 	imap.MailboxAttrJunk: "junk", imap.MailboxAttrArchive: "archive",
 }
 
-// Folders is every folder that holds messages, with its counts.
+// Folders is every folder that holds messages, with its counts. It is kept for foldersFor,
+// and dropped when a message is marked or moved, so show_mail on every Back, folder change
+// and Refresh does not ask the server again (#1847).
 func (m *Mailbox) Folders(ctx context.Context) ([]Folder, error) {
+	m.mu.Lock()
+	if m.folders != nil && time.Since(m.foldersAt) < foldersFor {
+		out := slices.Clone(m.folders)
+		m.mu.Unlock()
+		return out, nil
+	}
+	m.mu.Unlock()
 	var out []Folder
 	err := m.with(ctx, func(c *imapclient.Client) error {
-		out = nil
-		list, err := c.List("", "*", nil).Collect()
-		if err != nil {
+		var err error
+		if out, err = folders(c); err != nil {
 			return err
 		}
-		for _, l := range list {
-			if len(out) == maxFolders {
-				break
-			}
-			if slices.Contains(l.Attrs, imap.MailboxAttrNoSelect) || slices.Contains(l.Attrs, imap.MailboxAttrNonExistent) {
-				continue
-			}
-			f := Folder{Name: l.Mailbox}
-			if strings.EqualFold(l.Mailbox, "INBOX") {
-				f.Role = "inbox"
-			}
-			for _, a := range l.Attrs {
-				if r, ok := roles[a]; ok {
-					f.Role = r
-				}
-			}
-			status, err := c.Status(l.Mailbox, &imap.StatusOptions{NumMessages: true, NumUnseen: true}).Wait()
-			if err != nil {
-				return err
-			}
-			if status.NumMessages != nil {
-				f.Total = *status.NumMessages
-			}
-			if status.NumUnseen != nil {
-				f.Unread = *status.NumUnseen
-			}
-			out = append(out, f)
-		}
+		m.folders, m.foldersAt = out, time.Now()
 		return nil
 	})
-	return out, err
+	return slices.Clone(out), err
+}
+
+// folders asks the server for the folders and their counts: in one LIST when it offers
+// LIST-STATUS (RFC 5819, in IMAP4rev2), or else a STATUS for each.
+func folders(c *imapclient.Client) ([]Folder, error) {
+	counts := &imap.StatusOptions{NumMessages: true, NumUnseen: true}
+	var options *imap.ListOptions
+	if c.Caps().Has(imap.CapListStatus) || c.Caps().Has(imap.CapIMAP4rev2) {
+		options = &imap.ListOptions{ReturnStatus: counts}
+	}
+	list, err := c.List("", "*", options).Collect()
+	if err != nil {
+		return nil, err
+	}
+	out := []Folder{}
+	for _, l := range list {
+		if len(out) == maxFolders {
+			break
+		}
+		if slices.Contains(l.Attrs, imap.MailboxAttrNoSelect) || slices.Contains(l.Attrs, imap.MailboxAttrNonExistent) {
+			continue
+		}
+		f := Folder{Name: l.Mailbox}
+		if strings.EqualFold(l.Mailbox, "INBOX") {
+			f.Role = "inbox"
+		}
+		for _, a := range l.Attrs {
+			if r, ok := roles[a]; ok {
+				f.Role = r
+			}
+		}
+		status := l.Status
+		if status == nil {
+			if status, err = c.Status(l.Mailbox, counts).Wait(); err != nil {
+				return nil, err
+			}
+		}
+		if status.NumMessages != nil {
+			f.Total = *status.NumMessages
+		}
+		if status.NumUnseen != nil {
+			f.Unread = *status.NumUnseen
+		}
+		out = append(out, f)
+	}
+	return out, nil
 }
 
 func limited(limit int) uint32 {
@@ -524,6 +557,7 @@ func (m *Mailbox) Read(ctx context.Context, id string) (Message, error) {
 // MarkRead marks a message read, or unread with read false.
 func (m *Mailbox) MarkRead(ctx context.Context, id string, read bool) error {
 	return m.with(ctx, func(c *imapclient.Client) error {
+		m.folders = nil
 		uid, err := m.openMessage(c, id)
 		if err != nil {
 			return err
@@ -540,6 +574,7 @@ func (m *Mailbox) MarkRead(ctx context.Context, id string, read bool) error {
 func (m *Mailbox) Move(ctx context.Context, id, folder string) (string, error) {
 	var moved string
 	err := m.with(ctx, func(c *imapclient.Client) error {
+		m.folders = nil
 		uid, err := m.openMessage(c, id)
 		if err != nil {
 			return err

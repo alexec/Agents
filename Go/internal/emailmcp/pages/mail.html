@@ -52,7 +52,7 @@ select, label { font: inherit; font-size: 13px; }
 <script>
 /*bridge.js*/
 (() => {
-  let folder = "INBOX", unreadOnly = false, folders = [], open = null;
+  let folder = "INBOX", unreadOnly = false, folders = [], messages = [], asOf = "", open = null;
   const ui = bridge("email-mail", {
     input: (args) => { folder = args.folder || "INBOX"; unreadOnly = !!args.unreadOnly; say("Listing…"); },
     result: (result) => draw(result),
@@ -82,10 +82,17 @@ select, label { font: inherit; font-size: 13px; }
     folder = found.folder || folder;
     folders = Array.isArray(found.folders) ? found.folders : [];
     fillFolders();
-    const messages = Array.isArray(found.messages) ? found.messages : [];
+    messages = Array.isArray(found.messages) ? found.messages : [];
+    asOf = new Date().toLocaleTimeString();
+    drawMessages();
+  };
+
+  // drawMessages draws the list the page holds: Back shows it again without asking the
+  // server (#1847).
+  const drawMessages = () => {
     $("messages").replaceChildren(...messages.map(row));
     const unread = messages.filter((m) => m.unread).length;
-    say(messages.length ? `${messages.length} in ${folder} · ${unread} unread · as of ${new Date().toLocaleTimeString()}`
+    say(messages.length ? `${messages.length} in ${folder} · ${unread} unread · as of ${asOf}`
       : unreadOnly ? `No unread mail in ${folder}.` : `No mail in ${folder}.`);
   };
 
@@ -132,7 +139,13 @@ select, label { font: inherit; font-size: 13px; }
     if (!open) return;
     try {
       const done = await ui.call("mark_read", { id: open.id, read: !!open.unread });
+      const was = !!open.unread;
       open.unread = !!done.unread;
+      // The list and the folder's count as they are now, for Back.
+      const held = messages.find((m) => m.id === open.id);
+      if (held) held.unread = open.unread;
+      const f = folders.find((x) => x.name === open.folder);
+      if (f && was !== open.unread) f.unread = Math.max(0, (f.unread || 0) + (open.unread ? 1 : -1));
       $("mark").textContent = open.unread ? "Mark Read" : "Mark Unread";
       say(`${open.folder} · ${open.unread ? "unread" : "read"}`);
     } catch (e) { say("Couldn't mark it: " + e.message, true); }
@@ -159,7 +172,7 @@ select, label { font: inherit; font-size: 13px; }
   $("folder").onchange = () => { folder = $("folder").value; showList(); say("Listing…"); list(); };
   $("unread").onchange = () => { unreadOnly = $("unread").checked; showList(); say("Listing…"); list(); };
   $("refresh").onclick = () => { showList(); list(); };
-  $("back").onclick = () => { showList(); list(); };
+  $("back").onclick = () => { showList(); fillFolders(); drawMessages(); };
   $("mark").onclick = markRead;
   $("move").onclick = move;
   ui.start();

@@ -33,6 +33,8 @@ type fakeMail struct {
 	// What the server was asked for, so a test can prove a bound: the numbers every SEARCH
 	// answered with and the messages every FETCH named.
 	searched, fetched int
+	// And how many LIST and STATUS commands came.
+	lists, statuses int
 }
 
 // countingSession is the in-memory session, counting what SEARCH and FETCH give.
@@ -66,6 +68,20 @@ func (s *countingSession) Fetch(w *imapserver.FetchWriter, numSet imap.NumSet, o
 	s.f.fetched += numbers(numSet)
 	s.f.mu.Unlock()
 	return s.UserSession.Fetch(w, numSet, options)
+}
+
+func (s *countingSession) List(w *imapserver.ListWriter, ref string, patterns []string, options *imap.ListOptions) error {
+	s.f.mu.Lock()
+	s.f.lists++
+	s.f.mu.Unlock()
+	return s.UserSession.List(w, ref, patterns, options)
+}
+
+func (s *countingSession) Status(name string, options *imap.StatusOptions) (*imap.StatusData, error) {
+	s.f.mu.Lock()
+	s.f.statuses++
+	s.f.mu.Unlock()
+	return s.UserSession.Status(name, options)
 }
 
 // numbers is how many numbers set names; "*" counts as one.
@@ -183,6 +199,16 @@ type literal struct {
 }
 
 func (l literal) Size() int64 { return l.size }
+
+// commands is how many LIST and STATUS commands came since the last call, and starts the
+// count again.
+func (f *fakeMail) commands() (lists, statuses int) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	lists, statuses = f.lists, f.statuses
+	f.lists, f.statuses = 0, 0
+	return
+}
 
 // plain is a plain-text message.
 func plain(from, to, subject, body string) string {
