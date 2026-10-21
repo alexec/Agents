@@ -170,6 +170,22 @@ What someone holding a browser's session could do, in brief:
 - **A website** can do nothing: its requests are refused on their address and origin, and
   it has no key.
 
+### With the control plane elsewhere
+
+When the control plane runs elsewhere, this Mac's host serves the page instead, with the same
+listener: the same address checks, the same list of files and the same origin rule. The host
+can't check a browser's key, because that needs the control plane's private key, which a host
+never has. So for each page, the host opens a socket of its own to the control plane and proves
+itself there as a host that carries a page, from its loopback listener on a given port. The
+page's own exchange then runs on that socket, with the control plane, bound to
+`localhost` on that port.
+
+That is a rule of trust: the control plane takes the host's word that the socket came in on
+the host's loopback listener. It gives a host nothing new. A host can carry only the sessions
+of browsers that paired at its own `localhost` address, because only the browser's key can
+prove itself there, and a host already reads and answers everything its own agents do. A
+relay host, which runs no agents, can't carry a page. See `specs/1480-local-page-on-agentsd/`.
+
 Since every client may do everything (#111), the listener's address and origin checks and
 the key that can't be read are what keep a browser's session its own. Serving the page at a
 public address, for a browser elsewhere, waits on issue #61.
