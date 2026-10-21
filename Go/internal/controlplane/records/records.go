@@ -56,6 +56,8 @@ type Records struct {
 	clients  map[string]held[ClientRecord]
 	hosts    map[string]held[HostRecord]
 	settings *held[Settings]
+	// Every user, removed ones too (#994).
+	people map[string]held[Person]
 	// Tags of tombstones, so a refresh does not read them again and again.
 	tombstones map[string]string
 	// Keys listed whose object could not be read or decoded, by entity tag (#171). Such
@@ -68,7 +70,7 @@ type Records struct {
 
 func New(s store.Store) *Records {
 	return &Records{Store: s, clients: map[string]held[ClientRecord]{}, hosts: map[string]held[HostRecord]{},
-		tombstones: map[string]string{}, unreadable: map[string]string{}}
+		people: map[string]held[Person]{}, tombstones: map[string]string{}, unreadable: map[string]string{}}
 }
 
 // OnUnreadable sets where an unreadable record is said, once per version (the log).
@@ -157,6 +159,9 @@ func (r *Records) load(ctx context.Context) error {
 	}
 	r.mu.Unlock()
 
+	if err := r.loadPeople(ctx); err != nil {
+		return err
+	}
 	if object, ok := r.read(ctx, store.Key{Key: SettingsKey, ETag: "unreadable"}); ok && object != nil {
 		var settings Settings
 		if err := json.Unmarshal(object.Data, &settings); err != nil {
@@ -390,9 +395,7 @@ func (r *Records) SettingsOrMake(ctx context.Context, makeSettings func() Settin
 		r.mu.Lock()
 		r.settings = &held[Settings]{kept, etag}
 		r.mu.Unlock()
-		if data, err := Encode(Person{ID: *kept.Owner, Name: kept.Name}); err == nil {
-			r.Store.Put(ctx, PersonKey(*kept.Owner), data, store.Absent)
-		}
+		r.savePerson(ctx, r.localOwner(kept))
 		return &kept, nil
 	}
 }
@@ -441,6 +444,64 @@ func (r *Records) ChangeSettings(ctx context.Context, change func(*Settings)) (*
 		return &kept, nil
 	}
 	return nil, &store.ConflictError{Key: SettingsKey}
+}
+
+// localOwner is the first person, as made with new settings or by the migration
+// (FR-002, FR-003): the admin, who signs in with the control plane's key.
+func (r *Records) localOwner(s Settings) Person {
+	now := Now()
+	return Person{ID: *s.Owner, Name: s.Name, Kind: KindPerson, Role: RoleAdmin,
+		SignIns: []SignIn{{Provider: ProviderLocal, Account: ControlKeyID(s.ControlKey), Added: &now}}}
+}
+
+// Migrate is the first start with people (#994, FR-003): the existing person becomes the
+// local owner and the admin, and every client and host without an owner gets that
+// person. Only fields are added; no key changes. It is safe to run on every start.
+func (r *Records) Migrate(ctx context.Context) error {
+	s := r.Settings()
+	if s == nil || s.Owner == nil {
+		return nil
+	}
+	r.writing.Lock()
+	r.mu.Lock()
+	h, known := r.people[*s.Owner]
+	r.mu.Unlock()
+	var err error
+	if !known {
+		err = r.savePerson(ctx, r.localOwner(*s))
+	} else if p := h.record; p.Kind == "" || p.Role == "" || !p.HasSignIn(ProviderLocal, ControlKeyID(s.ControlKey)) {
+		owner := r.localOwner(*s)
+		if p.Kind == "" {
+			p.Kind = KindPerson
+		}
+		if p.Role == "" {
+			p.Role = RoleAdmin
+		}
+		if !p.HasSignIn(ProviderLocal, ControlKeyID(s.ControlKey)) {
+			p.SignIns = append(p.SignIns, owner.SignIns[0])
+		}
+		err = r.savePerson(ctx, p)
+	}
+	r.writing.Unlock()
+	if err != nil {
+		return err
+	}
+	for _, c := range r.Clients() {
+		if c.Owner == nil || *c.Owner == "" {
+			if err := r.ChangeClient(ctx, c.ID, func(c *ClientRecord) bool { c.Owner = s.Owner; return true }); err != nil {
+				return err
+			}
+		}
+	}
+	for _, h := range r.Hosts() {
+		if h.Owner == nil || *h.Owner == "" {
+			h.Owner = s.Owner
+			if err := r.SaveHost(ctx, h); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 func (r *Records) owner() *string {

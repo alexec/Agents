@@ -13,37 +13,26 @@ import (
 
 // Who did what (#996, spec 736 US8): the actor the control plane knows each client by,
 // written on each channel it opens and on each entry the audit keeps, never taken from
-// the client. Until people (#994) are built, every client is the local owner's.
+// the client. Each client is its person's (#994).
 
-// localOwner is the one person: control.json's owner, or "local" before it has one.
-func (s *Service) localOwner() string {
-	if settings := s.records.Settings(); settings != nil && settings.Owner != nil && *settings.Owner != "" {
-		return *settings.Owner
-	}
-	return "local"
-}
-
-// actorFor is who a client is: its owner (the local owner, for now) and the client. A
-// name that is not a client's (a code, a host) is the local owner alone.
+// actorFor is who a client is: its person (#994) and the client. A name that is not a
+// client's (a code, a host) is the local owner alone.
 func (s *Service) actorFor(client string) wire.AuditActor {
 	owner := s.localOwner()
 	actor := wire.AuditActor{User: owner}
 	if c := s.records.Client(strings.ToUpper(client)); c != nil {
-		if c.Owner != nil && *c.Owner != "" {
-			actor.User = *c.Owner
-		}
+		actor.User = s.PersonOf(c.ID)
 		id, name := wire.UUID(c.ID), c.Name
 		actor.Client, actor.ClientName = &id, &name
 	}
 	if actor.User == owner {
 		name := audit.LocalOwnerName
 		actor.UserName = &name
+	} else if name := s.personName(actor.User); name != "" {
+		actor.UserName = &name
 	}
 	return actor
 }
-
-// isAdmin says whether a person sees every entry. The local owner is the admin (FR-003).
-func (s *Service) isAdmin(user string) bool { return user == s.localOwner() }
 
 func (s *Service) auditLog() *audit.Log { return &audit.Log{Store: s.cfg.Store} }
 

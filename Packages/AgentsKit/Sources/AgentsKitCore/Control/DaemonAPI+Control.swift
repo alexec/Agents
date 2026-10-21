@@ -181,6 +181,11 @@ public extension DaemonAPI {
         /// (#1748). Nil from a control plane older than that.
         public var capabilities: [String]?
         public var required: RequiredCapabilities?
+        /// Who this client belongs to (#994). Nil from a control plane older than people.
+        public var person: ControlPerson?
+        /// The one line to run on a server so that it asks to join as this client's person,
+        /// with no code (#994). Nil from a control plane that does not say.
+        public var joinCommand: String?
 
         public init(name: String, version: String, homeHost: HostID?, machineID: String,
                     startedAt: Date? = nil, port: Int? = nil, awayFromHome: Bool? = nil) {
@@ -289,6 +294,8 @@ public extension DaemonAPI {
         public func has(_ capability: String) -> Bool {
             capabilities?.contains(capability) ?? true
         }
+        /// The user who owns the machine (#994).
+        public var owner: String?
 
         public init(id: HostID, name: String, platform: String, version: String, state: String,
                     reach: String, machineID: String?, relay: Bool? = nil) {

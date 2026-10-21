@@ -46,6 +46,7 @@ const (
 	CapHandover1             = "handover/1"
 	CapHostWire1             = "host.wire/1"
 	CapHost1                 = "host/1"
+	CapHostsJoin1            = "hosts.join/1"
 	CapHosts1                = "hosts/1"
 	CapLeases1               = "leases/1"
 	CapLiveactivity1         = "liveactivity/1"
@@ -59,6 +60,7 @@ const (
 	CapOptions1              = "options/1"
 	CapPages1                = "pages/1"
 	CapPairing1              = "pairing/1"
+	CapPeople1               = "people/1"
 	CapPermissions1          = "permissions/1"
 	CapPerson1               = "person/1"
 	CapPersonal1             = "personal/1"
@@ -455,11 +457,14 @@ var ControlCapabilities = map[string]string{
 	"host/status":                 "host/1",
 	"host/workspaces":             "host/1",
 	"hosts/announce":              "hosts/1",
+	"hosts/approveJoin":           "hosts.join/1",
 	"hosts/checkAgain":            "hosts/1",
 	"hosts/deleteWorkspace":       "hosts/1",
+	"hosts/denyJoin":              "hosts.join/1",
 	"hosts/detect":                "hosts/1",
 	"hosts/dropKept":              "hosts/1",
 	"hosts/install":               "hosts/1",
+	"hosts/joinRequests":          "hosts.join/1",
 	"hosts/keep":                  "hosts/1",
 	"hosts/lastHeard":             "hosts/1",
 	"hosts/lendGit":               "hosts/1",
@@ -477,6 +482,10 @@ var ControlCapabilities = map[string]string{
 	"hosts/stop":                  "hosts/1",
 	"hosts/unlink":                "hosts/1",
 	"hosts/update":                "hosts/1",
+	"people/invite":               "people/1",
+	"people/list":                 "people/1",
+	"people/remove":               "people/1",
+	"people/setRole":              "people/1",
 	"projects/detected":           "projects/1",
 	"providers/add":               "providers/1",
 	"providers/create":            "providers/1",
@@ -495,9 +504,12 @@ var ControlCapabilities = map[string]string{
 	"control/clientChanged":       "control/1",
 	"control/hostChanged":         "control/1",
 	"control/installProgress":     "control/1",
+	"control/joinDecided":         "hosts.join/1",
+	"control/joinRequested":       "hosts.join/1",
 	"control/keptChanged":         "control/1",
 	"control/keptDelivered":       "control/1",
 	"control/moved":               "control/1",
+	"control/peopleChanged":       "people/1",
 	"control/providerDraft":       "control/1",
 	"control/providersChanged":    "control/1",
 	"control/thisMacHostChanged":  "control/1",
@@ -515,9 +527,12 @@ var ControlNotifications = map[string]bool{
 	"control/clientChanged":      true,
 	"control/hostChanged":        true,
 	"control/installProgress":    true,
+	"control/joinDecided":        true,
+	"control/joinRequested":      true,
 	"control/keptChanged":        true,
 	"control/keptDelivered":      true,
 	"control/moved":              true,
+	"control/peopleChanged":      true,
 	"control/providerDraft":      true,
 	"control/providersChanged":   true,
 	"control/thisMacHostChanged": true,

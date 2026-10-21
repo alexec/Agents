@@ -2,23 +2,32 @@
 # Make this machine a host of an Agents control plane (058, US4).
 #
 #   curl -fsSL [--pinnedpubkey sha256//…] https://<control plane>/v1/install.sh | sh -s -- '<host code>' [name]
+#   curl … | sh -s -- --join '<url>' '<pin or ->' '<person>' [name]
+#
+# With --join there is no code: the host asks to join as the person, shows a short code,
+# and waits until the person approves it on a client (#994).
 #
 # Installs the host (agentsd, Go since #1136) for this user in ~/.agents-server, and starts
 # it. It connects out to the control plane; nothing needs to reach this machine. Run it
 # again with a new code to join again. The Swift host, and --impl, went in #1381.
 set -eu
 
-code= name=
-while [ $# -gt 0 ]; do
-    if [ -z "$code" ]; then code=$1; elif [ -z "$name" ]; then name=$1; fi; shift
-done
-[ -n "$code" ] || { echo "Say the host code the control plane showed." >&2; exit 2; }
+code= name= ask=
+if [ "${1:-}" = --join ]; then
+    [ $# -ge 4 ] || { echo "Say the control plane's address, its pin (or -) and the person." >&2; exit 2; }
+    ask=1 url=$2 pin=$3 person=$4 name=${5:-}
+    case "$url" in https://*) ;; *) echo "The control plane's address starts with https://." >&2; exit 2 ;; esac
+else
+    while [ $# -gt 0 ]; do
+        if [ -z "$code" ]; then code=$1; elif [ -z "$name" ]; then name=$1; fi; shift
+    done
+    [ -n "$code" ] || { echo "Say the host code the control plane showed." >&2; exit 2; }
+    case "$code" in agents-control:2:h:*) ;; *) echo "That is not a host code." >&2; exit 2 ;; esac
+    # The code's own fields: agents-control:2:h:-:<key>:<secret>:<url>:<pin>:<name>
+    url=$(printf %s "$code" | cut -d: -f7 | sed 's/%3[Aa]/:/g; s/%2[Ff]/\//g; s/%25/%/g')
+    pin=$(printf %s "$code" | cut -d: -f8)
+fi
 name=${name:-$(hostname)}
-case "$code" in agents-control:2:h:*) ;; *) echo "That is not a host code." >&2; exit 2 ;; esac
-
-# The code's own fields: agents-control:2:h:-:<key>:<secret>:<url>:<pin>:<name>
-url=$(printf %s "$code" | cut -d: -f7 | sed 's/%3[Aa]/:/g; s/%2[Ff]/\//g; s/%25/%/g')
-pin=$(printf %s "$code" | cut -d: -f8)
 
 fetch() {
     if [ "$pin" != "-" ]; then
@@ -99,9 +108,20 @@ if [ -f "$d/root/daemon.lock" ]; then
 fi
 # The host enrols again with the new code. (The record of which host was installed,
 # from when there were two, is gone with them.)
-rm -f "$d/root/control-host.json" "$d/impl"
-printf %s "$code" > "$d/root/control-join-code"
-chmod 600 "$d/root/control-join-code"
+rm -f "$d/root/control-host.json" "$d/impl" "$d/root/control-join-shown"
+if [ -n "$ask" ]; then
+    # The person's id or name, the address and the pin, as JSON: none holds a quote.
+    for v in "$url" "$pin" "$person"; do
+        case "$v" in *'"'*|*'\'*) echo "The address, pin and person can't hold quotes." >&2; exit 2 ;; esac
+    done
+    printf '{"url":"%s","pin":"%s","person":"%s"}' "$url" "$pin" "$person" > "$d/root/control-join-ask"
+    chmod 600 "$d/root/control-join-ask"
+    rm -f "$d/root/control-join-code"
+else
+    printf %s "$code" > "$d/root/control-join-code"
+    chmod 600 "$d/root/control-join-code"
+    rm -f "$d/root/control-join-ask"
+fi
 
 unit="$HOME/.config/systemd/user/agents-host.service"
 if command -v systemctl >/dev/null 2>&1 && systemctl --user show-environment >/dev/null 2>&1; then
@@ -129,8 +149,18 @@ else
     echo "Started in the background (no systemd user session here)."
 fi
 
+wait=30
+if [ -n "$ask" ]; then
+    # Up to the request's 10 minutes, and a little more.
+    wait=660
+    i=0
+    while [ ! -f "$d/root/control-join-shown" ] && [ $i -lt 30 ]; do sleep 1; i=$((i + 1)); done
+    if [ -f "$d/root/control-join-shown" ]; then
+        echo "Waiting for approval. On a client of $person, approve $name. Check that it shows the code $(cat "$d/root/control-join-shown")."
+    fi
+fi
 i=0
-while [ ! -f "$d/root/control-host.json" ] && [ $i -lt 30 ]; do sleep 1; i=$((i + 1)); done
+while [ ! -f "$d/root/control-host.json" ] && [ $i -lt $wait ]; do sleep 1; i=$((i + 1)); done
 if [ -f "$d/root/control-host.json" ]; then
     echo "$name joined the control plane."
 else

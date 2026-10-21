@@ -13,7 +13,7 @@ import type {
   PagesChangedNotification, PinsChangedNotification, PinView, ViewPin, ListCursor, ListRequest, FileMentionDTO, SandboxChoice, RuntimeAllowances,
   GuardedChange, GuardedChangeReading, HostJoinStatus, RequiredCapabilities, KeptDelivered, KeptList, KeptRequest, Approval, ApprovalAction, UsageHistory, TimeHistory, Milestones,
   BuildOutputRemoved, ProjectWorktrees, RemovalCheck, WorktreeSize, WorktreeSummary, WorktreesSized, FindResult,
-  BackupRestoreResult, BackupSettings, BackupState } from "../protocol/generated";
+  BackupRestoreResult, BackupSettings, BackupState, ControlPerson, JoinDecided, JoinRequest } from "../protocol/generated";
 import { Failure } from "../protocol/generated";
 import { CallFailed, type Link } from "../wire/link";
 import type { FolderGoneAsk } from "./missingFolder";
@@ -42,6 +42,7 @@ import { goOnRequest } from "./limits";
 import { milestonesSeen } from "./milestones";
 import { hostAnswers, hostHas } from "./capabilities";
 import { Capability } from "../protocol/capabilities.generated";
+import { withJoin, withoutJoin } from "./people";
 import type { ChartHint } from "./chart";
 import { Providers } from "./providers";
 
@@ -407,6 +408,14 @@ export class Work {
     const onThisMac = !!plane?.machineID && plane.machineID === mac?.machineID;
     return decideMacHostNotice(onThisMac, mac?.state, plane?.thisMacHost);
   });
+  /** Who this client belongs to (#994), from `control/status`: none from a control plane before it. */
+  readonly person = signal<ControlPerson | null>(null);
+  /** The line a server runs to ask to join as this client's person, with no code (#994), from `control/status`. */
+  readonly joinCommand = signal<string | null>(null);
+  /** Machines waiting for the person's approval to join (#994), kept by control/joinRequested and joinDecided. */
+  readonly joinRequests = signal<JoinRequest[]>([]);
+  /** Counts each control/peopleChanged (#994): Settings ▸ People loads its list again when it moves. */
+  readonly peopleChanges = signal(0);
   /** The mode last chosen for each runtime, by host (029). */
   readonly rememberedModes = signal<Record<string, Record<string, JSONValue>>>({});
 
@@ -1102,6 +1111,20 @@ export class Store extends Work {
         this.keptDelivered.value = params as KeptDelivered;
         return;
       }
+      if (method === "control/joinRequested") {
+        const request = params as JoinRequest | null;
+        if (request?.request) this.joinRequests.value = withJoin(this.joinRequests.value, request);
+        return;
+      }
+      if (method === "control/joinDecided") {
+        const decided = params as JoinDecided | null;
+        if (decided?.request) this.joinRequests.value = withoutJoin(this.joinRequests.value, decided.request);
+        return;
+      }
+      if (method === "control/peopleChanged") {
+        this.peopleChanges.value += 1;
+        return;
+      }
       if (method === "control/thisMacHostChanged") {
         const plane = this.plane.value;
         if (plane) this.plane.value = { ...plane, thisMacHost: (params as HostJoinStatus | null) ?? undefined };
@@ -1132,7 +1155,7 @@ export class Store extends Work {
    */
   load(): Promise<void> {
     return this.once("*", async () => {
-      const [hosts] = await Promise.all([this.link.call("hosts/list", {}), this.loadPlane(), this.loadKept()]);
+      const [hosts] = await Promise.all([this.link.call("hosts/list", {}), this.loadPlane(), this.loadKept(), this.loadJoinRequests()]);
       this.takeHosts(hosts);
       await Promise.all(this.hosts.value.filter((host) => hostAnswers(host.state)).map((host) => this.onHost(host.id, async () => {
         // A removal that landed while this waited is not loaded back (#291).
@@ -1159,7 +1182,28 @@ export class Store extends Work {
     if (!status) return;
     this.plane.value = { machineID: status.machineID, homeHost: status.homeHost, thisMacHost: status.thisMacHost,
       name: status.name, version: status.version, required: status.required };
+    this.person.value = status.person ?? null;
+    this.joinCommand.value = status.joinCommand || null;
     knowPublicViews(status.publicViews);
+  }
+
+  /** Machines waiting to join (#994); a control plane before it has none to say. */
+  private async loadJoinRequests(): Promise<void> {
+    const listed = await this.link.call("hosts/joinRequests", {}).catch(() => null);
+    this.joinRequests.value = listed ?? [];
+  }
+
+  /**
+   * Approve or deny a machine's ask to join (#994). The card goes at once; the control plane's
+   * control/joinDecided says the same to every other client. A refusal is said, and the card stays.
+   */
+  async decideJoin(request: string, approve: boolean): Promise<void> {
+    try {
+      await this.link.call(approve ? "hosts/approveJoin" : "hosts/denyJoin", { request });
+      this.joinRequests.value = withoutJoin(this.joinRequests.value, request);
+    } catch (error) {
+      this.say(describe(error));
+    }
   }
 
   /** One load of a host at a time: `load` and `reloadHost` queue here rather than running together (#291). */

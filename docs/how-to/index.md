@@ -18,6 +18,8 @@ something particular done.
   the Mac that runs Agents Host, pair it once, and forget it.
 - [Add a server](add-a-server.md): make a Linux server, or another Mac, a host of your
   control plane.
+- [Invite someone](invite-someone.md): add another person to your control plane, change
+  their role, approve a machine that asks to join, and remove a person.
 - [Send a project to a server](send-a-project-to-a-server.md): a repository on this Mac,
   with its unpushed branches and uncommitted changes, made a project on the server, and
   the server's work brought back.

@@ -258,3 +258,30 @@
 .with-sidebar .sidebar-head h1.alone-title { flex-basis: 100%; margin: 6px 0 2px; font-size: 1.0625rem; text-align: left; }
 .sidebar button.link.elsewhere { display: block; margin: 12px 8px; padding: 0; font-size: 0.8125rem; cursor: pointer; text-align: left; }
 .sidebar button.link.elsewhere:hover { text-decoration: underline; }
+/* A machine asking to join (#994): the approvals' shield, its name, the code to check and its
+   platform, then Deny and Approve. At the sidebar's top and in Settings ▸ People. */
+.join-requests ul { list-style: none; margin: 4px 0 8px; padding: 0; }
+.join-request { display: grid; grid-template-columns: 18px minmax(0, 1fr); column-gap: 8px; align-items: start;
+  margin: 0 4px 6px; padding: 8px; border: 1px solid var(--paper-rule); border-radius: var(--radius-card); background: var(--paper-raised); }
+.join-request .body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.join-request .title { font-weight: 400; overflow-wrap: anywhere; }
+.join-request .subtitle { font-size: 0.75rem; opacity: 0.65; }
+.join-request .join-actions { display: flex; justify-content: flex-end; gap: 6px; margin-top: 6px; }
+.with-sidebar .settings-body .join-requests { max-width: 420px; }
+/* Settings ▸ People (#994): a person's row, then their machines and clients. */
+.with-sidebar .settings-body .people-list { list-style: none; margin: 0 0 8px; padding: 0; max-width: 420px; }
+.with-sidebar .settings-body .person .badge { margin-left: 6px; padding: 0 6px; font-size: 0.6875rem; border-radius: 8px;
+  border: 1px solid var(--paper-rule); opacity: 0.75; }
+.with-sidebar .settings-body .person-things { display: flex; flex-direction: column; gap: 2px; padding: 4px 8px 8px; }
+.with-sidebar .settings-body button.invite { margin: 4px 8px; }
+button.destructive { color: var(--tint-failure); }
+button.prominent.destructive { background: var(--tint-failure); border-color: var(--tint-failure); color: var(--paper-ground); }
+.invite-code .code-text { font-family: var(--font-mono); padding: 6px 8px; border: 1px solid var(--paper-rule);
+  border-radius: var(--radius-control); background: var(--paper-ground); user-select: all; overflow-wrap: anywhere; }
+.sheet .remove-lines { padding-left: 18px; min-height: 0; }
+/* Add a machine without a code (#994): the command to run, Copy, and what happens next. */
+.with-sidebar .settings-body .join-command { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; }
+.with-sidebar .settings-body .join-command-line { display: flex; align-items: flex-start; gap: 6px; }
+.with-sidebar .settings-body .join-command .code-text { flex: 1; min-width: 0; font-family: var(--font-mono); font-size: 0.6875rem;
+  padding: 4px 6px; border: 1px solid var(--paper-rule); border-radius: var(--radius-control); background: var(--paper-ground);
+  user-select: all; overflow-wrap: anywhere; }

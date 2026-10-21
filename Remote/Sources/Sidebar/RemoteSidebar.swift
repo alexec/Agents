@@ -69,6 +69,22 @@ struct RemoteSidebar: View {
     var body: some View {
         let projects = SidebarOrder.projects(model.projects, servers: servers)
         List(selection: selection) {
+            // A machine asking to join as this person (#994): at the top, as it waits on
+            // an answer and its code lasts ten minutes.
+            let joining = model.people.open()
+            if !joining.isEmpty {
+                Section {
+                    ForEach(joining) { request in
+                        JoinRequestCard(request: request, you: model.people.you?.id,
+                                        isAnswering: model.people.answering.contains(request.request),
+                                        answer: { approve in Task { await model.answerJoin(request, approve: approve) } })
+                            .listRowSeparator(.hidden)
+                            .listRowBackground(Color.clear)
+                            .listRowInsets(EdgeInsets(top: 4, leading: 12, bottom: 4, trailing: 12))
+                    }
+                }
+            }
+
             if !model.projects.isEmpty {
                 // One way to start a session (#495), in the project last started in.
                 // A project's long press starts one in it.
@@ -232,7 +248,9 @@ struct RemoteSidebar: View {
             if showsBanner { StaleBanner() }
         }
         .overlay {
-            if model.projects.isEmpty { Waiting() }
+            // Not over a machine's ask to join (#994): the card is the list's, and the
+            // waiting view in the middle would lie over the rows under it.
+            if model.projects.isEmpty, model.people.open().isEmpty { Waiting() }
         }
         // The catch-up leaves archived projects out; they are asked for here (#343), and
         // again once the list is pulled.
@@ -741,6 +759,21 @@ private struct RemoteSettings: View {
                 // The control plane's workspace providers (#1819), as the page's Settings has them.
                 Section {
                     NavigationLink(WorkspaceProviderWords.heading) { WorkspaceProvidersView() }
+                }
+                // Who uses the control plane, and what belongs to them (#994).
+                if !model.needsPairing {
+                    Section {
+                        NavigationLink {
+                            PeoplePane(control: model.controlPlane, revision: model.people.revision)
+                                .navigationTitle("People")
+                                .navigationBarTitleDisplayMode(.inline)
+                        } label: {
+                            Label("People", systemImage: "person.2")
+                        }
+                    } footer: {
+                        Text("The people who use this control plane, and their machines and clients.")
+                    }
+                    .paperListRow()
                 }
                 // The docs site (#1327), as the Mac's Help ▸ Agents Help.
                 Section {

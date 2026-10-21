@@ -103,12 +103,20 @@ func (p *plane) host(machine string) *fakeHost { return p.hostWith(machine, nil)
 func (p *plane) hostWith(machine string, opened func(controllink.Conn)) *fakeHost {
 	root := p.t.TempDir()
 	private := controllink.NewPrivateKey()
-	hello := controllink.HostHello{Version: "0.1", Platform: "linux aarch64", MachineID: machine, Name: new("box " + machine),
-		Implementation: new("go")}
-	member, err := controllink.Enroll(context.Background(), root, p.code(true), private, hello)
+	member, err := controllink.Enroll(context.Background(), root, p.code(true), private, fakeHello(machine))
 	if err != nil {
 		p.t.Fatal(err)
 	}
+	return p.serveHost(root, member, private, fakeHello(machine), opened)
+}
+
+func fakeHello(machine string) controllink.HostHello {
+	return controllink.HostHello{Version: "0.1", Platform: "linux aarch64", MachineID: machine, Name: new("box " + machine),
+		Implementation: new("go")}
+}
+
+// serveHost connects a host that has joined, and answers its channels as host does.
+func (p *plane) serveHost(root string, member *controllink.Membership, private []byte, hello controllink.HostHello, opened func(controllink.Conn)) *fakeHost {
 	ctx, cancel := context.WithCancel(context.Background())
 	h := &fakeHost{root: root, member: member, cancel: cancel, done: make(chan struct{})}
 	u := &controllink.Uplink{Root: root, Member: member, Private: private, Hello: hello, Accept: func(c controllink.Conn) {

@@ -14,6 +14,8 @@ Nothing here needs doing; it is for understanding.
   editor you already use, and when something else is better.
 - [The control plane](control-plane.md): hosts, clients, copies and the store, where to
   run it, and what happens when it is down.
+- [People and machines](people-and-machines.md): why each client is a person's and each
+  machine one user's, what an admin sees, and why machines are not shared.
 - [The window and the host](window-and-daemon.md): why agents keep working when the
   window is closed, what Agents Host does, and what happens when the Mac restarts.
 - [Why agents' own tools are taken away](scoped-tools.md): what a runtime loses in the

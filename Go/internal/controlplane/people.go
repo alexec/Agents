@@ -1,0 +1,384 @@
+package controlplane
+
+import (
+	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
+	"strings"
+	"time"
+
+	"github.com/alexec/agents/Go/internal/controlplane/records"
+	"github.com/alexec/agents/Go/wire"
+)
+
+// People (#994, spec 736 T1): every client belongs to a person, and every machine to one
+// user. A person reaches only their own machines; another's is not found (FR-018). The
+// first person is the local owner and an admin; with one person, nothing changes.
+
+// inviteLifetime is how long an invite code works (FR-007).
+const inviteLifetime = 7 * 24 * time.Hour
+
+// codeOwnerKey carries, through a context, the person a code is made for.
+type codeOwnerKey struct{}
+
+// withCodeOwner says whose a client or machine that uses the code made under ctx is.
+func withCodeOwner(ctx context.Context, person string) context.Context {
+	if person == "" {
+		return ctx
+	}
+	return context.WithValue(ctx, codeOwnerKey{}, person)
+}
+
+func codeOwnerOf(ctx context.Context) *string {
+	if person, ok := ctx.Value(codeOwnerKey{}).(string); ok && person != "" {
+		return &person
+	}
+	return nil
+}
+
+// localOwner is the first person: control.json's owner, or "local" before it has one.
+func (s *Service) localOwner() string {
+	if settings := s.records.Settings(); settings != nil && settings.Owner != nil && *settings.Owner != "" {
+		return *settings.Owner
+	}
+	return "local"
+}
+
+// PersonOf is the person a client belongs to: its owner, else the local owner.
+func (s *Service) PersonOf(client string) string {
+	if c := s.records.Client(client); c != nil && c.Owner != nil && *c.Owner != "" {
+		return *c.Owner
+	}
+	return s.localOwner()
+}
+
+// OwnerOf is the user a machine belongs to: its owner, else the local owner.
+func (s *Service) OwnerOf(host string) string { return s.ownerOf(host) }
+
+func (s *Service) ownerOf(host string) string {
+	if h := s.records.Host(host); h != nil && h.Owner != nil && *h.Owner != "" {
+		return *h.Owner
+	}
+	return s.localOwner()
+}
+
+// isAdmin says whether a person is an admin. The local owner with no record yet is.
+func (s *Service) isAdmin(user string) bool {
+	p := s.records.Person(user)
+	if p == nil {
+		return user == s.localOwner()
+	}
+	return !p.IsRemoved() && p.IsAdmin()
+}
+
+// personName is what a person is called, for the screen.
+func (s *Service) personName(user string) string {
+	if p := s.records.Person(user); p != nil && p.Name != "" {
+		return p.Name
+	}
+	return ""
+}
+
+// owns says a caller owns a machine that is there.
+func (m *Methods) owns(from Caller, host string) bool {
+	return m.records.Host(host) != nil && m.s.ownerOf(host) == m.callerPerson(from)
+}
+
+// callerPerson is the caller's person: as the router knew it, or from the records.
+func (m *Methods) callerPerson(from Caller) string {
+	if from.Person != "" {
+		return from.Person
+	}
+	return m.s.PersonOf(from.Client)
+}
+
+// namedHosts are the machines a call names, by the fields that name one: each must be
+// the caller's, or the call is refused as if there were no such machine (FR-018).
+var hostFields = []string{"host", "from"}
+
+func (m *Methods) refuseOthersHosts(params json.RawMessage, from Caller) error {
+	var fields map[string]json.RawMessage
+	if json.Unmarshal(params, &fields) != nil {
+		return nil
+	}
+	for _, field := range hostFields {
+		var host string
+		if raw, ok := fields[field]; !ok || json.Unmarshal(raw, &host) != nil || host == "" {
+			continue
+		}
+		if m.records.Host(host) != nil && !m.owns(from, host) {
+			return fail(noSuchHost, "No host is called %s.", host)
+		}
+	}
+	return nil
+}
+
+// me is control/status's person: who the caller belongs to.
+func (m *Methods) me(from Caller) *wire.ControlPerson {
+	user := m.callerPerson(from)
+	me := &wire.ControlPerson{ID: user, Name: m.s.personName(user), Role: wire.UserRoleMember}
+	if m.s.isAdmin(user) {
+		me.Role = wire.UserRoleAdmin
+	}
+	if user == m.s.localOwner() {
+		yes := true
+		me.LocalOwner = &yes
+		if me.Name == "" || (m.records.Settings() != nil && me.Name == m.records.Settings().Name) {
+			me.Name = localOwnerName
+		}
+	}
+	return me
+}
+
+// localOwnerName is the local owner as the screen says them, until they give a name.
+const localOwnerName = "Local owner"
+
+// peopleMethod answers people/list, people/invite, people/setRole and people/remove.
+func (m *Methods) peopleMethod(ctx context.Context, method string, params json.RawMessage, from Caller) (any, error) {
+	user := m.callerPerson(from)
+	admin := m.s.isAdmin(user)
+	switch method {
+	case "people/list":
+		return m.peopleList(user, admin), nil
+	case "people/invite":
+		if !admin {
+			return nil, fail(notPermitted, "Only an admin can invite a person.")
+		}
+		request, err := require[wire.PersonInvite](params, "PersonInvite")
+		if err != nil {
+			return nil, err
+		}
+		name := strings.TrimSpace(request.Name)
+		if name == "" || len([]rune(name)) > 80 {
+			return nil, fail(invalidParams, "Give the person a name of 1 to 80 characters.")
+		}
+		if request.Role != wire.UserRoleAdmin && request.Role != wire.UserRoleMember {
+			return nil, fail(invalidParams, "A role is admin or member.")
+		}
+		shown, err := m.s.codes.Invite(ctx, invite{Name: name, Role: string(request.Role), By: user}, inviteLifetime)
+		if err != nil {
+			return nil, err
+		}
+		return wire.PersonInvited{Text: shown.Text, Expires: shown.Expires, Name: name, Role: request.Role}, nil
+	case "people/setRole":
+		if !admin {
+			return nil, fail(notPermitted, "Only an admin can change a role.")
+		}
+		request, err := require[wire.PersonRoleRequest](params, "PersonRoleRequest")
+		if err != nil {
+			return nil, err
+		}
+		if request.Role != wire.UserRoleAdmin && request.Role != wire.UserRoleMember {
+			return nil, fail(invalidParams, "A role is admin or member.")
+		}
+		err = m.records.ChangePeople(ctx, func(all map[string]records.Person) ([]records.Person, error) {
+			p, ok := all[request.User]
+			if !ok || p.IsRemoved() {
+				return nil, fail(invalidParams, "There is no such person.")
+			}
+			if p.RoleOrAdmin() == string(request.Role) {
+				return nil, nil
+			}
+			if request.Role == wire.UserRoleMember && admins(all) <= 1 {
+				return nil, fail(notPermitted, "%s is the only admin. Make another person an admin first.", p.Name)
+			}
+			p.Role = string(request.Role)
+			return []records.Person{p}, nil
+		})
+		if err != nil {
+			return nil, err
+		}
+		m.s.peopleChanged(request.User, false)
+		return map[string]any{}, nil
+	case "people/remove":
+		if !admin {
+			return nil, fail(notPermitted, "Only an admin can remove a person.")
+		}
+		request, err := require[wire.PersonRequest](params, "PersonRequest")
+		if err != nil {
+			return nil, err
+		}
+		if request.User == user {
+			return nil, fail(notPermitted, "You can't remove yourself. Another admin can.")
+		}
+		if request.User == m.s.localOwner() {
+			return nil, fail(notPermitted, "The local owner holds the control plane's key, and stays.")
+		}
+		return map[string]any{}, m.removePerson(ctx, request.User, from)
+	}
+	return nil, notFound(method)
+}
+
+func admins(all map[string]records.Person) int {
+	n := 0
+	for _, p := range all {
+		if !p.IsRemoved() && p.Kind != records.KindBot && p.IsAdmin() {
+			n++
+		}
+	}
+	return n
+}
+
+// peopleList is every user for an admin, and only themselves for a member. Machines say
+// their name and state, and nothing inside them (FR-019).
+func (m *Methods) peopleList(user string, admin bool) wire.PeopleList {
+	clients := map[string][]wire.PersonClient{}
+	for _, c := range m.records.Clients() {
+		person := m.s.PersonOf(c.ID)
+		clients[person] = append(clients[person], wire.PersonClient{ID: wire.UUID(c.ID), Name: c.Name, Kind: wire.ClientKind(c.Kind)})
+	}
+	machines := map[string][]wire.PersonMachine{}
+	for _, h := range m.records.Hosts() {
+		owner := m.s.ownerOf(h.ID)
+		state, _ := m.router.Described(h.ID)["state"].(string)
+		machines[owner] = append(machines[owner], wire.PersonMachine{ID: wire.HostID(h.ID), Name: h.Name, State: state,
+			Platform: optional(h.Platform)})
+	}
+	people := m.records.People()
+	if len(people) == 0 {
+		// Before the migration has written the local owner.
+		people = []records.Person{{ID: m.s.localOwner(), Kind: records.KindPerson, Role: records.RoleAdmin}}
+	}
+	out := wire.PeopleList{People: []wire.PersonRow{}, Admin: admin}
+	for _, p := range people {
+		if !admin && p.ID != user {
+			continue
+		}
+		row := wire.PersonRow{ID: p.ID, Name: p.Name, Kind: kindOf(p), Role: wire.UserRole(p.RoleOrAdmin()),
+			SignIns: []wire.SignIn{}, Clients: clients[p.ID], Machines: machines[p.ID]}
+		if row.Clients == nil {
+			row.Clients = []wire.PersonClient{}
+		}
+		if row.Machines == nil {
+			row.Machines = []wire.PersonMachine{}
+		}
+		for _, sign := range p.SignIns {
+			in := wire.SignIn{Provider: sign.Provider, Email: optional(sign.Email), Login: optional(sign.Login)}
+			if sign.Added != nil {
+				in.Added = new(dateOf(sign.Added.Time))
+			}
+			row.SignIns = append(row.SignIns, in)
+		}
+		yes := true
+		if p.ID == m.s.localOwner() {
+			row.LocalOwner = &yes
+			if row.Name == "" || (m.records.Settings() != nil && row.Name == m.records.Settings().Name) {
+				row.Name = localOwnerName
+			}
+		}
+		if p.ID == user {
+			row.You = &yes
+		}
+		out.People = append(out.People, row)
+	}
+	return out
+}
+
+func kindOf(p records.Person) string {
+	if p.Kind == "" {
+		return records.KindPerson
+	}
+	return p.Kind
+}
+
+// removePerson is people/remove (FR-029): the person's clients are forgotten (their
+// sockets close with 4403), their machines leave the control plane, and their record is
+// kept removed, so the code they paired with does nothing again.
+func (m *Methods) removePerson(ctx context.Context, user string, from Caller) error {
+	err := m.records.ChangePeople(ctx, func(all map[string]records.Person) ([]records.Person, error) {
+		p, ok := all[user]
+		if !ok || p.IsRemoved() {
+			return nil, fail(invalidParams, "There is no such person.")
+		}
+		if p.IsAdmin() && admins(all) <= 1 {
+			return nil, fail(notPermitted, "%s is the only admin.", p.Name)
+		}
+		yes, now := true, records.Now()
+		p.Removed, p.RemovedAt = &yes, &now
+		return []records.Person{p}, nil
+	})
+	if err != nil {
+		return err
+	}
+	for _, c := range m.records.Clients() {
+		if m.s.PersonOf(c.ID) == user {
+			if err := m.forget(ctx, c.ID, 0); err != nil {
+				return err
+			}
+			m.s.announce("clientForgotten", c.ID, from.Client)
+		}
+	}
+	for _, h := range m.records.Hosts() {
+		if m.s.ownerOf(h.ID) == user {
+			if _, err := m.removeHost(ctx, h.ID, from); err != nil {
+				return err
+			}
+		}
+	}
+	m.s.joins.dropFor(ctx, user)
+	m.s.peopleChanged(user, true)
+	m.s.log("person " + user + " removed")
+	return nil
+}
+
+// peopleChanged tells every admin's sessions, and the person changed.
+func (s *Service) peopleChanged(user string, removed bool) {
+	change := wire.PeopleChanged{}
+	if user != "" {
+		change.User = &user
+	}
+	if removed {
+		change.Removed = &removed
+	}
+	told := map[string]bool{}
+	for _, p := range s.records.People() {
+		if p.IsAdmin() || p.ID == user {
+			s.router.TellPerson(p.ID, "control/peopleChanged", change)
+			told[p.ID] = true
+		}
+	}
+	if !told[s.localOwner()] {
+		s.router.TellPerson(s.localOwner(), "control/peopleChanged", change)
+	}
+	s.announce("peopleChanged", user, "")
+}
+
+// redeemInvite makes the person an invite code names, as its first client pairs (#994):
+// once, as the code itself is spent once. A code replayed by the same key finds the
+// person made the first time.
+func (s *Service) redeemInvite(ctx context.Context, codeID string, in invite) (string, error) {
+	id := personIDFor(codeID)
+	if p := s.records.Person(id); p != nil {
+		if p.IsRemoved() {
+			return "", fail(notPermitted, "This invite was for a person who has since been removed. Ask for a new invite.")
+		}
+		return id, nil
+	}
+	now := records.Now()
+	person := records.Person{ID: id, Name: in.Name, Kind: records.KindPerson, Role: in.Role,
+		SignIns: []records.SignIn{{Provider: records.ProviderCode, Account: codeID, Added: &now}}}
+	if err := s.records.SavePerson(ctx, person); err != nil {
+		return "", err
+	}
+	s.peopleChanged(id, false)
+	s.log("person " + id + " joined by an invite from " + in.By)
+	return id, nil
+}
+
+// personIDFor is the person an invite makes: the same for the same code at every copy,
+// so two copies spending one code make one person.
+// It is a hash of the code's id, which is part of its secret.
+func personIDFor(codeID string) string {
+	sum := sha256.Sum256([]byte("agents-person\x00" + strings.ToLower(codeID)))
+	id := hex.EncodeToString(sum[:16])
+	return id[0:8] + "-" + id[8:12] + "-4" + id[13:16] + "-8" + id[17:20] + "-" + id[20:32]
+}
+
+// joinCommand is control/status's joinCommand: the line that asks to join as person.
+func (s *Service) joinCommand(person string) string {
+	if s.codes.URL == "" || person == "" {
+		return ""
+	}
+	return JoinCommand(s.codes.URL, s.codes.Pin, person)
+}

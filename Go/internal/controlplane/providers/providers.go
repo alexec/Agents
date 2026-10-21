@@ -100,11 +100,13 @@ type Hooks struct {
 	Connect func(record ProviderRecord, secrets map[string]string) (Provider, error)
 	// HostCommand is the one line that installs a host with a new host code, for a new
 	// workspace's first boot (US5).
-	HostCommand func() (string, error)
+	HostCommand func(person string) (string, error)
 	// BackUp makes a backup of the host, and waits for it, before its workspace is deleted
 	// (#1815). False when the host can't make one: it is offline, or older than backups.
 	// Nil makes none.
 	BackUp func(host string, caller Caller) (bool, error)
+	// OwnerOf is the user who owns a host (#994): an agent reaches only its own user's.
+	OwnerOf func(host string) string
 }
 
 // Config is what NewProviders is given.
@@ -233,7 +235,10 @@ func NewProviders(cfg Config) *Providers {
 		h.InstalledOver = func(string) string { return "" }
 	}
 	if h.HostCommand == nil {
-		h.HostCommand = func() (string, error) { return "", providerFailure("This control plane can’t give out host codes.") }
+		h.HostCommand = func(string) (string, error) { return "", providerFailure("This control plane can’t give out host codes.") }
+	}
+	if h.OwnerOf == nil {
+		h.OwnerOf = func(string) string { return "" }
 	}
 	return &Providers{store: cfg.Store, records: cfg.Records, router: cfg.Router, methods: cfg.Methods,
 		secrets: cfg.Secrets, timing: cfg.Timing, hooks: cfg.Hooks, log: cfg.Log,
@@ -424,7 +429,7 @@ func (p *Providers) AgentCall(host, agent, method string, params json.RawMessage
 		hostName = h.Name
 	}
 	// No client: the host's own channel.
-	caller := Caller{Session: records.NewUUID(), Client: records.NewUUID(), Kind: "unknown"}
+	caller := Caller{Session: records.NewUUID(), Client: records.NewUUID(), Kind: "unknown", Person: p.hooks.OwnerOf(host)}
 	if method == MethodWorkspacesAgent {
 		return p.forAgent(), nil
 	}
@@ -445,6 +450,10 @@ func (p *Providers) AgentCall(host, agent, method string, params json.RawMessage
 			return nil, fail(CodeNoSuchHost, "No host is called %s.", named)
 		}
 		given["host"] = found
+	}
+	// Another user's machine is not there for this agent (FR-038).
+	if named, ok := str(given["host"]); ok && p.hooks.OwnerOf(named) != caller.Person {
+		return nil, fail(CodeNoSuchHost, "No host is called %s.", named)
 	}
 	if named, ok := str(given["id"]); ok && (method == MethodProvidersCreate || method == MethodProvidersOptions) {
 		p.mu.Lock()
@@ -1384,7 +1393,12 @@ func (p *Providers) create(request ProviderCreate, who string, caller *Caller) (
 		}
 	}
 	// The install line holds a host code: passed on, never logged.
-	command, err := p.hooks.HostCommand()
+	// The workspace's machine is the starter's (FR-028).
+	person := ""
+	if caller != nil {
+		person = caller.Person
+	}
+	command, err := p.hooks.HostCommand(person)
 	if err != nil {
 		var f *Failure
 		if errors.As(err, &f) {

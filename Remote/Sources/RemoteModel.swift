@@ -297,6 +297,8 @@ final class RemoteModel {
     /// The watch's own client of the control plane while it is connected, for the control
     /// plane's own requests (`hosts/start`, #691). Nil against a bridge with no control plane.
     @ObservationIgnored private(set) var controlPlane: DaemonClient?
+    /// People (#994): the machines waiting for this person's approval, fed from the watch.
+    let people = PeopleState()
     /// What `hosts/list` last said, so the project list can name each host (058, frame H).
     /// Empty when this phone is not a client of a control plane.
     private(set) var controlHosts: [DaemonAPI.ControlHost] = []
@@ -2053,6 +2055,13 @@ final class RemoteModel {
         }
     }
 
+    /// Approve or Deny on a machine's card (#994): a refusal is the app's alert.
+    func answerJoin(_ request: DaemonAPI.JoinRequest, approve: Bool) async {
+        if let refused = await people.answer(request, approve: approve, on: controlPlane) {
+            problem = refused
+        }
+    }
+
     private func loadKept(_ control: DaemonClient) async {
         kept = (try? await control.call(DaemonAPI.Method.hostsListKept, returning: DaemonAPI.KeptList.self))?.kept ?? []
     }
@@ -2264,8 +2273,10 @@ final class RemoteModel {
                     self?.controlPlane = control
                     await self?.syncOtherHosts(control, link: link)
                     await self?.loadKept(control)
+                    await self?.people.connected(control)
                     for await change in control.notifications() {
                         guard let self, !Task.isCancelled else { return }
+                        if await self.people.heard(change.method, change.params, on: control) { continue }
                         if change.method == DaemonAPI.Notification.controlKeptChanged
                             || change.method == DaemonAPI.Notification.controlKeptDelivered {
                             await self.heardKept(change.method, change.params)
@@ -2284,7 +2295,10 @@ final class RemoteModel {
                         await self.syncOtherHosts(control, link: link)
                     }
                     note("hosts: the control plane's watch closed")
-                    if self?.controlPlane === control { self?.controlPlane = nil }
+                    if self?.controlPlane === control {
+                        self?.controlPlane = nil
+                        self?.people.went()
+                    }
                 }
                 guard !Task.isCancelled, self != nil else { return }
                 await backoff.wait()
@@ -2303,6 +2317,7 @@ final class RemoteModel {
         hostWatch?.cancel()
         hostWatch = nil
         controlPlane = nil
+        people.went()
         listening?.cancel()
         listening = nil
         for (_, other) in otherHosts { await other.disconnect() }

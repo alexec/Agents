@@ -885,6 +885,8 @@ final class AppModel {
     @ObservationIgnored private var controlHosts: [HostID: DaemonClient] = [:]
     /// The control plane's own connection, as the watch made it: for Start on a strip (#691).
     @ObservationIgnored private(set) var controlRequests: DaemonClient?
+    /// People (#994): the machines waiting for this person's approval, fed from the watch.
+    let people = PeopleState()
     /// Hosts whose Start was pressed here and not answered yet.
     private(set) var hostsBeingStarted: Set<HostID> = []
     /// Prompts and starts the control plane keeps for stopped workspaces (#691 US3), every host's.
@@ -3038,7 +3040,9 @@ final class AppModel {
                     self?.controlPlaneDidAnswer()
                     await self?.syncControlHosts(control)
                     await self?.loadKept(control)
+                    await self?.people.connected(control)
                     for await note in control.notifications() {
+                        if await self?.people.heard(note.method, note.params, on: control) == true { continue }
                         switch note.method {
                         case DaemonAPI.Notification.controlKeptChanged, DaemonAPI.Notification.controlKeptDelivered:
                             await self?.heardKept(note.method, note.params)
@@ -3076,6 +3080,7 @@ final class AppModel {
 
     private func controlPlaneWent() {
         guard controlLink != nil else { return }
+        people.went()
         controlPlaneReachable = false
         controlPlaneMissed = true
     }
@@ -3102,6 +3107,13 @@ final class AppModel {
             problem = HostProblem.controlRefusal(error)
         } catch {
             problem = "The control plane can’t be reached, so \(hosts.label(host)) can’t be started."
+        }
+    }
+
+    /// Approve or Deny on a machine's card (#994): a refusal is the window's alert.
+    func answerJoin(_ request: DaemonAPI.JoinRequest, approve: Bool) async {
+        if let refused = await people.answer(request, approve: approve, on: controlRequests) {
+            problem = refused
         }
     }
 

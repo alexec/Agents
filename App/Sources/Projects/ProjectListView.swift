@@ -68,6 +68,20 @@ struct ProjectListView: View {
 
     var body: some View {
         List(selection: $picked) {
+            // A machine asking to join as this person (#994): above everything, as it
+            // waits on an answer and its code lasts ten minutes.
+            let joining = model.people.open()
+            if !joining.isEmpty {
+                Section {
+                    ForEach(joining) { request in
+                        JoinRequestCard(request: request, you: model.people.you?.id,
+                                        isAnswering: model.people.answering.contains(request.request),
+                                        answer: { approve in Task { await model.answerJoin(request, approve: approve) } })
+                            .listRowSeparator(.hidden)
+                            .selectionDisabled()
+                    }
+                }
+            }
             // A newcomer's checklist (#982), above everything until it has gone.
             if model.showsGetStarted {
                 Section {

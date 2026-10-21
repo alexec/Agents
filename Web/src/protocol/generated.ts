@@ -1410,6 +1410,8 @@ export interface ControlHost {
    * (#1748). Its state is then needsUpdate.
    */
   missing?: string[];
+  /** The user who owns the machine (#994). */
+  owner?: string;
 }
 
 /** control/installProgress: a step of Add a Server. */
@@ -1434,6 +1436,14 @@ export interface ControlOK {
   relayed?: boolean;
   endpoints?: ControlEndpoint[];
   epoch?: number;
+}
+
+/** Who a client belongs to (#994): its person, their role, and whether they are the local owner. */
+export interface ControlPerson {
+  id: string;
+  name: string;
+  role: UserRole;
+  localOwner?: boolean;
 }
 
 /**
@@ -1481,6 +1491,13 @@ export interface ControlStatus {
   /** The capabilities the control plane has (#1748). */
   capabilities?: string[];
   required?: RequiredCapabilities;
+  /** Who this client belongs to (#994). */
+  person?: ControlPerson;
+  /**
+   * The one line to run on a server so that it asks to join as this client's person, with no code
+   * (#994).
+   */
+  joinCommand?: string;
 }
 
 export interface Cost {
@@ -2233,11 +2250,44 @@ export interface HostInstall {
   tunnel?: boolean;
 }
 
+/**
+ * POST /v1/join (#994, spec 736 FR-017): a machine with no code asks to join. `person` names whose
+ * it is to be, by name or id; with none, an admin approves it.
+ */
+export interface HostJoinAsk {
+  name: string;
+  platform: string;
+  version?: string;
+  publicKey: Base64;
+  machineID?: string;
+  person?: string;
+}
+
+/** GET /v1/join/<request> (#994): waiting, or how it ended; `host` once approved. */
+export interface HostJoinDecision {
+  result: "waiting" | "approved" | "denied" | "expired";
+  host?: HostID;
+  /**
+   * Once approved: the control plane's public key, which the machine keeps as a code's would give
+   * it.
+   */
+  controlKey?: Base64;
+  /** Once approved: the control plane's name. */
+  name?: string;
+}
+
 export interface HostJoinStatus {
   member: boolean;
   connected: boolean;
   problem?: string;
   at: WireDate;
+}
+
+/** POST /v1/join: the request, the short code the machine shows, and when it ends (10 minutes). */
+export interface HostJoinTicket {
+  request: string;
+  code: string;
+  expires: WireDate;
 }
 
 export interface HostLastHeard {
@@ -2362,6 +2412,35 @@ export interface HostedMCPStatus {
   lastError?: string;
   restarts: number;
   users: number;
+}
+
+export interface JoinApproved {
+  host: HostID;
+}
+
+/** control/joinDecided (#994): a request ended, approved or not, so every card for it goes. */
+export interface JoinDecided {
+  request: string;
+  result: string;
+}
+
+/**
+ * hosts/joinRequests, control/joinRequested (#994): a machine waiting for approval, with the code
+ * it shows.
+ */
+export interface JoinRequest {
+  request: string;
+  name: string;
+  platform: string;
+  code: string;
+  expires: WireDate;
+  for: string;
+  forName?: string;
+}
+
+/** hosts/approveJoin, hosts/denyJoin (#994). */
+export interface JoinRequestDecide {
+  request: string;
 }
 
 /** hosts/keep: a request for a stopped host, kept until it is up. */
@@ -2970,6 +3049,18 @@ export interface PendingMove {
   askedAt: WireDate;
 }
 
+/** control/peopleChanged (#994): a person was added, changed or removed. */
+export interface PeopleChanged {
+  user?: string;
+  removed?: boolean;
+}
+
+/** people/list (#994): every user for an admin; for a member, only themselves. */
+export interface PeopleList {
+  people: PersonRow[];
+  admin: boolean;
+}
+
 export interface PermissionNotification {
   agentID: UUID;
   request?: PermissionRequest;
@@ -2993,14 +3084,69 @@ export interface PermissionRequest {
   subagent?: string;
 }
 
+export interface PersonClient {
+  id: UUID;
+  name: string;
+  kind: ClientKind;
+}
+
 export interface PersonEndRequest {
   name: string;
   agentID?: string;
 }
 
+/** people/invite (#994): the new person's name and role. */
+export interface PersonInvite {
+  name: string;
+  role: UserRole;
+}
+
+/**
+ * people/invite: the invite code to send, for one use within 7 days. Its first client pairs as the
+ * new person.
+ */
+export interface PersonInvited {
+  text: string;
+  expires: WireDate;
+  name: string;
+  role: UserRole;
+}
+
+/** A machine in People: its name, its state and nothing inside it (FR-019). */
+export interface PersonMachine {
+  id: HostID;
+  name: string;
+  state: string;
+  platform?: string;
+}
+
 export interface PersonRemoveRequest {
   name: string;
   agentID: string;
+}
+
+/** people/remove (#994): the user. */
+export interface PersonRequest {
+  user: string;
+}
+
+/** people/setRole (#994). Refused when it would leave no admin. */
+export interface PersonRoleRequest {
+  user: string;
+  role: UserRole;
+}
+
+/** people/list (#994): a user, with their clients and machines. */
+export interface PersonRow {
+  id: string;
+  name: string;
+  kind: "person" | "bot";
+  role: UserRole;
+  localOwner?: boolean;
+  you?: boolean;
+  signIns: SignIn[];
+  clients: PersonClient[];
+  machines: PersonMachine[];
 }
 
 /**
@@ -4161,6 +4307,18 @@ export interface ShownFile {
   chart?: ChartHint;
 }
 
+/**
+ * One way a person signs in (#994, spec 736): `local` is the local owner's (codes, with the control
+ * plane's key), `code` an invite code redeemed; Google, Apple and GitHub come with #995.
+ */
+export interface SignIn {
+  provider: string;
+  account?: string;
+  email?: string;
+  login?: string;
+  added?: WireDate;
+}
+
 export type SignInWantedReason = "notSignedIn" | "unreadable";
 
 /**
@@ -4560,6 +4718,9 @@ export interface UsageHistory {
    */
   timeZone?: string;
 }
+
+/** A user's role (#994, spec 736 FR-001): an admin manages people; a member sees only their own. */
+export type UserRole = "admin" | "member";
 
 /**
  * What a third-party server's view waits on before it is drawn: the person's Show (#191). The data
@@ -5042,7 +5203,10 @@ export interface Methods {
   "files/read": { params: FilesReadRequest; result: FileReading };
   "files/unwatch": { params: FilesWatchRequest; result: Empty };
   "files/watch": { params: FilesWatchRequest; result: Empty };
+  "hosts/approveJoin": { params: JoinRequestDecide; result: JoinApproved };
+  "hosts/denyJoin": { params: JoinRequestDecide; result: Empty };
   "hosts/dropKept": { params: KeptRequestID; result: Empty };
+  "hosts/joinRequests": { params: Empty; result: JoinRequest[] };
   "hosts/lastHeard": { params: HostRequest; result: HostLastHeard };
   "hosts/lendGit": { params: LendGit; result: Empty };
   "hosts/link": { params: HostLink; result: ControlHost };
@@ -5060,6 +5224,10 @@ export interface Methods {
   "milestones/state": { params: Empty; result: Milestones };
   "modes/remembered": { params: Empty; result: Record<string, JSONValue> };
   "options/remembered": { params: RememberedOptionsRequest; result: ConfigOption[] };
+  "people/invite": { params: PersonInvite; result: PersonInvited };
+  "people/list": { params: Empty; result: PeopleList };
+  "people/remove": { params: PersonRequest; result: Empty };
+  "people/setRole": { params: PersonRoleRequest; result: Empty };
   "permissions/answer": { params: AnswerRequest; result: Empty };
   "permissions/pending": { params: Empty; result: PermissionRequest[] };
   "personas/list": { params: PersonasListRequest; result: Persona[] };
@@ -5211,7 +5379,10 @@ export const MethodTarget = {
   "files/read": "host",
   "files/unwatch": "host",
   "files/watch": "host",
+  "hosts/approveJoin": "control",
+  "hosts/denyJoin": "control",
   "hosts/dropKept": "control",
+  "hosts/joinRequests": "control",
   "hosts/lastHeard": "control",
   "hosts/lendGit": "control",
   "hosts/link": "control",
@@ -5229,6 +5400,10 @@ export const MethodTarget = {
   "milestones/state": "host",
   "modes/remembered": "host",
   "options/remembered": "host",
+  "people/invite": "control",
+  "people/list": "control",
+  "people/remove": "control",
+  "people/setRole": "control",
   "permissions/answer": "host",
   "permissions/pending": "host",
   "personas/list": "host",
@@ -5316,8 +5491,11 @@ export interface Notifications {
   "backups/changed": BackupState;
   "clone/changed": CloneNotification;
   "control/hostChanged": JSONValue;
+  "control/joinDecided": JoinDecided;
+  "control/joinRequested": JoinRequest;
   "control/keptChanged": KeptList;
   "control/keptDelivered": KeptDelivered;
+  "control/peopleChanged": PeopleChanged;
   "control/providersChanged": ProviderList;
   "disk/changed": DiskState;
   "files/changed": FilesChangedNotification;
@@ -5455,13 +5633,14 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ControlCodeShown: { required: ["text", "expires"], optional: ["command"] },
   ControlEndpoint: { required: ["url"], optional: ["pin"] },
   ControlHello: { required: ["v", "name", "control", "nonce", "copy"], optional: [] },
-  ControlHost: { required: ["id", "name", "platform", "version", "state", "reach"], optional: ["machineID", "relay", "signInFrom", "gitFrom", "gitAsks", "tunnel", "workspace", "implementation", "capabilities", "missing"] },
+  ControlHost: { required: ["id", "name", "platform", "version", "state", "reach"], optional: ["machineID", "relay", "signInFrom", "gitFrom", "gitAsks", "tunnel", "workspace", "implementation", "capabilities", "missing", "owner"] },
   ControlInstallProgress: { required: ["name", "step"], optional: [] },
   ControlMoved: { required: ["url", "controlKey", "name"], optional: ["pin"] },
   ControlOK: { required: ["mac"], optional: ["grant", "host", "relayed", "endpoints", "epoch"] },
+  ControlPerson: { required: ["id", "name", "role"], optional: ["localOwner"] },
   ControlPush: { required: ["sealed"], optional: [] },
   ControlPushItem: { required: ["needID", "alert"], optional: ["headline"] },
-  ControlStatus: { required: ["name", "version", "machineID"], optional: ["homeHost", "startedAt", "port", "awayFromHome", "you", "relayKey", "web", "publicWeb", "publicViews", "thisMacHost", "projectDetection", "unjoinedTunnels", "capabilities", "required"] },
+  ControlStatus: { required: ["name", "version", "machineID"], optional: ["homeHost", "startedAt", "port", "awayFromHome", "you", "relayKey", "web", "publicWeb", "publicViews", "thisMacHost", "projectDetection", "unjoinedTunnels", "capabilities", "required", "person", "joinCommand"] },
   Cost: { required: ["amount", "currency"], optional: [] },
   CostLimits: { required: [], optional: ["perAgent", "daily", "perAgentTokens", "dailyTokens"] },
   CostState: { required: ["limits", "today", "day", "tokensToday"], optional: ["note"] },
@@ -5556,7 +5735,10 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   HostClients: { required: ["clients"], optional: [] },
   HostHello: { required: ["version", "platform", "machineID"], optional: ["host", "name", "relay", "implementation", "capabilities"] },
   HostInstall: { required: ["destination"], optional: ["name", "key", "trust", "tunnel"] },
+  HostJoinAsk: { required: ["name", "platform", "publicKey"], optional: ["version", "machineID", "person"] },
+  HostJoinDecision: { required: ["result"], optional: ["host", "controlKey", "name"] },
   HostJoinStatus: { required: ["member", "connected", "at"], optional: ["problem"] },
+  HostJoinTicket: { required: ["request", "code", "expires"], optional: [] },
   HostLastHeard: { required: ["host"], optional: ["projects", "agents", "heardAt"] },
   HostLink: { required: ["host", "provider", "workspace"], optional: ["startWhenUsed", "stopWhenIdleMinutes"] },
   HostProviderDraftCall: { required: ["agentID", "draft", "tool"], optional: ["arguments"] },
@@ -5572,6 +5754,10 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   HostWorkspaceOptions: { required: ["host"], optional: ["startWhenUsed", "stopWhenIdleMinutes", "startForSchedules"] },
   HostedMCPSnapshot: { required: ["servers", "at"], optional: [] },
   HostedMCPStatus: { required: ["name", "state", "restarts", "users"], optional: ["project", "since", "retryAt", "lastError"] },
+  JoinApproved: { required: ["host"], optional: [] },
+  JoinDecided: { required: ["request", "result"], optional: [] },
+  JoinRequest: { required: ["request", "name", "platform", "code", "expires", "for"], optional: ["forName"] },
+  JoinRequestDecide: { required: ["request"], optional: [] },
   KeepRequest: { required: ["host", "method", "params"], optional: [] },
   KeptDelivered: { required: ["host", "id"], optional: ["agentID"] },
   KeptList: { required: ["kept"], optional: [] },
@@ -5649,11 +5835,20 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   PairingCode: { required: ["macKey", "secret", "name", "expires"], optional: [] },
   PairingSecret: { required: [], optional: ["secret", "expires"] },
   PendingMove: { required: ["target", "removeLeft", "discardChanges", "askedBy", "askedAt"], optional: [] },
+  PeopleChanged: { required: [], optional: ["user", "removed"] },
+  PeopleList: { required: ["people", "admin"], optional: [] },
   PermissionNotification: { required: ["agentID"], optional: ["request", "requestID"] },
   PermissionOption: { required: ["optionID", "name", "kind"], optional: [] },
   PermissionRequest: { required: ["id", "agentID", "toolCall", "options", "askedAt"], optional: ["subagent"] },
+  PersonClient: { required: ["id", "name", "kind"], optional: [] },
   PersonEndRequest: { required: ["name"], optional: ["agentID"] },
+  PersonInvite: { required: ["name", "role"], optional: [] },
+  PersonInvited: { required: ["text", "expires", "name", "role"], optional: [] },
+  PersonMachine: { required: ["id", "name", "state"], optional: ["platform"] },
   PersonRemoveRequest: { required: ["name", "agentID"], optional: [] },
+  PersonRequest: { required: ["user"], optional: [] },
+  PersonRoleRequest: { required: ["user", "role"], optional: [] },
+  PersonRow: { required: ["id", "name", "kind", "role", "signIns", "clients", "machines"], optional: ["localOwner", "you"] },
   PersonSettings: { required: [], optional: ["name", "pronouns"] },
   Persona: { required: ["id", "name", "origin", "settings"], optional: ["description", "problem"] },
   PersonasListRequest: { required: ["folder"], optional: [] },
@@ -5799,6 +5994,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ShellStateNotification: { required: ["agentID", "shell", "state"], optional: [] },
   ShowFileNotification: { required: ["agentID", "file"], optional: [] },
   ShownFile: { required: ["path"], optional: ["line", "chart"] },
+  SignIn: { required: ["provider"], optional: ["account", "email", "login", "added"] },
   Simulator: { required: ["udid", "name", "os", "booted"], optional: [] },
   SimulatorList: { required: ["simulators"], optional: ["reason"] },
   SimulatorRequest: { required: ["udid"], optional: [] },

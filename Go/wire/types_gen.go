@@ -1533,6 +1533,8 @@ type ControlHost struct {
 	Capabilities []string `json:"capabilities,omitzero"`
 	// Of the control plane's required capabilities for hosts, the ones this host does not have (#1748). Its state is then needsUpdate.
 	Missing []string `json:"missing,omitzero"`
+	// The user who owns the machine (#994).
+	Owner *string `json:"owner,omitzero"`
 }
 
 // control/installProgress: a step of Add a Server.
@@ -1557,6 +1559,14 @@ type ControlOK struct {
 	Relayed   *bool             `json:"relayed,omitzero"`
 	Endpoints []ControlEndpoint `json:"endpoints,omitzero"`
 	Epoch     *int64            `json:"epoch,omitzero"`
+}
+
+// Who a client belongs to (#994): its person, their role, and whether they are the local owner.
+type ControlPerson struct {
+	ID         string   `json:"id"`
+	Name       string   `json:"name"`
+	Role       UserRole `json:"role"`
+	LocalOwner *bool    `json:"localOwner,omitzero"`
 }
 
 // The `agents` key of a push the control plane sends through APNs (#1460), beside an `aps` that says only that an agent needs the person: a ControlPushItem, sealed.
@@ -1592,6 +1602,10 @@ type ControlStatus struct {
 	// The capabilities the control plane has (#1748).
 	Capabilities []string              `json:"capabilities,omitzero"`
 	Required     *RequiredCapabilities `json:"required,omitzero"`
+	// Who this client belongs to (#994).
+	Person *ControlPerson `json:"person,omitzero"`
+	// The one line to run on a server so that it asks to join as this client's person, with no code (#994).
+	JoinCommand *string `json:"joinCommand,omitzero"`
 }
 
 type Cost struct {
@@ -2478,11 +2492,38 @@ type HostInstall struct {
 	Tunnel      *bool   `json:"tunnel,omitzero"`
 }
 
+// POST /v1/join (#994, spec 736 FR-017): a machine with no code asks to join. `person` names whose it is to be, by name or id; with none, an admin approves it.
+type HostJoinAsk struct {
+	Name      string  `json:"name"`
+	Platform  string  `json:"platform"`
+	Version   *string `json:"version,omitzero"`
+	PublicKey Data    `json:"publicKey"`
+	MachineID *string `json:"machineID,omitzero"`
+	Person    *string `json:"person,omitzero"`
+}
+
+// GET /v1/join/<request> (#994): waiting, or how it ended; `host` once approved.
+type HostJoinDecision struct {
+	Result string  `json:"result"`
+	Host   *HostID `json:"host,omitzero"`
+	// Once approved: the control plane's public key, which the machine keeps as a code's would give it.
+	ControlKey Data `json:"controlKey,omitzero"`
+	// Once approved: the control plane's name.
+	Name *string `json:"name,omitzero"`
+}
+
 type HostJoinStatus struct {
 	Member    bool    `json:"member"`
 	Connected bool    `json:"connected"`
 	Problem   *string `json:"problem,omitzero"`
 	At        Date    `json:"at"`
+}
+
+// POST /v1/join: the request, the short code the machine shows, and when it ends (10 minutes).
+type HostJoinTicket struct {
+	Request string `json:"request"`
+	Code    string `json:"code"`
+	Expires Date   `json:"expires"`
 }
 
 type HostLastHeard struct {
@@ -2611,6 +2652,32 @@ type HostedMCPStatus struct {
 	LastError *string        `json:"lastError,omitzero"`
 	Restarts  int64          `json:"restarts"`
 	Users     int64          `json:"users"`
+}
+
+type JoinApproved struct {
+	Host HostID `json:"host"`
+}
+
+// control/joinDecided (#994): a request ended, approved or not, so every card for it goes.
+type JoinDecided struct {
+	Request string `json:"request"`
+	Result  string `json:"result"`
+}
+
+// hosts/joinRequests, control/joinRequested (#994): a machine waiting for approval, with the code it shows.
+type JoinRequest struct {
+	Request  string  `json:"request"`
+	Name     string  `json:"name"`
+	Platform string  `json:"platform"`
+	Code     string  `json:"code"`
+	Expires  Date    `json:"expires"`
+	For      string  `json:"for"`
+	ForName  *string `json:"forName,omitzero"`
+}
+
+// hosts/approveJoin, hosts/denyJoin (#994).
+type JoinRequestDecide struct {
+	Request string `json:"request"`
 }
 
 // hosts/keep: a request for a stopped host, kept until it is up.
@@ -3455,6 +3522,18 @@ type PendingMove struct {
 	AskedAt        Date       `json:"askedAt"`
 }
 
+// control/peopleChanged (#994): a person was added, changed or removed.
+type PeopleChanged struct {
+	User    *string `json:"user,omitzero"`
+	Removed *bool   `json:"removed,omitzero"`
+}
+
+// people/list (#994): every user for an admin; for a member, only themselves.
+type PeopleList struct {
+	People []PersonRow `json:"people"`
+	Admin  bool        `json:"admin"`
+}
+
 type PermissionNotification struct {
 	AgentID   UUID               `json:"agentID"`
 	Request   *PermissionRequest `json:"request,omitzero"`
@@ -3486,14 +3565,66 @@ type PermissionRequest struct {
 	Subagent *string            `json:"subagent,omitzero"`
 }
 
+type PersonClient struct {
+	ID   UUID       `json:"id"`
+	Name string     `json:"name"`
+	Kind ClientKind `json:"kind"`
+}
+
 type PersonEndRequest struct {
 	Name    string  `json:"name"`
 	AgentID *string `json:"agentID,omitzero"`
 }
 
+// people/invite (#994): the new person's name and role.
+type PersonInvite struct {
+	Name string   `json:"name"`
+	Role UserRole `json:"role"`
+}
+
+// people/invite: the invite code to send, for one use within 7 days. Its first client pairs as the new person.
+type PersonInvited struct {
+	Text    string   `json:"text"`
+	Expires Date     `json:"expires"`
+	Name    string   `json:"name"`
+	Role    UserRole `json:"role"`
+}
+
+// A machine in People: its name, its state and nothing inside it (FR-019).
+type PersonMachine struct {
+	ID       HostID  `json:"id"`
+	Name     string  `json:"name"`
+	State    string  `json:"state"`
+	Platform *string `json:"platform,omitzero"`
+}
+
 type PersonRemoveRequest struct {
 	Name    string `json:"name"`
 	AgentID string `json:"agentID"`
+}
+
+// people/remove (#994): the user.
+type PersonRequest struct {
+	User string `json:"user"`
+}
+
+// people/setRole (#994). Refused when it would leave no admin.
+type PersonRoleRequest struct {
+	User string   `json:"user"`
+	Role UserRole `json:"role"`
+}
+
+// people/list (#994): a user, with their clients and machines.
+type PersonRow struct {
+	ID         string          `json:"id"`
+	Name       string          `json:"name"`
+	Kind       string          `json:"kind"`
+	Role       UserRole        `json:"role"`
+	LocalOwner *bool           `json:"localOwner,omitzero"`
+	You        *bool           `json:"you,omitzero"`
+	SignIns    []SignIn        `json:"signIns"`
+	Clients    []PersonClient  `json:"clients"`
+	Machines   []PersonMachine `json:"machines"`
 }
 
 // What agents call the person, and their pronouns (#121), as given: person.json in the person's settings.
@@ -4830,6 +4961,15 @@ type ShownFile struct {
 	Chart *ChartHint `json:"chart,omitzero"`
 }
 
+// One way a person signs in (#994, spec 736): `local` is the local owner's (codes, with the control plane's key), `code` an invite code redeemed; Google, Apple and GitHub come with #995.
+type SignIn struct {
+	Provider string  `json:"provider"`
+	Account  *string `json:"account,omitzero"`
+	Email    *string `json:"email,omitzero"`
+	Login    *string `json:"login,omitzero"`
+	Added    *Date   `json:"added,omitzero"`
+}
+
 type SignInWantedReason string
 
 const (
@@ -5381,6 +5521,14 @@ type UsageHistory struct {
 	// The host's time zone, an IANA identifier such as America/Los_Angeles, that its hour and day stamps are in (#1267). Absent from a host too old to say: read as the viewer's own.
 	TimeZone *string `json:"timeZone,omitzero"`
 }
+
+// A user's role (#994, spec 736 FR-001): an admin manages people; a member sees only their own.
+type UserRole string
+
+const (
+	UserRoleAdmin  UserRole = "admin"
+	UserRoleMember UserRole = "member"
+)
 
 // What a third-party server's view waits on before it is drawn: the person's Show (#191). The data of a viewNeedsShow failure.
 type ViewAsk struct {

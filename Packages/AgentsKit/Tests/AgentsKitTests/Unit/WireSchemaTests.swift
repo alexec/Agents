@@ -217,6 +217,23 @@ struct WireSchemaTests {
             "SendReadRequest": Self.through(DaemonAPI.SendReadRequest.self),
             "SendRead": Self.through(DaemonAPI.SendRead.self),
             "ActivityToken": Self.through(DaemonAPI.ActivityToken.self),
+            // People and approve-to-join (#994).
+            "ControlPerson": Self.through(DaemonAPI.ControlPerson.self),
+            "SignIn": Self.through(DaemonAPI.SignIn.self),
+            "PersonClient": Self.through(DaemonAPI.PersonClient.self),
+            "PersonMachine": Self.through(DaemonAPI.PersonMachine.self),
+            "PersonRow": Self.through(DaemonAPI.PersonRow.self),
+            "PeopleList": Self.through(DaemonAPI.PeopleList.self),
+            "PersonInvite": Self.through(DaemonAPI.PersonInvite.self),
+            "PersonInvited": Self.through(DaemonAPI.PersonInvited.self),
+            "PersonRequest": Self.through(DaemonAPI.PersonRequest.self),
+            "PersonRoleRequest": Self.through(DaemonAPI.PersonRoleRequest.self),
+            "PeopleChanged": Self.through(DaemonAPI.PeopleChanged.self),
+            "JoinRequest": Self.through(DaemonAPI.JoinRequest.self),
+            "JoinRequestDecide": Self.through(DaemonAPI.JoinRequestDecide.self),
+            "JoinApproved": Self.through(DaemonAPI.JoinApproved.self),
+            "JoinDecided": Self.through(DaemonAPI.JoinDecided.self),
+            "HostJoinDecision": Self.through(DaemonAPI.HostJoinDecision.self),
         ]
         let all = samples.objectValue ?? [:]
         #expect(Set(all.keys) == Set(types.keys), "a sample with no Swift type, or a type with no sample")

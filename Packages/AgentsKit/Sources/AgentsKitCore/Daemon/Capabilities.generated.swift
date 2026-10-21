@@ -46,6 +46,7 @@ public enum Capability {
     public static let handover1 = "handover/1"
     public static let hostWire1 = "host.wire/1"
     public static let host1 = "host/1"
+    public static let hostsJoin1 = "hosts.join/1"
     public static let hosts1 = "hosts/1"
     public static let leases1 = "leases/1"
     public static let liveactivity1 = "liveactivity/1"
@@ -59,6 +60,7 @@ public enum Capability {
     public static let options1 = "options/1"
     public static let pages1 = "pages/1"
     public static let pairing1 = "pairing/1"
+    public static let people1 = "people/1"
     public static let permissions1 = "permissions/1"
     public static let person1 = "person/1"
     public static let personal1 = "personal/1"
@@ -410,11 +412,14 @@ public enum Capability {
         "host/status": "host/1",
         "host/workspaces": "host/1",
         "hosts/announce": "hosts/1",
+        "hosts/approveJoin": "hosts.join/1",
         "hosts/checkAgain": "hosts/1",
         "hosts/deleteWorkspace": "hosts/1",
+        "hosts/denyJoin": "hosts.join/1",
         "hosts/detect": "hosts/1",
         "hosts/dropKept": "hosts/1",
         "hosts/install": "hosts/1",
+        "hosts/joinRequests": "hosts.join/1",
         "hosts/keep": "hosts/1",
         "hosts/lastHeard": "hosts/1",
         "hosts/lendGit": "hosts/1",
@@ -432,6 +437,10 @@ public enum Capability {
         "hosts/stop": "hosts/1",
         "hosts/unlink": "hosts/1",
         "hosts/update": "hosts/1",
+        "people/invite": "people/1",
+        "people/list": "people/1",
+        "people/remove": "people/1",
+        "people/setRole": "people/1",
         "projects/detected": "projects/1",
         "providers/add": "providers/1",
         "providers/create": "providers/1",
@@ -450,9 +459,12 @@ public enum Capability {
         "control/clientChanged": "control/1",
         "control/hostChanged": "control/1",
         "control/installProgress": "control/1",
+        "control/joinDecided": "hosts.join/1",
+        "control/joinRequested": "hosts.join/1",
         "control/keptChanged": "control/1",
         "control/keptDelivered": "control/1",
         "control/moved": "control/1",
+        "control/peopleChanged": "people/1",
         "control/providerDraft": "control/1",
         "control/providersChanged": "control/1",
         "control/thisMacHostChanged": "control/1",
