@@ -413,7 +413,7 @@ export function ConnectDialog({ store, host, provider, folder, connected, close 
         <h2 class="setup-heading">Agents will be able to</h2>
         <ul class="abilities">{words.abilitiesFor(provider).map((a) => <li key={a}>{a}</li>)}</ul>
         {withToken && (
-          <form class="token-form" onSubmit={(e) => { e.preventDefault(); void connectWithToken(); }}>
+          <form id="connect-token" class="token-form" onSubmit={(e) => { e.preventDefault(); void connectWithToken(); }}>
             <p class="small">{words.gitlab.tokenIntro}</p>
             <label>{words.gitlab.addressLabel}
               <input type="url" value={address} placeholder={words.gitlab.addressPrompt} disabled={busy}
@@ -428,7 +428,7 @@ export function ConnectDialog({ store, host, provider, folder, connected, close 
           </form>
         )}
         {isEmail && (
-          <form class="token-form" onSubmit={(e) => { e.preventDefault(); void connectWithEmail(); }}>
+          <form id="connect-email" class="token-form" onSubmit={(e) => { e.preventDefault(); void connectWithEmail(); }}>
             <p class="small">{words.email.intro}</p>
             <label>{words.email.serverLabel}
               <input type="text" value={server} placeholder={words.email.serverPrompt} disabled={busy}
@@ -441,7 +441,7 @@ export function ConnectDialog({ store, host, provider, folder, connected, close 
                 onInput={(e) => setUser((e.target as HTMLInputElement).value)} />
             </label>
             <label>{words.email.passwordLabel}
-              <input type="password" value={password} placeholder={words.email.passwordPrompt} disabled={busy} autocomplete="new-password"
+              <input type="password" value={password} placeholder={words.email.passwordPrompt} disabled={busy} autocomplete="current-password"
                 onInput={(e) => setPassword((e.target as HTMLInputElement).value)} />
             </label>
           </form>
@@ -483,11 +483,11 @@ export function ConnectDialog({ store, host, provider, folder, connected, close 
               <button onClick={close}>Cancel</button>
               {isEmail
                 ? (step.kind === "asking" || step.kind === "failed") &&
-                  <button class="prominent" disabled={!words.emailRequest(server, user, password)}
-                    onClick={() => void connectWithEmail()}>{words.email.button}</button>
+                  <button type="submit" form="connect-email" class="prominent"
+                    disabled={!words.emailRequest(server, user, password)}>{words.email.button}</button>
                 : withToken
                 ? (step.kind === "asking" || step.kind === "failed") &&
-                  <button class="prominent" disabled={!token.trim()} onClick={() => void connectWithToken()}>{words.gitlab.tokenButton}</button>
+                  <button type="submit" form="connect-token" class="prominent" disabled={!token.trim()}>{words.gitlab.tokenButton}</button>
                 : <>
                   {step.kind === "asking" && <button class="prominent" onClick={() => void start()}>{words.continueButtonFor(provider)}</button>}
                   {step.kind === "failed" && <button class="prominent" onClick={() => void start()}>Try Again</button>}
