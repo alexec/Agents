@@ -1,0 +1,82 @@
+# The hosted service (#1807): people sign up on the web with GitHub, and each gets a control
+# plane of their own at https://<account>.AGENTS_HOSTED_ACCOUNTS_DOMAIN, each with its own
+# store prefix and its own control key, sealed by Google Cloud KMS. One agents-hosted runs
+# them all, and Caddy in front gets each name's certificate when it is first asked for. The
+# how-to is docs/how-to/run-the-hosted-service.md.
+#
+#   deploy/make-secrets.sh --public --kms projects/P/locations/L/keyRings/R/cryptoKeys/K
+#   AGENTS_HOSTED_DOMAIN=agentloops.dev AGENTS_HOSTED_ACCOUNTS_DOMAIN=cp.agentloops.dev \
+#       AGENTS_HOSTED_GITHUB_SECRET=… ACME_EMAIL=you@example.com \
+#       docker compose -f deploy/compose.hosted.yaml up -d --build
+#
+# DNS: AGENTS_HOSTED_DOMAIN and *.AGENTS_HOSTED_ACCOUNTS_DOMAIN point at this machine, with
+# ports 80 and 443 open. The GitHub App's callback URL is
+# https://AGENTS_HOSTED_DOMAIN/signin/callback, and its client secret is
+# AGENTS_HOSTED_GITHUB_SECRET (in deploy/.env). Without it the sign-up page says sign-up is
+# not open.
+name: agents-hosted
+
+services:
+  hosted:
+    build:
+      context: ..
+      dockerfile: deploy/Containerfile
+      args:
+        VERSION: ${AGENTS_VERSION:-dev}
+    image: agents-control:latest
+    restart: unless-stopped
+    entrypoint: ["/agents-hosted"]
+    command: ["serve"]
+    environment:
+      # Every account's records, each under accounts/<id>/: a folder in the data volume, or a
+      # bucket (s3://bucket/prefix) with its keys in deploy/.env.
+      AGENTS_STORE: ${AGENTS_STORE:-file:///data/store}
+      AGENTS_STORE_ENDPOINT: ${AGENTS_STORE_ENDPOINT:-}
+      AGENTS_STORE_REGION: ${AGENTS_STORE_REGION:-}
+      AGENTS_STORE_PATH_STYLE: ${AGENTS_STORE_PATH_STYLE:-}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+      # The key that seals every account's control key: gcpkms://projects/P/locations/L/keyRings/R/cryptoKeys/K.
+      AGENTS_CONTROL_KMS: ${AGENTS_CONTROL_KMS:?run deploy/make-secrets.sh --public --kms <key name>}
+      GOOGLE_APPLICATION_CREDENTIALS: /run/secrets/gcp-service-account
+      AGENTS_HOSTED_DOMAIN: ${AGENTS_HOSTED_DOMAIN:?set AGENTS_HOSTED_DOMAIN to the sign-up pages' name}
+      AGENTS_HOSTED_ACCOUNTS_DOMAIN: ${AGENTS_HOSTED_ACCOUNTS_DOMAIN:-}
+      AGENTS_HOSTED_GITHUB_CLIENT_ID: ${AGENTS_HOSTED_GITHUB_CLIENT_ID:-}
+      AGENTS_HOSTED_GITHUB_SECRET: ${AGENTS_HOSTED_GITHUB_SECRET:-}
+      # The web page each control plane serves, built into the image.
+      AGENTS_HOSTED_WEB: /web
+      AGENTS_HOSTED_VIEWS_DOMAIN: ${AGENTS_HOSTED_VIEWS_DOMAIN:-}
+      # Caddy's address below: only its X-Forwarded-For says where a request came from.
+      AGENTS_CONTROL_TRUSTED_PROXIES: 172.30.62.250
+    secrets: [gcp-service-account]
+    volumes:
+      - data:/data
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    depends_on: [hosted]
+    ports: ["80:80", "443:443"]
+    environment:
+      ACME_EMAIL: ${ACME_EMAIL:?set ACME_EMAIL for Let's Encrypt's notices}
+    networks:
+      default:
+        # Fixed, so agents-hosted can trust it and nothing else on the network.
+        ipv4_address: 172.30.62.250
+    volumes:
+      - ./Caddyfile.hosted:/etc/caddy/Caddyfile:ro
+      - caddy:/data
+
+networks:
+  default:
+    ipam:
+      config:
+        - subnet: 172.30.62.0/24
+
+secrets:
+  gcp-service-account:
+    file: ./secrets/gcp-service-account
+
+volumes:
+  data:
+  caddy:

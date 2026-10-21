@@ -1,0 +1,242 @@
+package hosted
+
+import (
+	"bytes"
+	"context"
+	"crypto/tls"
+	"encoding/base64"
+	"encoding/json"
+	"io"
+	"net"
+	"net/http"
+	"net/http/cookiejar"
+	"net/http/httptest"
+	"net/url"
+	"strings"
+	"testing"
+
+	"github.com/alexec/agents/Go/internal/controllink"
+	"github.com/alexec/agents/Go/internal/controlplane/records"
+	"github.com/alexec/agents/Go/internal/controlplane/store"
+)
+
+const domain = "hosted.test"
+
+// fakeGitHub signs in user 42, ana, for the code "good", and nobody for any other.
+func fakeGitHub(t *testing.T) *httptest.Server {
+	g := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/login/oauth/access_token":
+			r.ParseForm()
+			if r.PostForm.Get("client_secret") != "secret" || r.PostForm.Get("code") != "good" {
+				json.NewEncoder(w).Encode(map[string]string{"error": "bad_verification_code", "error_description": "The code is wrong."})
+				return
+			}
+			json.NewEncoder(w).Encode(map[string]string{"access_token": "gho_token"})
+		case "/user":
+			if r.Header.Get("Authorization") != "Bearer gho_token" {
+				w.WriteHeader(http.StatusUnauthorized)
+				return
+			}
+			json.NewEncoder(w).Encode(map[string]any{"id": 42, "login": "ana"})
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	t.Cleanup(g.Close)
+	return g
+}
+
+type browser struct {
+	t      *testing.T
+	client *http.Client
+}
+
+// start serves the hosted service over TLS, and a browser that reaches it at every name.
+func start(t *testing.T, st store.Store) (*Service, *browser) {
+	t.Helper()
+	g := fakeGitHub(t)
+	keeper := "base64key://" + base64.URLEncoding.EncodeToString(bytes.Repeat([]byte{3}, 32))
+	s, err := New(context.Background(), Config{Store: st, Keeper: keeper, Domain: domain, GitHubClientID: "Iv1.test",
+		GitHubSecret: "secret", GitHubWeb: g.URL, GitHubAPI: g.URL, Log: func(line string) { t.Log(line) }})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(s.Stop)
+	server := httptest.NewTLSServer(s)
+	t.Cleanup(server.Close)
+	jar, _ := cookiejar.New(nil)
+	address := server.Listener.Addr().String()
+	transport := &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+			return (&net.Dialer{}).DialContext(ctx, network, address)
+		}}
+	client := &http.Client{Jar: jar, Transport: transport,
+		CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+	return s, &browser{t: t, client: client}
+}
+
+func (b *browser) get(u string) (*http.Response, string) {
+	b.t.Helper()
+	res, err := b.client.Get(u)
+	if err != nil {
+		b.t.Fatal(err)
+	}
+	body, _ := io.ReadAll(res.Body)
+	res.Body.Close()
+	return res, string(body)
+}
+
+func (b *browser) post(u string, form url.Values) (*http.Response, string) {
+	b.t.Helper()
+	res, err := b.client.PostForm(u, form)
+	if err != nil {
+		b.t.Fatal(err)
+	}
+	body, _ := io.ReadAll(res.Body)
+	res.Body.Close()
+	return res, string(body)
+}
+
+// signIn goes to GitHub and back with code, and says where the service sent the browser.
+func (b *browser) signIn(code string) *http.Response {
+	b.t.Helper()
+	res, _ := b.get("https://" + domain + "/signin")
+	to, err := url.Parse(res.Header.Get("Location"))
+	if err != nil || res.StatusCode != http.StatusSeeOther || to.Path != "/login/oauth/authorize" {
+		b.t.Fatalf("%d %s", res.StatusCode, res.Header.Get("Location"))
+	}
+	if to.Query().Get("redirect_uri") != "https://"+domain+"/signin/callback" || to.Query().Get("client_id") != "Iv1.test" {
+		b.t.Fatal(to)
+	}
+	back, _ := b.get("https://" + domain + "/signin/callback?" + url.Values{"code": {code}, "state": {to.Query().Get("state")}}.Encode())
+	return back
+}
+
+// #1807: sign up with GitHub, get a control plane of your own, and this browser is sent to
+// it with a code it pairs itself with. Signing in again finds the same account; deleting
+// it deletes its control plane's store.
+func TestSignUpGivesAControlPlaneOfYourOwn(t *testing.T) {
+	st := store.NewMemory()
+	s, b := start(t, st)
+	_, page := b.get("https://" + domain + "/")
+	if !strings.Contains(page, "Sign Up with GitHub") {
+		t.Fatal(page)
+	}
+
+	res := b.signIn("good")
+	to, err := url.Parse(res.Header.Get("Location"))
+	if err != nil || res.StatusCode != http.StatusSeeOther {
+		t.Fatalf("%d %v", res.StatusCode, err)
+	}
+	id, ok := strings.CutSuffix(to.Host, "."+domain)
+	if !ok || !validID(id) || to.Scheme != "https" || to.Path != "/" {
+		t.Fatal(to)
+	}
+	text, ok := strings.CutPrefix(to.Fragment, "code=")
+	if !ok {
+		t.Fatal(to)
+	}
+	code, err := controllink.ParseCode(text)
+	if err != nil || code.URL != "https://"+id+"."+domain || code.Host {
+		t.Fatalf("%+v %v", code, err)
+	}
+	// The code is that account's control plane's, under its own prefix and key.
+	o, _ := st.Get(context.Background(), "accounts/"+id+"/v1/control.json")
+	var settings records.Settings
+	if o == nil || json.Unmarshal(o.Data, &settings) != nil || !bytes.Equal(settings.ControlKey, code.ControlKey) {
+		t.Fatal("the code is not the account's control plane's")
+	}
+	if o, _ := st.Get(context.Background(), "accounts/"+id+"/v1/keys/control.sealed"); o == nil {
+		t.Fatal("the account's key is not sealed in its prefix")
+	}
+	// Its control plane answers at its own name, through this service.
+	if res, body := b.get("https://" + id + "." + domain + "/readyz"); res.StatusCode != http.StatusOK {
+		t.Fatalf("%d %s", res.StatusCode, body)
+	}
+	if res, _ := b.get("https://abcdefghij." + domain + "/readyz"); res.StatusCode != http.StatusNotFound {
+		t.Fatal("a name with no account was answered")
+	}
+	// A WebSocket reaches it too: the upgrade passes through.
+	req, _ := http.NewRequest(http.MethodGet, "https://"+id+"."+domain+"/v1/connect", nil)
+	for k, v := range map[string]string{"Connection": "Upgrade", "Upgrade": "websocket", "Sec-WebSocket-Version": "13",
+		"Sec-WebSocket-Key": "dGhlIHNhbXBsZSBub25jZQ=="} {
+		req.Header.Set(k, v)
+	}
+	if res, err := b.client.Do(req); err != nil || res.StatusCode != http.StatusSwitchingProtocols {
+		t.Fatalf("%v %v", res, err)
+	} else {
+		res.Body.Close()
+	}
+	// A certificate is asked for only for the pages and an account that exists.
+	for name, want := range map[string]int{domain: 200, id + "." + domain: 200, "abcdefghij." + domain: 404, "other.test": 404} {
+		if res, _ := b.get("https://" + domain + "/v1/tls-allowed?domain=" + name); res.StatusCode != want {
+			t.Fatalf("%s: %d", name, res.StatusCode)
+		}
+	}
+
+	// Signing in again is the same account, and this browser can be sent to it again.
+	res = b.signIn("good")
+	if res.Header.Get("Location") != "/account" {
+		t.Fatal(res.Header.Get("Location"))
+	}
+	_, page = b.get("https://" + domain + "/account")
+	if !strings.Contains(page, "https://"+id+"."+domain) || !strings.Contains(page, "as ana") {
+		t.Fatal(page)
+	}
+	token := s.sessions.form(id)
+	res, _ = b.post("https://"+domain+"/account/open", url.Values{"token": {token}})
+	if !strings.HasPrefix(res.Header.Get("Location"), "https://"+id+"."+domain+"/#code=") {
+		t.Fatal(res.Header.Get("Location"))
+	}
+	// A form from anywhere else does nothing.
+	if res, _ := b.post("https://"+domain+"/account/open", url.Values{"token": {"forged"}}); res.Header.Get("Location") != "/" {
+		t.Fatal(res.Header.Get("Location"))
+	}
+
+	// Deleting asks for the name first, then takes the control plane's whole store.
+	if _, page := b.post("https://"+domain+"/account/delete", url.Values{"token": {token}, "confirm": {"nope"}}); !strings.Contains(page, "Type the account") {
+		t.Fatal(page)
+	}
+	if _, page := b.post("https://"+domain+"/account/delete", url.Values{"token": {token}, "confirm": {id}}); !strings.Contains(page, "are deleted") {
+		t.Fatal(page)
+	}
+	if left, _ := st.List(context.Background(), "accounts/"+id+"/"); len(left) != 0 {
+		t.Fatalf("%d objects left", len(left))
+	}
+	if res, _ := b.get("https://" + id + "." + domain + "/readyz"); res.StatusCode != http.StatusNotFound {
+		t.Fatal("a deleted account's control plane answered")
+	}
+	// The same GitHub user can sign up again, with a new control plane.
+	res = b.signIn("good")
+	if again, _ := url.Parse(res.Header.Get("Location")); again == nil || strings.HasPrefix(again.Host, id) {
+		t.Fatal(res.Header.Get("Location"))
+	}
+}
+
+// A callback that this browser did not start, or that GitHub refused, signs nobody in.
+func TestASignInMustBeThisBrowsers(t *testing.T) {
+	_, b := start(t, store.NewMemory())
+	if res, _ := b.get("https://" + domain + "/signin/callback?code=good&state=made-up"); res.StatusCode != http.StatusBadRequest {
+		t.Fatal(res.StatusCode)
+	}
+	res := b.signIn("bad")
+	if res.StatusCode != http.StatusBadGateway {
+		t.Fatal(res.StatusCode)
+	}
+	if res, _ := b.get("https://" + domain + "/account"); res.Header.Get("Location") != "/" {
+		t.Fatal("signed in with a refused code")
+	}
+	if res, _ := b.get("https://elsewhere.test/"); res.StatusCode != http.StatusMisdirectedRequest {
+		t.Fatal(res.StatusCode)
+	}
+}
+
+// A code in the link decodes back whole in the page (decodeURIComponent).
+func TestTheLinkKeepsTheCodeWhole(t *testing.T) {
+	code := "agents-control:2:c:-:AbC_-:s3cr3t:https%3A%2F%2Fx.test:-:Your%20control%20plane"
+	back, err := url.PathUnescape(escapeCode(code))
+	if err != nil || back != code || strings.ContainsAny(escapeCode(code), ":/% ") && !strings.Contains(escapeCode(code), "%3A") {
+		t.Fatal(escapeCode(code), back, err)
+	}
+}

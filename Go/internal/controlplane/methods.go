@@ -96,6 +96,9 @@ func (m *Methods) Handle(method string, params json.RawMessage, from Caller) (an
 	if frozen && (writes[method] || workspaceMethods[method] && !readsOnly) {
 		return nil, fail(storeUnavailable, "The control plane is moving to another machine. Nothing was changed; try again in a minute.")
 	}
+	if m.s.cfg.Hosted && overSSH[method] {
+		return nil, noSSHHere
+	}
 	switch method {
 	case "daemon/ping":
 		return map[string]any{}, nil
