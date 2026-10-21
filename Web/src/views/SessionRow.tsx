@@ -17,7 +17,7 @@ import { fromWireDate } from "../protocol/dates";
 import { Telling } from "./Telling";
 import { folderIsMissing, folderPath, missingFolderLabel } from "../model/missingFolder";
 import { shortAgo } from "../model/activity";
-import { sessionMark, type SessionMark } from "../model/sidebar";
+import { runningTool, runningToolLabel, sessionMark, type SessionMark } from "../model/sidebar";
 
 const glyphs: Record<StatusShape, string> = { working: "", needsYou: "!", waiting: "ᶻᶻ", done: "✓", stopped: "■" };
 
@@ -32,7 +32,7 @@ export function StatusMark({ agent, comingBack = false }: { agent: Agent; coming
   );
 }
 
-const markWords: Record<SessionMark, string> = { needsYou: "Needs you", working: "Working", queued: "Queued", waiting: "Waiting", paused: "Paused", done: "Done",
+const markWords: Record<SessionMark, string> = { needsYou: "Needs you", working: "Working", tool: "Running a tool", queued: "Queued", waiting: "Waiting", paused: "Paused", done: "Done",
   asksToArchive: archiveMark };
 
 /**
@@ -44,14 +44,31 @@ const markWords: Record<SessionMark, string> = { needsYou: "Needs you", working:
 export function SidebarMark({ agent, comingBack = false }: { agent: Agent; comingBack?: boolean }) {
   const mark = comingBack ? null : sessionMark(agent);
   if (!mark) return <StatusMark agent={agent} comingBack={comingBack} />;
+  const tool = mark === "tool" ? runningTool(agent) : null;
+  const words = tool !== null ? runningToolLabel(tool) : markWords[mark];
   return (
-    <span class={`sidebar-mark ${mark}`} role="img" aria-label={markWords[mark]} title={markWords[mark]}>
+    <span class={`sidebar-mark ${mark}`} role="img" aria-label={words} title={words}>
       {mark === "needsYou" && <span class="glyph" aria-hidden="true">✋&#xFE0E;</span>}
+      {mark === "tool" && <WrenchMark />}
       {mark === "queued" && <span class="glyph" aria-hidden="true">≡</span>}
       {mark === "waiting" && <span class="glyph" aria-hidden="true">ᶻᶻ</span>}
       {mark === "paused" && <span class="glyph" aria-hidden="true">⏸&#xFE0E;</span>}
       {mark === "asksToArchive" && <span class="glyph" aria-hidden="true">🗃&#xFE0E;</span>}
     </span>
+  );
+}
+
+/**
+ * The window's `wrench.and.screwdriver` as a small drawing (#1902): 🛠 does not draw as text in every
+ * font, and the other marks here are text.
+ */
+function WrenchMark() {
+  return (
+    <svg class="glyph" viewBox="0 0 16 16" width="12" height="12" aria-hidden="true" fill="none" stroke="currentColor"
+      stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M10.5 2.2a3 3 0 0 0-3.2 4L2.6 10.9a1.3 1.3 0 0 0 1.9 1.9l4.7-4.7a3 3 0 0 0 4-3.2l-1.8 1.8-1.7-.4-.4-1.7z" />
+      <path d="M3 3l3.2 3.2M9.6 9.6l3.2 3.2" />
+    </svg>
   );
 }
 
