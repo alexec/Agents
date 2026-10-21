@@ -1557,11 +1557,15 @@ public enum DaemonAPI {
         public var agentID: UUID
         public var path: String
         public var text: String
+        /// The SHA-256 (lower-case hex) of the text the edit began from (#1858): with it,
+        /// the host refuses with `Failure.fileChanged` when the file changed on disk since.
+        public var base: String?
 
-        public init(agentID: UUID, path: String, text: String) {
+        public init(agentID: UUID, path: String, text: String, base: String? = nil) {
             self.agentID = agentID
             self.path = path
             self.text = text
+            self.base = base
         }
     }
 
@@ -2661,6 +2665,8 @@ public enum DaemonAPI {
         public static let worktreeInUse = -32031
         /// The folder or file asked for is not there, or not any more (034).
         public static let fileGone = -32032
+        /// `artifact/write` with a base: the file changed on disk since the edit began (#1858).
+        public static let fileChanged = -32081
         /// It is there and cannot be opened (034).
         public static let fileNotReadable = -32033
         /// `changes/file` for a path that is not in the agent's list of changes.

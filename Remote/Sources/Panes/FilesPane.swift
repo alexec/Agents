@@ -551,6 +551,9 @@ struct FilesPane: View {
         var actions = PageActions(
             save: { path, document in await model.writeArtifact(agentID: agentID, path: path, text: document) },
             canEdit: !model.isStale)
+        actions.saveOver = { path, document, base in
+            await model.writeArtifact(agentID: agentID, path: path, text: document, base: base)
+        }
         // A source file's problems, from its language server on the agent's host (#844), when
         // the host is new enough to ask (#1748).
         if model.agent(agentID, has: Capability.filesDiagnostics1) {

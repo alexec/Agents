@@ -166,6 +166,9 @@ struct PagePane: View {
             image: { url in await model.pictures.image(agentID: agentID, url: url) },
             stamp: { url in await model.pictures.stamp(agentID: agentID, url: url) },
             canEdit: !model.isStale)
+        actions.saveOver = { path, document, base in
+            await model.writeArtifact(agentID: agentID, path: path, text: document, base: base)
+        }
         actions.typing = { model.isTyping = $0 }
         return actions
     }

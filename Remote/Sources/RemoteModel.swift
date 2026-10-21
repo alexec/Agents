@@ -510,6 +510,22 @@ final class RemoteModel {
     /// writer and the one that tells the agent (022). The same request the Mac's page
     /// makes, so a phone's edit is the person's in exactly the same way (034 FR-006).
     /// Answers why it did not land, or nil.
+    /// The editor's save that checks the file first (#1858).
+    func writeArtifact(agentID: UUID, path: String, text: String, base: String) async -> SaveOutcome {
+        guard !isStale else { return .failed("Your Mac is not answering. What you typed is kept here.") }
+        do {
+            let request = DaemonAPI.ArtifactWriteRequest(agentID: agentID, path: path, text: text, base: base)
+            try await client(for: request).call(DaemonAPI.Method.artifactWrite, request)
+            return .saved
+        } catch let error as JSONRPCError where error.code == DaemonAPI.Failure.fileChanged {
+            return .changedOnDisk
+        } catch let error as JSONRPCError {
+            return .failed(error.message)
+        } catch {
+            return .failed("Your Mac is not answering. What you typed is kept here.")
+        }
+    }
+
     func writeArtifact(agentID: UUID, path: String, text: String) async -> String? {
         guard !isStale else { return "Your Mac is not answering. What you typed is kept here." }
         do {

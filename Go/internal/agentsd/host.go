@@ -2,6 +2,8 @@ package agentsd
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -420,6 +422,10 @@ func (d *Daemon) writeArtifact(r wire.ArtifactWriteRequest) error {
 	if string(old) == r.Text {
 		return nil
 	}
+	// Not over a change made since the edit began, an agent's most of all (#1858).
+	if r.Base != nil && textDigest(string(old)) != *r.Base {
+		return &Error{Code: wire.FailureFileChanged, Message: filepath.Base(r.Path) + " changed on disk since you began editing it, so it was not saved."}
+	}
 	if err := store.WriteAtomically(r.Path, []byte(r.Text), 0o644); err != nil {
 		return &Error{Code: CodeInternal, Message: "Could not save " + filepath.Base(r.Path) + ": " + err.Error()}
 	}
@@ -506,4 +512,10 @@ func (d *Daemon) putInDropbox(r wire.DropboxPutRequest) (wire.DropboxPutResponse
 		return wire.DropboxPutResponse{}, &Error{Code: wire.FailureCouldNotSave, Message: "The file could not be put in the drop box."}
 	}
 	return wire.DropboxPutResponse{Path: path}, nil
+}
+
+// textDigest is ArtifactWriteRequest.base: a text's SHA-256 in lower-case hex.
+func textDigest(text string) string {
+	sum := sha256.Sum256([]byte(text))
+	return hex.EncodeToString(sum[:])
 }

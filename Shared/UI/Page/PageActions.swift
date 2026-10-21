@@ -28,6 +28,10 @@ extension Image {
 struct PageActions {
     /// Hand the whole document to the daemon to write. Answers why it did not, or nil.
     var save: @MainActor (_ path: String, _ document: String) async -> String?
+    /// The same, refused when the file on disk is no longer `base`, the text the edit began
+    /// from (#1858), so an agent's change is never written over unseen. Nil where the host
+    /// cannot check, and then the editor uses `save`.
+    var saveOver: (@MainActor (_ path: String, _ document: String, _ base: String) async -> SaveOutcome)? = nil
     /// A picture beside the document, or nil to show its alternative text.
     var image: @MainActor (URL) async -> PlatformImage?
     /// What a picture's file is now, so a redrawn one is noticed (022 FR-020).
@@ -59,6 +63,14 @@ struct PageActions {
         self.stamp = stamp
         self.canEdit = canEdit
     }
+}
+
+/// What a save that checks the file first answers (#1858).
+enum SaveOutcome: Equatable {
+    case saved
+    /// Somebody, an agent most likely, changed the file since the edit began: nothing written.
+    case changedOnDisk
+    case failed(String)
 }
 
 extension EnvironmentValues {

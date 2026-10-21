@@ -32,6 +32,7 @@ export const Failure = {
   dayLimitReached: -32018,
   deleteRefused: -32051,
   eventRefused: -32050,
+  fileChanged: -32081,
   fileGone: -32032,
   fileNotReadable: -32033,
   folderGone: -32004,
@@ -400,6 +401,12 @@ export interface ArtifactWriteRequest {
   agentID: UUID;
   path: string;
   text: string;
+  /**
+   * The SHA-256, in lower-case hex, of the text the edit started from (#1858). When the file on
+   * disk is not that text any more, the write is refused with fileChanged and nothing is written.
+   * Left out, the text is written whatever is on disk.
+   */
+  base?: string;
 }
 
 export interface AssessRuntimeRequest {
@@ -5273,7 +5280,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   Approval: { required: ["kind", "key", "title", "line", "actions"], optional: ["digest", "since", "agentID"] },
   ApprovalAnswer: { required: ["folder", "kind", "key", "action"], optional: ["digest", "note"] },
   ApprovalReadRequest: { required: ["folder", "kind", "key"], optional: [] },
-  ArtifactWriteRequest: { required: ["agentID", "path", "text"], optional: [] },
+  ArtifactWriteRequest: { required: ["agentID", "path", "text"], optional: ["base"] },
   AssessRuntimeRequest: { required: ["runtimeID", "folder"], optional: ["model"] },
   AssessRuntimeResult: { required: ["agentID", "reportPath"], optional: ["model"] },
   Attachment: { required: ["id", "block", "displayName"], optional: ["byteCount"] },
