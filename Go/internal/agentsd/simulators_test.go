@@ -65,8 +65,10 @@ func TestShrinkReadsAJPEGsPlanesDirectly(t *testing.T) {
 	for i := range picture.Cb {
 		picture.Cb[i], picture.Cr[i] = uint8(112+i%32), uint8(120+i%16)
 	}
-	// One for each pixel is about 3 million; -race and coverage add a few dozen of their own.
-	if allocs := testing.AllocsPerRun(1, func() { shrink(picture, 1200) }); allocs > 1000 {
+	// One for each pixel is about 3 million. AllocsPerRun counts the whole process, so
+	// goroutines other tests leave running add theirs: 1072 and 2083 on CI (#1957). The
+	// limit is far under 3 million and far over that noise.
+	if allocs := testing.AllocsPerRun(1, func() { shrink(picture, 1200) }); allocs > 100000 {
 		t.Fatalf("%v allocations to shrink one screen", allocs)
 	}
 	// The same averages as a pixel-by-pixel read, within rounding.
