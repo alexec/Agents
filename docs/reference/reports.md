@@ -1,3 +1,9 @@
+---
+diataxis: reference
+devices: [mac, iphone, ipad]
+description: Usage, cost and time by person, project, machine and runtime, added up on the control plane from what each machine sends.
+---
+
 # Reports
 
 A report shows the usage, cost and time of each person, project, machine and runtime
