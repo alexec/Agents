@@ -594,6 +594,26 @@ struct AgentsModelTests {
         #expect(model.firstTurn == 5 + 40)
     }
 
+    /// The Prompts list numbers from the host's count of the person's prompts before the
+    /// turns (#1862). Turns let go at the front add theirs, so a row keeps its number.
+    @Test func trimmedTurnsKeepThePromptNumbers() {
+        let model = AgentsModel()
+        let page = (0..<80).map { n in
+            TurnSummary(id: UUID(), start: n, end: n + 1, ask: TranscriptEntry(
+                at: Date(), kind: .userMessage("ask \(n)", from: n.isMultiple(of: 2) ? .person : .agent)), last: nil)
+        }
+        model.replaceTurns(with: TurnsPage(turns: page, firstTurn: 100, openStart: 80, firstPrompt: 60))
+        let dropped = 80 - AgentsModel.turnsKept
+        #expect(model.firstPrompt == 60 + dropped / 2)
+        let prompts = SessionPrompts.of(turns: model.turns, entries: [], isRunning: false, earlier: model.firstPrompt ?? 0)
+        #expect(prompts.first?.text == "ask \(dropped)")
+        #expect(prompts.first?.number == 60 + dropped / 2 + 1)
+        #expect(prompts.last?.number == 60 + 40)
+
+        model.clearTranscript()
+        #expect(model.firstPrompt == nil)
+    }
+
     /// Find goes to an old match in a long chat with one call for the turns, keeps what it
     /// brought in while the chat followed the end, and stops at `revealTurnsCap` (#1649).
     /// Before, it asked one 50-turn page at a time, with no cap, and the trim undid them.

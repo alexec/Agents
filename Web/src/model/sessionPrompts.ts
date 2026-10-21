@@ -31,9 +31,10 @@ interface Turn { ask: TranscriptEntry; cost: Cost | null; lastAt: number | null;
 
 /**
  * The person's prompts, oldest first, from the stored turns and the entries held after them (which
- * may overlap the last turn). `isRunning` is whether the last turn is still going.
+ * may overlap the last turn). `isRunning` is whether the last turn is still going. `earlier` is how
+ * many of the person's prompts come before the turns: the first is numbered after them (#1862).
  */
-export function sessionPrompts(turns: readonly TurnSummary[], entries: readonly TranscriptEntry[], isRunning: boolean): SessionPrompt[] {
+export function sessionPrompts(turns: readonly TurnSummary[], entries: readonly TranscriptEntry[], isRunning: boolean, earlier = 0): SessionPrompt[] {
   // A turn for each ask, in order; a held copy of a turn replaces its stored one.
   const byAsk = new Map<string, Turn>();
   const keep = (turn: Turn) => { byAsk.set(turn.ask.id, turn); };
@@ -70,13 +71,21 @@ export function sessionPrompts(turns: readonly TurnSummary[], entries: readonly 
     if (!message || (message.from ?? "person") !== "person") return;
     const going = isRunning && index === order.length - 1;
     prompts.push({
-      id: turn.ask.id, number: prompts.length + 1, text: message._0, title: titleOf(message._0), at: turn.ask.at,
+      id: turn.ask.id, number: earlier + prompts.length + 1, text: message._0, title: titleOf(message._0), at: turn.ask.at,
       cost: turn.cost,
       seconds: going || turn.lastAt === null ? null : Math.max(0, Math.round(turn.lastAt - turn.ask.at)),
       ending: going ? null : turn.ending,
     });
   });
   return prompts;
+}
+
+/** How many of the person's prompts these turns start with: what the chat lets go of when it trims its oldest turns. */
+export function personPrompts(turns: readonly TurnSummary[]): number {
+  return turns.filter((turn) => {
+    const message = turn.ask && fields(turn.ask, "userMessage");
+    return !!message && (message.from ?? "person") === "person";
+  }).length;
 }
 
 /** The prompts whose words hold `query`, whatever their case; all of them for none. */

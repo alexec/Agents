@@ -9,11 +9,15 @@ public struct TurnsPage: Codable, Hashable, Sendable {
     /// The transcript's index of the first entry of the turn after the last finished
     /// one: where `agents/transcript` is asked to start.
     public var openStart: Int
+    /// How many of the person's prompts come before the first of `turns`: what the Prompts
+    /// list numbers from (#1862). Nil from a host too old to say.
+    public var firstPrompt: Int?
 
-    public init(turns: [TurnSummary], firstTurn: Int, openStart: Int) {
+    public init(turns: [TurnSummary], firstTurn: Int, openStart: Int, firstPrompt: Int? = nil) {
         self.turns = turns
         self.firstTurn = firstTurn
         self.openStart = openStart
+        self.firstPrompt = firstPrompt
     }
 
     public var hasMoreBefore: Bool { firstTurn > 0 }

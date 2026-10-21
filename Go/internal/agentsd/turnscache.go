@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"sort"
 	"sync"
 
 	"github.com/alexec/agents/Go/internal/agentsd/diskjson"
@@ -29,6 +30,9 @@ type turnState struct {
 	// asks is the lines that are an ask, up to scanned.
 	asks    []int
 	scanned int
+	// people is the lines of asks that are the person's, in order: what numbers the
+	// Prompts list from the first prompt (#1862).
+	people []int
 	// known is the summaries of the first turns, without a gap: what turns.jsonl holds.
 	known []wire.TurnSummary
 	// later is summaries of later turns by position, made for a page before the ones
@@ -99,6 +103,11 @@ func (d *Daemon) turns(r wire.TurnsRequest) (wire.TurnsPage, error) {
 	if len(starts) > 0 {
 		page.OpenStart = int64(starts[len(starts)-1])
 	}
+	before := 0
+	if start < len(starts) {
+		before = sort.SearchInts(t.people, starts[start])
+	}
+	page.FirstPrompt = new(int64(before))
 	for p := start; p < end; p++ {
 		if p < len(t.known) {
 			// A file the Swift host wrote before 069 kept no outcome: made again for the page.
@@ -151,15 +160,18 @@ func (d *Daemon) currentTurns(id wire.UUID, ends []int64) (*turnState, error) {
 	t.used = d.turnTick
 	// Read from some other transcript than this one: look again.
 	if t.scanned > total {
-		t.asks, t.scanned, t.later = nil, 0, map[int]wire.TurnSummary{}
+		t.asks, t.people, t.scanned, t.later = nil, nil, 0, map[int]wire.TurnSummary{}
 	}
 	lines, err := d.Store.LinesContaining(id, ends, `"userMessage"`, t.scanned)
 	if err != nil {
 		return nil, err
 	}
 	for _, l := range lines {
-		if d.isAskLine(id, ends, l) {
+		if ask, person := d.askAt(id, ends, l); ask {
 			t.asks = append(t.asks, l)
+			if person {
+				t.people = append(t.people, l)
+			}
 		}
 	}
 	t.scanned = total
@@ -183,11 +195,26 @@ func (d *Daemon) currentTurns(id wire.UUID, ends []int64) (*turnState, error) {
 }
 
 func (d *Daemon) isAskLine(id wire.UUID, ends []int64, line int) bool {
+	ask, _ := d.askAt(id, ends, line)
+	return ask
+}
+
+// askAt is whether the line starts a turn, and whether the person sent it.
+func (d *Daemon) askAt(id wire.UUID, ends []int64, line int) (ask, person bool) {
 	if line >= len(ends) {
-		return false
+		return false, false
 	}
 	entries, _, err := d.Store.Entries(id, ends, line, line+1)
-	return err == nil && len(entries) == 1 && isPersonsAsk(&entries[0])
+	if err != nil || len(entries) != 1 || !isPersonsAsk(&entries[0]) {
+		return false, false
+	}
+	return true, isPersonsPrompt(&entries[0])
+}
+
+// isPersonsPrompt is a prompt the person sent, as promptNumber counts them.
+func isPersonsPrompt(e *wire.TranscriptEntry) bool {
+	u := e.Kind.UserMessage
+	return u != nil && (u.From == nil || *u.From == wire.PromptOriginPerson)
 }
 
 // checkKept is checkKept: the kept turns hold while each starts on the entry it began
@@ -228,9 +255,14 @@ func (d *Daemon) checkKept(id wire.UUID, t *turnState, ends []int64) error {
 		t.known = known[:holding]
 		d.writeTurns(id, t.known)
 	}
-	t.asks = nil
-	for _, k := range t.known[min(1, len(t.known)):] {
-		t.asks = append(t.asks, int(k.Start))
+	t.asks, t.people = nil, nil
+	for i, k := range t.known {
+		if i > 0 {
+			t.asks = append(t.asks, int(k.Start))
+		}
+		if k.Ask != nil && isPersonsPrompt(k.Ask) {
+			t.people = append(t.people, int(k.Start))
+		}
 	}
 	if n := len(t.known); n > 0 {
 		t.scanned = int(t.known[n-1].End)

@@ -4311,6 +4311,7 @@ export interface TurnsPage {
   turns: TurnSummary[];
   firstTurn: number;
   openStart: number;
+  firstPrompt?: number;
 }
 
 export interface TurnsRequest {
@@ -5577,7 +5578,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   TunnelOpen: { required: ["runtime", "ref"], optional: [] },
   TurnSummary: { required: ["id", "start", "end"], optional: ["ask", "last", "concise", "outcome", "steps", "usage"] },
   TurnUsage: { required: ["totalTokens", "inputTokens", "outputTokens"], optional: ["thoughtTokens", "cachedReadTokens", "cachedWriteTokens", "cost"] },
-  TurnsPage: { required: ["turns", "firstTurn", "openStart"], optional: [] },
+  TurnsPage: { required: ["turns", "firstTurn", "openStart"], optional: ["firstPrompt"] },
   TurnsRequest: { required: ["agentID", "limit"], optional: ["before"] },
   UnqueueRequest: { required: ["agentID", "promptID"], optional: [] },
   Usage: { required: ["used", "size", "at"], optional: ["cost"] },

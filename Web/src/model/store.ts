@@ -24,6 +24,7 @@ import { folderKey, projectFolder, projectView, type ProjectView } from "./group
 import { decideMacHostNotice, type MacHostNotice } from "./macHostNotice";
 import { DisplayBuilder, keepingTurns, storedTurn, turns, type ChatTurn, type Item } from "./turns";
 import { sortedRuntimes } from "./runtimes";
+import { personPrompts } from "./sessionPrompts";
 import { shownItems } from "./thoughts";
 import { blockLines, openBlock } from "./block";
 import { Drafts } from "./drafts";
@@ -225,6 +226,8 @@ export class Work {
   isFollowingEnd = true;
   private nextTrimAt = entriesTrimmedAt;
   readonly firstTurn = signal(0);
+  /** How many of the person's prompts come before `turns`, as the host counts them (#1862). Null from a host too old to say. */
+  readonly firstPrompt = signal<number | null>(null);
   readonly openTurnStart = signal(0);
   readonly firstEntryIndex = signal(0);
   readonly hasMoreBefore = signal(false);
@@ -835,6 +838,7 @@ export class Work {
     if (!following || held.length <= turnsKept + openingTurns) return;
     const cut = held.length - turnsKept;
     batch(() => {
+      if (this.firstPrompt.value !== null) this.firstPrompt.value += personPrompts(held.slice(0, cut));
       this.turns.value = held.slice(cut);
       this.firstTurn.value += cut;
     });
@@ -845,6 +849,7 @@ export class Work {
     batch(() => {
       this.turns.value = keepingLatestByID(page.turns);
       this.firstTurn.value = page.firstTurn;
+      this.firstPrompt.value = page.firstPrompt ?? null;
       this.openTurnStart.value = page.openStart;
     });
   }
@@ -855,6 +860,7 @@ export class Work {
     batch(() => {
       this.turns.value = keepingLatestByID([...page.turns, ...this.turns.value]);
       this.firstTurn.value = page.firstTurn;
+      this.firstPrompt.value = page.firstPrompt ?? null;
     });
   }
 
@@ -889,6 +895,7 @@ export class Work {
     this.hasMoreBefore.value = false;
     this.turns.value = [];
     this.firstTurn.value = 0;
+    this.firstPrompt.value = null;
     this.openTurnStart.value = 0;
     this.refold([]);
   }

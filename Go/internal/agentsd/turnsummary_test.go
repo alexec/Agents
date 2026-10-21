@@ -131,16 +131,22 @@ func TestTurnsAreKept(t *testing.T) {
 	var id wire.UUID
 	json.Unmarshal(c.call(t, 1, "agents/start", map[string]any{"runtimeID": "claude", "cwd": "file://" + t.TempDir(), "prompt": "hello"}), &id)
 	c.until(t, "the first turn", ended(id, wire.AgentStateFinished))
-	person := wire.PromptOriginPerson
+	person, agent := wire.PromptOriginPerson, wire.PromptOriginAgent
 	for i := range 300 {
+		// The first is another agent's: a turn, but not one of the person's prompts (#1862).
+		from := &person
+		if i == 0 {
+			from = &agent
+		}
 		d.Store.Append(id, wire.TranscriptEntry{ID: store.NewUUID(), At: now(), Kind: wire.TranscriptEntryKind{
-			UserMessage: &wire.TranscriptEntryKindUserMessage{Value: fmt.Sprintf("ask %d", i), From: &person}}})
+			UserMessage: &wire.TranscriptEntryKindUserMessage{Value: fmt.Sprintf("ask %d", i), From: from}}})
 		d.Store.Append(id, wire.TranscriptEntry{ID: store.NewUUID(), At: now(), Kind: wire.TranscriptEntryKind{
 			AgentMessage: &wire.TranscriptEntryKindAgentMessage{Text: fmt.Sprintf("done %d", i)}}})
 	}
 	var page wire.TurnsPage
 	json.Unmarshal(c.call(t, 2, "agents/turns", map[string]any{"agentID": id, "limit": 5}), &page)
-	if len(page.Turns) != 5 || page.Turns[4].Ask.Kind.UserMessage.Value != "ask 298" {
+	// Before "ask 294": "hello" and asks 1 to 293, which the Prompts list numbers from (#1862).
+	if len(page.Turns) != 5 || page.Turns[4].Ask.Kind.UserMessage.Value != "ask 298" || page.FirstPrompt == nil || *page.FirstPrompt != 294 {
 		t.Fatalf("%+v", page)
 	}
 	closed := int(page.FirstTurn) + 5
@@ -156,7 +162,9 @@ func TestTurnsAreKept(t *testing.T) {
 	d.turnMu.Unlock()
 	page = wire.TurnsPage{}
 	json.Unmarshal(c.call(t, 3, "agents/turns", map[string]any{"agentID": id, "before": 150, "limit": 1}), &page)
-	if len(page.Turns) != 1 || page.Turns[0].Ask.Kind.UserMessage.Value != fmt.Sprintf("ask %d", 149-(closed-299)) {
+	ask := 149 - (closed - 299)
+	if len(page.Turns) != 1 || page.Turns[0].Ask.Kind.UserMessage.Value != fmt.Sprintf("ask %d", ask) ||
+		page.FirstPrompt == nil || *page.FirstPrompt != int64(ask) {
 		b, _ := json.Marshal(page)
 		t.Fatalf("%s", b)
 	}

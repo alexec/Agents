@@ -904,6 +904,7 @@ button.remove:hover { opacity: 1; }
 /* The Prompts list (#1658): as Open File…, with a heading, and two lines and a ··· to a row. */
 .prompt-list { background: var(--paper-raised); border: 1px solid var(--paper-rule); border-radius: 14px; box-shadow: 0 6px 20px var(--paper-shadow); padding: 12px; }
 .prompt-list h2 { margin: 0 4px; font-size: 0.9375rem; }
+.prompt-list .prompt-earlier { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin: 0 4px; }
 .prompt-list .completions { max-height: min(420px, 60vh); box-shadow: none; }
 .prompt-list .completions li { align-items: center; }
 .prompt-list .prompt-number { flex: none; min-width: 1.5em; text-align: right; font-variant-numeric: tabular-nums; }

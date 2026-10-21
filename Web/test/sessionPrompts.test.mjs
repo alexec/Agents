@@ -10,7 +10,7 @@ const row = ({ id, number, title, cost, seconds, ending }) => ({ id: id.toUpperC
 
 for (const { name, input, expected } of cases("prompts/list.json")) {
   test(`list: ${name}`, () => {
-    assert.deepEqual(p.sessionPrompts(input.turns, input.entries, input.isRunning).map(row), expected);
+    assert.deepEqual(p.sessionPrompts(input.turns, input.entries, input.isRunning, input.earlier).map(row), expected);
   });
 }
 

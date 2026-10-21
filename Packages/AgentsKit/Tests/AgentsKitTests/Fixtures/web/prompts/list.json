@@ -38,6 +38,7 @@
       }
     ],
     "input" : {
+      "earlier" : 0,
       "entries" : [
         {
           "at" : 812500054,
@@ -286,6 +287,7 @@
       }
     ],
     "input" : {
+      "earlier" : 0,
       "entries" : [
         {
           "at" : 812500054,
@@ -494,5 +496,254 @@
       ]
     },
     "name" : "every turn over"
+  },
+  {
+    "expected" : [
+      {
+        "cost" : {
+          "amount" : 0.75,
+          "currency" : "USD"
+        },
+        "ending" : null,
+        "id" : "00000000-0000-0000-0000-000000001001",
+        "number" : 13,
+        "seconds" : 18,
+        "title" : "Make the cache"
+      },
+      {
+        "cost" : null,
+        "ending" : "stopped",
+        "id" : "00000000-0000-0000-0000-000000001005",
+        "number" : 14,
+        "seconds" : 6,
+        "title" : "Make it faster"
+      },
+      {
+        "cost" : null,
+        "ending" : "failed",
+        "id" : "00000000-0000-0000-0000-000000001009",
+        "number" : 15,
+        "seconds" : 6,
+        "title" : "Run the tests"
+      },
+      {
+        "cost" : null,
+        "ending" : null,
+        "id" : "00000000-0000-0000-0000-000000001011",
+        "number" : 16,
+        "seconds" : 12,
+        "title" : "Ship it"
+      }
+    ],
+    "input" : {
+      "earlier" : 12,
+      "entries" : [
+        {
+          "at" : 812500054,
+          "id" : "00000000-0000-0000-0000-000000001009",
+          "kind" : {
+            "userMessage" : {
+              "_0" : "Run the tests"
+            }
+          }
+        },
+        {
+          "at" : 812500060,
+          "id" : "00000000-0000-0000-0000-000000001010",
+          "kind" : {
+            "stateChanged" : {
+              "_0" : "stopped",
+              "reason" : "processDied"
+            }
+          }
+        },
+        {
+          "at" : 812500066,
+          "id" : "00000000-0000-0000-0000-000000001011",
+          "kind" : {
+            "userMessage" : {
+              "_0" : "Ship it"
+            }
+          }
+        },
+        {
+          "at" : 812500072,
+          "id" : "00000000-0000-0000-0000-000000001012",
+          "kind" : {
+            "userMessage" : {
+              "_0" : "Did it work?",
+              "from" : "app"
+            }
+          }
+        },
+        {
+          "at" : 812500078,
+          "id" : "00000000-0000-0000-0000-000000001013",
+          "kind" : {
+            "agentMessage" : {
+              "text" : "Shipping."
+            }
+          }
+        }
+      ],
+      "isRunning" : false,
+      "query" : null,
+      "turns" : [
+        {
+          "ask" : {
+            "at" : 812500006,
+            "id" : "00000000-0000-0000-0000-000000001001",
+            "kind" : {
+              "userMessage" : {
+                "_0" : "\n  Make the cache\nwith a bound"
+              }
+            }
+          },
+          "concise" : [
+            {
+              "at" : 812500024,
+              "id" : "00000000-0000-0000-0000-000000001004",
+              "kind" : {
+                "agentMessage" : {
+                  "text" : "Made."
+                }
+              }
+            }
+          ],
+          "end" : 4,
+          "id" : "00000000-0000-0000-0000-000000001001",
+          "last" : {
+            "at" : 812500024,
+            "id" : "00000000-0000-0000-0000-000000001004",
+            "kind" : {
+              "agentMessage" : {
+                "text" : "Made."
+              }
+            }
+          },
+          "outcome" : [
+            {
+              "at" : 812500024,
+              "id" : "00000000-0000-0000-0000-000000001004",
+              "kind" : {
+                "agentMessage" : {
+                  "text" : "Made."
+                }
+              }
+            }
+          ],
+          "start" : 0,
+          "steps" : 0,
+          "usage" : {
+            "cost" : {
+              "amount" : 0.75,
+              "currency" : "USD"
+            },
+            "inputTokens" : 0,
+            "outputTokens" : 0,
+            "totalTokens" : 0
+          }
+        },
+        {
+          "ask" : {
+            "at" : 812500030,
+            "id" : "00000000-0000-0000-0000-000000001005",
+            "kind" : {
+              "userMessage" : {
+                "_0" : "Make it faster"
+              }
+            }
+          },
+          "concise" : [
+
+          ],
+          "end" : 6,
+          "id" : "00000000-0000-0000-0000-000000001005",
+          "outcome" : [
+            {
+              "at" : 812500036,
+              "id" : "00000000-0000-0000-0000-000000001006",
+              "kind" : {
+                "stateChanged" : {
+                  "_0" : "stopped",
+                  "reason" : "cancelled"
+                }
+              }
+            }
+          ],
+          "start" : 4,
+          "steps" : 0
+        },
+        {
+          "ask" : {
+            "at" : 812500042,
+            "id" : "00000000-0000-0000-0000-000000001007",
+            "kind" : {
+              "userMessage" : {
+                "_0" : "from a helper",
+                "from" : "agent"
+              }
+            }
+          },
+          "concise" : [
+            {
+              "at" : 812500048,
+              "id" : "00000000-0000-0000-0000-000000001008",
+              "kind" : {
+                "agentMessage" : {
+                  "text" : "Noted."
+                }
+              }
+            }
+          ],
+          "end" : 8,
+          "id" : "00000000-0000-0000-0000-000000001007",
+          "last" : {
+            "at" : 812500048,
+            "id" : "00000000-0000-0000-0000-000000001008",
+            "kind" : {
+              "agentMessage" : {
+                "text" : "Noted."
+              }
+            }
+          },
+          "outcome" : [
+            {
+              "at" : 812500048,
+              "id" : "00000000-0000-0000-0000-000000001008",
+              "kind" : {
+                "agentMessage" : {
+                  "text" : "Noted."
+                }
+              }
+            }
+          ],
+          "start" : 6,
+          "steps" : 0
+        },
+        {
+          "ask" : {
+            "at" : 812500054,
+            "id" : "00000000-0000-0000-0000-000000001009",
+            "kind" : {
+              "userMessage" : {
+                "_0" : "Run the tests"
+              }
+            }
+          },
+          "concise" : [
+
+          ],
+          "end" : 9,
+          "id" : "00000000-0000-0000-0000-000000001009",
+          "outcome" : [
+
+          ],
+          "start" : 8,
+          "steps" : 0
+        }
+      ]
+    },
+    "name" : "twelve prompts before the page"
   }
 ]
