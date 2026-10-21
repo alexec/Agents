@@ -48,13 +48,18 @@ func TestATurnsPhaseIsWhatItsActivitySays(t *testing.T) {
 		{reported(wire.WorkOutcomeNeedsAnswer, nil), nil, wire.TurnPhaseNeedsYou},
 		{unknown, nil, wire.TurnPhaseNeedsYou},
 		{agent(wire.AgentStateStopped, nil), nil, wire.TurnPhaseFailed},
+		{agent(wire.AgentStateStopped, reason(wire.EndedReasonCancelled)), nil, wire.TurnPhasePaused},
+		{agent(wire.AgentStateStopped, reason(wire.EndedReasonStoppedByAgent)), nil, wire.TurnPhasePaused},
+		{agent(wire.AgentStateStopped, reason(wire.EndedReasonAllowanceSpent)), nil, wire.TurnPhasePaused},
+		{agent(wire.AgentStateStopped, reason(wire.EndedReasonRateLimited)), nil, wire.TurnPhaseFailed},
 		{agent(wire.AgentStateArchived, nil), asks, wire.TurnPhaseGone},
 	} {
 		turn := turnPhase(c.agent, c.needs)
 		if turn.Phase != c.want {
 			t.Errorf("%s with %d needs: %s, not %s", c.agent.State, len(c.needs), turn.Phase, c.want)
 		}
-		if ended := turn.EndedAt != nil; ended != (c.want == wire.TurnPhaseDone || c.want == wire.TurnPhaseNeedsYou || c.want == wire.TurnPhaseFailed) {
+		if ended := turn.EndedAt != nil; ended != (c.want == wire.TurnPhaseDone || c.want == wire.TurnPhaseNeedsYou || c.want == wire.TurnPhasePaused ||
+			c.want == wire.TurnPhaseFailed) {
 			t.Errorf("%s: endedAt %v", c.want, turn.EndedAt)
 		}
 	}

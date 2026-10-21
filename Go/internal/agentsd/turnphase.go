@@ -14,6 +14,14 @@ import (
 // Activity to update: one lives at most twelve hours.
 const turnWindow = 12 * time.Hour
 
+// pausingReasons are TurnActivityContent.pausingReasons: the endings the sidebars show as
+// Paused.
+var pausingReasons = map[wire.EndedReason]bool{
+	wire.EndedReasonCancelled:      true,
+	wire.EndedReasonStoppedByAgent: true,
+	wire.EndedReasonAllowanceSpent: true,
+}
+
 // turnPhase is TurnActivityContent.make's phase (AgentsKitCore/Widget): what waits on the
 // person first, the newest of it, then the session's state.
 func turnPhase(a wire.Agent, needs []wire.Need) wire.AttentionTurn {
@@ -36,9 +44,13 @@ func turnPhase(a wire.Agent, needs []wire.Need) wire.AttentionTurn {
 		turn.Phase = wire.TurnPhaseQuestion
 	case a.State == wire.AgentStateFinished || a.State == wire.AgentStateStopped:
 		turn.Phase = wire.TurnPhaseDone
-		// Any ending but a clean end of turn says why (EndedReason.summary).
+		// Any ending but a clean end of turn says why (EndedReason.summary): Paused for the
+		// sidebars' three (a stop someone chose, a spent allowance), else a failure (#1869).
 		if a.EndedReason != nil && *a.EndedReason != wire.EndedReasonEndTurn || a.State == wire.AgentStateStopped {
 			turn.Phase = wire.TurnPhaseFailed
+			if a.EndedReason != nil && pausingReasons[*a.EndedReason] {
+				turn.Phase = wire.TurnPhasePaused
+			}
 		} else if Group(&a) == "needsAttention" {
 			// A clean end that still wants the person, as the sidebars say (#1861).
 			turn.Phase = wire.TurnPhaseNeedsYou
