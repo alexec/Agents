@@ -38,7 +38,7 @@ down for a runtime that has none. [Overall score](#overall-score), after the
 tables, adds every feature up.
 
 The matrix was filled in on 2026-10-12 from each app's own docs, changelog, README,
-releases and, where open, source. Agents' row was last brought up to date on 2026-10-20. Every app is held to the same bar, Agents included: a ●
+releases and, where open, source. Agents' row was last brought up to date on 2026-10-21. Every app is held to the same bar, Agents included: a ●
 needs the whole feature, documented by the app itself, and a ○ needs evidence, such as an
 app that ships for macOS alone having no Android app. Once per release, after the
 Competitor check, the Feature matrix workflow (`.agents/workflows/feature-matrix.md`)
@@ -56,12 +56,13 @@ Agents' ◐ cells, and why:
   price or tokens. Cursor, Antigravity and Grok report neither, and run past every
   limit. See [Limit spending](../how-to/limit-spending.md).
 - **A browser the agent drives:** through the Playwright server from the MCP marketplace,
-  with nothing shown in the app.
+  with nothing shown in the app, or with **Use Chrome** (#1837), which drives the person's
+  own Chrome for Claude alone, once its extension is installed.
 
 Agents has none of these at all:
 
 - Android app (#810), Windows or Linux desktop (#811).
-- Several accounts per runtime, teams.
+- Several accounts per runtime.
 
 ## What each feature means
 
@@ -212,6 +213,7 @@ Agents has none of these at all:
 | Warp | ● | ● | ◐ | ● | ● | ● | ◐ | 86% |
 | Agentastic | ● | ● | ● | ● | ◐ | ● | ?⃝ | 79% |
 | Claude Code | ● | ● | ● | ● | ● | ◐ | ?⃝ | 79% |
+| Nuphos | ● | ● | ● | ● | ◐ | ● | ?⃝ | 79% |
 | Parallel Code | ● | ● | ● | ● | ◐ | ○ | ● | 79% |
 | Atelier (was Acepe) | ● | ● | ◐ | ● | ● | ○ | ◐ | 71% |
 | OpenAI Codex | ● | ● | ◐ | ● | ● | ◐ | ?⃝ | 71% |
@@ -221,7 +223,6 @@ Agents has none of these at all:
 | Threadlines | ● | ?⃝ | ● | ● | ● | ● | ?⃝ | 71% |
 | Codeg | ● | ● | ◐ | ● | ?⃝ | ● | ?⃝ | 64% |
 | Happy | ● | ?⃝ | ◐ | ● | ● | ● | ?⃝ | 64% |
-| Nuphos | ?⃝ | ● | ● | ● | ◐ | ● | ?⃝ | 64% |
 | T3 Code | ● | ?⃝ | ◐ | ● | ◐ | ● | ◐ | 64% |
 | Emdash | ● | ● | ?⃝ | ● | ◐ | ◐ | ?⃝ | 57% |
 | Maestro | ● | ● | ◐ | ● | ?⃝ | ◐ | ?⃝ | 57% |
@@ -400,8 +401,8 @@ Agents has none of these at all:
 
 | App | Labels or tags | Pins | Archive | Teams | Open source | Self-hosted | Score |
 |---|:-:|:-:|:-:|:-:|:-:|:-:|--:|
+| **Agents** | ● | ● | ● | ● | ● | ● | 100% |
 | Paseo | ● | ● | ● | ● | ● | ● | 100% |
-| **Agents** | ● | ● | ● | ○ | ● | ● | 83% |
 | Codeg | ● | ● | ?⃝ | ● | ● | ● | 83% |
 | Nimbalyst | ● | ● | ● | ◐ | ● | ◐ | 83% |
 | Nuphos | ?⃝ | ● | ● | ● | ● | ● | 83% |
@@ -441,7 +442,7 @@ Each app's score in every table, and overall: its points over the 49 scored feat
 
 | Rank | App | Running | Reach | Following | Reviewing | Tools | Tasks | Extensions | Organising | Overall |
 |--:|---|--:|--:|--:|--:|--:|--:|--:|--:|--:|
-| 1 | **Agents** | 100% | 67% | 100% | 100% | 90% | 100% | 70% | 83% | **90%** |
+| 1 | **Agents** | 100% | 67% | 100% | 100% | 90% | 100% | 70% | 100% | **92%** |
 | 2 | GitHub Copilot | 92% | 83% | 100% | 100% | 80% | 61% | 100% | 50% | **82%** |
 | 3 | Paseo | 100% | 100% | 71% | 90% | 60% | 61% | 60% | 100% | **80%** |
 | 4 | Cursor | 83% | 67% | 86% | 100% | 80% | 67% | 80% | 50% | **76%** |
@@ -455,8 +456,8 @@ Each app's score in every table, and overall: its points over the 49 scored feat
 | 12 | Superset | 75% | 42% | 71% | 70% | 80% | 72% | 40% | 83% | **67%** |
 | 13 | T3 Code | 83% | 92% | 64% | 80% | 80% | 39% | 40% | 67% | **66%** |
 | 14 | Pragma | 75% | 83% | 57% | 60% | 60% | 50% | 60% | 50% | **61%** |
+| 15 | Nuphos | 83% | 58% | 79% | 70% | 40% | 44% | 20% | 83% | **60%** |
 | 15 | Threadlines | 83% | 50% | 71% | 100% | 40% | 28% | 60% | 67% | **60%** |
-| 16 | Nuphos | 83% | 58% | 64% | 70% | 40% | 44% | 20% | 83% | **58%** |
 | 17 | Happy | 92% | 100% | 64% | 30% | 20% | 33% | 40% | 67% | **56%** |
 | 18 | Emdash | 83% | 33% | 57% | 70% | 70% | 33% | 40% | 67% | **55%** |
 | 19 | Maestro | 50% | 50% | 57% | 50% | 60% | 56% | 60% | 50% | **54%** |
