@@ -951,6 +951,12 @@ func (s *Service) WebPort() int {
 // origin, never to anything the peer says (071, FR-006). proved, when not nil, is told
 // once whether the socket proved a key, for its source's budget (P3).
 func (s *Service) accept(conn *Conn, webOrigin string, proved func(failed bool)) {
+	s.acceptVia(conn, webOrigin, proved, "")
+}
+
+// acceptVia is accept, for a socket a host carries from its loopback listener (#1480):
+// via is that host, and webOrigin its listener's origin.
+func (s *Service) acceptVia(conn *Conn, webOrigin string, proved func(failed bool), via string) {
 	settle := func(failed bool) {
 		if proved != nil {
 			proved(failed)
@@ -1026,7 +1032,7 @@ func (s *Service) accept(conn *Conn, webOrigin string, proved func(failed bool))
 	// and is given the new one in ok.
 	var offer *controllink.NewKeyOffer
 	if r := (*controllink.Refusal)(nil); errors.As(err, &r) && r.Reason == controllink.BadProof && keys.previousPrivate != nil &&
-		(strings.HasPrefix(auth.ID, "c:") || strings.HasPrefix(auth.ID, "h:")) {
+		(strings.HasPrefix(auth.ID, "c:") || strings.HasPrefix(auth.ID, "h:") || strings.HasPrefix(auth.ID, "w:")) {
 		if id, mac, err = verify(keys.previousPrivate); err == nil {
 			offer = newKeyFor(shared, keys.public)
 		}
@@ -1048,7 +1054,7 @@ func (s *Service) accept(conn *Conn, webOrigin string, proved func(failed bool))
 		// Being filled, so its records are not whole yet: not a verdict on anyone (#81).
 		refuse(controllink.Refuse(controllink.Unavailable))
 		return
-	case (phase == phaseFrozen || phase == phaseForwarding) && (id.Kind == 'p' || id.Kind == 'e'):
+	case (phase == phaseFrozen || phase == phaseForwarding) && (id.Kind == 'p' || id.Kind == 'e' || id.Kind == 'w'):
 		refuse(controllink.Refuse(controllink.Unknown))
 		return
 	case phase == phaseForwarding && (id.Kind == 'c' || id.Kind == 'h') && s.phase.forwardingUntil().Before(time.Now()):
@@ -1060,6 +1066,28 @@ func (s *Service) accept(conn *Conn, webOrigin string, proved func(failed bool))
 	// page on this domain's, #1459), and nothing else's does there (071).
 	if client != nil && (client.Kind == records.KindBrowser) != (webOrigin != "") {
 		refuse(controllink.Refuse(controllink.Unknown))
+		return
+	}
+	// A page a host carries (#1480): from a host that runs agents and whose uplink is up,
+	// for a port it can listen on. Its origin is http://localhost:<page>, never anything
+	// else, and the page proves itself to this control plane after the ok, bound to it.
+	var pageOrigin string
+	if id.Kind == 'w' {
+		h := s.records.Host(host)
+		switch {
+		case auth.Page == nil || *auth.Page < 1 || *auth.Page > 65535:
+			refuse(controllink.Refuse(controllink.BadMessage))
+			return
+		case h == nil || (h.Relay != nil && *h.Relay):
+			refuse(controllink.Refuse(controllink.Unknown))
+			return
+		case !s.router.Reaches(host):
+			refuse(controllink.Refuse(controllink.Unavailable))
+			return
+		}
+		pageOrigin = web.OriginFor(int(*auth.Page))
+	} else if auth.Page != nil {
+		refuse(controllink.Refuse(controllink.BadMessage))
 		return
 	}
 	// A device through agents-relay (T096): the exchange is its own, end to end, and it
@@ -1117,9 +1145,16 @@ func (s *Service) accept(conn *Conn, webOrigin string, proved func(failed bool))
 		if relayed {
 			through = " through the relay"
 		}
+		if via != "" {
+			through = " through " + via + "'s loopback listener"
+		}
 		s.log(fmt.Sprintf("client %s (%s) connected%s from %s", client.Name, client.Kind, through, conn.Remote))
 	case 'h':
 		s.hostArrived(host, conn)
+	case 'w':
+		// The page's own exchange, on the same socket, bound to the host's listener.
+		s.log(fmt.Sprintf("host %s carries a page from %s", host, pageOrigin))
+		s.acceptVia(conn, pageOrigin, nil, host)
 	case 'p', 'e':
 		s.spend(conn, id.ID, webOrigin)
 	case 'x':
@@ -1221,7 +1256,7 @@ func (s *Service) keyWith(id controllink.Identity, private []byte) ([]byte, *rec
 			return nil, nil, "", controllink.Refuse(controllink.Unknown)
 		}
 		return key, c, "", nil
-	case 'h':
+	case 'h', 'w':
 		if s.records.Host(id.ID) == nil {
 			if err := s.readAgain(); err != nil {
 				return nil, nil, "", err

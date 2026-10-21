@@ -1335,7 +1335,7 @@ export interface ContinueWhenBack {
 
 /**
  * The peer's answer: {"auth":…} (ControlAuth.Auth). `kind` is mac, iphone, ipad, browser, host,
- * relay or copy.
+ * relay, copy or page.
  */
 export interface ControlAuth {
   id: string;
@@ -1349,6 +1349,12 @@ export interface ControlAuth {
    * which says its own in host/hello.
    */
   capabilities?: string[];
+  /**
+   * With a `w:<host>` identity (#1480): the port of that host's loopback listener. The socket then
+   * carries a page from http://localhost:<page>, whose own exchange follows the ok, bound to that
+   * origin.
+   */
+  page?: number;
 }
 
 /**
@@ -5752,7 +5758,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ContentBlockAnnotations: { required: [], optional: ["audience", "priority"] },
   ContinueInProjectRequest: { required: ["agentID", "text", "attachments"], optional: ["requestID"] },
   ContinueWhenBack: { required: ["at", "resetKnown"], optional: [] },
-  ControlAuth: { required: ["id", "nonce", "mac", "kind"], optional: ["for", "epoch", "capabilities"] },
+  ControlAuth: { required: ["id", "nonce", "mac", "kind"], optional: ["for", "epoch", "capabilities", "page"] },
   ControlClientChanged: { required: [], optional: ["client", "removed"] },
   ControlCodeShown: { required: ["text", "expires"], optional: ["command"] },
   ControlEndpoint: { required: ["url"], optional: ["pin"] },

@@ -141,14 +141,16 @@ does not have (see "Not in this feature").
   addresses only, the Host and Origin checks, the manifest, the headers and the CSP.
 - **FR-003**: agentsd MUST NOT check a browser's proof itself, and MUST NOT hold the control plane's
   private key or any key derived from it for a browser.
-- **FR-004**: agentsd MUST relay a page socket's key exchange to the control plane on its uplink
-  (a new channel-0 request, `host/relayPage`), with the origin from its own listener. Nothing the
-  page says decides the origin.
-- **FR-005**: The control plane MUST accept a relayed exchange only from a host that runs agents,
-  is online, and has the capability for it, and MUST bind the proof to the origin
-  `http://localhost:<port>` the host names, where the port is one the control plane was told when
-  the host said hello. It MUST admit only `c:` (a paired client) and `p:` (a code) identities there,
-  and only browser-kind clients, as on its own loopback listener.
+- **FR-004**: agentsd MUST carry each page socket to the control plane on a socket of its own,
+  proved as `w:<host>` with the host's key and its listener's port (`ControlAuth.page`, #1950).
+  After the control plane's ok, the page's own exchange runs on that socket, bound to
+  `http://localhost:<page>`. Nothing the page says decides the origin. An older control plane
+  refuses the `w:` identity as unknown, so a host never mistakes one for a carried page.
+- **FR-005**: The control plane MUST accept a carried page only from a host that runs agents (not
+  a relay host) and whose uplink is up, with a port from 1 to 65535, and MUST bind the page's proof
+  to `http://localhost:<port>`. It MUST admit only `c:` (a paired client) and `p:` (a code)
+  identities there, and only browser-kind clients, as on its own loopback listener. No identity
+  but `w:` may say a port.
 - **FR-006**: The control plane MUST say in its log, and in the client's record, that a browser
   session came through a host's loopback listener, and which host.
 - **FR-007**: For a relayed session, agentsd MUST answer the page's calls to itself locally, and
@@ -165,8 +167,8 @@ does not have (see "Not in this feature").
 
 - **A relayed page session**: a browser's socket on agentsd's loopback listener, the client id it
   proved, and the session the control plane opened for it through this host's uplink.
-- **`host/relayPage`** (control, channel 0): the host's request to check a page's auth for an
-  origin, and its answer (the server MAC, the client id, or a refusal).
+- **`w:<host>`** and **`ControlAuth.page`**: a host's proof that the socket carries a page from
+  its loopback listener at that port, before the page's own exchange on the same socket.
 - **The page's origin for a host**: `http://localhost:<port>`, named by the host when it says
   hello, and the only origin the control plane binds a relayed exchange to.
 
@@ -204,14 +206,15 @@ proof is bound only to origins the control plane serves itself.
   Mac's host leaving the Mac (the control plane's log shows none).
 - **SC-002**: A page socket whose Origin is not `http://localhost:8792` is refused before any
   exchange, in a test.
-- **SC-003**: A relayed exchange from a host for a port it did not name, or for a `mac`-kind client,
-  is refused by the control plane, in a test.
+- **SC-003**: A page's proof bound to one port is refused through another; a carried page with no
+  port, a port of 0, a port on a host's own uplink, or from a relay host is refused, in a test
+  (`TestAPageAHostCarries`).
 - **SC-004**: The same `Web/dist` serves on both listeners (the manifest test passes on both).
 
 ## Tasks, each its own PR
 
-1. Control plane: `host/relayPage` (schema in `Packages/Wire/control.openrpc.json`, the trust rule
-   of FR-005, the log of FR-006), with tests for SC-003.
+1. Control plane: the `w:<host>` identity and `ControlAuth.page` (the trust rule of FR-005, the
+   log of FR-006), with tests for SC-003 (#1950).
 2. agentsd: the loopback listener (`--web`, `--web-port`, the `web` package), the relayed exchange,
    and the session through the uplink (FR-001 to FR-009), with tests for SC-002.
 3. Agents Host: pass `--web` and `--web-port` to agentsd when the role is `joinElsewhere`, and stop
