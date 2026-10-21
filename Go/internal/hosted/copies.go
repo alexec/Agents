@@ -148,6 +148,11 @@ func (s *Service) clientOf(r *http.Request) string {
 
 // toAccount passes a request to an account's control plane.
 func (s *Service) toAccount(w http.ResponseWriter, r *http.Request, id string) {
+	if c := s.inUse(id); c != nil {
+		defer s.done(c)
+		c.proxy.ServeHTTP(w, r)
+		return
+	}
 	acc, err := s.accounts.get(r.Context(), id)
 	if err != nil {
 		s.log("store: " + err.Error())
@@ -168,6 +173,19 @@ func (s *Service) toAccount(w http.ResponseWriter, r *http.Request, id string) {
 	}
 	defer s.done(c)
 	c.proxy.ServeHTTP(w, r)
+}
+
+// inUse is an account's copy when it is running, in use until done is called with it.
+// Delete Account stops the copy before it removes the account, so a running copy is an
+// account that is there, and its requests need no store read (P20261020-24).
+func (s *Service) inUse(id string) *copyRunning {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	c := s.copies[id]
+	if c != nil {
+		c.open++
+	}
+	return c
 }
 
 // stopCopy stops an account's copy, when it is running.
