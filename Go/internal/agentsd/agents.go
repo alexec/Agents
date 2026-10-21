@@ -474,6 +474,9 @@ func (d *Daemon) setOption(ctx context.Context, r wire.SetOptionRequest) ([]wire
 		return nil, noSuchAgent()
 	}
 	l := d.live(a.ID)
+	if a.RuntimeID == "claude" && r.OptionID == chromeOptionID {
+		return d.setChrome(a, l, r.Value), nil
+	}
 	l.mu.Lock()
 	s := l.session
 	l.mu.Unlock()
@@ -501,7 +504,7 @@ func (d *Daemon) setOption(ctx context.Context, r wire.SetOptionRequest) ([]wire
 		values[r.OptionID] = r.Value
 		a.StartOptions.Values = values
 		if s != nil {
-			a.AdvertisedOptions = options
+			a.AdvertisedOptions = withAppOptions(a.RuntimeID, values, options)
 		}
 	})
 	known := options

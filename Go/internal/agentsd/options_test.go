@@ -21,7 +21,9 @@ func TestAFormIsGivenWhatTheRuntimeOffers(t *testing.T) {
 	os.Mkdir(dir, 0o755)
 	var got wire.OptionsResponse
 	json.Unmarshal(c.call(t, 1, "agents/options", map[string]any{"runtimeID": "claude", "cwd": "file://" + dir, "mcpServers": []any{}}), &got)
-	if got.DraftID == "" || len(got.Options) != 1 || got.Options[0].ID != "model" || len(got.Commands) != 1 || got.Commands[0].Name != "review" {
+	// Claude's model, then the app's Use Chrome beside it (#1837).
+	if got.DraftID == "" || len(got.Options) != 2 || got.Options[0].ID != "model" || got.Options[1].ID != "chrome" ||
+		len(got.Commands) != 1 || got.Commands[0].Name != "review" {
 		t.Fatalf("%+v", got)
 	}
 	b, _ := os.ReadFile(d.optionCachePath())
@@ -31,7 +33,7 @@ func TestAFormIsGivenWhatTheRuntimeOffers(t *testing.T) {
 	// What a workflow's form reads, with no session.
 	var remembered []wire.ConfigOption
 	json.Unmarshal(c.call(t, 2, "options/remembered", map[string]any{"runtimeID": "claude", "cwd": "file://" + dir}), &remembered)
-	if len(remembered) != 1 {
+	if len(remembered) != 2 {
 		t.Fatalf("%+v", remembered)
 	}
 	// The next form has them at once; the runtime offers the same, so nothing more is said.

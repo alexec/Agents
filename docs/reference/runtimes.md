@@ -135,6 +135,18 @@ Measured on 2026-09-29 against Claude Code 2.1.280 (adapter 0.81.2), Codex 0.156
 handshake in an empty home. `scripts/acp-handshake.sh` names any option or `_meta` key a
 newer version starts offering.
 
+### Use Chrome (Claude)
+
+Claude's options under the prompt also have **Use Chrome**, which the app adds. On, Claude
+starts with `--chrome`: it can drive your own Chrome, signed in as you, through the
+[Claude in Chrome](https://code.claude.com/docs/en/chrome) extension. That gives the agent
+your sign-ins, so it is off unless you turn it on, for one chat at a time. A workflow turns it
+on with `options: chrome: true`.
+
+It takes effect from the chat's next turn: a chat between turns starts Claude again, and
+carries on its conversation. Chrome needs the extension, and Claude Code's native messaging
+host, which `claude` installs the first time you run `/chrome` in it.
+
 ### What the app sets for you
 
 | Runtime | What | How | Why |

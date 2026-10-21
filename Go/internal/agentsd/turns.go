@@ -455,7 +455,7 @@ func (l *live) turn() bool {
 			continuing = *a.RuntimeSessionID
 		}
 		sandbox, why := d.resolveSandbox(a.RuntimeID, a.SandboxOverride, a.StartedByAgent)
-		launch, meta := withSandbox(launch, sessionMeta(a.RuntimeID), a.RuntimeID, sandbox)
+		launch, meta := withSandbox(launch, agentSessionMeta(a), a.RuntimeID, sandbox)
 		brief := d.briefFor(a)
 		meta = withSystemPrompt(meta, a.RuntimeID, brief)
 		s, err := acp.Start(ctx, launch, l, d.mcpServersFor(l.id), meta, continuing)
@@ -513,7 +513,7 @@ func (l *live) turn() bool {
 		d.change(l.id, func(a *wire.Agent) {
 			a.RuntimeSessionID = &sessionID
 			if opts := configOptions(s.NewResult.ConfigOptions); opts != nil {
-				a.AdvertisedOptions = opts
+				a.AdvertisedOptions = withAppOptions(a.RuntimeID, a.StartOptions.Values, opts)
 			}
 		})
 		safe.Go("session watch", func() {
@@ -1078,7 +1078,7 @@ func (l *live) Update(n sdk.SessionNotification) {
 				if was != nil && now != nil && was.ID == now.ID && len(now.CurrentValue) > 0 && !bytes.Equal(was.CurrentValue, now.CurrentValue) {
 					keepMode(a, now.ID, now.CurrentValue)
 				}
-				a.AdvertisedOptions = opts
+				a.AdvertisedOptions = withAppOptions(a.RuntimeID, a.StartOptions.Values, opts)
 			})
 		}
 	case u.AvailableCommandsUpdate != nil:

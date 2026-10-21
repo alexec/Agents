@@ -213,6 +213,8 @@ func (d *Daemon) whatItOffers(rt *runtimeDef, path string) (optionEntry, error) 
 	if opts := p.lastOptions(); opts != nil {
 		e.Options = opts
 	}
+	// The app's own options beside the runtime's, off for a new chat (#1837).
+	e.Options = withAppOptions(rt.ID, nil, e.Options)
 	return e, nil
 }
 
