@@ -12,7 +12,8 @@ import type {
   ChatProjectState, CostState, EventsPage, Event as ActivityEvent, ConfigOption, WorkflowSettings,
   PagesChangedNotification, PinsChangedNotification, PinView, ViewPin, ListCursor, ListRequest, FileMentionDTO, SandboxChoice, RuntimeAllowances,
   GuardedChange, GuardedChangeReading, HostJoinStatus, RequiredCapabilities, KeptDelivered, KeptList, KeptRequest, Approval, ApprovalAction, UsageHistory, TimeHistory, Milestones,
-  BuildOutputRemoved, ProjectWorktrees, RemovalCheck, WorktreeSize, WorktreeSummary, WorktreesSized, FindResult } from "../protocol/generated";
+  BuildOutputRemoved, ProjectWorktrees, RemovalCheck, WorktreeSize, WorktreeSummary, WorktreesSized, FindResult,
+  BackupRestoreResult, BackupSettings, BackupState } from "../protocol/generated";
 import { Failure } from "../protocol/generated";
 import { CallFailed, type Link } from "../wire/link";
 import type { FolderGoneAsk } from "./missingFolder";
@@ -357,6 +358,9 @@ export class Work {
   readonly resuming = signal<Record<string, readonly string[]>>({});
   /** Each host's volumes low on space (#196), replaced whole by each disk/changed, never merged. */
   readonly disk = signal<Record<string, DiskState>>({});
+  /** The person's Mac's backups (#1810), for Settings ▸ Backups: null until it has said, or from a
+   * host too old to keep backups, which leaves the section out. */
+  readonly backups = signal<BackupState | null>(null);
   /** Each host's projects' worktrees (#790), as `worktrees/all` last answered: asked when Activity ▸
    * Worktrees is shown, not kept up by the host. */
   readonly worktreeLists = signal<Record<string, ProjectWorktrees[]>>({});
@@ -563,6 +567,9 @@ export class Work {
         return true;
       case "disk/changed":
         this.disk.value = { ...this.disk.value, [host]: params as DiskState };
+        return true;
+      case "backups/changed":
+        if (this.isMac(host)) this.backups.value = params as BackupState;
         return true;
       case "worktrees/sized": {
         const held = { ...(this.worktreeSizes.value[host] ?? {}) };
@@ -1673,6 +1680,42 @@ export class Store extends Work {
   async answerGitLend(ask: GitLendAsk, allowed: boolean): Promise<void> {
     this.gitAsksAnswered.value = new Set([...this.gitAsksAnswered.value, askID(ask.host, ask.server)]);
     await this.lendGit(ask.host, ask.from, ask.server, allowed);
+  }
+
+  /** Settings ▸ Backups (#1810), asked when Settings is shown. */
+  loadBackups(): void {
+    void this.link.call("backups/state", {}, this.macHostID.value).then((state) => {
+      this.backups.value = state;
+    }).catch(() => {
+      // A host too old to know backups/state leaves the section out.
+    });
+  }
+
+  /** How often, how many kept: answered with the state after. A refusal is said. */
+  async configureBackups(settings: BackupSettings): Promise<void> {
+    try {
+      this.backups.value = await this.link.call("backups/configure", settings, this.macHostID.value);
+    } catch (error) {
+      this.say(describe(error));
+    }
+  }
+
+  async makeBackup(): Promise<void> {
+    try {
+      this.backups.value = await this.link.call("backups/make", {}, this.macHostID.value);
+    } catch (error) {
+      this.say(describe(error));
+    }
+  }
+
+  /** The result, or null when it failed, which is said. */
+  async restoreBackup(id: string): Promise<BackupRestoreResult | null> {
+    try {
+      return await this.link.call("backups/restore", { id }, this.macHostID.value);
+    } catch (error) {
+      this.say(describe(error));
+      return null;
+    }
   }
 
   /** Said to the control plane; Settings ▸ Git access takes one back with `allowed` false. */

@@ -1271,6 +1271,128 @@
       ],
       "additionalProperties": false
     },
+    "Backup": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "machine": {
+          "type": "string"
+        },
+        "rootID": {
+          "type": "string"
+        },
+        "madeAt": {
+          "$ref": "#/definitions/WireDate"
+        },
+        "bytes": {
+          "type": "integer"
+        },
+        "agents": {
+          "type": "integer"
+        },
+        "thisMachine": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "machine",
+        "rootID",
+        "madeAt",
+        "bytes",
+        "agents",
+        "thisMachine"
+      ],
+      "additionalProperties": false
+    },
+    "BackupEvery": {
+      "type": "string",
+      "enum": [
+        "off",
+        "daily",
+        "weekly"
+      ],
+      "x-fallback": "daily"
+    },
+    "BackupRestoreRequest": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "additionalProperties": false
+    },
+    "BackupRestoreResult": {
+      "type": "object",
+      "properties": {
+        "restored": {
+          "type": "integer"
+        },
+        "skipped": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "restored",
+        "skipped"
+      ],
+      "additionalProperties": false
+    },
+    "BackupSettings": {
+      "type": "object",
+      "properties": {
+        "every": {
+          "$ref": "#/definitions/BackupEvery"
+        },
+        "keep": {
+          "type": "integer"
+        },
+        "folder": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "every",
+        "keep"
+      ],
+      "additionalProperties": false
+    },
+    "BackupState": {
+      "type": "object",
+      "properties": {
+        "settings": {
+          "$ref": "#/definitions/BackupSettings"
+        },
+        "folder": {
+          "type": "string"
+        },
+        "backups": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Backup"
+          }
+        },
+        "making": {
+          "type": "boolean"
+        },
+        "lastError": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "settings",
+        "folder",
+        "backups",
+        "making"
+      ],
+      "additionalProperties": false
+    },
     "BackgroundItem": {
       "type": "object",
       "properties": {

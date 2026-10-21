@@ -15,7 +15,7 @@
 
 ## Counts
 
-Of 237 rows: **159 same**, **50 by design**, **28 delta** (after #188, #189, #191, #221, #238–#244, #249, #252–#255, #257, #259–#261, #263–#266, #291, #254, #317, #341, #342, #343, #345, #344, #357, #366, #375, #377, #381, #378, #400, #396, #394, #436, #433, #432, #506, #545, #548, #791, #790, #846, #826, #888, #982, #1089, #1109, #1122, #1419, #1123, #1118, #1473, #1459, #1460, #1336, #1658, #1862). A row with any open delta counts as delta, even where another side's difference is by design.
+Of 238 rows: **160 same**, **50 by design**, **28 delta** (after #188, #189, #191, #221, #238–#244, #249, #252–#255, #257, #259–#261, #263–#266, #291, #254, #317, #341, #342, #343, #345, #344, #357, #366, #375, #377, #381, #378, #400, #396, #394, #436, #433, #432, #506, #545, #548, #791, #790, #846, #826, #888, #982, #1089, #1109, #1122, #1419, #1123, #1118, #1473, #1459, #1460, #1336, #1658, #1862, #1810). A row with any open delta counts as delta, even where another side's difference is by design.
 
 | Screen | Same | By design | Delta |
 |---|---|---|---|
@@ -28,7 +28,7 @@ Of 237 rows: **159 same**, **50 by design**, **28 delta** (after #188, #189, #19
 | Worktrees and Files | 12 | 5 | 6 |
 | Pins | 4 | 1 | 0 |
 | Workflows page | 15 | 1 | 2 |
-| Settings and Project Settings | 4 | 8 | 0 |
+| Settings and Project Settings | 5 | 8 | 0 |
 | Pool, runtimes and spending | 8 | 1 | 2 |
 | Events and resources | 3 | 1 | 2 |
 | Notifications and badges | 3 | 4 | 0 |
@@ -332,6 +332,7 @@ The deltas are tracked by 31 issues:
 | Text size: no setting (#750 removed by #1034); the system's size, and the marks beside text grow with it; the terminal keeps its own | The Mac's text size where SwiftUI applies it: `S/TypeScale.swift` (`appText`, `glyph`) | Dynamic Type: `S/TypeScale.swift`, glyphs through `@ScaledMetric` | The browser's font size and zoom: every font-size in `rem` (`W/theme/paper.css`) | **same** |
 | The accent (#156) | AccentColor | AccentColor | `--accent`, the same values | **same** |
 | What agents call you (#121) | Settings ▸ Account | None | None | **by design** |
+| Backups of the Mac (#1810): Back up (Never, Every day, Every week), Keep 1–10, the folder, Back Up Now, and Restore… for each backup in the folder, confirmed, saying what came back | Settings ▸ Mac ▸ Backups: `S/BackupsSection.swift` in `A/Settings/AppearanceSettingsView.swift` (`MacSettingsView`), with **Choose…** for the folder | Settings ▸ Backups, the same section: `R/Sidebar/RemoteSidebar.swift` (`RemoteSettings`) | Settings ▸ Backups: `W/views/Settings.tsx` (`BackupsSection`), words in `W/model/backups.ts` | The section: **same** (built 2026-10-20; walk owed). Choosing the folder: **by design** (it is on the Mac's disk). A server's backups: #1815 |
 | Warm pool size (#183) | Settings ▸ General | None | None | **by design** |
 | The most workflows that may run (#506): the setting, and the number in force on an over-the-limit row and in its refusal | The setting in Settings ▸ Cost: `A/Settings/CostSettingsView.swift`; the number on the row and status card from `WorkflowSummary.totalLimit`: `A/Projects/WorkflowRow.swift`, `S/WorkflowStatus.swift` | The number on the status card: `S/WorkflowStatus.swift`; a refused Turn On says why | The number on the row and status card, and in a refusal's words: `W/model/workflows.ts`; a refused Turn On says why | The number: **same**. The setting: **by design** (Settings are the Mac's) |
 

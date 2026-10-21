@@ -13,6 +13,7 @@ const (
 	CapApprovals1          = "approvals/1"
 	CapArtifact1           = "artifact/1"
 	CapAttention1          = "attention/1"
+	CapBackups1            = "backups/1"
 	CapCatalog1            = "catalog/1"
 	CapChanges1            = "changes/1"
 	CapChatBranch1         = "chat.branch/1"
@@ -129,6 +130,10 @@ var HostCapabilities = map[string]string{
 	"approvals/read":                   "approvals/1",
 	"artifact/write":                   "artifact/1",
 	"attention/pending":                "attention/1",
+	"backups/configure":                "backups/1",
+	"backups/make":                     "backups/1",
+	"backups/restore":                  "backups/1",
+	"backups/state":                    "backups/1",
 	"catalog/destination-state":        "catalog/1",
 	"catalog/preview":                  "catalog/1",
 	"catalog/search":                   "catalog/1",
@@ -337,6 +342,7 @@ var HostCapabilities = map[string]string{
 	"agent/showFile":                   "agent/1",
 	"agents/draftOptions":              "agents/1",
 	"attention/changed":                "attention/1",
+	"backups/changed":                  "backups/1",
 	"clone/changed":                    "clone/1",
 	"cost/changed":                     "cost/1",
 	"device/changed":                   "device/1",
@@ -380,6 +386,7 @@ var HostNotifications = map[string]bool{
 	"agent/showFile":             true,
 	"agents/draftOptions":        true,
 	"attention/changed":          true,
+	"backups/changed":            true,
 	"clone/changed":              true,
 	"cost/changed":               true,
 	"device/changed":             true,

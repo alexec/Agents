@@ -520,6 +520,62 @@ const (
 	BackgroundItemStateDisconnected BackgroundItemState = "disconnected"
 )
 
+type Backup struct {
+	ID          string `json:"id"`
+	Machine     string `json:"machine"`
+	RootID      string `json:"rootID"`
+	MadeAt      Date   `json:"madeAt"`
+	Bytes       int64  `json:"bytes"`
+	Agents      int64  `json:"agents"`
+	ThisMachine bool   `json:"thisMachine"`
+}
+
+type BackupEvery string
+
+const (
+	BackupEveryOff    BackupEvery = "off"
+	BackupEveryDaily  BackupEvery = "daily"
+	BackupEveryWeekly BackupEvery = "weekly"
+)
+
+// UnmarshalJSON reads a value this build does not know as "daily".
+func (v *BackupEvery) UnmarshalJSON(b []byte) error {
+	var s string
+	if err := json.Unmarshal(b, &s); err != nil {
+		return err
+	}
+	switch BackupEvery(s) {
+	case BackupEveryOff, BackupEveryDaily, BackupEveryWeekly:
+		*v = BackupEvery(s)
+	default:
+		*v = BackupEveryDaily
+	}
+	return nil
+}
+
+type BackupRestoreRequest struct {
+	ID string `json:"id"`
+}
+
+type BackupRestoreResult struct {
+	Restored int64 `json:"restored"`
+	Skipped  int64 `json:"skipped"`
+}
+
+type BackupSettings struct {
+	Every  BackupEvery `json:"every"`
+	Keep   int64       `json:"keep"`
+	Folder *string     `json:"folder,omitzero"`
+}
+
+type BackupState struct {
+	Settings  BackupSettings `json:"settings"`
+	Folder    string         `json:"folder"`
+	Backups   []Backup       `json:"backups"`
+	Making    bool           `json:"making"`
+	LastError *string        `json:"lastError,omitzero"`
+}
+
 type Block struct {
 	Waits        []Wait         `json:"waits"`
 	CheckAgainAt *Date          `json:"checkAgainAt,omitzero"`

@@ -119,6 +119,12 @@ public extension DaemonAPI {
                     kind: .hostRequest),
                 // The low disk space strip (#195, #196), as the window draws it.
                 Row(Method.diskState, params: Empty.self, result: DiskState.self, kind: .hostRequest),
+                // Backups of the machine, in Settings (#1810).
+                Row(Method.backupsState, params: Empty.self, result: BackupState.self, kind: .hostRequest),
+                Row(Method.backupsConfigure, params: BackupSettings.self, result: BackupState.self, kind: .hostRequest),
+                Row(Method.backupsMake, params: Empty.self, result: BackupState.self, kind: .hostRequest),
+                Row(Method.backupsRestore, params: BackupRestoreRequest.self, result: BackupRestoreResult.self,
+                    kind: .hostRequest),
                 // The files the host could not read in this run (#205, #223), as the window's sidebar foot.
                 Row(Method.storeNotes, params: Empty.self, result: StoreNotes.self, kind: .hostRequest),
                 // Pinned pages (#159): the sidebar's rows and the pages themselves.
@@ -316,6 +322,7 @@ public extension DaemonAPI {
                 Row(Notification.mcpHealthChanged, params: MCPHealthSnapshot.self, result: Empty.self,
                     kind: .hostNotification),
                 Row(Notification.diskChanged, params: DiskState.self, result: Empty.self, kind: .hostNotification),
+                Row(Notification.backupsChanged, params: BackupState.self, result: Empty.self, kind: .hostNotification),
                 Row(Notification.worktreesSized, params: WorktreesSized.self, result: Empty.self, kind: .hostNotification),
                 Row(Notification.milestonesChanged, params: Milestones.self, result: Empty.self, kind: .hostNotification),
                 Row(Notification.storeNotesChanged, params: StoreNotes.self, result: Empty.self,

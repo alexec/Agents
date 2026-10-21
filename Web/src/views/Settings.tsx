@@ -2,6 +2,8 @@
 // window has in Settings ▸ Sidebar. Which smart groups are on is the person's, kept on their
 // Mac and the same on every client (#1033). Workspace providers are the control plane's (#1808).
 // Versions are the control plane's and each host's (#1748).
+// Backups are the person's Mac's, as the window's Settings ▸ Mac draws them (#1810).
+import { useEffect, useState } from "preact/hooks";
 import type { Store } from "../model/store";
 import { smartRows, smartTitles } from "../model/sidebar";
 import { setSmartGroup, smartGroupsOn } from "../model/smartGroups";
@@ -12,6 +14,10 @@ import { iconShowsMood, setIconShowsMood } from "../model/iconMood";
 import { setShowsThoughts, showsThoughts, thoughtsFooter } from "../model/thoughts";
 import { appMissingWords, missingWords, stateWords, versionWords } from "../model/capabilities";
 import { ProvidersSection } from "./Providers";
+import { backupDetail, backupEveries, backupKeeps, backupsFooter, confirmTitle, everyLabel, restoreMessage,
+  restoredWords } from "../model/backups";
+import { fromWireDate } from "../protocol/dates";
+import type { BackupEvery } from "../protocol/generated";
 
 /** The words under the Sidebar section, as the window's and the Remote's (#846). */
 export const sidebarSettingsFooter = "A group that is off is not shown. Its sessions go to the next group they fit, "
@@ -62,6 +68,57 @@ function VersionsSection({ store }: { store: Store }) {
   );
 }
 
+/** Backups (#1810): how often, how many kept, Back Up Now, and Restore for each backup in the folder. The
+ * folder is the Mac's disk, so it is chosen on the Mac. */
+function BackupsSection({ store }: { store: Store }) {
+  const [said, setSaid] = useState<string | null>(null);
+  useEffect(() => store.loadBackups(), [store]);
+  const state = store.backups.value;
+  if (!state) return null;
+  const restore = async (id: string, title: string) => {
+    if (!confirm(`${title}\n\n${restoreMessage}`)) return;
+    setSaid(null);
+    const result = await store.restoreBackup(id);
+    if (result) setSaid(restoredWords(result));
+  };
+  const error = said ?? state.lastError;
+  return (
+    <section aria-labelledby="settings-backups">
+      <h2 class="section-head" id="settings-backups">Backups</h2>
+      <label class="setting">
+        <span>Back up</span>
+        <select value={state.settings.every}
+          onChange={(e) => void store.configureBackups({ ...state.settings, every: e.currentTarget.value as BackupEvery })}>
+          {backupEveries.map((every) => <option key={every} value={every}>{everyLabel(every)}</option>)}
+        </select>
+      </label>
+      <label class="setting">
+        <span>Keep</span>
+        <select value={String(state.settings.keep)}
+          onChange={(e) => void store.configureBackups({ ...state.settings, keep: Number(e.currentTarget.value) })}>
+          {backupKeeps.map((n) => <option key={n} value={String(n)}>{n === 1 ? "1 backup" : `${n} backups`}</option>)}
+        </select>
+      </label>
+      <div class="setting"><span>Folder</span><span class="faint small">{state.folder}</span></div>
+      <div class="setting">
+        <span />
+        <button type="button" disabled={state.making} onClick={() => { setSaid(null); void store.makeBackup(); }}>
+          {state.making ? "Backing Up…" : "Back Up Now"}
+        </button>
+      </div>
+      {state.backups.map((backup) => (
+        <div class="setting" key={backup.id}>
+          <span>{fromWireDate(backup.madeAt).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}
+            {" "}<span class="faint small">{backupDetail(backup)}</span></span>
+          <button type="button" onClick={() => void restore(backup.id, confirmTitle(backup))}>Restore…</button>
+        </div>
+      ))}
+      {error && <p class="hint">{error}</p>}
+      <p class="hint">{backupsFooter}</p>
+    </section>
+  );
+}
+
 export function SettingsPage({ store }: { store: Store }) {
   const on = smartGroupsOn.value;
   return (
@@ -107,6 +164,7 @@ export function SettingsPage({ store }: { store: Store }) {
           <ProvidersSection store={store} />
           <GitAccessSection store={store} />
           <VersionsSection store={store} />
+          <BackupsSection store={store} />
         </div>
       </div>
     </section>

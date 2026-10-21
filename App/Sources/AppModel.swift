@@ -2006,6 +2006,28 @@ final class AppModel {
         }
     }
 
+    func refreshBackupState() async {
+        guard let state = try? await macClient.call(DaemonAPI.Method.backupsState, DaemonAPI.Empty(),
+                                                 returning: DaemonAPI.BackupState.self) else { return }
+        work.replaceBackupState(state)
+    }
+
+    /// Settings ▸ Mac ▸ Backups (#1810): each throws the host's refusal, for the section to say.
+    func configureBackups(_ settings: DaemonAPI.BackupSettings) async throws {
+        work.replaceBackupState(try await macClient.call(DaemonAPI.Method.backupsConfigure, settings,
+                                                         returning: DaemonAPI.BackupState.self))
+    }
+
+    func makeBackup() async throws {
+        work.replaceBackupState(try await macClient.call(DaemonAPI.Method.backupsMake, DaemonAPI.Empty(),
+                                                         returning: DaemonAPI.BackupState.self))
+    }
+
+    func restoreBackup(_ backup: DaemonAPI.Backup) async throws -> DaemonAPI.BackupRestoreResult {
+        try await macClient.call(DaemonAPI.Method.backupsRestore, DaemonAPI.BackupRestoreRequest(id: backup.id),
+                                 returning: DaemonAPI.BackupRestoreResult.self)
+    }
+
     func refreshRetentionState() async {
         guard let state = try? await macClient.call(DaemonAPI.Method.retentionState,
                                                  Optional<String>.none,
@@ -3324,9 +3346,10 @@ final class AppModel {
             return
         case DaemonAPI.Notification.wakeChanged, DaemonAPI.Notification.modesChanged,
              DaemonAPI.Notification.attentionChanged, DaemonAPI.Notification.storeNotesChanged,
-             DaemonAPI.Notification.milestonesChanged, DaemonAPI.Notification.preferencesChanged:
+             DaemonAPI.Notification.milestonesChanged, DaemonAPI.Notification.preferencesChanged,
+             DaemonAPI.Notification.backupsChanged:
             // The milestones and display choices are the person's, kept on the Mac's own
-            // host (#984, #1033).
+            // host (#984, #1033). Settings ▸ Mac ▸ Backups is this Mac's (#1810).
             return
         default:
             break
@@ -3455,6 +3478,7 @@ final class AppModel {
         DaemonAPI.Notification.runtimeChanged, DaemonAPI.Notification.runtimeAccountChanged,
         DaemonAPI.Notification.signInNeeded, DaemonAPI.Notification.clientPermissionsChanged,
         DaemonAPI.Notification.personChanged, DaemonAPI.Notification.sandboxChanged,
+        DaemonAPI.Notification.backupsChanged,
     ]
 
     /// What is this Mac's own, from this Mac's host by an id of its own (#1496). Its

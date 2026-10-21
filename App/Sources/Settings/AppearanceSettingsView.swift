@@ -69,7 +69,8 @@ struct AccountSettingsView: View {
     }
 }
 
-/// Settings ▸ Mac (#846): whether this Mac stays awake, and how long archived agents are kept.
+/// Settings ▸ Mac (#846): whether this Mac stays awake, how long archived agents are kept,
+/// and its backups (#1810).
 struct MacSettingsView: View {
     @Environment(AppModel.self) private var model
 
@@ -77,12 +78,31 @@ struct MacSettingsView: View {
         Form {
             WakeSettingsSection()
             ArchiveSettingsSection()
+            if let backups = model.work.backupState {
+                BackupsSection(state: backups, configure: model.configureBackups, make: model.makeBackup,
+                               restore: model.restoreBackup, chooseFolder: { chooseBackupFolder(backups) })
+            }
         }
         .paperForm()
         .task {
             await model.refreshWakeSettings()
             await model.refreshRetentionState()
+            await model.refreshBackupState()
         }
+    }
+
+    /// A second disk or a synced folder, so a backup outlives this Mac's.
+    private func chooseBackupFolder(_ state: DaemonAPI.BackupState) {
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.canCreateDirectories = true
+        panel.prompt = "Back Up Here"
+        panel.directoryURL = URL(filePath: state.folder)
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        var settings = state.settings
+        settings.folder = url.path(percentEncoded: false)
+        Task { try? await model.configureBackups(settings) }
     }
 }
 
