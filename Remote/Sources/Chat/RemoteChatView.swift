@@ -291,7 +291,8 @@ struct RemoteChatView: View {
             }
             if let agent {
                 ToolbarItem(placement: .topBarTrailing) {
-                    ChatMenu(agent: agent, find: findsInChat ? { finding = true } : nil,
+                    ChatMenu(agent: agent, find: popped == nil ? { finding = true } : nil,
+                             findsOnHost: findsInChat,
                              prompts: popped == nil ? { showingPrompts = true } : nil) { searchingFiles = true }
                 }
             }
@@ -507,6 +508,9 @@ private struct ChatMenu: View {
     let agent: Agent
     /// Find in Chat (#1532), over the chat. Nil in a scene of its own.
     var find: (() -> Void)? = nil
+    /// Whether the chat's host can find: on one too old (#1748) the item is greyed, with
+    /// the update help, not left out (#1867).
+    var findsOnHost = true
     /// The Prompts list (#1658), over the chat. Nil in a scene of its own.
     var prompts: (() -> Void)? = nil
     /// Open File… (#415), over the chat.
@@ -524,7 +528,16 @@ private struct ChatMenu: View {
                 Divider()
             }
             if let find {
-                Button("Find in Chat", systemImage: "text.magnifyingglass", action: find)
+                // A menu draws a label's second line under the item: the update help.
+                Button(action: find) {
+                    Label {
+                        Text("Find in Chat")
+                        if !findsOnHost { Text(UpdateWords.hostNeedsUpdate) }
+                    } icon: {
+                        Image(systemName: "text.magnifyingglass")
+                    }
+                }
+                .disabled(!findsOnHost)
             }
             if let prompts {
                 Button("Prompts", systemImage: "list.number", action: prompts)

@@ -5,6 +5,7 @@
 // menu does (#543), for a page with no keyboard to press ⌘F or ⌘P on. Below 760 it has the header's Turns and Files too, so the
 // header's right is the ··· alone, as on the iPhone (#981).
 import { undoLine } from "../model/archiveWords";
+import { hostNeedsUpdate } from "../model/capabilities";
 import { useSignal } from "@preact/signals";
 import { useEffect, useRef } from "preact/hooks";
 import type { Agent } from "../protocol/generated";
@@ -149,8 +150,19 @@ async function stopAll(store: Store, host: string, agent: Agent) {
 /** One of the chat header's own controls, in the ··· menu only below 760 (#981). */
 export type NarrowItem = { label: string; help?: string; checked: boolean; run: () => void };
 
-export function SessionMenu({ store, host, agent, disabled, find, prompts, openFile, inChat, narrow = [] }:
-  { store: Store; host: string; agent: Agent | undefined; disabled: boolean; find?: (() => void) | undefined; prompts?: () => void; openFile?: () => void; inChat?: boolean; narrow?: NarrowItem[] }) {
+/**
+ * Find in Chat in the chat's menu (#1867): on a host too old to find (#1748) it stays,
+ * greyed, with the update help, as on the Mac and the Remote (`ChatFindItem`). ⌘F is left
+ * to the browser there.
+ */
+export function findInChatItem(hostFinds: boolean): { disabled: boolean; title: string } {
+  return hostFinds
+    ? { disabled: false, title: "Find words in this chat's prompts and replies" }
+    : { disabled: true, title: hostNeedsUpdate };
+}
+
+export function SessionMenu({ store, host, agent, disabled, find, findsOnHost = true, prompts, openFile, inChat, narrow = [] }:
+  { store: Store; host: string; agent: Agent | undefined; disabled: boolean; find?: (() => void) | undefined; findsOnHost?: boolean; prompts?: () => void; openFile?: () => void; inChat?: boolean; narrow?: NarrowItem[] }) {
   const open = useSignal(false);
   const anchor = useRef<HTMLSpanElement>(null);
   useEffect(() => {
@@ -176,7 +188,7 @@ export function SessionMenu({ store, host, agent, disabled, find, prompts, openF
           ))}
           {narrow.length > 0 && <hr class="narrow-only" />}
           {find && (
-            <button role="menuitem" title="Find words in this chat's prompts and replies"
+            <button role="menuitem" {...findInChatItem(findsOnHost)}
               onClick={() => {
                 open.value = false;
                 find();

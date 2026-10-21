@@ -7,7 +7,7 @@ import { cases } from "./fixtures.mjs";
 // Branch opens the new session (#342), so the menu reads the page's address as it loads.
 globalThis.location = { hash: "" };
 globalThis.addEventListener = () => {};
-const { sessionActions, headerActions, deleteTitle, deleteMessage, cleanedTitle, sessionTabURL } = await load("src/views/SessionMenu.tsx");
+const { sessionActions, headerActions, deleteTitle, deleteMessage, cleanedTitle, sessionTabURL, findInChatItem } = await load("src/views/SessionMenu.tsx");
 delete globalThis.location;
 delete globalThis.addEventListener;
 const agents = Object.fromEntries(cases("groups/agents.json").map((c) => [c.name, c.input.agent]));
@@ -88,4 +88,9 @@ test("Open in New Tab opens this page on the session alone (#826)", () => {
   const url = sessionTabURL("mac", agent, { pathname: "/agents/", search: "?k=1" });
   assert.ok(url.startsWith("/agents/?k=1#/h/mac/p/"), url);
   assert.ok(url.endsWith("/s/A1B2"), url);
+});
+
+test("Find in Chat stays in the chat's menu on an old host, greyed, with the update help (#1867)", () => {
+  assert.deepEqual(findInChatItem(false), { disabled: true, title: "This host needs an update to do this." });
+  assert.equal(findInChatItem(true).disabled, false);
 });

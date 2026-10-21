@@ -216,14 +216,17 @@ struct AgentsCommands: Commands {
             Divider()
             // In the main window's open chat, ⌘F finds in it (#1532), and Find Session
             // takes ⌥⌘F; with no chat open, ⌘F is Find Session as before.
-            // Not on a host too old to find (#1748).
-            let findsInChat = popped == nil && projectWindow == nil && model.selectedAgent != nil
-                && model.agent(model.selectedAgent?.id, has: Capability.agentsFind1)
+            // On a host too old to find (#1748) it is greyed and keeps ⌘F, so the key never
+            // moves the focus out of a chat to Find Session (#1867).
+            let find = ChatFindItem.of(
+                chatOpen: popped == nil && projectWindow == nil && model.selectedAgent != nil,
+                hostFinds: model.agent(model.selectedAgent?.id, has: Capability.agentsFind1))
             Button("Find in Chat") { requests.wantsChatFind = true }
-                .keyboardShortcut(findsInChat ? KeyboardShortcut("f") : nil)
-                .disabled(!findsInChat)
+                .keyboardShortcut(find.isShown ? KeyboardShortcut("f") : nil)
+                .disabled(!find.isEnabled)
+                .help(find == .needsUpdate ? UpdateWords.hostNeedsUpdate : "Find words in this chat's prompts and replies")
             Button("Find Session") { requests.focusSessionSearch() }
-                .keyboardShortcut(findsInChat ? KeyboardShortcut("f", modifiers: [.command, .option]) : KeyboardShortcut("f"))
+                .keyboardShortcut(find.isShown ? KeyboardShortcut("f", modifiers: [.command, .option]) : KeyboardShortcut("f"))
                 .disabled(model.selectedProjectSummary == nil)
         }
 

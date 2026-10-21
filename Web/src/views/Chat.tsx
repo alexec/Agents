@@ -507,7 +507,7 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
           <button class="wide-only" onClick={() => replace({ ...r, files: !r.files })} aria-pressed={!!r.files}>Files</button>
           <SessionButtons store={store} host={host} agent={agent} disabled={down} />
           <SessionMenu store={store} host={host} agent={agent} disabled={down} inChat
-            find={store.has(host, Capability.agentsFind1) ? () => (finding.value = true) : undefined} prompts={() => (listingPrompts.value = true)} openFile={() => (searchingFiles.value = true)}
+            find={() => (finding.value = true)} findsOnHost={store.has(host, Capability.agentsFind1)} prompts={() => (listingPrompts.value = true)} openFile={() => (searchingFiles.value = true)}
             narrow={[
               { label: "Files", checked: !!r.files, run: () => replace({ ...r, files: !r.files }) },
             ]} />
