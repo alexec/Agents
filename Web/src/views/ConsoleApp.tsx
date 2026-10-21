@@ -4,14 +4,21 @@
 // The control plane checks each call's role itself; the page only leaves out what would be refused.
 import type { ComponentChildren } from "preact";
 import { useEffect } from "preact/hooks";
-import { signal } from "@preact/signals";
+import { signal, useSignal } from "@preact/signals";
 import type { Store } from "../model/store";
 import { go, route } from "../route";
 import type { SubApp } from "../route";
 import { CallFailed } from "../wire/link";
-import { adminsOnly, appTitle, apps, consoleFoot, grouped, noRoles, notBuilt, openSection, sectionsOf } from "../model/console";
-import type { AppName, Section } from "../model/console";
+import { adminsOnly, appTitle, apps, consoleFoot, fleetFilterTitle, fleetFilters, fleetFoot, fleetShown, fleetSummary, grouped,
+  kindWords, noMachines, noRoles, notBuilt, openSection, outOfDate, ownerWords, runningWords, sectionsOf } from "../model/console";
+import type { AppName, FleetFilter, Section } from "../model/console";
+import type { FleetBoard } from "../protocol/generated";
+import { fromWireDate } from "../protocol/dates";
+import { ago } from "../model/connectorSetup";
+import { missingWords, stateWords, versionWords } from "../model/capabilities";
 import { ReportsPage } from "./Reports";
+import { PeopleSection } from "./People";
+import { GroupsSection } from "./Groups";
 
 /** Whether this person is an admin of the control plane: null until people/list answers. */
 export const isAdmin = signal<boolean | null>(null);
@@ -79,10 +86,98 @@ export function SubAppPage({ store, app, down }: { store: Store; app: SubApp; do
   );
 }
 
-function ConsoleSection({ section }: { store: Store; section: Section; down: boolean }) {
+function ConsoleSection({ store, section, down }: { store: Store; section: Section; down: boolean }) {
   switch (section.id) {
+    case "people": return <PeoplePage store={store} down={down} />;
+    case "machines": return <MachinesPage store={store} down={down} />;
     default: return <Overview />;
   }
+}
+
+/** The words of a call that failed, for the page. */
+export function failedWords(error: unknown): string {
+  if (error instanceof CallFailed) {
+    return error.code === -32601 ? "This control plane does not have this page. Update it to use it." : error.message;
+  }
+  return "The control plane can’t be reached.";
+}
+
+/** M2: who belongs, their roles and machines, bots and groups. The same sections as Settings ▸ People and Groups. */
+function PeoplePage({ store, down }: { store: Store; down: boolean }) {
+  return (
+    <>
+      <PeopleSection store={store} down={down} />
+      <GroupsSection store={store} down={down} />
+    </>
+  );
+}
+
+/** M1: every machine on the control plane, its owner, state, version and running agents. */
+function MachinesPage({ store, down }: { store: Store; down: boolean }) {
+  const board = useSignal<FleetBoard | null>(null);
+  const problem = useSignal<string | null>(null);
+  const filter = useSignal<FleetFilter>("all");
+  const load = async () => {
+    try {
+      board.value = await store.link.call("console/fleet", {});
+      problem.value = null;
+    } catch (error) {
+      problem.value = failedWords(error);
+    }
+  };
+  // Again when a machine joins, leaves or changes state, and each minute for the running counts.
+  const hosts = store.hosts.value;
+  useEffect(() => { if (!down) void load(); }, [down, hosts]);
+  useEffect(() => {
+    const every = setInterval(() => { if (document.visibilityState === "visible" && !down) void load(); }, 60_000);
+    return () => clearInterval(every);
+  }, [down]);
+  const version = store.plane.value?.version;
+  const all = board.value?.machines ?? [];
+  const shown = fleetShown(all, filter.value, version);
+  return (
+    <div class="fleet">
+      {problem.value && <p class="hint">{problem.value}</p>}
+      {!board.value && !problem.value && <p class="hint">Loading…</p>}
+      {board.value && (
+        <>
+          <p class="quiet small">{fleetSummary(all, version)}</p>
+          <div class="segmented" role="radiogroup" aria-label="Show">
+            {fleetFilters.map((f) => (
+              <button key={f} role="radio" aria-checked={filter.value === f} class={filter.value === f ? "on" : ""}
+                onClick={() => { filter.value = f; }}>{fleetFilterTitle[f]} {fleetShown(all, f, version).length}</button>
+            ))}
+          </div>
+          {all.length === 0 ? <p class="hint">{noMachines}</p> : (
+            <table class="console-table">
+              <thead>
+                <tr><th>Machine</th><th>Owner</th><th>State</th><th>Version</th><th class="num">Running</th><th>Last listed</th></tr>
+              </thead>
+              <tbody>
+                {shown.map((m) => {
+                  const missing = missingWords(m.host, version);
+                  return (
+                    <tr key={m.host.id}>
+                      <td><span class="strong">{m.host.name}</span><br /><span class="quiet small">{kindWords(m)}</span></td>
+                      <td>{ownerWords(m)}</td>
+                      <td><span class={`fleet-state ${m.host.state}`}>{stateWords(m.host)}</span></td>
+                      <td title={missing ?? undefined}>
+                        {versionWords(m.host)}
+                        {outOfDate(m, version) && <><br /><span class="small attention">Out of date</span></>}
+                      </td>
+                      <td class="num">{runningWords(m)}</td>
+                      <td class="quiet">{m.heardAt === undefined ? "—" : ago(fromWireDate(m.heardAt))}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
+          <p class="hint">{fleetFoot}</p>
+        </>
+      )}
+    </div>
+  );
 }
 
 /** The Console's first page: each of its pages, what it is for, and which are still to come. */

@@ -302,6 +302,8 @@ public extension DaemonAPI {
                 // Reports (#1811): usage, cost and time by person, project and machine.
                 Row(Method.reportsUsage, params: ReportQuery.self, result: UsageReport.self, kind: .controlRequest),
                 Row(Method.reportsExport, params: ReportQuery.self, result: ReportExport.self, kind: .controlRequest),
+                // The Console (#1804): the admins' app on the web page.
+                Row(Method.consoleFleet, params: Empty.self, result: FleetBoard.self, kind: .controlRequest),
                 // The user scope (#1760): what follows the person to their machines, under You.
                 Row(Method.userSettings, params: Empty.self, result: UserSettings.self, kind: .controlRequest),
                 Row(Method.userSetSettings, params: UserSettingsPart.self, result: Empty.self, kind: .controlRequest),

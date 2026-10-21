@@ -2244,6 +2244,27 @@ export interface FindResult {
   more: boolean;
 }
 
+/** console/fleet's answer (#1804): every machine on the control plane, for an admin. */
+export interface FleetBoard {
+  machines: FleetMachine[];
+}
+
+/**
+ * One machine on Console ▸ Machines (#1804): its hosts/list row, whose it is, and how many of its
+ * agents were running when it last listed them. Numbers only, never what the agents said.
+ */
+export interface FleetMachine {
+  host: ControlHost;
+  /** Its person's or bot's name; empty when nobody owns it. */
+  ownerName: string;
+  /** Whether its owner is a bot (#1761). */
+  bot: boolean;
+  /** Its agents running when it last listed them; absent when it never has. */
+  running?: number;
+  /** When it last listed its agents. */
+  heardAt?: WireDate;
+}
+
 export interface FolderHunk {
   oldStart: number;
   newStart: number;
@@ -5819,6 +5840,7 @@ export interface Methods {
   "connections/sign-in/wait": { params: ConnectionSignInFlowRequest; result: ConnectionSignIn };
   "connectors/setup": { params: ConnectorSetupRequest; result: ConnectorSetup };
   "connectors/setup/skip": { params: ConnectorSkipRequest; result: ConnectorSetup };
+  "console/fleet": { params: Empty; result: FleetBoard };
   "control/rotate": { params: Empty; result: Empty };
   "control/setAuditDays": { params: AuditDays; result: AuditDays };
   "control/status": { params: Empty; result: ControlStatus };
@@ -6019,6 +6041,7 @@ export const MethodTarget = {
   "connections/sign-in/wait": "host",
   "connectors/setup": "host",
   "connectors/setup/skip": "host",
+  "console/fleet": "control",
   "control/rotate": "control",
   "control/setAuditDays": "control",
   "control/status": "control",
@@ -6417,6 +6440,8 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   FindMatch: { required: ["index", "entryID", "line"], optional: [] },
   FindRequest: { required: ["agentID", "text"], optional: ["limit"] },
   FindResult: { required: ["matches", "more"], optional: [] },
+  FleetBoard: { required: ["machines"], optional: [] },
+  FleetMachine: { required: ["host", "ownerName", "bot"], optional: ["running", "heardAt"] },
   FolderHunk: { required: ["oldStart", "newStart", "noNewlineAtEnd", "lines"], optional: [] },
   FoundFolder: { required: ["folder", "exists", "isRepository", "isProject"], optional: ["typed"] },
   GitAsk: { required: ["server", "from"], optional: [] },

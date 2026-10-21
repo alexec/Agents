@@ -20421,6 +20421,53 @@
         "identity"
       ],
       "additionalProperties": false
+    },
+    "FleetMachine": {
+      "type": "object",
+      "description": "One machine on Console ▸ Machines (#1804): its hosts/list row, whose it is, and how many of its agents were running when it last listed them. Numbers only, never what the agents said.",
+      "properties": {
+        "host": {
+          "$ref": "#/definitions/ControlHost"
+        },
+        "ownerName": {
+          "type": "string",
+          "description": "Its person's or bot's name; empty when nobody owns it."
+        },
+        "bot": {
+          "type": "boolean",
+          "description": "Whether its owner is a bot (#1761)."
+        },
+        "running": {
+          "type": "integer",
+          "description": "Its agents running when it last listed them; absent when it never has."
+        },
+        "heardAt": {
+          "$ref": "#/definitions/WireDate",
+          "description": "When it last listed its agents."
+        }
+      },
+      "required": [
+        "host",
+        "ownerName",
+        "bot"
+      ],
+      "additionalProperties": false
+    },
+    "FleetBoard": {
+      "type": "object",
+      "description": "console/fleet's answer (#1804): every machine on the control plane, for an admin.",
+      "properties": {
+        "machines": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/FleetMachine"
+          }
+        }
+      },
+      "required": [
+        "machines"
+      ],
+      "additionalProperties": false
     }
   }
 }
