@@ -451,6 +451,9 @@ func (s *Service) peopleChanged(user string, removed bool) {
 		// A role or a removal changes which providers each person is shown (#1761).
 		s.providers.Republish()
 	}
+	// A bot made, renamed or removed changes which bots' workflows each person's machine
+	// hears (#2027).
+	s.tellPeoplesMachines()
 	s.announce("peopleChanged", user, "")
 }
 

@@ -15111,6 +15111,10 @@
         "isRunning": {
           "type": "boolean"
         },
+        "hearsFor": {
+          "type": "string",
+          "description": "A bot's workflow that does not run here (#2027): the bot's name. This machine hears its server triggers with its own servers, once approved here, and sends each match to the control plane, which runs it on one of the bot's machines. Nothing of it runs here."
+        },
         "awaitingApproval": {
           "$ref": "#/definitions/WorkflowApproval"
         },
@@ -20147,6 +20151,13 @@
         },
         "capReachedUntil": {
           "$ref": "#/definitions/WireDate"
+        },
+        "bots": {
+          "type": "array",
+          "description": "For a person: the names of the bots in their groups (#2027). A runs-on: workflow that names one is heard here, once approved here, and its matches are sent to the control plane, never run here.",
+          "items": {
+            "type": "string"
+          }
         }
       },
       "required": [

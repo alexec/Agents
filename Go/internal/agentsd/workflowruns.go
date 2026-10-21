@@ -131,7 +131,7 @@ func (d *Daemon) fireWorkflows(e wire.Event) {
 	if d.ctx.Err() != nil {
 		return
 	}
-	var fires []fireRequest
+	var fires, sends []fireRequest
 	d.workflowMu.Lock()
 	if d.workflowFiles == nil {
 		d.scanLocked()
@@ -159,7 +159,16 @@ func (d *Daemon) fireWorkflows(e wire.Event) {
 		for _, id := range ids {
 			f := d.workflowFiles[folder][id]
 			w := f.wf
-			if !d.runsHere(w) || w.Problem != nil || isArchived(w) {
+			if w.Problem != nil || isArchived(w) {
+				continue
+			}
+			if !d.runsHere(w) {
+				// A bot's workflow heard here (#2027): a server's event its triggers match goes
+				// to the control plane, which runs it on one of the bot's machines. Nothing of
+				// it runs here.
+				if fr, ok := d.heardForBotLocked(folder, id, f, e); ok {
+					sends = append(sends, fr)
+				}
 				continue
 			}
 			if strings.HasPrefix(e.Name, "workflow.") && e.Details["workflow"] == id {
@@ -185,6 +194,10 @@ func (d *Daemon) fireWorkflows(e wire.Event) {
 	for _, f := range fires {
 		f := f
 		d.goAfterTurn("workflow fire", func() { d.fire(f) })
+	}
+	for _, f := range sends {
+		f := f
+		safe.Go("workflow event sent", func() { d.sendOthers(f) })
 	}
 }
 

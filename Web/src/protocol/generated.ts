@@ -2802,6 +2802,12 @@ export interface HostUser {
   name: string;
   labels: string[];
   capReachedUntil?: WireDate;
+  /**
+   * For a person: the names of the bots in their groups (#2027). A runs-on: workflow that names one
+   * is heard here, once approved here, and its matches are sent to the control plane, never run
+   * here.
+   */
+  bots?: string[];
 }
 
 /**
@@ -6225,6 +6231,12 @@ export interface WorkflowSummary {
   causingEvent?: number;
   causingEventName?: string;
   isRunning: boolean;
+  /**
+   * A bot's workflow that does not run here (#2027): the bot's name. This machine hears its server
+   * triggers with its own servers, once approved here, and sends each match to the control plane,
+   * which runs it on one of the bot's machines. Nothing of it runs here.
+   */
+  hearsFor?: string;
   awaitingApproval?: WorkflowApproval;
   deniedHere?: WorkflowApproval;
   lastFiredAt?: WireDate;
@@ -7070,7 +7082,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   HostTunnel: { required: ["up"], optional: ["problem"] },
   HostTunnelChanged: { required: ["name", "tunnel"], optional: ["host"] },
   HostUpdate: { required: ["host", "destination"], optional: ["key", "trust"] },
-  HostUser: { required: ["user", "kind", "name", "labels"], optional: ["capReachedUntil"] },
+  HostUser: { required: ["user", "kind", "name", "labels"], optional: ["capReachedUntil", "bots"] },
   HostUserSettings: { required: ["user", "settings", "secrets"], optional: [] },
   HostWorkspace: { required: ["provider", "providerName", "workspace", "workspaceName", "workspaceState", "canStart", "canStop", "startWhenUsed", "current"], optional: ["hostState", "phase", "since", "problem", "stoppedBy", "stopWhenIdleMinutes", "cost", "startForSchedules", "tellsSchedule", "nextWorkflow", "nextWorkflowAt", "wakeAt"] },
   HostWorkspaceCall: { required: ["agent", "method", "params"], optional: [] },
@@ -7441,7 +7453,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   WorkflowSchedule: { required: ["minutes", "hours", "startMinute", "endMinute", "days"], optional: [] },
   WorkflowSettings: { required: ["options", "labels"], optional: ["permissionMode", "runtimeID", "model", "effort"] },
   WorkflowSettingsRequest: { required: ["folder", "workflowID", "settings"], optional: ["cooldown", "labels", "whenDone", "continueWhenBack", "runsOn"] },
-  WorkflowSummary: { required: ["workflow", "isArchived", "isEnabled", "nextFireAtByTrigger", "isRunning", "holdsAFire", "queued"], optional: ["overLimit", "totalLimit", "nextFireAt", "lastOutcome", "causingEvent", "causingEventName", "awaitingApproval", "deniedHere", "lastFiredAt", "lastFiredBy", "cooldownEndsAt", "offReason", "standingAgentID", "mcpTriggers"] },
+  WorkflowSummary: { required: ["workflow", "isArchived", "isEnabled", "nextFireAtByTrigger", "isRunning", "holdsAFire", "queued"], optional: ["overLimit", "totalLimit", "nextFireAt", "lastOutcome", "causingEvent", "causingEventName", "hearsFor", "awaitingApproval", "deniedHere", "lastFiredAt", "lastFiredBy", "cooldownEndsAt", "offReason", "standingAgentID", "mcpTriggers"] },
   WorkflowsListRequest: { required: [], optional: ["folder"] },
   WorkspaceInfo: { required: ["id", "name", "state"], optional: ["ssh", "tunnel", "hostKeyRenews", "cost", "host"] },
   WorktreeRemovalRequest: { required: ["project", "root", "confirmed"], optional: [] },

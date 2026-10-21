@@ -301,7 +301,7 @@ func (d *Daemon) workflowsHearingServers() []hearingWorkflow {
 	for folder, files := range d.workflowFiles {
 		for id, f := range files {
 			w := f.wf
-			if !d.runsHere(w) || w.Problem != nil || isArchived(w) || isOff(w) {
+			if !d.listedHere(w) || w.Problem != nil || isArchived(w) || isOff(w) {
 				continue
 			}
 			var ts []mcpTrigger

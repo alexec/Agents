@@ -6,6 +6,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -183,5 +184,120 @@ func TestAPersonsMachineSendsABotsSchedule(t *testing.T) {
 	defer mu.Unlock()
 	if len(sent) != 1 {
 		t.Fatalf("%+v", sent)
+	}
+}
+
+// #2027: a person's machine hears a bot's workflow's server triggers for it, with its own
+// servers, only once the person approves it here (the first start's approvals do not), and
+// sends each match to the control plane. Nothing of it runs here, by a trigger or by hand.
+// A server's event is one trigger whatever each machine's credentials were shown of it.
+func TestAPersonsMachineHearsABotsServerEventsAndOnlySendsThem(t *testing.T) {
+	fakeRuntimes(t)
+	d, c := start(t, t.TempDir())
+	defer d.Shutdown()
+	dir := project(t, c, 1)
+	folder := store.FolderURL(dir)
+	os.MkdirAll(workflowsFolder(dir), 0o755)
+	os.WriteFile(filepath.Join(workflowsFolder(dir), "merged.md"), []byte("---\nname: Merged\non:\n  - pr.merged:\n      server: ci\nruns-on: [review-bot]\n---\nTidy up.\n"), 0o644)
+	var mu sync.Mutex
+	var sent []wire.TeamTrigger
+	d.SetControlAsk(askControl(func(_ context.Context, method string, params any) (json.RawMessage, error) {
+		if method == wire.CallWorkflowsTrigger.Name {
+			mu.Lock()
+			sent = append(sent, params.(wire.TeamTrigger))
+			mu.Unlock()
+		}
+		return json.Marshal(wire.TeamTriggerSent{Taken: true})
+	}))
+	sentCount := func() int { mu.Lock(); defer mu.Unlock(); return len(sent) }
+	summary := func() *wire.WorkflowSummary {
+		var list []wire.WorkflowSummary
+		json.Unmarshal(c.call(t, 90, "workflows/list", map[string]any{"folder": folder}), &list)
+		for i := range list {
+			if list[i].Workflow.WorkflowID == "merged" {
+				return &list[i]
+			}
+		}
+		return nil
+	}
+	key := mcpTrigger{event: "pr.merged", arguments: map[string]json.RawMessage{}}.subscriptionKey("ci")
+	merged := func(id string) {
+		d.raise(wire.EventDraft{Name: "pr.merged", At: now(), Scope: projectScope(dir), Sentence: "ci reported pr.merged",
+			Details: map[string]string{"server": "ci", "event": "pr.merged", "subscription": key, "mcp_event_id": id, "payload": "{}"}})
+	}
+	// The first start approves every file as it stands, this one too; it is not listed.
+	if s := summary(); s != nil {
+		t.Fatalf("listed before the bot was named: %+v", s)
+	}
+
+	// Told Sam's groups have review-bot: it is listed, heard for the bot, and waits.
+	told, _ := json.Marshal(wire.HostUser{User: "u1", Kind: "person", Name: "Sam", Labels: []string{}, Bots: []string{"Review-Bot"}})
+	d.toldHostUser(told)
+	s := summary()
+	if s == nil || s.HearsFor == nil || *s.HearsFor != "Review-Bot" || s.AwaitingApproval == nil {
+		t.Fatalf("%+v", s)
+	}
+	if len(d.workflowsHearingServers()) != 0 {
+		t.Fatal("heard before it was approved")
+	}
+	if changes := d.waitingWorkflowChanges(dir); len(changes) != 1 || !strings.Contains(d.workflowApproval(dir, changes[0]).Line, "for Review-Bot") {
+		t.Fatalf("%+v", changes)
+	}
+	merged("e1")
+	time.Sleep(200 * time.Millisecond)
+	if n := sentCount(); n != 0 {
+		t.Fatalf("sent %d before it was approved", n)
+	}
+
+	c.call(t, 91, "workflows/approve", map[string]any{"folder": folder, "workflowID": "merged", "digest": s.AwaitingApproval.Digest})
+	if s := summary(); s.AwaitingApproval != nil || s.DeniedHere != nil {
+		t.Fatalf("%+v", s)
+	}
+	if h := d.workflowsHearingServers(); len(h) != 1 || h[0].id != "merged" {
+		t.Fatalf("%+v", h)
+	}
+	merged("e2")
+	waitFor(t, "the match sent", func() bool { return sentCount() == 1 })
+	mu.Lock()
+	got := sent[0]
+	mu.Unlock()
+	if got.Workflow != filepath.Base(dir)+"/merged" || got.Event == nil || got.Event.Details["mcp_event_id"] != "e2" || got.DueAt != nil ||
+		strings.Join(got.RunsOn, ",") != "review-bot" {
+		t.Fatalf("%+v", got)
+	}
+	// Run now is refused: it runs on the bot's machines.
+	if e := c.callError(t, 92, "workflows/run", map[string]any{"folder": folder, "workflowID": "merged"}); !strings.Contains(e.Message, "another computer") {
+		t.Fatal(e)
+	}
+	time.Sleep(200 * time.Millisecond)
+	for _, n := range names(d) {
+		if n == "workflow.ran" || n == "workflow.refused" {
+			t.Fatalf("%s here", n)
+		}
+	}
+	d.workflowMu.Lock()
+	runs := len(d.recordsLocked().Runs)
+	d.workflowMu.Unlock()
+	if runs != 0 || sentCount() != 1 {
+		t.Fatalf("%d runs, %d sent", runs, sentCount())
+	}
+
+	// The same event, as the bot's credentials were shown it, is the same trigger.
+	mine := wire.Event{Name: "pr.merged", Details: map[string]string{"server": "ci", "event": "pr.merged", "subscription": "k", "mcp_event_id": "e2", "payload": "{}"}}
+	bots := wire.Event{Name: "pr.merged", Details: map[string]string{"server": "ci", "event": "pr.merged", "subscription": "other", "mcp_event_id": "e2", "payload": `{"private":true}`}}
+	if triggerID(fireRequest{}, &mine) != triggerID(fireRequest{}, &bots) {
+		t.Fatal("one server event is two triggers")
+	}
+
+	// Out of the bot's group: no longer listed or heard, and nothing sent.
+	told, _ = json.Marshal(wire.HostUser{User: "u1", Kind: "person", Name: "Sam", Labels: []string{}})
+	d.toldHostUser(told)
+	if summary() != nil || len(d.workflowsHearingServers()) != 0 {
+		t.Fatal("still heard out of the group")
+	}
+	merged("e3")
+	time.Sleep(200 * time.Millisecond)
+	if n := sentCount(); n != 1 {
+		t.Fatalf("sent %d", n)
 	}
 }

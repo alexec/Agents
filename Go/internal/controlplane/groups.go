@@ -192,4 +192,5 @@ func (s *Service) tellGroupsChanged(id string, removed bool) {
 	if s.providers != nil {
 		s.providers.Republish()
 	}
+	s.tellPeoplesMachines()
 }

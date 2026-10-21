@@ -68,7 +68,8 @@ func (d *Daemon) toldHostUser(params json.RawMessage) {
 			log.Printf("host/user: %v", err)
 		}
 	}
-	if was == nil || was.Kind != u.Kind || strings.Join(was.Labels, ",") != strings.Join(u.Labels, ",") {
+	if was == nil || was.Kind != u.Kind || strings.Join(was.Labels, ",") != strings.Join(u.Labels, ",") ||
+		strings.Join(was.Bots, ",") != strings.Join(u.Bots, ",") {
 		log.Printf("host/user: %s %s, labels %s", u.Kind, u.Name, strings.Join(u.Labels, ", "))
 		// Which workflows run here may have changed.
 		d.tellEveryWorkflow()
@@ -125,6 +126,41 @@ func (d *Daemon) runsOnHere(runsOn []string) bool {
 	return true
 }
 
+// hearsFor is the bot a person's machine hears a workflow for (#2027): a runs-on: workflow
+// that does not run here, names a bot of the person's groups, and has a server trigger.
+// Once approved here, its server triggers are heard with this machine's servers, and each
+// match goes to the control plane (workflows/trigger), which runs it on one of the bot's
+// machines. Nothing of it runs here; "" for any other.
+func (d *Daemon) hearsFor(w wire.Workflow) string {
+	u := d.user()
+	if u == nil || u.Kind == kindBot || len(u.Bots) == 0 || len(w.RunsOn) == 0 || d.runsHere(w) {
+		return ""
+	}
+	hasServer := false
+	for _, t := range w.Triggers {
+		if _, ok := serverTrigger(t); ok {
+			hasServer = true
+			break
+		}
+	}
+	if !hasServer {
+		return ""
+	}
+	for _, l := range w.RunsOn {
+		l = strings.ToLower(strings.TrimSpace(l))
+		for _, b := range u.Bots {
+			if strings.ToLower(b) == l {
+				return b
+			}
+		}
+	}
+	return ""
+}
+
+// listedHere says a workflow is this machine's to show and approve: it runs here, or it is
+// heard here for a bot.
+func (d *Daemon) listedHere(w wire.Workflow) bool { return d.runsHere(w) || d.hearsFor(w) != "" }
+
 // claimsRuns says a run of this workflow is claimed first: a bot's machine, with runs-on:,
 // runs a trigger once across all of that bot's machines (FR-034).
 func (d *Daemon) claimsRuns(w wire.Workflow) bool { return len(w.RunsOn) > 0 && d.isBot() }
@@ -140,9 +176,11 @@ func triggerID(fr fireRequest, event *wire.Event) string {
 	}
 	keys := make([]string, 0, len(event.Details))
 	for k := range event.Details {
-		// A server's event is the same on every machine by its id; when it was heard, and
-		// what was missed before it, are each machine's own (#2011).
-		if event.Details["mcp_event_id"] != "" && (k == "time" || k == "missed_since") {
+		// A server's event is the same on every machine by its server, event and id (#2011):
+		// when it was heard, what was missed before it, its subscription and what each
+		// machine's credentials were shown of it (a bot's, a person's heard for it, #2027)
+		// are each machine's own.
+		if event.Details["mcp_event_id"] != "" && k != "server" && k != "event" && k != "mcp_event_id" {
 			continue
 		}
 		keys = append(keys, k)
