@@ -1,8 +1,10 @@
 package gitlabmcp
 
 import (
+	"bufio"
 	"context"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -457,13 +459,56 @@ func plain(text string) string {
 	return controls.ReplaceAllString(sections.ReplaceAllString(escapes.ReplaceAllString(text, ""), ""), "")
 }
 
-// tail is text's last n lines, without its trailing newlines.
-func tail(text string, n int) string {
-	lines := strings.Split(strings.TrimRight(text, "\n"), "\n")
+// tailSlack is how many lines before the last logLines are kept too, for those at the end
+// that are nothing once cleaned (a section's end mark).
+const tailSlack = 100
+
+// maxLogLine is how much of one line of a log is kept: its start.
+const maxLogLine = 16 << 10
+
+// traceTail is the last n lines of a job's log as it is read, cleaned, without the trailing
+// lines that are nothing once cleaned (P20261020-4): a log can be tens of MB, and only its end
+// is given, so it is never held whole. The lines are kept in a ring whose slots are used again.
+func traceTail(r io.Reader, n int) (string, error) {
+	br := bufio.NewReaderSize(r, 64<<10)
+	ring := make([][]byte, n+tailSlack)
+	next, count := 0, 0
+	var line []byte
+	for {
+		chunk, err := br.ReadSlice('\n')
+		if len(line) < maxLogLine {
+			line = append(line, chunk[:min(len(chunk), maxLogLine-len(line))]...)
+		}
+		if err == bufio.ErrBufferFull {
+			continue
+		}
+		if len(chunk) > 0 && chunk[len(chunk)-1] == '\n' || (err == io.EOF && len(line) > 0) {
+			if line[len(line)-1] == '\n' {
+				line = line[:len(line)-1]
+			}
+			ring[next] = append(ring[next][:0], line...)
+			next, count = (next+1)%len(ring), count+1
+			line = line[:0]
+		}
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return "", &GitLabError{Kind: Failed, Message: "GitLab: " + err.Error()}
+		}
+	}
+	kept := min(count, len(ring))
+	lines := make([]string, 0, kept)
+	for i := range kept {
+		lines = append(lines, plain(string(ring[(next-kept+i+len(ring))%len(ring)])))
+	}
+	for len(lines) > 0 && lines[len(lines)-1] == "" {
+		lines = lines[:len(lines)-1]
+	}
 	if len(lines) > n {
 		lines = lines[len(lines)-n:]
 	}
-	return strings.Join(lines, "\n")
+	return strings.Join(lines, "\n"), nil
 }
 
 // FailedLog is the end of each failed job's log in a pipeline (not those allowed to fail), or of one job by name.
@@ -477,16 +522,30 @@ func (g *RealGitLab) FailedLog(ctx context.Context, project string, pipelineID i
 		if j.Status != "failed" || (job != "" && j.Name != job) || (job == "" && j.AllowFailure) {
 			continue
 		}
-		body, err := g.do(ctx, http.MethodGet, fmt.Sprintf("projects/%s/jobs/%d/trace", pid(project), j.ID), nil)
+		end, err := g.trace(ctx, project, j.ID)
 		if err != nil {
 			return "", err
 		}
-		parts = append(parts, fmt.Sprintf("== %s (%s), last %d lines ==\n%s", j.Name, j.WebURL, logLines, tail(plain(string(body)), logLines)))
+		parts = append(parts, fmt.Sprintf("== %s (%s), last %d lines ==\n%s", j.Name, j.WebURL, logLines, end))
 	}
 	if len(parts) == 0 {
 		return fmt.Sprintf("No failed jobs in pipeline %d.", pipelineID), nil
 	}
 	return strings.Join(parts, "\n\n"), nil
+}
+
+// trace is the end of a job's log, read as it comes.
+func (g *RealGitLab) trace(ctx context.Context, project string, job int) (string, error) {
+	res, err := g.request(ctx, http.MethodGet, fmt.Sprintf("projects/%s/jobs/%d/trace", pid(project), job), nil, "")
+	if err != nil {
+		return "", err
+	}
+	defer res.Body.Close()
+	if res.StatusCode < 200 || res.StatusCode >= 300 {
+		_, err := answer(res)
+		return "", err
+	}
+	return traceTail(res.Body, logLines)
 }
 
 // RetryPipeline runs a pipeline's failed and canceled jobs again.
