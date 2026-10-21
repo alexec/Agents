@@ -6,6 +6,7 @@ import (
 	"log"
 	"net"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -26,25 +27,95 @@ const (
 type fakeMail struct {
 	t       *testing.T
 	address string
+	user    *imapmemserver.User
+
+	mu sync.Mutex
+	// What the server was asked for, so a test can prove a bound: the numbers every SEARCH
+	// answered with and the messages every FETCH named.
+	searched, fetched int
+}
+
+// countingSession is the in-memory session, counting what SEARCH and FETCH give.
+type countingSession struct {
+	*imapmemserver.UserSession
+	f *fakeMail
+}
+
+func (s *countingSession) Login(username, password string) error {
+	if err := s.f.user.Login(username, password); err != nil {
+		return err
+	}
+	s.UserSession = imapmemserver.NewUserSession(s.f.user)
+	return nil
+}
+
+func (s *countingSession) Search(kind imapserver.NumKind, criteria *imap.SearchCriteria, options *imap.SearchOptions) (*imap.SearchData, error) {
+	data, err := s.UserSession.Search(kind, criteria, options)
+	// An ESEARCH that asks for MIN, MAX or COUNT alone answers with no list.
+	listed := options == nil || options.ReturnAll || !options.ReturnMin && !options.ReturnMax && !options.ReturnCount && !options.ReturnSave
+	if err == nil && listed {
+		s.f.mu.Lock()
+		s.f.searched += numbers(data.All)
+		s.f.mu.Unlock()
+	}
+	return data, err
+}
+
+func (s *countingSession) Fetch(w *imapserver.FetchWriter, numSet imap.NumSet, options *imap.FetchOptions) error {
+	s.f.mu.Lock()
+	s.f.fetched += numbers(numSet)
+	s.f.mu.Unlock()
+	return s.UserSession.Fetch(w, numSet, options)
+}
+
+// numbers is how many numbers set names; "*" counts as one.
+func numbers(set imap.NumSet) int {
+	n := 0
+	add := func(start, stop uint32) {
+		if stop == 0 || start == 0 {
+			n++
+			return
+		}
+		n += int(max(start, stop)-min(start, stop)) + 1
+	}
+	switch s := set.(type) {
+	case imap.SeqSet:
+		for _, r := range s {
+			add(r.Start, r.Stop)
+		}
+	case imap.UIDSet:
+		for _, r := range s {
+			add(uint32(r.Start), uint32(r.Stop))
+		}
+	}
+	return n
+}
+
+// asked is what the server gave since the last call, and starts the count again.
+func (f *fakeMail) asked() (searched, fetched int) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	searched, fetched = f.searched, f.fetched
+	f.searched, f.fetched = 0, 0
+	return
 }
 
 // newFakeMail is a mailbox with INBOX and Archive. caps nil is IMAP4rev2 (IDLE and MOVE).
 func newFakeMail(t *testing.T, caps imap.CapSet) *fakeMail {
 	t.Helper()
-	mem := imapmemserver.New()
 	user := imapmemserver.NewUser(fakeUser, fakePassword)
 	for _, name := range []string{"INBOX", "Archive"} {
 		if err := user.Create(name, nil); err != nil {
 			t.Fatal(err)
 		}
 	}
-	mem.AddUser(user)
 	if caps == nil {
 		caps = imap.CapSet{imap.CapIMAP4rev1: {}, imap.CapIMAP4rev2: {}}
 	}
+	f := &fakeMail{t: t, user: user}
 	server := imapserver.New(&imapserver.Options{
 		NewSession: func(*imapserver.Conn) (imapserver.Session, *imapserver.GreetingData, error) {
-			return mem.NewSession(), nil, nil
+			return &countingSession{f: f}, nil, nil
 		},
 		InsecureAuth: true,
 		Caps:         caps,
@@ -56,7 +127,8 @@ func newFakeMail(t *testing.T, caps imap.CapSet) *fakeMail {
 	}
 	go func() { _ = server.Serve(ln) }()
 	t.Cleanup(func() { _ = server.Close() })
-	return &fakeMail{t: t, address: ln.Addr().String()}
+	f.address = ln.Addr().String()
+	return f
 }
 
 func (f *fakeMail) account() (Account, error) {
@@ -92,6 +164,25 @@ func (f *fakeMail) deliver(folder, raw string) {
 		f.t.Fatal(err)
 	}
 }
+
+// deliverMany puts n messages into folder, numbered in their subjects from 1, straight into
+// the in-memory server.
+func (f *fakeMail) deliverMany(folder string, n int) {
+	f.t.Helper()
+	for i := 1; i <= n; i++ {
+		raw := strings.ReplaceAll(plain("news@example.org", fakeUser, fmt.Sprintf("Message %d", i), "Nothing much."), "\n", "\r\n")
+		if _, err := f.user.Append(folder, literal{strings.NewReader(raw), int64(len(raw))}, &imap.AppendOptions{}); err != nil {
+			f.t.Fatal(err)
+		}
+	}
+}
+
+type literal struct {
+	*strings.Reader
+	size int64
+}
+
+func (l literal) Size() int64 { return l.size }
 
 // plain is a plain-text message.
 func plain(from, to, subject, body string) string {

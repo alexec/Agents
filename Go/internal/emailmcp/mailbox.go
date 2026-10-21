@@ -324,11 +324,14 @@ func (m *Mailbox) Folders(ctx context.Context) ([]Folder, error) {
 	return out, err
 }
 
-func limited(limit int) int {
-	if limit <= 0 {
+func limited(limit int) uint32 {
+	switch {
+	case limit <= 0:
 		return 20
+	case limit >= maxListed:
+		return maxListed
 	}
-	return min(limit, maxListed)
+	return uint32(limit)
 }
 
 // List is a folder's newest messages, newest first.
@@ -351,31 +354,90 @@ func (m *Mailbox) Search(ctx context.Context, folder string, q Query, limit int)
 	if q.UnreadOnly {
 		criteria.NotFlag = []imap.Flag{imap.FlagSeen}
 	}
+	filtered := len(criteria.Header) > 0 || len(criteria.Text) > 0 || !criteria.Since.IsZero() || q.UnreadOnly
 	var out []Summary
 	err := m.with(ctx, func(c *imapclient.Client) error {
 		if err := m.open(c, folder); err != nil {
 			return err
 		}
-		found, err := c.UIDSearch(criteria, nil).Wait()
+		total, err := count(c, folder)
 		if err != nil {
 			return err
 		}
-		uids := found.AllUIDs()
-		slices.Sort(uids)
-		uids = uids[max(0, len(uids)-limited(limit)):]
-		out, err = m.summaries(c, folder, uids)
+		if !filtered {
+			// The newest by sequence number: no SEARCH, so no UID of the rest (#1846).
+			var newest imap.SeqSet
+			if total > 0 {
+				newest.AddRange(total-min(total, limited(limit))+1, total)
+			}
+			out, err = m.summaries(c, folder, newest)
+			return err
+		}
+		uids, err := newestMatching(c, criteria, total, limited(limit))
+		if err != nil {
+			return err
+		}
+		out, err = m.summaries(c, folder, imap.UIDSetNum(uids...))
 		return err
 	})
 	return out, err
 }
 
-// summaries fetches uids' envelopes, newest (highest UID) first.
-func (m *Mailbox) summaries(c *imapclient.Client, folder string, uids []imap.UID) ([]Summary, error) {
+// count is how many messages the selected folder holds, asked of the server: the client's
+// own count can be off after a move (#1846). ESEARCH answers with the number alone; without
+// it, STATUS on the selected folder does.
+func count(c *imapclient.Client, folder string) (uint32, error) {
+	if c.Caps().Has(imap.CapESearch) || c.Caps().Has(imap.CapIMAP4rev2) {
+		data, err := c.Search(&imap.SearchCriteria{}, &imap.SearchOptions{ReturnCount: true}).Wait()
+		if err != nil {
+			return 0, err
+		}
+		return data.Count, nil
+	}
+	s, err := c.Status(folder, &imap.StatusOptions{NumMessages: true}).Wait()
+	if err != nil || s.NumMessages == nil {
+		return 0, err
+	}
+	return *s.NumMessages, nil
+}
+
+// newestMatching is the UIDs of the newest limit of a folder's total messages that match
+// criteria. It searches the newest 10×limit messages, then the 4× as many before them, and so
+// on until limit match or the folder is done, so a search answers with the UIDs of a window,
+// not of the folder (#1846). go-imap has no PARTIAL (RFC 9394), which would do it in one.
+func newestMatching(c *imapclient.Client, criteria *imap.SearchCriteria, total uint32, limit uint32) ([]imap.UID, error) {
+	var uids []imap.UID
+	size := limit * 10
+	for top := total; top > 0; {
+		low := top - min(top, size) + 1
+		window := *criteria
+		var seq imap.SeqSet
+		seq.AddRange(low, top)
+		window.SeqNum = []imap.SeqSet{seq}
+		found, err := c.UIDSearch(&window, nil).Wait()
+		if err != nil {
+			return nil, err
+		}
+		uids = append(uids, found.AllUIDs()...)
+		if len(uids) >= int(limit) {
+			break
+		}
+		top = low - 1
+		if size < top {
+			size *= 4
+		}
+	}
+	slices.Sort(uids)
+	return uids[max(0, len(uids)-int(limit)):], nil
+}
+
+// summaries fetches the envelopes of set (UIDs or sequence numbers), newest (highest UID) first.
+func (m *Mailbox) summaries(c *imapclient.Client, folder string, set imap.NumSet) ([]Summary, error) {
 	out := []Summary{}
-	if len(uids) == 0 {
+	if isEmpty(set) {
 		return out, nil
 	}
-	msgs, err := c.Fetch(imap.UIDSetNum(uids...), &imap.FetchOptions{UID: true, Envelope: true, Flags: true, InternalDate: true,
+	msgs, err := c.Fetch(set, &imap.FetchOptions{UID: true, Envelope: true, Flags: true, InternalDate: true,
 		BodySection: []*imap.FetchItemBodySection{authSection}}).Collect()
 	if err != nil {
 		return nil, err
@@ -385,6 +447,16 @@ func (m *Mailbox) summaries(c *imapclient.Client, folder string, uids []imap.UID
 	}
 	slices.SortFunc(out, func(a, b Summary) int { return int(b.uid) - int(a.uid) })
 	return out, nil
+}
+
+func isEmpty(set imap.NumSet) bool {
+	switch s := set.(type) {
+	case imap.SeqSet:
+		return len(s) == 0
+	case imap.UIDSet:
+		return len(s) == 0
+	}
+	return set == nil
 }
 
 func (m *Mailbox) summary(folder string, msg *imapclient.FetchMessageBuffer) Summary {
@@ -584,7 +656,7 @@ func (m *Mailbox) Since(ctx context.Context, folder string, validity uint32, aft
 		if len(uids) > limit {
 			uids, more = uids[:limit], true
 		}
-		if out, err = m.summaries(c, folder, uids); err != nil {
+		if out, err = m.summaries(c, folder, imap.UIDSetNum(uids...)); err != nil {
 			return err
 		}
 		slices.Reverse(out)
