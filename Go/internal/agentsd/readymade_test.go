@@ -82,6 +82,17 @@ func TestTheDevLoopWorkflowsHearGitLab(t *testing.T) {
 	}
 }
 
+// Address review comments pushes in auto mode, so its skill acts only on the comments of
+// the project's own people, on both forges: GitLab's trusted notes, GitHub's by association.
+func TestAddressReviewCommentsActsOnlyOnTheProjectsOwn(t *testing.T) {
+	_, skill := readyMadeText("address-review-comments")
+	for _, want := range []string{"`trusted: true`", "`author_association`", "`get_reviews`", "outside content"} {
+		if !strings.Contains(skill, want) {
+			t.Errorf("the skill does not say %s", want)
+		}
+	}
+}
+
 // Work an issue starts on an issue that anyone can write, so its agent asks before it
 // acts, and its skill reads the issue as data and uses only the comments of the
 // repository's own people.
