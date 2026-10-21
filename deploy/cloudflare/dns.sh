@@ -3,10 +3,13 @@
 # page's name and the views name, both to the VM's address that deploy/gcp/up.sh prints. The
 # name @ is the zone itself: --names @ points agentloops.dev at the VM, for the hand-back page
 # (#1343, deploy/gcp/site.sh).
+# --cname TARGET makes CNAME records to TARGET instead of A records: --names docs --cname
+# alexec.github.io serves the docs site from GitHub Pages at docs.agentloops.dev (#1549).
 # A record that is already right is left alone, and one with another address is changed, so
 # running it again is safe.
 #
 #   deploy/cloudflare/dns.sh [--dry-run] [--zone agentloops.dev] [--names "control views"] IP
+#   deploy/cloudflare/dns.sh [--dry-run] [--zone agentloops.dev] --names docs --cname alexec.github.io
 #
 # The API token comes from the Keychain item agents-cloudflare-token, and is never printed or
 # put on a command line. Make it at Cloudflare (My Profile ▸ API Tokens ▸ Create Token, the
@@ -15,7 +18,8 @@
 #   security add-generic-password -a "$USER" -s agents-cloudflare-token -w
 #
 # The records are DNS only (not proxied): Caddy on the VM gets the certificates from Let's
-# Encrypt, and each client checks Caddy's certificate itself. --dry-run prints the requests and
+# Encrypt, and each client checks Caddy's certificate itself. GitHub Pages also gets its own
+# certificate, so a CNAME is DNS only too. --dry-run prints the requests and
 # makes none: it needs no token.
 set -euo pipefail
 die() {
@@ -27,16 +31,18 @@ dry_run=0
 zone=agentloops.dev
 names='control views'
 ip=''
+cname=''
 while (($#)); do
 	case $1 in
 	--dry-run) dry_run=1; shift ;;
 	--zone) zone=${2:?--zone needs a domain}; shift 2 ;;
 	--names) names=${2:?--names needs the names, such as "control views"}; shift 2 ;;
+	--cname) cname=${2:?--cname needs the target, such as alexec.github.io}; shift 2 ;;
 	-*) die "$1 is not an option" ;;
 	*) ip=$1; shift ;;
 	esac
 done
-[[ $ip =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]] || die "say the VM's IPv4 address: deploy/cloudflare/dns.sh [--dry-run] IP"
+[[ -n $cname || $ip =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]] || die "say the VM's IPv4 address: deploy/cloudflare/dns.sh [--dry-run] IP"
 command -v jq >/dev/null || die "jq is needed"
 api=https://api.cloudflare.com/client/v4
 token=''
@@ -75,6 +81,24 @@ for n in $names; do
 	fqdn=$n.$zone
 	[[ $n == @ ]] && fqdn=$zone
 	records=$(cf GET "/zones/$zone_id/dns_records?name=$fqdn")
+	if [[ -n $cname ]]; then
+		if [[ $(jq '[.[] | select(.type == "A" or .type == "AAAA")] | length' <<<"$records") != 0 ]]; then
+			die "$fqdn has an A or AAAA record at Cloudflare: delete it there, then run this again"
+		fi
+		c=$(jq -c '[.[] | select(.type == "CNAME")]' <<<"$records")
+		if [[ $(jq length <<<"$c") == 0 ]]; then
+			cf POST "/zones/$zone_id/dns_records" \
+				"{\"type\":\"CNAME\",\"name\":\"$fqdn\",\"content\":\"$cname\",\"ttl\":300,\"proxied\":false}" >/dev/null
+			echo "$fqdn: CNAME $cname, made"
+		elif [[ $(jq -r '.[0].content' <<<"$c") == "$cname" && $(jq -r '.[0].proxied' <<<"$c") == false ]]; then
+			echo "$fqdn: CNAME $cname, already"
+		else
+			cf PATCH "/zones/$zone_id/dns_records/$(jq -r '.[0].id' <<<"$c")" \
+				"{\"content\":\"$cname\",\"proxied\":false}" >/dev/null
+			echo "$fqdn: CNAME $cname, changed from $(jq -r '.[0].content' <<<"$c")"
+		fi
+		continue
+	fi
 	if [[ $(jq '[.[] | select(.type == "CNAME")] | length' <<<"$records") != 0 ]]; then
 		die "$fqdn is a CNAME at Cloudflare: delete it there, then run this again"
 	fi
