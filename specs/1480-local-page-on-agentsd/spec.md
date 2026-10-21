@@ -217,6 +217,8 @@ proof is bound only to origins the control plane serves itself.
    log of FR-006), with tests for SC-003 (#1950).
 2. agentsd: the loopback listener (`--web`, `--web-port`, the `web` package), the relayed exchange,
    and the session through the uplink (FR-001 to FR-009), with tests for SC-002.
+   (#1951 serves the page and carries every line to the control plane; answering this
+   host's own calls here, FR-007, is 1970.)
 3. Agents Host: pass `--web` and `--web-port` to agentsd when the role is `joinElsewhere`, and stop
    passing them on a move back.
 4. A walk (SC-001), and the docs: `docs/how-to/` for the page on this Mac, `docs/explanation/`
