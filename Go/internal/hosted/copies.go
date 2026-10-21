@@ -26,7 +26,7 @@ type copyRunning struct {
 }
 
 // loopback is where this service reaches its copies from: they believe its
-// X-Forwarded-For, and through it the proxies in front.
+// X-Forwarded-For, which is one address, decided by clientOf.
 var loopback = []netip.Prefix{netip.MustParsePrefix("127.0.0.1/32"), netip.MustParsePrefix("::1/128")}
 
 // copyFor is an account's running copy, started if it is not running.
@@ -98,16 +98,9 @@ func (s *Service) startCopy(ctx context.Context, id string) (*copyRunning, error
 		pr.SetURL(target)
 		// The copy answers only at its own name (DNS rebinding): the request keeps it.
 		pr.Out.Host = pr.In.Host
-		// Where the request came from, after what the proxies in front said: the copy
-		// believes it from loopback, and the rest from TrustedProxies.
-		from, _, err := net.SplitHostPort(pr.In.RemoteAddr)
-		if err != nil {
-			from = pr.In.RemoteAddr
-		}
-		if prior := pr.In.Header.Values("X-Forwarded-For"); len(prior) > 0 {
-			from = strings.Join(prior, ", ") + ", " + from
-		}
-		pr.Out.Header.Set("X-Forwarded-For", from)
+		// Where the request came from, as one address: the copy believes it from
+		// loopback and counts clients by it.
+		pr.Out.Header.Set("X-Forwarded-For", s.clientOf(pr.In))
 	}}
 	proxy.ErrorHandler = func(w http.ResponseWriter, r *http.Request, err error) {
 		s.log(id + ": proxy: " + err.Error())
@@ -115,6 +108,34 @@ func (s *Service) startCopy(ctx context.Context, id string) (*copyRunning, error
 	}
 	s.log(fmt.Sprintf("%s: started at %s", id, cfg.URL))
 	return &copyRunning{service: service, proxy: proxy}, nil
+}
+
+// clientOf is the address a request comes from: the last X-Forwarded-For entry when the
+// peer is a trusted proxy (Caddy, which writes it), else the peer, never one a stranger
+// says. As controlplane's sources.of.
+func (s *Service) clientOf(r *http.Request) string {
+	peer := r.RemoteAddr
+	if host, _, err := net.SplitHostPort(peer); err == nil {
+		peer = host
+	}
+	addr, err := netip.ParseAddr(peer)
+	if err != nil {
+		return peer
+	}
+	addr = addr.Unmap()
+	for _, p := range s.cfg.TrustedProxies {
+		if !p.Contains(addr) {
+			continue
+		}
+		if values := r.Header.Values("X-Forwarded-For"); len(values) > 0 {
+			list := strings.Split(values[len(values)-1], ",")
+			if forwarded, err := netip.ParseAddr(strings.TrimSpace(list[len(list)-1])); err == nil {
+				return forwarded.Unmap().String()
+			}
+		}
+		break
+	}
+	return addr.String()
 }
 
 // toAccount passes a request to an account's control plane.

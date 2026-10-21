@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/http/cookiejar"
 	"net/http/httptest"
+	"net/netip"
 	"net/url"
 	"strings"
 	"testing"
@@ -55,10 +56,16 @@ type browser struct {
 // start serves the hosted service over TLS, and a browser that reaches it at every name.
 func start(t *testing.T, st store.Store) (*Service, *browser) {
 	t.Helper()
+	return startBehind(t, st, nil)
+}
+
+// startBehind is start with trusted as the proxies in front.
+func startBehind(t *testing.T, st store.Store, trusted []netip.Prefix) (*Service, *browser) {
+	t.Helper()
 	g := fakeGitHub(t)
 	keeper := "base64key://" + base64.URLEncoding.EncodeToString(bytes.Repeat([]byte{3}, 32))
 	s, err := New(context.Background(), Config{Store: st, Keeper: keeper, Domain: domain, GitHubClientID: "Iv1.test",
-		GitHubSecret: "secret", GitHubWeb: g.URL, GitHubAPI: g.URL, Log: func(line string) { t.Log(line) }})
+		GitHubSecret: "secret", GitHubWeb: g.URL, GitHubAPI: g.URL, TrustedProxies: trusted, Log: func(line string) { t.Log(line) }})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -211,6 +218,54 @@ func TestSignUpGivesAControlPlaneOfYourOwn(t *testing.T) {
 	res = b.signIn("good")
 	if again, _ := url.Parse(res.Header.Get("Location")); again == nil || strings.HasPrefix(again.Host, id) {
 		t.Fatal(res.Header.Get("Location"))
+	}
+}
+
+// Behind a trusted proxy, the copy counts each client by its own address, not the
+// proxy's: one client's sockets do not count against another.
+func TestTheCopyCountsEachClientNotTheProxy(t *testing.T) {
+	_, b := startBehind(t, store.NewMemory(), []netip.Prefix{netip.MustParsePrefix("127.0.0.1/32")})
+	to, _ := url.Parse(b.signIn("good").Header.Get("Location"))
+	connect := func(from string) *http.Response {
+		t.Helper()
+		req, _ := http.NewRequest(http.MethodGet, "https://"+to.Host+"/v1/connect", nil)
+		for k, v := range map[string]string{"Connection": "Upgrade", "Upgrade": "websocket", "Sec-WebSocket-Version": "13",
+			"Sec-WebSocket-Key": "dGhlIHNhbXBsZSBub25jZQ==", "X-Forwarded-For": from} {
+			req.Header.Set(k, v)
+		}
+		res, err := b.client.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { res.Body.Close() })
+		return res
+	}
+	for i := 0; i < 50; i++ {
+		if res := connect("203.0.113.7"); res.StatusCode != http.StatusSwitchingProtocols {
+			t.Fatalf("socket %d: %d", i, res.StatusCode)
+		}
+	}
+	if res := connect("203.0.113.7"); res.StatusCode != http.StatusTooManyRequests {
+		t.Fatalf("the first client's 51st socket: %d", res.StatusCode)
+	}
+	if res := connect("198.51.100.9"); res.StatusCode != http.StatusSwitchingProtocols {
+		t.Fatalf("the second client was counted with the first: %d", res.StatusCode)
+	}
+}
+
+// With no trusted proxy in front, what a client says in X-Forwarded-For is not believed.
+func TestTheCopyBelievesNoClientsForwardedFor(t *testing.T) {
+	s, _ := start(t, store.NewMemory())
+	r := httptest.NewRequest(http.MethodGet, "/", nil)
+	r.RemoteAddr = "192.0.2.4:5000"
+	r.Header.Set("X-Forwarded-For", "203.0.113.7")
+	if got := s.clientOf(r); got != "192.0.2.4" {
+		t.Fatal(got)
+	}
+	s.cfg.TrustedProxies = []netip.Prefix{netip.MustParsePrefix("192.0.2.0/24")}
+	r.Header.Add("X-Forwarded-For", "10.0.0.1, 198.51.100.9")
+	if got := s.clientOf(r); got != "198.51.100.9" {
+		t.Fatal(got)
 	}
 }
 
