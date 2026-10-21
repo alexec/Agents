@@ -73,16 +73,16 @@ To make and delete workspaces from Agents as well, configure the command provide
   key are filled in, each as one shell word. With `${firstBoot}` in it, the new workspace
   installs Agents on its first boot. Without it, you add it over ssh once it is made.
 - **`delete`**: the command that deletes one, with `${id}` and its list's columns.
-- **`options`**: the New Workspace form, as a JSON Schema object. A property's `default`
+- **`options`**: the New Machine form, as a JSON Schema object. A property's `default`
   fills in a choice the form leaves empty.
 
 The Docker preset makes workspaces when you give it an **Image** and no containers. New
 Workspace… runs `docker run -d --name <name> --label agents.workspace <image>`, then the
 install command in it with `docker exec`, so the container joins by itself. The image must
-keep running and have `curl`. Delete Workspace… runs `docker rm -f -v`, which also removes
+keep running and have `curl`. Delete Machine… runs `docker rm -f -v`, which also removes
 the container's anonymous volumes.
 
-DigitalOcean through its API makes droplets too. New Workspace… makes a droplet with the
+DigitalOcean through its API makes droplets too. New Machine… makes a droplet with the
 tag, in the region, size and image you choose (an image with systemd, such as
 `ubuntu-24-04-x64`). Its first boot makes a user, `agents`, with root's ssh keys, and
 installs Agents as that user, never as root. The host starts with the droplet. Delete

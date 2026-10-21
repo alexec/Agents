@@ -28,9 +28,9 @@ test("this Mac's host needing an update is up, not down (#1771)", async () => {
 
 test("not running and not joined say to open Agents Host", async () => {
   const { macHostNoticeTitle: title, macHostNoticeDetail: detail } = await load("src/model/macHostNotice.ts");
-  assert.equal(title({ kind: "notRunning" }), "This Mac’s host isn’t running");
+  assert.equal(title({ kind: "notRunning" }), "This Mac isn’t running as a machine");
   assert.match(detail({ kind: "notRunning" }), /^Open Agents Host\./);
-  assert.equal(title({ kind: "notJoined" }), "This Mac’s host hasn’t joined");
+  assert.equal(title({ kind: "notJoined" }), "This Mac hasn’t joined");
   assert.equal(detail({ kind: "notJoined", problem: "the code expired" }),
     "It’s running, and it has no membership. The code expired. Open Agents Host and press Try Again there.");
   assert.match(detail({ kind: "notAnswering" }), /trying again by itself/);

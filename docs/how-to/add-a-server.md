@@ -35,7 +35,7 @@ it and no port needs opening. See [Projects, hosts and worktrees](../explanation
 
 ### Run a command on the server
 
-1. In the window, open **Settings ▸ Control plane**, and click **Show** beside **Hosts**.
+1. In the window, open **Settings ▸ Machines**.
 2. Click **Add a Server…**. With **Run a command** chosen, the sheet shows one command,
    which works once.
 3. Click **Copy**.
@@ -49,7 +49,7 @@ it and no port needs opening. See [Projects, hosts and worktrees](../explanation
 
    The sheet says **devbox joined.** and lists the git repositories it found on the server,
    unticked (see [Choose its projects](#choose-its-projects)). The server is listed under
-   **Hosts**, and has a heading of its own in the projects list.
+   **Machines**, and has a heading of its own in the projects list.
 
 The host then installs Claude by itself, into `~/.agents-server/tools`, from the pins
 the control plane gives with the host (#1312). This takes about a minute and 500 MB. Until
@@ -109,7 +109,7 @@ certificate is still checked by its pin. The key, if you chose one, is still rea
 install.
 
 If the server won't open that port (something else has it, or its sshd has
-`AllowTcpForwarding no`), or the session drops, the server goes offline. Under **Hosts** its
+`AllowTcpForwarding no`), or the session drops, the server goes offline. Under **Machines** its
 line says **ssh tunnel down** and ssh's reason. The control plane starts the session again by
 itself, waiting longer each time it fails, and at once when this Mac wakes or its network
 changes. When you remove the server, the tunnel closes.
@@ -122,7 +122,7 @@ What the control plane passes to ssh, and how each common `~/.ssh/config` option
 Nothing on the server becomes a project by itself (#656). Once it joins, Add a Server lists each
 git repository directly inside the paths under **Auto-detect** (`~`, `~/src` and the like, `~`
 being the server's home), each unticked, and the same list opens later from **Choose
-Projects…** on the server's row under **Hosts**, or on **This Mac**'s.
+Projects…** on the server's row under **Machines**, or on **This Mac**'s.
 
 1. Tick the repositories to add. One that is already a project is shown ticked and greyed.
 2. To add a folder that is not listed, type its path on the server, such as `~/work/app`, and
@@ -196,13 +196,13 @@ Host…** beside it. Add a Server opens over ssh, with the address the provider 
 filled in. Once the server joins, it is linked to its workspace, so it can be started and
 stopped from Agents. See [Start workspaces from Agents](start-workspaces-from-agents.md).
 
-**New Workspace…** on a provider's card has **Clone these projects**: git URLs, one a line.
+**New Machine…** on a provider's card has **Clone these projects**: git URLs, one a line.
 Once the new workspace joins, it clones each one, with this Mac's git access when you allow
 it, and they appear under its heading.
 
 ## When the server is offline
 
-If the server loses its network, or the host stops, **Hosts** marks it offline and its
+If the server loses its network, or the host stops, **Machines** marks it offline and its
 projects go grey. Agents already working there keep working. The host reconnects by
 itself when it can, and you see everything that happened meanwhile. **Check again**, in
 its `···` menu, asks at once.

@@ -42,8 +42,8 @@ extension WorkflowSummary {
                                             tint: .attention))
         } else if deniedHere != nil {
             lines.append(WorkflowStatusLine(symbol: "hand.raised.slash",
-                                            text: "Denied on this host — it does not run here",
-                                            detail: "Other hosts still see it waiting. Approve to let it run here"))
+                                            text: "Denied on this machine — it does not run here",
+                                            detail: "Other machines still see it waiting. Approve to let it run here"))
         }
         if !isArchived {
             lines.append(enabledLine)
@@ -200,7 +200,7 @@ extension MCPTriggerStatus {
             body = failure?.message ?? "Stopped"
             tint = .failure
         case .notThisHost:
-            body = "Runs on another host, which asks for its events"
+            body = "Runs on another machine, which asks for its events"
         }
         let lead = server.map { "\($0) · \(name)" } ?? name
         return ("\(lead): \(body)", tint)

@@ -334,7 +334,7 @@ func (m *Methods) Handle(method string, params json.RawMessage, from Caller) (an
 			return nil, err
 		}
 		if !gone {
-			return nil, fail(noSuchHost, "No host is called %s.", host)
+			return nil, fail(noSuchHost, "No machine is called %s.", host)
 		}
 		return map[string]any{}, nil
 	case "hosts/lastHeard":
@@ -344,7 +344,7 @@ func (m *Methods) Handle(method string, params json.RawMessage, from Caller) (an
 		}
 		host := string(request.Host)
 		if m.records.Host(host) == nil {
-			return nil, fail(noSuchHost, "No host is called %s.", host)
+			return nil, fail(noSuchHost, "No machine is called %s.", host)
 		}
 		return m.s.copies.lastHeard(host), nil
 	}
@@ -694,7 +694,7 @@ func (m *Methods) setRelay(ctx context.Context, request wire.HostRelayRequest) e
 	host := string(request.Host)
 	record := m.records.Host(host)
 	if record == nil {
-		return fail(noSuchHost, "No host is called %s.", host)
+		return fail(noSuchHost, "No machine is called %s.", host)
 	}
 	// Only agents-relay carries devices; a host that runs agents cannot start to.
 	if record.Relay == nil {

@@ -45,8 +45,8 @@ waits for its agentsd to connect, and the server comes online by itself.
 ## Link a server to its workspace
 
 - **For a server you already have:** in **Settings ▸ Machines**, open its `···`
-  menu, choose **Link to Workspace…**, pick the workspace and choose **Link**.
-- **For a workspace that isn't a server yet:** start it, then choose **Add as Host…** beside
+  menu, choose **Link to Provider…**, pick the workspace and choose **Link**.
+- **For a workspace that isn't a server yet:** start it, then choose **Add as Machine…** beside
   it on the Providers page. Add a Server opens over ssh, with the provider's address filled
   in. The new server is linked to the workspace once it joins.
 
@@ -158,7 +158,7 @@ added while it is stopped is not seen until it is next up.
 ## Make a new workspace
 
 For a provider that can make workspaces, its card in **Settings ▸ Control plane ▸
-Providers** has **New Workspace…**.
+Providers** has **New Machine…**.
 
 1. Give it a name, and make its choices: its size or region, say.
 2. Choose **Make…**. Agents says what it will make and, if the provider says, what it costs.
@@ -166,9 +166,9 @@ Providers** has **New Workspace…**.
 
 The new workspace shows **Joining…** until it has installed Agents and joined. Then it is
 linked to its host. A provider that can't install on first boot opens **Add a Server** with
-the new workspace filled in, as **Add as Host…** does.
+the new workspace filled in, as **Add as Machine…** does.
 
-To delete one, choose **Delete Workspace…** in its server's `···` menu on the Hosts page.
+To delete one, choose **Delete Machine…** in its server's `···` menu on Settings ▸ Machines.
 Agents names what is lost first: the workspace, everything on its disk, and the server with
 its agents.
 

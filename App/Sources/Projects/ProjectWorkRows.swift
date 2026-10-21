@@ -210,7 +210,7 @@ struct WorkflowListRow: View {
                 }
                 // Not here, without archiving it everywhere (#391).
                 if summary.canBeDenied {
-                    Button("Deny on This Host") { Task { await model.denyWorkflow(summary) } }
+                    Button("Deny on This Machine") { Task { await model.denyWorkflow(summary) } }
                 }
             } else {
                 Button("Run now") { Task { await model.runWorkflow(summary) } }

@@ -8,7 +8,7 @@ enum OfflineWords {
     static func line(host: HostID, name: String, since: String?) -> String {
         let since = since.map { " since \($0)" } ?? ""
         return host == .mac
-            ? "This Mac’s host hasn’t answered\(since). Nothing here can change until it’s back. Trying again…"
+            ? "This Mac hasn’t answered\(since). Nothing here can change until it’s back. Trying again…"
             : "\(name) is offline\(since). Agents there keep working."
     }
 
@@ -58,7 +58,7 @@ enum OfflineWords {
 
     /// Under a chat's history that did not load because its server is down (#963): the strip
     /// above already says why, so this says only what the page shows. The web's words.
-    static let lastHeard = "That host is offline. What's shown is from when it was last heard."
+    static let lastHeard = "That machine is offline. What's shown is from when it was last heard."
 
     /// Whether a call failed because its host is down, not because of what it asked: the
     /// host refused as offline, or its channel closed under it (#963).

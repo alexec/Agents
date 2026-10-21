@@ -66,12 +66,12 @@ export function elapsed(since: number, now: number): string {
 /** What the strip draws for `host`: its words, a spinner or the dot, and Start or the timer. */
 export function offlineStrip(host: string, row: ControlHost | undefined, at: string | null, macID = "mac"):
   { line: string; starting: boolean; since: number | null; start: boolean } {
-  const name = row?.name ?? "This host";
+  const name = row?.name ?? "This machine";
   const state = row?.state ?? "offline";
   const workspace = row?.workspace;
   const said = workspace ? workspaceLine(name, state, workspace) : null;
   const line = said ?? (host === macID
-    ? `This Mac’s host hasn’t answered${at ? ` since ${at}` : ""}. Nothing here can change until it’s back. Trying again…`
+    ? `This Mac hasn’t answered${at ? ` since ${at}` : ""}. Nothing here can change until it’s back. Trying again…`
     : `${name} is offline${at ? ` since ${at}` : ""}. Agents there keep working; nothing can be sent until it’s back.`);
   const starting = workspace !== undefined && state === "starting";
   return {
@@ -95,7 +95,7 @@ export function OfflineStrip({ store, host }: { store: Store; host: string }) {
       {strip.since !== null ? <Elapsed since={strip.since} />
         : strip.start ? (
           <button type="button" disabled={store.hostsBeingStarted.value.includes(host)}
-            aria-label={`Start ${row?.name ?? "this host"}`} onClick={() => void store.startHost(host)}>Start</button>
+            aria-label={`Start ${row?.name ?? "this machine"}`} onClick={() => void store.startHost(host)}>Start</button>
         ) : null}
     </p>
   );

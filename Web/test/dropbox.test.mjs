@@ -8,7 +8,7 @@ const d = await load("src/model/dropbox.ts");
 test("a file within the link's record goes; a bigger one or a dot name is refused", () => {
   assert.equal(d.dropboxRefusal("notes.md", 900_000), null);
   assert.equal(d.dropboxRefusal("film.mov", 2_000_000),
-    "From a browser, a drop box file can be 900 KB, and film.mov is 2.0 MB. Copy it into .agents/dropbox/ on its host instead.");
+    "From a browser, a drop box file can be 900 KB, and film.mov is 2.0 MB. Copy it into .agents/dropbox/ on its machine instead.");
   assert.ok(d.dropboxRefusal(".env", 3));
 });
 

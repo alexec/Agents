@@ -148,7 +148,7 @@ export function connectorLevels(levels: MCPLevels | undefined): { name: string; 
 
 /** The levels as a sentence, for a screen reader and the tooltip, as `MCPHealthWords.levelsSentence`. */
 export function levelsSentence(levels: MCPLevels | undefined): string {
-  if (!levels) return "Its levels show once its host has checked it.";
+  if (!levels) return "Its levels show once its machine has checked it.";
   const each = connectorLevels(levels);
   const reached = each.filter((l) => l.reached).map((l) => l.name);
   const not = each.filter((l) => !l.reached).map((l) => l.name);
@@ -161,10 +161,10 @@ export function levelsSentence(levels: MCPLevels | undefined): string {
 export const madeByAgents = "Made by Agents";
 
 export const personalIntro = "Every connector in your own ~/.agents/mcp.json, which every agent has. "
-  + "A hosted one runs once on this host; any other is checked every four hours, and when its entry changes. "
+  + "A hosted one runs once on this machine; any other is checked every four hours, and when its entry changes. "
   + "Edit them in Settings ▸ Shared ▸ Connectors.";
 export const projectIntro = "Every connector in this project's .agents/mcp.json. "
-  + "A hosted one runs once on its host; any other is checked every four hours, and when its entry changes. "
+  + "A hosted one runs once on its machine; any other is checked every four hours, and when its entry changes. "
   + "Edit them in the project's settings.";
 export const personalEmpty = "No connectors in ~/.agents/mcp.json yet.";
 export const projectEmpty = "No connectors in this project's .agents/mcp.json yet.";

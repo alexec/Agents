@@ -3904,7 +3904,7 @@ final class AppModel {
                                               DaemonAPI.MCPSignInRequest(target: target, client: client),
                                               returning: DaemonAPI.MCPSignInAnswer.self)
         } catch {
-            return .init(error: "The sign-in couldn't start: the app could not reach its host.")
+            return .init(error: "The sign-in couldn't start: the app could not reach its machine.")
         }
     }
 
@@ -3914,7 +3914,7 @@ final class AppModel {
             return try await macClient.call(DaemonAPI.Method.mcpSignInWait, DaemonAPI.MCPSignInFlowRequest(flowID: flowID),
                                          returning: DaemonAPI.MCPSignInWaitAnswer.self).status
         } catch {
-            return .failed("The app lost touch with its host while waiting.")
+            return .failed("The app lost touch with its machine while waiting.")
         }
     }
 
@@ -3929,7 +3929,7 @@ final class AppModel {
             return try await macClient.call(DaemonAPI.Method.mcpSignOut, DaemonAPI.MCPSignOutRequest(target: target),
                                          returning: DaemonAPI.MCPSignOutAnswer.self).error
         } catch {
-            return "It couldn't be signed out: the app could not reach its host."
+            return "It couldn't be signed out: the app could not reach its machine."
         }
     }
 

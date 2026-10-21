@@ -134,5 +134,5 @@ function ViewState({ layer, id }: { layer: ViewLayer; id: string }) {
 
 function missingWords(pin: PinView): string {
   const why = pin.missingReason ?? "no such view";
-  return `${pin.title} can't be shown on this host: ${why}.`;
+  return `${pin.title} can't be shown on this machine: ${why}.`;
 }

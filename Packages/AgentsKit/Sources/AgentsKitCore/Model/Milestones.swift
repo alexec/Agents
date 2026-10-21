@@ -19,7 +19,7 @@ public enum Milestone: String, CaseIterable, Codable, Hashable, Sendable, Identi
         case .firstPairing: "First phone or browser paired"
         case .firstRemoteAnswer: "First question answered away from the Mac"
         case .firstWorkflow: "First workflow made"
-        case .firstCloudHost: "First cloud host started"
+        case .firstCloudHost: "First cloud machine started"
         case .firstLandedPR: "First pull request landed with nobody watching"
         case .fiveAtOnce: "Five agents working at once"
         }
@@ -32,7 +32,7 @@ public enum Milestone: String, CaseIterable, Codable, Hashable, Sendable, Identi
         case .firstPairing: "Pair a phone or a browser with Pair a Device…."
         case .firstRemoteAnswer: "Answer an agent's question from the Remote or the web page."
         case .firstWorkflow: "Make a workflow that runs an agent on a schedule or an event."
-        case .firstCloudHost: "Start a workspace on a cloud provider."
+        case .firstCloudHost: "Start a machine on a cloud provider."
         case .firstLandedPR: "Let an agent open a pull request that merges by itself."
         case .fiveAtOnce: "Have five agents in a turn at the same time."
         }

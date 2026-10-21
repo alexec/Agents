@@ -405,7 +405,7 @@ public actor ControlRouter {
                 for id in waiting {
                     reply(to: sessionID, host: host, id: id, wrapped: wrapped,
                           error: JSONRPCError(code: DaemonAPI.Failure.hostOffline,
-                                              message: "That host went offline before it answered."))
+                                              message: "That machine went offline before it answered."))
                 }
                 // A bare-wire client (the Remote) talks to the home host's daemon and hears
                 // nothing else: no `control/hostChanged`, and the daemon that comes back
@@ -776,7 +776,7 @@ public actor ControlRouter {
                 toHost(homeHost, message, from: sessionID)
             } else if let request = ControlWire.request(in: message) {
                 reply(to: sessionID, host: nil, id: request.id, wrapped: false,
-                      error: JSONRPCError(code: DaemonAPI.Failure.noSuchHost, message: "This control plane has no home host."))
+                      error: JSONRPCError(code: DaemonAPI.Failure.noSuchHost, message: "This control plane has no home machine."))
             }
         }
     }
@@ -795,7 +795,7 @@ public actor ControlRouter {
             }
             guard known.contains(host) else {
                 return reply(to: sessionID, host: host, id: id, wrapped: wrapped,
-                             error: JSONRPCError(code: DaemonAPI.Failure.noSuchHost, message: "No host is called \(host.rawValue)."))
+                             error: JSONRPCError(code: DaemonAPI.Failure.noSuchHost, message: "No machine is called \(host.rawValue)."))
             }
             guard let channel = session.channels[host], let uplink = hosts[host] else {
                 // A prompt or a start for a stopped workspace may be kept, and start it (#691 US3).
@@ -820,7 +820,7 @@ public actor ControlRouter {
                 }
             } catch {
                 reply(to: sessionID, host: host, id: id, wrapped: wrapped,
-                      error: JSONRPCError(code: DaemonAPI.Failure.hostOffline, message: "That host is offline."))
+                      error: JSONRPCError(code: DaemonAPI.Failure.hostOffline, message: "That machine is offline."))
             }
         case .notification?, .success?, .failure?:
             // A notification, or an answer to something the host asked this client.
@@ -872,9 +872,9 @@ public actor ControlRouter {
     private func offlineRefusal(_ host: HostID) -> JSONRPCError {
         if workspaces[host]?.hostState == "stopped" {
             return JSONRPCError(code: DaemonAPI.Failure.hostOffline,
-                                message: "That host is stopped. Start it to reach it.")
+                                message: "That machine is stopped. Start it to reach it.")
         }
-        return JSONRPCError(code: DaemonAPI.Failure.hostOffline, message: "That host is offline.")
+        return JSONRPCError(code: DaemonAPI.Failure.hostOffline, message: "That machine is offline.")
     }
 
     // MARK: Kept requests (#691 US3)

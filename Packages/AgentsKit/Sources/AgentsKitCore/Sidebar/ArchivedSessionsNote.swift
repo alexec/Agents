@@ -27,7 +27,7 @@ public enum ArchivedSessionsNote: Equatable, Sendable {
     public var text: String {
         switch self {
         case .loading: "Loading…"
-        case .hostSilent: "Its host isn’t answering"
+        case .hostSilent: "Its machine isn’t answering"
         case .none: "No archived sessions"
         case .capped(let shown, let total): "The newest \(shown) of \(total). Search to find an older one."
         }

@@ -150,7 +150,7 @@ private struct WorkspaceProviderRow: View {
                 }
                 if workspace.host == nil, !free.isEmpty {
                     Button(free.count == 1 && WorkspaceProviderWords.mayBe(workspace, hostName: free[0].name)
-                           ? "Link to \(free[0].name)…" : "Link to Host…", action: link)
+                           ? "Link to \(free[0].name)…" : "Link to Machine…", action: link)
                 }
             }
             .buttonStyle(.bordered)
@@ -210,7 +210,7 @@ private struct AddWorkspaceProviderSheet: View {
                     }
                 }
                 if working {
-                    Section { Text("Checking it lists its workspaces…").foregroundStyle(.secondary) }
+                    Section { Text("Checking it lists its machines…").foregroundStyle(.secondary) }
                 }
                 if let problem {
                     Section { Text(problem).tinted(.failure) }
@@ -302,7 +302,7 @@ private struct LinkWorkspaceToHostSheet: View {
                     if hosts.isEmpty {
                         Text(WorkspaceProviderWords.noHosts)
                     } else {
-                        Picker("Host", selection: $host) {
+                        Picker("Machine", selection: $host) {
                             ForEach(hosts) { Text($0.name).tag(HostID?.some($0.id)) }
                         }
                         Toggle("Start when used", isOn: $startWhenUsed)
@@ -311,13 +311,13 @@ private struct LinkWorkspaceToHostSheet: View {
                         }
                     }
                 } footer: {
-                    Text("The host already runs on this workspace: \(provider.name) starts and stops it, and nothing is installed again.")
+                    Text("Agents already runs on this machine: \(provider.name) starts and stops it, and nothing is installed again.")
                 }
                 if let problem {
                     Section { Text(problem).tinted(.failure) }
                 }
             }
-            .navigationTitle("Link \(workspace.name) to a Host")
+            .navigationTitle("Link \(workspace.name) to a Machine")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }

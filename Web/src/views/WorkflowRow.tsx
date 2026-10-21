@@ -86,7 +86,7 @@ export function workflowActions(summary: WorkflowSummary, pinned: boolean, pinne
 }
 
 const words: Record<WorkflowAction, string> = {
-  open: "Open", unarchive: "Unarchive", approve: "Approve", deny: "Deny on This Host", runNow: "Run Now",
+  open: "Open", unarchive: "Unarchive", approve: "Approve", deny: "Deny on This Machine", runNow: "Run Now",
   pin: "Pin", unpin: "Unpin", moveUp: "Move Up", moveDown: "Move Down", turnOff: "Turn Off", turnOn: "Turn On",
   archive: "Archive", delete: "Delete…",
 };

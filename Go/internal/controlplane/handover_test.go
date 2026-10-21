@@ -86,7 +86,7 @@ func TestAFrozenCopyChangesNothing(t *testing.T) {
 	call(t, window, "", "hosts/list", nil)
 	d.must("handover/unfreeze", nil)
 	call(t, window, "", "clients/startPairing", nil)
-	if _, refused := d.call("relay/set", map[string]any{"host": "nobody", "relay": true}); !strings.Contains(refused, "No host is called nobody") {
+	if _, refused := d.call("relay/set", map[string]any{"host": "nobody", "relay": true}); !strings.Contains(refused, "No machine is called nobody") {
 		t.Fatal(refused)
 	}
 }

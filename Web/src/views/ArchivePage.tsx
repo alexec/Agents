@@ -54,7 +54,7 @@ export function ArchivePage({ store, host, folder, projectName, down }: {
                 onPick={() => go({ host, project: folder, workflow: summary.workflow.workflowID })} />
             </div>
           ))}
-          {sessions.length === 0 && workflows.length === 0 && <p class="hint">{online ? "Nothing archived" : "Its host isn’t answering"}</p>}
+          {sessions.length === 0 && workflows.length === 0 && <p class="hint">{online ? "Nothing archived" : "Its machine isn’t answering"}</p>}
         </div>
       </div>
     </section>

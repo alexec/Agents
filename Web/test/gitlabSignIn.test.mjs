@@ -50,5 +50,5 @@ test("a GitLab project's set-up says GitLab, merge requests and pipelines", () =
 });
 
 test("Disconnect GitLab says every project's GitLab slots wait again, as the Mac does (#1868)", () => {
-  assert.match(c.disconnectNoteFor("gitlab"), /^Disconnect deletes the host's token\. Every project's GitLab slots wait for a connection again\. /);
+  assert.match(c.disconnectNoteFor("gitlab"), /^Disconnect deletes the machine's token\. Every project's GitLab slots wait for a connection again\. /);
 });

@@ -54,7 +54,7 @@ test("a host on no workspace keeps today's words and no button", () => {
     { line: "devbox is offline since 9:41. Agents there keep working; nothing can be sent until it’s back.",
       starting: false, since: null, start: false });
   assert.equal(offlineStrip("mac", undefined, null).line,
-    "This Mac’s host hasn’t answered. Nothing here can change until it’s back. Trying again…");
+    "This Mac hasn’t answered. Nothing here can change until it’s back. Trying again…");
   assert.equal(offlineStrip("box", row("offline", workspace({ workspaceState: "running" })), null).line,
     "devbox is offline. Agents there keep working; nothing can be sent until it’s back.",
     "a running workspace whose agentsd went is the ordinary line");

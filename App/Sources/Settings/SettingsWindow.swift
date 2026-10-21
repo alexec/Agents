@@ -323,13 +323,13 @@ private struct NoMacHostNotice: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Label("There is no host on this Mac", systemImage: "exclamationmark.triangle")
+            Label("This Mac is not one of your machines", systemImage: "exclamationmark.triangle")
                 .appText(.supporting).fontWeight(.semibold)
                 .tinted(.attention)
-            Text("This Mac’s runtimes and settings are on its host, and the control plane has no host on this Mac. Agents on your servers are not changed. To add this Mac, make a code in Machines ▸ Add by Code…, then paste it in Agents Host under Join one elsewhere.")
+            Text("This Mac’s runtimes and settings are kept only when it is one of your machines, and the control plane does not have it. Agents on your servers are not changed. To add this Mac, make a code in Machines ▸ Add by Code…, then paste it in Agents Host under Join one elsewhere.")
                 .appText(.fine).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
-            Button("Show Hosts", action: showHosts)
+            Button("Show Machines", action: showHosts)
                 .controlSize(.small)
         }
         .frame(maxWidth: 560, alignment: .leading)

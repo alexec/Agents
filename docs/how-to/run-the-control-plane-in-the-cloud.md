@@ -336,7 +336,7 @@ window can. To cut it off, click **Forget…** on its row. To serve no page, set
 
 ### Enrol a Linux server
 
-1. In the window, open **Settings ▸ Control plane**, click **Show** beside **Hosts**, then
+1. In the window, open **Settings ▸ Machines**, then
    **Add a Server…**, and **Copy** the command.
 2. On the server, as the user your agents should run as, run it. It looks like this:
 

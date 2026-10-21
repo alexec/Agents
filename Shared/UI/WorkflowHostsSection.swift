@@ -25,11 +25,11 @@ struct WorkflowHostsSection: View {
                 .appText(.fine).fontWeight(.semibold)
                 .foregroundStyle(.secondary)
                 .accessibilityAddTraits(.isHeader)
-            Text("Every host with this project runs it, unless it is pinned to some of them. The file stores each computer's id, so renaming one does not unpin it.")
+            Text("Every machine with this project runs it, unless it is pinned to some of them. The file stores each machine's id, so renaming one does not unpin it.")
                 .appText(.fine)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
-            Toggle("Every host", isOn: Binding(
+            Toggle("Every machine", isOn: Binding(
                 get: { hosts.isEmpty },
                 set: { on in if on { onChange([]) } }))
                 .disabled(locked || hosts.isEmpty)

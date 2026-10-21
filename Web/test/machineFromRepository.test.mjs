@@ -50,5 +50,5 @@ test("the form leaves out repository, and the request types its values", () => {
 test("the words say what happens next", () => {
   const r = m.repositoryOf("https://github.com/alexec/agents");
   assert.match(m.machineWords.joining("agents-1", r), /clones alexec\/agents on its first boot/);
-  assert.match(m.machineWords.notJoining("agents-1", "Codespaces"), /Add it as a host in the Mac app/);
+  assert.match(m.machineWords.notJoining("agents-1", "Codespaces"), /Add it as a machine in the Mac app/);
 });

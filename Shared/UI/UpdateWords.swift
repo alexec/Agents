@@ -5,7 +5,7 @@ import SwiftUI
 /// docs/explanation/versions.md), once for both apps; the web page says the same.
 enum UpdateWords {
     /// Beside a feature that the host does not have.
-    static let hostNeedsUpdate = "This host needs an update to do this."
+    static let hostNeedsUpdate = "This machine needs an update to do this."
 
     /// "Agents 0.9 (Go)" for a host written in Go (#1134), so the one being tried is never
     /// taken for the other; the Swift host says only its version.
@@ -37,7 +37,7 @@ enum UpdateWords {
     static func missing(_ host: DaemonAPI.ControlHost, controlVersion: String?) -> String? {
         guard let missing = host.missing, !missing.isEmpty else { return nil }
         let to = controlVersion.map { " to Agents \($0)" } ?? ""
-        return "Update this host\(to). It does not have \(missing.joined(separator: ", "))."
+        return "Update this machine\(to). It does not have \(missing.joined(separator: ", "))."
     }
 }
 

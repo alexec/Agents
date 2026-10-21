@@ -64,7 +64,7 @@ export function RuntimeRow({ store, host, summary, disabled, change }: {
           onChange={writer(change)((s, v) => without(s, "runtimeID", v))} />
       </div>
       {named !== undefined && runtimes.length > 0 && !runtimes.some((r) => r.id === named) && (
-        <p class="marked small">⚠︎ "{named}" is not a runtime this host knows</p>
+        <p class="marked small">⚠︎ "{named}" is not a runtime this machine knows</p>
       )}
     </>
   );

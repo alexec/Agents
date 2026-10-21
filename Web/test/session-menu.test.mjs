@@ -91,6 +91,6 @@ test("Open in New Tab opens this page on the session alone (#826)", () => {
 });
 
 test("Find in Chat stays in the chat's menu on an old host, greyed, with the update help (#1867)", () => {
-  assert.deepEqual(findInChatItem(false), { disabled: true, title: "This host needs an update to do this." });
+  assert.deepEqual(findInChatItem(false), { disabled: true, title: "This machine needs an update to do this." });
   assert.equal(findInChatItem(true).disabled, false);
 });

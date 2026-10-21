@@ -61,7 +61,7 @@ extension HostProblem {
     /// (#1118), still works from here.
     static func controlPlaneUnreachable(name: String, address: String, thisMacDirect: Bool = false) -> String {
         if thisMacDirect {
-            return "Can’t reach the control plane on \(name) (\(address)). This Mac’s agents still work here; other hosts’ agents are still working there."
+            return "Can’t reach the control plane on \(name) (\(address)). This Mac’s agents still work here; other machines’ agents are still working there."
         }
         return "Can’t reach the control plane on \(name) (\(address)). Your agents are still working there."
     }

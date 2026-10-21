@@ -38,5 +38,5 @@ export const gitLendWords = {
   message: (ask: GitLendAsk): string =>
     `Its git can then clone, pull and push on ${ask.server} as you, through ${ask.lenderName}, whenever ${ask.lenderName} is connected. `
     + `Nothing is kept on ${ask.hostName}. You can stop it in Settings ▸ Machines.`,
-  footer: "A host asks the first time its git needs a Mac’s git access for a server. Nothing is kept on the host.",
+  footer: "A machine asks the first time its git needs a Mac’s git access for a server. Nothing is kept on the machine.",
 };

@@ -94,7 +94,7 @@ struct ConnectLinearSheet: View {
         switch step {
         case .waiting(let flow): ConnectorSetupWords.sheetStatus(flow)
         case .finishing: ConnectorSetupWords.Linear.finishing
-        default: "Asking the host for Linear's address\u{2026}"
+        default: "Asking the machine for Linear's address\u{2026}"
         }
     }
 

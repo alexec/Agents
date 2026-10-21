@@ -177,7 +177,7 @@ public enum WorkflowRefusal: Codable, Hashable, Sendable {
         case .dayLimitReached: return "the day's spending limit has been reached"
         case .settingRefused(_, let detail): return detail
         case .awaitingApproval: return "it is waiting for your OK"
-        case .deniedHere: return "it is denied on this host"
+        case .deniedHere: return "it is denied on this machine"
         case .coolingDown(let until?):
             return "it is cooling down until \(until.formatted(date: .omitted, time: .shortened)), and runs once then"
         case .coolingDown(nil): return "a run is still going, and it runs once more when that ends"

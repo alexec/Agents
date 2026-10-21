@@ -27,7 +27,7 @@ struct GitAccessSettingsSection: View {
             } header: {
                 Text("Git access")
             } footer: {
-                Text("A host asks the first time its git needs a Mac’s git access for a server. Nothing is kept on the host.")
+                Text("A machine asks the first time its git needs a Mac’s git access for a server. Nothing is kept on the machine.")
             }
             .paperListRow()
         }

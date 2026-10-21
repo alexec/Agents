@@ -28,7 +28,7 @@ export function actionWord(kind: ApprovalKind, action: ApprovalAction): string {
 export const explanations: Record<ApprovalKind, string> = {
   mcpServer: "No session here is given this server until you approve it. Deny leaves it off until its entry in "
     + ".agents/mcp.json changes again.",
-  workflow: "The workflow does not run until you approve it. Deny leaves it off on this host until its file "
+  workflow: "The workflow does not run until you approve it. Deny leaves it off on this machine until its file "
     + "changes again.",
   plugin: "Nothing from this plugin reaches a session until you approve it. Deny leaves it out until its folder "
     + "changes again.",

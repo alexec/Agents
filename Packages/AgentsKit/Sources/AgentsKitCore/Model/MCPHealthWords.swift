@@ -85,7 +85,7 @@ public enum MCPHealthWords {
 
     /// The levels as a sentence, for VoiceOver and the tooltip.
     public static func levelsSentence(_ levels: DaemonAPI.MCPLevels?) -> String {
-        guard let levels else { return "Its levels show once its host has checked it." }
+        guard let levels else { return "Its levels show once its machine has checked it." }
         let reached = levels.each.filter(\.reached).map(\.name)
         let not = levels.each.filter { !$0.reached }.map(\.name)
         if not.isEmpty { return "Reaches all five levels." }
@@ -97,12 +97,12 @@ public enum MCPHealthWords {
     public static let madeByAgents = "Made by Agents"
 
     public static let personalIntro = "Every connector in your own ~/.agents/mcp.json, which every agent has. "
-        + "A hosted one runs once on this host; any other is checked every four hours, and when its entry changes. "
+        + "A hosted one runs once on this machine; any other is checked every four hours, and when its entry changes. "
         + "Edit them in Settings \u{25B8} Shared \u{25B8} Connectors."
 
     /// Above a project's servers.
     public static let projectIntro = "Every connector in this project's .agents/mcp.json. "
-        + "A hosted one runs once on its host; any other is checked every four hours, and when its entry changes. "
+        + "A hosted one runs once on its machine; any other is checked every four hours, and when its entry changes. "
         + "Edit them in the project's settings."
 
     public static let personalEmpty = "No connectors in ~/.agents/mcp.json yet."

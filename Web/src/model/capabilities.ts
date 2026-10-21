@@ -5,7 +5,7 @@ import type { ControlHost, RequiredCapabilities } from "../protocol/generated";
 import { DeclaredCapabilities } from "../protocol/capabilities.generated";
 
 /** Beside a feature that the host does not have. */
-export const hostNeedsUpdate = "This host needs an update to do this.";
+export const hostNeedsUpdate = "This machine needs an update to do this.";
 
 /**
  * Whether a host in `state` answers calls: `online`, or `needsUpdate`, which is connected and
@@ -38,7 +38,7 @@ export function stateWords(host: ControlHost): string {
 export function missingWords(host: ControlHost, controlVersion: string | undefined): string | null {
   if (!host.missing || host.missing.length === 0) return null;
   const to = controlVersion ? ` to Agents ${controlVersion}` : "";
-  return `Update this host${to}. It does not have ${host.missing.join(", ")}.`;
+  return `Update this machine${to}. It does not have ${host.missing.join(", ")}.`;
 }
 
 /** When this page does not have what the control plane requires of a client; null when it has it. */

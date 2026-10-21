@@ -113,8 +113,8 @@ export function WorkflowPage({ store, host, folder, projectName, workflowID, dow
                   )}
                   {/* Not on this host, without archiving it everywhere (#391). */}
                   {canBeDenied(summary) && (
-                    <button class="deny" disabled={down} title="Don't run it on this host. Other hosts still see it waiting; Approve takes this back"
-                      onClick={() => void store.denyWorkflow(host, summary)}>Deny on This Host</button>
+                    <button class="deny" disabled={down} title="Don't run it on this machine. Other machines still see it waiting; Approve takes this back"
+                      onClick={() => void store.denyWorkflow(host, summary)}>Deny on This Machine</button>
                   )}
                 </>
                 : <RunNow store={store} host={host} summary={summary} disabled={down} wide />}
@@ -248,12 +248,12 @@ export function WorkflowPage({ store, host, folder, projectName, workflowID, dow
             )}
 
             <h2 class="section-head">Runs on</h2>
-            <p class="quiet small">Every host with this project runs it, unless it is pinned to some of them. The file stores each computer's id, so renaming one does not unpin it.</p>
+            <p class="quiet small">Every machine with this project runs it, unless it is pinned to some of them. The file stores each machine's id, so renaming one does not unpin it.</p>
             <div class="host-pins">
               <label class="switch">
-                <input type="checkbox" role="switch" aria-label="Every host" checked={pinned.length === 0} disabled={locked || pinned.length === 0}
+                <input type="checkbox" role="switch" aria-label="Every machine" checked={pinned.length === 0} disabled={locked || pinned.length === 0}
                   onChange={() => change({ hosts: [] })} />
-                Every host
+                Every machine
               </label>
               {rows.map((row) => (
                 <label class="switch" key={row.machineID}>
@@ -303,7 +303,7 @@ function UnreadableFile({ store, host, folder, workflowID }: {
     <>
       <h2 class="section-head">The file is below</h2>
       {raw.value === undefined ? <p class="hint">Loading…</p>
-        : raw.value === null ? <p class="hint">The workflow file could not be read from the host.</p>
+        : raw.value === null ? <p class="hint">The workflow file could not be read from the machine.</p>
         : <>
             {raw.value.truncated && <p class="quiet small">Only the start of {path} is shown.</p>}
             <pre class="prompt-text">{raw.value.text}</pre>

@@ -25,7 +25,7 @@ struct ConnectSheet: View {
     private var isHostCode: Bool { if case .host = parsed?.purpose { true } else { false } }
 
     private var hostCodeWords: String {
-        "This is a code for a host. Give it to Agents Host on the Mac or server that should run the agents. To connect this window, use a code from Pair a Mac."
+        "This is a code for a machine. Give it to Agents Host on the Mac or server that should run the agents. To connect this window, use a code from Pair a Mac."
     }
 
     var body: some View {
@@ -67,7 +67,7 @@ struct ConnectSheet: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
             if let joined {
-                Text("This Mac is a host of \(joined) now. Its projects are listed wherever that control plane is used.")
+                Text("This Mac is one of the machines of \(joined) now. Its projects are listed wherever that control plane is used.")
                     .appText(.supporting).tinted(.vouched)
                     .fixedSize(horizontal: false, vertical: true)
             }

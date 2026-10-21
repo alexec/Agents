@@ -50,7 +50,7 @@ func usageKey(prefix, at, host string) string {
 // keepRollup is usage/rollup: each period checked, bounded and written over the last.
 func (s *Service) keepRollup(ctx context.Context, host string, rollup wire.UsageRollup, now time.Time) error {
 	if s.records.Host(host) == nil {
-		return fail(noSuchHost, "No host is called %s.", host)
+		return fail(noSuchHost, "No machine is called %s.", host)
 	}
 	if len(rollup.Hours)+len(rollup.Days) > mostRollupPeriods {
 		return fail(invalidParams, "Send at most %d hours and days at a time.", mostRollupPeriods)

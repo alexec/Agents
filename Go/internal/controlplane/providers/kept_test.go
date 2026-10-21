@@ -203,7 +203,7 @@ func TestAReadIsNeverKept(t *testing.T) {
 		t.Errorf("%v", f)
 	}
 	// The router answers it with the offline refusal, which says it is stopped (FR-022).
-	if OfflineRefusal(h.router.workspace(devbox)).Message != "That host is stopped. Start it to reach it." {
+	if OfflineRefusal(h.router.workspace(devbox)).Message != "That machine is stopped. Start it to reach it." {
 		t.Error("refusal")
 	}
 	if starts, _ := h.provider.count(); starts != 0 {

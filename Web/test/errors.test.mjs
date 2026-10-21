@@ -19,5 +19,5 @@ test("anything else the host says is shown as it said it", () => {
 });
 
 test("an offline host says so", () => {
-  assert.match(e.describe(new w.CallFailed(-32090, "host offline")), /^That host is offline/);
+  assert.match(e.describe(new w.CallFailed(-32090, "host offline")), /^That machine is offline/);
 });
