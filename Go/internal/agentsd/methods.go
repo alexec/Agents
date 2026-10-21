@@ -112,12 +112,13 @@ func (d *Daemon) register() {
 		return d.listAgents(r), nil
 	})
 	On(d, wire.CallAgentsStart, func(ctx context.Context, c *Client, r wire.StartRequest) (wire.UUID, error) {
-		return d.start(r)
+		return d.startAs(r, c.actor)
 	})
 	On(d, wire.CallAgentsStop, func(ctx context.Context, c *Client, r wire.AgentRequest) (wire.Empty, error) {
 		if d.Store.Agent(r.AgentID) == nil {
 			return wire.Empty{}, &Error{Code: CodeNoSuchAgent, Message: "no agent " + string(r.AgentID)}
 		}
+		d.actedOn(r.AgentID, c.actor)
 		d.live(r.AgentID).cancel()
 		d.cancelContinue(r.AgentID)
 		d.dropLeases(r.AgentID, "holderStopped")
@@ -125,6 +126,7 @@ func (d *Daemon) register() {
 		return wire.Empty{}, nil
 	})
 	On(d, wire.CallAgentsArchive, func(ctx context.Context, c *Client, r wire.AgentRequest) (wire.Empty, error) {
+		d.actedOn(r.AgentID, c.actor)
 		return wire.Empty{}, d.archive(r.AgentID)
 	})
 	On(d, wire.CallAgentsSetUnread, func(ctx context.Context, c *Client, r wire.SetUnreadRequest) (wire.Empty, error) {

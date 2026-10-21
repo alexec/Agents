@@ -2073,6 +2073,8 @@ type Event struct {
 	Message      *string           `json:"message,omitzero"`
 	ChainDepth   int64             `json:"chainDepth"`
 	Consequences []Consequence     `json:"consequences"`
+	// Who raised it, when a person's call through the control plane did (#1751, spec 736 FR-040): the actor the control plane gave the call's channel, never taken from the client. None for what an agent, a workflow or the machine did.
+	Actor *AuditActor `json:"actor,omitzero"`
 }
 
 type EventDraft struct {

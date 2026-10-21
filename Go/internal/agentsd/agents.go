@@ -59,6 +59,7 @@ func (d *Daemon) registerAgents() {
 		return wire.Empty{}, d.unarchive(r.AgentID)
 	})
 	On(d, wire.CallAgentsDelete, func(ctx context.Context, c *Client, r wire.AgentRequest) (wire.Empty, error) {
+		d.actedOn(r.AgentID, c.actor)
 		return wire.Empty{}, d.delete(r.AgentID)
 	})
 	On(d, wire.CallAgentsSetCeiling, func(ctx context.Context, c *Client, r wire.SetCeilingRequest) (wire.Agent, error) {
@@ -462,6 +463,7 @@ func (d *Daemon) deleteArchived(a *wire.Agent, because string) error {
 	}
 	Broadcast(d, wire.NotifyAgentRemoved, wire.AgentRemovedNotification{AgentID: a.ID})
 	d.raiseAbout(a, "agent.deleted", "was deleted with its conversation.", map[string]string{"because": because})
+	d.takeActor(a.ID) // a helper's deletion raises nothing to take it
 	d.projectChanged(projectFolder(a))
 	return nil
 }

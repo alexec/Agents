@@ -67,6 +67,8 @@ type Client struct {
 	Role Role
 	conn controllink.Conn
 	d    *Daemon
+	// actor is who the control plane says this connection's calls are from (#1751).
+	actor *wire.AuditActor
 }
 
 func (c *Client) send(v any) {
@@ -117,7 +119,7 @@ var nextClient atomic.Int64
 
 // Accept serves one connection until it closes.
 func (d *Daemon) Accept(conn controllink.Conn) {
-	c := &Client{ID: nextClient.Add(1), Role: roleOf(conn), conn: conn, d: d}
+	c := &Client{ID: nextClient.Add(1), Role: roleOf(conn), conn: conn, d: d, actor: actorOf(conn)}
 	// Only a person's connection is one the host speaks to unasked (roles.go).
 	if c.Role.HearsNotifications() {
 		d.addClient(c)
