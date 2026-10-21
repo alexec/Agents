@@ -201,3 +201,36 @@ func waitFor(t *testing.T, what string, ok func() bool) {
 		time.Sleep(10 * time.Millisecond)
 	}
 }
+
+// authenticated: "true" hears only mail the receiving server authenticated: a forged From
+// with no pass, or with a pass the sender wrote itself below the server's, raises nothing.
+func TestReceivedAuthenticatedOnly(t *testing.T) {
+	f := newFakeMail(t, nil)
+	s := &Events{Mailbox: f.mailbox()}
+	only := map[string]any{"from": "noreply@github.com", "authenticated": "true"}
+	_, cursor := mustPoll(t, s, only, "")
+	_, allCursor := mustPoll(t, s, map[string]any{"from": "noreply@github.com"}, "")
+
+	f.deliver("INBOX", plain("GitHub <noreply@github.com>", fakeUser, "Forged", "Your code is 111111."))
+	f.deliver("INBOX", "Authentication-Results: mx.example.com; dmarc=fail header.from=github.com\n"+
+		"Authentication-Results: mx.example.com; dmarc=pass header.from=github.com\n"+
+		plain("GitHub <noreply@github.com>", fakeUser, "Forged too", "Your code is 222222."))
+	f.deliver("INBOX", "Authentication-Results: mx.example.com; dkim=pass header.d=github.com; dmarc=pass header.from=github.com\n"+
+		plain("GitHub <noreply@github.com>", fakeUser, "Your code", "Your code is 333333."))
+
+	events, _ := mustPoll(t, s, only, cursor)
+	if len(events) != 1 {
+		t.Fatalf("authenticated: %v", events)
+	}
+	data := events[0].(map[string]any)["data"].(map[string]any)
+	if data["subject"] != "Your code" || data["authenticated"] != true {
+		t.Fatalf("event: %v", data)
+	}
+	events, _ = mustPoll(t, s, map[string]any{"from": "noreply@github.com"}, allCursor)
+	if len(events) != 3 || events[0].(map[string]any)["data"].(map[string]any)["authenticated"] != false {
+		t.Fatalf("without the filter: %v", events)
+	}
+	if _, err := poll(t, s, map[string]any{"authenticated": "maybe"}, ""); err == nil {
+		t.Fatal("authenticated takes true or false")
+	}
+}

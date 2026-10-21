@@ -56,7 +56,10 @@ type Summary struct {
 	Subject string    `json:"subject"`
 	Date    time.Time `json:"date"`
 	Unread  bool      `json:"unread"`
-	uid     imap.UID
+	// Authenticated is true when the receiving server found the sender is who From says
+	// (auth.go).
+	Authenticated bool `json:"authenticated"`
+	uid           imap.UID
 }
 
 // Message is a message with its text, which is outside content (body.go).
@@ -372,7 +375,8 @@ func (m *Mailbox) summaries(c *imapclient.Client, folder string, uids []imap.UID
 	if len(uids) == 0 {
 		return out, nil
 	}
-	msgs, err := c.Fetch(imap.UIDSetNum(uids...), &imap.FetchOptions{UID: true, Envelope: true, Flags: true, InternalDate: true}).Collect()
+	msgs, err := c.Fetch(imap.UIDSetNum(uids...), &imap.FetchOptions{UID: true, Envelope: true, Flags: true, InternalDate: true,
+		BodySection: []*imap.FetchItemBodySection{authSection}}).Collect()
 	if err != nil {
 		return nil, err
 	}
@@ -392,6 +396,7 @@ func (m *Mailbox) summary(folder string, msg *imapclient.FetchMessageBuffer) Sum
 			s.Date = e.Date.UTC()
 		}
 	}
+	s.Authenticated = authenticated(msg.FindBodySection(authSection), s.From)
 	return s
 }
 
@@ -422,7 +427,7 @@ func (m *Mailbox) Read(ctx context.Context, id string) (Message, error) {
 		folder, _, _, _ := parseID(id)
 		section := &imap.FetchItemBodySection{Peek: true, Partial: &imap.SectionPartial{Offset: 0, Size: maxRaw}}
 		msgs, err := c.Fetch(imap.UIDSetNum(uid), &imap.FetchOptions{UID: true, Envelope: true, Flags: true,
-			InternalDate: true, RFC822Size: true, BodySection: []*imap.FetchItemBodySection{section}}).Collect()
+			InternalDate: true, RFC822Size: true, BodySection: []*imap.FetchItemBodySection{section, authSection}}).Collect()
 		if err != nil {
 			return err
 		}
