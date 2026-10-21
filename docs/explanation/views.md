@@ -188,7 +188,8 @@ Merge, review and comment are tools that only a view may call (`merge_pr`, `revi
 `comment_on_pr`): a person does them, from the page. Only the copy of `github-mcp` that the
 host runs has them (it sets `AGENTS_MCP_HOSTED=1`), and the host leaves them out of an
 agent's list. When the host has no room for another copy, a session runs its own, without
-them. The server reads GitHub as the
+them. `gitlab-mcp` does the same with `merge_merge_request` and `approve_merge_request`. The
+server reads GitHub as the
 person, with the host's GitHub connection (#1335). Merge, auto-merge and review carry the
 head commit that the page shows (`sha`, from `headSha`). When the pull request has a newer
 commit, the server does nothing and says so: open the page again to see it. The diff is of

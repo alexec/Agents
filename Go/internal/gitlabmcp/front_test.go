@@ -33,7 +33,7 @@ func TestTheFrontOffersEventsAndTools(t *testing.T) {
 	f.jobs[100] = []obj{{"id": 1, "name": "test", "stage": "test", "status": "failed", "web_url": "https://gitlab.test/j/1"}}
 	g := f.gitlab()
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
-	front := &Front{Events: &Events{GitLab: g}, Upstream: NewServer("test", g), Version: "test", Logger: logger}
+	front := &Front{Events: &Events{GitLab: g}, Upstream: NewServer("test", g, true), Version: "test", Logger: logger}
 	clientIn, frontOut := io.Pipe()
 	frontIn, clientOut := io.Pipe()
 	served := make(chan error, 1)

@@ -16,7 +16,7 @@ import (
 
 func viewsClient(t *testing.T, f *fakeGitLab) *mcp.ClientSession {
 	t.Helper()
-	server := NewServer("test", f.gitlab())
+	server := NewServer("test", f.gitlab(), true)
 	ct, st := mcp.NewInMemoryTransports()
 	ctx := context.Background()
 	if _, err := server.Connect(ctx, st, nil); err != nil {
@@ -283,5 +283,40 @@ func TestAMergeRequestsDiffIsReadOnceAtAHead(t *testing.T) {
 	callTool(t, c, "show_merge_request", map[string]any{"number": 3})
 	if diffReads() != first+4 {
 		t.Fatalf("a new head read %d diff pages, want 4", diffReads()-first)
+	}
+}
+
+// A copy a session runs itself (not the host's, so not person) has no merge or approve at
+// all: no tools/list filter stands between it and the agent.
+func TestOnlyTheHostsCopyMergesAndApproves(t *testing.T) {
+	f := newFake(t)
+	for _, person := range []bool{true, false} {
+		server := NewServer("test", f.gitlab(), person)
+		ct, st := mcp.NewInMemoryTransports()
+		ctx := context.Background()
+		if _, err := server.Connect(ctx, st, nil); err != nil {
+			t.Fatal(err)
+		}
+		c, err := mcp.NewClient(&mcp.Implementation{Name: "test"}, nil).Connect(ctx, ct, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		list, err := c.ListTools(ctx, nil)
+		_ = c.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+		has := map[string]bool{}
+		for _, tool := range list.Tools {
+			has[tool.Name] = true
+		}
+		for _, name := range []string{"merge_merge_request", "approve_merge_request"} {
+			if has[name] != person {
+				t.Errorf("person %v: %s listed %v", person, name, has[name])
+			}
+		}
+		if !has["comment_on_merge_request"] {
+			t.Errorf("person %v: an agent's tool is missing", person)
+		}
 	}
 }
