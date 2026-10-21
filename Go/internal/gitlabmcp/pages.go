@@ -232,7 +232,7 @@ func (g *RealGitLab) MRPage(ctx context.Context, project string, number int) (ma
 		"author": m.Author.Username, "state": state, "draft": m.draft(), "body": m.Description, "createdAt": m.CreatedAt,
 		"additions": additions, "deletions": deletions, "checks": checks, "autoMerge": m.autoMerge(), "squash": m.Squash,
 		"checkRuns": runs, "files": files, "filesTotal": len(files), "comments": conversation, "threads": threads, "viewer": viewer,
-		"fromFork": m.SourceProjectID != m.TargetProjectID,
+		"fromFork": m.SourceProjectID != m.TargetProjectID, "headSha": m.SHA,
 	}
 	if pipelineID != 0 {
 		page["pipelineId"] = pipelineID
@@ -498,10 +498,11 @@ func (g *RealGitLab) RetryPipeline(ctx context.Context, project string, pipeline
 	return map[string]any{"retried": true, "pipelineId": pipelineID, "status": p.Status, "url": p.WebURL}, nil
 }
 
-// Approve approves a merge request as the person. GitLab refuses one's own where the project says so.
-func (g *RealGitLab) Approve(ctx context.Context, project string, number int) (map[string]any, error) {
+// Approve approves a merge request as the person, at sha: GitLab refuses when its head is
+// another commit, and one's own where the project says so.
+func (g *RealGitLab) Approve(ctx context.Context, project string, number int, sha string) (map[string]any, error) {
 	var out map[string]any
-	if err := g.send(ctx, http.MethodPost, fmt.Sprintf("projects/%s/merge_requests/%d/approve", pid(project), number), map[string]any{}, &out); err != nil {
+	if err := g.send(ctx, http.MethodPost, fmt.Sprintf("projects/%s/merge_requests/%d/approve", pid(project), number), map[string]any{"sha": sha}, &out); err != nil {
 		return nil, err
 	}
 	return map[string]any{"approved": true, "number": number}, nil

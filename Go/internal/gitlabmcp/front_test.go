@@ -107,13 +107,13 @@ func TestTheFrontOffersEventsAndTools(t *testing.T) {
 	equal(t, len(tool(8, "list_issues", map[string]any{})["issues"].([]any)), 1, "list_issues")
 	equal(t, tool(9, "comment_on_issue", map[string]any{"number": 2, "body": "On it."})["commentId"], float64(900), "comment_on_issue")
 	tool(10, "comment_on_merge_request", map[string]any{"number": 1, "body": "Rebased."})
-	merged := tool(11, "merge_merge_request", map[string]any{"number": 1, "squash": true, "auto": true})
+	merged := tool(11, "merge_merge_request", map[string]any{"number": 1, "squash": true, "auto": true, "sha": "head1"})
 	equal(t, merged["mergeSha"], "merged1", "merge_merge_request")
 	f.set(func() {
 		equal(t, f.posted[0], obj{"path": "issues/2/notes", "body": "On it."}, "issue comment sent")
 		equal(t, f.posted[1], obj{"path": "merge_requests/1/notes", "body": "Rebased."}, "MR comment sent")
 		equal(t, f.posted[2], obj{"path": "merge_requests/1/merge", "squash": true, "should_remove_source_branch": true,
-			"auto_merge": true, "merge_when_pipeline_succeeds": true}, "merge sent")
+			"auto_merge": true, "merge_when_pipeline_succeeds": true, "sha": "head1"}, "merge sent")
 	})
 	empty := call(12, "tools/call", map[string]any{"name": "comment_on_issue", "arguments": map[string]any{"number": 2, "body": " "}})
 	equal(t, empty["result"].(map[string]any)["isError"], true, "an empty comment")
