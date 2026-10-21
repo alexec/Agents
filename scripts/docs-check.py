@@ -23,7 +23,9 @@ SECTIONS = {
     "reference": "reference",
     "explanation": "explanation",
 }
-KINDS = set(SECTIONS) | {"index"}
+KINDS = set(SECTIONS) | {"index", "legal"}
+# Pages that are about the site and the service, not the app, at the top of docs/ (#1856).
+LEGAL = {"privacy.md", "terms.md"}
 IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".gif", ".svg", ".webp"}
 IMAGE_LIMIT = 400 * 1024
 
@@ -148,6 +150,10 @@ def check_page(problems, docs, path, used_images):
         if not allowed:
             problems.add(path, kind[1], "section-folder: `index` is only for docs/index.md "
                          "and each section's index.md")
+    elif kind[0] == "legal":
+        if relative not in LEGAL:
+            problems.add(path, kind[1], "section-folder: `legal` is only for "
+                         + ", ".join(f"docs/{name}" for name in sorted(LEGAL)))
     else:
         folder = SECTIONS[kind[0]]
         if not relative.startswith(folder + "/"):
