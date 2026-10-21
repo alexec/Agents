@@ -236,3 +236,66 @@ func TestCheckSignsInOnce(t *testing.T) {
 		}
 	}
 }
+
+// A list asks the server for its newest messages only, and a search for the UIDs of a window
+// of them, never of the whole folder (#1846).
+// With no ESEARCH (IMAP4rev1), STATUS gives the folder's count.
+func TestListAndSearchFetchOnlyTheNewest(t *testing.T) {
+	for name, caps := range map[string]imap.CapSet{"IMAP4rev2": nil, "IMAP4rev1": {imap.CapIMAP4rev1: {}}} {
+		t.Run(name, func(t *testing.T) { fetchOnlyTheNewest(t, caps) })
+	}
+}
+
+func fetchOnlyTheNewest(t *testing.T, caps imap.CapSet) {
+	ctx := context.Background()
+	f := newFakeMail(t, caps)
+	f.deliverMany("INBOX", 300)
+	m := f.mailbox()
+
+	if _, err := m.Folders(ctx); err != nil { // signs in
+		t.Fatal(err)
+	}
+	f.asked()
+	list, err := m.List(ctx, "INBOX", false, 5)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(list) != 5 || list[0].Subject != "Message 300" || list[4].Subject != "Message 296" {
+		t.Fatalf("newest five, newest first: %+v", list)
+	}
+	if searched, fetched := f.asked(); searched != 0 || fetched != 5 {
+		t.Fatalf("list: %d UIDs searched, %d messages fetched; want 0 and 5", searched, fetched)
+	}
+
+	// Every message is unread: the first window, 10×5 of the newest, has enough.
+	list, err = m.List(ctx, "INBOX", true, 5)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(list) != 5 || list[0].Subject != "Message 300" || list[4].Subject != "Message 296" {
+		t.Fatalf("unread: %+v", list)
+	}
+	if searched, fetched := f.asked(); searched > 50 || fetched != 5 {
+		t.Fatalf("unread list: %d UIDs searched, %d messages fetched; want at most 50 and 5", searched, fetched)
+	}
+
+	// Only the oldest matches: the windows go on down to it.
+	found, err := m.Search(ctx, "INBOX", Query{Subject: "Message 1"}, 5)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(found) != 5 || found[0].Subject != "Message 199" {
+		t.Fatalf("search: %+v", found)
+	}
+	found, err = m.Search(ctx, "INBOX", Query{Subject: "Message 2"}, 100)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(found) != 100 || found[0].Subject != "Message 299" {
+		t.Fatalf("search all windows: %d, %+v", len(found), found[:1])
+	}
+
+	if empty, err := m.List(ctx, "Archive", false, 5); err != nil || len(empty) != 0 {
+		t.Fatalf("empty folder: %+v %v", empty, err)
+	}
+}
