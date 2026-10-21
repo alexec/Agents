@@ -1029,6 +1029,13 @@ button.remove:hover { opacity: 1; }
   user-select: all; overflow-wrap: anywhere; }
 .sub-app .settings-body .settings-scope { margin-bottom: 20px; }
 .sub-app .settings-body .scope-head { font-size: 0.875rem; font-weight: 600; margin: 8px 8px 4px; }
+.sub-app-row { display: flex; justify-content: space-between; align-items: center; }
+.sub-app-count { font-size: 0.6875rem; font-weight: 600; padding: 0 6px; border-radius: 8px; background: var(--accent); color: var(--paper-ground); }
+.requests { display: flex; flex-direction: column; gap: 8px; max-width: 560px; }
+.request-list { list-style: none; margin: 0; padding: 0; }
+.request { display: flex; justify-content: space-between; gap: 12px; align-items: center; padding: 8px; border-bottom: 1px solid var(--paper-rule); }
+.request-actions { display: inline-flex; gap: 6px; flex: none; }
+.request-actions .prominent { background: var(--accent); color: var(--paper-ground); border-color: var(--accent); }
 .report-policy { display: flex; flex-direction: column; gap: 4px; max-width: 436px; }
 .report-policy .budget-field { display: inline-flex; gap: 4px; align-items: center; }
 .report-policy .budget-field input { width: 7em; text-align: right; }

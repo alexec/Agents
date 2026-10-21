@@ -20,6 +20,7 @@ import { ReportsPage } from "./Reports";
 import { PeopleSection } from "./People";
 import { GroupsSection } from "./Groups";
 import { ReportPolicyPage } from "./ConsolePolicy";
+import { AuditPage, RequestsPage, requestCount } from "./ConsoleRecords";
 
 /** Whether this person is an admin of the control plane: null until people/list answers. */
 export const isAdmin = signal<boolean | null>(null);
@@ -67,7 +68,10 @@ export function SubAppPage({ store, app, down }: { store: Store; app: SubApp; do
             {list.map((s) => (
               <button key={s.id} type="button" class={`sub-app-row${s.id === open.id ? " on" : ""}`} disabled={!s.built || gated}
                 aria-current={s.id === open.id ? "page" : undefined} title={s.built ? s.about : notBuilt}
-                onClick={() => go({ app, section: s.id })}>{s.title}</button>
+                onClick={() => go({ app, section: s.id })}>
+                {s.title}
+                {s.id === "requests" && !gated && requestCount(store) > 0 && <span class="sub-app-count">{requestCount(store)}</span>}
+              </button>
             ))}
           </div>
         ))}
@@ -92,6 +96,8 @@ function ConsoleSection({ store, section, down }: { store: Store; section: Secti
     case "people": return <PeoplePage store={store} down={down} />;
     case "machines": return <MachinesPage store={store} down={down} />;
     case "reportPolicy": return <ReportPolicyPage store={store} down={down} />;
+    case "requests": return <RequestsPage store={store} down={down} />;
+    case "audit": return <AuditPage store={store} down={down} />;
     default: return <Overview />;
   }
 }
