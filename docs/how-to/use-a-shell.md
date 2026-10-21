@@ -1,7 +1,7 @@
 ---
 diataxis: how-to
 devices: [mac, iphone, ipad]
-description: Open shells in an agent's folder from the Terminal pane, or in the project folder with Control-`, one per tab, and keep them running.
+description: Open shells in an agent's folder from the Terminal pane, or in the project folder with Control-`, one per tab, keep them running, and run a command from a reply.
 ---
 
 # Use a shell in an agent's folder
@@ -37,6 +37,37 @@ is in** the old folder, and **Type cd there** types the `cd` to the new one for 
 
 Open **Terminal** from the conversation. It shows the agent's first shell, **Shell 1**,
 and has no tabs.
+
+## Run a command from a reply
+
+When an agent's reply has a shell command in it, you can run it in the agent's shell
+without copying it. Then, if it fails, you can send the agent what it printed, so the agent
+can find the cause.
+
+A **Run** button shows under a code block in a reply when the block is tagged as a shell's:
+`sh`, `bash`, `zsh`, `shell`, `console` or `shell-session`. In a `console` or
+`shell-session` block, only the lines at a prompt (`$ `, `% ` or `# `) run. The other lines
+are what the command printed.
+
+1. Click or tap **Run** under the block.
+
+   The **Terminal** pane opens on **Shell 1**, in the agent's folder or worktree. The app
+   types the command there and presses Return. Nothing runs until you press **Run**.
+2. Read what the command prints.
+3. If it did not work, click or tap **Tell the Agent**.
+
+   The app sends the agent a prompt from you, with the command and the last 40 lines it
+   printed, and asks it to find the cause and fix it.
+
+**Tell the Agent** shows after every Run, not only after an error, because the shell does
+not tell the app if a command failed. You decide.
+
+On iPhone and iPad, **Run** opens the conversation's **Terminal**, where the Mac can give
+one. A session in a window of its own on the Mac has no **Terminal** pane, so it has no
+**Run**. The web page has no **Run**, because it has no terminal.
+
+If the shell cannot start, the app says **The session's shell did not start, so the command
+did not run.**
 
 ## A shell in the project folder
 

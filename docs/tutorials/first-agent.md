@@ -180,6 +180,46 @@ did, with its summary under the name.
 That is the whole loop: ask, answer, read. Every agent in the app works this way,
 whether it runs for a minute or an afternoon.
 
+## 8. Start the next one with a persona
+
+Press Command-N (**File ▸ New Session**). The new session page for `weather-app` opens
+again, as in step 3.
+
+Look at the three Blobs above the project's name. Click in the prompt and move the pointer:
+they look at it. Keep the pointer still, or type, and they look down at the prompt. They go
+away when your first prompt starts the session. With **Reduce motion** on in System
+Settings, their eyes stay still.
+
+The project's name is a menu. Click it to start the session in another project instead.
+
+A persona is a kind of session that you can start again and again. It sets the runtime,
+model, effort, mode and labels of the new session in one go, and gives the agent a prompt
+of its own. Make one for this project. In Terminal:
+
+```sh
+mkdir -p ~/Demo/weather-app/.agents/personas
+
+cat > ~/Demo/weather-app/.agents/personas/reviewer.md <<'EOF'
+---
+name: Reviewer
+description: Reads a change and says what is wrong with it.
+labels: [review]
+---
+
+You review changes. Say what you would change before you change anything.
+EOF
+```
+
+Go back to the window and press Command-N again. Under the project's name there is now a
+menu that says **No persona**. Click it and choose **Reviewer**.
+
+You should see the persona's description under the menu, and the label `review` with the
+prompt's labels. This persona names no runtime, so the session still uses Claude. Type a
+prompt such as *Review the last commit.* and press Return to start it, or leave the page.
+
+[Personas](../reference/personas.md) lists every key a persona file can have, and where
+else you can keep one.
+
 ## Where next
 
 - [Follow your agents from your iPhone](follow-from-iphone.md), the next tutorial.

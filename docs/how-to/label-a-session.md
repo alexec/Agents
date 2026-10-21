@@ -1,7 +1,7 @@
 ---
 diataxis: how-to
-devices: [mac, iphone, ipad, server]
-description: Add session labels, find labeled work, and see who owns each label.
+devices: [mac, iphone, ipad, web, server]
+description: Add session labels, find labeled work, see who owns each label, and rename a session.
 ---
 
 # Label a session
@@ -47,6 +47,29 @@ Search includes archived sessions. On the phone it loads the full project archiv
 for the query, even when only the newest ten archived cards were previously shown.
 If nothing matches, the session list says so. A new chat starts with its own
 labels; it does not copy labels from the session whose work you continue.
+
+## Rename a session
+
+A runtime names each session from its first prompt, and it can change the name later.
+Give a session a title of your own when the runtime's name does not tell it apart. Your
+title stays: the runtime's later names do not replace it.
+
+- **Mac:** choose **Rename…** from the session's context menu in the sidebar or from the
+  **Session** menu, or click **Rename** in the toolbar above the chat. You can also
+  double-click the session's row, or highlight one row and press Return. The title
+  becomes a field in the row, or in a popover under the toolbar.
+- **iPhone and iPad:** long-press the session and tap **Rename…**, or tap **···** in the
+  chat and tap **Rename…**. Type the title in **Rename Session** and tap **Rename**.
+- **Web page:** choose **Rename…** from the session's menu in the sidebar or from **···**
+  in the chat's header, or double-click the session's row. The title becomes a field in
+  the row or in the header.
+
+On the Mac and the web page, press Return to keep the title, or Escape to cancel. A
+title is one line, with runs of spaces made into one, and 80 characters at most.
+
+To give the session back the runtime's name, empty the field and keep it. The field shows
+the runtime's latest name as its placeholder. An archived session cannot be renamed.
+Agents see the new title too, in `list_sessions` and `read_session`.
 
 ## See also
 

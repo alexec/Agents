@@ -30,6 +30,8 @@ something particular done.
 - [Set up a cloud workspace provider](set-up-a-cloud-workspace-provider.md): add AWS EC2,
   Compute Engine, Cloud Workstations, DigitalOcean, Codespaces or Coder, with the credentials
   each one needs.
+- [Turn the relay on or off](turn-the-relay-on-or-off.md): let your iPhone and iPad reach
+  your agents away from home through iCloud, and be notified, or stop it.
 - [Run the control plane in the cloud](run-the-control-plane-in-the-cloud.md): on a
   machine you rent, at your own domain with a public certificate.
 - [Run the control plane as several copies](run-several-copies.md): over one bucket,
@@ -62,12 +64,18 @@ something particular done.
   in Agents with one you began in Terminal, or delete one.
 - [Answer a question or a permission request](answer-a-question.md): from the Mac, the
   iPhone or iPad, or a notification.
+- [Read a chat](read-a-chat.md): open a chat at its latest message, follow the plan card,
+  and show or hide the agent's thoughts.
+- [Find in a chat or a session](find-in-a-chat-or-a-session.md): find words in the open
+  chat with Find in Chat, or find a session by what was said in it.
 - [Send a prompt while an agent is working](send-while-an-agent-works.md): let it wait
   its turn, or put it into the running turn with **Send now**.
 - [See what needs you from your Home screen](see-what-needs-you-from-your-home-screen.md):
   the number of sessions waiting on you, and a tap that opens one.
 - [Watch an agent's background work](watch-background-work.md): the shells and
   subagents it runs in the background, their output, and **Stop**.
+- [Review changes and approvals](review-changes-and-approvals.md): read a change that waits
+  for your OK on its Review page, and answer it from the page, the card or Needs You.
 - [Use a shell in an agent's folder](use-a-shell.md): the Terminal pane, one shell to a
   tab.
 - [Attach files and pictures to a prompt](attach-files.md): drag, paste, the paperclip,
@@ -78,6 +86,12 @@ something particular done.
   agent writes it, and type on it yourself.
 - [Look at an HTML page an agent wrote](look-at-an-html-page.md): a report or wireframe as a
   page, with its stylesheet and pictures, and what it is not allowed to do.
+- [Edit files](edit-files.md): open a file in an agent's folder, type in it (it saves by
+  itself), and see the problems and completions from the file's language server.
+- [Use the Simulator pane](use-the-simulator-pane.md): see an iOS simulator on the
+  session's Mac, boot it or shut it down, and tap on its screen, from any client.
+- [Open a session or a project in its own window](open-in-its-own-window.md): a window of
+  its own on the Mac, a scene of its own on an iPad, or a tab of its own on the web page.
 - [Stop and archive agents](archive-and-stop.md): what each does, and what each
   keeps.
 - [Sign a runtime in](sign-a-runtime-in.md): sign Claude Code, Codex, Copilot, Cursor, Grok
@@ -101,6 +115,8 @@ something particular done.
   OAuth, such as GitHub's, signed in to in your browser so agents start with it.
 - [Keep going when a runtime runs out](keep-going-when-a-runtime-runs-out.md): see which
   runtimes are out, and continue a chat's work in a new chat on another.
+- [See usage, cost and time](see-usage-cost-and-time.md): open the Cost, Tokens and Time
+  pages, read their charts, and see how much of a runtime's allowance is used.
 - [Limit what agents spend](limit-spending.md): the Spending page, and a limit per agent
   or per day.
 

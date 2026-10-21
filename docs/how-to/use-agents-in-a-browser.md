@@ -87,7 +87,7 @@ and iPad show, on every host:
 
 - read a conversation as it happens, and answer permission requests and questions. With
   **Show thoughts** on, each of the agent's thoughts is one folded line; off, they are not
-  shown;
+  shown (see [Read a chat](read-a-chat.md));
 - send a prompt with files or pictures attached, use **Send now** on a queued prompt, and
   change the mode, model or runtime;
 - start a chat with **New Chat** at the top of the **+** menu, in the host's **chat**
@@ -105,8 +105,8 @@ and iPad show, on every host:
 - answer a change that waits for an OK on its **Review** page;
 - see a simulator on the session's Mac in the **Simulator** pane, and touch its screen;
 - use a project's connector views, such as the GitHub **Pull requests** and **Issues**, the
-  GitLab merge requests and pipelines, and **Linear issues** (see
-  [Use Linear issues](use-linear-issues.md));
+  GitLab merge requests and pipelines, and **Linear issues** (see [Use GitHub](use-github.md),
+  [Use GitLab](use-gitlab.md) and [Use Linear issues](use-linear-issues.md));
 - see **Cost**, **Tokens**, **Time**, **Events**, **Resources**, **Runtimes**, **Your
   Connectors** and **Worktrees** from the sidebar's Activity rows;
 - open **Settings**: **Appearance** (with **Show thoughts**), **Sidebar** (which smart
