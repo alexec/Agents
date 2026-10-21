@@ -212,7 +212,8 @@ func TestPushesToAForgeInAWorktree(t *testing.T) {
 }
 
 // Answer a sign-up code (#1780) hears only the email server, one trigger per allowlisted
-// sender, and its skill names the tools it uses and never one that sends mail.
+// sender the receiving server authenticated, and its skill names the tools it uses, never
+// one that sends mail, and passes on only a code.
 func TestAnswerASignUpCodeHearsOnlyItsSenders(t *testing.T) {
 	text, skill := readyMadeText("answer-a-sign-up-code")
 	w := parseWorkflow(text, "answer-a-sign-up-code", "/p")
@@ -225,6 +226,16 @@ func TestAnswerASignUpCodeHearsOnlyItsSenders(t *testing.T) {
 		if triggerName(tr) != "email.received" || !ok || !slices.Equal(mt.servers, []string{"email"}) || !strings.Contains(string(raw), `"from"`) {
 			t.Fatalf("trigger: %s", raw)
 		}
+		// Every sender must be authenticated, and GitHub and GitLab only by their no-reply
+		// address: their whole domains also send notifications that strangers write.
+		args := string(mustRaw(mt.arguments))
+		wholeForge := strings.Contains(args, "*") && (strings.Contains(args, "github.com") || strings.Contains(args, "gitlab.com"))
+		if !strings.Contains(args, `"authenticated":"true"`) || wholeForge {
+			t.Fatalf("trigger arguments: %s", args)
+		}
+	}
+	if !strings.Contains(skill, "^[A-Za-z0-9-]{4,12}$") || strings.Contains(skill, "<subject>") {
+		t.Error("the skill must send only a code of that shape, and never the subject")
 	}
 	for _, tool := range []string{"read_message", "mark_read", "list_sessions", "message_session"} {
 		if !strings.Contains(skill, "`"+tool+"`") {
