@@ -221,6 +221,8 @@ Shared/UI/Paper.swift                                  settings
 Shared/UI/TypeScale.swift                              settings
 Packages/AgentsKit/Sources/AgentsKitCore/Model/PersonSettings.swift  settings
 Web/src/views/Settings.tsx                             settings
+Web/src/views/settings/                                settings
+Remote/Sources/Settings/                               settings
 Web/src/theme/                                         settings
 docs/reference/settings.md                             settings
 
