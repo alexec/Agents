@@ -6265,6 +6265,10 @@
         },
         "publicKey": {
           "$ref": "#/definitions/Base64"
+        },
+        "person": {
+          "type": "string",
+          "description": "The person the window belongs to (#994). The host lets it in only when it is the host's own user (FR-020)."
         }
       },
       "required": [
@@ -6283,6 +6287,10 @@
           "items": {
             "$ref": "#/definitions/HostClient"
           }
+        },
+        "user": {
+          "type": "string",
+          "description": "The user the host belongs to (#994). With it, the host lets in only a window whose person is that user (FR-020); without it (an older control plane), every window listed."
         }
       },
       "required": [

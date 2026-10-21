@@ -2474,11 +2474,15 @@ type HostClient struct {
 	ID        UUID   `json:"id"`
 	Kind      string `json:"kind"`
 	PublicKey Data   `json:"publicKey"`
+	// The person the window belongs to (#994). The host lets it in only when it is the host's own user (FR-020).
+	Person *string `json:"person,omitzero"`
 }
 
 // host/clients: every window paired with the control plane, which a host checks its local socket against (#1118).
 type HostClients struct {
 	Clients []HostClient `json:"clients"`
+	// The user the host belongs to (#994). With it, the host lets in only a window whose person is that user (FR-020); without it (an older control plane), every window listed.
+	User *string `json:"user,omitzero"`
 }
 
 // host/hello, on every connect of an uplink. `implementation` is `swift` or `go` (#1134).

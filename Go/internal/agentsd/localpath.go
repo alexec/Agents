@@ -4,11 +4,11 @@ import (
 	"bufio"
 	"bytes"
 	"context"
-	"errors"
-	"io"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
+	"io"
 	"log"
 	"net"
 	"os"
@@ -96,10 +96,7 @@ func (d *Daemon) MoveLocal(controlKey []byte) {
 // SetLocalClients is host/clients: the windows the control plane lists as paired. It is
 // kept in the root, and a window no longer listed (forgotten) is cut off at once.
 func (d *Daemon) SetLocalClients(list wire.HostClients) {
-	clients := map[string]wire.HostClient{}
-	for _, c := range list.Clients {
-		clients[strings.ToUpper(string(c.ID))] = c
-	}
+	clients := ownUsersWindows(list)
 	if list.Clients == nil {
 		list.Clients = []wire.HostClient{}
 	}
@@ -138,6 +135,21 @@ func (d *Daemon) SetLocalClients(list wire.HostClients) {
 	}
 }
 
+// ownUsersWindows is the windows of a host/clients by upper-case id: of the host's own user
+// only, when the control plane says who that is (FR-020). A window of another person is
+// never let in here, even if a control plane lists it; an older control plane, which says
+// no user, is taken at its word.
+func ownUsersWindows(list wire.HostClients) map[string]wire.HostClient {
+	clients := map[string]wire.HostClient{}
+	for _, c := range list.Clients {
+		if list.User != nil && (c.Person == nil || *c.Person != *list.User) {
+			continue
+		}
+		clients[strings.ToUpper(string(c.ID))] = c
+	}
+	return clients
+}
+
 // localClient is a window the control plane last listed, read from the root the first
 // time, as the host may start with the control plane away.
 func (d *Daemon) localClient(id string) (wire.HostClient, bool) {
@@ -147,9 +159,7 @@ func (d *Daemon) localClient(id string) (wire.HostClient, bool) {
 		d.localClients = map[string]wire.HostClient{}
 		var kept wire.HostClients
 		if b, err := os.ReadFile(filepath.Join(d.Store.Loc.Root, localClientsFile)); err == nil && json.Unmarshal(b, &kept) == nil {
-			for _, c := range kept.Clients {
-				d.localClients[strings.ToUpper(string(c.ID))] = c
-			}
+			d.localClients = ownUsersWindows(kept)
 		}
 	}
 	c, ok := d.localClients[strings.ToUpper(id)]
