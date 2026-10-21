@@ -100,7 +100,7 @@ struct TurnMark: View {
         case .working:
             Image(systemName: "circle.dashed").foregroundStyle(Paper.accent)
                 .accessibilityLabel("Working")
-        case .question, .approval:
+        case .question, .approval, .needsYou:
             Image(systemName: "hand.raised.fill").tinted(.attention)
                 .accessibilityLabel("Needs you")
         case .done:
