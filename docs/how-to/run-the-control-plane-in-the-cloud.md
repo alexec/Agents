@@ -358,7 +358,7 @@ server, and its Claude sign-in.
 
 Your Mac becomes a host of the control plane in the cloud with Agents Host.
 
-1. In the window, open **Settings ▸ Control plane ▸ Hosts**, click **Add by Code…**, then
+1. In the window, open **Settings ▸ Machines**, click **Add by Code…**, then
    **Copy**.
 2. On the Mac, open Agents Host. Under **Join one elsewhere**, paste the code and click
    **Join**.

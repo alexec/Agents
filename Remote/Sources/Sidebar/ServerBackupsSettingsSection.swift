@@ -3,7 +3,7 @@ import SwiftUI
 
 /// Settings ▸ Servers' Backups (#1815): a row for each server on the control plane that
 /// answers now, opening its backups, as the window opens them from the host's menu in
-/// Settings ▸ Control plane ▸ Hosts. The home Mac's are the Backups section above; a relay
+/// Settings ▸ Machines. The home Mac's are the Backups section above; a relay
 /// runs no agents, so it has none. Nothing when no server can be asked.
 struct ServerBackupsSettingsSection: View {
     @Environment(RemoteModel.self) private var model

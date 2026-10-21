@@ -183,7 +183,7 @@ func (d *Daemon) makeWorkspace(agent wire.UUID, args map[string]json.RawMessage)
 		return "Made " + made.Workspace.Name + ". It joins as the host " + made.Workspace.Name + " on its first boot: wait for server.online.", nil
 	}
 	return "Made " + made.Workspace.Name + ". It can’t install Agents on its first boot, so the person adds it from " +
-		"Settings ▸ Control plane ▸ Providers with Add as Host….", nil
+		"Settings ▸ Workspace Providers with Add as Host….", nil
 }
 
 // deleteWorkspace is delete_workspace.
@@ -271,7 +271,7 @@ func workspaceProvider(given string, listed wire.AgentWorkspaces) *wire.AgentWor
 
 func noProvider(given string, listed wire.AgentWorkspaces) string {
 	if len(listed.Providers) == 0 {
-		return "this control plane has no workspace providers. The person adds them in Settings ▸ Control plane ▸ Providers."
+		return "this control plane has no workspace providers. The person adds them in Settings ▸ Workspace Providers."
 	}
 	var names []string
 	for _, p := range listed.Providers {
@@ -284,7 +284,7 @@ func noProvider(given string, listed wire.AgentWorkspaces) string {
 // their hosts, and what a new one takes.
 func workspacesNote(listed wire.AgentWorkspaces) string {
 	if len(listed.Providers) == 0 {
-		return "This control plane has no workspace providers. The person adds them in Settings ▸ Control plane ▸ Providers."
+		return "This control plane has no workspace providers. The person adds them in Settings ▸ Workspace Providers."
 	}
 	var lines []string
 	for _, p := range listed.Providers {

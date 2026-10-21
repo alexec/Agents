@@ -543,7 +543,7 @@ struct RelayCodeSheet: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             Text("Relay for My Devices").font(.title3.weight(.semibold))
-            Text("Paste a host code from your control plane: in Agents, Settings ▸ Control plane ▸ Hosts ▸ Add a Mac. The relay joins it as a host that runs no agents.")
+            Text("Paste a host code from your control plane: in Agents, Settings ▸ Machines ▸ Add a Mac. The relay joins it as a host that runs no agents.")
                 .foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             TextField("Host code", text: $code, prompt: Text("agents-control:2:h:…"))
                 .textFieldStyle(.roundedBorder).labelsHidden()

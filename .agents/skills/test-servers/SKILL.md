@@ -1,6 +1,6 @@
 ---
 name: test-servers
-description: Test agents on servers (037 cloud agents, 058 hosts) end to end — a real Linux box (the agents-devbox Docker container on 127.0.0.1:2222) joining a scratch control plane, or the fake ssh for install failures — by driving a scratch set-up through Add a Server, a server project, a turn, offline and remove. Use whenever a change touches Hosts/, ServerInstaller, HostInstall, the Linux agentsd, files/browse or files/write, the offline strip, Settings ▸ Control plane ▸ Hosts, or anything that says "server" or "host", or when asked to walk, test or prove servers or cloud agents.
+description: Test agents on servers (037 cloud agents, 058 hosts) end to end — a real Linux box (the agents-devbox Docker container on 127.0.0.1:2222) joining a scratch control plane, or the fake ssh for install failures — by driving a scratch set-up through Add a Server, a server project, a turn, offline and remove. Use whenever a change touches Hosts/, ServerInstaller, HostInstall, the Linux agentsd, files/browse or files/write, the offline strip, Settings ▸ Machines, or anything that says "server" or "host", or when asked to walk, test or prove servers or cloud agents.
 ---
 
 # Test agents on servers
@@ -174,7 +174,7 @@ host. Only the environment is read at launch, so each of these needs a fresh roo
 | Server daemon died | `devbox.sh ssh 'kill $(cat ~/.agents-server/root/daemon.lock)'`: offline; the host's systemd unit or the next command starts it again |
 | Control plane restarted | kill the scratch `agents-control` by its pid file and start it again the same way: the box and the window redial without a new code |
 | First install | `devbox.sh fresh`, then the command again with a new code |
-| Remove | Settings ▸ Control plane ▸ Hosts ▸ Remove: gone from every client at once, and its daemon still running on the box (FR-020) |
+| Remove | Settings ▸ Machines ▸ Remove: gone from every client at once, and its daemon still running on the box (FR-020) |
 | Files pane | open a server chat's files: it reads through `files/browse` on the host |
 | Zero-setup (043, 056) | `bare.sh rebuild`, join it with the command: Claude's toolset installs, a Claude agent answers with the sign-in this Mac lends |
 | Linux binary itself | `scripts/build-linux-agentsd.sh --check` |

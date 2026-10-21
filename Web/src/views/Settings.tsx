@@ -1,8 +1,10 @@
 // This browser's Settings (#846), opened from the sidebar's foot, in the chat's place: what the
 // window has in Settings ▸ Sidebar, and Settings ▸ People (#994). Which smart groups are on is the person's,
 // kept on their Mac and the same on every client (#1033). Workspace providers are the control plane's (#1808).
-// Versions are the control plane's and each host's (#1748).
-// Backups are the person's Mac's, as the window's Settings ▸ Mac draws them (#1810), and each server's (#1815).
+// Machines lists each machine with its version, and the control plane's (#1748, #1759).
+// Its sections are in the window's three groups (#1759): This device, You and Control plane.
+// Backups are the person's Mac's, as the window's Settings ▸ Machines ▸ This Mac draws them (#1810), and each server's (#1815).
+import type { ComponentChildren } from "preact";
 import { useEffect, useState } from "preact/hooks";
 import type { Store } from "../model/store";
 import { smartRows, smartTitles } from "../model/sidebar";
@@ -25,6 +27,20 @@ import { PeopleSection } from "./People";
 export const sidebarSettingsFooter = "A group that is off is not shown. Its sessions go to the next group they fit, "
   + "or under their project. With Needs You off, approvals are not listed in the sidebar.";
 
+/** Settings' groups (#1759), as the window's rail and the Remote's Settings name them: what is kept in this
+ * browser only, what is the person's, and what is the control plane's. A section added later goes in its group. */
+export const scopeTitles = { thisDevice: "This device", you: "You", controlPlane: "Control plane" } as const;
+
+/** One group of Settings, under its heading. */
+function Scope({ id, title, children }: { id: string; title: string; children: ComponentChildren }) {
+  return (
+    <section class="settings-scope" aria-labelledby={id}>
+      <h2 class="scope-head" id={id}>{title}</h2>
+      {children}
+    </section>
+  );
+}
+
 /** The words under the icon's mood (#1317), for this tab's favicon. */
 export const iconMoodFooter = "The Blob on this tab sleeps when nothing runs, smiles while agents work, and looks "
   + "puzzled when a question waits. Off, it always smiles.";
@@ -35,7 +51,7 @@ function GitAccessSection({ store }: { store: Store }) {
   if (lent.length === 0) return null;
   return (
     <section aria-labelledby="settings-git">
-      <h2 class="section-head" id="settings-git">Git access</h2>
+      <h3 class="section-head" id="settings-git">Git access</h3>
       <p class="hint">{gitLendWords.footer}</p>
       {lent.map((lend) => (
         <div class="setting" key={`${lend.host} ${lend.server}`}>
@@ -47,18 +63,18 @@ function GitAccessSection({ store }: { store: Store }) {
   );
 }
 
-/** Versions (#1748): the control plane's and each host's, as the window's Control plane pane says them. */
+/** Machines (#1759): every machine, with its version (#1748) and what one too old for the control plane is
+ * missing, as the window's Machines pane lists them. The control plane's own version is under the list. */
 function VersionsSection({ store }: { store: Store }) {
   const plane = store.plane.value;
-  if (!plane?.version) return null;
-  const appMissing = appMissingWords(plane.required, plane.version);
+  const hosts = store.hosts.value.filter((h) => h.relay == null);
+  const appMissing = plane?.version ? appMissingWords(plane.required, plane.version) : null;
   return (
-    <section aria-labelledby="settings-versions">
-      <h2 class="section-head" id="settings-versions">Versions</h2>
-      <div class="setting"><span>{plane.name ?? "Control plane"}</span><span class="faint">agents-control {plane.version}</span></div>
-      {appMissing && <p class="hint failure">{appMissing}</p>}
-      {store.hosts.value.filter((h) => h.relay == null).map((host) => {
-        const missing = missingWords(host, plane.version);
+    <section aria-labelledby="settings-machines">
+      <h3 class="section-head" id="settings-machines">Machines</h3>
+      {hosts.length === 0 && <p class="hint">No machines yet. Add one on the Mac, in Settings ▸ Machines.</p>}
+      {hosts.map((host) => {
+        const missing = missingWords(host, plane?.version);
         return (
           <div class="setting" key={host.id}>
             <span>{host.name}{missing && <span class="small failure"> {missing}</span>}</span>
@@ -66,6 +82,8 @@ function VersionsSection({ store }: { store: Store }) {
           </div>
         );
       })}
+      {plane?.version && <p class="hint">{plane.name ?? "Control plane"}: agents-control {plane.version}</p>}
+      {appMissing && <p class="hint failure">{appMissing}</p>}
     </section>
   );
 }
@@ -90,7 +108,7 @@ function BackupsView({ state, title, id, configure, make, restore }: {
   const error = said ?? state.lastError;
   return (
     <section aria-labelledby={id}>
-      <h2 class="section-head" id={id}>{title}</h2>
+      <h3 class="section-head" id={id}>{title}</h3>
       <label class="setting">
         <span>Back up</span>
         <select value={state.settings.every}
@@ -182,7 +200,7 @@ function ServerBackupsSection({ store }: { store: Store }) {
   return (
     <>
       <section aria-labelledby="settings-server-backups">
-        <h2 class="section-head" id="settings-server-backups">Servers' Backups</h2>
+        <h3 class="section-head" id="settings-server-backups">Servers' Backups</h3>
         {servers.map((host) => (
           <div class="setting" key={host.id}>
             <span>{host.name}</span>
@@ -203,48 +221,54 @@ export function SettingsPage({ store, down = false }: { store: Store; down?: boo
       <header class="column-head"><BackToList /><h1>Settings</h1></header>
       <div class="scroll">
         <div class="activity-body settings-body">
-          <section aria-labelledby="settings-appearance">
-            <h2 class="section-head" id="settings-appearance">Appearance</h2>
-            <label class="setting">
-              <span>Icon shows what agents are doing</span>
-              <input type="checkbox" role="switch" checked={iconShowsMood.value}
-                onChange={(e) => setIconShowsMood(e.currentTarget.checked)} />
-            </label>
-            <p class="hint">{iconMoodFooter}</p>
-            <label class="setting">
-              <span>Show thoughts</span>
-              <input type="checkbox" role="switch" checked={showsThoughts.value}
-                onChange={(e) => setShowsThoughts(e.currentTarget.checked)} />
-            </label>
-            <p class="hint">{thoughtsFooter}</p>
-          </section>
-          <section aria-labelledby="settings-sidebar">
-            <h2 class="section-head" id="settings-sidebar">Sidebar</h2>
-            {smartRows.map((row) => (
-              <label class="setting" key={row}>
-                <span>{smartTitles[row]}</span>
-                <input type="checkbox" role="switch" checked={on.has(row)}
-                  onChange={(e) => setSmartGroup(row, e.currentTarget.checked)} />
+          <Scope id="settings-scope-device" title={scopeTitles.thisDevice}>
+            <section aria-labelledby="settings-appearance">
+              <h3 class="section-head" id="settings-appearance">Appearance</h3>
+              <label class="setting">
+                <span>Icon shows what agents are doing</span>
+                <input type="checkbox" role="switch" checked={iconShowsMood.value}
+                  onChange={(e) => setIconShowsMood(e.currentTarget.checked)} />
               </label>
-            ))}
-            <p class="hint">{sidebarSettingsFooter}</p>
-          </section>
-          <section aria-labelledby="settings-finished">
-            <h2 class="section-head" id="settings-finished">Finished chats</h2>
-            <label class="setting">
-              <span>Agents may archive the chats I start</span>
-              <input type="checkbox" role="switch" checked={mayArchiveMyChats.value}
-                onChange={(e) => setMayArchiveMyChats(e.currentTarget.checked)} />
-            </label>
-            <p class="hint">{mayArchiveMyChatsFooter}</p>
-          </section>
-          <ProvidersSection store={store} />
-          <GitAccessSection store={store} />
-          <VersionsSection store={store} />
-          <BackupsSection store={store} />
-          <ServerBackupsSection store={store} />
-          {/* Who belongs to the control plane, and their machines and clients (#994). */}
-          <PeopleSection store={store} down={down} />
+              <p class="hint">{iconMoodFooter}</p>
+              <label class="setting">
+                <span>Show thoughts</span>
+                <input type="checkbox" role="switch" checked={showsThoughts.value}
+                  onChange={(e) => setShowsThoughts(e.currentTarget.checked)} />
+              </label>
+              <p class="hint">{thoughtsFooter}</p>
+            </section>
+            <section aria-labelledby="settings-sidebar">
+              <h3 class="section-head" id="settings-sidebar">Sidebar</h3>
+              {smartRows.map((row) => (
+                <label class="setting" key={row}>
+                  <span>{smartTitles[row]}</span>
+                  <input type="checkbox" role="switch" checked={on.has(row)}
+                    onChange={(e) => setSmartGroup(row, e.currentTarget.checked)} />
+                </label>
+              ))}
+              <p class="hint">{sidebarSettingsFooter}</p>
+            </section>
+            <section aria-labelledby="settings-finished">
+              <h3 class="section-head" id="settings-finished">Finished chats</h3>
+              <label class="setting">
+                <span>Agents may archive the chats I start</span>
+                <input type="checkbox" role="switch" checked={mayArchiveMyChats.value}
+                  onChange={(e) => setMayArchiveMyChats(e.currentTarget.checked)} />
+              </label>
+              <p class="hint">{mayArchiveMyChatsFooter}</p>
+            </section>
+          </Scope>
+          <Scope id="settings-scope-you" title={scopeTitles.you}>
+            <GitAccessSection store={store} />
+            <VersionsSection store={store} />
+            <BackupsSection store={store} />
+            <ServerBackupsSection store={store} />
+          </Scope>
+          <Scope id="settings-scope-control" title={scopeTitles.controlPlane}>
+            {/* Who belongs to the control plane, and their machines and clients (#994). */}
+            <PeopleSection store={store} down={down} />
+            <ProvidersSection store={store} />
+          </Scope>
         </div>
       </div>
     </section>

@@ -2,7 +2,7 @@ import AgentsKitCore
 import SwiftUI
 
 /// Settings ▸ Workspace providers (#1819), as the web page's (#1808) and the window's
-/// Settings ▸ Control plane ▸ Providers: each provider as a section of its workspaces, Add
+/// Settings ▸ Workspace Providers: each provider as a section of its workspaces, Add
 /// Provider… (kind first, then its short form), Edit…, List Again and Remove…, and on a
 /// workspace Link to Host…, Start, Stop and Unlink. Only the API providers are added here;
 /// the rest are the Mac's. Tokens go to the control plane and are not kept on the device.

@@ -69,7 +69,7 @@ struct AccountSettingsView: View {
     }
 }
 
-/// Settings ▸ Mac (#846): whether this Mac stays awake, how long archived agents are kept,
+/// Settings ▸ Machines ▸ This Mac (#846): whether this Mac stays awake, how long archived agents are kept,
 /// and its backups (#1810).
 struct MacSettingsView: View {
     @Environment(AppModel.self) private var model

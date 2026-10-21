@@ -16,7 +16,7 @@ conversation and its folder belong to the machine that made it.
 
 ## Where to find it
 
-- **Mac:** Settings ▸ Mac ▸ **Backups**.
+- **Mac:** Settings ▸ Machines ▸ This Mac ▸ **Backups**.
 - **iPhone and iPad:** Settings ▸ **Backups**.
 - **Browser:** Settings ▸ **Backups**.
 
@@ -25,7 +25,7 @@ choose the folder, because the folder is on the Mac's disk.
 
 A server's backups are on its own page:
 
-- **Mac:** Settings ▸ Control plane ▸ Hosts, the server's **⋯** menu ▸ **Backups…**.
+- **Mac:** Settings ▸ Machines, the server's **⋯** menu ▸ **Backups…**.
 - **iPhone and iPad:** Settings ▸ **Servers' Backups** ▸ the server.
 - **Browser:** Settings ▸ **Servers' Backups** ▸ **Backups…** beside the server.
 
@@ -61,7 +61,7 @@ A machine on a control plane shows **Back up to**: **A folder** or **The control
 
 1. Put the old machine's backup folder where the new machine can read it: the same second
    disk or synced folder, or a copy of it.
-2. On the new Mac, in Settings ▸ Mac ▸ **Backups**, click **Choose…** and select that
+2. On the new Mac, in Settings ▸ Machines ▸ This Mac ▸ **Backups**, click **Choose…** and select that
    folder. The list shows each backup with its date, the machine that made it, how many
    agents it holds and its size. A backup made by this machine says **This machine**.
 3. Click **Restore…** beside a backup, then **Restore**.

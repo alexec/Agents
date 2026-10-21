@@ -71,7 +71,7 @@ without starting anything. A finished agent you haven't read is in its group, su
 While any agent has a turn in flight, the host keeps the Mac from going to sleep because
 it has been left alone. After the last turn stops, it stays awake for a while longer so
 you can reply — an hour by default, or right away through eight hours in
-**Settings ▸ Mac ▸ Sleep**. An agent waiting for your answer does not count as a turn
+**Settings ▸ Machines ▸ This Mac ▸ Sleep**. An agent waiting for your answer does not count as a turn
 in flight, so that grace is when you get the time. Closing the lid, or choosing **Sleep**
 yourself, still puts the Mac to sleep, and a turn in flight goes to sleep with it. At
 20% battery or below the hold ends anyway.

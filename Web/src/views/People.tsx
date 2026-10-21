@@ -229,7 +229,7 @@ export function PeopleSection({ store, down }: { store: Store; down: boolean }) 
   const shown = list.value;
   return (
     <section aria-labelledby="settings-people">
-      <h2 class="section-head" id="settings-people">People</h2>
+      <h3 class="section-head" id="settings-people">People</h3>
       <JoinRequests store={store} down={down} explained />
       {problem.value && <p class="hint">{problem.value}</p>}
       {!shown && !problem.value && <p class="hint">Loading…</p>}

@@ -103,7 +103,7 @@ public enum GitLendWords {
     public static func message(host: String, lender: String?, server: String) -> String {
         let mac = lender ?? "this Mac"
         return "Its git can then clone, pull and push on \(server) as you, through \(mac), whenever \(mac) is connected. "
-            + "Nothing is kept on \(host). You can stop it in Settings ▸ Control plane ▸ Hosts."
+            + "Nothing is kept on \(host). You can stop it in Settings ▸ Machines."
     }
 
     /// "Uses this Mac’s git access for github.com", for a host's row; nil when it uses none.

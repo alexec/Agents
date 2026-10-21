@@ -442,7 +442,7 @@ enum WindowAlert: Identifiable {
     var message: String {
         switch self {
         case .lend(let ask):
-            "Its agents will use \(ask.runtimeName) as you, through this Mac, whenever this Mac is awake. The sign-in itself stays on this Mac. You can stop it in Settings ▸ Control plane ▸ Hosts."
+            "Its agents will use \(ask.runtimeName) as you, through this Mac, whenever this Mac is awake. The sign-in itself stays on this Mac. You can stop it in Settings ▸ Machines."
         case .lendGit(let ask): ask.message
         case .problem(let words): words.text
         case .folderGone(let ask): ask.message + " What you typed is still in the prompt."

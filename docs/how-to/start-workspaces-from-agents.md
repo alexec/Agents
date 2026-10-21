@@ -26,7 +26,7 @@ waits for its agentsd to connect, and the server comes online by itself.
 
 ## Add a provider
 
-1. Open **Settings ▸ Control plane ▸ Providers** on the Mac and choose **Add Provider…**.
+1. Open **Settings ▸ Workspace Providers** on the Mac and choose **Add Provider…**.
 2. Pick the kind:
    - **Docker Containers**: containers on the Mac that runs the control plane.
    - **DigitalOcean Droplets**: droplets with a tag. Agents reaches each one as `root@` its address
@@ -44,7 +44,7 @@ waits for its agentsd to connect, and the server comes online by itself.
 
 ## Link a server to its workspace
 
-- **For a server you already have:** in **Settings ▸ Control plane ▸ Hosts**, open its `···`
+- **For a server you already have:** in **Settings ▸ Machines**, open its `···`
   menu, choose **Link to Workspace…**, pick the workspace and choose **Link**.
 - **For a workspace that isn't a server yet:** start it, then choose **Add as Host…** beside
   it on the Providers page. Add a Server opens over ssh, with the provider's address filled
@@ -76,7 +76,7 @@ say why and offer **Start** again.
 
 ## Stop a server
 
-Choose **Stop** on its row in **Settings ▸ Control plane ▸ Hosts**. If agents are working
+Choose **Stop** on its row in **Settings ▸ Machines**. If agents are working
 there, Agents names them and asks first. The row says **Stopping…** and then **Stopped**.
 
 ## Start when used and stop when idle
