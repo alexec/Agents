@@ -19775,6 +19775,43 @@
         "secrets"
       ],
       "additionalProperties": false
+    },
+    "UserPartRequest": {
+      "type": "object",
+      "description": "settings/userPart (#1760): a part of the user settings, as this machine has it now.",
+      "properties": {
+        "part": {
+          "$ref": "#/definitions/UserSettingsPartName"
+        }
+      },
+      "required": [
+        "part"
+      ],
+      "additionalProperties": false
+    },
+    "UserPartHere": {
+      "type": "object",
+      "description": "settings/userPart's answer (#1760): this machine's own part, for a client to set at the user scope with Use This Mac's. An MCP server with a token in clear is refused, so no secret goes into the user settings unsealed.",
+      "properties": {
+        "part": {
+          "$ref": "#/definitions/UserSettingsPartName"
+        },
+        "value": {
+          "$ref": "#/definitions/JSONValue"
+        },
+        "leftOut": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "What could not be taken, by name: a skill with files beside its SKILL.md."
+        }
+      },
+      "required": [
+        "part",
+        "value"
+      ],
+      "additionalProperties": false
     }
   }
 }

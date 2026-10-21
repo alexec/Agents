@@ -65,6 +65,7 @@ func (d *Daemon) register() {
 	d.registerHostedMCP()
 	d.registerViews()
 	// What the control plane keeps under You is changed there, not here (#1760).
+	d.registerUserScope()
 	defer d.guardUserScope()
 	On(d, wire.CallPermissionsPending, func(ctx context.Context, c *Client, _ wire.Empty) ([]wire.PermissionRequest, error) {
 		return d.pendingPermissions(), nil

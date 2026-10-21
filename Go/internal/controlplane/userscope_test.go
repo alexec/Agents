@@ -50,7 +50,12 @@ func secretsOf(u wire.HostUserSettings) map[string]string {
 	return out
 }
 
-func takingHello(name string) controllink.HostHello { return fakeHello(name) }
+// takingHello is a machine that writes host/userSettings (it serves settings/userPart).
+func takingHello(name string) controllink.HostHello {
+	hello := fakeHello(name)
+	hello.Capabilities = append(slices.Clone(hello.Capabilities), CapHostUserSettings)
+	return hello
+}
 
 // notTakingHello is a machine from before #1760.
 func notTakingHello(name string) controllink.HostHello {

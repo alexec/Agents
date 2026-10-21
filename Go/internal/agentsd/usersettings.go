@@ -389,3 +389,137 @@ func (d *Daemon) declareAll(list []wire.DeclaredResource) error {
 	d.settle(append(loaded, events...))
 	return err
 }
+
+// registerUserScope is settings/userPart: a part as this machine has it, for Use This
+// Mac's under You.
+func (d *Daemon) registerUserScope() {
+	On(d, wire.CallSettingsUserPart, func(ctx context.Context, c *Client, r wire.UserPartRequest) (wire.UserPartHere, error) {
+		return d.userPartHere(r.Part)
+	})
+}
+
+func (d *Daemon) userPartHere(part wire.UserSettingsPartName) (wire.UserPartHere, error) {
+	out := wire.UserPartHere{Part: part}
+	home := d.personalHome()
+	switch part {
+	case wire.UserSettingsPartNameMcpServers:
+		servers := json.RawMessage(`{}`)
+		if home != "" {
+			var file struct {
+				MCPServers json.RawMessage `json:"mcpServers"`
+			}
+			if b, err := os.ReadFile(filepath.Join(home, ".agents", "mcp.json")); err == nil && json.Unmarshal(b, &file) == nil && len(file.MCPServers) > 0 {
+				servers = file.MCPServers
+			}
+		}
+		if err := tokensInClear(servers); err != nil {
+			return out, err
+		}
+		out.Value = servers
+	case wire.UserSettingsPartNameAgentConfig:
+		config, left := agentConfigHere(home)
+		out.Value, out.LeftOut = asJSON(config), left
+	case wire.UserSettingsPartNameRuntimes:
+		out.Value = asJSON(userRuntimes{Sandbox: new(d.sandboxSettings()), ClientPermissions: new(d.clientPermissions())})
+	case wire.UserSettingsPartNameCostLimits:
+		out.Value = asJSON(d.costState().Limits)
+	case wire.UserSettingsPartNameResources:
+		declared := d.declaredResources()
+		if declared == nil {
+			declared = []wire.DeclaredResource{}
+		}
+		out.Value = asJSON(declared)
+	default:
+		return out, Invalid("There is no part called %q.", part)
+	}
+	return out, nil
+}
+
+// secretLooking is a header or variable whose value is a secret by its name.
+var secretLooking = regexp.MustCompile(`(?i)(token|secret|key|password|passwd|auth|bearer|cookie|credential)`)
+
+// tokensInClear refuses servers with a secret written in clear in an env or a header: in
+// the user settings it would be kept unsealed. Its words name the server and the key,
+// never the value.
+func tokensInClear(servers json.RawMessage) error {
+	var list map[string]struct {
+		Env     map[string]string `json:"env"`
+		Headers map[string]string `json:"headers"`
+	}
+	if err := json.Unmarshal(servers, &list); err != nil {
+		return Invalid("mcp.json's mcpServers cannot be read.")
+	}
+	names := make([]string, 0, len(list))
+	for name := range list {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	for _, name := range names {
+		s := list[name]
+		for _, kv := range []map[string]string{s.Env, s.Headers} {
+			for k, v := range kv {
+				if v == "" || secretRef.MatchString(v) {
+					continue
+				}
+				if secretLooking.MatchString(k) || strings.HasPrefix(strings.ToLower(v), "bearer ") {
+					return Invalid("The server %s has %s written in clear. Put it in a secret under You, write ${NAME} in its place, and try again.", name, k)
+				}
+			}
+		}
+	}
+	return nil
+}
+
+// agentConfigHere is ~/.agents' instructions, personas and one-file skills. A skill with
+// other files beside its SKILL.md is left out, by name: the user settings keep text only.
+func agentConfigHere(home string) (wire.UserAgentConfig, []string) {
+	var config wire.UserAgentConfig
+	var left []string
+	if home == "" {
+		return config, nil
+	}
+	base := filepath.Join(home, ".agents")
+	if b, err := os.ReadFile(filepath.Join(base, "AGENTS.md")); err == nil {
+		text := string(b)
+		config.Instructions = &text
+	}
+	if entries, err := os.ReadDir(filepath.Join(base, "personas")); err == nil {
+		for _, e := range entries {
+			name, ok := strings.CutSuffix(e.Name(), ".md")
+			if !ok || !e.Type().IsRegular() || !agentConfigName.MatchString(name) {
+				continue
+			}
+			if b, err := os.ReadFile(filepath.Join(base, "personas", e.Name())); err == nil {
+				if config.Personas == nil {
+					config.Personas = map[string]string{}
+				}
+				config.Personas[name] = string(b)
+			}
+		}
+	}
+	if entries, err := os.ReadDir(filepath.Join(base, "skills")); err == nil {
+		for _, e := range entries {
+			if !e.IsDir() || !agentConfigName.MatchString(e.Name()) {
+				continue
+			}
+			files, _ := os.ReadDir(filepath.Join(base, "skills", e.Name()))
+			if len(files) != 1 || files[0].Name() != "SKILL.md" || !files[0].Type().IsRegular() {
+				left = append(left, e.Name())
+				continue
+			}
+			if b, err := os.ReadFile(filepath.Join(base, "skills", e.Name(), "SKILL.md")); err == nil {
+				if config.Skills == nil {
+					config.Skills = map[string]string{}
+				}
+				config.Skills[e.Name()] = string(b)
+			}
+		}
+	}
+	sort.Strings(left)
+	return config, left
+}
+
+func asJSON(v any) json.RawMessage {
+	b, _ := json.Marshal(v)
+	return b
+}

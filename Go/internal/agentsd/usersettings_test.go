@@ -110,3 +110,40 @@ func TestAgentConfigNamesStayInTheirFolders(t *testing.T) {
 		t.Fatal("removed a file outside ~/.agents")
 	}
 }
+
+func TestAPartIsTakenFromThisMachine(t *testing.T) {
+	root, home := t.TempDir(), t.TempDir()
+	t.Setenv("AGENTS_PERSONAL_HOME", home)
+	d, c := start(t, root)
+	defer d.Shutdown()
+	d.SettingsDir = t.TempDir()
+	os.MkdirAll(filepath.Join(home, ".agents", "skills", "one"), 0o755)
+	os.MkdirAll(filepath.Join(home, ".agents", "skills", "many"), 0o755)
+	os.WriteFile(filepath.Join(home, ".agents", "skills", "one", "SKILL.md"), []byte("one"), 0o644)
+	os.WriteFile(filepath.Join(home, ".agents", "skills", "many", "SKILL.md"), []byte("many"), 0o644)
+	os.WriteFile(filepath.Join(home, ".agents", "skills", "many", "run.sh"), []byte("x"), 0o644)
+	os.WriteFile(filepath.Join(home, ".agents", "AGENTS.md"), []byte("Be brief."), 0o644)
+	var got wire.UserPartHere
+	json.Unmarshal(c.call(t, 1, "settings/userPart", wire.UserPartRequest{Part: wire.UserSettingsPartNameAgentConfig}), &got)
+	var config wire.UserAgentConfig
+	json.Unmarshal(got.Value, &config)
+	if config.Instructions == nil || *config.Instructions != "Be brief." || config.Skills["one"] != "one" || len(config.Skills) != 1 ||
+		len(got.LeftOut) != 1 || got.LeftOut[0] != "many" {
+		t.Fatalf("%+v %+v", got, config)
+	}
+	// A token in clear is refused, by name only; one in a secret is taken.
+	os.WriteFile(filepath.Join(home, ".agents", "mcp.json"), []byte(`{"mcpServers":{"gh":{"url":"https://x","headers":{"Authorization":"Bearer ghp_clear"}}}}`), 0o644)
+	if e := c.callError(t, 2, "settings/userPart", wire.UserPartRequest{Part: wire.UserSettingsPartNameMcpServers}); e == nil ||
+		!strings.Contains(e.Message, "gh has Authorization") || strings.Contains(e.Message, "ghp_clear") {
+		t.Fatalf("%+v", e)
+	}
+	os.WriteFile(filepath.Join(home, ".agents", "mcp.json"), []byte(`{"mcpServers":{"gh":{"url":"https://x","headers":{"Authorization":"Bearer ${GH}"},"env":{"DEBUG":"1"}}}}`), 0o644)
+	json.Unmarshal(c.call(t, 3, "settings/userPart", wire.UserPartRequest{Part: wire.UserSettingsPartNameMcpServers}), &got)
+	if !strings.Contains(string(got.Value), "${GH}") {
+		t.Fatalf("%s", got.Value)
+	}
+	json.Unmarshal(c.call(t, 4, "settings/userPart", wire.UserPartRequest{Part: wire.UserSettingsPartNameResources}), &got)
+	if string(got.Value) != "[]" {
+		t.Fatalf("%s", got.Value)
+	}
+}

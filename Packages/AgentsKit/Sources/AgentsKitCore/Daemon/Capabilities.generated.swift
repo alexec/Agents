@@ -298,6 +298,7 @@ public enum Capability {
         "sessions/adopt": "sessions/1",
         "sessions/delete": "sessions/1",
         "sessions/list": "sessions/1",
+        "settings/userPart": "host.user-settings/1",
         "shell/attach": "shell/1",
         "shell/close": "shell/1",
         "shell/detach": "shell/1",
@@ -499,6 +500,6 @@ public enum Capability {
     /// x-declared-capabilities: what a host, a client or the control plane declares by hand, by who.
     public static let declared: [String: [String]] = [
         "client": ["client.wire/1", "client.team/1"],
-        "host": ["host.wire/1", "agents.move-worktree/1", "host.team/1", "host.user-settings/1"],
+        "host": ["host.wire/1", "agents.move-worktree/1", "host.team/1"],
     ]
 }

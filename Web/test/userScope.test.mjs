@@ -1,0 +1,32 @@
+// You ▸ On Every Machine (#1760): the same words as UserScopeWords in Packages/AgentsKit.
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { load } from "./load.mjs";
+
+const u = await load("src/model/userScope.ts");
+
+test("user scope: a part follows the person only when the control plane keeps it", () => {
+  assert.equal(u.follows(null, "costLimits"), false);
+  assert.equal(u.follows({ costLimits: null }, "costLimits"), false);
+  assert.equal(u.follows({ costLimits: { dailyTokens: 5 } }, "costLimits"), true);
+  assert.equal(u.partState({ resources: [] }, "resources"), "The same on every machine of yours.");
+  assert.equal(u.partState({}, "mcpServers"), "Each machine keeps its own.");
+  assert.deepEqual(u.parts, ["mcpServers", "agentConfig", "runtimes", "costLimits", "resources"]);
+});
+
+test("user scope: a secret's row says where it is, and a removed machine it was on", () => {
+  assert.equal(u.machines({ machines: [] }), "On no machine yet");
+  assert.equal(u.machines({ machines: ["a"] }), "On 1 machine");
+  assert.equal(u.machines({ machines: ["a", "b"] }), "On 2 machines");
+  assert.equal(u.leftOn({}), null);
+  assert.match(u.leftOn({ leftOn: [{ host: "b", name: "Sam's box", at: "2026-10-21T15:00:00Z" }] }), /^It was on Sam's box, which was removed/);
+  assert.equal(u.secretsLeft({ host: "b", name: "Sam's box", secrets: ["A", "B"] }),
+    "Sam's box was removed with these secrets on it: A, B. Change them where they were issued.");
+});
+
+test("user scope: a secret's name is an environment variable's", () => {
+  assert.equal(u.isSecretName("GITHUB_TOKEN"), true);
+  assert.equal(u.isSecretName("github_token"), false);
+  assert.equal(u.isSecretName("../X"), false);
+  assert.equal(u.isSecretName(""), false);
+});
