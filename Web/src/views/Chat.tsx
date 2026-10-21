@@ -483,6 +483,12 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
     loadDetail: (turn: ChatTurn) => latest.current.loadDetail(turn),
     loadEarlier: (turn: ChatTurn) => latest.current.loadEarlierSteps(turn),
   }), []);
+  // The Prompts list's rows, while it is open, worked out again only when the chat changes,
+  // not on every keystroke in its filter or every draw of the chat (#1850).
+  const listing = listingPrompts.value && !!agent;
+  const turnsNow = store.turns.value, entriesNow = store.entries.value, firstPrompt = store.firstPrompt.value ?? 0;
+  const prompts = useMemo(() => listing ? sessionPrompts(turnsNow, entriesNow, live, firstPrompt) : [],
+    [listing, turnsNow, entriesNow, live, firstPrompt]);
 
   return (
     <section class="chat" aria-label="Chat" ref={chatColumn}>
@@ -490,7 +496,7 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
         <FileSearch place={nameOf(pathOf(agent.cwd))} search={findFiles} choose={openFound} close={() => (searchingFiles.value = false)} />
       )}
       {listingPrompts.value && agent && (
-        <PromptList prompts={sessionPrompts(store.turns.value, store.entries.value, live, store.firstPrompt.value ?? 0)}
+        <PromptList prompts={prompts}
           hasEarlier={store.firstTurn.value > 0 || store.hasMoreBefore.value}
           loadEarlier={store.hasMoreOfTheConversation ? () => store.loadEarlier() : undefined}
           close={() => (listingPrompts.value = false)}

@@ -24,6 +24,8 @@ struct PromptsList: View {
     var branchNeedsUpdate = false
 
     @State private var query = ""
+    /// The prompts, worked out again only when the chat's turns or entries change (#1850).
+    @State private var memo = SessionPrompts.Memo()
     @State private var isLoadingEarlier = false
     /// The row Up and Down chose; nil for the newest, also after the filter changes.
     @State private var picked: SessionPrompt.ID?
@@ -32,8 +34,8 @@ struct PromptsList: View {
     var body: some View {
         // The last turn is going while the chat says it is at work, as the transcript has it.
         let isRunning = [.running, .starting, .waitingOnUser].contains(agent.state)
-        let prompts = SessionPrompts.of(turns: page.turns, entries: page.entries, isRunning: isRunning,
-                                        earlier: page.firstPrompt ?? 0)
+        let prompts = memo.of(turns: page.turns, entries: page.entries, isRunning: isRunning,
+                              earlier: page.firstPrompt ?? 0)
         let shown = SessionPrompts.filtered(prompts, by: query)
         let chosen = shown.firstIndex { $0.id == picked } ?? (shown.isEmpty ? nil : shown.count - 1)
         NavigationStack {
