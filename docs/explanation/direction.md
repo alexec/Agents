@@ -77,7 +77,8 @@ organisation           one control plane store prefix (hosted: one per account)
   organisation. A hosted organisation that asks for more gets a bucket and an encryption
   key of its own. No record is read across prefixes.
 - **Machine data:** on the machine, in the owner's account. The control plane passes
-  requests through, but does not keep transcripts, files or runtime sign-ins.
+  requests through, but does not keep transcripts, files or runtime sign-ins, except a
+  server's backups, sealed, under its owner's prefix (#1815).
 - **Credentials:** a secret lives in the person's account on their machines, or, for an
   organisation credential (such as a Slack app or an org model key), on the control plane,
   sealed to each machine's key. A secret is never written to the store in clear text.
@@ -101,10 +102,13 @@ SQL database unless a measured need shows that the store cannot do the job.
 - **Control plane:** several copies share one bucket behind a load balancer. If one copy
   stops, its clients and machines go to another copy in seconds. Back up the bucket with
   the provider's versioning. Losing the control key means every client must pair again,
-  so keep the key in a secret manager with its own backup.
+  and the machines' backups in the store no longer open, as they are sealed with a key
+  made from it. Keep the key in a secret manager with its own backup.
 - **Machines:** a machine is the only copy of its agents and transcripts. A cloud machine
-  that is deleted takes its history with it. Machines back up their data folder to the
-  organisation's bucket, and a new machine can restore it.
+  that is deleted takes its history with it. So a server backs up its agents and
+  transcripts to the organisation's store, under its owner, sealed, and a new machine of
+  the same person can restore them (#1815). A provider's delete backs the machine up
+  first. A Mac backs up to a folder (#1810).
 - **Release check:** the Review HADR workflow (#1557) checks availability, recovery and
   bounded data before each release.
 

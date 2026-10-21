@@ -123,6 +123,8 @@ type Service struct {
 	records *records.Records
 	codes   *Codes
 	router  *Router
+	// Servers' backups (#1815).
+	backups *backupStore
 	methods *Methods
 	started time.Time
 	// What this copy has told its relay host for each need (T097).
@@ -195,6 +197,9 @@ func New(cfg Config) (*Service, error) {
 	s.methods = newMethods(s)
 	s.router.handler = s.methods
 	s.copies = newHostCopies(cfg.Store)
+	if s.backups, err = newBackupStore(cfg.Store, s.records, cfg.PrivateKey); err != nil {
+		return nil, err
+	}
 	if cfg.PeerURL != "" {
 		if s.peerOrigin, err = controllink.Origin(cfg.PeerURL); err != nil {
 			return nil, fmt.Errorf("%s is not an address copies can dial", cfg.PeerURL)

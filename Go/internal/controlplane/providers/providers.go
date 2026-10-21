@@ -100,6 +100,10 @@ type Hooks struct {
 	// HostCommand is the one line that installs a host with a new host code, for a new
 	// workspace's first boot (US5).
 	HostCommand func() (string, error)
+	// BackUp makes a backup of the host, and waits for it, before its workspace is deleted
+	// (#1815). False when the host can't make one: it is offline, or older than backups.
+	// Nil makes none.
+	BackUp func(host string, caller Caller) (bool, error)
 }
 
 // Config is what NewProviders is given.
@@ -130,6 +134,8 @@ type activityKind int
 const (
 	starting activityKind = iota + 1
 	stopping
+	// deleting: its backup is being made before its workspace is deleted (#1815).
+	deleting
 )
 
 // activity is WorkspaceProviders.Activity: a start or stop under way, for one host.
@@ -1220,6 +1226,9 @@ func (p *Providers) begin(kind activityKind, host, who string) (any, error) {
 		if under.kind == starting {
 			return nil, fail(CodeProviderFailed, "%s is starting. Stop it once it has started.", record.Name)
 		}
+		if under.kind == deleting {
+			return nil, fail(CodeProviderFailed, "%s is being backed up, to be deleted.", record.Name)
+		}
 		return nil, fail(CodeProviderFailed, "%s is stopping. Start it once it has stopped.", record.Name)
 	}
 	fresh := p.activities[host] == nil
@@ -1524,6 +1533,46 @@ func (p *Providers) deleteWorkspace(host, who string, caller Caller) error {
 		return fail(CodeProviderFailed, "%s is starting or stopping. Delete it once that is done.", record.Name)
 	}
 	what := fmt.Sprintf("%s (%s/%s)", record.Name, link.Provider, link.Workspace)
+	// A machine is the only copy of its agents, so one that is online backs up first, and
+	// is deleted once that is done (#1815). It takes minutes, so the answer is at once and
+	// the row says it is going; a backup that fails leaves it, with the reason. One that is
+	// offline is deleted now: its newest backup is the one in the store.
+	if p.hooks.BackUp != nil && p.router.Online(host) {
+		p.mu.Lock()
+		if p.activities[host] != nil {
+			p.mu.Unlock()
+			return fail(CodeProviderFailed, "%s is starting or stopping. Delete it once that is done.", record.Name)
+		}
+		p.activities[host] = &activity{kind: deleting, phase: "backing up", since: time.Now()}
+		delete(p.problems, host)
+		p.mu.Unlock()
+		p.changed()
+		go func() {
+			made, err := p.hooks.BackUp(host, caller)
+			if err != nil {
+				p.log(fmt.Sprintf("workspace: delete %s by %s: the backup failed: %s", what, who, errorWords(err)))
+				p.finish(host, "Couldn’t back up "+record.Name+", so it wasn’t deleted: "+errorWords(err))
+				return
+			}
+			if !made {
+				p.log(fmt.Sprintf("workspace: delete %s by %s: no backup, the host can't make one", what, who))
+			}
+			if err := p.removeWorkspace(host, *link, what, who, caller); err != nil {
+				p.finish(host, "Couldn’t delete "+record.Name+": "+errorWords(err))
+				return
+			}
+			p.finish(host, "")
+		}()
+		return nil
+	}
+	if p.hooks.BackUp != nil {
+		p.log(fmt.Sprintf("workspace: delete %s by %s: offline, so no backup first", what, who))
+	}
+	return p.removeWorkspace(host, *link, what, who, caller)
+}
+
+// removeWorkspace is the delete itself: the provider's, then the host's record.
+func (p *Providers) removeWorkspace(host string, link WorkspaceLink, what, who string, caller Caller) error {
 	if _, err := p.providerCall(link.Provider, func(c Provider) (any, error) { return nil, c.Delete(link.Workspace) }); err != nil {
 		p.log(fmt.Sprintf("workspace: delete %s by %s: failed: %s", what, who, errorWords(err)))
 		return err
@@ -1788,7 +1837,8 @@ func (p *Providers) Asleep(host string) bool {
 	found := p.workspaceLocked(*link)
 	p.mu.Unlock()
 	if a != nil {
-		return a.kind != starting
+		// One being backed up to be deleted is awake: its backup goes over its link.
+		return a.kind == stopping
 	}
 	return found != nil && (found.State == "stopped" || found.State == "stopping")
 }
@@ -1903,7 +1953,8 @@ func (p *Providers) overlay(record records.HostRecord) *HostWorkspace {
 	}
 	if a != nil {
 		ws.Since = dateOf(a.since)
-		if a.kind == starting {
+		// A start's steps, and a delete's backup (#1815).
+		if a.kind == starting || a.kind == deleting {
 			ws.Phase = optional(a.phase)
 		}
 	}

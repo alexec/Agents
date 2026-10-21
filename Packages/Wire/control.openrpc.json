@@ -56,6 +56,90 @@
       }
     },
     {
+      "name": "backups/stored",
+      "x-capability": "backups.store/1",
+      "description": "A host, on its channel 0 (#1815): every backup of its owner's machines in the control plane's store, newest first.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/BackupStoreList"
+        }
+      }
+    },
+    {
+      "name": "backups/upload",
+      "x-capability": "backups.store/1",
+      "description": "A host, on its channel 0 (#1815): one part of a backup, in its own folder of the store.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/BackupStorePart"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
+      "name": "backups/commit",
+      "x-capability": "backups.store/1",
+      "description": "A host, on its channel 0 (#1815): a backup's parts are all there; write its .json and keep the newest keep.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/BackupStoreCommit"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Backup"
+        }
+      }
+    },
+    {
+      "name": "backups/download",
+      "x-capability": "backups.store/1",
+      "description": "A host, on its channel 0 (#1815): one part of a listed backup, for a restore.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/BackupStorePartRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/BackupStorePart"
+        }
+      }
+    },
+    {
       "name": "clients/announce",
       "x-capability": "clients/1",
       "description": "On a pairing connection, before any other.",

@@ -41,3 +41,8 @@ test("the page says when it is too old for the control plane", () => {
     "Update this page to Agents 0.8.0 to use this control plane. It does not have client.wire/2.");
   assert.equal(caps.appMissingWords(undefined, "0.6.0"), null);
 });
+
+test("a host being backed up to be deleted says so (#1815)", () => {
+  assert.equal(caps.stateWords(row({ state: "stopping", workspace: { phase: "backing up" } })), "Backing up to delete");
+  assert.equal(caps.stateWords(row({ state: "stopping", workspace: {} })), "Stopping");
+});

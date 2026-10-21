@@ -3928,7 +3928,7 @@ final class RemoteModel {
     }
 
     func makeBackup() async throws {
-        work.replaceBackupState(try await client.call(DaemonAPI.Method.backupsMake, DaemonAPI.Empty(),
+        work.replaceBackupState(try await client.call(DaemonAPI.Method.backupsMake, DaemonAPI.BackupMakeRequest(),
                                                       returning: DaemonAPI.BackupState.self))
     }
 

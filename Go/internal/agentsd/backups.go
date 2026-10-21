@@ -12,6 +12,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	goruntime "runtime"
 	"slices"
 	"sort"
 	"strings"
@@ -25,13 +26,18 @@ import (
 )
 
 // Backups of this machine's data (#1810): its agents, their transcripts, and its usage and
-// time history, as one .tar.gz in a folder, never a secret. A backup goes in
-// <folder>/<root id>/<made at>.tar.gz with a .json beside it that says what is in it, so a
-// list reads no archive. The folder is <root>/backups unless the person names another (a
-// second disk, a synced folder); the control plane's store comes later. A new machine of
-// the same person that reads the same folder can restore one: its agents come back
-// archived, and keep the root they were made under, so they are shown and never run here
-// (refuseToRun).
+// time history, as one .tar.gz, never a secret. It goes to one of two targets:
+//
+//   - a folder: <folder>/<root id>/<made at>.tar.gz with a .json beside it that says what
+//     is in it, so a list reads no archive. The folder is <root>/backups unless the person
+//     names another (a second disk, a synced folder). The Mac's default.
+//   - the control plane's store (#1815): the archive is made here, then sent in parts of
+//     backupPartBytes (backups/upload, then backups/commit) and deleted here. A server's
+//     default, since a cloud machine that is deleted takes its data folder with it.
+//
+// A new machine of the same person that reads the same target can restore one: its agents
+// come back archived, and keep the root they were made under, so they are shown and never
+// run here (refuseToRun).
 
 const (
 	backupSettingsFile = "backup-settings.json"
@@ -40,7 +46,15 @@ const (
 	backupCheckEvery   = time.Hour
 	backupFirstCheck   = 10 * time.Minute
 	backupFormat       = 1
+	backupPartsMost    = 1024
+	// backupStoreWait bounds a list of the store, so a control plane that does not answer
+	// does not hold the state up.
+	backupStoreWait = 10 * time.Second
 )
+
+// backupPartBytes is one backups/upload: a JSON-RPC line of about 11 MB in base64, well
+// under the link's 64 MB. A test makes it smaller.
+var backupPartBytes = 8 << 20
 
 // backupAgentFiles are the files of an agent's folder a backup carries: the record, the
 // transcript, and what the transcript points at. Anything else there is left out.
@@ -54,6 +68,10 @@ type backupState struct {
 	// backupMaking is a backup being made; only one at a time.
 	backupMaking bool
 	backupError  string
+	// backupDone is closed when the backup being made ends.
+	backupDone chan struct{}
+	// backupRestoring is held by a restore from the store: one download folder.
+	backupRestoring sync.Mutex
 }
 
 // backupManifest is the .json beside a backup, and its first entry.
@@ -78,7 +96,14 @@ func (d *Daemon) registerBackups() {
 		Broadcast(d, wire.NotifyBackupsChanged, st)
 		return st, nil
 	})
-	On(d, wire.CallBackupsMake, func(ctx context.Context, c *Client, _ wire.Empty) (wire.BackupState, error) {
+	On(d, wire.CallBackupsMake, func(ctx context.Context, c *Client, r wire.BackupMakeRequest) (wire.BackupState, error) {
+		// A provider's delete waits for the backup (#1815); a person's Back Up Now does not.
+		if r.Wait != nil && *r.Wait {
+			if err := d.backupAndWait(ctx); err != nil {
+				return wire.BackupState{}, &Error{Code: wire.FailureBusy, Message: "The backup failed: " + err.Error()}
+			}
+			return d.backupsState(), nil
+		}
 		if !d.startBackup() {
 			return wire.BackupState{}, &Error{Code: wire.FailureBusy, Message: "A backup is already being made."}
 		}
@@ -91,7 +116,9 @@ func (d *Daemon) registerBackups() {
 
 // MARK: settings
 
-func (d *Daemon) backupSettingsPath() string { return filepath.Join(d.Store.Loc.Root, backupSettingsFile) }
+func (d *Daemon) backupSettingsPath() string {
+	return filepath.Join(d.Store.Loc.Root, backupSettingsFile)
+}
 
 // backupSettings is backup-settings.json, this machine's own: a value it cannot read is
 // the default, so a file from a later build never turns backups off.
@@ -107,6 +134,7 @@ func (d *Daemon) backupSettings() wire.BackupSettings {
 			if read.Folder != nil && filepath.IsAbs(*read.Folder) {
 				s.Folder = read.Folder
 			}
+			s.Target = read.Target
 		}
 	}
 	if s.Every == "" {
@@ -141,6 +169,22 @@ func (d *Daemon) configureBackups(s wire.BackupSettings) error {
 	return nil
 }
 
+// backupTarget is where backups go: the settings', else the control plane's store for a
+// server linked to one (a cloud machine's data folder goes with the machine), else the
+// folder.
+func (d *Daemon) backupTarget() wire.BackupTarget {
+	if t := d.backupSettings().Target; t != nil {
+		if *t == wire.BackupTargetControl && d.askControl.Load() == nil {
+			return wire.BackupTargetFolder
+		}
+		return *t
+	}
+	if d.askControl.Load() != nil && goruntime.GOOS != "darwin" {
+		return wire.BackupTargetControl
+	}
+	return wire.BackupTargetFolder
+}
+
 func (d *Daemon) backupFolder() string {
 	if f := d.backupSettings().Folder; f != nil {
 		return *f
@@ -154,16 +198,32 @@ func (d *Daemon) backupsState() wire.BackupState {
 	d.backupMu.Lock()
 	making, lastError := d.backupMaking, d.backupError
 	d.backupMu.Unlock()
-	s := wire.BackupState{Settings: d.backupSettings(), Folder: d.backupFolder(), Backups: d.listBackups(), Making: making}
+	settings := d.backupSettings()
+	target := d.backupTarget()
+	settings.Target = &target
+	backups, err := d.listBackups()
+	if err != nil && lastError == "" {
+		lastError = err.Error()
+	}
+	s := wire.BackupState{Settings: settings, Folder: d.backupFolder(), Backups: backups, Making: making,
+		CanUseControl: new(d.askControl.Load() != nil)}
 	if lastError != "" {
 		s.LastError = &lastError
 	}
 	return s
 }
 
-// listBackups is every backup in the folder, this machine's and others', newest first.
+// listBackups is every backup in the target, this machine's and others', newest first.
+func (d *Daemon) listBackups() ([]wire.Backup, error) {
+	if d.backupTarget() == wire.BackupTargetControl {
+		return d.storedBackups()
+	}
+	return d.folderBackups(), nil
+}
+
+// folderBackups is every backup in the folder, this machine's and others', newest first.
 // Only one whose .json and archive are both there is listed.
-func (d *Daemon) listBackups() []wire.Backup {
+func (d *Daemon) folderBackups() []wire.Backup {
 	folder := d.backupFolder()
 	out := []wire.Backup{}
 	roots, _ := os.ReadDir(folder)
@@ -250,7 +310,11 @@ func (d *Daemon) backupIfDue() {
 	if !on {
 		return
 	}
-	for _, b := range d.listBackups() {
+	backups, err := d.listBackups()
+	if err != nil {
+		return
+	}
+	for _, b := range backups {
 		if b.ThisMachine {
 			if nowFunc().Sub(b.MadeAt.Time()) < gap {
 				return
@@ -264,30 +328,70 @@ func (d *Daemon) backupIfDue() {
 // startBackup makes a backup off the caller's goroutine and says the state when it ends;
 // false when one is being made already.
 func (d *Daemon) startBackup() bool {
+	if !d.claimBackup() {
+		return false
+	}
+	safe.Go("backup", func() { d.runBackup() })
+	return true
+}
+
+// backupAndWait makes a backup and answers when it is made: after the one being made
+// ends, if there is one, as that one may be older than what the caller wants kept.
+func (d *Daemon) backupAndWait(ctx context.Context) error {
+	for {
+		d.backupMu.Lock()
+		done := d.backupDone
+		d.backupMu.Unlock()
+		if d.claimBackup() {
+			return d.runBackup()
+		}
+		if done == nil {
+			continue
+		}
+		select {
+		case <-done:
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}
+}
+
+// claimBackup marks a backup as being made; false when one is already.
+func (d *Daemon) claimBackup() bool {
 	d.backupMu.Lock()
 	if d.backupMaking {
 		d.backupMu.Unlock()
 		return false
 	}
 	d.backupMaking = true
+	d.backupDone = make(chan struct{})
 	d.backupMu.Unlock()
 	Broadcast(d, wire.NotifyBackupsChanged, d.backupsState())
-	safe.Go("backup", func() {
-		_, err := d.makeBackup()
-		d.backupMu.Lock()
-		d.backupMaking = false
-		d.backupError = ""
-		if err != nil {
-			d.backupError = "The last backup failed: " + err.Error()
-			log.Printf("backup: %v", err)
-		}
-		d.backupMu.Unlock()
-		Broadcast(d, wire.NotifyBackupsChanged, d.backupsState())
-	})
 	return true
 }
 
-// makeBackup writes one backup and keeps the newest Keep of this machine's.
+// runBackup makes the backup claimBackup claimed, and says the state when it ends.
+func (d *Daemon) runBackup() error {
+	var err error
+	if d.backupTarget() == wire.BackupTargetControl {
+		err = d.storeBackup()
+	} else {
+		_, err = d.makeBackup()
+	}
+	d.backupMu.Lock()
+	d.backupMaking = false
+	d.backupError = ""
+	if err != nil {
+		d.backupError = "The last backup failed: " + err.Error()
+		log.Printf("backup: %v", err)
+	}
+	close(d.backupDone)
+	d.backupMu.Unlock()
+	Broadcast(d, wire.NotifyBackupsChanged, d.backupsState())
+	return err
+}
+
+// makeBackup writes one backup to the folder and keeps the newest Keep of this machine's.
 func (d *Daemon) makeBackup() (wire.Backup, error) {
 	at := nowFunc().UTC()
 	name := at.Format("20060102T150405Z")
@@ -426,12 +530,20 @@ func (d *Daemon) pruneBackups(keep int64) {
 // skipped, never overwritten. The usage and time history come back only to a machine
 // that has none of its own.
 func (d *Daemon) restoreBackup(id string) (wire.BackupRestoreResult, error) {
-	res := wire.BackupRestoreResult{}
+	if d.backupTarget() == wire.BackupTargetControl {
+		return d.restoreStored(id)
+	}
 	listed, ok := d.readBackup(id)
 	if !ok {
-		return res, &Error{Code: CodeInvalidParams, Message: "There is no backup " + id + "."}
+		return wire.BackupRestoreResult{}, &Error{Code: CodeInvalidParams, Message: "There is no backup " + id + "."}
 	}
 	archive, _, _ := d.backupPaths(id)
+	return d.restoreArchive(archive, listed.RootID)
+}
+
+// restoreArchive restores the archive at path; madeIn is the root that made it.
+func (d *Daemon) restoreArchive(archive, madeIn string) (wire.BackupRestoreResult, error) {
+	res := wire.BackupRestoreResult{}
 	f, err := os.Open(archive)
 	if err != nil {
 		return res, err
@@ -442,9 +554,8 @@ func (d *Daemon) restoreBackup(id string) (wire.BackupRestoreResult, error) {
 		return res, fmt.Errorf("the backup can't be read: %w", err)
 	}
 	tr := tar.NewReader(gz)
-	// The root that made it, from the .json the list read: a record that names none is
-	// stamped with it, so one from another machine is never run here.
-	madeIn := listed.RootID
+	// madeIn, the root that made it, is from the .json the list read: a record that names
+	// none is stamped with it, so one from another machine is never run here.
 	// One agent's files are held until the next agent's begin: a backup is written agent
 	// by agent. Its record goes in last, so a restore cut off leaves a folder with no
 	// record, which the store does not load.

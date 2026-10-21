@@ -48,6 +48,8 @@ const slowCallTimeout: Readonly<Record<string, number>> = {
   "projects/clone": 65 * 60_000,
   "agents/start": 2 * 60_000,
   "agents/options": 2 * 60_000,
+  // A restore from the control plane's store reads every part first (#1815): hundreds of MB.
+  "backups/restore": 30 * 60_000,
 };
 
 /** How long `method` waits. `override` is a test's one timeout for every method. */

@@ -682,6 +682,14 @@ func (m *Methods) HostSaid(host, method string, params json.RawMessage) (any, er
 			return nil, fail(providersNeedOneCopy, "Workspace providers need a control plane with one copy, for now.")
 		}
 		return m.s.providers.HostSaid(host, method, params)
+	case "backups/stored", "backups/upload", "backups/commit", "backups/download":
+		m.mu.Lock()
+		frozen := m.frozen
+		m.mu.Unlock()
+		if frozen && (method == "backups/upload" || method == "backups/commit") {
+			return nil, fail(storeUnavailable, "The control plane is moving to another machine. Back up again in a minute.")
+		}
+		return m.s.backups.said(method, host, params)
 	case "git/credential":
 		request, err := require[wire.GitCredentialRequest](params, "GitCredentialRequest")
 		if err != nil {

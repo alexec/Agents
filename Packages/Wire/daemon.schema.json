@@ -1316,6 +1316,16 @@
       ],
       "x-fallback": "daily"
     },
+    "BackupMakeRequest": {
+      "type": "object",
+      "properties": {
+        "wait": {
+          "type": "boolean",
+          "description": "Answer once the backup is made, not at once: a provider's delete waits for it (#1815)."
+        }
+      },
+      "additionalProperties": false
+    },
     "BackupRestoreRequest": {
       "type": "object",
       "properties": {
@@ -1355,6 +1365,10 @@
         },
         "folder": {
           "type": "string"
+        },
+        "target": {
+          "$ref": "#/definitions/BackupTarget",
+          "description": "Where backups go (#1815): this machine's folder, or the control plane's store. Left out is the machine's default: the store for a server linked to a control plane, else the folder."
         }
       },
       "required": [
@@ -1383,6 +1397,10 @@
         },
         "lastError": {
           "type": "string"
+        },
+        "canUseControl": {
+          "type": "boolean",
+          "description": "The machine is linked to a control plane, so it can back up to the control plane's store (#1815)."
         }
       },
       "required": [
@@ -1392,6 +1410,109 @@
         "making"
       ],
       "additionalProperties": false
+    },
+    "BackupStoreCommit": {
+      "type": "object",
+      "description": "A host's backup whose parts are all uploaded: the control plane writes its .json last, then keeps the newest keep of this host's (#1815).",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "parts": {
+          "type": "integer"
+        },
+        "machine": {
+          "type": "string"
+        },
+        "rootID": {
+          "type": "string"
+        },
+        "madeAt": {
+          "$ref": "#/definitions/WireDate"
+        },
+        "bytes": {
+          "type": "integer"
+        },
+        "agents": {
+          "type": "integer"
+        },
+        "keep": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "name",
+        "parts",
+        "machine",
+        "rootID",
+        "madeAt",
+        "bytes",
+        "agents",
+        "keep"
+      ],
+      "additionalProperties": false
+    },
+    "BackupStoreList": {
+      "type": "object",
+      "properties": {
+        "backups": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Backup"
+          }
+        }
+      },
+      "required": [
+        "backups"
+      ],
+      "additionalProperties": false
+    },
+    "BackupStorePart": {
+      "type": "object",
+      "description": "One part of a backup, at most 8 MiB (#1815): a host's upload, or the control plane's answer to a download.",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "On an upload, the backup's name; this host's own folder is the control plane's to say."
+        },
+        "part": {
+          "type": "integer"
+        },
+        "data": {
+          "$ref": "#/definitions/Base64"
+        }
+      },
+      "required": [
+        "name",
+        "part",
+        "data"
+      ],
+      "additionalProperties": false
+    },
+    "BackupStorePartRequest": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "A listed backup's id: <host>/<name>."
+        },
+        "part": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "part"
+      ],
+      "additionalProperties": false
+    },
+    "BackupTarget": {
+      "type": "string",
+      "enum": [
+        "folder",
+        "control"
+      ],
+      "x-fallback": "folder"
     },
     "BackgroundItem": {
       "type": "object",

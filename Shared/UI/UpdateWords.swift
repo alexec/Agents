@@ -16,7 +16,10 @@ enum UpdateWords {
     /// A host's state, as a host row says it: "Needs an update" for `needsUpdate`, which
     /// `capitalized` would make "Needsupdate".
     static func state(_ host: DaemonAPI.ControlHost) -> String {
-        host.state == "needsUpdate" ? "Needs an update" : host.state.capitalized
+        if host.state == "needsUpdate" { return "Needs an update" }
+        // A delete's backup, before its workspace goes (#1815).
+        if host.state == "stopping", host.workspace?.phase == "backing up" { return "Backing up to delete" }
+        return host.state.capitalized
     }
 
     /// When this app does not have what the control plane requires of a client: it then

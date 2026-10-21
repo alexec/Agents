@@ -3,10 +3,12 @@ package providers
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"reflect"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -604,6 +606,61 @@ func TestDeleteWorkspaceTakesTheWorkspaceAndTheHost(t *testing.T) {
 	h.must(MethodHostsDelete, map[string]string{"host": devbox})
 	if !reflect.DeepEqual(h.provider.deleted, []string{"agents-devbox"}) || h.records.Host(devbox) != nil {
 		t.Errorf("%v %v", h.provider.deleted, h.records.Host(devbox))
+	}
+}
+
+// A machine is the only copy of its agents: one that is online backs up first, and is
+// deleted once the backup is made (#1815). A backup that fails leaves it, and says why.
+func TestDeleteWorkspaceBacksUpFirst(t *testing.T) {
+	release := make(chan error)
+	var asked atomic.Int32
+	h := newHarness(t, func(o *harnessOptions) {
+		o.backUp = func(host string, _ Caller) (bool, error) {
+			asked.Add(1)
+			return true, <-release
+		}
+	})
+	h.link(h.add(), devbox, "agents-devbox")
+	h.router.setOnline(devbox, true)
+	h.must(MethodHostsDelete, map[string]string{"host": devbox})
+	r := h.row(devbox)
+	if r.Workspace == nil || deref(r.Workspace.HostState) != "stopping" || deref(r.Workspace.Phase) != "backing up" || r.Workspace.CanStart || r.Workspace.CanStop {
+		t.Fatalf("while it backs up: %+v", r.Workspace)
+	}
+	if h.providers.Asleep(devbox) {
+		t.Error("asleep while its backup goes over its link")
+	}
+	if _, err := h.call(MethodHostsStart, map[string]string{"host": devbox}); err == nil {
+		t.Error("started while it is backed up to be deleted")
+	}
+	release <- errors.New("the store is full")
+	h.waitFor("online", devbox, 5, func(r row) bool { return deref(r.Workspace.Problem) != "" })
+	if p := deref(h.row(devbox).Workspace.Problem); !strings.HasPrefix(p, "Couldn’t back up devbox, so it wasn’t deleted: ") {
+		t.Fatalf("problem %q", p)
+	}
+	if h.records.Host(devbox) == nil {
+		t.Fatal("deleted after its backup failed")
+	}
+	h.must(MethodHostsDelete, map[string]string{"host": devbox})
+	release <- nil
+	deadline := time.Now().Add(5 * time.Second)
+	for h.records.Host(devbox) != nil && time.Now().Before(deadline) {
+		time.Sleep(10 * time.Millisecond)
+	}
+	if h.records.Host(devbox) != nil || asked.Load() != 2 {
+		t.Fatalf("not deleted after its backup; asked %d", asked.Load())
+	}
+}
+
+func TestAnOfflineHostIsDeletedWithNoBackup(t *testing.T) {
+	var asked atomic.Int32
+	h := newHarness(t, func(o *harnessOptions) {
+		o.backUp = func(string, Caller) (bool, error) { asked.Add(1); return true, nil }
+	})
+	h.link(h.add(), devbox, "agents-devbox")
+	h.must(MethodHostsDelete, map[string]string{"host": devbox})
+	if h.records.Host(devbox) != nil || asked.Load() != 0 {
+		t.Fatalf("asked %d", asked.Load())
 	}
 }
 

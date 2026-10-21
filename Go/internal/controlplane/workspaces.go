@@ -8,6 +8,7 @@ import (
 
 	"github.com/alexec/agents/Go/internal/controlplane/providers"
 	"github.com/alexec/agents/Go/internal/controlplane/records"
+	"github.com/alexec/agents/Go/wire"
 )
 
 // Workspace providers (#691), as ControlService.takeUp wires them: on a single copy with
@@ -58,6 +59,7 @@ func (s *Service) makeProviders(home string) *providers.Providers {
 				}
 				return *shown.Command, nil
 			},
+			BackUp: s.backUpBeforeDelete,
 		},
 	})
 	providers.NewDraftsFor(p, providers.DraftWiring{Router: adapter, Records: s.records, Home: home, Connect: connect,
@@ -70,6 +72,30 @@ func (s *Service) makeProviders(home string) *providers.Providers {
 	kept := providers.NewKeptFor(p, s.log)
 	s.router.SetKeeper(kept)
 	return p
+}
+
+// backupPatience is how long a delete waits for the host's backup (#1815): hundreds of MB
+// in 8 MiB parts.
+var backupPatience = 30 * time.Minute
+
+// backUpBeforeDelete asks the host for a backup, on a channel bound to the client that
+// asked for the delete, and waits for it to be made (#1815). False when the host can't:
+// it is not here, or older than backups.
+func (s *Service) backUpBeforeDelete(host string, caller providers.Caller) (bool, error) {
+	record := s.records.Host(host)
+	if record == nil || !wire.Has(hostCapabilities(*record), wire.CapBackups1) {
+		return false, nil
+	}
+	m := s.router.DeliverKept(wire.CallBackupsMake.Name, wire.BackupMakeRequest{Wait: new(true)}, caller.Client, caller.Kind, host, backupPatience)
+	if m == nil {
+		return false, errors.New("the host went, or did not finish the backup in time")
+	}
+	if len(m.Error) > 0 {
+		var refusal providers.Failure
+		json.Unmarshal(m.Error, &refusal)
+		return false, &refusal
+	}
+	return true, nil
 }
 
 // providerRouter is the router as the providers see it (their Router).
