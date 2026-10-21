@@ -74,11 +74,9 @@ func (d *Daemon) carryPage(ctx context.Context, page *websocket.Conn, private []
 	}
 	defer up.Close()
 	page.SetReadLimit(64 << 20)
-	toPage := func(line string) error {
-		wctx, cancel := context.WithTimeout(ctx, 30*time.Second)
-		defer cancel()
-		return page.Write(wctx, websocket.MessageText, []byte(line))
-	}
+	out := newPageOut(ctx, page)
+	defer out.Close()
+	toPage := out.Write
 	// Set once the control plane's ok has gone to the page: only then is the page one the
 	// control plane has checked, and only then are its calls to this host answered here.
 	var proved atomic.Bool
@@ -130,6 +128,26 @@ func (d *Daemon) carryPage(ctx context.Context, page *websocket.Conn, private []
 	case <-ctx.Done():
 	}
 }
+
+// pageOut writes the lines to one page: the control plane's and this host's channel's.
+type pageOut struct {
+	ctx  context.Context
+	page *websocket.Conn
+}
+
+func newPageOut(ctx context.Context, page *websocket.Conn) *pageOut {
+	return &pageOut{ctx: ctx, page: page}
+}
+
+// Write writes a line to the page.
+func (o *pageOut) Write(line string) error {
+	wctx, cancel := context.WithTimeout(o.ctx, 30*time.Second)
+	defer cancel()
+	return o.page.Write(wctx, websocket.MessageText, []byte(line))
+}
+
+// Close lets the page go.
+func (o *pageOut) Close() { o.page.CloseNow() }
 
 // dialForPage opens a socket to the control plane and proves this host on it as w:<host>,
 // with the page's port, at each address the membership has in turn.
