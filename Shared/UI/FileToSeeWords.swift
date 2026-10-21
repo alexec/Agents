@@ -13,4 +13,11 @@ enum FileToSeeWords {
     static func line(_ agent: Agent?) -> String? {
         agent?.fileToSee.map { "File to see: \($0.name)" }
     }
+
+    /// The row's grey line in the report's place: the file to see while it is unseen, then
+    /// the report. Said in words, not only by the mark, because a touch screen has no
+    /// hover to name it (#1873).
+    static func reportLine(_ agent: Agent) -> String? {
+        line(agent) ?? agent.report?.message
+    }
 }

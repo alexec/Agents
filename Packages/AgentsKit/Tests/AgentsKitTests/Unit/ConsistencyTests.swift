@@ -377,6 +377,27 @@ struct ConsistencyTests {
 
     /// The page is one page on the Mac and the phone. Two `MarkdownText`s drifted once;
     /// this is what stops two pages doing the same.
+    /// A row that marks a file to see also names it on its grey line (#1873): the mark's
+    /// help is a hover, and a touch screen has none.
+    @Test func everyFileToSeeMarkIsSaidInWords() async throws {
+        var marks = 0
+        var violations: [String] = []
+        for source in try Self.sources(under: ["Remote/Sources", "App/Sources"]) {
+            let code = source.lines.map { Self.code($0) }
+            guard code.contains(where: { $0.contains("FileToSeeWords.symbol") }) else { continue }
+            marks += 1
+            if !code.contains(where: { $0.contains("FileToSeeWords.reportLine(") }) {
+                violations.append(source.path)
+            }
+        }
+        #expect(marks >= 3, "the Mac's row, the phone's row and its card all draw the mark")
+        #expect(violations.isEmpty, """
+            A row draws the file-to-see mark without `FileToSeeWords.reportLine` on its \
+            grey line, so a phone cannot say which file it is.
+            \(violations.joined(separator: "\n"))
+            """)
+    }
+
     @Test func neitherAppHasAPageOfItsOwn() async throws {
         var violations: [String] = []
         var scanned = 0

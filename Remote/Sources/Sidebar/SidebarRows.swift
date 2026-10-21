@@ -114,7 +114,8 @@ struct SidebarSessionRow: View {
                         .appText(.fine)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
-                } else if let report = agent.report?.message {
+                } else if let report = FileToSeeWords.reportLine(agent) {
+                    // A file to see is named here first, as on the Mac (#1873).
                     Text(report)
                         .appText(.fine)
                         .foregroundStyle(.secondary)

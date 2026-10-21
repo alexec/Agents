@@ -184,8 +184,9 @@ struct AgentRow: View {
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                         .help(said)
-                } else if let report = agent.report?.message {
-                    // Grey under the white title, in the sidebar as on the page (#587).
+                } else if let report = FileToSeeWords.reportLine(agent) {
+                    // Grey under the white title, in the sidebar as on the page (#587); a
+                    // file to see is named here first (#1873).
                     Text(report)
                         .appText(isCompact ? .fine : .supporting)
                         .foregroundStyle(.secondary)

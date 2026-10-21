@@ -54,8 +54,8 @@ an unexpected stop. An unread finish is not counted there (#1565).
 A session whose agent showed you a file with `show_file` is not under **Needs you**:
 **Needs you** means only that the agent cannot go on without you (#1802). The session stays
 where its ending puts it, usually unread under **Done**, and its row has a small document
-mark beside the title. Hover over it, or let a screen reader read it, for the file's name:
-**File to see: report.md**. The mark is not counted on the Dock badge, the app icon badge,
+mark beside the title, and its grey line names the file in the report's place:
+**File to see: report.md** (#1873). On the Mac you can also hover over the mark. The mark is not counted on the Dock badge, the app icon badge,
 the widget or the tab's title, and the session is not in the **Needs You** list.
 
 The mark goes when you open the conversation, which opens the file beside it, or choose
