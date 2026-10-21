@@ -14,7 +14,7 @@ final class PeopleState {
     private(set) var queue = JoinRequestQueue()
     /// Who this client belongs to, as `control/status` said. Nil from an older control plane.
     private(set) var you: DaemonAPI.ControlPerson?
-    /// Goes up on `control/peopleChanged`.
+    /// Goes up on `control/peopleChanged` and `control/groupsChanged` (#1761).
     private(set) var revision = 0
     /// Requests answered from here and not decided yet: their buttons wait.
     private(set) var answering: Set<String> = []
@@ -45,6 +45,8 @@ final class PeopleState {
             revision += 1
             // A role changed or a person went: who this is, and what they may approve.
             await connected(control)
+        case DaemonAPI.Notification.controlGroupsChanged:
+            revision += 1
         default:
             return false
         }

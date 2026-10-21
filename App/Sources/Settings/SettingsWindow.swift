@@ -123,6 +123,8 @@ struct SettingsWindow: View {
     private func shows(_ each: SettingsPane) -> Bool {
         switch each {
         case .controlPlane, .clients, .onEveryMachine: control != nil
+        // An admin's: a member sees the groups they are in on their providers (#1761).
+        case .groups: control != nil && model.people.you?.isAdmin != false
         case .providers: control?.providersHere ?? false
         default: true
         }
@@ -176,6 +178,8 @@ struct SettingsWindow: View {
             // Through the window's own connection to the control plane, which hears when
             // people change (#994).
             FormColumn { PeoplePane(control: model.controlRequests, revision: model.people.revision) }
+        case .groups:
+            FormColumn { GroupsPane(control: model.controlRequests, revision: model.people.revision) }
         }
     }
 
@@ -190,7 +194,7 @@ extension SettingsScope {
         switch self {
         case .thisDevice: [.appearance, .sidebar]
         case .you: [.account, .runtimes, .agentConfiguration, .spending, .resources, .onEveryMachine, .machines]
-        case .controlPlane: [.people, .providers, .clients, .controlPlane]
+        case .controlPlane: [.people, .groups, .providers, .clients, .controlPlane]
         }
     }
 }
@@ -210,6 +214,8 @@ enum SettingsPane: String, Hashable, CaseIterable {
     case providers, clients
     /// Who uses the control plane, and the machines and clients that belong to them (#994).
     case people
+    /// Groups own workspace providers (#1761).
+    case groups
     /// Was Shared (#754): the raw value is what a window left open on it kept.
     case agentConfiguration = "shared"
     /// The settings and secrets the control plane keeps for the person (#1760).
@@ -220,7 +226,8 @@ enum SettingsPane: String, Hashable, CaseIterable {
     var isThisMacs: Bool {
         switch self {
         case .runtimes, .agentConfiguration, .spending, .resources: true
-        case .appearance, .sidebar, .account, .machines, .controlPlane, .providers, .clients, .people, .onEveryMachine: false
+        case .appearance, .sidebar, .account, .machines, .controlPlane, .providers, .clients, .people, .groups,
+             .onEveryMachine: false
         }
     }
 
@@ -241,6 +248,7 @@ enum SettingsPane: String, Hashable, CaseIterable {
         case .providers: "Workspace Providers"
         case .clients: "Clients"
         case .people: "People"
+        case .groups: GroupWords.title
         case .onEveryMachine: UserScopeWords.title
         }
     }
@@ -259,6 +267,7 @@ enum SettingsPane: String, Hashable, CaseIterable {
         case .providers: "cloud"
         case .clients: "iphone"
         case .people: "person.2"
+        case .groups: "person.3"
         case .onEveryMachine: "arrow.triangle.2.circlepath"
         }
     }

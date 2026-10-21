@@ -35,7 +35,10 @@ struct WorkspaceProvidersView: View {
                     providerSection(provider)
                 }
                 Section {
-                    Button(WorkspaceProviderWords.add) { adding = true }
+                    // Only an admin adds one (#1761).
+                    if model.isAdmin {
+                        Button(WorkspaceProviderWords.add) { adding = true }
+                    }
                 } footer: {
                     Text(WorkspaceProviderWords.footer)
                 }
@@ -80,10 +83,17 @@ struct WorkspaceProvidersView: View {
                     Button("List Again", systemImage: "arrow.clockwise") {
                         Task { await model.listWorkspacesAgain(provider.id) }
                     }
-                    if APIProviderKind.ofPreset(provider.preset) != nil {
-                        Button("Edit…", systemImage: "pencil") { editing = provider }
+                    // Who may start machines from it (#1761): an admin gives it to a group.
+                    if model.isAdmin {
+                        ProviderGroupPicker(provider: provider, groups: model.providerGroups) { group in
+                            Task { said = await model.setProviderGroup(provider.id, group) }
+                        }
+                        .pickerStyle(.menu)
+                        if APIProviderKind.ofPreset(provider.preset) != nil {
+                            Button("Edit…", systemImage: "pencil") { editing = provider }
+                        }
+                        Button("Remove…", systemImage: "trash", role: .destructive) { removing = provider }
                     }
-                    Button("Remove…", systemImage: "trash", role: .destructive) { removing = provider }
                 } label: {
                     Image(systemName: "ellipsis.circle")
                         .accessibilityLabel("\(provider.name) actions")
@@ -91,7 +101,8 @@ struct WorkspaceProvidersView: View {
             }
         } footer: {
             let line = WorkspaceProviderWords.providerLine(provider) { $0.formatted(date: .omitted, time: .shortened) }
-            Text([WorkspaceProviderWords.kindChip(provider), line].filter { !$0.isEmpty }.joined(separator: " · "))
+            let group = GroupWords.providerLine(provider, groups: model.providerGroups) ?? ""
+            Text([WorkspaceProviderWords.kindChip(provider), line, group].filter { !$0.isEmpty }.joined(separator: " · "))
         }
         .paperListRow()
     }

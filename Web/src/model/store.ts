@@ -1129,6 +1129,12 @@ export class Store extends Work {
         this.peopleChanges.value += 1;
         return;
       }
+      if (method === "control/groupsChanged") {
+        // Settings ▸ Groups loads again, and each provider's group's name (#1761).
+        this.peopleChanges.value += 1;
+        void this.providers.loadGroups();
+        return;
+      }
       if (method === "control/userSettingsChanged") {
         this.userScopeChanges.value += 1;
         return;

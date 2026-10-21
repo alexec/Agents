@@ -29,6 +29,8 @@ something up, not for reading through.
 - [Personas](personas.md): the persona file format, where personas live, and what picking one does.
 - [Events](events.md): everything the app records, for waits, workflow triggers and the
   Events page.
+- [Groups](groups.md): groups of people, and the workspace providers each group may start
+  machines from.
 - [On Every Machine](on-every-machine.md): the settings and secrets the control plane keeps
   for you and sends to each machine of yours.
 - [Reports](reports.md): usage, cost and time by person, project and machine, added up on

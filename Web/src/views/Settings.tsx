@@ -22,6 +22,7 @@ import { fromWireDate } from "../protocol/dates";
 import { Capability } from "../protocol/capabilities.generated";
 import type { BackupEvery, BackupRestoreResult, BackupSettings, BackupState, BackupTarget } from "../protocol/generated";
 import { PeopleSection } from "./People";
+import { GroupsSection } from "./Groups";
 import { UserScopeSection } from "./UserScope";
 
 /** The words under the Sidebar section, as the window's and the Remote's (#846). */
@@ -270,6 +271,8 @@ export function SettingsPage({ store, down = false }: { store: Store; down?: boo
           <Scope id="settings-scope-control" title={scopeTitles.controlPlane}>
             {/* Who belongs to the control plane, and their machines and clients (#994). */}
             <PeopleSection store={store} down={down} />
+            {/* Groups own workspace providers (#1761). */}
+            <GroupsSection store={store} down={down} />
             <ProvidersSection store={store} />
           </Scope>
         </div>

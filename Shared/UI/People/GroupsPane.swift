@@ -1,0 +1,271 @@
+import AgentsKitCore
+import SwiftUI
+
+/// Settings ▸ Groups (#1761, spec 736 FR-027, FR-028): each group, its people and the
+/// workspace providers it has. An admin makes, changes and removes groups; a member sees
+/// the groups they are in, read only.
+///
+/// One view for the Mac's Settings pane and the Remote's Settings page (the web page's is
+/// `Web/src/views/Groups.tsx`).
+struct GroupsPane: View {
+    /// The control plane, or nil while it cannot be reached.
+    let control: DaemonClient?
+    /// Goes up when the control plane says people or groups changed, to load them again.
+    let revision: Int
+
+    @State private var groups: [DaemonAPI.Group]?
+    @State private var people: [DaemonAPI.PersonRow] = []
+    @State private var providers: [DaemonAPI.ProviderSummary] = []
+    @State private var admin = false
+    @State private var problem: String?
+    @State private var editing: GroupSheet.Editing?
+    @State private var removing: DaemonAPI.Group?
+
+    private struct Load: Hashable {
+        var reachable: Bool
+        var revision: Int
+    }
+
+    var body: some View {
+        Form {
+            if let problem {
+                Section {
+                    Text(problem).appText(.supporting).tinted(.failure)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .paperListRow()
+            }
+            if let groups {
+                ForEach(groups) { group in
+                    Section {
+                        Text(group.name).appText(.reading)
+                        GroupLine(title: "People", words: GroupWords.members(group, people: people))
+                        GroupLine(title: "Workspace providers", words: GroupWords.providers(group, of: providers) ?? "None")
+                        if admin {
+                            HStack {
+                                Button("Edit…") { editing = .init(group: group) }
+                                Spacer()
+                                Button("Remove…", role: .destructive) { removing = group }
+                            }
+                            .buttonStyle(.borderless)
+                        }
+                    }
+                    .paperListRow()
+                }
+                Section {
+                    if admin {
+                        Button("Make a Group…") { editing = .init(group: nil) }
+                    } else if groups.isEmpty {
+                        Text("You are in no group.").appText(.supporting).foregroundStyle(.secondary)
+                    }
+                } footer: {
+                    Text(GroupWords.foot(admin: admin)).appText(.fine).foregroundStyle(.secondary)
+                }
+                .paperListRow()
+            } else if problem == nil {
+                Text("Loading…").appText(.supporting).foregroundStyle(.secondary).paperListRow()
+            }
+        }
+        .paperForm()
+        .task(id: Load(reachable: control != nil, revision: revision)) {
+            while !(await load()), !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(3))
+            }
+        }
+        .refreshable { await load() }
+        .sheet(item: $editing) { editing in
+            GroupSheet(control: control, editing: editing, people: people.filter { $0.kind == .person }) {
+                Task { await load() }
+            }
+            .paperSheet()
+        }
+        .confirmationDialog(removing.map(GroupWords.removeTitle) ?? "",
+                            isPresented: Binding(get: { removing != nil }, set: { if !$0 { removing = nil } }),
+                            titleVisibility: .visible, presenting: removing) { group in
+            Button("Remove", role: .destructive) { Task { await remove(group) } }
+            Button("Cancel", role: .cancel) {}
+        } message: { _ in
+            Text(GroupWords.removeMessage)
+        }
+    }
+
+    /// False when the control plane did not answer at all, so it is worth asking again.
+    @discardableResult
+    private func load() async -> Bool {
+        guard let control else {
+            problem = "The control plane can’t be reached."
+            return true
+        }
+        do {
+            let listed = try await control.call(DaemonAPI.Method.groupsList, DaemonAPI.Empty(),
+                                                returning: DaemonAPI.GroupList.self)
+            let list = try await control.call(DaemonAPI.Method.peopleList, DaemonAPI.Empty(),
+                                              returning: DaemonAPI.PeopleList.self)
+            // A control plane with several copies has no providers: the groups still show.
+            let answer = try? await control.call(DaemonAPI.Method.providersList, DaemonAPI.Empty())
+            providers = (try? answer?["providers"]?.decode([DaemonAPI.ProviderSummary].self)) ?? []
+            people = list.people
+            admin = list.admin
+            groups = listed.groups
+            problem = nil
+        } catch {
+            problem = PeopleWords.refusal(error)
+            return error is JSONRPCError
+        }
+        return true
+    }
+
+    private func remove(_ group: DaemonAPI.Group) async {
+        guard let control else { return }
+        do {
+            _ = try await control.call(DaemonAPI.Method.groupsRemove, DaemonAPI.GroupRequest(id: group.id))
+            problem = nil
+        } catch {
+            problem = PeopleWords.refusal(error)
+        }
+        let said = problem
+        await load()
+        if let said { problem = said }
+    }
+}
+
+/// A heading word over a line of names.
+private struct GroupLine: View {
+    let title: String
+    let words: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(title).appText(.fine).foregroundStyle(.secondary)
+            Text(words).appText(.supporting)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .accessibilityElement(children: .combine)
+    }
+}
+
+/// Make a Group… and Edit…: a name, and everyone or the people named.
+struct GroupSheet: View {
+    struct Editing: Identifiable {
+        var group: DaemonAPI.Group?
+        var id: String { group?.id ?? "new" }
+    }
+
+    @Environment(\.dismiss) private var dismiss
+    let control: DaemonClient?
+    let editing: Editing
+    let people: [DaemonAPI.PersonRow]
+    let saved: () -> Void
+
+    @State private var name = ""
+    @State private var everyone = false
+    @State private var members: Set<String> = []
+    @State private var problem: String?
+    @State private var isAsking = false
+
+    private var trimmed: String { name.trimmingCharacters(in: .whitespacesAndNewlines) }
+    private var title: String { editing.group == nil ? "Make a Group" : "Edit \(editing.group?.name ?? "Group")" }
+
+    var body: some View {
+        #if os(macOS)
+        VStack(alignment: .leading, spacing: 16) {
+            Text(title).appText(.title)
+            form
+            HStack {
+                Spacer()
+                Button("Cancel") { dismiss() }.keyboardShortcut(.cancelAction)
+                Button(editing.group == nil ? "Make Group" : "Save") { Task { await save() } }
+                    .keyboardShortcut(.defaultAction)
+                    .disabled(trimmed.isEmpty || isAsking)
+            }
+        }
+        .padding(24)
+        .frame(width: 420)
+        .onAppear(perform: fill)
+        #else
+        NavigationStack {
+            form
+                .navigationTitle(title)
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button(editing.group == nil ? "Make" : "Save") { Task { await save() } }
+                            .disabled(trimmed.isEmpty || isAsking)
+                    }
+                }
+        }
+        .onAppear(perform: fill)
+        #endif
+    }
+
+    private var form: some View {
+        Form {
+            Section {
+                TextField("Name", text: $name, prompt: Text("Platform"))
+                Toggle("Everyone", isOn: $everyone)
+            } footer: {
+                Text("Everyone takes in each person who joins later too.")
+                    .appText(.fine).foregroundStyle(.secondary)
+            }
+            .paperListRow()
+            if !everyone {
+                Section("People") {
+                    ForEach(people) { person in
+                        Toggle(person.name, isOn: Binding(
+                            get: { members.contains(person.id) },
+                            set: { on in if on { members.insert(person.id) } else { members.remove(person.id) } }))
+                    }
+                }
+                .paperListRow()
+            }
+            if let problem {
+                Text(problem).appText(.supporting).tinted(.failure).paperListRow()
+            }
+        }
+        .paperForm()
+    }
+
+    private func fill() {
+        guard let group = editing.group else { return }
+        name = group.name
+        everyone = group.everyone
+        members = Set(group.members)
+    }
+
+    private func save() async {
+        guard let control else {
+            problem = "The control plane can’t be reached."
+            return
+        }
+        guard !trimmed.isEmpty, !isAsking else { return }
+        isAsking = true
+        defer { isAsking = false }
+        // In the order People lists them.
+        let named = people.map(\.id).filter(members.contains)
+        do {
+            _ = try await control.call(DaemonAPI.Method.groupsSet,
+                                       DaemonAPI.GroupSet(id: editing.group?.id, name: trimmed, everyone: everyone,
+                                                          members: everyone ? [] : named),
+                                       returning: DaemonAPI.Group.self)
+            saved()
+            dismiss()
+        } catch {
+            problem = PeopleWords.refusal(error)
+        }
+    }
+}
+
+/// A provider's group, for an admin: a menu of the groups and Admins Only (#1761).
+struct ProviderGroupPicker: View {
+    let provider: DaemonAPI.ProviderSummary
+    let groups: [DaemonAPI.Group]
+    let set: (String?) -> Void
+
+    var body: some View {
+        Picker("Group", selection: Binding(get: { provider.group ?? "" }, set: { set($0.isEmpty ? nil : $0) })) {
+            Text(GroupWords.adminsOnly).tag("")
+            ForEach(groups) { Text($0.name).tag($0.id) }
+        }
+    }
+}

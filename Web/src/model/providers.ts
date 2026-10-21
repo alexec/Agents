@@ -2,7 +2,7 @@
 // ControlSettingsModel: listed when Settings opens, kept by control/providersChanged, and each
 // change sent to the control plane. Secrets pass through in a request and are not kept here.
 import { signal } from "@preact/signals";
-import type { HostID, ProviderAdd, ProviderID, ProviderSummary } from "../protocol/generated";
+import type { Group, HostID, ProviderAdd, ProviderID, ProviderSummary } from "../protocol/generated";
 import { Failure } from "../protocol/generated";
 import type { Caller } from "../protocol/methods";
 import { CallFailed } from "../wire/link";
@@ -20,6 +20,8 @@ export class Providers {
   readonly list = signal<ProviderSummary[] | null>(null);
   /** Why there are none to show: a control plane with several copies, or a list that failed. */
   readonly problem = signal<string | null>(null);
+  /** The groups providers are given to (#1761): every one for an admin, a member's own. Empty from a control plane before groups. */
+  readonly groups = signal<Group[]>([]);
 
   constructor(private readonly caller: Caller) {}
 
@@ -34,6 +36,7 @@ export class Providers {
     try {
       this.list.value = (await this.caller.call("providers/list", {})).providers;
       this.problem.value = null;
+      await this.loadGroups();
     } catch (error) {
       this.list.value = [];
       this.problem.value = error instanceof CallFailed && error.code === Failure.providersNeedOneCopy ? providerWords.oneCopy : describe(error);
@@ -53,6 +56,21 @@ export class Providers {
       const saved = await this.caller.call(request.id ? "providers/update" : "providers/add", request);
       const list = this.list.value ?? [];
       this.list.value = list.some((p) => p.id === saved.id) ? list.map((p) => (p.id === saved.id ? saved : p)) : [...list, saved];
+      return null;
+    } catch (error) {
+      return describe(error);
+    }
+  }
+
+  /** `groups/list`, again on each control/groupsChanged (#1761). */
+  async loadGroups(): Promise<void> {
+    this.groups.value = (await this.caller.call("groups/list", {}).catch(() => null))?.groups ?? [];
+  }
+
+  /** Gives a provider to a group, or with none to the admins alone (#1761). */
+  async setGroup(provider: string, group: string | null): Promise<string | null> {
+    try {
+      await this.caller.call("providers/setGroup", group ? { provider: provider as ProviderID, group } : { provider: provider as ProviderID });
       return null;
     } catch (error) {
       return describe(error);

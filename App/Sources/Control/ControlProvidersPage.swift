@@ -29,11 +29,14 @@ struct ControlProvidersPage: View {
                     providerCard(provider)
                 }
                 HStack(spacing: 8) {
-                    Button("Add Provider…") { adding = true }.buttonStyle(.paper)
+                    // Only an admin adds one (#1761).
+                    if control.isAdmin {
+                        Button("Add Provider…") { adding = true }.buttonStyle(.paper)
+                    }
                     // A machine of its own for a repository (#1809), from a provider that makes them.
                     Button(MachineFromRepository.Words.menuItem) { startingMachine = true }
                         .buttonStyle(.paper)
-                        .disabled(!control.providers.contains { $0.capabilities.contains("create") })
+                        .disabled(!control.providers.contains { $0.capabilities.contains("create") && $0.usable })
                 }
                 Text("A provider starts and stops your machines: Docker containers, DigitalOcean Droplets, GitHub Codespaces, Coder workspaces, Google Cloud Workstations and Compute Engine VMs, AWS EC2 instances, or anything with a command. It runs here, on the control plane, so it can start a machine that is down.")
                     .appText(.supporting).foregroundStyle(.secondary)
@@ -74,21 +77,33 @@ struct ControlProvidersPage: View {
                 HStack(spacing: 8) {
                 if provider.capabilities.contains("create") {
                     Button("New Machine…") { making = provider }.buttonStyle(.paper)
+                        .disabled(!provider.usable)
+                        .help(provider.usable ? "" : GroupWords.mayNotUse(provider, groups: control.groups))
                 }
                 Menu {
+                    // Who may start machines from it (#1761): an admin gives it to a group.
+                    if control.isAdmin {
+                        ProviderGroupPicker(provider: provider, groups: control.groups) { group in
+                            Task { await control.setGroup(provider.id, group) }
+                        }
+                        .pickerStyle(.menu)
+                        Divider()
+                    }
                     // A preset's name, and an API one's token or keys, as on the web page (#1932).
-                    if provider.preset != nil {
+                    if control.isAdmin, provider.preset != nil {
                         Button("Edit…") { editing = provider }
                     }
                     Button("List Again") { Task { await control.listWorkspacesAgain(provider.id) } }
                     // An agent writes its map or commands again, from the ones it has (#858 US4).
-                    if provider.kind == "commands" ? provider.preset == nil : provider.mapped {
+                    if control.isAdmin, provider.kind == "commands" ? provider.preset == nil : provider.mapped {
                         Button(provider.kind == "commands" ? "Write the Commands Again…" : "Write the Map Again…") {
                             rewriting = provider
                         }
                     }
-                    Divider()
-                    Button("Remove…") { removing = provider }
+                    if control.isAdmin {
+                        Divider()
+                        Button("Remove…") { removing = provider }
+                    }
                 } label: {
                     Image(systemName: "ellipsis.circle")
                 }
@@ -175,6 +190,7 @@ struct ControlProvidersPage: View {
             parts.append("\(provider.current ? "Listed" : "Showing what it listed at") \(at.formatted(date: .omitted, time: .shortened))")
         }
         if provider.workspaces.isEmpty, provider.listedAt != nil { parts.append("No machines") }
+        if let group = GroupWords.providerLine(provider, groups: control.groups) { parts.append(group) }
         if let tool = provider.preset.flatMap(AddProviderSheet.Kind.sshTool) { parts.append("needs \(tool) for ssh") }
         // A map or commands written for it that give no ssh (#975); a preset's own way in is its own.
         let written = provider.kind == "commands" ? provider.preset == nil : provider.mapped
