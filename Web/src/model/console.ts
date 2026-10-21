@@ -3,7 +3,7 @@
 // One web bundle; the switcher at the top moves between them. The Mac window and the Remote draw
 // the Me scope of Reports already (Cost, Time, Pool), and leave the Console to the web.
 import type { SubApp } from "../route";
-import type { FleetMachine, Group, PersonRow } from "../protocol/generated";
+import type { ChannelLinkRequest, FleetMachine, Group, PersonRow } from "../protocol/generated";
 import { CallFailed } from "../wire/link";
 
 export type AppName = "workspace" | SubApp;
@@ -29,8 +29,8 @@ export const consoleSections: readonly Section[] = [
   { id: "machines", title: "Machines", about: "Every machine: its owner, state, version and agents.", group: "Organisation", built: true },
   { id: "reportPolicy", title: "Report Policy", about: "Who leads each group, what leads see, and each budget.", group: "Rules", built: true },
   { id: "workflows", title: "Team Workflows", about: "The bots that run the team’s workflows, and their runs.", group: "Rules", built: false },
-  { id: "requests", title: "Requests", about: "Machines asking to join, and bots stopped at a cap.", group: "Records", built: false },
-  { id: "audit", title: "Audit", about: "Who did what on each machine.", group: "Records", built: false },
+  { id: "requests", title: "Requests", about: "Machines asking to join, channel identities to link, and bots stopped at a cap.", group: "Records", built: true },
+  { id: "audit", title: "Audit", about: "Who did what on each machine, for one person or everyone.", group: "Records", built: true },
 ];
 
 /** Reports' pages. Each has three scopes: Me, a group and the organisation. */
@@ -149,4 +149,16 @@ export function budgetValue(text: string): number | null {
 /** A budget as the field shows it. */
 export function budgetInput(usd: number): string {
   return Number.isInteger(usd) ? String(usd) : usd.toFixed(2);
+}
+
+// Console ▸ Requests (M7).
+
+export const noRequests = "Nothing waits for you.";
+export const requestsFoot = "A machine asking to join and a bot stopped at its cap are also sent to every admin’s window, Remote and page as they happen.";
+
+/** "Sam (sam@acme.dev) on Slack wants to be linked to Sam". */
+export function linkWords(r: ChannelLinkRequest): string {
+  const who = r.name ? (r.email ? `${r.name} (${r.email})` : r.name) : r.identity;
+  const to = r.forName ? ` to ${r.forName}` : "";
+  return `${who} on ${r.channel} wants to be linked${to}`;
 }

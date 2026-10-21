@@ -50,3 +50,34 @@ export function exportName(now: Date = new Date()): string {
   const pad = (n: number) => String(n).padStart(2, "0");
   return `audit-${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}.jsonl`;
 }
+
+// Console ▸ Audit (#1804, M8): the same entries, for one person or everyone, and as CSV for a
+// spreadsheet (decision 4), made here from audit/export's JSON lines.
+
+const csvField = (text: string) => /[",\n\r]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+
+/** audit/export's JSON lines as CSV, a row per entry, oldest first; a line that is not an entry is left out. */
+export function auditCSV(lines: string, hostName: (host: string) => string): string {
+  const header = ["at", "action", "method", "host", "hostName", "target", "user", "userName", "client", "clientName", "event"];
+  const rows = [header.join(",")];
+  for (const line of lines.split("\n")) {
+    if (!line.trim()) continue;
+    let entry: AuditEntry;
+    try {
+      entry = JSON.parse(line) as AuditEntry;
+    } catch {
+      continue;
+    }
+    if (typeof entry.at !== "number" || !entry.actor) continue;
+    const a = entry.actor;
+    rows.push([fromWireDate(entry.at).toISOString(), entry.action, entry.method, entry.host ?? "", entry.host ? hostName(entry.host) : "",
+      entry.target ?? "", a.user, a.userName ?? "", a.client ?? "", a.clientName ?? "", a.event ? `${a.event.kind} ${a.event.id}` : ""]
+      .map((f) => csvField(String(f))).join(","));
+  }
+  return rows.join("\n") + "\n";
+}
+
+/** `audit-2026-10-20.csv`. */
+export function csvExportName(now: Date = new Date()): string {
+  return exportName(now).replace(/\.jsonl$/, ".csv");
+}

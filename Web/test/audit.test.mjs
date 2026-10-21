@@ -29,3 +29,17 @@ test("entries are cut into days, newest first", () => {
 test("an export is named by the day", () => {
   assert.equal(a.exportName(new Date(2026, 9, 20, 9)), "audit-2026-10-20.jsonl");
 });
+
+test("Console ▸ Audit (#1804): JSON lines as CSV, quoted where they must be", async () => {
+  const lines = [
+    JSON.stringify({ id: "1", at: 0, action: "Stopped an agent", method: "agents/stop", host: "H1", target: "A1", actor: { user: "u", userName: "Bea, admin" } }),
+    "not json",
+    JSON.stringify({ id: "2", at: 60, action: "Approved", method: "hosts/approveJoin", actor: { user: "b", event: { kind: "schedule", id: "w" } } }),
+  ].join("\n");
+  const csv = a.auditCSV(lines, (h) => `${h}'s box`).trim().split("\n");
+  assert.equal(csv.length, 3);
+  assert.equal(csv[0], "at,action,method,host,hostName,target,user,userName,client,clientName,event");
+  assert.equal(csv[1], `2001-01-01T00:00:00.000Z,Stopped an agent,agents/stop,H1,H1's box,A1,u,"Bea, admin",,,`);
+  assert.match(csv[2], /,schedule w$/);
+  assert.equal(a.csvExportName(new Date(2026, 9, 20)), "audit-2026-10-20.csv");
+});

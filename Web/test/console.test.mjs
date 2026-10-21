@@ -69,3 +69,9 @@ test("Report Policy: budgets as typed, and who may lead a group", () => {
   assert.deepEqual(c.leadCandidates({ everyone: true, members: [] }, people).map((p) => p.id), ["a", "b"]);
   assert.deepEqual(c.leadCandidates({ everyone: false, members: ["b", "bot"] }, people).map((p) => p.id), ["b"]);
 });
+
+test("Requests: a channel identity's words", () => {
+  assert.equal(c.linkWords({ identity: "U1", channel: "Slack", name: "Sam", email: "sam@acme.dev", forName: "Sam" }),
+    "Sam (sam@acme.dev) on Slack wants to be linked to Sam");
+  assert.equal(c.linkWords({ identity: "U1", channel: "Discord" }), "U1 on Discord wants to be linked");
+});
