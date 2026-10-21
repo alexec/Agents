@@ -9,6 +9,21 @@ description: Usage, cost and time by person, project, machine and runtime, added
 A report shows the usage, cost and time of each person, project, machine and runtime
 (#1811). The control plane adds them up from what each machine sends.
 
+## The Reports pane
+
+The Cost page has two panes, **Cost** and **Reports**, on the Mac, the Remote and the web
+page.
+
+- **The range:** D (the last 24 hours, by the hour), W, M or 3M (the last 7, 30 or 90
+  days, by the day), as the Cost page's charts.
+- **By:** Person, Project, Machine or Runtime. The first line is the total. Under it is a
+  line for each person, project, machine or runtime, largest first, with a bar for its
+  share of the largest. Each line says the cost, the tokens, the turns and the working
+  time.
+- **Export** saves the rows of the range as CSV or as JSON lines.
+- **A control plane that keeps no reports** (one from before #1811) says so, and says to
+  update it.
+
 ## What a machine sends
 
 - **Each machine keeps its usage by the UTC hour**, by project and runtime, in

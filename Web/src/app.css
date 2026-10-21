@@ -995,6 +995,14 @@ button.remove:hover { opacity: 1; }
 /* Events | Audit (#996). */
 .activity-page .events-panes { display: flex; width: fit-content; margin: 4px auto 12px; }
 .activity-page .audit-head { display: flex; gap: 8px; align-items: center; }
+.reports-pane { display: flex; flex-direction: column; gap: 8px; }
+.reports-pane .segmented { align-self: flex-start; }
+.reports-head { display: flex; gap: 8px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+.reports-export { display: inline-flex; gap: 6px; }
+.report-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.report-list li { display: flex; flex-direction: column; gap: 2px; }
+.report-bar { display: block; height: 3px; background: var(--paper-rule); border-radius: 2px; overflow: hidden; }
+.report-bar span { display: block; height: 100%; background: var(--accent, currentColor); opacity: 0.6; }
 .triggers { list-style: none; margin: 0; padding: 0; background: var(--paper-raised); border: 1px solid var(--paper-rule); border-radius: var(--radius-card); }
 .trigger { display: grid; grid-template-columns: 18px minmax(0, 1fr) auto; column-gap: 10px; padding: 10px 14px; align-items: start; }
 .trigger + .trigger { border-top: 1px solid var(--paper-rule); }

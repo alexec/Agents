@@ -20,7 +20,30 @@ struct SpendingView: View {
 
     private var spending: Spending { Spending(model.projects) }
 
+    /// Cost, or Reports: every person's machines, from the control plane (#1811).
+    @State private var pane: CostPane = .cost
+
     var body: some View {
+        Group {
+            switch pane {
+            case .cost: cost
+            case .reports: ReportsPane(control: model.controlRequests)
+            }
+        }
+        .navigationTitle(pane.rawValue)
+        .toolbar {
+            ToolbarItem(placement: .principal) {
+                Picker("Show", selection: $pane) {
+                    ForEach(CostPane.allCases) { Text($0.rawValue).tag($0) }
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .fixedSize()
+            }
+        }
+    }
+
+    private var cost: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 // The day's ledger or the limits set aside as unreadable (#171).
@@ -45,7 +68,6 @@ struct SpendingView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(24)
         }
-        .navigationTitle("Cost")
     }
 
     /// The first thing on the page, because it is the question the page answers. One
@@ -102,6 +124,14 @@ struct SpendingView: View {
             .foregroundStyle(.secondary)
             .padding(.top, 4)
     }
+}
+
+/// The Cost page's panes (#1811).
+enum CostPane: String, CaseIterable, Identifiable {
+    case cost = "Cost"
+    case reports = "Reports"
+
+    var id: Self { self }
 }
 
 /// One project's share of the bill.

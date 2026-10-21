@@ -1,0 +1,148 @@
+import Foundation
+
+/// The Reports pane (#1811): a report's rows added up by person, project, machine or
+/// runtime, largest first. The window, the Remote and the web page (`Web/src/model/reports.ts`)
+/// add up the same way.
+public struct ReportTotals: Sendable, Hashable {
+    public enum Dimension: String, CaseIterable, Identifiable, Sendable {
+        case person = "Person"
+        case project = "Project"
+        case machine = "Machine"
+        case runtime = "Runtime"
+
+        public var id: Self { self }
+    }
+
+    /// One person's, project's, machine's or runtime's share.
+    public struct Group: Identifiable, Sendable, Hashable {
+        public var id: String
+        public var name: String
+        /// Per currency, never added across.
+        public var cost: [String: Decimal] = [:]
+        /// Input, output, thought and cache-write tokens: UsageBucket.freshTokens.
+        public var tokens = 0
+        public var turns = 0
+        public var unpricedTurns = 0
+        public var workingSeconds: Double = 0
+        public var waitingSeconds: Double = 0
+
+        mutating func add(_ row: DaemonAPI.ReportRow) {
+            for (currency, amount) in row.cost { cost[currency, default: 0] += amount }
+            tokens += row.inputTokens + row.outputTokens + row.thoughtTokens + row.cachedWriteTokens
+            turns += row.turns
+            unpricedTurns += row.unpricedTurns
+            workingSeconds += row.workingSeconds
+            waitingSeconds += row.waitingSeconds
+        }
+    }
+
+    public var groups: [Group]
+    public var total: Group
+    /// The currencies any row has, the one with most spent first.
+    public var currencies: [String]
+
+    public init(_ rows: [DaemonAPI.ReportRow], by dimension: Dimension,
+                runtimeName: (String) -> String = UsageChart.runtimeName) {
+        var groups: [String: Group] = [:]
+        var total = Group(id: "", name: "Total")
+        for row in rows {
+            let (id, name) = Self.key(row, dimension, runtimeName)
+            groups[id, default: Group(id: id, name: name)].add(row)
+            total.add(row)
+        }
+        let currencies = total.cost.sorted { $0.value != $1.value ? $0.value > $1.value : $0.key < $1.key }.map(\.key)
+        let first = currencies.first
+        self.groups = groups.values.sorted { a, b in
+            let ca = first.flatMap { a.cost[$0] } ?? 0, cb = first.flatMap { b.cost[$0] } ?? 0
+            if ca != cb { return ca > cb }
+            if a.tokens != b.tokens { return a.tokens > b.tokens }
+            if a.workingSeconds != b.workingSeconds { return a.workingSeconds > b.workingSeconds }
+            return a.name.localizedStandardCompare(b.name) == .orderedAscending
+        }
+        self.total = total
+        self.currencies = currencies
+    }
+
+    /// A share of the largest group, 0 to 1, for the bar under each row: by the first
+    /// currency's cost, or by tokens when nothing was priced.
+    public func share(of group: Group) -> Double {
+        if let currency = currencies.first {
+            let most = groups.compactMap { $0.cost[currency] }.max() ?? 0
+            guard most > 0 else { return 0 }
+            return NSDecimalNumber(decimal: (group.cost[currency] ?? 0) / most).doubleValue
+        }
+        let most = groups.map(\.tokens).max() ?? 0
+        return most > 0 ? Double(group.tokens) / Double(most) : 0
+    }
+
+    private static func key(_ row: DaemonAPI.ReportRow, _ dimension: Dimension,
+                            _ runtimeName: (String) -> String) -> (String, String) {
+        switch dimension {
+        case .person:
+            return (row.person, row.person.isEmpty ? ReportWords.removedOwner
+                    : (row.personName.isEmpty ? row.person : row.personName))
+        case .project:
+            return (row.project, row.project.isEmpty ? ReportWords.noProject : row.project)
+        case .machine:
+            return (row.host, row.hostName.isEmpty ? row.host : row.hostName)
+        case .runtime:
+            return (row.runtime, row.runtime.isEmpty ? ReportWords.noRuntime : runtimeName(row.runtime))
+        }
+    }
+}
+
+/// The Reports pane's words, on all three clients.
+public enum ReportWords {
+    public static let removedOwner = "A removed machine"
+    public static let noProject = "No project"
+    public static let noRuntime = "No runtime"
+    public static let empty = "Nothing was used in this time. Each machine sends what it used once an hour."
+    public static let memberNote = "You see your own machines. An admin sees everyone's."
+    public static let utcNote = "Hours and days are UTC, so machines in other time zones add up."
+
+    /// D, W, M and 3M, as the Cost page's charts name them.
+    public static func short(_ range: DaemonAPI.ReportRange) -> String {
+        switch range {
+        case .day: "D"
+        case .week: "W"
+        case .month: "M"
+        case .threeMonths: "3M"
+        }
+    }
+
+    /// What the range covers, in words.
+    public static func span(_ range: DaemonAPI.ReportRange) -> String {
+        switch range {
+        case .day: "The last 24 hours"
+        case .week: "The last 7 days"
+        case .month: "The last 30 days"
+        case .threeMonths: "The last 90 days"
+        }
+    }
+
+    /// The figures under a name: cost, tokens, turns and working time.
+    public static func line(_ group: ReportTotals.Group) -> String {
+        var parts: [String] = []
+        if let cost = Cost.total(of: group.cost), !cost.isEmpty { parts.append(cost) }
+        parts.append("\(UsageChart.tokenWords(Double(group.tokens))) tokens")
+        parts.append(group.turns == 1 ? "1 turn" : "\(group.turns) turns")
+        parts.append("\(TimeChart.words(group.workingSeconds)) working")
+        return parts.joined(separator: " · ")
+    }
+
+    /// "report-week-2026-10-21.csv".
+    public static func exportName(_ range: DaemonAPI.ReportRange, _ format: DaemonAPI.ReportFormat,
+                                  _ now: Date = Date(), calendar: Calendar = .current) -> String {
+        let day = calendar.dateComponents([.year, .month, .day], from: now)
+        return String(format: "report-%@-%04d-%02d-%02d.%@", range.rawValue, day.year ?? 0, day.month ?? 0,
+                      day.day ?? 0, format.rawValue)
+    }
+
+    /// A failure, in a sentence: a control plane before #1811 keeps no reports.
+    public static func sentence(_ error: Error) -> String {
+        if let error = error as? JSONRPCError {
+            return error.code == -32601 ? "This control plane keeps no reports. Update it to see them." : error.message
+        }
+        return "The control plane can’t be reached."
+    }
+}
