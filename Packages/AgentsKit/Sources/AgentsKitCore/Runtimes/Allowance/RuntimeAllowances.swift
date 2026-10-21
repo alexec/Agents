@@ -63,11 +63,15 @@ public struct RuntimeAllowances: Codable, Hashable, Sendable {
         public var state: AllowanceState
         /// Why it cannot be used at all: not signed in, not installed. Nil when it can.
         public var unusable: String?
+        /// What one of its features needs on the host and lacks, with the step that fixes
+        /// it (#1946): Use Chrome without Claude Code's native host in Chrome.
+        public var setupNote: String?
 
-        public init(credentialKey: String, state: AllowanceState, unusable: String? = nil) {
+        public init(credentialKey: String, state: AllowanceState, unusable: String? = nil, setupNote: String? = nil) {
             self.credentialKey = credentialKey
             self.state = state
             self.unusable = unusable
+            self.setupNote = setupNote
         }
 
         public var id: String { credentialKey }

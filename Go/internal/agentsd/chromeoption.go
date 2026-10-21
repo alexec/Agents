@@ -2,6 +2,9 @@ package agentsd
 
 import (
 	"encoding/json"
+	"os"
+	"path/filepath"
+	goruntime "runtime"
 	"strings"
 
 	"github.com/alexec/agents/Go/wire"
@@ -113,4 +116,50 @@ func (d *Daemon) setChrome(a *wire.Agent, l *live, value wire.JSONValue) []wire.
 	}
 	d.record(a.ID, wire.TranscriptEntryKind{OptionChanged: &wire.TranscriptEntryKindOptionChanged{ID: chromeOptionID, Value: value}})
 	return options
+}
+
+// chromeHostNote is the Runtimes page's note on Claude when Use Chrome cannot work here
+// (#1946): Chrome has no native messaging host for Claude Code, which `/chrome` in `claude`
+// installs. Nil when the host is there, or Chrome keeps its hosts where we do not look.
+func chromeHostNote() *string {
+	dir := chromeNativeHostsDir()
+	if dir == "" {
+		return nil
+	}
+	if hasClaudeCodeHost(dir) {
+		return nil
+	}
+	s := "Use Chrome needs Claude Code’s native host in Chrome. Run `claude`, then `/chrome`."
+	return &s
+}
+
+// chromeNativeHostsDir is where Chrome reads its native messaging hosts for this user.
+func chromeNativeHostsDir() string {
+	home, _ := os.UserHomeDir()
+	if home == "" {
+		return ""
+	}
+	switch goruntime.GOOS {
+	case "darwin":
+		return filepath.Join(home, "Library", "Application Support", "Google", "Chrome", "NativeMessagingHosts")
+	case "linux":
+		return filepath.Join(home, ".config", "google-chrome", "NativeMessagingHosts")
+	}
+	return ""
+}
+
+// hasClaudeCodeHost is whether dir has Claude Code's host manifest
+// (com.anthropic.claude_code_browser_extension.json). The Claude desktop app's own host
+// (com.anthropic.claude_browser_extension) does not serve `claude --chrome`.
+func hasClaudeCodeHost(dir string) bool {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return false
+	}
+	for _, e := range entries {
+		if n := e.Name(); strings.HasPrefix(n, "com.anthropic.claude_code") && strings.HasSuffix(n, ".json") {
+			return true
+		}
+	}
+	return false
 }

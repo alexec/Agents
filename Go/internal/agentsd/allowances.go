@@ -176,7 +176,11 @@ func (d *Daemon) runtimeAllowances() wire.RuntimeAllowances {
 	}
 	d.allowMu.Unlock()
 	for i := range out.Rows {
-		out.Rows[i].Unusable = d.unusable(runtimeOf(out.Rows[i].CredentialKey))
+		rt := runtimeOf(out.Rows[i].CredentialKey)
+		out.Rows[i].Unusable = d.unusable(rt)
+		if rt == "claude" && out.Rows[i].CredentialKey == ownKey(rt) && out.Rows[i].Unusable == nil {
+			out.Rows[i].SetupNote = chromeHostNote()
+		}
 	}
 	sort.Slice(out.Shared, func(i, j int) bool { return out.Shared[i].CredentialKey < out.Shared[j].CredentialKey })
 	return out

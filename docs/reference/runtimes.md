@@ -145,7 +145,11 @@ on with `options: chrome: true`.
 
 It takes effect from the chat's next turn: a chat between turns starts Claude again, and
 carries on its conversation. Chrome needs the extension, and Claude Code's native messaging
-host, which `claude` installs the first time you run `/chrome` in it.
+host, which `claude` installs the first time you run `/chrome` in it. When the host is not
+there, the Runtimes page says so under Claude: "Use Chrome needs Claude Code's native host in
+Chrome. Run `claude`, then `/chrome`." The host looks in Chrome's `NativeMessagingHosts`
+folder (`~/Library/Application Support/Google/Chrome/` on a Mac, `~/.config/google-chrome/`
+on Linux).
 
 ### What the app sets for you
 

@@ -298,6 +298,7 @@ export function ActivityPageView({ store, page }: { store: Store; page: Activity
                       {allowance.state.reading && <AllowanceBar reading={allowance.state.reading} />}
                     </>}
                     {status.poolNote && <p class="quiet small">{status.poolNote}</p>}
+                    {allowance?.setupNote && <p class="quiet small">{allowance.setupNote.split("`").map((part, i) => i % 2 ? <code key={i}>{part}</code> : part)}</p>}
                     {isAllowanceOut && allowance && <button onClick={() => void store.markRuntimeAvailable(host.id, allowance.credentialKey)}>Mark available</button>}
                   </li>
                 })}

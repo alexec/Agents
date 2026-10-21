@@ -4456,6 +4456,8 @@ type RuntimeAllowancesRow struct {
 	CredentialKey string         `json:"credentialKey"`
 	State         AllowanceState `json:"state"`
 	Unusable      *string        `json:"unusable,omitzero"`
+	// Something one of the runtime's features needs on this host and lacks, with the step that fixes it (#1946). Only on the runtime's own sign-in row.
+	SetupNote *string `json:"setupNote,omitzero"`
 }
 
 type RuntimeAssessmentCheck struct {

@@ -2,6 +2,8 @@ package agentsd
 
 import (
 	"encoding/json"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -70,5 +72,28 @@ func TestAChatsUseChromeIsKeptWithoutAskingClaude(t *testing.T) {
 	}
 	if got := d.Store.Agent(a.ID); !chromeOn(got.StartOptions.Values) {
 		t.Fatalf("not kept: %+v", got.StartOptions.Values)
+	}
+}
+
+// The Runtimes page's note (#1946) looks for Claude Code's own host, not the desktop app's.
+func TestHasClaudeCodeHost(t *testing.T) {
+	dir := t.TempDir()
+	if hasClaudeCodeHost(dir) {
+		t.Fatal("an empty folder has no host")
+	}
+	if hasClaudeCodeHost(filepath.Join(dir, "missing")) {
+		t.Fatal("a missing folder has no host")
+	}
+	if err := os.WriteFile(filepath.Join(dir, "com.anthropic.claude_browser_extension.json"), []byte("{}"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if hasClaudeCodeHost(dir) {
+		t.Fatal("the desktop app's host does not serve claude --chrome")
+	}
+	if err := os.WriteFile(filepath.Join(dir, "com.anthropic.claude_code_browser_extension.json"), []byte("{}"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if !hasClaudeCodeHost(dir) {
+		t.Fatal("Claude Code's host is there")
 	}
 }
