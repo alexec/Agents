@@ -13,6 +13,8 @@ struct ControlProvidersPage: View {
     @State private var making: DaemonAPI.ProviderSummary?
     /// Write the Map Again… (#858 US4, L10f).
     @State private var rewriting: DaemonAPI.ProviderSummary?
+    /// Edit… (#1932): a preset's name, and its token or keys again.
+    @State private var editing: DaemonAPI.ProviderSummary?
     /// Start a Machine from a Repository… (#1809).
     @State private var startingMachine = false
 
@@ -47,6 +49,7 @@ struct ControlProvidersPage: View {
                 .paperSheet()
         }
         .sheet(item: $rewriting) { provider in AddProviderSheet(control: control, editing: provider).paperSheet() }
+        .sheet(item: $editing) { provider in EditProviderSheet(control: control, provider: provider).paperSheet() }
         .sheet(item: $addingHost) { prefill in ControlAddServerSheet(control: control, prefill: prefill).paperSheet() }
         .sheet(item: $making) { provider in
             NewWorkspaceSheet(control: control, provider: provider) { prefill in
@@ -73,6 +76,10 @@ struct ControlProvidersPage: View {
                     Button("New Workspace…") { making = provider }.buttonStyle(.paper)
                 }
                 Menu {
+                    // A preset's name, and an API one's token or keys, as on the web page (#1932).
+                    if provider.preset != nil {
+                        Button("Edit…") { editing = provider }
+                    }
                     Button("List Again") { Task { await control.listWorkspacesAgain(provider.id) } }
                     // An agent writes its map or commands again, from the ones it has (#858 US4).
                     if provider.kind == "commands" ? provider.preset == nil : provider.mapped {
@@ -976,6 +983,131 @@ struct AddProviderSheet: View {
                                          map: mapped, secrets: given)
         }
         return DaemonAPI.ProviderAdd(name: name, kind: .commands, commands: .object(commands), secrets: given)
+    }
+}
+
+/// Edit… on a preset's card (#1932), as the web page's: its name, and for an API preset its
+/// token or keys again, when one ends or is rotated. A secret left empty keeps the one it has;
+/// `providers/update` keeps the configuration, so nothing is unlinked.
+struct EditProviderSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    let control: ControlSettingsModel
+    let provider: DaemonAPI.ProviderSummary
+
+    @State private var name = ""
+    @State private var values: [String: String] = [:]
+    @State private var serviceAccount = ""
+    @State private var choosingKey = false
+    @State private var working = false
+    @State private var problem: String?
+
+    /// A secret the form asks for again: its label, the secret's name, and whether it is hidden.
+    struct Field: Hashable {
+        var label: String
+        var secret: String
+        var hidden = true
+    }
+
+    /// The secrets a preset reads; none for a CLI preset, which only has its name to edit.
+    static func fields(_ preset: String?) -> [Field] {
+        switch preset {
+        case "digitalocean-api": [Field(label: "API token", secret: "DIGITALOCEAN_API_TOKEN")]
+        case "codespaces-api": [Field(label: "Token", secret: "GITHUB_TOKEN")]
+        case "coder-api": [Field(label: "Session token", secret: "CODER_SESSION_TOKEN")]
+        case "aws-ec2-api": [Field(label: "Access key ID", secret: "AWS_ACCESS_KEY_ID", hidden: false),
+                             Field(label: "Secret access key", secret: "AWS_SECRET_ACCESS_KEY")]
+        case "gcp-compute-api": [Field(label: "Service account key", secret: "GOOGLE_SERVICE_ACCOUNT_KEY")]
+        default: []
+        }
+    }
+
+    /// What Save sends: the name, and only the secrets given, so an empty one is kept.
+    static func request(_ provider: DaemonAPI.ProviderSummary, name: String,
+                        values: [String: String]) -> DaemonAPI.ProviderAdd {
+        var secrets: [String: String] = [:]
+        for field in fields(provider.preset) {
+            let value = values[field.secret] ?? ""
+            // A key is what it is: only a shown ID is trimmed.
+            let given = field.hidden ? value : value.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !given.isEmpty { secrets[field.secret] = given }
+        }
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        return DaemonAPI.ProviderAdd(id: provider.id, name: trimmed.isEmpty ? provider.name : trimmed,
+                                     kind: .commands, secrets: secrets)
+    }
+
+    var body: some View {
+        let fields = Self.fields(provider.preset)
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Edit \(provider.name)").appText(.title).fontWeight(.semibold)
+            Form {
+                TextField("Name", text: $name)
+                ForEach(fields, id: \.self) { field in
+                    if field.secret == "GOOGLE_SERVICE_ACCOUNT_KEY" {
+                        LabeledContent(field.label) {
+                            HStack {
+                                Text(serviceAccount.isEmpty ? "Keep the one it has" : serviceAccount).foregroundStyle(.secondary)
+                                Button("Choose Key File…") { choosingKey = true }
+                            }
+                        }
+                    } else if field.hidden {
+                        SecureField(field.label, text: binding(field.secret), prompt: Text("Keep the one it has"))
+                    } else {
+                        TextField(field.label, text: binding(field.secret), prompt: Text("Keep the one it has"))
+                    }
+                }
+            }
+            .formStyle(.grouped)
+            .fileImporter(isPresented: $choosingKey, allowedContentTypes: [.json]) { result in
+                guard case .success(let file) = result else { return }
+                readServiceKey(file)
+            }
+            Text(fields.isEmpty ? "Its CLI signs in where the control plane runs: only its name is kept here."
+                 : "Leave a field empty to keep the one it has. A new one goes to the control plane and is never shown again. Its hosts stay linked.")
+                .appText(.supporting).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            if let problem {
+                Text(problem).appText(.supporting).tinted(.failure).fixedSize(horizontal: false, vertical: true)
+            }
+            HStack {
+                Spacer()
+                if working { ProgressView().controlSize(.small) }
+                Button("Cancel") { dismiss() }.keyboardShortcut(.cancelAction)
+                Button("Save") { save() }
+                    .keyboardShortcut(.defaultAction)
+                    .disabled(working)
+            }
+        }
+        .padding(28)
+        .frame(width: 480)
+        .onAppear { name = provider.name }
+    }
+
+    private func binding(_ secret: String) -> Binding<String> {
+        Binding(get: { values[secret] ?? "" }, set: { values[secret] = $0 })
+    }
+
+    /// A Google service account's JSON key, read once: only its email is shown.
+    private func readServiceKey(_ file: URL) {
+        let opened = file.startAccessingSecurityScopedResource()
+        defer { if opened { file.stopAccessingSecurityScopedResource() } }
+        guard let data = try? Data(contentsOf: file),  // store-ok: a file chosen in the open panel
+              let email = (try? JSONValue.parse(data))?.objectValue?["client_email"]?.stringValue else {
+            problem = "That file isn’t a service account’s JSON key."
+            return
+        }
+        values["GOOGLE_SERVICE_ACCOUNT_KEY"] = String(decoding: data, as: UTF8.self)
+        serviceAccount = email
+        problem = nil
+    }
+
+    private func save() {
+        working = true
+        problem = nil
+        Task {
+            let refused = await control.addProvider(Self.request(provider, name: name, values: values))
+            working = false
+            if let refused { problem = refused } else { dismiss() }
+        }
     }
 }
 
