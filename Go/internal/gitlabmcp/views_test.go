@@ -241,10 +241,42 @@ func TestAPersonsActionsFromThePage(t *testing.T) {
 	f := viewsFake(t)
 	c := viewsClient(t, f)
 	callTool(t, c, "retry_pipeline", map[string]any{"pipelineId": 100})
-	callTool(t, c, "approve_merge_request", map[string]any{"number": 3})
+	_, page := callTool(t, c, "show_merge_request", map[string]any{"number": 3})
+	equal(t, page["headSha"], "s3", "the page's head")
+	callTool(t, c, "approve_merge_request", map[string]any{"number": 3, "sha": page["headSha"]})
 	f.set(func() {
 		equal(t, f.posted[0]["path"], "pipelines/100/retry", "retry")
-		equal(t, f.posted[1]["path"], "merge_requests/3/approve", "approve")
+		equal(t, f.posted[1], obj{"path": "merge_requests/3/approve", "sha": "s3"}, "approve")
+	})
+}
+
+// Approve and Merge act on the commit the page shows: with another head GitLab does nothing,
+// and the server says to open the page again; with none, nothing is sent.
+func TestApproveAndMergeOnlyAtTheHeadShown(t *testing.T) {
+	f := viewsFake(t)
+	c := viewsClient(t, f)
+	for _, name := range []string{"approve_merge_request", "merge_merge_request"} {
+		for _, sha := range []any{"older", nil} {
+			args := map[string]any{"number": 3}
+			if sha != nil {
+				args["sha"] = sha
+			}
+			r, err := c.CallTool(context.Background(), &mcp.CallToolParams{Name: name, Arguments: args})
+			if err != nil {
+				t.Fatal(err)
+			}
+			// With no sha the tool's schema refuses it; with another, GitLab does.
+			if !r.IsError || sha != nil && !strings.Contains(r.Content[0].(*mcp.TextContent).Text, "page again") {
+				t.Errorf("%s at %v: %v", name, sha, r.Content)
+			}
+		}
+	}
+	f.set(func() {
+		for _, sent := range f.posted {
+			if sent["sha"] != "older" {
+				t.Errorf("sent with no sha: %v", sent)
+			}
+		}
 	})
 }
 

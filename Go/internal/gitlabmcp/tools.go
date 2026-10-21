@@ -3,6 +3,7 @@ package gitlabmcp
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -75,6 +76,32 @@ type mergeArgs struct {
 	Number  int    `json:"number" jsonschema:"the merge request's number (its iid)"`
 	Squash  bool   `json:"squash,omitempty" jsonschema:"true: squash its commits into one"`
 	Auto    bool   `json:"auto,omitempty" jsonschema:"true: merge once its pipeline succeeds"`
+	Sha     string `json:"sha" jsonschema:"the head commit the page shows (headSha); GitLab refuses when the merge request has a newer one"`
+}
+
+type approveArgs struct {
+	Project string `json:"project,omitempty" jsonschema:"group/name or a project id; the project this folder pushes to when left out"`
+	Number  int    `json:"number" jsonschema:"the merge request's number (its iid)"`
+	Sha     string `json:"sha" jsonschema:"the head commit the page shows (headSha); GitLab refuses when the merge request has a newer one"`
+}
+
+// headSha is a merge or an approval's sha: the commit the person saw, which GitLab checks
+// is still the head.
+func headSha(sha string) (string, error) {
+	sha = strings.TrimSpace(sha)
+	if sha == "" {
+		return "", fmt.Errorf("sha is the head commit the page shows: open the merge request's page again")
+	}
+	return sha, nil
+}
+
+// staleHead says, for a refusal of a sha, that the merge request moved on.
+func staleHead(err error) error {
+	var gl *GitLabError
+	if errors.As(err, &gl) && strings.Contains(strings.ToLower(gl.Message), "sha") {
+		return fmt.Errorf("the merge request has a newer commit than the page shows: open its page again to see it (%w)", err)
+	}
+	return err
 }
 
 // structured is a tool's answer: the data, and the same as JSON text for a client that
@@ -452,7 +479,11 @@ func AddTools(server *mcp.Server, g *RealGitLab, person bool) {
 				if err != nil {
 					return nil, err
 				}
-				body := map[string]any{"squash": in.Squash, "should_remove_source_branch": true}
+				sha, err := headSha(in.Sha)
+				if err != nil {
+					return nil, err
+				}
+				body := map[string]any{"squash": in.Squash, "should_remove_source_branch": true, "sha": sha}
 				if in.Auto {
 					// auto_merge since GitLab 17.11; merge_when_pipeline_succeeds before it.
 					body["auto_merge"], body["merge_when_pipeline_succeeds"] = true, true
@@ -460,7 +491,7 @@ func AddTools(server *mcp.Server, g *RealGitLab, person bool) {
 				var m mergeRequest
 				path := fmt.Sprintf("projects/%s/merge_requests/%d/merge", pid(project), in.Number)
 				if err := g.send(ctx, http.MethodPut, path, body, &m); err != nil {
-					return nil, err
+					return nil, staleHead(err)
 				}
 				return map[string]any{"project": project, "number": in.Number, "state": m.State, "mergeSha": m.mergeSHA(), "auto": in.Auto}, nil
 			})

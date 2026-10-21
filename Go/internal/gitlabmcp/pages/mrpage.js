@@ -157,7 +157,7 @@ const mrPage = (ui, project, back) => {
     const others = mr.viewer && mr.author && mr.viewer.toLowerCase() !== mr.author.toLowerCase();
     const approve = others ? button("Approve", async (event) => {
       event.target.disabled = true;
-      try { await call("approve_merge_request"); say(`Approved !${mr.number}.`); log(`approve !${mr.number}`); refresh(); }
+      try { await call("approve_merge_request", { sha: mr.headSha }); say(`Approved !${mr.number}.`); log(`approve !${mr.number}`); refresh(); }
       catch (e) { event.target.disabled = false; say("Couldn't approve: " + e.message, true); }
     }) : null;
     const blocked = mr.conflicts ? "It conflicts with its target branch: rebase it first" : mr.draft ? "A draft can't be merged" : "";
@@ -173,7 +173,7 @@ const mrPage = (ui, project, back) => {
       const yes = button(isAuto ? "Turn On Auto-merge" : "Merge", async () => {
         yes.disabled = true;
         try {
-          const r = await call("merge_merge_request", { auto: isAuto, squash: !!mr.squash });
+          const r = await call("merge_merge_request", { auto: isAuto, squash: !!mr.squash, sha: mr.headSha });
           confirming = null;
           say(r.auto ? "Auto-merge is on: it merges once its pipeline succeeds." : `Merged !${mr.number}.`);
           log(`merge !${mr.number}${isAuto ? " (auto)" : ""}`);

@@ -156,12 +156,17 @@ func addViews(server *mcp.Server, g *RealGitLab, projectOf func(context.Context,
 		tool(server, &mcp.Tool{Name: "approve_merge_request", Title: "Approve a merge request",
 			Description: "Approves a merge request as the person whose token it is. Only a view may call it: a person approves.",
 			Meta:        uiMeta("", "app")},
-			func(ctx context.Context, in numberArgs) (map[string]any, error) {
+			func(ctx context.Context, in approveArgs) (map[string]any, error) {
 				project, err := projectOf(ctx, in.Project)
 				if err != nil {
 					return nil, err
 				}
-				return g.Approve(ctx, project, in.Number)
+				sha, err := headSha(in.Sha)
+				if err != nil {
+					return nil, err
+				}
+				r, err := g.Approve(ctx, project, in.Number, sha)
+				return r, staleHead(err)
 			})
 	}
 

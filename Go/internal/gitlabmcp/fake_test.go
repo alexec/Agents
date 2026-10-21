@@ -168,6 +168,11 @@ func (f *fakeGitLab) serve(w http.ResponseWriter, r *http.Request) {
 		}
 		return nil, false
 	}
+	// atHead is whether this request sent merge request iid's head sha.
+	atHead := func(iid string) bool {
+		o, ok := byIID(f.mrs, "iid", iid)
+		return ok && len(f.posted) > 0 && f.posted[len(f.posted)-1]["sha"] == o["sha"]
+	}
 	// stated is list's items in that state, in the order asked for and the page asked for, as
 	// GitLab answers.
 	stated := func(list []obj, key, want string) []obj {
@@ -215,6 +220,9 @@ func (f *fakeGitLab) serve(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		answer(404, obj{"message": "404 Not found"})
+	case len(parts) == 3 && parts[0] == "merge_requests" && (parts[2] == "merge" || parts[2] == "approve") && !atHead(parts[1]):
+		// GitLab's answer to a sha that is not the head.
+		answer(409, obj{"message": "SHA does not match HEAD of source branch"})
 	case len(parts) == 3 && parts[0] == "merge_requests" && parts[2] == "merge" && r.Method == http.MethodPut:
 		answer(200, obj{"iid": 1, "state": "merged", "merge_commit_sha": "merged1"})
 	case len(parts) == 3 && parts[0] == "merge_requests" && parts[2] == "diffs":
