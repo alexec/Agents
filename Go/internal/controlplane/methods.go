@@ -211,6 +211,9 @@ func (m *Methods) Handle(method string, params json.RawMessage, from Caller) (an
 			return nil, err
 		}
 	}
+	if ownersSSH[method] && m.callerPerson(from) != m.s.localOwner() {
+		return nil, notOwnersSSH
+	}
 	// What a code makes is the caller's person's (FR-017).
 	ctx = withCodeOwner(ctx, m.callerPerson(from))
 	if consoleMethods[method] {
