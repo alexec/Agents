@@ -74,11 +74,9 @@ func (d *Daemon) carryPage(ctx context.Context, page *websocket.Conn, private []
 	}
 	defer up.Close()
 	page.SetReadLimit(64 << 20)
-	toPage := func(line string) error {
-		wctx, cancel := context.WithTimeout(ctx, 30*time.Second)
-		defer cancel()
-		return page.Write(wctx, websocket.MessageText, []byte(line))
-	}
+	out := newPageOut(ctx, page)
+	defer out.Close()
+	toPage := out.Write
 	// Set once the control plane's ok has gone to the page: only then is the page one the
 	// control plane has checked, and only then are its calls to this host answered here.
 	var proved atomic.Bool
@@ -130,6 +128,83 @@ func (d *Daemon) carryPage(ctx context.Context, page *websocket.Conn, private []
 	case <-ctx.Done():
 	}
 }
+
+// pageOut writes the lines to one page, the control plane's and this host's channel's, in
+// the order they come. It writes from a goroutine of its own, through a bounded queue, as
+// a daemon.sock client is written (#1399, P20261021-1), so a page that stops reading (a
+// hung renderer, a frozen tab) never holds Broadcast, its caller or agentMu: its queue
+// stays full for sockQueueWait, or a write to it takes longer than pageWriteTimeout, and
+// it is let go. It connects again and catches up.
+type pageOut struct {
+	page *websocket.Conn
+	out  chan string
+	done chan struct{}
+	once sync.Once
+}
+
+const pageWriteTimeout = 30 * time.Second
+
+func newPageOut(ctx context.Context, page *websocket.Conn) *pageOut {
+	o := &pageOut{page: page, out: make(chan string, sockQueue), done: make(chan struct{})}
+	safe.Go("page write", func() { o.writeAll(ctx) })
+	return o
+}
+
+// Write queues a line; it never waits for the page.
+func (o *pageOut) Write(line string) error {
+	select {
+	case <-o.done:
+		return errSocketGone
+	default:
+	}
+	select {
+	case o.out <- line:
+		return nil
+	case <-o.done:
+		return errSocketGone
+	default:
+	}
+	// Full: a page behind in a burst gets a moment; one that reads nothing is let go.
+	wait := time.NewTimer(sockQueueWait)
+	defer wait.Stop()
+	select {
+	case o.out <- line:
+		return nil
+	case <-o.done:
+		return errSocketGone
+	case <-wait.C:
+		log.Printf("page: a page read none of the last %d lines in %s; let go", sockQueue, sockQueueWait)
+		o.Close()
+		return errSocketGone
+	}
+}
+
+// writeAll writes what is queued, a line at a time, until the page goes.
+func (o *pageOut) writeAll(ctx context.Context) {
+	for {
+		select {
+		case <-o.done:
+			return
+		case <-ctx.Done():
+			o.Close()
+			return
+		case line := <-o.out:
+			wctx, cancel := context.WithTimeout(ctx, pageWriteTimeout)
+			err := o.page.Write(wctx, websocket.MessageText, []byte(line))
+			cancel()
+			if err != nil {
+				if wctx.Err() == context.DeadlineExceeded {
+					log.Printf("page: a page took over %s to take a write; let go", pageWriteTimeout)
+				}
+				o.Close()
+				return
+			}
+		}
+	}
+}
+
+// Close lets the page go: its socket is closed, so its reader ends too.
+func (o *pageOut) Close() { o.once.Do(func() { close(o.done); o.page.CloseNow() }) }
 
 // dialForPage opens a socket to the control plane and proves this host on it as w:<host>,
 // with the page's port, at each address the membership has in turn.
