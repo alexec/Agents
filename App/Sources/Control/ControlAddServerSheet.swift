@@ -192,7 +192,7 @@ struct ControlAddServerSheet: View {
                                 if host.resolved != host.alias {
                                     Text(host.resolved).foregroundStyle(.secondary)
                                 }
-                                if host.known { Text("· already a host").foregroundStyle(.secondary) }
+                                if host.known { Text("· already a machine").foregroundStyle(.secondary) }
                             }
                             .textInputCompletion(host.alias)
                         }
@@ -311,7 +311,7 @@ struct ControlAddServerSheet: View {
     static func resolvedLine(_ host: DaemonAPI.SSHHost) -> String {
         var parts = ["ssh reaches it as \(host.resolved)"]
         if host.throughBastion { parts.append("through a bastion, so it can rarely reach this Mac") }
-        if host.known { parts.append("already a host") }
+        if host.known { parts.append("already a machine") }
         return parts.joined(separator: ", ") + "."
     }
 

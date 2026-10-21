@@ -3,7 +3,7 @@ import SwiftUI
 
 /// Settings ▸ Workspace Providers (#691, layouts.md L3): each workspace provider as a
 /// card of its workspaces, which are hosts already or can be added as one. A provider runs on
-/// the control plane, so it can start a host that is down.
+/// the control plane, so it can start a machine that is down.
 struct ControlProvidersPage: View {
     let control: ControlSettingsModel
     @State private var adding = false
@@ -35,7 +35,7 @@ struct ControlProvidersPage: View {
                         .buttonStyle(.paper)
                         .disabled(!control.providers.contains { $0.capabilities.contains("create") })
                 }
-                Text("A provider starts and stops the machines your hosts run on: Docker containers, DigitalOcean Droplets, GitHub Codespaces, Coder workspaces, Google Cloud Workstations and Compute Engine VMs, AWS EC2 instances, or anything with a command. It runs here, on the control plane, so it can start a host that is down.")
+                Text("A provider starts and stops your machines: Docker containers, DigitalOcean Droplets, GitHub Codespaces, Coder workspaces, Google Cloud Workstations and Compute Engine VMs, AWS EC2 instances, or anything with a command. It runs here, on the control plane, so it can start a machine that is down.")
                     .appText(.supporting).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -64,7 +64,7 @@ struct ControlProvidersPage: View {
             Button("Remove", role: .destructive) { Task { await control.removeProvider(provider.id) } }
             Button("Cancel", role: .cancel) {}
         } message: { _ in
-            Text("Its hosts stay, unlinked: nothing here can start or stop them any more. Its workspaces are left as they are.")
+            Text("Its machines stay as they are, unlinked: nothing here can start or stop them any more.")
         }
     }
 
@@ -73,7 +73,7 @@ struct ControlProvidersPage: View {
             ControlRow(dot: .none, title: provider.name, chip: kindChip(provider), detail: providerLine(provider)) {
                 HStack(spacing: 8) {
                 if provider.capabilities.contains("create") {
-                    Button("New Workspace…") { making = provider }.buttonStyle(.paper)
+                    Button("New Machine…") { making = provider }.buttonStyle(.paper)
                 }
                 Menu {
                     // A preset's name, and an API one's token or keys, as on the web page (#1932).
@@ -111,15 +111,15 @@ struct ControlProvidersPage: View {
                     } else if workspace.host == nil {
                         HStack(spacing: 8) {
                             linkToExistingHost(workspace, of: provider)
-                            Button("Add as Host…") {
+                            Button("Add as Machine…") {
                                 addingHost = .init(destination: workspace.ssh ?? "", name: workspace.name,
                                                    tunnel: workspace.tunnel ?? false, provider: provider.id,
                                                    workspace: workspace.id)
                             }
                             .buttonStyle(.paper)
                             .disabled(workspace.ssh == nil || workspace.state != "running")
-                            .help(workspace.ssh == nil ? "\(provider.name) gives no ssh destination for it: add it by command, then Link to Workspace… on its host."
-                                  : workspace.state == "running" ? "Installs Agents on it over ssh, and links the host to it."
+                            .help(workspace.ssh == nil ? "\(provider.name) gives no ssh destination for it: add it by command, then use Link to Provider… on it."
+                                  : workspace.state == "running" ? "Installs Agents on it over ssh, and links the machine to it."
                                   : "Start it first: it has to be running to be installed.")
                         }
                         .fixedSize()
@@ -139,9 +139,9 @@ struct ControlProvidersPage: View {
                 Task { await control.link(host.id, to: provider.id, workspace: workspace.id) }
             }
             .buttonStyle(.paper)
-            .help("\(host.name) may already be this workspace: links it, without installing again.")
+            .help("\(host.name) may already be this machine: links it, without installing again.")
         } else if !hosts.isEmpty {
-            Menu("Link to Existing Host") {
+            Menu("Link to Existing Machine") {
                 ForEach(hosts) { host in
                     Button(host.name) {
                         Task { await control.link(host.id, to: provider.id, workspace: workspace.id) }
@@ -150,7 +150,7 @@ struct ControlProvidersPage: View {
             }
             .menuStyle(.borderlessButton)
             .fixedSize()
-            .help("These hosts may already be this workspace: links one, without installing again.")
+            .help("One of these machines may already be this one: links it, without installing again.")
         }
     }
 
@@ -174,12 +174,12 @@ struct ControlProvidersPage: View {
         if let at = provider.listedAt {
             parts.append("\(provider.current ? "Listed" : "Showing what it listed at") \(at.formatted(date: .omitted, time: .shortened))")
         }
-        if provider.workspaces.isEmpty, provider.listedAt != nil { parts.append("No workspaces") }
+        if provider.workspaces.isEmpty, provider.listedAt != nil { parts.append("No machines") }
         if let tool = provider.preset.flatMap(AddProviderSheet.Kind.sshTool) { parts.append("needs \(tool) for ssh") }
         // A map or commands written for it that give no ssh (#975); a preset's own way in is its own.
         let written = provider.kind == "commands" ? provider.preset == nil : provider.mapped
         if written, !provider.workspaces.isEmpty, provider.workspaces.allSatisfy({ $0.ssh == nil }) {
-            parts.append("⚠ No ssh destination: Add as Host… and starting agentsd over ssh won’t work for these workspaces. Add one by hand: `user@{field}`.")
+            parts.append("⚠ No ssh destination: Add as Machine… and starting agentsd over ssh won’t work for these machines. Add one by hand: `user@{field}`.")
         }
         return parts.joined(separator: " · ")
     }
@@ -195,9 +195,9 @@ struct ControlProvidersPage: View {
     private func workspaceLine(_ workspace: DaemonAPI.WorkspaceInfo, of provider: DaemonAPI.ProviderSummary) -> String {
         var parts = [workspace.state.capitalized]
         if let host = workspace.host {
-            parts.append("linked to \(control.hosts.first { $0.id == host }?.name ?? "a host")")
+            parts.append("linked to \(control.hosts.first { $0.id == host }?.name ?? "a machine")")
         } else {
-            parts.append("not a host")
+            parts.append("not joined")
         }
         if let cost = workspace.cost { parts.append(cost) }
         return parts.joined(separator: " · ")
@@ -257,7 +257,7 @@ struct AddProviderSheet: View {
             case .coder: "Needs coder, signed in, and `coder config-ssh` run, on the Mac that runs the control plane."
             case .workstations: "Needs gcloud, signed in, on the Mac that runs the control plane, and a host in its ssh config that reaches the workstation’s port 22 through `gcloud workstations start-tcp-tunnel`."
             case .compute:
-                "Needs a service account’s JSON key, with the smallest role: compute.instances.list, start and stop, and for New Workspace… compute.instances.create, delete, setMetadata and setLabels, compute.disks.create, and compute.subnetworks.use and useExternalIp. ssh goes to each VM’s external address, so the network must let in port 22, and a static address keeps it the same after a stop (#1691). Nothing to install."
+                "Needs a service account’s JSON key, with the smallest role: compute.instances.list, start and stop, and for New Machine… compute.instances.create, delete, setMetadata and setLabels, compute.disks.create, and compute.subnetworks.use and useExternalIp. ssh goes to each VM’s external address, so the network must let in port 22, and a static address keeps it the same after a stop (#1691). Nothing to install."
             case .aws:
                 "Needs an IAM user’s access key, with the smallest policy: ec2:DescribeInstances on all resources, and ec2:StartInstances and ec2:StopInstances only on instances that have the tag (the condition aws:ResourceTag/‹tag› not Null). Nothing to install."
             case .commands: "The commands run on the Mac that runs the control plane, as you."
@@ -472,7 +472,7 @@ struct AddProviderSheet: View {
                 TextField("ssh", text: $ssh, prompt: Text("alex@127.0.0.1 -p 2222"))
                 TextField("Image", text: $image, prompt: Text("agents-devbox:latest"))
                     .disabled(!trimmed(containers).isEmpty)
-                Text("For New Workspace… and Delete Workspace…: an image that keeps running and has curl. Empty: it only lists.")
+                Text("For New Machine… and Delete Machine…: an image that keeps running and has curl. Empty: it only lists.")
                     .appText(.supporting).foregroundStyle(.secondary)
             case .digitalOcean:
                 reachPicker
@@ -681,7 +681,7 @@ struct AddProviderSheet: View {
             }
         } else {
             Section {
-                TextField("Workspace", text: $workspace, prompt: Text("devstack"))
+                TextField("Machine", text: $workspace, prompt: Text("devstack"))
                 TextField("ssh", text: $ssh, prompt: Text("devstack-1.cws"))
                 TextField("Start", text: $start, prompt: Text("cws start devstack-1"))
                 TextField("Stop", text: $stop, prompt: Text("cws stop devstack-1"))
@@ -888,7 +888,7 @@ struct AddProviderSheet: View {
             return parsed
         }
         guard !trimmed(workspace).isEmpty, !trimmed(start).isEmpty, !trimmed(stop).isEmpty else {
-            throw Wrong(description: "Give the workspace a name, and its Start and Stop commands.")
+            throw Wrong(description: "Give the machine a name, and its Start and Stop commands.")
         }
         var entry: [String: JSONValue] = ["name": .string(trimmed(workspace)), "start": .string(trimmed(start)),
                                           "stop": .string(trimmed(stop))]
@@ -1063,7 +1063,7 @@ struct EditProviderSheet: View {
                 readServiceKey(file)
             }
             Text(fields.isEmpty ? "Its CLI signs in where the control plane runs: only its name is kept here."
-                 : "Leave a field empty to keep the one it has. A new one goes to the control plane and is never shown again. Its hosts stay linked.")
+                 : "Leave a field empty to keep the one it has. A new one goes to the control plane and is never shown again. Its machines stay linked.")
                 .appText(.supporting).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             if let problem {
                 Text(problem).appText(.supporting).tinted(.failure).fixedSize(horizontal: false, vertical: true)
@@ -1124,7 +1124,7 @@ struct LinkWorkspaceSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("Link \(host.name) to a Workspace").appText(.title).fontWeight(.semibold)
+            Text("Link \(host.name) to a Provider’s Machine").appText(.title).fontWeight(.semibold)
             ScrollView {
                 VStack(alignment: .leading, spacing: 10) {
                     ForEach(control.providers) { provider in

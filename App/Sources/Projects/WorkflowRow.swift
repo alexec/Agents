@@ -70,7 +70,7 @@ struct WorkflowRow: View {
                     }
                     // Not here, without archiving it everywhere (#391).
                     if summary.canBeDenied {
-                        Button("Deny on This Host") { Task { await model.denyWorkflow(summary) } }
+                        Button("Deny on This Machine") { Task { await model.denyWorkflow(summary) } }
                     }
                 } else {
                     Button("Run now") { Task { await model.runWorkflow(summary) } }
@@ -234,7 +234,7 @@ struct WorkflowRow: View {
             if let note = waiting.note { return "Waiting for your OK — \(note)" }
             return (waiting.isNew ? "New" : "Changed since you approved it") + " — waiting for your OK"
         }
-        if summary.deniedHere != nil { return "Denied on this host — it does not run here" }
+        if summary.deniedHere != nil { return "Denied on this machine — it does not run here" }
         // Ahead of the pause, because unpausing it would change nothing: what has to
         // happen is that something else goes.
         if let limit = summary.overLimit {
@@ -291,7 +291,7 @@ struct WorkflowStatusIcon: View {
         if summary.isArchived { return "Archived" }
         if summary.waitsItsTurn { return "Over the limit" }
         if summary.awaitingApproval != nil { return "Waiting for your OK" }
-        if summary.deniedHere != nil { return "Denied on this host" }
+        if summary.deniedHere != nil { return "Denied on this machine" }
         if !summary.isEnabled { return "Turned off" }
         if summary.overLimit != nil { return "Over the limit" }
         if summary.needsAPerson { return "Needs attention" }

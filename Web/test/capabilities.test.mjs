@@ -19,7 +19,7 @@ test("a host has what its list names, and everything when it said no list", () =
 test("a host without the required set says what to update it to", () => {
   const old = row({ state: "needsUpdate", capabilities: ["agents/1"], missing: ["host.wire/1"] });
   assert.equal(caps.stateWords(old), "Needs an update");
-  assert.equal(caps.missingWords(old, "0.7.0"), "Update this host to Agents 0.7.0. It does not have host.wire/1.");
+  assert.equal(caps.missingWords(old, "0.7.0"), "Update this machine to Agents 0.7.0. It does not have host.wire/1.");
   assert.equal(caps.missingWords(row(), "0.7.0"), null);
   assert.equal(caps.versionWords(row({ implementation: "go" })), "Agents 0.6.0 (Go)");
 });

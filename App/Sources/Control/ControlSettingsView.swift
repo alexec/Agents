@@ -145,14 +145,14 @@ struct ControlOverviewPage: View {
                 // not writing a join, on this Mac's own plane, is down (#303).
                 if let join = control.status?.thisMacHost, !join.member || join.failed {
                     Divider()
-                    ControlRow(dot: .attention, title: "This Mac’s host", detail: join.summary) {
+                    ControlRow(dot: .attention, title: "This Mac as a machine", detail: join.summary) {
                         Text(join.member ? "Reconnecting" : "Not joined yet")
                             .appText(.reading)
                             .foregroundStyle(.secondary)
                     }
                 } else if control.isOnThisMac, control.thisMacHost == nil, control.status?.thisMacHost == nil {
                     Divider()
-                    ControlRow(dot: .attention, title: "This Mac’s host",
+                    ControlRow(dot: .attention, title: "This Mac as a machine",
                                detail: "It isn’t running, so it has not joined. Open Agents Host: it says why, and Repair there starts it again.") {
                         Text("Not running").appText(.reading).foregroundStyle(.secondary)
                     }
@@ -163,9 +163,9 @@ struct ControlOverviewPage: View {
                     .appText(.supporting).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            SharedSectionLabel("Hosts")
+            SharedSectionLabel("Machines")
             ControlCard {
-                ControlRow(dot: .none, title: "\(count(control.hosts.count, "host")) · \(control.onlineCount) online",
+                ControlRow(dot: .none, title: "\(count(control.hosts.count, "machine")) · \(control.onlineCount) online",
                            detail: control.hosts.map(hostName).joined(separator: ", ")) {
                     Button("Show") { model.settingsPaneAsked = .machines }.buttonStyle(.link)
                 }
@@ -302,7 +302,7 @@ struct ControlHostsPage: View {
                 Button("Add a Server…") { addingServer = true }.buttonStyle(.paper)
                 Button("Add by Code…") { addingByCode = true }.buttonStyle(.paper)
             }
-            Text("Add a Server gives you one command to run on it, or installs it over ssh as you log in from Terminal, through an ssh tunnel when it can’t reach this Mac. Either way the server connects out, so nothing has to reach it. Add by Code gives another Mac a code to join with. Removing a host stops it connecting. Its agents are left running where they are.")
+            Text("Add a Server gives you one command to run on it, or installs it over ssh as you log in from Terminal, through an ssh tunnel when it can’t reach this Mac. Either way the server connects out, so nothing has to reach it. Add by Code gives another Mac a code to join with. Removing a machine stops it connecting. Its agents are left running where they are.")
                 .appText(.supporting).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             SharedSectionLabel("Auto-detect")
@@ -432,7 +432,7 @@ struct ControlHostsPage: View {
                 if let workspace = host.workspace {
                     Button("Unlink from \(workspace.workspaceName)") { Task { await control.unlink(host.id) } }
                     if control.canDeleteWorkspace(host) {
-                        Button("Delete Workspace…", role: .destructive) { deleting = host }
+                        Button("Delete Machine…", role: .destructive) { deleting = host }
                     }
                     Toggle("Start when used", isOn: Binding(
                         get: { workspace.startWhenUsed },
@@ -450,7 +450,7 @@ struct ControlHostsPage: View {
                         Text("After 2 hours").tag(120)
                     }
                 } else {
-                    Button("Link to Workspace…") { linking = host }.disabled(control.providers.isEmpty)
+                    Button("Link to Provider…") { linking = host }.disabled(control.providers.isEmpty)
                 }
             }
             // Git access it uses of a Mac's, each taken back on its own (#1122).
@@ -477,11 +477,11 @@ struct ControlHostsPage: View {
     /// agents, and whether it backs up first (#1815).
     private func deleteWords(_ host: DaemonAPI.ControlHost) -> String {
         let agents = model.work.agents.filter { $0.host == host.id }.count
-        let workspace = host.workspace.map { "\($0.workspaceName) at \($0.providerName)" } ?? "The workspace"
+        let workspace = host.workspace.map { "\($0.workspaceName) at \($0.providerName)" } ?? "The machine"
         // An online host backs up first (#1815); an offline one keeps the backups it made.
         let backup = host.answers ? " It is backed up first, and deleted once the backup is made."
             : " It is offline, so it is not backed up first; the backups it made are kept."
-        return "\(workspace) and everything on its disk are deleted, and host \(host.name) is removed"
+        return "\(workspace) and everything on its disk are deleted, and \(host.name) is removed from your machines"
             + (agents == 0 ? "." : " with its \(agents == 1 ? "agent" : "\(agents) agents").") + backup
     }
 
@@ -499,7 +499,7 @@ struct ControlHostsPage: View {
     private func stopWords(_ host: DaemonAPI.ControlHost) -> String {
         var words: [String] = []
         if !stoppingNames.isEmpty {
-            words.append("\(Self.list(stoppingNames)) \(stoppingNames.count == 1 ? "is" : "are") working there. Stopping its workspace stops them.")
+            words.append("\(Self.list(stoppingNames)) \(stoppingNames.count == 1 ? "is" : "are") working there. Stopping the machine stops them.")
         }
         if let workspace = host.workspace, let wake = OfflineWords.wakeLine(workspace) {
             words.append("\(wake) again.")
@@ -600,7 +600,7 @@ struct ProjectDetectionCard: View {
         let detection = control.projectDetection
         ControlCard {
             VStack(alignment: .leading, spacing: 10) {
-                Toggle("Suggest projects on a host", isOn: Binding(
+                Toggle("Suggest projects on a machine", isOn: Binding(
                     get: { detection.enabled },
                     set: { on in Task { await control.setProjectDetection(ProjectDetection(enabled: on, paths: detection.paths)) } }))
                 TextField("Paths", text: $text, axis: .vertical)
@@ -624,7 +624,7 @@ struct ProjectDetectionCard: View {
             }
             .padding(16)
         }
-        Text("When a server joins, and from Choose Projects… on any host, each git repository directly inside these paths is listed, unticked. Only the ones you tick become projects, and you can add any other folder by its path. ~ is the host’s own home.")
+        Text("When a server joins, and from Choose Projects… on any machine, each git repository directly inside these paths is listed, unticked. Only the ones you tick become projects, and you can add any other folder by its path. ~ is the machine’s own home.")
             .appText(.supporting).foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)
             .onAppear(perform: load)
@@ -714,7 +714,7 @@ struct CodeSheet: View {
         switch purpose {
         case .mac: "Pair a Mac"
         case .browser: "Add a Browser"
-        case .host: "Add a host by code"
+        case .host: "Add a machine by code"
         }
     }
 

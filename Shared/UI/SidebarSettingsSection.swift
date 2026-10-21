@@ -41,7 +41,7 @@ struct SidebarSettingsSection: View {
                  + "Nothing to do, unless it showed you a file. Off, it waits for you to approve it. "
                  + "Archived chats come back with Unarchive. "
                  // Each host reads its own preferences (#1872): the docs' sentence.
-                 + "A server's host does not read this switch, so a chat in a server project may still archive itself.")
+                 + "A server does not read this switch, so a chat in a server project may still archive itself.")
                 .appText(.fine)
                 .foregroundStyle(.secondary)
         }

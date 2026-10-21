@@ -15,7 +15,7 @@ test("an email row says its IMAP server and the app password", () => {
 test("Email has the Mac's words", () => {
   assert.equal(c.name("email"), "Email");
   assert.equal(c.letters("email"), "EM");
-  assert.equal(c.email.sheetFoot, "The app password is kept by the host, never in a log.");
+  assert.equal(c.email.sheetFoot, "The app password is kept by the machine, never in a log.");
   assert.equal(c.site("email"), "");
   assert.equal(c.notConnectedNote("email"), "One mailbox for agents: they wait for mail, such as a sign-up code, and read it.");
   assert.equal(c.continueButtonFor("email"), "Connect");

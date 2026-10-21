@@ -111,7 +111,7 @@ function WorkspaceRow({ store, provider, workspace, hosts, say, link }: {
       {host && <button type="button" class="link small" onClick={() => void unlink()}>Unlink</button>}
       {!workspace.host && free.length > 0 && (
         <button type="button" onClick={link}>
-          {free.length === 1 && mayBe(workspace, free[0]!.name) ? `Link to ${free[0]!.name}…` : "Link to Host…"}
+          {free.length === 1 && mayBe(workspace, free[0]!.name) ? `Link to ${free[0]!.name}…` : "Link to Machine…"}
         </button>
       )}
     </li>
@@ -179,7 +179,7 @@ function AddProviderDialog({ store, editing, close }: { store: Store; editing?: 
             ))}
           </form>
         )}
-        {working && <p class="quiet small">Checking it lists its workspaces…</p>}
+        {working && <p class="quiet small">Checking it lists its machines…</p>}
         {problem && <p class="small failure">{problem}</p>}
         <div class="sheet-actions">
           <span class="quiet small grow">{words.secretsFoot}</span>
@@ -206,13 +206,13 @@ function LinkDialog({ store, provider, workspace, close }: {
     else close();
   };
   return (
-    <Modal label={`Link ${workspace.name} to a Host`} close={close}>
+    <Modal label={`Link ${workspace.name} to a Machine`} close={close}>
       <div class="sheet-body connect-sheet provider-sheet">
-        <p class="strong">Link {workspace.name} to a Host</p>
-        <p class="small quiet">The host already runs on this workspace: {provider.name} starts and stops it, and nothing is installed again.</p>
+        <p class="strong">Link {workspace.name} to a Machine</p>
+        <p class="small quiet">Agents already runs on this machine: {provider.name} starts and stops it, and nothing is installed again.</p>
         {hosts.length === 0 ? <p class="small">{words.noHosts}</p> : (
           <form class="token-form" onSubmit={(e) => { e.preventDefault(); void link(); }}>
-            <label>Host
+            <label>Machine
               <select value={host} onChange={(e) => setHost((e.target as HTMLSelectElement).value)}>
                 {hosts.map((h) => <option key={h.id} value={h.id}>{h.name}</option>)}
               </select>

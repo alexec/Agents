@@ -50,7 +50,7 @@ struct NewWorkspaceSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("New Workspace on \(provider.name)").appText(.title).fontWeight(.semibold)
+            Text("New Machine on \(provider.name)").appText(.title).fontWeight(.semibold)
             if loading {
                 ProgressView().controlSize(.small)
             } else {
@@ -66,7 +66,7 @@ struct NewWorkspaceSheet: View {
             if let problem {
                 Text(problem).appText(.supporting).tinted(.failure).fixedSize(horizontal: false, vertical: true)
             }
-            Text("It joins as a host by itself once it has started, and is linked to it. Then it clones the projects you list, one a line, with this Mac’s git access when you allow it.")
+            Text("It joins as a machine by itself once it has started, and is linked to it. Then it clones the projects you list, one a line, with this Mac’s git access when you allow it.")
                 .appText(.supporting).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             HStack {
                 Spacer()

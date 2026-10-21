@@ -231,7 +231,7 @@ struct WorkflowPage: View {
                         // Not on this host, without archiving it everywhere (#391).
                         if summary.canBeDenied {
                             Button { Task { await model.denyWorkflow(summary) } } label: {
-                                Text("Deny on This Host").frame(maxWidth: .infinity)
+                                Text("Deny on This Machine").frame(maxWidth: .infinity)
                             }
                             .buttonStyle(.paper)
                         }
@@ -346,7 +346,7 @@ struct WorkflowPage: View {
                     .padding(14)
                     .paperRaised(in: RoundedRectangle(cornerRadius: 18))
             } else {
-                note("The workflow file could not be read from the host.")
+                note("The workflow file could not be read from the machine.")
             }
         }
     }
@@ -470,11 +470,11 @@ struct WorkflowPage: View {
 
     private func scopeLine(_ trigger: WorkflowTrigger) -> String? {
         let project = summaryProjectName
-        if trigger.schedule != nil { return "By the host's clock" }
+        if trigger.schedule != nil { return "By the machine's clock" }
         switch trigger.listensIn {
         case .project?: return "In \(project)"
-        case .mac?: return "Anywhere on this host, so it runs in every project"
-        case .either?: return "In \(project), or anywhere on this host"
+        case .mac?: return "Anywhere on this machine, so it runs in every project"
+        case .either?: return "In \(project), or anywhere on this machine"
         case nil: return nil
         }
     }

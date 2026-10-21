@@ -12,7 +12,7 @@ struct ConnectorLevelsTests {
         #expect(MCPHealthWords.levels(github).filter(\.reached).map(\.name) == ["Tools", "Events"])
         #expect(MCPHealthWords.levels(nil).filter(\.reached).isEmpty)
         #expect(MCPHealthWords.levelsSentence(github) == "Reaches Tools, Events. Not yet Views, Workflows, Tested.")
-        #expect(MCPHealthWords.levelsSentence(nil) == "Its levels show once its host has checked it.")
+        #expect(MCPHealthWords.levelsSentence(nil) == "Its levels show once its machine has checked it.")
         #expect(MCPHealthWords.levelsSentence(DaemonAPI.MCPLevels()) == "Reaches none of the five levels yet.")
         #expect(MCPHealthWords.levelsSentence(DaemonAPI.MCPLevels(tools: true, events: true, views: true,
                                                                   workflows: true, tested: true))

@@ -13,7 +13,7 @@ export function KeptBubbles({ store, kept }: { store: Store; kept: readonly Kept
   return (
     <>
       {kept.map((one) => {
-        const name = store.hosts.value.find((h) => h.id === one.host)?.name ?? "the host";
+        const name = store.hosts.value.find((h) => h.id === one.host)?.name ?? "the machine";
         return (
           <div key={one.id} class="queued kept">
             <div class="queued-bubble" role="group" aria-label={`${keptLine(name, one)}: ${one.text}`}>

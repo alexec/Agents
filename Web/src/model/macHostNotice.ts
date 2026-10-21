@@ -33,10 +33,10 @@ export function decideMacHostNotice(planeOnThisMac: boolean, macState: string | 
 
 export function macHostNoticeTitle(notice: MacHostNotice): string {
   switch (notice.kind) {
-    case "notRunning": return "This Mac’s host isn’t running";
-    case "notJoined": return "This Mac’s host hasn’t joined";
-    case "uplinkFailing": return "This Mac’s host can’t reach the control plane";
-    case "notAnswering": return "This Mac’s host isn’t answering";
+    case "notRunning": return "This Mac isn’t running as a machine";
+    case "notJoined": return "This Mac hasn’t joined";
+    case "uplinkFailing": return "This Mac can’t reach the control plane";
+    case "notAnswering": return "This Mac isn’t answering";
   }
 }
 

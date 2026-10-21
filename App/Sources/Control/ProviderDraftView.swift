@@ -166,7 +166,7 @@ struct ProviderDraftStatus: View {
     private func sshLine(_ update: DaemonAPI.ProviderDraftUpdate) -> (text: String, warning: Bool)? {
         guard let check = update.check, check.passed else { return nil }
         if check.noSSH == true {
-            return ("⚠ No ssh destination: Add as Host… and starting agentsd over ssh won’t work for these workspaces. Add one by hand: `user@{field}`.", true)
+            return ("⚠ No ssh destination: Add as Machine… and starting agentsd over ssh won’t work for these machines. Add one by hand: `user@{field}`.", true)
         }
         return check.ssh.map { ("✓ \($0)", false) }
     }

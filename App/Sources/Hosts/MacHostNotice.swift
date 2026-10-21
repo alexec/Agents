@@ -46,11 +46,11 @@ enum MacHostNotice: Equatable {
 
     var title: String {
         switch self {
-        case .notRunning: "This Mac’s host isn’t running"
-        case .notJoined: "This Mac’s host hasn’t joined"
-        case .notAnswering: "This Mac’s host isn’t answering"
-        case .uplinkFailing: "This Mac’s host can’t reach the control plane"
-        case .windowLost: "This window lost its connection to this Mac’s host"
+        case .notRunning: "This Mac isn’t running as a machine"
+        case .notJoined: "This Mac hasn’t joined"
+        case .notAnswering: "This Mac isn’t answering"
+        case .uplinkFailing: "This Mac can’t reach the control plane"
+        case .windowLost: "This window lost its connection to this Mac"
         }
     }
 
@@ -69,7 +69,7 @@ enum MacHostNotice: Equatable {
         case .uplinkFailing(let problem):
             "It’s running, and its link to the control plane keeps failing. \(Self.sentence(problem)) It’s trying again by itself; Agents Host’s Copy Diagnostics says more."
         case .windowLost:
-            "The host and the control plane are both up. What’s listed is what the window last heard, and it’s reconnecting by itself."
+            "This Mac and the control plane are both up. What’s listed is what the window last heard, and it’s reconnecting by itself."
         }
     }
 
@@ -77,15 +77,15 @@ enum MacHostNotice: Equatable {
     var action: String {
         switch self {
         case .notRunning:
-            "This Mac’s host isn’t running, so that didn’t happen. Open Agents Host."
+            "This Mac isn’t running as a machine, so that didn’t happen. Open Agents Host."
         case .notJoined:
-            "This Mac’s host hasn’t joined the control plane, so that didn’t happen. Open Agents Host and press Try Again there."
+            "This Mac hasn’t joined the control plane, so that didn’t happen. Open Agents Host and press Try Again there."
         case .notAnswering:
-            "This Mac’s host isn’t answering, so that didn’t happen. The window is trying again by itself; Try Again tries now."
+            "This Mac isn’t answering, so that didn’t happen. The window is trying again by itself; Try Again tries now."
         case .uplinkFailing:
-            "This Mac’s host can’t reach the control plane, so that didn’t happen. It’s trying again by itself; Try Again tries now."
+            "This Mac can’t reach the control plane, so that didn’t happen. It’s trying again by itself; Try Again tries now."
         case .windowLost:
-            "This window lost its connection to this Mac’s host, so that didn’t happen. It’s reconnecting by itself; Try Again tries now."
+            "This window lost its connection to this Mac, so that didn’t happen. It’s reconnecting by itself; Try Again tries now."
         }
     }
 
@@ -93,15 +93,15 @@ enum MacHostNotice: Equatable {
     func strip(since: String?) -> String {
         switch self {
         case .notRunning:
-            "This Mac’s host isn’t running\(Self.since(since)). Open Agents Host. Nothing here can change until it is."
+            "This Mac isn’t running as a machine\(Self.since(since)). Open Agents Host. Nothing here can change until it is."
         case .notJoined:
-            "This Mac’s host hasn’t joined the control plane\(Self.since(since)). Open Agents Host and press Try Again there. Nothing here can change until it has."
+            "This Mac hasn’t joined the control plane\(Self.since(since)). Open Agents Host and press Try Again there. Nothing here can change until it has."
         case .notAnswering:
             OfflineWords.line(host: .mac, name: "This Mac", since: since)
         case .uplinkFailing(let problem):
-            "This Mac’s host is running and can’t reach the control plane\(Self.since(since)). \(Self.sentence(problem)) It’s trying again by itself."
+            "This Mac is up and can’t reach the control plane\(Self.since(since)). \(Self.sentence(problem)) It’s trying again by itself."
         case .windowLost:
-            "This window lost its connection to this Mac’s host\(Self.since(since)). The host is up, and the window is reconnecting by itself."
+            "This window lost its connection to this Mac\(Self.since(since)). This Mac is up, and the window is reconnecting by itself."
         }
     }
 

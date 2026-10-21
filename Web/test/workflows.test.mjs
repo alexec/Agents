@@ -124,17 +124,17 @@ test("a workflow denied on this host stays listed, runs nothing here, and can be
   const summary = { workflow: { workflowID: "d", triggers: [schedule], mode: "new", prompt: "", settings: {}, unknownFields: {} },
     isArchived: false, isEnabled: true, isRunning: false, nextFireAtByTrigger: [],
     deniedHere: { digest: "x", isNew: true } };
-  assert.equal(w.workflowStatus(summary).words, "Denied on this host");
+  assert.equal(w.workflowStatus(summary).words, "Denied on this machine");
   assert.equal(w.workflowNeedsAPerson(summary), false);
   assert.equal(w.isUnapproved(summary), true);
   assert.equal(w.canBeApproved(summary), true);
   assert.equal(w.canBeDenied(summary), false);
-  assert.equal(w.happening(summary), "Denied on this host — it does not run here");
+  assert.equal(w.happening(summary), "Denied on this machine — it does not run here");
   assert.equal(w.nextLine(summary, 0), "No next time until you approve it");
   const waiting = { ...summary, deniedHere: undefined, awaitingApproval: { digest: "x", isNew: true }, overLimit: "project" };
   assert.equal(w.canBeDenied(waiting), true, "even one waiting its turn can be denied");
   assert.equal(w.canBeApproved(waiting), false);
-  assert.equal(w.refusalMessage({ deniedHere: {} }), "it is denied on this host");
+  assert.equal(w.refusalMessage({ deniedHere: {} }), "it is denied on this machine");
 });
 
 // Filters in words (#574): the key and its values, held to EventPatternFinerTests.swift's

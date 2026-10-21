@@ -493,7 +493,7 @@ func TestOverlayAndOfflineRefusal(t *testing.T) {
 	if Overlay(map[string]any{"state": "online"}, true, &HostWorkspace{HostState: new("stopping")})["state"] != "stopping" {
 		t.Error("stopping not shown")
 	}
-	if OfflineRefusal(ws).Message != "That host is stopped. Start it to reach it." || OfflineRefusal(nil).Message != "That host is offline." {
+	if OfflineRefusal(ws).Message != "That machine is stopped. Start it to reach it." || OfflineRefusal(nil).Message != "That machine is offline." {
 		t.Error("refusal words")
 	}
 }

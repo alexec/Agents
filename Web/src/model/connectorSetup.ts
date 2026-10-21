@@ -16,12 +16,12 @@ export const abilities = [
 ];
 export const sheetSubtitle = "For you, in every project. Agents talks to GitHub's API directly.";
 export const sheetChoose = "On github.com you choose which repositories. You can take it back there, or with Disconnect on Your Connectors.";
-export const sheetFoot = "The token is kept by the host, never in a log.";
+export const sheetFoot = "The token is kept by the machine, never in a log.";
 export const continueButton = "Continue on github.com";
 /** Where the person sees and changes which repositories the App reaches, as the Mac's (#1685). */
 export const installationsURL = "https://github.com/settings/installations";
 export const otherProvidersElsewhere = "Other providers are set up on the Mac.";
-export const disconnectNote = "Disconnect deletes the host's tokens. Every project's GitHub slots wait for a connection again. To revoke the App too, go to github.com ▸ Settings ▸ Applications.";
+export const disconnectNote = "Disconnect deletes the machine's tokens. Every project's GitHub slots wait for a connection again. To revoke the App too, go to github.com ▸ Settings ▸ Applications.";
 
 export function intro(project: string, repository: string | undefined, site = "github.com"): string {
   if (!repository) return `What agents in ${project} can reach. It has no GitHub or GitLab remote.`;
@@ -251,7 +251,7 @@ export function disconnectNoteFor(p: ConnectionProvider): string {
   if (p === "github") return disconnectNote;
   if (p === "gitlab") return gitlab.disconnectNote;
   if (p === "email") return email.disconnectNote;
-  return "Disconnect deletes the host's tokens. Linear's events stop until you connect again or set LINEAR_API_KEY. To revoke Agents too, go to linear.app ▸ Settings ▸ Security & access.";
+  return "Disconnect deletes the machine's tokens. Linear's events stop until you connect again or set LINEAR_API_KEY. To revoke Agents too, go to linear.app ▸ Settings ▸ Security & access.";
 }
 
 export function projectLine(setup: ConnectorSetup): string {
@@ -296,7 +296,7 @@ export const gitlab = {
   tokenPrompt: "glpat-…",
   tokenButton: "Connect",
   checking: "Checking the token with GitLab…",
-  disconnectNote: "Disconnect deletes the host's token. Every project's GitLab slots wait for a connection again. GitLab's events stop until you connect again or set GITLAB_TOKEN. To revoke it too, go to GitLab ▸ Preferences ▸ Applications or Access tokens.",
+  disconnectNote: "Disconnect deletes the machine's token. Every project's GitLab slots wait for a connection again. GitLab's events stop until you connect again or set GITLAB_TOKEN. To revoke it too, go to GitLab ▸ Preferences ▸ Applications or Access tokens.",
 };
 
 /**
@@ -326,7 +326,7 @@ export function newGitLabTokenURL(address: string): string {
 
 /** Connect Email (#1780): one IMAP mailbox, by an app password that goes to the host only. */
 export const email = {
-  sheetFoot: "The app password is kept by the host, never in a log.",
+  sheetFoot: "The app password is kept by the machine, never in a log.",
   abilities: [
     "Know when mail comes, by sender and subject",
     "List, search and read messages",
@@ -343,7 +343,7 @@ export const email = {
   button: "Connect",
   checking: "Signing in to the mail server…",
   choose: "Agents can read every message in this mailbox. It never sends, answers or deletes mail. Take the app password back at your mail provider, or with Disconnect on Your Connectors.",
-  disconnectNote: "Disconnect deletes the host's app password. The email server's events stop until you connect again or set EMAIL_PASSWORD. To revoke it too, delete the app password at your mail provider.",
+  disconnectNote: "Disconnect deletes the machine's app password. The email server's events stop until you connect again or set EMAIL_PASSWORD. To revoke it too, delete the app password at your mail provider.",
   failed: "The mail server did not take the sign-in.",
 };
 

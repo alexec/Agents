@@ -130,7 +130,7 @@ public struct HTMLPageScope: Sendable, Hashable {
                 return .refused(status: 415, reason: "\(describedAs) is not carried to the page.")
             case .unchanged:
                 // Never asked for: a page's request names no stamp.
-                return .refused(status: 500, reason: "The host sent nothing.")
+                return .refused(status: 500, reason: "The machine sent nothing.")
             }
         } catch let error as JSONRPCError {
             // The host's own refusal (gone, outside the agent's folders) in its words.

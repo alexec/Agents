@@ -17,7 +17,7 @@ hosts/dropKept
 {"kept":[]}
 
 hosts/link refused
-{"code":-32091,"message":"No host is called nobody."}
+{"code":-32091,"message":"No machine is called nobody."}
 
 providers/remove refused
 {"code":-32602,"message":"There is no such provider."}

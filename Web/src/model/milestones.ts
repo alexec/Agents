@@ -16,7 +16,7 @@ export const milestoneList: { id: MilestoneID; title: string; how: string }[] = 
   { id: "firstRemoteAnswer", title: "First question answered away from the Mac",
     how: "Answer an agent's question from the Remote or the web page." },
   { id: "firstWorkflow", title: "First workflow made", how: "Make a workflow that runs an agent on a schedule or an event." },
-  { id: "firstCloudHost", title: "First cloud host started", how: "Start a workspace on a cloud provider." },
+  { id: "firstCloudHost", title: "First cloud machine started", how: "Start a machine on a cloud provider." },
   { id: "firstLandedPR", title: "First pull request landed with nobody watching",
     how: "Let an agent open a pull request that merges by itself." },
   { id: "fiveAtOnce", title: "Five agents working at once", how: "Have five agents in a turn at the same time." },

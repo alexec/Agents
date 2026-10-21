@@ -137,7 +137,7 @@ export function useWaitingCards({ store, host, session, down = false }: {
 
   const cards = held.value.filter((c) => c.answered !== "here");
   if (!cards.length) return [];
-  const recipient = store.isMac(host) ? "your Mac" : store.hosts.value.find((h) => h.id === host)?.name ?? "the host";
+  const recipient = store.isMac(host) ? "your Mac" : store.hosts.value.find((h) => h.id === host)?.name ?? "the machine";
   // Who is asking, by title and runtime (#121).
   const runtimeName = (id: string) => (store.runtimes.value[host] ?? []).find((r) => r.runtime.id === id)?.runtime.name;
   const asker = (agentID: string, subagent?: string) =>

@@ -111,7 +111,7 @@ func (m *Methods) refuseOthersHosts(params json.RawMessage, from Caller) error {
 			continue
 		}
 		if m.records.Host(host) != nil && !m.owns(from, host) {
-			return fail(noSuchHost, "No host is called %s.", host)
+			return fail(noSuchHost, "No machine is called %s.", host)
 		}
 	}
 	return nil

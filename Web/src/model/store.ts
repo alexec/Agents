@@ -2150,7 +2150,7 @@ export class Store extends Work {
 
   /** Who an action goes to, as the pending mark says it: "your Mac", or the host's name. */
   recipient(host: string): string {
-    return this.isMac(host) ? "your Mac" : this.hosts.value.find((h) => h.id === host)?.name ?? "the host";
+    return this.isMac(host) ? "your Mac" : this.hosts.value.find((h) => h.id === host)?.name ?? "the machine";
   }
 
   private async acting(agentID: string, act: AgentAct, run: () => Promise<unknown>): Promise<void> {

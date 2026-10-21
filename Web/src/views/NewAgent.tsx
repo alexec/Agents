@@ -351,7 +351,7 @@ export function NewAgent({ store, host, folder, projectName, down }: {
     form.value = { ...form.value, chosen: { ...form.value.chosen, [id]: value } };
     note({ runtimeID: chosenRuntime!, chosen: form.value.chosen });
   };
-  const saying = !chosenRuntime ? <p class="quiet small">No runtime can start on this host.</p>
+  const saying = !chosenRuntime ? <p class="quiet small">No runtime can start on this machine.</p>
     : state === "loading" ? <p class="quiet small">Asking {runtimeName} what it offers…</p>
     : typeof state === "object" ? (
       <p class="failure small">{state.failed}{" "}
@@ -450,7 +450,7 @@ export function NewAgent({ store, host, folder, projectName, down }: {
                   refusal.value = null;
                   note({ runtimeID: id, chosen: {} });
                 }}>
-                {!runtimes.length && <option value="">No runtime can start on this host</option>}
+                {!runtimes.length && <option value="">No runtime can start on this machine</option>}
                 {/* In runs only when one is out, as the window's chooser (065). */}
                 {runs.out.length ? <optgroup label="Available">{runs.available.map(runtimeOption)}</optgroup> : runs.available.map(runtimeOption)}
                 {runs.out.length > 0 && <optgroup label="Out">{runs.out.map(runtimeOption)}</optgroup>}

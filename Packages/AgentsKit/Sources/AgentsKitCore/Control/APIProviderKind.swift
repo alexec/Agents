@@ -55,7 +55,7 @@ public enum APIProviderKind: String, CaseIterable, Identifiable, Sendable {
         case .aws:
             "Needs an IAM user’s access key, with the smallest policy: ec2:DescribeInstances on all resources, and ec2:StartInstances and ec2:StopInstances only on instances that have the tag (the condition aws:ResourceTag/‹tag› not Null). Nothing to install."
         case .compute:
-            "Needs a service account’s JSON key, with the smallest role: compute.instances.list, start and stop, and for New Workspace… compute.instances.create, delete, setMetadata and setLabels, compute.disks.create, and compute.subnetworks.use and useExternalIp. ssh goes to each VM’s external address, so the network must let in port 22. Nothing to install."
+            "Needs a service account’s JSON key, with the smallest role: compute.instances.list, start and stop, and for New Machine… compute.instances.create, delete, setMetadata and setLabels, compute.disks.create, and compute.subnetworks.use and useExternalIp. ssh goes to each VM’s external address, so the network must let in port 22. Nothing to install."
         }
     }
 
@@ -156,17 +156,17 @@ public enum APIProviderKind: String, CaseIterable, Identifiable, Sendable {
 /// Settings ▸ Workspace providers' words on a phone and on the web (#1808, #1819).
 public enum WorkspaceProviderWords {
     public static let heading = "Workspace providers"
-    public static let footer = "A provider starts and stops the machines your hosts run on: DigitalOcean Droplets, GitHub Codespaces, Coder workspaces, "
-        + "Google Compute Engine VMs or AWS EC2 instances, through their API. It runs on the control plane, so it can start a host that is down. "
+    public static let footer = "A provider starts and stops your machines: DigitalOcean Droplets, GitHub Codespaces, Coder workspaces, "
+        + "Google Compute Engine VMs or AWS EC2 instances, through their API. It runs on the control plane, so it can start a machine that is down. "
         + "Docker, Cloud Workstations, your own commands and MCP servers are added in the Mac app."
     public static let oneCopy = "Workspace providers need a control plane with one copy, such as the one on your Mac. This one has several."
     public static let add = "Add Provider…"
     public static let secretsFoot = "Tokens and keys go to the control plane and are never shown again. This device does not keep them."
     public static let editSecret = "Leave empty to keep the one it has."
     public static func removeTitle(_ name: String) -> String { "Remove \(name)?" }
-    public static let removeNote = "Its hosts stay, unlinked: nothing here can start or stop them any more. Its workspaces are left as they are."
-    public static let noHosts = "No host to link: add one in the Mac app, or start one from a repository."
-    public static let notAHostYet = "Not a host yet: add it as a host in the Mac app, in Settings ▸ Workspace Providers."
+    public static let removeNote = "Its machines stay as they are, unlinked: nothing here can start or stop them any more."
+    public static let noHosts = "No machine to link: add one in the Mac app, or start one from a repository."
+    public static let notAHostYet = "Not joined yet: add it as a machine in the Mac app, in Settings ▸ Workspace Providers."
 
     /// What a workspace with no host says when no host is free to link to it (#1931): this
     /// device can't install Agents on it, so the person is told where to (the Mac's Add as Host…).
@@ -187,7 +187,7 @@ public enum WorkspaceProviderWords {
         var parts: [String] = []
         if let problem = provider.problem, !provider.current || provider.listedAt == nil { parts.append("Couldn’t list: \(problem)") }
         if let at = provider.listedAt { parts.append("\(provider.current ? "Listed" : "Showing what it listed at") \(time(at))") }
-        if provider.workspaces.isEmpty, provider.listedAt != nil { parts.append("No workspaces") }
+        if provider.workspaces.isEmpty, provider.listedAt != nil { parts.append("No machines") }
         switch provider.preset {
         case "codespaces-api": parts.append("needs gh for ssh")
         case "coder-api": parts.append("needs coder for ssh")
@@ -200,9 +200,9 @@ public enum WorkspaceProviderWords {
     public static func workspaceLine(_ workspace: DaemonAPI.WorkspaceInfo, hosts: [DaemonAPI.ControlHost]) -> String {
         var parts = [workspace.state.prefix(1).uppercased() + workspace.state.dropFirst()]
         if let host = workspace.host {
-            parts.append("linked to \(hosts.first { $0.id == host }?.name ?? "a host")")
+            parts.append("linked to \(hosts.first { $0.id == host }?.name ?? "a machine")")
         } else {
-            parts.append("not a host")
+            parts.append("not joined")
         }
         if let cost = workspace.cost { parts.append(cost) }
         return parts.joined(separator: " · ")

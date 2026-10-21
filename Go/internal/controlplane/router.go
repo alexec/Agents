@@ -787,7 +787,7 @@ func (r *Router) dropHostLocked(host string, gen int64, newState *hostState) {
 			delete(s.copying, host)
 			// What was asked of it is answered, not lost (#77).
 			for id := range waiting {
-				r.writeLocked(t.session, s.wrap(host, replyError(json.RawMessage(id), fail(hostOffline, "That host went offline before it answered."))))
+				r.writeLocked(t.session, s.wrap(host, replyError(json.RawMessage(id), fail(hostOffline, "That machine went offline before it answered."))))
 			}
 			// A bare-wire client (the Remote) talks to the home host's daemon and hears
 			// nothing else. Its connection ends, so it reconnects and reads everything
@@ -1420,7 +1420,7 @@ func (r *Router) clientLine(line, sessionID string) {
 		if r.homeHost != "" {
 			r.toHostLocked(r.homeHost, msg, sessionID)
 		} else if ok && m.isRequest() {
-			r.writeLocked(sessionID, replyError(m.ID, fail(noSuchHost, "This control plane has no home host.")))
+			r.writeLocked(sessionID, replyError(m.ID, fail(noSuchHost, "This control plane has no home machine.")))
 		}
 		r.mu.Unlock()
 	}
@@ -1463,7 +1463,7 @@ func (r *Router) toHostLocked(host, msg, sessionID string) {
 	}
 	// Another user's machine is not found, as one that is not there (FR-018).
 	if !r.known[host] || !r.mayReachLocked(s.caller, host) {
-		r.writeLocked(sessionID, s.wrap(host, replyError(m.ID, fail(noSuchHost, "No host is called %s.", host))))
+		r.writeLocked(sessionID, s.wrap(host, replyError(m.ID, fail(noSuchHost, "No machine is called %s.", host))))
 		return
 	}
 	// A host from before the team tier, on a team, would act for every person (R14).
@@ -1504,7 +1504,7 @@ func (r *Router) toHostLocked(host, msg, sessionID string) {
 	}
 	if !h.conn.Send(channelFrame(c, msg)) {
 		// An uplink that has ended but is not yet dropped takes nothing: said, not lost (#62).
-		r.writeLocked(sessionID, s.wrap(host, replyError(m.ID, fail(hostOffline, "That host is offline."))))
+		r.writeLocked(sessionID, s.wrap(host, replyError(m.ID, fail(hostOffline, "That machine is offline."))))
 		return
 	}
 	if s.inFlight[host] == nil {

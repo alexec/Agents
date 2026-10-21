@@ -278,7 +278,7 @@ export function workflowStatus(s: WorkflowSummary): { mark: string; words: strin
   // A shield, not a hand (#587): the hand is a session's Needs You mark, and a workflow waiting
   // for an OK beside it read as one more session asking.
   if (s.awaitingApproval) return { mark: "🛡\uFE0E", words: "Waiting for your OK", tinted };
-  if (s.deniedHere) return { mark: "⊘", words: "Denied on this host", tinted };
+  if (s.deniedHere) return { mark: "⊘", words: "Denied on this machine", tinted };
   if (!isOn(s)) return { mark: "⏸\uFE0E", words: "Turned off", tinted };
   if (s.overLimit) return { mark: "!", words: "Over the limit", tinted };
   if (tinted) return { mark: "!", words: "Needs attention", tinted };
@@ -581,7 +581,7 @@ export function refusalMessage(refusal: WorkflowRefusal): string {
   if ("folderGone" in refusal) return "the project folder is not there";
   if ("dayLimitReached" in refusal) return "the day's spending limit has been reached";
   if ("settingRefused" in refusal) return refusal.settingRefused.detail;
-  if ("deniedHere" in refusal) return "it is denied on this host";
+  if ("deniedHere" in refusal) return "it is denied on this machine";
   if ("queued" in refusal) return "a run is still going, and it runs when that ends";
   if ("queueFull" in refusal) return `${refusal.queueFull.limit} triggers are already queued for it`;
   if ("coolingDown" in refusal) {
@@ -620,7 +620,7 @@ export function happening(summary: WorkflowSummary, now = new Date()): string | 
     const why = offReasonSentence(summary);
     return why ? `${waiting} · ${why}` : waiting;
   } else if (summary.deniedHere) {
-    return "Denied on this host — it does not run here";
+    return "Denied on this machine — it does not run here";
   } else if (!isOn(summary)) parts.push(turnedOffSentenceFor(summary));
   else if (summary.overLimit) parts.push(`${limitSentence(summary.overLimit, limitTotal(summary))}. ${limitRemedy(summary.overLimit)}`);
   else if (summary.nextFireAt !== undefined) parts.push(`Next ${namedRelative(fromWireDate(summary.nextFireAt), now)}`);
@@ -671,8 +671,8 @@ export function workflowStatusLines(s: WorkflowSummary, now = new Date()): Statu
       : s.awaitingApproval.isNew ? "New — waiting for your OK" : "Changed since you approved it — waiting for your OK",
       detail: "Read the prompt and settings below, then Approve to let it run", tint: "attention" });
   } else if (s.deniedHere) {
-    lines.push({ glyph: "⊘", text: "Denied on this host — it does not run here",
-      detail: "Other hosts still see it waiting. Approve to let it run here" });
+    lines.push({ glyph: "⊘", text: "Denied on this machine — it does not run here",
+      detail: "Other machines still see it waiting. Approve to let it run here" });
   }
   if (!s.isArchived) lines.push(enabledLine(s));
   if (s.overLimit && !waitsItsTurn(s)) {
@@ -851,7 +851,7 @@ export function mcpTriggerWords(status: MCPTriggerStatus, now = new Date()): { t
       tint = "failure";
       break;
     default:
-      body = "Runs on another host, which asks for its events";
+      body = "Runs on another machine, which asks for its events";
   }
   const lead = status.server !== undefined ? `${status.server} · ${status.name}` : status.name;
   return { text: `${lead}: ${body}`, tint };

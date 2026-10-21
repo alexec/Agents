@@ -535,7 +535,7 @@ function TimePage({ store }: { store: Store }) {
     return () => clearInterval(every);
   }, [hosts.join(" ")]);
   const runtimeName = chartRuntimeName(store, hosts);
-  if (!host) return <p class="quiet">No host is connected.</p>;
+  if (!host) return <p class="quiet">No machine is connected.</p>;
   const history = store.time.value[host] ? mergeTime(hosts.flatMap((each) => store.time.value[each] ?? [])) : undefined;
   return (
     <TimeMilestonesUnder milestones={store.milestones.value[host]}>
@@ -553,7 +553,7 @@ function milestonesHost(store: Store): string | undefined {
 /** The milestones as a page (#1067): the newcomer's checklist, from its row in Usage. */
 function MilestonesPage({ store }: { store: Store }) {
   const milestones = store.milestones.value[milestonesHost(store) ?? ""];
-  if (!milestones) return <p class="quiet">No host is connected.</p>;
+  if (!milestones) return <p class="quiet">No machine is connected.</p>;
   return <MilestonesSection milestones={milestones} />;
 }
 

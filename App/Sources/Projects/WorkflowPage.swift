@@ -247,9 +247,9 @@ struct WorkflowPage: View {
                         Button {
                             Task { await model.denyWorkflow(summary) }
                         } label: {
-                            Label("Deny on This Host", systemImage: "hand.raised.slash")
+                            Label("Deny on This Machine", systemImage: "hand.raised.slash")
                         }
-                        .help("Don't run it on this host. Other hosts still see it waiting; Approve takes this back")
+                        .help("Don't run it on this machine. Other machines still see it waiting; Approve takes this back")
                     }
                 } else {
                     // Offered even on a workflow that cannot fire on its own. Being able to

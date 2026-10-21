@@ -50,7 +50,7 @@ clients/setGrant refused
 {"code":-32009,"message":"Every paired client may do everything now, so there is no grant to change. Update this window to lose the choice."}
 
 hosts/remove refused
-{"code":-32091,"message":"No host is called nobody."}
+{"code":-32091,"message":"No machine is called nobody."}
 
 hosts/update refused
 {"code":-32009,"message":"This control plane cannot do that yet."}

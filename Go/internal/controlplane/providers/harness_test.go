@@ -144,7 +144,7 @@ func (m *fakeMethods) HostRow(h records.HostRecord) any {
 func (m *fakeMethods) RemoveHost(host string, from Caller) error {
 	ok, err := m.records.RemoveHost(context.Background(), host)
 	if err == nil && !ok {
-		return fail(CodeNoSuchHost, "No host is called %s.", host)
+		return fail(CodeNoSuchHost, "No machine is called %s.", host)
 	}
 	return err
 }

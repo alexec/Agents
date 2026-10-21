@@ -56,7 +56,7 @@ public enum EventWords {
 
     public static func neverHere(_ names: [String]) -> String {
         let one = names.count == 1
-        return "\(names.joined(separator: ", ")) \(one ? "is" : "are") only raised on a Mac, and this host is "
+        return "\(names.joined(separator: ", ")) \(one ? "is" : "are") only raised on a Mac, and this machine is "
             + "a Linux server, so \(one ? "it never happens" : "they never happen") here."
     }
 

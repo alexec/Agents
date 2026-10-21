@@ -447,13 +447,13 @@ func (p *Providers) AgentCall(host, agent, method string, params json.RawMessage
 			}
 		}
 		if found == "" {
-			return nil, fail(CodeNoSuchHost, "No host is called %s.", named)
+			return nil, fail(CodeNoSuchHost, "No machine is called %s.", named)
 		}
 		given["host"] = found
 	}
 	// Another user's machine is not there for this agent (FR-038).
 	if named, ok := str(given["host"]); ok && p.hooks.OwnerOf(named) != caller.Person {
-		return nil, fail(CodeNoSuchHost, "No host is called %s.", named)
+		return nil, fail(CodeNoSuchHost, "No machine is called %s.", named)
 	}
 	if named, ok := str(given["id"]); ok && (method == MethodProvidersCreate || method == MethodProvidersOptions) {
 		p.mu.Lock()
@@ -646,7 +646,7 @@ func (p *Providers) answer(method string, params json.RawMessage, caller Caller,
 			answer = kept.Keep(string(request.Host), request.Method, request.Params, caller)
 		}
 		if answer == nil {
-			name := "That host"
+			name := "That machine"
 			if h := p.records.Host(string(request.Host)); h != nil {
 				name = h.Name
 			}
@@ -1164,7 +1164,7 @@ func (p *Providers) link(request HostLink) (any, error) {
 func (p *Providers) changeLink(host string, change func(*records.HostRecord), after func()) (any, error) {
 	record := p.records.Host(host)
 	if record == nil {
-		return nil, fail(CodeNoSuchHost, "No host is called %s.", host)
+		return nil, fail(CodeNoSuchHost, "No machine is called %s.", host)
 	}
 	change(record)
 	if err := p.records.SaveHost(context.Background(), *record); err != nil {
@@ -1217,7 +1217,7 @@ func (p *Providers) StartForUse(host, by string) { p.begin(starting, host, by) }
 func (p *Providers) begin(kind activityKind, host, who string) (any, error) {
 	record := p.records.Host(host)
 	if record == nil {
-		return nil, fail(CodeNoSuchHost, "No host is called %s.", host)
+		return nil, fail(CodeNoSuchHost, "No machine is called %s.", host)
 	}
 	link := LinkOf(record)
 	p.mu.Lock()
@@ -1578,7 +1578,7 @@ func (p *Providers) clone(urls []string, host, name string, caller *Caller) {
 func (p *Providers) deleteWorkspace(host, who string, caller Caller) error {
 	record := p.records.Host(host)
 	if record == nil {
-		return fail(CodeNoSuchHost, "No host is called %s.", host)
+		return fail(CodeNoSuchHost, "No machine is called %s.", host)
 	}
 	link := LinkOf(record)
 	p.mu.Lock()

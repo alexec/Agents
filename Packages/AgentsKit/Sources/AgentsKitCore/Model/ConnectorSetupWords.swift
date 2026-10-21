@@ -19,7 +19,7 @@ public enum ConnectorSetupWords {
     ]
     public static let sheetSubtitle = "For you, in every project. Agents talks to GitHub's API directly."
     public static let sheetChoose = "On github.com you choose which repositories. You can take it back there, or with Disconnect on Your Connectors."
-    public static let sheetFoot = "The token is kept by the host, never in a log."
+    public static let sheetFoot = "The token is kept by the machine, never in a log."
     public static let continueButton = "Continue on github.com"
     /// Where the person installs the App on the project's repository.
     public static let installURL = "https://github.com/apps/agents-loops/installations/new"
@@ -274,12 +274,12 @@ public enum ConnectorSetupWords {
         }
     }
 
-    public static let disconnectNote = "Disconnect deletes the host's tokens. Every project's GitHub slots wait for a connection again. To revoke the App too, go to github.com \u{25B8} Settings \u{25B8} Applications."
+    public static let disconnectNote = "Disconnect deletes the machine's tokens. Every project's GitHub slots wait for a connection again. To revoke the App too, go to github.com \u{25B8} Settings \u{25B8} Applications."
 
     public static func disconnectNote(_ p: DaemonAPI.ConnectionProvider) -> String {
         switch p {
         case .github: disconnectNote
-        case .linear: "Disconnect deletes the host's tokens. Linear's events stop until you connect again or set LINEAR_API_KEY. To revoke Agents too, go to linear.app \u{25B8} Settings \u{25B8} Security & access."
+        case .linear: "Disconnect deletes the machine's tokens. Linear's events stop until you connect again or set LINEAR_API_KEY. To revoke Agents too, go to linear.app \u{25B8} Settings \u{25B8} Security & access."
         case .gitlab: GitLab.disconnectNote
         case .email: Email.disconnectNote
         }
@@ -342,7 +342,7 @@ public enum ConnectorSetupWords {
         public static let tokenPrompt = "glpat-\u{2026}"
         public static let tokenButton = "Connect"
         public static let checking = "Checking the token with GitLab\u{2026}"
-        public static let disconnectNote = "Disconnect deletes the host's token. Every project's GitLab slots wait for a connection again. GitLab's events stop until you connect again or set GITLAB_TOKEN. To revoke it too, go to GitLab \u{25B8} Preferences \u{25B8} Applications or Access tokens."
+        public static let disconnectNote = "Disconnect deletes the machine's token. Every project's GitLab slots wait for a connection again. GitLab's events stop until you connect again or set GITLAB_TOKEN. To revoke it too, go to GitLab \u{25B8} Preferences \u{25B8} Applications or Access tokens."
 
         /// How Connect Again\u{2026} opens for an ended GitLab connection (#1865): on Access token,
         /// with its GitLab's address, when it was an access token or a self-managed GitLab; on the
@@ -368,7 +368,7 @@ public enum ConnectorSetupWords {
         public static let name = "Email"
         public static let letters = "EM"
         /// The sheet's foot: an app password, not a token.
-        public static let sheetFoot = "The app password is kept by the host, never in a log."
+        public static let sheetFoot = "The app password is kept by the machine, never in a log."
         public static let notConnectedNote = "One mailbox for agents: they wait for mail, such as a sign-up code, and read it."
         public static let subtitle = "For you, in every project. Agents reads the mailbox over IMAP and never sends mail."
         public static let abilities = [
@@ -386,7 +386,7 @@ public enum ConnectorSetupWords {
         public static let button = "Connect"
         public static let checking = "Signing in to the mail server\u{2026}"
         public static let choose = "Agents can read every message in this mailbox. It never sends, answers or deletes mail. Take the app password back at your mail provider, or with Disconnect on Your Connectors."
-        public static let disconnectNote = "Disconnect deletes the host's app password. The email server's events stop until you connect again or set EMAIL_PASSWORD. To revoke it too, delete the app password at your mail provider."
+        public static let disconnectNote = "Disconnect deletes the machine's app password. The email server's events stop until you connect again or set EMAIL_PASSWORD. To revoke it too, delete the app password at your mail provider."
         /// The connection's note after its server: how it signs in.
         public static let how = "App password"
         /// When the host gives no words of its own for a failed sign-in.

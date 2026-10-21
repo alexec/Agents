@@ -120,7 +120,7 @@ public enum MachineFromRepository {
             "\(name) is starting. It installs Agents, joins and clones \(repository.path) on its first boot. The project shows when it has."
         }
         public static func notJoining(_ name: String, provider: String) -> String {
-            "\(provider) made \(name), but can't install Agents on its first boot. Add it as a host in the Mac app: Settings ▸ Workspace Providers, Add as Host…."
+            "\(provider) made \(name), but can't install Agents on its first boot. Add it as a machine in the Mac app: Settings ▸ Workspace Providers, Add as Machine…."
         }
         public static let privateNote = "A private repository needs git access on the new machine."
     }

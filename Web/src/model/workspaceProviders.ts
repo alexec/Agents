@@ -86,17 +86,17 @@ const kinds: Record<ProviderKind, KindInfo> = {
 
 export const providerWords = {
   heading: "Workspace providers",
-  footer: "A provider starts and stops the machines your hosts run on: DigitalOcean Droplets, GitHub Codespaces, Coder workspaces, "
-    + "Google Compute Engine VMs or AWS EC2 instances, through their API. It runs on the control plane, so it can start a host that is down. "
+  footer: "A provider starts and stops your machines: DigitalOcean Droplets, GitHub Codespaces, Coder workspaces, "
+    + "Google Compute Engine VMs or AWS EC2 instances, through their API. It runs on the control plane, so it can start a machine that is down. "
     + "Docker, Cloud Workstations, your own commands and MCP servers are added in the Mac app.",
   oneCopy: "Workspace providers need a control plane with one copy, such as the one on your Mac. This one has several.",
   add: "Add Provider…",
   secretsFoot: "Tokens and keys go to the control plane and are never shown again. This page does not keep them.",
   editSecret: "Leave empty to keep the one it has.",
   removeTitle: (name: string) => `Remove ${name}?`,
-  removeNote: "Its hosts stay, unlinked: nothing here can start or stop them any more. Its workspaces are left as they are.",
-  noHosts: "No host to link: add one in the Mac app, or start one from a repository.",
-  notAHostYet: "Not a host yet: add it as a host in the Mac app, in Settings ▸ Workspace Providers.",
+  removeNote: "Its machines stay as they are, unlinked: nothing here can start or stop them any more.",
+  noHosts: "No machine to link: add one in the Mac app, or start one from a repository.",
+  notAHostYet: "Not joined yet: add it as a machine in the Mac app, in Settings ▸ Workspace Providers.",
 };
 
 export function kindTitle(kind: ProviderKind): string { return kinds[kind].title; }
@@ -180,7 +180,7 @@ export function providerLine(provider: ProviderSummary, time: (at: Date) => stri
   const parts: string[] = [];
   if (provider.problem && (!provider.current || provider.listedAt == null)) parts.push(`Couldn’t list: ${provider.problem}`);
   if (provider.listedAt != null) parts.push(`${provider.current ? "Listed" : "Showing what it listed at"} ${time(fromWireDate(provider.listedAt))}`);
-  if (provider.workspaces.length === 0 && provider.listedAt != null) parts.push("No workspaces");
+  if (provider.workspaces.length === 0 && provider.listedAt != null) parts.push("No machines");
   const tool = sshTool(provider.preset);
   if (tool) parts.push(`needs ${tool} for ssh`);
   return parts.join(" · ");
@@ -191,7 +191,7 @@ function capitalized(word: string): string { return word.slice(0, 1).toUpperCase
 /** The grey line under a workspace, as the window's workspaceLine. */
 export function workspaceLine(workspace: WorkspaceInfo, hosts: readonly ControlHost[]): string {
   const parts = [capitalized(workspace.state)];
-  parts.push(workspace.host ? `linked to ${hosts.find((h) => h.id === workspace.host)?.name ?? "a host"}` : "not a host");
+  parts.push(workspace.host ? `linked to ${hosts.find((h) => h.id === workspace.host)?.name ?? "a machine"}` : "not joined");
   if (workspace.cost) parts.push(workspace.cost);
   return parts.join(" · ");
 }

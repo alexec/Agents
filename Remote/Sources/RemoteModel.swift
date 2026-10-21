@@ -383,7 +383,7 @@ final class RemoteModel {
     func pair(scanned text: String) async {
         if let control = ControlCode(text: text), control.url != nil {
             guard case .client = control.purpose else {
-                pairing = .failed("That code is for adding a host, not a phone.")
+                pairing = .failed("That code is for adding a machine, not a phone.")
                 return
             }
             pairing = .pairing
@@ -4903,7 +4903,7 @@ final class RemoteModel {
 
     /// Another of the control plane's hosts, by the name it was given.
     func hostName(_ host: HostID) -> String {
-        controlHosts.first { $0.id == host }.map { $0.name.isEmpty ? $0.id.rawValue : $0.name } ?? "That host"
+        controlHosts.first { $0.id == host }.map { $0.name.isEmpty ? $0.id.rawValue : $0.name } ?? "That machine"
     }
 
     func dismissProblem() { problem = nil }

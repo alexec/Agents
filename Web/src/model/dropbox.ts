@@ -10,7 +10,7 @@ import { limit, sizeWords } from "./attachments";
 export function dropboxRefusal(name: string, size: number): string | null {
   if (name.startsWith(".")) return `${name} starts with a dot, so the drop box would pass it over.`;
   if (size > limit) {
-    return `From a browser, a drop box file can be 900 KB, and ${name} is ${sizeWords(size)}. Copy it into .agents/dropbox/ on its host instead.`;
+    return `From a browser, a drop box file can be 900 KB, and ${name} is ${sizeWords(size)}. Copy it into .agents/dropbox/ on its machine instead.`;
   }
   return null;
 }

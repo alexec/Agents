@@ -92,6 +92,6 @@ export const machineWords = {
   start: "Start",
   starting: (name: string) => `Starting ${name}…`,
   joining: (name: string, r: Repository) => `${name} is starting. It installs Agents, joins and clones ${r.path} on its first boot. The project shows when it has.`,
-  notJoining: (name: string, provider: string) => `${provider} made ${name}, but can't install Agents on its first boot. Add it as a host in the Mac app: Settings ▸ Workspace Providers, Add as Host….`,
+  notJoining: (name: string, provider: string) => `${provider} made ${name}, but can't install Agents on its first boot. Add it as a machine in the Mac app: Settings ▸ Workspace Providers, Add as Machine….`,
   privateNote: "A private repository needs git access on the new machine.",
 };

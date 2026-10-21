@@ -255,9 +255,9 @@ func Overlay(described map[string]any, online bool, ws *HostWorkspace) map[strin
 // up is answered with. A host whose workspace is stopped says so (FR-022).
 func OfflineRefusal(ws *HostWorkspace) *Failure {
 	if ws != nil && deref(ws.HostState) == "stopped" {
-		return fail(CodeHostOffline, "That host is stopped. Start it to reach it.")
+		return fail(CodeHostOffline, "That machine is stopped. Start it to reach it.")
 	}
-	return fail(CodeHostOffline, "That host is offline.")
+	return fail(CodeHostOffline, "That machine is offline.")
 }
 
 // ProviderAdd is DaemonAPI.ProviderAdd: providers/add and providers/update. Secrets, name

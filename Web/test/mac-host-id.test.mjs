@@ -65,6 +65,6 @@ test("the sidebar, the workflow host menu and the offline strip name the person'
   assert.equal(projectLabel(mac, project), "Studio:Agents", "without the id, only a host mac is this Mac");
   assert.deepEqual(orderedProjects([server, mac], { box: [project], [mac.id]: [project] }, mac.id).map((r) => r.host.id), [mac.id, "box"]);
   assert.deepEqual(workflowHostChoices([server, mac], mac.id).map((c) => c.name), ["This Mac", "box"]);
-  assert.match(offlineStrip(mac.id, { ...mac, state: "offline" }, null, mac.id).line, /^This Mac’s host hasn’t answered/);
+  assert.match(offlineStrip(mac.id, { ...mac, state: "offline" }, null, mac.id).line, /^This Mac hasn’t answered/);
   assert.match(offlineStrip("box", { ...server, state: "offline" }, null, mac.id).line, /^box is offline/);
 });
