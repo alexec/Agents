@@ -208,7 +208,7 @@ func TestEveryClientMethodChecksTheOwner(t *testing.T) {
 		"daemon/ping": true, "control/status": true, "hosts/list": true, "hosts/startEnroll": true, "hosts/install": true,
 		"hosts/detect": true, "hosts/sshHosts": true, "control/setProjectDetection": true, "clients/list": true,
 		"clients/startPairing": true, "clients/stopPairing": true, "clients/setGrant": true, "clients/forget": true,
-		"clients/connections": true, "clients/forgetSelf": true, "clients/setPushToken": true, "devices/list": true,
+		"clients/connections": true, "clients/forgetSelf": true, "clients/setPushToken": true, "clients/setActivityToken": true, "devices/list": true,
 		"devices/startPairing": true, "devices/stopPairing": true, "devices/forget": true, "audit/list": true,
 		"audit/export": true, "control/setAuditDays": true, "people/list": true, "people/invite": true,
 		"people/setRole": true, "people/remove": true, "hosts/joinRequests": true, "hosts/approveJoin": true,

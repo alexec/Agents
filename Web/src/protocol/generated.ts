@@ -559,6 +559,94 @@ export type BackgroundItemKind = "task" | "subagent";
 
 export type BackgroundItemState = "running" | "paused" | "completed" | "failed" | "stopped" | "disconnected";
 
+export interface Backup {
+  id: string;
+  machine: string;
+  rootID: string;
+  madeAt: WireDate;
+  bytes: number;
+  agents: number;
+  thisMachine: boolean;
+}
+
+export type BackupEvery = "off" | "daily" | "weekly";
+
+export interface BackupMakeRequest {
+  /** Answer once the backup is made, not at once: a provider's delete waits for it (#1815). */
+  wait?: boolean;
+}
+
+export interface BackupRestoreRequest {
+  id: string;
+}
+
+export interface BackupRestoreResult {
+  restored: number;
+  skipped: number;
+}
+
+export interface BackupSettings {
+  every: BackupEvery;
+  keep: number;
+  folder?: string;
+  /**
+   * Where backups go (#1815): this machine's folder, or the control plane's store. Left out is the
+   * machine's default: the store for a server linked to a control plane, else the folder.
+   */
+  target?: BackupTarget;
+}
+
+export interface BackupState {
+  settings: BackupSettings;
+  folder: string;
+  backups: Backup[];
+  making: boolean;
+  lastError?: string;
+  /**
+   * The machine is linked to a control plane, so it can back up to the control plane's store
+   * (#1815).
+   */
+  canUseControl?: boolean;
+}
+
+/**
+ * A host's backup whose parts are all uploaded: the control plane writes its .json last, then keeps
+ * the newest keep of this host's (#1815).
+ */
+export interface BackupStoreCommit {
+  name: string;
+  parts: number;
+  machine: string;
+  rootID: string;
+  madeAt: WireDate;
+  bytes: number;
+  agents: number;
+  keep: number;
+}
+
+export interface BackupStoreList {
+  backups: Backup[];
+}
+
+/**
+ * One part of a backup, at most 8 MiB (#1815): a host's upload, or the control plane's answer to a
+ * download.
+ */
+export interface BackupStorePart {
+  /** On an upload, the backup's name; this host's own folder is the control plane's to say. */
+  name: string;
+  part: number;
+  data: Base64;
+}
+
+export interface BackupStorePartRequest {
+  /** A listed backup's id: <host>/<name>. */
+  id: string;
+  part: number;
+}
+
+export type BackupTarget = "folder" | "control";
+
 export interface Block {
   waits: Wait[];
   checkAgainAt?: WireDate;
@@ -4512,9 +4600,11 @@ export interface TunnelOpen {
 
 /**
  * Where a session's turn is, as its Live Activity says it (#1744): working; a question or an
- * approval waiting on the person; done; ended for another reason; or gone (archived or deleted).
+ * approval waiting on the person; done; ended cleanly but wanting the person, as Needs you in the
+ * sidebars (#1861); stopped on purpose or out of allowance, as Paused in the sidebars (#1869);
+ * ended for another reason; or gone (archived or deleted).
  */
-export type TurnPhase = "working" | "question" | "approval" | "done" | "failed" | "gone";
+export type TurnPhase = "working" | "question" | "approval" | "done" | "needs_you" | "paused" | "failed" | "gone";
 
 export interface TurnSummary {
   id: UUID;
@@ -4542,6 +4632,7 @@ export interface TurnsPage {
   turns: TurnSummary[];
   firstTurn: number;
   openStart: number;
+  firstPrompt?: number;
 }
 
 export interface TurnsRequest {
@@ -5035,6 +5126,10 @@ export interface Methods {
   "attention/pending": { params: Empty; result: AttentionPending };
   "audit/export": { params: AuditQuery; result: AuditExport };
   "audit/list": { params: AuditQuery; result: AuditList };
+  "backups/configure": { params: BackupSettings; result: BackupState };
+  "backups/make": { params: BackupMakeRequest; result: BackupState };
+  "backups/restore": { params: BackupRestoreRequest; result: BackupRestoreResult };
+  "backups/state": { params: Empty; result: BackupState };
   "changes/file": { params: ChangesFileRequest; result: ChangedFileDetail };
   "changes/list": { params: ChangesListRequest; result: ChangesList };
   "clients/forgetSelf": { params: Empty; result: Empty };
@@ -5073,11 +5168,14 @@ export interface Methods {
   "hosts/joinRequests": { params: Empty; result: JoinRequest[] };
   "hosts/lastHeard": { params: HostRequest; result: HostLastHeard };
   "hosts/lendGit": { params: LendGit; result: Empty };
+  "hosts/link": { params: HostLink; result: ControlHost };
   "hosts/list": { params: Empty; result: ControlHost[] };
   "hosts/listKept": { params: Empty; result: KeptList };
   "hosts/retryKept": { params: KeptRequestID; result: Empty };
+  "hosts/setWorkspaceOptions": { params: HostWorkspaceOptions; result: ControlHost };
   "hosts/start": { params: HostRequest; result: ControlHost };
   "hosts/stop": { params: HostStop; result: ControlHost };
+  "hosts/unlink": { params: HostRequest; result: ControlHost };
   "leases/snapshot": { params: Empty; result: LeaseSnapshot };
   "mcp/health": { params: Empty; result: MCPHealthSnapshot };
   "mcp/health/check": { params: MCPHealthCheckRequest; result: MCPHealthSnapshot };
@@ -5119,6 +5217,11 @@ export interface Methods {
   "projects/setPinned": { params: SetPinnedRequest; result: ProjectSummary };
   "projects/unarchive": { params: ProjectRequest; result: ProjectSummary };
   "projects/undoGuardedChange": { params: GuardedChangeRequest; result: ProjectSummary };
+  "providers/add": { params: ProviderAdd; result: ProviderSummary };
+  "providers/list": { params: Empty; result: ProviderList };
+  "providers/refresh": { params: ProviderRequest; result: Empty };
+  "providers/remove": { params: ProviderRequest; result: Empty };
+  "providers/update": { params: ProviderAdd; result: ProviderSummary };
   "runtimes/accounts": { params: Empty; result: RuntimeAccount[] };
   "runtimes/allowances": { params: string | null; result: RuntimeAllowances };
   "runtimes/list": { params: Empty; result: RuntimeStatus[] };
@@ -5195,6 +5298,10 @@ export const MethodTarget = {
   "attention/pending": "host",
   "audit/export": "control",
   "audit/list": "control",
+  "backups/configure": "host",
+  "backups/make": "host",
+  "backups/restore": "host",
+  "backups/state": "host",
   "changes/file": "host",
   "changes/list": "host",
   "clients/forgetSelf": "control",
@@ -5233,11 +5340,14 @@ export const MethodTarget = {
   "hosts/joinRequests": "control",
   "hosts/lastHeard": "control",
   "hosts/lendGit": "control",
+  "hosts/link": "control",
   "hosts/list": "control",
   "hosts/listKept": "control",
   "hosts/retryKept": "control",
+  "hosts/setWorkspaceOptions": "control",
   "hosts/start": "control",
   "hosts/stop": "control",
+  "hosts/unlink": "control",
   "leases/snapshot": "host",
   "mcp/health": "host",
   "mcp/health/check": "host",
@@ -5279,6 +5389,11 @@ export const MethodTarget = {
   "projects/setPinned": "host",
   "projects/unarchive": "host",
   "projects/undoGuardedChange": "host",
+  "providers/add": "control",
+  "providers/list": "control",
+  "providers/refresh": "control",
+  "providers/remove": "control",
+  "providers/update": "control",
   "runtimes/accounts": "host",
   "runtimes/allowances": "host",
   "runtimes/list": "host",
@@ -5326,6 +5441,7 @@ export interface Notifications {
   "agent/showFile": ShowFileNotification;
   "agents/draftOptions": DraftOptionsNotification;
   "attention/changed": AttentionNotification;
+  "backups/changed": BackupState;
   "clone/changed": CloneNotification;
   "control/hostChanged": JSONValue;
   "control/joinDecided": JoinDecided;
@@ -5333,6 +5449,7 @@ export interface Notifications {
   "control/keptChanged": KeptList;
   "control/keptDelivered": KeptDelivered;
   "control/peopleChanged": PeopleChanged;
+  "control/providersChanged": ProviderList;
   "disk/changed": DiskState;
   "files/changed": FilesChangedNotification;
   "leases/changed": LeaseSnapshot;
@@ -5399,6 +5516,16 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   AuthStatus: { required: ["kind", "label"], optional: [] },
   AuthenticateRequest: { required: ["runtimeID", "methodID"], optional: [] },
   BackgroundItem: { required: ["id", "kind", "name", "state", "canStop", "isStopping", "startedAt"], optional: ["taskType", "detail", "command", "parentID", "toolCallID", "outputFilePath", "summary", "lastToolName", "endedAt"] },
+  Backup: { required: ["id", "machine", "rootID", "madeAt", "bytes", "agents", "thisMachine"], optional: [] },
+  BackupMakeRequest: { required: [], optional: ["wait"] },
+  BackupRestoreRequest: { required: ["id"], optional: [] },
+  BackupRestoreResult: { required: ["restored", "skipped"], optional: [] },
+  BackupSettings: { required: ["every", "keep"], optional: ["folder", "target"] },
+  BackupState: { required: ["settings", "folder", "backups", "making"], optional: ["lastError", "canUseControl"] },
+  BackupStoreCommit: { required: ["name", "parts", "machine", "rootID", "madeAt", "bytes", "agents", "keep"], optional: [] },
+  BackupStoreList: { required: ["backups"], optional: [] },
+  BackupStorePart: { required: ["name", "part", "data"], optional: [] },
+  BackupStorePartRequest: { required: ["id", "part"], optional: [] },
   Block: { required: ["waits"], optional: ["checkAgainAt", "wakeOn", "clearedAt", "clearedBy"] },
   BranchFromRequest: { required: ["agentID", "entryID"], optional: [] },
   BranchSummary: { required: ["name"], optional: ["remote"] },
@@ -5859,7 +5986,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   TunnelOpen: { required: ["runtime", "ref"], optional: [] },
   TurnSummary: { required: ["id", "start", "end"], optional: ["ask", "last", "concise", "outcome", "steps", "usage"] },
   TurnUsage: { required: ["totalTokens", "inputTokens", "outputTokens"], optional: ["thoughtTokens", "cachedReadTokens", "cachedWriteTokens", "cost"] },
-  TurnsPage: { required: ["turns", "firstTurn", "openStart"], optional: [] },
+  TurnsPage: { required: ["turns", "firstTurn", "openStart"], optional: ["firstPrompt"] },
   TurnsRequest: { required: ["agentID", "limit"], optional: ["before"] },
   UnqueueRequest: { required: ["agentID", "promptID"], optional: [] },
   Usage: { required: ["used", "size", "at"], optional: ["cost"] },
