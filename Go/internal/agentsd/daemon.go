@@ -109,6 +109,7 @@ func New(ctx context.Context, root string) (*Daemon, error) {
 	d.noteRestart()
 	d.resumeEventWaits()
 	d.resumeBlocks()
+	d.resumeContinues()
 	d.checkEveryQueue()
 	d.restoreRuns()
 	safe.Go("workflow clock", d.workflowClock)

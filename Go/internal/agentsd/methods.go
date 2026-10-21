@@ -39,6 +39,7 @@ func (d *Daemon) register() {
 	d.registerCost()
 	d.registerDevices()
 	d.registerAllowances()
+	d.registerContinueWhenBack()
 	d.registerMCP()
 	d.registerOptions()
 	d.registerInstall()
@@ -118,6 +119,7 @@ func (d *Daemon) register() {
 			return wire.Empty{}, &Error{Code: CodeNoSuchAgent, Message: "no agent " + string(r.AgentID)}
 		}
 		d.live(r.AgentID).cancel()
+		d.cancelContinue(r.AgentID)
 		d.dropLeases(r.AgentID, "holderStopped")
 		d.endWait(r.AgentID, "stopped", false)
 		return wire.Empty{}, nil
@@ -317,7 +319,7 @@ func (d *Daemon) archiveBy(id wire.UUID, by wire.AgentArchivedReason) error {
 	t := now()
 	d.change(id, func(a *wire.Agent) {
 		a.State, a.ArchivedAt, a.ArchivedReason = wire.AgentStateArchived, &t, &by
-		a.ArchiveRequest, a.AfterTurn = nil, nil
+		a.ArchiveRequest, a.AfterTurn, a.ContinueWhenBack = nil, nil, nil
 	})
 	d.record(id, stateChanged(wire.AgentStateArchived, nil))
 	// Archived first, then its turn and runtime ended: the turn's ending finds it archived

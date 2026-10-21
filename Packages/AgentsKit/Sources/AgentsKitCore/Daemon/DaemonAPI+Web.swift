@@ -173,6 +173,8 @@ public extension DaemonAPI {
                 Row(Method.agentsContinueInProject, params: ContinueInProjectRequest.self, result: UUID.self,
                     kind: .hostRequest),
                 Row(Method.agentsRecreateWorktree, params: AgentRequest.self, result: Agent.self, kind: .hostRequest),
+                Row(Method.agentsContinueWhenBack, params: AgentRequest.self, result: Agent.self, kind: .hostRequest),
+                Row(Method.agentsCancelContinue, params: AgentRequest.self, result: Agent.self, kind: .hostRequest),
                 Row(Method.agentsSetUnread, params: SetUnreadRequest.self, result: Empty.self, kind: .hostRequest),
                 Row(Method.agentsRename, params: RenameRequest.self, result: Agent.self, kind: .hostRequest),
                 // Branch (#342): the new session's id, as the window's row and Session menu have it.

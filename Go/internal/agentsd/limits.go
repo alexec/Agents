@@ -360,6 +360,13 @@ func (d *Daemon) applyLimit(l *live, lim limit, worked bool) (why wire.EndedReas
 			note = name + "’s allowance ran out. Its provider says it resets at " + poolTime(lim.resetsAt.Time(), at) + "; the app checks before using it again."
 		}
 		d.record(l.id, runtimeNote(note))
+		// The wait's own turn refused again: it waits again, for the next time (#1859).
+		l.mu.Lock()
+		sent := l.lastSent
+		l.mu.Unlock()
+		if sentToContinue(sent) {
+			d.waitForAllowance(l.id, a.RuntimeID)
+		}
 		return wire.EndedReasonAllowanceSpent, true, time.Time{}
 	case limitCreditGone:
 		s := d.markOut(a.RuntimeID, wire.AllowanceStateOutReasonCreditUsedUp, nil, wire.AllowanceStateSourceWords, nil)
@@ -459,6 +466,7 @@ func (d *Daemon) allowanceWorked(l *live, runtimeID string) {
 	if wasOut {
 		d.raise(wire.EventDraft{Name: "cost.allowance_back", At: now(), Scope: macScope(), Sentence: runtimeName(runtimeID) + "’s allowance came back.",
 			Details: map[string]string{"runtime": runtimeID, "how": "worked"}})
+		d.allowanceBack(runtimeID)
 	}
 	d.tellAllowances()
 }

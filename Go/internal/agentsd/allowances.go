@@ -229,6 +229,7 @@ func (d *Daemon) markAvailable(key string) wire.RuntimeAllowances {
 		runtime, _, _ := strings.Cut(key, ":")
 		d.raise(wire.EventDraft{Name: "cost.allowance_back", At: now(), Scope: macScope(), Sentence: runtimeName(runtime) + "’s allowance came back.",
 			Details: map[string]string{"runtime": runtime, "how": "person"}})
+		d.allowanceBack(runtime)
 		d.tellAllowances()
 	}
 	return d.runtimeAllowances()

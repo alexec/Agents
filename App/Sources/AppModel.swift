@@ -4670,6 +4670,19 @@ final class AppModel {
         if host == .mac { await refreshAgents() } else { await refreshServer(host) }
     }
 
+    /// Carry on when the allowance is back, or no longer (#1859).
+    func continueWhenBack(_ agentID: UUID) async { await waitForAllowance(agentID, DaemonAPI.Method.agentsContinueWhenBack) }
+    func cancelContinue(_ agentID: UUID) async { await waitForAllowance(agentID, DaemonAPI.Method.agentsCancelContinue) }
+
+    private func waitForAllowance(_ agentID: UUID, _ method: String) async {
+        let host = host(ofAgent: agentID)
+        let went = await attempt(on: host) {
+            _ = try await self.client(forAgent: agentID).call(method, DaemonAPI.AgentRequest(agentID: agentID), returning: Agent.self)
+        }
+        guard went else { return }
+        if host == .mac { await refreshAgents() } else { await refreshServer(host) }
+    }
+
     /// End a block by hand (039): the prompt Carry on sends, as the person, to an agent
     /// that need not be the one selected. A person's prompt is what clears a block, so
     /// this is an ordinary prompt and nothing else.

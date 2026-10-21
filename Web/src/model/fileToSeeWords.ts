@@ -4,6 +4,7 @@
 import { computed } from "@preact/signals";
 import type { Agent } from "../protocol/generated";
 import { boolPreference, preferenceKeys, setPreferences } from "./preferences";
+import { continueLine } from "./continueWhenBack";
 
 /** "File to see: report.md", or null for a session with nothing to see. */
 export function fileToSeeLine(agent: Agent): string | null {
@@ -14,10 +15,10 @@ export function fileToSeeLine(agent: Agent): string | null {
 
 /**
  * The row's grey line in the report's place (FileToSeeWords.reportLine): the file to see while it
- * is unseen, then the report. In words, because a touch screen has no hover for the mark's title (#1873).
+ * is unseen, then when a paused chat continues (#1859), then the report. In words, because a touch screen has no hover for the mark's title (#1873).
  */
 export function reportLine(agent: Agent): string | null {
-  return fileToSeeLine(agent) ?? agent.report?.message ?? null;
+  return fileToSeeLine(agent) ?? continueLine(agent) ?? agent.report?.message ?? null;
 }
 
 /**

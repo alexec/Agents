@@ -197,6 +197,12 @@ export interface Agent {
    * row, never a group or a badge. Cleared when the person opens the conversation or marks it read.
    */
   fileToSee?: ShownFile;
+  /**
+   * The person asked a chat paused by a spent allowance to carry on when the allowance is back
+   * (#1859). At `at` the host sends "continue" in the same chat; a turn that works, any other
+   * message, Stop or Archive takes it away.
+   */
+  continueWhenBack?: ContinueWhenBack;
 }
 
 export type AgentArchivedReason = "byUser" | "byAgent";
@@ -1225,6 +1231,19 @@ export interface ContinueInProjectRequest {
   text: string;
   attachments: Attachment[];
   requestID?: UUID;
+}
+
+/** When a chat paused by a spent allowance carries on by itself (#1859). */
+export interface ContinueWhenBack {
+  /**
+   * When it sends "continue": the provider's reset time, or the app's next check of the runtime.
+   */
+  at: WireDate;
+  /**
+   * True when `at` is the time the provider said the allowance resets; false when it is only the
+   * app's next check.
+   */
+  resetKnown: boolean;
 }
 
 /**
@@ -4863,7 +4882,9 @@ export interface Methods {
   "agents/answerSandbox": { params: AnswerSandboxRequest; result: Agent };
   "agents/archive": { params: AgentRequest; result: Empty };
   "agents/branchFrom": { params: BranchFromRequest; result: UUID };
+  "agents/cancelContinue": { params: AgentRequest; result: Agent };
   "agents/continueInProject": { params: ContinueInProjectRequest; result: UUID };
+  "agents/continueWhenBack": { params: AgentRequest; result: Agent };
   "agents/delete": { params: AgentRequest; result: Empty };
   "agents/discardDraft": { params: DiscardDraftRequest; result: Empty };
   "agents/editQueued": { params: EditQueuedRequest; result: EditQueuedResult };
@@ -5027,7 +5048,9 @@ export const MethodTarget = {
   "agents/answerSandbox": "host",
   "agents/archive": "host",
   "agents/branchFrom": "host",
+  "agents/cancelContinue": "host",
   "agents/continueInProject": "host",
+  "agents/continueWhenBack": "host",
   "agents/delete": "host",
   "agents/discardDraft": "host",
   "agents/editQueued": "host",
@@ -5230,7 +5253,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ActivityToken: { required: ["agentID", "environment", "startedAt"], optional: ["token"] },
   Admitted: { required: [], optional: ["client", "host", "grant"] },
   AdoptRequest: { required: ["runtimeID", "sessionID", "cwd"], optional: [] },
-  Agent: { required: ["id", "runtimeID", "cwd", "state", "startOptions", "advertisedOptions", "availableCommands", "createdAt", "lastActivityAt"], optional: ["title", "labels", "runtimeSessionID", "isUnread", "reportSeenAt", "endedReason", "archivedReason", "usage", "lastTurnUsage", "costToDate", "costCeiling", "tokensToDate", "tokenCeiling", "plans", "background", "additionalDirectories", "mcpServers", "queuedPrompts", "suggestedPrompts", "startedByWorkflow", "purpose", "startedByRun", "startedByAgent", "chainDepth", "eventWait", "worktree", "pendingMove", "startingPoint", "startRequestID", "persona", "restartPickUps", "report", "outcomeAsked", "archiveRequest", "afterTurn", "archivedAt", "sandboxOverride", "effectiveSandbox", "pendingSandboxFailure", "missingFolder", "listsLeftOut", "titleIsPersons", "runtimeTitle", "madeInRoot", "queuedStart", "branchedFrom", "fileToSee"] },
+  Agent: { required: ["id", "runtimeID", "cwd", "state", "startOptions", "advertisedOptions", "availableCommands", "createdAt", "lastActivityAt"], optional: ["title", "labels", "runtimeSessionID", "isUnread", "reportSeenAt", "endedReason", "archivedReason", "usage", "lastTurnUsage", "costToDate", "costCeiling", "tokensToDate", "tokenCeiling", "plans", "background", "additionalDirectories", "mcpServers", "queuedPrompts", "suggestedPrompts", "startedByWorkflow", "purpose", "startedByRun", "startedByAgent", "chainDepth", "eventWait", "worktree", "pendingMove", "startingPoint", "startRequestID", "persona", "restartPickUps", "report", "outcomeAsked", "archiveRequest", "afterTurn", "archivedAt", "sandboxOverride", "effectiveSandbox", "pendingSandboxFailure", "missingFolder", "listsLeftOut", "titleIsPersons", "runtimeTitle", "madeInRoot", "queuedStart", "branchedFrom", "fileToSee", "continueWhenBack"] },
   AgentRemovedNotification: { required: ["agentID"], optional: [] },
   AgentRequest: { required: ["agentID"], optional: [] },
   AgentWorkspaces: { required: ["providers"], optional: [] },
@@ -5326,6 +5349,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ConnectorWorkflow: { required: ["id", "name"], optional: [] },
   ContentBlockAnnotations: { required: [], optional: ["audience", "priority"] },
   ContinueInProjectRequest: { required: ["agentID", "text", "attachments"], optional: ["requestID"] },
+  ContinueWhenBack: { required: ["at", "resetKnown"], optional: [] },
   ControlAuth: { required: ["id", "nonce", "mac", "kind"], optional: ["for", "epoch", "capabilities"] },
   ControlClientChanged: { required: [], optional: ["client", "removed"] },
   ControlCodeShown: { required: ["text", "expires"], optional: ["command"] },

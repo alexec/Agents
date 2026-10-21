@@ -7,7 +7,9 @@ var (
 	CallAgentsAnswerSandbox            = Method[AnswerSandboxRequest, Agent]{"agents/answerSandbox"}
 	CallAgentsArchive                  = Method[AgentRequest, Empty]{"agents/archive"}
 	CallAgentsBranchFrom               = Method[BranchFromRequest, UUID]{"agents/branchFrom"}
+	CallAgentsCancelContinue           = Method[AgentRequest, Agent]{"agents/cancelContinue"}
 	CallAgentsContinueInProject        = Method[ContinueInProjectRequest, UUID]{"agents/continueInProject"}
+	CallAgentsContinueWhenBack         = Method[AgentRequest, Agent]{"agents/continueWhenBack"}
 	CallAgentsDelete                   = Method[AgentRequest, Empty]{"agents/delete"}
 	CallAgentsDiscardDraft             = Method[DiscardDraftRequest, Empty]{"agents/discardDraft"}
 	CallAgentsEditQueued               = Method[EditQueuedRequest, EditQueuedResult]{"agents/editQueued"}

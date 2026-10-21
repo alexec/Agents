@@ -2086,6 +2086,12 @@ export class Store extends Work {
     if (agent) this.apply("agent/changed", agent, host);
   }
 
+  /** Carry on when the allowance is back, or no longer (#1859); the row follows from `agent/changed`. */
+  async continueWhenBack(host: string, agentID: string, on: boolean): Promise<void> {
+    const agent = await this.act(on ? "agents/continueWhenBack" : "agents/cancelContinue", { agentID: agentID as UUID }, host);
+    if (agent) this.apply("agent/changed", agent, host);
+  }
+
   async sendNow(host: string, agentID: string, promptID: string): Promise<void> {
     await this.acting(agentID, { sendNow: promptID }, () =>
       this.act("agents/sendNow", { agentID: agentID as UUID, promptID: promptID as UUID }, host));

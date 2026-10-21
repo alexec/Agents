@@ -4573,6 +4573,25 @@ final class RemoteModel {
             problem = "That did not reach your Mac."
         }
     }
+    /// Carry on when the allowance is back, or no longer (#1859).
+    func continueWhenBack(_ agentID: UUID) async { await waitForAllowance(agentID, DaemonAPI.Method.agentsContinueWhenBack) }
+    func cancelContinue(_ agentID: UUID) async { await waitForAllowance(agentID, DaemonAPI.Method.agentsCancelContinue) }
+
+    private func waitForAllowance(_ agentID: UUID, _ method: String) async {
+        guard !isStale(on: work.agent(agentID)?.host ?? .mac) else {
+            problem = "Your Mac is not answering, so that could not be sent."
+            return
+        }
+        do {
+            try await sendOnce(method, DaemonAPI.AgentRequest(agentID: agentID))
+            await loadWholeAgent(agentID)
+        } catch let error as JSONRPCError {
+            problem = error.message
+        } catch {
+            problem = away(error, "that could not be sent.") ?? "That did not reach your Mac."
+        }
+    }
+
     /// Branch (#342): a new session that carries the history so far, the original left
     /// alone, as the Mac's row has it. Opened once its host has started it.
     func fork(_ agentID: UUID) async {

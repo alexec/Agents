@@ -84,6 +84,7 @@ public extension StatusShape {
     init(row agent: Agent, isComingBack: Bool) {
         self.init(state: agent.state, outcome: agent.report?.outcome, isWaiting: agent.isWaiting,
                   isComingBack: isComingBack, endedReason: agent.endedReason,
+                  waitingForAllowance: agent.continueWhenBack != nil,
                   outcomeUnknown: agent.endingIsUnaccountedFor)
     }
 
@@ -121,6 +122,7 @@ public extension StatusShape {
     static func words(row agent: Agent, isComingBack: Bool) -> String {
         words(StatusShape(row: agent, isComingBack: isComingBack), state: agent.state, isComingBack: isComingBack,
               outcome: agent.report?.outcome, isUnaccountedFor: agent.endingIsUnaccountedFor,
-              ending: agent.endedReason?.summary, isUnread: agent.isUnread)
+              ending: agent.endedReason?.summary, isUnread: agent.isUnread,
+              isWaitingForAllowance: agent.continueWhenBack != nil)
     }
 }

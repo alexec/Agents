@@ -19,6 +19,7 @@ import { DiskStrip } from "./DiskStrip";
 import { KeptBubbles } from "./Kept";
 import { FolderGoneNotice, MissingFolderStrip } from "./MissingFolder";
 import { BlockStrip } from "./BlockStrip";
+import { ContinueStrip } from "./ContinueStrip";
 import { CurrentPlanStrip } from "./PlanStrip";
 import { Telling } from "./Telling";
 import { Labels } from "./Labels";
@@ -528,6 +529,7 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
       <FolderGoneNotice store={store} host={host} agent={agent} />
       <MissingFolderStrip store={store} host={host} agent={agent} />
       <BlockStrip store={store} host={host} agent={agent} disabled={down} />
+      <ContinueStrip store={store} host={host} agent={agent} disabled={down} />
       {/* What it said it would do, under what it waits on, as the Remote has it (#341). */}
       <CurrentPlanStrip agent={agent} />
       {finding.value && agent && <FindBar store={store} host={host} agentID={agent.id} close={() => (finding.value = false)} />}

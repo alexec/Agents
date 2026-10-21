@@ -18,6 +18,7 @@ public enum Capability {
     public static let catalog1 = "catalog/1"
     public static let changes1 = "changes/1"
     public static let chatBranch1 = "chat.branch/1"
+    public static let chatContinueWhenBack1 = "chat.continue-when-back/1"
     public static let clientPermissions1 = "client-permissions/1"
     public static let clientWire1 = "client.wire/1"
     public static let client1 = "client/1"
@@ -97,7 +98,9 @@ public enum Capability {
         "agents/answerSandbox": "agents/1",
         "agents/archive": "agents/1",
         "agents/branchFrom": "chat.branch/1",
+        "agents/cancelContinue": "chat.continue-when-back/1",
         "agents/continueInProject": "agents/1",
+        "agents/continueWhenBack": "chat.continue-when-back/1",
         "agents/delete": "agents/1",
         "agents/discardDraft": "agents/1",
         "agents/editQueued": "agents.edit-queued/1",

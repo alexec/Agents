@@ -173,6 +173,10 @@ public enum DaemonAPI {
         /// branch. The person's, from the error and the chat header.
         public static let agentsContinueInProject = "agents/continueInProject"
         public static let agentsRecreateWorktree = "agents/recreateWorktree"
+        /// A chat paused by a spent allowance carries on when it is back, or no longer
+        /// does (#1859). The person's, from the chat.
+        public static let agentsContinueWhenBack = "agents/continueWhenBack"
+        public static let agentsCancelContinue = "agents/cancelContinue"
         /// Mark a finished chat unread, or read, from its row (#70). The person's word
         /// about their own attention: no agent tool reaches it.
         public static let agentsSetUnread = "agents/setUnread"
