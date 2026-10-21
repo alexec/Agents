@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -49,9 +50,12 @@ func secretsOf(u wire.HostUserSettings) map[string]string {
 	return out
 }
 
-func takingHello(name string) controllink.HostHello {
+func takingHello(name string) controllink.HostHello { return fakeHello(name) }
+
+// notTakingHello is a machine from before #1760.
+func notTakingHello(name string) controllink.HostHello {
 	hello := fakeHello(name)
-	hello.Capabilities = append(append([]string{}, hello.Capabilities...), CapHostUserSettings)
+	hello.Capabilities = slices.DeleteFunc(slices.Clone(hello.Capabilities), func(c string) bool { return c == CapHostUserSettings })
 	return hello
 }
 
@@ -69,7 +73,7 @@ func TestSettingsAndSecretsGoOnlyToTheirPersonsMachines(t *testing.T) {
 	sam := p.invite(alexWindow, "Sam", wire.UserRoleMember)
 	alexBox := p.machineSaying(alex, takingHello("MACHINE-20"))
 	samBox := p.machineSaying(sam, takingHello("MACHINE-21"))
-	older := p.machine(sam, "MACHINE-22")
+	older := p.machineSaying(sam, notTakingHello("MACHINE-22"))
 	p.waitFor(func() bool { _, ok := told.last(samBox.member.Host); return ok }, "Sam's machine told at its join")
 
 	// Sam's server and token, under You.

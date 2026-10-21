@@ -47,6 +47,7 @@ const (
 	CapGit1                  = "git/1"
 	CapHandover1             = "handover/1"
 	CapHostTeam1             = "host.team/1"
+	CapHostUserSettings1     = "host.user-settings/1"
 	CapHostWire1             = "host.wire/1"
 	CapHost1                 = "host/1"
 	CapHostsJoin1            = "hosts.join/1"
@@ -570,5 +571,5 @@ var ControlNotifications = map[string]bool{
 // declares by hand, by who.
 var DeclaredCapabilities = map[string][]string{
 	"client": {"client.wire/1", "client.team/1"},
-	"host":   {"host.wire/1", "agents.move-worktree/1", "host.team/1"},
+	"host":   {"host.wire/1", "agents.move-worktree/1", "host.team/1", "host.user-settings/1"},
 }

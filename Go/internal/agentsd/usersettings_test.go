@@ -1,0 +1,112 @@
+package agentsd
+
+import (
+	"encoding/json"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+
+	"github.com/alexec/agents/Go/wire"
+)
+
+// The user scope on a machine (#1760): what the control plane sends goes into the files the
+// machine reads, marked as from the control plane, and a local edit of a marked part is
+// refused.
+func TestUserSettingsGoIntoTheMachinesFiles(t *testing.T) {
+	root, home := t.TempDir(), t.TempDir()
+	t.Setenv("AGENTS_PERSONAL_HOME", home)
+	d, c := start(t, root)
+	defer d.Shutdown()
+	d.SettingsDir = t.TempDir()
+	os.MkdirAll(filepath.Join(home, ".agents-secrets"), 0o700)
+	os.WriteFile(filepath.Join(home, ".agents-secrets", "secrets.env"), []byte("MINE=kept\n"), 0o600)
+	os.MkdirAll(filepath.Join(home, ".agents"), 0o755)
+	os.WriteFile(filepath.Join(home, ".agents", "mcp.json"), []byte(`{"mcpServers":{"old":{"command":"x"}},"note":"kept"}`), 0o644)
+
+	instructions := "Use ASD-STE100."
+	sent := wire.HostUserSettings{User: "sam", Settings: wire.UserSettings{
+		McpServers:  json.RawMessage(`{"github":{"url":"https://api.githubcopilot.com/mcp/","headers":{"Authorization":"Bearer ${GITHUB_TOKEN}"}}}`),
+		AgentConfig: mustJSON(wire.UserAgentConfig{Instructions: &instructions, Personas: map[string]string{"reviewer": "You review."}, Skills: map[string]string{"release": "---\nname: release\n---\n"}}),
+		Runtimes:    json.RawMessage(`{"sandbox":{"defaults":{"claude":"on"}}}`),
+		CostLimits:  json.RawMessage(`{"dailyTokens":5000}`),
+		Resources:   json.RawMessage(`[{"name":"build","displayName":"Build","description":"When building.","holders":3}]`),
+	}, Secrets: []wire.UserSecret{{Name: "GITHUB_TOKEN", Value: "ghp_sams"}}}
+	d.Told(wire.NotifyHostUserSettings.Name, mustJSON(sent))
+
+	read := func(parts ...string) string {
+		b, _ := os.ReadFile(filepath.Join(parts...))
+		return string(b)
+	}
+	if mcp := read(home, ".agents", "mcp.json"); !strings.Contains(mcp, "githubcopilot") || strings.Contains(mcp, `"old"`) || !strings.Contains(mcp, `"note"`) {
+		t.Fatal(mcp)
+	}
+	if read(home, ".agents", "AGENTS.md") != instructions || read(home, ".agents", "personas", "reviewer.md") != "You review." ||
+		!strings.Contains(read(home, ".agents", "skills", "release", "SKILL.md"), "name: release") {
+		t.Fatal("agent configuration not written")
+	}
+	if !strings.Contains(read(d.SettingsDir, "sandbox.json"), `"claude":"on"`) {
+		t.Fatal(read(d.SettingsDir, "sandbox.json"))
+	}
+	var st wire.CostState
+	json.Unmarshal(c.call(t, 1, "cost/state", nil), &st)
+	if st.Limits.DailyTokens == nil || *st.Limits.DailyTokens != 5000 {
+		t.Fatalf("%+v", st.Limits)
+	}
+	if r := read(root, "resources.json"); !strings.Contains(r, `"build"`) {
+		t.Fatal(r)
+	}
+	secrets := read(home, ".agents-secrets", "secrets.env")
+	if !strings.Contains(secrets, "GITHUB_TOKEN=ghp_sams") || !strings.Contains(secrets, "MINE=kept") {
+		t.Fatal("secrets.env")
+	}
+	if info, _ := os.Stat(filepath.Join(home, ".agents-secrets", "secrets.env")); info.Mode().Perm() != 0o600 {
+		t.Fatal(info.Mode())
+	}
+	mark := read(root, userScopeFile)
+	if strings.Contains(mark, "ghp_sams") || !strings.Contains(mark, "GITHUB_TOKEN") || !strings.Contains(mark, "costLimits") {
+		t.Fatal(mark)
+	}
+
+	// A local edit of a part that is the control plane's is refused.
+	if e := c.callError(t, 2, "cost/setLimits", map[string]any{"dailyTokens": 1}); e == nil || !strings.Contains(e.Message, "under You") {
+		t.Fatalf("%+v", e)
+	}
+	if e := c.callError(t, 3, "resources/remove", map[string]any{"name": "build"}); e == nil || !strings.Contains(e.Message, "under You") {
+		t.Fatalf("%+v", e)
+	}
+
+	// Sent again without the persona, the secret and the cost limits: the persona and the
+	// secret go, the limits stay and are this machine's own again; a secret set by hand stays.
+	sent.Settings.AgentConfig = mustJSON(wire.UserAgentConfig{Instructions: &instructions})
+	sent.Settings.CostLimits = nil
+	sent.Secrets = nil
+	d.Told(wire.NotifyHostUserSettings.Name, mustJSON(sent))
+	if _, err := os.Stat(filepath.Join(home, ".agents", "personas", "reviewer.md")); !os.IsNotExist(err) {
+		t.Fatal("the persona is still there")
+	}
+	if _, err := os.Stat(filepath.Join(home, ".agents", "skills", "release")); !os.IsNotExist(err) {
+		t.Fatal("the skill is still there")
+	}
+	if secrets := read(home, ".agents-secrets", "secrets.env"); strings.Contains(secrets, "GITHUB_TOKEN") || !strings.Contains(secrets, "MINE=kept") {
+		t.Fatal("secrets.env after")
+	}
+	c.call(t, 4, "cost/setLimits", map[string]any{"dailyTokens": 1})
+}
+
+func TestAgentConfigNamesStayInTheirFolders(t *testing.T) {
+	home := t.TempDir()
+	for _, name := range []string{"../evil", "a/b", ".hidden", ""} {
+		raw := mustJSON(wire.UserAgentConfig{Personas: map[string]string{name: "x"}})
+		if _, err := writeAgentConfig(home, raw, nil); err == nil {
+			t.Fatalf("%q was written", name)
+		}
+	}
+	// A mark that names a file outside is never removed.
+	outside := filepath.Join(home, "keep.txt")
+	os.WriteFile(outside, []byte("x"), 0o644)
+	writeAgentConfig(home, mustJSON(wire.UserAgentConfig{}), []string{"../keep.txt", "/etc/hosts"})
+	if _, err := os.Stat(outside); err != nil {
+		t.Fatal("removed a file outside ~/.agents")
+	}
+}
