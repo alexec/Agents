@@ -5137,9 +5137,10 @@ type TurnUsage struct {
 }
 
 type TurnsPage struct {
-	Turns     []TurnSummary `json:"turns"`
-	FirstTurn int64         `json:"firstTurn"`
-	OpenStart int64         `json:"openStart"`
+	Turns       []TurnSummary `json:"turns"`
+	FirstTurn   int64         `json:"firstTurn"`
+	OpenStart   int64         `json:"openStart"`
+	FirstPrompt *int64        `json:"firstPrompt,omitzero"`
 }
 
 type TurnsRequest struct {

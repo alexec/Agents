@@ -12906,6 +12906,9 @@
         },
         "openStart": {
           "type": "integer"
+        },
+        "firstPrompt": {
+          "type": "integer"
         }
       },
       "required": [

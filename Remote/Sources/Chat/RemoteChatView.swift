@@ -224,6 +224,7 @@ struct RemoteChatView: View {
                                 model.focusedEntry = prompt.id
                             },
                             branch: branchFrom.map { branch in { branch($0.id, $0.text) } },
+                            loadEarlier: { [model] in await model.loadEarlier() },
                             close: { showingPrompts = false })
             }
         }

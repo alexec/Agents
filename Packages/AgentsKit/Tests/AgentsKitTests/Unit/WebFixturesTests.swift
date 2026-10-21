@@ -892,9 +892,9 @@ struct WebFixturesTests {
         let entries = [ask(9, "Run the tests"), Self.entry(10, .stateChanged(.stopped, reason: .processDied)),
                        ask(11, "Ship it"), Self.entry(12, .userMessage("Did it work?", from: .app)),
                        Self.entry(13, .agentMessage(messageID: nil, text: "Shipping."))]
-        let input = { (running: Bool, query: String?) in
+        let input = { (running: Bool, query: String?, earlier: Int) in
             JSONValue.object(["turns": try Self.encode(turns), "entries": try Self.encode(entries), "isRunning": .bool(running),
-                              "query": query.map(JSONValue.string) ?? .null])
+                              "query": query.map(JSONValue.string) ?? .null, "earlier": .int(earlier)])
         }
         let encoded = { (prompts: [SessionPrompt]) -> JSONValue in
             .array(try prompts.map { prompt in
@@ -906,14 +906,17 @@ struct WebFixturesTests {
         func prompts(_ input: JSONValue) throws -> [SessionPrompt] {
             SessionPrompts.of(turns: try (input["turns"] ?? .null).decode([TurnSummary].self),
                               entries: try (input["entries"] ?? .null).decode([TranscriptEntry].self),
-                              isRunning: input["isRunning"]?.boolValue ?? false)
+                              isRunning: input["isRunning"]?.boolValue ?? false,
+                              earlier: input["earlier"]?.intValue ?? 0)
         }
-        try pin("prompts/list.json", [Case(name: "the last turn running", input: try input(true, nil)),
-                                      Case(name: "every turn over", input: try input(false, nil))]) { input in
+        // Earlier turns not in hand: numbered from the chat's first prompt, as the host counts them (#1862).
+        try pin("prompts/list.json", [Case(name: "the last turn running", input: try input(true, nil, 0)),
+                                      Case(name: "every turn over", input: try input(false, nil, 0)),
+                                      Case(name: "twelve prompts before the page", input: try input(false, nil, 12))]) { input in
             try encoded(try prompts(input))
         }
         let queries = [("words in two", "make"), ("another case", "SHIP"), ("nothing typed", "  "), ("no match", "deploy")]
-        try pin("prompts/filter.json", try queries.map { Case(name: $0, input: try input(false, $1)) }) { input in
+        try pin("prompts/filter.json", try queries.map { Case(name: $0, input: try input(false, $1, 0)) }) { input in
             .array(SessionPrompts.filtered(try prompts(input), by: input["query"]?.stringValue ?? "").map { .int($0.number) })
         }
     }

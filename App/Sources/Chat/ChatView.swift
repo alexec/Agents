@@ -119,6 +119,7 @@ struct ChatView: View {
                 PromptsList(agent: agent, page: model.work,
                             go: { [model] prompt in model.focusEntry(prompt.id) },
                             branch: branchFrom(agent).map { branch in { branch($0.id, $0.text) } },
+                            loadEarlier: { [model] in await model.loadEarlier() },
                             close: { showingPrompts = false })
             }
         }

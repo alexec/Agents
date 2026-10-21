@@ -69,6 +69,9 @@ public final class AgentsModel {
     /// chat draws of them until one is opened. `entries` start at `openTurnStart`.
     public private(set) var turns: [TurnSummary] = []
     public private(set) var firstTurn = 0
+    /// How many of the person's prompts come before `turns`, as the host counts them (#1862).
+    /// Nil from a host too old to say.
+    public private(set) var firstPrompt: Int?
     public private(set) var openTurnStart = 0
     public var hasMoreTurns: Bool { firstTurn > 0 }
     /// Whether anything at all of the conversation comes before what is in hand.
@@ -1251,6 +1254,7 @@ public final class AgentsModel {
     public func replaceTurns(with page: TurnsPage) {
         turns = page.turns.keepingLastTurnWithEachID()
         firstTurn = page.firstTurn
+        firstPrompt = page.firstPrompt
         openTurnStart = page.openStart
         trimTurns()
     }
@@ -1260,6 +1264,7 @@ public final class AgentsModel {
     public func prependTurns(_ page: TurnsPage) {
         turns = (page.turns + turns).keepingLastTurnWithEachID()
         firstTurn = page.firstTurn
+        firstPrompt = page.firstPrompt
         trimTurns()
     }
 
@@ -1269,6 +1274,7 @@ public final class AgentsModel {
         guard isFollowingEnd, turns.count > Self.turnsTrimmedAt else { return }
         let drop = turns.count - Self.turnsKept
         guard drop > 0 else { return }
+        firstPrompt = firstPrompt.map { $0 + SessionPrompts.count(in: turns.prefix(drop)) }
         turns.removeFirst(drop)
         firstTurn += drop
     }
@@ -1333,6 +1339,7 @@ public final class AgentsModel {
         hasMoreBefore = false
         turns = []
         firstTurn = 0
+        firstPrompt = nil
         openTurnStart = 0
         refold()
     }

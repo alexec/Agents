@@ -1,19 +1,26 @@
 // The Prompts list (#1658), from the chat's ··· menu: each prompt the person sent in this chat,
 // oldest first and opened at the newest, with its turn's cost, time and ending. A filter field
 // narrows it. A row goes to its prompt in the transcript; its ··· has Copy and Branch from Here.
-// Up and Down move, Return goes, Escape or a click outside closes it.
+// Up and Down move, Return goes, Escape or a click outside closes it. Rows are numbered from the
+// chat's first prompt, as the host counts them; while earlier turns are not in hand, a line above
+// the rows says so and loads them (#1862).
 import { useSignal } from "@preact/signals";
 import { useEffect, useRef } from "preact/hooks";
 import { endingLabel, filteredPrompts, movedTo, promptLine, type SessionPrompt } from "../../model/sessionPrompts";
 
-export function PromptList({ prompts, choose, branchFrom, close }: {
+export function PromptList({ prompts, hasEarlier, loadEarlier, choose, branchFrom, close }: {
   prompts: readonly SessionPrompt[];
+  /** Earlier turns of the chat are not in hand. */
+  hasEarlier: boolean;
+  /** Brings the page before them; absent when the chat holds all it will (#291). */
+  loadEarlier?: (() => Promise<void>) | undefined;
   choose: (prompt: SessionPrompt) => void;
   /** Absent on an archived session, as Branch is. */
   branchFrom?: ((prompt: SessionPrompt) => void) | undefined;
   close: () => void;
 }) {
   const query = useSignal("");
+  const loading = useSignal(false);
   const field = useRef<HTMLInputElement>(null);
   useEffect(() => { field.current?.focus(); }, []);
   const shown = filteredPrompts(prompts, query.value);
@@ -60,6 +67,17 @@ export function PromptList({ prompts, choose, branchFrom, close }: {
             at.value = null;
             menu.value = null;
           }} />
+        {hasEarlier && (
+          <p class="prompt-earlier quiet small" role="status">
+            <span>Earlier prompts aren't loaded</span>
+            {loadEarlier && (
+              <button class="link" disabled={loading.value} onClick={() => {
+                loading.value = true;
+                void loadEarlier().finally(() => (loading.value = false));
+              }}>{loading.value ? "Loading…" : "Load Earlier"}</button>
+            )}
+          </p>
+        )}
         {shown.length > 0 ? (
           <ul class="completions" id="prompt-list-rows" role="listbox" aria-label="Prompts" onScroll={() => (menu.value = null)}>
             {shown.map((prompt, i) => (
@@ -98,7 +116,8 @@ export function PromptList({ prompts, choose, branchFrom, close }: {
               </li>
             ))}
           </ul>
-        ) : (
+        ) : (prompts.length > 0 || !hasEarlier) && (
+          // None in hand while earlier ones are not loaded: the line above says so.
           <p class="hint">{prompts.length ? "No prompts match" : "No prompts yet"}</p>
         )}
       </div>

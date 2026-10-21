@@ -47,8 +47,10 @@ public struct SessionPrompt: Identifiable, Hashable, Sendable {
 /// `Web/src/model/sessionPrompts.ts`), held to `Fixtures/web/prompts/`.
 public enum SessionPrompts {
     /// The stored turns and the entries held after them, which may overlap the last turn.
-    /// `isRunning` is whether the last turn is still going.
-    public static func of(turns: [TurnSummary], entries: [TranscriptEntry], isRunning: Bool) -> [SessionPrompt] {
+    /// `isRunning` is whether the last turn is still going. `earlier` is how many of the
+    /// person's prompts come before the turns: the first is numbered after them (#1862).
+    public static func of(turns: [TurnSummary], entries: [TranscriptEntry], isRunning: Bool,
+                          earlier: Int = 0) -> [SessionPrompt] {
         // A turn for each ask, in order; a held copy of a turn replaces its stored one.
         struct Turn { var ask: TranscriptEntry; var cost: Cost?; var lastAt: Date?; var ending: SessionPrompt.Ending? }
         var order: [UUID] = []
@@ -85,11 +87,20 @@ public enum SessionPrompts {
             guard let turn = byAsk[id], case .userMessage(let text, _, .person) = turn.ask.kind else { continue }
             let going = isRunning && index == order.count - 1
             prompts.append(SessionPrompt(
-                id: id, number: prompts.count + 1, text: text, at: turn.ask.at, cost: turn.cost,
+                id: id, number: earlier + prompts.count + 1, text: text, at: turn.ask.at, cost: turn.cost,
                 seconds: going ? nil : turn.lastAt.map { max(0, Int($0.timeIntervalSince(turn.ask.at).rounded())) },
                 ending: going ? nil : turn.ending))
         }
         return prompts
+    }
+
+    /// How many of the person's prompts these turns start with: what the chat lets go of
+    /// when it trims its oldest turns.
+    public static func count(in turns: some Sequence<TurnSummary>) -> Int {
+        turns.count { turn in
+            if case .userMessage(_, _, .person)? = turn.ask?.kind { return true }
+            return false
+        }
     }
 
     static func isAsk(_ entry: TranscriptEntry) -> Bool {

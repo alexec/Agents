@@ -487,7 +487,9 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
         <FileSearch place={nameOf(pathOf(agent.cwd))} search={findFiles} choose={openFound} close={() => (searchingFiles.value = false)} />
       )}
       {listingPrompts.value && agent && (
-        <PromptList prompts={sessionPrompts(store.turns.value, store.entries.value, live)}
+        <PromptList prompts={sessionPrompts(store.turns.value, store.entries.value, live, store.firstPrompt.value ?? 0)}
+          hasEarlier={store.firstTurn.value > 0 || store.hasMoreBefore.value}
+          loadEarlier={store.hasMoreOfTheConversation ? () => store.loadEarlier() : undefined}
           close={() => (listingPrompts.value = false)}
           choose={(prompt) => {
             // To the prompt in the transcript, as Find goes to a match (#1532).
