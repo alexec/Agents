@@ -431,7 +431,7 @@ func (p *Provider) Create(name string, options map[string]any, firstBoot string)
 	if owner, name, ok := strings.Cut(values["repository"], "/"); ok && owner != "" && name != "" && !strings.Contains(name, "/") {
 		values["repository.owner"], values["repository.name"] = owner, name
 	} else if making.CreateRequest != nil && strings.Contains(making.CreateRequest.URL, "${repository.") {
-		return Workspace{}, Failure{"Give the repository as owner/name."}
+		return Workspace{}, Failure{Reason: "Give the repository as owner/name."}
 	}
 	// The first-boot command carries a host code: logged as the template, never filled in.
 	if err := p.do(making.Create, making.CreateRequest, values, "create "+name, "making "+name); err != nil {
