@@ -9,7 +9,7 @@ import Foundation
 /// here once, so the Mac's row and the phone's card cannot say it two ways. Not tinted:
 /// a waiting agent takes Blocked's look from its group, and this adds nothing to it.
 public struct WaitStatus: Codable, Hashable, Sendable {
-    /// The capsule: what, since when, until when.
+    /// The chat's wait card (#1995): what, since when, until when.
     public var line: String
     /// The row and card: what, in a few words.
     public var mark: String

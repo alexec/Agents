@@ -92,9 +92,6 @@ test("the chat's capsules: one a lease or wait, and an event wait's line and hin
   assert.deepEqual(lines.leaseMark("me", snapshot, title).capsules, ["◷ Waiting for Screen · held by “Fix login” until 14:12 · 1st"]);
   const agent = { state: "finished", eventWait: { id: "w", from: 0, since: wire(new Date(2026, 9, 4, 23, 30)),
     deadline: wire(new Date(2026, 9, 5, 9, 0)), patterns: [{ name: "workflow.completed", filters: { workflow: "nightly" } }] } };
-  assert.deepEqual(lines.eventWaitCapsule(agent, title), {
-    line: "◷ Waiting for workflow.completed workflow nightly · since 23:30 · until 09:00",
-    hint: "Sending will cancel the wait on workflow.completed workflow nightly.",
-  });
-  assert.equal(lines.eventWaitCapsule({ state: "running" }, title), null);
+  assert.equal(lines.eventWaitLine(agent, title), "◷ Waiting for workflow.completed workflow nightly · since 23:30 · until 09:00");
+  assert.equal(lines.eventWaitLine({ state: "running" }, title), null);
 });

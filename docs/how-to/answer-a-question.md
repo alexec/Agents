@@ -26,15 +26,12 @@ Whichever it is, the agent and its project say **Needs you** until you answer.
      notification, on the device you used last: the Mac if you are at it, otherwise the
      iPhone or iPad you touched most recently. None comes if you are already reading
      that conversation.
-2. Answer the card in the conversation. It is where the agent asked: what came before the
-   question is above it, and anything that came after it (more of the agent's work, a
-   prompt waiting to be sent) is below it. Usually that is the end of the conversation,
-   just above the prompt. It scrolls with the conversation.
-   When you follow the end of the conversation and new work pushes the card up, the
-   conversation keeps following the end. Scroll up to find the card again; **↓** above the
-   prompt takes you back to the end.
+2. Answer the card in the conversation. It is at the end of the conversation, after the
+   agent's work and any prompt waiting to be sent, just above the prompt. It scrolls with
+   the conversation. When you have scrolled up, **↓** above the prompt takes you back to the
+   end, and to the card.
    When the agent asks about several things at once — several file edits, for example —
-   each question stays as its own card, each where it was asked, until you answer it.
+   each question stays as its own card, in the order asked, until you answer it.
    Answering one leaves the others.
    - **Permission.** The card names what the agent wants to do, such as the command it
      wants to run or the file it wants to change. The buttons are the agent's own

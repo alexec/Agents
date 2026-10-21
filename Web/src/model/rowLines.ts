@@ -104,16 +104,16 @@ function single(pattern: EventPattern, key: string): string | undefined {
 }
 
 /**
- * WaitStatus.of(…).line and EventWords.hint for a wait on events, for the chat's capsule over the
- * prompt: "◷ Waiting for … · since 23:30 · until 09:00", and that sending takes its place.
+ * WaitStatus.of(…).line for a wait on events, for the chat's wait card (#1995): "◷ Waiting for … ·
+ * since 23:30 · until 09:00".
  */
-export function eventWaitCapsule(agent: Agent, title: (id: string) => string | undefined): { line: string; hint: string } | null {
+export function eventWaitLine(agent: Agent, title: (id: string) => string | undefined): string | null {
   const wait = agent.eventWait;
   const mark = eventWaitMark(agent, title);
   if (!wait || !mark) return null;
   let line = `${mark} \u00B7 since ${clock(fromWireDate(wait.since))}`;
   if (wait.deadline !== undefined) line += ` \u00B7 until ${clock(fromWireDate(wait.deadline))}`;
-  return { line, hint: `Sending will cancel the wait on ${wait.patterns.map(patternLabel).join(" or ")}.` };
+  return line;
 }
 
 /** WaitStatus.of(…).mark for a wait on events: "◷ Waiting for “Fix login” to finish". A block's is blockLines'. */
@@ -155,7 +155,7 @@ export interface WaitMark { line: string; detail: string }
 export function waitMark(agent: Agent, block: { names: string[]; lines: string[] }, leases: LeaseMark | null,
   title: (id: string) => string | undefined): WaitMark | null {
   const things = [...block.names, ...eventWaitThings(agent, title), ...(leases?.waitingNames ?? [])];
-  const event = eventWaitCapsule(agent, title)?.line;
+  const event = eventWaitLine(agent, title);
   const detail = [...block.lines, ...(event ? [event] : []), ...(leases?.waitingFull ?? [])];
   const line = rowWaitLine(things) ?? (detail[0] !== undefined ? `◷ ${detail[0]}` : null);
   return line === null ? null : { line, detail: detail.join("\n") };

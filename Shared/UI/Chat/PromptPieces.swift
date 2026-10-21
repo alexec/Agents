@@ -54,7 +54,8 @@ enum PromptWords {
 /// Where the agent is working, how full it is, and what runs it: the row above the
 /// field once an agent exists.
 ///
-/// What the agent holds, waits for and runs in the background, above the prompt.
+/// What the agent holds and runs in the background, above the prompt. What it waits for
+/// on events is a card at the end of the chat (#1995).
 /// Live, so shown only while it is so. The settled facts — its place, its runtime,
 /// what it has used — are not drawn here: the pills under the prompt are the settings.
 struct PromptHeader: View {
@@ -64,12 +65,6 @@ struct PromptHeader: View {
     var leaseStatus: LeaseStatus? = nil
     /// What a lease capsule does when pressed. See `LeaseRow`.
     var openLease: ((ResourceName) -> Void)? = nil
-    /// What the agent waits for on events (042), drawn above this row. Nil draws nothing.
-    var waitStatus: WaitStatus? = nil
-    var waitHint: String = ""
-    /// What the wait capsule does when pressed, and its ✕. See `WaitCapsule`.
-    var openWait: (() -> Void)? = nil
-    var cancelWait: (() -> Void)? = nil
     /// What it has running in the background (057), drawn above the leases: a block of
     /// rows, or on a phone one line that opens them (`compactBackground`).
     var background: [BackgroundItem] = []
@@ -78,9 +73,6 @@ struct PromptHeader: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            if let waitStatus {
-                WaitCapsule(status: waitStatus, hint: waitHint, open: openWait, cancel: cancelWait)
-            }
             if compactBackground {
                 BackgroundLine(items: background, actions: backgroundActions)
             } else {

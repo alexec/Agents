@@ -205,13 +205,6 @@ public enum EventWords {
     // The paragraph every agent is briefed with (042) is the Go daemon's, eventsBrief in
     // Go/internal/agentsd/brief.go (#1801).
 
-    // MARK: The person's side
-
-    /// The line above the prompt bar while an agent waits: sending takes its place.
-    public static func hint(_ wait: EventWait) -> String {
-        "Sending will cancel the wait on \(wait.label)."
-    }
-
     static func messageLine(_ event: Event) -> String {
         event.message.map { ". Message: \($0)" } ?? ""
     }

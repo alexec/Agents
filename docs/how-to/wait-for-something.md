@@ -51,8 +51,9 @@ and then carry on.
 2. If the runtime asks permission to use `wait_for_event`, allow it. Claude and Cursor may
    ask, and Copilot always does.
 
-3. Check that it is waiting. Above the prompt, the chat shows a capsule such as
-   **◷ Waiting for pr.merged on github (pr 640) · since 14:02 · until 18:00**. On the
+3. Check that it is waiting. At the end of the chat, a card says, for example,
+   **◷ Waiting for pr.merged on github (pr 640) · since 14:02 · until 18:00**. It is under any
+   question the agent is waiting on you for, and goes when the wait ends. On the
    project page, the agent is under **Waiting** with the same line under its report.
 
 4. Leave it. When the pull request merges, the agent is started again with a message saying
@@ -61,11 +62,11 @@ and then carry on.
 
 ## Stop a wait
 
-- **On the Mac**: click ✕ on the capsule above the prompt, or on the agent's line under
-  **Waiting now** on the Events page.
-- **Anywhere, including the phone and iPad**: send the agent a prompt. A line above the
-  prompt says **Sending will cancel the wait on …** before you do. The agent is told its
-  wait was cancelled by your message, and can wait again if it still needs to.
+- **In the chat, anywhere**: choose **Stop Waiting** on the wait card. On the Mac and the
+  web page, **Show in Events** opens the Events page at **Waiting now**, where ✕ on the
+  agent's line does the same.
+- **Send the agent a prompt.** The agent is told its wait was cancelled by your message, and
+  can wait again if it still needs to.
 
 Stopping or archiving the agent also ends its wait.
 

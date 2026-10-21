@@ -1,4 +1,4 @@
-// Permission requests and question cards in the conversation, each where it was asked (071 FR-024, #723, #973;
+// Permission requests and question cards in the conversation, at its end (071 FR-024, #723, #1995;
 // PermissionView.swift and ElicitationView.swift). Answering one here answers it everywhere. One answered somewhere else
 // while it is on screen says so, and its buttons do nothing (US2 scenario 5).
 //
@@ -45,12 +45,11 @@ const questionWentUnanswered = "Nobody answered this question before the agent e
 /** How long a card answered elsewhere stays to say so. */
 const answeredElsewhereShownFor = 4_000;
 
-/** A card that waits on the person, and when it was asked: where the chat draws it (WaitingCard, #973). */
-export interface WaitingCard { key: string; at: number; node: ComponentChildren }
+/** A card that waits on the person, or the agent's wait on events, at the end of the chat (WaitingCard, #1995). */
+export interface WaitingCard { key: string; node: ComponentChildren }
 
 /**
- * The permission and question cards waiting in a session, each with the time it was asked, for the
- * chat to draw in its place. A hook rather than a component, so the cards can sit apart while what
+ * The permission and question cards waiting in a session, for the chat to draw at its end. A hook rather than a component, so the cards can sit apart while what
  * they hold (an answer on its way, one answered elsewhere) is kept in one place.
  */
 export function useWaitingCards({ store, host, session, down = false }: {
@@ -144,7 +143,6 @@ export function useWaitingCards({ store, host, session, down = false }: {
     askerFor(store.agents.value[host] ?? [], agentID, runtimeName, subagent);
   return cards.map((card, index) => ({
     key: card.request.id,
-    at: card.request.askedAt,
     node: card.kind === "permission"
       ? <PermissionCard key={card.request.id} active={index === 0} request={card.request} asker={asker(card.request.agentID, card.request.subagent)}
           // Shown as the host shows it: the page beside the chat, read again (the window's Show plan).
