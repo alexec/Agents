@@ -143,6 +143,32 @@ func TestTranscriptAppendAndRead(t *testing.T) {
 	}
 }
 
+// AppendMany writes a branch's 10,000 entries with one open, not one for each (#1852).
+func TestAppendManyOpensTheTranscriptOnce(t *testing.T) {
+	s, _ := Open(t.TempDir())
+	id := NewUUID()
+	s.Append(id, wire.TranscriptEntry{ID: NewUUID(), Kind: wire.TranscriptEntryKind{AgentMessage: &wire.TranscriptEntryKindAgentMessage{}}})
+	opens := 0
+	was := openTranscript
+	openTranscript = func(file string) (*os.File, error) { opens++; return was(file) }
+	defer func() { openTranscript = was }()
+	es := make([]wire.TranscriptEntry, 10000)
+	for i := range es {
+		es[i] = wire.TranscriptEntry{ID: NewUUID(), Kind: wire.TranscriptEntryKind{AgentMessage: &wire.TranscriptEntryKindAgentMessage{Text: "x"}}}
+	}
+	n, err := s.AppendMany(id, es)
+	if err != nil || n != 1 || opens != 1 {
+		t.Fatalf("first %d, opens %d, %v", n, opens, err)
+	}
+	if n, _ := s.Append(id, es[0]); n != 10001 {
+		t.Fatalf("next index %d", n)
+	}
+	got, at, _ := s.Transcript(id, 0)
+	if len(got) != 10002 || at[10001] != 10001 || got[5000].ID != es[4999].ID {
+		t.Fatalf("read back %d", len(got))
+	}
+}
+
 func TestProjectsFile(t *testing.T) {
 	s, _ := Open(t.TempDir())
 	ps := []wire.Project{{Folder: FolderURL("/w/b"), AddedAt: 2}, {Folder: FolderURL("/w/a b"), AddedAt: 1}}

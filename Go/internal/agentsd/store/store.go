@@ -242,9 +242,25 @@ func (s *Store) Agents() []wire.Agent {
 
 // Append adds an entry to an agent's transcript and says its index: the line it is.
 func (s *Store) Append(id wire.UUID, e wire.TranscriptEntry) (int, error) {
-	b, err := diskjson.Marshal(e)
-	if err != nil {
-		return 0, err
+	return s.AppendMany(id, []wire.TranscriptEntry{e})
+}
+
+// openTranscript opens a transcript to append to; a test counts the opens through it.
+var openTranscript = func(file string) (*os.File, error) {
+	return os.OpenFile(file, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
+}
+
+// AppendMany adds entries to an agent's transcript with one open and one write, and says
+// the index of the first (#1852): a branch copies up to 10,000 entries at once, and the
+// store's lock, which every agent lookup takes, is held once rather than for each.
+func (s *Store) AppendMany(id wire.UUID, es []wire.TranscriptEntry) (int, error) {
+	var buf []byte
+	for _, e := range es {
+		b, err := diskjson.Marshal(e)
+		if err != nil {
+			return 0, err
+		}
+		buf = append(append(buf, b...), '\n')
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -252,19 +268,22 @@ func (s *Store) Append(id wire.UUID, e wire.TranscriptEntry) (int, error) {
 	if !ok {
 		n = countLines(s.Loc.Transcript(string(id)))
 	}
+	if len(es) == 0 {
+		return n, nil
+	}
 	if err := os.MkdirAll(s.Loc.Agent(string(id)), 0o755); err != nil {
 		return 0, err
 	}
-	f, err := os.OpenFile(s.Loc.Transcript(string(id)), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
+	f, err := openTranscript(s.Loc.Transcript(string(id)))
 	if err != nil {
 		return 0, err
 	}
-	_, err = f.Write(append(b, '\n'))
+	_, err = f.Write(buf)
 	f.Close()
 	if err != nil {
 		return 0, err
 	}
-	s.lines[id] = n + 1
+	s.lines[id] = n + len(es)
 	return n, nil
 }
 
