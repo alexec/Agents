@@ -289,6 +289,10 @@ public extension DaemonAPI {
                 Row(Method.hostsRetryKept, params: KeptRequestID.self, result: Empty.self, kind: .controlRequest),
                 // What an offline host last listed (#962).
                 Row(Method.hostsLastHeard, params: HostRequest.self, result: HostLastHeard.self, kind: .controlRequest),
+                // Who did what (#996): Events ▸ Audit.
+                Row(Method.auditList, params: AuditQuery.self, result: AuditList.self, kind: .controlRequest),
+                Row(Method.auditExport, params: AuditQuery.self, result: AuditExport.self, kind: .controlRequest),
+                Row(Method.controlSetAuditDays, params: AuditDays.self, result: AuditDays.self, kind: .controlRequest),
                 // Heard
                 Row(Notification.agentChanged, params: Agent.self, result: Empty.self, kind: .hostNotification),
                 Row(Notification.agentEntry, params: EntryNotification.self, result: Empty.self, kind: .hostNotification),

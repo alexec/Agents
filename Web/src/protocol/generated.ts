@@ -475,6 +475,77 @@ export interface AttentionTurn {
   endedAt?: WireDate;
 }
 
+/**
+ * Who did something through the control plane (#996, spec 736 FR-039), as the control plane wrote
+ * it: never taken from a client. A person and their client, or a bot and the event that started it.
+ * On a control plane with one person, the user is always the local owner.
+ */
+export interface AuditActor {
+  /** The person's id (people/<id>.json). */
+  user: string;
+  userName?: string;
+  client?: UUID;
+  clientName?: string;
+  event?: AuditCause;
+}
+
+/** The event that started a bot's action (#996). */
+export interface AuditCause {
+  kind: string;
+  id: string;
+}
+
+/**
+ * control/setAuditDays (#996): how many days audit entries are kept, 1 to 3,650. The default is 90.
+ */
+export interface AuditDays {
+  days: number;
+}
+
+/**
+ * One audit entry (#996): who did what, on which machine, and when. `action` is in words; `method`
+ * is the call it came from.
+ */
+export interface AuditEntry {
+  id: string;
+  at: WireDate;
+  action: string;
+  method: string;
+  host?: HostID;
+  target?: string;
+  actor: AuditActor;
+}
+
+/** audit/export's answer (#996): the entries as JSON lines, oldest first, at most 50,000. */
+export interface AuditExport {
+  lines: string;
+  count: number;
+}
+
+/**
+ * audit/list's answer (#996): entries newest first, how many days the control plane keeps them, and
+ * whether older ones were left out.
+ */
+export interface AuditList {
+  entries: AuditEntry[];
+  days: number;
+  more: boolean;
+  /** Whether the caller sees every person's entries. */
+  admin: boolean;
+}
+
+/**
+ * audit/list and audit/export (#996): a time range and, for an admin, one person. A member sees
+ * only their own entries, whatever `user` says.
+ */
+export interface AuditQuery {
+  since?: WireDate;
+  until?: WireDate;
+  user?: string;
+  /** At most this many, newest first; 200 when absent, never more than 1,000. */
+  limit?: number;
+}
+
 export interface AuthStatus {
   kind: string;
   label: string;
@@ -814,6 +885,8 @@ export interface ChannelOpen {
   tunnel?: string;
   tunnelRef?: string;
   fanOut?: boolean;
+  /** Who the channel's calls are from, written by the control plane (#996). */
+  actor?: AuditActor;
 }
 
 export interface ChartHint {
@@ -4931,6 +5004,8 @@ export interface Methods {
   "approvals/read": { params: ApprovalReadRequest; result: GuardedChangeReading };
   "artifact/write": { params: ArtifactWriteRequest; result: Empty };
   "attention/pending": { params: Empty; result: AttentionPending };
+  "audit/export": { params: AuditQuery; result: AuditExport };
+  "audit/list": { params: AuditQuery; result: AuditList };
   "backups/configure": { params: BackupSettings; result: BackupState };
   "backups/make": { params: BackupMakeRequest; result: BackupState };
   "backups/restore": { params: BackupRestoreRequest; result: BackupRestoreResult };
@@ -4948,6 +5023,7 @@ export interface Methods {
   "connections/sign-in/wait": { params: ConnectionSignInFlowRequest; result: ConnectionSignIn };
   "connectors/setup": { params: ConnectorSetupRequest; result: ConnectorSetup };
   "connectors/setup/skip": { params: ConnectorSkipRequest; result: ConnectorSetup };
+  "control/setAuditDays": { params: AuditDays; result: AuditDays };
   "control/status": { params: Empty; result: ControlStatus };
   "cost/state": { params: Empty; result: CostState };
   "credentials/lend": { params: CredentialsLend; result: Empty };
@@ -5097,6 +5173,8 @@ export const MethodTarget = {
   "approvals/read": "host",
   "artifact/write": "host",
   "attention/pending": "host",
+  "audit/export": "control",
+  "audit/list": "control",
   "backups/configure": "host",
   "backups/make": "host",
   "backups/restore": "host",
@@ -5114,6 +5192,7 @@ export const MethodTarget = {
   "connections/sign-in/wait": "host",
   "connectors/setup": "host",
   "connectors/setup/skip": "host",
+  "control/setAuditDays": "control",
   "control/status": "control",
   "cost/state": "host",
   "credentials/lend": "host",
@@ -5296,6 +5375,13 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   AttentionNotification: { required: ["needID", "alert"], optional: ["need", "to"] },
   AttentionPending: { required: ["needs", "deliveries"], optional: [] },
   AttentionTurn: { required: ["agentID", "phase"], optional: ["endedAt"] },
+  AuditActor: { required: ["user"], optional: ["userName", "client", "clientName", "event"] },
+  AuditCause: { required: ["kind", "id"], optional: [] },
+  AuditDays: { required: ["days"], optional: [] },
+  AuditEntry: { required: ["id", "at", "action", "method", "actor"], optional: ["host", "target"] },
+  AuditExport: { required: ["lines", "count"], optional: [] },
+  AuditList: { required: ["entries", "days", "more", "admin"], optional: [] },
+  AuditQuery: { required: [], optional: ["since", "until", "user", "limit"] },
   AuthStatus: { required: ["kind", "label"], optional: [] },
   AuthenticateRequest: { required: ["runtimeID", "methodID"], optional: [] },
   BackgroundItem: { required: ["id", "kind", "name", "state", "canStop", "isStopping", "startedAt"], optional: ["taskType", "detail", "command", "parentID", "toolCallID", "outputFilePath", "summary", "lastToolName", "endedAt"] },
@@ -5330,7 +5416,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ChangesFileRequest: { required: ["agentID", "path", "whole"], optional: [] },
   ChangesList: { required: ["files", "git", "reportsEdits"], optional: ["more"] },
   ChangesListRequest: { required: ["agentID"], optional: [] },
-  ChannelOpen: { required: ["grant", "client"], optional: ["device", "relayed", "tunnel", "tunnelRef", "fanOut"] },
+  ChannelOpen: { required: ["grant", "client"], optional: ["device", "relayed", "tunnel", "tunnelRef", "fanOut", "actor"] },
   ChartHint: { required: ["mark", "x", "y"], optional: ["color", "title"] },
   ClientAnnounce: { required: ["id", "publicKey", "name", "kind"], optional: [] },
   ClientConnection: { required: ["client", "relayed"], optional: ["through"] },

@@ -884,7 +884,7 @@ final class AppModel {
     /// here, with the ssh on the control plane's side.
     @ObservationIgnored private var controlHosts: [HostID: DaemonClient] = [:]
     /// The control plane's own connection, as the watch made it: for Start on a strip (#691).
-    @ObservationIgnored private var controlRequests: DaemonClient?
+    @ObservationIgnored private(set) var controlRequests: DaemonClient?
     /// Hosts whose Start was pressed here and not answered yet.
     private(set) var hostsBeingStarted: Set<HostID> = []
     /// Prompts and starts the control plane keeps for stopped workspaces (#691 US3), every host's.

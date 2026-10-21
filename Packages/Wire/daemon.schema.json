@@ -2605,6 +2605,10 @@
         },
         "fanOut": {
           "type": "boolean"
+        },
+        "actor": {
+          "$ref": "#/definitions/AuditActor",
+          "description": "Who the channel's calls are from, written by the control plane (#996)."
         }
       },
       "required": [
@@ -18491,6 +18495,163 @@
         "folder",
         "slot",
         "skipped"
+      ],
+      "additionalProperties": false
+    },
+    "AuditActor": {
+      "type": "object",
+      "description": "Who did something through the control plane (#996, spec 736 FR-039), as the control plane wrote it: never taken from a client. A person and their client, or a bot and the event that started it. On a control plane with one person, the user is always the local owner.",
+      "properties": {
+        "user": {
+          "type": "string",
+          "description": "The person's id (people/<id>.json)."
+        },
+        "userName": {
+          "type": "string"
+        },
+        "client": {
+          "$ref": "#/definitions/UUID"
+        },
+        "clientName": {
+          "type": "string"
+        },
+        "event": {
+          "$ref": "#/definitions/AuditCause"
+        }
+      },
+      "required": [
+        "user"
+      ],
+      "additionalProperties": false
+    },
+    "AuditCause": {
+      "type": "object",
+      "description": "The event that started a bot's action (#996).",
+      "properties": {
+        "kind": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "id"
+      ],
+      "additionalProperties": false
+    },
+    "AuditEntry": {
+      "type": "object",
+      "description": "One audit entry (#996): who did what, on which machine, and when. `action` is in words; `method` is the call it came from.",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "at": {
+          "$ref": "#/definitions/WireDate"
+        },
+        "action": {
+          "type": "string"
+        },
+        "method": {
+          "type": "string"
+        },
+        "host": {
+          "$ref": "#/definitions/HostID"
+        },
+        "target": {
+          "type": "string"
+        },
+        "actor": {
+          "$ref": "#/definitions/AuditActor"
+        }
+      },
+      "required": [
+        "id",
+        "at",
+        "action",
+        "method",
+        "actor"
+      ],
+      "additionalProperties": false
+    },
+    "AuditQuery": {
+      "type": "object",
+      "description": "audit/list and audit/export (#996): a time range and, for an admin, one person. A member sees only their own entries, whatever `user` says.",
+      "properties": {
+        "since": {
+          "$ref": "#/definitions/WireDate"
+        },
+        "until": {
+          "$ref": "#/definitions/WireDate"
+        },
+        "user": {
+          "type": "string"
+        },
+        "limit": {
+          "type": "integer",
+          "description": "At most this many, newest first; 200 when absent, never more than 1,000."
+        }
+      },
+      "additionalProperties": false
+    },
+    "AuditList": {
+      "type": "object",
+      "description": "audit/list's answer (#996): entries newest first, how many days the control plane keeps them, and whether older ones were left out.",
+      "properties": {
+        "entries": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/AuditEntry"
+          }
+        },
+        "days": {
+          "type": "integer"
+        },
+        "more": {
+          "type": "boolean"
+        },
+        "admin": {
+          "type": "boolean",
+          "description": "Whether the caller sees every person's entries."
+        }
+      },
+      "required": [
+        "entries",
+        "days",
+        "more",
+        "admin"
+      ],
+      "additionalProperties": false
+    },
+    "AuditExport": {
+      "type": "object",
+      "description": "audit/export's answer (#996): the entries as JSON lines, oldest first, at most 50,000.",
+      "properties": {
+        "lines": {
+          "type": "string"
+        },
+        "count": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "lines",
+        "count"
+      ],
+      "additionalProperties": false
+    },
+    "AuditDays": {
+      "type": "object",
+      "description": "control/setAuditDays (#996): how many days audit entries are kept, 1 to 3,650. The default is 90.",
+      "properties": {
+        "days": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "days"
       ],
       "additionalProperties": false
     }

@@ -97,7 +97,10 @@ type fakeHost struct {
 	opened []string
 }
 
-func (p *plane) host(machine string) *fakeHost {
+func (p *plane) host(machine string) *fakeHost { return p.hostWith(machine, nil) }
+
+// hostWith is host, told each channel as it opens.
+func (p *plane) hostWith(machine string, opened func(controllink.Conn)) *fakeHost {
 	root := p.t.TempDir()
 	private := controllink.NewPrivateKey()
 	hello := controllink.HostHello{Version: "0.1", Platform: "linux aarch64", MachineID: machine, Name: new("box " + machine),
@@ -112,6 +115,9 @@ func (p *plane) host(machine string) *fakeHost {
 		h.mu.Lock()
 		h.opened = append(h.opened, c.Device())
 		h.mu.Unlock()
+		if opened != nil {
+			opened(c)
+		}
 		for line := range c.In() {
 			var m struct {
 				ID     json.RawMessage `json:"id"`

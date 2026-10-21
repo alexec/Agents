@@ -46,6 +46,8 @@ type gitAskWaiting struct {
 }
 
 func newMethods(s *Service) *Methods {
+	// The audit (#996) is told each call the router passes on or answers here.
+	s.startAudit()
 	return &Methods{s: s, records: s.records, router: s.router, gitAsks: map[string]map[string]*gitAskWaiting{},
 		gitAskPatience: 120 * time.Second, gitFillPatience: 30 * time.Second}
 }
@@ -63,6 +65,7 @@ var own = map[string]bool{
 	"clients/forgetSelf": true, "clients/setPushToken": true, "clients/setActivityToken": true,
 	"devices/list": true, "devices/startPairing": true, "devices/stopPairing": true,
 	"devices/forget": true, "hosts/lastHeard": true,
+	"audit/list": true, "audit/export": true, "control/setAuditDays": true,
 }
 
 // Handles says whether a bare method is the control plane's. A bare daemon/ping from
@@ -85,6 +88,7 @@ var writes = map[string]bool{
 	"control/setProjectDetection": true, "clients/startPairing": true, "clients/forget": true,
 	"devices/startPairing": true, "devices/forget": true, "clients/setPushToken": true,
 	"clients/setActivityToken": true,
+	"control/setAuditDays": true,
 }
 
 func (m *Methods) Handle(method string, params json.RawMessage, from Caller) (any, error) {
@@ -211,6 +215,8 @@ func (m *Methods) Handle(method string, params json.RawMessage, from Caller) (an
 			return nil, err
 		}
 		return map[string]any{}, m.s.installer.CheckAgain(ctx, string(request.Host))
+	case "audit/list", "audit/export", "control/setAuditDays":
+		return m.auditMethod(ctx, method, params, from)
 	case "control/setProjectDetection":
 		request, err := require[wire.ProjectDetection](params, "ProjectDetection")
 		if err != nil {

@@ -93,7 +93,12 @@ type Router struct {
 	keeping chan func()
 	// Told each host's answer to a whole list (#962), for hosts/lastHeard: host, method,
 	// the reply line. Nil where none is kept.
-	copier     func(host, method, reply string)
+	copier func(host, method, reply string)
+	// Who a client is (#996): written on each channel it opens, and on each entry the
+	// audit keeps. Told each call passed on or answered here, for the audit. Nil where
+	// there is no audit.
+	actorOf    func(Caller) *wire.AuditActor
+	audited    func(from Caller, host, method string, params json.RawMessage)
 	log        func(string)
 	generation int64
 }
@@ -1265,6 +1270,9 @@ func (r *Router) openChannelLocked(sessionID, host string) {
 	if s.caller.Relayed {
 		open.Relayed = &yes
 	}
+	if r.actorOf != nil {
+		open.Actor = r.actorOf(s.caller)
+	}
 	h.conn.Send(openFrame(c, open))
 }
 
@@ -1412,6 +1420,9 @@ func (r *Router) toHostLocked(host, msg, sessionID string) {
 		refusal := providers.OfflineRefusal(r.workspaces[host])
 		// A prompt or a start for a stopped workspace may be kept, and start it (#691 US3).
 		if r.keeper != nil && providers.KeptMethods[m.Method] {
+			if r.audited != nil {
+				r.audited(s.caller, host, m.Method, m.Params)
+			}
 			k, caller, id, wrapped, method, params := r.keeper, s.caller, m.ID, s.wrapped, m.Method, m.Params
 			r.keeping <- func() {
 				answer := k.Keep(host, method, params, providers.Caller{Session: caller.Session, Client: caller.Client, Kind: caller.Kind})
@@ -1441,12 +1452,23 @@ func (r *Router) toHostLocked(host, msg, sessionID string) {
 		s.inFlight[host] = map[string]bool{}
 	}
 	s.inFlight[host][idKey(m.ID)] = true
+	if r.audited != nil {
+		r.audited(s.caller, host, m.Method, m.Params)
+	}
 	if r.copier != nil && keepsList(m.Method, m.Params) {
 		if s.copying[host] == nil {
 			s.copying[host] = map[string]string{}
 		}
 		s.copying[host][idKey(m.ID)] = m.Method
 	}
+}
+
+// SetAudit says who each client is, and where each call goes for the audit (#996).
+// audited must not wait: the router holds its lock while it is told.
+func (r *Router) SetAudit(actorOf func(Caller) *wire.AuditActor, audited func(from Caller, host, method string, params json.RawMessage)) {
+	r.mu.Lock()
+	r.actorOf, r.audited = actorOf, audited
+	r.mu.Unlock()
 }
 
 // SetCopier says where each host's answer to a whole list goes (#962).
@@ -1465,6 +1487,7 @@ func (r *Router) toControl(msg, sessionID string, wrapped bool) {
 	}
 	r.mu.Lock()
 	s := r.clients[sessionID]
+	audited := r.audited
 	r.mu.Unlock()
 	if s == nil {
 		return
@@ -1477,6 +1500,9 @@ func (r *Router) toControl(msg, sessionID string, wrapped bool) {
 			line = replyError(m.ID, err)
 		} else {
 			line = reply(m.ID, result)
+			if audited != nil {
+				audited(caller, "", m.Method, m.Params)
+			}
 		}
 		if wrapped {
 			line = wrap("", line)

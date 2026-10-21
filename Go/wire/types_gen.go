@@ -479,6 +479,62 @@ type AttentionTurn struct {
 	EndedAt *Date     `json:"endedAt,omitzero"`
 }
 
+// Who did something through the control plane (#996, spec 736 FR-039), as the control plane wrote it: never taken from a client. A person and their client, or a bot and the event that started it. On a control plane with one person, the user is always the local owner.
+type AuditActor struct {
+	// The person's id (people/<id>.json).
+	User       string      `json:"user"`
+	UserName   *string     `json:"userName,omitzero"`
+	Client     *UUID       `json:"client,omitzero"`
+	ClientName *string     `json:"clientName,omitzero"`
+	Event      *AuditCause `json:"event,omitzero"`
+}
+
+// The event that started a bot's action (#996).
+type AuditCause struct {
+	Kind string `json:"kind"`
+	ID   string `json:"id"`
+}
+
+// control/setAuditDays (#996): how many days audit entries are kept, 1 to 3,650. The default is 90.
+type AuditDays struct {
+	Days int64 `json:"days"`
+}
+
+// One audit entry (#996): who did what, on which machine, and when. `action` is in words; `method` is the call it came from.
+type AuditEntry struct {
+	ID     string     `json:"id"`
+	At     Date       `json:"at"`
+	Action string     `json:"action"`
+	Method string     `json:"method"`
+	Host   *HostID    `json:"host,omitzero"`
+	Target *string    `json:"target,omitzero"`
+	Actor  AuditActor `json:"actor"`
+}
+
+// audit/export's answer (#996): the entries as JSON lines, oldest first, at most 50,000.
+type AuditExport struct {
+	Lines string `json:"lines"`
+	Count int64  `json:"count"`
+}
+
+// audit/list's answer (#996): entries newest first, how many days the control plane keeps them, and whether older ones were left out.
+type AuditList struct {
+	Entries []AuditEntry `json:"entries"`
+	Days    int64        `json:"days"`
+	More    bool         `json:"more"`
+	// Whether the caller sees every person's entries.
+	Admin bool `json:"admin"`
+}
+
+// audit/list and audit/export (#996): a time range and, for an admin, one person. A member sees only their own entries, whatever `user` says.
+type AuditQuery struct {
+	Since *Date   `json:"since,omitzero"`
+	Until *Date   `json:"until,omitzero"`
+	User  *string `json:"user,omitzero"`
+	// At most this many, newest first; 200 when absent, never more than 1,000.
+	Limit *int64 `json:"limit,omitzero"`
+}
+
 type AuthStatus struct {
 	Kind  string `json:"kind"`
 	Label string `json:"label"`
@@ -931,6 +987,8 @@ type ChannelOpen struct {
 	Tunnel    *string `json:"tunnel,omitzero"`
 	TunnelRef *string `json:"tunnelRef,omitzero"`
 	FanOut    *bool   `json:"fanOut,omitzero"`
+	// Who the channel's calls are from, written by the control plane (#996).
+	Actor *AuditActor `json:"actor,omitzero"`
 }
 
 type ChartHint struct {

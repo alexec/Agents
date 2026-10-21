@@ -295,6 +295,36 @@ On the iPhone and iPad, **Events** is a row under the project list. It shows the
 and details, filtered by one menu. It has no subject capsules, no **Copy as trigger** and
 no **Waiting now**.
 
+## Audit: who did what
+
+The Events page has two panes, **Events** and **Audit**, on the Mac, the Remote and the web
+page (#996). **Audit** shows what was done through the control plane, newest first by day.
+It is read only.
+
+- **Each entry** shows the time, what was done ("Stopped an agent"), who did it and with
+  which client ("Local owner · MacBook Pro"), on which machine, and the call with what it
+  acted on (`agents/stop · <agent>`).
+- **The control plane writes the actor itself.** It uses the client it knows the call came
+  from. It ignores an actor that a client puts in its request. It also gives the actor to
+  the host when it opens the client's channel (`ChannelOpen.actor`).
+- **What is kept**: start, stop, archive or delete an agent or session; answer an approval,
+  permission, question or sandbox card; change a setting, a cost limit or a project's
+  limits; approve, deny, run, turn on or off, or delete a workflow; approve a plugin; add,
+  approve or remove an MCP server, a skill or a marketplace; add or delete a project;
+  pair, forget or remove a client or a machine; lend a sign-in or git access; change a
+  workspace provider. Reads, prompts and presence are not kept. An entry is written when
+  the control plane passes the call on, so a call that the host refuses is kept too.
+- **How long**: 90 days by default. An admin picks 30, 90, 180 or 365 days in the pane
+  (`control/setAuditDays`, 1 to 3,650). The control plane's hourly sweep deletes older
+  entries, by day.
+- **Export…** saves every entry kept as JSON lines (`audit/export`, at most 50,000).
+- **Who sees what**: an admin sees every entry and a member sees only their own. Until
+  people (#994) are built, a control plane has one person, the local owner. That person is
+  the admin, and every client belongs to them.
+
+Entries are stored in the control plane's store under `v1/events/<day>/`, one file each.
+The methods are `audit/list`, `audit/export` and `control/setAuditDays`.
+
 ## See also
 
 - [Have an agent wait for something](../how-to/wait-for-something.md)

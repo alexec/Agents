@@ -24,7 +24,7 @@ func TestTheSweepRemovesTheDeadAndKeepsTheLive(t *testing.T) {
 	rs.SettingsOrMake(ctx, func() records.Settings { return records.Settings{Name: "test", MachineID: "m"} })
 	now := time.Now()
 	day := func(ago int) string { return now.Add(-time.Duration(ago) * 24 * time.Hour).UTC().Format("2006-01-02") }
-	s.Put(ctx, "v1/events/"+day(10)+"/old.json", []byte("{}"), store.Absent)
+	s.Put(ctx, "v1/events/"+day(91)+"/old.json", []byte("{}"), store.Absent)
 	s.Put(ctx, "v1/events/"+day(1)+"/new.json", []byte("{}"), store.Absent)
 	code := func(id string, expires time.Time, spent bool) {
 		data, _ := records.Encode(storedCode{Purpose: "client", Expires: records.At(expires)})
@@ -75,7 +75,7 @@ func TestTheSweepRemovesTheDeadAndKeepsTheLive(t *testing.T) {
 		keys[k.Key] = true
 	}
 	for key, want := range map[string]bool{
-		"v1/events/" + day(10) + "/old.json": false, "v1/events/" + day(1) + "/new.json": true,
+		"v1/events/" + day(91) + "/old.json": false, "v1/events/" + day(1) + "/new.json": true,
 		codeKey("long-gone"): false, spentKey("long-gone"): false, spentKey("orphan"): false,
 		codeKey("just-expired"): true, codeKey("good"): true, spentKey("good"): true,
 		records.ClientKey(forgotten.ID): true,

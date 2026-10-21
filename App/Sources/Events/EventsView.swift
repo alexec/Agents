@@ -26,6 +26,8 @@ struct EventsView: View {
     @State private var isScrolledDown = false
     /// The newest position the person has had in view, to count what arrived since.
     @State private var seenHead: EventPosition = 0
+    /// Events, or Audit: who did what through the control plane (#996).
+    @State private var pane: EventsPane = .events
 
     private var filter: EventFilter { EventFilter(scope: scope, groups: groups) }
 
@@ -45,8 +47,35 @@ struct EventsView: View {
     }
 
     var body: some View {
+        Group {
+            switch pane {
+            case .events: events
+            case .audit:
+                AuditPane(control: model.controlRequests) { host in
+                    host == .mac ? "this Mac" : model.hosts.label(host)
+                }
+            }
+        }
+        .navigationTitle(pane.rawValue)
+        // Going to an event or to Waiting now goes back to Events.
+        .onChange(of: model.eventsFocus == nil) { _, none in
+            if !none { pane = .events }
+        }
+        .toolbar {
+            ToolbarItem(placement: .principal) {
+                Picker("Show", selection: $pane) {
+                    ForEach(EventsPane.allCases) { Text($0.rawValue).tag($0) }
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .fixedSize()
+            }
+        }
+    }
+
+    private var events: some View {
         let shown = self.shown
-        HStack(spacing: 0) {
+        return HStack(spacing: 0) {
             ScrollViewReader { proxy in
                 ScrollView {
                     // Lazy, and the days' rows straight inside it rather than in a stack
@@ -126,7 +155,6 @@ struct EventsView: View {
                     .frame(width: 300)
             }
         }
-        .navigationTitle("Events")
         .task(id: filter) {
             await model.refreshEvents(filter)
             seenHead = model.work.recentEvents.first?.position ?? 0
@@ -134,6 +162,13 @@ struct EventsView: View {
     }
 
     private static let top = "top"
+
+    enum EventsPane: String, CaseIterable, Identifiable {
+        case events = "Events"
+        case audit = "Audit"
+
+        var id: Self { self }
+    }
     private static let waitingNow = "waiting-now"
 
     private var emptyWords: String {

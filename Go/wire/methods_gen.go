@@ -358,6 +358,8 @@ const (
 var (
 	CallAttentionNeed               = Method[AttentionNeed, Empty]{"attention/need"}
 	CallAttentionTurn               = Method[AttentionTurn, Empty]{"attention/turn"}
+	CallAuditExport                 = Method[AuditQuery, AuditExport]{"audit/export"}
+	CallAuditList                   = Method[AuditQuery, AuditList]{"audit/list"}
 	CallBackupsCommit               = Method[BackupStoreCommit, Backup]{"backups/commit"}
 	CallBackupsDownload             = Method[BackupStorePartRequest, BackupStorePart]{"backups/download"}
 	CallBackupsStored               = Method[Empty, BackupStoreList]{"backups/stored"}
@@ -373,6 +375,7 @@ var (
 	CallClientsStartPairing         = Method[ClientPairingRequest, ControlCodeShown]{"clients/startPairing"}
 	CallClientsStopPairing          = Method[Empty, Empty]{"clients/stopPairing"}
 	CallControlPing                 = Method[Empty, Empty]{"control/ping"}
+	CallControlSetAuditDays         = Method[AuditDays, AuditDays]{"control/setAuditDays"}
 	CallControlSetProjectDetection  = Method[ProjectDetection, ProjectDetection]{"control/setProjectDetection"}
 	CallControlStatus               = Method[Empty, ControlStatus]{"control/status"}
 	CallGitCredential               = Method[GitCredentialRequest, GitCredential]{"git/credential"}

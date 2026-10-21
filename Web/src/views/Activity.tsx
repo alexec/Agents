@@ -12,6 +12,7 @@ import { Resources } from "./Resources";
 import { MCPServersList } from "./MCPServers";
 import { YourConnections } from "./ConnectorSetup";
 import { WorktreesList } from "./Worktrees";
+import { AuditPane } from "./Audit";
 import { forCleanup, pageLine, rowWords, tally as worktreeTally, worktreesIntro } from "../model/worktrees";
 import { BackToList } from "./BackToList";
 import { Modal } from "./Modal";
@@ -246,12 +247,23 @@ export function ActivityPageView({ store, page }: { store: Store; page: Activity
   }, [page]);
   const several = store.hosts.value.length > 1;
   const hostName = (host: string) => (store.isMac(host) ? "This Mac" : store.hosts.value.find((h) => h.id === host)?.name ?? host);
+  // Events, or Audit: who did what through the control plane (#996).
+  const pane = useSignal<"events" | "audit">("events");
   return (
     <section class={`chat activity-page ${page}-page`} aria-label={pageTitles[page]}>
       <header class="column-head"><BackToList /><h1>{pageTitles[page]}</h1></header>
       <div class="scroll">
         <div class="activity-body">
-          {page === "events" && <EventsList store={store} hostName={hostName} />}
+          {page === "events" && (
+            <div class="segmented events-panes" role="radiogroup" aria-label="Show">
+              {(["events", "audit"] as const).map((p) => (
+                <button key={p} role="radio" aria-checked={pane.value === p} class={pane.value === p ? "on" : ""}
+                  onClick={() => { pane.value = p; }}>{p === "events" ? "Events" : "Audit"}</button>
+              ))}
+            </div>
+          )}
+          {page === "events" && pane.value === "events" && <EventsList store={store} hostName={hostName} />}
+          {page === "events" && pane.value === "audit" && <AuditPane store={store} hostName={hostName} />}
           {page === "resources" && (
             <>
               {store.hosts.value.map((host) => (
