@@ -113,8 +113,8 @@ struct LocalServices {
             try StoreCoding.writeAtomically(Data(code.utf8), to: file, permissions: 0o600)
         } catch {
             // Said as what it is (#212): a full disk is not a code refused.
-            throw ControlService.Failure(WriteFailure(error, keeping: "the code for this Mac's host")?.message
-                ?? "could not leave the code for this Mac's host: \(error.localizedDescription)")
+            throw ControlService.Failure(WriteFailure(error, keeping: "the code for the machine on this Mac")?.message
+                ?? "could not leave the code for the machine on this Mac: \(error.localizedDescription)")
         }
     }
 

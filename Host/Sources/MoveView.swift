@@ -60,7 +60,7 @@ final class HostMove {
             phase = .moving("Letting the earlier app’s agents go…")
             try await letTheOldDaemonGo()
 
-            phase = .moving("Starting the control plane and this Mac’s host…")
+            phase = .moving("Starting the control plane and this Mac as a machine…")
             model.problem = nil
             await model.runHere()
             if let problem = model.problem { throw Failure(problem) }
@@ -83,7 +83,7 @@ final class HostMove {
                 return parts.count == 3 && parts[0] == "server" ? (String(parts[1]), String(parts[2])) : nil
             }
             for (sshName, label) in listed {
-                phase = .moving("Adding \(label) as a host…")
+                phase = .moving("Adding \(label) as a machine…")
                 servers.append(await join(sshName: sshName, label: label, model: model))
             }
             try? ControlMove.retireServers(of: locations)
@@ -121,7 +121,7 @@ final class HostMove {
         let made = await ControlTool.run(["code", "--host", "--command", "--home", paths.controlHome.path],
                                          paths: paths, settings: model.settings)
         guard made.ok, let line = made.output.split(separator: "\n").first(where: { $0.hasPrefix("command\t") }) else {
-            return Server(label: label, joined: false, command: nil, why: "no host code: \(made.output)")
+            return Server(label: label, joined: false, command: nil, why: "no machine code: \(made.output)")
         }
         let command = String(line.dropFirst("command\t".count))
         let ssh = SSHCommand(name: sshName, controlPath: nil)
@@ -167,13 +167,13 @@ struct MoveSheet: View {
                     .foregroundStyle(.secondary)
                 VStack(alignment: .leading, spacing: 8) {
                     kept(move.summary.agents == 1
-                         ? "Your agent and its conversation stay on this Mac, as this Mac’s host"
-                         : "All \(move.summary.agents) agents and their conversations stay on this Mac, as this Mac’s host")
+                         ? "Your agent and its conversation stay on this Mac, as a machine"
+                         : "All \(move.summary.agents) agents and their conversations stay on this Mac, as a machine")
                     if !move.summary.devices.isEmpty {
                         kept("\(ListFormatter.localizedString(byJoining: move.summary.devices)) \(move.summary.devices.count == 1 ? "keeps" : "keep") working, without pairing again")
                     }
                     if !move.summary.servers.isEmpty {
-                        kept("\(ListFormatter.localizedString(byJoining: move.summary.servers)) \(move.summary.servers.count == 1 ? "is added as a host" : "are added as hosts"), over your ssh as now")
+                        kept("\(ListFormatter.localizedString(byJoining: move.summary.servers)) \(move.summary.servers.count == 1 ? "is added as a machine" : "are added as machines"), over your ssh as now")
                     }
                     kept("Work on this Mac carries on after a restart, without opening Agents")
                 }
@@ -189,7 +189,7 @@ struct MoveSheet: View {
                     .foregroundStyle(.green)
                 ForEach(move.servers) { server in
                     if server.joined {
-                        kept("\(server.label) joined as a host")
+                        kept("\(server.label) joined as a machine")
                     } else {
                         VStack(alignment: .leading, spacing: 4) {
                             Text("\(server.label) couldn’t be reached over ssh\(server.why.map { ": \($0)" } ?? ""). Run this there to add it:")

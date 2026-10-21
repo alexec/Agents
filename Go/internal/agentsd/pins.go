@@ -343,7 +343,7 @@ func (d *Daemon) pinnerView(p pinner) wire.PinnerView {
 		return wire.PinnerView{Kind: wire.PinnerKindWorkflow, ID: *p.Workflow, Name: *p.Workflow}
 	case p.Agent != nil:
 		id := strings.ToUpper(*p.Agent)
-		name := "an agent not on this host"
+		name := "an agent not on this machine"
 		if a := d.Store.Agent(wire.UUID(id)); a != nil && a.Title != nil {
 			name = *a.Title
 		}
@@ -395,7 +395,7 @@ func (d *Daemon) knownPinProject(folder wire.URL) (string, error) {
 			return path, nil
 		}
 	}
-	return "", pinRefused("This host has no project at " + path + ".")
+	return "", pinRefused("This machine has no project at " + path + ".")
 }
 
 // pageURL is a file in the project folder, its links resolved, still in the folder.

@@ -313,7 +313,7 @@ func (r assessRecord) workspaces() (verdict, string) {
 		return passed, "`list_workspaces` answered"
 	}
 	if strings.Contains(strings.ToLower(answerOfCall(last)), "has no workspaces") {
-		return passed, "`list_workspaces` answered that this host has no workspaces"
+		return passed, "`list_workspaces` answered that this machine has no workspaces"
 	}
 	return failedStep, "`list_workspaces` refused: " + clip(answerOfCall(last), 160)
 }
@@ -784,7 +784,7 @@ func (r assessRecord) worktree() (verdict, string) {
 			}
 		}
 		if len(into) == 0 {
-			return notOffered, "move_worktree is not one of this host's tools yet"
+			return notOffered, "move_worktree is not one of this machine's tools yet"
 		}
 		return failedStep, said(into, "move_worktree worktree")
 	}

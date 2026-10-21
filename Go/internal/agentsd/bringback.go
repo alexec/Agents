@@ -63,7 +63,7 @@ func (d *Daemon) bringBack(r wire.BringBackRequest) (wire.BringBack, error) {
 	if bundle != "" {
 		if _, err := git(path, "fetch", "-q", "--no-tags", "--", bundle, "+refs/heads/*:refs/agents-back/*"); err != nil {
 			if strings.Contains(err.Error(), "prerequisite") {
-				return done, Invalid("%s is not what the host expected. Bring back again. Nothing was changed.", here)
+				return done, Invalid("%s is not what the machine expected. Bring back again. Nothing was changed.", here)
 			}
 			return done, err
 		}
@@ -101,7 +101,7 @@ func (d *Daemon) bringBack(r wire.BringBackRequest) (wire.BringBack, error) {
 			continue
 		case have != "":
 			if _, err := git(path, "merge-base", "--is-ancestor", have, b.Commit); err != nil {
-				return done, &Error{Code: wire.FailureFolderInTheWay, Message: b.Name + " has commits of its own on this Mac that the host does not have. Nothing was changed."}
+				return done, &Error{Code: wire.FailureFolderInTheWay, Message: b.Name + " has commits of its own on this Mac that the machine does not have. Nothing was changed."}
 			}
 		}
 		if root, ok := checkedOut[b.Name]; ok {
@@ -122,10 +122,10 @@ func (d *Daemon) bringBack(r wire.BringBackRequest) (wire.BringBack, error) {
 		if status, err := git(path, "status", "--porcelain"); err != nil {
 			return done, err
 		} else if status != "" {
-			return done, &Error{Code: wire.FailureFolderInTheWay, Message: here + " has uncommitted changes. Commit or remove them to take the host's, then bring back again. Nothing was changed."}
+			return done, &Error{Code: wire.FailureFolderInTheWay, Message: here + " has uncommitted changes. Commit or remove them to take the machine's, then bring back again. Nothing was changed."}
 		}
 		if err := patchApplies(path, patchOn, r.Branches, patch); err != nil {
-			return done, Invalid("The host's uncommitted changes do not apply here: %s Nothing was changed.", err.Error())
+			return done, Invalid("The machine's uncommitted changes do not apply here: %s Nothing was changed.", err.Error())
 		}
 	}
 

@@ -414,7 +414,7 @@ func (l *live) run() {
 		drain := false
 		if v := safe.Catch("turn of "+string(l.id), func() { drain = l.turn() }); v != nil {
 			// The turn's own defers ran; end it so the window does not wait on it.
-			l.d.record(l.id, notice("error", "The host hit a bug", fmt.Sprint(v)))
+			l.d.record(l.id, notice("error", "The machine hit a bug", fmt.Sprint(v)))
 			l.d.end(l, wire.AgentStateStopped, wire.EndedReasonRuntimeError)
 		}
 		if !drain {

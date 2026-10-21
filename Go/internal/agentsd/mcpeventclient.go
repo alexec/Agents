@@ -33,7 +33,7 @@ const (
 	mcpEventListLimit = 1000
 )
 
-var mcpTooMany = fmt.Sprintf("Too many servers with events on this host (%d).", mcpEventConnLimit)
+var mcpTooMany = fmt.Sprintf("Too many servers with events on this machine (%d).", mcpEventConnLimit)
 
 // mcpEventDef is EventDefinition: one entry of events/list.
 type mcpEventDef struct {

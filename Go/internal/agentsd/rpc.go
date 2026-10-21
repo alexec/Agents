@@ -148,7 +148,7 @@ func (d *Daemon) dispatch(c *Client, m message) {
 		d.logUnknown(m.Method)
 		err = &Error{Code: CodeMethodNotFound, Message: "Method not found: " + m.Method}
 	} else if v := safe.Catch("rpc "+m.Method, func() { result, err = h(d.ctx, c, m.Params) }); v != nil {
-		err = &Error{Code: CodeInternal, Message: fmt.Sprintf("the host hit a bug in %s: %v", m.Method, v)}
+		err = &Error{Code: CodeInternal, Message: fmt.Sprintf("the machine hit a bug in %s: %v", m.Method, v)}
 	}
 	if m.ID == nil {
 		return // a notification

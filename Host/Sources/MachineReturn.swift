@@ -318,7 +318,7 @@ struct MachineReturnSheet: View {
                          note: "Pairing and changes wait. Agents keep working.")
             Pieces.stage(back.stages[1], back.copied ?? "Copying records to this Mac")
             Pieces.stage(back.stages[2], "This Mac takes over")
-            Pieces.stage(back.stages[3], "Hosts come back here")
+            Pieces.stage(back.stages[3], "Machines come back here")
             Pieces.stage(back.stages[4], "\(back.placeName) sends anyone still going there on to this Mac")
             Pieces.problemLine(back.problem)
             Pieces.buttons {

@@ -137,7 +137,7 @@ func (d *Daemon) heldMessages(a *wire.Agent) map[wire.UUID]bool {
 
 func (d *Daemon) unavailableRuntime(rt *runtimeDef) string {
 	if p, _, _ := locateFor(rt); p == "" {
-		return rt.Name + " is not installed on this host"
+		return rt.Name + " is not installed on this machine"
 	}
 	if err := d.needsSignIn(rt.ID); err != nil {
 		if e, ok := err.(*Error); ok {
@@ -577,12 +577,12 @@ func (d *Daemon) runtimeChoices() string {
 			available = append(available, rt.ID)
 		}
 	}
-	lines := []string{"No runtime can take a new agent on this host right now."}
+	lines := []string{"No runtime can take a new agent on this machine right now."}
 	if len(available) > 0 {
 		lines = []string{"Runtimes you can start agents on (" + defaultRuntimeID + " if you name none): " + strings.Join(available, ", ") + "."}
 	}
 	if len(not) > 0 {
-		lines = append(lines, "Not available on this host: "+strings.Join(not, ", ")+".")
+		lines = append(lines, "Not available on this machine: "+strings.Join(not, ", ")+".")
 	}
 	return strings.Join(lines, "\n")
 }

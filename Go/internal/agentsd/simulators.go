@@ -71,7 +71,7 @@ func (d *Daemon) registerSimulators() {
 // noSimulators says why a host lists none: not a Mac, or no Xcode on it.
 func noSimulators() string {
 	if goruntime.GOOS != "darwin" {
-		return "Simulators run on a Mac. This host is not a Mac."
+		return "Simulators run on a Mac. This machine is not a Mac."
 	}
 	if _, err := exec.LookPath("xcrun"); err != nil {
 		return "Xcode is not on this Mac, so it has no simulators."
@@ -111,7 +111,7 @@ func simulatorInput(ctx context.Context, verb, udid string, args ...string) erro
 	}
 	helper := simulatorHelper()
 	if helper == "" {
-		return &Error{Code: wire.FailureNotSupported, Message: "This host cannot touch a simulator: agents-watch is not beside agentsd."}
+		return &Error{Code: wire.FailureNotSupported, Message: "This machine cannot touch a simulator: agents-watch is not beside agentsd."}
 	}
 	ctx, cancel := context.WithTimeout(ctx, simulatorTimeout)
 	defer cancel()

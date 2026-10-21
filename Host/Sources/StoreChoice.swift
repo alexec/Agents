@@ -96,7 +96,7 @@ struct HostSettings: Codable, Sendable, Equatable {
         }
         guard let data = read(key(paths), paths),
               (try? JSONDecoder().decode(HostSettings.self, from: data)) == nil else { return nil }
-        return "This Mac's host settings could not be read (perhaps a newer build saved them), so it starts "
+        return "Agents Host's settings could not be read (perhaps a newer build saved them), so it starts "
             + "with the defaults. What was saved is kept aside, under its own name, and never written over."
     }
 
