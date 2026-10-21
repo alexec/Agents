@@ -717,7 +717,8 @@ private extension View {
 /// pane of the same name and the page's Settings keep it, Show thoughts, as the
 /// window's Appearance pane (#1725), Live Activities, which only a phone or an iPad
 /// has (#1657), the versions of the control plane and its hosts (#1748), and the Mac's
-/// backups, as the window's Settings ▸ Mac draws them (#1810), and each server's (#1815).
+/// backups, as the window's Settings ▸ Mac draws them (#1810), and each server's (#1815),
+/// and the workspace providers (#1819).
 /// Everything else follows the Mac.
 private struct RemoteSettings: View {
     @Environment(\.dismiss) private var dismiss
@@ -737,6 +738,10 @@ private struct RemoteSettings: View {
                                    restore: model.restoreBackup)
                 }
                 ServerBackupsSettingsSection()
+                // The control plane's workspace providers (#1819), as the page's Settings has them.
+                Section {
+                    NavigationLink(WorkspaceProviderWords.heading) { WorkspaceProvidersView() }
+                }
                 // The docs site (#1327), as the Mac's Help ▸ Agents Help.
                 Section {
                     Link(destination: HelpSite.url) {
