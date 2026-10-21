@@ -2338,6 +2338,32 @@
       }
     },
     {
+      "name": "console/fleet",
+      "x-capability": "console/1",
+      "description": "Console ▸ Machines (#1804, M1): every machine, its owner and state. Admins only.",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/FleetBoard"
+        }
+      }
+    },
+    {
       "name": "user/settings",
       "x-capability": "user/1",
       "tags": [

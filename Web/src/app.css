@@ -1020,6 +1020,14 @@ button.remove:hover { opacity: 1; }
 .console-cards { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
 .console-card { display: flex; flex-direction: column; gap: 4px; align-items: flex-start; border: 1px solid var(--paper-rule);
   border-radius: var(--radius-card); padding: 10px 12px; background: var(--paper-raised); }
+.fleet { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
+.console-table { border-collapse: collapse; width: 100%; font-size: 0.8125rem; }
+.console-table th { text-align: left; font-weight: 600; font-size: 0.6875rem; opacity: 0.6; padding: 6px 8px; border-bottom: 1px solid var(--paper-rule); }
+.console-table td { padding: 7px 8px; border-bottom: 1px solid var(--paper-rule); vertical-align: top; }
+.console-table .num { text-align: right; font-variant-numeric: tabular-nums; }
+.fleet-state::before { content: ""; display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 6px; background: currentColor; opacity: 0.5; vertical-align: 1px; }
+.fleet-state.online::before { background: var(--tint-success, #1e8a4c); opacity: 1; }
+.fleet-state.needsUpdate::before, .fleet-state.failed::before { background: var(--tint-failure); opacity: 1; }
 .console-card .link, .sub-app-page .link { border: 0; background: none; padding: 0; color: var(--accent); cursor: pointer; font: inherit; }
 @media (max-width: 759px) {
   .columns.sub-app { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }

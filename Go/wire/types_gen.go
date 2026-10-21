@@ -2436,6 +2436,24 @@ type FindResult struct {
 	More    bool        `json:"more"`
 }
 
+// console/fleet's answer (#1804): every machine on the control plane, for an admin.
+type FleetBoard struct {
+	Machines []FleetMachine `json:"machines"`
+}
+
+// One machine on Console ▸ Machines (#1804): its hosts/list row, whose it is, and how many of its agents were running when it last listed them. Numbers only, never what the agents said.
+type FleetMachine struct {
+	Host ControlHost `json:"host"`
+	// Its person's or bot's name; empty when nobody owns it.
+	OwnerName string `json:"ownerName"`
+	// Whether its owner is a bot (#1761).
+	Bot bool `json:"bot"`
+	// Its agents running when it last listed them; absent when it never has.
+	Running *int64 `json:"running,omitzero"`
+	// When it last listed its agents.
+	HeardAt *Date `json:"heardAt,omitzero"`
+}
+
 type FolderHunk struct {
 	OldStart       int64      `json:"oldStart"`
 	NewStart       int64      `json:"newStart"`

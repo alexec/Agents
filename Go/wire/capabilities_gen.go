@@ -30,6 +30,7 @@ const (
 	CapConnectionsEmail1     = "connections.email/1"
 	CapConnections1          = "connections/1"
 	CapConnectorsSetup1      = "connectors.setup/1"
+	CapConsole1              = "console/1"
 	CapControlRotate1        = "control.rotate/1"
 	CapControl1              = "control/1"
 	CapCost1                 = "cost/1"
@@ -463,6 +464,7 @@ var ControlCapabilities = map[string]string{
 	"clients/setPushToken":        "clients/1",
 	"clients/startPairing":        "clients/1",
 	"clients/stopPairing":         "clients/1",
+	"console/fleet":               "console/1",
 	"control/ping":                "control/1",
 	"control/rotate":              "control.rotate/1",
 	"control/setAuditDays":        "events.audit/1",

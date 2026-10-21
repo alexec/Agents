@@ -382,6 +382,7 @@ var (
 	CallClientsSetPushToken          = Method[PushToken, Empty]{"clients/setPushToken"}
 	CallClientsStartPairing          = Method[ClientPairingRequest, ControlCodeShown]{"clients/startPairing"}
 	CallClientsStopPairing           = Method[Empty, Empty]{"clients/stopPairing"}
+	CallConsoleFleet                 = Method[Empty, FleetBoard]{"console/fleet"}
 	CallControlPing                  = Method[Empty, Empty]{"control/ping"}
 	CallControlRotate                = Method[Empty, Empty]{"control/rotate"}
 	CallControlSetAuditDays          = Method[AuditDays, AuditDays]{"control/setAuditDays"}
