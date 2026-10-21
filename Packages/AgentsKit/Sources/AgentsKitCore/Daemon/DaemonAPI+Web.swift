@@ -295,6 +295,9 @@ public extension DaemonAPI {
                 Row(Method.controlSetAuditDays, params: AuditDays.self, result: AuditDays.self, kind: .controlRequest),
                 // Rotate Control Key… in Settings ▸ People (#997).
                 Row(Method.controlRotate, params: Empty.self, result: Empty.self, kind: .controlRequest),
+                // Reports (#1811): usage, cost and time by person, project and machine.
+                Row(Method.reportsUsage, params: ReportQuery.self, result: UsageReport.self, kind: .controlRequest),
+                Row(Method.reportsExport, params: ReportQuery.self, result: ReportExport.self, kind: .controlRequest),
                 // People and the machines that belong to them (#994): Settings ▸ People.
                 Row(Method.peopleList, params: Empty.self, result: PeopleList.self, kind: .controlRequest),
                 Row(Method.peopleInvite, params: PersonInvite.self, result: PersonInvited.self, kind: .controlRequest),

@@ -314,6 +314,7 @@ func (d *Daemon) bankSessionCost(id wire.UUID, c wire.Cost) {
 		runtime = a.RuntimeID
 	}
 	d.recordUsageLocked(runtime, wire.UsageBucket{Cost: map[string]float64{c.Currency: added}})
+	d.addReport(a, runtime, time.Now(), wire.UsageRollupRow{Cost: map[string]float64{c.Currency: added}})
 	d.costMu.Unlock()
 	d.change(id, func(a *wire.Agent) {
 		to := map[string]float64{}
@@ -374,6 +375,9 @@ func (d *Daemon) bankTurnUsage(id wire.UUID, u wire.TurnUsage) {
 		b.UnpricedTurns = 1
 	}
 	d.recordUsageLocked(a.RuntimeID, b)
+	d.addReport(a, a.RuntimeID, time.Now(), wire.UsageRollupRow{Cost: b.Cost, InputTokens: b.InputTokens,
+		OutputTokens: b.OutputTokens, ThoughtTokens: b.ThoughtTokens, CachedReadTokens: b.CachedReadTokens,
+		CachedWriteTokens: b.CachedWriteTokens, Turns: b.Turns, UnpricedTurns: b.UnpricedTurns})
 	d.costMu.Unlock()
 	d.change(id, func(a *wire.Agent) {
 		a.LastTurnUsage = &u

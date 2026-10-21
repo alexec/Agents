@@ -122,6 +122,7 @@ nav:
       - reference/workflows.md
       - reference/personas.md
       - reference/events.md
+      - reference/reports.md
       - reference/workspace-providers.md
       - reference/integrations.md
       - reference/ssh-options.md

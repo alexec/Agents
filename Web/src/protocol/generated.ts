@@ -3733,6 +3733,53 @@ export interface RenameRequest {
   title: string;
 }
 
+/** reports/export's answer (#1811): the rows as CSV or JSON lines. */
+export interface ReportExport {
+  text: string;
+  count: number;
+  format: ReportFormat;
+}
+
+export type ReportFormat = "csv" | "jsonl";
+
+/**
+ * reports/usage and reports/export (#1811). An admin sees every person; a member only their own
+ * machines.
+ */
+export interface ReportQuery {
+  range: ReportRange;
+  /** For reports/export; CSV when absent. */
+  format?: ReportFormat;
+}
+
+/** D is the last 24 hours by the hour; W, M and 3M the last 7, 30 and 90 days by the day (UTC). */
+export type ReportRange = "day" | "week" | "month" | "threeMonths";
+
+/** One hour or day of one machine's project and runtime, with its person (#1811). */
+export interface ReportRow {
+  /** The UTC hour ("2026-10-21T15") or day ("2026-10-21"). */
+  at: string;
+  person: string;
+  personName: string;
+  host: HostID;
+  hostName: string;
+  project: string;
+  runtime: string;
+  /** By currency. */
+  cost: Record<string, number>;
+  inputTokens: number;
+  outputTokens: number;
+  thoughtTokens: number;
+  cachedReadTokens: number;
+  cachedWriteTokens: number;
+  turns: number;
+  unpricedTurns: number;
+  /** The agent, its tools and waiting on others: TimeBucket's agent + tools + others. */
+  workingSeconds: number;
+  /** Waiting for the person: TimeBucket's person. */
+  waitingSeconds: number;
+}
+
 export interface ReportedEdit {
   path: string;
   oldText?: string;
@@ -4742,6 +4789,54 @@ export interface UsageHistory {
   timeZone?: string;
 }
 
+/**
+ * reports/usage's answer (#1811): rows oldest first, by the hour for D and by the day otherwise.
+ */
+export interface UsageReport {
+  range: ReportRange;
+  rows: ReportRow[];
+  /** Whether the caller sees every person's machines. */
+  admin: boolean;
+}
+
+/**
+ * usage/rollup (#1811): a machine's hours and days that changed since it last sent them, sent each
+ * hour on its channel 0. The control plane keeps hours 7 days and days 90.
+ */
+export interface UsageRollup {
+  hours: UsageRollupPeriod[];
+  days: UsageRollupPeriod[];
+}
+
+/**
+ * An hour ("2026-10-21T15") or a day ("2026-10-21"), in UTC, and its rows: the whole of that period
+ * on this machine, which replaces what was sent before.
+ */
+export interface UsageRollupPeriod {
+  at: string;
+  rows: UsageRollupRow[];
+}
+
+/** One project and runtime's usage in an hour or a day (#1811), as a machine adds it up. */
+export interface UsageRollupRow {
+  /** The project's folder name, so the same repository on two machines adds up. */
+  project: string;
+  runtime: string;
+  /** By currency. */
+  cost: Record<string, number>;
+  inputTokens: number;
+  outputTokens: number;
+  thoughtTokens: number;
+  cachedReadTokens: number;
+  cachedWriteTokens: number;
+  turns: number;
+  unpricedTurns: number;
+  /** The agent, its tools and waiting on others: TimeBucket's agent + tools + others. */
+  workingSeconds: number;
+  /** Waiting for the person: TimeBucket's person. */
+  waitingSeconds: number;
+}
+
 /** A user's role (#994, spec 736 FR-001): an admin manages people; a member sees only their own. */
 export type UserRole = "admin" | "member";
 
@@ -5289,6 +5384,8 @@ export interface Methods {
   "providers/refresh": { params: ProviderRequest; result: Empty };
   "providers/remove": { params: ProviderRequest; result: Empty };
   "providers/update": { params: ProviderAdd; result: ProviderSummary };
+  "reports/export": { params: ReportQuery; result: ReportExport };
+  "reports/usage": { params: ReportQuery; result: UsageReport };
   "runtimes/accounts": { params: Empty; result: RuntimeAccount[] };
   "runtimes/allowances": { params: string | null; result: RuntimeAllowances };
   "runtimes/list": { params: Empty; result: RuntimeStatus[] };
@@ -5466,6 +5563,8 @@ export const MethodTarget = {
   "providers/refresh": "control",
   "providers/remove": "control",
   "providers/update": "control",
+  "reports/export": "control",
+  "reports/usage": "control",
   "runtimes/accounts": "host",
   "runtimes/allowances": "host",
   "runtimes/list": "host",
@@ -5948,6 +6047,9 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   RemovalCheck: { required: ["blockedBy", "uncommitted", "unmerged"], optional: [] },
   RemoveResourceRequest: { required: ["name"], optional: [] },
   RenameRequest: { required: ["agentID", "title"], optional: [] },
+  ReportExport: { required: ["text", "count", "format"], optional: [] },
+  ReportQuery: { required: ["range"], optional: ["format"] },
+  ReportRow: { required: ["at", "person", "personName", "host", "hostName", "project", "runtime", "cost", "inputTokens", "outputTokens", "thoughtTokens", "cachedReadTokens", "cachedWriteTokens", "turns", "unpricedTurns", "workingSeconds", "waitingSeconds"], optional: [] },
   ReportedEdit: { required: ["path", "newText", "toolCallID", "index", "entryIndex", "replaceAll", "at"], optional: ["oldText"] },
   RequiredCapabilities: { required: ["host", "client"], optional: [] },
   ResourceState: { required: ["name", "kind", "displayName", "isGone", "line", "endingSoon"], optional: ["holds", "lease", "places", "declared"] },
@@ -6066,6 +6168,10 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   Usage: { required: ["used", "size", "at"], optional: ["cost"] },
   UsageBucket: { required: ["cost", "inputTokens", "outputTokens", "thoughtTokens", "cachedReadTokens", "cachedWriteTokens", "turns", "unpricedTurns"], optional: [] },
   UsageHistory: { required: ["hours", "days", "now"], optional: ["timeZone"] },
+  UsageReport: { required: ["range", "rows", "admin"], optional: [] },
+  UsageRollup: { required: ["hours", "days"], optional: [] },
+  UsageRollupPeriod: { required: ["at", "rows"], optional: [] },
+  UsageRollupRow: { required: ["project", "runtime", "cost", "inputTokens", "outputTokens", "thoughtTokens", "cachedReadTokens", "cachedWriteTokens", "turns", "unpricedTurns", "workingSeconds", "waitingSeconds"], optional: [] },
   ViewAsk: { required: ["server", "uri", "hash", "isNew"], optional: [] },
   ViewCallRequest: { required: ["agentID", "viewID", "name"], optional: ["project", "arguments", "feed", "server"] },
   ViewContextRequest: { required: ["agentID", "viewID"], optional: ["uri", "content", "structuredContent"] },

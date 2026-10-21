@@ -762,5 +762,41 @@
     "host": "host",
     "controlKey": "AQID",
     "name": "name"
+  },
+  "ReportQuery": {
+    "range": "week",
+    "format": "csv"
+  },
+  "UsageReport": {
+    "range": "day",
+    "rows": [
+      {
+        "at": "2026-10-21T15",
+        "person": "person",
+        "personName": "personName",
+        "host": "host",
+        "hostName": "hostName",
+        "project": "project",
+        "runtime": "claude",
+        "cost": {
+          "USD": 1.5
+        },
+        "inputTokens": 7,
+        "outputTokens": 7,
+        "thoughtTokens": 7,
+        "cachedReadTokens": 7,
+        "cachedWriteTokens": 7,
+        "turns": 7,
+        "unpricedTurns": 7,
+        "workingSeconds": 60.5,
+        "waitingSeconds": 30.5
+      }
+    ],
+    "admin": true
+  },
+  "ReportExport": {
+    "text": "text",
+    "count": 7,
+    "format": "jsonl"
   }
 }

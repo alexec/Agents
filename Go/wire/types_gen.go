@@ -4242,6 +4242,62 @@ type RenameRequest struct {
 	Title   string `json:"title"`
 }
 
+// reports/export's answer (#1811): the rows as CSV or JSON lines.
+type ReportExport struct {
+	Text   string       `json:"text"`
+	Count  int64        `json:"count"`
+	Format ReportFormat `json:"format"`
+}
+
+type ReportFormat string
+
+const (
+	ReportFormatCsv   ReportFormat = "csv"
+	ReportFormatJsonl ReportFormat = "jsonl"
+)
+
+// reports/usage and reports/export (#1811). An admin sees every person; a member only their own machines.
+type ReportQuery struct {
+	Range ReportRange `json:"range"`
+	// For reports/export; CSV when absent.
+	Format *ReportFormat `json:"format,omitzero"`
+}
+
+// D is the last 24 hours by the hour; W, M and 3M the last 7, 30 and 90 days by the day (UTC).
+type ReportRange string
+
+const (
+	ReportRangeDay         ReportRange = "day"
+	ReportRangeWeek        ReportRange = "week"
+	ReportRangeMonth       ReportRange = "month"
+	ReportRangeThreeMonths ReportRange = "threeMonths"
+)
+
+// One hour or day of one machine's project and runtime, with its person (#1811).
+type ReportRow struct {
+	// The UTC hour ("2026-10-21T15") or day ("2026-10-21").
+	At         string `json:"at"`
+	Person     string `json:"person"`
+	PersonName string `json:"personName"`
+	Host       HostID `json:"host"`
+	HostName   string `json:"hostName"`
+	Project    string `json:"project"`
+	Runtime    string `json:"runtime"`
+	// By currency.
+	Cost              map[string]float64 `json:"cost"`
+	InputTokens       int64              `json:"inputTokens"`
+	OutputTokens      int64              `json:"outputTokens"`
+	ThoughtTokens     int64              `json:"thoughtTokens"`
+	CachedReadTokens  int64              `json:"cachedReadTokens"`
+	CachedWriteTokens int64              `json:"cachedWriteTokens"`
+	Turns             int64              `json:"turns"`
+	UnpricedTurns     int64              `json:"unpricedTurns"`
+	// The agent, its tools and waiting on others: TimeBucket's agent + tools + others.
+	WorkingSeconds float64 `json:"workingSeconds"`
+	// Waiting for the person: TimeBucket's person.
+	WaitingSeconds float64 `json:"waitingSeconds"`
+}
+
 type ReportedEdit struct {
 	Path       string  `json:"path"`
 	OldText    *string `json:"oldText,omitzero"`
@@ -5531,6 +5587,46 @@ type UsageHistory struct {
 	Now   string                            `json:"now"`
 	// The host's time zone, an IANA identifier such as America/Los_Angeles, that its hour and day stamps are in (#1267). Absent from a host too old to say: read as the viewer's own.
 	TimeZone *string `json:"timeZone,omitzero"`
+}
+
+// reports/usage's answer (#1811): rows oldest first, by the hour for D and by the day otherwise.
+type UsageReport struct {
+	Range ReportRange `json:"range"`
+	Rows  []ReportRow `json:"rows"`
+	// Whether the caller sees every person's machines.
+	Admin bool `json:"admin"`
+}
+
+// usage/rollup (#1811): a machine's hours and days that changed since it last sent them, sent each hour on its channel 0. The control plane keeps hours 7 days and days 90.
+type UsageRollup struct {
+	Hours []UsageRollupPeriod `json:"hours"`
+	Days  []UsageRollupPeriod `json:"days"`
+}
+
+// An hour ("2026-10-21T15") or a day ("2026-10-21"), in UTC, and its rows: the whole of that period on this machine, which replaces what was sent before.
+type UsageRollupPeriod struct {
+	At   string           `json:"at"`
+	Rows []UsageRollupRow `json:"rows"`
+}
+
+// One project and runtime's usage in an hour or a day (#1811), as a machine adds it up.
+type UsageRollupRow struct {
+	// The project's folder name, so the same repository on two machines adds up.
+	Project string `json:"project"`
+	Runtime string `json:"runtime"`
+	// By currency.
+	Cost              map[string]float64 `json:"cost"`
+	InputTokens       int64              `json:"inputTokens"`
+	OutputTokens      int64              `json:"outputTokens"`
+	ThoughtTokens     int64              `json:"thoughtTokens"`
+	CachedReadTokens  int64              `json:"cachedReadTokens"`
+	CachedWriteTokens int64              `json:"cachedWriteTokens"`
+	Turns             int64              `json:"turns"`
+	UnpricedTurns     int64              `json:"unpricedTurns"`
+	// The agent, its tools and waiting on others: TimeBucket's agent + tools + others.
+	WorkingSeconds float64 `json:"workingSeconds"`
+	// Waiting for the person: TimeBucket's person.
+	WaitingSeconds float64 `json:"waitingSeconds"`
 }
 
 // A user's role (#994, spec 736 FR-001): an admin manages people; a member sees only their own.

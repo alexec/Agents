@@ -643,6 +643,8 @@ func (d *Daemon) ControlUplinkChanged(up bool) {
 	d.attentionMu.Unlock()
 	// A control plane that just heard from this host hears whether it is idle (#1387).
 	d.startHostStatus()
+	// And the usage it has not sent yet (#1811).
+	d.startReports()
 	d.reconsider()
 }
 

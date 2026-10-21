@@ -29,14 +29,14 @@ const (
 
 // sweepReport is StoreSweep.Report.
 type sweepReport struct {
-	events, codes, tombstones, leftovers, dated int
+	events, codes, tombstones, leftovers, dated, usage int
 }
 
-func (r sweepReport) total() int { return r.events + r.codes + r.tombstones + r.leftovers }
+func (r sweepReport) total() int { return r.events + r.codes + r.tombstones + r.leftovers + r.usage }
 
 func (r sweepReport) String() string {
-	return fmt.Sprintf("removed %d events, %d code files, %d tombstones, %d leftovers; dated %d tombstones",
-		r.events, r.codes, r.tombstones, r.leftovers, r.dated)
+	return fmt.Sprintf("removed %d events, %d code files, %d tombstones, %d leftovers, %d usage periods; dated %d tombstones",
+		r.events, r.codes, r.tombstones, r.leftovers, r.usage, r.dated)
 }
 
 // sweep is StoreSweep.run: old events, spent and expired codes, old tombstones and a
@@ -154,6 +154,13 @@ func sweep(ctx context.Context, rs *records.Records, now time.Time, most int) (s
 		}
 		report.tombstones++
 		left--
+	}
+
+	// The reports' hours and days (#1811).
+	usage, err := sweepUsage(ctx, s, now, left)
+	report.usage = usage
+	if err != nil {
+		return report, err
 	}
 
 	if folder, ok := s.(*store.Folder); ok {

@@ -68,6 +68,7 @@ var own = map[string]bool{
 	"audit/list": true, "audit/export": true, "control/setAuditDays": true, "control/rotate": true,
 	"people/list": true, "people/invite": true, "people/setRole": true, "people/remove": true,
 	"hosts/joinRequests": true, "hosts/approveJoin": true, "hosts/denyJoin": true,
+	"reports/usage": true, "reports/export": true,
 }
 
 // Handles says whether a bare method is the control plane's. A bare daemon/ping from
@@ -130,6 +131,8 @@ func (m *Methods) Handle(method string, params json.RawMessage, from Caller) (an
 		return out, nil
 	case "people/list", "people/invite", "people/setRole", "people/remove":
 		return m.peopleMethod(ctx, method, params, from)
+	case "reports/usage", "reports/export":
+		return m.reportMethod(ctx, method, params, from)
 	case "hosts/joinRequests":
 		return m.s.joins.list(ctx, m.callerPerson(from))
 	case "hosts/approveJoin", "hosts/denyJoin":
@@ -739,6 +742,12 @@ func (m *Methods) HostSaid(host, method string, params json.RawMessage) (any, er
 		}
 		m.s.turnMoved(turn)
 		return map[string]any{}, nil
+	case "usage/rollup":
+		rollup, err := require[wire.UsageRollup](params, "UsageRollup")
+		if err != nil {
+			return nil, err
+		}
+		return map[string]any{}, m.s.keepRollup(ctx, host, rollup, time.Now())
 	case "host/workspaces", "host/providerDraft", "host/status":
 		if m.s.providers == nil {
 			if method == "host/status" {
