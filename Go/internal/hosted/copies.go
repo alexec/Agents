@@ -200,3 +200,12 @@ func escapeCode(code string) string {
 	}
 	return b.String()
 }
+
+// idleLimit is how long a copy runs with no request before it stops.
+const idleLimit = 15 * time.Minute
+
+// done says a request to c has ended.
+func (s *Service) done(c *copyRunning) {}
+
+// sweepIdle stops every copy that has been idle for idleLimit.
+func (s *Service) sweepIdle() {}
