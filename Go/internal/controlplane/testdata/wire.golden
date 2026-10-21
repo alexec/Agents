@@ -1,35 +1,218 @@
 control/status
-{"name":"Test plane","version":"dev","homeHost":"mac","machineID":"MACHINE-1","startedAt":<date>,"port":<port>,"awayFromHome":true,"you":"<UUID>","relayKey":"<secret>","projectDetection":{"enabled":true,"paths":["~","~/src","~/code","~/projects","~/Developer","~/dev","~/git"]},"capabilities":["attention/1","backups.store/1","bots/1","clients/1","console/1","control.rotate/1","control/1","events.audit/1","events.team/1","git/1","groups/1","handover/1","host/1","hosts.join/1","hosts/1","links/1","liveactivity/1","people/1","projects/1","providers/1","relay/1","reports.scope/1","reports/1","signin/1","tunnel/1","user/1","workspaces/1"],"required":{"host":["host.wire/1"],"client":["client.wire/1"]},"person":{"id":"<uuid>","name":"Local owner","role":"admin","localOwner":true},"joinCommand":"curl -fsSL <url>/v1/install.sh | sh -s -- --join '<url>' '-' '<uuid>'"}
+{
+  "name": "Test plane",
+  "version": "dev",
+  "homeHost": "mac",
+  "machineID": "MACHINE-1",
+  "startedAt": <date>,
+  "port": <port>,
+  "awayFromHome": true,
+  "you": "<UUID>",
+  "relayKey": "<secret>",
+  "projectDetection": {
+    "enabled": true,
+    "paths": [
+      "~",
+      "~/src",
+      "~/code",
+      "~/projects",
+      "~/Developer",
+      "~/dev",
+      "~/git"
+    ]
+  },
+  "capabilities": [
+    "attention/1",
+    "backups.store/1",
+    "bots/1",
+    "clients/1",
+    "console/1",
+    "control.rotate/1",
+    "control/1",
+    "events.audit/1",
+    "events.team/1",
+    "git/1",
+    "groups/1",
+    "handover/1",
+    "host/1",
+    "hosts.join/1",
+    "hosts/1",
+    "links/1",
+    "liveactivity/1",
+    "people/1",
+    "projects/1",
+    "providers/1",
+    "relay/1",
+    "reports.scope/1",
+    "reports/1",
+    "signin/1",
+    "tunnel/1",
+    "user/1",
+    "workspaces/1"
+  ],
+  "required": {
+    "host": [
+      "host.wire/1"
+    ],
+    "client": [
+      "client.wire/1"
+    ]
+  },
+  "person": {
+    "id": "<uuid>",
+    "name": "Local owner",
+    "role": "admin",
+    "localOwner": true
+  },
+  "joinCommand": "curl -fsSL <url>/v1/install.sh | sh -s -- --join '<url>' '-' '<uuid>'"
+}
 
 hosts/list
-[{"id":"<host a>","name":"box MACHINE-2","platform":"linux aarch64","version":"0.1","state":"online","reach":"dialOut","machineID":"MACHINE-2","implementation":"go","owner":"<uuid>"},{"id":"<host b>","name":"relay mac","platform":"macOS arm64","version":"1","state":"online","reach":"dialOut","machineID":"RELAY-MAC","relay":true,"owner":"<uuid>"},{"id":"<host c>","name":"plain mac","platform":"macOS arm64","version":"1","state":"online","reach":"dialOut","machineID":"RELAY-MAC","owner":"<uuid>"},{"id":"mac","name":"box MACHINE-1","platform":"linux aarch64","version":"0.1","state":"online","reach":"dialOut","machineID":"MACHINE-1","implementation":"go","owner":"<uuid>"}]
+[
+  {
+    "id": "<host a>",
+    "name": "box MACHINE-2",
+    "platform": "linux aarch64",
+    "version": "0.1",
+    "state": "online",
+    "reach": "dialOut",
+    "machineID": "MACHINE-2",
+    "implementation": "go",
+    "owner": "<uuid>"
+  },
+  {
+    "id": "<host b>",
+    "name": "relay mac",
+    "platform": "macOS arm64",
+    "version": "1",
+    "state": "online",
+    "reach": "dialOut",
+    "machineID": "RELAY-MAC",
+    "relay": true,
+    "owner": "<uuid>"
+  },
+  {
+    "id": "<host c>",
+    "name": "plain mac",
+    "platform": "macOS arm64",
+    "version": "1",
+    "state": "online",
+    "reach": "dialOut",
+    "machineID": "RELAY-MAC",
+    "owner": "<uuid>"
+  },
+  {
+    "id": "mac",
+    "name": "box MACHINE-1",
+    "platform": "linux aarch64",
+    "version": "0.1",
+    "state": "online",
+    "reach": "dialOut",
+    "machineID": "MACHINE-1",
+    "implementation": "go",
+    "owner": "<uuid>"
+  }
+]
 
 clients/list
-[{"id":"<UUID>","name":"Golden window","kind":"mac","publicKey":"<secret>","grant":"operator","paired":<date>,"lastSeen":<date>,"owner":"<uuid>","rev":2,"knownEpoch":0},{"id":"<UUID>","name":"phone","kind":"iPhone","publicKey":"<secret>","grant":"operator","paired":<date>,"lastSeen":<date>,"mayNotify":true,"owner":"<uuid>","rev":2}]
+[
+  {
+    "id": "<UUID>",
+    "name": "Golden window",
+    "kind": "mac",
+    "publicKey": "<secret>",
+    "grant": "operator",
+    "paired": <date>,
+    "lastSeen": <date>,
+    "owner": "<uuid>",
+    "rev": 2,
+    "knownEpoch": 0
+  },
+  {
+    "id": "<UUID>",
+    "name": "phone",
+    "kind": "iPhone",
+    "publicKey": "<secret>",
+    "grant": "operator",
+    "paired": <date>,
+    "lastSeen": <date>,
+    "mayNotify": true,
+    "owner": "<uuid>",
+    "rev": 2
+  }
+]
 
 devices/list
-[{"id":"<UUID>","name":"Golden window","kind":"mac","publicKey":"<secret>","grant":"operator","paired":<date>,"lastSeen":<date>,"owner":"<uuid>","rev":2,"knownEpoch":0},{"id":"<UUID>","name":"phone","kind":"iPhone","publicKey":"<secret>","grant":"operator","paired":<date>,"lastSeen":<date>,"mayNotify":true,"owner":"<uuid>","rev":2}]
+[
+  {
+    "id": "<UUID>",
+    "name": "Golden window",
+    "kind": "mac",
+    "publicKey": "<secret>",
+    "grant": "operator",
+    "paired": <date>,
+    "lastSeen": <date>,
+    "owner": "<uuid>",
+    "rev": 2,
+    "knownEpoch": 0
+  },
+  {
+    "id": "<UUID>",
+    "name": "phone",
+    "kind": "iPhone",
+    "publicKey": "<secret>",
+    "grant": "operator",
+    "paired": <date>,
+    "lastSeen": <date>,
+    "mayNotify": true,
+    "owner": "<uuid>",
+    "rev": 2
+  }
+]
 
 clients/connections
-[{"client":"<UUID>","relayed":false}]
+[
+  {
+    "client": "<UUID>",
+    "relayed": false
+  }
+]
 
 hosts/startEnroll
-{"text":"<secret>","expires":<date>,"command":"<secret>"}
+{
+  "text": "<secret>",
+  "expires": <date>,
+  "command": "<secret>"
+}
 
 clients/startPairing
-{"text":"<secret>","expires":<date>}
+{
+  "text": "<secret>",
+  "expires": <date>
+}
 
 devices/startPairing
-{"text":"<secret>","expires":<date>}
+{
+  "text": "<secret>",
+  "expires": <date>
+}
 
 clients/stopPairing
 {}
 
 hosts/lastHeard
-{"host":"<host a>"}
+{
+  "host": "<host a>"
+}
 
 control/setProjectDetection
-{"enabled":true,"paths":["~/src","~/work"]}
+{
+  "enabled": true,
+  "paths": [
+    "~/src",
+    "~/work"
+  ]
+}
 
 hosts/lendSignIn
 {}
@@ -41,36 +224,213 @@ hosts/setRelay
 {}
 
 control/status
-{"name":"Test plane","version":"dev","homeHost":"mac","machineID":"MACHINE-1","startedAt":<date>,"port":<port>,"awayFromHome":true,"you":"<UUID>","relayKey":"<secret>","projectDetection":{"enabled":true,"paths":["~/src","~/work"]},"capabilities":["attention/1","backups.store/1","bots/1","clients/1","console/1","control.rotate/1","control/1","events.audit/1","events.team/1","git/1","groups/1","handover/1","host/1","hosts.join/1","hosts/1","links/1","liveactivity/1","people/1","projects/1","providers/1","relay/1","reports.scope/1","reports/1","signin/1","tunnel/1","user/1","workspaces/1"],"required":{"host":["host.wire/1"],"client":["client.wire/1"]},"person":{"id":"<uuid>","name":"Local owner","role":"admin","localOwner":true},"joinCommand":"curl -fsSL <url>/v1/install.sh | sh -s -- --join '<url>' '-' '<uuid>'"}
+{
+  "name": "Test plane",
+  "version": "dev",
+  "homeHost": "mac",
+  "machineID": "MACHINE-1",
+  "startedAt": <date>,
+  "port": <port>,
+  "awayFromHome": true,
+  "you": "<UUID>",
+  "relayKey": "<secret>",
+  "projectDetection": {
+    "enabled": true,
+    "paths": [
+      "~/src",
+      "~/work"
+    ]
+  },
+  "capabilities": [
+    "attention/1",
+    "backups.store/1",
+    "bots/1",
+    "clients/1",
+    "console/1",
+    "control.rotate/1",
+    "control/1",
+    "events.audit/1",
+    "events.team/1",
+    "git/1",
+    "groups/1",
+    "handover/1",
+    "host/1",
+    "hosts.join/1",
+    "hosts/1",
+    "links/1",
+    "liveactivity/1",
+    "people/1",
+    "projects/1",
+    "providers/1",
+    "relay/1",
+    "reports.scope/1",
+    "reports/1",
+    "signin/1",
+    "tunnel/1",
+    "user/1",
+    "workspaces/1"
+  ],
+  "required": {
+    "host": [
+      "host.wire/1"
+    ],
+    "client": [
+      "client.wire/1"
+    ]
+  },
+  "person": {
+    "id": "<uuid>",
+    "name": "Local owner",
+    "role": "admin",
+    "localOwner": true
+  },
+  "joinCommand": "curl -fsSL <url>/v1/install.sh | sh -s -- --join '<url>' '-' '<uuid>'"
+}
 
 hosts/list
-[{"id":"<host a>","name":"box MACHINE-2","platform":"linux aarch64","version":"0.1","state":"online","reach":"dialOut","machineID":"MACHINE-2","signInFrom":{"claude":"mac"},"gitFrom":{"github.com":"mac"},"implementation":"go","owner":"<uuid>"},{"id":"<host b>","name":"relay mac","platform":"macOS arm64","version":"1","state":"online","reach":"dialOut","machineID":"RELAY-MAC","relay":true,"owner":"<uuid>"},{"id":"<host c>","name":"plain mac","platform":"macOS arm64","version":"1","state":"online","reach":"dialOut","machineID":"RELAY-MAC","owner":"<uuid>"},{"id":"mac","name":"box MACHINE-1","platform":"linux aarch64","version":"0.1","state":"online","reach":"dialOut","machineID":"MACHINE-1","implementation":"go","owner":"<uuid>"}]
+[
+  {
+    "id": "<host a>",
+    "name": "box MACHINE-2",
+    "platform": "linux aarch64",
+    "version": "0.1",
+    "state": "online",
+    "reach": "dialOut",
+    "machineID": "MACHINE-2",
+    "signInFrom": {
+      "claude": "mac"
+    },
+    "gitFrom": {
+      "github.com": "mac"
+    },
+    "implementation": "go",
+    "owner": "<uuid>"
+  },
+  {
+    "id": "<host b>",
+    "name": "relay mac",
+    "platform": "macOS arm64",
+    "version": "1",
+    "state": "online",
+    "reach": "dialOut",
+    "machineID": "RELAY-MAC",
+    "relay": true,
+    "owner": "<uuid>"
+  },
+  {
+    "id": "<host c>",
+    "name": "plain mac",
+    "platform": "macOS arm64",
+    "version": "1",
+    "state": "online",
+    "reach": "dialOut",
+    "machineID": "RELAY-MAC",
+    "owner": "<uuid>"
+  },
+  {
+    "id": "mac",
+    "name": "box MACHINE-1",
+    "platform": "linux aarch64",
+    "version": "0.1",
+    "state": "online",
+    "reach": "dialOut",
+    "machineID": "MACHINE-1",
+    "implementation": "go",
+    "owner": "<uuid>"
+  }
+]
 
 clients/setGrant refused
-{"code":-32009,"message":"Every paired client may do everything now, so there is no grant to change. Update this window to lose the choice."}
+{
+  "code": -32009,
+  "message": "Every paired client may do everything now, so there is no grant to change. Update this window to lose the choice."
+}
 
 hosts/remove refused
-{"code":-32091,"message":"No machine is called nobody."}
+{
+  "code": -32091,
+  "message": "No machine is called nobody."
+}
 
 hosts/update refused
-{"code":-32091,"message":"There is no such host."}
+{
+  "code": -32091,
+  "message": "There is no such host."
+}
 
 providers/list refused
-{"code":-32064,"message":"Workspace providers need a control plane with one copy, for now."}
+{
+  "code": -32064,
+  "message": "Workspace providers need a control plane with one copy, for now."
+}
 
 nothing/here refused
-{"code":-32601,"message":"Method not found","data":{"method":"nothing/here"}}
+{
+  "code": -32601,
+  "message": "Method not found",
+  "data": {
+    "method": "nothing/here"
+  }
+}
 
 relay reads
-{"c":0,"m":{"jsonrpc":"2.0","method":"relay/deliver","params":{"needID":{"permission":"<UUID>"},"device":"<UUID>","publicKey":"<secret>","headline":{"h1":"work","h2":"Fix","h3":"may run"},"alert":true}}}
+{
+  "c": 0,
+  "m": {
+    "jsonrpc": "2.0",
+    "method": "relay/deliver",
+    "params": {
+      "needID": {
+        "permission": "<UUID>"
+      },
+      "device": "<UUID>",
+      "publicKey": "<secret>",
+      "headline": {
+        "h1": "work",
+        "h2": "Fix",
+        "h3": "may run"
+      },
+      "alert": true
+    }
+  }
+}
 
 relay reads
-{"c":0,"m":{"jsonrpc":"2.0","method":"relay/deliver","params":{"needID":{"permission":"<UUID>"},"device":"<UUID>","alert":false}}}
+{
+  "c": 0,
+  "m": {
+    "jsonrpc": "2.0",
+    "method": "relay/deliver",
+    "params": {
+      "needID": {
+        "permission": "<UUID>"
+      },
+      "device": "<UUID>",
+      "alert": false
+    }
+  }
+}
 
 host reads
-{"c":1,"open":{"grant":"operator","client":"<UUID>","fanOut":true,"actor":{"user":"<uuid>","userName":"Local owner","client":"<UUID>","clientName":"Golden window"}}}
+{
+  "c": 1,
+  "open": {
+    "grant": "operator",
+    "client": "<UUID>",
+    "fanOut": true,
+    "actor": {
+      "user": "<uuid>",
+      "userName": "Local owner",
+      "client": "<UUID>",
+      "clientName": "Golden window"
+    }
+  }
+}
 
 # notifications
 
 control/hostChanged
-{"host":"<host a>","state":"online"}
+{
+  "host": "<host a>",
+  "state": "online"
+}
