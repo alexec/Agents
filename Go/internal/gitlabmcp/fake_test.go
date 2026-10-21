@@ -2,7 +2,9 @@ package gitlabmcp
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -44,6 +46,7 @@ type fakeGitLab struct {
 	labelled map[int][]obj // issue → its resource label events
 	status   int           // answer every request with this, when set
 	header   http.Header
+	sent     int // bytes of the bodies answered
 	server   *httptest.Server
 }
 
@@ -124,8 +127,19 @@ func (f *fakeGitLab) serve(w http.ResponseWriter, r *http.Request) {
 		for k, vs := range f.header {
 			w.Header()[k] = vs
 		}
+		body, _ := json.Marshal(v)
+		// GitLab's Rack ETag: a weak one over the body, and 304 for a GET that sends it back.
+		if r.Method == http.MethodGet && status == 200 {
+			etag := fmt.Sprintf(`W/"%x"`, sha256.Sum256(body))
+			w.Header().Set("ETag", etag)
+			if r.Header.Get("If-None-Match") == etag {
+				w.WriteHeader(http.StatusNotModified)
+				return
+			}
+		}
 		w.WriteHeader(status)
-		_ = json.NewEncoder(w).Encode(v)
+		f.sent += len(body)
+		_, _ = w.Write(body)
 	}
 	if r.Header.Get("Authorization") != "Bearer "+token {
 		answer(401, obj{"message": "401 Unauthorized"})

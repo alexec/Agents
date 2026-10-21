@@ -3,6 +3,7 @@ package gitlabmcp
 import (
 	"context"
 	"encoding/json"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -475,5 +476,34 @@ func TestProjectByIDOrPath(t *testing.T) {
 	asked := f.asked()
 	if len(asked) == 0 || !strings.Contains(asked[0], "/projects/group%2Fsub%2Fapp/merge_requests") {
 		t.Fatalf("asked %v", asked)
+	}
+}
+
+// P20261020-2: a pr.opened wait on a project with 500 open merge requests lists them all each
+// poll, but GitLab answers 304 while none changed, so an hour of polls is six pages of 304s
+// each (five full and the empty one that ends the list) and no bodies, not 1.7 MB a poll. A merge request that changes is seen at the next poll.
+func TestOpenedListsAgainOnlyWhatChanged(t *testing.T) {
+	f := newFake(t)
+	f.addMembers()
+	for i := 1; i <= 500; i++ {
+		f.mrs = append(f.mrs, mrJSON(i, "b"+strconv.Itoa(i), dev, obj{"draft": true, "description": strings.Repeat("words ", 500)}))
+	}
+	p := newPoller(t, f, "pr.opened", nil)
+	p.poll()
+	asked, sent := len(f.asked()), f.sent
+	for poll := 1; poll <= 120; poll++ { // an hour at 30 s
+		if ids, _ := p.poll(); len(ids) != 0 {
+			t.Fatalf("poll %d: %v", poll, ids)
+		}
+	}
+	requests, bytes := len(f.asked())-asked, f.sent-sent
+	t.Logf("an hour of polls with 500 open: %d requests, %d bytes (the first poll: %d bytes)", requests, bytes, sent)
+	if requests != 120*6 || bytes != 0 {
+		t.Fatalf("an hour of polls: %d requests, %d bytes; want 720 and 0", requests, bytes)
+	}
+	f.set(func() { f.mrs[0]["draft"] = false })
+	ids, _ := p.poll()
+	if len(ids) != 1 || !strings.HasPrefix(ids[0], "pr.opened:group/app:1:") {
+		t.Fatalf("ready: %v", ids)
 	}
 }
