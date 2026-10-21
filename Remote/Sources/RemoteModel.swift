@@ -2111,6 +2111,97 @@ final class RemoteModel {
         }
     }
 
+    // MARK: Workspace providers (#1819)
+
+    /// The control plane's workspace providers, as Settings ▸ Workspace providers last listed
+    /// them (the web page's Providers, the window's ControlProvidersPage); nil before the first.
+    var workspaceProviders: [DaemonAPI.ProviderSummary]?
+    /// Why none are shown: a control plane with several copies, or a list that failed.
+    var workspaceProvidersProblem: String?
+
+    /// Lists them, and asks every provider to list again (FR-004), as the page opens.
+    func loadWorkspaceProviders() async {
+        guard let control = controlPlane else {
+            workspaceProvidersProblem = "The control plane isn’t answering."
+            return
+        }
+        do {
+            let answer = try await control.call(DaemonAPI.Method.providersList, DaemonAPI.Empty())
+            workspaceProviders = (try? answer["providers"]?.decode([DaemonAPI.ProviderSummary].self)) ?? []
+            workspaceProvidersProblem = nil
+        } catch let error as JSONRPCError where error.code == DaemonAPI.Failure.providersNeedOneCopy {
+            workspaceProviders = []
+            workspaceProvidersProblem = WorkspaceProviderWords.oneCopy
+            return
+        } catch {
+            workspaceProviders = []
+            workspaceProvidersProblem = sentence(for: error)
+            return
+        }
+        await listWorkspacesAgain()
+    }
+
+    /// List Again: one provider, or every one. The new list comes as control/providersChanged.
+    func listWorkspacesAgain(_ provider: ProviderID? = nil) async {
+        _ = try? await controlPlane?.call(DaemonAPI.Method.providersRefresh, DaemonAPI.ProviderRequest(id: provider))
+    }
+
+    /// Add or Save: nil, or why the control plane refused it, to say in the sheet.
+    func saveWorkspaceProvider(_ request: DaemonAPI.ProviderAdd) async -> String? {
+        guard let control = controlPlane else { return "The control plane isn’t answering." }
+        do {
+            let saved = try await control.call(request.id == nil ? DaemonAPI.Method.providersAdd : DaemonAPI.Method.providersUpdate,
+                                               request, returning: DaemonAPI.ProviderSummary.self)
+            var list = workspaceProviders ?? []
+            if let index = list.firstIndex(where: { $0.id == saved.id }) { list[index] = saved } else { list.append(saved) }
+            workspaceProviders = list
+            return nil
+        } catch {
+            return sentence(for: error)
+        }
+    }
+
+    /// Remove, Link, Unlink: nil, or why the control plane refused it.
+    func removeWorkspaceProvider(_ id: ProviderID) async -> String? {
+        let refused = await controlRequest(DaemonAPI.Method.providersRemove, DaemonAPI.ProviderRequest(id: id))
+        if refused == nil { workspaceProviders?.removeAll { $0.id == id } }
+        return refused
+    }
+
+    func linkWorkspace(host: HostID, provider: ProviderID, workspace: String, startWhenUsed: Bool,
+                       stopWhenIdleMinutes: Int) async -> String? {
+        await controlRequest(DaemonAPI.Method.hostsLink,
+                             DaemonAPI.HostLink(host: host, provider: provider, workspace: workspace,
+                                                startWhenUsed: startWhenUsed, stopWhenIdleMinutes: stopWhenIdleMinutes))
+    }
+
+    func unlinkWorkspace(host: HostID) async -> String? {
+        await controlRequest(DaemonAPI.Method.hostsUnlink, DaemonAPI.HostRequest(host: host))
+    }
+
+    /// Stop. With agents at work there and not `confirmed`, answers the question to ask first.
+    func stopWorkspace(host: HostID, confirmed: Bool = false) async -> (refused: String?, ask: String?) {
+        guard let control = controlPlane else { return ("The control plane isn’t answering.", nil) }
+        do {
+            _ = try await control.call(DaemonAPI.Method.hostsStop, DaemonAPI.HostStop(host: host, confirmRunning: confirmed ? true : nil))
+            return (nil, nil)
+        } catch let error as JSONRPCError where error.code == DaemonAPI.Failure.agentsWorking && !confirmed {
+            return (nil, error.message)
+        } catch {
+            return (sentence(for: error), nil)
+        }
+    }
+
+    private func controlRequest(_ method: String, _ params: some Encodable & Sendable) async -> String? {
+        guard let control = controlPlane else { return "The control plane isn’t answering." }
+        do {
+            _ = try await control.call(method, params)
+            return nil
+        } catch {
+            return sentence(for: error)
+        }
+    }
+
     /// A host's git asking to use a Mac's git access (#1122), not answered here yet. Any
     /// client may answer it; the control plane takes the first answer.
     var gitLendAsk: GitLendAsk? {
@@ -2178,6 +2269,13 @@ final class RemoteModel {
                         if change.method == DaemonAPI.Notification.controlKeptChanged
                             || change.method == DaemonAPI.Notification.controlKeptDelivered {
                             await self.heardKept(change.method, change.params)
+                            continue
+                        }
+                        // Settings ▸ Workspace providers keeps up (#1819).
+                        if change.method == DaemonAPI.Notification.controlProvidersChanged {
+                            if let listed = try? change.params?["providers"]?.decode([DaemonAPI.ProviderSummary].self) {
+                                self.workspaceProviders = listed
+                            }
                             continue
                         }
                         guard change.method == DaemonAPI.Notification.controlHostChanged else { continue }
