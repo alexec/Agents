@@ -20,6 +20,8 @@ struct PromptsList: View {
     /// Brings the page of turns before the ones in hand.
     let loadEarlier: @MainActor () async -> Void
     let close: () -> Void
+    /// The host is too old to branch: Branch from Here greyed, saying so (#1866).
+    var branchNeedsUpdate = false
 
     @State private var query = ""
     @State private var isLoadingEarlier = false
@@ -43,7 +45,8 @@ struct PromptsList: View {
                     ForEach(shown) { prompt in
                         PromptsListRow(prompt: prompt,
                                        go: { close(); go(prompt) },
-                                       branch: branch.map { branch in { close(); branch(prompt) } })
+                                       branch: branch.map { branch in { close(); branch(prompt) } },
+                                       branchNeedsUpdate: branchNeedsUpdate)
                     }
                 }
                 // Opened at the newest, which is the one most often wanted.
@@ -144,6 +147,7 @@ private struct PromptsListRow: View {
     let prompt: SessionPrompt
     let go: () -> Void
     let branch: (() -> Void)?
+    let branchNeedsUpdate: Bool
 
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
@@ -191,6 +195,10 @@ private struct PromptsListRow: View {
         if let branch {
             Button("Branch from Here", systemImage: "arrow.triangle.branch", action: branch)
                 .help(SessionPrompt.branchHelp)
+        } else if branchNeedsUpdate {
+            Button("Branch from Here", systemImage: "arrow.triangle.branch") {}
+                .disabled(true)
+                .help(UpdateWords.hostNeedsUpdate)
         }
     }
 

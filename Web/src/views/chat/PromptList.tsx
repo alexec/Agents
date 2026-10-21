@@ -5,10 +5,11 @@
 // chat's first prompt, as the host counts them; while earlier turns are not in hand, a line above
 // the rows says so and loads them (#1862).
 import { useSignal } from "@preact/signals";
+import { hostNeedsUpdate } from "../../model/capabilities";
 import { useEffect, useRef } from "preact/hooks";
 import { endingLabel, filteredPrompts, movedTo, promptLine, type SessionPrompt } from "../../model/sessionPrompts";
 
-export function PromptList({ prompts, hasEarlier, loadEarlier, choose, branchFrom, close }: {
+export function PromptList({ prompts, hasEarlier, loadEarlier, choose, branchFrom, branchNeedsUpdate = false, close }: {
   prompts: readonly SessionPrompt[];
   /** Earlier turns of the chat are not in hand. */
   hasEarlier: boolean;
@@ -17,6 +18,8 @@ export function PromptList({ prompts, hasEarlier, loadEarlier, choose, branchFro
   choose: (prompt: SessionPrompt) => void;
   /** Absent on an archived session, as Branch is. */
   branchFrom?: ((prompt: SessionPrompt) => void) | undefined;
+  /** The host is too old to branch: Branch from Here greyed, saying so (#1866). */
+  branchNeedsUpdate?: boolean;
   close: () => void;
 }) {
   const query = useSignal("");
@@ -112,7 +115,7 @@ export function PromptList({ prompts, hasEarlier, loadEarlier, choose, branchFro
                     menu.value = null;
                     close();
                     branchFrom(prompt);
-                  })} number={prompt.number} />
+                  })} branchNeedsUpdate={branchNeedsUpdate} number={prompt.number} />
               </li>
             ))}
           </ul>
@@ -126,9 +129,9 @@ export function PromptList({ prompts, hasEarlier, loadEarlier, choose, branchFro
 }
 
 /** A row's ···: Copy, and Branch from Here where the session can branch. */
-function RowMenu({ open, at, toggle, copy, branch, number }: {
+function RowMenu({ open, at, toggle, copy, branch, branchNeedsUpdate, number }: {
   open: boolean; at: { top: number; right: number }; toggle: (button: HTMLElement) => void; copy: () => void;
-  branch: (() => void) | undefined; number: number;
+  branch: (() => void) | undefined; branchNeedsUpdate: boolean; number: number;
 }) {
   return (
     <span class="menu-anchor prompt-row-menu">
@@ -141,6 +144,7 @@ function RowMenu({ open, at, toggle, copy, branch, number }: {
             <button role="menuitem" title="Start a new session from just before this prompt, with the prompt in its bar to change. The files stay as they are now."
               onClick={branch}>Branch from Here</button>
           )}
+          {!branch && branchNeedsUpdate && <button role="menuitem" title={hostNeedsUpdate} disabled>Branch from Here</button>}
         </div>
       )}
     </span>

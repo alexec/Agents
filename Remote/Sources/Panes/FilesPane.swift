@@ -555,12 +555,17 @@ struct FilesPane: View {
         // the host is new enough to ask (#1748).
         if model.agent(agentID, has: Capability.filesDiagnostics1) {
             actions.diagnose = { path, text in try await model.diagnose(path: path, text: text, of: agentID) }
+        } else {
+            // Said in the problems' place, with no call sent (#1866): not "no problems".
+            actions.diagnose = { _, _ in DaemonAPI.FileDiagnostics(diagnostics: [], reason: UpdateWords.hostNeedsUpdate) }
         }
         // And what it would write at the caret (#1603).
         if model.agent(agentID, has: Capability.filesComplete1) {
             actions.complete = { path, text, line, column in
                 await model.complete(path: path, text: text, line: line, column: column, of: agentID)
             }
+        } else {
+            actions.complete = { _, _, _, _ in DaemonAPI.FileCompletions(items: [], reason: UpdateWords.hostNeedsUpdate) }
         }
         return actions
     }

@@ -531,5 +531,28 @@ struct ConsistencyTests {
         return keys.keys.filter { $0.hasSuffix("UsageDescription") }
     }
 
+    /// A feature left out because the host is too old says so (#1866): the line in the
+    /// hidden section's place, or the control greyed with it as its help, on the Mac and the
+    /// Remote alike. Each file that gates one names `hostNeedsUpdate`, or passes the greying
+    /// on to the shared view that does.
+    @Test func aFeatureTheHostIsTooOldForSaysSo() throws {
+        let saying: [String: String] = [
+            "App/Sources/MCPServers/MCPServersView.swift": "UpdateWords.hostNeedsUpdate",
+            "Remote/Sources/MCPServers/MCPServersListView.swift": "UpdateWords.hostNeedsUpdate",
+            "App/Sources/Sidebar/MacPageActions.swift": "reason: UpdateWords.hostNeedsUpdate",
+            "Remote/Sources/Panes/FilesPane.swift": "reason: UpdateWords.hostNeedsUpdate",
+            "Shared/UI/Chat/TranscriptRows.swift": ".help(UpdateWords.hostNeedsUpdate)",
+            "Shared/UI/Chat/PromptsList.swift": ".help(UpdateWords.hostNeedsUpdate)",
+            "App/Sources/Chat/ChatView.swift": "branchNeedsUpdate: branchNeedsUpdate(agent)",
+            "Remote/Sources/Chat/RemoteChatView.swift": "branchNeedsUpdate: branchNeedsUpdate",
+        ]
+        for (path, words) in saying {
+            let text = try String(contentsOf: Self.root.appending(path: path), encoding: .utf8)
+            #expect(text.contains(words), "\(path) leaves out a feature the host is too old for and says nothing")
+        }
+        let rows = try String(contentsOf: Self.root.appending(path: "Shared/UI/Chat/TranscriptRows.swift"), encoding: .utf8)
+        #expect(!rows.contains("prompt.from == .person, actions.canEditQueued"), "Edit is hidden, not greyed")
+    }
+
     private enum PlistShape: Error { case unexpected(String) }
 }

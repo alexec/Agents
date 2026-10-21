@@ -28,14 +28,18 @@ struct MCPServersListView: View {
 
     var body: some View {
         List {
-            // The set-up first (#1336): a project's slots, or the person's connections; neither
-            // on a host too old to have them (#1748).
+            // The set-up first (#1336): a project's slots, or the person's connections; on a
+            // host too old to have them (#1748), the line that says so in their place (#1866).
             if let project, model.host(project.host, has: Capability.connectorsSetup1) {
                 RemoteConnectorSetup(project: project, projectName: model.work.project(project)?.name
                                          ?? project.folder.lastPathComponent, setup: $setup,
                                      problem: setupProblem, reload: readSetUp)
             } else if project == nil, model.host(.mac, has: Capability.connections1) {
                 RemoteConnections(connections: connections, problem: $setupProblem, reload: { await readSetUp(.cached) })
+            } else {
+                Section {
+                    Text(UpdateWords.hostNeedsUpdate).foregroundStyle(.secondary)
+                }
             }
             Section {
                 if let problem {

@@ -2,6 +2,7 @@
 // shared TranscriptRows.swift draws them for the Mac and the phone (071 FR-023). Words come from
 // the ported rules; agent text goes through the Markdown renderer and nowhere else.
 import { useSignal } from "@preact/signals";
+import { hostNeedsUpdate } from "../../model/capabilities";
 import { createContext } from "preact";
 import { useContext, useEffect, useRef } from "preact/hooks";
 import type {
@@ -146,6 +147,8 @@ export interface CallActions {
   quote?: ((words: string) => void) | undefined;
   /** Branch from Here (#1658): a new session from just before the person's prompt `entryID`. Not on an archived session. */
   branchFrom?: ((entryID: string, text: string) => void) | undefined;
+  /** The host is too old to branch (#1748): Branch from Here stays, greyed, and says so (#1866). */
+  branchNeedsUpdate?: boolean | undefined;
 }
 export const CallActionsContext = createContext<CallActions | null>(null);
 
@@ -303,7 +306,8 @@ function CopyMessage({ entry, quotes = false, branches = false }: { entry: Trans
       setTimeout(() => { copied.value = false; }, 1500);
     }, () => {});
   };
-  const grouped = (quotes && !!quote) || !!branchFrom;
+  const greyedBranch = branches && !branchFrom && !!actions?.branchNeedsUpdate;
+  const grouped = (quotes && !!quote) || !!branchFrom || greyedBranch;
   const copyButton = (
     <button class={grouped ? "steps-control" : "steps-control copy-message"} onClick={copy} title="Copy this message, as written">
       {copied.value ? "Copied" : "Copy"}
@@ -315,6 +319,14 @@ function CopyMessage({ entry, quotes = false, branches = false }: { entry: Trans
       <span class="copy-message message-actions">
         <button class="steps-control" title="Start a new session from just before this prompt, with the prompt in its bar to change. The files stay as they are now."
           onClick={() => branchFrom(entry.id, words)}>Branch from Here</button>
+        {copyButton}
+      </span>
+    );
+  }
+  if (greyedBranch) {
+    return (
+      <span class="copy-message message-actions">
+        <button class="steps-control" title={hostNeedsUpdate} disabled>Branch from Here</button>
         {copyButton}
       </span>
     );
