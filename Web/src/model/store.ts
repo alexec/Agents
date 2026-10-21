@@ -2528,6 +2528,18 @@ export class Store extends Work {
     await this.act("agents/rename", { agentID: agentID as UUID, title }, host);
   }
 
+  /** Mute Notifications / Unmute Notifications (#2003): kept by the session's host. */
+  async setMuted(host: string, agentID: string, muted: boolean): Promise<void> {
+    await this.act("agents/setMuted", { agentID: agentID as UUID, muted }, host);
+  }
+
+  /** Mute Notifications for a workflow's runs, or Unmute (#2003): `muted: true` in its file. */
+  async setWorkflowMuted(host: string, summary: WorkflowSummary, muted: boolean): Promise<void> {
+    const changed = await this.act("workflows/setMuted",
+      { folder: summary.workflow.folder, workflowID: summary.workflow.workflowID, muted }, host);
+    if (changed) this.placeWorkflow(changed, host);
+  }
+
   /** Mark as Unread / Mark as Read (#70). */
   async setUnread(host: string, agentID: string, unread: boolean): Promise<void> {
     await this.act("agents/setUnread", { agentID: agentID as UUID, unread }, host);

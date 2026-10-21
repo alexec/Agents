@@ -87,6 +87,13 @@ struct SidebarSessionRow: View {
                             // Said, as the workflow mark is and the Mac's row says it (#1326).
                             .accessibilityLabel(starter)
                     }
+                    // Mute Notifications (#2003), as on the Mac.
+                    if agent.isMuted {
+                        Image(systemName: MuteWords.symbol)
+                            .appText(.fine)
+                            .foregroundStyle(.tertiary)
+                            .accessibilityLabel(MuteWords.muted)
+                    }
                     // A file it showed that the person has not looked at (#1802), as on the Mac.
                     if let file = FileToSeeWords.line(agent) {
                         Image(systemName: FileToSeeWords.symbol)
@@ -294,6 +301,13 @@ struct SidebarWorkflowRow: View {
                     .lineLimit(1)
             }
             Spacer(minLength: 4)
+            // Its runs send no notifications (#2003), as on the Mac.
+            if summary.workflow.isMuted, !summary.isArchived {
+                Image(systemName: MuteWords.symbol)
+                    .appText(.fine)
+                    .foregroundStyle(.tertiary)
+                    .accessibilityLabel(MuteWords.muted)
+            }
             // A running one counts from when this run started (#755).
             if let at = summary.lastFiredAt {
                 ActivityTime(date: at)
@@ -353,6 +367,12 @@ struct SidebarWorkflowRow: View {
                 Button(summary.isEnabled ? "Turn Off" : "Turn On",
                        systemImage: summary.isEnabled ? "pause.circle" : "play.circle") {
                     Task { await model.setWorkflowEnabled(summary, !summary.isEnabled) }
+                }
+                if model.canMute(summary) {
+                    let muted = summary.workflow.isMuted
+                    Button(MuteWords.label(muted: muted), systemImage: MuteWords.symbol(muted: muted)) {
+                        Task { await model.setWorkflowMuted(summary, !muted) }
+                    }
                 }
                 Button("Archive", systemImage: "archivebox") { Task { await model.setWorkflowArchived(summary, true) } }
             }

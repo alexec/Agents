@@ -1494,6 +1494,16 @@ final class AppModel {
         }
     }
 
+    /// Mute Notifications for every run of one, or Unmute (#2003): `muted: true` in its file.
+    func setWorkflowMuted(_ summary: WorkflowSummary, _ muted: Bool, on host: HostID? = nil) async {
+        let host = host ?? selectedProjectHost
+        await attempt(on: host) {
+            try await self.client(for: host).call(
+                DaemonAPI.Method.workflowsSetMuted,
+                DaemonAPI.WorkflowMuteRequest(folder: summary.folder, workflowID: summary.workflowID, muted: muted))
+        }
+    }
+
     /// Clear a server's event trigger's missed-events mark (#383).
     func clearMCPMissed(_ summary: WorkflowSummary, _ status: MCPTriggerStatus) async {
         _ = try? await client(for: selectedProjectHost).call(
@@ -5031,6 +5041,19 @@ final class AppModel {
             try await self.client(forAgent: id).call(DaemonAPI.Method.agentsSetUnread,
                                                      DaemonAPI.SetUnreadRequest(agentID: id, unread: unread))
         }
+    }
+
+    /// Mute Notifications, or Unmute, from the row's or the Session menu (#2003).
+    func setMuted(_ id: UUID, _ muted: Bool) async {
+        await attempt(on: work.agent(id)?.host ?? .mac) {
+            try await self.client(forAgent: id).call(DaemonAPI.Method.agentsSetMuted,
+                                                     DaemonAPI.SetMutedRequest(agentID: id, muted: muted))
+        }
+    }
+
+    /// Whether the host of this session can mute it: one from before #2003 cannot.
+    func canMute(_ agent: Agent) -> Bool {
+        agent.state != .archived && host(agent.host, has: Capability.mute1)
     }
 
     /// Whether the answer went, so the card can give its buttons back when it did not.

@@ -31,3 +31,11 @@ test("the row's end says when it last ran, and nothing for one that never has (#
   assert.equal(lastRan(summary({ lastFiredAt: 0 }))?.toISOString(), "2001-01-01T00:00:00.000Z");
   assert.equal(lastRan(summary({ lastFiredAt: 3_600, isRunning: true }))?.toISOString(), "2001-01-01T01:00:00.000Z");
 });
+
+test("on a host that can, Mute Notifications or Unmute after Turn Off (#2003)", () => {
+  assert.deepEqual(workflowActions(summary(), false, undefined, true), ["open", "runNow", "pin", "turnOff", "mute", "archive", "delete"]);
+  const muted = summary();
+  muted.workflow.muted = true;
+  assert.deepEqual(workflowActions(muted, false, undefined, true), ["open", "runNow", "pin", "turnOff", "unmute", "archive", "delete"]);
+  assert.deepEqual(workflowActions(summary({ isArchived: true }), false, undefined, true), ["open", "unarchive", "delete"]);
+});

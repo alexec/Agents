@@ -415,7 +415,7 @@ func parseWorkflow(text, id, project string) wire.Workflow {
 			w.Cooldown = &c
 		}
 	}
-	for _, key := range []string{"enabled", "archived", "continue-when-back"} {
+	for _, key := range []string{"enabled", "archived", "continue-when-back", "muted"} {
 		if n, ok := m[key]; ok {
 			t, _ := n.Text()
 			var v *bool
@@ -435,6 +435,11 @@ func parseWorkflow(text, id, project string) wire.Workflow {
 				w.Enabled = v
 			case "archived":
 				w.Archived = v
+			case "muted":
+				// Unmuted is no choice at all, as continue-when-back's off is.
+				if v != nil && *v {
+					w.Muted = v
+				}
 			default:
 				// Off is no choice at all, as when-done's keep is.
 				if v != nil && *v {

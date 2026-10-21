@@ -176,6 +176,8 @@ public extension DaemonAPI {
                 Row(Method.agentsContinueWhenBack, params: AgentRequest.self, result: Agent.self, kind: .hostRequest),
                 Row(Method.agentsCancelContinue, params: AgentRequest.self, result: Agent.self, kind: .hostRequest),
                 Row(Method.agentsSetUnread, params: SetUnreadRequest.self, result: Empty.self, kind: .hostRequest),
+                // Mute Notifications (#2003), as the window's and the Remote's menus have it.
+                Row(Method.agentsSetMuted, params: SetMutedRequest.self, result: Empty.self, kind: .hostRequest),
                 Row(Method.agentsRename, params: RenameRequest.self, result: Agent.self, kind: .hostRequest),
                 // Branch (#342): the new session's id, as the window's row and Session menu have it.
                 Row(Method.agentsFork, params: AgentRequest.self, result: UUID.self, kind: .hostRequest),
@@ -211,6 +213,8 @@ public extension DaemonAPI {
                     kind: .hostRequest),
                 // Turn Off / Turn On (#100), as the window's and the Remote's rows have it.
                 Row(Method.workflowsEnable, params: WorkflowEnableRequest.self, result: WorkflowSummary.self,
+                    kind: .hostRequest),
+                Row(Method.workflowsSetMuted, params: WorkflowMuteRequest.self, result: WorkflowSummary.self,
                     kind: .hostRequest),
                 // Approve, and Archive or Unarchive, on the workflow page (#142), as the window's has them.
                 Row(Method.workflowsApprove, params: WorkflowApproveRequest.self, result: WorkflowSummary.self,

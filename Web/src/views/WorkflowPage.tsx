@@ -21,6 +21,8 @@ import { CooldownMenu, RuntimeRow, WhenDoneMenu, WorkflowSettingsForm } from "./
 import { whenDoneSentence } from "../model/workflowSettings";
 import { workflowContinueSentence, workflowContinueSwitch } from "../model/continueWhenBack";
 import { BackToList } from "./BackToList";
+import { isWorkflowMuted, muteLabel, workflowMuteHelp } from "../model/mute";
+import { Capability } from "../protocol/capabilities.generated";
 
 export function WorkflowPage({ store, host, folder, projectName, workflowID, down }: {
   store: Store; host: string; folder: string; projectName: string; workflowID: string; down: boolean;
@@ -125,6 +127,14 @@ export function WorkflowPage({ store, host, folder, projectName, workflowID, dow
                   onChange={(e) => void store.setWorkflowEnabled(host, summary, (e.currentTarget as HTMLInputElement).checked)} />
                 Enabled
               </label>
+              {/* Its runs still go under Needs You, and send no notifications (#2003). */}
+              {store.has(host, Capability.mute1) && (
+                <label class="switch" title={workflowMuteHelp(isWorkflowMuted(summary))}>
+                  <input type="checkbox" role="switch" aria-label={muteLabel} checked={isWorkflowMuted(summary)} disabled={down}
+                    onChange={(e) => void store.setWorkflowMuted(host, summary, (e.currentTarget as HTMLInputElement).checked)} />
+                  {muteLabel}
+                </label>
+              )}
               {/* Pinned to the top of its project in the sidebar (#432), as the window's page has it. */}
               {(() => {
                 const pinned = store.workflowPinsIn(host, folder).includes(workflow.workflowID);

@@ -894,6 +894,9 @@ func (d *Daemon) registerWorkflows() {
 	On(d, wire.CallWorkflowsDelete, func(ctx context.Context, c *Client, r wire.WorkflowRequest) (wire.Empty, error) {
 		return wire.Empty{}, d.deleteWorkflow(r)
 	})
+	On(d, wire.CallWorkflowsSetMuted, func(ctx context.Context, c *Client, r wire.WorkflowMuteRequest) (wire.WorkflowSummary, error) {
+		return d.muteWorkflow(r, d.byPerson(c))
+	})
 	On(d, wire.CallWorkflowsSettings, func(ctx context.Context, c *Client, r wire.WorkflowSettingsRequest) (wire.WorkflowSummary, error) {
 		return d.workflowSettingsChange(r, d.byPerson(c))
 	})

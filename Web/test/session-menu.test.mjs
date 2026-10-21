@@ -94,3 +94,11 @@ test("Find in Chat stays in the chat's menu on an old host, greyed, with the upd
   assert.deepEqual(findInChatItem(false), { disabled: true, title: "This machine needs an update to do this." });
   assert.equal(findInChatItem(true).disabled, false);
 });
+
+test("on a host that can, Mute Notifications or Unmute before Rename; never on archived (#2003)", () => {
+  assert.deepEqual(sessionActions(agents["running"], false, [], true).map((a) => a.label),
+    ["Stop", "Mute Notifications", "Rename…", "Pin", "Branch", "Archive"]);
+  assert.deepEqual(sessionActions({ ...agents["running"], isMuted: true }, false, [], true).map((a) => a.label),
+    ["Stop", "Unmute Notifications", "Rename…", "Pin", "Branch", "Archive"]);
+  assert.deepEqual(sessionActions(agents["archived"], true, [], true).map((a) => a.label), ["Unarchive", "Delete…"]);
+});

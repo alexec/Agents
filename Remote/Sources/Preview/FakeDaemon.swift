@@ -135,6 +135,11 @@ private actor FakeState {
                 await change(request?.agentID) { $0.isUnread = request?.unread == true }
                 return .success(.object([:]))
 
+            case DaemonAPI.Method.agentsSetMuted:
+                let request = try params?.decode(DaemonAPI.SetMutedRequest.self)
+                await change(request?.agentID) { $0.isMuted = request?.muted == true }
+                return .success(.object([:]))
+
             case DaemonAPI.Method.agentsRename:
                 let request = try params?.decode(DaemonAPI.RenameRequest.self)
                 await change(request?.agentID) { $0.rename(to: request.flatMap { Agent.cleanedTitle($0.title) }) }

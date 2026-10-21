@@ -149,6 +149,10 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
     /// finished agent: a running chat is not something you have "read", and a stopped
     /// one is under its own heading.
     public var isUnread: Bool
+    /// Mute Notifications (#2003): the session still goes under Needs you and counts in
+    /// the badge, but the host sends no push, no Mac notification and no banner for it. Kept
+    /// on the host's record, so every client agrees; a muted workflow's runs start muted.
+    public var isMuted: Bool
     /// Which report the person has had in front of them, by its `at`. A report that
     /// wants a person is news once: seen, it stops being a notification to send, though
     /// the agent stays under Needs attention until it is answered. A newer report has
@@ -322,6 +326,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         createdAt = try c.decode(Date.self, forKey: .createdAt)
         lastActivityAt = try c.decode(Date.self, forKey: .lastActivityAt)
         isUnread = try c.decodeIfPresent(Bool.self, forKey: .isUnread) ?? false
+        isMuted = (try? c.decodeIfPresent(Bool.self, forKey: .isMuted)) ?? false
         reportSeenAt = try c.decodeIfPresent(Date.self, forKey: .reportSeenAt)
         endedReason = try c.decodeIfPresent(EndedReason.self, forKey: .endedReason)
         // A state we have never heard of, and no reason beside it, is an ending
@@ -445,6 +450,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         try c.encode(createdAt, forKey: .createdAt)
         try c.encode(lastActivityAt, forKey: .lastActivityAt)
         if isUnread { try c.encode(isUnread, forKey: .isUnread) }
+        if isMuted { try c.encode(isMuted, forKey: .isMuted) }
         try c.encodeIfPresent(reportSeenAt, forKey: .reportSeenAt)
         try c.encodeIfPresent(endedReason, forKey: .endedReason)
         try c.encodeIfPresent(archivedReason, forKey: .archivedReason)
@@ -506,7 +512,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
 
     enum CodingKeys: String, CodingKey, CaseIterable {
         case id, runtimeID, cwd, title, labels, state, runtimeSessionID, startOptions
-        case advertisedOptions, availableCommands, createdAt, lastActivityAt, isUnread, reportSeenAt
+        case advertisedOptions, availableCommands, createdAt, lastActivityAt, isUnread, isMuted, reportSeenAt
         case endedReason, archivedReason
         case usage, lastTurnUsage, costToDate, costCeiling, tokensToDate, tokenCeiling, plans, additionalDirectories, mcpServers
         case queuedPrompts, suggestedPrompts
@@ -561,6 +567,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
                 createdAt: Date = Date(),
                 lastActivityAt: Date = Date(),
                 isUnread: Bool = false,
+                isMuted: Bool = false,
                 reportSeenAt: Date? = nil,
                 endedReason: EndedReason? = nil,
                 archivedReason: Agent.ArchivedReason? = nil,
@@ -605,6 +612,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         self.createdAt = createdAt
         self.lastActivityAt = lastActivityAt
         self.isUnread = isUnread
+        self.isMuted = isMuted
         self.reportSeenAt = reportSeenAt
         self.endedReason = endedReason
         self.archivedReason = archivedReason

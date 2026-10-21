@@ -440,8 +440,12 @@ func (d *Daemon) runAgent(w wire.Workflow, run workflowRun, fr fireRequest) (wir
 	}
 	depth := run.Depth + 1
 	wid, rid, name := w.WorkflowID, run.ID, w.Name
+	muted := w.Muted != nil && *w.Muted
 	d.change(id, func(a *wire.Agent) {
 		a.StartedByWorkflow, a.StartedByRun, a.ChainDepth, a.Title = &wid, &rid, &depth, &name
+		if muted {
+			a.IsMuted = &muted // a muted workflow's runs start muted (#2003)
+		}
 	})
 	if w.Mode == wire.WorkflowModeStanding {
 		d.workflowMu.Lock()

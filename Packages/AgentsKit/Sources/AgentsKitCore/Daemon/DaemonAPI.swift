@@ -180,6 +180,9 @@ public enum DaemonAPI {
         /// Mark a finished chat unread, or read, from its row (#70). The person's word
         /// about their own attention: no agent tool reaches it.
         public static let agentsSetUnread = "agents/setUnread"
+        /// Mute Notifications, or Unmute, from a session's menu (#2003). The person's word
+        /// about their own notifications: no agent tool reaches it.
+        public static let agentsSetMuted = "agents/setMuted"
         /// Rename a session, or with an empty title hand naming back to the runtime
         /// (#751). The person's, from a row's menu or the chat header; one title on every
         /// client, and no agent tool reaches it.
@@ -297,6 +300,9 @@ public enum DaemonAPI {
         public static let workflowsDelete = "workflows/delete"
         /// Turn one on or off, keeping its place on the list (#100).
         public static let workflowsEnable = "workflows/enable"
+        /// Mute Notifications for every run of one, or Unmute (#2003): `muted: true` in
+        /// its file, and the same mark on its sessions.
+        public static let workflowsSetMuted = "workflows/setMuted"
         /// Approve a workflow file as the person was shown it (security review).
         public static let workflowsApprove = "workflows/approve"
         /// Deny one on this host only (#391): it does not run here, and the file is not
@@ -1087,6 +1093,16 @@ public enum DaemonAPI {
         public init(agentID: UUID, unread: Bool) {
             self.agentID = agentID
             self.unread = unread
+        }
+    }
+
+    /// `agents/setMuted`: Mute Notifications on a session, or Unmute (#2003).
+    public struct SetMutedRequest: Codable, Sendable {
+        public var agentID: UUID
+        public var muted: Bool
+        public init(agentID: UUID, muted: Bool) {
+            self.agentID = agentID
+            self.muted = muted
         }
     }
 
@@ -2758,6 +2774,18 @@ public enum DaemonAPI {
             self.folder = folder
             self.workflowID = workflowID
             self.archived = archived
+        }
+    }
+
+    /// `workflows/setMuted`: Mute Notifications for a workflow's runs, or Unmute (#2003).
+    public struct WorkflowMuteRequest: Codable, Sendable {
+        public var folder: URL
+        public var workflowID: String
+        public var muted: Bool
+        public init(folder: URL, workflowID: String, muted: Bool) {
+            self.folder = folder
+            self.workflowID = workflowID
+            self.muted = muted
         }
     }
 

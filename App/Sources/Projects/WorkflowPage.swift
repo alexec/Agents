@@ -283,6 +283,16 @@ struct WorkflowPage: View {
                 }
                 .help(pinned ? "Take this workflow out of Pinned in the sidebar"
                              : "Keep this workflow in Pinned, at the top of the sidebar")
+                // Its runs still go under Needs You, and send no notifications (#2003).
+                if model.host(place.host, has: Capability.mute1) {
+                    let muted = summary.workflow.isMuted
+                    Button {
+                        Task { await model.setWorkflowMuted(summary, !muted, on: place.host) }
+                    } label: {
+                        Label(MuteWords.label(muted: muted), systemImage: MuteWords.symbol(muted: muted))
+                    }
+                    .help(MuteWords.workflowHelp(muted: muted))
+                }
                 // One click, and back to the project: the same thing the Archive
                 // button in a chat's toolbar does (#586), so putting a thing away is
                 // one gesture wherever it is.

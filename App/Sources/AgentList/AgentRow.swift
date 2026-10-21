@@ -127,6 +127,14 @@ struct AgentRow: View {
                             .help("Started by the workflow \(workflowName)")
                             .accessibilityLabel("started by the workflow \(workflowName)")
                     }
+                    // Mute Notifications (#2003): a bell with a slash, as Messages marks it.
+                    if agent.isMuted {
+                        Image(systemName: MuteWords.symbol)
+                            .appText(.fine)
+                            .foregroundStyle(.tertiary)
+                            .help(MuteWords.muted)
+                            .accessibilityLabel(MuteWords.muted)
+                    }
                     // Started by another agent (028): the same kind of mark, for the
                     // same reason — this is not something the person typed for.
                     if let starter = model.startedByAgentLabel(agent) {
@@ -312,6 +320,12 @@ struct AgentRow: View {
                         Button("Mark as Unread", systemImage: "envelope.badge") {
                             Task { await model.setUnread(agent.id, true) }
                         }
+                    }
+                }
+                // No push, banner or Mac notification, and still in Needs You (#2003).
+                if model.canMute(agent) {
+                    Button(MuteWords.label(muted: agent.isMuted), systemImage: MuteWords.symbol(muted: agent.isMuted)) {
+                        Task { await model.setMuted(agent.id, !agent.isMuted) }
                     }
                 }
                 // The person's title, which the runtime's no longer replaces (#751).

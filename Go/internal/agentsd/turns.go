@@ -142,6 +142,12 @@ func stateChanged(s wire.AgentState, reason *wire.EndedReason) wire.TranscriptEn
 
 // change saves an agent's record, moved on to now, and tells every client and its project.
 func (d *Daemon) change(id wire.UUID, edit func(a *wire.Agent)) *wire.Agent {
+	return d.changeAgent(id, true, edit)
+}
+
+// changeAgent is change; with moveOn false, the record keeps its last activity, so a mark
+// such as Mute (#2003) does not move the session up its list.
+func (d *Daemon) changeAgent(id wire.UUID, moveOn bool, edit func(a *wire.Agent)) *wire.Agent {
 	d.agentMu.Lock()
 	defer d.agentMu.Unlock()
 	a := d.Store.Agent(id)
@@ -150,7 +156,9 @@ func (d *Daemon) change(id wire.UUID, edit func(a *wire.Agent)) *wire.Agent {
 	}
 	before := *a
 	edit(a)
-	a.LastActivityAt = now()
+	if moveOn {
+		a.LastActivityAt = now()
+	}
 	if err := d.Store.Save(*a); err != nil {
 		log.Printf("agent %s: %v", id, err)
 		return nil

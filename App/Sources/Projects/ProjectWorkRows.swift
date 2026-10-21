@@ -170,8 +170,17 @@ struct WorkflowListRow: View {
             // When it last ran, as a session's row has its time (#755); nothing if it never
             // has. A running one counts from when this run started. Off is marked where it
             // stands, rather than moved (#100), by its icon and its tooltip.
-            if let at = summary.lastFiredAt {
-                ActivityTime(date: at)
+            HStack(spacing: 4) {
+                // Its runs send no notifications (#2003), marked as a muted session is.
+                if summary.workflow.isMuted, !summary.isArchived {
+                    Image(systemName: MuteWords.symbol)
+                        .appText(.fine)
+                        .foregroundStyle(.tertiary)
+                        .accessibilityLabel(MuteWords.muted)
+                }
+                if let at = summary.lastFiredAt {
+                    ActivityTime(date: at)
+                }
             }
         }
         .padding(.leading, isNested ? 22 : 0)
@@ -220,6 +229,12 @@ struct WorkflowListRow: View {
                 Button(pinned ? "Unpin" : "Pin") { Task { await model.setPinned(summary, !pinned, on: project.host) } }
                 Button(summary.isEnabled ? "Turn Off" : "Turn On") {
                     Task { await model.setWorkflowEnabled(summary, !summary.isEnabled) }
+                }
+                if model.host(project.host, has: Capability.mute1) {
+                    let muted = summary.workflow.isMuted
+                    Button(MuteWords.label(muted: muted)) {
+                        Task { await model.setWorkflowMuted(summary, !muted, on: project.host) }
+                    }
                 }
                 Button("Archive") { Task { await model.setWorkflowArchived(summary, true) } }
             }

@@ -143,6 +143,12 @@ func (d *Daemon) register() {
 		}
 		return wire.Empty{}, nil
 	})
+	On(d, wire.CallAgentsSetMuted, func(ctx context.Context, c *Client, r wire.SetMutedRequest) (wire.Empty, error) {
+		if d.setMuted(r.AgentID, r.Muted) == nil {
+			return wire.Empty{}, &Error{Code: CodeNoSuchAgent, Message: "no agent " + string(r.AgentID)}
+		}
+		return wire.Empty{}, nil
+	})
 	On(d, wire.CallAgentsTranscript, func(ctx context.Context, c *Client, r wire.TranscriptRequest) (wire.TranscriptPage, error) {
 		return d.transcript(r)
 	})
