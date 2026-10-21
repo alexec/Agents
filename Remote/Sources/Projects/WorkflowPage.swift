@@ -235,7 +235,7 @@ struct WorkflowPage: View {
                             }
                             .buttonStyle(.paper)
                         }
-                    } else {
+                    } else if summary.runsHere {
                         Button { Task { await model.runWorkflow(summary) } } label: {
                             Text(summary.isRunning ? "Running…" : "Run now").frame(maxWidth: .infinity)
                         }

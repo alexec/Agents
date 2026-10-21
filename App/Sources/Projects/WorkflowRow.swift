@@ -72,7 +72,7 @@ struct WorkflowRow: View {
                     if summary.canBeDenied {
                         Button("Deny on This Machine") { Task { await model.denyWorkflow(summary) } }
                     }
-                } else {
+                } else if summary.runsHere {
                     Button("Run now") { Task { await model.runWorkflow(summary) } }
                 }
                 Button("Archive") { Task { await model.setWorkflowArchived(summary, true) } }
@@ -179,7 +179,7 @@ struct WorkflowRow: View {
                         .appText(.fine)
                         .help("Let this workflow run as its file now reads")
                 }
-            } else {
+            } else if summary.runsHere {
                 if summary.isRunning {
                     Text("Running…")
                         .appText(.fine)
@@ -277,6 +277,8 @@ struct WorkflowStatusIcon: View {
         if summary.deniedHere != nil { return "xmark.shield" }
         if !summary.isEnabled { return "pause.circle" }
         if summary.needsAPerson { return "exclamationmark.triangle" }
+        // A bot's workflow heard here (#2027).
+        if !summary.runsHere { return "ear" }
         if summary.isRunning { return "circle.dotted" }
         // Run only by hand (#432): nothing to wait for, and nothing wrong.
         if summary.workflow.runsOnlyByHand && summary.workflow.problem == nil { return "hand.tap" }
@@ -295,6 +297,7 @@ struct WorkflowStatusIcon: View {
         if !summary.isEnabled { return "Turned off" }
         if summary.overLimit != nil { return "Over the limit" }
         if summary.needsAPerson { return "Needs attention" }
+        if let bot = summary.hearsFor { return "Heard for \(bot)" }
         if summary.isRunning { return "Running" }
         if summary.workflow.runsOnlyByHand && summary.workflow.problem == nil { return "Runs by hand" }
         if !summary.workflow.canFire { return "Not yet supported" }

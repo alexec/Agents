@@ -251,7 +251,7 @@ struct WorkflowPage: View {
                         }
                         .help("Don't run it on this machine. Other machines still see it waiting; Approve takes this back")
                     }
-                } else {
+                } else if summary.runsHere {
                     // Offered even on a workflow that cannot fire on its own. Being able to
                     // try one is what makes writing one worth doing, and a refusal says why
                     // rather than nothing happening.

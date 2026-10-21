@@ -221,7 +221,7 @@ struct WorkflowListRow: View {
                 if summary.canBeDenied {
                     Button("Deny on This Machine") { Task { await model.denyWorkflow(summary) } }
                 }
-            } else {
+            } else if summary.runsHere {
                 Button("Run now") { Task { await model.runWorkflow(summary) } }
             }
             if !summary.isArchived {

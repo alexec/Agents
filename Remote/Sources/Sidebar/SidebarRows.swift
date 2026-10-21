@@ -352,7 +352,7 @@ struct SidebarWorkflowRow: View {
                         Task { await model.denyWorkflow(summary) }
                     }
                 }
-                if !summary.isUnapproved {
+                if !summary.isUnapproved && summary.runsHere {
                     Button("Run now", systemImage: "play") { Task { await model.runWorkflow(summary) } }
                         .disabled(summary.isRunning)
                 }
@@ -447,6 +447,8 @@ struct WorkflowMark: View {
         // Waiting behind a run is not something wrong (#422).
         if summary.queued > 0 { return "tray.full" }
         if case .refused = summary.lastOutcome { return "exclamationmark.triangle" }
+        // A bot's workflow heard here (#2027).
+        if !summary.runsHere { return "ear" }
         // An alarm clock for a schedule, a flowchart otherwise (#765): a plain clock read as
         // a session's Waiting.
         if summary.nextFireAt != nil { return "alarm" }

@@ -39,3 +39,20 @@ test("on a host that can, Mute Notifications or Unmute after Turn Off (#2003)", 
   assert.deepEqual(workflowActions(muted, false, undefined, true), ["open", "runNow", "pin", "turnOff", "unmute", "archive", "delete"]);
   assert.deepEqual(workflowActions(summary({ isArchived: true }), false, undefined, true), ["open", "unarchive", "delete"]);
 });
+
+test("a bot's workflow heard here is approved or denied, never run here (#2027)", async () => {
+  const { workflowStatusLines } = await load("src/model/workflows.ts");
+  const heard = summary({ hearsFor: "review-bot" });
+  assert.deepEqual(workflowActions(heard, false), ["open", "pin", "turnOff", "archive", "delete"]);
+  assert.deepEqual(workflowActions(summary({ hearsFor: "review-bot", awaitingApproval: {} }), false),
+    ["open", "approve", "deny", "pin", "turnOff", "archive", "delete"]);
+  const lines = workflowStatusLines(summary({ hearsFor: "review-bot", awaitingApproval: { isNew: true } }), new Date());
+  assert.ok(lines.some((l) => l.detail === "Read its triggers below, then Approve to let your servers hear them for review-bot"));
+  assert.ok(lines.some((l) => l.text === "Heard here for review-bot — review-bot's machines run it"));
+});
+
+test("a heard workflow's row says for whom (#2027)", async () => {
+  const { workflowStatus } = await load("src/model/workflows.ts");
+  assert.equal(workflowStatus(summary({ hearsFor: "review-bot", workflow: { workflowID: "n", triggers: [{ unrecognised: { name: "pr.merged", keys: {} } }], mode: "new", prompt: "", settings: {}, unknownFields: {} } })).words,
+    "Heard for review-bot");
+});

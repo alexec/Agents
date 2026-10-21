@@ -282,6 +282,8 @@ export function workflowStatus(s: WorkflowSummary): { mark: string; words: strin
   if (!isOn(s)) return { mark: "⏸\uFE0E", words: "Turned off", tinted };
   if (s.overLimit) return { mark: "!", words: "Over the limit", tinted };
   if (tinted) return { mark: "!", words: "Needs attention", tinted };
+  // A bot's workflow heard here (#2027).
+  if (s.hearsFor !== undefined) return { mark: "◉", words: `Heard for ${s.hearsFor}`, tinted };
   if (s.isRunning) return { mark: "◌", words: "Running", tinted };
   // A trigger held by its cooldown (#103): it runs once when the cooldown ends.
   if (s.holdsAFire) return { mark: "⧗", words: "Cooling down, then it runs once", tinted };
@@ -503,6 +505,24 @@ export function isUnapproved(s: WorkflowSummary): boolean {
   return !!s.awaitingApproval || !!s.deniedHere;
 }
 
+/** WorkflowSummary.runsHere: Run now is not offered on a bot's workflow heard here (#2027). */
+export function runsHere(s: WorkflowSummary): boolean {
+  return s.hearsFor === undefined;
+}
+
+/** WorkflowSummary.hearsForText. */
+export function hearsForText(s: WorkflowSummary): string | undefined {
+  return s.hearsFor === undefined ? undefined : `Heard here for ${s.hearsFor} — ${s.hearsFor}'s machines run it`;
+}
+
+export const hearsForDetail = "Your servers here hear its triggers and send each match to the control plane. It never runs here";
+
+/** WorkflowSummary.approveDetail. */
+export function approveDetail(s: WorkflowSummary): string {
+  return s.hearsFor === undefined ? "Read the prompt and settings below, then Approve to let it run"
+    : `Read its triggers below, then Approve to let your servers hear them for ${s.hearsFor}`;
+}
+
 /** WorkflowSummary.canBeApproved: waiting and allowed to, or denied here, where Approve takes it back. */
 export function canBeApproved(s: WorkflowSummary): boolean {
   return (!!s.awaitingApproval && !waitsItsTurn(s)) || !!s.deniedHere;
@@ -669,7 +689,7 @@ export function workflowStatusLines(s: WorkflowSummary, now = new Date()): Statu
     const note = s.awaitingApproval.note;
     lines.push({ glyph: "✋", text: note !== undefined ? `Waiting for your OK — ${note}`
       : s.awaitingApproval.isNew ? "New — waiting for your OK" : "Changed since you approved it — waiting for your OK",
-      detail: "Read the prompt and settings below, then Approve to let it run", tint: "attention" });
+      detail: approveDetail(s), tint: "attention" });
   } else if (s.deniedHere) {
     lines.push({ glyph: "⊘", text: "Denied on this machine — it does not run here",
       detail: "Other machines still see it waiting. Approve to let it run here" });
@@ -716,6 +736,9 @@ function enabledLine(s: WorkflowSummary): StatusLine {
 }
 
 function nextRunLine(s: WorkflowSummary, now: Date): StatusLine {
+  // A bot's workflow heard here (#2027): nothing of it runs here.
+  const heard = hearsForText(s);
+  if (heard) return { glyph: "◉", text: heard, detail: hearsForDetail };
   const blocked = s.isArchived || !isOn(s) || s.workflow.problem !== undefined || isUnapproved(s) || !!s.overLimit;
   if (s.nextFireAt !== undefined && !blocked) {
     const at = fromWireDate(s.nextFireAt);
