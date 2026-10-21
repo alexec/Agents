@@ -115,6 +115,15 @@ public enum SessionPrompts {
         return prompts.filter { $0.text.lowercased().contains(query) }
     }
 
+    /// The row chosen after Up (`down` false) or Down in a list of `count` rows, from `at`:
+    /// the newest (the last) while none is chosen, and no further than either end (#1870).
+    /// The page has its own copy (`movedTo` in `Web/src/model/sessionPrompts.ts`).
+    public static func moved(from at: Int?, count: Int, down: Bool) -> Int? {
+        guard count > 0 else { return nil }
+        guard let at else { return count - 1 }
+        return max(0, min(count - 1, at + (down ? 1 : -1)))
+    }
+
     /// How a turn's entries say it ended, the latest that says: a stop, a sandbox that did
     /// not start, or a finish (nothing to mark).
     static func ending(of entries: [TranscriptEntry]) -> SessionPrompt.Ending? {
