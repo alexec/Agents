@@ -206,6 +206,18 @@ func (s *Schema) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
+// inNameOrder refuses a list that is not in name order. A new definition or method goes
+// where its name sorts, not at the end, so that two features that each add one touch
+// different lines (#2020).
+func inNameOrder(what string, names []string) error {
+	for i := 1; i < len(names); i++ {
+		if names[i] < names[i-1] {
+			return fmt.Errorf("%s: %s is not in name order; put it before %s (#2020)", what, names[i], names[i-1])
+		}
+	}
+	return nil
+}
+
 // ordered reads an object's keys in the order they are written.
 func ordered(b []byte) ([]string, map[string]json.RawMessage, error) {
 	d := json.NewDecoder(bytes.NewReader(b))
@@ -238,13 +250,20 @@ type Document struct {
 
 func readDocument(b []byte) (*Document, error) {
 	var top struct {
-		Definitions map[string]json.RawMessage `json:"definitions"`
+		Definitions json.RawMessage `json:"definitions"`
 	}
 	if err := json.Unmarshal(b, &top); err != nil {
 		return nil, err
 	}
+	names, definitions, err := ordered(top.Definitions)
+	if err != nil {
+		return nil, fmt.Errorf("definitions: %w", err)
+	}
+	if err := inNameOrder("definitions", names); err != nil {
+		return nil, err
+	}
 	doc := &Document{Definitions: map[string]*Schema{}}
-	for name, raw := range top.Definitions {
+	for name, raw := range definitions {
 		s := &Schema{}
 		if err := json.Unmarshal(raw, s); err != nil {
 			return nil, fmt.Errorf("definitions/%s: %w", name, err)
@@ -346,6 +365,13 @@ func readRPC(b []byte, target string, doc *Document) (*RPC, error) {
 		} `json:"components"`
 	}
 	if err := json.Unmarshal(b, &top); err != nil {
+		return nil, err
+	}
+	var names []string
+	for _, m := range top.Methods {
+		names = append(names, m.Name)
+	}
+	if err := inNameOrder("methods", names); err != nil {
 		return nil, err
 	}
 	rpc := &RPC{Target: target}

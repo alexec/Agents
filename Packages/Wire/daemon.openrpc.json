@@ -24,6 +24,146 @@
   ],
   "methods": [
     {
+      "name": "agent/changed",
+      "x-capability": "agent/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/Agent"
+          }
+        }
+      ]
+    },
+    {
+      "name": "agent/elicitation",
+      "x-capability": "agent/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/ElicitationNotification"
+          }
+        }
+      ]
+    },
+    {
+      "name": "agent/entry",
+      "x-capability": "agent/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/EntryNotification"
+          }
+        }
+      ]
+    },
+    {
+      "name": "agent/permission",
+      "x-capability": "agent/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/PermissionNotification"
+          }
+        }
+      ]
+    },
+    {
+      "name": "agent/removed",
+      "x-capability": "agent/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/AgentRemovedNotification"
+          }
+        }
+      ]
+    },
+    {
+      "name": "agent/resuming",
+      "x-capability": "agent/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/ResumingNotification"
+          }
+        }
+      ]
+    },
+    {
+      "name": "agent/showFile",
+      "x-capability": "agent/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/ShowFileNotification"
+          }
+        }
+      ]
+    },
+    {
       "name": "agents/answerSandbox",
       "x-capability": "agents/1",
       "tags": [
@@ -99,6 +239,32 @@
       }
     },
     {
+      "name": "agents/cancelContinue",
+      "description": "The chat no longer carries on by itself (#1859). Nothing happens when it was not waiting to.",
+      "x-capability": "chat.continue-when-back/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/AgentRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Agent"
+        }
+      }
+    },
+    {
       "name": "agents/continueInProject",
       "x-capability": "agents/1",
       "tags": [
@@ -120,6 +286,32 @@
         "name": "result",
         "schema": {
           "$ref": "daemon.schema.json#/definitions/UUID"
+        }
+      }
+    },
+    {
+      "name": "agents/continueWhenBack",
+      "description": "A chat paused by a spent allowance carries on when the allowance is back (#1859): at the provider's reset time, or the app's next check, or as soon as a turn on that runtime works or the person marks it available. Refused for a chat that is not paused by a spent allowance.",
+      "x-capability": "chat.continue-when-back/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/AgentRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Agent"
         }
       }
     },
@@ -170,6 +362,76 @@
         "name": "result",
         "schema": {
           "$ref": "daemon.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
+      "name": "agents/draftOptions",
+      "x-capability": "agents/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/DraftOptionsNotification"
+          }
+        }
+      ]
+    },
+    {
+      "name": "agents/editQueued",
+      "x-capability": "agents.edit-queued/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/EditQueuedRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/EditQueuedResult"
+        }
+      }
+    },
+    {
+      "name": "agents/find",
+      "x-capability": "agents.find/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/FindRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/FindResult"
         }
       }
     },
@@ -355,58 +617,6 @@
       }
     },
     {
-      "name": "agents/continueWhenBack",
-      "description": "A chat paused by a spent allowance carries on when the allowance is back (#1859): at the provider's reset time, or the app's next check, or as soon as a turn on that runtime works or the person marks it available. Refused for a chat that is not paused by a spent allowance.",
-      "x-capability": "chat.continue-when-back/1",
-      "tags": [
-        {
-          "name": "web"
-        }
-      ],
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/AgentRequest"
-          }
-        }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "$ref": "daemon.schema.json#/definitions/Agent"
-        }
-      }
-    },
-    {
-      "name": "agents/cancelContinue",
-      "description": "The chat no longer carries on by itself (#1859). Nothing happens when it was not waiting to.",
-      "x-capability": "chat.continue-when-back/1",
-      "tags": [
-        {
-          "name": "web"
-        }
-      ],
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/AgentRequest"
-          }
-        }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "$ref": "daemon.schema.json#/definitions/Agent"
-        }
-      }
-    },
-    {
       "name": "agents/rename",
       "x-capability": "agents/1",
       "tags": [
@@ -453,6 +663,31 @@
         "name": "result",
         "schema": {
           "$ref": "daemon.schema.json#/definitions/ResumingResponse"
+        }
+      }
+    },
+    {
+      "name": "agents/said",
+      "x-capability": "agents.said/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/SaidSearchRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/SaidSearchResult"
         }
       }
     },
@@ -532,6 +767,31 @@
       }
     },
     {
+      "name": "agents/setMuted",
+      "x-capability": "mute/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/SetMutedRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
       "name": "agents/setOption",
       "x-capability": "agents/1",
       "tags": [
@@ -599,31 +859,6 @@
           "required": true,
           "schema": {
             "$ref": "daemon.schema.json#/definitions/SetUnreadRequest"
-          }
-        }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "$ref": "daemon.schema.json#/definitions/Empty"
-        }
-      }
-    },
-    {
-      "name": "agents/setMuted",
-      "x-capability": "mute/1",
-      "tags": [
-        {
-          "name": "web"
-        }
-      ],
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/SetMutedRequest"
           }
         }
       ],
@@ -838,81 +1073,6 @@
       }
     },
     {
-      "name": "agents/editQueued",
-      "x-capability": "agents.edit-queued/1",
-      "tags": [
-        {
-          "name": "web"
-        }
-      ],
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/EditQueuedRequest"
-          }
-        }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "$ref": "daemon.schema.json#/definitions/EditQueuedResult"
-        }
-      }
-    },
-    {
-      "name": "agents/find",
-      "x-capability": "agents.find/1",
-      "tags": [
-        {
-          "name": "web"
-        }
-      ],
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/FindRequest"
-          }
-        }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "$ref": "daemon.schema.json#/definitions/FindResult"
-        }
-      }
-    },
-    {
-      "name": "agents/said",
-      "x-capability": "agents.said/1",
-      "tags": [
-        {
-          "name": "web"
-        }
-      ],
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/SaidSearchRequest"
-          }
-        }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "$ref": "daemon.schema.json#/definitions/SaidSearchResult"
-        }
-      }
-    },
-    {
       "name": "approvals/answer",
       "x-capability": "approvals/1",
       "tags": [
@@ -989,6 +1149,26 @@
       "description": "Write a file an agent may read, whole (#415). With `base`, refused with fileChanged when the file changed on disk since the edit began (#1858), so nobody's change is written over unseen."
     },
     {
+      "name": "attention/changed",
+      "x-capability": "attention/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/AttentionNotification"
+          }
+        }
+      ]
+    },
+    {
       "name": "attention/pending",
       "x-capability": "attention/1",
       "tags": [
@@ -1014,29 +1194,24 @@
       }
     },
     {
-      "name": "backups/state",
+      "name": "backups/changed",
       "x-capability": "backups/1",
       "tags": [
         {
           "name": "web"
         }
       ],
+      "x-notification": true,
       "paramStructure": "by-name",
       "params": [
         {
           "name": "params",
           "required": true,
           "schema": {
-            "$ref": "daemon.schema.json#/definitions/Empty"
+            "$ref": "daemon.schema.json#/definitions/BackupState"
           }
         }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "$ref": "daemon.schema.json#/definitions/BackupState"
-        }
-      }
+      ]
     },
     {
       "name": "backups/configure",
@@ -1110,6 +1285,31 @@
         "name": "result",
         "schema": {
           "$ref": "daemon.schema.json#/definitions/BackupRestoreResult"
+        }
+      }
+    },
+    {
+      "name": "backups/state",
+      "x-capability": "backups/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/BackupState"
         }
       }
     },
@@ -1264,6 +1464,26 @@
       }
     },
     {
+      "name": "clone/changed",
+      "x-capability": "clone/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/CloneNotification"
+          }
+        }
+      ]
+    },
+    {
       "name": "connection/bindDevice",
       "x-capability": "connection/1",
       "paramStructure": "by-name",
@@ -1409,31 +1629,6 @@
       }
     },
     {
-      "name": "connections/sign-in/token",
-      "x-capability": "connections/1",
-      "tags": [
-        {
-          "name": "web"
-        }
-      ],
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/ConnectionTokenRequest"
-          }
-        }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "$ref": "daemon.schema.json#/definitions/ConnectionTokenAnswer"
-        }
-      }
-    },
-    {
       "name": "connections/sign-in/email",
       "x-capability": "connections.email/1",
       "tags": [
@@ -1448,6 +1643,31 @@
           "required": true,
           "schema": {
             "$ref": "daemon.schema.json#/definitions/ConnectionEmailRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/ConnectionTokenAnswer"
+        }
+      }
+    },
+    {
+      "name": "connections/sign-in/token",
+      "x-capability": "connections/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/ConnectionTokenRequest"
           }
         }
       ],
@@ -1532,6 +1752,21 @@
           "$ref": "daemon.schema.json#/definitions/ConnectorSetup"
         }
       }
+    },
+    {
+      "name": "cost/changed",
+      "x-capability": "cost/1",
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/CostState"
+          }
+        }
+      ]
     },
     {
       "name": "cost/setLimits",
@@ -1689,6 +1924,144 @@
       }
     },
     {
+      "name": "device/changed",
+      "x-capability": "device/1",
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/DeviceNotification"
+          }
+        }
+      ]
+    },
+    {
+      "name": "devices/announce",
+      "x-capability": "devices/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/DeviceAnnouncement"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/AnnounceReply"
+        }
+      }
+    },
+    {
+      "name": "devices/forget",
+      "x-capability": "devices/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/DeviceForget"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
+      "name": "devices/list",
+      "x-capability": "devices/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "type": "array",
+          "items": {
+            "$ref": "daemon.schema.json#/definitions/Device"
+          }
+        }
+      }
+    },
+    {
+      "name": "devices/startPairing",
+      "x-capability": "devices/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/PairingCode"
+        }
+      }
+    },
+    {
+      "name": "devices/stopPairing",
+      "x-capability": "devices/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
+      "name": "disk/changed",
+      "x-capability": "disk/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/DiskState"
+          }
+        }
+      ]
+    },
+    {
       "name": "disk/state",
       "x-capability": "disk/1",
       "tags": [
@@ -1820,6 +2193,21 @@
       }
     },
     {
+      "name": "events/changed",
+      "x-capability": "events/1",
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/EventsChange"
+          }
+        }
+      ]
+    },
+    {
       "name": "events/list",
       "x-capability": "events/1",
       "tags": [
@@ -1885,6 +2273,51 @@
       }
     },
     {
+      "name": "files/browse",
+      "x-capability": "files/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/FilesBrowseRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/DirectoryListing"
+        }
+      }
+    },
+    {
+      "name": "files/changed",
+      "x-capability": "files/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/FilesChangedNotification"
+          }
+        }
+      ]
+    },
+    {
       "name": "files/complete",
       "x-capability": "files.complete/1",
       "tags": [
@@ -1931,31 +2364,6 @@
         "name": "result",
         "schema": {
           "$ref": "daemon.schema.json#/definitions/FileDiagnostics"
-        }
-      }
-    },
-    {
-      "name": "files/browse",
-      "x-capability": "files/1",
-      "tags": [
-        {
-          "name": "web"
-        }
-      ],
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/FilesBrowseRequest"
-          }
-        }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "$ref": "daemon.schema.json#/definitions/DirectoryListing"
         }
       }
     },
@@ -2146,6 +2554,47 @@
           "$ref": "daemon.schema.json#/definitions/FilesWriteResponse"
         }
       }
+    },
+    {
+      "name": "git/fill",
+      "x-capability": "git/1",
+      "description": "Asked by the control plane on the lending host's channel 0, for a lend a person allowed (#1122).",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/GitCredentialRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/GitCredential"
+        }
+      }
+    },
+    {
+      "name": "leases/changed",
+      "x-capability": "leases/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/LeaseSnapshot"
+          }
+        }
+      ]
     },
     {
       "name": "leases/end",
@@ -2563,6 +3012,26 @@
       }
     },
     {
+      "name": "mcp/healthChanged",
+      "x-capability": "mcp/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/MCPHealthSnapshot"
+          }
+        }
+      ]
+    },
+    {
       "name": "mcp/hosted",
       "x-capability": "mcp/1",
       "tags": [
@@ -2588,24 +3057,24 @@
       }
     },
     {
-      "name": "mcp/made-by-agents",
-      "x-capability": "mcp.made-by-agents/1",
+      "name": "mcp/hostedChanged",
+      "x-capability": "mcp/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "x-notification": true,
       "paramStructure": "by-name",
       "params": [
         {
           "name": "params",
           "required": true,
           "schema": {
-            "$ref": "daemon.schema.json#/definitions/Empty"
+            "$ref": "daemon.schema.json#/definitions/HostedMCPSnapshot"
           }
         }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "$ref": "daemon.schema.json#/definitions/MCPSearchAnswer"
-        }
-      }
+      ]
     },
     {
       "name": "mcp/list",
@@ -2624,6 +3093,26 @@
         "name": "result",
         "schema": {
           "$ref": "daemon.schema.json#/definitions/MCPListAnswer"
+        }
+      }
+    },
+    {
+      "name": "mcp/made-by-agents",
+      "x-capability": "mcp.made-by-agents/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/MCPSearchAnswer"
         }
       }
     },
@@ -2788,6 +3277,26 @@
       }
     },
     {
+      "name": "milestones/changed",
+      "x-capability": "milestones/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/Milestones"
+          }
+        }
+      ]
+    },
+    {
       "name": "milestones/state",
       "x-capability": "milestones/1",
       "tags": [
@@ -2811,6 +3320,29 @@
           "$ref": "daemon.schema.json#/definitions/Milestones"
         }
       }
+    },
+    {
+      "name": "modes/changed",
+      "x-capability": "modes/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "daemon.schema.json#/definitions/JSONValue"
+            }
+          }
+        }
+      ]
     },
     {
       "name": "modes/remembered",
@@ -2869,6 +3401,61 @@
       }
     },
     {
+      "name": "pages/changed",
+      "x-capability": "pages/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/PagesChangedNotification"
+          }
+        }
+      ]
+    },
+    {
+      "name": "pairing/changed",
+      "x-capability": "pairing/1",
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/Empty"
+          }
+        }
+      ]
+    },
+    {
+      "name": "pairing/current",
+      "x-capability": "pairing/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/PairingSecret"
+        }
+      }
+    },
+    {
       "name": "permissions/answer",
       "x-capability": "permissions/1",
       "tags": [
@@ -2922,6 +3509,21 @@
       }
     },
     {
+      "name": "person/changed",
+      "x-capability": "person/1",
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/PersonSettings"
+          }
+        }
+      ]
+    },
+    {
       "name": "person/set",
       "x-capability": "person/1",
       "paramStructure": "by-name",
@@ -2958,6 +3560,26 @@
         "name": "result",
         "schema": {
           "$ref": "daemon.schema.json#/definitions/PersonSettings"
+        }
+      }
+    },
+    {
+      "name": "personal/shared",
+      "x-capability": "personal/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": false,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/SharedRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/SharedSnapshot"
         }
       }
     },
@@ -3063,6 +3685,26 @@
           "$ref": "daemon.schema.json#/definitions/Empty"
         }
       }
+    },
+    {
+      "name": "pins/changed",
+      "x-capability": "pins/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/PinsChangedNotification"
+          }
+        }
+      ]
     },
     {
       "name": "pins/list",
@@ -3316,6 +3958,21 @@
       }
     },
     {
+      "name": "plugins/changed",
+      "x-capability": "plugins/1",
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/PluginsList"
+          }
+        }
+      ]
+    },
+    {
       "name": "plugins/list",
       "x-capability": "plugins/1",
       "paramStructure": "by-name",
@@ -3354,6 +4011,29 @@
           "$ref": "daemon.schema.json#/definitions/Changed"
         }
       }
+    },
+    {
+      "name": "preferences/changed",
+      "x-capability": "preferences/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "daemon.schema.json#/definitions/JSONValue"
+            }
+          }
+        }
+      ]
     },
     {
       "name": "preferences/get",
@@ -3440,6 +4120,46 @@
       }
     },
     {
+      "name": "project/changed",
+      "x-capability": "project/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/ProjectSummary"
+          }
+        }
+      ]
+    },
+    {
+      "name": "project/removed",
+      "x-capability": "project/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/ProjectRemovedNotification"
+          }
+        }
+      ]
+    },
+    {
       "name": "projects/add",
       "x-capability": "projects/1",
       "tags": [
@@ -3486,6 +4206,26 @@
         "name": "result",
         "schema": {
           "$ref": "daemon.schema.json#/definitions/ProjectSummary"
+        }
+      }
+    },
+    {
+      "name": "projects/bringBack",
+      "x-capability": "projects/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/BringBackRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/BringBack"
         }
       }
     },
@@ -3564,146 +4304,6 @@
           "items": {
             "$ref": "daemon.schema.json#/definitions/CloneSummary"
           }
-        }
-      }
-    },
-    {
-      "name": "projects/receive",
-      "x-capability": "projects/1",
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/ReceiveRequest"
-          }
-        }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "$ref": "daemon.schema.json#/definitions/ProjectSummary"
-        }
-      }
-    },
-    {
-      "name": "projects/receiveState",
-      "x-capability": "projects/1",
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/ReceiveStateRequest"
-          }
-        }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "$ref": "daemon.schema.json#/definitions/ReceiveState"
-        }
-      }
-    },
-    {
-      "name": "projects/receiveUpload",
-      "x-capability": "projects/1",
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/ReceiveUploadRequest"
-          }
-        }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "$ref": "daemon.schema.json#/definitions/Empty"
-        }
-      }
-    },
-    {
-      "name": "projects/bringBack",
-      "x-capability": "projects/1",
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/BringBackRequest"
-          }
-        }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "$ref": "daemon.schema.json#/definitions/BringBack"
-        }
-      }
-    },
-    {
-      "name": "projects/sendFacts",
-      "x-capability": "projects/1",
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/SendFactsRequest"
-          }
-        }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "$ref": "daemon.schema.json#/definitions/SendFacts"
-        }
-      }
-    },
-    {
-      "name": "projects/sendPack",
-      "x-capability": "projects/1",
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/SendPackRequest"
-          }
-        }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "$ref": "daemon.schema.json#/definitions/SendPack"
-        }
-      }
-    },
-    {
-      "name": "projects/sendRead",
-      "x-capability": "projects/1",
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/SendReadRequest"
-          }
-        }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "$ref": "daemon.schema.json#/definitions/SendRead"
         }
       }
     },
@@ -3834,6 +4434,126 @@
       }
     },
     {
+      "name": "projects/receive",
+      "x-capability": "projects/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/ReceiveRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/ProjectSummary"
+        }
+      }
+    },
+    {
+      "name": "projects/receiveState",
+      "x-capability": "projects/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/ReceiveStateRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/ReceiveState"
+        }
+      }
+    },
+    {
+      "name": "projects/receiveUpload",
+      "x-capability": "projects/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/ReceiveUploadRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
+      "name": "projects/sendFacts",
+      "x-capability": "projects/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/SendFactsRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/SendFacts"
+        }
+      }
+    },
+    {
+      "name": "projects/sendPack",
+      "x-capability": "projects/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/SendPackRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/SendPack"
+        }
+      }
+    },
+    {
+      "name": "projects/sendRead",
+      "x-capability": "projects/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/SendReadRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/SendRead"
+        }
+      }
+    },
+    {
       "name": "projects/setDiskSpace",
       "x-capability": "projects/1",
       "paramStructure": "by-name",
@@ -3949,6 +4669,26 @@
       }
     },
     {
+      "name": "relay/grant",
+      "x-capability": "relay/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/RelayGrantRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/RelayGrantReply"
+        }
+      }
+    },
+    {
       "name": "relay/offer",
       "x-capability": "relay/1",
       "paramStructure": "by-name",
@@ -3969,7 +4709,7 @@
       }
     },
     {
-      "name": "relay/grant",
+      "name": "relay/register",
       "x-capability": "relay/1",
       "paramStructure": "by-name",
       "params": [
@@ -3977,14 +4717,14 @@
           "name": "params",
           "required": true,
           "schema": {
-            "$ref": "daemon.schema.json#/definitions/RelayGrantRequest"
+            "$ref": "daemon.schema.json#/definitions/RelayRegistration"
           }
         }
       ],
       "result": {
         "name": "result",
         "schema": {
-          "$ref": "daemon.schema.json#/definitions/RelayGrantReply"
+          "$ref": "daemon.schema.json#/definitions/Empty"
         }
       }
     },
@@ -4049,6 +4789,36 @@
       }
     },
     {
+      "name": "runtime/account",
+      "x-capability": "runtime/1",
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/RuntimeAccount"
+          }
+        }
+      ]
+    },
+    {
+      "name": "runtime/changed",
+      "x-capability": "runtime/1",
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/RuntimeStatus"
+          }
+        }
+      ]
+    },
+    {
       "name": "runtimes/accounts",
       "x-capability": "runtimes/1",
       "tags": [
@@ -4103,6 +4873,21 @@
           "$ref": "daemon.schema.json#/definitions/RuntimeAllowances"
         }
       }
+    },
+    {
+      "name": "runtimes/allowancesChanged",
+      "x-capability": "runtimes/1",
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/RuntimeAllowances"
+          }
+        }
+      ]
     },
     {
       "name": "runtimes/assess",
@@ -4389,6 +5174,27 @@
       }
     },
     {
+      "name": "settings/userPart",
+      "x-capability": "host.user-settings/1",
+      "description": "A part of the user settings as this machine has it (#1760), for Use This Mac's under You. This machine also writes host/userSettings into its files.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/UserPartRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/UserPartHere"
+        }
+      }
+    },
+    {
       "name": "shell/attach",
       "x-capability": "shell/1",
       "paramStructure": "by-name",
@@ -4509,6 +5315,21 @@
       }
     },
     {
+      "name": "shell/output",
+      "x-capability": "shell/1",
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/ShellOutputNotification"
+          }
+        }
+      ]
+    },
+    {
       "name": "shell/resize",
       "x-capability": "shell/1",
       "paramStructure": "by-name",
@@ -4569,29 +5390,19 @@
       }
     },
     {
-      "name": "simulators/list",
-      "x-capability": "simulators/1",
-      "tags": [
-        {
-          "name": "web"
-        }
-      ],
+      "name": "shell/stateChanged",
+      "x-capability": "shell/1",
+      "x-notification": true,
       "paramStructure": "by-name",
       "params": [
         {
           "name": "params",
           "required": true,
           "schema": {
-            "$ref": "daemon.schema.json#/definitions/Empty"
+            "$ref": "daemon.schema.json#/definitions/ShellStateNotification"
           }
         }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "$ref": "daemon.schema.json#/definitions/SimulatorList"
-        }
-      }
+      ]
     },
     {
       "name": "simulators/boot",
@@ -4619,7 +5430,7 @@
       }
     },
     {
-      "name": "simulators/shutdown",
+      "name": "simulators/home",
       "x-capability": "simulators/1",
       "tags": [
         {
@@ -4640,6 +5451,31 @@
         "name": "result",
         "schema": {
           "$ref": "daemon.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
+      "name": "simulators/list",
+      "x-capability": "simulators/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/SimulatorList"
         }
       }
     },
@@ -4669,6 +5505,31 @@
       }
     },
     {
+      "name": "simulators/shutdown",
+      "x-capability": "simulators/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/SimulatorRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
       "name": "simulators/tap",
       "x-capability": "simulators/1",
       "tags": [
@@ -4683,31 +5544,6 @@
           "required": true,
           "schema": {
             "$ref": "daemon.schema.json#/definitions/SimulatorTapRequest"
-          }
-        }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "$ref": "daemon.schema.json#/definitions/Empty"
-        }
-      }
-    },
-    {
-      "name": "simulators/home",
-      "x-capability": "simulators/1",
-      "tags": [
-        {
-          "name": "web"
-        }
-      ],
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/SimulatorRequest"
           }
         }
       ],
@@ -4819,6 +5655,26 @@
       }
     },
     {
+      "name": "storage/writeFailed",
+      "x-capability": "storage/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/WriteFailure"
+          }
+        }
+      ]
+    },
+    {
       "name": "store/notes",
       "x-capability": "store/1",
       "tags": [
@@ -4842,6 +5698,26 @@
           "$ref": "daemon.schema.json#/definitions/StoreNotes"
         }
       }
+    },
+    {
+      "name": "store/notesChanged",
+      "x-capability": "store/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/StoreNotes"
+          }
+        }
+      ]
     },
     {
       "name": "surface/identify",
@@ -5064,6 +5940,21 @@
       }
     },
     {
+      "name": "wake/changed",
+      "x-capability": "wake/1",
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/WakeState"
+          }
+        }
+      ]
+    },
+    {
       "name": "wake/set",
       "x-capability": "wake/1",
       "paramStructure": "by-name",
@@ -5122,6 +6013,46 @@
           "$ref": "daemon.schema.json#/definitions/WakeState"
         }
       }
+    },
+    {
+      "name": "workflow/changed",
+      "x-capability": "workflow/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/WorkflowSummary"
+          }
+        }
+      ]
+    },
+    {
+      "name": "workflow/removed",
+      "x-capability": "workflow/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/WorkflowRemovedNotification"
+          }
+        }
+      ]
     },
     {
       "name": "workflows/approve",
@@ -5249,31 +6180,6 @@
       }
     },
     {
-      "name": "workflows/setMuted",
-      "x-capability": "mute/1",
-      "tags": [
-        {
-          "name": "web"
-        }
-      ],
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/WorkflowMuteRequest"
-          }
-        }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "$ref": "daemon.schema.json#/definitions/WorkflowSummary"
-        }
-      }
-    },
-    {
       "name": "workflows/list",
       "x-capability": "workflows/1",
       "tags": [
@@ -5341,6 +6247,31 @@
           "required": true,
           "schema": {
             "$ref": "daemon.schema.json#/definitions/WorkflowRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/WorkflowSummary"
+        }
+      }
+    },
+    {
+      "name": "workflows/setMuted",
+      "x-capability": "mute/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/WorkflowMuteRequest"
           }
         }
       ],
@@ -5505,723 +6436,6 @@
       }
     },
     {
-      "name": "git/fill",
-      "x-capability": "git/1",
-      "description": "Asked by the control plane on the lending host's channel 0, for a lend a person allowed (#1122).",
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/GitCredentialRequest"
-          }
-        }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "$ref": "daemon.schema.json#/definitions/GitCredential"
-        }
-      }
-    },
-    {
-      "name": "agent/changed",
-      "x-capability": "agent/1",
-      "tags": [
-        {
-          "name": "web"
-        }
-      ],
-      "x-notification": true,
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/Agent"
-          }
-        }
-      ]
-    },
-    {
-      "name": "agent/elicitation",
-      "x-capability": "agent/1",
-      "tags": [
-        {
-          "name": "web"
-        }
-      ],
-      "x-notification": true,
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/ElicitationNotification"
-          }
-        }
-      ]
-    },
-    {
-      "name": "agent/entry",
-      "x-capability": "agent/1",
-      "tags": [
-        {
-          "name": "web"
-        }
-      ],
-      "x-notification": true,
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/EntryNotification"
-          }
-        }
-      ]
-    },
-    {
-      "name": "agent/permission",
-      "x-capability": "agent/1",
-      "tags": [
-        {
-          "name": "web"
-        }
-      ],
-      "x-notification": true,
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/PermissionNotification"
-          }
-        }
-      ]
-    },
-    {
-      "name": "agent/removed",
-      "x-capability": "agent/1",
-      "tags": [
-        {
-          "name": "web"
-        }
-      ],
-      "x-notification": true,
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/AgentRemovedNotification"
-          }
-        }
-      ]
-    },
-    {
-      "name": "agent/resuming",
-      "x-capability": "agent/1",
-      "tags": [
-        {
-          "name": "web"
-        }
-      ],
-      "x-notification": true,
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/ResumingNotification"
-          }
-        }
-      ]
-    },
-    {
-      "name": "agent/showFile",
-      "x-capability": "agent/1",
-      "tags": [
-        {
-          "name": "web"
-        }
-      ],
-      "x-notification": true,
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/ShowFileNotification"
-          }
-        }
-      ]
-    },
-    {
-      "name": "agents/draftOptions",
-      "x-capability": "agents/1",
-      "tags": [
-        {
-          "name": "web"
-        }
-      ],
-      "x-notification": true,
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/DraftOptionsNotification"
-          }
-        }
-      ]
-    },
-    {
-      "name": "attention/changed",
-      "x-capability": "attention/1",
-      "tags": [
-        {
-          "name": "web"
-        }
-      ],
-      "x-notification": true,
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/AttentionNotification"
-          }
-        }
-      ]
-    },
-    {
-      "name": "backups/changed",
-      "x-capability": "backups/1",
-      "tags": [
-        {
-          "name": "web"
-        }
-      ],
-      "x-notification": true,
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/BackupState"
-          }
-        }
-      ]
-    },
-    {
-      "name": "clone/changed",
-      "x-capability": "clone/1",
-      "tags": [
-        {
-          "name": "web"
-        }
-      ],
-      "x-notification": true,
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/CloneNotification"
-          }
-        }
-      ]
-    },
-    {
-      "name": "cost/changed",
-      "x-capability": "cost/1",
-      "x-notification": true,
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/CostState"
-          }
-        }
-      ]
-    },
-    {
-      "name": "disk/changed",
-      "x-capability": "disk/1",
-      "tags": [
-        {
-          "name": "web"
-        }
-      ],
-      "x-notification": true,
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/DiskState"
-          }
-        }
-      ]
-    },
-    {
-      "name": "events/changed",
-      "x-capability": "events/1",
-      "x-notification": true,
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/EventsChange"
-          }
-        }
-      ]
-    },
-    {
-      "name": "files/changed",
-      "x-capability": "files/1",
-      "tags": [
-        {
-          "name": "web"
-        }
-      ],
-      "x-notification": true,
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/FilesChangedNotification"
-          }
-        }
-      ]
-    },
-    {
-      "name": "leases/changed",
-      "x-capability": "leases/1",
-      "tags": [
-        {
-          "name": "web"
-        }
-      ],
-      "x-notification": true,
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/LeaseSnapshot"
-          }
-        }
-      ]
-    },
-    {
-      "name": "mcp/healthChanged",
-      "x-capability": "mcp/1",
-      "tags": [
-        {
-          "name": "web"
-        }
-      ],
-      "x-notification": true,
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/MCPHealthSnapshot"
-          }
-        }
-      ]
-    },
-    {
-      "name": "mcp/hostedChanged",
-      "x-capability": "mcp/1",
-      "tags": [
-        {
-          "name": "web"
-        }
-      ],
-      "x-notification": true,
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/HostedMCPSnapshot"
-          }
-        }
-      ]
-    },
-    {
-      "name": "milestones/changed",
-      "x-capability": "milestones/1",
-      "tags": [
-        {
-          "name": "web"
-        }
-      ],
-      "x-notification": true,
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/Milestones"
-          }
-        }
-      ]
-    },
-    {
-      "name": "modes/changed",
-      "x-capability": "modes/1",
-      "tags": [
-        {
-          "name": "web"
-        }
-      ],
-      "x-notification": true,
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "type": "object",
-            "additionalProperties": {
-              "$ref": "daemon.schema.json#/definitions/JSONValue"
-            }
-          }
-        }
-      ]
-    },
-    {
-      "name": "pages/changed",
-      "x-capability": "pages/1",
-      "tags": [
-        {
-          "name": "web"
-        }
-      ],
-      "x-notification": true,
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/PagesChangedNotification"
-          }
-        }
-      ]
-    },
-    {
-      "name": "person/changed",
-      "x-capability": "person/1",
-      "x-notification": true,
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/PersonSettings"
-          }
-        }
-      ]
-    },
-    {
-      "name": "pins/changed",
-      "x-capability": "pins/1",
-      "tags": [
-        {
-          "name": "web"
-        }
-      ],
-      "x-notification": true,
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/PinsChangedNotification"
-          }
-        }
-      ]
-    },
-    {
-      "name": "plugins/changed",
-      "x-capability": "plugins/1",
-      "x-notification": true,
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/PluginsList"
-          }
-        }
-      ]
-    },
-    {
-      "name": "preferences/changed",
-      "x-capability": "preferences/1",
-      "tags": [
-        {
-          "name": "web"
-        }
-      ],
-      "x-notification": true,
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "type": "object",
-            "additionalProperties": {
-              "$ref": "daemon.schema.json#/definitions/JSONValue"
-            }
-          }
-        }
-      ]
-    },
-    {
-      "name": "project/changed",
-      "x-capability": "project/1",
-      "tags": [
-        {
-          "name": "web"
-        }
-      ],
-      "x-notification": true,
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/ProjectSummary"
-          }
-        }
-      ]
-    },
-    {
-      "name": "project/removed",
-      "x-capability": "project/1",
-      "tags": [
-        {
-          "name": "web"
-        }
-      ],
-      "x-notification": true,
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/ProjectRemovedNotification"
-          }
-        }
-      ]
-    },
-    {
-      "name": "runtime/account",
-      "x-capability": "runtime/1",
-      "x-notification": true,
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/RuntimeAccount"
-          }
-        }
-      ]
-    },
-    {
-      "name": "runtime/changed",
-      "x-capability": "runtime/1",
-      "x-notification": true,
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/RuntimeStatus"
-          }
-        }
-      ]
-    },
-    {
-      "name": "runtimes/allowancesChanged",
-      "x-capability": "runtimes/1",
-      "x-notification": true,
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/RuntimeAllowances"
-          }
-        }
-      ]
-    },
-    {
-      "name": "shell/output",
-      "x-capability": "shell/1",
-      "x-notification": true,
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/ShellOutputNotification"
-          }
-        }
-      ]
-    },
-    {
-      "name": "shell/stateChanged",
-      "x-capability": "shell/1",
-      "x-notification": true,
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/ShellStateNotification"
-          }
-        }
-      ]
-    },
-    {
-      "name": "storage/writeFailed",
-      "x-capability": "storage/1",
-      "tags": [
-        {
-          "name": "web"
-        }
-      ],
-      "x-notification": true,
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/WriteFailure"
-          }
-        }
-      ]
-    },
-    {
-      "name": "store/notesChanged",
-      "x-capability": "store/1",
-      "tags": [
-        {
-          "name": "web"
-        }
-      ],
-      "x-notification": true,
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/StoreNotes"
-          }
-        }
-      ]
-    },
-    {
-      "name": "wake/changed",
-      "x-capability": "wake/1",
-      "x-notification": true,
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/WakeState"
-          }
-        }
-      ]
-    },
-    {
-      "name": "workflow/changed",
-      "x-capability": "workflow/1",
-      "tags": [
-        {
-          "name": "web"
-        }
-      ],
-      "x-notification": true,
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/WorkflowSummary"
-          }
-        }
-      ]
-    },
-    {
-      "name": "workflow/removed",
-      "x-capability": "workflow/1",
-      "tags": [
-        {
-          "name": "web"
-        }
-      ],
-      "x-notification": true,
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/WorkflowRemovedNotification"
-          }
-        }
-      ]
-    },
-    {
       "name": "worktrees/sized",
       "x-capability": "worktrees/1",
       "tags": [
@@ -6240,220 +6454,6 @@
           }
         }
       ]
-    },
-    {
-      "name": "devices/announce",
-      "x-capability": "devices/1",
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/DeviceAnnouncement"
-          }
-        }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "$ref": "daemon.schema.json#/definitions/AnnounceReply"
-        }
-      }
-    },
-    {
-      "name": "devices/forget",
-      "x-capability": "devices/1",
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/DeviceForget"
-          }
-        }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "$ref": "daemon.schema.json#/definitions/Empty"
-        }
-      }
-    },
-    {
-      "name": "devices/list",
-      "x-capability": "devices/1",
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/Empty"
-          }
-        }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "type": "array",
-          "items": {
-            "$ref": "daemon.schema.json#/definitions/Device"
-          }
-        }
-      }
-    },
-    {
-      "name": "devices/startPairing",
-      "x-capability": "devices/1",
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/Empty"
-          }
-        }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "$ref": "daemon.schema.json#/definitions/PairingCode"
-        }
-      }
-    },
-    {
-      "name": "devices/stopPairing",
-      "x-capability": "devices/1",
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/Empty"
-          }
-        }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "$ref": "daemon.schema.json#/definitions/Empty"
-        }
-      }
-    },
-    {
-      "name": "pairing/current",
-      "x-capability": "pairing/1",
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/Empty"
-          }
-        }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "$ref": "daemon.schema.json#/definitions/PairingSecret"
-        }
-      }
-    },
-    {
-      "name": "relay/register",
-      "x-capability": "relay/1",
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/RelayRegistration"
-          }
-        }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "$ref": "daemon.schema.json#/definitions/Empty"
-        }
-      }
-    },
-    {
-      "name": "device/changed",
-      "x-capability": "device/1",
-      "x-notification": true,
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/DeviceNotification"
-          }
-        }
-      ]
-    },
-    {
-      "name": "pairing/changed",
-      "x-capability": "pairing/1",
-      "x-notification": true,
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/Empty"
-          }
-        }
-      ]
-    },
-    {
-      "name": "personal/shared",
-      "x-capability": "personal/1",
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": false,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/SharedRequest"
-          }
-        }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "$ref": "daemon.schema.json#/definitions/SharedSnapshot"
-        }
-      }
-    },
-    {
-      "name": "settings/userPart",
-      "x-capability": "host.user-settings/1",
-      "description": "A part of the user settings as this machine has it (#1760), for Use This Mac's under You. This machine also writes host/userSettings into its files.",
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/UserPartRequest"
-          }
-        }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "$ref": "daemon.schema.json#/definitions/UserPartHere"
-        }
-      }
     }
   ],
   "components": {
