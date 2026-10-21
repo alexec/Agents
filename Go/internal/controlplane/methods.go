@@ -53,30 +53,77 @@ func newMethods(s *Service) *Methods {
 }
 
 // own is ControlMethods.own: the methods with no host named that are the control
-// plane's. Workspace methods join them once providers are ported.
-var own = map[string]bool{
-	"daemon/ping": true, "control/status": true, "hosts/list": true,
-	"hosts/startEnroll": true, "hosts/install": true, "hosts/checkAgain": true,
-	"hosts/update": true, "hosts/remove": true, "hosts/setRelay": true,
-	"hosts/lendSignIn": true, "hosts/lendGit": true, "hosts/detect": true,
-	"hosts/sshHosts": true, "control/setProjectDetection": true, "clients/list": true,
-	"clients/startPairing": true, "clients/stopPairing": true,
-	"clients/setGrant": true, "clients/forget": true, "clients/connections": true,
-	"clients/forgetSelf": true, "clients/setPushToken": true, "clients/setActivityToken": true,
-	"devices/list": true, "devices/startPairing": true, "devices/stopPairing": true,
-	"devices/forget": true, "hosts/lastHeard": true,
-	"audit/list": true, "audit/export": true, "control/setAuditDays": true, "control/rotate": true,
-	"people/list": true, "people/invite": true, "people/setRole": true, "people/remove": true,
-	"people/removePreview": true, "hosts/joinRequests": true, "hosts/approveJoin": true, "hosts/denyJoin": true,
-	"reports/usage": true, "reports/export": true,
-	"user/settings": true, "user/setSettings": true, "user/setSecret": true, "user/removeSecret": true,
-	"user/secretNames": true,
-	"groups/list": true, "groups/set": true, "groups/remove": true, "providers/setGroup": true,
-	"bots/make": true, "bots/setCaps": true, "bots/stopRun": true,
-	"links/list": true, "links/requests": true, "links/approve": true, "links/deny": true, "links/remove": true,
-	"signIn/providers": true, "signIn/pair": true, "signIn/addToMe": true, "signIn/removeFromMe": true, "signIn/configure": true,
-	"signIn/requests": true, "signIn/approve": true, "signIn/deny": true,
-}
+// plane's. Workspace methods join them once providers are ported. One a line, sorted, so
+// two features that each add one touch different lines (#2020).
+var own = methodSet(
+	"audit/export",
+	"audit/list",
+	"bots/make",
+	"bots/setCaps",
+	"bots/stopRun",
+	"clients/connections",
+	"clients/forget",
+	"clients/forgetSelf",
+	"clients/list",
+	"clients/setActivityToken",
+	"clients/setGrant",
+	"clients/setPushToken",
+	"clients/startPairing",
+	"clients/stopPairing",
+	"control/rotate",
+	"control/setAuditDays",
+	"control/setProjectDetection",
+	"control/status",
+	"daemon/ping",
+	"devices/forget",
+	"devices/list",
+	"devices/startPairing",
+	"devices/stopPairing",
+	"groups/list",
+	"groups/remove",
+	"groups/set",
+	"hosts/approveJoin",
+	"hosts/checkAgain",
+	"hosts/denyJoin",
+	"hosts/detect",
+	"hosts/install",
+	"hosts/joinRequests",
+	"hosts/lastHeard",
+	"hosts/lendGit",
+	"hosts/lendSignIn",
+	"hosts/list",
+	"hosts/remove",
+	"hosts/setRelay",
+	"hosts/sshHosts",
+	"hosts/startEnroll",
+	"hosts/update",
+	"links/approve",
+	"links/deny",
+	"links/list",
+	"links/remove",
+	"links/requests",
+	"people/invite",
+	"people/list",
+	"people/remove",
+	"people/removePreview",
+	"people/setRole",
+	"providers/setGroup",
+	"reports/export",
+	"reports/usage",
+	"signIn/addToMe",
+	"signIn/approve",
+	"signIn/configure",
+	"signIn/deny",
+	"signIn/pair",
+	"signIn/providers",
+	"signIn/removeFromMe",
+	"signIn/requests",
+	"user/removeSecret",
+	"user/secretNames",
+	"user/setSecret",
+	"user/setSettings",
+	"user/settings",
+)
 
 // Handles says whether a bare method is the control plane's. A bare daemon/ping from
 // today's Remote is the home host's to answer: that is how the Remote knows its Mac is
@@ -85,27 +132,65 @@ func (m *Methods) Handles(method string) bool {
 	return method != "daemon/ping" && (own[method] || workspaceMethods[method] || consoleMethods[method] || scopeMethods[method])
 }
 
+// methodSet is a list of methods as a set: a list, not a map literal, so that gofmt does
+// not align it (#2020).
+func methodSet(methods ...string) map[string]bool {
+	out := make(map[string]bool, len(methods))
+	for _, method := range methods {
+		out[method] = true
+	}
+	return out
+}
+
 func (m *Methods) setFrozen(frozen bool) {
 	m.mu.Lock()
 	m.frozen = frozen
 	m.mu.Unlock()
 }
 
-// writes is ControlMethods.writes: what changes records, refused while frozen.
-var writes = map[string]bool{
-	"hosts/startEnroll": true, "hosts/install": true, "hosts/update": true, "hosts/remove": true,
-	"hosts/setRelay": true, "hosts/lendSignIn": true, "hosts/lendGit": true, "hosts/detect": true,
-	"control/setProjectDetection": true, "clients/startPairing": true, "clients/forget": true,
-	"devices/startPairing": true, "devices/forget": true, "clients/setPushToken": true,
-	"clients/setActivityToken": true,
-	"control/setAuditDays":     true, "control/rotate": true, "people/invite": true, "people/setRole": true, "people/remove": true,
-	"hosts/approveJoin": true, "hosts/denyJoin": true,
-	"user/setSettings": true, "user/setSecret": true, "user/removeSecret": true,
-	"groups/set": true, "groups/remove": true, "providers/setGroup": true,
-	"bots/make": true, "bots/setCaps": true, "reports/setPolicy": true,
-	"links/approve": true, "links/deny": true, "links/remove": true,
-	"signIn/addToMe": true, "signIn/removeFromMe": true, "signIn/configure": true, "signIn/approve": true, "signIn/deny": true,
-}
+// writes is ControlMethods.writes: what changes records, refused while frozen. One a
+// line, sorted (#2020).
+var writes = methodSet(
+	"bots/make",
+	"bots/setCaps",
+	"clients/forget",
+	"clients/setActivityToken",
+	"clients/setPushToken",
+	"clients/startPairing",
+	"control/rotate",
+	"control/setAuditDays",
+	"control/setProjectDetection",
+	"devices/forget",
+	"devices/startPairing",
+	"groups/remove",
+	"groups/set",
+	"hosts/approveJoin",
+	"hosts/denyJoin",
+	"hosts/detect",
+	"hosts/install",
+	"hosts/lendGit",
+	"hosts/lendSignIn",
+	"hosts/remove",
+	"hosts/setRelay",
+	"hosts/startEnroll",
+	"hosts/update",
+	"links/approve",
+	"links/deny",
+	"links/remove",
+	"people/invite",
+	"people/remove",
+	"people/setRole",
+	"providers/setGroup",
+	"reports/setPolicy",
+	"signIn/addToMe",
+	"signIn/approve",
+	"signIn/configure",
+	"signIn/deny",
+	"signIn/removeFromMe",
+	"user/removeSecret",
+	"user/setSecret",
+	"user/setSettings",
+)
 
 func (m *Methods) Handle(method string, params json.RawMessage, from Caller) (any, error) {
 	ctx := context.Background()
