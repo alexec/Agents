@@ -19115,6 +19115,277 @@
         "result"
       ],
       "additionalProperties": false
+    },
+    "UsageRollupRow": {
+      "type": "object",
+      "description": "One project and runtime's usage in an hour or a day (#1811), as a machine adds it up.",
+      "properties": {
+        "project": {
+          "type": "string",
+          "description": "The project's folder name, so the same repository on two machines adds up."
+        },
+        "runtime": {
+          "type": "string"
+        },
+        "cost": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "number"
+          },
+          "description": "By currency."
+        },
+        "inputTokens": {
+          "type": "integer"
+        },
+        "outputTokens": {
+          "type": "integer"
+        },
+        "thoughtTokens": {
+          "type": "integer"
+        },
+        "cachedReadTokens": {
+          "type": "integer"
+        },
+        "cachedWriteTokens": {
+          "type": "integer"
+        },
+        "turns": {
+          "type": "integer"
+        },
+        "unpricedTurns": {
+          "type": "integer"
+        },
+        "workingSeconds": {
+          "type": "number",
+          "description": "The agent, its tools and waiting on others: TimeBucket's agent + tools + others."
+        },
+        "waitingSeconds": {
+          "type": "number",
+          "description": "Waiting for the person: TimeBucket's person."
+        }
+      },
+      "required": [
+        "project",
+        "runtime",
+        "cost",
+        "inputTokens",
+        "outputTokens",
+        "thoughtTokens",
+        "cachedReadTokens",
+        "cachedWriteTokens",
+        "turns",
+        "unpricedTurns",
+        "workingSeconds",
+        "waitingSeconds"
+      ],
+      "additionalProperties": false
+    },
+    "UsageRollupPeriod": {
+      "type": "object",
+      "description": "An hour (\"2026-10-21T15\") or a day (\"2026-10-21\"), in UTC, and its rows: the whole of that period on this machine, which replaces what was sent before.",
+      "properties": {
+        "at": {
+          "type": "string"
+        },
+        "rows": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/UsageRollupRow"
+          }
+        }
+      },
+      "required": [
+        "at",
+        "rows"
+      ],
+      "additionalProperties": false
+    },
+    "UsageRollup": {
+      "type": "object",
+      "description": "usage/rollup (#1811): a machine's hours and days that changed since it last sent them, sent each hour on its channel 0. The control plane keeps hours 7 days and days 90.",
+      "properties": {
+        "hours": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/UsageRollupPeriod"
+          }
+        },
+        "days": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/UsageRollupPeriod"
+          }
+        }
+      },
+      "required": [
+        "hours",
+        "days"
+      ],
+      "additionalProperties": false
+    },
+    "ReportRange": {
+      "type": "string",
+      "enum": [
+        "day",
+        "week",
+        "month",
+        "threeMonths"
+      ],
+      "description": "D is the last 24 hours by the hour; W, M and 3M the last 7, 30 and 90 days by the day (UTC)."
+    },
+    "ReportFormat": {
+      "type": "string",
+      "enum": [
+        "csv",
+        "jsonl"
+      ]
+    },
+    "ReportQuery": {
+      "type": "object",
+      "description": "reports/usage and reports/export (#1811). An admin sees every person; a member only their own machines.",
+      "properties": {
+        "range": {
+          "$ref": "#/definitions/ReportRange"
+        },
+        "format": {
+          "$ref": "#/definitions/ReportFormat",
+          "description": "For reports/export; CSV when absent."
+        }
+      },
+      "required": [
+        "range"
+      ],
+      "additionalProperties": false
+    },
+    "ReportRow": {
+      "type": "object",
+      "description": "One hour or day of one machine's project and runtime, with its person (#1811).",
+      "properties": {
+        "at": {
+          "type": "string",
+          "description": "The UTC hour (\"2026-10-21T15\") or day (\"2026-10-21\")."
+        },
+        "person": {
+          "type": "string"
+        },
+        "personName": {
+          "type": "string"
+        },
+        "host": {
+          "$ref": "#/definitions/HostID"
+        },
+        "hostName": {
+          "type": "string"
+        },
+        "project": {
+          "type": "string"
+        },
+        "runtime": {
+          "type": "string"
+        },
+        "cost": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "number"
+          },
+          "description": "By currency."
+        },
+        "inputTokens": {
+          "type": "integer"
+        },
+        "outputTokens": {
+          "type": "integer"
+        },
+        "thoughtTokens": {
+          "type": "integer"
+        },
+        "cachedReadTokens": {
+          "type": "integer"
+        },
+        "cachedWriteTokens": {
+          "type": "integer"
+        },
+        "turns": {
+          "type": "integer"
+        },
+        "unpricedTurns": {
+          "type": "integer"
+        },
+        "workingSeconds": {
+          "type": "number",
+          "description": "The agent, its tools and waiting on others: TimeBucket's agent + tools + others."
+        },
+        "waitingSeconds": {
+          "type": "number",
+          "description": "Waiting for the person: TimeBucket's person."
+        }
+      },
+      "required": [
+        "at",
+        "person",
+        "personName",
+        "host",
+        "hostName",
+        "project",
+        "runtime",
+        "cost",
+        "inputTokens",
+        "outputTokens",
+        "thoughtTokens",
+        "cachedReadTokens",
+        "cachedWriteTokens",
+        "turns",
+        "unpricedTurns",
+        "workingSeconds",
+        "waitingSeconds"
+      ],
+      "additionalProperties": false
+    },
+    "UsageReport": {
+      "type": "object",
+      "description": "reports/usage's answer (#1811): rows oldest first, by the hour for D and by the day otherwise.",
+      "properties": {
+        "range": {
+          "$ref": "#/definitions/ReportRange"
+        },
+        "rows": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ReportRow"
+          }
+        },
+        "admin": {
+          "type": "boolean",
+          "description": "Whether the caller sees every person's machines."
+        }
+      },
+      "required": [
+        "range",
+        "rows",
+        "admin"
+      ],
+      "additionalProperties": false
+    },
+    "ReportExport": {
+      "type": "object",
+      "description": "reports/export's answer (#1811): the rows as CSV or JSON lines.",
+      "properties": {
+        "text": {
+          "type": "string"
+        },
+        "count": {
+          "type": "integer"
+        },
+        "format": {
+          "$ref": "#/definitions/ReportFormat"
+        }
+      },
+      "required": [
+        "text",
+        "count",
+        "format"
+      ],
+      "additionalProperties": false
     }
   }
 }

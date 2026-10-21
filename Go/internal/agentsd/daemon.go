@@ -63,6 +63,7 @@ type Daemon struct {
 	findBook
 	optionBook
 	timeBook
+	reportBook
 	milestoneBook
 	afterTurnState
 	attentionState

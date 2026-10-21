@@ -216,7 +216,7 @@ func TestEveryClientMethodChecksTheOwner(t *testing.T) {
 		"providers/list": true, "providers/refresh": true, "providers/add": true, "providers/update": true,
 		"providers/remove": true, "providers/options": true, "providers/runtimes": true, "providers/draftStart": true,
 		"providers/draftAnswer": true, "providers/draftCancel": true, "providers/create": true, "hosts/listKept": true,
-		"hosts/retryKept": true, "hosts/dropKept": true,
+		"hosts/retryKept": true, "hosts/dropKept": true, "reports/usage": true, "reports/export": true,
 	}
 	// Methods that name one by host (and lendSignIn and lendGit by from too).
 	namesHost := map[string]bool{

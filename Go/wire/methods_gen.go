@@ -428,7 +428,10 @@ var (
 	CallProvidersRuntimes           = Method[Empty, ProviderRuntimes]{"providers/runtimes"}
 	CallProvidersUpdate             = Method[ProviderAdd, ProviderSummary]{"providers/update"}
 	CallRelaySwitch                 = Method[RelaySwitch, Empty]{"relay/switch"}
+	CallReportsExport               = Method[ReportQuery, ReportExport]{"reports/export"}
+	CallReportsUsage                = Method[ReportQuery, UsageReport]{"reports/usage"}
 	CallTunnelOpen                  = Method[TunnelOpen, Empty]{"tunnel/open"}
+	CallUsageRollup                 = Method[UsageRollup, Empty]{"usage/rollup"}
 	CallWorkspacesForAgent          = Method[Empty, AgentWorkspaces]{"workspaces/forAgent"}
 	NotifyControlClientChanged      = Notification[ControlClientChanged]{"control/clientChanged"}
 	NotifyControlHostChanged        = Notification[JSONValue]{"control/hostChanged"}

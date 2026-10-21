@@ -234,6 +234,10 @@ struct WireSchemaTests {
             "JoinApproved": Self.through(DaemonAPI.JoinApproved.self),
             "JoinDecided": Self.through(DaemonAPI.JoinDecided.self),
             "HostJoinDecision": Self.through(DaemonAPI.HostJoinDecision.self),
+            // Reports (#1811).
+            "ReportQuery": Self.through(DaemonAPI.ReportQuery.self),
+            "UsageReport": Self.through(DaemonAPI.UsageReport.self),
+            "ReportExport": Self.through(DaemonAPI.ReportExport.self),
         ]
         let all = samples.objectValue ?? [:]
         #expect(Set(all.keys) == Set(types.keys), "a sample with no Swift type, or a type with no sample")

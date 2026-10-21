@@ -378,6 +378,7 @@ func (d *Daemon) noteTurnLocked(m timeMark, agent wire.UUID, runtime string) boo
 	if m.kind == markState && !working(m.state) {
 		segments, _ := splitMarks(t.marks)
 		d.bankLocked(segments, runtime, true)
+		d.reportTime(agent, runtime, segments)
 		delete(d.timeTurns, agent)
 		delete(d.timeWaiting, agent)
 		return true
@@ -385,6 +386,7 @@ func (d *Daemon) noteTurnLocked(m timeMark, agent wire.UUID, runtime string) boo
 	if len(t.marks)-t.carried >= timeMarksKept {
 		segments, carry := splitMarks(t.marks)
 		d.bankLocked(segments, runtime, false)
+		d.reportTime(agent, runtime, segments)
 		t.marks, t.carried = carry, len(carry)
 	}
 	return false
