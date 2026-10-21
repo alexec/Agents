@@ -6214,6 +6214,10 @@
         },
         "agentsMayArchive": {
           "type": "boolean"
+        },
+        "continueWhenBack": {
+          "description": "A helper's turn refused for a spent allowance waits for it at once, as if the person had chosen Continue (#1918). Off unless set.",
+          "type": "boolean"
         }
       },
       "additionalProperties": false
@@ -14227,6 +14231,10 @@
         },
         "whenDone": {
           "$ref": "#/definitions/WorkflowWhenDone"
+        },
+        "continueWhenBack": {
+          "description": "`continue-when-back: true`: a run's turn refused for a spent allowance waits for it at once, as if the person had chosen Continue (#1918).",
+          "type": "boolean"
         }
       },
       "required": [
@@ -14986,6 +14994,9 @@
         },
         "whenDone": {
           "type": "string"
+        },
+        "continueWhenBack": {
+          "type": "boolean"
         }
       },
       "required": [

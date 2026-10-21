@@ -131,13 +131,17 @@ public struct HelperLimits: Codable, Hashable, Sendable {
     /// project, rather than asking the person (#120, #638). Nil is the default,
     /// `HelperLimit.defaultAgentsMayArchive`.
     public var agentsMayArchive: Bool?
+    /// Whether a helper's turn refused for a spent allowance waits for it at once, as if
+    /// the person had chosen Continue (#1918). Nil is off.
+    public var continueWhenBack: Bool?
 
     public init(running: Int? = nil, notArchived: Int? = nil, queued: Int? = nil,
-                agentsMayArchive: Bool? = nil) {
+                agentsMayArchive: Bool? = nil, continueWhenBack: Bool? = nil) {
         self.running = running
         self.notArchived = notArchived
         self.queued = queued
         self.agentsMayArchive = agentsMayArchive
+        self.continueWhenBack = continueWhenBack
     }
 
     /// Whether agents may archive the helpers they started here: the person's
@@ -182,12 +186,13 @@ public struct HelperLimits: Codable, Hashable, Sendable {
         return nil
     }
 
-    /// Nil when all four are the defaults, so a project that never changed them keeps
-    /// no record of it. The switch set to its default is kept as no choice at all.
+    /// Nil when all are the defaults, so a project that never changed them keeps no
+    /// record of it. A switch set to its default is kept as no choice at all.
     public var orNilIfDefault: HelperLimits? {
         var kept = self
         if kept.agentsMayArchive == HelperLimit.defaultAgentsMayArchive { kept.agentsMayArchive = nil }
+        if kept.continueWhenBack == false { kept.continueWhenBack = nil }
         return kept.running == nil && kept.notArchived == nil && kept.queued == nil
-            && kept.agentsMayArchive == nil ? nil : kept
+            && kept.agentsMayArchive == nil && kept.continueWhenBack == nil ? nil : kept
     }
 }

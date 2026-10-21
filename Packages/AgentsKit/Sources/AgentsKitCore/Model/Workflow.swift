@@ -83,6 +83,9 @@ public struct Workflow: Codable, Hashable, Sendable, Identifiable {
     /// What a run may do with its session when it is done, from the file's
     /// `when-done:` (#433). `nil` is a file that does not say, which is `keep`.
     public var whenDone: WorkflowWhenDone?
+    /// From the file's `continue-when-back: true` (#1918): a run's turn refused for a spent
+    /// allowance waits for it at once, as if the person had chosen Continue. `nil` is off.
+    public var continueWhenBack: Bool?
     /// SHA-256 of the bytes this was read from, or nil when it was not read from a file.
     /// What runs is this copy, so it is this digest that must be the approved one, not
     /// the digest of whatever the file holds when it fires (security review). The
@@ -91,7 +94,7 @@ public struct Workflow: Codable, Hashable, Sendable, Identifiable {
 
     private enum CodingKeys: String, CodingKey {
         case workflowID, folder, name, triggers, mode, prompt, problem, unknownFields, settings,
-             cooldown, enabled, archived, hosts, whenDone
+             cooldown, enabled, archived, hosts, whenDone, continueWhenBack
     }
 
     /// Whether it is put away.
@@ -108,9 +111,10 @@ public struct Workflow: Codable, Hashable, Sendable, Identifiable {
                 unknownFields: [String: JSONValue] = [:],
                 settings: WorkflowSettings = WorkflowSettings(),
                 cooldown: TimeInterval? = nil, enabled: Bool? = nil, archived: Bool? = nil,
-                hosts: [String]? = nil, whenDone: WorkflowWhenDone? = nil) {
+                hosts: [String]? = nil, whenDone: WorkflowWhenDone? = nil, continueWhenBack: Bool? = nil) {
         self.hosts = hosts
         self.whenDone = whenDone
+        self.continueWhenBack = continueWhenBack
         self.cooldown = cooldown
         self.enabled = enabled
         self.archived = archived

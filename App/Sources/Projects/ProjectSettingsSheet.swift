@@ -294,6 +294,16 @@ private struct ProjectGeneralPane: View {
                                 .fixedSize(horizontal: false, vertical: true)
                         }
                     }
+                    row("Allowance spent") {
+                        VStack(alignment: .leading, spacing: 6) {
+                            helpersContinue(in: summary)
+                            Text("A session started by a session waits for the allowance and carries on "
+                                 + "when it is back, as if you had chosen Continue. Off, it stops until you do.")
+                                .appText(.fine)
+                                .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
                     row("Low disk space") {
                         diskLine(\.lowGB, in: summary, default: DiskThresholds.defaultLowGB,
                                  choices: DiskThresholds.lowChoices)
@@ -381,6 +391,20 @@ private struct ProjectGeneralPane: View {
         return Toggle("Sessions may archive the sessions they started", isOn: Binding(get: { kept.mayArchive }, set: { on in
             var limits = kept
             limits.agentsMayArchive = on == HelperLimit.defaultAgentsMayArchive ? nil : on
+            Task { await model.setHelperLimits(limits, for: summary.key) }
+        }))
+        .toggleStyle(.switch)
+        .controlSize(.small)
+        .disabled(model.hosts.isOffline(summary.host))
+    }
+
+    /// Whether helpers carry on by themselves when a spent allowance is back (#1918). Off
+    /// is the default, and back to nil.
+    private func helpersContinue(in summary: DaemonAPI.ProjectSummary) -> some View {
+        let kept = summary.project.helperLimits ?? HelperLimits()
+        return Toggle("Helpers continue when the allowance is back", isOn: Binding(get: { kept.continueWhenBack == true }, set: { on in
+            var limits = kept
+            limits.continueWhenBack = on ? true : nil
             Task { await model.setHelperLimits(limits, for: summary.key) }
         }))
         .toggleStyle(.switch)

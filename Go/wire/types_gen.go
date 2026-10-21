@@ -2456,6 +2456,8 @@ type HelperLimits struct {
 	NotArchived      *int64 `json:"notArchived,omitzero"`
 	Queued           *int64 `json:"queued,omitzero"`
 	AgentsMayArchive *bool  `json:"agentsMayArchive,omitzero"`
+	// A helper's turn refused for a spent allowance waits for it at once, as if the person had chosen Continue (#1918). Off unless set.
+	ContinueWhenBack *bool `json:"continueWhenBack,omitzero"`
 }
 
 // hosts/announce, on an enrolment connection.
@@ -5866,6 +5868,8 @@ type Workflow struct {
 	Archived      *bool                `json:"archived,omitzero"`
 	Hosts         []string             `json:"hosts,omitzero"`
 	WhenDone      *WorkflowWhenDone    `json:"whenDone,omitzero"`
+	// `continue-when-back: true`: a run's turn refused for a spent allowance waits for it at once, as if the person had chosen Continue (#1918).
+	ContinueWhenBack *bool `json:"continueWhenBack,omitzero"`
 }
 
 type WorkflowApproval struct {
@@ -6045,13 +6049,14 @@ type WorkflowSettings struct {
 }
 
 type WorkflowSettingsRequest struct {
-	Folder     URL              `json:"folder"`
-	WorkflowID string           `json:"workflowID"`
-	Settings   WorkflowSettings `json:"settings"`
-	Cooldown   *string          `json:"cooldown,omitzero"`
-	Labels     []string         `json:"labels,omitzero"`
-	Hosts      []string         `json:"hosts,omitzero"`
-	WhenDone   *string          `json:"whenDone,omitzero"`
+	Folder           URL              `json:"folder"`
+	WorkflowID       string           `json:"workflowID"`
+	Settings         WorkflowSettings `json:"settings"`
+	Cooldown         *string          `json:"cooldown,omitzero"`
+	Labels           []string         `json:"labels,omitzero"`
+	Hosts            []string         `json:"hosts,omitzero"`
+	WhenDone         *string          `json:"whenDone,omitzero"`
+	ContinueWhenBack *bool            `json:"continueWhenBack,omitzero"`
 }
 
 // Read forgivingly (Workflow.swift's init(from:)): a field that is missing or does not read takes its default (`isEnabled` true; false, 0, [] or absent for the rest).

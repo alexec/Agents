@@ -2,6 +2,8 @@ package agentsd
 
 import (
 	"encoding/json"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -82,5 +84,51 @@ func TestAWaitThatIsDueGoesAndCancelStopsOne(t *testing.T) {
 	})
 	if users, _ := saidIn(d, waiting.ID); len(users) != 0 {
 		t.Fatalf("a cancelled wait sent %v", users)
+	}
+}
+
+// #1918: nobody watches a helper or a workflow's run, so one set to waits by itself. A
+// helper in a project whose helpers are set to waits as soon as its turn is refused; a
+// chat the person started does not, and nor does a run of a workflow that is not set to.
+func TestHelpersAndRunsSetToContinueWaitByThemselves(t *testing.T) {
+	fakeRuntimes(t)
+	d, c := start(t, t.TempDir())
+	defer d.Shutdown()
+	dir := project(t, c, 1)
+	c.call(t, 2, "projects/setHelperLimits", map[string]any{"folder": "file://" + dir + "/", "limits": map[string]any{"continueWhenBack": true}})
+	lead := seeded(t, d, dir, nil)
+	if d.continuesByItself(&lead) {
+		t.Fatal("the person's own chat waits by itself")
+	}
+	m := appClient(t, d, lead.ID)
+	m.post("initialize", map[string]any{}, 1)
+	text, _ := m.tool(3, "start_session", map[string]any{"prompt": "typed limit"})
+	if !strings.HasPrefix(text, "Started ") {
+		t.Fatal(text)
+	}
+	helper := wire.UUID(strings.Fields(text)[len(strings.Fields("Started “typed limit” (id"))][:36])
+	waitFor(t, "the helper waiting", func() bool {
+		a := d.Store.Agent(helper)
+		return a.State == wire.AgentStateStopped && a.ContinueWhenBack != nil
+	})
+
+	// A workflow's run goes by its own file.
+	wfDir := filepath.Join(dir, ".agents", "workflows")
+	if err := os.MkdirAll(wfDir, 0o750); err != nil {
+		t.Fatal(err)
+	}
+	for name, front := range map[string]string{"nightly": "continue-when-back: true\n", "daily": ""} {
+		if err := os.WriteFile(filepath.Join(wfDir, name+".md"), []byte("---\nname: "+name+"\n"+front+"---\n\nGo.\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	d.workflowMu.Lock()
+	d.scanLocked()
+	d.workflowMu.Unlock()
+	for id, want := range map[string]bool{"nightly": true, "daily": false} {
+		run := seeded(t, d, dir, func(a *wire.Agent) { a.StartedByWorkflow = &id })
+		if got := d.continuesByItself(&run); got != want {
+			t.Fatalf("%s: %v", id, got)
+		}
 	}
 }

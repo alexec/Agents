@@ -44,3 +44,9 @@ test("the reset time comes from the runtime's out row", () => {
   assert.equal(w.resetsAt(allowances, "codex"), null);
   assert.equal(w.resetsAt(undefined, "claude"), null);
 });
+
+test("the workflow page's switch says what a run does (#1918)", () => {
+  assert.equal(w.workflowContinueSwitch, "Continue when the allowance is back");
+  assert.equal(w.workflowContinueSentence(true), "A run whose allowance is spent waits, and carries on when it is back.");
+  assert.equal(w.workflowContinueSentence(false), "A run whose allowance is spent stops until somebody chooses Continue.");
+});

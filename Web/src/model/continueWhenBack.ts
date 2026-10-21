@@ -28,6 +28,15 @@ export function continueLine(agent: Agent, now = new Date()): string | null {
   return wait.resetKnown ? `Continues at ${time}` : `Continues when it is back · tries at ${time}`;
 }
 
+/** The workflow page's switch (#1918), writing `continue-when-back:`. */
+export const workflowContinueSwitch = "Continue when the allowance is back";
+
+/** What the switch means for this workflow's runs. */
+export function workflowContinueSentence(on: boolean): string {
+  return on ? "A run whose allowance is spent waits, and carries on when it is back."
+    : "A run whose allowance is spent stops until somebody chooses Continue.";
+}
+
 /** RuntimeAllowances.resetsAt: when the provider said this runtime's allowance resets. */
 export function resetsAt(allowances: RuntimeAllowances | undefined, runtimeID: string): Date | null {
   const row = allowances?.rows.find((r) => r.credentialKey.split(":", 1)[0] === runtimeID && "out" in r.state.status);

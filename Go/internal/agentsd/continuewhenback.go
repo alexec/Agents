@@ -137,6 +137,25 @@ func (d *Daemon) resumeContinues() {
 	}
 }
 
+// continuesByItself is whether a turn refused for a spent allowance waits at once, with
+// nobody to choose Continue (#1918): a workflow's run with `continue-when-back: true`, or a
+// helper in a project whose helpers are set to (HelperLimits.continueWhenBack). A chat the
+// person started waits only when the person asks.
+func (d *Daemon) continuesByItself(a *wire.Agent) bool {
+	folder := projectFolder(a)
+	if a.StartedByWorkflow != nil {
+		d.workflowMu.Lock()
+		defer d.workflowMu.Unlock()
+		f := d.fileLocked(folder, *a.StartedByWorkflow)
+		return f != nil && f.wf.ContinueWhenBack != nil && *f.wf.ContinueWhenBack
+	}
+	if a.StartedByAgent != nil {
+		s, ok := d.summaryFor(folder)
+		return ok && s.Project.HelperLimits != nil && s.Project.HelperLimits.ContinueWhenBack != nil && *s.Project.HelperLimits.ContinueWhenBack
+	}
+	return false
+}
+
 // sentToContinue is whether the turn's prompt was the wait's own, so a refusal waits again.
 func sentToContinue(sent *wire.QueuedPrompt) bool {
 	return sent != nil && sent.From == wire.PromptOriginApp && sent.Text == continueWhenBackWords

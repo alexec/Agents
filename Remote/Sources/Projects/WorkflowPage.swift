@@ -377,6 +377,7 @@ struct WorkflowPage: View {
             }
             cooldown(summary)
             whenDone(summary)
+            continueWhenBack(summary)
             if let at = summary.lastFiredAt {
                 note(["Last ran \(at.formatted(.relative(presentation: .named)))", summary.lastFiredBy?.phrase]
                     .compactMap { $0 }.joined(separator: ", ") + ".")
@@ -410,6 +411,25 @@ struct WorkflowPage: View {
             .labelsHidden()
             .pickerStyle(.menu)
             .fixedSize()
+            .disabled(summary.workflow.settingsLocked || model.isStale)
+        }
+    }
+
+    /// Whether a run carries on by itself when a spent allowance is back (#1918), as the
+    /// window's page has it. Not for a triggering workflow, whose agent is somebody else's.
+    @ViewBuilder
+    private func continueWhenBack(_ summary: WorkflowSummary) -> some View {
+        if summary.workflow.mode != .triggering {
+            let on = summary.workflow.continueWhenBack == true
+            Toggle(isOn: Binding(get: { on }, set: { chosen in
+                guard chosen != on else { return }
+                Task { await model.setWorkflowSettings(summary, summary.workflow.settings, continueWhenBack: chosen) }
+            })) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(ContinueWhenBackWords.workflowSwitch)
+                    note(ContinueWhenBackWords.workflowSentence(on))
+                }
+            }
             .disabled(summary.workflow.settingsLocked || model.isStale)
         }
     }
