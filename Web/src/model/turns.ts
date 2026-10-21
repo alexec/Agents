@@ -445,18 +445,44 @@ export function thoughtLine(text: string): string {
   return words === "" ? "Thought" : `Thought: ${words}`;
 }
 
-/** Runs with nothing drawn between them are one run, under the first run's id. */
+/**
+ * Runs with nothing drawn between them are one run, under the first run's id. A joined run is
+ * the same object as last time while its calls are (#1848), so a turn whose runs were joined
+ * keeps its items, and an entry still redraws only its own turn (#170).
+ */
 export function joiningAdjacentToolRuns(items: readonly Item[]): Item[] {
   const kept: Item[] = [];
+  let runs: RunItem[] = [];
+  const close = () => {
+    if (runs.length === 1) kept.push(runs[0]!);
+    else if (runs.length > 1) kept.push(joinedRun(runs));
+    runs = [];
+  };
   for (const item of items) {
-    const last = kept[kept.length - 1];
-    if (item.kind === "run" && last?.kind === "run") {
-      kept[kept.length - 1] = { kind: "run", id: last.id, calls: [...last.calls, ...item.calls] };
+    if (item.kind === "run") {
+      runs.push(item);
     } else {
+      close();
       kept.push(item);
     }
   }
+  close();
   return kept;
+}
+
+type RunItem = Extract<Item, { kind: "run" }>;
+
+/** The last run made from each first run, kept while that run is. */
+const joinedRuns = new WeakMap<RunItem, RunItem>();
+
+function joinedRun(runs: readonly RunItem[]): RunItem {
+  const first = runs[0]!;
+  const calls = runs.flatMap((run) => run.calls);
+  const was = joinedRuns.get(first);
+  if (was && was.calls.length === calls.length && was.calls.every((call, index) => call === calls[index])) return was;
+  const run: RunItem = { kind: "run", id: first.id, calls };
+  joinedRuns.set(first, run);
+  return run;
 }
 
 export function omittingThoughts(items: readonly Item[]): Item[] {
