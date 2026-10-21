@@ -235,6 +235,9 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
     /// The last file it showed that the person has not looked at (#1802): a mark on its
     /// row, never a group or a badge. The daemon clears it when the conversation is read.
     public var fileToSee: ShownFile?
+    /// While a turn runs, the title of the tool it is running now (#1902); nil while it
+    /// thinks or replies. The daemon changes it only once a new value has held a second.
+    public var runningTool: String?
     /// Paused by a spent allowance, and asked to carry on when it is back (#1859): the
     /// daemon sends "continue" in this chat at `at`, or sooner when the runtime is back.
     public var continueWhenBack: ContinueWhenBack?
@@ -409,6 +412,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         queuedStart = (try? c.decodeIfPresent(QueuedStart.self, forKey: .queuedStart)) ?? nil
         branchedFrom = (try? c.decodeIfPresent(UUID.self, forKey: .branchedFrom)) ?? nil
         fileToSee = (try? c.decodeIfPresent(ShownFile.self, forKey: .fileToSee)) ?? nil
+        runningTool = (try? c.decodeIfPresent(String.self, forKey: .runningTool)) ?? nil
         continueWhenBack = (try? c.decodeIfPresent(ContinueWhenBack.self, forKey: .continueWhenBack)) ?? nil
         // Only the keys this build does not know are read as open-ended values.
         // Reading the whole record that way too — which is what this did — decoded
@@ -489,6 +493,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         try c.encodeIfPresent(queuedStart, forKey: .queuedStart)
         try c.encodeIfPresent(branchedFrom, forKey: .branchedFrom)
         try c.encodeIfPresent(fileToSee, forKey: .fileToSee)
+        try c.encodeIfPresent(runningTool, forKey: .runningTool)
         try c.encodeIfPresent(continueWhenBack, forKey: .continueWhenBack)
         // Whatever a newer version wrote, written back out beside our own fields.
         if !unknownFields.isEmpty {
@@ -532,6 +537,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         case queuedStart
         case branchedFrom
         case fileToSee
+        case runningTool
         case continueWhenBack
     }
 

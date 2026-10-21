@@ -51,12 +51,23 @@ export function inSmartRow(row: Exclude<SmartRow, "pinned">, agent: Agent,
 }
 
 /** The mark a session's row carries in the sidebar (#495): what it wants, or null for its own status mark. */
-export type SessionMark = "needsYou" | "working" | "queued" | "waiting" | "paused" | "done" | "asksToArchive";
+export type SessionMark = "needsYou" | "working" | "tool" | "queued" | "waiting" | "paused" | "done" | "asksToArchive";
+
+/** The tool a working session runs now (#1902, RunningToolWords.tool), or null while it thinks. */
+export function runningTool(agent: Agent): string | null {
+  return agent.state === "running" ? agent.runningTool ?? null : null;
+}
+
+/** RunningToolWords.label: "Running: swift test". */
+export function runningToolLabel(tool: string): string {
+  return `Running: ${tool}`;
+}
 
 export function sessionMark(agent: Agent): SessionMark | null {
   switch (groupOf(agent)) {
     case "needsAttention": case "blocked": return "needsYou";
-    case "running": return "working";
+    // A wrench in the spinner's place while it runs a tool (#1902); thinking keeps the spinner.
+    case "running": return runningTool(agent) !== null ? "tool" : "working";
     // Waiting and paused in the accent as the rest, not the grey status mark (#630).
     // A queued helper waits for a free place, not on anything it asked for.
     case "waiting": return agent.state === "queued" ? "queued" : "waiting";

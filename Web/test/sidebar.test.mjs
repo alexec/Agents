@@ -77,6 +77,17 @@ test("smart groups gather by what a session wants, newest started first (#495)",
   assert.equal(sessionMark(agent("gone", 1, { state: "archived" })), null, "its own status mark");
 });
 
+test("a working session running a tool shows a wrench, named by its tool; thinking keeps the spinner (#1902)", async () => {
+  const { sessionMark, runningTool, runningToolLabel } = await load("src/model/sidebar.ts");
+  const tooling = agent("tool", 1, { state: "running", runningTool: "swift test" });
+  assert.equal(sessionMark(tooling), "tool");
+  assert.equal(runningTool(tooling), "swift test");
+  assert.equal(runningToolLabel("swift test"), "Running: swift test");
+  assert.equal(sessionMark(agent("thinking", 1, { state: "running" })), "working");
+  // A tool left on a record that is not running any more says nothing.
+  assert.equal(runningTool(agent("done", 1, { runningTool: "ls" })), null);
+});
+
 test("only an unread session in Done is drawn unread, though one that asks still counts (#1323)", async () => {
   const { drawsUnread, showsUnread } = await load("src/model/groups.ts");
   const asking = agent("asking", 1, { isUnread: true, report: { outcome: "needs_answer", message: "Which?", at: 1 } });

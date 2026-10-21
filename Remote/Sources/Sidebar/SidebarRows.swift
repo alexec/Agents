@@ -202,8 +202,11 @@ private struct FoldAction: ViewModifier {
 private struct SessionMark: View {
     private enum Kind { case needsYou, working, queued, waiting, paused, done, asksToArchive }
     private let kind: Kind
+    /// The tool a working session runs (#1902): a wrench in the spinner's place.
+    private var tool: String?
 
     init?(agent: Agent, group: AgentGroup) {
+        tool = group == .running ? RunningToolWords.tool(agent) : nil
         switch group {
         case .needsAttention, .blocked: kind = .needsYou
         case .running: kind = .working
@@ -229,6 +232,8 @@ private struct SessionMark: View {
             switch kind {
             case .needsYou:
                 Image(systemName: "hand.raised.fill").tinted(.attention)
+            case .working where tool != nil:
+                Image(systemName: RunningToolWords.symbol).foregroundStyle(Paper.accent)
             case .working:
                 // In the accent as the other marks (#1558).
                 SyncedSpinner(diameter: 14 * scale, color: Paper.accent)
@@ -254,7 +259,7 @@ private struct SessionMark: View {
     private var label: String {
         switch kind {
         case .needsYou: "Needs you"
-        case .working: "Working"
+        case .working: tool.map(RunningToolWords.label) ?? "Working"
         case .queued: "Queued"
         case .waiting: "Waiting"
         case .paused: "Paused"

@@ -113,6 +113,8 @@ type Agent struct {
 	FileToSee *ShownFile `json:"fileToSee,omitzero"`
 	// The person asked a chat paused by a spent allowance to carry on when the allowance is back (#1859). At `at` the host sends "continue" in the same chat; a turn that works, any other message, Stop or Archive takes it away.
 	ContinueWhenBack *ContinueWhenBack `json:"continueWhenBack,omitzero"`
+	// While a turn runs, the title of the tool the agent is running now, the newest when more than one is (#1902). Absent while it thinks or replies. It changes only once a new value has held for a second, so a short tool never shows and a short gap between two does not flash. Cleared when the turn ends.
+	RunningTool *string `json:"runningTool,omitzero"`
 }
 
 type AgentArchivedReason string

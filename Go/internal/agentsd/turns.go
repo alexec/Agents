@@ -71,6 +71,8 @@ type live struct {
 	// briefDue is whether the next prompt carries the brief (brief.go): a new conversation
 	// on a runtime that takes no system prompt.
 	briefDue bool
+	// tools is the turn's tool calls in flight, for Agent.RunningTool (runningtool.go).
+	tools toolsInFlight
 }
 
 type pendingPermission struct {
@@ -621,6 +623,7 @@ func (l *live) turn() bool {
 		d.end(l, wire.AgentStateStopped, wire.EndedReasonCancelled)
 		return false
 	}
+	l.forgetTools()
 	d.moveState(l.id, wire.AgentStateRunning, true)
 	// What the person changed on a live page since this agent's last turn (022 FR-016),
 	// whoever sent the prompt, told once: the edit itself is in the file.
@@ -817,6 +820,7 @@ func (d *Daemon) moveState(id wire.UUID, s wire.AgentState, fromArchive bool) {
 		a.ArchivedReason = nil
 		if s == wire.AgentStateRunning && !answered {
 			a.Report = nil
+			a.RunningTool = nil // a new turn begins thinking (#1902)
 		}
 	})
 	if changed {
@@ -838,6 +842,7 @@ func (d *Daemon) end(l *live, s wire.AgentState, why wire.EndedReason) {
 	// A turn its archive cut off (#1611): the session stays archived, and the ending is not
 	// said, as a stop or a crash, nor picked up after a restart.
 	if a := d.Store.Agent(l.id); a != nil && a.State == wire.AgentStateArchived {
+		l.forgetTools()
 		d.workflowRunFinished(l.id)
 		d.guardedTurnEnded(l.id)
 		d.checkQueueSoon(projectFolder(a))
@@ -853,8 +858,9 @@ func (d *Daemon) end(l *live, s wire.AgentState, why wire.EndedReason) {
 		}
 	}
 	var requested, archiveNow bool
+	l.forgetTools()
 	d.change(l.id, func(a *wire.Agent) {
-		a.State, a.EndedReason = s, reason(why)
+		a.State, a.EndedReason, a.RunningTool = s, reason(why), nil
 		if why != wire.EndedReasonDaemonGone {
 			a.RestartPickUps = nil // any ending but the daemon's going clears the count
 		}
@@ -1035,6 +1041,7 @@ func (l *live) Update(n sdk.SessionNotification) {
 		l.toolCalls[string(u.ToolCall.ToolCallId)] = true
 		l.seen.Broadcast()
 		l.mu.Unlock()
+		l.noteToolCall(call, true)
 	case u.ToolCallUpdate != nil:
 		call := toolCall(u.ToolCallUpdate)
 		d.record(l.id, wire.TranscriptEntryKind{ToolCallUpdate: &wire.TranscriptEntryKindToolCallUpdate{Value: call}})
@@ -1042,6 +1049,7 @@ func (l *live) Update(n sdk.SessionNotification) {
 		l.mu.Lock()
 		l.evidence.takeCall(call)
 		l.mu.Unlock()
+		l.noteToolCall(call, false)
 	case u.Plan != nil:
 		b, _ := json.Marshal(u.Plan.Entries)
 		var entries []wire.PlanEntry
