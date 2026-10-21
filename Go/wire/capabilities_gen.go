@@ -299,6 +299,7 @@ var HostCapabilities = map[string]string{
 	"sessions/adopt":                   "sessions/1",
 	"sessions/delete":                  "sessions/1",
 	"sessions/list":                    "sessions/1",
+	"settings/userPart":                "host.user-settings/1",
 	"shell/attach":                     "shell/1",
 	"shell/close":                      "shell/1",
 	"shell/detach":                     "shell/1",
@@ -571,5 +572,5 @@ var ControlNotifications = map[string]bool{
 // declares by hand, by who.
 var DeclaredCapabilities = map[string][]string{
 	"client": {"client.wire/1", "client.team/1"},
-	"host":   {"host.wire/1", "agents.move-worktree/1", "host.team/1", "host.user-settings/1"},
+	"host":   {"host.wire/1", "agents.move-worktree/1", "host.team/1"},
 }

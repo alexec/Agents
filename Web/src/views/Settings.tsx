@@ -22,6 +22,7 @@ import { fromWireDate } from "../protocol/dates";
 import { Capability } from "../protocol/capabilities.generated";
 import type { BackupEvery, BackupRestoreResult, BackupSettings, BackupState, BackupTarget } from "../protocol/generated";
 import { PeopleSection } from "./People";
+import { UserScopeSection } from "./UserScope";
 
 /** The words under the Sidebar section, as the window's and the Remote's (#846). */
 export const sidebarSettingsFooter = "A group that is off is not shown. Its sessions go to the next group they fit, "
@@ -263,6 +264,8 @@ export function SettingsPage({ store, down = false }: { store: Store; down?: boo
             <VersionsSection store={store} />
             <BackupsSection store={store} />
             <ServerBackupsSection store={store} />
+            {/* The settings and secrets the control plane keeps for you (#1760). */}
+            <UserScopeSection store={store} down={down} />
           </Scope>
           <Scope id="settings-scope-control" title={scopeTitles.controlPlane}>
             {/* Who belongs to the control plane, and their machines and clients (#994). */}

@@ -15,11 +15,6 @@
       "name": "client.team/1",
       "by": "client",
       "description": "A client knows it belongs to one person of a team (#994, #1763). On a control plane with more than one person, the control plane answers a client without it -32074 updateToJoinTeam (R14)."
-    },
-    {
-      "name": "host.user-settings/1",
-      "by": "host",
-      "description": "A machine writes host/userSettings into its ~/.agents and ~/.agents-secrets, marked as from the control plane (#1760). The control plane sends a person's settings and secrets only to a machine that says it."
     }
   ],
   "methods": [

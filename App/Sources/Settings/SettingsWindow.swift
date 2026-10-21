@@ -101,6 +101,8 @@ struct SettingsWindow: View {
         }
         .onChange(of: pane.wrappedValue) { _, chosen in
             if chosen == .agentConfiguration { Task { await refreshShared() } }
+            // Leaving a pane whose edits may change a part that follows the person (#1760).
+            Task { await model.keepFollowingParts() }
             if chosen == .runtimes { Task { await model.refreshRuntimes() } }
         }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
@@ -120,7 +122,7 @@ struct SettingsWindow: View {
     /// Providers one that can run them (#691).
     private func shows(_ each: SettingsPane) -> Bool {
         switch each {
-        case .controlPlane, .clients: control != nil
+        case .controlPlane, .clients, .onEveryMachine: control != nil
         case .providers: control?.providersHere ?? false
         default: true
         }
@@ -164,6 +166,12 @@ struct SettingsWindow: View {
             if let control { ControlSettingsView(control: control, page: .providers) }
         case .clients:
             if let control { ControlSettingsView(control: control, page: .clients) }
+        case .onEveryMachine:
+            // Through the window's own connection, which hears when they change (#1760).
+            FormColumn {
+                UserScopePane(control: model.controlRequests, state: model.userScope,
+                              takeHere: (name: "This Mac", take: { part in await model.takeUserPartFromThisMac(part) }))
+            }
         case .people:
             // Through the window's own connection to the control plane, which hears when
             // people change (#994).
@@ -181,7 +189,7 @@ extension SettingsScope {
     var panes: [SettingsPane] {
         switch self {
         case .thisDevice: [.appearance, .sidebar]
-        case .you: [.account, .runtimes, .agentConfiguration, .spending, .resources, .machines]
+        case .you: [.account, .runtimes, .agentConfiguration, .spending, .resources, .onEveryMachine, .machines]
         case .controlPlane: [.people, .providers, .clients, .controlPlane]
         }
     }
@@ -204,18 +212,20 @@ enum SettingsPane: String, Hashable, CaseIterable {
     case people
     /// Was Shared (#754): the raw value is what a window left open on it kept.
     case agentConfiguration = "shared"
+    /// The settings and secrets the control plane keeps for the person (#1760).
+    case onEveryMachine
 
     /// A pane of what this Mac's host keeps: its runtimes, settings, cost and resources.
     /// Machines is one only on its This Mac page.
     var isThisMacs: Bool {
         switch self {
         case .runtimes, .agentConfiguration, .spending, .resources: true
-        case .appearance, .sidebar, .account, .machines, .controlPlane, .providers, .clients, .people: false
+        case .appearance, .sidebar, .account, .machines, .controlPlane, .providers, .clients, .people, .onEveryMachine: false
         }
     }
 
     /// A pane drawn only with a control plane to show.
-    var needsControlPlane: Bool { [.controlPlane, .providers, .clients].contains(self) }
+    var needsControlPlane: Bool { [.controlPlane, .providers, .clients, .onEveryMachine].contains(self) }
 
     var title: String {
         switch self {
@@ -231,6 +241,7 @@ enum SettingsPane: String, Hashable, CaseIterable {
         case .providers: "Workspace Providers"
         case .clients: "Clients"
         case .people: "People"
+        case .onEveryMachine: UserScopeWords.title
         }
     }
 
@@ -248,6 +259,7 @@ enum SettingsPane: String, Hashable, CaseIterable {
         case .providers: "cloud"
         case .clients: "iphone"
         case .people: "person.2"
+        case .onEveryMachine: "arrow.triangle.2.circlepath"
         }
     }
 }

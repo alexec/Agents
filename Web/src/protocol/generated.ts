@@ -4958,6 +4958,23 @@ export interface UserAgentConfig {
   skills?: Record<string, string>;
 }
 
+/**
+ * settings/userPart's answer (#1760): this machine's own part, for a client to set at the user
+ * scope with Use This Mac's. An MCP server with a token in clear is refused, so no secret goes into
+ * the user settings unsealed.
+ */
+export interface UserPartHere {
+  part: UserSettingsPartName;
+  value: JSONValue;
+  /** What could not be taken, by name: a skill with files beside its SKILL.md. */
+  leftOut?: string[];
+}
+
+/** settings/userPart (#1760): a part of the user settings, as this machine has it now. */
+export interface UserPartRequest {
+  part: UserSettingsPartName;
+}
+
 /** A user's role (#994, spec 736 FR-001): an admin manages people; a member sees only their own. */
 export type UserRole = "admin" | "member";
 
@@ -6394,6 +6411,8 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   UsageRollupPeriod: { required: ["at", "rows"], optional: [] },
   UsageRollupRow: { required: ["project", "runtime", "cost", "inputTokens", "outputTokens", "thoughtTokens", "cachedReadTokens", "cachedWriteTokens", "turns", "unpricedTurns", "workingSeconds", "waitingSeconds"], optional: [] },
   UserAgentConfig: { required: [], optional: ["instructions", "personas", "skills"] },
+  UserPartHere: { required: ["part", "value"], optional: ["leftOut"] },
+  UserPartRequest: { required: ["part"], optional: [] },
   UserSecret: { required: ["name", "value"], optional: [] },
   UserSecretNames: { required: ["secrets", "sealing"], optional: [] },
   UserSecretRequest: { required: ["name"], optional: [] },

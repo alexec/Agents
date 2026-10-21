@@ -299,6 +299,8 @@ final class RemoteModel {
     @ObservationIgnored private(set) var controlPlane: DaemonClient?
     /// People (#994): the machines waiting for this person's approval, fed from the watch.
     let people = PeopleState()
+    /// The settings and secrets that follow the person to their machines (#1760).
+    let userScope = UserScopeState()
     /// What `hosts/list` last said, so the project list can name each host (058, frame H).
     /// Empty when this phone is not a client of a control plane.
     private(set) var controlHosts: [DaemonAPI.ControlHost] = []
@@ -2277,6 +2279,7 @@ final class RemoteModel {
                     for await change in control.notifications() {
                         guard let self, !Task.isCancelled else { return }
                         if await self.people.heard(change.method, change.params, on: control) { continue }
+                        if await self.userScope.heard(change.method, change.params, on: control) { continue }
                         if change.method == DaemonAPI.Notification.controlKeptChanged
                             || change.method == DaemonAPI.Notification.controlKeptDelivered {
                             await self.heardKept(change.method, change.params)

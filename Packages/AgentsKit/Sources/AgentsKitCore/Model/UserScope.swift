@@ -114,6 +114,21 @@ public extension DaemonAPI {
         public var secrets: Bool?
     }
 
+    /// `settings/userPart`, to a machine: one part as it has it, for Use This Mac's.
+    struct UserPartRequest: Codable, Sendable, Hashable {
+        public var part: UserSettingsPartName
+
+        public init(part: UserSettingsPartName) { self.part = part }
+    }
+
+    /// `settings/userPart`'s answer. `leftOut` names what could not be taken: a skill with
+    /// files beside its SKILL.md.
+    struct UserPartHere: Codable, Sendable, Hashable {
+        public var part: UserSettingsPartName
+        public var value: JSONValue
+        public var leftOut: [String]?
+    }
+
     /// `control/secretsLeft`: a machine of the person's was removed with these secrets on it.
     struct SecretsLeft: Codable, Sendable, Hashable {
         public var host: String
@@ -133,6 +148,8 @@ public extension DaemonAPI.Method {
     static let userRemoveSecret = "user/removeSecret"
     /// `{}` → `UserSecretNames` (#1760).
     static let userSecretNames = "user/secretNames"
+    /// To a machine: `UserPartRequest` → `UserPartHere` (#1760).
+    static let settingsUserPart = "settings/userPart"
 }
 
 public extension DaemonAPI.Notification {
@@ -140,4 +157,89 @@ public extension DaemonAPI.Notification {
     static let controlUserSettingsChanged = "control/userSettingsChanged"
     /// `SecretsLeft` (#1760).
     static let controlSecretsLeft = "control/secretsLeft"
+}
+
+/// The words of You ▸ On Every Machine (#1760), for the window and the Remote. The web page
+/// says the same in `Web/src/model/userScope.ts`.
+public enum UserScopeWords {
+    public static let title = "On Every Machine"
+    public static let secretsHeading = "Secrets"
+    public static let partsHeading = "Settings"
+
+    public static func partTitle(_ part: DaemonAPI.UserSettingsPartName) -> String {
+        switch part {
+        case .mcpServers: "MCP servers"
+        case .agentConfig: "Agent configuration"
+        case .runtimes: "Agent runtime choices"
+        case .costLimits: "Cost limits"
+        case .resources: "Resources"
+        }
+    }
+
+    /// What each part holds, under its title.
+    public static func partDetail(_ part: DaemonAPI.UserSettingsPartName) -> String {
+        switch part {
+        case .mcpServers: "Your own servers in ~/.agents/mcp.json."
+        case .agentConfig: "Your instructions, personas and one-file skills in ~/.agents."
+        case .runtimes: "Each runtime's sandbox and permission choices. Sign-ins stay on each machine."
+        case .costLimits: "The most an agent and a day may spend."
+        case .resources: "What agents take turns with, such as build."
+        }
+    }
+
+    public static func partState(_ value: JSONValue?, updated: String?) -> String {
+        guard value != nil else { return "Each machine keeps its own." }
+        return "The same on every machine of yours."
+    }
+
+    public static func useHere(_ machine: String) -> String { "Use \(machine)’s" }
+    public static let stop = "Each Machine Its Own"
+    public static let addSecret = "Add a Secret…"
+
+    public static let secretsFoot = "A secret goes only to your own machines, into ~/.agents-secrets/secrets.env. "
+        + "Write ${NAME} for it in an MCP server's env or headers. Nobody can read it back, you included: to change it, replace it."
+    public static let noSealing = "This control plane has no key to seal secrets with, so it keeps none. "
+        + "Its operator starts it with a key file or AGENTS_CONTROL_KMS."
+    public static let partsFoot = "A setting here is the same on every machine of yours, and on each new one as it joins. "
+        + "On a machine, it is changed here, not in its own pane."
+    public static let partsFootNoTake = "Choose on the Mac which of its settings are the same on every machine of yours."
+
+    /// A secret's row: where it is.
+    public static func machines(_ row: DaemonAPI.UserSecretRow) -> String {
+        switch row.machines.count {
+        case 0: "On no machine yet"
+        case 1: "On 1 machine"
+        default: "On \(row.machines.count) machines"
+        }
+    }
+
+    /// Under a secret that was on a machine since removed (FR-026).
+    public static func leftOn(_ row: DaemonAPI.UserSecretRow) -> String? {
+        guard let left = row.leftOn, !left.isEmpty else { return nil }
+        let names = left.map(\.name).joined(separator: ", ")
+        return "It was on \(names), which was removed. Change it where it was issued, then replace it here."
+    }
+
+    /// When a machine of yours went with secrets on it (control/secretsLeft).
+    public static func secretsLeft(_ left: DaemonAPI.SecretsLeft) -> String {
+        let names = left.secrets.joined(separator: ", ")
+        return "\(left.name) was removed with \(left.secrets.count == 1 ? "this secret" : "these secrets") on it: \(names). "
+            + "Change \(left.secrets.count == 1 ? "it" : "them") where \(left.secrets.count == 1 ? "it was" : "they were") issued."
+    }
+
+    /// A secret's name as the person types it: capital letters, digits and _.
+    public static func isSecretName(_ name: String) -> Bool {
+        name.range(of: #"^[A-Z_][A-Z0-9_]{0,63}$"#, options: .regularExpression) != nil
+    }
+
+    public static let nameHint = "Capital letters, digits and _, such as GITHUB_TOKEN."
+
+    public static func refusal(_ error: any Error) -> String {
+        if let error = error as? JSONRPCError {
+            return error.code == JSONRPCError.methodNotFound
+                ? "This control plane does not keep settings for you yet. Update it."
+                : error.message
+        }
+        return "The control plane can’t be reached."
+    }
 }

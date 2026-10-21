@@ -13,7 +13,7 @@ import type {
   PagesChangedNotification, PinsChangedNotification, PinView, ViewPin, ListCursor, ListRequest, FileMentionDTO, SandboxChoice, RuntimeAllowances,
   GuardedChange, GuardedChangeReading, HostJoinStatus, RequiredCapabilities, KeptDelivered, KeptList, KeptRequest, Approval, ApprovalAction, UsageHistory, TimeHistory, Milestones,
   BuildOutputRemoved, ProjectWorktrees, RemovalCheck, WorktreeSize, WorktreeSummary, WorktreesSized, FindResult,
-  BackupRestoreResult, BackupSettings, BackupState, ControlPerson, JoinDecided, JoinRequest } from "../protocol/generated";
+  BackupRestoreResult, BackupSettings, BackupState, ControlPerson, JoinDecided, JoinRequest, SecretsLeft } from "../protocol/generated";
 import { Failure } from "../protocol/generated";
 import { CallFailed, type Link } from "../wire/link";
 import type { FolderGoneAsk } from "./missingFolder";
@@ -416,6 +416,10 @@ export class Work {
   readonly joinRequests = signal<JoinRequest[]>([]);
   /** Counts each control/peopleChanged (#994): Settings ▸ People loads its list again when it moves. */
   readonly peopleChanges = signal(0);
+  /** Counts each control/userSettingsChanged (#1760): You ▸ On Every Machine loads again when it moves. */
+  readonly userScopeChanges = signal(0);
+  /** The last machine of the person's removed with secrets on it (#1760, control/secretsLeft), until read. */
+  readonly secretsLeft = signal<SecretsLeft | null>(null);
   /** The mode last chosen for each runtime, by host (029). */
   readonly rememberedModes = signal<Record<string, Record<string, JSONValue>>>({});
 
@@ -1123,6 +1127,15 @@ export class Store extends Work {
       }
       if (method === "control/peopleChanged") {
         this.peopleChanges.value += 1;
+        return;
+      }
+      if (method === "control/userSettingsChanged") {
+        this.userScopeChanges.value += 1;
+        return;
+      }
+      if (method === "control/secretsLeft") {
+        this.secretsLeft.value = (params as SecretsLeft | null) ?? null;
+        this.userScopeChanges.value += 1;
         return;
       }
       if (method === "control/thisMacHostChanged") {

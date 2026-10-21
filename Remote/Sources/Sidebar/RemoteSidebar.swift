@@ -763,6 +763,16 @@ private struct RemoteSettings: View {
                         ServerBackupsSettingsSection()
                     }
                     .task { await model.refreshBackupState() }
+                    // The settings and secrets the control plane keeps for you (#1760).
+                    if !model.needsPairing {
+                        NavigationLink {
+                            UserScopePane(control: model.controlPlane, state: model.userScope)
+                                .navigationTitle(UserScopeWords.title)
+                                .navigationBarTitleDisplayMode(.inline)
+                        } label: {
+                            Label(UserScopeWords.title, systemImage: "arrow.triangle.2.circlepath")
+                        }
+                    }
                 }
                 .paperListRow()
                 Section {

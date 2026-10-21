@@ -5704,6 +5704,19 @@ type UserAgentConfig struct {
 	Skills map[string]string `json:"skills,omitzero"`
 }
 
+// settings/userPart's answer (#1760): this machine's own part, for a client to set at the user scope with Use This Mac's. An MCP server with a token in clear is refused, so no secret goes into the user settings unsealed.
+type UserPartHere struct {
+	Part  UserSettingsPartName `json:"part"`
+	Value JSONValue            `json:"value"`
+	// What could not be taken, by name: a skill with files beside its SKILL.md.
+	LeftOut []string `json:"leftOut,omitzero"`
+}
+
+// settings/userPart (#1760): a part of the user settings, as this machine has it now.
+type UserPartRequest struct {
+	Part UserSettingsPartName `json:"part"`
+}
+
 // A user's role (#994, spec 736 FR-001): an admin manages people; a member sees only their own.
 type UserRole string
 
