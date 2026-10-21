@@ -1,9 +1,9 @@
 {
   "permissions": {
     "allow": [
-      "Bash(gh api -X POST repos/alexec/Agents/security-advisories *)",
-      "Bash(gh api -X POST repos/alexec/Agents/security-advisories/*)",
-      "Bash(gh api -X PATCH repos/alexec/Agents/security-advisories/*)"
+      "Bash(python3 .agents/skills/release/scripts/advisory.py create*)",
+      "Bash(python3 .agents/skills/release/scripts/advisory.py fork GHSA-*)",
+      "Bash(python3 .agents/skills/release/scripts/advisory.py fixed GHSA-*)"
     ]
   }
 }

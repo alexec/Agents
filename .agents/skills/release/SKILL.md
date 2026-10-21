@@ -135,22 +135,24 @@ For each open high or medium security finding:
    at the end of the description, and send the Scrum Master nothing for it. It does not
    block. (In v0.6.0 both high fixes were on main an hour before their advisories.)
 3. If there is no advisory, make it, and its private fork. Write the JSON with a quoted
-   heredoc or from Python, never with `echo` (zsh's `echo` breaks the escapes).
-   `.claude/settings.json` allows these two calls, so auto mode does not refuse them:
+   heredoc or from Python, never with `echo` (zsh's `echo` breaks the escapes). Use
+   `.agents/skills/release/scripts/advisory.py`, which sends only these fields.
+   `.claude/settings.json` allows it, and no other change to an advisory, so auto mode
+   does not refuse it:
 
    ```sh
-   gh api -X POST repos/alexec/Agents/security-advisories --input - <<'EOF'
+   python3 .agents/skills/release/scripts/advisory.py create <<'EOF'
    {"summary": "<id>: <short title>", "description": "<the finding's fields, and its fix branch if the review made one>",
     "severity": "<critical, high or medium>", "vulnerabilities": [{"package": {"ecosystem": "swift", "name": "Agents"}}]}
    EOF
-   gh api -X POST repos/alexec/Agents/security-advisories/<ghsa_id>/forks
+   python3 .agents/skills/release/scripts/advisory.py fork <ghsa_id>
    ```
 
 4. Send the Scrum Master the advisory's URL only (it is private). Its lane fixes the
    finding on the advisory's private fork, then opens the pull request on `main` with a
    title and body that name no attack ("Harden token comparison"), and writes
    `Fixed by <merge commit> on main.` at the end of the advisory's description
-   (`gh api -X PATCH …/security-advisories/<ghsa_id>`).
+   (`python3 .agents/skills/release/scripts/advisory.py fixed <ghsa_id> <merge commit>`).
 
 An advisory is fixed when its description says `Fixed by <commit>` and that commit is on
 `origin/main`. Leave the advisory a draft: publishing it after the release is Alex's.
