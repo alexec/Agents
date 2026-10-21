@@ -7,7 +7,7 @@ import type { Store } from "../model/store";
 import type { WorktreeSummary } from "../protocol/generated";
 import { folderKey } from "../model/groups";
 import {
-  cleanUpPrompt, forCleanup, freedWords, isIdle, measuring, removalMessage, sizeWords, worktreeDetail,
+  cleanUpDraft, forCleanup, freedWords, isIdle, measuring, removalMessage, sizeWords, worktreeDetail,
 } from "../model/worktrees";
 
 /** One host's worktrees, a section per project. */
@@ -18,7 +18,8 @@ export function WorktreesList({ store, host }: { store: Store; host: string }) {
     store.projects.value[host]?.find((p) => folderKey(p.project.folder) === folderKey(folder))?.name
       ?? decodeURIComponent(folder.replace(/\/$/, "").split("/").pop() ?? folder);
   const cleanUp = (folder: string) => {
-    store.drafts.set(`new|${host}|${folderKey(folder)}`, { text: cleanUpPrompt, attachments: [] });
+    const key = `new|${host}|${folderKey(folder)}`;
+    store.drafts.set(key, cleanUpDraft(store.drafts.get(key)));
     // The hash the router reads, as Activity's navigate writes one: importing the router here would
     // have it read the location as the module loads.
     location.hash = "#/" + ["h", host, "p", folder, "n", "1"].map(encodeURIComponent).join("/");

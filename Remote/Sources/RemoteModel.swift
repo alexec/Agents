@@ -3540,10 +3540,12 @@ final class RemoteModel {
         }
     }
 
-    /// Clean up worktrees (030): the project's new session, its prompt offered the words,
-    /// as the window's does.
+    /// Clean up worktrees (030): the project's new session, its prompt offered the words
+    /// after anything half-typed there (#1863), as the window's does.
     func offerCleanUp(in project: URL) {
-        StartDraftKeeper.shared.note(WorktreeTally.cleanUpPrompt, [], in: project)
+        let keeper = StartDraftKeeper.shared
+        let draft = Draft.givingBack(WorktreeTally.cleanUpPrompt, to: keeper.draft(in: project))
+        keeper.note(draft.text, draft.attachments, in: project)
         StartDraftKeeper.shared.flush()
         openActivity = nil
         sidebarItem = .project(ProjectKey(host: .mac, folder: project))

@@ -42,3 +42,11 @@ test("worktrees: a size heard after the list fills it in, and the project holdin
   assert.equal(w.worktreeDetail(tree("x", 1, 2), { bytes: 4.1 * gb, partial: false }), "agents/x · 2 agents working · 4.1 GB");
   assert.equal(w.statusSummary({ uncommitted: 2, unmerged: 1, ahead: 1 }), "2 uncommitted · 1 unmerged · ↑1");
 });
+
+test("worktrees: Clean up worktrees keeps a half-typed draft and its files (#1863)", () => {
+  const file = { id: "f", name: "notes.md" };
+  assert.deepEqual(w.cleanUpDraft(undefined), { text: w.cleanUpPrompt, attachments: [] });
+  assert.deepEqual(w.cleanUpDraft({ text: "  ", attachments: [file] }), { text: w.cleanUpPrompt, attachments: [file] });
+  assert.deepEqual(w.cleanUpDraft({ text: "Half a thought", attachments: [file] }),
+    { text: `Half a thought\n\n${w.cleanUpPrompt}`, attachments: [file] });
+});
