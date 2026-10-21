@@ -577,11 +577,12 @@ func (s *Service) syncRelays() {
 // which a host checks its local socket against (#1118). Only a Mac's window is on the
 // same machine as a host, and only its own person's reaches it there (FR-020).
 func (s *Service) hostClients(host string) wire.HostClients {
-	out := wire.HostClients{Clients: []wire.HostClient{}}
 	owner := s.ownerOf(host)
+	out := wire.HostClients{Clients: []wire.HostClient{}, User: &owner}
 	for _, c := range s.records.Clients() {
-		if c.Kind == records.KindMac && len(c.PublicKey) > 0 && s.PersonOf(c.ID) == owner {
-			out.Clients = append(out.Clients, wire.HostClient{ID: wire.UUID(c.ID), Kind: c.Kind, PublicKey: c.PublicKey})
+		if person := s.PersonOf(c.ID); c.Kind == records.KindMac && len(c.PublicKey) > 0 && person == owner {
+			out.Clients = append(out.Clients, wire.HostClient{ID: wire.UUID(c.ID), Kind: c.Kind, PublicKey: c.PublicKey,
+				Person: &person})
 		}
 	}
 	return out

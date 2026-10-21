@@ -52,7 +52,7 @@
 - [ ] T026 [US3] Add `joins/`: `hosts/requestJoin`, `hosts/approveJoin`, `hosts/denyJoin`, and `control/joinRequested` to the person's or admins' clients (FR-017, R5).
 - [ ] T027 [US3] `agentsd` asks to join when it has no code: it prints the code and waits, in `Go/internal/controllink/` and `Go/cmd/agentsd/`. The one-line install command gains `--person`.
 - [ ] T028 [US3] Workspace providers get a join token for each start and pass `AGENTS_JOIN_TOKEN`, in `Go/internal/controlplane/providers/` and `workspaces.go`. The started machine belongs to the starter.
-- [ ] T029 [US3] The direct path (#1118) only when the window's person owns this Mac's machine (FR-020). `signInFrom` and `gitFrom` only within one user (FR-021).
+- [x] T029 [US3] The direct path (#1118) only when the window's person owns this Mac's machine (FR-020). `signInFrom` and `gitFrom` only within one user (FR-021).
 - [ ] T030 [P] [US3] The machine approval card on all three clients, in `Shared/UI/ApprovalViews.swift` and `Web/src/views/Approval.tsx`.
 
 **Checkpoint**: T1 and T2 can be used by two people. Walk `quickstart.md` steps 1–3.

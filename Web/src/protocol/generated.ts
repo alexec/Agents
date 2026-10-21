@@ -2235,6 +2235,11 @@ export interface HostClient {
   id: UUID;
   kind: string;
   publicKey: Base64;
+  /**
+   * The person the window belongs to (#994). The host lets it in only when it is the host's own
+   * user (FR-020).
+   */
+  person?: string;
 }
 
 /**
@@ -2243,6 +2248,11 @@ export interface HostClient {
  */
 export interface HostClients {
   clients: HostClient[];
+  /**
+   * The user the host belongs to (#994). With it, the host lets in only a window whose person is
+   * that user (FR-020); without it (an older control plane), every window listed.
+   */
+  user?: string;
 }
 
 /** host/hello, on every connect of an uplink. `implementation` is `swift` or `go` (#1134). */
@@ -5856,8 +5866,8 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   Headline: { required: ["h1", "h2", "h3"], optional: ["answers"] },
   HelperLimits: { required: [], optional: ["running", "notArchived", "queued", "agentsMayArchive"] },
   HostAnnounce: { required: ["publicKey", "name", "platform", "version", "machineID"], optional: ["relay", "implementation"] },
-  HostClient: { required: ["id", "kind", "publicKey"], optional: [] },
-  HostClients: { required: ["clients"], optional: [] },
+  HostClient: { required: ["id", "kind", "publicKey"], optional: ["person"] },
+  HostClients: { required: ["clients"], optional: ["user"] },
   HostHello: { required: ["version", "platform", "machineID"], optional: ["host", "name", "relay", "implementation", "capabilities"] },
   HostInstall: { required: ["destination"], optional: ["name", "key", "trust", "tunnel"] },
   HostJoinAsk: { required: ["name", "platform", "publicKey"], optional: ["version", "machineID", "person"] },

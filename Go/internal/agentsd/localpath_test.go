@@ -248,3 +248,26 @@ func TestTheLocalSocketMovesWithARotatedKey(t *testing.T) {
 	waitFor(t, "the socket at the new key's name", at("new key"))
 	waitFor(t, "the old name gone", func() bool { return !at("old key")() })
 }
+
+// A window of another person is never let in on the local socket, even if a control plane
+// lists it, once it says whose host this is (FR-020); one of the host's own user is.
+func TestOnlyTheHostsOwnUsersWindowIsLetIn(t *testing.T) {
+	d, _ := start(t, t.TempDir())
+	mine, listedMine := newWindow(t)
+	theirs, listedTheirs := newWindow(t)
+	alex, sam := "alex", "sam"
+	listedMine.Person, listedTheirs.Person = &alex, &sam
+	d.SetLocalClients(wire.HostClients{User: &alex, Clients: []wire.HostClient{listedMine, listedTheirs}})
+	path := serveLocal(t, d, RoleWindow)
+	if _, _, reply := prove(t, path, mine); reply.OK == nil {
+		t.Fatalf("the host's own user's window: %+v", reply)
+	}
+	if _, _, reply := prove(t, path, theirs); reply.OK != nil {
+		t.Fatal("another person's window was let in")
+	}
+	// An older control plane says no user: every window listed, as before.
+	d.SetLocalClients(wire.HostClients{Clients: []wire.HostClient{listedTheirs}})
+	if _, ok := d.localClient(theirs.id); !ok {
+		t.Fatal("a window an older control plane listed was not kept")
+	}
+}

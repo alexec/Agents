@@ -91,7 +91,7 @@ var writes = map[string]bool{
 	"control/setProjectDetection": true, "clients/startPairing": true, "clients/forget": true,
 	"devices/startPairing": true, "devices/forget": true, "clients/setPushToken": true,
 	"clients/setActivityToken": true,
-	"control/setAuditDays": true, "control/rotate": true, "people/invite": true, "people/setRole": true, "people/remove": true,
+	"control/setAuditDays":     true, "control/rotate": true, "people/invite": true, "people/setRole": true, "people/remove": true,
 	"hosts/approveJoin": true, "hosts/denyJoin": true,
 }
 
@@ -278,7 +278,7 @@ func (m *Methods) Handle(method string, params json.RawMessage, from Caller) (an
 			return nil, err
 		}
 		record := m.records.Host(string(request.Host))
-		if record == nil || m.records.Host(string(request.From)) == nil {
+		if record == nil || m.records.Host(string(request.From)) == nil || !m.sameUser(record.ID, string(request.From)) {
 			return nil, fail(noSuchHost, "No such host.")
 		}
 		lends := map[string]string{}
@@ -446,8 +446,9 @@ func (m *Methods) removeHost(ctx context.Context, host string, from Caller) (boo
 func (m *Methods) hostRow(h records.HostRecord) wire.ControlHost {
 	state, _ := m.router.Described(h.ID)["state"].(string)
 	row := wire.ControlHost{ID: wire.HostID(h.ID), Name: h.Name, Platform: h.Platform, Version: h.Version, State: state,
-		Reach: "dialOut", MachineID: h.MachineID, Relay: h.Relay, SignInFrom: hostIDs(h.SignInFrom), GitFrom: hostIDs(h.GitFrom),
-		Owner: optional(m.s.ownerOf(h.ID))}
+		Reach: "dialOut", MachineID: h.MachineID, Relay: h.Relay, SignInFrom: hostIDs(m.sameUsers(h.ID, h.SignInFrom)),
+		GitFrom: hostIDs(m.sameUsers(h.ID, h.GitFrom)),
+		Owner:   optional(m.s.ownerOf(h.ID))}
 	if raw, ok := h.Extra["implementation"]; ok {
 		var impl string
 		json.Unmarshal(raw, &impl)
@@ -780,7 +781,7 @@ func (m *Methods) HostSaid(host, method string, params json.RawMessage) (any, er
 			m.records.Load(ctx)
 		}
 		record := m.records.Host(host)
-		if record == nil || record.SignInFrom[request.Runtime] == "" {
+		if record == nil || record.SignInFrom[request.Runtime] == "" || !m.sameUser(host, record.SignInFrom[request.Runtime]) {
 			return nil, fail(notPermitted, "No host lends this host its %s sign-in.", request.Runtime)
 		}
 		if !m.router.OpenTunnel(host, record.SignInFrom[request.Runtime], request.Runtime, request.Ref) {
@@ -897,6 +898,25 @@ func isGitServer(s string) bool {
 	return true
 }
 
+// sameUser says two machines belong to the same user: only such a pair lends a sign-in or
+// git access (FR-021).
+func (m *Methods) sameUser(a, b string) bool { return m.s.ownerOf(a) == m.s.ownerOf(b) }
+
+// sameUsers is a host's lends of only its own user's machines: one made before the team
+// tier by another user's machine is not shown, nor used (FR-021).
+func (m *Methods) sameUsers(host string, lends map[string]string) map[string]string {
+	if lends == nil {
+		return nil
+	}
+	out := map[string]string{}
+	for k, lender := range lends {
+		if m.sameUser(host, lender) {
+			out[k] = lender
+		}
+	}
+	return out
+}
+
 // lendGit is hosts/lendGit: kept for a yes, taken back for a no; either ends a waiting ask.
 func (m *Methods) lendGit(ctx context.Context, request wire.LendGit) error {
 	if !isGitServer(request.Server) {
@@ -904,7 +924,7 @@ func (m *Methods) lendGit(ctx context.Context, request wire.LendGit) error {
 	}
 	host := string(request.Host)
 	record := m.records.Host(host)
-	if record == nil || m.records.Host(string(request.From)) == nil {
+	if record == nil || m.records.Host(string(request.From)) == nil || !m.sameUser(host, string(request.From)) {
 		return fail(noSuchHost, "No such host.")
 	}
 	lends := map[string]string{}
@@ -952,6 +972,10 @@ func (m *Methods) gitCredential(ctx context.Context, host string, request wire.G
 		return nil, fail(noSuchHost, "No such host.")
 	}
 	lender := record.GitFrom[server]
+	if lender != "" && !m.sameUser(host, lender) {
+		// Lent before the team tier by another user's machine: never theirs to use (FR-021).
+		lender = ""
+	}
 	if lender == "" {
 		mac := m.gitLender(host)
 		if mac == "" {
@@ -960,7 +984,7 @@ func (m *Methods) gitCredential(ctx context.Context, host string, request wire.G
 		if !m.askToLendGit(host, mac, server) {
 			return nil, fail(notPermitted, "%s may not use the git access of %s for %s.", record.Name, m.name(mac), server)
 		}
-		if r := m.records.Host(host); r != nil {
+		if r := m.records.Host(host); r != nil && m.sameUser(host, r.GitFrom[server]) {
 			lender = r.GitFrom[server]
 		}
 	}
@@ -985,11 +1009,12 @@ func (m *Methods) gitCredential(ctx context.Context, host string, request wire.G
 }
 
 // gitLender is the Mac whose git access a host would use: the home host if it is a Mac,
-// else the first connected Mac. Never the host itself, and never a relay.
+// else the first connected Mac. Never the host itself, never a relay, and only a Mac of
+// the host's own user (FR-021).
 func (m *Methods) gitLender(host string) string {
 	var macs []string
 	for _, r := range m.records.Hosts() {
-		if r.ID == host || r.Relay != nil || !strings.HasPrefix(r.Platform, "macOS") {
+		if r.ID == host || r.Relay != nil || !strings.HasPrefix(r.Platform, "macOS") || !m.sameUser(host, r.ID) {
 			continue
 		}
 		if s, ok := m.router.State(r.ID); ok && s.online() {

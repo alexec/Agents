@@ -432,3 +432,69 @@ func TestACodeMadeForAPersonMakesTheirMachine(t *testing.T) {
 		t.Fatalf("%+v", h)
 	}
 }
+
+// FR-020, FR-021: a machine is told only its own user's windows, and lends and borrows a
+// sign-in or git access only within one user. A lend made before the team tier by another
+// user's machine is neither shown nor used.
+func TestLendsAndWindowsStayWithinOneUser(t *testing.T) {
+	p := startPlane(t, store.NewMemory(), controllink.NewPrivateKey())
+	ctx := context.Background()
+	_, alexWindow := p.client("Alex's Mac")
+	alex := &person{id: p.s.localOwner(), window: alexWindow}
+	sam := p.invite(alexWindow, "Sam", wire.UserRoleMember)
+	alexMac := p.machine(alex, "ALEX-MAC").member.Host
+	samBox := p.machine(sam, "SAM-BOX").member.Host
+	samMac := p.machine(sam, "SAM-MAC").member.Host
+	for _, mac := range []string{alexMac, samMac} {
+		record := *p.s.Records().Host(mac)
+		record.Platform = "macOS arm64"
+		if err := p.s.Records().SaveHost(ctx, record); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// host/clients names the host's user, and only that user's windows.
+	clients := p.s.hostClients(samBox)
+	if clients.User == nil || *clients.User != sam.id {
+		t.Fatalf("user: %+v", clients.User)
+	}
+	for _, c := range clients.Clients {
+		if c.Person == nil || *c.Person != sam.id {
+			t.Fatalf("another person's window told to Sam's machine: %+v", c)
+		}
+	}
+
+	// Sam cannot name Alex's machine as a lender.
+	if e := callError(t, sam.window, "", "hosts/lendSignIn", wire.LendSignIn{Host: wire.HostID(samBox), From: wire.HostID(alexMac),
+		Runtime: "claude", Allowed: true}); !strings.Contains(e, "-32091") {
+		t.Fatalf("a lend from another user's machine: %s", e)
+	}
+	call(t, sam.window, "", "hosts/lendSignIn", wire.LendSignIn{Host: wire.HostID(samBox), From: wire.HostID(samMac),
+		Runtime: "codex", Allowed: true})
+
+	// A lend from before the team tier, from Alex's Mac, is not shown and not used.
+	record := *p.s.Records().Host(samBox)
+	record.SignInFrom["claude"] = alexMac
+	record.GitFrom = map[string]string{"github.com": alexMac}
+	if err := p.s.Records().SaveHost(ctx, record); err != nil {
+		t.Fatal(err)
+	}
+	var hosts []wire.ControlHost
+	json.Unmarshal(call(t, sam.window, "", "hosts/list", nil), &hosts)
+	for _, h := range hosts {
+		if string(h.ID) != samBox {
+			continue
+		}
+		if _, ok := h.SignInFrom["claude"]; ok || h.GitFrom != nil || string(h.SignInFrom["codex"]) != samMac {
+			t.Fatalf("Sam's machine's lends: %+v %+v", h.SignInFrom, h.GitFrom)
+		}
+	}
+	params, _ := json.Marshal(wire.TunnelOpen{Runtime: "claude", Ref: "r"})
+	if _, err := p.s.methods.HostSaid(samBox, "tunnel/open", params); err == nil || !strings.Contains(err.Error(), "-32045") {
+		t.Fatalf("a tunnel to another user's machine: %v", err)
+	}
+	// Git access is asked of Sam's own Mac only, never Alex's.
+	if lender := p.s.methods.gitLender(samBox); lender != samMac {
+		t.Fatalf("git lender: %s", lender)
+	}
+}
