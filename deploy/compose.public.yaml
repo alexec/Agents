@@ -29,8 +29,17 @@
 # notices. Empty (make-secrets.sh without --apns), it sends no pushes and says so in its log.
 name: agents-control
 
+# Docker's json-file driver keeps every log line for ever on the one disk (#2290): each service
+# keeps at most 3 files of 10 MB in the local driver.
+x-logging: &logging
+  driver: local
+  options:
+    max-size: 10m
+    max-file: "3"
+
 services:
   control:
+    logging: *logging
     build:
       context: ..
       dockerfile: deploy/Containerfile
@@ -90,6 +99,7 @@ services:
       - data:/data
 
   caddy:
+    logging: *logging
     image: caddy:2
     restart: unless-stopped
     depends_on: [control]

@@ -258,6 +258,10 @@ else
 	curl -fsS "https://$domain/healthz" >/dev/null ||
 		die "https://$domain/healthz does not answer: see gcloud compute ssh $name --zone $zone --command '$compose logs caddy'"
 fi
+# Each release pulls a new image, and the old ones stay on the one 30 GB disk with the store
+# (#2290). Once the new one serves, every image no container uses goes.
+say "== the images no container uses, removed"
+vm_ssh 'sudo docker image prune -af'
 # The version Settings ▸ Control plane shows is the running binary's own.
 if ((dry_run)); then
 	vm_ssh "$compose exec -T control /agents-control version"

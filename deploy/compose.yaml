@@ -7,6 +7,14 @@
 # Clients and hosts reach https://127.0.0.1:8443 (Caddy), with the pin in deploy/secrets/pin.
 # MinIO's console is not published; its API is on 127.0.0.1:19100 for looking at the bucket.
 
+# Docker's json-file driver keeps every log line for ever on the one disk (#2290): each service
+# keeps at most 3 files of 10 MB in the local driver.
+x-logging: &logging
+  driver: local
+  options:
+    max-size: 10m
+    max-file: "3"
+
 x-copy: &copy
   build:
     context: ..
@@ -14,6 +22,7 @@ x-copy: &copy
     args:
       VERSION: ${AGENTS_VERSION:-dev}
   image: agents-control:walk
+  logging: *logging
   restart: unless-stopped
   depends_on:
     bucket:
@@ -40,6 +49,7 @@ x-copy: &copy
 
 services:
   minio:
+    logging: *logging
     image: cgr.dev/chainguard/minio:latest
     command: ["server", "/data"]
     environment:
@@ -49,6 +59,7 @@ services:
 
   # Makes the bucket once, signed like any client.
   bucket:
+    logging: *logging
     image: curlimages/curl:latest
     depends_on: [minio]
     command:
@@ -79,6 +90,7 @@ services:
       AGENTS_CONTROL_PEER_URL: http://cp3:8791
 
   caddy:
+    logging: *logging
     image: caddy:2
     depends_on: [cp1, cp2, cp3]
     ports: ["127.0.0.1:8443:8443"]
