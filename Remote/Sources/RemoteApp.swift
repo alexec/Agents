@@ -130,8 +130,8 @@ struct RemoteView: View {
 
     /// What is open over the project, in the order each was opened from the one before:
     /// a pinned page, a workflow, a conversation. The first is the detail's own page, the
-    /// one the sidebar lights; the rest are pushed over it. With none, the project's page
-    /// is a new session in it (#366).
+    /// one the sidebar lights; the rest are pushed over it. With none, a new session in the
+    /// project when one was asked for (#366), else nothing (#2090).
     private var routes: [RemoteRoute] {
         let open = [model.openArchive ? RemoteRoute.archive : nil, model.openMCPServers ? RemoteRoute.mcpServers : nil,
                     model.openPin.map(RemoteRoute.page),
@@ -139,7 +139,8 @@ struct RemoteView: View {
                     model.openReview.map(RemoteRoute.review)]
             .compactMap { $0 }
         // A project with nothing open over it starts a session (#366): its New session row (#375).
-        if open.isEmpty, model.selectedProject != nil { return [.start] }
+        // Only when asked for: leaving a session does not open one (#2090).
+        if open.isEmpty, model.selectedProject != nil, model.composing { return [.start] }
         return open
     }
 
@@ -169,8 +170,7 @@ struct RemoteView: View {
                     } else if let activity = model.openActivity {
                         activityPage(activity)
                     } else {
-                        ContentUnavailableView("Nothing open", systemImage: "sidebar.left",
-                                               description: Text("Pick a session, a workflow or a project."))
+                        NothingPickedPage()
                     }
                 }
                 .navigationDestination(for: RemoteRoute.self) { page($0) }
@@ -195,8 +195,14 @@ struct RemoteView: View {
         }
         // Something picked, here or from a banner, a widget or a start, is shown; back to
         // the list on a phone puts it down, so the same row opens it again.
+        // Nothing left to show, as after Archive: back to the list it came from (#2090).
         .onChange(of: model.sidebarItem) { _, item in
-            if item != nil { compactColumn = .detail }
+            model.startPagesMoved()
+            if item != nil {
+                compactColumn = .detail
+            } else if sizeClass == .compact, model.openActivity == nil {
+                compactColumn = .sidebar
+            }
         }
         .onChange(of: compactColumn) { _, column in
             if column == .sidebar, sizeClass == .compact { model.sidebarItem = nil }
@@ -467,5 +473,18 @@ private struct ArchiveUndoOverlay: ViewModifier {
                 }
             }
             .animation(.easeOut(duration: 0.2), value: model.archiveUndo?.id)
+    }
+}
+
+/// The detail with nothing picked (#2090): what the Mac's window says, in the Remote's words.
+/// Leaving a session comes here on an iPad, and never to New session.
+struct NothingPickedPage: View {
+    var body: some View {
+        ContentUnavailableView {
+            Label("Nothing selected", systemImage: "sidebar.left")
+        } description: {
+            Text("Pick a session to read it, or New Session to start one.")
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }

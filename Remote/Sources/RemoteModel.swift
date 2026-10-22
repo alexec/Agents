@@ -60,6 +60,7 @@ final class RemoteModel {
     var selectedProject: URL? {
         didSet {
             guard selectedProject != oldValue else { return }
+            composing = false
             selection = nil
             openWorkflow = nil
             openPin = nil
@@ -70,10 +71,17 @@ final class RemoteModel {
         }
     }
 
+    /// A new session is being written in the selected project (#2090), the Mac's
+    /// `composing`: set only by asking for one (New Session, +, a link), and let go by
+    /// anything else opening. Leaving a session, by Archive or by its going, never opens
+    /// New session: with nothing open the detail says nothing is picked.
+    var composing = false
+
     /// The conversation open, if any. Set by the push, cleared by the back button.
     var selection: UUID? {
         didSet {
             guard selection != oldValue else { return }
+            if selection != nil { composing = false }
             // A Review page pushed over the last chat is not left over the next (#1472).
             openReview = nil
             work.watching = selection
@@ -720,7 +728,8 @@ final class RemoteModel {
     /// was opened from that is pushed over it in the detail. A project chosen with nothing
     /// open over it starts a new session in it, as the Mac's New session row does (#375):
     /// only that row and the project's New Session (long press, swipe) choose it so; a
-    /// tap on the project's own row only folds it.
+    /// tap on the project's own row only folds it. Nothing open and no new session asked
+    /// for, and nothing is picked (#2090).
     var sidebarItem: SidebarItem? {
         get {
             if let openActivity { return openActivity }
@@ -732,9 +741,12 @@ final class RemoteModel {
             if let openWorkflow { return .workflow(openWorkflow, in: key) }
             if let selection { return .session(selection) }
             if let openReview { return .review(openReview, in: key) }
-            return .project(key)
+            return composing ? .project(key) : nil
         }
         set {
+            defer {
+                if case .project = newValue { composing = true } else { composing = false }
+            }
             switch newValue {
             case nil:
                 openActivity = nil
@@ -888,9 +900,47 @@ final class RemoteModel {
     var startingIn: URL? {
         didSet {
             guard startingIn != oldValue else { return }
-            if let startingIn { Task { await openStart(in: startingIn) } } else { startPage.release(); closeStart() }
+            if let startingIn { queueOpenStart(startingIn) } else { closeStart() }
         }
     }
+
+    /// The page goes to whichever showing holds it now (#2089): the one under the showing
+    /// that went, or none. `afresh` opens it again even in the same project, for a showing
+    /// that has had nothing behind it since its agent started.
+    private func startPageMoved(afresh: Bool) {
+        let next = startPage.key
+        note("start: page now held for \(next?.lastPathComponent ?? "nothing")")
+        if afresh, let next, next == startingIn {
+            closeStart()
+            queueOpenStart(next)
+        } else {
+            startingIn = next
+        }
+        if next == nil { startPageLetGo += 1 }
+    }
+
+    /// The projects whose New session is asked for now (#2090): the sidebar's pick, and each
+    /// project scene's. What SwiftUI says came and went is not trusted beyond these (#2089).
+    private var startPagesWanted: [URL] {
+        var wanted: [URL] = []
+        if case .project(let key) = sidebarItem { wanted.append(key.folder) }
+        for state in projectScenes.values {
+            if case .project(let key) = state.pick { wanted.append(key.folder) }
+        }
+        return wanted
+    }
+
+    /// What is picked moved, here or in a project's scene: a showing of a page no longer
+    /// asked for stops holding it, though it never said it went.
+    func startPagesMoved() {
+        let wanted = startPagesWanted
+        startPage.keep { wanted.contains($0) }
+        if startPage.key != startingIn, !isStarting { startPageMoved(afresh: false) }
+    }
+
+    /// Counts each time no showing holds the page any more (#2089), for a showing still on
+    /// screen to hear it and hold it again.
+    private(set) var startPageLetGo = 0
 
     /// The showing of the page that holds `startingIn` (#1044). The detail is rebuilt with
     /// each pick, and the page it replaced can say it went after the new one said it came:
@@ -901,14 +951,30 @@ final class RemoteModel {
     /// showing that went without saying so left nothing this one can trust.
     func startPageAppeared(in folder: URL, page: UUID) {
         startPage.appeared(folder, showing: page)
+        note("start: page appeared for \(folder.lastPathComponent)")
         guard startingIn == folder else { startingIn = folder; return }
         closeStart()
-        Task { await openStart(in: folder) }
+        queueOpenStart(folder)
     }
+
+    /// A showing that said it went is still on screen (#2089), and nothing holds the page:
+    /// it holds it again. Not one whose agent has started, which is on its way out, nor
+    /// while one starts.
+    func startPageStillShown(in folder: URL, page: UUID) {
+        guard startingIn == nil, !isStarting, !startedPages.contains(page),
+              startPagesWanted.contains(folder) else { return }
+        note("start: page still shown for \(folder.lastPathComponent), held again")
+        startPageAppeared(in: folder, page: page)
+    }
+
+    /// The showings whose Send started an agent: they are going, and never hold the page again.
+    @ObservationIgnored private var startedPages: Set<UUID> = []
+    /// The showing whose Send is starting an agent.
+    @ObservationIgnored private var startingPage: UUID?
 
     /// The page went. Nothing, when another showing has taken it since.
     func startPageDisappeared(_ page: UUID) {
-        if startPage.disappeared(page) { startingIn = nil }
+        if startPage.disappeared(page) { startPageMoved(afresh: false) }
     }
 
     /// What a ui:// view filled the page with (#834), for the page in its project to take
@@ -1025,8 +1091,17 @@ final class RemoteModel {
     /// visit the Runtimes page.
     private static let startParts: Set<CatchUpPart> = [.runtimes, .allowances, .modes, .sandbox]
 
-    private func openStart(in folder: URL) async {
+    /// Opens the page, numbered as it is queued: an open queued before a later one is let go.
+    private func queueOpenStart(_ folder: URL) {
+        startOpens += 1
+        let open = startOpens
+        Task { await openStart(in: folder, open: open) }
+    }
+
+    private func openStart(in folder: URL, open: Int) async {
+        guard open == startOpens else { return }
         startOpenedAt = .now
+        startOpenedOn = startHost
         startAsks.opened()
         startRefusal = nil
         startWorktree = nil
@@ -1054,10 +1129,33 @@ final class RemoteModel {
             let listed = Task { await DaemonClient.$patience.withValue(listPatience) { await refreshServerRuntimes(host) } }
             if startRuntimes.isEmpty { await listed.value }
         }
-        guard startingIn == folder else { return }
+        // Said, so a page left with no choices can be read from the log (#2089).
+        guard startingIn == folder else {
+            note("start: open of \(folder.lastPathComponent) gave way to \(startingIn?.lastPathComponent ?? "nothing")")
+            return
+        }
+        // A later open of the page asks for the choices; one draft, not two.
+        guard open == startOpens else { return }
         startRuntimeID = pickedStartRuntime
         startPicked = true
+        if startRuntimeID == nil {
+            note("start: no runtime to pick, \(startAvailableRuntimeIDs.count) of \(startRuntimes.count) can start")
+        }
         await loadStartChoices()
+    }
+
+    /// Counts the page's opens, so only the last asks for its choices.
+    @ObservationIgnored private var startOpens = 0
+    /// The host the open page asked for runtimes, as it knew the project then.
+    @ObservationIgnored private var startOpenedOn: HostID?
+
+    /// The project list came after the page opened (#2089): a page that took the Mac's
+    /// runtimes for a server's project opens again on its own host's.
+    private func startHostMoved() {
+        guard let folder = startingIn, let opened = startOpenedOn, opened != startHost, !isStarting else { return }
+        note("start: \(folder.lastPathComponent) is on \(hostName(startHost)), not \(hostName(opened)); opened again")
+        closeStart()
+        queueOpenStart(folder)
     }
 
     /// The one rule (#264): the runtime this page is on while it can start, else the one it
@@ -1142,6 +1240,7 @@ final class RemoteModel {
 
     private func closeStart() {
         startPicked = false
+        startOpenedOn = nil
         if startShowsParts {
             startShowsParts = false
             notShowing(Self.startParts)
@@ -1407,6 +1506,8 @@ final class RemoteModel {
             startOptions: StartOptions(values: startChosen), draftID: startDraftID,
             additionalDirectories: startFolders, worktree: startWorktree, requestID: retrying ?? UUID(), sandbox: startSandbox,
             labels: labels, persona: startPersona)
+        startingPage = page
+        defer { startingPage = nil }
         return await send(start: request)
     }
 
@@ -1491,7 +1592,10 @@ final class RemoteModel {
         StartDraftKeeper.shared.clear(in: folder)
         guard open else { return }
         await loadWholeAgent(id)
-        startingIn = nil
+        // The page that started it goes; one still on screen under it is opened again.
+        if let startingPage { startedPages.insert(startingPage) }
+        startPage.release()
+        startPageMoved(afresh: true)
         // Started in a project's own scene: it opens there (#1089).
         if let scene = composingScene.flatMap({ projectScenes[$0] }), scene.key.folder == folder {
             scene.pick = .session(id)
@@ -2405,6 +2509,7 @@ final class RemoteModel {
                                                     DaemonAPI.ProjectsListRequest(includeArchived: false),
                                                     returning: [DaemonAPI.ProjectSummary].self) {
                 work.replaceProjects(projects, from: id)
+                startHostMoved()
             }
             // Its projects' MCP servers, for their rows in the sidebar (#753).
             if let health = try? await other.call(DaemonAPI.Method.mcpHealth, Optional<String>.none,
@@ -2779,6 +2884,7 @@ final class RemoteModel {
             return nil
         }
         work.replaceProjects(snapshot.projects, from: .mac)
+        startHostMoved()
         takeLiveAgents(snapshot.agents, page: DaemonAPI.CatchUpRequest.firstPage)
         work.replacePermissions(snapshot.permissions)
         work.replaceElicitations(snapshot.elicitations)
@@ -4735,7 +4841,11 @@ final class RemoteModel {
         let archived = await act(.archive, on: agentID, DaemonAPI.Method.agentsArchive,
                                  DaemonAPI.AgentRequest(agentID: agentID))
         // Not when it failed: the chat stays in front, under the reason why.
-        if archived, andLeave, selection == agentID { selection = nil }
+        if archived, andLeave {
+            if selection == agentID { selection = nil }
+            // A project's own screen or scene goes back to its list (#2090).
+            for state in projectScenes.values where state.pick == .session(agentID) { state.pick = nil }
+        }
         return archived
     }
 
@@ -5029,6 +5139,7 @@ final class RemoteModel {
            let summary = work.projects.first(where: { $0.name == name }) {
             // Its page is New session (#366).
             selectedProject = summary.folder
+            composing = true
         }
         if let title = value("-agent"),
            let agent = work.agents.first(where: { $0.title == title }) {
@@ -5037,6 +5148,12 @@ final class RemoteModel {
             // pushes in one turn of the loop is not something to ask of a split view.
             try? await Task.sleep(for: .milliseconds(600))
             selection = agent.id
+            // `-archive-open`: then Archive from the chat's bar, for a walk (#2090): the walk
+            // socket presses no menu.
+            if arguments.contains("-archive-open") {
+                try? await Task.sleep(for: .seconds(2))
+                await archive(agent.id, andLeave: true)
+            }
         }
         // `-workflow` opens a workflow's page on the chosen project, by its name.
         if let name = value("-workflow"),
