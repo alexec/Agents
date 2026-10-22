@@ -49,7 +49,10 @@ let package = Package(
             swiftSettings: [.treatAllWarnings(as: .error)]),
         .testTarget(
             name: "AgentsKitTests",
-            dependencies: ["ControlDial", "AgentsKit", "AgentsKitCore", "accept-probe"],
+            dependencies: ["ControlDial", "AgentsKit", "AgentsKitCore", "accept-probe",
+                           // A proxy and a server of the tests' own, for the dial (#2177).
+                           .product(name: "NIOCore", package: "swift-nio"),
+                           .product(name: "NIOPosix", package: "swift-nio")],
             swiftSettings: [.treatAllWarnings(as: .error)]),
         // Tests only, and no product: a daemon socket in a process of its own with few
         // descriptors (#201). Out of descriptors is the whole process's state, so it

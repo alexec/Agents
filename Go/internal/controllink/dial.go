@@ -2,8 +2,6 @@ package controllink
 
 import (
 	"context"
-	"crypto/sha256"
-	"crypto/tls"
 	"crypto/x509"
 	"encoding/base64"
 	"errors"
@@ -44,7 +42,8 @@ func (l *Lines) Close() { l.ws.Close(websocket.StatusNormalClosure, "") }
 func (l *Lines) Socket() *websocket.Conn { return l.ws }
 
 // Dial opens wss://…/v1/connect. With a pin, only a certificate whose SPKI hashes to it is
-// taken and no trust store is read (R6); without one, the system roots decide.
+// taken and no trust store is read (R6); without one, TrustRoots decide. It goes through
+// the network's proxy, if there is one (network.go).
 func Dial(ctx context.Context, base, pin string) (*Lines, error) { return dial(ctx, base, pin, "") }
 
 // DialOrigin opens the web remote's socket as the page does: plain ws on loopback, with
@@ -65,28 +64,8 @@ func dial(ctx context.Context, base, pin, origin string) (*Lines, error) {
 		u.Scheme = "ws"
 	}
 	u.Path = "/v1/connect"
-	tlsConfig := &tls.Config{MinVersion: tls.VersionTLS12}
-	if pin != "" {
-		tlsConfig.InsecureSkipVerify = true
-		tlsConfig.VerifyPeerCertificate = func(raw [][]byte, _ [][]*x509.Certificate) error {
-			if len(raw) == 0 {
-				return errors.New("no certificate")
-			}
-			leaf, err := x509.ParseCertificate(raw[0])
-			if err != nil {
-				return err
-			}
-			sum := sha256.Sum256(leaf.RawSubjectPublicKeyInfo)
-			if B64URL(sum[:]) != pin {
-				return fmt.Errorf("the certificate is not the pinned one")
-			}
-			return nil
-		}
-	}
-	if pin == "" {
-		tlsConfig.RootCAs = TestTrustRoots()
-	}
-	client := &http.Client{Transport: &http.Transport{TLSClientConfig: tlsConfig}}
+	// Through the network's proxy, trusting its CA too (#2177).
+	client := &http.Client{Transport: transport(pin)}
 	dctx, cancel := context.WithTimeout(ctx, dialWait)
 	defer cancel()
 	options := &websocket.DialOptions{HTTPClient: client}
