@@ -6,8 +6,8 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
-	"sync"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -115,6 +115,51 @@ func TestMetricsMethodsAreBounded(t *testing.T) {
 	}
 	if !strings.Contains(b.String(), `agents_control_requests_total{method="other",result="error"} 50`) {
 		t.Fatal(b.String())
+	}
+}
+
+// stalledWriter is a scraper that stops reading: its first write never returns until let go.
+type stalledWriter struct {
+	writing chan struct{}
+	release chan struct{}
+	once    sync.Once
+}
+
+func (w *stalledWriter) Write(b []byte) (int, error) {
+	w.once.Do(func() { close(w.writing) })
+	<-w.release
+	return len(b), nil
+}
+
+// A scraper that stops reading mid-scrape holds no lock: requests, events and store
+// operations are counted at once while it waits (#2249).
+func TestStalledScraperDoesNotBlockCounting(t *testing.T) {
+	m := newMetrics()
+	for i := range metricsMethods {
+		m.Request("made/up"+itoa(i), "ok", time.Millisecond)
+	}
+	w := &stalledWriter{writing: make(chan struct{}), release: make(chan struct{})}
+	done := make(chan struct{})
+	go func() {
+		m.write(w, gauges{phase: phaseServing})
+		close(done)
+	}()
+	defer func() {
+		close(w.release)
+		<-done
+	}()
+	<-w.writing
+	counted := make(chan struct{})
+	go func() {
+		m.Request("daemon/ping", "routed", 0)
+		m.Event("agent/changed", 3)
+		m.Store("get", nil, time.Millisecond)
+		close(counted)
+	}()
+	select {
+	case <-counted:
+	case <-time.After(2 * time.Second):
+		t.Fatal("counting waited for a stalled scraper")
 	}
 }
 
