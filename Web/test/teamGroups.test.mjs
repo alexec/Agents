@@ -79,6 +79,8 @@ test("team groups: a cap notice holds only while true: its day, its cap, its bot
   assert.equal(g.openCaps([own], null, [], at(now)).length, 1);
   // One per bot, the last told.
   assert.deepEqual(g.addCap({ ...own, spentUSD: 60 }, [own, grouped]).map((n) => [n.user, n.spentUSD]), [["c", 90], ["b", 60]]);
+  // OK puts one bot's notice away and keeps the others (#2198).
+  assert.deepEqual(g.dropCap(own, [own, grouped]).map((n) => n.user), ["c"]);
 });
 
 test("team groups: a group's cap line adds its bots' spend today (#2074)", () => {

@@ -104,6 +104,11 @@ export function addCap(reached: CapReached, notices: readonly CapReached[]): Cap
   return [...notices.filter((n) => n.user !== reached.user), reached];
 }
 
+/** The notices left once an admin puts one away with OK (#2198), as PeopleState.dismissCap in Swift. */
+export function dropCap(reached: Pick<CapReached, "user">, notices: readonly CapReached[]): CapReached[] {
+  return notices.filter((n) => n.user !== reached.user);
+}
+
 /**
  * The cap notices still true (#2073), as CapNotices.open in Swift: before their until, and while the cap each
  * names is the one the bot, or the bot's group, has now. With no people list yet, only the time is weighed.

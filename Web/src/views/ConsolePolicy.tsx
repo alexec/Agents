@@ -3,7 +3,8 @@
 // for each group and for the organisation draws a line and a forecast on Reports ▸ Spend.
 //
 // Edits not saved are kept (#2072): a person joining reloads the groups and people, not the edits;
-// the edits stay while the admin opens another page and comes back; and closing the tab asks first.
+// the edits stay while the admin opens another page and comes back; and closing the tab asks first,
+// from any page (#2202), while the Console's list marks Report Policy "Not saved".
 import { useEffect } from "preact/hooks";
 import { signal, useSignal } from "@preact/signals";
 import type { Store } from "../model/store";
@@ -18,11 +19,17 @@ interface Draft {
 }
 const draft = signal<Draft | null>(null);
 
-/** Closing the tab with edits not saved asks first. */
+/** Closing the tab with edits not saved asks first, whichever page is open (#2202). */
 function askBeforeClosing(e: BeforeUnloadEvent) {
   if (!draft.value) return;
   e.preventDefault();
   e.returnValue = "";
+}
+addEventListener("beforeunload", askBeforeClosing);
+
+/** Whether the store's control plane has Report Policy edits not saved, for the Console's list (#2202). */
+export function policyNotSaved(store: Store): boolean {
+  return draft.value?.store === store;
 }
 
 export function ReportPolicyPage({ store, down }: { store: Store; down: boolean }) {
@@ -50,10 +57,6 @@ export function ReportPolicyPage({ store, down }: { store: Store; down: boolean 
   };
   const changes = store.peopleChanges.value;
   useEffect(() => { if (!down) void load(); }, [down, changes]);
-  useEffect(() => {
-    addEventListener("beforeunload", askBeforeClosing);
-    return () => removeEventListener("beforeunload", askBeforeClosing);
-  }, []);
   const shown = policy;
   const edit = (next: Partial<Omit<Draft, "store">>) => {
     if (!shown) return;
