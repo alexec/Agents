@@ -33,3 +33,11 @@ test("where backups go has words, and the store's sentence only when they go the
   assert.equal(backups.footerWords(state("folder")), backups.backupsFooter);
   assert.match(backups.footerWords(state("control")), /control plane's store, sealed/);
 });
+
+test("a folder on the disk it backs up says so, with what to do (#2139)", () => {
+  const state = (extra) => ({ settings: { every: "daily", keep: 3 }, folder: "/root/backups", backups: [], making: false, ...extra });
+  assert.equal(backups.sameDiskWords(state({})), null);
+  assert.match(backups.sameDiskWords(state({ sameDisk: true })), /same disk as what it backs up.*lost with the disk.*on the Mac\.$/);
+  assert.match(backups.sameDiskWords(state({ sameDisk: true, canUseControl: true })), /Or back up to the control plane\.$/);
+  assert.equal(backups.sameDiskWords(state({ sameDisk: true, settings: { every: "daily", keep: 3, target: "control" } })), null);
+});

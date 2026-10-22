@@ -431,3 +431,56 @@ func TestBackupToTheControlPlaneAndRestoreOnANewServer(t *testing.T) {
 		t.Fatalf("refused: %+v", s)
 	}
 }
+
+// The default folder is on the disk it backs up, and the state says so (#2139); a synced
+// folder and a folder on another disk are not. A backup in a folder on another volume
+// restores on a new machine.
+func TestABackupFolderOnTheSameDiskIsSaid(t *testing.T) {
+	clock := time.Date(2026, 10, 22, 9, 0, 0, 0, time.UTC)
+	atTime(t, &clock)
+	root := t.TempDir()
+	a, ca := start(t, root)
+	if s := backupsIn(t, ca, 1); s.SameDisk == nil || !*s.SameDisk {
+		t.Fatalf("the default folder in the data folder: %+v", s.SameDisk)
+	}
+	synced := filepath.Join(root, "Users", "sam", "Library", "CloudStorage", "Dropbox", "Agents backups")
+	ca.call(t, 2, "backups/configure", map[string]any{"every": "off", "keep": 3, "folder": synced})
+	if s := backupsIn(t, ca, 3); s.SameDisk != nil {
+		t.Fatalf("a synced folder said to be on the same disk")
+	}
+	// Another volume: tmpfs where there is one (Linux), else a stand-in for the device.
+	other := ""
+	if info, err := os.Stat("/dev/shm"); err == nil && info.IsDir() {
+		if made, err := os.MkdirTemp("/dev/shm", "agents-backups-"); err == nil {
+			dev, _ := deviceOf(made)
+			if mine, _ := deviceOf(root); mine != dev {
+				other = made
+			}
+			t.Cleanup(func() { os.RemoveAll(made) })
+		}
+	}
+	if other == "" {
+		other = t.TempDir()
+		was := sameDevice
+		sameDevice = func(a, b string) bool { return !strings.HasPrefix(a, other) && was(a, b) }
+		t.Cleanup(func() { sameDevice = was })
+	}
+	ca.call(t, 4, "backups/configure", map[string]any{"every": "off", "keep": 3, "folder": other})
+	if s := backupsIn(t, ca, 5); s.SameDisk != nil {
+		t.Fatalf("a folder on another disk said to be on the same disk")
+	}
+	dir := project(t, ca, 6)
+	agent := seeded(t, a, dir, nil)
+	made, err := a.makeBackup()
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The disk is lost: a new machine reads the other volume.
+	b, cb := start(t, t.TempDir())
+	cb.call(t, 1, "backups/configure", map[string]any{"every": "off", "keep": 3, "folder": other})
+	var res wire.BackupRestoreResult
+	json.Unmarshal(cb.call(t, 2, "backups/restore", map[string]any{"id": made.ID}), &res)
+	if res.Restored != 1 || b.Store.Agent(agent.ID) == nil {
+		t.Fatalf("restored %+v", res)
+	}
+}

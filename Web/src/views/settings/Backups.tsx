@@ -3,7 +3,7 @@ import { useEffect, useState } from "preact/hooks";
 import type { Store } from "../../model/store";
 import { hostAnswers, hostHas } from "../../model/capabilities";
 import { backupDetail, backupEveries, backupKeeps, backupTarget, backupTargets, confirmTitle, everyLabel, footerWords,
-  restoreMessage, restoredWords, targetLabel } from "../../model/backups";
+  restoreMessage, restoredWords, sameDiskWords, targetLabel } from "../../model/backups";
 import { fromWireDate } from "../../protocol/dates";
 import { Capability } from "../../protocol/capabilities.generated";
 import type { BackupEvery, BackupRestoreResult, BackupSettings, BackupState, BackupTarget } from "../../protocol/generated";
@@ -69,6 +69,7 @@ function BackupsView({ state, title, id, configure, make, restore }: {
         </div>
       ))}
       {error && <p class="hint">{error}</p>}
+      {sameDiskWords(state) && <p class="hint attention">{sameDiskWords(state)}</p>}
       <p class="hint">{footerWords(state)}</p>
     </section>
   );

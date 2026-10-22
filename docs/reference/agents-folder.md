@@ -56,7 +56,11 @@ not be able to change them:
 - **Secrets:** `~/.agents-secrets`, a separate folder that only you can read.
 - **This Mac's data:** agents, transcripts, and the sleep, resource, approval and
   retention-clock files, in `~/Library/Application Support/Agents`
-  (`~/.agents-server/root` on a server).
+  (`~/.agents-server/root` on a server). Its backups go to `backups/` in that folder unless
+  you choose another: the same disk, so they do not survive the loss of the disk. Choose a
+  second disk or a synced folder in **Settings ▸ Machines ▸ This Mac ▸ Backups**, or, on a
+  server, back up to the control plane
+  ([Back up and restore a machine](../how-to/back-up-and-restore.md)).
 - **The control plane's folder** (Agents Host): `~/Library/Application Support/Agents Control`.
   It holds the store (unless it is a bucket), `secrets-key` and the certificate in `tls/`.
   The control key is in the keychain. To back them up together, and restore

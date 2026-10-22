@@ -79,6 +79,9 @@ struct BackupsSection: View {
                 if let error = said ?? state.lastError {
                     Text(error)
                 }
+                if let words = Self.sameDiskWords(state, choosesHere: chooseFolder != nil) {
+                    Text(words).foregroundStyle(StateTint.attention.style(or: .secondary))
+                }
                 Text(Self.footer(state))
             }
             .appText(.fine)
@@ -135,6 +138,18 @@ struct BackupsSection: View {
         guard target(state) == .control else { return held }
         return held + " Backups go to the control plane's store, sealed, where your other machines can restore them, even "
             + "after this one is deleted."
+    }
+
+    /// What a folder on the disk it backs up means, and what to do (#2139); nil elsewhere.
+    static func sameDiskWords(_ state: DaemonAPI.BackupState, choosesHere: Bool) -> String? {
+        guard target(state) == .folder, state.sameDisk == true else { return nil }
+        var words = "This folder is on the same disk as what it backs up. A backup here can undo a mistake, "
+            + "but is lost with the disk. Choose a folder on a second disk, or one that syncs to another place"
+        words += choosesHere ? "." : ", on the Mac."
+        if state.canUseControl == true {
+            words += " Or back up to the control plane."
+        }
+        return words
     }
 
     static func everyLabel(_ every: DaemonAPI.BackupEvery) -> String {

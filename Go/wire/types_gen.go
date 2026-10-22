@@ -851,6 +851,9 @@ type BackupState struct {
 
 	// The machine is linked to a control plane, so it can back up to the control plane's store (#1815).
 	CanUseControl *bool `json:"canUseControl,omitzero"`
+
+	// The backup folder is on the disk of what it backs up, and not a synced folder (#2139): a backup there undoes a mistake, but is lost with the disk.
+	SameDisk *bool `json:"sameDisk,omitzero"`
 }
 
 // A host's backup whose parts are all uploaded: the control plane writes its .json last, then keeps the newest keep of this host's (#1815).

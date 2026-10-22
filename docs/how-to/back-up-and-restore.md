@@ -40,7 +40,9 @@ server. A server is listed while it is online.
 3. On the Mac, click **Choose…** beside **Folder** to keep the backups on a second disk, or
    in a folder that your Mac syncs to another place. The default is the `backups` folder in
    the machine's data folder, which is on the same disk as what it backs up: it lets you
-   undo a mistake, but does not survive the loss of the Mac.
+   undo a mistake, but does not survive the loss of the Mac. While the folder is on that
+   disk, and is not a synced folder (iCloud Drive, or one in `~/Library/CloudStorage`), the
+   section says so on all three, until you choose another.
 
 The machine checks each hour whether a backup is due, starting ten minutes after it
 starts. To make one now, click **Back Up Now**. It says **Backing Up…** until the backup is

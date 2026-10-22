@@ -17,6 +17,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/alexec/agents/Go/internal/agentsd/diskjson"
@@ -210,7 +211,48 @@ func (d *Daemon) backupsState() wire.BackupState {
 	if lastError != "" {
 		s.LastError = &lastError
 	}
+	if target == wire.BackupTargetFolder && d.backupOnSameDisk() {
+		s.SameDisk = new(true)
+	}
 	return s
+}
+
+// backupOnSameDisk says the backup folder is on the disk of this machine's data, and not a
+// synced folder (#2139): a backup there undoes a mistake, but goes with the disk.
+func (d *Daemon) backupOnSameDisk() bool {
+	folder := d.backupFolder()
+	return !syncedFolder(folder) && sameDevice(folder, d.Store.Loc.Root)
+}
+
+// syncedFolder is a folder that a Mac syncs to another place: iCloud Drive, or a File
+// Provider's (Dropbox, Google Drive, OneDrive), which are on the Mac's own disk.
+func syncedFolder(path string) bool {
+	path = filepath.ToSlash(path)
+	return strings.Contains(path, "/Library/Mobile Documents/") || strings.Contains(path, "/Library/CloudStorage/")
+}
+
+// sameDevice says two paths are on one device, each read where it is, or where its nearest
+// folder that is there is. A test stands in for a second disk.
+var sameDevice = func(a, b string) bool {
+	da, okA := deviceOf(a)
+	db, okB := deviceOf(b)
+	return okA && okB && da == db
+}
+
+func deviceOf(path string) (uint64, bool) {
+	for {
+		if info, err := os.Stat(path); err == nil {
+			if st, ok := info.Sys().(*syscall.Stat_t); ok {
+				return uint64(st.Dev), true //nolint:unconvert // int32 on darwin
+			}
+			return 0, false
+		}
+		parent := filepath.Dir(path)
+		if parent == path {
+			return 0, false
+		}
+		path = parent
+	}
 }
 
 // listBackups is every backup in the target, this machine's and others', newest first.
