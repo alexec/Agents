@@ -267,6 +267,19 @@ extension ButtonStyle where Self == PaperProminentButtonStyle<RoundedRectangle> 
     }
 }
 
+extension View {
+    /// For buttons that share one Form or List row (#2065). On iOS a tap anywhere in a row with
+    /// automatic-style buttons fires every one of them, so here each is borderless and takes only
+    /// its own taps. A Mac row takes no taps, so its buttons stay as they are.
+    @ViewBuilder func rowButtons() -> some View {
+        #if os(macOS)
+        self
+        #else
+        buttonStyle(.borderless)
+        #endif
+    }
+}
+
 /// A sheet laid out the same way every time: title, body, then Cancel / primary actions.
 struct PaperSheet<Content: View, Actions: View>: View {
     let title: String

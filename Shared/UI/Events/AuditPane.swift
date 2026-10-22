@@ -85,6 +85,7 @@ struct AuditPane: View {
                 Spacer()
             }
         }
+        .rowButtons()
     }
 
     // MARK: Asking

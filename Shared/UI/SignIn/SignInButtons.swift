@@ -79,6 +79,8 @@ struct SignInButtons: View {
                 }
             }
             .controlSize(.small)
+            // In a Form row, as Sign In… on the Remote has it: Copy Code must not cancel too.
+            .rowButtons()
         }
     }
 
