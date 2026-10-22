@@ -1,0 +1,101 @@
+@preconcurrency import AVFoundation
+import Foundation
+
+/// Says sentences in the voice, one after another (#2322).
+///
+/// The next sentence is made while the one before it plays, so there is no gap after the
+/// first. `stop()` stops at once: the person pressed Stop, or spoke, and what was not said
+/// is still on the screen.
+@MainActor
+final class VoiceSpeaker {
+    private let voice: ParadeeVoice
+    private let engine = AVAudioEngine()
+    private let player = AVAudioPlayerNode()
+    private let format = AVAudioFormat(standardFormatWithSampleRate: ParadeeVoice.sampleRate, channels: 1)
+    private var run = 0
+    private var isConnected = false
+    /// Made and played in silence: a walk on the person's Mac says nothing out loud.
+    var isMuted = false {
+        didSet { engine.mainMixerNode.outputVolume = isMuted ? 0 : 1 }
+    }
+
+    init(voice: ParadeeVoice) {
+        self.voice = voice
+        engine.attach(player)
+    }
+
+    /// Says `sentences`, calling `onSentence` as each one starts. Returns when the last has
+    /// been heard, or at once when stopped. Throws when the voice cannot be loaded or the
+    /// audio would not start.
+    func say(_ sentences: [String], onSentence: (String) -> Void = { _ in }) async throws {
+        guard let format, !sentences.isEmpty else { return }
+        run += 1
+        let thisRun = run
+        try openOutput()
+        defer { if thisRun == run { closeOutput() } }
+        var next: [Float]? = try await voice.audio(for: sentences[0])
+        for index in sentences.indices {
+            guard thisRun == run, let samples = next, let buffer = Self.buffer(samples, format: format) else { return }
+            onSentence(sentences[index])
+            let playing = try play(buffer)
+            // The next one is made while this one is heard.
+            next = index + 1 < sentences.count ? try await voice.audio(for: sentences[index + 1]) : nil
+            await playing.value
+        }
+    }
+
+    /// Stops at once, mid-word if it must.
+    func stop() {
+        run += 1
+        player.stop()
+        closeOutput()
+    }
+
+    /// Plays `buffer`; the task ends once it has been heard, or the player was stopped.
+    private func play(_ buffer: AVAudioPCMBuffer) throws -> Task<Void, Never> {
+        let (heard, done) = AsyncStream<Void>.makeStream()
+        player.scheduleBuffer(buffer, completionCallbackType: .dataPlayedBack) { @Sendable _ in
+            done.finish()
+        }
+        if !player.isPlaying { try player.playAudio() }
+        return Task { for await _ in heard {} }
+    }
+
+    private func openOutput() throws {
+        #if os(iOS)
+        // Spoken audio: other sound ducks under it, and the silent switch does not mute it,
+        // since the person asked to hear the reply.
+        let session = AVAudioSession.sharedInstance()
+        try session.setCategory(.playback, mode: .spokenAudio, options: [.duckOthers])
+        try session.setActive(true)
+        #endif
+        if !isConnected, let format {
+            try engine.connectNode(player, to: engine.mainMixerNode, format: format)
+            isConnected = true
+        }
+        if !engine.isRunning {
+            engine.prepare()
+            try engine.start()
+        }
+    }
+
+    private func closeOutput() {
+        player.stop()
+        if engine.isRunning { engine.stop() }
+        #if os(iOS)
+        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+        #endif
+    }
+
+    private static func buffer(_ samples: [Float], format: AVAudioFormat) -> AVAudioPCMBuffer? {
+        guard !samples.isEmpty,
+              let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: AVAudioFrameCount(samples.count)),
+              let channel = buffer.floatChannelData?[0] else { return nil }
+        buffer.frameLength = AVAudioFrameCount(samples.count)
+        samples.withUnsafeBufferPointer { source in
+            guard let base = source.baseAddress else { return }
+            channel.update(from: base, count: samples.count)
+        }
+        return buffer
+    }
+}

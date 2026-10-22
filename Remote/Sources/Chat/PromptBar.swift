@@ -103,6 +103,8 @@ struct PromptBar: View {
             if sending > 0, sendingIsSlow {
                 Telling(host: model.answerRecipient(agent.id), doing: "Sending")
             }
+            // Voice mode in this chat (#2322): what it hears and says.
+            VoiceModeStrip(agentID: agent.id)
             field
             if isShowingEverything { options }
         }
@@ -256,6 +258,9 @@ struct PromptBar: View {
             AttachButton(attachments: $attachments, refusal: $attachRefusal)
 
             DictateButton(dictation: dictation, begin: beginDictation)
+
+            // Voice mode (#2322), while Settings ▸ Voice has it on.
+            VoiceModeButton(agentID: agent.id) { await model.send($0, to: agent.id, voice: true) }
 
             // While it works and nothing is typed, send is stop. Type and it is send
             // again, queueing what is typed for when the turn ends.

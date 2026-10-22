@@ -50,7 +50,7 @@
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>So this can find your Mac on the network you are both on, and show you what your agents are doing.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>To hear what you say while you dictate into your prompt.</string>
+	<string>To hear what you say while you dictate into your prompt, or talk to an agent in voice mode.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
 	<string>To turn what you say into words for your prompt.</string>
 	<key>NSSupportsLiveActivities</key>
