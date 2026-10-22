@@ -536,6 +536,56 @@ notifications.
   lines again (see [Start it](#start-it)). Hosts and clients reconnect within
   seconds. Linux servers update their host the next time they connect.
 
+## On a corporate network
+
+On a network where machines reach the internet through a proxy, and where the network may
+re-sign TLS with the organisation's own certificate authority (CA), every part of Agents
+can still reach the control plane:
+
+| What dials | Its proxy | The organisation's CA |
+| --- | --- | --- |
+| The Agents window on a Mac | The Mac's: System Settings ▸ Network ▸ Proxies, a PAC file too | The Mac's keychain |
+| Agents on iPhone and iPad | The device's | The device's trusted certificates |
+| A browser | The browser's | The browser's |
+| The Mac's host (agentsd) and relay (Agents Host) | `HTTPS_PROXY`, `HTTP_PROXY` and `NO_PROXY` when set; otherwise the Mac's web proxies and their exceptions. A PAC file is not read | The Mac's keychain |
+| A Linux server's host | `HTTPS_PROXY`, `HTTP_PROXY` and `NO_PROXY` | The system's roots, and the PEM file in `AGENTS_CA_FILE`, or else `/etc/agents/ca.pem` |
+
+The tunnel through a proxy is HTTP `CONNECT`, so TLS goes from end to end. A proxy that
+re-signs TLS breaks a pinned control plane: its codes carry a pin, which only the
+control plane's own certificate matches. Use a control plane with a publicly trusted
+certificate, as in this guide, or exempt its name from the re-signing. Whichever CA signs
+the certificate, each window, phone and host also checks the control plane's own key at
+each connection, so a proxy can't stand in for the control plane.
+
+On a Mac:
+
+1. If the network uses a PAC file and no fixed proxy, also set the **Secure web proxy
+   (HTTPS)** in System Settings ▸ Network ▸ Details ▸ Proxies. The window follows the PAC
+   file. The host and the relay follow the fixed proxy.
+2. To trust the organisation's CA, open its certificate in Keychain Access, add it to the
+   **System** keychain, and set **When using this certificate** to **Always Trust**. Most
+   organisations do this for you with a configuration profile.
+
+On a Linux server, before you run the install command:
+
+1. Export the proxy in the shell where you run the install command:
+
+   ```sh
+   export HTTPS_PROXY=http://proxy.example.com:3128
+   export NO_PROXY=localhost,.internal.example.com
+   ```
+
+   The install command's `curl` follows them, and the install command writes them, with
+   `AGENTS_CA_FILE` if set, into the host's systemd service. To change them later, run the
+   install command again with a new code.
+2. Put the organisation's CA, as PEM, in `/etc/agents/ca.pem` (one or more certificates
+   in one file). To keep it elsewhere, set `AGENTS_CA_FILE` to its path. Add it to the
+   system's roots too (`update-ca-certificates` on Debian and Ubuntu), so that the install
+   command's `curl` trusts it.
+
+The control plane itself also dials: other copies of it, with several copies. If its
+machine has `HTTPS_PROXY` or `HTTP_PROXY` set, put the copies' names in `NO_PROXY`.
+
 ## Metrics and logs
 
 To scrape the control plane with Prometheus and ship its logs, set these in `deploy/.env`,

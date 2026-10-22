@@ -3,9 +3,6 @@ package controllink
 import (
 	"bytes"
 	"context"
-	"crypto/sha256"
-	"crypto/tls"
-	"crypto/x509"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -88,29 +85,10 @@ func AskToJoin(ctx context.Context, root string, ask JoinAsk, private []byte, he
 	}
 }
 
-// httpsClient checks the control plane's certificate by its pin, or by the system's roots.
+// httpsClient checks the control plane's certificate by its pin, or by TrustRoots, through
+// the network's proxy (#2177).
 func httpsClient(pin string) *http.Client {
-	config := &tls.Config{MinVersion: tls.VersionTLS12}
-	if pin != "" {
-		config.InsecureSkipVerify = true
-		config.VerifyPeerCertificate = func(raw [][]byte, _ [][]*x509.Certificate) error {
-			if len(raw) == 0 {
-				return errors.New("no certificate")
-			}
-			leaf, err := x509.ParseCertificate(raw[0])
-			if err != nil {
-				return err
-			}
-			sum := sha256.Sum256(leaf.RawSubjectPublicKeyInfo)
-			if B64URL(sum[:]) != pin {
-				return errors.New("the certificate is not the pinned one")
-			}
-			return nil
-		}
-	} else {
-		config.RootCAs = TestTrustRoots()
-	}
-	return &http.Client{Timeout: 40 * time.Second, Transport: &http.Transport{TLSClientConfig: config}}
+	return &http.Client{Timeout: 40 * time.Second, Transport: transport(pin)}
 }
 
 func callJSON(ctx context.Context, client *http.Client, method, url string, body []byte, into any) error {

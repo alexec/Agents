@@ -38,8 +38,9 @@ public enum ControlDial {
     /// A WebSocket to `url`, open and upgraded, as lines. The key exchange is the caller's
     /// (`ControlAuth.join`). `origin` is sent as a browser sends it: the web remote's
     /// listener refuses an upgrade without its own (071); tests dial it as a page would.
+    /// It goes through `proxy`, or else the one `ControlProxy.forURL` finds (#2177).
     public static func connect(_ url: URL, pin: String? = nil, roots: [NIOSSLCertificate]? = nil,
-                               origin: String? = nil,
+                               origin: String? = nil, proxy: ControlProxy? = nil,
                                timeout: TimeAmount = .seconds(10)) async throws -> WebSocketLineTransport {
         guard let scheme = url.scheme?.lowercased(), let host = url.host else {
             throw Failure("\(url) is not an address to dial")
@@ -58,40 +59,51 @@ public enum ControlDial {
             }
         }
 
+        let proxy = proxy ?? ControlProxy.forURL(url)
         let opened = group.next().makePromise(of: WebSocketLineTransport.self)
+        // TLS and the upgrade: at once, or once a proxy's tunnel is open.
+        let dial: (any Channel) throws -> Void = { channel in
+            if let context {
+                let tls = if let verify {
+                    try NIOSSLClientHandler(context: context, serverHostname: host.isIPAddress ? nil : host,
+                                            customVerificationCallback: verify)
+                } else {
+                    try NIOSSLClientHandler(context: context, serverHostname: host.isIPAddress ? nil : host)
+                }
+                try channel.pipeline.syncOperations.addHandler(tls)
+            }
+            let requester = UpgradeRequester(host: host, port: port, secure: secure, path: path, origin: origin,
+                                             failed: opened)
+            let upgrader = NIOWebSocketClientUpgrader(
+                requestKey: NIOWebSocketClientUpgrader.randomRequestKey(),
+                maxFrameSize: maxMessage,
+                upgradePipelineHandler: { channel, _ in
+                    channel.pipeline.addHandlers([
+                        NIOWebSocketFrameAggregator(minNonFinalFragmentSize: 0, maxAccumulatedFrameCount: 100_000,
+                                                    maxAccumulatedFrameSize: maxMessage),
+                        WebSocketLineHandler(isClient: true) { opened.succeed($0) },
+                    ])
+                })
+            let config: NIOHTTPClientUpgradeConfiguration = (
+                upgraders: [upgrader],
+                completionHandler: { context in context.channel.pipeline.removeHandler(requester, promise: nil) })
+            // Forwarded, not dropped: behind a proxy (Caddy) the server's hello can
+            // arrive in the same read as the 101, and NIO's default throws it away.
+            try channel.pipeline.syncOperations.addHTTPClientHandlers(leftOverBytesStrategy: .forwardBytes,
+                                                                      withClientUpgrade: config)
+            try channel.pipeline.syncOperations.addHandler(requester)
+        }
         let bootstrap = ClientBootstrap(group: group)
             .connectTimeout(timeout)
             .channelInitializer { channel in
                 do {
-                    if let context {
-                        let tls = if let verify {
-                            try NIOSSLClientHandler(context: context, serverHostname: host.isIPAddress ? nil : host,
-                                                    customVerificationCallback: verify)
-                        } else {
-                            try NIOSSLClientHandler(context: context, serverHostname: host.isIPAddress ? nil : host)
-                        }
-                        try channel.pipeline.syncOperations.addHandler(tls)
+                    if proxy != nil {
+                        try channel.pipeline.syncOperations.addHandler(
+                            ProxyTunnel(target: "\(host.contains(":") ? "[\(host)]" : host):\(port)", then: dial,
+                                        failed: { opened.fail($0) }))
+                    } else {
+                        try dial(channel)
                     }
-                    let requester = UpgradeRequester(host: host, port: port, secure: secure, path: path, origin: origin,
-                                                     failed: opened)
-                    let upgrader = NIOWebSocketClientUpgrader(
-                        requestKey: NIOWebSocketClientUpgrader.randomRequestKey(),
-                        maxFrameSize: maxMessage,
-                        upgradePipelineHandler: { channel, _ in
-                            channel.pipeline.addHandlers([
-                                NIOWebSocketFrameAggregator(minNonFinalFragmentSize: 0, maxAccumulatedFrameCount: 100_000,
-                                                            maxAccumulatedFrameSize: maxMessage),
-                                WebSocketLineHandler(isClient: true) { opened.succeed($0) },
-                            ])
-                        })
-                    let config: NIOHTTPClientUpgradeConfiguration = (
-                        upgraders: [upgrader],
-                        completionHandler: { context in context.channel.pipeline.removeHandler(requester, promise: nil) })
-                    // Forwarded, not dropped: behind a proxy (Caddy) the server's hello can
-                    // arrive in the same read as the 101, and NIO's default throws it away.
-                    try channel.pipeline.syncOperations.addHTTPClientHandlers(leftOverBytesStrategy: .forwardBytes,
-                                                                              withClientUpgrade: config)
-                    try channel.pipeline.syncOperations.addHandler(requester)
                     return channel.eventLoop.makeSucceededVoidFuture()
                 } catch {
                     return channel.eventLoop.makeFailedFuture(error)
@@ -99,10 +111,13 @@ public enum ControlDial {
             }
         let channel: any Channel
         do {
-            channel = try await bootstrap.connect(host: host, port: port).get()
+            channel = try await bootstrap.connect(host: proxy?.host ?? host, port: proxy?.port ?? port).get()
         } catch {
             // Nothing will complete the promise now, and NIO traps on one left behind.
             opened.fail(error)
+            if let proxy {
+                throw Failure("the proxy " + Self.words(for: error, host: proxy.host, port: proxy.port))
+            }
             throw Failure(Self.words(for: error, host: host, port: port))
         }
         channel.closeFuture.whenComplete { _ in opened.fail(Failure("the connection closed before the WebSocket opened")) }
@@ -160,7 +175,21 @@ private final class UpgradeRequester: ChannelInboundHandler, RemovableChannelHan
         self.failed = failed
     }
 
+    private var sent = false
+
+    /// Added once a proxy's tunnel is open, to a channel already active.
+    func handlerAdded(context: ChannelHandlerContext) {
+        if context.channel.isActive { request(context: context) }
+    }
+
     func channelActive(context: ChannelHandlerContext) {
+        request(context: context)
+        context.fireChannelActive()
+    }
+
+    private func request(context: ChannelHandlerContext) {
+        guard !sent else { return }
+        sent = true
         var headers = HTTPHeaders()
         let standard = secure ? 443 : 80
         headers.add(name: "Host", value: port == standard ? host : "\(host):\(port)")
@@ -169,7 +198,6 @@ private final class UpgradeRequester: ChannelInboundHandler, RemovableChannelHan
         let head = HTTPRequestHead(version: .http1_1, method: .GET, uri: path, headers: headers)
         context.write(wrapOutboundOut(.head(head)), promise: nil)
         context.writeAndFlush(wrapOutboundOut(.end(nil)), promise: nil)
-        context.fireChannelActive()
     }
 
     func channelRead(context: ChannelHandlerContext, data: NIOAny) {
