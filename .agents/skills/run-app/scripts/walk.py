@@ -19,7 +19,7 @@
     walk.py ROOT context TEXT [ITEM…]            TEXT's context menu (#1123): its items, or ITEM chosen
     walk.py ROOT click TEXT [--count 2]          a click on TEXT's middle, for a tap gesture
     walk.py ROOT click --x X --y Y               a click at a point of the shot
-    walk.py ROOT key return|escape|right|a… [--mods cmd,shift]   a key to the window
+    walk.py ROOT key return|escape|right|pageup|end|a… [--mods cmd,shift]   a key to the window
     walk.py ROOT info TEXT                       the match and what is above it: class, actions
     walk.py ROOT views [DEPTH] | layers [DEPTH] --view CLASS[#N]   when a shot or press goes wrong
     walk.py ROOT wait TEXT [SECONDS]             until TEXT is on the window (exit 1 if not)

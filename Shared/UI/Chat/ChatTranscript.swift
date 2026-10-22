@@ -159,6 +159,8 @@ struct ChatTranscript: View {
     @State private var settling: Task<Void, Never>?
     /// Whether the conversation's first page is in hand since it was chosen.
     @State private var hasFirstPage = false
+    /// Going to the end in hand (`goToEnd`), until the pane rests there (#2210).
+    @State private var reaching: Task<Void, Never>?
 
     private final class Motion {
         /// Whether the hand last moved the pane down it, rather than up.
@@ -671,6 +673,24 @@ struct ChatTranscript: View {
         isFollowing = true
         position = ScrollPosition(idType: UUID.self)
         withAnimation(.easeOut(duration: 0.2)) { scroller.scrollTo(bottom, anchor: .bottom) }
+        reaching?.cancel()
+        reaching = Task { await reachEnd(scroller) }
+    }
+
+    /// After a long read back, the eased move lands where the estimates of the rows above
+    /// the end put the foot: turns short of it. Then nothing moves, so the pinning in the
+    /// geometry, which acts only on a change, never catches up (#2210). Placed again
+    /// without an ease, a frame at a time, until it rests at the end, as `settle` does on
+    /// opening. A hand on the pane, or reading back again, ends it.
+    private func reachEnd(_ scroller: ScrollViewProxy) async {
+        try? await Task.sleep(for: .milliseconds(250))
+        var foot = FootPlacement(atTheEnd: true)
+        let by = ContinuousClock.now.advanced(by: .seconds(2))
+        while !Task.isCancelled, isFollowing, !isUserScrolling, ContinuousClock.now < by,
+              !foot.rests(after: Double(motion.pastTheEnd)) {
+            place(scroller, on: bottom, anchor: .bottom)
+            try? await Task.sleep(for: .milliseconds(16))
+        }
     }
 
     /// How far from the foot counts as having left it, and how close counts as being
@@ -713,6 +733,7 @@ struct ChatTranscript: View {
     }
 
     private func startSettling(_ scroller: ScrollViewProxy) {
+        reaching?.cancel()
         settling?.cancel()
         settling = Task { await settle(scroller) }
     }
@@ -764,14 +785,12 @@ struct ChatTranscript: View {
         // measured after the move, and a long chat's grew enough to leave it a screen short
         // of the end (#1287, #1349). Shown three samples running at rest, or after 400 ms.
         let shownBy = ContinuousClock.now.advanced(by: .milliseconds(400))
-        var resting = 0
-        var last = motion.pastTheEnd
-        while resting < 3, ContinuousClock.now < shownBy, !Task.isCancelled {
+        var foot = FootPlacement(atTheEnd: false)
+        _ = foot.rests(after: Double(motion.pastTheEnd))
+        while ContinuousClock.now < shownBy, !Task.isCancelled {
             try? await Task.sleep(for: .milliseconds(16))
             place(scroller, on: bottom, anchor: .bottom)
-            let now = motion.pastTheEnd
-            resting = now.isFinite && abs(now - last) < 0.5 ? resting + 1 : 0
-            last = now
+            if foot.rests(after: Double(motion.pastTheEnd)) { break }
         }
         isPlacing = false
         try? await Task.sleep(for: .milliseconds(400))
