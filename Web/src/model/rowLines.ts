@@ -33,11 +33,11 @@ function shortName(displayName: string, kind: ResourceKind): string {
 }
 
 /**
- * LeaseMark: the first lease or wait in short, how many more, the whole of it, and one capsule each;
+ * LeaseMark: the first lease or wait in short, how many more, the whole of it, and one line each;
  * then LeaseStatus.holdingOnly's mark for a row (#582), and each wait by name and in full for its wait line.
  */
 export interface LeaseMark {
-  mark: string; more: number; full: string; capsules: string[];
+  mark: string; more: number; full: string; lines: string[];
   holds: { mark: string; more: number; full: string } | null;
   waitingNames: string[]; waitingFull: string[];
 }
@@ -73,12 +73,12 @@ export function leaseMark(agentID: string, snapshot: LeaseSnapshot | undefined,
   const held = holding.map((h) => `Holding ${h.display}, ${h.minutes} min left, until ${clock(h.expires)}`);
   const waitingFull = waiting.map((w) => `Waiting for ${w.display}, held by ${w.holder}${w.until ? ` until ${clock(w.until)}` : ""}, ${ordinal(w.place)} in line`);
   const full = [...held, ...waitingFull].join(". ") + ".";
-  // LeaseStatus.capsules: holdings first, for the chat's row over the prompt.
-  const capsules = [
+  // LeaseStatus.lines: holdings first, for the chat's foot with the working line (#2344).
+  const lines = [
     ...holding.map((h) => `\u25A3 ${h.short} \u00B7 ${h.minutes} min${h.soon ? " left" : ""}`),
     ...waiting.map((w) => `\u25F7 Waiting for ${w.short} \u00B7 held by ${w.holder}${w.until ? ` until ${clock(w.until)}` : ""} \u00B7 ${ordinal(w.place)}`),
   ];
-  return { mark, more: holding.length + waiting.length - 1, full, capsules,
+  return { mark, more: holding.length + waiting.length - 1, full, lines,
     holds: first ? { mark, more: holding.length - 1, full: held.join(". ") + "." } : null,
     waitingNames: waiting.map((w) => w.short), waitingFull };
 }

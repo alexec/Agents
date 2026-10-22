@@ -73,9 +73,9 @@ public struct LeaseStatus: Equatable, Sendable {
 
     // MARK: Words
 
-    /// One capsule each, holdings first: "▣ Screen · 18 min", "◷ Waiting for Screen ·
-    /// held by “Fix login” until 14:12 · 2nd".
-    public var capsules: [String] {
+    /// One line each at the chat's foot (#2344), holdings first: "▣ Screen · 18 min",
+    /// "◷ Waiting for Screen · held by “Fix login” until 14:12 · 2nd".
+    public var lines: [String] {
         holding.map { "\(Self.holdingSymbol) \(Self.holdingWords($0))" }
             + waiting.map { "\(Self.waitingSymbol) \(Self.waitingWords($0))" }
     }

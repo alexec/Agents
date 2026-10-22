@@ -75,12 +75,14 @@ anyway, both leases still run out in time, and you can see both waits and end on
 
 In the Mac window, the **Resources** row at the bottom of the sidebar opens a page listing
 every resource, whether it is free, who holds it and since when, when the lease runs out,
-and who is waiting, in order. Each agent's chat has a line saying what it holds and what
-it is waiting for, and its card on the project page says the same briefly.
+and who is waiting, in order. At the end of each agent's chat, with the line that says it
+is working, a line says what it holds and what it is waiting for. Click it to open
+**Resources** at that resource. The agent's card on the project page says the same briefly.
 
-On iPhone and iPad, the chat and the card show the same leases and waits, and
-**Resources** under **Activity** lists the declared resources and anything held, read-only.
-The web page lists them under each host. Declaring, and ending leases, are on the Mac.
+On iPhone and iPad, the chat and the card show the same leases and waits. Tap the line to
+open **Resources** under **Activity**, which lists the declared resources and anything
+held, read-only. On the web page the line opens **Resources**, which lists them under each
+host. Declaring, and ending leases, are on the Mac.
 
 ## What you can end
 

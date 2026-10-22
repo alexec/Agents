@@ -418,6 +418,11 @@ struct ChatTranscript: View {
                     // page, by the words that say what runs (#2338).
                     WorkingLine(tool: RunningToolWords.tool(agent))
                 }
+                // What it holds and waits for in line: what the agent is doing now, as the
+                // working line says, so here and not over the prompt (#2344).
+                if let leases = actions.leaseStatus(agent.id) {
+                    LeaseLine(status: leases, open: actions.openLease)
+                }
             }
             .inColumn(column)
             // Last, after everything the agent said and everything waiting to be sent
