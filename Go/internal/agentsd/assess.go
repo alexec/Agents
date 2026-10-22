@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/alexec/agents/Go/internal/agentsd/diskjson"
+	"github.com/alexec/agents/Go/internal/agentsd/redact"
 	"github.com/alexec/agents/Go/internal/agentsd/store"
 	"github.com/alexec/agents/Go/wire"
 )
@@ -144,6 +145,7 @@ func (d *Daemon) keepAppToolCall(agent wire.UUID, tool string, args map[string]j
 		log.Printf("could not keep a record of an app tool call: %v", oErr)
 		return
 	}
+	b, _ = redact.Bytes(b) // a call's arguments or answer can hold a token (#1001)
 	f.Write(append(b, '\n'))
 	f.Close()
 }

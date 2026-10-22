@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/alexec/agents/Go/internal/agentsd/diskjson"
+	"github.com/alexec/agents/Go/internal/agentsd/redact"
 	"github.com/alexec/agents/Go/wire"
 )
 
@@ -241,8 +242,18 @@ func (s *Store) Agents() []wire.Agent {
 }
 
 // Append adds an entry to an agent's transcript and says its index: the line it is.
+// The entry is redacted as AppendMany does it; AppendOne also gives it back.
 func (s *Store) Append(id wire.UUID, e wire.TranscriptEntry) (int, error) {
-	return s.AppendMany(id, []wire.TranscriptEntry{e})
+	n, _, err := s.AppendOne(id, e)
+	return n, err
+}
+
+// AppendOne is Append that also gives back the entry as it was written: redacted when it
+// held a known token shape (#1001).
+func (s *Store) AppendOne(id wire.UUID, e wire.TranscriptEntry) (int, wire.TranscriptEntry, error) {
+	es := []wire.TranscriptEntry{e}
+	n, err := s.AppendMany(id, es)
+	return n, es[0], err
 }
 
 // openTranscript opens a transcript to append to; a test counts the opens through it.
@@ -253,12 +264,22 @@ var openTranscript = func(file string) (*os.File, error) {
 // AppendMany adds entries to an agent's transcript with one open and one write, and says
 // the index of the first (#1852): a branch copies up to 10,000 entries at once, and the
 // store's lock, which every agent lookup takes, is held once rather than for each.
+//
+// Each line is written with its known token shapes redacted (#1001), and an entry that
+// held one is changed in es to what was written, for the caller to send on.
 func (s *Store) AppendMany(id wire.UUID, es []wire.TranscriptEntry) (int, error) {
 	var buf []byte
-	for _, e := range es {
+	for i, e := range es {
 		b, err := diskjson.Marshal(e)
 		if err != nil {
 			return 0, err
+		}
+		if r, changed := redact.Bytes(b); changed {
+			var cut wire.TranscriptEntry
+			if err := diskjson.Unmarshal(r, &cut); err != nil {
+				return 0, fmt.Errorf("redact an entry: %w", err)
+			}
+			b, es[i] = r, cut
 		}
 		buf = append(append(buf, b...), '\n')
 	}

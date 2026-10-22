@@ -6,13 +6,13 @@
 
 ## Phase 1: a1, redaction (area: hosts)
 
-- [ ] T001 [US1] Test `redact.Text` and `redact.Bytes`: each token shape becomes `[redacted:<kind>]`; plain text, hashes and UUIDs do not change; a JSON line stays valid, in `Go/internal/agentsd/redact/redact_test.go`.
-- [ ] T002 [US1] Test that a transcript entry with a GitHub token is stored redacted, and the entry the caller gets back is redacted, in `Go/internal/agentsd/store/store_test.go` (SC-001).
-- [ ] T003 [US1] Test that a log line with a token is written redacted, in `Go/cmd/agentsd/main_test.go` (SC-001).
-- [ ] T004 [US1] Add `Go/internal/agentsd/redact/redact.go`.
-- [ ] T005 [US1] Redact in `store.AppendMany`; decode a changed line back into the entry.
-- [ ] T006 [US1] Redact in `logLine.Write`.
-- [ ] T007 Update `docs/explanation/compliance/` (redaction is built).
+- [x] T001 [US1] Test `redact.Text` and `redact.Bytes`: each token shape becomes `[redacted:<kind>]`; plain text, hashes and UUIDs do not change; a JSON line stays valid, in `Go/internal/agentsd/redact/redact_test.go`.
+- [x] T002 [US1] Test that a transcript entry with a GitHub token is stored redacted, and the entry the caller gets back is redacted, in `Go/internal/agentsd/store/store_test.go` (SC-001).
+- [x] T003 [US1] Test that a log line with a token is written redacted, in `Go/cmd/agentsd/main_test.go` (SC-001).
+- [x] T004 [US1] Add `Go/internal/agentsd/redact/redact.go`.
+- [x] T005 [US1] Redact in `store.AppendMany`; decode a changed line back into the entry.
+- [x] T006 [US1] Redact in `logLine.Write`, and in `app-tools.jsonl` (`assess.go`).
+- [x] T007 Update `docs/explanation/compliance/` (redaction is built).
 
 ## Phase 2: b1, erasure (area: hosts)
 
