@@ -11,10 +11,12 @@ by pane, the **Resources** page (not in that window), and the system settings th
 iPhone and iPad depends on.
 
 The Mac's Settings window has panes chosen from one rail down its left side, in three
-groups by whose they are: **This device** (**Appearance** and **Sidebar**, kept on this Mac
-only); **You** (**Account**, **Agent Runtimes**, **Agent Configuration**, **Cost**,
-**Resources** and **Machines**, which are yours wherever you are); and **Control plane**
-(**People**, **Workspace Providers**, **Clients** and **Overview**). **Machines** lists every
+groups by what they are about: **This app** (**Appearance** and **Sidebar**: how the app
+draws); **Machines** (**Machines**, **Agent Runtimes**, **Agent Configuration**, **Cost**,
+**Resources** and **On Every Machine**: the machines that run your agents); and **Control
+plane** (**Account** and **Sign-ins** first, shown also with no control plane; then
+**People**, **Groups**, **Channels**, **Sign-In**, **Workspace Providers**, **Clients** and
+**Overview**). The web page calls the first group **This browser**. **Machines** lists every
 machine, with **This Mac**'s own settings on a page of its own. **Agent Runtimes** and **Agent Configuration** are headings: each runtime
 has its own page under **Agent Runtimes**, and Agent Configuration's pages (Overview,
 Instructions, Skills, Connectors, Plugins and Other files) sit under **Agent Configuration**,

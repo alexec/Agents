@@ -24,10 +24,9 @@ struct ControlSettingsView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
-                // Where the page is in the rail (#1759): Machines is the person's, the rest the
-                // control plane's.
+                // Where the page is in the rail (#1759, #2157): Machines, or Control plane.
                 HStack(spacing: 6) {
-                    Text(page == .hosts ? SettingsScope.you.title : SettingsScope.controlPlane.title)
+                    Text(page == .hosts ? SettingsScope.machines.title : SettingsScope.controlPlane.title)
                         .appText(.reading).fontWeight(.semibold)
                     Text("›").foregroundStyle(.secondary)
                     Text(page.title).appText(.reading).foregroundStyle(.secondary)

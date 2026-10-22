@@ -1,14 +1,14 @@
-/// Settings' groups (#1759, spec 736 FR-022), the same on the window's rail, the Remote's
-/// Settings and the page's: what is kept on this device only, what is the person's and
-/// follows them, and what is the control plane's. The window's panes for each are
-/// `SettingsScope.panes`; a pane added later goes there.
+/// Settings' groups by subject (#2157, was by scope #1759; spec 736 FR-022), the same on
+/// the window's rail, the Remote's Settings and the page's: this app, the machines that run
+/// agents, and what the control plane keeps (the person's account first). The window's panes
+/// for each are `SettingsScope.panes`; a pane added later goes there.
 enum SettingsScope: CaseIterable {
-    case thisDevice, you, controlPlane
+    case thisApp, machines, controlPlane
 
     var title: String {
         switch self {
-        case .thisDevice: "This device"
-        case .you: "You"
+        case .thisApp: "This app"
+        case .machines: "Machines"
         case .controlPlane: "Control plane"
         }
     }
