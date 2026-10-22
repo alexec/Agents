@@ -17,6 +17,15 @@ struct GroupWordsTests {
         #expect(GroupWords.members(DaemonAPI.Group(id: "g", name: "P"), people: []) == "No one")
     }
 
+    /// A group's bots are said apart from its people (#2132): a bot names its group itself.
+    @Test func botsAreThoseThatNameTheGroup() {
+        let platform = DaemonAPI.Group(id: "g1", name: "Platform", members: ["sam"])
+        let review = DaemonAPI.PersonRow(id: "b1", name: "review-bot", kind: .bot, role: .member, group: "g1")
+        let nightly = DaemonAPI.PersonRow(id: "b2", name: "nightly-bot", kind: .bot, role: .member, group: "g2")
+        #expect(GroupWords.bots(platform, people: [sam, review, nightly]) == "review-bot")
+        #expect(GroupWords.bots(platform, people: [sam]) == "None")
+    }
+
     @Test func aProviderIsForItsGroupOrTheAdmins() {
         let platform = DaemonAPI.Group(id: "g1", name: "Platform", members: ["sam"])
         let given = DaemonAPI.ProviderSummary(id: ProviderID(rawValue: "do"), name: "DigitalOcean", kind: "commands",

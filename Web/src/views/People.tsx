@@ -1,7 +1,8 @@
 // Settings ▸ People (#994, Team T1), as the window's and the Remote's People pane: each person with
 // their role, their machines (name and state, nothing inside them) and their clients. An admin
 // changes roles, invites a person with a one-use code, and removes a person; a member sees only
-// themselves, read only. Machines waiting to join are at the top.
+// themselves, read only. Machines waiting to join are at the top. Settings ▸ Bots (#2132) is the same list of the
+// bots alone, with Make a Bot… and the bots stopped at a cap.
 import { useEffect } from "preact/hooks";
 import { useSignal } from "@preact/signals";
 import type { Store } from "../model/store";
@@ -300,7 +301,17 @@ function PersonItem({ person, list, groups, joinCommand, setRole, askRemove, set
   );
 }
 
+/** Settings ▸ People: the people alone (#2132). */
 export function PeopleSection({ store, down }: { store: Store; down: boolean }) {
+  return <PeopleOrBots store={store} down={down} kind="person" />;
+}
+
+/** Settings ▸ Bots (#2132): the bots alone, an admin's. */
+export function BotsSection({ store, down }: { store: Store; down: boolean }) {
+  return <PeopleOrBots store={store} down={down} kind="bot" />;
+}
+
+function PeopleOrBots({ store, down, kind }: { store: Store; down: boolean; kind: "person" | "bot" }) {
   const problem = useSignal<string | null>(null);
   const inviting = useSignal(false);
   const removing = useSignal<PersonRow | null>(null);
@@ -323,36 +334,41 @@ export function PeopleSection({ store, down }: { store: Store; down: boolean }) 
     }
   };
   const shown = store.people.value;
+  const bots = kind === "bot";
+  const rows = (shown?.people ?? []).filter((person) => (person.kind === "bot") === bots);
+  const headId = bots ? "settings-bots" : "settings-people";
   return (
-    <section aria-labelledby="settings-people">
-      <h3 class="section-head" id="settings-people">People</h3>
-      <JoinRequests store={store} down={down} explained />
+    <section aria-labelledby={headId}>
+      <h3 class="section-head" id={headId}>{bots ? botWords.title : "People"}</h3>
+      {!bots && <JoinRequests store={store} down={down} explained />}
       {said && <p class="hint">{said}</p>}
       {/* Each bot stopped at a cap, while it is true (#2073). */}
-      {shown?.admin && store.capped.value.map((reached) => (
+      {bots && shown?.admin && store.capped.value.map((reached) => (
         <p key={reached.user} class="hint attention" role="status">{capReachedWords(reached)}</p>
       ))}
       {!shown && !said && <p class="hint">Loading…</p>}
       {shown && (
         <>
-          {shown.people.length === 0 && <p class="hint">{noPeople}</p>}
+          {rows.length === 0 && <p class="hint">{bots ? botWords.empty : noPeople}</p>}
           <ul class="people-list">
-            {ordered(shown.people).map((person) => (
+            {ordered(rows).map((person) => (
               <PersonItem key={person.id} person={person} list={shown} groups={groups} joinCommand={store.joinCommand.value}
                 setRole={(role) => void setRole(person, role)} askRemove={() => { removing.value = person; }}
                 setCap={() => { botSheet.value = { bot: person }; }} addMachine={() => { machineFor.value = person; }} />
             ))}
           </ul>
-          {shown.admin
-            ? (
+          {bots
+            // A bot runs the team's workflows (#1761).
+            ? shown.admin && (
               <>
-                <button type="button" class="invite" disabled={down} onClick={() => { inviting.value = true; }}>Invite a Person…</button>
-                {/* A bot runs the team's workflows (#1761). */}
                 <button type="button" class="invite" disabled={down} onClick={() => { botSheet.value = { bot: null }; }}>{botWords.make}</button>
+                <p class="hint">{botWords.foot}</p>
               </>
             )
-            : <p class="hint">{memberNote}</p>}
-          {shown.admin && (
+            : shown.admin
+              ? <button type="button" class="invite" disabled={down} onClick={() => { inviting.value = true; }}>Invite a Person…</button>
+              : <p class="hint">{memberNote}</p>}
+          {!bots && shown.admin && (
             <div class="rotate-key">
               <button type="button" disabled={down} onClick={() => { rotating.value = true; }}>Rotate Control Key…</button>
               {wasRotated.value && <p class="hint" role="status">{rotated}</p>}

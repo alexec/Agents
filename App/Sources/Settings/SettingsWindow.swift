@@ -133,6 +133,8 @@ struct SettingsWindow: View {
         case .groups: control != nil && model.people.showsGroups
         // An admin's: which providers people sign in with (#995).
         case .signIn: control != nil && model.people.you?.isAdmin == true
+        // An admin's: a member sees only themselves, so no bots (#2132).
+        case .bots: control != nil && model.people.you?.isAdmin == true
         case .providers: control?.providersHere ?? false
         default: true
         }
@@ -207,6 +209,8 @@ struct SettingsWindow: View {
             // Through the window's own connection to the control plane, which hears when
             // people change (#994).
             FormColumn { PeoplePane(control: model.controlRequests, people: model.people) }
+        case .bots:
+            FormColumn { PeoplePane(control: model.controlRequests, people: model.people, kind: .bot) }
         case .groups:
             FormColumn { GroupsPane(control: model.controlRequests, state: model.people) }
         case .channels:
@@ -231,7 +235,7 @@ extension SettingsScope {
         case .thisApp: [.appearance, .sidebar]
         case .machines: [.machines, .runtimes, .agentConfiguration, .spending, .resources, .onEveryMachine]
         // The person's account first, shown with no control plane too (#2157).
-        case .controlPlane: [.account, .signIns, .people, .groups, .channels, .signIn, .providers, .clients, .controlPlane]
+        case .controlPlane: [.account, .signIns, .people, .bots, .groups, .channels, .signIn, .providers, .clients, .controlPlane]
         }
     }
 }
@@ -251,6 +255,8 @@ enum SettingsPane: String, Hashable, CaseIterable {
     case providers, clients
     /// Who uses the control plane, and the machines and clients that belong to them (#994).
     case people
+    /// The bots that run the team's workflows (#1761), apart from the people (#2132).
+    case bots
     /// Groups own workspace providers (#1761).
     case groups
     /// Channel identities linked to people (#1762).
@@ -270,7 +276,7 @@ enum SettingsPane: String, Hashable, CaseIterable {
     var isThisMacs: Bool {
         switch self {
         case .runtimes, .agentConfiguration, .spending, .resources: true
-        case .appearance, .sidebar, .account, .machines, .controlPlane, .providers, .clients, .people, .groups,
+        case .appearance, .sidebar, .account, .machines, .controlPlane, .providers, .clients, .people, .bots, .groups,
              .channels, .signIn, .signIns, .onEveryMachine: false
         }
     }
@@ -292,6 +298,7 @@ enum SettingsPane: String, Hashable, CaseIterable {
         case .providers: "Workspace Providers"
         case .clients: "Clients"
         case .people: "People"
+        case .bots: BotWords.title
         case .groups: GroupWords.title
         case .channels: ChannelLinkWords.title
         case .signIn: SignInWords.paneTitle
@@ -314,6 +321,7 @@ enum SettingsPane: String, Hashable, CaseIterable {
         case .providers: "cloud"
         case .clients: "iphone"
         case .people: "person.2"
+        case .bots: "gearshape.2"
         case .groups: "person.3"
         case .channels: "bubble.left.and.bubble.right"
         case .signIn: SignInWords.paneSymbol

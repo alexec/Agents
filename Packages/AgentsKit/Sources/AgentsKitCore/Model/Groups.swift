@@ -198,6 +198,12 @@ public enum GroupWords {
             .joined(separator: ", ")
     }
 
+    /// The bots in a group (#2132), which a bot names itself: "review-bot, nightly-bot", or "None".
+    public static func bots(_ group: DaemonAPI.Group, people: [DaemonAPI.PersonRow]) -> String {
+        let names = people.filter { $0.kind == .bot && $0.group == group.id }.map(\.name)
+        return names.isEmpty ? "None" : names.joined(separator: ", ")
+    }
+
     /// "DigitalOcean, Docker", or nil with none.
     public static func providers(_ group: DaemonAPI.Group, of all: [DaemonAPI.ProviderSummary]) -> String? {
         let names = all.filter { $0.group == group.id }.map(\.name)
@@ -252,6 +258,9 @@ public enum GroupWords {
 /// The words a bot is shown in, in Settings ▸ People (#1761), the same on the Mac and the
 /// Remote (the web page's are in `Web/src/model/teamGroups.ts`).
 public enum BotWords {
+    /// Settings ▸ Control plane ▸ Bots (#2132), a pane of its own next to People.
+    public static let title = "Bots"
+    public static let empty = "No bots yet. A bot runs workflows as its own user, in one group, with a daily cap."
     public static let make = "Make a Bot…"
     public static let addMachine = "Add a Machine…"
     public static let setCap = "Group and Cap…"

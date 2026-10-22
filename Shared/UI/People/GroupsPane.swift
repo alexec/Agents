@@ -42,6 +42,8 @@ struct GroupsPane: View {
                     Section {
                         Text(group.name).appText(.reading)
                         GroupLine(title: "People", words: GroupWords.members(group, people: people))
+                        // Its bots apart from its people (#2132).
+                        GroupLine(title: BotWords.title, words: GroupWords.bots(group, people: people))
                         GroupLine(title: "Workspace providers", words: GroupWords.providers(group, of: providers) ?? "None")
                         // What its bots may spend together in a day (#2074).
                         GroupLine(title: "Daily cap", words: GroupWords.capLine(group, people: people))

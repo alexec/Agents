@@ -5,7 +5,7 @@ import { useSignal } from "@preact/signals";
 import type { Store } from "../model/store";
 import type { Group, PersonRow } from "../protocol/generated";
 import { describe } from "../model/errors";
-import { dollars, foot, groupCapFoot, groupCapLine, members, providersOf, readCap, removeMessage, removeTitle, title } from "../model/teamGroups";
+import { botWords, dollars, foot, groupBots, groupCapFoot, groupCapLine, members, providersOf, readCap, removeMessage, removeTitle, title } from "../model/teamGroups";
 import { Modal } from "./Modal";
 
 function GroupSheet({ store, group, people, close }: {
@@ -115,6 +115,9 @@ export function GroupsSection({ store, down }: { store: Store; down: boolean }) 
                 <div class="person-things">
                   <span class="faint small">People</span>
                   <span class="small">{members(group, people)}</span>
+                  {/* Its bots apart from its people (#2132). */}
+                  <span class="faint small">{botWords.title}</span>
+                  <span class="small">{groupBots(group, people)}</span>
                   <span class="faint small">Workspace providers</span>
                   <span class="small">{providersOf(group, providers) ?? "None"}</span>
                   <span class="faint small">Daily cap</span>

@@ -5,7 +5,7 @@ import type { ComponentType } from "preact";
 import type { Store } from "../../model/store";
 import { ChannelsSection } from "../ChannelLinks";
 import { GroupsSection } from "../Groups";
-import { PeopleSection } from "../People";
+import { BotsSection, PeopleSection } from "../People";
 import { ProvidersSection } from "../Providers";
 import { SignInSection, SignInsSection } from "../SignInSection";
 import { UserScopeSection } from "../UserScope";
@@ -33,6 +33,8 @@ export interface SettingsSection {
 export const settingsSections: readonly SettingsSection[] = [
   { name: "appearance", scope: "thisApp", order: 10, Section: AppearanceSection },
   { name: "backups", scope: "machines", order: 30, Section: BackupsSection },
+  // The bots that run the team's workflows, apart from the people (#2132): an admin's.
+  { name: "bots", scope: "controlPlane", order: 15, Section: BotsSection, shows: (store) => store.person.value?.role === "admin" },
   // Channel identities linked to people (#1762).
   { name: "channels", scope: "controlPlane", order: 30, Section: ChannelsSection },
   { name: "finishedChats", scope: "thisApp", order: 30, Section: FinishedChatsSection },

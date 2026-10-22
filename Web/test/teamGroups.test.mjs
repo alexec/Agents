@@ -14,6 +14,14 @@ test("groups: members are everyone or named", () => {
   assert.equal(g.members({ id: "g", name: "P", everyone: false, members: [] }, []), "No one");
 });
 
+test("groups: a group's bots are those that name it (#2132)", () => {
+  const platform = { id: "g1", name: "Platform", everyone: false, members: ["sam"] };
+  const review = { id: "b1", name: "review-bot", kind: "bot", group: "g1" };
+  const nightly = { id: "b2", name: "nightly-bot", kind: "bot", group: "g2" };
+  assert.equal(g.groupBots(platform, [sam, review, nightly]), "review-bot");
+  assert.equal(g.groupBots(platform, [sam]), "None");
+});
+
 test("groups: a provider is for its group or the admins", () => {
   const platform = { id: "g1", name: "Platform", everyone: false, members: ["sam"] };
   const given = { id: "do", name: "DigitalOcean", group: "g1", mayUse: false };
