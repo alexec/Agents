@@ -7,7 +7,7 @@ import type { Store } from "../model/store";
 import type { MCPLevels } from "../protocol/generated";
 import {
   connectorLevels, fileProblem, healthKind, healthLastError, healthLine, healthTone, levelsSentence, madeByAgents,
-  personalServers, projectEmpty, projectIntro, projectServers, removesCommitted, removesWords,
+  notRemoved, notRemovedOffline, personalServers, projectEmpty, projectIntro, projectServers, removesCommitted, removesWords,
 } from "../model/hostedMCP";
 import { BackToList } from "./BackToList";
 import { ConnectorSetupSection } from "./ConnectorSetup";
@@ -24,10 +24,14 @@ export function MCPServersList({ store, host, folder }: { store: Store; host: st
   const [removeProblem, setRemoveProblem] = useState<string | undefined>();
   const checkable = servers.some((s) => !s.hosted);
   // Every connector (#2154), one written by hand in mcp.json too; asked first, as the window's sheet.
+  // A server's is named (#2266); the Mac's is not.
+  const machine = store.isMac(host) ? undefined : store.hosts.value.find((h) => h.id === host)?.name ?? host;
   const remove = async (name: string) => {
     const inProject = folder !== undefined;
-    if (!window.confirm(`Remove ${name}? ${removesWords(name, inProject)}${inProject ? ` ${removesCommitted}` : ""}`)) return;
-    setRemoveProblem(await store.removeConnector(host, name, folder));
+    if (!window.confirm(`Remove ${name}? ${removesWords(name, inProject, machine)}${inProject ? ` ${removesCommitted}` : ""}`)) return;
+    const why = await store.removeConnector(host, name, folder);
+    if (why === undefined) setRemoveProblem(undefined);
+    else setRemoveProblem(store.hostIsOnline(host) ? notRemoved(name, why) : notRemovedOffline(name, machine ?? "This Mac"));
   };
   const checkNow = () => {
     setChecking(true);

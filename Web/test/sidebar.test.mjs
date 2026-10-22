@@ -559,3 +559,12 @@ test("a tab holding one project is titled with its name (#1089)", async () => {
   assert.equal(titleFor(0), "Agents");
   assert.equal(titleFor(2, "alpha"), "(2) alpha");
 });
+
+test("Remove…'s words name a server and say a refusal as a removal (#2266)", async () => {
+  const { removesWords, notRemoved, notRemovedOffline } = await load("src/model/hostedMCP.ts");
+  assert.equal(removesWords("github", true, "devbox"),
+    "This removes the github entry from .agents/mcp.json on devbox. Agents started after that won't have it.");
+  assert.equal(removesWords("github", false), "This removes the github entry from ~/.agents/mcp.json. Agents started after that won't have it.");
+  assert.equal(notRemovedOffline("github", "devbox"), "github was not removed: devbox is offline.");
+  assert.equal(notRemoved("github", "That machine is offline."), "github was not removed. That machine is offline.");
+});

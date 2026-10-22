@@ -99,6 +99,8 @@ struct MCPServersView: View {
                                 // a server project's on its own host (#2199).
                                 .contextMenu {
                                     Button("Remove\u{2026}", role: .destructive) { removing = server }
+                                        // Its mcp.json is on that machine (#2266).
+                                        .disabled(model.hostUnreachable(host))
                                 }
                         }
                     }
@@ -124,7 +126,8 @@ struct MCPServersView: View {
                             presenting: removing) { server in
             Button("Remove", role: .destructive) { Task { await remove(server) } }
         } message: { server in
-            Text(MCPHealthWords.removes(server.name, inProject: project != nil)
+            Text(MCPHealthWords.removes(server.name, inProject: project != nil,
+                                        on: host == .mac ? nil : model.hosts.label(host))
                  + (project != nil ? " " + MCPHealthWords.removesCommitted : ""))
         }
         .sheet(isPresented: $adding) {
@@ -138,7 +141,8 @@ struct MCPServersView: View {
     /// Its secrets stay: Settings' Remove… is where one is forgotten too.
     private func remove(_ server: DaemonAPI.MCPServerHealth) async {
         let destination: DaemonAPI.SkillDestination = project.map { .project(folder: $0.folder.path) } ?? .personal
-        removeProblem = await model.mcpRemove(server.name, at: destination, forgetSecret: nil, on: host).map(MCPCatalogWords.sentence)
+        removeProblem = await model.mcpRemove(server.name, at: destination, forgetSecret: nil, on: host)
+            .map { MCPCatalogWords.notRemoved(server.name, $0) }
         await model.refreshMCPHealth(host)
     }
 }

@@ -83,7 +83,7 @@ struct RemoveMCPServerSheet: View {
         defer { removing = false }
         let forget = alsoForget ? forgettable : nil
         if let error = await model.mcpRemove(server.name, at: destination, forgetSecret: forget) {
-            failure = MCPCatalogWords.sentence(error)
+            failure = MCPCatalogWords.notRemoved(server.name, error)
         } else {
             onRemoved()
             dismiss()

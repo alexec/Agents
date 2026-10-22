@@ -109,9 +109,20 @@ public enum MCPHealthWords {
     public static let projectEmpty = "No connectors in this project's .agents/mcp.json yet."
 
     /// What Remove… takes out (#2154), whether the app added it or it was written by hand.
-    public static func removes(_ name: String, inProject: Bool) -> String {
-        "This removes the \(name) entry from \(inProject ? ".agents/mcp.json" : "~/.agents/mcp.json"). "
-            + "Agents started after that won't have it."
+    /// `machine` names a server a project is on (#2266); nil for this Mac's.
+    public static func removes(_ name: String, inProject: Bool, on machine: String? = nil) -> String {
+        "This removes the \(name) entry from \(inProject ? ".agents/mcp.json" : "~/.agents/mcp.json")"
+            + (machine.map { " on \($0)" } ?? "") + ". Agents started after that won't have it."
+    }
+
+    /// Remove… found the machine offline (#2266).
+    public static func notRemoved(_ name: String, offline machine: String) -> String {
+        "\(name) was not removed: \(machine) is offline."
+    }
+
+    /// Remove… was refused: `why` is a sentence (#2266).
+    public static func notRemoved(_ name: String, because why: String) -> String {
+        "\(name) was not removed. \(why)"
     }
 
     /// Said too for a project's: its mcp.json is committed (#2154).

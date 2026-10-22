@@ -169,10 +169,23 @@ export const projectIntro = "Every connector in this project's .agents/mcp.json.
 export const personalEmpty = "No connectors in ~/.agents/mcp.json yet.";
 export const projectEmpty = "No connectors in this project's .agents/mcp.json yet.";
 
-/** What Remove… takes out (#2154), as MCPHealthWords.removes: one the app added or one written by hand. */
-export function removesWords(name: string, inProject: boolean): string {
-  return `This removes the ${name} entry from ${inProject ? ".agents/mcp.json" : "~/.agents/mcp.json"}. `
-    + "Agents started after that won't have it.";
+/**
+ * What Remove… takes out (#2154), as MCPHealthWords.removes: one the app added or one written by hand.
+ * `machine` names a server a project is on (#2266); undefined for the Mac's.
+ */
+export function removesWords(name: string, inProject: boolean, machine?: string): string {
+  return `This removes the ${name} entry from ${inProject ? ".agents/mcp.json" : "~/.agents/mcp.json"}`
+    + `${machine ? ` on ${machine}` : ""}. Agents started after that won't have it.`;
+}
+
+/** Remove… found the machine offline (#2266), as MCPHealthWords.notRemoved. */
+export function notRemovedOffline(name: string, machine: string): string {
+  return `${name} was not removed: ${machine} is offline.`;
+}
+
+/** Remove… was refused: `why` is a sentence (#2266). */
+export function notRemoved(name: string, why: string): string {
+  return `${name} was not removed. ${why}`;
 }
 
 /** Said too for a project's: its mcp.json is committed (#2154). */
