@@ -1,4 +1,4 @@
-// The #1634 walk on a scratch root signed in to a real gitlab.com account: Your Connectors with
+// The #1634 walk on a scratch root signed in to a real gitlab.com account: Connectors with
 // the GitLab connection, a GitLab project's Connectors page (#1632), and a session whose agent
 // opened the gitlab server's views (#1631), each Show pressed. Screenshots go to <out dir>.
 //

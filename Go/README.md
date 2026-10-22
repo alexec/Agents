@@ -132,7 +132,7 @@ it (`scripts/go-github-mcp.sh linear-mcp`) and every Linux host installs
 The github server's shape for GitLab: a stdio front (`gitlabmcp.Front`) answers
 `events/list` and `events/poll` and passes everything else to a go-sdk server with our own
 tools, all over GitLab's REST API v4 with one token: the person's GitLab connection (#1630,
-Your Connectors ▸ Connect GitLab: the device flow on gitlab.com, or an access token on any
+Connectors ▸ Connect GitLab: the device flow on gitlab.com, or an access token on any
 GitLab), or `GITLAB_TOKEN` (an access token with the `api` scope), which goes first.
 `GITLAB_URL` (or `--url`) is the GitLab: the connection's when empty, else
 `https://gitlab.com`. The connection's token goes only to the GitLab it was made on. GitLab's own MCP server

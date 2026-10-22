@@ -328,7 +328,7 @@ func (s *Events) Poll(ctx context.Context, raw json.RawMessage) (map[string]any,
 	}
 	// No key is said at once, on the first poll too, so a wait set up without one fails then.
 	if s.SignedIn != nil && !s.SignedIn() {
-		return nil, eventsError(&LinearError{Kind: NotSignedIn, Message: "Linear is not signed in: connect Linear in Your Connectors, or set LINEAR_API_KEY to a personal API key"})
+		return nil, eventsError(&LinearError{Kind: NotSignedIn, Message: "Linear is not signed in: connect Linear in Connectors, or set LINEAR_API_KEY to a personal API key"})
 	}
 	limit := 50
 	if p.MaxEvents != nil {

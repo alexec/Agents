@@ -622,7 +622,7 @@ struct RemoteConnectEmailSheet: View {
     }
 }
 
-/// Your Connectors ▸ Connections on the iPhone and iPad (frame E). The page that shows them
+/// Connectors ▸ Connections on the iPhone and iPad (frame E). The page that shows them
 /// reads them, as a project's set-up (#1684).
 struct RemoteConnections: View {
     @Environment(RemoteModel.self) private var model

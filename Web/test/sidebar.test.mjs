@@ -341,7 +341,7 @@ test("an Activity page is in the address on its own, and an unknown one is ignor
     assert.deepEqual(parseRoute("#/a/spending"), { activity: "spending" });
     assert.deepEqual(parseRoute("#/a/time"), { activity: "time" });
     assert.deepEqual(parseRoute("#/a/milestones"), { activity: "milestones" });
-    assert.deepEqual(parseRoute("#/a/mcp"), { activity: "mcp" }, "Your Connectors has a page of its own (#589)");
+    assert.deepEqual(parseRoute("#/a/mcp"), { activity: "mcp" }, "Connectors has a page of its own (#589)");
     assert.deepEqual(parseRoute("#/h/mac/p/file%3A%2F%2F%2Fw%2Fa/m/1"), { host: "mac", project: "file:///w/a", mcp: true },
       "a project's Connectors has a page of its own (#753)");
     assert.equal(routeHash({ host: "mac", project: "file:///w/a", mcp: true }), "#/h/mac/p/file%3A%2F%2F%2Fw%2Fa/m/1");
@@ -352,7 +352,7 @@ test("an Activity page is in the address on its own, and an unknown one is ignor
   }
 });
 
-test("the Your Connectors row: none hosted says nothing, one stopped in use is the count (#589)", async () => {
+test("the Connectors row: none hosted says nothing, one stopped in use is the count (#589)", async () => {
   const { hostedTally } = await load("src/model/hostedMCP.ts");
   const server = (name, state) => ({ name, state, restarts: 0, users: 1 });
   assert.equal(hostedTally([]), null);

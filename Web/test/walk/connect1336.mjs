@@ -1,6 +1,6 @@
 // The #1336 walk on a scratch root: a project's Connectors page opens with its set-up (frame F,
 // the Mac's grid), Skip and Set Up go through the host, the Connect GitHub sheet shows the host's
-// device-flow code (frame B), and Your Connectors lists the connections (frame E). Screenshots go
+// device-flow code (frame B), and Connectors lists the connections (frame E). Screenshots go
 // to <out dir>; the sign-in is left waiting, so a person can approve the code it prints.
 //
 //   node Web/test/walk/connect1336.mjs <WEB_URL> <browser code> <project name> <out dir> [stop]

@@ -28,8 +28,8 @@ GitHub App `agents-loops`. You choose on github.com which repositories it can se
 1. Open the connection sheet:
    - On a project's **Connectors** page (the **Connectors** row under the project in the
      sidebar), choose **Connect GitHub…**.
-   - Or open **Your Connectors** (under Activity in the sidebar; on the Mac also
-     **View ▸ Your Connectors**). On the Mac, choose **Connect… ▸ GitHub**. On the Remote
+   - Or open **Connectors** (under Activity in the sidebar; on the Mac also
+     **View ▸ Connectors**). On the Mac, choose **Connect… ▸ GitHub**. On the Remote
      and the web page, choose **Connect GitHub…**.
 2. The sheet lists what Agents will be able to do: read and write issues, pull requests
    and reviews, read checks and Actions runs, and read and push code. Choose
@@ -49,7 +49,7 @@ an error or an answer to a client. The host renews it by itself before it ends.
 
 ### Change or end the connection
 
-On **Your Connectors ▸ Connections**:
+On **Connectors ▸ Connections**:
 
 - **Repositories on github.com** opens the page where you change which repositories the
   App can see.

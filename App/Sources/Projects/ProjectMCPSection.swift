@@ -58,7 +58,7 @@ struct ProjectMCPSection: View {
 
     private var heading: some View {
         HStack(spacing: 8) {
-            SectionHeading(title: "Connectors")
+            SectionHeading(title: place == .you ? "User connectors" : "Project connectors")
                 .fixedSize()
             if !servers.isEmpty {
                 SharedChip(text: "\(servers.count)").padding(.top, 20)

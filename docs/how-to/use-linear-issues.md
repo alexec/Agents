@@ -25,7 +25,7 @@ Agents Host carries `linear-mcp`, and every Linux host installs it beside agents
 
 ## Connect Linear
 
-On **Your Connectors**, choose **Connect… ▸ Linear** on the Mac (**Connect Linear…** on the
+On **Connectors**, choose **Connect… ▸ Linear** on the Mac (**Connect Linear…** on the
 Remote and the web page), then **Continue on linear.app**. Approve on linear.app; Agents comes
 back by itself. The host keeps the tokens and renews them. `linear-mcp` reads this connection,
 so it needs no key.
@@ -122,7 +122,7 @@ each wait costs one request a minute.
   from that history. `issue.opened` has the issue's labels as they are when it is seen.
 
 - **"Linear is not signed in"**: there is no Linear connection on the host, and
-  `LINEAR_API_KEY` is not set for the server. Connect Linear on Your Connectors.
+  `LINEAR_API_KEY` is not set for the server. Connect Linear on Connectors.
 - **"Linear refused the key"**: the connection or the key was revoked. Connect Linear
   again, or make a new key.
 - **"Linear's rate limit is reached"**: too many waits use the one key. The server waits as

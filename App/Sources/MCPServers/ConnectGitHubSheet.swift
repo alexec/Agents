@@ -12,7 +12,7 @@ struct ConnectGitHubSheet: View {
     @Environment(\.dismiss) private var dismiss
 
     var host: HostID
-    /// The project whose page opened it, for the install step; nil from Your Connectors.
+    /// The project whose page opened it, for the install step; nil from Connectors.
     var project: ProjectKey?
     var onConnected: () -> Void = {}
 

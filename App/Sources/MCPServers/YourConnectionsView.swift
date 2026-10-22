@@ -2,7 +2,7 @@ import AgentsKitCore
 import AppKit
 import SwiftUI
 
-/// Activity ▸ Your Connectors (#1336, frame E): the person's connections, one row each with
+/// Activity ▸ Connectors (#1336, frame E): the person's connections, one row each with
 /// Disconnect, and each project's set-up with Open ›. A connection is the person's, so it
 /// lives here; a project's page shows it as one line.
 struct YourConnectionsView: View {
@@ -23,7 +23,7 @@ struct YourConnectionsView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             VStack(alignment: .leading, spacing: 4) {
-                Text("Your Connectors").appText(.title).fontWeight(.semibold)
+                Text("Connectors").appText(.title).fontWeight(.semibold)
                 Text("Your connections, and the connectors in your own ~/.agents/mcp.json. They reach every project.")
                     .appText(.supporting).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)

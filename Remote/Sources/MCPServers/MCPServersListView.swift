@@ -1,8 +1,8 @@
 import AgentsKitCore
 import SwiftUI
 
-/// A project's Connectors page, with its set-up first (#1336), or Your Connectors, with the
-/// person's connections first. Then every MCP server in one `mcp.json` and how each is doing
+/// A project's Connectors page, with its set-up first (#1336), or the person's own Connectors page, with
+/// their connections first. Then every MCP server in one `mcp.json` and how each is doing
 /// (#753), as the window's: under Activity, the person's own on the Mac (#589); under a
 /// project, its `.agents/mcp.json`.
 /// Read-only but for Check Now and Remove… (#2154): servers are edited in Settings.
@@ -67,7 +67,7 @@ struct MCPServersListView: View {
                 }
                 .paperListRow()
             } header: {
-                Text(project == nil ? "Your connectors" : "All connectors")
+                Text(project == nil ? "User connectors" : "Project connectors")
             } footer: {
                 Text(project == nil ? MCPHealthWords.personalIntro : MCPHealthWords.projectIntro)
             }
@@ -75,7 +75,7 @@ struct MCPServersListView: View {
         .listStyle(.insetGrouped)
         .scrollContentBackground(.hidden)
         .background(Paper.ground)
-        .navigationTitle(project.flatMap { model.work.project($0)?.name }.map { "\($0): Connectors" } ?? "Your Connectors")
+        .navigationTitle(project.flatMap { model.work.project($0)?.name }.map { "\($0): Connectors" } ?? "Connectors")
         .toolbar {
             Button("Check Now") {
                 checking = true
@@ -133,11 +133,11 @@ struct MCPServersRow: View {
         // The title alone (#587): the count is said to VoiceOver, and one not answering
         // turns the row's icon red (`activityIcon(_:warns:)`).
         HStack(alignment: .firstTextBaseline) {
-            Text("Your Connectors")
+            Text("Connectors")
             Spacer()
         }
         .accessibilityElement(children: .combine)
         .accessibilityValue(MCPHealthWords.tally(model.work.mcpHealthSnapshot()?.personal ?? [])?.words ?? "")
-        .accessibilityHint("Opens Your Connectors")
+        .accessibilityHint("Opens Connectors")
     }
 }

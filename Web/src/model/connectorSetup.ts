@@ -15,7 +15,7 @@ export const abilities = [
   "Read and push code",
 ];
 export const sheetSubtitle = "For you, in every project. Agents talks to GitHub's API directly.";
-export const sheetChoose = "On github.com you choose which repositories. You can take it back there, or with Disconnect on Your Connectors.";
+export const sheetChoose = "On github.com you choose which repositories. You can take it back there, or with Disconnect on Connectors.";
 export const sheetFoot = "The token is kept by the machine, never in a log.";
 export const continueButton = "Continue on github.com";
 /** Where the person sees and changes which repositories the App reaches, as the Mac's (#1685). */
@@ -187,7 +187,7 @@ export function otherTrackers(linearConnected: boolean): string {
     : "Then add its connector, or another tracker's, with Add Connector on the Mac.";
 }
 
-/** The providers a person connects, in the order Your Connectors shows them. */
+/** The providers a person connects, in the order Connectors shows them. */
 export const providers: ConnectionProvider[] = ["github", "linear", "gitlab", "email"];
 
 /** The providers that host can connect: Email only when it has connections.email/1 (#1780). */
@@ -232,7 +232,7 @@ export function tokenEnds(at: Date, now: Date = new Date()): string {
   return `ends ${new Date(at.getTime() - 1000).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" })}`;
 }
 
-/** A provider with no connection yet, on Your Connectors. */
+/** A provider with no connection yet, on Connectors. */
 export function notConnectedNote(p: ConnectionProvider): string {
   return {
     github: "Issues, pull requests and Actions in every project.",
@@ -268,7 +268,7 @@ export const linear = {
     "Comment as you",
   ],
   subtitle: "For you, in every project. Agents talks to Linear's API directly.",
-  choose: "On linear.app you choose the workspace. You can take it back there, or with Disconnect on Your Connectors.",
+  choose: "On linear.app you choose the workspace. You can take it back there, or with Disconnect on Connectors.",
   continueButton: "Continue on linear.app",
   waiting: "Waiting for linear.app… Approve there, and Agents comes back by itself.",
   finishing: "Finishing the sign-in…",
@@ -285,7 +285,7 @@ export const gitlab = {
     "Read and write issues",
   ],
   subtitle: "For you, in every project. Agents talks to GitLab's API directly.",
-  choose: "GitLab asks for the api scope. You can take it back on GitLab ▸ Preferences ▸ Applications, or with Disconnect on Your Connectors.",
+  choose: "GitLab asks for the api scope. You can take it back on GitLab ▸ Preferences ▸ Applications, or with Disconnect on Connectors.",
   continueButton: "Continue on gitlab.com",
   signInWay: "gitlab.com",
   tokenWay: "Access token",
@@ -342,7 +342,7 @@ export const email = {
   passwordPrompt: "App password",
   button: "Connect",
   checking: "Signing in to the mail server…",
-  choose: "Agents can read every message in this mailbox. It never sends, answers or deletes mail. Take the app password back at your mail provider, or with Disconnect on Your Connectors.",
+  choose: "Agents can read every message in this mailbox. It never sends, answers or deletes mail. Take the app password back at your mail provider, or with Disconnect on Connectors.",
   disconnectNote: "Disconnect deletes the machine's app password. The email server's events stop until you connect again or set EMAIL_PASSWORD. To revoke it too, delete the app password at your mail provider.",
   failed: "The mail server did not take the sign-in.",
 };

@@ -47,7 +47,7 @@ approved again, in **Project Settings ▸ Agent Configuration ▸ Connectors**, 
 
 ## See what it is doing
 
-**Your Connectors** under Activity lists every connector in your own `~/.agents/mcp.json`, and a
+**Connectors** under Activity lists every connector in your own `~/.agents/mcp.json`, and a
 project's own **Connectors** row, under it in the sidebar, lists the connectors in its
 `.agents/mcp.json`. Every project has the row, also one with no connectors. Both are on the Mac, the Remote and in
 a browser (#753). A hosted server's row says whether it is running, idle or starting
