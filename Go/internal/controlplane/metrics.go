@@ -186,7 +186,7 @@ type gauges struct {
 func (m *Metrics) write(w io.Writer, g gauges) {
 	var b bytes.Buffer
 	m.text(&b, g)
-	w.Write(b.Bytes())
+	_, _ = w.Write(b.Bytes()) // a scraper that went is not ours to answer
 }
 
 func (m *Metrics) text(w *bytes.Buffer, g gauges) {
