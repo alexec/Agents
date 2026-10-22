@@ -35,7 +35,7 @@ struct CapReachedCard: View {
                     Button("OK") { people.dismissCap(reached) }
                         .buttonStyle(.bordered)
                 }
-                .controlSize(.small)
+                .cardButtons()
                 .padding(.top, 2)
             }
             Spacer(minLength: 0)

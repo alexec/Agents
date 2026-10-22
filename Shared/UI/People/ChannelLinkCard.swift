@@ -53,7 +53,7 @@ struct ChannelLinkCard: View {
                         .buttonStyle(.bordered)
                     if isAnswering { ProgressView().controlSize(.small) }
                 }
-                .controlSize(.small)
+                .cardButtons()
                 .disabled(isAnswering)
                 .padding(.top, 2)
                 Text(ChannelLinkWords.explanation(request))
