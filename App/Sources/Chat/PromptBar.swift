@@ -162,11 +162,7 @@ struct PromptBar: View {
                         Telling(host: recipient, doing: "Sending")
                     }
                     field
-                    // Attach, dictate and voice, under the field with the options (#2375).
-                    HStack(spacing: 10) {
-                        tools
-                        options
-                    }
+                    options
                 }
             }
         }
@@ -590,6 +586,31 @@ struct PromptBar: View {
                     if !text.isEmpty, let id = agent?.id { Task { await model.prewarm(id, .typing) } }
                 }
 
+            Button(action: chooseAttachment) {
+                Image(systemName: "paperclip")
+                    .appText(.reading).fontWeight(.semibold)
+                    .frame(width: 22, height: 22)
+            }
+            .buttonStyle(.paper)
+            .buttonBorderShape(.circle)
+            .help("Attach a file or a picture")
+            .accessibilityLabel("Attach")
+
+            Button(action: dictate) {
+                Image(systemName: "microphone")
+                    .appText(.reading).fontWeight(.semibold)
+                    .frame(width: 22, height: 22)
+            }
+            .buttonStyle(.paper)
+            .buttonBorderShape(.circle)
+            .help("Dictate, as the Mac does everywhere")
+            .accessibilityLabel("Dictate")
+
+            // Voice mode (#2322), while Settings ▸ Appearance has it on.
+            if let agent {
+                VoiceModeButton(agentID: agent.id) { await model.send($0, to: agent.id, voice: true) }
+            }
+
             // While it works and nothing is typed, send is stop. Type and it is send
             // again, queueing what is typed for when the turn ends.
             if let agent, model.canStop(agent), text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
@@ -649,38 +670,6 @@ struct PromptBar: View {
         }
         .onPasteCommand(of: [.fileURL] + PromptPaste.pictureTypes + [.image]) { providers in
             for provider in providers { paste(provider) }
-        }
-    }
-
-    /// What goes into a prompt other than typing: a file, dictation, and voice mode
-    /// (#2322), while Settings ▸ Appearance has it on. Under the field (#2375), so the
-    /// field is for words.
-    private var tools: some View {
-        HStack(spacing: 6) {
-            Button(action: chooseAttachment) {
-                Image(systemName: "paperclip")
-                    .appText(.reading).fontWeight(.semibold)
-                    .frame(width: 22, height: 22)
-            }
-            .buttonStyle(.paper)
-            .buttonBorderShape(.circle)
-            .help("Attach a file or a picture")
-            .accessibilityLabel("Attach")
-
-            Button(action: dictate) {
-                Image(systemName: "microphone")
-                    .appText(.reading).fontWeight(.semibold)
-                    .frame(width: 22, height: 22)
-            }
-            .buttonStyle(.paper)
-            .buttonBorderShape(.circle)
-            .help("Dictate, as the Mac does everywhere")
-            .accessibilityLabel("Dictate")
-
-            // Voice mode (#2322), while Settings ▸ Appearance has it on.
-            if let agent {
-                VoiceModeButton(agentID: agent.id) { await model.send($0, to: agent.id, voice: true) }
-            }
         }
     }
 

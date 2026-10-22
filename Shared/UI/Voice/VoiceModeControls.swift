@@ -43,8 +43,8 @@ struct VoiceModeButton: View {
 }
 
 /// Voice mode's talking area (#2375), in place of the prompt field while voice mode is on in
-/// this chat: what it is doing (listening, sending, working or speaking), every word heard
-/// for the next prompt as it is heard, or the sentence being said, with Stop and End.
+/// this chat: every word heard for the next prompt as it is heard, or the sentence being
+/// said, with Stop, and × to end it.
 struct VoiceModeField: View {
     let agentID: UUID
     private var voice: VoiceMode { VoiceMode.shared }
@@ -57,21 +57,14 @@ struct VoiceModeField: View {
                 .frame(width: 22, height: 22)
                 .symbolEffect(.variableColor, isActive: voice.phase == .listening || voice.phase == .speaking)
                 .accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: 4) {
-                Text(state)
-                    .appText(.fine)
-                    .foregroundStyle(.secondary)
-                // All of it, never cut: the person sees each word before it goes.
-                if !words.isEmpty {
-                    Text(words)
-                        .appText(.reading)
-                        .foregroundStyle(voice.phase == .speaking || voice.heard.isEmpty ? .secondary : .primary)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .textSelection(.enabled)
-                }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .accessibilityElement(children: .combine)
+            // All of it, never cut: the person sees each word before it goes. No heading
+            // over it (Alex, #2375): the mark beside it says what it is doing.
+            Text(words)
+                .appText(.reading)
+                .foregroundStyle(voice.phase == .speaking || voice.heard.isEmpty ? .secondary : .primary)
+                .fixedSize(horizontal: false, vertical: true)
+                .textSelection(.enabled)
+                .frame(maxWidth: .infinity, alignment: .leading)
             if voice.phase == .speaking {
                 Button("Stop") { voice.stopSpeaking() }
                     .buttonStyle(.paper)
@@ -81,9 +74,12 @@ struct VoiceModeField: View {
             Button {
                 voice.turnOff()
             } label: {
-                Label("Type", systemImage: "keyboard")
+                Image(systemName: "xmark")
+                    .appText(.reading).fontWeight(.semibold)
+                    .frame(width: 22, height: 22)
             }
             .buttonStyle(.paper)
+            .buttonBorderShape(.circle)
             .help("End voice mode and type instead")
             .accessibilityLabel("End voice mode")
         }
@@ -102,25 +98,18 @@ struct VoiceModeField: View {
         }
     }
 
-    private var state: String {
+    /// The words heard, or the sentence being said, or what it waits for.
+    private var words: String {
         switch voice.phase {
         case .off: ""
         case .loading: "Getting the voice ready…"
-        case .sending: "Sending…"
-        case .speaking: "Speaking. Talk to stop it."
+        case .sending: voice.heard.isEmpty ? "Sending…" : voice.heard
+        case .speaking: voice.saying ?? "Speaking…"
         case .listening:
-            if voice.isAsking { "Listening for your answer" }
+            if !voice.heard.isEmpty { voice.heard }
+            else if voice.isAsking { "Say your answer." }
             else if voice.isWaitingForReply { "Working on it. You can say more." }
-            else { "Listening" }
-        }
-    }
-
-    /// The words heard, or the sentence being said.
-    private var words: String {
-        switch voice.phase {
-        case .speaking: voice.saying ?? ""
-        case .listening: voice.heard.isEmpty && !voice.isWaitingForReply ? "Say what you want." : voice.heard
-        default: voice.heard
+            else { "Say what you want." }
         }
     }
 }
