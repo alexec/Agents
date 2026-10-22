@@ -49,6 +49,7 @@ const CapFiles1 = "files/1"
 const CapGit1 = "git/1"
 const CapGroups1 = "groups/1"
 const CapHandover1 = "handover/1"
+const CapHostOrgRoutes1 = "host.org-routes/1"
 const CapHostPolicy1 = "host.policy/1"
 const CapHostTeam1 = "host.team/1"
 const CapHostUserSettings1 = "host.user-settings/1"
@@ -68,6 +69,7 @@ const CapMilestones1 = "milestones/1"
 const CapModes1 = "modes/1"
 const CapMute1 = "mute/1"
 const CapOptions1 = "options/1"
+const CapOrgRoutes1 = "org-routes/1"
 const CapPages1 = "pages/1"
 const CapPairing1 = "pairing/1"
 const CapPeople1 = "people/1"
@@ -485,6 +487,8 @@ var ControlCapabilities = pairs([][2]string{
 	{"groups/set", "groups/1"},
 	{"handover/status", "handover/1"},
 	{"host/hello", "host/1"},
+	{"host/orgRoutesAgain", "host.org-routes/1"},
+	{"host/orgRoutesApplied", "host.org-routes/1"},
 	{"host/policyApplied", "host.policy/1"},
 	{"host/providerDraft", "host/1"},
 	{"host/status", "host/1"},
@@ -521,6 +525,12 @@ var ControlCapabilities = pairs([][2]string{
 	{"links/list", "links/1"},
 	{"links/remove", "links/1"},
 	{"links/requests", "links/1"},
+	{"orgRoutes/check", "org-routes/1"},
+	{"orgRoutes/list", "org-routes/1"},
+	{"orgRoutes/mine", "org-routes/1"},
+	{"orgRoutes/remove", "org-routes/1"},
+	{"orgRoutes/replaceKey", "org-routes/1"},
+	{"orgRoutes/set", "org-routes/1"},
 	{"people/invite", "people/1"},
 	{"people/list", "people/1"},
 	{"people/remove", "people/1"},
@@ -582,6 +592,8 @@ var ControlCapabilities = pairs([][2]string{
 	{"control/linkRequested", "links/1"},
 	{"control/linksChanged", "links/1"},
 	{"control/moved", "control/1"},
+	{"control/orgRoutesChanged", "org-routes/1"},
+	{"control/orgRoutesLeft", "org-routes/1"},
 	{"control/peopleChanged", "people/1"},
 	{"control/policyChanged", "policy/1"},
 	{"control/providerDraft", "control/1"},
@@ -596,6 +608,7 @@ var ControlCapabilities = pairs([][2]string{
 	{"control/userSettingsChanged", "user/1"},
 	{"control/webChanged", "control/1"},
 	{"host/clients", "host/1"},
+	{"host/orgRoutes", "host.org-routes/1"},
 	{"host/policy", "host.policy/1"},
 	{"host/user", "bots/1"},
 	{"host/userSettings", "user/1"},
@@ -620,6 +633,8 @@ var ControlNotifications = set([]string{
 	"control/linkRequested",
 	"control/linksChanged",
 	"control/moved",
+	"control/orgRoutesChanged",
+	"control/orgRoutesLeft",
 	"control/peopleChanged",
 	"control/policyChanged",
 	"control/providerDraft",
@@ -634,6 +649,7 @@ var ControlNotifications = set([]string{
 	"control/userSettingsChanged",
 	"control/webChanged",
 	"host/clients",
+	"host/orgRoutes",
 	"host/policy",
 	"host/user",
 	"host/userSettings",

@@ -2378,6 +2378,34 @@ type DeleteSessionRequest struct {
 	Confirmed *bool `json:"confirmed,omitzero"`
 }
 
+// One org route as a machine gets it (#999, FR-005): the route without its groups, fingerprint and stamps, and each secret sealed with HPKE to the machine's key (SealedEnvelope), info com.alexecollins.agents.orgroute.v1, associated data <route id>|<host id>|<version>. A cloud credential is sent only as a token that ends at expires (Q1 A): awsSession, googleToken or entraToken.
+type DeliveredRoute struct {
+	ID string `json:"id"`
+
+	Name string `json:"name"`
+
+	Kind OrgRouteKind `json:"kind"`
+
+	Vendor *OrgRouteVendor `json:"vendor,omitzero"`
+
+	Runtimes []string `json:"runtimes"`
+
+	Settings *OrgRouteSettings `json:"settings,omitzero"`
+
+	Models map[string]string `json:"models,omitzero"`
+
+	DefaultFor []string `json:"defaultFor"`
+
+	SecretFields []string `json:"secretFields"`
+
+	Version int64 `json:"version"`
+
+	// Each secret value, or token, by field.
+	Sealed map[string]SealedEnvelope `json:"sealed"`
+
+	Expires *Date `json:"expires,omitzero"`
+}
+
 type DestinationState struct {
 	Free *struct{} `json:"free,omitzero"`
 
@@ -4843,6 +4871,190 @@ type OrgPolicy struct {
 
 	// Empty. A place for later layers that only make a rule tighter.
 	Groups *Empty `json:"groups,omitzero"`
+
+	Notices *PolicyNotices `json:"notices,omitzero"`
+}
+
+// An organisation's way to the model for one or more runtimes (#999, spec FR-001): an org key or a gateway. The control plane keeps it at v1/org/routes/<id>.json; its secrets are in an envelope beside it, never in this record. The control plane sets version, secretFields, fingerprint, created and changed; machines is how many machines hold its version, for an admin.
+type OrgRoute struct {
+	// [a-z0-9-]{1,40}, made from the name when absent at add, never changed.
+	ID string `json:"id"`
+
+	// What members see, such as Acme Bedrock. 1 to 60 characters.
+	Name string `json:"name"`
+
+	Kind OrgRouteKind `json:"kind"`
+
+	Vendor *OrgRouteVendor `json:"vendor,omitzero"`
+
+	// The runtimes it serves: only those whose row of the spec's table allows the kind.
+	Runtimes []string `json:"runtimes"`
+
+	Settings *OrgRouteSettings `json:"settings,omitzero"`
+
+	// The runtime's model ids to the gateway's. Absent: the runtime's ids as they are.
+	Models map[string]string `json:"models,omitzero"`
+
+	// The groups whose people may use it (T1). Empty: everyone.
+	Groups []string `json:"groups,omitzero"`
+
+	// The runtimes whose default account it is.
+	DefaultFor []string `json:"defaultFor,omitzero"`
+
+	// The names of the secret fields that are set (apiKey, awsAccessKeyId, serviceAccount, entraClientSecret, …), never a value.
+	SecretFields []string `json:"secretFields,omitzero"`
+
+	// The first 8 hex of SHA-256 of each secret value (spec D14), by field.
+	Fingerprint map[string]string `json:"fingerprint,omitzero"`
+
+	// One more at each change, a replaced key included.
+	Version *int64 `json:"version,omitzero"`
+
+	Created *OrgRouteStamp `json:"created,omitzero"`
+
+	Changed *OrgRouteStamp `json:"changed,omitzero"`
+
+	// How many machines said they keep this version (host/orgRoutesApplied). Only in orgRoutes/list.
+	Machines *int64 `json:"machines,omitzero"`
+}
+
+// orgRoutes/check (#999): what one small request from the control plane found, in words.
+type OrgRouteCheck struct {
+	Ok bool `json:"ok"`
+
+	Words string `json:"words"`
+}
+
+// host/orgRoutes (#999): every route the machine's person (or bot) may use. An empty list removes every route.
+type OrgRouteDelivery struct {
+	Routes []DeliveredRoute `json:"routes"`
+
+	At Date `json:"at"`
+}
+
+// An org route with its store tag, for an admin (#999).
+type OrgRouteKept struct {
+	Route OrgRoute `json:"route"`
+
+	Rev string `json:"rev"`
+}
+
+// How an org route reaches the model (#999): an org key of the runtime's own vendor, or a gateway: Amazon Bedrock, Google Vertex AI, Microsoft Azure, or the organisation's own base URL.
+type OrgRouteKind string
+
+const OrgRouteKindKey OrgRouteKind = "key"
+const OrgRouteKindBedrock OrgRouteKind = "bedrock"
+const OrgRouteKindVertex OrgRouteKind = "vertex"
+const OrgRouteKindAzure OrgRouteKind = "azure"
+const OrgRouteKindBaseURL OrgRouteKind = "baseURL"
+
+// orgRoutes/list (#999), an admin's: every route, and whether this control plane can seal a secret.
+type OrgRouteList struct {
+	Routes []OrgRouteKept `json:"routes"`
+
+	Sealing bool `json:"sealing"`
+}
+
+// A route the caller may use (#999): no settings, no fingerprint.
+type OrgRouteMine struct {
+	ID string `json:"id"`
+
+	Name string `json:"name"`
+
+	Kind OrgRouteKind `json:"kind"`
+
+	Runtimes []string `json:"runtimes"`
+
+	DefaultFor []string `json:"defaultFor"`
+}
+
+// orgRoutes/replaceKey (#999): new values for a route's secret fields.
+type OrgRouteReplaceKey struct {
+	ID string `json:"id"`
+
+	Secrets map[string]string `json:"secrets"`
+
+	Rev string `json:"rev"`
+}
+
+// orgRoutes/check and orgRoutes/remove (#999): a route, and for remove the tag the admin read.
+type OrgRouteRequest struct {
+	ID string `json:"id"`
+
+	Rev *string `json:"rev,omitzero"`
+}
+
+// orgRoutes/set (#999): add a route, or change one. secrets are written only, never read back; an absent field keeps its value. rev is the tag the admin read; none to add.
+type OrgRouteSet struct {
+	Route OrgRoute `json:"route"`
+
+	Secrets map[string]string `json:"secrets,omitzero"`
+
+	Rev *string `json:"rev,omitzero"`
+}
+
+// An org route's settings that are not secret (#999, data-model.md). bedrock: region. vertex: project, location. azure: resource or address, apiVersion, and tenant and clientID for an Entra app. baseURL: address, and header, the header the key goes in.
+type OrgRouteSettings struct {
+	Address *string `json:"address,omitzero"`
+
+	ApiVersion *string `json:"apiVersion,omitzero"`
+
+	ClientID *string `json:"clientID,omitzero"`
+
+	Header *string `json:"header,omitzero"`
+
+	Location *string `json:"location,omitzero"`
+
+	Project *string `json:"project,omitzero"`
+
+	Region *string `json:"region,omitzero"`
+
+	Resource *string `json:"resource,omitzero"`
+
+	Tenant *string `json:"tenant,omitzero"`
+}
+
+// Who changed an org route, and when (#999).
+type OrgRouteStamp struct {
+	By AuditActor `json:"by"`
+
+	At Date `json:"at"`
+}
+
+// An org route's vendor (#999): whose key a key route holds, and the API shape of a base-URL or Azure route.
+type OrgRouteVendor string
+
+const OrgRouteVendorAnthropic OrgRouteVendor = "anthropic"
+const OrgRouteVendorOpenai OrgRouteVendor = "openai"
+const OrgRouteVendorGemini OrgRouteVendor = "gemini"
+const OrgRouteVendorXai OrgRouteVendor = "xai"
+
+// A route a machine keeps, and its version (#999).
+type OrgRouteVersion struct {
+	ID string `json:"id"`
+
+	Version int64 `json:"version"`
+}
+
+// host/orgRoutesApplied (#999): the routes a machine keeps, after a delivery.
+type OrgRoutesApplied struct {
+	Routes []OrgRouteVersion `json:"routes"`
+}
+
+// control/orgRoutesLeft (#999): a machine was removed with these routes on it. To its person and to every admin.
+type OrgRoutesLeft struct {
+	Host HostID `json:"host"`
+
+	Name string `json:"name"`
+
+	User string `json:"user"`
+
+	Routes []string `json:"routes"`
+}
+
+// orgRoutes/mine (#999).
+type OrgRoutesMine struct {
+	Routes []OrgRouteMine `json:"routes"`
 }
 
 type PagesChangedNotification struct {
@@ -5298,6 +5510,12 @@ type PolicyMarketplaces struct {
 	CustomServers string `json:"customServers"`
 }
 
+// The notices a policy decides for every member (#999, FR-008).
+type PolicyNotices struct {
+	// Google's terms notice for Antigravity: show (as absent), accepted (the organisation reviewed them; no notice), refuse (Antigravity is refused).
+	AntigravityTerms *string `json:"antigravityTerms,omitzero"`
+}
+
 // policy/raise (#998): an admin raises a person's budget for today (UTC).
 type PolicyRaiseRequest struct {
 	User string `json:"user"`
@@ -5308,6 +5526,13 @@ type PolicyRaiseRequest struct {
 
 	Request *string `json:"request,omitzero"`
 }
+
+// A way a runtime reaches the model (#999): the person's own sign-in, an org key, or a gateway.
+type PolicyReach string
+
+const PolicyReachSignIn PolicyReach = "signIn"
+const PolicyReachOrgKey PolicyReach = "orgKey"
+const PolicyReachGateway PolicyReach = "gateway"
 
 // The data of a policyRefused error (#998, FR-010): why, the rule, and the words for the client.
 type PolicyRefusal struct {
@@ -5324,6 +5549,9 @@ type PolicyRefusal struct {
 type PolicyRuntimeRule struct {
 	// The model ids allowed, with * at the end allowed (claude-sonnet-*). Absent allows every model.
 	Models []string `json:"models,omitzero"`
+
+	// The ways this runtime may reach the model (#999). Absent: every way. [orgKey, gateway] is the org path only.
+	Reach []PolicyReach `json:"reach,omitzero"`
 }
 
 // policy/set (#998): the rules, and the rev the admin read. No rev when there was no policy. Refused changedElsewhere when another admin saved first.

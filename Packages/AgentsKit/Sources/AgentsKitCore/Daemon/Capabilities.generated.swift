@@ -50,6 +50,7 @@ public enum Capability {
     public static let git1 = "git/1"
     public static let groups1 = "groups/1"
     public static let handover1 = "handover/1"
+    public static let hostOrgRoutes1 = "host.org-routes/1"
     public static let hostPolicy1 = "host.policy/1"
     public static let hostTeam1 = "host.team/1"
     public static let hostUserSettings1 = "host.user-settings/1"
@@ -69,6 +70,7 @@ public enum Capability {
     public static let modes1 = "modes/1"
     public static let mute1 = "mute/1"
     public static let options1 = "options/1"
+    public static let orgRoutes1 = "org-routes/1"
     public static let pages1 = "pages/1"
     public static let pairing1 = "pairing/1"
     public static let people1 = "people/1"
@@ -441,6 +443,8 @@ public enum Capability {
         "groups/set": "groups/1",
         "handover/status": "handover/1",
         "host/hello": "host/1",
+        "host/orgRoutesAgain": "host.org-routes/1",
+        "host/orgRoutesApplied": "host.org-routes/1",
         "host/policyApplied": "host.policy/1",
         "host/providerDraft": "host/1",
         "host/status": "host/1",
@@ -477,6 +481,12 @@ public enum Capability {
         "links/list": "links/1",
         "links/remove": "links/1",
         "links/requests": "links/1",
+        "orgRoutes/check": "org-routes/1",
+        "orgRoutes/list": "org-routes/1",
+        "orgRoutes/mine": "org-routes/1",
+        "orgRoutes/remove": "org-routes/1",
+        "orgRoutes/replaceKey": "org-routes/1",
+        "orgRoutes/set": "org-routes/1",
         "people/invite": "people/1",
         "people/list": "people/1",
         "people/remove": "people/1",
@@ -538,6 +548,8 @@ public enum Capability {
         "control/linkRequested": "links/1",
         "control/linksChanged": "links/1",
         "control/moved": "control/1",
+        "control/orgRoutesChanged": "org-routes/1",
+        "control/orgRoutesLeft": "org-routes/1",
         "control/peopleChanged": "people/1",
         "control/policyChanged": "policy/1",
         "control/providerDraft": "control/1",
@@ -552,6 +564,7 @@ public enum Capability {
         "control/userSettingsChanged": "user/1",
         "control/webChanged": "control/1",
         "host/clients": "host/1",
+        "host/orgRoutes": "host.org-routes/1",
         "host/policy": "host.policy/1",
         "host/user": "bots/1",
         "host/userSettings": "user/1",

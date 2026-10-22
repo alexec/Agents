@@ -1923,6 +1923,29 @@ export interface DeleteSessionRequest {
   confirmed?: boolean;
 }
 
+/**
+ * One org route as a machine gets it (#999, FR-005): the route without its groups, fingerprint and
+ * stamps, and each secret sealed with HPKE to the machine's key (SealedEnvelope), info
+ * com.alexecollins.agents.orgroute.v1, associated data <route id>|<host id>|<version>. A cloud
+ * credential is sent only as a token that ends at expires (Q1 A): awsSession, googleToken or
+ * entraToken.
+ */
+export interface DeliveredRoute {
+  id: string;
+  name: string;
+  kind: OrgRouteKind;
+  vendor?: OrgRouteVendor;
+  runtimes: string[];
+  settings?: OrgRouteSettings;
+  models?: Record<string, string>;
+  defaultFor: string[];
+  secretFields: string[];
+  version: number;
+  /** Each secret value, or token, by field. */
+  sealed: Record<string, SealedEnvelope>;
+  expires?: WireDate;
+}
+
 export type DestinationState =
   | { free: Record<string, never> }
   | { sameSkill: { update: boolean } }
@@ -3650,6 +3673,178 @@ export interface OrgPolicy {
   requireFollowing?: boolean;
   /** Empty. A place for later layers that only make a rule tighter. */
   groups?: Empty;
+  notices?: PolicyNotices;
+}
+
+/**
+ * An organisation's way to the model for one or more runtimes (#999, spec FR-001): an org key or a
+ * gateway. The control plane keeps it at v1/org/routes/<id>.json; its secrets are in an envelope
+ * beside it, never in this record. The control plane sets version, secretFields, fingerprint,
+ * created and changed; machines is how many machines hold its version, for an admin.
+ */
+export interface OrgRoute {
+  /** [a-z0-9-]{1,40}, made from the name when absent at add, never changed. */
+  id: string;
+  /** What members see, such as Acme Bedrock. 1 to 60 characters. */
+  name: string;
+  kind: OrgRouteKind;
+  vendor?: OrgRouteVendor;
+  /** The runtimes it serves: only those whose row of the spec's table allows the kind. */
+  runtimes: string[];
+  settings?: OrgRouteSettings;
+  /** The runtime's model ids to the gateway's. Absent: the runtime's ids as they are. */
+  models?: Record<string, string>;
+  /** The groups whose people may use it (T1). Empty: everyone. */
+  groups?: string[];
+  /** The runtimes whose default account it is. */
+  defaultFor?: string[];
+  /**
+   * The names of the secret fields that are set (apiKey, awsAccessKeyId, serviceAccount,
+   * entraClientSecret, …), never a value.
+   */
+  secretFields?: string[];
+  /** The first 8 hex of SHA-256 of each secret value (spec D14), by field. */
+  fingerprint?: Record<string, string>;
+  /** One more at each change, a replaced key included. */
+  version?: number;
+  created?: OrgRouteStamp;
+  changed?: OrgRouteStamp;
+  /**
+   * How many machines said they keep this version (host/orgRoutesApplied). Only in orgRoutes/list.
+   */
+  machines?: number;
+}
+
+/** orgRoutes/check (#999): what one small request from the control plane found, in words. */
+export interface OrgRouteCheck {
+  ok: boolean;
+  words: string;
+}
+
+/**
+ * host/orgRoutes (#999): every route the machine's person (or bot) may use. An empty list removes
+ * every route.
+ */
+export interface OrgRouteDelivery {
+  routes: DeliveredRoute[];
+  at: WireDate;
+}
+
+/** An org route with its store tag, for an admin (#999). */
+export interface OrgRouteKept {
+  route: OrgRoute;
+  rev: string;
+}
+
+/**
+ * How an org route reaches the model (#999): an org key of the runtime's own vendor, or a gateway:
+ * Amazon Bedrock, Google Vertex AI, Microsoft Azure, or the organisation's own base URL.
+ */
+export type OrgRouteKind =
+  | "key"
+  | "bedrock"
+  | "vertex"
+  | "azure"
+  | "baseURL";
+
+/**
+ * orgRoutes/list (#999), an admin's: every route, and whether this control plane can seal a secret.
+ */
+export interface OrgRouteList {
+  routes: OrgRouteKept[];
+  sealing: boolean;
+}
+
+/** A route the caller may use (#999): no settings, no fingerprint. */
+export interface OrgRouteMine {
+  id: string;
+  name: string;
+  kind: OrgRouteKind;
+  runtimes: string[];
+  defaultFor: string[];
+}
+
+/** orgRoutes/replaceKey (#999): new values for a route's secret fields. */
+export interface OrgRouteReplaceKey {
+  id: string;
+  secrets: Record<string, string>;
+  rev: string;
+}
+
+/** orgRoutes/check and orgRoutes/remove (#999): a route, and for remove the tag the admin read. */
+export interface OrgRouteRequest {
+  id: string;
+  rev?: string;
+}
+
+/**
+ * orgRoutes/set (#999): add a route, or change one. secrets are written only, never read back; an
+ * absent field keeps its value. rev is the tag the admin read; none to add.
+ */
+export interface OrgRouteSet {
+  route: OrgRoute;
+  secrets?: Record<string, string>;
+  rev?: string;
+}
+
+/**
+ * An org route's settings that are not secret (#999, data-model.md). bedrock: region. vertex:
+ * project, location. azure: resource or address, apiVersion, and tenant and clientID for an Entra
+ * app. baseURL: address, and header, the header the key goes in.
+ */
+export interface OrgRouteSettings {
+  address?: string;
+  apiVersion?: string;
+  clientID?: string;
+  header?: string;
+  location?: string;
+  project?: string;
+  region?: string;
+  resource?: string;
+  tenant?: string;
+}
+
+/** Who changed an org route, and when (#999). */
+export interface OrgRouteStamp {
+  by: AuditActor;
+  at: WireDate;
+}
+
+/**
+ * An org route's vendor (#999): whose key a key route holds, and the API shape of a base-URL or
+ * Azure route.
+ */
+export type OrgRouteVendor =
+  | "anthropic"
+  | "openai"
+  | "gemini"
+  | "xai";
+
+/** A route a machine keeps, and its version (#999). */
+export interface OrgRouteVersion {
+  id: string;
+  version: number;
+}
+
+/** host/orgRoutesApplied (#999): the routes a machine keeps, after a delivery. */
+export interface OrgRoutesApplied {
+  routes: OrgRouteVersion[];
+}
+
+/**
+ * control/orgRoutesLeft (#999): a machine was removed with these routes on it. To its person and to
+ * every admin.
+ */
+export interface OrgRoutesLeft {
+  host: HostID;
+  name: string;
+  user: string;
+  routes: string[];
+}
+
+/** orgRoutes/mine (#999). */
+export interface OrgRoutesMine {
+  routes: OrgRouteMine[];
 }
 
 export interface PagesChangedNotification {
@@ -4012,6 +4207,15 @@ export interface PolicyMarketplaces {
   customServers: "allow" | "refuse";
 }
 
+/** The notices a policy decides for every member (#999, FR-008). */
+export interface PolicyNotices {
+  /**
+   * Google's terms notice for Antigravity: show (as absent), accepted (the organisation reviewed
+   * them; no notice), refuse (Antigravity is refused).
+   */
+  antigravityTerms?: "show" | "accepted" | "refuse";
+}
+
 /** policy/raise (#998): an admin raises a person's budget for today (UTC). */
 export interface PolicyRaiseRequest {
   user: string;
@@ -4019,6 +4223,12 @@ export interface PolicyRaiseRequest {
   dailyTokens?: number;
   request?: string;
 }
+
+/** A way a runtime reaches the model (#999): the person's own sign-in, an org key, or a gateway. */
+export type PolicyReach =
+  | "signIn"
+  | "orgKey"
+  | "gateway";
 
 /**
  * The data of a policyRefused error (#998, FR-010): why, the rule, and the words for the client.
@@ -4036,6 +4246,11 @@ export interface PolicyRuntimeRule {
    * The model ids allowed, with * at the end allowed (claude-sonnet-*). Absent allows every model.
    */
   models?: string[];
+  /**
+   * The ways this runtime may reach the model (#999). Absent: every way. [orgKey, gateway] is the
+   * org path only.
+   */
+  reach?: PolicyReach[];
 }
 
 /**
@@ -7262,6 +7477,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   DeclareResourceRequest: { required: ["resource"], optional: ["replacing"] },
   DeclaredResource: { required: ["name", "displayName", "description", "holders"], optional: ["defaultMinutes", "maximumMinutes"] },
   DeleteSessionRequest: { required: ["runtimeID", "sessionID"], optional: ["confirmed"] },
+  DeliveredRoute: { required: ["id", "name", "kind", "runtimes", "defaultFor", "secretFields", "version", "sealed"], optional: ["vendor", "settings", "models", "expires"] },
   DestinationStateAnswer: { required: ["destinationState"], optional: [] },
   DestinationStateRequest: { required: ["previewID", "destination"], optional: [] },
   DetectedServer: { required: ["alias", "resolved", "outcome"], optional: ["detail"] },
@@ -7454,7 +7670,22 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   Need: { required: ["id", "folder", "kind", "raisedAt", "headline"], optional: ["agentID"] },
   OptionsRequest: { required: ["runtimeID", "cwd", "mcpServers"], optional: [] },
   OptionsResponse: { required: ["draftID", "options", "commands"], optional: [] },
-  OrgPolicy: { required: ["version", "issued", "changedBy", "requires"], optional: ["modeCeiling", "sandbox", "runtimes", "marketplaces", "budgets", "helpers", "environment", "stopAll", "requireFollowing", "groups"] },
+  OrgPolicy: { required: ["version", "issued", "changedBy", "requires"], optional: ["modeCeiling", "sandbox", "runtimes", "marketplaces", "budgets", "helpers", "environment", "stopAll", "requireFollowing", "groups", "notices"] },
+  OrgRoute: { required: ["id", "name", "kind", "runtimes"], optional: ["vendor", "settings", "models", "groups", "defaultFor", "secretFields", "fingerprint", "version", "created", "changed", "machines"] },
+  OrgRouteCheck: { required: ["ok", "words"], optional: [] },
+  OrgRouteDelivery: { required: ["routes", "at"], optional: [] },
+  OrgRouteKept: { required: ["route", "rev"], optional: [] },
+  OrgRouteList: { required: ["routes", "sealing"], optional: [] },
+  OrgRouteMine: { required: ["id", "name", "kind", "runtimes", "defaultFor"], optional: [] },
+  OrgRouteReplaceKey: { required: ["id", "secrets", "rev"], optional: [] },
+  OrgRouteRequest: { required: ["id"], optional: ["rev"] },
+  OrgRouteSet: { required: ["route"], optional: ["secrets", "rev"] },
+  OrgRouteSettings: { required: [], optional: ["address", "apiVersion", "clientID", "header", "location", "project", "region", "resource", "tenant"] },
+  OrgRouteStamp: { required: ["by", "at"], optional: [] },
+  OrgRouteVersion: { required: ["id", "version"], optional: [] },
+  OrgRoutesApplied: { required: ["routes"], optional: [] },
+  OrgRoutesLeft: { required: ["host", "name", "user", "routes"], optional: [] },
+  OrgRoutesMine: { required: ["routes"], optional: [] },
   PagesChangedNotification: { required: ["folder", "folders"], optional: [] },
   PairingCode: { required: ["macKey", "secret", "name", "expires"], optional: [] },
   PairingSecret: { required: [], optional: ["secret", "expires"] },
@@ -7500,9 +7731,10 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   PolicyHelpers: { required: [], optional: ["mostRunning", "mostNotArchived"] },
   PolicyKept: { required: [], optional: ["policy", "rev", "machines"] },
   PolicyMarketplaces: { required: ["allowed", "customServers"], optional: [] },
+  PolicyNotices: { required: [], optional: ["antigravityTerms"] },
   PolicyRaiseRequest: { required: ["user"], optional: ["daily", "dailyTokens", "request"] },
   PolicyRefusal: { required: ["reason", "words"], optional: ["rule", "until"] },
-  PolicyRuntimeRule: { required: [], optional: ["models"] },
+  PolicyRuntimeRule: { required: [], optional: ["models", "reach"] },
   PolicySet: { required: ["policy"], optional: ["rev"] },
   PolicySetBy: { required: ["by", "rule", "words"], optional: [] },
   PolicySignature: { required: ["version", "keyID", "alg", "sig"], optional: [] },
