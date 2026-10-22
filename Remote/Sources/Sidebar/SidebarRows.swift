@@ -247,11 +247,10 @@ private struct SessionMark: View {
             switch kind {
             case .needsYou:
                 Image(systemName: "hand.raised.fill").tinted(.attention)
-            case .working where tool != nil:
-                // In the accent as the other marks (#1558, #2044).
-                TurningCog(size: 14 * scale, color: Paper.accent)
             case .working:
-                ThinkingDots(size: 14 * scale, color: Paper.accent)
+                // In the accent as the other marks (#1558, #2044); one ring for both
+                // activities (#2332).
+                WorkingRing(size: 14 * scale, color: Paper.accent, doing: tool != nil)
             case .queued:
                 Image(systemName: "list.number").foregroundStyle(Paper.accent)
             case .waiting:

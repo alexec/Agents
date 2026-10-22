@@ -1,4 +1,5 @@
 import AgentsKitCore
+import Foundation
 import QuartzCore
 import SwiftUI
 
@@ -8,57 +9,59 @@ import AppKit
 import UIKit
 #endif
 
-/// A working session's marks (#2044), in the sidebar rows, the phone's agent cards and at
-/// the chat's foot: three dots that fade up in turn, left to right, while it thinks or
-/// replies, and a cog that turns while it runs a tool. `SyncedSpinner` stays for plain
-/// loading, where nothing thinks.
+/// A working session's mark (#2044, #2332), in the sidebar rows, the phone's agent cards and
+/// at the chat's foot: three dots on a ring seen edge on. While the session thinks or
+/// replies the ring spins about the vertical axis, so the dots slide left and right, bright
+/// at the front and dim at the back; while it runs a tool the same ring also pivots about
+/// the horizontal axis, so the line opens into a thin ellipse that tips up and down. One
+/// view for both, so a change of activity changes the keyframes on the same layers.
+/// `SyncedSpinner` stays for plain loading, where nothing thinks.
 ///
-/// As the spinner (#1558, #1653), each is Core Animation layers whose cycle starts where
-/// `SpinnerClock` says it is now, so every mark of a kind on a screen is in step, and the
-/// render server draws the frames: a sidebar full of working agents does not wake the main
-/// thread. Under Reduce Motion they keep going, as a still mark reads as stuck, but slower.
-/// The web page draws the same in `SessionRow.tsx` and `app.css`.
-struct ThinkingDots: View {
+/// As the spinner (#1558, #1653), it is Core Animation layers whose cycle starts where
+/// `SpinnerClock` says it is now, so every ring on a screen is in step, and the render
+/// server draws the frames: a sidebar full of working agents does not wake the main
+/// thread. Under Reduce Motion it keeps going, as a still mark reads as stuck, but slower.
+/// The web page draws the same in `SessionRow.tsx` and `spinnerClock.ts`.
+struct WorkingRing: View {
     /// The well's width and height, in points.
     var size: CGFloat
     /// Grey, as the spinner's, except in the sidebar's marks, which are in the accent.
     var color: Color = .secondary
+    /// True while the session runs a tool: the ring pivots as it spins.
+    var doing = false
 
     var body: some View {
-        ClockedMark(kind: .dots, color: color)
+        ClockedMark(tilt: doing ? Self.tilt : 0, color: color)
             .frame(width: size, height: size)
             // One element and no words of its own: the caller says what it means.
             .accessibilityElement()
     }
+
+    /// How far the ring pivots while it runs a tool, in degrees: `workingMarkTilt` in the
+    /// defaults (`defaults write` the app's domain), read once at launch, else 30 (#2332).
+    static let tilt: Double = {
+        let set = WindowDefaults.store.object(forKey: SpinnerClock.ringTiltKey) as? NSNumber
+        guard let degrees = set?.doubleValue, degrees.isFinite else { return SpinnerClock.ringTilt }
+        return min(max(degrees, 0), 90)
+    }()
 }
 
-/// The cog for a session that runs a tool (#2044); see `ThinkingDots`.
-struct TurningCog: View {
-    var size: CGFloat
-    var color: Color = .secondary
-
-    var body: some View {
-        ClockedMark(kind: .cog, color: color)
-            .frame(width: size, height: size)
-            .accessibilityElement()
-    }
-}
-
-/// The two marks' layers. The colour is resolved against the SwiftUI environment, so it
+/// The ring's layers. The colour is resolved against the SwiftUI environment, so it
 /// follows light and dark and the accent.
 private struct ClockedMark {
-    var kind: ClockedMarkView.Kind
+    var tilt: Double
     var color: Color
 
     @MainActor func update(_ view: ClockedMarkView, in environment: EnvironmentValues) {
         view.color = color.resolve(in: environment).cgColor
         view.reduceMotion = environment.accessibilityReduceMotion
+        view.tilt = tilt
     }
 }
 
 #if os(macOS)
 extension ClockedMark: NSViewRepresentable {
-    func makeNSView(context: Context) -> ClockedMarkView { ClockedMarkView(kind: kind) }
+    func makeNSView(context: Context) -> ClockedMarkView { ClockedMarkView() }
 
     func updateNSView(_ view: ClockedMarkView, context: Context) {
         update(view, in: context.environment)
@@ -66,7 +69,7 @@ extension ClockedMark: NSViewRepresentable {
 }
 #else
 extension ClockedMark: UIViewRepresentable {
-    func makeUIView(context: Context) -> ClockedMarkView { ClockedMarkView(kind: kind) }
+    func makeUIView(context: Context) -> ClockedMarkView { ClockedMarkView() }
 
     func updateUIView(_ view: ClockedMarkView, context: Context) {
         update(view, in: context.environment)
@@ -80,35 +83,27 @@ private typealias PlatformView = NSView
 private typealias PlatformView = UIView
 #endif
 
-/// The layers of one mark, and their cycle kept in step with the clock.
+/// The layers of one ring, and their cycle kept in step with the clock.
 private final class ClockedMarkView: PlatformView {
-    enum Kind { case dots, cog }
+    /// The dots, left to right at the start of the cycle.
+    private let dots = (0..<3).map { _ in CALayer() }
+    private static let cycleKeys = ["position", "opacity"]
 
-    private let kind: Kind
-    /// The dots, left to right; empty for the cog.
-    private var dots: [CALayer] = []
-    /// The cog: a layer in the colour, masked by the symbol, turned as one.
-    private let cog = CALayer()
-    private let cogShape = CALayer()
-    private static let cycleKey = "cycle"
-
-    /// AppKit's layers count y up, UIKit's count y down: the turn goes the other way round
-    /// on the Mac, so the cog turns clockwise on both.
+    /// AppKit's layers count y up, UIKit's count y down: the ring tips the same way on both.
     #if os(macOS)
-    private static let clockwise: CGFloat = -1
+    private static let up: CGFloat = 1
     #else
-    private static let clockwise: CGFloat = 1
+    private static let up: CGFloat = -1
     #endif
 
-    /// How dim a dot is while the others take their turn.
-    private static let restingOpacity: Float = 0.3
+    /// Points in one cycle the keyframes go through, 25 ms apart at full speed.
+    private static let samples = 144
 
     var color: CGColor? {
         didSet {
             guard color != oldValue else { return }
             withoutActions {
                 for dot in dots { dot.backgroundColor = color }
-                cog.backgroundColor = color
             }
         }
     }
@@ -117,8 +112,12 @@ private final class ClockedMarkView: PlatformView {
         didSet { if reduceMotion != oldValue, window != nil { startCycle() } }
     }
 
-    init(kind: Kind) {
-        self.kind = kind
+    /// How far the ring pivots each way, in degrees: 0 while it thinks.
+    var tilt: Double = 0 {
+        didSet { if tilt != oldValue, window != nil { startCycle() } }
+    }
+
+    init() {
         super.init(frame: .zero)
         #if os(macOS)
         wantsLayer = true
@@ -128,18 +127,7 @@ private final class ClockedMarkView: PlatformView {
         backgroundColor = .clear
         let host: CALayer? = layer
         #endif
-        switch kind {
-        case .dots:
-            dots = (0..<3).map { _ in CALayer() }
-            for dot in dots {
-                dot.opacity = Self.restingOpacity
-                host?.addSublayer(dot)
-            }
-        case .cog:
-            cogShape.contentsGravity = .resizeAspect
-            cog.mask = cogShape
-            host?.addSublayer(cog)
-        }
+        for dot in dots { host?.addSublayer(dot) }
     }
 
     @available(*, unavailable)
@@ -176,100 +164,63 @@ private final class ClockedMarkView: PlatformView {
     }
     #endif
 
-    private var scale: CGFloat = 2
-
     private func setScale(_ scale: CGFloat) {
-        self.scale = scale
         for dot in dots { dot.contentsScale = scale }
-        cog.contentsScale = scale
-        cogShape.contentsScale = scale
-        placeLayers()
     }
 
-    /// Sizes the layers to the view: three dots across the middle of the well, or the cog
-    /// filling it.
+    /// The well the keyframes were made for: a new size makes them again.
+    private var placed = CGRect.null
+
+    /// Sizes the dots to the well and puts them where the cycle starts: today's three dots
+    /// across its middle.
     private func placeLayers() {
-        let side = min(bounds.width, bounds.height)
-        guard side > 0 else { return }
+        guard min(bounds.width, bounds.height) > 0, bounds != placed else { return }
+        placed = bounds
+        let diameter = min(bounds.width, bounds.height) * SpinnerClock.ringDotDiameter
         withoutActions {
-            switch kind {
-            case .dots:
-                let diameter = side * 0.24
-                let gap = side * 0.1
-                let width = 3 * diameter + 2 * gap
-                for (index, dot) in dots.enumerated() {
-                    dot.bounds = CGRect(x: 0, y: 0, width: diameter, height: diameter)
-                    dot.cornerRadius = diameter / 2
-                    dot.position = CGPoint(
-                        x: bounds.midX - width / 2 + diameter / 2 + CGFloat(index) * (diameter + gap),
-                        y: bounds.midY)
-                }
-            case .cog:
-                let frame = CGRect(x: 0, y: 0, width: side, height: side)
-                cog.bounds = frame
-                cog.position = CGPoint(x: bounds.midX, y: bounds.midY)
-                cogShape.frame = frame
-                cogShape.contents = Self.cogImage(side: side, scale: scale)
+            for (dot, place) in zip(dots, SpinnerClock.ringDots(at: 0, tilt: 0)) {
+                dot.bounds = CGRect(x: 0, y: 0, width: diameter, height: diameter)
+                dot.cornerRadius = diameter / 2
+                dot.position = point(place)
+                dot.opacity = Float(place.opacity)
             }
         }
+        if window != nil { startCycle() }
+    }
+
+    private func point(_ dot: SpinnerClock.RingDot) -> CGPoint {
+        let side = min(bounds.width, bounds.height)
+        return CGPoint(x: bounds.midX + dot.x * side, y: bounds.midY + Self.up * dot.y * side)
     }
 
     /// Starts the cycle from where the clock is in it now. The render server runs it;
-    /// nothing here runs again until the mark changes window or Reduce Motion changes.
+    /// nothing here runs again until the mark changes window, size, activity or Reduce
+    /// Motion.
     private func startCycle() {
-        let slowing = reduceMotion ? SpinnerClock.reducedMotionSlowing : 1
-        let now = Date()
-        switch kind {
-        case .dots:
-            let period = SpinnerClock.dotsPeriod * slowing
-            let offset = SpinnerClock.fraction(at: now, period: period) * period
-            for (index, dot) in dots.enumerated() {
-                // Each dot comes up and goes down in its fifth of the pass, left to right,
-                // and the last fifth rests before the row goes again.
-                let start = Double(index) * 0.2
-                let fade = CAKeyframeAnimation(keyPath: "opacity")
-                fade.values = [Self.restingOpacity, Self.restingOpacity, 1, Self.restingOpacity, Self.restingOpacity]
-                fade.keyTimes = [0, start, start + 0.2, start + 0.4, 1].map { NSNumber(value: $0) }
-                fade.duration = period
-                fade.repeatCount = .infinity
-                fade.timeOffset = offset
-                // Kept when the app goes to the background, so the dots still go on return.
-                fade.isRemovedOnCompletion = false
-                dot.add(fade, forKey: Self.cycleKey)
-            }
-        case .cog:
-            let period = SpinnerClock.cogPeriod * slowing
-            let turn = CABasicAnimation(keyPath: "transform.rotation.z")
-            turn.fromValue = 0
-            turn.toValue = Self.clockwise * 2 * .pi
-            turn.duration = period
-            turn.repeatCount = .infinity
-            turn.timeOffset = SpinnerClock.fraction(at: now, period: period) * period
-            turn.isRemovedOnCompletion = false
-            cog.add(turn, forKey: Self.cycleKey)
+        guard min(bounds.width, bounds.height) > 0 else { return }
+        let period = SpinnerClock.ringPeriod * (reduceMotion ? SpinnerClock.reducedMotionSlowing : 1)
+        let offset = SpinnerClock.fraction(at: Date(), period: period) * period
+        let frames = (0...Self.samples).map {
+            SpinnerClock.ringDots(at: Double($0) / Double(Self.samples) * SpinnerClock.ringPeriod, tilt: tilt)
         }
-    }
-
-    /// The `gearshape` symbol as an image the size of the well, for the cog's mask.
-    private static func cogImage(side: CGFloat, scale: CGFloat) -> CGImage? {
-        #if os(macOS)
-        let configuration = NSImage.SymbolConfiguration(pointSize: side * 0.8, weight: .medium)
-        guard let symbol = NSImage(systemSymbolName: "gearshape", accessibilityDescription: nil)?
-            .withSymbolConfiguration(configuration) else { return nil }
-        var rect = CGRect(origin: .zero, size: CGSize(width: side * scale, height: side * scale))
-        return symbol.cgImage(forProposedRect: &rect, context: nil, hints: nil)
-        #else
-        let configuration = UIImage.SymbolConfiguration(pointSize: side * 0.8, weight: .medium)
-        guard let symbol = UIImage(systemName: "gearshape", withConfiguration: configuration) else { return nil }
-        let format = UIGraphicsImageRendererFormat()
-        format.scale = scale
-        let size = CGSize(width: side, height: side)
-        return UIGraphicsImageRenderer(size: size, format: format).image { _ in
-            let fit = symbol.size
-            symbol.draw(in: CGRect(x: (side - fit.width) / 2, y: (side - fit.height) / 2,
-                                   width: fit.width, height: fit.height))
-        }.cgImage
-        #endif
+        for (index, dot) in dots.enumerated() {
+            let move = CAKeyframeAnimation(keyPath: "position")
+            #if os(macOS)
+            move.values = frames.map { NSValue(point: point($0[index])) }
+            #else
+            move.values = frames.map { NSValue(cgPoint: point($0[index])) }
+            #endif
+            let fade = CAKeyframeAnimation(keyPath: "opacity")
+            fade.values = frames.map { Float($0[index].opacity) }
+            for (animation, key) in zip([move, fade], Self.cycleKeys) {
+                animation.duration = period
+                animation.repeatCount = .infinity
+                animation.timeOffset = offset
+                // Kept when the app goes to the background, so the ring still turns on return.
+                animation.isRemovedOnCompletion = false
+                dot.add(animation, forKey: key)
+            }
+        }
     }
 
     private func withoutActions(_ change: () -> Void) {

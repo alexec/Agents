@@ -40,7 +40,7 @@ const markWords: Record<SessionMark, string> = { needsYou: "Needs you", working:
 
 /**
  * A session's mark in the sidebar (#495, #499), the window's and the Remote's: an orange hand when
- * it needs the person, dots while it thinks and a turning cog while it runs a tool (#2044), a numbered list while queued, Zs while it waits (#765), a pause mark once
+ * it needs the person, the working ring while it thinks, tipping while it runs a tool (#2332), a numbered list while queued, Zs while it waits (#765), a pause mark once
  * stopped (#630), an empty ring once done, read or not (#1323). Archived keeps its
  * status mark.
  */
@@ -52,8 +52,7 @@ export function SidebarMark({ agent, comingBack = false }: { agent: Agent; comin
   return (
     <span class={`sidebar-mark ${mark}`} role="img" aria-label={words} title={words}>
       {mark === "needsYou" && <span class="glyph" aria-hidden="true">✋&#xFE0E;</span>}
-      {mark === "working" && <ThinkingDots />}
-      {mark === "tool" && <TurningCog />}
+      {(mark === "working" || mark === "tool") && <WorkingMark tool={tool} />}
       {mark === "queued" && <span class="glyph" aria-hidden="true">≡</span>}
       {mark === "waiting" && <span class="glyph" aria-hidden="true">ᶻᶻ</span>}
       {mark === "paused" && <span class="glyph" aria-hidden="true">⏸&#xFE0E;</span>}
@@ -63,27 +62,13 @@ export function SidebarMark({ agent, comingBack = false }: { agent: Agent; comin
 }
 
 /**
- * A working session's mark (#2044), the window's `ThinkingDots` and `TurningCog`: three dots that
- * fade up in turn while it thinks or replies, a cog that turns while it runs a tool. Each kind is
- * in step on the page (spinnerClock.ts), in the colour around it.
+ * A working session's mark (#2044, #2332), the window's `WorkingRing`: three dots on a ring seen
+ * edge on, spinning while it thinks or replies, and pivoting as well while it runs a tool. One
+ * element for both, so a tool changes the keyframes on the same dots. In step on the page
+ * (spinnerClock.ts), in the colour around it.
  */
 export function WorkingMark({ tool }: { tool: string | null }) {
-  return tool !== null ? <TurningCog /> : <ThinkingDots />;
-}
-
-function ThinkingDots() {
-  return <span class="working-dots" aria-hidden="true"><i /><i /><i /></span>;
-}
-
-/** The window's `gearshape` as a small drawing: eight teeth round a ring. */
-function TurningCog() {
-  return (
-    <svg class="glyph working-cog" viewBox="0 0 16 16" width="12" height="12" aria-hidden="true" fill="none"
-      stroke="currentColor">
-      <circle cx="8" cy="8" r="6.2" stroke-width="2.4" stroke-dasharray="2.43 2.44" />
-      <circle cx="8" cy="8" r="4.3" stroke-width="1.8" />
-    </svg>
-  );
+  return <span class={tool !== null ? "working-ring doing" : "working-ring"} aria-hidden="true"><i /><i /><i /></span>;
 }
 
 const relative = new Intl.RelativeTimeFormat("en", { numeric: "always" });

@@ -454,11 +454,10 @@ private struct SessionMark: View {
             switch kind {
             case .needsYou:
                 Image(systemName: "hand.raised.fill").tinted(.attention)
-            case .working where tool != nil:
-                // In the accent as the other marks, and in step with every one (#1558, #2044).
-                TurningCog(size: 12 * scale, color: Paper.accent)
             case .working:
-                ThinkingDots(size: 12 * scale, color: Paper.accent)
+                // In the accent as the other marks, and in step with every one (#1558, #2044).
+                // One case for both activities, so a tool tips the same ring (#2332).
+                WorkingRing(size: 12 * scale, color: Paper.accent, doing: tool != nil)
             case .queued:
                 Image(systemName: "list.number").foregroundStyle(Paper.accent)
             case .waiting:
@@ -509,7 +508,7 @@ struct StatusIcon: View {
     /// Waiting for an allowance to come back (052, US4): it will carry on by itself, so
     /// it does not want a person, whatever its stopped shape says.
     var isWaitingForAllowance = false
-    /// The tool it runs, for the cog in place of the dots (#2044).
+    /// The tool it runs, which tips the working ring (#2044, #2332).
     var tool: String?
     /// The well grows with the text beside it (#750), so the row keeps its shape.
     @ScaledMetric private var scale: CGFloat = 1
@@ -530,10 +529,8 @@ struct StatusIcon: View {
                     .foregroundStyle((StatusShape.isTinted(shape, isWaitingForAllowance: isWaitingForAllowance)
                                       ? StateTint.attention : .none)
                         .style(or: .secondary))
-            } else if tool != nil {
-                TurningCog(size: 12 * scale)
             } else {
-                ThinkingDots(size: 12 * scale)
+                WorkingRing(size: 12 * scale, doing: tool != nil)
             }
         }
         .frame(width: 18 * scale, height: 18 * scale)
@@ -542,7 +539,7 @@ struct StatusIcon: View {
     }
 
     /// What a screen reader hears, and what the tooltip says: `StatusShape.words`, which
-    /// the web remote says too. A running tool is named, as the cog draws it (#2261).
+    /// the web remote says too. A running tool is named, as the tipping ring draws it (#2261).
     private var description: String {
         StatusShape.words(shape, state: state, isComingBack: isComingBack, outcome: outcome,
                           isUnaccountedFor: isUnaccountedFor, ending: ending, isUnread: isUnread,
