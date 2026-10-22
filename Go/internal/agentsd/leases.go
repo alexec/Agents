@@ -20,7 +20,7 @@ import (
 
 // Resource leases (036), as the Swift host keeps them (LeaseBook, DaemonCore+Leases): one
 // book in <root>/leases.json of who holds what and who waits, the person's declared
-// resources in <root>/resources.json, and leases/changed whenever either moves.
+// resources in <root>/resources.json, and resources/changed whenever either moves.
 
 const (
 	leaseDefaultMinutes = 30
@@ -267,12 +267,12 @@ func (d *Daemon) nextDeadline() (time.Time, bool) {
 	return next, !next.IsZero()
 }
 
-// leasesChanged saves the book, says leases/changed and aims the timer at what is next.
+// leasesChanged saves the book, says resources/changed and aims the timer at what is next.
 // Called with leaseMu held.
 func (d *Daemon) leasesChanged() {
 	d.saveLeases()
 	snap := d.leaseSnapshot()
-	safe.Go("leases/changed", func() { Broadcast(d, wire.NotifyLeasesChanged, snap) })
+	safe.Go("resources/changed", func() { Broadcast(d, wire.NotifyResourcesChanged, snap) })
 	if d.leaseTick != nil {
 		d.leaseTick.Stop()
 		d.leaseTick = nil
@@ -509,13 +509,13 @@ func (d *Daemon) registerLeases() {
 	noConversation := func() error {
 		return &Error{Code: CodeNoSuchAgent, Message: "That conversation is not open any more, so nothing was leased."}
 	}
-	On(d, wire.CallLeasesLease, func(ctx context.Context, c *Client, _ wire.LeaseRequest) (wire.LeaseNote, error) {
+	On(d, wire.CallResourcesLease, func(ctx context.Context, c *Client, _ wire.LeaseRequest) (wire.LeaseNote, error) {
 		return wire.LeaseNote{}, noConversation()
 	})
-	On(d, wire.CallLeasesRelease, func(ctx context.Context, c *Client, _ wire.LeaseNameRequest) (wire.LeaseNote, error) {
+	On(d, wire.CallResourcesRelease, func(ctx context.Context, c *Client, _ wire.LeaseNameRequest) (wire.LeaseNote, error) {
 		return wire.LeaseNote{}, noConversation()
 	})
-	On(d, wire.CallLeasesList, func(ctx context.Context, c *Client, _ wire.LeaseTokenRequest) (wire.LeaseNote, error) {
+	On(d, wire.CallResourcesList, func(ctx context.Context, c *Client, _ wire.LeaseTokenRequest) (wire.LeaseNote, error) {
 		return wire.LeaseNote{}, noConversation()
 	})
 	person := func(f func() ([]leaseEvent, error)) (wire.LeaseSnapshot, error) {
@@ -530,7 +530,7 @@ func (d *Daemon) registerLeases() {
 		d.settle(append(loaded, events...))
 		return snap, err
 	}
-	On(d, wire.CallLeasesSnapshot, func(ctx context.Context, c *Client, _ wire.Empty) (wire.LeaseSnapshot, error) {
+	On(d, wire.CallResourcesSnapshot, func(ctx context.Context, c *Client, _ wire.Empty) (wire.LeaseSnapshot, error) {
 		d.leaseMu.Lock()
 		loaded := d.loadLeases()
 		if len(loaded) > 0 {
@@ -541,7 +541,7 @@ func (d *Daemon) registerLeases() {
 		d.settle(loaded)
 		return snap, nil
 	})
-	On(d, wire.CallLeasesEnd, func(ctx context.Context, c *Client, r wire.PersonEndRequest) (wire.LeaseSnapshot, error) {
+	On(d, wire.CallResourcesEnd, func(ctx context.Context, c *Client, r wire.PersonEndRequest) (wire.LeaseSnapshot, error) {
 		return person(func() ([]leaseEvent, error) {
 			name, ok := resourceName(r.Name)
 			if !ok {
@@ -581,7 +581,7 @@ func (d *Daemon) registerLeases() {
 			return events, nil
 		})
 	})
-	On(d, wire.CallLeasesRemoveWaiter, func(ctx context.Context, c *Client, r wire.PersonRemoveRequest) (wire.LeaseSnapshot, error) {
+	On(d, wire.CallResourcesRemoveWaiter, func(ctx context.Context, c *Client, r wire.PersonRemoveRequest) (wire.LeaseSnapshot, error) {
 		return person(func() ([]leaseEvent, error) {
 			name, ok := resourceName(r.Name)
 			agent := strings.ToUpper(strings.TrimSpace(r.AgentID))
@@ -677,7 +677,7 @@ func (d *Daemon) registerLeases() {
 				}
 				d.leaseMu.Unlock()
 				if held {
-					Broadcast(d, wire.NotifyLeasesChanged, snap)
+					Broadcast(d, wire.NotifyResourcesChanged, snap)
 				}
 			}
 		}

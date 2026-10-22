@@ -119,6 +119,33 @@ func (r assessRecord) callsOf(method string) []appToolCall {
 	return out
 }
 
+// waitsOnSessions is wait_for_event's calls on agents (`events/wait` with agents), which
+// were `agents/waitOn` before #2172.
+func (r assessRecord) waitsOnSessions() []appToolCall {
+	var out []appToolCall
+	for _, c := range r.callsOf("events/wait") {
+		if _, ok := c.Arguments["agents"]; ok {
+			out = append(out, c)
+		}
+	}
+	return out
+}
+
+// listsOwnHelpers and listsSessions are list_sessions with started_by me, and without
+// (one method since #2172).
+func (r assessRecord) listsOwnHelpers() []appToolCall { return r.listSessionsCalls(true) }
+func (r assessRecord) listsSessions() []appToolCall   { return r.listSessionsCalls(false) }
+
+func (r assessRecord) listSessionsCalls(mine bool) []appToolCall {
+	var out []appToolCall
+	for _, c := range r.callsOf("sessions/list") {
+		if strings.EqualFold(strings.TrimSpace(arg(c, "started_by")), "me") == mine {
+			out = append(out, c)
+		}
+	}
+	return out
+}
+
 // arg is the first of keys a call was given as text.
 func arg(c appToolCall, keys ...string) string {
 	for _, k := range keys {
@@ -228,7 +255,7 @@ func eqFold(a, b string) bool { return strings.EqualFold(strings.TrimSpace(a), s
 // MARK: The steps
 
 func (r assessRecord) showFile() (verdict, string) {
-	shown := r.callsOf("agents/showFile")
+	shown := r.callsOf("files/show")
 	if r.reportPath == "" {
 		if len(shown) == 0 {
 			return failedStep, "`show_file` never called"
@@ -252,25 +279,25 @@ func (r assessRecord) showFile() (verdict, string) {
 
 func (r assessRecord) leases() (verdict, string) {
 	var leased []appToolCall
-	for _, c := range r.callsOf("leases/lease") {
+	for _, c := range r.callsOf("resources/lease") {
 		if c.Ok {
 			leased = append(leased, c)
 		}
 	}
 	if len(leased) == 0 || arg(leased[0], "name") == "" {
-		return failedStep, said(r.callsOf("leases/lease"), "lease_resource")
+		return failedStep, said(r.callsOf("resources/lease"), "lease_resource")
 	}
 	name := arg(leased[0], "name")
 	key := strings.ToLower(strings.TrimSpace(name))
-	if !anyOk(r.callsOf("leases/list")) {
-		return failedStep, said(r.callsOf("leases/list"), "list_resources")
+	if !anyOk(r.callsOf("resources/list")) {
+		return failedStep, said(r.callsOf("resources/list"), "list_resources")
 	}
 	released := false
-	for _, c := range r.callsOf("leases/release") {
+	for _, c := range r.callsOf("resources/release") {
 		released = released || c.Ok && eqFold(arg(c, "name"), key)
 	}
 	if !released {
-		return failedStep, said(r.callsOf("leases/release"), "release_resource")
+		return failedStep, said(r.callsOf("resources/release"), "release_resource")
 	}
 	var granted *wire.Event
 	for i, e := range r.events {
@@ -298,7 +325,7 @@ func (r assessRecord) leases() (verdict, string) {
 }
 
 func (r assessRecord) workspaces() (verdict, string) {
-	all := r.callsOf("agents/workspaces")
+	all := r.callsOf("workspaces/list")
 	var listed []appToolCall
 	for _, c := range all {
 		if a := arg(c, "action"); a == "" || a == "list" {
@@ -319,7 +346,7 @@ func (r assessRecord) workspaces() (verdict, string) {
 }
 
 func (r assessRecord) workflows() (verdict, string) {
-	all := r.callsOf("agents/manageWorkflows")
+	all := r.callsOf("workflows/manage")
 	action := func(name string) []appToolCall {
 		var out []appToolCall
 		for _, c := range all {
@@ -424,7 +451,7 @@ func (r assessRecord) eventSteps() (verdict, string) {
 		return strings.HasSuffix(name, "-ping")
 	}
 	var leased []appToolCall
-	for _, c := range r.callsOf("leases/lease") {
+	for _, c := range r.callsOf("resources/lease") {
 		if isPing(arg(c, "name")) {
 			leased = append(leased, c)
 		}
@@ -534,7 +561,7 @@ func questionsOf(c appToolCall) []formQuestion {
 }
 
 func (r assessRecord) askForm() (verdict, string) {
-	asked := r.callsOf("agents/askForm")
+	asked := r.callsOf("questions/ask")
 	var call *appToolCall
 	for i := range asked {
 		if asked[i].Ok {
@@ -588,7 +615,7 @@ func (r assessRecord) ownAsk() (verdict, string) {
 			asked++
 		}
 	}
-	if own := asked - len(r.callsOf("agents/askForm")); own > 0 {
+	if own := asked - len(r.callsOf("questions/ask")); own > 0 {
 		via := "the runtime's own tool"
 		if r.escalation != "" {
 			via = "`" + r.escalation + "`"
@@ -607,7 +634,7 @@ func (r assessRecord) ownAsk() (verdict, string) {
 
 // blockFoundHelperDone is a wait on the helper refused because it had already ended.
 func (r assessRecord) blockFoundHelperDone(helper *wire.UUID) bool {
-	for _, c := range r.callsOf("agents/waitOn") {
+	for _, c := range r.waitsOnSessions() {
 		if c.Ok || !strings.Contains(answerOfCall(c), "has already ended") {
 			continue
 		}
@@ -624,7 +651,7 @@ func (r assessRecord) blockFoundHelperDone(helper *wire.UUID) bool {
 }
 
 func (r assessRecord) helperSteps() (verdict, string) {
-	started := r.callsOf("agents/startHelper")
+	started := r.callsOf("sessions/start")
 	var call *appToolCall
 	for i := range started {
 		if started[i].Ok && started[i].AgentID != nil {
@@ -646,8 +673,8 @@ func (r assessRecord) helperSteps() (verdict, string) {
 	if helper == nil {
 		return failedStep, "the helper " + short + " is not marked as this agent's"
 	}
-	if !anyOk(r.callsOf("agents/listHelpers")) {
-		return failedStep, said(r.callsOf("agents/listHelpers"), "list_sessions with started_by me")
+	if !anyOk(r.listsOwnHelpers()) {
+		return failedStep, said(r.listsOwnHelpers(), "list_sessions with started_by me")
 	}
 	resumed := false
 	for _, p := range r.appPrompts() {
@@ -657,7 +684,7 @@ func (r assessRecord) helperSteps() (verdict, string) {
 		return failedStep, "never started again when the helper finished"
 	}
 	var requested []appToolCall
-	for _, c := range r.callsOf("agents/requestArchiveHelper") {
+	for _, c := range r.callsOf("sessions/archive") {
 		if strings.EqualFold(arg(c, "agentID", "id"), string(id)) {
 			requested = append(requested, c)
 		}
@@ -711,7 +738,7 @@ func (r assessRecord) wait() (verdict, string) {
 func (r assessRecord) ending() (verdict, string) {
 	onHelper, withTime, refused := r.blockFoundHelperDone(nil), false, 0
 	var outcomes []string
-	for _, c := range r.callsOf("agents/waitOn") {
+	for _, c := range r.waitsOnSessions() {
 		if !c.Ok {
 			refused++
 			continue
@@ -724,9 +751,10 @@ func (r assessRecord) ending() (verdict, string) {
 			withTime = true
 		}
 	}
-	// A wait on a time alone, as this host keeps it: wait_for_event with no events.
+	// A wait on a time alone, as this host keeps it: wait_for_event with no events and no agents.
 	for _, c := range r.callsOf("events/wait") {
-		if _, ok := intArg(c, "until_minutes", "untilMinutes"); c.Ok && ok && len(listArg(c, "events")) == 0 && arg(c, "action") == "" {
+		if _, ok := intArg(c, "until_minutes", "untilMinutes"); c.Ok && ok && len(listArg(c, "events")) == 0 &&
+			len(listArg(c, "agents")) == 0 && arg(c, "action") == "" {
 			outcomes = append(outcomes, "blocked")
 			withTime = true
 		}
@@ -755,7 +783,7 @@ func (r assessRecord) ending() (verdict, string) {
 func (r assessRecord) worktree() (verdict, string) {
 	var into []appToolCall
 	var back []appToolCall
-	for _, c := range r.callsOf("agents/moveSelf") {
+	for _, c := range r.callsOf("worktrees/move") {
 		if arg(c, "leave_worktree") != "" {
 			back = append(back, c)
 		} else {
@@ -836,7 +864,7 @@ func (r assessRecord) worktree() (verdict, string) {
 
 func (r assessRecord) sessions() (verdict, string) {
 	me := string(r.agent.ID)
-	listed := r.callsOf("agents/listSessions")
+	listed := r.listsSessions()
 	var list *appToolCall
 	for i := range listed {
 		if listed[i].Ok {
@@ -855,7 +883,7 @@ func (r assessRecord) sessions() (verdict, string) {
 		title = *r.agent.Title
 	}
 	var read []appToolCall
-	for _, c := range r.callsOf("agents/readSession") {
+	for _, c := range r.callsOf("sessions/read") {
 		asked := arg(c, "session")
 		if strings.EqualFold(asked, me) || title != "" && asked == title {
 			read = append(read, c)

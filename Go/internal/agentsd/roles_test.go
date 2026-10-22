@@ -28,7 +28,9 @@ func TestRoleAllows(t *testing.T) {
 	}{
 		{RoleControl, "agents/delete", true},
 		{RoleDevice, "agents/delete", true},
-		{RoleAgent, "agents/finishTurn", true},
+		{RoleAgent, "resources/lease", true},
+		{RoleAgent, "agents/finishTurn", false},
+		{RoleAgent, "sessions/list", false},
 		{RoleAgent, "daemon/ping", true},
 		{RoleAgent, "agents/delete", false},
 		{RoleAgent, "projects/setHelperLimits", false},

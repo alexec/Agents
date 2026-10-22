@@ -62,7 +62,6 @@ const CapHostWire1 = "host.wire/1"
 const CapHost1 = "host/1"
 const CapHostsJoin1 = "hosts.join/1"
 const CapHosts1 = "hosts/1"
-const CapLeases1 = "leases/1"
 const CapLinks1 = "links/1"
 const CapLiveactivity1 = "liveactivity/1"
 const CapMac1 = "mac/1"
@@ -97,6 +96,7 @@ const CapRelay1 = "relay/1"
 const CapReportsScope1 = "reports.scope/1"
 const CapReportsViews1 = "reports.views/1"
 const CapReports1 = "reports/1"
+const CapResourcesLeases1 = "resources.leases/1"
 const CapResources1 = "resources/1"
 const CapRetention1 = "retention/1"
 const CapRuntime1 = "runtime/1"
@@ -223,12 +223,6 @@ var HostCapabilities = pairs([][2]string{
 	{"files/watch", "files/1"},
 	{"files/write", "files/1"},
 	{"git/fill", "git/1"},
-	{"leases/end", "leases/1"},
-	{"leases/lease", "leases/1"},
-	{"leases/list", "leases/1"},
-	{"leases/release", "leases/1"},
-	{"leases/removeWaiter", "leases/1"},
-	{"leases/snapshot", "leases/1"},
 	{"mac/open", "mac/1"},
 	{"mac/reveal", "mac/1"},
 	{"mac/terminal", "mac/1"},
@@ -307,7 +301,13 @@ var HostCapabilities = pairs([][2]string{
 	{"relay/offer", "relay/1"},
 	{"relay/register", "relay/1"},
 	{"resources/declare", "resources/1"},
+	{"resources/end", "resources.leases/1"},
+	{"resources/lease", "resources.leases/1"},
+	{"resources/list", "resources.leases/1"},
+	{"resources/release", "resources.leases/1"},
 	{"resources/remove", "resources/1"},
+	{"resources/removeWaiter", "resources.leases/1"},
+	{"resources/snapshot", "resources.leases/1"},
 	{"retention/state", "retention/1"},
 	{"runtimes/accountProfiles", "runtimes.accounts/1"},
 	{"runtimes/accounts", "runtimes/1"},
@@ -397,7 +397,6 @@ var HostCapabilities = pairs([][2]string{
 	{"disk/changed", "disk/1"},
 	{"events/changed", "events/1"},
 	{"files/changed", "files/1"},
-	{"leases/changed", "leases/1"},
 	{"mcp/healthChanged", "mcp/1"},
 	{"mcp/hostedChanged", "mcp/1"},
 	{"milestones/changed", "milestones/1"},
@@ -410,6 +409,7 @@ var HostCapabilities = pairs([][2]string{
 	{"preferences/changed", "preferences/1"},
 	{"project/changed", "project/1"},
 	{"project/removed", "project/1"},
+	{"resources/changed", "resources.leases/1"},
 	{"runtime/account", "runtime/1"},
 	{"runtime/changed", "runtime/1"},
 	{"runtimes/accountProfilesChanged", "runtimes.accounts/1"},
@@ -444,7 +444,6 @@ var HostNotifications = set([]string{
 	"disk/changed",
 	"events/changed",
 	"files/changed",
-	"leases/changed",
 	"mcp/healthChanged",
 	"mcp/hostedChanged",
 	"milestones/changed",
@@ -457,6 +456,7 @@ var HostNotifications = set([]string{
 	"preferences/changed",
 	"project/changed",
 	"project/removed",
+	"resources/changed",
 	"runtime/account",
 	"runtime/changed",
 	"runtimes/accountProfilesChanged",

@@ -57,51 +57,39 @@ type appToolCall struct {
 	Seconds   *float64                   `json:"seconds,omitempty"`
 }
 
-// appToolMethod is the daemon method a tool is, as the Swift host keeps it.
-func appToolMethod(tool string, args map[string]json.RawMessage) string {
-	switch tool {
-	case "show_file":
-		return "agents/showFile"
-	case "lease_resource":
-		return "leases/lease"
-	case "release_resource":
-		return "leases/release"
-	case "list_resources":
-		return "leases/list"
-	case "wait_for_event":
-		if _, ok := args["agents"]; ok {
-			return "agents/waitOn"
-		}
-		return "events/wait"
-	case "cancel_wait":
-		return "events/cancel"
-	case "ask_form":
-		return "agents/askForm"
-	case "list_sessions":
-		if strings.EqualFold(strings.TrimSpace(argString(args, "started_by")), "me") {
-			return "agents/listHelpers"
-		}
-		return "agents/listSessions"
-	case "read_session":
-		return "agents/readSession"
-	case "archive_session":
-		return "agents/requestArchiveHelper"
-	case "start_session":
-		return "agents/startHelper"
-	case "stop_session":
-		return "agents/stopHelper"
-	case "manage_workflows":
-		return "agents/manageWorkflows"
-	case "list_workspaces":
-		return "agents/workspaces"
-	case "move_worktree":
-		return "agents/moveSelf"
-	case "set_session_labels":
-		return "agents/setOwnLabels"
-	case "message_session":
-		return "agents/messageAgent"
-	case "suggest_next_prompt":
-		return "agents/suggestPrompts"
+// appToolMethods is the method each app tool is (#2172), as app-tools.jsonl, the audit and
+// Events name it: `<the tool's noun, plural>/<its verb>`, in camelCase, one a tool. A tool
+// with two ways (list_sessions with started_by, wait_for_event with agents) is still one
+// method, told apart by its arguments. ask_form is a question (#2298), so `questions/ask`.
+var appToolMethods = map[string]string{
+	"start_session":       "sessions/start",
+	"stop_session":        "sessions/stop",
+	"archive_session":     "sessions/archive",
+	"list_sessions":       "sessions/list",
+	"read_session":        "sessions/read",
+	"message_session":     "sessions/message",
+	"set_session_labels":  "sessions/setLabels",
+	"move_worktree":       "worktrees/move",
+	"show_file":           "files/show",
+	"ask_form":            "questions/ask",
+	"suggest_next_prompt": "prompts/suggest",
+	"manage_workflows":    "workflows/manage",
+	"lease_resource":      "resources/lease",
+	"release_resource":    "resources/release",
+	"list_resources":      "resources/list",
+	"wait_for_event":      "events/wait",
+	"cancel_wait":         "events/cancel",
+	"list_workspaces":     "workspaces/list",
+	"start_workspace":     "workspaces/start",
+	"stop_workspace":      "workspaces/stop",
+	"make_workspace":      "workspaces/make",
+	"delete_workspace":    "workspaces/delete",
+}
+
+// appToolMethod is the method a tool is, or the tool's own name for one not in the table.
+func appToolMethod(tool string) string {
+	if m, ok := appToolMethods[tool]; ok {
+		return m
 	}
 	return tool
 }
@@ -110,7 +98,7 @@ var uuidIn = regexp.MustCompile(`[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0
 
 // keepAppToolCall keeps one call, as answered: a line a call, the token never in it.
 func (d *Daemon) keepAppToolCall(agent wire.UUID, tool string, args map[string]json.RawMessage, note string, err error, began time.Time) {
-	call := appToolCall{At: wire.DateOf(began), Method: appToolMethod(tool, args), Ok: err == nil, Arguments: map[string]json.RawMessage{}}
+	call := appToolCall{At: wire.DateOf(began), Method: appToolMethod(tool), Ok: err == nil, Arguments: map[string]json.RawMessage{}}
 	for k, v := range args {
 		if k != "token" {
 			call.Arguments[k] = v
@@ -453,7 +441,7 @@ func (d *Daemon) assessment(id wire.UUID) (wire.RuntimeAssessmentScore, error) {
 // .agents/reviews/runtimes/.
 func shownReport(calls []appToolCall) string {
 	for _, c := range calls {
-		if c.Method != "agents/showFile" || !c.Ok {
+		if c.Method != "files/show" || !c.Ok {
 			continue
 		}
 		if p := callPath(c); strings.Contains(p, ".agents/reviews/runtimes/") && strings.HasSuffix(p, ".md") {

@@ -2656,7 +2656,7 @@ final class RemoteModel {
                         continue
                     }
                     // Settings ▸ Backups is the Mac's (#1810).
-                    if note.method == DaemonAPI.Notification.leasesChanged
+                    if note.method == DaemonAPI.Notification.resourcesChanged
                         || note.method == DaemonAPI.Notification.mcpHostedChanged
                         || note.method == DaemonAPI.Notification.eventsChanged
                         || note.method == DaemonAPI.Notification.backupsChanged { continue }
@@ -3891,7 +3891,7 @@ final class RemoteModel {
     /// What each agent holds and waits for (036). The phone only reads it: the
     /// Resources page and ending a lease are the Mac's (FR-011).
     private func refreshLeases() async {
-        guard let snapshot = try? await client.call(DaemonAPI.Method.leasesSnapshot,
+        guard let snapshot = try? await client.call(DaemonAPI.Method.resourcesSnapshot,
                                                     Optional<String>.none,
                                                     returning: DaemonAPI.LeaseSnapshot.self) else { return }
         work.replaceLeases(snapshot)

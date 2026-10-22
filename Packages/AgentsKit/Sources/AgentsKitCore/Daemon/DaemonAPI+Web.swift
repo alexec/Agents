@@ -97,7 +97,7 @@ public extension DaemonAPI {
                 // The Time page's milestones (#984).
                 Row(Method.milestonesState, params: Empty.self, result: Milestones.self, kind: .hostRequest),
                 Row(Method.eventsList, params: EventsListRequest.self, result: EventsPage.self, kind: .hostRequest),
-                Row(Method.leasesSnapshot, params: Empty.self, result: LeaseSnapshot.self, kind: .hostRequest),
+                Row(Method.resourcesSnapshot, params: Empty.self, result: LeaseSnapshot.self, kind: .hostRequest),
                 // The MCP servers the host runs for every agent (#488), for the Resources page.
                 Row(Method.mcpHosted, params: Empty.self, result: HostedMCPSnapshot.self, kind: .hostRequest),
                 // Every MCP server's health (#753), for the MCP Servers pages, and Check Now.
@@ -456,7 +456,7 @@ public extension DaemonAPI {
                 // A write nobody was waiting on that the host could not keep (#88).
                 Row(Notification.writeFailed, params: WriteFailure.self, result: Empty.self, kind: .hostNotification),
                 // Who holds what, for the page's read-only Resources list (#116).
-                Row(Notification.leasesChanged, params: LeaseSnapshot.self, result: Empty.self, kind: .hostNotification),
+                Row(Notification.resourcesChanged, params: LeaseSnapshot.self, result: Empty.self, kind: .hostNotification),
                 Row(Notification.mcpHostedChanged, params: HostedMCPSnapshot.self, result: Empty.self,
                     kind: .hostNotification),
                 Row(Notification.mcpHealthChanged, params: MCPHealthSnapshot.self, result: Empty.self,

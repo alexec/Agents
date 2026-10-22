@@ -56,8 +56,8 @@ func TestARuntimeAssessedFromTheRecord(t *testing.T) {
 	os.WriteFile(started.ReportPath, []byte(strings.Join(steps, "\n")), 0o644)
 
 	calls := d.appToolCalls(a.ID)
-	if len(calls) != 4 || calls[0].Method != "agents/showFile" || !calls[0].Ok || !strings.Contains(*calls[0].Answer, "open, empty") ||
-		calls[1].Method != "leases/lease" {
+	if len(calls) != 4 || calls[0].Method != "files/show" || !calls[0].Ok || !strings.Contains(*calls[0].Answer, "open, empty") ||
+		calls[1].Method != "resources/lease" {
 		t.Fatalf("%+v", calls)
 	}
 
@@ -91,8 +91,8 @@ func TestSessionsTakesTheTitleListedBeforeTheRead(t *testing.T) {
 		return appToolCall{At: now, Method: method, Ok: true, Arguments: args, Answer: text(answer)}
 	}
 	r := assessRecord{agent: wire.Agent{ID: wire.UUID(me), Title: &title}, calls: []appToolCall{
-		call("agents/listSessions", "- "+me+": “Assess the Codex runtime (#47)…” (you) — Codex, Working", nil),
-		call("agents/readSession", "# Session “Assess the Codex runtime (#47)…”\n\n- Id: "+me, map[string]json.RawMessage{"session": json.RawMessage(`"` + me + `"`)}),
+		call("sessions/list", "- "+me+": “Assess the Codex runtime (#47)…” (you) — Codex, Working", nil),
+		call("sessions/read", "# Session “Assess the Codex runtime (#47)…”\n\n- Id: "+me, map[string]json.RawMessage{"session": json.RawMessage(`"` + me + `"`)}),
 	}}
 	if v, why := r.sessions(); v != passed {
 		t.Fatal(why)
@@ -100,5 +100,44 @@ func TestSessionsTakesTheTitleListedBeforeTheRead(t *testing.T) {
 	r.calls[1].Answer = text("# Session “Something else”\n\n- Id: " + me)
 	if v, _ := r.sessions(); v != failedStep {
 		t.Fatal("a title neither listed nor current passed")
+	}
+}
+
+// Every app tool is one method, `<the tool's noun, plural>/<its verb>` (#2172): a new tool
+// cannot be left out, nor named after something else.
+func TestEveryAppToolIsOneMethodNamedAfterIt(t *testing.T) {
+	// The tools whose noun is not in their name: ask_form asks a question (#2298), and
+	// cancel_wait cancels a wait for an event.
+	nouns := map[string]string{"ask_form": "questions", "cancel_wait": "events", "wait_for_event": "events"}
+	seen := map[string]string{}
+	for _, tool := range appToolCalls() {
+		method, ok := appToolMethods[tool.name]
+		if !ok {
+			t.Errorf("%s has no method", tool.name)
+			continue
+		}
+		if other, dup := seen[method]; dup {
+			t.Errorf("%s and %s are both %s", tool.name, other, method)
+		}
+		seen[method] = tool.name
+		noun, verb, ok := strings.Cut(method, "/")
+		words := strings.Split(tool.name, "_")
+		if !ok || !strings.HasPrefix(strings.ToLower(verb), words[0]) {
+			t.Errorf("%s: %s does not start with the tool's verb, %s", tool.name, method, words[0])
+		}
+		want := nouns[tool.name]
+		if want == "" {
+			for _, w := range words[1:] {
+				if plural := strings.TrimSuffix(w, "s") + "s"; plural == noun {
+					want = noun
+				}
+			}
+		}
+		if noun != want {
+			t.Errorf("%s: %s is not after the tool's noun", tool.name, method)
+		}
+	}
+	if len(seen) != len(appToolMethods) {
+		t.Errorf("appToolMethods has %d tools, the host serves %d", len(appToolMethods), len(seen))
 	}
 }

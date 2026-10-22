@@ -627,7 +627,7 @@ export class Work {
         this.resuming.value = { ...this.resuming.value, [host]: note.isResuming ? [...held, note.agentID] : held };
         return true;
       }
-      case "leases/changed":
+      case "resources/changed":
         this.leases.value = { ...this.leases.value, [host]: params as LeaseSnapshot };
         return true;
       case "mcp/hostedChanged":
@@ -1600,9 +1600,9 @@ export class Store extends Work {
     void this.link.call("agents/resuming", {}, host).then((response) => {
       this.resuming.value = { ...this.resuming.value, [host]: response.agentIDs };
     }).catch(failed("agents/resuming"));
-    void this.link.call("leases/snapshot", {}, host).then((snapshot) => {
+    void this.link.call("resources/snapshot", {}, host).then((snapshot) => {
       this.leases.value = { ...this.leases.value, [host]: snapshot };
-    }).catch(failed("leases/snapshot"));
+    }).catch(failed("resources/snapshot"));
     // A host from before #488 doesn't know the method, and hosts no servers.
     void this.link.call("mcp/hosted", {}, host).then((snapshot) => {
       this.hostedMCP.value = { ...this.hostedMCP.value, [host]: snapshot };

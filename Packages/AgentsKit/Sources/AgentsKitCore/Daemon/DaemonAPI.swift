@@ -210,17 +210,6 @@ public enum DaemonAPI {
         /// Letting one agent carry on past the per-agent limit, or giving it a
         /// tighter ceiling of its own. The reader's call, never an agent's.
         public static let agentsSetCeiling = "agents/setCeiling"
-        /// Not the app's to call. Since 023 the older door for the chips half of
-        /// `agentsFinishTurn`; the helper stopped relaying it when the tool names were
-        /// retired (09-29). Kept for a helper binary from before then, which is after the
-        /// #58 cut-off (051).
-        public static let agentsSuggestPrompts = "agents/suggestPrompts"
-        /// Nor this one. Another of that MCP server's tools: the agent asking that a
-        /// file be put in front of the user.
-        public static let agentsShowFile = "agents/showFile"
-        /// The helper relaying `ask_form`: the agent asking the person a question and
-        /// waiting for the answer. The daemon holds the form as an elicitation.
-        public static let agentsAskForm = "agents/askForm"
         /// A window asking the daemon to write what the person typed on a live page
         /// (022). The daemon writes rather than the window, so that it knows the
         /// person did — that is what lets it tell the agent on its next turn.
@@ -334,36 +323,20 @@ public enum DaemonAPI {
         public static let workflowsSettings = "workflows/settings"
         /// Clear a server's event trigger's "events may have been missed" (#383).
         public static let workflowsClearMCPMissed = "workflows/mcpTrigger/clearMissed"
-        /// What the MCP helper relays when an agent calls the workflow tool.
-        public static let agentsManageWorkflows = "agents/manageWorkflows"
-        /// What the MCP helper relays when an agent calls `start_session`,
-        /// `stop_session`, `archive_session` or `list_sessions` with `started_by: me` (028, #638). The
-        /// caller is the token, and the token alone decides the project and what it
-        /// may touch.
-        public static let agentsStartHelper = "agents/startHelper"
-        public static let agentsStopHelper = "agents/stopHelper"
-        /// `archive_session` with an id (#584, #638; `park_agent`, then `request_archive`, before it).
-        public static let agentsRequestArchiveHelper = "agents/requestArchiveHelper"
-        public static let agentsListHelpers = "agents/listHelpers"
-        /// `list_sessions` and `read_session` (065): the caller's project, read only.
-        public static let agentsListSessions = "agents/listSessions"
-        public static let agentsReadSession = "agents/readSession"
-        /// `message_session` (#560): words for another session in the caller's project.
-        public static let agentsMessageAgent = "agents/messageAgent"
         /// What the MCP helper relays for `lease_resource`, `release_resource` and
-        /// `list_resources` (036). The caller is the token. `leases/lease` may stay open
+        /// `list_resources` (036). The caller is the token. `resources/lease` may stay open
         /// for up to `LeaseLimits.waitLimit` while the agent waits its turn.
-        public static let leasesLease = "leases/lease"
-        public static let leasesRelease = "leases/release"
-        public static let leasesList = "leases/list"
+        public static let resourcesLease = "resources/lease"
+        public static let resourcesRelease = "resources/release"
+        public static let resourcesList = "resources/list"
         /// Every resource and who holds and waits for it, for a window that has just
-        /// connected. Kept up to date after that by `leases/changed`.
-        public static let leasesSnapshot = "leases/snapshot"
+        /// connected. Kept up to date after that by `resources/changed`.
+        public static let resourcesSnapshot = "resources/snapshot"
         /// The person ending whoever holds a resource, and taking one agent out of a
         /// line (036 US4). There is no method for the person to take one: only agents
         /// hold leases.
-        public static let leasesEnd = "leases/end"
-        public static let leasesRemoveWaiter = "leases/removeWaiter"
+        public static let resourcesEnd = "resources/end"
+        public static let resourcesRemoveWaiter = "resources/removeWaiter"
         /// The person adding or changing a declared resource, and taking one away
         /// (#116). A person's, never an agent's: an agent reads declarations in
         /// `list_resources` and does not write them.
@@ -383,28 +356,6 @@ public enum DaemonAPI {
         /// The person moving an agent into a worktree or back to its project folder, or
         /// taking back a move still waiting for the turn to end (053).
         public static let agentsMove = "agents/move"
-        /// What an MCP helper begun before 2026-09-29 relays when its agent calls
-        /// `enter_worktree` or `exit_worktree` (053). The caller is the token. Kept for
-        /// those sessions: a move is now asked for on `finish_turn`.
-        public static let agentsMoveSelf = "agents/moveSelf"
-        /// The agent saying how the work actually went, at the end of it. The app
-        /// cannot know this any other way — a turn giving itself back says nothing
-        /// about whether the work is finished. Since 023 the older door for the
-        /// outcome half of `agentsFinishTurn`, kept like `agentsSuggestPrompts` above
-        /// for a helper from before 09-29 (#58).
-        public static let agentsReportOutcome = "agents/reportOutcome"
-        /// Both of those at once (023): the one call that ends a turn, relayed by the
-        /// helper when an agent calls `finish_turn`. The two above stay for the older
-        /// names the helper still relays.
-        public static let agentsFinishTurn = "agents/finishTurn"
-        /// `archive_session` with no id (#481, #584, #638): the agent asking
-        /// to be put away once its own turn ends.
-        public static let agentsAfterTurn = "agents/afterTurn"
-        /// `set_session_labels` (#481): the agent's own labels on its own session.
-        public static let agentsSetOwnLabels = "agents/setOwnLabels"
-        /// `wait_for_event` naming agents or only a time (#481): a block, as `blocked`
-        /// on `finish_turn` was, which ends the turn.
-        public static let agentsWaitOn = "agents/waitOn"
 
         public static let permissionsPending = "permissions/pending"
         public static let elicitationsPending = "elicitations/pending"
@@ -616,7 +567,7 @@ public enum DaemonAPI {
         /// the whole `LeaseSnapshot`, which clients replace rather than merge (036).
         /// Also once a minute while anything is held, so "minutes left" stays true
         /// without each client counting against its own clock.
-        public static let leasesChanged = "leases/changed"
+        public static let resourcesChanged = "resources/changed"
         /// A volume went low or came back, or how much a low one has free moved (#195).
         public static let diskChanged = "disk/changed"
         /// A backup started or ended, or the backup settings changed (#1810). A `BackupState`.

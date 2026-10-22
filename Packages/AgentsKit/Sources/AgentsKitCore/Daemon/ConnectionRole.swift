@@ -30,35 +30,15 @@ public enum ConnectionRole: String, Sendable, Hashable {
     /// Anything else of this account: whether the daemon is there, and no more.
     case stranger
 
-    /// What a helper relays, one per app tool, and nothing a window does. Not
-    /// `projects/setHelperLimits`: an agent reads its project's helper limits in its
-    /// tools' results and never sets them (#64).
+    /// What an agent's connection may call on the socket, and nothing a window does: the
+    /// app tools are served over MCP, so only those the host serves on the socket too (#2172),
+    /// as the Go host's `agentMethods`. Not `projects/setHelperLimits`: an agent reads its
+    /// project's helper limits in its tools' results and never sets them (#64).
     public static let agentMethods: Set<String> = Set<String>([
-        DaemonAPI.Method.agentsFinishTurn,
-        DaemonAPI.Method.agentsAfterTurn,
-        DaemonAPI.Method.agentsSetOwnLabels,
-        DaemonAPI.Method.agentsWaitOn,
-        DaemonAPI.Method.agentsSuggestPrompts,
-        DaemonAPI.Method.agentsReportOutcome,
-        DaemonAPI.Method.agentsShowFile,
-        DaemonAPI.Method.agentsAskForm,
-        DaemonAPI.Method.agentsManageWorkflows,
-        DaemonAPI.Method.agentsStartHelper,
-        DaemonAPI.Method.agentsStopHelper,
-        DaemonAPI.Method.agentsRequestArchiveHelper,
-        DaemonAPI.Method.agentsListHelpers,
-        DaemonAPI.Method.agentsListSessions,
-        DaemonAPI.Method.agentsReadSession,
-        DaemonAPI.Method.agentsMessageAgent,
-        DaemonAPI.Method.leasesLease,
-        DaemonAPI.Method.leasesRelease,
-        DaemonAPI.Method.leasesList,
-        DaemonAPI.Method.eventsWait,
-        DaemonAPI.Method.eventsCancel,
-        DaemonAPI.Method.agentsMoveSelf,
+        DaemonAPI.Method.resourcesLease,
+        DaemonAPI.Method.resourcesRelease,
+        DaemonAPI.Method.resourcesList,
         DaemonAPI.Method.viewsToolCall,
-        DaemonAPI.Method.agentsWorkspaces,
-        DaemonAPI.Method.agentsProviderDraft,
     ]).union(strangerMethods)
 
     /// Announcing, and finding out a daemon is answering.

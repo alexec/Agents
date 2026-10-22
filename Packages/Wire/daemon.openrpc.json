@@ -2755,151 +2755,6 @@
       }
     },
     {
-      "name": "leases/changed",
-      "x-capability": "leases/1",
-      "tags": [
-        {
-          "name": "web"
-        }
-      ],
-      "x-notification": true,
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/LeaseSnapshot"
-          }
-        }
-      ]
-    },
-    {
-      "name": "leases/end",
-      "x-capability": "leases/1",
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/PersonEndRequest"
-          }
-        }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "$ref": "daemon.schema.json#/definitions/LeaseSnapshot"
-        }
-      }
-    },
-    {
-      "name": "leases/lease",
-      "x-capability": "leases/1",
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/LeaseRequest"
-          }
-        }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "$ref": "daemon.schema.json#/definitions/LeaseNote"
-        }
-      }
-    },
-    {
-      "name": "leases/list",
-      "x-capability": "leases/1",
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/LeaseTokenRequest"
-          }
-        }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "$ref": "daemon.schema.json#/definitions/LeaseNote"
-        }
-      }
-    },
-    {
-      "name": "leases/release",
-      "x-capability": "leases/1",
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/LeaseNameRequest"
-          }
-        }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "$ref": "daemon.schema.json#/definitions/LeaseNote"
-        }
-      }
-    },
-    {
-      "name": "leases/removeWaiter",
-      "x-capability": "leases/1",
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/PersonRemoveRequest"
-          }
-        }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "$ref": "daemon.schema.json#/definitions/LeaseSnapshot"
-        }
-      }
-    },
-    {
-      "name": "leases/snapshot",
-      "x-capability": "leases/1",
-      "tags": [
-        {
-          "name": "web"
-        }
-      ],
-      "paramStructure": "by-name",
-      "params": [
-        {
-          "name": "params",
-          "required": true,
-          "schema": {
-            "$ref": "daemon.schema.json#/definitions/Empty"
-          }
-        }
-      ],
-      "result": {
-        "name": "result",
-        "schema": {
-          "$ref": "daemon.schema.json#/definitions/LeaseSnapshot"
-        }
-      }
-    },
-    {
       "name": "mac/open",
       "x-capability": "mac/1",
       "paramStructure": "by-name",
@@ -4887,6 +4742,26 @@
       }
     },
     {
+      "name": "resources/changed",
+      "x-capability": "resources.leases/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/LeaseSnapshot"
+          }
+        }
+      ]
+    },
+    {
       "name": "resources/declare",
       "x-capability": "resources/1",
       "paramStructure": "by-name",
@@ -4907,6 +4782,86 @@
       }
     },
     {
+      "name": "resources/end",
+      "x-capability": "resources.leases/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/PersonEndRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/LeaseSnapshot"
+        }
+      }
+    },
+    {
+      "name": "resources/lease",
+      "x-capability": "resources.leases/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/LeaseRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/LeaseNote"
+        }
+      }
+    },
+    {
+      "name": "resources/list",
+      "x-capability": "resources.leases/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/LeaseTokenRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/LeaseNote"
+        }
+      }
+    },
+    {
+      "name": "resources/release",
+      "x-capability": "resources.leases/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/LeaseNameRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/LeaseNote"
+        }
+      }
+    },
+    {
       "name": "resources/remove",
       "x-capability": "resources/1",
       "paramStructure": "by-name",
@@ -4916,6 +4871,51 @@
           "required": true,
           "schema": {
             "$ref": "daemon.schema.json#/definitions/RemoveResourceRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/LeaseSnapshot"
+        }
+      }
+    },
+    {
+      "name": "resources/removeWaiter",
+      "x-capability": "resources.leases/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/PersonRemoveRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/LeaseSnapshot"
+        }
+      }
+    },
+    {
+      "name": "resources/snapshot",
+      "x-capability": "resources.leases/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/Empty"
           }
         }
       ],
