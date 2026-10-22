@@ -5212,6 +5212,32 @@
       }
     },
     {
+      "name": "runtimes/setDefaultAccount",
+      "x-capability": "host.org-routes/1",
+      "description": "A runtime's account for new sessions, Reaches the Model By (#999, FR-016): an added account, an org account (org:<route id>) or default for the runtime's own sign-in. Kept in the runtimes part of the person's settings. Refused with policyRefused when the organisation's policy refuses that account.",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/DefaultAccountRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
       "name": "runtimes/setProvider",
       "x-capability": "runtimes/1",
       "paramStructure": "by-name",
@@ -6788,6 +6814,14 @@
       "notYours": {
         "code": -32027,
         "message": "notYours"
+      },
+      "orgRouteMissing": {
+        "code": -32099,
+        "message": "orgRouteMissing"
+      },
+      "orgRouteRemoved": {
+        "code": -32100,
+        "message": "orgRouteRemoved"
       },
       "outsideScratchRoot": {
         "code": -32098,

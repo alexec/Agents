@@ -93,6 +93,22 @@
         "signInCommand": {
           "description": "The command that signs it in, in a terminal on the host, for a runtime the app cannot sign in itself (Claude). Absent for one that signs in with runtimes/authenticate.",
           "type": "string"
+        },
+        "source": {
+          "description": "Who gave the account (#999): absent or person for one the person added, organisation for an org route, which the person cannot remove.",
+          "type": "string",
+          "enum": [
+            "person",
+            "organisation"
+          ]
+        },
+        "isDefault": {
+          "description": "The runtime's default account for new sessions (Reaches the Model By, #999). When no account says so, the runtime's own sign-in is the default.",
+          "type": "boolean"
+        },
+        "setBy": {
+          "$ref": "#/definitions/PolicySetBy",
+          "description": "The organisation's policy refuses this account (#999, runtimes.<id>.reach)."
         }
       },
       "required": [
@@ -106,7 +122,7 @@
       "additionalProperties": false
     },
     "AccountReach": {
-      "description": "How an account reaches the model (#840). Today only a sign-in kept in a folder of its own; an org key and a gateway (T6, #999) are other cases of this.",
+      "description": "How an account reaches the model (#840): a sign-in kept in a folder of its own, or (#999) an organisation's route: an org key or a gateway, through the machine's model relay.",
       "anyOf": [
         {
           "type": "object",
@@ -127,6 +143,54 @@
           },
           "required": [
             "signIn"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "orgKey": {
+              "type": "object",
+              "properties": {
+                "route": {
+                  "description": "The org route's id.",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "route"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "orgKey"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "gateway": {
+              "type": "object",
+              "properties": {
+                "route": {
+                  "description": "The org route's id.",
+                  "type": "string"
+                },
+                "kind": {
+                  "$ref": "#/definitions/OrgRouteKind"
+                }
+              },
+              "required": [
+                "route",
+                "kind"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "gateway"
           ],
           "additionalProperties": false
         }
@@ -5207,6 +5271,22 @@
         "displayName",
         "description",
         "holders"
+      ],
+      "additionalProperties": false
+    },
+    "DefaultAccountRequest": {
+      "type": "object",
+      "description": "runtimes/setDefaultAccount (#999): a runtime's account for new sessions. accountID default (or absent) is the runtime's own sign-in.",
+      "properties": {
+        "runtimeID": {
+          "type": "string"
+        },
+        "accountID": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "runtimeID"
       ],
       "additionalProperties": false
     },
@@ -14657,6 +14737,31 @@
       ],
       "additionalProperties": false
     },
+    "RelayTokens": {
+      "type": "object",
+      "description": "The tokens the machine's model relay counted from the provider's own answers (#999, FR-019): fresh input, output, and cache reads and writes.",
+      "properties": {
+        "input": {
+          "type": "integer"
+        },
+        "output": {
+          "type": "integer"
+        },
+        "cacheRead": {
+          "type": "integer"
+        },
+        "cacheWrite": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "input",
+        "output",
+        "cacheRead",
+        "cacheWrite"
+      ],
+      "additionalProperties": false
+    },
     "RememberedOptionsRequest": {
       "type": "object",
       "properties": {
@@ -19707,6 +19812,14 @@
         },
         "cost": {
           "$ref": "#/definitions/Cost"
+        },
+        "route": {
+          "type": "string",
+          "description": "The org route the turn went through (#999)."
+        },
+        "relayTokens": {
+          "$ref": "#/definitions/RelayTokens",
+          "description": "The relay's count for an org account's turn, beside what the runtime reported (#999)."
         }
       },
       "required": [
@@ -20129,6 +20242,10 @@
         "limitTokens": {
           "type": "integer",
           "description": "The row's tokens as the machine counts them for a limit (#998, FR-017): fresh input and output, no cache reads and no thoughts. Absent from an older machine, whose rows count as inputTokens + outputTokens."
+        },
+        "route": {
+          "type": "string",
+          "description": "The org route of this row's turns (#999, FR-021); absent for the person's own sign-in and accounts."
         }
       },
       "required": [

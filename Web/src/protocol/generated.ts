@@ -62,6 +62,8 @@ export const Failure = {
   notPermitted: -32045,
   notSupported: -32009,
   notYours: -32027,
+  orgRouteMissing: -32099,
+  orgRouteRemoved: -32100,
   outsideScratchRoot: -32098,
   pinRefused: -32061,
   policyRefused: -32076,
@@ -131,14 +133,28 @@ export interface AccountProfile {
    * itself (Claude). Absent for one that signs in with runtimes/authenticate.
    */
   signInCommand?: string;
+  /**
+   * Who gave the account (#999): absent or person for one the person added, organisation for an org
+   * route, which the person cannot remove.
+   */
+  source?: "person" | "organisation";
+  /**
+   * The runtime's default account for new sessions (Reaches the Model By, #999). When no account
+   * says so, the runtime's own sign-in is the default.
+   */
+  isDefault?: boolean;
+  /** The organisation's policy refuses this account (#999, runtimes.<id>.reach). */
+  setBy?: PolicySetBy;
 }
 
 /**
- * How an account reaches the model (#840). Today only a sign-in kept in a folder of its own; an org
- * key and a gateway (T6, #999) are other cases of this.
+ * How an account reaches the model (#840): a sign-in kept in a folder of its own, or (#999) an
+ * organisation's route: an org key or a gateway, through the machine's model relay.
  */
 export type AccountReach =
-  | { signIn: { folder: string } };
+  | { signIn: { folder: string } }
+  | { orgKey: { route: string } }
+  | { gateway: { route: string; kind: OrgRouteKind } };
 
 export interface AccountRequest {
   runtimeID: string;
@@ -1925,6 +1941,15 @@ export interface DeclaredResource {
   holders: number;
   defaultMinutes?: number;
   maximumMinutes?: number;
+}
+
+/**
+ * runtimes/setDefaultAccount (#999): a runtime's account for new sessions. accountID default (or
+ * absent) is the runtime's own sign-in.
+ */
+export interface DefaultAccountRequest {
+  runtimeID: string;
+  accountID?: string;
 }
 
 export interface DeleteSessionRequest {
@@ -4796,6 +4821,17 @@ export interface RelaySwitch {
   relay: boolean;
 }
 
+/**
+ * The tokens the machine's model relay counted from the provider's own answers (#999, FR-019):
+ * fresh input, output, and cache reads and writes.
+ */
+export interface RelayTokens {
+  input: number;
+  output: number;
+  cacheRead: number;
+  cacheWrite: number;
+}
+
 export interface RememberedOptionsRequest {
   runtimeID: string;
   cwd: URLString;
@@ -6258,6 +6294,10 @@ export interface TurnUsage {
   cachedReadTokens?: number;
   cachedWriteTokens?: number;
   cost?: Cost;
+  /** The org route the turn went through (#999). */
+  route?: string;
+  /** The relay's count for an org account's turn, beside what the runtime reported (#999). */
+  relayTokens?: RelayTokens;
 }
 
 export interface TurnsPage {
@@ -6401,6 +6441,11 @@ export interface UsageRollupRow {
    * outputTokens.
    */
   limitTokens?: number;
+  /**
+   * The org route of this row's turns (#999, FR-021); absent for the person's own sign-in and
+   * accounts.
+   */
+  route?: string;
 }
 
 /**
@@ -7168,6 +7213,7 @@ export interface Methods {
   "runtimes/list": { params: Empty; result: RuntimeStatus[] };
   "runtimes/markAvailable": { params: MarkRuntimeAvailable; result: RuntimeAllowances };
   "runtimes/removeAccount": { params: AccountRequest; result: UUID[] };
+  "runtimes/setDefaultAccount": { params: DefaultAccountRequest; result: Empty };
   "sandbox/state": { params: Empty; result: SandboxSettings };
   "signIn/approve": { params: SignInDecide; result: Empty };
   "signIn/configure": { params: SignInConfigure; result: SignInProviders };
@@ -7386,6 +7432,7 @@ export const MethodTarget = {
   "runtimes/list": "host",
   "runtimes/markAvailable": "host",
   "runtimes/removeAccount": "host",
+  "runtimes/setDefaultAccount": "host",
   "sandbox/state": "host",
   "signIn/approve": "control",
   "signIn/configure": "control",
@@ -7484,7 +7531,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ACPAuthMethod: { required: ["id"], optional: ["name", "description", "_meta"] },
   ACPPromptCapabilities: { required: [], optional: ["image", "audio", "embeddedContext"] },
   ACPProviderInfo: { required: ["id"], optional: ["name", "protocol", "configured"] },
-  AccountProfile: { required: ["id", "runtimeID", "name", "reach", "addedAt", "signedIn"], optional: ["signedInAs", "signInCommand"] },
+  AccountProfile: { required: ["id", "runtimeID", "name", "reach", "addedAt", "signedIn"], optional: ["signedInAs", "signInCommand", "source", "isDefault", "setBy"] },
   AccountRequest: { required: ["runtimeID", "accountID"], optional: [] },
   ActivityToken: { required: ["agentID", "environment", "startedAt"], optional: ["token"] },
   AddAccountRequest: { required: ["runtimeID", "name"], optional: [] },
@@ -7631,6 +7678,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   DayRecap: { required: ["agents", "peakAgents", "longestClear"], optional: ["prsMerged"] },
   DeclareResourceRequest: { required: ["resource"], optional: ["replacing"] },
   DeclaredResource: { required: ["name", "displayName", "description", "holders"], optional: ["defaultMinutes", "maximumMinutes"] },
+  DefaultAccountRequest: { required: ["runtimeID"], optional: ["accountID"] },
   DeleteSessionRequest: { required: ["runtimeID", "sessionID"], optional: ["confirmed"] },
   DeliveredRoute: { required: ["id", "name", "kind", "runtimes", "defaultFor", "secretFields", "version", "sealed"], optional: ["vendor", "settings", "models", "expires"] },
   DestinationStateAnswer: { required: ["destinationState"], optional: [] },
@@ -7949,6 +7997,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   RelayOffer: { required: ["runtime", "socketPath", "caCertificate", "standIn"], optional: [] },
   RelayRegistration: { required: ["publicKey"], optional: [] },
   RelaySwitch: { required: ["relay"], optional: [] },
+  RelayTokens: { required: ["input", "output", "cacheRead", "cacheWrite"], optional: [] },
   RememberedOptionsRequest: { required: ["runtimeID", "cwd"], optional: [] },
   RemovalCheck: { required: ["blockedBy", "uncommitted", "unmerged"], optional: [] },
   RemoveResourceRequest: { required: ["name"], optional: [] },
@@ -8098,7 +8147,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   TranscriptRequest: { required: ["agentID", "limit"], optional: ["before", "from"] },
   TunnelOpen: { required: ["runtime", "ref"], optional: [] },
   TurnSummary: { required: ["id", "start", "end"], optional: ["ask", "last", "concise", "outcome", "steps", "usage"] },
-  TurnUsage: { required: ["totalTokens", "inputTokens", "outputTokens"], optional: ["thoughtTokens", "cachedReadTokens", "cachedWriteTokens", "cost"] },
+  TurnUsage: { required: ["totalTokens", "inputTokens", "outputTokens"], optional: ["thoughtTokens", "cachedReadTokens", "cachedWriteTokens", "cost", "route", "relayTokens"] },
   TurnsPage: { required: ["turns", "firstTurn", "openStart"], optional: ["firstPrompt"] },
   TurnsRequest: { required: ["agentID", "limit"], optional: ["before"] },
   UnpushedWork: { required: ["project", "worktree"], optional: ["branch", "ahead", "unmerged", "uncommitted"] },
@@ -8109,7 +8158,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   UsageReport: { required: ["range", "rows", "admin"], optional: ["scope", "personsHidden", "groupNames", "budgetUSD", "monthSpentUSD"] },
   UsageRollup: { required: ["hours", "days"], optional: [] },
   UsageRollupPeriod: { required: ["at", "rows"], optional: [] },
-  UsageRollupRow: { required: ["project", "runtime", "cost", "inputTokens", "outputTokens", "thoughtTokens", "cachedReadTokens", "cachedWriteTokens", "turns", "unpricedTurns", "workingSeconds", "waitingSeconds"], optional: ["workflow", "counts", "limitTokens"] },
+  UsageRollupRow: { required: ["project", "runtime", "cost", "inputTokens", "outputTokens", "thoughtTokens", "cachedReadTokens", "cachedWriteTokens", "turns", "unpricedTurns", "workingSeconds", "waitingSeconds"], optional: ["workflow", "counts", "limitTokens", "route"] },
   UserAgentConfig: { required: [], optional: ["instructions", "personas", "skills"] },
   UserPartHere: { required: ["part", "value"], optional: ["leftOut"] },
   UserPartRequest: { required: ["part"], optional: [] },
