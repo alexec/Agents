@@ -1,6 +1,7 @@
 package controlplane
 
 import (
+	"bytes"
 	"context"
 	"crypto/subtle"
 	"encoding/json"
@@ -175,12 +176,20 @@ var help = map[string][2]string{
 // gauges is what is read when scraped, rather than counted.
 type gauges struct {
 	hostsConnected, hostsKnown, clients, sessions, relays, leases, copies int
-	phase, version                                                       string
-	up                                                                   time.Duration
+	phase, version                                                        string
+	up                                                                    time.Duration
 }
 
-// write writes every metric in the Prometheus text format (version 0.0.4).
+// write writes every metric in the Prometheus text format (version 0.0.4). The text is made
+// under m.mu and written after it is let go: a scraper that stops reading must not hold up
+// every request, event and store operation, which count under the same lock (#2249).
 func (m *Metrics) write(w io.Writer, g gauges) {
+	var b bytes.Buffer
+	m.text(&b, g)
+	_, _ = w.Write(b.Bytes()) // a scraper that went is not ours to answer
+}
+
+func (m *Metrics) text(w *bytes.Buffer, g gauges) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	out := map[string][]string{}
@@ -229,7 +238,7 @@ func (m *Metrics) write(w io.Writer, g gauges) {
 			sort.Strings(lines)
 		}
 		for _, line := range lines {
-			io.WriteString(w, line)
+			w.WriteString(line)
 		}
 	}
 }
