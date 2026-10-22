@@ -60,10 +60,10 @@
 
 ## Phase 4: Billing (#2225; area billing)
 
-- [ ] T050 [US6] Tests with a fake Stripe: no key → no routes, no **Upgrade** (SC-006); Upgrade → Checkout with `client_reference_id`; webhook: bad signature refused, old one refused, each event acted on once (SC-007); deleted subscription → Free, nothing deleted; Manage Billing → portal.
-- [ ] T051 [US6] `Go/internal/hosted/billing/`: `Stripe`, `stripeHTTP`, `Verify`.
-- [ ] T052 [US6] Routes and the account page's **Upgrade** and **Manage Billing**; the Stripe ids on the account.
-- [ ] T053 Docs: billing in the how-to; a Stripe row in `docs/reference/integrations.md`; Alex's steps on #2227.
+- [x] T050 [US6] Tests with a fake Stripe: no key → no routes, no **Upgrade** (SC-006); Upgrade → Checkout with `client_reference_id`; webhook: bad signature refused, old one refused, each event acted on once (SC-007); deleted subscription → Free, nothing deleted; Manage Billing → portal.
+- [x] T051 [US6] `Go/internal/hosted/billing/`: `Stripe`, `stripeHTTP`, `Verify`.
+- [x] T052 [US6] Routes and the account page's **Upgrade** and **Manage Billing**; the Stripe ids on the account.
+- [x] T053 Docs: billing in the how-to; a Stripe row in `docs/reference/integrations.md`; Alex's steps on #2227.
 
 ## Phase 5: Operations (#2226; area hosted-ops, and hosted for the code)
 
