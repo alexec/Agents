@@ -81,14 +81,14 @@
 .with-sidebar .sidebar .title.placed :is(.place, .started-by) { flex: none; white-space: pre; }
 .with-sidebar .sidebar .title.placed .place { max-width: 40%; overflow: hidden; text-overflow: ellipsis; }
 
-/* A session's mark in the sidebar (#495): an orange hand, a spinner, a list when queued, an
+/* A session's mark in the sidebar (#495): an orange hand, dots or a cog (#2044), a list when queued, an
    Zs (#765), a pause mark (#630), an empty ring once done, read or not (#1323); every icon in the
    accent but what lists it under Needs You (#817). */
 .sidebar-mark { width: 1rem; height: 1rem; margin-top: 1px; box-sizing: border-box; border-radius: 50%;
   display: inline-flex; align-items: center; justify-content: center; color: var(--accent); }
 .sidebar-mark.needsYou { color: var(--tint-attention); font-size: 0.8125rem; border-radius: 0; }
-.sidebar-mark.working { --notch: var(--accent); --notch-width: 1.5px; }
-/* Running a tool (#1902): a wrench in the accent, in the spinner's place. */
+.sidebar-mark.working { border-radius: 0; }
+/* Running a tool (#1902): a turning cog in the accent, in the dots' place (#2044). */
 .sidebar-mark.tool { color: var(--accent); border-radius: 0; display: inline-flex; align-items: center; justify-content: center; }
 .sidebar-mark.done { border: 1.5px solid currentColor; opacity: 0.7; }
 .sidebar-mark.queued, .sidebar-mark.waiting, .sidebar-mark.paused { font-size: 0.75rem; border-radius: 0; }
@@ -97,7 +97,6 @@
 .sidebar-mark.asksToArchive { color: var(--tint-attention); font-size: 0.75rem; border-radius: 0; }
 /* Waiting for an OK (#773): a shield, in the attention tint as the hand is, whatever its kind. */
 .sidebar-mark.approval { color: var(--tint-attention); border-radius: 0; }
-@media (prefers-reduced-motion: reduce) { .sidebar-mark.working { animation-duration: 3s; } }
 
 /* A project's Archived row (#495), opening its page: in the rows' type, its count on the right. */
 .row.page-row { grid-template-columns: minmax(0, 1fr); padding: 0; }

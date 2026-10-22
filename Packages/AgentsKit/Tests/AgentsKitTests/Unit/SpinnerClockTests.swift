@@ -35,4 +35,22 @@ struct SpinnerClockTests {
         let quarterBefore = SpinnerClock.epoch.addingTimeInterval(-0.25 * SpinnerClock.period)
         #expect(abs(SpinnerClock.angle(at: quarterBefore) - 270) < 0.001)
     }
+
+    @Test("The dots and the cog read the same clock, each at its own period (#2044)")
+    func dotsAndCog() {
+        for period in [SpinnerClock.dotsPeriod, SpinnerClock.cogPeriod] {
+            // A whole number of cycles after the epoch, so the cycle starts there.
+            let start = SpinnerClock.epoch.addingTimeInterval(400 * period)
+            for n in 0..<8 {
+                let date = start.addingTimeInterval(Double(n) / 8 * period)
+                let fraction = SpinnerClock.fraction(at: date, period: period)
+                #expect(abs(fraction - Double(n) / 8) < 0.001)
+                let later = SpinnerClock.fraction(at: date.addingTimeInterval(period), period: period)
+                #expect(abs(later - fraction) < 0.001)
+            }
+            let before = SpinnerClock.fraction(at: SpinnerClock.epoch.addingTimeInterval(-0.25 * period),
+                                               period: period)
+            #expect(abs(before - 0.75) < 0.001)
+        }
+    }
 }

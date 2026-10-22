@@ -80,7 +80,8 @@ struct AgentRow: View {
                        isUnaccountedFor: agent.endingIsUnaccountedFor,
                        ending: agent.endedReason?.summary,
                        endedReason: agent.endedReason,
-                       isUnread: agent.isUnread)
+                       isUnread: agent.isUnread,
+                       tool: RunningToolWords.tool(agent))
                 .frame(width: isCompact ? 16 : nil)
                 .padding(.top, 1)
             }
@@ -451,10 +452,10 @@ private struct SessionMark: View {
             case .needsYou:
                 Image(systemName: "hand.raised.fill").tinted(.attention)
             case .working where tool != nil:
-                Image(systemName: RunningToolWords.symbol).foregroundStyle(Paper.accent)
+                // In the accent as the other marks, and in step with every one (#1558, #2044).
+                TurningCog(size: 12 * scale, color: Paper.accent)
             case .working:
-                // In the accent as the other marks, and in step with every spinner (#1558).
-                SyncedSpinner(diameter: 12 * scale, color: Paper.accent)
+                ThinkingDots(size: 12 * scale, color: Paper.accent)
             case .queued:
                 Image(systemName: "list.number").foregroundStyle(Paper.accent)
             case .waiting:
@@ -505,6 +506,8 @@ struct StatusIcon: View {
     /// Waiting for an allowance to come back (052, US4): it will carry on by itself, so
     /// it does not want a person, whatever its stopped shape says.
     var isWaitingForAllowance = false
+    /// The tool it runs, for the cog in place of the dots (#2044).
+    var tool: String?
     /// The well grows with the text beside it (#750), so the row keeps its shape.
     @ScaledMetric private var scale: CGFloat = 1
 
@@ -524,8 +527,10 @@ struct StatusIcon: View {
                     .foregroundStyle((StatusShape.isTinted(shape, isWaitingForAllowance: isWaitingForAllowance)
                                       ? StateTint.attention : .none)
                         .style(or: .secondary))
+            } else if tool != nil {
+                TurningCog(size: 12 * scale)
             } else {
-                SyncedSpinner(diameter: 12 * scale)
+                ThinkingDots(size: 12 * scale)
             }
         }
         .frame(width: 18 * scale, height: 18 * scale)

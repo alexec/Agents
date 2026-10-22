@@ -262,7 +262,7 @@ struct ChatTranscript: View {
                         if isComingBack {
                             ComingBackLine()
                         } else if agent.state == .running || agent.state == .starting {
-                            WorkingLine()
+                            WorkingLine(tool: RunningToolWords.tool(agent))
                         }
                     }
                     // The chat column, shared with the prompt bar below it and with the

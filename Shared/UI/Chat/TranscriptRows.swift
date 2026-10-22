@@ -919,17 +919,26 @@ private extension JSONEncoder {
     }()
 }
 
-/// The agent is at work and the person is waiting: the same small spinner the
-/// sidebar row shows, turning in step with it (`SyncedSpinner`), at the foot of the
-/// conversation, so the chat itself moves while nothing else on it does. Live rather
-/// than recorded — it is there exactly as long as the wait is, and it rides the end of
-/// the transcript as the reply arrives.
+/// The agent is at work and the person is waiting: the same mark the sidebar row shows,
+/// in step with it (#2044), at the foot of the conversation, so the chat itself moves
+/// while nothing else on it does: the dots while it thinks or replies, the cog while it
+/// runs a tool. Live rather than recorded — it is there exactly as long as the wait is,
+/// and it rides the end of the transcript as the reply arrives.
 struct WorkingLine: View {
+    /// The tool it runs, or nil while it thinks (`RunningToolWords.tool`).
+    var tool: String?
+
     var body: some View {
-        SyncedSpinner(diameter: 16)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.leading, 2)
-            .accessibilityLabel("Working")
+        Group {
+            if tool != nil {
+                TurningCog(size: 16)
+            } else {
+                ThinkingDots(size: 16)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.leading, 2)
+        .accessibilityLabel(tool.map(RunningToolWords.label) ?? "Working")
     }
 }
 
