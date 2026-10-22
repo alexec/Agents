@@ -64,7 +64,6 @@ struct PromptBar: View {
                 // window and the page (#108, #242).
                 PromptHead(agent: agent)
                 PromptHeader(agent: agent,
-                             leaseStatus: model.work.leaseStatus(of: agent.id),
                              background: agent.background,
                              backgroundActions: BackgroundActions(
                                 stop: { [model] item in await model.stopBackground(item, of: agent.id) },

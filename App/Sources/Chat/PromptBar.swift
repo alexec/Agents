@@ -330,8 +330,6 @@ struct PromptBar: View {
                             .fixedSize(horizontal: true, vertical: false)
                     }
                 PromptHeader(agent: agent,
-                             leaseStatus: model.work.leaseStatus(of: agent.id),
-                             openLease: { model.showResources(at: $0) },
                              background: agent.background,
                              backgroundActions: backgroundActions(agent))
                 }

@@ -484,7 +484,10 @@ struct RemoteChatView: View {
                 guard let agentID,
                       let image = await model.pictures.image(agentID: agentID, url: file.url) else { return nil }
                 return Image(uiImage: image)
-            })
+            },
+            leaseStatus: { [model] agentID in model.work.leaseStatus(of: agentID) },
+            // Activity ▸ Resources (#116), as the Mac opens its Resources page (#2344).
+            openLease: { [model] _ in model.sidebarItem = .resources })
     }
 
     /// What a view in the chat may ask of the phone (#187): the Mac it is on, the person's

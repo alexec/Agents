@@ -595,6 +595,8 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
           <p class="working" role="status" aria-label={runningTool(agent) !== null ? runningToolLabel(runningTool(agent)!) : "Working"}>
             <WorkingMark tool={runningTool(agent)} /></p>
         )}
+        {/* What it holds and waits for in line: what the agent is doing now, as the working line says (#2344). */}
+        {agent && <LeaseLine store={store} host={host} agent={agent} />}
         {/* After all of it, where the reader is (#1995). */}
         {cards.length > 0 && (
           <div class="waiting" aria-label="Waiting for you">
@@ -620,7 +622,6 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
       )}
       <footer class="foot">
         <BackgroundRows store={store} host={host} agent={agent} disabled={down} steps={(item) => (subagent.value = item)} />
-        {agent && <Capsules store={store} host={host} agent={agent} />}
         <Prompt store={store} draftKey={`${host}|${session}`} placeholder={refusedHere ?? promptPlaceholder(agent)}
           disabled={(down && !keeps) || !agent || refusedHere !== null}
           stop={agent && hasTurnInFlight(agent) ? () => void store.perform(host, agent.id, "agents/stop") : undefined}
@@ -776,17 +777,18 @@ function Queued({ store, host, agent, disabled, draftKey }: { store: Store; host
 }
 
 /**
- * What the open agent holds, over the prompt (036; LeaseRow, #254): one capsule each. What it waits
- * for on events is a card at the end of the chat (#1995).
+ * What the open agent holds and waits for in line, with the working line (036; LeaseLine.swift,
+ * #2344): one line each, a way to the Resources page. What it waits for on events is a card (#1995).
  */
-function Capsules({ store, host, agent }: { store: Store; host: string; agent: Agent }) {
+function LeaseLine({ store, host, agent }: { store: Store; host: string; agent: Agent }) {
   const leases = leaseMark(agent.id, store.leases.value[host], (id) => store.agent(host, id)?.title);
   if (!leases) return null;
   return (
-    <div class="capsules">
-      <p class="capsule-row" role="note" aria-label={leases.full}>
-        {leases.capsules.map((text) => <span key={text} class="capsule" title={leases.full}>{text}</span>)}
-      </p>
+    <div class="lease-line" role="status" aria-label={leases.full}>
+      {leases.lines.map((text) => (
+        <button key={text} class="link" title={leases.full}
+          onClick={() => { location.hash = routeHash({ activity: "resources" }); }}>{text}</button>
+      ))}
     </div>
   );
 }

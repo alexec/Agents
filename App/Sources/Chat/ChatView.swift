@@ -264,7 +264,10 @@ struct ChatView: View {
                         .read(agentID: agent.id, path: file.path),
                       let image = NSImage(data: bytes) else { return nil }
                 return Image(nsImage: image)
-            })
+            },
+            leaseStatus: { [model] agentID in model.work.leaseStatus(of: agentID) },
+            // Resources at the resource, as the line names it (036 FR-011).
+            openLease: { [model] name in model.showResources(at: name) })
     }
 
     /// The sandbox card's answer for the open agent (064).
