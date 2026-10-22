@@ -129,6 +129,15 @@ func (d *Daemon) editQueued(r wire.EditQueuedRequest) (wire.EditQueuedResult, er
 	return wire.EditQueuedResult{Edited: edited}, nil
 }
 
+// voicePreface is what the runtime reads before words sent from voice mode (#2322): the
+// person hears the reply and does not see it. The spike's text (#1792) took Claude's
+// replies from a median of 138 words to 48, with no markdown and no paths.
+const voicePreface = "You are in voice mode. The person hears your reply and does not see it. " +
+	"Answer in one to three short spoken sentences. Use plain words. " +
+	"Do not use markdown, lists, tables, code or file paths. " +
+	"If the work changed files, say what changed in one sentence. " +
+	"If you need a decision, ask one clear question."
+
 // prompt is agents/prompt: the words go on the queue, never refused for the agent being
 // busy, and go once the agent is free.
 func (d *Daemon) prompt(r wire.PromptRequest) error {
@@ -166,6 +175,13 @@ func (d *Daemon) prompt(r wire.PromptRequest) error {
 			p := "(Your wait for " + waitLabel(w) + " was cancelled by this message. Wait again if you still need to.)"
 			preface = &p
 		}
+	}
+	if r.Voice != nil && *r.Voice {
+		p := voicePreface
+		if preface != nil {
+			p = *preface + "\n\n" + p
+		}
+		preface = &p
 	}
 	return d.enqueue(a.ID, wire.QueuedPrompt{ID: store.NewUUID(), Text: r.Text, Attachments: r.Attachments,
 		QueuedAt: now(), From: from, Preface: preface}, false)

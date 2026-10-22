@@ -14900,6 +14900,10 @@
         },
         "sendID": {
           "$ref": "#/definitions/UUID"
+        },
+        "voice": {
+          "type": "boolean",
+          "description": "Sent from voice mode (#2322): the daemon puts the voice-mode text in front of the words, as the prompt's preface."
         }
       },
       "required": [

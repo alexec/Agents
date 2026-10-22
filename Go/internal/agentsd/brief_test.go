@@ -266,3 +266,27 @@ func TestASessionStartedAsAPersonaHasItsPrompt(t *testing.T) {
 		t.Fatalf("said %q", said)
 	}
 }
+
+// Words sent from voice mode have the voice-mode text before them, and the next words
+// sent without the flag do not (#2322).
+func TestVoiceModeTextGoesBeforeTheWords(t *testing.T) {
+	fakeRuntimes(t)
+	d, c := start(t, t.TempDir())
+	defer d.Shutdown()
+	id := startAgent(t, c, 1, t.TempDir(), "hi")
+	c.until(t, "the first end", ended(id, wire.AgentStateFinished))
+	c.call(t, 2, "agents/prompt", map[string]any{"agentID": id, "text": "say your brief", "from": "person", "voice": true})
+	waitFor(t, "the answer", func() bool { return strings.Count(agentMessages(d, id), "Before: ") == 1 })
+	if said := agentMessages(d, id); !strings.HasSuffix(said, "Before: "+voicePreface) {
+		t.Fatalf("said %q", said)
+	}
+	if u := userMessages(d, id); u[len(u)-1] != "say your brief" {
+		t.Fatalf("the person's words %q", u)
+	}
+	c.until(t, "the second end", ended(id, wire.AgentStateFinished))
+	c.call(t, 3, "agents/prompt", map[string]any{"agentID": id, "text": "say your brief", "from": "person"})
+	waitFor(t, "the second answer", func() bool { return strings.Count(agentMessages(d, id), "Before: ") == 2 })
+	if said := agentMessages(d, id); !strings.HasSuffix(said, "Before: ") {
+		t.Fatalf("said %q", said)
+	}
+}

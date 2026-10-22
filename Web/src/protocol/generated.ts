@@ -5018,6 +5018,11 @@ export interface PromptRequest {
   attachments: Attachment[];
   from: PromptOrigin;
   sendID?: UUID;
+  /**
+   * Sent from voice mode (#2322): the daemon puts the voice-mode text in front of the words, as the
+   * prompt's preface.
+   */
+  voice?: boolean;
 }
 
 /**
@@ -8922,7 +8927,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ProjectWorktrees: { required: ["project", "worktrees"], optional: [] },
   ProjectsFindRequest: { required: [], optional: ["paths", "folders"] },
   ProjectsListRequest: { required: ["includeArchived"], optional: [] },
-  PromptRequest: { required: ["agentID", "text", "attachments", "from"], optional: ["sendID"] },
+  PromptRequest: { required: ["agentID", "text", "attachments", "from"], optional: ["sendID", "voice"] },
   ProviderAdd: { required: ["name", "kind"], optional: ["id", "command", "args", "url", "headers", "commands", "map", "secrets", "cli", "draft"] },
   ProviderCreate: { required: ["id", "name"], optional: ["options", "clones", "repository"] },
   ProviderCreated: { required: ["workspace", "joining"], optional: [] },
