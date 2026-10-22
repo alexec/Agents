@@ -1,6 +1,7 @@
 package agentsd
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -239,6 +240,35 @@ func (d *Daemon) claimRun(folder, id, trigger string) bool {
 	return claimed.Won
 }
 
+// linkCheckWait is how long a link check waits for the control plane: a message is not
+// held up behind one that does not answer for the uplink's whole wait (#2060).
+const linkCheckWait = 10 * time.Second
+
+// senderChecks is what links/check said of each sender in one poll, so a burst of
+// messages from one sender asks once, not once a message (#2060). Only for a poll: a link
+// made a minute later is heard at the next.
+type senderChecks map[string]senderCheck
+
+type senderCheck struct {
+	linked wire.ChannelLinkChecked
+	ok     bool
+}
+
+// linked is senderLinked, asked once a sender for c; a nil c asks every time.
+func (c senderChecks) linked(d *Daemon, sender wire.ChannelSender) (wire.ChannelLinkChecked, bool) {
+	if c == nil {
+		return d.senderLinked(sender)
+	}
+	// The whole sender is the key: its DKIM result is checked too.
+	key, _ := json.Marshal(sender)
+	if got, asked := c[string(key)]; asked {
+		return got.linked, got.ok
+	}
+	linked, ok := d.senderLinked(sender)
+	c[string(key)] = senderCheck{linked, ok}
+	return linked, ok
+}
+
 // senderLinked asks the control plane whether a channel message's sender is linked to a
 // person (#1762, FR-037). False, so nothing starts, when it is not, when it is refused (an
 // email that fails DKIM), and when there is no control plane to ask or it does not answer.
@@ -248,7 +278,9 @@ func (d *Daemon) senderLinked(sender wire.ChannelSender) (wire.ChannelLinkChecke
 		log.Printf("channel message from %s: no control plane to say whom it is from", sender.Channel)
 		return wire.ChannelLinkChecked{}, false
 	}
-	out, err := (*ask)(d.ctx, wire.CallLinksCheck.Name, sender)
+	ctx, cancel := context.WithTimeout(d.ctx, linkCheckWait)
+	defer cancel()
+	out, err := (*ask)(ctx, wire.CallLinksCheck.Name, sender)
 	if err != nil {
 		log.Printf("channel message from %s: the link check was not answered: %v", sender.Channel, err)
 		return wire.ChannelLinkChecked{}, false

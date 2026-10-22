@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"net/mail"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -40,6 +41,9 @@ const (
 	linkKept           = 24 * time.Hour
 	// linksOpen is how many requests may wait at once.
 	linksOpen = 50
+	// requestsReadAgain is how long the requests read are used before they are read again,
+	// unless a change here or at another copy drops them first (#2060).
+	requestsReadAgain = time.Minute
 )
 
 var channelNameRule = regexp.MustCompile(`^[a-z0-9][a-z0-9._-]{0,39}$`)
@@ -80,6 +84,12 @@ type links struct {
 	now func() time.Time
 	// One change at a time, so the limits hold at this copy.
 	mu sync.Mutex
+	// The requests as last read, and when: a burst of messages from senders not linked
+	// reads them once, not once a message (#2060).
+	readMu   sync.Mutex
+	kept     []linkRequestRecord
+	keptAt   time.Time
+	keptGood bool
 }
 
 func newLinks(s *Service) *links { return &links{s: s, now: time.Now} }
@@ -216,14 +226,21 @@ func (l *links) ask(ctx context.Context, sender wire.ChannelSender) error {
 	if _, err := l.s.cfg.Store.Put(ctx, linkRequestKey(r.ID), data, store.Absent); err != nil {
 		return err
 	}
+	l.readAgain()
 	l.tellRequested(r)
 	l.s.announce("linkRequested", r.ID, "")
 	l.s.log("a " + r.Channel + " identity asks to be linked (request " + r.ID[:8] + ")")
 	return nil
 }
 
-// all is every request kept; ended ones older than linkKept are deleted on the way.
+// all is every request kept; ended ones older than linkKept are deleted on the way. What
+// was read is used again for requestsReadAgain, until a request changes.
 func (l *links) all(ctx context.Context) ([]linkRequestRecord, error) {
+	l.readMu.Lock()
+	defer l.readMu.Unlock()
+	if l.keptGood && l.now().Sub(l.keptAt) < requestsReadAgain {
+		return slices.Clone(l.kept), nil
+	}
 	listed, err := l.s.cfg.Store.List(ctx, linkRequestsPrefix)
 	if err != nil {
 		return nil, err
@@ -242,7 +259,15 @@ func (l *links) all(ctx context.Context) ([]linkRequestRecord, error) {
 		out = append(out, *r)
 	}
 	sort.Slice(out, func(a, b int) bool { return out[a].Created.Before(out[b].Created.Time) })
-	return out, nil
+	l.kept, l.keptAt, l.keptGood = out, now, true
+	return slices.Clone(out), nil
+}
+
+// readAgain drops the requests read: one was made or changed, here or at another copy.
+func (l *links) readAgain() {
+	l.readMu.Lock()
+	l.keptGood = false
+	l.readMu.Unlock()
 }
 
 func (l *links) readRequest(ctx context.Context, id string) (*linkRequestRecord, string, error) {
@@ -265,7 +290,9 @@ func (l *links) writeRequest(ctx context.Context, r linkRequestRecord, etag stri
 	if err != nil {
 		return err
 	}
-	if _, err := l.s.cfg.Store.Put(ctx, linkRequestKey(r.ID), data, store.Matching(etag)); err != nil {
+	_, err = l.s.cfg.Store.Put(ctx, linkRequestKey(r.ID), data, store.Matching(etag))
+	l.readAgain()
+	if err != nil {
 		if store.IsConflict(err) {
 			return fail(notPermitted, "That request was decided already.")
 		}
@@ -528,6 +555,7 @@ func (l *links) tellChanged(user string) {
 
 // heardFromCopy is another copy's request made, sent on or decided: its cards here.
 func (l *links) heardFromCopy(kind, id string) {
+	l.readAgain()
 	r, _, err := l.readRequest(context.Background(), id)
 	if err != nil || r == nil {
 		return

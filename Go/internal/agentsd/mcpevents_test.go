@@ -562,7 +562,44 @@ func TestAChannelMessageStartsWorkOnlyFromALinkedSender(t *testing.T) {
 	// No control plane: nothing starts.
 	d.askControl.Store(nil)
 	if got := d.raiseMCPEvent(mcpPolled{EventID: new("lone"), Name: new("pr.merged"), Sender: &wire.ChannelSender{Channel: "slack", Identity: "U-SAM"}},
-		&mcpSubscription{server: "ci", event: "pr.merged"}); got.Name != "" {
+		&mcpSubscription{server: "ci", event: "pr.merged"}, nil); got.Name != "" {
 		t.Fatalf("raised with no control plane: %+v", got)
+	}
+}
+
+// #2060: a poll of 50 messages from two senders asks links/check twice, once a sender,
+// and each ask waits at most linkCheckWait, not the uplink's whole wait.
+func TestAPollAsksOnceASender(t *testing.T) {
+	d := &Daemon{ctx: context.Background()}
+	var asked []string
+	d.SetControlAsk(func(ctx context.Context, method string, params any) (json.RawMessage, error) {
+		if deadline, ok := ctx.Deadline(); !ok || time.Until(deadline) > linkCheckWait {
+			t.Errorf("a link check that may wait %v", time.Until(deadline))
+		}
+		sender := params.(wire.ChannelSender)
+		asked = append(asked, sender.Identity)
+		if sender.Identity == "U-SAM" {
+			return json.RawMessage(`{"user":"sam-id"}`), nil
+		}
+		return json.RawMessage(`{}`), nil
+	})
+	checks := senderChecks{}
+	linked := 0
+	for n := range 50 {
+		identity := "U-EVE"
+		if n%2 == 0 {
+			identity = "U-SAM"
+		}
+		if _, ok := checks.linked(d, wire.ChannelSender{Channel: "slack", Identity: identity}); ok {
+			linked++
+		}
+	}
+	if len(asked) != 2 || linked != 25 {
+		t.Fatalf("asked %v, %d linked", asked, linked)
+	}
+	// Another poll asks again: a link made since is heard.
+	senderChecks{}.linked(d, wire.ChannelSender{Channel: "slack", Identity: "U-EVE"})
+	if len(asked) != 3 {
+		t.Fatalf("asked %v", asked)
 	}
 }
