@@ -89,6 +89,7 @@ public enum Capability {
     public static let providers1 = "providers/1"
     public static let relay1 = "relay/1"
     public static let reportsScope1 = "reports.scope/1"
+    public static let reportsViews1 = "reports.views/1"
     public static let reports1 = "reports/1"
     public static let resources1 = "resources/1"
     public static let retention1 = "retention/1"
@@ -511,11 +512,14 @@ public enum Capability {
         "providers/setGroup": "groups/1",
         "providers/update": "providers/1",
         "relay/switch": "relay/1",
+        "reports/deleteView": "reports.views/1",
         "reports/export": "reports/1",
         "reports/policy": "reports.scope/1",
+        "reports/saveView": "reports.views/1",
         "reports/scopes": "reports.scope/1",
         "reports/setPolicy": "reports.scope/1",
         "reports/usage": "reports/1",
+        "reports/views": "reports.views/1",
         "signIn/addToMe": "signin/1",
         "signIn/approve": "signin/1",
         "signIn/configure": "signin/1",

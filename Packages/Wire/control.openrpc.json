@@ -3009,6 +3009,32 @@
       }
     },
     {
+      "name": "reports/deleteView",
+      "x-capability": "reports.views/1",
+      "description": "Deletes one of the caller's saved views of Reports (#2019).",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/ReportViewID"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/ReportViews"
+        }
+      }
+    },
+    {
       "name": "reports/export",
       "x-capability": "reports/1",
       "tags": [
@@ -3056,6 +3082,32 @@
         "name": "result",
         "schema": {
           "$ref": "daemon.schema.json#/definitions/ReportPolicy"
+        }
+      }
+    },
+    {
+      "name": "reports/saveView",
+      "x-capability": "reports.views/1",
+      "description": "Keeps a view of Reports for the caller (#2019): a new one with no id, or changes the one with its id. At most 50; a scope the caller may see.",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/ReportView"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/ReportViews"
         }
       }
     },
@@ -3133,6 +3185,32 @@
         "name": "result",
         "schema": {
           "$ref": "daemon.schema.json#/definitions/UsageReport"
+        }
+      }
+    },
+    {
+      "name": "reports/views",
+      "x-capability": "reports.views/1",
+      "description": "The caller's saved views of Reports (#2019).",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/ReportViews"
         }
       }
     },

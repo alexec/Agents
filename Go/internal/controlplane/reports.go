@@ -249,6 +249,8 @@ func (m *Methods) reportMethod(ctx context.Context, method string, params json.R
 	switch method {
 	case "reports/scopes":
 		return m.s.reportScopes(ctx, user)
+	case "reports/views", "reports/saveView", "reports/deleteView":
+		return m.viewMethod(ctx, method, params, user)
 	case "reports/policy", "reports/setPolicy":
 		if !m.s.isAdmin(user) {
 			return nil, fail(notPermitted, "Only an admin can see or change the report policy.")

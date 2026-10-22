@@ -42,6 +42,7 @@ export const reportSections: readonly Section[] = [
   { id: "runtimes", title: "Runtimes", about: "Which runtime earns its cost: cost per merged pull request, and the sessions that failed.", group: "Reports", built: true },
   { id: "adoption", title: "Adoption", about: "Who uses the agents each week, and which runtimes and workflows.", group: "Reports", built: true },
   { id: "workflows", title: "Workflows", about: "Each workflow’s runs, its failed runs, and the cost of a run.", group: "Reports", built: true },
+  { id: "saved", title: "Saved Views", about: "Your saved views, each to open or copy as a digest.", group: "Saved", built: true },
 ];
 
 export function sectionsOf(app: SubApp): readonly Section[] {

@@ -128,3 +128,22 @@ test("runtimes by cost, workflows failing first, adoption by the week", () => {
   assert.equal(r.adoptionLine(r.adoption(rows, true)[0]), "6 sessions · 2 runtimes · 1 workflow");
   assert.equal(r.weekTitle("2026-10-19"), "The week of 19 Oct");
 });
+
+// Saved views and digests (#2019).
+test("a saved view's words and its digest", () => {
+  const usd = (n) => new Intl.NumberFormat(undefined, { style: "currency", currency: "USD" }).format(n);
+  const view = { id: "v1", name: "Monday digest", page: "outcomes", scope: { kind: "org" }, range: "week", by: "project" };
+  assert.equal(r.viewWords(view, "Acme"), "Outcomes · Acme · The last 7 days · By Project");
+  assert.equal(r.viewWords({ ...view, by: "colour" }, "Acme"), "Outcomes · Acme · The last 7 days");
+  const rows = [
+    row({ cost: { USD: 10 }, counts: counts({ sessions: 4, prsMerged: 2, failedSessions: 1, waits: 1, waitBuckets: [0, 1, 0, 0, 0, 0] }) }),
+    row({ workflow: "nightly", cost: { USD: 2 }, counts: counts({ workflowRuns: 3, workflowFailures: 2 }) }),
+  ];
+  assert.equal(r.digestText(view, "Acme", { range: "week", rows, admin: true }), [
+    "Monday digest: Acme, the last 7 days",
+    `${usd(12)} spent · 2 pull requests merged · ${usd(6)} a merged pull request · 4 sessions`,
+    "Workflow nightly failed 2 of 3 runs.",
+    "The middle wait for a person was 1 to 5 minutes.",
+    "1 session ended in an error.",
+  ].join("\n"));
+});

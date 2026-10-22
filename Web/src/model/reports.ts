@@ -1,6 +1,6 @@
 // Cost ▸ Reports (#1811), as ReportTotals and ReportWords have it on the window and the
 // Remote: a report's rows added up by person, project, machine or runtime, largest first.
-import type { ReportFormat, ReportRange, ReportRow, ReportScope, UsageReport } from "../protocol/generated";
+import type { ReportFormat, ReportPage, ReportRange, ReportRow, ReportScope, ReportView, UsageReport } from "../protocol/generated";
 import { money } from "./limits";
 import { timeWords } from "./time";
 import { tokenWords } from "./usage";
@@ -380,3 +380,45 @@ export function adoptionLine(w: AdoptionWeek): string {
 }
 
 export const adoptionNote = "A person is active in a week when one of their machines, or a bot’s, ran a turn. Weeks start on Monday, UTC.";
+
+// Saved views and digests (R8), #2019: a page with its scope, range and way to add up, kept on the
+// control plane for the person who saved it, and its numbers as a few lines to paste.
+
+export const reportPages: readonly ReportPage[] = ["spend", "outcomes", "time", "runtimes", "adoption", "workflows"];
+export const pageTitle: Record<ReportPage, string> = { spend: "Spend", outcomes: "Outcomes", time: "Time", runtimes: "Runtimes",
+  adoption: "Adoption", workflows: "Workflows" };
+
+const isDimension = (by: string | undefined): by is ReportDimension =>
+  by !== undefined && ["person", "project", "machine", "runtime", "group", "workflow"].includes(by);
+
+/** A view's way to add up, when it says one this build knows. */
+export function viewBy(view: Pick<ReportView, "by">): ReportDimension | undefined {
+  return isDimension(view.by) ? view.by : undefined;
+}
+
+/** "Outcomes · Platform · The last 7 days · By Project". */
+export function viewWords(view: ReportView, scopeName: string): string {
+  const by = viewBy(view);
+  return [pageTitle[view.page], scopeName, rangeSpan[view.range], ...(by ? [`By ${dimensionTitle[by]}`] : [])].join(" · ");
+}
+
+export const noViews = "No saved views yet. On any page of Reports, choose Save View… to keep its scope, range and way to add up.";
+export const viewsNote = "Your saved views are yours: nobody else sees them. Copy Digest gives a view’s numbers as text to paste into an email or a chat.";
+export const noViewsHere = "This control plane keeps no saved views. Update it to save them.";
+
+/** A view's numbers as a few lines of text: what was spent, shipped and failed, and the middle wait. */
+export function digestText(view: ReportView, scopeName: string, report: UsageReport): string {
+  const all = outcomeTotals(report.rows, "person", "merged").total;
+  const lines = [`${view.name}: ${scopeName}, ${rangeSpan[view.range].toLowerCase()}`];
+  const spent = Object.entries(all.cost).sort(([a], [b]) => a.localeCompare(b));
+  const first = [...spent.map(([c, v]) => `${money(v, c)} spent`), `${plural(all.merged, "pull request", "pull requests")} merged`];
+  if (all.merged > 0) for (const [c, v] of spent) first.push(`${money(v / all.merged, c)} a merged pull request`);
+  first.push(plural(all.sessions, "session", "sessions"));
+  lines.push(first.join(" · "));
+  const failing = outcomeTotals(workflowRows(report.rows), "workflow", "failing").groups.filter((g) => g.runFailures > 0);
+  for (const g of failing.slice(0, 5)) lines.push(`Workflow ${g.name} failed ${g.runFailures} of ${plural(g.runs, "run", "runs")}.`);
+  const middle = medianWait(all.buckets);
+  if (middle) lines.push(`The middle wait for a person was ${middle}.`);
+  if (all.failed > 0) lines.push(`${plural(all.failed, "session", "sessions")} ended in an error.`);
+  return lines.join("\n");
+}

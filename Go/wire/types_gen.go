@@ -6254,6 +6254,16 @@ type ReportFormat string
 const ReportFormatCsv ReportFormat = "csv"
 const ReportFormatJsonl ReportFormat = "jsonl"
 
+// A page of Reports (#1804, #2019).
+type ReportPage string
+
+const ReportPageSpend ReportPage = "spend"
+const ReportPageOutcomes ReportPage = "outcomes"
+const ReportPageTime ReportPage = "time"
+const ReportPageRuntimes ReportPage = "runtimes"
+const ReportPageAdoption ReportPage = "adoption"
+const ReportPageWorkflows ReportPage = "workflows"
+
 // Who sees what in Reports (#1804), set by an admin in Console ▸ Report Policy.
 type ReportPolicy struct {
 	// A group lead sees the group's totals only, with no person or machine named. An admin always sees each person.
@@ -6362,6 +6372,33 @@ type ReportScopes struct {
 	Scopes []ReportScopeOption `json:"scopes"`
 
 	Admin bool `json:"admin"`
+}
+
+// A saved view of Reports (#2019, R8): a page with its scope, range and way to add up, kept for the person who saved it.
+type ReportView struct {
+	// Given by the control plane; empty to save a new view.
+	ID string `json:"id"`
+
+	Name string `json:"name"`
+
+	Page ReportPage `json:"page"`
+
+	Scope ReportScope `json:"scope"`
+
+	Range ReportRange `json:"range"`
+
+	// The way the page adds up: person, project, machine, runtime, group or workflow.
+	By *string `json:"by,omitzero"`
+}
+
+// reports/deleteView (#2019).
+type ReportViewID struct {
+	ID string `json:"id"`
+}
+
+// The caller's saved views of Reports (#2019), in the order they were saved.
+type ReportViews struct {
+	Views []ReportView `json:"views"`
 }
 
 type ReportedEdit struct {

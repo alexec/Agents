@@ -14727,6 +14727,18 @@
         "jsonl"
       ]
     },
+    "ReportPage": {
+      "type": "string",
+      "enum": [
+        "spend",
+        "outcomes",
+        "time",
+        "runtimes",
+        "adoption",
+        "workflows"
+      ],
+      "description": "A page of Reports (#1804, #2019)."
+    },
     "ReportPolicy": {
       "type": "object",
       "description": "Who sees what in Reports (#1804), set by an admin in Console ▸ Report Policy.",
@@ -14950,6 +14962,69 @@
       "required": [
         "scopes",
         "admin"
+      ],
+      "additionalProperties": false
+    },
+    "ReportView": {
+      "type": "object",
+      "description": "A saved view of Reports (#2019, R8): a page with its scope, range and way to add up, kept for the person who saved it.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Given by the control plane; empty to save a new view."
+        },
+        "name": {
+          "type": "string"
+        },
+        "page": {
+          "$ref": "#/definitions/ReportPage"
+        },
+        "scope": {
+          "$ref": "#/definitions/ReportScope"
+        },
+        "range": {
+          "$ref": "#/definitions/ReportRange"
+        },
+        "by": {
+          "type": "string",
+          "description": "The way the page adds up: person, project, machine, runtime, group or workflow."
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "page",
+        "scope",
+        "range"
+      ],
+      "additionalProperties": false
+    },
+    "ReportViewID": {
+      "type": "object",
+      "description": "reports/deleteView (#2019).",
+      "properties": {
+        "id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "additionalProperties": false
+    },
+    "ReportViews": {
+      "type": "object",
+      "description": "The caller's saved views of Reports (#2019), in the order they were saved.",
+      "properties": {
+        "views": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ReportView"
+          }
+        }
+      },
+      "required": [
+        "views"
       ],
       "additionalProperties": false
     },

@@ -21,9 +21,11 @@ import (
 // The policy is one object, v1/reports/policy.json, read on each call, so every copy of
 // the control plane answers the same.
 
-// scopeMethods are the scopes' and their policy's (#1804): each names no machine and
-// checks its caller itself; reports/policy and reports/setPolicy are an admin's.
-var scopeMethods = map[string]bool{"reports/scopes": true, "reports/policy": true, "reports/setPolicy": true}
+// scopeMethods are the scopes', their policy's (#1804) and the saved views' (#2019): each
+// names no machine and checks its caller itself; reports/policy and reports/setPolicy are
+// an admin's.
+var scopeMethods = map[string]bool{"reports/scopes": true, "reports/policy": true, "reports/setPolicy": true,
+	"reports/views": true, "reports/saveView": true, "reports/deleteView": true}
 
 const reportPolicyKey = "v1/reports/policy.json"
 
