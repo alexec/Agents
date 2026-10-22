@@ -56,7 +56,7 @@ The phase is one of these:
 | **Question waiting** | The question. |
 | **Needs approval** | What the agent asks to do, such as a command to run. |
 | **Done** | The first line of the agent's report. |
-| **Needs you** | Why: **Partly done**, **Stuck**, **Blocked** or **Waiting on your answer**, with the report, or **Outcome unknown**. |
+| **Needs you** | Why: **Partly done**, **Stuck** or **Waiting on your answer**, with the report, or **Outcome unknown**. |
 | **Paused** | **Stopped by you**, **Stopped by the agent that started it** or **Its allowance ran out**. |
 | **Unexpected stop** | The reason, such as **The runtime crashed**. |
 
