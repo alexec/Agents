@@ -370,8 +370,12 @@ struct SidebarWorkflowRow: View {
                 }
                 if model.canMute(summary) {
                     let muted = summary.workflow.isMuted
-                    Button(MuteWords.label(muted: muted), systemImage: MuteWords.symbol(muted: muted)) {
+                    Button {
                         Task { await model.setWorkflowMuted(summary, !muted) }
+                    } label: {
+                        Label(MuteWords.label(muted: muted), systemImage: MuteWords.symbol(muted: muted))
+                        // What it does, under it (#2086).
+                        Text(MuteWords.workflowHelp(muted: muted))
                     }
                 }
                 Button("Archive", systemImage: "archivebox") { Task { await model.setWorkflowArchived(summary, true) } }

@@ -356,11 +356,14 @@ struct RemoteChatView: View {
                     .transition(.move(edge: .bottom).combined(with: .opacity))
             })
         }
-        // The agent's wait on events, under the questions, as on the Mac (#1995). No
-        // Events page here, so only Stop Waiting.
+        // The agent's wait on events, under the questions, as on the Mac (#1995), with Show
+        // in Events: Activity's Events page, Waiting now at its top (#2083). Not in a scene of
+        // its own, which has no Activity.
         if agent.eventWait?.isOpen == true, let status = model.work.waitStatus(of: agent) {
+            let open: (() -> Void)? = popped == nil ? { [model] in model.sidebarItem = .events } : nil
             cards.append(WaitingCard(id: "wait:" + agent.id.uuidString) {
                 WaitCard(status: status,
+                         open: open,
                          stop: { await model.cancelWait(of: agent.id) },
                          isDisabled: model.isStale(agent))
                     .chatColumn()

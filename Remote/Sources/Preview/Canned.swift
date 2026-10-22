@@ -160,6 +160,14 @@ enum Canned {
                   title: "The project lead that came back out", state: .archived,
                   createdAt: ago(2_200), lastActivityAt: ago(2_000),
                   archivedReason: .byUser),
+            // Waiting on an event (042): the wait card at the end of its chat, with Show in
+            // Events (#2083).
+            Agent(id: UUID(), runtimeID: "claude", cwd: agentsFolder,
+                  title: "Wait for the checks", state: .finished,
+                  createdAt: ago(20), lastActivityAt: ago(5),
+                  endedReason: .endTurn,
+                  eventWait: EventWait(patterns: [EventPattern("checks.passed")], from: 0,
+                                       deadline: ago(-55), since: ago(5))),
             Agent(id: inTheOther, runtimeID: "cursor", cwd: apiFolder,
                   title: "Work out what the new tier costs", state: .running,
                   createdAt: ago(9), lastActivityAt: ago(3)),

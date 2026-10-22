@@ -377,6 +377,9 @@ struct PromptBar: View {
         // Whatever was suggested has been answered, by being taken or by being typed
         // past. An emptied field must not offer last turn's words back.
         dismissedSuggestions = true
+        // The keyboard goes (#2091): the reply is what comes next, and an open keyboard
+        // hides half of it. A tap on the field brings it back.
+        focused = false
         // What you just sent is the thing you want to see, so the conversation comes
         // back to its end even if you were reading three screens up.
         if let popped { popped.scrollToEnd() } else { model.scrollToEnd() }

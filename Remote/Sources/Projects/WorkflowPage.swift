@@ -253,6 +253,14 @@ struct WorkflowPage: View {
                             set: { on in Task { await model.setWorkflowMuted(summary, on) } }))
                             .appText(.reading)
                     }
+                    // What Mute does (#2086): its runs still go under Needs You and in the badge.
+                    if model.canMute(summary) {
+                        Text(MuteWords.workflowHelp(muted: summary.workflow.isMuted))
+                            .appText(.fine)
+                            .foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                     // They write the workflow's file (#125), the Mac page's words.
                     Text(summary.switchesSentence)
                         .appText(.fine)

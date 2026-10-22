@@ -8,16 +8,18 @@ export const unmuteLabel = "Unmute Notifications";
 /** The row's mark, a bell with a slash, drawn as text as the row's other marks are. */
 export const muteMark = "🔕︎";
 export const mutedWords = "Notifications muted";
+/** The mark's tooltip (#2086), as MuteWords.mutedHelp. */
+export const mutedHelp = "Notifications muted: none are sent for it. It still shows under Needs You and in the badge";
 
 export const isMuted = (agent: Agent): boolean => agent.isMuted === true;
 export const isWorkflowMuted = (summary: WorkflowSummary): boolean => summary.workflow.muted === true;
 
 export function muteHelp(muted: boolean): string {
   return muted ? "Send notifications for this session again"
-    : "Send no notifications for this session. It still shows under Needs You";
+    : "Send no notifications for this session. It still shows under Needs You and in the badge";
 }
 
 export function workflowMuteHelp(muted: boolean): string {
   return muted ? "Send notifications for this workflow's runs again. Takes muted: true out of its file"
-    : "Send no notifications for this workflow's runs. They still show under Needs You. Writes muted: true into its file";
+    : "Send no notifications for this workflow's runs. They still show under Needs You and in the badge. Writes muted: true into its file";
 }

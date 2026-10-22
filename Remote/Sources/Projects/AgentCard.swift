@@ -405,6 +405,8 @@ struct MuteAgentButton: View {
                 Task { await model.setMuted(agent.id, !agent.isMuted) }
             } label: {
                 Label(MuteWords.label(muted: agent.isMuted), systemImage: MuteWords.symbol(muted: agent.isMuted))
+                // What it does, under it (#2086): iOS menus draw a second Text as a subtitle.
+                Text(MuteWords.help(muted: agent.isMuted))
             }
             .disabled(model.isStale(agent))
         }

@@ -388,10 +388,6 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
       key: `archive:${agent.id}`,
       node: <ArchiveCard store={store} host={host} agent={agent} disabled={down} />,
     }] : []),
-    ...(agent && waitLine ? [{
-      key: `wait:${agent.id}`,
-      node: <WaitCard line={waitLine} disabled={down} stop={() => store.cancelWait(host, agent.id)} />,
-    }] : []),
   ];
 
   const toEnd = () => {
@@ -569,6 +565,8 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
             {cards.map((card) => <Fragment key={card.key}>{card.node}</Fragment>)}
           </div>
         )}
+        {/* Under them, and not in "Waiting for you": the agent waits, not the person (#2084). */}
+        {agent && waitLine && <WaitCard line={waitLine} disabled={down} stop={() => store.cancelWait(host, agent.id)} />}
         {agent && !store.isComingBack(host, agent.id) && agent.state !== "running" && agent.state !== "starting" && (
           <QuietLine since={lastEntryAt(store.entries.value, store.turns.value) ?? fromWireDate(agent.lastActivityAt)} />
         )}
@@ -763,7 +761,7 @@ function WaitCard({ line, disabled, stop }: { line: string; disabled: boolean; s
   const busy = useSignal(false);
   return (
     <div class="cards">
-      <div class="card wait-card" role="status" aria-label={line}>
+      <div class="card wait-card">
         <p class="strong">{line}</p>
         <p class="wait-answers">
           <button onClick={() => { location.hash = routeHash({ activity: "events" }); }}>Show in Events</button>

@@ -176,6 +176,7 @@ struct WorkflowListRow: View {
                     Image(systemName: MuteWords.symbol)
                         .appText(.fine)
                         .foregroundStyle(.tertiary)
+                        .help(MuteWords.mutedHelp)
                         .accessibilityLabel(MuteWords.muted)
                 }
                 if let at = summary.lastFiredAt {
@@ -235,6 +236,7 @@ struct WorkflowListRow: View {
                     Button(MuteWords.label(muted: muted)) {
                         Task { await model.setWorkflowMuted(summary, !muted, on: project.host) }
                     }
+                    .help(MuteWords.workflowHelp(muted: muted))
                 }
                 Button("Archive") { Task { await model.setWorkflowArchived(summary, true) } }
             }
