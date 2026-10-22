@@ -110,7 +110,7 @@ func (d *Daemon) record(id wire.UUID, kind wire.TranscriptEntryKind) {
 // recordFrom is record with the agent that sent the words, for a message between agents.
 func (d *Daemon) recordFrom(id wire.UUID, kind wire.TranscriptEntryKind, sender *wire.MessageSender) {
 	e := wire.TranscriptEntry{ID: store.NewUUID(), At: now(), Kind: kind, Sender: sender}
-	n, err := d.Store.Append(id, e)
+	n, e, err := d.Store.AppendOne(id, e)
 	if err != nil {
 		log.Printf("agent %s: could not record an entry: %v", id, err)
 		return

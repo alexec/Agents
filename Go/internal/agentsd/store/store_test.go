@@ -230,3 +230,41 @@ func TestEntriesFrom(t *testing.T) {
 		t.Fatalf("kept %d line indexes", len(s.ib.indexes))
 	}
 }
+
+// A transcript line with a token in it is written redacted, and the caller gets the
+// redacted entry to send on (#1001, SC-001).
+func TestATokenInATranscriptLineIsStoredRedacted(t *testing.T) {
+	s, _ := Open(t.TempDir())
+	id := NewUUID()
+	token := "ghp_" + strings.Repeat("a1B2", 9)
+	said := "Your token is " + token + ".\nKeep it safe."
+	call := wire.ToolCall{Title: "cat .env: GITHUB_TOKEN=" + token, Content: []wire.ToolCallContent{}}
+	n, got, err := s.AppendOne(id, wire.TranscriptEntry{ID: NewUUID(), Kind: wire.TranscriptEntryKind{
+		AgentMessage: &wire.TranscriptEntryKindAgentMessage{Text: said}}})
+	if err != nil || n != 0 {
+		t.Fatal(n, err)
+	}
+	if want := "Your token is [redacted:github].\nKeep it safe."; got.Kind.AgentMessage == nil || got.Kind.AgentMessage.Text != want {
+		t.Fatalf("entry sent on: %+v", got.Kind.AgentMessage)
+	}
+	if _, err := s.Append(id, wire.TranscriptEntry{ID: NewUUID(), Kind: wire.TranscriptEntryKind{
+		ToolCall: &wire.TranscriptEntryKindToolCall{Value: call}}}); err != nil {
+		t.Fatal(err)
+	}
+	plain := "Nothing secret here."
+	if _, got, _ := s.AppendOne(id, wire.TranscriptEntry{ID: NewUUID(), Kind: wire.TranscriptEntryKind{
+		AgentMessage: &wire.TranscriptEntryKindAgentMessage{Text: plain}}}); got.Kind.AgentMessage.Text != plain {
+		t.Fatalf("plain text changed: %q", got.Kind.AgentMessage.Text)
+	}
+	b, err := os.ReadFile(s.Loc.Transcript(string(id)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(b), token) || strings.Count(string(b), "[redacted:github]") != 2 {
+		t.Fatalf("transcript on disk:\n%s", b)
+	}
+	entries, _, _ := s.Transcript(id, 0)
+	if len(entries) != 3 || entries[1].Kind.ToolCall.Value.Title != "cat .env: GITHUB_TOKEN=[redacted:github]" {
+		t.Fatalf("read back: %+v", entries)
+	}
+}

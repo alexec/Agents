@@ -156,11 +156,25 @@ planned (T6, #999).
 | `relay.log`, `host-relay.log` | The Mac's log folder | The phone relay; the sign-in relay (what was asked and how it was answered) | 1 MB |
 | `app-tools.jsonl` | Each agent's folder | Every call to the app's own tools, with a `token` argument left out and answers cut to 2,000 characters | Deleted with the agent |
 
-The code does not write tokens to these logs. It does not redact them either: a token that
-an agent prints goes into its transcript as it is. **Redaction** of known token shapes in
-transcripts and `daemon.log` is planned (T8, #1001). Agents Host's diagnostics bundle is
-the one place that redacts today: it masks codes, secrets, tokens, passwords, keys, and long
-base64 and hex strings.
+The code does not write tokens to these logs. **Redaction** (T8, #1001) also cuts known
+token shapes out of each transcript line, each `app-tools.jsonl` line and each line that
+`agentsd` writes to `daemon.log`, before it is written. A match becomes
+`[redacted:<kind>]`, and the clients get the redacted line too. The shapes are GitHub,
+GitLab, Anthropic, OpenAI, Stripe, AWS access key, Google API key, Slack and npm tokens,
+JWTs, private key blocks, the token after `Bearer`, and the control plane's codes.
+Redaction is always on.
+
+Redaction does not catch:
+
+- text that is not a known shape, such as a password in plain words;
+- a token that the runtime streams in two parts, one in each message chunk (planned, #1001
+  slice a2);
+- what a runtime writes to its standard error, and what Agents Host writes to `daemon.log`;
+- the runtimes' own session files (see [Erasure](data-and-retention.md#erasure)).
+
+`control.log` cuts out codes, `Bearer` tokens and `token=`, `secret=` and `password=`
+values. Agents Host's diagnostics bundle masks codes, secrets, tokens, passwords, keys, and
+long base64 and hex strings.
 
 ## The web page
 

@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/alexec/agents/Go/internal/agentsd"
+	"github.com/alexec/agents/Go/internal/agentsd/redact"
 	"github.com/alexec/agents/Go/internal/agentsd/store"
 	"github.com/alexec/agents/Go/internal/buildinfo"
 	"github.com/alexec/agents/Go/internal/controllink"
@@ -27,12 +28,14 @@ import (
 	"github.com/alexec/agents/Go/internal/safe"
 )
 
-// logLine writes each line as DaemonLog does: the time in UTC to the second, then the words.
+// logLine writes each line as DaemonLog does: the time in UTC to the second, then the words,
+// with any known token shape redacted (#1001).
 type logLine struct{ w io.Writer }
 
 func (l logLine) Write(p []byte) (int, error) {
 	stamp := time.Now().UTC().Format("2006-01-02T15:04:05Z") + " "
-	if _, err := l.w.Write(append([]byte(stamp), p...)); err != nil {
+	words, _ := redact.Bytes(p)
+	if _, err := l.w.Write(append([]byte(stamp), words...)); err != nil {
 		return 0, err
 	}
 	return len(p), nil

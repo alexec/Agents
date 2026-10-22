@@ -37,9 +37,11 @@ the page says so and names its issue.
 
 ## Not built yet
 
-Data governance is roadmap step T8 (#1001). These parts of it are planned, not built:
+Data governance is roadmap step T8 (#1001, `specs/1001-data-governance/`). **Redaction**
+is built: known token shapes are cut out of transcripts, `app-tools.jsonl` and `daemon.log`
+when they are written (see [Security overview](security-overview.md#logs)). These parts are
+planned, not built:
 
-- **Redaction.** Agents does not redact tokens from transcripts or `daemon.log` yet.
 - **Full erasure.** Delete removes an agent's records on its machine. It does not remove
   the runtime's own session files.
 - **Export and import** of an agent or a project.
