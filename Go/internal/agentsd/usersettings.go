@@ -270,9 +270,6 @@ func safeRelative(rel string) bool {
 type userRuntimes struct {
 	Sandbox           *wire.SandboxSettings          `json:"sandbox,omitempty"`
 	ClientPermissions *wire.ClientPermissionSettings `json:"clientPermissions,omitempty"`
-	// DefaultAccount is each runtime's Reaches the Model By: an account's id, or default
-	// for its own sign-in (#999, FR-016).
-	DefaultAccount map[string]string `json:"defaultAccount,omitempty"`
 }
 
 func (d *Daemon) writeRuntimeChoices(raw wire.JSONValue) error {
@@ -294,12 +291,6 @@ func (d *Daemon) writeRuntimeChoices(raw wire.JSONValue) error {
 		if err := store.WriteAtomically(filepath.Join(d.SettingsDir, "client-permissions.json"), b, 0o644); err != nil {
 			return err
 		}
-	}
-	if r.DefaultAccount != nil {
-		if err := d.writeDefaultAccounts(r.DefaultAccount); err != nil {
-			return err
-		}
-		d.tellAccountProfiles()
 	}
 	return nil
 }
@@ -429,8 +420,7 @@ func (d *Daemon) userPartHere(part wire.UserSettingsPartName) (wire.UserPartHere
 		config, left := agentConfigHere(home)
 		out.Value, out.LeftOut = asJSON(config), left
 	case wire.UserSettingsPartNameRuntimes:
-		out.Value = asJSON(userRuntimes{Sandbox: new(d.sandboxSettings()), ClientPermissions: new(d.clientPermissions()),
-			DefaultAccount: d.defaultAccounts()})
+		out.Value = asJSON(userRuntimes{Sandbox: new(d.sandboxSettings()), ClientPermissions: new(d.clientPermissions())})
 	case wire.UserSettingsPartNameCostLimits:
 		out.Value = asJSON(d.costState().Limits)
 	case wire.UserSettingsPartNameResources:

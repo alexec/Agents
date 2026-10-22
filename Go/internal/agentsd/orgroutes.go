@@ -481,7 +481,8 @@ func (d *Daemon) chosenDefault(runtimeID string) string {
 	return d.defaultsLocked()[runtimeID]
 }
 
-// writeDefaultAccounts keeps the person's choices; from the control plane too (#1760).
+// writeDefaultAccounts keeps the person's choices, on this machine. Carrying them in the
+// runtimes part of the person's settings (#1760, FR-016) is the team area's.
 func (d *Daemon) writeDefaultAccounts(m map[string]string) error {
 	d.orgRouteMu.Lock()
 	d.orgDefaultRead = true
@@ -546,9 +547,6 @@ func (d *Daemon) setDefaultAccount(r wire.DefaultAccountRequest) error {
 	rt := runtimeByID(r.RuntimeID)
 	if rt == nil {
 		return &Error{Code: CodeRuntimeNotFound, Message: "There is no runtime called " + r.RuntimeID + "."}
-	}
-	if err := d.refuseUserScoped(wire.UserSettingsPartNameRuntimes); err != nil {
-		return err
 	}
 	id := ownSignIn
 	var account *wire.AccountProfile

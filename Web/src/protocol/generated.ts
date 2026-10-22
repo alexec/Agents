@@ -7213,7 +7213,6 @@ export interface Methods {
   "runtimes/list": { params: Empty; result: RuntimeStatus[] };
   "runtimes/markAvailable": { params: MarkRuntimeAvailable; result: RuntimeAllowances };
   "runtimes/removeAccount": { params: AccountRequest; result: UUID[] };
-  "runtimes/setDefaultAccount": { params: DefaultAccountRequest; result: Empty };
   "sandbox/state": { params: Empty; result: SandboxSettings };
   "signIn/approve": { params: SignInDecide; result: Empty };
   "signIn/configure": { params: SignInConfigure; result: SignInProviders };
@@ -7432,7 +7431,6 @@ export const MethodTarget = {
   "runtimes/list": "host",
   "runtimes/markAvailable": "host",
   "runtimes/removeAccount": "host",
-  "runtimes/setDefaultAccount": "host",
   "sandbox/state": "host",
   "signIn/approve": "control",
   "signIn/configure": "control",
