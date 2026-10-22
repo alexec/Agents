@@ -9,6 +9,7 @@ import (
 
 	"github.com/alexec/agents/Go/internal/controlplane/audit"
 	"github.com/alexec/agents/Go/internal/controlplane/records"
+	"github.com/alexec/agents/Go/internal/controlplane/store"
 	"github.com/alexec/agents/Go/wire"
 )
 
@@ -79,7 +80,8 @@ func (m *Methods) fleet(ctx context.Context) wire.FleetBoard {
 	return wire.FleetBoard{Machines: out}
 }
 
-// mostRunsRead bounds the claims console/teamWorkflows reads: a week of triggers.
+// mostRunsRead bounds the claims console/teamWorkflows reads: a week of triggers, the
+// newest first. A claim is written once, so each is read from the store once (readCache).
 const mostRunsRead = 5000
 
 // teamWorkflows is console/teamWorkflows (M6): each bot, its group, caps and spend today,
@@ -161,18 +163,21 @@ func (m *Methods) botRuns(ctx context.Context, bots map[string]*wire.TeamBot, no
 		last time.Time
 	}
 	counts := map[string]map[string]*tally{}
-	read := 0
-	for _, k := range keys {
-		day, _, _ := strings.Cut(strings.TrimPrefix(k.Key, runsPrefix), "/")
+	// The keys sort by day, oldest first: the newest mostRunsRead of the week.
+	var read []store.Key
+	for i := len(keys) - 1; i >= 0 && len(read) < mostRunsRead; i-- {
+		day, _, _ := strings.Cut(strings.TrimPrefix(keys[i].Key, runsPrefix), "/")
 		if day < oldest {
-			continue
-		}
-		if read >= mostRunsRead {
 			break
 		}
-		read++
-		object, err := m.s.cfg.Store.Get(ctx, k.Key)
-		if err != nil || object == nil {
+		read = append(read, keys[i])
+	}
+	objects, err := m.s.storeReads.read(ctx, m.s.cfg.Store, runsPrefix, keys, read)
+	if err != nil {
+		return fail(storeUnavailable, "The runs could not be read: %v", err)
+	}
+	for _, data := range objects {
+		if data == nil {
 			continue
 		}
 		var claim struct {
@@ -180,7 +185,7 @@ func (m *Methods) botRuns(ctx context.Context, bots map[string]*wire.TeamBot, no
 			Workflow  string        `json:"workflow"`
 			ClaimedAt records.Stamp `json:"claimedAt"`
 		}
-		if json.Unmarshal(object.Data, &claim) != nil {
+		if json.Unmarshal(data, &claim) != nil {
 			continue
 		}
 		owner := m.s.ownerOf(claim.Machine)

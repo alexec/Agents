@@ -145,7 +145,14 @@ func (s *Service) report(ctx context.Context, r wire.ReportRange, keep func(pers
 	for _, h := range s.records.Hosts() {
 		hosts[strings.ToLower(h.ID)] = h
 	}
-	out := []wire.ReportRow{}
+	// The keys of the range and the people kept, then their objects, read once each.
+	type wanted struct {
+		at     string
+		person string
+		host   records.HostRecord
+	}
+	var read []store.Key
+	var meta []wanted
 	for _, k := range keys {
 		at, file, _ := strings.Cut(strings.TrimPrefix(k.Key, prefix), "/")
 		if at < first {
@@ -164,15 +171,21 @@ func (s *Service) report(ctx context.Context, r wire.ReportRange, keep func(pers
 		if !keep(person) {
 			continue
 		}
-		object, err := s.cfg.Store.Get(ctx, k.Key)
-		if err != nil {
-			return nil, fail(storeUnavailable, "The reports could not be read: %v", err)
-		}
-		if object == nil {
+		read = append(read, k)
+		meta = append(meta, wanted{at: at, person: person, host: host})
+	}
+	objects, err := s.storeReads.read(ctx, s.cfg.Store, prefix, keys, read)
+	if err != nil {
+		return nil, fail(storeUnavailable, "The reports could not be read: %v", err)
+	}
+	out := []wire.ReportRow{}
+	for i, data := range objects {
+		at, person, host := meta[i].at, meta[i].person, meta[i].host
+		if data == nil {
 			continue
 		}
 		var stored storedUsage
-		if json.Unmarshal(object.Data, &stored) != nil {
+		if json.Unmarshal(data, &stored) != nil {
 			continue
 		}
 		// As the audit names them (actorFor).

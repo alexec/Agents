@@ -182,6 +182,8 @@ type Service struct {
 	caps botCaps
 	// A bot's machine started for its triggers (#2011, FR-034).
 	starts botStarts
+	// What Reports and the Console read from the store, by entity tag (#2054, #2056).
+	storeReads readCache
 
 	mu       sync.Mutex
 	servers  []*http.Server
