@@ -63,6 +63,7 @@ Agents has none of these at all:
 
 - Android app (#810), Windows or Linux desktop (#811).
 - Several accounts per runtime.
+- Open source: the source is visible on GitHub, but all rights are reserved (#2110).
 
 ## What each feature means
 
@@ -271,10 +272,10 @@ Agents has none of these at all:
 | Vibe Kanban | ● | ● | ● | ?⃝ | ?⃝ | 60% |
 | Warp | ● | ?⃝ | ● | ?⃝ | ● | 60% |
 | Maestro | ● | ● | ?⃝ | ?⃝ | ◐ | 50% |
-| Ace | ● | ● | ?⃝ | ?⃝ | ?⃝ | 40% |
 | VibeiDE | ● | ?⃝ | ?⃝ | ?⃝ | ● | 40% |
 | CodeAgentSwarm | ● | ?⃝ | ◐ | ?⃝ | ?⃝ | 30% |
 | Happy | ● | ?⃝ | ?⃝ | ?⃝ | ◐ | 30% |
+| Ace | ● | ○ | ?⃝ | ?⃝ | ?⃝ | 20% |
 | Claude Squad | ● | ?⃝ | ○ | ?⃝ | ○ | 20% |
 | DockTerm | ● | ?⃝ | ?⃝ | ?⃝ | ?⃝ | 20% |
 | Helicon | ● | ?⃝ | ?⃝ | ?⃝ | ?⃝ | 20% |
@@ -295,12 +296,12 @@ Agents has none of these at all:
 | Nimbalyst | ● | ● | ● | ?⃝ | ● | ◐ | 70% |
 | Orca | ● | ● | ● | ◐ | ● | ○ | 70% |
 | Warp | ● | ?⃝ | ◐ | ?⃝ | ● | ● | 70% |
-| Ace | ● | ● | ● | ?⃝ | ● | ?⃝ | 60% |
 | Atelier (was Acepe) | ?⃝ | ● | ● | ?⃝ | ● | ● | 60% |
 | Codeg | ● | ● | ● | ?⃝ | ● | ?⃝ | 60% |
 | Maestro | ● | ● | ● | ?⃝ | ● | ?⃝ | 60% |
 | Paseo | ● | ● | ● | ?⃝ | ● | ○ | 60% |
 | Pragma | ● | ● | ● | ?⃝ | ● | ?⃝ | 60% |
+| Ace | ● | ○ | ○ | ?⃝ | ● | ?⃝ | 40% |
 | Conductor | ● | ◐ | ?⃝ | ?⃝ | ● | ?⃝ | 40% |
 | DockTerm | ● | ?⃝ | ○ | ○ | ● | ○ | 40% |
 | Nuphos | ● | ● | ● | ?⃝ | ?⃝ | ?⃝ | 40% |
@@ -350,8 +351,8 @@ Agents has none of these at all:
 | tuios | ?⃝ | ?⃝ | ?⃝ | ◐ | ● | ● | ○ | ◐ | ○ | 33% |
 | Threadlines | ?⃝ | ?⃝ | ?⃝ | ◐ | ● | ● | ○ | ○ | ○ | 28% |
 | Vibe Kanban | ○ | ?⃝ | ◐ | ?⃝ | ● | ● | ○ | ○ | ○ | 28% |
-| Ace | ● | ?⃝ | ?⃝ | ?⃝ | ?⃝ | ● | ?⃝ | ?⃝ | ?⃝ | 22% |
 | ReevesAgents | ?⃝ | ○ | ?⃝ | ○ | ● | ● | ○ | ○ | ○ | 22% |
+| Ace | ○ | ?⃝ | ?⃝ | ?⃝ | ?⃝ | ● | ?⃝ | ?⃝ | ?⃝ | 11% |
 | Roamgate | ?⃝ | ?⃝ | ?⃝ | ◐ | ◐ | ?⃝ | ○ | ○ | ○ | 11% |
 | VibeiDE | ● | ?⃝ | ?⃝ | ?⃝ | ?⃝ | ?⃝ | ?⃝ | ?⃝ | ?⃝ | 11% |
 | Helicon | ?⃝ | ?⃝ | ?⃝ | ?⃝ | ?⃝ | ?⃝ | ○ | ◐ | ○ | 6% |
@@ -371,7 +372,6 @@ Agents has none of these at all:
 | **Agents** | ● | ● | ● | ◐ | ○ | ◐ | 70% |
 | Nimbalyst | ● | ● | ● | ◐ | ?⃝ | ?⃝ | 70% |
 | Warp | ● | ?⃝ | ● | ● | ◐ | ?⃝ | 70% |
-| Ace | ?⃝ | ● | ● | ?⃝ | ● | ◐ | 60% |
 | Maestro | ?⃝ | ● | ● | ?⃝ | ● | ?⃝ | 60% |
 | Orca | ◐ | ◐ | ● | ○ | ● | ○ | 60% |
 | Paseo | ?⃝ | ● | ● | ?⃝ | ● | ?⃝ | 60% |
@@ -385,6 +385,7 @@ Agents has none of these at all:
 | Superset | ?⃝ | ?⃝ | ● | ?⃝ | ● | ?⃝ | 40% |
 | T3 Code | ?⃝ | ?⃝ | ● | ?⃝ | ● | ◐ | 40% |
 | tuios | ?⃝ | ● | ◐ | ?⃝ | ?⃝ | ?⃝ | 30% |
+| Ace | ?⃝ | ?⃝ | ?⃝ | ?⃝ | ● | ◐ | 20% |
 | Atelier (was Acepe) | ?⃝ | ?⃝ | ● | ?⃝ | ?⃝ | ?⃝ | 20% |
 | DockTerm | ?⃝ | ?⃝ | ● | ?⃝ | ?⃝ | ?⃝ | 20% |
 | Nuphos | ?⃝ | ?⃝ | ● | ?⃝ | ?⃝ | ?⃝ | 20% |
@@ -469,10 +470,10 @@ Each app's score in every table, and overall: its points over the 49 scored feat
 | 25 | tuios | 83% | 33% | 50% | 60% | 20% | 33% | 30% | 33% | **43%** |
 | 25 | Vibe Kanban | 67% | 50% | 29% | 60% | 30% | 28% | 20% | 67% | **43%** |
 | 27 | Sculptor | 58% | 33% | 29% | 80% | 20% | 33% | 20% | 33% | **38%** |
-| 28 | Ace | 33% | 17% | 43% | 40% | 60% | 22% | 60% | 33% | **37%** |
 | 28 | Roamgate | 67% | 50% | 29% | 80% | 20% | 11% | 0% | 50% | **37%** |
-| 30 | Helicon | 42% | 33% | 29% | 20% | 0% | 6% | 40% | 67% | **29%** |
-| 30 | VibeiDE | 50% | 50% | 29% | 40% | 30% | 11% | 20% | 8% | **29%** |
+| 29 | Helicon | 42% | 33% | 29% | 20% | 0% | 6% | 40% | 67% | **29%** |
+| 29 | VibeiDE | 50% | 50% | 29% | 40% | 30% | 11% | 20% | 8% | **29%** |
+| 31 | Ace | 33% | 17% | 43% | 20% | 40% | 11% | 20% | 33% | **27%** |
 | 32 | DockTerm | 17% | 33% | 50% | 20% | 40% | 0% | 20% | 33% | **26%** |
 | 33 | ReevesAgents | 33% | 17% | 29% | 0% | 20% | 22% | 0% | 50% | **22%** |
 | 34 | Claude Squad | 50% | 0% | 14% | 20% | 20% | 0% | 0% | 33% | **16%** |
@@ -523,7 +524,7 @@ thing. A ?⃝ has no link: the app's docs did not say.
 
 - **Agents:** this project. Mac window, Remote on iPhone and iPad, web page, and agentsd hosts.
 - **[Agentastic](https://www.agentastic.dev/):** A closed-source native Mac IDE for many agents, with an iPhone companion and cloud agents.
-- **[Ace](https://useace.dev):** A closed-source native app for Claude Code, Cursor and its own agent, on Mac, Windows and Linux, from the maker of Atelier. Its row is filled from its release notes ([flazouh/ace-releases](https://github.com/flazouh/ace-releases/releases)).
+- **[Ace](https://useace.dev):** A closed-source native app for Claude Code, Cursor and its own agent, on Mac, Windows and Linux, from the maker of Atelier. Its row is filled from its release notes ([flazouh/ace-releases](https://github.com/flazouh/ace-releases/releases)). Since 0.1.53 it is Sessions and Code only: the Browser, Git, Tasks, Usage and Marketplace pages are gone "for now".
 - **[Atelier (was Acepe)](https://github.com/flazouh/atelier):** A young native editor for coding agents over ACP, Mac and Linux.
 - **[Claude Code](https://code.claude.com/docs):** Anthropic's agent: CLI, desktop Code tab, web and mobile, with background agents and routines.
 - **[Claude Squad](https://github.com/smtg-ai/claude-squad):** A terminal app running agent CLIs in tmux, a worktree each.
