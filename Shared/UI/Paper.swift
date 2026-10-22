@@ -278,6 +278,16 @@ extension View {
         buttonStyle(.borderless)
         #endif
     }
+
+    /// The answer buttons on a sidebar card (join, link, sign-in, cap): small on the Mac, and
+    /// at least 44 pt on iOS, so a mis-tap does not deny a machine, a link or a sign-in (#2078).
+    @ViewBuilder func cardButtons() -> some View {
+        #if os(macOS)
+        controlSize(.small)
+        #else
+        controlSize(.large)
+        #endif
+    }
 }
 
 /// A sheet laid out the same way every time: title, body, then Cancel / primary actions.
