@@ -5,26 +5,26 @@ import { useEffect } from "preact/hooks";
 import { useSignal } from "@preact/signals";
 import type { Store } from "../model/store";
 import type { ChannelLinkRequest, PersonRow } from "../protocol/generated";
-import { go } from "../route";
 import { failedWords, linkWords, noRequests, requestsFoot } from "../model/console";
 import { capReachedWords } from "../model/teamGroups";
 import { liveJoins } from "../model/people";
 import { AuditPane } from "./Audit";
+import { BotSheet } from "./People";
 import { JoinRequests } from "./JoinRequest";
 
 /** M8: the audit, every machine's names from the fleet, and a person to narrow it to. */
 export function AuditPage({ store, down }: { store: Store; down: boolean }) {
-  const people = useSignal<PersonRow[] | null>(null);
   const names = useSignal<Record<string, string>>({});
+  // The store's one people list (#2055); a control plane before people has none.
+  const people: PersonRow[] | null = store.people.value?.people ?? (store.peopleFailure.value ? [] : null);
   useEffect(() => {
     if (down) return;
-    void store.link.call("people/list", {}).then((l) => { people.value = l.people; }, () => { people.value = []; });
     void store.link.call("console/fleet", {}).then((b) => {
       names.value = Object.fromEntries(b.machines.map((m) => [m.host.id, m.host.name]));
     }, () => {});
   }, [down]);
-  if (people.value === null) return <p class="hint">Loading…</p>;
-  return <AuditPane store={store} people={people.value} hostName={(host) => names.value[host] ?? host} />;
+  if (people === null) return <p class="hint">Loading…</p>;
+  return <AuditPane store={store} people={people} hostName={(host) => names.value[host] ?? host} />;
 }
 
 /** M7: each request with its answer. Join requests and a bot at its cap come as notifications too. */
@@ -45,9 +45,12 @@ export function RequestsPage({ store, down }: { store: Store; down: boolean }) {
     }
     await load();
   };
+  // Change Cap…: that bot's Group and Cap… sheet, here (#2088).
+  const changing = useSignal<PersonRow | null>(null);
   const joins = liveJoins(store.joinRequests.value);
-  const cap = store.capReached.value;
-  const none = joins.length === 0 && links.value.length === 0 && !cap;
+  // Every bot stopped at a cap, while it is true (#2073, #2088).
+  const capped = store.capped.value;
+  const none = joins.length === 0 && links.value.length === 0 && capped.length === 0;
   return (
     <div class="requests">
       {problem.value && <p class="hint" role="alert">{problem.value}</p>}
@@ -74,18 +77,26 @@ export function RequestsPage({ store, down }: { store: Store; down: boolean }) {
           </ul>
         </section>
       )}
-      {cap && (
+      {capped.length > 0 && (
         <section aria-labelledby="requests-caps">
           <h3 class="section-head" id="requests-caps">Spend Caps</h3>
           <ul class="request-list">
-            <li class="request">
-              <span>{capReachedWords(cap)}</span>
-              <span class="request-actions">
-                <button type="button" onClick={() => go({ app: "console", section: "people" })}>Change Cap…</button>
-              </span>
-            </li>
+            {capped.map((reached) => {
+              const bot = store.people.value?.people.find((p) => p.id === reached.user) ?? null;
+              return (
+                <li key={reached.user} class="request">
+                  <span>{capReachedWords(reached)}</span>
+                  <span class="request-actions">
+                    <button type="button" disabled={down || !bot} onClick={() => { changing.value = bot; }}>Change Cap…</button>
+                  </span>
+                </li>
+              );
+            })}
           </ul>
         </section>
+      )}
+      {changing.value && (
+        <BotSheet store={store} bot={changing.value} groups={store.providers.groups.value} close={() => { changing.value = null; }} />
       )}
       <p class="hint">{requestsFoot}</p>
     </div>
@@ -94,5 +105,5 @@ export function RequestsPage({ store, down }: { store: Store; down: boolean }) {
 
 /** How many requests wait, for the Console's list. */
 export function requestCount(store: Store): number {
-  return liveJoins(store.joinRequests.value).length + (store.capReached.value ? 1 : 0);
+  return liveJoins(store.joinRequests.value).length + store.capped.value.length;
 }
