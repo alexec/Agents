@@ -94,7 +94,10 @@ In the repository on your Mac:
      only to your Mac's IPv4 address;
    - a static IPv4 address;
    - an e2-micro machine in `us-west1-b`, running Debian, with a 30 GB *standard* disk.
-     A startup script puts Docker on it.
+     A startup script puts Docker on it;
+   - the snapshot schedule `agents-control-daily` on that disk: a snapshot every day at
+     10:00 UTC, each kept 7 days. See
+     [Restore the disk from a snapshot](#restore-the-disk-from-a-snapshot).
 
    It prints the machine's address, then stops: the names do not point at it yet.
 3. Make the DNS records, with the address that `up.sh` printed:
@@ -124,8 +127,8 @@ In the repository on your Mac:
 5. Get the first code with the command that `up.sh` prints, then go on at
    [Pair your first window](#pair-your-first-window).
 
-To upgrade, run `up.sh` again: it builds and copies the new image, and keeps the store
-and the APNs key. Set `AGENTS_VERSION` to the version to stamp on it, such as `0.9.0`;
+To upgrade, run `up.sh` again: it builds and copies the new image, and keeps the store,
+the APNs key and the snapshot schedule. Set `AGENTS_VERSION` to the version to stamp on it, such as `0.9.0`;
 without it, `scripts/version.sh` says. At the end, `up.sh` checks that the control plane on
 the machine says that version, the one **Settings ▸ Control plane** shows.
 
@@ -142,7 +145,9 @@ served is the new one. If either check fails, the release report says so and a
 `priority:high` bug is filed. The store is never rolled back.
 
 To remove it all, run `deploy/gcp/down.sh`. It asks first. **The store is on the
-machine's disk,** so after `down.sh` every window, phone and host must pair again. The
+machine's disk,** so after `down.sh` every window, phone and host must pair again. It
+removes the snapshot schedule, but keeps the snapshots, as the last copy of the store, and
+prints the command that deletes them. The
 Cloud KMS key stays, unless you give `--destroy-key`. Remove the DNS records at Cloudflare
 yourself.
 
@@ -154,6 +159,7 @@ yourself.
 | The e2-micro machine in us-west1 | free tier (one a month) |
 | The 30 GB standard disk | free tier (30 GB a month); a *balanced* disk, the console's default, is billed |
 | The Cloud KMS key | about $0.06 a month, and $0.03 for each 10,000 uses |
+| The disk's snapshots | billed by the GB a month that they hold: each snapshot after the first holds only what changed |
 | Traffic out | free tier (1 GB a month), then billed |
 
 ## Steps
@@ -507,15 +513,72 @@ notifications.
   connecting after the first renewal.
 - **What's kept, and where.** The store, with every host and client and the sealed
   control plane key, is in the Docker volume `agents-control_data`. The certificate and the
-  ACME account are in `agents-control_caddy`. Back up the store's volume. Never destroy
-  the Cloud KMS key: without it, the sealed key doesn't open, and every window, phone and
-  host must pair again.
+  ACME account are in `agents-control_caddy`. Both are on the machine's disk, which the
+  daily snapshots copy. Never destroy the Cloud KMS key: without it, the sealed key doesn't
+  open, and every window, phone and host must pair again.
 - **If the machine or its disk is lost,** remove the service account's key in Google Cloud
   (**IAM ▸ Service accounts ▸ agents-control ▸ Keys**). A copy of the disk then can't
   open the control plane's key.
 - **Upgrading.** Build the Linux host again on your Mac, copy `deploy/`, `Go/`, `Web/`,
   `App/Resources/servers/` and `App/Resources/toolsets/` across, and run the `up -d --build` line again. Hosts and clients reconnect within
   seconds. Linux servers update their host the next time they connect.
+
+## Restore the disk from a snapshot
+
+`up.sh` keeps a snapshot of the machine's disk for each of the last 7 days. The disk holds
+the store, the sealed control plane key and Caddy's certificate, so a restore brings the
+whole control plane back. Every window, phone and host stays paired. What changed after the
+snapshot is lost: at most a day.
+
+Run these on your Mac, in the scripts' own gcloud configuration:
+
+```sh
+export CLOUDSDK_CONFIG=~/.agents/gcloud/agents-control
+zone=us-west1-b
+```
+
+1. Find the snapshot to restore. The newest is last:
+
+   ```sh
+   gcloud compute snapshots list --filter "sourceDisk~/agents-control" \
+       --sort-by creationTimestamp --format "table(name,creationTimestamp,diskSizeGb)"
+   ```
+
+2. Make a new disk from it, beside the old one:
+
+   ```sh
+   gcloud compute disks create agents-control-restored --zone $zone \
+       --source-snapshot <snapshot> --type pd-standard
+   ```
+
+3. Stop the machine, and put the new disk in the place of the old one:
+
+   ```sh
+   old=$(gcloud compute instances describe agents-control --zone $zone \
+       --format 'value(disks[0].source.basename())')
+   gcloud compute instances stop agents-control --zone $zone
+   gcloud compute instances detach-disk agents-control --zone $zone --disk "$old"
+   gcloud compute instances attach-disk agents-control --zone $zone \
+       --disk agents-control-restored --boot
+   gcloud compute instances start agents-control --zone $zone
+   ```
+
+4. Run `deploy/gcp/up.sh` again, with the options you gave before. It puts the snapshot
+   schedule on the new disk, and checks that `https://control.agentloops.dev/healthz`
+   answers.
+5. When the control plane works, delete the old disk. Until then it is kept, and two
+   disks are more than the free tier's 30 GB:
+
+   ```sh
+   gcloud compute disks delete "$old" --zone $zone
+   ```
+
+If the zone itself is down, make the disk from the snapshot in another zone of
+`us-west1` (`--zone us-west1-a`). The snapshots are kept in the region, not in the zone.
+Then make a machine there that starts from that disk, with the flags of `up.sh`'s
+`instances create`, but `--disk name=agents-control-restored,boot=yes` in place of the
+`--image-family`, `--image-project` and `--boot-disk-*` flags. Set `zone` in
+`deploy/gcp/common.sh` to the new zone before you run `up.sh` again.
 
 ## If it doesn't work
 
