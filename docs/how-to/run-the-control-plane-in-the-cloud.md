@@ -125,7 +125,21 @@ In the repository on your Mac:
    [Pair your first window](#pair-your-first-window).
 
 To upgrade, run `up.sh` again: it builds and copies the new image, and keeps the store
-and the APNs key.
+and the APNs key. Set `AGENTS_VERSION` to the version to stamp on it, such as `0.9.0`;
+without it, `scripts/version.sh` says. At the end, `up.sh` checks that the control plane on
+the machine says that version, the one **Settings ▸ Control plane** shows.
+
+Every release of Agents deploys control.agentloops.dev this way (#2100). After the tag,
+and after the GitHub release and both TestFlight builds pass, the release runs, in a
+checkout of the tag:
+
+```sh
+AGENTS_VERSION=<version> deploy/gcp/up.sh
+```
+
+Then it checks that `https://control.agentloops.dev/healthz` answers and that the version
+served is the new one. If either check fails, the release report says so and a
+`priority:high` bug is filed. The store is never rolled back.
 
 To remove it all, run `deploy/gcp/down.sh`. It asks first. **The store is on the
 machine's disk,** so after `down.sh` every window, phone and host must pair again. The

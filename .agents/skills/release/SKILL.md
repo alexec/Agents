@@ -1,6 +1,6 @@
 ---
 name: release
-description: Take main to a new version with nobody watching (#914), started by Alex or by itself once the open milestone is ready (#1729). Run the six reviews and checks once each on what changed since the last tag, have the high findings fixed through the Scrum Master's lanes (the medium ones are filed, listed as known issues and left to the lanes after the release), check the gate, choose the version, check its milestone, write the notes, tag and push, check the GitHub release and both TestFlight builds, close the milestone, lift the next milestone's hold, and review how the release went. Use when the Release workflow runs, or when Alex asks for a release. Not for installing on Alex's Mac or devices (ship-app), and never for App Review.
+description: Take main to a new version with nobody watching (#914), started by Alex or by itself once the open milestone is ready (#1729). Run the six reviews and checks once each on what changed since the last tag, have the high findings fixed through the Scrum Master's lanes (the medium ones are filed, listed as known issues and left to the lanes after the release), check the gate, choose the version, check its milestone, write the notes, tag and push, check the GitHub release and both TestFlight builds, deploy the live control plane, close the milestone, lift the next milestone's hold, and review how the release went. Use when the Release workflow runs, or when Alex asks for a release. Not for installing on Alex's Mac or devices (ship-app), and never for App Review.
 ---
 
 # Release
@@ -44,8 +44,8 @@ Alex decided (2026-10-13, #914):
   commit, the notes or a message to another session. Use its id (`S20261011-2`) only in
   the draft advisory.
 - Never write on the review branches (`agents/reviews-*`). They are the reviews' own.
-- Run every command from the project folder. Change no file in it: you only read, tag
-  and push the tag. Write the notes in `$TMPDIR`.
+- Run every command from the project folder (step 8's deploy from its scratch worktree).
+  Change no file in it: you only read, tag and push the tag. Write the notes in `$TMPDIR`.
 - Questions: nobody is watching, and every choice here is already made. Do not ask;
   put what stopped you in the report. If you must ever ask, use your question tool and
   name yourself ("Claude (Release) recommends… Alex, do you want…?").
@@ -270,6 +270,27 @@ A tag that already exists for this version means another release ran: end with
 4. If the `testflight` job failed at "The App Store secrets are there", the secrets are
    still Alex's to add: say which, from its log, and that the GitHub release is out.
    Any other failure: name the step and the first error.
+5. **Deploy the control plane** (#2100). When steps 2 and 3 found the GitHub release and
+   both TestFlight builds, put the version on the live control plane,
+   control.agentloops.dev. Alex approved its restart for every release's deploy (2026-10-22).
+   In the scratch worktree of step 2 (at `v<version>`), lease "build" (30 minutes), run
+
+   ```sh
+   AGENTS_VERSION=<version> deploy/gcp/up.sh
+   ```
+
+   and release "build" the moment it ends. It acts as `~/.agents/secrets/gcp-agents-control.json`
+   and keeps the store and the APNs key. Then check, from this Mac:
+   - `curl -fsS https://control.agentloops.dev/healthz` says `ok`;
+   - the version it serves, the one Settings ▸ Control plane shows, is `<version>`. `up.sh`
+     checks it last and prints `agents-control <version> (go)`; to look again:
+     `CLOUDSDK_CONFIG=~/.agents/gcloud/agents-control gcloud compute ssh agents-control --zone us-west1-b --command 'cd /opt/agents && sudo docker compose -f deploy/compose.public.yaml exec -T control /agents-control version'`.
+
+   If `up.sh` or a check fails, never roll back the store and never run `down.sh`. File a
+   bug: title `Release v<version>: the control plane deploy failed`, labels `bug`,
+   `priority:high`, `area:control-plane`, in the next milestone, with the step and its first
+   error (never a secret). Say it in the report. It does not hold step 9: the release is
+   out.
 
 ## 9. Close the milestone
 
@@ -313,6 +334,6 @@ finding. `.agents/reviews/releases/v0.6.0.md` is the first, and the model.
 ## 11. Report
 
 End with `done` and a short table: version, tag, the GitHub release URL, the iOS and
-macOS builds' states, the milestone and whether it is closed, the reviews you ran, the issues fixed for this release, the known
+macOS builds' states, the control plane deploy (healthz, the version served, its bug if it failed), the milestone and whether it is closed, the reviews you ran, the issues fixed for this release, the known
 issues, the advisories that are fixed and ready for Alex to publish, the held PRs you
 released, and the release review's file and issues.
