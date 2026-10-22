@@ -147,3 +147,8 @@ test("a saved view's words and its digest", () => {
     "1 session ended in an error.",
   ].join("\n"));
 });
+
+test("Delete… names the view, and a refused copy is not the control plane (#2262, #2263)", () => {
+  assert.match(r.deleteViewWords("Monday digest"), /^Delete Monday digest\?/);
+  assert.doesNotMatch(r.noCopy, /control plane/);
+});

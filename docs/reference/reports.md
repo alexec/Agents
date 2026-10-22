@@ -86,7 +86,8 @@ Three more pages of Reports (#2019), with the same scopes:
 - **Saved Views** lists them, each with **Open** (the page, its scope, range and By),
   **Copy Digest** (its numbers as a few lines of text: what was spent, the pull requests
   merged and their cost, the workflows with failed runs, the middle wait and the sessions
-  that failed) and **Delete**.
+  that failed; a browser that refuses the clipboard is told so, #2263) and **Delete…**, which
+  asks first (#2262).
 - **A view is the person's own.** Nobody else sees it. A view of a scope the person no
   longer sees opens nothing: `reports/usage` checks the scope each time.
 - **The control plane keeps them** in one object a person, `v1/reports/views/<user>.json`.

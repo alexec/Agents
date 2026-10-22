@@ -11,7 +11,7 @@ import { CallFailed } from "../wire/link";
 import { adoption, adoptionLine, adoptionNote, budgetWords, dimensionTitle, empty, exportName, groupNote, hiddenNote, line, meNote,
   memberNote, noOutcomes, noWorkflows, outcomeLine, outcomeTotals, outcomesNote, rangeShort, rangeSpan, ranges, reportTotals, runtimeLine,
   runtimesNote, sameScope, scopeKey, scopeNote, scopedDimensions, share, timeLine, timeNote, utcNote, waitingShare, weekTitle, workflowLine,
-  workflowRows, workflowsNote, digestText, noViews, noViewsHere, viewBy, viewWords, viewsNote } from "../model/reports";
+  workflowRows, workflowsNote, deleteViewWords, digestText, noCopy, noViews, noViewsHere, viewBy, viewWords, viewsNote } from "../model/reports";
 import type { OutcomeGroup, OutcomeOrder, ReportDimension, ReportGroup } from "../model/reports";
 import type { Section } from "../model/console";
 
@@ -219,15 +219,24 @@ function SavedPage({ store, scopes }: { store: Store; scopes: readonly ReportSco
     go({ app: "reports", section: v.page });
   };
   const digest = async (v: ReportView) => {
+    const text = store.link.call("reports/usage", { range: v.range, scope: v.scope }).then((r) => digestText(v, scopeName(v), r));
     try {
-      const report = await store.link.call("reports/usage", { range: v.range, scope: v.scope });
-      await navigator.clipboard.writeText(digestText(v, scopeName(v), report));
+      // Safari refuses a write that comes after an await (#2263): give the clipboard the promise of the text at once.
+      if (typeof ClipboardItem !== "undefined" && navigator.clipboard.write) {
+        await navigator.clipboard.write([new ClipboardItem({ "text/plain": text.then((t) => new Blob([t], { type: "text/plain" })) })]);
+      } else {
+        await navigator.clipboard.writeText(await text);
+      }
       copied.value = v.id;
-    } catch (error) {
-      failed(error);
+    } catch {
+      // A failed call says why; a refused write is not the control plane's fault.
+      const asked = await text.then(() => null, (e: unknown) => e ?? new Error());
+      if (asked) failed(asked);
+      else problem.value = noCopy;
     }
   };
   const remove = async (v: ReportView) => {
+    if (!window.confirm(deleteViewWords(v.name))) return;
     try {
       views.value = (await store.link.call("reports/deleteView", { id: v.id })).views;
     } catch (error) {
@@ -248,7 +257,7 @@ function SavedPage({ store, scopes }: { store: Store; scopes: readonly ReportSco
               <span class="reports-export">
                 <button onClick={() => open(v)}>Open</button>
                 <button title="Copy this view’s numbers as text" onClick={() => void digest(v)}>{copied.value === v.id ? "Copied" : "Copy Digest"}</button>
-                <button onClick={() => void remove(v)}>Delete</button>
+                <button class="destructive" onClick={() => void remove(v)}>Delete…</button>
               </span>
             </li>
           ))}
