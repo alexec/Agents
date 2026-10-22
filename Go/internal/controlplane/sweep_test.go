@@ -123,6 +123,59 @@ func TestTheSweepStopsAtItsBound(t *testing.T) {
 	}
 }
 
+// #2291: more expired than one round deletes goes within a bounded number of rounds of the
+// same hour, not a round an hour for ever.
+func TestTheSweepCatchesUpWithinTheHour(t *testing.T) {
+	ctx := context.Background()
+	s := store.NewMemory()
+	now := time.Date(2026, 10, 21, 12, 0, 0, 0, time.UTC)
+	for _, day := range []string{"2000-01-01", "2000-01-02", "2000-01-03"} {
+		for n := range 17 {
+			s.Put(ctx, "v1/events/"+day+"/"+itoa(n)+".json", []byte("{}"), store.Absent)
+		}
+	}
+	kept := now.Format(sweptDayLayout)
+	s.Put(ctx, "v1/events/"+kept+"/0.json", []byte("{}"), store.Absent)
+	pauses := 0
+	report, rounds, err := sweepRounds(ctx, records.New(s), func() time.Time { return now }, 10, &eventSweep{},
+		time.Second, func(time.Duration) bool { pauses++; return true })
+	left, _ := s.List(ctx, eventsPrefix)
+	// 51 expired, 10 a round: 6 rounds, the last one not full.
+	if err != nil || report.events != 51 || rounds != 6 || pauses != 5 || len(left) != 1 || left[0].Key != "v1/events/"+kept+"/0.json" {
+		t.Fatalf("%+v rounds %d pauses %d left %v %v", report, rounds, pauses, left, err)
+	}
+}
+
+// The rounds stop when told to (the copy stops serving, or the service stops), and when
+// the next hour's sweep is due: the rest is the next hour's.
+func TestTheSweepRoundsStop(t *testing.T) {
+	ctx := context.Background()
+	fill := func() store.Store {
+		s := store.NewMemory()
+		for n := range 50 {
+			s.Put(ctx, "v1/events/2000-01-01/"+itoa(n)+".json", []byte("{}"), store.Absent)
+		}
+		return s
+	}
+	start := time.Date(2026, 10, 21, 12, 0, 0, 0, time.UTC)
+
+	s := fill()
+	report, rounds, _ := sweepRounds(ctx, records.New(s), func() time.Time { return start }, 10, &eventSweep{},
+		time.Second, func(time.Duration) bool { return false })
+	if report.events != 10 || rounds != 1 {
+		t.Fatalf("told to stop: %+v %d", report, rounds)
+	}
+
+	s = fill()
+	clock := start
+	report, rounds, _ = sweepRounds(ctx, records.New(s), func() time.Time { return clock }, 10, &eventSweep{},
+		25*time.Minute, func(pause time.Duration) bool { clock = clock.Add(pause); return true })
+	// Rounds at :00, :25 and :50; a fourth would start after the hour.
+	if report.events != 30 || rounds != 3 {
+		t.Fatalf("the hour: %+v %d", report, rounds)
+	}
+}
+
 // listCounter is a store that counts its lists.
 type listCounter struct {
 	store.Store
