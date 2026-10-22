@@ -40,7 +40,8 @@ const leasesBrief = "Lease a shared resource with lease_resource before using it
 
 // endingBrief names the three ways a turn ends (#1801). Without it an agent learnt about
 // archiving only from archive_session's description, and one that had finished with
-// nothing for the person stopped and left an unread row.
+// nothing for the person stopped and left an unread row. suggest_next_prompt is named here
+// too (#2171): Claude defers MCP tools, so its description alone was never read.
 func endingBrief(runtimeID string) string {
 	ask := "ask_form"
 	if own := escalationTools[runtimeID]; own != "" {
@@ -49,8 +50,10 @@ func endingBrief(runtimeID string) string {
 	return "End each turn in one of three ways. If you cannot continue without me, ask me with " +
 		ask + ", or end the turn stuck or blocked. If you are done and have something for me " +
 		"(a report, a document, a diagram), call show_file on it once and end the turn; do not " +
-		"archive. If you are done and have nothing for me, clean up, then call archive_session " +
-		"with no id."
+		"archive. When such a turn, or a done reply, leaves one clear next step for me, call " +
+		"suggest_next_prompt with it before you end the turn; not with a question waiting, nor " +
+		"when you archive. If you are done and have nothing for me, clean up, then call " +
+		"archive_session with no id."
 }
 
 // systemPromptDelivery is RuntimeCatalog's: how a runtime takes words of ours as its system

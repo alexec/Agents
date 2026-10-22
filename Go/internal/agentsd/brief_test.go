@@ -17,7 +17,7 @@ import (
 func TestTheEndingBriefNamesTheThreeEndings(t *testing.T) {
 	for runtimeID, ask := range map[string]string{"claude": "AskUserQuestion (or ask_form if you lack it)", "grok": "ask_form,"} {
 		got := endingBrief(runtimeID)
-		for _, want := range []string{ask, "show_file on it once", "do not archive", "archive_session with no id"} {
+		for _, want := range []string{ask, "show_file on it once", "do not archive", "suggest_next_prompt with it", "archive_session with no id"} {
 			if !strings.Contains(got, want) {
 				t.Fatalf("%s: %q has no %q", runtimeID, got, want)
 			}
