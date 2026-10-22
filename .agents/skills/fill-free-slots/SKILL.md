@@ -1,6 +1,6 @@
 ---
 name: fill-free-slots
-description: Find the free agent slots in this project and start an agent on each open, unassigned GitHub issue until the slots are full. Open-milestone issues and bugs go first (never the next milestone), walk lanes go first while more than five issues need a walk, spare slots go to polish and competitor issues by RICE, then to the backlog, and only one lane works in each area. Nothing else. Use when the Fill free slots workflow runs, or when Alex asks to fill the free slots.
+description: Find the free agent slots in this project and start an agent on each open, unassigned GitHub issue until the slots are full. High issues, then UI changes (bugs first), then open-milestone issues and bugs go first (never the next milestone), walk lanes go first while more than five issues need a walk, spare slots go to polish and competitor issues by RICE, then to the backlog, and only one lane works in each area. Nothing else. Use when the Fill free slots workflow runs, or when Alex asks to fill the free slots.
 ---
 
 # Fill free slots
@@ -36,6 +36,14 @@ Order them by AGENTS.md, "Work by milestone" (#2309): issues in the open milesto
 for the next milestone, whose issues keep `parked` until the open one ships. Then the
 standing issues below, then the backlog (issues with no milestone that are not standing):
 `bug` first, then by RICE, highest first.
+
+**UI changes first (#2337).** Before the order above, put the `priority:high` issues, then
+the **UI changes**: issues whose change alters what a client shows (`App/Sources`,
+`Remote/Sources`, `Shared/UI`, `Web/src`, as their text, area or `.agents/areas` says), from
+the open milestone and the backlog alike, `bug` before the rest. Then the rest, in the order
+above. A UI issue takes a free slot before a non-UI one. When slots run short, a non-UI lane
+waits, never a UI one. Why: a person must review each UI change, so it must get to
+`main` and TestFlight early (Alex, 2026-10-22).
 
 **Standing work (#1570, #1604).** The open issues labelled `polish` or `competitor`
 with no milestone are standing issues; order them by RICE, highest first. Keep at least
