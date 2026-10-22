@@ -78,36 +78,6 @@ public struct SidebarProjectFold {
         pinned.contains { work.group(of: $0) == .needsAttention } || pinnedWorkflows.contains(where: \.needsAPerson)
     }
 
-    /// How many sessions the project's own group lists, folded or not: its live ones that
-    /// no smart group lists (#587). The busy groups go to Needs You and Working whole, so
-    /// what is left is the rest, less the unread, those asking to be archived (#937) and the
-    /// pinned among them, and less the session Unread keeps while it is open (#689). With a
-    /// smart group off (#846), a pass over its live sessions instead, as
-    /// `SidebarSmartRow.home` places each.
-    public static func ownCount(_ key: ProjectKey, in work: AgentsModel, keptInUnread: UUID? = nil,
-                                on: Set<SidebarSmartRow> = SidebarSmartRow.all) -> Int {
-        let shelf = work.shelf(key)
-        if on != SidebarSmartRow.all {
-            let pinned = Set(work.pinnedSessions(in: key.folder))
-            let kept = SidebarSmartRow.keptInUnread(keptInUnread, in: work, on: on)?.id
-            return AgentGroup.live.reduce(0) { total, group in
-                total + (shelf.groups[group] ?? []).count {
-                    $0.id != kept && SidebarSmartRow.home(of: $0, in: group, isPinned: pinned.contains($0.id), on: on) == nil
-                }
-            }
-        }
-        let rest = AgentGroup.live.filter { !SidebarSmartRow.busyGroups.contains($0) }
-            .reduce(0) { $0 + (shelf.counts[$1] ?? 0) }
-        let pinnedAtRest = SidebarSmartRow.pinnedSessions(in: work, key).count {
-            SidebarSmartRow.home(of: $0, in: work.group(of: $0), isPinned: false) == nil
-        }
-        let kept = SidebarSmartRow.keptInUnread(keptInUnread, in: work).map {
-            ProjectKey(host: $0.host, folder: $0.projectFolder) == key && !$0.showsUnread
-        } ?? false
-        return max(0, rest - SidebarSmartRow.unreadAtRest(in: shelf) - SidebarSmartRow.askingAtRest(in: shelf)
-            - pinnedAtRest - (kept ? 1 : 0))
-    }
-
     /// How many archived sessions the fold says it holds: the host's count while there is
     /// no search, since the client holds a page of them only while the fold is open (#165).
     public func archivedCount(_ summary: DaemonAPI.ProjectSummary?) -> Int {

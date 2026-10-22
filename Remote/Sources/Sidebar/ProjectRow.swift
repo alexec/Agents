@@ -2,12 +2,10 @@ import AgentsKitCore
 import SwiftUI
 
 /// One folder in the sidebar, the row its sessions fold under: the Mac's `ProjectRow`
-/// (#145, #226). As a group's heading, a grey count of its own sessions, as every group's
-/// heading says it (#587); as a row, a dot when something in it is waiting on you.
+/// (#145, #226). As a group's heading, the name alone: its Sessions fold counts them
+/// (#2364). As a row, a dot when something in it is waiting on you.
 struct ProjectRow: View {
     @Environment(RemoteModel.self) private var model
-    /// The smart groups turned off in Settings ▸ Sidebar (#846), for the count.
-    @AppStorage(SidebarSmartRow.offDefaultsKey) private var smartOff = SidebarSmartRow.offAtFirst
     let summary: DaemonAPI.ProjectSummary
     /// The name as the sidebar shows it: `server:Project` on a server.
     var label: String? = nil
@@ -52,16 +50,9 @@ struct ProjectRow: View {
                 }
             }
             Spacer(minLength: 4)
-            if asHeading {
-                // How many its group lists (#587). Who needs you is in Needs You at the
-                // top, so no dot.
-                if ownCount > 0 {
-                    Text("\(ownCount)")
-                        .monospacedDigit()
-                        .appText(.fine)
-                        .foregroundStyle(.secondary)
-                }
-            } else if needsPerson {
+            // As a heading, no count: its Sessions fold has one (#2364). Who needs you is
+            // in Needs You at the top, so no dot.
+            if !asHeading, needsPerson {
                 Circle()
                     .fill(StateTint.attention.style(or: .secondary))
                     .frame(width: 7 * scale, height: 7 * scale)
@@ -70,12 +61,6 @@ struct ProjectRow: View {
         }
         .accessibilityElement(children: .combine)
         .accessibilityLabel(accessibilityLabel)
-    }
-
-    /// The sessions its group lists, each listed once (`SidebarSmartRow.home`).
-    private var ownCount: Int {
-        SidebarProjectFold.ownCount(summary.key, in: model.work, keptInUnread: model.keptInUnread,
-                                    on: SidebarSmartRow.on(off: smartOff))
     }
 
     /// What is going on in there, in the Mac row's words and order: urgency first, and
@@ -103,9 +88,7 @@ struct ProjectRow: View {
         var parts = [label ?? summary.name]
         if summary.project.isPinned { parts.append("pinned") }
         if !summary.exists { parts.append("folder is missing") }
-        if asHeading {
-            if ownCount > 0 { parts.append("\(ownCount)") }
-        } else if let subtitle {
+        if !asHeading, let subtitle {
             parts.append(subtitle)
         }
         return parts.joined(separator: ", ")

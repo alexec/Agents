@@ -194,7 +194,7 @@ test("a project's sessions are one list, the pinned out of it; Pinned keeps pin 
 });
 
 test("a session is listed once, in its first group: Pinned, Needs You, Working, Unread, else its project (#587)", async () => {
-  const { home, smartAgents, projectSessions, ownCount } = await load("src/model/sidebar.ts");
+  const { home, smartAgents, projectSessions } = await load("src/model/sidebar.ts");
   const live = [
     agent("pinned-asking", 1, { state: "waitingOnUser" }),
     agent("asking-unread", 2, { state: "waitingOnUser", isUnread: true }),
@@ -208,7 +208,6 @@ test("a session is listed once, in its first group: Pinned, Needs You, Working, 
   assert.deepEqual(smartAgents("working", live, undefined, pins).map((a) => a.id), ["working-unread"]);
   assert.deepEqual(smartAgents("unread", live, undefined, pins).map((a) => a.id), ["unread"], "not those busy");
   assert.deepEqual(projectSessions(live, pins).map((a) => a.id), ["read"], "its project has the rest");
-  assert.equal(ownCount(live, pins), 1);
 });
 
 test("Unread keeps the session opened from it in its place (#495)", async () => {
@@ -221,11 +220,10 @@ test("Unread keeps the session opened from it in its place (#495)", async () => 
 });
 
 test("the session Unread keeps is not under its project too, until another is opened (#689)", async () => {
-  const { keepsInUnread, projectSessions, ownCount } = await load("src/model/sidebar.ts");
+  const { keepsInUnread, projectSessions } = await load("src/model/sidebar.ts");
   const live = [agent("opened", 2), agent("read", 1), agent("working", 3, { state: "running" })];
   assert.equal(keepsInUnread(live[0], []), true, "read now, still kept");
   assert.deepEqual(projectSessions(live, [], undefined, "opened").map((a) => a.id), ["read"]);
-  assert.equal(ownCount(live, [], "opened"), 1);
   assert.deepEqual(projectSessions(live, []).map((a) => a.id), ["opened", "read"], "under its project once let go");
   assert.equal(keepsInUnread(live[0], ["opened"]), false, "pinned, it is in Pinned");
   assert.equal(keepsInUnread(live[2], []), false, "working, it is in Working");
@@ -233,7 +231,7 @@ test("the session Unread keeps is not under its project too, until another is op
 });
 
 test("a group turned off is not drawn, and its sessions go to the next group they fit, or under their project (#846)", async () => {
-  const { smartAgents, smartRows, projectSessions, ownCount, keepsInUnread, pinnedSessions } = await load("src/model/sidebar.ts");
+  const { smartAgents, smartRows, projectSessions, keepsInUnread, pinnedSessions } = await load("src/model/sidebar.ts");
   const live = [
     agent("pinned-asking", 1, { state: "waitingOnUser" }),
     agent("asking", 2, { state: "waitingOnUser" }),
@@ -251,7 +249,6 @@ test("a group turned off is not drawn, and its sessions go to the next group the
       : row === "pinned" ? pinnedSessions(live, pins).map((a) => a.id)
       : smartAgents(row, live, undefined, pins, on).map((a) => a.id)]));
     const own = projectSessions(live, pins, undefined, undefined, on).map((a) => a.id);
-    assert.equal(ownCount(live, pins, undefined, on), own.length, "the project's count is what it lists");
     const every = [...Object.values(rows).flat(), ...own];
     assert.equal(new Set(every).size, every.length, "once each");
     assert.equal(every.length, live.length, "none left out");
