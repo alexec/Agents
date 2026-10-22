@@ -326,8 +326,12 @@ func setBy(rule, words string) *wire.PolicySetBy {
 }
 
 // workRefusal is why this machine starts no work at all now: no policy it can trust
-// (FR-013), a capability it lacks (FR-014), or the kill switch (FR-015). Nil otherwise.
+// (FR-013), a capability it lacks (FR-014), the kill switch (FR-015), or its person
+// suspended (#1002, FR-018). Nil otherwise.
 func (d *Daemon) workRefusal() error {
+	if err := d.suspensionRefusal(); err != nil {
+		return err
+	}
 	d.orgMu.Lock()
 	d.readOrgPolicyLocked()
 	lost := d.orgLost
@@ -1005,6 +1009,12 @@ func (d *Daemon) holdsForPolicy(l *live) bool {
 // Agents and their queues are kept; nothing starts again by itself when it is turned off.
 func (d *Daemon) stopAllForPolicy() {
 	log.Printf("policy: the kill switch is on; stopping every turn")
+	d.stopEveryTurn("Stopped. " + orgSetBy + " " + orgStopAllWords)
+}
+
+// stopEveryTurn stops every running turn, as Stop does, with this line in its chat: the
+// kill switch, and a suspended person (#1002). Agents and their queues are kept.
+func (d *Daemon) stopEveryTurn(line string) {
 	d.mu.Lock()
 	ls := make([]*live, 0, len(d.lives))
 	for _, l := range d.lives {
@@ -1016,7 +1026,7 @@ func (d *Daemon) stopAllForPolicy() {
 		in := l.inTurn
 		l.mu.Unlock()
 		if in {
-			d.record(l.id, runtimeNote("Stopped. "+orgSetBy+" "+orgStopAllWords))
+			d.record(l.id, runtimeNote(line))
 			l.cancel()
 		}
 	}
@@ -1155,8 +1165,10 @@ func (d *Daemon) policyState() wire.PolicyState {
 		st.Update = d.missingCapabilities(p)
 	}
 	if err := d.workRefusal(); err != nil {
-		r := err.(*Error).Data.(wire.PolicyRefusal)
-		st.Refusal = &r
+		// A suspension is no policy's refusal: its clients are cut off.
+		if r, ok := err.(*Error).Data.(wire.PolicyRefusal); ok {
+			st.Refusal = &r
+		}
 	}
 	return st
 }

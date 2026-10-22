@@ -67,10 +67,10 @@
 
 **Goal**: a suspended user's work stops on their machines, and nothing is deleted. Covers US4 on the machine.
 
-- [ ] T030 [US4] Test in `Go/internal/agentsd/usersuspend_test.go`: `user/suspended` stops two running turns in 5 s, pauses workflows and queued prompts, refuses new work and the direct path; `off: true` undoes the pause and starts nothing by itself; every agent and file stays (FR-018).
-- [ ] T031 [US4] Add `Go/internal/agentsd/usersuspend.go`: handle `user/suspended` (dispatch in `localpath.go`), reuse the T5 kill switch's stop for one user, keep the state in `<root>/suspended.json` so a restart keeps it, say `host.suspend.1` in `host/hello`.
-- [ ] T032 [US4] Stop (not delete) the person's started machines through their workspace provider on suspension, in the control plane's provider code.
-- [ ] T033 [P] Docs: `docs/explanation/org-identity.md` "What an offline machine does".
+- [x] T030 [US4] Test in `Go/internal/agentsd/usersuspend_test.go`: `user/suspended` stops two running turns in 5 s, pauses workflows and queued prompts, refuses new work and the direct path; `off: true` undoes the pause and starts nothing by itself; every agent and file stays (FR-018).
+- [x] T031 [US4] Add `Go/internal/agentsd/usersuspend.go`: handle `user/suspended` (dispatch in `localpath.go`), reuse the T5 kill switch's stop for one user, keep the state in `<root>/suspended.json` so a restart keeps it, say `host.suspend.1` in `host/hello`.
+- [x] T032 [US4] Stop (not delete) the person's started machines through their workspace provider on suspension, in the control plane's provider code.
+- [x] T033 [P] Docs: `docs/explanation/org-identity.md` "What an offline machine does".
 
 **Checkpoint**: quickstart step 4.
 

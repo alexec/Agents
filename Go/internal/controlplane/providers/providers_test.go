@@ -838,3 +838,42 @@ func TestARemovedPersonsMachineIsDeletedThroughItsProvider(t *testing.T) {
 		t.Errorf("%v", deleted)
 	}
 }
+
+// #1002, D13, FR-018: a suspended person's started machines are stopped through their
+// provider, never deleted, and are not started while the suspension lasts.
+func TestASuspendedPersonsMachinesAreStoppedNotDeleted(t *testing.T) {
+	h := newHarness(t)
+	suspended := false
+	h.providers.hooks.OwnerOf = func(host string) string {
+		if host == devbox {
+			return "kim"
+		}
+		return "lee"
+	}
+	h.providers.hooks.Suspended = func(person string) bool { return suspended && person == "kim" }
+	id := h.add()
+	h.link(id, devbox, "scratch-1")
+	h.router.setOnline(devbox, true)
+	suspended = true
+	h.providers.StopFor("kim", "suspension (Acme Okta)")
+	h.waitFor("stopped", devbox, 5, func(r row) bool { return r.Workspace.CanStart })
+	if _, stops := h.provider.count(); stops != 1 {
+		t.Fatalf("stops %d", stops)
+	}
+	if h.records.Host(devbox) == nil || h.row(devbox).Workspace == nil {
+		t.Fatal("the machine or its link went")
+	}
+	// Not started while suspended; by hand, for use, or again by StopFor.
+	_, err := h.call(MethodHostsStart, map[string]string{"host": devbox})
+	if f := failureOf(err); f == nil || f.Code != CodeProviderFailed {
+		t.Fatalf("%v", err)
+	}
+	h.providers.StartForUse(devbox, "a kept prompt")
+	h.providers.StopFor("kim", "suspension (Acme Okta)")
+	if starts, stops := h.provider.count(); starts != 0 || stops != 1 {
+		t.Fatalf("starts %d stops %d", starts, stops)
+	}
+	// Once it ends, the person starts it again by hand.
+	suspended = false
+	h.must(MethodHostsStart, map[string]string{"host": devbox})
+}

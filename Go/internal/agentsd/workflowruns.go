@@ -329,6 +329,12 @@ func (d *Daemon) fire(fr fireRequest) {
 		d.workflowMu.Unlock()
 		return
 	}
+	// A suspended person's workflows are paused (#1002, FR-018): a trigger is let go, not
+	// kept, so nothing runs by itself when the suspension ends.
+	if d.suspension() != nil {
+		d.workflowMu.Unlock()
+		return
+	}
 	// A bot's machine at the bot's spend cap starts no work (#1761, FR-033), and a runs-on:
 	// workflow runs once per trigger across the bot's machines (FR-034), by the trigger's
 	// scope (#2011, FR-035).
@@ -795,6 +801,9 @@ func (d *Daemon) runWorkflow(r wire.WorkflowRequest) (wire.WorkflowSummary, erro
 		return wire.WorkflowSummary{}, &Error{Code: wire.FailureNoSuchWorkflow, Message: f.wf.Name + " runs on another computer."}
 	}
 	d.workflowMu.Unlock()
+	if err := d.suspensionRefusal(); err != nil {
+		return wire.WorkflowSummary{}, err
+	}
 	d.fire(fireRequest{folder: folder, id: r.WorkflowID, byHand: true, trigger: byHandTrigger()})
 	return d.oneWorkflow(folder, r.WorkflowID)
 }

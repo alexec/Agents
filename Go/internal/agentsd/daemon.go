@@ -50,6 +50,7 @@ type Daemon struct {
 	actorBook
 	appToolsState
 	hostUserState
+	userSuspendState
 	hostedPool
 	eventWaitState
 	messageState
