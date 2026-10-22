@@ -266,8 +266,9 @@ struct StartAgentView: View {
             if model.isStarting {
                 Telling(host: model.recipient(on: model.startHost), doing: AgentState.startingLabel)
             }
-            // The chat's prompt bar: one raised card holding the words, attach, dictate and send
-            // in ink, so starting an agent and talking to one look like the same act.
+            // The chat's prompt bar: one raised card holding the words and send in ink, attach
+            // and dictate under it (#2375), so starting an agent and talking to one look like
+            // the same act.
             HStack(alignment: .bottom, spacing: 8) {
                 TextField(policyRefusal ?? "What should it do?", text: $text, selection: $selection, axis: .vertical)
                     .textFieldStyle(.plain)
@@ -279,11 +280,6 @@ struct StartAgentView: View {
                     // ⌘V of a picture from an iPad's keyboard attaches it (#396).
                     .modifier(PastesPictures(attachments: $attachments, refusal: $attachNote))
                     // Held, words and all, while they start an agent (#87).
-                    .disabled(model.isStarting)
-
-                AttachButton(attachments: $attachments, refusal: $attachNote)
-
-                DictateButton(dictation: dictation, begin: beginDictation)
                     .disabled(model.isStarting)
 
                 Button {
@@ -309,6 +305,11 @@ struct StartAgentView: View {
             }
             .padding(14)
             .paperRaised(in: RoundedRectangle(cornerRadius: 18))
+            HStack(spacing: 6) {
+                AttachButton(attachments: $attachments, refusal: $attachNote)
+                DictateButton(dictation: dictation, begin: beginDictation)
+                    .disabled(model.isStarting)
+            }
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 10)

@@ -1,0 +1,71 @@
+@preconcurrency import AVFoundation
+import Foundation
+
+/// The one audio engine of voice mode (#2375): the microphone and the voice together.
+///
+/// The person can talk over the voice, so the microphone stays open while the voice
+/// speaks. For the microphone not to hear the voice, the voice plays through the same
+/// engine, with the system's voice processing (echo cancellation) on its input. Voice mode
+/// opens it when it turns on and closes it when it turns off; `Dictation` and
+/// `VoiceSpeaker` only add and take away their own parts.
+@MainActor
+final class VoiceAudio {
+    let engine = AVAudioEngine()
+    private(set) var isOpen = false
+    /// Whether the microphone leaves out what the voice says. Without it, the microphone
+    /// closes while the voice speaks, as before #2375.
+    private(set) var cancelsEcho = false
+    /// Off in a walk: no microphone, so nothing to ask for and nothing to cancel.
+    var listens = true
+
+    /// Opens the audio route for talking and listening. Throws when there is none.
+    func open() throws {
+        guard !isOpen else { return }
+        #if os(iOS)
+        // Speaker and microphone at once. The silent switch does not mute it, since the
+        // person asked to hear the reply, and other sound ducks under it.
+        let session = AVAudioSession.sharedInstance()
+        if listens {
+            try session.setCategory(.playAndRecord, mode: .voiceChat,
+                                    options: [.defaultToSpeaker, .allowBluetoothHFP, .duckOthers])
+        } else {
+            try session.setCategory(.playback, mode: .spokenAudio, options: [.duckOthers])
+        }
+        try session.setActive(true)
+        #endif
+        cancelsEcho = false
+        if listens {
+            do {
+                try engine.inputNode.setVoiceProcessingEnabled(true)
+                // Other apps' sound stays as loud as it can: the voice is not a phone call.
+                engine.inputNode.voiceProcessingOtherAudioDuckingConfiguration =
+                    AVAudioVoiceProcessingOtherAudioDuckingConfiguration(enableAdvancedDucking: false, duckingLevel: .min)
+                cancelsEcho = true
+            } catch {
+                // No echo cancellation on this route: the microphone closes while it speaks.
+            }
+        }
+        // The output is joined to the engine before it starts, as voice processing needs.
+        _ = engine.mainMixerNode
+        isOpen = true
+    }
+
+    /// Starts the engine, once something is joined to it.
+    func start() throws {
+        guard !engine.isRunning else { return }
+        engine.prepare()
+        try engine.start()
+    }
+
+    func close() {
+        guard isOpen else { return }
+        engine.inputNode.removeTap(onBus: 0)
+        if engine.isRunning { engine.stop() }
+        if cancelsEcho { try? engine.inputNode.setVoiceProcessingEnabled(false) }
+        cancelsEcho = false
+        isOpen = false
+        #if os(iOS)
+        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+        #endif
+    }
+}

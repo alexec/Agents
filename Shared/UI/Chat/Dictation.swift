@@ -120,7 +120,10 @@ final class Dictation {
     private(set) var isListening = false
     private(set) var problem: Problem?
 
-    private let engine = AVAudioEngine()
+    private let engine: AVAudioEngine
+    /// Voice mode's engine and audio route, when this is voice mode's dictation (#2375):
+    /// they are opened and closed by voice mode, and this only adds its tap.
+    private let shared: VoiceAudio?
     private let sink = BufferSink()
     private var analyzer: SpeechAnalyzer?
     private var results: Task<Void, Never>?
@@ -141,6 +144,11 @@ final class Dictation {
 
     /// Whether the system has been asked yet. Used to put our own words in front of
     /// the system's alert the first time.
+    init(shared: VoiceAudio? = nil) {
+        self.shared = shared
+        engine = shared?.engine ?? AVAudioEngine()
+    }
+
     var hasBeenAsked: Bool {
         SFSpeechRecognizer.authorizationStatus() != .notDetermined
     }
@@ -319,13 +327,15 @@ final class Dictation {
 
     /// The microphone, opened once and left open for as long as dictation is on.
     private func openMicrophone() async throws {
-        guard !engine.isRunning else { return }
+        guard shared != nil || !engine.isRunning else { return }
         #if os(iOS)
+        if shared == nil {
         // A phone shares one audio route between everything on it, and the microphone
         // is not the app's until the app says it is recording.
         let session = AVAudioSession.sharedInstance()
         try session.setCategory(.record, mode: .measurement, options: .duckOthers)
         try session.setActive(true, options: .notifyOthersOnDeactivation)
+        }
         #endif
 
         // The tap is called by the audio realtime thread. A closure written inside a
@@ -342,6 +352,10 @@ final class Dictation {
         input.removeTap(onBus: 0)
         // The throwing tap that replaced the old one in 27 reaches Swift only by its refined name.
         try input.__installTap(onBus: 0, bufferSize: 1_024, format: format, error: (), block: tap)
+        if let shared {
+            try shared.start()
+            return
+        }
         engine.prepare()
         try engine.start()
     }
@@ -364,6 +378,12 @@ final class Dictation {
     }
 
     private func closeMicrophone() {
+        // Voice mode's engine goes on playing the voice: only the tap comes off.
+        if shared != nil {
+            engine.inputNode.removeTap(onBus: 0)
+            sink.point(at: nil)
+            return
+        }
         if engine.isRunning {
             engine.inputNode.removeTap(onBus: 0)
             engine.stop()

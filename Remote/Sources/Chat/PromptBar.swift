@@ -102,10 +102,18 @@ struct PromptBar: View {
             if sending > 0, sendingIsSlow {
                 Telling(host: model.answerRecipient(agent.id), doing: "Sending")
             }
-            // Voice mode in this chat (#2322): what it hears and says.
-            VoiceModeStrip(agentID: agent.id)
-            field
-            if isShowingEverything { options }
+            // Voice mode in this chat (#2322) takes the field's place: what it hears and
+            // says (#2375).
+            if VoiceMode.shared.isOn(in: agent.id) {
+                VoiceModeField(agentID: agent.id)
+            } else {
+                field
+            }
+            // Attach, dictate and voice, under the field with the options (#2375).
+            HStack(spacing: 10) {
+                tools
+                if isShowingEverything { options }
+            }
         }
         .task(id: sending > 0) {
             sendingIsSlow = false
@@ -254,13 +262,6 @@ struct PromptBar: View {
                     return .handled
                 }
 
-            AttachButton(attachments: $attachments, refusal: $attachRefusal)
-
-            DictateButton(dictation: dictation, begin: beginDictation)
-
-            // Voice mode (#2322), while Settings ▸ Voice has it on.
-            VoiceModeButton(agentID: agent.id) { await model.send($0, to: agent.id, voice: true) }
-
             // While it works and nothing is typed, send is stop. Type and it is send
             // again, queueing what is typed for when the turn ends.
             if model.canStop(agent), !model.isStale(agent), text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
@@ -311,6 +312,17 @@ struct PromptBar: View {
         }
         .padding(14)
         .paperRaised(in: RoundedRectangle(cornerRadius: 18))
+    }
+
+    /// What goes into a prompt other than typing: a file, dictation, and voice mode
+    /// (#2322), while Settings ▸ Voice has it on. Under the field (#2375), so the field
+    /// is for words.
+    private var tools: some View {
+        HStack(spacing: 6) {
+            AttachButton(attachments: $attachments, refusal: $attachRefusal)
+            DictateButton(dictation: dictation, begin: beginDictation)
+            VoiceModeButton(agentID: agent.id) { await model.send($0, to: agent.id, voice: true) }
+        }
     }
 
     /// Why nothing can be sent on the Mac's host now, in its organisation's words (#998). A
