@@ -36,7 +36,9 @@ struct RemoteReviewDestination: View {
         } else if let agent = approval.agentID, model.work.agent(agent) != nil {
             model.sidebarItem = .session(agent)
         } else {
+            // Nothing picked in its project, not New session (#2090).
             model.sidebarItem = .project(project)
+            model.composing = false
         }
     }
 }

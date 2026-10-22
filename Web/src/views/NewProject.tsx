@@ -293,7 +293,7 @@ function FolderDialog({ store, host, close }: { store: Store; host: string; clos
     close();
     if (!folder) return;
     const summary = await store.addProject(host, folder);
-    if (summary) go({ host, project: summary.project.folder });
+    if (summary) go({ host, project: summary.project.folder, compose: true });
   };
   return (
     <Modal label={`Choose a folder on ${label}`} close={close}>
@@ -335,7 +335,7 @@ function CloneDialog({ store, host, close }: { store: Store; host: string; close
     // Closed as the clone begins: how it goes is a row in the projects column (027).
     close();
     void store.cloneProject(host, remote.url).then((summary) => {
-      if (summary) go({ host, project: summary.project.folder });
+      if (summary) go({ host, project: summary.project.folder, compose: true });
     });
   };
   const note = remote

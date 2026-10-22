@@ -29,15 +29,12 @@ struct StartAgentView: View {
     @State private var pointer: CGPoint?
     /// This showing of the page (#1044): only it lets the page go when it goes.
     @State private var page = UUID()
-    /// Whether this showing is on screen, to take the page back when the model lets it go (#1874).
-    @State private var onScreen = false
 
     var body: some View {
         form
         .onAppear {
             // What it starts opens in this scene (#1089).
             model.composingScene = sceneProject
-            onScreen = true
             model.startPageAppeared(in: project, page: page)
             let kept = StartDraftKeeper.shared.draft(in: project)
             text = kept?.text ?? ""
@@ -51,12 +48,14 @@ struct StartAgentView: View {
             focused = true
         }
         .onChange(of: model.offeredStart) { takeOffer() }
-        // An old showing can let the page go after this one took it (#1044), and then
-        // nothing asks the runtime for its choices until Send (#1874): take it back at
-        // once. Not while starting: the agent this page started lets it go as it leaves.
-        .onChange(of: model.startingIn) {
-            guard onScreen, !model.isStarting, model.startingIn != project else { return }
-            model.startPageAppeared(in: project, page: page)
+        // Which showing holds the page is the model's (#2089): the last to come, and the
+        // one under it once that goes. But an iPhone says this showing went just after it
+        // came, and it stays on screen with nothing behind it: a showing still told of
+        // changes takes the page back when nothing holds it. Not one that holds nothing
+        // because it is going: the model knows which started their agent. A count, not
+        // `startingIn`: that went to the project and back to nil before a frame was drawn.
+        .onChange(of: model.startPageLetGo) {
+            model.startPageStillShown(in: project, page: page)
         }
         // Said once, when it arrives: a refusal is the one thing on this page a person
         // using VoiceOver would otherwise have to go looking for.
@@ -69,7 +68,6 @@ struct StartAgentView: View {
         .onChange(of: text) { keep() }
         .onChange(of: attachments) { keep() }
         .onDisappear {
-            onScreen = false
             StartDraftKeeper.shared.flush()
             model.startPageDisappeared(page)
         }

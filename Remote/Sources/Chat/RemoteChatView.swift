@@ -30,6 +30,9 @@ struct RemoteChatView: View {
     private static let edgePull: CGFloat = 24
     /// Set in a scene of its own (#888): this session, not the selection.
     @Environment(\.poppedChat) private var popped
+    /// The project of the scene this is in, when it is a project's own (#1089): Archive
+    /// leaves the chat there too, back to the project's list (#2090).
+    @Environment(\.sceneProject) private var sceneProject
 
     private var agent: Agent? { popped.map { model.work.agent($0.id) } ?? model.selectedAgent }
     /// This chat's page of the transcript: its scene's own, or the main scene's.
@@ -279,7 +282,7 @@ struct RemoteChatView: View {
                     } else {
                         PinAgentButton(agent: agent)
                         // A scene of its own stays, saying it is archived (#888).
-                        ArchiveAgentButton(agent: agent, leavesChat: popped == nil)
+                        ArchiveAgentButton(agent: agent, leavesChat: popped == nil || sceneProject != nil)
                     }
                 }
             }
@@ -527,6 +530,9 @@ struct RemoteChatView: View {
 private struct ChatMenu: View {
     @Environment(RemoteModel.self) private var model
     @Environment(\.poppedChat) private var popped
+    /// The project of the scene this is in, when it is a project's own (#1089): Archive
+    /// leaves the chat there too, back to the project's list (#2090).
+    @Environment(\.sceneProject) private var sceneProject
     @Environment(\.horizontalSizeClass) private var sizeClass
     let agent: Agent
     /// Find in Chat (#1532), over the chat. Nil in a scene of its own.
@@ -588,7 +594,7 @@ private struct ChatMenu: View {
                 if sizeClass != .regular {
                     Divider()
                     PinAgentButton(agent: agent)
-                    ArchiveAgentButton(agent: agent, leavesChat: popped == nil)
+                    ArchiveAgentButton(agent: agent, leavesChat: popped == nil || sceneProject != nil)
                 }
             } else {
                 Divider()

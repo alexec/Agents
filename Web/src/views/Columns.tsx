@@ -76,7 +76,8 @@ export function Columns({ session, store }: { session: Session; store: Store }) 
             <ArchivePage store={store} host={r.host} folder={project.project.folder} projectName={project.name} down={down} />
           ) : r.host && r.project && project && r.mcp ? (
             <MCPServersPage store={store} host={r.host} folder={project.project.folder} projectName={project.name} />
-          ) : r.host && r.project && project ? (
+          ) : r.host && r.project && project && r.compose ? (
+            // Only when asked for: leaving a session shows nothing chosen, not New Session (#2090).
             <NewAgent store={store} host={r.host} folder={project.project.folder} projectName={project.name} down={down} />
           ) : <NothingChosen />}
         {r.host && r.session && r.files && <FilesPane store={store} host={r.host} session={r.session} />}

@@ -30,6 +30,7 @@ extension RemoteModel {
         guard state.scenes <= 0, projectScenes[state.key] === state else { return }
         projectScenes[state.key] = nil
         if composingScene == state.key { composingScene = nil }
+        startPagesMoved()
     }
 
     /// A session in its project's own scene or screen, when one is open (#1089): what a
@@ -142,8 +143,10 @@ private struct RemoteProjectColumns: View {
         }
         .navigationSplitViewStyle(.balanced)
         .environment(\.sceneProject, state.key)
+        // Nothing left to show, as after Archive: back to the list on an iPhone (#2090).
         .onChange(of: state.pick) { _, pick in
-            if pick != nil { compactColumn = .detail }
+            model.startPagesMoved()
+            compactColumn = pick != nil ? .detail : .sidebar
         }
     }
 
@@ -156,8 +159,12 @@ private struct RemoteProjectColumns: View {
                     .paperGround()
                     .environment(\.poppedChat, chat)
             }
-        case .project, nil:
+        case .project:
             StartAgentView(project: summary.folder)
+                .paperGround()
+        case nil:
+            // Only New Session opens the start page (#2090), as in the sidebar of every project.
+            NothingPickedPage()
                 .paperGround()
         default:
             ContentUnavailableView("Open it in All Projects", systemImage: "sidebar.left",
@@ -185,7 +192,9 @@ private struct RemoteProjectSidebar: View {
     private var label: String { SidebarOrder.label(summary) { model.hostLabel($0) } }
 
     var body: some View {
-        List(selection: Binding(get: { state.pick }, set: { state.pick = $0 })) {
+        // A list clears its selection by itself while rows come and go, as an archived
+        // session's does, and that must not empty the detail (#2090), as `RemoteSidebar`'s.
+        List(selection: Binding(get: { state.pick }, set: { if let pick = $0 { state.pick = pick } })) {
             Section {
                 Label("New Session", systemImage: "square.and.pencil")
                     .appText(.supporting)

@@ -118,7 +118,7 @@ export function SessionButtons({ store, host, agent, disabled }: { store: Store;
   );
 }
 
-/** Archive, then the session's project: the chat it was open in has nothing left to show. */
+/** Archive, then the session's project with nothing chosen (#2090): the chat it was open in has nothing left to show. */
 function archiveAndLeave(store: Store, host: string, agent: Agent) {
   void archiveWithChildren(store, host, agent).then((done) => { if (done) go({ host, project: projectFolder(agent) }); });
 }
