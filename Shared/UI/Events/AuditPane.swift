@@ -101,8 +101,10 @@ struct AuditPane: View {
                     Button("Cancel", role: .cancel) {}
                 } message: {
                     if let days = shorter {
+                        // No count while Whose names a person: the list is theirs, and the
+                        // sweep deletes everyone's (#2192).
                         Text(AuditWords.shorterMessage(from: list.days, to: days,
-                                                       older: AuditWords.older(list, than: days)))
+                                                       older: user.isEmpty ? AuditWords.older(list, than: days) : nil))
                     }
                 }
                 if !people.isEmpty {
