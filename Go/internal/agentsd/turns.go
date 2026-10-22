@@ -606,6 +606,12 @@ func (l *live) turn() bool {
 				}
 			}
 		}
+		// The policy again, now the runtime has said its options: an agent with no model
+		// or mode chosen runs on the runtime's own, which the check before it started
+		// could not see. A refused one waits, as at the start of a turn.
+		if d.holdsForPolicy(l) {
+			return false
+		}
 	}
 	// The words, off the queue now the runtime is there to take them.
 	var q wire.QueuedPrompt
