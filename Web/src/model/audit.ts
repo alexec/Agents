@@ -48,10 +48,13 @@ export function shorterTitle(days: number): string {
   return `Keep the audit for ${daysWord(days)}?`;
 }
 
-/** AuditWords.shorterMessage: what a shorter time deletes, and how to keep it: the sweep waits a day. */
+/**
+ * AuditWords.shorterMessage: what a shorter time deletes, and how to keep it: the sweep waits a day.
+ * Everyone's entries: while Whose names a person, the caller passes no count (#2192).
+ */
 export function shorterMessage(from: number, to: number, count: number | null): string {
   const n = count === null ? "" : count === 1 ? ", 1 entry now" : `, ${count} entries now`;
-  return `Entries older than ${daysWord(to)} are deleted in a day (up to ${daysWord(from - to)} of them${n}). To keep them, choose ${from} days again before then.`;
+  return `Everyone's entries older than ${daysWord(to)} are deleted in a day (up to ${daysWord(from - to)} of them${n}). To keep them, choose ${from} days again before then.`;
 }
 
 /** AuditWords.empty. */

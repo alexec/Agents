@@ -150,11 +150,13 @@ public enum AuditWords {
         "Keep the audit for \(days == 1 ? "1 day" : "\(days) days")?"
     }
 
-    /// What a shorter time deletes, and how to keep it: the sweep waits a day.
+    /// What a shorter time deletes, and how to keep it: the sweep waits a day. Everyone's
+    /// entries, also while Whose names one person, whose list cannot count them: the caller
+    /// passes no count then (#2192).
     public static func shorterMessage(from: Int, to: Int, older: Int?) -> String {
         let span = from - to == 1 ? "1 day" : "\(from - to) days"
         let count = older.map { $0 == 1 ? ", 1 entry now" : ", \($0) entries now" } ?? ""
-        return "Entries older than \(to == 1 ? "1 day" : "\(to) days") are deleted in a day (up to \(span) of them\(count)). "
+        return "Everyone's entries older than \(to == 1 ? "1 day" : "\(to) days") are deleted in a day (up to \(span) of them\(count)). "
             + "To keep them, choose \(from) days again before then."
     }
 

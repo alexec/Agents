@@ -104,7 +104,7 @@ export function AuditPane({ store, hostName, people: given }: { store: Store; ho
                     // A shorter time asks first (#2067); Cancel puts the menu back.
                     const select = e.currentTarget as HTMLSelectElement;
                     const n = Number(select.value);
-                    if (n < shown.days && !window.confirm(`${shorterTitle(n)}\n\n${shorterMessage(shown.days, n, olderCount(shown, n))}`)) {
+                    if (n < shown.days && !window.confirm(`${shorterTitle(n)}\n\n${shorterMessage(shown.days, n, user.value ? null : olderCount(shown, n))}`)) {
                       select.value = String(shown.days);
                       return;
                     }
