@@ -126,7 +126,9 @@ keeps its sign-in:
 - **Choose it** when you start a session: the **Account** menu is beside the runtime menu,
   on all three, when the runtime has more than one account. Under each choice is why it
   cannot be used or that its allowance is out (#2265). A branch, **Continue in New** and
-  a helper the session starts keep its account.
+  a helper the session starts keep its account. A started session's runtime, over its
+  prompt, names the account, such as **Claude · Work**, on all three (#2259). A session on
+  the runtime's own sign-in shows the runtime's name only.
 - **Its allowance is its own.** The **Runtimes** page shows a row for each account, under
   its runtime ("Claude · Work"). One account running out does not put the runtime, or
   another account, out. The app never changes a session to another account by itself.

@@ -51,6 +51,7 @@ import { showsThoughts, shownItems } from "../model/thoughts";
 import { hasTurnInFlight, promptPlaceholder, willQueue } from "../model/promptWords";
 import { eventWaitLine, leaseMark } from "../model/rowLines";
 import { routeHash } from "../route";
+import { sessionRuntimeName } from "../model/runtimes";
 import { GuardedChangeCard } from "./GuardedChange";
 import { Capability } from "../protocol/capabilities.generated";
 import { hostNeedsUpdate } from "../model/capabilities";
@@ -645,7 +646,7 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
               {r.project && <Labels store={store} host={host} agent={agent} folder={r.project} disabled={down} />}
             </>
           )}
-          runtime={agent && <RuntimeLabel store={store} host={host} runtimeID={agent.runtimeID} />}>
+          runtime={agent && <RuntimeLabel store={store} host={host} agent={agent} />}>
           {agent && (
           <PromptMenus options={drawable(agent.advertisedOptions, [])} disabled={down} runtime={runtimeNameOn(store, host, agent.runtimeID)}
               value={(o) => store.pendingOptions.value[agent.id]?.[o.id] ?? agent.startOptions.values[o.id] ?? o.currentValue}
@@ -687,9 +688,12 @@ function runtimeNameOn(store: Store, host: string, runtimeID: string): string {
   return (store.runtimes.value[host] ?? []).find((r) => r.runtime.id === runtimeID)?.runtime.name ?? runtimeID;
 }
 
-function RuntimeLabel({ store, host, runtimeID }: { store: Store; host: string; runtimeID: string }) {
-  const name = runtimeNameOn(store, host, runtimeID);
-  return <span class="pill" title="Runtime" aria-label={`Runtime: ${name}`}>{name}</span>;
+/** With the account it runs on, when that is not the runtime's own sign-in: "Claude · Work" (#2259). */
+function RuntimeLabel({ store, host, agent }: { store: Store; host: string; agent: Agent }) {
+  const name = sessionRuntimeName(runtimeNameOn(store, host, agent.runtimeID), agent.runtimeID, agent.accountID,
+    store.accountProfiles.value[host] ?? []);
+  const title = agent.accountID === undefined ? "Runtime" : "Runtime and account";
+  return <span class="pill" title={title} aria-label={`Runtime: ${name}`}>{name}</span>;
 }
 
 /**

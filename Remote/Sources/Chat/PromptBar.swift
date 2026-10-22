@@ -607,14 +607,14 @@ private struct PromptHead: View {
             // chips wrapped beside empty space (#670).
             labels
                 .frame(maxWidth: .infinity, alignment: .leading)
-            Text(PromptWords.runtimeName(agent.runtimeID))
+            Text(PromptWords.runtimeName(agent, accounts: model.accountProfiles))
                 .lineLimit(1)
                 .padding(.horizontal, 10)
                 .padding(.vertical, 4)
                 .appText(.fine)
                 .fixedSize()
                 .paperRaised(in: .capsule)
-                .accessibilityLabel("Runtime: \(PromptWords.runtimeName(agent.runtimeID))")
+                .accessibilityLabel("Runtime: \(PromptWords.runtimeName(agent, accounts: model.accountProfiles))")
         }
         // Asked once a chat, as the window asks: the branch is not on the agent's record.
         .task(id: "\(agent.id)-\(agent.cwd.path)") {

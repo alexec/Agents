@@ -194,6 +194,13 @@ public extension Array where Element == AccountProfile {
         filter { $0.runtimeID == runtimeID }
     }
 
+    /// The name of the account a session runs on (#2259): nil for the runtime's own sign-in,
+    /// or for an account this list does not hold.
+    func name(of accountID: String?, on runtimeID: String) -> String? {
+        guard let accountID, accountID != AccountProfile.ownSignInID else { return nil }
+        return first { $0.id == accountID && $0.runtimeID == runtimeID }?.name
+    }
+
     /// The ones the person added to one runtime (#840): not the organisation's.
     func added(to runtimeID: String) -> [AccountProfile] {
         filter { $0.runtimeID == runtimeID && !$0.isOrganisation }

@@ -67,4 +67,15 @@ struct AccountProfileTests {
         let p = AccountProfile(id: "w1", runtimeID: "codex", name: "Work", reach: .signIn(folder: "/r/a"))
         #expect(p.state == "Not signed in")
     }
+
+    /// A started session names the account it runs on (#2259), never the runtime's own.
+    @Test func aSessionsAccountIsNamedByItsID() {
+        let accounts = [AccountProfile(id: "w1", runtimeID: "claude", name: "Work", reach: .signIn(folder: "/a")),
+                        AccountProfile(id: "w2", runtimeID: "codex", name: "Home", reach: .signIn(folder: "/b"))]
+        #expect(accounts.name(of: "w1", on: "claude") == "Work")
+        #expect(accounts.name(of: "w2", on: "claude") == nil, "another runtime's")
+        #expect(accounts.name(of: nil, on: "claude") == nil)
+        #expect(accounts.name(of: AccountProfile.ownSignInID, on: "claude") == nil)
+        #expect(accounts.name(of: "gone", on: "claude") == nil)
+    }
 }

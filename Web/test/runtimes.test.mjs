@@ -82,6 +82,12 @@ test("runtimes: an added account's row is apart from the runtime's own, and name
   assert.deepEqual(r.accountRows(rows, "codex"), []);
   assert.equal(r.rowTitle(rows[0], "Claude"), "Claude · Work");
   assert.equal(r.rowTitle(rows[1], "Claude"), "Claude");
+  // A started session's label names its account the same way (#2259), never the runtime's own.
+  const profiles = [{ id: "w1", runtimeID: "claude", name: "Work" }, { id: "h1", runtimeID: "codex", name: "Home" }];
+  assert.equal(r.sessionRuntimeName("Claude", "claude", "w1", profiles), "Claude · Work");
+  assert.equal(r.sessionRuntimeName("Claude", "claude", "h1", profiles), "Claude", "another runtime's");
+  assert.equal(r.sessionRuntimeName("Claude", "claude", undefined, profiles), "Claude");
+  assert.equal(r.sessionRuntimeName("Claude", "claude", "default", profiles), "Claude");
   assert.equal(r.accountState({ signedIn: false }), "Not signed in");
   assert.equal(r.accountState({ signedIn: true, signedInAs: "a@example.com" }), "Signed in as a@example.com");
 });

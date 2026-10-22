@@ -49,6 +49,13 @@ enum PromptWords {
     static func runtimeName(_ id: String) -> String {
         RuntimeCatalog.runtime(id: id)?.name ?? id
     }
+
+    /// A started session's runtime, and the account it runs on when that is not the
+    /// runtime's own sign-in, as the Runtimes rows name it: "Claude · Work" (#2259).
+    static func runtimeName(_ agent: Agent, accounts: [AccountProfile]) -> String {
+        let runtime = runtimeName(agent.runtimeID)
+        return accounts.name(of: agent.accountID, on: agent.runtimeID).map { "\(runtime) · \($0)" } ?? runtime
+    }
 }
 
 /// Where the agent is working, how full it is, and what runs it: the row above the

@@ -122,6 +122,17 @@ export function rowTitle(row: RuntimeAllowancesRow, runtimeName: string): string
   return row.accountName === undefined ? runtimeName : `${runtimeName} · ${row.accountName}`;
 }
 
+/**
+ * A started session's runtime, and the account it runs on when that is not the runtime's own
+ * sign-in, as the Runtimes rows name it: "Claude · Work" (#2259; PromptWords.runtimeName(_:accounts:)).
+ */
+export function sessionRuntimeName(runtimeName: string, runtimeID: string, accountID: string | undefined,
+  profiles: readonly AccountProfile[]): string {
+  if (accountID === undefined || accountID === ownSignInID) return runtimeName;
+  const account = profiles.find((a) => a.id === accountID && a.runtimeID === runtimeID);
+  return account ? `${runtimeName} · ${account.name}` : runtimeName;
+}
+
 /** An organisation's account (#999), AccountProfile.isOrganisation: not one the person added. */
 export function isOrgAccount(account: AccountProfile): boolean {
   const reach = account.reach ?? {};
