@@ -8,6 +8,7 @@ import type { ChannelLinkRequest, PersonRow } from "../protocol/generated";
 import { failedWords, linkWords, noRequests, requestsFoot } from "../model/console";
 import { capReachedWords } from "../model/teamGroups";
 import { liveJoins } from "../model/people";
+import { liveRequests, withoutRequest } from "../model/channelLinks";
 import { AuditPane } from "./Audit";
 import { BotSheet } from "./People";
 import { JoinRequests } from "./JoinRequest";
@@ -27,30 +28,26 @@ export function AuditPage({ store, down }: { store: Store; down: boolean }) {
   return <AuditPane store={store} people={people} hostName={(host) => names.value[host] ?? host} />;
 }
 
-/** M7: each request with its answer. Join requests and a bot at its cap come as notifications too. */
+/** M7: each request with its answer. Join requests and a bot at its cap come as notifications too. The
+ * link requests are the store's, as the count beside Requests is (#2070). */
 export function RequestsPage({ store, down }: { store: Store; down: boolean }) {
-  const links = useSignal<ChannelLinkRequest[]>([]);
   const problem = useSignal<string | null>(null);
-  const load = async () => {
-    // A control plane before channel links (#1762) has none to list.
-    links.value = await store.link.call("links/requests", {}).catch(() => []);
-  };
-  useEffect(() => { if (!down) void load(); }, [down]);
   const decide = async (request: ChannelLinkRequest, approve: boolean) => {
     try {
       await store.link.call(approve ? "links/approve" : "links/deny", { request: request.request });
+      store.linkRequests.value = withoutRequest(store.linkRequests.value, request.request);
       problem.value = null;
     } catch (error) {
       problem.value = failedWords(error);
     }
-    await load();
   };
+  const links = liveRequests(store.linkRequests.value);
   // Change Cap…: that bot's Group and Cap… sheet, here (#2088).
   const changing = useSignal<PersonRow | null>(null);
   const joins = liveJoins(store.joinRequests.value);
   // Every bot stopped at a cap, while it is true (#2073, #2088).
   const capped = store.capped.value;
-  const none = joins.length === 0 && links.value.length === 0 && capped.length === 0;
+  const none = joins.length === 0 && links.length === 0 && capped.length === 0;
   return (
     <div class="requests">
       {problem.value && <p class="hint" role="alert">{problem.value}</p>}
@@ -61,11 +58,11 @@ export function RequestsPage({ store, down }: { store: Store; down: boolean }) {
           <JoinRequests store={store} down={down} />
         </section>
       )}
-      {links.value.length > 0 && (
+      {links.length > 0 && (
         <section aria-labelledby="requests-links">
           <h3 class="section-head" id="requests-links">Channels</h3>
           <ul class="request-list">
-            {links.value.map((r) => (
+            {links.map((r) => (
               <li key={r.request} class="request">
                 <span>{linkWords(r)}</span>
                 <span class="request-actions">
@@ -103,7 +100,7 @@ export function RequestsPage({ store, down }: { store: Store; down: boolean }) {
   );
 }
 
-/** How many requests wait, for the Console's list. */
+/** How many requests wait, for the Console's list and its Overview: machines, channel identities and capped bots (#2070). */
 export function requestCount(store: Store): number {
-  return liveJoins(store.joinRequests.value).length + store.capped.value.length;
+  return liveJoins(store.joinRequests.value).length + liveRequests(store.linkRequests.value).length + store.capped.value.length;
 }

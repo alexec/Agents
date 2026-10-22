@@ -133,6 +133,7 @@ export function runningWords(m: FleetMachine): string {
 export const orgKey = "org";
 export const totalsOnlyFoot = "On, a group’s leads see its spend and time added up, with no person or machine named. Off, they see each person’s. An admin always sees each person.";
 export const policyFoot = "A group’s leads see its reports in Reports, beside their own. A budget is for a calendar month in US dollars, drawn with a forecast on Reports ▸ Spend.";
+export const notSaved = "Not saved. Your changes stay here until you save or revert them.";
 
 /** Who may lead a group: its people (everyone, for Everyone), never a bot. */
 export function leadCandidates(group: Group, people: readonly PersonRow[]): PersonRow[] {

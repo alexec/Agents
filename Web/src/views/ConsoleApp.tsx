@@ -97,7 +97,7 @@ function ConsoleSection({ store, section, down }: { store: Store; section: Secti
     case "requests": return <RequestsPage store={store} down={down} />;
     case "workflows": return <TeamWorkflowsPage store={store} down={down} />;
     case "audit": return <AuditPage store={store} down={down} />;
-    default: return <Overview />;
+    default: return <Overview store={store} />;
   }
 }
 
@@ -180,12 +180,13 @@ function MachinesPage({ store, down }: { store: Store; down: boolean }) {
 }
 
 /** The Console's first page: each of its pages, what it is for, and which are still to come. */
-function Overview() {
+function Overview({ store }: { store: Store }) {
+  const waiting = requestCount(store);
   return (
     <>
       <ul class="console-cards">
         {sectionsOf("console").filter((s) => s.id !== "overview").map((s) => (
-          <Card key={s.id} section={s}>
+          <Card key={s.id} section={s} count={s.id === "requests" ? waiting : 0}>
             {s.built
               ? <button type="button" class="link" onClick={() => go({ app: "console", section: s.id })}>Open</button>
               : <span class="quiet small">{notBuilt}</span>}
@@ -197,10 +198,10 @@ function Overview() {
   );
 }
 
-function Card({ section, children }: { section: Section; children: ComponentChildren }) {
+function Card({ section, count, children }: { section: Section; count: number; children: ComponentChildren }) {
   return (
     <li class="console-card">
-      <span class="strong">{section.title}</span>
+      <span class="strong">{section.title}{count > 0 && <span class="sub-app-count">{count}</span>}</span>
       <span class="quiet small">{section.about}</span>
       {children}
     </li>
