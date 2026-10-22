@@ -291,6 +291,11 @@ A tag that already exists for this version means another release ran: end with
    `priority:high`, `area:control-plane`, in the next milestone, with the step and its first
    error (never a secret). Say it in the report. It does not hold step 9: the release is
    out.
+6. **Integration videos** (#1857): `scripts/video/make.sh --changed <the last tag> v<version>`
+   lists the integration scenes whose integration this release changed. If it lists any,
+   run the `integration-videos` workflow with `manage_workflows run`, with those ids as
+   its note. Do not wait for it: it is not part of the gate, and its result is not in
+   your report.
 
 ## 9. Close the milestone
 
