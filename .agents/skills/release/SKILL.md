@@ -1,6 +1,6 @@
 ---
 name: release
-description: Take main to a new version with nobody watching (#914), started by Alex or by itself once the open milestone is ready (#1729). Run the seven reviews and checks once each on what changed since the last tag, have the high findings fixed through the Scrum Master's lanes (the medium ones are filed, listed as known issues and left to the lanes after the release), check the gate, choose the version, check its milestone, write the notes, tag and push, check the GitHub release and both TestFlight builds, deploy the live control plane, close the milestone, lift the next milestone's hold, and review how the release went. Use when the Release workflow runs, or when Alex asks for a release. Not for installing on Alex's Mac or devices (ship-app), and never for App Review.
+description: Take main to a new version with nobody watching (#914), started by Alex or by itself once the open milestone is ready: no open issue but bugs, none high, its walks done (#1729, #2294). Run the seven reviews and checks once each on what changed since the last tag, have the high findings fixed through the Scrum Master's lanes (the medium ones are filed, listed as known issues and left to the lanes after the release), check the gate, choose the version, check its milestone, write the notes, tag and push, check the GitHub release and both TestFlight builds, deploy the live control plane, close the milestone, lift the next milestone's hold, and review how the release went. Use when the Release workflow runs, or when Alex asks for a release. Not for installing on Alex's Mac or devices (ship-app), and never for App Review.
 ---
 
 # Release
@@ -66,14 +66,19 @@ of the prompt says why it started.
    `gh api 'repos/alexec/Agents/milestones?state=open' --jq '.[]|[.number,.title]|@tsv'`,
    the lowest `0.x` first.
 2. It is ready when all of these hold:
+   - no open issue of the milestone is anything but a bug (#2294): every issue that
+     `gh issue list --milestone "<title>" --state open --json number,labels` lists has the
+     `bug` label. A milestone never closes with its features open (Alex, 2026-10-22);
    - none of its open issues is labelled `priority:high`
      (`gh issue list --milestone "<title>" --state open --label priority:high`);
    - none of its open issues is labelled `needs-walk`: its walks are done;
    - no other release is running: no session not archived, other than this one, labelled
      `release` and working (`list_sessions`).
-   Open issues that are not high are fine: they go into the notes as known issues (step 6).
-3. Not ready: end with `nothing_to_do`, and one line that says what it waits for ("0.9: 2
-   high issues open, #1990 and #1991"). Change nothing and start nothing.
+   Open bugs that are not high are fine: they go into the notes as known issues (step 6),
+   and move to the next milestone when step 9 closes this one.
+3. Not ready: end with `nothing_to_do`, and one line that says what it waits for ("0.11: 6
+   features open, #998, #1001, …", "0.9: 2 high issues open, #1990 and #1991"). Change
+   nothing and start nothing.
 4. Ready: go on to step 1, which still ends `nothing_to_do` when nothing merged since the
    last tag.
 
@@ -320,7 +325,8 @@ milestone (none for a patch version):
    open one with the next lowest version.
 2. Close it: `gh api -X PATCH repos/alexec/Agents/milestones/<number> -f state=closed`.
 
-Its other open issues stay open in it. Then the next milestone's work can merge to `main`,
+Its other open issues stay open in it. A run a trigger started has none but bugs (step 0);
+only a run Alex started can leave other issues open here. Then the next milestone's work can merge to `main`,
 and you open the gate for it yourself (#1729). The Scrum Master may not read a message
 from you until Alex speaks to it (#1728), so do not leave this to it:
 
