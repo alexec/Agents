@@ -123,7 +123,17 @@ func (m *Methods) stopBotRun(request wire.BotStopRun, from Caller) error {
 	if m.records.Host(host) == nil || owner == nil || !owner.IsBot() {
 		return fail(noSuchHost, "No bot's machine is called %s.", host)
 	}
-	answer := m.router.DeliverKept(wire.CallAgentsStop.Name, wire.AgentRequest{AgentID: request.Agent}, from.Client, from.Kind, host,
+	if err := m.stopAgentOn(host, request.Agent, from); err != nil {
+		return err
+	}
+	m.s.log("an admin stopped " + string(request.Agent) + " on " + owner.Name + "'s " + host)
+	return nil
+}
+
+// stopAgentOn stops one agent on a machine for an admin (bots/stopRun, console/stopAgent):
+// the machine's own agents/stop, kept for it for 10 seconds.
+func (m *Methods) stopAgentOn(host string, agent wire.UUID, from Caller) error {
+	answer := m.router.DeliverKept(wire.CallAgentsStop.Name, wire.AgentRequest{AgentID: agent}, from.Client, from.Kind, host,
 		10*time.Second)
 	if answer == nil {
 		return fail(hostOffline, "%s is not online.", m.records.Host(host).Name)
@@ -135,7 +145,6 @@ func (m *Methods) stopBotRun(request wire.BotStopRun, from Caller) error {
 		}
 		return fail(invalidParams, "%s did not stop it.", m.records.Host(host).Name)
 	}
-	m.s.log("an admin stopped " + string(request.Agent) + " on " + owner.Name + "'s " + host)
 	return nil
 }
 

@@ -4471,6 +4471,23 @@
         }
       ]
     },
+    "ConsoleStopAgent": {
+      "type": "object",
+      "description": "console/stopAgent (#2019, M9): an admin stops one agent on any machine of the organisation, as Console ▸ Live Now does.",
+      "properties": {
+        "host": {
+          "$ref": "#/definitions/HostID"
+        },
+        "agent": {
+          "$ref": "#/definitions/UUID"
+        }
+      },
+      "required": [
+        "host",
+        "agent"
+      ],
+      "additionalProperties": false
+    },
     "ContentBlock": {
       "anyOf": [
         {
@@ -9475,6 +9492,87 @@
       "required": [
         "name",
         "folder"
+      ],
+      "additionalProperties": false
+    },
+    "LiveAgent": {
+      "type": "object",
+      "description": "One agent on Console ▸ Live Now (#2019, M9): whose machine, which runtime, its state, since when and its cost so far. No title and nothing it said.",
+      "properties": {
+        "host": {
+          "$ref": "#/definitions/HostID"
+        },
+        "hostName": {
+          "type": "string"
+        },
+        "owner": {
+          "type": "string",
+          "description": "The person or bot whose machine it is, by id."
+        },
+        "ownerName": {
+          "type": "string"
+        },
+        "bot": {
+          "type": "boolean",
+          "description": "Whether the machine is a bot's."
+        },
+        "agent": {
+          "$ref": "#/definitions/UUID"
+        },
+        "runtime": {
+          "type": "string"
+        },
+        "state": {
+          "$ref": "#/definitions/AgentState"
+        },
+        "waitsOnOthers": {
+          "type": "boolean",
+          "description": "It waits for an event or another agent (eventWait), not for its person."
+        },
+        "workflow": {
+          "type": "string",
+          "description": "The workflow that started it."
+        },
+        "since": {
+          "$ref": "#/definitions/WireDate"
+        },
+        "costToDate": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "number"
+          },
+          "description": "Its cost so far, by currency."
+        },
+        "heardAt": {
+          "$ref": "#/definitions/WireDate",
+          "description": "When the machine last listed its agents."
+        }
+      },
+      "required": [
+        "host",
+        "hostName",
+        "owner",
+        "ownerName",
+        "bot",
+        "agent",
+        "runtime",
+        "state"
+      ],
+      "additionalProperties": false
+    },
+    "LiveBoard": {
+      "type": "object",
+      "description": "console/live's answer (#2019, M9): every agent running now on every machine, as each machine last listed them, for an admin. The most costly first.",
+      "properties": {
+        "agents": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/LiveAgent"
+          }
+        }
+      },
+      "required": [
+        "agents"
       ],
       "additionalProperties": false
     },

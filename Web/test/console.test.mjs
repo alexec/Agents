@@ -87,3 +87,19 @@ test("Team Workflows: a bot's machines, spend and runs in words", () => {
   assert.equal(c.runsWords(1), "1 run");
   assert.equal(c.runsWords(3), "3 runs");
 });
+
+test("Live Now (#2019, M9) says each agent's state and cost, and adds up the board", () => {
+  const a = (agent, host, state, cost, extra = {}) => ({ host, hostName: host, owner: "p", ownerName: "Bea", bot: false, agent, runtime: "claude", state,
+    costToDate: cost, ...extra });
+  assert.equal(c.liveStateWords(a("A", "H", "waitingOnUser")), "Waiting for its person");
+  assert.equal(c.liveStateWords(a("A", "H", "running", undefined, { waitsOnOthers: true })), "Waiting on others");
+  assert.equal(c.liveStateWords(a("A", "H", "starting")), "Starting");
+  assert.equal(c.liveStateWords(a("A", "H", "running")), "Working");
+  assert.equal(c.liveCostWords(undefined), "Nothing yet");
+  assert.match(c.liveCostWords({ USD: 4.2 }), /4\.20/);
+  const board = { agents: [a("A", "H1", "running", { USD: 5 }), a("B", "H1", "running", { USD: 2.5 }), a("C", "H2", "running")] };
+  assert.match(c.liveSummary(board), /^3 agents on 2 machines · .*7\.50 so far$/);
+  assert.equal(c.liveSummary({ agents: [a("C", "H2", "running")] }), "1 agent on 1 machine");
+  assert.deepEqual(c.liveMachines(board).map((m) => [m.host, m.agents.length]), [["H1", 2], ["H2", 1]]);
+  assert.ok(c.consoleSections.some((s) => s.id === "live" && s.built));
+});

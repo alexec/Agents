@@ -16,7 +16,7 @@ import type { FleetBoard, PolicyKept } from "../protocol/generated";
 import { fromWireDate } from "../protocol/dates";
 import { ago } from "../model/connectorSetup";
 import { missingWords, stateWords, versionWords } from "../model/capabilities";
-import { ReportsPage } from "./Reports";
+import { ReportsPage, runtimeNameIn } from "./Reports";
 import { BotsSection, PeopleSection } from "./People";
 import { GroupsSection } from "./Groups";
 import { ReportPolicyPage, policyNotSaved } from "./ConsolePolicy";
@@ -25,6 +25,7 @@ import { ModelAccessPage } from "./ConsoleModelAccess";
 import { followsWords } from "../model/orgPolicy";
 import { AuditPage, RequestsPage, requestCount } from "./ConsoleRecords";
 import { TeamWorkflowsPage } from "./ConsoleWorkflows";
+import { LiveNowPage } from "./ConsoleLive";
 
 /** Whether this person is an admin of the control plane, from the store's one people list (#2055): null until it answers. */
 function adminOf(store: Store): boolean | null {
@@ -98,6 +99,7 @@ function ConsoleSection({ store, section, down }: { store: Store; section: Secti
   switch (section.id) {
     case "people": return <PeoplePage store={store} down={down} />;
     case "machines": return <MachinesPage store={store} down={down} />;
+    case "live": return <LiveNowPage store={store} down={down} runtimeName={runtimeNameIn(store)} />;
     case "policy": return <OrgPolicyPage store={store} down={down} />;
     case "modelAccess": return <ModelAccessPage store={store} down={down} />;
     case "reportPolicy": return <ReportPolicyPage store={store} down={down} />;

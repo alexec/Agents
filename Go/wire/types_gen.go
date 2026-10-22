@@ -2061,6 +2061,13 @@ type ConsequenceCouldNotWake struct {
 	Reason string `json:"reason"`
 }
 
+// console/stopAgent (#2019, M9): an admin stops one agent on any machine of the organisation, as Console ▸ Live Now does.
+type ConsoleStopAgent struct {
+	Host HostID `json:"host"`
+
+	Agent UUID `json:"agent"`
+}
+
 // ContentBlock (ACP/ContentBlock.swift): the protocol's own block shapes, as sent. A block of a kind this build doesn't know is written back as it came, so any other `type` may arrive.
 type ContentBlock struct {
 	// Type is one of "text", "image", "audio", "resource_link", "resource".
@@ -4147,6 +4154,46 @@ type ListedSkill struct {
 	Folder string `json:"folder"`
 
 	Managed *ManagedSkill `json:"managed,omitzero"`
+}
+
+// One agent on Console ▸ Live Now (#2019, M9): whose machine, which runtime, its state, since when and its cost so far. No title and nothing it said.
+type LiveAgent struct {
+	Host HostID `json:"host"`
+
+	HostName string `json:"hostName"`
+
+	// The person or bot whose machine it is, by id.
+	Owner string `json:"owner"`
+
+	OwnerName string `json:"ownerName"`
+
+	// Whether the machine is a bot's.
+	Bot bool `json:"bot"`
+
+	Agent UUID `json:"agent"`
+
+	Runtime string `json:"runtime"`
+
+	State AgentState `json:"state"`
+
+	// It waits for an event or another agent (eventWait), not for its person.
+	WaitsOnOthers *bool `json:"waitsOnOthers,omitzero"`
+
+	// The workflow that started it.
+	Workflow *string `json:"workflow,omitzero"`
+
+	Since *Date `json:"since,omitzero"`
+
+	// Its cost so far, by currency.
+	CostToDate map[string]float64 `json:"costToDate,omitzero"`
+
+	// When the machine last listed its agents.
+	HeardAt *Date `json:"heardAt,omitzero"`
+}
+
+// console/live's answer (#2019, M9): every agent running now on every machine, as each machine last listed them, for an admin. The most costly first.
+type LiveBoard struct {
+	Agents []LiveAgent `json:"agents"`
 }
 
 type MCPAddAnswer struct {

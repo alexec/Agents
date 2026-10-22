@@ -3,8 +3,9 @@
 // One web bundle; the switcher at the top moves between them. The Mac window and the Remote draw
 // the Me scope of Reports already (Cost, Time, Pool), and leave the Console to the web.
 import type { SubApp } from "../route";
-import type { ChannelLinkRequest, FleetMachine, Group, PersonRow, TeamBot } from "../protocol/generated";
+import type { ChannelLinkRequest, FleetMachine, Group, LiveAgent, LiveBoard, PersonRow, TeamBot } from "../protocol/generated";
 import { dollars } from "./teamGroups";
+import { money } from "./limits";
 import { CallFailed } from "../wire/link";
 
 export type AppName = "workspace" | SubApp;
@@ -28,6 +29,7 @@ export const consoleSections: readonly Section[] = [
   { id: "overview", title: "Overview", about: "What the Console has, and what waits for you.", group: "Organisation", built: true },
   { id: "people", title: "People and Groups", about: "Who belongs, their roles, bots and groups.", group: "Organisation", built: true },
   { id: "machines", title: "Machines", about: "Every machine: its owner, state, version and agents.", group: "Organisation", built: true },
+  { id: "live", title: "Live Now", about: "Every agent running now, its cost so far, and Stop.", group: "Organisation", built: true },
   { id: "policy", title: "Policy", about: "The rules every machine follows: modes, sandbox, runtimes, budgets, and the kill switch.", group: "Rules", built: true },
   { id: "modelAccess", title: "Model Access", about: "The organisation’s keys and gateways to the model, and who may use each.", group: "Rules", built: true },
   { id: "reportPolicy", title: "Report Policy", about: "Who leads each group, what leads see, and each budget.", group: "Rules", built: true },
@@ -194,4 +196,45 @@ export function spendWords(bot: TeamBot): string {
 /** "3 runs", "1 run". */
 export function runsWords(runs: number): string {
   return runs === 1 ? "1 run" : `${runs} runs`;
+}
+
+// Console ▸ Live Now (#2019, M9): every agent running now on every machine, the most costly
+// first, each with Stop (console/stopAgent). Ids and numbers only; no agent's title or words.
+
+export const noLive = "No agent is running now on any machine.";
+export const liveFoot = "The page asks each online machine for its agents every 15 seconds. A machine that is offline shows what it ran last. Stop ends one agent. For an incident, Policy’s Stop All Agent Work stops every agent on every machine.";
+
+/** "Waiting for its person", "Waiting on others", "Starting" or "Working". */
+export function liveStateWords(a: LiveAgent): string {
+  if (a.state === "waitingOnUser") return "Waiting for its person";
+  if (a.waitsOnOthers) return "Waiting on others";
+  return a.state === "starting" ? "Starting" : "Working";
+}
+
+/** "$4.20", "$4.20 · €1.00", or "Nothing yet". */
+export function liveCostWords(cost: Record<string, number> | undefined): string {
+  const parts = Object.entries(cost ?? {}).filter(([, v]) => v > 0).sort(([a], [b]) => a.localeCompare(b)).map(([c, v]) => money(v, c));
+  return parts.length ? parts.join(" · ") : "Nothing yet";
+}
+
+/** "3 agents on 2 machines · $7.50 so far". */
+export function liveSummary(board: LiveBoard): string {
+  const machines = new Set(board.agents.map((a) => a.host)).size;
+  const cost: Record<string, number> = {};
+  for (const a of board.agents) for (const [c, v] of Object.entries(a.costToDate ?? {})) cost[c] = (cost[c] ?? 0) + v;
+  const agents = board.agents.length === 1 ? "1 agent" : `${board.agents.length} agents`;
+  const on = machines === 1 ? "1 machine" : `${machines} machines`;
+  const spent = liveCostWords(cost);
+  return spent === "Nothing yet" ? `${agents} on ${on}` : `${agents} on ${on} · ${spent} so far`;
+}
+
+/** Each machine with agents running, the most agents first: for Stop All on a machine. */
+export function liveMachines(board: LiveBoard): { host: string; hostName: string; ownerName: string; agents: LiveAgent[] }[] {
+  const machines = new Map<string, { host: string; hostName: string; ownerName: string; agents: LiveAgent[] }>();
+  for (const a of board.agents) {
+    const m = machines.get(a.host) ?? { host: a.host, hostName: a.hostName, ownerName: a.ownerName, agents: [] };
+    machines.set(a.host, m);
+    m.agents.push(a);
+  }
+  return [...machines.values()].sort((a, b) => b.agents.length - a.agents.length || a.hostName.localeCompare(b.hostName));
 }

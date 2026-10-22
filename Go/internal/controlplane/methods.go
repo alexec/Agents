@@ -253,8 +253,8 @@ func (m *Methods) Handle(method string, params json.RawMessage, from Caller) (an
 		return nil, noSSHHere
 	}
 	// Another user's machine is not there (#994, FR-018); bots/stopRun names a bot's, an
-	// admin's to stop (#1761).
-	if method != "bots/stopRun" {
+	// admin's to stop (#1761), and console/stopAgent anyone's, an admin's to stop (#2019, M9).
+	if method != "bots/stopRun" && method != "console/stopAgent" {
 		if err := m.refuseOthersHosts(params, from); err != nil {
 			return nil, err
 		}

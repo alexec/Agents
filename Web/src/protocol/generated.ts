@@ -1657,6 +1657,15 @@ export type Consequence =
   | { couldNotWake: { agentID: UUID; title: string; reason: string } };
 
 /**
+ * console/stopAgent (#2019, M9): an admin stops one agent on any machine of the organisation, as
+ * Console ▸ Live Now does.
+ */
+export interface ConsoleStopAgent {
+  host: HostID;
+  agent: UUID;
+}
+
+/**
  * ContentBlock (ACP/ContentBlock.swift): the protocol's own block shapes, as sent. A block of a
  * kind this build doesn't know is written back as it came, so any other `type` may arrive.
  */
@@ -3272,6 +3281,40 @@ export interface ListedSkill {
   description?: string;
   folder: string;
   managed?: ManagedSkill;
+}
+
+/**
+ * One agent on Console ▸ Live Now (#2019, M9): whose machine, which runtime, its state, since when
+ * and its cost so far. No title and nothing it said.
+ */
+export interface LiveAgent {
+  host: HostID;
+  hostName: string;
+  /** The person or bot whose machine it is, by id. */
+  owner: string;
+  ownerName: string;
+  /** Whether the machine is a bot's. */
+  bot: boolean;
+  agent: UUID;
+  runtime: string;
+  state: AgentState;
+  /** It waits for an event or another agent (eventWait), not for its person. */
+  waitsOnOthers?: boolean;
+  /** The workflow that started it. */
+  workflow?: string;
+  since?: WireDate;
+  /** Its cost so far, by currency. */
+  costToDate?: Record<string, number>;
+  /** When the machine last listed its agents. */
+  heardAt?: WireDate;
+}
+
+/**
+ * console/live's answer (#2019, M9): every agent running now on every machine, as each machine last
+ * listed them, for an admin. The most costly first.
+ */
+export interface LiveBoard {
+  agents: LiveAgent[];
 }
 
 export interface MCPAddAnswer {
@@ -7636,6 +7679,8 @@ export interface Methods {
   "connectors/setup": { params: ConnectorSetupRequest; result: ConnectorSetup };
   "connectors/setup/skip": { params: ConnectorSkipRequest; result: ConnectorSetup };
   "console/fleet": { params: Empty; result: FleetBoard };
+  "console/live": { params: Empty; result: LiveBoard };
+  "console/stopAgent": { params: ConsoleStopAgent; result: Empty };
   "console/teamWorkflows": { params: Empty; result: TeamWorkflows };
   "control/rotate": { params: Empty; result: Empty };
   "control/setAuditDays": { params: AuditDays; result: AuditDays };
@@ -7869,6 +7914,8 @@ export const MethodTarget = {
   "connectors/setup": "host",
   "connectors/setup/skip": "host",
   "console/fleet": "control",
+  "console/live": "control",
+  "console/stopAgent": "control",
   "console/teamWorkflows": "control",
   "control/rotate": "control",
   "control/setAuditDays": "control",
@@ -8218,6 +8265,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ConnectorSkipRequest: { required: ["folder", "slot", "skipped"], optional: [] },
   ConnectorSlot: { required: ["slot", "choice", "state"], optional: ["proof", "readAt", "message"] },
   ConnectorWorkflow: { required: ["id", "name"], optional: [] },
+  ConsoleStopAgent: { required: ["host", "agent"], optional: [] },
   ContentBlockAnnotations: { required: [], optional: ["audience", "priority"] },
   ContinueInNewRequest: { required: ["agentID"], optional: ["accountID", "requestID"] },
   ContinueInProjectRequest: { required: ["agentID", "text", "attachments"], optional: ["requestID"] },
@@ -8391,6 +8439,8 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ListCursor: { required: ["lastActivityAt", "id"], optional: ["archivedAt"] },
   ListRequest: { required: ["includeArchived", "archivedCommands", "archivedOnly", "lean"], optional: ["folder", "startedByWorkflow", "limit", "agentID", "after", "query"] },
   ListedSkill: { required: ["name", "folder"], optional: ["description", "managed"] },
+  LiveAgent: { required: ["host", "hostName", "owner", "ownerName", "bot", "agent", "runtime", "state"], optional: ["waitsOnOthers", "workflow", "since", "costToDate", "heardAt"] },
+  LiveBoard: { required: ["agents"], optional: [] },
   MCPAddAnswer: { required: [], optional: ["server", "error"] },
   MCPAddByHandRequest: { required: ["verifyID", "destination"], optional: [] },
   MCPAddRequest: { required: ["previewID", "destination", "secrets", "plain", "replace"], optional: [] },
