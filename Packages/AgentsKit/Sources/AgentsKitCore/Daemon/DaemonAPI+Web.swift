@@ -327,6 +327,8 @@ public extension DaemonAPI {
                 // The Console (#1804): the admins' app on the web page.
                 Row(Method.consoleFleet, params: Empty.self, result: FleetBoard.self, kind: .controlRequest),
                 Row(Method.consoleTeamWorkflows, params: Empty.self, result: TeamWorkflows.self, kind: .controlRequest),
+                Row(Method.consoleLive, params: Empty.self, result: LiveBoard.self, kind: .controlRequest),
+                Row(Method.consoleStopAgent, params: ConsoleStopAgent.self, result: Empty.self, kind: .controlRequest),
                 // The organisation's policy (#998): Console ▸ Policy, and Settings ▸ Policy on every client.
                 Row(Method.policyMine, params: Empty.self, result: PolicyView.self, kind: .controlRequest),
                 Row(Method.policyGet, params: Empty.self, result: PolicyKept.self, kind: .controlRequest),

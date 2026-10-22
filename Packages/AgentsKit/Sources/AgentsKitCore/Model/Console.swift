@@ -63,6 +63,65 @@ public extension DaemonAPI {
         }
     }
 
+    /// One agent on Console ▸ Live Now (#2019, M9): whose machine, which runtime, its state,
+    /// since when and its cost so far. No title and nothing it said.
+    struct LiveAgent: Codable, Sendable, Hashable {
+        public var host: String
+        public var hostName: String
+        public var owner: String
+        public var ownerName: String
+        public var bot: Bool
+        public var agent: UUID
+        public var runtime: String
+        public var state: AgentState
+        /// It waits for an event or another agent, not for its person.
+        public var waitsOnOthers: Bool?
+        public var workflow: String?
+        public var since: Date?
+        /// Its cost so far, by currency.
+        public var costToDate: [String: Double]?
+        /// When the machine last listed its agents.
+        public var heardAt: Date?
+
+        public init(host: String, hostName: String, owner: String, ownerName: String, bot: Bool, agent: UUID,
+                    runtime: String, state: AgentState, waitsOnOthers: Bool? = nil, workflow: String? = nil,
+                    since: Date? = nil, costToDate: [String: Double]? = nil, heardAt: Date? = nil) {
+            self.host = host
+            self.hostName = hostName
+            self.owner = owner
+            self.ownerName = ownerName
+            self.bot = bot
+            self.agent = agent
+            self.runtime = runtime
+            self.state = state
+            self.waitsOnOthers = waitsOnOthers
+            self.workflow = workflow
+            self.since = since
+            self.costToDate = costToDate
+            self.heardAt = heardAt
+        }
+    }
+
+    /// `console/live`'s answer (#2019, M9): every agent running now, the most costly first.
+    struct LiveBoard: Codable, Sendable, Hashable {
+        public var agents: [LiveAgent]
+
+        public init(agents: [LiveAgent]) {
+            self.agents = agents
+        }
+    }
+
+    /// `console/stopAgent` (#2019, M9): an admin stops one agent on any machine.
+    struct ConsoleStopAgent: Codable, Sendable, Hashable {
+        public var host: HostID
+        public var agent: UUID
+
+        public init(host: HostID, agent: UUID) {
+            self.host = host
+            self.agent = agent
+        }
+    }
+
     /// A bot on Console ▸ Team Workflows (M6).
     struct TeamBot: Codable, Sendable, Hashable {
         public var user: String
@@ -110,4 +169,8 @@ public extension DaemonAPI.Method {
     static let consoleFleet = "console/fleet"
     /// `Empty` → `TeamWorkflows` (#1804, M6). Admins only.
     static let consoleTeamWorkflows = "console/teamWorkflows"
+    /// `Empty` → `LiveBoard` (#2019, M9). Admins only.
+    static let consoleLive = "console/live"
+    /// `ConsoleStopAgent` → `Empty` (#2019, M9). Admins only.
+    static let consoleStopAgent = "console/stopAgent"
 }
