@@ -35,6 +35,8 @@ export interface ReportTotals {
   groups: ReportGroup[];
   total: ReportGroup;
   currencies: string[];
+  /** The largest group's cost in the first currency, or its tokens when nothing was priced: worked out once (#2057). */
+  most: number;
 }
 
 const blank = (id: string, name: string): ReportGroup => ({ id, name, cost: {}, tokens: 0, turns: 0, unpricedTurns: 0, workingSeconds: 0, waitingSeconds: 0 });
@@ -81,18 +83,15 @@ export function reportTotals(rows: readonly ReportRow[], by: ReportDimension, ru
     const ca = first ? a.cost[first] ?? 0 : 0, cb = first ? b.cost[first] ?? 0 : 0;
     return cb - ca || b.tokens - a.tokens || b.workingSeconds - a.workingSeconds || a.name.localeCompare(b.name);
   });
-  return { groups: sorted, total, currencies };
+  const most = Math.max(0, ...sorted.map((x) => first ? x.cost[first] ?? 0 : x.tokens));
+  return { groups: sorted, total, currencies, most };
 }
 
 /** A group's share of the largest, 0 to 1: by the first currency's cost, or by tokens when nothing was priced. */
 export function share(totals: ReportTotals, g: ReportGroup): number {
   const currency = totals.currencies[0];
-  if (currency) {
-    const most = Math.max(0, ...totals.groups.map((x) => x.cost[currency] ?? 0));
-    return most > 0 ? (g.cost[currency] ?? 0) / most : 0;
-  }
-  const most = Math.max(0, ...totals.groups.map((x) => x.tokens));
-  return most > 0 ? g.tokens / most : 0;
+  const value = currency ? g.cost[currency] ?? 0 : g.tokens;
+  return totals.most > 0 ? value / totals.most : 0;
 }
 
 /** The figures under a name: cost, tokens, turns and working time. */
@@ -126,12 +125,6 @@ export function scopedDimensions(report: Pick<UsageReport, "scope" | "personsHid
 
 export const hiddenNote = "You see this group’s totals. An admin’s policy names no person or machine to a group’s leads.";
 export const groupNote = "A person in more than one group counts in each.";
-
-/** The US dollars spent in this calendar month (UTC) by rows of days. */
-export function monthSpentUSD(rows: readonly ReportRow[], now: Date = new Date()): number {
-  const first = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, "0")}-01`;
-  return rows.filter((r) => r.at.slice(0, 10) >= first).reduce((sum, r) => sum + (r.cost["USD"] ?? 0), 0);
-}
 
 /** This month's spend at today's pace, to its last day (UTC). */
 export function forecastUSD(spent: number, now: Date = new Date()): number {

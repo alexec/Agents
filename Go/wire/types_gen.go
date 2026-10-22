@@ -7749,6 +7749,9 @@ type UsageReport struct {
 
 	// The scope's budget for a calendar month, in US dollars (#1804); absent when it has none.
 	BudgetUSD *float64 `json:"budgetUSD,omitzero"`
+
+	// What the scope spent this calendar month (UTC), in US dollars, beside budgetUSD (#2057); absent when there is no budget.
+	MonthSpentUSD *float64 `json:"monthSpentUSD,omitzero"`
 }
 
 // usage/rollup (#1811): a machine's hours and days that changed since it last sent them, sent each hour on its channel 0. The control plane keeps hours 7 days and days 90.

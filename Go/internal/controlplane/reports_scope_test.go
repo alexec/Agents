@@ -85,6 +85,10 @@ func TestReportScopesAndTheGroupLead(t *testing.T) {
 	if len(r.Rows) != 2 || !people["Bea"] || !people["Cy"] || r.PersonsHidden != nil || r.BudgetUSD == nil || *r.BudgetUSD != 400 {
 		t.Fatalf("%+v", r)
 	}
+	// The month's spend beside the budget, added up here (#2057): Bea's and Cy's, not Dee's.
+	if r.MonthSpentUSD == nil || *r.MonthSpentUSD != 4 {
+		t.Fatalf("%v", r.MonthSpentUSD)
+	}
 
 	// Totals only: the same rows, with nobody and no machine named; an admin still sees each.
 	call(t, admin, "", "reports/setPolicy", wire.ReportPolicy{TotalsOnly: true, Leads: policy.Leads, BudgetsUSD: policy.BudgetsUSD})

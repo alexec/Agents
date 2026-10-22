@@ -1,12 +1,12 @@
 // Cost ▸ Reports (#1811), as the window's and the Remote's ReportsPane: usage, cost and time by
 // person, project, machine and runtime, added up on the control plane from what each machine
 // sends each hour. An admin sees every person's machines; a member their own.
-import { useEffect } from "preact/hooks";
+import { useEffect, useMemo } from "preact/hooks";
 import { useSignal } from "@preact/signals";
 import type { Store } from "../model/store";
 import type { ReportFormat, ReportRange, ReportScope, ReportScopeOption, UsageReport } from "../protocol/generated";
 import { CallFailed } from "../wire/link";
-import { budgetWords, dimensionTitle, empty, exportName, groupNote, hiddenNote, line, memberNote, monthSpentUSD, rangeShort, rangeSpan, ranges,
+import { budgetWords, dimensionTitle, empty, exportName, groupNote, hiddenNote, line, memberNote, rangeShort, rangeSpan, ranges,
   reportTotals, scopeKey, scopedDimensions, share, utcNote } from "../model/reports";
 import type { ReportDimension, ReportGroup } from "../model/reports";
 import type { Section } from "../model/console";
@@ -51,7 +51,9 @@ export function ReportsPane({ store, runtimeName, scope }: { store: Store; runti
   const ways = scopedDimensions(shown);
   // A way the scope does not offer (a person, with nobody named) falls back to the first.
   const way = ways.includes(by.value) ? by.value : ways[0]!;
-  const totals = shown ? reportTotals(shown.rows, way, runtimeName, shown.groupNames ?? {}) : null;
+  // Added up once per report and way, not at each draw (#2057).
+  const names = store.runtimes.value;
+  const totals = useMemo(() => shown ? reportTotals(shown.rows, way, runtimeName, shown.groupNames ?? {}) : null, [shown, way, names]);
   const row = (g: ReportGroup, bar: number | null) => (
     <li key={g.id} class={bar === null ? "report-total" : ""}>
       <span class={bar === null ? "strong" : ""}>{g.name}</span>
@@ -80,7 +82,7 @@ export function ReportsPane({ store, runtimeName, scope }: { store: Store; runti
         ))}
       </div>
       <p class="quiet small">{rangeSpan[range.value]}</p>
-      {scope && shown?.budgetUSD !== undefined && <Budget store={store} scope={scope} budget={shown.budgetUSD} />}
+      {scope && shown?.budgetUSD !== undefined && shown.monthSpentUSD !== undefined && <Budget spent={shown.monthSpentUSD} budget={shown.budgetUSD} />}
       {problem.value && <p class="hint">{problem.value}</p>}
       {!totals && !problem.value && <p class="hint">Loading…</p>}
       {totals && shown && (
@@ -106,18 +108,13 @@ function runtimeNameIn(store: Store) {
     .find((name) => name) || id;
 }
 
-/** This month's spend against the scope's budget, with a forecast to the month's end (#1804). */
-function Budget({ store, scope, budget }: { store: Store; scope: ReportScope; budget: number }) {
-  const spent = useSignal<number | null>(null);
-  useEffect(() => {
-    void store.link.call("reports/usage", { range: "month", scope })
-      .then((r) => { spent.value = monthSpentUSD(r.rows); }, () => { spent.value = null; });
-  }, [scopeKey(scope), budget]);
-  if (spent.value === null) return null;
-  const used = Math.min(1, budget > 0 ? spent.value / budget : 0);
+/** This month's spend against the scope's budget, with a forecast to the month's end (#1804). The
+ * control plane adds the month up (#2057). */
+function Budget({ spent, budget }: { spent: number; budget: number }) {
+  const used = Math.min(1, budget > 0 ? spent / budget : 0);
   return (
     <div class="report-budget">
-      <span class="strong">{budgetWords(spent.value, budget)}</span>
+      <span class="strong">{budgetWords(spent, budget)}</span>
       <span class={`report-bar${used >= 1 ? " over" : ""}`} aria-hidden="true"><span style={{ width: `${Math.max(1, used * 100)}%` }} /></span>
     </div>
   );

@@ -40,6 +40,9 @@ public struct ReportTotals: Sendable, Hashable {
     public var total: Group
     /// The currencies any row has, the one with most spent first.
     public var currencies: [String]
+    /// The largest group's cost in the first currency, or its tokens when nothing was
+    /// priced: worked out once, not for each row's bar (#2057).
+    private var most: Double = 0
 
     public init(_ rows: [DaemonAPI.ReportRow], by dimension: Dimension,
                 runtimeName: (String) -> String = UsageChart.runtimeName) {
@@ -61,18 +64,22 @@ public struct ReportTotals: Sendable, Hashable {
         }
         self.total = total
         self.currencies = currencies
+        if let first {
+            let top = self.groups.compactMap { $0.cost[first] }.max() ?? 0
+            most = NSDecimalNumber(decimal: top).doubleValue
+        } else {
+            most = Double(self.groups.map(\.tokens).max() ?? 0)
+        }
     }
 
     /// A share of the largest group, 0 to 1, for the bar under each row: by the first
     /// currency's cost, or by tokens when nothing was priced.
     public func share(of group: Group) -> Double {
+        guard most > 0 else { return 0 }
         if let currency = currencies.first {
-            let most = groups.compactMap { $0.cost[currency] }.max() ?? 0
-            guard most > 0 else { return 0 }
-            return NSDecimalNumber(decimal: (group.cost[currency] ?? 0) / most).doubleValue
+            return NSDecimalNumber(decimal: group.cost[currency] ?? 0).doubleValue / most
         }
-        let most = groups.map(\.tokens).max() ?? 0
-        return most > 0 ? Double(group.tokens) / Double(most) : 0
+        return Double(group.tokens) / most
     }
 
     private static func key(_ row: DaemonAPI.ReportRow, _ dimension: Dimension,
