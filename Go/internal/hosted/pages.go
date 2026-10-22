@@ -125,6 +125,7 @@ func (s *Service) callback(w http.ResponseWriter, r *http.Request) {
 		got := s.gate(ctx, s.clientOf(r), user, invite)
 		switch {
 		case got.refused != "":
+			s.metrics.refused(got.kind)
 			s.log(fmt.Sprintf("sign-up refused: github %d: %s", user.ID, got.refused))
 			s.page(w, got.status, page{Title: "Agents", Welcome: true, Problem: got.refused})
 			return
@@ -139,6 +140,7 @@ func (s *Service) callback(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/account", http.StatusSeeOther)
 		return
 	}
+	s.metrics.signedUp("account")
 	s.log("signed up: " + acc.ID)
 	// The browser that signed up is the first client: to its control plane, to pair.
 	s.openIn(w, r, acc.ID)
@@ -154,6 +156,7 @@ func (s *Service) openIn(w http.ResponseWriter, r *http.Request, account string)
 	}
 	link, err := s.firstCode(ctx, account)
 	if errors.Is(err, errFull) {
+		s.metrics.refused("full")
 		s.accountPage(w, r, account, "The service is full just now. Try Open in This Browser again in a few minutes.")
 		return
 	}

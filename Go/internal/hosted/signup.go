@@ -137,7 +137,9 @@ type signUpResult struct {
 	place   int
 	why     string
 	refused string
-	status  int
+	// What kind of refusal, for the metrics.
+	kind   string
+	status int
 }
 
 // gate decides what a GitHub user with no account gets.
@@ -146,10 +148,10 @@ func (s *Service) gate(ctx context.Context, from string, user GitHubID, invite s
 	if o, err := st.Get(ctx, blockedKey(user.ID)); err != nil {
 		return unreadable(err)
 	} else if o != nil {
-		return signUpResult{refused: "Sign-up is not open to this GitHub account.", status: http.StatusForbidden}
+		return signUpResult{refused: "Sign-up is not open to this GitHub account.", status: http.StatusForbidden, kind: "blocked"}
 	}
 	if s.cfg.SignUp == SignUpClosed {
-		return signUpResult{refused: "Sign-up is not open yet.", status: http.StatusServiceUnavailable}
+		return signUpResult{refused: "Sign-up is not open yet.", status: http.StatusServiceUnavailable, kind: "closed"}
 	}
 	listed := false
 	if validLogin(user.Login) {
@@ -236,7 +238,7 @@ func (s *Service) wait(ctx context.Context, from string, user GitHubID, why stri
 		return unreadable(err)
 	}
 	if len(keys) >= waitlistMost {
-		return signUpResult{refused: "The waitlist is full just now. Try again another day.", status: http.StatusServiceUnavailable}
+		return signUpResult{refused: "The waitlist is full just now. Try again another day.", status: http.StatusServiceUnavailable, kind: "waitlist_full"}
 	}
 	now := s.cfg.Now().UTC()
 	// Front places sort before the others, each in the order they came.
@@ -258,6 +260,7 @@ func (s *Service) wait(ctx context.Context, from string, user GitHubID, why stri
 	if _, err := st.Put(ctx, waitlistKey(entry.Place), link, store.Absent); err != nil {
 		return unreadable(err)
 	}
+	s.metrics.signedUp("waitlist")
 	s.log(fmt.Sprintf("waitlist: github %d (%s)", user.ID, why))
 	return s.placeOf(ctx, entry)
 }
@@ -305,11 +308,11 @@ func whyText(why string, minAge time.Duration) string {
 
 func unreadable(err error) signUpResult {
 	_ = err
-	return signUpResult{refused: "Your account could not be read or made. Try again in a moment.", status: http.StatusServiceUnavailable}
+	return signUpResult{refused: "Your account could not be read or made. Try again in a moment.", status: http.StatusServiceUnavailable, kind: "store"}
 }
 
 func tooMany() signUpResult {
-	return signUpResult{refused: "Too many sign-ups just now. Try again in an hour.", status: http.StatusTooManyRequests}
+	return signUpResult{refused: "Too many sign-ups just now. Try again in an hour.", status: http.StatusTooManyRequests, kind: "rate"}
 }
 
 // rates are the sign-ups of the last hour, by address and in all (FR-006). They are in
