@@ -62,7 +62,7 @@ func TestTheSweepRemovesTheDeadAndKeepsTheLive(t *testing.T) {
 	then := now.Add(-2 * time.Hour)
 	os.Chtimes(oldTmp, then, then)
 
-	first, err := sweep(ctx, rs, now, mostPerSweep)
+	first, err := sweep(ctx, rs, now, mostPerSweep, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -92,7 +92,7 @@ func TestTheSweepRemovesTheDeadAndKeepsTheLive(t *testing.T) {
 	}
 
 	// Eight days on, both tombstones go; the live client and the settings stay.
-	later, err := sweep(ctx, rs, now.Add(8*24*time.Hour), mostPerSweep)
+	later, err := sweep(ctx, rs, now.Add(8*24*time.Hour), mostPerSweep, nil)
 	if err != nil || later.tombstones != 2 {
 		t.Fatalf("%+v %v", later, err)
 	}
@@ -117,9 +117,69 @@ func TestTheSweepStopsAtItsBound(t *testing.T) {
 	for n := range 12 {
 		s.Put(ctx, "v1/events/2000-01-01/"+itoa(n)+".json", []byte("{}"), store.Absent)
 	}
-	report, _ := sweep(ctx, records.New(s), time.Now(), 5)
+	report, _ := sweep(ctx, records.New(s), time.Now(), 5, nil)
 	if left, _ := s.List(ctx, "v1/events/"); report.events != 5 || len(left) != 7 {
 		t.Fatal(report, len(left))
+	}
+}
+
+// listCounter is a store that counts its lists.
+type listCounter struct {
+	store.Store
+	lists []string
+}
+
+func (l *listCounter) List(ctx context.Context, prefix string) ([]store.Key, error) {
+	l.lists = append(l.lists, prefix)
+	return l.Store.List(ctx, prefix)
+}
+
+// #2053: the hourly sweep lists the audit's events once, at its first sweep. After that it
+// lists only each day that has expired since, not the 90 days kept.
+func TestTheSweepListsOnlyTheExpiredDays(t *testing.T) {
+	ctx := context.Background()
+	s := &listCounter{Store: store.NewMemory()}
+	now := time.Date(2026, 10, 21, 12, 0, 0, 0, time.UTC)
+	for ago := range 93 {
+		day := now.AddDate(0, 0, -ago).Format("2006-01-02")
+		for n := range 20 {
+			s.Put(ctx, "v1/events/"+day+"/by/x/"+itoa(n)+".json", []byte("{}"), store.Absent)
+		}
+	}
+	rs := records.New(s)
+	events := &eventSweep{}
+	eventLists := func() (n int) {
+		for _, prefix := range s.lists {
+			if strings.HasPrefix(prefix, eventsPrefix) {
+				n++
+			}
+		}
+		s.lists = nil
+		return n
+	}
+
+	// The first: one list of every event, then each of the two expired days.
+	first, err := sweep(ctx, rs, now, mostPerSweep, events)
+	if err != nil || first.events != 40 || eventLists() != 3 {
+		t.Fatalf("%+v %v", first, err)
+	}
+	// An hour on, nothing has expired: no list.
+	if again, _ := sweep(ctx, rs, now.Add(time.Hour), mostPerSweep, events); again.events != 0 || eventLists() != 0 {
+		t.Fatalf("%+v", again)
+	}
+	// A day on, that day's folder alone.
+	if later, _ := sweep(ctx, rs, now.Add(24*time.Hour), mostPerSweep, events); later.events != 20 || eventLists() != 1 {
+		t.Fatalf("%+v", later)
+	}
+	// At its bound, a day is finished by the next sweep.
+	if part, _ := sweep(ctx, rs, now.Add(48*time.Hour), 15, events); part.events != 15 {
+		t.Fatalf("%+v", part)
+	}
+	if rest, _ := sweep(ctx, rs, now.Add(49*time.Hour), mostPerSweep, events); rest.events != 5 {
+		t.Fatalf("%+v", rest)
+	}
+	if left, _ := s.Store.List(ctx, eventsPrefix); len(left) != 89*20 {
+		t.Fatalf("%d left", len(left))
 	}
 }
 
