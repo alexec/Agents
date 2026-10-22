@@ -14,17 +14,19 @@ public enum MuteWords {
     public static let unmuteSymbol = "bell"
     /// The mark's spoken value and tooltip.
     public static let muted = "Notifications muted"
+    /// The mark's tooltip (#2086): what muting does and does not do.
+    public static let mutedHelp = "Notifications muted: none are sent for it. It still shows under Needs You and in the badge"
 
     public static func label(muted: Bool) -> String { muted ? unmute : mute }
     public static func symbol(muted: Bool) -> String { muted ? unmuteSymbol : symbol }
 
     public static func help(muted: Bool) -> String {
         muted ? "Send notifications for this session again"
-              : "Send no notifications for this session. It still shows under Needs You"
+              : "Send no notifications for this session. It still shows under Needs You and in the badge"
     }
 
     public static func workflowHelp(muted: Bool) -> String {
         muted ? "Send notifications for this workflow's runs again. Takes muted: true out of its file"
-              : "Send no notifications for this workflow's runs. They still show under Needs You. Writes muted: true into its file"
+              : "Send no notifications for this workflow's runs. They still show under Needs You and in the badge. Writes muted: true into its file"
     }
 }

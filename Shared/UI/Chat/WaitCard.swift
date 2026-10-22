@@ -9,7 +9,8 @@ import SwiftUI
 /// The question cards' shape, under them, since an agent waiting on an event is very like
 /// one waiting for an answer. Not tinted: nothing has gone wrong, and the chat is already
 /// under Waiting. One view for both apps; the web page's is `WaitCard` in `Chat.tsx`. The
-/// Mac opens Events at Waiting now from it; the Remote has no Events page.
+/// Mac and the Remote open Events, Waiting now at its top, from it (#2083); the Remote not
+/// from a chat in a scene of its own.
 struct WaitCard: View {
     let status: WaitStatus
     var open: (() -> Void)?

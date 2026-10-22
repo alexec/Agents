@@ -313,6 +313,8 @@ struct StartAgentView: View {
     private func send() {
         // One agent at a time: a second tap while one starts is not a second (#87).
         guard canSend else { return }
+        // The keyboard goes, as the chat's does (#2091): what the start says is what comes next.
+        focused = false
         let words = text
         let attached = attachments
         Task { _ = await model.startAgent(prompt: words, attachments: attached, labels: draftLabels, in: project, page: page) }

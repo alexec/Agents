@@ -96,6 +96,8 @@ something particular done.
   its own on the Mac, a scene of its own on an iPad, or a tab of its own on the web page.
 - [Stop and archive agents](archive-and-stop.md): what each does, and what each
   keeps.
+- [Mute the notifications for a session](mute-notifications.md): no alerts for a session
+  or a workflow's runs, which still go under Needs You and on the badge.
 - [Sign a runtime in](sign-a-runtime-in.md): sign Claude Code, Codex, Copilot, Cursor, Grok
   or Antigravity in or out from the app, and give Gemini its key.
 - [Assess a runtime](assess-a-runtime.md): have an agent on a runtime work through the app's

@@ -66,6 +66,15 @@ To leave a finished conversation to come back to, choose **Mark as Unread** from
 menu. It stays unread until you open it again. **Mark as Read** clears the mark without
 opening it.
 
+## Muted
+
+A muted session sends no notification on the Mac, no push and no banner. Nothing else
+changes: it still goes under **Needs you** when it needs you, and it still counts on the
+Dock badge, the app icon badge, the widget and the tab's title. Its row has a bell with a
+slash (🔕) beside the title; on the Mac and in a browser, hover over it to read this. A
+muted workflow's runs are muted sessions. See
+[Mute the notifications for a session](../how-to/mute-notifications.md) (#2086).
+
 ## Archiving needs approval
 
 **Archiving needs approval** is a mark on a row, like the unread mark, not a group. An agent

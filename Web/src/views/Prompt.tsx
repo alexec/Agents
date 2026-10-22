@@ -203,6 +203,8 @@ export function Prompt({ store, draftKey, placeholder, capabilities, disabled, s
    */
   const submit = async () => {
     if (!canSend) return;
+    // On a phone or tablet the keyboard goes, as the Remote's does (#2091); a desktop keeps focus.
+    if (onTouchScreen()) field.current?.blur();
     const outgoing = text.value.trim();
     const going = attachments.value;
     if (!starting) {

@@ -132,7 +132,7 @@ struct AgentRow: View {
                         Image(systemName: MuteWords.symbol)
                             .appText(.fine)
                             .foregroundStyle(.tertiary)
-                            .help(MuteWords.muted)
+                            .help(MuteWords.mutedHelp)
                             .accessibilityLabel(MuteWords.muted)
                     }
                     // Started by another agent (028): the same kind of mark, for the
@@ -327,6 +327,7 @@ struct AgentRow: View {
                     Button(MuteWords.label(muted: agent.isMuted), systemImage: MuteWords.symbol(muted: agent.isMuted)) {
                         Task { await model.setMuted(agent.id, !agent.isMuted) }
                     }
+                    .help(MuteWords.help(muted: agent.isMuted))
                 }
                 // The person's title, which the runtime's no longer replaces (#751).
                 Button("Rename…") { model.renaming = Renaming(id: agent.id) }

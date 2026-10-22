@@ -13,7 +13,7 @@ import { canBeApproved, canBeDenied, isOn, isUnapproved, runsHere, workflowStatu
 import { holdForMenu, isMenuKey, openContextMenu, type MenuItem } from "./ContextMenu";
 import { fromWireDate } from "../protocol/dates";
 import { shortAgo } from "../model/activity";
-import { isWorkflowMuted, muteLabel, muteMark, mutedWords, unmuteLabel, workflowMuteHelp } from "../model/mute";
+import { isWorkflowMuted, muteLabel, muteMark, mutedHelp, mutedWords, unmuteLabel, workflowMuteHelp } from "../model/mute";
 import { Capability } from "../protocol/capabilities.generated";
 
 export function WorkflowRow({ store, host, summary, disabled, chosen, onPick, pinnedAt, place }: {
@@ -40,7 +40,7 @@ export function WorkflowRow({ store, host, summary, disabled, chosen, onPick, pi
         </span>
         {/* Its runs send no notifications (#2003), marked as a muted session is. */}
         {isWorkflowMuted(summary) && !summary.isArchived && (
-          <span class="started-by muted" role="img" title={mutedWords} aria-label={mutedWords}>{muteMark}</span>
+          <span class="started-by muted" role="img" title={mutedHelp} aria-label={mutedWords}>{muteMark}</span>
         )}
         {ran && <time class="when" dateTime={ran.toISOString()} title={ran.toLocaleString()}>{shortAgo(ran)}</time>}
       </button>

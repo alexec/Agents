@@ -265,6 +265,7 @@ struct AgentsCommands: Commands {
             // No push, banner or Mac notification for it, and still in Needs You (#2003).
             let muted = agent?.isMuted ?? false
             Button(MuteWords.label(muted: muted)) { act { await model.setMuted($0.id, !muted) } }
+                .help(MuteWords.help(muted: muted))
                 .disabled(agent.map { !model.canMute($0) } ?? true)
             // The person's title (#751), edited in the key window's toolbar.
             Button("Rename…") { rename() }
