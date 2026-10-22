@@ -284,7 +284,7 @@ A tag that already exists for this version means another release ran: end with
    - `curl -fsS https://control.agentloops.dev/healthz` says `ok`;
    - the version it serves, the one Settings ▸ Control plane shows, is `<version>`. `up.sh`
      checks it last and prints `agents-control <version> (go)`; to look again:
-     `CLOUDSDK_CONFIG=~/.agents/gcloud/agents-control gcloud compute ssh agents-control --zone us-west1-b --command 'cd /opt/agents && sudo docker compose -f deploy/compose.public.yaml exec -T control /agents-control version'`.
+     `CLOUDSDK_CONFIG=~/.agents/gcloud/agents-control CLOUDSDK_CORE_PROJECT=agents-control gcloud compute ssh agents-control --zone us-west1-b --command 'cd /opt/agents && sudo docker compose -f deploy/compose.public.yaml exec -T control /agents-control version'`.
 
    If `up.sh` or a check fails, never roll back the store and never run `down.sh`. File a
    bug: title `Release v<version>: the control plane deploy failed`, labels `bug`,
