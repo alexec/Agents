@@ -1,7 +1,8 @@
 ---
 name: Release
 # Run now, an issue closing, or once a day: a run a trigger started checks first that the
-# milestone is ready, and ends at once when it is not (#1729, the skill's step 0).
+# milestone is ready (no open issue but bugs, none high, walks done), and ends at once when
+# it is not (#1729, #2294, the skill's step 0).
 on:
   - issue.closed
   - schedule:
@@ -22,7 +23,8 @@ TestFlight, with nobody watching. Follow the `release` skill
 
 You start by Alex's Run now or message, or by a trigger (#1729): an issue closing, or the
 daily check. Started by a trigger, you first check that the open milestone is ready (the
-skill's step 0), and end with `nothing_to_do` at once when it is not. Started by Alex, you
+skill's step 0: no open issue of the milestone but bugs, none of them high, its walks
+done), and end with `nothing_to_do` at once when it is not. Started by Alex, you
 go on whatever the age of the last tag.
 
 You do not start fix lanes, merge or push anything but the tag: high fixes go
