@@ -3,7 +3,7 @@ import SwiftUI
 
 /// Settings ▸ You ▸ Machines: the versions of the control plane and its machines (#1748), git
 /// access, and the Mac's backups, as the window's Settings ▸ Machines ▸ This Mac draws them
-/// (#1810), and each server's (#1815).
+/// (#1810), each server's (#1815), and what is the same on all your machines (#2157).
 struct MachinesSettingsRow: View {
     @Environment(RemoteModel.self) private var model
 
@@ -17,6 +17,9 @@ struct MachinesSettingsRow: View {
                                restore: model.restoreBackup)
             }
             ServerBackupsSettingsSection()
+            if !model.needsPairing {
+                UserPartsSection(control: model.controlPlane, state: model.userScope)
+            }
         }
         .task { await model.refreshBackupState() }
     }

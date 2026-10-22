@@ -62,9 +62,11 @@ struct SettingsWindow: View {
                     }
                     Divider()
                 }
-                // A pane whose edits go to every machine of the person's (#2069): it says so.
-                if let part = followedPart {
-                    FollowedPaneNote(part: part) { pane.wrappedValue = .onEveryMachine }
+                // A pane whose part can be the same on every machine of the person's says where
+                // an edit in it goes, with the switch (#2069, #2157).
+                if let part = scopePart {
+                    // One per part, so a pane never shows another's switch.
+                    ScopeLine(part: part).id(part)
                     Divider()
                 }
                 content
@@ -128,7 +130,7 @@ struct SettingsWindow: View {
     private func shows(_ each: SettingsPane) -> Bool {
         switch each {
         // A person's own sign-ins (#995), a pane of its own as on the Remote (#2197).
-        case .controlPlane, .clients, .onEveryMachine, .channels, .signIns, .policy: control != nil
+        case .controlPlane, .clients, .secrets, .channels, .signIns, .policy: control != nil
         // An admin's, and a member's in a group, who sees the groups they are in (#1761, #2076).
         case .groups: control != nil && model.people.showsGroups
         // An admin's: which providers people sign in with (#995).
@@ -140,18 +142,18 @@ struct SettingsWindow: View {
         }
     }
 
-    /// The part of You ▸ On Every Machine this pane edits, when it is the same on every
-    /// machine: an edit here then goes to each of them.
-    private var followedPart: DaemonAPI.UserSettingsPartName? {
-        let part: DaemonAPI.UserSettingsPartName? = switch pane.wrappedValue {
+    /// The part this pane edits that can be the same on every machine of the person's
+    /// (#1760), with a control plane to keep it and this Mac's host to take it from.
+    private var scopePart: DaemonAPI.UserSettingsPartName? {
+        guard control != nil, !model.noHostOnThisMac else { return nil }
+        return switch pane.wrappedValue {
         case .spending: .costLimits
         case .resources: .resources
         case .runtimes: .runtimes
-        case .agentConfiguration: .agentConfig
+        // Its Connectors page edits the MCP servers; its other pages, the configuration.
+        case .agentConfiguration: sharedPage.wrappedValue == .mcp ? .mcpServers : .agentConfig
         default: nil
         }
-        guard let part, model.userScope.follows(part) else { return nil }
-        return part
     }
 
     private var title: String {
@@ -199,12 +201,9 @@ struct SettingsWindow: View {
             if let control { ControlSettingsView(control: control, page: .providers) }
         case .clients:
             if let control { ControlSettingsView(control: control, page: .clients) }
-        case .onEveryMachine:
+        case .secrets:
             // Through the window's own connection, which hears when they change (#1760).
-            FormColumn {
-                UserScopePane(control: model.controlRequests, state: model.userScope,
-                              takeHere: (name: "This Mac", take: { part in await model.takeUserPartFromThisMac(part) }))
-            }
+            FormColumn { SecretsPane(control: model.controlRequests, state: model.userScope) }
         case .people:
             // Through the window's own connection to the control plane, which hears when
             // people change (#994).
@@ -235,7 +234,7 @@ extension SettingsScope {
         // How this app draws: Sidebar is kept on the Mac's host so every client draws the
         // same (#1033, #2079), but its subject is the app (#2157).
         case .thisApp: [.appearance, .sidebar]
-        case .machines: [.machines, .runtimes, .agentConfiguration, .spending, .resources, .onEveryMachine]
+        case .machines: [.machines, .runtimes, .agentConfiguration, .spending, .resources, .secrets]
         // The person's account first, shown with no control plane too (#2157).
         case .controlPlane: [.account, .signIns, .people, .bots, .groups, .channels, .signIn, .policy, .providers, .clients, .controlPlane]
         }
@@ -272,8 +271,10 @@ enum SettingsPane: String, Hashable, CaseIterable {
     case signIns
     /// Was Shared (#754): the raw value is what a window left open on it kept.
     case agentConfiguration = "shared"
-    /// The settings and secrets the control plane keeps for the person (#1760).
-    case onEveryMachine
+    /// The secrets the control plane keeps for the person (#1760). Was On Every Machine, whose
+    /// settings moved into their own panes (#2157): its raw value is what a window left open
+    /// on it kept.
+    case secrets = "onEveryMachine"
 
     /// A pane of what this Mac's host keeps: its runtimes, settings, cost and resources.
     /// Machines is one only on its This Mac page.
@@ -281,12 +282,12 @@ enum SettingsPane: String, Hashable, CaseIterable {
         switch self {
         case .runtimes, .agentConfiguration, .spending, .resources: true
         case .appearance, .sidebar, .account, .machines, .controlPlane, .providers, .clients, .people, .bots, .groups,
-             .channels, .signIn, .signIns, .onEveryMachine, .policy: false
+             .channels, .signIn, .signIns, .secrets, .policy: false
         }
     }
 
     /// A pane drawn only with a control plane to show.
-    var needsControlPlane: Bool { [.controlPlane, .providers, .clients, .onEveryMachine, .signIns, .policy].contains(self) }
+    var needsControlPlane: Bool { [.controlPlane, .providers, .clients, .secrets, .signIns, .policy].contains(self) }
 
     var title: String {
         switch self {
@@ -308,7 +309,7 @@ enum SettingsPane: String, Hashable, CaseIterable {
         case .signIn: SignInWords.paneTitle
         case .policy: OrgPolicyWords.title
         case .signIns: SignInWords.signInsTitle
-        case .onEveryMachine: UserScopeWords.title
+        case .secrets: UserScopeWords.secretsTitle
         }
     }
 
@@ -332,7 +333,7 @@ enum SettingsPane: String, Hashable, CaseIterable {
         case .signIn: SignInWords.paneSymbol
         case .policy: OrgPolicyWords.symbol
         case .signIns: "person.badge.key"
-        case .onEveryMachine: "arrow.triangle.2.circlepath"
+        case .secrets: "key"
         }
     }
 }
@@ -423,24 +424,74 @@ private struct NoMacHostNotice: View {
     }
 }
 
-/// Over a pane whose part is the same on every machine (#2069): an edit here changes them all.
-private struct FollowedPaneNote: View {
+/// The top of a pane whose part can be the same on every machine of the person's (#2069,
+/// #2157): where an edit here goes, and the switch. On takes this Mac's to every machine;
+/// off, asked first, leaves each machine what it has.
+private struct ScopeLine: View {
+    @Environment(AppModel.self) private var model
     let part: DaemonAPI.UserSettingsPartName
-    let show: () -> Void
+
+    @State private var busy = false
+    @State private var problem: String?
+    @State private var asksToStop = false
+    /// The switch: moved at once by a press, then kept to what the control plane says.
+    @State private var isOn = false
+
+    private var follows: Bool { model.userScope.follows(part) }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Label(UserScopeWords.followedTitle, systemImage: "arrow.triangle.2.circlepath")
-                .appText(.supporting).fontWeight(.semibold)
-            Text(UserScopeWords.followedNote(part))
-                .appText(.fine).foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-            Button(UserScopeWords.showOnEveryMachine, action: show)
-                .controlSize(.small)
+            HStack {
+                Label(follows ? UserScopeWords.allMachines : UserScopeWords.thisMacOnly,
+                      systemImage: follows ? "arrow.triangle.2.circlepath" : "desktopcomputer")
+                    .appText(.supporting).fontWeight(.semibold)
+                Spacer()
+                if busy { ProgressView().controlSize(.small) }
+                Toggle(UserScopeWords.partsHeading, isOn: $isOn)
+                    .toggleStyle(.switch).controlSize(.small)
+                    .disabled(busy || model.controlRequests == nil)
+                    .accessibilityIdentifier("sameOnAll-\(part.rawValue)")
+            }
+            if let problem {
+                Text(problem).appText(.fine).tinted(.failure)
+                    .fixedSize(horizontal: false, vertical: true)
+            } else {
+                Text(UserScopeWords.scopeNote(part, follows: follows))
+                    .appText(.fine).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
         .frame(maxWidth: 560, alignment: .leading)
         .padding(16)
         .accessibilityElement(children: .contain)
+        .onChange(of: follows, initial: true) { isOn = follows }
+        .onChange(of: isOn) { turn(isOn) }
+        // Cancel, or the dialog sent away: the switch goes back.
+        .onChange(of: asksToStop) { if !asksToStop, !busy { isOn = follows } }
+        .confirmationDialog(UserScopeWords.stopTitle(part), isPresented: $asksToStop, titleVisibility: .visible) {
+            Button(UserScopeWords.stop) {
+                Task { await run { await model.userScope.set(part, to: .null, on: model.controlRequests) } }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text(UserScopeWords.stopMessage)
+        }
+    }
+
+    private func turn(_ on: Bool) {
+        guard on != follows, !busy else { return }
+        if on {
+            Task { await run { await model.takeUserPartFromThisMac(part) } }
+        } else {
+            asksToStop = true
+        }
+    }
+
+    private func run(_ change: () async -> String?) async {
+        busy = true
+        problem = await change()
+        busy = false
+        isOn = follows
     }
 }
 

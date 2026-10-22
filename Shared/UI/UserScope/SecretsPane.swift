@@ -1,26 +1,18 @@
 import AgentsKitCore
 import SwiftUI
 
-/// You ▸ On Every Machine (#1760, spec 736 US4): the person's secrets and the settings that
-/// are the same on every machine of theirs, kept by the control plane. The window and the
-/// Remote draw it; the web page draws the same in `Web/src/views/UserScope.tsx`.
-struct UserScopePane: View {
+/// Machines ▸ Secrets (#1760, #2157): the person's secrets, by name only, kept by the control
+/// plane and sent to each machine of theirs. The window and the Remote draw it; the web page
+/// draws the same in `Web/src/views/UserScope.tsx`.
+struct SecretsPane: View {
     /// The control plane, or nil while it cannot be reached.
     let control: DaemonClient?
     let state: UserScopeState
-    /// Use This Mac's: takes a part from this machine and sets it at the user scope, nil
-    /// once done, else why not. Nil where there is no machine of one's own to take it from
-    /// (the Remote).
-    var takeHere: (name: String, take: (DaemonAPI.UserSettingsPartName) async -> String?)?
 
     @State private var problem: String?
     @State private var isAdding = false
     @State private var replacing: DaemonAPI.UserSecretRow?
     @State private var removing: DaemonAPI.UserSecretRow?
-    @State private var giving: DaemonAPI.UserSettingsPartName?
-    @State private var busy: DaemonAPI.UserSettingsPartName?
-    /// Use This Mac's on a part every machine has already: asked first (#2069).
-    @State private var replacingPart: DaemonAPI.UserSettingsPartName?
 
     var body: some View {
         Form {
@@ -40,7 +32,6 @@ struct UserScopePane: View {
                 .paperListRow()
             }
             secretsSection
-            partsSection
         }
         .paperForm()
         .task(id: control != nil) { await state.load(control) }
@@ -63,29 +54,6 @@ struct UserScopePane: View {
         } message: { _ in
             Text("It is taken out of secrets.env on every machine of yours.")
         }
-        .confirmationDialog(giving.map { "\(UserScopeWords.partTitle($0)): each machine its own?" } ?? "",
-                            isPresented: Binding(get: { giving != nil }, set: { if !$0 { giving = nil } }),
-                            titleVisibility: .visible, presenting: giving) { part in
-            Button(UserScopeWords.stop) { Task { problem = await state.set(part, to: .null, on: control) } }
-            Button("Cancel", role: .cancel) {}
-        } message: { _ in
-            Text("Each machine keeps what it has now, and changes it in its own pane.")
-        }
-        .confirmationDialog(replacingPart.map { UserScopeWords.replaceTitle($0, machine: takeHere?.name ?? "") } ?? "",
-                            isPresented: Binding(get: { replacingPart != nil }, set: { if !$0 { replacingPart = nil } }),
-                            titleVisibility: .visible, presenting: replacingPart) { part in
-            Button(UserScopeWords.useHere(takeHere?.name ?? "")) { Task { await take(part) } }
-            Button("Cancel", role: .cancel) {}
-        } message: { _ in
-            Text(UserScopeWords.replaceMessage)
-        }
-    }
-
-    private func take(_ part: DaemonAPI.UserSettingsPartName) async {
-        guard let takeHere else { return }
-        busy = part
-        problem = await takeHere.take(part)
-        busy = nil
     }
 
     private var secretsSection: some View {
@@ -119,48 +87,8 @@ struct UserScopePane: View {
                 Button(UserScopeWords.addSecret) { isAdding = true }
                     .disabled(control == nil)
             }
-        } header: {
-            Text(UserScopeWords.secretsHeading)
         } footer: {
             Text(UserScopeWords.secretsFoot).appText(.fine).foregroundStyle(.secondary)
-        }
-        .paperListRow()
-    }
-
-    private var partsSection: some View {
-        Section {
-            ForEach(DaemonAPI.UserSettingsPartName.allCases, id: \.self) { part in
-                let follows = state.follows(part)
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(UserScopeWords.partTitle(part)).appText(.reading)
-                    Text(UserScopeWords.partDetail(part)).appText(.fine).foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                    Text(UserScopeWords.partState(state.settings?[part], updated: state.settings?.updated))
-                        .appText(.fine)
-                    HStack {
-                        if let takeHere {
-                            Button(UserScopeWords.useHere(takeHere.name)) {
-                                // Over every machine's copy: asked first.
-                                if follows { replacingPart = part } else { Task { await take(part) } }
-                            }
-                            .disabled(control == nil || busy != nil)
-                            .accessibilityIdentifier("useHere-\(part.rawValue)")
-                        }
-                        if follows {
-                            Button(UserScopeWords.stop) { giving = part }
-                                .disabled(control == nil || busy != nil)
-                                .accessibilityIdentifier("stop-\(part.rawValue)")
-                        }
-                        if busy == part { ProgressView().controlSize(.small) }
-                    }
-                    .rowButtons()
-                }
-            }
-        } header: {
-            Text(UserScopeWords.partsHeading)
-        } footer: {
-            Text(takeHere == nil ? UserScopeWords.partsFoot + " " + UserScopeWords.partsFootNoTake : UserScopeWords.partsFoot)
-                .appText(.fine).foregroundStyle(.secondary)
         }
         .paperListRow()
     }

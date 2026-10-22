@@ -2044,7 +2044,7 @@ final class AppModel {
         return await userScope.set(part, to: encoded, on: controlRequests)
     }
 
-    /// Use This Mac's under You ▸ On Every Machine: this Mac's host's own part, set at the
+    /// The switch at the top of a pane turned on (#2157): this Mac's host's own part, set at the
     /// user scope. Nil once done, else why not, in the host's words (a token in clear).
     func takeUserPartFromThisMac(_ part: DaemonAPI.UserSettingsPartName) async -> String? {
         do {

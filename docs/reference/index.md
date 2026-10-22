@@ -38,8 +38,8 @@ something up, not for reading through.
 - [Groups](groups.md): groups of people, and the workspace providers each group may start
 - [Policy](policy.md): the organisation's policy, its rules, its signature and its methods
   machines from.
-- [On Every Machine](on-every-machine.md): the settings and secrets the control plane keeps
-  for you and sends to each machine of yours.
+- [Secrets and the same on all your machines](on-every-machine.md): the settings and secrets
+  the control plane keeps for you and sends to each machine of yours.
 - [Reports](reports.md): usage, cost and time by person, project and machine, added up on
   the control plane.
 - [The Console](console.md): the control plane's app for admins on the web page, and what

@@ -451,7 +451,7 @@ export class Work {
   dismissCap(reached: CapReached) {
     this.capped.value = dropCap(reached, this.capped.value);
   }
-  /** Counts each control/userSettingsChanged (#1760): You ▸ On Every Machine loads again when it moves. */
+  /** Counts each control/userSettingsChanged (#1760): Machines ▸ Secrets and the parts load again when it moves. */
   readonly userScopeChanges = signal(0);
   /**
    * The organisation's policy in force (#998): from policy/mine when Settings ▸ Policy loads it, and from each
