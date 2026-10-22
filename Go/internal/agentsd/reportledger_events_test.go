@@ -79,3 +79,49 @@ func TestOutcomesGoIntoTheHours(t *testing.T) {
 		t.Fatalf("%+v", c)
 	}
 }
+
+// Runtimes and Workflows (#2019): a workflow's agents have rows of their own, with its runs
+// and the runs that failed; any agent's failure counts.
+func TestWorkflowRunsAndFailuresGoIntoTheHours(t *testing.T) {
+	d, _ := start(t, t.TempDir())
+	defer d.Shutdown()
+	d.SettingsDir = t.TempDir()
+	project := filepath.Join(t.TempDir(), "shop")
+	nightly := "nightly"
+	run := seeded(t, d, project, func(a *wire.Agent) { a.StartedByWorkflow = &nightly })
+	mine := seeded(t, d, project, nil)
+	d.raise(wire.EventDraft{Name: "workflow.ran", At: now(), Scope: projectScope(project), Sentence: "Workflow nightly started it.",
+		Details: map[string]string{"workflow": nightly, "agent": string(run.ID)}})
+	d.raiseAgentEvent("agent.failed", run.ID, "ended in an error.", map[string]string{"reason": "runtime_error"})
+	d.raiseAgentEvent("agent.failed", mine.ID, "ended in an error.", map[string]string{"reason": "runtime_error"})
+	d.bankSessionCost(run.ID, wire.Cost{Amount: 0.25, Currency: "USD"})
+
+	var sent []wire.UsageRollup
+	d.SetControlAsk(askControl(func(_ context.Context, _ string, params any) (json.RawMessage, error) {
+		sent = append(sent, params.(wire.UsageRollup))
+		return json.RawMessage(`{}`), nil
+	}))
+	d.sendReport()
+	byWorkflow := map[string]wire.ReportCounts{}
+	cost := map[string]float64{}
+	for _, h := range sent[0].Hours {
+		for _, row := range h.Rows {
+			w := ""
+			if row.Workflow != nil {
+				w = *row.Workflow
+			}
+			c := byWorkflow[w]
+			if row.Counts != nil {
+				addCounts(&c, *row.Counts)
+			}
+			byWorkflow[w] = c
+			cost[w] += row.Cost["USD"]
+		}
+	}
+	if c := byWorkflow[nightly]; c.WorkflowRuns != 1 || c.WorkflowFailures != 1 || c.FailedSessions != 1 || cost[nightly] != 0.25 {
+		t.Fatalf("%+v %v", byWorkflow, cost)
+	}
+	if c := byWorkflow[""]; c.FailedSessions != 1 || c.WorkflowFailures != 0 {
+		t.Fatalf("%+v", byWorkflow)
+	}
+}

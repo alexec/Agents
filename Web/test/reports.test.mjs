@@ -75,8 +75,9 @@ test("a late answer to another scope is not taken for this one (#2201)", () => {
 });
 
 // Outcomes and Time (#2019): the counts each machine adds to its rows.
+const counts = (over) => ({ sessions: 0, failedSessions: 0, prsOpened: 0, prsMerged: 0, prsReverted: 0, mergeSeconds: 0, waits: 0,
+  waitBuckets: [0, 0, 0, 0, 0, 0], workflowRuns: 0, workflowFailures: 0, ...over });
 test("outcomes add up by person, merged first, with the cost of each merged pull request", () => {
-  const counts = (over) => ({ sessions: 0, prsOpened: 0, prsMerged: 0, prsReverted: 0, mergeSeconds: 0, waits: 0, waitBuckets: [0, 0, 0, 0, 0, 0], ...over });
   const rows = [
     row({ cost: { USD: 8 }, counts: counts({ sessions: 3, prsOpened: 2, prsMerged: 2, prsReverted: 1, mergeSeconds: 7200 }) }),
     row({ person: "al", personName: "Al", cost: { USD: 1 }, workingSeconds: 60, waitingSeconds: 180,
@@ -98,4 +99,32 @@ test("outcomes add up by person, merged first, with the cost of each merged pull
   assert.equal(r.medianWait([0, 0, 0, 0, 0, 0]), null);
   assert.equal(r.timeLine(time.groups[0]), "Waiting for a person 75% of the time · 3 waits, the middle one 5 to 15 minutes · 1m working");
   assert.equal(r.timeLine(time.groups[2]), "Waiting for a person 0% of the time · no waits · 2m working");
+});
+
+// Runtimes, Adoption and Workflows (#2019).
+test("runtimes by cost, workflows failing first, adoption by the week", () => {
+  const usd = (n) => new Intl.NumberFormat(undefined, { style: "currency", currency: "USD" }).format(n);
+  const rows = [
+    row({ at: "2026-10-21", cost: { USD: 6 }, turns: 4, unpricedTurns: 1, counts: counts({ sessions: 4, failedSessions: 1, prsMerged: 3 }) }),
+    row({ at: "2026-10-20", person: "al", personName: "Al", runtime: "codex", cost: { USD: 1 }, turns: 2, workingSeconds: 600,
+      workflow: "nightly", counts: counts({ sessions: 2, workflowRuns: 2, workflowFailures: 1, failedSessions: 1 }) }),
+    row({ at: "2026-10-18", person: "al", personName: "Al", runtime: "codex", turns: 1, workflow: "review", workingSeconds: 60,
+      counts: counts({ workflowRuns: 3 }) }),
+  ];
+  const runtimes = r.outcomeTotals(rows, "runtime", "cost");
+  assert.deepEqual(runtimes.groups.map((g) => g.name), ["claude", "codex"]);
+  assert.equal(r.runtimeLine(runtimes.groups[0]), `${usd(6)} · 3 merged · ${usd(2)} a merged pull request · 1 of 4 sessions failed (25%) · 1 turn not priced`);
+
+  const flows = r.outcomeTotals(r.workflowRows(rows), "workflow", "failing");
+  assert.deepEqual(flows.groups.map((g) => g.name), ["nightly", "review"]);
+  assert.equal(r.workflowLine(flows.groups[0]), `1 of 2 runs failed · ${usd(0.5)} a run · 5m working a run`);
+  assert.equal(r.workflowLine(r.outcomeTotals([], "workflow", "failing").total), "0 of 0 runs failed");
+
+  assert.equal(r.weekOf("2026-10-21T15"), "2026-10-19");
+  assert.equal(r.weekOf("2026-10-18"), "2026-10-12");
+  const weeks = r.adoption(rows);
+  assert.deepEqual(weeks.map((w) => [w.week, w.people, w.sessions, w.runtimes, w.workflows]), [["2026-10-19", 2, 6, 2, 1], ["2026-10-12", 1, 0, 1, 1]]);
+  assert.equal(r.adoptionLine(weeks[0]), "2 active people · 3 sessions a person · 2 runtimes · 1 workflow");
+  assert.equal(r.adoptionLine(r.adoption(rows, true)[0]), "6 sessions · 2 runtimes · 1 workflow");
+  assert.equal(r.weekTitle("2026-10-19"), "The week of 19 Oct");
 });

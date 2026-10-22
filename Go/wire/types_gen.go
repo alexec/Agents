@@ -5979,10 +5979,13 @@ type RenameRequest struct {
 	Title string `json:"title"`
 }
 
-// What a machine's agents did in an hour or a day (#2019), counted from its own event log and its time ledger: never a conversation's words. Absent from a machine before #2019.
+// What a machine's agents did in an hour or a day (#2019, R2 to R6), counted from its own event log and its time ledger: never a conversation's words. Absent from a machine before #2019.
 type ReportCounts struct {
 	// Agents that began their first turn (agent.started).
 	Sessions int64 `json:"sessions"`
+
+	// Agents that ended in an error that nobody chose (agent.failed).
+	FailedSessions int64 `json:"failedSessions"`
 
 	// Pull and merge requests opened from an agent's branch on this machine (pr.opened).
 	PrsOpened int64 `json:"prsOpened"`
@@ -6001,6 +6004,12 @@ type ReportCounts struct {
 
 	// The waits by how long each was: under 1 minute, 5, 15, 60, 240, and longer. Six numbers.
 	WaitBuckets []int64 `json:"waitBuckets"`
+
+	// Runs a workflow started (workflow.ran).
+	WorkflowRuns int64 `json:"workflowRuns"`
+
+	// Runs whose agent ended in an error (agent.failed of an agent a workflow started).
+	WorkflowFailures int64 `json:"workflowFailures"`
 }
 
 // reports/export's answer (#1811): the rows as CSV or JSON lines.
@@ -6064,6 +6073,9 @@ type ReportRow struct {
 	Project string `json:"project"`
 
 	Runtime string `json:"runtime"`
+
+	// The workflow that started the agents of this row (#2019), by its id; absent for agents a person or another agent started.
+	Workflow *string `json:"workflow,omitzero"`
 
 	// By currency.
 	Cost map[string]float64 `json:"cost"`
@@ -8070,6 +8082,9 @@ type UsageRollupRow struct {
 	Project string `json:"project"`
 
 	Runtime string `json:"runtime"`
+
+	// The workflow that started the agents of this row (#2019), by its id; absent for agents a person or another agent started.
+	Workflow *string `json:"workflow,omitzero"`
 
 	// By currency.
 	Cost map[string]float64 `json:"cost"`

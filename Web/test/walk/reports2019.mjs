@@ -1,4 +1,4 @@
-// The #2019 walk: Reports ▸ Outcomes and Time on a scratch control plane whose store holds
+// The #2019 walk: Reports ▸ Outcomes, Time, Runtimes, Adoption and Workflows on a scratch control plane whose store holds
 // synthetic days with counts (never a real record). Opens each page, checks the totals' words,
 // and shoots each at <out dir>.
 //
@@ -19,7 +19,8 @@ try {
   await page.type(code);
   await page.press("Connect");
   await page.waitFor(`document.querySelector(".sidebar")`, 20_000);
-  for (const [section, words] of [["outcomes", "merged of"], ["time", "Waiting for a person"]]) {
+  for (const [section, words] of [["outcomes", "merged of"], ["time", "Waiting for a person"], ["runtimes", "sessions failed"],
+    ["adoption", "active person"], ["workflows", "runs failed"]]) {
     await page.eval(`location.hash = "#/reports/${section}"`);
     await page.waitFor(`document.querySelector(".report-list")?.textContent.includes(${JSON.stringify(words)})`, 20_000);
     const said = (await page.text(".reports-pane")).replace(/\s+/g, " ");
@@ -27,6 +28,8 @@ try {
     check(said.includes(words), `${section} draws its totals`);
     await page.shot(`${out}/web-${section}.png`);
   }
+  await page.eval(`location.hash = "#/reports/time"`);
+  await page.waitFor(`document.querySelector(".report-list")?.textContent.includes("Waiting")`, 20_000);
   await page.press("3M");
   await page.press("Runtime");
   await page.waitFor(`document.querySelector(".report-list")?.textContent.includes("Codex")`, 20_000);

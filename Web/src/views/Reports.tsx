@@ -5,12 +5,13 @@
 import { useEffect, useMemo, useRef } from "preact/hooks";
 import { useSignal } from "@preact/signals";
 import type { Store } from "../model/store";
-import type { ReportFormat, ReportRange, ReportScope, ReportScopeOption, UsageReport } from "../protocol/generated";
+import type { ReportFormat, ReportRange, ReportRow, ReportScope, ReportScopeOption, UsageReport } from "../protocol/generated";
 import { CallFailed } from "../wire/link";
-import { budgetWords, dimensionTitle, empty, exportName, groupNote, hiddenNote, line, meNote, memberNote, noOutcomes, outcomeLine,
-  outcomeTotals, outcomesNote, rangeShort, rangeSpan, ranges, reportTotals, sameScope, scopeKey, scopeNote, scopedDimensions, share,
-  timeLine, timeNote, utcNote, waitingShare } from "../model/reports";
-import type { OutcomeGroup, ReportDimension, ReportGroup } from "../model/reports";
+import { adoption, adoptionLine, adoptionNote, budgetWords, dimensionTitle, empty, exportName, groupNote, hiddenNote, line, meNote,
+  memberNote, noOutcomes, noWorkflows, outcomeLine, outcomeTotals, outcomesNote, rangeShort, rangeSpan, ranges, reportTotals, runtimeLine,
+  runtimesNote, sameScope, scopeKey, scopeNote, scopedDimensions, share, timeLine, timeNote, utcNote, waitingShare, weekTitle, workflowLine,
+  workflowRows, workflowsNote } from "../model/reports";
+import type { OutcomeGroup, OutcomeOrder, ReportDimension, ReportGroup } from "../model/reports";
 import type { Section } from "../model/console";
 
 function sentence(error: unknown): string {
@@ -138,38 +139,60 @@ function note(shown: UsageReport, scope: ReportScope | undefined, more: boolean)
   return scopeNote(of, of.group ? shown.groupNames?.[of.group] : undefined);
 }
 
-/** Reports ▸ Outcomes (R2) and Time (R3), #2019: what the agents shipped, and how much of their time
- * they waited for a person, from the counts each machine adds to its rows. */
+type CountsKind = "outcomes" | "time" | "runtimes" | "workflows";
+
+/** How each page of counts adds up, sorts, says and draws its groups. */
+const countsPages: Record<CountsKind, { order: OutcomeOrder; by: ReportDimension; words: (g: OutcomeGroup) => string; note: string;
+  none: string; rows: (rows: readonly ReportRow[]) => readonly ReportRow[]; nothing: (t: OutcomeGroup) => boolean;
+  bar: (g: OutcomeGroup, most: OutcomeGroup[]) => number }> = {
+  outcomes: { order: "merged", by: "person", words: outcomeLine, note: outcomesNote, none: noOutcomes, rows: (r) => r,
+    nothing: (t) => t.sessions + t.opened === 0, bar: (g, all) => fraction(g.merged, Math.max(0, ...all.map((x) => x.merged))) },
+  time: { order: "waiting", by: "person", words: timeLine, note: timeNote, none: empty, rows: (r) => r,
+    nothing: (t) => t.workingSeconds + t.waitingSeconds === 0, bar: (g) => waitingShare(g) },
+  runtimes: { order: "cost", by: "runtime", words: runtimeLine, note: runtimesNote, none: empty, rows: (r) => r,
+    nothing: (t) => t.turns + t.sessions === 0, bar: (g, all) => fraction(costOf(g), Math.max(0, ...all.map(costOf))) },
+  workflows: { order: "failing", by: "workflow", words: workflowLine, note: workflowsNote, none: noWorkflows, rows: workflowRows,
+    nothing: (t) => t.runs + t.turns === 0, bar: (g) => fraction(g.runFailures, g.runs) },
+};
+
+const fraction = (part: number, all: number) => all > 0 ? part / all : 0;
+const costOf = (g: OutcomeGroup) => Object.values(g.cost)[0] ?? 0;
+
+function RangePicker({ range, from = 0 }: { range: { value: ReportRange }; from?: number }) {
+  return (
+    <div class="segmented" role="radiogroup" aria-label="Range" title={rangeSpan[range.value]}>
+      {ranges.slice(from).map((r) => (
+        <button key={r} role="radio" aria-checked={range.value === r} class={range.value === r ? "on" : ""}
+          onClick={() => { range.value = r; }}>{rangeShort[r]}</button>
+      ))}
+    </div>
+  );
+}
+
+/** Reports ▸ Outcomes (R2), Time (R3), Runtimes (R4) and Workflows (R6), #2019: what the agents did,
+ * from the counts each machine adds to its rows. */
 function CountsPane({ store, runtimeName, scope, kind }: { store: Store; runtimeName: (id: string) => string; scope: ReportScope | undefined;
-  kind: "outcomes" | "time" }) {
+  kind: CountsKind }) {
+  const page = countsPages[kind];
   const range = useSignal<ReportRange>("week");
-  const by = useSignal<ReportDimension>("person");
+  const by = useSignal<ReportDimension>(page.by);
   const { problem, shown } = useReport(store, range.value, scope);
-  const ways = scopedDimensions(shown);
+  const scoped = scopedDimensions(shown);
+  const ways = kind === "workflows" ? ["workflow" as const, ...scoped] : scoped;
   const way = ways.includes(by.value) ? by.value : ways[0]!;
   const names = store.runtimes.value;
-  const order = kind === "outcomes" ? "merged" : "waiting";
-  const totals = useMemo(() => shown ? outcomeTotals(shown.rows, way, order, runtimeName, shown.groupNames ?? {}) : null, [shown, way, names, order]);
-  const most = totals ? Math.max(0, ...totals.groups.map((g) => g.merged)) : 0;
-  const words = kind === "outcomes" ? outcomeLine : timeLine;
-  const bar = (g: OutcomeGroup) => kind === "outcomes" ? (most > 0 ? g.merged / most : 0) : waitingShare(g);
-  const nothing = totals && (kind === "outcomes" ? totals.total.sessions + totals.total.opened === 0
-    : totals.total.workingSeconds + totals.total.waitingSeconds === 0);
+  const totals = useMemo(() => shown ? outcomeTotals(page.rows(shown.rows), way, page.order, runtimeName, shown.groupNames ?? {}) : null,
+    [shown, way, names, kind]);
   const row = (g: OutcomeGroup, total: boolean) => (
     <li key={g.id} class={total ? "report-total" : ""}>
       <span class={total ? "strong" : ""}>{g.name}</span>
-      <span class="quiet small">{words(g)}</span>
-      {!total && <span class="report-bar" aria-hidden="true"><span style={{ width: `${Math.max(1, bar(g) * 100)}%` }} /></span>}
+      <span class="quiet small">{page.words(g)}</span>
+      {!total && totals && <span class="report-bar" aria-hidden="true"><span style={{ width: `${Math.max(1, page.bar(g, totals.groups) * 100)}%` }} /></span>}
     </li>
   );
   return (
     <div class="reports-pane">
-      <div class="segmented" role="radiogroup" aria-label="Range" title={rangeSpan[range.value]}>
-        {ranges.map((r) => (
-          <button key={r} role="radio" aria-checked={range.value === r} class={range.value === r ? "on" : ""}
-            onClick={() => { range.value = r; }}>{rangeShort[r]}</button>
-        ))}
-      </div>
+      <RangePicker range={range} />
       <div class="segmented" role="radiogroup" aria-label="By">
         {ways.map((d) => (
           <button key={d} role="radio" aria-checked={way === d} class={way === d ? "on" : ""}
@@ -181,16 +204,48 @@ function CountsPane({ store, runtimeName, scope, kind }: { store: Store; runtime
       {!totals && !problem.value && <p class="hint">Loading…</p>}
       {totals && shown && (
         <>
-          {nothing ? <p class="hint">{kind === "outcomes" ? noOutcomes : empty}</p> : (
+          {page.nothing(totals.total) ? <p class="hint">{page.none}</p> : (
             <ul class="report-list">
               {row(totals.total, true)}
               {totals.groups.map((g) => row(g, false))}
             </ul>
           )}
-          <p class="quiet small">{kind === "outcomes" ? outcomesNote : timeNote}</p>
+          <p class="quiet small">{page.note}</p>
           {shown.personsHidden && <p class="quiet small">{hiddenNote}</p>}
           {way === "group" && <p class="quiet small">{groupNote}</p>}
           {scope && <p class="quiet small">{`${scopeNote(scope, scope.group ? shown.groupNames?.[scope.group] : undefined)} ${utcNote}`}</p>}
+        </>
+      )}
+    </div>
+  );
+}
+
+/** Reports ▸ Adoption (R5), #2019: each week's active people, sessions, runtimes and workflows in use. */
+function AdoptionPane({ store, scope }: { store: Store; scope: ReportScope | undefined }) {
+  const range = useSignal<ReportRange>("month");
+  const { problem, shown } = useReport(store, range.value, scope);
+  const weeks = useMemo(() => shown ? adoption(shown.rows, shown.personsHidden === true) : null, [shown]);
+  return (
+    <div class="reports-pane">
+      <RangePicker range={range} from={1} />
+      <p class="quiet small">{rangeSpan[range.value]}</p>
+      {problem.value && <p class="hint">{problem.value}</p>}
+      {!weeks && !problem.value && <p class="hint">Loading…</p>}
+      {weeks && shown && (
+        <>
+          {weeks.length === 0 ? <p class="hint">{empty}</p> : (
+            <ul class="report-list">
+              {weeks.map((w) => (
+                <li key={w.week}>
+                  <span>{weekTitle(w.week)}</span>
+                  <span class="quiet small">{adoptionLine(w)}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+          <p class="quiet small">{adoptionNote}</p>
+          {shown.personsHidden && <p class="quiet small">{hiddenNote}</p>}
+          {scope && <p class="quiet small">{scopeNote(scope, scope.group ? shown.groupNames?.[scope.group] : undefined)}</p>}
         </>
       )}
     </div>
@@ -243,8 +298,9 @@ export function ReportsPage({ store, section, down }: { store: Store; section: S
           })}
         </div>
       )}
-      {scopes.value !== null && (section.id === "outcomes" || section.id === "time"
-        ? <CountsPane key={section.id} store={store} runtimeName={runtimeNameIn(store)} scope={option?.scope} kind={section.id} />
+      {scopes.value !== null && (section.id in countsPages
+        ? <CountsPane key={section.id} store={store} runtimeName={runtimeNameIn(store)} scope={option?.scope} kind={section.id as CountsKind} />
+        : section.id === "adoption" ? <AdoptionPane store={store} scope={option?.scope} />
         : <ReportsPane store={store} runtimeName={runtimeNameIn(store)} scope={option?.scope} seesMore={list.length > 1} />)}
     </>
   );

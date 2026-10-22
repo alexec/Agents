@@ -128,8 +128,10 @@ func TestReportsKeepWhatTheAgentsDid(t *testing.T) {
 	owner := p.host("OWNERS-MAC")
 	_, admin := p.client("Owner's window")
 	hour := time.Now().UTC().Format(usageHourLayout)
-	counts := &wire.ReportCounts{Sessions: 2, PrsOpened: 1, PrsMerged: 1, MergeSeconds: 3600, Waits: 1, WaitBuckets: []int64{1, 0, 0, 0, 0, 0}}
-	rows := []wire.UsageRollupRow{{Project: "shop", Runtime: "claude", Cost: map[string]float64{}, Counts: counts},
+	counts := &wire.ReportCounts{Sessions: 2, FailedSessions: 1, PrsOpened: 1, PrsMerged: 1, MergeSeconds: 3600, Waits: 1,
+		WaitBuckets: []int64{1, 0, 0, 0, 0, 0}, WorkflowRuns: 3, WorkflowFailures: 1}
+	nightly := "nightly"
+	rows := []wire.UsageRollupRow{{Project: "shop", Runtime: "claude", Workflow: &nightly, Cost: map[string]float64{}, Counts: counts},
 		{Project: "site", Runtime: "codex", Cost: map[string]float64{"USD": 1}}}
 	params, _ := json.Marshal(wire.UsageRollup{Hours: []wire.UsageRollupPeriod{{At: hour, Rows: rows}}, Days: []wire.UsageRollupPeriod{}})
 	if _, err := p.s.methods.HostSaid(owner.member.Host, "usage/rollup", params); err != nil {
@@ -137,14 +139,15 @@ func TestReportsKeepWhatTheAgentsDid(t *testing.T) {
 	}
 	var got wire.UsageReport
 	json.Unmarshal(call(t, admin, "", "reports/usage", wire.ReportQuery{Range: wire.ReportRangeDay}), &got)
-	if len(got.Rows) != 2 || got.Rows[0].Counts == nil || got.Rows[0].Counts.PrsMerged != 1 || got.Rows[1].Counts != nil {
+	if len(got.Rows) != 2 || got.Rows[0].Counts == nil || got.Rows[0].Counts.PrsMerged != 1 || got.Rows[1].Counts != nil ||
+		got.Rows[0].Workflow == nil || *got.Rows[0].Workflow != "nightly" {
 		t.Fatalf("%+v", got.Rows)
 	}
 	var csv wire.ReportExport
 	json.Unmarshal(call(t, admin, "", "reports/export", wire.ReportQuery{Range: wire.ReportRangeDay}), &csv)
 	lines := strings.Split(strings.TrimSpace(csv.Text), "\n")
-	if !strings.HasSuffix(lines[0], ",sessions,prsOpened,prsMerged,prsReverted,mergeSeconds,waits,groups") ||
-		!strings.HasSuffix(lines[1], ",2,1,1,0,3600,1,") || !strings.HasSuffix(lines[2], ",,,,,,,") {
+	if !strings.HasSuffix(lines[0], ",workflow,sessions,failedSessions,prsOpened,prsMerged,prsReverted,mergeSeconds,waits,workflowRuns,workflowFailures,groups") ||
+		!strings.HasSuffix(lines[1], ",nightly,2,1,1,1,0,3600,1,3,1,") || !strings.HasSuffix(lines[2], ",,,,,,,,,,,") {
 		t.Fatalf("%v", lines)
 	}
 }

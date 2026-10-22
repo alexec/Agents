@@ -10,7 +10,7 @@ import (
 	"github.com/alexec/agents/Go/wire"
 )
 
-// What the agents did, for Reports ▸ Outcomes and Time (#2019): counted into the same UTC
+// What the agents did, for Reports ▸ Outcomes, Time, Runtimes, Adoption and Workflows (#2019): counted into the same UTC
 // hours as their cost, by project and runtime, from this host's own event log and time
 // ledger. Only numbers go to the control plane, never a conversation's words.
 //
@@ -28,6 +28,9 @@ func blankCounts() *wire.ReportCounts {
 
 func addCounts(r *wire.ReportCounts, o wire.ReportCounts) {
 	r.Sessions += o.Sessions
+	r.FailedSessions += o.FailedSessions
+	r.WorkflowRuns += o.WorkflowRuns
+	r.WorkflowFailures += o.WorkflowFailures
 	r.PrsOpened += o.PrsOpened
 	r.PrsMerged += o.PrsMerged
 	r.PrsReverted += o.PrsReverted
@@ -96,17 +99,36 @@ func (d *Daemon) countReportEvents() {
 		return
 	}
 	type add struct {
-		project, runtime, hour string
-		counts                 *wire.ReportCounts
+		project, runtime, workflow, hour string
+		counts                           *wire.ReportCounts
 	}
 	var adds []add
 	var branches map[string]*wire.Agent
 	for _, e := range list {
 		switch e.Name {
-		case "agent.started":
+		case "agent.started", "agent.failed":
 			c := blankCounts()
-			c.Sessions = 1
-			adds = append(adds, add{eventProject(e), e.Details["runtime"], utcHour(e.At.Time()), c})
+			workflow := ""
+			if a := d.Store.Agent(wire.UUID(e.Details["agent"])); a != nil {
+				workflow = reportWorkflow(a)
+			}
+			if e.Name == "agent.started" {
+				c.Sessions = 1
+			} else {
+				c.FailedSessions = 1
+				if workflow != "" {
+					c.WorkflowFailures = 1
+				}
+			}
+			adds = append(adds, add{eventProject(e), e.Details["runtime"], workflow, utcHour(e.At.Time()), c})
+		case "workflow.ran":
+			c := blankCounts()
+			c.WorkflowRuns = 1
+			runtime := ""
+			if a := d.Store.Agent(wire.UUID(e.Details["agent"])); a != nil {
+				runtime = a.RuntimeID
+			}
+			adds = append(adds, add{eventProject(e), runtime, e.Details["workflow"], utcHour(e.At.Time()), c})
 		case "pr.opened", "pr.merged":
 			var p prPayload
 			if json.Unmarshal([]byte(e.Details["payload"]), &p) != nil || p.PR.Branch == "" {
@@ -139,7 +161,7 @@ func (d *Daemon) countReportEvents() {
 					c.MergeSeconds = took.Seconds()
 				}
 			}
-			adds = append(adds, add{reportProject(a), a.RuntimeID, utcHour(at), c})
+			adds = append(adds, add{reportProject(a), a.RuntimeID, reportWorkflow(a), utcHour(at), c})
 		}
 	}
 	last := list[len(list)-1].Position
@@ -148,7 +170,7 @@ func (d *Daemon) countReportEvents() {
 	oldest := utcHour(time.Now().Add(-reportHoursKept * time.Hour))
 	for _, a := range adds {
 		if a.hour >= oldest {
-			d.addReportLocked(a.project, a.runtime, a.hour, wire.UsageRollupRow{Counts: a.counts})
+			d.addReportLocked(a.project, a.runtime, a.workflow, a.hour, wire.UsageRollupRow{Counts: a.counts})
 		}
 	}
 	d.reportLocked().EventsSeen = last
