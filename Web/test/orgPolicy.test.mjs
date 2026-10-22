@@ -172,3 +172,41 @@ test("the organisation's budgets are rows on Cost, as on the Mac and the Remote"
   const rows = o.budgetRows({ daily: { amount: 40, currency: "USD" }, dailyTokens: 50000 }, money);
   assert.deepEqual(rows.map((r) => [r.title, r.words]), [["Per day", "USD 40"], ["Tokens per day", "50,000 tokens"]]);
 });
+
+test("each runtime's ways to the model and Antigravity's terms go to the form and back (#999)", () => {
+  const p = policy({ runtimes: { claude: { reach: ["orgKey", "gateway"] }, codex: { reach: ["orgKey"] } }, notices: { antigravityTerms: "accepted" } });
+  const form = o.formOf(p);
+  assert.equal(form.reach.claude, "org");
+  assert.equal(form.antigravityTerms, "accepted");
+  // A rule the form does not name (org key alone) is kept while its choice is not changed.
+  assert.deepEqual(o.policyOf(form, p, priya).policy, p);
+  form.reach.claude = "signIn";
+  form.antigravityTerms = "show";
+  const made = o.policyOf(form, p, priya).policy;
+  assert.deepEqual(made.runtimes.claude.reach, ["signIn"]);
+  assert.equal(made.notices, undefined);
+  const words = Object.fromEntries(o.rules(p).map((r) => [r.title, r.words]));
+  assert.equal(words["Claude reaches the model by"], "Org key or gateway only");
+  assert.equal(words["Codex reaches the model by"], "Org key only");
+});
+
+test("a reach rule with no runtime list names every runtime, so none is refused", () => {
+  const form = o.formOf(undefined);
+  form.reach.claude = "org";
+  const made = o.policyOf(form, undefined, priya).policy;
+  assert.deepEqual(Object.keys(made.runtimes).sort(), [...o.runtimeIDs].sort());
+  assert.deepEqual(made.runtimes.claude.reach, ["orgKey", "gateway"]);
+  assert.equal(made.runtimes.codex.reach, undefined);
+});
+
+test("the org path with no route that serves it is warned of", () => {
+  const p = policy({ runtimes: { claude: { reach: ["orgKey", "gateway"] }, codex: {} } });
+  assert.deepEqual(o.warnings(p, [], []),
+    ["Claude can reach the model only by an org key or gateway, and no route in Model Access serves it: nobody can start Claude."]);
+  assert.deepEqual(o.warnings(p, [], [{ runtimes: ["claude"] }]), []);
+});
+
+test("every runtime named only for its ways to the model says Every runtime", () => {
+  const runtimes = Object.fromEntries(o.runtimeIDs.map((id) => [id, id === "claude" ? { reach: ["signIn"] } : {}]));
+  assert.equal(o.rules(policy({ runtimes }))[0].words, "Every runtime");
+});

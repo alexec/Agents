@@ -480,6 +480,12 @@ public enum OrgPolicyWords {
         }
         if let runtimes = policy.runtimes {
             out.append(Rule(name: "runtimes", title: "Runtimes", words: runtimeWords(runtimes)))
+            // Each runtime's ways to the model (#999).
+            for id in runtimes.keys.sorted(by: { runtimeName($0) < runtimeName($1) }) {
+                guard let reach = runtimes[id]?.reach else { continue }
+                out.append(Rule(name: "runtimes.\(id).reach", title: "\(runtimeName(id)) reaches the model by",
+                                words: OrgAccountWords.reachWords(reach)))
+            }
         }
         if let marketplaces = policy.marketplaces {
             let allowed = marketplaces.allowed.isEmpty ? "None" : "Only \(marketplaces.allowed.sorted().joined(separator: ", "))"
@@ -516,6 +522,8 @@ public enum OrgPolicyWords {
     /// "Claude (claude-sonnet-*), Codex".
     static func runtimeWords(_ runtimes: [String: DaemonAPI.PolicyRuntimeRule]) -> String {
         if runtimes.isEmpty { return "None" }
+        // Each runtime named for its ways to the model only (#999).
+        if runtimeNames.keys.allSatisfy({ runtimes[$0] != nil && runtimes[$0]?.models == nil }) { return "Every runtime" }
         return "Only " + runtimes.keys.sorted { runtimeName($0) < runtimeName($1) }.map { id in
             let name = runtimeName(id)
             guard let models = runtimes[id]?.models else { return name }

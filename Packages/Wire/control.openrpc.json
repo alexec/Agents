@@ -786,6 +786,11 @@
       "name": "control/orgRoutesChanged",
       "x-capability": "org-routes/1",
       "description": "To every person's clients when an org route is added, changed or removed (#999).",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
       "x-notification": true,
       "paramStructure": "by-name",
       "params": [
@@ -2296,6 +2301,11 @@
       "name": "orgRoutes/check",
       "x-capability": "org-routes/1",
       "description": "An admin's: one small request from the control plane with the route's credential, where it can make one (#999).",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
       "paramStructure": "by-name",
       "params": [
         {
@@ -2317,6 +2327,11 @@
       "name": "orgRoutes/list",
       "x-capability": "org-routes/1",
       "description": "An admin's: every org route with its rev and how many machines hold it; no secret value (#999).",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
       "paramStructure": "by-name",
       "params": [
         {
@@ -2338,6 +2353,11 @@
       "name": "orgRoutes/mine",
       "x-capability": "org-routes/1",
       "description": "Any person's: the org routes they may use (#999).",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
       "paramStructure": "by-name",
       "params": [
         {
@@ -2359,6 +2379,11 @@
       "name": "orgRoutes/remove",
       "x-capability": "org-routes/1",
       "description": "An admin's: delete a route and its secrets, conditional on its rev; every machine that held it is sent its routes without it (#999).",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
       "paramStructure": "by-name",
       "params": [
         {
@@ -2380,6 +2405,11 @@
       "name": "orgRoutes/replaceKey",
       "x-capability": "org-routes/1",
       "description": "An admin's: new values for a route's secret fields, one version higher (#999).",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
       "paramStructure": "by-name",
       "params": [
         {
@@ -2401,6 +2431,11 @@
       "name": "orgRoutes/set",
       "x-capability": "org-routes/1",
       "description": "An admin's: add or change an org route, conditional on its rev; its secrets sealed with the keeper; audited and sent to the machines that may use it (#999).",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
       "paramStructure": "by-name",
       "params": [
         {

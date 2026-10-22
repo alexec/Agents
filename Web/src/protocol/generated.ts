@@ -7448,6 +7448,12 @@ export interface Methods {
   "milestones/state": { params: Empty; result: Milestones };
   "modes/remembered": { params: Empty; result: Record<string, JSONValue> };
   "options/remembered": { params: RememberedOptionsRequest; result: ConfigOption[] };
+  "orgRoutes/check": { params: OrgRouteRequest; result: OrgRouteCheck };
+  "orgRoutes/list": { params: Empty; result: OrgRouteList };
+  "orgRoutes/mine": { params: Empty; result: OrgRoutesMine };
+  "orgRoutes/remove": { params: OrgRouteRequest; result: Empty };
+  "orgRoutes/replaceKey": { params: OrgRouteReplaceKey; result: OrgRouteKept };
+  "orgRoutes/set": { params: OrgRouteSet; result: OrgRouteKept };
   "people/invite": { params: PersonInvite; result: PersonInvited };
   "people/list": { params: Empty; result: PeopleList };
   "people/remove": { params: PersonRequest; result: Empty };
@@ -7673,6 +7679,12 @@ export const MethodTarget = {
   "milestones/state": "host",
   "modes/remembered": "host",
   "options/remembered": "host",
+  "orgRoutes/check": "control",
+  "orgRoutes/list": "control",
+  "orgRoutes/mine": "control",
+  "orgRoutes/remove": "control",
+  "orgRoutes/replaceKey": "control",
+  "orgRoutes/set": "control",
   "people/invite": "control",
   "people/list": "control",
   "people/remove": "control",
@@ -7804,6 +7816,7 @@ export interface Notifications {
   "control/linkDecided": ChannelLinkDecided;
   "control/linkRequested": ChannelLinkRequest;
   "control/linksChanged": Empty;
+  "control/orgRoutesChanged": Empty;
   "control/peopleChanged": PeopleChanged;
   "control/policyChanged": PolicyView;
   "control/providersChanged": ProviderList;

@@ -29,6 +29,7 @@ export const consoleSections: readonly Section[] = [
   { id: "people", title: "People and Groups", about: "Who belongs, their roles, bots and groups.", group: "Organisation", built: true },
   { id: "machines", title: "Machines", about: "Every machine: its owner, state, version and agents.", group: "Organisation", built: true },
   { id: "policy", title: "Policy", about: "The rules every machine follows: modes, sandbox, runtimes, budgets, and the kill switch.", group: "Rules", built: true },
+  { id: "modelAccess", title: "Model Access", about: "The organisation’s keys and gateways to the model, and who may use each.", group: "Rules", built: true },
   { id: "reportPolicy", title: "Report Policy", about: "Who leads each group, what leads see, and each budget.", group: "Rules", built: true },
   { id: "workflows", title: "Team Workflows", about: "The bots that run the team’s workflows, and their runs.", group: "Rules", built: true },
   { id: "requests", title: "Requests", about: "Machines asking to join, channel identities to link, and bots stopped at a cap.", group: "Records", built: true },

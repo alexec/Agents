@@ -7,10 +7,13 @@
 import { useEffect } from "preact/hooks";
 import { signal, useSignal } from "@preact/signals";
 import type { Store } from "../model/store";
-import type { FleetMachine, PolicyKept } from "../protocol/generated";
+import type { FleetMachine, OrgRouteKept, PolicyKept } from "../protocol/generated";
 import { fromWireDate } from "../protocol/dates";
 import { failedWords, notSaved } from "../model/console";
-import { changed, changes, formOf, modeNames, modes, policyOf, runtimeName, unmetered, viewOf, warnings } from "../model/orgPolicy";
+import { changed, changes, formOf, modeNames, modes, policyOf, reachChoiceNames, reachChoices, runtimeName, termsChoices, termsNames, unmetered, viewOf,
+  warnings } from "../model/orgPolicy";
+import type { ReachChoice } from "../model/orgPolicy";
+import { routeRuntimes } from "../model/orgAccounts";
 import type { ModeName, PolicyForm } from "../model/orgPolicy";
 import { KillSwitch, StoppedStrip } from "./settings/Policy";
 
@@ -36,15 +39,18 @@ export const orgPolicyFoot = "Every machine follows the policy within seconds, a
 export function OrgPolicyPage({ store, down }: { store: Store; down: boolean }) {
   const kept = useSignal<PolicyKept | null>(null);
   const machines = useSignal<FleetMachine[] | undefined>(undefined);
+  // The org routes, for the warning when the org path has no route (#999); none from a control plane before them.
+  const routes = useSignal<OrgRouteKept[] | undefined>(undefined);
   const problem = useSignal<string | null>(null);
   const saved = useSignal(false);
   const busy = useSignal(false);
   const load = async () => {
     try {
-      const [k, fleet] = await Promise.all([store.link.call("policy/get", {}),
-        store.link.call("console/fleet", {}).catch(() => null)]);
+      const [k, fleet, list] = await Promise.all([store.link.call("policy/get", {}),
+        store.link.call("console/fleet", {}).catch(() => null), store.link.call("orgRoutes/list", {}).catch(() => null)]);
       kept.value = k;
       machines.value = fleet?.machines;
+      routes.value = list?.routes;
       problem.value = null;
     } catch (error) {
       problem.value = failedWords(error);
@@ -52,7 +58,8 @@ export function OrgPolicyPage({ store, down }: { store: Store; down: boolean }) 
   };
   // Again when another admin saves it, or the kill switch moves.
   const view = store.orgPolicy.value;
-  useEffect(() => { if (!down) void load(); }, [down, view]);
+  const routeChanges = store.orgRoutesChanges.value;
+  useEffect(() => { if (!down) void load(); }, [down, view, routeChanges]);
   const loaded = kept.value?.policy;
   const edits = draft.value?.store === store ? draft.value : null;
   const form = edits?.form ?? (kept.value ? formOf(loaded) : null);
@@ -68,7 +75,7 @@ export function OrgPolicyPage({ store, down }: { store: Store; down: boolean }) 
   const save = async () => {
     if (!made) return;
     if ("problem" in made) { problem.value = made.problem; return; }
-    const warned = warnings(made.policy, machines.value);
+    const warned = warnings(made.policy, machines.value, routes.value?.map((r) => r.route));
     if (warned.some((w) => w.includes("nobody can start an agent")) && !window.confirm(`${warned.join("\n")}\n\nSave the policy anyway?`)) return;
     busy.value = true;
     try {
@@ -86,7 +93,7 @@ export function OrgPolicyPage({ store, down }: { store: Store; down: boolean }) 
   };
   if (!form) return problem.value ? <p class="hint" role="alert">{problem.value}</p> : <p class="hint">Loading…</p>;
   const preview = edits && next ? changes(loaded, next) : [];
-  const warned = next ? warnings(next, machines.value) : [];
+  const warned = next ? warnings(next, machines.value, routes.value?.map((r) => r.route)) : [];
   const text = (key: keyof PolicyForm) => (e: Event) => edit({ [key]: (e.currentTarget as HTMLInputElement).value });
   const check = (key: keyof PolicyForm) => (e: Event) => edit({ [key]: (e.currentTarget as HTMLInputElement).checked });
   const budgetSet = [form.daily, form.dailyTokens, form.perAgent, form.perAgentTokens].some((t) => t.trim() !== "");
@@ -130,6 +137,28 @@ export function OrgPolicyPage({ store, down }: { store: Store; down: boolean }) 
           );
         })}
         {form.limitRuntimes && <p class="hint">Models by id, commas between, with * at the end allowed (claude-sonnet-*). Empty allows every model.</p>}
+      </section>
+
+      <section aria-labelledby="org-policy-reach">
+        <h3 class="section-head" id="org-policy-reach">Ways to the Model</h3>
+        {routeRuntimes.map((id) => (
+          <label key={id} class="setting">
+            <span>{runtimeName(id)} reaches the model by</span>
+            <select aria-label={`${runtimeName(id)} reaches the model by`} value={form.reach[id] ?? "any"}
+              onChange={(e) => edit({ reach: { ...form.reach, [id]: (e.currentTarget as HTMLSelectElement).value as ReachChoice } })}>
+              {reachChoices.map((c) => <option key={c} value={c}>{reachChoiceNames[c]}</option>)}
+            </select>
+          </label>
+        ))}
+        <p class="hint">Org key or gateway only refuses each member’s own sign-in, and their own key or gateway in the variables passed to the runtime. Add the routes in Model Access.</p>
+        <label class="setting">
+          <span>Antigravity’s terms</span>
+          <select aria-label="Antigravity’s terms" value={form.antigravityTerms}
+            onChange={(e) => edit({ antigravityTerms: (e.currentTarget as HTMLSelectElement).value as (typeof termsChoices)[number] })}>
+            {termsChoices.map((c) => <option key={c} value={c}>{termsNames[c]}</option>)}
+          </select>
+        </label>
+        <p class="hint">Reviewed by your organisation: members do not see Google’s notice. Do not allow: Antigravity is refused.</p>
       </section>
 
       <section aria-labelledby="org-policy-marketplaces">

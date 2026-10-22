@@ -14,6 +14,8 @@ struct OrgPolicyPane: View {
 
     @Environment(\.openURL) private var openURL
     @State private var view: DaemonAPI.PolicyView?
+    /// The routes this person may use (#999); nil from a control plane before them, which shows none.
+    @State private var routes: [DaemonAPI.OrgRouteMine]?
     @State private var console: URL?
     @State private var problem: String?
     @State private var isChanging = false
@@ -69,6 +71,25 @@ struct OrgPolicyPane: View {
                     .appText(.fine).foregroundStyle(.secondary)
                 }
                 .paperListRow()
+                if let routes {
+                    Section {
+                        if routes.isEmpty {
+                            Text(OrgAccountWords.noRoutes).appText(.supporting).foregroundStyle(.secondary)
+                        }
+                        ForEach(routes) { route in
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(route.name).appText(.reading)
+                                Text(OrgAccountWords.mineLine(route)).appText(.fine).foregroundStyle(.secondary)
+                                Text(OrgAccountWords.fromOrganisation).appText(.fine).foregroundStyle(.secondary)
+                            }
+                        }
+                    } header: {
+                        Text(OrgAccountWords.routesTitle)
+                    } footer: {
+                        Text(OrgAccountWords.routesFoot).appText(.fine).foregroundStyle(.secondary)
+                    }
+                    .paperListRow()
+                }
                 if isAdmin {
                     Section {
                         if let console {
@@ -121,6 +142,8 @@ struct OrgPolicyPane: View {
             problem = PeopleWords.refusal(error)
             return error is JSONRPCError
         }
+        routes = (try? await control.call(DaemonAPI.Method.orgRoutesMine, DaemonAPI.Empty(),
+                                          returning: DaemonAPI.OrgRoutesMine.self))?.routes
         if isAdmin {
             let status = try? await control.call(DaemonAPI.Method.controlStatus, returning: DaemonAPI.ControlStatus.self)
             console = OrgPolicyWords.consoleURL(status)
