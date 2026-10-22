@@ -4,13 +4,15 @@ import SwiftUI
 /// Control plane ▸ Policy (#998, spec 998 FR-021, FR-022): the organisation's rules in words, read
 /// only, with the last change and who made it. An admin also gets **Edit in Console**, which opens
 /// Console ▸ Policy on the web page, and the kill switch, because an incident does not wait for a desk.
+/// Anyone can ask for an MCP server or skill here and see their own requests (#2335, the web page's
+/// `GovernanceAsk`); an admin decides on Console ▸ Requests.
 ///
 /// One view for the Mac's Settings pane and the Remote's Settings page (the web page's is
 /// `Web/src/views/settings/Policy.tsx`).
 struct OrgPolicyPane: View {
     /// The control plane, or nil while it cannot be reached.
     let control: DaemonClient?
-    let isAdmin: Bool
+    let people: PeopleState
 
     @Environment(\.openURL) private var openURL
     @State private var view: DaemonAPI.PolicyView?
@@ -21,6 +23,16 @@ struct OrgPolicyPane: View {
     @State private var isChanging = false
     /// The question before the kill switch moves, with the running agents it names.
     @State private var asking: Ask?
+    /// The person's own requests of the last 30 days; nil from a control plane before them, which
+    /// shows no ask.
+    @State private var requests: [DaemonAPI.CatalogRequest]?
+    @State private var askKind: DaemonAPI.CatalogKind = .mcp
+    @State private var askName = ""
+    @State private var askWhy = ""
+    @State private var askProblem: String?
+    @State private var isSending = false
+
+    private var isAdmin: Bool { people.you?.isAdmin == true }
 
     private struct Ask: Identifiable {
         var on: Bool
@@ -90,6 +102,9 @@ struct OrgPolicyPane: View {
                     }
                     .paperListRow()
                 }
+                if let requests {
+                    askSection(GovernanceWords.own(requests, user: people.you?.id, isAdmin: isAdmin))
+                }
                 if isAdmin {
                     Section {
                         if let console {
@@ -116,6 +131,7 @@ struct OrgPolicyPane: View {
             }
         }
         .refreshable { await load() }
+        .task(id: people.governanceRevision) { await loadRequests() }
         .confirmationDialog(asking.map { $0.on ? OrgPolicyWords.stopTitle : OrgPolicyWords.resumeTitle } ?? "",
                             isPresented: Binding(get: { asking != nil }, set: { if !$0 { asking = nil } }),
                             titleVisibility: .visible, presenting: asking) { ask in
@@ -126,6 +142,38 @@ struct OrgPolicyPane: View {
         } message: { ask in
             Text(ask.on ? OrgPolicyWords.stopMessage(running: ask.running) : OrgPolicyWords.resumeMessage)
         }
+    }
+
+    private func askSection(_ own: [DaemonAPI.CatalogRequest]) -> some View {
+        Section {
+            Picker("Kind", selection: $askKind) {
+                Text(GovernanceWords.kindName(.mcp)).tag(DaemonAPI.CatalogKind.mcp)
+                Text(GovernanceWords.kindName(.skills)).tag(DaemonAPI.CatalogKind.skills)
+            }
+            TextField("Name", text: $askName, prompt: Text(GovernanceWords.namePrompt))
+                .autocorrectionDisabled()
+                #if os(iOS)
+                .textInputAutocapitalization(.never)
+                #endif
+            TextField("Why", text: $askWhy, prompt: Text(GovernanceWords.whyPrompt))
+            if let askProblem {
+                Text(askProblem).appText(.supporting).tinted(.failure)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Button(GovernanceWords.ask) { Task { await sendAsk() } }
+                .disabled(isSending || control == nil
+                    || GovernanceWords.request(kind: askKind, name: askName, why: askWhy) == nil)
+            ForEach(own) { request in
+                Text(GovernanceWords.mine(request)).appText(.fine)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        } header: {
+            Text(GovernanceWords.askTitle)
+        } footer: {
+            Text(GovernanceWords.askFoot).appText(.fine).foregroundStyle(.secondary)
+        }
+        .disabled(control == nil)
+        .paperListRow()
     }
 
     /// False when the control plane did not answer at all, so it is worth asking again.
@@ -142,6 +190,7 @@ struct OrgPolicyPane: View {
             problem = PeopleWords.refusal(error)
             return error is JSONRPCError
         }
+        await loadRequests()
         routes = (try? await control.call(DaemonAPI.Method.orgRoutesMine, DaemonAPI.Empty(),
                                           returning: DaemonAPI.OrgRoutesMine.self))?.routes
         if isAdmin {
@@ -149,6 +198,28 @@ struct OrgPolicyPane: View {
             console = OrgPolicyWords.consoleURL(status)
         }
         return true
+    }
+
+    /// The person's own requests. A control plane before them does not know the method: no ask.
+    private func loadRequests() async {
+        guard let control else { return }
+        requests = (try? await control.call(DaemonAPI.Method.governanceRequests, DaemonAPI.Empty(),
+                                            returning: DaemonAPI.CatalogRequestList.self))?.requests
+    }
+
+    private func sendAsk() async {
+        guard let control, let ask = GovernanceWords.request(kind: askKind, name: askName, why: askWhy) else { return }
+        isSending = true
+        defer { isSending = false }
+        do {
+            _ = try await control.call(DaemonAPI.Method.governanceRequest, ask, returning: DaemonAPI.CatalogRequest.self)
+            askName = ""
+            askWhy = ""
+            askProblem = nil
+            await loadRequests()
+        } catch {
+            askProblem = PeopleWords.refusal(error)
+        }
     }
 
     /// The question first, naming the agents running now when the control plane can say.
