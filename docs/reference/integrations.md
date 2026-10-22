@@ -70,6 +70,21 @@ Open issues: `is:open label:integration allowance`.
 | More than one Claude account (`CLAUDE_CONFIG_DIR`) | Mac, Remote, web | built (walked on a scratch set-up with an account not signed in; not tested on a real second account) | 2026-10-21 | `Go/internal/agentsd/accounts.go` | Alex to test with two real sign-ins (#840) |
 | More than one Codex account (`CODEX_HOME`) | Mac, Remote, web | built (not walked: no Codex on the walk's Mac) | 2026-10-21 | `Go/internal/agentsd/accounts.go` | Alex to test with two real sign-ins (#840) |
 
+## Model gateways
+
+An organisation's way to the model (#999): an org key or a gateway, kept on the control
+plane and sent to machines sealed (`docs/explanation/org-keys-and-gateways.md`). Slice 1
+keeps routes and sends them; the machine's relay and launch are slice 2.
+Open issues: `is:open label:integration gateway`.
+
+| Integration | Clients that show it | State | Last checked | Where | Gaps |
+| --- | --- | --- | --- | --- | --- |
+| Org key (Anthropic, OpenAI, Gemini, xAI) | control plane | built (control plane only) | 2026-10-22, check against a fake API only | `Go/internal/controlplane/orgroutes.go`, `orgtokens.go` | machine relay (slice 2); Alex to test with a real key |
+| Amazon Bedrock (API key, or access key and role by STS) | control plane | built (control plane only) | 2026-10-22, STS against a fake server only | `Go/internal/controlplane/orgtokens.go` | machine relay (slice 2); Alex to test with a real account |
+| Google Vertex AI (service account by OAuth) | control plane | built (control plane only) | 2026-10-22, OAuth against a fake server only | `Go/internal/controlplane/orgtokens.go` | machine relay (slice 2); Alex to test with a real account |
+| Microsoft Azure (key, or Entra app) | control plane | built (control plane only) | 2026-10-22, Entra against a fake server only | `Go/internal/controlplane/orgtokens.go` | machine relay (slice 2); Alex to test with a real account |
+| Base URL (LiteLLM, Portkey, …) | control plane | built (control plane only) | 2026-10-22, check against a fake API only | `Go/internal/controlplane/orgroutes.go` | machine relay (slice 2) |
+
 ## Runtime downloads
 
 What the app downloads to install or update a runtime.

@@ -196,4 +196,6 @@ func (s *Service) tellGroupsChanged(id string, removed bool) {
 		s.providers.Republish()
 	}
 	s.tellPeoplesMachines()
+	// A group's people are who may use its org routes (#999).
+	s.resendOrgRoutes()
 }

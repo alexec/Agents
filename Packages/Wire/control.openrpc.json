@@ -783,6 +783,38 @@
       ]
     },
     {
+      "name": "control/orgRoutesChanged",
+      "x-capability": "org-routes/1",
+      "description": "To every person's clients when an org route is added, changed or removed (#999).",
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/Empty"
+          }
+        }
+      ]
+    },
+    {
+      "name": "control/orgRoutesLeft",
+      "x-capability": "org-routes/1",
+      "description": "To a removed machine's person and to every admin: the org routes it held (#999).",
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/OrgRoutesLeft"
+          }
+        }
+      ]
+    },
+    {
       "name": "control/peopleChanged",
       "x-capability": "people/1",
       "tags": [
@@ -1273,6 +1305,64 @@
           "required": true,
           "schema": {
             "$ref": "daemon.schema.json#/definitions/HostHello"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
+      "name": "host/orgRoutes",
+      "x-capability": "host.org-routes/1",
+      "description": "To a machine that says host.org-routes/1, on its channel 0, at each join and within 5 seconds of a change to what it may use (#999, FR-005): every route its person may use, each secret sealed to the machine's key. A machine without it is sent nothing.",
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/OrgRouteDelivery"
+          }
+        }
+      ]
+    },
+    {
+      "name": "host/orgRoutesAgain",
+      "x-capability": "host.org-routes/1",
+      "description": "A machine, on its channel 0: a sealed route did not open; send its delivery again (#999).",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
+      "name": "host/orgRoutesApplied",
+      "x-capability": "host.org-routes/1",
+      "description": "A machine, on its channel 0, after it keeps a delivery of org routes (#999).",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/OrgRoutesApplied"
           }
         }
       ],
@@ -2173,6 +2263,132 @@
           "items": {
             "$ref": "daemon.schema.json#/definitions/ChannelLinkRequest"
           }
+        }
+      }
+    },
+    {
+      "name": "orgRoutes/check",
+      "x-capability": "org-routes/1",
+      "description": "An admin's: one small request from the control plane with the route's credential, where it can make one (#999).",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/OrgRouteRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/OrgRouteCheck"
+        }
+      }
+    },
+    {
+      "name": "orgRoutes/list",
+      "x-capability": "org-routes/1",
+      "description": "An admin's: every org route with its rev and how many machines hold it; no secret value (#999).",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/OrgRouteList"
+        }
+      }
+    },
+    {
+      "name": "orgRoutes/mine",
+      "x-capability": "org-routes/1",
+      "description": "Any person's: the org routes they may use (#999).",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/OrgRoutesMine"
+        }
+      }
+    },
+    {
+      "name": "orgRoutes/remove",
+      "x-capability": "org-routes/1",
+      "description": "An admin's: delete a route and its secrets, conditional on its rev; every machine that held it is sent its routes without it (#999).",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/OrgRouteRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
+      "name": "orgRoutes/replaceKey",
+      "x-capability": "org-routes/1",
+      "description": "An admin's: new values for a route's secret fields, one version higher (#999).",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/OrgRouteReplaceKey"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/OrgRouteKept"
+        }
+      }
+    },
+    {
+      "name": "orgRoutes/set",
+      "x-capability": "org-routes/1",
+      "description": "An admin's: add or change an org route, conditional on its rev; its secrets sealed with the keeper; audited and sent to the machines that may use it (#999).",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/OrgRouteSet"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/OrgRouteKept"
         }
       }
     },

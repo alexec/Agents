@@ -103,6 +103,8 @@ type fakeHost struct {
 	opened []string
 	// uplink is the host's side of the link, to ask the control plane on channel 0.
 	uplink *controllink.Uplink
+	// private is the host's own P-256 key, which what is sealed to it opens with (#999).
+	private []byte
 }
 
 func (p *plane) host(machine string) *fakeHost { return p.hostWith(machine, nil) }
@@ -138,7 +140,7 @@ func fakeHello(machine string) controllink.HostHello {
 // serveHost connects a host that has joined, and answers its channels as host does.
 func (p *plane) serveHost(root string, member *controllink.Membership, private []byte, hello controllink.HostHello, opened func(controllink.Conn)) *fakeHost {
 	ctx, cancel := context.WithCancel(context.Background())
-	h := &fakeHost{root: root, member: member, cancel: cancel, done: make(chan struct{})}
+	h := &fakeHost{root: root, member: member, cancel: cancel, done: make(chan struct{}), private: private}
 	told, asked := p.told, p.asked
 	u := &controllink.Uplink{Root: root, Member: member, Private: private, Hello: hello, Told: func(method string, params json.RawMessage) {
 		if told != nil {

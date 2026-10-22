@@ -171,6 +171,7 @@ nav:
       - explanation/direction.md
       - explanation/why-agents.md
       - explanation/control-plane.md
+      - explanation/org-keys-and-gateways.md
       - explanation/people-and-machines.md
       - Compliance pack:
           - explanation/compliance/index.md

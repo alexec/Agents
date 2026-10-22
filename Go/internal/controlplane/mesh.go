@@ -703,6 +703,9 @@ func (s *Service) apply(e controlEvent) {
 	case "userSettingsChanged":
 		// A person's settings or secrets changed at another copy (#1760).
 		s.userChangedHere(e.Subject, nil, true)
+	case "orgRoutesChanged":
+		// An org route changed at another copy (#999): its machines and clients here.
+		s.orgRoutesChangedHere()
 	case "policyChanged", "policyStopAll":
 		// The policy changed at another copy (#998): its machines and clients here.
 		s.policyChangedHere(e.Kind == "policyStopAll")
@@ -718,6 +721,8 @@ func (s *Service) apply(e controlEvent) {
 		// Another copy's invite or removal makes this one a team, or not (#1763).
 		s.noteTeam()
 		s.tellPeoplesMachines()
+		// Who may use which org route (#999).
+		s.resendOrgRoutes()
 	case "clientPaired", "hostEnrolled", "hostMoved":
 		for _, h := range s.records.Hosts() {
 			s.router.Know(h.ID)

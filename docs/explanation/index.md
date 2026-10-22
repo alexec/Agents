@@ -14,6 +14,9 @@ Nothing here needs doing; it is for understanding.
   editor you already use, and when something else is better.
 - [The control plane](control-plane.md): hosts, clients, copies and the store, where to
   run it, and what happens when it is down.
+- [Org keys and gateways](org-keys-and-gateways.md): where an organisation's keys and
+  gateways are kept, how each machine gets them sealed to its own key, and what that does
+  not protect against.
 - [People and machines](people-and-machines.md): why each client is a person's and each
   machine one user's, what an admin sees, and why machines are not shared.
 - [Compliance pack](compliance/index.md): for an organisation's IT and security team: the
