@@ -33,6 +33,12 @@
 //	AGENTS_HOSTED_MAX_COPIES           control planes running at once, 50
 //	AGENTS_HOSTED_CERTS_PER_HOUR       new certificates an hour, 10
 //	AGENTS_HOSTED_CERTS_PER_WEEK       new certificates a week, 40
+//
+// Billing (#2225), off without a key:
+//
+//	AGENTS_HOSTED_STRIPE_KEY            Stripe's secret (or restricted) key
+//	AGENTS_HOSTED_STRIPE_PRICE          the Pro plan's price, price_…
+//	AGENTS_HOSTED_STRIPE_WEBHOOK_SECRET the webhook endpoint's signing secret, whsec_…
 package main
 
 import (
@@ -97,7 +103,9 @@ func serve() error {
 		Domain: strings.ToLower(os.Getenv("AGENTS_HOSTED_DOMAIN")), AccountsDomain: strings.ToLower(os.Getenv("AGENTS_HOSTED_ACCOUNTS_DOMAIN")),
 		GitHubClientID: client, GitHubSecret: os.Getenv("AGENTS_HOSTED_GITHUB_SECRET"), Web: os.Getenv("AGENTS_HOSTED_WEB"),
 		ViewsDomain: os.Getenv("AGENTS_HOSTED_VIEWS_DOMAIN"), TrustedProxies: trusted, Log: logf,
-		SignUp: strings.ToLower(os.Getenv("AGENTS_HOSTED_SIGNUP"))}
+		SignUp:    strings.ToLower(os.Getenv("AGENTS_HOSTED_SIGNUP")),
+		StripeKey: os.Getenv("AGENTS_HOSTED_STRIPE_KEY"), StripePrice: os.Getenv("AGENTS_HOSTED_STRIPE_PRICE"),
+		StripeWebhookSecret: os.Getenv("AGENTS_HOSTED_STRIPE_WEBHOOK_SECRET")}
 	for name, into := range map[string]*int{"AGENTS_HOSTED_MAX_ACCOUNTS": &cfg.MaxAccounts,
 		"AGENTS_HOSTED_SIGNUPS_PER_ADDRESS": &cfg.SignUpsPerAddress, "AGENTS_HOSTED_SIGNUPS_PER_HOUR": &cfg.SignUpsPerHour,
 		"AGENTS_HOSTED_MAX_COPIES": &cfg.MaxCopies, "AGENTS_HOSTED_CERTS_PER_HOUR": &cfg.CertsPerHour,
@@ -131,7 +139,11 @@ func serve() error {
 		defer cancel()
 		_ = server.Shutdown(shutdown)
 	}()
-	logf("agents-hosted " + buildinfo.Version + " listening on :" + port)
+	billing := "off"
+	if cfg.StripeKey != "" {
+		billing = "on"
+	}
+	logf("agents-hosted " + buildinfo.Version + " listening on :" + port + ", billing " + billing)
 	if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		return err
 	}

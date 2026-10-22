@@ -118,6 +118,43 @@ agents-hosted admin plan <account> pro
 
 A running control plane has its new limits within a minute.
 
+## Turn billing on
+
+Billing is off until you give the service a Stripe key. With it off, every account is on
+Free unless you put it on a plan by hand, and the account page has no **Upgrade**. With it
+on, a Free account's page has **Upgrade**, which goes to Stripe Checkout for Pro, and an
+account that has paid has **Manage Billing**, which goes to Stripe's customer portal. Stripe
+keeps the cards. The service keeps only each account's Stripe customer and subscription ids.
+
+1. In Stripe, make a product, Agents Pro, with a monthly price. Keep its id, `price_…`.
+2. Turn on the customer portal (Settings ▸ Billing ▸ Customer portal), so a person can
+   cancel and change their card.
+3. Add a webhook endpoint at `https://<your domain>/billing/webhook` with these events:
+   `checkout.session.completed`, `customer.subscription.updated` and
+   `customer.subscription.deleted`. Keep its signing secret, `whsec_…`.
+4. Put the three values in `deploy/.env`, and start the service again:
+
+    ```sh
+    AGENTS_HOSTED_STRIPE_KEY=sk_live_…
+    AGENTS_HOSTED_STRIPE_PRICE=price_…
+    AGENTS_HOSTED_STRIPE_WEBHOOK_SECRET=whsec_…
+    ```
+
+    A restricted key needs write access to Checkout Sessions and Customer portal only.
+    With a key and no price or signing secret, the service does not start, and says which.
+
+What each event does:
+
+- **Checkout done:** the account is on Pro.
+- **Subscription changed:** Pro while it is `active` or `trialing`, Free otherwise, such as
+  when a payment fails for good.
+- **Subscription ended:** Free. Nothing is deleted, except events older than Free keeps.
+
+A webhook whose signature is wrong or older than five minutes is refused. Each event is
+acted on once, however often Stripe sends it. An event for an account that is deleted is
+ignored, and logged. Test first with Stripe's test keys (`sk_test_…`) and
+`stripe trigger checkout.session.completed`.
+
 ## Suspend or block an account
 
 Run these on the service's machine. A running service sees each change within a minute.
@@ -150,6 +187,9 @@ Run these on the service's machine. A running service sees each change within a 
 | `AGENTS_HOSTED_MAX_COPIES` | Control planes running at once; 50 |
 | `AGENTS_HOSTED_CERTS_PER_HOUR` | New certificates an hour; 10 |
 | `AGENTS_HOSTED_CERTS_PER_WEEK` | New certificates a week; 40 |
+| `AGENTS_HOSTED_STRIPE_KEY` | Stripe's secret key; billing is off without it |
+| `AGENTS_HOSTED_STRIPE_PRICE` | The Pro plan's price, `price_…` |
+| `AGENTS_HOSTED_STRIPE_WEBHOOK_SECRET` | The webhook endpoint's signing secret, `whsec_…` |
 
 ## Related
 

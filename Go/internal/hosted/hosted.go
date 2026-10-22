@@ -20,6 +20,7 @@ import (
 	"github.com/alexec/agents/Go/internal/controllink"
 	"github.com/alexec/agents/Go/internal/controlplane/kms"
 	"github.com/alexec/agents/Go/internal/controlplane/store"
+	"github.com/alexec/agents/Go/internal/hosted/billing"
 )
 
 // Config is what the service needs. Nothing in it is a secret except GitHubSecret.
@@ -60,6 +61,13 @@ type Config struct {
 	MaxCopies int
 	// The most new certificates an hour and a week. 0 is 10 and 40.
 	CertsPerHour, CertsPerWeek int
+
+	// Billing (#2225): Stripe's secret key; "" is billing off (FR-031). With it, the Pro
+	// plan's price and the webhook's signing secret are needed too.
+	StripeKey, StripePrice, StripeWebhookSecret string
+	// Stripe's address, API when ""; Stripe itself, for tests (a fake), over the key.
+	StripeAPI string
+	Stripe    billing.Stripe
 }
 
 // Service is the hosted service.
@@ -70,6 +78,8 @@ type Service struct {
 	github   gitHub
 	rates    rates
 	certs    certificates
+	// Stripe, or nil when billing is off.
+	stripe billing.Stripe
 
 	mu     sync.Mutex
 	copies map[string]*copyRunning
@@ -78,6 +88,8 @@ type Service struct {
 	stopped  bool
 	// Closed by Stop, for the idle sweep.
 	stop chan struct{}
+	// When the Stripe events acted on were last swept (billing.go).
+	stripeSwept time.Time
 }
 
 // New makes the service: its session key comes from its own key, sealed in the store
@@ -116,6 +128,16 @@ func New(ctx context.Context, cfg Config) (*Service, error) {
 	if cfg.MinGitHubAge == 0 {
 		cfg.MinGitHubAge = defaultMinGitHubAge
 	}
+	var stripe billing.Stripe
+	if cfg.StripeKey != "" || cfg.Stripe != nil {
+		if cfg.StripePrice == "" || cfg.StripeWebhookSecret == "" {
+			return nil, errors.New("billing needs the Pro plan's price and the webhook's signing secret: AGENTS_HOSTED_STRIPE_PRICE and AGENTS_HOSTED_STRIPE_WEBHOOK_SECRET")
+		}
+		stripe = cfg.Stripe
+		if stripe == nil {
+			stripe = billing.NewHTTP(cfg.StripeKey, cfg.StripeAPI)
+		}
+	}
 	own, err := kms.Kept{Store: store.NewPrefixed(cfg.Store, hostedPrefix), Keeper: cfg.Keeper}.ControlKey(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("the hosted service's own key: %w", err)
@@ -124,7 +146,7 @@ func New(ctx context.Context, cfg Config) (*Service, error) {
 		sessions: sessions{key: controllink.HKDF(own, []byte("agents-hosted-session-v1"), nil, 32), now: cfg.Now},
 		github: gitHub{clientID: cfg.GitHubClientID, secret: cfg.GitHubSecret, web: cfg.GitHubWeb, api: cfg.GitHubAPI,
 			redirect: "https://" + cfg.Domain + "/signin/callback"},
-		copies: map[string]*copyRunning{}, starting: map[string]chan struct{}{}, stop: make(chan struct{})}
+		stripe: stripe, copies: map[string]*copyRunning{}, starting: map[string]chan struct{}{}, stop: make(chan struct{})}
 	go s.sweepIdleEvery(time.Minute)
 	return s, nil
 }

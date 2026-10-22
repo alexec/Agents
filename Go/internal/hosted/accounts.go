@@ -22,6 +22,7 @@ import (
 //	hosted/v1/waiting/<id>.json    a GitHub user on the waitlist: its place's key below
 //	hosted/v1/waitlist/<place>.json  the waitlist, in order of its keys
 //	hosted/v1/blocked/<id>.json    a GitHub user who may not sign up
+//	hosted/v1/stripe/<event>.json  a Stripe event acted on, so once (#2225, billing.go)
 //	accounts/<id>/v1/…             the account's control plane's store, its sealed key too
 const (
 	hostedPrefix   = "hosted/"
@@ -39,6 +40,9 @@ type Account struct {
 	Suspended *Suspension `json:"suspended,omitempty"`
 	// When its name's certificate was first allowed (FR-008), so it counts once.
 	Certificate *time.Time `json:"certificate,omitempty"`
+	// Its Stripe customer and subscription (#2225, FR-035): no card data.
+	StripeCustomer     string `json:"stripe_customer,omitempty"`
+	StripeSubscription string `json:"stripe_subscription,omitempty"`
 }
 
 // Suspension is why and when the operator suspended an account.
