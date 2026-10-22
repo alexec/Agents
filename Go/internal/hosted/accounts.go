@@ -173,6 +173,9 @@ func (a *accounts) remove(ctx context.Context, acc *Account) error {
 	if _, err := store.DeleteAll(ctx, accountStore(a.store, acc.ID)); err != nil {
 		return fmt.Errorf("its store: %w", err)
 	}
+	if err := a.store.Delete(ctx, usageKey(acc.ID)); err != nil {
+		return err
+	}
 	if err := a.store.Delete(ctx, accountKey(acc.ID)); err != nil {
 		return err
 	}

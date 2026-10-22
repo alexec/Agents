@@ -263,8 +263,12 @@ func TestSignUpGivesAControlPlaneOfYourOwn(t *testing.T) {
 // Behind a trusted proxy, the copy counts each client by its own address, not the
 // proxy's: one client's sockets do not count against another.
 func TestTheCopyCountsEachClientNotTheProxy(t *testing.T) {
-	_, b := startBehind(t, store.NewMemory(), []netip.Prefix{netip.MustParsePrefix("127.0.0.1/32")})
+	s, b := startBehind(t, store.NewMemory(), []netip.Prefix{netip.MustParsePrefix("127.0.0.1/32")})
 	to, _ := url.Parse(b.signIn("good").Header.Get("Location"))
+	// On Pro, whose 200 connections are more than the copy's 50 a client (#2224).
+	s.mu.Lock()
+	s.copies[strings.TrimSuffix(to.Host, "."+domain)].limits.setPlan(plans[PlanPro])
+	s.mu.Unlock()
 	connect := func(from string) *http.Response {
 		t.Helper()
 		req, _ := http.NewRequest(http.MethodGet, "https://"+to.Host+"/v1/connect", nil)

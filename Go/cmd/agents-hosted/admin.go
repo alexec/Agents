@@ -27,6 +27,7 @@ const adminUsage = `usage: agents-hosted admin <verb> …
   unsuspend <account>        let it start again
   block <github id|login> [why]  refuse a GitHub user, and suspend their account
   unblock <github id>        let them sign up again
+  plan <account> free|pro    put an account on a plan by hand
 
 It reads AGENTS_STORE and AGENTS_HOSTED_DOMAIN, as serve does.`
 
@@ -146,6 +147,11 @@ func runAdmin(ctx context.Context, a hosted.Admin, args []string, out io.Writer)
 			fmt.Fprintf(out, "blocked GitHub id %d\n", id)
 		}
 		return err
+	case "plan":
+		if err := need(2); err != nil {
+			return err
+		}
+		return a.SetPlan(ctx, rest[0], rest[1])
 	case "unblock":
 		if err := need(1); err != nil {
 			return err

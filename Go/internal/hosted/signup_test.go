@@ -261,7 +261,7 @@ func TestSuspendAnAccount(t *testing.T) {
 	if err := admin.Suspend(context.Background(), id, "Spam from its agents"); err != nil {
 		t.Fatal(err)
 	}
-	s.sweepSuspended(context.Background())
+	s.sweepAccounts(context.Background())
 	res, text := b.get("https://" + id + "." + domain + "/readyz")
 	if res.StatusCode != http.StatusForbidden || res.Header.Get("Agents-Refusal") != "suspended" || !strings.Contains(text, "suspended") {
 		t.Fatal(res.StatusCode, text)
