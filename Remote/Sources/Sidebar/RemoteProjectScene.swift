@@ -200,7 +200,12 @@ private struct RemoteProjectSidebar: View {
     var body: some View {
         // A list clears its selection by itself while rows come and go, as an archived
         // session's does, and that must not empty the detail (#2090), as `RemoteSidebar`'s.
-        List(selection: Binding(get: { state.pick }, set: { if let pick = $0 { state.pick = pick } })) {
+        List(selection: Binding(get: { state.pick }, set: { pick in
+            guard let pick else { return }
+            state.pick = pick
+            // Its New Session is the next one at the top of every project's sidebar too (#2160).
+            if case .project(let key) = pick { model.rememberNewSessionProject(key) }
+        })) {
             Section {
                 Label("New Session", systemImage: "square.and.pencil")
                     .appText(.supporting)
