@@ -326,6 +326,9 @@ button.link {
 .chat.empty { justify-content: center; align-items: center; opacity: 0.5; }
 
 .transcript { padding: 16px 20px; display: flex; flex-direction: column; gap: 10px; }
+/* The chat holds the reader's turn itself, in every browser (Chat.tsx, #2310): the browser's own
+   anchoring would move it a second time. */
+.transcript { overflow-anchor: none; }
 
 .bubble {
   align-self: flex-end;
