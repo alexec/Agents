@@ -1,6 +1,6 @@
 ---
 diataxis: how-to
-devices: [mac, iphone, ipad]
+devices: [mac, iphone, ipad, web]
 description: Stop an agent mid-turn, or archive a chat when you are done, including one that asks to be archived.
 ---
 
@@ -82,6 +82,39 @@ approval. Bring back an archived chat with **Unarchive**. See
 [When a run is done](../reference/workflows.md#when-a-run-is-done) and
 **Agents may archive the helpers they started** in the
 [settings reference](../reference/settings.md).
+
+**Undo Archive**
+
+Each time you archive, the app gives you five seconds to take it back. This lets you
+undo an archive by mistake without a search under **Archived**.
+
+1. Archive a chat. A strip shows **Archived** and the chat's title, for example
+   **Archived “Fix the parser”**, with **Undo**. On the Mac and the web page it is at the
+   foot of the sidebar. On iPhone and iPad it is at the foot of the screen.
+2. Click **Undo** in the strip within five seconds. Or use the keyboard:
+   - On the Mac, choose **Session ▸ Undo Archive**, or press **⌘Z**. The menu item is
+     there only while the strip shows. For those five seconds, **⌘Z** undoes the archive
+     even in a text field.
+   - On an iPad with a keyboard, press **⌘Z** while the strip shows.
+   - On the web page, press **⌘Z** or Ctrl+Z while the strip shows. In a text field,
+     **⌘Z** stays the field's own undo.
+3. The chat comes back where it was. The chats it started, which Archive put away with
+   it, come back too.
+
+Undo is the same as **Unarchive**. It does not start an agent again: if the agent was
+working, Archive stopped it, and it stays stopped. The strip then says so, for example
+**Archived “Fix the parser” and stopped it. Undo does not start it again.**
+
+On the Mac, when you select more than one session and press Delete, one strip covers
+all of them, for example **Archived 3 sessions** or **Archived 2 sessions and 1
+workflow**. **Undo** brings all of them back. The Remote and the web page archive one
+chat at a time.
+
+The five seconds wait while the pointer is on the strip, so you have time to read it. On
+the Mac, iPhone and iPad they also wait while VoiceOver is on, and VoiceOver reads the
+strip when it comes. On the web page they also wait while the strip has the keyboard
+focus, and a screen reader reads the strip when it comes. After the five seconds, use
+**Unarchive**, as above.
 
 **What each keeps**
 

@@ -1,7 +1,7 @@
 ---
 diataxis: how-to
-devices: [mac, iphone, ipad]
-description: Send a prompt while an agent is still working, and put it into the running turn with Send now.
+devices: [mac, iphone, ipad, web]
+description: Send a prompt while an agent is still working, put it into the running turn with Send now, change it while it waits, bring back an earlier prompt, and quote a reply.
 ---
 
 # Send a prompt while an agent is working
@@ -35,6 +35,72 @@ you can steer the agent without stopping it.
 If the agent is waiting on a permission card when you click **Send now**, the card stays
 as it is. Answer it, and the agent reads your words after it. If the turn ended just as
 you clicked, your prompt goes as the next prompt instead.
+
+## Bring back a prompt you sent before
+
+Use Up Arrow and Down Arrow in an empty prompt to send a prompt again, or to change it a
+little first, without typing it all again. It works as the history does in a terminal.
+
+1. Click in the prompt. Make sure it is empty.
+2. Press Up Arrow. The last prompt you sent in this session comes back.
+3. Press Up Arrow again to go further back. Press Down Arrow to come forward again. Past the
+   newest one, the prompt is empty again.
+4. Press Return to send it, or change it first.
+
+Only your own prompts come back: not a message from another agent, and not a question the
+app asked. A prompt you sent twice in a row comes back once.
+
+When you change a prompt that came back, it is yours: the arrow keys move the caret again,
+as in any text. While a list of commands (`/`) or files (`@`) shows, the arrow keys move
+through the list instead.
+
+On the Mac and on the web page this works in every prompt. On iPhone and iPad it needs a
+keyboard connected to the device.
+
+## Change a waiting prompt
+
+You can change the words of a prompt while it waits its turn. It keeps its place in the
+queue, so you do not have to take it back and send it again behind the others.
+
+1. On the waiting bubble, click or tap the pencil (**Edit queued prompt**). On the web page
+   it is **Edit**.
+
+   The words open in an editor in the bubble's place.
+2. Change the words.
+3. Click **Save**, or press Command-Return. To keep the words as they were, click
+   **Cancel**, or press Escape.
+
+You can change only your own prompts. A prompt that another agent sent has no Edit.
+
+If the prompt went to the agent before you saved, your change cannot go with it. The app
+says **That prompt was sent before your change. Your words are in the prompt bar.** Send
+them from there as a new prompt.
+
+## Quote a reply in your prompt
+
+Quote part of a reply when you want to say which words you mean, for example "this step
+fails". The quote goes at the end of what you have typed, as a Markdown quote (each line
+starts with `>`), with an empty line after it for your own words.
+
+**On the Mac**
+
+1. Select the words in the agent's reply.
+2. Choose **Session ▸ Quote in Prompt**, or press Shift-Command-' (apostrophe).
+
+If no words are selected, the Mac beeps and quotes nothing. Where the reply's own
+right-click menu shows **Quote in Prompt**, it quotes the selected words, or the whole
+reply when none are selected.
+
+**On iPhone and iPad**
+
+Touch and hold the reply, then tap **Quote in Prompt**. It quotes the whole reply, because
+the device does not tell the app which words are selected. Delete the lines you do not need.
+
+**On the web page**
+
+Select words in the reply, if you want only part of it. Then point at the reply and click
+**Quote**, beside **Copy**. It quotes the selected words, or the whole reply when none are
+selected.
 
 ## If it doesn't work
 

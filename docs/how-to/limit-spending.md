@@ -29,7 +29,7 @@ work.
 
 **See what has been spent**
 
-1. Click **Spending** at the foot of the sidebar, or press Option-Command-S.
+1. Click **Cost** in the sidebar's **Usage** group, or press Option-Command-S.
 
    The page shows **All time** at the top, then each project with what its agents cost,
    in each currency the runtimes reported. Archived projects are shown greyed. A line
@@ -39,7 +39,7 @@ work.
 
 **Set a limit**
 
-1. Choose **Agents ▸ Settings…** and click **Spending** in the rail.
+1. Choose **Agents ▸ Settings…** and click **Cost** in the rail.
 2. Under **Per agent** (*The most one agent may spend*), type an amount, choose the
    currency, and click **Set**.
 

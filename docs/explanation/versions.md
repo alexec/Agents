@@ -1,7 +1,7 @@
 ---
 diataxis: explanation
 description: How the Mac window, the Remote, the web page, the hosts and the control plane work together at different versions, and what a version number means.
-devices: [mac, iphone, ipad]
+devices: [mac, iphone, ipad, web]
 ---
 
 # Versions and capabilities
@@ -11,22 +11,64 @@ control plane can each run a different version. A server's host can update a wee
 Mac, and the Remote updates when TestFlight sends it. This page explains how the parts know
 what each other can do, and what a version number means (#1748).
 
-## Capabilities decide
+## Capabilities
 
 Each part sends a list of its **capabilities** when it connects. A capability is a name and a
 number, such as `chat.branch/1` (Branch from Here) or `agents/1`. Each decision reads the
-list, never the version:
+list, never the version. The version is for people: Settings, logs, "update to 0.8.0", and
+the release notes.
 
-- A client shows a feature only when the host has its capability. When it does not, the
-  feature is disabled with "This host needs an update to do this". The client does not send the
-  call and then show an empty pane.
-- The control plane keeps a **required set**: the capabilities that it needs to route. A host
-  without one of them shows "Needs an update", with the names that it does not have, and
-  **Update…** in its menu, which updates it over ssh (#1766). A client without one of them is
-  told to update the app.
-- A part from before capabilities sends no list. Nothing is hidden or refused for it.
+So a client shows only what its host can do, and it says so where something is missing. It
+does not send a call that the host cannot answer and then show an empty pane, which would
+look like a fault. The words are the same on the Mac, the Remote and the web page.
 
-The version is for people: Settings, logs, "update to 0.8.0", and the release notes.
+### A feature the host is too old for
+
+The client keeps the control, greyed, with **This host needs an update to do this.** as its
+help, so you can see that the feature exists and why it is not offered here:
+
+- **Branch from Here**, in a prompt's menu and in the Prompts list.
+- **Edit** on a queued prompt.
+- **Find in Chat**. On the Mac it keeps **⌘F** (Command-F), so the key does not move you
+  out of the chat to Find Session. On the Remote the line is under the menu item.
+
+Where a whole section or pane needs the feature, the line is in its place:
+
+- A project's connector set-up, and your own connections on the connectors page.
+- The **Simulator** pane. On the Mac and the Remote it says **Needs an Update** above the
+  line.
+- **Language-server problems** in a file say it as their heading, and an asked completion
+  says it as its note. No call goes to the host.
+
+Each host has its own list, so the same chat feature can be there for a project on one host
+and greyed for a project on another.
+
+### A host too old for the control plane
+
+The control plane keeps a **required set**: the capabilities that it needs to route. A host
+without one of them is still connected and serves what its list says, but its row says
+**Needs an update**, with a second line: "Update this host to Agents 0.9.0. It does not have
+…", and the names it is missing, and **Update…** in its menu updates it over ssh (#1766). On the Mac this is in **Settings ▸ Control plane**, on the
+host's row. On the Remote and the web page it is in **Settings ▸ Versions**, which also gives
+the control plane's version and each host's, such as **Agents 0.9.0 (Go)** for a host written
+in Go.
+
+### An app too old for the control plane
+
+A client without the control plane's required set is refused, as
+[Where each part sends its list](#where-each-part-sends-its-list) says, with the error "This
+app needs an update to work with this control plane." The client says what to do: "Update
+this app to Agents 0.9.0 to use this control plane. It does not have …", with the missing
+names. On the Mac this is under the control plane's row
+in **Settings ▸ Control plane**; on the Remote it is in **Settings ▸ Versions**. The web page
+says "Update this page …" in the same place. The control plane serves the web page, so a
+page loaded fresh always has the control plane's version; only a tab left open across an
+update can see this.
+
+### A part from before capabilities
+
+A part from before capabilities sends no list. Nothing is hidden or refused for it: the
+client offers every feature, and a call that the host does not know fails as it did before.
 
 ## Where the names come from
 

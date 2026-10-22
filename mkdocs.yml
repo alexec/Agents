@@ -66,6 +66,7 @@ nav:
       - tutorials/index.md
       - tutorials/first-agent.md
       - tutorials/follow-from-iphone.md
+      - tutorials/sign-up-for-the-hosted-service.md
   - How-to guides:
       - how-to/index.md
       - how-to/set-up-on-this-mac.md
@@ -78,6 +79,7 @@ nav:
       - how-to/start-workspaces-from-agents.md
       - how-to/add-a-workspace-provider.md
       - how-to/set-up-a-cloud-workspace-provider.md
+      - how-to/turn-the-relay-on-or-off.md
       - how-to/run-the-control-plane-in-the-cloud.md
       - how-to/run-the-hosted-service.md
       - how-to/run-several-copies.md
@@ -92,10 +94,16 @@ nav:
       - how-to/choose-runtime-model-mode.md
       - how-to/pick-up-a-conversation.md
       - how-to/answer-a-question.md
+      - how-to/read-a-chat.md
+      - how-to/find-in-a-chat-or-a-session.md
       - how-to/send-while-an-agent-works.md
       - how-to/see-what-needs-you-from-your-home-screen.md
       - how-to/watch-background-work.md
+      - how-to/review-changes-and-approvals.md
       - how-to/use-a-shell.md
+      - how-to/edit-files.md
+      - how-to/use-the-simulator-pane.md
+      - how-to/open-in-its-own-window.md
       - how-to/set-up-a-workflow.md
       - how-to/start-a-workflow-from-an-mcp-event.md
       - how-to/use-github.md
@@ -114,6 +122,7 @@ nav:
       - how-to/sign-in-to-a-connector.md
       - how-to/share-one-copy-of-a-local-connector.md
       - how-to/keep-going-when-a-runtime-runs-out.md
+      - how-to/see-usage-cost-and-time.md
       - how-to/limit-spending.md
       - how-to/archive-and-stop.md
       - how-to/label-a-session.md
@@ -127,6 +136,7 @@ nav:
       - reference/statuses.md
       - reference/runtimes.md
       - reference/agent-tools.md
+      - reference/sidebar.md
       - reference/settings.md
       - reference/agents-folder.md
       - reference/workflows.md
@@ -139,6 +149,8 @@ nav:
       - reference/workspace-providers.md
       - reference/integrations.md
       - reference/ssh-options.md
+      - reference/get-started-checklist.md
+      - reference/charts-and-diagrams.md
       - reference/keyboard-shortcuts.md
       - reference/feature-matrix.md
   - Explanation:

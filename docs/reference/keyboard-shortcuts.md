@@ -33,12 +33,18 @@ ones every Mac app has.
 | Shift-Command-Return | **Session ▸ Carry On** | Tells an agent blocked under **Needs you** that its block has gone, or a **Waiting** one that its wait is over early. |
 | Option-Command-Delete | **Session ▸ Archive** or **Unarchive** | Archives the session, or unarchives an archived one. |
 | Delete | Selected session(s) in the sessions list | Archives the highlighted session, or every highlighted one that is not already archived (⌘-click to pick several). |
+| Command-Z | **Session ▸ Undo Archive** | Brings back the session you just archived, while the strip that says so shows. See [Stop and archive agents](../how-to/archive-and-stop.md). |
+| Shift-Command-' | **Session ▸ Quote in Prompt** | Quotes the words you selected in a reply in the prompt. |
+| Shift-Option-Command-O | **Session ▸ Open in New Window** | Opens the session in a window of its own. See [Open a session or a project in its own window](../how-to/open-in-its-own-window.md). |
+| Option-Command-O | **Window ▸ Open Project in New Window** | Opens the selected project in a window of its own. |
+| Option-Escape | **Edit ▸ Complete** | In the file editor, asks the file's language server what to write at the caret. See [Edit files](../how-to/edit-files.md). |
+| Up Arrow, Down Arrow | In an empty prompt | Brings back the prompts you sent before, one at a time. See [Send a prompt while an agent is working](../how-to/send-while-an-agent-works.md). |
 | Option-Command-B | **Session ▸ Branch** | Starts a new agent from this conversation so far. |
 | Option-Command-Down Arrow, Option-Command-Up Arrow | **Go ▸ Next Session**, **Previous Session** | Moves through the sessions in the list. |
 | Command-J | **Go ▸ Next Needing Attention** | Opens the next session under **Needs you**, then the next unread finished session. |
 | Control-Command-1 to 9 | **Go ▸** a project | Opens that project. |
 | Option-Command-I | **View ▸ Show Inspector** or **Hide Inspector** | Opens or closes the sidebar beside the conversation. |
-| Command-1 to Command-6 | **View ▸ Files**, **Changes**, **Terminal**, **Browser**, **Exchanged**, **Background** | Opens that pane of the sidebar. While a permission or question card is up, these yield to the card's answers. |
+| Command-1 to Command-7 | **View ▸ Files**, **Changes**, **Terminal**, **Browser**, **Exchanged**, **Background**, **Simulator** | Opens that pane of the sidebar. While a permission or question card is up, these yield to the card's answers. |
 | Control-` | **View ▸ Project Terminal** | Shows or hides the selected project's own shells, one to a tab, in its folder under the page, with or without an agent chosen. Hiding them leaves them running. |
 | Command-+, Command-- | **View ▸ Zoom In**, **Zoom Out** | Makes the text of the Markdown page in front larger or smaller. |
 | Command-0 | **View ▸ Actual Size** | Puts the Markdown page in front back to its own size. With no page in front, Command-0 is **Window ▸ Agents (All Projects)**. |
@@ -46,8 +52,8 @@ ones every Mac app has.
 | Option-Command-E | **View ▸ Events** | Opens the Events page. |
 | Option-Command-L | **View ▸ Resources** | Opens the Resources page, which shows who holds or is waiting for the simulators, browsers and screen. |
 | Option-Command-R | **View ▸ Runtimes** | Opens the Runtimes page, which shows what each runtime can be started on right now and where its allowance stands. |
-| Option-Command-S | **View ▸ Spending** | Opens the Spending page. See [Limit what agents spend](../how-to/limit-spending.md). |
-| Command-F | **View ▸ Find in Chat** | With a chat open in the main window, finds words in its prompts and replies. With no chat open, Command-F is **Find Session**. |
+| Option-Command-S | **View ▸ Cost** | Opens the Cost page. See [See usage, cost and time](../how-to/see-usage-cost-and-time.md) and See [Limit what agents spend](../how-to/limit-spending.md). |
+| Command-F | **View ▸ Find in Chat** | With a chat open in the main window, finds words in its prompts and replies. See [Find in a chat or a session](../how-to/find-in-a-chat-or-a-session.md). With no chat open, Command-F is **Find Session**. |
 | Option-Command-F | **View ▸ Find Session** | With a chat open, puts the keyboard in the sessions column's search field. |
 | Command-P | **Go ▸ Open File…** | Finds a file in the open session's folders by name, to read or edit. |
 | Command-? | **Help ▸ Agents Help** | Opens these docs. |

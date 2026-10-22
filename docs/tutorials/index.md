@@ -12,3 +12,5 @@ every step says what you should see. Start with the first; they are in order.
    fix a failing test. About fifteen minutes.
 2. [Follow your agents from your iPhone](follow-from-iphone.md): put Agents on your phone,
    answer an agent from it, and start another. About ten minutes.
+3. [Sign up for the hosted service](sign-up-for-the-hosted-service.md): sign up with GitHub,
+   get a control plane of your own, open it in a second browser, and delete the account.

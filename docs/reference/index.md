@@ -14,6 +14,8 @@ something up, not for reading through.
   in the app.
 - [Tools the app gives agents](agent-tools.md): every tool an agent gets from the app, and
   whether you are asked before it runs.
+- [The sidebar](sidebar.md): what the sidebar holds, in what order, which smart groups
+  start on or off, sessions under their starter, and read and unread.
 - [Settings, and the Runtimes and Resources pages](settings.md): every control in Settings
   on the Mac, the Runtimes and Resources pages, and what iPhone and iPad need.
 - [The `~/.agents` folder](agents-folder.md): every file in it, what writes it, and what
@@ -37,6 +39,10 @@ something up, not for reading through.
   for you and sends to each machine of yours.
 - [Reports](reports.md): usage, cost and time by person, project and machine, added up on
   the control plane.
+- [The Get started checklist](get-started-checklist.md): every Get started step and
+  milestone, when each is ticked, where it shows, and how to hide it.
+- [Charts and diagrams](charts-and-diagrams.md): which Vega-Lite charts and Mermaid
+  diagrams each client draws, and what happens to one it cannot draw.
 - [Keyboard shortcuts](keyboard-shortcuts.md): every shortcut and menu command on the Mac.
 - [Feature matrix of coding-agent apps](feature-matrix.md): which apps for running several
   coding agents have which features, Agents included.

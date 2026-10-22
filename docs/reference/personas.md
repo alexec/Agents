@@ -52,9 +52,9 @@ The body is the persona's prompt. It can name the skills the persona relies on.
 
 ## Picking one
 
-The choice is the first row of the new-session form, on the Mac, the Remote and the web
-page: one segment per persona, and a menu on the chat project. It is not shown when the
-project has no personas. A file that cannot be read is listed under it with what is wrong.
+The choice is a menu under the project's name at the top of the new-session form, on the
+Mac, the Remote and the web page (#918). It shows the persona picked, or **No persona**, and
+**No persona** is first in the menu. It is not shown when the project has no personas. A file that cannot be read is listed under it with what is wrong.
 
 Picking a persona:
 
