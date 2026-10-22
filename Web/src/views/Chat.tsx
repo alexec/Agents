@@ -53,6 +53,8 @@ import { routeHash } from "../route";
 import { GuardedChangeCard } from "./GuardedChange";
 import { Capability } from "../protocol/capabilities.generated";
 import { hostNeedsUpdate } from "../model/capabilities";
+import { WorkingMark } from "./SessionRow";
+import { runningTool, runningToolLabel } from "../model/sidebar";
 
 /** One opened turn's entries, so an earlier page can be put in front and drawn again (#291). */
 interface HeldTurn {
@@ -532,7 +534,8 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
         {/* Live, at the foot: what the row says, until the prompt lands (ChatTranscript, #251). */}
         {agent && store.isComingBack(host, agent.id) ? <p class="working coming-back" role="status">↻ {comingBackDescription}</p>
           : agent && (agent.state === "running" || agent.state === "starting") && (
-          <p class="working" aria-label="Working"><span class="spinner" /></p>
+          <p class="working" aria-label={runningTool(agent) !== null ? runningToolLabel(runningTool(agent)!) : "Working"}>
+            <WorkingMark tool={runningTool(agent)} /></p>
         )}
         {/* After all of it, where the reader is (#1995). */}
         {cards.length > 0 && (

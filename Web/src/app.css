@@ -246,7 +246,7 @@ input.rename {
   font-weight: 700;
   opacity: 0.55;
 }
-.status.working { border: none; --notch-width: 1.5px; }
+.status.working { border: none; opacity: 0.7; }
 .status.needsYou { background: currentColor; }
 .status.needsYou .glyph { color: var(--paper-ground); }
 .status.needsYou.tinted { color: var(--tint-attention); opacity: 1; }
@@ -517,9 +517,9 @@ button.link.reading:hover { text-decoration: underline; }
   border-radius: 50%;
   vertical-align: middle;
 }
-/* The working spinner on all three clients (#1606): a circle-notch, a ring with a fifth of it open,
+/* The loading spinner on all three clients (#1606): a circle-notch, a ring with a fifth of it open,
    turning once a second as SpinnerClock does. --notch is its colour, --notch-width the ring's. */
-.spinner, .status.working, .sidebar-mark.working {
+.spinner {
   background: conic-gradient(var(--notch, var(--paper-ink)) 0 80%, transparent 0);
   -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - var(--notch-width, 2px) - 0.5px), #000 calc(100% - var(--notch-width, 2px)));
   mask: radial-gradient(farthest-side, transparent calc(100% - var(--notch-width, 2px) - 0.5px), #000 calc(100% - var(--notch-width, 2px)));
@@ -527,6 +527,22 @@ button.link.reading:hover { text-decoration: underline; }
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .spinner { animation-duration: 3s; } }
+/* A working session's marks on all three clients (#2044), as ThinkingDots and TurningCog: three dots
+   that fade up in turn, left to right, in 1.2 s, and a cog that turns in 2 s, each read off the
+   clock (spinnerClock.ts) so every one on the page is in step. In the colour around them. Under
+   Reduce Motion they keep going, twice as slow, as SpinnerClock.reducedMotionSlowing says. */
+.working-dots { --dots-period: 1.2s; display: inline-flex; align-items: center; justify-content: center; gap: 1.5px;
+  width: 12px; height: 12px; vertical-align: middle; }
+.working-dots i { width: 3px; height: 3px; border-radius: 50%; background: currentColor; opacity: 0.3;
+  animation: dots var(--dots-period) linear infinite backwards; }
+.working-dots i:nth-child(2) { animation-delay: calc(var(--dots-period) * 0.2); }
+.working-dots i:nth-child(3) { animation-delay: calc(var(--dots-period) * 0.4); }
+@keyframes dots { 0% { opacity: 0.3; } 20% { opacity: 1; } 40%, 100% { opacity: 0.3; } }
+.working-cog { --cog-period: 2s; animation: cog var(--cog-period) linear infinite; }
+@keyframes cog { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .working-dots { --dots-period: 2.4s; } .working-cog { --cog-period: 4s; } }
+.working .working-dots, .working .working-cog { width: 16px; height: 16px; opacity: 0.6; }
+.working .working-dots i { width: 4px; height: 4px; }
 .jump {
   position: relative;
   align-self: center;

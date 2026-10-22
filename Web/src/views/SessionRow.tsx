@@ -28,7 +28,9 @@ export function StatusMark({ agent, comingBack = false }: { agent: Agent; coming
   return (
     <span class={`status ${status.shape}${status.tinted ? " tinted" : ""}`} role="img" aria-label={status.words}
       title={status.words}>
-      <span class="glyph" aria-hidden="true">{glyphs[status.shape]}</span>
+      {status.shape === "working"
+        ? <WorkingMark tool={runningTool(agent)} />
+        : <span class="glyph" aria-hidden="true">{glyphs[status.shape]}</span>}
     </span>
   );
 }
@@ -38,7 +40,7 @@ const markWords: Record<SessionMark, string> = { needsYou: "Needs you", working:
 
 /**
  * A session's mark in the sidebar (#495, #499), the window's and the Remote's: an orange hand when
- * it needs the person, a spinner while it works, a numbered list while queued, Zs while it waits (#765), a pause mark once
+ * it needs the person, dots while it thinks and a turning cog while it runs a tool (#2044), a numbered list while queued, Zs while it waits (#765), a pause mark once
  * stopped (#630), an empty ring once done, read or not (#1323). Archived keeps its
  * status mark.
  */
@@ -50,7 +52,8 @@ export function SidebarMark({ agent, comingBack = false }: { agent: Agent; comin
   return (
     <span class={`sidebar-mark ${mark}`} role="img" aria-label={words} title={words}>
       {mark === "needsYou" && <span class="glyph" aria-hidden="true">✋&#xFE0E;</span>}
-      {mark === "tool" && <WrenchMark />}
+      {mark === "working" && <ThinkingDots />}
+      {mark === "tool" && <TurningCog />}
       {mark === "queued" && <span class="glyph" aria-hidden="true">≡</span>}
       {mark === "waiting" && <span class="glyph" aria-hidden="true">ᶻᶻ</span>}
       {mark === "paused" && <span class="glyph" aria-hidden="true">⏸&#xFE0E;</span>}
@@ -60,15 +63,25 @@ export function SidebarMark({ agent, comingBack = false }: { agent: Agent; comin
 }
 
 /**
- * The window's `wrench.and.screwdriver` as a small drawing (#1902): 🛠 does not draw as text in every
- * font, and the other marks here are text.
+ * A working session's mark (#2044), the window's `ThinkingDots` and `TurningCog`: three dots that
+ * fade up in turn while it thinks or replies, a cog that turns while it runs a tool. Each kind is
+ * in step on the page (spinnerClock.ts), in the colour around it.
  */
-function WrenchMark() {
+export function WorkingMark({ tool }: { tool: string | null }) {
+  return tool !== null ? <TurningCog /> : <ThinkingDots />;
+}
+
+function ThinkingDots() {
+  return <span class="working-dots" aria-hidden="true"><i /><i /><i /></span>;
+}
+
+/** The window's `gearshape` as a small drawing: eight teeth round a ring. */
+function TurningCog() {
   return (
-    <svg class="glyph" viewBox="0 0 16 16" width="12" height="12" aria-hidden="true" fill="none" stroke="currentColor"
-      stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-      <path d="M10.5 2.2a3 3 0 0 0-3.2 4L2.6 10.9a1.3 1.3 0 0 0 1.9 1.9l4.7-4.7a3 3 0 0 0 4-3.2l-1.8 1.8-1.7-.4-.4-1.7z" />
-      <path d="M3 3l3.2 3.2M9.6 9.6l3.2 3.2" />
+    <svg class="glyph working-cog" viewBox="0 0 16 16" width="12" height="12" aria-hidden="true" fill="none"
+      stroke="currentColor">
+      <circle cx="8" cy="8" r="6.2" stroke-width="2.4" stroke-dasharray="2.43 2.44" />
+      <circle cx="8" cy="8" r="4.3" stroke-width="1.8" />
     </svg>
   );
 }

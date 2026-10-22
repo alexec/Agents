@@ -56,7 +56,8 @@ struct SidebarSessionRow: View {
                            outcome: agent.report?.outcome,
                            isWaiting: agent.isWaiting,
                            endedReason: agent.endedReason,
-                           outcomeUnknown: agent.endingIsUnaccountedFor)
+                           outcomeUnknown: agent.endingIsUnaccountedFor,
+                           tool: RunningToolWords.tool(agent))
             }
             VStack(alignment: .leading, spacing: 3) {
                 HStack(alignment: .firstTextBaseline, spacing: 5) {
@@ -240,10 +241,10 @@ private struct SessionMark: View {
             case .needsYou:
                 Image(systemName: "hand.raised.fill").tinted(.attention)
             case .working where tool != nil:
-                Image(systemName: RunningToolWords.symbol).foregroundStyle(Paper.accent)
+                // In the accent as the other marks (#1558, #2044).
+                TurningCog(size: 14 * scale, color: Paper.accent)
             case .working:
-                // In the accent as the other marks (#1558).
-                SyncedSpinner(diameter: 14 * scale, color: Paper.accent)
+                ThinkingDots(size: 14 * scale, color: Paper.accent)
             case .queued:
                 Image(systemName: "list.number").foregroundStyle(Paper.accent)
             case .waiting:

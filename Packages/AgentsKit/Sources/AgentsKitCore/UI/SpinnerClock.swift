@@ -19,13 +19,30 @@ public enum SpinnerClock {
     /// still agree.
     public static let epoch = Date(timeIntervalSinceReferenceDate: 0)
 
+    /// One pass of the working dots, left to right (#2044).
+    public static let dotsPeriod: TimeInterval = 1.2
+
+    /// One turn of the working cog (#2044): slower than the spinner, so a small cog does
+    /// not look busy.
+    public static let cogPeriod: TimeInterval = 2
+
+    /// Under Reduce Motion the marks keep going, as a still one reads as stuck, but this
+    /// many times slower.
+    public static let reducedMotionSlowing: Double = 2
+
     /// How far the notch has turned at `date`, in degrees from 0 up to 360, clockwise.
     public static func angle(at date: Date) -> Double {
-        let turns = date.timeIntervalSince(epoch) / period
-        let fraction = turns - turns.rounded(.down)
+        fraction(at: date, period: period) * 360
+    }
+
+    /// How far into a cycle of `period` seconds every mark is at `date`, from 0 up to 1.
+    /// The dots and the cog read it as the spinner reads its angle, so each kind is in
+    /// step on a screen.
+    public static func fraction(at date: Date, period: TimeInterval) -> Double {
+        let cycles = date.timeIntervalSince(epoch) / period
+        let fraction = cycles - cycles.rounded(.down)
         // `rounded(.down)` keeps a date before the epoch in range too; the guard is for
-        // a fraction that rounds up to a whole turn.
-        let degrees = fraction * 360
-        return degrees < 360 ? degrees : 0
+        // a fraction that rounds up to a whole cycle.
+        return fraction < 1 ? fraction : 0
     }
 }

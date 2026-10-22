@@ -69,7 +69,8 @@ struct AgentCard: View {
                            outcome: agent.report?.outcome,
                            isWaiting: agent.isWaiting,
                            endedReason: agent.endedReason,
-                           outcomeUnknown: agent.endingIsUnaccountedFor)
+                           outcomeUnknown: agent.endingIsUnaccountedFor,
+                           tool: RunningToolWords.tool(agent))
                     .padding(.top, 1)
 
                 VStack(alignment: .leading, spacing: 3) {
@@ -453,6 +454,8 @@ struct StatusIcon: View {
     var endedReason: EndedReason?
     var outcomeUnknown = false
     var isWaitingForAllowance = false
+    /// The tool it runs, for the cog in place of the dots (#2044).
+    var tool: String?
 
     private var shape: StatusShape {
         StatusShape(state: state, outcome: outcome, isWaiting: isWaiting, isComingBack: isComingBack,
@@ -469,8 +472,10 @@ struct StatusIcon: View {
                     .glyph(size: 16)
                     .foregroundStyle((shape.wantsAPerson ? StateTint.attention : .none)
                         .style(or: .secondary))
+            } else if tool != nil {
+                TurningCog(size: 18)
             } else {
-                SyncedSpinner(diameter: 18)
+                ThinkingDots(size: 18)
             }
         }
         .frame(width: 20, height: 20)
