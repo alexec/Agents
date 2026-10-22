@@ -163,7 +163,7 @@
     "title" : "Ask the person a question"
   },
   {
-    "description" : "Near the end of your turn, optionally offer one useful next prompt. Call at most once; a later call replaces it. Use a 2–5 word label and the full prompt text.",
+    "description" : "When your turn ends with a report or a done reply and leaves one clear next step for the person, offer it as a prompt before you end the turn; not with a question waiting, nor when you archive. Call at most once; a later call replaces it. Use a 2–5 word label and the full prompt text.",
     "inputSchema" : {
       "properties" : {
         "description" : {
