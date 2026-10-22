@@ -111,17 +111,17 @@ func TestTheNewestServerLogsAreKept(t *testing.T) {
 	}
 }
 
-// A folder that is no longer a project leaves events-state.json's branch tips.
+// A folder that is no longer a project leaves events-state.json's branch tips. On the
+// map alone: a started daemon's own project watch drops "/kept" too, as it has no project.
 func TestBranchTipsOfAGoneProjectGo(t *testing.T) {
-	d, _ := start(t, t.TempDir())
-	defer d.Shutdown()
-	d.eventMu.Lock()
-	d.eventStateNow.BranchTips = map[string]map[string]string{"/kept": {"main": "a"}, "/gone": {"main": "b"}}
-	d.eventMu.Unlock()
-	d.dropGoneBranchTips(map[string]bool{"/kept": true})
-	d.eventMu.Lock()
-	defer d.eventMu.Unlock()
-	if _, ok := d.eventStateNow.BranchTips["/gone"]; ok || len(d.eventStateNow.BranchTips) != 1 {
-		t.Fatalf("%v", d.eventStateNow.BranchTips)
+	tips := map[string]map[string]string{"/kept": {"main": "a"}, "/gone": {"main": "b"}}
+	if !dropGone(tips, map[string]bool{"/kept": true}) {
+		t.Fatal("nothing went")
+	}
+	if _, ok := tips["/gone"]; ok || len(tips) != 1 {
+		t.Fatalf("%v", tips)
+	}
+	if dropGone(tips, map[string]bool{"/kept": true}) {
+		t.Fatal("a second drop said one went")
 	}
 }

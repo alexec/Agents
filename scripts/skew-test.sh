@@ -24,6 +24,9 @@ work=$(mktemp -d)
 pids=""
 cleanup() {
 	for p in $pids; do kill "$p" 2>/dev/null || true; done
+	# A host writes its state as it stops: rm only once each has gone, or it races a
+	# write and finds a folder not empty.
+	for p in $pids; do wait "$p" 2>/dev/null || true; done
 	rm -rf "$work"
 }
 trap cleanup EXIT INT TERM
