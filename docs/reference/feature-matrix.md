@@ -38,7 +38,7 @@ down for a runtime that has none. [Overall score](#overall-score), after the
 tables, adds every feature up.
 
 The matrix was filled in on 2026-10-12 from each app's own docs, changelog, README,
-releases and, where open, source. Agents' row was last brought up to date on 2026-10-21. Every app is held to the same bar, Agents included: a ●
+releases and, where open, source. Agents' row was last brought up to date on 2026-10-22. Every app is held to the same bar, Agents included: a ●
 needs the whole feature, documented by the app itself, and a ○ needs evidence, such as an
 app that ships for macOS alone having no Android app. Once per release, after the
 Competitor check, the Feature matrix workflow (`.agents/workflows/feature-matrix.md`)
@@ -58,11 +58,13 @@ Agents' ◐ cells, and why:
 - **A browser the agent drives:** through the Playwright server from the MCP marketplace,
   with nothing shown in the app, or with **Use Chrome** (#1837), which drives the person's
   own Chrome for Claude alone, once its extension is installed.
+- **Several accounts per runtime:** for Claude and Codex alone (#840). The person picks
+  the account when a session starts. See
+  [More than one account](runtimes.md#more-than-one-account).
 
 Agents has none of these at all:
 
 - Android app (#810), Windows or Linux desktop (#811).
-- Several accounts per runtime.
 - Open source: the source is visible on GitHub, but all rights are reserved (#2110).
 
 ## What each feature means
@@ -365,11 +367,11 @@ Agents has none of these at all:
 |---|:-:|:-:|:-:|:-:|:-:|:-:|--:|
 | GitHub Copilot | ● | ● | ● | ● | ● | ?⃝ | 100% |
 | Agentastic | ● | ● | ● | ?⃝ | ● | ?⃝ | 80% |
+| **Agents** | ● | ● | ● | ◐ | ◐ | ◐ | 80% |
 | Claude Code | ● | ● | ● | ● | ?⃝ | ?⃝ | 80% |
 | CodeAgentSwarm | ● | ?⃝ | ● | ● | ● | ◐ | 80% |
 | Cursor | ● | ● | ● | ● | ?⃝ | ?⃝ | 80% |
 | OpenAI Codex | ● | ● | ● | ● | ?⃝ | ?⃝ | 80% |
-| **Agents** | ● | ● | ● | ◐ | ○ | ◐ | 70% |
 | Nimbalyst | ● | ● | ● | ◐ | ?⃝ | ?⃝ | 70% |
 | Warp | ● | ?⃝ | ● | ● | ◐ | ?⃝ | 70% |
 | Maestro | ?⃝ | ● | ● | ?⃝ | ● | ?⃝ | 60% |
@@ -443,7 +445,7 @@ Each app's score in every table, and overall: its points over the 49 scored feat
 
 | Rank | App | Running | Reach | Following | Reviewing | Tools | Tasks | Extensions | Organising | Overall |
 |--:|---|--:|--:|--:|--:|--:|--:|--:|--:|--:|
-| 1 | **Agents** | 100% | 67% | 100% | 100% | 90% | 100% | 70% | 83% | **90%** |
+| 1 | **Agents** | 100% | 67% | 100% | 100% | 90% | 100% | 80% | 83% | **91%** |
 | 2 | GitHub Copilot | 92% | 83% | 100% | 100% | 80% | 61% | 100% | 50% | **82%** |
 | 3 | Paseo | 100% | 100% | 71% | 90% | 60% | 61% | 60% | 100% | **80%** |
 | 4 | Cursor | 83% | 67% | 86% | 100% | 80% | 67% | 80% | 50% | **76%** |
