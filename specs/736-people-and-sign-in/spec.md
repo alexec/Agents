@@ -418,7 +418,7 @@ Client and machine keys expire after 90 days and renew when in use. A person who
 
 **Scopes and secrets (T1)**
 
-- **FR-022**: Settings MUST have the scopes this device, you, control plane and project. One Settings window MUST group its rail by scope, on all three clients.
+- **FR-022**: Settings MUST have the scopes this device, you, control plane and project. One Settings window MUST group its rail by scope, on all three clients. *Amended by #2157:* Settings MUST group its rail by subject: **This app** (the web: **This browser**), **Machines** and **Control plane** (the person's account first); project settings stay in the project's own sheet. See [settings-by-subject.md](settings-by-subject.md).
 - **FR-023**: These settings MUST be at the user scope:
   - MCP servers and their secrets;
   - agent configuration (skills, instructions, personas);

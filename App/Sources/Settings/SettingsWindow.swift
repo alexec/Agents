@@ -5,7 +5,7 @@ import SwiftUI
 /// The Settings window (055, look/ frames A–G): one rail down the left and the chosen pane
 /// beside it. It opens at one size for every pane, so choosing another never makes the
 /// window jump, and it can be resized larger than that. The rail has one row for each pane
-/// (#1076), grouped by scope (#1759): This device, You and Control plane. Agent Runtimes,
+/// (#1076), grouped by subject (#2157): This app, Machines and Control plane. Agent Runtimes,
 /// Agent Configuration and Machines list their own pages in a column inside the pane.
 struct SettingsWindow: View {
     @Environment(AppModel.self) private var model
@@ -226,10 +226,12 @@ struct SettingsWindow: View {
 extension SettingsScope {
     var panes: [SettingsPane] {
         switch self {
-        case .thisDevice: [.appearance]
-        // Sidebar is kept on the Mac's host and is the same on every client (#1033, #2079).
-        case .you: [.account, .signIns, .sidebar, .runtimes, .agentConfiguration, .spending, .resources, .onEveryMachine, .machines]
-        case .controlPlane: [.people, .groups, .channels, .signIn, .providers, .clients, .controlPlane]
+        // How this app draws: Sidebar is kept on the Mac's host so every client draws the
+        // same (#1033, #2079), but its subject is the app (#2157).
+        case .thisApp: [.appearance, .sidebar]
+        case .machines: [.machines, .runtimes, .agentConfiguration, .spending, .resources, .onEveryMachine]
+        // The person's account first, shown with no control plane too (#2157).
+        case .controlPlane: [.account, .signIns, .people, .groups, .channels, .signIn, .providers, .clients, .controlPlane]
         }
     }
 }

@@ -16,8 +16,9 @@ import { GitAccessSection } from "./GitAccess";
 import { VersionsSection } from "./Machines";
 import { SidebarGroupsSection } from "./SidebarGroups";
 
-/** Settings' groups (#1759): what is kept in this browser only, what is the person's, and the control plane's. */
-export type SettingsScope = "thisDevice" | "you" | "controlPlane";
+/** Settings' groups by subject (#2157, was by scope #1759): this browser, the machines that run agents, and
+ * what the control plane keeps (the person's sign-ins first). */
+export type SettingsScope = "thisApp" | "machines" | "controlPlane";
 
 export interface SettingsSection {
   name: string;
@@ -30,27 +31,27 @@ export interface SettingsSection {
 }
 
 export const settingsSections: readonly SettingsSection[] = [
-  { name: "appearance", scope: "thisDevice", order: 10, Section: AppearanceSection },
-  { name: "backups", scope: "you", order: 30, Section: BackupsSection },
+  { name: "appearance", scope: "thisApp", order: 10, Section: AppearanceSection },
+  { name: "backups", scope: "machines", order: 30, Section: BackupsSection },
   // Channel identities linked to people (#1762).
   { name: "channels", scope: "controlPlane", order: 30, Section: ChannelsSection },
-  { name: "finishedChats", scope: "you", order: 80, Section: FinishedChatsSection },
-  { name: "gitAccess", scope: "you", order: 10, Section: GitAccessSection },
+  { name: "finishedChats", scope: "thisApp", order: 30, Section: FinishedChatsSection },
+  { name: "gitAccess", scope: "machines", order: 10, Section: GitAccessSection },
   // Groups own workspace providers (#1761).
   { name: "groups", scope: "controlPlane", order: 20, Section: GroupsSection },
-  { name: "machines", scope: "you", order: 20, Section: VersionsSection },
+  { name: "machines", scope: "machines", order: 20, Section: VersionsSection },
   // Who belongs to the control plane, and their machines and clients (#994).
   { name: "people", scope: "controlPlane", order: 10, Section: PeopleSection },
   { name: "providers", scope: "controlPlane", order: 50, Section: ProvidersSection },
-  { name: "serverBackups", scope: "you", order: 40, Section: ServerBackupsSection },
-  // Kept on the Mac's host, the same on every client (#1033, #2079), so under You.
-  { name: "sidebar", scope: "you", order: 70, Section: SidebarGroupsSection },
+  { name: "serverBackups", scope: "machines", order: 40, Section: ServerBackupsSection },
+  // Kept on the Mac's host, the same on every client (#1033, #2079); its subject is the app (#2157).
+  { name: "sidebar", scope: "thisApp", order: 20, Section: SidebarGroupsSection },
   // Which providers people sign in with (#995): an admin's.
   { name: "signInProviders", scope: "controlPlane", order: 40, Section: SignInSection, shows: (store) => store.person.value?.role === "admin" },
   // How you sign in on your Macs, iPhones and iPads (#995).
-  { name: "signIns", scope: "you", order: 60, Section: SignInsSection },
+  { name: "signIns", scope: "controlPlane", order: 5, Section: SignInsSection },
   // The settings and secrets the control plane keeps for you (#1760).
-  { name: "userScope", scope: "you", order: 50, Section: UserScopeSection },
+  { name: "userScope", scope: "machines", order: 50, Section: UserScopeSection },
 ];
 
 /** One group's sections, in their order, less any not shown now. */
