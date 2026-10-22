@@ -62,7 +62,7 @@ var backupPartBytes = 8 << 20
 var backupAgentFiles = []string{"agent.json", "transcript.jsonl", "turns.jsonl", "app-tools.jsonl", "said.json"}
 
 // backupRootFiles are the root's files a backup carries.
-var backupRootFiles = []string{"usage-history.json", "time-history.json"}
+var backupRootFiles = []string{"usage-history.json", "time-history.json", erasedFile}
 
 type backupState struct {
 	backupMu sync.Mutex
@@ -611,8 +611,17 @@ func (d *Daemon) restoreArchive(archive, madeIn string, mine bool) (wire.BackupR
 	// record, which the store does not load.
 	var held wire.UUID
 	files := map[string][]byte{}
+	// An agent this machine deleted is never restored (#1001).
+	d.erasures.mu.Lock()
+	erased := d.readErasedLocked()
+	d.erasures.mu.Unlock()
 	flush := func() error {
 		if held == "" {
+			return nil
+		}
+		if _, gone := erased[held]; gone {
+			held, files = "", map[string][]byte{}
+			res.Skipped++
 			return nil
 		}
 		restored, err := d.restoreAgent(held, files, madeIn, mine)
@@ -643,6 +652,8 @@ func (d *Daemon) restoreArchive(archive, madeIn string, mine bool) (wire.BackupR
 			return res, err
 		}
 		switch {
+		case h.Name == erasedFile:
+			d.takeErasedList(b)
 		case slices.Contains(backupRootFiles, h.Name):
 			p := filepath.Join(d.Store.Loc.Root, h.Name)
 			if _, err := os.Stat(p); errors.Is(err, os.ErrNotExist) {

@@ -16,12 +16,12 @@
 
 ## Phase 2: b1, erasure (area: hosts)
 
-- [ ] T008 [US2] Test that Delete of an archived Claude agent leaves no session file in a scratch `CLAUDE_CONFIG_DIR`, and none for Codex in a scratch `CODEX_HOME`, in `Go/internal/agentsd/erasure_test.go` (SC-002).
-- [ ] T009 [US2] Test the queue: bounded to 1,000, kept across a restart, dropped after 3 tries.
-- [ ] T010 [US2] Test that a restore skips an erased agent (SC-003).
-- [ ] T011 [US2] Add `Go/internal/agentsd/erasure.go`: the queue, the eraser, the files fallback, the erased list.
-- [ ] T012 [US2] Queue from `deleteArchived`; `runtimeCopy` on `agent.deleted`; skip in `restoreAgent`.
-- [ ] T013 Update `docs/explanation/compliance/` (erasure is built).
+- [x] T008 [US2] Test that Delete of an archived Claude agent leaves no session file in a scratch `CLAUDE_CONFIG_DIR`, and none for Codex in a scratch `CODEX_HOME`, in `Go/internal/agentsd/erasure_test.go` (SC-002).
+- [x] T009 [US2] Test the queue: bounded to 1,000, kept across a restart, dropped after 3 tries.
+- [x] T010 [US2] Test that a restore skips an erased agent (SC-003).
+- [x] T011 [US2] Add `Go/internal/agentsd/erasure.go`: the queue, the eraser, the files fallback, the erased list.
+- [x] T012 [US2] Queue from `deleteArchived`; `runtimeCopy` on `agent.deleted`; skip in `restoreAgent`.
+- [x] T013 Update `docs/explanation/compliance/` (erasure is built).
 
 ## Phase 3: a2, chunk seams (area: hosts) — other lane
 

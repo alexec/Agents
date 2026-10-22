@@ -29,6 +29,7 @@ command). Only its user can read it (mode 0700).
 | `<project>/.agents/dropbox` | Files handed to a workflow | 25 MB a file. Not swept. |
 | Terminal scrollback | What a terminal showed | In memory only, 4 MiB a terminal |
 | `daemon.log` | What the host did | 4 MB, and one older file |
+| `erasures.json`, `erased.json` | Runtime copies of deleted agents still to erase; every agent deleted here | 1,000 entries for 7 days; 10,000 IDs for 400 days |
 | `~/.agents-secrets` | Secrets (see [Security overview](security-overview.md#where-secrets-live)) | Until you remove them |
 
 ## On the control plane
@@ -54,16 +55,27 @@ account, then the account. It does not delete the account's machines.
 ## Erasure
 
 **Delete** works on an archived agent. It stops the agent's runtime, takes back its tokens,
-and deletes its folder (record, conversation, tool log) and its turn summaries. These stay
-behind:
+and deletes its folder (record, conversation, tool log) and its turn summaries. Then
+(T8, #1001):
 
-- the runtime's own session files, such as Claude Code's in `~/.claude/projects`;
+- **The runtime's own copy goes.** The machine starts the runtime as the agent ran (with
+  its account) and asks it to delete the conversation (ACP `session/delete`). For Claude
+  and Codex it also removes the session's files in the runtime's folder (`~/.claude` or
+  `CLAUDE_CONFIG_DIR`; `~/.codex` or `CODEX_HOME`). This waits in `erasures.json` in the
+  data folder: 1,000 at most, done one at a time, and tried again at the next start when
+  the runtime does not answer, 3 times at most within 7 days.
+- **A restore never brings the agent back.** `erased.json` in the data folder names every
+  agent the machine deleted: 10,000 at most, each for 400 days. A backup carries it, and a
+  restore skips each agent in it, also on a new machine.
+
+These stay behind:
+
+- the copy of a runtime whose files are not known and that cannot delete a conversation;
 - attachments, until the next sweep finds no conversation that names them;
 - the agent's events, until they are 7 days old;
-- the backups that hold it.
+- the backups that hold it, until they age out (a restore skips it).
 
-Deleting the runtime's own files too is planned (T8, #1001). So are **export and import**
-of an agent or a project.
+**Export and import** of an agent or a project are planned (T8, #1001).
 
 ## Backups
 

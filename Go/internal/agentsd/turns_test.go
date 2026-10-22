@@ -38,6 +38,8 @@ func TestMain(m *testing.M) {
 	}
 	// No test asks the person's gh about merged pull requests unless it says so.
 	findGH = func() string { return "" }
+	// Nor erases a deleted agent's runtime copy (#1001): that starts the runtime.
+	erasing = false
 	os.Exit(m.Run())
 }
 
@@ -90,7 +92,11 @@ func (f *fakeRuntime) LoadSession(ctx context.Context, r sdk.LoadSessionRequest)
 	return sdk.LoadSessionResponse{}, nil
 }
 
-func (f *fakeRuntime) UnstableDeleteSession(context.Context, sdk.UnstableDeleteSessionRequest) (sdk.UnstableDeleteSessionResponse, error) {
+func (f *fakeRuntime) UnstableDeleteSession(_ context.Context, r sdk.UnstableDeleteSessionRequest) (sdk.UnstableDeleteSessionResponse, error) {
+	// AGENTS_FAKE_DELETED names a file the fake writes each deleted session's ID to.
+	if file := os.Getenv("AGENTS_FAKE_DELETED"); file != "" {
+		os.WriteFile(file, []byte(r.SessionId), 0o600)
+	}
 	return sdk.UnstableDeleteSessionResponse{}, nil
 }
 

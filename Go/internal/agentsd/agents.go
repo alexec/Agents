@@ -464,8 +464,13 @@ func (d *Daemon) deleteArchived(a *wire.Agent, because string) error {
 	if err := d.Store.Delete(a.ID); err != nil {
 		return &Error{Code: wire.FailureCouldNotSave, Message: "The agent could not be deleted: " + err.Error()}
 	}
+	// The runtime's own copy goes next, and a backup never brings the agent back (#1001).
+	copyOf := "none"
+	if d.queueErasure(a) {
+		copyOf = "queued"
+	}
 	Broadcast(d, wire.NotifyAgentRemoved, wire.AgentRemovedNotification{AgentID: a.ID})
-	d.raiseAbout(a, "agent.deleted", "was deleted with its conversation.", map[string]string{"because": because})
+	d.raiseAbout(a, "agent.deleted", "was deleted with its conversation.", map[string]string{"because": because, "runtimeCopy": copyOf})
 	d.takeActor(a.ID) // a helper's deletion raises nothing to take it
 	d.projectChanged(projectFolder(a))
 	return nil
