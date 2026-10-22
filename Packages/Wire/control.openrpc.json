@@ -512,6 +512,58 @@
       }
     },
     {
+      "name": "console/live",
+      "x-capability": "console/1",
+      "description": "Console ▸ Live Now (#2019, M9): every agent running now on every machine, with its cost so far. Admins only.",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/LiveBoard"
+        }
+      }
+    },
+    {
+      "name": "console/stopAgent",
+      "x-capability": "console/1",
+      "description": "Console ▸ Live Now (#2019, M9): an admin stops one agent on any machine. Admins only.",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/ConsoleStopAgent"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
       "name": "console/teamWorkflows",
       "x-capability": "console/1",
       "description": "Console ▸ Team Workflows (#1804, M6): each bot, the workflows it ran and what runs now. Admins only.",

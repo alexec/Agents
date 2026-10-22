@@ -360,7 +360,7 @@ function AdoptionPane({ store, scope, initial }: { store: Store; scope: ReportSc
 }
 
 /** A runtime's name, from the first host that knows it. */
-function runtimeNameIn(store: Store) {
+export function runtimeNameIn(store: Store) {
   return (id: string) => Object.values(store.runtimes.value).map((list) => list.find((s) => s.runtime.id === id)?.runtime.name)
     .find((name) => name) || id;
 }
