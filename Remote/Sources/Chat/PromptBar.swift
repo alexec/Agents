@@ -656,11 +656,11 @@ private struct PromptHead: View {
     /// The project folder's branch, for an agent working there rather than in a worktree.
     @State private var projectBranch: String?
     @Environment(\.horizontalSizeClass) private var sizeClass
-    /// At compact width the labels are one line until tapped (#1107).
+    /// At compact width the labels are one line, and a tap opens them in a popover (#2173).
     @State private var editingLabels = false
 
     var body: some View {
-        HStack(alignment: sizeClass == .compact && !editingLabels ? .center : .top, spacing: 10) {
+        HStack(alignment: sizeClass == .compact ? .center : .top, spacing: 10) {
             if let place {
                 Text(place)
                     .lineLimit(1)
@@ -692,26 +692,11 @@ private struct PromptHead: View {
     }
 
     /// On an iPhone, one line: the first label and +N, or Add label with none. A tap opens
-    /// the whole field in place, focused, and it folds again when the field loses the focus.
-    /// The iPad has the room for the field (#1107).
+    /// the whole field in a popover, focused, so the head stays one line and the chat does
+    /// not move (#2173). The iPad has the room for the field (#1107).
     @ViewBuilder private var labels: some View {
         if sizeClass != .compact {
             RemoteSessionLabels(agent: agent, compact: false)
-        } else if editingLabels {
-            HStack(alignment: .top, spacing: 6) {
-                LabelTagField(labels: agent.labels,
-                              suggestions: model.labelSuggestions(in: agent.projectFolder),
-                              add: { values in Task { _ = await model.setLabels(on: agent.id, add: values) } },
-                              remove: { value in Task { _ = await model.setLabels(on: agent.id, remove: [value]) } },
-                              focusFirst: true,
-                              onEndEditing: { editingLabels = false })
-                // With five labels there is no field to lose the focus: this folds it.
-                Button("Done") { editingLabels = false }
-                    .appText(.fine)
-                    .buttonStyle(.plain)
-                    .foregroundStyle(Paper.accent)
-                    .padding(.vertical, 3)
-            }
         } else {
             Button { editingLabels = true } label: {
                 if agent.labels.isEmpty {
@@ -728,7 +713,30 @@ private struct PromptHead: View {
                 ? "Add label"
                 : "Labels: \(agent.labels.map(\.value).joined(separator: ", "))")
             .accessibilityHint("Edits the labels.")
+            .popover(isPresented: $editingLabels, arrowEdge: .bottom) {
+                labelEditor
+                    .presentationCompactAdaptation(.popover)
+            }
         }
+    }
+
+    /// The whole field, as the iPad has it. Each change applies as it is made, so a tap
+    /// outside closes it as Done does.
+    private var labelEditor: some View {
+        VStack(alignment: .trailing, spacing: 8) {
+            LabelTagField(labels: agent.labels,
+                          suggestions: model.labelSuggestions(in: agent.projectFolder),
+                          add: { values in Task { _ = await model.setLabels(on: agent.id, add: values) } },
+                          remove: { value in Task { _ = await model.setLabels(on: agent.id, remove: [value]) } },
+                          focusFirst: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            Button("Done") { editingLabels = false }
+                .appText(.fine)
+                .buttonStyle(.plain)
+                .foregroundStyle(Paper.accent)
+        }
+        .padding(12)
+        .frame(width: 300)
     }
 
     /// Its worktree, or the project folder's branch. None for an archived agent, whose
