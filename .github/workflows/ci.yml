@@ -19,9 +19,13 @@ on:
 permissions:
   contents: read
 
+# A newer push cancels a pull request's run, but never a run on main (#2218). When each
+# merge cancelled the one before it, a busy main finished no run for six hours and the
+# release could not tag. GitHub keeps one running and at most one pending run per group,
+# and a newer push replaces the pending one, so a burst of merges costs one extra run.
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   # Which macOS jobs this run needs (#594), on a runner that is never short. Most of a
@@ -32,10 +36,8 @@ jobs:
   # selection steps still choose the suites; this only decides whether they start, and
   # if it fails they start anyway.
   #
-  # On a push to main it waits first (#595): every merge starts a run, the next merge
-  # cancels it (the concurrency group above), and each cancelled run used to hold two
-  # macOS runners until then. Waiting here lets a burst of merges cancel each other on
-  # this runner, so only the last takes macOS runners.
+  # A push to main no longer waits here first (#595, removed by #2218): a run on main is
+  # not cancelled now, so the wait only made every main run five minutes slower.
   select:
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -45,10 +47,6 @@ jobs:
       codetext: ${{ steps.test-selection.outputs.codetext }}
       go: ${{ steps.test-selection.outputs.go }}
     steps:
-      - name: Let a burst of merges settle
-        if: github.event_name == 'push'
-        run: sleep 300
-
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0
