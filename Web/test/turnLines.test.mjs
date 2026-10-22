@@ -1,16 +1,9 @@
-// Opening and closing a turn (#993, #759, #1315).
+// A turn's lines (#759, #1315). Every turn draws its steps, with no control to close them (#2170).
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { load } from "./load.mjs";
 
-const t = await load("src/model/turnDetail.ts");
 const turns = await load("src/model/turns.ts");
-
-test("a turn starts open, and its N steps closes it and opens it again", () => {
-  assert.equal(t.initialDetail, "open");
-  assert.equal(t.toggled(t.initialDetail), "collapsed");
-  assert.equal(t.toggled("collapsed"), "open");
-});
 
 test("a thought folds to its first words, as TranscriptItem.thoughtLine does", () => {
   assert.equal(turns.thoughtLine("**Planning the fix**\n\nRead   the file first."), "Thought: Planning the fix Read the file first.");

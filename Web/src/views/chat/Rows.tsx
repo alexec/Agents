@@ -1,4 +1,4 @@
-// One turn of the chat, open or collapsed (069, #1315), and every kind of line in it, as the
+// One turn of the chat, with its steps (069, #1315, #2170), and every kind of line in it, as the
 // shared TranscriptRows.swift draws them for the Mac and the phone (071 FR-023). Words come from
 // the ported rules; agent text goes through the Markdown renderer and nowhere else.
 import { useSignal } from "@preact/signals";
@@ -23,10 +23,7 @@ import { FileCard } from "./FileCard";
 import type { Shown } from "../../model/shownFile";
 import { switchNote } from "../../model/switchNote";
 import { continueWithout, keepStopped, sandboxCard } from "../../model/sandboxWords";
-import type { TurnDetail } from "../../model/turnDetail";
 import { memo } from "../../render/memo";
-
-export type { TurnDetail } from "../../model/turnDetail";
 
 /** The text of a message's blocks: text blocks as Markdown, anything else named. */
 export function Blocks({ blocks, text }: { blocks: ContentBlock[] | undefined; text: string }) {
@@ -529,23 +526,18 @@ export function ItemRow({ item, background }: { item: Item; background: readonly
   return item.kind === "run" ? <ToolRun calls={item.calls} background={background} /> : <EntryRow entry={item.entry} />;
 }
 
-function stepsWords(count: number | undefined, open: boolean): string {
-  if (open) return "Hide steps";
-  if (count === undefined) return "Show steps";
-  return count === 1 ? "1 step" : `${count} steps`;
-}
-
 /**
- * One turn: the ask, the control into its steps, and its outcome (TurnView). Drawn again only
+ * One turn: the ask, its steps and its outcome (TurnView). Every turn draws its steps, with no
+ * control to hide them (#2170): each run of calls is one line already (#1315). Drawn again only
  * when one of its props changes: the chat keeps a turn the same object until an entry lands in
- * it, and hands every turn the same `toggle` and `loadDetail` (#170).
+ * it, and hands every turn the same `loadDetail` (#170).
  *
- * Opening loads the last page once, and only for a turn near the end: every turn open at once
- * would fetch them all. One the chat has let go shows a button instead of fetching itself (#291).
+ * A stored turn loads its last page once, and only near the end: every turn at once would fetch
+ * them all. One the chat has let go shows Load steps instead of fetching itself (#291).
  */
-export const TurnView = memo(function TurnView({ turn, detail, focusedRun, fetched, fetchFailed, hasEarlier, auto, isLive, background, toggle: toggleTurn, loadDetail: loadTurn, loadEarlier }: {
-  turn: ChatTurn; detail: TurnDetail; focusedRun: string | null; fetched: readonly Item[] | undefined; fetchFailed: boolean; hasEarlier: boolean; auto: boolean; isLive: boolean;
-  background: readonly BackgroundItem[]; toggle: (turn: ChatTurn) => void;
+export const TurnView = memo(function TurnView({ turn, focusedRun, fetched, fetchFailed, hasEarlier, auto, isLive, background, loadDetail: loadTurn, loadEarlier }: {
+  turn: ChatTurn; focusedRun: string | null; fetched: readonly Item[] | undefined; fetchFailed: boolean; hasEarlier: boolean; auto: boolean; isLive: boolean;
+  background: readonly BackgroundItem[];
   loadDetail: (turn: ChatTurn) => Promise<void>; loadEarlier: (turn: ChatTurn) => Promise<void>;
 }) {
   const asked = useRef(false);
@@ -557,38 +549,24 @@ export const TurnView = memo(function TurnView({ turn, detail, focusedRun, fetch
     loading.value = true;
     void load.current(turn).finally(() => { loading.value = false; });
   };
-  const toggle = () => {
-    if (detail === "collapsed") ask();
-    toggleTurn(turn);
-  };
   const waiting = isSummaryOnly(turn) && fetched === undefined;
   const items = isSummaryOnly(turn) ? fetched ?? [] : turn.items;
   const parts = waiting ? undefined : turnParts(items, isLive);
   const outcome = parts?.outcome ?? turn.storedOutcome ?? [];
   const stepCount = parts?.stepCount ?? turn.storedStepCount;
-  const open = detail !== "collapsed";
   const outcomeIDs = new Set((parts?.outcome ?? []).map((i) => i.id));
   // Thinking too, each a folded line in its place (#1315).
   const steps = drawnInTurn(items, isLive).filter((i) => !outcomeIDs.has(i.id));
   useEffect(() => {
-    if (!open) asked.current = false;
-  }, [open]);
-  useEffect(() => {
     // Once, and only while this turn is among the ones the chat will keep. A later eviction
     // leaves `asked` set, so the effect does not fetch it straight back (#291).
-    if (!(open && waiting && auto) || asked.current) return;
+    if (!(waiting && auto) || asked.current) return;
     ask();
-  }, [open, waiting, auto]);
+  }, [waiting, auto]);
   return (
     <article class="turn" aria-label="Turn" data-turn={turn.id}>
       {turn.ask && <ItemRow item={turn.ask} background={background} />}
-      {stepCount !== 0 && (
-        <button class="steps-control" aria-expanded={open} onClick={toggle}
-          title={open ? "Hide this turn's steps" : "Show every step of this turn"}>
-          {stepsWords(stepCount, open)}
-        </button>
-      )}
-      {open && stepCount !== 0 ? (
+      {stepCount !== 0 ? (
         waiting ? (loading.value || (auto && !asked.current) ? <p class="quiet">Loading…</p>
           // A read that failed says so, as the window's turn does, rather than a bare Load steps (#544).
           : fetchFailed ? <p class="load-failure" role="status"><span>These steps did not load.</span>

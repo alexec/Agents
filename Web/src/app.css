@@ -366,8 +366,8 @@ button.link {
 .failure { color: var(--tint-failure); margin: 0; }
 .tinted { color: var(--tint-attention); }
 
-/* A turn (069): the ask, "N steps", the steps in the turn's margin (no rule, no indent: #148), and the outcome. */
-/* Its text at the window's reading step (15, sans, as every other step since #326); the control is chrome, at fine (11). */
+/* A turn (069): the ask, the steps in the turn's margin (no rule, no indent: #148), and the outcome; no control hides them (#2170). */
+/* Its text at the window's reading step (15, sans, as every other step since #326); Load steps and Earlier steps are chrome, at fine (11). */
 .turn { display: flex; flex-direction: column; gap: 10px; font-family: var(--font-text); font-size: 0.9375rem; }
 /* Plain text you click, flush with the turn's edge: no capsule, no padding (#758). */
 .steps-control {

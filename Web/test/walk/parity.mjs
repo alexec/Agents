@@ -126,15 +126,14 @@ for (const scene of scenes) {
       say(`opened: ${JSON.stringify(await page.eval(`[...document.querySelectorAll(".turn button.call-line[aria-expanded=true]")].map((b) => b.textContent)`))}`);
       await shot("margin");
     } else if (scene === "turn") {
-      // #148, #1315: the last turn open, a thought opened in its place, and collapsed, beside the
-      // window: the ask, the steps control, the steps (no chevron, no rule, no indent), each
-      // thought one folded line, and the outcome. Takes the first session.
+      // #148, #1315, #2170: the last turn, and a thought opened in its place, beside the window:
+      // the ask, the steps (no control over them, no chevron, no rule, no indent), each thought
+      // one folded line, and the outcome. Takes the first session.
       await openProject();
       await page.eval(`document.querySelector(".row.session .pick, .row.session")?.click()`);
       await page.waitFor(`document.querySelector(".chat .turn")`, 30_000);
-      for (const state of ["open", "thought", "collapsed"]) {
+      for (const state of ["open", "thought"]) {
         if (state === "thought") await page.eval(`[...document.querySelectorAll(".chat .turn")].pop()?.querySelector(".thought .call-line")?.click()`);
-        if (state === "collapsed") await page.eval(`[...document.querySelectorAll(".chat .turn")].pop()?.querySelector(".steps-control[aria-expanded]")?.click()`);
         await sleep(500);
         say(`${state}: ${JSON.stringify(await page.eval(`(() => {
           const turn = [...document.querySelectorAll(".chat .turn")].pop();

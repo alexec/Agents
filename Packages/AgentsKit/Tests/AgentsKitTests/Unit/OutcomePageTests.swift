@@ -38,13 +38,11 @@ struct OutcomePageTests {
         TranscriptEntry.display(entries).turns()[0]
     }
 
-    /// No levels (#1315): a turn starts open, with its steps, and its *N steps* closes it
-    /// and opens it again.
-    @Test func turnsStartOpenAndToggleThroughCollapsed() {
+    /// No levels (#1315) and no control (#2170): a turn draws its steps until the chat lets
+    /// them go.
+    @Test func turnsStartWithTheirStepsUntilLetGo() {
         #expect(TurnDetail.initial == .open && TurnDetail.open.showsSteps)
-        #expect(!TurnDetail.collapsed.showsSteps)
-        #expect(TurnDetail.initial.toggled == .collapsed)
-        #expect(TurnDetail.collapsed.toggled == .open)
+        #expect(!TurnDetail.letGo.showsSteps)
     }
 
     @Test func aTurnIsItsAskAndEverythingAfterIt() throws {
