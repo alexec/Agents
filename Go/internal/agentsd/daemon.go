@@ -198,6 +198,7 @@ func (d *Daemon) Shutdown() {
 	d.stopAll()
 	d.waitAfterTurns(afterTurnLimit)
 	d.noteCutOffAgents(stoppedAt)
+	d.closeReport()
 	d.clearPickUps()
 	d.stopMCPEvents()
 	d.stopEvents()

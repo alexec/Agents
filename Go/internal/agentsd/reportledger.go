@@ -22,6 +22,9 @@ import (
 //
 // UTC, not the host's own hours (usage-history.json), so that machines in other time
 // zones add up into the same hour and day.
+//
+// The hours are kept in memory and saved at most every reportSaveAfter, after a send and
+// at shutdown, not on each usage update under costMu and timeMu (#2052).
 
 const (
 	reportHoursKept = 8 * 24
@@ -29,6 +32,7 @@ const (
 	reportPatience  = 30 * time.Second
 	// reportMostHours bounds one send: a host offline for a week sends its hours in turns.
 	reportMostHours = 48
+	reportSaveAfter = 30 * time.Second
 )
 
 type reportFile struct {
@@ -44,6 +48,11 @@ type reportBook struct {
 	reportMu   sync.Mutex
 	report     *reportFile
 	reportTick sync.Once
+	// reportSave is the save to come of hours changed since the last one; nil when the
+	// file holds them all.
+	reportSave *time.Timer
+	// reportClosed is set at shutdown: from then on a change is saved at once.
+	reportClosed bool
 	// reportSending keeps one send at a time.
 	reportSending sync.Mutex
 }
@@ -113,12 +122,12 @@ func pruneReport(r *reportFile, now time.Time) {
 	}
 }
 
-// addReport adds to an agent's project and runtime in the UTC hour at holds, and saves.
+// addReport adds to an agent's project and runtime in the UTC hour at holds.
 func (d *Daemon) addReport(a *wire.Agent, runtime string, at time.Time, add wire.UsageRollupRow) {
 	d.reportMu.Lock()
 	defer d.reportMu.Unlock()
 	d.addReportLocked(reportProject(a), runtime, utcHour(at), add)
-	d.saveReportLocked(at)
+	d.reportChangedLocked()
 }
 
 func (d *Daemon) addReportLocked(project, runtime, hour string, add wire.UsageRollupRow) {
@@ -135,7 +144,39 @@ func (d *Daemon) addReportLocked(project, runtime, hour string, add wire.UsageRo
 	r.Unsent[hour] = r.Seq
 }
 
+// reportChangedLocked saves the hours within reportSaveAfter, or at once after shutdown.
+func (d *Daemon) reportChangedLocked() {
+	if d.reportClosed {
+		d.saveReportLocked(time.Now())
+		return
+	}
+	if d.reportSave == nil {
+		d.reportSave = time.AfterFunc(reportSaveAfter, d.flushReport)
+	}
+}
+
+// flushReport saves the hours if any changed since the last save.
+func (d *Daemon) flushReport() {
+	d.reportMu.Lock()
+	defer d.reportMu.Unlock()
+	if d.reportSave != nil {
+		d.saveReportLocked(time.Now())
+	}
+}
+
+// closeReport saves what is unsaved at shutdown.
+func (d *Daemon) closeReport() {
+	d.flushReport()
+	d.reportMu.Lock()
+	d.reportClosed = true
+	d.reportMu.Unlock()
+}
+
 func (d *Daemon) saveReportLocked(now time.Time) {
+	if d.reportSave != nil {
+		d.reportSave.Stop()
+		d.reportSave = nil
+	}
 	r := d.reportLocked()
 	pruneReport(r, now)
 	if err := writeStore(d.reportPath(), r); err != nil {
@@ -170,7 +211,7 @@ func (d *Daemon) reportTime(agent wire.UUID, runtime string, segments []timeSegm
 			from = next
 		}
 	}
-	d.saveReportLocked(time.Now())
+	d.reportChangedLocked()
 }
 
 // rows is a period's rows in a steady order.

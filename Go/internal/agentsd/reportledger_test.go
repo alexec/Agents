@@ -96,3 +96,52 @@ func TestOldReportHoursGo(t *testing.T) {
 		t.Fatalf("%+v", r)
 	}
 }
+
+// A usage update writes no file (#2052): the hours are saved once, by the timer or at
+// shutdown, however many updates came.
+func TestReportHoursAreSavedOnceNotPerUpdate(t *testing.T) {
+	root := t.TempDir()
+	d, c := start(t, root)
+	d.SettingsDir = t.TempDir()
+	a := seeded(t, d, filepath.Join(t.TempDir(), "shop"), nil)
+	path := filepath.Join(root, "report-hours.json")
+	// Each update tells the cost to the client: read it, or the updates wait on it.
+	done := make(chan struct{})
+	defer close(done)
+	go func() {
+		for {
+			select {
+			case <-c.out:
+			case <-done:
+				return
+			}
+		}
+	}()
+
+	// A session's cost is its running total.
+	for i := 1; i <= 100; i++ {
+		d.bankSessionCost(a.ID, wire.Cost{Amount: float64(i) / 100, Currency: "USD"})
+	}
+	var file reportFile
+	if readStore(path, &file, ""); len(file.Hours) != 0 {
+		t.Fatalf("saved on an update: %+v", file)
+	}
+	d.flushReport()
+	if readStore(path, &file, ""); len(file.Hours) == 0 {
+		t.Fatal("not saved by the flush")
+	}
+
+	d.bankSessionCost(a.ID, wire.Cost{Amount: 2, Currency: "USD"})
+	d.Shutdown()
+	file = reportFile{}
+	readStore(path, &file, "")
+	var cost float64
+	for _, h := range file.Hours {
+		for _, row := range h {
+			cost += row.Cost["USD"]
+		}
+	}
+	if cost < 1.99 || cost > 2.01 {
+		t.Fatalf("not saved at shutdown: %v", cost)
+	}
+}
