@@ -2,6 +2,14 @@
 @import "./theme/paper.css";
 @import "./sidebar.css";
 
+/* 1rem is the root's size, so the root alone sets the scale of the page (#2135): two steps
+   over the browser's own size (18px at its default), which the person's zoom still scales.
+   The body's size is in rem of that root; before, the root was 13px and the body 0.8125 of
+   it. */
+html {
+  font-size: 112.5%;
+}
+
 html,
 body {
   margin: 0;
@@ -9,8 +17,11 @@ body {
   background: var(--paper-ground);
   color: var(--paper-ink);
   font-family: var(--font-text);
-  font-size: 0.8125rem;
   -webkit-font-smoothing: antialiased;
+}
+
+body {
+  font-size: 0.8125rem;
 }
 
 ::selection {
