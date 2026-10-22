@@ -12,7 +12,8 @@ control plane with no provider turned on uses only codes. A browser always pairs
 code from a signed-in client.
 
 The control plane uses the app's own Google, Apple and GitHub client ids. You do not register
-anything with them.
+anything with them. A build that you make from source needs ids of its own: see [Set up Google,
+Apple and GitHub sign-in for your own build](set-up-sign-in-for-your-own-build.md).
 
 ## Turn a provider on
 

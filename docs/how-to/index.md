@@ -16,6 +16,10 @@ something particular done.
   an iPad or a browser, change what it may do, and forget it.
 - [Use Agents in a browser](use-agents-in-a-browser.md): open Agents in Safari or Chrome on
   the Mac that runs Agents Host, pair it once, and forget it.
+- [Sign in with Google, Apple or GitHub](sign-in-with-google-apple-or-github.md): pair a
+  client with no code, and turn those sign-ins on for your control plane.
+- [Set up Google, Apple and GitHub sign-in for your own build](set-up-sign-in-for-your-own-build.md):
+  make your own ids for a build from source, and check that sign-in works.
 - [Add a server](add-a-server.md): make a Linux server, or another Mac, a host of your
   control plane.
 - [Invite someone](invite-someone.md): add another person to your control plane, change
