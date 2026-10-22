@@ -612,7 +612,7 @@ const ProjectFold = memo(function ProjectFold({ store, host, project, query, lin
           }}
           onContextMenu={(e) => openContextMenu(e, projectMenu)} {...holdForMenu(() => projectMenu)}
           onKeyDown={(e) => { if (isMenuKey(e)) openContextMenu(e, projectMenu); }}>
-          <span class="title">{project.isChat === true && <ChatMark />}{label}</span>
+          <span class="title">{label}</span>
           {/* A heading, as the groups' at the top (#587): who needs you is in Needs You, so no
               line under it and no dot; only a missing folder is said. */}
           {!project.exists && <span class="subtitle">Folder is missing</span>}
@@ -874,17 +874,6 @@ function moveWithKeys(e: KeyboardEvent): void {
       }
       break;
   }
-}
-
-/** The chat project's mark (#229): two bubbles drawn in the name's own grey (#694), as the window's is. */
-function ChatMark() {
-  return (
-    <svg class="project-chat" role="img" aria-label="chat project" viewBox="0 0 16 16" width="12" height="12"
-      fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round">
-      <path d="M2 3.5h7.5v5H5L2.5 10.5V8.5H2z" />
-      <path d="M11 6h3v5h-.5v2L11 11H7.5V9.5" />
-    </svg>
-  );
 }
 
 /** The groups a tab holding one project draws (#1089): Working and Unread are its sessions, in its list. */

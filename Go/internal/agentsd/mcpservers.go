@@ -47,7 +47,7 @@ func (d *Daemon) personalHome() string {
 	if h := os.Getenv("AGENTS_PERSONAL_HOME"); h != "" {
 		return h
 	}
-	return d.ChatHome
+	return d.PersonalHome
 }
 
 // orderedKeys is the keys of a JSON object in the file's own order.

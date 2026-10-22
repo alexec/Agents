@@ -95,7 +95,7 @@ func TestMCPServersAreChecked(t *testing.T) {
 	locked := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusUnauthorized) }))
 	defer locked.Close()
 	home := t.TempDir()
-	d.ChatHome = home
+	d.PersonalHome = home
 	os.MkdirAll(filepath.Join(home, ".agents"), 0o755)
 	entries := map[string]any{
 		"fake":   map[string]any{"command": self},

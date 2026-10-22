@@ -208,7 +208,7 @@ export function otherAgentsNote(git: GitView | undefined): string | null {
 
 /**
  * Why git's half of the list is missing, in the Remote's words (RemoteChangesPane.unavailable):
- * a chat project's folder (#229) is not a repository, and says so rather than nothing.
+ * a folder that is not a repository says so rather than nothing.
  */
 export function unavailableNote(git: GitView | undefined): string | null {
   if (!git || !("unavailable" in git)) return null;

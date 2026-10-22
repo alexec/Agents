@@ -164,7 +164,6 @@ var CallPresenceReport = Method[PresenceReport, Empty]{"presence/report"}
 var CallProjectsAdd = Method[ProjectRequest, ProjectSummary]{"projects/add"}
 var CallProjectsArchive = Method[ProjectRequest, ProjectSummary]{"projects/archive"}
 var CallProjectsBringBack = Method[BringBackRequest, BringBack]{"projects/bringBack"}
-var CallProjectsChatState = Method[Empty, ChatProjectState]{"projects/chatState"}
 var CallProjectsClone = Method[CloneRequest, ProjectSummary]{"projects/clone"}
 var CallProjectsClones = Method[Empty, []CloneSummary]{"projects/clones"}
 var CallProjectsDelete = Method[ProjectRequest, Empty]{"projects/delete"}

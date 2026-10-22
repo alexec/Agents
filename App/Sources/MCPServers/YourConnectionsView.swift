@@ -17,7 +17,7 @@ struct YourConnectionsView: View {
     @State private var again: DaemonAPI.Connection?
 
     private var projects: [DaemonAPI.ProjectSummary] {
-        model.work.projects.filter { $0.host == .mac && !$0.project.isArchived && $0.isChat != true }
+        model.work.projects.filter { $0.host == .mac && !$0.project.isArchived }
     }
 
     var body: some View {

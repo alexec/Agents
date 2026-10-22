@@ -92,10 +92,10 @@ func main() {
 	// uses, nor in a release.
 	d.RaiseByHand = buildinfo.Version == "dev" && !ordinaryRoot(cl.root)
 	if home := personalHome(cl); home != "" {
-		// The person's settings and chat project are in their home: a server's
+		// The person's settings are in their home: a server's
 		// (Daemon.swift's --serve), and the ordinary root's (StoreLocations.personalHome).
 		d.SettingsDir = filepath.Join(home, ".agents", "settings")
-		d.ChatHome = home
+		d.PersonalHome = home
 	}
 	// A root that joined follows its organisation's policy from its first call, also when
 	// started without the control network (#998, FR-013): only its control plane's key
@@ -118,7 +118,6 @@ func main() {
 		join(ctx, cl, d)
 	}
 	log.Printf("agentsd %s on %s, root %s", buildinfo.String(), platform(), cl.root)
-	d.EnsureChatProject()
 	// The restart itself, for a wait or a workflow that names it (#1219), and from now on
 	// a word once a minute that this host is alive.
 	d.SayRestarted()

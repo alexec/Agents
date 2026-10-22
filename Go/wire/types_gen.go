@@ -1570,28 +1570,6 @@ const ChartMarkLine ChartMark = "line"
 const ChartMarkPoint ChartMark = "point"
 const ChartMarkArea ChartMark = "area"
 
-type ChatProjectState struct {
-	Ready *ChatProjectStateReady `json:"ready,omitzero"`
-
-	Archived *ChatProjectStateArchived `json:"archived,omitzero"`
-
-	NoPersonalHome *struct{} `json:"noPersonalHome,omitzero"`
-
-	Failed *ChatProjectStateFailed `json:"failed,omitzero"`
-}
-
-type ChatProjectStateReady struct {
-	Folder URL `json:"folder"`
-}
-
-type ChatProjectStateArchived struct {
-	Folder URL `json:"folder"`
-}
-
-type ChatProjectStateFailed struct {
-	Message string `json:"message"`
-}
-
 // clients/announce, on a pairing connection.
 type ClientAnnounce struct {
 	ID UUID `json:"id"`
@@ -6150,8 +6128,6 @@ type ProjectSummary struct {
 	UnmeasuredAgents int64 `json:"unmeasuredAgents"`
 
 	RetiredCount int64 `json:"retiredCount"`
-
-	IsChat *bool `json:"isChat,omitzero"`
 
 	GuardedChanges []GuardedChange `json:"guardedChanges,omitzero"`
 

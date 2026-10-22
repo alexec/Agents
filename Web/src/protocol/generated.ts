@@ -1252,12 +1252,6 @@ export type ChartMark =
   | "point"
   | "area";
 
-export type ChatProjectState =
-  | { ready: { folder: URLString } }
-  | { archived: { folder: URLString } }
-  | { noPersonalHome: Record<string, never> }
-  | { failed: { message: string } };
-
 /** clients/announce, on a pairing connection. */
 export interface ClientAnnounce {
   id: UUID;
@@ -4802,7 +4796,6 @@ export interface ProjectSummary {
   costToDate: Record<string, number>;
   unmeasuredAgents: number;
   retiredCount: number;
-  isChat?: boolean;
   guardedChanges?: GuardedChange[];
   approvals?: Approval[];
   /**
@@ -7803,7 +7796,6 @@ export interface Methods {
   "presence/report": { params: PresenceReport; result: Empty };
   "projects/add": { params: ProjectRequest; result: ProjectSummary };
   "projects/archive": { params: ProjectRequest; result: ProjectSummary };
-  "projects/chatState": { params: Empty; result: ChatProjectState };
   "projects/clone": { params: CloneRequest; result: ProjectSummary };
   "projects/clones": { params: Empty; result: CloneSummary[] };
   "projects/delete": { params: ProjectRequest; result: Empty };
@@ -8058,7 +8050,6 @@ export const MethodTarget = {
   "presence/report": "host",
   "projects/add": "host",
   "projects/archive": "host",
-  "projects/chatState": "host",
   "projects/clone": "host",
   "projects/clones": "host",
   "projects/delete": "host",
@@ -8660,7 +8651,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ProjectPlugin: { required: ["project", "folder", "name", "carries"], optional: ["awaitingApproval"] },
   ProjectRemovedNotification: { required: ["folder"], optional: [] },
   ProjectRequest: { required: ["folder"], optional: [] },
-  ProjectSummary: { required: ["project", "name", "exists", "lastActivityAt", "counts", "costToDate", "unmeasuredAgents", "retiredCount"], optional: ["isChat", "guardedChanges", "approvals", "helperLimitsSetBy"] },
+  ProjectSummary: { required: ["project", "name", "exists", "lastActivityAt", "counts", "costToDate", "unmeasuredAgents", "retiredCount"], optional: ["guardedChanges", "approvals", "helperLimitsSetBy"] },
   ProjectWorktrees: { required: ["project", "worktrees"], optional: [] },
   ProjectsFindRequest: { required: [], optional: ["paths", "folders"] },
   ProjectsListRequest: { required: ["includeArchived"], optional: [] },

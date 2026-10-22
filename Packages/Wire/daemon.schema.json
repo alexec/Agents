@@ -3504,88 +3504,6 @@
         "area"
       ]
     },
-    "ChatProjectState": {
-      "anyOf": [
-        {
-          "type": "object",
-          "properties": {
-            "ready": {
-              "type": "object",
-              "properties": {
-                "folder": {
-                  "$ref": "#/definitions/URLString"
-                }
-              },
-              "required": [
-                "folder"
-              ],
-              "additionalProperties": false
-            }
-          },
-          "required": [
-            "ready"
-          ],
-          "additionalProperties": false
-        },
-        {
-          "type": "object",
-          "properties": {
-            "archived": {
-              "type": "object",
-              "properties": {
-                "folder": {
-                  "$ref": "#/definitions/URLString"
-                }
-              },
-              "required": [
-                "folder"
-              ],
-              "additionalProperties": false
-            }
-          },
-          "required": [
-            "archived"
-          ],
-          "additionalProperties": false
-        },
-        {
-          "type": "object",
-          "properties": {
-            "noPersonalHome": {
-              "type": "object",
-              "additionalProperties": {
-                "not": {}
-              }
-            }
-          },
-          "required": [
-            "noPersonalHome"
-          ],
-          "additionalProperties": false
-        },
-        {
-          "type": "object",
-          "properties": {
-            "failed": {
-              "type": "object",
-              "properties": {
-                "message": {
-                  "type": "string"
-                }
-              },
-              "required": [
-                "message"
-              ],
-              "additionalProperties": false
-            }
-          },
-          "required": [
-            "failed"
-          ],
-          "additionalProperties": false
-        }
-      ]
-    },
     "ClientAnnounce": {
       "type": "object",
       "description": "clients/announce, on a pairing connection.",
@@ -14441,9 +14359,6 @@
         },
         "retiredCount": {
           "type": "integer"
-        },
-        "isChat": {
-          "type": "boolean"
         },
         "guardedChanges": {
           "type": "array",

@@ -29,11 +29,10 @@ A project need not be a Git repository. Worktrees, branches and the git half of 
 agent's changes need one, and are simply not offered in a folder that is not; everything
 else works the same.
 
-One project is made for you: **chat**, at `~/.agents/chat` on each host. A chat is an
-ordinary session of it, so a quick question needs no project picked, and the folder every
-chat shares is where one keeps a file for the next. Each host makes its own the first time
-it starts, and leaves it alone after that: archived stays archived, and its files and
-`AGENTS.md` are yours. See [Chat without a project](../how-to/chat-without-a-project.md).
+No project is made for you (#2134). To ask an agent something that needs no repository,
+add any folder as a project, such as an empty one, and start a session in it. A host that
+still has the **chat** project at `~/.agents/chat` from an earlier version keeps it as an
+ordinary project: archive it, or keep using it, as any other.
 
 ## A project lives on one host
 

@@ -20,26 +20,17 @@ import (
 	"github.com/alexec/agents/Go/wire"
 )
 
-// The rest of a project's life, as DaemonCore+Projects, +ProjectDetection, +Cloning and
-// +ChatProject serve it on a server: archiving and deleting, its pin, its settings in
-// .agents/project.json, finding folders to add, cloning one, and the chat project.
+// The rest of a project's life, as DaemonCore+Projects, +ProjectDetection and +Cloning
+// serve it on a server: archiving and deleting, its pin, its settings in
+// .agents/project.json, finding folders to add, and cloning one.
 
 func noSuchProject(msg string) error { return &Error{Code: CodeNoSuchProject, Message: msg} }
 
 type projectState struct {
-	// ChatHome is where the chat project lives (~/.agents/chat): the account's home on a
-	// server, "" where there is none.
-	ChatHome    string
-	chatFailure string
-	cloneMu     sync.Mutex
-	clones      map[string]wire.CloneSummary
-}
-
-func (d *Daemon) chatFolder() string {
-	if d.ChatHome == "" {
-		return ""
-	}
-	return filepath.Join(d.ChatHome, ".agents", "chat")
+	// PersonalHome is the account's home on a server, "" where there is none.
+	PersonalHome string
+	cloneMu      sync.Mutex
+	clones       map[string]wire.CloneSummary
 }
 
 // summaryFor is the summary of one project, or false.
@@ -440,54 +431,6 @@ func (d *Daemon) findProjects(r wire.ProjectsFindRequest) []wire.FoundFolder {
 	return out
 }
 
-// MARK: the chat project (DaemonCore+ChatProject)
-
-// EnsureChatProject makes ~/.agents/chat and its record, unless it was archived.
-func (d *Daemon) EnsureChatProject() {
-	folder := d.chatFolder()
-	if folder == "" {
-		return
-	}
-	if fi, err := os.Stat(folder); err == nil && !fi.IsDir() {
-		d.chatFailure = folder + " is a file, so there is no chat project."
-		return
-	}
-	p, i, _ := d.projectRecord(folder)
-	if i >= 0 && p.ArchivedAt != nil {
-		return
-	}
-	if err := os.MkdirAll(folder, 0o755); err != nil {
-		d.chatFailure = err.Error()
-		return
-	}
-	if i < 0 {
-		d.editRecord(folder, func(*wire.Project) {})
-	}
-}
-
-func (d *Daemon) chatProjectState() wire.ChatProjectState {
-	folder := d.chatFolder()
-	if folder == "" {
-		return wire.ChatProjectState{NoPersonalHome: &struct{}{}}
-	}
-	url := store.FolderURL(folder)
-	if strings.HasSuffix(string(url), "/") == false {
-		url += "/"
-	}
-	p, i, _ := d.projectRecord(folder)
-	switch {
-	case i >= 0 && p.ArchivedAt != nil:
-		return wire.ChatProjectState{Archived: &wire.ChatProjectStateArchived{Folder: url}}
-	case i >= 0 && isDir(folder):
-		return wire.ChatProjectState{Ready: &wire.ChatProjectStateReady{Folder: url}}
-	}
-	why := d.chatFailure
-	if why == "" {
-		why = folder + " is not there. It is made again when this host's daemon starts."
-	}
-	return wire.ChatProjectState{Failed: &wire.ChatProjectStateFailed{Message: why}}
-}
-
 // MARK: cloning (DaemonCore+Cloning)
 
 type gitRemote struct{ url, host, path, folderName string }
@@ -678,18 +621,10 @@ func (d *Daemon) archiveApprovals(folder string) []wire.Approval {
 	return out
 }
 
-// dress is what a summary says beyond the record: the chat project, pinned unless the
-// person unpinned it, and the settings in .agents/project.json (#126), the record's own
-// older ones where the file has none.
+// dress is what a summary says beyond the record: the settings in .agents/project.json
+// (#126), the record's own older ones where the file has none.
 func (d *Daemon) dress(s *wire.ProjectSummary) {
 	folder := store.FolderPath(s.Project.Folder)
-	if chat := d.chatFolder(); chat != "" && folder == chat {
-		yes := true
-		s.IsChat = &yes
-		if s.Project.Pinned == nil {
-			s.Project.Pinned = &yes
-		}
-	}
 	if s.Project.Pinned != nil && !*s.Project.Pinned {
 		s.Project.Pinned = nil
 	}
@@ -751,9 +686,6 @@ func (d *Daemon) registerProjects() {
 	})
 	On(d, wire.CallProjectsFind, func(ctx context.Context, c *Client, r wire.ProjectsFindRequest) ([]wire.FoundFolder, error) {
 		return d.findProjects(r), nil
-	})
-	On(d, wire.CallProjectsChatState, func(ctx context.Context, c *Client, _ wire.Empty) (wire.ChatProjectState, error) {
-		return d.chatProjectState(), nil
 	})
 	On(d, wire.CallProjectsClone, func(ctx context.Context, c *Client, r wire.CloneRequest) (wire.ProjectSummary, error) {
 		return d.cloneProject(r)

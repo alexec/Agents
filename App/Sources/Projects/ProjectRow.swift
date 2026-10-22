@@ -23,7 +23,7 @@ struct ProjectRow: View {
     /// Remote's row and the web's do. A session starts from the fold's New session row.
     var onClick: () -> Void = {}
 
-    /// The name's colour, which the chat project's mark takes too (#694).
+    /// The name's colour.
     private var nameStyle: HierarchicalShapeStyle { summary.exists && !asHeading ? .primary : .secondary }
 
     /// The dot grows with the title beside it (#750).
@@ -33,14 +33,7 @@ struct ProjectRow: View {
         HStack(spacing: 8) {
             VStack(alignment: .leading, spacing: 1) {
                 HStack(spacing: 4) {
-                    // The chat project (#229) says what it is for, in its name's grey (#694).
                     // A pinned project shows no pin: being at the top says it.
-                    if summary.isChat == true {
-                        Image(systemName: "bubble.left.and.bubble.right")
-                            .imageScale(.small)
-                            .foregroundStyle(nameStyle)
-                            .accessibilityHidden(true)
-                    }
                     Text(label ?? summary.name)
                         .lineLimit(1)
                         .foregroundStyle(nameStyle)
@@ -141,7 +134,6 @@ struct ProjectRow: View {
     /// Said in words, because a coloured dot is not something VoiceOver can read.
     private var accessibilityLabel: String {
         var parts = [label ?? summary.name]
-        if summary.isChat == true { parts.append("chat project") }
         if summary.project.isPinned { parts.append("pinned") }
         if !summary.exists { parts.append("folder is missing") }
         if asHeading {

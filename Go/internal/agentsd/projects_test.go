@@ -12,7 +12,7 @@ import (
 )
 
 // Ports ProjectArchiveTests, ProjectDeleteTests, HelperLimitTests, DiskSpaceTests,
-// ProjectDetectionTests, ChatProjectTests and GitRemoteTests for a server.
+// ProjectDetectionTests and GitRemoteTests for a server.
 
 func TestArchiveUnarchiveAndDeleteAProject(t *testing.T) {
 	d, c := start(t, t.TempDir())
@@ -98,24 +98,18 @@ func TestFindingFolders(t *testing.T) {
 	}
 }
 
-func TestTheChatProject(t *testing.T) {
+// #2134: no chat project. A host with a personal home lists only the projects added.
+func TestNoChatProject(t *testing.T) {
 	d, c := start(t, t.TempDir())
 	defer d.Shutdown()
-	var state wire.ChatProjectState
-	json.Unmarshal(c.call(t, 1, "projects/chatState", nil), &state)
-	if state.NoPersonalHome == nil {
-		t.Fatalf("%+v", state)
-	}
-	d.ChatHome = t.TempDir()
-	d.EnsureChatProject()
-	json.Unmarshal(c.call(t, 2, "projects/chatState", nil), &state)
-	if state.Ready == nil || !strings.HasSuffix(string(state.Ready.Folder), "/.agents/chat/") {
-		t.Fatalf("%+v", state)
-	}
+	d.PersonalHome = t.TempDir()
 	var ps []wire.ProjectSummary
-	json.Unmarshal(c.call(t, 3, "projects/list", map[string]any{}), &ps)
-	if len(ps) != 1 || ps[0].IsChat == nil || !*ps[0].IsChat || ps[0].Project.Pinned == nil {
+	json.Unmarshal(c.call(t, 1, "projects/list", map[string]any{}), &ps)
+	if len(ps) != 0 {
 		t.Fatalf("%+v", ps)
+	}
+	if _, err := os.Stat(filepath.Join(d.PersonalHome, ".agents", "chat")); !os.IsNotExist(err) {
+		t.Fatalf("~/.agents/chat made: %v", err)
 	}
 }
 

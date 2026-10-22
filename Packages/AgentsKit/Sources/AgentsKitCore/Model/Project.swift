@@ -32,10 +32,8 @@ public struct Project: Codable, Hashable, Sendable, Identifiable {
     /// `.agents/project.json`. Nil is the defaults. Only ever in a summary; never kept in
     /// `projects.json`. Set only by `projects/setDiskSpace`, which agents cannot call.
     public var diskSpace: DiskThresholds?
-    /// Whether the person pinned it to the top of the sidebar. Nil is the default: pinned
-    /// for the chat project (#229), not for any other, so a chat project made before pins
-    /// is pinned without being written to. In a summary, what the host worked out from
-    /// that; in `projects.json`, only what the person chose. Set only by
+    /// Whether the person pinned it to the top of the sidebar. Nil is the default: not
+    /// pinned. In `projects.json`, only what the person chose. Set only by
     /// `projects/setPinned`, which agents cannot call.
     public var pinned: Bool?
 

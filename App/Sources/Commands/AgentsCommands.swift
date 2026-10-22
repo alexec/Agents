@@ -112,26 +112,12 @@ struct AgentsCommands: Commands {
             Button("New Session in a Worktree") { newSession(inWorktree: true) }
                 .keyboardShortcut("n", modifiers: [.command, .option])
                 .disabled(keyProject == nil || !model.draftWorktrees.canMakeNew)
-            // A chat in the project this Mac made for chats (#229), with no project to pick;
-            // gone while Settings ▸ Account ▸ Chat project is off (#694).
-            if !model.chatProjectSwitchedOff {
-                Button("New Chat") { newChat(on: .mac) }
-                    .keyboardShortcut("n", modifiers: [.command, .shift])
-                let servers = model.hostsWithChats.filter { $0 != .mac }
-                if !servers.isEmpty {
-                    Menu("New Chat On") {
-                        ForEach(servers, id: \.self) { host in
-                            Button(model.hosts.label(host)) { newChat(on: host) }
-                        }
-                    }
-                }
-            }
             Divider()
             Button("Add Project…") { requests.projectSheet = .chooseFolder() }
                 .keyboardShortcut("o")
             Button("Clone Project from Git URL…") { requests.projectSheet = .clone() }
                 .keyboardShortcut("o", modifiers: [.command, .shift])
-            // On a server (037), as New Chat On is.
+            // On a server (037).
             if !model.hosts.servers.isEmpty {
                 Menu("Add Project On") {
                     ForEach(model.hosts.servers, id: \.self) { host in
@@ -384,13 +370,6 @@ struct AgentsCommands: Commands {
             alert.messageText = "Agents can’t open in a browser"
             alert.informativeText = why
             alert.runModal()
-        }
-    }
-
-    /// The project's page with the keyboard in its prompt, which is where a session starts.
-    private func newChat(on host: HostID) {
-        Task {
-            if await model.newChat(on: host) { requests.focusPrompt() }
         }
     }
 
