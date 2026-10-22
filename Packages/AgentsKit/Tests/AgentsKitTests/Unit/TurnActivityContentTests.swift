@@ -99,7 +99,7 @@ struct TurnActivityContentTests {
     }
 
     @Test func blockedOnWhatTheAppCannotWatchNeedsYou() throws {
-        #expect(try endedNeedingYou(.blocked, block: Block()).line == "Blocked: The rest is yours.")
+        #expect(try endedNeedingYou(.blocked, block: Block()).line == "Waiting: The rest is yours.")
     }
 
     @Test func outcomeUnknownNeedsYou() throws {

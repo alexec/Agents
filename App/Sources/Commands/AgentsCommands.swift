@@ -337,7 +337,7 @@ struct AgentsCommands: Commands {
                 // Each project's count, not the list itself: the menu bar is drawn again
                 // whenever what it reads changes, and the list reads every session (#165).
                 .disabled(!projectsInListOrder.contains { model.work.shelf($0.key).toVisit > 0 })
-                .help("Needs attention or Blocked")
+                .help("Needs you")
             Divider()
             ForEach(Array(projectsInListOrder.prefix(9).enumerated()), id: \.element.key) { index, summary in
                 Button(summary.name) { model.showProject(summary.key) }
