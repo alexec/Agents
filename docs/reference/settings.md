@@ -40,7 +40,6 @@ Change one on any of them and the others follow. They are kept on your Mac, in
 | Device | Pane | Control | What it does |
 | --- | --- | --- | --- |
 | Mac | Appearance | **Appearance**: **System**, **Light**, **Dark** | Sets the app's look. **System** follows your Mac, and changes with it. |
-| Mac, web | Appearance | **Icon shows what agents are doing**, on or off | On (the default): the Blob on the Dock, or on the web page's tab, sleeps when nothing runs, smiles while agents work, and looks puzzled when a question waits. Off, it always smiles. |
 | Mac, iPhone, iPad, web | Appearance | **Show thoughts**, on or off | On: the chat shows each of the agent's thoughts as one folded line. Off (the default): they are not shown. The same on every device. See [Read a chat](../how-to/read-a-chat.md). |
 | Mac | View menu | **Zoom In**, **Zoom Out**, **Actual Size** | Makes the text of a Markdown page in front larger or smaller, as Safari and Preview do (#1419). A pinch does the same. Command-0 is **Actual Size** while a page is in front. |
 | Mac | Control plane | The control plane's version, and each host's | The running line says `agents-control` and its version. Each host says its own version, and a host too old for the control plane says what it is missing (#1748). |

@@ -7,7 +7,7 @@
 import { effect } from "@preact/signals";
 import type { Store } from "./model/store";
 import { alone } from "./route";
-import { faviconFor, iconMood, iconShowsMood, type MoodCounts } from "./model/iconMood";
+import { faviconFor, iconMood, type MoodCounts } from "./model/iconMood";
 import { hostAnswers } from "./model/capabilities";
 
 const settle = 500;
@@ -88,7 +88,7 @@ export function startPresence(store: Store): void {
   });
   // The Blob's mood on the favicon (#1317), changed only when the mood does.
   effect(() => {
-    const href = faviconFor[iconShowsMood.value ? iconMood(liveViews(store)) : "happy"];
+    const href = faviconFor[iconMood(liveViews(store))];
     const icon = document.querySelector<HTMLLinkElement>("link[rel=icon]");
     if (icon && icon.getAttribute("href") !== href) icon.setAttribute("href", href);
   });

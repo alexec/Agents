@@ -21,8 +21,4 @@ public enum IconMood: String, Sendable, CaseIterable {
         }
         self = working ? .happy : .asleep
     }
-
-    /// Where the switch in Settings ▸ Appearance is kept, per device: off draws the happy
-    /// Blob always.
-    public static let showsMoodKey = "iconShowsMood"
 }
