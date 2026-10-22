@@ -37,13 +37,16 @@ the page says so and names its issue.
 
 ## Not built yet
 
-Data governance is roadmap step T8 (#1001, `specs/1001-data-governance/`). **Redaction**
-is built: known token shapes are cut out of transcripts, `app-tools.jsonl` and `daemon.log`
-when they are written (see [Security overview](security-overview.md#logs)). These parts are
-planned, not built:
+Data governance is roadmap step T8 (#1001, `specs/1001-data-governance/`). Two parts are
+built:
 
-- **Full erasure.** Delete removes an agent's records on its machine. It does not remove
-  the runtime's own session files.
+- **Redaction:** known token shapes are cut out of transcripts, `app-tools.jsonl` and
+  `daemon.log` when they are written (see [Security overview](security-overview.md#logs)).
+- **Erasure:** Delete also removes the runtime's own copy, and a restore never brings a
+  deleted agent back (see [Data and retention](data-and-retention.md#erasure)).
+
+These parts are planned, not built:
+
 - **Export and import** of an agent or a project.
 - **Tamper-evident audit.** No hash chain on events, and no syslog or HTTP sink.
 

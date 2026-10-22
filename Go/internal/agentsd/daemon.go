@@ -20,6 +20,9 @@ type Daemon struct {
 	Store    *store.Store
 	handlers map[string]Handler
 
+	// erasures is the queue of runtime copies of deleted agents to erase (#1001).
+	erasures eraser
+
 	// Tunneler opens tunnels through the control plane, to a host that lends a sign-in;
 	// nil when this host has no control plane.
 	Tunneler Tunneler
@@ -112,6 +115,7 @@ func New(ctx context.Context, root string) (*Daemon, error) {
 	d.loadEvents()
 	d.beginMCPApprovals()
 	d.recover()
+	d.startErasures()
 	// How long nothing ran, and the waits open over it (#1219): before anything below can
 	// raise an event that wakes one, so its wake says so.
 	d.noteRestart()
