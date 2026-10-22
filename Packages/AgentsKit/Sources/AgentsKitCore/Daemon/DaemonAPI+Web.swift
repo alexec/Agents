@@ -328,6 +328,13 @@ public extension DaemonAPI {
                 Row(Method.policySet, params: PolicySet.self, result: PolicyKept.self, kind: .controlRequest),
                 Row(Method.policyStopAll, params: PolicyStopAllRequest.self, result: PolicyKept.self, kind: .controlRequest),
                 Row(Method.policyRaise, params: PolicyRaiseRequest.self, result: PolicyKept.self, kind: .controlRequest),
+                // The organisation's ways to the model (#999): Console ▸ Model Access, and Settings ▸ Policy.
+                Row(Method.orgRoutesMine, params: Empty.self, result: OrgRoutesMine.self, kind: .controlRequest),
+                Row(Method.orgRoutesList, params: Empty.self, result: OrgRouteList.self, kind: .controlRequest),
+                Row(Method.orgRoutesSet, params: OrgRouteSet.self, result: OrgRouteKept.self, kind: .controlRequest),
+                Row(Method.orgRoutesReplaceKey, params: OrgRouteReplaceKey.self, result: OrgRouteKept.self, kind: .controlRequest),
+                Row(Method.orgRoutesCheck, params: OrgRouteRequest.self, result: OrgRouteCheck.self, kind: .controlRequest),
+                Row(Method.orgRoutesRemove, params: OrgRouteRequest.self, result: Empty.self, kind: .controlRequest),
                 // The user scope (#1760): what follows the person to their machines, under You.
                 Row(Method.userSettings, params: Empty.self, result: UserSettings.self, kind: .controlRequest),
                 Row(Method.userSetSettings, params: UserSettingsPart.self, result: Empty.self, kind: .controlRequest),
@@ -456,6 +463,8 @@ public extension DaemonAPI {
                 Row(Notification.controlPolicyChanged, params: PolicyView.self, result: Empty.self,
                     kind: .controlNotification),
                 Row(Notification.controlStopAll, params: PolicyView.self, result: Empty.self,
+                    kind: .controlNotification),
+                Row(Notification.controlOrgRoutesChanged, params: Empty.self, result: Empty.self,
                     kind: .controlNotification),
             ]
         }

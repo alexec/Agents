@@ -66,12 +66,14 @@
 
 **Goal**: an admin manages routes and the two rules on the web page; everyone reads them. Runs beside Phase 2.
 
-- [ ] T029 [US2] Add the words of the org account (**From your organisation**, **Organisation · No plan limit**, the refusals of the contract) to `Packages/AgentsKit/Sources/AgentsKitCore/Runtimes/OrgAccountWords.swift` (new) with `OrgAccountWordsTests`, and to `Web/src/model/orgAccounts.ts` (new) with `Web/test/orgAccounts.test.mjs`.
-- [ ] T030 [US2] Web: `Web/src/views/ConsoleModelAccess.tsx` and a `modelAccess` section in `Web/src/model/console.ts` (group "Rules", after Policy): the routes, **Add Route** per kind with write-only secret fields, model map, groups, default for, **Check**, **Replace Key**, **Remove** with a question, machines that hold each route, tokens this month. Tests in `Web/test/console.test.mjs`.
-- [ ] T031 [US3] Console ▸ Policy (T5): **Reaches the model by** per runtime and **Antigravity's terms**, with the preview (FR-028).
+- [x] T029 [US2] Add the words of the org account (**From your organisation**, **Organisation · No plan limit**, the refusals of the contract) to `Packages/AgentsKit/Sources/AgentsKitCore/Runtimes/OrgAccountWords.swift` (new) with `OrgAccountWordsTests`, and to `Web/src/model/orgAccounts.ts` (new) with `Web/test/orgAccounts.test.mjs`.
+- [x] T030 [US2] Web: `Web/src/views/ConsoleModelAccess.tsx` and a `modelAccess` section in `Web/src/model/console.ts` (group "Rules", after Policy): the routes, **Add Route** per kind with write-only secret fields, model map, groups, default for, **Check**, **Replace Key**, **Remove** with a question, machines that hold each route, tokens this month. Tests in `Web/test/console.test.mjs`.
+- [x] T031 [US3] Console ▸ Policy (T5): **Reaches the model by** per runtime and **Antigravity's terms**, with the preview (FR-028).
 - [ ] T032 [US5] Console ▸ Reports: tokens by route, person and day (FR-021).
-- [ ] T033 [P] [US3] The read-only Policy pane (T5, `Shared/UI/OrgPolicyPane.swift`, `Web/src/views/settings/Policy.tsx`): the routes the person may use, and the Antigravity line (FR-029).
-- [ ] T034 [P] Docs: `docs/how-to/add-an-org-key-or-gateway.md`, `docs/reference/policy.md` (the two rules).
+- [x] T033 [P] [US3] The read-only Policy pane (T5, `Shared/UI/OrgPolicyPane.swift`, `Web/src/views/settings/Policy.tsx`): the routes the person may use, and the Antigravity line (FR-029).
+- [x] T034 [P] Docs: `docs/how-to/add-an-org-key-or-gateway.md`, `docs/reference/policy.md` (the two rules).
+
+**Built in the slice-4 lane (#999, Decided):** T029, T030, T031, T033, T034. The words are in `Runtimes/OrgAccountWords.swift` and `Web/src/model/orgAccounts.ts`; the hand-written Swift types of `orgRoutes/*` are in `Runtimes/OrgAccount.swift`, for WebSignatures. **Left:** T032 (Console ▸ Reports by route) and Model Access's "tokens this month": both need `route` on each usage roll-up row, which slice 2's T027 (hosts) adds, and the control plane's sum by route; the preview's "4 people use their own Claude sign-in" needs T5 slice 1b's `policy/preview`.
 
 **Checkpoint**: quickstart step 4.
 

@@ -4,12 +4,13 @@
 import { useEffect } from "preact/hooks";
 import { useSignal } from "@preact/signals";
 import type { Store } from "../../model/store";
-import type { OrgPolicy } from "../../protocol/generated";
+import type { OrgPolicy, OrgRouteMine } from "../../protocol/generated";
 import { fromWireDate } from "../../protocol/dates";
 import { go } from "../../route";
 import { describe } from "../../model/errors";
 import { changed, editInConsole, foot, none, resumeAll, resumeMessage, resumeTitle, rules, runningAgents, stopAll, stopFoot,
   stopMessage, stopTitle, stoppedBy, stoppedStrip, title, viewOf } from "../../model/orgPolicy";
+import { fromOrganisation, mineLine, noRoutes, routesFoot, routesTitle } from "../../model/orgAccounts";
 
 /** The red strip while the kill switch is on, and the time it went on. */
 export function StoppedStrip({ policy }: { policy: OrgPolicy | undefined }) {
@@ -58,6 +59,8 @@ export function KillSwitch({ store, policy, down, changedTo }: { store: Store; p
 
 export function PolicySection({ store, down }: { store: Store; down: boolean }) {
   const problem = useSignal<string | null>(null);
+  // The routes this person may use (#999); null from a control plane before them, which shows none.
+  const routes = useSignal<OrgRouteMine[] | null>(null);
   const admin = store.person.value?.role === "admin";
   const load = async () => {
     try {
@@ -67,7 +70,12 @@ export function PolicySection({ store, down }: { store: Store; down: boolean }) 
       problem.value = describe(error);
     }
   };
+  const loadRoutes = async () => {
+    routes.value = await store.link.call("orgRoutes/mine", {}).then((m) => m.routes, () => null);
+  };
   useEffect(() => { if (!down) void load(); }, [down]);
+  const routeChanges = store.orgRoutesChanges.value;
+  useEffect(() => { if (!down) void loadRoutes(); }, [down, routeChanges]);
   const view = store.orgPolicy.value;
   const policy = view?.policy;
   const list = policy ? rules(policy) : [];
@@ -90,6 +98,22 @@ export function PolicySection({ store, down }: { store: Store; down: boolean }) 
             </dl>
           )}
           {policy && <p class="quiet small">{changed(policy, fromWireDate(policy.issued), new Date())}</p>}
+          {routes.value && (
+            <>
+              <h4 class="section-head">{routesTitle}</h4>
+              {routes.value.length === 0 ? <p class="hint">{noRoutes}</p> : (
+                <ul class="policy-routes">
+                  {routes.value.map((r) => (
+                    <li key={r.id}>
+                      <span class="strong">{r.name}</span> <span class="quiet small">{fromOrganisation}</span><br />
+                      <span class="small">{mineLine(r)}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <p class="hint">{routesFoot}</p>
+            </>
+          )}
           {admin && (
             <>
               <div class="policy-kill">

@@ -45,9 +45,36 @@ public struct AccountProfile: Codable, Hashable, Sendable, Identifiable {
     public static let defaultName = "Default account"
 }
 
-/// How an account reaches the model (#840). Only a sign-in in a folder today.
+/// How an account reaches the model (#840): a sign-in in a folder of its own. An organisation's
+/// route (#999: `orgKey`, `gateway`) and any way a newer host names is kept whole as `other`, so
+/// the account list still decodes when a route reaches a machine before this client draws it.
 public enum AccountReach: Codable, Hashable, Sendable {
     case signIn(folder: String)
+    /// A way this build does not draw yet, as the host sent it: `{"orgKey": {"route": …}}`.
+    case other(JSONValue)
+
+    private enum Key: String, CodingKey { case signIn }
+    private struct Folder: Codable { var folder: String }
+
+    public init(from decoder: Decoder) throws {
+        let value = try JSONValue(from: decoder)
+        if case .object(let object) = value, let signIn = object[Key.signIn.rawValue],
+           let folder = try? signIn.decode(Folder.self) {
+            self = .signIn(folder: folder.folder)
+        } else {
+            self = .other(value)
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        switch self {
+        case .signIn(let folder):
+            var container = encoder.container(keyedBy: Key.self)
+            try container.encode(Folder(folder: folder), forKey: .signIn)
+        case .other(let value):
+            try value.encode(to: encoder)
+        }
+    }
 }
 
 public extension DaemonAPI {

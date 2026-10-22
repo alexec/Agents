@@ -1113,6 +1113,11 @@ button.remove:hover { opacity: 1; }
 .org-policy .budget-field input { width: 9em; text-align: right; }
 .org-policy .runtime-models { width: 16em; }
 .org-policy .preview { margin: 4px 0; padding-left: 18px; }
+.model-access { display: flex; flex-direction: column; gap: 8px; }
+.model-access .sheet-actions { display: flex; gap: 8px; align-items: center; justify-content: flex-end; max-width: 520px; }
+.model-access .route-actions { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; white-space: nowrap; }
+.org-policy textarea { font-family: var(--mono, ui-monospace, monospace); font-size: 0.75rem; }
+.policy-routes { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 4px; }
 .fleet-state::before { content: ""; display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 6px; background: currentColor; opacity: 0.5; vertical-align: 1px; }
 .fleet-state.online::before { background: var(--tint-success, #1e8a4c); opacity: 1; }
 .fleet-state.needsUpdate::before, .fleet-state.failed::before { background: var(--tint-failure); opacity: 1; }

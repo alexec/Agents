@@ -3,7 +3,8 @@
 // are OrgPolicyWords (Packages/AgentsKit/.../Model/OrgPolicy.swift) on the Mac and the Remote; the
 // same here, for Settings ▸ Policy and Console ▸ Policy. Below them, the Console's form: the policy
 // as fields an admin types in, back to a policy, and what a change does before it is saved.
-import type { AuditActor, CostLimits, FleetMachine, OrgPolicy, PolicyBudgets, PolicyRefusal, PolicyRuntimeRule, PolicySetBy, PolicyState, PolicyStopAll, PolicyView, WireDate }
+import type { AuditActor, CostLimits, FleetMachine, OrgPolicy, PolicyBudgets, PolicyReach, PolicyRefusal, PolicyRuntimeRule, PolicySetBy, PolicyState, PolicyStopAll,
+  PolicyView, WireDate }
   from "../protocol/generated";
 import type { CallFailed } from "../wire/link";
 import { Failure } from "../protocol/generated";
@@ -89,6 +90,43 @@ export function tokens(count: number): string {
   return `${count.toLocaleString("en-GB")} tokens`;
 }
 
+// The ways a runtime reaches the model (#999, T031).
+
+/** "own sign-in", "org key", "gateway". */
+export function reachName(reach: string): string {
+  return reach === "signIn" ? "own sign-in" : reach === "orgKey" ? "org key" : reach;
+}
+
+/** A runtime's reach rule in words: "Org key or gateway only", "Any way". */
+export function reachWords(reach: readonly string[]): string {
+  const ways = (["signIn", "orgKey", "gateway"] as const).filter((w) => reach.includes(w));
+  if (ways.length === 3) return "Any way";
+  const named = ways.map(reachName).join(" or ");
+  return `${named.charAt(0).toUpperCase()}${named.slice(1)} only`;
+}
+
+/** Console ▸ Policy's choice per runtime, as Alex's mock-up names them. */
+export type ReachChoice = "any" | "org" | "signIn";
+export const reachChoices: readonly ReachChoice[] = ["any", "org", "signIn"];
+export const reachChoiceNames: Record<ReachChoice, string> = { any: "Any way", org: "Org key or gateway only", signIn: "Own sign-in only" };
+
+export function reachChoiceOf(reach: readonly PolicyReach[] | undefined): ReachChoice {
+  if (!reach) return "any";
+  if (reach.length === 1 && reach[0] === "signIn") return "signIn";
+  if (!reach.includes("signIn") && reach.length > 0) return "org";
+  return "any";
+}
+
+export function reachOf(choice: ReachChoice): PolicyReach[] | undefined {
+  return choice === "org" ? ["orgKey", "gateway"] : choice === "signIn" ? ["signIn"] : undefined;
+}
+
+/** Antigravity's terms, as Console ▸ Policy names the choices. */
+export const termsChoices = ["show", "accepted", "refuse"] as const;
+export const termsNames: Record<(typeof termsChoices)[number], string> = {
+  show: "Show the notice", accepted: "Reviewed by your organisation", refuse: "Do not allow",
+};
+
 export interface Rule {
   name: string;
   title: string;
@@ -103,6 +141,8 @@ function list(names: readonly string[]): string {
 function runtimeWords(runtimes: Record<string, PolicyRuntimeRule>): string {
   const ids = Object.keys(runtimes).sort((a, b) => runtimeName(a).localeCompare(runtimeName(b)));
   if (ids.length === 0) return "None";
+  // Each runtime named for its ways to the model only (#999).
+  if (runtimeIDs.every((id) => runtimes[id] && !runtimes[id]!.models)) return "Every runtime";
   return "Only " + ids.map((id) => {
     const models = runtimes[id]!.models;
     if (!models) return runtimeName(id);
@@ -133,7 +173,14 @@ export function rules(p: OrgPolicy): Rule[] {
   const out: Rule[] = [];
   if (p.modeCeiling) out.push({ name: "modeCeiling", title: "Modes", words: `Up to ${modeNames[p.modeCeiling] ?? p.modeCeiling}` });
   if (p.sandbox === "required") out.push({ name: "sandbox", title: "Command sandbox", words: "Required" });
-  if (p.runtimes) out.push({ name: "runtimes", title: "Runtimes", words: runtimeWords(p.runtimes) });
+  if (p.runtimes) {
+    out.push({ name: "runtimes", title: "Runtimes", words: runtimeWords(p.runtimes) });
+    // Each runtime's ways to the model (#999).
+    for (const id of Object.keys(p.runtimes).sort((a, b) => runtimeName(a).localeCompare(runtimeName(b)))) {
+      const reach = p.runtimes[id]!.reach;
+      if (reach) out.push({ name: `runtimes.${id}.reach`, title: `${runtimeName(id)} reaches the model by`, words: reachWords(reach) });
+    }
+  }
   if (p.marketplaces) {
     out.push({ name: "marketplaces", title: "Marketplaces", words: list(p.marketplaces.allowed) });
     out.push({ name: "marketplaces.customServers", title: "MCP servers added by hand",
@@ -233,6 +280,9 @@ export interface PolicyForm {
   limitPassThrough: boolean;
   passThrough: string;
   requireFollowing: boolean;
+  /** Each runtime's ways to the model (#999): any way when absent. */
+  reach: Record<string, ReachChoice>;
+  antigravityTerms: (typeof termsChoices)[number];
 }
 
 function names(text: string): string[] {
@@ -269,6 +319,8 @@ export function formOf(p: OrgPolicy | undefined): PolicyForm {
     limitPassThrough: p?.environment !== undefined,
     passThrough: p?.environment?.passThrough.join(", ") ?? "",
     requireFollowing: p?.requireFollowing === true,
+    reach: Object.fromEntries(Object.entries(p?.runtimes ?? {}).filter(([, r]) => r.reach).map(([id, r]) => [id, reachChoiceOf(r.reach)])),
+    antigravityTerms: p?.notices?.antigravityTerms ?? "show",
   };
 }
 
@@ -300,20 +352,32 @@ export function policyOf(form: PolicyForm, base: OrgPolicy | undefined, me: Audi
   };
   set("modeCeiling", form.mode === "" ? undefined : form.mode);
   set("sandbox", form.sandboxRequired ? "required" : undefined);
-  if (form.limitRuntimes) {
+  // A runtime's ways to the model sit on its rule (#999), so a reach rule with no runtime list names every runtime.
+  const reached = Object.entries(form.reach).some(([, c]) => c !== "any");
+  if (form.limitRuntimes || reached) {
     const runtimes: Record<string, PolicyRuntimeRule> = {};
     for (const [id, field] of Object.entries(form.runtimes)) {
-      if (!field.on) continue;
+      if (form.limitRuntimes && !field.on) continue;
       const rule: PolicyRuntimeRule = { ...base?.runtimes?.[id] };
       const models = names(field.models);
-      if (models.length > 0) rule.models = models;
+      if (form.limitRuntimes && models.length > 0) rule.models = models;
       else delete rule.models;
+      const choice = form.reach[id] ?? "any";
+      // A rule of the kind the form does not name (orgKey alone) is kept while its choice is not changed.
+      const kept = base?.runtimes?.[id]?.reach;
+      const reach = kept && reachChoiceOf(kept) === choice ? kept : reachOf(choice);
+      if (reach) rule.reach = reach;
+      else delete rule.reach;
       runtimes[id] = rule;
     }
     set("runtimes", runtimes);
   } else {
     set("runtimes", undefined);
   }
+  const notices = { ...base?.notices };
+  if (form.antigravityTerms === "show") delete notices.antigravityTerms;
+  else notices.antigravityTerms = form.antigravityTerms;
+  set("notices", Object.keys(notices).length > 0 ? notices : undefined);
   set("marketplaces", form.limitMarketplaces
     ? { allowed: names(form.marketplaces), customServers: form.refuseCustomServers ? "refuse" : "allow" } : undefined);
   const daily = amount(form.daily), perAgent = amount(form.perAgent);
@@ -367,7 +431,7 @@ export function changes(before: OrgPolicy | undefined, after: OrgPolicy): string
  * US4 4): no runtime left, runtimes a required sandbox refuses, runtimes a budget refuses, and
  * machines that cannot follow a policy.
  */
-export function warnings(p: OrgPolicy, machines: readonly FleetMachine[] | undefined): string[] {
+export function warnings(p: OrgPolicy, machines: readonly FleetMachine[] | undefined, routes?: readonly { runtimes: string[] }[]): string[] {
   const out: string[] = [];
   const allowed = p.runtimes ? Object.keys(p.runtimes) : [...runtimeIDs];
   const runnable = allowed.filter((id) => !(p.notices?.antigravityTerms === "refuse" && id === "antigravity"));
@@ -386,6 +450,16 @@ export function warnings(p: OrgPolicy, machines: readonly FleetMachine[] | undef
       out.push(refused.length === 1
         ? `The budget refuses ${names(refused)}: its turns report neither a cost nor tokens. Allow it by name to keep it.`
         : `The budget refuses ${names(refused)}: their turns report neither a cost nor tokens. Allow them by name to keep them.`);
+    }
+  }
+  // The org path only, with no route for it in Model Access (#999): nobody can start that runtime.
+  if (routes) {
+    for (const id of runnable) {
+      const reach = p.runtimes?.[id]?.reach;
+      if (!reach || reach.includes("signIn")) continue;
+      if (!routes.some((r) => r.runtimes.includes(id))) {
+        out.push(`${runtimeName(id)} can reach the model only by an org key or gateway, and no route in Model Access serves it: nobody can start ${runtimeName(id)}.`);
+      }
     }
   }
   const old = (machines ?? []).filter((m) => !m.host.capabilities?.includes("host.policy/1"));

@@ -21,6 +21,7 @@ import { BotsSection, PeopleSection } from "./People";
 import { GroupsSection } from "./Groups";
 import { ReportPolicyPage, policyNotSaved } from "./ConsolePolicy";
 import { OrgPolicyPage, orgPolicyNotSaved } from "./ConsoleOrgPolicy";
+import { ModelAccessPage } from "./ConsoleModelAccess";
 import { followsWords } from "../model/orgPolicy";
 import { AuditPage, RequestsPage, requestCount } from "./ConsoleRecords";
 import { TeamWorkflowsPage } from "./ConsoleWorkflows";
@@ -98,6 +99,7 @@ function ConsoleSection({ store, section, down }: { store: Store; section: Secti
     case "people": return <PeoplePage store={store} down={down} />;
     case "machines": return <MachinesPage store={store} down={down} />;
     case "policy": return <OrgPolicyPage store={store} down={down} />;
+    case "modelAccess": return <ModelAccessPage store={store} down={down} />;
     case "reportPolicy": return <ReportPolicyPage store={store} down={down} />;
     case "requests": return <RequestsPage store={store} down={down} />;
     case "workflows": return <TeamWorkflowsPage store={store} down={down} />;

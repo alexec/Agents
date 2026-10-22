@@ -69,3 +69,8 @@ lists the ways allowed (`signIn`, `orgKey`, `gateway`). Its `notices.antigravity
 says whether members see Google's terms notice for Antigravity (`show`), not see it
 (`accepted`), or cannot use Antigravity (`refuse`). A machine needs `host.org-routes/1` to
 follow either rule.
+
+## See also
+
+- [Add an org key or a gateway](../how-to/add-an-org-key-or-gateway.md): Console ▸ Model
+  Access, and the policy's two rules.
