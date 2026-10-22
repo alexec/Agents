@@ -13,8 +13,6 @@ struct ContentView: View {
     let terminal: ProjectTerminalFrame
     @State private var sidebarStates = SidebarStates()
     @State private var webHolders = WebHolders()
-    /// Settings ▸ Appearance ▸ the icon's mood (#1317), per Mac.
-    @AppStorage(IconMood.showsMoodKey, store: WindowDefaults.store) private var iconShowsMood = true
     /// Which columns are showing. The projects stay put: moving between them is the
     /// ordinary thing to do here, and a list that hides itself when used is a list you
     /// have to keep fetching back.
@@ -386,9 +384,9 @@ struct ContentView: View {
         .onChange(of: model.needsPersonCount, initial: true) { _, count in
             NSApp.dockTile.badgeLabel = count > 0 ? "\(count)" : nil
         }
-        // How the agents are, on the Dock tile's Blob (#1317). Set only when the mood or
-        // the switch changes; the image changes with no animation.
-        .onChange(of: iconShowsMood ? model.iconMood : .happy, initial: true) { _, mood in
+        // How the agents are, on the Dock tile's Blob (#1317), always (#2156). Set only when
+        // the mood changes; the image changes with no animation.
+        .onChange(of: model.iconMood, initial: true) { _, mood in
             DockMood.show(mood)
         }
     }
