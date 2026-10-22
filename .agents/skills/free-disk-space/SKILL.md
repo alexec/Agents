@@ -79,16 +79,18 @@ df -k "$P" | tail -1
 ## 3. Bound the build cache
 
 Bound the build cache every worktree shares (#234). It is outside every worktree,
-everything in it can be fetched or compiled again, and the script leaves each part alone
-while a build of that kind is running. The Swift part and Go's part each have a bound of
+everything in it can be fetched or compiled again, and the script leaves alone each folder
+that a running build uses, and Go's part while Go runs. The Swift part and Go's part each have a bound of
 their own, so a large Go cache never costs the Swift one:
 
 ```sh
-scripts/build-cache.sh prune                                # low: Swift 30 GB, Go 10 GB
-scripts/build-cache.sh prune --max-gb 10 --go-max-gb 3      # critical
+scripts/build-cache.sh prune                                # low: 15 GB, of it Go 3 GB
+scripts/build-cache.sh prune --max-gb 6 --go-max-gb 1       # critical
 ```
 
-If it exits non-zero, say so with its output in the report, and go on.
+Each build also prunes it to 15 GB behind itself (#2346), so this step frees little
+unless a bound was raised. The last line says `after: <GB>; freed <GB>`: put both in the
+report. If it exits non-zero, say so with its output in the report, and go on.
 
 ## 4. Free build output
 
@@ -117,12 +119,16 @@ A folder git ignores and tracks nothing in is build output, by the project's own
 At both levels, for each archived path `W` that passed step 2.4 and step 4:
 
 ```sh
+git -C "$P" fetch -q origin                                        # the remote branches now
 git -C "$W" symbolic-ref -q HEAD                                   # on a branch
 [ -z "$(git -C "$W" status --porcelain --untracked-files=all)" ]  # nothing uncommitted
+[ -z "$(git -C "$W" rev-list -n 1 HEAD --not --remotes)" ]        # every commit pushed
 git -C "$P" worktree remove "$W"                                   # no --force
 ```
 
-If any line fails, keep it and say why. A detached HEAD is kept: its commits are on no
+If any line fails, keep it and say why. The fourth line passes only when HEAD is on a
+remote branch or on main: a commit that no remote branch has is work that is not pushed,
+and its worktree stays. A detached HEAD is kept: its commits are on no
 branch. The branch stays, with every commit: never delete it. Git itself refuses to remove
 a worktree with changes or untracked files, or one that is locked.
 

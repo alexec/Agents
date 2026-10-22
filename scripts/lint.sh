@@ -220,6 +220,7 @@ run_checks() {
 	python3 scripts/check-deploy-bounds.py || status=1
 	python3 -m unittest discover -s .agents/skills/ship-app/scripts -p 'test_*.py' -q || status=1
 	sh scripts/version.sh --selftest || status=1
+	bash scripts/build-cache-test.sh || status=1
 	python3 .agents/skills/release/scripts/capability-changes.py --selftest || status=1
 	python3 .agents/skills/release/scripts/advisory.py --selftest || status=1
 	return $status
