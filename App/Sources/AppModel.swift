@@ -588,14 +588,11 @@ final class AppModel {
         draftWorktree = nil
     }
 
-    /// The project New Session at the top of the sidebar starts in (#495): the last one a
-    /// new session was opened in, while it is still a live project; otherwise the selected
-    /// one, otherwise the first.
+    /// The project New Session at the top of the sidebar starts in (#495, #2160):
+    /// `NewSessionProject`, the Remote's rule too.
     var newSessionProject: ProjectKey? {
-        let live = liveProjects.map(\.key)
-        if let remembered = rememberedNewSessionProject, live.contains(remembered) { return remembered }
-        if let selected = selectedProjectKey, live.contains(selected) { return selected }
-        return live.first
+        NewSessionProject.choose(live: liveProjects.map(\.key), remembered: rememberedNewSessionProject,
+                                 selected: selectedProjectKey)?.key
     }
 
     private var rememberedNewSessionProject: ProjectKey? =
@@ -4676,6 +4673,8 @@ final class AppModel {
         do {
             let id = try await draftHostClient.call(DaemonAPI.Method.agentsStart, request, returning: UUID.self)
             draftID = nil
+            // The last project used is the one a session was started in, from any window (#2160).
+            rememberNewSessionProject(ProjectKey(host: draftHost, folder: cwd))
             // Back to the project folder, and the list fetched again: the start may
             // have made a worktree, and it has put an agent in one.
             draftWorktree = nil

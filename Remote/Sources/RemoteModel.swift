@@ -826,22 +826,26 @@ final class RemoteModel {
     }
     var selectedSummary: DaemonAPI.ProjectSummary? { work.project(selectedProject) }
 
-    /// The project New Session at the top of the sidebar starts in (#495, #498): the last
-    /// one a new session was opened in, while it is still a live project; otherwise the
-    /// selected one, otherwise the first. The window's rule.
+    /// The project New Session at the top of the sidebar starts in (#495, #498, #2160): the
+    /// window's rule, `NewSessionProject`. A change of choice is said in remote.log.
     var newSessionProject: ProjectKey? {
-        let live = projects.map(\.key)
-        if let remembered = rememberedNewSessionProject, live.contains(remembered) { return remembered }
-        if let summary = selectedSummary, live.contains(summary.key) { return summary.key }
-        return live.first
+        let chosen = NewSessionProject.choose(live: projects.map(\.key), remembered: rememberedNewSessionProject,
+                                              selected: selectedSummary?.key)
+        if chosen != saidNewSessionProject {
+            saidNewSessionProject = chosen
+            note("new session: \(chosen?.sentence ?? "no project")")
+        }
+        return chosen?.key
     }
+    @ObservationIgnored private var saidNewSessionProject: NewSessionProject?
 
     private var rememberedNewSessionProject: ProjectKey? =
         UserDefaults.standard.string(forKey: RemoteModel.newSessionProjectDefault).flatMap(ProjectKey.init(stored:))
 
     static let newSessionProjectDefault = "newSessionProject"
 
-    private func rememberNewSessionProject(_ key: ProjectKey) {
+    /// Every way into a project's New session calls this, and a start in it (#2160).
+    func rememberNewSessionProject(_ key: ProjectKey) {
         guard rememberedNewSessionProject != key else { return }
         rememberedNewSessionProject = key
         UserDefaults.standard.set(key.stored, forKey: Self.newSessionProjectDefault)
@@ -1586,6 +1590,10 @@ final class RemoteModel {
     ///   when a lost answer is settled later, perhaps while they read something else,
     ///   and taking the screen from them would be the surprise.
     private func started(_ id: UUID, in folder: URL, open: Bool = true) async {
+        // The last project used is the one a session was started in, from any window (#2160).
+        if let key = work.project(folder)?.key ?? work.agent(id).map({ ProjectKey(host: $0.host, folder: folder) }) {
+            rememberNewSessionProject(key)
+        }
         unsettledStart = nil
         startWorktree = nil
         // Only now: a draft is kept until the agent it was typed for exists (FR-017).
@@ -3853,7 +3861,8 @@ final class RemoteModel {
         keeper.note(draft.text, draft.attachments, in: project)
         StartDraftKeeper.shared.flush()
         openActivity = nil
-        sidebarItem = .project(ProjectKey(host: .mac, folder: project))
+        // With its own host: a server's project kept as the Mac's was never found again (#2160).
+        sidebarItem = .project(work.project(project)?.key ?? ProjectKey(host: .mac, folder: project))
     }
 
     /// Every volume on the Mac low on space (#196), for the strip under the banner. A Mac
