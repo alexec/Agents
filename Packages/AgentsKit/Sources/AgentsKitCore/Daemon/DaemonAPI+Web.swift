@@ -340,11 +340,12 @@ public extension DaemonAPI {
                 // no Swift types; the shapes are Packages/Wire's.
                 Row("groups/setRole", params: JSONValue.self, result: JSONValue.self, kind: .controlRequest),
                 Row("people/removeRequests", params: JSONValue.self, result: JSONValue.self, kind: .controlRequest),
-                // Catalogue governance (#2019, M5): the Console's and the web page's only, so no Swift types.
+                // Catalogue governance (#2019, M5): a person's ask in Settings ▸ Policy, on all three
+                // (#2335); the rest are the Console's and the web page's only, so no Swift types.
+                Row(Method.governanceRequest, params: CatalogAsk.self, result: CatalogRequest.self, kind: .controlRequest),
+                Row(Method.governanceRequests, params: Empty.self, result: CatalogRequestList.self, kind: .controlRequest),
                 Row("governance/approvals", params: JSONValue.self, result: JSONValue.self, kind: .controlRequest),
                 Row("governance/decide", params: JSONValue.self, result: JSONValue.self, kind: .controlRequest),
-                Row("governance/request", params: JSONValue.self, result: JSONValue.self, kind: .controlRequest),
-                Row("governance/requests", params: JSONValue.self, result: JSONValue.self, kind: .controlRequest),
                 Row("governance/revoke", params: JSONValue.self, result: JSONValue.self, kind: .controlRequest),
                 Row("governance/usage", params: JSONValue.self, result: JSONValue.self, kind: .controlRequest),
                 // The read API's tokens and the OTLP exporter (#2019): the Console's only.
@@ -509,7 +510,8 @@ public extension DaemonAPI {
                     kind: .controlNotification),
                 Row(Notification.controlOrgRoutesChanged, params: Empty.self, result: Empty.self,
                     kind: .controlNotification),
-                Row("control/governanceRequested", params: JSONValue.self, result: Empty.self, kind: .controlNotification),
+                Row(Notification.controlGovernanceRequested, params: CatalogRequest.self, result: Empty.self,
+                    kind: .controlNotification),
             ]
         }
     }

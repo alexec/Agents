@@ -29,7 +29,7 @@ extension DaemonAPI.Method {
 }
 
 extension DaemonAPI {
-    public enum CatalogKind: String, Codable, Sendable {
+    public enum CatalogKind: String, Codable, Hashable, Sendable {
         case skills
         case mcp
     }

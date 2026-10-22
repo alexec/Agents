@@ -9,7 +9,7 @@ struct PolicySettingsRow: View {
     var body: some View {
         if !model.needsPairing {
             NavigationLink {
-                OrgPolicyPane(control: model.controlPlane, isAdmin: model.people.you?.isAdmin == true)
+                OrgPolicyPane(control: model.controlPlane, people: model.people)
                     .navigationTitle(OrgPolicyWords.title)
                     .navigationBarTitleDisplayMode(.inline)
             } label: {

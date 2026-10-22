@@ -16,6 +16,9 @@ final class PeopleState {
     private(set) var links = ChannelLinkRequestQueue()
     /// Goes up on `control/linksChanged`, so an open Control plane ▸ Channels loads again.
     private(set) var linksRevision = 0
+    /// Goes up on `control/governanceRequested` (#2335), so Settings ▸ Policy loads the person's
+    /// own requests again.
+    private(set) var governanceRevision = 0
     /// The people an admin can send a link request on to (#1762); empty for a member.
     private(set) var linkPeople: [DaemonAPI.PersonRow] = []
     /// Who this client belongs to, as `control/status` said. Nil from an older control plane.
@@ -146,6 +149,8 @@ final class PeopleState {
             }
         case DaemonAPI.Notification.controlLinksChanged:
             linksRevision += 1
+        case DaemonAPI.Notification.controlGovernanceRequested:
+            governanceRevision += 1
         case DaemonAPI.Notification.controlPeopleChanged:
             // A role changed or a person went: who this is, what they may approve, and the list.
             await connected(control)

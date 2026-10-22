@@ -219,7 +219,7 @@ struct SettingsWindow: View {
         case .signIn:
             FormColumn { SignInPane(control: model.controlRequests, revision: model.people.revision) }
         case .policy:
-            FormColumn { OrgPolicyPane(control: model.controlRequests, isAdmin: model.people.you?.isAdmin == true) }
+            FormColumn { OrgPolicyPane(control: model.controlRequests, people: model.people) }
         }
     }
 
