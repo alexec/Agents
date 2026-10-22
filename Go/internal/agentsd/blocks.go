@@ -164,12 +164,9 @@ func (d *Daemon) blockedNote(b *wire.Block) string {
 	for _, w := range b.Waits {
 		named = append(named, "“"+d.waitName(w)+"”")
 	}
-	byItself := len(named) > 0 || b.CheckAgainAt != nil
-	group := "Blocked"
-	if byItself {
-		group = "Waiting"
-	}
-	note := "Recorded. The person will see this conversation under \"" + group + "\"."
+	// Every new block names agents or a time (until_minutes is required), so it is always
+	// under Waiting (#2045).
+	note := "Recorded. The person will see this conversation under \"Waiting\"."
 	switch {
 	case len(named) == 1:
 		note += " You will be resumed when " + named[0] + " has finished"

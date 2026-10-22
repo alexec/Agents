@@ -60,7 +60,9 @@ public enum WorkOutcome: String, Codable, Hashable, Sendable, CaseIterable {
         case .needsAnswer: return "Waiting on your answer"
         case .partlyDone: return "Partly done"
         case .stuck: return "Stuck"
-        case .blocked: return "Blocked"
+        // An agent that waits on other agents or a time is waiting, not blocked (#2045). The
+        // wire keeps `blocked`, which workflows and old records use.
+        case .blocked: return "Waiting"
         }
     }
 
@@ -170,14 +172,14 @@ public struct WorkReport: Codable, Hashable, Sendable {
     }
 
     /// A blocked report whose block has not yet cleared: under Waiting when the app will
-    /// resume it (`resumesByItself`), and under Blocked when only the person can.
+    /// resume it (`resumesByItself`), and under Needs you when only the person can.
     public var isOpenBlock: Bool {
         outcome == .blocked && block?.isOpen != false
     }
 
     /// An open block the app will clear by itself: it names agents to wait for, or a
-    /// time to check again. The rest — a block that named nothing and gave no time —
-    /// waits for the person, and is the only kind still called Blocked.
+    /// time to check again. The rest — a block that named nothing and gave no time, which
+    /// only an old record has — waits for the person.
     public var resumesByItself: Bool {
         guard isOpenBlock, let block else { return false }
         return !block.waits.isEmpty || block.checkAgainAt != nil

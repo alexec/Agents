@@ -473,7 +473,7 @@
       "shape" : "needsYou",
       "symbol" : "exclamationmark.circle.fill",
       "tinted" : true,
-      "words" : "Blocked"
+      "words" : "Waiting"
     },
     "input" : {
       "agent" : {
@@ -513,7 +513,7 @@
       "shape" : "needsYou",
       "symbol" : "exclamationmark.circle.fill",
       "tinted" : true,
-      "words" : "Blocked"
+      "words" : "Waiting"
     },
     "input" : {
       "agent" : {
