@@ -75,7 +75,19 @@ These stay behind:
 - the agent's events, until they are 7 days old;
 - the backups that hold it, until they age out (a restore skips it).
 
-**Export and import** of an agent or a project are planned (T8, #1001).
+## Export and import
+
+**Export…** in an agent's menu, and **Export Agents…** in a project's, on the Mac, the
+Remote and the web page, give a `.tar.gz` of the agent, or of every agent of the project
+(T8, #1001). It is in the backup format: each agent's record, conversation, turn summaries
+and tool log. It holds no secret, no usage history and no other agent.
+
+**Import Agents…** in a project's menu sends the file to that project's machine. Its agents
+come back archived, to read and search. They are never run there, and bring no MCP servers.
+An agent that the machine has already, or that it deleted (`erased.json`), is skipped.
+
+The machine makes an export in its `Outgoing` folder and an import arrives in `Incoming`.
+Each goes once it is read or imported, or after an hour untouched.
 
 ## Backups
 

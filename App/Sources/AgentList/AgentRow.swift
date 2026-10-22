@@ -344,9 +344,12 @@ struct AgentRow: View {
                         .disabled(isActing)
                 }
             }
+            Divider()
+            // Its record and transcript as a .tar.gz, to keep or import elsewhere (#1001).
+            Button("Export…") { Task { await model.exportAgent(agent) } }
+                .disabled(model.hostUnreachable(agent.host))
             // Finder only sees this Mac's disk (058, FR-019).
             if model.isOnThisMac(agent.host) {
-                Divider()
                 Button("Show in Finder") {
                     model.reveal(agent.cwd, on: agent.host)
                 }

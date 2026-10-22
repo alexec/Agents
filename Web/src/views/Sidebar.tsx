@@ -29,7 +29,7 @@ import { keepsInUnread, newSessionProject, ownCount, pinnedSessions, pinnedWorkf
 import { updatedLine } from "../model/updated";
 import { namedRelative, workflowSummary } from "../model/workflows";
 import { fromWireDate } from "../protocol/dates";
-import type { Agent, ControlHost, ProjectSummary, WorkflowSummary } from "../protocol/generated";
+import type { Agent, AgentsExportRequest, ControlHost, ProjectSummary, WorkflowSummary } from "../protocol/generated";
 import { alone, aloneURL, go, route, showAll, type ActivityPage } from "../route";
 import { onThisMac } from "../place";
 import { browserName, type Session } from "../session";
@@ -37,6 +37,7 @@ import { ActivityRows } from "./Activity";
 import { holdForMenu, isMenuKey, openContextMenu, type MenuItem } from "./ContextMenu";
 import { CloningRows, EmptyProjects, NewProjectMenu } from "./NewProject";
 import { putFilesInDropbox, useDropboxDrop } from "./DropboxDialog";
+import { exportFromMenu, importFromMenu } from "../model/exports";
 import { rowExtras, SessionRow } from "./SessionRow";
 import { openInNewTab, RenameInput, runSessionAction, sessionActions, startedBy } from "./SessionMenu";
 import { markAgentOf, treeRows, type TreeRow } from "../model/tree";
@@ -571,6 +572,13 @@ const ProjectFold = memo(function ProjectFold({ store, host, project, query, lin
           if (summary && here) go({});
         });
       } },
+    // Its agents as a .tar.gz, and an export brought back on its machine (#1001), as the window's.
+    ...(store.has(host.id, Capability.agentsExport1) ? [
+      { label: "Export Agents…", disabled: down, help: "Download this project's agents as a .tar.gz",
+        run: () => exportFromMenu(store, host.id, { folder: folder as NonNullable<AgentsExportRequest["folder"]> }) },
+      { label: "Import Agents…", disabled: down, help: "Bring back the agents of an export, archived, on this project's machine",
+        run: () => importFromMenu(store, host.id) },
+    ] : []),
   ];
   const row = (agent: Agent, tree?: TreeRow) => (
     <SidebarSession key={agent.id} store={store} host={host.id} folder={folder} agent={agent}
@@ -752,6 +760,11 @@ export const SidebarSession = memo(function SidebarSession({ store, host, folder
       label: words, help, disabled: down || !!store.onItsWay.value[agent.id],
       run: () => runSessionAction(store, host, agent, action),
     })),
+    // Its record and transcript as a .tar.gz (#1001), as the window's Export….
+    ...(store.has(host, Capability.agentsExport1) ? [
+      { label: "Export…", help: "Download this session as a .tar.gz", disabled: down,
+        run: () => exportFromMenu(store, host, { agentID: agent.id }) },
+    ] : []),
     ...(pinnedAt ? [
       { label: "Move Up", disabled: down || pinnedAt[0] === agent.id, run: () => move(-1) },
       { label: "Move Down", disabled: down || pinnedAt[pinnedAt.length - 1] === agent.id, run: () => move(1) },
