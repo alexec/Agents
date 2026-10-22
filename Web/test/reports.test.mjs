@@ -56,3 +56,10 @@ test("scopes (#1804): a group dimension past Me, none naming a person when hidde
   assert.equal(r.forecastUSD(100, now), 310);
   assert.match(r.budgetWords(100, 250, now), /of .*250.* this month · forecast .*310.*, over budget$/);
 });
+
+test("each scope is named on the pane (#2071)", () => {
+  assert.equal(r.scopeNote({ kind: "me" }), "Your machines.");
+  assert.equal(r.scopeNote({ kind: "org" }), "Everyone’s machines.");
+  assert.equal(r.scopeNote({ kind: "group", group: "g1" }, "Platform"), "The machines of Platform’s people.");
+  assert.match(r.meNote, /^Your machines\. .*Reports ▸ Spend/);
+});

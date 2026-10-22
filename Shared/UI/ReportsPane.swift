@@ -3,8 +3,9 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 /// Cost ▸ Reports (#1811): usage, cost and time by person, project, machine and runtime,
-/// added up on the control plane from what each machine sends each hour. An admin sees
-/// every person's machines; a member their own. Export saves the rows as CSV or JSON lines.
+/// added up on the control plane from what each machine sends each hour. It shows the
+/// caller's own machines, an admin's too (the Me scope, #2071); a group's and everyone's are
+/// Reports ▸ Spend on the web page. Export saves the rows as CSV or JSON lines.
 ///
 /// One view for the Mac's page and the Remote's (the web page's is `Web/src/views/Reports.tsx`).
 struct ReportsPane: View {
@@ -40,7 +41,7 @@ struct ReportsPane: View {
                         }
                     }
                 } footer: {
-                    Text(report.admin ? ReportWords.utcNote : "\(ReportWords.memberNote) \(ReportWords.utcNote)")
+                    Text("\(ReportWords.meNote) \(ReportWords.utcNote)")
                         .appText(.fine)
                         .foregroundStyle(.secondary)
                 }
@@ -61,6 +62,9 @@ struct ReportsPane: View {
             if case .failure(let error) = result { problem = "Not exported: \(error.localizedDescription)" }
         }
     }
+
+    /// The caller's own machines, an admin's too: the organisation is Reports ▸ Spend's (#2071).
+    private static let me = DaemonAPI.ReportScope(kind: .me)
 
     private struct Ask: Equatable {
         var range: DaemonAPI.ReportRange
@@ -104,7 +108,7 @@ struct ReportsPane: View {
             return
         }
         do {
-            report = try await control.call(DaemonAPI.Method.reportsUsage, DaemonAPI.ReportQuery(range: range),
+            report = try await control.call(DaemonAPI.Method.reportsUsage, DaemonAPI.ReportQuery(range: range, scope: Self.me),
                                             returning: DaemonAPI.UsageReport.self)
             addUp()
             problem = nil
@@ -120,7 +124,7 @@ struct ReportsPane: View {
     private func exportRows(_ format: DaemonAPI.ReportFormat) async {
         guard let control else { return }
         do {
-            let got = try await control.call(DaemonAPI.Method.reportsExport, DaemonAPI.ReportQuery(range: range, format: format),
+            let got = try await control.call(DaemonAPI.Method.reportsExport, DaemonAPI.ReportQuery(range: range, format: format, scope: Self.me),
                                              returning: DaemonAPI.ReportExport.self)
             export = ReportFile(text: got.text, format: format, name: ReportWords.exportName(range, format))
             isExporting = true

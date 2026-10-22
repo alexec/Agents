@@ -104,7 +104,8 @@ public enum ReportWords {
     public static let noProject = "No project"
     public static let noRuntime = "No runtime"
     public static let empty = "Nothing was used in this time. Each machine sends what it used once an hour."
-    public static let memberNote = "You see your own machines. An admin sees everyone's."
+    /// Whose spend the Cost page's Reports pane shows: the caller's own, an admin's too (#2071).
+    public static let meNote = "Your machines. A group’s and everyone’s are in Reports ▸ Spend on the web page."
     public static let utcNote = "Hours and days are UTC, so machines in other time zones add up."
 
     /// D, W, M and 3M, as the Cost page's charts name them.
