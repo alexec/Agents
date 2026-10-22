@@ -86,6 +86,7 @@ const CapProjects1 = "projects/1"
 const CapProviders1 = "providers/1"
 const CapRelay1 = "relay/1"
 const CapReportsScope1 = "reports.scope/1"
+const CapReportsViews1 = "reports.views/1"
 const CapReports1 = "reports/1"
 const CapResources1 = "resources/1"
 const CapRetention1 = "retention/1"
@@ -545,11 +546,14 @@ var ControlCapabilities = pairs([][2]string{
 	{"providers/setGroup", "groups/1"},
 	{"providers/update", "providers/1"},
 	{"relay/switch", "relay/1"},
+	{"reports/deleteView", "reports.views/1"},
 	{"reports/export", "reports/1"},
 	{"reports/policy", "reports.scope/1"},
+	{"reports/saveView", "reports.views/1"},
 	{"reports/scopes", "reports.scope/1"},
 	{"reports/setPolicy", "reports.scope/1"},
 	{"reports/usage", "reports/1"},
+	{"reports/views", "reports.views/1"},
 	{"signIn/addToMe", "signin/1"},
 	{"signIn/approve", "signin/1"},
 	{"signIn/configure", "signin/1"},

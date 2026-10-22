@@ -76,6 +76,19 @@ Three more pages of Reports (#2019), with the same scopes:
   ended in an error), the cost of a run and the time working a run. By Workflow first. The
   most failed runs come first. By Person shows each bot's runs under its name.
 
+## Reports ▸ Saved Views, on the web page
+
+- **Save View…** on each page of Reports keeps its scope, range and **By** under a name
+  (#2019, R8). At most 50 a person.
+- **Saved Views** lists them, each with **Open** (the page, its scope, range and By),
+  **Copy Digest** (its numbers as a few lines of text: what was spent, the pull requests
+  merged and their cost, the workflows with failed runs, the middle wait and the sessions
+  that failed) and **Delete**.
+- **A view is the person's own.** Nobody else sees it. A view of a scope the person no
+  longer sees opens nothing: `reports/usage` checks the scope each time.
+- **The control plane keeps them** in one object a person, `v1/reports/views/<user>.json`.
+- **Not yet:** sending a digest each week by email or to a chat channel.
+
 ## What a machine sends
 
 - **Each machine keeps its usage by the UTC hour**, by project and runtime, in
@@ -129,6 +142,9 @@ Three more pages of Reports (#2019), with the same scopes:
   (`sessions`, `failedSessions`, `prsOpened`, `prsMerged`, `prsReverted`, `mergeSeconds`,
   `waits`, `workflowRuns`, `workflowFailures`; blank from a machine before #2019), then
   `groups`.
+
+- `reports/views`, `reports/saveView` (a view with no `id` is new) and `reports/deleteView`
+  (#2019): the caller's saved views.
 
 ## See also
 

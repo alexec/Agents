@@ -311,6 +311,10 @@ public extension DaemonAPI {
                 Row(Method.reportsScopes, params: Empty.self, result: ReportScopes.self, kind: .controlRequest),
                 Row(Method.reportsPolicy, params: Empty.self, result: ReportPolicy.self, kind: .controlRequest),
                 Row(Method.reportsSetPolicy, params: ReportPolicy.self, result: ReportPolicy.self, kind: .controlRequest),
+                // Saved views of Reports (#2019).
+                Row(Method.reportsViews, params: Empty.self, result: ReportViews.self, kind: .controlRequest),
+                Row(Method.reportsSaveView, params: ReportView.self, result: ReportViews.self, kind: .controlRequest),
+                Row(Method.reportsDeleteView, params: ReportViewID.self, result: ReportViews.self, kind: .controlRequest),
                 // The Console (#1804): the admins' app on the web page.
                 Row(Method.consoleFleet, params: Empty.self, result: FleetBoard.self, kind: .controlRequest),
                 Row(Method.consoleTeamWorkflows, params: Empty.self, result: TeamWorkflows.self, kind: .controlRequest),

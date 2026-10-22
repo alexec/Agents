@@ -4584,6 +4584,15 @@ export type ReportFormat =
   | "csv"
   | "jsonl";
 
+/** A page of Reports (#1804, #2019). */
+export type ReportPage =
+  | "spend"
+  | "outcomes"
+  | "time"
+  | "runtimes"
+  | "adoption"
+  | "workflows";
+
 /** Who sees what in Reports (#1804), set by an admin in Console ▸ Report Policy. */
 export interface ReportPolicy {
   /**
@@ -4679,6 +4688,31 @@ export interface ReportScopeOption {
 export interface ReportScopes {
   scopes: ReportScopeOption[];
   admin: boolean;
+}
+
+/**
+ * A saved view of Reports (#2019, R8): a page with its scope, range and way to add up, kept for the
+ * person who saved it.
+ */
+export interface ReportView {
+  /** Given by the control plane; empty to save a new view. */
+  id: string;
+  name: string;
+  page: ReportPage;
+  scope: ReportScope;
+  range: ReportRange;
+  /** The way the page adds up: person, project, machine, runtime, group or workflow. */
+  by?: string;
+}
+
+/** reports/deleteView (#2019). */
+export interface ReportViewID {
+  id: string;
+}
+
+/** The caller's saved views of Reports (#2019), in the order they were saved. */
+export interface ReportViews {
+  views: ReportView[];
 }
 
 export interface ReportedEdit {
@@ -6833,11 +6867,14 @@ export interface Methods {
   "providers/remove": { params: ProviderRequest; result: Empty };
   "providers/setGroup": { params: ProviderGroup; result: Empty };
   "providers/update": { params: ProviderAdd; result: ProviderSummary };
+  "reports/deleteView": { params: ReportViewID; result: ReportViews };
   "reports/export": { params: ReportQuery; result: ReportExport };
   "reports/policy": { params: Empty; result: ReportPolicy };
+  "reports/saveView": { params: ReportView; result: ReportViews };
   "reports/scopes": { params: Empty; result: ReportScopes };
   "reports/setPolicy": { params: ReportPolicy; result: ReportPolicy };
   "reports/usage": { params: ReportQuery; result: UsageReport };
+  "reports/views": { params: Empty; result: ReportViews };
   "runtimes/accountProfiles": { params: Empty; result: AccountProfile[] };
   "runtimes/accounts": { params: Empty; result: RuntimeAccount[] };
   "runtimes/addAccount": { params: AddAccountRequest; result: AccountProfile };
@@ -7048,11 +7085,14 @@ export const MethodTarget = {
   "providers/remove": "control",
   "providers/setGroup": "control",
   "providers/update": "control",
+  "reports/deleteView": "control",
   "reports/export": "control",
   "reports/policy": "control",
+  "reports/saveView": "control",
   "reports/scopes": "control",
   "reports/setPolicy": "control",
   "reports/usage": "control",
+  "reports/views": "control",
   "runtimes/accountProfiles": "host",
   "runtimes/accounts": "host",
   "runtimes/addAccount": "host",
@@ -7615,6 +7655,9 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ReportScope: { required: ["kind"], optional: ["group"] },
   ReportScopeOption: { required: ["scope", "name"], optional: [] },
   ReportScopes: { required: ["scopes", "admin"], optional: [] },
+  ReportView: { required: ["id", "name", "page", "scope", "range"], optional: ["by"] },
+  ReportViewID: { required: ["id"], optional: [] },
+  ReportViews: { required: ["views"], optional: [] },
   ReportedEdit: { required: ["path", "newText", "toolCallID", "index", "entryIndex", "replaceAll", "at"], optional: ["oldText"] },
   RequiredCapabilities: { required: ["host", "client"], optional: [] },
   ResourceState: { required: ["name", "kind", "displayName", "isGone", "line", "endingSoon"], optional: ["holds", "lease", "places", "declared"] },

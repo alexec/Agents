@@ -168,6 +168,47 @@ public extension DaemonAPI {
         }
     }
 
+    /// A page of Reports (#1804, #2019).
+    enum ReportPage: String, Codable, Sendable, Hashable, CaseIterable {
+        case spend, outcomes, time, runtimes, adoption, workflows
+    }
+
+    /// A saved view of Reports (#2019, R8): a page with its scope, range and way to add up,
+    /// kept for the person who saved it. The web page saves and opens them.
+    struct ReportView: Codable, Sendable, Hashable {
+        /// Given by the control plane; empty to save a new view.
+        public var id: String
+        public var name: String
+        public var page: ReportPage
+        public var scope: ReportScope
+        public var range: ReportRange
+        /// person, project, machine, runtime, group or workflow.
+        public var by: String?
+
+        public init(id: String = "", name: String, page: ReportPage, scope: ReportScope, range: ReportRange, by: String? = nil) {
+            self.id = id
+            self.name = name
+            self.page = page
+            self.scope = scope
+            self.range = range
+            self.by = by
+        }
+    }
+
+    /// `reports/deleteView`'s params (#2019).
+    struct ReportViewID: Codable, Sendable, Hashable {
+        public var id: String
+
+        public init(id: String) { self.id = id }
+    }
+
+    /// The caller's saved views of Reports (#2019), in the order they were saved.
+    struct ReportViews: Codable, Sendable, Hashable {
+        public var views: [ReportView]
+
+        public init(views: [ReportView] = []) { self.views = views }
+    }
+
     /// `reports/export`'s answer: the rows as CSV or JSON lines.
     struct ReportExport: Codable, Sendable, Hashable {
         public var text: String
@@ -187,4 +228,10 @@ public extension DaemonAPI.Method {
     static let reportsPolicy = "reports/policy"
     /// `ReportPolicy` → `ReportPolicy` (#1804). Admins only.
     static let reportsSetPolicy = "reports/setPolicy"
+    /// `Empty` → `ReportViews` (#2019).
+    static let reportsViews = "reports/views"
+    /// `ReportView` → `ReportViews` (#2019).
+    static let reportsSaveView = "reports/saveView"
+    /// `ReportViewID` → `ReportViews` (#2019).
+    static let reportsDeleteView = "reports/deleteView"
 }

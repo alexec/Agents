@@ -1,0 +1,64 @@
+// The #2019 walk of saved views (R8) on a scratch control plane with synthetic days: Save View…
+// on Outcomes by Project over M, then Reports ▸ Saved Views lists it, Open brings back its range and
+// way, Copy Digest copies its numbers, and Delete takes it away. Shots go to <out dir>.
+//
+//   node Web/test/walk/views2019.mjs <WEB_URL> <browser code> <out dir>
+
+import { launch } from "./cdp.mjs";
+
+const [webURL, code, out] = process.argv.slice(2);
+let failed = 0;
+const check = (ok, line) => { if (!ok) failed += 1; console.log(`${ok ? "ok  " : "FAIL"} ${line}`); };
+const pane = `document.querySelector(".reports-pane")`;
+const on = (label) => `[...document.querySelectorAll("[role=radio][aria-checked=true]")].some((b) => b.textContent === ${JSON.stringify(label)})`;
+
+const chrome = await launch({ profile: `/tmp/run-r2019-chrome-${process.pid}` });
+let page;
+try {
+  page = await chrome.page(webURL, { width: 1300, height: 900 });
+  await page.waitFor(`document.querySelector("textarea")`);
+  await page.focus("textarea");
+  await page.type(code);
+  await page.press("Connect");
+  await page.waitFor(`document.querySelector(".sidebar")`, 20_000);
+  await page.eval(`location.hash = "#/reports/outcomes"`);
+  await page.waitFor(`${pane}?.textContent.includes("merged of")`, 20_000);
+  await page.press("M");
+  await page.press("Project");
+  await page.press("Save View…");
+  await page.focus("input[aria-label='View name']");
+  await page.type("Monday digest");
+  await page.press("Save");
+  await page.waitFor(`${pane}.textContent.includes("It is in Reports ▸ Saved Views")`, 10_000);
+  check(true, "Save View… saved it");
+
+  await page.eval(`location.hash = "#/reports/saved"`);
+  await page.waitFor(`${pane}?.textContent.includes("Monday digest")`, 10_000);
+  const said = (await page.text(".reports-pane")).replace(/\s+/g, " ");
+  check(said.includes("Outcomes · Me · The last 30 days · By Project"), `Saved lists it: ${said.slice(0, 200)}`);
+  await page.shot(`${out}/web-saved.png`);
+
+  await page.eval(`(async () => { const b = [...document.querySelectorAll("button")].find((x) => x.textContent === "Copy Digest"); b.click(); })()`);
+  await page.waitFor(`[...document.querySelectorAll("button")].some((x) => x.textContent === "Copied") || document.querySelector(".reports-pane .hint")`, 10_000);
+  const copied = await page.eval(`[...document.querySelectorAll("button")].some((x) => x.textContent === "Copied")`);
+  check(copied, "Copy Digest copied");
+
+  await page.press("Open");
+  await page.waitFor(`location.hash === "#/reports/outcomes" && ${on("M")} && ${on("Project")}`, 10_000);
+  check(true, "Open brings back M and By Project on Outcomes");
+  await page.shot(`${out}/web-opened.png`);
+
+  await page.eval(`location.hash = "#/reports/saved"`);
+  await page.waitFor(`${pane}?.textContent.includes("Monday digest")`, 10_000);
+  await page.press("Delete");
+  await page.waitFor(`${pane}.textContent.includes("No saved views yet")`, 10_000);
+  check(true, "Delete takes it away");
+} catch (error) {
+  failed += 1;
+  console.log(`FAIL ${error.message}`);
+  if (page) console.log((await page.text("body").catch(() => "")).replace(/\s+/g, " ").slice(0, 1500));
+} finally {
+  await chrome.close();
+}
+console.log(JSON.stringify({ failed }));
+process.exit(failed ? 1 : 0);
