@@ -77,16 +77,14 @@ struct VoiceModeField: View {
                     .buttonStyle(.paper)
                     .help("Stop the voice. The reply stays on the screen. Or talk over it.")
             }
+            // The way back to typing, and the only other control while it is on (#2375).
             Button {
                 voice.turnOff()
             } label: {
-                Image(systemName: "xmark")
-                    .appText(.reading).fontWeight(.semibold)
-                    .frame(width: 22, height: 22)
+                Label("Type", systemImage: "keyboard")
             }
             .buttonStyle(.paper)
-            .buttonBorderShape(.circle)
-            .help("End voice mode")
+            .help("End voice mode and type instead")
             .accessibilityLabel("End voice mode")
         }
         .padding(14)

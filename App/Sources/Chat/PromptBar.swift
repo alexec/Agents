@@ -121,52 +121,52 @@ struct PromptBar: View {
 
     var body: some View {
         GlassEffectContainer(spacing: 12) {
-            VStack(alignment: .leading, spacing: 12) {
-                whereAndWhat
-                atItsLimit
-                startingOnOut
-                if !attachments.isEmpty {
-                    AttachmentStrip(attachments: attachments,
-                                    refusal: { $0.refusal(from: promptCapabilities) },
-                                    remove: { attachment in
-                                        attachments.removeAll { $0.id == attachment.id }
-                                    })
-                }
-                if draftLostSomething {
-                    Text(PromptWords.draftLostSomething)
-                        .appText(.fine)
-                        .foregroundStyle(.secondary)
-                }
-                if isCompleting {
-                    CommandList(commands: matchingCommands, selected: selectedCommand,
-                                choose: accept)
-                        .transition(.opacity)
-                }
-                if isMentioning {
-                    MentionList(mentions: mentions, selected: selectedMention, choose: accept)
-                        .transition(.opacity)
-                }
-                if agent == nil, let refusal = model.draftSandboxRefusal {
-                    sandboxRefusal(refusal)
-                }
-                // On its way (#87): a start can take seconds, making a worktree and a
-                // runtime, and a send to a slow host as long.
-                if agent == nil, model.isStarting {
-                    Telling(host: recipient, doing: AgentState.startingLabel)
-                } else if agent != nil, sending > 0, sendingIsSlow {
-                    Telling(host: recipient, doing: "Sending")
-                }
-                // Voice mode in this chat (#2322) takes the field's place: what it hears
-                // and says (#2375).
-                if let agent, VoiceMode.shared.isOn(in: agent.id) {
-                    VoiceModeField(agentID: agent.id)
-                } else {
+            // Voice mode in this chat (#2322) is the whole bar: the talking area, and the way
+            // back to typing. Labels, options and tools wait for the keyboard (#2375).
+            if let agent, VoiceMode.shared.isOn(in: agent.id) {
+                VoiceModeField(agentID: agent.id)
+            } else {
+                VStack(alignment: .leading, spacing: 12) {
+                    whereAndWhat
+                    atItsLimit
+                    startingOnOut
+                    if !attachments.isEmpty {
+                        AttachmentStrip(attachments: attachments,
+                                        refusal: { $0.refusal(from: promptCapabilities) },
+                                        remove: { attachment in
+                                            attachments.removeAll { $0.id == attachment.id }
+                                        })
+                    }
+                    if draftLostSomething {
+                        Text(PromptWords.draftLostSomething)
+                            .appText(.fine)
+                            .foregroundStyle(.secondary)
+                    }
+                    if isCompleting {
+                        CommandList(commands: matchingCommands, selected: selectedCommand,
+                                    choose: accept)
+                            .transition(.opacity)
+                    }
+                    if isMentioning {
+                        MentionList(mentions: mentions, selected: selectedMention, choose: accept)
+                            .transition(.opacity)
+                    }
+                    if agent == nil, let refusal = model.draftSandboxRefusal {
+                        sandboxRefusal(refusal)
+                    }
+                    // On its way (#87): a start can take seconds, making a worktree and a
+                    // runtime, and a send to a slow host as long.
+                    if agent == nil, model.isStarting {
+                        Telling(host: recipient, doing: AgentState.startingLabel)
+                    } else if agent != nil, sending > 0, sendingIsSlow {
+                        Telling(host: recipient, doing: "Sending")
+                    }
                     field
-                }
-                // Attach, dictate and voice, under the field with the options (#2375).
-                HStack(spacing: 10) {
-                    tools
-                    options
+                    // Attach, dictate and voice, under the field with the options (#2375).
+                    HStack(spacing: 10) {
+                        tools
+                        options
+                    }
                 }
             }
         }
