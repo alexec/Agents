@@ -124,16 +124,6 @@ else
 fi
 
 unit="$HOME/.config/systemd/user/agents-host.service"
-# A corporate network's proxy and CA (#2177): what this command was run with, the service
-# runs with too, as systemd gives it no login environment.
-service_env=""
-for v in HTTPS_PROXY https_proxy HTTP_PROXY http_proxy NO_PROXY no_proxy AGENTS_CA_FILE; do
-    val=$(printenv "$v" || true)
-    [ -n "$val" ] || continue
-    val=$(printf %s "$val" | sed 's/%/%%/g; s/"/\\"/g')
-    service_env="$service_env
-Environment=\"$v=$val\""
-done
 if command -v systemctl >/dev/null 2>&1 && systemctl --user show-environment >/dev/null 2>&1; then
     mkdir -p "$(dirname "$unit")"
     cat > "$unit" <<UNIT
@@ -141,7 +131,7 @@ if command -v systemctl >/dev/null 2>&1 && systemctl --user show-environment >/d
 Description=Agents host ($name)
 After=network-online.target
 
-[Service]$service_env
+[Service]
 ExecStart=%h/.agents-server/bin/current --root %h/.agents-server/root --serve --control-network --host-name "$name"
 Restart=always
 RestartSec=5

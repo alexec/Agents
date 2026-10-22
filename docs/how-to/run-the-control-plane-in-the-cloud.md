@@ -566,7 +566,7 @@ On a Mac:
    **System** keychain, and set **When using this certificate** to **Always Trust**. Most
    organisations do this for you with a configuration profile.
 
-On a Linux server, before you run the install command:
+On a Linux server:
 
 1. Export the proxy in the shell where you run the install command:
 
@@ -575,13 +575,28 @@ On a Linux server, before you run the install command:
    export NO_PROXY=localhost,.internal.example.com
    ```
 
-   The install command's `curl` follows them, and the install command writes them, with
-   `AGENTS_CA_FILE` if set, into the host's systemd service. To change them later, run the
-   install command again with a new code.
+   The install command's `curl` follows them. The host started in the background (with no
+   systemd user session) has them too.
 2. Put the organisation's CA, as PEM, in `/etc/agents/ca.pem` (one or more certificates
    in one file). To keep it elsewhere, set `AGENTS_CA_FILE` to its path. Add it to the
    system's roots too (`update-ca-certificates` on Debian and Ubuntu), so that the install
    command's `curl` trusts it.
+3. After the install command, if it started the host as the systemd user service
+   `agents-host`, give the service the same variables (and `AGENTS_CA_FILE`, if you set
+   it), as systemd does not read your shell's:
+
+   ```sh
+   mkdir -p ~/.config/systemd/user/agents-host.service.d
+   cat > ~/.config/systemd/user/agents-host.service.d/proxy.conf <<'EOF'
+   [Service]
+   Environment=HTTPS_PROXY=http://proxy.example.com:3128
+   Environment=NO_PROXY=localhost,.internal.example.com
+   EOF
+   systemctl --user daemon-reload
+   systemctl --user restart agents-host
+   ```
+
+   Running the install command again keeps this file.
 
 The control plane itself also dials: other copies of it, with several copies. If its
 machine has `HTTPS_PROXY` or `HTTP_PROXY` set, put the copies' names in `NO_PROXY`.
