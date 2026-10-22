@@ -113,11 +113,31 @@ type SignInSession struct {
 
 // OpenSignIn dials as s:<a new UUID> with a new key and proves it (#995).
 func OpenSignIn(ctx context.Context, base, pin string, controlKey []byte, kind string) (*SignInSession, error) {
+	return OpenSignInAs(ctx, base, pin, controlKey, kind, strings.ToUpper(newRef()), NewPrivateKey())
+}
+
+// OpenSignInAs dials as s:<id> with the key private and proves it: as the web page does
+// when it comes back from its org provider with a ticket (#1002, FR-027).
+func OpenSignInAs(ctx context.Context, base, pin string, controlKey []byte, kind, id string, private []byte) (*SignInSession, error) {
+	return openSignIn(ctx, base, pin, "", controlKey, kind, id, private)
+}
+
+// OpenPageSignIn dials as the page on the control plane's own domain does (#1459): its
+// socket, with the page's Origin, as s:<id> with the key private (#1002, FR-027).
+func OpenPageSignIn(ctx context.Context, base, kind, id string, private []byte) (*SignInSession, error) {
 	origin, err := Origin(base)
 	if err != nil {
 		return nil, err
 	}
-	l, err := Dial(ctx, base, pin)
+	return openSignIn(ctx, base, "", origin, nil, kind, id, private)
+}
+
+func openSignIn(ctx context.Context, base, pin, page string, controlKey []byte, kind, id string, private []byte) (*SignInSession, error) {
+	origin, err := Origin(base)
+	if err != nil {
+		return nil, err
+	}
+	l, err := dial(ctx, base, pin, page)
 	if err != nil {
 		return nil, err
 	}
@@ -144,9 +164,7 @@ func OpenSignIn(ctx context.Context, base, pin string, controlKey []byte, kind s
 	if err != nil {
 		return fail(Refuse(BadMessage))
 	}
-	private := NewPrivateKey()
 	public, _ := PublicKey(private)
-	id := strings.ToUpper(newRef())
 	key, err := ClientKey(private, controlKey, id)
 	if err != nil {
 		return fail(err)
@@ -176,6 +194,12 @@ func OpenSignIn(ctx context.Context, base, pin string, controlKey []byte, kind s
 	return &SignInSession{l: l, id: id, private: private, controlKey: controlKey, helloNonce: helloNonce, base: base, pin: pin,
 		name: h.Hello.Name}, nil
 }
+
+// ID is the connection's id, which the client keeps once paired.
+func (s *SignInSession) ID() string { return s.id }
+
+// Private is the key the connection proved.
+func (s *SignInSession) Private() []byte { return s.private }
 
 // Nonce is what a provider's ID token names on this connection (R2).
 func (s *SignInSession) Nonce() string { return SignInNonce(s.controlKey, s.helloNonce) }

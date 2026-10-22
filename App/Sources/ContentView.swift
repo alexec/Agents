@@ -271,6 +271,9 @@ struct ContentView: View {
                 // No control plane and nothing of the old way: one question, and no
                 // sidebar or toolbar until it is answered (058, frame A).
                 FirstRunView()
+            } else if model.signIn.suspended {
+                // The organisation turned this person's access off: only that (#1002, FR-029).
+                SuspendedPage(device: "Mac")
             } else {
                 // Two columns (#145): the one sidebar, then what is being read, with the
                 // inspector beside a chat.

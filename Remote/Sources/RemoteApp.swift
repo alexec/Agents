@@ -1,5 +1,6 @@
 import AgentsKitCore
 import SwiftUI
+import UIKit
 
 /// The remote: the same app, laid out for the screen it is on.
 ///
@@ -42,6 +43,12 @@ struct RemoteApp: App {
         WindowGroup {
             RemoteView()
                 .background(Paper.ground)
+                // The organisation turned this person's access off: only that (#1002, FR-029).
+                .overlay {
+                    if model.signIn.suspended {
+                        SuspendedPage(device: UIDevice.current.userInterfaceIdiom == .pad ? "iPad" : "iPhone")
+                    }
+                }
                 // Undo after Archive (#1534), for a few seconds, over the foot of whatever shows.
                 .modifier(ArchiveUndoOverlay())
                 .environment(model)

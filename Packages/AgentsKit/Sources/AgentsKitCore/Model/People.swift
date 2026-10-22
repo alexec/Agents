@@ -112,11 +112,24 @@ public extension DaemonAPI {
         public var group: String?
         public var caps: SpendCaps?
         public var spentTodayUSD: Double?
+        /// What SCIM says of the person, for one SCIM made (#1002): Managed by <provider>.
+        public var scim: PersonSCIM?
+        /// Made by SCIM and not signed in yet: Waiting for first sign-in.
+        public var provisioned: Bool?
+        /// Suspended by their org provider (D13).
+        public var suspended: PersonSuspended?
+        /// The SCIM groups that give the person their role (FR-020): Set by <provider>.
+        public var roleFrom: [String]?
 
         public init(id: String, name: String, kind: Kind = .person, role: UserRole, localOwner: Bool? = nil,
                     you: Bool? = nil, signIns: [SignIn] = [], clients: [PersonClient] = [],
                     machines: [PersonMachine] = [], group: String? = nil, caps: SpendCaps? = nil,
-                    spentTodayUSD: Double? = nil) {
+                    spentTodayUSD: Double? = nil, scim: PersonSCIM? = nil, provisioned: Bool? = nil,
+                    suspended: PersonSuspended? = nil, roleFrom: [String]? = nil) {
+            self.scim = scim
+            self.provisioned = provisioned
+            self.suspended = suspended
+            self.roleFrom = roleFrom
             self.group = group
             self.caps = caps
             self.spentTodayUSD = spentTodayUSD
@@ -133,6 +146,39 @@ public extension DaemonAPI {
 
         public var isYou: Bool { you == true }
         public var isLocalOwner: Bool { localOwner == true }
+        /// The org provider that sets this person's role: people/setRole refuses it.
+        public var roleSetBy: String? { roleFrom?.isEmpty == false ? scim?.provider ?? suspended?.provider : nil }
+    }
+
+    /// What an org provider's SCIM says of a person (#1002, FR-015). Only what a client shows.
+    struct PersonSCIM: Codable, Sendable, Hashable {
+        public var provider: String
+        public var userName: String
+        public var displayName: String?
+        public var active: Bool
+
+        public init(provider: String, userName: String, displayName: String? = nil, active: Bool = true) {
+            self.provider = provider
+            self.userName = userName
+            self.displayName = displayName
+            self.active = active
+        }
+    }
+
+    /// Why a person is suspended (#1002, D13): by SCIM, a refused refresh, or an admin; with
+    /// the provider and when.
+    struct PersonSuspended: Codable, Sendable, Hashable {
+        public var by: String
+        public var provider: String
+        public var at: Date
+        public var why: String?
+
+        public init(by: String, provider: String, at: Date, why: String? = nil) {
+            self.by = by
+            self.provider = provider
+            self.at = at
+            self.why = why
+        }
     }
 
     /// `people/list`: every user for an admin; for a member, only themselves.
@@ -409,6 +455,31 @@ public enum PeopleWords {
         parts.append(person.role.title)
         return parts.joined(separator: " · ")
     }
+
+    /// The org provider lines under a person (#1002, FR-028), with `name` giving a provider's
+    /// name by its id: Managed by, Waiting for first sign-in, Suspended by.
+    public static func orgLines(_ person: DaemonAPI.PersonRow, name: (String) -> String) -> [String] {
+        var lines: [String] = []
+        if let scim = person.scim { lines.append(managedBy(name(scim.provider))) }
+        if person.provisioned == true { lines.append(waitingFirstSignIn) }
+        if let suspended = person.suspended { lines.append(suspendedBy(name(suspended.provider))) }
+        return lines
+    }
+
+    public static func managedBy(_ provider: String) -> String { "Managed by \(provider)" }
+    public static let waitingFirstSignIn = "Waiting for first sign-in"
+    public static let editInConsole = "Edit in Console"
+
+    /// Console ▸ People on the web page, for Edit in Console (D17), where Console ▸ Policy is.
+    public static func consoleURL(_ status: DaemonAPI.ControlStatus?) -> URL? {
+        guard let policy = OrgPolicyWords.consoleURL(status),
+              var parts = URLComponents(url: policy, resolvingAgainstBaseURL: false) else { return nil }
+        parts.fragment = "/console/people"
+        return parts.url
+    }
+    public static func suspendedBy(_ provider: String) -> String { "Suspended by \(provider)" }
+    /// On a role or a group that the provider controls (FR-020, FR-028).
+    public static func setBy(_ provider: String) -> String { "Set by \(provider)" }
 
     /// "box-1 (online), studio (offline)", or nil with none.
     public static func machines(_ person: DaemonAPI.PersonRow) -> String? {

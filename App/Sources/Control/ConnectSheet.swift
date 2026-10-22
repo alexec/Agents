@@ -55,15 +55,10 @@ struct ConnectSheet: View {
             .background(.background, in: RoundedRectangle(cornerRadius: 10))
             .overlay { RoundedRectangle(cornerRadius: 10).strokeBorder(Color.secondary.opacity(0.25)) }
 
-            Text("CODE").appText(.fine).fontWeight(.semibold).foregroundStyle(.secondary)
-            TextField("AGT-…", text: $code)
-                .textFieldStyle(.roundedBorder)
-                .appText(.code)
-            Text("Paste the code, or its link. It works once, for five minutes.")
-                .appText(.supporting).foregroundStyle(.secondary)
-            // With no code (#995): sign in as a person the control plane knows.
+            // With no code (#995): sign in as a person the control plane knows. First, with the
+            // organisation's own providers first in it, then the code (#1002, FR-026).
             if joined == nil {
-                Text("OR SIGN IN").appText(.fine).fontWeight(.semibold).foregroundStyle(.secondary)
+                Text("SIGN IN").appText(.fine).fontWeight(.semibold).foregroundStyle(.secondary)
                 SignInToPair(pair: { url, signIn, waiting in
                     let membership = try await ControlConfig.signIn(at: url, with: signIn, waiting: waiting)
                     Task { await model.adopt(.remote(membership)) }
@@ -74,6 +69,12 @@ struct ConnectSheet: View {
                 Text("Type the control plane’s address. Sign in with an account added to your person there.")
                     .appText(.supporting).foregroundStyle(.secondary)
             }
+            Text(joined == nil ? "OR USE A CODE" : "CODE").appText(.fine).fontWeight(.semibold).foregroundStyle(.secondary)
+            TextField("AGT-…", text: $code)
+                .textFieldStyle(.roundedBorder)
+                .appText(.code)
+            Text("Paste the code, or its link. It works once, for five minutes.")
+                .appText(.supporting).foregroundStyle(.secondary)
             if isHostCode, joined == nil {
                 Text(hostCodeWords)
                     .appText(.supporting)

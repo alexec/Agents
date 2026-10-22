@@ -3180,7 +3180,16 @@ final class AppModel {
                 // Before the list comes, and while the control plane stays away (#1481).
                 await self?.reachKeptHost(controlLink)
                 backoff.trying()
-                if (try? await control.connect(startIfNeeded: false, timeout: .seconds(3))) != nil {
+                let answered: Bool
+                do {
+                    try await control.connect(startIfNeeded: false, timeout: .seconds(3))
+                    answered = true
+                } catch {
+                    // Refused as suspended (#1002): the window shows only that, and dials again.
+                    self?.signIn.refused(error)
+                    answered = false
+                }
+                if answered {
                     backoff.connected()
                     self?.controlPlaneDidAnswer()
                     await self?.syncControlHosts(control)

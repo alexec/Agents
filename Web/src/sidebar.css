@@ -272,6 +272,8 @@
 .with-sidebar .settings-body .person .badge { margin-left: 6px; padding: 0 6px; font-size: 0.6875rem; border-radius: 8px;
   border: 1px solid var(--paper-rule); opacity: 0.75; }
 .with-sidebar .settings-body .person-things { display: flex; flex-direction: column; gap: 2px; padding: 4px 8px 8px; }
+/* What an org provider controls (#1002, FR-028), in grey under the name. */
+.with-sidebar .settings-body .person-org { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: 0 8px; }
 .with-sidebar .settings-body button.invite { margin: 4px 8px; }
 /* Make a Group… (#1761): the people to name, one checkbox each. */
 .group-people { border: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }

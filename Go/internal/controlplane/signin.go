@@ -606,7 +606,7 @@ func (si *signIns) pairing(conn *Conn, client string, public, helloNonce []byte)
 			o, err := require[wire.SignInOrgStart](m.Params, "SignInOrgStart")
 			if err == nil {
 				var started wire.SignInOrgStarted
-				if started, err = si.orgStart(context.Background(), o, binding{hello: helloNonce}); err == nil {
+				if started, err = si.orgStart(context.Background(), o, binding{hello: helloNonce, client: client, public: public}); err == nil {
 					conn.SendNow(reply(m.ID, started))
 					continue
 				}

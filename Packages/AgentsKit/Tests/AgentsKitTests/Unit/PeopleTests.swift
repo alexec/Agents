@@ -141,4 +141,27 @@ struct ChannelLinkWordsTests {
         queue.remove("r")
         #expect(queue.open().isEmpty)
     }
+
+    /// The org provider lines under a person (#1002, FR-028).
+    @Test func orgLinesSayWhoManagesAPerson() throws {
+        let json = #"{"id":"u1","name":"Sam","kind":"person","role":"admin","signIns":[],"clients":[],"machines":[],"#
+            + #""scim":{"provider":"acme-okta","userName":"sam@acme.com","active":false},"provisioned":true,"#
+            + #""suspended":{"by":"scim","provider":"acme-okta","at":"2026-10-22T09:00:00Z"},"roleFrom":["g1"]}"#
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        let sam = try decoder.decode(DaemonAPI.PersonRow.self, from: Data(json.utf8))
+        let names = ["acme-okta": "Acme Okta"]
+        #expect(PeopleWords.orgLines(sam) { names[$0] ?? $0 }
+            == ["Managed by Acme Okta", "Waiting for first sign-in", "Suspended by Acme Okta"])
+        #expect(sam.roleSetBy == "acme-okta")
+        #expect(PeopleWords.setBy("Acme Okta") == "Set by Acme Okta")
+        let lee = DaemonAPI.PersonRow(id: "u2", name: "Lee", role: .member)
+        #expect(PeopleWords.orgLines(lee) { $0 }.isEmpty && lee.roleSetBy == nil)
+    }
+
+    @Test func editInConsoleOpensConsolePeople() throws {
+        let json = #"{"name":"Team","version":"1","machineID":"m","publicWeb":"https://control.example.com/"}"#
+        let status = try JSONDecoder().decode(DaemonAPI.ControlStatus.self, from: Data(json.utf8))
+        #expect(PeopleWords.consoleURL(status)?.absoluteString == "https://control.example.com/#/console/people")
+    }
 }

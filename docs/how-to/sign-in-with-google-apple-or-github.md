@@ -8,8 +8,8 @@ description: Pair a Mac, iPhone or iPad with no code by signing in with Google, 
 
 A person can pair a new Mac, iPhone or iPad with no code. They sign in with Google, Apple
 or GitHub, and the control plane pairs the client as that person. Codes still work, and a
-control plane with no provider turned on uses only codes. A browser always pairs with a
-code from a signed-in client.
+control plane with no provider turned on uses only codes. A browser pairs with a code from a
+signed-in client, or signs in with your organisation's own provider (see below).
 
 The control plane uses the app's own Google, Apple and GitHub client ids. You do not register
 anything with them. A build that you make from source needs ids of its own: see [Set up Google,
@@ -55,6 +55,29 @@ With Apple or Google, the client pairs at once. With GitHub, the new client show
 one of your other clients, a card says **wants to sign in as you**, with your GitHub account and the same
 code. Make sure that the codes are the same, then select **Approve**. The request stops
 after 10 minutes.
+
+## Sign in with your organisation's provider
+
+When your organisation added its own provider (Okta, Entra, Google Workspace with its own
+client, or another OIDC provider), its button comes first, by name: **Sign in with Acme
+Okta**. The built-in providers come after it, then the code.
+
+1. On a Mac, open the **Connect** sheet and type the control plane's address. On an iPhone
+   or iPad, select **Sign In Instead…** and type it. In a browser, open the control plane's
+   page, for example `https://agents.example.com/`.
+2. Select **Sign in with Acme Okta**. Or select **Use an Email**, type your work email and
+   select **Continue**: the control plane finds your organisation's provider.
+3. Sign in at the provider. You come back paired, with no code and no Approve.
+
+The control plane runs the sign-in itself, and the client gets a ticket that works once, on
+the connection that started it. No token from the provider comes to the client. To add the
+provider to yourself on a paired Mac, iPhone or iPad, use **Add a Sign-in…**.
+
+Your organisation can require its provider for its email domain. Then a Google, Apple or
+GitHub sign-in at that domain says **Your organisation asks you to sign in with Acme Okta.**,
+with the button. If your organisation turns your access off, every client of yours shows only
+**Your organisation's sign-in turned your access off.** Your clients stay paired, and open
+again by themselves when your organisation turns your access on. See [Org identity](../explanation/org-identity.md).
 
 ## Why GitHub asks for Approve
 

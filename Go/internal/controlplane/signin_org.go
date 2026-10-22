@@ -150,19 +150,38 @@ func randomToken(n int) string {
 }
 
 // binding is what a flow is bound to: the hello's nonce of an s: connection, or a paired
-// client's session and person.
+// client's session and person. The web page's flow leaves the page and its connection
+// (FR-027, the same tab), so it is bound to what the page keeps instead: the key it
+// proved on its s: connection and that connection's id, or its paired client and person.
 type binding struct {
 	hello   []byte
 	session string
 	person  string
+	// The s: connection's id and public key, or the paired client's id.
+	client string
+	public []byte
+}
+
+// to is the binding for a flow that comes back to returnTo.
+func (b binding) to(returnTo string) binding {
+	if returnTo != string(wire.SignInOrgReturnWeb) || b.client == "" {
+		return binding{hello: b.hello, session: b.session, person: b.person}
+	}
+	return binding{client: strings.ToUpper(b.client), public: b.public, person: b.person}
 }
 
 func (b binding) hash() string {
 	h := sha256.New()
-	if b.hello != nil {
+	switch {
+	case b.client != "" && b.public != nil:
+		h.Write([]byte("agents-oidc-key\x00" + b.client + "\x00"))
+		h.Write(b.public)
+	case b.client != "":
+		h.Write([]byte("agents-oidc-client\x00" + b.client + "\x00" + b.person))
+	case b.hello != nil:
 		h.Write([]byte("agents-oidc-hello\x00"))
 		h.Write(b.hello)
-	} else {
+	default:
 		h.Write([]byte("agents-oidc-session\x00" + b.session + "\x00" + b.person))
 	}
 	return hex.EncodeToString(h.Sum(nil))
@@ -735,7 +754,7 @@ func (si *signIns) orgStart(ctx context.Context, start wire.SignInOrgStart, b bi
 		return wire.SignInOrgStarted{}, fail(notPermitted, "This control plane cannot open its secrets.")
 	}
 	now := si.clock()
-	state := orgState{Provider: p.ID, Purpose: string(start.Purpose), ReturnTo: string(start.ReturnTo), Bind: b.hash(), Person: b.person,
+	state := orgState{Provider: p.ID, Purpose: string(start.Purpose), ReturnTo: string(start.ReturnTo), Bind: b.to(string(start.ReturnTo)).hash(), Person: b.person,
 		LoginHint: hint, Made: records.At(now), Ends: records.At(now.Add(stateLife)), Sealed: sealed}
 	data, err := records.Encode(state)
 	if err != nil {
@@ -783,7 +802,7 @@ func (si *signIns) takeTicket(ctx context.Context, ticket string, b binding, pur
 	if err != nil {
 		return nil, err
 	}
-	if t.Bind != b.hash() || t.Purpose != string(purpose) {
+	if t.Bind != b.to(t.ReturnTo).hash() || t.Purpose != string(purpose) {
 		return nil, fail(notPermitted, "That sign-in was made for another connection. Sign in again on this one.")
 	}
 	if !si.clock().Before(t.Ends.Time) {
@@ -814,7 +833,7 @@ func (si *signIns) ticketPair(ctx context.Context, client string, public, helloN
 	if name == "" || len([]rune(name)) > 80 {
 		return nil, fail(invalidParams, "Say the client's name.")
 	}
-	t, err := si.takeTicket(ctx, r.Ticket, binding{hello: helloNonce}, wire.SignInOrgPurposePair, func(t *orgTicket) error {
+	t, err := si.takeTicket(ctx, r.Ticket, binding{hello: helloNonce, client: client, public: public}, wire.SignInOrgPurposePair, func(t *orgTicket) error {
 		switch {
 		case kind == records.KindMac || kind == records.KindIPhone || kind == records.KindIPad:
 		case kind == records.KindBrowser && t.ReturnTo == string(wire.SignInOrgReturnWeb):
@@ -918,7 +937,7 @@ func (si *signIns) joinByOrg(ctx context.Context, t *orgTicket) (string, error) 
 // ticketAdd is signIn/ticket on a paired client's connection: the org sign-in becomes one
 // more of the caller's (US2 AS6).
 func (si *signIns) ticketAdd(ctx context.Context, r wire.SignInTicket, from Caller, user string) (*wire.SignInTicketResult, error) {
-	t, err := si.takeTicket(ctx, r.Ticket, binding{session: from.Session, person: user}, wire.SignInOrgPurposeAddToMe, nil)
+	t, err := si.takeTicket(ctx, r.Ticket, binding{session: from.Session, person: user, client: from.Client}, wire.SignInOrgPurposeAddToMe, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -1014,7 +1033,7 @@ func (m *Methods) orgSignInMethod(ctx context.Context, method string, params jso
 		if err != nil {
 			return nil, err
 		}
-		return si.orgStart(ctx, o, binding{session: from.Session, person: user})
+		return si.orgStart(ctx, o, binding{session: from.Session, person: user, client: from.Client})
 	case "signIn/ticket":
 		t, err := require[wire.SignInTicket](params, "SignInTicket")
 		if err != nil {

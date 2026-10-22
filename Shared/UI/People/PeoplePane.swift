@@ -34,6 +34,8 @@ struct PeoplePane: View {
     /// Make a Bot… (nil bot) and Group and Cap… (#1761).
     @State private var botSheet: BotSheetItem?
     @State private var machineFor: DaemonAPI.PersonRow?
+    /// Console ▸ People on the web page, for an admin's Edit in Console (#1002, D17).
+    @State private var console: URL?
 
     struct BotSheetItem: Identifiable {
         var bot: DaemonAPI.PersonRow?
@@ -73,7 +75,8 @@ struct PeoplePane: View {
                         .paperListRow()
                 }
                 ForEach(shown) { person in
-                    PersonSection(person: person, admin: list.admin, groups: groups,
+                    PersonSection(person: person, admin: list.admin, groups: groups, providerName: people.providerName,
+                                  console: console,
                                   setRole: { role in Task { await setRole(person, role) } },
                                   remove: { removing = person },
                                   setCap: { botSheet = BotSheetItem(bot: person) },
@@ -121,6 +124,10 @@ struct PeoplePane: View {
             // connection to it is up. Once loaded, the model keeps the list true.
             while people.list == nil, !(await load()), !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(3))
+            }
+            if let control, people.list?.admin == true {
+                let status = try? await control.call(DaemonAPI.Method.controlStatus, returning: DaemonAPI.ControlStatus.self)
+                console = PeopleWords.consoleURL(status)
             }
         }
         .refreshable { await load() }
@@ -193,10 +200,15 @@ private struct PersonSection: View {
     let person: DaemonAPI.PersonRow
     let admin: Bool
     let groups: [DaemonAPI.Group]
+    let providerName: (String) -> String
+    /// Edit in Console, for an admin when the web page is served (#1002, D17).
+    let console: URL?
     let setRole: (DaemonAPI.UserRole) -> Void
     let remove: () -> Void
     let setCap: () -> Void
     let addMachine: () -> Void
+
+    @Environment(\.openURL) private var openURL
 
     var body: some View {
         Section {
@@ -205,6 +217,10 @@ private struct PersonSection: View {
                 Text(PeopleWords.badges(person))
                     .appText(.fine)
                     .foregroundStyle(.secondary)
+                // Managed by, Waiting for first sign-in, Suspended by (#1002, FR-028).
+                ForEach(PeopleWords.orgLines(person, name: providerName), id: \.self) { line in
+                    Text(line).appText(.fine).foregroundStyle(.secondary)
+                }
             }
             .accessibilityElement(children: .combine)
             if person.kind == .bot {
@@ -216,7 +232,13 @@ private struct PersonSection: View {
                     Button(BotWords.addMachine, action: addMachine)
                 }
             } else {
-                if admin {
+                if let provider = person.roleSetBy {
+                    // The provider's group gives the role: read only (FR-020).
+                    ListLine(title: "Role", words: "\(person.role.title) · \(PeopleWords.setBy(providerName(provider)))")
+                    if admin, let console {
+                        Button(PeopleWords.editInConsole) { openURL(console) }
+                    }
+                } else if admin {
                     Picker("Role", selection: Binding(get: { person.role }, set: setRole)) {
                         ForEach(DaemonAPI.UserRole.allCases) { Text($0.title).tag($0) }
                     }
