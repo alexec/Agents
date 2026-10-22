@@ -49,6 +49,7 @@ const CapFilesComplete1 = "files.complete/1"
 const CapFilesDiagnostics1 = "files.diagnostics/1"
 const CapFiles1 = "files/1"
 const CapGit1 = "git/1"
+const CapGovernance1 = "governance/1"
 const CapGroups1 = "groups/1"
 const CapHandover1 = "handover/1"
 const CapHostOrgRoutes1 = "host.org-routes/1"
@@ -505,6 +506,13 @@ var ControlCapabilities = pairs([][2]string{
 	{"control/setProjectDetection", "control/1"},
 	{"control/status", "control/1"},
 	{"git/credential", "git/1"},
+	{"governance/approvals", "governance/1"},
+	{"governance/decide", "governance/1"},
+	{"governance/report", "governance/1"},
+	{"governance/request", "governance/1"},
+	{"governance/requests", "governance/1"},
+	{"governance/revoke", "governance/1"},
+	{"governance/usage", "governance/1"},
 	{"groups/list", "groups/1"},
 	{"groups/remove", "groups/1"},
 	{"groups/set", "groups/1"},
@@ -627,6 +635,7 @@ var ControlCapabilities = pairs([][2]string{
 	{"control/capReached", "bots/1"},
 	{"control/clientChanged", "control/1"},
 	{"control/cutOff", "org-identity/1"},
+	{"control/governanceRequested", "governance/1"},
 	{"control/groupsChanged", "groups/1"},
 	{"control/hostChanged", "control/1"},
 	{"control/installProgress", "control/1"},
@@ -672,6 +681,7 @@ var ControlNotifications = set([]string{
 	"control/capReached",
 	"control/clientChanged",
 	"control/cutOff",
+	"control/governanceRequested",
 	"control/groupsChanged",
 	"control/hostChanged",
 	"control/installProgress",

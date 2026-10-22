@@ -1235,6 +1235,52 @@ type CarriedSettingSourceLevel struct {
 	Value string `json:"_0"`
 }
 
+// An approval of an MCP server or skill (#2019, M5): for a group, or for one person.
+type CatalogApproval struct {
+	Kind CatalogKind `json:"kind"`
+
+	Name string `json:"name"`
+
+	Source *string `json:"source,omitzero"`
+
+	Group *string `json:"group,omitzero"`
+
+	GroupName *string `json:"groupName,omitzero"`
+
+	User *string `json:"user,omitzero"`
+
+	UserName *string `json:"userName,omitzero"`
+
+	By string `json:"by"`
+
+	At Date `json:"at"`
+}
+
+// governance/approvals (#2019, M5), an admin's: every approval, by item.
+type CatalogApprovalList struct {
+	Approvals []CatalogApproval `json:"approvals"`
+}
+
+// governance/request (#2019, M5): a person asks for an MCP server or skill, with why.
+type CatalogAsk struct {
+	Kind CatalogKind `json:"kind"`
+
+	Name string `json:"name"`
+
+	Source *string `json:"source,omitzero"`
+
+	Why *string `json:"why,omitzero"`
+}
+
+// governance/decide (#2019, M5), an admin's: approve or refuse a request. Approved with a group, the approval holds for each of its members; with none, for the person who asked.
+type CatalogDecide struct {
+	Request string `json:"request"`
+
+	Approve bool `json:"approve"`
+
+	Group *string `json:"group,omitzero"`
+}
+
 type CatalogError struct {
 	Unreachable *CatalogErrorUnreachable `json:"unreachable,omitzero"`
 
@@ -1291,10 +1337,30 @@ type CatalogErrorFailed struct {
 	Value string `json:"_0"`
 }
 
+// One MCP server or skill a machine has from a catalogue (#2019, M5): its name, the registry name or catalogue it came from, and its version (a server's version, a skill's commit).
+type CatalogItem struct {
+	Kind CatalogKind `json:"kind"`
+
+	Name string `json:"name"`
+
+	Source *string `json:"source,omitzero"`
+
+	Version *string `json:"version,omitzero"`
+
+	ByHand *bool `json:"byHand,omitzero"`
+}
+
 type CatalogKind string
 
 const CatalogKindSkills CatalogKind = "skills"
 const CatalogKindMCP CatalogKind = "mcp"
+
+// A person in the catalogue's rows: their id and name.
+type CatalogPerson struct {
+	ID string `json:"id"`
+
+	Name string `json:"name"`
+}
 
 type CatalogPreviewAnswer struct {
 	Preview *SkillPreview `json:"preview,omitzero"`
@@ -1307,6 +1373,46 @@ type CatalogPreviewRequest struct {
 
 	Destination SkillDestination `json:"destination"`
 }
+
+// A request for an MCP server or skill (#2019, M5). Approved for a group, it is approved at once for every member who asks again.
+type CatalogRequest struct {
+	ID string `json:"id"`
+
+	Kind CatalogKind `json:"kind"`
+
+	Name string `json:"name"`
+
+	Source *string `json:"source,omitzero"`
+
+	Why *string `json:"why,omitzero"`
+
+	User string `json:"user"`
+
+	UserName string `json:"userName"`
+
+	At Date `json:"at"`
+
+	State CatalogRequestState `json:"state"`
+
+	Group *string `json:"group,omitzero"`
+
+	GroupName *string `json:"groupName,omitzero"`
+
+	DecidedBy *string `json:"decidedBy,omitzero"`
+
+	DecidedAt *Date `json:"decidedAt,omitzero"`
+}
+
+// governance/requests (#2019, M5): every request waiting to an admin, and to anyone their own of the last 30 days, oldest first.
+type CatalogRequestList struct {
+	Requests []CatalogRequest `json:"requests"`
+}
+
+type CatalogRequestState string
+
+const CatalogRequestStateWaiting CatalogRequestState = "waiting"
+const CatalogRequestStateApproved CatalogRequestState = "approved"
+const CatalogRequestStateRefused CatalogRequestState = "refused"
 
 type CatalogResult struct {
 	ID string `json:"id"`
@@ -1328,6 +1434,17 @@ type CatalogResult struct {
 	SkillPath *string `json:"skillPath,omitzero"`
 }
 
+// governance/revoke (#2019, M5), an admin's: take back one approval, for a group or for a person.
+type CatalogRevoke struct {
+	Kind CatalogKind `json:"kind"`
+
+	Name string `json:"name"`
+
+	Group *string `json:"group,omitzero"`
+
+	User *string `json:"user,omitzero"`
+}
+
 type CatalogSearchAnswer struct {
 	Results []CatalogResult `json:"results"`
 
@@ -1342,6 +1459,29 @@ type CatalogSearchRequest struct {
 	Marketplace *string `json:"marketplace,omitzero"`
 
 	Destination *SkillDestination `json:"destination,omitzero"`
+}
+
+// governance/usage (#2019, M5), an admin's: who uses each MCP server and skill, at each version, from what each machine last reported.
+type CatalogUsage struct {
+	Rows []CatalogUseRow `json:"rows"`
+
+	// How many machines have reported.
+	Machines int64 `json:"machines"`
+}
+
+// One item at one version in governance/usage: on how many machines, and whose (at most 50 people named).
+type CatalogUseRow struct {
+	Kind CatalogKind `json:"kind"`
+
+	Name string `json:"name"`
+
+	Source *string `json:"source,omitzero"`
+
+	Version string `json:"version"`
+
+	Machines int64 `json:"machines"`
+
+	People []CatalogPerson `json:"people"`
 }
 
 type CatchUpLeases struct {
@@ -3661,6 +3801,11 @@ type HostAnnounce struct {
 	Relay *bool `json:"relay,omitzero"`
 
 	Implementation *string `json:"implementation,omitzero"`
+}
+
+// governance/report (#2019, M5): the MCP servers and skills a machine has from a catalogue, personal and in its projects, at most 500. Sent at start and each hour; each replaces the last.
+type HostCatalog struct {
+	Items []CatalogItem `json:"items"`
 }
 
 // A paired window a host may let in on its local socket (#1118), with the key it proves itself with.

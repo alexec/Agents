@@ -27,6 +27,7 @@ import { AuditPage, RequestsPage, requestCount } from "./ConsoleRecords";
 import { TeamWorkflowsPage } from "./ConsoleWorkflows";
 import { LiveNowPage } from "./ConsoleLive";
 import { SignInPage } from "./ConsoleSignIn";
+import { CataloguePage } from "./Governance";
 
 /** Whether this person is an admin of the control plane, from the store's one people list (#2055): null until it answers. */
 function adminOf(store: Store): boolean | null {
@@ -107,6 +108,7 @@ function ConsoleSection({ store, section, down }: { store: Store; section: Secti
     case "reportPolicy": return <ReportPolicyPage store={store} down={down} />;
     case "requests": return <RequestsPage store={store} down={down} />;
     case "workflows": return <TeamWorkflowsPage store={store} down={down} />;
+    case "catalogue": return <CataloguePage store={store} down={down} />;
     case "audit": return <AuditPage store={store} down={down} />;
     default: return <Overview store={store} />;
   }

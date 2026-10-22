@@ -1,0 +1,91 @@
+package agentsd
+
+import (
+	"context"
+	"encoding/json"
+	"log"
+	"os"
+	"path/filepath"
+	"sort"
+	"strings"
+
+	"github.com/alexec/agents/Go/internal/agentsd/mcpcatalog"
+	"github.com/alexec/agents/Go/internal/agentsd/skillcatalog"
+	"github.com/alexec/agents/Go/wire"
+)
+
+// governanceItemsMost is what the control plane keeps of one report (#2019, M5).
+const governanceItemsMost = 500
+
+// governanceItems is each MCP server and skill this machine has from a catalogue,
+// personal and in its projects, from the catalogue sidecars: a server's registry name
+// and version, a skill's catalogue and commit. A project's folder is not said. The files
+// are only read here: one that does not decode says nothing.
+func (d *Daemon) governanceItems() []wire.CatalogItem {
+	seen := map[string]bool{}
+	var out []wire.CatalogItem
+	add := func(item wire.CatalogItem) {
+		key := string(item.Kind) + "\x00" + item.Name + "\x00" + deref(item.Version)
+		if item.Name != "" && !seen[key] {
+			seen[key] = true
+			out = append(out, item)
+		}
+	}
+	var servers mcpcatalog.Sidecar
+	if b, err := os.ReadFile(d.mcpSidecarPath()); err == nil && json.Unmarshal(b, &servers) == nil {
+		for key, r := range servers.Servers {
+			add(wire.CatalogItem{Kind: wire.CatalogKindMCP, Name: lastPart(key), Source: optionalString(r.RegistryName),
+				Version: optionalString(r.Version), ByHand: r.ByHand})
+		}
+	}
+	var skills skillcatalog.Sidecar
+	if b, err := os.ReadFile(filepath.Join(d.Store.Loc.Root, "catalog-skills.json")); err == nil && json.Unmarshal(b, &skills) == nil {
+		for key, r := range skills.Skills {
+			commit := r.Commit
+			if len(commit) > 12 {
+				commit = commit[:12]
+			}
+			add(wire.CatalogItem{Kind: wire.CatalogKindSkills, Name: lastPart(key), Source: optionalString(r.Catalogue),
+				Version: optionalString(commit)})
+		}
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].Kind != out[j].Kind {
+			return out[i].Kind < out[j].Kind
+		}
+		return out[i].Name < out[j].Name
+	})
+	if len(out) > governanceItemsMost {
+		out = out[:governanceItemsMost]
+	}
+	return out
+}
+
+// lastPart is a sidecar key's name: personal/<name> or <folder>/<name>.
+func lastPart(key string) string { return key[strings.LastIndex(key, "/")+1:] }
+
+func optionalString(s string) *string {
+	if s == "" {
+		return nil
+	}
+	return &s
+}
+
+// sendGovernanceReport tells the control plane what this machine has from a catalogue,
+// with the hourly report. A control plane before governance/1 answers that it has no such
+// method; nothing more is tried until the next hour.
+func (d *Daemon) sendGovernanceReport() {
+	ask := d.askControl.Load()
+	if ask == nil {
+		return
+	}
+	items := d.governanceItems()
+	if items == nil {
+		items = []wire.CatalogItem{}
+	}
+	ctx, cancel := context.WithTimeout(d.ctx, reportPatience)
+	defer cancel()
+	if _, err := (*ask)(ctx, wire.CallGovernanceReport.Name, wire.HostCatalog{Items: items}); err != nil {
+		log.Printf("governance/report: not sent, tried again within the hour: %v", err)
+	}
+}

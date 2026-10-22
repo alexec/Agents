@@ -127,7 +127,8 @@ func (c *clientRates) allow(client string, n int, method string) bool {
 
 // costly is a method that reads much of the store, or starts work outside it.
 func costly(method string) bool {
-	if strings.HasPrefix(method, "reports/") || strings.HasPrefix(method, "audit/") || strings.HasPrefix(method, "console/") {
+	if strings.HasPrefix(method, "reports/") || strings.HasPrefix(method, "audit/") || strings.HasPrefix(method, "console/") ||
+		strings.HasPrefix(method, "governance/") {
 		return true
 	}
 	switch method {

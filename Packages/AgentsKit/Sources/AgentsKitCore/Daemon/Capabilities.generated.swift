@@ -50,6 +50,7 @@ public enum Capability {
     public static let filesDiagnostics1 = "files.diagnostics/1"
     public static let files1 = "files/1"
     public static let git1 = "git/1"
+    public static let governance1 = "governance/1"
     public static let groups1 = "groups/1"
     public static let handover1 = "handover/1"
     public static let hostOrgRoutes1 = "host.org-routes/1"
@@ -459,6 +460,13 @@ public enum Capability {
         "control/setProjectDetection": "control/1",
         "control/status": "control/1",
         "git/credential": "git/1",
+        "governance/approvals": "governance/1",
+        "governance/decide": "governance/1",
+        "governance/report": "governance/1",
+        "governance/request": "governance/1",
+        "governance/requests": "governance/1",
+        "governance/revoke": "governance/1",
+        "governance/usage": "governance/1",
         "groups/list": "groups/1",
         "groups/remove": "groups/1",
         "groups/set": "groups/1",
@@ -581,6 +589,7 @@ public enum Capability {
         "control/capReached": "bots/1",
         "control/clientChanged": "control/1",
         "control/cutOff": "org-identity/1",
+        "control/governanceRequested": "governance/1",
         "control/groupsChanged": "groups/1",
         "control/hostChanged": "control/1",
         "control/installProgress": "control/1",
