@@ -252,7 +252,7 @@ To try it without opening anything:
 ./scripts/nightly-runtimes.py report --home /tmp/nightly --dry-run
 ```
 
-Two reviews (#42) run once per release, started by the Release workflow (#1462). They look
+Three reviews (#42, #1557) run once per release, started by the Release workflow (#1462). They look
 for new problems only in what changed on `main` since the last tag, and have the critical
 and high findings fixed by helper agents on branches of their own (failing test first, proven, left unmerged for you):
 
@@ -263,11 +263,18 @@ and high findings fixed by helper agents on branches of their own (failing test 
   main-thread work, unbounded growth, file descriptors, polling, transcript size,
   start-up and reconnects. At most one helper a run, whose proof is six runs of the
   measurement on `main` and six on its branch.
+- **HADR review** (`.agents/workflows/hadr-review.md`, #1557): high availability, disaster
+  recovery and bounded data. Every store has an enforced bound, writes are atomic, each
+  store that cannot be rebuilt has a backup whose restore it tries on a scratch set-up
+  (with the time it took and what was lost), the single points of failure in `deploy/`,
+  store copies and the handover, several copies over a bucket, and the docs. Its first run
+  reviews the whole system. At most one helper a run.
 
 Each keeps its findings, and the commit of `main` it reviewed through, in its own folder,
-`.agents/reviews/security/` or `.agents/reviews/performance/`, on a local branch that is
-never pushed (`agents/reviews-security`, `agents/reviews-performance`): a security
-finding is not published before it is fixed. Neither has a schedule; **Run now** tries one.
+`.agents/reviews/security/`, `.agents/reviews/performance/` or `.agents/reviews/hadr/`, on a
+local branch that is never pushed (`agents/reviews-security`, `agents/reviews-performance`,
+`agents/reviews-hadr`): a security finding is not published before it is fixed. None has a
+schedule; **Run now** tries one.
 
 **Free disk space** (`.agents/workflows/free-disk-space.md`, #199) runs on `machine.disk_low`. It
 deletes build output (the folders `.gitignore` ignores and git tracks nothing in, such as
