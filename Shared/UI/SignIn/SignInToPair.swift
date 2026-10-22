@@ -71,6 +71,8 @@ struct SignInToPair: View {
                 Button("Cancel", role: .cancel, action: cancel).controlSize(.small)
             }
         }
+        // One Form row on the Remote: a tap on one button fires only that one.
+        .rowButtons()
         .onDisappear(perform: cancel)
     }
 

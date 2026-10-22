@@ -139,6 +139,7 @@ struct UserScopePane: View {
                         }
                         if busy == part { ProgressView().controlSize(.small) }
                     }
+                    .rowButtons()
                 }
             }
         } header: {
@@ -196,6 +197,7 @@ private struct SecretSheet: View {
                 .keyboardShortcut(.defaultAction)
                 .disabled(saving || value.isEmpty || !UserScopeWords.isSecretName(chosen))
             }
+            .rowButtons()
         }
         .paperForm()
         .frame(minWidth: 360)
