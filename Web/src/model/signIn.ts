@@ -5,7 +5,7 @@
 import type { SignIn, SignInRequest } from "../protocol/generated";
 import { fromWireDate } from "../protocol/dates";
 
-export const paneTitle = "Sign-in";
+export const paneTitle = "Sign-in Providers";
 export const signInsTitle = "Sign-ins";
 
 const titles: Record<string, string> = { google: "Google", apple: "Apple", github: "GitHub", local: "This control plane", code: "Invite code" };
@@ -39,8 +39,10 @@ export function removeTitle(signIn: SignIn): string {
 }
 
 export const removeMessage = "You can no longer pair a client with this sign-in. Your clients stay paired.";
-export const signInsFoot = "Sign in with one of these on a Mac, iPhone or iPad to pair it with no code. Add one there, under Account. A browser pairs with a code.";
-export const paneFoot = "People sign in with these to pair a window or a phone with no code. A person not known joins only through an allowed Google Workspace domain; everyone else is invited first, and adds the sign-in under Account.";
+export const signInsFoot = "Sign in with one of these on a Mac, iPhone or iPad to pair it with no code. Add one there, under You ▸ Sign-ins. A browser pairs with a code.";
+/** You ▸ Sign-ins with none yet: where one is added (#2080). */
+export const signInsNone = "No sign-ins yet. Add one on a Mac, iPhone or iPad, under You ▸ Sign-ins.";
+export const paneFoot = "People sign in with these to pair a window or a phone with no code. A person not known joins only through an allowed Google Workspace domain; everyone else is invited first, and adds their sign-in under You ▸ Sign-ins.";
 export const domainsTitle = "Allowed Google Workspace domains";
 export const domainsFoot = "Anyone with a Workspace account on one of these joins as a member with no invite.";
 export const organisationsTitle = "Allowed GitHub organisations";

@@ -69,7 +69,8 @@ struct SignInButtons: View {
             Text("Your code").appText(.fine).foregroundStyle(.secondary)
             Text(code.userCode).appText(.title).monospaced().textSelection(.enabled)
             Text("Type it on github.com, then come back here.").appText(.supporting).foregroundStyle(.secondary)
-            HStack {
+            // One above another on iOS, so none is cut off at large text sizes (#2081).
+            codeActions {
                 Button("Copy Code") { Clipboard.copy(code.userCode) }
                 Button("Open github.com Again") { openURL(code.verificationURI) }
                 Button("Cancel", role: .cancel) {
@@ -78,10 +79,18 @@ struct SignInButtons: View {
                     busy = nil
                 }
             }
-            .controlSize(.small)
             // In a Form row, as Sign In… on the Remote has it: Copy Code must not cancel too.
             .rowButtons()
         }
+    }
+
+    @ViewBuilder
+    private func codeActions(@ViewBuilder _ buttons: () -> some View) -> some View {
+        #if os(iOS)
+        VStack(alignment: .leading, spacing: 10) { buttons() }
+        #else
+        HStack { buttons() }.controlSize(.small)
+        #endif
     }
 
     private func apple(_ result: Result<ASAuthorization, any Error>) {

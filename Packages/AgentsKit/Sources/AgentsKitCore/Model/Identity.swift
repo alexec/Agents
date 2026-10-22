@@ -240,10 +240,12 @@ public struct SignInRequestQueue: Sendable, Hashable {
 /// What the clients say about sign-in (#995), the same on the Mac and the Remote; the web
 /// page's are in `Web/src/model/signIn.ts`.
 public enum SignInWords {
-    public static let paneTitle = "Sign-in"
+    public static let paneTitle = "Sign-in Providers"
     public static let paneFoot = "People sign in with these to pair a window or a phone with no code. "
         + "A person not known joins only through an allowed Google Workspace domain; "
-        + "everyone else is invited first, and adds the sign-in under Account."
+        + "everyone else is invited first, and adds their sign-in under You ▸ Sign-ins."
+    /// The admin's pane, apart from a person's own Sign-ins (#2080).
+    public static let paneSymbol = "key.horizontal"
     public static let signInsTitle = "Sign-ins"
     public static let signInsFoot = "Sign in with one of these on another Mac, iPhone or iPad to pair it with no code. "
         + "A GitHub sign-in waits for Approve here."

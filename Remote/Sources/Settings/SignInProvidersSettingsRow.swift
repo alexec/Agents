@@ -12,7 +12,7 @@ struct SignInProvidersSettingsRow: View {
                     .navigationTitle(SignInWords.paneTitle)
                     .navigationBarTitleDisplayMode(.inline)
             } label: {
-                Label(SignInWords.paneTitle, systemImage: "person.badge.key")
+                Label(SignInWords.paneTitle, systemImage: SignInWords.paneSymbol)
             }
         }
     }

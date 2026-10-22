@@ -301,7 +301,7 @@ enum SettingsPane: String, Hashable, CaseIterable {
         case .people: "person.2"
         case .groups: "person.3"
         case .channels: "bubble.left.and.bubble.right"
-        case .signIn: "person.badge.key"
+        case .signIn: SignInWords.paneSymbol
         case .onEveryMachine: "arrow.triangle.2.circlepath"
         }
     }

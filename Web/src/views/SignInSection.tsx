@@ -1,6 +1,6 @@
 // Sign-in on the web page (#995, spec 736 T2), as the window's and the Remote's: You ▸ Sign-ins lists
 // how this person signs in, with Remove (Shared/UI/SignIn/SignInsSection.swift), and Control plane ▸
-// Sign-in lets an admin turn providers on and allow domains and organisations
+// Sign-in Providers lets an admin turn providers on and allow domains and organisations
 // (Shared/UI/SignIn/SignInPane.swift). A browser adds no sign-in: it pairs with a code (FR-014).
 import { useEffect } from "preact/hooks";
 import { useSignal } from "@preact/signals";
@@ -9,7 +9,7 @@ import type { SignIn, SignInConfigure, SignInProviders } from "../protocol/gener
 import { describe } from "../model/errors";
 import {
   domainsFoot, domainsTitle, isOutside, list, organisationsFoot, organisationsTitle, paneFoot, paneTitle, providerTitle,
-  removeMessage, removeTitle, row, signInsFoot, signInsTitle,
+  removeMessage, removeTitle, row, signInsFoot, signInsNone, signInsTitle,
 } from "../model/signIn";
 
 /** You ▸ Sign-ins: this person's sign-ins, each outside one with Remove. */
@@ -33,7 +33,8 @@ export function SignInsSection({ store, down }: { store: Store; down: boolean })
       <h3 class="section-head" id="settings-signins">{signInsTitle}</h3>
       {problem && <p class="hint">{problem}</p>}
       {!shown && !problem && <p class="hint">Loading…</p>}
-      {shown && (
+      {shown && shown.length === 0 && <p class="hint">{signInsNone}</p>}
+      {shown && shown.length > 0 && (
         <ul class="people-list">
           {shown.map((signIn) => (
             <li key={`${signIn.provider}\n${signIn.account ?? ""}`} class="person">
@@ -54,7 +55,7 @@ export function SignInsSection({ store, down }: { store: Store; down: boolean })
   );
 }
 
-/** Control plane ▸ Sign-in, for admins: the providers, and the allowed domains and organisations. */
+/** Control plane ▸ Sign-in Providers, for admins: the providers, and the allowed domains and organisations. */
 export function SignInSection({ store, down }: { store: Store; down: boolean }) {
   const providers = useSignal<SignInProviders | null>(null);
   const problem = useSignal<string | null>(null);
