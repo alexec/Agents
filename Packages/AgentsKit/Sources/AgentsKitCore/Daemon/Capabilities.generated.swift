@@ -53,6 +53,7 @@ public enum Capability {
     public static let hostOrgRoutes1 = "host.org-routes/1"
     public static let hostPolicy1 = "host.policy/1"
     public static let hostTeam1 = "host.team/1"
+    public static let hostUpdate1 = "host.update/1"
     public static let hostUserSettings1 = "host.user-settings/1"
     public static let hostWire1 = "host.wire/1"
     public static let host1 = "host/1"
@@ -316,6 +317,8 @@ public enum Capability {
         "runtimes/setDefaultAccount": "host.org-routes/1",
         "runtimes/setProvider": "runtimes/1",
         "sandbox/state": "sandbox/1",
+        "selfUpdate/set": "host.update/1",
+        "selfUpdate/status": "host.update/1",
         "sessions/adopt": "sessions/1",
         "sessions/delete": "sessions/1",
         "sessions/list": "sessions/1",
@@ -403,6 +406,7 @@ public enum Capability {
         "runtime/changed": "runtime/1",
         "runtimes/accountProfilesChanged": "runtimes.accounts/1",
         "runtimes/allowancesChanged": "runtimes/1",
+        "selfUpdate/changed": "host.update/1",
         "shell/output": "shell/1",
         "shell/stateChanged": "shell/1",
         "storage/writeFailed": "storage/1",
@@ -588,6 +592,7 @@ public enum Capability {
         "host/clients": "host/1",
         "host/orgRoutes": "host.org-routes/1",
         "host/policy": "host.policy/1",
+        "host/release": "host.update/1",
         "host/user": "bots/1",
         "host/userSettings": "user/1",
         "projects/detect": "projects/1",

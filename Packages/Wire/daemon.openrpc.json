@@ -5288,6 +5288,64 @@
       }
     },
     {
+      "name": "selfUpdate/changed",
+      "x-capability": "host.update/1",
+      "description": "A Mac's host, when how it updates Agents Host changes (#2178).",
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/SelfUpdate"
+          }
+        }
+      ]
+    },
+    {
+      "name": "selfUpdate/set",
+      "x-capability": "host.update/1",
+      "description": "A Mac's host: turn updating Agents Host by itself on or off (#2178). Kept in host-update.json in the root.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/SelfUpdateSet"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/SelfUpdate"
+        }
+      }
+    },
+    {
+      "name": "selfUpdate/status",
+      "x-capability": "host.update/1",
+      "description": "A Mac's host: how it updates Agents Host to the release the control plane names (#2178). Only a Mac's host serves it.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/SelfUpdate"
+        }
+      }
+    },
+    {
       "name": "sessions/adopt",
       "x-capability": "sessions/1",
       "paramStructure": "by-name",

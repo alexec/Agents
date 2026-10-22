@@ -52,6 +52,7 @@ const CapHandover1 = "handover/1"
 const CapHostOrgRoutes1 = "host.org-routes/1"
 const CapHostPolicy1 = "host.policy/1"
 const CapHostTeam1 = "host.team/1"
+const CapHostUpdate1 = "host.update/1"
 const CapHostUserSettings1 = "host.user-settings/1"
 const CapHostWire1 = "host.wire/1"
 const CapHost1 = "host/1"
@@ -315,6 +316,8 @@ var HostCapabilities = pairs([][2]string{
 	{"runtimes/setDefaultAccount", "host.org-routes/1"},
 	{"runtimes/setProvider", "runtimes/1"},
 	{"sandbox/state", "sandbox/1"},
+	{"selfUpdate/set", "host.update/1"},
+	{"selfUpdate/status", "host.update/1"},
 	{"sessions/adopt", "sessions/1"},
 	{"sessions/delete", "sessions/1"},
 	{"sessions/list", "sessions/1"},
@@ -402,6 +405,7 @@ var HostCapabilities = pairs([][2]string{
 	{"runtime/changed", "runtime/1"},
 	{"runtimes/accountProfilesChanged", "runtimes.accounts/1"},
 	{"runtimes/allowancesChanged", "runtimes/1"},
+	{"selfUpdate/changed", "host.update/1"},
 	{"shell/output", "shell/1"},
 	{"shell/stateChanged", "shell/1"},
 	{"storage/writeFailed", "storage/1"},
@@ -448,6 +452,7 @@ var HostNotifications = set([]string{
 	"runtime/changed",
 	"runtimes/accountProfilesChanged",
 	"runtimes/allowancesChanged",
+	"selfUpdate/changed",
 	"shell/output",
 	"shell/stateChanged",
 	"storage/writeFailed",
@@ -633,6 +638,7 @@ var ControlCapabilities = pairs([][2]string{
 	{"host/clients", "host/1"},
 	{"host/orgRoutes", "host.org-routes/1"},
 	{"host/policy", "host.policy/1"},
+	{"host/release", "host.update/1"},
 	{"host/user", "bots/1"},
 	{"host/userSettings", "user/1"},
 	{"projects/detect", "projects/1"},
@@ -674,6 +680,7 @@ var ControlNotifications = set([]string{
 	"host/clients",
 	"host/orgRoutes",
 	"host/policy",
+	"host/release",
 	"host/user",
 	"host/userSettings",
 	"projects/detect",

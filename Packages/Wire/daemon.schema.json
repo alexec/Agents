@@ -8436,6 +8436,19 @@
       ],
       "additionalProperties": false
     },
+    "HostRelease": {
+      "type": "object",
+      "description": "host/release (#2178): the release the control plane names, as X.Y.Z.",
+      "properties": {
+        "version": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "version"
+      ],
+      "additionalProperties": false
+    },
     "HostRequest": {
       "type": "object",
       "properties": {
@@ -16464,6 +16477,63 @@
         "secrets"
       ],
       "additionalProperties": false
+    },
+    "SelfUpdate": {
+      "type": "object",
+      "description": "How a Mac's host updates Agents Host to the release the control plane names, with no administrator (#2178).",
+      "properties": {
+        "autoUpdate": {
+          "type": "boolean"
+        },
+        "state": {
+          "$ref": "#/definitions/SelfUpdateState"
+        },
+        "running": {
+          "type": "string",
+          "description": "The version this copy is."
+        },
+        "release": {
+          "type": "string",
+          "description": "The release the control plane named last; none until it names one."
+        },
+        "message": {
+          "type": "string",
+          "description": "Why it failed or cannot, in a sentence for the person."
+        }
+      },
+      "required": [
+        "autoUpdate",
+        "state",
+        "running"
+      ],
+      "additionalProperties": false
+    },
+    "SelfUpdateSet": {
+      "type": "object",
+      "description": "selfUpdate/set (#2178).",
+      "properties": {
+        "autoUpdate": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "autoUpdate"
+      ],
+      "additionalProperties": false
+    },
+    "SelfUpdateState": {
+      "type": "string",
+      "description": "Where updating Agents Host is (#2178): upToDate, off (the person turned it off), downloading, waiting (ready; it waits for the last turn to end), restarting, failed (the next release named tries again), cannot (this copy cannot update itself, such as one in a folder only an administrator changes).",
+      "enum": [
+        "upToDate",
+        "off",
+        "downloading",
+        "waiting",
+        "restarting",
+        "failed",
+        "cannot"
+      ],
+      "x-fallback": "upToDate"
     },
     "SendFacts": {
       "type": "object",

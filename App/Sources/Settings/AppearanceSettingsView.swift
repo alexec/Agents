@@ -70,14 +70,15 @@ struct AccountSettingsView: View {
     }
 }
 
-/// Settings ▸ Machines ▸ This Mac (#846): whether this Mac stays awake, how long archived agents are kept,
-/// and its backups (#1810).
+/// Settings ▸ Machines ▸ This Mac (#846): whether this Mac stays awake, whether Agents Host updates
+/// itself (#2178), how long archived agents are kept, and its backups (#1810).
 struct MacSettingsView: View {
     @Environment(AppModel.self) private var model
 
     var body: some View {
         Form {
             WakeSettingsSection()
+            SelfUpdateSection()
             ArchiveSettingsSection()
             if let backups = model.work.backupState {
                 BackupsSection(state: backups, configure: model.configureBackups, make: model.makeBackup,
@@ -87,6 +88,7 @@ struct MacSettingsView: View {
         .paperForm()
         .task {
             await model.refreshWakeSettings()
+            await model.refreshSelfUpdate()
             await model.refreshRetentionState()
             await model.refreshBackupState()
         }

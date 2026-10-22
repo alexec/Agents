@@ -265,7 +265,8 @@ A tag that already exists for this version means another release ran: end with
    `gh run watch <id> --exit-status` (run it in the background, then wait with
    `wait_for_event` and `until_minutes: 30`, and look again).
 2. **GitHub:** `gh release view v<version> --json assets` has the `.dmg`, the `.zip`,
-   both `agentsd-linux-*.tar.gz` and `SHA256SUMS`.
+   both `agentsd-linux-*.tar.gz` and `SHA256SUMS`. Macs update Agents Host from the `.zip`
+   and `SHA256SUMS` by these names (#2178): a release without them updates no Mac.
    **The image** (#2140): the `image` job passed, and
    `docker buildx imagetools inspect ghcr.io/alexec/agents-control:<version>` lists
    `linux/amd64` and `linux/arm64`. If the job failed, name
