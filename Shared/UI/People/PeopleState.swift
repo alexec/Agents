@@ -32,8 +32,11 @@ final class PeopleState {
     /// Goes up on `control/peopleChanged` and `control/groupsChanged` (#1761), for what a
     /// pane loads beside the list.
     private(set) var revision = 0
-    /// The last bot that stopped at a cap (#1761, `control/capReached`), shown to admins.
-    private(set) var capReached: DaemonAPI.CapReached?
+    /// The bots stopped at a cap (#1761, `control/capReached`), shown to admins: one per
+    /// bot, each only while it is true (#2073, `CapNotices`).
+    private(set) var capped: [DaemonAPI.CapReached] = []
+    /// Takes a notice away when its day ends.
+    private var capExpiry: Task<Void, Never>?
     /// Requests answered from here and not decided yet: their buttons wait.
     private(set) var answering: Set<String> = []
 
@@ -66,6 +69,7 @@ final class PeopleState {
             return error is JSONRPCError
         }
         if withGroups { await loadGroups(control) }
+        keepCapsTrue()
         return true
     }
 
@@ -73,6 +77,25 @@ final class PeopleState {
     private func loadGroups(_ control: DaemonClient) async {
         groups = (try? await control.call(DaemonAPI.Method.groupsList, DaemonAPI.Empty(),
                                           returning: DaemonAPI.GroupList.self))?.groups ?? []
+        keepCapsTrue()
+    }
+
+    /// Drops the cap notices that are no longer true, and wakes when the next one's day ends.
+    private func keepCapsTrue() {
+        let open = CapNotices.open(capped, people: list?.people, groups: groups)
+        if open != capped { capped = open }
+        capExpiry?.cancel()
+        guard let next = capped.map(\.until).min() else { return }
+        capExpiry = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(max(1, next.timeIntervalSinceNow)))
+            guard !Task.isCancelled else { return }
+            self?.keepCapsTrue()
+        }
+    }
+
+    /// OK on a cap notice: gone until the bot stops at a cap again.
+    func dismissCap(_ reached: DaemonAPI.CapReached) {
+        capped.removeAll { $0.user == reached.user }
     }
 
     /// The link requests this person decides, and for an admin who to send them on to.
@@ -114,7 +137,9 @@ final class PeopleState {
             await loadGroups(control)
             revision += 1
         case DaemonAPI.Notification.controlCapReached:
-            capReached = try? params?.decode(DaemonAPI.CapReached.self)
+            if let reached = try? params?.decode(DaemonAPI.CapReached.self) {
+                capped = CapNotices.adding(reached, to: capped)
+            }
             // Only the bot's spend today changed.
             await loadList(control, groups: false)
         default:

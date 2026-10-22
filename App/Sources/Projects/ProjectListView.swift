@@ -82,6 +82,16 @@ struct ProjectListView: View {
                     }
                 }
             }
+            // A bot stopped at its cap (#2073), for an admin, beside the machines.
+            if model.people.list?.admin == true, !model.people.capped.isEmpty {
+                Section {
+                    ForEach(model.people.capped, id: \.user) { reached in
+                        CapReachedCard(reached: reached, control: model.controlRequests, people: model.people)
+                            .listRowSeparator(.hidden)
+                            .selectionDisabled()
+                    }
+                }
+            }
             // A channel identity asking to act as this person (#1762), beside the machines.
             let linking = model.people.openLinks()
             if !linking.isEmpty {

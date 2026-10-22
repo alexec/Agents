@@ -84,6 +84,17 @@ struct RemoteSidebar: View {
                     }
                 }
             }
+            // A bot stopped at its cap (#2073), for an admin, beside the machines.
+            if model.people.list?.admin == true, !model.people.capped.isEmpty {
+                Section {
+                    ForEach(model.people.capped, id: \.user) { reached in
+                        CapReachedCard(reached: reached, control: model.controlPlane, people: model.people)
+                            .listRowSeparator(.hidden)
+                            .listRowBackground(Color.clear)
+                            .listRowInsets(EdgeInsets(top: 4, leading: 12, bottom: 4, trailing: 12))
+                    }
+                }
+            }
             // A new client that signed in with GitHub as this person (#995), beside them.
             let signingIn = model.signIn.open()
             if !signingIn.isEmpty {

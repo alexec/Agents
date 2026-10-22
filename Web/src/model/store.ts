@@ -19,6 +19,8 @@ import { Failure } from "../protocol/generated";
 import { CallFailed, type Link } from "../wire/link";
 import type { FolderGoneAsk } from "./missingFolder";
 import { describe, methodNotFound } from "./errors";
+import { fromWireDate } from "../protocol/dates";
+import { addCap, openCaps } from "./teamGroups";
 import type { SaveOutcome } from "./sourceEdit";
 import { artifactsIn, withArtifactsOf, type Artifact } from "./artifacts";
 import { log } from "../log";
@@ -434,8 +436,11 @@ export class Work {
   readonly people = signal<PeopleList | null>(null);
   /** Why `people` could not be loaded: the failure itself, for each view to word. */
   readonly peopleFailure = signal<unknown>(null);
-  /** The last bot that stopped at a cap (#1761, control/capReached), for an admin's Settings ▸ People. */
-  readonly capReached = signal<CapReached | null>(null);
+  /** The bots stopped at a cap (#1761, control/capReached), for an admin: one per bot, each only while true (#2073). */
+  readonly capped = signal<CapReached[]>([]);
+  /** The last of them, for Console ▸ Requests. */
+  readonly capReached = computed(() => this.capped.value.at(-1) ?? null);
+  protected capExpiry: ReturnType<typeof setTimeout> | null = null;
   /** Counts each control/userSettingsChanged (#1760): You ▸ On Every Machine loads again when it moves. */
   readonly userScopeChanges = signal(0);
   /** The last machine of the person's removed with secrets on it (#1760, control/secretsLeft), until read. */
@@ -1176,14 +1181,15 @@ export class Store extends Work {
         return;
       }
       if (method === "control/capReached") {
-        this.capReached.value = (params as CapReached | null) ?? null;
+        const reached = params as CapReached | null;
+        if (reached?.user) this.capped.value = addCap(reached, this.capped.value);
         // Only the bot's spend today changed.
         void this.loadPeople();
         return;
       }
       if (method === "control/groupsChanged") {
         // Settings ▸ Groups, and each provider's group's name (#1761).
-        void this.providers.loadGroups().then(() => { this.peopleChanges.value += 1; });
+        void this.providers.loadGroups().then(() => { this.keepCapsTrue(); this.peopleChanges.value += 1; });
         return;
       }
       if (method === "control/userSettingsChanged") {
@@ -1297,6 +1303,18 @@ export class Store extends Work {
       return;
     }
     if (this.providers.groups.value.length === 0) await this.providers.loadGroups();
+    this.keepCapsTrue();
+  }
+
+  /** Drops the cap notices no longer true (#2073), and wakes when the next one's day ends. */
+  private keepCapsTrue(): void {
+    const open = openCaps(this.capped.value, this.people.value?.people ?? null, this.providers.groups.value);
+    if (open.length !== this.capped.value.length) this.capped.value = open;
+    if (this.capExpiry) clearTimeout(this.capExpiry);
+    this.capExpiry = null;
+    if (open.length === 0) return;
+    const next = Math.min(...open.map((n) => fromWireDate(n.until).getTime()));
+    this.capExpiry = setTimeout(() => this.keepCapsTrue(), Math.max(1000, next - Date.now()));
   }
 
   /** Link requests (#1762), and for an admin whom to send them on to; a control plane before links has none. */

@@ -456,6 +456,11 @@ public enum PeopleWords {
     /// with the work on them that is not pushed, and their other machines leave. Without a
     /// preview (a control plane from before #1763), every machine only leaves.
     public static func removeMessage(_ person: DaemonAPI.PersonRow, preview: DaemonAPI.PersonRemovePreview? = nil) -> String {
+        removeLines(person, preview: preview).joined(separator: " ")
+    }
+
+    /// The same, a line each (#2077): for Remove…'s sheet, a machine to a line.
+    public static func removeLines(_ person: DaemonAPI.PersonRow, preview: DaemonAPI.PersonRemovePreview? = nil) -> [String] {
         var lines = ["\(person.name) can no longer reach the control plane."]
         if let clients = clients(person) {
             lines.append("These clients are forgotten: \(clients).")
@@ -481,7 +486,7 @@ public enum PeopleWords {
         if person.clients.isEmpty, person.machines.isEmpty {
             lines.append("They have no clients and no machines.")
         }
-        return lines.joined(separator: " ")
+        return lines
     }
 
     /// "agents/fix (2 commits not pushed, changes not committed)": a worktree by its branch,

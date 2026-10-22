@@ -21,12 +21,8 @@ struct PeoplePane: View {
 
     @State private var problem: String?
     @State private var isInviting = false
+    /// Remove…'s sheet (#2077): it opens at once, and asks what would go while it shows.
     @State private var removing: DaemonAPI.PersonRow?
-    /// What Remove would take (#1763): the person's started machines with their work that
-    /// is not pushed. Nil from a control plane from before it.
-    @State private var removal: DaemonAPI.PersonRemovePreview?
-    /// The person whose machines are being asked, before the confirmation shows.
-    @State private var asking: DaemonAPI.PersonRow?
     @State private var isRotating = false
     /// Said once the control key was rotated (#997).
     @State private var rotated = false
@@ -42,8 +38,6 @@ struct PeoplePane: View {
     private var list: DaemonAPI.PeopleList? { people.list }
     /// The groups a bot may be in (#1761).
     private var groups: [DaemonAPI.Group] { people.groups }
-    /// The last bot that stopped at a cap, for an admin (#1761).
-    private var capReached: DaemonAPI.CapReached? { people.capReached }
 
     var body: some View {
         Form {
@@ -54,16 +48,13 @@ struct PeoplePane: View {
                 }
                 .paperListRow()
             }
-            if let capReached, list?.admin == true {
+            // Each bot stopped at a cap, for an admin (#1761, #2073).
+            if list?.admin == true, !people.capped.isEmpty {
                 Section {
-                    Text(BotWords.capReached(capReached)).appText(.supporting).tinted(.attention)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                .paperListRow()
-            }
-            if let asking {
-                Section {
-                    Text(PeopleWords.asking(asking)).appText(.supporting).foregroundStyle(.secondary)
+                    ForEach(people.capped, id: \.user) { reached in
+                        Text(BotWords.capReached(reached)).appText(.supporting).tinted(.attention)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                 }
                 .paperListRow()
             }
@@ -71,7 +62,7 @@ struct PeoplePane: View {
                 ForEach(list.people) { person in
                     PersonSection(person: person, admin: list.admin, groups: groups,
                                   setRole: { role in Task { await setRole(person, role) } },
-                                  remove: { Task { await askBeforeRemoving(person) } },
+                                  remove: { removing = person },
                                   setCap: { botSheet = BotSheetItem(bot: person) },
                                   addMachine: { machineFor = person })
                     if person.isYou, let joinCommand = people.joinCommand, !joinCommand.isEmpty {
@@ -129,13 +120,9 @@ struct PeoplePane: View {
         .sheet(item: $machineFor) { bot in
             BotMachineSheet(control: control, bot: bot).paperSheet()
         }
-        .confirmationDialog(removing.map(PeopleWords.removeTitle) ?? "",
-                            isPresented: Binding(get: { removing != nil }, set: { if !$0 { removing = nil } }),
-                            titleVisibility: .visible, presenting: removing) { person in
-            Button("Remove", role: .destructive) { Task { await remove(person) } }
-            Button("Cancel", role: .cancel) {}
-        } message: { person in
-            Text(PeopleWords.removeMessage(person, preview: removal))
+        .sheet(item: $removing) { person in
+            RemovePersonSheet(control: control, person: person)
+                .paperSheet()
         }
         .confirmationDialog(PeopleWords.rotateTitle, isPresented: $isRotating, titleVisibility: .visible) {
             Button("Rotate") { Task { await rotate() } }
@@ -168,36 +155,6 @@ struct PeoplePane: View {
             problem = PeopleWords.refusal(error)
         }
         // A change is told as control/peopleChanged, which loads the list once for every pane.
-    }
-
-    /// Asks the control plane what Remove would take, then asks to confirm it (FR-029). An
-    /// older control plane does not know `people/removePreview`: the confirmation then says
-    /// what it did before.
-    private func askBeforeRemoving(_ person: DaemonAPI.PersonRow) async {
-        guard let control, asking == nil else { return }
-        asking = person
-        defer { asking = nil }
-        do {
-            removal = try await control.call(DaemonAPI.Method.peopleRemovePreview, DaemonAPI.PersonRequest(user: person.id),
-                                             returning: DaemonAPI.PersonRemovePreview.self)
-        } catch let error as JSONRPCError where error.code == JSONRPCError.methodNotFound {
-            removal = nil
-        } catch {
-            problem = PeopleWords.refusal(error)
-            return
-        }
-        problem = nil
-        removing = person
-    }
-
-    private func remove(_ person: DaemonAPI.PersonRow) async {
-        guard let control else { return }
-        do {
-            _ = try await control.call(DaemonAPI.Method.peopleRemove, DaemonAPI.PersonRequest(user: person.id))
-            problem = nil
-        } catch {
-            problem = PeopleWords.refusal(error)
-        }
     }
 
     /// control/rotate (#997). This client's own connection closes a moment later, and it
@@ -299,6 +256,110 @@ private struct ListLine: View {
                 .fixedSize(horizontal: false, vertical: true)
         }
         .accessibilityElement(children: .combine)
+    }
+}
+
+/// Remove… (FR-029, #1763, #2077): opens at once, asks the control plane what would go (the
+/// person's started machines with their work that is not pushed) while it shows, then says
+/// it a line each, as the web page's sheet does. An older control plane does not know
+/// `people/removePreview`: the sheet then says what it did before.
+struct RemovePersonSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    let control: DaemonClient?
+    let person: DaemonAPI.PersonRow
+
+    @State private var preview: DaemonAPI.PersonRemovePreview?
+    @State private var isAsking = true
+    @State private var isRemoving = false
+    @State private var problem: String?
+
+    var body: some View {
+        #if os(macOS)
+        VStack(alignment: .leading, spacing: 16) {
+            Text(PeopleWords.removeTitle(person)).appText(.title)
+            form
+            HStack {
+                Spacer()
+                Button("Cancel") { dismiss() }.keyboardShortcut(.cancelAction)
+                Button("Remove", role: .destructive) { Task { await remove() } }
+                    .keyboardShortcut(.defaultAction)
+                    .disabled(isAsking || isRemoving)
+            }
+        }
+        .padding(24)
+        .frame(width: 460)
+        .task { await ask() }
+        #else
+        NavigationStack {
+            form
+                .navigationTitle(PeopleWords.removeTitle(person))
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("Remove", role: .destructive) { Task { await remove() } }
+                            .disabled(isAsking || isRemoving)
+                    }
+                }
+        }
+        .task { await ask() }
+        #endif
+    }
+
+    private var form: some View {
+        Form {
+            Section {
+                if isAsking {
+                    HStack(spacing: 8) {
+                        ProgressView().controlSize(.small)
+                        Text(PeopleWords.asking(person)).appText(.supporting).foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                } else {
+                    ForEach(PeopleWords.removeLines(person, preview: preview), id: \.self) { line in
+                        Text(line).appText(.supporting)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+            }
+            .paperListRow()
+            if let problem {
+                Text(problem).appText(.supporting).tinted(.failure)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .paperListRow()
+            }
+        }
+        .paperForm()
+    }
+
+    private func ask() async {
+        guard let control else {
+            problem = "The control plane can’t be reached."
+            isAsking = false
+            return
+        }
+        defer { isAsking = false }
+        do {
+            preview = try await control.call(DaemonAPI.Method.peopleRemovePreview, DaemonAPI.PersonRequest(user: person.id),
+                                             returning: DaemonAPI.PersonRemovePreview.self)
+        } catch let error as JSONRPCError where error.code == JSONRPCError.methodNotFound {
+            preview = nil
+        } catch {
+            problem = PeopleWords.refusal(error)
+        }
+    }
+
+    /// The change is told as control/peopleChanged, which loads the list once for every pane.
+    private func remove() async {
+        guard let control, !isRemoving else { return }
+        isRemoving = true
+        defer { isRemoving = false }
+        do {
+            _ = try await control.call(DaemonAPI.Method.peopleRemove, DaemonAPI.PersonRequest(user: person.id))
+            dismiss()
+        } catch {
+            problem = PeopleWords.refusal(error)
+        }
     }
 }
 

@@ -43,6 +43,8 @@ struct GroupsPane: View {
                         Text(group.name).appText(.reading)
                         GroupLine(title: "People", words: GroupWords.members(group, people: people))
                         GroupLine(title: "Workspace providers", words: GroupWords.providers(group, of: providers) ?? "None")
+                        // What its bots may spend together in a day (#2074).
+                        GroupLine(title: "Daily cap", words: GroupWords.capLine(group, people: people))
                         if admin {
                             HStack {
                                 Button("Edit…") { editing = .init(group: group) }
@@ -148,6 +150,8 @@ struct GroupSheet: View {
     @State private var name = ""
     @State private var everyone = false
     @State private var members: Set<String> = []
+    /// What its bots may spend together in a day (#2074), as typed.
+    @State private var cap = ""
     @State private var problem: String?
     @State private var isAsking = false
 
@@ -197,6 +201,12 @@ struct GroupSheet: View {
                     .appText(.fine).foregroundStyle(.secondary)
             }
             .paperListRow()
+            Section {
+                TextField("Daily cap", text: $cap, prompt: Text("No cap, or dollars a day"))
+            } footer: {
+                Text(GroupWords.capFoot).appText(.fine).foregroundStyle(.secondary)
+            }
+            .paperListRow()
             if !everyone {
                 Section("People") {
                     ForEach(people) { person in
@@ -219,6 +229,7 @@ struct GroupSheet: View {
         name = group.name
         everyone = group.everyone
         members = Set(group.members)
+        if let usd = group.caps?.dailyUSD { cap = BotWords.dollars(usd) }
     }
 
     private func save() async {
@@ -227,6 +238,14 @@ struct GroupSheet: View {
             return
         }
         guard !trimmed.isEmpty, !isAsking else { return }
+        let caps: DaemonAPI.SpendCaps
+        switch BotWords.readCap(cap) {
+        case .none: caps = DaemonAPI.SpendCaps(dailyUSD: nil)
+        case .dollars(let usd): caps = DaemonAPI.SpendCaps(dailyUSD: usd)
+        case .refused(let why):
+            problem = why
+            return
+        }
         isAsking = true
         defer { isAsking = false }
         // In the order People lists them.
@@ -234,7 +253,7 @@ struct GroupSheet: View {
         do {
             _ = try await control.call(DaemonAPI.Method.groupsSet,
                                        DaemonAPI.GroupSet(id: editing.group?.id, name: trimmed, everyone: everyone,
-                                                          members: everyone ? [] : named),
+                                                          members: everyone ? [] : named, caps: caps),
                                        returning: DaemonAPI.Group.self)
             saved()
             dismiss()

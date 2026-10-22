@@ -53,3 +53,42 @@ test("bots: a cap typed in is dollars or refused, never no cap for text typed (#
   assert.deepEqual(g.readCap("-5"), refused(g.capNotDollars));
   assert.deepEqual(g.readCap("0"), refused(g.capNotAboveZero));
 });
+
+test("team groups: a cap notice holds only while true: its day, its cap, its bot (#2073)", () => {
+  const now = Date.UTC(2026, 9, 21, 12) / 1000;
+  const until = Date.UTC(2026, 9, 22) / 1000;
+  const own = { user: "b", name: "review-bot", spentUSD: 51, capUSD: 50, until };
+  const grouped = { user: "c", name: "lint-bot", group: "Platform", spentUSD: 90, capUSD: 80, until };
+  const people = [
+    { id: "b", name: "review-bot", kind: "bot", caps: { dailyUSD: 50 }, group: "g1" },
+    { id: "c", name: "lint-bot", kind: "bot", group: "g1" },
+  ];
+  const groups = [{ id: "g1", name: "Platform", everyone: false, members: [], caps: { dailyUSD: 80 } }];
+  // A wire date counts seconds from 2001, as Foundation does.
+  const at = (seconds) => Date.UTC(2001, 0, 1) + seconds * 1000;
+  assert.equal(g.openCaps([own, grouped], people, groups, at(now)).length, 2);
+  // Its day ended.
+  assert.equal(g.openCaps([own], people, groups, at(until)).length, 0);
+  // Its cap changed, or its group's.
+  assert.equal(g.openCaps([own], [{ ...people[0], caps: { dailyUSD: 100 } }], groups, at(now)).length, 0);
+  assert.equal(g.openCaps([grouped], people, [{ ...groups[0], caps: { dailyUSD: 200 } }], at(now)).length, 0);
+  // Its bot was removed, or moved to another group.
+  assert.equal(g.openCaps([own], [], groups, at(now)).length, 0);
+  assert.equal(g.openCaps([grouped], [people[0], { ...people[1], group: "g2" }], groups, at(now)).length, 0);
+  // No list yet: only the time.
+  assert.equal(g.openCaps([own], null, [], at(now)).length, 1);
+  // One per bot, the last told.
+  assert.deepEqual(g.addCap({ ...own, spentUSD: 60 }, [own, grouped]).map((n) => [n.user, n.spentUSD]), [["c", 90], ["b", 60]]);
+});
+
+test("team groups: a group's cap line adds its bots' spend today (#2074)", () => {
+  const group = { id: "g1", name: "Platform", everyone: false, members: [], caps: { dailyUSD: 50 } };
+  const people = [
+    { id: "a", kind: "bot", group: "g1", spentTodayUSD: 3.2 },
+    { id: "b", kind: "bot", group: "g1", spentTodayUSD: 8.8 },
+    { id: "c", kind: "bot", group: "g2", spentTodayUSD: 40 },
+    { id: "d", kind: "person", group: "g1", spentTodayUSD: 1 },
+  ];
+  assert.equal(g.groupCapLine(group, people), "$50 a day · $12 today");
+  assert.equal(g.groupCapLine({ ...group, caps: undefined }, []), "No cap");
+});

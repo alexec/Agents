@@ -234,6 +234,18 @@ public enum GroupWords {
 
     public static func removeTitle(_ group: DaemonAPI.Group) -> String { "Remove \(group.name)?" }
 
+    /// A group's daily cap and its bots' spend today, together (#2074): "$50 a day · $12 today",
+    /// or "No cap". The control plane weighs the group's bots together against it.
+    public static func capLine(_ group: DaemonAPI.Group, people: [DaemonAPI.PersonRow]) -> String {
+        let spent = people.filter { $0.kind == .bot && $0.group == group.id }.compactMap(\.spentTodayUSD)
+        var parts = [BotWords.cap(group.caps)]
+        // To the cent, so $3.20 and $8.80 make $12.
+        if !spent.isEmpty { parts.append("\(BotWords.dollars((spent.reduce(0, +) * 100).rounded() / 100)) today") }
+        return parts.joined(separator: " · ")
+    }
+
+    public static let capFoot = "Its bots together stop starting work at it, until midnight UTC."
+
     public static let removeMessage = "Its people keep their machines. A provider must go to another group first."
 }
 
@@ -263,6 +275,9 @@ public enum BotWords {
         let whose = reached.group.map { "\($0)’s cap" } ?? "its cap"
         return "\(reached.name) stopped at \(whose): \(dollars(reached.spentUSD)) of \(dollars(reached.capUSD)) today. It starts work again at midnight UTC."
     }
+
+    /// The sidebar card's heading for a bot at its cap (#2073).
+    public static func capReachedTitle(_ reached: DaemonAPI.CapReached) -> String { "\(reached.name) stopped at its cap" }
 
     public static let foot = "A bot runs the team’s workflows: a workflow whose runs-on: names it runs on its machines, once per trigger. Nobody can start, message or answer its agents; an admin can stop a run. Its spend counts against its own cap and its group’s."
 
@@ -303,5 +318,30 @@ public enum BotWords {
               let usd = Double(words.replacingOccurrences(of: ",", with: "")), usd.isFinite
         else { return .refused(capNotDollars) }
         return usd > 0 ? .dollars(usd) : .refused(capNotAboveZero)
+    }
+}
+
+/// The cap notices an admin is shown (#2073): one per bot, the last told, and only while it
+/// is true: before its `until`, and while the cap it names is the one the bot, or the
+/// bot's group, has now. The web page's are `openCaps` in `Web/src/model/teamGroups.ts`.
+public enum CapNotices {
+    /// `control/capReached`: this bot's notice, in place of any it had.
+    public static func adding(_ reached: DaemonAPI.CapReached, to notices: [DaemonAPI.CapReached]) -> [DaemonAPI.CapReached] {
+        notices.filter { $0.user != reached.user } + [reached]
+    }
+
+    /// The notices still true at `now`. With no people list yet, only the time is weighed.
+    public static func open(_ notices: [DaemonAPI.CapReached], people: [DaemonAPI.PersonRow]?, groups: [DaemonAPI.Group],
+                            at now: Date = Date()) -> [DaemonAPI.CapReached] {
+        notices.filter { notice in
+            guard notice.until > now else { return false }
+            guard let people else { return true }
+            // A bot removed has no cap to change.
+            guard let bot = people.first(where: { $0.id == notice.user }) else { return false }
+            guard let name = notice.group else { return bot.caps?.dailyUSD == notice.capUSD }
+            // Its group's cap: changed, or the bot moved to another group.
+            guard let group = groups.first(where: { $0.name == name }) else { return false }
+            return bot.group == group.id && group.caps?.dailyUSD == notice.capUSD
+        }
     }
 }
