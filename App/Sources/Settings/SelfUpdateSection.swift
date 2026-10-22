@@ -19,7 +19,7 @@ struct SelfUpdateSection: View {
                 LabeledContent("Version", value: update.running)
                 Text(Self.line(update))
                     .appText(.fine)
-                    .foregroundStyle(update.state == .failed ? .red : .secondary)
+                    .foregroundStyle((update.state == .failed ? StateTint.failure : .none).style(or: .secondary))
             } header: {
                 Text("Updates")
             } footer: {
