@@ -72,7 +72,7 @@ export function sessionMark(agent: Agent): SessionMark | null {
     // A queued helper waits for a free place, not on anything it asked for.
     case "waiting": return agent.state === "queued" ? "queued" : "waiting";
     // Asking to be archived (#584) is what the person has left to do with it, as the window's mark says.
-    // Read or unread, one ring (#1323): the bold title alone says unread.
+    // Read or unread, one tick (#1323, #2363): the bold title alone says unread.
     case "finished": return asksToArchive(agent) ? "asksToArchive" : "done";
     case "stopped": return asksToArchive(agent) ? "asksToArchive" : "paused";
     default: return null;

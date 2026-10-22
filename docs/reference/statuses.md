@@ -13,7 +13,14 @@ shown. Archived chats stay under **Archived sessions**, folded away until you op
 
 The status is what the agent's icon says when you hover over it, and what a screen reader
 reads. The Mac, iPhone and iPad use the same words. Only **Needs you** is drawn in
-colour. Session labels appear beneath the title on Mac rows and phone cards; agent-owned labels use an outline, while person-owned labels have a filled background. The phone shows two labels on a card and a **+N** count for the rest. Labels remain on archived sessions.
+colour.
+
+In the sidebar, each session has a mark for what it wants: an orange hand when it needs
+you, a spinning ring of dots while it works, a numbered list while it is queued, Zs while
+it waits, a pause mark when it is paused, and a tick when it is done. All but the hand
+are in the accent colour.
+
+Session labels appear beneath the title on Mac rows and phone cards; agent-owned labels use an outline, while person-owned labels have a filled background. The phone shows two labels on a card and a **+N** count for the rest. Labels remain on archived sessions.
 
 | Status | Group | What it means | What you can do |
 | --- | --- | --- | --- |

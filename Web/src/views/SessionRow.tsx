@@ -41,7 +41,7 @@ const markWords: Record<SessionMark, string> = { needsYou: "Needs you", working:
 /**
  * A session's mark in the sidebar (#495, #499), the window's and the Remote's: an orange hand when
  * it needs the person, the working ring while it thinks, tipping while it runs a tool (#2332), a numbered list while queued, Zs while it waits (#765), a pause mark once
- * stopped (#630), an empty ring once done, read or not (#1323). Archived keeps its
+ * stopped (#630), a tick once done, read or not (#1323, #2363). Archived keeps its
  * status mark.
  */
 export function SidebarMark({ agent, comingBack = false }: { agent: Agent; comingBack?: boolean }) {
@@ -56,6 +56,7 @@ export function SidebarMark({ agent, comingBack = false }: { agent: Agent; comin
       {mark === "queued" && <span class="glyph" aria-hidden="true">≡</span>}
       {mark === "waiting" && <span class="glyph" aria-hidden="true">ᶻᶻ</span>}
       {mark === "paused" && <span class="glyph" aria-hidden="true">⏸&#xFE0E;</span>}
+      {mark === "done" && <span class="glyph" aria-hidden="true">✓&#xFE0E;</span>}
       {mark === "asksToArchive" && <span class="glyph" aria-hidden="true">🗃&#xFE0E;</span>}
     </span>
   );
