@@ -542,11 +542,11 @@ struct StatusIcon: View {
     }
 
     /// What a screen reader hears, and what the tooltip says: `StatusShape.words`, which
-    /// the web remote says too.
+    /// the web remote says too. A running tool is named, as the cog draws it (#2261).
     private var description: String {
         StatusShape.words(shape, state: state, isComingBack: isComingBack, outcome: outcome,
                           isUnaccountedFor: isUnaccountedFor, ending: ending, isUnread: isUnread,
-                          isWaitingForAllowance: isWaitingForAllowance)
+                          isWaitingForAllowance: isWaitingForAllowance, tool: tool)
     }
 }
 

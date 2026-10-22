@@ -12,5 +12,5 @@ enum RunningToolWords {
     }
 
     /// "Running: swift test", for the tooltip and VoiceOver.
-    static func label(_ tool: String) -> String { "Running: \(tool)" }
+    static func label(_ tool: String) -> String { StatusShape.runningLabel(tool) }
 }

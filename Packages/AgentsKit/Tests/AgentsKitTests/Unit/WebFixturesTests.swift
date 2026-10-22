@@ -363,6 +363,11 @@ struct WebFixturesTests {
         }
         cases.append(Case(name: "coming back after a restart", input: .object([
             "agent": try Self.encode(Self.agent(40, .stopped, endedReason: .daemonGone)), "isComingBack": .bool(true)])))
+        // A running tool is named, not "Working" (#2261).
+        var tooling = Self.agent(41, .running)
+        tooling.runningTool = "swift test"
+        cases.append(Case(name: "running a tool", input: .object([
+            "agent": try Self.encode(tooling), "isComingBack": .bool(false)])))
         try pin("status/rows.json", cases) { input in
             let agent = try input["agent"]!.decode(Agent.self)
             let back = input["isComingBack"]?.boolValue ?? false

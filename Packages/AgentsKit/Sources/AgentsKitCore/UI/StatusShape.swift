@@ -95,11 +95,11 @@ public extension StatusShape {
     }
 
     /// What a screen reader hears for the shape, and what the tooltip says. Precise where
-    /// the shape is not: the outcome's words come from `WorkOutcome.heading`, and a
-    /// stopped agent says why.
+    /// the shape is not: the outcome's words come from `WorkOutcome.heading`, a
+    /// stopped agent says why, and a running one names its tool (#2261).
     static func words(_ shape: StatusShape, state: AgentState, isComingBack: Bool, outcome: WorkOutcome?,
                       isUnaccountedFor: Bool, ending: String?, isUnread: Bool,
-                      isWaitingForAllowance: Bool = false) -> String {
+                      isWaitingForAllowance: Bool = false, tool: String? = nil) -> String {
         if isComingBack { return AgentsModel.comingBackDescription }
         if isUnread && state == .finished { return "Unread · \(outcome?.heading ?? "Finished")" }
         if isWaitingForAllowance { return "Waiting for an allowance" }
@@ -108,7 +108,7 @@ public extension StatusShape {
         if state == .finished, let outcome { return outcome.heading }
         if isUnaccountedFor && state == .finished { return "Finished without saying how it went" }
         switch state {
-        case .running: return "Working"
+        case .running: return tool.map(runningLabel) ?? "Working"
         case .starting: return AgentState.startingLabel
         case .waitingOnUser: return "Waiting on you"
         case .finished: return "Finished"
@@ -123,6 +123,11 @@ public extension StatusShape {
         words(StatusShape(row: agent, isComingBack: isComingBack), state: agent.state, isComingBack: isComingBack,
               outcome: agent.report?.outcome, isUnaccountedFor: agent.endingIsUnaccountedFor,
               ending: agent.endedReason?.summary, isUnread: agent.isUnread,
-              isWaitingForAllowance: agent.continueWhenBack != nil)
+              isWaitingForAllowance: agent.continueWhenBack != nil,
+              tool: agent.state == .running ? agent.runningTool : nil)
     }
+
+    /// "Running: swift test": a running agent's words while it runs a tool (#1902), in the
+    /// sidebar, the rows, the cards and the chat's working line alike.
+    static func runningLabel(_ tool: String) -> String { "Running: \(tool)" }
 }

@@ -2,6 +2,7 @@
 // sessions list draws it, ported by hand and held to Fixtures/web/status (research R7).
 import type { Agent, AgentState, EndedReason, WorkOutcome } from "../protocol/generated";
 import { endingIsUnaccountedFor, isWaiting, outcomeNeedsAPerson, projectFolder } from "./groups";
+import { runningToolLabel } from "./sidebar";
 
 /** Working is a spinner; the rest are drawn. Only needsYou is ever in colour. */
 export type StatusShape = "working" | "needsYou" | "waiting" | "done" | "stopped";
@@ -82,7 +83,8 @@ export function statusWords(agent: Agent, isComingBack = false): string {
   if (state === "finished" && outcome) return outcomeHeadings[outcome];
   if (endingIsUnaccountedFor(agent)) return "Finished without saying how it went";
   switch (state) {
-    case "running": return "Working";
+    // A running tool is named, as the cog draws it (#2261).
+    case "running": return agent.runningTool ? runningToolLabel(agent.runningTool) : "Working";
     case "starting": return startingLabel;
     case "waitingOnUser": return "Waiting on you";
     case "finished": return "Finished";
