@@ -54,7 +54,15 @@ func sweep(ctx context.Context, rs *records.Records, now time.Time, most int, ev
 
 	// Events, by the day in their key: the audit's days (#996), or the days before a
 	// shorter time for a day after it (#2067).
-	n, err := events.sweep(ctx, s, audit.Cutoff(audit.SweepDays(rs.Settings(), now), now), left)
+	cutoff := audit.Cutoff(audit.SweepDays(rs.Settings(), now), now)
+	n, err := events.sweep(ctx, s, cutoff, left)
+	report.events += n
+	left -= n
+	if err != nil {
+		return report, err
+	}
+	// The audit chain's seals (#1001), a day's each, go with their day's entries.
+	n, err = audit.SweepSeals(ctx, s, cutoff)
 	report.events += n
 	left -= n
 	if err != nil {
@@ -264,6 +272,10 @@ func (s *Service) sweepEveryHour() {
 		var report sweepReport
 		var err error
 		if s.phase.now() == phaseServing {
+			// Today's head of this copy's audit chain, sealed (#1001).
+			if err := s.auditChain.Seal(context.Background(), s.cfg.Store, time.Now()); err != nil {
+				s.log("audit: could not seal the chain: " + err.Error())
+			}
 			report, err = sweep(context.Background(), s.records, time.Now(), mostPerSweep, &events)
 			s.renewConnected(context.Background())
 			s.dropPreviousKey(context.Background())

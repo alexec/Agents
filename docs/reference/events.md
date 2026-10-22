@@ -346,6 +346,21 @@ It is read only.
 Entries are stored in the control plane's store under `v1/events/<day>/`, one file each.
 The methods are `audit/list`, `audit/export` and `control/setAuditDays`.
 
+### The hash chain
+
+Each entry is in a **chain** (#1001). Each copy of the control plane links the entries it
+writes. An entry carries `chain` (the copy), `seq` (its place, from 1 when the copy
+starts) and `prev` (the SHA-256 of the stored entry before it). Each hour, and when a day
+ends, the copy writes a **seal** for the day under `v1/audit-seals/<day>/<copy>.json`: the
+chain's last place and its hash. Seals go with their day's entries.
+
+`agents-control audit verify` reads every entry and seal in the store. It says which
+entry was changed and which were removed, and exits 1 when it finds any. A day that the
+sweep deleted is not a removal. Entries written before the chain are counted, not checked.
+
+The chain shows a change. It does not stop one: a person who can write the store can also
+write a new chain. To keep a copy out of their reach, send the entries to a sink.
+
 ## See also
 
 - [Have an agent wait for something](../how-to/wait-for-something.md)

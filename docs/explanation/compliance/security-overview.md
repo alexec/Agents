@@ -87,8 +87,11 @@ answering cards and changing settings are recorded. Reads and prompts are not.
   A member sees only their own entries. See [Events](../../reference/events.md#audit-who-did-what).
 - **How long:** 90 days by default. An admin sets 1 to 3,650 days.
 - **Export:** an admin exports the entries as CSV or JSON lines.
-- **Not yet:** the entries are not tamper-evident. A hash chain, and syslog and HTTP sinks,
-  are planned (T8, #1001).
+- **Tamper-evident:** each entry carries the hash of the one before it, in a chain for
+  each copy of the control plane, and a seal for each day holds each chain's head
+  (T8, #1001). `agents-control audit verify` says which entry was changed or removed. See
+  [Events](../../reference/events.md#the-hash-chain).
+- **Not yet:** syslog and HTTP sinks are planned (T8, #1001).
 
 ## Sandboxes
 
