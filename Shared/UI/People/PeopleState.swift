@@ -40,6 +40,10 @@ final class PeopleState {
     /// Requests answered from here and not decided yet: their buttons wait.
     private(set) var answering: Set<String> = []
 
+    /// Whether Settings lists Groups: for an admin, and for a member in a group, who sees
+    /// the groups they are in (#2076), as the web page does.
+    var showsGroups: Bool { you?.isAdmin != false || !groups.isEmpty }
+
     /// The approval cards to show now.
     func open(at now: Date = Date()) -> [DaemonAPI.JoinRequest] { queue.open(at: now) }
 

@@ -1,4 +1,4 @@
-// Settings ▸ This device ▸ Finished chats. Listed in ./sections.ts.
+// Settings ▸ You ▸ Finished chats: kept on the Mac's host, so the same on every client (#2079). Listed in ./sections.ts.
 import { mayArchiveMyChats, mayArchiveMyChatsFooter, setMayArchiveMyChats } from "../../model/fileToSeeWords";
 
 export function FinishedChatsSection() {
