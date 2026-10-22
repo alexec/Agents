@@ -55,8 +55,10 @@ page.
 
 ## Who sees what
 
-- **An admin** sees every person's machines.
-- **A member** sees only their own machines.
+- **The Cost page's Reports pane** shows your own machines, also for an admin, and says
+  "Your machines" (#2071).
+- **Reports ▸ Spend** on the web page names its scope: your machines, a group's people's,
+  or everyone's. Only an admin sees everyone's.
 
 ## Methods
 

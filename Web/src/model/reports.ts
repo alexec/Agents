@@ -17,7 +17,15 @@ export const noProject = "No project";
 export const noRuntime = "No runtime";
 export const noGroup = "No group";
 export const empty = "Nothing was used in this time. Each machine sends what it used once an hour.";
-export const memberNote = "You see your own machines. An admin sees everyone's.";
+/** Whose spend a scope shows, said on the pane (#2071). */
+export const meNote = "Your machines. A group’s and everyone’s are in Reports ▸ Spend.";
+export function scopeNote(scope: ReportScope, groupName?: string): string {
+  switch (scope.kind) {
+    case "me": return "Your machines.";
+    case "org": return "Everyone’s machines.";
+    case "group": return `The machines of ${groupName ?? "the group"}’s people.`;
+  }
+}
 export const utcNote = "Hours and days are UTC, so machines in other time zones add up.";
 
 export interface ReportGroup {

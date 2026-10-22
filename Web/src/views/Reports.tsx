@@ -1,13 +1,14 @@
 // Cost ▸ Reports (#1811), as the window's and the Remote's ReportsPane: usage, cost and time by
 // person, project, machine and runtime, added up on the control plane from what each machine
-// sends each hour. An admin sees every person's machines; a member their own.
+// sends each hour. Cost ▸ Reports shows the caller's own machines (Me, #2071); Reports ▸ Spend
+// has a scope, Me, a group or the organisation, and names it.
 import { useEffect, useMemo } from "preact/hooks";
 import { useSignal } from "@preact/signals";
 import type { Store } from "../model/store";
 import type { ReportFormat, ReportRange, ReportScope, ReportScopeOption, UsageReport } from "../protocol/generated";
 import { CallFailed } from "../wire/link";
-import { budgetWords, dimensionTitle, empty, exportName, groupNote, hiddenNote, line, memberNote, rangeShort, rangeSpan, ranges,
-  reportTotals, scopeKey, scopedDimensions, share, utcNote } from "../model/reports";
+import { budgetWords, dimensionTitle, empty, exportName, groupNote, hiddenNote, line, meNote, rangeShort, rangeSpan, ranges,
+  reportTotals, scopeKey, scopeNote, scopedDimensions, share, utcNote } from "../model/reports";
 import type { ReportDimension, ReportGroup } from "../model/reports";
 import type { Section } from "../model/console";
 
@@ -19,12 +20,13 @@ function sentence(error: unknown): string {
   return "The control plane can’t be reached.";
 }
 
+/** With no `scope`, the Cost page's pane: the caller's own machines, an admin's too (#2071). */
 export function ReportsPane({ store, runtimeName, scope }: { store: Store; runtimeName: (id: string) => string; scope?: ReportScope | undefined }) {
   const range = useSignal<ReportRange>("week");
   const by = useSignal<ReportDimension>("person");
   const report = useSignal<UsageReport | null>(null);
   const problem = useSignal<string | null>(null);
-  const asked = scope ? { scope } : {};
+  const asked = { scope: scope ?? { kind: "me" as const } };
   const load = async () => {
     try {
       report.value = await store.link.call("reports/usage", { range: range.value, ...asked });
@@ -95,7 +97,7 @@ export function ReportsPane({ store, runtimeName, scope }: { store: Store; runti
           )}
           {shown.personsHidden && <p class="quiet small">{hiddenNote}</p>}
           {way === "group" && <p class="quiet small">{groupNote}</p>}
-          <p class="quiet small">{shown.admin || scope ? utcNote : `${memberNote} ${utcNote}`}</p>
+          <p class="quiet small">{scope ? `${scopeNote(scope, scope.group ? shown.groupNames?.[scope.group] : undefined)} ${utcNote}` : `${meNote} ${utcNote}`}</p>
         </>
       )}
     </div>
