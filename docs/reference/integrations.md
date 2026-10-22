@@ -75,16 +75,16 @@ Open issues: `is:open label:integration allowance`.
 An organisation's way to the model (#999): an org key or a gateway, kept on the control
 plane and sent to machines sealed (`docs/explanation/org-keys-and-gateways.md`). Slice 1
 keeps routes and sends them; slice 2 keeps them on the machine and reaches the model through
-its relay. The clients' words are slice 3.
+its relay. Slice 3 shows the routes to members on the Mac, the Remote and the web page (#2283).
 Open issues: `is:open label:integration gateway`.
 
 | Integration | Clients that show it | State | Last checked | Where | Gaps |
 | --- | --- | --- | --- | --- | --- |
-| Org key (Anthropic, OpenAI, Gemini, xAI) | control plane, machine | built | 2026-10-22, relay against a fake API; Claude, Codex, Gemini and OpenCode CLIs reach the relay | `Go/internal/controlplane/orgroutes.go`, `Go/internal/agentsd/modelrelay.go` | clients (slice 3); Alex to test with a real key |
-| Amazon Bedrock (API key, or access key and role by STS) | control plane, machine | built (Claude only) | 2026-10-22, STS, SigV4 and the event stream against fakes only | `Go/internal/controlplane/orgtokens.go`, `Go/internal/agentsd/modelrelay.go` | OpenCode not built; clients (slice 3); Alex to test with a real account |
-| Google Vertex AI (service account by OAuth) | control plane, machine | built (Claude, Gemini) | 2026-10-22, OAuth and the relay against fakes only | `Go/internal/controlplane/orgtokens.go`, `Go/internal/agentsd/modelrelay.go` | OpenCode not built; clients (slice 3); Alex to test with a real account |
-| Microsoft Azure (key, or Entra app) | control plane, machine | built | 2026-10-22, Entra and the relay against fakes only | `Go/internal/controlplane/orgtokens.go`, `Go/internal/agentsd/modelrelay.go` | clients (slice 3); Alex to test with a real account |
-| Base URL (LiteLLM, Portkey, …) | control plane, machine | built | 2026-10-22, relay against a fake API only | `Go/internal/controlplane/orgroutes.go`, `Go/internal/agentsd/modelrelay.go` | clients (slice 3) |
+| Org key (Anthropic, OpenAI, Gemini, xAI) | control plane, machine; Mac, Remote, web | built | 2026-10-22, relay against a fake API; Claude, Codex, Gemini and OpenCode CLIs reach the relay | `Go/internal/controlplane/orgroutes.go`, `Go/internal/agentsd/modelrelay.go` | Alex to test with a real key (#2222) |
+| Amazon Bedrock (API key, or access key and role by STS) | control plane, machine; Mac, Remote, web | built (Claude only) | 2026-10-22, STS, SigV4 and the event stream against fakes only | `Go/internal/controlplane/orgtokens.go`, `Go/internal/agentsd/modelrelay.go` | OpenCode not built; Alex to test with a real account (#2222) |
+| Google Vertex AI (service account by OAuth) | control plane, machine; Mac, Remote, web | built (Claude, Gemini) | 2026-10-22, OAuth and the relay against fakes only | `Go/internal/controlplane/orgtokens.go`, `Go/internal/agentsd/modelrelay.go` | OpenCode not built; Alex to test with a real account (#2222) |
+| Microsoft Azure (key, or Entra app) | control plane, machine; Mac, Remote, web | built | 2026-10-22, Entra and the relay against fakes only | `Go/internal/controlplane/orgtokens.go`, `Go/internal/agentsd/modelrelay.go` | Alex to test with a real account (#2222) |
+| Base URL (LiteLLM, Portkey, …) | control plane, machine; Mac, Remote, web | built | 2026-10-22, relay against a fake API only | `Go/internal/controlplane/orgroutes.go`, `Go/internal/agentsd/modelrelay.go` | Alex to test with a real gateway (#2222) |
 
 ## Runtime downloads
 
@@ -186,6 +186,7 @@ Open issues: `is:open label:integration "control plane"`.
 | Caddy with ACME | control plane | tested on a real account | 2026-10-18, Let's Encrypt certificates for control.agentloops.dev and views.agentloops.dev (`specs/058-control-plane/walks/1461.md`) | `deploy/` | |
 | Bonjour discovery | Mac, control plane | built | — | `Host/Sources/LocalServices.swift`, `Go/internal/controlplane/machine.go` | |
 | ssh host install and tunnels | Mac, server, control plane | built | — | `Go/internal/controlplane/hostinstall/ssh.go`, `Go/internal/controlplane/hosttunnels/ssh.go` | |
+| Audit sinks: syslog (RFC 5424 over TCP or TLS) and HTTP (JSON lines, a bearer token) to a SIEM (#1001) | web (Console ▸ Audit ▸ Sinks), control plane | built | 2026-10-22, against a local TCP, TLS and HTTP listener in tests only | `Go/internal/controlplane/audit/sink.go`, `Go/internal/controlplane/auditing_sinks.go`, `Web/src/views/AuditSinks.tsx` | Alex to test with a real SIEM (#2222) |
 | Google Cloud (Compute Engine VM and Cloud KMS) for the control plane | control plane | tested on a real account | 2026-10-18, `up.sh` made the VM `agents-control`, the live control plane moved there and back (`specs/058-control-plane/walks/1461.md`) | `deploy/gcp/up.sh`, `deploy/gcp/down.sh`, `deploy/gcp/startup.sh` | |
 | Cloudflare DNS for the control plane's names | control plane | tested on a real account | 2026-10-18, `dns.sh` made the A records for control.agentloops.dev and views.agentloops.dev (`specs/058-control-plane/walks/1461.md`) | `deploy/cloudflare/dns.sh` | |
 | Cloudflare Pages for the promotional site, www.agentloops.dev | none (the public site) | built | — | `.github/workflows/www-publish.yml`, `www/` | #1550: the Pages token is Alex's |

@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/alexec/agents/Go/internal/agentsd/redact"
 	"github.com/alexec/agents/Go/internal/rolllog"
 )
 
@@ -189,12 +190,13 @@ var redactions = []struct {
 	{regexp.MustCompile(`(?i)\b((?:access_|refresh_|id_)?token|secret|password|passwd)=[^\s&'"]+`), "${1}=<redacted>"},
 }
 
-// Redact cuts codes and tokens out of a log line.
+// Redact cuts codes and tokens out of a log line: its own shapes, then the known token
+// shapes a machine cuts out of transcripts (#1001, redact.Text).
 func Redact(line string) string {
 	for _, r := range redactions {
 		line = r.re.ReplaceAllString(line, r.with)
 	}
-	return line
+	return redact.Text(line)
 }
 
 // stamped is ControlLog.stamped: ISO 8601 with milliseconds and the local zone, before

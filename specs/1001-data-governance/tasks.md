@@ -27,18 +27,18 @@
 
 - [ ] T014 [US1] Hold back a trailing run of token characters in an agent message chunk (at most 256 bytes) until the next chunk, a different update or the turn's end; test a GitHub token split over two chunks.
 
-## Phase 4: a3, the control plane's log (area: control-plane) — other lane
+## Phase 4: a3, the control plane's log (area: control-plane)
 
-- [ ] T015 `controlplane/log.go` `Redact` also runs `redact.Text`.
+- [x] T015 `controlplane/log.go` `Redact` also runs `redact.Text`.
 
-## Phase 5: c1 and c2, export and import (areas: hosts; sidebar, projects) — other lanes
+## Phase 5: c1 and c2, export and import (areas: hosts; sidebar, projects)
 
 - [x] T016 [US3] `agents/export {agentID | project}` and `agents/import` in `Packages/Wire`; `scripts/wire.sh gen`.
 - [x] T017 [US3] Daemon: write the backup format for the chosen agents; import as restore does.
 - [x] T018 [US3] Export… and Import… in the agent and project menus, on the Mac, the Remote and the web page; parity rows.
 
-## Phase 6: d1 to d3, chain and sinks (areas: reports, control-plane) — other lanes
+## Phase 6: d1 to d3, chain and sinks (areas: reports, control-plane)
 
-- [ ] T019 [US4] `seq` and `prev` on each audit entry, one chain for each copy; a seal for each day; `agents-control audit verify`; test one changed and one removed entry.
-- [ ] T020 [US4] Syslog (RFC 5424, TCP or TLS) and HTTP (JSON lines) sinks; a queue of 10,000, oldest out, with a count of the dropped.
-- [ ] T021 [US4] Console ▸ Audit ▸ Sinks on the web page.
+- [x] T019 [US4] `seq` and `prev` on each audit entry, one chain for each copy; a seal for each day; `agents-control audit verify`; test one changed and one removed entry.
+- [x] T020 [US4] Syslog (RFC 5424, TCP or TLS) and HTTP (JSON lines) sinks; a queue of 10,000, oldest out, with a count of the dropped.
+- [x] T021 [US4] Console ▸ Audit ▸ Sinks on the web page.
