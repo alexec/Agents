@@ -11,6 +11,7 @@ import { describe } from "../../model/errors";
 import { changed, editInConsole, foot, none, resumeAll, resumeMessage, resumeTitle, rules, runningAgents, stopAll, stopFoot,
   stopMessage, stopTitle, stoppedBy, stoppedStrip, title, viewOf } from "../../model/orgPolicy";
 import { fromOrganisation, mineLine, noRoutes, routesFoot, routesTitle } from "../../model/orgAccounts";
+import { GovernanceAsk } from "../Governance";
 
 /** The red strip while the kill switch is on, and the time it went on. */
 export function StoppedStrip({ policy }: { policy: OrgPolicy | undefined }) {
@@ -114,6 +115,8 @@ export function PolicySection({ store, down }: { store: Store; down: boolean }) 
               <p class="hint">{routesFoot}</p>
             </>
           )}
+          {/* A person's ask for an MCP server or skill (#2019, M5). */}
+          <GovernanceAsk store={store} down={down} />
           {admin && (
             <>
               <div class="policy-kill">

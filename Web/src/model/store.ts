@@ -14,13 +14,14 @@ import type {
   GuardedChange, GuardedChangeReading, HostJoinStatus, RequiredCapabilities, KeptDelivered, KeptList, KeptRequest, Approval, ApprovalAction, UsageHistory, TimeHistory, Milestones,
   BuildOutputRemoved, ProjectWorktrees, RemovalCheck, WorktreeSize, WorktreeSummary, WorktreesSized, FindResult,
   BackupRestoreResult, BackupSettings, BackupState, CapReached, ChannelLinkDecided, ChannelLinkRequest, ControlPerson, JoinDecided, JoinRequest, PeopleList, PersonRow, SecretsLeft, SignInDecided,
-  PolicyView, PolicyState, PassThroughName, SignInRequest } from "../protocol/generated";
+  PolicyView, PolicyState, PassThroughName, SignInRequest, CatalogRequest } from "../protocol/generated";
 import { Failure } from "../protocol/generated";
 import { CallFailed, type Link } from "../wire/link";
 import type { FolderGoneAsk } from "./missingFolder";
 import { describe, methodNotFound } from "./errors";
 import { fromWireDate } from "../protocol/dates";
 import { addCap, dropCap, openCaps } from "./teamGroups";
+import { withGovernanceRequest } from "./governance";
 import type { SaveOutcome } from "./sourceEdit";
 import { artifactsIn, withArtifactsOf, type Artifact } from "./artifacts";
 import { log } from "../log";
@@ -424,6 +425,10 @@ export class Work {
   readonly joinRequests = signal<JoinRequest[]>([]);
   /** Channel identities waiting for the person to link them, or an admin to send on (#1762). */
   readonly linkRequests = signal<ChannelLinkRequest[]>([]);
+  /** Requests for an MCP server or skill waiting for an admin (#2019, M5); empty for a member. */
+  readonly governanceRequests = signal<CatalogRequest[]>([]);
+  /** Goes up on each control/governanceRequested, so a person's own requests load again. */
+  readonly governanceChanges = signal(0);
   /** Whom an admin may send a link request on to (#1762); empty for a member. */
   readonly linkPeople = signal<PersonRow[]>([]);
   /** GitHub sign-ins on new clients waiting for the person's Approve (#995). */
@@ -1184,6 +1189,12 @@ export class Store extends Work {
         if (request && !request.for && this.linkPeople.value.length === 0) void this.loadLinkRequests();
         return;
       }
+      if (method === "control/governanceRequested") {
+        const request = params as CatalogRequest | null;
+        if (request?.id && this.people.value?.admin) this.governanceRequests.value = withGovernanceRequest(this.governanceRequests.value, request);
+        this.governanceChanges.value += 1;
+        return;
+      }
       if (method === "control/linkDecided") {
         const decided = params as ChannelLinkDecided | null;
         if (decided?.request) this.linkRequests.value = withoutRequest(this.linkRequests.value, decided.request);
@@ -1272,7 +1283,7 @@ export class Store extends Work {
   load(): Promise<void> {
     return this.once("*", async () => {
       const [hosts] = await Promise.all([this.link.call("hosts/list", {}), this.loadPlane(), this.loadKept(), this.loadJoinRequests(),
-        this.loadPeople().then(() => this.loadLinkRequests()),
+        this.loadPeople().then(() => Promise.all([this.loadLinkRequests(), this.loadGovernanceRequests()])),
         this.loadSignInRequests()]);
       this.takeHosts(hosts);
       await Promise.all(this.hosts.value.filter((host) => hostAnswers(host.state)).map((host) => this.onHost(host.id, async () => {
@@ -1367,6 +1378,14 @@ export class Store extends Work {
     if (open.length === 0) return;
     const next = Math.min(...open.map((n) => fromWireDate(n.until).getTime()));
     this.capExpiry = setTimeout(() => this.keepCapsTrue(), Math.max(1000, next - Date.now()));
+  }
+
+  /** An admin's requests for an MCP server or skill (#2019, M5); a control plane before them has none. */
+  async loadGovernanceRequests(): Promise<void> {
+    const admin = this.people.value?.admin ?? false;
+    const listed = admin ? await this.link.call("governance/requests", {}).then((l) => l.requests, () => []) : [];
+    // An admin's own decided ones come too, for Settings ▸ Policy: the Console has the waiting ones.
+    this.governanceRequests.value = listed.filter((r) => r.state === "waiting");
   }
 
   /** Link requests (#1762), and for an admin whom to send them on to; a control plane before links has none. */

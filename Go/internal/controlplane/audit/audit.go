@@ -167,6 +167,12 @@ var controlActions = map[string]string{
 	"scim/group/delete":  "Deleted a group by SCIM",
 	"person/suspended":   "Suspended a person",
 	"person/unsuspended": "Ended a person's suspension",
+
+	// Catalogue governance (#2019, M5): each writes its own entry, naming the item.
+	"governance/asked":    "Asked for an MCP server or skill",
+	"governance/approved": "Approved an MCP server or skill",
+	"governance/refused":  "Refused an MCP server or skill",
+	"governance/revoked":  "Took back an approval of an MCP server or skill",
 }
 
 // Action is what a call is in words, and whether the audit keeps it at all. toHost is a

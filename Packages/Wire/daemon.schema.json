@@ -2656,6 +2656,105 @@
         }
       ]
     },
+    "CatalogApproval": {
+      "type": "object",
+      "description": "An approval of an MCP server or skill (#2019, M5): for a group, or for one person.",
+      "properties": {
+        "kind": {
+          "$ref": "#/definitions/CatalogKind"
+        },
+        "name": {
+          "type": "string"
+        },
+        "source": {
+          "type": "string"
+        },
+        "group": {
+          "type": "string"
+        },
+        "groupName": {
+          "type": "string"
+        },
+        "user": {
+          "type": "string"
+        },
+        "userName": {
+          "type": "string"
+        },
+        "by": {
+          "type": "string"
+        },
+        "at": {
+          "$ref": "#/definitions/WireDate"
+        }
+      },
+      "required": [
+        "kind",
+        "name",
+        "by",
+        "at"
+      ],
+      "additionalProperties": false
+    },
+    "CatalogApprovalList": {
+      "type": "object",
+      "description": "governance/approvals (#2019, M5), an admin's: every approval, by item.",
+      "properties": {
+        "approvals": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/CatalogApproval"
+          }
+        }
+      },
+      "required": [
+        "approvals"
+      ],
+      "additionalProperties": false
+    },
+    "CatalogAsk": {
+      "type": "object",
+      "description": "governance/request (#2019, M5): a person asks for an MCP server or skill, with why.",
+      "properties": {
+        "kind": {
+          "$ref": "#/definitions/CatalogKind"
+        },
+        "name": {
+          "type": "string"
+        },
+        "source": {
+          "type": "string"
+        },
+        "why": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "name"
+      ],
+      "additionalProperties": false
+    },
+    "CatalogDecide": {
+      "type": "object",
+      "description": "governance/decide (#2019, M5), an admin's: approve or refuse a request. Approved with a group, the approval holds for each of its members; with none, for the person who asked.",
+      "properties": {
+        "request": {
+          "type": "string"
+        },
+        "approve": {
+          "type": "boolean"
+        },
+        "group": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "request",
+        "approve"
+      ],
+      "additionalProperties": false
+    },
     "CatalogError": {
       "anyOf": [
         {
@@ -2873,12 +2972,55 @@
         }
       ]
     },
+    "CatalogItem": {
+      "type": "object",
+      "description": "One MCP server or skill a machine has from a catalogue (#2019, M5): its name, the registry name or catalogue it came from, and its version (a server's version, a skill's commit).",
+      "properties": {
+        "kind": {
+          "$ref": "#/definitions/CatalogKind"
+        },
+        "name": {
+          "type": "string"
+        },
+        "source": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        },
+        "byHand": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "kind",
+        "name"
+      ],
+      "additionalProperties": false
+    },
     "CatalogKind": {
       "type": "string",
       "enum": [
         "skills",
         "mcp"
       ]
+    },
+    "CatalogPerson": {
+      "type": "object",
+      "description": "A person in the catalogue's rows: their id and name.",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name"
+      ],
+      "additionalProperties": false
     },
     "CatalogPreviewAnswer": {
       "type": "object",
@@ -2907,6 +3049,85 @@
         "destination"
       ],
       "additionalProperties": false
+    },
+    "CatalogRequest": {
+      "type": "object",
+      "description": "A request for an MCP server or skill (#2019, M5). Approved for a group, it is approved at once for every member who asks again.",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/definitions/CatalogKind"
+        },
+        "name": {
+          "type": "string"
+        },
+        "source": {
+          "type": "string"
+        },
+        "why": {
+          "type": "string"
+        },
+        "user": {
+          "type": "string"
+        },
+        "userName": {
+          "type": "string"
+        },
+        "at": {
+          "$ref": "#/definitions/WireDate"
+        },
+        "state": {
+          "$ref": "#/definitions/CatalogRequestState"
+        },
+        "group": {
+          "type": "string"
+        },
+        "groupName": {
+          "type": "string"
+        },
+        "decidedBy": {
+          "type": "string"
+        },
+        "decidedAt": {
+          "$ref": "#/definitions/WireDate"
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "name",
+        "user",
+        "userName",
+        "at",
+        "state"
+      ],
+      "additionalProperties": false
+    },
+    "CatalogRequestList": {
+      "type": "object",
+      "description": "governance/requests (#2019, M5): every request waiting to an admin, and to anyone their own of the last 30 days, oldest first.",
+      "properties": {
+        "requests": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/CatalogRequest"
+          }
+        }
+      },
+      "required": [
+        "requests"
+      ],
+      "additionalProperties": false
+    },
+    "CatalogRequestState": {
+      "type": "string",
+      "enum": [
+        "waiting",
+        "approved",
+        "refused"
+      ]
     },
     "CatalogResult": {
       "type": "object",
@@ -2950,6 +3171,29 @@
       ],
       "additionalProperties": false
     },
+    "CatalogRevoke": {
+      "type": "object",
+      "description": "governance/revoke (#2019, M5), an admin's: take back one approval, for a group or for a person.",
+      "properties": {
+        "kind": {
+          "$ref": "#/definitions/CatalogKind"
+        },
+        "name": {
+          "type": "string"
+        },
+        "group": {
+          "type": "string"
+        },
+        "user": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "name"
+      ],
+      "additionalProperties": false
+    },
     "CatalogSearchAnswer": {
       "type": "object",
       "properties": {
@@ -2986,6 +3230,62 @@
       },
       "required": [
         "query"
+      ],
+      "additionalProperties": false
+    },
+    "CatalogUsage": {
+      "type": "object",
+      "description": "governance/usage (#2019, M5), an admin's: who uses each MCP server and skill, at each version, from what each machine last reported.",
+      "properties": {
+        "rows": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/CatalogUseRow"
+          }
+        },
+        "machines": {
+          "type": "integer",
+          "description": "How many machines have reported."
+        }
+      },
+      "required": [
+        "rows",
+        "machines"
+      ],
+      "additionalProperties": false
+    },
+    "CatalogUseRow": {
+      "type": "object",
+      "description": "One item at one version in governance/usage: on how many machines, and whose (at most 50 people named).",
+      "properties": {
+        "kind": {
+          "$ref": "#/definitions/CatalogKind"
+        },
+        "name": {
+          "type": "string"
+        },
+        "source": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        },
+        "machines": {
+          "type": "integer"
+        },
+        "people": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/CatalogPerson"
+          }
+        }
+      },
+      "required": [
+        "kind",
+        "name",
+        "version",
+        "machines",
+        "people"
       ],
       "additionalProperties": false
     },
@@ -8320,6 +8620,22 @@
         "platform",
         "version",
         "machineID"
+      ],
+      "additionalProperties": false
+    },
+    "HostCatalog": {
+      "type": "object",
+      "description": "governance/report (#2019, M5): the MCP servers and skills a machine has from a catalogue, personal and in its projects, at most 500. Sent at start and each hour; each replaces the last.",
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/CatalogItem"
+          }
+        }
+      },
+      "required": [
+        "items"
       ],
       "additionalProperties": false
     },

@@ -397,6 +397,8 @@ func (d *Daemon) sendReport() {
 // startReports sends what is unsent now, and starts the hourly send once.
 func (d *Daemon) startReports() {
 	safe.Go("usage rollup", d.sendReport)
+	// What it has from a catalogue (#2019, M5), on the same clock.
+	safe.Go("governance report", d.sendGovernanceReport)
 	d.reportTick.Do(func() {
 		safe.Go("usage rollup clock", func() {
 			tick := time.NewTicker(reportEvery)
@@ -407,6 +409,7 @@ func (d *Daemon) startReports() {
 					return
 				case <-tick.C:
 					d.sendReport()
+					d.sendGovernanceReport()
 				}
 			}
 		})

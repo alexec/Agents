@@ -691,6 +691,27 @@
       ]
     },
     {
+      "name": "control/governanceRequested",
+      "x-capability": "governance/1",
+      "description": "To admins (#2019, M5): a request for an MCP server or skill waits, or was decided.",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/CatalogRequest"
+          }
+        }
+      ]
+    },
+    {
       "name": "control/groupsChanged",
       "x-capability": "groups/1",
       "tags": [
@@ -1328,6 +1349,183 @@
         "name": "result",
         "schema": {
           "$ref": "daemon.schema.json#/definitions/GitCredential"
+        }
+      }
+    },
+    {
+      "name": "governance/approvals",
+      "x-capability": "governance/1",
+      "description": "An admin's (#2019, M5): every approval.",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/CatalogApprovalList"
+        }
+      }
+    },
+    {
+      "name": "governance/decide",
+      "x-capability": "governance/1",
+      "description": "An admin's (#2019, M5): approve a request, for a group or the person, or refuse it.",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/CatalogDecide"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/CatalogRequest"
+        }
+      }
+    },
+    {
+      "name": "governance/report",
+      "x-capability": "governance/1",
+      "description": "A host, on its channel 0 (#2019, M5): the MCP servers and skills it has from a catalogue.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/HostCatalog"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
+      "name": "governance/request",
+      "x-capability": "governance/1",
+      "description": "Anyone's (#2019, M5): ask for an MCP server or skill. Approved at once when a group of theirs, or they, already have it approved.",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/CatalogAsk"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/CatalogRequest"
+        }
+      }
+    },
+    {
+      "name": "governance/requests",
+      "x-capability": "governance/1",
+      "description": "To an admin, the requests waiting; to anyone, their own (#2019, M5).",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/CatalogRequestList"
+        }
+      }
+    },
+    {
+      "name": "governance/revoke",
+      "x-capability": "governance/1",
+      "description": "An admin's (#2019, M5): take back an approval.",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/CatalogRevoke"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/CatalogApprovalList"
+        }
+      }
+    },
+    {
+      "name": "governance/usage",
+      "x-capability": "governance/1",
+      "description": "An admin's (#2019, M5): who uses each MCP server and skill, and at which version.",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/CatalogUsage"
         }
       }
     },

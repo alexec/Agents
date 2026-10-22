@@ -340,6 +340,13 @@ public extension DaemonAPI {
                 // no Swift types; the shapes are Packages/Wire's.
                 Row("groups/setRole", params: JSONValue.self, result: JSONValue.self, kind: .controlRequest),
                 Row("people/removeRequests", params: JSONValue.self, result: JSONValue.self, kind: .controlRequest),
+                // Catalogue governance (#2019, M5): the Console's and the web page's only, so no Swift types.
+                Row("governance/approvals", params: JSONValue.self, result: JSONValue.self, kind: .controlRequest),
+                Row("governance/decide", params: JSONValue.self, result: JSONValue.self, kind: .controlRequest),
+                Row("governance/request", params: JSONValue.self, result: JSONValue.self, kind: .controlRequest),
+                Row("governance/requests", params: JSONValue.self, result: JSONValue.self, kind: .controlRequest),
+                Row("governance/revoke", params: JSONValue.self, result: JSONValue.self, kind: .controlRequest),
+                Row("governance/usage", params: JSONValue.self, result: JSONValue.self, kind: .controlRequest),
                 Row("scim/set", params: JSONValue.self, result: JSONValue.self, kind: .controlRequest),
                 Row("scim/tokens/list", params: JSONValue.self, result: JSONValue.self, kind: .controlRequest),
                 Row("scim/tokens/make", params: JSONValue.self, result: JSONValue.self, kind: .controlRequest),
@@ -498,6 +505,7 @@ public extension DaemonAPI {
                     kind: .controlNotification),
                 Row(Notification.controlOrgRoutesChanged, params: Empty.self, result: Empty.self,
                     kind: .controlNotification),
+                Row("control/governanceRequested", params: JSONValue.self, result: Empty.self, kind: .controlNotification),
             ]
         }
     }

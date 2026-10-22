@@ -35,7 +35,8 @@ export const consoleSections: readonly Section[] = [
   { id: "modelAccess", title: "Model Access", about: "The organisation’s keys and gateways to the model, and who may use each.", group: "Rules", built: true },
   { id: "reportPolicy", title: "Report Policy", about: "Who leads each group, what leads see, and each budget.", group: "Rules", built: true },
   { id: "workflows", title: "Team Workflows", about: "The bots that run the team’s workflows, and their runs.", group: "Rules", built: true },
-  { id: "requests", title: "Requests", about: "Machines asking to join, channel identities to link, and bots stopped at a cap.", group: "Records", built: true },
+  { id: "catalogue", title: "Catalogue", about: "Who uses each MCP server and skill, at which version, and what is approved for whom.", group: "Rules", built: true },
+  { id: "requests", title: "Requests", about: "Machines asking to join, channel identities to link, bots stopped at a cap, and people asking for an MCP server or skill.", group: "Records", built: true },
   { id: "audit", title: "Audit", about: "Who did what on each machine, for one person or everyone.", group: "Records", built: true },
 ];
 

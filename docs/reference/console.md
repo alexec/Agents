@@ -25,7 +25,8 @@ requests and cap notices come to them as cards.
 | **Live Now** | Every agent that runs now on every machine (`console/live`, #2019): its runtime and workflow, whose machine it is, its state (working, waiting for its person, waiting on others), when it started and its cost so far. The most costly agent comes first. No title and nothing it said. | **Stop** ends one agent (`console/stopAgent`). **Stop All on This Machine…** asks first, then stops each agent on that machine. For an incident, **Stop All Agent Work** in Policy stops everything. |
 | **Report Policy** | Totals Only, the leads of each group, and a budget a month for each group and for the organisation (`reports/policy`). | Change them and select **Save** (`reports/setPolicy`). |
 | **Team Workflows** | Each bot (`console/teamWorkflows`): its group, its machines online, its spend today against its cap, the workflows it ran in the last 7 days, and the agents that run on its machines now. | **Stop** an agent that runs on a bot's machine (`bots/stopRun`). |
-| **Requests** | Machines that ask to join, channel identities that ask to be linked (`links/requests`), and each bot that stopped at its cap. The count beside **Requests** includes them all. | Approve or refuse a join or a link. **Change Cap…** opens the bot's sheet. |
+| **Catalogue** | **Who Uses What**: each MCP server and skill that machines have from a catalogue, at each version, on how many machines and whose (`governance/usage`, #2019). Each machine sends this list each hour. **Approved**: each approval, for a group or a person (`governance/approvals`). | **Take Back** an approval (`governance/revoke`). |
+| **Requests** | Machines that ask to join, channel identities that ask to be linked (`links/requests`), each bot that stopped at its cap, and people who ask for an MCP server or skill (`governance/requests`). The count beside **Requests** includes them all. | Approve or refuse a join or a link. **Change Cap…** opens the bot's sheet. Approve an MCP server or skill for the person or for a group, or refuse it (`governance/decide`). |
 | **Audit** | Who did what through the control plane. This is the same pane as Events ▸ Audit. | Choose whose entries to see, change how long entries are kept, and export them. |
 
 ## Report Policy
@@ -39,6 +40,14 @@ requests and cap notices come to them as cards.
 - **Edits not saved stay (#2072).** The page says "Not saved" until you select **Save**
   or **Revert**. A person who joins does not reset your edits. The edits stay when you open
   another page and come back. If you close the tab, the browser asks first.
+
+## Asking for an MCP server or skill
+
+A person asks in Settings ▸ Policy: the kind, the name, and why (`governance/request`). Each admin sees the request in Console ▸ Requests. An admin approves it for the person, or for a group. A group approval holds for each member: a member who asks later is approved at once, and members who already wait are approved with it.
+
+An approval answers the request and keeps a record of it. The Policy's marketplaces still say what a machine may add.
+
+The control plane keeps each of these with a limit: at most 10 waiting requests a person and 1,000 in all, a decided request for 30 days, 1,000 approvals, and 500 servers and skills from each machine. A machine's list goes when the machine leaves. A person's requests go when the person is removed.
 
 ## Audit, in the Console and in Events
 

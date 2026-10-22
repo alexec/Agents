@@ -254,6 +254,8 @@ func TestEveryClientMethodChecksTheOwner(t *testing.T) {
 		"orgRoutes/check": true, "orgRoutes/remove": true,
 		"scim/set": true, "scim/tokens/list": true, "scim/tokens/make": true, "scim/tokens/revoke": true,
 		"groups/setRole": true, "people/removeRequests": true,
+		"governance/usage": true, "governance/request": true, "governance/requests": true, "governance/decide": true,
+		"governance/approvals": true, "governance/revoke": true,
 		// It names a bot's machine, an admin's to stop, and checks that itself (#1761).
 		"bots/stopRun": true,
 	}

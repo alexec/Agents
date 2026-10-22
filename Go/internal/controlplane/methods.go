@@ -81,6 +81,12 @@ var own = methodSet(
 	"devices/list",
 	"devices/startPairing",
 	"devices/stopPairing",
+	"governance/approvals",
+	"governance/decide",
+	"governance/request",
+	"governance/requests",
+	"governance/revoke",
+	"governance/usage",
 	"groups/list",
 	"groups/remove",
 	"groups/set",
@@ -195,6 +201,9 @@ var writes = methodSet(
 	"control/setProjectDetection",
 	"devices/forget",
 	"devices/startPairing",
+	"governance/decide",
+	"governance/request",
+	"governance/revoke",
 	"groups/remove",
 	"groups/set",
 	"groups/setRole",
@@ -451,6 +460,8 @@ func (m *Methods) Handle(method string, params json.RawMessage, from Caller) (an
 		return m.auditMethod(ctx, method, params, from)
 	case "audit/sinks", "audit/setSinks":
 		return m.auditSinksMethod(ctx, method, params, from)
+	case "governance/usage", "governance/request", "governance/requests", "governance/decide", "governance/approvals", "governance/revoke":
+		return m.governanceMethod(ctx, method, params, from)
 	case "control/rotate":
 		return wire.Empty{}, m.s.rotate(ctx, from)
 	case "control/setProjectDetection":
@@ -645,6 +656,8 @@ func (m *Methods) removeHost(ctx context.Context, host string, from Caller) (boo
 	defer m.s.orgRoutesLeft(host, owner, name, held)
 	m.router.ForgetHost(host)
 	m.s.copies.forget(host)
+	// What it said it had from a catalogue (#2019, M5).
+	_ = m.s.cfg.Store.Delete(ctx, governanceMachineKey(host))
 	if m.s.providers != nil && m.s.providers.Kept() != nil {
 		m.s.providers.Kept().Forget(host)
 	}
@@ -974,6 +987,12 @@ func (m *Methods) HostSaid(host, method string, params json.RawMessage) (any, er
 		}
 		m.s.turnMoved(turn)
 		return map[string]any{}, nil
+	case "governance/report":
+		report, err := require[wire.HostCatalog](params, "HostCatalog")
+		if err != nil {
+			return nil, err
+		}
+		return map[string]any{}, m.s.keepGovernanceReport(ctx, host, report, time.Now())
 	case "usage/rollup":
 		rollup, err := require[wire.UsageRollup](params, "UsageRollup")
 		if err != nil {

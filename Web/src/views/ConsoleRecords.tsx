@@ -16,6 +16,7 @@ import { orgName } from "../model/signIn";
 import { fromWireDate } from "../protocol/dates";
 import { when } from "../model/orgPolicy";
 import { JoinRequests } from "./JoinRequest";
+import { GovernanceRequests } from "./Governance";
 
 /** M8: the audit, every machine's names from the fleet, and a person to narrow it to. */
 export function AuditPage({ store, down }: { store: Store; down: boolean }) {
@@ -61,7 +62,8 @@ export function RequestsPage({ store, down }: { store: Store; down: boolean }) {
   const loadRemovals = () => store.link.call("people/removeRequests", {}).then((r) => { removals.value = r.requests; }, () => {});
   const changes = store.peopleChanges.value;
   useEffect(() => { if (!down) void loadRemovals(); }, [down, changes]);
-  const none = joins.length === 0 && links.length === 0 && capped.length === 0 && removals.value.length === 0;
+  const none = joins.length === 0 && links.length === 0 && capped.length === 0 && removals.value.length === 0 &&
+    store.governanceRequests.value.length === 0;
   return (
     <div class="requests">
       {problem.value && <p class="hint" role="alert">{problem.value}</p>}
@@ -107,6 +109,8 @@ export function RequestsPage({ store, down }: { store: Store; down: boolean }) {
           </ul>
         </section>
       )}
+      {/* People asking for an MCP server or skill (#2019, M5). */}
+      <GovernanceRequests store={store} down={down} />
       {removals.value.length > 0 && (
         <section aria-labelledby="requests-removals">
           <h3 class="section-head" id="requests-removals">Removals</h3>
@@ -136,9 +140,11 @@ export function RequestsPage({ store, down }: { store: Store; down: boolean }) {
   );
 }
 
-/** How many requests wait, for the Console's list and its Overview: machines, channel identities and capped bots (#2070). */
+/** How many requests wait, for the Console's list and its Overview: machines, channel identities, capped bots (#2070), and
+ * asks for an MCP server or skill (#2019, M5). */
 export function requestCount(store: Store): number {
-  return liveJoins(store.joinRequests.value).length + liveRequests(store.linkRequests.value).length + store.capped.value.length;
+  return liveJoins(store.joinRequests.value).length + liveRequests(store.linkRequests.value).length + store.capped.value.length +
+    store.governanceRequests.value.length;
 }
 
 /** "Acme Okta deleted Bea on 12 Oct at 09:30. Bea is suspended until you remove them." */

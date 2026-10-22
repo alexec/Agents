@@ -1036,6 +1036,42 @@ export type CarriedSettingSource =
   | { closestNoLooser: Record<string, never> }
   | { person: Record<string, never> };
 
+/** An approval of an MCP server or skill (#2019, M5): for a group, or for one person. */
+export interface CatalogApproval {
+  kind: CatalogKind;
+  name: string;
+  source?: string;
+  group?: string;
+  groupName?: string;
+  user?: string;
+  userName?: string;
+  by: string;
+  at: WireDate;
+}
+
+/** governance/approvals (#2019, M5), an admin's: every approval, by item. */
+export interface CatalogApprovalList {
+  approvals: CatalogApproval[];
+}
+
+/** governance/request (#2019, M5): a person asks for an MCP server or skill, with why. */
+export interface CatalogAsk {
+  kind: CatalogKind;
+  name: string;
+  source?: string;
+  why?: string;
+}
+
+/**
+ * governance/decide (#2019, M5), an admin's: approve or refuse a request. Approved with a group,
+ * the approval holds for each of its members; with none, for the person who asked.
+ */
+export interface CatalogDecide {
+  request: string;
+  approve: boolean;
+  group?: string;
+}
+
 export type CatalogError =
   | { unreachable: { host: string } }
   | { rateLimited: { retryAfter?: number } }
@@ -1049,9 +1085,27 @@ export type CatalogError =
   | { notManaged: { name: string } }
   | { failed: { _0: string } };
 
+/**
+ * One MCP server or skill a machine has from a catalogue (#2019, M5): its name, the registry name
+ * or catalogue it came from, and its version (a server's version, a skill's commit).
+ */
+export interface CatalogItem {
+  kind: CatalogKind;
+  name: string;
+  source?: string;
+  version?: string;
+  byHand?: boolean;
+}
+
 export type CatalogKind =
   | "skills"
   | "mcp";
+
+/** A person in the catalogue's rows: their id and name. */
+export interface CatalogPerson {
+  id: string;
+  name: string;
+}
 
 export interface CatalogPreviewAnswer {
   preview?: SkillPreview;
@@ -1062,6 +1116,39 @@ export interface CatalogPreviewRequest {
   result: CatalogResult;
   destination: SkillDestination;
 }
+
+/**
+ * A request for an MCP server or skill (#2019, M5). Approved for a group, it is approved at once
+ * for every member who asks again.
+ */
+export interface CatalogRequest {
+  id: string;
+  kind: CatalogKind;
+  name: string;
+  source?: string;
+  why?: string;
+  user: string;
+  userName: string;
+  at: WireDate;
+  state: CatalogRequestState;
+  group?: string;
+  groupName?: string;
+  decidedBy?: string;
+  decidedAt?: WireDate;
+}
+
+/**
+ * governance/requests (#2019, M5): every request waiting to an admin, and to anyone their own of
+ * the last 30 days, oldest first.
+ */
+export interface CatalogRequestList {
+  requests: CatalogRequest[];
+}
+
+export type CatalogRequestState =
+  | "waiting"
+  | "approved"
+  | "refused";
 
 export interface CatalogResult {
   id: string;
@@ -1075,6 +1162,16 @@ export interface CatalogResult {
   skillPath?: string;
 }
 
+/**
+ * governance/revoke (#2019, M5), an admin's: take back one approval, for a group or for a person.
+ */
+export interface CatalogRevoke {
+  kind: CatalogKind;
+  name: string;
+  group?: string;
+  user?: string;
+}
+
 export interface CatalogSearchAnswer {
   results: CatalogResult[];
   error?: CatalogError;
@@ -1085,6 +1182,29 @@ export interface CatalogSearchRequest {
   kind?: CatalogKind;
   marketplace?: string;
   destination?: SkillDestination;
+}
+
+/**
+ * governance/usage (#2019, M5), an admin's: who uses each MCP server and skill, at each version,
+ * from what each machine last reported.
+ */
+export interface CatalogUsage {
+  rows: CatalogUseRow[];
+  /** How many machines have reported. */
+  machines: number;
+}
+
+/**
+ * One item at one version in governance/usage: on how many machines, and whose (at most 50 people
+ * named).
+ */
+export interface CatalogUseRow {
+  kind: CatalogKind;
+  name: string;
+  source?: string;
+  version: string;
+  machines: number;
+  people: CatalogPerson[];
 }
 
 export interface CatchUpLeases {
@@ -2911,6 +3031,14 @@ export interface HostAnnounce {
   machineID: string;
   relay?: boolean;
   implementation?: string;
+}
+
+/**
+ * governance/report (#2019, M5): the MCP servers and skills a machine has from a catalogue,
+ * personal and in its projects, at most 500. Sent at start and each hour; each replaces the last.
+ */
+export interface HostCatalog {
+  items: CatalogItem[];
 }
 
 /**
@@ -7775,6 +7903,12 @@ export interface Methods {
   "files/read": { params: FilesReadRequest; result: FileReading };
   "files/unwatch": { params: FilesWatchRequest; result: Empty };
   "files/watch": { params: FilesWatchRequest; result: Empty };
+  "governance/approvals": { params: Empty; result: CatalogApprovalList };
+  "governance/decide": { params: CatalogDecide; result: CatalogRequest };
+  "governance/request": { params: CatalogAsk; result: CatalogRequest };
+  "governance/requests": { params: Empty; result: CatalogRequestList };
+  "governance/revoke": { params: CatalogRevoke; result: CatalogApprovalList };
+  "governance/usage": { params: Empty; result: CatalogUsage };
   "groups/list": { params: Empty; result: GroupList };
   "groups/remove": { params: GroupRequest; result: Empty };
   "groups/set": { params: GroupSet; result: Group };
@@ -8031,6 +8165,12 @@ export const MethodTarget = {
   "files/read": "host",
   "files/unwatch": "host",
   "files/watch": "host",
+  "governance/approvals": "control",
+  "governance/decide": "control",
+  "governance/request": "control",
+  "governance/requests": "control",
+  "governance/revoke": "control",
+  "governance/usage": "control",
   "groups/list": "control",
   "groups/remove": "control",
   "groups/set": "control",
@@ -8206,6 +8346,7 @@ export interface Notifications {
   "backups/changed": BackupState;
   "clone/changed": CloneNotification;
   "control/capReached": CapReached;
+  "control/governanceRequested": CatalogRequest;
   "control/groupsChanged": GroupsChanged;
   "control/hostChanged": JSONValue;
   "control/joinDecided": JoinDecided;
@@ -8328,11 +8469,22 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   CancelWaitRequest: { required: ["agentID"], optional: [] },
   CapReached: { required: ["user", "name", "spentUSD", "capUSD", "until"], optional: ["group"] },
   CarriedSetting: { required: ["optionID", "name", "source"], optional: ["from", "to"] },
+  CatalogApproval: { required: ["kind", "name", "by", "at"], optional: ["source", "group", "groupName", "user", "userName"] },
+  CatalogApprovalList: { required: ["approvals"], optional: [] },
+  CatalogAsk: { required: ["kind", "name"], optional: ["source", "why"] },
+  CatalogDecide: { required: ["request", "approve"], optional: ["group"] },
+  CatalogItem: { required: ["kind", "name"], optional: ["source", "version", "byHand"] },
+  CatalogPerson: { required: ["id", "name"], optional: [] },
   CatalogPreviewAnswer: { required: [], optional: ["preview", "error"] },
   CatalogPreviewRequest: { required: ["result", "destination"], optional: [] },
+  CatalogRequest: { required: ["id", "kind", "name", "user", "userName", "at", "state"], optional: ["source", "why", "group", "groupName", "decidedBy", "decidedAt"] },
+  CatalogRequestList: { required: ["requests"], optional: [] },
   CatalogResult: { required: ["id", "name", "owner", "repo", "skillID", "installs", "known"], optional: ["marketplace", "skillPath"] },
+  CatalogRevoke: { required: ["kind", "name"], optional: ["group", "user"] },
   CatalogSearchAnswer: { required: ["results"], optional: ["error"] },
   CatalogSearchRequest: { required: ["query"], optional: ["kind", "marketplace", "destination"] },
+  CatalogUsage: { required: ["rows", "machines"], optional: [] },
+  CatalogUseRow: { required: ["kind", "name", "version", "machines", "people"], optional: ["source"] },
   CatchUpLeases: { required: ["leases", "hosted", "health"], optional: [] },
   CatchUpRequest: { required: [], optional: ["agents", "parts"] },
   CatchUpSnapshot: { required: ["projects", "agents", "permissions", "elicitations", "attention", "resuming"], optional: ["disk", "storeNotes", "milestones", "workflows", "pins", "leases"] },
@@ -8503,6 +8655,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   Headline: { required: ["h1", "h2", "h3"], optional: ["answers"] },
   HelperLimits: { required: [], optional: ["running", "notArchived", "queued", "agentsMayArchive", "continueWhenBack"] },
   HostAnnounce: { required: ["publicKey", "name", "platform", "version", "machineID"], optional: ["relay", "implementation"] },
+  HostCatalog: { required: ["items"], optional: [] },
   HostClient: { required: ["id", "kind", "publicKey"], optional: ["person"] },
   HostClients: { required: ["clients"], optional: ["user"] },
   HostEnroll: { required: [], optional: ["as"] },
