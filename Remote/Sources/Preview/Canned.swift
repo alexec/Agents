@@ -168,9 +168,14 @@ enum Canned {
                   endedReason: .endTurn,
                   eventWait: EventWait(patterns: [EventPattern("checks.passed")], from: 0,
                                        deadline: ago(-55), since: ago(5))),
-            Agent(id: inTheOther, runtimeID: "cursor", cwd: apiFolder,
-                  title: "Work out what the new tier costs", state: .running,
-                  createdAt: ago(9), lastActivityAt: ago(3)),
+            {
+                var agent = Agent(id: inTheOther, runtimeID: "cursor", cwd: apiFolder,
+                                  title: "Work out what the new tier costs", state: .running,
+                                  createdAt: ago(9), lastActivityAt: ago(3))
+                // In a tool, so a walk sees the ring pivot beside one that thinks (#2332).
+                agent.runningTool = "swift test"
+                return agent
+            }(),
         ]
     }
 

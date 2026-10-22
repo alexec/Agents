@@ -548,22 +548,25 @@ button.link.reading:hover { text-decoration: underline; }
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .spinner { animation-duration: 3s; } }
-/* A working session's marks on all three clients (#2044), as ThinkingDots and TurningCog: three dots
-   that fade up in turn, left to right, in 1.2 s, and a cog that turns in 2 s, each read off the
-   clock (spinnerClock.ts) so every one on the page is in step. In the colour around them. Under
-   Reduce Motion they keep going, twice as slow, as SpinnerClock.reducedMotionSlowing says. */
-.working-dots { --dots-period: 1.2s; display: inline-flex; align-items: center; justify-content: center; gap: 1.5px;
-  width: 12px; height: 12px; vertical-align: middle; }
-.working-dots i { width: 3px; height: 3px; border-radius: 50%; background: currentColor; opacity: 0.3;
-  animation: dots var(--dots-period) linear infinite backwards; }
-.working-dots i:nth-child(2) { animation-delay: calc(var(--dots-period) * 0.2); }
-.working-dots i:nth-child(3) { animation-delay: calc(var(--dots-period) * 0.4); }
-@keyframes dots { 0% { opacity: 0.3; } 20% { opacity: 1; } 40%, 100% { opacity: 0.3; } }
-.working-cog { --cog-period: 2s; animation: cog var(--cog-period) linear infinite; }
-@keyframes cog { to { transform: rotate(360deg); } }
-@media (prefers-reduced-motion: reduce) { .working-dots { --dots-period: 2.4s; } .working-cog { --cog-period: 4s; } }
-.working .working-dots, .working .working-cog { width: 16px; height: 16px; opacity: 0.6; }
-.working .working-dots i { width: 4px; height: 4px; }
+/* A working session's mark on all three clients (#2044, #2332), as WorkingRing: three dots on a ring
+   seen edge on that spins once in 1.8 s while it thinks or replies, and also pivots ±30° once in
+   3.6 s while it runs a tool. The keyframes (ring-think-*, ring-do-*) come from spinnerClock.ts,
+   which keeps every ring on the page in step. In the colour around it. Under Reduce Motion it
+   keeps going, twice as slow, as SpinnerClock.reducedMotionSlowing says. */
+.working-ring { --well: 12px; --ring-period: 3.6s; position: relative; display: inline-block; width: var(--well);
+  height: var(--well); vertical-align: middle; }
+.working-ring i { position: absolute; left: 50%; top: 50%; width: calc(var(--well) * 0.24);
+  height: calc(var(--well) * 0.24); margin: calc(var(--well) * -0.12); border-radius: 50%; background: currentColor;
+  animation-duration: var(--ring-period); animation-timing-function: linear; animation-iteration-count: infinite; }
+.working-ring i:nth-child(1) { animation-name: ring-think-0; }
+.working-ring i:nth-child(2) { animation-name: ring-think-1; }
+.working-ring i:nth-child(3) { animation-name: ring-think-2; }
+.working-ring.doing i:nth-child(1) { animation-name: ring-do-0; }
+.working-ring.doing i:nth-child(2) { animation-name: ring-do-1; }
+.working-ring.doing i:nth-child(3) { animation-name: ring-do-2; }
+@media (prefers-reduced-motion: reduce) { .working-ring { --ring-period: 7.2s; } }
+/* At the chat's foot only: .working is also the sidebar mark's and the status mark's class. */
+p.working .working-ring { --well: 16px; opacity: 0.6; }
 .jump {
   position: relative;
   align-self: center;

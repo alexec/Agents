@@ -19,12 +19,32 @@ public enum SpinnerClock {
     /// still agree.
     public static let epoch = Date(timeIntervalSinceReferenceDate: 0)
 
-    /// One pass of the working dots, left to right (#2044).
-    public static let dotsPeriod: TimeInterval = 1.2
+    /// One turn of the working ring (#2332): three dots on a ring seen edge on, which spins
+    /// about the vertical axis while the session thinks or replies.
+    public static let ringSpinPeriod: TimeInterval = 1.8
 
-    /// One turn of the working cog (#2044): slower than the spinner, so a small cog does
-    /// not look busy.
-    public static let cogPeriod: TimeInterval = 2
+    /// One pivot of the ring about the horizontal axis while the session runs a tool
+    /// (#2332): up, down and back, once in two turns.
+    public static let ringPivotPeriod: TimeInterval = 3.6
+
+    /// The cycle that holds a whole number of turns and pivots: every mark's keyframes run
+    /// over it, so a change of activity changes the keyframes and not the cycle.
+    public static let ringPeriod: TimeInterval = ringPivotPeriod
+
+    /// How far the ring pivots each way while the session runs a tool, in degrees, unless
+    /// `workingMarkTilt` in the defaults (localStorage on the web page) says otherwise.
+    public static let ringTilt: Double = 30
+
+    /// The key that changes `ringTilt` without a build (#2332), read once at launch.
+    public static let ringTiltKey = "workingMarkTilt"
+
+    /// A dot's diameter and the ring's radius, as fractions of the well's side. At rest
+    /// the ring is the three dots of #2044: 0.24 across, 0.34 from centre to centre.
+    public static let ringDotDiameter: Double = 0.24
+    public static let ringRadius: Double = 0.34 / (3.0.squareRoot() / 2)
+
+    /// How dim a dot is at the back of the ring.
+    public static let ringRestingOpacity: Double = 0.3
 
     /// Under Reduce Motion the marks keep going, as a still one reads as stuck, but this
     /// many times slower.
@@ -36,13 +56,43 @@ public enum SpinnerClock {
     }
 
     /// How far into a cycle of `period` seconds every mark is at `date`, from 0 up to 1.
-    /// The dots and the cog read it as the spinner reads its angle, so each kind is in
-    /// step on a screen.
+    /// The working ring reads it as the spinner reads its angle, so every ring on a screen
+    /// is in step.
     public static func fraction(at date: Date, period: TimeInterval) -> Double {
         let cycles = date.timeIntervalSince(epoch) / period
         let fraction = cycles - cycles.rounded(.down)
         // `rounded(.down)` keeps a date before the epoch in range too; the guard is for
         // a fraction that rounds up to a whole cycle.
         return fraction < 1 ? fraction : 0
+    }
+
+    /// Where one dot of the working ring is, in fractions of the well's side from its
+    /// centre (y up), and how bright it is.
+    public struct RingDot: Equatable, Sendable {
+        public var x: Double
+        public var y: Double
+        public var opacity: Double
+    }
+
+    /// The dot at angle `spin` on a ring tipped `tilt` from edge on, both in radians: a
+    /// spin of 90° is the front of the ring, at full brightness.
+    public static func ringDot(spin: Double, tilt: Double) -> RingDot {
+        let depth = (sin(spin) * cos(tilt) + 1) / 2
+        return RingDot(x: ringRadius * cos(spin),
+                       y: ringRadius * sin(spin) * sin(tilt),
+                       opacity: ringRestingOpacity + (1 - ringRestingOpacity) * depth)
+    }
+
+    /// The three dots `time` seconds into the cycle, left to right at its start. The ring
+    /// turns so that the front dots go left to right; `tilt` is how far it pivots each
+    /// way, in degrees: 0 while it thinks, `ringTilt` while it runs a tool.
+    public static func ringDots(at time: TimeInterval, tilt: Double) -> [RingDot] {
+        let pivot = tilt * .pi / 180 * cos(2 * .pi * time / ringPivotPeriod)
+        let turned = 2 * .pi * time / ringSpinPeriod
+        // The middle dot starts at the front and the outer two behind it, a third of a turn
+        // each way: seen edge on, today's three dots in a line.
+        return [7.0 / 6, 1.0 / 2, 11.0 / 6].map { start in
+            ringDot(spin: start * .pi - turned, tilt: pivot)
+        }
     }
 }

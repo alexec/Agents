@@ -83,15 +83,14 @@
 .with-sidebar .sidebar .title.placed :is(.place, .started-by) { flex: none; white-space: pre; }
 .with-sidebar .sidebar .title.placed .place { max-width: 40%; overflow: hidden; text-overflow: ellipsis; }
 
-/* A session's mark in the sidebar (#495): an orange hand, dots or a cog (#2044), a list when queued, an
+/* A session's mark in the sidebar (#495): an orange hand, the working ring (#2044, #2332), a list when queued, an
    Zs (#765), a pause mark (#630), an empty ring once done, read or not (#1323); every icon in the
    accent but what lists it under Needs You (#817). */
 .sidebar-mark { width: 1rem; height: 1rem; margin-top: 1px; box-sizing: border-box; border-radius: 50%;
   display: inline-flex; align-items: center; justify-content: center; color: var(--accent); }
 .sidebar-mark.needsYou { color: var(--tint-attention); font-size: 0.8125rem; border-radius: 0; }
-.sidebar-mark.working { border-radius: 0; }
-/* Running a tool (#1902): a turning cog in the accent, in the dots' place (#2044). */
-.sidebar-mark.tool { color: var(--accent); border-radius: 0; display: inline-flex; align-items: center; justify-content: center; }
+/* Thinking, or running a tool (#1902): the same ring, which tips for a tool (#2332). */
+.sidebar-mark.working, .sidebar-mark.tool { border-radius: 0; }
 .sidebar-mark.done { border: 1.5px solid currentColor; opacity: 0.7; }
 .sidebar-mark.queued, .sidebar-mark.waiting, .sidebar-mark.paused { font-size: 0.75rem; border-radius: 0; }
 /* Archiving needs approval (#584): the window's archive box, in the attention tint, as it is

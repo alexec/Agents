@@ -36,21 +36,83 @@ struct SpinnerClockTests {
         #expect(abs(SpinnerClock.angle(at: quarterBefore) - 270) < 0.001)
     }
 
-    @Test("The dots and the cog read the same clock, each at its own period (#2044)")
-    func dotsAndCog() {
-        for period in [SpinnerClock.dotsPeriod, SpinnerClock.cogPeriod] {
-            // A whole number of cycles after the epoch, so the cycle starts there.
-            let start = SpinnerClock.epoch.addingTimeInterval(400 * period)
-            for n in 0..<8 {
-                let date = start.addingTimeInterval(Double(n) / 8 * period)
-                let fraction = SpinnerClock.fraction(at: date, period: period)
-                #expect(abs(fraction - Double(n) / 8) < 0.001)
-                let later = SpinnerClock.fraction(at: date.addingTimeInterval(period), period: period)
-                #expect(abs(later - fraction) < 0.001)
+    @Test("Every working ring reads the same clock, at the ring's period (#2332)")
+    func ringClock() {
+        let period = SpinnerClock.ringPeriod
+        // A whole number of cycles after the epoch, so the cycle starts there.
+        let start = SpinnerClock.epoch.addingTimeInterval(400 * period)
+        for n in 0..<8 {
+            let date = start.addingTimeInterval(Double(n) / 8 * period)
+            // On the circle: 0.9999… and 0 are the same place in the cycle.
+            let apart = { (a: Double, b: Double) in min(abs(a - b), 1 - abs(a - b)) }
+            let fraction = SpinnerClock.fraction(at: date, period: period)
+            #expect(apart(fraction, Double(n) / 8) < 0.001)
+            let later = SpinnerClock.fraction(at: date.addingTimeInterval(period), period: period)
+            #expect(apart(later, fraction) < 0.001)
+        }
+        let before = SpinnerClock.fraction(at: SpinnerClock.epoch.addingTimeInterval(-0.25 * period),
+                                           period: period)
+        #expect(abs(before - 0.75) < 0.001)
+        // The cycle holds whole turns and whole pivots, so it loops without a jump.
+        let turns = period / SpinnerClock.ringSpinPeriod
+        #expect(abs(turns - turns.rounded()) < 1e-9)
+        let pivots = period / SpinnerClock.ringPivotPeriod
+        #expect(abs(pivots - pivots.rounded()) < 1e-9)
+    }
+
+    @Test("At rest the ring is today's three dots: a line, 0.34 apart, the middle one bright")
+    func ringAtRest() throws {
+        for tilt in [0.0, SpinnerClock.ringTilt] {
+            let dots = SpinnerClock.ringDots(at: 0, tilt: tilt)
+            try #require(dots.count == 3)
+            #expect(abs(dots[0].x + 0.34) < 1e-9)
+            #expect(abs(dots[1].x) < 1e-9)
+            #expect(abs(dots[2].x - 0.34) < 1e-9)
+            if tilt == 0 {
+                for dot in dots { #expect(abs(dot.y) < 1e-9) }
+                #expect(abs(dots[1].opacity - 1) < 1e-9)
             }
-            let before = SpinnerClock.fraction(at: SpinnerClock.epoch.addingTimeInterval(-0.25 * period),
-                                               period: period)
-            #expect(abs(before - 0.75) < 0.001)
+        }
+    }
+
+    @Test("A dot is bright at the front, 0.3 at the back, and on the line while flat")
+    func ringDot() {
+        let front = SpinnerClock.ringDot(spin: .pi / 2, tilt: 0)
+        #expect(abs(front.x) < 1e-9 && abs(front.y) < 1e-9 && abs(front.opacity - 1) < 1e-9)
+        let back = SpinnerClock.ringDot(spin: -.pi / 2, tilt: 0)
+        #expect(abs(back.opacity - 0.3) < 1e-9)
+        let side = SpinnerClock.ringDot(spin: 0, tilt: 0)
+        #expect(abs(side.x - SpinnerClock.ringRadius) < 1e-9 && abs(side.opacity - 0.65) < 1e-9)
+        // Tipped 30°: the front dot rises by r·sin 30° and dims by the cosine.
+        let tipped = SpinnerClock.ringDot(spin: .pi / 2, tilt: .pi / 6)
+        #expect(abs(tipped.y - SpinnerClock.ringRadius / 2) < 1e-9)
+        #expect(abs(tipped.opacity - (0.3 + 0.7 * (cos(.pi / 6) + 1) / 2)) < 1e-9)
+        // The ellipse at full tilt fits the well: about 0.2 of the side above and below.
+        #expect(SpinnerClock.ringRadius * sin(.pi / 6) < 0.2 + 1e-3)
+    }
+
+    @Test("Thinking spins on the line; a tool pivots it, and the front goes left to right")
+    func ringMotion() throws {
+        for step in 0..<36 {
+            let time = Double(step) / 36 * SpinnerClock.ringPeriod
+            for dot in SpinnerClock.ringDots(at: time, tilt: 0) { #expect(abs(dot.y) < 1e-9) }
+        }
+        // A quarter of a pivot in, the ring is edge on again; at half a pivot it is tipped
+        // the other way, so the front dot is below the line.
+        let quarter = SpinnerClock.ringDots(at: SpinnerClock.ringPivotPeriod / 4, tilt: 30)
+        for dot in quarter { #expect(abs(dot.y) < 1e-9) }
+        let start = SpinnerClock.ringDots(at: 0, tilt: 30)
+        let half = SpinnerClock.ringDots(at: SpinnerClock.ringPivotPeriod / 2, tilt: 30)
+        let soon = SpinnerClock.ringDots(at: 0.05, tilt: 0)
+        try #require(start.count == 3 && half.count == 3 && soon.count == 3)
+        #expect(start[1].y > 0)
+        #expect(half[1].y < 0)
+        // Just after the start, the front (middle) dot has moved right.
+        #expect(soon[1].x > 0)
+        // After a whole cycle every dot is back where it began.
+        let again = SpinnerClock.ringDots(at: SpinnerClock.ringPeriod, tilt: 30)
+        for (a, b) in zip(start, again) {
+            #expect(abs(a.x - b.x) < 1e-9 && abs(a.y - b.y) < 1e-9 && abs(a.opacity - b.opacity) < 1e-9)
         }
     }
 }
