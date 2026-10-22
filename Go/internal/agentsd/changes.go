@@ -817,6 +817,9 @@ func (d *Daemon) fork(ctx context.Context, id wire.UUID) (wire.UUID, error) {
 	if err := d.refuseToRun(a); err != nil {
 		return "", err
 	}
+	if err := d.promptRefusal(a); err != nil {
+		return "", err
+	}
 	if a.RuntimeSessionID == nil {
 		return "", &Error{Code: wire.FailureSessionGone, Message: "That agent has no conversation to branch yet."}
 	}
@@ -878,6 +881,9 @@ func (d *Daemon) branchFrom(r wire.BranchFromRequest) (wire.UUID, error) {
 		return "", noSuchAgent()
 	}
 	if err := d.refuseToRun(a); err != nil {
+		return "", err
+	}
+	if err := d.promptRefusal(a); err != nil {
 		return "", err
 	}
 	entries, _, err := d.Store.Transcript(a.ID, 0)

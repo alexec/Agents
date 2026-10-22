@@ -257,6 +257,11 @@ func (d *Daemon) costStateLocked() wire.CostState {
 		spent[c] = v
 	}
 	st := wire.CostState{Limits: limits, Today: spent, Day: today, TokensToday: s.Tokens[today]}
+	// The organisation's budgets over the person's own limits (#998, FR-016).
+	if org := d.orgBudgets(d.orgPolicy()); org != nil {
+		st.Organisation = org
+		st.SetBy = setBy("budgets", budgetWords(*org))
+	}
 	var notes []string
 	for _, n := range []string{d.limitsNote, d.spendNote} {
 		if n != "" {
@@ -377,7 +382,7 @@ func (d *Daemon) bankTurnUsage(id wire.UUID, u wire.TurnUsage) {
 	d.recordUsageLocked(a.RuntimeID, b)
 	d.addReport(a, a.RuntimeID, time.Now(), wire.UsageRollupRow{Cost: b.Cost, InputTokens: b.InputTokens,
 		OutputTokens: b.OutputTokens, ThoughtTokens: b.ThoughtTokens, CachedReadTokens: b.CachedReadTokens,
-		CachedWriteTokens: b.CachedWriteTokens, Turns: b.Turns, UnpricedTurns: b.UnpricedTurns})
+		CachedWriteTokens: b.CachedWriteTokens, Turns: b.Turns, UnpricedTurns: b.UnpricedTurns, LimitTokens: &counted})
 	d.costMu.Unlock()
 	d.change(id, func(a *wire.Agent) {
 		a.LastTurnUsage = &u

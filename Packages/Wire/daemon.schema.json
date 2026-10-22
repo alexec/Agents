@@ -5053,6 +5053,14 @@
         },
         "tokensToday": {
           "type": "integer"
+        },
+        "organisation": {
+          "$ref": "#/definitions/CostLimits",
+          "description": "The organisation's budgets for this person today, in US dollars and tokens, with any raise (#998, FR-016). Each limit in force is the lower of this and limits."
+        },
+        "setBy": {
+          "$ref": "#/definitions/PolicySetBy",
+          "description": "Set when the organisation's budgets cap this person's own limits, or this person is at a budget today (#998)."
         }
       },
       "required": [
@@ -11958,6 +11966,44 @@
       },
       "additionalProperties": false
     },
+    "PassThroughName": {
+      "type": "object",
+      "description": "One name in the person's own pass-through list (#998, FR-011a), as runtime-environment.json has it.",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "A variable's name, or a prefix ending in *."
+        },
+        "runtime": {
+          "type": "string",
+          "description": "The runtime it is passed to; absent for every runtime."
+        },
+        "setBy": {
+          "$ref": "#/definitions/PolicySetBy",
+          "description": "Set when the organisation's policy does not allow the name: it is not passed."
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "additionalProperties": false
+    },
+    "PassThroughState": {
+      "type": "object",
+      "description": "settings/passThrough (#998): the person's own pass-through names, each marked when the policy refuses it.",
+      "properties": {
+        "names": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/PassThroughName"
+          }
+        }
+      },
+      "required": [
+        "names"
+      ],
+      "additionalProperties": false
+    },
     "Payment": {
       "anyOf": [
         {
@@ -13155,6 +13201,43 @@
       ],
       "additionalProperties": false
     },
+    "PolicyState": {
+      "type": "object",
+      "description": "daemon/policyState and daemon/policyStateChanged (#998, T027): the organisation's policy as this machine follows it, so a client on the direct path draws the strip and the Policy pane. No version when this machine has no policy.",
+      "properties": {
+        "version": {
+          "type": "integer"
+        },
+        "policy": {
+          "$ref": "#/definitions/OrgPolicy",
+          "description": "The rules in force here, with only this machine's person's raises."
+        },
+        "stopAll": {
+          "type": "boolean",
+          "description": "The kill switch is on: this machine stops its turns and starts no work."
+        },
+        "noPolicy": {
+          "type": "boolean",
+          "description": "This machine had a policy from its organisation and has none it can trust now (missing, or it fails the signature check). It starts no work until it gets one."
+        },
+        "update": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "The capabilities the policy requires that this machine lacks (FR-014). It starts no work."
+        },
+        "refusal": {
+          "$ref": "#/definitions/PolicyRefusal",
+          "description": "Why this machine starts no work now, when it starts none."
+        }
+      },
+      "required": [
+        "stopAll",
+        "noPolicy"
+      ],
+      "additionalProperties": false
+    },
     "PolicyStopAll": {
       "type": "object",
       "description": "The kill switch (#998, FR-015): while on, every machine stops its turns and starts no work.",
@@ -13616,6 +13699,10 @@
           "items": {
             "$ref": "#/definitions/Approval"
           }
+        },
+        "helperLimitsSetBy": {
+          "$ref": "#/definitions/PolicySetBy",
+          "description": "Set when the organisation's policy caps this project's helper limits (#998, #64): the lower number is used."
         }
       },
       "required": [
@@ -15776,6 +15863,10 @@
         },
         "isOut": {
           "type": "boolean"
+        },
+        "setBy": {
+          "$ref": "#/definitions/PolicySetBy",
+          "description": "Set when the organisation's policy does not allow this runtime here (#998, FR-010)."
         }
       },
       "required": [
@@ -15921,6 +16012,10 @@
           "additionalProperties": {
             "$ref": "#/definitions/SandboxChoice"
           }
+        },
+        "setBy": {
+          "$ref": "#/definitions/PolicySetBy",
+          "description": "Set when the organisation's policy requires the command sandbox (#998): off is refused, and a runtime that cannot be put in a sandbox does not start."
         }
       },
       "required": [
@@ -20030,6 +20125,10 @@
         "counts": {
           "$ref": "#/definitions/ReportCounts",
           "description": "What the agents did (#2019): sessions, pull requests and waits."
+        },
+        "limitTokens": {
+          "type": "integer",
+          "description": "The row's tokens as the machine counts them for a limit (#998, FR-017): fresh input and output, no cache reads and no thoughts. Absent from an older machine, whose rows count as inputTokens + outputTokens."
         }
       },
       "required": [

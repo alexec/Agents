@@ -206,6 +206,9 @@ func (d *Daemon) mcpPreview(ctx context.Context, r wire.MCPPreviewRequest) wire.
 	if r.Destination.Kind == wire.SkillDestinationKindPersonal && d.personalHome() == "" {
 		return fail(mcpcatalog.NoPersonalHome())
 	}
+	if _, ours := mcpcatalog.OursByID(r.Result.ID); !ours && r.Result.Marketplace == nil && !d.marketplaceAllowed("", "") {
+		return fail(errors.New(orgSetBy + " " + marketplaceRefusalWords()))
+	}
 	var market *wire.Marketplace
 	if r.Result.Marketplace != nil {
 		if m, ok := d.marketplace(r.Result.Marketplace, wire.CatalogKindMCP, &r.Destination); ok {

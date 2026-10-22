@@ -432,6 +432,9 @@ func sameDestination(a, b wire.SkillDestination) bool {
 // mcpAddByHand writes a server that answered Verify, exactly as it was verified: its
 // secrets to secrets.env first, the name still free.
 func (d *Daemon) mcpAddByHand(r wire.MCPAddByHandRequest) (wire.MCPAddAnswer, error) {
+	if err := d.customServerRefusal(); err != nil {
+		return wire.MCPAddAnswer{}, err
+	}
 	if err := d.requireMCPProject(r.Destination); err != nil {
 		return wire.MCPAddAnswer{}, mcpRefusal(err)
 	}

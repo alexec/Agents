@@ -1,6 +1,7 @@
 package agentsd
 
 import (
+	"slices"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -195,6 +196,9 @@ func catalogWhy(err error) wire.CatalogError {
 // previewCatalog is skills.sh, for its copy of a skill's files, only when the skill was
 // found there.
 func (d *Daemon) previewCatalog(result wire.CatalogResult, dest wire.SkillDestination) *skillcatalog.SkillsSh {
+	if result.Marketplace == nil && !d.marketplaceAllowed(skillcatalog.SkillsShID, "") {
+		return nil
+	}
 	if result.Marketplace == nil {
 		return &skillcatalog.SkillsSh{Client: catalogHTTP, Base: d.catalogEndpoints().Catalog}
 	}
@@ -329,8 +333,11 @@ func (d *Daemon) marketplacesList(kind *wire.CatalogKind, dest *wire.SkillDestin
 	if home != "" {
 		secrets = skillcatalog.LoadSecrets(skillcatalog.SecretsPath(home))
 	}
-	return wire.MarketplacesListAnswer{Marketplaces: skillcatalog.ListMarketplaces(kind, personal, project, secrets.IsSet, os.Getenv),
-		Problem: problem}
+	// A marketplace the organisation does not allow is not listed (#998, US3 scenario 1),
+	// so nothing is searched, previewed or added from it.
+	listed := slices.DeleteFunc(skillcatalog.ListMarketplaces(kind, personal, project, secrets.IsSet, os.Getenv),
+		func(m wire.Marketplace) bool { return !d.marketplaceAllowed(m.ID, m.URL) })
+	return wire.MarketplacesListAnswer{Marketplaces: listed, Problem: problem}
 }
 
 // marketplace is the one a search names, if it is on; else the first on for the kind.
@@ -361,6 +368,9 @@ func (d *Daemon) marketplaceFile() (string, skillcatalog.MarketplaceFile, error)
 }
 
 func (d *Daemon) marketplacesAdd(r wire.MarketplaceAddRequest) (wire.MarketplacesListAnswer, error) {
+	if url := skillcatalog.Normalized(r.URL); !d.marketplaceAllowed(skillcatalog.MarketplaceID(wire.MarketplaceOriginPersonal, url), url) {
+		return wire.MarketplacesListAnswer{}, policyRefusal("policy", "marketplaces", marketplaceRefusalWords(), nil)
+	}
 	path, f, err := d.marketplaceFile()
 	if err != nil {
 		return wire.MarketplacesListAnswer{}, err
@@ -426,6 +436,9 @@ func (d *Daemon) marketplacesRemove(id string) (wire.MarketplacesListAnswer, err
 }
 
 func (d *Daemon) marketplacesSetEnabled(r wire.MarketplaceSetEnabledRequest) (wire.MarketplacesListAnswer, error) {
+	if r.Enabled && !d.marketplaceAllowed(r.ID, "") {
+		return wire.MarketplacesListAnswer{}, policyRefusal("policy", "marketplaces", marketplaceRefusalWords(), nil)
+	}
 	path, f, err := d.marketplaceFile()
 	if err != nil {
 		return wire.MarketplacesListAnswer{}, err

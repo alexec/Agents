@@ -65,6 +65,17 @@ stopped**, in the same pane, lists every agent a limit has stopped.
 Each server keeps to the per-day limit on its own. For every control in the pane, see
 [Settings and the Resources page](../reference/settings.md).
 
+**When your organisation sets a budget**
+
+An organisation's policy can give each person a budget per UTC day and per agent, in US
+dollars and in tokens (#998). It is a ceiling over your own limits: the lower one stops the
+work. A runtime on a subscription reports tokens and no price, so the token budget holds it.
+At the budget, new turns are refused until 00:00 UTC, and the chat says that your
+organisation set the budget. Your machines count together: the control plane adds what each
+one spent. While a budget is set, a runtime that reports neither a price nor tokens is
+refused, unless your organisation allows it. See
+[Organisation policy on a machine](../explanation/organisation-policy.md#budgets).
+
 ## If it doesn't work
 
 - **An agent went over its limit.** A limit is checked between turns, so the turn that
@@ -73,7 +84,8 @@ Each server keeps to the per-day limit on its own. For every control in the pane
   reports no price; hover over the figure and it says so. Set a token limit: the figure
   then shows the tokens used against it.
 - **The figure says *Not measured* and no limit stops the agent.** Its runtime reports
-  neither a price nor tokens (Cursor, Antigravity, Grok). No limit applies to it.
+  neither a price nor tokens (Cursor, Antigravity, Grok). No limit applies to it. While
+  your organisation sets a budget, such a runtime does not start at all.
 
 ## See also
 

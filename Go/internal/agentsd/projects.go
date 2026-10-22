@@ -302,6 +302,9 @@ func (d *Daemon) setHelperLimits(r wire.SetHelperLimitsRequest) (wire.ProjectSum
 	if why := helperLimitsProblem(r.Limits); why != "" {
 		return wire.ProjectSummary{}, Invalid("%s", why)
 	}
+	if err := d.helperLimitsRefusal(r.Limits); err != nil {
+		return wire.ProjectSummary{}, err
+	}
 	if !isDir(folder) {
 		return wire.ProjectSummary{}, noSuchProject(folder + " is not there, so its settings cannot be written.")
 	}

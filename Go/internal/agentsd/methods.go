@@ -65,6 +65,7 @@ func (d *Daemon) register() {
 	d.registerAssess()
 	d.registerHostedMCP()
 	d.registerViews()
+	d.registerPolicy()
 	// What the control plane keeps under You is changed there, not here (#1760).
 	d.registerUserScope()
 	defer d.guardUserScope()
@@ -95,7 +96,7 @@ func (d *Daemon) register() {
 		return wire.Empty{}, d.answerElicitation(r)
 	})
 	On(d, wire.CallRuntimesList, func(ctx context.Context, c *Client, _ wire.Empty) ([]wire.RuntimeStatus, error) {
-		return d.runtimeStatuses(), nil
+		return d.markRuntimes(d.runtimeStatuses()), nil
 	})
 	// relay/offer: a sign-in lent by another host (056, T091), from the window's lend.
 	On(d, wire.CallRelayOffer, func(ctx context.Context, c *Client, o wire.RelayOffer) (wire.Empty, error) {
@@ -215,6 +216,7 @@ func (d *Daemon) projects(includeArchived bool) []wire.ProjectSummary {
 			continue
 		}
 		d.dress(&s)
+		d.markHelperLimits(&s)
 		out = append(out, s)
 	}
 	sort.Slice(out, func(i, j int) bool {

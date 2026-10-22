@@ -70,6 +70,24 @@ change. A person sees only their own raises.
 | `host/policy` | To a machine | The signed policy, or `{none: true}`. |
 | `host/policyApplied` | From a machine | The version it keeps. |
 
+## On a machine
+
+A machine says `host.policy/1` when it follows the policy (slice 2a). How it follows it:
+[Organisation policy on a machine](../explanation/organisation-policy.md).
+
+| File or method | What it is |
+|---|---|
+| `<root>/policy.json` | The newest signed policy, as `{policy, signature}`, 0600. |
+| `<root>/policy-seen.json` | The highest version applied, and the control key before a rotation, trusted 30 days. |
+| `<settings>/runtime-environment.json` | The person's own pass-through names: `{names: [name], runtimes: {<id>: [name]}}`, `*` at the end for a prefix. |
+| `daemon/policyState` | The policy as the machine follows it: `version`, the rules with only this person's raises, `stopAll`, `noPolicy`, `update` (the capabilities it lacks) and `refusal`. `daemon/policyStateChanged` says each change. |
+| `settings/passThrough` | The person's pass-through names, each marked with `setBy` when the policy refuses it. |
+
+The lists marked with `setBy` (`{by: "organisation", rule, words}`): `runtimes/list` on each
+runtime, each mode and model value of an agent's options and of `agents/options`,
+`sandbox/state`, `cost/state` (with `organisation`, the budgets in force today), and
+`helperLimitsSetBy` on a project. Each roll-up row of `usage/rollup` has `limitTokens`.
+
 A refusal is the error `policyRefused` (-32076). Its data is a `PolicyRefusal`: the reason
 (`policy`, `budget`, `stopAll`, `noPolicy`, `mustJoin` or `update`), the rule, and the
 words for the client.
