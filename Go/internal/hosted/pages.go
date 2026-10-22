@@ -20,10 +20,16 @@ import (
 //	/account/open      a new code for this browser, then to the control plane
 //	/account/delete    the account and its store, once its name is typed
 //	/signout           the session ends
+//	/account/upgrade, /account/billing, /billing/webhook   with billing on (billing.go)
 
 func (s *Service) pages(w http.ResponseWriter, r *http.Request) {
 	h := w.Header()
-	h.Set("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'")
+	// A form's redirect counts for form-action: Upgrade and Manage Billing go on to Stripe.
+	formAction := "'self'"
+	if s.billingOn() {
+		formAction += " https://checkout.stripe.com https://billing.stripe.com"
+	}
+	h.Set("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'; form-action "+formAction+"; frame-ancestors 'none'; base-uri 'none'")
 	h.Set("X-Content-Type-Options", "nosniff")
 	h.Set("Referrer-Policy", "no-referrer")
 	h.Set("Cache-Control", "no-store")
@@ -60,6 +66,19 @@ func (s *Service) pages(w http.ResponseWriter, r *http.Request) {
 		s.openIn(w, r, account)
 	case r.URL.Path == "/account/delete" && r.Method == http.MethodPost:
 		s.deleteAccount(w, r, account)
+	case r.URL.Path == "/account/upgrade" && r.Method == http.MethodPost && s.billingOn(),
+		r.URL.Path == "/account/billing" && r.Method == http.MethodPost && s.billingOn():
+		if account == "" || !s.sessions.formOK(r, account) {
+			http.Redirect(w, r, "/", http.StatusSeeOther)
+			return
+		}
+		if r.URL.Path == "/account/upgrade" {
+			s.upgrade(w, r, account)
+		} else {
+			s.manageBilling(w, r, account)
+		}
+	case r.URL.Path == "/billing/webhook" && r.Method == http.MethodPost && s.billingOn():
+		s.webhook(w, r)
 	case r.URL.Path == "/signout" && r.Method == http.MethodPost:
 		endCookie(w, sessionCookie)
 		http.Redirect(w, r, "/", http.StatusSeeOther)
@@ -164,9 +183,12 @@ func (s *Service) accountPage(w http.ResponseWriter, r *http.Request, account, p
 	if err != nil {
 		s.log(acc.ID + ": use: " + err.Error())
 	}
+	billingOn := s.billingOn()
 	s.page(w, http.StatusOK, page{Title: "Your account", Account: acc, Address: s.accountURL(acc.ID),
 		Token: s.sessions.form(acc.ID), Problem: problem, Use: &use, StorageUsed: bytesText(use.Storage),
-		StorageAllowed: bytesText(use.Plan.Storage), EventsDays: int(use.Plan.EventsKept / day)})
+		StorageAllowed: bytesText(use.Plan.Storage), EventsDays: int(use.Plan.EventsKept / day),
+		Upgrade: billingOn && use.Plan.ID == PlanFree, ManageBilling: billingOn && acc.StripeCustomer != "",
+		Confirming: billingOn && use.Plan.ID == PlanFree && r.URL.Query().Get("upgraded") == "1"})
 }
 
 func (s *Service) deleteAccount(w http.ResponseWriter, r *http.Request, account string) {
@@ -219,6 +241,9 @@ type page struct {
 	Use                         *Use
 	StorageUsed, StorageAllowed string
 	EventsDays                  int
+	// Billing (#2225): Upgrade and Manage Billing, each only with billing on; Confirming
+	// is back from Checkout before Stripe's event came.
+	Upgrade, ManageBilling, Confirming bool
 }
 
 func (s *Service) page(w http.ResponseWriter, status int, p page) {
@@ -298,6 +323,9 @@ var pageTemplate = template.Must(template.New("page").Parse(`<!doctype html>
 <tr><td>Agents running at once</td><td>up to {{.Plan.AgentsRunning}}</td></tr>
 </table>
 <p class="quiet">At a limit, nothing is deleted: the next machine, client or write is refused, with words that say which limit.</p>
+{{if $.Confirming}}<p role="status">Stripe is confirming your payment. Your account is on Pro in a minute; reload this page.</p>{{end}}
+{{if $.Upgrade}}<form method="post" action="/account/upgrade"><input type="hidden" name="token" value="{{$.Token}}"><button class="prominent">Upgrade</button></form>{{end}}
+{{if $.ManageBilling}}<form method="post" action="/account/billing"><input type="hidden" name="token" value="{{$.Token}}"><button>Manage Billing</button></form>{{end}}
 </section>{{end}}
 <section>
 <h2>Delete Account</h2>
