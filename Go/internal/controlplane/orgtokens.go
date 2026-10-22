@@ -1,6 +1,7 @@
 package controlplane
 
 import (
+	"cmp"
 	"context"
 	"crypto"
 	"crypto/hmac"
@@ -42,6 +43,13 @@ const (
 	entraScope       = "https://cognitiveservices.azure.com/.default"
 )
 
+// firstTokenRetry and lastTokenRetry bound the wait after a token that was not made:
+// 1, 2, 4 … 30 minutes, for every machine together (#2250).
+const (
+	firstTokenRetry = time.Minute
+	lastTokenRetry  = 30 * time.Minute
+)
+
 // orgEndpoints are where the token and check calls go. Tests point them at fakes.
 type orgEndpoints struct {
 	// STS is AWS STS's address for a region.
@@ -79,12 +87,25 @@ func (s *Service) endpoints() *orgEndpoints {
 	return &defaultOrgEndpoints
 }
 
-// orgToken is a token made for a route's version, its field and when it ends.
+// orgToken is a token made for a route's version, its field and when it ends; and, after
+// a renewal that failed, how many failed and when the next is tried.
 type orgToken struct {
-	version int64
-	field   string
-	value   string
-	expires time.Time
+	version  int64
+	field    string
+	value    string
+	expires  time.Time
+	failures int
+	retryAt  time.Time
+	err      error
+}
+
+// tokenRetry is how long to wait after the nth renewal in a row that failed.
+func tokenRetry(failures int) time.Duration {
+	wait := firstTokenRetry
+	for i := 1; i < failures && wait < lastTokenRetry; i++ {
+		wait *= 2
+	}
+	return min(wait, lastTokenRetry)
 }
 
 // tokenField is the field a route's token goes in, or "" for a route sent as it is.
@@ -113,19 +134,31 @@ func (s *Service) routeValuesToSend(ctx context.Context, r wire.OrgRoute, values
 	s.orgRoutes.mu.Lock()
 	t, ok := s.orgRoutes.tokens[r.ID]
 	s.orgRoutes.mu.Unlock()
-	if !ok || t.version != deref(r.Version) || t.expires.Sub(now) <= renewTokenBefore {
+	if ok && (t.version != deref(r.Version) || t.field != field) {
+		t = orgToken{}
+	}
+	// After a renewal that failed, nothing is tried until retryAt, whichever machine asks.
+	if t.expires.Sub(now) <= renewTokenBefore && !now.Before(t.retryAt) {
 		value, expires, err := s.makeToken(ctx, r, values)
-		if err != nil {
-			return nil, time.Time{}, err
+		if err == nil {
+			t = orgToken{version: deref(r.Version), field: field, value: value, expires: expires}
+			s.log(fmt.Sprintf("org route %s: a token made, until %s", r.ID, expires.UTC().Format(time.TimeOnly)))
+		} else {
+			t.version, t.field, t.err = deref(r.Version), field, err
+			t.failures++
+			t.retryAt = now.Add(tokenRetry(t.failures))
+			s.log(fmt.Sprintf("org route %s: no token made (%v); tried again at %s", r.ID, err, t.retryAt.UTC().Format(time.TimeOnly)))
 		}
-		t = orgToken{version: deref(r.Version), field: field, value: value, expires: expires}
 		s.orgRoutes.mu.Lock()
 		if s.orgRoutes.tokens == nil {
 			s.orgRoutes.tokens = map[string]orgToken{}
 		}
 		s.orgRoutes.tokens[r.ID] = t
 		s.orgRoutes.mu.Unlock()
-		s.log(fmt.Sprintf("org route %s: a token made, until %s", r.ID, expires.UTC().Format(time.TimeOnly)))
+	}
+	// The last token goes on until it ends, through a renewal that failed.
+	if t.value == "" || !t.expires.After(now) {
+		return nil, time.Time{}, cmp.Or(t.err, errors.New("no token was made"))
 	}
 	return map[string]string{t.field: t.value}, t.expires, nil
 }
@@ -175,13 +208,14 @@ func (s *Service) renewTokensEvery(every time.Duration) {
 	}
 }
 
-// tokensEndingSoon says a token this copy made ends within renewTokenBefore.
+// tokensEndingSoon says a token this copy made ends within renewTokenBefore, and is due a
+// renewal: not one that failed until its retryAt.
 func (s *Service) tokensEndingSoon() bool {
 	now := s.endpoints().Now()
 	s.orgRoutes.mu.Lock()
 	defer s.orgRoutes.mu.Unlock()
 	for _, t := range s.orgRoutes.tokens {
-		if t.expires.Sub(now) <= renewTokenBefore {
+		if t.expires.Sub(now) <= renewTokenBefore && !now.Before(t.retryAt) {
 			return true
 		}
 	}

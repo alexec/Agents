@@ -448,6 +448,7 @@ func TestReplaceAndRemoveARoute(t *testing.T) {
 type fakeClouds struct {
 	server              *httptest.Server
 	sts, google, entra  atomic.Int32
+	refuseSTS           atomic.Bool
 	stsAuth, stsActions []string
 	mu                  sync.Mutex
 }
@@ -459,6 +460,10 @@ func newFakeClouds(t *testing.T) *fakeClouds {
 		switch {
 		case strings.HasPrefix(r.URL.Path, "/sts/"):
 			n := f.sts.Add(1)
+			if f.refuseSTS.Load() {
+				w.WriteHeader(http.StatusForbidden)
+				return
+			}
 			f.mu.Lock()
 			f.stsAuth = append(f.stsAuth, r.Header.Get("Authorization"))
 			f.stsActions = append(f.stsActions, r.PostForm.Get("Action")+" "+r.PostForm.Get("RoleArn")+" "+r.PostForm.Get("ExternalId"))
@@ -602,6 +607,88 @@ func TestCloudCredentialsGoAsShortLivedTokens(t *testing.T) {
 	json.Unmarshal(call(t, window, "", "orgRoutes/check", wire.OrgRouteRequest{ID: "vertex"}), &check)
 	if !check.Ok || !strings.Contains(check.Words, "A token was made") {
 		t.Fatalf("%+v", check)
+	}
+}
+
+// A cloud credential that is refused is tried again once per backoff step for every
+// machine, not once a minute for each one; and a machine keeps the last token until it
+// ends (#2250).
+func TestARefusedCredentialBacksOff(t *testing.T) {
+	clouds := newFakeClouds(t)
+	var clock atomic.Int64
+	clock.Store(time.Now().UnixNano())
+	endpoints := &orgEndpoints{
+		STS:    func(region string) string { return clouds.server.URL + "/sts/" + region },
+		Client: clouds.server.Client(),
+		Now:    func() time.Time { return time.Unix(0, clock.Load()) },
+	}
+	p := startPlaneWith(t, store.NewMemory(), controllink.NewPrivateKey(), func(c *Config) {
+		withKeeper(newKeeperKey())(c)
+		c.orgEndpoints = endpoints
+	})
+	told := newRoutesTold()
+	p.told = told.heard
+	_, window := p.client("Alex's Mac")
+	alex := &person{id: p.s.localOwner(), window: window}
+	const machines = 10
+	boxes := []*fakeHost{}
+	for i := range machines {
+		boxes = append(boxes, p.machineSaying(alex, routesHello("MACHINE-"+itoa(i+2))))
+	}
+	setRoute(t, window, wire.OrgRoute{ID: "bedrock", Name: "Acme Bedrock", Kind: wire.OrgRouteKindBedrock, Runtimes: []string{"claude"},
+		Settings: &wire.OrgRouteSettings{Region: optional("us-east-1")}},
+		map[string]string{"awsAccessKeyId": "AKIAEXAMPLE", "awsSecretAccessKey": "aws-long-lived-secret-key"}, nil)
+	holds := func(box *fakeHost) bool { return told.route(box.member.Host, "bedrock") != nil }
+	for _, box := range boxes {
+		p.waitFor(func() bool { return holds(box) }, "each machine told the route")
+	}
+	if clouds.sts.Load() != 1 {
+		t.Fatal(clouds.sts.Load())
+	}
+	// tick is renewTokensEvery's tick, each machine's delivery made before it returns.
+	tick := func(by time.Duration) {
+		clock.Add(int64(by))
+		if p.s.tokensEndingSoon() {
+			for _, box := range boxes {
+				p.s.sendOrgRoutes(box.member.Host, false)
+			}
+		}
+	}
+
+	// The key is revoked. 52 minutes on, one renewal is tried for all ten machines, and
+	// each keeps the token it holds, which has 8 minutes left.
+	clouds.refuseSTS.Store(true)
+	tick(52 * time.Minute)
+	if clouds.sts.Load() != 2 {
+		t.Fatal(clouds.sts.Load())
+	}
+	for _, box := range boxes {
+		if !holds(box) {
+			t.Fatal("a machine lost a token that has not ended")
+		}
+	}
+	// Ticks a minute apart: tries at 1, 2, 4 and 8 minutes, not ten for each tick.
+	for range 20 {
+		tick(time.Minute)
+	}
+	if got := clouds.sts.Load(); got != 2+4 {
+		t.Fatalf("%d calls to STS in 20 minutes", got)
+	}
+	// The token has ended: the route leaves the machines.
+	for _, box := range boxes {
+		p.waitFor(func() bool { return !holds(box) }, "the ended token taken from each machine")
+	}
+
+	// The key works again: the next try sends a new token to every machine.
+	clouds.refuseSTS.Store(false)
+	for range 16 {
+		tick(time.Minute)
+	}
+	if got := clouds.sts.Load(); got != 2+4+1 {
+		t.Fatalf("%d calls to STS", got)
+	}
+	for _, box := range boxes {
+		p.waitFor(func() bool { return holds(box) }, "a new token sent to each machine")
 	}
 }
 
