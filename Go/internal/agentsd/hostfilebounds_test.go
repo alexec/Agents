@@ -15,7 +15,7 @@ import (
 // #2292: host files that were never removed each have a bound. Each test makes one more
 // than the bound and finds the bound.
 
-func names(t *testing.T, dir string) []string {
+func dirNames(t *testing.T, dir string) []string {
 	t.Helper()
 	entries, _ := os.ReadDir(dir)
 	var out []string
@@ -41,7 +41,7 @@ func TestOnlyTheNamedWorkflowCopiesAreKept(t *testing.T) {
 	for i := range 3 {
 		os.WriteFile(file, fmt.Appendf(nil, "---\non:\n  - schedule:\n      at: \":00\"\n---\nTidy up %d.\n", i), 0o644)
 		approveAll(t, c, folder)
-		copies := names(t, d.workflowCopies())
+		copies := dirNames(t, d.workflowCopies())
 		if len(copies) != 1 {
 			t.Fatalf("version %d: %v, want the one copy", i, copies)
 		}
@@ -73,7 +73,7 @@ func TestTheNewestAssessmentsAreKept(t *testing.T) {
 		os.Chtimes(kept, at, at)
 	}
 	d.dropOldAssessments()
-	got := names(t, dir)
+	got := dirNames(t, dir)
 	if len(got) != 3*assessmentsKept {
 		t.Fatalf("%d files, want %d", len(got), 3*assessmentsKept)
 	}
@@ -97,7 +97,7 @@ func TestTheNewestServerLogsAreKept(t *testing.T) {
 	}
 	// The one opened is the oldest, and stays.
 	dropOldHostedLogs(dir, "server-00.log")
-	got := names(t, dir)
+	got := dirNames(t, dir)
 	if len(got) != 2*hostedLogsKept {
 		t.Fatalf("%d files, want %d: %v", len(got), 2*hostedLogsKept, got)
 	}
