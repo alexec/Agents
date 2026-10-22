@@ -68,6 +68,19 @@ struct RemoteApp: App {
                           let url = URL(string: args[at + 1]) else { return }
                     model.openedFromTheWidget(url)
                 }
+                // A project alone (#2191), as its heading's long press opens it: a menu no walk
+                // can open. Named as its heading is, once the projects have come.
+                .task {
+                    let args = ProcessInfo.processInfo.arguments
+                    guard args.contains("-walk"), let at = args.firstIndex(of: "-alone"), at + 1 < args.count else { return }
+                    for _ in 0..<50 {
+                        if let project = model.projects.first(where: { $0.name == args[at + 1] }) {
+                            model.phoneProject = project.key
+                            return
+                        }
+                        try? await Task.sleep(for: .milliseconds(200))
+                    }
+                }
                 #endif
                 .onChange(of: model.pairedWithControlPlane) { _, paired in
                     guard paired else { return }
