@@ -6225,6 +6225,9 @@ type PromptRequest struct {
 	From PromptOrigin `json:"from"`
 
 	SendID *UUID `json:"sendID,omitzero"`
+
+	// Sent from voice mode (#2322): the daemon puts the voice-mode text in front of the words, as the prompt's preface.
+	Voice *bool `json:"voice,omitzero"`
 }
 
 // providers/add and providers/update. `secrets` only ever goes to the control plane; `cli` is not kept; `draft` is the draft this accepts (#858).

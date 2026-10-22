@@ -99,6 +99,16 @@ public struct TurnParts: Hashable, Sendable {
         self.live = isLive && reply.isEmpty ? shown.last(where: { !$0.isOutcome }) : nil
     }
 
+    /// The reply's words, its messages joined: what voice mode speaks (#2322). Never the
+    /// thoughts, the steps or the report. Empty when the turn said nothing at the end.
+    public var replyText: String {
+        outcome.compactMap { item -> String? in
+            guard case .entry(let entry) = item, case .agentMessage(_, let text, _) = entry.kind else { return nil }
+            return text
+        }
+        .joined(separator: "\n\n")
+    }
+
     /// What a turn draws of its items, thinking aside. A passing line — "Picked the
     /// conversation back up." — is only news while its turn is going; once the turn
     /// is over it is neither a step nor something standing between the reply and the

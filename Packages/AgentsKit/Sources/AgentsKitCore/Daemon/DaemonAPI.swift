@@ -1175,14 +1175,18 @@ public enum DaemonAPI {
         /// nothing and answers as it did (037, FR-020). Nil from the phone and from any
         /// older window, which is today's behaviour.
         public var sendID: UUID?
+        /// Sent from voice mode (#2322): the daemon puts the voice-mode text in front of the
+        /// words, so the reply is short and fit to be heard. Nil is a typed prompt.
+        public var voice: Bool?
 
         public init(agentID: UUID, text: String, attachments: [Attachment] = [],
-                    from: PromptOrigin = .person, sendID: UUID? = nil) {
+                    from: PromptOrigin = .person, sendID: UUID? = nil, voice: Bool? = nil) {
             self.agentID = agentID
             self.text = text
             self.attachments = attachments
             self.from = from
             self.sendID = sendID
+            self.voice = voice
         }
 
         /// Attachments and origin are optional on the way in: a caller that sends only the
@@ -1194,6 +1198,7 @@ public enum DaemonAPI {
             attachments = try c.decodeIfPresent([Attachment].self, forKey: .attachments) ?? []
             from = try c.decodeIfPresent(PromptOrigin.self, forKey: .from) ?? .person
             sendID = try c.decodeIfPresent(UUID.self, forKey: .sendID)
+            voice = try c.decodeIfPresent(Bool.self, forKey: .voice)
         }
 
         public var blocks: [ContentBlock] {
