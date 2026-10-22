@@ -57,7 +57,11 @@ func (d *Daemon) registerHost() {
 		return d.diskState(), nil
 	})
 	On(d, wire.CallSandboxState, func(ctx context.Context, c *Client, _ wire.Empty) (wire.SandboxSettings, error) {
-		return d.sandboxSettings(), nil
+		st := d.sandboxSettings()
+		if sandboxRequired(d.orgPolicy()) {
+			st.SetBy = setBy("sandbox", sandboxRequiredWords)
+		}
+		return st, nil
 	})
 	On(d, wire.CallClientPermissionsState, func(ctx context.Context, c *Client, _ wire.Empty) (wire.ClientPermissionSettings, error) {
 		return d.clientPermissions(), nil

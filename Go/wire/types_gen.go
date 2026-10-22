@@ -2312,6 +2312,12 @@ type CostState struct {
 	Note *string `json:"note,omitzero"`
 
 	TokensToday int64 `json:"tokensToday"`
+
+	// The organisation's budgets for this person today, in US dollars and tokens, with any raise (#998, FR-016). Each limit in force is the lower of this and limits.
+	Organisation *CostLimits `json:"organisation,omitzero"`
+
+	// Set when the organisation's budgets cap this person's own limits, or this person is at a budget today (#998).
+	SetBy *PolicySetBy `json:"setBy,omitzero"`
 }
 
 type CredentialKind string
@@ -5081,6 +5087,23 @@ type PairingSecret struct {
 	Expires *Date `json:"expires,omitzero"`
 }
 
+// One name in the person's own pass-through list (#998, FR-011a), as runtime-environment.json has it.
+type PassThroughName struct {
+	// A variable's name, or a prefix ending in *.
+	Name string `json:"name"`
+
+	// The runtime it is passed to; absent for every runtime.
+	Runtime *string `json:"runtime,omitzero"`
+
+	// Set when the organisation's policy does not allow the name: it is not passed.
+	SetBy *PolicySetBy `json:"setBy,omitzero"`
+}
+
+// settings/passThrough (#998): the person's own pass-through names, each marked when the policy refuses it.
+type PassThroughState struct {
+	Names []PassThroughName `json:"names"`
+}
+
 type Payment struct {
 	Allowance *PaymentAllowance `json:"allowance,omitzero"`
 
@@ -5582,6 +5605,26 @@ type PolicySignature struct {
 	Sig Data `json:"sig"`
 }
 
+// daemon/policyState and daemon/policyStateChanged (#998, T027): the organisation's policy as this machine follows it, so a client on the direct path draws the strip and the Policy pane. No version when this machine has no policy.
+type PolicyState struct {
+	Version *int64 `json:"version,omitzero"`
+
+	// The rules in force here, with only this machine's person's raises.
+	Policy *OrgPolicy `json:"policy,omitzero"`
+
+	// The kill switch is on: this machine stops its turns and starts no work.
+	StopAll bool `json:"stopAll"`
+
+	// This machine had a policy from its organisation and has none it can trust now (missing, or it fails the signature check). It starts no work until it gets one.
+	NoPolicy bool `json:"noPolicy"`
+
+	// The capabilities the policy requires that this machine lacks (FR-014). It starts no work.
+	Update []string `json:"update,omitzero"`
+
+	// Why this machine starts no work now, when it starts none.
+	Refusal *PolicyRefusal `json:"refusal,omitzero"`
+}
+
 // The kill switch (#998, FR-015): while on, every machine stops its turns and starts no work.
 type PolicyStopAll struct {
 	On bool `json:"on"`
@@ -5754,6 +5797,9 @@ type ProjectSummary struct {
 	GuardedChanges []GuardedChange `json:"guardedChanges,omitzero"`
 
 	Approvals []Approval `json:"approvals,omitzero"`
+
+	// Set when the organisation's policy caps this project's helper limits (#998, #64): the lower number is used.
+	HelperLimitsSetBy *PolicySetBy `json:"helperLimitsSetBy,omitzero"`
 }
 
 type ProjectSummaryCounts struct {
@@ -6720,6 +6766,9 @@ type RuntimeStatus struct {
 	PoolNote *string `json:"poolNote,omitzero"`
 
 	IsOut *bool `json:"isOut,omitzero"`
+
+	// Set when the organisation's policy does not allow this runtime here (#998, FR-010).
+	SetBy *PolicySetBy `json:"setBy,omitzero"`
 }
 
 // A server ssh knows by a name, for Add a Server's server box (#610).
@@ -6781,6 +6830,9 @@ type SandboxFailureRecord struct {
 
 type SandboxSettings struct {
 	Defaults map[string]SandboxChoice `json:"defaults"`
+
+	// Set when the organisation's policy requires the command sandbox (#998): off is refused, and a runtime that cannot be put in a sandbox does not start.
+	SetBy *PolicySetBy `json:"setBy,omitzero"`
 }
 
 type SandboxState string
@@ -8376,6 +8428,9 @@ type UsageRollupRow struct {
 
 	// What the agents did (#2019): sessions, pull requests and waits.
 	Counts *ReportCounts `json:"counts,omitzero"`
+
+	// The row's tokens as the machine counts them for a limit (#998, FR-017): fresh input and output, no cache reads and no thoughts. Absent from an older machine, whose rows count as inputTokens + outputTokens.
+	LimitTokens *int64 `json:"limitTokens,omitzero"`
 }
 
 // The agentConfig part (#1760): the person's own instructions, personas and skills, as ~/.agents keeps them on each machine.

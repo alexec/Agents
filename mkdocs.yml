@@ -179,6 +179,7 @@ nav:
           - explanation/compliance/sub-processors.md
           - explanation/compliance/security-overview.md
           - explanation/compliance/data-and-retention.md
+      - explanation/organisation-policy.md
       - explanation/window-and-daemon.md
       - explanation/architecture.md
       - explanation/versions.md

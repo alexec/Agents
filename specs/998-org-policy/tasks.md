@@ -43,24 +43,24 @@
 
 ### Tests first
 
-- [ ] T014 [US2] Write the ceiling table test in `Go/internal/agentsd/policy_test.go`: every rule × every path of FR-009 (start, helper, workflow, Continue in New, Branch, `setOption` mode and model, workflow and helper `model:`, sandbox set and failure card, marketplace add and enable, `skills/add`, `mcp/add`, `mcp/add-by-hand`, project helper limits, launch environment, `ApplyUserSettings`). 0 escapes (SC-003). A new path with no row fails the test. A looser policy gives back each choice the person had set, unchanged (FR-011).
-- [ ] T015 [P] [US6] Test the file: a forged, missing, older and newer policy; a rotated key within and after 30 days (SC-005).
-- [ ] T016 [P] [US5] Test the kill switch: two running turns stop within 5 s, a workflow trigger does not run, a queued prompt stays, turning it off starts nothing (SC-004).
-- [ ] T017 [P] [US4] Test machine budgets: the machine refuses at its own count; `capReachedUntil` from the control plane wins; an unmetered runtime is refused unless allowed; tokens count for a cost-less runtime (SC-006).
-- [ ] T018 [P] [US2] Test `requires`: a capability the machine lacks refuses every start with `reason: update`.
+- [x] T014 [US2] Write the ceiling table test in `Go/internal/agentsd/policy_test.go`: every rule × every path of FR-009 (start, helper, workflow, Continue in New, Branch, `setOption` mode and model, workflow and helper `model:`, sandbox set and failure card, marketplace add and enable, `skills/add`, `mcp/add`, `mcp/add-by-hand`, project helper limits, launch environment, `ApplyUserSettings`). 0 escapes (SC-003). A new path with no row fails the test. A looser policy gives back each choice the person had set, unchanged (FR-011).
+- [x] T015 [P] [US6] Test the file: a forged, missing, older and newer policy; a rotated key within and after 30 days (SC-005).
+- [x] T016 [P] [US5] Test the kill switch: two running turns stop within 5 s, a workflow trigger does not run, a queued prompt stays, turning it off starts nothing (SC-004).
+- [x] T017 [P] [US4] Test machine budgets: the machine refuses at its own count; `capReachedUntil` from the control plane wins; an unmetered runtime is refused unless allowed; tokens count for a cost-less runtime (SC-006).
+- [x] T018 [P] [US2] Test `requires`: a capability the machine lacks refuses every start with `reason: update`.
 
 ### Build
 
-- [ ] T019 [US6] Add `Go/internal/agentsd/policy.go`: receive `host/policy` (dispatch in `localpath.go`), verify, keep `<root>/policy.json` 0600, refuse a lower version, send `host/policyApplied`, say `host.policy.1` in `host/hello` (`Go/internal/controllink/uplink.go`). Joined with no trusted policy → `noPolicy`.
-- [ ] T020 [US2] Add the ceiling checks at each path of T014, with `policyRefused` errors (`PolicyRefusal`). Mode by `modeRanks`; an unknown mode counts as rank 4.
-- [ ] T021 [US2] Mark refused items with `setBy` in `runtimes/list`, the options lists (`agents/options`, `draftOptions`), `marketplaces/list`, `sandbox/state`, the project's helper limits, `cost/state`, and the pass-through list.
-- [ ] T022 [US2] Read `<settings>/runtime-environment.json` in `runtimes.go` `environment()`, then cut it to `environment.passThrough` (FR-011a).
-- [ ] T023 [US2] A running agent meets a new policy at its next turn: lower the mode, or refuse the turn, with a line in the chat (FR-012).
-- [ ] T024 [US4] Budgets: the policy's `budgets` as a ceiling over `CostLimits` in `costlimits.go`; honour `capReachedUntil` for a person; refuse unmetered runtimes under a budget.
-- [ ] T025 [US4] Add `limitTokens` to each row in `reportledger.go`.
-- [ ] T026 [US5] The kill switch: reuse `stopAll` in `turns.go` for running turns, refuse new work, pause workflows and their queues in `workflows.go`.
-- [ ] T027 [US2] `daemon/policyState` and its notification, so a client on the direct path (#1118) gets the same state.
-- [ ] T028 [P] Docs: `docs/explanation/organisation-policy.md` (with what it does not protect against), `docs/how-to/limit-spending.md`.
+- [x] T019 [US6] Add `Go/internal/agentsd/policy.go`: receive `host/policy` (dispatch in `localpath.go`), verify, keep `<root>/policy.json` 0600, refuse a lower version, send `host/policyApplied`, say `host.policy.1` in `host/hello` (`Go/internal/controllink/uplink.go`). Joined with no trusted policy → `noPolicy`.
+- [x] T020 [US2] Add the ceiling checks at each path of T014, with `policyRefused` errors (`PolicyRefusal`). Mode by `modeRanks`; an unknown mode counts as rank 4.
+- [x] T021 [US2] Mark refused items with `setBy` in `runtimes/list`, the options lists (`agents/options`, `draftOptions`), `marketplaces/list`, `sandbox/state`, the project's helper limits, `cost/state`, and the pass-through list.
+- [x] T022 [US2] Read `<settings>/runtime-environment.json` in `runtimes.go` `environment()`, then cut it to `environment.passThrough` (FR-011a).
+- [x] T023 [US2] A running agent meets a new policy at its next turn: lower the mode, or refuse the turn, with a line in the chat (FR-012).
+- [x] T024 [US4] Budgets: the policy's `budgets` as a ceiling over `CostLimits` in `costlimits.go`; honour `capReachedUntil` for a person; refuse unmetered runtimes under a budget.
+- [x] T025 [US4] Add `limitTokens` to each row in `reportledger.go`.
+- [x] T026 [US5] The kill switch: reuse `stopAll` in `turns.go` for running turns, refuse new work, pause workflows and their queues in `workflows.go`.
+- [x] T027 [US2] `daemon/policyState` and its notification, so a client on the direct path (#1118) gets the same state.
+- [x] T028 [P] Docs: `docs/explanation/organisation-policy.md` (with what it does not protect against), `docs/how-to/limit-spending.md`.
 
 **Checkpoint**: `run-app` on a scratch root joined to a scratch control plane: each rule refused by the wire; control plane stopped and the policy still holds; an edited file refuses work.
 

@@ -35,6 +35,8 @@ func (d *Daemon) helperLimitsIn(folder string) (running, notArchived, queued int
 			queued = *l.Queued
 		}
 	}
+	// The organisation's caps over the project's own (#998): the lower number is used.
+	running, notArchived, _ = d.helperCaps(running, notArchived)
 	return
 }
 

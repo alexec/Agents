@@ -1884,6 +1884,48 @@
       }
     },
     {
+      "name": "daemon/policyState",
+      "x-capability": "host.policy/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "description": "The organisation's policy as this machine follows it (#998, T027).",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/PolicyState"
+        }
+      }
+    },
+    {
+      "name": "daemon/policyStateChanged",
+      "x-capability": "host.policy/1",
+      "x-notification": true,
+      "description": "The policy this machine follows changed, or the kill switch turned (#998).",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/PolicyState"
+          }
+        }
+      ]
+    },
+    {
       "name": "daemon/quit",
       "x-capability": "daemon/1",
       "paramStructure": "by-name",
@@ -5279,6 +5321,32 @@
           "items": {
             "$ref": "daemon.schema.json#/definitions/RuntimeSession"
           }
+        }
+      }
+    },
+    {
+      "name": "settings/passThrough",
+      "x-capability": "host.policy/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "description": "The person's own pass-through names, from runtime-environment.json, each marked when the organisation's policy refuses it (#998, FR-011a).",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/PassThroughState"
         }
       }
     },

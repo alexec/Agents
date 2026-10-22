@@ -115,6 +115,14 @@ func addRollupRow(r *wire.UsageRollupRow, o wire.UsageRollupRow) {
 	}
 	r.InputTokens += o.InputTokens
 	r.OutputTokens += o.OutputTokens
+	// The tokens a limit counts (#998, FR-017), so the control plane adds what a machine does.
+	if o.LimitTokens != nil {
+		n := *o.LimitTokens
+		if r.LimitTokens != nil {
+			n += *r.LimitTokens
+		}
+		r.LimitTokens = &n
+	}
 	r.ThoughtTokens += o.ThoughtTokens
 	r.CachedReadTokens += o.CachedReadTokens
 	r.CachedWriteTokens += o.CachedWriteTokens

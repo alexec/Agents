@@ -94,6 +94,12 @@ func main() {
 		d.SettingsDir = filepath.Join(home, ".agents", "settings")
 		d.ChatHome = home
 	}
+	// A root that joined follows its organisation's policy from its first call, also when
+	// started without the control network (#998, FR-013): only its control plane's key
+	// checks the policy it keeps. join sets it again after a new enrolment.
+	if member, err := controllink.LoadMembership(loc.Root); err == nil && member.Host != "" {
+		d.SetControlKey(member.ControlKey)
+	}
 	safe.Go("socket", func() {
 		if err := d.ServeSocket(ctx, loc.Socket()); err != nil && ctx.Err() == nil {
 			log.Printf("socket: %v", err)
@@ -271,8 +277,10 @@ func join(ctx context.Context, cl commandLine, d *agentsd.Daemon) {
 		os.Remove(codeFile)
 		log.Printf("enrolled as host %s with %s", member.Host, member.Name)
 	}
+	// The organisation's policy is checked with the control key (#998).
+	d.SetControlKey(member.ControlKey)
 	up := &controllink.Uplink{Root: loc.Root, Member: member, Private: private, Hello: hello, Accept: d.Accept,
-		Lend: d.LendingPort, Rotated: d.MoveLocal}
+		Lend: d.LendingPort, Rotated: func(key []byte) { d.ControlKeyRotated(key); d.MoveLocal(key) }}
 	d.Tunneler = up
 	// The needs it shows nowhere go to the control plane, offered again on each return (#1367).
 	up.OnChange = func(connected bool, problem string) {

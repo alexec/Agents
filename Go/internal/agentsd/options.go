@@ -135,7 +135,7 @@ func (d *Daemon) options(r wire.OptionsRequest) (wire.OptionsResponse, error) {
 	if shown, ok := d.remembered(key); ok {
 		// Shown at once; the runtime is asked after, and a change is said (settleDraft).
 		safe.Go("draft options", func() { d.settleDraft(draft, key, rt, path, shown) })
-		return wire.OptionsResponse{DraftID: draft, Options: shown.Options, Commands: shown.Commands}, nil
+		return wire.OptionsResponse{DraftID: draft, Options: d.markOptions(r.RuntimeID, shown.Options), Commands: shown.Commands}, nil
 	}
 	e, err := d.whatItOffers(rt, path)
 	if err != nil {
@@ -143,7 +143,7 @@ func (d *Daemon) options(r wire.OptionsRequest) (wire.OptionsResponse, error) {
 		return wire.OptionsResponse{}, err
 	}
 	d.remember(key, e)
-	return wire.OptionsResponse{DraftID: draft, Options: e.Options, Commands: e.Commands}, nil
+	return wire.OptionsResponse{DraftID: draft, Options: d.markOptions(r.RuntimeID, e.Options), Commands: e.Commands}, nil
 }
 
 func (d *Daemon) settleDraft(draft wire.UUID, key string, rt *runtimeDef, path string, shown optionEntry) {
@@ -166,7 +166,7 @@ func (d *Daemon) settleDraft(draft wire.UUID, key string, rt *runtimeDef, path s
 	if !open || (sameJSON(e.Options, shown.Options) && sameJSON(e.Commands, shown.Commands)) {
 		return
 	}
-	Broadcast(d, wire.NotifyAgentsDraftOptions, wire.DraftOptionsNotification{DraftID: draft, Options: e.Options, Commands: e.Commands})
+	Broadcast(d, wire.NotifyAgentsDraftOptions, wire.DraftOptionsNotification{DraftID: draft, Options: d.markOptions(rt.ID, e.Options), Commands: e.Commands})
 }
 
 // closeDraft lets a draft go (agents/discardDraft, or the start that used it), and says

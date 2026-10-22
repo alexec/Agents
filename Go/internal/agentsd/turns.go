@@ -207,6 +207,11 @@ type startedBy struct {
 }
 
 func (d *Daemon) startFor(r wire.StartRequest, by startedBy) (wire.UUID, error) {
+	// The organisation's policy first (#998): its refusal says why, in its own words.
+	policyNote, err := d.policyStart(&r, by)
+	if err != nil {
+		return "", err
+	}
 	if err := d.startRefusal(); err != nil {
 		return "", err
 	}
@@ -302,6 +307,9 @@ func (d *Daemon) startFor(r wire.StartRequest, by startedBy) (wire.UUID, error) 
 	d.projectChanged(projectFolder(&a))
 	if wt != nil {
 		d.record(a.ID, runtimeNote(worktreeNote(*wt)))
+	}
+	if policyNote != "" {
+		d.record(a.ID, runtimeNote(policyNote))
 	}
 	if r.Purpose == nil {
 		safe.Go("starting point", func() { d.takeStartingPoint(a.ID, path) })
@@ -427,8 +435,9 @@ func (l *live) run() {
 			return
 		}
 		l.mu.Unlock()
-		// What is queued waits while the agent or the day is at its limit.
-		if l.d.holdsForLimit(l.id) {
+		// What is queued waits while the organisation's policy refuses the turn (#998),
+		// and while the agent or the day is at its limit.
+		if l.d.holdsForPolicy(l) || l.d.holdsForLimit(l.id) {
 			l.mu.Lock()
 			l.running = false
 			l.mu.Unlock()
@@ -551,7 +560,7 @@ func (l *live) turn() bool {
 		d.change(l.id, func(a *wire.Agent) {
 			a.RuntimeSessionID = &sessionID
 			if opts := configOptions(s.NewResult.ConfigOptions); opts != nil {
-				a.AdvertisedOptions = withAppOptions(a.RuntimeID, a.StartOptions.Values, opts)
+				a.AdvertisedOptions = d.markOptions(a.RuntimeID, withAppOptions(a.RuntimeID, a.StartOptions.Values, opts))
 			}
 		})
 		safe.Go("session watch", func() {
@@ -1123,7 +1132,7 @@ func (l *live) Update(n sdk.SessionNotification) {
 				if was != nil && now != nil && was.ID == now.ID && len(now.CurrentValue) > 0 && !bytes.Equal(was.CurrentValue, now.CurrentValue) {
 					keepMode(a, now.ID, now.CurrentValue)
 				}
-				a.AdvertisedOptions = withAppOptions(a.RuntimeID, a.StartOptions.Values, opts)
+				a.AdvertisedOptions = d.markOptions(a.RuntimeID, withAppOptions(a.RuntimeID, a.StartOptions.Values, opts))
 			})
 		}
 	case u.AvailableCommandsUpdate != nil:

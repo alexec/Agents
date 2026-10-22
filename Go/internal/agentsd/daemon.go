@@ -82,6 +82,7 @@ type Daemon struct {
 	localBook
 	connectionBook
 	setupBook
+	orgPolicyState
 	// pageEdits is what the person changed on live pages since each agent's last turn.
 	pageEdits  pageEdits
 	policyOnce sync.Once

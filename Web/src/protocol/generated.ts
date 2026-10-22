@@ -1874,6 +1874,16 @@ export interface CostState {
   day: string;
   note?: string;
   tokensToday: number;
+  /**
+   * The organisation's budgets for this person today, in US dollars and tokens, with any raise
+   * (#998, FR-016). Each limit in force is the lower of this and limits.
+   */
+  organisation?: CostLimits;
+  /**
+   * Set when the organisation's budgets cap this person's own limits, or this person is at a budget
+   * today (#998).
+   */
+  setBy?: PolicySetBy;
 }
 
 export type CredentialKind = "geminiAPIKey";
@@ -3869,6 +3879,27 @@ export interface PairingSecret {
   expires?: WireDate;
 }
 
+/**
+ * One name in the person's own pass-through list (#998, FR-011a), as runtime-environment.json has
+ * it.
+ */
+export interface PassThroughName {
+  /** A variable's name, or a prefix ending in *. */
+  name: string;
+  /** The runtime it is passed to; absent for every runtime. */
+  runtime?: string;
+  /** Set when the organisation's policy does not allow the name: it is not passed. */
+  setBy?: PolicySetBy;
+}
+
+/**
+ * settings/passThrough (#998): the person's own pass-through names, each marked when the policy
+ * refuses it.
+ */
+export interface PassThroughState {
+  names: PassThroughName[];
+}
+
 export type Payment =
   | { allowance: { label?: string } }
   | { freeTier: { reset: ResetRule } }
@@ -4282,6 +4313,28 @@ export interface PolicySignature {
   sig: Base64;
 }
 
+/**
+ * daemon/policyState and daemon/policyStateChanged (#998, T027): the organisation's policy as this
+ * machine follows it, so a client on the direct path draws the strip and the Policy pane. No
+ * version when this machine has no policy.
+ */
+export interface PolicyState {
+  version?: number;
+  /** The rules in force here, with only this machine's person's raises. */
+  policy?: OrgPolicy;
+  /** The kill switch is on: this machine stops its turns and starts no work. */
+  stopAll: boolean;
+  /**
+   * This machine had a policy from its organisation and has none it can trust now (missing, or it
+   * fails the signature check). It starts no work until it gets one.
+   */
+  noPolicy: boolean;
+  /** The capabilities the policy requires that this machine lacks (FR-014). It starts no work. */
+  update?: string[];
+  /** Why this machine starts no work now, when it starts none. */
+  refusal?: PolicyRefusal;
+}
+
 /** The kill switch (#998, FR-015): while on, every machine stops its turns and starts no work. */
 export interface PolicyStopAll {
   on: boolean;
@@ -4397,6 +4450,11 @@ export interface ProjectSummary {
   isChat?: boolean;
   guardedChanges?: GuardedChange[];
   approvals?: Approval[];
+  /**
+   * Set when the organisation's policy caps this project's helper limits (#998, #64): the lower
+   * number is used.
+   */
+  helperLimitsSetBy?: PolicySetBy;
 }
 
 export interface ProjectWorktrees {
@@ -5114,6 +5172,8 @@ export interface RuntimeStatus {
   outdated: boolean;
   poolNote?: string;
   isOut?: boolean;
+  /** Set when the organisation's policy does not allow this runtime here (#998, FR-010). */
+  setBy?: PolicySetBy;
 }
 
 /** A server ssh knows by a name, for Add a Server's server box (#610). */
@@ -5166,6 +5226,11 @@ export interface SandboxFailureRecord {
 
 export interface SandboxSettings {
   defaults: Record<string, SandboxChoice>;
+  /**
+   * Set when the organisation's policy requires the command sandbox (#998): off is refused, and a
+   * runtime that cannot be put in a sandbox does not start.
+   */
+  setBy?: PolicySetBy;
 }
 
 export type SandboxState =
@@ -6330,6 +6395,12 @@ export interface UsageRollupRow {
   waitingSeconds: number;
   /** What the agents did (#2019): sessions, pull requests and waits. */
   counts?: ReportCounts;
+  /**
+   * The row's tokens as the machine counts them for a limit (#998, FR-017): fresh input and output,
+   * no cache reads and no thoughts. Absent from an older machine, whose rows count as inputTokens +
+   * outputTokens.
+   */
+  limitTokens?: number;
 }
 
 /**
@@ -6994,6 +7065,7 @@ export interface Methods {
   "cost/state": { params: Empty; result: CostState };
   "credentials/lend": { params: CredentialsLend; result: Empty };
   "credentials/offer": { params: CredentialsOffer; result: Empty };
+  "daemon/policyState": { params: Empty; result: PolicyState };
   "disk/state": { params: Empty; result: DiskState };
   "dropbox/put": { params: DropboxPutRequest; result: DropboxPutResponse };
   "elicitations/answer": { params: AnswerElicitationRequest; result: Empty };
@@ -7098,6 +7170,7 @@ export interface Methods {
   "runtimes/markAvailable": { params: MarkRuntimeAvailable; result: RuntimeAllowances };
   "runtimes/removeAccount": { params: AccountRequest; result: UUID[] };
   "sandbox/state": { params: Empty; result: SandboxSettings };
+  "settings/passThrough": { params: Empty; result: PassThroughState };
   "signIn/approve": { params: SignInDecide; result: Empty };
   "signIn/configure": { params: SignInConfigure; result: SignInProviders };
   "signIn/deny": { params: SignInDecide; result: Empty };
@@ -7212,6 +7285,7 @@ export const MethodTarget = {
   "cost/state": "host",
   "credentials/lend": "host",
   "credentials/offer": "host",
+  "daemon/policyState": "host",
   "disk/state": "host",
   "dropbox/put": "host",
   "elicitations/answer": "host",
@@ -7316,6 +7390,7 @@ export const MethodTarget = {
   "runtimes/markAvailable": "host",
   "runtimes/removeAccount": "host",
   "sandbox/state": "host",
+  "settings/passThrough": "host",
   "signIn/approve": "control",
   "signIn/configure": "control",
   "signIn/deny": "control",
@@ -7553,7 +7628,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ControlStatus: { required: ["name", "version", "machineID"], optional: ["homeHost", "startedAt", "port", "awayFromHome", "you", "relayKey", "web", "publicWeb", "publicViews", "thisMacHost", "projectDetection", "unjoinedTunnels", "capabilities", "required", "person", "joinCommand"] },
   Cost: { required: ["amount", "currency"], optional: [] },
   CostLimits: { required: [], optional: ["perAgent", "daily", "perAgentTokens", "dailyTokens"] },
-  CostState: { required: ["limits", "today", "day", "tokensToday"], optional: ["note"] },
+  CostState: { required: ["limits", "today", "day", "tokensToday"], optional: ["note", "organisation", "setBy"] },
   CredentialsLend: { required: ["runtime", "kind", "secret"], optional: [] },
   CredentialsOffer: { required: ["runtimes", "ownSignInOnly"], optional: ["notRelayed", "signIns"] },
   DaemonStatus: { required: ["turnsInFlight", "agentsLive"], optional: [] },
@@ -7773,6 +7848,8 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   PagesChangedNotification: { required: ["folder", "folders"], optional: [] },
   PairingCode: { required: ["macKey", "secret", "name", "expires"], optional: [] },
   PairingSecret: { required: [], optional: ["secret", "expires"] },
+  PassThroughName: { required: ["name"], optional: ["runtime", "setBy"] },
+  PassThroughState: { required: ["names"], optional: [] },
   PendingMove: { required: ["target", "removeLeft", "discardChanges", "askedBy", "askedAt"], optional: [] },
   PeopleChanged: { required: [], optional: ["user", "removed"] },
   PeopleList: { required: ["people", "admin"], optional: [] },
@@ -7822,6 +7899,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   PolicySet: { required: ["policy"], optional: ["rev"] },
   PolicySetBy: { required: ["by", "rule", "words"], optional: [] },
   PolicySignature: { required: ["version", "keyID", "alg", "sig"], optional: [] },
+  PolicyState: { required: ["stopAll", "noPolicy"], optional: ["version", "policy", "update", "refusal"] },
   PolicyStopAll: { required: ["on", "by", "at"], optional: ["note"] },
   PolicyStopAllRequest: { required: ["on"], optional: ["note"] },
   PolicyView: { required: [], optional: ["policy"] },
@@ -7835,7 +7913,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ProjectPlugin: { required: ["project", "folder", "name", "carries"], optional: ["awaitingApproval"] },
   ProjectRemovedNotification: { required: ["folder"], optional: [] },
   ProjectRequest: { required: ["folder"], optional: [] },
-  ProjectSummary: { required: ["project", "name", "exists", "lastActivityAt", "counts", "costToDate", "unmeasuredAgents", "retiredCount"], optional: ["isChat", "guardedChanges", "approvals"] },
+  ProjectSummary: { required: ["project", "name", "exists", "lastActivityAt", "counts", "costToDate", "unmeasuredAgents", "retiredCount"], optional: ["isChat", "guardedChanges", "approvals", "helperLimitsSetBy"] },
   ProjectWorktrees: { required: ["project", "worktrees"], optional: [] },
   ProjectsFindRequest: { required: [], optional: ["paths", "folders"] },
   ProjectsListRequest: { required: ["includeArchived"], optional: [] },
@@ -7905,14 +7983,14 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   RuntimeAssessmentScore: { required: ["agentID", "runtimeID", "scoredAt", "checks"], optional: ["model", "runtimeVersion", "host", "reportPath"] },
   RuntimeRequest: { required: ["runtimeID"], optional: [] },
   RuntimeSession: { required: ["sessionID", "cwd"], optional: ["additionalDirectories", "title", "updatedAt", "isHeld"] },
-  RuntimeStatus: { required: ["runtime", "availability", "checkedAt", "outdated"], optional: ["poolNote", "isOut"] },
+  RuntimeStatus: { required: ["runtime", "availability", "checkedAt", "outdated"], optional: ["poolNote", "isOut", "setBy"] },
   SSHHost: { required: ["alias", "resolved", "throughBastion", "isBastion", "known"], optional: [] },
   SSHHostsRequest: { required: [], optional: ["destination"] },
   SaidMatch: { required: ["agentID", "line"], optional: [] },
   SaidSearchRequest: { required: ["text"], optional: ["folder", "limit"] },
   SaidSearchResult: { required: ["matches"], optional: [] },
   SandboxFailureRecord: { required: ["runtimeID", "detail", "hang", "recoveryOffered", "completedToolCalls"], optional: [] },
-  SandboxSettings: { required: ["defaults"], optional: [] },
+  SandboxSettings: { required: ["defaults"], optional: ["setBy"] },
   SealedEnvelope: { required: ["encapsulated", "ciphertext"], optional: [] },
   SecretLeftOn: { required: ["host", "name", "at"], optional: [] },
   SecretsLeft: { required: ["host", "name", "secrets"], optional: [] },
@@ -8035,7 +8113,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   UsageReport: { required: ["range", "rows", "admin"], optional: ["scope", "personsHidden", "groupNames", "budgetUSD", "monthSpentUSD"] },
   UsageRollup: { required: ["hours", "days"], optional: [] },
   UsageRollupPeriod: { required: ["at", "rows"], optional: [] },
-  UsageRollupRow: { required: ["project", "runtime", "cost", "inputTokens", "outputTokens", "thoughtTokens", "cachedReadTokens", "cachedWriteTokens", "turns", "unpricedTurns", "workingSeconds", "waitingSeconds"], optional: ["workflow", "counts"] },
+  UsageRollupRow: { required: ["project", "runtime", "cost", "inputTokens", "outputTokens", "thoughtTokens", "cachedReadTokens", "cachedWriteTokens", "turns", "unpricedTurns", "workingSeconds", "waitingSeconds"], optional: ["workflow", "counts", "limitTokens"] },
   UserAgentConfig: { required: [], optional: ["instructions", "personas", "skills"] },
   UserPartHere: { required: ["part", "value"], optional: ["leftOut"] },
   UserPartRequest: { required: ["part"], optional: [] },

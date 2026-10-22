@@ -253,11 +253,17 @@ var allowed = []string{"PATH", "HOME", "USER", "LOGNAME", "SHELL", "TMPDIR", "TZ
 	"REQUESTS_CA_BUNDLE", "CURL_CA_BUNDLE", "JAVA_HOME", "GOPATH", "GOROOT", "CARGO_HOME", "RUSTUP_HOME", "PYENV_ROOT",
 	"NVM_DIR", "AGENTS_"}
 
-func environment(r *runtimeDef, from []string) []string {
+// environment is the launch environment: the built-in allowlist, the runtime's own names,
+// and the person's own pass-through names (passthrough.go), as the policy allows them.
+func environment(r *runtimeDef, from []string, person ...string) []string {
 	names := append(append([]string{}, allowed...), r.passed...)
 	var env []string
 	for _, kv := range from {
 		name, _, _ := strings.Cut(kv, "=")
+		if passedThrough(person, name) {
+			env = append(env, kv)
+			continue
+		}
 		for _, a := range names {
 			if name == a || strings.HasSuffix(a, "_") && strings.HasPrefix(name, a) {
 				env = append(env, kv)
@@ -282,7 +288,7 @@ func (d *Daemon) launchAs(r *runtimeDef, dir string, account *wire.AccountProfil
 	if path == "" {
 		return acp.Launch{}, &Error{Code: CodeRuntimeNotFound, Message: r.Name + " is not installed on this machine (looked in " + strings.Join(looked, ", ") + ")"}
 	}
-	env := environment(r, loginEnvironment())
+	env := environment(r, loginEnvironment(), d.passThrough(r.ID)...)
 	// The shipped MCP servers sit beside agentsd (~/.agents-server/bin), last on PATH.
 	if self, err := os.Executable(); err == nil {
 		env = appendPath(env, filepath.Dir(self))

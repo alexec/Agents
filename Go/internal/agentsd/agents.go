@@ -136,6 +136,9 @@ func (d *Daemon) prompt(r wire.PromptRequest) error {
 	if err := d.refuseToRun(a); err != nil {
 		return err
 	}
+	if err := d.promptRefusal(a); err != nil {
+		return err
+	}
 	if err := d.needsSignIn(a.RuntimeID); err != nil {
 		return err
 	}
@@ -475,6 +478,9 @@ func (d *Daemon) setOption(ctx context.Context, r wire.SetOptionRequest) ([]wire
 	if a == nil {
 		return nil, noSuchAgent()
 	}
+	if err := d.optionRefusal(a, r.OptionID, stringValue(r.Value)); err != nil {
+		return nil, err
+	}
 	l := d.live(a.ID)
 	if a.RuntimeID == "claude" && r.OptionID == chromeOptionID {
 		return d.setChrome(a, l, r.Value), nil
@@ -506,7 +512,7 @@ func (d *Daemon) setOption(ctx context.Context, r wire.SetOptionRequest) ([]wire
 		values[r.OptionID] = r.Value
 		a.StartOptions.Values = values
 		if s != nil {
-			a.AdvertisedOptions = withAppOptions(a.RuntimeID, values, options)
+			a.AdvertisedOptions = d.markOptions(a.RuntimeID, withAppOptions(a.RuntimeID, values, options))
 		}
 	})
 	known := options
