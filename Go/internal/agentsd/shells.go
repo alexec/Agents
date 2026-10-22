@@ -172,6 +172,10 @@ func (s *shell) replay(since *int64, startedAt *wire.Date) wire.ShellAttachRespo
 }
 
 func (d *Daemon) openShell(r wire.ShellAttachRequest, number int64) (*shell, error) {
+	// A machine that must join its control plane, and has not, opens no shell (#998, FR-028).
+	if err := d.pinRefusal(); err != nil {
+		return nil, err
+	}
 	folder, err := d.shellFolder(r)
 	if err != nil {
 		return nil, err

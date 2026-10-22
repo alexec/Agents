@@ -35,6 +35,10 @@ struct HostWindow: View {
                     }
                     relay
                 }
+                if let note = model.mustJoinNote {
+                    Label(note, systemImage: OrgPolicyWords.symbol)
+                        .foregroundStyle(.orange).fixedSize(horizontal: false, vertical: true)
+                }
                 if let problem = model.problem {
                     Label(problem, systemImage: "exclamationmark.triangle")
                         .foregroundStyle(.red).fixedSize(horizontal: false, vertical: true)

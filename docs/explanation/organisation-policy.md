@@ -97,3 +97,5 @@ boundary against the user of the machine.
 - [Set an organisation policy](../how-to/set-an-organisation-policy.md): Console ▸ Policy,
   the Policy pane on every client, and the kill switch.
 - [Policy](../reference/policy.md): every field.
+- [Pin machines with MDM](../how-to/pin-machines-with-mdm.md): a configuration profile or
+  `/etc/agents/policy.json` that says which control plane a machine joins.

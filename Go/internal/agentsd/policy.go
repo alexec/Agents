@@ -326,10 +326,14 @@ func setBy(rule, words string) *wire.PolicySetBy {
 }
 
 // workRefusal is why this machine starts no work at all now: no policy it can trust
-// (FR-013), a capability it lacks (FR-014), the kill switch (FR-015), or its person
-// suspended (#1002, FR-018). Nil otherwise.
+// (FR-013), a capability it lacks (FR-014), the kill switch (FR-015), its person
+// suspended (#1002, FR-018), or a control plane it must join and has not (FR-028). Nil
+// otherwise.
 func (d *Daemon) workRefusal() error {
 	if err := d.suspensionRefusal(); err != nil {
+		return err
+	}
+	if err := d.pinRefusal(); err != nil {
 		return err
 	}
 	d.orgMu.Lock()

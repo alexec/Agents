@@ -82,6 +82,7 @@ nav:
       - how-to/add-a-server.md
       - how-to/invite-someone.md
       - how-to/set-an-organisation-policy.md
+      - how-to/pin-machines-with-mdm.md
       - how-to/add-an-org-key-or-gateway.md
       - how-to/send-a-project-to-a-server.md
       - how-to/start-workspaces-from-agents.md

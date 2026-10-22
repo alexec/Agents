@@ -51,6 +51,7 @@ type Daemon struct {
 	appToolsState
 	hostUserState
 	userSuspendState
+	machinePinState
 	hostedPool
 	eventWaitState
 	messageState

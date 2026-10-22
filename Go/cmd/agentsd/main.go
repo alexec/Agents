@@ -100,8 +100,14 @@ func main() {
 	// A root that joined follows its organisation's policy from its first call, also when
 	// started without the control network (#998, FR-013): only its control plane's key
 	// checks the policy it keeps. join sets it again after a new enrolment.
+	d.SetPin(machinePin(cl))
 	if member, err := controllink.LoadMembership(loc.Root); err == nil && member.Host != "" {
-		d.SetControlKey(member.ControlKey)
+		if err := d.Pin().AdmitsMember(member); err != nil {
+			log.Printf("pin: the membership kept here is for another control plane, and is not used: %v", err)
+		} else {
+			d.SetControlKey(member.ControlKey)
+			d.SetMember(member)
+		}
 	}
 	safe.Go("socket", func() {
 		if err := d.ServeSocket(ctx, loc.Socket()); err != nil && ctx.Err() == nil {
@@ -140,7 +146,12 @@ type commandLine struct {
 	// (#1951). Agents Host gives them only then.
 	web     string
 	webPort int
-	args    []string
+	// pinAddress, pinKey and mustJoin: the Mac's managed preferences, as Agents Host gives
+	// them (#998, FR-025). /etc/agents/policy.json, when there is one, wins.
+	pinAddress string
+	pinKey     string
+	mustJoin   bool
+	args       []string
 }
 
 func parse(args []string) commandLine {
@@ -164,6 +175,8 @@ func parse(args []string) commandLine {
 			cl.detach = true
 		case "--control-network":
 			cl.network = true
+		case "--must-join":
+			cl.mustJoin = true
 		}
 	}
 	cl.root = value("--root")
@@ -172,6 +185,8 @@ func parse(args []string) commandLine {
 		cl.code = value("--control-code")
 	}
 	cl.hostName = value("--host-name")
+	cl.pinAddress = value("--pin-address")
+	cl.pinKey = value("--pin-key")
 	cl.web = value("--web")
 	cl.webPort, _ = strconv.Atoi(value("--web-port"))
 	if cl.root == "" {
@@ -188,6 +203,19 @@ func parse(args []string) commandLine {
 	}
 	cl.root, _ = filepath.Abs(cl.root)
 	return cl
+}
+
+// machinePin is the pin (#998, US7): /etc/agents/policy.json when root owns it and nobody
+// else can write it, or else the managed preferences Agents Host gave. Read once, at start.
+func machinePin(cl commandLine) *agentsd.MachinePin {
+	pin, err := agentsd.ReadPinFile(agentsd.PinFile, 0)
+	if err != nil {
+		log.Printf("pin: %v", err)
+	}
+	if pin != nil {
+		return pin
+	}
+	return agentsd.PinFromFlags(cl.pinAddress, cl.pinKey, cl.mustJoin)
 }
 
 func (cl commandLine) controlNetwork() bool { return cl.code != "" || cl.network }
@@ -251,13 +279,22 @@ func join(ctx context.Context, cl commandLine, d *agentsd.Daemon) {
 	if err != nil {
 		log.Fatal(err)
 	}
+	pin := d.Pin()
 	member, err := controllink.LoadMembership(loc.Root)
+	if err == nil && member.Host != "" && pin.AdmitsMember(member) != nil {
+		// Joined another control plane before the pin: it is not dialled (FR-027).
+		member = nil
+	}
 	askFile := filepath.Join(loc.Root, "control-join-ask")
-	if code == "" && (err != nil || member.Host == "") {
+	if code == "" && (member == nil || member.Host == "") {
 		if b, err := os.ReadFile(askFile); err == nil {
 			var ask controllink.JoinAsk
 			if err := json.Unmarshal(b, &ask); err != nil {
 				log.Fatalf("control-join-ask: %v", err)
+			}
+			if err := pin.Admits(nil, ask.URL); err != nil {
+				log.Printf("pin: not asking to join %s: %v", ask.URL, err)
+				return
 			}
 			if member = askToJoin(ctx, loc.Root, ask, private, hello); member == nil {
 				return
@@ -272,6 +309,10 @@ func join(ctx context.Context, cl commandLine, d *agentsd.Daemon) {
 			return
 		}
 		member = enrol(ctx, code, codeFile, func(ctx context.Context, c *controllink.Code) (*controllink.Membership, error) {
+			// A code for another control plane is refused here, before it is used (FR-027).
+			if err := pin.Admits(c.ControlKey, c.URL); err != nil {
+				return nil, err
+			}
 			return controllink.Enroll(ctx, loc.Root, c, private, hello)
 		})
 		if member == nil {
@@ -280,8 +321,14 @@ func join(ctx context.Context, cl commandLine, d *agentsd.Daemon) {
 		os.Remove(codeFile)
 		log.Printf("enrolled as host %s with %s", member.Host, member.Name)
 	}
+	if err := pin.AdmitsMember(member); err != nil {
+		// An approved ask that turned out to be another control plane's key.
+		log.Printf("pin: the control plane joined is not the one required, and is not used: %v", err)
+		return
+	}
 	// The organisation's policy is checked with the control key (#998).
 	d.SetControlKey(member.ControlKey)
+	d.SetMember(member)
 	up := &controllink.Uplink{Root: loc.Root, Member: member, Private: private, Hello: hello, Accept: d.Accept,
 		Lend: d.LendingPort, Rotated: func(key []byte) { d.ControlKeyRotated(key); d.MoveLocal(key) }}
 	d.Tunneler = up

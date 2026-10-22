@@ -384,6 +384,11 @@ final class ControlSettingsModel {
     /// it, then the window's pairing goes. True when it was forgotten; otherwise `problem`
     /// says why, and nothing has changed.
     func forgetThisWindow() async -> Bool {
+        // Paired with the control plane the organisation pins this Mac to (#998, US7 AS3).
+        if let refusal = ControlConfig.leaveRefusal {
+            problem = refusal
+            return false
+        }
         do {
             _ = try await client.call(DaemonAPI.Method.clientsForgetSelf, DaemonAPI.Empty())
         } catch let error as JSONRPCError {

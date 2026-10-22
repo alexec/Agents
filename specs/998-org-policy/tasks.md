@@ -101,11 +101,11 @@
 
 **Goal**: US7.
 
-- [ ] T044 [US7] Tests first, in `Go/internal/agentsd/pin_test.go`: `/etc/agents/policy.json` read only when root owns it and nobody else can write it; must join refuses agents, shells and workflows; a code or join for another control plane is refused; another key is ignored and logged once. The path is a parameter, so the test needs no root.
-- [ ] T045 [US7] Add `Go/internal/agentsd/pin.go` and read it in `Go/cmd/agentsd/`. Refuse `--join` and codes for another control plane, and leaving.
-- [ ] T046 [US7] Agents Host: read the managed preferences (`ControlPlaneAddress`, `ControlPlaneKey`, `MustJoin`) in `Host/`, pass them to `agentsd`, and show "Your organisation requires this Mac to join <address>." until it has joined. Tests over a `UserDefaults` suite.
-- [ ] T047 [US7] The window: read the same keys from its own domain; the connect sheet and **Forget** refuse another control plane with **Set by your organisation** (`App/Sources/Control/`).
-- [ ] T048 [P] Docs: `docs/how-to/pin-machines-with-mdm.md` with a sample `.mobileconfig` that sets both domains, and `/etc/agents/policy.json`.
+- [x] T044 [US7] Tests first, in `Go/internal/agentsd/pin_test.go`: `/etc/agents/policy.json` read only when root owns it and nobody else can write it; must join refuses agents, shells and workflows; a code or join for another control plane is refused; another key is ignored and logged once. The path is a parameter, so the test needs no root.
+- [x] T045 [US7] Add `Go/internal/agentsd/pin.go` and read it in `Go/cmd/agentsd/`. Refuse `--join` and codes for another control plane, and leaving.
+- [x] T046 [US7] Agents Host: read the managed preferences (`ControlPlaneAddress`, `ControlPlaneKey`, `MustJoin`) in `Host/`, pass them to `agentsd`, and show "Your organisation requires this Mac to join <address>." until it has joined. Tests over a `UserDefaults` suite.
+- [x] T047 [US7] The window: read the same keys from its own domain; the connect sheet and **Forget** refuse another control plane with **Set by your organisation** (`App/Sources/Control/`).
+- [x] T048 [P] Docs: `docs/how-to/pin-machines-with-mdm.md` with a sample `.mobileconfig` that sets both domains, and `/etc/agents/policy.json`.
 
 **Checkpoint**: a scratch Mac account with a test profile (or the managed-preferences test suite when installing a profile needs Alex's hands), and the devbox with `/etc/agents/policy.json`.
 
