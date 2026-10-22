@@ -36,14 +36,20 @@ func (s *Service) actorFor(client string) wire.AuditActor {
 
 func (s *Service) auditLog() *audit.Log { return &audit.Log{Store: s.cfg.Store} }
 
-// audited keeps a call the audit keeps, on its own goroutine: the router holds its lock.
+// auditTarget is audit.Target; a test holds it to prove where it runs.
+var auditTarget = audit.Target
+
+// audited keeps a call the audit keeps. The router holds its lock, so only the method is
+// looked at here: who did it and what it named, which parses the whole params (an
+// attachment's content too), are read on the goroutine that writes it (#2058). The
+// params are the message's own, decoded from its line, and never changed after.
 func (s *Service) audited(from Caller, host, method string, params json.RawMessage) {
 	action, ok := audit.Action(method, host != "")
 	if !ok {
 		return
 	}
-	actor, target := s.actorFor(from.Client), audit.Target(params)
 	go func() {
+		actor, target := s.actorFor(from.Client), auditTarget(params)
 		if err := s.auditLog().Write(context.Background(), actor, method, action, host, target); err != nil {
 			s.log("audit: could not keep " + method + ": " + err.Error())
 		}

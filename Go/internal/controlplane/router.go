@@ -1312,6 +1312,17 @@ func (r *Router) openChannelLocked(sessionID, host string) {
 	if !r.mayReachLocked(s.caller, host) {
 		return
 	}
+	r.openReachedLocked(sessionID, host)
+}
+
+func (r *Router) relayLocked(host string) bool {
+	_, relay := r.relays[host]
+	return relay
+}
+
+// openReachedLocked is openChannelLocked for a session already known to reach the host.
+func (r *Router) openReachedLocked(sessionID, host string) {
+	s, h := r.clients[sessionID], r.hosts[host]
 	c := h.next
 	h.next++
 	h.channels[c] = target{session: sessionID}
@@ -1555,19 +1566,57 @@ func (r *Router) mayReachLocked(from Caller, host string) bool {
 
 // HoldToOwners opens a channel to each machine a session's person owns now, and closes
 // the one to each it no longer owns: after a join is approved, or a machine changes hands.
+// Each machine's owner is read once, outside the lock, as each read takes the records'
+// lock; under it, each session looks only at its own channels and its person's machines,
+// not every machine (#2059).
 func (r *Router) HoldToOwners() {
 	r.mu.Lock()
+	owners := r.owners
+	hosts := make([]string, 0, len(r.hosts))
+	for host := range r.hosts {
+		if _, relay := r.relays[host]; !relay {
+			hosts = append(hosts, host)
+		}
+	}
+	r.mu.Unlock()
+	ownerOf := make(map[string]string, len(hosts))
+	byOwner := map[string][]string{}
+	for _, host := range hosts {
+		owner := ""
+		if owners != nil {
+			owner = owners.OwnerOf(host)
+		}
+		ownerOf[host] = owner
+		byOwner[owner] = append(byOwner[owner], host)
+	}
+	r.mu.Lock()
 	defer r.mu.Unlock()
+	if r.owners != owners {
+		// SetOwnership ran meanwhile, and holds every session to its own.
+		return
+	}
 	for id, s := range r.clients {
-		for host, h := range r.hosts {
-			c, has := s.channels[host]
-			want := r.mayReachLocked(s.caller, host)
-			if want && !has {
-				r.openChannelLocked(id, host)
-			} else if !want && has {
-				delete(h.channels, c)
+		person := s.caller.Person
+		if owners == nil {
+			person = ""
+		}
+		for host, c := range s.channels {
+			owner, read := ownerOf[host]
+			if !read {
+				// A machine that came after the read: its channels were opened as it came.
+				continue
+			}
+			if owner != person {
+				if h := r.hosts[host]; h != nil {
+					delete(h.channels, c)
+					h.conn.Send(closeFrame(c))
+				}
 				delete(s.channels, host)
-				h.conn.Send(closeFrame(c))
+			}
+		}
+		for _, host := range byOwner[person] {
+			if _, has := s.channels[host]; !has && r.hosts[host] != nil && !r.relayLocked(host) {
+				r.openReachedLocked(id, host)
 			}
 		}
 	}
