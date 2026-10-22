@@ -31,18 +31,18 @@ struct TranscriptRow: View {
     }
 }
 
-/// One turn, open or collapsed (069, #1315).
+/// One turn, with its steps (069, #1315).
 ///
-/// Its outcome — the ask, the answers, the reply and how it went — is drawn either way.
-/// Between the ask and the outcome, one control opens and closes the steps, so the
-/// reply's text can be selected like any other; each step opens in its place.
+/// The ask, every step, and the outcome — the answers, the reply and how it went. No
+/// control hides the steps (#2170): each run of calls is one line already, and a count of
+/// calls over runs drawn could not be right. Each step opens in its place.
 ///
 /// Equal when what it draws is: the closures are left out, because they are made again
 /// on every pass of the chat and do the same thing for the same turn. Without this,
 /// every streamed chunk drew every turn of the conversation again (#90).
 struct TurnView: View, Equatable {
     let turn: ChatTurn
-    /// Open unless the person closed it.
+    /// Open unless the chat let a stored turn's entries go (#285).
     let detail: TurnDetail
     /// The run of calls gone to from elsewhere, drawn opened with its first call (#1315).
     var focusedRun: UUID? = nil
@@ -55,7 +55,8 @@ struct TurnView: View, Equatable {
     var fetchFailed = false
     /// Whether this is the turn still going.
     let isLive: Bool
-    let toggle: () -> Void
+    /// Draw a let-go turn with its steps again: its Load steps.
+    let loadSteps: () -> Void
     /// Fetch a stored turn's entries, for a turn drawn with its steps.
     let fetch: () async -> Void
     /// Fetch the page of its steps before the ones held.
@@ -84,9 +85,6 @@ struct TurnView: View, Equatable {
             if let ask = turn.ask {
                 TranscriptRow(item: ask)
             }
-            if stepCount != 0 {
-                StepsControl(count: stepCount, isOpen: detail.showsSteps, toggle: toggle)
-            }
             if detail.showsSteps, stepCount != 0 {
                 if waiting, fetchFailed {
                     HStack(spacing: 8) {
@@ -105,7 +103,9 @@ struct TurnView: View, Equatable {
                     ForEach(outcome) { StepRow(item: $0) }
                 }
             } else {
-                // Under the control, where the steps would be: what it is doing now.
+                // Where its steps go, a stored turn the chat let go: asked for again only
+                // by hand, so two of them cannot push each other out in a loop (#285).
+                if stepCount != 0 { LoadStepsControl(load: loadSteps) }
                 if let live = parts?.live { LiveLine(item: live) }
                 ForEach(outcome) { StepRow(item: $0) }
             }
@@ -120,27 +120,15 @@ struct TurnView: View, Equatable {
     }
 }
 
-/// "12 steps", or "Hide steps": the one way into a turn's steps and back out.
-private struct StepsControl: View {
-    let count: Int?
-    let isOpen: Bool
-    let toggle: () -> Void
+/// "Load steps": a stored turn's steps again, after the chat let them go (#285, #2170).
+private struct LoadStepsControl: View {
+    let load: () -> Void
     @State private var isHovering = false
 
-    private var words: String {
-        if isOpen { return "Hide steps" }
-        switch count {
-        case nil: return "Show steps"
-        case 1?: return "1 step"
-        case let n?: return "\(n) steps"
-        }
-    }
-
     var body: some View {
-        Button(action: toggle) {
-            // The words alone, with no chevron in front of them (#148).
+        Button(action: load) {
             // Plain text you click, flush with the turn's edge: no capsule, no padding (#758).
-            Text(words)
+            Text("Load steps")
                 .appText(.fine)
                 .foregroundStyle(isHovering ? .primary : .secondary)
                 .stepsControlFrame()
@@ -150,8 +138,7 @@ private struct StepsControl: View {
         #if os(macOS)
         .pointerStyle(.link)
         #endif
-        .help(isOpen ? "Hide this turn's steps" : "Show every step of this turn")
-        .accessibilityLabel(words)
+        .help("Show every step of this turn")
     }
 }
 

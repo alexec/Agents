@@ -54,7 +54,7 @@ struct ChatTranscript: View {
 
     /// Whether the agent's thoughts are drawn (#1725), from Settings ▸ Appearance.
     @AppStorage(ChatThoughts.showsKey, store: WindowDefaults.store) private var showsThoughts = ChatThoughts.showsAtFirst
-    /// The turns opened or closed by hand, by id. Kept until the chat is left (069).
+    /// The stored turns whose entries were let go, by id (#285). Kept until the chat is left.
     @State private var turnViews: [UUID: TurnDetail] = [:]
     /// The run of calls gone to from elsewhere: opened, with its first call (#1315).
     @State private var focusedRun: UUID?
@@ -225,7 +225,7 @@ struct ChatTranscript: View {
                                      hasEarlier: fetchedTurns[turn.id]?.hasEarlier(than: turn) ?? false,
                                      fetchFailed: failedTurns.contains(turn.id),
                                      isLive: turn.id == liveID,
-                                     toggle: { toggle(turn) },
+                                     loadSteps: { loadSteps(turn) },
                                      fetch: { await fetch(turn) },
                                      fetchEarlier: { await fetchEarlier(turn) })
                                 .equatable()
@@ -542,9 +542,9 @@ struct ChatTranscript: View {
         return lastEntryAt ?? agent.lastActivityAt
     }
 
-    /// Open a turn's steps, or close them (`TurnDetail.toggled`).
-    private func toggle(_ turn: ChatTurn) {
-        turnViews[turn.id] = (turnViews[turn.id] ?? .initial).toggled
+    /// Draw a let-go turn with its steps again: it fetches them as it is drawn.
+    private func loadSteps(_ turn: ChatTurn) {
+        turnViews[turn.id] = .open
     }
 
     /// A stored turn's entries, the first time it is drawn with its steps. The ask is
@@ -565,9 +565,10 @@ struct ChatTranscript: View {
         while fetchedOrder.count > Self.fetchedKept {
             let dropped = fetchedOrder.removeFirst()
             fetchedTurns[dropped] = nil
-            // Still open, it would ask again and push another one out. Closed, it
-            // shows the summary it already had (#285).
-            if turnViews[dropped]?.showsSteps == true { turnViews[dropped] = .collapsed }
+            // Still open, it would ask again as it is drawn and push another one out. Let
+            // go, it shows the summary it already had, and Load steps (#285). Every turn is
+            // open until now, not only one opened by hand (#2170).
+            turnViews[dropped] = .letGo
         }
     }
 

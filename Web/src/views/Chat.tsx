@@ -33,8 +33,7 @@ import { sentPrompts } from "../model/promptHistory";
 import { sessionPrompts } from "../model/sessionPrompts";
 import { PromptList } from "./chat/PromptList";
 import { asksToArchive, projectFolder } from "../model/groups";
-import { initialDetail, toggled } from "../model/turnDetail";
-import { CallActionsContext, fromLine, ItemRow, TurnView, type CallActions, type TurnDetail } from "./chat/Rows";
+import { CallActionsContext, fromLine, ItemRow, TurnView, type CallActions } from "./chat/Rows";
 import { Modal } from "./Modal";
 import { nameOf, pathOf, setPane } from "./files/paneState";
 import { FileSearch, isOpenFileKey } from "./files/FileSearch";
@@ -113,8 +112,6 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
     setPane(session, { tab: "files", file: file.path, fileLine: undefined, last: file.path });
     if (!route.peek().files) replace({ ...route.peek(), files: true });
   };
-  /** Turns opened or closed by hand, kept until the chat is left. */
-  const chosen = useSignal<Record<string, TurnDetail>>({});
   /** The run of calls gone to from elsewhere: opened, with its first call (#1315). */
   const focusedRun = useSignal<string | null>(null);
   /** Find in Chat is up over the chat (#1532). */
@@ -145,6 +142,8 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
   const subagent = useSignal<BackgroundItem | null>(null);
   const openedTurns = useRef<string[]>([]);
   const earlierTurn = useRef<string | null>(null);
+  /** The stored turn Find asked the steps of, so a miss is not asked again on every draw (#1532). */
+  const findAsked = useRef<string | null>(null);
   /** Which chat a turn's page was asked for, so a reply for one left behind is dropped. */
   const watchingSession = useRef(`${host}|${session}`);
   watchingSession.current = `${host}|${session}`;
@@ -246,7 +245,6 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
   useEffect(() => {
     // Whether its runtime takes words mid-turn, or pictures, is known once it has run.
     void store.loadRuntimes(host);
-    chosen.value = {};
     focusedRun.value = null;
     fetched.value = {};
     failedTurns.value = {};
@@ -356,21 +354,16 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
       focusedIndex.value = null;
       return;
     }
-    if (turn && (chosen.value[turn.id] ?? initialDetail) === "collapsed") {
-      follow(false);
-      chosen.value = { ...chosen.value, [turn.id]: "open" };
-      return;
-    }
     // Found by Find in a stored turn's steps (#1532): the turn is opened, and its steps come.
     const index = focusedIndex.value;
     const stored = !turn && index !== null ? rows.find((item) => item.range && item.range.start <= index && index < item.range.end) : undefined;
-    if (stored && (chosen.value[stored.id] ?? initialDetail) !== "open") {
+    if (stored && !fetched.value[stored.id] && findAsked.current !== `${focus}|${stored.id}`) {
       follow(false);
-      chosen.value = { ...chosen.value, [stored.id]: "open" };
-      // Asked for here: a turn far up the chat does not load its own steps.
+      // Asked for here, once a find: a turn far up the chat does not load its own steps.
+      findAsked.current = `${focus}|${stored.id}`;
       void latest.current.loadDetail(stored);
     }
-  }, [focus, rows, chosen.value, fetched.value]);
+  }, [focus, rows, fetched.value]);
 
   // What waits on the person is in the conversation, not over it (#723), after all of it (#1995),
   // and the agent's wait on events under it.
@@ -404,23 +397,6 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
     toEndSeen.current = toEndAsks;
     toEnd();
   }, [toEndAsks]);
-
-  const toggle = (turn: ChatTurn) => {
-    chosen.value = { ...chosen.value, [turn.id]: toggled(chosen.value[turn.id] ?? initialDetail) };
-  };
-
-  // A turn closed lets its entries go (#291).
-  useEffect(() => {
-    const openNow = new Set<string>();
-    for (const turn of rows) if ((chosen.value[turn.id] ?? initialDetail) !== "collapsed") openNow.add(turn.id);
-    const drop = openedTurns.current.filter((id) => !openNow.has(id));
-    if (!drop.length) return;
-    const next = { ...fetched.peek() };
-    let changed = false;
-    for (const id of drop) if (id in next) { delete next[id]; changed = true; }
-    openedTurns.current = openedTurns.current.filter((id) => openNow.has(id));
-    if (changed) fetched.value = next;
-  }, [rows, chosen.value]);
 
   useEffect(() => { void store.loadCost(host); }, [store, host]);
 
@@ -474,12 +450,11 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
     }
   };
 
-  // The same three for every turn, for as long as the chat is open, so a turn's props change only
+  // The same two for every turn, for as long as the chat is open, so a turn's props change only
   // when the turn does; each calls the latest of the functions above.
-  const latest = useRef({ toggle, loadDetail, loadEarlierSteps });
-  latest.current = { toggle, loadDetail, loadEarlierSteps };
+  const latest = useRef({ loadDetail, loadEarlierSteps });
+  latest.current = { loadDetail, loadEarlierSteps };
   const turnActions = useMemo(() => ({
-    toggle: (turn: ChatTurn) => latest.current.toggle(turn),
     loadDetail: (turn: ChatTurn) => latest.current.loadDetail(turn),
     loadEarlier: (turn: ChatTurn) => latest.current.loadEarlierSteps(turn),
   }), []);
@@ -546,11 +521,11 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
         )}
         {store.hasMoreOfTheConversation && <p class="more" aria-label="Loading earlier"><span class="spinner" /></p>}
         {rows.map((turn, i) => (
-          <TurnView key={turn.id} turn={turn} detail={chosen.value[turn.id] ?? initialDetail} focusedRun={focusedRun.value}
+          <TurnView key={turn.id} turn={turn} focusedRun={focusedRun.value}
             fetched={fetched.value[turn.id] && shownItems(fetched.value[turn.id]!.items)} fetchFailed={!!failedTurns.value[turn.id]} hasEarlier={fetched.value[turn.id]?.hasEarlier ?? false}
             auto={i >= rows.length - openTurnsHeld}
             isLive={i === rows.length - 1 && live} background={background}
-            toggle={turnActions.toggle} loadDetail={turnActions.loadDetail} loadEarlier={turnActions.loadEarlier} />
+            loadDetail={turnActions.loadDetail} loadEarlier={turnActions.loadEarlier} />
         ))}
         {agent && <Queued store={store} host={host} agent={agent} disabled={down} draftKey={`${host}|${session}`} />}
         {agent && <KeptBubbles store={store} kept={store.keptFor(host, agent.id)} />}

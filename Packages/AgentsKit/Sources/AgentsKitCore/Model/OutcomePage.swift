@@ -1,29 +1,28 @@
 import Foundation
 
-/// Whether a turn is drawn with its steps (069). Every turn opens with them; its *N steps*
-/// closes one, and it stays so until the chat is left. There are no levels (#1315): a run
-/// of calls, a call and a thought each open in their place.
+/// Whether a turn is drawn with its steps (069). Every turn is, with no control to hide
+/// them (#2170). There are no levels (#1315): a run of calls, a call and a thought each
+/// open in their place.
 public enum TurnDetail: Hashable, Sendable {
     /// The ask, the answers, the reply and how it went, and every step between them: a run
     /// of tool calls is drawn as its last, and opens to the rest (#759); a call opens to
     /// its argument and return; a thought is one line, and opens to the whole of it.
     case open
-    /// Closed by its *N steps*: the ask, the answers, the reply and how it went.
-    case collapsed
+    /// A stored turn whose entries the chat let go, to keep only a few (#285): the ask, the
+    /// answers, the reply and how it went, with *Load steps* where its steps go. It does not
+    /// fetch them again by itself, or two such turns would push each other out for ever.
+    case letGo
 
     public var showsSteps: Bool { self == .open }
 
-    /// Every turn before anyone opens or closes it, on every client (#993).
+    /// Every turn until the chat lets its entries go, on every client (#993).
     public static let initial = TurnDetail.open
-
-    /// The turn opened or closed by its *N steps*.
-    public var toggled: TurnDetail { showsSteps ? .collapsed : .open }
 }
 
 /// One turn of a conversation: what the person asked, and everything up to the next ask.
 ///
-/// Drawn open or collapsed (069, #759, #1315). Its outcome — the answers, the reply and how it
-/// went — is drawn at every one; the steps between are a click away.
+/// Drawn with its steps (069, #759, #1315, #2170). Its outcome — the answers, the reply and how
+/// it went — is drawn after them.
 public struct ChatTurn: Identifiable, Hashable, Sendable {
     /// The ask's id, or the first item's for what came before any ask.
     public var id: UUID
