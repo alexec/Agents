@@ -1,6 +1,8 @@
 #!/bin/zsh
 # The secrets deploy/compose.yaml mounts (058, T068), made once into deploy/secrets/:
 # - control-key: the control plane's private key, shared by every copy, never in the store;
+# - secrets-key: the key that seals people's and providers' secrets, shared by every copy, so a
+#   secret one copy sealed opens at the others (#2163);
 # - cert.pem and key.pem: the load balancer's certificate, self-signed;
 # - pin: that certificate's pin, which every code carries (compose reads it as AGENTS_CONTROL_PIN).
 #
@@ -105,6 +107,7 @@ if [[ ${1:-} == --public ]]; then
     exit 0
 fi
 [[ -f $dir/control-key ]] || { head -c 32 /dev/urandom > $dir/control-key && chmod 644 $dir/control-key }
+[[ -f $dir/secrets-key ]] || { head -c 32 /dev/urandom > $dir/secrets-key && chmod 644 $dir/secrets-key }
 if [[ ! -f $dir/cert.pem ]]; then
     openssl ecparam -name prime256v1 -genkey -noout -out $dir/key.pem
     openssl req -new -x509 -key $dir/key.pem -out $dir/cert.pem -days 3650 -subj /CN=agents-control \
