@@ -52,6 +52,11 @@ export function describedAs(call: ToolCall): string | undefined {
   return trimmed ? trimmed : undefined;
 }
 
+/** Still going, by its own status (ToolCall.isUnderway, #2338). No status, as from an old host, is not. */
+export function callIsUnderway(call: ToolCall): boolean {
+  return call.status === "pending" || call.status === "in_progress";
+}
+
 /** ToolCall.line: the description where the agent wrote one, else the runtime's title. */
 export function callLine(call: ToolCall): string {
   const input = call.rawInput;

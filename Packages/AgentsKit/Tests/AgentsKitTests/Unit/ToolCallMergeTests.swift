@@ -69,4 +69,13 @@ struct ToolCallMergeTests {
         #expect(call.diffs.count == 1)
         #expect(call.diffs.first?.fileName == "a.txt")
     }
+
+    @Test func aCallIsUnderwayUntilItsStatusSaysItEnded() {
+        // The live line's mark follows the call's own status (#2338).
+        #expect(ToolCall(title: "Read File", status: "pending").isUnderway)
+        #expect(ToolCall(title: "Read File", status: "in_progress").isUnderway)
+        #expect(!ToolCall(title: "Read File", status: "completed").isUnderway)
+        #expect(!ToolCall(title: "Read File", status: "failed").isUnderway)
+        #expect(!ToolCall(title: "Read File").isUnderway)
+    }
 }

@@ -63,6 +63,9 @@ public struct ToolCall: Codable, Hashable, Sendable {
     public var name: String?
     public var kind: String?
     public var status: String?
+    /// Still going, by its own status: `pending` or `in_progress` (#2338). A call with no
+    /// status, as from an old host, is not.
+    public var isUnderway: Bool { status == "pending" || status == "in_progress" }
     /// What it produced: diffs, output, blocks of content. Appended as updates arrive,
     /// because a tool call's content comes in pieces and the last piece is not the
     /// whole story.

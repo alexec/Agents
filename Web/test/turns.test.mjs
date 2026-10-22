@@ -49,3 +49,12 @@ test("copy takes the whole message as written (#519)", () => {
   assert.equal(turns.copiedText({ id: "n", at: "", kind: { runtimeNote: { _0: "note" } } }), undefined);
 });
 
+
+test("a call is underway until its status says it ended (#2338)", () => {
+  const call = (status) => ({ title: "Read File", status, content: [], locations: [] });
+  assert.equal(turns.callIsUnderway(call("pending")), true);
+  assert.equal(turns.callIsUnderway(call("in_progress")), true);
+  assert.equal(turns.callIsUnderway(call("completed")), false);
+  assert.equal(turns.callIsUnderway(call("failed")), false);
+  assert.equal(turns.callIsUnderway(call(undefined)), false);
+});
