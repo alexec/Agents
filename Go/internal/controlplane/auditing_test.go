@@ -1,9 +1,12 @@
 package controlplane
 
 import (
+	"context"
 	"encoding/json"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/alexec/agents/Go/internal/controllink"
 	"github.com/alexec/agents/Go/internal/controlplane/store"
@@ -64,4 +67,41 @@ func TestTheControlPlaneWritesTheActor(t *testing.T) {
 	if export.Count != 2 || strings.Count(export.Lines, "\n") != 2 || strings.Contains(export.Lines, "mallory") {
 		t.Fatalf("%+v", export)
 	}
+}
+
+// #2058: what an audited call named is read off the router's lock. While the read of a
+// start's target is held up, as a multi-MB attachment would hold it, the machine still
+// answers and other calls still pass; the entry is kept once the read ends.
+func TestTheAuditTargetIsReadOffTheRoutersLock(t *testing.T) {
+	reading, release := make(chan struct{}), make(chan struct{})
+	var once sync.Once
+	was := auditTarget
+	auditTarget = func(params json.RawMessage) *string {
+		once.Do(func() { close(reading) })
+		<-release
+		return was(params)
+	}
+	t.Cleanup(func() { auditTarget = was })
+	p := startPlane(t, store.NewMemory(), controllink.NewPrivateKey())
+	box := p.hostWith("MACHINE-2", nil)
+	_, window := p.client("Test window")
+
+	answered := make(chan error, 1)
+	go func() {
+		_, err := window.Call(context.Background(), box.member.Host, "agents/stop", map[string]any{"id": "A1"})
+		answered <- err
+	}()
+	<-reading
+	select {
+	case <-answered:
+	case <-time.After(10 * time.Second):
+		t.Fatal("the machine's answer waited for the audit's read")
+	}
+	call(t, window, box.member.Host, "agents/list", nil)
+	close(release)
+	p.waitFor(func() bool {
+		var list wire.AuditList
+		json.Unmarshal(call(t, window, "", "audit/list", wire.AuditQuery{}), &list)
+		return len(list.Entries) == 1 && list.Entries[0].Target != nil && *list.Entries[0].Target == "A1"
+	}, "the stop kept")
 }

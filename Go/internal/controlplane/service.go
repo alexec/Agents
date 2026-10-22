@@ -606,13 +606,35 @@ func (s *Service) syncRelays() {
 // which a host checks its local socket against (#1118). Only a Mac's window is on the
 // same machine as a host, and only its own person's reaches it there (FR-020).
 func (s *Service) hostClients(host string) wire.HostClients {
+	return s.hostClientsFrom(host, s.macWindows())
+}
+
+// hostClientsFrom is hostClients from the windows macWindows read once for every host
+// told, not once per host (#2059).
+func (s *Service) hostClientsFrom(host string, windows map[string][]wire.HostClient) wire.HostClients {
 	owner := s.ownerOf(host)
-	out := wire.HostClients{Clients: []wire.HostClient{}, User: &owner}
+	out := wire.HostClients{Clients: windows[owner], User: &owner}
+	if out.Clients == nil {
+		out.Clients = []wire.HostClient{}
+	}
+	return out
+}
+
+// macWindows is every paired Mac window with a key, by its person, in the order paired.
+func (s *Service) macWindows() map[string][]wire.HostClient {
+	local := s.localOwner()
+	out := map[string][]wire.HostClient{}
 	for _, c := range s.records.Clients() {
-		if person := s.PersonOf(c.ID); c.Kind == records.KindMac && len(c.PublicKey) > 0 && person == owner {
-			out.Clients = append(out.Clients, wire.HostClient{ID: wire.UUID(c.ID), Kind: c.Kind, PublicKey: c.PublicKey,
-				Person: &person})
+		if c.Kind != records.KindMac || len(c.PublicKey) == 0 {
+			continue
 		}
+		// PersonOf, from the record in hand.
+		person := local
+		if c.Owner != nil && *c.Owner != "" {
+			person = *c.Owner
+		}
+		out[person] = append(out[person], wire.HostClient{ID: wire.UUID(c.ID), Kind: c.Kind, PublicKey: c.PublicKey,
+			Person: &person})
 	}
 	return out
 }
@@ -647,8 +669,9 @@ func (s *Service) tellHostClients(only ...string) {
 	if s.told.last == nil {
 		s.told.last = map[string][sha256.Size]byte{}
 	}
+	windows := s.macWindows()
 	for _, host := range hosts {
-		clients := s.hostClients(host)
+		clients := s.hostClientsFrom(host, windows)
 		b, _ := json.Marshal(clients)
 		sum := sha256.Sum256(b)
 		if len(only) == 0 && s.told.last[host] == sum {
