@@ -405,6 +405,10 @@ export function viewWords(view: ReportView, scopeName: string): string {
 export const noViews = "No saved views yet. On any page of Reports, choose Save View… to keep its scope, range and way to add up.";
 export const viewsNote = "Your saved views are yours: nobody else sees them. Copy Digest gives a view’s numbers as text to paste into an email or a chat.";
 export const noViewsHere = "This control plane keeps no saved views. Update it to save them.";
+/** Copy Digest when the browser refuses the clipboard (#2263). */
+export const noCopy = "Couldn’t copy. Select the text and copy it.";
+/** Delete… asks first (#2262): a view took a scope, a range and a By to make, and nothing brings it back. */
+export const deleteViewWords = (name: string) => `Delete ${name}?\n\nThe view goes for good. Its numbers stay in Reports.`;
 
 /** A view's numbers as a few lines of text: what was spent, shipped and failed, and the middle wait. */
 export function digestText(view: ReportView, scopeName: string, report: UsageReport): string {
