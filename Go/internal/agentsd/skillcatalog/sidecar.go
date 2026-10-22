@@ -52,6 +52,7 @@ func LoadSidecar(path string) Sidecar {
 	if json.Unmarshal(b, &s) != nil {
 		aside := fmt.Sprintf("%s.unreadable-%d", path, time.Now().Unix())
 		os.Rename(path, aside)
+		store.TrimSetAsides(path)
 		log.Printf("%s: unreadable; kept as %s; skills added from the catalogue show without where they were taken from",
 			filepath.Base(path), filepath.Base(aside))
 		return empty

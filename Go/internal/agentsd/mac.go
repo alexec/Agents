@@ -73,6 +73,7 @@ func readPerson(path string) wire.PersonSettings {
 	}
 	if json.Unmarshal(b, &p) != nil {
 		os.Rename(path, fmt.Sprintf("%s.corrupt-%d", path, time.Now().Unix()))
+		store.TrimSetAsides(path)
 		return wire.PersonSettings{}
 	}
 	return p

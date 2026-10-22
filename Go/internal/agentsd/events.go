@@ -143,6 +143,7 @@ func (d *Daemon) loadEvents() {
 		} else {
 			os.WriteFile(aside, data, 0o644)
 		}
+		store.TrimSetAsides(d.eventsPath())
 		log.Printf("events.jsonl: skipped %d unreadable line(s); the whole file is kept as %s", unreadable, filepath.Base(aside))
 	}
 	if torn {

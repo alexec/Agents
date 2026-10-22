@@ -86,6 +86,7 @@ func readWakeSettings(path string) wire.WakeSettings {
 	var m map[string]json.RawMessage
 	if json.Unmarshal(b, &m) != nil {
 		os.Rename(path, fmt.Sprintf("%s.corrupt-%d", path, time.Now().Unix()))
+		store.TrimSetAsides(path)
 		return s
 	}
 	json.Unmarshal(m["keepsAwake"], &s.KeepsAwake)

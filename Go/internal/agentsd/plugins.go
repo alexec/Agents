@@ -172,6 +172,7 @@ func (d *Daemon) approvePlugin(r wire.PluginApproveRequest) (wire.PluginsList, e
 		path := d.pluginApprovalsPath()
 		if b, err := os.ReadFile(path); err == nil {
 			os.WriteFile(fmt.Sprintf("%s.unreadable-%d", path, time.Now().Unix()), b, 0o644)
+			store.TrimSetAsides(path)
 		}
 		began := now()
 		records = pluginApprovals{ApprovalsBegan: &began, Approved: map[string]string{}}

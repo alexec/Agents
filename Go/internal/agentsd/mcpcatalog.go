@@ -420,6 +420,7 @@ func (d *Daemon) saveMCPApprovalsLocked(replacing bool) error {
 		}
 		if b, err := os.ReadFile(d.mcpApprovalsPath()); err == nil {
 			os.WriteFile(fmt.Sprintf("%s.unreadable-%d", d.mcpApprovalsPath(), time.Now().Unix()), b, 0o644)
+			store.TrimSetAsides(d.mcpApprovalsPath())
 		}
 		began, _ := json.Marshal(now())
 		d.mcpApprovals = map[string]json.RawMessage{"approvalsBegan": began, "approved": json.RawMessage("{}")}

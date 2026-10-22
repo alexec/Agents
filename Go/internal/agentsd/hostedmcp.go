@@ -815,8 +815,42 @@ func hostedLogName(k hostedKey) string {
 func (d *Daemon) hostedLogLocked(h *hostedServer) *hostedLog {
 	if h.log == nil && d.Store != nil && d.Store.Loc.Logs != "" {
 		h.log = &hostedLog{path: filepath.Join(d.Store.Loc.Logs, "mcp-logs", hostedLogName(h.key))}
+		dropOldHostedLogs(filepath.Dir(h.log.path), filepath.Base(h.log.path))
 	}
 	return h.log
+}
+
+// hostedLogsKept is how many servers' logs mcp-logs keeps, each with its rolled .1 (#2292).
+const hostedLogsKept = 32
+
+// dropOldHostedLogs deletes all but the newest hostedLogsKept logs in mcp-logs, never
+// keep's (#2292): a server that is gone, or moved to another scope, leaves its log.
+func dropOldHostedLogs(dir, keep string) {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return
+	}
+	type logFile struct {
+		name string
+		at   time.Time
+	}
+	var logs []logFile
+	for _, e := range entries {
+		if name := e.Name(); strings.HasSuffix(name, ".log") && name != keep {
+			if fi, err := e.Info(); err == nil {
+				logs = append(logs, logFile{name, fi.ModTime()})
+			}
+		}
+	}
+	if len(logs) < hostedLogsKept {
+		return
+	}
+	sort.Slice(logs, func(i, j int) bool { return logs[i].at.After(logs[j].at) })
+	// One place is keep's.
+	for _, l := range logs[hostedLogsKept-1:] {
+		os.Remove(filepath.Join(dir, l.name))
+		os.Remove(filepath.Join(dir, l.name+".1"))
+	}
 }
 
 // hostedLog is a file of a server's own, started again past hostedLogLimit.
