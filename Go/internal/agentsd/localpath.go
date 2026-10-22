@@ -180,6 +180,10 @@ func (d *Daemon) Told(method string, params json.RawMessage) {
 		d.toldPolicy(params)
 		return
 	}
+	if method == wire.NotifyHostOrgRoutes.Name {
+		d.toldOrgRoutes(params)
+		return
+	}
 	if method != wire.NotifyHostClients.Name {
 		return
 	}

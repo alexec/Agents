@@ -2,10 +2,15 @@ package agentsd
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -152,6 +157,13 @@ func (f *fakeRuntime) Prompt(ctx context.Context, p sdk.PromptRequest) (sdk.Prom
 	// What it was told besides the words: its system prompt and what came before them.
 	if strings.Contains(text, "say your brief") {
 		say("System: " + f.systemPrompt + "\nBefore: " + strings.Join(before, "\n"))
+		return sdk.PromptResponse{StopReason: sdk.StopReasonEndTurn}, nil
+	}
+	// An agent on an org account (#999): it calls the model with what its environment
+	// holds (the relay's address, a stand-in and the relay's CA), then prints that
+	// environment, as an agent that runs env would.
+	if strings.Contains(text, "call the model") {
+		say("The model said " + callTheModel() + ".\nMy environment:\n" + strings.Join(os.Environ(), "\n"))
 		return sdk.PromptResponse{StopReason: sdk.StopReasonEndTurn}, nil
 	}
 	// Deaf to session/cancel, as Claude was waiting on CI (#1611): only a SIGTERM ends it.
@@ -464,4 +476,26 @@ func TestAToolCallIsRecordedAsSwiftRecordsIt(t *testing.T) {
 	if kind.Title != "edit" {
 		t.Fatalf("title %q", kind.Title)
 	}
+}
+
+// callTheModel is the fake runtime's model request: to ANTHROPIC_BASE_URL with
+// ANTHROPIC_AUTH_TOKEN, trusting NODE_EXTRA_CA_CERTS, as Claude Code does.
+func callTheModel() string {
+	pool := x509.NewCertPool()
+	if ca, err := os.ReadFile(os.Getenv("NODE_EXTRA_CA_CERTS")); err == nil {
+		pool.AppendCertsFromPEM(ca)
+	}
+	client := &http.Client{Transport: &http.Transport{TLSClientConfig: &tls.Config{RootCAs: pool}}, Timeout: 10 * time.Second}
+	req, err := http.NewRequest("POST", os.Getenv("ANTHROPIC_BASE_URL")+"/v1/messages", strings.NewReader(`{"model":"claude","messages":[]}`))
+	if err != nil {
+		return err.Error()
+	}
+	req.Header.Set("Authorization", "Bearer "+os.Getenv("ANTHROPIC_AUTH_TOKEN"))
+	resp, err := client.Do(req)
+	if err != nil {
+		return err.Error()
+	}
+	defer resp.Body.Close()
+	io.Copy(io.Discard, resp.Body)
+	return strconv.Itoa(resp.StatusCode)
 }

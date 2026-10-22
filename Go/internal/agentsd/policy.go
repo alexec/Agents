@@ -271,6 +271,8 @@ func (d *Daemon) policyChanged() {
 	d.markEveryAgent()
 	d.tellPolicyState()
 	d.tellCost()
+	// An org account's mark, and the default account, follow the policy's reach (#999).
+	d.tellAccountProfiles()
 }
 
 // orgPolicy is the policy in force here, or nil when none applies.
@@ -358,10 +360,27 @@ func (d *Daemon) runtimeRefusal(p *wire.OrgPolicy, runtimeID string) error {
 			return policyRefusal("policy", "runtimes", "Your organisation does not allow "+runtimeName(runtimeID)+".", nil)
 		}
 	}
+	if err := noticeRefusal(p, runtimeID); err != nil {
+		return err
+	}
 	if b := p.Budgets; b != nil && budgetSet(b) && unmeteredRuntimes[runtimeID] && !slices.Contains(b.AllowUnmetered, runtimeID) {
 		return policyRefusal("policy", "budgets.allowUnmetered", orgUnmeteredWords, nil)
 	}
 	return nil
+}
+
+// antigravityTermsWords is why Antigravity is refused under notices.antigravityTerms
+// refuse (#999, US6), with the terms.
+const antigravityTermsWords = "Your organisation does not allow Antigravity, because of Google's terms on third-party tools: https://antigravity.google/terms"
+
+// noticeRefusal is Antigravity refused for its terms (FR-017), or nil. Under accepted the
+// clients draw no notice: they read the rule from daemon/policyState.
+func noticeRefusal(p *wire.OrgPolicy, runtimeID string) error {
+	if runtimeID != "antigravity" || p == nil || p.Notices == nil || p.Notices.AntigravityTerms == nil ||
+		*p.Notices.AntigravityTerms != "refuse" {
+		return nil
+	}
+	return policyRefusal("policy", "notices.antigravityTerms", antigravityTermsWords, nil)
 }
 
 func budgetSet(b *wire.PolicyBudgets) bool {
@@ -836,6 +855,9 @@ func (d *Daemon) policyTurn(l *live, a *wire.Agent) string {
 	if err := d.runtimeRefusal(p, a.RuntimeID); err != nil {
 		return policyWords(err)
 	}
+	if err := d.sessionReachRefusal(a); err != nil {
+		return policyWords(err)
+	}
 	if err := d.modelRefusal(p, a.RuntimeID, agentModel(a)); err != nil {
 		return policyWords(err)
 	}
@@ -921,7 +943,29 @@ func (d *Daemon) promptRefusal(a *wire.Agent) error {
 	if err := d.workRefusal(); err != nil {
 		return err
 	}
-	return d.runtimeRefusal(d.orgPolicy(), a.RuntimeID)
+	if err := d.runtimeRefusal(d.orgPolicy(), a.RuntimeID); err != nil {
+		return err
+	}
+	return d.sessionReachRefusal(a)
+}
+
+// sessionReachRefusal is why a session's account may no longer reach the model, the
+// policy's reach having changed since it started (#999, US3): its next turn is refused,
+// and Continue in New moves it.
+func (d *Daemon) sessionReachRefusal(a *wire.Agent) error {
+	account, err := d.accountFor(a)
+	if e, ok := err.(*Error); ok && e.Code == wire.FailureOrgRouteRemoved {
+		return err
+	}
+	if err != nil || d.orgPolicy() == nil {
+		return nil
+	}
+	if err := d.accountRefusal(a.RuntimeID, account); err != nil {
+		e := err.(*Error)
+		e.Message += " Continue in New to move this session."
+		return e
+	}
+	return nil
 }
 
 // policyWords is a refusal's words for the chat.

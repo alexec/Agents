@@ -315,6 +315,7 @@ export const HostCapabilities: Readonly<Record<string, Capability>> = {
   "runtimes/logout": "runtimes/1",
   "runtimes/markAvailable": "runtimes/1",
   "runtimes/removeAccount": "runtimes.accounts/1",
+  "runtimes/setDefaultAccount": "host.org-routes/1",
   "runtimes/setProvider": "runtimes/1",
   "sandbox/state": "sandbox/1",
   "sessions/adopt": "sessions/1",

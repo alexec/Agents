@@ -54,16 +54,41 @@ type AccountProfile struct {
 
 	// The command that signs it in, in a terminal on the host, for a runtime the app cannot sign in itself (Claude). Absent for one that signs in with runtimes/authenticate.
 	SignInCommand *string `json:"signInCommand,omitzero"`
+
+	// Who gave the account (#999): absent or person for one the person added, organisation for an org route, which the person cannot remove.
+	Source *string `json:"source,omitzero"`
+
+	// The runtime's default account for new sessions (Reaches the Model By, #999). When no account says so, the runtime's own sign-in is the default.
+	IsDefault *bool `json:"isDefault,omitzero"`
+
+	// The organisation's policy refuses this account (#999, runtimes.<id>.reach).
+	SetBy *PolicySetBy `json:"setBy,omitzero"`
 }
 
-// How an account reaches the model (#840). Today only a sign-in kept in a folder of its own; an org key and a gateway (T6, #999) are other cases of this.
+// How an account reaches the model (#840): a sign-in kept in a folder of its own, or (#999) an organisation's route: an org key or a gateway, through the machine's model relay.
 type AccountReach struct {
 	SignIn *AccountReachSignIn `json:"signIn,omitzero"`
+
+	OrgKey *AccountReachOrgKey `json:"orgKey,omitzero"`
+
+	Gateway *AccountReachGateway `json:"gateway,omitzero"`
 }
 
 type AccountReachSignIn struct {
 	// The folder the runtime is given in its account variable (Runtime.accountFolderVariable).
 	Folder string `json:"folder"`
+}
+
+type AccountReachOrgKey struct {
+	// The org route's id.
+	Route string `json:"route"`
+}
+
+type AccountReachGateway struct {
+	// The org route's id.
+	Route string `json:"route"`
+
+	Kind OrgRouteKind `json:"kind"`
 }
 
 type AccountRequest struct {
@@ -2374,6 +2399,13 @@ type DeclaredResource struct {
 	DefaultMinutes *int64 `json:"defaultMinutes,omitzero"`
 
 	MaximumMinutes *int64 `json:"maximumMinutes,omitzero"`
+}
+
+// runtimes/setDefaultAccount (#999): a runtime's account for new sessions. accountID default (or absent) is the runtime's own sign-in.
+type DefaultAccountRequest struct {
+	RuntimeID string `json:"runtimeID"`
+
+	AccountID *string `json:"accountID,omitzero"`
 }
 
 type DeleteSessionRequest struct {
@@ -6229,6 +6261,17 @@ type RelaySwitch struct {
 	Relay bool `json:"relay"`
 }
 
+// The tokens the machine's model relay counted from the provider's own answers (#999, FR-019): fresh input, output, and cache reads and writes.
+type RelayTokens struct {
+	Input int64 `json:"input"`
+
+	Output int64 `json:"output"`
+
+	CacheRead int64 `json:"cacheRead"`
+
+	CacheWrite int64 `json:"cacheWrite"`
+}
+
 type RememberedOptionsRequest struct {
 	RuntimeID string `json:"runtimeID"`
 
@@ -8262,6 +8305,12 @@ type TurnUsage struct {
 	CachedWriteTokens *int64 `json:"cachedWriteTokens,omitzero"`
 
 	Cost *Cost `json:"cost,omitzero"`
+
+	// The org route the turn went through (#999).
+	Route *string `json:"route,omitzero"`
+
+	// The relay's count for an org account's turn, beside what the runtime reported (#999).
+	RelayTokens *RelayTokens `json:"relayTokens,omitzero"`
 }
 
 type TurnsPage struct {
@@ -8431,6 +8480,9 @@ type UsageRollupRow struct {
 
 	// The row's tokens as the machine counts them for a limit (#998, FR-017): fresh input and output, no cache reads and no thoughts. Absent from an older machine, whose rows count as inputTokens + outputTokens.
 	LimitTokens *int64 `json:"limitTokens,omitzero"`
+
+	// The org route of this row's turns (#999, FR-021); absent for the person's own sign-in and accounts.
+	Route *string `json:"route,omitzero"`
 }
 
 // The agentConfig part (#1760): the person's own instructions, personas and skills, as ~/.agents keeps them on each machine.
