@@ -128,8 +128,8 @@ struct SettingsWindow: View {
     private func shows(_ each: SettingsPane) -> Bool {
         switch each {
         case .controlPlane, .clients, .onEveryMachine, .channels: control != nil
-        // An admin's: a member sees the groups they are in on their providers (#1761).
-        case .groups: control != nil && model.people.you?.isAdmin != false
+        // An admin's, and a member's in a group, who sees the groups they are in (#1761, #2076).
+        case .groups: control != nil && model.people.showsGroups
         // An admin's: which providers people sign in with (#995).
         case .signIn: control != nil && model.people.you?.isAdmin == true
         case .providers: control?.providersHere ?? false
@@ -218,8 +218,9 @@ struct SettingsWindow: View {
 extension SettingsScope {
     var panes: [SettingsPane] {
         switch self {
-        case .thisDevice: [.appearance, .sidebar]
-        case .you: [.account, .runtimes, .agentConfiguration, .spending, .resources, .onEveryMachine, .machines]
+        case .thisDevice: [.appearance]
+        // Sidebar is kept on the Mac's host and is the same on every client (#1033, #2079).
+        case .you: [.account, .sidebar, .runtimes, .agentConfiguration, .spending, .resources, .onEveryMachine, .machines]
         case .controlPlane: [.people, .groups, .channels, .signIn, .providers, .clients, .controlPlane]
         }
     }

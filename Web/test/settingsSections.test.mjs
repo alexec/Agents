@@ -8,8 +8,9 @@ const store = (role) => ({ person: { value: role ? { role } : null } });
 
 test("each group's sections are in the order the page has always drawn them", () => {
   const names = (scope, role) => sectionsIn(scope, store(role)).map((s) => s.name);
-  assert.deepEqual(names("thisDevice"), ["appearance", "sidebar", "finishedChats"]);
-  assert.deepEqual(names("you"), ["gitAccess", "machines", "backups", "serverBackups", "userScope", "signIns"]);
+  // Sidebar and Finished chats are kept on the Mac's host, the same on every client: under You (#2079).
+  assert.deepEqual(names("thisDevice"), ["appearance"]);
+  assert.deepEqual(names("you"), ["gitAccess", "machines", "backups", "serverBackups", "userScope", "signIns", "sidebar", "finishedChats"]);
   assert.deepEqual(names("controlPlane", "admin"), ["people", "groups", "channels", "signInProviders", "providers"]);
   assert.deepEqual(names("controlPlane", "member"), ["people", "groups", "channels", "providers"]);
 });

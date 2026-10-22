@@ -1,9 +1,10 @@
 import AgentsKitCore
 import SwiftUI
 
-/// Settings ▸ Sidebar (#846): a switch for each smart group, kept on this device only, and
-/// whether agents may archive the chats the person starts (#1802), kept on the Mac's host. The Mac's Settings window and the Remote's Settings screen draw
-/// the same section; the web page keeps the same choice in its local storage.
+/// Settings ▸ You ▸ Sidebar (#846, #2079): a switch for each smart group, and whether agents
+/// may archive the chats the person starts (#1802). Both are kept on the Mac's host, so every
+/// client shows the same (#1033). The Mac's Settings window and the Remote's Settings screen
+/// draw the same section; the web page has the same two sections under You.
 struct SidebarSettingsSection: View {
     @AppStorage(SidebarSmartRow.offDefaultsKey, store: WindowDefaults.store) private var off = SidebarSmartRow.offAtFirst
     /// Kept on the Mac's host with the other display choices, so every device shows the
@@ -26,7 +27,7 @@ struct SidebarSettingsSection: View {
             Text("Smart groups")
         } footer: {
             Text("A group that is off is not shown. Its sessions go to the next group they fit, or under their project. "
-                 + "With Needs You off, approvals are not listed in the sidebar.")
+                 + "With Needs You off, approvals are not listed in the sidebar. The same on every client of yours.")
                 .appText(.fine)
                 .foregroundStyle(.secondary)
         }

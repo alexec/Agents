@@ -56,9 +56,10 @@ you without opening each project.
 
 ### Turn a smart group on or off
 
-Turn each group on or off under **Smart groups** in **Settings ▸ Sidebar** on the Mac, in
-**Settings…** at the foot of the sidebar on iPhone and iPad, and under **Sidebar** in
-**Settings** on the web page. A group that is off is not shown. Its sessions go to the next
+Turn each group on or off under **Smart groups** in **Settings ▸ You ▸ Sidebar** on the Mac,
+in **Settings…** at the foot of the sidebar on iPhone and iPad (under **You**), and under
+**Sidebar** in **Settings ▸ You** on the web page. The choice is kept on your Mac, so every
+client shows the same groups. A group that is off is not shown. Its sessions go to the next
 group they fit, or under their project. With **Needs You** off, approvals are not listed
 in the sidebar.
 

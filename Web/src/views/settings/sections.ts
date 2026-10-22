@@ -34,7 +34,7 @@ export const settingsSections: readonly SettingsSection[] = [
   { name: "backups", scope: "you", order: 30, Section: BackupsSection },
   // Channel identities linked to people (#1762).
   { name: "channels", scope: "controlPlane", order: 30, Section: ChannelsSection },
-  { name: "finishedChats", scope: "thisDevice", order: 30, Section: FinishedChatsSection },
+  { name: "finishedChats", scope: "you", order: 80, Section: FinishedChatsSection },
   { name: "gitAccess", scope: "you", order: 10, Section: GitAccessSection },
   // Groups own workspace providers (#1761).
   { name: "groups", scope: "controlPlane", order: 20, Section: GroupsSection },
@@ -43,7 +43,8 @@ export const settingsSections: readonly SettingsSection[] = [
   { name: "people", scope: "controlPlane", order: 10, Section: PeopleSection },
   { name: "providers", scope: "controlPlane", order: 50, Section: ProvidersSection },
   { name: "serverBackups", scope: "you", order: 40, Section: ServerBackupsSection },
-  { name: "sidebar", scope: "thisDevice", order: 20, Section: SidebarGroupsSection },
+  // Kept on the Mac's host, the same on every client (#1033, #2079), so under You.
+  { name: "sidebar", scope: "you", order: 70, Section: SidebarGroupsSection },
   // Which providers people sign in with (#995): an admin's.
   { name: "signInProviders", scope: "controlPlane", order: 40, Section: SignInSection, shows: (store) => store.person.value?.role === "admin" },
   // How you sign in on your Macs, iPhones and iPads (#995).
