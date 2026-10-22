@@ -459,6 +459,68 @@ func modeRefusal(p *wire.OrgPolicy, mode string) error {
 	return policyRefusal("policy", "modeCeiling", modeWords(ceiling), nil)
 }
 
+// approveAllID is the id of an option that approves every tool, path and web request
+// without asking (Copilot's), when the runtime does not give it the permissions category.
+const approveAllID = "allow_all"
+
+// approveAllOption is the runtime's option that approves every request without asking:
+// a select of the permissions category, or one of the known id. Nil when it has none.
+func approveAllOption(options []wire.ConfigOption) *wire.ConfigOption {
+	for _, o := range options {
+		if o.Type == "select" && o.Category != nil && *o.Category == "permissions" {
+			return &o
+		}
+	}
+	for _, o := range options {
+		if o.ID == approveAllID {
+			return &o
+		}
+	}
+	return nil
+}
+
+// approveAllOptionID is that option's id, or the known one before the runtime says its options.
+func approveAllOptionID(options []wire.ConfigOption) string {
+	if o := approveAllOption(options); o != nil {
+		return o.ID
+	}
+	return approveAllID
+}
+
+// approvesAll is whether a value of that option is looser than a ceiling of this rank:
+// a mode name by its rank, off and its like never, any other value (on) as bypass.
+func approvesAll(v string, rank int) bool {
+	if r, ok := modeRank(v); ok {
+		return r > rank
+	}
+	switch strings.ToLower(v) {
+	case "", "off", "false", "no", "0", "disabled", "never":
+		return false
+	}
+	return rank < 4
+}
+
+// approveAllRefusal is why the policy does not allow this value of that option, or nil.
+func approveAllRefusal(p *wire.OrgPolicy, value string) error {
+	ceiling, rank, ok := modeCeiling(p)
+	if !ok || !approvesAll(value, rank) {
+		return nil
+	}
+	return policyRefusal("policy", "modeCeiling", modeWords(ceiling), nil)
+}
+
+// approveAllOff is the option's value within a ceiling of this rank: "off" when it lists none.
+func approveAllOff(o *wire.ConfigOption, rank int) string {
+	if o != nil {
+		for _, v := range selectValues(o.Options) {
+			if !approvesAll(v, rank) {
+				return v
+			}
+		}
+	}
+	return "off"
+}
+
 // optionValue is one choice of a select option: its value, and its group's when grouped.
 type optionValue struct {
 	Value string `json:"value"`
@@ -834,6 +896,21 @@ func (d *Daemon) policyStart(r *wire.StartRequest, by startedBy) (note string, e
 		ceiling, _, _ := modeCeiling(p)
 		note = "It asked for the mode " + mode + ". " + orgSetBy + " " + modeWords(ceiling) + " It runs within that."
 	}
+	if v := stringValue(r.StartOptions.Values[approveAllID]); approveAllRefusal(p, v) != nil {
+		if by.owner == wire.SessionLabelOwnerPerson && by.agent == nil {
+			return "", approveAllRefusal(p, v)
+		}
+		// A helper or a workflow: it starts asking, as the ceiling allows.
+		values := make(map[string]wire.JSONValue, len(r.StartOptions.Values))
+		for k, v := range r.StartOptions.Values {
+			if k != approveAllID {
+				values[k] = v
+			}
+		}
+		r.StartOptions.Values = values
+		ceiling, _, _ := modeCeiling(p)
+		note = strings.TrimSpace(note + " It asked to approve all requests. " + orgSetBy + " " + modeWords(ceiling) + " It asks.")
+	}
 	if sandboxRequired(p) {
 		if r.Sandbox != nil && *r.Sandbox == wire.SandboxChoiceOff {
 			return "", policyRefusal("policy", "sandbox", sandboxRequiredWords, nil)
@@ -881,6 +958,7 @@ func (d *Daemon) policyTurn(l *live, a *wire.Agent) string {
 		}
 	}
 	d.capAgentMode(l, a, p)
+	d.capApproveAll(l, a, p)
 	return ""
 }
 
@@ -920,8 +998,42 @@ func (d *Daemon) capAgentMode(l *live, a *wire.Agent, p *wire.OrgPolicy) {
 	d.record(a.ID, runtimeNote("The mode is now "+lower+", not "+mode+". "+orgSetBy+" "+modeWords(ceiling)))
 }
 
+// capApproveAll turns off an agent's approval of every request, with a line in its chat,
+// before its turn, when the ceiling is below bypass: that option is a mode by another name.
+func (d *Daemon) capApproveAll(l *live, a *wire.Agent, p *wire.OrgPolicy) {
+	ceiling, rank, ok := modeCeiling(p)
+	if !ok {
+		return
+	}
+	o := approveAllOption(a.AdvertisedOptions)
+	id := approveAllOptionID(a.AdvertisedOptions)
+	value := stringValue(a.StartOptions.Values[id])
+	if value == "" && o != nil {
+		value = stringValue(o.CurrentValue)
+	}
+	if !approvesAll(value, rank) {
+		return
+	}
+	off := approveAllOff(o, rank)
+	v, _ := json.Marshal(off)
+	l.mu.Lock()
+	s := l.session
+	l.mu.Unlock()
+	if s != nil {
+		ctx, cancel := context.WithTimeout(d.ctx, 30*time.Second)
+		err := s.SetConfig(ctx, id, off)
+		cancel()
+		if err != nil {
+			log.Printf("agent %s: policy: set %s=%s: %v", a.ID, id, off, err)
+		}
+	}
+	d.change(a.ID, func(a *wire.Agent) { keepMode(a, id, v) })
+	d.record(a.ID, runtimeNote("It no longer approves every request without asking. "+orgSetBy+" "+modeWords(ceiling)))
+}
+
 // optionRefusal is why agents/setOption may not set this value (FR-009): a mode above the
-// ceiling, a model not allowed, or Codex's full access while the sandbox is required.
+// ceiling (approving every request among them), a model not allowed, or Codex's full
+// access while the sandbox is required.
 func (d *Daemon) optionRefusal(a *wire.Agent, optionID, value string) error {
 	p := d.orgPolicy()
 	if p == nil || value == "" {
@@ -941,6 +1053,8 @@ func (d *Daemon) optionRefusal(a *wire.Agent, optionID, value string) error {
 		}
 	case modelOptionID(a.AdvertisedOptions):
 		return d.modelRefusal(p, a.RuntimeID, value)
+	case approveAllOptionID(a.AdvertisedOptions):
+		return approveAllRefusal(p, value)
 	}
 	return nil
 }
@@ -1038,7 +1152,7 @@ func (d *Daemon) stopEveryTurn(line string) {
 
 // MARK: marks on the lists the clients draw (FR-010)
 
-// markOptions marks each mode and model a policy refuses, in the options' own JSON.
+// markOptions marks each mode, approve-all value and model a policy refuses, in the options' own JSON.
 func (d *Daemon) markOptions(runtimeID string, options []wire.ConfigOption) []wire.ConfigOption {
 	p := d.orgPolicy()
 	if p == nil || len(options) == 0 {
@@ -1046,6 +1160,7 @@ func (d *Daemon) markOptions(runtimeID string, options []wire.ConfigOption) []wi
 	}
 	mode := modeOption(options)
 	modelID := modelOptionID(options)
+	approveAll := approveAllOption(options)
 	out := make([]wire.ConfigOption, len(options))
 	for i, o := range options {
 		out[i] = o
@@ -1066,6 +1181,17 @@ func (d *Daemon) markOptions(runtimeID string, options []wire.ConfigOption) []wi
 			refuse = func(v string) *wire.PolicySetBy {
 				if err := d.modelRefusal(p, runtimeID, v); err != nil {
 					return setBy("runtimes."+runtimeID+".models", err.(*Error).Data.(wire.PolicyRefusal).Words)
+				}
+				return nil
+			}
+		case approveAll != nil && o.ID == approveAll.ID:
+			ceiling, rank, ok := modeCeiling(p)
+			if !ok {
+				continue
+			}
+			refuse = func(v string) *wire.PolicySetBy {
+				if approvesAll(v, rank) {
+					return setBy("modeCeiling", modeWords(ceiling))
 				}
 				return nil
 			}

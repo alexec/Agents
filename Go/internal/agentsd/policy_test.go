@@ -472,6 +472,59 @@ func TestARunningAgentMeetsANewPolicyAtItsNextTurn(t *testing.T) {
 	}
 }
 
+// An option that approves every request without asking (Copilot's allow_all) is under
+// the mode ceiling: refused to a person, dropped from a helper's or a workflow's start,
+// marked in the lists, and turned off before a running agent's next turn.
+func TestApprovingEveryRequestIsUnderTheModeCeiling(t *testing.T) {
+	fakeRuntimes(t)
+	k := newControlKeys(t)
+	root := t.TempDir()
+	d, c := joined(t, root, k)
+	dir := t.TempDir()
+	id := startAgent(t, c, 1, dir, "hi")
+	c.until(t, "the first turn", ended(id, wire.AgentStateFinished))
+	opts := []wire.ConfigOption{{ID: "allow_all", Name: "Allow all", Category: new("permissions"), Type: "select",
+		CurrentValue: json.RawMessage(`"on"`),
+		Options:      json.RawMessage(`[{"value":"off"},{"value":"on"}]`)}}
+	d.change(id, func(a *wire.Agent) { a.AdvertisedOptions = opts })
+	d.Told(wire.NotifyHostPolicy.Name, k.signed(t, 1, map[string]any{"modeCeiling": "acceptEdits"}))
+
+	refused(t, c.callError(t, 2, "agents/start", startParams(dir, "claude", map[string]any{"allow_all": "on"})), "policy", "modeCeiling")
+	refused(t, c.callError(t, 3, "agents/setOption", map[string]any{"agentID": id, "optionID": "allow_all", "value": "on"}), "policy", "modeCeiling")
+	r := helperRequest("claude", dir, "help", "", nil, nil, nil)
+	r.StartOptions.Values["allow_all"] = json.RawMessage(`"on"`)
+	helper, err := d.startFor(r, startedBy{agent: &id, owner: wire.SessionLabelOwnerAgent})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if v := stringValue(d.Store.Agent(helper).StartOptions.Values["allow_all"]); v == "on" {
+		t.Fatal("the helper approves every request")
+	}
+	var marked []struct {
+		Value string            `json:"value"`
+		SetBy *wire.PolicySetBy `json:"setBy"`
+	}
+	json.Unmarshal(d.markOptions("copilot", opts)[0].Options, &marked)
+	if len(marked) != 2 || marked[0].SetBy != nil || marked[1].SetBy == nil || marked[1].SetBy.Rule != "modeCeiling" {
+		t.Fatalf("%+v", marked)
+	}
+
+	c.call(t, 4, "agents/prompt", map[string]any{"agentID": id, "text": "go on", "from": "person"})
+	waitFor(t, "the second turn", func() bool { return len(userMessages(d, id)) == 2 })
+	if v := stringValue(d.Store.Agent(id).StartOptions.Values["allow_all"]); v != "off" {
+		t.Fatalf("allow_all %q", v)
+	}
+	if !slices.ContainsFunc(notes(d, id), func(s string) bool { return strings.HasPrefix(s, "It no longer approves every request") }) {
+		t.Fatal(notes(d, id))
+	}
+
+	// The loosest ceiling allows it.
+	d.Told(wire.NotifyHostPolicy.Name, k.signed(t, 2, map[string]any{"modeCeiling": "bypassPermissions"}))
+	if err := d.optionRefusal(d.Store.Agent(id), "allow_all", "on"); err != nil {
+		t.Fatal(err)
+	}
+}
+
 // T016, US5, SC-004: the kill switch stops each running turn within 5 s, refuses new
 // agents, prompts and workflow runs, keeps what is queued, and when it is turned off
 // starts nothing by itself.
