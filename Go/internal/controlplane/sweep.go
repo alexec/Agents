@@ -20,6 +20,8 @@ const (
 	leftoversKept        = time.Hour
 	sweepEvery           = time.Hour
 	mostPerSweep         = 1000
+	// Between two rounds of one hour's sweep, while a round stops at mostPerSweep (#2291).
+	sweepPause = 5 * time.Second
 	eventsPrefix         = "v1/events/"
 	codesPrefix          = "v1/codes/"
 	sweptDayLayout       = "2006-01-02"
@@ -33,6 +35,17 @@ type sweepReport struct {
 }
 
 func (r sweepReport) total() int { return r.events + r.codes + r.tombstones + r.leftovers + r.usage }
+
+// full says whether a sweep of at most most deletions stopped at that bound, so more may
+// wait. The codes keep one deletion back (a code goes with its .spent), so most-1 is full.
+func (r sweepReport) full(most int) bool { return r.total()-r.leftovers >= most-1 }
+
+func (r sweepReport) add(o sweepReport) sweepReport {
+	return sweepReport{
+		events: r.events + o.events, codes: r.codes + o.codes, tombstones: r.tombstones + o.tombstones,
+		leftovers: r.leftovers + o.leftovers, dated: r.dated + o.dated, usage: r.usage + o.usage,
+	}
+}
 
 func (r sweepReport) String() string {
 	return fmt.Sprintf("removed %d events, %d code files, %d tombstones, %d leftovers, %d usage periods; dated %d tombstones",
@@ -257,6 +270,25 @@ func (e *eventSweep) sweep(ctx context.Context, s store.Store, cutoff string, mo
 	return deleted, nil
 }
 
+// sweepRounds is one hour's sweep (#2291): a round of at most most deletions, then, while a
+// round stops at that bound, another after pause, until nothing more has expired, the hour
+// is over, or wait says to stop. So when more expires in an hour than one round deletes
+// (the audit at scale, usage of many machines), the store still comes back to its bound.
+// It says what all the rounds removed, and how many there were.
+func sweepRounds(ctx context.Context, rs *records.Records, now func() time.Time, most int, events *eventSweep,
+	pause time.Duration, wait func(time.Duration) bool,
+) (sweepReport, int, error) {
+	start := now()
+	var report sweepReport
+	for rounds := 1; ; rounds++ {
+		round, err := sweep(ctx, rs, now(), most, events)
+		report = report.add(round)
+		if err != nil || !round.full(most) || now().Sub(start)+pause >= sweepEvery || !wait(pause) {
+			return report, rounds, err
+		}
+	}
+}
+
 // sweepEveryHour runs the sweep once an hour, the first a minute after start (#174).
 func (s *Service) sweepEveryHour() {
 	select {
@@ -276,7 +308,15 @@ func (s *Service) sweepEveryHour() {
 			if err := s.auditChain.Seal(context.Background(), s.cfg.Store, time.Now()); err != nil {
 				s.log("audit: could not seal the chain: " + err.Error())
 			}
-			report, err = sweep(context.Background(), s.records, time.Now(), mostPerSweep, &events)
+			report, _, err = sweepRounds(context.Background(), s.records, time.Now, mostPerSweep, &events, sweepPause,
+				func(pause time.Duration) bool {
+					select {
+					case <-s.stop:
+						return false
+					case <-time.After(pause):
+						return s.phase.now() == phaseServing
+					}
+				})
 			s.renewConnected(context.Background())
 			s.dropPreviousKey(context.Background())
 		}
