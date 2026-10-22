@@ -19,7 +19,7 @@ import { missingWords, stateWords, versionWords } from "../model/capabilities";
 import { ReportsPage } from "./Reports";
 import { PeopleSection } from "./People";
 import { GroupsSection } from "./Groups";
-import { ReportPolicyPage } from "./ConsolePolicy";
+import { ReportPolicyPage, policyNotSaved } from "./ConsolePolicy";
 import { AuditPage, RequestsPage, requestCount } from "./ConsoleRecords";
 import { TeamWorkflowsPage } from "./ConsoleWorkflows";
 
@@ -69,6 +69,7 @@ export function SubAppPage({ store, app, down }: { store: Store; app: SubApp; do
                 onClick={() => go({ app, section: s.id })}>
                 {s.title}
                 {s.id === "requests" && !gated && requestCount(store) > 0 && <span class="sub-app-count">{requestCount(store)}</span>}
+                {s.id === "reportPolicy" && !gated && policyNotSaved(store) && <span class="quiet small attention">Not saved</span>}
               </button>
             ))}
           </div>

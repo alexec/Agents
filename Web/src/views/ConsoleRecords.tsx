@@ -84,6 +84,7 @@ export function RequestsPage({ store, down }: { store: Store; down: boolean }) {
                 <li key={reached.user} class="request">
                   <span>{capReachedWords(reached)}</span>
                   <span class="request-actions">
+                    <button type="button" title="Keep the cap as it is" onClick={() => store.dismissCap(reached)}>OK</button>
                     <button type="button" disabled={down || !bot} onClick={() => { changing.value = bot; }}>Change Cap…</button>
                   </span>
                 </li>

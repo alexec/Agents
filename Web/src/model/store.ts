@@ -20,7 +20,7 @@ import { CallFailed, type Link } from "../wire/link";
 import type { FolderGoneAsk } from "./missingFolder";
 import { describe, methodNotFound } from "./errors";
 import { fromWireDate } from "../protocol/dates";
-import { addCap, openCaps } from "./teamGroups";
+import { addCap, dropCap, openCaps } from "./teamGroups";
 import type { SaveOutcome } from "./sourceEdit";
 import { artifactsIn, withArtifactsOf, type Artifact } from "./artifacts";
 import { log } from "../log";
@@ -441,6 +441,10 @@ export class Work {
   /** The last of them, for Console ▸ Requests. */
   readonly capReached = computed(() => this.capped.value.at(-1) ?? null);
   protected capExpiry: ReturnType<typeof setTimeout> | null = null;
+  /** OK on a cap notice (#2198): the cap stays as it is, and the notice goes. */
+  dismissCap(reached: CapReached) {
+    this.capped.value = dropCap(reached, this.capped.value);
+  }
   /** Counts each control/userSettingsChanged (#1760): You ▸ On Every Machine loads again when it moves. */
   readonly userScopeChanges = signal(0);
   /** The last machine of the person's removed with secrets on it (#1760, control/secretsLeft), until read. */
