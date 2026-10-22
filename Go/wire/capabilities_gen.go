@@ -51,6 +51,7 @@ const CapGroups1 = "groups/1"
 const CapHandover1 = "handover/1"
 const CapHostOrgRoutes1 = "host.org-routes/1"
 const CapHostPolicy1 = "host.policy/1"
+const CapHostSuspend1 = "host.suspend/1"
 const CapHostTeam1 = "host.team/1"
 const CapHostUpdate1 = "host.update/1"
 const CapHostUserSettings1 = "host.user-settings/1"
@@ -497,6 +498,7 @@ var ControlCapabilities = pairs([][2]string{
 	{"groups/list", "groups/1"},
 	{"groups/remove", "groups/1"},
 	{"groups/set", "groups/1"},
+	{"groups/setRole", "org-identity/1"},
 	{"handover/status", "handover/1"},
 	{"host/hello", "host/1"},
 	{"host/orgRoutesAgain", "host.org-routes/1"},
@@ -547,6 +549,7 @@ var ControlCapabilities = pairs([][2]string{
 	{"people/list", "people/1"},
 	{"people/remove", "people/1"},
 	{"people/removePreview", "people/1"},
+	{"people/removeRequests", "org-identity/1"},
 	{"people/setRole", "people/1"},
 	{"policy/get", "policy/1"},
 	{"policy/mine", "policy/1"},
@@ -575,6 +578,10 @@ var ControlCapabilities = pairs([][2]string{
 	{"reports/setPolicy", "reports.scope/1"},
 	{"reports/usage", "reports/1"},
 	{"reports/views", "reports.views/1"},
+	{"scim/set", "org-identity/1"},
+	{"scim/tokens/list", "org-identity/1"},
+	{"scim/tokens/make", "org-identity/1"},
+	{"scim/tokens/revoke", "org-identity/1"},
 	{"signIn/addToMe", "signin/1"},
 	{"signIn/approve", "signin/1"},
 	{"signIn/configure", "signin/1"},
@@ -609,6 +616,7 @@ var ControlCapabilities = pairs([][2]string{
 	{"workspaces/forAgent", "workspaces/1"},
 	{"control/capReached", "bots/1"},
 	{"control/clientChanged", "control/1"},
+	{"control/cutOff", "org-identity/1"},
 	{"control/groupsChanged", "groups/1"},
 	{"control/hostChanged", "control/1"},
 	{"control/installProgress", "control/1"},
@@ -620,6 +628,7 @@ var ControlCapabilities = pairs([][2]string{
 	{"control/linkRequested", "links/1"},
 	{"control/linksChanged", "links/1"},
 	{"control/moved", "control/1"},
+	{"control/notice", "org-identity/1"},
 	{"control/orgRoutesChanged", "org-routes/1"},
 	{"control/orgRoutesLeft", "org-routes/1"},
 	{"control/peopleChanged", "people/1"},
@@ -645,12 +654,14 @@ var ControlCapabilities = pairs([][2]string{
 	{"relay/count", "relay/1"},
 	{"relay/deliver", "relay/1"},
 	{"relay/devices", "relay/1"},
+	{"user/suspended", "host.suspend/1"},
 })
 
 // ControlNotifications is each notification in control.openrpc.json: what its server sends, not serves.
 var ControlNotifications = set([]string{
 	"control/capReached",
 	"control/clientChanged",
+	"control/cutOff",
 	"control/groupsChanged",
 	"control/hostChanged",
 	"control/installProgress",
@@ -662,6 +673,7 @@ var ControlNotifications = set([]string{
 	"control/linkRequested",
 	"control/linksChanged",
 	"control/moved",
+	"control/notice",
 	"control/orgRoutesChanged",
 	"control/orgRoutesLeft",
 	"control/peopleChanged",
@@ -687,6 +699,7 @@ var ControlNotifications = set([]string{
 	"relay/count",
 	"relay/deliver",
 	"relay/devices",
+	"user/suspended",
 })
 
 // DeclaredCapabilities is x-declared-capabilities: what a host, a client or the control plane

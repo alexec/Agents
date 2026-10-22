@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -183,4 +184,54 @@ func Exchange(ctx context.Context, client *http.Client, d *Discovery, clientID, 
 		return nil, &Refused{fmt.Sprintf("%s did not finish the sign-in. Sign in again.", name)}
 	}
 	return &answer.Tokens, nil
+}
+
+// ErrInvalidGrant is a refresh token the provider refused: the person left, was disabled
+// or had their sessions revoked (#1002, Q1 A).
+var ErrInvalidGrant = errors.New("invalid_grant")
+
+// Refresh uses a refresh token, as a confidential client, and answers the refresh token
+// to keep: a new one when the provider rotates them, or the same. The access and ID tokens
+// it gives are forgotten here. ErrInvalidGrant when the provider refused it; Unavailable
+// when it could not be reached.
+func Refresh(ctx context.Context, client *http.Client, d *Discovery, clientID, secret, refresh, name string) (string, error) {
+	form := url.Values{"grant_type": {"refresh_token"}, "refresh_token": {refresh}}
+	post := len(d.TokenAuthMethods) > 0 && !slices.Contains(d.TokenAuthMethods, "client_secret_basic")
+	if post {
+		form.Set("client_id", clientID)
+		form.Set("client_secret", secret)
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, d.TokenEndpoint, strings.NewReader(form.Encode()))
+	if err != nil {
+		return "", &Unavailable{fmt.Sprintf("%s cannot be reached.", name)}
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("Accept", "application/json")
+	if !post {
+		req.Header.Set("Authorization", "Basic "+base64.StdEncoding.EncodeToString([]byte(url.QueryEscape(clientID)+":"+url.QueryEscape(secret))))
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", &Unavailable{fmt.Sprintf("%s cannot be reached.", name)}
+	}
+	defer resp.Body.Close()
+	var answer struct {
+		RefreshToken string `json:"refresh_token"`
+		Error        string `json:"error"`
+	}
+	decodeErr := json.NewDecoder(io.LimitReader(resp.Body, 1<<20)).Decode(&answer)
+	switch {
+	case answer.Error == "invalid_grant":
+		return "", ErrInvalidGrant
+	case resp.StatusCode >= 500 || resp.StatusCode == http.StatusTooManyRequests:
+		return "", &Unavailable{fmt.Sprintf("%s cannot be reached.", name)}
+	case resp.StatusCode != http.StatusOK || decodeErr != nil:
+		// A refused client secret is the control plane's to fix, not the person's: not a
+		// leaver.
+		return "", &Unavailable{fmt.Sprintf("%s did not take the refresh (%d %s).", name, resp.StatusCode, answer.Error)}
+	}
+	if answer.RefreshToken == "" {
+		return refresh, nil
+	}
+	return answer.RefreshToken, nil
 }

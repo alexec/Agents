@@ -31,6 +31,7 @@ import (
 	"github.com/alexec/agents/Go/internal/controlplane/notices"
 	"github.com/alexec/agents/Go/internal/controlplane/providers"
 	"github.com/alexec/agents/Go/internal/controlplane/records"
+	"github.com/alexec/agents/Go/internal/controlplane/scim"
 	"github.com/alexec/agents/Go/internal/controlplane/signin"
 	"github.com/alexec/agents/Go/internal/controlplane/store"
 	"github.com/alexec/agents/Go/internal/controlplane/usersettings"
@@ -186,7 +187,10 @@ type Service struct {
 	joins *joins
 	links *links
 	// Sign-in with Google, Apple and GitHub (#995), and the GitHub sign-ins waiting.
-	signIns         *signIns
+	signIns *signIns
+	// SCIM at /scim/v2/ (#1002, slice 2a).
+	scimTokens      *scimTokens
+	scimServer      *scim.Server
 	signInApprovals *signInApprovals
 	// Each person's settings and secrets (#1760), and what each machine here was sent.
 	users     *usersettings.Book
@@ -261,6 +265,11 @@ func New(cfg Config) (*Service, error) {
 	s.joins = newJoins(s)
 	s.links = newLinks(s)
 	s.signIns = newSignIns(s, cfg.SignIn)
+	s.scimTokens = &scimTokens{s: s}
+	s.scimServer = &scim.Server{Directory: scimDirectory{s}, Tokens: s.scimTokens, Log: s.log, URL: func() string {
+		base, _ := s.signIns.httpsBase()
+		return base + scim.Base
+	}}
 	s.signInApprovals = newSignInApprovals(s)
 	s.copies = newHostCopies(cfg.Store)
 	if s.users, err = openUserBook(cfg); err != nil {
@@ -955,6 +964,8 @@ func (s *Service) serveHTTP(w http.ResponseWriter, r *http.Request) {
 		w.Write(data)
 	case strings.HasPrefix(path, "/v1/oidc/"):
 		s.signIns.serveOIDC(w, r)
+	case path == scim.Base || strings.HasPrefix(path, scim.Base+"/"):
+		s.scimServer.ServeHTTP(w, r)
 	case path == "/v1/join" || strings.HasPrefix(path, "/v1/join/"):
 		s.joins.serve(w, r)
 	case path == "/v1/connect":
@@ -1415,6 +1426,10 @@ func (s *Service) keyWith(id controllink.Identity, private []byte) ([]byte, *rec
 		// Not used for its whole lifetime (#997): it pairs again.
 		if keyExpired(c.Expires, time.Now()) {
 			return nil, nil, "", controllink.Refuse(controllink.Expired)
+		}
+		// Its person's org provider suspended them (#1002, D13): it keeps its key.
+		if c.Owner != nil && s.suspended(*c.Owner) {
+			return nil, nil, "", controllink.Refuse(controllink.Suspended)
 		}
 		key, err := controllink.ClientKey(private, c.PublicKey, c.ID)
 		if err != nil {

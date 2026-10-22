@@ -116,6 +116,14 @@ func (si *signIns) serveStart(ctx context.Context, w http.ResponseWriter, r *htt
 	if s.LoginHint != "" {
 		q.Set("login_hint", s.LoginHint)
 	}
+	// A refresh token, to find a leaver without SCIM (Q1 A, FR-024): offline_access where
+	// the issuer offers it; Google's own way for Google Workspace.
+	if slices.Contains(d.Scopes, "offline_access") && !slices.Contains(p.Scopes, "offline_access") {
+		q.Set("scope", q.Get("scope")+" offline_access")
+	}
+	if p.Preset == wire.OrgProviderPresetGoogleWorkspace {
+		q.Set("access_type", "offline")
+	}
 	if p.Preset == wire.OrgProviderPresetGoogleWorkspace {
 		// Google sends people of other domains back with an error at once with hd set.
 		if domains := si.provedDomains(ctx, p.ID); len(domains) == 1 {
@@ -196,11 +204,13 @@ func (si *signIns) serveCallback(ctx context.Context, w http.ResponseWriter, r *
 	}
 	ticket := randomToken(16)
 	now := si.clock()
+	ticketKey := storeKeyHash(oidcTicketPrefix, ticket)
 	t := orgTicket{Provider: p.ID, Account: c.account, Email: c.email, Name: c.name, Purpose: s.Purpose, ReturnTo: s.ReturnTo,
-		Bind: s.Bind, Person: s.Person, Made: records.At(now), Ends: records.At(now.Add(ticketLife))}
+		Bind: s.Bind, Person: s.Person, Made: records.At(now), Ends: records.At(now.Add(ticketLife)),
+		Refresh: si.sealTicketRefresh(ctx, ticketKey, c.refresh)}
 	data, err := records.Encode(t)
 	if err == nil {
-		_, err = si.s.cfg.Store.Put(ctx, storeKeyHash(oidcTicketPrefix, ticket)+".json", data, store.Absent)
+		_, err = si.s.cfg.Store.Put(ctx, ticketKey+".json", data, store.Absent)
 	}
 	if err != nil {
 		refuse("unavailable", "The sign-in could not be kept. Try again.")
@@ -210,7 +220,7 @@ func (si *signIns) serveCallback(ctx context.Context, w http.ResponseWriter, r *
 }
 
 // orgChecked is who an org provider's callback names.
-type orgChecked struct{ account, email, name string }
+type orgChecked struct{ account, email, name, refresh string }
 
 // finishCallback exchanges the code and checks the ID token (FR-005): its signature by the
 // JWKS, iss, aud, exp and the nonce, then the account claim, Entra's tid, and Google
@@ -263,5 +273,5 @@ func (si *signIns) finishCallback(ctx context.Context, s *orgState, key string, 
 	if len(email) > 254 {
 		email = ""
 	}
-	return &orgChecked{account: account, email: email, name: name}, nil
+	return &orgChecked{account: account, email: email, name: name, refresh: tokens.RefreshToken}, nil
 }

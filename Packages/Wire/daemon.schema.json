@@ -1527,6 +1527,14 @@
         },
         "event": {
           "$ref": "#/definitions/AuditCause"
+        },
+        "scim": {
+          "$ref": "#/definitions/AuditSCIM",
+          "description": "A SCIM write: the user is scim:<provider> (#1002)."
+        },
+        "refresh": {
+          "$ref": "#/definitions/AuditRefresh",
+          "description": "A suspension by a refused refresh: the user is the suspended person (#1002)."
         }
       },
       "required": [
@@ -1663,6 +1671,36 @@
           "description": "At most this many, newest first; 200 when absent, never more than 1,000."
         }
       },
+      "additionalProperties": false
+    },
+    "AuditRefresh": {
+      "type": "object",
+      "description": "A suspension by a refused refresh (#1002, Q1 A): the provider that refused.",
+      "properties": {
+        "provider": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "provider"
+      ],
+      "additionalProperties": false
+    },
+    "AuditSCIM": {
+      "type": "object",
+      "description": "A SCIM write's actor (#1002, D16): the provider and the id of the token it used, never its value.",
+      "properties": {
+        "provider": {
+          "type": "string"
+        },
+        "token": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "provider",
+        "token"
+      ],
       "additionalProperties": false
     },
     "AuthStatus": {
@@ -4707,6 +4745,25 @@
       ],
       "additionalProperties": false
     },
+    "ControlCutOff": {
+      "type": "object",
+      "description": "control/cutOff (#1002, D13): to every client of a suspended person, just before the control plane closes their sockets with 4403 suspended.",
+      "properties": {
+        "why": {
+          "type": "string",
+          "enum": [
+            "suspended"
+          ]
+        },
+        "provider": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "why"
+      ],
+      "additionalProperties": false
+    },
     "ControlEndpoint": {
       "type": "object",
       "description": "One place a control plane answers (R16).",
@@ -4894,6 +4951,34 @@
       "required": [
         "key",
         "proof"
+      ],
+      "additionalProperties": false
+    },
+    "ControlNotice": {
+      "type": "object",
+      "description": "control/notice (#1002): something an admin should know, that no click caused: lastAdminKept, groupSharesOrphaned or removeRequested; words to show, and whom it is about.",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "lastAdminKept",
+            "groupSharesOrphaned",
+            "removeRequested"
+          ]
+        },
+        "words": {
+          "type": "string"
+        },
+        "user": {
+          "type": "string"
+        },
+        "group": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "words"
       ],
       "additionalProperties": false
     },
@@ -7742,6 +7827,17 @@
         },
         "caps": {
           "$ref": "#/definitions/SpendCaps"
+        },
+        "source": {
+          "$ref": "#/definitions/GroupSource",
+          "description": "A SCIM group's provider (#1002). Absent for a group an admin made."
+        },
+        "role": {
+          "type": "string",
+          "enum": [
+            "admin"
+          ],
+          "description": "Gives the admin role (#1002, FR-020): its members are admins."
         }
       },
       "required": [
@@ -7781,6 +7877,25 @@
       ],
       "additionalProperties": false
     },
+    "GroupRoleSet": {
+      "type": "object",
+      "description": "groups/setRole (#1002, FR-020): mark a SCIM group as giving the admin role, or not (no role).",
+      "properties": {
+        "group": {
+          "type": "string"
+        },
+        "role": {
+          "type": "string",
+          "enum": [
+            "admin"
+          ]
+        }
+      },
+      "required": [
+        "group"
+      ],
+      "additionalProperties": false
+    },
     "GroupSet": {
       "type": "object",
       "description": "groups/set (#1761): makes a group, or with id changes one. One user is a list of one.",
@@ -7806,6 +7921,26 @@
       },
       "required": [
         "name"
+      ],
+      "additionalProperties": false
+    },
+    "GroupSource": {
+      "type": "object",
+      "description": "Where a group comes from (#1002, FR-019): an org provider's SCIM. Only SCIM changes its members.",
+      "properties": {
+        "scim": {
+          "type": "string"
+        },
+        "externalId": {
+          "type": "string"
+        },
+        "displayName": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "scim",
+        "displayName"
       ],
       "additionalProperties": false
     },
@@ -11714,6 +11849,10 @@
         "redirectURI": {
           "type": "string",
           "description": "The callback to register at the provider: this control plane's https address and /v1/oidc/callback. Only in answers."
+        },
+        "scim": {
+          "$ref": "#/definitions/OrgProviderSCIM",
+          "description": "SCIM for this provider (slice 2a). Set by scim/set only."
         }
       },
       "required": [
@@ -11818,6 +11957,23 @@
       },
       "required": [
         "id"
+      ],
+      "additionalProperties": false
+    },
+    "OrgProviderSCIM": {
+      "type": "object",
+      "description": "An org provider's SCIM (#1002, FR-013, FR-016): on or off, and the attribute that matches a provisioned person to a sign-in.",
+      "properties": {
+        "on": {
+          "type": "boolean"
+        },
+        "match": {
+          "$ref": "#/definitions/SCIMMatch"
+        }
+      },
+      "required": [
+        "on",
+        "match"
       ],
       "additionalProperties": false
     },
@@ -12814,6 +12970,25 @@
         "spentTodayUSD": {
           "type": "number",
           "description": "A bot's spend today, UTC, as its machines reported it (#1761)."
+        },
+        "scim": {
+          "$ref": "#/definitions/PersonSCIM",
+          "description": "What SCIM says of the person, for one SCIM made (#1002). Shown as Managed by <provider>."
+        },
+        "provisioned": {
+          "type": "boolean",
+          "description": "Made by SCIM and not signed in yet: Waiting for first sign-in (#1002)."
+        },
+        "suspended": {
+          "$ref": "#/definitions/PersonSuspended",
+          "description": "Suspended by their org provider (#1002, D13)."
+        },
+        "roleFrom": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "The SCIM groups that give the person their role (#1002, FR-020): Set by <provider>. Absent: set by hand."
         }
       },
       "required": [
@@ -12824,6 +12999,42 @@
         "signIns",
         "clients",
         "machines"
+      ],
+      "additionalProperties": false
+    },
+    "PersonSCIM": {
+      "type": "object",
+      "description": "What an org provider's SCIM says of a person (#1002, FR-015). The match is only inside its provider.",
+      "properties": {
+        "provider": {
+          "type": "string"
+        },
+        "externalId": {
+          "type": "string"
+        },
+        "userName": {
+          "type": "string"
+        },
+        "name": {
+          "$ref": "#/definitions/SCIMName"
+        },
+        "displayName": {
+          "type": "string"
+        },
+        "emails": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/SCIMEmail"
+          }
+        },
+        "active": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "provider",
+        "userName",
+        "active"
       ],
       "additionalProperties": false
     },
@@ -12838,6 +13049,30 @@
           "type": "string"
         }
       },
+      "additionalProperties": false
+    },
+    "PersonSuspended": {
+      "type": "object",
+      "description": "Why a person is suspended (#1002, D13): by SCIM, by a refresh the provider refused (Q1 A), or by an admin's id; with the provider and when.",
+      "properties": {
+        "by": {
+          "type": "string"
+        },
+        "provider": {
+          "type": "string"
+        },
+        "at": {
+          "$ref": "#/definitions/WireDate"
+        },
+        "why": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "by",
+        "provider",
+        "at"
+      ],
       "additionalProperties": false
     },
     "Persona": {
@@ -15078,6 +15313,47 @@
       ],
       "additionalProperties": false
     },
+    "RemoveRequest": {
+      "type": "object",
+      "description": "A Remove request (#1002, D13, FR-017): an org provider deleted a person by SCIM; the person is suspended, and an admin confirms the removal with people/remove.",
+      "properties": {
+        "user": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "provider": {
+          "type": "string"
+        },
+        "at": {
+          "$ref": "#/definitions/WireDate"
+        }
+      },
+      "required": [
+        "user",
+        "name",
+        "provider",
+        "at"
+      ],
+      "additionalProperties": false
+    },
+    "RemoveRequestList": {
+      "type": "object",
+      "description": "people/removeRequests (#1002): the Remove requests waiting for an admin, oldest first.",
+      "properties": {
+        "requests": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/RemoveRequest"
+          }
+        }
+      },
+      "required": [
+        "requests"
+      ],
+      "additionalProperties": false
+    },
     "RemoveResourceRequest": {
       "type": "object",
       "properties": {
@@ -16256,6 +16532,202 @@
         "availability",
         "checkedAt",
         "outdated"
+      ],
+      "additionalProperties": false
+    },
+    "SCIMEmail": {
+      "type": "object",
+      "description": "A SCIM user's email (RFC 7643 §4.1.2), to show only: never a sign-in.",
+      "properties": {
+        "value": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string"
+        },
+        "primary": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "value"
+      ],
+      "additionalProperties": false
+    },
+    "SCIMMatch": {
+      "type": "string",
+      "description": "Which SCIM attribute must equal an org sign-in's account claim for the two to be one person (#1002, D5, R5).",
+      "enum": [
+        "externalId",
+        "userName"
+      ]
+    },
+    "SCIMName": {
+      "type": "object",
+      "description": "A SCIM user's name parts (RFC 7643 §4.1.1), kept as they came.",
+      "properties": {
+        "givenName": {
+          "type": "string"
+        },
+        "familyName": {
+          "type": "string"
+        },
+        "formatted": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "SCIMSet": {
+      "type": "object",
+      "description": "scim/set (#1002): turn SCIM on or off for an org provider, and say which attribute matches a sign-in (externalId by default).",
+      "properties": {
+        "provider": {
+          "type": "string"
+        },
+        "on": {
+          "type": "boolean"
+        },
+        "match": {
+          "$ref": "#/definitions/SCIMMatch"
+        }
+      },
+      "required": [
+        "provider",
+        "on"
+      ],
+      "additionalProperties": false
+    },
+    "SCIMToken": {
+      "type": "object",
+      "description": "A SCIM bearer token of one org provider (#1002, D12, FR-014), with no value: the control plane keeps only its SHA-256.",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "provider": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "made": {
+          "$ref": "#/definitions/OrgRouteStamp"
+        },
+        "ends": {
+          "$ref": "#/definitions/WireDate"
+        },
+        "lastUse": {
+          "$ref": "#/definitions/SCIMTokenUse"
+        },
+        "revoked": {
+          "$ref": "#/definitions/OrgRouteStamp"
+        }
+      },
+      "required": [
+        "id",
+        "provider",
+        "name",
+        "made"
+      ],
+      "additionalProperties": false
+    },
+    "SCIMTokenList": {
+      "type": "object",
+      "description": "scim/tokens/list (#1002): one provider's tokens, newest first, revoked ones too.",
+      "properties": {
+        "tokens": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/SCIMToken"
+          }
+        }
+      },
+      "required": [
+        "tokens"
+      ],
+      "additionalProperties": false
+    },
+    "SCIMTokenMade": {
+      "type": "object",
+      "description": "scim/tokens/make (#1002): the token, its value once (never shown again), and the SCIM base URL to give the provider.",
+      "properties": {
+        "token": {
+          "$ref": "#/definitions/SCIMToken"
+        },
+        "value": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "token",
+        "value",
+        "url"
+      ],
+      "additionalProperties": false
+    },
+    "SCIMTokenMake": {
+      "type": "object",
+      "description": "scim/tokens/make (#1002): a name for the token, and when it ends, if ever. Refused while two are live.",
+      "properties": {
+        "provider": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "ends": {
+          "$ref": "#/definitions/WireDate"
+        }
+      },
+      "required": [
+        "provider",
+        "name"
+      ],
+      "additionalProperties": false
+    },
+    "SCIMTokenRequest": {
+      "type": "object",
+      "description": "scim/tokens/revoke (#1002): the token's id.",
+      "properties": {
+        "id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "additionalProperties": false
+    },
+    "SCIMTokenUse": {
+      "type": "object",
+      "description": "When and from where a SCIM token was last used (#1002, D12), written at most once a minute.",
+      "properties": {
+        "at": {
+          "$ref": "#/definitions/WireDate"
+        },
+        "address": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "at"
+      ],
+      "additionalProperties": false
+    },
+    "SCIMTokensRequest": {
+      "type": "object",
+      "description": "scim/tokens/list (#1002): the provider.",
+      "properties": {
+        "provider": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "provider"
       ],
       "additionalProperties": false
     },
@@ -21074,6 +21546,30 @@
         "resources"
       ],
       "description": "A part of a person's user settings (#1760, spec 736 FR-023). Each keeps the shape its file has on a machine today: mcpServers is mcp.json's mcpServers, agentConfig is UserAgentConfig, runtimes is each runtime's choices, costLimits is CostLimits, resources is a list of DeclaredResource."
+    },
+    "UserSuspended": {
+      "type": "object",
+      "description": "user/suspended (#1002, FR-018): to each machine of a suspended person, at hello before its settings and within 5 seconds of a change; off: true ends it.",
+      "properties": {
+        "user": {
+          "type": "string"
+        },
+        "off": {
+          "type": "boolean"
+        },
+        "provider": {
+          "type": "string"
+        },
+        "at": {
+          "$ref": "#/definitions/WireDate"
+        }
+      },
+      "required": [
+        "user",
+        "provider",
+        "at"
+      ],
+      "additionalProperties": false
     },
     "ViewAsk": {
       "description": "What a third-party server's view waits on before it is drawn: the person's Show (#191). The data of a viewNeedsShow failure.",

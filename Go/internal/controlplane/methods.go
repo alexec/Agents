@@ -82,6 +82,7 @@ var own = methodSet(
 	"groups/list",
 	"groups/remove",
 	"groups/set",
+	"groups/setRole",
 	"hosts/approveJoin",
 	"hosts/checkAgain",
 	"hosts/denyJoin",
@@ -112,6 +113,7 @@ var own = methodSet(
 	"people/list",
 	"people/remove",
 	"people/removePreview",
+	"people/removeRequests",
 	"people/setRole",
 	"policy/get",
 	"policy/mine",
@@ -121,6 +123,10 @@ var own = methodSet(
 	"providers/setGroup",
 	"reports/export",
 	"reports/usage",
+	"scim/set",
+	"scim/tokens/list",
+	"scim/tokens/make",
+	"scim/tokens/revoke",
 	"signIn/addToMe",
 	"signIn/approve",
 	"signIn/configure",
@@ -188,6 +194,7 @@ var writes = methodSet(
 	"devices/startPairing",
 	"groups/remove",
 	"groups/set",
+	"groups/setRole",
 	"hosts/approveJoin",
 	"hosts/denyJoin",
 	"hosts/detect",
@@ -212,6 +219,9 @@ var writes = methodSet(
 	"policy/stopAll",
 	"providers/setGroup",
 	"reports/setPolicy",
+	"scim/set",
+	"scim/tokens/make",
+	"scim/tokens/revoke",
 	"signIn/addToMe",
 	"signIn/approve",
 	"signIn/configure",
@@ -276,10 +286,12 @@ func (m *Methods) Handle(method string, params json.RawMessage, from Caller) (an
 			}
 		}
 		return out, nil
-	case "people/list", "people/invite", "people/setRole", "people/remove", "people/removePreview":
+	case "people/list", "people/invite", "people/setRole", "people/remove", "people/removePreview", "people/removeRequests":
 		return m.peopleMethod(ctx, method, params, from)
-	case "groups/list", "groups/set", "groups/remove", "providers/setGroup":
+	case "groups/list", "groups/set", "groups/remove", "groups/setRole", "providers/setGroup":
 		return m.groupsMethod(ctx, method, params, from)
+	case "scim/set", "scim/tokens/list", "scim/tokens/make", "scim/tokens/revoke":
+		return m.scimMethod(ctx, method, params, from)
 	case "bots/make", "bots/setCaps", "bots/stopRun":
 		return m.botsMethod(ctx, method, params, from)
 	case "policy/get", "policy/mine", "policy/set", "policy/stopAll", "policy/raise":
@@ -1113,6 +1125,10 @@ func (m *Methods) hello(ctx context.Context, host string, hello wire.HostHello) 
 			}
 		}
 	}
+	// A suspended person's machine that cannot stop their work is refused (#1002, FR-018).
+	if err := m.s.refuseSuspendedHost(host, hello.Capabilities); err != nil {
+		return err
+	}
 	m.noteCapabilities(host, hello.Capabilities, hello.Version)
 	if changed {
 		m.router.BroadcastHost(host, "control/hostChanged", m.router.Described(host))
@@ -1122,6 +1138,8 @@ func (m *Methods) hello(ctx context.Context, host string, hello wire.HostHello) 
 	} else {
 		m.s.tellHostClients(host)
 	}
+	// Whether its person is suspended, before anything they set (#1002, FR-018).
+	m.s.sendUserSuspended(host)
 	// Its person's settings and secrets, at every join (#1760, FR-024).
 	go m.s.sendUserSettings(host, true)
 	// The organisation's policy, or none, at every join (#998, FR-006).

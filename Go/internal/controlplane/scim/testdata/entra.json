@@ -1,0 +1,44 @@
+{
+  "source": "Written from Microsoft's 'Develop and plan provisioning for a SCIM endpoint' and its validator's requests (Entra's request shapes: PATCH with paths, active as a string, excludedAttributes=members). Alex records the real set on an Entra tenant later (#1782).",
+  "steps": [
+    {"name": "Entra checks with a random filter", "method": "GET", "path": "/Users?filter=userName%20eq%20%229c1f7d2b-entra-check%22", "status": 200, "expect": {"totalResults": 0}},
+    {"name": "Find Ana by externalId", "method": "GET", "path": "/Users?filter=externalId%20eq%20%2211111111-aaaa-4bbb-8ccc-000000000001%22", "status": 200, "expect": {"totalResults": 0}},
+    {"name": "Make Ana", "method": "POST", "path": "/Users", "status": 201, "save": "ana", "body": {
+      "schemas": ["urn:ietf:params:scim:schemas:core:2.0:User", "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User"],
+      "externalId": "11111111-aaaa-4bbb-8ccc-000000000001", "userName": "ana@contoso.test", "active": true,
+      "displayName": "Ana Silva", "emails": [{"primary": true, "type": "work", "value": "ana@contoso.test"}],
+      "meta": {"resourceType": "User"}, "name": {"formatted": "Ana Silva", "familyName": "Silva", "givenName": "Ana"},
+      "roles": [], "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User": {"employeeNumber": "701", "department": "Sales"}}},
+    {"name": "Make Ben", "method": "POST", "path": "/Users", "status": 201, "save": "ben", "body": {
+      "schemas": ["urn:ietf:params:scim:schemas:core:2.0:User"], "externalId": "11111111-aaaa-4bbb-8ccc-000000000002",
+      "userName": "ben@contoso.test", "active": true, "displayName": "Ben Okafor"}},
+    {"name": "Find Ana by userName", "method": "GET", "path": "/Users?filter=userName%20eq%20%22ana%40contoso.test%22", "status": 200, "expect": {"totalResults": 1}},
+    {"name": "Change Ana's name and work email by paths", "method": "PATCH", "path": "/Users/${ana}", "status": 200, "expect": {"displayName": "Ana Silva-Reis"}, "body": {
+      "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"], "Operations": [
+        {"op": "Replace", "path": "displayName", "value": "Ana Silva-Reis"},
+        {"op": "Replace", "path": "name.familyName", "value": "Silva-Reis"},
+        {"op": "Replace", "path": "emails[type eq \"work\"].value", "value": "ana.reis@contoso.test"},
+        {"op": "Add", "path": "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User:department", "value": "Marketing"}]}},
+    {"name": "Remove an attribute", "method": "PATCH", "path": "/Users/${ana}", "status": 200, "body": {
+      "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"], "Operations": [{"op": "Remove", "path": "name.givenName"}]}},
+    {"name": "Make a group with no members, as Entra does", "method": "POST", "path": "/Groups", "status": 201, "save": "admins", "body": {
+      "schemas": ["urn:ietf:params:scim:schemas:core:2.0:Group"], "externalId": "22222222-bbbb-4ccc-8ddd-000000000001",
+      "displayName": "Agents Admins", "members": [], "meta": {"resourceType": "Group"}}},
+    {"name": "Find the group with no members", "method": "GET", "path": "/Groups?excludedAttributes=members&filter=displayName%20eq%20%22Agents%20Admins%22", "status": 200, "expect": {"totalResults": 1}, "noMembers": true},
+    {"name": "Add Ana and Ben", "method": "PATCH", "path": "/Groups/${admins}", "status": 200, "body": {
+      "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"], "Operations": [{"op": "Add", "path": "members", "value": [{"value": "${ana}"}, {"value": "${ben}"}]}]}},
+    {"name": "Take Ben out by value", "method": "PATCH", "path": "/Groups/${admins}", "status": 200, "body": {
+      "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"], "Operations": [{"op": "Remove", "path": "members", "value": [{"value": "${ben}"}]}]}},
+    {"name": "Check Ana is a member", "method": "GET", "path": "/Groups?filter=id%20eq%20%22${admins}%22%20and%20members%20eq%20%22${ana}%22&excludedAttributes=members", "status": 200, "expect": {"totalResults": 1}},
+    {"name": "A member of no one here is refused", "method": "PATCH", "path": "/Groups/${admins}", "status": 400, "body": {
+      "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"], "Operations": [{"op": "Add", "path": "members", "value": [{"value": "not-a-user-here"}]}]}},
+    {"name": "A filter Entra does not send is refused", "method": "GET", "path": "/Users?filter=displayName%20co%20%22Ana%22", "status": 400},
+    {"name": "Disable Ben with active as a string", "method": "PATCH", "path": "/Users/${ben}", "status": 200, "expect": {"active": false}, "body": {
+      "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"], "Operations": [{"op": "Replace", "path": "active", "value": "False"}]}},
+    {"name": "Delete Ben after the soft-delete time", "method": "DELETE", "path": "/Users/${ben}", "status": 204},
+    {"name": "Ben is gone to Entra", "method": "GET", "path": "/Users/${ben}", "status": 404},
+    {"name": "A PATCH for Ben now answers 404", "method": "PATCH", "path": "/Users/${ben}", "status": 404, "body": {
+      "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"], "Operations": [{"op": "Replace", "path": "active", "value": "True"}]}},
+    {"name": "Bulk is not supported", "method": "POST", "path": "/Bulk", "status": 501, "body": {"schemas": ["urn:ietf:params:scim:api:messages:2.0:BulkRequest"], "Operations": []}}
+  ]
+}

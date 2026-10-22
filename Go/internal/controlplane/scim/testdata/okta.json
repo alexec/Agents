@@ -1,0 +1,40 @@
+{
+  "source": "Written from Okta's SCIM 2.0 protocol reference (request shapes and order of a first push, a profile change, a group push and a deactivation). Alex records the real set on an Okta tenant later (#1782).",
+  "steps": [
+    {"name": "Okta checks the connection with a user that is not there", "method": "GET", "path": "/Users?filter=userName%20eq%20%22check-0000%40acme.test%22&startIndex=1&count=100", "status": 200, "expect": {"totalResults": 0}},
+    {"name": "Find Lee before making them", "method": "GET", "path": "/Users?filter=userName%20eq%20%22lee%40acme.test%22&startIndex=1&count=100", "status": 200, "expect": {"totalResults": 0}},
+    {"name": "Make Lee", "method": "POST", "path": "/Users", "status": 201, "save": "lee", "body": {
+      "schemas": ["urn:ietf:params:scim:schemas:core:2.0:User"], "userName": "lee@acme.test", "externalId": "00u-lee",
+      "name": {"givenName": "Lee", "familyName": "Park"}, "emails": [{"primary": true, "value": "lee@acme.test", "type": "work"}],
+      "displayName": "Lee Park", "locale": "en-US", "groups": [], "password": "never-kept-1", "active": true}},
+    {"name": "Make Kim", "method": "POST", "path": "/Users", "status": 201, "save": "kim", "body": {
+      "schemas": ["urn:ietf:params:scim:schemas:core:2.0:User", "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User"],
+      "userName": "kim@acme.test", "externalId": "00u-kim", "name": {"givenName": "Kim", "familyName": "Lo"},
+      "emails": [{"primary": true, "value": "kim@acme.test", "type": "work"}], "displayName": "Kim Lo", "active": true,
+      "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User": {"department": "Platform", "manager": {"value": "00u-boss"}}}},
+    {"name": "A second Lee is refused", "method": "POST", "path": "/Users", "status": 409, "body": {
+      "schemas": ["urn:ietf:params:scim:schemas:core:2.0:User"], "userName": "LEE@acme.test", "externalId": "00u-lee2", "active": true}},
+    {"name": "Read Lee", "method": "GET", "path": "/Users/${lee}", "status": 200, "expect": {"userName": "lee@acme.test", "externalId": "00u-lee", "active": true}},
+    {"name": "Profile change by PUT", "method": "PUT", "path": "/Users/${lee}", "status": 200, "expect": {"displayName": "Lee Park-Smith"}, "body": {
+      "schemas": ["urn:ietf:params:scim:schemas:core:2.0:User"], "id": "${lee}", "userName": "lee@acme.test", "externalId": "00u-lee",
+      "name": {"givenName": "Lee", "familyName": "Park-Smith"}, "emails": [{"primary": true, "value": "lee@acme.test", "type": "work"}],
+      "displayName": "Lee Park-Smith", "active": true}},
+    {"name": "Push the group Engineering", "method": "POST", "path": "/Groups", "status": 201, "save": "engineering", "body": {
+      "schemas": ["urn:ietf:params:scim:schemas:core:2.0:Group"], "displayName": "Engineering", "members": [{"value": "${lee}", "display": "lee@acme.test"}]}},
+    {"name": "Add Kim to Engineering", "method": "PATCH", "path": "/Groups/${engineering}", "status": 200, "body": {
+      "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"], "Operations": [{"op": "add", "path": "members", "value": [{"value": "${kim}", "display": "kim@acme.test"}]}]}},
+    {"name": "Read Engineering", "method": "GET", "path": "/Groups/${engineering}", "status": 200, "expectMembers": 2},
+    {"name": "Rename the group by PATCH replace", "method": "PATCH", "path": "/Groups/${engineering}", "status": 200, "expect": {"displayName": "Platform Engineering"}, "body": {
+      "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"], "Operations": [{"op": "replace", "value": {"id": "${engineering}", "displayName": "Platform Engineering"}}]}},
+    {"name": "Take Lee out of the group", "method": "PATCH", "path": "/Groups/${engineering}", "status": 200, "body": {
+      "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"], "Operations": [{"op": "remove", "path": "members[value eq \"${lee}\"]"}]}},
+    {"name": "Read the group again", "method": "GET", "path": "/Groups/${engineering}", "status": 200, "expectMembers": 1},
+    {"name": "List groups", "method": "GET", "path": "/Groups?startIndex=1&count=100", "status": 200, "expect": {"totalResults": 1}},
+    {"name": "Deactivate Kim", "method": "PATCH", "path": "/Users/${kim}", "status": 200, "expect": {"active": false}, "body": {
+      "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"], "Operations": [{"op": "replace", "value": {"active": false}}]}},
+    {"name": "Reactivate Kim", "method": "PATCH", "path": "/Users/${kim}", "status": 200, "expect": {"active": true}, "body": {
+      "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"], "Operations": [{"op": "replace", "value": {"active": true}}]}},
+    {"name": "Delete the group", "method": "DELETE", "path": "/Groups/${engineering}", "status": 204},
+    {"name": "The group is gone", "method": "GET", "path": "/Groups/${engineering}", "status": 404}
+  ]
+}

@@ -151,6 +151,21 @@ var controlActions = map[string]string{
 	"signIn/domains/lost":        "Lost a domain's proof",
 	"signIn/ticket":              "Signed in with an org provider",
 	"signIn/refusedByRequire":    "Refused a sign-in the organisation does not allow",
+
+	// SCIM and suspension (#1002, slice 2a, FR-025): each writes its own entry. A SCIM
+	// write's actor is the provider and its token's id, never its value.
+	"scim/set":           "Turned SCIM on or off",
+	"scim/tokens/make":   "Made a SCIM token",
+	"scim/tokens/revoke": "Revoked a SCIM token",
+	"groups/setRole":     "Changed the role a group gives",
+	"scim/user/create":   "Added a person by SCIM",
+	"scim/user/change":   "Changed a person by SCIM",
+	"scim/user/delete":   "Deleted a person by SCIM",
+	"scim/group/create":  "Added a group by SCIM",
+	"scim/group/change":  "Changed a group by SCIM",
+	"scim/group/delete":  "Deleted a group by SCIM",
+	"person/suspended":   "Suspended a person",
+	"person/unsuspended": "Ended a person's suspension",
 }
 
 // Action is what a call is in words, and whether the audit keeps it at all. toHost is a

@@ -1,7 +1,7 @@
 ---
 diataxis: how-to
 devices: [mac, iphone, ipad, web]
-description: Invite another person to your control plane, change their role, approve a machine that asks to join, and remove a person.
+description: Invite another person to your control plane, let your organisation's provider add people by SCIM, change their role, approve a machine that asks to join, and remove a person.
 ---
 
 # Invite someone
@@ -48,10 +48,32 @@ GitHub sign-in for your own build](set-up-sign-in-for-your-own-build.md).
 A person pairs more clients (another Mac, a phone, a browser) with codes made on a client
 they already have, as you do. Those clients are theirs.
 
+## Who may join, and SCIM
+
+With an [org provider](../explanation/org-identity.md) (Okta, Entra, Google Workspace), an
+admin chooses **Who may join** for it: **Only by invite**, **Anyone the provider signs in**,
+or **Only people from SCIM**. An invite works with each of them.
+
+With SCIM, your organisation's provider adds people for you, and you send no invites:
+
+1. Turn on SCIM for the provider (`scim/set`), and make a SCIM token
+   (`scim/tokens/make`). Copy the token and the SCIM URL: the token is shown once.
+2. In Okta or Entra, add the SCIM URL and the token to the app, and map `externalId` to the
+   person's id there: `user.id` in Okta, `objectId` in Entra.
+3. Assign the app to people or groups at the provider. They show in People as **Waiting for
+   first sign-in**, and join when they first sign in with the provider.
+
+When the provider deactivates a person, they are suspended within 5 seconds: their
+clients are cut off and their machines stop their work, and nothing is deleted. When the
+provider deletes a person, an admin is asked to remove them (`people/removeRequests`).
+
 ## Change a role
 
 In **Settings ▸ People**, choose **Admin** or **Member** beside the person. A control plane
 always keeps one admin at least: the last admin can't be made a member.
+
+A SCIM group can **Give the admin role** (`groups/setRole`). Its members' roles are then
+set by the provider: change them in the provider's group, not here.
 
 ## Approve a machine that asks to join
 

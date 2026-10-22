@@ -3,6 +3,7 @@ package controlplane
 import (
 	"context"
 	"encoding/json"
+	"slices"
 	"strings"
 	"unicode/utf8"
 
@@ -44,7 +45,21 @@ func groupOnWire(g records.Group) wire.Group {
 	if members == nil || g.Everyone {
 		members = []string{}
 	}
-	return wire.Group{ID: g.ID, Name: g.Name, Everyone: g.Everyone, Members: members, Caps: capsOnWire(g.Caps)}
+	out := wire.Group{ID: g.ID, Name: g.Name, Everyone: g.Everyone, Members: members, Caps: capsOnWire(g.Caps)}
+	if g.Source != nil {
+		out.Source = &wire.GroupSource{Scim: g.Source.SCIM, ExternalId: optional(g.Source.ExternalID), DisplayName: g.Source.DisplayName}
+	}
+	if g.Role != "" {
+		out.Role = optional(g.Role)
+	}
+	return out
+}
+
+func nonNilStrings(list []string) []string {
+	if list == nil {
+		return []string{}
+	}
+	return list
 }
 
 // groupsMethod answers groups/list, groups/set, groups/remove and providers/setGroup.
@@ -75,7 +90,16 @@ func (m *Methods) groupsMethod(ctx context.Context, method string, params json.R
 		if err != nil {
 			return nil, err
 		}
+		if g := m.records.Group(request.ID); g != nil && g.Source != nil {
+			return nil, fail(managedByProvider, "%s comes from your organisation's provider, which removes it.", g.Name)
+		}
 		return wire.Empty{}, m.removeGroup(ctx, request.ID)
+	case "groups/setRole":
+		request, err := require[wire.GroupRoleSet](params, "GroupRoleSet")
+		if err != nil {
+			return nil, err
+		}
+		return m.setGroupRole(ctx, request, from)
 	case "providers/setGroup":
 		request, err := require[wire.ProviderGroup](params, "ProviderGroup")
 		if err != nil {
@@ -120,6 +144,11 @@ func (m *Methods) setGroup(ctx context.Context, request wire.GroupSet) (wire.Gro
 				members = append(members, user)
 			}
 		}
+	}
+	// A SCIM group's name and members are its provider's (FR-019); its caps are an admin's.
+	if g := m.records.Group(id); g != nil && g.Source != nil &&
+		(name != g.Name || everyone != g.Everyone || !slices.Equal(members, nonNilStrings(g.Members))) {
+		return wire.Group{}, fail(managedByProvider, "%s's name and members come from your organisation's provider.", g.Name)
 	}
 	making := id == ""
 	if making {

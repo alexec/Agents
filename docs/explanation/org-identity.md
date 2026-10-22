@@ -1,6 +1,6 @@
 ---
 diataxis: explanation
-description: How an organisation's own sign-in provider, its tickets and its claimed domains work on the control plane, and what they do not protect against.
+description: How an organisation's own sign-in provider, its tickets, its claimed domains, SCIM and suspension work on the control plane, and what they do not protect against.
 ---
 
 # Org identity
@@ -38,7 +38,9 @@ An admin chooses **Who may join** for each provider:
   invite. With the invite, they pair with its code and then add the org sign-in.
 - **Anyone the provider signs in**: the provider's own assignment of the app is the gate.
   A new person joins as a member.
-- **Only people from SCIM**: comes with SCIM. Until then it acts as **Only by invite**.
+- **Only people from SCIM**: only a person the provider added by SCIM signs in. Anybody
+  else is told that the organisation has not added them yet. With SCIM off, it acts as
+  **Only by invite**.
 
 There are 5 org providers at most. A removed provider keeps its id, so that a new provider
 with another issuer can never take over its sign-ins.
@@ -115,13 +117,71 @@ Clients that are paired keep working until their keys end (90 days at most), so 
 cut off by surprise. A person who adds the org sign-in renews again. The local owner is
 never refused: the local owner is how the key holder gets back in.
 
+## SCIM adds, changes and suspends people
+
+An admin turns on SCIM for a provider and makes a SCIM token. The provider (Okta, Entra)
+then sends its people and groups to `https://<control plane>/scim/v2/`, with the token.
+
+- **The token decides the provider.** The control plane keeps only the token's SHA-256,
+  so a store that leaks does not leak the token. Two tokens are live at most, so an admin
+  can make the next one before revoking the old one. A request with no live token is
+  refused with `401`, and writes nothing.
+- **A SCIM user is a person.** The person is **provisioned**: People says **Waiting for first
+  sign-in**. When they first sign in with the same provider, the control plane matches them
+  by the provider's match attribute, `externalId` (the default) or `userName`, equal to the
+  sign-in's account claim. It never matches by email. Map `externalId` to the person's id
+  at the provider: Okta's `user.id`, or Entra's `objectId`.
+- **A SCIM group is a group.** Only SCIM changes its name and members, and its members are
+  people of the same provider. An admin can give it what any group gets, and can mark it
+  **Gives the admin role**: its members are admins while they are in it, and go back to the
+  role they had before when they leave it. A SCIM change never leaves the control plane
+  with no admin: the change to the group is made, the last admin stays an admin, and the
+  admins get a notice.
+
+## Suspension
+
+`active: false` from SCIM **suspends** the person. Within 5 seconds, on every copy of the
+control plane:
+
+- each of their clients is told `control/cutOff` and closed with `4403 suspended`. The
+  client keeps its key, and it is refused with `suspended` while the suspension lasts;
+- their keys stop renewing, and their org sign-ins are refused with `personSuspended`;
+- each of their machines is told `user/suspended`. A machine that cannot hear it
+  (an older Agents) is closed, and refused at hello until it is updated.
+
+Nothing is deleted: their machines, agents, conversations and branches stay. `active: true`
+ends the suspension, and their clients connect again.
+
+SCIM `DELETE` suspends the person too, and adds a **Remove** request for the admins
+(`people/removeRequests`). Only an admin removes a person, after reading what work on their
+machines is not pushed. The local owner is never cut off: only their org sign-in is refused.
+
+## Leavers without SCIM
+
+At an org sign-in, the control plane asks for a refresh token (`offline_access`, or
+`access_type=offline` for Google Workspace) and keeps it sealed with the keeper for secrets,
+at `v1/signin/refresh/<person>/<provider>.json`. It uses it when the person's key is about to
+renew, at most once an hour, and once a day:
+
+- the provider answers `invalid_grant` (the person was deactivated, disabled, or their
+  sessions were revoked): the person is suspended, as above;
+- the provider cannot be reached: keys still renew for 7 days after the last good check,
+  then stop until a check works.
+
+A Google Workspace sign-in gives a refresh token only the first time a person consents.
+Without one, that person is checked at sign-in only.
+
 ## What this does not protect against
 
 - **A provider's account is the provider's to guard.** When an organisation's provider signs
   someone in, the control plane trusts it, as it trusts Google for a Google sign-in.
-- **A paired client keeps working until its key ends.** In this version, a person removed
-  at the provider is cut off only when an admin removes them, or when their keys end. SCIM
-  and the daily refresh check, which find leavers sooner, come in a later step of #1002.
+- **A leaver is found as soon as the provider says so, not sooner.** With SCIM, that is
+  when the provider sends `active: false`; without it, at the next renewal or the daily
+  check. A provider that keeps a person's refresh token valid after they leave is not
+  caught without SCIM.
+- **An offline machine runs until it connects.** A suspended person's machine that is off
+  the network does not hear `user/suspended`. It hears it before anything else when it
+  connects.
 - **Require reads the email the built-in provider gives.** A sign-in with no email, or with
   Apple's hidden relay address, is not at the domain, and is not refused.
 - **A DNS record proves who controls the domain now.** A domain that changes hands keeps

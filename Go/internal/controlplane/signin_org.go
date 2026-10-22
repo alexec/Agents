@@ -114,6 +114,10 @@ type orgTicket struct {
 	Person   string        `json:"person,omitempty"`
 	Made     records.Stamp `json:"made"`
 	Ends     records.Stamp `json:"ends"`
+	// The refresh token, sealed and bound to the ticket's key (Q1 A), moved to the person
+	// when the ticket is spent.
+	Refresh *kms.Sealed `json:"refresh,omitempty"`
+	key     string
 }
 
 // orgBits is what signIns keeps for org providers at this copy.
@@ -516,9 +520,10 @@ func (si *signIns) setOrgProvider(ctx context.Context, set wire.OrgProviderSet, 
 	}
 	now := records.At(si.clock())
 	stamp := &wire.OrgRouteStamp{By: actor, At: wire.DateOf(now.Time)}
-	p.Created, p.Changed, p.Version, p.RedirectURI = stamp, stamp, new(int64(1)), nil
+	p.Created, p.Changed, p.Version, p.RedirectURI, p.Scim = stamp, stamp, new(int64(1)), nil, nil
 	if kept != nil {
-		p.Created, p.Secret = kept.p.Created, kept.p.Secret
+		// SCIM is changed by scim/set only.
+		p.Created, p.Secret, p.Scim = kept.p.Created, kept.p.Secret, kept.p.Scim
 		p.Version = new(deref(kept.p.Version) + 1)
 	}
 	var restore func()
@@ -763,6 +768,7 @@ func (si *signIns) readTicket(ctx context.Context, ticket string) (*orgTicket, s
 	if json.Unmarshal(object.Data, &t) != nil {
 		return nil, "", fail(notPermitted, "That sign-in is not known here. Sign in again.")
 	}
+	t.key = key
 	return &t, key, nil
 }
 
@@ -828,8 +834,18 @@ func (si *signIns) ticketPair(ctx context.Context, client string, public, helloN
 	if err != nil {
 		return nil, err
 	}
+	// A person SCIM made, signing in for the first time (FR-016).
+	if person == nil {
+		if person, err = si.matchProvisioned(ctx, t.Provider, t.Account, t.Email); err != nil {
+			return nil, err
+		}
+	}
 	joined := false
 	if person == nil {
+		if deref(p.Join) == wire.OrgProviderJoinScim && p.Scim != nil && p.Scim.On {
+			si.auditSignIn(t, "", "signIn/ticket", "refused: not provisioned by SCIM")
+			return nil, fail(notPermitted, "%s has not added you to this control plane yet. Ask your IT team to assign you the app, or ask an admin for an invite.", p.Name)
+		}
 		if deref(p.Join) != wire.OrgProviderJoinAnyone {
 			si.auditSignIn(t, "", "signIn/ticket", "refused: needs an invite")
 			return nil, fail(notPermitted, "Ask an admin of this control plane for an invite. Pair with its code, then add Sign in with %s under Account.", p.Name)
@@ -846,6 +862,10 @@ func (si *signIns) ticketPair(ctx context.Context, client string, public, helloN
 	if person.IsBot() {
 		return nil, fail(notPermitted, "A bot does not sign in.")
 	}
+	if person.IsSuspended() {
+		si.auditSignIn(t, person.ID, "signIn/ticket", "refused: suspended")
+		return nil, fail(personSuspended, "Your organisation's sign-in turned your access off.")
+	}
 	owner := person.ID
 	record := records.ClientRecord{ID: client, Name: name, Kind: kind, PublicKey: public, Paired: records.Now(), Owner: &owner,
 		Expires: si.s.newExpiry()}
@@ -857,6 +877,7 @@ func (si *signIns) ticketPair(ctx context.Context, client string, public, helloN
 		what = "joined, and paired " + name
 	}
 	si.auditSignIn(t, owner, "signIn/ticket", what)
+	si.keepRefresh(ctx, t, owner)
 	si.s.log(name + " paired (" + kind + ") by signing in with org provider " + p.ID + " as person " + owner)
 	si.s.announce("clientPaired", client, "signin")
 	return &wire.SignInTicketResult{Client: new(wire.UUID(client))}, nil
@@ -908,6 +929,9 @@ func (si *signIns) ticketAdd(ctx context.Context, r wire.SignInTicket, from Call
 		if !ok || me.IsRemoved() || me.IsBot() {
 			return nil, fail(notPermitted, "This client's person cannot add a sign-in.")
 		}
+		if me.IsSuspended() {
+			return nil, fail(personSuspended, "Your organisation's sign-in turned your access off.")
+		}
 		for _, p := range all {
 			if p.HasSignIn(t.Provider, t.Account) {
 				if p.ID == user {
@@ -923,6 +947,7 @@ func (si *signIns) ticketAdd(ctx context.Context, r wire.SignInTicket, from Call
 		return nil, err
 	}
 	si.auditSignIn(t, user, "signIn/ticket", "added the sign-in")
+	si.keepRefresh(ctx, t, user)
 	si.s.peopleChanged(user, false)
 	si.s.log("person " + user + " added a sign-in with org provider " + t.Provider)
 	out := wire.SignIn{Provider: t.Provider, Account: &t.Account, Email: optional(t.Email)}
@@ -934,7 +959,8 @@ func (si *signIns) ticketAdd(ctx context.Context, r wire.SignInTicket, from Call
 // orgSelfAudited are the methods that write their own entry, with what changed and never
 // a secret, so the router does not write one from their params (FR-025).
 var orgSelfAudited = methodSet("signIn/domains/check", "signIn/domains/claim", "signIn/domains/remove", "signIn/domains/set",
-	"signIn/orgProviders/check", "signIn/orgProviders/remove", "signIn/orgProviders/set", "signIn/ticket")
+	"signIn/orgProviders/check", "signIn/orgProviders/remove", "signIn/orgProviders/set", "signIn/ticket",
+	"groups/setRole", "scim/set", "scim/tokens/make", "scim/tokens/revoke")
 
 func (si *signIns) auditOrg(actor wire.AuditActor, method, id, what string) {
 	action, ok := audit.Action(method, false)

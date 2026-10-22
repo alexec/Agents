@@ -725,6 +725,12 @@ type AuditActor struct {
 	ClientName *string `json:"clientName,omitzero"`
 
 	Event *AuditCause `json:"event,omitzero"`
+
+	// A SCIM write: the user is scim:<provider> (#1002).
+	Scim *AuditSCIM `json:"scim,omitzero"`
+
+	// A suspension by a refused refresh: the user is the suspended person (#1002).
+	Refresh *AuditRefresh `json:"refresh,omitzero"`
 }
 
 // The event that started a bot's action (#996).
@@ -785,6 +791,18 @@ type AuditQuery struct {
 
 	// At most this many, newest first; 200 when absent, never more than 1,000.
 	Limit *int64 `json:"limit,omitzero"`
+}
+
+// A suspension by a refused refresh (#1002, Q1 A): the provider that refused.
+type AuditRefresh struct {
+	Provider string `json:"provider"`
+}
+
+// A SCIM write's actor (#1002, D16): the provider and the id of the token it used, never its value.
+type AuditSCIM struct {
+	Provider string `json:"provider"`
+
+	Token string `json:"token"`
 }
 
 type AuthStatus struct {
@@ -2140,6 +2158,13 @@ type ControlCodeShown struct {
 	Command *string `json:"command,omitzero"`
 }
 
+// control/cutOff (#1002, D13): to every client of a suspended person, just before the control plane closes their sockets with 4403 suspended.
+type ControlCutOff struct {
+	Why string `json:"why"`
+
+	Provider *string `json:"provider,omitzero"`
+}
+
 // One place a control plane answers (R16).
 type ControlEndpoint struct {
 	URL string `json:"url"`
@@ -2225,6 +2250,17 @@ type ControlNewKey struct {
 	Key string `json:"key"`
 
 	Proof string `json:"proof"`
+}
+
+// control/notice (#1002): something an admin should know, that no click caused: lastAdminKept, groupSharesOrphaned or removeRequested; words to show, and whom it is about.
+type ControlNotice struct {
+	Kind string `json:"kind"`
+
+	Words string `json:"words"`
+
+	User *string `json:"user,omitzero"`
+
+	Group *string `json:"group,omitzero"`
 }
 
 // The control plane's proof back: {"ok":…} (ControlAuth.OK).
@@ -3395,6 +3431,12 @@ type Group struct {
 	Members []string `json:"members"`
 
 	Caps *SpendCaps `json:"caps,omitzero"`
+
+	// A SCIM group's provider (#1002). Absent for a group an admin made.
+	Source *GroupSource `json:"source,omitzero"`
+
+	// Gives the admin role (#1002, FR-020): its members are admins.
+	Role *string `json:"role,omitzero"`
 }
 
 // groups/list (#1761): every group for an admin; for a member, the groups they are in.
@@ -3405,6 +3447,13 @@ type GroupList struct {
 // groups/remove (#1761): the group. Refused while a workspace provider or a bot has it.
 type GroupRequest struct {
 	ID string `json:"id"`
+}
+
+// groups/setRole (#1002, FR-020): mark a SCIM group as giving the admin role, or not (no role).
+type GroupRoleSet struct {
+	Group string `json:"group"`
+
+	Role *string `json:"role,omitzero"`
 }
 
 // groups/set (#1761): makes a group, or with id changes one. One user is a list of one.
@@ -3418,6 +3467,15 @@ type GroupSet struct {
 	Members []string `json:"members,omitzero"`
 
 	Caps *SpendCaps `json:"caps,omitzero"`
+}
+
+// Where a group comes from (#1002, FR-019): an org provider's SCIM. Only SCIM changes its members.
+type GroupSource struct {
+	Scim string `json:"scim"`
+
+	ExternalId *string `json:"externalId,omitzero"`
+
+	DisplayName string `json:"displayName"`
 }
 
 // control/groupsChanged (#1761): a group was made, changed or removed.
@@ -4989,6 +5047,9 @@ type OrgProvider struct {
 
 	// The callback to register at the provider: this control plane's https address and /v1/oidc/callback. Only in answers.
 	RedirectURI *string `json:"redirectURI,omitzero"`
+
+	// SCIM for this provider (slice 2a). Set by scim/set only.
+	Scim *OrgProviderSCIM `json:"scim,omitzero"`
 }
 
 // signIn/orgProviders/check (#1002, FR-004): what the issuer's discovery document lacks, and how many keys its JWKS has.
@@ -5034,6 +5095,13 @@ type OrgProviderRequest struct {
 	ID string `json:"id"`
 
 	Rev *string `json:"rev,omitzero"`
+}
+
+// An org provider's SCIM (#1002, FR-013, FR-016): on or off, and the attribute that matches a provisioned person to a sign-in.
+type OrgProviderSCIM struct {
+	On bool `json:"on"`
+
+	Match SCIMMatch `json:"match"`
 }
 
 // Who set an org provider's client secret, when, and its fingerprint: the first 8 hex of its SHA-256 (#1002, D4). Never the value.
@@ -5467,6 +5535,35 @@ type PersonRow struct {
 
 	// A bot's spend today, UTC, as its machines reported it (#1761).
 	SpentTodayUSD *float64 `json:"spentTodayUSD,omitzero"`
+
+	// What SCIM says of the person, for one SCIM made (#1002). Shown as Managed by <provider>.
+	Scim *PersonSCIM `json:"scim,omitzero"`
+
+	// Made by SCIM and not signed in yet: Waiting for first sign-in (#1002).
+	Provisioned *bool `json:"provisioned,omitzero"`
+
+	// Suspended by their org provider (#1002, D13).
+	Suspended *PersonSuspended `json:"suspended,omitzero"`
+
+	// The SCIM groups that give the person their role (#1002, FR-020): Set by <provider>. Absent: set by hand.
+	RoleFrom []string `json:"roleFrom,omitzero"`
+}
+
+// What an org provider's SCIM says of a person (#1002, FR-015). The match is only inside its provider.
+type PersonSCIM struct {
+	Provider string `json:"provider"`
+
+	ExternalId *string `json:"externalId,omitzero"`
+
+	UserName string `json:"userName"`
+
+	Name *SCIMName `json:"name,omitzero"`
+
+	DisplayName *string `json:"displayName,omitzero"`
+
+	Emails []SCIMEmail `json:"emails,omitzero"`
+
+	Active bool `json:"active"`
 }
 
 // What agents call the person, and their pronouns (#121), as given: person.json in the person's settings.
@@ -5474,6 +5571,17 @@ type PersonSettings struct {
 	Name *string `json:"name,omitzero"`
 
 	Pronouns *string `json:"pronouns,omitzero"`
+}
+
+// Why a person is suspended (#1002, D13): by SCIM, by a refresh the provider refused (Q1 A), or by an admin's id; with the provider and when.
+type PersonSuspended struct {
+	By string `json:"by"`
+
+	Provider string `json:"provider"`
+
+	At Date `json:"at"`
+
+	Why *string `json:"why,omitzero"`
 }
 
 type Persona struct {
@@ -6427,6 +6535,22 @@ type RemovalCheck struct {
 	Unmerged bool `json:"unmerged"`
 }
 
+// A Remove request (#1002, D13, FR-017): an org provider deleted a person by SCIM; the person is suspended, and an admin confirms the removal with people/remove.
+type RemoveRequest struct {
+	User string `json:"user"`
+
+	Name string `json:"name"`
+
+	Provider string `json:"provider"`
+
+	At Date `json:"at"`
+}
+
+// people/removeRequests (#1002): the Remove requests waiting for an admin, oldest first.
+type RemoveRequestList struct {
+	Requests []RemoveRequest `json:"requests"`
+}
+
 type RemoveResourceRequest struct {
 	Name string `json:"name"`
 }
@@ -6953,6 +7077,96 @@ type RuntimeStatus struct {
 
 	// Set when the organisation's policy does not allow this runtime here (#998, FR-010).
 	SetBy *PolicySetBy `json:"setBy,omitzero"`
+}
+
+// A SCIM user's email (RFC 7643 §4.1.2), to show only: never a sign-in.
+type SCIMEmail struct {
+	Value string `json:"value"`
+
+	Type *string `json:"type,omitzero"`
+
+	Primary *bool `json:"primary,omitzero"`
+}
+
+// Which SCIM attribute must equal an org sign-in's account claim for the two to be one person (#1002, D5, R5).
+type SCIMMatch string
+
+const SCIMMatchExternalId SCIMMatch = "externalId"
+const SCIMMatchUserName SCIMMatch = "userName"
+
+// A SCIM user's name parts (RFC 7643 §4.1.1), kept as they came.
+type SCIMName struct {
+	GivenName *string `json:"givenName,omitzero"`
+
+	FamilyName *string `json:"familyName,omitzero"`
+
+	Formatted *string `json:"formatted,omitzero"`
+}
+
+// scim/set (#1002): turn SCIM on or off for an org provider, and say which attribute matches a sign-in (externalId by default).
+type SCIMSet struct {
+	Provider string `json:"provider"`
+
+	On bool `json:"on"`
+
+	Match *SCIMMatch `json:"match,omitzero"`
+}
+
+// A SCIM bearer token of one org provider (#1002, D12, FR-014), with no value: the control plane keeps only its SHA-256.
+type SCIMToken struct {
+	ID string `json:"id"`
+
+	Provider string `json:"provider"`
+
+	Name string `json:"name"`
+
+	Made OrgRouteStamp `json:"made"`
+
+	Ends *Date `json:"ends,omitzero"`
+
+	LastUse *SCIMTokenUse `json:"lastUse,omitzero"`
+
+	Revoked *OrgRouteStamp `json:"revoked,omitzero"`
+}
+
+// scim/tokens/list (#1002): one provider's tokens, newest first, revoked ones too.
+type SCIMTokenList struct {
+	Tokens []SCIMToken `json:"tokens"`
+}
+
+// scim/tokens/make (#1002): the token, its value once (never shown again), and the SCIM base URL to give the provider.
+type SCIMTokenMade struct {
+	Token SCIMToken `json:"token"`
+
+	Value string `json:"value"`
+
+	URL string `json:"url"`
+}
+
+// scim/tokens/make (#1002): a name for the token, and when it ends, if ever. Refused while two are live.
+type SCIMTokenMake struct {
+	Provider string `json:"provider"`
+
+	Name string `json:"name"`
+
+	Ends *Date `json:"ends,omitzero"`
+}
+
+// scim/tokens/revoke (#1002): the token's id.
+type SCIMTokenRequest struct {
+	ID string `json:"id"`
+}
+
+// When and from where a SCIM token was last used (#1002, D12), written at most once a minute.
+type SCIMTokenUse struct {
+	At Date `json:"at"`
+
+	Address *string `json:"address,omitzero"`
+}
+
+// scim/tokens/list (#1002): the provider.
+type SCIMTokensRequest struct {
+	Provider string `json:"provider"`
 }
 
 // A server ssh knows by a name, for Add a Server's server box (#610).
@@ -8894,6 +9108,17 @@ const UserSettingsPartNameAgentConfig UserSettingsPartName = "agentConfig"
 const UserSettingsPartNameRuntimes UserSettingsPartName = "runtimes"
 const UserSettingsPartNameCostLimits UserSettingsPartName = "costLimits"
 const UserSettingsPartNameResources UserSettingsPartName = "resources"
+
+// user/suspended (#1002, FR-018): to each machine of a suspended person, at hello before its settings and within 5 seconds of a change; off: true ends it.
+type UserSuspended struct {
+	User string `json:"user"`
+
+	Off *bool `json:"off,omitzero"`
+
+	Provider string `json:"provider"`
+
+	At Date `json:"at"`
+}
 
 // What a third-party server's view waits on before it is drawn: the person's Show (#191). The data of a viewNeedsShow failure.
 type ViewAsk struct {
