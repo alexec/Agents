@@ -49,17 +49,22 @@ public struct EffectiveSandbox: Codable, Sendable, Hashable {
 /// `runtime` (FR-003c), so a missing or unreadable file changes nothing.
 public struct SandboxSettings: Codable, Sendable, Hashable {
     public var defaults: [String: SandboxChoice]
+    /// Set when the organisation's policy requires the command sandbox (#998): **Off** is
+    /// refused, and **Continue without sandbox** is not offered. Only read: never written.
+    public var setBy: DaemonAPI.PolicySetBy?
 
-    public init(defaults: [String: SandboxChoice] = [:]) {
+    public init(defaults: [String: SandboxChoice] = [:], setBy: DaemonAPI.PolicySetBy? = nil) {
         self.defaults = defaults
+        self.setBy = setBy
     }
 
     public init(from decoder: any Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         defaults = try c.decodeIfPresent([String: SandboxChoice].self, forKey: .defaults) ?? [:]
+        setBy = try c.decodeIfPresent(DaemonAPI.PolicySetBy.self, forKey: .setBy)
     }
 
-    private enum CodingKeys: String, CodingKey { case defaults }
+    private enum CodingKeys: String, CodingKey { case defaults, setBy }
 
     public func choice(for runtimeID: String) -> SandboxChoice {
         defaults[runtimeID] ?? .runtime

@@ -5,6 +5,8 @@ import type { ComponentChildren } from "preact";
 import type { ConfigOption, JSONValue } from "../protocol/generated";
 import { choiceGroups, closedTitle, isAboutPermission, same } from "../model/options";
 import { nothingToAdjust } from "../model/promptWords";
+import { line } from "../model/orgPolicy";
+import { optionLabel } from "./OrgPolicyLine";
 
 export function OptionControl({ option, value, onChange, disabled }: {
   option: ConfigOption; value: JSONValue | undefined; onChange: (value: JSONValue) => void; disabled?: boolean | undefined;
@@ -33,7 +35,9 @@ export function OptionControl({ option, value, onChange, disabled }: {
         {groups.map((group, g) => {
           const offset = groups.slice(0, g).reduce((n, x) => n + x.choices.length, 0);
           const items = group.choices.map((c, i) => (
-            <option key={offset + i} value={String(offset + i)} title={c.description ?? ""}>{c.name}</option>
+            // A mode or model the organisation refuses: shown, dimmed, not chosen (#998, FR-020).
+            <option key={offset + i} value={String(offset + i)} disabled={c.setBy !== undefined}
+              title={c.setBy ? line(c.setBy) : c.description ?? ""}>{optionLabel(c.name, c.setBy)}</option>
           ));
           return group.name ? <optgroup key={g} label={group.name}>{items}</optgroup> : items;
         })}

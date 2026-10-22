@@ -3731,6 +3731,10 @@
         },
         "description": {
           "type": "string"
+        },
+        "setBy": {
+          "$ref": "#/definitions/PolicySetBy",
+          "description": "Set when the organisation's policy refuses this choice (#998, FR-010): a mode above the ceiling, or a model it does not allow."
         }
       },
       "required": [

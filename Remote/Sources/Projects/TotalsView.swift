@@ -75,7 +75,8 @@ struct TotalsView: View {
                 }
                 today
                 // The money limits, by host; the token ones are on Tokens (#956).
-                ForEach(model.costStates.filter { $0.1.limits.daily != nil || $0.1.limits.perAgent != nil }, id: \.0) { host, state in
+                ForEach(model.costStates.filter { $0.1.limits.daily != nil || $0.1.limits.perAgent != nil
+                    || !OrgPolicyWords.budgetRows($0.1.organisation).isEmpty }, id: \.0) { host, state in
                     VStack(alignment: .leading, spacing: 4) {
                         Text(host).appText(.supporting).foregroundStyle(.secondary)
                         if let daily = state.limits.daily {
@@ -86,6 +87,8 @@ struct TotalsView: View {
                             Text("Each agent up to \(perAgent.amount.formatted(.currency(code: perAgent.currency)))")
                                 .appText(.fine).monospacedDigit().foregroundStyle(.secondary)
                         }
+                        // The organisation's budgets, beside these: the lower is used (#998).
+                        OrgBudgetRows(state: state).appText(.fine)
                     }
                     .padding(.top, 8)
                 }

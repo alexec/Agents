@@ -256,14 +256,20 @@ private struct ProjectGeneralPane: View {
                     row("Machine") { Text(model.hosts.label(summary.host)) }
                     row("Spent") { spent(summary) }
                     row("Helpers running") {
-                        helperLimit(\.running, in: summary, default: HelperLimit.defaultRunning,
-                                    upTo: min(HelperLimit.maximumRunning, summary.helperLimits.notArchived))
+                        VStack(alignment: .leading, spacing: 6) {
+                            helperLimit(\.running, in: summary, default: HelperLimit.defaultRunning,
+                                        upTo: min(HelperLimit.maximumRunning, summary.helperLimits.notArchived),
+                                        cap: helperCaps(summary)?.mostRunning)
+                            // The organisation's cap is lower: it is the one used (#998).
+                            if let mark = summary.helperLimitsSetBy { OrgPolicyLine(mark: mark) }
+                        }
                     }
                     row("Helpers not archived") {
                         VStack(alignment: .leading, spacing: 6) {
                             helperLimit(\.notArchived, in: summary, default: HelperLimit.defaultNotArchived,
                                         upTo: HelperLimit.maximumNotArchived,
-                                        from: summary.helperLimits.running)
+                                        from: summary.helperLimits.running,
+                                        cap: helperCaps(summary)?.mostNotArchived)
                         }
                     }
                     row("Helpers queued") {
@@ -345,8 +351,15 @@ private struct ProjectGeneralPane: View {
 
     /// One helper limit (#64) as a menu of the numbers it may be, its default marked and
     /// choosing it putting the project back to the default.
+    /// The organisation's caps over a project's helper limits (#998), as this Mac's host follows
+    /// them. A server says its own when it refuses a number.
+    private func helperCaps(_ summary: DaemonAPI.ProjectSummary) -> DaemonAPI.PolicyHelpers? {
+        summary.host == .mac ? model.policyState?.policy?.helpers : nil
+    }
+
     private func helperLimit(_ key: WritableKeyPath<HelperLimits, Int?>, in summary: DaemonAPI.ProjectSummary,
-                             default standard: Int, upTo maximum: Int, from minimum: Int = 1) -> some View {
+                             default standard: Int, upTo maximum: Int, from minimum: Int = 1,
+                             cap: Int? = nil) -> some View {
         let kept = summary.project.helperLimits ?? HelperLimits()
         let current = kept[keyPath: key] ?? standard
         return Picker("", selection: Binding(get: { current }, set: { chosen in
@@ -355,7 +368,9 @@ private struct ProjectGeneralPane: View {
             Task { await model.setHelperLimits(limits, for: summary.key) }
         })) {
             ForEach(Array(Swift.min(minimum, current)...Swift.max(maximum, current)), id: \.self) { number in
+                // Above the organisation's cap: shown, not chosen (#998).
                 Text(number == standard ? "\(number) (default)" : "\(number)").tag(number)
+                    .disabled(cap.map { number > $0 } ?? false)
             }
         }
         .labelsHidden()

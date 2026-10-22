@@ -257,7 +257,7 @@ struct StartAgentView: View {
             // The chat's prompt bar: one raised card holding the words, attach, and send
             // in ink, so starting an agent and talking to one look like the same act.
             HStack(alignment: .bottom, spacing: 8) {
-                TextField("What should it do?", text: $text, axis: .vertical)
+                TextField(policyRefusal ?? "What should it do?", text: $text, axis: .vertical)
                     .textFieldStyle(.plain)
                     .lineLimit(2...6)
                     .focused($focused)
@@ -299,10 +299,16 @@ struct StartAgentView: View {
         .background(Paper.ground)
     }
 
+    /// Why nothing can start on the Mac's host now, in its organisation's words (#998).
+    private var policyRefusal: String? {
+        model.startHost == .mac ? model.policyState?.composerReason : nil
+    }
+
     private var canSend: Bool {
+        guard policyRefusal == nil else { return false }
         // Off while the project's host is not answering, the Mac or its server (#239).
         // A stopped workspace that starts when used keeps the start until it is up (#691 US3).
-        !model.isStarting && (!model.isStale(on: model.startHost) || model.startsWhenUsed(model.startHost))
+        return !model.isStarting && (!model.isStale(on: model.startHost) || model.startsWhenUsed(model.startHost))
             && !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 

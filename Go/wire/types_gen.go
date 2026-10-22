@@ -1698,6 +1698,9 @@ type ConfigChoice struct {
 	Name string `json:"name"`
 
 	Description *string `json:"description,omitzero"`
+
+	// Set when the organisation's policy refuses this choice (#998, FR-010): a mode above the ceiling, or a model it does not allow.
+	SetBy *PolicySetBy `json:"setBy,omitzero"`
 }
 
 type ConfigChoiceGroup struct {

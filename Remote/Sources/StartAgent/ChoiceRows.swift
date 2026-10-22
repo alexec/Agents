@@ -120,7 +120,7 @@ struct ChoiceRows: View {
                 Text(status.runtime.name)
                 if let detail = detail(for: status, out: out) { Text(detail) }
             }
-            .disabled(!status.availability.isAvailable)
+            .disabled(!status.canStart)
         }
     }
 
@@ -244,26 +244,40 @@ struct ChoiceRows: View {
                 }
                 .appText(.reading)
                 .accessibilityHint(SandboxCatalog.entry(for: runtimeID)?.why ?? "")
+                // No sandbox the app can vouch for, so the organisation's rule refuses it (#998).
+                if let mark = model.sandboxSettings.setBy { OrgPolicyLine(mark: mark) }
             } else {
+                // While the organisation requires the sandbox, only On is in force (#998).
+                let setBy = model.sandboxSettings.setBy
                 Menu {
-                    Button {
-                        model.startSandbox = nil
-                    } label: {
-                        choiceLabel(SandboxWords.override(nil, runtimeDefault: runtimeDefault, runtimeID: runtimeID),
-                                    chosen: model.startSandbox == nil)
+                    if let setBy, runtimeDefault != .on {
+                        OrgPolicyMenuItem(name: SandboxWords.override(nil, runtimeDefault: runtimeDefault, runtimeID: runtimeID),
+                                          mark: setBy)
+                    } else {
+                        Button {
+                            model.startSandbox = nil
+                        } label: {
+                            choiceLabel(SandboxWords.override(nil, runtimeDefault: runtimeDefault, runtimeID: runtimeID),
+                                        chosen: model.startSandbox == nil)
+                        }
                     }
                     ForEach(choices, id: \.self) { choice in
-                        Button {
-                            model.startSandbox = choice
-                            // Codex's sandbox is its mode (FR-005a).
-                            if runtimeID == RuntimeCatalog.codex.id, choice == .off {
-                                model.choose("agent-full-access", for: "mode")
+                        if let setBy, choice != .on {
+                            OrgPolicyMenuItem(name: choice == .off ? SandboxWords.startWithout
+                                                  : SandboxWords.choice(choice, runtimeID: runtimeID), mark: setBy)
+                        } else {
+                            Button {
+                                model.startSandbox = choice
+                                // Codex's sandbox is its mode (FR-005a).
+                                if runtimeID == RuntimeCatalog.codex.id, choice == .off {
+                                    model.choose("agent-full-access", for: "mode")
+                                }
+                            } label: {
+                                choiceLabel(choice == .off ? SandboxWords.startWithout : SandboxWords.choice(choice, runtimeID: runtimeID),
+                                            chosen: model.startSandbox == choice)
+                                Text(SandboxWords.explanation(choice, runtimeID: runtimeID,
+                                                              name: model.startRuntime?.runtime.name ?? runtimeID))
                             }
-                        } label: {
-                            choiceLabel(choice == .off ? SandboxWords.startWithout : SandboxWords.choice(choice, runtimeID: runtimeID),
-                                        chosen: model.startSandbox == choice)
-                            Text(SandboxWords.explanation(choice, runtimeID: runtimeID,
-                                                          name: model.startRuntime?.runtime.name ?? runtimeID))
                         }
                     }
                 } label: {
@@ -318,15 +332,20 @@ struct ChoiceRows: View {
             let chosen = model.startChosen[option.id]
             Menu {
                 ForEach(option.options ?? [], id: \.id) { choice in
-                    Button {
-                        model.choose(choice.value, for: option.id)
-                    } label: {
-                        if choice.value == chosen {
-                            Label(choice.name, systemImage: "checkmark")
-                        } else {
-                            Text(choice.name)
+                    if let mark = choice.setBy {
+                        // A mode or model the organisation refuses: shown, not chosen (#998).
+                        OrgPolicyMenuItem(name: choice.name, mark: mark)
+                    } else {
+                        Button {
+                            model.choose(choice.value, for: option.id)
+                        } label: {
+                            if choice.value == chosen {
+                                Label(choice.name, systemImage: "checkmark")
+                            } else {
+                                Text(choice.name)
+                            }
+                            if let description = choice.description { Text(description) }
                         }
-                        if let description = choice.description { Text(description) }
                     }
                 }
             } label: {

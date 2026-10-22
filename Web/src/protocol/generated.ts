@@ -1302,6 +1302,11 @@ export interface ConfigChoice {
   value: JSONValue;
   name: string;
   description?: string;
+  /**
+   * Set when the organisation's policy refuses this choice (#998, FR-010): a mode above the
+   * ceiling, or a model it does not allow.
+   */
+  setBy?: PolicySetBy;
 }
 
 export interface ConfigChoiceGroup {
@@ -7357,6 +7362,7 @@ export interface Methods {
   "cost/state": { params: Empty; result: CostState };
   "credentials/lend": { params: CredentialsLend; result: Empty };
   "credentials/offer": { params: CredentialsOffer; result: Empty };
+  "daemon/policyState": { params: Empty; result: PolicyState };
   "disk/state": { params: Empty; result: DiskState };
   "dropbox/put": { params: DropboxPutRequest; result: DropboxPutResponse };
   "elicitations/answer": { params: AnswerElicitationRequest; result: Empty };
@@ -7466,6 +7472,7 @@ export interface Methods {
   "runtimes/markAvailable": { params: MarkRuntimeAvailable; result: RuntimeAllowances };
   "runtimes/removeAccount": { params: AccountRequest; result: UUID[] };
   "sandbox/state": { params: Empty; result: SandboxSettings };
+  "settings/passThrough": { params: Empty; result: PassThroughState };
   "signIn/approve": { params: SignInDecide; result: Empty };
   "signIn/configure": { params: SignInConfigure; result: SignInProviders };
   "signIn/deny": { params: SignInDecide; result: Empty };
@@ -7580,6 +7587,7 @@ export const MethodTarget = {
   "cost/state": "host",
   "credentials/lend": "host",
   "credentials/offer": "host",
+  "daemon/policyState": "host",
   "disk/state": "host",
   "dropbox/put": "host",
   "elicitations/answer": "host",
@@ -7689,6 +7697,7 @@ export const MethodTarget = {
   "runtimes/markAvailable": "host",
   "runtimes/removeAccount": "host",
   "sandbox/state": "host",
+  "settings/passThrough": "host",
   "signIn/approve": "control",
   "signIn/configure": "control",
   "signIn/deny": "control",
@@ -7763,6 +7772,7 @@ export interface Notifications {
   "control/signInRequested": SignInRequest;
   "control/stopAll": PolicyView;
   "control/userSettingsChanged": UserSettingsChanged;
+  "daemon/policyStateChanged": PolicyState;
   "disk/changed": DiskState;
   "files/changed": FilesChangedNotification;
   "leases/changed": LeaseSnapshot;
@@ -7889,7 +7899,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   CloneNotification: { required: ["clone", "finished"], optional: [] },
   CloneRequest: { required: ["url"], optional: [] },
   CloneSummary: { required: ["id", "url", "folder", "startedAt"], optional: [] },
-  ConfigChoice: { required: ["value", "name"], optional: ["description"] },
+  ConfigChoice: { required: ["value", "name"], optional: ["description", "setBy"] },
   ConfigChoiceGroup: { required: ["options"], optional: ["name", "group"] },
   ConfigOption: { required: ["id", "name", "type"], optional: ["description", "category", "currentValue", "options"] },
   Connection: { required: ["provider", "state", "connectedAt"], optional: ["login", "installURL", "workspace", "expiresAt"] },

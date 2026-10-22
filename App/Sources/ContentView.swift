@@ -264,6 +264,8 @@ struct ContentView: View {
         // under an inset and hide their first rows behind it.
         VStack(spacing: 0) {
         if model.controlPlaneAway { ControlAwayStrip() }
+        // The organisation stopped all agent work, or this Mac follows no policy it can trust (#998).
+        OrgPolicyStrip(state: model.policyState)
         Group {
             if model.needsFirstRun {
                 // No control plane and nothing of the old way: one question, and no

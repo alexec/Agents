@@ -3,7 +3,7 @@
 // are OrgPolicyWords (Packages/AgentsKit/.../Model/OrgPolicy.swift) on the Mac and the Remote; the
 // same here, for Settings ▸ Policy and Console ▸ Policy. Below them, the Console's form: the policy
 // as fields an admin types in, back to a policy, and what a change does before it is saved.
-import type { AuditActor, FleetMachine, OrgPolicy, PolicyBudgets, PolicyRefusal, PolicyRuntimeRule, PolicySetBy, PolicyStopAll, PolicyView, WireDate }
+import type { AuditActor, CostLimits, FleetMachine, OrgPolicy, PolicyBudgets, PolicyRefusal, PolicyRuntimeRule, PolicySetBy, PolicyState, PolicyStopAll, PolicyView, WireDate }
   from "../protocol/generated";
 import type { CallFailed } from "../wire/link";
 import { Failure } from "../protocol/generated";
@@ -12,6 +12,8 @@ export const setBy = "Set by your organisation";
 export const title = "Policy";
 export const none = "Your organisation sets no policy.";
 export const editInConsole = "Edit in Console";
+/** Under the budgets on Cost, when no budget is reached and none caps a limit of the person's. */
+export const budgetFoot = "Your organisation’s budget. A lower limit of your own still applies.";
 export const foot = "Your organisation’s admins set these rules in Console ▸ Policy. Every machine follows them, also offline. A rule only caps your own settings: they come back when the rule does.";
 
 // The kill switch (spec 998 US5).
@@ -165,6 +167,29 @@ export function viewOf(policy: OrgPolicy | undefined): PolicyView {
 /** The line under a refused choice: the mark's words under **Set by your organisation**. */
 export function line(mark: PolicySetBy): string {
   return `${setBy}. ${mark.words}`;
+}
+
+/** The organisation's budgets in force for this person today (CostState.organisation), as rows on Cost. */
+export function budgetRows(limits: CostLimits | undefined, money: (amount: number, currency: string) => string): Rule[] {
+  if (!limits) return [];
+  const out: Rule[] = [];
+  if (limits.daily) out.push({ name: "budgets.daily", title: "Per day", words: money(limits.daily.amount, limits.daily.currency) });
+  if (limits.dailyTokens !== undefined) out.push({ name: "budgets.dailyTokens", title: "Tokens per day", words: tokens(limits.dailyTokens) });
+  if (limits.perAgent) out.push({ name: "budgets.perAgent", title: "Per agent", words: money(limits.perAgent.amount, limits.perAgent.currency) });
+  if (limits.perAgentTokens !== undefined) out.push({ name: "budgets.perAgentTokens", title: "Tokens per agent", words: tokens(limits.perAgentTokens) });
+  return out;
+}
+
+/** Whether a host starts no work now (PolicyState.startsNothing): the kill switch, no policy it can trust, or an update. */
+export function startsNothing(state: PolicyState | undefined): boolean {
+  return !!state && (state.stopAll || state.noPolicy || (state.update?.length ?? 0) > 0 || state.refusal !== undefined);
+}
+
+/** Why the composer cannot send to a host now, in its organisation's words, or null when it can. */
+export function composerReason(state: PolicyState | undefined): string | null {
+  if (state?.refusal) return refusalLine(state.refusal);
+  if (state?.stopAll) return `${setBy}. ${stoppedStrip}`;
+  return null;
 }
 
 /** The refusal in a policyRefused error, or null for any other failure. */

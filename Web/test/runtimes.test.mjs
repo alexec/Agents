@@ -85,3 +85,10 @@ test("runtimes: an added account's row is apart from the runtime's own, and name
   assert.equal(r.accountState({ signedIn: false }), "Not signed in");
   assert.equal(r.accountState({ signedIn: true, signedInAs: "a@example.com" }), "Signed in as a@example.com");
 });
+
+test("runtimes: one the organisation does not allow cannot start, and says why (#998)", () => {
+  const refused = { ...status("gemini", "Gemini"), setBy: { by: "organisation", rule: "runtimes", words: "Your organisation does not allow Gemini." } };
+  const got = r.runtimeRuns([status("claude", "Claude"), refused]);
+  assert.deepEqual([got.available, got.out, got.cannot].map((run) => run.map((s) => s.runtime.id)), [["claude"], [], ["gemini"]]);
+  assert.equal(r.unavailableReason(refused), "Set by your organisation. Your organisation does not allow Gemini.");
+});

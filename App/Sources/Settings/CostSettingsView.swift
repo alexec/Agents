@@ -68,6 +68,14 @@ struct CostSettingsView: View {
             }
             .paperListRow()
 
+            // The organisation's budgets, beside these (#998): the lower of the two is used.
+            if !OrgPolicyWords.budgetRows(model.costState?.organisation).isEmpty {
+                Section("Your organisation’s budget") {
+                    OrgBudgetRows(state: model.costState)
+                }
+                .paperListRow()
+            }
+
             Section {
                 Label("Only Claude reports a price. Codex, Gemini, OpenCode and Copilot report "
                       + "tokens, so only a token limit stops them. Cursor, Antigravity and Grok "

@@ -153,6 +153,7 @@ struct RemoteChatView: View {
                 }
         )
         .environment(\.chatActions, actions)
+        .environment(\.orgSandboxSetBy, model.sandboxSettings.setBy)
         // A file a message links to is on the Mac: it opens in Files, as a file a tool
         // call touched does (#548). Links to the web are the system's.
         .environment(\.openURL, OpenURLAction { [actions] url in

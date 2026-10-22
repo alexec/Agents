@@ -102,4 +102,59 @@ struct OrgPolicyWordsTests {
         #expect(view.policy?.modeCeiling == "auto")
         #expect(DaemonAPI.PolicyView(policy: nil).policy == nil)
     }
+
+    // MARK: Slice 2b: the marks each client draws (T030–T034)
+
+    @Test func theMarksOnEachListDecode() throws {
+        let mark = #"{"by":"organisation","rule":"modeCeiling","words":"Your organisation allows modes up to Accept Edits."}"#
+        // A mode above the ceiling, in the option's own JSON, flat or in a group.
+        let option = try JSONDecoder().decode(ConfigOption.self, from: Data(#"""
+        {"id":"mode","name":"Mode","category":"mode","type":"select","currentValue":"default",
+         "options":[{"value":"default","name":"Default"},{"value":"bypassPermissions","name":"Bypass Permissions","setBy":\#(mark)}]}
+        """#.utf8))
+        #expect(option.options?.map { $0.setBy?.rule } == [nil, "modeCeiling"])
+        // A runtime not allowed here: listed, cannot start, and says why.
+        var status = RuntimeStatus(runtime: RuntimeCatalog.claude, availability: .available(path: "/bin/claude", supportsResume: true))
+        #expect(status.canStart)
+        status.setBy = .init(rule: "runtimes", words: "Your organisation does not allow Claude.")
+        #expect(!status.canStart)
+        #expect(status.unavailableReason == "Set by your organisation. Your organisation does not allow Claude.")
+        // The sandbox, cost and a project's helper limits.
+        let sandbox = try JSONDecoder().decode(SandboxSettings.self, from: Data(#"{"defaults":{},"setBy":\#(mark)}"#.utf8))
+        #expect(sandbox.setBy?.rule == "modeCeiling")
+        let cost = try JSONDecoder().decode(DaemonAPI.CostState.self, from: Data(#"""
+        {"limits":{},"today":{},"day":"2026-10-22","tokensToday":0,
+         "organisation":{"daily":{"amount":40,"currency":"USD"},"dailyTokens":50000},"setBy":\#(mark)}
+        """#.utf8))
+        #expect(OrgPolicyWords.budgetRows(cost.organisation).map(\.title) == ["Per day", "Tokens per day"])
+        #expect(OrgPolicyWords.budgetRows(cost.organisation).last?.words == "50,000 tokens")
+        #expect(OrgPolicyWords.budgetRows(nil).isEmpty)
+        #expect(cost.setBy != nil)
+    }
+
+    @Test func thePolicyStateSaysWhyTheComposerCannotSend() throws {
+        #expect(DaemonAPI.PolicyState().composerReason == nil)
+        #expect(!DaemonAPI.PolicyState().startsNothing)
+        let stopped = try JSONDecoder().decode(DaemonAPI.PolicyState.self, from: Data(#"""
+        {"version":3,"stopAll":true,"noPolicy":false,
+         "refusal":{"reason":"stopAll","rule":"stopAll","words":"Your organisation has stopped all agent work."}}
+        """#.utf8))
+        #expect(stopped.startsNothing)
+        #expect(stopped.composerReason == "Set by your organisation. Your organisation has stopped all agent work.")
+        let lost = DaemonAPI.PolicyState(noPolicy: true, refusal: .init(reason: "noPolicy",
+            words: "Agents Host has no policy from your organisation. Connect to the network."))
+        #expect(lost.composerReason == "Agents Host has no policy from your organisation. Connect to the network.")
+    }
+
+    @Test func addByHandAndPassThroughNamesAreMarked() throws {
+        #expect(OrgPolicyWords.customServersMark(Self.policy()) == nil)
+        let refused = Self.policy { $0.marketplaces = .init(allowed: [], customServers: "refuse") }
+        #expect(OrgPolicyWords.customServersMark(refused)?.rule == "marketplaces.customServers")
+        let state = try JSONDecoder().decode(DaemonAPI.PassThroughState.self, from: Data(#"""
+        {"names":[{"name":"AWS_*"},{"name":"OPENAI_API_KEY","runtime":"codex",
+          "setBy":{"by":"organisation","rule":"environment.passThrough","words":"Not passed."}},{"name":"GEMINI_KEY","runtime":"gemini"}]}
+        """#.utf8))
+        #expect(state.names(for: "codex").map(\.name) == ["AWS_*", "OPENAI_API_KEY"])
+        #expect(state.names(for: "codex").last?.setBy != nil)
+    }
 }

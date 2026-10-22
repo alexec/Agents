@@ -2,6 +2,7 @@
 // alphabetical by the name shown, case-insensitive and as the person's language would, the id
 // breaking a tie. A host on an older build still answers in its catalog's order.
 import type { AccountProfile, RuntimeAllowancesRow, RuntimeStatus } from "../protocol/generated";
+import { line } from "./orgPolicy";
 
 /** The runtime a new agent gets when nothing else says: RuntimeCatalog.defaultRuntime. */
 export const defaultRuntimeID = "claude";
@@ -63,6 +64,7 @@ export function emptyListRuntimeLine(status: RuntimeStatus): { line: string; fai
 
 /** RuntimeStatus.unavailableReason: why it cannot be started, in the runtime's own terms, or null. */
 export function unavailableReason(status: RuntimeStatus): string | null {
+  if (status.setBy) return line(status.setBy);
   const a = status.availability;
   if ("available" in a) return null;
   if ("missing" in a) return `Looked for ${status.runtime.executable} in ${a.missing.lookedIn.slice(0, 4).join(", ")}…`;
@@ -78,11 +80,12 @@ export function unavailableReason(status: RuntimeStatus): string | null {
  * message, and it is the only way back to it), and those that cannot start, with why.
  */
 export function runtimeRuns(runtimes: RuntimeStatus[]): { available: RuntimeStatus[]; out: RuntimeStatus[]; cannot: RuntimeStatus[] } {
-  const startable = runtimes.filter((r) => "available" in r.availability);
+  // A runtime the organisation does not allow here cannot start: listed, dimmed, with why (#998).
+  const startable = runtimes.filter((r) => "available" in r.availability && !r.setBy);
   return {
     available: startable.filter((r) => !r.isOut),
     out: startable.filter((r) => r.isOut),
-    cannot: runtimes.filter((r) => !("available" in r.availability)),
+    cannot: runtimes.filter((r) => !("available" in r.availability) || r.setBy),
   };
 }
 

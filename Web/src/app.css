@@ -1101,6 +1101,11 @@ button.remove:hover { opacity: 1; }
 .policy-rules dd { margin: 0; text-align: right; }
 .policy-stopped { max-width: 596px; box-sizing: border-box; margin: 4px 0; padding: 8px 12px; border-radius: 6px; color: var(--tint-failure);
   background: color-mix(in srgb, var(--tint-failure) 10%, transparent); border: 1px solid color-mix(in srgb, var(--tint-failure) 30%, transparent); }
+/* A choice the policy refuses (#998, FR-020): dimmed, with the line under it (views/OrgPolicyLine.tsx). */
+.org-policy-line { display: block; opacity: 0.75; }
+.org-policy-line strong { font-weight: 600; }
+.set-by-org { opacity: 0.5; }
+.org-policy-refusal { margin: 4px 0; color: var(--tint-failure); }
 .policy-kill { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; margin-top: 8px; }
 .org-policy { display: flex; flex-direction: column; gap: 4px; max-width: 520px; }
 .org-policy .sheet-actions { display: flex; gap: 8px; align-items: center; justify-content: flex-end; }
