@@ -25,4 +25,12 @@ struct UserScopeWordsTests {
         #expect(settings[.mcpServers] == nil)
         #expect(UserScopeWords.partState(settings[.costLimits], updated: nil) == "The same on every machine of yours.")
     }
+
+    /// #2069: an edit in a followed pane goes to every machine, and the words say so.
+    @Test func aFollowedPaneSaysAnEditGoesToEveryMachine() {
+        #expect(UserScopeWords.partsFoot.contains("the change goes to every machine of yours"))
+        #expect(!UserScopeWords.partsFoot.contains("not in its own pane"))
+        #expect(UserScopeWords.followedNote(.costLimits) == "Cost limits: a change here goes to every machine of yours, not only to this Mac.")
+        #expect(UserScopeWords.replaceTitle(.resources, machine: "This Mac") == "Use This Mac’s Resources?")
+    }
 }

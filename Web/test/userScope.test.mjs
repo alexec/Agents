@@ -30,3 +30,8 @@ test("user scope: a secret's name is an environment variable's", () => {
   assert.equal(u.isSecretName("../X"), false);
   assert.equal(u.isSecretName(""), false);
 });
+
+test("user scope: the footer says an edit in a Mac's pane goes to every machine (#2069)", () => {
+  assert.match(u.partsFoot, /the change goes to every machine of yours/);
+  assert.doesNotMatch(u.partsFoot, /not in its own pane/);
+});
