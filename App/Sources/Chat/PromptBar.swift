@@ -458,15 +458,16 @@ struct PromptBar: View {
     /// The runtime the conversation is on, where a new chat chooses one. Said, not
     /// offered: a conversation stays on the runtime it started on.
     private func runtimeLabel(_ agent: Agent) -> some View {
-        Text(runtimeName(agent.runtimeID))
+        let name = PromptWords.runtimeName(agent, accounts: model.accountProfiles)
+        return Text(name)
             .lineLimit(1)
             .padding(.horizontal, 10)
             .padding(.vertical, 4)
             .appText(.fine)
             .fixedSize()
             .paperRaised(in: .capsule)
-            .help("Runtime")
-            .accessibilityLabel("Runtime: \(runtimeName(agent.runtimeID))")
+            .help(agent.accountID == nil ? "Runtime" : "Runtime and account")
+            .accessibilityLabel("Runtime: \(name)")
     }
 
     /// A server with nothing to start agents with says so where the runtime is chosen
