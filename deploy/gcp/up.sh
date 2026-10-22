@@ -16,7 +16,10 @@
 #   machine's IPv4 address (made again at each run, for a new address);
 # - the static IPv4 address agents-control, about $3.65 a month;
 # - the e2-micro VM agents-control in us-west1-b, Debian with a 30 GB standard disk (the free
-#   tier's), running as agents-control-vm, with deploy/gcp/startup.sh to put Docker on it.
+#   tier's), running as agents-control-vm, with deploy/gcp/startup.sh to put Docker on it;
+# - the snapshot schedule agents-control-daily on that disk: a snapshot each day at 10:00 UTC,
+#   each kept 7 days, in us-west1 (#2136). The store, the sealed key and the certificate are
+#   all on the disk, so a snapshot restores the whole control plane.
 #
 # Then it prints the address, and stops until both names point at it (deploy/cloudflare/dns.sh):
 # Let's Encrypt allows only a few failed tries an hour. Run it again after that, and it builds
@@ -128,6 +131,25 @@ else
 		--shielded-secure-boot --shielded-vtpm --shielded-integrity-monitoring \
 		--metadata-from-file "startup-script=$here/startup.sh"
 fi
+
+say "== the disk's daily snapshots, kept $snapshot_days days: $snapshots"
+exists gcloud compute resource-policies describe "$snapshots" --region "$region" ||
+	run gcloud compute resource-policies create snapshot-schedule "$snapshots" --region "$region" \
+		--daily-schedule --start-time "$snapshot_start" --max-retention-days "$snapshot_days" \
+		--on-source-disk-delete keep-auto-snapshots --storage-location "$region"
+# On the VM's boot disk, whatever its name: one restored from a snapshot is a new disk. Attached
+# once: a disk refuses a policy it has already.
+if ((dry_run)); then
+	disk=$name
+	say "? $(shown gcloud compute instances describe "$name" --zone "$zone" --format 'value(disks[0].source.basename())')   ($disk stands in)"
+	say "? $(shown gcloud compute disks describe "$disk" --zone "$zone" --format 'value(resourcePolicies)')   (is $snapshots there?)"
+	attached=''
+else
+	disk=$(gcloud compute instances describe "$name" --zone "$zone" --format 'value(disks[0].source.basename())')
+	attached=$(gcloud compute disks describe "$disk" --zone "$zone" --format 'value(resourcePolicies)')
+fi
+[[ $attached == *"/$snapshots"* ]] ||
+	run gcloud compute disks add-resource-policies "$disk" --zone "$zone" --resource-policies "$snapshots"
 
 say
 say "The VM's address is $ip."

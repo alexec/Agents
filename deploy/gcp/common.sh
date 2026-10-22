@@ -17,6 +17,11 @@ vm_account_name=agents-control-vm
 keyring=agents
 key_location=global
 key=control
+# The VM's disk is snapshotted every day, and each snapshot kept 7 days (#2136). The boot
+# disk has the VM's name. 10:00 UTC is 03:00 in us-west1, when the control plane is quiet.
+snapshots=$name-daily
+snapshot_days=7
+snapshot_start=10:00
 dry_run=0
 project=''
 vm_account=''

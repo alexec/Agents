@@ -42,6 +42,11 @@ fi
 if exists gcloud compute instances describe "$name" --zone "$zone"; then
 	run gcloud compute instances delete "$name" --zone "$zone" --delete-disks all --quiet
 fi
+# The schedule goes with the disk; the snapshots it made stay (#2136), as the one copy of the
+# store left. Each is billed by the GB a month until it is deleted.
+if exists gcloud compute resource-policies describe "$snapshots" --region "$region"; then
+	run gcloud compute resource-policies delete "$snapshots" --region "$region" --quiet
+fi
 if exists gcloud compute addresses describe "$name" --region "$region"; then
 	run gcloud compute addresses delete "$name" --region "$region" --quiet
 fi
@@ -77,3 +82,5 @@ if ((destroy_key)); then
 	done
 fi
 say "Removed. The DNS records for the names still point at the old address: remove them at Cloudflare."
+say "The disk's snapshots are kept, and billed until deleted. To delete them:"
+say "  $(shown gcloud compute snapshots list --filter "sourceDisk~/$name" --format 'value(name)') | xargs gcloud compute snapshots delete --quiet"
