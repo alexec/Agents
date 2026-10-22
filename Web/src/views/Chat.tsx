@@ -540,7 +540,7 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
         {/* Live, at the foot: what the row says, until the prompt lands (ChatTranscript, #251). */}
         {agent && store.isComingBack(host, agent.id) ? <p class="working coming-back" role="status">↻ {comingBackDescription}</p>
           : agent && (agent.state === "running" || agent.state === "starting") && (
-          <p class="working" aria-label={runningTool(agent) !== null ? runningToolLabel(runningTool(agent)!) : "Working"}>
+          <p class="working" role="status" aria-label={runningTool(agent) !== null ? runningToolLabel(runningTool(agent)!) : "Working"}>
             <WorkingMark tool={runningTool(agent)} /></p>
         )}
         {/* After all of it, where the reader is (#1995). */}

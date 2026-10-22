@@ -1446,5 +1446,41 @@
       "isComingBack" : true
     },
     "name" : "coming back after a restart"
+  },
+  {
+    "expected" : {
+      "shape" : "working",
+      "symbol" : null,
+      "tinted" : false,
+      "words" : "Running: swift test"
+    },
+    "input" : {
+      "agent" : {
+        "advertisedOptions" : [
+
+        ],
+        "availableCommands" : [
+
+        ],
+        "createdAt" : 812500000,
+        "cwd" : "file:///fixture/project/",
+        "id" : "00000000-0000-0000-0000-000000000041",
+        "lastActivityAt" : 812500000,
+        "runningTool" : "swift test",
+        "runtimeID" : "claude",
+        "startOptions" : {
+          "extraArguments" : [
+
+          ],
+          "values" : {
+
+          }
+        },
+        "state" : "running",
+        "title" : "Session 41"
+      },
+      "isComingBack" : false
+    },
+    "name" : "running a tool"
   }
 ]
