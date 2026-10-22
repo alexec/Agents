@@ -46,9 +46,10 @@ from a provider that can make machines.
 ## Where the credentials go
 
 You type a token or a key once. It goes to the control plane and is never shown again. The
-device that you typed it on does not keep it. The control plane keeps it in
-`provider-secrets.json` in its own folder, readable only by its user. It is never in the
-store, never sent to a host or a client, and never logged. An API preset sends it only in
+device that you typed it on does not keep it. The control plane keeps it in its store,
+sealed with the key that seals your secrets (a KMS on a cloud machine), so no value is in
+the store in clear, and a store copy or a backup keeps it. It is never sent to a host or a
+client, and never logged. An API preset sends it only in
 a request's header, never in an address.
 
 To change it later, choose **Edit…** on the provider's card. An empty field keeps the one

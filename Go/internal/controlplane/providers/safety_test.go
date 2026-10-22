@@ -1,10 +1,15 @@
 package providers
 
 import (
+	"bytes"
+	"context"
 	"encoding/base64"
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/alexec/agents/Go/internal/controlplane/kms"
+	"github.com/alexec/agents/Go/internal/controlplane/store"
 )
 
 // What a draft's check may run without asking (#858, FR-013, FR-014), and what its agent
@@ -141,5 +146,51 @@ func TestSecretsAreLaidOverAndTakenAway(t *testing.T) {
 	os.WriteFile(filepath.Join(home, SecretsFileName), []byte("{\n  \"q\" : {\n    \"T\" : \"x\\/y\"\n  }\n}"), 0o600)
 	if NewSecrets(home).Values("q")["T"] != "x/y" {
 		t.Error("Swift's file not read")
+	}
+}
+
+// With a keeper, each provider's secrets are sealed in the store (#2138): no value is in
+// it in clear, and a copy of the store opens with the same keeper, so a store copy, a
+// handover or a backup keeps a provider usable.
+func TestSealedSecretsGoWithTheStore(t *testing.T) {
+	ctx := context.Background()
+	url := "base64key://" + base64.URLEncoding.EncodeToString(bytes.Repeat([]byte{7}, 32))
+	k, err := kms.Keeper(ctx, url)
+	if err != nil {
+		t.Fatal(err)
+	}
+	st := store.NewMemory()
+	s := NewSealedSecrets(st, k, url)
+	if err := s.Set("p", map[string]string{"TOKEN": "dop_v1_secret", "B": "2"}); err != nil {
+		t.Fatal(err)
+	}
+	s.Set("p", map[string]string{"B": ""})
+	listed, _ := st.List(ctx, "v1/")
+	if len(listed) != 1 || listed[0].Key != SecretsPrefix+"p.json" {
+		t.Fatalf("%v", listed)
+	}
+	copied := store.NewMemory()
+	for _, key := range listed {
+		object, _ := st.Get(ctx, key.Key)
+		if bytes.Contains(object.Data, []byte("dop_v1_secret")) {
+			t.Fatal("a value is in the store in clear")
+		}
+		copied.Put(ctx, key.Key, object.Data, store.Absent)
+	}
+	if v := NewSealedSecrets(copied, k, url).Values("p"); len(v) != 1 || v["TOKEN"] != "dop_v1_secret" {
+		t.Fatalf("the copy holds %v", v)
+	}
+	// Moved to another provider's key, it does not open.
+	object, _ := copied.Get(ctx, SecretsPrefix+"p.json")
+	copied.Put(ctx, SecretsPrefix+"q.json", object.Data, store.Absent)
+	if v := NewSealedSecrets(copied, k, url).Values("q"); len(v) != 0 {
+		t.Fatalf("a moved envelope opened: %v", v)
+	}
+	again := NewSealedSecrets(copied, k, url)
+	if err := again.Remove("p"); err != nil {
+		t.Fatal(err)
+	}
+	if o, _ := copied.Get(ctx, SecretsPrefix+"p.json"); o != nil {
+		t.Fatal("removed secrets are still in the store")
 	}
 }

@@ -44,6 +44,8 @@ something particular done.
   agents, devices and servers to a control plane, once.
 - [Back up and restore a machine](back-up-and-restore.md): keep a fixed number of backups
   of a machine's agents and conversations in a folder, and restore one on a new machine.
+- [Back up and restore a control plane](back-up-a-control-plane.md): its store, key,
+  secrets key and certificate in one folder, restored so that every device stays paired.
 - [Release Agents Host](release-agents-host.md): publish the Developer ID download on
   GitHub by tagging main, and set up its signing secrets once.
 - [Fix Agents Host when it won't start](fix-agents-host-not-starting.md): see why a login

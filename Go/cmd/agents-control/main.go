@@ -18,6 +18,8 @@
 //	agents-control handover STEP --at URL|self … a step of a move to a copy elsewhere (R16, #1490)
 //	agents-control store copy --from URL --to URL  every record into an empty store (Switch Store…)
 //	agents-control key export --key-fd N        the key, raw, out on N: for a move back to a Mac
+//	agents-control backup --to DIR              the store and what a restore needs beside it (#2137)
+//	agents-control restore --from DIR [--new-kms]  a backup, into a new home and an empty store
 //	agents-control install-script               the script a server runs to become a host
 //	agents-control store check [--store URL]
 //	agents-control version
@@ -685,7 +687,9 @@ const usage = `usage: agents-control serve [--port N] [--bind ADDR] [--self-sign
        agents-control key export --key-fd N
        agents-control install-script
        agents-control store check [--store URL]
-       agents-control store copy --from URL --to URL`
+       agents-control store copy --from URL --to URL
+       agents-control backup --to DIR [--home DIR]
+       agents-control restore --from DIR [--home DIR] [--store URL] [--new-kms]`
 
 func main() {
 	first := ""
@@ -711,6 +715,10 @@ func main() {
 		sealKey()
 	case first == "key" && len(args) > 1 && args[1] == "export":
 		exportKey()
+	case first == "backup":
+		backup()
+	case first == "restore":
+		restore()
 	case first == "install-script":
 		fmt.Print(controlplane.InstallScript)
 	case first == "--version" || first == "version":

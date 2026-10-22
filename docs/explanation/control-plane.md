@@ -225,8 +225,18 @@ store. Any copy will take any client or host, and a request for a host held by a
 copy is passed across. A code shown by one copy works at any other, once.
 
 Every copy is given the same private key, which proves to clients and hosts that they have
-reached your control plane and not someone else's. That key is never written to the store;
-whatever runs the copies hands it to each one as a secret.
+reached your control plane and not someone else's. That key is never written to the store
+in clear: whatever runs the copies hands it to each one as a secret, or a cloud machine's
+KMS seals it in the store.
+
+### Back up and restore
+
+A copy of the store is not a backup on its own. A restore also needs the control key (or,
+on a cloud machine, the KMS key that sealed it), the key that seals secrets, and the
+certificate that devices are pinned to. Without the key, the restored control plane does not
+start; without the certificate, every device must pair again. `agents-control backup` puts
+all of them into one folder, and `agents-control restore` puts them back into a new home:
+see [Back up and restore a control plane](../how-to/back-up-a-control-plane.md).
 
 ## Where to run it
 

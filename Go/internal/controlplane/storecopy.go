@@ -20,8 +20,13 @@ var ErrDestinationInUse = errors.New("The new store already holds a control plan
 // machine sealed in its store by its own keeper, #1458), so a sealed key stays where it is.
 var copySkipped = []string{"v1/leases/", "v1/copies/", "v1/keys/"}
 
-func copyLeavesOut(key string) bool {
-	for _, prefix := range copySkipped {
+// backupSkipped is what a backup leaves out (#2137): only what a copy rebuilds when it
+// starts. A sealed key stays in, as a restore at the same keeper needs it.
+var backupSkipped = []string{"v1/leases/", "v1/copies/"}
+
+// leftOut says a key is under one of the prefixes skipped.
+func leftOut(key string, skipped []string) bool {
+	for _, prefix := range skipped {
 		if strings.HasPrefix(key, prefix) {
 			return true
 		}
@@ -34,6 +39,15 @@ func copyLeavesOut(key string) bool {
 // Store… runs it with no copy serving; a handover runs it between a frozen copy and a
 // receiving one, each end a PeerStore (#1490).
 func CopyStore(ctx context.Context, from, to store.Store) (copied, skipped int, err error) {
+	return copyStoreLeaving(ctx, from, to, copySkipped)
+}
+
+// BackupStore is CopyStore for a backup (#2137): the sealed keys go too.
+func BackupStore(ctx context.Context, from, to store.Store) (copied, skipped int, err error) {
+	return copyStoreLeaving(ctx, from, to, backupSkipped)
+}
+
+func copyStoreLeaving(ctx context.Context, from, to store.Store, leaving []string) (copied, skipped int, err error) {
 	if held, err := to.Get(ctx, records.SettingsKey); err != nil {
 		return 0, 0, err
 	} else if held != nil {
@@ -45,7 +59,7 @@ func CopyStore(ctx context.Context, from, to store.Store) (copied, skipped int, 
 	}
 	written := map[string][]byte{}
 	for _, k := range keys {
-		if copyLeavesOut(k.Key) {
+		if leftOut(k.Key, leaving) {
 			skipped++
 			continue
 		}
@@ -68,7 +82,7 @@ func CopyStore(ctx context.Context, from, to store.Store) (copied, skipped int, 
 	}
 	count := 0
 	for _, k := range landed {
-		if !copyLeavesOut(k.Key) {
+		if !leftOut(k.Key, leaving) {
 			count++
 		}
 	}
