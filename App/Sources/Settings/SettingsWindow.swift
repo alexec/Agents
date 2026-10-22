@@ -62,6 +62,11 @@ struct SettingsWindow: View {
                     }
                     Divider()
                 }
+                // A pane whose edits go to every machine of the person's (#2069): it says so.
+                if let part = followedPart {
+                    FollowedPaneNote(part: part) { pane.wrappedValue = .onEveryMachine }
+                    Divider()
+                }
                 content
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             }
@@ -130,6 +135,20 @@ struct SettingsWindow: View {
         case .providers: control?.providersHere ?? false
         default: true
         }
+    }
+
+    /// The part of You ▸ On Every Machine this pane edits, when it is the same on every
+    /// machine: an edit here then goes to each of them.
+    private var followedPart: DaemonAPI.UserSettingsPartName? {
+        let part: DaemonAPI.UserSettingsPartName? = switch pane.wrappedValue {
+        case .spending: .costLimits
+        case .resources: .resources
+        case .runtimes: .runtimes
+        case .agentConfiguration: .agentConfig
+        default: nil
+        }
+        guard let part, model.userScope.follows(part) else { return nil }
+        return part
     }
 
     private var title: String {
@@ -366,6 +385,27 @@ private struct NoMacHostNotice: View {
                 .appText(.fine).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             Button("Show Machines", action: showHosts)
+                .controlSize(.small)
+        }
+        .frame(maxWidth: 560, alignment: .leading)
+        .padding(16)
+        .accessibilityElement(children: .contain)
+    }
+}
+
+/// Over a pane whose part is the same on every machine (#2069): an edit here changes them all.
+private struct FollowedPaneNote: View {
+    let part: DaemonAPI.UserSettingsPartName
+    let show: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Label(UserScopeWords.followedTitle, systemImage: "arrow.triangle.2.circlepath")
+                .appText(.supporting).fontWeight(.semibold)
+            Text(UserScopeWords.followedNote(part))
+                .appText(.fine).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            Button(UserScopeWords.showOnEveryMachine, action: show)
                 .controlSize(.small)
         }
         .frame(maxWidth: 560, alignment: .leading)

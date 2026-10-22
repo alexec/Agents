@@ -201,7 +201,18 @@ public enum UserScopeWords {
     public static let noSealing = "This control plane has no key to seal secrets with, so it keeps none. "
         + "Its operator starts it with a key file or AGENTS_CONTROL_KMS."
     public static let partsFoot = "A setting here is the same on every machine of yours, and on each new one as it joins. "
-        + "On a machine, it is changed here, not in its own pane."
+        + "Change it in its own pane on any of your Macs: the change goes to every machine of yours."
+    /// Over a Mac pane whose part is the same on every machine (#2069).
+    public static let followedTitle = "The same on every machine of yours"
+    public static func followedNote(_ part: DaemonAPI.UserSettingsPartName) -> String {
+        "\(partTitle(part)): a change here goes to every machine of yours, not only to this Mac."
+    }
+    public static let showOnEveryMachine = "Show On Every Machine"
+    /// Use This Mac's on a part that is the same on every machine already (#2069).
+    public static func replaceTitle(_ part: DaemonAPI.UserSettingsPartName, machine: String) -> String {
+        "Use \(machine)’s \(partTitle(part))?"
+    }
+    public static let replaceMessage = "Every machine of yours takes this one’s, in place of what they all have now."
     public static let partsFootNoTake = "Choose on the Mac which of its settings are the same on every machine of yours."
 
     /// A secret's row: where it is.

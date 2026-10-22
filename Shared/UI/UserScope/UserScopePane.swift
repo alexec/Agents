@@ -19,6 +19,8 @@ struct UserScopePane: View {
     @State private var removing: DaemonAPI.UserSecretRow?
     @State private var giving: DaemonAPI.UserSettingsPartName?
     @State private var busy: DaemonAPI.UserSettingsPartName?
+    /// Use This Mac's on a part every machine has already: asked first (#2069).
+    @State private var replacingPart: DaemonAPI.UserSettingsPartName?
 
     var body: some View {
         Form {
@@ -69,6 +71,21 @@ struct UserScopePane: View {
         } message: { _ in
             Text("Each machine keeps what it has now, and changes it in its own pane.")
         }
+        .confirmationDialog(replacingPart.map { UserScopeWords.replaceTitle($0, machine: takeHere?.name ?? "") } ?? "",
+                            isPresented: Binding(get: { replacingPart != nil }, set: { if !$0 { replacingPart = nil } }),
+                            titleVisibility: .visible, presenting: replacingPart) { part in
+            Button(UserScopeWords.useHere(takeHere?.name ?? "")) { Task { await take(part) } }
+            Button("Cancel", role: .cancel) {}
+        } message: { _ in
+            Text(UserScopeWords.replaceMessage)
+        }
+    }
+
+    private func take(_ part: DaemonAPI.UserSettingsPartName) async {
+        guard let takeHere else { return }
+        busy = part
+        problem = await takeHere.take(part)
+        busy = nil
     }
 
     private var secretsSection: some View {
@@ -123,11 +140,8 @@ struct UserScopePane: View {
                     HStack {
                         if let takeHere {
                             Button(UserScopeWords.useHere(takeHere.name)) {
-                                Task {
-                                    busy = part
-                                    problem = await takeHere.take(part)
-                                    busy = nil
-                                }
+                                // Over every machine's copy: asked first.
+                                if follows { replacingPart = part } else { Task { await take(part) } }
                             }
                             .disabled(control == nil || busy != nil)
                             .accessibilityIdentifier("useHere-\(part.rawValue)")

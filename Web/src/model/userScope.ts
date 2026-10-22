@@ -44,7 +44,8 @@ export const secretsFoot = "A secret goes only to your own machines, into ~/.age
 export const noSealing = "This control plane has no key to seal secrets with, so it keeps none. "
   + "Its operator starts it with a key file or AGENTS_CONTROL_KMS.";
 export const partsFoot = "A setting here is the same on every machine of yours, and on each new one as it joins. "
-  + "On a machine, it is changed here, not in its own pane. Choose on the Mac which of its settings are the same on every machine of yours.";
+  + "Change it in its own pane on any of your Macs: the change goes to every machine of yours. "
+  + "Choose on the Mac which of its settings are the same on every machine of yours.";
 export const nameHint = "Capital letters, digits and _, such as GITHUB_TOKEN.";
 
 /** A secret's row: where it is. */
