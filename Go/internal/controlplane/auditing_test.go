@@ -38,6 +38,8 @@ func TestTheControlPlaneWritesTheActor(t *testing.T) {
 
 	var list wire.AuditList
 	p.waitFor(func() bool {
+		// A new list each time: decoding into the last one keeps its fields a reply leaves out.
+		list = wire.AuditList{}
 		json.Unmarshal(call(t, window, "", "audit/list", wire.AuditQuery{}), &list)
 		return len(list.Entries) == 2
 	}, "two entries")
