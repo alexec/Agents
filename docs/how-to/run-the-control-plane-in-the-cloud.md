@@ -60,7 +60,7 @@ Each takes `--dry-run`, which prints every command and runs none.
    ```
 
 4. For notices on iPhone and iPad with no Mac host: the APNs `.p8` key, as in
-   [Build and copy what it runs](#build-and-copy-what-it-runs). Its name gives the Key ID.
+   [Get what it runs](#get-what-it-runs). Its name gives the Key ID.
 5. On your Mac: `gcloud` (`brew install --cask gcloud-cli`). Docker only to build a commit
    that no release has
    (`up.sh --build`): then Docker, running, with the `buildx` plugin. The image is for
