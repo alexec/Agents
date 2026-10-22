@@ -74,8 +74,8 @@ approval, if the turn ends **Complete** or **Nothing to do**. A partly done one 
 for it.
 
 For chats you started, this is the setting **Agents may archive the chats I start**, in
-**Settings ▸ You ▸ Sidebar ▸ Finished chats** on the Mac, iPhone and iPad, and **Settings ▸
-You ▸ Finished chats** on the web page. It is kept on your Mac, so it is the same on every
+**Settings ▸ This app ▸ Sidebar ▸ Finished chats** on the Mac, iPhone and iPad, and
+**Settings ▸ This browser ▸ Finished chats** on the web page. It is kept on your Mac, so it is the same on every
 client. It is on at first. Turn it off to approve each one, as
 above. Even with it on, a chat whose last turn showed you a file with `show_file` is not
 archived: it stays unread under **Done**, with the file's mark on its row, and asks no

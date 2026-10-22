@@ -159,12 +159,14 @@ public extension DaemonAPI.Notification {
     static let controlSecretsLeft = "control/secretsLeft"
 }
 
-/// The words of You ▸ On Every Machine (#1760), for the window and the Remote. The web page
-/// says the same in `Web/src/model/userScope.ts`.
+/// The words of the user scope (#1760, #2157): the scope line at the top of each Mac pane
+/// whose part can be the same on every machine, Machines ▸ Secrets, and the parts at the end
+/// of Machines on the Remote. The web page says the same in `Web/src/model/userScope.ts`.
 public enum UserScopeWords {
-    public static let title = "On Every Machine"
-    public static let secretsHeading = "Secrets"
-    public static let partsHeading = "Settings"
+    /// Machines ▸ Secrets.
+    public static let secretsTitle = "Secrets"
+    /// The parts at the end of Machines on the Remote and the web page, and each pane's switch.
+    public static let partsHeading = "The same on all your machines"
 
     public static func partTitle(_ part: DaemonAPI.UserSettingsPartName) -> String {
         switch part {
@@ -188,32 +190,30 @@ public enum UserScopeWords {
     }
 
     public static func partState(_ value: JSONValue?, updated: String?) -> String {
-        guard value != nil else { return "Each machine keeps its own." }
-        return "The same on every machine of yours."
+        value == nil ? "Each machine its own" : allMachines
     }
 
-    public static func useHere(_ machine: String) -> String { "Use \(machine)’s" }
+    /// The scope line over a Mac pane (#2157): where an edit in it goes.
+    public static let allMachines = "All your machines"
+    public static let thisMacOnly = "This Mac only"
+    public static func scopeNote(_ part: DaemonAPI.UserSettingsPartName, follows: Bool) -> String {
+        follows
+            ? "\(partTitle(part)): a change here goes to every machine of yours, and to each new one."
+            : "\(partTitle(part)): turn it on to give every machine of yours what this Mac has."
+    }
+
     public static let stop = "Each Machine Its Own"
+    public static func stopTitle(_ part: DaemonAPI.UserSettingsPartName) -> String { "\(partTitle(part)): each machine its own?" }
+    public static let stopMessage = "Each machine keeps what it has now, and changes it in its own pane."
     public static let addSecret = "Add a Secret…"
 
     public static let secretsFoot = "A secret goes only to your own machines, into ~/.agents-secrets/secrets.env. "
         + "Write ${NAME} for it in an MCP server's env or headers. Nobody can read it back, you included: to change it, replace it."
     public static let noSealing = "This control plane has no key to seal secrets with, so it keeps none. "
         + "Its operator starts it with a key file or AGENTS_CONTROL_KMS."
-    public static let partsFoot = "A setting here is the same on every machine of yours, and on each new one as it joins. "
-        + "Change it in its own pane on any of your Macs: the change goes to every machine of yours."
-    /// Over a Mac pane whose part is the same on every machine (#2069).
-    public static let followedTitle = "The same on every machine of yours"
-    public static func followedNote(_ part: DaemonAPI.UserSettingsPartName) -> String {
-        "\(partTitle(part)): a change here goes to every machine of yours, not only to this Mac."
-    }
-    public static let showOnEveryMachine = "Show On Every Machine"
-    /// Use This Mac's on a part that is the same on every machine already (#2069).
-    public static func replaceTitle(_ part: DaemonAPI.UserSettingsPartName, machine: String) -> String {
-        "Use \(machine)’s \(partTitle(part))?"
-    }
-    public static let replaceMessage = "Every machine of yours takes this one’s, in place of what they all have now."
-    public static let partsFootNoTake = "Choose on the Mac which of its settings are the same on every machine of yours."
+    /// Under the parts on the Remote and the web page, which cannot read a machine's files.
+    public static let partsFoot = "Turn one on in its own pane on the Mac. A change there then goes to every machine of yours, "
+        + "and to each new one."
 
     /// A secret's row: where it is.
     public static func machines(_ row: DaemonAPI.UserSecretRow) -> String {

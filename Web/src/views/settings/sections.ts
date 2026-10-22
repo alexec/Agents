@@ -8,7 +8,7 @@ import { GroupsSection } from "../Groups";
 import { BotsSection, PeopleSection } from "../People";
 import { ProvidersSection } from "../Providers";
 import { SignInSection, SignInsSection } from "../SignInSection";
-import { UserScopeSection } from "../UserScope";
+import { SecretsSection, UserPartsSection } from "../UserScope";
 import { AppearanceSection } from "./Appearance";
 import { BackupsSection, ServerBackupsSection } from "./Backups";
 import { FinishedChatsSection } from "./FinishedChats";
@@ -48,6 +48,10 @@ export const settingsSections: readonly SettingsSection[] = [
   // The organisation's rules, read only, and the kill switch for an admin (#998).
   { name: "policy", scope: "controlPlane", order: 45, Section: PolicySection },
   { name: "providers", scope: "controlPlane", order: 50, Section: ProvidersSection },
+  // Which settings are the same on every machine of yours (#1760); turned on on the Mac (#2157).
+  { name: "sameOnAll", scope: "machines", order: 50, Section: UserPartsSection },
+  // The secrets the control plane keeps for you and sends to each machine of yours (#1760, #2157).
+  { name: "secrets", scope: "machines", order: 60, Section: SecretsSection },
   { name: "serverBackups", scope: "machines", order: 40, Section: ServerBackupsSection },
   // Kept on the Mac's host, the same on every client (#1033, #2079); its subject is the app (#2157).
   { name: "sidebar", scope: "thisApp", order: 20, Section: SidebarGroupsSection },
@@ -55,8 +59,6 @@ export const settingsSections: readonly SettingsSection[] = [
   { name: "signInProviders", scope: "controlPlane", order: 40, Section: SignInSection, shows: (store) => store.person.value?.role === "admin" },
   // How you sign in on your Macs, iPhones and iPads (#995).
   { name: "signIns", scope: "controlPlane", order: 5, Section: SignInsSection },
-  // The settings and secrets the control plane keeps for you (#1760).
-  { name: "userScope", scope: "machines", order: 50, Section: UserScopeSection },
 ];
 
 /** One group's sections, in their order, less any not shown now. */

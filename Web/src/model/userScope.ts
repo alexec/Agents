@@ -1,9 +1,10 @@
-// You ▸ On Every Machine's words (#1760, spec 736 US4), as the window and the Remote have them
-// (UserScopeWords in Packages/AgentsKit): the secrets and settings the control plane keeps for
-// the person and sends to each machine of theirs.
+// The user scope's words (#1760, #2157), as the window and the Remote have them (UserScopeWords
+// in Packages/AgentsKit): the secrets and settings the control plane keeps for the person and
+// sends to each machine of theirs. Machines ▸ Secrets, and the parts at the end of Machines.
 import type { SecretsLeft, UserSecretRow, UserSettings, UserSettingsPartName } from "../protocol/generated";
 
-export const title = "On Every Machine";
+export const secretsTitle = "Secrets";
+export const partsHeading = "The same on all your machines";
 
 /** The parts, in the order the section shows them. */
 export const parts: UserSettingsPartName[] = ["mcpServers", "agentConfig", "runtimes", "costLimits", "resources"];
@@ -34,18 +35,20 @@ export function follows(settings: UserSettings | null, part: UserSettingsPartNam
 }
 
 export function partState(settings: UserSettings | null, part: UserSettingsPartName): string {
-  return follows(settings, part) ? "The same on every machine of yours." : "Each machine keeps its own.";
+  return follows(settings, part) ? "All your machines" : "Each machine its own";
 }
 
 export const stop = "Each Machine Its Own";
+export function stopTitle(part: UserSettingsPartName): string { return `${partTitle(part)}: each machine its own?`; }
+export const stopMessage = "Each machine keeps what it has now, and changes it in its own pane.";
 export const addSecret = "Add a Secret…";
 export const secretsFoot = "A secret goes only to your own machines, into ~/.agents-secrets/secrets.env. "
   + "Write ${NAME} for it in an MCP server's env or headers. Nobody can read it back, you included: to change it, replace it.";
 export const noSealing = "This control plane has no key to seal secrets with, so it keeps none. "
   + "Its operator starts it with a key file or AGENTS_CONTROL_KMS.";
-export const partsFoot = "A setting here is the same on every machine of yours, and on each new one as it joins. "
-  + "Change it in its own pane on any of your Macs: the change goes to every machine of yours. "
-  + "Choose on the Mac which of its settings are the same on every machine of yours.";
+/** Under the parts: the page cannot read a machine's files, so one is turned on on the Mac. */
+export const partsFoot = "Turn one on in its own pane on the Mac. A change there then goes to every machine of yours, "
+  + "and to each new one.";
 export const nameHint = "Capital letters, digits and _, such as GITHUB_TOKEN.";
 
 /** A secret's row: where it is. */
