@@ -130,6 +130,9 @@ final class AppModel {
     /// The switch and the hours (Settings ▸ Machines ▸ This Mac ▸ Sleep). Nil until the daemon has
     /// said, including a daemon too old to know the method.
     private(set) var wakeSettings: WakeSettings?
+    /// How this Mac's host updates Agents Host by itself (#2178). Nil from a host that
+    /// cannot (a test's, or one older than the method), and Settings draws nothing for it.
+    private(set) var selfUpdate: DaemonAPI.SelfUpdate?
     /// How many workflows turned on may run across every project (#506): the Mac's,
     /// copied to every server.
     private(set) var workflowLimit: WorkflowLimitSettings?
@@ -1835,6 +1838,20 @@ final class AppModel {
                                               returning: WakeSettings.self)
     }
 
+    func refreshSelfUpdate() async {
+        selfUpdate = try? await macClient.call(DaemonAPI.Method.selfUpdateStatus, Optional<String>.none,
+                                               returning: DaemonAPI.SelfUpdate.self)
+    }
+
+    /// The person turned updating Agents Host by itself on or off.
+    func setAutoUpdate(_ on: Bool) async {
+        await attempt {
+            self.selfUpdate = try await self.macClient.call(DaemonAPI.Method.selfUpdateSet,
+                                                            DaemonAPI.SelfUpdateSet(autoUpdate: on),
+                                                            returning: DaemonAPI.SelfUpdate.self)
+        }
+    }
+
     /// The person changed Sleep. The daemon clamps the hours and answers with what it kept.
     func setWakeSettings(_ settings: WakeSettings) async {
         await attempt {
@@ -2991,6 +3008,8 @@ final class AppModel {
         }
 
         switch method {
+        case DaemonAPI.Notification.selfUpdateChanged:
+            if let state = try? params?.decode(DaemonAPI.SelfUpdate.self) { selfUpdate = state }
         case DaemonAPI.Notification.shellOutput:
             // Read rather than decoded: this one arrives whenever a shell prints, and
             // the general path would re-encode every byte of it here on the main
@@ -3629,7 +3648,7 @@ final class AppModel {
         DaemonAPI.Notification.runtimesAllowancesChanged, DaemonAPI.Notification.costChanged,
         DaemonAPI.Notification.leasesChanged, DaemonAPI.Notification.eventsChanged,
         DaemonAPI.Notification.mcpHostedChanged, DaemonAPI.Notification.wakeChanged,
-        DaemonAPI.Notification.modesChanged, DaemonAPI.Notification.storeNotesChanged,
+        DaemonAPI.Notification.selfUpdateChanged, DaemonAPI.Notification.modesChanged, DaemonAPI.Notification.storeNotesChanged,
         DaemonAPI.Notification.milestonesChanged, DaemonAPI.Notification.preferencesChanged,
         DaemonAPI.Notification.runtimeChanged, DaemonAPI.Notification.runtimeAccountChanged,
         DaemonAPI.Notification.signInNeeded, DaemonAPI.Notification.clientPermissionsChanged,

@@ -91,6 +91,7 @@ final class HostModel {
             secretDraft = keys.secretKey
         }
         Task { await registerOutdatedJobsAgain() }
+        if !paths.scratch { SelfUpdateRelaunch.watch() }
     }
 
     /// Once a launch (#1379): a login item registered from an older copy's plist is

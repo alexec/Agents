@@ -33,6 +33,11 @@ this Mac, with **Agents Host**.
    which you can always write to. `/Applications` asks for an admin's password. If
    your Mac won't open a disk image, a company policy for example, download the
    `.zip` instead, double-click it, and move the app it makes into `~/Applications`.
+
+   In `~/Applications`, Agents Host updates itself to the release your control plane
+   runs, with no admin password (#2178). It restarts only when no agent is in a turn.
+   **Settings ▸ Machines ▸ This Mac ▸ Updates** in the window shows where the update is,
+   and turns it off.
 3. Agents Host asks **Where should this Mac's agents report?** Under **Run the control
    plane here**, click **Run It Here**.
 

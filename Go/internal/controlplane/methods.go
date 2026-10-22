@@ -1128,6 +1128,8 @@ func (m *Methods) hello(ctx context.Context, host string, hello wire.HostHello) 
 	go m.s.sendPolicy(host, true)
 	// The organisation's routes it may use, or none, at every join (#999, FR-005).
 	go m.s.sendOrgRoutes(host, true)
+	// The release it names, for a Mac's Agents Host to update itself to (#2178).
+	go m.s.sendRelease(host)
 	// Its user, their kind and labels (#1761); a bot's cap is weighed again.
 	go func() {
 		m.s.sendHostUser(host)

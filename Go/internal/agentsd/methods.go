@@ -53,6 +53,7 @@ func (d *Daemon) register() {
 	d.registerShared()
 	d.registerPlugins()
 	d.registerWake()
+	d.registerSelfUpdate()
 	d.registerMacSignIn()
 	d.registerCatalog()
 	d.registerSimulators()

@@ -3706,6 +3706,11 @@ type HostRelayRequest struct {
 	Relay bool `json:"relay"`
 }
 
+// host/release (#2178): the release the control plane names, as X.Y.Z.
+type HostRelease struct {
+	Version string `json:"version"`
+}
+
 type HostRequest struct {
 	Host HostID `json:"host"`
 
@@ -7045,6 +7050,59 @@ type SecretsLeft struct {
 	Name string `json:"name"`
 
 	Secrets []UserSecretName `json:"secrets"`
+}
+
+// How a Mac's host updates Agents Host to the release the control plane names, with no administrator (#2178).
+type SelfUpdate struct {
+	AutoUpdate bool `json:"autoUpdate"`
+
+	State SelfUpdateState `json:"state"`
+
+	// The version this copy is.
+	Running string `json:"running"`
+
+	// The release the control plane named last; none until it names one.
+	Release *string `json:"release,omitzero"`
+
+	// Why it failed or cannot, in a sentence for the person.
+	Message *string `json:"message,omitzero"`
+}
+
+// selfUpdate/set (#2178).
+type SelfUpdateSet struct {
+	AutoUpdate bool `json:"autoUpdate"`
+}
+
+// Where updating Agents Host is (#2178): upToDate, off (the person turned it off), downloading, waiting (ready; it waits for the last turn to end), restarting, failed (the next release named tries again), cannot (this copy cannot update itself, such as one in a folder only an administrator changes).
+type SelfUpdateState string
+
+const SelfUpdateStateUpToDate SelfUpdateState = "upToDate"
+const SelfUpdateStateOff SelfUpdateState = "off"
+const SelfUpdateStateDownloading SelfUpdateState = "downloading"
+const SelfUpdateStateWaiting SelfUpdateState = "waiting"
+const SelfUpdateStateRestarting SelfUpdateState = "restarting"
+const SelfUpdateStateFailed SelfUpdateState = "failed"
+const SelfUpdateStateCannot SelfUpdateState = "cannot"
+
+// UnmarshalJSON reads a value this build does not know as "upToDate".
+func (v *SelfUpdateState) UnmarshalJSON(b []byte) error {
+	var s string
+	if err := json.Unmarshal(b, &s); err != nil {
+		return err
+	}
+	switch SelfUpdateState(s) {
+	case SelfUpdateStateUpToDate,
+		SelfUpdateStateOff,
+		SelfUpdateStateDownloading,
+		SelfUpdateStateWaiting,
+		SelfUpdateStateRestarting,
+		SelfUpdateStateFailed,
+		SelfUpdateStateCannot:
+		*v = SelfUpdateState(s)
+	default:
+		*v = SelfUpdateStateUpToDate
+	}
+	return nil
 }
 
 // What the Send sheet shows (#1123): the local branches, the one checked out (none when detached), the origin, and whether anything is uncommitted.

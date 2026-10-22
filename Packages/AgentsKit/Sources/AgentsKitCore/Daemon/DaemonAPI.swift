@@ -262,6 +262,9 @@ public enum DaemonAPI {
         public static let diskState = "disk/state"
         /// This machine's backups and their settings (#1810).
         public static let backupsState = "backups/state"
+        /// How this Mac's host updates Agents Host by itself, and the switch (#2178).
+        public static let selfUpdateStatus = "selfUpdate/status"
+        public static let selfUpdateSet = "selfUpdate/set"
         /// How often, how many to keep, and the folder. Answers the state after.
         public static let backupsConfigure = "backups/configure"
         /// Start a backup now. Answers at once, `making` set; `backups/changed` says when it ends.
@@ -614,6 +617,7 @@ public enum DaemonAPI {
         public static let diskChanged = "disk/changed"
         /// A backup started or ended, or the backup settings changed (#1810). A `BackupState`.
         public static let backupsChanged = "backups/changed"
+        public static let selfUpdateChanged = "selfUpdate/changed"
         /// Worktrees measured in the background (#790): each one's size as `worktrees/list`
         /// and `worktrees/all` will now give it, for a list already drawn to fill in.
         public static let worktreesSized = "worktrees/sized"
@@ -4362,6 +4366,42 @@ public extension DaemonAPI {
             self.agents = agents
             self.thisMachine = thisMachine
         }
+    }
+
+    /// `selfUpdate/status`, and what `selfUpdate/changed` carries (#2178): how this Mac's
+    /// host updates Agents Host to the release the control plane names.
+    struct SelfUpdate: Codable, Hashable, Sendable {
+        public enum State: String, Codable, Hashable, Sendable {
+            case upToDate, off, downloading, waiting, restarting, failed, cannot
+
+            public init(from decoder: any Decoder) throws {
+                self = State(rawValue: try decoder.singleValueContainer().decode(String.self)) ?? .upToDate
+            }
+        }
+
+        public var autoUpdate: Bool
+        public var state: State
+        /// The version this copy is.
+        public var running: String
+        /// The release the control plane named last.
+        public var release: String?
+        /// Why it failed or cannot.
+        public var message: String?
+
+        public init(autoUpdate: Bool, state: State, running: String, release: String? = nil, message: String? = nil) {
+            self.autoUpdate = autoUpdate
+            self.state = state
+            self.running = running
+            self.release = release
+            self.message = message
+        }
+    }
+
+    /// `selfUpdate/set`.
+    struct SelfUpdateSet: Codable, Sendable {
+        public var autoUpdate: Bool
+
+        public init(autoUpdate: Bool) { self.autoUpdate = autoUpdate }
     }
 
     /// `backups/state`, and what `backups/changed` carries.

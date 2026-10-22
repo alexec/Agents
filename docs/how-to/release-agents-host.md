@@ -15,7 +15,11 @@ publishes a release. The tag starts the `release` workflow, which:
 - staples the same app and zips it as `Agents-Host-<version>.zip`, for Macs that may not
   mount a disk image;
 - builds the static Linux agentsd (Go) as `agentsd-linux-<arch>-<version>.tar.gz`;
-- creates the release with these files and a `SHA256SUMS`;
+- creates the release with these files and a `SHA256SUMS`. Agents Host on a Mac updates
+  itself from these (#2178): it downloads `v<version>/SHA256SUMS` and
+  `v<version>/Agents-Host-<version>.zip`, checks the sum, then the app's signature (the same
+  team and identifier), its notarisation and its `CFBundleShortVersionString`. Keep these
+  names, and keep the app in the zip stapled and named `Agents Host.app`;
 - in its `image` job, builds the control plane's image for `linux/amd64` and `linux/arm64`
   and pushes it to `ghcr.io/alexec/agents-control` as `<version>`, `<major>.<minor>` and
   `latest`, with an SBOM and provenance, and signs it with cosign, keyless (#2140). It uses

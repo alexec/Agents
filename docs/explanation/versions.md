@@ -48,7 +48,10 @@ and greyed for a project on another.
 The control plane keeps a **required set**: the capabilities that it needs to route. A host
 without one of them is still connected and serves what its list says, but its row says
 **Needs an update**, with a second line: "Update this host to Agents 0.9.0. It does not have
-…", and the names it is missing, and **Update…** in its menu updates it over ssh (#1766). On the Mac this is in **Settings ▸ Control plane**, on the
+…", and the names it is missing, and **Update…** in its menu updates it over ssh (#1766). A
+Mac does not wait for that: at each join the control plane names its own version as the
+release (`host/release`, to a host that says `host.update/1`), and Agents Host updates itself
+to it when it is newer, between turns and with no admin password (#2178). On the Mac this is in **Settings ▸ Control plane**, on the
 host's row. On the Remote and the web page it is in **Settings ▸ Versions**, which also gives
 the control plane's version and each host's, such as **Agents 0.9.0 (Go)** for a host written
 in Go.

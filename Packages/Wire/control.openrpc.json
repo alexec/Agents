@@ -1442,6 +1442,22 @@
       }
     },
     {
+      "name": "host/release",
+      "x-capability": "host.update/1",
+      "description": "To a machine that says host.update/1, on its channel 0, at each join: the release this control plane names, its own version, when that is a release (#2178). The machine updates Agents Host to it, if it is newer, between turns.",
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/HostRelease"
+          }
+        }
+      ]
+    },
+    {
       "name": "host/status",
       "x-capability": "host/1",
       "description": "A host, on its channel 0 (#691 US4).",

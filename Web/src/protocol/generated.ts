@@ -2910,6 +2910,11 @@ export interface HostRelayRequest {
   relay: boolean;
 }
 
+/** host/release (#2178): the release the control plane names, as X.Y.Z. */
+export interface HostRelease {
+  version: string;
+}
+
 export interface HostRequest {
   host: HostID;
   purge?: boolean;
@@ -5441,6 +5446,41 @@ export interface SecretsLeft {
   name: string;
   secrets: UserSecretName[];
 }
+
+/**
+ * How a Mac's host updates Agents Host to the release the control plane names, with no
+ * administrator (#2178).
+ */
+export interface SelfUpdate {
+  autoUpdate: boolean;
+  state: SelfUpdateState;
+  /** The version this copy is. */
+  running: string;
+  /** The release the control plane named last; none until it names one. */
+  release?: string;
+  /** Why it failed or cannot, in a sentence for the person. */
+  message?: string;
+}
+
+/** selfUpdate/set (#2178). */
+export interface SelfUpdateSet {
+  autoUpdate: boolean;
+}
+
+/**
+ * Where updating Agents Host is (#2178): upToDate, off (the person turned it off), downloading,
+ * waiting (ready; it waits for the last turn to end), restarting, failed (the next release named
+ * tries again), cannot (this copy cannot update itself, such as one in a folder only an
+ * administrator changes).
+ */
+export type SelfUpdateState =
+  | "upToDate"
+  | "off"
+  | "downloading"
+  | "waiting"
+  | "restarting"
+  | "failed"
+  | "cannot";
 
 /**
  * What the Send sheet shows (#1123): the local branches, the one checked out (none when detached),
@@ -8050,6 +8090,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   HostPolicy: { required: [], optional: ["policy", "signature", "none"] },
   HostProviderDraftCall: { required: ["agentID", "draft", "tool"], optional: ["arguments"] },
   HostRelayRequest: { required: ["host", "relay"], optional: [] },
+  HostRelease: { required: ["version"], optional: [] },
   HostRequest: { required: ["host"], optional: ["purge"] },
   HostSchedule: { required: [], optional: ["at", "workflow"] },
   HostStatus: { required: ["idle", "running"], optional: ["schedule"] },
@@ -8314,6 +8355,8 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   SealedEnvelope: { required: ["encapsulated", "ciphertext"], optional: [] },
   SecretLeftOn: { required: ["host", "name", "at"], optional: [] },
   SecretsLeft: { required: ["host", "name", "secrets"], optional: [] },
+  SelfUpdate: { required: ["autoUpdate", "state", "running"], optional: ["release", "message"] },
+  SelfUpdateSet: { required: ["autoUpdate"], optional: [] },
   SendFacts: { required: ["branches", "hasChanges"], optional: ["current", "origin"] },
   SendFactsRequest: { required: ["folder"], optional: [] },
   SendFile: { required: ["id", "size"], optional: [] },
