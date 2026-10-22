@@ -1886,11 +1886,6 @@
     {
       "name": "daemon/policyState",
       "x-capability": "host.policy/1",
-      "tags": [
-        {
-          "name": "web"
-        }
-      ],
       "description": "The organisation's policy as this machine follows it (#998, T027).",
       "paramStructure": "by-name",
       "params": [
@@ -5327,11 +5322,6 @@
     {
       "name": "settings/passThrough",
       "x-capability": "host.policy/1",
-      "tags": [
-        {
-          "name": "web"
-        }
-      ],
       "description": "The person's own pass-through names, from runtime-environment.json, each marked when the organisation's policy refuses it (#998, FR-011a).",
       "paramStructure": "by-name",
       "params": [

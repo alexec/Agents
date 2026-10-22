@@ -527,18 +527,6 @@ func sandboxRequired(p *wire.OrgPolicy) bool { return p != nil && p.Sandbox != n
 
 const sandboxRequiredWords = "Your organisation requires the command sandbox."
 
-// sandboxRefusal is why an agent on this runtime cannot meet a required sandbox with this
-// choice, or nil: the effective state must be on (none and runtimeControlled are refused).
-func sandboxRefusal(p *wire.OrgPolicy, runtimeID string, choice wire.SandboxChoice, mode string) error {
-	if !sandboxRequired(p) {
-		return nil
-	}
-	if sandboxState(runtimeID, choice, mode) == wire.SandboxStateOn {
-		return nil
-	}
-	return policyRefusal("policy", "sandbox", sandboxRequiredWords, nil)
-}
-
 // requiredSandbox is the choice a required sandbox gives an agent: on, where the app can
 // set it. ok is false where it cannot.
 func requiredSandbox(runtimeID string) (wire.SandboxChoice, bool) {
