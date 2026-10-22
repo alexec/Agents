@@ -95,6 +95,9 @@ public extension DaemonAPI {
         public var hostName: String
         public var project: String
         public var runtime: String
+        /// The workflow that started the agents of this row (#2019), by its id; nil for agents
+        /// a person or another agent started.
+        public var workflow: String?
         /// Per currency, never added across.
         public var cost: [String: Decimal]
         public var inputTokens: Int
@@ -110,12 +113,16 @@ public extension DaemonAPI {
         public var waitingSeconds: Double
         /// The person's groups, by id, for a group or organisation scope (#1804).
         public var groups: [String]?
+        /// What the agents did (#2019): sessions, pull requests and waits. Nil from a machine
+        /// before #2019, whose rows count as nothing done.
+        public var counts: ReportCounts?
 
         public init(at: String, person: String, personName: String, host: String, hostName: String,
-                    project: String, runtime: String, cost: [String: Decimal] = [:], inputTokens: Int = 0,
-                    outputTokens: Int = 0, thoughtTokens: Int = 0, cachedReadTokens: Int = 0,
+                    project: String, runtime: String, workflow: String? = nil, cost: [String: Decimal] = [:],
+                    inputTokens: Int = 0, outputTokens: Int = 0, thoughtTokens: Int = 0, cachedReadTokens: Int = 0,
                     cachedWriteTokens: Int = 0, turns: Int = 0, unpricedTurns: Int = 0,
-                    workingSeconds: Double = 0, waitingSeconds: Double = 0, groups: [String]? = nil) {
+                    workingSeconds: Double = 0, waitingSeconds: Double = 0, groups: [String]? = nil,
+                    counts: ReportCounts? = nil) {
             self.at = at
             self.person = person
             self.personName = personName
@@ -123,6 +130,7 @@ public extension DaemonAPI {
             self.hostName = hostName
             self.project = project
             self.runtime = runtime
+            self.workflow = workflow
             self.cost = cost
             self.inputTokens = inputTokens
             self.outputTokens = outputTokens
@@ -134,6 +142,46 @@ public extension DaemonAPI {
             self.workingSeconds = workingSeconds
             self.waitingSeconds = waitingSeconds
             self.groups = groups
+            self.counts = counts
+        }
+    }
+
+    /// What the agents of a report row did (#2019), counted on the machine.
+    struct ReportCounts: Codable, Sendable, Hashable {
+        /// Agents that began their first turn (agent.started).
+        public var sessions: Int
+        /// Agents that ended in an error that nobody chose (agent.failed).
+        public var failedSessions: Int
+        /// Pull and merge requests opened from an agent's branch on this machine (pr.opened).
+        public var prsOpened: Int
+        /// Those merged (pr.merged).
+        public var prsMerged: Int
+        /// Of those merged, the ones whose title starts with "Revert".
+        public var prsReverted: Int
+        /// The merged ones' time from their agent's start to the merge, added up.
+        public var mergeSeconds: Double
+        /// The times an agent waited for its person in a turn.
+        public var waits: Int
+        /// The waits by length: under 1 minute, 5, 15, 60, 240, and longer.
+        public var waitBuckets: [Int]
+        /// Runs a workflow started (workflow.ran).
+        public var workflowRuns: Int
+        /// Runs whose agent ended in an error.
+        public var workflowFailures: Int
+
+        public init(sessions: Int = 0, failedSessions: Int = 0, prsOpened: Int = 0, prsMerged: Int = 0,
+                    prsReverted: Int = 0, mergeSeconds: Double = 0, waits: Int = 0,
+                    waitBuckets: [Int] = [0, 0, 0, 0, 0, 0], workflowRuns: Int = 0, workflowFailures: Int = 0) {
+            self.sessions = sessions
+            self.failedSessions = failedSessions
+            self.prsOpened = prsOpened
+            self.prsMerged = prsMerged
+            self.prsReverted = prsReverted
+            self.mergeSeconds = mergeSeconds
+            self.waits = waits
+            self.waitBuckets = waitBuckets
+            self.workflowRuns = workflowRuns
+            self.workflowFailures = workflowFailures
         }
     }
 

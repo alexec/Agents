@@ -21,6 +21,9 @@ page.
   share of the largest. Each line says the cost, the tokens, the turns and the working
   time.
 - **Export** saves the rows of the range as CSV or as JSON lines.
+- **Page** (the Mac and the Remote, #2183): Spend, or Outcomes, Time, Runtimes, Adoption or
+  Workflows, which are the web page's Reports pages below at the Me scope. A segmented control
+  on the Mac, and a menu on the Remote. On the web page these pages are in Reports.
 - **A control plane that keeps no reports** (one from before #1811) says so, and says to
   update it.
 
@@ -38,7 +41,7 @@ Reports is one of the control plane's three apps on the web page, beside Workspa
   control plane adds up the month (`monthSpentUSD`, #2057).
 - **CSV** names each person's groups.
 
-The Mac and the Remote show the Me scope only.
+The Mac and the Remote show the Me scope only, also of the pages below (#2183).
 
 ## Reports ▸ Outcomes and Time, on the web page
 
