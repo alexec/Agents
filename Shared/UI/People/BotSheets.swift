@@ -97,9 +97,16 @@ struct BotSheet: View {
             return
         }
         guard ready else { return }
+        let caps: DaemonAPI.SpendCaps
+        switch BotWords.readCap(cap) {
+        case .none: caps = DaemonAPI.SpendCaps(dailyUSD: nil)
+        case .dollars(let usd): caps = DaemonAPI.SpendCaps(dailyUSD: usd)
+        case .refused(let why):
+            problem = why
+            return
+        }
         isAsking = true
         defer { isAsking = false }
-        let caps = DaemonAPI.SpendCaps(dailyUSD: BotWords.parseCap(cap))
         do {
             if let bot {
                 _ = try await control.call(DaemonAPI.Method.botsSetCaps, DaemonAPI.BotCaps(user: bot.id, caps: caps, group: group))

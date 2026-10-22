@@ -179,4 +179,9 @@ func TestABotRunsOncePerTriggerAndStopsAtItsCap(t *testing.T) {
 	cap = 10
 	call(t, admin, "", "bots/setCaps", wire.BotCaps{User: bot, Caps: wire.SpendCaps{DailyUSD: &cap}})
 	p.waitFor(func() bool { u, _ := users.of(host); return u.CapReachedUntil == nil }, "told its cap is lifted")
+	// A cap of $0 or less is refused, not kept as no cap (#2066).
+	zero := 0.0
+	if e := callError(t, admin, "", "bots/setCaps", wire.BotCaps{User: bot, Caps: wire.SpendCaps{DailyUSD: &zero}}); !strings.Contains(e, "more than $0") {
+		t.Fatalf("a $0 cap: %q", e)
+	}
 }
