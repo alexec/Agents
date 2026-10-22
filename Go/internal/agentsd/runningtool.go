@@ -11,9 +11,15 @@ import (
 // flight are kept here; the newest one's title goes on Agent.RunningTool, and none is
 // thinking. A change goes on the record only once it has held for toolSettle, both ways,
 // so a tool that ends at once never shows, a short gap between two never flashes back to
-// thinking, and each agent sends at most one such change a second.
+// thinking, and each agent sends at most one such change a second. A change of mark,
+// thinking to a tool or back, also waits until the last one has held for markHold
+// (#2046), so a row changes its mark at most once in that time; a new title on the
+// same mark waits only for toolSettle.
 
-var toolSettle = time.Second
+var (
+	toolSettle = time.Second
+	markHold   = 5 * time.Second
+)
 
 // toolsInFlight is the turn's tool calls that are pending or in progress, oldest first.
 type toolsInFlight struct {
@@ -21,6 +27,7 @@ type toolsInFlight struct {
 	shown  string // on the record: "" is thinking
 	target string // what the timer will put there
 	timer  *time.Timer
+	markAt time.Time // when the record last changed between thinking and a tool
 }
 
 type openTool struct{ id, title string }
@@ -79,7 +86,11 @@ func (l *live) settleToolLocked() {
 		t.timer.Stop()
 	}
 	t.target = want
-	t.timer = time.AfterFunc(toolSettle, l.showTool)
+	wait := toolSettle
+	if (want == "") != (t.shown == "") {
+		wait = max(wait, time.Until(t.markAt.Add(markHold)))
+	}
+	t.timer = time.AfterFunc(wait, l.showTool)
 }
 
 // showTool puts what has held for toolSettle on the record, while the turn runs.
@@ -93,6 +104,9 @@ func (l *live) showTool() {
 	if want != t.target || want == t.shown {
 		l.mu.Unlock()
 		return
+	}
+	if (want == "") != (t.shown == "") {
+		t.markAt = time.Now()
 	}
 	t.shown, t.timer = want, nil
 	l.mu.Unlock()
