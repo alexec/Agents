@@ -92,3 +92,48 @@ test("runtimes: one the organisation does not allow cannot start, and says why (
   assert.deepEqual([got.available, got.out, got.cannot].map((run) => run.map((s) => s.runtime.id)), [["claude"], [], ["gemini"]]);
   assert.equal(r.unavailableReason(refused), "Set by your organisation. Your organisation does not allow Gemini.");
 });
+
+// An org account as a member sees it (#999, slice 3): OrgAccountMemberWordsTests says the same.
+const avail = { credentialKey: "claude:account:org:acme", entryID: "E", since: 0, status: { available: {} } };
+const clock = (wire) => `t${wire}`;
+const other = () => "Out since then";
+
+test("org account: no plan limit, its tokens today, and out until its time", () => {
+  assert.equal(r.orgAllowanceLine(avail, 12000, new Date(), clock, other), "Organisation · No plan limit · 12,000 tokens today");
+  assert.equal(r.orgAllowanceLine(avail, undefined, new Date(), clock, other), "Organisation · No plan limit");
+  const later = 2e9;
+  const limited = { ...avail, status: { rateLimited: { until: later } } };
+  assert.equal(r.orgAllowanceLine(limited, 5, new Date(0), clock, other), `Out until t${later} · 5 tokens today`);
+  assert.equal(r.isOrgRow({ credentialKey: "claude:account:org:acme", accountID: "org:acme" }), true);
+  assert.equal(r.isOrgRow({ credentialKey: "claude:account:w1", accountID: "w1" }), false);
+});
+
+test("org account: a cost says whose price it is, and the account says where it is from", () => {
+  assert.equal(r.listPrice("claude"), "list price, as Claude reports it");
+  assert.equal(r.priced({ accountID: "org:acme", runtimeID: "claude" }, "$0.42"), "$0.42 · list price, as Claude reports it");
+  assert.equal(r.priced({ runtimeID: "claude" }, "$0.42"), "$0.42");
+  const org = { id: "org:acme", runtimeID: "claude", name: "Acme", reach: { orgKey: { route: "acme" } }, source: "organisation", addedAt: 0, signedIn: true };
+  assert.equal(r.accountState(org), "From your organisation");
+});
+
+test("account choices: the default, the own sign-in, what is sent and why a session must move", () => {
+  const refused = { by: "organisation", rule: "runtimes.claude.reach", words: "Your organisation requires Claude to use Acme." };
+  const list = [
+    { id: "w1", runtimeID: "claude", name: "Work", reach: { signIn: { folder: "/a" } }, addedAt: 0, signedIn: true, setBy: refused },
+    { id: "org:acme", runtimeID: "claude", name: "Acme", reach: { orgKey: { route: "acme" } }, source: "organisation", isDefault: true, addedAt: 0, signedIn: true },
+  ];
+  const policy = { runtimes: { claude: { reach: ["orgKey", "gateway"] } } };
+  const c = r.accountChoices("claude", list, policy);
+  assert.equal(c.shows, true);
+  assert.equal(c.name(undefined), "Acme");
+  assert.equal(c.ownChoice, "default");
+  assert.equal(c.sent("default"), "default");
+  assert.equal(c.sent("nope"), undefined);
+  assert.equal(c.ownSetBy.words, "Your organisation requires Claude to use Acme.");
+  assert.equal(c.moveReason("w1", true), refused.words);
+  assert.equal(c.moveReason("org:gone", true), "Your organisation removed this way to the model.");
+  assert.equal(c.moveReason("org:acme", true), undefined);
+  assert.equal(c.moveReason("org:gone", false), undefined);
+  assert.equal(r.accountChoices("codex", list).ownChoice, undefined);
+  assert.equal(r.defaultAccountName, "Your Own Sign-In");
+});

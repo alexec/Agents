@@ -4583,6 +4583,26 @@
       },
       "additionalProperties": false
     },
+    "ContinueInNewRequest": {
+      "type": "object",
+      "description": "agents/continueInNew (#999): a new session in the same folder that reads this one and carries on, on another account of its runtime.",
+      "properties": {
+        "agentID": {
+          "$ref": "#/definitions/UUID"
+        },
+        "accountID": {
+          "description": "The account the new session uses: an added account, an org account (org:<route id>) or default for the runtime's own sign-in. Absent: the runtime's account for new sessions (Reaches the Model By).",
+          "type": "string"
+        },
+        "requestID": {
+          "$ref": "#/definitions/UUID"
+        }
+      },
+      "required": [
+        "agentID"
+      ],
+      "additionalProperties": false
+    },
     "ContinueInProjectRequest": {
       "type": "object",
       "properties": {
@@ -15886,12 +15906,16 @@
           "type": "string"
         },
         "accountID": {
-          "description": "The added account this row is for (#840); absent for the runtime's own sign-in.",
+          "description": "The added account this row is for (#840), or an org account (org:<route id>, #999); absent for the runtime's own sign-in.",
           "type": "string"
         },
         "accountName": {
           "description": "That account's name.",
           "type": "string"
+        },
+        "tokensToday": {
+          "description": "An org account's tokens today on this host, as its model relay counted them from the provider's answers (#999, D12): fresh input, cache writes and output. Only on an org account's row.",
+          "type": "integer"
         }
       },
       "required": [

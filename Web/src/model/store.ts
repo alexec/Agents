@@ -2230,7 +2230,7 @@ export class Store extends Work {
     if (allowances) this.runtimeAllowances.value = { ...this.runtimeAllowances.value, [host]: allowances };
   }
 
-  /** The accounts added to one of a host's runtimes (#840), in the order they were added. */
+  /** The accounts of one of a host's runtimes: the ones added (#840), in the order they were added, then the organisation's (#999). */
   addedAccounts(host: string, runtimeID: string): AccountProfile[] {
     return (this.accountProfiles.value[host] ?? []).filter((a) => a.runtimeID === runtimeID);
   }
@@ -2252,6 +2252,13 @@ export class Store extends Work {
       [host]: (this.accountProfiles.value[host] ?? []).filter((a) => a.id !== account.id),
     };
     void this.reloadAllowances(host);
+  }
+
+  /** Reaches the Model By (#999): a runtime's account for new sessions, "default" for its own sign-in. Throws the host's refusal. */
+  async setDefaultAccount(host: string, runtimeID: string, accountID: string): Promise<void> {
+    await this.link.call("runtimes/setDefaultAccount", { runtimeID, accountID }, host);
+    const profiles = await this.link.call("runtimes/accountProfiles", {}, host).catch(() => null);
+    if (profiles) this.accountProfiles.value = { ...this.accountProfiles.value, [host]: profiles };
   }
 
   private async reloadAllowances(host: string): Promise<void> {
@@ -2341,6 +2348,14 @@ export class Store extends Work {
   async continueInProject(host: string, agentID: string, text = "", attachments: Attachment[] = []): Promise<string | null> {
     return this.act("agents/continueInProject",
       { agentID: agentID as UUID, text, attachments, requestID: crypto.randomUUID().toUpperCase() as UUID }, host);
+  }
+
+  /**
+   * Continue in New (#999): a session in the same folder that reads this one and carries on, on the
+   * runtime's account for new sessions. Answers its id, or null with `problem` saying why.
+   */
+  async continueInNew(host: string, agentID: string): Promise<string | null> {
+    return this.act("agents/continueInNew", { agentID: agentID as UUID, requestID: crypto.randomUUID().toUpperCase() as UUID }, host);
   }
 
   /**

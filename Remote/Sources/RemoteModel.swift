@@ -1516,7 +1516,7 @@ final class RemoteModel {
             startOptions: StartOptions(values: startChosen), draftID: startDraftID,
             additionalDirectories: startFolders, worktree: startWorktree, requestID: retrying ?? UUID(), sandbox: startSandbox,
             labels: labels, persona: startPersona,
-            accountID: startAccounts.contains { $0.id == startAccountID } ? startAccountID : nil)
+            accountID: startAccountChoices?.sent(startAccountID))
         startingPage = page
         defer { startingPage = nil }
         return await send(start: request)
@@ -1664,15 +1664,45 @@ final class RemoteModel {
     /// silently is not there reads as one the phone forgot.
     private(set) var runtimes: [RuntimeStatus] = [] { didSet { startRuntimesMoved() } }
     private var accounts: [String: RuntimeAccount] = [:]
-    /// The accounts added to the Mac's runtimes (#840), beside each runtime's own sign-in.
-    private(set) var accountProfiles: [AccountProfile] = []
-    /// The added account the start page uses (#840); nil for the runtime's own sign-in.
+    /// The accounts of the Mac's runtimes (#840), beside each runtime's own sign-in, the
+    /// organisation's included (#999).
+    private(set) var accountProfiles: [AccountProfile] = [] {
+        didSet { accountProfilesRead = true }
+    }
+    /// Whether the Mac has listed them yet: until then no session is told its account is gone.
+    private(set) var accountProfilesRead = false
+    /// The account the start page uses (#840, #999), as `AccountChoices` keeps a choice: nil
+    /// for the runtime's account for new sessions.
     var startAccountID: String?
     /// The accounts the start page's runtime offers beyond its own sign-in: the Mac's, so
     /// none for a server's project. The picker shows only when there is one.
-    var startAccounts: [AccountProfile] {
-        guard startHost == .mac, let startRuntimeID else { return [] }
-        return accountProfiles.on(startRuntimeID)
+    var startAccounts: [AccountProfile] { startAccountChoices?.accounts ?? [] }
+    var startAccountChoices: AccountChoices? {
+        guard startHost == .mac, let startRuntimeID else { return nil }
+        return AccountChoices(runtimeID: startRuntimeID, profiles: accountProfiles, policy: policyState?.policy)
+    }
+
+    /// Why a session on the Mac can no longer reach the model on its account (#999): the
+    /// organisation removed it, or its policy refuses it now. Nil when it can.
+    func accountMoveReason(_ agent: Agent) -> String? {
+        guard agent.host == .mac, agent.state != .archived else { return nil }
+        return AccountChoices(runtimeID: agent.runtimeID, profiles: accountProfiles, policy: policyState?.policy)
+            .moveReason(accountID: agent.accountID, loaded: accountProfilesRead)
+    }
+
+    /// **Reaches the Model By** (#999): one of the Mac's runtimes' account for new sessions,
+    /// nil for its own sign-in. Nil when it was set; else why not.
+    func setDefaultAccount(runtimeID: String, accountID: String?) async -> String? {
+        do {
+            _ = try await client.call(DaemonAPI.Method.runtimesSetDefaultAccount,
+                                      DaemonAPI.DefaultAccountRequest(runtimeID: runtimeID,
+                                                                      accountID: accountID ?? AccountProfile.ownSignInID),
+                                      returning: DaemonAPI.Empty.self)
+            await refreshAccountProfiles()
+            return nil
+        } catch {
+            return sentence(for: error)
+        }
     }
 
     func refreshAccountProfiles() async {
@@ -4927,6 +4957,29 @@ final class RemoteModel {
             for state in projectScenes.values where state.pick == .session(agentID) { state.pick = nil }
         }
         return archived
+    }
+
+    /// **Continue in New** (#999): a session in the same folder that reads this one and
+    /// carries on, on the runtime's account for new sessions, and open it.
+    @discardableResult
+    func continueInNew(_ agentID: UUID) async -> Bool {
+        guard !isStale else {
+            problem = "Your Mac is not answering, so that could not be sent."
+            return false
+        }
+        do {
+            let id = try await sendOnce(DaemonAPI.Method.agentsContinueInNew,
+                                        DaemonAPI.ContinueInNewRequest(agentID: agentID, requestID: UUID())).decode(UUID.self)
+            await loadWholeAgent(id)
+            selection = id
+            return true
+        } catch let error as JSONRPCError {
+            problem = error.message
+            return false
+        } catch {
+            problem = "That did not reach your Mac."
+            return false
+        }
     }
 
     /// Continue in the project folder (#119): a successor that reads this session and

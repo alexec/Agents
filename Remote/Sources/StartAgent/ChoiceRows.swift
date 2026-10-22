@@ -81,34 +81,41 @@ struct ChoiceRows: View {
         .accessibilityLabel("Runtime, \(model.startRuntime?.runtime.name ?? "none")")
     }
 
+    /// Which of the runtime's accounts the session uses (#840), the organisation's included
+    /// (#999). One the organisation's policy refuses is shown, not chosen.
     private var accountRow: some View {
-        Menu {
-            Button {
-                model.startAccountID = nil
-            } label: {
-                if model.startAccountID == nil { Label(AccountProfile.defaultName, systemImage: "checkmark") }
-                else { Text(AccountProfile.defaultName) }
-            }
-            ForEach(model.startAccounts) { account in
+        let choices = model.startAccountChoices
+        let chosen = choices?.account(for: model.startAccountID)
+        let name = choices?.name(model.startAccountID) ?? AccountProfile.defaultName
+        return Menu {
+            if let mark = choices?.ownSetBy {
+                OrgPolicyMenuItem(name: AccountProfile.defaultName, mark: mark)
+            } else {
                 Button {
-                    model.startAccountID = account.id
+                    model.startAccountID = choices?.ownChoice
                 } label: {
-                    if model.startAccountID == account.id { Label(account.name, systemImage: "checkmark") }
-                    else { Text(account.name) }
-                    Text(account.state)
+                    choiceLabel(AccountProfile.defaultName, chosen: chosen == nil)
+                }
+            }
+            ForEach(choices?.accounts ?? []) { account in
+                if let mark = account.setBy {
+                    OrgPolicyMenuItem(name: account.name, mark: mark)
+                } else {
+                    Button {
+                        model.startAccountID = account.id
+                    } label: {
+                        choiceLabel(account.name, chosen: chosen?.id == account.id)
+                        Text(account.state)
+                    }
                 }
             }
         } label: {
             LabeledContent("Account") {
-                Text(startAccountName).foregroundStyle(.secondary)
+                Text(name).foregroundStyle(.secondary)
             }
             .appText(.reading)
         }
-        .accessibilityLabel("Account, \(startAccountName)")
-    }
-
-    private var startAccountName: String {
-        model.startAccounts.first { $0.id == model.startAccountID }?.name ?? AccountProfile.defaultName
+        .accessibilityLabel("Account, \(name)")
     }
 
     @ViewBuilder

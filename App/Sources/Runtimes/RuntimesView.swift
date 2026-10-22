@@ -30,7 +30,8 @@ struct RuntimesView: View {
                         RuntimeStatusRow(status: status,
                                          allowance: allowance(for: status.id),
                                          at: model.runtimeAllowances?.at ?? Date())
-                        // Each account added to it (#840), under it, with its own allowance.
+                        // Each account added to it (#840), then the organisation's (#999), under
+                        // it, with its own allowance.
                         ForEach(accountRows(for: status.id)) { row in
                             Divider().padding(.leading, 14)
                             RuntimeStatusRow(status: status, allowance: row, at: model.runtimeAllowances?.at ?? Date(),
@@ -87,6 +88,12 @@ private struct RuntimeStatusRow: View {
             VStack(alignment: .leading, spacing: 3) {
                 Text(title ?? status.runtime.name)
                     .fontWeight(.semibold)
+                // An org account says where it is from (spec FR-023), never a key or an address.
+                if allowance?.isOrganisation == true {
+                    Text(OrgAccountWords.fromOrganisation)
+                        .appText(.fine)
+                        .foregroundStyle(.secondary)
+                }
                 Text(line)
                     .appText(.fine)
                     .foregroundStyle(isOut ? StateTint.failure.style(or: .primary) : AnyShapeStyle(.secondary))
@@ -123,7 +130,7 @@ private struct RuntimeStatusRow: View {
         // A runtime the daemon found but nothing can start is that, whatever its plan
         // says. "Available" on a binary that is not here would be true of nothing.
         if let unusable = allowance?.unusable { return "Not usable: \(unusable)" }
-        if let allowance { return allowance.line(now: at) }
+        if let allowance { return allowance.memberLine(now: at) }
         switch status.availability {
         case .available: return "Available · no plan of its own"
         case .missing: return "Not on this Mac"

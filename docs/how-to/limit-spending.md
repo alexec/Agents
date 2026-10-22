@@ -76,6 +76,15 @@ one spent. While a budget is set, a runtime that reports neither a price nor tok
 refused, unless your organisation allows it. See
 [Organisation policy on a machine](../explanation/organisation-policy.md#budgets).
 
+**When a session uses your organisation's key or gateway**
+
+An org account (#999) has no plan, so the **Runtimes** page shows its row as **Organisation ·
+No plan limit**, with its tokens today. The tokens are the provider's own count, which the
+model relay on your machine reads from each answer. A token limit, yours or your
+organisation's, counts these tokens. A cost on an org account is the runtime's own figure at
+its list price ("list price, as Claude reports it"), not what your organisation pays. See
+[org keys and gateways](../reference/runtimes.md#org-keys-and-gateways).
+
 ## If it doesn't work
 
 - **An agent went over its limit.** A limit is checked between turns, so the turn that

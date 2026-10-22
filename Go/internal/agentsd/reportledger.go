@@ -76,6 +76,28 @@ func reportKey(project, runtime, workflow, route string) string {
 	return k
 }
 
+// routeTokensToday is an org account's tokens on this host since the start of today, as the
+// relay counted them (#999, D12): the limit tokens of its runtime's rows for its route, in the
+// UTC hours since local midnight.
+func (d *Daemon) routeTokensToday(runtime, route string, at time.Time) int64 {
+	y, m, day := at.Date()
+	since := utcHour(time.Date(y, m, day, 0, 0, 0, 0, at.Location()))
+	d.reportMu.Lock()
+	defer d.reportMu.Unlock()
+	var sum int64
+	for hour, rows := range d.reportLocked().Hours {
+		if hour < since {
+			continue
+		}
+		for _, row := range rows {
+			if row.Runtime == runtime && row.Route != nil && *row.Route == route && row.LimitTokens != nil {
+				sum += *row.LimitTokens
+			}
+		}
+	}
+	return sum
+}
+
 // reportRoute is the org route of an agent's account (#999), or "".
 func reportRoute(a *wire.Agent) string {
 	if a == nil {

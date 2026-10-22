@@ -20,7 +20,9 @@ import { forCleanup, pageLine, rowWords, tally as worktreeTally, worktreesIntro 
 import { BackToList } from "./BackToList";
 import { Modal } from "./Modal";
 import { folderKey, projectFolder } from "../model/groups";
-import { accountRows, accountState, ownRow, rowTitle, runtimeTally } from "../model/runtimes";
+import { accountChoices, accountRows, accountState, defaultAccountName, isOrgRow, orgAllowanceLine, ownRow, ownSignInID, reachesFoot, reachesTheModelBy, rowTitle, runtimeTally } from "../model/runtimes";
+import { fromOrganisation } from "../model/orgAccounts";
+import { setBy as setByWords } from "../model/orgPolicy";
 import { healthTally, personalEmpty, personalIntro, personalServers } from "../model/hostedMCP";
 import { refusalMessage } from "../model/workflows";
 import { describe } from "../model/errors";
@@ -130,6 +132,32 @@ function AllowanceBar({ reading }: { reading: AllowanceReading }) {
   if (used == null) return null;
   const tone = reading.spent || used >= 1 ? " spent" : reading.nearlySpent || used >= 0.8 ? " nearly-spent" : "";
   return <div class={`allowance-bar${tone}`} aria-hidden="true"><span style={{ width: `${Math.round(used * 100)}%` }} /></div>;
+}
+
+/**
+ * Reaches the Model By (#999, FR-024), on the runtime's row: the account new sessions use. A choice
+ * the organisation's policy refuses is shown, dimmed, with its line, and cannot be chosen.
+ */
+function ReachesTheModelBy({ store, host, runtime }: { store: Store; host: string; runtime: string }) {
+  const [problem, setProblem] = useState<string>();
+  const choices = accountChoices(runtime, store.accountProfiles.value[host] ?? [], store.policyStates.value[host]?.policy);
+  if (!choices.shows) return null;
+  const current = choices.defaultAccount?.id ?? ownSignInID;
+  const refused = (id: string) => (id === ownSignInID ? choices.ownSetBy : choices.accounts.find((a) => a.id === id)?.setBy);
+  const set = (id: string) => {
+    setProblem(undefined);
+    store.setDefaultAccount(host, runtime, id).catch((e: unknown) => setProblem(describe(e)));
+  };
+  return <div class="reaches-by">
+    <label>{reachesTheModelBy}{" "}
+      <select value={current} onChange={(e) => set((e.target as HTMLSelectElement).value)}>
+        <option value={ownSignInID} disabled={!!choices.ownSetBy}>{defaultAccountName}{choices.ownSetBy ? ` (${setByWords})` : ""}</option>
+        {choices.accounts.map((a) => <option key={a.id} value={a.id} disabled={!!a.setBy}>{a.name}{a.setBy ? ` (${setByWords})` : ""}</option>)}
+      </select>
+    </label>
+    <OrgPolicyLine mark={refused(current)} />
+    <p class={problem ? "failure small" : "quiet small"}>{problem ?? reachesFoot}</p>
+  </div>;
 }
 
 /** Add Account on a runtime that keeps its sign-in in a folder (#840): a name, then Add. */
@@ -323,14 +351,20 @@ export function ActivityPageView({ store, page }: { store: Store; page: Activity
                       {allowance?.setupNote && <p class="quiet small">{allowance.setupNote.split("`").map((part, i) => i % 2 ? <code key={i}>{part}</code> : part)}</p>}
                       {isAllowanceOut && allowance && <button onClick={() => void store.markRuntimeAvailable(host.id, allowance.credentialKey)}>Mark available</button>}
                       {status.runtime.accountFolderVariable !== undefined && <AddAccount store={store} host={host.id} runtime={status.runtime.id} />}
+                      <ReachesTheModelBy store={store} host={host.id} runtime={status.runtime.id} />
                     </li>
-                    {/* Each account added to it (#840), under it, with its own allowance. */}
+                    {/* Each account added to it (#840), then the organisation's (#999), under it, with its own allowance. */}
                     {allowanceSet && accountRows(allowanceSet.rows, status.runtime.id).map((row) => {
                       const out = "out" in row.state.status && !row.unusable;
-                      const account = store.addedAccounts(host.id, status.runtime.id).find((a) => a.id === row.accountID);
+                      const org = isOrgRow(row);
+                      // An org account is the organisation's to remove (#999).
+                      const account = org ? undefined : store.addedAccounts(host.id, status.runtime.id).find((a) => a.id === row.accountID);
                       return <li key={row.credentialKey} class={out ? "out" : ""}>
                         <p><span class="strong">{rowTitle(row, status.runtime.name)}</span>{" "}
-                          <span class="quiet small">{row.unusable ? `Not usable: ${row.unusable}` : allowanceLine(row.state)}</span></p>
+                          <span class="quiet small">{row.unusable ? `Not usable: ${row.unusable}`
+                            : org ? orgAllowanceLine(row.state, row.tokensToday, now, runtimeTime, allowanceLine) : allowanceLine(row.state)}</span></p>
+                        {/* Where it is from, never a key or an address (FR-023, FR-026). */}
+                        {org && <p class="quiet small">{fromOrganisation}</p>}
                         {account?.signedInAs !== undefined && <p class="quiet small">{accountState(account)}</p>}
                         {!row.unusable && allowanceReading(row.state, now) && <>
                           <p class="quiet small">{allowanceReading(row.state, now)}</p>

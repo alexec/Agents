@@ -43,7 +43,11 @@ final class AppModel {
     /// prompt, which provider is answering.
     private(set) var accounts: [String: RuntimeAccount] = [:]
     /// The accounts added to this Mac's runtimes (#840), beside each runtime's own sign-in.
-    private(set) var accountProfiles: [AccountProfile] = []
+    private(set) var accountProfiles: [AccountProfile] = [] {
+        didSet { accountProfilesRead = true }
+    }
+    /// Whether the host has listed its accounts yet: until then no session is told its account is gone.
+    private(set) var accountProfilesRead = false
     /// What the terminals the daemon is running for an agent have printed so far. The
     /// kit's, so a phone shows the same (033).
     var terminalOutput: [String: String] { work.terminalOutput }
@@ -803,14 +807,16 @@ final class AppModel {
             Task { await refreshAccountProfiles() }
         }
     }
-    /// The added account the next session uses (#840); nil for the runtime's own sign-in.
-    /// Back to the runtime's own whenever the runtime changes.
+    /// The account the next session uses (#840, #999), as `AccountChoices` keeps a choice:
+    /// nil for the runtime's account for new sessions. Back to that whenever the runtime changes.
     var draftAccountID: String?
-    /// The accounts the draft's runtime offers beyond its own sign-in: this Mac's, so none
-    /// for a project on a server. The picker shows only when there is one.
-    var draftAccounts: [AccountProfile] {
-        guard draftHost == .mac, let runtimeID = draftRuntimeID else { return [] }
-        return accountProfiles.on(runtimeID)
+    /// The accounts the draft's runtime offers beyond its own sign-in, the organisation's
+    /// included: this Mac's, so none for a project on a server. The picker shows only when
+    /// there is one.
+    var draftAccounts: [AccountProfile] { draftAccountChoices?.accounts ?? [] }
+    var draftAccountChoices: AccountChoices? {
+        guard draftHost == .mac, let runtimeID = draftRuntimeID else { return nil }
+        return AccountChoices(runtimeID: runtimeID, profiles: accountProfiles, policy: policyState?.policy)
     }
     /// The kinds of session the draft folder offers (#760): the project's personas and
     /// the home's, as the host lists them.
@@ -4729,7 +4735,7 @@ final class AppModel {
                                              mcpServers: draftServers,
                                              worktree: draftWorktree,
                                              sandbox: draftSandbox, labels: labels, persona: draftPersona,
-                                             accountID: draftAccounts.contains { $0.id == draftAccountID } ? draftAccountID : nil)
+                                             accountID: draftAccountChoices?.sent(draftAccountID))
         // A stopped workspace that starts when used: kept, and shown under this prompt (#691 US3).
         if draftHost != .mac, hosts.isOffline(draftHost), startsWhenUsed(draftHost) {
             var kept = request
@@ -4834,6 +4840,32 @@ final class AppModel {
                 DaemonAPI.Method.agentsContinueInProject,
                 DaemonAPI.ContinueInProjectRequest(agentID: agentID, text: text, attachments: attachments,
                                                    requestID: UUID()),
+                returning: UUID.self)
+        }
+        guard went, let made else { return false }
+        let host = host(ofAgent: agentID)
+        if host == .mac { await refreshAgents() } else { await refreshServer(host) }
+        selection = made
+        return true
+    }
+
+    /// Why a session on this Mac can no longer reach the model on its account (#999): the
+    /// organisation removed it, or its policy refuses it now. Nil when it can.
+    func accountMoveReason(_ agent: Agent) -> String? {
+        guard host(ofAgent: agent.id) == .mac, agent.state != .archived else { return nil }
+        return AccountChoices(runtimeID: agent.runtimeID, profiles: accountProfiles, policy: policyState?.policy)
+            .moveReason(accountID: agent.accountID, loaded: accountProfilesRead)
+    }
+
+    /// **Continue in New** (#999): a session in the same folder that reads this one and
+    /// carries on, on the runtime's account for new sessions, and open it.
+    @discardableResult
+    func continueInNew(_ agentID: UUID) async -> Bool {
+        var made: UUID?
+        let went = await attempt(on: host(ofAgent: agentID)) {
+            made = try await self.client(forAgent: agentID).call(
+                DaemonAPI.Method.agentsContinueInNew,
+                DaemonAPI.ContinueInNewRequest(agentID: agentID, requestID: UUID()),
                 returning: UUID.self)
         }
         guard went, let made else { return false }
@@ -5034,6 +5066,21 @@ final class AppModel {
         await refreshAccountProfiles()
         await refreshRuntimeAllowances()
         await refreshAgents()
+    }
+
+    /// **Reaches the Model By** (#999): the runtime's account for new sessions, nil for its own
+    /// sign-in. Nil when it was set; else why not.
+    func setDefaultAccount(runtimeID: String, accountID: String?) async -> String? {
+        do {
+            _ = try await macClient.call(DaemonAPI.Method.runtimesSetDefaultAccount,
+                                         DaemonAPI.DefaultAccountRequest(runtimeID: runtimeID,
+                                                                         accountID: accountID ?? AccountProfile.ownSignInID),
+                                         returning: DaemonAPI.Empty.self)
+            await refreshAccountProfiles()
+            return nil
+        } catch {
+            return describe(error)
+        }
     }
 
     /// The agents an added account is running, which removing it stops.

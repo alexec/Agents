@@ -208,6 +208,10 @@ func (d *Daemon) runtimeAllowances() wire.RuntimeAllowances {
 		rt := runtimeOf(out.Rows[i].CredentialKey)
 		if p, ok := profiles[out.Rows[i].CredentialKey]; ok {
 			out.Rows[i].Unusable = d.accountUnusable(p, installed)
+			// An org account has no plan reading: its tokens today instead (#999, FR-025).
+			if route := accountRoute(&p); route != "" {
+				out.Rows[i].TokensToday = new(d.routeTokensToday(p.RuntimeID, route, time.Now()))
+			}
 			continue
 		}
 		out.Rows[i].Unusable = d.unusable(rt, installed)

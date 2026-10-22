@@ -5,7 +5,9 @@ import SwiftUI
 /// when it is next checked, and what is left of its plan. The Mac's Agent Runtimes
 /// words, as a list. Mark available is a swipe action.
 /// An account added to a runtime (#840) is its own row; Add Account is in the toolbar and
-/// Remove is a swipe. Signing one in is done on the Mac.
+/// Remove is a swipe. Signing one in is done on the Mac. An org account (#999) is a row too,
+/// which only the organisation removes, and a runtime with accounts has **Reaches the Model
+/// By** under its own row.
 struct RuntimesView: View {
     @Environment(RemoteModel.self) private var model
 
@@ -13,7 +15,12 @@ struct RuntimesView: View {
         List {
             if let allowances = model.runtimeAllowances {
                 ForEach(allowances.rows) { row in
-                    RuntimeAllowanceRow(row: row, at: allowances.at, setBy: setBy(of: row))
+                    VStack(alignment: .leading, spacing: 6) {
+                        RuntimeAllowanceRow(row: row, at: allowances.at, setBy: setBy(of: row))
+                        if row.accountID == nil, let choices = choices(of: row), choices.shows {
+                            ReachesTheModelByMenu(choices: choices)
+                        }
+                    }
                         .swipeActions {
                             if row.state.isOut {
                                 Button("Mark available") { Task { await model.markRuntimeAvailable(row.credentialKey) } }
@@ -38,7 +45,7 @@ struct RuntimesView: View {
                     }
                 }
             }
-            if !model.accountProfiles.isEmpty {
+            if model.accountProfiles.contains(where: { !$0.isOrganisation }) {
                 Section {} footer: {
                     Text("Sign in to an added account on the Mac, in its runtime’s sign-in sheet.")
                 }
@@ -90,10 +97,12 @@ struct RuntimesView: View {
         }
         .task {
             await model.refreshRuntimeAllowances()
+            await model.refreshAccountProfiles()
             await model.refreshPassThrough()
         }
         .refreshable {
             await model.refreshRuntimeAllowances()
+            await model.refreshAccountProfiles()
             await model.refreshPassThrough()
         }
         .alert("Not added", isPresented: Binding(get: { addProblem != nil }, set: { if !$0 { addProblem = nil } })) {
@@ -119,8 +128,63 @@ struct RuntimesView: View {
         return model.runtimes.first { $0.id == runtimeID }?.setBy
     }
 
+    /// The account a row is for, when the person may remove it: not an org account.
     private func account(of row: RuntimeAllowances.Row) -> AccountProfile? {
-        row.accountID.flatMap { id in model.accountProfiles.first { $0.id == id } }
+        row.accountID.flatMap { id in model.accountProfiles.first { $0.id == id && !$0.isOrganisation } }
+    }
+
+    /// The accounts of the row's runtime, for **Reaches the Model By** (#999).
+    private func choices(of row: RuntimeAllowances.Row) -> AccountChoices? {
+        guard !row.credentialKey.contains(":account:") else { return nil }
+        return AccountChoices(runtimeID: row.runtimeID, profiles: model.accountProfiles, policy: model.policyState?.policy)
+    }
+}
+
+/// The runtime's account for new sessions (#999, spec FR-024), as the Mac's sign-in sheet
+/// has it: a choice the organisation's policy refuses is shown, not chosen.
+private struct ReachesTheModelByMenu: View {
+    @Environment(RemoteModel.self) private var model
+    let choices: AccountChoices
+    @State private var problem: String?
+
+    var body: some View {
+        let current = choices.defaultAccount
+        Menu {
+            if let mark = choices.ownSetBy {
+                OrgPolicyMenuItem(name: AccountProfile.defaultName, mark: mark)
+            } else {
+                Button { set(nil) } label: { label(AccountProfile.defaultName, chosen: current == nil) }
+            }
+            ForEach(choices.accounts) { account in
+                if let mark = account.setBy {
+                    OrgPolicyMenuItem(name: account.name, mark: mark)
+                } else {
+                    Button { set(account.id) } label: {
+                        label(account.name, chosen: current?.id == account.id)
+                        if account.isOrganisation { Text(account.state) }
+                    }
+                }
+            }
+        } label: {
+            LabeledContent(OrgAccountWords.reachesTheModelBy) {
+                Text(current?.name ?? AccountProfile.defaultName).foregroundStyle(.secondary)
+            }
+            .appText(.fine)
+        }
+        .accessibilityLabel("\(OrgAccountWords.reachesTheModelBy), \(current?.name ?? AccountProfile.defaultName)")
+        .alert("Not changed", isPresented: Binding(get: { problem != nil }, set: { if !$0 { problem = nil } })) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(problem ?? "")
+        }
+    }
+
+    @ViewBuilder private func label(_ title: String, chosen: Bool) -> some View {
+        if chosen { Label(title, systemImage: "checkmark") } else { Text(title) }
+    }
+
+    private func set(_ accountID: String?) {
+        Task { problem = await model.setDefaultAccount(runtimeID: choices.runtimeID, accountID: accountID) }
     }
 }
 
@@ -134,7 +198,11 @@ private struct RuntimeAllowanceRow: View {
             Text(row.title).fontWeight(.semibold)
                 .foregroundStyle(setBy == nil ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary))
             if let setBy { OrgPolicyLine(mark: setBy) }
-            Text(row.unusable.map { "Not usable: \($0)" } ?? row.line(now: at))
+            // An org account says where it is from (spec FR-023), never a key or an address.
+            if row.isOrganisation {
+                Text(OrgAccountWords.fromOrganisation).appText(.fine).foregroundStyle(.secondary)
+            }
+            Text(row.unusable.map { "Not usable: \($0)" } ?? row.memberLine(now: at))
                 .appText(.fine)
                 .foregroundStyle(row.state.isOut ? StateTint.failure.style(or: .primary) : AnyShapeStyle(.secondary))
             if row.unusable == nil, let reading = PoolWords.reading(row.state.reading, now: at) {

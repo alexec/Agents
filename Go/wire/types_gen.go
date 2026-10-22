@@ -2081,6 +2081,16 @@ type ContentBlockAnnotations struct {
 	Priority *float64 `json:"priority,omitzero"`
 }
 
+// agents/continueInNew (#999): a new session in the same folder that reads this one and carries on, on another account of its runtime.
+type ContinueInNewRequest struct {
+	AgentID UUID `json:"agentID"`
+
+	// The account the new session uses: an added account, an org account (org:<route id>) or default for the runtime's own sign-in. Absent: the runtime's account for new sessions (Reaches the Model By).
+	AccountID *string `json:"accountID,omitzero"`
+
+	RequestID *UUID `json:"requestID,omitzero"`
+}
+
 type ContinueInProjectRequest struct {
 	AgentID UUID `json:"agentID"`
 
@@ -6815,11 +6825,14 @@ type RuntimeAllowancesRow struct {
 	// Something one of the runtime's features needs on this host and lacks, with the step that fixes it (#1946). Only on the runtime's own sign-in row.
 	SetupNote *string `json:"setupNote,omitzero"`
 
-	// The added account this row is for (#840); absent for the runtime's own sign-in.
+	// The added account this row is for (#840), or an org account (org:<route id>, #999); absent for the runtime's own sign-in.
 	AccountID *string `json:"accountID,omitzero"`
 
 	// That account's name.
 	AccountName *string `json:"accountName,omitzero"`
+
+	// An org account's tokens today on this host, as its model relay counted them from the provider's answers (#999, D12): fresh input, cache writes and output. Only on an org account's row.
+	TokensToday *int64 `json:"tokensToday,omitzero"`
 }
 
 type RuntimeAssessmentCheck struct {

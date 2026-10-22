@@ -55,7 +55,7 @@ try {
   await page.eval(`(() => { const s = document.querySelector("select[aria-label=Runtime]"); s.value = "claude"; s.dispatchEvent(new Event("change", { bubbles: true })); })()`);
   await page.waitFor(`document.querySelector("select[aria-label=Account]")`, 10_000);
   const choices = await page.eval(`[...document.querySelector("select[aria-label=Account]").options].map((o) => o.textContent)`);
-  check(JSON.stringify(choices) === JSON.stringify(["Default account", "Work (not signed in)"]), `the Account choices: ${JSON.stringify(choices)}`);
+  check(JSON.stringify(choices) === JSON.stringify(["Your Own Sign-In", "Work (not signed in)"]), `the Account choices: ${JSON.stringify(choices)}`);
   await page.shot(`${out}/web-3-new-session.png`);
   const errors = page.errors ?? [];
   check(errors.length === 0, `no errors on the page: ${JSON.stringify(errors)}`);

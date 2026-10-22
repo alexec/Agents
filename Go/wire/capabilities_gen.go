@@ -123,6 +123,7 @@ var HostCapabilities = pairs([][2]string{
 	{"agents/archive", "agents/1"},
 	{"agents/branchFrom", "chat.branch/1"},
 	{"agents/cancelContinue", "chat.continue-when-back/1"},
+	{"agents/continueInNew", "host.org-routes/1"},
 	{"agents/continueInProject", "agents/1"},
 	{"agents/continueWhenBack", "chat.continue-when-back/1"},
 	{"agents/delete", "agents/1"},
