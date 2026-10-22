@@ -102,6 +102,12 @@ var own = methodSet(
 	"links/list",
 	"links/remove",
 	"links/requests",
+	"orgRoutes/check",
+	"orgRoutes/list",
+	"orgRoutes/mine",
+	"orgRoutes/remove",
+	"orgRoutes/replaceKey",
+	"orgRoutes/set",
 	"people/invite",
 	"people/list",
 	"people/remove",
@@ -182,6 +188,9 @@ var writes = methodSet(
 	"links/approve",
 	"links/deny",
 	"links/remove",
+	"orgRoutes/remove",
+	"orgRoutes/replaceKey",
+	"orgRoutes/set",
 	"people/invite",
 	"people/remove",
 	"people/setRole",
@@ -254,6 +263,8 @@ func (m *Methods) Handle(method string, params json.RawMessage, from Caller) (an
 		return m.botsMethod(ctx, method, params, from)
 	case "policy/get", "policy/mine", "policy/set", "policy/stopAll", "policy/raise":
 		return m.policyMethod(ctx, method, params, from)
+	case "orgRoutes/mine", "orgRoutes/list", "orgRoutes/set", "orgRoutes/replaceKey", "orgRoutes/check", "orgRoutes/remove":
+		return m.orgRoutesMethod(ctx, method, params, from)
 	case "links/list", "links/requests", "links/approve", "links/deny", "links/remove":
 		return m.linksMethod(ctx, method, params, from)
 	case "signIn/providers", "signIn/pair", "signIn/addToMe", "signIn/removeFromMe", "signIn/configure",
@@ -576,15 +587,21 @@ func (m *Methods) hostList(from Caller) []wire.ControlHost {
 // removeHost takes a machine off the control plane: hosts/remove, or with its person.
 func (m *Methods) removeHost(ctx context.Context, host string, from Caller) (bool, error) {
 	owner, name := m.s.ownerOf(host), host
-	if h := m.records.Host(host); h != nil && h.Name != "" {
-		name = h.Name
+	var held []wire.OrgRouteVersion
+	if h := m.records.Host(host); h != nil {
+		if h.Name != "" {
+			name = h.Name
+		}
+		held = appliedOrgRoutes(*h)
 	}
 	gone, err := m.records.RemoveHost(ctx, host)
 	if err != nil || !gone {
 		return gone, err
 	}
-	// No more secrets go to it, and its person hears which it had (FR-026).
+	// No more secrets go to it, and its person hears which it had (FR-026); its person
+	// and the admins hear which org routes it held (#999).
 	defer m.s.machineLeft(host, owner, name)
+	defer m.s.orgRoutesLeft(host, owner, name, held)
 	m.router.ForgetHost(host)
 	m.s.copies.forget(host)
 	if m.s.providers != nil && m.s.providers.Kept() != nil {
@@ -900,6 +917,15 @@ func (m *Methods) HostSaid(host, method string, params json.RawMessage) (any, er
 			return nil, err
 		}
 		return map[string]any{}, m.s.policyApplied(ctx, host, applied)
+	case "host/orgRoutesApplied":
+		applied, err := require[wire.OrgRoutesApplied](params, "OrgRoutesApplied")
+		if err != nil {
+			return nil, err
+		}
+		return map[string]any{}, m.s.orgRoutesApplied(ctx, host, applied)
+	case "host/orgRoutesAgain":
+		m.s.orgRoutesAgain(host)
+		return map[string]any{}, nil
 	case "attention/turn":
 		turn, err := require[wire.AttentionTurn](params, "AttentionTurn")
 		if err != nil {
@@ -1076,6 +1102,8 @@ func (m *Methods) hello(ctx context.Context, host string, hello wire.HostHello) 
 	go m.s.sendUserSettings(host, true)
 	// The organisation's policy, or none, at every join (#998, FR-006).
 	go m.s.sendPolicy(host, true)
+	// The organisation's routes it may use, or none, at every join (#999, FR-005).
+	go m.s.sendOrgRoutes(host, true)
 	// Its user, their kind and labels (#1761); a bot's cap is weighed again.
 	go func() {
 		m.s.sendHostUser(host)

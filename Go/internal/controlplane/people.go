@@ -454,6 +454,8 @@ func (s *Service) peopleChanged(user string, removed bool) {
 	// A bot made, renamed or removed changes which bots' workflows each person's machine
 	// hears (#2027).
 	s.tellPeoplesMachines()
+	// A person removed may use no org route (#999).
+	s.resendOrgRoutes()
 	s.announce("peopleChanged", user, "")
 }
 

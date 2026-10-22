@@ -83,6 +83,23 @@ func New(s store.Store, keeper *secrets.Keeper, keeperURL string) *Book {
 // Sealing says whether this book can keep secrets.
 func (b *Book) Sealing() bool { return b != nil && b.keeper != nil }
 
+// SealFor seals a value with this book's keeper, bound to the store key it is kept at. The
+// organisation's route secrets (#999) are sealed with the same keeper as a person's.
+func (b *Book) SealFor(ctx context.Context, plaintext, boundTo []byte) (*kms.Sealed, error) {
+	if !b.Sealing() {
+		return nil, ErrNoSealing
+	}
+	return kms.SealFor(ctx, b.keeper, b.keeperURL, plaintext, boundTo)
+}
+
+// OpenFor opens what SealFor sealed for the same store key.
+func (b *Book) OpenFor(ctx context.Context, sealed *kms.Sealed, boundTo []byte) ([]byte, error) {
+	if !b.Sealing() {
+		return nil, ErrNoSealing
+	}
+	return kms.OpenFor(ctx, b.keeper, sealed, boundTo)
+}
+
 func settingsKey(user string) string { return Prefix + user + "/settings.json" }
 func secretsPrefix(user string) string {
 	return Prefix + user + "/secrets/"

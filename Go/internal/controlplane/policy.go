@@ -250,6 +250,12 @@ func checkPolicy(p wire.OrgPolicy) error {
 		if err := checkNames("models of "+id, rule.Models, true); err != nil {
 			return err
 		}
+		if err := checkReach(id, rule.Reach); err != nil {
+			return err
+		}
+	}
+	if n := p.Notices; n != nil && n.AntigravityTerms != nil && !slices.Contains(antigravityTerms, *n.AntigravityTerms) {
+		return fail(invalidParams, "Antigravity's terms are %s.", strings.Join(antigravityTerms, ", "))
 	}
 	if p.Marketplaces != nil {
 		if err := checkNames("marketplaces", p.Marketplaces.Allowed, false); err != nil {
@@ -286,6 +292,32 @@ func checkPolicy(p wire.OrgPolicy) error {
 				return fail(invalidParams, "%q is not a variable name (letters, digits and _, with * at the end allowed).", name)
 			}
 		}
+	}
+	return nil
+}
+
+// antigravityTerms are notices.antigravityTerms' values (#999, spec D10).
+var antigravityTerms = []string{"show", "accepted", "refuse"}
+
+// checkReach bounds runtimes.<id>.reach (#999, FR-008): each way once, at least one.
+func checkReach(id string, reach []wire.PolicyReach) error {
+	if reach == nil {
+		return nil
+	}
+	if len(reach) == 0 {
+		return fail(invalidParams, "Allow %s at least one way to the model, or leave its ways out.", id)
+	}
+	seen := map[wire.PolicyReach]bool{}
+	for _, way := range reach {
+		switch way {
+		case wire.PolicyReachSignIn, wire.PolicyReachOrgKey, wire.PolicyReachGateway:
+		default:
+			return fail(invalidParams, "%q is not a way to the model: signIn, orgKey or gateway.", way)
+		}
+		if seen[way] {
+			return fail(invalidParams, "%s names %s twice.", id, way)
+		}
+		seen[way] = true
 	}
 	return nil
 }
@@ -417,10 +449,18 @@ func encodePolicy(p wire.OrgPolicy) ([]byte, error) {
 	return controllink.CanonicalJSON(b)
 }
 
-// policyRequires is what a machine needs to follow p: host.policy/1 for every rule today.
-// A later rule adds its own capability here (FR-014, FR-030).
+// policyRequires is what a machine needs to follow p: host.policy/1 for every rule, and
+// host.org-routes/1 for a reach rule or Antigravity's terms (FR-014, FR-030; #999 FR-008).
 func policyRequires(p wire.OrgPolicy) []string {
-	return []string{CapHostPolicy}
+	out := []string{CapHostPolicy}
+	routes := p.Notices != nil && p.Notices.AntigravityTerms != nil
+	for _, rule := range p.Runtimes {
+		routes = routes || rule.Reach != nil
+	}
+	if routes {
+		out = append(out, CapHostOrgRoutes)
+	}
+	return out
 }
 
 // currentRaises drops the raises of days before today (UTC): each is for one day.
