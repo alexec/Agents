@@ -61,7 +61,8 @@ public final class SidebarFolds {
         /// The pinned sessions (#180).
         case pinned
         case workflows
-        /// A project's flat list of sessions (#495), the rows' fold in their ids.
+        /// A project's sessions (#495): the rows' fold in their ids, and the Sessions row's
+        /// fold (#2312), open until closed.
         case sessions
         /// One of the smart rows at the sidebar's top (#495), across every project.
         case smart(SidebarSmartRow)

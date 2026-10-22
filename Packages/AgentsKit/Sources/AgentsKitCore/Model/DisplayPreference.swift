@@ -24,6 +24,10 @@ public enum DisplayPreference {
     /// unless they turn it off; the host reads it when such a turn ends.
     public static let agentsMayArchiveMyChats = "agentsMayArchiveMyChats"
     public static let agentsMayArchiveMyChatsDefault = true
+    /// Whether a project's sessions go under a folding Sessions row, as its workflows go
+    /// under Workflows (#2312). On unless the person turns it off; off, the flat list (#495).
+    public static let groupsSessions = "sidebarGroupsSessions"
+    public static let groupsSessionsDefault = true
 
     /// The ones kept as a plain value in a client's defaults, and the kind of each.
     public enum Kind: Sendable { case bool, string }
@@ -31,6 +35,6 @@ public enum DisplayPreference {
         smartGroupsOff: .string,
         showsArchivedProjects: .bool, showsActivity: .bool, showsUsage: .bool,
         startRuntimeID: .string, skillsMarketplace: .string, mcpMarketplace: .string,
-        agentsMayArchiveMyChats: .bool,
+        agentsMayArchiveMyChats: .bool, groupsSessions: .bool,
     ]
 }

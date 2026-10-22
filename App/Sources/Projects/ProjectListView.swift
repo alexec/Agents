@@ -458,6 +458,9 @@ struct ProjectFold: View {
     @Environment(AppModel.self) private var model
     @Environment(\.openWindow) private var openWindow
     @AppStorage(SidebarSmartRow.offDefaultsKey, store: WindowDefaults.store) private var smartOff = SidebarSmartRow.offAtFirst
+    /// Settings ▸ Sidebar: the sessions under a Sessions row (#2312), kept on the host.
+    @AppStorage(DisplayPreference.groupsSessions, store: WindowDefaults.store)
+    private var groupsSessions = DisplayPreference.groupsSessionsDefault
     @Environment(WindowRequests.self) private var requests
     let summary: DaemonAPI.ProjectSummary
     let folds: SidebarFolds
@@ -495,9 +498,20 @@ struct ProjectFold: View {
                 // Its pinned sessions and workflows are in Pinned at the top (#495).
                 // Then every other live session, newest first, its state a mark on the
                 // row rather than a heading over it (#495). Each under the session that
-                // started it, folded (#835).
-                ForEach(FoldedRow.rows(SidebarTree.rows(fold.sessions, in: model.work, folds: folds), in: .sessions)) { row in
-                    SessionSidebarRow(agent: row.item.agent, tree: row.item, folds: folds)
+                // started it, folded (#835). Under a Sessions row, as the workflows are
+                // under theirs (#2312), unless Settings ▸ Sidebar turns it off; not in a
+                // project's own window, whose group is headed Sessions already.
+                let grouped = groupsSessions && !inWindow && !fold.sessions.isEmpty
+                let sessionsOpen = !grouped || fold.isSearching || folds.isOpen(key, .sessions)
+                if grouped {
+                    SidebarFoldRow(title: "Sessions", count: fold.sessions.count, isOpen: Binding(
+                        get: { sessionsOpen },
+                        set: { folds.set(key, .sessions, open: $0) }))
+                }
+                // A closed fold has no rows at all (#237).
+                ForEach(FoldedRow.rows(sessionsOpen ? SidebarTree.rows(fold.sessions, in: model.work, folds: folds) : [],
+                                       in: .sessions)) { row in
+                    SessionSidebarRow(agent: row.item.agent, tree: row.item, folds: folds, isNested: grouped)
                 }
                 // Then its workflows, after the sessions (Alex, #495), in a Workflows fold
                 // of their own, one level in, as a mailbox's sub-mailboxes in Mail (#885).
@@ -638,12 +652,15 @@ struct SessionSidebarRow: View {
     /// Where it sits in its list's tree (#835), and the folds that keep a parent's.
     var tree: SidebarTree.Row? = nil
     var folds: SidebarFolds? = nil
+    /// In its project's Sessions fold: one level in, under the word Sessions (#2312).
+    var isNested = false
 
     var body: some View {
         AgentRow(agent: agent, isCompact: true, place: place, tree: tree) {
             guard let tree else { return }
             folds?.set(session: agent.id, open: !tree.isUnfolded)
         }
+            .padding(.leading, isNested ? 22 : 0)
             .padding(.vertical, 2)
             .listRowInsets(.vertical, 2)
             .sidebarInk(.session(agent.id))

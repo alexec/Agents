@@ -15,12 +15,18 @@ struct SidebarSessionRow: View {
     /// child one indent in, as on the Mac.
     private let tree: SidebarTree.Row?
     private let folds: SidebarFolds?
+    /// In its project's Sessions fold: one level in, under the word Sessions (#2312).
+    private let isNested: Bool
+    /// The mark's well and the gap after it, as the Workflows fold's rows have them (#750).
+    @ScaledMetric private var scale: CGFloat = 1
 
-    init(agent: Agent, place: String? = nil, tree: SidebarTree.Row? = nil, folds: SidebarFolds? = nil) {
+    init(agent: Agent, place: String? = nil, tree: SidebarTree.Row? = nil, folds: SidebarFolds? = nil,
+         isNested: Bool = false) {
         given = agent
         self.place = place
         self.tree = tree
         self.folds = folds
+        self.isNested = isNested
     }
 
     /// The session whose mark the row shows: its own, or for a folded parent the most
@@ -154,8 +160,9 @@ struct SidebarSessionRow: View {
             // When it last did anything, as the page's row has it (#341).
             ActivityTime(date: agent.lastActivityAt)
         }
-        // A child one indent in, under the mark's column (#835).
-        .padding(.leading, tree?.isChild == true ? 26 : 0)
+        // A child one indent in, under the mark's column (#835); in a Sessions fold, one
+        // more (#2312).
+        .padding(.leading, (tree?.isChild == true ? 26 : 0) + (isNested ? 20 * scale + 10 : 0))
         // Last known, not current: its host is not answering.
         .opacity(model.isStale(agent) ? 0.55 : 1)
         .accessibilityElement(children: .combine)

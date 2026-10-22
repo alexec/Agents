@@ -14,6 +14,7 @@ export const preferenceKeys = {
   startRuntimeID: "startRuntimeID",
   startChoices: "startChoices",
   agentsMayArchiveMyChats: "agentsMayArchiveMyChats",
+  groupsSessions: "sidebarGroupsSessions",
 } as const;
 
 /** The Mac's map, as last heard; empty until it is, which is every choice at its default. */
