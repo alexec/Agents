@@ -7,7 +7,10 @@
 #   deploy/make-secrets.sh --public --kms projects/P/locations/L/keyRings/R/cryptoKeys/K
 #   AGENTS_HOSTED_DOMAIN=agentloops.dev AGENTS_HOSTED_ACCOUNTS_DOMAIN=cp.agentloops.dev \
 #       AGENTS_HOSTED_GITHUB_SECRET=… ACME_EMAIL=you@example.com \
-#       docker compose -f deploy/compose.hosted.yaml up -d --build
+#       docker compose -f deploy/compose.hosted.yaml up -d
+#
+# The image is the release's, ghcr.io/alexec/agents-control:${AGENTS_VERSION:-latest} (#2140);
+# `docker compose … pull` gets a new one, and `up -d --build` builds it from this checkout.
 #
 # DNS: AGENTS_HOSTED_DOMAIN and *.AGENTS_HOSTED_ACCOUNTS_DOMAIN point at this machine, with
 # ports 80 and 443 open. The GitHub App's callback URL is
@@ -23,7 +26,7 @@ services:
       dockerfile: deploy/Containerfile
       args:
         VERSION: ${AGENTS_VERSION:-dev}
-    image: agents-control:latest
+    image: ghcr.io/alexec/agents-control:${AGENTS_VERSION:-latest}
     restart: unless-stopped
     entrypoint: ["/agents-hosted"]
     command: ["serve"]

@@ -16,6 +16,11 @@ publishes a release. The tag starts the `release` workflow, which:
   mount a disk image;
 - builds the static Linux agentsd (Go) as `agentsd-linux-<arch>-<version>.tar.gz`;
 - creates the release with these files and a `SHA256SUMS`;
+- in its `image` job, builds the control plane's image for `linux/amd64` and `linux/arm64`
+  and pushes it to `ghcr.io/alexec/agents-control` as `<version>`, `<major>.<minor>` and
+  `latest`, with an SBOM and provenance, and signs it with cosign, keyless (#2140). It uses
+  the workflow's own token: no secret to set. The release is not published unless the image
+  pushed;
 - in its `testflight` job, archives the Mac window and the Remote (one Universal app),
   checks both archives with `scripts/check-store-archive.sh`, uploads them to TestFlight
   and waits until App Store Connect has processed both. Nothing goes to App Review.

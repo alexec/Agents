@@ -4,11 +4,17 @@
 # too (#1459), for a browser anywhere, and its MCP Apps views at a second name (#1484). The how-to is
 # docs/how-to/run-the-control-plane-in-the-cloud.md.
 #
-#   scripts/build-linux-agentsd.sh               # the Linux host, handed to servers that join
 #   deploy/make-secrets.sh --public --kms projects/P/locations/L/keyRings/R/cryptoKeys/K \
 #       [--service-account sa.json] [--apns AuthKey_KEYID.p8]
-#   AGENTS_DOMAIN=agents.example.com AGENTS_VIEWS_DOMAIN=views.example.com \
-#       ACME_EMAIL=you@example.com docker compose -f deploy/compose.public.yaml up -d --build
+#   export AGENTS_DOMAIN=agents.example.com AGENTS_VIEWS_DOMAIN=views.example.com \
+#       ACME_EMAIL=you@example.com AGENTS_VERSION=0.11.0
+#   docker compose -f deploy/compose.public.yaml pull
+#   docker compose -f deploy/compose.public.yaml up -d
+#
+# The image is the release's, from ghcr.io/alexec/agents-control (#2140): AGENTS_VERSION is
+# its tag (X.Y.Z, X.Y or latest). It carries this file, the Linux host it hands to servers that
+# join and the runtimes' toolsets, so nothing else is downloaded. To run a commit no release
+# has, build it from the repository instead: `up -d --build`.
 #
 # AGENTS_DOMAIN and AGENTS_VIEWS_DOMAIN must already point at this machine, with ports 80 and
 # 443 open to the internet. The variables may also go in deploy/.env.
@@ -28,11 +34,12 @@ services:
     build:
       context: ..
       dockerfile: deploy/Containerfile
-      # The version Settings ▸ Control plane shows (#1498): git describe, as deploy/gcp/up.sh
-      # gives it. Unset, it is "dev".
+      # The version Settings ▸ Control plane shows (#1498), for a build from source:
+      # scripts/version.sh, as deploy/gcp/up.sh --build gives it. Unset, it is "dev".
       args:
         VERSION: ${AGENTS_VERSION:-dev}
-    image: agents-control:latest
+    # The release's image (#2140); `up --build` builds it here in its place.
+    image: ghcr.io/alexec/agents-control:${AGENTS_VERSION:-latest}
     restart: unless-stopped
     environment:
       # A folder in the data volume, or the bucket Agents Host already uses (s3://bucket/prefix),
@@ -67,13 +74,11 @@ services:
       AGENTS_APNS_KEY_ID: ${AGENTS_APNS_KEY_ID:-}
       AGENTS_APNS_TEAM_ID: ${AGENTS_APNS_TEAM_ID:-}
     secrets: [gcp-service-account, apns-key]
+    # The Linux host (/servers, served at /v1/servers/… to servers joining with the install
+    # command) and the runtimes' toolsets (/toolsets, at /v1/toolsets/…, so a server that joins
+    # installs Claude by itself, #1312) are in the image, of its version (#2140).
     volumes:
       - data:/data
-      # The Linux host, served at /v1/servers/… to servers joining with the install command.
-      - ../App/Resources/servers:/servers:ro
-      # The runtimes' toolsets, served at /v1/toolsets/…, so a server that joins installs
-      # Claude by itself (#1312). Without them it gets no Claude (#1461's walk).
-      - ../App/Resources/toolsets:/toolsets:ro
 
   caddy:
     image: caddy:2
