@@ -304,7 +304,10 @@ func TestEveryRuleAtEveryPath(t *testing.T) {
 			return call("agents/prompt", map[string]any{"agentID": gemini.ID, "text": "go on"})
 		}},
 		{"Continue in New: a runtime not allowed", "runtimes", func() *Error {
-			return asError(func() error { _, err := d.continueInProject(wire.ContinueInProjectRequest{AgentID: gemini.ID}); return err }())
+			return asError(func() error {
+				_, err := d.continueInProject(wire.ContinueInProjectRequest{AgentID: gemini.ID})
+				return err
+			}())
 		}},
 		{"Branch: a runtime not allowed", "runtimes", func() *Error {
 			return asError(func() error { _, err := d.fork(d.ctx, gemini.ID); return err }())
@@ -454,7 +457,9 @@ func TestARunningAgentMeetsANewPolicyAtItsNextTurn(t *testing.T) {
 	if v := stringValue(d.Store.Agent(id).StartOptions.Values["mode"]); v != "acceptEdits" {
 		t.Fatalf("mode %s", v)
 	}
-	if !slices.ContainsFunc(notes(d, id), func(s string) bool { return strings.HasPrefix(s, "The mode is now acceptEdits, not bypassPermissions.") }) {
+	if !slices.ContainsFunc(notes(d, id), func(s string) bool {
+		return strings.HasPrefix(s, "The mode is now acceptEdits, not bypassPermissions.")
+	}) {
 		t.Fatal(notes(d, id))
 	}
 	waitFor(t, "the end", func() bool { a := d.Store.Agent(id); return a.State == wire.AgentStateFinished })
@@ -542,6 +547,56 @@ func TestTheRuntimesOwnModelIsCheckedBeforeTheFirstTurn(t *testing.T) {
 	})
 	if len(userMessages(d, id)) != 0 || len(d.Store.Agent(id).QueuedPrompts) != 1 {
 		t.Fatal("the first turn went on a refused model")
+	}
+}
+
+// #2274: Claude's model values are aliases (sonnet, opus[1m], default), so a pattern is
+// matched with the value, the value without its context suffix, the model id that the
+// option's name says (Sonnet 5 is claude-sonnet-5) and the family (claude-sonnet).
+func TestAModelPatternMatchesTheAliasAndTheModelItIs(t *testing.T) {
+	// The Claude adapter's model option, as it says it (specs/052-quota-fallback/walk).
+	claude := []wire.ConfigOption{{ID: "model", Name: "Model", Category: new("model"), Type: "select",
+		CurrentValue: json.RawMessage(`"default"`), Options: json.RawMessage(`[
+		{"value":"default","name":"Default (recommended)","description":"Opus (1M context)"},
+		{"value":"opus[1m]","name":"Opus 5.5","description":"Opus 5.5 with 1M context"},
+		{"value":"claude-fable-5-1[1m]","name":"Fable 5.1","description":"Fable 5.1"},
+		{"value":"sonnet","name":"Sonnet 5","description":"Sonnet 5"},
+		{"value":"haiku","name":"Haiku 4.5","description":"Haiku 4.5"}]`)}}
+	d := &Daemon{}
+	rows := []struct {
+		runtime  string
+		patterns []string
+		options  []wire.ConfigOption
+		allowed  []string
+		refused  []string
+	}{
+		{"claude", []string{"claude-sonnet-*"}, claude, []string{"sonnet"}, []string{"default", "opus[1m]", "claude-fable-5-1[1m]", "haiku"}},
+		{"claude", []string{"claude-opus-*"}, claude, []string{"default", "opus[1m]"}, []string{"sonnet", "haiku", "claude-fable-5-1[1m]"}},
+		{"claude", []string{"claude-sonnet-5*", "claude-haiku-4-5*"}, claude, []string{"sonnet", "haiku"}, []string{"default", "opus[1m]"}},
+		{"claude", []string{"claude-sonnet-4*"}, claude, nil, []string{"sonnet"}},
+		{"claude", []string{"claude-fable-5-1"}, claude, []string{"claude-fable-5-1[1m]"}, []string{"opus[1m]"}},
+		{"claude", []string{"claude-opus-5-5"}, claude, []string{"opus[1m]", "default"}, []string{"sonnet"}},
+		{"claude", []string{"sonnet", "opus[1m]"}, claude, []string{"sonnet", "opus[1m]", "default"}, []string{"haiku"}},
+		{"claude", []string{"claude-*"}, claude, []string{"default", "opus[1m]", "claude-fable-5-1[1m]", "sonnet", "haiku"}, nil},
+		// Before the runtime says its options: the family alone, and default waits for the turn.
+		{"claude", []string{"claude-sonnet-*"}, nil, []string{"sonnet", "sonnet[1m]", "claude-sonnet-5", "default"}, []string{"opus", "claude-opus-5-5"}},
+		{"claude", []string{"claude-sonnet-5*"}, nil, []string{"claude-sonnet-5"}, []string{"sonnet", "opus"}},
+		// Another runtime's values are ids: exact names and prefixes only.
+		{"codex", []string{"gpt-5*"}, nil, []string{"gpt-5", "gpt-5-codex"}, []string{"o3", "default"}},
+		{"codex", []string{"gpt-5-codex"}, nil, []string{"gpt-5-codex"}, []string{"gpt-5", "gpt-5-codex-mini"}},
+	}
+	for _, r := range rows {
+		p := &wire.OrgPolicy{Runtimes: map[string]wire.PolicyRuntimeRule{r.runtime: {Models: r.patterns}}}
+		for _, m := range r.allowed {
+			if err := d.modelRefusal(p, r.runtime, m, r.options); err != nil {
+				t.Errorf("%s %v refused %s: %v", r.runtime, r.patterns, m, err)
+			}
+		}
+		for _, m := range r.refused {
+			if d.modelRefusal(p, r.runtime, m, r.options) == nil {
+				t.Errorf("%s %v allowed %s", r.runtime, r.patterns, m)
+			}
+		}
 	}
 }
 
