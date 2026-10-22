@@ -1,11 +1,13 @@
 // Settings ▸ Groups (#1761, spec 736 FR-027, FR-028), as the window's and the Remote's Groups pane
 // (Shared/UI/People/GroupsPane.swift): each group, its people and the workspace providers it has.
-// An admin makes, changes and removes groups; a member sees the groups they are in, read only.
+// An admin makes, changes and removes groups; a member sees the groups they are in, read only. A
+// group from an org provider's SCIM says so (#1002, FR-028), and only SCIM changes its members.
 import { useSignal } from "@preact/signals";
 import type { Store } from "../model/store";
 import type { Group, PersonRow } from "../protocol/generated";
 import { describe } from "../model/errors";
 import { botWords, dollars, foot, groupBots, groupCapFoot, groupCapLine, members, providersOf, readCap, removeMessage, removeTitle, title } from "../model/teamGroups";
+import { fromProvider, orgName } from "../model/signIn";
 import { Modal } from "./Modal";
 
 function GroupSheet({ store, group, people, close }: {
@@ -112,6 +114,11 @@ export function GroupsSection({ store, down }: { store: Store; down: boolean }) 
             {shown.map((group) => (
               <li key={group.id} class="person">
                 <div class="setting"><span class="person-name">{group.name}</span></div>
+                {group.source && (
+                  <div class="person-org">
+                    <span class="quiet small">{fromProvider(orgName(group.source.scim, store.orgProviderNames.value))}</span>
+                  </div>
+                )}
                 <div class="person-things">
                   <span class="faint small">People</span>
                   <span class="small">{members(group, people)}</span>

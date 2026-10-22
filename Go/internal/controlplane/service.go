@@ -1154,8 +1154,11 @@ func (s *Service) acceptVia(conn *Conn, webOrigin string, proved func(failed boo
 		bound = []string{s.peerOrigin}
 	}
 	if webOrigin != "" {
-		// On the loopback listener only a browser or its code may prove anything (071).
-		if !strings.HasPrefix(auth.ID, "c:") && !strings.HasPrefix(auth.ID, "p:") {
+		// On the loopback listener only a browser or its code may prove anything (071). The
+		// page on this domain also signs in with an org provider (#1002, FR-027): an s:
+		// whose ticket comes back to it.
+		signingIn := strings.HasPrefix(auth.ID, "s:") && s.page != nil && webOrigin == s.page.Origin()
+		if !strings.HasPrefix(auth.ID, "c:") && !strings.HasPrefix(auth.ID, "p:") && !signingIn {
 			refuse(controllink.Refuse(controllink.Unknown))
 			return
 		}

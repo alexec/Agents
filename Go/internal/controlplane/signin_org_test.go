@@ -2,12 +2,15 @@ package controlplane
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"net/http"
 	"net/url"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -758,5 +761,88 @@ func TestEntraAndGoogleWorkspacePresets(t *testing.T) {
 	prov.SignInAs(signintest.Claims{"sub": "g-2", "hd": "evil.test", "email": "x@evil.test"})
 	if _, err := p.signInOrg(t, b); err == nil {
 		t.Fatal("another Workspace domain signed in")
+	}
+}
+
+// FR-027: the web page's flow leaves the page in the same tab, and so its connection. Its
+// ticket is bound to the page's key and the s: id it proved, so the page pairs with it on a
+// new connection with the same key, and nothing else does.
+func TestTheWebPageComesBackOnANewConnection(t *testing.T) {
+	prov := signintest.NewProvider(t, "RS256", "")
+	p, _, owner, _ := orgPlane(t, prov, nil)
+	addOrg(t, owner, prov, wire.OrgProviderJoinAnyone)
+	b := &browser{prov: prov}
+	open := func(id string, private []byte) *controllink.SignInSession {
+		t.Helper()
+		s, err := controllink.OpenSignInAs(context.Background(), p.url, "", nil, records.KindBrowser, id, private)
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(s.Close)
+		return s
+	}
+	first := openSignIn(t, p)
+	v := b.open(t, orgStartOn(t, first, wire.SignInOrgReturnWeb))
+	first.Close()
+	// Another key under the same id, and the same key under another id, are another page.
+	if err := ticketOn(open(first.ID(), controllink.NewPrivateKey()), v.Get("ticket"), wire.ClientKindBrowser); err == nil ||
+		!strings.Contains(err.Error(), "another connection") {
+		t.Fatal(err)
+	}
+	if err := ticketOn(open("1F0C2E0A-5B7D-4E6A-9C1B-3D2E4F5A6B7C", first.Private()), v.Get("ticket"), wire.ClientKindBrowser); err == nil ||
+		!strings.Contains(err.Error(), "another connection") {
+		t.Fatal(err)
+	}
+	back := open(first.ID(), first.Private())
+	if err := ticketOn(back, v.Get("ticket"), wire.ClientKindBrowser); err != nil {
+		t.Fatal(err)
+	}
+	if c := p.s.records.Client(strings.ToUpper(first.ID())); c == nil || c.Kind != records.KindBrowser {
+		t.Fatalf("%+v", c)
+	}
+	// The app's flow stays bound to its connection: the same key on a new one is refused.
+	app := openSignIn(t, p)
+	v = b.open(t, orgStartOn(t, app, wire.SignInOrgReturnApp))
+	if err := ticketOn(open(app.ID(), app.Private()), v.Get("ticket"), wire.ClientKindMac); err == nil ||
+		!strings.Contains(err.Error(), "another connection") {
+		t.Fatal(err)
+	}
+}
+
+// FR-027 on the page on this domain (#1459): its socket takes an s: as well as a c: and a
+// p:, so the page signs in with its org provider and comes back to pair. This Mac's
+// loopback listener still takes none.
+func TestThePageOnThisDomainSignsIn(t *testing.T) {
+	dist := t.TempDir()
+	index := []byte("<html></html>")
+	sum := sha256.Sum256(index)
+	os.WriteFile(filepath.Join(dist, "index.html"), index, 0o644)
+	os.WriteFile(filepath.Join(dist, "MANIFEST"), []byte("agents-web 1\nout "+hex.EncodeToString(sum[:])+" Web/dist/index.html\n"), 0o644)
+	prov := signintest.NewProvider(t, "RS256", "")
+	p := startPlaneWith(t, store.NewMemory(), controllink.NewPrivateKey(), func(c *Config) {
+		withKeeper(newKeeperKey())(c)
+		c.SignIn = &signin.Config{HTTP: prov.HTTP()}
+		c.PublicWeb = dist
+	})
+	_, owner := p.client("Alex's Mac")
+	addOrg(t, owner, prov, wire.OrgProviderJoinAnyone)
+	b := &browser{prov: prov}
+	private, id := controllink.NewPrivateKey(), "6A1C3E0B-2D4F-4A6B-8C1D-3E5F7A9B0C2D"
+	first, err := controllink.OpenPageSignIn(context.Background(), p.url, records.KindBrowser, id, private)
+	if err != nil {
+		t.Fatal(err)
+	}
+	v := b.open(t, orgStartOn(t, first, wire.SignInOrgReturnWeb))
+	first.Close()
+	back, err := controllink.OpenPageSignIn(context.Background(), p.url, records.KindBrowser, id, private)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer back.Close()
+	if err := ticketOn(back, v.Get("ticket"), wire.ClientKindBrowser); err != nil {
+		t.Fatal(err)
+	}
+	if c := p.s.records.Client(id); c == nil || c.Kind != records.KindBrowser {
+		t.Fatalf("%+v", c)
 	}
 }

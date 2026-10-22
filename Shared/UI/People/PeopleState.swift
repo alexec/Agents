@@ -27,6 +27,8 @@ final class PeopleState {
     private(set) var list: DaemonAPI.PeopleList?
     /// Why `list` could not be loaded, in the control plane's words.
     private(set) var listProblem: String?
+    /// The org providers' names by id (#1002), for Managed by and Set by. Loaded with `list`.
+    private(set) var orgNames: [String: String] = [:]
     /// The groups (#1761), loaded with `list`. Empty from a control plane before groups.
     private(set) var groups: [DaemonAPI.Group] = []
     /// Goes up on `control/peopleChanged` and `control/groupsChanged` (#1761), for what a
@@ -73,9 +75,17 @@ final class PeopleState {
             return error is JSONRPCError
         }
         if withGroups { await loadGroups(control) }
+        if list?.people.contains(where: { $0.scim != nil || $0.suspended != nil }) == true {
+            let providers = try? await control.call(DaemonAPI.Method.signInProviders, DaemonAPI.Empty(),
+                                                    returning: DaemonAPI.SignInProviders.self)
+            orgNames = Dictionary((providers?.orgs ?? []).map { ($0.id, $0.name) }, uniquingKeysWith: { a, _ in a })
+        }
         keepCapsTrue()
         return true
     }
+
+    /// An org provider's name; its id when it is not on.
+    func providerName(_ id: String) -> String { orgNames[id] ?? id }
 
     /// A control plane before groups has none: no bot can be made.
     private func loadGroups(_ control: DaemonClient) async {

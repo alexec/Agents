@@ -39,3 +39,18 @@ test("a fragment that doesn't decode is still taken out of the address", async (
   assert.equal(linkedCode, null);
   assert.deepEqual(replaced, ["/"]);
 });
+
+test("an org provider's return is taken, and the address replaced without it (#1002)", async () => {
+  const replaced = [];
+  globalThis.location = { hash: "#oidc-ticket=T1", pathname: "/", search: "" };
+  globalThis.history = { replaceState: (_state, _title, url) => replaced.push(url) };
+  try {
+    const { linkedCode, oidcBack } = await load("src/pairLink.ts");
+    assert.equal(linkedCode, null);
+    assert.deepEqual(oidcBack, { ticket: "T1" });
+    assert.deepEqual(replaced, ["/"]);
+  } finally {
+    delete globalThis.location;
+    delete globalThis.history;
+  }
+});

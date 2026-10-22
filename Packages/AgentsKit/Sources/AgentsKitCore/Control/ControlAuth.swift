@@ -114,6 +114,9 @@ public enum ControlAuth {
         /// is being filled by a handover. Try again; it says nothing about the member (#81).
         /// A build from before this case cannot read it, and takes it as a failed dial.
         case unavailable
+        /// The client's person was suspended by their org provider (#1002, D13). The client
+        /// keeps its key and shows only that, until the provider turns them on again.
+        case suspended
     }
 
     /// One line of the exchange, as it goes on the wire.

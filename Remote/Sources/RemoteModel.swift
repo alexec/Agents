@@ -2102,7 +2102,10 @@ final class RemoteModel {
             return true
         } catch {
             note("link: attempt failed after \(ContinuousClock.now - began): \(error)")
-            if let reason = ControlPlaneLink.refused.take(), refusals.forgets(after: reason) {
+            let reason = ControlPlaneLink.refused.take()
+            // Suspended by the organisation (#1002): only that, with the pairing kept.
+            signIn.refused(reason)
+            if let reason, refusals.forgets(after: reason) {
                 note("link: forgotten by the control plane (\(reason))")
                 // Forgotten from a window, or unknown for minutes on end: this device asks
                 // for a new code, and stops dialling. One "unknown" alone is a control plane

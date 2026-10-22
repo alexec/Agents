@@ -146,6 +146,15 @@ Pair it again to carry on.**
 Clearing the site's data for `localhost`, or closing a private window, also loses the key.
 The control plane still lists the browser until you forget it there.
 
+### Sign in with your organisation's provider
+
+When the organisation added its own sign-in provider, the page on the control plane's own
+address shows **Sign in with Acme Okta** above the code, and **Use an Email** when its email
+domain is claimed. Select it, sign in at the provider, and the browser comes back to the page
+paired, with no code. The page keeps no token: it keeps only its own key, as with a code. The
+page on this Mac (`localhost`) does not show the button. See [Sign in with Google, Apple or
+GitHub](sign-in-with-google-apple-or-github.md#sign-in-with-your-organisations-provider).
+
 ## If it doesn't work
 
 - **This code has expired. Ask for a new one.** A code works for five minutes. Get a new one.
@@ -163,6 +172,11 @@ The control plane still lists the browser until you forget it there.
 - **Can't reach the control plane at localhost:8792. Trying again.** Agents Host's control
   plane has stopped. The page shows what it last knew, and catches up by itself when the
   control plane is back, with no reload.
+- **Your organisation's sign-in turned your access off.** Your organisation's provider
+  suspended you. The browser stays paired, and opens again by itself when they turn your
+  access on.
+- **This sign-in took too long, or started in another browser.** Select **Sign in with …**
+  again in this browser.
 - **This browser isn't supported.** The browser can't keep a key that can't be copied out of
   it. Use the current Safari or Chrome.
 - **The page doesn't load at all.** Check that **Serve Agents to browsers on this Mac** is on

@@ -78,13 +78,13 @@
 
 **Goal**: US7 on the Mac, the Remote and the web page. One PR per area when those areas are busy, else one PR.
 
-- [ ] T034 [US7] Add the org words to `Packages/AgentsKit/Sources/AgentsKitCore/Model/IdentityProviders.swift` (**Sign in with <name>**, **Use an Email**, **Managed by**, **Suspended by**, **Set by**, the suspended and required lines) and their tests. Web: `Web/src/model/signIn.ts`.
-- [ ] T035 [US7] In `Shared/UI/SignIn/SignInButtons.swift`: org buttons first; the org flow in `ASWebAuthenticationSession` with `.customScheme("agents")`, the ticket from the fragment, `signIn/ticket`; **Use an Email** with `signIn/discover`.
-- [ ] T036 [US7] Mac: `App/Sources/Control/ConnectSheet.swift` and Settings ▸ Account use the order of T035. Remote: `Remote/Sources/Link/PairingView.swift` the same.
-- [ ] T037 [US7] Web: `Web/src/views/Pairing.tsx` and `SignIn*.tsx`: org buttons first; the same-tab redirect; read `#oidc-ticket`, clear it from the address bar, send `signIn/ticket`.
-- [ ] T038 [US7] The suspended page and the "asks you to sign in with" line on all three (FR-029).
-- [ ] T039 [US7] People lines on all three: `Shared/UI/People/`, `Web/src/views/People.tsx` (FR-028).
-- [ ] T040 [P] Parity rows for FR-026 to FR-029 in `specs/071-web-remote/walks/parity/`; docs `sign-in-with-google-apple-or-github.md`, `use-agents-in-a-browser.md`.
+- [x] T034 [US7] Add the org words to `Packages/AgentsKit/Sources/AgentsKitCore/Model/IdentityProviders.swift` (**Sign in with <name>**, **Use an Email**, **Managed by**, **Suspended by**, **Set by**, the suspended and required lines) and their tests. Web: `Web/src/model/signIn.ts`.
+- [x] T035 [US7] In `Shared/UI/SignIn/SignInButtons.swift`: org buttons first; the org flow in `ASWebAuthenticationSession` with `.customScheme("agents")`, the ticket from the fragment, `signIn/ticket`; **Use an Email** with `signIn/discover`.
+- [x] T036 [US7] Mac: `App/Sources/Control/ConnectSheet.swift` and Settings ▸ Account use the order of T035. Remote: `Remote/Sources/Link/PairingView.swift` the same.
+- [x] T037 [US7] Web: `Web/src/views/Pairing.tsx` and `SignIn*.tsx`: org buttons first; the same-tab redirect; read `#oidc-ticket`, clear it from the address bar, send `signIn/ticket`.
+- [x] T038 [US7] The suspended page and the "asks you to sign in with" line on all three (FR-029).
+- [x] T039 [US7] People lines on all three: `Shared/UI/People/`, `Web/src/views/People.tsx` (FR-028).
+- [x] T040 [P] Parity rows for FR-026 to FR-029 in `specs/071-web-remote/walks/parity/`; docs `sign-in-with-google-apple-or-github.md`, `use-agents-in-a-browser.md`.
 
 **Checkpoint**: quickstart step 5.
 

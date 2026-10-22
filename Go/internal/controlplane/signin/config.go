@@ -1,9 +1,12 @@
 package signin
 
 import (
+	"crypto/tls"
+	"crypto/x509"
 	"net/http"
 	"os"
 	"strings"
+	"time"
 )
 
 // The app's own client ids (FR-012): every control plane trusts sign-ins made for them,
@@ -53,6 +56,17 @@ func FromEnvironment() Config {
 	}
 	if id := strings.TrimSpace(os.Getenv("AGENTS_SIGNIN_GITHUB_CLIENT_ID")); id != "" {
 		c.GitHubClientID = id
+	}
+	// A walk's stand-in for an organisation's provider (#1002, signintest): its
+	// certificate, PEM, is trusted beside the system's, as AGENTS_TEST_APNS_URL's is.
+	if pem := strings.TrimSpace(os.Getenv("AGENTS_TEST_TRUST_ROOT")); strings.Contains(pem, "-----BEGIN") {
+		pool, err := x509.SystemCertPool()
+		if err != nil {
+			pool = x509.NewCertPool()
+		}
+		if pool.AppendCertsFromPEM([]byte(pem)) {
+			c.HTTP = &http.Client{Timeout: 10 * time.Second, Transport: &http.Transport{TLSClientConfig: &tls.Config{RootCAs: pool}}}
+		}
 	}
 	return c
 }

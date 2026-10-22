@@ -45,7 +45,8 @@ import { goOnRequest } from "./limits";
 import { milestonesSeen } from "./milestones";
 import { hostAnswers, hostHas } from "./capabilities";
 import { Capability } from "../protocol/capabilities.generated";
-import { withJoin, withoutJoin } from "./people";
+import { providerManaged, withJoin, withoutJoin } from "./people";
+import { orgNames } from "./signIn";
 import { withRequest, withoutRequest } from "./channelLinks";
 import { withSignIn, withoutSignIn } from "./signIn";
 import type { ChartHint } from "./chart";
@@ -438,6 +439,9 @@ export class Work {
   readonly people = signal<PeopleList | null>(null);
   /** Why `people` could not be loaded: the failure itself, for each view to word. */
   readonly peopleFailure = signal<unknown>(null);
+  /** Each org provider's name by its id (#1002, FR-028), for People's "Managed by Okta": read once, when a person or group has one. */
+  readonly orgProviderNames = signal<Record<string, string>>({});
+  protected orgNamesRead = false;
   /** The bots stopped at a cap (#1761, control/capReached), for an admin: one per bot, each only while true (#2073). */
   readonly capped = signal<CapReached[]>([]);
   /** The last of them, for Console ▸ Requests. */
@@ -1340,6 +1344,18 @@ export class Store extends Work {
     }
     if (this.providers.groups.value.length === 0) await this.providers.loadGroups();
     this.keepCapsTrue();
+    await this.loadOrgNames();
+  }
+
+  /** The org providers' names (#1002), once, when a person or a group names one; an older control plane has none. */
+  private async loadOrgNames(): Promise<void> {
+    if (this.orgNamesRead) return;
+    const named = (this.people.value?.people ?? []).some(providerManaged) || this.providers.groups.value.some((g) => g.source);
+    if (!named) return;
+    this.orgNamesRead = true;
+    const providers = await this.link.call("signIn/providers", {}).catch(() => null);
+    if (providers) this.orgProviderNames.value = orgNames(providers.orgProviders);
+    else this.orgNamesRead = false;
   }
 
   /** Drops the cap notices no longer true (#2073), and wakes when the next one's day ends. */

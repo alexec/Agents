@@ -117,6 +117,27 @@ a[href] { cursor: pointer; }
   font-size: 0.75rem;
 }
 
+/* The organisation's providers, first (#1002, FR-026): a full-width button each, then Use an Email. */
+.pairing-org {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0 0 16px;
+}
+
+.pairing-email {
+  display: flex;
+  gap: 8px;
+}
+
+.pairing-email input { flex: 1; min-width: 0; }
+
+.pairing-required {
+  background: var(--paper-well);
+  border-radius: var(--radius-card);
+  padding: 8px 12px;
+}
+
 /* The columns (071 US2, US6; #151, #235): the one sidebar and the chat, the files pane a third
    from 1440 (over the chat below that), and below 760 the sidebar or what it picked. The widths
    are in sidebar.css. */
@@ -1051,6 +1072,8 @@ button.remove:hover { opacity: 1; }
 .sub-app .settings-body .person .badge { margin-left: 6px; padding: 0 6px; font-size: 0.6875rem; border-radius: 8px;
   border: 1px solid var(--paper-rule); opacity: 0.75; }
 .sub-app .settings-body .person-things { display: flex; flex-direction: column; gap: 2px; padding: 4px 8px 8px; }
+/* What an org provider controls (#1002, FR-028), in grey under the name. */
+.sub-app .settings-body .person-org { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: 0 8px; }
 .sub-app .settings-body button.invite { margin: 4px 8px; }
 .sub-app .settings-body .hint.attention { color: var(--tint-attention); }
 .sub-app .settings-body .join-command { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; }
