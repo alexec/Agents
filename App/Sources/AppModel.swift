@@ -1917,10 +1917,15 @@ final class AppModel {
         work.takeEvents(page, for: filter, appending: true)
     }
 
-    /// The person cancelling an agent's wait (042 FR-013). The Mac only.
+    /// The person cancelling an agent's wait (042 FR-013), on the agent's own host: a
+    /// server's or another Mac's agent waits there (#2068). A failure says why.
     func cancelWait(of agentID: UUID) async {
-        _ = try? await macClient.call(DaemonAPI.Method.eventsCancelWait, DaemonAPI.CancelWaitRequest(agentID: agentID),
-                                   returning: [DaemonAPI.WaitingAgent].self)
+        let host = host(ofAgent: agentID)
+        await attempt(on: host) {
+            _ = try await self.client(for: host).call(DaemonAPI.Method.eventsCancelWait,
+                                                      DaemonAPI.CancelWaitRequest(agentID: agentID),
+                                                      returning: [DaemonAPI.WaitingAgent].self)
+        }
     }
 
     /// The person ending a lease (036 US4): one holder's, or with none named, every

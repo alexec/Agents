@@ -409,6 +409,40 @@ struct ConsistencyTests {
         }
     }
 
+    /// The statement that sends `events/cancelWait` (#2068): the line naming the method
+    /// and the line before it, where the call and its `try` begin.
+    static func cancelWaitMisrouted(_ statement: String) -> Bool {
+        statement.contains("try?") || statement.contains("macClient.") || statement.contains(" client.call(")
+    }
+
+    @Test func theCancelWaitScanCatchesWhatItIsFor() async {
+        #expect(Self.cancelWaitMisrouted("_ = try? await macClient.call(DaemonAPI.Method.eventsCancelWait, request,"))
+        #expect(Self.cancelWaitMisrouted("_ = try? await client.call(DaemonAPI.Method.eventsCancelWait,"))
+        #expect(Self.cancelWaitMisrouted("_ = try await client.call(DaemonAPI.Method.eventsCancelWait,"))
+        #expect(!Self.cancelWaitMisrouted("_ = try await self.client(for: host).call(DaemonAPI.Method.eventsCancelWait,"))
+        #expect(!Self.cancelWaitMisrouted("_ = try await client(for: request).call(DaemonAPI.Method.eventsCancelWait, request,"))
+    }
+
+    /// Stop Waiting goes to the agent's own host and says when it fails (#2068): sent to
+    /// this Mac's host, a server's agent was "not here", and a `try?` hid it.
+    @Test func stopWaitingGoesToTheAgentsHost() async throws {
+        var violations: [String] = []
+        var found = 0
+        for source in try Self.sources(under: ["App/Sources", "Remote/Sources"]) {
+            for (index, line) in source.lines.enumerated() where line.contains("Method.eventsCancelWait") {
+                found += 1
+                let statement = (index > 0 ? Self.code(source.lines[index - 1]) + " " : "") + Self.code(line)
+                if Self.cancelWaitMisrouted(String(statement)) { violations.append(Self.at(source, index)) }
+            }
+        }
+        #expect(found >= 2, "the Mac and the Remote each send events/cancelWait; the scan found \(found)")
+        #expect(violations.isEmpty, """
+            events/cancelWait is sent to this Mac's own client, or with `try?`. Send it to the \
+            agent's own host (`client(for:)`) and show the problem when it fails (#2068).
+            \(violations.joined(separator: "\n"))
+            """)
+    }
+
     @Test func neitherAppHasAPageOfItsOwn() async throws {
         var violations: [String] = []
         var scanned = 0
