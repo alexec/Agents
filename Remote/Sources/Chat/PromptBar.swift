@@ -38,7 +38,6 @@ struct PromptBar: View {
     /// Why something picked could not be attached, said where it was picked.
     @State private var attachRefusal: String?
     @State private var dictation = Dictation()
-    @State private var isPrimingDictation = false
     /// Set when the list is put away, so it stays away until the word changes.
     @State private var dismissedCommandTerm: String?
     @State private var selectedCommand = 0
@@ -119,17 +118,6 @@ struct PromptBar: View {
         .padding(.vertical, 12)
         .animation(.easeOut(duration: 0.15), value: isCompleting)
         .animation(.easeOut(duration: 0.15), value: isMentioning)
-        .sheet(isPresented: $isPrimingDictation) { dictationPrimer.paperSheet() }
-        .alert("Dictation", isPresented: Binding(get: { dictation.problem != nil },
-                                                 set: { if !$0 { dictation.dismissProblem() } })) {
-            // Where a switch would fix it, offer to open the switch.
-            if let permission = dictation.problem?.permission {
-                Button("Open Settings") { UIApplication.shared.open(permission.settings) }
-            }
-            Button("OK", role: .cancel) {}
-        } message: {
-            Text(dictation.problem?.message ?? "")
-        }
         .onAppear { restoreDraft() }
         .onChange(of: agent.id) { restoreDraft() }
         // Opened: its runtime starts now, so the reply does not wait for it (#183). Once
@@ -192,7 +180,7 @@ struct PromptBar: View {
                 .textFieldStyle(.plain)
                 .appText(.reading)
                 .lineLimit(1...8)
-                .overlay(alignment: .topLeading) { heardUnderline }
+                .overlay(alignment: .topLeading) { HeardUnderline(dictation: dictation, text: text) }
                 .focused($focused)
                 .onChange(of: focused) { _, now in model.isTyping = now }
                 // ⌘V of a picture from an iPad's keyboard attaches it (#396).
@@ -267,15 +255,7 @@ struct PromptBar: View {
 
             AttachButton(attachments: $attachments, refusal: $attachRefusal)
 
-            Button(action: toggleDictation) {
-                Image(systemName: dictation.isListening ? "waveform" : "microphone")
-                    .appText(.reading).fontWeight(.semibold)
-                    .frame(width: 22, height: 22)
-                    .symbolEffect(.variableColor, isActive: dictation.isListening)
-            }
-            .buttonStyle(.paper)
-            .buttonBorderShape(.circle)
-            .accessibilityLabel(dictation.isListening ? "Stop dictating" : "Dictate")
+            DictateButton(dictation: dictation, begin: beginDictation)
 
             // While it works and nothing is typed, send is stop. Type and it is send
             // again, queueing what is typed for when the turn ends.
@@ -327,34 +307,6 @@ struct PromptBar: View {
         }
         .padding(14)
         .paperRaised(in: RoundedRectangle(cornerRadius: 18))
-    }
-
-    /// The words dictation is still hearing, underlined as system dictation does until
-    /// they settle (#448). A plain-text field cannot style part of its text, so this is
-    /// the same text laid over the field, invisible but for the underline. The field
-    /// itself is left exactly as it is: its keys, paste, focus and height. Once the text
-    /// is taller than the field, the field scrolls and the copy could not follow it, so
-    /// then nothing is drawn.
-    @ViewBuilder private var heardUnderline: some View {
-        if let heard = dictation.heardWords, heard.upperBound <= text.count {
-            ViewThatFits(in: .vertical) {
-                Text(Self.underlining(heard, of: text))
-                    .appText(.reading)
-                    .fixedSize(horizontal: false, vertical: true)
-                Color.clear
-            }
-            .allowsHitTesting(false)
-            .accessibilityHidden(true)
-        }
-    }
-
-    private static func underlining(_ heard: Range<Int>, of text: String) -> AttributedString {
-        var styled = AttributedString(text)
-        styled.foregroundColor = .clear
-        let lower = styled.index(styled.startIndex, offsetByCharacters: heard.lowerBound)
-        let upper = styled.index(lower, offsetByCharacters: heard.count)
-        styled[lower..<upper].underlineStyle = Text.LineStyle(pattern: .solid, color: .secondary)
-        return styled
     }
 
     /// Why nothing can be sent on the Mac's host now, in its organisation's words (#998). A
@@ -409,16 +361,6 @@ struct PromptBar: View {
 
     // MARK: Said instead of typed
 
-    private func toggleDictation() {
-        if dictation.isListening {
-            dictation.stop()
-        } else if dictation.hasBeenAsked {
-            beginDictation()
-        } else {
-            isPrimingDictation = true
-        }
-    }
-
     private func beginDictation() {
         focused = true
         // What is already in the field stays, and the words go in at the cursor.
@@ -427,30 +369,6 @@ struct PromptBar: View {
             text = field
             selection = DictationCursor.selection(cursor, in: field)
         }
-    }
-
-    /// Our own words before the system's alert, the first time only.
-    private var dictationPrimer: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            Text(PromptWords.dictationPrimerTitle).appText(.reading).fontWeight(.semibold)
-            Text("The phone listens while the button is on, and what you say becomes the words in the prompt. It is recognised on this phone where this phone can do it.")
-                .foregroundStyle(.secondary)
-            Text("iOS will ask for the microphone and for speech recognition next.")
-                .appText(.supporting)
-                .foregroundStyle(.secondary)
-            HStack {
-                Spacer()
-                Button("Not now") { isPrimingDictation = false }
-                    .buttonStyle(.paper)
-                Button("Continue") {
-                    isPrimingDictation = false
-                    beginDictation()
-                }
-                .buttonStyle(.paperProminent)
-            }
-        }
-        .padding(20)
-        .presentationDetents([.medium])
     }
 
     // MARK: Kept against this conversation
