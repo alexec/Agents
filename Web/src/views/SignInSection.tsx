@@ -1,4 +1,4 @@
-// Sign-in on the web page (#995, spec 736 T2), as the window's and the Remote's: You ▸ Sign-ins lists
+// Sign-in on the web page (#995, spec 736 T2), as the window's and the Remote's: Control plane ▸ Sign-ins lists
 // how this person signs in, with Remove (Shared/UI/SignIn/SignInsSection.swift), and Control plane ▸
 // Sign-in Providers lets an admin turn providers on and allow domains and organisations
 // (Shared/UI/SignIn/SignInPane.swift). A browser adds no sign-in: it pairs with a code (FR-014).
@@ -12,7 +12,7 @@ import {
   removeMessage, removeTitle, row, signInsFoot, signInsNone, signInsTitle,
 } from "../model/signIn";
 
-/** You ▸ Sign-ins: this person's sign-ins, each outside one with Remove. */
+/** Control plane ▸ Sign-ins: this person's sign-ins, each outside one with Remove. */
 export function SignInsSection({ store, down }: { store: Store; down: boolean }) {
   // From the store's one people list (#2055), loaded on each connection and each control/peopleChanged.
   const list = store.people.value;

@@ -1,7 +1,7 @@
 import AgentsKitCore
 import SwiftUI
 
-/// You ▸ Sign-ins (#995, spec 736 FR-005; a pane of its own on the Mac too, #2197): how this person signs in, with Add a
+/// Control plane ▸ Sign-ins (#995, spec 736 FR-005; a pane of its own on the Mac too, #2197): how this person signs in, with Add a
 /// Sign-in… (Apple, Google or GitHub, on this device) and Remove for an outside one. A
 /// sign-in added here pairs this person's other Macs, iPhones and iPads with no code.
 ///

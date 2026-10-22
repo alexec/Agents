@@ -369,7 +369,10 @@ public enum SignInWords {
     public static let paneTitle = "Sign-in Providers"
     public static let paneFoot = "People sign in with these to pair a window or a phone with no code. "
         + "A person not known joins only through an allowed Google Workspace domain; "
-        + "everyone else is invited first, and adds their sign-in under You ▸ Sign-ins."
+        + "everyone else is invited first, and adds their sign-in under \(signInsPlace)."
+    /// Where a person adds a sign-in: the group and pane every client lists it under (#2157,
+    /// #2256). Change it with the group.
+    public static let signInsPlace = "Control plane ▸ \(signInsTitle)"
     /// The admin's pane, apart from a person's own Sign-ins (#2080).
     public static let paneSymbol = "key.horizontal"
     public static let signInsTitle = "Sign-ins"

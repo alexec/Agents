@@ -61,6 +61,14 @@ struct IdentityProvidersTests {
         #expect(SignInWords.row(.init(provider: "local", account: "k")) == "This control plane")
     }
 
+    /// The words name the group and pane the Mac and the Remote list Sign-ins in (#2157,
+    /// #2256): Control plane, as `SettingsScope.controlPlane.title` says it.
+    @Test func signInWordsNameTheirPane() {
+        #expect(SignInWords.signInsPlace == "Control plane ▸ Sign-ins")
+        #expect(SignInWords.paneFoot.contains(SignInWords.signInsPlace))
+        #expect(!SignInWords.paneFoot.contains("You ▸"))
+    }
+
     /// Org providers (#1002, FR-026): first, by order, then the built-in ones on.
     @Test func orgProvidersComeFirstByOrder() throws {
         let json = #"{"providers":[{"provider":"google","on":true,"available":true},{"provider":"github","on":false,"available":true}],"#

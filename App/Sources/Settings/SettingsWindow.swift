@@ -266,8 +266,9 @@ enum SettingsPane: String, Hashable, CaseIterable {
     case signIn
     /// The organisation's policy, read only, and the kill switch for an admin (#998).
     case policy
-    /// How this person signs in on their other clients (#995): You ▸ Sign-ins, as the
-    /// Remote has it and every client's words name it (#2197). Was in Account.
+    /// How this person signs in on their other clients (#995): Control plane ▸ Sign-ins, as
+    /// the Remote and the page have it and every client's words name it (#2197, #2256). Was
+    /// in Account.
     case signIns
     /// Was Shared (#754): the raw value is what a window left open on it kept.
     case agentConfiguration = "shared"
