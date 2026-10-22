@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/alexec/agents/Go/internal/controlplane/records"
 	"github.com/alexec/agents/Go/internal/controlplane/store"
 	"github.com/alexec/agents/Go/wire"
 )
@@ -166,5 +167,32 @@ func TestANameStaysInItsFolder(t *testing.T) {
 	k := Key(time.Date(2026, 10, 20, 0, 0, 0, 0, time.UTC), "../x/y")
 	if strings.Count(k, "/") != 5 || strings.Contains(k, "..") || !strings.HasPrefix(k, Prefix+"2026-10-20/by/") {
 		t.Fatal(k)
+	}
+}
+
+func TestAShorterTimeKeepsTheOlderDaysForADay(t *testing.T) {
+	now := time.Date(2026, 10, 20, 12, 0, 0, 0, time.UTC)
+	year := 365
+	s := &records.Settings{AuditDays: &year}
+	SetDays(s, 30, now)
+	if Days(s) != 30 || SweepDays(s, now) != 365 || SweepDays(s, now.Add(Grace-time.Minute)) != 365 {
+		t.Fatalf("in the grace: %d %d", Days(s), SweepDays(s, now))
+	}
+	if SweepDays(s, now.Add(Grace)) != 30 {
+		t.Fatal("after the grace")
+	}
+	// Shorter again in the grace still keeps the year; back to a year ends it.
+	SetDays(s, 1, now.Add(time.Hour))
+	if SweepDays(s, now.Add(2*time.Hour)) != 365 {
+		t.Fatal(SweepDays(s, now.Add(2*time.Hour)))
+	}
+	SetDays(s, 365, now.Add(3*time.Hour))
+	if s.AuditDaysBefore != nil || s.AuditShortened != nil || SweepDays(s, now.Add(3*time.Hour)) != 365 {
+		t.Fatalf("%+v", s)
+	}
+	// A longer time has no grace.
+	SetDays(s, 400, now)
+	if s.AuditDaysBefore != nil || SweepDays(s, now) != 400 {
+		t.Fatal("longer")
 	}
 }

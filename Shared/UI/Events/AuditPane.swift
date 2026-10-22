@@ -17,6 +17,8 @@ struct AuditPane: View {
     @State private var problem: String?
     @State private var export: AuditFile?
     @State private var isExporting = false
+    /// A shorter time, waiting for the admin to say yes (#2067).
+    @State private var shorter: Int?
 
     private static let page = 200
 
@@ -65,15 +67,30 @@ struct AuditPane: View {
     @ViewBuilder private func footLine(_ list: DaemonAPI.AuditList) -> some View {
         HStack(spacing: 12) {
             if list.admin {
-                Menu {
-                    ForEach(AuditWords.dayChoices, id: \.self) { days in
-                        Button(AuditWords.kept(days)) { Task { await setDays(days) } }
-                    }
-                } label: {
-                    Text(AuditWords.kept(list.days)).appText(.fine)
+                // A Picker, so the days set now have a check mark; a shorter time asks first (#2067).
+                Picker("How long the audit is kept", selection: Binding(get: { list.days }, set: { days in
+                    if days < list.days { shorter = days } else { Task { await setDays(days) } }
+                })) {
+                    ForEach(AuditWords.choices(with: list.days), id: \.self) { Text(AuditWords.kept($0)).tag($0) }
                 }
+                .pickerStyle(.menu)
+                .labelsHidden()
+                .appText(.fine)
                 .fixedSize()
                 .help("How long the control plane keeps who did what")
+                .confirmationDialog(AuditWords.shorterTitle(shorter ?? list.days),
+                                    isPresented: Binding(get: { shorter != nil }, set: { if !$0 { shorter = nil } }),
+                                    titleVisibility: .visible) {
+                    Button(AuditWords.shorterConfirm, role: .destructive) {
+                        if let days = shorter { Task { await setDays(days) } }
+                    }
+                    Button("Cancel", role: .cancel) {}
+                } message: {
+                    if let days = shorter {
+                        Text(AuditWords.shorterMessage(from: list.days, to: days,
+                                                       older: AuditWords.older(list, than: days)))
+                    }
+                }
                 Spacer()
                 Button("Export…") { Task { await exportAll() } }
                     .appText(.fine)

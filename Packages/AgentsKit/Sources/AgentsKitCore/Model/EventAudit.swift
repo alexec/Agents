@@ -132,6 +132,35 @@ public enum AuditWords {
         days == 1 ? "Kept for 1 day" : "Kept for \(days) days"
     }
 
+    /// The choices, with the days set now when they are not one of them.
+    public static func choices(with days: Int) -> [Int] {
+        Array(Set(dayChoices + [days])).sorted()
+    }
+
+    /// How many entries in a list are older than `days`: nil when the list leaves older
+    /// ones out, so the count is not known (#2067).
+    public static func older(_ list: DaemonAPI.AuditList, than days: Int, now: Date = Date()) -> Int? {
+        guard !list.more else { return nil }
+        let cut = now.addingTimeInterval(-Double(days) * 86_400)
+        return list.entries.filter { $0.at < cut }.count
+    }
+
+    /// The question before a shorter time is saved (#2067).
+    public static func shorterTitle(_ days: Int) -> String {
+        "Keep the audit for \(days == 1 ? "1 day" : "\(days) days")?"
+    }
+
+    /// What a shorter time deletes, and how to keep it: the sweep waits a day.
+    public static func shorterMessage(from: Int, to: Int, older: Int?) -> String {
+        let span = from - to == 1 ? "1 day" : "\(from - to) days"
+        let count = older.map { $0 == 1 ? ", 1 entry now" : ", \($0) entries now" } ?? ""
+        return "Entries older than \(to == 1 ? "1 day" : "\(to) days") are deleted in a day (up to \(span) of them\(count)). "
+            + "To keep them, choose \(from) days again before then."
+    }
+
+    /// The button that saves a shorter time.
+    public static let shorterConfirm = "Delete Them"
+
     /// The page's foot when it is empty.
     public static let empty = "Nothing has been done through the control plane yet. Starting, stopping or deleting an agent, answering a card, changing a setting and approving something appear here, with who did it."
 

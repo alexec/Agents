@@ -234,6 +234,10 @@ type Settings struct {
 	Channels json.RawMessage
 	// How many days audit entries are kept (#996); nil is the default, 90.
 	AuditDays *int
+	// After a shorter AuditDays (#2067): the days kept before it, until a day after
+	// AuditShortened, so choosing the longer time again in that day loses nothing.
+	AuditDaysBefore *int
+	AuditShortened  *Stamp
 	// The key before the last rotation, while it is still accepted, and when it was
 	// rotated (#997).
 	PreviousKey []byte
@@ -257,13 +261,15 @@ type settingsJSON struct {
 	ProjectDetection json.RawMessage `json:"projectDetection,omitempty"`
 	Channels         json.RawMessage `json:"channels,omitempty"`
 	AuditDays        *int            `json:"auditDays,omitempty"`
+	AuditDaysBefore  *int            `json:"auditDaysBefore,omitempty"`
+	AuditShortened   *Stamp          `json:"auditShortened,omitempty"`
 	PreviousKey      []byte          `json:"previousKey,omitempty"`
 	RotatedAt        *Stamp          `json:"rotatedAt,omitempty"`
 }
 
 func (s Settings) MarshalJSON() ([]byte, error) {
 	return encodeKeeping(settingsJSON{s.Name, s.Port, s.HomeHost, s.MachineID, s.URL, s.Pin, s.Endpoints, s.Epoch,
-		s.ControlKey, s.Owner, s.Created, s.Rev, s.ProjectDetection, s.Channels, s.AuditDays, s.PreviousKey, s.RotatedAt}, s.Extra)
+		s.ControlKey, s.Owner, s.Created, s.Rev, s.ProjectDetection, s.Channels, s.AuditDays, s.AuditDaysBefore, s.AuditShortened, s.PreviousKey, s.RotatedAt}, s.Extra)
 }
 
 func (s *Settings) UnmarshalJSON(data []byte) error {
@@ -273,7 +279,7 @@ func (s *Settings) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	*s = Settings{j.Name, j.Port, j.HomeHost, j.MachineID, j.URL, j.Pin, j.Endpoints, j.Epoch, j.ControlKey, j.Owner,
-		j.Created, j.Rev, j.ProjectDetection, j.Channels, j.AuditDays, j.PreviousKey, j.RotatedAt, extra}
+		j.Created, j.Rev, j.ProjectDetection, j.Channels, j.AuditDays, j.AuditDaysBefore, j.AuditShortened, j.PreviousKey, j.RotatedAt, extra}
 	return nil
 }
 

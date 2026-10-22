@@ -29,6 +29,8 @@ const (
 	DefaultDays = 90
 	// MostDays bounds what an admin may set: ten years.
 	MostDays = 3650
+	// Grace is how long the sweep still keeps the days before a shorter time (#2067).
+	Grace = 24 * time.Hour
 	// Prefix is where entries live: the control plane's events.
 	Prefix    = "v1/events/"
 	dayLayout = "2006-01-02"
@@ -173,6 +175,30 @@ func Days(settings *records.Settings) int {
 		return *settings.AuditDays
 	}
 	return DefaultDays
+}
+
+// SweepDays is how many days the sweep keeps: Days, or for a day after it was made
+// shorter, the days before (#2067).
+func SweepDays(settings *records.Settings, now time.Time) int {
+	days := Days(settings)
+	if settings != nil && settings.AuditDaysBefore != nil && settings.AuditShortened != nil &&
+		now.Before(settings.AuditShortened.Add(Grace)) && *settings.AuditDaysBefore > days {
+		return *settings.AuditDaysBefore
+	}
+	return days
+}
+
+// SetDays is control/setAuditDays on the settings at now: a shorter time keeps what the
+// sweep keeps now for Grace, and a time as long as that ends the grace (#2067).
+func SetDays(s *records.Settings, days int, now time.Time) {
+	keep := SweepDays(s, now)
+	s.AuditDays = &days
+	if days < keep {
+		stamp := records.At(now)
+		s.AuditDaysBefore, s.AuditShortened = &keep, &stamp
+	} else {
+		s.AuditDaysBefore, s.AuditShortened = nil, nil
+	}
 }
 
 // stored is an entry as the store keeps it, beside the control plane's own events.
