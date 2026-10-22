@@ -68,7 +68,8 @@ struct ConnectSheet: View {
                     let membership = try await ControlConfig.signIn(at: url, with: signIn, waiting: waiting)
                     Task { await model.adopt(.remote(membership)) }
                 }, sentence: { error in
-                    SignInToPair.words(error) ?? PairingAttempt.sentence(for: error, device: "this Mac")
+                    (error as? MachinePin.Refused)?.words ?? SignInToPair.words(error)
+                        ?? PairingAttempt.sentence(for: error, device: "this Mac")
                 }, done: { dismiss() })
                 Text("Type the control plane’s address. Sign in with an account added to your person there.")
                     .appText(.supporting).foregroundStyle(.secondary)
@@ -133,7 +134,7 @@ struct ConnectSheet: View {
                 dismiss()
             } catch {
                 guard !Task.isCancelled else { return }
-                answer = PairingAttempt.sentence(for: error, device: "this Mac")
+                answer = (error as? MachinePin.Refused)?.words ?? PairingAttempt.sentence(for: error, device: "this Mac")
             }
             connecting = false
         }

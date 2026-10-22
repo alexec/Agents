@@ -194,6 +194,7 @@ struct LocalServices {
             // set-up's.
             arguments = [paths.agentsd.path, "--control-network"]
                 + DaemonLauncher.pageArguments(HostSettings.load(paths), paths: paths)
+                + DaemonLauncher.pinArguments()
             variables = [StoreLocations.rootVariable: paths.hostRoot.path, "PATH": path]
         case .relay:
             // `<root>/relay`, and a walk's folder standing in for iCloud when it gives one.

@@ -14,6 +14,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/alexec/agents/Go/internal/agentsd"
 	"github.com/alexec/agents/Go/internal/controllink"
 )
 
@@ -142,5 +143,24 @@ func TestTheJoinStatusSaysTheProblem(t *testing.T) {
 	data, _ = os.ReadFile(filepath.Join(root, joinStatusFile))
 	if strings.Contains(string(data), "problem") {
 		t.Fatalf("%s", data)
+	}
+}
+
+// #998, US7 AS2: a code for another control plane than the pinned one is refused for good,
+// said once with the control plane required, and the host waits for a new code.
+func TestACodeForAnotherControlPlaneIsRefused(t *testing.T) {
+	pin := agentsd.PinFromFlags("control.acme.dev", "", true)
+	c, err := controllink.ParseCode(hostCode(t, 1))
+	if err != nil {
+		t.Fatal(err)
+	}
+	refusal := pin.Admits(c.ControlKey, c.URL)
+	why, forGood := refusedForGood(fmt.Errorf("enrol: %w", refusal))
+	if !forGood || !strings.Contains(why, "control.acme.dev") {
+		t.Fatalf("%q %v", why, forGood)
+	}
+	cl := parse([]string{"--root", t.TempDir(), "--pin-address", "control.acme.dev", "--pin-key=abc", "--must-join"})
+	if cl.pinAddress != "control.acme.dev" || cl.pinKey != "abc" || !cl.mustJoin {
+		t.Fatalf("%+v", cl)
 	}
 }

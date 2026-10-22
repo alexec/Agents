@@ -329,9 +329,10 @@ func (d *Daemon) fire(fr fireRequest) {
 		d.workflowMu.Unlock()
 		return
 	}
-	// A suspended person's workflows are paused (#1002, FR-018): a trigger is let go, not
-	// kept, so nothing runs by itself when the suspension ends.
-	if d.suspension() != nil {
+	// A suspended person's workflows are paused (#1002, FR-018), and so are a machine's that
+	// must join its control plane and has not (#998, FR-028): a trigger is let go, not kept,
+	// so nothing runs by itself when that ends.
+	if d.suspension() != nil || d.pinRefusal() != nil {
 		d.workflowMu.Unlock()
 		return
 	}
@@ -802,6 +803,9 @@ func (d *Daemon) runWorkflow(r wire.WorkflowRequest) (wire.WorkflowSummary, erro
 	}
 	d.workflowMu.Unlock()
 	if err := d.suspensionRefusal(); err != nil {
+		return wire.WorkflowSummary{}, err
+	}
+	if err := d.pinRefusal(); err != nil {
 		return wire.WorkflowSummary{}, err
 	}
 	d.fire(fireRequest{folder: folder, id: r.WorkflowID, byHand: true, trigger: byHandTrigger()})

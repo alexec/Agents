@@ -60,6 +60,8 @@ struct ControlClientsPage: View {
                           chipTone: away ? .attention : .source, detail: line.plain, detailText: line.drawn) {
             if isYou {
                 Button("Forget This Mac…") { forgettingThisWindow = true }.buttonStyle(.paper)
+                    .disabled(ControlConfig.leaveRefusal != nil)
+                    .help(ControlConfig.leaveRefusal ?? "")
             } else {
                 Button("Forget…") { forgettingClient = client }.buttonStyle(.paper)
             }

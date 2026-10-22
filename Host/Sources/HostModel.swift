@@ -10,6 +10,9 @@ import UniformTypeIdentifiers
 @Observable
 final class HostModel {
     let paths = HostPaths.current
+    /// The control plane the organisation pins this Mac to, from its configuration profile
+    /// (#998, US7); read once, as agentsd reads it at each start.
+    let pin = MachinePin.managed()
     private(set) var settings: HostSettings
     private var services: LocalServices { LocalServices(paths: paths) }
 
@@ -399,6 +402,11 @@ final class HostModel {
     /// The control plane and this Mac's host, both here, and the host enrolled with it.
     func runHere() async {
         guard busy == nil else { return }
+        // A control plane of its own is another than the one the organisation pins (FR-027).
+        if let pin, pin.namesAControlPlane {
+            problem = pin.refusal
+            return
+        }
         problem = nil
         if storeDraft == .bucket {
             guard await saveBucket() else { return }
@@ -448,6 +456,14 @@ final class HostModel {
 
     static let ownHostCodeMinutes = 24 * 60
 
+    /// "Your organisation requires this Mac to join …" while its pin says must join and it
+    /// has not joined the pinned control plane (#998, US7); agentsd runs nothing until then.
+    var mustJoinNote: String? {
+        guard let pin, pin.mustJoin else { return nil }
+        if let member = ControlMembership.load(paths.hostLocations.controlHostMembership), pin.admits(member) { return nil }
+        return pin.mustJoinWords
+    }
+
     /// This Mac's host couldn't join or reach its control plane, and is trying again.
     var hostJoinFailed: Bool { daemonRunning && hostJoin?.failed == true }
 
@@ -469,8 +485,13 @@ final class HostModel {
     /// Only this Mac's host, for a control plane elsewhere: a host code from it (US9).
     func joinElsewhere(code: String) async {
         let code = code.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard ControlCode(text: code)?.purpose == .host else {
+        guard let parsed = ControlCode(text: code), parsed.purpose == .host else {
             problem = "That isn't a machine code. Ask the other control plane for one: Settings ▸ Machines ▸ Add a Mac."
+            return
+        }
+        // A code for another control plane than the pinned one (#998, US7 AS2).
+        if let pin, !pin.admits(parsed) {
+            problem = pin.refusal
             return
         }
         busy = "Joining…"
