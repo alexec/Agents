@@ -333,7 +333,11 @@ func (d *Daemon) bankSessionCost(id wire.UUID, c wire.Cost) {
 }
 
 // limitTokens is TurnUsage.limitTokens: fresh input and output, no cache reads or thoughts.
+// On an org account it is the relay's count of the provider's answers (#999, FR-022).
 func limitTokens(u wire.TurnUsage) int64 {
+	if t := u.RelayTokens; t != nil {
+		return max(0, t.Input+t.CacheWrite+t.Output)
+	}
 	read, write, thought := int64(0), int64(0), int64(0)
 	if u.CachedReadTokens != nil {
 		read = *u.CachedReadTokens
@@ -380,7 +384,7 @@ func (d *Daemon) bankTurnUsage(id wire.UUID, u wire.TurnUsage) {
 		b.UnpricedTurns = 1
 	}
 	d.recordUsageLocked(a.RuntimeID, b)
-	d.addReport(a, a.RuntimeID, time.Now(), wire.UsageRollupRow{Cost: b.Cost, InputTokens: b.InputTokens,
+	d.addReport(a, a.RuntimeID, time.Now(), wire.UsageRollupRow{Route: u.Route, Cost: b.Cost, InputTokens: b.InputTokens,
 		OutputTokens: b.OutputTokens, ThoughtTokens: b.ThoughtTokens, CachedReadTokens: b.CachedReadTokens,
 		CachedWriteTokens: b.CachedWriteTokens, Turns: b.Turns, UnpricedTurns: b.UnpricedTurns, LimitTokens: &counted})
 	d.costMu.Unlock()

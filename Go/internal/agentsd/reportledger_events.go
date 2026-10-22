@@ -170,7 +170,8 @@ func (d *Daemon) countReportEvents() {
 	oldest := utcHour(time.Now().Add(-reportHoursKept * time.Hour))
 	for _, a := range adds {
 		if a.hour >= oldest {
-			d.addReportLocked(a.project, a.runtime, a.workflow, a.hour, wire.UsageRollupRow{Counts: a.counts})
+			// What the agents did is counted by project, not by route.
+			d.addReportLocked(a.project, a.runtime, a.workflow, "", a.hour, wire.UsageRollupRow{Counts: a.counts})
 		}
 	}
 	d.reportLocked().EventsSeen = last

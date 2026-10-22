@@ -64,12 +64,24 @@ func (d *Daemon) reportPath() string { return filepath.Join(d.Store.Loc.Root, "r
 func utcHour(t time.Time) string { return t.UTC().Format("2006-01-02T15") }
 
 // reportKey is a row's key: its project, runtime and, for a workflow's agents, the workflow
-// (#2019). The rows before #2019 keep their keys.
-func reportKey(project, runtime, workflow string) string {
+// (#2019), and for an org account's turns its route (#999). The rows before keep their keys.
+func reportKey(project, runtime, workflow, route string) string {
+	k := project + "\t" + runtime
 	if workflow != "" {
-		return project + "\t" + runtime + "\t" + workflow
+		k += "\t" + workflow
 	}
-	return project + "\t" + runtime
+	if route != "" {
+		k += "\troute:" + route
+	}
+	return k
+}
+
+// reportRoute is the org route of an agent's account (#999), or "".
+func reportRoute(a *wire.Agent) string {
+	if a == nil {
+		return ""
+	}
+	return orgRouteOf(a.AccountID)
 }
 
 // reportWorkflow is the workflow that started an agent, or "".
@@ -157,20 +169,23 @@ func pruneReport(r *reportFile, now time.Time) {
 func (d *Daemon) addReport(a *wire.Agent, runtime string, at time.Time, add wire.UsageRollupRow) {
 	d.reportMu.Lock()
 	defer d.reportMu.Unlock()
-	d.addReportLocked(reportProject(a), runtime, reportWorkflow(a), utcHour(at), add)
+	d.addReportLocked(reportProject(a), runtime, reportWorkflow(a), reportRoute(a), utcHour(at), add)
 	d.reportChangedLocked()
 }
 
-func (d *Daemon) addReportLocked(project, runtime, workflow, hour string, add wire.UsageRollupRow) {
+func (d *Daemon) addReportLocked(project, runtime, workflow, route, hour string, add wire.UsageRollupRow) {
 	r := d.reportLocked()
 	if r.Hours[hour] == nil {
 		r.Hours[hour] = map[string]wire.UsageRollupRow{}
 	}
-	k := reportKey(project, runtime, workflow)
+	k := reportKey(project, runtime, workflow, route)
 	row := r.Hours[hour][k]
 	row.Project, row.Runtime = project, runtime
 	if workflow != "" {
 		row.Workflow = &workflow
+	}
+	if route != "" {
+		row.Route = &route
 	}
 	addRollupRow(&row, add)
 	r.Hours[hour][k] = row
@@ -225,7 +240,7 @@ func (d *Daemon) reportTime(agent wire.UUID, runtime string, segments []timeSegm
 		return
 	}
 	a := d.Store.Agent(agent)
-	project, workflow := reportProject(a), reportWorkflow(a)
+	project, workflow, route := reportProject(a), reportWorkflow(a), reportRoute(a)
 	d.reportMu.Lock()
 	defer d.reportMu.Unlock()
 	for _, s := range segments {
@@ -245,7 +260,7 @@ func (d *Daemon) reportTime(agent wire.UUID, runtime string, segments []timeSegm
 			} else {
 				add.WorkingSeconds = next.Sub(from).Seconds()
 			}
-			d.addReportLocked(project, runtime, workflow, utcHour(from), add)
+			d.addReportLocked(project, runtime, workflow, route, utcHour(from), add)
 			from = next
 		}
 	}

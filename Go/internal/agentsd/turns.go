@@ -224,22 +224,43 @@ func (d *Daemon) startFor(r wire.StartRequest, by startedBy) (wire.UUID, error) 
 		return "", &Error{Code: CodeFolderGone, Message: path + " is not there any more."}
 	}
 	// An added account has its own sign-in (#840): the host's is not wanted for it.
-	if r.AccountID != nil && *r.AccountID == "" {
+	// "default" names the runtime's own sign-in (#999).
+	ownNamed := r.AccountID != nil && *r.AccountID == ownSignIn
+	if r.AccountID != nil && (*r.AccountID == "" || ownNamed) {
 		r.AccountID = nil
 	}
-	// A helper on its starter's runtime uses its starter's account.
+	// A helper on its starter's runtime uses its starter's account, where the policy lets it.
 	if r.AccountID == nil && by.agent != nil {
-		if c := d.Store.Agent(*by.agent); c != nil && c.RuntimeID == r.RuntimeID && c.AccountID != nil &&
-			d.accountProfile(c.RuntimeID, *c.AccountID) != nil {
-			r.AccountID = c.AccountID
+		if c := d.Store.Agent(*by.agent); c != nil && c.RuntimeID == r.RuntimeID && c.AccountID != nil {
+			if p := d.accountProfile(c.RuntimeID, *c.AccountID); p != nil && reachRefusal(d.orgPolicy(), r.RuntimeID, p, nil) == nil {
+				r.AccountID = c.AccountID
+			}
 		}
 	}
+	// A session that names no account takes the runtime's default (#999, FR-016); a helper
+	// or a workflow says so in its chat.
+	if r.AccountID == nil && !ownNamed {
+		if def := d.defaultAccount(r.RuntimeID); def != nil {
+			r.AccountID = &def.ID
+			if by.agent != nil || by.owner != wire.SessionLabelOwnerPerson {
+				policyNote = strings.TrimSpace(policyNote + " It runs on " + def.Name + ", " + rt.Name + "'s default account.")
+			}
+		}
+	}
+	var account *wire.AccountProfile
 	if r.AccountID != nil {
-		if d.accountProfile(r.RuntimeID, *r.AccountID) == nil {
+		if account = d.accountProfile(r.RuntimeID, *r.AccountID); account == nil {
 			return "", Invalid("%s has no such account. It may have been removed.", rt.Name)
 		}
-	} else if err := d.needsSignIn(r.RuntimeID); err != nil {
+	}
+	// The organisation's policy may require the org path (#999, FR-015).
+	if err := d.accountRefusal(r.RuntimeID, account); err != nil {
 		return "", err
+	}
+	if account == nil {
+		if err := d.needsSignIn(r.RuntimeID); err != nil {
+			return "", err
+		}
 	}
 	// The same start sent again (a window retrying) is the agent it made.
 	if r.RequestID != nil {
@@ -486,7 +507,7 @@ func (l *live) turn() bool {
 		account, err := d.accountFor(a)
 		var launch acp.Launch
 		if err == nil {
-			launch, err = d.launchAs(rt, dir, account)
+			launch, err = d.launchOn(rt, dir, account, l.id)
 		}
 		if err != nil {
 			d.record(l.id, notice("error", rt.Name+" did not start", err.Error()))
@@ -756,16 +777,28 @@ func (l *live) turn() bool {
 		}
 		return true
 	}
-	if r.Usage != nil {
-		u := wire.TurnUsage{TotalTokens: int64(r.Usage.TotalTokens), InputTokens: int64(r.Usage.InputTokens), OutputTokens: int64(r.Usage.OutputTokens)}
-		optional := func(n *int) *int64 {
-			if n == nil {
-				return nil
+	// On an org account, the relay's count of the provider's answers goes beside what the
+	// runtime says (#999, FR-019), also from a runtime that says nothing.
+	relayed, route := d.takeRelayTokens(l.id)
+	if r.Usage != nil || relayed != nil {
+		u := wire.TurnUsage{}
+		if r.Usage != nil {
+			u = wire.TurnUsage{TotalTokens: int64(r.Usage.TotalTokens), InputTokens: int64(r.Usage.InputTokens), OutputTokens: int64(r.Usage.OutputTokens)}
+			optional := func(n *int) *int64 {
+				if n == nil {
+					return nil
+				}
+				v := int64(*n)
+				return &v
 			}
-			v := int64(*n)
-			return &v
+			u.ThoughtTokens, u.CachedReadTokens, u.CachedWriteTokens = optional(r.Usage.ThoughtTokens), optional(r.Usage.CachedReadTokens), optional(r.Usage.CachedWriteTokens)
 		}
-		u.ThoughtTokens, u.CachedReadTokens, u.CachedWriteTokens = optional(r.Usage.ThoughtTokens), optional(r.Usage.CachedReadTokens), optional(r.Usage.CachedWriteTokens)
+		if relayed != nil {
+			u.RelayTokens = relayed
+			if route != "" {
+				u.Route = &route
+			}
+		}
 		d.record(l.id, wire.TranscriptEntryKind{UsageRecorded: &wire.TranscriptEntryKindUsageRecorded{Value: u}})
 		// The turn's tokens on the agent, the day and the charts (finishTurn's banking).
 		d.bankTurnUsage(l.id, u)

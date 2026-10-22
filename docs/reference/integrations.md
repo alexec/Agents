@@ -74,16 +74,17 @@ Open issues: `is:open label:integration allowance`.
 
 An organisation's way to the model (#999): an org key or a gateway, kept on the control
 plane and sent to machines sealed (`docs/explanation/org-keys-and-gateways.md`). Slice 1
-keeps routes and sends them; the machine's relay and launch are slice 2.
+keeps routes and sends them; slice 2 keeps them on the machine and reaches the model through
+its relay. The clients' words are slice 3.
 Open issues: `is:open label:integration gateway`.
 
 | Integration | Clients that show it | State | Last checked | Where | Gaps |
 | --- | --- | --- | --- | --- | --- |
-| Org key (Anthropic, OpenAI, Gemini, xAI) | control plane | built (control plane only) | 2026-10-22, check against a fake API only | `Go/internal/controlplane/orgroutes.go`, `orgtokens.go` | machine relay (slice 2); Alex to test with a real key |
-| Amazon Bedrock (API key, or access key and role by STS) | control plane | built (control plane only) | 2026-10-22, STS against a fake server only | `Go/internal/controlplane/orgtokens.go` | machine relay (slice 2); Alex to test with a real account |
-| Google Vertex AI (service account by OAuth) | control plane | built (control plane only) | 2026-10-22, OAuth against a fake server only | `Go/internal/controlplane/orgtokens.go` | machine relay (slice 2); Alex to test with a real account |
-| Microsoft Azure (key, or Entra app) | control plane | built (control plane only) | 2026-10-22, Entra against a fake server only | `Go/internal/controlplane/orgtokens.go` | machine relay (slice 2); Alex to test with a real account |
-| Base URL (LiteLLM, Portkey, …) | control plane | built (control plane only) | 2026-10-22, check against a fake API only | `Go/internal/controlplane/orgroutes.go` | machine relay (slice 2) |
+| Org key (Anthropic, OpenAI, Gemini, xAI) | control plane, machine | built | 2026-10-22, relay against a fake API; Claude, Codex, Gemini and OpenCode CLIs reach the relay | `Go/internal/controlplane/orgroutes.go`, `Go/internal/agentsd/modelrelay.go` | clients (slice 3); Alex to test with a real key |
+| Amazon Bedrock (API key, or access key and role by STS) | control plane, machine | built (Claude only) | 2026-10-22, STS, SigV4 and the event stream against fakes only | `Go/internal/controlplane/orgtokens.go`, `Go/internal/agentsd/modelrelay.go` | OpenCode not built; clients (slice 3); Alex to test with a real account |
+| Google Vertex AI (service account by OAuth) | control plane, machine | built (Claude, Gemini) | 2026-10-22, OAuth and the relay against fakes only | `Go/internal/controlplane/orgtokens.go`, `Go/internal/agentsd/modelrelay.go` | OpenCode not built; clients (slice 3); Alex to test with a real account |
+| Microsoft Azure (key, or Entra app) | control plane, machine | built | 2026-10-22, Entra and the relay against fakes only | `Go/internal/controlplane/orgtokens.go`, `Go/internal/agentsd/modelrelay.go` | clients (slice 3); Alex to test with a real account |
+| Base URL (LiteLLM, Portkey, …) | control plane, machine | built | 2026-10-22, relay against a fake API only | `Go/internal/controlplane/orgroutes.go`, `Go/internal/agentsd/modelrelay.go` | clients (slice 3) |
 
 ## Runtime downloads
 
@@ -215,7 +216,7 @@ Open issues: `is:open label:integration gateway`.
 | Integration | Clients that show it | State | Last checked | Where | Gaps |
 | --- | --- | --- | --- | --- | --- |
 | Environment variables passed through (Bedrock, Vertex, base URL) | Mac, server | built | — | `Go/internal/agentsd/runtimes.go` | #999 |
-| Org keys and gateways | — | planned | — | — | #999 |
+| Org keys and gateways | control plane, machine | built (see above) | 2026-10-22 | `Go/internal/agentsd/orgroutes.go` | #999 |
 
 ## Planned (no code)
 

@@ -284,11 +284,22 @@ func (d *Daemon) launchFor(r *runtimeDef, dir string) (acp.Launch, error) {
 // launchAs is launchFor on an added account (#840), nil for the runtime's own sign-in. An
 // added account is the folder's own sign-in, so a relayed one is not used for it.
 func (d *Daemon) launchAs(r *runtimeDef, dir string, account *wire.AccountProfile) (acp.Launch, error) {
+	return d.launchOn(r, dir, account, "")
+}
+
+// launchOn is launchAs for a session: an org account's relay counts the session's tokens
+// (#999). An org account is reached through the model relay, never the 056 relay (D8).
+func (d *Daemon) launchOn(r *runtimeDef, dir string, account *wire.AccountProfile, agent wire.UUID) (acp.Launch, error) {
 	path, args, looked := locateFor(r)
 	if path == "" {
 		return acp.Launch{}, &Error{Code: CodeRuntimeNotFound, Message: r.Name + " is not installed on this machine (looked in " + strings.Join(looked, ", ") + ")"}
 	}
 	env := environment(r, loginEnvironment(), d.passThrough(r.ID)...)
+	// Under "the org path only", nothing of the person's own way to the model reaches the
+	// runtime (#999, D9), also for a handshake on the own sign-in.
+	if account == nil && d.signInRefusedHere(r.ID) {
+		env = withoutRuntimeVariables(env)
+	}
 	// The shipped MCP servers sit beside agentsd (~/.agents-server/bin), last on PATH.
 	if self, err := os.Executable(); err == nil {
 		env = appendPath(env, filepath.Dir(self))
@@ -315,7 +326,12 @@ func (d *Daemon) launchAs(r *runtimeDef, dir string, account *wire.AccountProfil
 		env = append(env, "GEMINI_HOME="+d.appHomes()["antigravity"], "AGY_ACP_DISABLE_WORKSPACE_TRUST=1",
 			"AGY_ACP_FORCE_FILE_STORAGE=1")
 	}
-	if account != nil {
+	if isOrgAccount(account) {
+		var err error
+		if env, err = d.withOrgAccount(env, r.ID, account, agent); err != nil {
+			return acp.Launch{}, err
+		}
+	} else if account != nil {
 		d.linkShared(*account)
 		env = withAccount(env, account)
 	}

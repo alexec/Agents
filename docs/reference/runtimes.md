@@ -130,6 +130,53 @@ keeps its sign-in:
 - **Remove it** to stop the sessions that use it, sign it out where the runtime can, and
   delete its folder.
 
+### Org keys and gateways
+
+An organisation's **org route** (#999) is one more account of each runtime it serves: an
+org key, or a gateway (Amazon Bedrock, Google Vertex AI, Microsoft Azure, or a base URL such
+as LiteLLM). Its id is `org:<route id>`, and it says **From your organisation**. The admin
+adds it in Console ▸ Model Access; the machine gets it sealed to its own key and keeps it in
+`org-routes/<id>.json` under the app's root. You cannot remove it; the organisation can. See
+[org keys and gateways](../explanation/org-keys-and-gateways.md).
+
+- **The runtime never gets the key.** The machine runs a **model relay** on loopback (TLS,
+  with a CA of its own in `runtimes/model-relay-ca.pem`). The runtime gets the relay's
+  address and a **stand-in**, a token that works only on that relay and only for its route.
+  The relay puts in the real key, sends the request on, and streams the answer back.
+- **First, everything of your own is taken out.** Your `ANTHROPIC_*`, `OPENAI_*`,
+  `GEMINI_*`, `GOOGLE_*`, `AWS_*`, `CLAUDE_CODE_USE_*` and the like, from your login
+  environment and your pass-through list, do not reach a session on an org account.
+- **Reaches the Model By** is each runtime's default account for new sessions
+  (`runtimes/setDefaultAccount`, kept in the runtimes part of your settings). Without a
+  choice of yours, it is the route the organisation made the default, then the runtime's
+  own sign-in. A helper or workflow that names no account takes it, and says so.
+- **The organisation can require the org path** (policy `runtimes.<id>.reach`). Your own
+  sign-in and added accounts are then refused, with **Set by your organisation**, and a
+  session on one is told to **Continue in New**.
+- **Tokens are the provider's count.** The relay reads the usage in each answer and keeps
+  it beside what the runtime says (`relayTokens`); a limit counts it. A rate-limit answer
+  puts only that account out, until its `Retry-After`, or for 5 minutes.
+
+What each runtime is given, measured on 2026-10-22 against each CLI with a fake provider
+(`<relay>` is `https://127.0.0.1:<port>/<route id>`):
+
+| Runtime | Kind | What the machine sets |
+| --- | --- | --- |
+| **Claude** | Org key, base URL | `ANTHROPIC_BASE_URL=<relay>`, `ANTHROPIC_AUTH_TOKEN=<stand-in>` |
+| **Claude** | Bedrock | `CLAUDE_CODE_USE_BEDROCK=1`, `ANTHROPIC_BEDROCK_BASE_URL=<relay>/~<stand-in>`, `CLAUDE_CODE_SKIP_BEDROCK_AUTH=1`, `AWS_REGION` |
+| **Claude** | Vertex | `CLAUDE_CODE_USE_VERTEX=1`, `ANTHROPIC_VERTEX_BASE_URL=<relay>/~<stand-in>`, `CLAUDE_CODE_SKIP_VERTEX_AUTH=1`, `ANTHROPIC_VERTEX_PROJECT_ID`, `CLOUD_ML_REGION` |
+| **Claude** | Azure (Foundry) | `CLAUDE_CODE_USE_FOUNDRY=1`, `ANTHROPIC_FOUNDRY_BASE_URL=<relay>/~<stand-in>`, `CLAUDE_CODE_SKIP_FOUNDRY_AUTH=1` |
+| **Codex** | Org key, Azure, base URL | `CODEX_HOME` of the route's own, whose `config.toml` has a model provider with `base_url = "<relay>/v1"` and `env_key = "AGENTS_ORG_STAND_IN"` |
+| **Gemini** | Org key, base URL | `GEMINI_API_KEY=<stand-in>`, `GOOGLE_GEMINI_BASE_URL=<relay>`, and `GEMINI_CLI_HOME` of the route's own, which chooses the API key |
+| **Gemini** | Vertex | `GOOGLE_GENAI_USE_VERTEXAI=true`, `GOOGLE_VERTEX_BASE_URL=<relay>`, `GOOGLE_API_KEY=<stand-in>`, `GOOGLE_CLOUD_PROJECT`, `GOOGLE_CLOUD_LOCATION` |
+| **OpenCode** | Org key, Azure, base URL (Anthropic or OpenAI API) | `OPENCODE_CONFIG` of the route's own, with one provider whose `baseURL` is `<relay>/v1` and whose `apiKey` is `{env:AGENTS_ORG_STAND_IN}` |
+
+Claude on Bedrock, Vertex and Foundry is told to skip its own auth, so the stand-in is in
+the path. Every runtime that trusts Node's CAs gets `NODE_EXTRA_CA_CERTS`; Codex gets
+`CODEX_CA_CERTIFICATE`. **Not built:** OpenCode on Bedrock and Vertex (its cloud SDKs sign
+their own requests); Grok (no base URL to measure); Copilot, Cursor and Antigravity (sign-in
+only).
+
 ## What each gets from `~/.agents`
 
 Your own skills, instructions, connectors and plugins in `~/.agents` reach each runtime the

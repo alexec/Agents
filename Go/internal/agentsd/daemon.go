@@ -83,6 +83,7 @@ type Daemon struct {
 	connectionBook
 	setupBook
 	orgPolicyState
+	orgRouteState
 	// pageEdits is what the person changed on live pages since each agent's last turn.
 	pageEdits  pageEdits
 	policyOnce sync.Once
@@ -212,6 +213,7 @@ func (d *Daemon) Shutdown() {
 	d.stopShells()
 	d.stopProjectWatches()
 	d.stopSignInRelays()
+	d.stopModelRelay()
 }
 
 // once is true the first time a sendID is seen: a window sends a prompt again for 30 s

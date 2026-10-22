@@ -64,8 +64,11 @@ func (d *Daemon) profilesLocked() []wire.AccountProfile {
 	return d.profiles
 }
 
-// accountProfile is an added account, or nil.
+// accountProfile is an added account or an org account (#999), or nil.
 func (d *Daemon) accountProfile(runtimeID, id string) *wire.AccountProfile {
+	if strings.HasPrefix(id, orgAccountPrefix) {
+		return d.orgAccount(runtimeID, id)
+	}
 	d.accountMu.Lock()
 	defer d.accountMu.Unlock()
 	for _, p := range d.profilesLocked() {
@@ -83,6 +86,10 @@ func (d *Daemon) accountFor(a *wire.Agent) (*wire.AccountProfile, error) {
 		return nil, nil
 	}
 	p := d.accountProfile(a.RuntimeID, *a.AccountID)
+	if p == nil && orgRouteOf(a.AccountID) != "" {
+		return nil, &Error{Code: wire.FailureOrgRouteRemoved,
+			Message: "Your organisation removed this way to the model. Continue in New to move this session to another account."}
+	}
 	if p == nil {
 		return nil, &Error{Code: CodeInvalidParams, Message: "The account this session used was removed. Start a new session on another account."}
 	}
@@ -90,7 +97,8 @@ func (d *Daemon) accountFor(a *wire.Agent) (*wire.AccountProfile, error) {
 }
 
 // accountProfiles is runtimes/accountProfiles: each added account, with what its folder
-// says about its sign-in now.
+// says about its sign-in now, then each org account (#999); each the policy refuses is
+// marked, and each runtime's default.
 func (d *Daemon) accountProfiles() []wire.AccountProfile {
 	d.accountMu.Lock()
 	list := append([]wire.AccountProfile{}, d.profilesLocked()...)
@@ -98,7 +106,7 @@ func (d *Daemon) accountProfiles() []wire.AccountProfile {
 	for i := range list {
 		d.readSignIn(&list[i])
 	}
-	return list
+	return d.markAccounts(append(list, d.orgAccounts()...))
 }
 
 func (d *Daemon) tellAccountProfiles() {
@@ -225,6 +233,9 @@ func (d *Daemon) removeAccount(ctx context.Context, r wire.AccountRequest) ([]wi
 	p := d.accountProfile(r.RuntimeID, r.AccountID)
 	if p == nil {
 		return nil, Invalid("There is no such account.")
+	}
+	if isOrgAccount(p) {
+		return nil, Invalid("%s is from your organisation. Only your organisation can remove it.", p.Name)
 	}
 	stopped := []wire.UUID{}
 	for _, a := range d.Store.Agents() {
@@ -387,5 +398,8 @@ func (d *Daemon) registerAccounts() {
 	})
 	On(d, wire.CallRuntimesRemoveAccount, func(ctx context.Context, c *Client, r wire.AccountRequest) ([]wire.UUID, error) {
 		return d.removeAccount(ctx, r)
+	})
+	On(d, wire.CallRuntimesSetDefaultAccount, func(ctx context.Context, c *Client, r wire.DefaultAccountRequest) (wire.Empty, error) {
+		return wire.Empty{}, d.setDefaultAccount(r)
 	})
 }
