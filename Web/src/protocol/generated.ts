@@ -693,6 +693,11 @@ export interface BackupState {
    * (#1815).
    */
   canUseControl?: boolean;
+  /**
+   * The backup folder is on the disk of what it backs up, and not a synced folder (#2139): a backup
+   * there undoes a mistake, but is lost with the disk.
+   */
+  sameDisk?: boolean;
 }
 
 /**
@@ -6887,7 +6892,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   BackupRestoreRequest: { required: ["id"], optional: [] },
   BackupRestoreResult: { required: ["restored", "skipped"], optional: [] },
   BackupSettings: { required: ["every", "keep"], optional: ["folder", "target"] },
-  BackupState: { required: ["settings", "folder", "backups", "making"], optional: ["lastError", "canUseControl"] },
+  BackupState: { required: ["settings", "folder", "backups", "making"], optional: ["lastError", "canUseControl", "sameDisk"] },
   BackupStoreCommit: { required: ["name", "parts", "machine", "rootID", "madeAt", "bytes", "agents", "keep"], optional: [] },
   BackupStoreList: { required: ["backups"], optional: [] },
   BackupStorePart: { required: ["name", "part", "data"], optional: [] },

@@ -39,6 +39,16 @@ export function footerWords(state: BackupState): string {
     + "after this one is deleted.";
 }
 
+/** What a folder on the disk it backs up means, and what to do (#2139); null elsewhere. The
+ * folder is chosen on the Mac. */
+export function sameDiskWords(state: BackupState): string | null {
+  if (backupTarget(state) !== "folder" || !state.sameDisk) return null;
+  let words = "This folder is on the same disk as what it backs up. A backup here can undo a mistake, "
+    + "but is lost with the disk. Choose a folder on a second disk, or one that syncs to another place, on the Mac.";
+  if (state.canUseControl) words += " Or back up to the control plane.";
+  return words;
+}
+
 export const restoreMessage = "Its agents come back archived. Nothing on this machine is changed or deleted.";
 
 function bytesWords(bytes: number): string {

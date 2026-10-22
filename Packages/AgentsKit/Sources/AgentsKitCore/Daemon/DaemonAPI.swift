@@ -4348,15 +4348,18 @@ public extension DaemonAPI {
         public var lastError: String?
         /// The machine is on a control plane, so it can back up to its store (#1815).
         public var canUseControl: Bool?
+        /// The folder is on the disk of what it backs up, and not a synced folder (#2139).
+        public var sameDisk: Bool?
 
         public init(settings: BackupSettings, folder: String, backups: [Backup], making: Bool, lastError: String? = nil,
-                    canUseControl: Bool? = nil) {
+                    canUseControl: Bool? = nil, sameDisk: Bool? = nil) {
             self.settings = settings
             self.folder = folder
             self.backups = backups
             self.making = making
             self.lastError = lastError
             self.canUseControl = canUseControl
+            self.sameDisk = sameDisk
         }
     }
 
