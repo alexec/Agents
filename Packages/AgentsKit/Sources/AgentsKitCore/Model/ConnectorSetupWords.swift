@@ -18,7 +18,7 @@ public enum ConnectorSetupWords {
         "Read and push code",
     ]
     public static let sheetSubtitle = "For you, in every project. Agents talks to GitHub's API directly."
-    public static let sheetChoose = "On github.com you choose which repositories. You can take it back there, or with Disconnect on Your Connectors."
+    public static let sheetChoose = "On github.com you choose which repositories. You can take it back there, or with Disconnect on Connectors."
     public static let sheetFoot = "The token is kept by the machine, never in a log."
     public static let continueButton = "Continue on github.com"
     /// Where the person installs the App on the project's repository.
@@ -215,7 +215,7 @@ public enum ConnectorSetupWords {
             : "Then add its connector, or another tracker's, with Add Connector on the Mac."
     }
 
-    // MARK: Your Connectors ▸ Connections
+    // MARK: Connectors ▸ Connections
 
     public static let noConnections = "No connections yet. Connect GitHub to give agents issues, pull requests and Actions in every project, Linear for its issues, GitLab for merge requests, pipelines and issues, and Email for the mail they wait for."
 
@@ -264,7 +264,7 @@ public enum ConnectorSetupWords {
         return at <= now ? "ended" : "ends \(at.addingTimeInterval(-1).formatted(style))"
     }
 
-    /// A provider with no connection yet, on Your Connectors.
+    /// A provider with no connection yet, on Connectors.
     public static func notConnectedNote(_ p: DaemonAPI.ConnectionProvider) -> String {
         switch p {
         case .github: "Issues, pull requests and Actions in every project."
@@ -299,7 +299,7 @@ public enum ConnectorSetupWords {
         return (losing + [disconnectNote(p)]).joined(separator: " ")
     }
 
-    /// A project on Your Connectors: what its set-up uses.
+    /// A project on Connectors: what its set-up uses.
     public static func projectLine(_ setup: Setup) -> String {
         if setup.repository == nil { return noRemote }
         let used = setup.slots.filter { $0.state == .read }.map(\.choice)
@@ -316,7 +316,7 @@ public enum ConnectorSetupWords {
             "Comment as you",
         ]
         public static let subtitle = "For you, in every project. Agents talks to Linear's API directly."
-        public static let choose = "On linear.app you choose the workspace. You can take it back there, or with Disconnect on Your Connectors."
+        public static let choose = "On linear.app you choose the workspace. You can take it back there, or with Disconnect on Connectors."
         public static let continueButton = "Continue on linear.app"
         public static let waiting = "Waiting for linear.app\u{2026} Approve there, and Agents comes back by itself."
         public static let finishing = "Finishing the sign-in\u{2026}"
@@ -330,7 +330,7 @@ public enum ConnectorSetupWords {
             "Read and write issues",
         ]
         public static let subtitle = "For you, in every project. Agents talks to GitLab's API directly."
-        public static let choose = "GitLab asks for the api scope. You can take it back on GitLab \u{25B8} Preferences \u{25B8} Applications, or with Disconnect on Your Connectors."
+        public static let choose = "GitLab asks for the api scope. You can take it back on GitLab \u{25B8} Preferences \u{25B8} Applications, or with Disconnect on Connectors."
         public static let continueButton = "Continue on gitlab.com"
         /// The two ways in, as the sheet's picker says them.
         public static let signInWay = "gitlab.com"
@@ -385,7 +385,7 @@ public enum ConnectorSetupWords {
         public static let passwordPrompt = "App password"
         public static let button = "Connect"
         public static let checking = "Signing in to the mail server\u{2026}"
-        public static let choose = "Agents can read every message in this mailbox. It never sends, answers or deletes mail. Take the app password back at your mail provider, or with Disconnect on Your Connectors."
+        public static let choose = "Agents can read every message in this mailbox. It never sends, answers or deletes mail. Take the app password back at your mail provider, or with Disconnect on Connectors."
         public static let disconnectNote = "Disconnect deletes the machine's app password. The email server's events stop until you connect again or set EMAIL_PASSWORD. To revoke it too, delete the app password at your mail provider."
         /// The connection's note after its server: how it signs in.
         public static let how = "App password"

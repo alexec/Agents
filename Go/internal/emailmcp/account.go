@@ -43,7 +43,7 @@ type Account struct {
 }
 
 // ErrNotConnected is a mailbox with no server, user or password yet.
-var ErrNotConnected = errors.New("no mailbox is connected: Connect Email on Your Connectors, or set EMAIL_IMAP_URL, EMAIL_USER and EMAIL_PASSWORD")
+var ErrNotConnected = errors.New("no mailbox is connected: Connect Email on Connectors, or set EMAIL_IMAP_URL, EMAIL_USER and EMAIL_PASSWORD")
 
 // ParseServer reads the IMAP server's address: imaps://host[:993], imap://host[:143] (with
 // STARTTLS), imap+insecure://127.0.0.1:port (no TLS, this machine only), or a bare host,

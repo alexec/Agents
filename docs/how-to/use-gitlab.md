@@ -26,7 +26,7 @@ You connect once, and the connection is for every project on that host. There ar
 ways in. The sheet has a picker for them, **gitlab.com** and **Access token**.
 
 Open the sheet from a project's **Connectors** page with **Connect GitLab…**, or from
-**Your Connectors** (under Activity in the sidebar). On the Mac, choose
+**Connectors** (under Activity in the sidebar). On the Mac, choose
 **Connect… ▸ GitLab** there. On the Remote and the web page, choose **Connect GitLab…**.
 
 ### On gitlab.com: sign in
@@ -39,7 +39,7 @@ Use this way on gitlab.com. You make no token, and the host renews the sign-in b
 3. The sheet closes by itself when GitLab says yes. If the browser closed, choose
    **Open gitlab.com Again**.
 
-GitLab asks for the `api` scope. Your Connectors then says "OAuth · renews by itself".
+GitLab asks for the `api` scope. Connectors then says "OAuth · renews by itself".
 
 ### On any GitLab: an access token
 
@@ -52,7 +52,7 @@ Use this way for a self-managed GitLab, or for gitlab.com without the sign-in.
 4. Paste it in **Access token**, and choose **Connect**. The host checks the token with
    GitLab before it keeps it.
 
-The row on Your Connectors says the GitLab's host and the token's last day, such as
+The row on Connectors says the GitLab's host and the token's last day, such as
 "Access token · ends 18 Oct 2027". When the token ends, the row says "The access token
 ended: connect again with a new one". **Connect Again…** opens the sheet on **Access
 token**, with the address filled in.
@@ -63,7 +63,7 @@ The host keeps the token, never a log or an answer to a client. The `gitlab` con
 sends it only to the GitLab where you made the connection, so a token for one GitLab never
 goes to another.
 
-**Disconnect** on **Your Connectors ▸ Connections** deletes the host's token. Before it
+**Disconnect** on **Connectors ▸ Connections** deletes the host's token. Before it
 does, it says which projects lose which slots. To revoke the token on GitLab too, go to
 GitLab ▸ Preferences ▸ Applications or Access tokens.
 

@@ -74,7 +74,7 @@ such as "Reaches Tools, Events, Views. Not yet Workflows, Tested."
 
 ## Where you see them
 
-- On every **Connectors** page, for a project and for **Your Connectors**, on the Mac, the
+- On every **Connectors** page, for a project and your own, on the Mac, the
   Remote and the web page.
 - In the Mac's catalogue (**Add Connector…**), on each row and on a connector's detail.
   The catalogue is on the Mac only.
@@ -89,7 +89,7 @@ that name.
 They are added in the same way as any other connector: an entry in an `mcp.json`, with a
 secret named, never written in. They run hosted, one copy on each host, so their events
 keep coming when no agent runs. Each one reads a connection that you made once on
-**Your Connectors**, so it needs no token of its own.
+**Connectors**, so it needs no token of its own.
 
 If you add GitHub's own server next to the GitHub connector that Agents makes, the app
 leaves both. It does not offer to replace one with the other, because you may want both.

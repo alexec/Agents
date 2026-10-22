@@ -191,7 +191,7 @@ def run(v):
 
     # 2. Connect Linear in the window; its sign-in in the video Chrome (the walk hand-off).
     v.say("connect", wait=False)
-    v.select("Your Connectors")
+    v.select("Connectors")
     v.press("Open")  # the project's row: its Connectors page, Tasks first
     v.press("Linear…")
     v.sleep(v.takes["connect"]["duration"])

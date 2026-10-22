@@ -1,5 +1,5 @@
 // A project's Connectors set-up (#1336, frames A, C, F and G), the one Connect sheet for GitHub
-// (frame B) and Linear (#1343, frame H), and Your Connectors ▸ Connections (frame E), as the
+// (frame B) and Linear (#1343, frame H), and Connectors ▸ Connections (frame E), as the
 // window's ConnectorSetupView, ConnectGitHubSheet and YourConnectionsView. The state is the host's, so all three clients
 // show the same ticks. The page draws the Mac's grid; Where agents run says the other
 // providers are set up on the Mac, since Providers is a Mac-only page by design.
@@ -138,7 +138,7 @@ function ConnectionCard({ setup, connect }: { setup: ConnectorSetup; connect: ()
             </p>
           )}
         </div>
-        <a class="small" href="#/a/mcp">Manage in Your Connectors…</a>
+        <a class="small" href="#/a/mcp">Manage in Connectors…</a>
       </div>
     );
   }
@@ -503,7 +503,7 @@ export function ConnectDialog({ store, host, provider, folder, again, connected,
   );
 }
 
-/** Activity ▸ Your Connectors: Connections, with Disconnect (frame E), and a row to connect each provider that is not connected. */
+/** Activity ▸ Connectors: Connections, with Disconnect (frame E), and a row to connect each provider that is not connected. */
 export function YourConnections({ store, host }: { store: Store; host: string }) {
   const [connections, setConnections] = useState<Connection[]>();
   const [problem, setProblem] = useState<string>();

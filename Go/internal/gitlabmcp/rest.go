@@ -101,7 +101,7 @@ func BaseURL(base string) string {
 // MARK: HTTP
 
 // NotConnected is what a call says with no token, or one GitLab no longer takes.
-const NotConnected = "GitLab is not connected, or its token ended: connect GitLab in Your Connectors, or set GITLAB_TOKEN to an access token with the api scope"
+const NotConnected = "GitLab is not connected, or its token ended: connect GitLab in Connectors, or set GITLAB_TOKEN to an access token with the api scope"
 
 func (g *RealGitLab) do(ctx context.Context, method, path string, body any) ([]byte, error) {
 	res, err := g.request(ctx, method, path, body, "")

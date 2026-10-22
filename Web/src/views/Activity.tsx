@@ -227,14 +227,14 @@ export function ActivityRows({ group, store, chosen, onPick }: {
       {row("runtimes", "Runtimes", "What each runtime can be started on right now",
         tally ? (tally.working === 0 ? `None of ${tally.total} working` : `${tally.working} of ${tally.total} working`) : null,
         tally?.working === 0)}
-      {row("mcp", "Your Connectors", "Every connector in your own mcp.json, and how each is doing",
+      {row("mcp", "Connectors", "Every connector in your own mcp.json, and how each is doing",
         mcp?.words ?? null, mcp?.failing ?? false)}
       {row("worktrees", "Worktrees", "Every project's worktrees, and how much each holds", worktrees)}
     </>
   );
 }
 
-const pageTitles: Record<ActivityPage, string> = { events: "Events", resources: "Resources", runtimes: "Runtimes", mcp: "Your Connectors", worktrees: "Worktrees", spending: "Cost", tokens: "Tokens", time: "Time", milestones: "Milestones" };
+const pageTitles: Record<ActivityPage, string> = { events: "Events", resources: "Resources", runtimes: "Runtimes", mcp: "Connectors", worktrees: "Worktrees", spending: "Cost", tokens: "Tokens", time: "Time", milestones: "Milestones" };
 
 /** An Activity page in the chat's place. */
 export function ActivityPageView({ store, page }: { store: Store; page: ActivityPage }) {
@@ -314,7 +314,7 @@ export function ActivityPageView({ store, page }: { store: Store; page: Activity
                   {store.has(host.id, Capability.connections1)
                     ? <YourConnections store={store} host={host.id} />
                     : <p class="hint">{hostNeedsUpdate}</p>}
-                  <h2 class="setup-heading">Your connectors</h2>
+                  <h2 class="setup-heading">User connectors</h2>
                   <MCPServersList store={store} host={host.id} />
                 </section>
               ))}

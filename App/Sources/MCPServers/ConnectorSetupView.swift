@@ -88,7 +88,7 @@ struct ConnectorSetupView: View {
                         Text(ConnectorSetupWords.connectedNote(setup)).appText(.fine).foregroundStyle(.secondary)
                     }
                     Spacer(minLength: 8)
-                    Button("Manage in Your Connectors\u{2026}") { model.sidebarItem = .mcpServers }
+                    Button("Manage in Connectors\u{2026}") { model.sidebarItem = .mcpServers }
                         .buttonStyle(.link).appText(.fine)
                 }
                 if setup.installed == false, let repository = setup.repository {

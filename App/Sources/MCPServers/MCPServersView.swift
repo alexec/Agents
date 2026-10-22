@@ -1,8 +1,8 @@
 import AgentsKitCore
 import SwiftUI
 
-/// A project's Connectors page, with its set-up first (#1336), or Your Connectors, with the
-/// person's connections first. Then every MCP server in one `mcp.json` and how each is doing
+/// A project's Connectors page, with its set-up first (#1336), or the person's own Connectors page, with
+/// their connections first. Then every MCP server in one `mcp.json` and how each is doing
 /// (#753): under Activity, the person's own `~/.agents/mcp.json` (#589); under a project, its
 /// `.agents/mcp.json`.
 ///
@@ -48,7 +48,7 @@ struct MCPServersView: View {
                     Text(UpdateWords.hostNeedsUpdate).foregroundStyle(.secondary)
                 }
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    Text(project == nil ? "Your connectors" : "All connectors")
+                    Text(project == nil ? "User connectors" : "Project connectors")
                         .appText(.fine).fontWeight(.semibold).foregroundStyle(.secondary)
                         .textCase(.uppercase)
                         .accessibilityAddTraits(.isHeader)
@@ -116,7 +116,7 @@ struct MCPServersView: View {
             .frame(maxWidth: 760, alignment: .leading)
             .frame(maxWidth: .infinity)
         }
-        .navigationTitle(projectName.map { "\($0) \u{2014} Connectors" } ?? "Your Connectors")
+        .navigationTitle(projectName.map { "\($0) \u{2014} Connectors" } ?? "Connectors")
         .task(id: host) {
             await model.refreshHostedMCP()
             await model.refreshMCPHealth(host)
@@ -154,7 +154,7 @@ struct MCPServersRow: View {
         // the row's icon red (`activityIcon(_:warns:)`).
         let words = MCPHealthWords.tally(model.work.mcpHealthSnapshot()?.personal ?? [])?.words
         HStack(alignment: .firstTextBaseline) {
-            Text("Your Connectors").foregroundStyle(.primary)
+            Text("Connectors").foregroundStyle(.primary)
             Spacer()
         }
         .help(words.map { "\($0). Every connector in your own mcp.json, and how each is doing" }

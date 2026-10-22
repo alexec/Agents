@@ -15,7 +15,7 @@ iPhone, and on a narrow web page, it is the first screen, and what you open goes
 | Part | What it is |
 | --- | --- |
 | **New Session** | Starts a session in the project you last started one in. The page it opens can change the project. |
-| **Status** | Pages about the work going on now: **Events**, **Resources**, **Runtimes**, **Your Connectors** and **Worktrees**. |
+| **Status** | Pages about the work going on now: **Events**, **Resources**, **Runtimes**, **Connectors** and **Worktrees**. |
 | **Usage** | Pages about past work: **Cost**, **Tokens**, **Time**, and **Milestones** until you have done every first step. |
 | Smart groups | **Pinned**, **Needs You**, **Working** and **Unread**, each across every project and host. See [Smart groups](#smart-groups). |
 | One group per project | Each project's own sessions and workflows. See [A project's group](#a-projects-group). |
@@ -29,7 +29,7 @@ stays in its place however busy its project is.
 
 **Status** and **Usage** each fold, as a project does. Both start open. A row in **Status**
 shows its icon in red when something is wrong: **Runtimes** when no runtime can start,
-and **Your Connectors** when a connector does not answer.
+and **Connectors** when a connector does not answer.
 
 ## Smart groups
 

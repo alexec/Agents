@@ -63,7 +63,7 @@ type gqlError struct {
 func (l *RealLinear) query(ctx context.Context, query string, variables map[string]any, out any) error {
 	key := l.Key()
 	if key == "" {
-		return &LinearError{Kind: NotSignedIn, Message: "Linear is not signed in: connect Linear in Your Connectors, or set LINEAR_API_KEY to a personal API key"}
+		return &LinearError{Kind: NotSignedIn, Message: "Linear is not signed in: connect Linear in Connectors, or set LINEAR_API_KEY to a personal API key"}
 	}
 	body, err := json.Marshal(map[string]any{"query": query, "variables": variables})
 	if err != nil {

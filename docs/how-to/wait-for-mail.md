@@ -30,7 +30,7 @@ Agents Host carries `email-mcp`, and every Linux host installs it beside agentsd
 
 ## Connect Email
 
-On **Your Connectors**, choose **Connect… ▸ Email** on the Mac (**Connect Email…** on the
+On **Connectors**, choose **Connect… ▸ Email** on the Mac (**Connect Email…** on the
 Remote and the web page). Give the IMAP server, the user (usually the address) and the app
 password, then **Connect**. The host signs in once to check them, and keeps the password in
 its own store: the Keychain on a Mac, `~/.agents-secrets` on Linux. The password never goes

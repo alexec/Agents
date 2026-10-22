@@ -1,6 +1,6 @@
 // Every MCP server in one mcp.json and how each is doing (#753), as the window's MCPServersView and
 // the Remote's MCPServersListView: the person's own under Activity, a project's on its own page from
-// its row in the sidebar. A project's page opens with its set-up (#1336), and Your Connectors with
+// its row in the sidebar. A project's page opens with its set-up (#1336), and Connectors with
 // the person's connections. Read-only but for Check Now and Remove… (#2154): servers are edited in Settings.
 import { useState } from "preact/hooks";
 import type { Store } from "../model/store";
@@ -95,7 +95,7 @@ export function MCPServersPage({ store, host, folder, projectName }: {
             ? <ConnectorSetupSection store={store} host={host} folder={folder} projectName={projectName}
               go={(workflow) => go({ host, project: folder, workflow })} />
             : <p class="hint">{hostNeedsUpdate}</p>}
-          <h2 class="setup-heading">All connectors</h2>
+          <h2 class="setup-heading">Project connectors</h2>
           <MCPServersList store={store} host={host} folder={folder} />
           {empty && <p class="hint">{projectEmpty}</p>}
           <p class="hint">{projectIntro}</p>
