@@ -124,23 +124,29 @@ private struct AddSignInSheet: View {
     @State private var problem: String?
     @State private var isAdding = false
 
+    private static let title = "Add a Sign-in"
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            Text("Add a Sign-in").appText(.title)
-            Text("Sign in on this device. Then sign in the same way on your other Macs, iPhones and iPads to pair them with no code.")
-                .appText(.supporting).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-            SignInButtons(providers: adding.providers, nonce: adding.nonce, signedIn: { provider, token in
-                Task {
-                    isAdding = true
-                    problem = await add(provider, token)
-                    isAdding = false
-                    if problem == nil { dismiss() }
-                }
-            }, failed: { problem = $0 })
-            .disabled(isAdding)
-            if let problem {
-                Text(problem).appText(.supporting).tinted(.failure).fixedSize(horizontal: false, vertical: true)
+        #if os(iOS)
+        // An iOS sheet (#2081): the title in the bar and Cancel where iOS puts it.
+        NavigationStack {
+            Form {
+                Section { content }
+                    .paperListRow()
             }
+            .paperForm()
+            .navigationTitle(Self.title)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel", role: .cancel) { dismiss() }
+                }
+            }
+        }
+        #else
+        VStack(alignment: .leading, spacing: 14) {
+            Text(Self.title).appText(.title)
+            content
             HStack {
                 Spacer()
                 Button("Cancel", role: .cancel) { dismiss() }
@@ -148,5 +154,24 @@ private struct AddSignInSheet: View {
         }
         .padding(20)
         .frame(minWidth: 320)
+        #endif
+    }
+
+    @ViewBuilder
+    private var content: some View {
+        Text("Sign in on this device. Then sign in the same way on your other Macs, iPhones and iPads to pair them with no code.")
+            .appText(.supporting).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+        SignInButtons(providers: adding.providers, nonce: adding.nonce, signedIn: { provider, token in
+            Task {
+                isAdding = true
+                problem = await add(provider, token)
+                isAdding = false
+                if problem == nil { dismiss() }
+            }
+        }, failed: { problem = $0 })
+        .disabled(isAdding)
+        if let problem {
+            Text(problem).appText(.supporting).tinted(.failure).fixedSize(horizontal: false, vertical: true)
+        }
     }
 }

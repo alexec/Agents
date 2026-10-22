@@ -1,7 +1,7 @@
 import AgentsKitCore
 import SwiftUI
 
-/// Control plane ▸ Sign-in (#995, spec 736 FR-004, FR-006), for admins: turn Apple, Google
+/// Control plane ▸ Sign-in Providers (#995, spec 736 FR-004, FR-006), for admins: turn Apple, Google
 /// and GitHub sign-in on or off, and allow Google Workspace domains and GitHub organisations.
 /// A provider this build has no client id for says so, and cannot be turned on.
 ///

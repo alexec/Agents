@@ -18,8 +18,8 @@ anything with them.
 
 You must be an admin.
 
-1. Open **Settings ▸ Control plane ▸ Sign-in** (on the web page, **Settings**, then
-   **Sign-in** under Control plane).
+1. Open **Settings ▸ Control plane ▸ Sign-in Providers** (on the web page, **Settings**,
+   then **Sign-in Providers** under Control plane).
 2. Turn on **Apple**, **Google** or **GitHub**. A provider that this build has no client id
    for says so, and you cannot turn it on.
 3. Optional: in **Allowed Google Workspace domains**, type your domains, for example
