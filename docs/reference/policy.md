@@ -1,3 +1,9 @@
+---
+diataxis: reference
+devices: [mac, iphone, ipad]
+description: The organisation's policy, its rules, its signature and its methods.
+---
+
 # Policy
 
 The organisation's policy (#998): one document on the control plane, signed by its key and
