@@ -32,8 +32,24 @@ test("bots: a bot's line says its group, cap and spend", () => {
   assert.equal(g.botLine({ id: "b", name: "review-bot", kind: "bot", group: "g1", caps: { dailyUSD: 50 }, spentTodayUSD: 3.2 }, [platform]),
     "In Platform · $50 a day · $3.20 today");
   assert.equal(g.capWords(undefined), "No cap");
-  assert.equal(g.parseCap(" $12.5 "), 12.5);
-  assert.equal(g.parseCap("none"), undefined);
   assert.equal(g.capReachedWords({ user: "b", name: "review-bot", group: "Platform", spentUSD: 51, capUSD: 50, until: 0 }),
     "review-bot stopped at Platform’s cap: $51 of $50 today. It starts work again at midnight UTC.");
+});
+
+test("bots: a cap typed in is dollars or refused, never no cap for text typed (#2066)", () => {
+  const dollars = (usd) => ({ kind: "dollars", usd });
+  const refused = (problem) => ({ kind: "refused", problem });
+  assert.deepEqual(g.readCap(" $12.5 "), dollars(12.5));
+  assert.deepEqual(g.readCap("1,000"), dollars(1000));
+  assert.deepEqual(g.readCap("$1,000.50"), dollars(1000.5));
+  assert.deepEqual(g.readCap("50 USD"), dollars(50));
+  assert.deepEqual(g.readCap("$50 a day"), dollars(50));
+  assert.deepEqual(g.readCap("50 dollars"), dollars(50));
+  assert.deepEqual(g.readCap(""), { kind: "none" });
+  assert.deepEqual(g.readCap(" None "), { kind: "none" });
+  assert.deepEqual(g.readCap("€50"), refused(g.capNotDollars));
+  assert.deepEqual(g.readCap("1,00"), refused(g.capNotDollars));
+  assert.deepEqual(g.readCap("fifty"), refused(g.capNotDollars));
+  assert.deepEqual(g.readCap("-5"), refused(g.capNotDollars));
+  assert.deepEqual(g.readCap("0"), refused(g.capNotAboveZero));
 });

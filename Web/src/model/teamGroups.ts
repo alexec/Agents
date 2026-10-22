@@ -86,8 +86,28 @@ export function capReachedWords(reached: CapReached): string {
   return `${reached.name} stopped at ${whose}: ${dollars(reached.spentUSD)} of ${dollars(reached.capUSD)} today. It starts work again at midnight UTC.`;
 }
 
-/** A cap typed in: dollars, or undefined for no cap. A bad number is no cap too. */
-export function parseCap(text: string): number | undefined {
-  const usd = Number(text.trim().replace("$", ""));
-  return text.trim() !== "" && Number.isFinite(usd) && usd > 0 ? usd : undefined;
+/** A daily cap as typed in (#2066): no cap, dollars, or the sentence that says why it is refused. */
+export type CapEntry = { kind: "none" } | { kind: "dollars"; usd: number } | { kind: "refused"; problem: string };
+
+export const capNotDollars = "Type the daily cap in dollars, such as 50 or $1,000, or leave it empty for no cap.";
+export const capNotAboveZero = "A daily cap is more than $0. Leave it empty for no cap.";
+
+/**
+ * Reads a cap typed in, as `BotWords.readCap` does. Empty or "none" is no cap; "50", "$1,000", "50 USD" and
+ * "$50 a day" are dollars. Any other text is refused, never saved as no cap.
+ */
+export function readCap(text: string): CapEntry {
+  let words = text.trim().toLowerCase();
+  if (["", "none", "no cap", "no"].includes(words)) return { kind: "none" };
+  const strip = (ends: string[], suffix: boolean) => {
+    const end = ends.find((e) => (suffix ? words.endsWith(e) : words.startsWith(e)));
+    if (end) words = (suffix ? words.slice(0, -end.length) : words.slice(end.length)).trim();
+  };
+  strip(["a day", "per day", "/day", "each day", "daily"], true);
+  strip(["usd", "dollars", "dollar"], true);
+  strip(["us$", "usd", "$"], false);
+  if (!/^(\d{1,3}(,\d{3})+(\.\d+)?|\d+(\.\d+)?|\.\d+)$/.test(words)) return { kind: "refused", problem: capNotDollars };
+  const usd = Number(words.replaceAll(",", ""));
+  if (!Number.isFinite(usd)) return { kind: "refused", problem: capNotDollars };
+  return usd > 0 ? { kind: "dollars", usd } : { kind: "refused", problem: capNotAboveZero };
 }

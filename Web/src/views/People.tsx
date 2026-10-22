@@ -6,7 +6,7 @@ import { useEffect } from "preact/hooks";
 import { useSignal } from "@preact/signals";
 import type { Store } from "../model/store";
 import type { ControlCodeShown, Group, PeopleList, PersonInvited, PersonRemovePreview, PersonRow, UserRole } from "../protocol/generated";
-import { botLine, botWords, capReachedWords, dollars, parseCap } from "../model/teamGroups";
+import { botLine, botWords, capReachedWords, dollars, readCap } from "../model/teamGroups";
 import { CallFailed } from "../wire/link";
 import { describe, methodNotFound } from "../model/errors";
 import { askingLine, badges, canRemove, joinCommandNote, joinCommandTitle, canSetRole, clientLine, inviteNote, machineLine, memberNote, noPeople, ordered, removeLines,
@@ -130,9 +130,13 @@ function BotSheet({ store, bot, groups, close }: { store: Store; bot: PersonRow 
   const busy = useSignal(false);
   const ready = (bot !== null || name.value.trim() !== "") && group.value !== "" && !busy.value;
   const save = async () => {
+    const entry = readCap(cap.value);
+    if (entry.kind === "refused") {
+      problem.value = entry.problem;
+      return;
+    }
     busy.value = true;
-    const usd = parseCap(cap.value);
-    const caps = usd !== undefined ? { dailyUSD: usd } : {};
+    const caps = entry.kind === "dollars" ? { dailyUSD: entry.usd } : {};
     try {
       if (bot) await store.link.call("bots/setCaps", { user: bot.id, caps, group: group.value });
       else await store.link.call("bots/make", { name: name.value.trim(), group: group.value, caps });

@@ -273,10 +273,35 @@ public enum BotWords {
         usd == usd.rounded() ? "$\(Int(usd))" : String(format: "$%.2f", usd)
     }
 
-    /// A cap typed in: dollars, or nil for no cap. A bad number is no cap too.
-    public static func parseCap(_ text: String) -> Double? {
-        let trimmed = text.trimmingCharacters(in: .whitespaces).replacingOccurrences(of: "$", with: "")
-        guard let usd = Double(trimmed), usd > 0 else { return nil }
-        return usd
+    /// A daily cap as typed in (#2066): no cap, dollars, or the sentence that says why it is refused.
+    public enum CapEntry: Equatable, Sendable {
+        case none
+        case dollars(Double)
+        case refused(String)
+    }
+
+    public static let capNotDollars = "Type the daily cap in dollars, such as 50 or $1,000, or leave it empty for no cap."
+    public static let capNotAboveZero = "A daily cap is more than $0. Leave it empty for no cap."
+
+    /// Reads a cap typed in. Empty or "none" is no cap; "50", "$1,000", "50 USD" and "$50 a day" are dollars.
+    /// Any other text is refused, never saved as no cap.
+    public static func readCap(_ text: String) -> CapEntry {
+        var words = text.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        if ["", "none", "no cap", "no"].contains(words) { return .none }
+        func strip(_ ends: [String], suffix: Bool) {
+            for end in ends where suffix ? words.hasSuffix(end) : words.hasPrefix(end) {
+                words = String(suffix ? words.dropLast(end.count) : words.dropFirst(end.count))
+                    .trimmingCharacters(in: .whitespaces)
+                return
+            }
+        }
+        strip(["a day", "per day", "/day", "each day", "daily"], suffix: true)
+        strip(["usd", "dollars", "dollar"], suffix: true)
+        strip(["us$", "usd", "$"], suffix: false)
+        guard let number = try? Regex(#"\d{1,3}(,\d{3})+(\.\d+)?|\d+(\.\d+)?|\.\d+"#),
+              words.wholeMatch(of: number) != nil,
+              let usd = Double(words.replacingOccurrences(of: ",", with: "")), usd.isFinite
+        else { return .refused(capNotDollars) }
+        return usd > 0 ? .dollars(usd) : .refused(capNotAboveZero)
     }
 }

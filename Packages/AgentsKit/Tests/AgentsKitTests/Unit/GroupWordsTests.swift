@@ -40,11 +40,26 @@ struct BotWordsTests {
                                       caps: DaemonAPI.SpendCaps(dailyUSD: 50), spentTodayUSD: 3.2)
         #expect(BotWords.line(bot, groups: [platform]) == "In Platform · $50 a day · $3.20 today")
         #expect(BotWords.cap(nil) == "No cap")
-        #expect(BotWords.parseCap(" $12.5 ") == 12.5)
-        #expect(BotWords.parseCap("none") == nil)
         let reached = DaemonAPI.CapReached(user: "b", name: "review-bot", group: "Platform", spentUSD: 51, capUSD: 50,
                                            until: Date())
         #expect(BotWords.capReached(reached)
             == "review-bot stopped at Platform’s cap: $51 of $50 today. It starts work again at midnight UTC.")
+    }
+
+    /// A cap typed in is dollars, no cap when empty, or refused: never no cap for text typed (#2066).
+    @Test func aCapTypedInIsDollarsOrRefused() {
+        #expect(BotWords.readCap(" $12.5 ") == .dollars(12.5))
+        #expect(BotWords.readCap("1,000") == .dollars(1000))
+        #expect(BotWords.readCap("$1,000.50") == .dollars(1000.5))
+        #expect(BotWords.readCap("50 USD") == .dollars(50))
+        #expect(BotWords.readCap("$50 a day") == .dollars(50))
+        #expect(BotWords.readCap("50 dollars") == .dollars(50))
+        #expect(BotWords.readCap("") == .none)
+        #expect(BotWords.readCap(" None ") == .none)
+        #expect(BotWords.readCap("€50") == .refused(BotWords.capNotDollars))
+        #expect(BotWords.readCap("1,00") == .refused(BotWords.capNotDollars))
+        #expect(BotWords.readCap("fifty") == .refused(BotWords.capNotDollars))
+        #expect(BotWords.readCap("-5") == .refused(BotWords.capNotDollars))
+        #expect(BotWords.readCap("0") == .refused(BotWords.capNotAboveZero))
     }
 }

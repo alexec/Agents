@@ -68,6 +68,9 @@ func (m *Methods) makeBot(ctx context.Context, request wire.BotMake) (wire.BotMa
 	if m.records.Group(request.Group) == nil {
 		return wire.BotMade{}, fail(invalidParams, "There is no such group.")
 	}
+	if err := refuseBadCap(request.Caps); err != nil {
+		return wire.BotMade{}, err
+	}
 	id := records.NewPersonID()
 	err := m.records.ChangePeople(ctx, func(all map[string]records.Person) ([]records.Person, error) {
 		for _, p := range all {
@@ -90,6 +93,9 @@ func (m *Methods) setBotCaps(ctx context.Context, request wire.BotCaps) error {
 	group := deref(request.Group)
 	if group != "" && m.records.Group(group) == nil {
 		return fail(invalidParams, "There is no such group.")
+	}
+	if err := refuseBadCap(&request.Caps); err != nil {
+		return err
 	}
 	err := m.records.ChangePeople(ctx, func(all map[string]records.Person) ([]records.Person, error) {
 		p, ok := all[request.User]
@@ -130,6 +136,15 @@ func (m *Methods) stopBotRun(request wire.BotStopRun, from Caller) error {
 		return fail(invalidParams, "%s did not stop it.", m.records.Host(host).Name)
 	}
 	m.s.log("an admin stopped " + string(request.Agent) + " on " + owner.Name + "'s " + host)
+	return nil
+}
+
+// refuseBadCap refuses a daily cap that is not more than $0 (#2066): no cap is a cap left out, never a
+// number that is quietly dropped.
+func refuseBadCap(c *wire.SpendCaps) error {
+	if c != nil && c.DailyUSD != nil && !(*c.DailyUSD > 0) {
+		return fail(invalidParams, "A daily cap is more than $0. Leave it out for no cap.")
+	}
 	return nil
 }
 

@@ -103,6 +103,9 @@ func (m *Methods) setGroup(ctx context.Context, request wire.GroupSet) (wire.Gro
 			return wire.Group{}, fail(invalidParams, "There is already a group called %s.", g.Name)
 		}
 	}
+	if err := refuseBadCap(request.Caps); err != nil {
+		return wire.Group{}, err
+	}
 	everyone := deref(request.Everyone)
 	members := []string{}
 	if !everyone {
