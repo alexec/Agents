@@ -339,3 +339,54 @@ func TestLeftoversGoAndLiveFilesStay(t *testing.T) {
 		t.Fatal("a record's lock went")
 	}
 }
+
+// #2293: a key's folder goes with its last key, up to the root, so an hour's folder of
+// usage does not stay for ever; a folder with another key stays.
+func TestAFolderGoesWithItsLastKey(t *testing.T) {
+	root := t.TempDir()
+	f := NewFolder(root)
+	f.Put(ctx, "v1/usage/hours/2026-10-21T10/a.json", []byte("{}"), Absent)
+	f.Put(ctx, "v1/usage/hours/2026-10-21T11/a.json", []byte("{}"), Absent)
+	f.Put(ctx, "v1/usage/hours/2026-10-21T11/b.json", []byte("{}"), Absent)
+	f.Delete(ctx, "v1/usage/hours/2026-10-21T10/a.json")
+	if _, err := os.Stat(filepath.Join(root, "v1/usage/hours/2026-10-21T10")); !os.IsNotExist(err) {
+		t.Fatal("the empty hour's folder stayed")
+	}
+	f.Delete(ctx, "v1/usage/hours/2026-10-21T11/a.json")
+	if _, err := os.Stat(filepath.Join(root, "v1/usage/hours/2026-10-21T11/b.json")); err != nil {
+		t.Fatal("a folder with a key went")
+	}
+	f.Delete(ctx, "v1/usage/hours/2026-10-21T11/b.json")
+	if _, err := os.Stat(filepath.Join(root, "v1")); !os.IsNotExist(err) {
+		t.Fatal("the empty folders above stayed")
+	}
+	if _, err := os.Stat(root); err != nil {
+		t.Fatal("the root went")
+	}
+}
+
+// Writes into a folder while its last key is deleted all land.
+func TestWritesRaceTheFolderGoing(t *testing.T) {
+	f := NewFolder(t.TempDir())
+	var wg sync.WaitGroup
+	errs := make(chan error, 400)
+	for n := range 200 {
+		wg.Add(2)
+		go func() {
+			defer wg.Done()
+			key := fmt.Sprintf("v1/h/%d/a.json", n%5)
+			if _, err := f.Put(ctx, key, []byte("{}"), Always); err != nil {
+				errs <- err
+			}
+		}()
+		go func() {
+			defer wg.Done()
+			f.Delete(ctx, fmt.Sprintf("v1/h/%d/b.json", n%5))
+		}()
+	}
+	wg.Wait()
+	close(errs)
+	for err := range errs {
+		t.Fatal(err)
+	}
+}

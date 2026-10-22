@@ -10,6 +10,7 @@ import (
 	"github.com/alexec/agents/Go/internal/controllink"
 	"github.com/alexec/agents/Go/internal/controlplane/records"
 	"github.com/alexec/agents/Go/internal/controlplane/store"
+	"github.com/alexec/agents/Go/internal/controlplane/usersettings"
 	"github.com/alexec/agents/Go/wire"
 )
 
@@ -280,5 +281,35 @@ func TestABurstOfStrangersReadsTheRequestsOnce(t *testing.T) {
 	call(t, owner, "", "links/deny", wire.ChannelLinkDecide{Request: requests[0].Request})
 	if got := len(linkRequests(t, owner)); got != linksOpen-1 {
 		t.Fatalf("%d requests wait after one was denied", got)
+	}
+}
+
+// #2293: a removed person's settings, sealed secrets and saved report views go with them;
+// another person's stay.
+func TestARemovedPersonsRecordsGo(t *testing.T) {
+	st := store.NewMemory()
+	p := startPlane(t, st, controllink.NewPrivateKey())
+	_, owner := p.client("Alex's Mac")
+	sam := p.invite(owner, "Sam", wire.UserRoleMember)
+	ctx := context.Background()
+	keys := func(user string) []string {
+		return []string{usersettings.Prefix + user + "/settings.json", usersettings.Prefix + user + "/secrets/TOKEN.json",
+			reportViewsKey(user)}
+	}
+	for _, user := range []string{sam.id, "someone-else"} {
+		for _, k := range keys(user) {
+			st.Put(ctx, k, []byte("{}"), store.Always)
+		}
+	}
+	call(t, owner, "", "people/remove", wire.PersonRequest{User: sam.id})
+	for _, k := range keys(sam.id) {
+		if o, _ := st.Get(ctx, k); o != nil {
+			t.Fatalf("%s stayed", k)
+		}
+	}
+	for _, k := range keys("someone-else") {
+		if o, _ := st.Get(ctx, k); o == nil {
+			t.Fatalf("%s went", k)
+		}
 	}
 }

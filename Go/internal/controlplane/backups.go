@@ -355,6 +355,27 @@ func (b *backupStore) prune(ctx context.Context, owner, host string, keep int64)
 	}
 }
 
+// pruneOrphans prunes each owner's backups, as a backup of one of their hosts does, for
+// the owners none of whose hosts backs up any more (#2293): the backups of a removed host
+// go once old, and parts a cut-off backup left go after a day. Run by the sweep once a day:
+// it lists every backup.
+func (b *backupStore) pruneOrphans(ctx context.Context) error {
+	keys, err := b.store.List(ctx, backupsPrefix)
+	if err != nil {
+		return err
+	}
+	owners := map[string]bool{}
+	for _, k := range keys {
+		if owner, _, ok := strings.Cut(strings.TrimPrefix(k.Key, backupsPrefix), "/"); ok && backupFolderName(owner) {
+			owners[owner] = true
+		}
+	}
+	for owner := range owners {
+		b.prune(ctx, owner, "", 0)
+	}
+	return nil
+}
+
 // backupFolderName is an id that is one folder of a key: a host's or an owner's.
 func backupFolderName(id string) bool {
 	return id != "" && !strings.HasPrefix(id, ".") && !strings.ContainsAny(id, `/\`)
