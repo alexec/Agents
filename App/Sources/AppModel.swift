@@ -3921,10 +3921,12 @@ final class AppModel {
         }
     }
 
+    /// Takes a connector out of its mcp.json on `host`: a server project's on its own
+    /// host (#2199), the person's own and this Mac's projects' on this Mac's.
     func mcpRemove(_ name: String, at destination: DaemonAPI.SkillDestination,
-                   forgetSecret: String?) async -> DaemonAPI.MCPCatalogError? {
+                   forgetSecret: String?, on host: HostID = .mac) async -> DaemonAPI.MCPCatalogError? {
         do {
-            _ = try await macClient.call(DaemonAPI.Method.mcpRemove,
+            _ = try await (host == .mac ? macClient : client(for: host)).call(DaemonAPI.Method.mcpRemove,
                                      DaemonAPI.MCPRemoveRequest(destination: destination, name: name,
                                                                forgetSecret: forgetSecret),
                                      returning: DaemonAPI.MCPRemoveAnswer.self)
