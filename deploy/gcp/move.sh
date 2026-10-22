@@ -2,14 +2,14 @@
 # The VM's side of a move of the control plane from a Mac to the VM (#1567), as the steps in
 # docs/how-to/run-the-control-plane-in-the-cloud.md ("Move the control plane from your Mac").
 #
-#   deploy/gcp/move.sh [--dry-run] receive control-key
+#   deploy/gcp/move.sh [--dry-run] [--build] receive control-key
 #   deploy/gcp/move.sh [--dry-run] done
 #
 # receive: before Check in the Move sheet. It stops the control plane on the VM, saves its store
 # to /opt/agents/saved/store-<time>.tgz on the VM (a copy from an earlier move is kept, not
 # lost), empties it, sets AGENTS_CONTROL_RECEIVE=1, and runs deploy/gcp/up.sh --seal-key with the
-# key that Save Key… wrote. up.sh builds what this checkout has, copies it, seals the key and
-# starts the control plane. Then it deletes the key file here.
+# key that Save Key… wrote. up.sh pulls the release's image (or, with --build, builds this
+# checkout), copies the rest, seals the key and starts the control plane. Then it deletes the key file here.
 #
 # done: after Move Now. It takes AGENTS_CONTROL_RECEIVE=1 out of the VM's deploy/.env, so a lost
 # store does not wait for a move again.
@@ -22,6 +22,7 @@ up_args=()
 while (($#)); do
 	case $1 in
 	--dry-run) dry_run=1; up_args+=(--dry-run); shift ;;
+	--build) build=1; up_args+=(--build); shift ;;
 	*) break ;;
 	esac
 done
@@ -34,6 +35,9 @@ receive)
 done) ;;
 *) die "say receive control-key, or done" ;;
 esac
+
+# Before the store is emptied: up.sh must have an image to start.
+[[ $what == "done" ]] || pick_version
 
 setup
 compose='cd /opt/agents && sudo docker compose -f deploy/compose.public.yaml'

@@ -52,11 +52,16 @@ service's own ssh. Machines join with a code or their join command, from the web
     ACME_EMAIL=you@example.com
     ```
 
-3. Start it:
+3. Get the release's image, `ghcr.io/alexec/agents-control` (set `AGENTS_VERSION` in
+    `deploy/.env` for a release other than the newest), and start it:
 
     ```sh
-    docker compose -f deploy/compose.hosted.yaml up -d --build
+    docker compose -f deploy/compose.hosted.yaml pull
+    docker compose -f deploy/compose.hosted.yaml up -d
     ```
+
+    To run a commit that no release has, give `--build` to `up` in a clone of the
+    repository: it builds the image there.
 
 4. Open `https://<your domain>/` and select **Sign Up with GitHub**.
 

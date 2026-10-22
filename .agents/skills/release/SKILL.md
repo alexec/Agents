@@ -266,6 +266,11 @@ A tag that already exists for this version means another release ran: end with
    `wait_for_event` and `until_minutes: 30`, and look again).
 2. **GitHub:** `gh release view v<version> --json assets` has the `.dmg`, the `.zip`,
    both `agentsd-linux-*.tar.gz` and `SHA256SUMS`.
+   **The image** (#2140): the `image` job passed, and
+   `docker buildx imagetools inspect ghcr.io/alexec/agents-control:<version>` lists
+   `linux/amd64` and `linux/arm64`. If the job failed, name
+   the step and the first error: the `mac` job waits for it, so there is no GitHub release
+   either.
    **The parts agree** (#1748): each asset's name says `<version>`, and so does the
    `testflight` job's version. On this Mac, `git checkout --detach v<version>` in a scratch
    worktree and `scripts/version.sh` there prints `<version>`, the version every build

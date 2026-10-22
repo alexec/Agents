@@ -18,8 +18,9 @@ copies](run-several-copies.md).
 
 ## Before you start
 
-- A clone of the Agents repository on a Mac with Docker running, to build the Linux
-  programs: they are Go, built in a container.
+- Nothing to build. Each release of Agents publishes the control plane as a signed image,
+  `ghcr.io/alexec/agents-control:<version>`, for x86-64 and ARM64, and the Linux host on
+  its GitHub release. See [The image](#the-image).
 - A Linux machine you rent, on x86-64 or ARM64, with Docker and Docker Compose. The
   smallest size a provider offers is plenty: 1 CPU and 1 GB of memory. The control plane
   runs no agents itself.
@@ -35,7 +36,7 @@ copies](run-several-copies.md).
 
 On Google Cloud, three scripts do most of the steps below for you: they make the machine,
 its firewall, its address, the Cloud KMS key and the DNS records, then build and start the
-control plane. Each script looks first for what it makes, so you can run it again safely.
+control plane. They run from a clone of the Agents repository on your Mac. Each script looks first for what it makes, so you can run it again safely.
 Each takes `--dry-run`, which prints every command and runs none.
 
 ### What you make first
@@ -59,9 +60,11 @@ Each takes `--dry-run`, which prints every command and runs none.
 
 4. For notices on iPhone and iPad with no Mac host: the APNs `.p8` key, as in
    [Build and copy what it runs](#build-and-copy-what-it-runs). Its name gives the Key ID.
-5. On your Mac: `gcloud` (`brew install --cask gcloud-cli`) and Docker, running, with the
-   `buildx` plugin. The image is for `linux/amd64`, and on an Apple silicon Mac only BuildKit
-   can build it. `docker buildx version` tells you if you have the plugin. If not:
+5. On your Mac: `gcloud` (`brew install --cask gcloud-cli`) and `gh`, signed in, which
+   gets the release's Linux host. Docker only to build a commit that no release has
+   (`up.sh --build`): then Docker, running, with the `buildx` plugin. The image is for
+   `linux/amd64`, and on an Apple silicon Mac only BuildKit can build it.
+   `docker buildx version` tells you if you have the plugin. If not:
 
    ```sh
    brew install docker-buildx
@@ -115,9 +118,9 @@ In the repository on your Mac:
    deploy/gcp/up.sh --apns AuthKey_KEYID.p8
    ```
 
-   When both names point at the machine, it builds the Linux host and the control
-   plane's image on your Mac, copies them, `deploy/compose.public.yaml` and the secrets to
-   `/opt/agents` on the machine, and starts the control plane and Caddy. It waits until
+   When both names point at the machine, it gets the release's Linux host, copies it,
+   `deploy/compose.public.yaml` and the secrets to `/opt/agents` on the machine, has the
+   machine pull the release's image, and starts the control plane and Caddy. It waits until
    `https://control.agentloops.dev/healthz` answers. Let's Encrypt's address for notices is
    your git email, or give `--email`. Use `--domain` and `--views-domain` for other names.
 
@@ -127,10 +130,14 @@ In the repository on your Mac:
 5. Get the first code with the command that `up.sh` prints, then go on at
    [Pair your first window](#pair-your-first-window).
 
-To upgrade, run `up.sh` again: it builds and copies the new image, and keeps the store,
-the APNs key and the snapshot schedule. Set `AGENTS_VERSION` to the version to stamp on it, such as `0.9.0`;
-without it, `scripts/version.sh` says. At the end, `up.sh` checks that the control plane on
-the machine says that version, the one **Settings ▸ Control plane** shows.
+`up.sh` runs the release in `AGENTS_VERSION`, such as `0.11.0`. Without it,
+`scripts/version.sh` says, which is a release's version only in a checkout of its tag. For
+a commit that no release has, give `--build`: it builds the Linux host and the image on your
+Mac from the checkout, stamps that version on them, and copies them to the machine.
+
+To upgrade, run `up.sh` again with the new version: the machine pulls the new image, and
+keeps the store, the APNs key and the snapshot schedule. At the end, `up.sh` checks that the
+control plane on the machine says that version, the one **Settings ▸ Control plane** shows.
 
 Every release of Agents deploys control.agentloops.dev this way (#2100). After the tag,
 and after the GitHub release and both TestFlight builds pass, the release runs, in a
@@ -233,21 +240,35 @@ On your Mac, with `gcloud` (put your project's id in place of `my-project`):
    On a Compute Engine VM that runs as the service account, make no key file: the VM gets
    its right to use the key from Google Cloud, and no secret of any kind is on its disk.
 
-### Build and copy what it runs
+### Get what it runs
 
-On your Mac, in the repository:
+On the machine, in a folder of its own such as `~/agents`, for the release you run (here
+0.11.0):
 
-1. Build the Linux host:
+1. Get the `deploy/` folder and the runtimes' toolsets from the release's source, with no
+   clone of the repository:
 
    ```sh
-   scripts/build-linux-agentsd.sh
+   v=0.11.0
+   curl -fsSL https://github.com/alexec/Agents/archive/refs/tags/v$v.tar.gz |
+       tar -xz --strip-components 1 --wildcards '*/deploy' '*/App/Resources/toolsets'
    ```
 
-   It goes in `App/Resources/servers/`, from where the control plane hands it to every
-   Linux server that joins. The control plane also hands each server the runtimes'
-   toolsets in `App/Resources/toolsets/`, so the server installs Claude by itself. The control plane itself is built in its image, on the
-   machine, from `Go/` and `Web/`.
-2. Say which key seals the control plane's key, and give the service account's key file:
+   `deploy/` has the compose file, the Caddyfile and `make-secrets.sh`. The control plane
+   hands each Linux server that joins the toolsets in `App/Resources/toolsets/`, so the
+   server installs Claude by itself.
+2. Get the Linux host from the release, into `App/Resources/servers/`, from where the
+   control plane hands it to every Linux server that joins:
+
+   ```sh
+   mkdir -p App/Resources/servers
+   for arch in x86_64 aarch64; do
+       curl -fsSL https://github.com/alexec/Agents/releases/download/v$v/agentsd-linux-$arch-$v.tar.gz |
+           tar -xz -C App/Resources/servers
+   done
+   ```
+
+3. Say which key seals the control plane's key, and give the service account's key file:
 
    ```sh
    deploy/make-secrets.sh --public \
@@ -272,37 +293,40 @@ On your Mac, in the repository:
    from the file's name) and `AGENTS_APNS_TEAM_ID` in `deploy/.env`. Give `--apns-key-id`
    when the file has another name. Without it, the control plane sends no pushes, and its
    log says so once when it starts. Never put the key in a code, the store or the repo.
-3. Copy the repository's `deploy/` folder (with `deploy/secrets`), `Go/`, `Web/`,
-   `App/Resources/servers/` and `App/Resources/toolsets/` to the machine, keeping the same layout. For example:
 
-   ```sh
-   rsync -a --relative --exclude node_modules --exclude Web/dist --exclude Go/out \
-       deploy Go Web App/Resources/servers App/Resources/toolsets you@agents.example.com:agents/
-   ```
+   `make-secrets.sh` runs on the machine, in the folder of step 1, or on your Mac: then
+   copy `deploy/.env` and `deploy/secrets/` to the machine.
+
+To run a commit that no release has, build from source instead: in a clone of the
+repository, run `scripts/build-linux-agentsd.sh` (it writes `App/Resources/servers/`), copy
+`deploy/`, `Go/`, `Web/` and `App/Resources/` to the machine with the same layout, and give
+`--build` to `docker compose up` below. The image is then built on the machine.
 
 ### Start it
 
 On the machine, in the folder you copied to:
 
-1. Say the two names and your email, in `deploy/.env`:
+1. Say the two names, your email and the release, in `deploy/.env`:
 
    ```sh
    AGENTS_DOMAIN=agents.example.com
    AGENTS_VIEWS_DOMAIN=views.example.com
    ACME_EMAIL=you@example.com
+   AGENTS_VERSION=0.11.0
    ```
 
-   Caddy gets a certificate for each name.
+   Caddy gets a certificate for each name. `AGENTS_VERSION` is the image's tag: a release
+   such as `0.11.0`, `0.11` for the newest 0.11 release, or `latest`. Without it, `latest`.
 
-2. Start the control plane and Caddy:
+2. Get the image, and start the control plane and Caddy:
 
    ```sh
-   docker compose -f deploy/compose.public.yaml up -d --build
+   docker compose -f deploy/compose.public.yaml pull
+   docker compose -f deploy/compose.public.yaml up -d
    ```
 
-   The control plane says its version in Settings ▸ Control plane. Put it in
-   `AGENTS_VERSION` (in `deploy/.env` or the environment), such as the output of
-   `git describe --tags --always`. Without it, the version is `dev`.
+   To upgrade, get the new release's `deploy/` folder and Linux host as above, set the new
+   `AGENTS_VERSION`, and run both commands again. The store and the certificate stay.
 
    At its first start the control plane makes its key and seals it in the store. To keep
    a key from elsewhere, seal it before this step: see
@@ -423,7 +447,7 @@ first.
    machine:
 
    ```sh
-   ssh you@agents.example.com 'cd agents && docker compose -f deploy/compose.public.yaml build control'
+   ssh you@agents.example.com 'cd agents && docker compose -f deploy/compose.public.yaml pull control'
    ssh you@agents.example.com 'cd agents && docker compose -f deploy/compose.public.yaml \
        run --rm -T control key seal --key-fd 0' < control-key
    ```
@@ -580,7 +604,42 @@ Then make a machine there that starts from that disk, with the flags of `up.sh`'
 `--image-family`, `--image-project` and `--boot-disk-*` flags. Set `zone` in
 `deploy/gcp/common.sh` to the new zone before you run `up.sh` again.
 
+## The image
+
+Each release pushes `ghcr.io/alexec/agents-control` from the release workflow (#2140), for
+`linux/amd64` and `linux/arm64`, with three tags: `0.11.0`, `0.11` and `latest`. It has
+`agents-control`, `workspace-commands`, `agents-hosted` and the web page in it, all of the
+same version.
+
+It is signed with cosign, keyless: the signature names the release workflow that pushed
+it. Check it before you run it:
+
+```sh
+cosign verify ghcr.io/alexec/agents-control:0.11.0 \
+    --certificate-identity-regexp '^https://github.com/alexec/Agents/\.github/workflows/release\.yml@' \
+    --certificate-oidc-issuer https://token.actions.githubusercontent.com
+```
+
+The image also carries an SBOM (SPDX) and its build's provenance (SLSA), as BuildKit
+attestations. To read them:
+
+```sh
+docker buildx imagetools inspect ghcr.io/alexec/agents-control:0.11.0 --format '{{ json .SBOM }}'
+docker buildx imagetools inspect ghcr.io/alexec/agents-control:0.11.0 --format '{{ json .Provenance }}'
+```
+
+The image is public, and pulling it needs no account. If the repository becomes private
+(#1064), the package stays public: its visibility is set on the package, apart from the
+repository's.
+
+To add the CLIs that your workspace commands call, make an image of your own `FROM` this
+one, and `apk add` them.
+
 ## If it doesn't work
+
+- **`docker compose pull` says `denied` or `manifest unknown`.** No release has that
+  `AGENTS_VERSION`. Check the tag at
+  [the package's page](https://github.com/alexec/Agents/pkgs/container/agents-control).
 
 - **The control plane stops at start with `could not find default credentials`.** It has no
   right to use the Cloud KMS key: `deploy/secrets/gcp-service-account` is empty and the

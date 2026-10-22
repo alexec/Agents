@@ -4,7 +4,7 @@
 # file's). Each step first looks for what it makes, so running it again is safe, and carries on
 # where it stopped.
 #
-#   deploy/gcp/up.sh [--dry-run] [--apns AuthKey_KEYID.p8 [--apns-key-id KEYID]]
+#   deploy/gcp/up.sh [--dry-run] [--build] [--apns AuthKey_KEYID.p8 [--apns-key-id KEYID]]
 #       [--email you@example.com] [--domain control.agentloops.dev] [--views-domain views.agentloops.dev]
 #       [--seal-key control-key]
 #
@@ -22,9 +22,11 @@
 #   all on the disk, so a snapshot restores the whole control plane.
 #
 # Then it prints the address, and stops until both names point at it (deploy/cloudflare/dns.sh):
-# Let's Encrypt allows only a few failed tries an hour. Run it again after that, and it builds
-# the image here (linux/amd64), copies it, deploy/compose.public.yaml and the secrets to
-# /opt/agents on the VM, and starts the control plane and Caddy there. The VM has no service
+# Let's Encrypt allows only a few failed tries an hour. Run it again after that, and it copies
+# deploy/compose.public.yaml, the secrets and the release's Linux host to /opt/agents on the VM,
+# has the VM pull the release's image, ghcr.io/alexec/agents-control:<version> (#2140), and
+# starts the control plane and Caddy there. --build is for a commit no release has: it builds
+# the image (linux/amd64) and the Linux host here, from this checkout, and copies them. The VM has no service
 # account file (an empty one): it uses the key as its own service account.
 #
 # --apns gives the APNs key (deploy/make-secrets.sh --apns); without it, a key already on the
@@ -32,9 +34,10 @@
 # from a Mac (docs/how-to/run-the-control-plane-in-the-cloud.md). --dry-run prints every command
 # and runs none: it needs no gcloud, no key file and no account.
 #
-# AGENTS_VERSION is the version it stamps on the control plane and the Linux host: a release
-# sets it to the tag's, X.Y.Z (#2100). Without it, scripts/version.sh says. At the end it checks
-# that the control plane running on the VM says that version.
+# AGENTS_VERSION is the version it runs: a release sets it to the tag's, X.Y.Z (#2100), whose
+# image and Linux host it pulls. Without it, scripts/version.sh says. That is a release's only
+# on its tag, so elsewhere give --build, which stamps that version on what it builds. At the end
+# it checks that the control plane running on the VM says that version.
 set -euo pipefail
 here=$(cd "$(dirname "$0")" && pwd)
 root=$(cd "$here/../.." && pwd)
@@ -49,6 +52,7 @@ seal_key=''
 while (($#)); do
 	case $1 in
 	--dry-run) dry_run=1; shift ;;
+	--build) build=1; shift ;;
 	--apns) apns+=(--apns "${2:?--apns needs the .p8 file}"); shift 2 ;;
 	--apns-key-id) apns+=(--apns-key-id "${2:?--apns-key-id needs the Key ID}"); shift 2 ;;
 	--email) email=${2:?--email needs an address}; shift 2 ;;
@@ -61,9 +65,13 @@ done
 [[ -n $email ]] || email=$(git -C "$root" config user.email || true)
 [[ -n $email ]] || die "say the address Let's Encrypt writes to: --email you@example.com"
 [[ -z $seal_key || -s $seal_key ]] || die "$seal_key is not a key file"
-# The image is built for linux/amd64. On an Apple silicon Mac the classic builder cannot do it:
-# it needs BuildKit, through the buildx plugin. Look before anything is made in the cloud.
-((dry_run)) || docker buildx version >/dev/null 2>&1 ||
+# Look before anything is made in the cloud.
+pick_version
+((build || dry_run)) || gh release view "v$version" --repo alexec/Agents >/dev/null ||
+	die "there is no GitHub release v$version: give --build to build this checkout"
+# With --build, the image is built for linux/amd64. On an Apple silicon Mac the classic builder
+# cannot do it: it needs BuildKit, through the buildx plugin.
+((!build || dry_run)) || docker buildx version >/dev/null 2>&1 ||
 	die "docker buildx is not installed: brew install docker-buildx, then link it for Docker: mkdir -p ~/.docker/cli-plugins && ln -sfn \$(brew --prefix)/opt/docker-buildx/bin/docker-buildx ~/.docker/cli-plugins/docker-buildx"
 
 setup
@@ -181,17 +189,27 @@ else
 	done
 fi
 
-say "== the image and the Linux host, built here"
-version=${AGENTS_VERSION:-$("$root/scripts/version.sh")}
-say "version $version"
-run env AGENTS_MARKETING_VERSION="$version" "$root/scripts/build-linux-agentsd.sh"
-run docker build --platform linux/amd64 --build-arg "VERSION=$version" \
-	-f "$root/deploy/Containerfile" -t agents-control:latest "$root"
-
-say "== what the VM runs, in /opt/agents"
 stage=$(mktemp -d)
 trap 'rm -rf "$stage"' EXIT
-mkdir -p "$stage/deploy" "$stage/App/Resources"
+mkdir -p "$stage/deploy" "$stage/App/Resources/servers"
+if ((build)); then
+	say "== the image and the Linux host, built here: $version"
+	run env AGENTS_MARKETING_VERSION="$version" "$root/scripts/build-linux-agentsd.sh"
+	run docker build --platform linux/amd64 --build-arg "VERSION=$version" \
+		-f "$root/deploy/Containerfile" -t "$image:$tag" "$root"
+	((dry_run)) || cp -R "$root/App/Resources/servers/." "$stage/App/Resources/servers/"
+else
+	# The release's own Linux host, the one its Agents Host carries, rather than one built here.
+	say "== the Linux host of release v$version"
+	for arch in x86_64 aarch64; do
+		run gh release download "v$version" --repo alexec/Agents --pattern "agentsd-linux-$arch-$version.tar.gz" \
+			--dir "$stage" --clobber
+		run tar -xzf "$stage/agentsd-linux-$arch-$version.tar.gz" -C "$stage/App/Resources/servers"
+		run rm "$stage/agentsd-linux-$arch-$version.tar.gz"
+	done
+fi
+
+say "== what the VM runs, in /opt/agents"
 cp "$root/deploy/compose.public.yaml" "$root/deploy/Caddyfile.public" "$root/deploy/make-secrets.sh" "$stage/deploy/"
 # The hand-back page's files (#1343), so a new copy of them goes with each run. Only
 # deploy/gcp/site.sh turns the site on.
@@ -202,11 +220,11 @@ run "$stage/deploy/make-secrets.sh" --public --kms "$kms" ${apns[@]+"${apns[@]}"
 tar_skip=()
 ((${#apns[@]})) || tar_skip=(--exclude deploy/secrets/apns-key)
 {
-	printf '%s=%s\n' AGENTS_DOMAIN "$domain" AGENTS_VIEWS_DOMAIN "$views_domain" ACME_EMAIL "$email"
+	printf '%s=%s\n' AGENTS_DOMAIN "$domain" AGENTS_VIEWS_DOMAIN "$views_domain" ACME_EMAIL "$email" \
+		AGENTS_VERSION "$tag"
 	if [[ -f $stage/deploy/.env ]]; then cat "$stage/deploy/.env"; fi
 } >"$stage/deploy/.env.new"
 rm -f "$stage/deploy/.env" "$stage/deploy/make-secrets.sh"
-((dry_run)) || cp -R "$root/App/Resources/servers" "$stage/App/Resources/servers"
 ((dry_run)) || cp -R "$root/App/Resources/toolsets" "$stage/App/Resources/toolsets"
 # The lines in .env.new replace the same names in the VM's deploy/.env; the others stay.
 install='set -e; sudo mkdir -p /opt/agents; sudo tar -C /opt/agents --no-same-owner -xzf -; cd /opt/agents/deploy
@@ -214,10 +232,12 @@ sudo touch .env; sudo chmod 600 .env
 while IFS= read -r line; do k=${line%%=*}; { sudo grep -v "^$k=" .env || true; echo "$line"; } | sudo tee .env.t >/dev/null; sudo mv .env.t .env; done < .env.new
 sudo rm .env.new; [ -f secrets/apns-key ] || { sudo touch secrets/apns-key; sudo chmod 644 secrets/apns-key; }'
 if ((dry_run)); then
-	say "+ docker save agents-control:latest | gzip | $(shown gcloud compute ssh "$name" --zone "$zone" --quiet --command 'gunzip | sudo docker load')"
+	if ((build)); then
+		say "+ docker save $image:$tag | gzip | $(shown gcloud compute ssh "$name" --zone "$zone" --quiet --command 'gunzip | sudo docker load')"
+	fi
 	say "+ tar -C STAGE ${tar_skip[*]-} -czf - deploy App | $(shown gcloud compute ssh "$name" --zone "$zone" --quiet --command "$install")"
 else
-	docker save agents-control:latest | gzip | vm_ssh 'gunzip | sudo docker load'
+	if ((build)); then docker save "$image:$tag" | gzip | vm_ssh 'gunzip | sudo docker load'; fi
 	COPYFILE_DISABLE=1 tar --no-xattrs -C "$stage" ${tar_skip[@]+"${tar_skip[@]}"} -czf - deploy App | vm_ssh "$install"
 fi
 
@@ -229,6 +249,12 @@ if [[ -n $seal_key ]]; then
 	else
 		vm_ssh "$compose run --rm -T control key seal --key-fd 0" <"$seal_key"
 	fi
+fi
+
+if ((!build)); then
+	say "== the image, pulled on the VM: $image:$tag"
+	vm_ssh "$compose pull --quiet control" ||
+		die "the VM could not pull $image:$tag: is the package public (github.com/alexec/Agents/pkgs/container/agents-control)? Or give --build"
 fi
 
 say "== the control plane and Caddy"
