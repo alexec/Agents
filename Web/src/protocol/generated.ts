@@ -5725,6 +5725,11 @@ export interface UsageReport {
   groupNames?: Record<string, string>;
   /** The scope's budget for a calendar month, in US dollars (#1804); absent when it has none. */
   budgetUSD?: number;
+  /**
+   * What the scope spent this calendar month (UTC), in US dollars, beside budgetUSD (#2057); absent
+   * when there is no budget.
+   */
+  monthSpentUSD?: number;
 }
 
 /**
@@ -7407,7 +7412,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   Usage: { required: ["used", "size", "at"], optional: ["cost"] },
   UsageBucket: { required: ["cost", "inputTokens", "outputTokens", "thoughtTokens", "cachedReadTokens", "cachedWriteTokens", "turns", "unpricedTurns"], optional: [] },
   UsageHistory: { required: ["hours", "days", "now"], optional: ["timeZone"] },
-  UsageReport: { required: ["range", "rows", "admin"], optional: ["scope", "personsHidden", "groupNames", "budgetUSD"] },
+  UsageReport: { required: ["range", "rows", "admin"], optional: ["scope", "personsHidden", "groupNames", "budgetUSD", "monthSpentUSD"] },
   UsageRollup: { required: ["hours", "days"], optional: [] },
   UsageRollupPeriod: { required: ["at", "rows"], optional: [] },
   UsageRollupRow: { required: ["project", "runtime", "cost", "inputTokens", "outputTokens", "thoughtTokens", "cachedReadTokens", "cachedWriteTokens", "turns", "unpricedTurns", "workingSeconds", "waitingSeconds"], optional: [] },

@@ -151,9 +151,12 @@ public extension DaemonAPI {
         public var groupNames: [String: String]?
         /// The scope's budget for a calendar month, in US dollars.
         public var budgetUSD: Double?
+        /// What the scope spent this calendar month (UTC), in US dollars, beside the budget.
+        public var monthSpentUSD: Double?
 
         public init(range: ReportRange, rows: [ReportRow], admin: Bool, scope: ReportScope? = nil,
-                    personsHidden: Bool? = nil, groupNames: [String: String]? = nil, budgetUSD: Double? = nil) {
+                    personsHidden: Bool? = nil, groupNames: [String: String]? = nil, budgetUSD: Double? = nil,
+                    monthSpentUSD: Double? = nil) {
             self.range = range
             self.rows = rows
             self.admin = admin
@@ -161,6 +164,7 @@ public extension DaemonAPI {
             self.personsHidden = personsHidden
             self.groupNames = groupNames
             self.budgetUSD = budgetUSD
+            self.monthSpentUSD = monthSpentUSD
         }
     }
 

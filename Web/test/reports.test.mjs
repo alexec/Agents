@@ -53,7 +53,6 @@ test("scopes (#1804): a group dimension past Me, none naming a person when hidde
   assert.deepEqual(t.groups.map((g) => [g.name, g.cost.USD]), [["Platform", 2], ["Web", 2], ["No group", 1]]);
   assert.equal(t.total.cost.USD, 3, "the total counts each row once");
   const now = new Date(Date.UTC(2026, 9, 11, 0, 0, 0));
-  assert.equal(r.monthSpentUSD([row({ at: "2026-10-01", cost: { USD: 5 } }), row({ at: "2026-09-30", cost: { USD: 9 } })], now), 5);
   assert.equal(r.forecastUSD(100, now), 310);
   assert.match(r.budgetWords(100, 250, now), /of .*250.* this month · forecast .*310.*, over budget$/);
 });

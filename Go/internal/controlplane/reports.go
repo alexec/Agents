@@ -137,6 +137,25 @@ func (s *Service) report(ctx context.Context, r wire.ReportRange, keep func(pers
 	if !ok {
 		return nil, fail(invalidParams, "Say a range: day, week, month or threeMonths.")
 	}
+	return s.reportFrom(ctx, prefix, first, keep)
+}
+
+// monthSpentUSD is what the people keep says spent this calendar month, UTC, in US
+// dollars: the budget's figure, so the page need not ask for the month's rows (#2057).
+func (s *Service) monthSpentUSD(ctx context.Context, keep func(person string) bool, now time.Time) (float64, error) {
+	rows, err := s.reportFrom(ctx, usageDaysPrefix, now.UTC().Format("2006-01")+"-01", keep)
+	if err != nil {
+		return 0, err
+	}
+	spent := 0.0
+	for _, row := range rows {
+		spent += row.Cost["USD"]
+	}
+	return spent, nil
+}
+
+// reportFrom is the rows under prefix from the period first on, oldest first.
+func (s *Service) reportFrom(ctx context.Context, prefix, first string, keep func(person string) bool) ([]wire.ReportRow, error) {
 	keys, err := s.cfg.Store.List(ctx, prefix)
 	if err != nil {
 		return nil, fail(storeUnavailable, "The reports could not be read: %v", err)

@@ -18680,6 +18680,10 @@
         "budgetUSD": {
           "type": "number",
           "description": "The scope's budget for a calendar month, in US dollars (#1804); absent when it has none."
+        },
+        "monthSpentUSD": {
+          "type": "number",
+          "description": "What the scope spent this calendar month (UTC), in US dollars, beside budgetUSD (#2057); absent when there is no budget."
         }
       },
       "required": [

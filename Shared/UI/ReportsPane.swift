@@ -14,6 +14,8 @@ struct ReportsPane: View {
     @State private var range: DaemonAPI.ReportRange = .week
     @State private var dimension: ReportTotals.Dimension = .person
     @State private var report: DaemonAPI.UsageReport?
+    /// The report added up by the dimension, once per report or dimension, not at each draw (#2057).
+    @State private var totals: ReportTotals?
     @State private var problem: String?
     @State private var export: ReportFile?
     @State private var isExporting = false
@@ -27,8 +29,7 @@ struct ReportsPane: View {
                 }
             }
             .paperListRow()
-            if let report, report.range == range {
-                let totals = ReportTotals(report.rows, by: dimension)
+            if let report, report.range == range, let totals {
                 Section {
                     if totals.groups.isEmpty {
                         Text(ReportWords.empty).appText(.supporting).foregroundStyle(.secondary)
@@ -54,6 +55,7 @@ struct ReportsPane: View {
         .scrollContentBackground(.hidden)
         .refreshable { await load() }
         .task(id: Ask(range: range, connected: control != nil)) { await load() }
+        .onChange(of: dimension) { addUp() }
         .fileExporter(isPresented: $isExporting, document: export, contentType: export?.type ?? .commaSeparatedText,
                       defaultFilename: export?.name) { result in
             if case .failure(let error) = result { problem = "Not exported: \(error.localizedDescription)" }
@@ -104,10 +106,15 @@ struct ReportsPane: View {
         do {
             report = try await control.call(DaemonAPI.Method.reportsUsage, DaemonAPI.ReportQuery(range: range),
                                             returning: DaemonAPI.UsageReport.self)
+            addUp()
             problem = nil
         } catch {
             problem = ReportWords.sentence(error)
         }
+    }
+
+    private func addUp() {
+        totals = report.map { ReportTotals($0.rows, by: dimension) }
     }
 
     private func exportRows(_ format: DaemonAPI.ReportFormat) async {

@@ -209,6 +209,9 @@ func (s *Service) scopedReport(ctx context.Context, r wire.ReportRange, scope *w
 	}
 	if usd, ok := policy.BudgetsUSD[budgetKey]; ok && budgetKey != "" {
 		out.BudgetUSD = &usd
+		if spent, err := s.monthSpentUSD(ctx, keep, time.Now()); err == nil {
+			out.MonthSpentUSD = &spent
+		}
 	}
 	return out, nil
 }
