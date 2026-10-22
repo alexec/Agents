@@ -90,13 +90,13 @@ export function orderedProjects(hosts: ControlHost[], projects: Record<string, P
           ...byHost.filter((r) => r.project.project.pinned !== true)];
 }
 
-/** Every host's archived projects, the latest worked on first, as the window's Archived projects (#343). */
+/** Every host's archived projects, the latest archived first (#2153), as the window's Archived projects (#343). */
 export function archivedProjects(hosts: ControlHost[], projects: Record<string, ProjectSummary[]>):
   { host: ControlHost; project: ProjectSummary }[] {
   return hosts.flatMap((host) => (projects[host.id] ?? [])
     .filter((project) => project.project.archivedAt !== undefined)
     .map((project) => ({ host, project })))
-    .sort((a, b) => b.project.lastActivityAt - a.project.lastActivityAt);
+    .sort((a, b) => (b.project.project.archivedAt ?? b.project.lastActivityAt) - (a.project.project.archivedAt ?? a.project.lastActivityAt));
 }
 
 export function Sidebar({ session, store, linkDown }: { session: Session; store: Store; linkDown: boolean }) {

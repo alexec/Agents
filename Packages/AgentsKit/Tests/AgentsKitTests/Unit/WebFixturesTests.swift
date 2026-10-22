@@ -299,7 +299,7 @@ struct WebFixturesTests {
         let everyone = Self.agents.enumerated().map { index, entry in
             var agent = entry.1
             // Spread out in time, not in the order listed, so the order is the rule's: a
-            // live group by when it started (#182), Archived by its last activity.
+            // live group by when it started (#182), Archived by its last activity (none has an archivedAt).
             agent.lastActivityAt = Self.at(Double((index * 7) % 23))
             agent.createdAt = Self.at(Double((index * 5) % 19) - 30)
             return agent
@@ -319,6 +319,17 @@ struct WebFixturesTests {
             ])),
             Case(name: "an empty project", input: .object([
                 "folder": .string(Self.folderURL.absoluteString), "agents": .array([try Self.encode(elsewhere)]),
+            ])),
+            // Archived newest archived first (#2153): 71 was active a day ago and archived
+            // now, 72 active an hour ago and archived a day ago, 73 has no archivedAt and
+            // goes by its activity two days ago.
+            Case(name: "archived by when each was archived", input: .object([
+                "folder": .string(Self.folderURL.absoluteString),
+                "agents": .array(try [(71, -1_440.0, 0.0), (72, -60.0, -1_440.0), (73, -2_880.0, nil)].map { n, active, archived in
+                    var agent = Self.agent(n, .archived, minutes: active)
+                    agent.archivedAt = archived.map(Self.at)
+                    return try Self.encode(agent)
+                }),
             ])),
         ]
         try pin("groups/panels.json", cases) { input in

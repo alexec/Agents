@@ -115,9 +115,12 @@ export function projectFolder(agent: Agent): string {
   return folderKey(agent.worktree?.project ?? agent.cwd);
 }
 
-/** ProjectShelf.byActivity: newest activity first, then by id. */
-function byActivity(a: Agent, b: Agent): number {
-  return b.lastActivityAt - a.lastActivityAt || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+/**
+ * ProjectShelf.byArchived: newest archived first, then by id (#2153); a record from before
+ * archivedAt goes by its last activity.
+ */
+export function byArchived(a: Agent, b: Agent): number {
+  return (b.archivedAt ?? b.lastActivityAt) - (a.archivedAt ?? a.lastActivityAt) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
 }
 
 /**
@@ -128,11 +131,11 @@ export function byStart(a: Agent, b: Agent): number {
   return b.createdAt - a.createdAt || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
 }
 
-/** AgentsModel.agents(in:group:): newest started first; under Archived newest activity first, as the host pages them. */
+/** AgentsModel.agents(in:group:): newest started first; under Archived newest archived first, as the host pages them. */
 export function agentsIn(agents: readonly Agent[], folder: string, group: AgentGroup): Agent[] {
   const wanted = folderKey(folder);
   const found = agents.filter((agent) => projectFolder(agent) === wanted && groupOf(agent) === group);
-  return found.sort(group === "archived" ? byActivity : byStart);
+  return found.sort(group === "archived" ? byArchived : byStart);
 }
 
 /** The column's headings in order, empty ones left out. */

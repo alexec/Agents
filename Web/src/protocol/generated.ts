@@ -3007,6 +3007,7 @@ export interface LineMember {
 export interface ListCursor {
   lastActivityAt: WireDate;
   id: UUID;
+  archivedAt?: WireDate;
 }
 
 export interface ListRequest {
@@ -7113,7 +7114,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   LendGit: { required: ["host", "from", "server", "allowed"], optional: [] },
   LendSignIn: { required: ["host", "from", "runtime", "allowed"], optional: [] },
   LineMember: { required: ["agentID", "askedAt", "isCallOpen"], optional: [] },
-  ListCursor: { required: ["lastActivityAt", "id"], optional: [] },
+  ListCursor: { required: ["lastActivityAt", "id"], optional: ["archivedAt"] },
   ListRequest: { required: ["includeArchived", "archivedCommands", "archivedOnly", "lean"], optional: ["folder", "startedByWorkflow", "limit", "agentID", "after", "query"] },
   ListedSkill: { required: ["name", "folder"], optional: ["description", "managed"] },
   MCPAddAnswer: { required: [], optional: ["server", "error"] },

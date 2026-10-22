@@ -8857,6 +8857,9 @@
         },
         "id": {
           "$ref": "#/definitions/UUID"
+        },
+        "archivedAt": {
+          "$ref": "#/definitions/WireDate"
         }
       },
       "required": [
