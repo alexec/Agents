@@ -340,17 +340,34 @@ func (c *botCaps) clear(user string) bool {
 // spentToday is what a user's machines said they spent today, UTC, in US dollars.
 func (s *Service) spentToday(ctx context.Context, user string, now time.Time) float64 {
 	day := now.UTC().Format(usageDayLayout)
-	total := 0.0
+	prefix := usageDaysPrefix + day + "/"
+	listed, err := s.cfg.Store.List(ctx, prefix)
+	if err != nil {
+		return 0
+	}
+	mine := map[string]bool{}
 	for _, h := range s.records.Hosts() {
-		if s.ownerOf(h.ID) != user {
-			continue
+		if s.ownerOf(h.ID) == user {
+			mine[usageKey(usageDaysPrefix, day, h.ID)] = true
 		}
-		object, err := s.cfg.Store.Get(ctx, usageKey(usageDaysPrefix, day, h.ID))
-		if err != nil || object == nil {
+	}
+	var read []store.Key
+	for _, k := range listed {
+		if mine[k.Key] {
+			read = append(read, k)
+		}
+	}
+	objects, err := s.storeReads.read(ctx, s.cfg.Store, prefix, listed, read)
+	if err != nil {
+		return 0
+	}
+	total := 0.0
+	for _, data := range objects {
+		if data == nil {
 			continue
 		}
 		var kept storedUsage
-		if json.Unmarshal(object.Data, &kept) != nil {
+		if json.Unmarshal(data, &kept) != nil {
 			continue
 		}
 		for _, row := range kept.Rows {
