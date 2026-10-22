@@ -86,6 +86,7 @@ nav:
       - how-to/run-several-copies.md
       - how-to/move-an-existing-set-up.md
       - how-to/back-up-and-restore.md
+      - how-to/back-up-a-control-plane.md
       - how-to/release-agents-host.md
       - how-to/fix-agents-host-not-starting.md
       - how-to/chat-without-a-project.md
