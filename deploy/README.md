@@ -150,6 +150,21 @@ the compose network whose certificate chains to the control plane's `AGENTS_TEST
 Nothing then goes to Apple. `agentsctl pair -kind iPhone` and `agentsctl device` stand in for a
 phone. See `specs/058-control-plane/walks/1507.md`.
 
+## Metrics and logs
+
+Each copy can serve Prometheus `/metrics` on a port of its own (#2176):
+`AGENTS_CONTROL_METRICS=0.0.0.0:9791` with `AGENTS_CONTROL_METRICS_TOKEN` (a token is necessary
+on any address but loopback), never on the port clients use. `AGENTS_CONTROL_LOG_FORMAT=json`
+writes JSON log lines (`log/slog`), and `AGENTS_CONTROL_LOG_LEVEL=debug` adds a line for each
+request. `compose.yaml` turns both on, with the token `walk-metrics`:
+
+```sh
+docker compose -f deploy/compose.yaml exec cp1 wget -qO- --header 'Authorization: Bearer walk-metrics' http://127.0.0.1:9791/metrics
+```
+
+`compose.public.yaml` has them off; docs/how-to/run-the-control-plane-in-the-cloud.md says how
+to turn them on, what each metric counts and how Prometheus scrapes them.
+
 ## Beyond one machine
 
 The same image runs anywhere containers do. Point `AGENTS_STORE` at a bucket of your own

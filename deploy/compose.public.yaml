@@ -73,6 +73,15 @@ services:
       AGENTS_APNS_KEY_FILE: /run/secrets/apns-key
       AGENTS_APNS_KEY_ID: ${AGENTS_APNS_KEY_ID:-}
       AGENTS_APNS_TEAM_ID: ${AGENTS_APNS_TEAM_ID:-}
+      # Prometheus /metrics (#2176), off unless set: an address in the container such as
+      # 0.0.0.0:9791, which Caddy does not serve, and then the token a scraper sends. A
+      # scraper on the same Docker network reaches http://control:9791/metrics.
+      AGENTS_CONTROL_METRICS: ${AGENTS_CONTROL_METRICS:-}
+      AGENTS_CONTROL_METRICS_TOKEN: ${AGENTS_CONTROL_METRICS_TOKEN:-}
+      # Log lines as JSON for a log shipper (#2176), and the lowest level written (debug
+      # adds a line for each request).
+      AGENTS_CONTROL_LOG_FORMAT: ${AGENTS_CONTROL_LOG_FORMAT:-text}
+      AGENTS_CONTROL_LOG_LEVEL: ${AGENTS_CONTROL_LOG_LEVEL:-info}
     secrets: [gcp-service-account, apns-key]
     # The Linux host (/servers, served at /v1/servers/… to servers joining with the install
     # command) and the runtimes' toolsets (/toolsets, at /v1/toolsets/…, so a server that joins

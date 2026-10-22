@@ -579,6 +579,15 @@ func (m *mesh) holding(host string, epoch int) {
 
 func (m *mesh) released(host string, epoch int) { m.broadcast(goneLine(host, epoch)) }
 
+// counts is how many leases this copy holds, and how many copies it knows, itself too:
+// for the metrics (#2176).
+func (m *mesh) counts() (leases, copies int) {
+	m.leases.mu.Lock()
+	leases = len(m.leases.held)
+	m.leases.mu.Unlock()
+	return leases, len(m.peers()) + 1
+}
+
 func (m *mesh) peers() []string {
 	m.mu.Lock()
 	defer m.mu.Unlock()

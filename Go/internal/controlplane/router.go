@@ -110,6 +110,10 @@ type Router struct {
 	copier func(host, method, reply string)
 	// The organisation's policy's check of a call to a machine (#998): it reads only memory.
 	policyGate func(host, method string) error
+	// Told of each request a client made, for the metrics and the log (#2176), and of each
+	// notification sent to clients.
+	requested func(caller Caller, host, method string, id json.RawMessage, result string, took time.Duration)
+	sent      func(method string, clients int)
 	// Who a client is (#996): written on each channel it opens, and on each entry the
 	// audit keeps. Told each call passed on or answered here, for the audit. Nil where
 	// there is no audit.
@@ -1486,11 +1490,13 @@ func (r *Router) toHostLocked(host, msg, sessionID string) {
 	// (#1761, FR-031); bots/stopRun is the one way to act on it.
 	if bots, ok := r.owners.(botOwners); ok && r.known[host] && bots.BotMachineFor(s.caller.Person, host) {
 		r.writeLocked(sessionID, s.wrap(host, replyError(m.ID, fail(botMachine, "That machine is a bot's: only its workflows start work there. An admin can stop a run."))))
+		r.noteLocked(s.caller, host, m, "refused")
 		return
 	}
 	// Another user's machine is not found, as one that is not there (FR-018).
 	if !r.known[host] || !r.mayReachLocked(s.caller, host) {
 		r.writeLocked(sessionID, s.wrap(host, replyError(m.ID, fail(noSuchHost, "No machine is called %s.", host))))
+		r.noteLocked(s.caller, host, m, "refused")
 		return
 	}
 	// A host from before the team tier, on a team, would act for every person (R14).
@@ -1504,6 +1510,7 @@ func (r *Router) toHostLocked(host, msg, sessionID string) {
 	if r.policyGate != nil {
 		if refusal := r.policyGate(host, m.Method); refusal != nil {
 			r.writeLocked(sessionID, s.wrap(host, replyError(m.ID, refusal)))
+			r.noteLocked(s.caller, host, m, "refused")
 			return
 		}
 	}
@@ -1539,8 +1546,10 @@ func (r *Router) toHostLocked(host, msg, sessionID string) {
 	if !h.conn.Send(channelFrame(c, msg)) {
 		// An uplink that has ended but is not yet dropped takes nothing: said, not lost (#62).
 		r.writeLocked(sessionID, s.wrap(host, replyError(m.ID, fail(hostOffline, "That machine is offline."))))
+		r.noteLocked(s.caller, host, m, "offline")
 		return
 	}
+	r.noteLocked(s.caller, host, m, "routed")
 	if s.inFlight[host] == nil {
 		s.inFlight[host] = map[string]bool{}
 	}
@@ -1639,20 +1648,30 @@ func (r *Router) TellPerson(person, method string, params any) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	line := wrap("", notification(method, params))
+	sent := 0
 	for id, s := range r.clients {
 		if s.wrapped && s.caller.Person == person {
 			r.writeLocked(id, line)
+			sent++
 		}
+	}
+	if r.sent != nil {
+		r.sent(method, sent)
 	}
 }
 
 // broadcastHostLocked tells a machine's change only to the sessions that reach it.
 func (r *Router) broadcastHostLocked(host, method string, params any) {
 	line := wrap("", notification(method, params))
+	sent := 0
 	for id, s := range r.clients {
 		if s.wrapped && r.mayReachLocked(s.caller, host) {
 			r.writeLocked(id, line)
+			sent++
 		}
+	}
+	if r.sent != nil {
+		r.sent(method, sent)
 	}
 }
 
@@ -1669,6 +1688,27 @@ func (r *Router) SetAudit(actorOf func(Caller) *wire.AuditActor, audited func(fr
 	r.mu.Lock()
 	r.actorOf, r.audited = actorOf, audited
 	r.mu.Unlock()
+}
+
+// SetRequested says what is told of each request a client made, and how it ended (#2176).
+func (r *Router) SetRequested(f func(caller Caller, host, method string, id json.RawMessage, result string, took time.Duration)) {
+	r.mu.Lock()
+	r.requested = f
+	r.mu.Unlock()
+}
+
+// SetSent says what is told of each notification sent to clients (#2176).
+func (r *Router) SetSent(f func(method string, clients int)) {
+	r.mu.Lock()
+	r.sent = f
+	r.mu.Unlock()
+}
+
+// noteLocked tells requested of a request to a machine, if it is one.
+func (r *Router) noteLocked(caller Caller, host string, m *message, result string) {
+	if r.requested != nil && m.isRequest() {
+		r.requested(caller, host, m.Method, m.ID, result, 0)
+	}
 }
 
 // SetPolicyGate says what checks each call to a machine against the policy (#998).
@@ -1700,8 +1740,17 @@ func (r *Router) toControl(msg, sessionID string, wrapped bool) {
 		return
 	}
 	caller := s.caller
+	requested := r.requested
 	go func() {
+		start := time.Now()
 		result, err := r.handler.Handle(m.Method, m.Params, caller)
+		if requested != nil {
+			outcome := "ok"
+			if err != nil {
+				outcome = "error"
+			}
+			requested(caller, "", m.Method, m.ID, outcome, max(time.Since(start), time.Nanosecond))
+		}
 		line := ""
 		if err != nil {
 			line = replyError(m.ID, err)
@@ -1755,19 +1804,29 @@ func (r *Router) BroadcastControlEach(method string, params func(person string) 
 	}
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	sent := 0
 	for id, s := range r.clients {
 		if line, ok := lines[s.caller.Person]; ok && s.wrapped {
 			r.writeLocked(id, line)
+			sent++
 		}
+	}
+	if r.sent != nil {
+		r.sent(method, sent)
 	}
 }
 
 func (r *Router) broadcastControlLocked(method string, params any) {
 	line := wrap("", notification(method, params))
+	sent := 0
 	for id, s := range r.clients {
 		if s.wrapped {
 			r.writeLocked(id, line)
+			sent++
 		}
+	}
+	if r.sent != nil {
+		r.sent(method, sent)
 	}
 }
 

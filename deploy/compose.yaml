@@ -28,6 +28,11 @@ x-copy: &copy
     AGENTS_CONTROL_PIN: ${AGENTS_CONTROL_PIN:?run deploy/make-secrets.sh first}
     AGENTS_CONTROL_KEY_FILE: /secrets/control-key
     AGENTS_CONTROL_NAME: Walk control plane
+    # Prometheus /metrics on each copy's own port 9791 (#2176), on the compose network
+    # only, so a token is needed; and JSON log lines.
+    AGENTS_CONTROL_METRICS: 0.0.0.0:9791
+    AGENTS_CONTROL_METRICS_TOKEN: walk-metrics
+    AGENTS_CONTROL_LOG_FORMAT: json
   volumes:
     - ./secrets/control-key:/secrets/control-key:ro
     # Beside the control key, where each copy looks for it: one key for every copy (#2163).
