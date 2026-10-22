@@ -813,6 +813,12 @@ public enum DaemonAPI {
         /// never sent (037). Not in `CodingKeys`.
         public var host: HostID = .mac
 
+        /// Archived projects, newest archived first (#2153); one archived before
+        /// `archivedAt` was kept goes by its last activity.
+        public static func byArchived(_ a: ProjectSummary, _ b: ProjectSummary) -> Bool {
+            (a.project.archivedAt ?? a.lastActivityAt) > (b.project.archivedAt ?? b.lastActivityAt)
+        }
+
         public var id: URL { project.folder }
         public var folder: URL { project.folder }
         public var key: ProjectKey { ProjectKey(host: host, folder: project.folder) }
@@ -2122,18 +2128,23 @@ public enum DaemonAPI {
     /// Where a page of `agents/list` ended (#164): its last agent's activity and id. The
     /// list is newest activity first, and by id among equals, so the next page is
     /// everything after this point. An agent that moves between pages may be listed
-    /// twice or not at all; `agent/changed` carries it either way.
+    /// twice or not at all; `agent/changed` carries it either way. An `archivedOnly` list
+    /// is newest archived first (#2153), and goes on from `archivedAt`.
     public struct ListCursor: Codable, Hashable, Sendable {
         public var lastActivityAt: Date
         public var id: UUID
+        /// When the last agent was archived, for an `archivedOnly` page; without it, its
+        /// last activity.
+        public var archivedAt: Date?
 
-        public init(lastActivityAt: Date, id: UUID) {
+        public init(lastActivityAt: Date, id: UUID, archivedAt: Date? = nil) {
             self.lastActivityAt = lastActivityAt
             self.id = id
+            self.archivedAt = archivedAt
         }
 
         public init(_ agent: Agent) {
-            self.init(lastActivityAt: agent.lastActivityAt, id: agent.id)
+            self.init(lastActivityAt: agent.lastActivityAt, id: agent.id, archivedAt: agent.archivedAt)
         }
 
         /// The list's order: newest activity first, then by id.

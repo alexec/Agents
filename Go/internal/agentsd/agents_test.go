@@ -308,3 +308,37 @@ func TestContinueInProject(t *testing.T) {
 		t.Fatalf("a second agent %s", again)
 	}
 }
+
+// TestArchivedListIsNewestArchivedFirst: an archived-only page is in order of when each was
+// archived, not of last activity (#2153), and goes on from its cursor in that order.
+func TestArchivedListIsNewestArchivedFirst(t *testing.T) {
+	d, c := start(t, t.TempDir())
+	defer d.Shutdown()
+	hour := wire.Date(3600)
+	archived := func(active, archivedAt wire.Date) func(a *wire.Agent) {
+		return func(a *wire.Agent) {
+			r := wire.AgentArchivedReasonByUser
+			a.State, a.ArchivedReason, a.LastActivityAt = wire.AgentStateArchived, &r, active
+			if archivedAt != 0 {
+				a.ArchivedAt = &archivedAt
+			}
+		}
+	}
+	t0 := now()
+	// A was active yesterday and archived now; B active an hour ago and archived yesterday;
+	// old has no archivedAt, and goes by its activity two days ago.
+	a := seeded(t, d, t.TempDir(), archived(t0-24*hour, t0))
+	b := seeded(t, d, t.TempDir(), archived(t0-hour, t0-24*hour))
+	old := seeded(t, d, t.TempDir(), archived(t0-48*hour, 0))
+	var list []wire.Agent
+	json.Unmarshal(c.call(t, 1, "agents/list", map[string]any{"archivedOnly": true, "includeArchived": true, "lean": true}), &list)
+	if len(list) != 3 || list[0].ID != a.ID || list[1].ID != b.ID || list[2].ID != old.ID {
+		t.Fatalf("not newest archived first: %+v", list)
+	}
+	list = nil
+	after := map[string]any{"lastActivityAt": a.LastActivityAt, "id": a.ID, "archivedAt": *a.ArchivedAt}
+	json.Unmarshal(c.call(t, 2, "agents/list", map[string]any{"archivedOnly": true, "includeArchived": true, "lean": true, "after": after}), &list)
+	if len(list) != 2 || list[0].ID != b.ID || list[1].ID != old.ID {
+		t.Fatalf("the next page: %+v", list)
+	}
+}

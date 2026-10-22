@@ -1190,5 +1190,100 @@
       "folder" : "file:///fixture/project/"
     },
     "name" : "an empty project"
+  },
+  {
+    "expected" : {
+      "archived" : [
+        "00000000-0000-0000-0000-000000000071",
+        "00000000-0000-0000-0000-000000000072",
+        "00000000-0000-0000-0000-000000000073"
+      ],
+      "attention" : 0,
+      "counts" : {
+        "archived" : 3
+      },
+      "headings" : [
+
+      ],
+      "needsYou" : 0,
+      "unread" : 0
+    },
+    "input" : {
+      "agents" : [
+        {
+          "advertisedOptions" : [
+
+          ],
+          "archivedAt" : 812500000,
+          "availableCommands" : [
+
+          ],
+          "createdAt" : 812500000,
+          "cwd" : "file:///fixture/project/",
+          "id" : "00000000-0000-0000-0000-000000000071",
+          "lastActivityAt" : 812413600,
+          "runtimeID" : "claude",
+          "startOptions" : {
+            "extraArguments" : [
+
+            ],
+            "values" : {
+
+            }
+          },
+          "state" : "archived",
+          "title" : "Session 71"
+        },
+        {
+          "advertisedOptions" : [
+
+          ],
+          "archivedAt" : 812413600,
+          "availableCommands" : [
+
+          ],
+          "createdAt" : 812500000,
+          "cwd" : "file:///fixture/project/",
+          "id" : "00000000-0000-0000-0000-000000000072",
+          "lastActivityAt" : 812496400,
+          "runtimeID" : "claude",
+          "startOptions" : {
+            "extraArguments" : [
+
+            ],
+            "values" : {
+
+            }
+          },
+          "state" : "archived",
+          "title" : "Session 72"
+        },
+        {
+          "advertisedOptions" : [
+
+          ],
+          "availableCommands" : [
+
+          ],
+          "createdAt" : 812500000,
+          "cwd" : "file:///fixture/project/",
+          "id" : "00000000-0000-0000-0000-000000000073",
+          "lastActivityAt" : 812327200,
+          "runtimeID" : "claude",
+          "startOptions" : {
+            "extraArguments" : [
+
+            ],
+            "values" : {
+
+            }
+          },
+          "state" : "archived",
+          "title" : "Session 73"
+        }
+      ],
+      "folder" : "file:///fixture/project/"
+    },
+    "name" : "archived by when each was archived"
   }
 ]

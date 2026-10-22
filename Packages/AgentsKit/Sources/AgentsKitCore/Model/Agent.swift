@@ -211,6 +211,10 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
     /// deleted. Cleared on unarchiving.
     public var archivedAt: Date?
 
+    /// What Archived is in order of (#2153): when it was archived, or its last activity
+    /// for a record from before `archivedAt`.
+    public var archivedOrder: Date { archivedAt ?? lastActivityAt }
+
     /// This agent's own command sandbox choice (064, FR-003b). Nil follows its runtime's
     /// default; set only by the person, or by **Continue without sandbox**.
     public var sandboxOverride: SandboxChoice?

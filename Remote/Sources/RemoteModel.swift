@@ -3539,13 +3539,13 @@ final class RemoteModel {
     /// appears, since the catch-up leaves them out.
     private(set) var archivedProjects: [DaemonAPI.ProjectSummary] = []
 
-    /// Every host's archived projects, the latest worked on first, as the window's
+    /// Every host's archived projects, the latest archived first (#2153), as the window's
     /// Archived projects (#343): those listed, less any brought back since, and any put
     /// away since, as their hosts said.
     var shelvedProjects: [DaemonAPI.ProjectSummary] {
         let held = Set(work.projects.map(\.key))
         return (work.archivedProjects + archivedProjects.filter { !held.contains($0.key) })
-            .sorted { $0.lastActivityAt > $1.lastActivityAt }
+            .sorted(by: DaemonAPI.ProjectSummary.byArchived)
     }
 
     func loadArchivedProjects() async {

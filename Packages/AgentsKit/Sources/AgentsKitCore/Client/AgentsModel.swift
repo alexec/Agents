@@ -1605,10 +1605,9 @@ public final class AgentsModel {
         projects.filter { !$0.project.isArchived }
     }
 
-    /// The archived ones, latest worked on first, as the web's: their activity no longer
-    /// moves, so this order does not shuffle.
+    /// The archived ones, latest archived first, as the web's (#2153).
     public var archivedProjects: [DaemonAPI.ProjectSummary] {
-        projects.filter(\.project.isArchived).sorted { $0.lastActivityAt > $1.lastActivityAt }
+        projects.filter(\.project.isArchived).sorted(by: DaemonAPI.ProjectSummary.byArchived)
     }
 
     public func project(_ key: ProjectKey?) -> DaemonAPI.ProjectSummary? {
@@ -1953,11 +1952,11 @@ private struct ShelfKey: Hashable {
 }
 
 private extension Dictionary where Key == AgentGroup, Value == [Agent] {
-    /// Each group in its own order: filed from a list newest activity first, Archived
-    /// is already, and the rest are not (#182).
+    /// Each group in its own order: filed from a list newest activity first, which none
+    /// is in since Archived went by when each was archived (#182, #2153).
     func sortedInGroupOrder() -> Self {
         var sorted = self
-        for (group, agents) in sorted where group != .archived {
+        for (group, agents) in sorted {
             sorted[group] = agents.sorted(by: ProjectShelf.order(group))
         }
         return sorted

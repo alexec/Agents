@@ -91,8 +91,7 @@ public final class ProjectShelf {
     // MARK: Order
 
     /// Newest activity first, then by id, so two agents with the same moment are always
-    /// in the same order. The order of everything held, and of Archived, which the host
-    /// pages in it (#165) and whose activity no longer moves.
+    /// in the same order. The order of everything held.
     nonisolated static func byActivity(_ a: Agent, _ b: Agent) -> Bool {
         if a.lastActivityAt != b.lastActivityAt { return a.lastActivityAt > b.lastActivityAt }
         return a.id.uuidString < b.id.uuidString
@@ -107,11 +106,19 @@ public final class ProjectShelf {
         return a.id.uuidString < b.id.uuidString
     }
 
-    /// Archived reads newest activity first; the rest, newest started first.
+    /// Newest archived first, then by id (#2153): what the person looks for in Archived is
+    /// what they put away last, and the host pages Archived in this order. A record from
+    /// before `archivedAt` goes by its last activity.
+    nonisolated public static func byArchived(_ a: Agent, _ b: Agent) -> Bool {
+        if a.archivedOrder != b.archivedOrder { return a.archivedOrder > b.archivedOrder }
+        return a.id.uuidString < b.id.uuidString
+    }
+
+    /// Archived reads newest archived first; the rest, newest started first.
     nonisolated static func order(_ group: AgentGroup) -> (Agent, Agent) -> Bool {
         switch group {
         case .archived:
-            return byActivity
+            return byArchived
         default:
             return byStart
         }

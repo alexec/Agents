@@ -3861,6 +3861,8 @@ type ListCursor struct {
 	LastActivityAt Date `json:"lastActivityAt"`
 
 	ID UUID `json:"id"`
+
+	ArchivedAt *Date `json:"archivedAt,omitzero"`
 }
 
 type ListRequest struct {

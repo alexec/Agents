@@ -371,7 +371,18 @@ func listed(a wire.Agent, r wire.ListRequest) wire.Agent {
 	return a
 }
 
-// listAgents is agents/list: newest activity first, a page after a cursor.
+// archivedOrder is what an archived-only list is in order of (#2153): when the agent was
+// archived, or its last activity for a record from before archivedAt.
+func archivedOrder(a *wire.Agent) wire.Date {
+	if a.ArchivedAt != nil {
+		return *a.ArchivedAt
+	}
+	return a.LastActivityAt
+}
+
+// listAgents is agents/list: newest activity first, a page after a cursor. An archived-only
+// list is newest archived first (#2153), as the Archive shows it, so the page holds the ones
+// put away last.
 func (d *Daemon) listAgents(r wire.ListRequest) []wire.Agent {
 	if r.AgentID != nil {
 		if a := d.Store.Agent(*r.AgentID); a != nil {
@@ -389,7 +400,16 @@ func (d *Daemon) listAgents(r wire.ListRequest) []wire.Agent {
 		query = *r.Query
 	}
 	read := 0
-	for _, a := range d.Store.Agents() {
+	agents := d.Store.Agents()
+	if r.ArchivedOnly {
+		sort.SliceStable(agents, func(i, j int) bool {
+			if a, b := archivedOrder(&agents[i]), archivedOrder(&agents[j]); a != b {
+				return a > b
+			}
+			return agents[i].ID < agents[j].ID
+		})
+	}
+	for _, a := range agents {
 		archived := a.State == wire.AgentStateArchived
 		if archived && !r.IncludeArchived && !r.ArchivedOnly || r.ArchivedOnly && !archived {
 			continue
@@ -400,8 +420,17 @@ func (d *Daemon) listAgents(r wire.ListRequest) []wire.Agent {
 		if r.StartedByWorkflow != nil && (a.StartedByWorkflow == nil || *a.StartedByWorkflow != *r.StartedByWorkflow) {
 			continue
 		}
-		if c := r.After; c != nil && (a.LastActivityAt > c.LastActivityAt || a.LastActivityAt == c.LastActivityAt && a.ID <= c.ID) {
+		if c := r.After; c != nil && !r.ArchivedOnly && (a.LastActivityAt > c.LastActivityAt || a.LastActivityAt == c.LastActivityAt && a.ID <= c.ID) {
 			continue
+		}
+		if c := r.After; c != nil && r.ArchivedOnly {
+			at := c.LastActivityAt
+			if c.ArchivedAt != nil {
+				at = *c.ArchivedAt
+			}
+			if o := archivedOrder(&a); o > at || o == at && a.ID <= c.ID {
+				continue
+			}
 		}
 		// A search (#165) asks for the sessions it matches; what was said is read for the
 		// most recently active saidSessions only (#1585).
