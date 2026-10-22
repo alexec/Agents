@@ -14,8 +14,18 @@ import (
 	"github.com/coder/websocket"
 )
 
-// maxMessage is ControlDial's maxMessage: the largest message a WebSocket takes.
-const maxMessage = 64 * 1024 * 1024
+// maxMessage is the largest message a WebSocket takes until it proves a key; Accept's
+// owner raises it once one has (#2150).
+const maxMessage = 64 * 1024
+
+// The listener's timeouts and header limit (#2150). A WebSocket clears them once the gate
+// lets it through, so they close only a slow request, never a socket in use.
+const (
+	readTimeout  = 30 * time.Second
+	writeTimeout = 60 * time.Second
+	idleTimeout  = 2 * time.Minute
+	headerMost   = 64 << 10
+)
 
 // Config is what Start needs: ControlService.Configuration.Web, and the two closures
 // startWeb gives LoopbackListener.start.
@@ -78,6 +88,10 @@ func bind(cfg Config, files Files) (*Listener, error) {
 	l.srv = &http.Server{
 		Handler:           l,
 		ReadHeaderTimeout: 20 * time.Second,
+		ReadTimeout:       readTimeout,
+		WriteTimeout:      writeTimeout,
+		IdleTimeout:       idleTimeout,
+		MaxHeaderBytes:    headerMost,
 		ConnState:         unproven.state,
 	}
 	listeners := []net.Listener{v4}
@@ -127,6 +141,9 @@ func (l *Listener) Stop() {
 // through becomes a WebSocket, and every other request gets the gate's reply and a close.
 func (l *Listener) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if v := l.gate.judge(r.Method, r.Host, r.RequestURI, r.Header); v.upgrade && handshakeOK(r) {
+		rc := http.NewResponseController(w)
+		rc.SetReadDeadline(time.Time{})
+		rc.SetWriteDeadline(time.Time{})
 		ws, err := websocket.Accept(w, r, &websocket.AcceptOptions{
 			// The gate has checked Host and Origin already, more strictly than Accept would.
 			InsecureSkipVerify: true,

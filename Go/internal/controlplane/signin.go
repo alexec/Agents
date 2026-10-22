@@ -77,8 +77,8 @@ type signIns struct {
 	github *signin.GitHubAPI
 
 	mu sync.Mutex
-	// Open s: connections, by source address.
-	open map[string]int
+	// Open s: connections, by source address (an IPv6 /64 as one), oldest first.
+	open map[string][]*Conn
 	// Each paired session's challenge for signIn/addToMe, used once.
 	challenges map[string]challenge
 }
@@ -94,7 +94,7 @@ func newSignIns(s *Service, cfg *signin.Config) *signIns {
 		c = *cfg
 	}
 	return &signIns{s: s, cfg: c, oidc: map[string]*signin.OIDC{signin.Google: c.OIDCFor(signin.Google), signin.Apple: c.OIDCFor(signin.Apple)},
-		github: c.GitHubFor(), open: map[string]int{}, challenges: map[string]challenge{}}
+		github: c.GitHubFor(), open: map[string][]*Conn{}, challenges: map[string]challenge{}}
 }
 
 // settings reads v1/signin.json: none is every provider off.
@@ -507,27 +507,49 @@ func sourceOf(remote string) string {
 	return remote
 }
 
+// drop lets go of a sign-in's place; one dropped already is not there.
+func (si *signIns) drop(source string, conn *Conn) {
+	list := slices.DeleteFunc(si.open[source], func(c *Conn) bool { return c == conn })
+	if len(list) == 0 {
+		delete(si.open, source)
+	} else {
+		si.open[source] = list
+	}
+}
+
 // pairing is an s: connection after its ok: signIn/providers, then one signIn/pair.
 func (si *signIns) pairing(conn *Conn, client string, public, helloNonce []byte) {
-	source := sourceOf(conn.Remote)
+	source := keyOf(sourceOf(conn.Remote))
 	si.mu.Lock()
-	total := 0
-	for _, n := range si.open {
-		total += n
+	total, counts := 0, map[string]int{}
+	for from, list := range si.open {
+		total += len(list)
+		counts[from] = len(list)
 	}
-	if total >= signInsOpen || si.open[source] >= signInsPerSource {
+	var dropped *Conn
+	if total >= signInsOpen && len(si.open[source]) < signInsPerSource {
+		// Every place is taken: the oldest of the address that holds the most goes (#2150).
+		if from := heaviest(counts); from != "" {
+			dropped = si.open[from][0]
+			si.drop(from, dropped)
+			total--
+		}
+	}
+	if total >= signInsOpen || len(si.open[source]) >= signInsPerSource {
 		si.mu.Unlock()
-		si.s.log("closed a sign-in from " + source + ": too many are open")
+		si.s.refusals.note("signin", source, "closed a sign-in from "+source+": too many are open")
 		conn.Close()
 		return
 	}
-	si.open[source]++
+	si.open[source] = append(si.open[source], conn)
 	si.mu.Unlock()
+	if dropped != nil {
+		si.s.refusals.note("signin-dropped", "", "closed the oldest sign-in from "+keyOf(sourceOf(dropped.Remote))+": every place was taken")
+		dropped.Close()
+	}
 	defer func() {
 		si.mu.Lock()
-		if si.open[source]--; si.open[source] <= 0 {
-			delete(si.open, source)
-		}
+		si.drop(source, conn)
 		si.mu.Unlock()
 		time.Sleep(200 * time.Millisecond)
 		conn.Close()

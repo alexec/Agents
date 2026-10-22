@@ -112,17 +112,20 @@ type Router struct {
 	// audit keeps. Told each call passed on or answered here, for the audit. Nil where
 	// there is no audit.
 	// Who owns each client and machine (#994); nil lets every client reach every host.
-	owners     Ownership
+	owners Ownership
 	// Whether the control plane has more than one person (#1763, R14), the version a build
 	// from before the team tier is told to update to, and the list each host last said:
 	// on a team, a client or host without the team capability is refused.
 	team             bool
 	version          string
 	hostCapabilities map[string][]string
-	actorOf    func(Caller) *wire.AuditActor
-	audited    func(from Caller, host, method string, params json.RawMessage)
-	log        func(string)
-	generation int64
+	actorOf          func(Caller) *wire.AuditActor
+	audited          func(from Caller, host, method string, params json.RawMessage)
+	log              func(string)
+	generation       int64
+	// Each client key's rates (#2150), and their refusals' log lines.
+	rates    *clientRates
+	refusals *refusalLog
 }
 
 type clientSession struct {
@@ -202,7 +205,7 @@ func NewRouter(h Handler, log func(string)) *Router {
 		known: map[string]bool{}, relays: map[string]bool{}, states: map[string]hostState{},
 		toldLinks: map[string]bool{}, asks: map[string]*hostAsk{}, keptWaits: map[string]chan *message{}, presence: map[string]notedPresence{}, log: log,
 		peers: map[string]func(string){}, peerLinks: map[string]map[string]bool{},
-		workspaces: map[string]*providers.HostWorkspace{}}
+		workspaces: map[string]*providers.HostWorkspace{}, rates: newClientRates(), refusals: newRefusalLog(log)}
 }
 
 // MARK: What it knows
@@ -1384,7 +1387,7 @@ func readClientFrame(line string) (host, msg string, kind int) {
 
 func (r *Router) clientLine(line, sessionID string) {
 	host, msg, kind := readClientFrame(line)
-	if kind != frameBad && r.refusedOld(sessionID, host, msg, kind) {
+	if r.refusedRate(sessionID, host, line, msg, kind) || kind != frameBad && r.refusedOld(sessionID, host, msg, kind) {
 		return
 	}
 	switch kind {

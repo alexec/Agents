@@ -344,6 +344,7 @@ const FailureShellNotLive = -32011
 const FailureShellWillNotStart = -32010
 const FailureSignInWanted = -32070
 const FailureStoreUnavailable = -32094
+const FailureTooManyRequests = -32075
 const FailureUpdateToJoinTeam = -32074
 const FailureViewNeedsShow = -32063
 const FailureViewRefused = -32062

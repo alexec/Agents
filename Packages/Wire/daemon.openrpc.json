@@ -6678,6 +6678,10 @@
         "code": -32094,
         "message": "storeUnavailable"
       },
+      "tooManyRequests": {
+        "code": -32075,
+        "message": "tooManyRequests"
+      },
       "updateToJoinTeam": {
         "code": -32074,
         "message": "updateToJoinTeam"
