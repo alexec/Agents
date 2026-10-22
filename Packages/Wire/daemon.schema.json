@@ -61,6 +61,93 @@
       ],
       "additionalProperties": false
     },
+    "AccountProfile": {
+      "description": "An account added to a runtime (#840), beside the runtime's own sign-in, which is the Default account and is not one of these. The person picks one when they start a session.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "description": "The host's own name for it. An agent keeps it as accountID.",
+          "type": "string"
+        },
+        "runtimeID": {
+          "type": "string"
+        },
+        "name": {
+          "description": "What the person called it, such as Work.",
+          "type": "string"
+        },
+        "reach": {
+          "$ref": "#/definitions/AccountReach"
+        },
+        "addedAt": {
+          "$ref": "#/definitions/WireDate"
+        },
+        "signedIn": {
+          "description": "Whether its folder holds a sign-in, as the host read it when it answered.",
+          "type": "boolean"
+        },
+        "signedInAs": {
+          "description": "Who it is signed in as, such as an email address, when the runtime's files say.",
+          "type": "string"
+        },
+        "signInCommand": {
+          "description": "The command that signs it in, in a terminal on the host, for a runtime the app cannot sign in itself (Claude). Absent for one that signs in with runtimes/authenticate.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "runtimeID",
+        "name",
+        "reach",
+        "addedAt",
+        "signedIn"
+      ],
+      "additionalProperties": false
+    },
+    "AccountReach": {
+      "description": "How an account reaches the model (#840). Today only a sign-in kept in a folder of its own; an org key and a gateway (T6, #999) are other cases of this.",
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "signIn": {
+              "type": "object",
+              "properties": {
+                "folder": {
+                  "description": "The folder the runtime is given in its account variable (Runtime.accountFolderVariable).",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "folder"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "signIn"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "AccountRequest": {
+      "type": "object",
+      "properties": {
+        "runtimeID": {
+          "type": "string"
+        },
+        "accountID": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "runtimeID",
+        "accountID"
+      ],
+      "additionalProperties": false
+    },
     "ActivityToken": {
       "type": "object",
       "description": "clients/setActivityToken (#1744): the push token of one session's Live Activity on this device, in hex, for the control plane to update it by APNs while the Remote is not running. startedAt is when the turn began, where the activity's timer counts from. No token takes it away.",
@@ -82,6 +169,22 @@
         "agentID",
         "environment",
         "startedAt"
+      ],
+      "additionalProperties": false
+    },
+    "AddAccountRequest": {
+      "type": "object",
+      "properties": {
+        "runtimeID": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "runtimeID",
+        "name"
       ],
       "additionalProperties": false
     },
@@ -342,6 +445,10 @@
         "runningTool": {
           "type": "string",
           "description": "While a turn runs, the title of the tool the agent is running now, the newest when more than one is (#1902). Absent while it thinks or replies. It changes only once a new value has held for a second, so a short tool never shows and a short gap between two does not flash. Cleared when the turn ends."
+        },
+        "accountID": {
+          "description": "The added account its runtime runs with (#840); absent for the runtime's own sign-in.",
+          "type": "string"
         }
       },
       "required": [
@@ -1517,6 +1624,10 @@
           "type": "string"
         },
         "methodID": {
+          "type": "string"
+        },
+        "accountID": {
+          "description": "An added account to sign in (#840); absent for the runtime's own sign-in.",
           "type": "string"
         }
       },
@@ -14533,6 +14644,10 @@
         },
         "usesAppCopyOnly": {
           "type": "boolean"
+        },
+        "accountFolderVariable": {
+          "description": "The variable that names the folder its sign-in is kept in, for a runtime that can have more than one account (#840): CLAUDE_CONFIG_DIR, CODEX_HOME.",
+          "type": "string"
         }
       },
       "required": [
@@ -14644,6 +14759,14 @@
         },
         "setupNote": {
           "description": "Something one of the runtime's features needs on this host and lacks, with the step that fixes it (#1946). Only on the runtime's own sign-in row.",
+          "type": "string"
+        },
+        "accountID": {
+          "description": "The added account this row is for (#840); absent for the runtime's own sign-in.",
+          "type": "string"
+        },
+        "accountName": {
+          "description": "That account's name.",
           "type": "string"
         }
       },
@@ -17411,6 +17534,10 @@
         },
         "purpose": {
           "$ref": "#/definitions/AgentPurpose"
+        },
+        "accountID": {
+          "description": "The added account the session uses (#840); absent for the runtime's own sign-in.",
+          "type": "string"
         }
       },
       "required": [

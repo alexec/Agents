@@ -825,7 +825,11 @@ func (d *Daemon) fork(ctx context.Context, id wire.UUID) (wire.UUID, error) {
 		return "", &Error{Code: CodeRuntimeNotFound, Message: "There is no runtime called " + a.RuntimeID + "."}
 	}
 	cwd := store.FolderPath(a.Cwd)
-	launch, err := d.launchFor(rt, cwd)
+	account, err := d.accountFor(a)
+	if err != nil {
+		return "", err
+	}
+	launch, err := d.launchAs(rt, cwd, account)
 	if err != nil {
 		return "", &Error{Code: CodeRuntimeNotFound, Message: err.Error()}
 	}
@@ -843,7 +847,7 @@ func (d *Daemon) fork(ctx context.Context, id wire.UUID) (wire.UUID, error) {
 		EndedReason: reason(wire.EndedReasonEndTurn), RuntimeSessionID: &forked, StartOptions: a.StartOptions,
 		AdvertisedOptions: a.AdvertisedOptions, AvailableCommands: a.AvailableCommands, AdditionalDirectories: a.AdditionalDirectories,
 		McpServers: a.McpServers, Worktree: a.Worktree, StartingPoint: a.StartingPoint, MadeInRoot: &d.Store.RootID,
-		CreatedAt: t, LastActivityAt: t}
+		CreatedAt: t, LastActivityAt: t, AccountID: a.AccountID}
 	if a.Title != nil {
 		title := *a.Title + " (branch)"
 		b.Title = &title
@@ -895,7 +899,8 @@ func (d *Daemon) branchFrom(r wire.BranchFromRequest) (wire.UUID, error) {
 		EndedReason: reason(wire.EndedReasonEndTurn), StartOptions: a.StartOptions,
 		AdvertisedOptions: a.AdvertisedOptions, AvailableCommands: a.AvailableCommands, AdditionalDirectories: a.AdditionalDirectories,
 		McpServers: a.McpServers, Worktree: a.Worktree, StartingPoint: a.StartingPoint, MadeInRoot: &d.Store.RootID,
-		SandboxOverride: a.SandboxOverride, BranchedFrom: &a.ID, CreatedAt: t, LastActivityAt: t}
+		SandboxOverride: a.SandboxOverride, BranchedFrom: &a.ID, CreatedAt: t, LastActivityAt: t,
+		AccountID: a.AccountID}
 	if a.Title != nil {
 		title := *a.Title + " (branch)"
 		b.Title = &title

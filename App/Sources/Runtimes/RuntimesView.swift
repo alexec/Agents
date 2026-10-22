@@ -30,6 +30,12 @@ struct RuntimesView: View {
                         RuntimeStatusRow(status: status,
                                          allowance: allowance(for: status.id),
                                          at: model.runtimeAllowances?.at ?? Date())
+                        // Each account added to it (#840), under it, with its own allowance.
+                        ForEach(accountRows(for: status.id)) { row in
+                            Divider().padding(.leading, 14)
+                            RuntimeStatusRow(status: status, allowance: row, at: model.runtimeAllowances?.at ?? Date(),
+                                             title: row.title)
+                        }
                     }
                 }
                 .paperRaised(in: RoundedRectangle(cornerRadius: 10))
@@ -59,7 +65,11 @@ struct RuntimesView: View {
     /// its own has more than one. The first is the runtime's own sign-in, which is the
     /// one a new agent would use.
     private func allowance(for runtimeID: String) -> RuntimeAllowances.Row? {
-        model.runtimeAllowances?.rows.first { $0.runtimeID == runtimeID }
+        model.runtimeAllowances?.row(runtimeID, account: nil)
+    }
+
+    private func accountRows(for runtimeID: String) -> [RuntimeAllowances.Row] {
+        model.runtimeAllowances?.rows.filter { $0.runtimeID == runtimeID && $0.accountID != nil } ?? []
     }
 }
 
@@ -69,11 +79,13 @@ private struct RuntimeStatusRow: View {
     let status: RuntimeStatus
     let allowance: RuntimeAllowances.Row?
     let at: Date
+    /// An added account's row is named for it too: "Claude · Work".
+    var title: String?
 
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 10) {
             VStack(alignment: .leading, spacing: 3) {
-                Text(status.runtime.name)
+                Text(title ?? status.runtime.name)
                     .fontWeight(.semibold)
                 Text(line)
                     .appText(.fine)

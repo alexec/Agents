@@ -26,12 +26,12 @@ func pausedBySpentAllowance(a *wire.Agent) bool {
 		*a.EndedReason == wire.EndedReasonAllowanceSpent
 }
 
-// backAt is when a runtime's allowance is expected back: the provider's reset time when it
+// backAt is when a credential's allowance (key, the agent's account) is expected back: the provider's reset time when it
 // said one still ahead (known), else the app's next check, else now for a runtime that is
 // not out any more.
-func (d *Daemon) backAt(runtimeID string) (at time.Time, known bool) {
+func (d *Daemon) backAt(key string) (at time.Time, known bool) {
 	d.allowMu.Lock()
-	s, ok := d.allowancesLocked()[ownKey(runtimeID)]
+	s, ok := d.allowancesLocked()[key]
 	d.allowMu.Unlock()
 	t := time.Now()
 	if !ok || s.Status.Out == nil {
@@ -55,11 +55,11 @@ func (d *Daemon) continueWhenBack(id wire.UUID) (wire.Agent, error) {
 	if !pausedBySpentAllowance(a) {
 		return wire.Agent{}, &Error{Code: CodeInvalidParams, Message: "Only a chat paused by a spent allowance can carry on when it is back."}
 	}
-	return d.waitForAllowance(id, a.RuntimeID)
+	return d.waitForAllowance(id, agentKey(a))
 }
 
-func (d *Daemon) waitForAllowance(id wire.UUID, runtimeID string) (wire.Agent, error) {
-	at, known := d.backAt(runtimeID)
+func (d *Daemon) waitForAllowance(id wire.UUID, key string) (wire.Agent, error) {
+	at, known := d.backAt(key)
 	wait := &wire.ContinueWhenBack{At: wire.DateOf(at), ResetKnown: known}
 	a := d.change(id, func(a *wire.Agent) { a.ContinueWhenBack = wait })
 	if a == nil {
@@ -118,11 +118,11 @@ func (d *Daemon) continueNow(id wire.UUID, expected *wire.ContinueWhenBack) {
 	}
 }
 
-// allowanceBack sends on every chat waiting for this runtime's allowance (a turn that
-// worked, or the person marking it available).
-func (d *Daemon) allowanceBack(runtimeID string) {
+// allowanceBack sends on every chat waiting for this credential's allowance, its runtime
+// and account (a turn that worked, or the person marking it available).
+func (d *Daemon) allowanceBack(key string) {
 	for _, a := range d.Store.Agents() {
-		if a.ContinueWhenBack != nil && a.RuntimeID == runtimeID {
+		if a.ContinueWhenBack != nil && agentKey(&a) == key {
 			d.continueNow(a.ID, nil)
 		}
 	}

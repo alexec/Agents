@@ -69,3 +69,19 @@ test("runtimes: the Runtimes row counts working out of installed (#379)", () => 
     status("gemini", "Gemini", false), installing]), { working: 1, total: 3 });
   assert.deepEqual(r.runtimeTally([{ ...status("claude", "Claude"), isOut: true }, signedOut]), { working: 0, total: 2 });
 });
+
+// Several accounts per runtime (#840): an added account's row is its own, under the runtime's.
+test("runtimes: an added account's row is apart from the runtime's own, and named for both", () => {
+  const rows = [
+    { credentialKey: "claude:account:w1", accountID: "w1", accountName: "Work", state: {} },
+    { credentialKey: "claude:sign-in", state: {} },
+    { credentialKey: "codex:sign-in", state: {} },
+  ];
+  assert.equal(r.ownRow(rows, "claude").credentialKey, "claude:sign-in");
+  assert.deepEqual(r.accountRows(rows, "claude").map((row) => row.credentialKey), ["claude:account:w1"]);
+  assert.deepEqual(r.accountRows(rows, "codex"), []);
+  assert.equal(r.rowTitle(rows[0], "Claude"), "Claude · Work");
+  assert.equal(r.rowTitle(rows[1], "Claude"), "Claude");
+  assert.equal(r.accountState({ signedIn: false }), "Not signed in");
+  assert.equal(r.accountState({ signedIn: true, signedInAs: "a@example.com" }), "Signed in as a@example.com");
+});

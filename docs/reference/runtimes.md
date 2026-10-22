@@ -94,6 +94,42 @@ offers one. A reply puts the runtime back, even if the provider's stated reset t
 arrived; a failed check leaves it out and schedules another four hours later. The stated reset
 time alone never brings it back. **Mark available** does, at once.
 
+## More than one account
+
+Claude and Codex can have more than one account (#840), for example a personal plan and a
+work plan. The sign-in a runtime has already is its **Default account**. Each account you add
+is a folder of its own, which the app gives the runtime in the variable that names where it
+keeps its sign-in:
+
+| Runtime | More than one account | The variable | Why or why not |
+| --- | --- | --- | --- |
+| **Claude** | Yes | `CLAUDE_CONFIG_DIR` | The folder holds the sign-in. On macOS, Claude keeps a Keychain item for each folder. |
+| **Codex** | Yes | `CODEX_HOME` | The folder holds `auth.json`. |
+| **Cursor** | Not yet | `CURSOR_CONFIG_DIR` | The folder holds the sign-in too, but a second sign-in in it is not measured yet. |
+| **Copilot** | No | | It keeps its own sign-ins and changes user itself (`/user`). |
+| **Gemini** | No | | Its account is an API key. A second key is an organisation key (#999). |
+| **OpenCode** | No | | One `auth.json` already holds a sign-in for each provider. |
+| **Grok** | No | | No variable moves its sign-in alone. |
+| **Antigravity** | No | | Its home is the app's own already. |
+
+- **Add one** with **Add Account…** in the runtime's sign-in sheet on the Mac (the runtime
+  menu above the prompt, **Sign in, sign out, providers…**), or on the **Runtimes** page on
+  iPhone, iPad and the web. The folder is `runtimes/accounts/<runtime>/<id>` under the app's
+  root. The app links your own settings into it (Claude's `settings.json`, `CLAUDE.md`,
+  skills, agents, commands and plugins; Codex's `config.toml`, `AGENTS.md`, prompts and
+  skills), so only the sign-in is separate.
+- **Sign it in** on the Mac. For Claude, **Sign In** gives the command
+  `CLAUDE_CONFIG_DIR=<folder> claude`: run it, then type `/login`. Codex signs in as its
+  Default account does.
+- **Choose it** when you start a session: the **Account** menu is beside the runtime menu,
+  on all three, when the runtime has more than one account. A branch, **Continue in New** and
+  a helper the session starts keep its account.
+- **Its allowance is its own.** The **Runtimes** page shows a row for each account, under
+  its runtime ("Claude · Work"). One account running out does not put the runtime, or
+  another account, out. The app never changes a session to another account by itself.
+- **Remove it** to stop the sessions that use it, sign it out where the runtime can, and
+  delete its folder.
+
 ## What each gets from `~/.agents`
 
 Your own skills, instructions, connectors and plugins in `~/.agents` reach each runtime the

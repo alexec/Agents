@@ -16,11 +16,16 @@ import (
 
 // handshake starts the runtime in the root only to ask it something.
 func (d *Daemon) handshake(ctx context.Context, runtimeID string, sink acp.Sink) (*acp.Session, *runtimeDef, error) {
+	return d.handshakeAs(ctx, runtimeID, nil, sink)
+}
+
+// handshakeAs is handshake on an added account (#840), nil for the runtime's own.
+func (d *Daemon) handshakeAs(ctx context.Context, runtimeID string, account *wire.AccountProfile, sink acp.Sink) (*acp.Session, *runtimeDef, error) {
 	rt := runtimeByID(runtimeID)
 	if rt == nil {
 		return nil, nil, &Error{Code: CodeRuntimeNotFound, Message: "There is no runtime called " + runtimeID + "."}
 	}
-	launch, err := d.launchFor(rt, d.Store.Loc.Root)
+	launch, err := d.launchAs(rt, d.Store.Loc.Root, account)
 	if err != nil {
 		return nil, nil, err
 	}

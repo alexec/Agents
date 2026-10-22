@@ -17,6 +17,9 @@ import (
 
 func (d *Daemon) registerRuntimeAuth() {
 	On(d, wire.CallRuntimesAuthenticate, func(ctx context.Context, c *Client, r wire.AuthenticateRequest) (wire.RuntimeAccount, error) {
+		if r.AccountID != nil && *r.AccountID != "" {
+			return d.authenticateAccount(ctx, r.RuntimeID, *r.AccountID, r.MethodID)
+		}
 		return d.authenticate(ctx, r.RuntimeID, r.MethodID)
 	})
 	On(d, wire.CallRuntimesLogout, func(ctx context.Context, c *Client, r wire.RuntimeRequest) ([]wire.UUID, error) {
@@ -95,6 +98,47 @@ func (d *Daemon) authenticate(ctx context.Context, runtimeID, methodID string) (
 		return wire.RuntimeAccount{}, &Error{Code: wire.FailureNeedsSignIn, Message: "That did not sign in: " + rpcMessage(err)}
 	}
 	return d.updateAccount(runtimeID, func(a *wire.RuntimeAccount) { a.State, a.CheckedAt = wire.RuntimeAccountStateReady, now() }), nil
+}
+
+// authenticateAccount is runtimes/authenticate for an added account (#840): the runtime
+// started on the account's folder signs in there. The runtime's own account is not
+// touched, and the account's state is its folder's, so the answer is the runtime's.
+func (d *Daemon) authenticateAccount(ctx context.Context, runtimeID, accountID, methodID string) (wire.RuntimeAccount, error) {
+	p := d.accountProfile(runtimeID, accountID)
+	if p == nil {
+		return wire.RuntimeAccount{}, Invalid("There is no such account.")
+	}
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Minute)
+	defer cancel()
+	s, _, err := d.handshakeAs(ctx, runtimeID, p, &probe{commands: make(chan []wire.SlashCommand, 1)})
+	if err != nil {
+		return wire.RuntimeAccount{}, err
+	}
+	defer s.Stop()
+	for _, m := range authMethods(s.Init.AuthMethods) {
+		if m.ID == methodID && terminalCommand(m) != "" {
+			// The runtime's own command signs in its own folder: the account's names its folder.
+			q := *p
+			d.readSignIn(&q)
+			if q.SignInCommand == nil {
+				return wire.RuntimeAccount{}, Invalid("Sign in to this account in a terminal on this machine.")
+			}
+			return wire.RuntimeAccount{}, &Error{Code: wire.FailureNeedsSignIn, Message: "Run this in a terminal: " + *q.SignInCommand,
+				Data: map[string]any{"command": *q.SignInCommand, "runtimeID": runtimeID}}
+		}
+	}
+	if err := s.Authenticate(ctx, methodID); err != nil {
+		return wire.RuntimeAccount{}, &Error{Code: wire.FailureNeedsSignIn, Message: "That did not sign in: " + rpcMessage(err)}
+	}
+	d.tellAccountProfiles()
+	d.allowMu.Lock()
+	a, ok := d.accounts[runtimeID]
+	d.allowMu.Unlock()
+	if !ok {
+		a = wire.RuntimeAccount{RuntimeID: runtimeID, State: wire.RuntimeAccountStateUnknown, AuthMethods: []wire.ACPAuthMethod{},
+			Providers: []wire.ACPProviderInfo{}, CheckedAt: now()}
+	}
+	return a, nil
 }
 
 // logOut is runtimes/logout, after stopping the agents that are using the runtime: they

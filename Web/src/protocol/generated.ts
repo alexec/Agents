@@ -111,6 +111,41 @@ export interface ACPProviderInfo {
 }
 
 /**
+ * An account added to a runtime (#840), beside the runtime's own sign-in, which is the Default
+ * account and is not one of these. The person picks one when they start a session.
+ */
+export interface AccountProfile {
+  /** The host's own name for it. An agent keeps it as accountID. */
+  id: string;
+  runtimeID: string;
+  /** What the person called it, such as Work. */
+  name: string;
+  reach: AccountReach;
+  addedAt: WireDate;
+  /** Whether its folder holds a sign-in, as the host read it when it answered. */
+  signedIn: boolean;
+  /** Who it is signed in as, such as an email address, when the runtime's files say. */
+  signedInAs?: string;
+  /**
+   * The command that signs it in, in a terminal on the host, for a runtime the app cannot sign in
+   * itself (Claude). Absent for one that signs in with runtimes/authenticate.
+   */
+  signInCommand?: string;
+}
+
+/**
+ * How an account reaches the model (#840). Today only a sign-in kept in a folder of its own; an org
+ * key and a gateway (T6, #999) are other cases of this.
+ */
+export type AccountReach =
+  | { signIn: { folder: string } };
+
+export interface AccountRequest {
+  runtimeID: string;
+  accountID: string;
+}
+
+/**
  * clients/setActivityToken (#1744): the push token of one session's Live Activity on this device,
  * in hex, for the control plane to update it by APNs while the Remote is not running. startedAt is
  * when the turn began, where the activity's timer counts from. No token takes it away.
@@ -120,6 +155,11 @@ export interface ActivityToken {
   token?: string;
   environment: PushEnvironment;
   startedAt: WireDate;
+}
+
+export interface AddAccountRequest {
+  runtimeID: string;
+  name: string;
 }
 
 /** What either announce is answered with: who the new party now is. */
@@ -222,6 +262,8 @@ export interface Agent {
    * when the turn ends.
    */
   runningTool?: string;
+  /** The added account its runtime runs with (#840); absent for the runtime's own sign-in. */
+  accountID?: string;
 }
 
 export type AgentArchivedReason =
@@ -610,6 +652,8 @@ export interface AuthStatus {
 export interface AuthenticateRequest {
   runtimeID: string;
   methodID: string;
+  /** An added account to sign in (#840); absent for the runtime's own sign-in. */
+  accountID?: string;
 }
 
 export interface BackgroundItem {
@@ -4682,6 +4726,11 @@ export interface Runtime {
   install?: RuntimeInstall;
   installPage: URLString;
   usesAppCopyOnly: boolean;
+  /**
+   * The variable that names the folder its sign-in is kept in, for a runtime that can have more
+   * than one account (#840): CLAUDE_CONFIG_DIR, CODEX_HOME.
+   */
+  accountFolderVariable?: string;
 }
 
 export interface RuntimeAccount {
@@ -4717,6 +4766,10 @@ export interface RuntimeAllowancesRow {
    * it (#1946). Only on the runtime's own sign-in row.
    */
   setupNote?: string;
+  /** The added account this row is for (#840); absent for the runtime's own sign-in. */
+  accountID?: string;
+  /** That account's name. */
+  accountName?: string;
 }
 
 export interface RuntimeAssessmentCheck {
@@ -5545,6 +5598,8 @@ export interface StartRequest {
   labels: string[];
   persona?: string;
   purpose?: AgentPurpose;
+  /** The added account the session uses (#840); absent for the runtime's own sign-in. */
+  accountID?: string;
 }
 
 /**
@@ -6739,10 +6794,13 @@ export interface Methods {
   "reports/scopes": { params: Empty; result: ReportScopes };
   "reports/setPolicy": { params: ReportPolicy; result: ReportPolicy };
   "reports/usage": { params: ReportQuery; result: UsageReport };
+  "runtimes/accountProfiles": { params: Empty; result: AccountProfile[] };
   "runtimes/accounts": { params: Empty; result: RuntimeAccount[] };
+  "runtimes/addAccount": { params: AddAccountRequest; result: AccountProfile };
   "runtimes/allowances": { params: string | null; result: RuntimeAllowances };
   "runtimes/list": { params: Empty; result: RuntimeStatus[] };
   "runtimes/markAvailable": { params: MarkRuntimeAvailable; result: RuntimeAllowances };
+  "runtimes/removeAccount": { params: AccountRequest; result: UUID[] };
   "sandbox/state": { params: Empty; result: SandboxSettings };
   "signIn/approve": { params: SignInDecide; result: Empty };
   "signIn/configure": { params: SignInConfigure; result: SignInProviders };
@@ -6951,10 +7009,13 @@ export const MethodTarget = {
   "reports/scopes": "control",
   "reports/setPolicy": "control",
   "reports/usage": "control",
+  "runtimes/accountProfiles": "host",
   "runtimes/accounts": "host",
+  "runtimes/addAccount": "host",
   "runtimes/allowances": "host",
   "runtimes/list": "host",
   "runtimes/markAvailable": "host",
+  "runtimes/removeAccount": "host",
   "sandbox/state": "host",
   "signIn/approve": "control",
   "signIn/configure": "control",
@@ -7040,6 +7101,7 @@ export interface Notifications {
   "preferences/changed": Record<string, JSONValue>;
   "project/changed": ProjectSummary;
   "project/removed": ProjectRemovedNotification;
+  "runtimes/accountProfilesChanged": AccountProfile[];
   "storage/writeFailed": WriteFailure;
   "store/notesChanged": StoreNotes;
   "workflow/changed": WorkflowSummary;
@@ -7052,10 +7114,13 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ACPAuthMethod: { required: ["id"], optional: ["name", "description", "_meta"] },
   ACPPromptCapabilities: { required: [], optional: ["image", "audio", "embeddedContext"] },
   ACPProviderInfo: { required: ["id"], optional: ["name", "protocol", "configured"] },
+  AccountProfile: { required: ["id", "runtimeID", "name", "reach", "addedAt", "signedIn"], optional: ["signedInAs", "signInCommand"] },
+  AccountRequest: { required: ["runtimeID", "accountID"], optional: [] },
   ActivityToken: { required: ["agentID", "environment", "startedAt"], optional: ["token"] },
+  AddAccountRequest: { required: ["runtimeID", "name"], optional: [] },
   Admitted: { required: [], optional: ["client", "host", "grant"] },
   AdoptRequest: { required: ["runtimeID", "sessionID", "cwd"], optional: [] },
-  Agent: { required: ["id", "runtimeID", "cwd", "state", "startOptions", "advertisedOptions", "availableCommands", "createdAt", "lastActivityAt"], optional: ["title", "labels", "runtimeSessionID", "isUnread", "isMuted", "reportSeenAt", "endedReason", "archivedReason", "usage", "lastTurnUsage", "costToDate", "costCeiling", "tokensToDate", "tokenCeiling", "plans", "background", "additionalDirectories", "mcpServers", "queuedPrompts", "suggestedPrompts", "startedByWorkflow", "purpose", "startedByRun", "startedByAgent", "chainDepth", "eventWait", "worktree", "pendingMove", "startingPoint", "startRequestID", "persona", "restartPickUps", "report", "outcomeAsked", "archiveRequest", "afterTurn", "archivedAt", "sandboxOverride", "effectiveSandbox", "pendingSandboxFailure", "missingFolder", "listsLeftOut", "titleIsPersons", "runtimeTitle", "madeInRoot", "queuedStart", "branchedFrom", "fileToSee", "continueWhenBack", "runningTool"] },
+  Agent: { required: ["id", "runtimeID", "cwd", "state", "startOptions", "advertisedOptions", "availableCommands", "createdAt", "lastActivityAt"], optional: ["title", "labels", "runtimeSessionID", "isUnread", "isMuted", "reportSeenAt", "endedReason", "archivedReason", "usage", "lastTurnUsage", "costToDate", "costCeiling", "tokensToDate", "tokenCeiling", "plans", "background", "additionalDirectories", "mcpServers", "queuedPrompts", "suggestedPrompts", "startedByWorkflow", "purpose", "startedByRun", "startedByAgent", "chainDepth", "eventWait", "worktree", "pendingMove", "startingPoint", "startRequestID", "persona", "restartPickUps", "report", "outcomeAsked", "archiveRequest", "afterTurn", "archivedAt", "sandboxOverride", "effectiveSandbox", "pendingSandboxFailure", "missingFolder", "listsLeftOut", "titleIsPersons", "runtimeTitle", "madeInRoot", "queuedStart", "branchedFrom", "fileToSee", "continueWhenBack", "runningTool", "accountID"] },
   AgentRemovedNotification: { required: ["agentID"], optional: [] },
   AgentRequest: { required: ["agentID"], optional: [] },
   AgentWorkspaces: { required: ["providers"], optional: [] },
@@ -7092,7 +7157,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   AuditList: { required: ["entries", "days", "more", "admin"], optional: [] },
   AuditQuery: { required: [], optional: ["since", "until", "user", "limit"] },
   AuthStatus: { required: ["kind", "label"], optional: [] },
-  AuthenticateRequest: { required: ["runtimeID", "methodID"], optional: [] },
+  AuthenticateRequest: { required: ["runtimeID", "methodID"], optional: ["accountID"] },
   BackgroundItem: { required: ["id", "kind", "name", "state", "canStop", "isStopping", "startedAt"], optional: ["taskType", "detail", "command", "parentID", "toolCallID", "outputFilePath", "summary", "lastToolName", "endedAt"] },
   Backup: { required: ["id", "machine", "rootID", "madeAt", "bytes", "agents", "thisMachine"], optional: [] },
   BackupMakeRequest: { required: [], optional: ["wait"] },
@@ -7512,10 +7577,10 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ResumingResponse: { required: ["agentIDs"], optional: [] },
   RetentionSettings: { required: ["keepFor"], optional: [] },
   RetentionState: { required: ["settings", "archivedCount", "archivedBytes"], optional: [] },
-  Runtime: { required: ["id", "name", "executable", "arguments", "installPage", "usesAppCopyOnly"], optional: ["install"] },
+  Runtime: { required: ["id", "name", "executable", "arguments", "installPage", "usesAppCopyOnly"], optional: ["install", "accountFolderVariable"] },
   RuntimeAccount: { required: ["runtimeID", "state", "authMethods", "canLogOut", "providers", "promptCapabilities", "canSteer", "checkedAt"], optional: ["currentProviderID", "signedInAs"] },
   RuntimeAllowances: { required: ["rows", "at"], optional: ["shared"] },
-  RuntimeAllowancesRow: { required: ["credentialKey", "state"], optional: ["unusable", "setupNote"] },
+  RuntimeAllowancesRow: { required: ["credentialKey", "state"], optional: ["unusable", "setupNote", "accountID", "accountName"] },
   RuntimeAssessmentCheck: { required: ["id", "area", "verdict", "evidence"], optional: [] },
   RuntimeAssessmentScore: { required: ["agentID", "runtimeID", "scoredAt", "checks"], optional: ["model", "runtimeVersion", "host", "reportPath"] },
   RuntimeRequest: { required: ["runtimeID"], optional: [] },
@@ -7612,7 +7677,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   SlashCommand: { required: ["name"], optional: ["description", "inputHint"] },
   SpendCaps: { required: [], optional: ["dailyUSD"] },
   StartOptions: { required: ["values", "extraArguments"], optional: [] },
-  StartRequest: { required: ["runtimeID", "cwd", "prompt", "attachments", "startOptions", "additionalDirectories", "mcpServers", "labels"], optional: ["draftID", "worktree", "requestID", "sandbox", "persona", "purpose"] },
+  StartRequest: { required: ["runtimeID", "cwd", "prompt", "attachments", "startOptions", "additionalDirectories", "mcpServers", "labels"], optional: ["draftID", "worktree", "requestID", "sandbox", "persona", "purpose", "accountID"] },
   StartedMachinePreview: { required: ["host", "name", "state", "unpushed"], optional: ["unknown"] },
   StartingPoint: { required: ["repository", "commit"], optional: [] },
   StopBackgroundRequest: { required: ["agentID", "itemID"], optional: [] },

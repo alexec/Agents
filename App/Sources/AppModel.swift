@@ -42,6 +42,8 @@ final class AppModel {
     /// What each runtime last said about itself: signed in or not, what it takes in a
     /// prompt, which provider is answering.
     private(set) var accounts: [String: RuntimeAccount] = [:]
+    /// The accounts added to this Mac's runtimes (#840), beside each runtime's own sign-in.
+    private(set) var accountProfiles: [AccountProfile] = []
     /// What the terminals the daemon is running for an agent have printed so far. The
     /// kit's, so a phone shows the same (033).
     var terminalOutput: [String: String] { work.terminalOutput }
@@ -785,7 +787,23 @@ final class AppModel {
             Task { await loadDraftPersonas() }
         }
     }
-    var draftRuntimeID: String?
+    var draftRuntimeID: String? {
+        didSet {
+            guard draftRuntimeID != oldValue else { return }
+            draftAccountID = nil
+            // An account signed in from a terminal since: its state under its name is today's.
+            Task { await refreshAccountProfiles() }
+        }
+    }
+    /// The added account the next session uses (#840); nil for the runtime's own sign-in.
+    /// Back to the runtime's own whenever the runtime changes.
+    var draftAccountID: String?
+    /// The accounts the draft's runtime offers beyond its own sign-in: this Mac's, so none
+    /// for a project on a server. The picker shows only when there is one.
+    var draftAccounts: [AccountProfile] {
+        guard draftHost == .mac, let runtimeID = draftRuntimeID else { return [] }
+        return accountProfiles.on(runtimeID)
+    }
     /// The kinds of session the draft folder offers (#760): the project's personas and
     /// the home's, as the host lists them.
     private(set) var draftPersonas: [Persona] = []
@@ -2990,6 +3008,10 @@ final class AppModel {
         case DaemonAPI.Notification.runtimeChanged:
             await refreshRuntimes()
 
+        case DaemonAPI.Notification.runtimesAccountProfilesChanged:
+            guard let list = try? params?.decode([AccountProfile].self) else { return }
+            accountProfiles = list
+
         case DaemonAPI.Notification.runtimeAccountChanged:
             guard let account = try? params?.decode(RuntimeAccount.self) else { return }
             accounts[account.runtimeID] = account
@@ -3592,7 +3614,7 @@ final class AppModel {
         DaemonAPI.Notification.runtimeChanged, DaemonAPI.Notification.runtimeAccountChanged,
         DaemonAPI.Notification.signInNeeded, DaemonAPI.Notification.clientPermissionsChanged,
         DaemonAPI.Notification.personChanged, DaemonAPI.Notification.sandboxChanged,
-        DaemonAPI.Notification.backupsChanged,
+        DaemonAPI.Notification.backupsChanged, DaemonAPI.Notification.runtimesAccountProfilesChanged,
     ]
 
     /// What is this Mac's own, from this Mac's host by an id of its own (#1496). Its
@@ -4662,7 +4684,8 @@ final class AppModel {
                                              additionalDirectories: draftFolders,
                                              mcpServers: draftServers,
                                              worktree: draftWorktree,
-                                             sandbox: draftSandbox, labels: labels, persona: draftPersona)
+                                             sandbox: draftSandbox, labels: labels, persona: draftPersona,
+                                             accountID: draftAccounts.contains { $0.id == draftAccountID } ? draftAccountID : nil)
         // A stopped workspace that starts when used: kept, and shown under this prompt (#691 US3).
         if draftHost != .mac, hosts.isOffline(draftHost), startsWhenUsed(draftHost) {
             var kept = request
@@ -4934,6 +4957,44 @@ final class AppModel {
                                                 Optional<Int>.none,
                                                 returning: [RuntimeAccount].self) else { return }
         accounts = Dictionary(uniqueKeysWithValues: list.map { ($0.runtimeID, $0) })
+        await refreshAccountProfiles()
+    }
+
+    func refreshAccountProfiles() async {
+        guard let list = try? await macClient.call(DaemonAPI.Method.runtimesAccountProfiles, Optional<Int>.none,
+                                                returning: [AccountProfile].self) else { return }
+        accountProfiles = list
+    }
+
+    /// Add an account to a runtime (#840). Nil when it was added; else why not, for the sheet.
+    func addAccount(runtimeID: String, name: String) async -> String? {
+        do {
+            let added = try await macClient.call(DaemonAPI.Method.runtimesAddAccount,
+                                              DaemonAPI.AddAccountRequest(runtimeID: runtimeID, name: name),
+                                              returning: AccountProfile.self)
+            accountProfiles.removeAll { $0.id == added.id }
+            accountProfiles.append(added)
+            await refreshRuntimeAllowances()
+            return nil
+        } catch {
+            return describe(error)
+        }
+    }
+
+    func removeAccount(_ account: AccountProfile) async {
+        await attempt {
+            _ = try await self.macClient.call(DaemonAPI.Method.runtimesRemoveAccount,
+                                           DaemonAPI.AccountRequest(runtimeID: account.runtimeID, accountID: account.id),
+                                           returning: [UUID].self)
+        }
+        await refreshAccountProfiles()
+        await refreshRuntimeAllowances()
+        await refreshAgents()
+    }
+
+    /// The agents an added account is running, which removing it stops.
+    func agentsHolding(account: AccountProfile) -> [Agent] {
+        agentsHolding(runtimeID: account.runtimeID).filter { $0.accountID == account.id }
     }
 
     func stop(_ id: UUID) async {
@@ -5412,14 +5473,16 @@ final class AppModel {
 
     // MARK: Runtimes
 
-    func signIn(runtimeID: String, methodID: String) async -> String? {
+    /// Sign the runtime in, or one of its added accounts (#840) when `accountID` is set.
+    func signIn(runtimeID: String, methodID: String, accountID: String? = nil) async -> String? {
         do {
             let account = try await macClient.call(DaemonAPI.Method.runtimeAuthenticate,
                                                 DaemonAPI.AuthenticateRequest(runtimeID: runtimeID,
-                                                                              methodID: methodID),
+                                                                              methodID: methodID, accountID: accountID),
                                                 returning: RuntimeAccount.self)
-            accounts[runtimeID] = account
+            if accountID == nil { accounts[runtimeID] = account }
             await refreshRuntimes()
+            if accountID != nil { await refreshAccountProfiles() }
             return nil
         } catch let error as JSONRPCError {
             // A method that needs a terminal comes back as the command to run, which is

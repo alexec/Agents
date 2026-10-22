@@ -21,11 +21,17 @@ public struct RuntimeAllowances: Codable, Hashable, Sendable {
 
     public var anyOut: Bool { rows.contains { $0.state.isOut } }
 
-    /// Whether this runtime's plan is spent, on any of its credentials. A chooser asks
+    /// Whether this runtime's plan is spent, on any of its own credentials. A chooser asks
     /// this to put a runtime in its out run: a spent plan cannot take a turn, but it is
     /// still worth naming rather than hiding, because that is the only way back to it.
+    /// An added account (#840) is not the runtime's: the account picker says its state.
     public func isOut(_ runtimeID: String) -> Bool {
-        rows.contains { $0.runtimeID == runtimeID && $0.state.isOut }
+        rows.contains { $0.runtimeID == runtimeID && $0.accountID == nil && $0.state.isOut }
+    }
+
+    /// The row for one account of a runtime: its own sign-in for nil (#840).
+    public func row(_ runtimeID: String, account accountID: String?) -> Row? {
+        accountID.map { id in rows.first { $0.runtimeID == runtimeID && $0.accountID == id } } ?? firstRow(runtimeID)
     }
 
     /// Its first row's line, which is the Mac's own wording for what is wrong with it.
@@ -47,13 +53,13 @@ public struct RuntimeAllowances: Codable, Hashable, Sendable {
     }
 
     private func firstRow(_ runtimeID: String) -> Row? {
-        rows.first { $0.runtimeID == runtimeID }
+        rows.first { $0.runtimeID == runtimeID && $0.accountID == nil }
     }
 
     /// The prompt bar's warning for a new chat on an out runtime, or nil. It names no
     /// other runtime: there is no order to take one from (065).
     public func startingOnOut(_ runtimeID: String) -> String? {
-        guard let row = rows.first(where: { $0.runtimeID == runtimeID && $0.state.isOut }) else { return nil }
+        guard let row = rows.first(where: { $0.runtimeID == runtimeID && $0.accountID == nil && $0.state.isOut }) else { return nil }
         return PoolWords.startingOnOut(runtimeID, state: row.state, now: at)
     }
 
@@ -66,12 +72,24 @@ public struct RuntimeAllowances: Codable, Hashable, Sendable {
         /// What one of its features needs on the host and lacks, with the step that fixes
         /// it (#1946): Use Chrome without Claude Code's native host in Chrome.
         public var setupNote: String?
+        /// The added account this row is for (#840), and its name; nil for the runtime's own.
+        public var accountID: String?
+        public var accountName: String?
 
-        public init(credentialKey: String, state: AllowanceState, unusable: String? = nil, setupNote: String? = nil) {
+        public init(credentialKey: String, state: AllowanceState, unusable: String? = nil, setupNote: String? = nil,
+                    accountID: String? = nil, accountName: String? = nil) {
             self.credentialKey = credentialKey
             self.state = state
             self.unusable = unusable
             self.setupNote = setupNote
+            self.accountID = accountID
+            self.accountName = accountName
+        }
+
+        /// The runtime's name, and the account's for an added one: "Claude · Work".
+        public var title: String {
+            let runtime = PoolWords.runtimeName(runtimeID)
+            return accountName.map { "\(runtime) · \($0)" } ?? runtime
         }
 
         public var id: String { credentialKey }

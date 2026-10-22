@@ -11,6 +11,10 @@ public enum DaemonAPI {
         /// Mac's daemon only, and only for the app itself: it runs a vendor's script.
         public static let runtimesInstall = "runtimes/install"
         public static let runtimesAccounts = "runtimes/accounts"
+        /// The accounts added to runtimes (#840), and adding and removing one.
+        public static let runtimesAccountProfiles = "runtimes/accountProfiles"
+        public static let runtimesAddAccount = "runtimes/addAccount"
+        public static let runtimesRemoveAccount = "runtimes/removeAccount"
         public static let runtimeAuthenticate = "runtimes/authenticate"
         public static let runtimeLogOut = "runtimes/logout"
         public static let runtimeSetProvider = "runtimes/setProvider"
@@ -591,6 +595,8 @@ public enum DaemonAPI {
         /// `RuntimeAllowances`, whenever a runtime's state changes (065). Debounced to
         /// one a second.
         public static let runtimesAllowancesChanged = "runtimes/allowancesChanged"
+        /// Every added account (#840), whenever one is added, removed or signed in.
+        public static let runtimesAccountProfilesChanged = "runtimes/accountProfilesChanged"
         /// The retention settings, or what the archive holds, changed (051). A
         /// `RetentionState`.
         public static let retentionChanged = "retention/changed"
@@ -980,6 +986,8 @@ public enum DaemonAPI {
         /// An agent started for something other than a person's work (#858). Its `cwd` is
         /// not used: the daemon makes a folder of its own for it.
         public var purpose: AgentPurpose?
+        /// The added account the session uses (#840); nil for the runtime's own sign-in.
+        public var accountID: String?
 
         public init(runtimeID: String, cwd: URL, prompt: String,
                     attachments: [Attachment] = [],
@@ -987,7 +995,8 @@ public enum DaemonAPI {
                     additionalDirectories: [URL] = [], mcpServers: [MCPServer] = [],
                     worktree: WorktreeChoice? = nil, requestID: UUID? = nil,
                     sandbox: SandboxChoice? = nil, labels: [String] = [], persona: String? = nil,
-                    purpose: AgentPurpose? = nil) {
+                    purpose: AgentPurpose? = nil, accountID: String? = nil) {
+            self.accountID = accountID
             self.persona = persona
             self.purpose = purpose
             self.sandbox = sandbox
@@ -1023,6 +1032,7 @@ public enum DaemonAPI {
             labels = try c.decodeIfPresent([String].self, forKey: .labels) ?? []
             persona = try c.decodeIfPresent(String.self, forKey: .persona)
             purpose = try c.decodeIfPresent(AgentPurpose.self, forKey: .purpose)
+            accountID = try c.decodeIfPresent(String.self, forKey: .accountID)
         }
 
         /// What goes to the runtime: the words, then whatever was attached.
@@ -2216,9 +2226,12 @@ public enum DaemonAPI {
     public struct AuthenticateRequest: Codable, Sendable {
         public var runtimeID: String
         public var methodID: String
-        public init(runtimeID: String, methodID: String) {
+        /// An added account to sign in (#840); nil for the runtime's own sign-in.
+        public var accountID: String?
+        public init(runtimeID: String, methodID: String, accountID: String? = nil) {
             self.runtimeID = runtimeID
             self.methodID = methodID
+            self.accountID = accountID
         }
     }
 

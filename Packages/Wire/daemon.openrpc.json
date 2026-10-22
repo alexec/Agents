@@ -4824,6 +4824,57 @@
       ]
     },
     {
+      "name": "runtimes/accountProfiles",
+      "x-capability": "runtimes.accounts/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "type": "array",
+          "items": {
+            "$ref": "daemon.schema.json#/definitions/AccountProfile"
+          }
+        }
+      }
+    },
+    {
+      "name": "runtimes/accountProfilesChanged",
+      "x-capability": "runtimes.accounts/1",
+      "x-notification": true,
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "type": "array",
+            "items": {
+              "$ref": "daemon.schema.json#/definitions/AccountProfile"
+            }
+          }
+        }
+      ]
+    },
+    {
       "name": "runtimes/accounts",
       "x-capability": "runtimes/1",
       "tags": [
@@ -4848,6 +4899,31 @@
           "items": {
             "$ref": "daemon.schema.json#/definitions/RuntimeAccount"
           }
+        }
+      }
+    },
+    {
+      "name": "runtimes/addAccount",
+      "x-capability": "runtimes.accounts/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/AddAccountRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/AccountProfile"
         }
       }
     },
@@ -5067,6 +5143,34 @@
         "name": "result",
         "schema": {
           "$ref": "daemon.schema.json#/definitions/RuntimeAllowances"
+        }
+      }
+    },
+    {
+      "name": "runtimes/removeAccount",
+      "x-capability": "runtimes.accounts/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/AccountRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "type": "array",
+          "items": {
+            "$ref": "daemon.schema.json#/definitions/UUID"
+          }
         }
       }
     },

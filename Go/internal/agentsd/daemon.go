@@ -53,6 +53,7 @@ type Daemon struct {
 	costBook
 	workflowBook
 	allowanceBook
+	accountBook
 	mcpBook
 	viewBook
 	mcpHealthBook

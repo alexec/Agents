@@ -294,13 +294,12 @@ func (d *Daemon) noteFailure(id wire.UUID, runtimeID string, f *sessionFailure) 
 	log.Printf("agent %s: %s %s %v %s %s", id, f.Severity, f.Category, f.Actions, f.Reason, f.Details)
 }
 
-// markOut is AllowanceState.markOut on a runtime's own credential: out since it went out,
-// back when the provider said, tried again after four hours either way.
-func (d *Daemon) markOut(runtimeID string, why wire.AllowanceStateOutReason, until *wire.Date, source wire.AllowanceStateSource,
+// markOut is AllowanceState.markOut on a credential (the agent's account, #840): out since
+// it went out, back when the provider said, tried again after four hours either way.
+func (d *Daemon) markOut(key string, why wire.AllowanceStateOutReason, until *wire.Date, source wire.AllowanceStateSource,
 	window *wire.RateLimitInfo) wire.AllowanceState {
 	at := time.Now()
 	retry := wire.DateOf(at.Add(retryWithoutATime))
-	key := ownKey(runtimeID)
 	d.allowMu.Lock()
 	defer d.allowMu.Unlock()
 	states := d.allowancesLocked()
@@ -323,16 +322,20 @@ func (d *Daemon) markOut(runtimeID string, why wire.AllowanceStateOutReason, unt
 	return s
 }
 
-func (d *Daemon) raiseAllowanceOut(runtimeID, reason string, s wire.AllowanceState) {
+func (d *Daemon) raiseAllowanceOut(key, reason string, s wire.AllowanceState) {
+	runtimeID, _, _ := strings.Cut(key, ":")
 	details := map[string]string{"runtime": runtimeID, "reason": reason}
+	if id := keyAccount(key); id != "" {
+		details["account"] = id
+	}
 	if o := s.Status.Out; o != nil && o.RetryAfter != nil {
 		details["retry_after"] = o.RetryAfter.Time().UTC().Format(time.RFC3339)
 	}
 	if o := s.Status.Out; o != nil && o.Until != nil {
 		details["until"] = o.Until.Time().UTC().Format(time.RFC3339)
 	}
-	log.Printf("%s's %s", runtimeID, reason)
-	d.raise(wire.EventDraft{Name: "cost.allowance_out", At: now(), Scope: macScope(), Sentence: runtimeName(runtimeID) + "’s allowance ran out.",
+	log.Printf("%s's %s", key, reason)
+	d.raise(wire.EventDraft{Name: "cost.allowance_out", At: now(), Scope: macScope(), Sentence: d.credentialName(key) + "’s allowance ran out.",
 		Details: details})
 	d.tellAllowances()
 }
@@ -346,15 +349,16 @@ func (d *Daemon) applyLimit(l *live, lim limit, worked bool) (why wire.EndedReas
 	if a == nil {
 		return "", false, time.Time{}
 	}
-	name := runtimeName(a.RuntimeID)
+	key := agentKey(a)
+	name := d.credentialName(key)
 	l.mu.Lock()
 	window := l.rateLimit
 	l.mu.Unlock()
 	at := time.Now()
 	switch lim.kind {
 	case limitSpent:
-		s := d.markOut(a.RuntimeID, wire.AllowanceStateOutReasonAllowanceSpent, lim.resetsAt, wire.AllowanceStateSourceTypedFailure, window)
-		d.raiseAllowanceOut(a.RuntimeID, "allowance spent", s)
+		s := d.markOut(key, wire.AllowanceStateOutReasonAllowanceSpent, lim.resetsAt, wire.AllowanceStateSourceTypedFailure, window)
+		d.raiseAllowanceOut(key, "allowance spent", s)
 		note := name + "’s allowance ran out. It is tried again after " + poolTime(s.Status.Out.RetryAfter.Time(), at) + "."
 		if lim.resetsAt != nil {
 			note = name + "’s allowance ran out. Its provider says it resets at " + poolTime(lim.resetsAt.Time(), at) + "; the app checks before using it again."
@@ -366,17 +370,17 @@ func (d *Daemon) applyLimit(l *live, lim limit, worked bool) (why wire.EndedReas
 		l.mu.Unlock()
 		// So does a workflow's run or a helper set to (#1918): nobody watches those.
 		if sentToContinue(sent) || d.continuesByItself(a) {
-			d.waitForAllowance(l.id, a.RuntimeID)
+			d.waitForAllowance(l.id, key)
 		}
 		return wire.EndedReasonAllowanceSpent, true, time.Time{}
 	case limitCreditGone:
-		s := d.markOut(a.RuntimeID, wire.AllowanceStateOutReasonCreditUsedUp, nil, wire.AllowanceStateSourceWords, nil)
-		d.raiseAllowanceOut(a.RuntimeID, "credit used up", s)
+		s := d.markOut(key, wire.AllowanceStateOutReasonCreditUsedUp, nil, wire.AllowanceStateSourceWords, nil)
+		d.raiseAllowanceOut(key, "credit used up", s)
 		d.record(l.id, runtimeNote(name+"’s credit is used up."))
 		return wire.EndedReasonAllowanceSpent, true, time.Time{}
 	case limitOverage:
-		s := d.markOut(a.RuntimeID, wire.AllowanceStateOutReasonOverage, lim.resetsAt, wire.AllowanceStateSourceOverageReport, nil)
-		d.raiseAllowanceOut(a.RuntimeID, "paid extra usage began", s)
+		s := d.markOut(key, wire.AllowanceStateOutReasonOverage, lim.resetsAt, wire.AllowanceStateSourceOverageReport, nil)
+		d.raiseAllowanceOut(key, "paid extra usage began", s)
 		d.record(l.id, runtimeNote(name+" started using paid extra usage, so it is treated as out."))
 		// The turn itself may have worked; then it stays worked.
 		return wire.EndedReasonAllowanceSpent, !worked, time.Time{}
@@ -402,13 +406,13 @@ func (d *Daemon) applyLimit(l *live, lim limit, worked bool) (why wire.EndedReas
 		}
 		l.mu.Unlock()
 		if persists {
-			s := d.markOut(a.RuntimeID, wire.AllowanceStateOutReasonRateLimitPersisted, nil, wire.AllowanceStateSourceTypedFailure, nil)
-			d.raiseAllowanceOut(a.RuntimeID, "still rate limited", s)
+			s := d.markOut(key, wire.AllowanceStateOutReasonRateLimitPersisted, nil, wire.AllowanceStateSourceTypedFailure, nil)
+			d.raiseAllowanceOut(key, "still rate limited", s)
 			d.record(l.id, runtimeNote(name+" is still rate limited after retrying, so it is treated as out for an hour."))
 			return wire.EndedReasonRateLimited, true, time.Time{}
 		}
 		retryAt = at.Add(rateLimitPolicy.delays[min(attempt, len(rateLimitPolicy.delays)-1)])
-		d.rateLimited(a.RuntimeID, wire.DateOf(retryAt))
+		d.rateLimited(key, wire.DateOf(retryAt))
 		if sent == nil {
 			d.record(l.id, runtimeNote(name+" is rate limited."))
 			return wire.EndedReasonRateLimited, true, time.Time{}
@@ -420,8 +424,7 @@ func (d *Daemon) applyLimit(l *live, lim limit, worked bool) (why wire.EndedReas
 }
 
 // rateLimited is AllowanceState.rateLimited: shown, and over by itself at retryAt.
-func (d *Daemon) rateLimited(runtimeID string, retryAt wire.Date) {
-	key := ownKey(runtimeID)
+func (d *Daemon) rateLimited(key string, retryAt wire.Date) {
 	d.allowMu.Lock()
 	states := d.allowancesLocked()
 	s, ok := states[key]
@@ -437,14 +440,13 @@ func (d *Daemon) rateLimited(runtimeID string, retryAt wire.Date) {
 	d.tellAllowances()
 }
 
-// allowanceWorked is a turn that worked: whatever held the runtime's credential is over,
-// and its rate limits are forgotten.
-func (d *Daemon) allowanceWorked(l *live, runtimeID string) {
+// allowanceWorked is a turn that worked: whatever held its credential (key) is over, and
+// its rate limits are forgotten.
+func (d *Daemon) allowanceWorked(l *live, key string) {
 	l.mu.Lock()
 	l.rateLimitStreak, l.rateLimitAttempts = nil, 0
 	window := l.rateLimit
 	l.mu.Unlock()
-	key := ownKey(runtimeID)
 	d.allowMu.Lock()
 	states := d.allowancesLocked()
 	s, ok := states[key]
@@ -465,9 +467,8 @@ func (d *Daemon) allowanceWorked(l *live, runtimeID string) {
 	d.saveAllowancesLocked()
 	d.allowMu.Unlock()
 	if wasOut {
-		d.raise(wire.EventDraft{Name: "cost.allowance_back", At: now(), Scope: macScope(), Sentence: runtimeName(runtimeID) + "’s allowance came back.",
-			Details: map[string]string{"runtime": runtimeID, "how": "worked"}})
-		d.allowanceBack(runtimeID)
+		d.raiseAllowanceBack(key, "worked")
+		d.allowanceBack(key)
 	}
 	d.tellAllowances()
 }
@@ -479,13 +480,12 @@ const readingKeptFor = 5 * time.Minute
 // notePlanWindow is a plan window the runtime reported (R2): kept for the turn's end, and
 // on the credential for the Pool page. One saying when a spent allowance is back, read
 // within a minute of the refusal it explains, puts that time on it.
-func (d *Daemon) notePlanWindow(l *live, runtimeID string, w *wire.RateLimitInfo) {
+func (d *Daemon) notePlanWindow(l *live, key string, w *wire.RateLimitInfo) {
 	l.mu.Lock()
 	l.rateLimit = w
 	l.mu.Unlock()
 	at := time.Now()
 	t := wire.DateOf(at)
-	key := ownKey(runtimeID)
 	changed := false
 	d.allowMu.Lock()
 	states := d.allowancesLocked()

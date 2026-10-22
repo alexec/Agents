@@ -7,7 +7,7 @@ import { batch, computed, signal, type ReadonlySignal, type Signal } from "@prea
 import type {
   Agent, AgentRemovedNotification, ResumingNotification, ControlHost, HostID, HostWorkspace, ElicitationNotification, ElicitationRequest, EntryNotification,
   PermissionNotification, PermissionRequest, ProjectSummary, TranscriptEntry, TranscriptPage, TurnsPage, TurnSummary,
-  WorkflowSummary, Attachment, FilesChangedNotification, ShowFileNotification, WorkflowRemovedNotification, ProjectRemovedNotification, DraftOptionsNotification, JSONValue, Methods, RuntimeAccount, RuntimeStatus,
+  WorkflowSummary, Attachment, FilesChangedNotification, ShowFileNotification, WorkflowRemovedNotification, ProjectRemovedNotification, DraftOptionsNotification, JSONValue, Methods, AccountProfile, RuntimeAccount, RuntimeStatus,
   StartRequest, UUID, WorktreesListResponse, Persona, FileStamp, WriteFailure, CloneNotification, CloneSummary, DirectoryListing, LeaseSnapshot, HostedMCPSnapshot, MCPHealthSnapshot, DiskState, StoreNotes,
   ChatProjectState, CostState, EventsPage, Event as ActivityEvent, ConfigOption, WorkflowSettings,
   PagesChangedNotification, PinsChangedNotification, PinView, ViewPin, ListCursor, ListRequest, FileMentionDTO, SandboxChoice, RuntimeAllowances,
@@ -198,6 +198,8 @@ export function hostStateWords(state: string): string {
 export class Work {
   readonly hosts = signal<ControlHost[]>([]);
   readonly projects = signal<ByHost<ProjectSummary>>({});
+  /** The accounts added to each host's runtimes (#840), by host. */
+  readonly accountProfiles = signal<Record<string, AccountProfile[]>>({});
   /** The clones under way on each host (027), drawn where the project will be. */
   readonly clones = signal<ByHost<CloneSummary>>({});
   readonly agents = signal<ByHost<Agent>>({});
@@ -500,6 +502,9 @@ export class Work {
     switch (method) {
       case "agent/changed":
         this.upsertAgent(params as Agent, host);
+        return true;
+      case "runtimes/accountProfilesChanged":
+        this.accountProfiles.value = { ...this.accountProfiles.value, [host]: params as AccountProfile[] };
         return true;
       case "project/removed":
         // Deleted (#677); its sessions went before it, each by its own agent/removed.
@@ -2123,19 +2128,22 @@ export class Store extends Work {
 
   /** What runs on a host, and what each runtime takes; asked once a connection. */
   async loadRuntimes(host: string): Promise<void> {
-    const [runtimes, accounts, modes, sandbox, allowances] = await Promise.all([
+    const [runtimes, accounts, modes, sandbox, allowances, profiles] = await Promise.all([
       this.link.call("runtimes/list", {}, host).catch(() => null),
       this.link.call("runtimes/accounts", {}, host).catch(() => null),
       this.link.call("modes/remembered", {}, host).catch(() => null),
       // A host on an older build is not asked by the page: every runtime then follows its own.
       this.link.call("sandbox/state", {}, host).catch(() => null),
       this.link.call("runtimes/allowances", null, host).catch(() => null),
+      // A host on an older build has no added accounts (#840).
+      this.link.call("runtimes/accountProfiles", {}, host).catch(() => null),
     ]);
     batch(() => {
       if (sandbox) this.sandboxDefaults.value = { ...this.sandboxDefaults.value, [host]: sandbox.defaults };
       if (runtimes) this.runtimes.value = { ...this.runtimes.value, [host]: sortedRuntimes(runtimes) };
       if (allowances) this.runtimeAllowances.value = { ...this.runtimeAllowances.value, [host]: allowances };
       if (accounts) this.accounts.value = { ...this.accounts.value, [host]: accounts };
+      if (profiles) this.accountProfiles.value = { ...this.accountProfiles.value, [host]: profiles };
       if (modes) this.rememberedModes.value = { ...this.rememberedModes.value, [host]: modes };
     });
   }
@@ -2178,6 +2186,35 @@ export class Store extends Work {
 
   async markRuntimeAvailable(host: string, credentialKey: string): Promise<void> {
     const allowances = await this.link.call("runtimes/markAvailable", { credentialKey }, host).catch(() => null);
+    if (allowances) this.runtimeAllowances.value = { ...this.runtimeAllowances.value, [host]: allowances };
+  }
+
+  /** The accounts added to one of a host's runtimes (#840), in the order they were added. */
+  addedAccounts(host: string, runtimeID: string): AccountProfile[] {
+    return (this.accountProfiles.value[host] ?? []).filter((a) => a.runtimeID === runtimeID);
+  }
+
+  /** Add an account to a runtime (#840). Throws the host's refusal. */
+  async addAccount(host: string, runtimeID: string, name: string): Promise<AccountProfile> {
+    const added = await this.link.call("runtimes/addAccount", { runtimeID, name }, host);
+    const rest = (this.accountProfiles.value[host] ?? []).filter((a) => a.id !== added.id);
+    this.accountProfiles.value = { ...this.accountProfiles.value, [host]: [...rest, added] };
+    void this.reloadAllowances(host);
+    return added;
+  }
+
+  /** Remove an added account: its sessions stop, and its folder goes (#840). */
+  async removeAccount(host: string, account: AccountProfile): Promise<void> {
+    await this.link.call("runtimes/removeAccount", { runtimeID: account.runtimeID, accountID: account.id }, host);
+    this.accountProfiles.value = {
+      ...this.accountProfiles.value,
+      [host]: (this.accountProfiles.value[host] ?? []).filter((a) => a.id !== account.id),
+    };
+    void this.reloadAllowances(host);
+  }
+
+  private async reloadAllowances(host: string): Promise<void> {
+    const allowances = await this.link.call("runtimes/allowances", null, host).catch(() => null);
     if (allowances) this.runtimeAllowances.value = { ...this.runtimeAllowances.value, [host]: allowances };
   }
 
