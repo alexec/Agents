@@ -218,7 +218,22 @@ func (d *Daemon) startFor(r wire.StartRequest, by startedBy) (wire.UUID, error) 
 	if !isDir(path) {
 		return "", &Error{Code: CodeFolderGone, Message: path + " is not there any more."}
 	}
-	if err := d.needsSignIn(r.RuntimeID); err != nil {
+	// An added account has its own sign-in (#840): the host's is not wanted for it.
+	if r.AccountID != nil && *r.AccountID == "" {
+		r.AccountID = nil
+	}
+	// A helper on its starter's runtime uses its starter's account.
+	if r.AccountID == nil && by.agent != nil {
+		if c := d.Store.Agent(*by.agent); c != nil && c.RuntimeID == r.RuntimeID && c.AccountID != nil &&
+			d.accountProfile(c.RuntimeID, *c.AccountID) != nil {
+			r.AccountID = c.AccountID
+		}
+	}
+	if r.AccountID != nil {
+		if d.accountProfile(r.RuntimeID, *r.AccountID) == nil {
+			return "", Invalid("%s has no such account. It may have been removed.", rt.Name)
+		}
+	} else if err := d.needsSignIn(r.RuntimeID); err != nil {
 		return "", err
 	}
 	// The same start sent again (a window retrying) is the agent it made.
@@ -261,7 +276,7 @@ func (d *Daemon) startFor(r wire.StartRequest, by startedBy) (wire.UUID, error) 
 		StartOptions:      wire.StartOptions{Values: values, ExtraArguments: extra},
 		AdvertisedOptions: []wire.ConfigOption{}, AvailableCommands: []wire.SlashCommand{},
 		CreatedAt: t, LastActivityAt: t, MadeInRoot: &d.Store.RootID, StartRequestID: r.RequestID,
-		StartedByAgent: by.agent, SandboxOverride: r.Sandbox, Persona: r.Persona,
+		StartedByAgent: by.agent, SandboxOverride: r.Sandbox, Persona: r.Persona, AccountID: r.AccountID,
 	}
 	if q := by.queued; q != nil {
 		// Out of the queue, the same agent: its id, its title and when it was asked for.
@@ -459,7 +474,11 @@ func (l *live) turn() bool {
 	if l.session == nil {
 		rt := runtimeByID(a.RuntimeID)
 		dir := store.FolderPath(a.Cwd)
-		launch, err := d.launchFor(rt, dir)
+		account, err := d.accountFor(a)
+		var launch acp.Launch
+		if err == nil {
+			launch, err = d.launchAs(rt, dir, account)
+		}
 		if err != nil {
 			d.record(l.id, notice("error", rt.Name+" did not start", err.Error()))
 			d.end(l, wire.AgentStateStopped, wire.EndedReasonRuntimeError)
@@ -493,8 +512,11 @@ func (l *live) turn() bool {
 			// A runtime with no sign-in refuses session/new with -32000 (#1430): it is not
 			// signed in, not crashed, and the Pool page says so.
 			if code, _ := refusal(err); code != nil && *code == authRequired {
-				d.markNeedsSignIn(a.RuntimeID)
-				d.record(l.id, notice("error", rt.Name+" is not signed in", err.Error()))
+				// An added account's sign-in is its own (#840): the runtime's is not in question.
+				if account == nil {
+					d.markNeedsSignIn(a.RuntimeID)
+				}
+				d.record(l.id, notice("error", d.credentialName(agentKey(a))+" is not signed in", err.Error()))
 				d.end(l, wire.AgentStateStopped, wire.EndedReasonSignInRefused)
 				return false
 			}
@@ -709,6 +731,13 @@ func (l *live) turn() bool {
 				return false
 			}
 		}
+		// An added account with no sign-in in its folder (#840): said as that, with where to fix it.
+		if code, _ := refusal(err); code != nil && *code == authRequired && a.AccountID != nil {
+			d.record(l.id, notice("error", d.credentialName(agentKey(a))+" is not signed in",
+				"Sign it in from "+runtimeName(a.RuntimeID)+"’s sign-in sheet on the Mac, under Accounts."))
+			d.end(l, wire.AgentStateStopped, wire.EndedReasonSignInRefused)
+			return false
+		}
 		d.record(l.id, notice("error", "The turn failed", err.Error()))
 		select {
 		case <-s.Done():
@@ -762,7 +791,7 @@ func (l *live) turn() bool {
 		return true
 	}
 	if worked && lim.kind == limitNone {
-		d.allowanceWorked(l, a.RuntimeID)
+		d.allowanceWorked(l, agentKey(a))
 	}
 	// A command whose sandbox could not be set up: the turn ran to its end, and the agent
 	// stops there with the card. Never once it said how it went itself (#224).
@@ -1109,7 +1138,7 @@ func (l *live) Update(n sdk.SessionNotification) {
 		uu := u.UsageUpdate
 		if w := rateLimitIn(uu.Meta); w != nil {
 			if a := d.Store.Agent(l.id); a != nil {
-				d.notePlanWindow(l, a.RuntimeID, w)
+				d.notePlanWindow(l, agentKey(a), w)
 			}
 		}
 		usage := wire.Usage{Used: int64(uu.Used), Size: int64(uu.Size), At: now()}

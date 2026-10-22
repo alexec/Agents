@@ -201,6 +201,9 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
     /// The persona it was started as (#760), by id: its prompt goes with every briefing,
     /// read from the file each time. Nil for most agents.
     public var persona: String?
+    /// The added account its runtime runs with (#840), by id. Nil for the runtime's own
+    /// sign-in, which is most agents.
+    public var accountID: String?
 
     /// How many times in a row this chat has been picked back up after the daemon
     /// went, without a turn since reaching its own end. On the record and not in
@@ -371,6 +374,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         startingPoint = try c.decodeIfPresent(StartingPoint.self, forKey: .startingPoint)
         startRequestID = try c.decodeIfPresent(UUID.self, forKey: .startRequestID)
         persona = try c.decodeIfPresent(String.self, forKey: .persona)
+        accountID = try c.decodeIfPresent(String.self, forKey: .accountID)
         // New in 011, and counted from nothing, so every record written before the
         // restart guard existed opens as a chat that has never been picked back up.
         restartPickUps = try c.decodeIfPresent(Int.self, forKey: .restartPickUps) ?? 0
@@ -479,6 +483,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         try c.encodeIfPresent(startingPoint, forKey: .startingPoint)
         try c.encodeIfPresent(startRequestID, forKey: .startRequestID)
         try c.encodeIfPresent(persona, forKey: .persona)
+        try c.encodeIfPresent(accountID, forKey: .accountID)
         if restartPickUps != 0 { try c.encode(restartPickUps, forKey: .restartPickUps) }
         try c.encodeIfPresent(report, forKey: .report)
         if outcomeAsked { try c.encode(outcomeAsked, forKey: .outcomeAsked) }
@@ -519,6 +524,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
         case startedByWorkflow, startedByRun, startedByAgent, chainDepth, eventWait, startRequestID
         case purpose
         case persona
+        case accountID
         case worktree
         case pendingMove
         case startingPoint

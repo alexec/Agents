@@ -28,8 +28,13 @@ func runtime(id, name, exe string, args []string, page string, appCopyOnly bool,
 	if args == nil {
 		args = []string{}
 	}
-	return runtimeDef{Runtime: wire.Runtime{ID: id, Name: name, Executable: exe, Arguments: args,
-		InstallPage: wire.URL(page), UsesAppCopyOnly: appCopyOnly}, passed: passed}
+	r := wire.Runtime{ID: id, Name: name, Executable: exe, Arguments: args, InstallPage: wire.URL(page), UsesAppCopyOnly: appCopyOnly}
+	// A runtime whose sign-in is a folder can have more than one account (#840).
+	if k, ok := accountKinds[id]; ok {
+		v := k.variable
+		r.AccountFolderVariable = &v
+	}
+	return runtimeDef{Runtime: r, passed: passed}
 }
 
 // catalog is RuntimeCatalog.builtIn, sorted by name. A server is given no installer
@@ -267,6 +272,12 @@ func environment(r *runtimeDef, from []string) []string {
 var locateFor = func(r *runtimeDef) (string, []string, []string) { return r.locate() }
 
 func (d *Daemon) launchFor(r *runtimeDef, dir string) (acp.Launch, error) {
+	return d.launchAs(r, dir, nil)
+}
+
+// launchAs is launchFor on an added account (#840), nil for the runtime's own sign-in. An
+// added account is the folder's own sign-in, so a relayed one is not used for it.
+func (d *Daemon) launchAs(r *runtimeDef, dir string, account *wire.AccountProfile) (acp.Launch, error) {
 	path, args, looked := locateFor(r)
 	if path == "" {
 		return acp.Launch{}, &Error{Code: CodeRuntimeNotFound, Message: r.Name + " is not installed on this machine (looked in " + strings.Join(looked, ", ") + ")"}
@@ -279,14 +290,14 @@ func (d *Daemon) launchFor(r *runtimeDef, dir string) (acp.Launch, error) {
 	root := d.Store.Loc.Root
 	switch r.ID {
 	case "claude":
-		if rl := d.relayFor("claude"); rl != nil {
+		if rl := d.relayFor("claude"); rl != nil && account == nil {
 			env = without(env, "ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "CLAUDE_CODE_USE_BEDROCK", "CLAUDE_CODE_USE_VERTEX",
 				"ANTHROPIC_BASE_URL", "CLAUDE_CODE_OAUTH_TOKEN", "NODE_EXTRA_CA_CERTS")
 			env = append(env, "ANTHROPIC_BASE_URL=https://127.0.0.1:"+strconv.Itoa(rl.port), "CLAUDE_CODE_OAUTH_TOKEN="+rl.standIn,
 				"NODE_EXTRA_CA_CERTS="+rl.caFile)
 		}
 	case "codex":
-		if rl := d.relayFor("codex"); rl != nil {
+		if rl := d.relayFor("codex"); rl != nil && account == nil {
 			env = without(env, "OPENAI_API_KEY", "CODEX_HOME", "CODEX_CA_CERTIFICATE")
 			env = append(env, "CODEX_HOME="+filepath.Join(root, "runtimes", "codex-relay-home"), "CODEX_CA_CERTIFICATE="+rl.caFile)
 		}
@@ -297,6 +308,10 @@ func (d *Daemon) launchFor(r *runtimeDef, dir string) (acp.Launch, error) {
 		// file under that home, not a Keychain item. Neither Gemini key is in env.
 		env = append(env, "GEMINI_HOME="+d.appHomes()["antigravity"], "AGY_ACP_DISABLE_WORKSPACE_TRUST=1",
 			"AGY_ACP_FORCE_FILE_STORAGE=1")
+	}
+	if account != nil {
+		d.linkShared(*account)
+		env = withAccount(env, account)
 	}
 	l := withToolPolicy(acp.Launch{Command: path, Args: args, Env: env, Dir: dir, Name: r.Name}, r.ID)
 	for _, f := range toolPolicyFiles[r.ID] {

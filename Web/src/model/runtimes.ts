@@ -1,7 +1,7 @@
 // The order runtimes are listed in, as RuntimeCatalog.sortedByName (AgentsKitCore) has it (#154):
 // alphabetical by the name shown, case-insensitive and as the person's language would, the id
 // breaking a tie. A host on an older build still answers in its catalog's order.
-import type { RuntimeStatus } from "../protocol/generated";
+import type { AccountProfile, RuntimeAllowancesRow, RuntimeStatus } from "../protocol/generated";
 
 /** The runtime a new agent gets when nothing else says: RuntimeCatalog.defaultRuntime. */
 export const defaultRuntimeID = "claude";
@@ -96,4 +96,28 @@ export function runtimeTally(runtimes: readonly RuntimeStatus[]): { working: num
   if (runtimes.length === 0) return undefined;
   const installed = runtimes.filter((r) => "available" in r.availability || "needsSignIn" in r.availability || "failed" in r.availability);
   return { working: installed.filter((r) => "available" in r.availability && !r.isOut).length, total: installed.length };
+}
+
+/** The name the account picker gives a runtime's own sign-in (#840), AccountProfile.defaultName. */
+export const defaultAccountName = "Default account";
+
+/** A runtime's own allowance row: the first that is not an added account's (#840). */
+export function ownRow(rows: readonly RuntimeAllowancesRow[], runtimeID: string): RuntimeAllowancesRow | undefined {
+  return rows.find((row) => row.credentialKey.split(":", 1)[0] === runtimeID && row.accountID === undefined);
+}
+
+/** The rows of the accounts added to a runtime, in the order they were added (#840). */
+export function accountRows(rows: readonly RuntimeAllowancesRow[], runtimeID: string): RuntimeAllowancesRow[] {
+  return rows.filter((row) => row.credentialKey.split(":", 1)[0] === runtimeID && row.accountID !== undefined);
+}
+
+/** An added account's row is named for the runtime and the account: "Claude · Work" (Row.title). */
+export function rowTitle(row: RuntimeAllowancesRow, runtimeName: string): string {
+  return row.accountName === undefined ? runtimeName : `${runtimeName} · ${row.accountName}`;
+}
+
+/** The words under an added account's name, AccountProfile.state. */
+export function accountState(account: AccountProfile): string {
+  if (!account.signedIn) return "Not signed in";
+  return account.signedInAs === undefined ? "Signed in" : `Signed in as ${account.signedInAs}`;
 }

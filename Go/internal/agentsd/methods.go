@@ -39,6 +39,7 @@ func (d *Daemon) register() {
 	d.registerCost()
 	d.registerDevices()
 	d.registerAllowances()
+	d.registerAccounts()
 	d.registerContinueWhenBack()
 	d.registerMCP()
 	d.registerOptions()

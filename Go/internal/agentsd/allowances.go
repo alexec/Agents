@@ -123,8 +123,15 @@ func (d *Daemon) unusable(runtime string) *string {
 }
 
 // runtimeAllowances is runtimes/allowances: a row each credential, by runtime name, each
-// runtime's own sign-in first; the shared sign-ins.
+// runtime's own sign-in first, then its added accounts in the order they were added
+// (#840); the shared sign-ins.
 func (d *Daemon) runtimeAllowances() wire.RuntimeAllowances {
+	profiles := map[string]wire.AccountProfile{}
+	added := map[string]int{}
+	for i, p := range d.accountProfiles() {
+		k := accountKey(p.RuntimeID, &p.ID)
+		profiles[k], added[k] = p, i
+	}
 	d.allowMu.Lock()
 	states := d.allowancesLocked()
 	keys := map[string]bool{}
@@ -134,6 +141,12 @@ func (d *Daemon) runtimeAllowances() wire.RuntimeAllowances {
 		}
 	}
 	for k := range states {
+		// A removed account's state is not a row.
+		if keyAccount(k) == "" || profiles[k].ID != "" {
+			keys[k] = true
+		}
+	}
+	for k := range profiles {
 		keys[k] = true
 	}
 	order := map[string]int{}
@@ -161,6 +174,14 @@ func (d *Daemon) runtimeAllowances() wire.RuntimeAllowances {
 		if (list[i] == ownKey(ri)) != (list[j] == ownKey(rj)) {
 			return list[i] == ownKey(ri)
 		}
+		ai, ok1 := added[list[i]]
+		aj, ok2 := added[list[j]]
+		if ok1 && ok2 {
+			return ai < aj
+		}
+		if ok1 != ok2 {
+			return ok2
+		}
 		return list[i] < list[j]
 	})
 	out := wire.RuntimeAllowances{Rows: []wire.RuntimeAllowancesRow{}, At: now(), Shared: []wire.AllowanceState{}}
@@ -169,7 +190,11 @@ func (d *Daemon) runtimeAllowances() wire.RuntimeAllowances {
 		if !ok {
 			s = availableState(k)
 		}
-		out.Rows = append(out.Rows, wire.RuntimeAllowancesRow{CredentialKey: k, State: s})
+		row := wire.RuntimeAllowancesRow{CredentialKey: k, State: s}
+		if p, ok := profiles[k]; ok {
+			row.AccountID, row.AccountName = &p.ID, &p.Name
+		}
+		out.Rows = append(out.Rows, row)
 		if ok && isSharedKey(k) {
 			out.Shared = append(out.Shared, s)
 		}
@@ -177,6 +202,10 @@ func (d *Daemon) runtimeAllowances() wire.RuntimeAllowances {
 	d.allowMu.Unlock()
 	for i := range out.Rows {
 		rt := runtimeOf(out.Rows[i].CredentialKey)
+		if p, ok := profiles[out.Rows[i].CredentialKey]; ok {
+			out.Rows[i].Unusable = d.accountUnusable(p)
+			continue
+		}
 		out.Rows[i].Unusable = d.unusable(rt)
 		if rt == "claude" && out.Rows[i].CredentialKey == ownKey(rt) && out.Rows[i].Unusable == nil {
 			out.Rows[i].SetupNote = chromeHostNote()
@@ -211,6 +240,17 @@ func (d *Daemon) tellAllowances() {
 	})
 }
 
+// raiseAllowanceBack is cost.allowance_back for a credential, how it came back.
+func (d *Daemon) raiseAllowanceBack(key, how string) {
+	runtime, _, _ := strings.Cut(key, ":")
+	details := map[string]string{"runtime": runtime, "how": how}
+	if id := keyAccount(key); id != "" {
+		details["account"] = id
+	}
+	d.raise(wire.EventDraft{Name: "cost.allowance_back", At: now(), Scope: macScope(), Sentence: d.credentialName(key) + "’s allowance came back.",
+		Details: details})
+}
+
 func isOutState(s wire.AllowanceState) bool { return s.Status.Out != nil }
 
 // markAvailable is runtimes/markAvailable: the person says it works again.
@@ -230,10 +270,8 @@ func (d *Daemon) markAvailable(key string) wire.RuntimeAllowances {
 	}
 	d.allowMu.Unlock()
 	if changed {
-		runtime, _, _ := strings.Cut(key, ":")
-		d.raise(wire.EventDraft{Name: "cost.allowance_back", At: now(), Scope: macScope(), Sentence: runtimeName(runtime) + "’s allowance came back.",
-			Details: map[string]string{"runtime": runtime, "how": "person"}})
-		d.allowanceBack(runtime)
+		d.raiseAllowanceBack(key, "person")
+		d.allowanceBack(key)
 		d.tellAllowances()
 	}
 	return d.runtimeAllowances()

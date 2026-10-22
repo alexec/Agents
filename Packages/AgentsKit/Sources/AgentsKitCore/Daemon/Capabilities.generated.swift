@@ -89,6 +89,7 @@ public enum Capability {
     public static let resources1 = "resources/1"
     public static let retention1 = "retention/1"
     public static let runtime1 = "runtime/1"
+    public static let runtimesAccounts1 = "runtimes.accounts/1"
     public static let runtimes1 = "runtimes/1"
     public static let sandbox1 = "sandbox/1"
     public static let sessions1 = "sessions/1"
@@ -292,7 +293,9 @@ public enum Capability {
         "resources/declare": "resources/1",
         "resources/remove": "resources/1",
         "retention/state": "retention/1",
+        "runtimes/accountProfiles": "runtimes.accounts/1",
         "runtimes/accounts": "runtimes/1",
+        "runtimes/addAccount": "runtimes.accounts/1",
         "runtimes/allowances": "runtimes/1",
         "runtimes/assess": "runtimes/1",
         "runtimes/assessment": "runtimes/1",
@@ -302,6 +305,7 @@ public enum Capability {
         "runtimes/list": "runtimes/1",
         "runtimes/logout": "runtimes/1",
         "runtimes/markAvailable": "runtimes/1",
+        "runtimes/removeAccount": "runtimes.accounts/1",
         "runtimes/setProvider": "runtimes/1",
         "sandbox/state": "sandbox/1",
         "sessions/adopt": "sessions/1",
@@ -387,6 +391,7 @@ public enum Capability {
         "project/removed": "project/1",
         "runtime/account": "runtime/1",
         "runtime/changed": "runtime/1",
+        "runtimes/accountProfilesChanged": "runtimes.accounts/1",
         "runtimes/allowancesChanged": "runtimes/1",
         "shell/output": "shell/1",
         "shell/stateChanged": "shell/1",

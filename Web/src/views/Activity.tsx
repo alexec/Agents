@@ -2,7 +2,8 @@
 // MCP Servers (#589), Worktrees (#790) and Spending, each a row whose tooltip says what it has at a glance (#587)
 // and that opens its page in the chat's place. What each page lets you change is the Mac's, but
 // for marking a runtime available and stopping a wait (#541).
-import { useEffect } from "preact/hooks";
+import { Fragment } from "preact";
+import { useEffect, useState } from "preact/hooks";
 import { useSignal } from "@preact/signals";
 import type { Store } from "../model/store";
 import type { AllowanceReading, AllowanceState, Consequence, ControlHost, CostState, Event, ProjectSummary, RuntimeAvailability, RuntimeStatus } from "../protocol/generated";
@@ -19,9 +20,10 @@ import { forCleanup, pageLine, rowWords, tally as worktreeTally, worktreesIntro 
 import { BackToList } from "./BackToList";
 import { Modal } from "./Modal";
 import { folderKey, projectFolder } from "../model/groups";
-import { runtimeTally } from "../model/runtimes";
+import { accountRows, accountState, ownRow, rowTitle, runtimeTally } from "../model/runtimes";
 import { healthTally, personalEmpty, personalIntro, personalServers } from "../model/hostedMCP";
 import { refusalMessage } from "../model/workflows";
+import { describe } from "../model/errors";
 import { dayTokenLimitReached, money } from "../model/limits";
 import { UsageCharts } from "./UsageCharts";
 import { mergeUsage } from "../model/usage";
@@ -127,6 +129,22 @@ function AllowanceBar({ reading }: { reading: AllowanceReading }) {
   if (used == null) return null;
   const tone = reading.spent || used >= 1 ? " spent" : reading.nearlySpent || used >= 0.8 ? " nearly-spent" : "";
   return <div class={`allowance-bar${tone}`} aria-hidden="true"><span style={{ width: `${Math.round(used * 100)}%` }} /></div>;
+}
+
+/** Add Account on a runtime that keeps its sign-in in a folder (#840): a name, then Add. */
+function AddAccount({ store, host, runtime }: { store: Store; host: string; runtime: string }) {
+  const [name, setName] = useState<string | null>(null);
+  const [problem, setProblem] = useState<string>();
+  if (name === null) return <button onClick={() => { setName(""); setProblem(undefined); }}>Add Account…</button>;
+  const add = () => {
+    store.addAccount(host, runtime, name).then(() => setName(null), (e: unknown) => setProblem(describe(e)));
+  };
+  return <form class="add-account" onSubmit={(e) => { e.preventDefault(); add(); }}>
+    <input aria-label="Account name" placeholder="Name, such as Work" value={name} onInput={(e) => setName((e.target as HTMLInputElement).value)} />
+    <button type="submit" disabled={name.trim() === ""}>Add</button>
+    <button type="button" onClick={() => setName(null)}>Cancel</button>
+    {problem && <p class="quiet small failure">{problem}</p>}
+  </form>;
 }
 
 const runtimeTime = (wire: number) => fromWireDate(wire as never).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
@@ -287,20 +305,42 @@ export function ActivityPageView({ store, page }: { store: Store; page: Activity
               <ul class="runtime-list">
                 {(store.runtimes.value[host.id] ?? []).map((status) => {
                   const allowanceSet = store.runtimeAllowances.value[host.id];
-                  const allowance = allowanceSet?.rows.find((row) => row.credentialKey.split(":", 1)[0] === status.runtime.id);
+                  const allowance = allowanceSet && ownRow(allowanceSet.rows, status.runtime.id);
                   const isAllowanceOut = !!allowance && "out" in allowance.state.status && !allowance.unusable;
                   const now = allowanceSet ? fromWireDate(allowanceSet.at) : new Date();
-                  return <li key={status.runtime.id} class={isAllowanceOut || isOut(status) ? "out" : ""}>
-                    <p><span class="strong">{status.runtime.name}</span>{" "}
-                      <span class="quiet small">{allowance?.unusable ? `Not usable: ${allowance.unusable}` : allowance ? allowanceLine(allowance.state) : availabilityWords(status.availability)}{status.outdated ? " · an update is out" : ""}</span></p>
-                    {allowance && !allowance.unusable && allowanceReading(allowance.state, now) && <>
-                      <p class="quiet small">{allowanceReading(allowance.state, now)}</p>
-                      {allowance.state.reading && <AllowanceBar reading={allowance.state.reading} />}
-                    </>}
-                    {status.poolNote && <p class="quiet small">{status.poolNote}</p>}
-                    {allowance?.setupNote && <p class="quiet small">{allowance.setupNote.split("`").map((part, i) => i % 2 ? <code key={i}>{part}</code> : part)}</p>}
-                    {isAllowanceOut && allowance && <button onClick={() => void store.markRuntimeAvailable(host.id, allowance.credentialKey)}>Mark available</button>}
-                  </li>
+                  return <Fragment key={status.runtime.id}>
+                    <li class={isAllowanceOut || isOut(status) ? "out" : ""}>
+                      <p><span class="strong">{status.runtime.name}</span>{" "}
+                        <span class="quiet small">{allowance?.unusable ? `Not usable: ${allowance.unusable}` : allowance ? allowanceLine(allowance.state) : availabilityWords(status.availability)}{status.outdated ? " · an update is out" : ""}</span></p>
+                      {allowance && !allowance.unusable && allowanceReading(allowance.state, now) && <>
+                        <p class="quiet small">{allowanceReading(allowance.state, now)}</p>
+                        {allowance.state.reading && <AllowanceBar reading={allowance.state.reading} />}
+                      </>}
+                      {status.poolNote && <p class="quiet small">{status.poolNote}</p>}
+                      {allowance?.setupNote && <p class="quiet small">{allowance.setupNote.split("`").map((part, i) => i % 2 ? <code key={i}>{part}</code> : part)}</p>}
+                      {isAllowanceOut && allowance && <button onClick={() => void store.markRuntimeAvailable(host.id, allowance.credentialKey)}>Mark available</button>}
+                      {status.runtime.accountFolderVariable !== undefined && <AddAccount store={store} host={host.id} runtime={status.runtime.id} />}
+                    </li>
+                    {/* Each account added to it (#840), under it, with its own allowance. */}
+                    {allowanceSet && accountRows(allowanceSet.rows, status.runtime.id).map((row) => {
+                      const out = "out" in row.state.status && !row.unusable;
+                      const account = store.addedAccounts(host.id, status.runtime.id).find((a) => a.id === row.accountID);
+                      return <li key={row.credentialKey} class={out ? "out" : ""}>
+                        <p><span class="strong">{rowTitle(row, status.runtime.name)}</span>{" "}
+                          <span class="quiet small">{row.unusable ? `Not usable: ${row.unusable}` : allowanceLine(row.state)}</span></p>
+                        {account?.signedInAs !== undefined && <p class="quiet small">{accountState(account)}</p>}
+                        {!row.unusable && allowanceReading(row.state, now) && <>
+                          <p class="quiet small">{allowanceReading(row.state, now)}</p>
+                          {row.state.reading && <AllowanceBar reading={row.state.reading} />}
+                        </>}
+                        {account && !account.signedIn && <p class="quiet small">Sign it in on the Mac, in {status.runtime.name}’s sign-in sheet.</p>}
+                        {out && <button onClick={() => void store.markRuntimeAvailable(host.id, row.credentialKey)}>Mark available</button>}
+                        {account && <button onClick={() => {
+                          if (window.confirm(`Remove ${account.name}? Its sessions stop, and its sign-in is deleted from the host.`)) void store.removeAccount(host.id, account);
+                        }}>Remove</button>}
+                      </li>;
+                    })}
+                  </Fragment>;
                 })}
               </ul>
             </section>

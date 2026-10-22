@@ -413,8 +413,42 @@ struct PromptBar: View {
                 }
                 .disabled(model.availableRuntimes.isEmpty)
                 .help(noServerRuntime ?? "")
+
+                // Which of the runtime's accounts the session uses (#840): only when it has
+                // more than one. Chosen, never switched to by itself.
+                if !model.draftAccounts.isEmpty {
+                    SelectCapsule(name: "Account", title: draftAccountName) { dismiss in
+                        SelectChoice(title: AccountProfile.defaultName,
+                                     description: accountNote(nil),
+                                     isChosen: model.draftAccountID == nil) {
+                            model.draftAccountID = nil
+                            dismiss()
+                        }
+                        ForEach(model.draftAccounts) { account in
+                            SelectChoice(title: account.name,
+                                         description: accountNote(account),
+                                         isChosen: model.draftAccountID == account.id) {
+                                model.draftAccountID = account.id
+                                dismiss()
+                            }
+                        }
+                    }
+                }
             }
         }
+    }
+
+    private var draftAccountName: String {
+        model.draftAccounts.first { $0.id == model.draftAccountID }?.name ?? AccountProfile.defaultName
+    }
+
+    /// Under an account's name: why it cannot be used, or where its allowance stands.
+    private func accountNote(_ account: AccountProfile?) -> String? {
+        guard let runtimeID = model.draftRuntimeID else { return nil }
+        if let account, !account.signedIn { return account.state }
+        guard let row = model.runtimeAllowances?.row(runtimeID, account: account?.id) else { return account?.signedInAs }
+        if let unusable = row.unusable { return "Not usable: \(unusable)" }
+        return row.state.isOut ? row.line(now: model.runtimeAllowances?.at ?? Date()) : account?.signedInAs
     }
 
     /// The runtime the conversation is on, where a new chat chooses one. Said, not

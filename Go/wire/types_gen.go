@@ -32,6 +32,46 @@ type ACPProviderInfo struct {
 	Configured *bool `json:"configured,omitzero"`
 }
 
+// An account added to a runtime (#840), beside the runtime's own sign-in, which is the Default account and is not one of these. The person picks one when they start a session.
+type AccountProfile struct {
+	// The host's own name for it. An agent keeps it as accountID.
+	ID string `json:"id"`
+
+	RuntimeID string `json:"runtimeID"`
+
+	// What the person called it, such as Work.
+	Name string `json:"name"`
+
+	Reach AccountReach `json:"reach"`
+
+	AddedAt Date `json:"addedAt"`
+
+	// Whether its folder holds a sign-in, as the host read it when it answered.
+	SignedIn bool `json:"signedIn"`
+
+	// Who it is signed in as, such as an email address, when the runtime's files say.
+	SignedInAs *string `json:"signedInAs,omitzero"`
+
+	// The command that signs it in, in a terminal on the host, for a runtime the app cannot sign in itself (Claude). Absent for one that signs in with runtimes/authenticate.
+	SignInCommand *string `json:"signInCommand,omitzero"`
+}
+
+// How an account reaches the model (#840). Today only a sign-in kept in a folder of its own; an org key and a gateway (T6, #999) are other cases of this.
+type AccountReach struct {
+	SignIn *AccountReachSignIn `json:"signIn,omitzero"`
+}
+
+type AccountReachSignIn struct {
+	// The folder the runtime is given in its account variable (Runtime.accountFolderVariable).
+	Folder string `json:"folder"`
+}
+
+type AccountRequest struct {
+	RuntimeID string `json:"runtimeID"`
+
+	AccountID string `json:"accountID"`
+}
+
 // clients/setActivityToken (#1744): the push token of one session's Live Activity on this device, in hex, for the control plane to update it by APNs while the Remote is not running. startedAt is when the turn began, where the activity's timer counts from. No token takes it away.
 type ActivityToken struct {
 	AgentID UUID `json:"agentID"`
@@ -41,6 +81,12 @@ type ActivityToken struct {
 	Environment PushEnvironment `json:"environment"`
 
 	StartedAt Date `json:"startedAt"`
+}
+
+type AddAccountRequest struct {
+	RuntimeID string `json:"runtimeID"`
+
+	Name string `json:"name"`
 }
 
 // What either announce is answered with: who the new party now is.
@@ -188,6 +234,9 @@ type Agent struct {
 
 	// While a turn runs, the title of the tool the agent is running now, the newest when more than one is (#1902). Absent while it thinks or replies. It changes only once a new value has held for a second, so a short tool never shows and a short gap between two does not flash. Cleared when the turn ends.
 	RunningTool *string `json:"runningTool,omitzero"`
+
+	// The added account its runtime runs with (#840); absent for the runtime's own sign-in.
+	AccountID *string `json:"accountID,omitzero"`
 }
 
 type AgentArchivedReason string
@@ -723,6 +772,9 @@ type AuthenticateRequest struct {
 	RuntimeID string `json:"runtimeID"`
 
 	MethodID string `json:"methodID"`
+
+	// An added account to sign in (#840); absent for the runtime's own sign-in.
+	AccountID *string `json:"accountID,omitzero"`
 }
 
 type BackgroundItem struct {
@@ -5980,6 +6032,9 @@ type Runtime struct {
 	InstallPage URL `json:"installPage"`
 
 	UsesAppCopyOnly bool `json:"usesAppCopyOnly"`
+
+	// The variable that names the folder its sign-in is kept in, for a runtime that can have more than one account (#840): CLAUDE_CONFIG_DIR, CODEX_HOME.
+	AccountFolderVariable *string `json:"accountFolderVariable,omitzero"`
 }
 
 type RuntimeAccount struct {
@@ -6027,6 +6082,12 @@ type RuntimeAllowancesRow struct {
 
 	// Something one of the runtime's features needs on this host and lacks, with the step that fixes it (#1946). Only on the runtime's own sign-in row.
 	SetupNote *string `json:"setupNote,omitzero"`
+
+	// The added account this row is for (#840); absent for the runtime's own sign-in.
+	AccountID *string `json:"accountID,omitzero"`
+
+	// That account's name.
+	AccountName *string `json:"accountName,omitzero"`
 }
 
 type RuntimeAssessmentCheck struct {
@@ -7089,6 +7150,9 @@ type StartRequest struct {
 	Persona *string `json:"persona,omitzero"`
 
 	Purpose *AgentPurpose `json:"purpose,omitzero"`
+
+	// The added account the session uses (#840); absent for the runtime's own sign-in.
+	AccountID *string `json:"accountID,omitzero"`
 }
 
 // A started machine in people/removePreview: the branches and worktrees on it with work that is not pushed. `unknown` says why it could not be asked (offline, or it did not answer), and then `unpushed` is empty.

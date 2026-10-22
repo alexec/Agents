@@ -88,6 +88,7 @@ const CapReports1 = "reports/1"
 const CapResources1 = "resources/1"
 const CapRetention1 = "retention/1"
 const CapRuntime1 = "runtime/1"
+const CapRuntimesAccounts1 = "runtimes.accounts/1"
 const CapRuntimes1 = "runtimes/1"
 const CapSandbox1 = "sandbox/1"
 const CapSessions1 = "sessions/1"
@@ -291,7 +292,9 @@ var HostCapabilities = pairs([][2]string{
 	{"resources/declare", "resources/1"},
 	{"resources/remove", "resources/1"},
 	{"retention/state", "retention/1"},
+	{"runtimes/accountProfiles", "runtimes.accounts/1"},
 	{"runtimes/accounts", "runtimes/1"},
+	{"runtimes/addAccount", "runtimes.accounts/1"},
 	{"runtimes/allowances", "runtimes/1"},
 	{"runtimes/assess", "runtimes/1"},
 	{"runtimes/assessment", "runtimes/1"},
@@ -301,6 +304,7 @@ var HostCapabilities = pairs([][2]string{
 	{"runtimes/list", "runtimes/1"},
 	{"runtimes/logout", "runtimes/1"},
 	{"runtimes/markAvailable", "runtimes/1"},
+	{"runtimes/removeAccount", "runtimes.accounts/1"},
 	{"runtimes/setProvider", "runtimes/1"},
 	{"sandbox/state", "sandbox/1"},
 	{"sessions/adopt", "sessions/1"},
@@ -386,6 +390,7 @@ var HostCapabilities = pairs([][2]string{
 	{"project/removed", "project/1"},
 	{"runtime/account", "runtime/1"},
 	{"runtime/changed", "runtime/1"},
+	{"runtimes/accountProfilesChanged", "runtimes.accounts/1"},
 	{"runtimes/allowancesChanged", "runtimes/1"},
 	{"shell/output", "shell/1"},
 	{"shell/stateChanged", "shell/1"},
@@ -430,6 +435,7 @@ var HostNotifications = set([]string{
 	"project/removed",
 	"runtime/account",
 	"runtime/changed",
+	"runtimes/accountProfilesChanged",
 	"runtimes/allowancesChanged",
 	"shell/output",
 	"shell/stateChanged",

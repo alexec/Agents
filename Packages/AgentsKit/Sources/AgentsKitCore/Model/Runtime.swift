@@ -22,12 +22,18 @@ public struct Runtime: Codable, Hashable, Sendable, Identifiable {
     /// Gemini do not, because what runs has to be the exact pinned lock, and because the
     /// person's own `codex-acp` or `gemini` on the PATH would otherwise win.
     public var usesAppCopyOnly: Bool
+    /// The variable that names the folder its sign-in is kept in, for a runtime that can
+    /// have more than one account (#840): `CLAUDE_CONFIG_DIR`, `CODEX_HOME`. Nil for one
+    /// that keeps one account.
+    public var accountFolderVariable: String?
 
     /// Where a runtime with no page of its own sends people: the protocol's list of agents.
     public static let genericInstallPage = URL(string: "https://agentclientprotocol.com/overview/agents")!
 
     public init(id: String, name: String, executable: String, arguments: [String],
-                install: RuntimeInstall? = nil, installPage: URL? = nil, usesAppCopyOnly: Bool = false) {
+                install: RuntimeInstall? = nil, installPage: URL? = nil, usesAppCopyOnly: Bool = false,
+                accountFolderVariable: String? = nil) {
+        self.accountFolderVariable = accountFolderVariable
         self.id = id
         self.name = name
         self.executable = executable
@@ -38,7 +44,7 @@ public struct Runtime: Codable, Hashable, Sendable, Identifiable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, name, executable, arguments, install, installPage, usesAppCopyOnly
+        case id, name, executable, arguments, install, installPage, usesAppCopyOnly, accountFolderVariable
     }
 
     /// Written by hand for `install` alone: a way of installing that a newer daemon
@@ -52,6 +58,7 @@ public struct Runtime: Codable, Hashable, Sendable, Identifiable {
         install = (try? c.decodeIfPresent(RuntimeInstall.self, forKey: .install)) ?? nil
         installPage = try c.decode(URL.self, forKey: .installPage)
         usesAppCopyOnly = try c.decode(Bool.self, forKey: .usesAppCopyOnly)
+        accountFolderVariable = try c.decodeIfPresent(String.self, forKey: .accountFolderVariable)
     }
 }
 

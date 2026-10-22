@@ -18,6 +18,10 @@ struct RuntimeAccountView: View {
     private var name: String { RuntimeCatalog.runtime(id: runtimeID)?.name ?? runtimeID }
 
     private var launch: RuntimeLaunch { RuntimeLaunchCatalog.launch(for: runtimeID) }
+    /// Whether the runtime keeps its sign-in in a folder, so it can have more than one (#840).
+    private var takesMoreAccounts: Bool {
+        model.runtimes.first { $0.runtime.id == runtimeID }?.runtime.accountFolderVariable != nil
+    }
     private var notice: RuntimeLaunch.SignInNotice? { launch.signInNotice }
 
     /// Ready or not, a runtime that signs in one provider at a time (049: OpenCode) keeps
@@ -107,6 +111,12 @@ struct RuntimeAccountView: View {
                         .textSelection(.enabled)
                         .padding(8)
                         .paperWell(in: RoundedRectangle(cornerRadius: 6))
+                    // An added Claude account (#840): the command opens Claude on its folder.
+                    if terminalCommand.hasPrefix("CLAUDE_CONFIG_DIR=") {
+                        Text("Then type /login in Claude, and sign in with the account you want here.")
+                            .appText(.fine).foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                     HStack {
                         Button("Open Terminal") { openTerminal(with: terminalCommand) }
                         Button("Copy") {
@@ -154,6 +164,11 @@ struct RuntimeAccountView: View {
                         }
                     }
                 }
+            }
+
+            if takesMoreAccounts {
+                RuntimeAccountsSection(runtimeID: runtimeID, name: name, methods: account.orderedAuthMethods,
+                                       terminalCommand: $terminalCommand)
             }
 
             HStack {

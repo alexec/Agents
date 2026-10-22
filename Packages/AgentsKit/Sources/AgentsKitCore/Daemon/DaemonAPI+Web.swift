@@ -53,6 +53,8 @@ public extension DaemonAPI {
                 Row(Method.runtimesList, params: Empty.self, result: [RuntimeStatus].self, kind: .hostRequest),
                 Row(Method.runtimesAllowances, params: Optional<String>.self, result: RuntimeAllowances.self, kind: .hostRequest),
                 Row(Method.runtimesAccounts, params: Empty.self, result: [RuntimeAccount].self, kind: .hostRequest),
+                // The accounts added to a runtime (#840), for the account picker and the Runtimes page.
+                Row(Method.runtimesAccountProfiles, params: Empty.self, result: [AccountProfile].self, kind: .hostRequest),
                 // Each runtime's sandbox default, for the new session's "Use runtime default (…)" (#257).
                 Row(Method.sandboxState, params: Empty.self, result: SandboxSettings.self, kind: .hostRequest),
                 Row(Method.optionsRemembered, params: RememberedOptionsRequest.self, result: [ConfigOption].self,
@@ -144,6 +146,8 @@ public extension DaemonAPI {
                 Row(Method.credentialsLend, params: CredentialsLend.self, result: Empty.self, kind: .hostRequest),
                 Row(Method.runtimesMarkAvailable, params: MarkRuntimeAvailable.self, result: RuntimeAllowances.self,
                     kind: .hostRequest),
+                Row(Method.runtimesAddAccount, params: AddAccountRequest.self, result: AccountProfile.self, kind: .hostRequest),
+                Row(Method.runtimesRemoveAccount, params: AccountRequest.self, result: [UUID].self, kind: .hostRequest),
                 Row(Method.agentsPrompt, params: PromptRequest.self, result: Empty.self, kind: .hostRequest),
                 Row(Method.agentsSendNow, params: UnqueueRequest.self, result: Empty.self, kind: .hostRequest),
                 Row(Method.agentsUnqueue, params: UnqueueRequest.self, result: Empty.self, kind: .hostRequest),
@@ -352,6 +356,8 @@ public extension DaemonAPI {
                 Row(Method.signInDeny, params: SignInDecide.self, result: Empty.self, kind: .controlRequest),
                 // Heard
                 Row(Notification.agentChanged, params: Agent.self, result: Empty.self, kind: .hostNotification),
+                Row(Notification.runtimesAccountProfilesChanged, params: [AccountProfile].self, result: Empty.self,
+                    kind: .hostNotification),
                 Row(Notification.agentEntry, params: EntryNotification.self, result: Empty.self, kind: .hostNotification),
                 Row(Notification.agentRemoved, params: AgentRemovedNotification.self, result: Empty.self,
                     kind: .hostNotification),

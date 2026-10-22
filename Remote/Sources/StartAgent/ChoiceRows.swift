@@ -13,6 +13,10 @@ struct ChoiceRows: View {
     var body: some View {
         Section {
             runtimeRow
+            // Which of the runtime's accounts (#840): only when it has more than one.
+            if !model.startAccounts.isEmpty {
+                accountRow
+            }
             if model.startWorktrees.isRepository {
                 worktreeRow
             }
@@ -75,6 +79,36 @@ struct ChoiceRows: View {
         }
         .disabled(model.startRuntimes.isEmpty)
         .accessibilityLabel("Runtime, \(model.startRuntime?.runtime.name ?? "none")")
+    }
+
+    private var accountRow: some View {
+        Menu {
+            Button {
+                model.startAccountID = nil
+            } label: {
+                if model.startAccountID == nil { Label(AccountProfile.defaultName, systemImage: "checkmark") }
+                else { Text(AccountProfile.defaultName) }
+            }
+            ForEach(model.startAccounts) { account in
+                Button {
+                    model.startAccountID = account.id
+                } label: {
+                    if model.startAccountID == account.id { Label(account.name, systemImage: "checkmark") }
+                    else { Text(account.name) }
+                    Text(account.state)
+                }
+            }
+        } label: {
+            LabeledContent("Account") {
+                Text(startAccountName).foregroundStyle(.secondary)
+            }
+            .appText(.reading)
+        }
+        .accessibilityLabel("Account, \(startAccountName)")
+    }
+
+    private var startAccountName: String {
+        model.startAccounts.first { $0.id == model.startAccountID }?.name ?? AccountProfile.defaultName
     }
 
     @ViewBuilder

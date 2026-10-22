@@ -1342,6 +1342,7 @@ final class RemoteModel {
         guard runtimeID != startRuntimeID else { return }
         startRuntimeID = runtimeID
         UserDefaults.standard.set(runtimeID, forKey: Self.keptStartRuntime)
+        startAccountID = nil
         startSandbox = nil
         startRefusal = nil
         await loadStartChoices()
@@ -1505,7 +1506,8 @@ final class RemoteModel {
             runtimeID: runtimeID, cwd: folder, prompt: words, attachments: attachments,
             startOptions: StartOptions(values: startChosen), draftID: startDraftID,
             additionalDirectories: startFolders, worktree: startWorktree, requestID: retrying ?? UUID(), sandbox: startSandbox,
-            labels: labels, persona: startPersona)
+            labels: labels, persona: startPersona,
+            accountID: startAccounts.contains { $0.id == startAccountID } ? startAccountID : nil)
         startingPage = page
         defer { startingPage = nil }
         return await send(start: request)
@@ -1649,6 +1651,50 @@ final class RemoteModel {
     /// silently is not there reads as one the phone forgot.
     private(set) var runtimes: [RuntimeStatus] = [] { didSet { startRuntimesMoved() } }
     private var accounts: [String: RuntimeAccount] = [:]
+    /// The accounts added to the Mac's runtimes (#840), beside each runtime's own sign-in.
+    private(set) var accountProfiles: [AccountProfile] = []
+    /// The added account the start page uses (#840); nil for the runtime's own sign-in.
+    var startAccountID: String?
+    /// The accounts the start page's runtime offers beyond its own sign-in: the Mac's, so
+    /// none for a server's project. The picker shows only when there is one.
+    var startAccounts: [AccountProfile] {
+        guard startHost == .mac, let startRuntimeID else { return [] }
+        return accountProfiles.on(startRuntimeID)
+    }
+
+    func refreshAccountProfiles() async {
+        if let listed = try? await client.call(DaemonAPI.Method.runtimesAccountProfiles, Optional<Int>.none,
+                                               returning: [AccountProfile].self) {
+            accountProfiles = listed
+        }
+    }
+
+    /// Add an account to one of the Mac's runtimes (#840). Nil when it was added; else why not.
+    func addAccount(runtimeID: String, name: String) async -> String? {
+        do {
+            let added = try await client.call(DaemonAPI.Method.runtimesAddAccount,
+                                              DaemonAPI.AddAccountRequest(runtimeID: runtimeID, name: name),
+                                              returning: AccountProfile.self)
+            accountProfiles.removeAll { $0.id == added.id }
+            accountProfiles.append(added)
+            await refreshRuntimeAllowances()
+            return nil
+        } catch {
+            return sentence(for: error)
+        }
+    }
+
+    func removeAccount(_ account: AccountProfile) async {
+        do {
+            _ = try await client.call(DaemonAPI.Method.runtimesRemoveAccount,
+                                      DaemonAPI.AccountRequest(runtimeID: account.runtimeID, accountID: account.id),
+                                      returning: [UUID].self)
+        } catch {
+            problem = sentence(for: error)
+        }
+        await refreshAccountProfiles()
+        await refreshRuntimeAllowances()
+    }
 
     /// Each other host's runtimes, as it last listed them (#240): a server project's
     /// start page offers its server's, as the window's does (037).
@@ -2686,6 +2732,10 @@ final class RemoteModel {
         if notification.method == DaemonAPI.Notification.filesChanged,
            let change = try? notification.params?.decode(DaemonAPI.FilesChangedNotification.self) {
             self.files.apply(change)
+        }
+        if notification.method == DaemonAPI.Notification.runtimesAccountProfilesChanged,
+           let list = try? notification.params?.decode([AccountProfile].self) {
+            self.accountProfiles = list
         }
         if notification.method == DaemonAPI.Notification.sandboxChanged,
            let settings = try? notification.params?.decode(SandboxSettings.self) {
@@ -4305,6 +4355,7 @@ final class RemoteModel {
                                                returning: [RuntimeAccount].self) {
             accounts = Dictionary(uniqueKeysWithValues: listed.map { ($0.runtimeID, $0) })
         }
+        await refreshAccountProfiles()
     }
 
     /// A project archived on the Mac while it is being read here moves the selection

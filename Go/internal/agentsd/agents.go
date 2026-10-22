@@ -598,7 +598,7 @@ func (d *Daemon) continueInProject(r wire.ContinueInProjectRequest) (wire.UUID, 
 	}
 	id, err := d.start(wire.StartRequest{RuntimeID: a.RuntimeID, Cwd: store.FolderURL(project), Prompt: prompt,
 		Attachments: r.Attachments, StartOptions: a.StartOptions, AdditionalDirectories: a.AdditionalDirectories,
-		McpServers: a.McpServers, RequestID: r.RequestID, Sandbox: a.SandboxOverride, Labels: labels})
+		McpServers: a.McpServers, RequestID: r.RequestID, Sandbox: a.SandboxOverride, Labels: labels, AccountID: a.AccountID})
 	if err != nil {
 		return "", err
 	}

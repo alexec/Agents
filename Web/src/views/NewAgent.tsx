@@ -19,7 +19,7 @@ import type { SandboxWillNotStart, Store } from "../model/store";
 import { drawable, modeOption, modeStartsOn } from "../model/options";
 import { keep, rememberOptions, rememberedOptions } from "../model/startMemory";
 import { folderKey } from "../model/groups";
-import { formRuntime, newSessionRuntime, runtimeRuns, unavailableReason } from "../model/runtimes";
+import { accountState, defaultAccountName, formRuntime, newSessionRuntime, runtimeRuns, unavailableReason } from "../model/runtimes";
 import { formFor, keepForm, keptForm } from "../model/startForm";
 import { personaChoices, withPersonaLabels } from "../model/personas";
 import { sandboxCardTitle, sandboxChoiceWords, sandboxChoices, sandboxExplanation, sandboxOverrideWords, sandboxState,
@@ -76,6 +76,8 @@ export function NewAgent({ store, host, folder, projectName, down }: {
   // A runtime picked here counts only while this host offers it: the bar can move to another host.
   const picked = runtimeID.value !== undefined && startable.includes(runtimeID.value) ? runtimeID.value : undefined;
   const chosenRuntime = formRuntime(openedRuntime.current.runtimeID, picked, startable, left.runtimeID);
+  /** The added account the session uses (#840); undefined for the runtime's own sign-in. */
+  const accountID = useSignal<string | undefined>(undefined);
   const where = useSignal<Where>({ kind: "project" });
   const worktrees = useSignal<WorktreeSummary[]>([]);
   const branches = useSignal<BranchSummary[]>([]);
@@ -271,6 +273,9 @@ export function NewAgent({ store, host, folder, projectName, down }: {
   const description = usablePersonas.find((p) => p.id === persona.value)?.description;
 
   const capabilities = chosenRuntime ? store.account(host, chosenRuntime)?.promptCapabilities : undefined;
+  // The runtime's accounts beyond its own sign-in (#840): the picker shows only when there is one.
+  const added = chosenRuntime ? store.addedAccounts(host, chosenRuntime) : [];
+  const chosenAccount = added.find((a) => a.id === accountID.value);
 
   const start = async (text: string, attachments: Attachment[], override = sandbox.value) => {
     if (!chosenRuntime) {
@@ -289,6 +294,7 @@ export function NewAgent({ store, host, folder, projectName, down }: {
         : w.kind === "branch" ? { worktree: { branch: { _0: w.name } } } : w.kind === "named" ? { worktree: { named: { _0: w.name } } } : {}),
       ...(override ? { sandbox: override } : {}),
       ...(persona.value ? { persona: persona.value } : {}),
+      ...(chosenAccount ? { accountID: chosenAccount.id } : {}),
       // Kept until this start succeeds, so a retry after a timeout is the same start (#291).
       requestID: store.startRequestID(host, folder),
     };
@@ -439,13 +445,14 @@ export function NewAgent({ store, host, folder, projectName, down }: {
                 remove={(value) => (labels.value = labels.value.filter((l) => l.toLowerCase() !== value.toLowerCase()))} />
             </>
           )}
-          runtime={(
+          runtime={(<>
             <label class="pill select" title="Runtime">
               <span aria-hidden="true">{chosenRuntime ? runtimeName : "Runtime"} ▾</span>
               <select aria-label="Runtime" value={chosenRuntime ?? ""} disabled={!runtimes.length || down}
                 onChange={(e) => {
                   const id = (e.currentTarget as HTMLSelectElement).value;
                   runtimeID.value = id;
+                  accountID.value = undefined;
                   sandbox.value = undefined;
                   refusal.value = null;
                   note({ runtimeID: id, chosen: {} });
@@ -457,7 +464,19 @@ export function NewAgent({ store, host, folder, projectName, down }: {
                 {runs.cannot.length > 0 && <optgroup label="Can't start">{runs.cannot.map(runtimeOption)}</optgroup>}
               </select>
             </label>
-          )}>
+            {/* Which of the runtime's accounts (#840): only when it has more than one. */}
+            {added.length > 0 && <label class="pill select" title="Account">
+              <span aria-hidden="true">{chosenAccount?.name ?? defaultAccountName} ▾</span>
+              <select aria-label="Account" value={chosenAccount?.id ?? ""} disabled={down}
+                onChange={(e) => {
+                  const id = (e.currentTarget as HTMLSelectElement).value;
+                  accountID.value = id === "" ? undefined : id;
+                }}>
+                <option value="">{defaultAccountName}</option>
+                {added.map((a) => <option key={a.id} value={a.id}>{a.name}{a.signedIn ? "" : ` (${accountState(a).toLowerCase()})`}</option>)}
+              </select>
+            </label>}
+          </>)}>
           {refusal.value && (
             <div class="sandbox-refusal" role="status">
               <div>
