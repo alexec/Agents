@@ -10,13 +10,10 @@ import SwiftUI
 struct GroupsPane: View {
     /// The control plane, or nil while it cannot be reached.
     let control: DaemonClient?
-    /// Goes up when the control plane says people or groups changed, to load them again.
-    let revision: Int
+    /// The people and groups this client keeps, loaded once per change (#2055).
+    let state: PeopleState
 
-    @State private var groups: [DaemonAPI.Group]?
-    @State private var people: [DaemonAPI.PersonRow] = []
     @State private var providers: [DaemonAPI.ProviderSummary] = []
-    @State private var admin = false
     @State private var problem: String?
     @State private var editing: GroupSheet.Editing?
     @State private var removing: DaemonAPI.Group?
@@ -26,9 +23,14 @@ struct GroupsPane: View {
         var revision: Int
     }
 
+    /// Nil until the control plane answers.
+    private var groups: [DaemonAPI.Group]? { state.list == nil ? nil : state.groups }
+    private var people: [DaemonAPI.PersonRow] { state.list?.people ?? [] }
+    private var admin: Bool { state.list?.admin ?? false }
+
     var body: some View {
         Form {
-            if let problem {
+            if let problem = problem ?? state.listProblem {
                 Section {
                     Text(problem).appText(.supporting).tinted(.failure)
                         .fixedSize(horizontal: false, vertical: true)
@@ -62,21 +64,21 @@ struct GroupsPane: View {
                     Text(GroupWords.foot(admin: admin)).appText(.fine).foregroundStyle(.secondary)
                 }
                 .paperListRow()
-            } else if problem == nil {
+            } else if problem == nil, state.listProblem == nil {
                 Text("Loading…").appText(.supporting).foregroundStyle(.secondary).paperListRow()
             }
         }
         .paperForm()
-        .task(id: Load(reachable: control != nil, revision: revision)) {
+        // The providers each group has change with the groups.
+        .task(id: Load(reachable: control != nil, revision: state.revision)) {
             while !(await load()), !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(3))
             }
         }
         .refreshable { await load() }
         .sheet(item: $editing) { editing in
-            GroupSheet(control: control, editing: editing, people: people.filter { $0.kind == .person }) {
-                Task { await load() }
-            }
+            // A group saved is told as control/groupsChanged: the groups load then.
+            GroupSheet(control: control, editing: editing, people: people.filter { $0.kind == .person }) {}
             .paperSheet()
         }
         .confirmationDialog(removing.map(GroupWords.removeTitle) ?? "",
@@ -96,23 +98,12 @@ struct GroupsPane: View {
             problem = "The control plane can’t be reached."
             return true
         }
-        do {
-            let listed = try await control.call(DaemonAPI.Method.groupsList, DaemonAPI.Empty(),
-                                                returning: DaemonAPI.GroupList.self)
-            let list = try await control.call(DaemonAPI.Method.peopleList, DaemonAPI.Empty(),
-                                              returning: DaemonAPI.PeopleList.self)
-            // A control plane with several copies has no providers: the groups still show.
-            let answer = try? await control.call(DaemonAPI.Method.providersList, DaemonAPI.Empty())
-            providers = (try? answer?["providers"]?.decode([DaemonAPI.ProviderSummary].self)) ?? []
-            people = list.people
-            admin = list.admin
-            groups = listed.groups
-            problem = nil
-        } catch {
-            problem = PeopleWords.refusal(error)
-            return error is JSONRPCError
-        }
-        return true
+        // A control plane with several copies has no providers: the groups still show.
+        let answer = try? await control.call(DaemonAPI.Method.providersList, DaemonAPI.Empty())
+        providers = (try? answer?["providers"]?.decode([DaemonAPI.ProviderSummary].self)) ?? []
+        problem = nil
+        if state.list != nil { return true }
+        return await state.loadList(control)
     }
 
     private func remove(_ group: DaemonAPI.Group) async {
@@ -123,9 +114,6 @@ struct GroupsPane: View {
         } catch {
             problem = PeopleWords.refusal(error)
         }
-        let said = problem
-        await load()
-        if let said { problem = said }
     }
 }
 

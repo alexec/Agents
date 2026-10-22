@@ -14,34 +14,25 @@ import {
 
 /** You ▸ Sign-ins: this person's sign-ins, each outside one with Remove. */
 export function SignInsSection({ store, down }: { store: Store; down: boolean }) {
-  const signIns = useSignal<SignIn[] | null>(null);
-  const problem = useSignal<string | null>(null);
-  const load = async () => {
-    try {
-      const people = await store.link.call("people/list", {});
-      signIns.value = people.people.find((p) => p.you)?.signIns ?? [];
-      problem.value = null;
-    } catch (error) {
-      problem.value = describe(error);
-    }
-  };
-  const changes = store.peopleChanges.value;
-  useEffect(() => { if (!down) void load(); }, [changes, down]);
+  // From the store's one people list (#2055), loaded on each connection and each control/peopleChanged.
+  const list = store.people.value;
+  const failure = store.peopleFailure.value;
+  const problem = failure ? describe(failure) : null;
   const remove = async (signIn: SignIn) => {
     if (!signIn.account || !window.confirm(`${removeTitle(signIn)} ${removeMessage}`)) return;
     try {
+      // The change comes back as control/peopleChanged.
       await store.link.call("signIn/removeFromMe", { provider: signIn.provider, account: signIn.account });
     } catch (error) {
       store.say(describe(error));
     }
-    await load();
   };
-  const shown = signIns.value;
+  const shown: SignIn[] | null = list ? list.people.find((p) => p.you)?.signIns ?? [] : null;
   return (
     <section aria-labelledby="settings-signins">
       <h3 class="section-head" id="settings-signins">{signInsTitle}</h3>
-      {problem.value && <p class="hint">{problem.value}</p>}
-      {!shown && !problem.value && <p class="hint">Loading…</p>}
+      {problem && <p class="hint">{problem}</p>}
+      {!shown && !problem && <p class="hint">Loading…</p>}
       {shown && (
         <ul class="people-list">
           {shown.map((signIn) => (

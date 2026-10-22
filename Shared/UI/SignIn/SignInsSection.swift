@@ -12,10 +12,9 @@ struct SignInsSection: View {
     let control: DaemonClient?
     /// The control key this client trusts, which the nonce is bound to; nil when not paired.
     let controlKey: Data?
-    /// Goes up when the control plane says people changed.
-    let revision: Int
+    /// The people this client keeps, loaded once per change (#2055): this person's sign-ins.
+    let people: PeopleState
 
-    @State private var signIns: [DaemonAPI.SignIn]?
     @State private var problem: String?
     @State private var adding: Adding?
     @State private var removing: DaemonAPI.SignIn?
@@ -27,14 +26,11 @@ struct SignInsSection: View {
         var id: String { nonce }
     }
 
-    private struct Load: Hashable {
-        var reachable: Bool
-        var revision: Int
-    }
+    private var signIns: [DaemonAPI.SignIn]? { people.list?.people.first(where: \.isYou)?.signIns }
 
     var body: some View {
         Section {
-            if let problem {
+            if let problem = problem ?? people.listProblem {
                 Text(problem).appText(.supporting).tinted(.failure).fixedSize(horizontal: false, vertical: true)
             }
             ForEach(signIns ?? [], id: \.self) { signIn in
@@ -55,7 +51,7 @@ struct SignInsSection: View {
         } footer: {
             Text(SignInWords.signInsFoot).appText(.fine).foregroundStyle(.secondary)
         }
-        .task(id: Load(reachable: control != nil, revision: revision)) { await load() }
+        .task(id: control != nil) { await load() }
         .sheet(item: $adding) { adding in
             AddSignInSheet(adding: adding, add: { provider, token in await add(provider, token) })
         }
@@ -70,14 +66,8 @@ struct SignInsSection: View {
     }
 
     private func load() async {
-        guard let control else { return }
-        do {
-            let list = try await control.call(DaemonAPI.Method.peopleList, DaemonAPI.Empty(), returning: DaemonAPI.PeopleList.self)
-            signIns = list.people.first(where: \.isYou)?.signIns ?? []
-            problem = nil
-        } catch {
-            problem = PeopleWords.refusal(error)
-        }
+        guard let control, people.list == nil else { return }
+        await people.loadList(control)
     }
 
     /// Asks for the providers and a fresh challenge, and makes the nonce from the control key
@@ -105,8 +95,8 @@ struct SignInsSection: View {
     private func add(_ provider: String, _ token: String) async -> String? {
         guard let control else { return "The control plane can’t be reached." }
         do {
+            // Told as control/peopleChanged: the list loads then.
             _ = try await control.call(DaemonAPI.Method.signInAddToMe, DaemonAPI.SignInAdd(provider: provider, token: token))
-            await load()
             return nil
         } catch {
             return PeopleWords.refusal(error)
@@ -122,7 +112,6 @@ struct SignInsSection: View {
         } catch {
             problem = PeopleWords.refusal(error)
         }
-        await load()
     }
 }
 

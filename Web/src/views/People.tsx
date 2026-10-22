@@ -301,50 +301,41 @@ function PersonItem({ person, list, groups, joinCommand, setRole, askRemove, set
 }
 
 export function PeopleSection({ store, down }: { store: Store; down: boolean }) {
-  const list = useSignal<PeopleList | null>(null);
   const problem = useSignal<string | null>(null);
   const inviting = useSignal(false);
   const removing = useSignal<PersonRow | null>(null);
   const rotating = useSignal(false);
   const wasRotated = useSignal(false);
-  const groups = useSignal<Group[]>([]);
   const botSheet = useSignal<{ bot: PersonRow | null } | null>(null);
   const machineFor = useSignal<PersonRow | null>(null);
-  const load = async () => {
-    try {
-      list.value = await store.link.call("people/list", {});
-      problem.value = null;
-      // A control plane before groups has none: no bot can be made.
-      groups.value = (await store.link.call("groups/list", {}).catch(() => null))?.groups ?? [];
-    } catch (error) {
-      problem.value = sentence(error);
-    }
-  };
-  // Again on each control/peopleChanged, and on each connection.
-  const changes = store.peopleChanges.value;
-  useEffect(() => { if (!down) void load(); }, [changes, down]);
+  // The store's one list (#2055), loaded on each connection and each control/peopleChanged. A control plane
+  // before groups has none: no bot can be made.
+  const groups = store.providers.groups.value;
+  const failure = store.peopleFailure.value;
+  const said = problem.value ?? (failure ? sentence(failure) : null);
   const setRole = async (person: PersonRow, role: UserRole) => {
     try {
+      // The change comes back as control/peopleChanged.
       await store.link.call("people/setRole", { user: person.id, role });
+      problem.value = null;
     } catch (error) {
       store.say(sentence(error));
     }
-    await load();
   };
-  const shown = list.value;
+  const shown = store.people.value;
   return (
     <section aria-labelledby="settings-people">
       <h3 class="section-head" id="settings-people">People</h3>
       <JoinRequests store={store} down={down} explained />
-      {problem.value && <p class="hint">{problem.value}</p>}
+      {said && <p class="hint">{said}</p>}
       {shown?.admin && store.capReached.value && <p class="hint attention" role="status">{capReachedWords(store.capReached.value)}</p>}
-      {!shown && !problem.value && <p class="hint">Loading…</p>}
+      {!shown && !said && <p class="hint">Loading…</p>}
       {shown && (
         <>
           {shown.people.length === 0 && <p class="hint">{noPeople}</p>}
           <ul class="people-list">
             {ordered(shown.people).map((person) => (
-              <PersonItem key={person.id} person={person} list={shown} groups={groups.value} joinCommand={store.joinCommand.value}
+              <PersonItem key={person.id} person={person} list={shown} groups={groups} joinCommand={store.joinCommand.value}
                 setRole={(role) => void setRole(person, role)} askRemove={() => { removing.value = person; }}
                 setCap={() => { botSheet.value = { bot: person }; }} addMachine={() => { machineFor.value = person; }} />
             ))}
@@ -369,11 +360,11 @@ export function PeopleSection({ store, down }: { store: Store; down: boolean }) 
       )}
       {rotating.value && <RotateSheet store={store} close={() => { rotating.value = false; }} done={() => { wasRotated.value = true; }} />}
       {botSheet.value && (
-        <BotSheet store={store} bot={botSheet.value.bot} groups={groups.value} close={() => { botSheet.value = null; void load(); }} />
+        <BotSheet store={store} bot={botSheet.value.bot} groups={groups} close={() => { botSheet.value = null; }} />
       )}
       {machineFor.value && <BotMachineSheet store={store} bot={machineFor.value} close={() => { machineFor.value = null; }} />}
-      {inviting.value && <InviteSheet store={store} close={() => { inviting.value = false; void load(); }} />}
-      {removing.value && <RemoveSheet store={store} person={removing.value} close={() => { removing.value = null; void load(); }} />}
+      {inviting.value && <InviteSheet store={store} close={() => { inviting.value = false; }} />}
+      {removing.value && <RemoveSheet store={store} person={removing.value} close={() => { removing.value = null; }} />}
     </section>
   );
 }

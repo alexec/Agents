@@ -8,7 +8,7 @@ struct GroupsSettingsRow: View {
     var body: some View {
         if !model.needsPairing, model.people.you?.isAdmin != false {
             NavigationLink {
-                GroupsPane(control: model.controlPlane, revision: model.people.revision)
+                GroupsPane(control: model.controlPlane, state: model.people)
                     .navigationTitle(GroupWords.title)
                     .navigationBarTitleDisplayMode(.inline)
             } label: {

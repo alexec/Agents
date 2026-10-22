@@ -13,7 +13,7 @@ import type {
   PagesChangedNotification, PinsChangedNotification, PinView, ViewPin, ListCursor, ListRequest, FileMentionDTO, SandboxChoice, RuntimeAllowances,
   GuardedChange, GuardedChangeReading, HostJoinStatus, RequiredCapabilities, KeptDelivered, KeptList, KeptRequest, Approval, ApprovalAction, UsageHistory, TimeHistory, Milestones,
   BuildOutputRemoved, ProjectWorktrees, RemovalCheck, WorktreeSize, WorktreeSummary, WorktreesSized, FindResult,
-  BackupRestoreResult, BackupSettings, BackupState, CapReached, ChannelLinkDecided, ChannelLinkRequest, ControlPerson, JoinDecided, JoinRequest, PersonRow, SecretsLeft, SignInDecided,
+  BackupRestoreResult, BackupSettings, BackupState, CapReached, ChannelLinkDecided, ChannelLinkRequest, ControlPerson, JoinDecided, JoinRequest, PeopleList, PersonRow, SecretsLeft, SignInDecided,
   SignInRequest } from "../protocol/generated";
 import { Failure } from "../protocol/generated";
 import { CallFailed, type Link } from "../wire/link";
@@ -427,6 +427,13 @@ export class Work {
   readonly linksChanges = signal(0);
   /** Counts each control/peopleChanged (#994): Settings ▸ People loads its list again when it moves. */
   readonly peopleChanges = signal(0);
+  /**
+   * The people this person may see (#2055): every one for an admin, a member only themselves. Loaded once per
+   * connection and per change, and read by every view, not one people/list each. Null until it answers.
+   */
+  readonly people = signal<PeopleList | null>(null);
+  /** Why `people` could not be loaded: the failure itself, for each view to word. */
+  readonly peopleFailure = signal<unknown>(null);
   /** The last bot that stopped at a cap (#1761, control/capReached), for an admin's Settings ▸ People. */
   readonly capReached = signal<CapReached | null>(null);
   /** Counts each control/userSettingsChanged (#1760): You ▸ On Every Machine loads again when it moves. */
@@ -1165,19 +1172,18 @@ export class Store extends Work {
         return;
       }
       if (method === "control/peopleChanged") {
-        this.peopleChanges.value += 1;
-        void this.loadLinkRequests();
+        void this.loadPeople().then(() => this.loadLinkRequests()).then(() => { this.peopleChanges.value += 1; });
         return;
       }
       if (method === "control/capReached") {
         this.capReached.value = (params as CapReached | null) ?? null;
-        this.peopleChanges.value += 1;
+        // Only the bot's spend today changed.
+        void this.loadPeople();
         return;
       }
       if (method === "control/groupsChanged") {
-        // Settings ▸ Groups loads again, and each provider's group's name (#1761).
-        this.peopleChanges.value += 1;
-        void this.providers.loadGroups();
+        // Settings ▸ Groups, and each provider's group's name (#1761).
+        void this.providers.loadGroups().then(() => { this.peopleChanges.value += 1; });
         return;
       }
       if (method === "control/userSettingsChanged") {
@@ -1219,7 +1225,8 @@ export class Store extends Work {
    */
   load(): Promise<void> {
     return this.once("*", async () => {
-      const [hosts] = await Promise.all([this.link.call("hosts/list", {}), this.loadPlane(), this.loadKept(), this.loadJoinRequests(), this.loadLinkRequests(),
+      const [hosts] = await Promise.all([this.link.call("hosts/list", {}), this.loadPlane(), this.loadKept(), this.loadJoinRequests(),
+        this.loadPeople().then(() => this.loadLinkRequests()),
         this.loadSignInRequests()]);
       this.takeHosts(hosts);
       await Promise.all(this.hosts.value.filter((host) => hostAnswers(host.state)).map((host) => this.onHost(host.id, async () => {
@@ -1277,11 +1284,26 @@ export class Store extends Work {
     }
   }
 
+  /**
+   * The one people list (#2055), and the groups the first time: every view reads these. A control plane before
+   * people has none.
+   */
+  async loadPeople(): Promise<void> {
+    try {
+      this.people.value = await this.link.call("people/list", {});
+      this.peopleFailure.value = null;
+    } catch (error) {
+      this.peopleFailure.value = error;
+      return;
+    }
+    if (this.providers.groups.value.length === 0) await this.providers.loadGroups();
+  }
+
   /** Link requests (#1762), and for an admin whom to send them on to; a control plane before links has none. */
   private async loadLinkRequests(): Promise<void> {
     const listed = await this.link.call("links/requests", {}).catch(() => null);
     this.linkRequests.value = listed ?? [];
-    const people = listed && listed.some((r) => !r.for) ? await this.link.call("people/list", {}).catch(() => null) : null;
+    const people = this.people.value;
     this.linkPeople.value = people?.admin ? people.people.filter((p) => p.kind === "person") : [];
   }
 

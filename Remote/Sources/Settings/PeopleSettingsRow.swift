@@ -8,8 +8,7 @@ struct PeopleSettingsRow: View {
     var body: some View {
         if !model.needsPairing {
             NavigationLink {
-                PeoplePane(control: model.controlPlane, revision: model.people.revision,
-                           capReached: model.people.capReached)
+                PeoplePane(control: model.controlPlane, people: model.people)
                     .navigationTitle("People")
                     .navigationBarTitleDisplayMode(.inline)
             } label: {

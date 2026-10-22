@@ -3,8 +3,8 @@ import Foundation
 import Observation
 
 /// What a client keeps of people (#994): the machines waiting for this person's approval,
-/// who this client belongs to, and a count that goes up each time people change, so an
-/// open Settings ▸ People loads again.
+/// who this client belongs to, and the one list of people and groups that every pane reads
+/// (#2055), loaded once per change and not once per open pane.
 ///
 /// The window's model and the Remote's each own one, and feed it from the control
 /// plane's own connection, which only they read: `connected` when it answers, `heard` for
@@ -20,7 +20,17 @@ final class PeopleState {
     private(set) var linkPeople: [DaemonAPI.PersonRow] = []
     /// Who this client belongs to, as `control/status` said. Nil from an older control plane.
     private(set) var you: DaemonAPI.ControlPerson?
-    /// Goes up on `control/peopleChanged` and `control/groupsChanged` (#1761).
+    /// `control/status`'s line to run on a server so it asks to join as this person.
+    private(set) var joinCommand: String?
+    /// The people this client may see (#2055): every one for an admin, a member only
+    /// themselves. Nil until the control plane answers.
+    private(set) var list: DaemonAPI.PeopleList?
+    /// Why `list` could not be loaded, in the control plane's words.
+    private(set) var listProblem: String?
+    /// The groups (#1761), loaded with `list`. Empty from a control plane before groups.
+    private(set) var groups: [DaemonAPI.Group] = []
+    /// Goes up on `control/peopleChanged` and `control/groupsChanged` (#1761), for what a
+    /// pane loads beside the list.
     private(set) var revision = 0
     /// The last bot that stopped at a cap (#1761, `control/capReached`), shown to admins.
     private(set) var capReached: DaemonAPI.CapReached?
@@ -32,12 +42,37 @@ final class PeopleState {
 
     /// The control plane answered: who this client is, and what waits for them.
     func connected(_ control: DaemonClient) async {
-        you = (try? await control.call(DaemonAPI.Method.controlStatus, returning: DaemonAPI.ControlStatus.self))?.person
+        let status = try? await control.call(DaemonAPI.Method.controlStatus, returning: DaemonAPI.ControlStatus.self)
+        you = status?.person
+        joinCommand = status?.joinCommand
         // A control plane before people does not know the method: no cards.
         let listed = try? await control.call(DaemonAPI.Method.hostsJoinRequests, DaemonAPI.Empty(),
                                              returning: [DaemonAPI.JoinRequest].self)
         queue.replace(with: listed ?? [])
+        await loadList(control)
         await loadLinks(control)
+    }
+
+    /// Loads the people, and the groups with them, once for every pane. False when the
+    /// control plane did not answer at all, so it is worth asking again.
+    @discardableResult
+    func loadList(_ control: DaemonClient, groups withGroups: Bool = true) async -> Bool {
+        do {
+            list = try await control.call(DaemonAPI.Method.peopleList, DaemonAPI.Empty(),
+                                          returning: DaemonAPI.PeopleList.self)
+            listProblem = nil
+        } catch {
+            listProblem = PeopleWords.refusal(error)
+            return error is JSONRPCError
+        }
+        if withGroups { await loadGroups(control) }
+        return true
+    }
+
+    /// A control plane before groups has none: no bot can be made.
+    private func loadGroups(_ control: DaemonClient) async {
+        groups = (try? await control.call(DaemonAPI.Method.groupsList, DaemonAPI.Empty(),
+                                          returning: DaemonAPI.GroupList.self))?.groups ?? []
     }
 
     /// The link requests this person decides, and for an admin who to send them on to.
@@ -46,13 +81,7 @@ final class PeopleState {
         let requests = try? await control.call(DaemonAPI.Method.linksRequests, DaemonAPI.Empty(),
                                                returning: [DaemonAPI.ChannelLinkRequest].self)
         links.replace(with: requests ?? [])
-        if you?.isAdmin == true {
-            let list = try? await control.call(DaemonAPI.Method.peopleList, DaemonAPI.Empty(),
-                                               returning: DaemonAPI.PeopleList.self)
-            linkPeople = list?.people.filter { $0.kind == .person } ?? []
-        } else {
-            linkPeople = []
-        }
+        linkPeople = you?.isAdmin == true ? list?.people.filter { $0.kind == .person } ?? [] : []
     }
 
     /// The link cards to show now.
@@ -78,14 +107,16 @@ final class PeopleState {
         case DaemonAPI.Notification.controlLinksChanged:
             linksRevision += 1
         case DaemonAPI.Notification.controlPeopleChanged:
-            revision += 1
-            // A role changed or a person went: who this is, and what they may approve.
+            // A role changed or a person went: who this is, what they may approve, and the list.
             await connected(control)
+            revision += 1
         case DaemonAPI.Notification.controlGroupsChanged:
+            await loadGroups(control)
             revision += 1
         case DaemonAPI.Notification.controlCapReached:
             capReached = try? params?.decode(DaemonAPI.CapReached.self)
-            revision += 1
+            // Only the bot's spend today changed.
+            await loadList(control, groups: false)
         default:
             return false
         }

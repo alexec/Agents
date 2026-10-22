@@ -2316,13 +2316,14 @@ final class RemoteModel {
                     await self?.signIn.connected(control)
                     for await change in control.notifications() {
                         guard let self, !Task.isCancelled else { return }
-                        // A provider's group's name, on Settings ▸ Workspace providers (#1761).
-                        if change.method == DaemonAPI.Notification.controlGroupsChanged {
-                            self.providerGroups = (try? await control.call(DaemonAPI.Method.groupsList, DaemonAPI.Empty(),
-                                                                           returning: DaemonAPI.GroupList.self))?.groups
-                                ?? self.providerGroups
+                        if await self.people.heard(change.method, change.params, on: control) {
+                            // A provider's group's name, on Settings ▸ Workspace providers (#1761),
+                            // from the groups people loaded once (#2055).
+                            if change.method == DaemonAPI.Notification.controlGroupsChanged {
+                                self.providerGroups = self.people.groups
+                            }
+                            continue
                         }
-                        if await self.people.heard(change.method, change.params, on: control) { continue }
                         if self.signIn.heard(change.method, change.params) { continue }
                         if await self.userScope.heard(change.method, change.params, on: control) { continue }
                         if change.method == DaemonAPI.Notification.controlKeptChanged

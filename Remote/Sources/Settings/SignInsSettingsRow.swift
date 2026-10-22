@@ -10,7 +10,7 @@ struct SignInsSettingsRow: View {
             NavigationLink {
                 Form {
                     SignInsSection(control: model.controlPlane, controlKey: RemoteControl.controlKey,
-                                   revision: model.people.revision)
+                                   people: model.people)
                         .paperListRow()
                 }
                 .paperForm()

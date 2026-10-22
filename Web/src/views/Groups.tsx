@@ -1,7 +1,6 @@
 // Settings ▸ Groups (#1761, spec 736 FR-027, FR-028), as the window's and the Remote's Groups pane
 // (Shared/UI/People/GroupsPane.swift): each group, its people and the workspace providers it has.
 // An admin makes, changes and removes groups; a member sees the groups they are in, read only.
-import { useEffect } from "preact/hooks";
 import { useSignal } from "@preact/signals";
 import type { Store } from "../model/store";
 import type { Group, PersonRow } from "../protocol/generated";
@@ -71,44 +70,31 @@ function GroupSheet({ store, group, people, close }: {
 }
 
 export function GroupsSection({ store, down }: { store: Store; down: boolean }) {
-  const groups = useSignal<Group[] | null>(null);
-  const people = useSignal<PersonRow[]>([]);
-  const admin = useSignal(false);
-  const problem = useSignal<string | null>(null);
+  // The store's one people list and its groups (#2055), loaded on each connection and each change.
+  const list = store.people.value;
+  const people = list?.people ?? [];
+  const admin = list?.admin ?? false;
+  const failure = store.peopleFailure.value;
+  const problem = failure ? describe(failure) : null;
   const editing = useSignal<{ group: Group | null } | null>(null);
-  const load = async () => {
-    try {
-      const listed = await store.link.call("groups/list", {});
-      const list = await store.link.call("people/list", {});
-      people.value = list.people;
-      admin.value = list.admin;
-      groups.value = listed.groups;
-      problem.value = null;
-    } catch (error) {
-      problem.value = describe(error);
-    }
-  };
-  // Again on each control/peopleChanged and control/groupsChanged, and on each connection.
-  const changes = store.peopleChanges.value;
-  useEffect(() => { if (!down) void load(); }, [changes, down]);
   const remove = async (group: Group) => {
     if (!window.confirm(`${removeTitle(group)} ${removeMessage}`)) return;
     try {
+      // The change comes back as control/groupsChanged.
       await store.link.call("groups/remove", { id: group.id });
     } catch (error) {
       store.say(describe(error));
     }
-    await load();
   };
-  const shown = groups.value;
+  const shown = list ? store.providers.groups.value : null;
   // A member in no group has nothing to see here.
-  if (shown && !admin.value && shown.length === 0) return null;
+  if (shown && !admin && shown.length === 0) return null;
   const providers = store.providers.list.value ?? [];
   return (
     <section aria-labelledby="settings-groups">
       <h3 class="section-head" id="settings-groups">{title}</h3>
-      {problem.value && <p class="hint">{problem.value}</p>}
-      {!shown && !problem.value && <p class="hint">Loading…</p>}
+      {problem && <p class="hint">{problem}</p>}
+      {!shown && !problem && <p class="hint">Loading…</p>}
       {shown && (
         <>
           <ul class="people-list">
@@ -117,10 +103,10 @@ export function GroupsSection({ store, down }: { store: Store; down: boolean }) 
                 <div class="setting"><span class="person-name">{group.name}</span></div>
                 <div class="person-things">
                   <span class="faint small">People</span>
-                  <span class="small">{members(group, people.value)}</span>
+                  <span class="small">{members(group, people)}</span>
                   <span class="faint small">Workspace providers</span>
                   <span class="small">{providersOf(group, providers) ?? "None"}</span>
-                  {admin.value && (
+                  {admin && (
                     <span>
                       <button type="button" class="link" disabled={down} onClick={() => { editing.value = { group }; }}>Edit…</button>
                       {" "}
@@ -131,15 +117,15 @@ export function GroupsSection({ store, down }: { store: Store; down: boolean }) 
               </li>
             ))}
           </ul>
-          {admin.value && (
+          {admin && (
             <button type="button" class="invite" disabled={down} onClick={() => { editing.value = { group: null }; }}>Make a Group…</button>
           )}
-          <p class="hint">{foot(admin.value)}</p>
+          <p class="hint">{foot(admin)}</p>
         </>
       )}
       {editing.value && (
-        <GroupSheet store={store} group={editing.value.group} people={people.value.filter((p) => p.kind === "person")}
-          close={() => { editing.value = null; void load(); }} />
+        <GroupSheet store={store} group={editing.value.group} people={people.filter((p) => p.kind === "person")}
+          close={() => { editing.value = null; }} />
       )}
     </section>
   );
