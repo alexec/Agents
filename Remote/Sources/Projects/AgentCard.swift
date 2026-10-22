@@ -317,6 +317,8 @@ struct AgentMenuItems: View {
             Button("Delete…", systemImage: "trash", role: .destructive) { model.askingToDelete = agent }
                 .disabled(model.isStale(agent))
         }
+        // Its record and transcript as a .tar.gz, as the Mac's (#1001).
+        ExportAgentButton(agent: agent)
     }
 
     private var isActing: Bool { model.acting(agent.id) != nil }

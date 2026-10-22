@@ -37,17 +37,18 @@ the page says so and names its issue.
 
 ## Not built yet
 
-Data governance is roadmap step T8 (#1001, `specs/1001-data-governance/`). Two parts are
+Data governance is roadmap step T8 (#1001, `specs/1001-data-governance/`). Three parts are
 built:
 
 - **Redaction:** known token shapes are cut out of transcripts, `app-tools.jsonl` and
   `daemon.log` when they are written (see [Security overview](security-overview.md#logs)).
 - **Erasure:** Delete also removes the runtime's own copy, and a restore never brings a
   deleted agent back (see [Data and retention](data-and-retention.md#erasure)).
+- **Export and import:** an agent or a project's agents as a `.tar.gz`, and brought back,
+  archived, on another machine (see [Data and retention](data-and-retention.md#export-and-import)).
 
-These parts are planned, not built:
+This part is planned, not built:
 
-- **Export and import** of an agent or a project.
 - **Tamper-evident audit.** No hash chain on events, and no syslog or HTTP sink.
 
 The organisation policy (T5, #998) and org keys and model gateways (T6, #999) are planned

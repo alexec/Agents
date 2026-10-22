@@ -827,6 +827,8 @@ private struct ProjectMenuItems: View {
             Label("Archive…", systemImage: "archivebox")
         }
         .disabled(model.isStale(on: summary.host))
+        // Its agents as a .tar.gz, and an export brought back on its machine (#1001).
+        ExportImportProjectButtons(summary: summary)
     }
 }
 
