@@ -3,8 +3,9 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 /// Events ▸ Audit (#996, spec 736 US8): who did what through the control plane, newest
-/// first in days. Read only. An admin also sets how long entries are kept and exports
-/// them as JSON lines; a member sees only their own.
+/// first in days. Read only. An admin also sets how long entries are kept, sees one
+/// person's entries or everyone's, and exports them as CSV or JSON lines, as the web
+/// page's Console ▸ Audit (#2087); a member sees only their own.
 ///
 /// One view for the Mac's page and the Remote's (the web page's is `Web/src/views/Audit.tsx`).
 struct AuditPane: View {
@@ -15,7 +16,10 @@ struct AuditPane: View {
 
     @State private var list: DaemonAPI.AuditList?
     @State private var problem: String?
-    @State private var export: AuditFile?
+    @State private var export: ReportFile?
+    /// For an admin: the people to narrow the entries to, and whose are shown ("" for everyone).
+    @State private var people: [DaemonAPI.PersonRow] = []
+    @State private var user = ""
     @State private var isExporting = false
     /// A shorter time, waiting for the admin to say yes (#2067).
     @State private var shorter: Int?
@@ -56,14 +60,24 @@ struct AuditPane: View {
         #endif
         .scrollContentBackground(.hidden)
         .refreshable { await load() }
-        .task(id: control == nil) { await load() }
-        .fileExporter(isPresented: $isExporting, document: export, contentType: AuditFile.type,
-                      defaultFilename: AuditWords.exportName()) { result in
+        .task(id: Ask(user: user, connected: control != nil)) { await load() }
+        .fileExporter(isPresented: $isExporting, document: export, contentType: export?.type ?? AuditFile.type,
+                      defaultFilename: export?.name) { result in
             if case .failure(let error) = result { problem = "Not exported: \(error.localizedDescription)" }
         }
     }
 
-    /// How long entries are kept, and for an admin the menu to change it and Export.
+    private struct Ask: Equatable {
+        var user: String
+        var connected: Bool
+    }
+
+    /// The query for the person chosen, or everyone.
+    private func query(until: Date? = nil, limit: Int? = nil) -> DaemonAPI.AuditQuery {
+        DaemonAPI.AuditQuery(until: until, user: user.isEmpty ? nil : user, limit: limit)
+    }
+
+    /// How long entries are kept, and for an admin the menu to change it, Whose and Export.
     @ViewBuilder private func footLine(_ list: DaemonAPI.AuditList) -> some View {
         HStack(spacing: 12) {
             if list.admin {
@@ -91,10 +105,25 @@ struct AuditPane: View {
                                                        older: AuditWords.older(list, than: days)))
                     }
                 }
-                Spacer()
-                Button("Export…") { Task { await exportAll() } }
+                if !people.isEmpty {
+                    Picker("Whose", selection: $user) {
+                        Text(AuditWords.everyone).tag("")
+                        ForEach(people) { Text($0.name).tag($0.id) }
+                    }
+                    .pickerStyle(.menu)
+                    .labelsHidden()
                     .appText(.fine)
-                    .help("Save every entry kept as JSON lines")
+                    .fixedSize()
+                    .help("Whose entries to see")
+                }
+                Spacer()
+                Menu("Export…") {
+                    Button("CSV") { Task { await exportAll(csv: true) } }
+                    Button("JSON lines") { Task { await exportAll(csv: false) } }
+                }
+                .fixedSize()
+                .appText(.fine)
+                .help("Save these entries")
             } else {
                 Text("\(AuditWords.kept(list.days)). You see what you did.")
                     .appText(.fine)
@@ -113,9 +142,13 @@ struct AuditPane: View {
             return
         }
         do {
-            list = try await control.call(DaemonAPI.Method.auditList, DaemonAPI.AuditQuery(limit: Self.page),
+            list = try await control.call(DaemonAPI.Method.auditList, query(limit: Self.page),
                                           returning: DaemonAPI.AuditList.self)
             problem = nil
+            if list?.admin == true, people.isEmpty,
+               let got = try? await control.call(DaemonAPI.Method.peopleList, returning: DaemonAPI.PeopleList.self) {
+                people = got.people
+            }
         } catch {
             problem = Self.sentence(error)
         }
@@ -125,7 +158,7 @@ struct AuditPane: View {
         guard let control, let current = list, let last = current.entries.last else { return }
         do {
             let older = try await control.call(DaemonAPI.Method.auditList,
-                                               DaemonAPI.AuditQuery(until: last.at.addingTimeInterval(-0.001), limit: Self.page),
+                                               query(until: last.at.addingTimeInterval(-0.001), limit: Self.page),
                                                returning: DaemonAPI.AuditList.self)
             var next = current
             let seen = Set(current.entries.map(\.id))
@@ -147,12 +180,13 @@ struct AuditPane: View {
         }
     }
 
-    private func exportAll() async {
+    private func exportAll(csv: Bool) async {
         guard let control else { return }
         do {
-            let got = try await control.call(DaemonAPI.Method.auditExport, DaemonAPI.AuditQuery(),
+            let got = try await control.call(DaemonAPI.Method.auditExport, query(),
                                              returning: DaemonAPI.AuditExport.self)
-            export = AuditFile(lines: got.lines)
+            export = ReportFile(text: csv ? AuditWords.csv(got.lines, hostName: hostName) : got.lines,
+                                format: csv ? .csv : .jsonl, name: AuditWords.exportName(csv: csv))
             isExporting = true
         } catch {
             problem = Self.sentence(error)
@@ -201,20 +235,7 @@ struct AuditRow: View {
     }
 }
 
-/// An export, as the file it is saved as.
-struct AuditFile: FileDocument {
+/// The JSON lines file type; an export is saved as a `ReportFile`.
+enum AuditFile {
     static let type = UTType(filenameExtension: "jsonl", conformingTo: .plainText) ?? .plainText
-    static var readableContentTypes: [UTType] { [type] }
-
-    var lines: String
-
-    init(lines: String) { self.lines = lines }
-
-    init(configuration: ReadConfiguration) throws {
-        lines = String(decoding: configuration.file.regularFileContents ?? Data(), as: UTF8.self)
-    }
-
-    func fileWrapper(configuration: WriteConfiguration) throws -> FileWrapper {
-        FileWrapper(regularFileWithContents: Data(lines.utf8))
-    }
 }

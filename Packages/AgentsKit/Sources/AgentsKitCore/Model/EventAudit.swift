@@ -179,9 +179,36 @@ public enum AuditWords {
         return out
     }
 
-    /// The file an export is saved as: `audit-2026-10-20.jsonl`.
-    public static func exportName(_ now: Date = Date(), calendar: Calendar = .current) -> String {
+    /// The file an export is saved as: `audit-2026-10-20.jsonl`, or `.csv`.
+    public static func exportName(_ now: Date = Date(), csv: Bool = false, calendar: Calendar = .current) -> String {
         let day = calendar.dateComponents([.year, .month, .day], from: now)
-        return String(format: "audit-%04d-%02d-%02d.jsonl", day.year ?? 0, day.month ?? 0, day.day ?? 0)
+        return String(format: "audit-%04d-%02d-%02d.%@", day.year ?? 0, day.month ?? 0, day.day ?? 0, csv ? "csv" : "jsonl")
+    }
+
+    /// An admin's choice of whose entries to see (#2087): everyone's.
+    public static let everyone = "Everyone"
+
+    /// `audit/export`'s JSON lines as CSV, a row per entry, oldest first, for a spreadsheet;
+    /// a line that is not an entry is left out. The web page's `auditCSV` makes the same.
+    public static func csv(_ lines: String, hostName: (HostID) -> String) -> String {
+        let header = ["at", "action", "method", "host", "hostName", "target", "user", "userName", "client", "clientName", "event"]
+        var rows = [header.joined(separator: ",")]
+        let iso = ISO8601DateFormatter()
+        iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let decoder = JSONDecoder()
+        for line in lines.split(whereSeparator: \.isNewline) where !line.allSatisfy(\.isWhitespace) {
+            guard let entry = try? decoder.decode(DaemonAPI.AuditEntry.self, from: Data(line.utf8)) else { continue }
+            let a = entry.actor
+            let fields = [iso.string(from: entry.at), entry.action, entry.method, entry.host?.rawValue ?? "",
+                          entry.host.map(hostName) ?? "", entry.target ?? "", a.user, a.userName ?? "",
+                          a.client?.uuidString ?? "", a.clientName ?? "", a.event.map { "\($0.kind) \($0.id)" } ?? ""]
+            rows.append(fields.map(csvField).joined(separator: ","))
+        }
+        return rows.joined(separator: "\n") + "\n"
+    }
+
+    private static func csvField(_ text: String) -> String {
+        text.contains(where: { $0 == "\"" || $0 == "," || $0 == "\n" || $0 == "\r" })
+            ? "\"" + text.replacingOccurrences(of: "\"", with: "\"\"") + "\"" : text
     }
 }

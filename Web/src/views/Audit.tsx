@@ -1,6 +1,7 @@
 // Events ▸ Audit (#996, spec 736 US8), as the window's and the Remote's AuditPane: who did what
 // through the control plane, newest first in days. Read only. An admin also sets how long entries
-// are kept and exports them as JSON lines; a member sees only their own.
+// are kept, sees one person's entries or everyone's, and exports them as CSV or JSON lines, here
+// and in Console ▸ Audit alike (#2087); a member sees only their own.
 import { useEffect } from "preact/hooks";
 import { useSignal } from "@preact/signals";
 import type { Store } from "../model/store";
@@ -37,9 +38,12 @@ function save(text: string, type: string, name: string) {
   URL.revokeObjectURL(url);
 }
 
-/** Events ▸ Audit, and Console ▸ Audit (#1804) with `people`: one person's entries or everyone's, and CSV. */
-export function AuditPane({ store, hostName, people }: { store: Store; hostName: (host: string) => string; people?: readonly PersonRow[] }) {
+/** Events ▸ Audit, and Console ▸ Audit (#1804) with `people`: for an admin, one person's entries or everyone's, and CSV.
+ * Without `people`, an admin's list of people is asked for here. */
+export function AuditPane({ store, hostName, people: given }: { store: Store; hostName: (host: string) => string; people?: readonly PersonRow[] }) {
   const list = useSignal<AuditList | null>(null);
+  const asked = useSignal<PersonRow[]>([]);
+  const people = given ?? asked.value;
   const problem = useSignal<string | null>(null);
   const user = useSignal("");
   const only = user.value ? { user: user.value } : {};
@@ -47,6 +51,9 @@ export function AuditPane({ store, hostName, people }: { store: Store; hostName:
     try {
       list.value = await store.link.call("audit/list", { limit: page, ...only });
       problem.value = null;
+      if (!given && list.value.admin && asked.value.length === 0) {
+        asked.value = await store.link.call("people/list", {}).then((l) => l.people, () => []);
+      }
     } catch (error) {
       problem.value = sentence(error);
     }
@@ -105,14 +112,14 @@ export function AuditPane({ store, hostName, people }: { store: Store; hostName:
                   }}>
                   {choices(shown.days).map((n) => <option key={n} value={String(n)}>{kept(n)}</option>)}
                 </select>
-                {people && (
+                {people.length > 0 && (
                   <select aria-label="Whose" value={user.value} onChange={(e) => { user.value = (e.currentTarget as HTMLSelectElement).value; }}>
                     <option value="">Everyone</option>
                     {people.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
                   </select>
                 )}
-                {people && <button title="Save these entries as CSV" onClick={() => void exportAll(true)}>Export CSV</button>}
-                <button title="Save every entry kept as JSON lines" onClick={() => void exportAll()}>{people ? "Export JSON lines" : "Export…"}</button>
+                <button title="Save these entries as CSV" onClick={() => void exportAll(true)}>Export CSV</button>
+                <button title="Save these entries as JSON lines" onClick={() => void exportAll()}>Export JSON lines</button>
               </>
             ) : <p class="quiet small">{kept(shown.days)}. You see what you did.</p>}
           </div>

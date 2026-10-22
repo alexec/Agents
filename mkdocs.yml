@@ -150,6 +150,7 @@ nav:
       - reference/groups.md
       - reference/on-every-machine.md
       - reference/reports.md
+      - reference/console.md
       - reference/workspace-providers.md
       - reference/integrations.md
       - reference/ssh-options.md

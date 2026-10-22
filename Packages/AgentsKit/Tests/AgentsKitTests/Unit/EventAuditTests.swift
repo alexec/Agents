@@ -70,4 +70,22 @@ struct EventAuditTests {
         #expect(AuditWords.choices(with: 90) == [30, 90, 180, 365])
         #expect(AuditWords.choices(with: 7) == [7, 30, 90, 180, 365])
     }
+
+    /// #2087: the window and the Remote make the same CSV as the web page's auditCSV.
+    @Test func jsonLinesBecomeTheWebPagesCSV() throws {
+        let lines = [
+            #"{"id":"1","at":0,"action":"Stopped an agent","method":"agents/stop","host":"H1","target":"A1","actor":{"user":"u","userName":"Bea, admin"}}"#,
+            "not json",
+            #"{"id":"2","at":60,"action":"Approved","method":"hosts/approveJoin","actor":{"user":"b","event":{"kind":"schedule","id":"w"}}}"#,
+        ].joined(separator: "\n")
+        let csv = AuditWords.csv(lines) { "\($0.rawValue)'s box" }.trimmingCharacters(in: .newlines).components(separatedBy: "\n")
+        try #require(csv.count == 3)
+        #expect(csv[0] == "at,action,method,host,hostName,target,user,userName,client,clientName,event")
+        #expect(csv[1] == #"2001-01-01T00:00:00.000Z,Stopped an agent,agents/stop,H1,H1's box,A1,u,"Bea, admin",,,"#)
+        #expect(csv[2].hasSuffix(",schedule w"))
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = try #require(TimeZone(identifier: "UTC"))
+        let day = try #require(calendar.date(from: DateComponents(year: 2026, month: 10, day: 20, hour: 9)))
+        #expect(AuditWords.exportName(day, csv: true, calendar: calendar) == "audit-2026-10-20.csv")
+    }
 }
