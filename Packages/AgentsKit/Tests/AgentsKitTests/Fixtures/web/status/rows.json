@@ -184,7 +184,7 @@
   {
     "expected" : {
       "shape" : "done",
-      "symbol" : "checkmark.circle",
+      "symbol" : "checkmark",
       "tinted" : false,
       "words" : "Finished"
     },
@@ -220,7 +220,7 @@
   {
     "expected" : {
       "shape" : "done",
-      "symbol" : "checkmark.circle",
+      "symbol" : "checkmark",
       "tinted" : false,
       "words" : "Unread · Finished"
     },
@@ -610,7 +610,7 @@
   {
     "expected" : {
       "shape" : "done",
-      "symbol" : "checkmark.circle",
+      "symbol" : "checkmark",
       "tinted" : false,
       "words" : "Finished"
     },
@@ -701,7 +701,7 @@
   {
     "expected" : {
       "shape" : "done",
-      "symbol" : "checkmark.circle",
+      "symbol" : "checkmark",
       "tinted" : false,
       "words" : "Complete"
     },
@@ -742,7 +742,7 @@
   {
     "expected" : {
       "shape" : "done",
-      "symbol" : "checkmark.circle",
+      "symbol" : "checkmark",
       "tinted" : false,
       "words" : "Nothing to do"
     },
@@ -782,7 +782,7 @@
   {
     "expected" : {
       "shape" : "done",
-      "symbol" : "checkmark.circle",
+      "symbol" : "checkmark",
       "tinted" : false,
       "words" : "Unread · Complete"
     },
@@ -1132,7 +1132,7 @@
   {
     "expected" : {
       "shape" : "done",
-      "symbol" : "checkmark.circle",
+      "symbol" : "checkmark",
       "tinted" : false,
       "words" : "Complete"
     },

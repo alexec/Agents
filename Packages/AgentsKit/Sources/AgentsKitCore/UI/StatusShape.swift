@@ -64,7 +64,7 @@ public enum StatusShape: Hashable, Sendable {
         case .working: return nil
         case .needsYou: return "exclamationmark.circle.fill"
         case .waiting: return "zzz"
-        case .done: return "checkmark.circle"
+        case .done: return "checkmark"
         case .stopped: return "stop.circle"
         }
     }

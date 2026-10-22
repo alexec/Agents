@@ -40,7 +40,7 @@ prompt you send after the turn ends starts the time again from that prompt.
 The Lock Screen shows these, from left to right:
 
 - **A mark** for the phase: a dashed ring while it works, an orange hand when it needs
-  you, an empty ring when it is done, a grey stop when it is paused, and a red triangle
+  you, a tick when it is done, a grey stop when it is paused, and a red triangle
   for an unexpected stop.
 - **The title** of the session. A session with no title yet is **New session**.
 - **The phase**, then the runtime and the project, such as **Working · Claude · api**.
