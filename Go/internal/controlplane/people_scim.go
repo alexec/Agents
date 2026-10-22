@@ -529,6 +529,9 @@ func (s *Service) suspend(ctx context.Context, user string, why records.Suspensi
 		return
 	}
 	s.suspendedHere(user)
+	if s.providers != nil {
+		s.providers.StopFor(user, "suspension ("+why.Provider+")")
+	}
 	s.announce("personSuspended", user, "")
 	s.auditAs(actor, "person/suspended", fmt.Sprintf("%s, by %s (%s)", cmp.Or(s.personName(user), user), why.Provider, why.Why))
 	s.log("person " + user + " suspended by " + why.Provider + ": " + why.Why)

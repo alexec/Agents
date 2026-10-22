@@ -20,6 +20,11 @@
       "name": "host.team/1",
       "by": "host",
       "description": "A host knows the user it belongs to (#994, #1763). On a control plane with more than one person, a host without it is needsUpdate, and calls to it are answered -32074 updateToJoinTeam (R14)."
+    },
+    {
+      "name": "host.suspend/1",
+      "by": "host",
+      "description": "The host hears user/suspended (#1002, FR-018): it stops its person's running turns, pauses their workflows and queued prompts, refuses new work and the window's direct path, and keeps every agent and file; off: true ends the pause. It keeps the state in <root>/suspended.json. A notification it hears, not a method it serves, so declared."
     }
   ],
   "methods": [

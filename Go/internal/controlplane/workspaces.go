@@ -72,6 +72,7 @@ func (s *Service) makeProviders(home string) *providers.Providers {
 			IsAdmin:   s.isAdmin,
 			InGroup:   s.inGroup,
 			GroupName: s.groupName,
+			Suspended: s.suspended,
 			HostCommand: func(person string) (string, error) {
 				shown, err := s.codes.Issue(withCodeOwner(context.Background(), person), true, false, 5*time.Minute)
 				if err != nil {

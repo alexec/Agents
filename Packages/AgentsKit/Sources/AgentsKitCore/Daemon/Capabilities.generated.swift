@@ -622,6 +622,7 @@ public enum Capability {
             "host.wire/1",
             "agents.move-worktree/1",
             "host.team/1",
+            "host.suspend/1",
         ],
     ]
 }

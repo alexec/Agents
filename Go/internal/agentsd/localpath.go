@@ -180,6 +180,10 @@ func (d *Daemon) Told(method string, params json.RawMessage) {
 		d.toldPolicy(params)
 		return
 	}
+	if method == wire.NotifyUserSuspended.Name {
+		d.toldUserSuspended(params)
+		return
+	}
 	if method == wire.NotifyHostRelease.Name {
 		d.toldRelease(params)
 		return
@@ -354,6 +358,10 @@ func (d *Daemon) localExchange(c net.Conn, r *bufio.Reader, host string, private
 	})
 	if err != nil {
 		return "", err
+	}
+	if d.suspension() != nil {
+		// The person is suspended (#1002, FR-018): their window is refused here too.
+		return "", controllink.Refuse(controllink.Suspended)
 	}
 	ok2 := controllink.Message{OK: &wire.ControlOK{Mac: controllink.B64URL(mac), Host: new(wire.HostID(host))}}
 	if _, err := c.Write([]byte(ok2.Line() + "\n")); err != nil {

@@ -152,6 +152,38 @@ control plane:
 Nothing is deleted: their machines, agents, conversations and branches stay. `active: true`
 ends the suspension, and their clients connect again.
 
+## What a machine does
+
+A machine that hears `user/suspended` (it says `host.suspend/1` at hello):
+
+- stops the person's running turns at once, with "Stopped. Your organisation's sign-in
+  turned your access off." in each chat;
+- pauses their workflows: a trigger, a schedule and a queued run are let go, not kept, and
+  **Run now** is refused;
+- keeps their queued prompts waiting, and refuses a new agent or prompt with
+  `personSuspended`;
+- cuts off the window on this Mac's direct path, and refuses it there with `suspended`;
+- keeps every agent, conversation, branch and file.
+
+It keeps the state in `<root>/suspended.json`, so a restart keeps it until the control plane
+says otherwise. `user/suspended {off: true}` ends the pause, and starts nothing by itself:
+a queued prompt waits until its person sends again.
+
+The person's started machines in a workspace provider are **stopped** through the provider,
+never deleted, so they cost nothing. They are not started while the suspension lasts (by
+hand, for a kept prompt or for a schedule), and stay stopped after it ends until the person
+starts them.
+
+## What an offline machine does
+
+A machine that is off the network cannot hear `user/suspended`, and it runs on until it
+connects: hosts never escalate, and the control plane cannot reach it. When it connects, the
+control plane says the person's state before anything else, so the machine stops their work
+before any workflow starts. A machine that was suspended and restarts offline stays paused,
+from `<root>/suspended.json`.
+
+## Removal
+
 SCIM `DELETE` suspends the person too, and adds a **Remove** request for the admins
 (`people/removeRequests`). Only an admin removes a person, after reading what work on their
 machines is not pushed. The local owner is never cut off: only their org sign-in is refused.
@@ -181,7 +213,7 @@ Without one, that person is checked at sign-in only.
   caught without SCIM.
 - **An offline machine runs until it connects.** A suspended person's machine that is off
   the network does not hear `user/suspended`. It hears it before anything else when it
-  connects.
+  connects (see [What an offline machine does](#what-an-offline-machine-does)).
 - **Require reads the email the built-in provider gives.** A sign-in with no email, or with
   Apple's hidden relay address, is not at the domain, and is not refused.
 - **A DNS record proves who controls the domain now.** A domain that changes hands keeps

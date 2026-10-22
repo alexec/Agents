@@ -113,6 +113,9 @@ type Hooks struct {
 	InGroup func(user, group string) bool
 	// GroupName is a group's name, for a refusal; "" for none.
 	GroupName func(group string) string
+	// Suspended says a person's org provider suspended them (#1002, D13): their machines
+	// are not started, by hand, for use or for a schedule. Nil: nobody is.
+	Suspended func(person string) bool
 }
 
 // Config is what NewProviders is given.
@@ -1228,6 +1231,31 @@ func (p *Providers) Keepable(host string) string {
 // request, or joins the start under way.
 func (p *Providers) StartForUse(host, by string) { p.begin(starting, host, by) }
 
+// StopFor stops (never deletes) each started workspace of a person's machines, so they
+// cost nothing while the person is suspended (#1002, D13, FR-018). Their disks, agents and
+// branches stay; they are started again by hand, once the suspension ends.
+func (p *Providers) StopFor(person, who string) {
+	if p.hooks.OwnerOf == nil {
+		return
+	}
+	for _, h := range p.records.Hosts() {
+		if LinkOf(&h) == nil || p.hooks.OwnerOf(h.ID) != person {
+			continue
+		}
+		if shown := p.overlay(h); shown != nil && deref(shown.HostState) == "stopped" && !p.router.Online(h.ID) {
+			continue
+		}
+		if _, err := p.begin(stopping, h.ID, who); err != nil {
+			p.log(fmt.Sprintf("workspace: stop %s for %s: refused: %s", h.Name, who, errorWords(err)))
+		}
+	}
+}
+
+// suspendedOwner says the host's person is suspended, so it is not started.
+func (p *Providers) suspendedOwner(host string) bool {
+	return p.hooks.Suspended != nil && p.hooks.OwnerOf != nil && p.hooks.Suspended(p.hooks.OwnerOf(host))
+}
+
 func (p *Providers) begin(kind activityKind, host, who string) (any, error) {
 	record := p.records.Host(host)
 	if record == nil {
@@ -1242,6 +1270,10 @@ func (p *Providers) begin(kind activityKind, host, who string) (any, error) {
 	if link == nil || !known {
 		p.mu.Unlock()
 		return nil, fail(CodeNotLinked, "%s isn’t linked to a workspace.", record.Name)
+	}
+	if kind == starting && p.suspendedOwner(host) {
+		p.mu.Unlock()
+		return nil, fail(CodeProviderFailed, "%s is not started: its person's organisation turned their access off.", record.Name)
 	}
 	// One start or stop at a time per workspace (US1 AS4): a second press of the same joins
 	// the first; the other is refused, never dropped without a word.
