@@ -76,8 +76,8 @@ func (m *Methods) auditMethod(ctx context.Context, method string, params json.Ra
 		if request.Days < 1 || request.Days > audit.MostDays {
 			return nil, fail(invalidParams, "Keep the audit for 1 to %d days.", audit.MostDays)
 		}
-		n := int(request.Days)
-		if _, err := m.records.ChangeSettings(ctx, func(s *records.Settings) { s.AuditDays = &n }); err != nil {
+		n, now := int(request.Days), time.Now()
+		if _, err := m.records.ChangeSettings(ctx, func(s *records.Settings) { audit.SetDays(s, n, now) }); err != nil {
 			return nil, err
 		}
 		return request, nil

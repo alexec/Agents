@@ -48,8 +48,9 @@ func sweep(ctx context.Context, rs *records.Records, now time.Time, most int) (s
 	s := rs.Store
 	left := most
 
-	// Events, by the day in their key: the audit's days (#996).
-	days := audit.Days(rs.Settings())
+	// Events, by the day in their key: the audit's days (#996), or the days before a
+	// shorter time for a day after it (#2067).
+	days := audit.SweepDays(rs.Settings(), now)
 	events, err := s.List(ctx, eventsPrefix)
 	if err != nil {
 		return report, err

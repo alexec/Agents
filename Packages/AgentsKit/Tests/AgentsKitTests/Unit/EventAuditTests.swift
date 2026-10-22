@@ -51,4 +51,23 @@ struct EventAuditTests {
         let days = AuditWords.days([entry("a", -30), entry("b", 1), entry("c", -1)], calendar: calendar)
         #expect(days.map { $0.entries.map(\.id) } == [["b", "c"], ["a"]])
     }
+
+    @Test func aShorterTimeSaysWhatItDeletes() {
+        let now = Date(timeIntervalSinceReferenceDate: 782_654_400)
+        func entry(_ id: String, _ days: Double) -> DaemonAPI.AuditEntry {
+            .init(id: id, at: now.addingTimeInterval(-days * 86_400), action: "", method: "m", actor: .init(user: "u"))
+        }
+        var list = DaemonAPI.AuditList(entries: [entry("a", 1), entry("b", 40), entry("c", 200)], days: 365, more: false, admin: true)
+        #expect(AuditWords.older(list, than: 30, now: now) == 2)
+        #expect(AuditWords.older(list, than: 180, now: now) == 1)
+        list.more = true
+        #expect(AuditWords.older(list, than: 30, now: now) == nil)
+        #expect(AuditWords.shorterTitle(30) == "Keep the audit for 30 days?")
+        #expect(AuditWords.shorterMessage(from: 365, to: 30, older: 2)
+            == "Entries older than 30 days are deleted in a day (up to 335 days of them, 2 entries now). To keep them, choose 365 days again before then.")
+        #expect(AuditWords.shorterMessage(from: 2, to: 1, older: nil)
+            == "Entries older than 1 day are deleted in a day (up to 1 day of them). To keep them, choose 2 days again before then.")
+        #expect(AuditWords.choices(with: 90) == [30, 90, 180, 365])
+        #expect(AuditWords.choices(with: 7) == [7, 30, 90, 180, 365])
+    }
 }

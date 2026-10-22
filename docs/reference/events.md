@@ -329,8 +329,11 @@ It is read only.
   workspace provider. Reads, prompts and presence are not kept. An entry is written when
   the control plane passes the call on, so a call that the host refuses is kept too.
 - **How long**: 90 days by default. An admin picks 30, 90, 180 or 365 days in the pane
-  (`control/setAuditDays`, 1 to 3,650). The control plane's hourly sweep deletes older
-  entries, by day.
+  (`control/setAuditDays`, 1 to 3,650); the menu marks the time set now. The control
+  plane's hourly sweep deletes older entries, by day. A shorter time asks first, with how
+  many days (and, when every entry is loaded, how many entries) it deletes, and the sweep
+  keeps the older days for one more day: choose the longer time again in that day and
+  nothing is lost (#2067).
 - **Export…** saves every entry kept as JSON lines (`audit/export`, at most 50,000).
 - **Who sees what**: an admin sees every entry and a member sees only their own. Until
   people (#994) are built, a control plane has one person, the local owner. That person is

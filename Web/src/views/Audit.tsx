@@ -8,7 +8,7 @@ import type { AuditList, PersonRow } from "../protocol/generated";
 import { fromWireDate, toWireDate } from "../protocol/dates";
 import { CallFailed } from "../wire/link";
 import { clock } from "../model/rowLines";
-import { auditCSV, call, csvExportName, dayChoices, days, empty, exportName, kept, place, who } from "../model/audit";
+import { auditCSV, call, choices, csvExportName, days, empty, exportName, kept, older as olderCount, place, shorterMessage, shorterTitle, who } from "../model/audit";
 
 const page = 200;
 
@@ -93,8 +93,17 @@ export function AuditPane({ store, hostName, people }: { store: Store; hostName:
             {shown.admin ? (
               <>
                 <select aria-label="How long the audit is kept" title="How long the control plane keeps who did what"
-                  value={String(shown.days)} onChange={(e) => void setDays(Number((e.currentTarget as HTMLSelectElement).value))}>
-                  {[...new Set([...dayChoices, shown.days])].sort((a, b) => a - b).map((n) => <option key={n} value={String(n)}>{kept(n)}</option>)}
+                  value={String(shown.days)} onChange={(e) => {
+                    // A shorter time asks first (#2067); Cancel puts the menu back.
+                    const select = e.currentTarget as HTMLSelectElement;
+                    const n = Number(select.value);
+                    if (n < shown.days && !window.confirm(`${shorterTitle(n)}\n\n${shorterMessage(shown.days, n, olderCount(shown, n))}`)) {
+                      select.value = String(shown.days);
+                      return;
+                    }
+                    void setDays(n);
+                  }}>
+                  {choices(shown.days).map((n) => <option key={n} value={String(n)}>{kept(n)}</option>)}
                 </select>
                 {people && (
                   <select aria-label="Whose" value={user.value} onChange={(e) => { user.value = (e.currentTarget as HTMLSelectElement).value; }}>

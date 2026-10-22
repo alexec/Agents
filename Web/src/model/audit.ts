@@ -29,6 +29,31 @@ export function kept(days: number): string {
   return days === 1 ? "Kept for 1 day" : `Kept for ${days} days`;
 }
 
+/** AuditWords.choices: the choices, with the days set now when they are not one of them. */
+export function choices(days: number): number[] {
+  return [...new Set([...dayChoices, days])].sort((a, b) => a - b);
+}
+
+/** AuditWords.older: how many entries are older than `days`; null when the list leaves older ones out (#2067). */
+export function older(list: { entries: AuditEntry[]; more: boolean }, days: number, now: Date = new Date()): number | null {
+  if (list.more) return null;
+  const cut = now.getTime() - days * 86_400_000;
+  return list.entries.filter((e) => fromWireDate(e.at).getTime() < cut).length;
+}
+
+const daysWord = (n: number) => n === 1 ? "1 day" : `${n} days`;
+
+/** AuditWords.shorterTitle: the question before a shorter time is saved (#2067). */
+export function shorterTitle(days: number): string {
+  return `Keep the audit for ${daysWord(days)}?`;
+}
+
+/** AuditWords.shorterMessage: what a shorter time deletes, and how to keep it: the sweep waits a day. */
+export function shorterMessage(from: number, to: number, count: number | null): string {
+  const n = count === null ? "" : count === 1 ? ", 1 entry now" : `, ${count} entries now`;
+  return `Entries older than ${daysWord(to)} are deleted in a day (up to ${daysWord(from - to)} of them${n}). To keep them, choose ${from} days again before then.`;
+}
+
 /** AuditWords.empty. */
 export const empty = "Nothing has been done through the control plane yet. Starting, stopping or deleting an agent, answering a card, changing a setting and approving something appear here, with who did it.";
 

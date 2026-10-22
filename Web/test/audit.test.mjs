@@ -43,3 +43,19 @@ test("Console ▸ Audit (#1804): JSON lines as CSV, quoted where they must be", 
   assert.match(csv[2], /,schedule w$/);
   assert.equal(a.csvExportName(new Date(2026, 9, 20)), "audit-2026-10-20.csv");
 });
+
+test("a shorter time says what it deletes (#2067)", () => {
+  const now = new Date((782654400 + 978307200) * 1000);
+  const ago = (id, d) => entry({ id, at: 782654400 - d * 86400 });
+  const list = { entries: [ago("a", 1), ago("b", 40), ago("c", 200)], more: false };
+  assert.equal(a.older(list, 30, now), 2);
+  assert.equal(a.older(list, 180, now), 1);
+  assert.equal(a.older({ ...list, more: true }, 30, now), null);
+  assert.equal(a.shorterTitle(30), "Keep the audit for 30 days?");
+  assert.equal(a.shorterMessage(365, 30, 2),
+    "Entries older than 30 days are deleted in a day (up to 335 days of them, 2 entries now). To keep them, choose 365 days again before then.");
+  assert.equal(a.shorterMessage(2, 1, null),
+    "Entries older than 1 day are deleted in a day (up to 1 day of them). To keep them, choose 2 days again before then.");
+  assert.deepEqual(a.choices(90), [30, 90, 180, 365]);
+  assert.deepEqual(a.choices(7), [7, 30, 90, 180, 365]);
+});
