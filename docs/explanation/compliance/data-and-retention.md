@@ -25,6 +25,11 @@ command). Only its user can read it (mode 0700).
 | `usage-history.json`, `time-history.json` | Usage, cost and time | 168 hours by the hour, 90 days by the day |
 | `spend.json` | Spend for the cost limits | 7 days |
 | `workflows.json` | Workflows and their runs | A run is kept 7 days, or until its agent is archived or gone |
+| `workflow-copies/` | The approved text of each workflow and its skills | The copies that `workflows.json` names; an older version goes when it is saved |
+| `assessments/` | Each runtime assessment's start, score and scope | The newest 50 |
+| `mcp-logs/`, in the log folder | What each hosted MCP server wrote to stderr | 1 MB and one older file a server, and the newest 32 servers |
+| `events-state.json` | The branch tips that `branch.moved` compares | The live projects only |
+| `<file>.unreadable-<time>`, `<file>.corrupt-<time>` | A store that could not be read, set aside | The newest 3 of each kind for each file |
 | `<project>/.agents/attachments` | Files attached to prompts | A file that no kept conversation names goes after 7 days. The folder stays under 500 MB, oldest first. |
 | `<project>/.agents/dropbox` | Files handed to a workflow | 25 MB a file. Not swept. |
 | Terminal scrollback | What a terminal showed | In memory only, 4 MiB a terminal |

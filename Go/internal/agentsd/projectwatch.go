@@ -107,6 +107,7 @@ func (d *Daemon) syncProjectWatches() {
 			live[folder] = true
 		}
 	}
+	d.dropGoneBranchTips(live)
 	d.pwMu.Lock()
 	if d.pwStopped {
 		d.pwMu.Unlock()
@@ -383,6 +384,24 @@ func (d *Daemon) checkBranches(folder string) {
 		d.raise(wire.EventDraft{Name: "branch.moved", At: now(), Scope: projectScope(folder),
 			Sentence: name + " moved to " + short(tip, 7) + ".",
 			Details:  map[string]string{"branch": name, "from": short(old, 12), "to": short(tip, 12)}})
+	}
+}
+
+// dropGoneBranchTips forgets the branch tips of each folder that is no longer a live
+// project (#2292), so events-state.json does not keep every project there ever was. One
+// that comes back is looked at afresh, as at the first start.
+func (d *Daemon) dropGoneBranchTips(live map[string]bool) {
+	d.eventMu.Lock()
+	defer d.eventMu.Unlock()
+	gone := false
+	for folder := range d.eventStateNow.BranchTips {
+		if !live[folder] {
+			delete(d.eventStateNow.BranchTips, folder)
+			gone = true
+		}
+	}
+	if gone {
+		d.saveEventStateLocked()
 	}
 }
 

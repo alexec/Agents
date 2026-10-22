@@ -41,6 +41,7 @@ func readJSONMap(path string) map[string]wire.JSONValue {
 	var m map[string]wire.JSONValue
 	if json.Unmarshal(b, &m) != nil || m == nil {
 		os.Rename(path, fmt.Sprintf("%s.corrupt-%d", path, time.Now().Unix()))
+		store.TrimSetAsides(path)
 		return map[string]wire.JSONValue{}
 	}
 	return m

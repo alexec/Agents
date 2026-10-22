@@ -166,6 +166,7 @@ func (d *Daemon) saveRecordsLocked(replacing bool) {
 	if d.workflowRecsBad {
 		if b, err := os.ReadFile(d.workflowsPath()); err == nil {
 			os.WriteFile(fmt.Sprintf("%s.unreadable-%d", d.workflowsPath(), time.Now().Unix()), b, 0o644)
+			store.TrimSetAsides(d.workflowsPath())
 		}
 		d.workflowRecsBad = false
 	}
@@ -178,6 +179,8 @@ func (d *Daemon) saveRecordsLocked(replacing bool) {
 	})
 	if err := writeStore(d.workflowsPath(), r); err != nil {
 		log.Printf("workflows.json: could not save: %v", err)
+	} else {
+		d.dropUnnamedCopiesLocked()
 	}
 	if r.ApprovalsBegan != nil {
 		if _, err := os.Stat(d.workflowBegan()); err != nil {
@@ -219,6 +222,32 @@ func (d *Daemon) keepCopyLocked(st *workflowState, f *workflowFile) {
 	}
 	digest := f.digest
 	st.ApprovedDigest = &digest
+}
+
+// dropUnnamedCopiesLocked deletes each copy in workflow-copies that no workflow's record
+// names (#2292): one is kept for each approved version, and an edit or a removal leaves
+// the last one behind. Called once workflows.json is saved, so a copy goes only after the
+// record that named it.
+func (d *Daemon) dropUnnamedCopiesLocked() {
+	entries, err := os.ReadDir(d.workflowCopies())
+	if err != nil {
+		return
+	}
+	named := map[string]bool{}
+	for _, st := range d.workflowRecs.States {
+		if st.ApprovedCopy != nil {
+			named[*st.ApprovedCopy] = true
+		}
+		for _, name := range st.ApprovedSkills {
+			named[name] = true
+		}
+	}
+	for _, e := range entries {
+		// Only the copies themselves: a sha256 in hex, not a write in progress.
+		if name := e.Name(); len(name) == sha256.Size*2 && !named[name] {
+			os.Remove(filepath.Join(d.workflowCopies(), name))
+		}
+	}
 }
 
 // keepBytes writes bytes into workflow-copies by their sha256, and says the name.

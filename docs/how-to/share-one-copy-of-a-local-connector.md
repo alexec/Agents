@@ -60,4 +60,4 @@ answer, or a hosted one stopped while in use.
 
 A hosted server's stderr goes to `mcp-logs/<name>-<digest>.log` in the app's log folder
 (`~/Library/Logs/Agents` on a Mac),
-rolled at 1 MB.
+rolled at 1 MB. The folder keeps the logs of the newest 32 servers.

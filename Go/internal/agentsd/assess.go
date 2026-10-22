@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"regexp"
 	goruntime "runtime"
+	"sort"
 	"strings"
 	"time"
 
@@ -184,6 +185,41 @@ type assessStart struct {
 
 func (d *Daemon) assessmentsPath() string { return filepath.Join(d.Store.Loc.Root, "assessments") }
 
+// assessmentsKept is how many runtime assessments the daemon keeps (#2292).
+const assessmentsKept = 50
+
+// dropOldAssessments deletes all but the newest assessmentsKept assessments, each its
+// <agentID>.start.json, its <agentID>.json score and its scope-<id>.txt (#2292). The
+// reports are in the projects, and stay.
+func (d *Daemon) dropOldAssessments() {
+	dir := d.assessmentsPath()
+	starts, _ := filepath.Glob(filepath.Join(dir, "*.start.json"))
+	if len(starts) <= assessmentsKept {
+		return
+	}
+	at := map[string]time.Time{}
+	for _, p := range starts {
+		if fi, err := os.Stat(p); err == nil {
+			at[p] = fi.ModTime()
+		}
+	}
+	sort.SliceStable(starts, func(i, j int) bool {
+		if !at[starts[i]].Equal(at[starts[j]]) {
+			return at[starts[i]].After(at[starts[j]])
+		}
+		return starts[i] > starts[j]
+	})
+	for _, p := range starts[assessmentsKept:] {
+		var start assessStart
+		if b, err := os.ReadFile(p); err == nil && diskjson.Unmarshal(b, &start) == nil &&
+			start.ScopePath != "" && filepath.Dir(start.ScopePath) == dir {
+			os.Remove(start.ScopePath)
+		}
+		os.Remove(strings.TrimSuffix(p, ".start.json") + ".json")
+		os.Remove(p)
+	}
+}
+
 // escalationTools is each runtime's own question tool the app carries (ToolPolicyCatalog).
 var escalationTools = map[string]string{"claude": "AskUserQuestion", "cursor": "AskQuestion", "codex": "request_user_input",
 	"antigravity": "ask_question"}
@@ -314,6 +350,7 @@ func (d *Daemon) assessRuntime(r wire.AssessRuntimeRequest) (wire.AssessRuntimeR
 	if err := writeStore(filepath.Join(d.assessmentsPath(), string(id)+".start.json"), kept); err != nil {
 		log.Printf("could not keep a runtime assessment's start: %v", err)
 	}
+	d.dropOldAssessments()
 	return wire.AssessRuntimeResult{AgentID: id, Model: model, ReportPath: report}, nil
 }
 
