@@ -92,6 +92,14 @@ struct AgentCard: View {
                                 .foregroundStyle(.tertiary)
                                 .accessibilityLabel("started by the workflow \(workflowName)")
                         }
+                        // Mute Notifications (#2003), as the Mac's row marks it (#2085):
+                        // a workflow's muted runs say so on its page too.
+                        if agent.isMuted {
+                            Image(systemName: MuteWords.symbol)
+                                .appText(.fine)
+                                .foregroundStyle(.tertiary)
+                                .accessibilityLabel(MuteWords.muted)
+                        }
                         // Started by another agent (028), marked as the Mac's row
                         // marks it.
                         if let starter = model.startedByAgentLabel(agent) {
@@ -238,7 +246,8 @@ struct AgentCard: View {
     /// Precise where the shape is not: which outcome, and why it stopped.
     private var accessibilityLabel: String {
         let words = model.queuedLine(agent) ?? StatusShape.words(row: agent, isComingBack: isComingBack)
-        return ([agent.title ?? "Untitled", model.startedByAgentLabel(agent), words, agent.report?.message]
+        return ([agent.title ?? "Untitled", agent.isMuted ? MuteWords.muted : nil,
+                 model.startedByAgentLabel(agent), words, agent.report?.message]
             .compactMap { $0 } + [model.work.waitMark(of: agent)?.detail, ArchiveRequestWords.line(agent),
                                 FileToSeeWords.line(agent)].compactMap { $0 })
             .joined(separator: ", ")
