@@ -334,7 +334,11 @@ It is read only.
   many days (and, when every entry is loaded, how many entries) it deletes, and the sweep
   keeps the older days for one more day: choose the longer time again in that day and
   nothing is lost (#2067).
-- **Export…** saves every entry kept as JSON lines (`audit/export`, at most 50,000).
+- **Whose** (an admin only): Everyone, or one person's entries (`audit/list` with `user`).
+- **Export** saves the entries shown as CSV or as JSON lines (`audit/export`, at most
+  50,000). On the Mac and the Remote, **Export…** is a menu with the two; the web page has
+  **Export CSV** and **Export JSON lines**. Console ▸ Audit on the web page is the same pane
+  (#2087).
 - **Who sees what**: an admin sees every entry and a member sees only their own. Until
   people (#994) are built, a control plane has one person, the local owner. That person is
   the admin, and every client belongs to them.

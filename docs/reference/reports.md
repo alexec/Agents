@@ -24,6 +24,22 @@ page.
 - **A control plane that keeps no reports** (one from before #1811) says so, and says to
   update it.
 
+## Reports ▸ Spend, on the web page
+
+Reports is one of the control plane's three apps on the web page, beside Workspace and the
+[Console](console.md) (#1804). Its page **Spend** is the Reports pane with a scope:
+
+- **Me:** your own machines, as the Cost page's Reports pane on all three clients.
+- **A group:** each group you lead, or every group for an admin. A lead sees each person,
+  or with Totals Only no person and no machine named. **By** also has Group.
+- **The organisation:** everyone, for an admin only.
+- **A budget:** when the scope has one (Console ▸ Report Policy), the page shows the spend
+  of this calendar month (UTC) against it, with a forecast to the end of the month. The
+  control plane adds up the month (`monthSpentUSD`, #2057).
+- **CSV** names each person's groups.
+
+The Mac and the Remote show the Me scope only.
+
 ## What a machine sends
 
 - **Each machine keeps its usage by the UTC hour**, by project and runtime, in
@@ -59,6 +75,8 @@ page.
   "Your machines" (#2071).
 - **Reports ▸ Spend** on the web page names its scope: your machines, a group's people's,
   or everyone's. Only an admin sees everyone's.
+- **A group's lead** sees the group's people in Reports ▸ Spend, as Console ▸ Report Policy
+  says.
 
 ## Methods
 
@@ -68,5 +86,7 @@ page.
   a cost column for each currency, such as `costUSD`.
 
 ## See also
+
+- [The Console](console.md): Report Policy, the leads and the budgets.
 
 - [Events](events.md): the audit, which says who did what.

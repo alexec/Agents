@@ -39,6 +39,8 @@ something up, not for reading through.
   for you and sends to each machine of yours.
 - [Reports](reports.md): usage, cost and time by person, project and machine, added up on
   the control plane.
+- [The Console](console.md): the control plane's app for admins on the web page, and what
+  each of its pages does.
 - [The Get started checklist](get-started-checklist.md): every Get started step and
   milestone, when each is ticked, where it shows, and how to hide it.
 - [Charts and diagrams](charts-and-diagrams.md): which Vega-Lite charts and Mermaid
