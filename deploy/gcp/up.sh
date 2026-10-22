@@ -28,6 +28,10 @@
 # VM is kept. --seal-key seals a control key from elsewhere before the first start, for a move
 # from a Mac (docs/how-to/run-the-control-plane-in-the-cloud.md). --dry-run prints every command
 # and runs none: it needs no gcloud, no key file and no account.
+#
+# AGENTS_VERSION is the version it stamps on the control plane and the Linux host: a release
+# sets it to the tag's, X.Y.Z (#2100). Without it, scripts/version.sh says. At the end it checks
+# that the control plane running on the VM says that version.
 set -euo pipefail
 here=$(cd "$(dirname "$0")" && pwd)
 root=$(cd "$here/../.." && pwd)
@@ -156,8 +160,9 @@ else
 fi
 
 say "== the image and the Linux host, built here"
-run "$root/scripts/build-linux-agentsd.sh"
-version=$(git -C "$root" describe --tags --always --dirty 2>/dev/null || echo dev)
+version=${AGENTS_VERSION:-$("$root/scripts/version.sh")}
+say "version $version"
+run env AGENTS_MARKETING_VERSION="$version" "$root/scripts/build-linux-agentsd.sh"
 run docker build --platform linux/amd64 --build-arg "VERSION=$version" \
 	-f "$root/deploy/Containerfile" -t agents-control:latest "$root"
 
@@ -218,6 +223,15 @@ else
 	say
 	curl -fsS "https://$domain/healthz" >/dev/null ||
 		die "https://$domain/healthz does not answer: see gcloud compute ssh $name --zone $zone --command '$compose logs caddy'"
+fi
+# The version Settings ▸ Control plane shows is the running binary's own.
+if ((dry_run)); then
+	vm_ssh "$compose exec -T control /agents-control version"
+else
+	served=$(vm_ssh "$compose exec -T control /agents-control version" | tr -d '\r')
+	say "$served"
+	[[ $served == "agents-control $version "* ]] ||
+		die "the control plane says \"$served\", not $version: see gcloud compute ssh $name --zone $zone --command '$compose logs control'"
 fi
 say
 say "https://$domain is up, at $ip. The first window's code:"
