@@ -82,7 +82,8 @@ enum WalkCommands {
         case "shot":
             let window = try target(request)
             let drawn = (request["view"] as? String).map { WalkShot.picture(ofView: $0, in: window) }
-                ?? WalkShot.picture(of: window, shadows: request["shadows"] as? Bool ?? true)
+                ?? WalkShot.picture(of: window, shadows: request["shadows"] as? Bool ?? true,
+                                    scale: (request["scale"] as? Double).map { CGFloat($0) })
             guard let drawn else { throw WalkError("could not draw the window") }
             return ["ok": true, "picture": drawn, "width": Int(window.frame.width),
                     "height": Int(window.frame.height)]

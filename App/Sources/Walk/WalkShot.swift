@@ -4,8 +4,8 @@ import Foundation
 import SwiftTerm
 
 /// The window drawn into a PNG by itself (#1172), with its sheet and child windows over it
-/// where they sit, at the screen's scale. No window server capture, so a locked screen
-/// still gets a picture.
+/// where they sit, at the screen's scale or at one asked for (#1855: a video's 2× on a 1×
+/// screen). No window server capture, so a locked screen still gets a picture.
 ///
 /// Every view draws into its layer first, then the layer tree is rendered (`render(in:)`):
 /// SwiftUI draws most of a page as plain layers with no view, which `cacheDisplay` leaves
@@ -23,8 +23,9 @@ enum WalkShot {
 
     /// Without `shadows`, the layers' shadows are left out: a layer render blurs each one in
     /// software, most of a shot's time, too slow for a video's frames (#1078).
-    static func picture(of window: NSWindow, shadows: Bool = true) -> Drawn? {
+    static func picture(of window: NSWindow, shadows: Bool = true, scale: CGFloat? = nil) -> Drawn? {
         prepare(window)
+        let scale = scale ?? window.backingScaleFactor
         guard window.contentView != nil else { return nil }
         let over = [window.attachedSheet].compactMap { $0 } + (window.childWindows ?? []).filter(\.isVisible)
         // A clear layer draws nothing, but a layer render still draws all under it, through
@@ -48,8 +49,8 @@ enum WalkShot {
             clear.forEach { $0.isHidden = false }
             CATransaction.commit()
         }
-        for each in [window] + over { (each.contentView?.superview ?? each.contentView).map(redraw) }
-        return picture(size: window.frame.size, scale: window.backingScaleFactor) {
+        for each in [window] + over { (each.contentView?.superview ?? each.contentView).map { redraw($0, scale: scale) } }
+        return picture(size: window.frame.size, scale: scale) {
             for (index, layer) in ([window] + over).enumerated() {
                 guard let view = layer.contentView?.superview ?? layer.contentView else { continue }
                 // Where it sits on the window, in points from the window's bottom left.
@@ -64,11 +65,39 @@ enum WalkShot {
     /// Every view draws into its layer: a window that is not on screen (locked, covered)
     /// has left that for later. Before the canvas is made the current context: drawn while
     /// it was, SwiftUI's text layers kept a picture upside down (#1078).
-    private static func redraw(_ root: NSView) {
+    ///
+    /// At a `scale` over the screen's, each layer is drawn again at that scale first, so its
+    /// text is sharp on the canvas, not a 1× picture made bigger (#1855).
+    private static func redraw(_ root: NSView, scale: CGFloat? = nil) {
         root.layoutSubtreeIfNeeded()
+        if let scale, let layer = root.layer, scale > (root.window?.backingScaleFactor ?? scale) {
+            func sharpen(_ layer: CALayer) {
+                defer { layer.sublayers?.forEach(sharpen) }
+                // Only a layer that draws its own contents (text, a path) is drawn again at
+                // the scale. One whose contents were given it (a symbol, an image) keeps them
+                // and its scale: asked to draw, it would be left empty.
+                guard layer.contentsScale != scale, draws(layer) else { return }
+                layer.contentsScale = scale
+                layer.setNeedsDisplay()
+            }
+            sharpen(layer)
+        }
         for view in [root] + root.subviews(of: NSView.self) where !view.isHiddenOrHasHiddenAncestor {
             view.needsDisplay = true
             view.displayIfNeeded()
+        }
+    }
+
+    /// Whether `layer` makes its own contents: through its delegate (a view), or as a class
+    /// that draws (SwiftUI's text).
+    private static func draws(_ layer: CALayer) -> Bool {
+        if let delegate = layer.delegate,
+           delegate.responds(to: #selector(CALayerDelegate.draw(_:in:))) || delegate.responds(to: #selector(CALayerDelegate.display(_:))) {
+            return true
+        }
+        let type: AnyClass = type(of: layer)
+        return [#selector(CALayer.draw(in:)), #selector(CALayer.display)].contains {
+            class_getMethodImplementation(type, $0) != class_getMethodImplementation(CALayer.self, $0)
         }
     }
 
@@ -216,7 +245,16 @@ enum WalkShot {
     }
 
     private static func draw(_ view: NSView, _ rect: CGRect, at place: CGRect) {
-        guard rect.width >= 1, rect.height >= 1, let rep = view.bitmapImageRepForCachingDisplay(in: rect) else { return }
+        guard rect.width >= 1, rect.height >= 1, var rep = view.bitmapImageRepForCachingDisplay(in: rect) else { return }
+        // At the canvas's scale, not the screen's (#1855).
+        let scale = abs(NSGraphicsContext.current?.cgContext.ctm.a ?? 1)
+        if scale > CGFloat(rep.pixelsWide) / rect.width,
+           let sharp = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: Int(rect.width * scale), pixelsHigh: Int(rect.height * scale),
+                                        bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
+                                        colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0) {
+            sharp.size = rect.size
+            rep = sharp
+        }
         view.cacheDisplay(in: rect, to: rep)
         rep.draw(in: place)
     }

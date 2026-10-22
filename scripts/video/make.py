@@ -77,9 +77,11 @@ class Recorder(threading.Thread):
     `fps` a second. A frame is kept only when it differs from the one before, with the time
     it was drawn; `finish` makes them a .mov at 30 fps and deletes them."""
 
-    def __init__(self, root, folder, fps=12):
+    def __init__(self, root, folder, fps=12, scale=None):
         super().__init__(daemon=True)
         self.walk, self.folder, self.every = Walk(root), folder, 1 / fps
+        # On a 1× screen the window draws each frame at 2× all the same (#1855).
+        self.scale = {"scale": scale} if scale else {}
         self.folder.mkdir(parents=True, exist_ok=True)
         self.frames, self.size, self.error = [], None, None
         self.started, self.running = threading.Event(), True
@@ -93,7 +95,7 @@ class Recorder(threading.Thread):
         try:
             while self.running:
                 began = time.time()
-                reply = self.walk.call("shot", shadows=False)
+                reply = self.walk.call("shot", shadows=False, **self.scale)
                 if not reply.get("ok"):
                     raise RuntimeError(f"shot: {reply.get('error')}")
                 png = base64.b64decode(reply["png"])
@@ -400,8 +402,12 @@ class Video:
     def click(self, label):
         return self.call("click", text=label).get("ok")
 
-    def size(self, width, height, x=40, y=40):
-        """The window's frame, its top left on the main screen, where it draws at 2×."""
+    def size(self, width, height, x=None, y=None):
+        """The window's frame, its top left on the main screen (at 2× there, or drawn at 2× by
+        itself on a 1× one, #1855). AGENTS_VIDEO_AT=x,y puts it elsewhere, in points from
+        the main screen's top left: on another screen, say."""
+        at = [float(n) for n in os.environ.get("AGENTS_VIDEO_AT", "40,40").split(",")]
+        x, y = (at[0] if x is None else x), (at[1] if y is None else y)
         return self.call("size", width=float(width), height=float(height), x=float(x), y=float(y))
 
     def select_agent(self, agent_id):
@@ -528,6 +534,11 @@ class Video:
         return self._Fast(self, most)
 
 
+def png_width(png):
+    """A PNG's width in pixels, from its header."""
+    return int.from_bytes(png[16:20], "big")
+
+
 def load_scene(scene_id):
     path = HERE / "scenes" / f"{scene_id.lower()}.py"
     spec = importlib.util.spec_from_file_location(f"scene_{scene_id}", path)
@@ -545,15 +556,22 @@ def record_scene(scene, takes, work, build, keep):
     recorder = None
     try:
         placed = v.size(*getattr(scene, "WINDOW", (1280, 780)))
-        if placed.get("scale") != 2:
-            raise RuntimeError(f"the window draws at {placed.get('scale')}×, not 2×: is the main screen a Retina one?")
+        # A 1× screen (#1855): the window draws its shots at 2× by itself, and no screen's
+        # mode changes. A window that cannot is an app from before #1855.
+        scale = None if placed.get("scale") == 2 else 2
+        if scale:
+            shot = v.walk.call("shot", shadows=False, scale=scale)
+            if shot.get("ok") and png_width(base64.b64decode(shot["png"])) == shot["width"] * 2:
+                log(f"the screen is {placed.get('scale')}×: the window draws its frames at 2× itself")
+            else:
+                raise RuntimeError(f"the window draws at {placed.get('scale')}×, not 2×, and its shots cannot be drawn at 2× (an app from before #1855?)")
         time.sleep(1.5)
         scene.setup(v)
         time.sleep(2.0)
         v.tidy()
         time.sleep(1.0)
-        Path(work / "still.png").write_bytes(base64.b64decode(v.walk.call("shot")["png"]))
-        recorder = v.recorder = Recorder(root, work / "frames")
+        Path(work / "still.png").write_bytes(base64.b64decode(v.walk.call("shot", **({"scale": scale} if scale else {}))["png"]))
+        recorder = v.recorder = Recorder(root, work / "frames", scale=scale)
         recorder.secret_labels.extend(getattr(v, "_hidden_labels", []))
         recorder.start()
         mac_start = recorder.start_time()
