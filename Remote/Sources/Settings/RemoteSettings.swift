@@ -6,12 +6,13 @@ import SwiftUI
 /// only a phone or an iPad has (#1657); and Sidebar, kept on the Mac's host and the same on
 /// every client: #1033, #2079); Machines (each machine, with what is the same on all of them,
 /// and the person's secrets); and Control plane (Sign-ins first, People (#994), Bots (#2132) and the workspace providers
-/// (#1819)). Each row opens its page. Everything else follows the Mac.
+/// (#1819)), only once paired (#2260). Each row opens its page. Everything else follows the Mac.
 ///
 /// Each row is a view in a file of its own in this folder, and one line here (#2020), so two
 /// features that each add a row touch different lines.
 struct RemoteSettings: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(RemoteModel.self) private var model
 
     var body: some View {
         NavigationStack {
@@ -28,24 +29,26 @@ struct RemoteSettings: View {
                     SecretsSettingsRow()
                 }
                 .paperListRow()
-                Section {
-                    SignInsSettingsRow()
-                    PeopleSettingsRow()
-                    BotsSettingsRow()
-                    ChannelsSettingsRow()
-                    SignInProvidersSettingsRow()
-                    PolicySettingsRow()
-                    GroupsSettingsRow()
-                    // The control plane's workspace providers (#1819), as the page's Settings has them.
-                    NavigationLink { WorkspaceProvidersView() } label: {
-                        Label(WorkspaceProviderWords.heading, systemImage: "cloud")
+                // Not paired yet: no control plane, so no group for it (#2260). The window hides
+                // it as well.
+                if !model.needsPairing {
+                    Section {
+                        // In the window's and the page's order (#2267).
+                        SignInsSettingsRow()
+                        PeopleSettingsRow()
+                        BotsSettingsRow()
+                        GroupsSettingsRow()
+                        ChannelsSettingsRow()
+                        SignInProvidersSettingsRow()
+                        PolicySettingsRow()
+                        WorkspaceProvidersSettingsRow()
+                    } header: {
+                        Text(SettingsScope.controlPlane.title)
+                    } footer: {
+                        Text("How you sign in, and the people who use this control plane, with their machines and clients.")
                     }
-                } header: {
-                    Text(SettingsScope.controlPlane.title)
-                } footer: {
-                    Text("How you sign in, and the people who use this control plane, with their machines and clients.")
+                    .paperListRow()
                 }
-                .paperListRow()
                 // The docs site (#1327), as the Mac's Help ▸ Agents Help.
                 Section {
                     Link(destination: HelpSite.url) {

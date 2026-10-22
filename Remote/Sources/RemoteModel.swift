@@ -2351,6 +2351,9 @@ final class RemoteModel {
     var workspaceProviders: [DaemonAPI.ProviderSummary]?
     /// Why none are shown: a control plane with several copies, or a list that failed.
     var workspaceProvidersProblem: String?
+    /// Whether the control plane runs workspace providers: one with several copies does not,
+    /// so Settings lists no row for them, as the window does (#2260).
+    private(set) var providersHere = true
     /// The groups providers are given to (#1761): every one for an admin, a member's own.
     var providerGroups: [DaemonAPI.Group] = []
     /// Whether this person is an admin, who adds and changes providers (#1761).
@@ -2359,6 +2362,8 @@ final class RemoteModel {
     /// Lists them, and asks every provider to list again (FR-004), as the page opens.
     func loadWorkspaceProviders() async {
         guard let control = controlPlane else {
+            // An empty list, so the page does not wait for one for ever (#2260).
+            workspaceProviders = []
             workspaceProvidersProblem = "The control plane isn’t answering."
             return
         }
@@ -2366,11 +2371,13 @@ final class RemoteModel {
             let answer = try await control.call(DaemonAPI.Method.providersList, DaemonAPI.Empty())
             workspaceProviders = (try? answer["providers"]?.decode([DaemonAPI.ProviderSummary].self)) ?? []
             workspaceProvidersProblem = nil
+            providersHere = true
             providerGroups = (try? await control.call(DaemonAPI.Method.groupsList, DaemonAPI.Empty(),
                                                       returning: DaemonAPI.GroupList.self))?.groups ?? []
         } catch let error as JSONRPCError where error.code == DaemonAPI.Failure.providersNeedOneCopy {
             workspaceProviders = []
             workspaceProvidersProblem = WorkspaceProviderWords.oneCopy
+            providersHere = false
             return
         } catch {
             workspaceProviders = []
@@ -2378,6 +2385,19 @@ final class RemoteModel {
             return
         }
         await listWorkspacesAgain()
+    }
+
+    /// Whether Settings lists Workspace providers: asks the control plane for its list, and
+    /// asks no provider to list again (#2260). As the window's `providersHere`.
+    func checkProvidersHere() async {
+        guard let control = controlPlane else { return }
+        do {
+            _ = try await control.call(DaemonAPI.Method.providersList, DaemonAPI.Empty())
+            providersHere = true
+        } catch let error as JSONRPCError where error.code == DaemonAPI.Failure.providersNeedOneCopy
+            || error.code == JSONRPCError.methodNotFound {
+            providersHere = false
+        } catch {}
     }
 
     /// List Again: one provider, or every one. The new list comes as control/providersChanged.
