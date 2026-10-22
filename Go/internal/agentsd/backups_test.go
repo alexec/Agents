@@ -450,10 +450,13 @@ func TestABackupFolderOnTheSameDiskIsSaid(t *testing.T) {
 	}
 	// Another volume: tmpfs where there is one (Linux), else a stand-in for the device.
 	other := ""
-	if dev, ok := deviceOf("/dev/shm"); ok {
-		if mine, _ := deviceOf(root); mine != dev {
-			other = filepath.Join("/dev/shm", "agents-backups-"+filepath.Base(root))
-			t.Cleanup(func() { os.RemoveAll(other) })
+	if info, err := os.Stat("/dev/shm"); err == nil && info.IsDir() {
+		if made, err := os.MkdirTemp("/dev/shm", "agents-backups-"); err == nil {
+			dev, _ := deviceOf(made)
+			if mine, _ := deviceOf(root); mine != dev {
+				other = made
+			}
+			t.Cleanup(func() { os.RemoveAll(made) })
 		}
 	}
 	if other == "" {

@@ -80,7 +80,7 @@ struct BackupsSection: View {
                     Text(error)
                 }
                 if let words = Self.sameDiskWords(state, choosesHere: chooseFolder != nil) {
-                    Text(words).foregroundStyle(.orange)
+                    Text(words).foregroundStyle(StateTint.attention.style(or: .secondary))
                 }
                 Text(Self.footer(state))
             }
