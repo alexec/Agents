@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/alexec/agents/Go/internal/agentsd/store"
@@ -53,7 +54,9 @@ var accountKinds = map[string]accountKind{
 		shared:  []string{"config.toml", "AGENTS.md", "prompts", "skills", "rules"}},
 }
 
-func (d *Daemon) accountsPath() string { return filepath.Join(d.Store.Loc.Root, "runtime-accounts.json") }
+func (d *Daemon) accountsPath() string {
+	return filepath.Join(d.Store.Loc.Root, "runtime-accounts.json")
+}
 
 func (d *Daemon) profilesLocked() []wire.AccountProfile {
 	if !d.accountLoaded {
@@ -124,38 +127,93 @@ func accountFolder(p wire.AccountProfile) string {
 func (d *Daemon) readSignIn(p *wire.AccountProfile) {
 	folder := accountFolder(*p)
 	p.SignedIn, p.SignedInAs, p.SignInCommand = false, nil, nil
+	var r signIn
 	switch p.RuntimeID {
 	case "claude":
 		cmd := "CLAUDE_CONFIG_DIR=" + shellWord(folder) + " claude"
 		p.SignInCommand = &cmd
-		var f struct {
-			OAuthAccount *struct {
-				EmailAddress string `json:"emailAddress"`
-			} `json:"oauthAccount"`
-		}
-		if b, err := os.ReadFile(filepath.Join(folder, ".claude.json")); err == nil && json.Unmarshal(b, &f) == nil && f.OAuthAccount != nil {
-			p.SignedIn = true
-			if f.OAuthAccount.EmailAddress != "" {
-				p.SignedInAs = &f.OAuthAccount.EmailAddress
+		r = readSignInFile(filepath.Join(folder, ".claude.json"), func(b []byte) signIn {
+			var f struct {
+				OAuthAccount *struct {
+					EmailAddress string `json:"emailAddress"`
+				} `json:"oauthAccount"`
 			}
-		}
+			if json.Unmarshal(b, &f) != nil || f.OAuthAccount == nil {
+				return signIn{}
+			}
+			return signIn{signedIn: true, as: f.OAuthAccount.EmailAddress}
+		})
 	case "codex":
-		b, err := os.ReadFile(filepath.Join(folder, "auth.json"))
-		if err != nil {
-			return
-		}
-		p.SignedIn = true
-		var f struct {
-			Tokens *struct {
-				IDToken string `json:"id_token"`
-			} `json:"tokens"`
-		}
-		if json.Unmarshal(b, &f) == nil && f.Tokens != nil {
-			if email := jwtEmail(f.Tokens.IDToken); email != "" {
-				p.SignedInAs = &email
+		r = readSignInFile(filepath.Join(folder, "auth.json"), func(b []byte) signIn {
+			var f struct {
+				Tokens *struct {
+					IDToken string `json:"id_token"`
+				} `json:"tokens"`
 			}
-		}
+			r := signIn{signedIn: true}
+			if json.Unmarshal(b, &f) == nil && f.Tokens != nil {
+				r.as = jwtEmail(f.Tokens.IDToken)
+			}
+			return r
+		})
 	}
+	p.SignedIn = r.signedIn
+	if r.as != "" {
+		p.SignedInAs = &r.as
+	}
+}
+
+// signIn is what an account folder's sign-in file says.
+type signIn struct {
+	signedIn bool
+	as       string
+}
+
+// signInCacheSize bounds signIns: one entry an added account's file, cleared when full.
+const signInCacheSize = 64
+
+// signIns keeps each sign-in file's reading by its size and modification time, so a
+// broadcast does not read and decode every account's file again (#2251).
+var signIns = struct {
+	sync.Mutex
+	m map[string]signInReading
+}{m: map[string]signInReading{}}
+
+type signInReading struct {
+	size  int64
+	mtime time.Time
+	r     signIn
+}
+
+// signInReads counts the files readSignInFile read; a test reads it.
+var signInReads atomic.Int64
+
+// readSignInFile is parse of the file at path, or nothing when there is no file; the file
+// is read again only when its size or modification time changed.
+func readSignInFile(path string, parse func([]byte) signIn) signIn {
+	fi, err := os.Stat(path)
+	if err != nil || fi.IsDir() {
+		return signIn{}
+	}
+	signIns.Lock()
+	c, ok := signIns.m[path]
+	signIns.Unlock()
+	if ok && c.size == fi.Size() && c.mtime.Equal(fi.ModTime()) {
+		return c.r
+	}
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return signIn{}
+	}
+	signInReads.Add(1)
+	r := parse(b)
+	signIns.Lock()
+	if _, ok := signIns.m[path]; !ok && len(signIns.m) >= signInCacheSize {
+		clear(signIns.m)
+	}
+	signIns.m[path] = signInReading{size: fi.Size(), mtime: fi.ModTime(), r: r}
+	signIns.Unlock()
+	return r
 }
 
 // jwtEmail is the email claim of a token's payload, read and not checked: it only names
@@ -371,14 +429,14 @@ func (d *Daemon) credentialName(key string) string {
 	return name
 }
 
-// accountUnusable is why an added account cannot be used now, or nil.
-func (d *Daemon) accountUnusable(p wire.AccountProfile) *string {
-	rt := runtimeByID(p.RuntimeID)
-	if rt == nil {
+// accountUnusable is why an added account cannot be used now, or nil; installed is as
+// for unusable.
+func (d *Daemon) accountUnusable(p wire.AccountProfile, installed map[string]bool) *string {
+	if runtimeByID(p.RuntimeID) == nil {
 		s := "not a runtime this app knows"
 		return &s
 	}
-	if path, _, _ := locateFor(rt); path == "" {
+	if !installed[p.RuntimeID] {
 		s := "not installed"
 		return &s
 	}
