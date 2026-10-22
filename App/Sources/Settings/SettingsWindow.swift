@@ -130,7 +130,8 @@ struct SettingsWindow: View {
     private func shows(_ each: SettingsPane) -> Bool {
         switch each {
         // A person's own sign-ins (#995), a pane of its own as on the Remote (#2197).
-        case .controlPlane, .clients, .secrets, .channels, .signIns, .policy: control != nil
+        // People with no control plane would say it can't be reached: it lists Account only (#2258).
+        case .controlPlane, .clients, .secrets, .people, .channels, .signIns, .policy: control != nil
         // An admin's, and a member's in a group, who sees the groups they are in (#1761, #2076).
         case .groups: control != nil && model.people.showsGroups
         // An admin's: which providers people sign in with (#995).
@@ -266,8 +267,9 @@ enum SettingsPane: String, Hashable, CaseIterable {
     case signIn
     /// The organisation's policy, read only, and the kill switch for an admin (#998).
     case policy
-    /// How this person signs in on their other clients (#995): You ▸ Sign-ins, as the
-    /// Remote has it and every client's words name it (#2197). Was in Account.
+    /// How this person signs in on their other clients (#995): Control plane ▸ Sign-ins, as
+    /// the Remote and the page have it and every client's words name it (#2197, #2256). Was
+    /// in Account.
     case signIns
     /// Was Shared (#754): the raw value is what a window left open on it kept.
     case agentConfiguration = "shared"
@@ -286,8 +288,12 @@ enum SettingsPane: String, Hashable, CaseIterable {
         }
     }
 
-    /// A pane drawn only with a control plane to show.
-    var needsControlPlane: Bool { [.controlPlane, .providers, .clients, .secrets, .signIns, .policy].contains(self) }
+    /// A pane drawn only with a control plane to show: a window left on one moves away when
+    /// the Mac is forgotten (#2258).
+    var needsControlPlane: Bool {
+        [.controlPlane, .providers, .clients, .secrets, .signIns, .people, .bots, .groups, .channels, .signIn, .policy]
+            .contains(self)
+    }
 
     var title: String {
         switch self {
