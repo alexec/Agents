@@ -54,8 +54,9 @@ func (g gitHub) user(ctx context.Context, code string) (GitHubID, error) {
 	req.Header.Set("Authorization", "Bearer "+token.AccessToken)
 	req.Header.Set("Accept", "application/vnd.github+json")
 	var who struct {
-		ID    int64  `json:"id"`
-		Login string `json:"login"`
+		ID      int64     `json:"id"`
+		Login   string    `json:"login"`
+		Created time.Time `json:"created_at"`
 	}
 	if err := call(req, &who); err != nil {
 		return GitHubID{}, err
@@ -63,7 +64,7 @@ func (g gitHub) user(ctx context.Context, code string) (GitHubID, error) {
 	if who.ID == 0 {
 		return GitHubID{}, errors.New("GitHub did not say who signed in")
 	}
-	return GitHubID{ID: who.ID, Login: who.Login}, nil
+	return GitHubID{ID: who.ID, Login: who.Login, Created: who.Created}, nil
 }
 
 func call(req *http.Request, into any) error {
