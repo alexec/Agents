@@ -73,3 +73,14 @@ test("a pending sign-in lasts 10 minutes, and an email needs an @ and a dot", ()
   assert.equal(s.looksLikeEmail("sam@example"), false);
   assert.equal(s.looksLikeEmail("sam"), false);
 });
+
+test("the words name the place the page lists Sign-ins in (#2256)", async () => {
+  const { scopeTitles } = await load("src/views/Settings.tsx");
+  const { sectionsIn } = await load("src/views/settings/sections.ts");
+  assert.equal(s.signInsPlace, `${scopeTitles.controlPlane} ▸ ${s.signInsTitle}`);
+  assert.ok(sectionsIn("controlPlane", { person: { value: { role: "member" } } }).some((each) => each.name === "signIns"));
+  for (const words of [s.signInsFoot, s.signInsNone, s.paneFoot]) {
+    assert.ok(words.includes(s.signInsPlace), words);
+    assert.ok(!words.includes("You ▸"), words);
+  }
+});
