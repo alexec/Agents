@@ -55,6 +55,10 @@ struct PeopleTests {
             + "p-new (1 commit never pushed). sam-old is not online, so it could not be asked. "
             + "These machines leave the control plane: studio.")
         #expect(PeopleWords.asking(sam) == "Asking Sam’s machines what work on them is not pushed…")
+        // Remove…'s sheet: a line each, a machine to a line (#2077).
+        let lines = PeopleWords.removeLines(sam, preview: preview)
+        try #require(lines.count == 5)
+        #expect(lines[3] == "sam-old is not online, so it could not be asked.")
     }
 
     @Test func theCardSaysWhoTheMachineIsFor() throws {

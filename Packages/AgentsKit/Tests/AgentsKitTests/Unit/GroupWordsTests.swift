@@ -62,4 +62,48 @@ struct BotWordsTests {
         #expect(BotWords.readCap("-5") == .refused(BotWords.capNotDollars))
         #expect(BotWords.readCap("0") == .refused(BotWords.capNotAboveZero))
     }
+
+    /// A cap notice holds only while true: before its until, while its cap and its bot's group stand (#2073).
+    @Test func aCapNoticeHoldsOnlyWhileTrue() {
+        let now = Date(timeIntervalSince1970: 1_000_000)
+        let until = now.addingTimeInterval(3_600)
+        let own = DaemonAPI.CapReached(user: "b", name: "review-bot", spentUSD: 51, capUSD: 50, until: until)
+        let grouped = DaemonAPI.CapReached(user: "c", name: "lint-bot", group: "Platform", spentUSD: 90, capUSD: 80, until: until)
+        let bot = DaemonAPI.PersonRow(id: "b", name: "review-bot", kind: .bot, role: .member, group: "g1", caps: .init(dailyUSD: 50))
+        let other = DaemonAPI.PersonRow(id: "c", name: "lint-bot", kind: .bot, role: .member, group: "g1")
+        let group = DaemonAPI.Group(id: "g1", name: "Platform", everyone: false, members: [], caps: .init(dailyUSD: 80))
+        #expect(CapNotices.open([own, grouped], people: [bot, other], groups: [group], at: now).count == 2)
+        // Its day ended.
+        #expect(CapNotices.open([own], people: [bot], groups: [group], at: until).isEmpty)
+        // Its cap changed, or its group's.
+        var raised = bot
+        raised.caps = .init(dailyUSD: 100)
+        #expect(CapNotices.open([own], people: [raised], groups: [group], at: now).isEmpty)
+        var bigger = group
+        bigger.caps = .init(dailyUSD: 200)
+        #expect(CapNotices.open([grouped], people: [other], groups: [bigger], at: now).isEmpty)
+        // Its bot was removed, or moved to another group.
+        #expect(CapNotices.open([own], people: [], groups: [group], at: now).isEmpty)
+        var moved = other
+        moved.group = "g2"
+        #expect(CapNotices.open([grouped], people: [moved], groups: [group], at: now).isEmpty)
+        // No list yet: only the time.
+        #expect(CapNotices.open([own], people: nil, groups: [], at: now) == [own])
+        // One per bot, the last told.
+        var again = own
+        again.spentUSD = 60
+        #expect(CapNotices.adding(again, to: [own, grouped]) == [grouped, again])
+    }
+
+    /// A group's cap line adds its bots' spend today (#2074), as the web page's does.
+    @Test func aGroupsCapLineAddsItsBotsSpend() {
+        let group = DaemonAPI.Group(id: "g1", name: "Platform", caps: .init(dailyUSD: 50))
+        let people = [
+            DaemonAPI.PersonRow(id: "a", name: "a", kind: .bot, role: .member, group: "g1", spentTodayUSD: 3.2),
+            DaemonAPI.PersonRow(id: "b", name: "b", kind: .bot, role: .member, group: "g1", spentTodayUSD: 8.8),
+            DaemonAPI.PersonRow(id: "c", name: "c", kind: .bot, role: .member, group: "g2", spentTodayUSD: 40),
+        ]
+        #expect(GroupWords.capLine(group, people: people) == "$50 a day · $12 today")
+        #expect(GroupWords.capLine(DaemonAPI.Group(id: "g2", name: "Ops"), people: []) == "No cap")
+    }
 }

@@ -2,6 +2,7 @@
 // Packages/AgentsKit. A group is everyone, or the people named; it owns workspace providers, and
 // only its people see them and start machines from them. A provider with no group is the admins'.
 import type { CapReached, Group, PersonRow, ProviderSummary, SpendCaps } from "../protocol/generated";
+import { fromWireDate } from "../protocol/dates";
 
 export const title = "Groups";
 export const adminsOnly = "Admins only";
@@ -84,6 +85,42 @@ export function botLine(bot: PersonRow, groups: readonly Group[]): string {
 export function capReachedWords(reached: CapReached): string {
   const whose = reached.group ? `${reached.group}’s cap` : "its cap";
   return `${reached.name} stopped at ${whose}: ${dollars(reached.spentUSD)} of ${dollars(reached.capUSD)} today. It starts work again at midnight UTC.`;
+}
+
+/** A group's daily cap and its bots' spend today together (#2074), as GroupWords.capLine: "$50 a day · $12 today". */
+export function groupCapLine(group: Group, people: readonly PersonRow[]): string {
+  const spent = people.filter((p) => p.kind === "bot" && p.group === group.id && p.spentTodayUSD !== undefined)
+    .map((p) => p.spentTodayUSD ?? 0);
+  const parts = [capWords(group.caps)];
+  // To the cent, so $3.20 and $8.80 make $12.
+  if (spent.length > 0) parts.push(`${dollars(Math.round(spent.reduce((a, b) => a + b, 0) * 100) / 100)} today`);
+  return parts.join(" · ");
+}
+
+export const groupCapFoot = "Its bots together stop starting work at it, until midnight UTC.";
+
+/** control/capReached: this bot's notice, in place of any it had (#2073). */
+export function addCap(reached: CapReached, notices: readonly CapReached[]): CapReached[] {
+  return [...notices.filter((n) => n.user !== reached.user), reached];
+}
+
+/**
+ * The cap notices still true (#2073), as CapNotices.open in Swift: before their until, and while the cap each
+ * names is the one the bot, or the bot's group, has now. With no people list yet, only the time is weighed.
+ */
+export function openCaps(notices: readonly CapReached[], people: readonly PersonRow[] | null, groups: readonly Group[],
+  now: number = Date.now()): CapReached[] {
+  return notices.filter((notice) => {
+    if (fromWireDate(notice.until).getTime() <= now) return false;
+    if (!people) return true;
+    // A bot removed has no cap to change.
+    const bot = people.find((p) => p.id === notice.user);
+    if (!bot) return false;
+    if (!notice.group) return bot.caps?.dailyUSD === notice.capUSD;
+    // Its group's cap: changed, or the bot moved to another group.
+    const group = groups.find((g) => g.name === notice.group);
+    return !!group && bot.group === group.id && group.caps?.dailyUSD === notice.capUSD;
+  });
 }
 
 /** A daily cap as typed in (#2066): no cap, dollars, or the sentence that says why it is refused. */

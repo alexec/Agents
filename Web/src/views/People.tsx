@@ -328,7 +328,10 @@ export function PeopleSection({ store, down }: { store: Store; down: boolean }) 
       <h3 class="section-head" id="settings-people">People</h3>
       <JoinRequests store={store} down={down} explained />
       {said && <p class="hint">{said}</p>}
-      {shown?.admin && store.capReached.value && <p class="hint attention" role="status">{capReachedWords(store.capReached.value)}</p>}
+      {/* Each bot stopped at a cap, while it is true (#2073). */}
+      {shown?.admin && store.capped.value.map((reached) => (
+        <p key={reached.user} class="hint attention" role="status">{capReachedWords(reached)}</p>
+      ))}
       {!shown && !said && <p class="hint">Loading…</p>}
       {shown && (
         <>

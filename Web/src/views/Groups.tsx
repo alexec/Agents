@@ -5,7 +5,7 @@ import { useSignal } from "@preact/signals";
 import type { Store } from "../model/store";
 import type { Group, PersonRow } from "../protocol/generated";
 import { describe } from "../model/errors";
-import { foot, members, providersOf, removeMessage, removeTitle, title } from "../model/teamGroups";
+import { dollars, foot, groupCapFoot, groupCapLine, members, providersOf, readCap, removeMessage, removeTitle, title } from "../model/teamGroups";
 import { Modal } from "./Modal";
 
 function GroupSheet({ store, group, people, close }: {
@@ -14,15 +14,23 @@ function GroupSheet({ store, group, people, close }: {
   const name = useSignal(group?.name ?? "");
   const everyone = useSignal(group?.everyone ?? false);
   const named = useSignal<string[]>(group?.members ?? []);
+  // What its bots may spend together in a day (#2074), as typed.
+  const cap = useSignal(group?.caps?.dailyUSD ? dollars(group.caps.dailyUSD) : "");
   const problem = useSignal<string | null>(null);
   const busy = useSignal(false);
   const save = async () => {
+    const entry = readCap(cap.value);
+    if (entry.kind === "refused") {
+      problem.value = entry.problem;
+      return;
+    }
     busy.value = true;
     try {
       // In the order People lists them.
       const chosen = everyone.value ? [] : people.map((p) => p.id).filter((id) => named.value.includes(id));
       await store.link.call("groups/set", {
         ...(group ? { id: group.id } : {}), name: name.value.trim(), everyone: everyone.value, members: chosen,
+        caps: entry.kind === "dollars" ? { dailyUSD: entry.usd } : {},
       });
       close();
     } catch (error) {
@@ -47,6 +55,9 @@ function GroupSheet({ store, group, people, close }: {
             onChange={(e) => (everyone.value = (e.currentTarget as HTMLInputElement).checked)} />
         </label>
         <p class="sheet-note">Everyone takes in each person who joins later too.</p>
+        <input type="text" aria-label="Daily cap" placeholder="No cap, or dollars a day" autocomplete="off" value={cap.value}
+          onInput={(e) => (cap.value = (e.currentTarget as HTMLInputElement).value)} />
+        <p class="sheet-note">{groupCapFoot}</p>
         {!everyone.value && (
           <fieldset class="group-people">
             <legend>People</legend>
@@ -106,6 +117,8 @@ export function GroupsSection({ store, down }: { store: Store; down: boolean }) 
                   <span class="small">{members(group, people)}</span>
                   <span class="faint small">Workspace providers</span>
                   <span class="small">{providersOf(group, providers) ?? "None"}</span>
+                  <span class="faint small">Daily cap</span>
+                  <span class="small">{groupCapLine(group, people)}</span>
                   {admin && (
                     <span>
                       <button type="button" class="link" disabled={down} onClick={() => { editing.value = { group }; }}>Edit…</button>
