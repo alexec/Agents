@@ -186,6 +186,8 @@ type Service struct {
 	toldUsers toldUsers
 	// Which bots are at a spend cap today (#1761).
 	caps botCaps
+	// The organisation's policy as this copy knows it, and what each machine was sent (#998).
+	policies policyBook
 	// A bot's machine started for its triggers (#2011, FR-034).
 	starts botStarts
 	// What Reports and the Console read from the store, by entity tag (#2054, #2056).
@@ -235,6 +237,7 @@ func New(cfg Config) (*Service, error) {
 	s.methods = newMethods(s)
 	s.router.handler = s.methods
 	s.router.SetOwnership(s)
+	s.router.SetPolicyGate(s.policyGate)
 	s.router.SetTeam(false, cfg.Version)
 	s.joins = newJoins(s)
 	s.links = newLinks(s)
@@ -356,6 +359,9 @@ func (s *Service) Start(ctx context.Context) (int, error) {
 			return 0, err
 		}
 		s.noteTeam()
+		if kept, err := s.readPolicy(ctx); err == nil {
+			s.notePolicy(kept)
+		}
 	}
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", s.serveHTTP)

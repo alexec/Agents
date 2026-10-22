@@ -6635,6 +6635,10 @@
         "code": -32061,
         "message": "pinRefused"
       },
+      "policyRefused": {
+        "code": -32076,
+        "message": "policyRefused"
+      },
       "projectHasLiveAgents": {
         "code": -32013,
         "message": "projectHasLiveAgents"

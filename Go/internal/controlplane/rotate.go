@@ -133,6 +133,8 @@ func (s *Service) rotate(ctx context.Context, from Caller) error {
 	}
 	s.setKeys(controlKeys{private: next, public: nextPublic, previousPrivate: old.private, previousPublic: old.public})
 	s.log("the control key was rotated; the previous one is accepted for 30 days")
+	// The policy, signed with the new key, which each member is given as it connects again.
+	s.resignPolicy(ctx)
 	// Each member connects again, with the previous key, and is given the new one. After
 	// a moment, so the admin's own answer goes first.
 	go func() {

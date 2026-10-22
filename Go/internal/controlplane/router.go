@@ -108,6 +108,8 @@ type Router struct {
 	// Told each host's answer to a whole list (#962), for hosts/lastHeard: host, method,
 	// the reply line. Nil where none is kept.
 	copier func(host, method, reply string)
+	// The organisation's policy's check of a call to a machine (#998): it reads only memory.
+	policyGate func(host, method string) error
 	// Who a client is (#996): written on each channel it opens, and on each entry the
 	// audit keeps. Told each call passed on or answered here, for the audit. Nil where
 	// there is no audit.
@@ -1498,6 +1500,13 @@ func (r *Router) toHostLocked(host, msg, sessionID string) {
 			return
 		}
 	}
+	// A machine that does not follow the policy starts no work when it says so (#998).
+	if r.policyGate != nil {
+		if refusal := r.policyGate(host, m.Method); refusal != nil {
+			r.writeLocked(sessionID, s.wrap(host, replyError(m.ID, refusal)))
+			return
+		}
+	}
 	c, ok := s.channels[host]
 	h := r.hosts[host]
 	if !ok || h == nil {
@@ -1659,6 +1668,13 @@ func (r *Router) BroadcastHost(host, method string, params any) {
 func (r *Router) SetAudit(actorOf func(Caller) *wire.AuditActor, audited func(from Caller, host, method string, params json.RawMessage)) {
 	r.mu.Lock()
 	r.actorOf, r.audited = actorOf, audited
+	r.mu.Unlock()
+}
+
+// SetPolicyGate says what checks each call to a machine against the policy (#998).
+func (r *Router) SetPolicyGate(gate func(host, method string) error) {
+	r.mu.Lock()
+	r.policyGate = gate
 	r.mu.Unlock()
 }
 

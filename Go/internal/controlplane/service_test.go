@@ -101,6 +101,8 @@ type fakeHost struct {
 	done   chan struct{}
 	mu     sync.Mutex
 	opened []string
+	// uplink is the host's side of the link, to ask the control plane on channel 0.
+	uplink *controllink.Uplink
 }
 
 func (p *plane) host(machine string) *fakeHost { return p.hostWith(machine, nil) }
@@ -167,6 +169,7 @@ func (p *plane) serveHost(root string, member *controllink.Membership, private [
 			}
 		}
 	}}
+	h.uplink = u
 	if asked != nil {
 		u.Asked = func(method string, params json.RawMessage) (any, bool) { return asked(member.Host, method, params) }
 	}

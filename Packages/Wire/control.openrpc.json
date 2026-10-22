@@ -824,6 +824,22 @@
       }
     },
     {
+      "name": "control/policyChanged",
+      "x-capability": "policy/1",
+      "description": "To every person's clients when the policy changes (#998).",
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/PolicyView"
+          }
+        }
+      ]
+    },
+    {
       "name": "control/providerDraft",
       "x-capability": "control/1",
       "x-notification": true,
@@ -1031,6 +1047,22 @@
           "$ref": "daemon.schema.json#/definitions/ControlStatus"
         }
       }
+    },
+    {
+      "name": "control/stopAll",
+      "x-capability": "policy/1",
+      "description": "To every person's clients when the kill switch is turned on or off (#998), so a client draws the strip at once.",
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/PolicyView"
+          }
+        }
+      ]
     },
     {
       "name": "control/thisMacHostChanged",
@@ -1241,6 +1273,43 @@
           "required": true,
           "schema": {
             "$ref": "daemon.schema.json#/definitions/HostHello"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
+      "name": "host/policy",
+      "x-capability": "host.policy/1",
+      "description": "To a machine that says host.policy/1, on its channel 0, at each join and within 5 seconds of each change (#998, FR-006). A machine says host.policy/1 only once it keeps and follows the policy; one without it is sent nothing.",
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/HostPolicy"
+          }
+        }
+      ]
+    },
+    {
+      "name": "host/policyApplied",
+      "x-capability": "host.policy/1",
+      "description": "A machine, on its channel 0, after it keeps a policy (#998).",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/PolicyApplied"
           }
         }
       ],
@@ -2229,6 +2298,111 @@
         "name": "result",
         "schema": {
           "$ref": "daemon.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
+      "name": "policy/get",
+      "x-capability": "policy/1",
+      "description": "An admin's: the whole policy, its rev, and each machine's applied version (#998).",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/PolicyKept"
+        }
+      }
+    },
+    {
+      "name": "policy/mine",
+      "x-capability": "policy/1",
+      "description": "Any person's: the policy in force (#998).",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/PolicyView"
+        }
+      }
+    },
+    {
+      "name": "policy/raise",
+      "x-capability": "policy/1",
+      "description": "An admin's: raise a person's budget for today, UTC (#998, FR-019).",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/PolicyRaiseRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/PolicyKept"
+        }
+      }
+    },
+    {
+      "name": "policy/set",
+      "x-capability": "policy/1",
+      "description": "An admin's: keep the rules, one version higher, signed, audited and sent to every machine (#998).",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/PolicySet"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/PolicyKept"
+        }
+      }
+    },
+    {
+      "name": "policy/stopAll",
+      "x-capability": "policy/1",
+      "description": "An admin's: the kill switch on or off (#998, FR-015).",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/PolicyStopAllRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/PolicyKept"
         }
       }
     },

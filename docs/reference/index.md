@@ -34,6 +34,7 @@ something up, not for reading through.
 - [Channels](channels.md): channel identities linked to people, so a chat or email message
   acts only as the person who approved it.
 - [Groups](groups.md): groups of people, and the workspace providers each group may start
+- [Policy](policy.md): the organisation's policy, its rules, its signature and its methods
   machines from.
 - [On Every Machine](on-every-machine.md): the settings and secrets the control plane keeps
   for you and sends to each machine of yours.

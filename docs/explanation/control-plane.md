@@ -140,6 +140,36 @@ keep a new one, and one that runs as several copies proves itself to its copies 
 key. Both refuse to rotate, and say why. Rotating does not change who anyone is: the local
 owner is still the admin.
 
+## Policy
+
+An organisation can have **one policy**: a document of rules that is a ceiling above each
+person's own settings (#998, spec `specs/998-org-policy/`). Only an admin can change it. A
+control plane with no policy works as before: it tells each machine "no policy", and
+nothing changes.
+
+- **One document.** The store keeps it at `v1/policy.json`, with the signature in
+  `v1/policy.sig`. Each version is also kept, as it was, in `v1/policy/versions/` (the
+  newest 100), so that an admin can see what each change did.
+- **Signed by the control key.** Each change is one version higher, and the control plane
+  signs it with its key (ECDSA P-256, the key that machines already trust). Any copy can send
+  the signed policy without the key. At a key rotation, the control plane signs the policy
+  again with the new key.
+- **Sent to every machine.** A machine that says the capability `host.policy/1` gets the
+  policy on its channel 0 when it connects, and within 5 seconds of each change, on every
+  copy. It tells the control plane which version it keeps (`host/policyApplied`). A machine
+  that does not say the capability gets nothing.
+- **Only an admin changes it.** `policy/set` saves the rules, and fails when another admin
+  saved first. `policy/stopAll` turns the kill switch on or off. `policy/raise` raises one
+  person's budget for today (UTC). The audit records each of them. Every person can read the
+  rules in force with `policy/mine`.
+- **Machines that do not follow it.** When the policy sets `requireFollowing`, the control
+  plane refuses to start work (a new agent, a prompt, a fork) on a machine that has not
+  kept the current version. The error is `policyRefused` (-32076), with the reason `update`.
+
+The fields are in [Policy](../reference/policy.md). Each machine enforces the rules itself,
+also when it is offline; that part, the **Set by your organisation** line on each client,
+the Console page and the MDM pin come in later steps of #998.
+
 ## A browser on this Mac
 
 Agents Host's copy of the control plane has a second, smaller listener: plain HTTP on the
