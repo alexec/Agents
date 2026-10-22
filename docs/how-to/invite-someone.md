@@ -18,8 +18,18 @@ See [People and machines](../explanation/people-and-machines.md) for why.
 - A client paired with your control plane, as an admin. The local owner is an admin.
 - The other person has Agents on a Mac, an iPhone or an iPad.
 
-Sign-in with Google, Apple or GitHub comes later (#995). Until then, a person joins with an
-invite code.
+A person joins with an invite code. After that, they can add a Google, Apple or GitHub
+sign-in to themselves, and pair more clients by signing in (see [Sign in with Google, Apple
+or GitHub](sign-in-with-google-apple-or-github.md)):
+
+- **Apple and GitHub:** the person needs an invite first. Then they add the sign-in.
+- **Google:** a person with an account on one of the **Allowed Google Workspace domains**
+  joins with no invite. Any other Google account needs an invite first.
+- **GitHub organisations:** when an admin allows organisations, only a member of one of
+  them can sign in with GitHub. This does not let a person join with no invite.
+
+A build of Agents from source needs its own ids for these: see [Set up Google, Apple and
+GitHub sign-in for your own build](set-up-sign-in-for-your-own-build.md).
 
 ## Invite a person
 
