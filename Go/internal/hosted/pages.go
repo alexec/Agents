@@ -160,8 +160,13 @@ func (s *Service) accountPage(w http.ResponseWriter, r *http.Request, account, p
 	if problem == "" && acc.Certificate == nil && !s.certificateRoom() {
 		problem = "Your control plane’s address is not ready yet. Try again in an hour."
 	}
+	use, err := s.useOf(r.Context(), acc)
+	if err != nil {
+		s.log(acc.ID + ": use: " + err.Error())
+	}
 	s.page(w, http.StatusOK, page{Title: "Your account", Account: acc, Address: s.accountURL(acc.ID),
-		Token: s.sessions.form(acc.ID), Problem: problem})
+		Token: s.sessions.form(acc.ID), Problem: problem, Use: &use, StorageUsed: bytesText(use.Storage),
+		StorageAllowed: bytesText(use.Plan.Storage), EventsDays: int(use.Plan.EventsKept / day)})
 }
 
 func (s *Service) deleteAccount(w http.ResponseWriter, r *http.Request, account string) {
@@ -210,6 +215,10 @@ type page struct {
 	// A place on the waitlist, and why, when not 0.
 	Place int
 	Why   string
+	// The account's plan and use (#2224).
+	Use                         *Use
+	StorageUsed, StorageAllowed string
+	EventsDays                  int
 }
 
 func (s *Service) page(w http.ResponseWriter, status int, p page) {
@@ -237,6 +246,7 @@ var pageTemplate = template.Must(template.New("page").Parse(`<!doctype html>
   code { font-size: .95rem; background: #f0f0ec; padding: .1rem .3rem; border-radius: .25rem; }
   section { margin-top: 2rem; }
   form { display: inline; }
+  td { padding: .15rem 1.5rem .15rem 0; }
   input { font: inherit; padding: .4rem .5rem; border: 1px solid #c7c7cc; border-radius: .4rem; }
   @media (prefers-color-scheme: dark) { body { background: #1c1c1e; color: #f2f2f7; } a.button, button, input { background: #2c2c2e; color: #f2f2f7; border-color: #48484a; } code { background: #2c2c2e; } }
 </style>
@@ -277,6 +287,18 @@ var pageTemplate = template.Must(template.New("page").Parse(`<!doctype html>
 <form method="post" action="/account/open"><input type="hidden" name="token" value="{{.Token}}"><button class="prominent">Open in This Browser</button></form>
 <form method="post" action="/signout"><button>Sign Out</button></form>
 </section>
+{{with .Use}}<section>
+<h2>{{.Plan.Name}} Plan</h2>
+<table>
+<tr><td>Machines</td><td>{{.Machines}} of {{.Plan.Machines}}</td></tr>
+<tr><td>Clients</td><td>{{.Clients}} of {{.Plan.Clients}}</td></tr>
+<tr><td>Storage</td><td>{{$.StorageUsed}} of {{$.StorageAllowed}}</td></tr>
+<tr><td>Connections at once</td><td>up to {{.Plan.Connections}}</td></tr>
+<tr><td>Events kept</td><td>{{$.EventsDays}} days</td></tr>
+<tr><td>Agents running at once</td><td>up to {{.Plan.AgentsRunning}}</td></tr>
+</table>
+<p class="quiet">At a limit, nothing is deleted: the next machine, client or write is refused, with words that say which limit.</p>
+</section>{{end}}
 <section>
 <h2>Delete Account</h2>
 <p>This deletes your control plane and everything it keeps: your people, clients, machines and settings. Your machines and their agents are not deleted. Type <code>{{.Account.ID}}</code> to delete it.</p>

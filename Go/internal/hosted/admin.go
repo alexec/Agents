@@ -14,7 +14,7 @@ import (
 
 // Admin is the operator's tool (#2152 FR-010, `agents-hosted admin`): it works on the
 // service's store, from the service's machine. A running service sees what it writes: a
-// suspension within a minute (sweepSuspended), the rest at the next sign-in.
+// suspension within a minute (sweepAccounts), the rest at the next sign-in.
 type Admin struct {
 	Store store.Store
 	// Where the pages are, for an invite link.
@@ -143,6 +143,19 @@ func (a Admin) Block(ctx context.Context, who, reason string) (int64, error) {
 // Unsuspend.
 func (a Admin) Unblock(ctx context.Context, user int64) error {
 	return a.Store.Delete(ctx, blockedKey(user))
+}
+
+// SetPlan puts an account on a plan by hand (#2224): a running copy has its limits within
+// a minute. Billing sets it too (#2225).
+func (a Admin) SetPlan(ctx context.Context, id, plan string) error {
+	if !ValidPlan(plan) {
+		return fmt.Errorf("%q is not a plan: free or pro", plan)
+	}
+	acc, err := a.accounts().update(ctx, id, func(acc *Account) { acc.Plan = plan })
+	if err == nil && acc == nil {
+		err = fmt.Errorf("there is no account %q", id)
+	}
+	return err
 }
 
 // Accounts is every account.
