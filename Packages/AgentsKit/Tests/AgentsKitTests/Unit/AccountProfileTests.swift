@@ -46,10 +46,11 @@ struct AccountProfileTests {
          {"id":"x","runtimeID":"claude","name":"Later","reach":{"teleport":{}},"addedAt":0,"signedIn":true}]
         """#
         let list = try JSONDecoder().decode([AccountProfile].self, from: Data(json.utf8))
-        #expect(list.map(\.name) == ["Acme Gateway", "Work", "Later"])
-        #expect(list[0].reach == .other(["gateway": ["route": "acme", "kind": "baseURL"]]))
-        #expect(list[1].reach == .signIn(folder: "/r/a"))
-        let back = try JSONSerialization.jsonObject(with: JSONEncoder().encode(list[0])) as? [String: Any]
+        try #require(list.map(\.name) == ["Acme Gateway", "Work", "Later"])
+        let org = list[0], work = list[1]  // index-ok: the three names are required just above
+        #expect(org.reach == .other(["gateway": ["route": "acme", "kind": "baseURL"]]))
+        #expect(work.reach == .signIn(folder: "/r/a"))
+        let back = try JSONSerialization.jsonObject(with: JSONEncoder().encode(org)) as? [String: Any]
         #expect(((back?["reach"] as? [String: Any])?["gateway"] as? [String: String]) == ["route": "acme", "kind": "baseURL"])
     }
 
