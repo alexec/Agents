@@ -14129,11 +14129,15 @@
     },
     "ReportCounts": {
       "type": "object",
-      "description": "What a machine's agents did in an hour or a day (#2019), counted from its own event log and its time ledger: never a conversation's words. Absent from a machine before #2019.",
+      "description": "What a machine's agents did in an hour or a day (#2019, R2 to R6), counted from its own event log and its time ledger: never a conversation's words. Absent from a machine before #2019.",
       "properties": {
         "sessions": {
           "type": "integer",
           "description": "Agents that began their first turn (agent.started)."
+        },
+        "failedSessions": {
+          "type": "integer",
+          "description": "Agents that ended in an error that nobody chose (agent.failed)."
         },
         "prsOpened": {
           "type": "integer",
@@ -14161,16 +14165,27 @@
             "type": "integer"
           },
           "description": "The waits by how long each was: under 1 minute, 5, 15, 60, 240, and longer. Six numbers."
+        },
+        "workflowRuns": {
+          "type": "integer",
+          "description": "Runs a workflow started (workflow.ran)."
+        },
+        "workflowFailures": {
+          "type": "integer",
+          "description": "Runs whose agent ended in an error (agent.failed of an agent a workflow started)."
         }
       },
       "required": [
         "sessions",
+        "failedSessions",
         "prsOpened",
         "prsMerged",
         "prsReverted",
         "mergeSeconds",
         "waits",
-        "waitBuckets"
+        "waitBuckets",
+        "workflowRuns",
+        "workflowFailures"
       ],
       "additionalProperties": false
     },
@@ -14291,6 +14306,10 @@
         },
         "runtime": {
           "type": "string"
+        },
+        "workflow": {
+          "type": "string",
+          "description": "The workflow that started the agents of this row (#2019), by its id; absent for agents a person or another agent started."
         },
         "cost": {
           "type": "object",
@@ -19382,6 +19401,10 @@
         },
         "runtime": {
           "type": "string"
+        },
+        "workflow": {
+          "type": "string",
+          "description": "The workflow that started the agents of this row (#2019), by its id; absent for agents a person or another agent started."
         },
         "cost": {
           "type": "object",

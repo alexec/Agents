@@ -222,7 +222,7 @@ func (s *Service) reportFrom(ctx context.Context, prefix, first string, keep fun
 				InputTokens: row.InputTokens, OutputTokens: row.OutputTokens, ThoughtTokens: row.ThoughtTokens,
 				CachedReadTokens: row.CachedReadTokens, CachedWriteTokens: row.CachedWriteTokens, Turns: row.Turns,
 				UnpricedTurns: row.UnpricedTurns, WorkingSeconds: row.WorkingSeconds, WaitingSeconds: row.WaitingSeconds,
-				Counts: row.Counts})
+				Workflow: row.Workflow, Counts: row.Counts})
 		}
 	}
 	sort.SliceStable(out, func(i, j int) bool {
@@ -316,7 +316,8 @@ func reportCSV(rows []wire.ReportRow, groupNames map[string]string) string {
 	}
 	header = append(header, "inputTokens", "outputTokens", "thoughtTokens", "cachedReadTokens",
 		"cachedWriteTokens", "turns", "unpricedTurns", "workingSeconds", "waitingSeconds",
-		"sessions", "prsOpened", "prsMerged", "prsReverted", "mergeSeconds", "waits", "groups")
+		"workflow", "sessions", "failedSessions", "prsOpened", "prsMerged", "prsReverted", "mergeSeconds", "waits",
+		"workflowRuns", "workflowFailures", "groups")
 	var b bytes.Buffer
 	w := csv.NewWriter(&b)
 	w.Write(header)
@@ -330,10 +331,16 @@ func reportCSV(rows []wire.ReportRow, groupNames map[string]string) string {
 		line = append(line, i(r.InputTokens), i(r.OutputTokens), i(r.ThoughtTokens), i(r.CachedReadTokens),
 			i(r.CachedWriteTokens), i(r.Turns), i(r.UnpricedTurns), f(r.WorkingSeconds), f(r.WaitingSeconds))
 		// What the agents did (#2019), blank from a machine before it.
+		workflow := ""
+		if r.Workflow != nil {
+			workflow = *r.Workflow
+		}
+		line = append(line, workflow)
 		if c := r.Counts; c != nil {
-			line = append(line, i(c.Sessions), i(c.PrsOpened), i(c.PrsMerged), i(c.PrsReverted), f(c.MergeSeconds), i(c.Waits))
+			line = append(line, i(c.Sessions), i(c.FailedSessions), i(c.PrsOpened), i(c.PrsMerged), i(c.PrsReverted),
+				f(c.MergeSeconds), i(c.Waits), i(c.WorkflowRuns), i(c.WorkflowFailures))
 		} else {
-			line = append(line, "", "", "", "", "", "")
+			line = append(line, "", "", "", "", "", "", "", "", "")
 		}
 		var groups []string
 		for _, id := range r.Groups {

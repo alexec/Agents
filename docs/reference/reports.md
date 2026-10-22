@@ -60,6 +60,22 @@ Two more pages of Reports (#2019), with the same scopes, ranges and **By** as Sp
   15 to 60, 1 to 4 hours, or longer. The middle wait is the bucket it falls in.
 - **A machine from before #2019** sends no counts, so its rows count as nothing done.
 
+## Reports ▸ Runtimes, Adoption and Workflows, on the web page
+
+Three more pages of Reports (#2019), with the same scopes:
+
+- **Runtimes** (R4): which runtime earns its cost. By Runtime first. Each line says the
+  cost, the pull requests merged, the cost of each merged one, the sessions that failed
+  and their share, and the turns not priced. The largest cost comes first. A session fails
+  when it ends in an error that nobody chose (`agent.failed`).
+- **Adoption** (R5): each week (Monday, UTC), newest first: the active people, the
+  sessions a person, and the runtimes and workflows in use. A person is active in a week
+  when one of their machines, or a bot's, ran a turn. With Totals Only, a lead sees the
+  sessions, not the people.
+- **Workflows** (R6): each workflow's runs (`workflow.ran`), its failed runs (its agent
+  ended in an error), the cost of a run and the time working a run. By Workflow first. The
+  most failed runs come first. By Person shows each bot's runs under its name.
+
 ## What a machine sends
 
 - **Each machine keeps its usage by the UTC hour**, by project and runtime, in
@@ -68,8 +84,10 @@ Two more pages of Reports (#2019), with the same scopes, ranges and **By** as Sp
   cache write), the turns, the turns with no price, the working seconds and the waiting
   seconds. Working is the agent, its tools and waiting on others. Waiting is waiting for
   the person.
-- **The counts** (#2019): the sessions that began, the pull requests opened, merged and
-  reverted, their time to merge, and the waits for the person by length. The machine counts
+- **The counts** (#2019): the sessions that began and those that failed, the pull requests
+  opened, merged and reverted, their time to merge, the waits for the person by length, and
+  the workflow runs and failed runs. The agents a workflow started have rows of their own,
+  with the workflow's id (`workflow`). The machine counts
   them from its own event log (`events.jsonl`) at each send, from the position it counted
   to last, and from its time ledger.
 - **The project** is the name of the project's folder. Thus the same repository on two
@@ -107,9 +125,10 @@ Two more pages of Reports (#2019), with the same scopes, ranges and **By** as Sp
 - `reports/usage` with a range: `day` (the last 24 hours, by the hour), `week`, `month` or
   `threeMonths` (the last 7, 30 or 90 days, by the day). It gives the rows, oldest first.
 - `reports/export` with a range and a format: `csv` (the default) or `jsonl`. The CSV has
-  a cost column for each currency, such as `costUSD`, then the counts (`sessions`,
-  `prsOpened`, `prsMerged`, `prsReverted`, `mergeSeconds`, `waits`; blank from a machine
-  before #2019), then `groups`.
+  a cost column for each currency, such as `costUSD`, then `workflow` and the counts
+  (`sessions`, `failedSessions`, `prsOpened`, `prsMerged`, `prsReverted`, `mergeSeconds`,
+  `waits`, `workflowRuns`, `workflowFailures`; blank from a machine before #2019), then
+  `groups`.
 
 ## See also
 

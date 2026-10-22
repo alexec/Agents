@@ -4544,12 +4544,14 @@ export interface RenameRequest {
 }
 
 /**
- * What a machine's agents did in an hour or a day (#2019), counted from its own event log and its
- * time ledger: never a conversation's words. Absent from a machine before #2019.
+ * What a machine's agents did in an hour or a day (#2019, R2 to R6), counted from its own event log
+ * and its time ledger: never a conversation's words. Absent from a machine before #2019.
  */
 export interface ReportCounts {
   /** Agents that began their first turn (agent.started). */
   sessions: number;
+  /** Agents that ended in an error that nobody chose (agent.failed). */
+  failedSessions: number;
   /** Pull and merge requests opened from an agent's branch on this machine (pr.opened). */
   prsOpened: number;
   /** Those merged (pr.merged). */
@@ -4565,6 +4567,10 @@ export interface ReportCounts {
   waits: number;
   /** The waits by how long each was: under 1 minute, 5, 15, 60, 240, and longer. Six numbers. */
   waitBuckets: number[];
+  /** Runs a workflow started (workflow.ran). */
+  workflowRuns: number;
+  /** Runs whose agent ended in an error (agent.failed of an agent a workflow started). */
+  workflowFailures: number;
 }
 
 /** reports/export's answer (#1811): the rows as CSV or JSON lines. */
@@ -4620,6 +4626,11 @@ export interface ReportRow {
   hostName: string;
   project: string;
   runtime: string;
+  /**
+   * The workflow that started the agents of this row (#2019), by its id; absent for agents a person
+   * or another agent started.
+   */
+  workflow?: string;
   /** By currency. */
   cost: Record<string, number>;
   inputTokens: number;
@@ -6050,6 +6061,11 @@ export interface UsageRollupRow {
   /** The project's folder name, so the same repository on two machines adds up. */
   project: string;
   runtime: string;
+  /**
+   * The workflow that started the agents of this row (#2019), by its id; absent for agents a person
+   * or another agent started.
+   */
+  workflow?: string;
   /** By currency. */
   cost: Record<string, number>;
   inputTokens: number;
@@ -7591,11 +7607,11 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   RemovalCheck: { required: ["blockedBy", "uncommitted", "unmerged"], optional: [] },
   RemoveResourceRequest: { required: ["name"], optional: [] },
   RenameRequest: { required: ["agentID", "title"], optional: [] },
-  ReportCounts: { required: ["sessions", "prsOpened", "prsMerged", "prsReverted", "mergeSeconds", "waits", "waitBuckets"], optional: [] },
+  ReportCounts: { required: ["sessions", "failedSessions", "prsOpened", "prsMerged", "prsReverted", "mergeSeconds", "waits", "waitBuckets", "workflowRuns", "workflowFailures"], optional: [] },
   ReportExport: { required: ["text", "count", "format"], optional: [] },
   ReportPolicy: { required: ["totalsOnly", "leads", "budgetsUSD"], optional: [] },
   ReportQuery: { required: ["range"], optional: ["format", "scope"] },
-  ReportRow: { required: ["at", "person", "personName", "host", "hostName", "project", "runtime", "cost", "inputTokens", "outputTokens", "thoughtTokens", "cachedReadTokens", "cachedWriteTokens", "turns", "unpricedTurns", "workingSeconds", "waitingSeconds"], optional: ["groups", "counts"] },
+  ReportRow: { required: ["at", "person", "personName", "host", "hostName", "project", "runtime", "cost", "inputTokens", "outputTokens", "thoughtTokens", "cachedReadTokens", "cachedWriteTokens", "turns", "unpricedTurns", "workingSeconds", "waitingSeconds"], optional: ["workflow", "groups", "counts"] },
   ReportScope: { required: ["kind"], optional: ["group"] },
   ReportScopeOption: { required: ["scope", "name"], optional: [] },
   ReportScopes: { required: ["scopes", "admin"], optional: [] },
@@ -7744,7 +7760,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   UsageReport: { required: ["range", "rows", "admin"], optional: ["scope", "personsHidden", "groupNames", "budgetUSD", "monthSpentUSD"] },
   UsageRollup: { required: ["hours", "days"], optional: [] },
   UsageRollupPeriod: { required: ["at", "rows"], optional: [] },
-  UsageRollupRow: { required: ["project", "runtime", "cost", "inputTokens", "outputTokens", "thoughtTokens", "cachedReadTokens", "cachedWriteTokens", "turns", "unpricedTurns", "workingSeconds", "waitingSeconds"], optional: ["counts"] },
+  UsageRollupRow: { required: ["project", "runtime", "cost", "inputTokens", "outputTokens", "thoughtTokens", "cachedReadTokens", "cachedWriteTokens", "turns", "unpricedTurns", "workingSeconds", "waitingSeconds"], optional: ["workflow", "counts"] },
   UserAgentConfig: { required: [], optional: ["instructions", "personas", "skills"] },
   UserPartHere: { required: ["part", "value"], optional: ["leftOut"] },
   UserPartRequest: { required: ["part"], optional: [] },
