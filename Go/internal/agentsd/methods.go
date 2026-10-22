@@ -27,6 +27,7 @@ func (d *Daemon) register() {
 	d.registerBackups()
 	d.registerReceive()
 	d.registerSend()
+	d.registerExports()
 	d.registerBringBack()
 	d.registerLeases()
 	d.registerAttention()

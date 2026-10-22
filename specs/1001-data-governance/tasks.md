@@ -33,8 +33,8 @@
 
 ## Phase 5: c1 and c2, export and import (areas: hosts; sidebar, projects) — other lanes
 
-- [ ] T016 [US3] `agents/export {agentID | project}` and `agents/import` in `Packages/Wire`; `scripts/wire.sh gen`.
-- [ ] T017 [US3] Daemon: write the backup format for the chosen agents; import as restore does.
+- [x] T016 [US3] `agents/export {agentID | project}` and `agents/import` in `Packages/Wire`; `scripts/wire.sh gen`.
+- [x] T017 [US3] Daemon: write the backup format for the chosen agents; import as restore does.
 - [ ] T018 [US3] Export… and Import… in the agent and project menus, on the Mac, the Remote and the web page; parity rows.
 
 ## Phase 6: d1 to d3, chain and sinks (areas: reports, control-plane) — other lanes

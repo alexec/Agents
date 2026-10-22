@@ -5,6 +5,7 @@ package wire
 // The capabilities that Packages/Wire names (#1748): x-capability on each method.
 const CapAgent1 = "agent/1"
 const CapAgentsEditQueued1 = "agents.edit-queued/1"
+const CapAgentsExport1 = "agents.export/1"
 const CapAgentsFind1 = "agents.find/1"
 const CapAgentsMoveWorktree1 = "agents.move-worktree/1"
 const CapAgentsSaid1 = "agents.said/1"
@@ -130,8 +131,12 @@ var HostCapabilities = pairs([][2]string{
 	{"agents/delete", "agents/1"},
 	{"agents/discardDraft", "agents/1"},
 	{"agents/editQueued", "agents.edit-queued/1"},
+	{"agents/export", "agents.export/1"},
+	{"agents/exportRead", "agents.export/1"},
 	{"agents/find", "agents.find/1"},
 	{"agents/fork", "agents/1"},
+	{"agents/import", "agents.export/1"},
+	{"agents/importUpload", "agents.export/1"},
 	{"agents/labelVocabulary", "agents/1"},
 	{"agents/list", "agents/1"},
 	{"agents/options", "agents/1"},

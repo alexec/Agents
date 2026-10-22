@@ -355,6 +355,33 @@ export interface AgentWorktree {
   madeByApp: boolean;
 }
 
+/**
+ * What agents/export made (#1001): a .tar.gz in the backup format, read in parts with
+ * agents/exportRead. `name` is a file name to save it as.
+ */
+export interface AgentsExport {
+  file: SendFile;
+  agents: number;
+  name: string;
+}
+
+/**
+ * agents/export (#1001): one agent (`agentID`) or every agent of one project (`folder`). Give one
+ * of the two.
+ */
+export interface AgentsExportRequest {
+  agentID?: UUID;
+  folder?: URLString;
+}
+
+/**
+ * agents/import (#1001): the export sent with agents/importUpload. Its agents come back archived,
+ * as a restore brings them; one this machine has, or deleted, is skipped.
+ */
+export interface AgentsImportRequest {
+  upload: UUID;
+}
+
 export interface AllowanceReading {
   window?: string;
   used?: number;
@@ -7583,8 +7610,12 @@ export interface Methods {
   "agents/delete": { params: AgentRequest; result: Empty };
   "agents/discardDraft": { params: DiscardDraftRequest; result: Empty };
   "agents/editQueued": { params: EditQueuedRequest; result: EditQueuedResult };
+  "agents/export": { params: AgentsExportRequest; result: AgentsExport };
+  "agents/exportRead": { params: SendReadRequest; result: SendRead };
   "agents/find": { params: FindRequest; result: FindResult };
   "agents/fork": { params: AgentRequest; result: UUID };
+  "agents/import": { params: AgentsImportRequest; result: BackupRestoreResult };
+  "agents/importUpload": { params: ReceiveUploadRequest; result: Empty };
   "agents/labelVocabulary": { params: LabelVocabularyRequest; result: string[] };
   "agents/list": { params: ListRequest; result: Agent[] };
   "agents/options": { params: OptionsRequest; result: OptionsResponse };
@@ -7816,8 +7847,12 @@ export const MethodTarget = {
   "agents/delete": "host",
   "agents/discardDraft": "host",
   "agents/editQueued": "host",
+  "agents/export": "host",
+  "agents/exportRead": "host",
   "agents/find": "host",
   "agents/fork": "host",
+  "agents/import": "host",
+  "agents/importUpload": "host",
   "agents/labelVocabulary": "host",
   "agents/list": "host",
   "agents/options": "host",
@@ -8108,6 +8143,9 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   AgentWorkspacesProvider: { required: ["id", "name", "canMake", "canDelete", "workspaces"], optional: ["options"] },
   AgentWorkspacesWorkspace: { required: ["id", "name", "state"], optional: ["host", "hostState", "cost"] },
   AgentWorktree: { required: ["name", "root", "project", "madeByApp"], optional: ["branch", "base"] },
+  AgentsExport: { required: ["file", "agents", "name"], optional: [] },
+  AgentsExportRequest: { required: [], optional: ["agentID", "folder"] },
+  AgentsImportRequest: { required: ["upload"], optional: [] },
   AllowanceReading: { required: ["spent", "nearlySpent", "at"], optional: ["window", "used", "resetsAt"] },
   AllowanceState: { required: ["credentialKey", "entryID", "status", "since", "changedAt", "learnedFrom", "spent", "rateLimitStreak"], optional: ["lastRateLimit", "reading", "modelsOut"] },
   AllowanceStateModelOut: { required: ["model", "since", "retryAfter"], optional: ["name"] },

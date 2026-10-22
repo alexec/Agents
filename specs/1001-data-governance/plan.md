@@ -40,9 +40,20 @@ Four parts, cut into slices by area (`.agents/areas`). Each slice is one pull re
 - **The eraser** (one goroutine, `safe.Go`): for each entry, start the runtime as the agent was (`launchAs` with its account), 60 s at most. When it offers `session/delete`, call it. Then, for Claude and Codex, remove the known files in the home that the launch named (`CLAUDE_CONFIG_DIR` or `~/.claude`; `CODEX_HOME` or `~/.codex`). Success, or a third failure, or 7 days, removes the entry.
 - **`erased.json`**: `{id: erasedAt}`, at most 10,000 and 400 days. `restoreAgent` skips an ID in it. Backups carry the file, so a server's list survives a new machine.
 
-### c, d
+### c1: export and import, the machine side
 
-See the table. Their lanes write their own plan sections.
+- **Wire** (`agents.export/1`, all tagged `web`): `agents/export {agentID | folder}` makes the archive in `Outgoing` and answers `{file, agents, name}`; `agents/exportRead` reads it in parts of 1 MB, as `projects/sendRead` does, and removes it after the last. `agents/importUpload` sends a file in parts into `Incoming`, as `projects/receiveUpload` does; `agents/import {upload}` restores it and removes it. An abandoned file goes after an hour (`transferLimit`).
+- **Format**: the backup archive (`manifest.json`, then `agents/<id>/…`), with no root files. `writeBackupArchive` and `restoreArchive` take the agents and a "with root files" switch.
+- **Import** never treats the file as this machine's own: the agents keep the root that made them (or `restored`), so they are shown and never run, and bring no MCP servers. An erased ID is skipped. Root files in the archive (history, erased list) are ignored. One file in the archive is at most 1 GB; an upload at most 8 GB (`receiveLimit`).
+- `Decided: one generic chunked transfer per direction, as Send to host has, not base64 in one message, because an export of a project can be hundreds of MB and the phone's link carries one message of at most 64 MB. Alex can overrule.`
+
+### c2: the clients
+
+- **Export…** in the agent's menu and the project's menu; **Import…** in the sidebar's project menu and in the File menu on the Mac. The Mac saves with a save panel, the Remote with the share sheet (`fileExporter`), the web page as a download. Import opens a file picker, sends the parts, and says "Imported N agents" (and how many were skipped).
+
+### d
+
+See the table. Its lane writes its own plan section.
 
 ## Docs
 

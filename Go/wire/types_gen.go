@@ -374,6 +374,27 @@ type AgentWorktree struct {
 	MadeByApp bool `json:"madeByApp"`
 }
 
+// What agents/export made (#1001): a .tar.gz in the backup format, read in parts with agents/exportRead. `name` is a file name to save it as.
+type AgentsExport struct {
+	File SendFile `json:"file"`
+
+	Agents int64 `json:"agents"`
+
+	Name string `json:"name"`
+}
+
+// agents/export (#1001): one agent (`agentID`) or every agent of one project (`folder`). Give one of the two.
+type AgentsExportRequest struct {
+	AgentID *UUID `json:"agentID,omitzero"`
+
+	Folder *URL `json:"folder,omitzero"`
+}
+
+// agents/import (#1001): the export sent with agents/importUpload. Its agents come back archived, as a restore brings them; one this machine has, or deleted, is skipped.
+type AgentsImportRequest struct {
+	Upload UUID `json:"upload"`
+}
+
 type AllowanceReading struct {
 	Window *string `json:"window,omitzero"`
 
