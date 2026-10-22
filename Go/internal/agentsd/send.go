@@ -151,13 +151,19 @@ func (d *Daemon) sendPack(r wire.SendPackRequest) (wire.SendPack, error) {
 }
 
 func (d *Daemon) sendRead(r wire.SendReadRequest) (wire.SendRead, error) {
+	return d.readOutgoing(r, "That file is gone. Send again.")
+}
+
+// readOutgoing reads one part of a file in Outgoing (a send's, or an export's, #1001);
+// gone is what to say when the file is not there.
+func (d *Daemon) readOutgoing(r wire.SendReadRequest, gone string) (wire.SendRead, error) {
 	path, err := d.outgoingFile(r.ID)
 	if err != nil {
 		return wire.SendRead{}, err
 	}
 	f, err := os.Open(path)
 	if err != nil {
-		return wire.SendRead{}, Invalid("That file is gone. Send again.")
+		return wire.SendRead{}, Invalid("%s", gone)
 	}
 	defer f.Close()
 	buf := make([]byte, sendPartSize)

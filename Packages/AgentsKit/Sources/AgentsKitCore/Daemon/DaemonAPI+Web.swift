@@ -133,6 +133,12 @@ public extension DaemonAPI {
                 Row(Method.backupsMake, params: BackupMakeRequest.self, result: BackupState.self, kind: .hostRequest),
                 Row(Method.backupsRestore, params: BackupRestoreRequest.self, result: BackupRestoreResult.self,
                     kind: .hostRequest),
+                // Export and import of an agent or a project (#1001).
+                Row(Method.agentsExport, params: AgentsExportRequest.self, result: AgentsExport.self, kind: .hostRequest),
+                Row(Method.agentsExportRead, params: SendReadRequest.self, result: SendRead.self, kind: .hostRequest),
+                Row(Method.agentsImportUpload, params: ReceiveUploadRequest.self, result: Empty.self, kind: .hostRequest),
+                Row(Method.agentsImport, params: AgentsImportRequest.self, result: BackupRestoreResult.self,
+                    kind: .hostRequest),
                 // The files the host could not read in this run (#205, #223), as the window's sidebar foot.
                 Row(Method.storeNotes, params: Empty.self, result: StoreNotes.self, kind: .hostRequest),
                 // Pinned pages (#159): the sidebar's rows and the pages themselves.

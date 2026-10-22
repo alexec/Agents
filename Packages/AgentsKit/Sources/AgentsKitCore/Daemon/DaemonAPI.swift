@@ -272,6 +272,13 @@ public enum DaemonAPI {
         public static let backupsMake = "backups/make"
         /// Bring a backup's agents back, archived. One already here is skipped.
         public static let backupsRestore = "backups/restore"
+        /// Export one agent or one project's agents (#1001): a .tar.gz in the backup format,
+        /// made on the host and read in parts. Import sends one in parts, then brings its
+        /// agents back archived, as a restore does.
+        public static let agentsExport = "agents/export"
+        public static let agentsExportRead = "agents/exportRead"
+        public static let agentsImportUpload = "agents/importUpload"
+        public static let agentsImport = "agents/import"
         /// Clone a Git URL into the home folder and add it (027). Answers when the
         /// project exists, which for a big repository is minutes: the window shows the
         /// clone from `clone/changed`, not from waiting on this.
@@ -4441,6 +4448,38 @@ public extension DaemonAPI {
         public var id: String
 
         public init(id: String) { self.id = id }
+    }
+
+    /// `agents/export` (#1001): one agent, or every agent of one project (its main folder).
+    struct AgentsExportRequest: Codable, Hashable, Sendable {
+        public var agentID: UUID?
+        public var folder: URL?
+
+        public init(agentID: UUID? = nil, folder: URL? = nil) {
+            self.agentID = agentID
+            self.folder = folder
+        }
+    }
+
+    /// What `agents/export` made: read it with `agents/exportRead` from offset 0 until `end`,
+    /// and save it as `name`.
+    struct AgentsExport: Codable, Hashable, Sendable {
+        public var file: SendFile
+        public var agents: Int
+        public var name: String
+
+        public init(file: SendFile, agents: Int, name: String) {
+            self.file = file
+            self.agents = agents
+            self.name = name
+        }
+    }
+
+    /// `agents/import`: the upload sent with `agents/importUpload`.
+    struct AgentsImportRequest: Codable, Hashable, Sendable {
+        public var upload: UUID
+
+        public init(upload: UUID) { self.upload = upload }
     }
 
     struct BackupRestoreResult: Codable, Hashable, Sendable {

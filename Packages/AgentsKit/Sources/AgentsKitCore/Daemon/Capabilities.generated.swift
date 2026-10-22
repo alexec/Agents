@@ -6,6 +6,7 @@
 public enum Capability {
     public static let agent1 = "agent/1"
     public static let agentsEditQueued1 = "agents.edit-queued/1"
+    public static let agentsExport1 = "agents.export/1"
     public static let agentsFind1 = "agents.find/1"
     public static let agentsMoveWorktree1 = "agents.move-worktree/1"
     public static let agentsSaid1 = "agents.said/1"
@@ -131,8 +132,12 @@ public enum Capability {
         "agents/delete": "agents/1",
         "agents/discardDraft": "agents/1",
         "agents/editQueued": "agents.edit-queued/1",
+        "agents/export": "agents.export/1",
+        "agents/exportRead": "agents.export/1",
         "agents/find": "agents.find/1",
         "agents/fork": "agents/1",
+        "agents/import": "agents.export/1",
+        "agents/importUpload": "agents.export/1",
         "agents/labelVocabulary": "agents/1",
         "agents/list": "agents/1",
         "agents/options": "agents/1",

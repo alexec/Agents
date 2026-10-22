@@ -51,6 +51,9 @@ const (
 	// backupStoreWait bounds a list of the store, so a control plane that does not answer
 	// does not hold the state up.
 	backupStoreWait = 10 * time.Second
+	// backupEntryMost bounds one file read from an archive into memory: a transcript is
+	// far less, and an archive made by hand (an import, #1001) can say any size.
+	backupEntryMost = 1 << 30
 )
 
 // backupPartBytes is one backups/upload: a JSON-RPC line of about 11 MB in base64, well
@@ -447,7 +450,7 @@ func (d *Daemon) makeBackup() (wire.Backup, error) {
 	}
 	m := backupManifest{Format: backupFormat, RootID: d.Store.RootID, Machine: macName(), MadeAt: wire.DateOf(at)}
 	tmp := filepath.Join(filepath.Dir(archive), "."+name+".tar.gz.tmp")
-	if err := d.writeBackupArchive(tmp, &m); err != nil {
+	if err := d.writeBackupArchive(tmp, &m, d.Store.Agents(), true); err != nil {
 		os.Remove(tmp)
 		return wire.Backup{}, err
 	}
@@ -468,7 +471,9 @@ func (d *Daemon) makeBackup() (wire.Backup, error) {
 	return made, nil
 }
 
-func (d *Daemon) writeBackupArchive(path string, m *backupManifest) error {
+// writeBackupArchive writes agents to path, with the root's files when withRoot: a backup
+// carries them, an export of some agents (#1001) does not.
+func (d *Daemon) writeBackupArchive(path string, m *backupManifest, agents []wire.Agent, withRoot bool) error {
 	f, err := os.OpenFile(path, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
 	if err != nil {
 		return err
@@ -476,7 +481,6 @@ func (d *Daemon) writeBackupArchive(path string, m *backupManifest) error {
 	defer f.Close()
 	gz := gzip.NewWriter(f)
 	tw := tar.NewWriter(gz)
-	agents := d.Store.Agents()
 	m.Agents = int64(len(agents))
 	head, _ := json.Marshal(m)
 	if err := addTarFile(tw, "manifest.json", head, m.MadeAt.Time()); err != nil {
@@ -500,6 +504,9 @@ func (d *Daemon) writeBackupArchive(path string, m *backupManifest) error {
 		}
 	}
 	for _, file := range backupRootFiles {
+		if !withRoot {
+			break
+		}
 		b, err := os.ReadFile(filepath.Join(d.Store.Loc.Root, file))
 		if errors.Is(err, os.ErrNotExist) {
 			continue
@@ -582,7 +589,7 @@ func (d *Daemon) restoreBackup(id string) (wire.BackupRestoreResult, error) {
 	archive, _, _ := d.backupPaths(id)
 	// The folder, not the manifest, says whose backup it is.
 	folder, _, _ := strings.Cut(id, "/")
-	return d.restoreArchive(archive, listed.RootID, folder == d.Store.RootID)
+	return d.restoreArchive(archive, listed.RootID, folder == d.Store.RootID, true)
 }
 
 // restoredElsewhere is the root a record from another machine's backup is stamped with
@@ -590,8 +597,10 @@ func (d *Daemon) restoreBackup(id string) (wire.BackupRestoreResult, error) {
 const restoredElsewhere = "restored"
 
 // restoreArchive restores the archive at path; madeIn is the root that made it, and mine
-// whether it is this machine's own backup.
-func (d *Daemon) restoreArchive(archive, madeIn string, mine bool) (wire.BackupRestoreResult, error) {
+// whether it is this machine's own backup. An import (#1001) takes no root files
+// (withRoot false): an export has none, and one made by hand must not change this
+// machine's history or its erased list.
+func (d *Daemon) restoreArchive(archive, madeIn string, mine, withRoot bool) (wire.BackupRestoreResult, error) {
 	res := wire.BackupRestoreResult{}
 	f, err := os.Open(archive)
 	if err != nil {
@@ -646,6 +655,12 @@ func (d *Daemon) restoreArchive(archive, madeIn string, mine bool) (wire.BackupR
 		}
 		if h.Typeflag != tar.TypeReg {
 			continue
+		}
+		if !withRoot && !strings.HasPrefix(h.Name, "agents/") {
+			continue
+		}
+		if h.Size > backupEntryMost {
+			return res, fmt.Errorf("the backup can't be read: %s is more than %d MB", h.Name, backupEntryMost>>20)
 		}
 		b, err := io.ReadAll(io.LimitReader(tr, h.Size))
 		if err != nil {

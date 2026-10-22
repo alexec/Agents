@@ -719,6 +719,53 @@
       ],
       "additionalProperties": false
     },
+    "AgentsExport": {
+      "type": "object",
+      "description": "What agents/export made (#1001): a .tar.gz in the backup format, read in parts with agents/exportRead. `name` is a file name to save it as.",
+      "properties": {
+        "file": {
+          "$ref": "#/definitions/SendFile"
+        },
+        "agents": {
+          "type": "integer"
+        },
+        "name": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "file",
+        "agents",
+        "name"
+      ],
+      "additionalProperties": false
+    },
+    "AgentsExportRequest": {
+      "type": "object",
+      "description": "agents/export (#1001): one agent (`agentID`) or every agent of one project (`folder`). Give one of the two.",
+      "properties": {
+        "agentID": {
+          "$ref": "#/definitions/UUID"
+        },
+        "folder": {
+          "$ref": "#/definitions/URLString"
+        }
+      },
+      "additionalProperties": false
+    },
+    "AgentsImportRequest": {
+      "type": "object",
+      "description": "What agents/import takes (#1001): the export sent with agents/importUpload. Its agents come back archived, as a restore brings them; one this machine has, or deleted, is skipped.",
+      "properties": {
+        "upload": {
+          "$ref": "#/definitions/UUID"
+        }
+      },
+      "required": [
+        "upload"
+      ],
+      "additionalProperties": false
+    },
     "AllowanceReading": {
       "type": "object",
       "properties": {
