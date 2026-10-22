@@ -269,8 +269,11 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
   const entryCount = store.entries.value.length;
   useLayoutEffect(() => {
     const el = scroller.current;
-    if (!el || loadingEarlier.current) return;
-    if (following.current) el.scrollTop = el.scrollHeight;
+    if (!el) return;
+    if (following.current) { if (!loadingEarlier.current) el.scrollTop = el.scrollHeight; }
+    // Reading: rows put in above (an earlier page) keep the turn held where it was, before the
+    // page is painted (#2310).
+    else keepHeld(el);
   }, [entryCount, store.turns.value.length, session]);
   // Every row is watched, those drawn since too: a queued bubble or a card that grows without an
   // entry arriving used to leave the foot a frame or more behind (#378).
@@ -279,7 +282,12 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
     const el = scroller.current;
     if (!el) return;
     const watcher = new ResizeObserver(() => {
-      if (following.current && !loadingEarlier.current) el.scrollTop = el.scrollHeight;
+      if (following.current) { if (!loadingEarlier.current) el.scrollTop = el.scrollHeight; return; }
+      // Reading back: a turn above that grew (its steps came, a picture, code colour) moves
+      // the turn held back to where it was on screen, in every browser, Safari before 27
+      // too, which has no scroll anchoring of its own (#2310). An earlier page too, before it
+      // is painted.
+      keepHeld(el);
     });
     sizes.current = watcher;
     watcher.observe(el);
@@ -290,15 +298,53 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
     if (el && sizes.current) for (const child of Array.from(el.children)) sizes.current.observe(child);
   });
 
+  /** The turn a reader's place is held by, and how far down the pane it starts (#2310). */
+  const held = useRef<{ id: string; top: number } | null>(null);
+  const turnTop = (el: HTMLElement, turn: HTMLElement) => turn.getBoundingClientRect().top - el.getBoundingClientRect().top;
+  /** Holds the place by the first turn that starts on screen, or the one the top of the pane is in. */
+  const holdTurn = (el: HTMLElement) => {
+    const turns = Array.from(el.querySelectorAll<HTMLElement>("article.turn"));
+    const shown = turns.filter((turn) => turnTop(el, turn) + turn.offsetHeight > 0);
+    const turn = shown.find((t) => turnTop(el, t) >= -0.5) ?? shown[0];
+    held.current = turn ? { id: turn.dataset.turn ?? "", top: turnTop(el, turn) } : null;
+  };
+  /** Puts the turn held back where it was on the pane. */
+  const keepHeld = (el: HTMLElement) => {
+    const was = held.current;
+    if (!was) return;
+    const turn = el.querySelector<HTMLElement>(`article.turn[data-turn="${CSS.escape(was.id)}"]`);
+    if (!turn) return;
+    const by = turnTop(el, turn) - was.top;
+    if (Math.abs(by) > 0.5) el.scrollTop += by;
+  };
+  // A wheel or a finger up the pane is reading back, even in the frame the page grows (#2310):
+  // the scroll test below cannot tell those apart.
+  const fingerAt = useRef<number | null>(null);
+  const readBack = () => {
+    const el = scroller.current;
+    if (!el || !following.current || el.scrollHeight <= el.clientHeight + 1) return;
+    holdTurn(el);
+    follow(false);
+  };
+  const onWheel = (event: WheelEvent) => { if (event.deltaY < 0) readBack(); };
+  const onTouchStart = (event: TouchEvent) => { fingerAt.current = event.touches[0]?.clientY ?? null; };
+  const onTouchMove = (event: TouchEvent) => {
+    const y = event.touches[0]?.clientY;
+    if (fingerAt.current !== null && y !== undefined && y > fingerAt.current + 4) readBack();
+  };
+
   const earlier = async () => {
     const el = scroller.current;
     if (!el || loadingEarlier.current || !settled.current || !store.hasMoreOfTheConversation) return;
     loadingEarlier.current = true;
-    // Hold the line being read: what arrives goes above it.
+    // Hold the line being read: what arrives goes above it. Following, the foot; reading, the
+    // turn held, as any growth above it is (#2310).
     const fromBottom = el.scrollHeight - el.scrollTop;
+    if (!following.current) holdTurn(el);
     await store.loadEarlier();
     requestAnimationFrame(() => {
-      el.scrollTop = el.scrollHeight - fromBottom;
+      if (following.current) el.scrollTop = el.scrollHeight - fromBottom;
+      else keepHeld(el);
       setTimeout(() => (loadingEarlier.current = false), 250);
     });
   };
@@ -315,6 +361,7 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
       if (el.scrollTop < was.top - 0.5 && el.scrollHeight === was.height) follow(false);
       // Back at the end on the way down, or right at it.
       else if (fromBottom < 1 || (fromBottom < atTheEnd && el.scrollTop > was.top)) follow(true);
+      if (!following.current) holdTurn(el);
     }
     if (el.scrollTop < 400) void earlier();
   };
@@ -337,6 +384,7 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
         return;
       } else return;
       e.preventDefault();
+      if (by < 0) readBack();
       el.scrollBy({ top: by, behavior: by === page || by === -page ? "smooth" : "instant" });
     };
     document.addEventListener("keydown", press);
@@ -517,7 +565,8 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
       {finding.value && agent && <FindBar store={store} host={host} agentID={agent.id} close={() => (finding.value = false)} />}
       <CallActionsContext.Provider value={callActions}>
       <ViewLayerContext.Provider value={viewHosting}>
-      <div class="scroll transcript" ref={scroller} onScroll={onScroll}>
+      <div class="scroll transcript" ref={scroller} onScroll={onScroll} onWheel={onWheel}
+        onTouchStart={onTouchStart} onTouchMove={onTouchMove}>
         <div class="view-layer" ref={(el) => { layer.element = el; }} />
         <ViewDiff layer={layer} openLink={(url) => { window.open(url, "_blank", "noopener,noreferrer"); }} />
         {failure && (

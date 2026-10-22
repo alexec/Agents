@@ -15,12 +15,11 @@ import AppKit
 
 /// What a hand does to the transcript, told as it happens (#378).
 ///
-/// A wheel or trackpad over it says which way it moved. The pane's own geometry cannot:
-/// a lazy stack re-measures its height every frame, and the offset moves with it, so a
-/// move up with the height unchanged is as often the stack as the reader. And the keys
-/// that read the transcript whenever nothing else is taking them: Page
-/// Up and Page Down, Space and Shift-Space a pane at a time, Home and ⌘↑ to the top, End
-/// to the end (⌘↓ is View ▸ Jump to Latest).
+/// A wheel or trackpad over it says which way it moved, in the frame it moves, even when
+/// the conversation grows in that same frame and the geometry cannot tell the two apart.
+/// And the keys that read the transcript whenever nothing else is taking them: Page Up and
+/// Page Down, Space and Shift-Space a pane at a time, Home and ⌘↑ to the top, End to the
+/// end (⌘↓ is View ▸ Jump to Latest).
 ///
 /// The transcript never holds the focus — a click on it leaves the focus where it was,
 /// usually the sidebar — so the keys are taken from the window as they arrive, before the
