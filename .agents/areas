@@ -225,6 +225,12 @@ Web/src/views/settings/                                settings
 Remote/Sources/Settings/                               settings
 Web/src/theme/                                         settings
 docs/reference/settings.md                             settings
+# The organisation's policy (#998): its words and the read-only Policy pane are settings'; the
+# "Set by your organisation" line under a refused choice is drawn by the runtimes lanes.
+**/OrgPolicy*                                          settings
+Web/src/model/orgPolicy.ts                             settings
+Web/test/orgPolicy.test.mjs                            settings
+**/OrgPolicyLine*                                      runtimes
 
 # usage: cost, spending limits, allowances, usage and time charts.
 App/Sources/Spending/                                  usage

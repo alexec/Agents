@@ -7130,6 +7130,11 @@ export interface Methods {
   "pins/unpinSession": { params: PinSessionRequest; result: Empty };
   "pins/unpinWorkflow": { params: WorkflowRequest; result: Empty };
   "pins/write": { params: PinWriteRequest; result: Empty };
+  "policy/get": { params: Empty; result: PolicyKept };
+  "policy/mine": { params: Empty; result: PolicyView };
+  "policy/raise": { params: PolicyRaiseRequest; result: PolicyKept };
+  "policy/set": { params: PolicySet; result: PolicyKept };
+  "policy/stopAll": { params: PolicyStopAllRequest; result: PolicyKept };
   "preferences/get": { params: Empty; result: Record<string, JSONValue> };
   "preferences/set": { params: Record<string, JSONValue>; result: Record<string, JSONValue> };
   "presence/report": { params: PresenceReport; result: Empty };
@@ -7348,6 +7353,11 @@ export const MethodTarget = {
   "pins/unpinSession": "host",
   "pins/unpinWorkflow": "host",
   "pins/write": "host",
+  "policy/get": "control",
+  "policy/mine": "control",
+  "policy/raise": "control",
+  "policy/set": "control",
+  "policy/stopAll": "control",
   "preferences/get": "host",
   "preferences/set": "host",
   "presence/report": "host",
@@ -7454,10 +7464,12 @@ export interface Notifications {
   "control/linkRequested": ChannelLinkRequest;
   "control/linksChanged": Empty;
   "control/peopleChanged": PeopleChanged;
+  "control/policyChanged": PolicyView;
   "control/providersChanged": ProviderList;
   "control/secretsLeft": SecretsLeft;
   "control/signInDecided": SignInDecided;
   "control/signInRequested": SignInRequest;
+  "control/stopAll": PolicyView;
   "control/userSettingsChanged": UserSettingsChanged;
   "disk/changed": DiskState;
   "files/changed": FilesChangedNotification;

@@ -34,6 +34,7 @@ struct RemoteSettings: View {
                     BotsSettingsRow()
                     ChannelsSettingsRow()
                     SignInProvidersSettingsRow()
+                    PolicySettingsRow()
                     GroupsSettingsRow()
                     // The control plane's workspace providers (#1819), as the page's Settings has them.
                     NavigationLink { WorkspaceProvidersView() } label: {

@@ -12,7 +12,7 @@ import { CallFailed } from "../wire/link";
 import { adminsOnly, appTitle, apps, consoleFoot, failedWords, fleetFilterTitle, fleetFilters, fleetFoot, fleetShown, fleetSummary, grouped,
   kindWords, noMachines, noRoles, notBuilt, openSection, outOfDate, ownerWords, runningWords, sectionsOf } from "../model/console";
 import type { AppName, FleetFilter, Section } from "../model/console";
-import type { FleetBoard } from "../protocol/generated";
+import type { FleetBoard, PolicyKept } from "../protocol/generated";
 import { fromWireDate } from "../protocol/dates";
 import { ago } from "../model/connectorSetup";
 import { missingWords, stateWords, versionWords } from "../model/capabilities";
@@ -20,6 +20,8 @@ import { ReportsPage } from "./Reports";
 import { BotsSection, PeopleSection } from "./People";
 import { GroupsSection } from "./Groups";
 import { ReportPolicyPage, policyNotSaved } from "./ConsolePolicy";
+import { OrgPolicyPage, orgPolicyNotSaved } from "./ConsoleOrgPolicy";
+import { followsWords } from "../model/orgPolicy";
 import { AuditPage, RequestsPage, requestCount } from "./ConsoleRecords";
 import { TeamWorkflowsPage } from "./ConsoleWorkflows";
 
@@ -70,6 +72,7 @@ export function SubAppPage({ store, app, down }: { store: Store; app: SubApp; do
                 {s.title}
                 {s.id === "requests" && !gated && requestCount(store) > 0 && <span class="sub-app-count">{requestCount(store)}</span>}
                 {s.id === "reportPolicy" && !gated && policyNotSaved(store) && <span class="quiet small attention">Not saved</span>}
+                {s.id === "policy" && !gated && orgPolicyNotSaved(store) && <span class="quiet small attention">Not saved</span>}
               </button>
             ))}
           </div>
@@ -94,6 +97,7 @@ function ConsoleSection({ store, section, down }: { store: Store; section: Secti
   switch (section.id) {
     case "people": return <PeoplePage store={store} down={down} />;
     case "machines": return <MachinesPage store={store} down={down} />;
+    case "policy": return <OrgPolicyPage store={store} down={down} />;
     case "reportPolicy": return <ReportPolicyPage store={store} down={down} />;
     case "requests": return <RequestsPage store={store} down={down} />;
     case "workflows": return <TeamWorkflowsPage store={store} down={down} />;
@@ -117,19 +121,24 @@ function PeoplePage({ store, down }: { store: Store; down: boolean }) {
 /** M1: every machine on the control plane, its owner, state, version and running agents. */
 function MachinesPage({ store, down }: { store: Store; down: boolean }) {
   const board = useSignal<FleetBoard | null>(null);
+  // The policy and each machine's applied version (#998, FR-024); none from a control plane before it.
+  const policy = useSignal<PolicyKept | null>(null);
   const problem = useSignal<string | null>(null);
   const filter = useSignal<FleetFilter>("all");
   const load = async () => {
     try {
-      board.value = await store.link.call("console/fleet", {});
+      const [fleet, kept] = await Promise.all([store.link.call("console/fleet", {}), store.link.call("policy/get", {}).catch(() => null)]);
+      board.value = fleet;
+      policy.value = kept;
       problem.value = null;
     } catch (error) {
       problem.value = failedWords(error);
     }
   };
-  // Again when a machine joins, leaves or changes state, and each minute for the running counts.
+  // Again when a machine joins, leaves or changes state, when the policy changes, and each minute for the running counts.
   const hosts = store.hosts.value;
-  useEffect(() => { if (!down) void load(); }, [down, hosts]);
+  const orgPolicy = store.orgPolicy.value;
+  useEffect(() => { if (!down) void load(); }, [down, hosts, orgPolicy]);
   useEffect(() => {
     const every = setInterval(() => { if (document.visibilityState === "visible" && !down) void load(); }, 60_000);
     return () => clearInterval(every);
@@ -166,6 +175,10 @@ function MachinesPage({ store, down }: { store: Store; down: boolean }) {
                       <td title={missing ?? undefined}>
                         {versionWords(m.host)}
                         {outOfDate(m, version) && <><br /><span class="small attention">Out of date</span></>}
+                        {followsWords(m, policy.value?.policy, policy.value?.machines) !== null && (
+                          <><br /><span class={`small${m.host.capabilities?.includes("host.policy/1") ? " quiet" : " attention"}`}>
+                            {followsWords(m, policy.value?.policy, policy.value?.machines)}</span></>
+                        )}
                       </td>
                       <td class="num">{runningWords(m)}</td>
                       <td class="quiet">{m.heardAt === undefined ? "—" : ago(fromWireDate(m.heardAt))}</td>

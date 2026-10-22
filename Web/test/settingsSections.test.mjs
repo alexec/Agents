@@ -11,8 +11,8 @@ test("each group's sections are in their subject's order", () => {
   // By subject (#2157): Sidebar and Finished chats are how this app draws, though the Mac's host keeps them (#2079).
   assert.deepEqual(names("thisApp"), ["appearance", "sidebar", "finishedChats"]);
   assert.deepEqual(names("machines"), ["gitAccess", "machines", "backups", "serverBackups", "userScope"]);
-  assert.deepEqual(names("controlPlane", "admin"), ["signIns", "people", "bots", "groups", "channels", "signInProviders", "providers"]);
-  assert.deepEqual(names("controlPlane", "member"), ["signIns", "people", "groups", "channels", "providers"]);
+  assert.deepEqual(names("controlPlane", "admin"), ["signIns", "people", "bots", "groups", "channels", "signInProviders", "policy", "providers"]);
+  assert.deepEqual(names("controlPlane", "member"), ["signIns", "people", "groups", "channels", "policy", "providers"]);
 });
 
 test("the list is sorted by name, a line each, and no two share a place", () => {

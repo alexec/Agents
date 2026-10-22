@@ -128,7 +128,7 @@ struct SettingsWindow: View {
     private func shows(_ each: SettingsPane) -> Bool {
         switch each {
         // A person's own sign-ins (#995), a pane of its own as on the Remote (#2197).
-        case .controlPlane, .clients, .onEveryMachine, .channels, .signIns: control != nil
+        case .controlPlane, .clients, .onEveryMachine, .channels, .signIns, .policy: control != nil
         // An admin's, and a member's in a group, who sees the groups they are in (#1761, #2076).
         case .groups: control != nil && model.people.showsGroups
         // An admin's: which providers people sign in with (#995).
@@ -218,6 +218,8 @@ struct SettingsWindow: View {
             FormColumn { ChannelsPane(control: model.controlRequests, people: model.people) }
         case .signIn:
             FormColumn { SignInPane(control: model.controlRequests, revision: model.people.revision) }
+        case .policy:
+            FormColumn { OrgPolicyPane(control: model.controlRequests, isAdmin: model.people.you?.isAdmin == true) }
         }
     }
 
@@ -235,7 +237,7 @@ extension SettingsScope {
         case .thisApp: [.appearance, .sidebar]
         case .machines: [.machines, .runtimes, .agentConfiguration, .spending, .resources, .onEveryMachine]
         // The person's account first, shown with no control plane too (#2157).
-        case .controlPlane: [.account, .signIns, .people, .bots, .groups, .channels, .signIn, .providers, .clients, .controlPlane]
+        case .controlPlane: [.account, .signIns, .people, .bots, .groups, .channels, .signIn, .policy, .providers, .clients, .controlPlane]
         }
     }
 }
@@ -263,6 +265,8 @@ enum SettingsPane: String, Hashable, CaseIterable {
     case channels
     /// Which providers people sign in with (#995).
     case signIn
+    /// The organisation's policy, read only, and the kill switch for an admin (#998).
+    case policy
     /// How this person signs in on their other clients (#995): You ▸ Sign-ins, as the
     /// Remote has it and every client's words name it (#2197). Was in Account.
     case signIns
@@ -277,12 +281,12 @@ enum SettingsPane: String, Hashable, CaseIterable {
         switch self {
         case .runtimes, .agentConfiguration, .spending, .resources: true
         case .appearance, .sidebar, .account, .machines, .controlPlane, .providers, .clients, .people, .bots, .groups,
-             .channels, .signIn, .signIns, .onEveryMachine: false
+             .channels, .signIn, .signIns, .onEveryMachine, .policy: false
         }
     }
 
     /// A pane drawn only with a control plane to show.
-    var needsControlPlane: Bool { [.controlPlane, .providers, .clients, .onEveryMachine, .signIns].contains(self) }
+    var needsControlPlane: Bool { [.controlPlane, .providers, .clients, .onEveryMachine, .signIns, .policy].contains(self) }
 
     var title: String {
         switch self {
@@ -302,6 +306,7 @@ enum SettingsPane: String, Hashable, CaseIterable {
         case .groups: GroupWords.title
         case .channels: ChannelLinkWords.title
         case .signIn: SignInWords.paneTitle
+        case .policy: OrgPolicyWords.title
         case .signIns: SignInWords.signInsTitle
         case .onEveryMachine: UserScopeWords.title
         }
@@ -325,6 +330,7 @@ enum SettingsPane: String, Hashable, CaseIterable {
         case .groups: "person.3"
         case .channels: "bubble.left.and.bubble.right"
         case .signIn: SignInWords.paneSymbol
+        case .policy: OrgPolicyWords.symbol
         case .signIns: "person.badge.key"
         case .onEveryMachine: "arrow.triangle.2.circlepath"
         }
