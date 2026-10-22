@@ -209,6 +209,7 @@ func (s *Service) makeRoomLocked() bool {
 
 // suspended is what a suspended account's address answers (#2152 FR-009).
 func (s *Service) suspended(w http.ResponseWriter) {
+	s.metrics.refused("suspended")
 	w.Header().Set("Agents-Refusal", "suspended")
 	plain(w, http.StatusForbidden, "This hosted account is suspended. See https://"+s.cfg.Domain+"/account.\n")
 }
@@ -238,6 +239,7 @@ func (s *Service) toAccount(w http.ResponseWriter, r *http.Request, id string) {
 	c, err := s.copyFor(ctx, id)
 	cancel()
 	if errors.Is(err, errFull) {
+		s.metrics.refused("full")
 		s.log(id + ": could not start: every copy is in use")
 		plain(w, http.StatusServiceUnavailable, "The service is full just now. Try again in a few minutes.\n")
 		return

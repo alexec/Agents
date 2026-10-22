@@ -67,11 +67,11 @@
 
 ## Phase 5: Operations (#2226; area hosted-ops, and hosted for the code)
 
-- [ ] T060 [US7] `deploy/gcp/hosted-up.sh` with `--check`; a test that it names each missing input (SC-008).
-- [ ] T061 [US7] The daily disk snapshot, as #2136.
-- [ ] T062 [US7] `/metrics` on its own listener, with a test.
-- [ ] T063 [US7] `admin backup` and `admin restore` of one account, with a test.
-- [ ] T064 [US7] The runbook (FR-044).
+- [x] T060 [US7] `deploy/gcp/hosted-up.sh` with `--check`; a test that it names each missing input (SC-008).
+- [x] T061 [US7] The daily disk snapshot, as #2136.
+- [x] T062 [US7] `/metrics` on its own listener, with a test.
+- [x] T063 [US7] `admin backup` and `admin restore` of one account, with a test.
+- [x] T064 [US7] The runbook (FR-044).
 
 ## Phase 6: After v0.11.0 ships (area control-plane)
 

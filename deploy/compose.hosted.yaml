@@ -73,6 +73,11 @@ services:
       AGENTS_HOSTED_STRIPE_WEBHOOK_SECRET: ${AGENTS_HOSTED_STRIPE_WEBHOOK_SECRET:-}
       # Caddy's address below: only its X-Forwarded-For says where a request came from.
       AGENTS_CONTROL_TRUSTED_PROXIES: 172.30.62.250
+      # Metrics (#2226) on a port Caddy does not pass, for this machine only: its published
+      # port's connections come from the network's gateway.
+      AGENTS_HOSTED_METRICS_PORT: 9795
+      AGENTS_HOSTED_METRICS_FROM: 172.30.62.1
+    ports: ["127.0.0.1:9795:9795"]
     secrets: [gcp-service-account]
     volumes:
       - data:/data
@@ -98,6 +103,7 @@ networks:
     ipam:
       config:
         - subnet: 172.30.62.0/24
+          gateway: 172.30.62.1
 
 secrets:
   gcp-service-account:

@@ -42,6 +42,8 @@ const recountAfter = 24 * time.Hour
 type limitedStore struct {
 	store.Store
 	account string
+	// Told each refusal's limit, for the metrics; nil in tests.
+	onRefuse func(limit string)
 
 	mu    sync.Mutex
 	plan  Plan
@@ -105,6 +107,9 @@ func (l *limitedStore) used() int64 {
 }
 
 func (l *limitedStore) refuse(p Plan, limit, allows, do string) *LimitError {
+	if l.onRefuse != nil {
+		l.onRefuse(limit)
+	}
 	return &LimitError{Plan: p, Limit: limit, Allows: allows, Do: do, Account: l.account}
 }
 
@@ -219,7 +224,7 @@ func count(ctx context.Context, st store.Store) (int64, error) {
 // counted again when there is none or it is old.
 func (s *Service) limitedFor(ctx context.Context, acc *Account) (*limitedStore, error) {
 	l := &limitedStore{Store: accountStore(s.cfg.Store, acc.ID), account: "https://" + s.cfg.Domain + "/account",
-		plan: PlanOf(acc)}
+		plan: PlanOf(acc), onRefuse: s.metrics.refused}
 	var u usage
 	if o, err := s.cfg.Store.Get(ctx, usageKey(acc.ID)); err != nil {
 		return nil, err
