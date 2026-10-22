@@ -5,7 +5,7 @@ import SwiftUI
 /// when it is next checked, and what is left of its plan. The Mac's Agent Runtimes
 /// words, as a list. Mark available is a swipe action.
 /// An account added to a runtime (#840) is its own row; Add Account is in the toolbar and
-/// Remove is a swipe. Signing one in is done on the Mac. An org account (#999) is a row too,
+/// Remove is a swipe. Signing one in is done on the Mac, in Runtimes (#2255). An org account (#999) is a row too,
 /// which only the organisation removes, and a runtime with accounts has **Reaches the Model
 /// By** under its own row.
 struct RuntimesView: View {
@@ -47,7 +47,7 @@ struct RuntimesView: View {
             }
             if model.accountProfiles.contains(where: { !$0.isOrganisation }) {
                 Section {} footer: {
-                    Text("Sign in to an added account on the Mac, in its runtime’s sign-in sheet.")
+                    Text("Sign in to an added account on the Mac, in Runtimes.")
                 }
             }
         }
@@ -74,7 +74,7 @@ struct RuntimesView: View {
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("You choose it when you start a session. Sign it in on the Mac.")
+            Text("You choose it when you start a session. \(AccountWords.signInOnTheMac)")
         }
         .confirmationDialog("Remove \(removing?.name ?? "this account")?",
                             isPresented: Binding(get: { removing != nil }, set: { if !$0 { removing = nil } }),
@@ -84,7 +84,8 @@ struct RuntimesView: View {
                 Task { await model.removeAccount(account) }
             }
         } message: {
-            Text("Its sessions stop, and its sign-in is deleted from the Mac.")
+            Text(AccountWords.removeMessage(stopping: removing.map(model.agentsHolding(account:))?.count ?? 0,
+                                            from: "the Mac"))
         }
         .navigationTitle("Runtimes")
         .navigationBarTitleDisplayMode(.inline)
@@ -117,9 +118,10 @@ struct RuntimesView: View {
     @State private var removing: AccountProfile?
     @State private var addProblem: String?
 
-    /// The Mac's runtimes that keep their sign-in in a folder, so take more than one account.
+    /// The Mac's runtimes that keep their sign-in in a folder, so take more than one account,
+    /// and are on the Mac.
     private var accountRuntimes: [RuntimeStatus] {
-        model.runtimes.filter { $0.runtime.accountFolderVariable != nil }
+        model.runtimes.filter { $0.runtime.accountFolderVariable != nil && !$0.availability.isMissing }
     }
 
     /// The organisation's mark when its policy does not allow the row's runtime (#998).

@@ -93,6 +93,8 @@ public enum RuntimeAvailability: Codable, Hashable, Sendable {
 
     public var isInstalling: Bool { if case .installing = self { return true }; return false }
 
+    public var isMissing: Bool { if case .missing = self { return true }; return false }
+
     // Written out rather than synthesised so that a case this build has never heard of
     // decodes as a failure with its name in it, instead of failing the whole runtime
     // list (048: a phone from before installing still reads a Mac that is installing).

@@ -112,23 +112,27 @@ keeps its sign-in:
 | **Grok** | No | | No variable moves its sign-in alone. |
 | **Antigravity** | No | | Its home is the app's own already. |
 
-- **Add one** with **Add Account…** in the runtime's sign-in sheet on the Mac (the runtime
-  menu above the prompt, **Sign in, sign out, providers…**), or on the **Runtimes** page on
-  iPhone, iPad and the web. The folder is `runtimes/accounts/<runtime>/<id>` under the app's
+- **Add one** with **Add Account…** on the **Runtimes** page, on all three, or in the
+  runtime's sign-in sheet on the Mac (the runtime menu above the prompt, **Sign in, sign out,
+  providers…**). Only a runtime on this Mac takes one: no client can sign in a server's
+  account (#2257). The folder is `runtimes/accounts/<runtime>/<id>` under the app's
   root. The app links your own settings into it (Claude's `settings.json`, `CLAUDE.md`,
   skills, agents, commands and plugins; Codex's `config.toml`, `AGENTS.md`, prompts and
   skills), so only the sign-in is separate.
-- **Sign it in** on the Mac. For Claude, **Sign In** gives the command
+- **Sign it in** on the Mac: **Sign In…** on its row of the **Runtimes** page opens the
+  runtime's sign-in sheet (#2255). For Claude, **Sign In** gives the command
   `CLAUDE_CONFIG_DIR=<folder> claude`: run it, then type `/login`. Codex signs in as its
   own sign-in does.
 - **Choose it** when you start a session: the **Account** menu is beside the runtime menu,
-  on all three, when the runtime has more than one account. A branch, **Continue in New** and
+  on all three, when the runtime has more than one account. Under each choice is why it
+  cannot be used or that its allowance is out (#2265). A branch, **Continue in New** and
   a helper the session starts keep its account.
 - **Its allowance is its own.** The **Runtimes** page shows a row for each account, under
   its runtime ("Claude · Work"). One account running out does not put the runtime, or
   another account, out. The app never changes a session to another account by itself.
 - **Remove it** to stop the sessions that use it, sign it out where the runtime can, and
-  delete its folder.
+  delete its folder. Every client asks first, and says how many sessions it stops and that
+  this cannot be undone (#2264).
 
 ### Org keys and gateways
 

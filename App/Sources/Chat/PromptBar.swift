@@ -451,11 +451,8 @@ struct PromptBar: View {
     /// Under an account's name: why it cannot be used, or where its allowance stands.
     private func accountNote(_ account: AccountProfile?) -> String? {
         guard let runtimeID = model.draftRuntimeID else { return nil }
-        if let account, !account.signedIn { return account.state }
-        let fallback = account?.isOrganisation == true ? account?.state : account?.signedInAs
-        guard let row = model.runtimeAllowances?.row(runtimeID, account: account?.id) else { return fallback }
-        if let unusable = row.unusable { return "Not usable: \(unusable)" }
-        return row.state.isOut ? row.memberLine(now: model.runtimeAllowances?.at ?? Date()) : fallback
+        return AccountWords.choiceNote(account, row: model.runtimeAllowances?.row(runtimeID, account: account?.id),
+                                       now: model.runtimeAllowances?.at ?? Date())
     }
 
     /// The runtime the conversation is on, where a new chat chooses one. Said, not

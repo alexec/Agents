@@ -5,6 +5,7 @@ import type { AccountProfile, Agent, AllowanceState, OrgPolicy, PolicySetBy, Run
 import { line, runtimeName, tokens } from "./orgPolicy";
 import { fromWireDate } from "../protocol/dates";
 import { fromOrganisation, noPlanLimit, requires, routeMissing, routeRemoved } from "./orgAccounts";
+import { hasTurnInFlight } from "./promptWords";
 
 /** The runtime a new agent gets when nothing else says: RuntimeCatalog.defaultRuntime. */
 export const defaultRuntimeID = "claude";
@@ -137,6 +138,49 @@ export function accountState(account: AccountProfile): string {
   if (isOrgAccount(account)) return fromOrganisation;
   if (!account.signedIn) return "Not signed in";
   return account.signedInAs === undefined ? "Signed in" : `Signed in as ${account.signedInAs}`;
+}
+
+// The words of an added account (#840) on every client: AccountWords on the Mac and the Remote.
+
+/** Where an added account is signed in: the Mac's Runtimes page (#2255). */
+export const signInOnTheMac = "Sign it in on the Mac, in Runtimes.";
+
+/** What Remove does, under its question: how many sessions it stops, and that it can't be undone (#2264). */
+export function removeMessage(stopping: number, place: string): string {
+  const stops = stopping === 0 ? "Nothing is running on it."
+    : `This stops ${stopping} session${stopping === 1 ? "" : "s"} mid-conversation.`;
+  return `${stops} Its sign-in is deleted from ${place}. This can’t be undone.`;
+}
+
+/** The sessions an added account is running, which removing it stops: AppModel.agentsHolding(account:). */
+export function agentsHolding(agents: readonly Agent[], account: AccountProfile): Agent[] {
+  return agents.filter((a) => a.runtimeID === account.runtimeID && a.accountID === account.id && hasTurnInFlight(a));
+}
+
+/** A time on the Runtimes page, such as 14:05. */
+export const runtimeTime = (wire: number) => fromWireDate(wire as never).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+
+/** An allowance's state, as the Runtimes page says it. */
+export function allowanceLine(state: AllowanceState): string {
+  if ("available" in state.status) return "Available";
+  if ("rateLimited" in state.status) return `Rate limited · trying again at ${runtimeTime(state.status.rateLimited.until)}`;
+  const out = state.status.out;
+  return out.until ? `Out · reset ${runtimeTime(out.until)}${out.retryAfter ? ` · checking after ${runtimeTime(out.retryAfter)}` : ""}`
+    : `Out since ${runtimeTime(state.since)}${out.retryAfter ? ` · checking after ${runtimeTime(out.retryAfter)}` : ""}`;
+}
+
+/**
+ * The line under a choice of account when a session starts (#2265), AccountWords.choiceNote: why
+ * it cannot be used, or that its allowance is out, else who it is. `account` undefined is the
+ * runtime's own sign-in; `row` is its allowance row.
+ */
+export function choiceNote(account: AccountProfile | undefined, row: RuntimeAllowancesRow | undefined, now: Date): string | undefined {
+  if (account && !account.signedIn && !isOrgAccount(account)) return accountState(account);
+  const fallback = account && isOrgAccount(account) ? accountState(account) : account?.signedInAs;
+  if (!row) return fallback;
+  if (row.unusable) return `Not usable: ${row.unusable}`;
+  if (!("out" in row.state.status)) return fallback;
+  return isOrgRow(row) ? orgAllowanceLine(row.state, row.tokensToday, now, runtimeTime, allowanceLine) : allowanceLine(row.state);
 }
 
 // What a member sees of an org account (#999, slice 3): OrgAccountMemberWords on the Mac and the Remote.
