@@ -12,7 +12,8 @@ struct SuspendedPage: View {
     var body: some View {
         VStack(spacing: 12) {
             Image(systemName: "person.crop.circle.badge.xmark")
-                .font(.system(size: 44))
+                .appText(.title)
+                .imageScale(.large)
                 .foregroundStyle(.secondary)
                 .accessibilityHidden(true)
             Text(SignInWords.suspendedLine)
