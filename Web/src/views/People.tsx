@@ -121,7 +121,7 @@ function RemoveSheet({ store, person, close }: { store: Store; person: PersonRow
 }
 
 /** Make a Bot… and Group and Cap… (#1761): a bot's name (when it is made), its group and daily cap. */
-function BotSheet({ store, bot, groups, close }: { store: Store; bot: PersonRow | null; groups: readonly Group[]; close: () => void }) {
+export function BotSheet({ store, bot, groups, close }: { store: Store; bot: PersonRow | null; groups: readonly Group[]; close: () => void }) {
   const name = useSignal("");
   // With one group, a new bot is in it.
   const group = useSignal(bot?.group ?? (groups.length === 1 ? groups[0]!.id : ""));

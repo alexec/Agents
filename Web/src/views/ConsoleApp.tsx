@@ -4,7 +4,7 @@
 // The control plane checks each call's role itself; the page only leaves out what would be refused.
 import type { ComponentChildren } from "preact";
 import { useEffect } from "preact/hooks";
-import { signal, useSignal } from "@preact/signals";
+import { useSignal } from "@preact/signals";
 import type { Store } from "../model/store";
 import { go, route } from "../route";
 import type { SubApp } from "../route";
@@ -23,27 +23,23 @@ import { ReportPolicyPage } from "./ConsolePolicy";
 import { AuditPage, RequestsPage, requestCount } from "./ConsoleRecords";
 import { TeamWorkflowsPage } from "./ConsoleWorkflows";
 
-/** Whether this person is an admin of the control plane: null until people/list answers. */
-export const isAdmin = signal<boolean | null>(null);
-/** Why the role is not known: a control plane before roles (#994), or none to ask. */
-const roleProblem = signal<string | null>(null);
+/** Whether this person is an admin of the control plane, from the store's one people list (#2055): null until it answers. */
+function adminOf(store: Store): boolean | null {
+  const list = store.people.value;
+  if (list) return list.admin;
+  return store.peopleFailure.value ? false : null;
+}
 
-async function loadRole(store: Store) {
-  try {
-    isAdmin.value = (await store.link.call("people/list", {})).admin;
-    roleProblem.value = null;
-  } catch (error) {
-    isAdmin.value = false;
-    roleProblem.value = error instanceof CallFailed && error.code === -32601 ? noRoles : null;
-  }
+/** Why the role is not known: a control plane before roles (#994), or none to ask. */
+function roleProblemOf(store: Store): string | null {
+  const failure = store.peopleFailure.value;
+  return failure instanceof CallFailed && failure.code === -32601 ? noRoles : null;
 }
 
 /** Workspace | Console | Reports, at the top of every page. Console is left out for a member. */
-export function AppSwitcher({ store, down }: { store: Store; down: boolean }) {
-  const changes = store.peopleChanges.value;
-  useEffect(() => { if (!down) void loadRole(store); }, [changes, down]);
+export function AppSwitcher({ store }: { store: Store; down: boolean }) {
   const current: AppName = route.value.app ?? "workspace";
-  const shown = apps.filter((a) => a !== "console" || isAdmin.value || current === "console");
+  const shown = apps.filter((a) => a !== "console" || adminOf(store) || current === "console");
   return (
     <nav class="app-switcher" aria-label="Apps">
       <div class="segmented" role="tablist">
@@ -59,7 +55,8 @@ export function AppSwitcher({ store, down }: { store: Store; down: boolean }) {
 /** The Console or Reports: its pages on the left, the one open on the right. */
 export function SubAppPage({ store, app, down }: { store: Store; app: SubApp; down: boolean }) {
   const open = openSection(app, route.value.section);
-  const gated = app === "console" && isAdmin.value !== true;
+  const isAdmin = adminOf(store);
+  const gated = app === "console" && isAdmin !== true;
   return (
     <div class="columns sub-app" aria-busy={down}>
       <nav class="projects sub-app-list" aria-label={appTitle[app]}>
@@ -82,7 +79,7 @@ export function SubAppPage({ store, app, down }: { store: Store; app: SubApp; do
         <div class="scroll">
           <div class="activity-body settings-body">
             {gated
-              ? <p class="hint">{isAdmin.value === null ? "Loading…" : roleProblem.value ?? adminsOnly}</p>
+              ? <p class="hint">{isAdmin === null ? "Loading…" : roleProblemOf(store) ?? adminsOnly}</p>
               : app === "console" ? <ConsoleSection store={store} section={open} down={down} />
               : <ReportsPage store={store} section={open} down={down} />}
           </div>

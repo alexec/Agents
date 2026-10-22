@@ -4,24 +4,23 @@
 import { useEffect } from "preact/hooks";
 import { useSignal } from "@preact/signals";
 import type { Store } from "../model/store";
-import type { Group, PersonRow, ReportPolicy } from "../protocol/generated";
+import type { Group, ReportPolicy } from "../protocol/generated";
 import { budgetInput, budgetValue, failedWords, leadCandidates, orgKey, policyFoot, totalsOnlyFoot } from "../model/console";
 
 export function ReportPolicyPage({ store, down }: { store: Store; down: boolean }) {
   const policy = useSignal<ReportPolicy | null>(null);
   const groups = useSignal<Group[]>([]);
-  const people = useSignal<PersonRow[]>([]);
+  // The store's one people list (#2055).
+  const people = store.people.value?.people ?? [];
   const budgets = useSignal<Record<string, string>>({});
   const problem = useSignal<string | null>(null);
   const saved = useSignal(false);
   const busy = useSignal(false);
   const load = async () => {
     try {
-      const [p, g, list] = await Promise.all([store.link.call("reports/policy", {}), store.link.call("groups/list", {}),
-        store.link.call("people/list", {})]);
+      const [p, g] = await Promise.all([store.link.call("reports/policy", {}), store.link.call("groups/list", {})]);
       policy.value = p;
       groups.value = g.groups;
-      people.value = list.people;
       budgets.value = Object.fromEntries(Object.entries(p.budgetsUSD).map(([k, v]) => [k, budgetInput(v)]));
       problem.value = null;
     } catch (error) {
@@ -89,7 +88,7 @@ export function ReportPolicyPage({ store, down }: { store: Store; down: boolean 
               <h3 class="section-head" id={`policy-${g.id}`}>{g.name}</h3>
               <fieldset class="group-people">
                 <legend>Leads</legend>
-                {leadCandidates(g, people.value).map((p) => (
+                {leadCandidates(g, people).map((p) => (
                   <label key={p.id} class="setting">
                     <span>{p.name}</span>
                     <input type="checkbox" checked={(shown.leads[g.id] ?? []).includes(p.id)}

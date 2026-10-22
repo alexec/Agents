@@ -21,7 +21,7 @@ export function TeamWorkflowsPage({ store, down }: { store: Store; down: boolean
     }
   };
   const changes = store.peopleChanges.value;
-  useEffect(() => { if (!down) void load(); }, [down, changes, store.capReached.value]);
+  useEffect(() => { if (!down) void load(); }, [down, changes, store.capped.value]);
   useEffect(() => {
     const every = setInterval(() => { if (document.visibilityState === "visible" && !down) void load(); }, 60_000);
     return () => clearInterval(every);
