@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Agents: run your coding agents together, and answer them from anywhere</title>
+<meta name="description" content="Keep your editor and the coding agents you already have. Agents runs several of them at once on your Mac or your own servers, shows which one needs you, and lets you answer from your iPhone, iPad or a browser.">
+<meta property="og:title" content="Agents">
+<meta property="og:description" content="Run several coding agents at once. See which one needs you. Answer from anywhere.">
+<meta property="og:image" content="https://www.agentloops.dev/assets/shots/mac.png">
+<meta property="og:url" content="https://www.agentloops.dev/">
+<link rel="canonical" href="https://www.agentloops.dev/">
+<link rel="icon" href="assets/favicon.png" type="image/png">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="top">
+  <a class="brand" href="/"><img src="assets/icon.svg" alt="" width="32" height="32">Agents</a>
+  <nav>
+    <a href="#clients">Clients</a>
+    <a href="https://docs.agentloops.dev/">Docs</a>
+    <a href="https://github.com/alexec/Agents">GitHub</a>
+  </nav>
+</header>
+
+<main>
+
+<section class="hero">
+  <img class="hero-icon" src="assets/icon.svg" alt="The Agents icon: a white blob with a smile, on blue" width="112" height="112">
+  <h1>Run several coding agents at once. See which one needs you.</h1>
+  <p class="lede">Keep your editor and the coding agents you already pay for. Agents runs them on your Mac or on your own servers. You answer them from your iPhone, your iPad or a browser.</p>
+  <p class="actions">
+    <a class="button primary" href="https://docs.agentloops.dev/tutorials/first-agent/">Get it on TestFlight</a>
+    <a class="button" href="https://docs.agentloops.dev/">Read the docs</a>
+  </p>
+  <p class="small">An alpha, on TestFlight by invitation. Open source under the <a href="https://github.com/alexec/Agents/blob/main/LICENSE">MIT licence</a>.</p>
+  <!-- The hero video goes here when #1078 makes it. Replace the figure with:
+       <div class="video"><iframe src="https://www.youtube-nocookie.com/embed/VIDEO_ID?rel=0"
+         title="Agents in two minutes" loading="lazy" allowfullscreen
+         allow="encrypted-media; picture-in-picture"></iframe></div> -->
+  <figure class="shot hero-shot">
+    <img src="assets/shots/mac.png" alt="The Agents window on a Mac: projects and their agents in the sidebar, grouped by what happens next, with one conversation open" width="1440" height="900">
+  </figure>
+</section>
+
+<section class="pitch">
+  <article>
+    <h2>It runs the agents you already have</h2>
+    <p>Claude, Codex, Gemini, Antigravity, Grok, Copilot, Cursor and OpenCode, each signed in with your own account and plan. Agents brings no model and no bill of its own. You choose the runtime, the model and the permission mode for each agent.</p>
+    <p class="more"><a href="https://docs.agentloops.dev/reference/runtimes/">What each runtime can do</a></p>
+  </article>
+
+  <article>
+    <h2>It shows which agent needs you</h2>
+    <p>Every agent is in one group: Needs you, Waiting, Working, Done or Paused. When an agent ends its turn, it says in one sentence how it went. Read the list and you know what to open, without reading a conversation.</p>
+    <p class="more"><a href="https://docs.agentloops.dev/reference/statuses/">Statuses and groups</a></p>
+  </article>
+
+  <article>
+    <h2>You see the work, not only the chat</h2>
+    <p>A plan or a review that an agent writes opens beside the conversation and fills in as the agent writes. You can type on it while it grows. Code changes are coloured down to the word.</p>
+    <p class="more"><a href="https://docs.agentloops.dev/how-to/follow-a-live-document/">Follow a live document</a></p>
+  </article>
+
+  <article>
+    <h2>Agents that work together, and on their own</h2>
+    <p>An agent finishes a change. A workflow, a Markdown file in your repository, starts a second agent to test it. The tester needs the iOS simulator, but another agent has it. So the tester takes a place in line and ends its turn. It costs nothing while it waits, and it starts again when the simulator is free.</p>
+    <p>It fixes the failure, then waits for <code>main</code> to move so it can rebase. Nothing polls. When <code>main</code> moves, the agent wakes up and finishes. Nobody asked you for anything.</p>
+    <ul>
+      <li><strong>Leases.</strong> Agents take turns with a simulator, a browser, the screen, or anything they name. <a href="https://docs.agentloops.dev/explanation/leases/">Leases</a></li>
+      <li><strong>Events.</strong> An agent can wait for another agent, a branch, a pull request or the Mac waking. <a href="https://docs.agentloops.dev/reference/events/">Events</a></li>
+      <li><strong>Workflows.</strong> Start an agent on a schedule or when something happens. The file lives beside your code. <a href="https://docs.agentloops.dev/how-to/set-up-a-workflow/">Set up a workflow</a></li>
+      <li><strong>Agents that manage agents.</strong> An agent can start helpers, each in a worktree of its own, then brief them, wait for them and stop them. <a href="https://docs.agentloops.dev/reference/agent-tools/">Tools for agents</a></li>
+    </ul>
+  </article>
+
+  <article>
+    <h2>They keep going without you</h2>
+    <p>Your agents run in a helper in the background, not in the window. Close the window or quit the app, and they carry on. The Mac stays awake while a turn runs. After a restart, the agents that were working pick up where they stopped.</p>
+    <p class="more"><a href="https://docs.agentloops.dev/explanation/window-and-daemon/">The window and the host</a></p>
+  </article>
+
+  <article>
+    <h2>Your machines, one figure for spending</h2>
+    <p>The work runs on your Mac, or on a Linux server of your own. The control plane that connects your devices runs on your Mac, or on hosting you rent. Every agent's spending, on every runtime and server, adds up to one figure for the day, and you can set a limit.</p>
+    <p class="more"><a href="https://docs.agentloops.dev/explanation/control-plane/">The control plane</a> · <a href="https://docs.agentloops.dev/how-to/limit-spending/">Limit spending</a></p>
+  </article>
+</section>
+
+<section class="clients" id="clients">
+  <h2>On the Mac, the iPhone and iPad, and the web</h2>
+  <p class="lede">The same agents, the same list and the same conversations on each. Read, answer, start and stop agents from any of them. When an agent needs you and you are away from the Mac, the device you used last gets a notification.</p>
+  <div class="three">
+    <figure class="shot">
+      <img src="assets/shots/mac-client.png" alt="The Mac window with an agent's conversation and its live document beside it" width="1440" height="900" loading="lazy">
+      <figcaption><strong>Mac.</strong> The window, with files, changes and a terminal beside each conversation.</figcaption>
+    </figure>
+    <figure class="shot phone">
+      <img src="assets/shots/iphone.png" alt="Agents on an iPhone: the list of agents grouped by who needs you" width="603" height="1311" loading="lazy">
+      <figcaption><strong>iPhone and iPad.</strong> Answer a question from the sofa, or start an agent on the train.</figcaption>
+    </figure>
+    <figure class="shot">
+      <img src="assets/shots/web.png" alt="Agents as a web page in a browser" width="1440" height="900" loading="lazy">
+      <figcaption><strong>Web.</strong> The same app as a page in any browser, served by your own Mac or control plane.</figcaption>
+    </figure>
+  </div>
+</section>
+
+<!-- Videos (#1078, #1793). When the first one is on YouTube, take out `hidden` and add one
+     <div class="video"> per video, with a youtube-nocookie.com address only:
+     <div class="video"><iframe src="https://www.youtube-nocookie.com/embed/VIDEO_ID?rel=0"
+       title="…" loading="lazy" allowfullscreen allow="encrypted-media; picture-in-picture"></iframe></div> -->
+<section class="videos" id="videos" hidden>
+  <h2>See it work</h2>
+</section>
+
+<section class="honest">
+  <h2>When something else is better</h2>
+  <ul>
+    <li><strong>You want one assistant beside the file you edit.</strong> The agent in your editor is closer to hand. Agents is not an editor.</li>
+    <li><strong>You do not use a Mac.</strong> Agents needs a Mac. Servers, phones and browsers connect to it.</li>
+    <li><strong>Your computer should be off while the work happens.</strong> A cloud agent does that. Agents runs the work on machines you own.</li>
+  </ul>
+  <p class="actions">
+    <a class="button primary" href="https://docs.agentloops.dev/tutorials/first-agent/">Start your first agent</a>
+    <a class="button" href="https://docs.agentloops.dev/explanation/why-agents/">Why Agents, in full</a>
+  </p>
+</section>
+
+</main>
+
+<footer>
+  <nav>
+    <a href="https://docs.agentloops.dev/">Docs</a>
+    <a href="https://docs.agentloops.dev/privacy/">Privacy</a>
+    <a href="https://docs.agentloops.dev/terms/">Terms</a>
+    <a href="https://github.com/alexec/Agents/issues">Support</a>
+    <a href="https://github.com/alexec/Agents">GitHub</a>
+  </nav>
+  <p class="small">This site sets no cookies and has no tracking. Apple, Mac, iPhone, iPad and TestFlight are trademarks of Apple Inc.</p>
+</footer>
+
+</body>
+</html>
