@@ -122,8 +122,8 @@ func (d *Daemon) machineID() string {
 	return d.machineValue
 }
 
-// runsHere says this machine has every label the workflow's runs-on: names (#1761); one
-// with none runs on every machine of the person who turned it on, as before.
+// runsHere says this machine matches the workflow's runs-on: (#1761, #2064): one of its
+// machine ids, and every other label. One with none runs on every machine of the person who turned it on, as before.
 func (d *Daemon) runsHere(w wire.Workflow) bool {
 	return len(w.RunsOn) == 0 || d.runsOnHere(w.RunsOn)
 }

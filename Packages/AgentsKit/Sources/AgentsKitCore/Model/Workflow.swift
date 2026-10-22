@@ -153,14 +153,28 @@ public struct Workflow: Codable, Hashable, Sendable, Identifiable {
 
     /// Whether `machineID` may fire this workflow (#317).
     ///
-    /// Absent or empty `runs-on:` is every machine. One that names machine ids runs only
-    /// where the id matches, on a schedule, on an event, or by hand. Its other labels (an
+    /// Absent or empty `runs-on:` is every machine. One that names machine ids runs on each
+    /// of them, as the host does (#2064), on a schedule, on an event, or by hand. Its other labels (an
     /// os, a provider, a user's name) are the machine's to match: a client cannot tell.
     public func runs(on machineID: String?) -> Bool {
         let ids = (runsOn ?? []).filter(Self.isMachineID)
         guard !ids.isEmpty else { return true }
         guard let machineID, !machineID.isEmpty else { return false }
         return ids.contains { $0.caseInsensitiveCompare(machineID) == .orderedSame }
+    }
+
+    /// What Runs on means, on every client (#2064).
+    public static let runsOnSentence = "Every machine with this project runs it, or each machine turned on here. The file stores each machine's id, so renaming one does not unpin it."
+
+    /// A `runs-on:` list as the Runs on section shows it (#2064): the machines it names, any
+    /// one of which runs it, and the labels every one of them also needs (a bot, an os, a
+    /// provider). A label is a machine when it is a choice on screen or looks like an id.
+    public static func runsOnParts(_ runsOn: [String], known: Set<String>) -> (machines: [String], needs: [String]) {
+        var machines: [String] = [], needs: [String] = []
+        for label in runsOn {
+            if known.contains(label) || isMachineID(label) { machines.append(label) } else { needs.append(label) }
+        }
+        return (machines, needs)
     }
 
     /// A label that is a machine's id: a UUID, or 32 hex digits (Linux `/etc/machine-id`).

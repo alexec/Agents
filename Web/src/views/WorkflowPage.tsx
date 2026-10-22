@@ -12,7 +12,7 @@ import type { Agent } from "../protocol/generated";
 import type { Store } from "../model/store";
 import {
   cooldownSentence, labelsNote, mcpMissedWords, mcpTriggerWords, agentModeWords, unknownLines, isUnapproved, canBeApproved, canBeDenied, workflowStatusLines, isOn, isSupportedTrigger, switchesSentence, lastRanLine, nextLine, resumedAgent, scopeLine, triggerFilters, triggerGlyph,
-  triggerSummary, workflowHostChoices, workflowSummary,
+  runsOnParts, triggerSummary, workflowRunsOnSentence, workflowHostChoices, workflowSummary,
 } from "../model/workflows";
 import { go } from "../route";
 import { RunNow } from "./WorkflowRow";
@@ -80,9 +80,9 @@ export function WorkflowPage({ store, host, folder, projectName, workflowID, dow
     ? [store.agent(host, summary.standingAgentID)].find((a) => a !== undefined && a.archivedAt === undefined) : undefined;
   const cooldown = cooldownSentence(summary);
   const unknown = unknownLines(workflow);
-  const pinned = workflow.runsOn ?? [];
   const choices = workflowHostChoices(store.hosts.value, store.macHostID.value);
   const knownHosts = new Set(choices.map((choice) => choice.machineID));
+  const { machines: pinned, needs } = runsOnParts(workflow.runsOn, knownHosts);
   const rows = [...choices, ...pinned.filter((id) => !knownHosts.has(id)).map((id) => ({ machineID: id, name: id }))];
   // A file that could not be read has no settings to show, so a change would write the empty ones.
   const locked = down || workflow.problem !== undefined;
@@ -265,11 +265,11 @@ export function WorkflowPage({ store, host, folder, projectName, workflowID, dow
             )}
 
             <h2 class="section-head">Runs on</h2>
-            <p class="quiet small">Every machine with this project runs it, unless it is pinned to some of them. The file stores each machine's id, so renaming one does not unpin it.</p>
+            <p class="quiet small">{workflowRunsOnSentence}</p>
             <div class="host-pins">
               <label class="switch">
                 <input type="checkbox" role="switch" aria-label="Every machine" checked={pinned.length === 0} disabled={locked || pinned.length === 0}
-                  onChange={() => change({ runsOn: [] })} />
+                  onChange={() => change({ runsOn: needs })} />
                 Every machine
               </label>
               {rows.map((row) => (
@@ -278,12 +278,13 @@ export function WorkflowPage({ store, host, folder, projectName, workflowID, dow
                     onChange={(event) => {
                       const on = (event.currentTarget as HTMLInputElement).checked;
                       const next = on ? [...pinned, row.machineID] : pinned.filter((id) => id !== row.machineID);
-                      change({ runsOn: next });
+                      change({ runsOn: [...next, ...needs] });
                     }} />
                   {row.name}
                 </label>
               ))}
             </div>
+            {needs.length > 0 && <p class="quiet small">Also needs: {needs.join(", ")}</p>}
 
             {unknown.length > 0 && (
               <>

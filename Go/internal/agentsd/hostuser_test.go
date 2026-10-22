@@ -29,6 +29,14 @@ func TestABotsMachineAsksNobodyAndClaimsItsRuns(t *testing.T) {
 	if !d.runsOnHere([]string{d.machineID()}) {
 		t.Fatal("its own id")
 	}
+	// Two machines under Runs on: one of them is enough, and the other labels still all match (#2064).
+	other, linux := "6F1C2E5A-0B7D-4C1E-9A3B-2D4E6F8A0B1C", "0123456789abcdef0123456789abcdef"
+	if !d.runsOnHere([]string{other, d.machineID()}) || !d.runsOnHere([]string{"review-bot", d.machineID(), linux}) {
+		t.Fatal("one of its machine ids")
+	}
+	if d.runsOnHere([]string{other, linux}) || d.runsOnHere([]string{d.machineID(), other, "windows"}) {
+		t.Fatal("another machine's ids, or a label it lacks")
+	}
 	if b, err := os.ReadFile(d.hostUserPath()); err != nil || !strings.Contains(string(b), "review-bot") {
 		t.Fatalf("%s %v", b, err)
 	}

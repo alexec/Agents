@@ -795,14 +795,29 @@ export function isMachineID(label: string): boolean {
 
 /**
  * Whether this host may run the workflow, by its runs-on: (#1761, was hosts:, #317). One that names
- * machine ids needs a known matching id; its other labels (an os, a provider, a user's name) are the
- * machine's to match, as Workflow.runs(on:) in Swift says.
+ * machine ids needs a known id that is one of them, as the host does (#2064); its other labels (an
+ * os, a provider, a user's name) are the machine's to match, as Workflow.runs(on:) in Swift says.
  */
 export function workflowRunsOn(runsOn: readonly string[] | undefined, machineID: string | undefined): boolean {
   const ids = (runsOn ?? []).filter(isMachineID);
   if (ids.length === 0) return true;
   if (!machineID) return false;
   return ids.some((id) => id.toLowerCase() === machineID.toLowerCase());
+}
+
+/** What Runs on means, on every client (#2064). */
+export const workflowRunsOnSentence =
+  "Every machine with this project runs it, or each machine turned on here. The file stores each machine's id, so renaming one does not unpin it.";
+
+/**
+ * A runs-on: list as the Runs on section shows it (#2064): the machines it names, any one of
+ * which runs it, and the labels every one of them also needs (a bot, an os, a provider). A
+ * label is a machine when it is a choice on screen or looks like a machine's id.
+ */
+export function runsOnParts(runsOn: readonly string[] | undefined, known: ReadonlySet<string>): { machines: string[]; needs: string[] } {
+  const machines: string[] = [], needs: string[] = [];
+  for (const label of runsOn ?? []) (known.has(label) || isMachineID(label) ? machines : needs).push(label);
+  return { machines, needs };
 }
 
 /** One computer the workflow page can pin to. The name is the one already on screen. */

@@ -104,7 +104,7 @@ Phase 0 for `plan.md`. Each entry gives a decision, why, and what was rejected.
 
 - **Decision**:
   - **Machine labels** are `os:<darwin|linux>`, `provider:<name>`, the user's or bot's name, and the machine id.
-  - `runs-on:` is a list of labels. All must match.
+  - `runs-on:` is a list of labels. All must match, except machine ids: a machine has one, so it runs when its id is one of them (#2064).
   - **A trigger for a bot's workflow:** each of the bot's machines that sees it asks `workflows/claimRun {workflow, triggerID}`. The control plane writes `runs/<workflow>/<triggerID>.json` with `absent`, and the first machine wins (the store's create-only condition). The others are told `taken`.
   - **Schedules and project events** for bots come from the control plane (scoped events, FR-035). So with no bot machine online, the control plane starts one (#1004 wake-up) and keeps the trigger.
   - **Personal workflows** (no `runs-on:`) run on each machine of each user who turned them on, as today.

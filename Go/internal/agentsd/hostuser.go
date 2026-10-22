@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"regexp"
 	goruntime "runtime"
 	"sort"
 	"strings"
@@ -115,16 +116,33 @@ func (d *Daemon) machineLabels() map[string]bool {
 	return labels
 }
 
-// runsOnHere says this machine has every label of a runs-on: list.
+// runsOnHere says this machine matches a runs-on: list (#2064). Its machine ids are a
+// choice: one of them is this machine's. Every other label (an os, a provider, a user's or
+// bot's name) this machine has. A machine has one id, so two ids that all had to match
+// would run nowhere, and the clients' Runs on, one switch per machine, names several.
 func (d *Daemon) runsOnHere(runsOn []string) bool {
 	labels := d.machineLabels()
+	own := strings.ToLower(d.machineID())
+	named, here := false, false
 	for _, l := range runsOn {
-		if !labels[strings.ToLower(strings.TrimSpace(l))] {
+		l = strings.ToLower(strings.TrimSpace(l))
+		if l == own || isMachineID(l) {
+			named = true
+			here = here || l == own
+			continue
+		}
+		if !labels[l] {
 			return false
 		}
 	}
-	return true
+	return !named || here
 }
+
+// isMachineID says a label is a machine's id, as the clients tell it: a UUID, or 32 hex
+// digits (Linux /etc/machine-id).
+func isMachineID(label string) bool { return machineIDPattern.MatchString(label) }
+
+var machineIDPattern = regexp.MustCompile(`^(?i:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|[0-9a-f]{32})$`)
 
 // hearsFor is the bot a person's machine hears a workflow for (#2027): a runs-on: workflow
 // that does not run here, names a bot of the person's groups, and has a server trigger.

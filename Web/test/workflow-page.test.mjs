@@ -84,6 +84,11 @@ test("the host list offers This Mac first and leaves out a relay, on or off (#31
   assert.equal(w.workflowRunsOn([mac.toUpperCase()], mac), true);
   assert.equal(w.workflowRunsOn([other], mac), false);
   assert.equal(w.workflowRunsOn(["review-bot", "linux"], mac), true);
+  // Two machines under Runs on: each of them runs it, as the host now does (#2064).
+  assert.equal(w.workflowRunsOn([other, mac], mac), true);
+  assert.deepEqual(w.runsOnParts([other, "review-bot", "mac-id", "linux"], new Set(["mac-id"])),
+    { machines: [other, "mac-id"], needs: ["review-bot", "linux"] });
+  assert.deepEqual(w.runsOnParts(undefined, new Set()), { machines: [], needs: [] });
 });
 
 test("the cooldown is written as the file writes it", () => {

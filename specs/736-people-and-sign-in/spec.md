@@ -455,7 +455,7 @@ Client and machine keys expire after 90 days and renew when in use. A person who
 - **FR-031**: No client MUST be able to start, message, stop for work, or answer an agent on a bot's machine. **Run now** MUST NOT be offered on a bot's workflows. Admins MAY stop a bot's run.
 - **FR-032**: A bot's sessions MUST have no ask tools. A tool permission MUST be answered by the bot's policy alone. A run that cannot go on MUST end as **Needs attention**, with a notice to the admins.
 - **FR-033**: Spend caps MUST be settable per group and per bot. At a cap, the bot MUST stop starting work, and the admins MUST get a notice.
-- **FR-034**: Workflows MUST replace `hosts:` with `runs-on:`, a list of labels. The labels are matched against machine labels: `os`, `provider`, and the user's or bot's name.
+- **FR-034**: Workflows MUST replace `hosts:` with `runs-on:`, a list of labels. The labels are matched against machine labels: `os`, `provider`, and the user's or bot's name. A machine needs every label, except machine ids: it needs to be one of those it names (#2064).
   - A workflow with a bot's name in `runs-on:` MUST run once per trigger, leased to one of that bot's machines. If none is online and a workspace provider of the bot's group is there, the control plane MUST start a machine (#1004).
   - A workflow with no `runs-on:` MUST run on the machines of each user who turned it on, as today.
 - **FR-035**: Events MUST have a scope:

@@ -4,18 +4,23 @@ import SwiftUI
 /// Which computers run this workflow (#317).
 ///
 /// An empty list is every host that has the project. Choosing a computer writes that
-/// computer's id into the file. Turning the last one off, or turning Every host on,
-/// takes the list out, which is every host again. A computer the control plane does
-/// not know still shows, as its id, so a save does not drop it.
+/// computer's id into the file, and each computer chosen runs it (#2064). Turning the last
+/// one off, or turning Every host on, takes the ids out, which is every host again. A
+/// computer the control plane does not know still shows, as its id, so a save does not drop
+/// it. A label that is no computer (a bot, an os) is shown under Also needs and kept.
 struct WorkflowHostsSection: View {
     let choices: [WorkflowHostChoice]
     let hosts: [String]
     var locked: Bool
     let onChange: ([String]) -> Void
 
+    private var parts: (machines: [String], needs: [String]) {
+        Workflow.runsOnParts(hosts, known: Set(choices.map(\.machineID)))
+    }
+
     private var rows: [WorkflowHostChoice] {
         let known = Set(choices.map(\.machineID))
-        let extras = hosts.filter { !known.contains($0) }.map { WorkflowHostChoice(machineID: $0, name: $0) }
+        let extras = parts.machines.filter { !known.contains($0) }.map { WorkflowHostChoice(machineID: $0, name: $0) }
         return choices + extras
     }
 
@@ -25,24 +30,31 @@ struct WorkflowHostsSection: View {
                 .appText(.fine).fontWeight(.semibold)
                 .foregroundStyle(.secondary)
                 .accessibilityAddTraits(.isHeader)
-            Text("Every machine with this project runs it, unless it is pinned to some of them. The file stores each machine's id, so renaming one does not unpin it.")
+            Text(Workflow.runsOnSentence)
                 .appText(.fine)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             Toggle("Every machine", isOn: Binding(
-                get: { hosts.isEmpty },
-                set: { on in if on { onChange([]) } }))
-                .disabled(locked || hosts.isEmpty)
+                get: { parts.machines.isEmpty },
+                set: { on in if on { onChange(parts.needs) } }))
+                .disabled(locked || parts.machines.isEmpty)
                 .hostPinStyle()
             ForEach(rows) { row in
                 Toggle(row.name, isOn: Binding(
-                    get: { hosts.contains(row.machineID) },
+                    get: { parts.machines.contains(row.machineID) },
                     set: { on in
-                        let next = on ? hosts + [row.machineID] : hosts.filter { $0 != row.machineID }
-                        onChange(next)
+                        let (machines, needs) = parts
+                        let next = on ? machines + [row.machineID] : machines.filter { $0 != row.machineID }
+                        onChange(next + needs)
                     }))
                     .disabled(locked)
                     .hostPinStyle()
+            }
+            if !parts.needs.isEmpty {
+                Text("Also needs: \(parts.needs.joined(separator: ", "))")
+                    .appText(.fine)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
     }
