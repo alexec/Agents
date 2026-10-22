@@ -62,11 +62,7 @@ struct AccountSettingsView: View {
     var body: some View {
         Form {
             PersonSettingsSection()
-            // How this person signs in on their other clients (#995), with a control plane.
-            if model.controlRequests != nil {
-                SignInsSection(control: model.controlRequests, controlKey: ControlConfig.controlKey,
-                               people: model.people)
-            }
+            // How this person signs in on their other clients is You ▸ Sign-ins (#2197).
             ChatProjectSettingsSection()
         }
         .paperForm()

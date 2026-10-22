@@ -127,7 +127,8 @@ struct SettingsWindow: View {
     /// Providers one that can run them (#691).
     private func shows(_ each: SettingsPane) -> Bool {
         switch each {
-        case .controlPlane, .clients, .onEveryMachine, .channels: control != nil
+        // A person's own sign-ins (#995), a pane of its own as on the Remote (#2197).
+        case .controlPlane, .clients, .onEveryMachine, .channels, .signIns: control != nil
         // An admin's, and a member's in a group, who sees the groups they are in (#1761, #2076).
         case .groups: control != nil && model.people.showsGroups
         // An admin's: which providers people sign in with (#995).
@@ -163,6 +164,13 @@ struct SettingsWindow: View {
         case .appearance: FormColumn { Form { AppearanceSettingsView() }.paperForm() }
         case .sidebar: FormColumn { Form { SidebarSettingsSection() }.paperForm() }
         case .account: FormColumn { AccountSettingsView() }
+        case .signIns:
+            FormColumn {
+                Form {
+                    SignInsSection(control: model.controlRequests, controlKey: ControlConfig.controlKey, people: model.people)
+                }
+                .paperForm()
+            }
         case .machines:
             if let control {
                 HStack(spacing: 0) {
@@ -220,7 +228,7 @@ extension SettingsScope {
         switch self {
         case .thisDevice: [.appearance]
         // Sidebar is kept on the Mac's host and is the same on every client (#1033, #2079).
-        case .you: [.account, .sidebar, .runtimes, .agentConfiguration, .spending, .resources, .onEveryMachine, .machines]
+        case .you: [.account, .signIns, .sidebar, .runtimes, .agentConfiguration, .spending, .resources, .onEveryMachine, .machines]
         case .controlPlane: [.people, .groups, .channels, .signIn, .providers, .clients, .controlPlane]
         }
     }
@@ -247,6 +255,9 @@ enum SettingsPane: String, Hashable, CaseIterable {
     case channels
     /// Which providers people sign in with (#995).
     case signIn
+    /// How this person signs in on their other clients (#995): You ▸ Sign-ins, as the
+    /// Remote has it and every client's words name it (#2197). Was in Account.
+    case signIns
     /// Was Shared (#754): the raw value is what a window left open on it kept.
     case agentConfiguration = "shared"
     /// The settings and secrets the control plane keeps for the person (#1760).
@@ -258,12 +269,12 @@ enum SettingsPane: String, Hashable, CaseIterable {
         switch self {
         case .runtimes, .agentConfiguration, .spending, .resources: true
         case .appearance, .sidebar, .account, .machines, .controlPlane, .providers, .clients, .people, .groups,
-             .channels, .signIn, .onEveryMachine: false
+             .channels, .signIn, .signIns, .onEveryMachine: false
         }
     }
 
     /// A pane drawn only with a control plane to show.
-    var needsControlPlane: Bool { [.controlPlane, .providers, .clients, .onEveryMachine].contains(self) }
+    var needsControlPlane: Bool { [.controlPlane, .providers, .clients, .onEveryMachine, .signIns].contains(self) }
 
     var title: String {
         switch self {
@@ -282,6 +293,7 @@ enum SettingsPane: String, Hashable, CaseIterable {
         case .groups: GroupWords.title
         case .channels: ChannelLinkWords.title
         case .signIn: SignInWords.paneTitle
+        case .signIns: SignInWords.signInsTitle
         case .onEveryMachine: UserScopeWords.title
         }
     }
@@ -303,6 +315,7 @@ enum SettingsPane: String, Hashable, CaseIterable {
         case .groups: "person.3"
         case .channels: "bubble.left.and.bubble.right"
         case .signIn: SignInWords.paneSymbol
+        case .signIns: "person.badge.key"
         case .onEveryMachine: "arrow.triangle.2.circlepath"
         }
     }

@@ -1,11 +1,11 @@
 import AgentsKitCore
 import SwiftUI
 
-/// You ▸ Account ▸ Sign-ins (#995, spec 736 FR-005): how this person signs in, with Add a
+/// You ▸ Sign-ins (#995, spec 736 FR-005; a pane of its own on the Mac too, #2197): how this person signs in, with Add a
 /// Sign-in… (Apple, Google or GitHub, on this device) and Remove for an outside one. A
 /// sign-in added here pairs this person's other Macs, iPhones and iPads with no code.
 ///
-/// A section, for the Mac's Account pane and the Remote's Account page (the web page lists
+/// A section, for the Mac's Sign-ins pane and the Remote's Sign-ins page (the web page lists
 /// them in `Web/src/views/SignInSection.tsx`, and cannot add one: a browser pairs by code).
 struct SignInsSection: View {
     /// The control plane, or nil while it cannot be reached.
