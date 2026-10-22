@@ -1,6 +1,6 @@
 ---
 name: release
-description: Take main to a new version with nobody watching (#914), started by Alex or by itself once the open milestone is ready (#1729). Run the six reviews and checks once each on what changed since the last tag, have the high findings fixed through the Scrum Master's lanes (the medium ones are filed, listed as known issues and left to the lanes after the release), check the gate, choose the version, check its milestone, write the notes, tag and push, check the GitHub release and both TestFlight builds, deploy the live control plane, close the milestone, lift the next milestone's hold, and review how the release went. Use when the Release workflow runs, or when Alex asks for a release. Not for installing on Alex's Mac or devices (ship-app), and never for App Review.
+description: Take main to a new version with nobody watching (#914), started by Alex or by itself once the open milestone is ready (#1729). Run the seven reviews and checks once each on what changed since the last tag, have the high findings fixed through the Scrum Master's lanes (the medium ones are filed, listed as known issues and left to the lanes after the release), check the gate, choose the version, check its milestone, write the notes, tag and push, check the GitHub release and both TestFlight builds, deploy the live control plane, close the milestone, lift the next milestone's hold, and review how the release went. Use when the Release workflow runs, or when Alex asks for a release. Not for installing on Alex's Mac or devices (ship-app), and never for App Review.
 ---
 
 # Release
@@ -15,15 +15,15 @@ Alex decided (2026-10-13, #914):
 - **It runs on its own.** When the gate passes, push the tag. Do not ask for approval.
 - **Version:** minor when an `enhancement` merged since the last tag, otherwise patch.
   1.0 and major versions only when Alex says.
-- **Every release runs the six reviews and checks once each** (#1462): security,
-  performance, runtimes, usability, competitors and the feature matrix.
+- **Every release runs the seven reviews and checks once each** (#1462, #1557): security,
+  performance, HADR, runtimes, usability, competitors and the feature matrix.
 - **Scope is what changed** (#1462): the reviews read only `main` since the last tag, and
   only what this release found or filed counts (step 3). Older open issues are not
   this release's.
 - **Time is one day** (#1462), from the start of the run (T0): the reviews and the fixes
   fit in it.
 - **Priority is a label:** `priority:high` and `priority:medium`. Within each, security
-  goes before performance, before usability, before runtimes, before the rest.
+  goes before performance, before HADR, before usability, before runtimes, before the rest.
 - **Only high blocks** (Alex, 2026-10-19, #1661). The release tags as soon as no high is
   open; it never waits for a medium fix. Medium is filed with `priority:medium`, listed as
   a known issue, and worked by the ordinary lanes after the release (a bug in the next
@@ -85,12 +85,13 @@ of the prompt says why it started.
 
 ## 2. Reviews and checks, once each
 
-Six workflows run exactly once per release, and only here (#1462). None has a schedule.
+Seven workflows run exactly once per release, and only here (#1462). None has a schedule.
 
 | Order | Workflow | It writes |
 |---|---|---|
 | 1 | `security-review` | `.agents/reviews/security/` on `agents/reviews-security` |
 | 1 | `performance-review` | `.agents/reviews/performance/` on `agents/reviews-performance` |
+| 1 | `hadr-review` | `.agents/reviews/hadr/` on `agents/reviews-hadr` |
 | 2 | `nightly-runtimes` (Runtime check) | `~/Library/Caches/Agents Nightly Runtimes/runs/latest/report.md` |
 | 2 | `usability-check` | `.agents/reviews/usability/` on `agents/reviews-usability` |
 | 3 | `competitor-check` | `~/.agents/reviews/competitors/` |
@@ -122,6 +123,11 @@ medium **that this release's runs recorded**: the ones in their run files (front
   `git show agents/reviews-performance:.agents/reviews/performance/findings.md`. A status
   `fixed on <branch>` is fixed only when that branch is merged; until then it is open,
   and the issue names the branch so the lane can push it.
+- **HADR:** the same in
+  `git show agents/reviews-hadr:.agents/reviews/hadr/findings.md` (#1557). A line that
+  says `filed #NNN` is that issue. A line that says `needs a decision` is for Alex (a
+  change that costs money or changes the live set-up): name it in the report, and file
+  it as for the others.
 - **Usability:** the same in `.agents/reviews/usability/findings.md` on
   `agents/reviews-usability`. Most already say `filed #NNN`.
 - **Runtimes:** open issues the runtime check filed in this release (their titles start with
@@ -133,14 +139,14 @@ For each finding that is not security:
 
 1. Search the issues, open and closed, for its id (`gh issue list --state all --search
    "P20261011-1 in:body"`). If there is one, make sure it is open and has the label.
-2. If there is none, file one: title `Performance (high): <title>` (or `Usability`,
-   `Runtime`), the finding's fields in the body with its id, the label `priority:high` or
+2. If there is none, file one: title `Performance (high): <title>` (or `HADR`,
+   `Usability`, `Runtime`), the finding's fields in the body with its id, the label `priority:high` or
    `priority:medium`, `bug`, and its `area:<name>` from `.agents/areas` when its files
    have one.
 
 Then send the Scrum Master one message (`list_sessions`, then `message_session` to the
 session not archived whose title has "scrum master" in it, any case, and that is labelled
-`lead`): the high issues in priority order (security, performance, usability, runtimes,
+`lead`): the high issues in priority order (security, performance, HADR, usability, runtimes,
 the rest), and that the release waits for them. Send no medium one: the release does not
 wait for it, and the lanes take it after the release as its label and milestone say.
 
