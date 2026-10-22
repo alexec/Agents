@@ -107,4 +107,13 @@ public enum MCPHealthWords {
 
     public static let personalEmpty = "No connectors in ~/.agents/mcp.json yet."
     public static let projectEmpty = "No connectors in this project's .agents/mcp.json yet."
+
+    /// What Remove… takes out (#2154), whether the app added it or it was written by hand.
+    public static func removes(_ name: String, inProject: Bool) -> String {
+        "This removes the \(name) entry from \(inProject ? ".agents/mcp.json" : "~/.agents/mcp.json"). "
+            + "Agents started after that won't have it."
+    }
+
+    /// Said too for a project's: its mcp.json is committed (#2154).
+    public static let removesCommitted = "That file is committed with the project, so the change shows in git."
 }

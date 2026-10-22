@@ -8,13 +8,17 @@ import SwiftUI
 ///
 /// A hosted server (#488) says what its one copy is doing; any other, what the host found
 /// when it last checked it, and Check Now checks them again. Add Connector… opens the
-/// catalogue; Settings is where servers are edited.
+/// catalogue, and a row's Remove… takes it out (#2154); Settings is where servers are edited.
 struct MCPServersView: View {
     @Environment(AppModel.self) private var model
     /// Nil for the person's own servers, on this Mac.
     var project: ProjectKey?
     @State private var checking = false
     @State private var adding = false
+    /// The connector Remove… asks about (#2154).
+    @State private var removing: DaemonAPI.MCPServerHealth?
+    /// Why the last Remove… did not take it out.
+    @State private var removeProblem: String?
 
     private var host: HostID { project?.host ?? .mac }
     private var snapshot: DaemonAPI.MCPHealthSnapshot? { model.work.mcpHealthSnapshot(host) }
@@ -73,6 +77,11 @@ struct MCPServersView: View {
                         .foregroundStyle(StateTint.failure.style(or: .secondary))
                         .textSelection(.enabled)
                 }
+                if let removeProblem {
+                    Text(removeProblem)
+                        .appText(.fine)
+                        .foregroundStyle(StateTint.failure.style(or: .secondary))
+                }
                 if servers.isEmpty {
                     Text(project == nil ? MCPHealthWords.personalEmpty : MCPHealthWords.projectEmpty)
                         .appText(.supporting).foregroundStyle(.secondary)
@@ -86,6 +95,13 @@ struct MCPServersView: View {
                             MCPHealthRow(server: server)
                                 .padding(.horizontal, 14)
                                 .padding(.vertical, 10)
+                                // Every connector (#2154), one written by hand in mcp.json too;
+                                // the catalogue's writes are this Mac's, and so are its removes.
+                                .contextMenu {
+                                    if host == .mac {
+                                        Button("Remove\u{2026}", role: .destructive) { removing = server }
+                                    }
+                                }
                         }
                     }
                     .padding(.vertical, 4)
@@ -105,6 +121,14 @@ struct MCPServersView: View {
             await model.refreshHostedMCP()
             await model.refreshMCPHealth(host)
         }
+        .confirmationDialog(removing.map { "Remove \($0.name)?" } ?? "",
+                            isPresented: Binding(get: { removing != nil }, set: { if !$0 { removing = nil } }),
+                            presenting: removing) { server in
+            Button("Remove", role: .destructive) { Task { await remove(server) } }
+        } message: { server in
+            Text(MCPHealthWords.removes(server.name, inProject: project != nil)
+                 + (project != nil ? " " + MCPHealthWords.removesCommitted : ""))
+        }
         .sheet(isPresented: $adding) {
             AddMCPSheet(destination: project.map { .project(folder: $0.folder.path) } ?? .personal,
                         onAdded: { Task { await model.refreshMCPHealth(host) } })
@@ -112,6 +136,13 @@ struct MCPServersView: View {
     }
 
     private var projectName: String? { project.flatMap { model.work.project($0)?.name } }
+
+    /// Its secrets stay: Settings' Remove… is where one is forgotten too.
+    private func remove(_ server: DaemonAPI.MCPServerHealth) async {
+        let destination: DaemonAPI.SkillDestination = project.map { .project(folder: $0.folder.path) } ?? .personal
+        removeProblem = await model.mcpRemove(server.name, at: destination, forgetSecret: nil).map(MCPCatalogWords.sentence)
+        await model.refreshMCPHealth(host)
+    }
 }
 
 /// The way into MCP Servers under Activity.

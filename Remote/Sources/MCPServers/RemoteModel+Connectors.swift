@@ -103,6 +103,20 @@ extension RemoteModel {
         }
     }
 
+    /// Takes one connector out of its mcp.json (#2154), the person's own or a project's, then
+    /// reads the servers again. Its secrets stay. Nil when it went, else why not.
+    func removeConnector(_ name: String, project: ProjectKey?) async -> RemoteConnectorProblem? {
+        let destination: DaemonAPI.SkillDestination = project.map { .project(folder: $0.folder.path) } ?? .personal
+        let answer = await connectorCall(project?.host ?? .mac) {
+            try await $0.call(DaemonAPI.Method.mcpRemove,
+                              DaemonAPI.MCPRemoveRequest(destination: destination, name: name, forgetSecret: nil),
+                              returning: DaemonAPI.MCPRemoveAnswer.self)
+        }
+        if case .failure(let problem) = answer { return problem }
+        await checkMCPHealth(project: project)
+        return nil
+    }
+
     private func connectorCall<T: Sendable>(_ host: HostID, _ body: (DaemonClient) async throws -> T) async
         -> Result<T, RemoteConnectorProblem> {
         guard let target = hostClient(host) else {

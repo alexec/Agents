@@ -100,8 +100,8 @@ func TestAnMCPServerFoundAddedListedAndRemoved(t *testing.T) {
 	// The project's pinned pages are said again: one of the server's waited for this (#1780).
 	c.until(t, "pins/changed after mcp/approve", func(method string, _ json.RawMessage) bool { return method == "pins/changed" })
 
-	// A hand-written server is not the app's to remove, and a secret another names stays.
-	if e := c.callError(t, 10, "mcp/remove", map[string]any{"destination": dest, "name": "mine"}); e.Code != wire.FailureCatalogRefused {
+	// A secret another names stays; a server that is not there is refused.
+	if e := c.callError(t, 10, "mcp/remove", map[string]any{"destination": dest, "name": "nobody"}); e.Code != wire.FailureCatalogRefused {
 		t.Fatalf("%+v", e)
 	}
 	if e := c.callError(t, 11, "mcp/remove", map[string]any{"destination": dest, "name": "weather", "forgetSecret": "GITHUB_TOKEN"}); !strings.Contains(e.Message, "still named by another server") {
@@ -122,6 +122,17 @@ func TestAnMCPServerFoundAddedListedAndRemoved(t *testing.T) {
 		t.Fatalf("%+v", e)
 	}
 	c.call(t, 15, "mcp/forgetViews", map[string]any{"destination": dest, "name": "mine"})
+
+	// A hand-written server is removed too (#2154), and the rest of the file stays as it was.
+	path := filepath.Join(project, ".agents", "mcp.json")
+	os.WriteFile(path, []byte("{\n  \"note\": \"kept\",\n  \"mcpServers\": {\n    \"mine\": {\"command\": \"my-server\"},\n    \"theirs\": {\"command\": \"their-server\"}\n  }\n}\n"), 0o644)
+	c.call(t, 16, "mcp/remove", map[string]any{"destination": dest, "name": "mine"})
+	if _, ok, _ := mcpEntryAt(path, "mine"); ok {
+		t.Fatal("the hand-written one is still there")
+	}
+	if left, _ := os.ReadFile(path); !strings.Contains(string(left), `"note": "kept"`) || !strings.Contains(string(left), `"theirs"`) {
+		t.Fatal(string(left))
+	}
 }
 
 func list0Digest(t *testing.T, c *conn, dest map[string]any) string {

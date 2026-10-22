@@ -208,11 +208,10 @@ private struct ProjectMCPRow: View {
                     .appText(.fine)
                     .help("Ask Show or Don't Show again the next time one of its views is drawn")
                 }
-                if server.managed != nil {
-                    Button("Remove…") { removing = true }
-                        .buttonStyle(.paper)
-                        .appText(.fine)
-                }
+                // Every one (#2154): one written by hand in mcp.json too.
+                Button("Remove…") { removing = true }
+                    .buttonStyle(.paper)
+                    .appText(.fine)
             }
         }
         .padding(.horizontal, 16)

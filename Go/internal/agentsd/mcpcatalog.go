@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -682,8 +683,10 @@ func (d *Daemon) mcpSetSecret(r wire.MCPSetSecretRequest) (wire.MCPSetSecretAnsw
 	return wire.MCPSetSecretAnswer{Set: true}, nil
 }
 
-// mcpRemove takes a server the app added out of mcp.json; a hand-written one is refused.
-// forgetSecret goes only when no other server, personal or a project's, still names it.
+// mcpRemove takes a server out of mcp.json, one the app added or one written by hand
+// (#2154): the person asked for it, so only add leaves a hand-written entry alone. The rest
+// of the file stays as it is. forgetSecret goes only when no other server, personal or a
+// project's, still names it.
 func (d *Daemon) mcpRemove(r wire.MCPRemoveRequest) (wire.MCPRemoveAnswer, error) {
 	if err := d.requireMCPProject(r.Destination); err != nil {
 		return wire.MCPRemoveAnswer{}, mcpRefusal(err)
@@ -696,11 +699,15 @@ func (d *Daemon) mcpRemove(r wire.MCPRemoveRequest) (wire.MCPRemoveAnswer, error
 	if err != nil {
 		return wire.MCPRemoveAnswer{}, mcpRefusal(err)
 	}
+	entries, problem := readMCPFile(path)
+	if problem != "" {
+		return wire.MCPRemoveAnswer{}, mcpRefusal(mcpcatalog.Unreadable(path))
+	}
+	if !slices.ContainsFunc(entries, func(e mcpEntry) bool { return e.name == r.Name }) {
+		return wire.MCPRemoveAnswer{}, mcpRefusal(mcpcatalog.Failed("There is no " + r.Name + " in " + path + "."))
+	}
 	side := mcpcatalog.LoadSidecar(d.mcpSidecarPath())
 	key := mcpcatalog.Key(r.Destination, r.Name)
-	if _, ok := side.Servers[key]; !ok {
-		return wire.MCPRemoveAnswer{}, mcpRefusal(mcpcatalog.Unmanaged(path))
-	}
 	forget := ""
 	if r.ForgetSecret != nil {
 		forget = *r.ForgetSecret

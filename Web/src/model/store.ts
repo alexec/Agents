@@ -2159,6 +2159,19 @@ export class Store extends Work {
     if (snapshot) this.mcpHealth.value = { ...this.mcpHealth.value, [host]: snapshot };
   }
 
+  /**
+   * Takes one connector out of its mcp.json (#2154), the person's own (no folder) or a project's,
+   * one the app added or one written by hand, then checks the rest again. Its secrets stay.
+   * Undefined when it went, else why not.
+   */
+  async removeConnector(host: string, name: string, folder?: string): Promise<string | undefined> {
+    const destination = folder === undefined ? { kind: "personal" } : { kind: "project", folder: projectPath(folder) };
+    const why = await this.link.call("mcp/remove", { destination: destination as never, name }, host)
+      .then(() => undefined, (error: unknown) => describe(error));
+    if (why === undefined) await this.checkMCPHealth(host, folder);
+    return why;
+  }
+
   async markRuntimeAvailable(host: string, credentialKey: string): Promise<void> {
     const allowances = await this.link.call("runtimes/markAvailable", { credentialKey }, host).catch(() => null);
     if (allowances) this.runtimeAllowances.value = { ...this.runtimeAllowances.value, [host]: allowances };

@@ -168,3 +168,12 @@ export const projectIntro = "Every connector in this project's .agents/mcp.json.
   + "Edit them in the project's settings.";
 export const personalEmpty = "No connectors in ~/.agents/mcp.json yet.";
 export const projectEmpty = "No connectors in this project's .agents/mcp.json yet.";
+
+/** What Remove… takes out (#2154), as MCPHealthWords.removes: one the app added or one written by hand. */
+export function removesWords(name: string, inProject: boolean): string {
+  return `This removes the ${name} entry from ${inProject ? ".agents/mcp.json" : "~/.agents/mcp.json"}. `
+    + "Agents started after that won't have it.";
+}
+
+/** Said too for a project's: its mcp.json is committed (#2154). */
+export const removesCommitted = "That file is committed with the project, so the change shows in git.";

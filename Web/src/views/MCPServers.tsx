@@ -1,13 +1,13 @@
 // Every MCP server in one mcp.json and how each is doing (#753), as the window's MCPServersView and
 // the Remote's MCPServersListView: the person's own under Activity, a project's on its own page from
 // its row in the sidebar. A project's page opens with its set-up (#1336), and Your Connectors with
-// the person's connections. Read-only but for Check Now: servers are edited in Settings.
+// the person's connections. Read-only but for Check Now and Remove… (#2154): servers are edited in Settings.
 import { useState } from "preact/hooks";
 import type { Store } from "../model/store";
 import type { MCPLevels } from "../protocol/generated";
 import {
   connectorLevels, fileProblem, healthKind, healthLastError, healthLine, healthTone, levelsSentence, madeByAgents,
-  personalServers, projectEmpty, projectIntro, projectServers,
+  personalServers, projectEmpty, projectIntro, projectServers, removesCommitted, removesWords,
 } from "../model/hostedMCP";
 import { BackToList } from "./BackToList";
 import { ConnectorSetupSection } from "./ConnectorSetup";
@@ -21,7 +21,14 @@ export function MCPServersList({ store, host, folder }: { store: Store; host: st
   const servers = folder === undefined ? personalServers(snapshot) : projectServers(snapshot, folder);
   const problem = fileProblem(snapshot, folder);
   const [checking, setChecking] = useState(false);
+  const [removeProblem, setRemoveProblem] = useState<string | undefined>();
   const checkable = servers.some((s) => !s.hosted);
+  // Every connector (#2154), one written by hand in mcp.json too; asked first, as the window's sheet.
+  const remove = async (name: string) => {
+    const inProject = folder !== undefined;
+    if (!window.confirm(`Remove ${name}? ${removesWords(name, inProject)}${inProject ? ` ${removesCommitted}` : ""}`)) return;
+    setRemoveProblem(await store.removeConnector(host, name, folder));
+  };
   const checkNow = () => {
     setChecking(true);
     void store.checkMCPHealth(host, folder).finally(() => setChecking(false));
@@ -29,6 +36,7 @@ export function MCPServersList({ store, host, folder }: { store: Store; host: st
   return (
     <div class="resources mcp-servers">
       {problem && <p class="small failure">{problem}</p>}
+      {removeProblem && <p class="small failure">{removeProblem}</p>}
       {servers.length > 0 && (
         <ul>
           {servers.map((server) => {
@@ -45,6 +53,8 @@ export function MCPServersList({ store, host, folder }: { store: Store; host: st
                 <p class="quiet small">{healthLine(server)}</p>
                 {error && <p class={tone === "failing" ? "small failure" : "quiet small"}>{error}</p>}
                 <ConnectorLevels levels={server.levels} />
+                <button class="small" disabled={!store.hostIsOnline(host)} title={`Take ${server.name} out of its mcp.json`}
+                  onClick={() => void remove(server.name)}>Remove…</button>
               </li>
             );
           })}
