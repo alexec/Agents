@@ -95,12 +95,10 @@ struct MCPServersView: View {
                             MCPHealthRow(server: server)
                                 .padding(.horizontal, 14)
                                 .padding(.vertical, 10)
-                                // Every connector (#2154), one written by hand in mcp.json too;
-                                // the catalogue's writes are this Mac's, and so are its removes.
+                                // Every connector (#2154), one written by hand in mcp.json too,
+                                // a server project's on its own host (#2199).
                                 .contextMenu {
-                                    if host == .mac {
-                                        Button("Remove\u{2026}", role: .destructive) { removing = server }
-                                    }
+                                    Button("Remove\u{2026}", role: .destructive) { removing = server }
                                 }
                         }
                     }
@@ -140,7 +138,7 @@ struct MCPServersView: View {
     /// Its secrets stay: Settings' Remove… is where one is forgotten too.
     private func remove(_ server: DaemonAPI.MCPServerHealth) async {
         let destination: DaemonAPI.SkillDestination = project.map { .project(folder: $0.folder.path) } ?? .personal
-        removeProblem = await model.mcpRemove(server.name, at: destination, forgetSecret: nil).map(MCPCatalogWords.sentence)
+        removeProblem = await model.mcpRemove(server.name, at: destination, forgetSecret: nil, on: host).map(MCPCatalogWords.sentence)
         await model.refreshMCPHealth(host)
     }
 }
