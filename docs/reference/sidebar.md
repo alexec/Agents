@@ -68,7 +68,8 @@ the same groups.
 
 ## A project's group
 
-The project's name is the group's heading. A project starts folded. Click or tap its
+The project's name is the group's heading. The heading has no count: the **Sessions**
+fold counts the sessions. A project starts folded. Click or tap its
 heading to open it. In order, an open project holds:
 
 - **Its pinned pages,** when it has some.

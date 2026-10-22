@@ -9,8 +9,6 @@ import SwiftUI
 /// project you happen to have open, folded or not.
 struct ProjectRow: View {
     @Environment(AppModel.self) private var model
-    /// The smart groups turned off in Settings ▸ Sidebar (#846), for the count.
-    @AppStorage(SidebarSmartRow.offDefaultsKey, store: WindowDefaults.store) private var smartOff = SidebarSmartRow.offAtFirst
     let summary: DaemonAPI.ProjectSummary
     /// The name as the sidebar shows it: `server:Project` on a server.
     var label: String? = nil
@@ -50,26 +48,15 @@ struct ProjectRow: View {
                 }
             }
             Spacer(minLength: 4)
-            if asHeading {
-                // How many its group lists, as every group's heading says it (#587). Who
-                // needs you is in Needs You at the top, so no dot.
-                let own = SidebarProjectFold.ownCount(summary.key, in: model.work, keptInUnread: model.keptInUnread,
-                                                     on: SidebarSmartRow.on(off: smartOff))
-                if own > 0 {
-                    Text("\(own)")
-                        .monospacedDigit()
-                        .appText(.fine)
-                        .foregroundStyle(.secondary)
-                }
-            } else if needsPerson {
+            // As a heading, no count: its Sessions fold has one, and the project holds more
+            // than sessions (#2364). Who needs you is in Needs You at the top, so no dot.
+            if !asHeading, needsPerson {
                 Circle()
                     .fill(StateTint.attention.style(or: .secondary))
                     .frame(width: 7 * scale, height: 7 * scale)
                     .accessibilityHidden(true)
             }
         }
-        // As a group's heading, its count over the rows' times (#495).
-        .padding(.trailing, asHeading ? SidebarHeading.trailingInset : 0)
         .contentShape(Rectangle())
         // Clicking a project folds or unfolds it (#375); the detail stays as it was.
         // `simultaneousGesture` sits alongside the list's own handling rather than
@@ -136,11 +123,7 @@ struct ProjectRow: View {
         var parts = [label ?? summary.name]
         if summary.project.isPinned { parts.append("pinned") }
         if !summary.exists { parts.append("folder is missing") }
-        if asHeading {
-            let own = SidebarProjectFold.ownCount(summary.key, in: model.work, keptInUnread: model.keptInUnread,
-                                                     on: SidebarSmartRow.on(off: smartOff))
-            if own > 0 { parts.append("\(own)") }
-        } else if let subtitle {
+        if !asHeading, let subtitle {
             parts.append(subtitle)
         }
         return parts.joined(separator: ", ")

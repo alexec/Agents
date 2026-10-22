@@ -254,7 +254,6 @@ struct SidebarModelTests {
 
         let fold = SidebarProjectFold(key, label: "api", in: model, isOpen: true)
         #expect(fold.sessions.map(\.id) == [done.id])
-        #expect(SidebarProjectFold.ownCount(key, in: model) == 1)
         #expect(fold.pinned.map(\.id) == [pinned.id])
         #expect(SidebarProjectFold(key, label: "api", in: model, isOpen: false).sessions.isEmpty)
     }
@@ -396,14 +395,13 @@ struct SidebarModelTests {
         for row in SidebarSmartRow.allCases {
             #expect(row.count(in: model, projects: projects) == listed[row]?.count, "\(row)")
         }
-        #expect(SidebarProjectFold.ownCount(key, in: model) == 1)
         let everyRow = listed.values.flatMap { $0 } + fold.sessions.map(\.id)
         #expect(everyRow.count == Set(everyRow).count, "nothing is listed twice")
         #expect(Set(everyRow).count == 7, "nothing is left out")
     }
 
     /// The session opened from Unread, read now, stays in Unread alone until another is
-    /// opened (#689): not under its project too, nor in its count.
+    /// opened (#689): not under its project too.
     @Test func theSessionUnreadKeepsIsNotUnderItsProjectToo() {
         let model = AgentsModel()
         let opened = started(api, .finished, "opened", at: 2)
@@ -416,11 +414,8 @@ struct SidebarModelTests {
         #expect(SidebarSmartRow.keptInUnread(opened.id, in: model)?.id == opened.id)
         let fold = SidebarProjectFold(key, label: "api", in: model, isOpen: true, keptInUnread: opened.id)
         #expect(fold.sessions.map(\.id) == [read.id])
-        #expect(SidebarProjectFold.ownCount(key, in: model, keptInUnread: opened.id) == 1)
-        #expect(SidebarProjectFold.ownCount(ProjectKey(host: .mac, folder: web), in: model, keptInUnread: opened.id) == 0)
         // Let go, it is under its project.
         #expect(SidebarProjectFold(key, label: "api", in: model, isOpen: true).sessions.map(\.id) == [opened.id, read.id])
-        #expect(SidebarProjectFold.ownCount(key, in: model) == 2)
         // A search, or a home elsewhere, lets it go too.
         #expect(SidebarSmartRow.keptInUnread(opened.id, in: model, query: "opened") == nil)
         #expect(SidebarSmartRow.keptInUnread(working.id, in: model) == nil)
@@ -452,7 +447,6 @@ struct SidebarModelTests {
                 #expect(row.count(in: model, projects: projects, on: on) == rows[row]?.count, "\(row) \(on)")
             }
             let own = SidebarProjectFold(key, label: "api", in: model, isOpen: true, on: on).sessions.map(\.id)
-            #expect(SidebarProjectFold.ownCount(key, in: model, on: on) == own.count, "\(on)")
             let every = rows.values.flatMap { $0 } + own
             #expect(every.count == Set(every).count && Set(every).count == 7, "\(on): once each, none left out")
             return (rows, own)

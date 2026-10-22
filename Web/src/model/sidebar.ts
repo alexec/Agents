@@ -104,12 +104,6 @@ export function projectSessions(live: readonly Agent[], pins: readonly string[],
     .sort(byStart);
 }
 
-/** How many sessions a project's own group lists, folded or not (#587), as `SidebarProjectFold.ownCount`. */
-export function ownCount(live: readonly Agent[], pins: readonly string[], kept?: string,
-  on: ReadonlySet<SmartRow> = allSmartRows): number {
-  return projectSessions(live, pins, undefined, kept, on).length;
-}
-
 /**
  * Whether Unread keeps the session opened from it (#495), as `SidebarSmartRow.keptInUnread`: not
  * once it belongs elsewhere (archived, pinned, waiting, working or asking to be archived). Only

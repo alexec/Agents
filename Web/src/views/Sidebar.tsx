@@ -24,7 +24,7 @@ import { macHostNoticeDetail, macHostNoticeTitle } from "../model/macHostNotice"
 import { hostAnswers } from "../model/capabilities";
 import { Capability } from "../protocol/capabilities.generated";
 import { parseQuery, queryMatches, type LabelQuery } from "../model/labels";
-import { keepsInUnread, newSessionProject, ownCount, pinnedSessions, pinnedWorkflows, projectSessions, rememberedProject, rememberProject,
+import { keepsInUnread, newSessionProject, pinnedSessions, pinnedWorkflows, projectSessions, rememberedProject, rememberProject,
   smartAgents, smartApprovals, smartRows, smartTitles, withKept, type ProjectKey, type SmartRow } from "../model/sidebar";
 import { updatedLine } from "../model/updated";
 import { namedRelative, workflowSummary } from "../model/workflows";
@@ -531,8 +531,6 @@ const ProjectFold = memo(function ProjectFold({ store, host, project, query, lin
   const keptAgent = keptID ? live.find((a) => a.id === keptID) : undefined;
   const kept = keptAgent && keepsInUnread(keptAgent, pins, on) ? keptAgent.id : undefined;
   const sessions = !unfolded ? [] : projectSessions(live, pins, parsed, kept, on);
-  // The heading's grey count, as every group's heading has one (#587), folded or not.
-  const own = ownCount(live, pins, kept, on);
   const archived = !unfolded || !parsed ? [] : view.archived.filter((a) => queryMatches(parsed, a));
   const allWorkflows = (unfolded ? store.projectWorkflows(host.id, folder) : [])
     .filter(workflowMatches(store, host.id, parsed))
@@ -621,7 +619,6 @@ const ProjectFold = memo(function ProjectFold({ store, host, project, query, lin
               line under it and no dot; only a missing folder is said. */}
           {!project.exists && <span class="subtitle">Folder is missing</span>}
         </button>
-        {own > 0 && <span class="count" aria-label={`${own} sessions`}>{own}</span>}
       </div>
       )}
       <DropNote note={drop.note} />
