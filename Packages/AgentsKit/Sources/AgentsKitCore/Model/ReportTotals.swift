@@ -9,8 +9,13 @@ public struct ReportTotals: Sendable, Hashable {
         case project = "Project"
         case machine = "Machine"
         case runtime = "Runtime"
+        /// The workflow that started the agents: Reports ▸ Workflows' (#2019).
+        case workflow = "Workflow"
 
         public var id: Self { self }
+
+        /// The ways Spend adds up, and every page's after its own first.
+        public static let spend: [Dimension] = [.person, .project, .machine, .runtime]
     }
 
     /// One person's, project's, machine's or runtime's share.
@@ -82,8 +87,8 @@ public struct ReportTotals: Sendable, Hashable {
         return Double(group.tokens) / most
     }
 
-    private static func key(_ row: DaemonAPI.ReportRow, _ dimension: Dimension,
-                            _ runtimeName: (String) -> String) -> (String, String) {
+    static func key(_ row: DaemonAPI.ReportRow, _ dimension: Dimension,
+                    _ runtimeName: (String) -> String) -> (String, String) {
         switch dimension {
         case .person:
             return (row.person, row.person.isEmpty ? ReportWords.removedOwner
@@ -94,6 +99,9 @@ public struct ReportTotals: Sendable, Hashable {
             return (row.host, row.hostName.isEmpty ? row.host : row.hostName)
         case .runtime:
             return (row.runtime, row.runtime.isEmpty ? ReportWords.noRuntime : runtimeName(row.runtime))
+        case .workflow:
+            let workflow = row.workflow ?? ""
+            return (workflow, workflow.isEmpty ? ReportOutcomeWords.noWorkflow : workflow)
         }
     }
 }
