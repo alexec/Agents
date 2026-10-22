@@ -162,7 +162,7 @@ export const madeByAgents = "Made by Agents";
 
 export const personalIntro = "Every connector in your own ~/.agents/mcp.json, which every agent has. "
   + "A hosted one runs once on this machine; any other is checked every four hours, and when its entry changes. "
-  + "Edit them in Settings ▸ Shared ▸ Connectors.";
+  + "Edit them in the Mac's Settings ▸ Agent Configuration ▸ Connectors.";
 export const projectIntro = "Every connector in this project's .agents/mcp.json. "
   + "A hosted one runs once on its machine; any other is checked every four hours, and when its entry changes. "
   + "Edit them in the project's settings.";

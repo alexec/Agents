@@ -5716,7 +5716,7 @@ final class AppModel {
         // relay, the sheet that signs it in on this Mac, and a sentence saying so.
         if host != .mac, let error = error as? JSONRPCError, error.code == DaemonAPI.Failure.signInWanted,
            let wanted = try? error.data?.decode(DaemonAPI.SignInWanted.self) {
-            problem = error.message + " Sign it in on this Mac, or use \(hosts.label(host))’s own sign-in in Settings ▸ Servers."
+            problem = error.message + " Sign it in on this Mac, or use \(hosts.label(host))’s own sign-in in Settings ▸ Machines."
             signInRuntimeID = wanted.runtime
             return
         }

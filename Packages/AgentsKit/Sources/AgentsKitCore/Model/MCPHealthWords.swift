@@ -98,7 +98,7 @@ public enum MCPHealthWords {
 
     public static let personalIntro = "Every connector in your own ~/.agents/mcp.json, which every agent has. "
         + "A hosted one runs once on this machine; any other is checked every four hours, and when its entry changes. "
-        + "Edit them in Settings \u{25B8} Shared \u{25B8} Connectors."
+        + "Edit them in the Mac's Settings \u{25B8} Agent Configuration \u{25B8} Connectors."
 
     /// Above a project's servers.
     public static let projectIntro = "Every connector in this project's .agents/mcp.json. "

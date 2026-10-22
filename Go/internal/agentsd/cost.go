@@ -29,7 +29,7 @@ const (
 	usageHoursKept = 168
 	usageDaysKept  = 90
 	// limitsUnreadableWords is CostWords.limitsUnreadable.
-	limitsUnreadableWords = "The spending limits could not be read, so nothing new starts until they are set again in Settings ▸ Spending. What was in the file is kept."
+	limitsUnreadableWords = "The spending limits could not be read, so nothing new starts until they are set again in Settings ▸ Cost. What was in the file is kept."
 )
 
 type spendFile struct {
