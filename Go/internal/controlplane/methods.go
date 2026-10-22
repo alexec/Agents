@@ -129,6 +129,9 @@ var own = methodSet(
 	"policy/set",
 	"policy/stopAll",
 	"providers/setGroup",
+	"readApi/list",
+	"readApi/make",
+	"readApi/revoke",
 	"reports/export",
 	"reports/usage",
 	"scim/set",
@@ -230,6 +233,8 @@ var writes = methodSet(
 	"policy/set",
 	"policy/stopAll",
 	"providers/setGroup",
+	"readApi/make",
+	"readApi/revoke",
 	"reports/setPolicy",
 	"scim/set",
 	"scim/tokens/make",
@@ -462,6 +467,8 @@ func (m *Methods) Handle(method string, params json.RawMessage, from Caller) (an
 		return m.auditSinksMethod(ctx, method, params, from)
 	case "governance/usage", "governance/request", "governance/requests", "governance/decide", "governance/approvals", "governance/revoke":
 		return m.governanceMethod(ctx, method, params, from)
+	case "readApi/list", "readApi/make", "readApi/revoke":
+		return m.readAPIMethod(ctx, method, params, from)
 	case "control/rotate":
 		return wire.Empty{}, m.s.rotate(ctx, from)
 	case "control/setProjectDetection":

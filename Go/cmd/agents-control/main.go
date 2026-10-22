@@ -64,6 +64,9 @@
 //	AGENTS_CONTROL_METRICS      as --metrics: host:port, such as 127.0.0.1:9791; off when unset
 //	AGENTS_CONTROL_METRICS_TOKEN  the bearer token a scraper sends; needed on any address but
 //	                            loopback. AGENTS_CONTROL_METRICS_TOKEN_FILE reads it from a file
+//	OTEL_EXPORTER_OTLP_ENDPOINT  the report figures to an OTLP/HTTP collector (#2019), off when
+//	                            unset; OTEL_EXPORTER_OTLP_METRICS_ENDPOINT, _HEADERS and
+//	                            OTEL_METRIC_EXPORT_INTERVAL as OpenTelemetry has them
 //	AGENTS_TEST_APNS_URL        a walk's fake APNs, trusted by AGENTS_TEST_TRUST_ROOT (#1507)
 package main
 
@@ -597,6 +600,11 @@ func serve() {
 		if _, err := s.ServeMetrics(addr, metricsToken()); err != nil {
 			fail("metrics: %v", err)
 		}
+	}
+	if otlp, err := controlplane.OTLPFromEnv(os.Getenv); err != nil {
+		fail("otlp: %v", err)
+	} else if otlp != nil {
+		s.ExportOTLP(*otlp)
 	}
 	if cfg.Pin != "" {
 		say("pin " + cfg.Pin)

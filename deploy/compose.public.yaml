@@ -87,6 +87,11 @@ services:
       # scraper on the same Docker network reaches http://control:9791/metrics.
       AGENTS_CONTROL_METRICS: ${AGENTS_CONTROL_METRICS:-}
       AGENTS_CONTROL_METRICS_TOKEN: ${AGENTS_CONTROL_METRICS_TOKEN:-}
+      # The report figures to an OpenTelemetry collector over OTLP/HTTP (#2019), off unless
+      # the endpoint is set: docs/reference/reports.md.
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
+      OTEL_EXPORTER_OTLP_HEADERS: ${OTEL_EXPORTER_OTLP_HEADERS:-}
+      OTEL_METRIC_EXPORT_INTERVAL: ${OTEL_METRIC_EXPORT_INTERVAL:-}
       # Log lines as JSON for a log shipper (#2176), and the lowest level written (debug
       # adds a line for each request).
       AGENTS_CONTROL_LOG_FORMAT: ${AGENTS_CONTROL_LOG_FORMAT:-text}

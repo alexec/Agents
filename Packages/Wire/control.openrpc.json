@@ -3410,6 +3410,84 @@
       }
     },
     {
+      "name": "readApi/list",
+      "x-capability": "readapi/1",
+      "description": "An admin's (#2019): the read API's tokens and URL, and the OTLP exporter.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/ReadAPI"
+        }
+      },
+      "tags": [
+        {
+          "name": "web"
+        }
+      ]
+    },
+    {
+      "name": "readApi/make",
+      "x-capability": "readapi/1",
+      "description": "An admin's (#2019): a new read API token, its value shown once. At most 10 live.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/ReadTokenMake"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/ReadTokenMade"
+        }
+      },
+      "tags": [
+        {
+          "name": "web"
+        }
+      ]
+    },
+    {
+      "name": "readApi/revoke",
+      "x-capability": "readapi/1",
+      "description": "An admin's (#2019): a read API token stops working at once.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/ReadTokenRevoke"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/ReadAPI"
+        }
+      },
+      "tags": [
+        {
+          "name": "web"
+        }
+      ]
+    },
+    {
       "name": "relay/count",
       "x-capability": "relay/1",
       "description": "To a relay host, on its channel 0 (#1163).",

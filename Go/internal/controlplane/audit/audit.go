@@ -173,6 +173,9 @@ var controlActions = map[string]string{
 	"governance/approved": "Approved an MCP server or skill",
 	"governance/refused":  "Refused an MCP server or skill",
 	"governance/revoked":  "Took back an approval of an MCP server or skill",
+	// The read API (#2019): each writes its own entry, naming the token, never its value.
+	"readApi/made":    "Made a read API token",
+	"readApi/revoked": "Revoked a read API token",
 }
 
 // Action is what a call is in words, and whether the audit keeps it at all. toHost is a
