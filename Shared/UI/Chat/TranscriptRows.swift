@@ -98,16 +98,16 @@ struct TurnView: View, Equatable {
                     if hasEarlier { EarlierStepsControl(fetch: fetchEarlier) }
                     // In the turn's own margin: no rule and no indent (#148).
                     VStack(alignment: .leading, spacing: 10) {
-                        ForEach(steps) { StepRow(item: $0, isFocused: $0.id == focusedRun) }
+                        ForEach(steps) { StepRow(item: $0, isFocused: $0.id == focusedRun, isLive: isLive) }
                     }
-                    ForEach(outcome) { StepRow(item: $0) }
+                    ForEach(outcome) { StepRow(item: $0, isLive: isLive) }
                 }
             } else {
                 // Where its steps go, a stored turn the chat let go: asked for again only
                 // by hand, so two of them cannot push each other out in a loop (#285).
                 if stepCount != 0 { LoadStepsControl(load: loadSteps) }
                 if let live = parts?.live { LiveLine(item: live) }
-                ForEach(outcome) { StepRow(item: $0) }
+                ForEach(outcome) { StepRow(item: $0, isLive: isLive) }
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -190,13 +190,15 @@ private struct LiveLine: View {
 
     var body: some View {
         if case .toolRun(_, let calls) = item, let call = calls.last {
-            Text(call.turnLine)
-                .appText(.reading)
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-                .frame(maxWidth: .infinity, alignment: .leading)
+            LiveCallMarked(isUnderway: call.isUnderway) {
+                Text(call.turnLine)
+                    .appText(.reading)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
         } else {
-            StepRow(item: item)
+            StepRow(item: item, isLive: true)
         }
     }
 }
@@ -206,6 +208,9 @@ private struct StepRow: View {
     let item: TranscriptItem
     /// Gone to from elsewhere: the run opened, and its first call (#1315).
     var isFocused = false
+    /// Whether its turn is still going: only then does a call's own status get a mark
+    /// (#2338), so a call a stopped turn left `in_progress` does not spin for ever.
+    var isLive = false
     /// A run of calls is its last until it is clicked (#759).
     @State private var isUnrolled = false
 
@@ -214,18 +219,20 @@ private struct StepRow: View {
             switch item {
             case .toolRun(_, let calls) where !isUnrolled && calls.count > 1:
                 if let last = calls.last {
-                    ToolCallLine(call: last, lineText: last.turnLine, onClick: { isUnrolled = true }, brightensOnHover: true)
+                    ToolCallLine(call: last, lineText: last.turnLine, onClick: { isUnrolled = true }, brightensOnHover: true,
+                                 marksUnderway: isLive)
                 }
             case .toolRun(_, let calls):
                 VStack(alignment: .leading, spacing: 4) {
                     ForEach(Array(calls.enumerated()), id: \.offset) { index, call in
                         ToolCallLine(call: call, lineText: call.turnLine, isFocused: isFocused && index == 0,
-                                     brightensOnHover: true)
+                                     brightensOnHover: true, marksUnderway: isLive)
                     }
                 }
             case .entry(let entry):
                 if case .toolCall(let call) = entry.kind {
-                    ToolCallLine(call: call, lineText: call.turnLine, isFocused: isFocused, brightensOnHover: true)
+                    ToolCallLine(call: call, lineText: call.turnLine, isFocused: isFocused, brightensOnHover: true,
+                                 marksUnderway: isLive)
                 } else {
                     EntryRow(entry: entry)
                 }
@@ -717,6 +724,9 @@ private struct ToolCallLine: View {
     /// Brighter under the pointer, as a turn's step is (069): the step is a line of
     /// text like the rest of the turn's margin, with no chevron in front of it (#112).
     var brightensOnHover = false
+    /// Whether a call still underway shows the tool mark in front of its words: in a
+    /// turn still going, and not elsewhere (#2338).
+    var marksUnderway = false
     @State private var isExpanded = false
     @State private var isHovering = false
 
@@ -757,14 +767,16 @@ private struct ToolCallLine: View {
     /// wraps to three lines is three lines of a run that reads as one call per line;
     /// the whole of it is a click away in the detail, where the raw input is.
     private var line: some View {
-        Text((lineText ?? call.line) + runsOn)
-            .appText(.reading)
-            .foregroundStyle(isHovering ? .primary : .secondary)
-            .lineLimit(1)
-            .truncationMode(.tail)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .contentShape(.rect)
-            .onHover { isHovering = brightensOnHover && $0 }
+        LiveCallMarked(isUnderway: marksUnderway && call.isUnderway) {
+            Text((lineText ?? call.line) + runsOn)
+                .appText(.reading)
+                .foregroundStyle(isHovering ? .primary : .secondary)
+                .lineLimit(1)
+                .truncationMode(.tail)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .contentShape(.rect)
+        .onHover { isHovering = brightensOnHover && $0 }
     }
 
     /// " · running in the background", while what this call started still runs (057).
@@ -917,6 +929,36 @@ private extension JSONEncoder {
         e.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
         return e
     }()
+}
+
+/// A call's line with the tool mark in front of it while the call is underway (#2338):
+/// the mark is next to the words that say what runs, not only at the chat's foot. The
+/// same ring as the sidebar's, in step with it, grey, in a well the line's text height.
+/// Inline: the words move right by its width while it is there, with the line's own
+/// short ease, so a run of finished calls keeps its edge.
+private struct LiveCallMarked<Line: View>: View {
+    let isUnderway: Bool
+    @ViewBuilder var line: Line
+
+    var body: some View {
+        HStack(spacing: 6) {
+            if isUnderway {
+                WorkingRing(size: Self.size, doing: true)
+                    .accessibilityHidden(true)
+                    .transition(.opacity)
+            }
+            line
+        }
+        .animation(.easeOut(duration: 0.15), value: isUnderway)
+        .accessibilityElement(children: .combine)
+        .accessibilityValue(isUnderway ? "Running" : "")
+    }
+
+    #if os(macOS)
+    private static var size: CGFloat { 12 }
+    #else
+    private static var size: CGFloat { 14 }
+    #endif
 }
 
 /// The agent is at work and the person is waiting: the same mark the sidebar row shows,

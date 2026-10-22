@@ -15,7 +15,7 @@ import { backgroundEntryLine } from "../../model/background";
 import { outcomeNeedsAPerson } from "../../model/groups";
 import { outcomeHeadings, queuedLabel, startingLabel } from "../../model/status";
 import {
-  callLine, compactionLine, copiedText, drawnInTurn, fields, isSummaryOnly, kindOf, thoughtLine, turnLine, turnParts, type ChatTurn, type Item,
+  callIsUnderway, callLine, compactionLine, copiedText, drawnInTurn, fields, isSummaryOnly, kindOf, thoughtLine, turnLine, turnParts, type ChatTurn, type Item,
 } from "../../model/turns";
 import { fileLinkPath, Markdown } from "../../render/markdown";
 import { AppView } from "./AppView";
@@ -25,6 +25,7 @@ import { switchNote } from "../../model/switchNote";
 import { continueWithout, keepStopped, sandboxCard } from "../../model/sandboxWords";
 import { OrgPolicyLine } from "../OrgPolicyLine";
 import { memo } from "../../render/memo";
+import { WorkingMark } from "../SessionRow";
 
 /** The text of a message's blocks: text blocks as Markdown, anything else named. */
 export function Blocks({ blocks, text }: { blocks: ContentBlock[] | undefined; text: string }) {
@@ -163,8 +164,10 @@ export function EditDiff({ diff }: { diff: Extract<ToolCallContent, { type: "dif
 }
 
 /** One tool call: its line, and what it did once asked (ToolCallLine). Gone to from elsewhere, opened (#1315). */
-export function ToolCallLine({ call, text, focused = false, background, onClick }: {
+export function ToolCallLine({ call, text, focused = false, background, onClick, marksUnderway = false }: {
   call: ToolCall; text?: string; focused?: boolean; background: readonly BackgroundItem[]; onClick?: () => void;
+  /** In a turn still going, a call still underway has the tool mark in front of its words (#2338). */
+  marksUnderway?: boolean;
 }) {
   const expanded = useSignal(false);
   useEffect(() => {
@@ -176,7 +179,8 @@ export function ToolCallLine({ call, text, focused = false, background, onClick 
     ? " · running in the background" : "";
   const hasDetail = (call.content ?? []).length > 0 || (call.locations ?? []).length > 0
     || call.rawInput !== undefined || call.rawOutput !== undefined;
-  const line = (text ?? callLine(call)) + runsOn;
+  const words = (text ?? callLine(call)) + runsOn;
+  const line = marksUnderway && callIsUnderway(call) ? <LiveCallMarked>{words}</LiveCallMarked> : words;
   const showsDetail = expanded.value;
   return (
     <div class="call">
@@ -504,24 +508,43 @@ function ThoughtLine({ text }: { text: string }) {
 }
 
 /**
+ * A call's words with the tool mark in front while it is underway (LiveCallMarked, #2338): the
+ * mark by the words that say what runs, grey, the line's text height. The mark is hidden from the
+ * screen reader, and the line says "Running" after its words.
+ */
+function LiveCallMarked({ children }: { children: string }) {
+  return <><WorkingMark tool="" />{children}<span class="visually-hidden">, Running</span></>;
+}
+
+/** A running turn's latest call, in one line, until the turn has its outcome (LiveLine). */
+function LiveRunLine({ call }: { call: ToolCall }) {
+  const words = turnLine(call);
+  return <p class="live quiet">{callIsUnderway(call) ? <LiveCallMarked>{words}</LiveCallMarked> : words}</p>;
+}
+
+/**
  * An item of a turn: a call a line of its own, anything else as it is drawn (StepRow). A run of
  * calls is its last until it is clicked (#759); gone to from elsewhere, it is opened with its
  * first call (#1315).
  */
-function StepRow({ item, focused = false, background }: { item: Item; focused?: boolean; background: readonly BackgroundItem[] }) {
+function StepRow({ item, focused = false, background, isLive = false }: {
+  item: Item; focused?: boolean; background: readonly BackgroundItem[];
+  /** Its turn is still going: only then does a call's own status get the mark (#2338). */
+  isLive?: boolean;
+}) {
   const unrolled = useSignal(false);
   useEffect(() => {
     if (focused) unrolled.value = true;
   }, [focused]);
   if (item.kind === "run" && !unrolled.value && !focused && item.calls.length > 1) {
     const last = item.calls[item.calls.length - 1]!;
-    return <div class="run" data-entry={item.id}><ToolCallLine call={last} text={turnLine(last)} background={background} onClick={() => (unrolled.value = true)} /></div>;
+    return <div class="run" data-entry={item.id}><ToolCallLine call={last} text={turnLine(last)} background={background} onClick={() => (unrolled.value = true)} marksUnderway={isLive} /></div>;
   }
   if (item.kind === "run") {
-    return <div class="run" data-entry={item.id}>{item.calls.map((call, i) => <ToolCallLine key={i} call={call} text={turnLine(call)} focused={focused && i === 0} background={background} />)}</div>;
+    return <div class="run" data-entry={item.id}>{item.calls.map((call, i) => <ToolCallLine key={i} call={call} text={turnLine(call)} focused={focused && i === 0} background={background} marksUnderway={isLive} />)}</div>;
   }
   const call = fields(item.entry, "toolCall");
-  if (call) return <ToolCallLine call={call._0} text={turnLine(call._0)} focused={focused} background={background} />;
+  if (call) return <ToolCallLine call={call._0} text={turnLine(call._0)} focused={focused} background={background} marksUnderway={isLive} />;
   return <EntryRow entry={item.entry} />;
 }
 
@@ -578,16 +601,16 @@ export const TurnView = memo(function TurnView({ turn, focusedRun, fetched, fetc
           : <button class="steps-control" onClick={ask}>Load steps</button>) : (
           <>
             {hasEarlier && <button class="steps-control" onClick={() => void loadEarlier(turn)}>Earlier steps</button>}
-            <div class="steps">{steps.map((item) => <StepRow key={item.id} item={item} focused={item.id === focusedRun} background={background} />)}</div>
-            {outcome.map((item) => <StepRow key={item.id} item={item} background={background} />)}
+            <div class="steps">{steps.map((item) => <StepRow key={item.id} item={item} focused={item.id === focusedRun} background={background} isLive={isLive} />)}</div>
+            {outcome.map((item) => <StepRow key={item.id} item={item} background={background} isLive={isLive} />)}
           </>
         )
       ) : (
         <>
           {parts?.live && (parts.live.kind === "run"
-            ? <p class="live quiet">{turnLine(parts.live.calls[parts.live.calls.length - 1]!)}</p>
-            : <StepRow item={parts.live} background={background} />)}
-          {outcome.map((item) => <StepRow key={item.id} item={item} background={background} />)}
+            ? <LiveRunLine call={parts.live.calls[parts.live.calls.length - 1]!} />
+            : <StepRow item={parts.live} background={background} isLive />)}
+          {outcome.map((item) => <StepRow key={item.id} item={item} background={background} isLive={isLive} />)}
         </>
       )}
     </article>
