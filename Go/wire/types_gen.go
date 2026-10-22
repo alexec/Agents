@@ -390,7 +390,7 @@ type AgentsExportRequest struct {
 	Folder *URL `json:"folder,omitzero"`
 }
 
-// agents/import (#1001): the export sent with agents/importUpload. Its agents come back archived, as a restore brings them; one this machine has, or deleted, is skipped.
+// What agents/import takes (#1001): the export sent with agents/importUpload. Its agents come back archived, as a restore brings them; one this machine has, or deleted, is skipped.
 type AgentsImportRequest struct {
 	Upload UUID `json:"upload"`
 }

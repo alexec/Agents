@@ -375,8 +375,8 @@ export interface AgentsExportRequest {
 }
 
 /**
- * agents/import (#1001): the export sent with agents/importUpload. Its agents come back archived,
- * as a restore brings them; one this machine has, or deleted, is skipped.
+ * What agents/import takes (#1001): the export sent with agents/importUpload. Its agents come back
+ * archived, as a restore brings them; one this machine has, or deleted, is skipped.
  */
 export interface AgentsImportRequest {
   upload: UUID;
