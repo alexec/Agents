@@ -210,7 +210,7 @@ private struct FoldAction: ViewModifier {
 
 /// A session's mark in the sidebar (#495, #498), the window's: what it wants, in four
 /// shapes — an orange hand when it needs the person, a spinner in the accent while it
-/// works (#1558), an empty ring once done, read or not (#1323); a numbered list while queued, an
+/// works (#1558), a tick once done, read or not (#1323, #2363); a numbered list while queued, an
 /// hourglass while it waits and a pause mark once stopped (#630).
 /// An orange archive box when it asks to be archived, as it is listed under Needs You
 /// (#817). Archived keeps its `StatusIcon`.
@@ -227,7 +227,7 @@ private struct SessionMark: View {
         case .running: kind = .working
         // Asking to be archived (#584), as the window's mark says it.
         case .finished where agent.asksToArchive: kind = .asksToArchive
-        // Read or unread, one ring (#1323): the bold title alone says unread.
+        // Read or unread, one tick (#1323, #2363): the bold title alone says unread.
         case .finished: kind = .done
         case .stopped where agent.asksToArchive: kind = .asksToArchive
         // In the accent as the rest, not the grey `StatusIcon` (#630).
@@ -258,7 +258,7 @@ private struct SessionMark: View {
             case .paused:
                 Image(systemName: "pause.circle").foregroundStyle(Paper.accent)
             case .done:
-                Image(systemName: "circle").foregroundStyle(Paper.accent)
+                Image(systemName: "checkmark").foregroundStyle(Paper.accent)
             case .asksToArchive:
                 Image(systemName: ArchiveRequestWords.symbol).tinted(.attention)
             }
