@@ -19,7 +19,7 @@ requests and cap notices come to them as cards.
 | Page | What it shows | What an admin can do |
 |---|---|---|
 | **Overview** | Each page of the Console, with one line on what it is for. The Requests card shows how many requests wait. | Open a page. |
-| **People and Groups** | The people, their roles, their machines, the bots and the groups. These are the same sections as Settings ▸ People and Groups. | Invite a person, change a role, make a bot, make a group. |
+| **People and Groups** | The people, their roles and their machines; the bots, in a section of their own; and the groups. These are the same sections as Settings ▸ People, Bots and Groups. | Invite a person, change a role, make a bot, make a group. |
 | **Machines** | Every machine (`console/fleet`): its owner, its state, its version, whether it is out of date, how many agents run on it and when it last listed them. Filters: All, Offline, Out of Date. | Read only. |
 | **Report Policy** | Totals Only, the leads of each group, and a budget a month for each group and for the organisation (`reports/policy`). | Change them and select **Save** (`reports/setPolicy`). |
 | **Team Workflows** | Each bot (`console/teamWorkflows`): its group, its machines online, its spend today against its cap, the workflows it ran in the last 7 days, and the agents that run on its machines now. | **Stop** an agent that runs on a bot's machine (`bots/stopRun`). |

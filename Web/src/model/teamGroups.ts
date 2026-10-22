@@ -14,6 +14,12 @@ export function members(group: Group, people: readonly PersonRow[]): string {
   return group.members.map((id) => people.find((p) => p.id === id)?.name ?? "Someone removed").join(", ");
 }
 
+/** The bots in a group (#2132), which a bot names itself: "review-bot, nightly-bot", or "None". */
+export function groupBots(group: Group, people: readonly PersonRow[]): string {
+  const names = people.filter((p) => p.kind === "bot" && p.group === group.id).map((p) => p.name);
+  return names.length === 0 ? "None" : names.join(", ");
+}
+
 /** "DigitalOcean, Docker", or null with none. */
 export function providersOf(group: Group, all: readonly ProviderSummary[]): string | null {
   const names = all.filter((p) => p.group === group.id).map((p) => p.name);
@@ -54,8 +60,10 @@ export function foot(admin: boolean): string {
 export const removeTitle = (group: Group) => `Remove ${group.name}?`;
 export const removeMessage = "Its people keep their machines. A provider must go to another group first.";
 
-// A bot in Settings ▸ People (#1761): the same words as BotWords in Packages/AgentsKit.
+// A bot in Settings ▸ Bots (#1761, #2132): the same words as BotWords in Packages/AgentsKit.
 export const botWords = {
+  title: "Bots",
+  empty: "No bots yet. A bot runs workflows as its own user, in one group, with a daily cap.",
   make: "Make a Bot…",
   addMachine: "Add a Machine…",
   setCap: "Group and Cap…",

@@ -15,7 +15,7 @@ groups by what they are about: **This app** (**Appearance** and **Sidebar**: how
 draws); **Machines** (**Machines**, **Agent Runtimes**, **Agent Configuration**, **Cost**,
 **Resources** and **On Every Machine**: the machines that run your agents); and **Control
 plane** (**Account** and **Sign-ins** first, shown also with no control plane; then
-**People**, **Groups**, **Channels**, **Sign-In**, **Workspace Providers**, **Clients** and
+**People**, **Bots**, **Groups**, **Channels**, **Sign-In**, **Workspace Providers**, **Clients** and
 **Overview**). The web page calls the first group **This browser**. **Machines** lists every
 machine, with **This Mac**'s own settings on a page of its own. **Agent Runtimes** and **Agent Configuration** are headings: each runtime
 has its own page under **Agent Runtimes**, and Agent Configuration's pages (Overview,

@@ -11,6 +11,9 @@ import UIKit
 /// a member sees only themselves, read only. With one person it shows them as
 /// "You · Local owner · Admin", with Invite a Person….
 ///
+/// With `kind: .bot` it is Settings ▸ Bots (#2132), a pane of its own: each bot's group, cap
+/// and machines, Make a Bot…, and the bots stopped at a cap.
+///
 /// One view for the Mac's Settings pane and the Remote's Settings page (the web page's is
 /// `Web/src/views/People.tsx`).
 struct PeoplePane: View {
@@ -18,6 +21,8 @@ struct PeoplePane: View {
     let control: DaemonClient?
     /// The people and groups this client keeps, loaded once per change (#2055).
     let people: PeopleState
+    /// People, or bots (#2132).
+    var kind: DaemonAPI.PersonRow.Kind = .person
 
     @State private var problem: String?
     @State private var isInviting = false
@@ -36,6 +41,8 @@ struct PeoplePane: View {
     }
 
     private var list: DaemonAPI.PeopleList? { people.list }
+    /// The rows of this pane's kind.
+    private var shown: [DaemonAPI.PersonRow] { list?.people.filter { $0.kind == kind } ?? [] }
     /// The groups a bot may be in (#1761).
     private var groups: [DaemonAPI.Group] { people.groups }
 
@@ -49,7 +56,7 @@ struct PeoplePane: View {
                 .paperListRow()
             }
             // Each bot stopped at a cap, for an admin (#1761, #2073).
-            if list?.admin == true, !people.capped.isEmpty {
+            if kind == .bot, list?.admin == true, !people.capped.isEmpty {
                 Section {
                     ForEach(people.capped, id: \.user) { reached in
                         Text(BotWords.capReached(reached)).appText(.supporting).tinted(.attention)
@@ -59,7 +66,13 @@ struct PeoplePane: View {
                 .paperListRow()
             }
             if let list {
-                ForEach(list.people) { person in
+                if shown.isEmpty {
+                    Text(kind == .bot ? BotWords.empty : "No people yet.")
+                        .appText(.supporting).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .paperListRow()
+                }
+                ForEach(shown) { person in
                     PersonSection(person: person, admin: list.admin, groups: groups,
                                   setRole: { role in Task { await setRole(person, role) } },
                                   remove: { removing = person },
@@ -71,17 +84,20 @@ struct PeoplePane: View {
                 }
                 Section {
                     if list.admin {
-                        Button("Invite a Person…") { isInviting = true }
-                        // A bot runs the team's workflows (#1761).
-                        Button(BotWords.make) { botSheet = BotSheetItem(bot: nil) }
+                        if kind == .bot {
+                            // A bot runs the team's workflows (#1761).
+                            Button(BotWords.make) { botSheet = BotSheetItem(bot: nil) }
+                        } else {
+                            Button("Invite a Person…") { isInviting = true }
+                        }
                     }
                 } footer: {
-                    Text(PeopleWords.foot(admin: list.admin))
+                    Text(kind == .bot ? BotWords.foot : PeopleWords.foot(admin: list.admin))
                         .appText(.fine)
                         .foregroundStyle(.secondary)
                 }
                 .paperListRow()
-                if list.admin {
+                if list.admin, kind == .person {
                     Section {
                         Button("Rotate Control Key…") { isRotating = true }
                         if rotated {

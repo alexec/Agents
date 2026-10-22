@@ -17,7 +17,7 @@ import { fromWireDate } from "../protocol/dates";
 import { ago } from "../model/connectorSetup";
 import { missingWords, stateWords, versionWords } from "../model/capabilities";
 import { ReportsPage } from "./Reports";
-import { PeopleSection } from "./People";
+import { BotsSection, PeopleSection } from "./People";
 import { GroupsSection } from "./Groups";
 import { ReportPolicyPage, policyNotSaved } from "./ConsolePolicy";
 import { AuditPage, RequestsPage, requestCount } from "./ConsoleRecords";
@@ -102,11 +102,13 @@ function ConsoleSection({ store, section, down }: { store: Store; section: Secti
   }
 }
 
-/** M2: who belongs, their roles and machines, bots and groups. The same sections as Settings ▸ People and Groups. */
+/** M2: who belongs, their roles and machines, bots and groups. The same sections as Settings ▸ People, Bots and Groups (#2132). */
 function PeoplePage({ store, down }: { store: Store; down: boolean }) {
   return (
     <>
       <PeopleSection store={store} down={down} />
+      {/* The bots apart from the people, as Settings has them (#2132). */}
+      <BotsSection store={store} down={down} />
       <GroupsSection store={store} down={down} />
     </>
   );
