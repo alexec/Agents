@@ -43,6 +43,9 @@ final class VoiceMode {
         didSet { speaker.isMuted = isWalked }
     }
 
+    /// Sends an answer to a form, and says whether it went.
+    typealias Answer = (ElicitationRequest, [String: JSONValue]) async -> Bool
+
     /// How long a pause is before the words go (#1792: speech within 2.5 s joins them).
     static let pause: Duration = .milliseconds(2_500)
 
@@ -57,8 +60,8 @@ final class VoiceMode {
     /// since: a turn has ended only once both have moved on.
     private var turnAtSend: UUID?
     private var sawWork = false
-    /// The turn last spoken, so a reply is said once.
-    private var spokenTurn: UUID?
+    /// The reply last spoken and its turn, so a reply is said once.
+    private var spoken: (turn: UUID, text: String)?
     /// The chat's last turn, as last seen.
     private var latestTurn: UUID?
     /// Set when voice mode turns on, until the chat is first seen.
@@ -111,6 +114,10 @@ final class VoiceMode {
         heard = ""
         saying = nil
         isWaitingForReply = false
+        asking = nil
+        confirming?.cancel()
+        confirming = nil
+        waiting = nil
         Task { await voice.unload() }
     }
 
@@ -127,8 +134,18 @@ final class VoiceMode {
     func dismissProblem() { problem = nil }
 
     /// What the chat shows now. The chat calls this as its agent and items change.
-    func observe(_ agent: Agent, items: [TranscriptItem]) {
+    func observe(_ agent: Agent, items: [TranscriptItem], question: ElicitationRequest? = nil,
+                 answer: Answer? = nil) {
         guard agent.id == agentID, phase != .off else { return }
+        waiting = question
+        if let answer { self.answer = answer }
+        // Answered on the screen, or withdrawn: it is not asked any more.
+        if let asking, asking.request.id != question?.id {
+            self.asking = nil
+            confirming?.cancel()
+            confirming = nil
+        }
+        defer { askIfWaiting() }
         if agent.state == .archived {
             turnOff()
             return
@@ -137,7 +154,7 @@ final class VoiceMode {
         latestTurn = last?.id
         if needsBaseline {
             needsBaseline = false
-            spokenTurn = last?.id
+            spoken = last.map { ($0.id, TurnParts($0.items, isLive: false).replyText) }
         }
         guard isWaitingForReply else { return }
         let working = agent.state == .running || agent.state == .starting || agent.state == .queued
@@ -145,16 +162,18 @@ final class VoiceMode {
             sawWork = true
             return
         }
-        guard let turn = last, turn.id != spokenTurn else { return }
+        guard let turn = last else { return }
         let parts = TurnParts(turn.items, isLive: false)
+        // A reply not said yet: a new turn, or the same one going on after an answer.
+        guard turn.id != spoken?.turn || parts.replyText != spoken?.text else { return }
         // Ended: seen working since the send, or a new turn that already has its reply.
         guard sawWork || (turn.id != turnAtSend && !parts.replyText.isEmpty) else { return }
-        spokenTurn = turn.id
+        spoken = (turn.id, parts.replyText)
         isWaitingForReply = false
         sawWork = false
-        let asks = agent.state == .waitingOnUser
+        // A turn that stops to ask with no form (Grok's way): its reply is the question.
+        if agent.state == .waitingOnUser, question == nil { sound(.question) }
         let sentences = Speakable.spoken(parts.replyText)
-        if asks { sound(.question) }
         guard !sentences.isEmpty else { return }
         // Mid-sentence, the person goes first: the reply is said once their words have gone.
         if !heard.isEmpty { pendingReply = sentences; return }
@@ -164,12 +183,84 @@ final class VoiceMode {
     /// A reply held while the person was still talking.
     private var pendingReply: [String]?
 
+    // MARK: Questions
+
+    /// The form the agent waits on, as last seen, and how to answer it.
+    private var waiting: ElicitationRequest?
+    private var answer: Answer?
+    /// The question being asked by voice, and how many answers missed.
+    private var asking: (request: ElicitationRequest, spoken: SpokenQuestion, misses: Int)?
+    /// Questions already read out, so each is read once.
+    private var asked: Set<UUID> = []
+    /// "Sending: File.", and two seconds to say no.
+    private var confirming: Task<Void, Never>?
+    private static let confirmFor: Duration = .seconds(2)
+
+    /// Whether a question is being answered by voice: the strip says so.
+    var isAsking: Bool { asking != nil }
+
+    /// Reads out a question that waits, once, when nothing else is being said or heard.
+    private func askIfWaiting() {
+        guard phase == .listening, heard.isEmpty, asking == nil, confirming == nil,
+              let question = waiting, !asked.contains(question.id) else { return }
+        asked.insert(question.id)
+        sound(.question)
+        guard let spoken = SpokenQuestion(question) else {
+            speak([SpokenQuestion.needsTheScreen])
+            return
+        }
+        asking = (question, spoken, 0)
+        speak(spoken.sentences)
+    }
+
+    /// The person's words, as the answer to the question being asked.
+    private func answerHeard(_ words: String) {
+        guard var asking else { return }
+        guard let choice = asking.spoken.choice(for: words) else {
+            asking.misses += 1
+            if asking.misses >= 2 {
+                self.asking = nil
+                speak(["It stays on the screen."])
+            } else {
+                self.asking = asking
+                speak([SpokenQuestion.notCaught])
+            }
+            return
+        }
+        let title = SpokenQuestion.spokenTitle(choice.title)
+        speak(["Sending: \(title)."]) { [weak self] in
+            self?.confirm(asking.request, property: asking.spoken.property, value: choice.value)
+        }
+    }
+
+    /// Listens for two seconds for a "no", then sends the answer.
+    private func confirm(_ request: ElicitationRequest, property: String, value: String) {
+        confirming = Task { [weak self] in
+            try? await Task.sleep(for: Self.confirmFor)
+            guard let self, !Task.isCancelled else { return }
+            confirming = nil
+            self.asking = nil
+            heard = ""
+            pauseTimer?.cancel()
+            let sent = await answer?(request, [property: .string(value)]) ?? false
+            if sent {
+                // The turn goes on, and its reply is said when it ends.
+                isWaitingForReply = true
+                sawWork = false
+                turnAtSend = latestTurn
+            } else {
+                sound(.problem)
+            }
+        }
+    }
+
     // MARK: Listening
 
     private func listen() {
         guard agentID != nil else { return }
         heard = ""
         phase = .listening
+        defer { askIfWaiting() }
         guard !isWalked else { return }
         sound(.listening)
         dictation.start(in: "", selection: nil, vocabulary: vocabulary) { [weak self] text, _ in
@@ -204,6 +295,13 @@ final class VoiceMode {
     private func heardChanged(_ text: String) {
         heard = text
         pauseTimer?.cancel()
+        if confirming != nil, SpokenQuestion.isNo(text) {
+            confirming?.cancel()
+            confirming = nil
+            dictation.stop()
+            if let asking { speak(["Not sent."] + asking.spoken.sentences) }
+            return
+        }
         guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
         pauseTimer = Task { [weak self] in
             try? await Task.sleep(for: Self.pause)
@@ -215,6 +313,13 @@ final class VoiceMode {
     private func sendHeard() async {
         let words = heard.trimmingCharacters(in: .whitespacesAndNewlines)
         guard phase == .listening, !words.isEmpty, let send else { return }
+        if asking != nil, confirming == nil {
+            dictation.stop()
+            answerHeard(words)
+            return
+        }
+        // Words while an answer waits to go are not a prompt.
+        guard confirming == nil else { return }
         dictation.stop()
         phase = .sending
         let agent = agentID
@@ -238,7 +343,7 @@ final class VoiceMode {
 
     // MARK: Speaking
 
-    private func speak(_ sentences: [String]) {
+    private func speak(_ sentences: [String], then: (() -> Void)? = nil) {
         pauseTimer?.cancel()
         dictation.stop()
         phase = .speaking
@@ -256,6 +361,7 @@ final class VoiceMode {
             guard !Task.isCancelled, phase == .speaking else { return }
             saying = nil
             listen()
+            then?()
         }
     }
 
