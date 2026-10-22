@@ -56,7 +56,12 @@ markdown_extensions:
   - toc:
       permalink: true
   - pymdownx.details
-  - pymdownx.superfences
+  # Mermaid fences drawn as diagrams (the compliance pack's data flow, #1001).
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
   - pymdownx.tabbed:
       alternate_style: true
 
@@ -165,6 +170,12 @@ nav:
       - explanation/why-agents.md
       - explanation/control-plane.md
       - explanation/people-and-machines.md
+      - Compliance pack:
+          - explanation/compliance/index.md
+          - explanation/compliance/data-flow.md
+          - explanation/compliance/sub-processors.md
+          - explanation/compliance/security-overview.md
+          - explanation/compliance/data-and-retention.md
       - explanation/window-and-daemon.md
       - explanation/architecture.md
       - explanation/versions.md
