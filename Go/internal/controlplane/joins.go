@@ -34,6 +34,8 @@ const (
 	// joinsOpen is how many requests may wait at once, and joinsPerSource from one address.
 	joinsOpen      = 50
 	joinsPerSource = 5
+	// joinsPerPerson requests may name one person at once (#2150).
+	joinsPerPerson = 10
 	// joinKept is how long an ended request stays, so the machine hears how it ended.
 	joinKept = time.Hour
 )
@@ -178,21 +180,45 @@ func (j *joins) ask(ctx context.Context, a wire.HostJoinAsk, from string) (*wire
 	if err != nil {
 		return nil, err
 	}
-	waiting, fromHere := 0, 0
+	// By address (an IPv6 /64 as one) and by person named, so neither a few addresses nor
+	// one name holds every place (#2150).
+	person := j.person(deref(a.Person))
+	waiting, forThem, counts, oldest := 0, 0, map[string]int{}, map[string]joinRecord{}
 	for _, r := range all {
 		if j.open(r) {
 			waiting++
-			if r.From == from {
-				fromHere++
+			key := keyOf(r.From)
+			if counts[key] == 0 {
+				oldest[key] = r
+			}
+			counts[key]++
+			if person != "" && r.Person == person {
+				forThem++
 			}
 		}
 	}
-	if waiting >= joinsOpen || fromHere >= joinsPerSource {
-		return nil, fail(notPermitted, "Too many machines are waiting to join. Try again in a few minutes.")
+	busy := fail(notPermitted, "Too many machines are waiting to join. Try again in a few minutes.")
+	if counts[keyOf(from)] >= joinsPerSource || forThem >= joinsPerPerson {
+		j.s.refusals.note("join", keyOf(from), "refused a request to join from "+keyOf(from)+": too many are waiting")
+		return nil, busy
+	}
+	if waiting >= joinsOpen {
+		// Every place is taken: the oldest of the address that holds the most ends first.
+		heavy := heaviest(counts)
+		if heavy == "" {
+			j.s.refusals.note("join", "", "refused a request to join from "+keyOf(from)+": every place is taken")
+			return nil, busy
+		}
+		old := oldest[heavy]
+		if err := j.end(ctx, old.ID, "expired"); err != nil {
+			return nil, busy
+		}
+		j.tell(old, "control/joinDecided", wire.JoinDecided{Request: old.ID, Result: "expired"})
+		j.s.refusals.note("join-dropped", "", "ended the oldest request to join from "+heavy+": every place was taken")
 	}
 	now := records.At(j.now())
 	r := joinRecord{ID: newJoinID(), Code: newJoinCode(), Name: name, Platform: a.Platform, Version: deref(a.Version),
-		PublicKey: a.PublicKey, MachineID: deref(a.MachineID), Person: j.person(deref(a.Person)), From: from,
+		PublicKey: a.PublicKey, MachineID: deref(a.MachineID), Person: person, From: from,
 		Created: now, Expires: records.At(now.Add(joinLifetime))}
 	data, err := records.Encode(r)
 	if err != nil {
@@ -332,6 +358,16 @@ func (j *joins) decide(ctx context.Context, id, user string, approve bool) (*wir
 	j.tell(*r, "control/joinDecided", wire.JoinDecided{Request: r.ID, Result: r.Result})
 	j.s.log("machine " + r.Name + " joined as " + host + " by approval")
 	return &wire.JoinApproved{Host: wire.HostID(host)}, nil
+}
+
+// end ends an open request with a result, as a decision would.
+func (j *joins) end(ctx context.Context, id, result string) error {
+	r, etag, err := j.read(ctx, id)
+	if err != nil || r == nil {
+		return fail(storeUnavailable, "The request could not be read.")
+	}
+	r.Result = result
+	return j.write(ctx, *r, etag)
 }
 
 func (j *joins) write(ctx context.Context, r joinRecord, etag string) error {

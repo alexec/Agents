@@ -167,6 +167,11 @@ type Service struct {
 	reads readGate
 	// What each source address may still try before it proves a key (P3).
 	sources *sources
+	// The downloads' rate for each address, the most sockets open at once, and the log of
+	// what was refused for either (#2150).
+	downloads   *addressRates
+	socketsMost int
+	refusals    *refusalLog
 	// The host/clients each host here was told last (#1528).
 	told toldClients
 	// Machines asking to join with no code (#994).
@@ -218,6 +223,7 @@ func New(cfg Config) (*Service, error) {
 		records: records.New(cfg.Store), started: time.Now(), desk: notices.NewDesk(), phase: &phaseBox{phase: phaseServing}, sockets: map[*Conn]bool{}, stop: make(chan struct{}),
 		reads: readGate{every: readAgainEvery}}
 	s.sources = newSources(cfg.TrustedProxies, s.log)
+	s.downloads, s.socketsMost, s.refusals = newAddressRates(), socketsMost, newRefusalLog(s.log)
 	if cfg.Push != nil {
 		s.pushes = newPushes(s, cfg.Push)
 	}
@@ -358,7 +364,7 @@ func (s *Service) Start(ctx context.Context) (int, error) {
 	}
 	port := listeners[0].Addr().(*net.TCPAddr).Port
 	for _, ln := range listeners {
-		srv := &http.Server{Handler: mux, ReadHeaderTimeout: 10 * time.Second, ErrorLog: nil}
+		srv := timeouts(&http.Server{Handler: mux, ReadHeaderTimeout: 10 * time.Second, ErrorLog: nil})
 		s.servers = append(s.servers, srv)
 		if s.cfg.TLS != nil {
 			go srv.Serve(tls.NewListener(ln, s.cfg.TLS))
@@ -897,6 +903,8 @@ func (s *Service) serveHTTP(w http.ResponseWriter, r *http.Request) {
 		} else {
 			plain(w, http.StatusServiceUnavailable, "the store can't be reached\n")
 		}
+	case (path == "/v1/install.sh" || strings.HasPrefix(path, "/v1/servers/") || strings.HasPrefix(path, "/v1/toolsets/")) && !s.mayDownload(r):
+		plain(w, http.StatusTooManyRequests, "too many downloads from this address; try again in a minute\n")
 	case path == "/v1/install.sh":
 		w.Header().Set("Content-Type", "text/x-shellscript")
 		w.Write([]byte(InstallScript))
@@ -907,6 +915,7 @@ func (s *Service) serveHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		w.Header().Set("Content-Type", "application/octet-stream")
+		http.NewResponseController(w).SetWriteDeadline(time.Now().Add(downloadWriteTimeout))
 		w.Write(data)
 	case strings.HasPrefix(path, "/v1/toolsets/"):
 		data, ok := toolsetFile(strings.TrimPrefix(path, "/v1/toolsets/"), s.cfg.ToolsetFolder)
@@ -921,8 +930,15 @@ func (s *Service) serveHTTP(w http.ResponseWriter, r *http.Request) {
 	case path == "/v1/connect":
 		// Refused before the socket opens, so a refused source costs a reply and no more.
 		source := s.sources.of(r)
+		if s.full() {
+			s.refusals.note("full", "", fmt.Sprintf("refused a connection from %s: %d sockets are open, the most this copy holds", source, s.socketsMost))
+			w.Header().Set("Retry-After", "60")
+			plain(w, http.StatusServiceUnavailable, "this control plane has too many connections; try again in a minute\n")
+			return
+		}
 		proved, ok := s.sources.enter(source)
 		if !ok {
+			w.Header().Set("Retry-After", "60")
 			plain(w, http.StatusTooManyRequests, "too many tries from this address; try again in a minute\n")
 			return
 		}
@@ -933,6 +949,8 @@ func (s *Service) serveHTTP(w http.ResponseWriter, r *http.Request) {
 		if s.page != nil && s.page.FromPage(r.Header) {
 			webOrigin = s.page.Origin()
 		}
+		// A socket stays open as long as it is used: the listener's timeouts are for requests.
+		noDeadlines(w)
 		ws, err := websocket.Accept(w, r, &websocket.AcceptOptions{InsecureSkipVerify: true})
 		if err != nil {
 			proved(false)
@@ -951,6 +969,23 @@ func plain(w http.ResponseWriter, status int, text string) {
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.WriteHeader(status)
 	w.Write([]byte(text))
+}
+
+// full says as many sockets are open as this copy holds (#2150).
+func (s *Service) full() bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return len(s.sockets) >= s.socketsMost
+}
+
+// mayDownload takes one of the address's downloads, and logs a refusal once a minute.
+func (s *Service) mayDownload(r *http.Request) bool {
+	source := s.sources.of(r)
+	if s.downloads.allow(source) {
+		return true
+	}
+	s.refusals.note("download", keyOf(source), "refused downloads from "+keyOf(source)+": over the rate")
+	return false
 }
 
 // adopt keeps a socket so Stop can close it.
@@ -1144,6 +1179,15 @@ func (s *Service) acceptVia(conn *Conn, webOrigin string, proved func(failed boo
 		refuse(controllink.Refuse(controllink.Unknown))
 		return
 	}
+	// A client key, or a person, holding as many sockets as it may (#2150): not a verdict
+	// on it, so it tries again later, and logged once a minute.
+	if client != nil && s.router.Crowded(client.ID) {
+		settle(false)
+		conn.SendNow(controllink.Message{Refused: controllink.Unavailable}.Line())
+		s.refusals.note("crowded", client.ID, fmt.Sprintf("refused a connection from %s: client %s holds as many sockets as it may", conn.Remote, client.ID))
+		conn.Close()
+		return
+	}
 	// A page a host carries (#1480): from a host that runs agents and whose uplink is up,
 	// for a port it can listen on. Its origin is http://localhost:<page>, never anything
 	// else, and the page proves itself to this control plane after the ok, bound to it.
@@ -1207,6 +1251,14 @@ func (s *Service) acceptVia(conn *Conn, webOrigin string, proved func(failed boo
 	if phase == phaseForwarding && (id.Kind == 'c' || id.Kind == 'h') {
 		conn.Close()
 		return
+	}
+	// The largest message by what proved a key (#2150): a host or a copy carries files and
+	// records, a client its largest upload, and a code or a page's exchange little.
+	switch id.Kind {
+	case 'c':
+		conn.SetReadLimit(clientMessageMost)
+	case 'h', 'x':
+		conn.SetReadLimit(peerMessageMost)
 	}
 	switch id.Kind {
 	case 'c':

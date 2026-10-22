@@ -78,6 +78,13 @@ func TestNoRequestReachesAnotherUsersMachineAtSpecScale(t *testing.T) {
 			t.Fatalf("%s lists %v, owns %v", who.id, got, want)
 		}
 	}
+	// Every method at every machine, as fast as it goes: far past a client's rate (#2150), so
+	// each line comes a second after the last, as far as the rates can tell.
+	clock := time.Now()
+	p.s.router.rates.now = func() time.Time {
+		clock = clock.Add(time.Second)
+		return clock
+	}
 	for _, who := range everyone {
 		for _, other := range everyone {
 			for _, h := range other.machines {

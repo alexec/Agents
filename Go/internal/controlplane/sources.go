@@ -21,6 +21,10 @@ const (
 	waitingAllowed = 50
 	// sourcesHeld is how many addresses the table holds; past it, an idle one goes.
 	sourcesHeld = 4096
+	// unprovenMost sockets at once, from every address, that have not proved a key yet: the
+	// cap that holds when an attacker turns over more addresses than the table holds
+	// (#2150).
+	unprovenMost = 512
 )
 
 // sources is the per-source table: a socket from an address that failed to prove a key
@@ -34,6 +38,8 @@ type sources struct {
 
 	mu    sync.Mutex
 	table map[string]*source
+	// waiting is every socket still to prove a key, counted in the table or not.
+	waiting int
 }
 
 type source struct {
@@ -97,6 +103,9 @@ func (t *sources) enter(addr string) (proved func(failed bool), ok bool) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	now := t.now()
+	if t.waiting >= unprovenMost {
+		return nil, false
+	}
 	s := t.table[key]
 	if s == nil {
 		if len(t.table) >= sourcesHeld {
@@ -104,8 +113,17 @@ func (t *sources) enter(addr string) (proved func(failed bool), ok bool) {
 		}
 		if len(t.table) >= sourcesHeld {
 			// Every address held is busy: this one goes uncounted rather than refused, so
-			// many addresses can't shut out one that has done nothing.
-			return func(bool) {}, true
+			// many addresses can't shut out one that has done nothing. It still counts
+			// towards unprovenMost.
+			t.waiting++
+			var once sync.Once
+			return func(bool) {
+				once.Do(func() {
+					t.mu.Lock()
+					t.waiting--
+					t.mu.Unlock()
+				})
+			}, true
 		}
 		s = &source{since: now}
 		t.table[key] = s
@@ -114,6 +132,7 @@ func (t *sources) enter(addr string) (proved func(failed bool), ok bool) {
 		return nil, false
 	}
 	s.waiting++
+	t.waiting++
 	var once sync.Once
 	return func(failed bool) { once.Do(func() { t.leave(key, s, failed) }) }, true
 }
@@ -122,6 +141,7 @@ func (t *sources) leave(key string, s *source, failed bool) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	s.waiting--
+	t.waiting--
 	if !failed {
 		return
 	}

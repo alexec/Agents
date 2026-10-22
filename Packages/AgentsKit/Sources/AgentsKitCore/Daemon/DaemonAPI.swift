@@ -2666,6 +2666,9 @@ public enum DaemonAPI {
         /// person (#1763, R14): it cannot tell people apart, so it is refused with "Update
         /// Agents to join this team". Never said to a build that has `client.team/1`.
         public static let updateToJoinTeam = -32074
+        /// A client over its rate at the control plane (#2150): the request was not run. The
+        /// socket stays open; wait a moment and try again.
+        public static let tooManyRequests = -32075
         /// `presence/report` from a connection with no identity: not a window and not a
         /// device the bridge opened on behalf of. The surface is taken from the
         /// connection and never from the parameters, so there is nothing to report as.

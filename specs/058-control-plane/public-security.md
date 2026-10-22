@@ -172,6 +172,34 @@ capped (`maxMessage`), and the listen backlog is 256. Caddy's stock image has no
 - **P5. Forwarding is public for 30 days.** The old address keeps answering any member
   that proves itself, and only with the new list. That's no more than it gave before the
   move. When the old address is a `.local` name it isn't public anyway.
+- **P6. Limits after a peer has paired (#2150).** *Go, 2026-10-21: fixed.* The numbers
+  are in `limits.go`; `limits_test.go` tests each one.
+  - **Timeouts.** Both listeners (the TLS one and the web listener) have `ReadTimeout`
+    30 s, `WriteTimeout` 60 s, `IdleTimeout` 2 min and `MaxHeaderBytes` 64 KiB. A
+    WebSocket clears the read and write deadlines before it opens, so the timeouts close
+    a slow request, never a socket in use. A download of a server's build has 10 min to
+    be written.
+  - **Sockets.** A copy holds at most 1,024 WebSockets. Past that, `/v1/connect` is
+    answered 503 before the socket opens. A client key holds at most 8 sessions, and one
+    person's clients 32. Past either, the exchange is refused `unavailable`, and the
+    client tries again with its back-off. At most 512 sockets from all addresses wait for
+    `auth` at once, also those that the full table of addresses does not count.
+  - **Message size.** Until a socket proves a key, it reads messages of 64 KiB at most.
+    After that, a client reads 40 MiB (its largest real message is a 25 MiB drop box
+    file as base64), and a host or a copy reads 64 MiB.
+  - **Rates.** Each client key has a token bucket: 100 lines a second (burst 1,000) and
+    8 MiB a second (burst 96 MiB). It also has a smaller bucket for the costly methods
+    (reports, audit, the Console, installs, pairing codes, rotation): 2 a second, burst
+    20. A request over a rate is answered `tooManyRequests` (-32075), and the socket stays
+    open. Hosts and bots' machines are hosts, so these rates do not apply to them.
+  - **Join and sign-in places.** Each address (an IPv6 /64 as one) holds 5. One person
+    named holds 10 requests to join. When all 50 places are taken, the oldest request of
+    the address that holds the most ends ("expired"; a closed socket for a sign-in) before a
+    newcomer is turned away.
+  - **Downloads.** `install.sh`, `/v1/servers/*` and `/v1/toolsets/*` allow 30 a minute
+    from each address. Past that, they are answered 429.
+  - **Logs.** Each kind of refusal is logged once a minute for each source, with a count
+    of the refusals that were not logged.
 
 ## 4. Logs and secrets
 

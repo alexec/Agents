@@ -23,7 +23,8 @@ type Conn struct {
 const queued = 8192
 
 func newConn(ws *websocket.Conn, remote string) *Conn {
-	ws.SetReadLimit(64 << 20)
+	// Until it proves a key; then by what proved one (#2150).
+	ws.SetReadLimit(unprovenMessageMost)
 	c := &Conn{ws: ws, out: make(chan string, queued), done: make(chan struct{}), Remote: remote}
 	go c.write()
 	go c.ping()
@@ -115,6 +116,9 @@ func (c *Conn) CloseWith(code websocket.StatusCode, reason string) {
 		go c.ws.Close(code, reason)
 	})
 }
+
+// SetReadLimit is the largest message the socket reads from now on.
+func (c *Conn) SetReadLimit(n int64) { c.ws.SetReadLimit(n) }
 
 // Done is closed when the socket is.
 func (c *Conn) Done() <-chan struct{} { return c.done }
